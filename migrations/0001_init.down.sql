@@ -1,0 +1,7 @@
+﻿DROP TABLE IF EXISTS transcoding_jobs;
+DROP TABLE IF EXISTS episodes;
+DROP TABLE IF EXISTS seasons;
+DROP TABLE IF EXISTS series;
+DROP TABLE IF EXISTS user_video_actions;
+DROP TABLE IF EXISTS video_tags;
+DROP TABLE IF EXISTS videos;
