@@ -136,3 +136,18 @@
   - `go test ./...` passed (with local `GOCACHE`).
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 13:10] Fix duplicate migration constraint on one-click startup
+- Type: `implementation`
+- Summary:
+  - Fixed `0002_auth.up.sql` to make FK and column changes idempotent.
+  - Updated `scripts/dev-up.sh` to use `schema_migrations` and skip already-applied migrations.
+  - This prevents repeated startup from failing with `constraint ... already exists`.
+- Changed Files:
+  - `migrations/0002_auth.up.sql`
+  - `scripts/dev-up.sh`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed (with local `GOCACHE`).
+- Rollback:
+  - Revert the commit containing this feature entry.
