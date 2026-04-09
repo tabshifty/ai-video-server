@@ -15,6 +15,7 @@ type Config struct {
 	PostgresDSN         string
 	RedisAddr           string
 	RedisPassword       string
+	ServerLogPath       string
 	JWTSecret           string
 	StorageRoot         string
 	PosterStoragePath   string
@@ -38,6 +39,7 @@ func Load() (Config, error) {
 		PostgresDSN:         os.Getenv("POSTGRES_DSN"),
 		RedisAddr:           getEnv("REDIS_ADDR", "127.0.0.1:6379"),
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
+		ServerLogPath:       getEnv("SERVER_LOG_PATH", "./.run/server.log"),
 		JWTSecret:           os.Getenv("JWT_SECRET"),
 		StorageRoot:         getEnv("STORAGE_ROOT", "./storage"),
 		PosterStoragePath:   getEnv("POSTER_STORAGE_PATH", "./storage/posters"),

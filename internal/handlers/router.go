@@ -3,6 +3,8 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -22,33 +24,47 @@ import (
 type API struct {
 	repo          *repository.VideoRepository
 	uploadSvc     *services.UploadService
+	chunkUpload   *services.ChunkUploadService
 	recSvc        *services.RecommendService
 	scrapeSvc     *services.ScraperService
 	appSvc        *services.AppService
 	enqueuer      *queue.Enqueuer
 	logger        *slog.Logger
 	redis         *redis.Client
+	redisAddr     string
+	redisPassword string
+	asynqQueue    string
 	jwtSecret     string
 	accessTTL     time.Duration
 	refreshTTL    time.Duration
 	maxVideoSize  int64
+	storageRoot   string
+	uploadTempDir string
+	serverLogPath string
 	enableSwagger bool
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, jwtSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, enableSwagger bool) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath string, enableSwagger bool) *API {
 	return &API{
 		repo:          repo,
 		uploadSvc:     uploadSvc,
+		chunkUpload:   chunkUpload,
 		recSvc:        recSvc,
 		scrapeSvc:     scrapeSvc,
 		appSvc:        appSvc,
 		enqueuer:      enqueuer,
 		logger:        logger,
 		redis:         redisClient,
+		redisAddr:     redisAddr,
+		redisPassword: redisPassword,
+		asynqQueue:    asynqQueue,
 		jwtSecret:     jwtSecret,
 		accessTTL:     accessTTL,
 		refreshTTL:    refreshTTL,
 		maxVideoSize:  maxVideoSize,
+		storageRoot:   storageRoot,
+		uploadTempDir: uploadTempDir,
+		serverLogPath: serverLogPath,
 		enableSwagger: enableSwagger,
 	}
 }
@@ -64,6 +80,10 @@ func (a *API) Register(r *gin.Engine) {
 			auth.POST("/logout", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.LogoutAuth)
 		}
 		v1.POST("/upload/check", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadCheck)
+		v1.POST("/upload/init", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadInit)
+		v1.PUT("/upload/chunk", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadChunk)
+		v1.POST("/upload/complete", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadComplete)
+		v1.DELETE("/upload/session/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadAbort)
 		v1.POST("/upload", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.Upload)
 		v1.POST("/scrape", a.Scrape)
 		v1.GET("/short/random", a.RandomShort)
@@ -85,6 +105,18 @@ func (a *API) Register(r *gin.Engine) {
 
 		admin := v1.Group("/admin", middleware.AuthMiddleware(a.jwtSecret, a.redis), middleware.AdminRequired())
 		{
+			admin.GET("/events/ws", a.AdminEventsStream)
+			admin.GET("/stats", a.AdminStats)
+			admin.GET("/videos", a.AdminVideos)
+			admin.GET("/videos/:id", a.AdminVideoDetail)
+			admin.PUT("/videos/:id", a.AdminUpdateVideo)
+			admin.DELETE("/videos/:id", a.AdminDeleteVideo)
+			admin.POST("/videos/:id/retranscode", a.AdminRetranscodeVideo)
+			admin.GET("/users", a.AdminUsers)
+			admin.PUT("/users/:id/role", a.AdminUpdateUserRole)
+			admin.GET("/tasks", a.AdminTasks)
+			admin.POST("/system/cleanup", a.AdminSystemCleanup)
+			admin.GET("/system/logs", a.AdminSystemLogs)
 			admin.POST("/scrape/preview", a.AdminScrapePreview)
 			admin.PUT("/scrape/confirm", a.AdminScrapeConfirm)
 		}
@@ -100,6 +132,26 @@ func (a *API) Register(r *gin.Engine) {
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Serve built admin frontend from Go server at /admin.
+	adminDist := filepath.Join("admin-web", "dist")
+	if st, err := os.Stat(adminDist); err == nil && st.IsDir() {
+		r.Static("/admin/assets", filepath.Join(adminDist, "assets"))
+		r.GET("/admin", func(c *gin.Context) {
+			c.File(filepath.Join(adminDist, "index.html"))
+		})
+		r.GET("/admin/*path", func(c *gin.Context) {
+			reqPath := strings.TrimSpace(c.Param("path"))
+			if reqPath != "" && reqPath != "/" {
+				target := filepath.Join(adminDist, reqPath)
+				if st, err := os.Stat(target); err == nil && !st.IsDir() {
+					c.File(target)
+					return
+				}
+			}
+			c.File(filepath.Join(adminDist, "index.html"))
+		})
+	}
 }
 
 func parsePage(raw string, fallback int) int {

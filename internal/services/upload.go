@@ -45,8 +45,136 @@ type UploadResult struct {
 	TargetFormat  string
 }
 
+type LocalUploadInput struct {
+	UserID   uuid.UUID
+	FilePath string
+	Filename string
+	FileSize int64
+	Title    string
+	Desc     string
+	Type     string
+	Tags     []string
+	Hash     string
+}
+
 func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
 	return &UploadService{repo: repo, uploadDir: uploadDir, storage: storageRoot, logger: logger}
+}
+
+func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInput, maxVideoSize int64) (UploadResult, error) {
+	if in.Type != "short" && in.Type != "movie" && in.Type != "episode" {
+		return UploadResult{}, ErrInvalidType
+	}
+	info, err := os.Stat(in.FilePath)
+	if err != nil {
+		return UploadResult{}, fmt.Errorf("stat uploaded file: %w", err)
+	}
+	if maxVideoSize > 0 && info.Size() > maxVideoSize {
+		return UploadResult{}, ErrFileTooLarge
+	}
+	serverHash, err := hashutil.SHA256(in.FilePath)
+	if err != nil {
+		return UploadResult{}, fmt.Errorf("calculate file hash: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(in.Hash), serverHash) {
+		return UploadResult{}, ErrHashMismatch
+	}
+
+	if existingID, exists, err := s.repo.FindVideoByHash(ctx, serverHash, info.Size()); err != nil {
+		return UploadResult{}, err
+	} else if exists {
+		existingVideo, getErr := s.repo.GetVideoByID(ctx, existingID)
+		if getErr != nil {
+			return UploadResult{}, getErr
+		}
+		if existingVideo.Type != in.Type {
+			return UploadResult{}, ErrHashTypeConflict
+		}
+		return UploadResult{
+			VideoID:       existingID,
+			Status:        existingVideo.Status,
+			AlreadyExists: true,
+			Enqueue:       false,
+		}, nil
+	}
+
+	metaRaw, err := json.Marshal(map[string]any{
+		"original_filename": in.Filename,
+		"source_hash":       serverHash,
+		"source_size":       info.Size(),
+	})
+	if err != nil {
+		return UploadResult{}, fmt.Errorf("marshal upload metadata: %w", err)
+	}
+
+	videoID := uuid.New()
+	finalTitle := strings.TrimSpace(in.Title)
+	if finalTitle == "" {
+		name := strings.TrimSpace(in.Filename)
+		finalTitle = strings.TrimSuffix(name, filepath.Ext(name))
+		if finalTitle == "" {
+			finalTitle = "untitled"
+		}
+	}
+	status := "uploaded"
+	enqueueTranscode := true
+	if in.Type == "movie" || in.Type == "episode" {
+		status = "scraping"
+		enqueueTranscode = false
+	}
+
+	v := models.Video{
+		ID:           videoID,
+		UserID:       &in.UserID,
+		Title:        finalTitle,
+		Description:  in.Desc,
+		Type:         in.Type,
+		Status:       status,
+		OriginalPath: in.FilePath,
+		Metadata:     metaRaw,
+	}
+
+	if err := s.repo.CreateVideo(ctx, v); err != nil {
+		return UploadResult{}, err
+	}
+	if err := s.repo.AddTags(ctx, videoID, in.Tags); err != nil {
+		_ = s.repo.DeleteVideoByID(ctx, videoID)
+		return UploadResult{}, err
+	}
+	if err := s.repo.InsertFileHash(ctx, serverHash, videoID, info.Size()); err != nil {
+		if repository.IsUniqueViolation(err) {
+			_ = s.repo.DeleteVideoByID(ctx, videoID)
+			existingID, getErr := s.repo.GetVideoIDByHash(ctx, serverHash)
+			if getErr != nil {
+				return UploadResult{}, getErr
+			}
+			existingVideo, getVideoErr := s.repo.GetVideoByID(ctx, existingID)
+			if getVideoErr != nil {
+				return UploadResult{}, getVideoErr
+			}
+			if existingVideo.Type != in.Type {
+				return UploadResult{}, ErrHashTypeConflict
+			}
+			return UploadResult{
+				VideoID:       existingID,
+				Status:        existingVideo.Status,
+				AlreadyExists: true,
+				Enqueue:       false,
+			}, nil
+		}
+		_ = s.repo.DeleteVideoByID(ctx, videoID)
+		return UploadResult{}, err
+	}
+
+	return UploadResult{
+		VideoID:       videoID,
+		Status:        status,
+		AlreadyExists: false,
+		Enqueue:       enqueueTranscode,
+		InputPath:     in.FilePath,
+		OutputDir:     filepath.Join(s.storage, "videos"),
+		TargetFormat:  "mp4",
+	}, nil
 }
 
 func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, clientHash string, maxVideoSize int64) (UploadResult, error) {
@@ -96,119 +224,24 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 		return UploadResult{}, ErrFileTooLarge
 	}
 
-	serverHash, err := hashutil.SHA256(originalPath)
+	result, err := s.SaveUploadedFile(ctx, LocalUploadInput{
+		UserID:   userID,
+		FilePath: originalPath,
+		Filename: fileHeader.Filename,
+		FileSize: info.Size(),
+		Title:    title,
+		Desc:     desc,
+		Type:     typ,
+		Tags:     tags,
+		Hash:     clientHash,
+	}, maxVideoSize)
 	if err != nil {
 		_ = os.Remove(originalPath)
-		return UploadResult{}, fmt.Errorf("calculate file hash: %w", err)
-	}
-	if !strings.EqualFold(strings.TrimSpace(clientHash), serverHash) {
-		_ = os.Remove(originalPath)
-		return UploadResult{}, ErrHashMismatch
-	}
-
-	if existingID, exists, err := s.repo.FindVideoByHash(ctx, serverHash, info.Size()); err != nil {
-		_ = os.Remove(originalPath)
-		return UploadResult{}, err
-	} else if exists {
-		existingVideo, getErr := s.repo.GetVideoByID(ctx, existingID)
-		if getErr != nil {
-			_ = os.Remove(originalPath)
-			return UploadResult{}, getErr
-		}
-		if existingVideo.Type != typ {
-			_ = os.Remove(originalPath)
-			return UploadResult{}, ErrHashTypeConflict
-		}
-		_ = os.Remove(originalPath)
-		return UploadResult{
-			VideoID:       existingID,
-			Status:        existingVideo.Status,
-			AlreadyExists: true,
-			Enqueue:       false,
-		}, nil
-	}
-
-	metaRaw, err := json.Marshal(map[string]any{
-		"original_filename": fileHeader.Filename,
-		"source_hash":       serverHash,
-		"source_size":       info.Size(),
-	})
-	if err != nil {
-		_ = os.Remove(originalPath)
-		return UploadResult{}, fmt.Errorf("marshal upload metadata: %w", err)
-	}
-
-	videoID := uuid.New()
-	finalTitle := strings.TrimSpace(title)
-	if finalTitle == "" {
-		name := strings.TrimSpace(fileHeader.Filename)
-		finalTitle = strings.TrimSuffix(name, filepath.Ext(name))
-		if finalTitle == "" {
-			finalTitle = "untitled"
-		}
-	}
-	status := "uploaded"
-	enqueueTranscode := true
-	if typ == "movie" || typ == "episode" {
-		status = "scraping"
-		enqueueTranscode = false
-	}
-
-	v := models.Video{
-		ID:           videoID,
-		UserID:       &userID,
-		Title:        finalTitle,
-		Description:  desc,
-		Type:         typ,
-		Status:       status,
-		OriginalPath: originalPath,
-		Metadata:     metaRaw,
-	}
-
-	if err := s.repo.CreateVideo(ctx, v); err != nil {
-		_ = os.Remove(originalPath)
 		return UploadResult{}, err
 	}
-	if err := s.repo.AddTags(ctx, videoID, tags); err != nil {
-		_ = s.repo.DeleteVideoByID(ctx, videoID)
+	if result.AlreadyExists {
 		_ = os.Remove(originalPath)
-		return UploadResult{}, err
 	}
-	if err := s.repo.InsertFileHash(ctx, serverHash, videoID, info.Size()); err != nil {
-		if repository.IsUniqueViolation(err) {
-			_ = s.repo.DeleteVideoByID(ctx, videoID)
-			_ = os.Remove(originalPath)
-			existingID, getErr := s.repo.GetVideoIDByHash(ctx, serverHash)
-			if getErr != nil {
-				return UploadResult{}, getErr
-			}
-			existingVideo, getVideoErr := s.repo.GetVideoByID(ctx, existingID)
-			if getVideoErr != nil {
-				return UploadResult{}, getVideoErr
-			}
-			if existingVideo.Type != typ {
-				return UploadResult{}, ErrHashTypeConflict
-			}
-			return UploadResult{
-				VideoID:       existingID,
-				Status:        existingVideo.Status,
-				AlreadyExists: true,
-				Enqueue:       false,
-			}, nil
-		}
-		_ = s.repo.DeleteVideoByID(ctx, videoID)
-		_ = os.Remove(originalPath)
-		return UploadResult{}, err
-	}
-
-	s.logger.Info("upload saved", "video_id", videoID, "path", originalPath)
-	return UploadResult{
-		VideoID:       videoID,
-		Status:        status,
-		AlreadyExists: false,
-		Enqueue:       enqueueTranscode,
-		InputPath:     originalPath,
-		OutputDir:     filepath.Join(s.storage, "videos"),
-		TargetFormat:  "mp4",
-	}, nil
+	s.logger.Info("upload saved", "video_id", result.VideoID, "path", originalPath)
+	return result, nil
 }

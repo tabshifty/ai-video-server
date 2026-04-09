@@ -96,6 +96,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	}
 
 	uploadSvc := services.NewUploadService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
+	chunkUploadSvc := services.NewChunkUploadService(cfg.UploadTempDir)
 	recSvc := services.NewRecommendService(repo)
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
 	appSvc := services.NewAppService(repo)
@@ -103,7 +104,28 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
-	api := handlers.NewAPI(repo, uploadSvc, recSvc, scrapeSvc, appSvc, enqueuer, logger, redisClient, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL, cfg.MaxVideoSize, cfg.EnableSwagger)
+	api := handlers.NewAPI(
+		repo,
+		uploadSvc,
+		chunkUploadSvc,
+		recSvc,
+		scrapeSvc,
+		appSvc,
+		enqueuer,
+		logger,
+		redisClient,
+		cfg.RedisAddr,
+		cfg.RedisPassword,
+		cfg.AsynqQueue,
+		cfg.JWTSecret,
+		cfg.AccessTokenTTL,
+		cfg.RefreshTokenTTL,
+		cfg.MaxVideoSize,
+		cfg.StorageRoot,
+		cfg.UploadTempDir,
+		cfg.ServerLogPath,
+		cfg.EnableSwagger,
+	)
 	api.Register(r)
 
 	srv := &http.Server{

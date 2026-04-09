@@ -183,3 +183,30 @@
   - `bash -n scripts/dev-up.sh` could not be run in this Windows shell (`bash` not installed).
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 17:15] Implement admin web and admin management APIs integration
+- Type: `implementation`
+- Summary:
+  - Added backend admin management APIs for stats/videos/users/tasks/system operations and chunked upload endpoints.
+  - Added SSE event stream endpoint at `/api/v1/admin/events/ws` and static hosting of built admin frontend under `/admin`.
+  - Generated full `admin-web` (Vue3 + Vite + Element Plus + Pinia + axios) with login, dashboard, video/upload/scrape/user/system/task pages and API integration.
+  - Added module-level `admin-web/AGENTS.md` and included newly added skill assets/directories in workspace scope as requested.
+- Changed Files:
+  - `internal/config/config.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/admin_events.go`
+  - `internal/handlers/upload_chunk.go`
+  - `internal/models/admin.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/services/upload.go`
+  - `internal/services/chunk_upload.go`
+  - `main.go`
+  - `admin-web/*`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `npm --prefix admin-web install` succeeded.
+  - `npm --prefix admin-web run build` succeeded.
+- Rollback:
+  - Revert the commit containing this feature entry.
