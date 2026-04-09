@@ -167,3 +167,19 @@
   - `go test ./...` passed (with local `GOCACHE`).
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 13:35] Harden .env parsing in dev-up script
+- Type: `implementation`
+- Summary:
+  - Replaced `source .env` with safe line-by-line env parsing in `scripts/dev-up.sh`.
+  - Parser now handles BOM/CRLF, ignores blank/comment lines, skips invalid lines, and supports quoted values.
+  - Updated run documentation accordingly.
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `docs/run.md`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed (with local `GOCACHE`).
+  - `bash -n scripts/dev-up.sh` could not be run in this Windows shell (`bash` not installed).
+- Rollback:
+  - Revert the commit containing this feature entry.

@@ -43,3 +43,4 @@ This stops:
 - If `.env` does not exist, `dev-up.sh` copies from `.env.example`.
 - Required commands: `docker` (with compose plugin) and `go`.
 - `main.go` will prioritize `ENV_FILE` when loading environment variables.
+- `dev-up.sh` parses `.env` in a safe mode (handles BOM/CRLF, ignores invalid lines) instead of `source`.
