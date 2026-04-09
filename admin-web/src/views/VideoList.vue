@@ -47,8 +47,16 @@ onMounted(load)
 
 <template>
   <Layout>
-    <el-card>
-      <el-form inline>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">视频管理</h1>
+          <p class="page-subtitle">筛选、检查、重转码与元数据编辑</p>
+        </div>
+      </div>
+
+      <el-card class="soft-card">
+      <el-form inline class="filter-form">
         <el-form-item><el-input v-model="query.q" placeholder="标题/标签搜索" /></el-form-item>
         <el-form-item>
           <el-select v-model="query.type" placeholder="类型" clearable style="width:120px">
@@ -69,10 +77,17 @@ onMounted(load)
         <el-form-item><el-button type="primary" @click="load">查询</el-button></el-form-item>
       </el-form>
 
+      <div class="table-wrap">
       <el-table :data="list" border>
         <el-table-column prop="title" label="标题" min-width="220" />
         <el-table-column prop="type" label="类型" width="110" />
-        <el-table-column prop="status" label="状态" width="120" />
+        <el-table-column prop="status" label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'ready' ? 'success' : row.status === 'failed' ? 'danger' : 'info'">
+              {{ row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="upload_user" label="上传用户" width="140" />
         <el-table-column prop="created_at" label="上传时间" width="180" />
         <el-table-column label="操作" width="300">
@@ -83,8 +98,9 @@ onMounted(load)
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
-      <div style="margin-top: 12px; display:flex; justify-content:flex-end">
+      <div class="action-row">
         <el-pagination
           v-model:current-page="query.page"
           v-model:page-size="query.page_size"
@@ -94,6 +110,7 @@ onMounted(load)
         />
       </div>
     </el-card>
+    </div>
 
     <el-dialog v-model="detailVisible" title="视频详情" width="760px">
       <el-form v-if="detail" label-width="90px">

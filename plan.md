@@ -228,3 +228,29 @@
   - `bash -n scripts/dev-down.sh` passed.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 17:41] Polish admin-web UI with unified design system
+- Type: `implementation`
+- Summary:
+  - Applied `ui-ux-pro-max` design direction to admin frontend with a unified visual system (fonts, colors, cards, tables, transitions, responsive behavior).
+  - Refined shared layout shell (brand sidebar, icon navigation, sticky top bar) and upgraded all key views for stronger hierarchy and readability.
+  - Enhanced chart styling, upload progress presentation, scrape candidate card interactions, and system log panel legibility.
+- Changed Files:
+  - `admin-web/src/assets/theme.css`
+  - `admin-web/src/main.js`
+  - `admin-web/src/App.vue`
+  - `admin-web/src/components/Layout.vue`
+  - `admin-web/src/components/UploadProgress.vue`
+  - `admin-web/src/views/Login.vue`
+  - `admin-web/src/views/Dashboard.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/VideoUpload.vue`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `admin-web/src/views/UserManage.vue`
+  - `admin-web/src/views/SystemSettings.vue`
+  - `admin-web/src/views/TaskMonitor.vue`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` succeeded.
+- Rollback:
+  - Revert the commit containing this feature entry.

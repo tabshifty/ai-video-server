@@ -26,7 +26,16 @@ onUnmounted(() => {
 
 <template>
   <Layout>
-    <el-card>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">任务监控</h1>
+          <p class="page-subtitle">每 5 秒自动刷新转码任务状态</p>
+        </div>
+      </div>
+
+    <el-card class="soft-card">
+      <div class="table-wrap">
       <el-table :data="list" border>
         <el-table-column prop="id" label="任务ID" width="90" />
         <el-table-column prop="video_id" label="视频ID" min-width="220" />
@@ -35,9 +44,11 @@ onUnmounted(() => {
         <el-table-column prop="error" label="错误信息" min-width="280" />
         <el-table-column prop="started_at" label="开始时间" width="180" />
       </el-table>
-      <div style="margin-top:12px;display:flex;justify-content:flex-end">
+      </div>
+      <div class="action-row">
         <el-pagination v-model:current-page="query.page" :total="total" @current-change="load" />
       </div>
     </el-card>
+    </div>
   </Layout>
 </template>

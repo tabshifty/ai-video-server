@@ -30,8 +30,16 @@ async function doSave() {
 
 <template>
   <Layout>
-    <el-card>
-      <el-form inline>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">刮削管理</h1>
+          <p class="page-subtitle">预览 TMDB 候选并手动修正元数据后确认保存</p>
+        </div>
+      </div>
+
+    <el-card class="soft-card">
+      <el-form inline class="filter-form">
         <el-form-item label="视频ID"><el-input v-model="form.video_id" style="width:300px" /></el-form-item>
         <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
         <el-form-item label="年份"><el-input-number v-model="form.year" :min="1900" /></el-form-item>
@@ -45,17 +53,17 @@ async function doSave() {
       </el-form>
     </el-card>
 
-    <el-row :gutter="12" style="margin-top:12px">
+    <el-row :gutter="12">
       <el-col v-for="item in candidates" :key="item.tmdb_id" :span="8">
-        <el-card shadow="hover" @click="choose(item)">
-          <div style="font-weight:700">{{ item.title }}</div>
-          <div style="color:#64748b;margin:6px 0">评分: {{ item.vote_average || '-' }}</div>
-          <div style="font-size:13px;line-height:1.5">{{ item.overview }}</div>
+        <el-card shadow="hover" class="soft-card interactive-card" @click="choose(item)">
+          <div class="candidate-title">{{ item.title }}</div>
+          <div class="candidate-score">评分: {{ item.vote_average || '-' }}</div>
+          <div class="candidate-overview">{{ item.overview }}</div>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card style="margin-top:12px">
+    <el-card class="soft-card">
       <template #header>编辑并确认</template>
       <el-form label-width="90px">
         <el-form-item label="TMDB ID"><el-input v-model="edit.tmdb_id" /></el-form-item>
@@ -66,5 +74,26 @@ async function doSave() {
       </el-form>
       <el-button type="primary" @click="doSave">保存</el-button>
     </el-card>
+    </div>
   </Layout>
 </template>
+
+<style scoped>
+.candidate-title {
+  font-weight: 700;
+  color: #881337;
+}
+
+.candidate-score {
+  color: #6b7280;
+  margin: 6px 0;
+}
+
+.candidate-overview {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #374151;
+  max-height: 82px;
+  overflow: auto;
+}
+</style>
