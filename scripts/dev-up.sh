@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUN_DIR="$ROOT_DIR/.run"
+ENV_FILE="$ROOT_DIR/.env"
+ENV_EXAMPLE="$ROOT_DIR/.env.example"
+
+log() {
+  printf '[dev-up] %s\n' "$*"
+}
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf 'missing command: %s\n' "$1" >&2
+    exit 1
+  fi
+}
+
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE_CMD=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE_CMD=(docker-compose)
+else
+  printf 'docker compose is required\n' >&2
+  exit 1
+fi
+
+require_cmd go
+require_cmd docker
+
+cd "$ROOT_DIR"
+mkdir -p "$RUN_DIR"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  cp "$ENV_EXAMPLE" "$ENV_FILE"
+  log "created .env from .env.example"
+fi
+
+is_running() {
+  local pid_file="$1"
+  if [[ ! -f "$pid_file" ]]; then
+    return 1
+  fi
+  local pid
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+wait_postgres() {
+  local container_id="$1"
+  local retries=30
+  local delay=2
+  local i
+  for ((i = 1; i <= retries; i++)); do
+    if docker exec "$container_id" pg_isready -U video -d video_server >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+  return 1
+}
+
+apply_migrations() {
+  local container_id="$1"
+  local file
+  while IFS= read -r -d '' file; do
+    log "applying migration $(basename "$file")"
+    cat "$file" | docker exec -i "$container_id" psql -U video -d video_server -v ON_ERROR_STOP=1 >/dev/null
+  done < <(find "$ROOT_DIR/migrations" -maxdepth 1 -type f -name '*.up.sql' -print0 | sort -z)
+}
+
+log "starting postgres and redis"
+"${COMPOSE_CMD[@]}" up -d postgres redis >/dev/null
+
+POSTGRES_CID="$("${COMPOSE_CMD[@]}" ps -q postgres)"
+if [[ -z "$POSTGRES_CID" ]]; then
+  printf 'failed to resolve postgres container id\n' >&2
+  exit 1
+fi
+
+log "waiting for postgres"
+if ! wait_postgres "$POSTGRES_CID"; then
+  printf 'postgres is not ready\n' >&2
+  exit 1
+fi
+
+apply_migrations "$POSTGRES_CID"
+
+if is_running "$RUN_DIR/server.pid"; then
+  log "server already running (pid $(cat "$RUN_DIR/server.pid"))"
+else
+  log "starting server"
+  nohup go run main.go -mode server >"$RUN_DIR/server.log" 2>&1 &
+  echo "$!" >"$RUN_DIR/server.pid"
+fi
+
+if is_running "$RUN_DIR/worker.pid"; then
+  log "worker already running (pid $(cat "$RUN_DIR/worker.pid"))"
+else
+  log "starting worker"
+  nohup go run main.go -mode worker >"$RUN_DIR/worker.log" 2>&1 &
+  echo "$!" >"$RUN_DIR/worker.pid"
+fi
+
+log "done"
+log "server log: $RUN_DIR/server.log"
+log "worker log: $RUN_DIR/worker.log"
