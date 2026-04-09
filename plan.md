@@ -119,3 +119,20 @@
   - `go run ./cmd/gen-openapi` generated docs files successfully.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 12:55] Add one-command run scripts
+- Type: `implementation`
+- Summary:
+  - Added Linux/macOS one-command startup and shutdown scripts.
+  - `dev-up.sh` now starts postgres/redis, waits for DB readiness, runs all migrations, and starts server/worker with logs + PID files.
+  - Added run guide documentation and `.run/` git ignore.
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `scripts/dev-down.sh`
+  - `docs/run.md`
+  - `.gitignore`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed (with local `GOCACHE`).
+- Rollback:
+  - Revert the commit containing this feature entry.
