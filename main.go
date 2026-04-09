@@ -83,7 +83,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 
 	uploadSvc := services.NewUploadService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	recSvc := services.NewRecommendService(repo)
-	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.TMDBTimeout)
+	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.TMDBTimeout)
 	appSvc := services.NewAppService(repo)
 
 	r := gin.New()
@@ -126,7 +126,10 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 
 func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
 	mux := asynq.NewServeMux()
-	processor := queue.NewProcessor(repo, transSvc, logger)
+	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue)
+	defer enqueuer.Close()
+	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.TMDBTimeout)
+	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, enqueuer, logger)
 	processor.Register(mux)
 
 	srv := asynq.NewServer(

@@ -20,10 +20,11 @@ import (
 )
 
 var (
-	ErrHashMismatch  = errors.New("hash mismatch")
-	ErrFileTooLarge  = errors.New("file size exceeds limit")
-	ErrInvalidType   = errors.New("invalid video type")
-	ErrInvalidUpload = errors.New("invalid upload")
+	ErrHashMismatch     = errors.New("hash mismatch")
+	ErrFileTooLarge     = errors.New("file size exceeds limit")
+	ErrInvalidType      = errors.New("invalid video type")
+	ErrInvalidUpload    = errors.New("invalid upload")
+	ErrHashTypeConflict = errors.New("hash already exists with different video type")
 )
 
 // UploadService stores uploaded files and creates video records.
@@ -109,10 +110,19 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 		_ = os.Remove(originalPath)
 		return UploadResult{}, err
 	} else if exists {
+		existingVideo, getErr := s.repo.GetVideoByID(ctx, existingID)
+		if getErr != nil {
+			_ = os.Remove(originalPath)
+			return UploadResult{}, getErr
+		}
+		if existingVideo.Type != typ {
+			_ = os.Remove(originalPath)
+			return UploadResult{}, ErrHashTypeConflict
+		}
 		_ = os.Remove(originalPath)
 		return UploadResult{
 			VideoID:       existingID,
-			Status:        "uploaded",
+			Status:        existingVideo.Status,
 			AlreadyExists: true,
 			Enqueue:       false,
 		}, nil
@@ -137,13 +147,20 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 			finalTitle = "untitled"
 		}
 	}
+	status := "uploaded"
+	enqueueTranscode := true
+	if typ == "movie" || typ == "episode" {
+		status = "scraping"
+		enqueueTranscode = false
+	}
+
 	v := models.Video{
 		ID:           videoID,
 		UserID:       &userID,
 		Title:        finalTitle,
 		Description:  desc,
 		Type:         typ,
-		Status:       "uploaded",
+		Status:       status,
 		OriginalPath: originalPath,
 		Metadata:     metaRaw,
 	}
@@ -165,9 +182,16 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 			if getErr != nil {
 				return UploadResult{}, getErr
 			}
+			existingVideo, getVideoErr := s.repo.GetVideoByID(ctx, existingID)
+			if getVideoErr != nil {
+				return UploadResult{}, getVideoErr
+			}
+			if existingVideo.Type != typ {
+				return UploadResult{}, ErrHashTypeConflict
+			}
 			return UploadResult{
 				VideoID:       existingID,
-				Status:        "uploaded",
+				Status:        existingVideo.Status,
 				AlreadyExists: true,
 				Enqueue:       false,
 			}, nil
@@ -180,9 +204,9 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 	s.logger.Info("upload saved", "video_id", videoID, "path", originalPath)
 	return UploadResult{
 		VideoID:       videoID,
-		Status:        "uploaded",
+		Status:        status,
 		AlreadyExists: false,
-		Enqueue:       true,
+		Enqueue:       enqueueTranscode,
 		InputPath:     originalPath,
 		OutputDir:     filepath.Join(s.storage, "videos"),
 		TargetFormat:  "mp4",

@@ -54,6 +54,15 @@ func (a *API) Upload(c *gin.Context) {
 		response.Error(c, 401, "unauthorized")
 		return
 	}
+	role, okRole := middleware.RoleFromContext(c)
+	if !okRole {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	if role != "admin" && typ != "short" {
+		response.Error(c, 403, "insufficient role for video type")
+		return
+	}
 
 	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, hash, a.maxVideoSize)
 	if err != nil {
@@ -65,6 +74,8 @@ func (a *API) Upload(c *gin.Context) {
 			bad(c, "file size exceeds limit")
 		case errors.Is(err, services.ErrInvalidType):
 			bad(c, "invalid type")
+		case errors.Is(err, services.ErrHashTypeConflict):
+			response.Error(c, 409, "hash exists with another video type")
 		default:
 			response.Error(c, 2, err.Error())
 		}
@@ -79,7 +90,7 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 
-	if result.Enqueue {
+	if typ == "short" && result.Enqueue {
 		payload := queue.TranscodePayload{
 			VideoID:      result.VideoID.String(),
 			InputPath:    result.InputPath,
@@ -92,13 +103,39 @@ func (a *API) Upload(c *gin.Context) {
 			return
 		}
 	}
+	if typ == "movie" || typ == "episode" {
+		payload := queue.ScrapePayload{
+			VideoID:  result.VideoID.String(),
+			FilePath: result.InputPath,
+			Filename: file.Filename,
+			Type:     typ,
+		}
+		if typ == "movie" {
+			if err := a.enqueuer.EnqueueScrapeMovie(payload); err != nil {
+				a.logger.Error("enqueue scrape movie failed", "video_id", result.VideoID, "error", err)
+				response.Error(c, 3, err.Error())
+				return
+			}
+		} else {
+			if err := a.enqueuer.EnqueueScrapeTV(payload); err != nil {
+				a.logger.Error("enqueue scrape tv failed", "video_id", result.VideoID, "error", err)
+				response.Error(c, 3, err.Error())
+				return
+			}
+		}
+	}
+
+	respStatus := result.Status
+	if typ == "movie" || typ == "episode" {
+		respStatus = "scraping"
+	}
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"code": 0,
 		"msg":  "upload accepted",
 		"data": gin.H{
 			"video_id": result.VideoID,
-			"status":   result.Status,
+			"status":   respStatus,
 		},
 	})
 }

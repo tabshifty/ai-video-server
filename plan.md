@@ -48,3 +48,29 @@
   - `go test ./...` passed (with local `GOCACHE`).
 - Rollback:
   - Revert the commit containing the upload dedupe implementation.
+
+### [2026-04-09 11:05] Add admin movie/episode upload with async scrape pipeline
+- Type: `implementation`
+- Summary:
+  - Added role-based upload restrictions (`user` can only upload `short`, `admin` can upload `short/movie/episode`).
+  - Added asynchronous scrape tasks for `movie/episode` uploads and chained transcode enqueue after scrape.
+  - Added filename parser `ParseFilename` for movie and episode patterns and updated scrape service to write TMDB metadata, poster thumbnail, and `tmdb_id`.
+  - Added migration for `videos.tmdb_id` and new `scraping` status.
+- Changed Files:
+  - `internal/handlers/upload.go`
+  - `internal/queue/scrape_tasks.go`
+  - `internal/queue/tasks.go`
+  - `internal/services/scraper.go`
+  - `internal/services/upload.go`
+  - `internal/repository/video_repository.go`
+  - `internal/utils/filename_parser.go`
+  - `internal/utils/filename.go`
+  - `internal/utils/filename_test.go`
+  - `internal/models/models.go`
+  - `main.go`
+  - `migrations/0005_video_scrape_fields.up.sql`
+  - `migrations/0005_video_scrape_fields.down.sql`
+- Verification:
+  - `go test ./...` passed (with local `GOCACHE`).
+- Rollback:
+  - Revert the commit containing this feature entry.

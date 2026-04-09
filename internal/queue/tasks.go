@@ -18,6 +18,8 @@ import (
 const (
 	// TypeVideoTranscode is the task type for transcoding uploads.
 	TypeVideoTranscode = "video:transcode"
+	TypeScrapeMovie    = "video:scrape:movie"
+	TypeScrapeTV       = "video:scrape:tv"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -66,16 +68,20 @@ func (e *Enqueuer) EnqueueTranscode(payloadIn TranscodePayload) error {
 type Processor struct {
 	repo     *repository.VideoRepository
 	trans    *services.TranscodeService
+	scrape   *services.ScraperService
+	enqueuer *Enqueuer
 	logger   *slog.Logger
 	uploadGC bool
 }
 
-func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, logger *slog.Logger) *Processor {
-	return &Processor{repo: repo, trans: trans, logger: logger, uploadGC: true}
+func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, enqueuer *Enqueuer, logger *slog.Logger) *Processor {
+	return &Processor{repo: repo, trans: trans, scrape: scrape, enqueuer: enqueuer, logger: logger, uploadGC: true}
 }
 
 func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeVideoTranscode, p.HandleTranscode)
+	mux.HandleFunc(TypeScrapeMovie, p.HandleScrapeMovie)
+	mux.HandleFunc(TypeScrapeTV, p.HandleScrapeTV)
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

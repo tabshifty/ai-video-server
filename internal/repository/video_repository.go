@@ -26,9 +26,9 @@ func NewVideoRepository(pool *pgxpool.Pool) *VideoRepository {
 
 func (r *VideoRepository) CreateVideo(ctx context.Context, v models.Video) error {
 	_, err := r.pool.Exec(ctx, `
-INSERT INTO videos (id, user_id, title, description, type, status, original_path, metadata)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-`, v.ID, v.UserID, v.Title, v.Description, v.Type, v.Status, v.OriginalPath, v.Metadata)
+INSERT INTO videos (id, user_id, tmdb_id, title, description, type, status, original_path, metadata)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+`, v.ID, v.UserID, v.TMDBID, v.Title, v.Description, v.Type, v.Status, v.OriginalPath, v.Metadata)
 	if err != nil {
 		return fmt.Errorf("insert video: %w", err)
 	}
@@ -178,9 +178,9 @@ func (r *VideoRepository) UpdateVideoStatus(ctx context.Context, videoID uuid.UU
 func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error) {
 	var v models.Video
 	err := r.pool.QueryRow(ctx, `
-SELECT id, user_id, title, description, type, status, duration_seconds, width, height, original_path, transcoded_path, thumbnail_path, metadata, created_at, updated_at
+SELECT id, user_id, tmdb_id, title, description, type, status, duration_seconds, width, height, original_path, transcoded_path, thumbnail_path, metadata, created_at, updated_at
 FROM videos WHERE id=$1`, videoID).Scan(
-		&v.ID, &v.UserID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
+		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {
@@ -214,9 +214,9 @@ WHERE status IN ('uploaded','processing') AND original_path IS NOT NULL AND orig
 func (r *VideoRepository) GetVideoByOriginalPath(ctx context.Context, originalPath string) (models.Video, error) {
 	var v models.Video
 	err := r.pool.QueryRow(ctx, `
-SELECT id, user_id, title, description, type, status, duration_seconds, width, height, original_path, transcoded_path, thumbnail_path, metadata, created_at, updated_at
+SELECT id, user_id, tmdb_id, title, description, type, status, duration_seconds, width, height, original_path, transcoded_path, thumbnail_path, metadata, created_at, updated_at
 FROM videos WHERE original_path=$1`, originalPath).Scan(
-		&v.ID, &v.UserID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
+		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {
@@ -238,6 +238,52 @@ WHERE id=$1`, videoID, title, description, metaRaw)
 		return fmt.Errorf("update video metadata: %w", err)
 	}
 	return nil
+}
+
+func (r *VideoRepository) UpdateVideoScrapeResult(ctx context.Context, videoID uuid.UUID, tmdbID *int, title, description, thumbnailPath string, metadata map[string]any, status string) error {
+	metaRaw, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("marshal scrape metadata: %w", err)
+	}
+	_, err = r.pool.Exec(ctx, `
+UPDATE videos
+SET tmdb_id=$2, title=$3, description=$4, thumbnail_path=$5, metadata=$6, status=$7, updated_at=NOW()
+WHERE id=$1
+`, videoID, tmdbID, title, description, thumbnailPath, metaRaw, status)
+	if err != nil {
+		return fmt.Errorf("update scrape result: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) AppendVideoMetadata(ctx context.Context, videoID uuid.UUID, key string, value any) error {
+	_, err := r.pool.Exec(ctx, `
+UPDATE videos
+SET metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object($2, to_jsonb($3)),
+    updated_at = NOW()
+WHERE id=$1
+`, videoID, key, value)
+	if err != nil {
+		return fmt.Errorf("append video metadata: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) FindVideoByTypeTMDB(ctx context.Context, typ string, tmdbID int, excludeVideoID uuid.UUID) (uuid.UUID, bool, error) {
+	var id uuid.UUID
+	err := r.pool.QueryRow(ctx, `
+SELECT id
+FROM videos
+WHERE type=$1 AND tmdb_id=$2 AND id <> $3
+LIMIT 1
+`, typ, tmdbID, excludeVideoID).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, false, nil
+		}
+		return uuid.Nil, false, fmt.Errorf("find video by tmdb: %w", err)
+	}
+	return id, true, nil
 }
 
 func (r *VideoRepository) FetchUserTagAffinity(ctx context.Context, userID uuid.UUID, since time.Time, limit int) (map[string]float64, error) {

@@ -10,6 +10,7 @@ import (
 type Video struct {
 	ID              uuid.UUID
 	UserID          *uuid.UUID
+	TMDBID          *int
 	Title           string
 	Description     string
 	Type            string
