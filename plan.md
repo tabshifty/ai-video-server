@@ -210,3 +210,21 @@
   - `npm --prefix admin-web run build` succeeded.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 17:27] Extend one-command scripts to include admin frontend
+- Type: `implementation`
+- Summary:
+  - Extended `scripts/dev-up.sh` to support `--frontend dev|build|off` with default `dev`.
+  - Added auto-install of frontend dependencies when `admin-web/node_modules` is missing.
+  - Added frontend dev process management (`.run/frontend.pid`, `.run/frontend.log`) and build-mode output guidance.
+  - Updated `scripts/dev-down.sh` to stop frontend process and refreshed run documentation.
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `scripts/dev-down.sh`
+  - `docs/run.md`
+  - `plan.md`
+- Verification:
+  - `bash -n scripts/dev-up.sh` passed.
+  - `bash -n scripts/dev-down.sh` passed.
+- Rollback:
+  - Revert the commit containing this feature entry.
