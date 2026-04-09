@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
-ENV_FILE="$ROOT_DIR/.env"
+ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
 ENV_EXAMPLE="$ROOT_DIR/.env.example"
 
 log() {
@@ -34,8 +34,14 @@ mkdir -p "$RUN_DIR"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   cp "$ENV_EXAMPLE" "$ENV_FILE"
-  log "created .env from .env.example"
+  log "created env file from .env.example: $ENV_FILE"
 fi
+
+set -a
+source "$ENV_FILE"
+set +a
+export ENV_FILE
+log "using env file: $ENV_FILE"
 
 is_running() {
   local pid_file="$1"
