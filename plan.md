@@ -299,3 +299,17 @@
   - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 19:33] Harden dev-up startup checks to catch false-positive server start
+- Type: `implementation`
+- Summary:
+  - Added background process startup helper in `scripts/dev-up.sh` with post-start liveness checks.
+  - If `server`/`worker`/`frontend` exits immediately (for example, port conflict on `:8080`), script now fails fast and prints recent log tail.
+  - Prevents misleading "starting server" success when actual process has already crashed.
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `plan.md`
+- Verification:
+  - `bash -n scripts/dev-up.sh` passed.
+- Rollback:
+  - Revert the commit containing this feature entry.

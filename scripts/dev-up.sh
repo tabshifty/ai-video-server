@@ -136,6 +136,33 @@ is_running() {
   [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
 }
 
+start_bg_process() {
+  local name="$1"
+  local pid_file="$2"
+  local log_file="$3"
+  shift 3
+
+  if is_running "$pid_file"; then
+    log "$name already running (pid $(cat "$pid_file"))"
+    return 0
+  fi
+
+  log "starting $name"
+  nohup "$@" >"$log_file" 2>&1 &
+  local pid="$!"
+  echo "$pid" >"$pid_file"
+
+  sleep 1
+  if ! kill -0 "$pid" 2>/dev/null; then
+    printf '%s failed to start. check log: %s\n' "$name" "$log_file" >&2
+    if [[ -f "$log_file" ]]; then
+      tail -n 80 "$log_file" >&2 || true
+    fi
+    rm -f "$pid_file"
+    return 1
+  fi
+}
+
 wait_postgres() {
   local container_id="$1"
   local retries=30
@@ -197,21 +224,8 @@ fi
 
 apply_migrations "$POSTGRES_CID"
 
-if is_running "$RUN_DIR/server.pid"; then
-  log "server already running (pid $(cat "$RUN_DIR/server.pid"))"
-else
-  log "starting server"
-  nohup go run main.go -mode server >"$RUN_DIR/server.log" 2>&1 &
-  echo "$!" >"$RUN_DIR/server.pid"
-fi
-
-if is_running "$RUN_DIR/worker.pid"; then
-  log "worker already running (pid $(cat "$RUN_DIR/worker.pid"))"
-else
-  log "starting worker"
-  nohup go run main.go -mode worker >"$RUN_DIR/worker.log" 2>&1 &
-  echo "$!" >"$RUN_DIR/worker.pid"
-fi
+start_bg_process "server" "$RUN_DIR/server.pid" "$RUN_DIR/server.log" go run main.go -mode server
+start_bg_process "worker" "$RUN_DIR/worker.pid" "$RUN_DIR/worker.log" go run main.go -mode worker
 
 if [[ "$FRONTEND_MODE" == "off" ]]; then
   log "frontend is disabled"
@@ -225,13 +239,7 @@ else
   fi
 
   if [[ "$FRONTEND_MODE" == "dev" ]]; then
-    if is_running "$RUN_DIR/frontend.pid"; then
-      log "frontend already running (pid $(cat "$RUN_DIR/frontend.pid"))"
-    else
-      log "starting frontend dev server"
-      nohup npm --prefix "$FRONTEND_DIR" run dev >"$RUN_DIR/frontend.log" 2>&1 &
-      echo "$!" >"$RUN_DIR/frontend.pid"
-    fi
+    start_bg_process "frontend" "$RUN_DIR/frontend.pid" "$RUN_DIR/frontend.log" npm --prefix "$FRONTEND_DIR" run dev
     log "frontend url: http://localhost:5173"
     log "frontend log: $RUN_DIR/frontend.log"
   else
