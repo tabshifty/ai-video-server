@@ -25,12 +25,39 @@ async function runCleanup() {
 
 <template>
   <Layout>
-    <el-card>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">系统设置</h1>
+          <p class="page-subtitle">执行清理任务并查看近期系统日志</p>
+        </div>
+      </div>
+
+    <el-card class="soft-card">
       <el-button type="warning" @click="runCleanup">清理临时文件</el-button>
       <el-button @click="loadLogs" :loading="loading" style="margin-left:8px">刷新日志</el-button>
-      <el-scrollbar height="520px" style="margin-top: 12px; background:#0b1021; color:#e2e8f0; padding:12px">
-        <pre style="white-space: pre-wrap; margin:0">{{ logs.join('\n') }}</pre>
+      <el-scrollbar height="520px" class="log-box">
+        <pre class="log-text">{{ logs.join('\n') }}</pre>
       </el-scrollbar>
     </el-card>
+    </div>
   </Layout>
 </template>
+
+<style scoped>
+.log-box {
+  margin-top: 12px;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+}
+
+.log-text {
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+  color: #e5e7eb;
+  font-size: 12px;
+  font-family: 'Fira Code', monospace;
+}
+</style>

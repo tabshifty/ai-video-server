@@ -24,7 +24,16 @@ onMounted(load)
 
 <template>
   <Layout>
-    <el-card>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">用户管理</h1>
+          <p class="page-subtitle">管理用户角色与权限</p>
+        </div>
+      </div>
+
+    <el-card class="soft-card">
+      <div class="table-wrap">
       <el-table :data="list" border>
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="email" label="邮箱" />
@@ -38,9 +47,11 @@ onMounted(load)
           </template>
         </el-table-column>
       </el-table>
-      <div style="margin-top:12px;display:flex;justify-content:flex-end">
+      </div>
+      <div class="action-row">
         <el-pagination v-model:current-page="query.page" :total="total" @current-change="load" />
       </div>
     </el-card>
+    </div>
   </Layout>
 </template>

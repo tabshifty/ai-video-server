@@ -87,10 +87,18 @@ async function cancelUpload() {
 
 <template>
   <Layout>
-    <el-card>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">上传中心</h1>
+          <p class="page-subtitle">支持分片上传、秒传检测与上传取消</p>
+        </div>
+      </div>
+
+      <el-card class="soft-card">
       <el-form label-width="100px">
         <el-form-item label="视频文件">
-          <el-upload drag :auto-upload="false" :on-change="onFileChange" :limit="1">
+          <el-upload drag :auto-upload="false" :on-change="onFileChange" :limit="1" class="upload-drop">
             <el-icon><UploadFilled /></el-icon>
             <div>拖拽文件到此，或点击选择文件</div>
           </el-upload>
@@ -111,7 +119,21 @@ async function cancelUpload() {
       </el-form>
 
       <UploadProgress :percentage="progress" :status-text="`哈希计算 ${hashProgress}%`" />
-      <div v-if="result" style="margin-top: 10px">视频ID: {{ result.video_id }}</div>
+      <div v-if="result" class="upload-result">视频ID: {{ result.video_id }}</div>
     </el-card>
+    </div>
   </Layout>
 </template>
+
+<style scoped>
+.upload-drop :deep(.el-upload-dragger) {
+  border-radius: 14px;
+  background: linear-gradient(160deg, #fff1f2 0%, #fff 100%);
+}
+
+.upload-result {
+  margin-top: 10px;
+  color: #881337;
+  font-family: 'Fira Code', monospace;
+}
+</style>
