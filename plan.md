@@ -254,3 +254,17 @@
   - `npm --prefix admin-web run build` succeeded.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 17:56] Add tag input to admin video upload form
+- Type: `implementation`
+- Summary:
+  - Added missing upload form control for video tags using multi-select with create mode.
+  - Added preset tag options and kept support for custom tag creation.
+  - Added submit-time tag normalization (trim, empty filtering, lowercase dedupe) before calling `/upload/init`.
+- Changed Files:
+  - `admin-web/src/views/VideoUpload.vue`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` succeeded.
+- Rollback:
+  - Revert the commit containing this feature entry.
