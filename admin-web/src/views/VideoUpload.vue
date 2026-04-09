@@ -21,6 +21,7 @@ const form = reactive({
   description: '',
   tags: []
 })
+const presetTags = ['action', 'comedy', 'drama', 'documentary', 'anime', 'music', 'sports', 'family']
 
 function onFileChange(raw) {
   file.value = raw.raw
@@ -44,6 +45,15 @@ async function submit() {
       return
     }
 
+    const normalizedTags = Array.from(
+      new Map(
+        (form.tags || [])
+          .map((tag) => String(tag).trim())
+          .filter((tag) => tag !== '')
+          .map((tag) => [tag.toLowerCase(), tag.toLowerCase()])
+      ).values()
+    )
+
     const chunkSize = 4 * 1024 * 1024
     const totalChunks = Math.ceil(file.value.size / chunkSize)
     const initResp = await uploadInit({
@@ -55,7 +65,7 @@ async function submit() {
       type: form.type,
       title: form.title,
       description: form.description,
-      tags: form.tags
+      tags: normalizedTags
     })
     sessionId.value = initResp.upload_session_id
 
@@ -112,6 +122,20 @@ async function cancelUpload() {
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="form.description" type="textarea" rows="3" /></el-form-item>
+        <el-form-item label="视频标签">
+          <el-select
+            v-model="form.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="可选择或输入标签"
+            style="width: 100%"
+          >
+            <el-option v-for="tag in presetTags" :key="tag" :label="tag" :value="tag" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="uploading" @click="submit">开始上传</el-button>
           <el-button v-if="uploading" type="danger" @click="cancelUpload">取消上传</el-button>
