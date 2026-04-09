@@ -63,10 +63,31 @@ wait_postgres() {
 
 apply_migrations() {
   local container_id="$1"
+  docker exec -i "$container_id" psql -U video -d video_server -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+SQL
+
   local file
   while IFS= read -r -d '' file; do
-    log "applying migration $(basename "$file")"
+    local version
+    version="$(basename "$file")"
+
+    local already
+    already="$(docker exec -i "$container_id" psql -U video -d video_server -tA -c "SELECT 1 FROM schema_migrations WHERE version='${version}' LIMIT 1;")"
+    if [[ "$already" == "1" ]]; then
+      log "skip migration $version (already applied)"
+      continue
+    fi
+
+    log "applying migration $version"
     cat "$file" | docker exec -i "$container_id" psql -U video -d video_server -v ON_ERROR_STOP=1 >/dev/null
+    docker exec -i "$container_id" psql -U video -d video_server -v ON_ERROR_STOP=1 >/dev/null <<SQL
+INSERT INTO schema_migrations(version) VALUES ('${version}')
+ON CONFLICT(version) DO NOTHING;
+SQL
   done < <(find "$ROOT_DIR/migrations" -maxdepth 1 -type f -name '*.up.sql' -print0 | sort -z)
 }
 

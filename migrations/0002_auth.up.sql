@@ -9,16 +9,43 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 ALTER TABLE videos
-    ADD CONSTRAINT fk_videos_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+    ADD COLUMN IF NOT EXISTS user_id UUID;
 
-ALTER TABLE user_video_actions
-    ADD CONSTRAINT fk_user_video_actions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_videos_user_id'
+    ) THEN
+        ALTER TABLE videos
+            ADD CONSTRAINT fk_videos_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+END
+$$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_user_video_actions_user_id'
+    ) THEN
+        ALTER TABLE user_video_actions
+            ADD CONSTRAINT fk_user_video_actions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+END
+$$;
 
 ALTER TABLE transcoding_jobs
-    ADD COLUMN user_id UUID;
+    ADD COLUMN IF NOT EXISTS user_id UUID;
 
-ALTER TABLE transcoding_jobs
-    ADD CONSTRAINT fk_transcoding_jobs_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_transcoding_jobs_user_id'
+    ) THEN
+        ALTER TABLE transcoding_jobs
+            ADD CONSTRAINT fk_transcoding_jobs_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
