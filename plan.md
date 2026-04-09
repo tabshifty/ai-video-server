@@ -313,3 +313,17 @@
   - `bash -n scripts/dev-up.sh` passed.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 19:47] Fix admin video detail NULL scan failure
+- Type: `implementation`
+- Summary:
+  - Fixed `AdminVideoDetail` query scanning failures when nullable video columns contain `NULL`.
+  - Added SQL-side `COALESCE` defaults for nullable detail fields (`duration_seconds`, `width`, `height`, path fields, metadata, and text fields) before scanning into Go struct fields.
+  - Prevents `cannot scan NULL into *int` errors on video detail retrieval.
+- Changed Files:
+  - `internal/repository/admin_repository.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+- Rollback:
+  - Revert the commit containing this feature entry.

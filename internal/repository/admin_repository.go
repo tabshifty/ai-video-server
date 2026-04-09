@@ -138,7 +138,22 @@ func (r *VideoRepository) AdminVideoDetail(ctx context.Context, videoID uuid.UUI
 	var out models.AdminVideoDetail
 	var metadata []byte
 	err := r.pool.QueryRow(ctx, `
-SELECT id, user_id, title, description, type, status, duration_seconds, width, height, original_path, transcoded_path, thumbnail_path, metadata, created_at, updated_at
+SELECT
+  id,
+  user_id,
+  COALESCE(title, ''),
+  COALESCE(description, ''),
+  type,
+  status,
+  COALESCE(duration_seconds, 0),
+  COALESCE(width, 0),
+  COALESCE(height, 0),
+  COALESCE(original_path, ''),
+  COALESCE(transcoded_path, ''),
+  COALESCE(thumbnail_path, ''),
+  COALESCE(metadata, '{}'::jsonb),
+  created_at,
+  updated_at
 FROM videos
 WHERE id=$1
 `, videoID).Scan(
