@@ -37,9 +37,48 @@ if [[ ! -f "$ENV_FILE" ]]; then
   log "created env file from .env.example: $ENV_FILE"
 fi
 
-set -a
-source "$ENV_FILE"
-set +a
+trim_spaces() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+load_env_file() {
+  local file="$1"
+  local line line_no key value
+  line_no=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    ((line_no += 1))
+    line="${line%$'\r'}"
+    if [[ $line_no -eq 1 ]]; then
+      line="${line#$'\xEF\xBB\xBF'}"
+    fi
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+
+    line="$(trim_spaces "$line")"
+    if [[ ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      log "skip invalid env line $line_no"
+      continue
+    fi
+
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="$(trim_spaces "$key")"
+    value="$(trim_spaces "$value")"
+
+    if [[ ${#value} -ge 2 && "${value:0:1}" == "\"" && "${value: -1}" == "\"" ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ ${#value} -ge 2 && "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+
+    export "$key=$value"
+  done <"$file"
+}
+
+load_env_file "$ENV_FILE"
 export ENV_FILE
 log "using env file: $ENV_FILE"
 
