@@ -20,32 +20,34 @@ import (
 
 // API bundles all HTTP handlers.
 type API struct {
-	repo       *repository.VideoRepository
-	uploadSvc  *services.UploadService
-	recSvc     *services.RecommendService
-	scrapeSvc  *services.ScraperService
-	appSvc     *services.AppService
-	enqueuer   *queue.Enqueuer
-	logger     *slog.Logger
-	redis      *redis.Client
-	jwtSecret  string
-	accessTTL  time.Duration
-	refreshTTL time.Duration
+	repo         *repository.VideoRepository
+	uploadSvc    *services.UploadService
+	recSvc       *services.RecommendService
+	scrapeSvc    *services.ScraperService
+	appSvc       *services.AppService
+	enqueuer     *queue.Enqueuer
+	logger       *slog.Logger
+	redis        *redis.Client
+	jwtSecret    string
+	accessTTL    time.Duration
+	refreshTTL   time.Duration
+	maxVideoSize int64
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, jwtSecret string, accessTTL, refreshTTL time.Duration) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, jwtSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64) *API {
 	return &API{
-		repo:       repo,
-		uploadSvc:  uploadSvc,
-		recSvc:     recSvc,
-		scrapeSvc:  scrapeSvc,
-		appSvc:     appSvc,
-		enqueuer:   enqueuer,
-		logger:     logger,
-		redis:      redisClient,
-		jwtSecret:  jwtSecret,
-		accessTTL:  accessTTL,
-		refreshTTL: refreshTTL,
+		repo:         repo,
+		uploadSvc:    uploadSvc,
+		recSvc:       recSvc,
+		scrapeSvc:    scrapeSvc,
+		appSvc:       appSvc,
+		enqueuer:     enqueuer,
+		logger:       logger,
+		redis:        redisClient,
+		jwtSecret:    jwtSecret,
+		accessTTL:    accessTTL,
+		refreshTTL:   refreshTTL,
+		maxVideoSize: maxVideoSize,
 	}
 }
 
@@ -59,6 +61,7 @@ func (a *API) Register(r *gin.Engine) {
 			auth.POST("/refresh", a.RefreshAuth)
 			auth.POST("/logout", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.LogoutAuth)
 		}
+		v1.POST("/upload/check", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadCheck)
 		v1.POST("/upload", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.Upload)
 		v1.POST("/scrape", a.Scrape)
 		v1.GET("/short/random", a.RandomShort)

@@ -21,6 +21,7 @@ type Config struct {
 	TMDBBaseURL         string
 	MaxTranscodeWorkers int
 	AsynqQueue          string
+	MaxVideoSize        int64
 	TMDBTimeout         time.Duration
 	AccessTokenTTL      time.Duration
 	RefreshTokenTTL     time.Duration
@@ -41,6 +42,7 @@ func Load() (Config, error) {
 		TMDBBaseURL:         getEnv("TMDB_BASE_URL", "https://api.themoviedb.org/3"),
 		AsynqQueue:          getEnv("ASYNQ_QUEUE", "transcode"),
 		MaxTranscodeWorkers: getIntEnv("MAX_TRANSCODE_WORKERS", 2),
+		MaxVideoSize:        getInt64Env("MAX_VIDEO_SIZE", 2*1024*1024*1024),
 		TMDBTimeout:         time.Duration(getIntEnv("TMDB_TIMEOUT_SECONDS", 10)) * time.Second,
 		AccessTokenTTL:      time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 24)) * time.Hour,
 		RefreshTokenTTL:     time.Duration(getIntEnv("REFRESH_TOKEN_TTL_HOURS", 168)) * time.Hour,
@@ -69,6 +71,18 @@ func getIntEnv(key string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func getInt64Env(key string, fallback int64) int64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
 		return fallback
 	}

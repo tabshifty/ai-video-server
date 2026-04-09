@@ -57,6 +57,54 @@ func (r *VideoRepository) AddTags(ctx context.Context, videoID uuid.UUID, tags [
 	return nil
 }
 
+func (r *VideoRepository) FindVideoByHash(ctx context.Context, hash string, fileSize int64) (uuid.UUID, bool, error) {
+	var videoID uuid.UUID
+	err := r.pool.QueryRow(ctx, `
+SELECT video_id
+FROM file_hashes
+WHERE hash = $1 AND file_size = $2
+`, hash, fileSize).Scan(&videoID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, false, nil
+		}
+		return uuid.Nil, false, fmt.Errorf("find video by hash: %w", err)
+	}
+	return videoID, true, nil
+}
+
+func (r *VideoRepository) InsertFileHash(ctx context.Context, hash string, videoID uuid.UUID, fileSize int64) error {
+	_, err := r.pool.Exec(ctx, `
+INSERT INTO file_hashes(hash, video_id, file_size)
+VALUES ($1,$2,$3)
+`, hash, videoID, fileSize)
+	if err != nil {
+		return fmt.Errorf("insert file hash: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) GetVideoIDByHash(ctx context.Context, hash string) (uuid.UUID, error) {
+	var videoID uuid.UUID
+	err := r.pool.QueryRow(ctx, `
+SELECT video_id
+FROM file_hashes
+WHERE hash = $1
+`, hash).Scan(&videoID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("get video id by hash: %w", err)
+	}
+	return videoID, nil
+}
+
+func (r *VideoRepository) DeleteVideoByID(ctx context.Context, videoID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, "DELETE FROM videos WHERE id = $1", videoID)
+	if err != nil {
+		return fmt.Errorf("delete video by id: %w", err)
+	}
+	return nil
+}
+
 func (r *VideoRepository) RandomShorts(ctx context.Context, limit int) ([]models.RecommendedVideo, error) {
 	rows, err := r.pool.Query(ctx, `
 SELECT id, title, type, transcoded_path, duration_seconds
@@ -139,6 +187,28 @@ FROM videos WHERE id=$1`, videoID).Scan(
 		return models.Video{}, fmt.Errorf("get video by id: %w", err)
 	}
 	return v, nil
+}
+
+func (r *VideoRepository) ListActiveOriginalPaths(ctx context.Context) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `
+SELECT original_path
+FROM videos
+WHERE status IN ('uploaded','processing') AND original_path IS NOT NULL AND original_path <> ''
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list active original paths: %w", err)
+	}
+	defer rows.Close()
+
+	var paths []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, fmt.Errorf("scan active original path: %w", err)
+		}
+		paths = append(paths, path)
+	}
+	return paths, rows.Err()
 }
 
 func (r *VideoRepository) GetVideoByOriginalPath(ctx context.Context, originalPath string) (models.Video, error) {

@@ -1,12 +1,19 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"video-server/internal/middleware"
+	"video-server/internal/queue"
 	"video-server/internal/response"
+	"video-server/internal/services"
 )
 
 // Upload handles media upload and transcode task enqueue.
@@ -16,37 +23,130 @@ func (a *API) Upload(c *gin.Context) {
 		bad(c, "file is required")
 		return
 	}
-	typ := c.DefaultPostForm("type", "short")
+	typ := c.PostForm("type")
+	if typ != "short" && typ != "movie" && typ != "episode" {
+		bad(c, "type must be one of: short, movie, episode")
+		return
+	}
+	hash := strings.TrimSpace(c.PostForm("hash"))
+	if !isSHA256Hex(hash) {
+		bad(c, "invalid hash")
+		return
+	}
+	if !isAllowedVideoExt(file.Filename) {
+		bad(c, "unsupported file extension")
+		return
+	}
+	if ct := strings.ToLower(strings.TrimSpace(file.Header.Get("Content-Type"))); ct != "" && !strings.HasPrefix(ct, "video/") {
+		bad(c, "unsupported content type")
+		return
+	}
+	if a.maxVideoSize > 0 && file.Size > a.maxVideoSize {
+		bad(c, "file size exceeds limit")
+		return
+	}
+
 	title := c.PostForm("title")
 	desc := c.PostForm("description")
-	tags := parseTags(c.PostForm("tags"))
+	tags := parseUploadTags(c.PostForm("tags"))
 	userID, okUser := middleware.UserIDFromContext(c)
 	if !okUser {
 		response.Error(c, 401, "unauthorized")
 		return
 	}
 
-	video, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags)
+	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, hash, a.maxVideoSize)
 	if err != nil {
 		a.logger.Error("upload failed", "error", err)
-		response.Error(c, 2, err.Error())
+		switch {
+		case errors.Is(err, services.ErrHashMismatch):
+			bad(c, "hash mismatch")
+		case errors.Is(err, services.ErrFileTooLarge):
+			bad(c, "file size exceeds limit")
+		case errors.Is(err, services.ErrInvalidType):
+			bad(c, "invalid type")
+		default:
+			response.Error(c, 2, err.Error())
+		}
 		return
 	}
 
-	if err := a.enqueuer.EnqueueTranscode(video.ID); err != nil {
-		a.logger.Error("enqueue transcode failed", "video_id", video.ID, "error", err)
-		response.Error(c, 3, err.Error())
+	if result.AlreadyExists {
+		ok(c, gin.H{
+			"exists":   true,
+			"video_id": result.VideoID,
+		})
 		return
+	}
+
+	if result.Enqueue {
+		payload := queue.TranscodePayload{
+			VideoID:      result.VideoID.String(),
+			InputPath:    result.InputPath,
+			OutputDir:    result.OutputDir,
+			TargetFormat: result.TargetFormat,
+		}
+		if err := a.enqueuer.EnqueueTranscode(payload); err != nil {
+			a.logger.Error("enqueue transcode failed", "video_id", result.VideoID, "error", err)
+			response.Error(c, 3, err.Error())
+			return
+		}
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"code": 0,
-		"msg":  "",
+		"msg":  "upload accepted",
 		"data": gin.H{
-			"video_id": video.ID,
-			"status":   "uploaded",
+			"video_id": result.VideoID,
+			"status":   result.Status,
 		},
 	})
+}
+
+var hashPattern = regexp.MustCompile("^[a-fA-F0-9]{64}$")
+
+func isSHA256Hex(raw string) bool {
+	return hashPattern.MatchString(strings.TrimSpace(raw))
+}
+
+func parseUploadTags(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var jsonTags []string
+	if strings.HasPrefix(raw, "[") {
+		if err := json.Unmarshal([]byte(raw), &jsonTags); err == nil {
+			out := make([]string, 0, len(jsonTags))
+			for _, item := range jsonTags {
+				t := strings.TrimSpace(item)
+				if t != "" {
+					out = append(out, t)
+				}
+			}
+			return out
+		}
+	}
+
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		t := strings.TrimSpace(part)
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func isAllowedVideoExt(name string) bool {
+	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(name)))
+	switch ext {
+	case ".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v":
+		return true
+	default:
+		return false
+	}
 }
 
 // Scrape handles movie/series metadata search and sync.

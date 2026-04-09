@@ -22,7 +22,10 @@ const (
 
 // TranscodePayload carries identifiers for worker-side processing.
 type TranscodePayload struct {
-	VideoID string `json:"video_id"`
+	VideoID      string `json:"video_id"`
+	InputPath    string `json:"input_path"`
+	OutputDir    string `json:"output_dir"`
+	TargetFormat string `json:"target_format"`
 }
 
 // Enqueuer wraps asynq client operations.
@@ -42,14 +45,14 @@ func (e *Enqueuer) Close() error {
 	return e.client.Close()
 }
 
-func (e *Enqueuer) EnqueueTranscode(videoID uuid.UUID) error {
-	payload, err := json.Marshal(TranscodePayload{VideoID: videoID.String()})
+func (e *Enqueuer) EnqueueTranscode(payloadIn TranscodePayload) error {
+	payload, err := json.Marshal(payloadIn)
 	if err != nil {
 		return fmt.Errorf("marshal transcode payload: %w", err)
 	}
 	_, err = e.client.Enqueue(
 		asynq.NewTask(TypeVideoTranscode, payload),
-		asynq.MaxRetry(5),
+		asynq.MaxRetry(3),
 		asynq.ProcessIn(2*time.Second),
 		asynq.Queue(e.queue),
 	)
@@ -89,13 +92,26 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	if err != nil {
 		return err
 	}
+	if video.Status == "ready" || video.Status == "processing" {
+		p.logger.Info("skip duplicate transcode task", "video_id", videoID, "status", video.Status)
+		return nil
+	}
+
+	inputPath := payload.InputPath
+	if inputPath == "" {
+		inputPath = video.OriginalPath
+	}
+	if inputPath == "" {
+		return fmt.Errorf("empty input path for video %s", videoID)
+	}
+
 	jobID, err := p.repo.InsertTranscodingJob(ctx, videoID, video.UserID, "running")
 	if err != nil {
 		return err
 	}
 	_ = p.repo.UpdateVideoStatus(ctx, videoID, "processing")
 
-	result, transcodeErr := p.trans.Process(ctx, video.ID, video.OriginalPath, video.Type)
+	result, transcodeErr := p.trans.Process(ctx, video.ID, inputPath, video.Type)
 	if transcodeErr != nil {
 		_ = p.repo.MarkVideoFailed(ctx, videoID, transcodeErr.Error())
 		_ = p.repo.FinishTranscodingJob(ctx, jobID, "failed", transcodeErr.Error())

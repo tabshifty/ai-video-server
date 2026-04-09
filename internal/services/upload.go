@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,57 +14,133 @@ import (
 
 	"github.com/google/uuid"
 
+	"video-server/internal/hashutil"
 	"video-server/internal/models"
 	"video-server/internal/repository"
+)
+
+var (
+	ErrHashMismatch  = errors.New("hash mismatch")
+	ErrFileTooLarge  = errors.New("file size exceeds limit")
+	ErrInvalidType   = errors.New("invalid video type")
+	ErrInvalidUpload = errors.New("invalid upload")
 )
 
 // UploadService stores uploaded files and creates video records.
 type UploadService struct {
 	repo      *repository.VideoRepository
 	uploadDir string
+	storage   string
 	logger    *slog.Logger
 }
 
-func NewUploadService(repo *repository.VideoRepository, uploadDir string, logger *slog.Logger) *UploadService {
-	return &UploadService{repo: repo, uploadDir: uploadDir, logger: logger}
+type UploadResult struct {
+	VideoID       uuid.UUID
+	Status        string
+	AlreadyExists bool
+	Enqueue       bool
+	InputPath     string
+	OutputDir     string
+	TargetFormat  string
 }
 
-func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string) (models.Video, error) {
+func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
+	return &UploadService{repo: repo, uploadDir: uploadDir, storage: storageRoot, logger: logger}
+}
+
+func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, clientHash string, maxVideoSize int64) (UploadResult, error) {
+	if fileHeader == nil {
+		return UploadResult{}, ErrInvalidUpload
+	}
+	if typ != "short" && typ != "movie" && typ != "episode" {
+		return UploadResult{}, ErrInvalidType
+	}
+	if maxVideoSize > 0 && fileHeader.Size > maxVideoSize {
+		return UploadResult{}, ErrFileTooLarge
+	}
 	if err := os.MkdirAll(s.uploadDir, 0o755); err != nil {
-		return models.Video{}, fmt.Errorf("create upload dir: %w", err)
+		return UploadResult{}, fmt.Errorf("create upload dir: %w", err)
 	}
 
-	videoID := uuid.New()
-	safeName := strings.ReplaceAll(fileHeader.Filename, " ", "_")
-	originalPath := filepath.Join(s.uploadDir, videoID.String()+"_"+safeName)
+	tempID := uuid.New()
+	originalPath := filepath.Join(s.uploadDir, tempID.String()+".tmp")
 
 	src, err := fileHeader.Open()
 	if err != nil {
-		return models.Video{}, fmt.Errorf("open uploaded file: %w", err)
+		return UploadResult{}, fmt.Errorf("open uploaded file: %w", err)
 	}
 	defer src.Close()
 
 	dst, err := os.Create(originalPath)
 	if err != nil {
-		return models.Video{}, fmt.Errorf("create local file: %w", err)
+		return UploadResult{}, fmt.Errorf("create local file: %w", err)
 	}
 	if _, err := io.Copy(dst, src); err != nil {
 		dst.Close()
-		return models.Video{}, fmt.Errorf("save upload file: %w", err)
+		_ = os.Remove(originalPath)
+		return UploadResult{}, fmt.Errorf("save upload file: %w", err)
 	}
 	if err := dst.Close(); err != nil {
-		return models.Video{}, fmt.Errorf("close upload file: %w", err)
+		_ = os.Remove(originalPath)
+		return UploadResult{}, fmt.Errorf("close upload file: %w", err)
 	}
 
-	metaRaw, err := json.Marshal(map[string]any{"original_filename": fileHeader.Filename})
+	info, err := os.Stat(originalPath)
 	if err != nil {
-		return models.Video{}, fmt.Errorf("marshal upload metadata: %w", err)
+		_ = os.Remove(originalPath)
+		return UploadResult{}, fmt.Errorf("stat uploaded file: %w", err)
+	}
+	if maxVideoSize > 0 && info.Size() > maxVideoSize {
+		_ = os.Remove(originalPath)
+		return UploadResult{}, ErrFileTooLarge
 	}
 
+	serverHash, err := hashutil.SHA256(originalPath)
+	if err != nil {
+		_ = os.Remove(originalPath)
+		return UploadResult{}, fmt.Errorf("calculate file hash: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(clientHash), serverHash) {
+		_ = os.Remove(originalPath)
+		return UploadResult{}, ErrHashMismatch
+	}
+
+	if existingID, exists, err := s.repo.FindVideoByHash(ctx, serverHash, info.Size()); err != nil {
+		_ = os.Remove(originalPath)
+		return UploadResult{}, err
+	} else if exists {
+		_ = os.Remove(originalPath)
+		return UploadResult{
+			VideoID:       existingID,
+			Status:        "uploaded",
+			AlreadyExists: true,
+			Enqueue:       false,
+		}, nil
+	}
+
+	metaRaw, err := json.Marshal(map[string]any{
+		"original_filename": fileHeader.Filename,
+		"source_hash":       serverHash,
+		"source_size":       info.Size(),
+	})
+	if err != nil {
+		_ = os.Remove(originalPath)
+		return UploadResult{}, fmt.Errorf("marshal upload metadata: %w", err)
+	}
+
+	videoID := uuid.New()
+	finalTitle := strings.TrimSpace(title)
+	if finalTitle == "" {
+		name := strings.TrimSpace(fileHeader.Filename)
+		finalTitle = strings.TrimSuffix(name, filepath.Ext(name))
+		if finalTitle == "" {
+			finalTitle = "untitled"
+		}
+	}
 	v := models.Video{
 		ID:           videoID,
 		UserID:       &userID,
-		Title:        title,
+		Title:        finalTitle,
 		Description:  desc,
 		Type:         typ,
 		Status:       "uploaded",
@@ -72,12 +149,42 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 	}
 
 	if err := s.repo.CreateVideo(ctx, v); err != nil {
-		return models.Video{}, err
+		_ = os.Remove(originalPath)
+		return UploadResult{}, err
 	}
 	if err := s.repo.AddTags(ctx, videoID, tags); err != nil {
-		return models.Video{}, err
+		_ = s.repo.DeleteVideoByID(ctx, videoID)
+		_ = os.Remove(originalPath)
+		return UploadResult{}, err
+	}
+	if err := s.repo.InsertFileHash(ctx, serverHash, videoID, info.Size()); err != nil {
+		if repository.IsUniqueViolation(err) {
+			_ = s.repo.DeleteVideoByID(ctx, videoID)
+			_ = os.Remove(originalPath)
+			existingID, getErr := s.repo.GetVideoIDByHash(ctx, serverHash)
+			if getErr != nil {
+				return UploadResult{}, getErr
+			}
+			return UploadResult{
+				VideoID:       existingID,
+				Status:        "uploaded",
+				AlreadyExists: true,
+				Enqueue:       false,
+			}, nil
+		}
+		_ = s.repo.DeleteVideoByID(ctx, videoID)
+		_ = os.Remove(originalPath)
+		return UploadResult{}, err
 	}
 
 	s.logger.Info("upload saved", "video_id", videoID, "path", originalPath)
-	return v, nil
+	return UploadResult{
+		VideoID:       videoID,
+		Status:        "uploaded",
+		AlreadyExists: false,
+		Enqueue:       true,
+		InputPath:     originalPath,
+		OutputDir:     filepath.Join(s.storage, "videos"),
+		TargetFormat:  "mp4",
+	}, nil
 }

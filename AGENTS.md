@@ -16,6 +16,16 @@
 - Prefer fast search/read commands (`rg`, targeted file reads) over broad scans.
 - Before claiming completion, run only the verifications that actually exist in this repo.
 
+## Change Management Rules
+- Every change must be rollbackable:
+  - Prefer small, scoped commits.
+  - Keep migration and code changes reversible where practical.
+- Every completed change must be committed to git; do not leave accepted work only in the working tree.
+- `plan.md` is mandatory and append-only for progress tracking:
+  - Every new plan must be appended as an incremental entry.
+  - Every implementation update must append what changed (not overwrite old entries).
+  - Maintain reverse-chronological entries with date/time, summary, affected files, and verification status.
+
 ## Module Map (Current)
 | Module | Path | Purpose | Notes |
 |---|---|---|---|
