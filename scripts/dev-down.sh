@@ -40,6 +40,7 @@ mkdir -p "$RUN_DIR"
 
 stop_by_pid_file "$RUN_DIR/server.pid" "server"
 stop_by_pid_file "$RUN_DIR/worker.pid" "worker"
+stop_by_pid_file "$RUN_DIR/frontend.pid" "frontend"
 
 log "stopping postgres and redis"
 "${COMPOSE_CMD[@]}" stop postgres redis >/dev/null || true

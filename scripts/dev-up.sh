@@ -5,6 +5,47 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
 ENV_EXAMPLE="$ROOT_DIR/.env.example"
+FRONTEND_MODE="dev"
+FRONTEND_DIR="$ROOT_DIR/admin-web"
+
+print_usage() {
+  cat <<'EOF'
+Usage: bash scripts/dev-up.sh [--frontend dev|build|off]
+
+Options:
+  --frontend dev    Start frontend with Vite dev server (default)
+  --frontend build  Build frontend assets only
+  --frontend off    Skip frontend
+  -h, --help        Show this help
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --frontend)
+    if [[ $# -lt 2 ]]; then
+      printf 'missing value for --frontend\n' >&2
+      exit 1
+    fi
+    FRONTEND_MODE="$2"
+    shift 2
+    ;;
+  -h | --help)
+    print_usage
+    exit 0
+    ;;
+  *)
+    printf 'unknown argument: %s\n' "$1" >&2
+    print_usage >&2
+    exit 1
+    ;;
+  esac
+done
+
+if [[ "$FRONTEND_MODE" != "dev" && "$FRONTEND_MODE" != "build" && "$FRONTEND_MODE" != "off" ]]; then
+  printf 'invalid --frontend mode: %s (expected: dev|build|off)\n' "$FRONTEND_MODE" >&2
+  exit 1
+fi
 
 log() {
   printf '[dev-up] %s\n' "$*"
@@ -28,6 +69,9 @@ fi
 
 require_cmd go
 require_cmd docker
+if [[ "$FRONTEND_MODE" != "off" ]]; then
+  require_cmd npm
+fi
 
 cd "$ROOT_DIR"
 mkdir -p "$RUN_DIR"
@@ -167,6 +211,35 @@ else
   log "starting worker"
   nohup go run main.go -mode worker >"$RUN_DIR/worker.log" 2>&1 &
   echo "$!" >"$RUN_DIR/worker.pid"
+fi
+
+if [[ "$FRONTEND_MODE" == "off" ]]; then
+  log "frontend is disabled"
+elif [[ ! -d "$FRONTEND_DIR" ]]; then
+  printf 'frontend directory not found: %s\n' "$FRONTEND_DIR" >&2
+  exit 1
+else
+  if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
+    log "installing frontend dependencies"
+    npm --prefix "$FRONTEND_DIR" install
+  fi
+
+  if [[ "$FRONTEND_MODE" == "dev" ]]; then
+    if is_running "$RUN_DIR/frontend.pid"; then
+      log "frontend already running (pid $(cat "$RUN_DIR/frontend.pid"))"
+    else
+      log "starting frontend dev server"
+      nohup npm --prefix "$FRONTEND_DIR" run dev >"$RUN_DIR/frontend.log" 2>&1 &
+      echo "$!" >"$RUN_DIR/frontend.pid"
+    fi
+    log "frontend url: http://localhost:5173"
+    log "frontend log: $RUN_DIR/frontend.log"
+  else
+    log "building frontend assets"
+    npm --prefix "$FRONTEND_DIR" run build
+    log "frontend build ready at $FRONTEND_DIR/dist"
+    log "frontend url: http://localhost:8080/admin/"
+  fi
 fi
 
 log "done"
