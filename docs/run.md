@@ -16,6 +16,12 @@ This script will:
    - `go run main.go -mode worker`
 5. write logs and PID files into `.run/`
 
+You can also specify a custom env file path:
+
+```bash
+ENV_FILE=/absolute/path/to/.env bash scripts/dev-up.sh
+```
+
 ## Stop all
 
 ```bash
@@ -36,3 +42,4 @@ This stops:
 
 - If `.env` does not exist, `dev-up.sh` copies from `.env.example`.
 - Required commands: `docker` (with compose plugin) and `go`.
+- `main.go` will prioritize `ENV_FILE` when loading environment variables.

@@ -35,7 +35,11 @@ import (
 // @name Authorization
 
 func main() {
-	_ = godotenv.Load()
+	if envFile := os.Getenv("ENV_FILE"); envFile != "" {
+		_ = godotenv.Overload(envFile)
+	} else {
+		_ = godotenv.Load()
+	}
 	modeFlag := flag.String("mode", "", "run mode: server|worker")
 	flag.Parse()
 

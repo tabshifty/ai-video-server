@@ -151,3 +151,19 @@
   - `go test ./...` passed (with local `GOCACHE`).
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 13:25] Add explicit ENV_FILE loading for startup
+- Type: `implementation`
+- Summary:
+  - Added `ENV_FILE` support in `main.go` (`godotenv.Overload` when provided).
+  - Updated `scripts/dev-up.sh` to load and export env vars from `ENV_FILE` (defaults to project `.env`).
+  - Updated run docs to show custom env file usage.
+- Changed Files:
+  - `main.go`
+  - `scripts/dev-up.sh`
+  - `docs/run.md`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed (with local `GOCACHE`).
+- Rollback:
+  - Revert the commit containing this feature entry.
