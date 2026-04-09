@@ -27,6 +27,18 @@ bash scripts/dev-up.sh
 bash scripts/dev-up.sh --frontend dev
 ```
 
+In dev mode, Vite listens on `0.0.0.0:5173`, so you can access from LAN:
+
+```bash
+http://<server-ip>:5173
+```
+
+If backend is not on the same machine as Vite, set proxy target in `admin-web/.env.development`:
+
+```bash
+VITE_API_PROXY_TARGET=http://<backend-ip>:8080
+```
+
 Build frontend (served by Go backend at `/admin`):
 
 ```bash
@@ -68,3 +80,11 @@ This stops:
 - Required commands: `docker` (with compose plugin) and `go`.
 - `main.go` will prioritize `ENV_FILE` when loading environment variables.
 - `dev-up.sh` parses `.env` in a safe mode (handles BOM/CRLF, ignores invalid lines) instead of `source`.
+
+## Troubleshooting `404` on `/api/v1/*` in dev mode
+
+If browser Network response is Vite HTML (not JSON), request did not reach Go backend:
+
+1. check backend is running on expected address (`http://127.0.0.1:8080` by default)
+2. verify `admin-web/.env.development` has correct `VITE_API_PROXY_TARGET`
+3. restart Vite dev server after env changes

@@ -13,6 +13,8 @@ npm run dev
 ```
 
 Vite dev server proxies `/api/*` to `http://localhost:8080`.
+Default proxy target can be overridden with `VITE_API_PROXY_TARGET` (for example `http://192.168.1.10:8080`).
+Vite dev server listens on `0.0.0.0:5173`, so LAN devices can access `http://<server-ip>:5173`.
 
 ## Build
 

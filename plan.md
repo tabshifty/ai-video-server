@@ -268,3 +268,20 @@
   - `npm --prefix admin-web run build` succeeded.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 19:16] Fix dev-mode LAN access and Vite API proxy 404
+- Type: `implementation`
+- Summary:
+  - Updated Vite dev server to listen on `0.0.0.0:5173` with strict port behavior for LAN access.
+  - Switched proxy matching to `/api/v1` and made proxy backend target configurable via `VITE_API_PROXY_TARGET`.
+  - Updated frontend and run documentation with LAN usage and `/api/v1/*` 404 troubleshooting steps.
+- Changed Files:
+  - `admin-web/vite.config.js`
+  - `admin-web/.env.development`
+  - `admin-web/README.md`
+  - `docs/run.md`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` succeeded.
+- Rollback:
+  - Revert the commit containing this feature entry.
