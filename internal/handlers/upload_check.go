@@ -8,6 +8,15 @@ import (
 	"video-server/internal/response"
 )
 
+// @Summary Upload hash check
+// @Tags upload
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body UploadCheckRequest true "hash check payload"
+// @Success 200 {object} APIResponse
+// @Failure 200 {object} APIResponse
+// @Router /upload/check [post]
 func (a *API) UploadCheck(c *gin.Context) {
 	var req struct {
 		Hash     string `json:"hash"`

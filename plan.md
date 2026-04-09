@@ -93,3 +93,29 @@
   - `go test ./...` passed (with local `GOCACHE`).
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 12:20] Add API docs generation and Swagger UI
+- Type: `implementation`
+- Summary:
+  - Added API docs generation command `go run ./cmd/gen-openapi` and wired `go:generate` in `main.go`.
+  - Added runtime Swagger docs exposure under `/swagger/index.html` and `/swagger/openapi.json` controlled by `ENABLE_SWAGGER`.
+  - Added OpenAPI base metadata and handler documentation models/comments for key endpoints.
+- Changed Files:
+  - `cmd/gen-openapi/main.go`
+  - `docs/swagger/index.html`
+  - `docs/swagger/openapi.json`
+  - `internal/config/config.go`
+  - `.env.example`
+  - `main.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/swagger_models.go`
+  - `internal/handlers/auth.go`
+  - `internal/handlers/upload_check.go`
+  - `internal/handlers/upload.go`
+  - `internal/handlers/admin_scrape.go`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed (with local `GOCACHE`).
+  - `go run ./cmd/gen-openapi` generated docs files successfully.
+- Rollback:
+  - Revert the commit containing this feature entry.

@@ -20,34 +20,36 @@ import (
 
 // API bundles all HTTP handlers.
 type API struct {
-	repo         *repository.VideoRepository
-	uploadSvc    *services.UploadService
-	recSvc       *services.RecommendService
-	scrapeSvc    *services.ScraperService
-	appSvc       *services.AppService
-	enqueuer     *queue.Enqueuer
-	logger       *slog.Logger
-	redis        *redis.Client
-	jwtSecret    string
-	accessTTL    time.Duration
-	refreshTTL   time.Duration
-	maxVideoSize int64
+	repo          *repository.VideoRepository
+	uploadSvc     *services.UploadService
+	recSvc        *services.RecommendService
+	scrapeSvc     *services.ScraperService
+	appSvc        *services.AppService
+	enqueuer      *queue.Enqueuer
+	logger        *slog.Logger
+	redis         *redis.Client
+	jwtSecret     string
+	accessTTL     time.Duration
+	refreshTTL    time.Duration
+	maxVideoSize  int64
+	enableSwagger bool
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, jwtSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, jwtSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, enableSwagger bool) *API {
 	return &API{
-		repo:         repo,
-		uploadSvc:    uploadSvc,
-		recSvc:       recSvc,
-		scrapeSvc:    scrapeSvc,
-		appSvc:       appSvc,
-		enqueuer:     enqueuer,
-		logger:       logger,
-		redis:        redisClient,
-		jwtSecret:    jwtSecret,
-		accessTTL:    accessTTL,
-		refreshTTL:   refreshTTL,
-		maxVideoSize: maxVideoSize,
+		repo:          repo,
+		uploadSvc:     uploadSvc,
+		recSvc:        recSvc,
+		scrapeSvc:     scrapeSvc,
+		appSvc:        appSvc,
+		enqueuer:      enqueuer,
+		logger:        logger,
+		redis:         redisClient,
+		jwtSecret:     jwtSecret,
+		accessTTL:     accessTTL,
+		refreshTTL:    refreshTTL,
+		maxVideoSize:  maxVideoSize,
+		enableSwagger: enableSwagger,
 	}
 }
 
@@ -86,6 +88,14 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/scrape/preview", a.AdminScrapePreview)
 			admin.PUT("/scrape/confirm", a.AdminScrapeConfirm)
 		}
+	}
+	if a.enableSwagger {
+		r.GET("/swagger/index.html", func(c *gin.Context) {
+			c.File("docs/swagger/index.html")
+		})
+		r.GET("/swagger/openapi.json", func(c *gin.Context) {
+			c.File("docs/swagger/openapi.json")
+		})
 	}
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

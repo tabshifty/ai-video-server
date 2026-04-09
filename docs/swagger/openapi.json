@@ -1,0 +1,115 @@
+{
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Generated OpenAPI for video-server.",
+    "title": "Video Server API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/admin/scrape/confirm": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Admin scrape confirm"
+      }
+    },
+    "/admin/scrape/preview": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Admin scrape preview"
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Login"
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "description": "Create user account",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Register"
+      }
+    },
+    "/healthz": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Health check"
+      }
+    },
+    "/upload": {
+      "post": {
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Upload video"
+      }
+    },
+    "/upload/check": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Upload hash check"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ]
+}

@@ -12,6 +12,15 @@ import (
 	"video-server/internal/utils"
 )
 
+// @Summary Admin preview scrape candidates
+// @Tags admin-scrape
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body AdminScrapePreviewRequest true "preview payload"
+// @Success 200 {object} APIResponse
+// @Failure 200 {object} APIResponse
+// @Router /admin/scrape/preview [post]
 func (a *API) AdminScrapePreview(c *gin.Context) {
 	var req struct {
 		VideoID string `json:"video_id"`
@@ -104,6 +113,15 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 	ok(c, gin.H{"candidates": candidates})
 }
 
+// @Summary Admin confirm scrape metadata
+// @Tags admin-scrape
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param payload body AdminScrapeConfirmRequest true "confirm payload"
+// @Success 200 {object} APIResponse
+// @Failure 200 {object} APIResponse
+// @Router /admin/scrape/confirm [put]
 func (a *API) AdminScrapeConfirm(c *gin.Context) {
 	var req struct {
 		VideoID       string         `json:"video_id"`

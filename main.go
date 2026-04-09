@@ -24,6 +24,16 @@ import (
 	"video-server/internal/services"
 )
 
+//go:generate go run ./cmd/gen-openapi
+
+// @title Video Server API
+// @version 1.0
+// @description API documentation for video-server.
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
 func main() {
 	_ = godotenv.Load()
 	modeFlag := flag.String("mode", "", "run mode: server|worker")
@@ -89,7 +99,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
-	api := handlers.NewAPI(repo, uploadSvc, recSvc, scrapeSvc, appSvc, enqueuer, logger, redisClient, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL, cfg.MaxVideoSize)
+	api := handlers.NewAPI(repo, uploadSvc, recSvc, scrapeSvc, appSvc, enqueuer, logger, redisClient, cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL, cfg.MaxVideoSize, cfg.EnableSwagger)
 	api.Register(r)
 
 	srv := &http.Server{

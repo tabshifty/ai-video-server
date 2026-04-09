@@ -16,6 +16,14 @@ import (
 	"video-server/internal/utils"
 )
 
+// @Summary Register user
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param payload body AuthRegisterRequest true "register payload"
+// @Success 200 {object} APIResponse
+// @Failure 200 {object} APIResponse
+// @Router /auth/register [post]
 func (a *API) RegisterAuth(c *gin.Context) {
 	var req struct {
 		Username string `json:"username"`
@@ -77,6 +85,14 @@ func (a *API) RegisterAuth(c *gin.Context) {
 	})
 }
 
+// @Summary Login
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param payload body AuthLoginRequest true "login payload"
+// @Success 200 {object} APIResponse
+// @Failure 200 {object} APIResponse
+// @Router /auth/login [post]
 func (a *API) LoginAuth(c *gin.Context) {
 	var req struct {
 		Username string `json:"username"`

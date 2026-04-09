@@ -17,6 +17,20 @@ import (
 )
 
 // Upload handles media upload and transcode task enqueue.
+// @Summary Upload video
+// @Tags upload
+// @Accept mpfd
+// @Produce json
+// @Security BearerAuth
+// @Param file formData file true "video file"
+// @Param type formData string true "short|movie|episode"
+// @Param title formData string false "title"
+// @Param description formData string false "description"
+// @Param tags formData string false "tags json array or csv"
+// @Param hash formData string true "sha256 hash"
+// @Success 202 {object} APIResponse
+// @Failure 200 {object} APIResponse
+// @Router /upload [post]
 func (a *API) Upload(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {

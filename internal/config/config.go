@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,7 @@ type Config struct {
 	MaxTranscodeWorkers int
 	AsynqQueue          string
 	MaxVideoSize        int64
+	EnableSwagger       bool
 	TMDBTimeout         time.Duration
 	AccessTokenTTL      time.Duration
 	RefreshTokenTTL     time.Duration
@@ -45,6 +47,7 @@ func Load() (Config, error) {
 		AsynqQueue:          getEnv("ASYNQ_QUEUE", "transcode"),
 		MaxTranscodeWorkers: getIntEnv("MAX_TRANSCODE_WORKERS", 2),
 		MaxVideoSize:        getInt64Env("MAX_VIDEO_SIZE", 2*1024*1024*1024),
+		EnableSwagger:       getBoolEnv("ENABLE_SWAGGER", false),
 		TMDBTimeout:         time.Duration(getIntEnv("TMDB_TIMEOUT_SECONDS", 10)) * time.Second,
 		AccessTokenTTL:      time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 24)) * time.Hour,
 		RefreshTokenTTL:     time.Duration(getIntEnv("REFRESH_TOKEN_TTL_HOURS", 168)) * time.Hour,
@@ -89,4 +92,19 @@ func getInt64Env(key string, fallback int64) int64 {
 		return fallback
 	}
 	return parsed
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if v == "" {
+		return fallback
+	}
+	switch v {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
 }
