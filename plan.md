@@ -285,3 +285,17 @@
   - `npm --prefix admin-web run build` succeeded.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 19:28] Fix backend admin SPA route conflict causing startup panic
+- Type: `implementation`
+- Summary:
+  - Fixed Gin route conflict between `/admin/assets/*filepath` and `/admin/*path` by replacing wildcard route with `NoRoute` fallback logic for `/admin/`.
+  - Preserved static asset serving for `/admin/assets/*` and SPA index fallback for non-asset `/admin/*` paths.
+  - This removes startup panic and restores normal admin API availability when server runs with latest code.
+- Changed Files:
+  - `internal/handlers/router.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+- Rollback:
+  - Revert the commit containing this feature entry.

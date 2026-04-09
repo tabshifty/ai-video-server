@@ -137,19 +137,22 @@ func (a *API) Register(r *gin.Engine) {
 	adminDist := filepath.Join("admin-web", "dist")
 	if st, err := os.Stat(adminDist); err == nil && st.IsDir() {
 		r.Static("/admin/assets", filepath.Join(adminDist, "assets"))
-		r.GET("/admin", func(c *gin.Context) {
+		serveAdminIndex := func(c *gin.Context) {
 			c.File(filepath.Join(adminDist, "index.html"))
-		})
-		r.GET("/admin/*path", func(c *gin.Context) {
-			reqPath := strings.TrimSpace(c.Param("path"))
-			if reqPath != "" && reqPath != "/" {
-				target := filepath.Join(adminDist, reqPath)
-				if st, err := os.Stat(target); err == nil && !st.IsDir() {
-					c.File(target)
-					return
-				}
+		}
+		r.GET("/admin", serveAdminIndex)
+		r.GET("/admin/", serveAdminIndex)
+		r.NoRoute(func(c *gin.Context) {
+			reqPath := strings.TrimSpace(c.Request.URL.Path)
+			if strings.HasPrefix(reqPath, "/admin/assets/") {
+				c.String(http.StatusNotFound, "404 page not found")
+				return
 			}
-			c.File(filepath.Join(adminDist, "index.html"))
+			if strings.HasPrefix(reqPath, "/admin/") {
+				serveAdminIndex(c)
+				return
+			}
+			c.String(http.StatusNotFound, "404 page not found")
 		})
 	}
 }
