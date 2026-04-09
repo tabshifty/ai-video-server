@@ -16,6 +16,7 @@ type Config struct {
 	RedisPassword       string
 	JWTSecret           string
 	StorageRoot         string
+	PosterStoragePath   string
 	UploadTempDir       string
 	TMDBAPIKey          string
 	TMDBBaseURL         string
@@ -37,6 +38,7 @@ func Load() (Config, error) {
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
 		JWTSecret:           os.Getenv("JWT_SECRET"),
 		StorageRoot:         getEnv("STORAGE_ROOT", "./storage"),
+		PosterStoragePath:   getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
 		UploadTempDir:       getEnv("UPLOAD_TEMP_DIR", "./tmp/uploads"),
 		TMDBAPIKey:          os.Getenv("TMDB_API_KEY"),
 		TMDBBaseURL:         getEnv("TMDB_BASE_URL", "https://api.themoviedb.org/3"),

@@ -9,7 +9,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,22 +22,34 @@ import (
 
 // ScraperService handles TMDB search and metadata syncing.
 type ScraperService struct {
-	repo        *repository.VideoRepository
-	apiKey      string
-	baseURL     string
-	storageRoot string
-	httpClient  *http.Client
+	repo         *repository.VideoRepository
+	apiKey       string
+	baseURL      string
+	storageRoot  string
+	posterRoot   string
+	httpClient   *http.Client
+	cacheTTL     time.Duration
+	cacheMu      sync.RWMutex
+	previewCache map[string]previewCacheEntry
 }
 
-func NewScraperService(repo *repository.VideoRepository, apiKey, baseURL, storageRoot string, timeout time.Duration) *ScraperService {
+type previewCacheEntry struct {
+	ExpireAt   time.Time
+	Candidates []map[string]any
+}
+
+func NewScraperService(repo *repository.VideoRepository, apiKey, baseURL, storageRoot, posterRoot string, timeout time.Duration) *ScraperService {
 	return &ScraperService{
 		repo:        repo,
 		apiKey:      apiKey,
 		baseURL:     strings.TrimSuffix(baseURL, "/"),
 		storageRoot: storageRoot,
+		posterRoot:  posterRoot,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		cacheTTL:     5 * time.Minute,
+		previewCache: map[string]previewCacheEntry{},
 	}
 }
 
@@ -45,6 +59,255 @@ type ScrapeResult struct {
 	Description   string
 	ThumbnailPath string
 	Metadata      map[string]any
+}
+
+type ConfirmScrapeInput struct {
+	VideoID       uuid.UUID
+	Type          string // movie | tv | episode
+	TMDBID        int
+	Title         string
+	Overview      string
+	PosterURL     string
+	ReleaseDate   string
+	Metadata      map[string]any
+	SeasonNumber  int
+	EpisodeNumber int
+}
+
+func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year int) ([]map[string]any, error) {
+	if s.apiKey == "" {
+		return nil, fmt.Errorf("TMDB_API_KEY is empty")
+	}
+	cacheKey := fmt.Sprintf("movie|%s|%d", normalizeCacheKey(title), year)
+	if c, ok := s.getPreviewCache(cacheKey); ok {
+		return c, nil
+	}
+
+	q := url.Values{}
+	q.Set("api_key", s.apiKey)
+	q.Set("query", strings.TrimSpace(title))
+	if year > 0 {
+		q.Set("year", fmt.Sprintf("%d", year))
+	}
+	raw, err := s.getJSON(ctx, fmt.Sprintf("%s/search/movie?%s", s.baseURL, q.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	rows, _ := raw["results"].([]any)
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		item, ok := row.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := asInt(item["id"])
+		if id <= 0 {
+			continue
+		}
+		detail, dErr := s.getJSON(ctx, fmt.Sprintf("%s/movie/%d?%s", s.baseURL, id, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+		if dErr != nil {
+			detail = item
+		}
+		out = append(out, map[string]any{
+			"tmdb_id":         id,
+			"title":           asString(detail["title"]),
+			"original_title":  asString(detail["original_title"]),
+			"overview":        asString(detail["overview"]),
+			"poster_path":     asString(detail["poster_path"]),
+			"release_date":    asString(detail["release_date"]),
+			"vote_average":    detail["vote_average"],
+			"genres":          extractGenres(detail["genres"]),
+			"metadata":        detail,
+			"media_type_hint": "movie",
+		})
+	}
+	s.setPreviewCache(cacheKey, out)
+	return out, nil
+}
+
+func (s *ScraperService) PreviewTV(ctx context.Context, title string, year int) ([]map[string]any, error) {
+	if s.apiKey == "" {
+		return nil, fmt.Errorf("TMDB_API_KEY is empty")
+	}
+	cacheKey := fmt.Sprintf("tv|%s|%d", normalizeCacheKey(title), year)
+	if c, ok := s.getPreviewCache(cacheKey); ok {
+		return c, nil
+	}
+
+	q := url.Values{}
+	q.Set("api_key", s.apiKey)
+	q.Set("query", strings.TrimSpace(title))
+	raw, err := s.getJSON(ctx, fmt.Sprintf("%s/search/tv?%s", s.baseURL, q.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	rows, _ := raw["results"].([]any)
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		item, ok := row.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := asInt(item["id"])
+		if id <= 0 {
+			continue
+		}
+		detail, dErr := s.getJSON(ctx, fmt.Sprintf("%s/tv/%d?%s", s.baseURL, id, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+		if dErr != nil {
+			detail = item
+		}
+		firstYear := 0
+		if fd := asString(detail["first_air_date"]); len(fd) >= 4 {
+			firstYear, _ = strconv.Atoi(fd[:4])
+		}
+		if year > 0 && firstYear > 0 && firstYear != year {
+			continue
+		}
+		out = append(out, map[string]any{
+			"tmdb_id":         id,
+			"title":           asString(detail["name"]),
+			"original_title":  asString(detail["original_name"]),
+			"overview":        asString(detail["overview"]),
+			"poster_path":     asString(detail["poster_path"]),
+			"release_date":    asString(detail["first_air_date"]),
+			"vote_average":    detail["vote_average"],
+			"genres":          extractGenres(detail["genres"]),
+			"metadata":        detail,
+			"media_type_hint": "tv",
+		})
+	}
+	s.setPreviewCache(cacheKey, out)
+	return out, nil
+}
+
+func (s *ScraperService) ConfirmMovie(ctx context.Context, in ConfirmScrapeInput) error {
+	if in.TMDBID <= 0 {
+		return fmt.Errorf("tmdb_id is required")
+	}
+	video, err := s.repo.GetVideoByID(ctx, in.VideoID)
+	if err != nil {
+		return err
+	}
+	detail, err := s.getJSON(ctx, fmt.Sprintf("%s/movie/%d?%s", s.baseURL, in.TMDBID, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+	if err != nil {
+		return err
+	}
+
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		title = asString(detail["title"])
+	}
+	overview := strings.TrimSpace(in.Overview)
+	if overview == "" {
+		overview = asString(detail["overview"])
+	}
+	posterURL := strings.TrimSpace(in.PosterURL)
+	if posterURL == "" {
+		posterURL = asString(detail["poster_path"])
+	}
+	thumbPath, err := s.DownloadPoster(ctx, posterURL, in.VideoID)
+	if err != nil {
+		return err
+	}
+	meta := map[string]any{
+		"tmdb":         detail,
+		"manual":       in.Metadata,
+		"release_date": chooseStr(in.ReleaseDate, asString(detail["release_date"])),
+	}
+	return s.repo.UpdateVideoScrapeResult(ctx, video.ID, &in.TMDBID, title, overview, thumbPath, meta, "uploaded")
+}
+
+func (s *ScraperService) ConfirmEpisode(ctx context.Context, in ConfirmScrapeInput) error {
+	if in.TMDBID <= 0 {
+		return fmt.Errorf("tmdb_id is required")
+	}
+	video, err := s.repo.GetVideoByID(ctx, in.VideoID)
+	if err != nil {
+		return err
+	}
+	seasonNum := in.SeasonNumber
+	episodeNum := in.EpisodeNumber
+	if seasonNum <= 0 || episodeNum <= 0 {
+		_, _, sn, en, ok := utils.ParseFilename(video.OriginalPath)
+		if ok {
+			if seasonNum <= 0 {
+				seasonNum = sn
+			}
+			if episodeNum <= 0 {
+				episodeNum = en
+			}
+		}
+	}
+	if seasonNum <= 0 || episodeNum <= 0 {
+		return fmt.Errorf("season_number and episode_number are required for episode")
+	}
+
+	tvRaw, err := s.getJSON(ctx, fmt.Sprintf("%s/tv/%d?%s", s.baseURL, in.TMDBID, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+	if err != nil {
+		return err
+	}
+	seriesID, err := s.repo.UpsertSeries(
+		ctx,
+		in.TMDBID,
+		asString(tvRaw["name"]),
+		asString(tvRaw["overview"]),
+		asString(tvRaw["poster_path"]),
+		asString(tvRaw["backdrop_path"]),
+		parseDate(tvRaw["first_air_date"]),
+		asInt(tvRaw["number_of_seasons"]),
+		asInt(tvRaw["number_of_episodes"]),
+	)
+	if err != nil {
+		return err
+	}
+
+	seasonRaw, err := s.getJSON(ctx, fmt.Sprintf("%s/tv/%d/season/%d?%s", s.baseURL, in.TMDBID, seasonNum, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+	if err != nil {
+		return err
+	}
+	seasonID, err := s.repo.UpsertSeason(ctx, seriesID, seasonNum, asString(seasonRaw["name"]), asString(seasonRaw["overview"]), asString(seasonRaw["poster_path"]), parseDate(seasonRaw["air_date"]))
+	if err != nil {
+		return err
+	}
+
+	var epRaw map[string]any
+	episodes, _ := seasonRaw["episodes"].([]any)
+	for _, ep := range episodes {
+		row, ok := ep.(map[string]any)
+		if !ok {
+			continue
+		}
+		if asInt(row["episode_number"]) == episodeNum {
+			epRaw = row
+			break
+		}
+	}
+	if epRaw == nil {
+		return fmt.Errorf("episode S%02dE%02d not found", seasonNum, episodeNum)
+	}
+	episodeTMDBID := asInt(epRaw["id"])
+	if episodeTMDBID <= 0 {
+		return fmt.Errorf("invalid episode tmdb id")
+	}
+
+	if err := s.repo.UpsertEpisode(ctx, seasonID, episodeNum, asString(epRaw["name"]), asString(epRaw["overview"]), asString(epRaw["still_path"]), asInt(epRaw["runtime"]), parseDate(epRaw["air_date"]), in.VideoID); err != nil {
+		return err
+	}
+	title := chooseStr(in.Title, asString(epRaw["name"]))
+	overview := chooseStr(in.Overview, asString(epRaw["overview"]))
+	posterURL := chooseStr(in.PosterURL, chooseStr(asString(epRaw["still_path"]), asString(tvRaw["poster_path"])))
+	thumbPath, err := s.DownloadPoster(ctx, posterURL, in.VideoID)
+	if err != nil {
+		return err
+	}
+	meta := map[string]any{
+		"tmdb_tv":      tvRaw,
+		"tmdb_season":  seasonRaw,
+		"tmdb_episode": epRaw,
+		"manual":       in.Metadata,
+		"release_date": chooseStr(in.ReleaseDate, asString(epRaw["air_date"])),
+	}
+	return s.repo.UpdateVideoScrapeResult(ctx, video.ID, &episodeTMDBID, title, overview, thumbPath, meta, "uploaded")
 }
 
 // SearchMovieCandidates searches TMDB by file title/year pattern.
@@ -437,6 +700,48 @@ func parseDate(v any) *time.Time {
 	return &t
 }
 
+func (s *ScraperService) DownloadPoster(ctx context.Context, posterURL string, videoID uuid.UUID) (string, error) {
+	posterURL = strings.TrimSpace(posterURL)
+	if posterURL == "" {
+		return "", nil
+	}
+	imageURL := posterURL
+	if !strings.HasPrefix(posterURL, "http://") && !strings.HasPrefix(posterURL, "https://") {
+		imageURL = "https://image.tmdb.org/t/p/original" + posterURL
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("create poster request: %w", err)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("download poster failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return "", fmt.Errorf("poster status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	root := s.posterRoot
+	if strings.TrimSpace(root) == "" {
+		root = filepath.Join(s.storageRoot, "posters")
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return "", fmt.Errorf("create poster root: %w", err)
+	}
+	outputPath := filepath.Join(root, videoID.String()+".jpg")
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return "", fmt.Errorf("create poster file: %w", err)
+	}
+	defer f.Close()
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return "", fmt.Errorf("write poster file: %w", err)
+	}
+	return outputPath, nil
+}
+
 func (s *ScraperService) downloadTMDBImage(ctx context.Context, relativePath string, videoID uuid.UUID) (string, error) {
 	relativePath = strings.TrimSpace(relativePath)
 	if relativePath == "" {
@@ -475,4 +780,59 @@ func (s *ScraperService) downloadTMDBImage(ctx context.Context, relativePath str
 		return "", fmt.Errorf("write poster file: %w", err)
 	}
 	return outputPath, nil
+}
+
+func extractGenres(v any) []string {
+	rows, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		item, ok := row.(map[string]any)
+		if !ok {
+			continue
+		}
+		name := asString(item["name"])
+		if name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func chooseStr(primary, fallback string) string {
+	if strings.TrimSpace(primary) != "" {
+		return strings.TrimSpace(primary)
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func normalizeCacheKey(raw string) string {
+	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(raw)), " "))
+}
+
+func (s *ScraperService) getPreviewCache(key string) ([]map[string]any, bool) {
+	s.cacheMu.RLock()
+	defer s.cacheMu.RUnlock()
+	entry, ok := s.previewCache[key]
+	if !ok || time.Now().After(entry.ExpireAt) {
+		return nil, false
+	}
+	return entry.Candidates, true
+}
+
+func (s *ScraperService) setPreviewCache(key string, candidates []map[string]any) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	now := time.Now()
+	for k, v := range s.previewCache {
+		if now.After(v.ExpireAt) {
+			delete(s.previewCache, k)
+		}
+	}
+	s.previewCache[key] = previewCacheEntry{
+		ExpireAt:   now.Add(s.cacheTTL),
+		Candidates: candidates,
+	}
 }

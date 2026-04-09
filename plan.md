@@ -74,3 +74,22 @@
   - `go test ./...` passed (with local `GOCACHE`).
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-09 11:45] Add admin scrape preview and manual confirm APIs
+- Type: `implementation`
+- Summary:
+  - Added admin-only scrape management endpoints: preview TMDB candidates and confirm manual metadata edits.
+  - Added in-memory preview cache (5 minutes), configurable poster storage path, and poster download for confirm flow.
+  - Extended scraper service with preview/confirm methods for movie and TV episode; confirm updates videos metadata and episode linkage.
+- Changed Files:
+  - `internal/handlers/admin_scrape.go`
+  - `internal/handlers/router.go`
+  - `internal/services/scraper.go`
+  - `internal/config/config.go`
+  - `main.go`
+  - `.env.example`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed (with local `GOCACHE`).
+- Rollback:
+  - Revert the commit containing this feature entry.

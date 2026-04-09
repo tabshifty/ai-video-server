@@ -80,6 +80,12 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/user/uploaded-videos", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadedVideos)
 		v1.GET("/user/liked-videos", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.LikedVideos)
 		v1.GET("/user/favorited-videos", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.FavoritedVideos)
+
+		admin := v1.Group("/admin", middleware.AuthMiddleware(a.jwtSecret, a.redis), middleware.AdminRequired())
+		{
+			admin.POST("/scrape/preview", a.AdminScrapePreview)
+			admin.PUT("/scrape/confirm", a.AdminScrapeConfirm)
+		}
 	}
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
