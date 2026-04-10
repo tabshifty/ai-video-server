@@ -16,7 +16,8 @@ import (
 )
 
 type ChunkUploadService struct {
-	baseDir string
+	baseDir      string
+	assembledDir string
 }
 
 type ChunkSession struct {
@@ -38,7 +39,10 @@ type ChunkSession struct {
 }
 
 func NewChunkUploadService(uploadTempDir string) *ChunkUploadService {
-	return &ChunkUploadService{baseDir: filepath.Join(uploadTempDir, "chunk-sessions")}
+	return &ChunkUploadService{
+		baseDir:      filepath.Join(uploadTempDir, "chunk-sessions"),
+		assembledDir: filepath.Join(uploadTempDir, "assembled"),
+	}
 }
 
 func (s *ChunkUploadService) Init(ctx context.Context, userID uuid.UUID, filename string, fileSize, chunkSize int64, totalChunks int, hash, typ, title, description string, tags []string) (ChunkSession, error) {
@@ -111,7 +115,10 @@ func (s *ChunkUploadService) Complete(ctx context.Context, sessionID string) (Ch
 		return ChunkSession{}, "", fmt.Errorf("not all chunks uploaded")
 	}
 	dir := s.sessionDir(sessionID)
-	finalPath := filepath.Join(dir, "assembled-"+session.Filename)
+	if err := os.MkdirAll(s.assembledDir, 0o755); err != nil {
+		return ChunkSession{}, "", fmt.Errorf("create assembled dir: %w", err)
+	}
+	finalPath := filepath.Join(s.assembledDir, session.ID+"-"+session.Filename)
 	dst, err := os.Create(finalPath)
 	if err != nil {
 		return ChunkSession{}, "", fmt.Errorf("create assembled file: %w", err)

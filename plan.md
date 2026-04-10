@@ -511,3 +511,20 @@
   - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-10 18:41] 修复分片上传后 worker 转码找不到源文件
+- Type: `implementation`
+- Summary:
+  - 定位到 `UploadComplete` 会在入队后执行 `chunkUpload.Abort`，导致会话目录被删除，连同 `assembled-*.mp4` 一起被删。
+  - 调整 `ChunkUploadService.Complete`：合并文件改为写入 `UPLOAD_TEMP_DIR/assembled/`，不再位于 `chunk-sessions/<session_id>/` 下。
+  - 保持 `Abort(session_id)` 只清理分片会话目录，避免误删待转码输入文件。
+  - 新增回归测试，覆盖“Complete 后 Abort，合并文件仍可读取”行为。
+- Changed Files:
+  - `internal/services/chunk_upload.go`
+  - `internal/services/chunk_upload_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run TestChunkUploadCompleteFileSurvivesAbort -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services` passed。
+- Rollback:
+  - Revert the commit containing this feature entry.
