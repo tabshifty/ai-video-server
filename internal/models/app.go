@@ -12,6 +12,7 @@ type VideoDetail struct {
 	ID             uuid.UUID       `json:"id"`
 	Title          string          `json:"title"`
 	Description    string          `json:"description"`
+	PlayURL        string          `json:"play_url"`
 	TranscodedPath string          `json:"transcoded_path"`
 	ThumbnailPath  string          `json:"thumbnail_path"`
 	Duration       int             `json:"duration"`

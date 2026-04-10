@@ -5,6 +5,7 @@ import (
 
 	"video-server/internal/middleware"
 	"video-server/internal/response"
+	"video-server/internal/utils"
 )
 
 func (a *API) VideoDetail(c *gin.Context) {
@@ -23,5 +24,6 @@ func (a *API) VideoDetail(c *gin.Context) {
 		response.Error(c, 20, err.Error())
 		return
 	}
+	detail.PlayURL = utils.VideoPlayURL(detail.ID)
 	ok(c, detail)
 }
