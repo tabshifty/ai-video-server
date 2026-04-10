@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 ## Scope
 - This file applies to the entire repository: `D:\workspace\git\App\video-test`.
@@ -16,6 +16,8 @@
 - Prefer fast search/read commands (`rg`, targeted file reads) over broad scans.
 - Before claiming completion, run only the verifications that actually exist in this repo.
 - 所有 Markdown 文件以及前端面向用户的界面文案默认必须使用中文；仅在任务明确要求其他语言时可例外。
+- 中文内容必须保证编码与显示正确，禁止出现乱码（包括 Markdown、注释、界面文案）。
+- Git 提交信息默认使用中文，且必须无乱码。
 
 ## Change Management Rules
 - Every change must be rollbackable:
