@@ -528,3 +528,19 @@
   - `GOCACHE=$(pwd)/.gocache go test ./internal/services` passed。
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-10 19:40] 修复删除转码失败视频的外键约束报错
+- Type: `implementation`
+- Summary:
+  - 修复删除视频时因 `transcoding_jobs.video_id` 与 `user_video_actions.video_id` 外键依赖导致的 `SQLSTATE 23503`。
+  - 将 `DeleteVideoByID` 改为事务删除：先删 `transcoding_jobs`、再删 `user_video_actions`、最后删 `videos`。
+  - 提取 `deleteVideoDependencies` 并补充顺序与错误分支回归测试。
+- Changed Files:
+  - `internal/repository/video_repository.go`
+  - `internal/repository/video_delete_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository -run TestDeleteVideoDependencies -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
+- Rollback:
+  - Revert the commit containing this feature entry.
