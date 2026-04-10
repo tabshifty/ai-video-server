@@ -121,6 +121,9 @@ type execer interface {
 }
 
 func deleteVideoDependencies(ctx context.Context, db execer, videoID uuid.UUID) error {
+	if _, err := db.Exec(ctx, "SELECT 1 FROM videos WHERE id = $1 FOR UPDATE", videoID); err != nil {
+		return fmt.Errorf("lock video row for delete: %w", err)
+	}
 	if _, err := db.Exec(ctx, "DELETE FROM transcoding_jobs WHERE video_id = $1", videoID); err != nil {
 		return fmt.Errorf("delete transcoding jobs by video id: %w", err)
 	}
