@@ -193,7 +193,7 @@ func (r *VideoRepository) ListActiveOriginalPaths(ctx context.Context) ([]string
 	rows, err := r.pool.Query(ctx, `
 SELECT original_path
 FROM videos
-WHERE status IN ('uploaded','processing') AND original_path IS NOT NULL AND original_path <> ''
+WHERE status IN ('uploaded','scraping','processing','failed') AND original_path IS NOT NULL AND original_path <> ''
 `)
 	if err != nil {
 		return nil, fmt.Errorf("list active original paths: %w", err)
