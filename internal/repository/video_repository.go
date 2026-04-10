@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -177,6 +178,9 @@ func (r *VideoRepository) UpdateVideoStatus(ctx context.Context, videoID uuid.UU
 
 func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error) {
 	var v models.Video
+	var durationSeconds sql.NullInt32
+	var width sql.NullInt32
+	var height sql.NullInt32
 	err := r.pool.QueryRow(ctx, `
 SELECT
   id,
@@ -196,12 +200,15 @@ SELECT
   created_at,
   updated_at
 FROM videos WHERE id=$1`, videoID).Scan(
-		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
+		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {
 		return models.Video{}, fmt.Errorf("get video by id: %w", err)
 	}
+	v.DurationSeconds = nullInt32ToInt(durationSeconds)
+	v.Width = nullInt32ToInt(width)
+	v.Height = nullInt32ToInt(height)
 	return v, nil
 }
 
@@ -229,6 +236,9 @@ WHERE status IN ('uploaded','scraping','processing','failed') AND original_path 
 
 func (r *VideoRepository) GetVideoByOriginalPath(ctx context.Context, originalPath string) (models.Video, error) {
 	var v models.Video
+	var durationSeconds sql.NullInt32
+	var width sql.NullInt32
+	var height sql.NullInt32
 	err := r.pool.QueryRow(ctx, `
 SELECT
   id,
@@ -248,13 +258,23 @@ SELECT
   created_at,
   updated_at
 FROM videos WHERE original_path=$1`, originalPath).Scan(
-		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
+		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {
 		return models.Video{}, fmt.Errorf("get video by original path: %w", err)
 	}
+	v.DurationSeconds = nullInt32ToInt(durationSeconds)
+	v.Width = nullInt32ToInt(width)
+	v.Height = nullInt32ToInt(height)
 	return v, nil
+}
+
+func nullInt32ToInt(v sql.NullInt32) int {
+	if !v.Valid {
+		return 0
+	}
+	return int(v.Int32)
 }
 
 func (r *VideoRepository) UpdateVideoMetadata(ctx context.Context, videoID uuid.UUID, title, description string, metadata map[string]any) error {

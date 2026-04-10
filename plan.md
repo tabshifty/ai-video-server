@@ -496,3 +496,18 @@
   - `go test ./internal/repository ./internal/services ./internal/queue ./internal/utils` passed。
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-10 17:53] 修复删除视频时 NULL 数值字段扫描报错
+- Type: `implementation`
+- Summary:
+  - 修复 `GetVideoByID`/`GetVideoByOriginalPath` 在 `duration_seconds/width/height` 为 `NULL` 时扫描到 `int` 触发报错的问题。
+  - 将上述字段改为先扫描 `sql.NullInt32`，再统一转换为 `int`，避免 `cannot scan NULL into *int`。
+  - 新增回归测试覆盖 `NULL -> 0` 和有效值转换行为。
+- Changed Files:
+  - `internal/repository/video_repository.go`
+  - `internal/repository/video_repository_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
+- Rollback:
+  - Revert the commit containing this feature entry.
