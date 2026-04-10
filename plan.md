@@ -385,3 +385,47 @@
   - 文档变更，人工检查文本显示正常，无乱码。
 - Rollback:
   - Revert the commit containing this feature entry.
+### [2026-04-10 14:28] 新增可播放视频源接口（计划）
+- Type: `plan`
+- Summary:
+  - 新增鉴权播放源接口 `GET /api/v1/videos/:id/source`，用于直接返回可播放视频流。
+  - 限定仅 `ready` 状态可播放，未就绪返回 `409`，不存在返回 `404`，未登录返回 `401`。
+  - 在视频详情接口中新增 `play_url`（相对路径），减少客户端拼接逻辑。
+  - 更新 OpenAPI 生成配置并补充最小单测。
+- Changed Files:
+  - `internal/handlers/router.go`
+  - `internal/handlers/video_source.go`
+  - `internal/handlers/video_detail.go`
+  - `internal/models/app.go`
+  - `internal/utils/video_url.go`
+  - `internal/utils/video_url_test.go`
+  - `cmd/gen-openapi/main.go`
+  - `docs/swagger/openapi.json`
+- Verification:
+  - 待执行：`go test ./...`
+- Rollback:
+  - Revert the commit containing this entry.
+
+### [2026-04-10 14:35] 实现可播放视频源接口与详情 play_url
+- Type: `implementation`
+- Summary:
+  - 新增 `GET /api/v1/videos/:id/source`（鉴权）并返回视频流；仅 `ready` 可播放。
+  - 新增错误返回策略：`401`（未登录）、`400`（非法 ID）、`404`（视频或源文件不存在）、`409`（视频未就绪）。
+  - 视频详情响应新增 `play_url` 字段，固定为相对路径 `/api/v1/videos/{id}/source`。
+  - 新增 `internal/utils/VideoPlayURL` 与对应单测，确保播放地址生成稳定。
+  - 更新 `cmd/gen-openapi` 并重新生成 `docs/swagger/openapi.json`，加入新接口说明。
+- Changed Files:
+  - `internal/handlers/router.go`
+  - `internal/handlers/video_source.go`
+  - `internal/handlers/video_detail.go`
+  - `internal/models/app.go`
+  - `internal/utils/video_url.go`
+  - `internal/utils/video_url_test.go`
+  - `cmd/gen-openapi/main.go`
+  - `docs/swagger/openapi.json`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/utils ./internal/services ./internal/repository ./internal/queue ./pkg/ffmpeg ./cmd/gen-openapi` passed。
+  - `go test ./...` failed（既有 Windows 编译问题：`internal/handlers/admin.go` 中 `syscall.Statfs_t/Statfs` 不可用）。
+- Rollback:
+  - Revert the commit containing this feature entry.

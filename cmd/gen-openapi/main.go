@@ -75,6 +75,26 @@ func pathsSpec() map[string]any {
 				"responses": map[string]any{"202": map[string]any{"description": "Accepted"}},
 			},
 		},
+		"/videos/{id}/source": map[string]any{
+			"get": map[string]any{
+				"summary":  "Get video source stream",
+				"security": []map[string]any{{"BearerAuth": []string{}}},
+				"parameters": []map[string]any{
+					{
+						"name":     "id",
+						"in":       "path",
+						"required": true,
+						"schema":   map[string]any{"type": "string"},
+					},
+				},
+				"responses": map[string]any{
+					"200": map[string]any{"description": "Video stream"},
+					"401": map[string]any{"description": "Unauthorized"},
+					"404": map[string]any{"description": "Not found"},
+					"409": map[string]any{"description": "Video not ready"},
+				},
+			},
+		},
 		"/admin/scrape/preview": map[string]any{
 			"post": map[string]any{
 				"summary":   "Admin scrape preview",
