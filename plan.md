@@ -544,3 +544,19 @@
   - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-10 21:28] 修复删除视频与转码任务并发导致的外键竞态
+- Type: `implementation`
+- Summary:
+  - 针对“仍偶发 `transcoding_jobs_video_id_fkey`”问题，补充并发安全：删除事务先对目标视频行执行 `FOR UPDATE` 锁定。
+  - 在锁定后再顺序删除 `transcoding_jobs`、`user_video_actions`、`videos`，避免 worker 并发插入同 `video_id` 任务造成竞态。
+  - 更新回归测试，覆盖加锁后的 SQL 执行顺序与错误分支。
+- Changed Files:
+  - `internal/repository/video_repository.go`
+  - `internal/repository/video_delete_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository -run TestDeleteVideoDependencies -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
+- Rollback:
+  - Revert the commit containing this feature entry.

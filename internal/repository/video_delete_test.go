@@ -33,17 +33,20 @@ func TestDeleteVideoDependenciesOrder(t *testing.T) {
 		t.Fatalf("deleteVideoDependencies() error = %v", err)
 	}
 
-	if len(execer.statements) != 3 {
-		t.Fatalf("statements count = %d, want 3", len(execer.statements))
+	if len(execer.statements) != 4 {
+		t.Fatalf("statements count = %d, want 4", len(execer.statements))
 	}
-	if execer.statements[0] != "DELETE FROM transcoding_jobs WHERE video_id = $1" {
+	if execer.statements[0] != "SELECT 1 FROM videos WHERE id = $1 FOR UPDATE" {
 		t.Fatalf("statement[0] = %q", execer.statements[0])
 	}
-	if execer.statements[1] != "DELETE FROM user_video_actions WHERE video_id = $1" {
+	if execer.statements[1] != "DELETE FROM transcoding_jobs WHERE video_id = $1" {
 		t.Fatalf("statement[1] = %q", execer.statements[1])
 	}
-	if execer.statements[2] != "DELETE FROM videos WHERE id = $1" {
+	if execer.statements[2] != "DELETE FROM user_video_actions WHERE video_id = $1" {
 		t.Fatalf("statement[2] = %q", execer.statements[2])
+	}
+	if execer.statements[3] != "DELETE FROM videos WHERE id = $1" {
+		t.Fatalf("statement[3] = %q", execer.statements[3])
 	}
 }
 
@@ -52,7 +55,7 @@ func TestDeleteVideoDependenciesError(t *testing.T) {
 
 	videoID := uuid.New()
 	execer := &fakeExecer{
-		failAt: 2,
+		failAt: 3,
 		err:    errors.New("boom"),
 	}
 
