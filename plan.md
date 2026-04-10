@@ -483,3 +483,16 @@
   - `npm --prefix admin-web run build` failed（当前环境 Node 权限问题：`EPERM: operation not permitted, lstat 'C:\Users\CheeTsui'`）。
 - Rollback:
   - Revert the commit containing this feature entry.
+### [2026-04-10 17:44] 修复视频删除时 NULL 扫描导致失败
+- Type: `implementation`
+- Summary:
+  - 修复 `AdminDeleteVideo` 依赖的 `GetVideoByID` 查询在历史数据存在 NULL 时扫描失败的问题（`duration_seconds/width/height` 等字段）。
+  - 在 `GetVideoByID` 与 `GetVideoByOriginalPath` 中统一使用 SQL `COALESCE` 提供默认值，避免 `cannot scan NULL into *int/*string`。
+  - 删除逻辑保持容错：即使磁盘文件不存在也不会阻断删除（`os.Remove` 错误已忽略）。
+- Changed Files:
+  - `internal/repository/video_repository.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/repository ./internal/services ./internal/queue ./internal/utils` passed。
+- Rollback:
+  - Revert the commit containing this feature entry.
