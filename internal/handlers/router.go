@@ -22,50 +22,54 @@ import (
 
 // API bundles all HTTP handlers.
 type API struct {
-	repo          *repository.VideoRepository
-	uploadSvc     *services.UploadService
-	chunkUpload   *services.ChunkUploadService
-	recSvc        *services.RecommendService
-	scrapeSvc     *services.ScraperService
-	appSvc        *services.AppService
-	enqueuer      *queue.Enqueuer
-	logger        *slog.Logger
-	redis         *redis.Client
-	redisAddr     string
-	redisPassword string
-	asynqQueue    string
-	jwtSecret     string
-	accessTTL     time.Duration
-	refreshTTL    time.Duration
-	maxVideoSize  int64
-	storageRoot   string
-	uploadTempDir string
-	serverLogPath string
-	enableSwagger bool
+	repo           *repository.VideoRepository
+	uploadSvc      *services.UploadService
+	chunkUpload    *services.ChunkUploadService
+	recSvc         *services.RecommendService
+	scrapeSvc      *services.ScraperService
+	appSvc         *services.AppService
+	enqueuer       *queue.Enqueuer
+	logger         *slog.Logger
+	redis          *redis.Client
+	redisAddr      string
+	redisPassword  string
+	asynqQueue     string
+	jwtSecret      string
+	playSignSecret string
+	playSignTTL    time.Duration
+	accessTTL      time.Duration
+	refreshTTL     time.Duration
+	maxVideoSize   int64
+	storageRoot    string
+	uploadTempDir  string
+	serverLogPath  string
+	enableSwagger  bool
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath string, enableSwagger bool) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath string, enableSwagger bool) *API {
 	return &API{
-		repo:          repo,
-		uploadSvc:     uploadSvc,
-		chunkUpload:   chunkUpload,
-		recSvc:        recSvc,
-		scrapeSvc:     scrapeSvc,
-		appSvc:        appSvc,
-		enqueuer:      enqueuer,
-		logger:        logger,
-		redis:         redisClient,
-		redisAddr:     redisAddr,
-		redisPassword: redisPassword,
-		asynqQueue:    asynqQueue,
-		jwtSecret:     jwtSecret,
-		accessTTL:     accessTTL,
-		refreshTTL:    refreshTTL,
-		maxVideoSize:  maxVideoSize,
-		storageRoot:   storageRoot,
-		uploadTempDir: uploadTempDir,
-		serverLogPath: serverLogPath,
-		enableSwagger: enableSwagger,
+		repo:           repo,
+		uploadSvc:      uploadSvc,
+		chunkUpload:    chunkUpload,
+		recSvc:         recSvc,
+		scrapeSvc:      scrapeSvc,
+		appSvc:         appSvc,
+		enqueuer:       enqueuer,
+		logger:         logger,
+		redis:          redisClient,
+		redisAddr:      redisAddr,
+		redisPassword:  redisPassword,
+		asynqQueue:     asynqQueue,
+		jwtSecret:      jwtSecret,
+		playSignSecret: playSignSecret,
+		playSignTTL:    10 * time.Minute,
+		accessTTL:      accessTTL,
+		refreshTTL:     refreshTTL,
+		maxVideoSize:   maxVideoSize,
+		storageRoot:    storageRoot,
+		uploadTempDir:  uploadTempDir,
+		serverLogPath:  serverLogPath,
+		enableSwagger:  enableSwagger,
 	}
 }
 
@@ -91,6 +95,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.POST("/actions", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.RecordAction)
 		v1.GET("/videos/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.VideoDetail)
 		v1.GET("/videos/:id/source", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.VideoSource)
+		v1.GET("/videos/:id/source/signed", a.VideoSourceSigned)
 		v1.POST("/history", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.RecordHistory)
 		v1.GET("/history/continue", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ContinueHistory)
 		v1.DELETE("/history/:video_id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.DeleteHistory)
@@ -110,6 +115,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/stats", a.AdminStats)
 			admin.GET("/videos", a.AdminVideos)
 			admin.GET("/videos/:id", a.AdminVideoDetail)
+			admin.GET("/videos/:id/play-url", a.AdminVideoPlayURL)
 			admin.PUT("/videos/:id", a.AdminUpdateVideo)
 			admin.DELETE("/videos/:id", a.AdminDeleteVideo)
 			admin.POST("/videos/:id/retranscode", a.AdminRetranscodeVideo)

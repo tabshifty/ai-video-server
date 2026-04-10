@@ -95,6 +95,59 @@ func pathsSpec() map[string]any {
 				},
 			},
 		},
+		"/videos/{id}/source/signed": map[string]any{
+			"get": map[string]any{
+				"summary": "Get video source stream by signed url",
+				"parameters": []map[string]any{
+					{
+						"name":     "id",
+						"in":       "path",
+						"required": true,
+						"schema":   map[string]any{"type": "string"},
+					},
+					{
+						"name":     "exp",
+						"in":       "query",
+						"required": true,
+						"schema":   map[string]any{"type": "integer"},
+					},
+					{
+						"name":     "sig",
+						"in":       "query",
+						"required": true,
+						"schema":   map[string]any{"type": "string"},
+					},
+				},
+				"responses": map[string]any{
+					"200": map[string]any{"description": "Video stream"},
+					"400": map[string]any{"description": "Bad request"},
+					"401": map[string]any{"description": "Invalid signature"},
+					"404": map[string]any{"description": "Not found"},
+					"409": map[string]any{"description": "Video not ready"},
+					"410": map[string]any{"description": "Signed url expired"},
+				},
+			},
+		},
+		"/admin/videos/{id}/play-url": map[string]any{
+			"get": map[string]any{
+				"summary":  "Admin get signed play url",
+				"security": []map[string]any{{"BearerAuth": []string{}}},
+				"parameters": []map[string]any{
+					{
+						"name":     "id",
+						"in":       "path",
+						"required": true,
+						"schema":   map[string]any{"type": "string"},
+					},
+				},
+				"responses": map[string]any{
+					"200": map[string]any{"description": "OK"},
+					"401": map[string]any{"description": "Unauthorized"},
+					"404": map[string]any{"description": "Video not found"},
+					"409": map[string]any{"description": "Video not ready"},
+				},
+			},
+		},
 		"/admin/scrape/preview": map[string]any{
 			"post": map[string]any{
 				"summary":   "Admin scrape preview",

@@ -429,3 +429,57 @@
   - `go test ./...` failed（既有 Windows 编译问题：`internal/handlers/admin.go` 中 `syscall.Statfs_t/Statfs` 不可用）。
 - Rollback:
   - Revert the commit containing this feature entry.
+### [2026-04-10 14:48] 管理端新增签名播放预览功能（计划）
+- Type: `plan`
+- Summary:
+  - 为 admin-web 视频详情新增可播放预览能力，解决 `<video>` 无法携带 Bearer 头问题。
+  - 后端新增管理员获取临时签名播放地址接口，并新增签名流播放接口。
+  - 签名默认有效期 10 分钟，签名口径绑定 `video_id + exp`。
+  - 同步更新 OpenAPI 与前端页面文案，确保中文无乱码。
+- Changed Files:
+  - `internal/config/config.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/video_source.go`
+  - `internal/utils/play_url_sign.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/views/VideoList.vue`
+  - `cmd/gen-openapi/main.go`
+  - `docs/swagger/openapi.json`
+- Verification:
+  - 待执行：`go test ./...`
+  - 待执行：`npm --prefix admin-web run build`
+- Rollback:
+  - Revert the commit containing this entry.
+
+### [2026-04-10 14:59] 实现管理端签名播放预览与临时播放链接
+- Type: `implementation`
+- Summary:
+  - 新增配置项 `PLAY_URL_SIGN_SECRET`（为空时回退 `JWT_SECRET`），用于签名播放地址。
+  - 新增管理员接口 `GET /api/v1/admin/videos/:id/play-url`，返回 `signed_url` 与 `expires_at`。
+  - 新增签名播放接口 `GET /api/v1/videos/:id/source/signed`，支持签名校验、过期校验与 `ready` 状态校验。
+  - 保留原接口 `GET /api/v1/videos/:id/source`（Bearer 鉴权）不变，并复用统一可播放源检查逻辑。
+  - 新增签名工具与单测：`SignVideoSource` / `VerifyVideoSourceSign`。
+  - 管理端 `VideoList` 详情弹窗新增播放器预览、刷新播放链接按钮、到期时间展示与非 ready 状态提示。
+  - 修复 `VideoList` 页面中文文案乱码，确保界面文案为中文且无乱码。
+  - 更新 OpenAPI 生成器并重新生成 `docs/swagger/openapi.json`，补充两个新接口文档。
+- Changed Files:
+  - `.env.example`
+  - `internal/config/config.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/video_source.go`
+  - `internal/utils/play_url_sign.go`
+  - `internal/utils/play_url_sign_test.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/views/VideoList.vue`
+  - `cmd/gen-openapi/main.go`
+  - `docs/swagger/openapi.json`
+  - `main.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/utils ./internal/services ./internal/repository ./internal/queue ./pkg/ffmpeg ./cmd/gen-openapi` passed。
+  - `go test ./...` failed（既有 Windows 编译问题：`internal/handlers/admin.go` 中 `syscall.Statfs_t/Statfs` 不可用）。
+  - `npm --prefix admin-web run build` failed（当前环境 Node 权限问题：`EPERM: operation not permitted, lstat 'C:\Users\CheeTsui'`）。
+- Rollback:
+  - Revert the commit containing this feature entry.
