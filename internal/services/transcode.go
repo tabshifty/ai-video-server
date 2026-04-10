@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -47,22 +48,45 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	if err := ffmpeg.Thumbnail(ctx, outputPath, thumbPath); err != nil {
 		return TranscodeResult{}, err
 	}
-	probe, err := ffmpeg.Probe(ctx, outputPath)
-	if err != nil {
-		return TranscodeResult{}, err
-	}
+	probe, probeErr := ffmpeg.Probe(ctx, outputPath)
+	duration, width, height, metadata := resolveProbeFields(probe, probeErr, crf)
 
 	return TranscodeResult{
 		TranscodedPath: outputPath,
 		ThumbnailPath:  thumbPath,
-		Duration:       int(math.Round(probe.Duration)),
-		Width:          probe.Width,
-		Height:         probe.Height,
-		Metadata: map[string]any{
-			"codec": probe.Codec,
-			"crf":   crf,
-		},
+		Duration:       duration,
+		Width:          width,
+		Height:         height,
+		Metadata:       metadata,
 	}, nil
+}
+
+func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, crf string) (duration, width, height int, metadata map[string]any) {
+	duration = 0
+	width = 0
+	height = 0
+	metadata = map[string]any{
+		"codec": "unknown",
+		"crf":   crf,
+	}
+	if probeErr != nil {
+		metadata["probe_error"] = probeErr.Error()
+		return duration, width, height, metadata
+	}
+
+	if probe.Duration > 0 {
+		duration = int(math.Round(probe.Duration))
+	}
+	if probe.Width > 0 {
+		width = probe.Width
+	}
+	if probe.Height > 0 {
+		height = probe.Height
+	}
+	if codec := strings.TrimSpace(probe.Codec); codec != "" {
+		metadata["codec"] = codec
+	}
+	return duration, width, height, metadata
 }
 
 func chooseCRF(videoType string) string {
