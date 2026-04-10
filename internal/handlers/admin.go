@@ -3,6 +3,7 @@ package handlers
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -19,7 +20,9 @@ import (
 	"video-server/internal/middleware"
 	"video-server/internal/models"
 	"video-server/internal/queue"
+	"video-server/internal/repository"
 	"video-server/internal/response"
+	"video-server/internal/utils"
 )
 
 func (a *API) AdminStats(c *gin.Context) {
@@ -129,6 +132,34 @@ func (a *API) AdminVideoDetail(c *gin.Context) {
 		return
 	}
 	ok(c, detail)
+}
+
+func (a *API) AdminVideoPlayURL(c *gin.Context) {
+	videoID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid video id")
+		return
+	}
+	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			response.Error(c, 404, "video not found")
+			return
+		}
+		response.Error(c, 1022, err.Error())
+		return
+	}
+	if video.Status != "ready" {
+		response.Error(c, 1023, "video not ready")
+		return
+	}
+
+	exp := time.Now().Add(a.playSignTTL).Unix()
+	sig := utils.SignVideoSource(a.playSignSecret, videoID, exp)
+	ok(c, gin.H{
+		"signed_url": fmt.Sprintf("/api/v1/videos/%s/source/signed?exp=%d&sig=%s", videoID.String(), exp, sig),
+		"expires_at": exp,
+	})
 }
 
 func (a *API) AdminUpdateVideo(c *gin.Context) {

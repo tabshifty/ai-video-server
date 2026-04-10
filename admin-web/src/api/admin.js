@@ -3,6 +3,7 @@ import request from './request'
 export const getAdminStats = () => request.get('/admin/stats')
 export const getAdminVideos = (params) => request.get('/admin/videos', { params })
 export const getAdminVideoDetail = (id) => request.get(`/admin/videos/${id}`)
+export const getAdminVideoPlayURL = (id) => request.get(`/admin/videos/${id}/play-url`)
 export const updateAdminVideo = (id, payload) => request.put(`/admin/videos/${id}`, payload)
 export const deleteAdminVideo = (id) => request.delete(`/admin/videos/${id}`)
 export const retranscodeVideo = (id) => request.post(`/admin/videos/${id}/retranscode`)

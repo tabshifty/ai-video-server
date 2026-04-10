@@ -118,6 +118,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 		cfg.RedisPassword,
 		cfg.AsynqQueue,
 		cfg.JWTSecret,
+		cfg.PlayURLSignSecret,
 		cfg.AccessTokenTTL,
 		cfg.RefreshTokenTTL,
 		cfg.MaxVideoSize,

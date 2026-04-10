@@ -17,6 +17,7 @@ type Config struct {
 	RedisPassword       string
 	ServerLogPath       string
 	JWTSecret           string
+	PlayURLSignSecret   string
 	StorageRoot         string
 	PosterStoragePath   string
 	UploadTempDir       string
@@ -41,6 +42,7 @@ func Load() (Config, error) {
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
 		ServerLogPath:       getEnv("SERVER_LOG_PATH", "./.run/server.log"),
 		JWTSecret:           os.Getenv("JWT_SECRET"),
+		PlayURLSignSecret:   os.Getenv("PLAY_URL_SIGN_SECRET"),
 		StorageRoot:         getEnv("STORAGE_ROOT", "./storage"),
 		PosterStoragePath:   getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
 		UploadTempDir:       getEnv("UPLOAD_TEMP_DIR", "./tmp/uploads"),
@@ -60,6 +62,9 @@ func Load() (Config, error) {
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, fmt.Errorf("JWT_SECRET is required")
+	}
+	if strings.TrimSpace(cfg.PlayURLSignSecret) == "" {
+		cfg.PlayURLSignSecret = cfg.JWTSecret
 	}
 
 	return cfg, nil
