@@ -15,6 +15,7 @@
 - Do not modify skill files under `.codex/skills/*` unless the task is explicitly about skill authoring.
 - Prefer fast search/read commands (`rg`, targeted file reads) over broad scans.
 - Before claiming completion, run only the verifications that actually exist in this repo.
+- 所有 Markdown 文件以及前端面向用户的界面文案默认必须使用中文；仅在任务明确要求其他语言时可例外。
 
 ## Change Management Rules
 - Every change must be rollbackable:
@@ -51,4 +52,3 @@
 ## Maintenance
 - Keep this file concise; move long details to module-level `AGENTS.md`.
 - Update the module map whenever top-level directories or ownership boundaries change.
-

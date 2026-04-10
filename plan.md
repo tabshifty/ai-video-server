@@ -327,3 +327,16 @@
   - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-10 13:52] 新增 Markdown 与前端界面文案中文约束
+- Type: `implementation`
+- Summary:
+  - 在仓库全局规则中新增约束：所有 Markdown 文件及前端面向用户的界面文案默认使用中文。
+  - 仅当任务明确要求其他语言时，允许例外。
+- Changed Files:
+  - `AGENTS.md`
+  - `plan.md`
+- Verification:
+  - 文档变更，无需构建或测试。
+- Rollback:
+  - Revert the commit containing this feature entry.
