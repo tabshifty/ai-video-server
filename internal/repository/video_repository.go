@@ -178,7 +178,23 @@ func (r *VideoRepository) UpdateVideoStatus(ctx context.Context, videoID uuid.UU
 func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error) {
 	var v models.Video
 	err := r.pool.QueryRow(ctx, `
-SELECT id, user_id, tmdb_id, title, description, type, status, duration_seconds, width, height, original_path, transcoded_path, thumbnail_path, metadata, created_at, updated_at
+SELECT
+  id,
+  user_id,
+  tmdb_id,
+  COALESCE(title, ''),
+  COALESCE(description, ''),
+  type,
+  status,
+  COALESCE(duration_seconds, 0),
+  COALESCE(width, 0),
+  COALESCE(height, 0),
+  COALESCE(original_path, ''),
+  COALESCE(transcoded_path, ''),
+  COALESCE(thumbnail_path, ''),
+  COALESCE(metadata, '{}'::jsonb),
+  created_at,
+  updated_at
 FROM videos WHERE id=$1`, videoID).Scan(
 		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
@@ -214,7 +230,23 @@ WHERE status IN ('uploaded','scraping','processing','failed') AND original_path 
 func (r *VideoRepository) GetVideoByOriginalPath(ctx context.Context, originalPath string) (models.Video, error) {
 	var v models.Video
 	err := r.pool.QueryRow(ctx, `
-SELECT id, user_id, tmdb_id, title, description, type, status, duration_seconds, width, height, original_path, transcoded_path, thumbnail_path, metadata, created_at, updated_at
+SELECT
+  id,
+  user_id,
+  tmdb_id,
+  COALESCE(title, ''),
+  COALESCE(description, ''),
+  type,
+  status,
+  COALESCE(duration_seconds, 0),
+  COALESCE(width, 0),
+  COALESCE(height, 0),
+  COALESCE(original_path, ''),
+  COALESCE(transcoded_path, ''),
+  COALESCE(thumbnail_path, ''),
+  COALESCE(metadata, '{}'::jsonb),
+  created_at,
+  updated_at
 FROM videos WHERE original_path=$1`, originalPath).Scan(
 		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &v.DurationSeconds, &v.Width, &v.Height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
