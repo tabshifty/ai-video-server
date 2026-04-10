@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -99,8 +100,34 @@ WHERE hash = $1
 }
 
 func (r *VideoRepository) DeleteVideoByID(ctx context.Context, videoID uuid.UUID) error {
-	_, err := r.pool.Exec(ctx, "DELETE FROM videos WHERE id = $1", videoID)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
+		return fmt.Errorf("begin tx for delete video: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := deleteVideoDependencies(ctx, tx, videoID); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete video tx: %w", err)
+	}
+	return nil
+}
+
+type execer interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
+func deleteVideoDependencies(ctx context.Context, db execer, videoID uuid.UUID) error {
+	if _, err := db.Exec(ctx, "DELETE FROM transcoding_jobs WHERE video_id = $1", videoID); err != nil {
+		return fmt.Errorf("delete transcoding jobs by video id: %w", err)
+	}
+	if _, err := db.Exec(ctx, "DELETE FROM user_video_actions WHERE video_id = $1", videoID); err != nil {
+		return fmt.Errorf("delete user actions by video id: %w", err)
+	}
+	if _, err := db.Exec(ctx, "DELETE FROM videos WHERE id = $1", videoID); err != nil {
 		return fmt.Errorf("delete video by id: %w", err)
 	}
 	return nil
