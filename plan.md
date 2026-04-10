@@ -560,3 +560,20 @@
   - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
 - Rollback:
   - Revert the commit containing this feature entry.
+
+### [2026-04-10 21:37] 通过外键级联删除消除视频删除阻塞
+- Type: `implementation`
+- Summary:
+  - 新增迁移将 `transcoding_jobs.video_id` 与 `user_video_actions.video_id` 外键改为 `ON DELETE CASCADE`。
+  - 解决删除视频时依赖记录并发/残留导致的 `SQLSTATE 23503` 阻塞问题。
+  - 已在当前数据库执行迁移并核验 `confdeltype='c'`（cascade）。
+- Changed Files:
+  - `migrations/0006_video_fk_cascade.up.sql`
+  - `migrations/0006_video_fk_cascade.down.sql`
+  - `plan.md`
+- Verification:
+  - `docker exec -i video_server_postgres psql -U video -d video_server -v ON_ERROR_STOP=1 < migrations/0006_video_fk_cascade.up.sql` applied successfully。
+  - `docker exec -i video_server_postgres psql -U video -d video_server -tA -c "SELECT conname, confdeltype FROM pg_constraint ..."` returned `c` for both constraints。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
+- Rollback:
+  - Revert the commit containing this feature entry, then执行 `migrations/0006_video_fk_cascade.down.sql`。
