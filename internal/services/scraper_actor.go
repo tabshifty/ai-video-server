@@ -119,9 +119,6 @@ func (s *ScraperService) previewActorsTMDB(ctx context.Context, keyword string, 
 			avatarURL = "https://image.tmdb.org/t/p/w500" + profilePath
 		}
 		notes := strings.TrimSpace(asString(detail["biography"]))
-		if len(notes) > 500 {
-			notes = notes[:500]
-		}
 
 		out = append(out, ActorScrapeCandidate{
 			Source:     "tmdb",
