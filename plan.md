@@ -677,3 +677,36 @@
   - 说明：`internal/services` 全量测试在当前沙箱环境存在 `httptest` 端口监听限制，故本次使用定向用例与编译校验。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 20:19] 新增演员支持按姓名刮削（TMDB + JavDB）并增强重名处理
+- Type: `implementation`
+- Summary:
+  - 新增管理端演员刮削预览接口 `POST /api/v1/admin/actors/scrape/preview`，支持 `tmdb/javdb` 双来源按姓名查询。
+  - `ScraperService` 新增演员刮削能力：TMDB 人物检索（`zh-CN` 优先 + 英文兜底）与 JavDB HTML 候选解析；统一返回候选结构。
+  - 新增 AV 刮削配置项：`AV_SCRAPER_BASE_URL`、`AV_SCRAPER_TIMEOUT_SECONDS`、`AV_SCRAPER_USER_AGENT`，并在 server/worker 启动时注入。
+  - 演员创建重名时返回已存在演员信息（`existing_actor_id / existing_actor / existing_actor_name`），用于前端直接跳转编辑。
+  - 管理端“演员管理”弹窗新增“按姓名刮削”交互：来源切换、候选列表、loading、中文错误提示、一键回填字段；重名创建支持提示并跳转编辑。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_actor.go`
+  - `internal/services/scraper_test.go`
+  - `internal/handlers/admin_actor_scrape.go`
+  - `internal/handlers/admin_actor_scrape_test.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/swagger_models.go`
+  - `internal/repository/actor_repository.go`
+  - `internal/config/config.go`
+  - `main.go`
+  - `.env.example`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/api/request.js`
+  - `admin-web/src/views/ActorManage.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run 'TestPreviewActorByName(TMDB|JavDB)|TestPreview(Movie|TV)UsesChineseLanguageAnd(EnglishFallback|Fallback)|TestExtractCastNames' -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/handlers -run 'TestAdminActorScrapePreview' -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository -run 'TestNormalizeActorName' -count=1` passed。
+  - `npm --prefix admin-web run build` passed。
+- Rollback:
+  - `git revert <commit>`

@@ -12,6 +12,7 @@ export const getAdminUsers = (params) => request.get('/admin/users', { params })
 export const updateUserRole = (id, payload) => request.put(`/admin/users/${id}/role`, payload)
 export const getAdminActors = (params) => request.get('/admin/actors', { params })
 export const createAdminActor = (payload) => request.post('/admin/actors', payload)
+export const scrapeAdminActorPreview = (payload) => request.post('/admin/actors/scrape/preview', payload)
 export const updateAdminActor = (id, payload) => request.put(`/admin/actors/${id}`, payload)
 
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })

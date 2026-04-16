@@ -138,6 +138,26 @@ func (r *VideoRepository) ListActors(ctx context.Context, q string, active *bool
 	return items, total, rows.Err()
 }
 
+func (r *VideoRepository) GetActorByName(ctx context.Context, name string) (models.AdminActor, error) {
+	normalized := normalizeActorName(name)
+	if normalized == "" {
+		return models.AdminActor{}, fmt.Errorf("演员姓名不能为空")
+	}
+	row := r.pool.QueryRow(ctx, `
+SELECT
+  id, name, aliases, COALESCE(gender,''), COALESCE(country,''), COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''),
+  COALESCE(avatar_url,''), COALESCE(source,''), COALESCE(external_id,''), COALESCE(notes,''), active, created_at, updated_at
+FROM actors
+WHERE normalized_name=$1
+LIMIT 1
+`, normalized)
+	out, err := scanAdminActor(row)
+	if err != nil {
+		return models.AdminActor{}, fmt.Errorf("get actor by name: %w", err)
+	}
+	return out, nil
+}
+
 func (r *VideoRepository) CreateActor(ctx context.Context, input models.AdminActorInput) (models.AdminActor, error) {
 	input, err := normalizeActorInput(input)
 	if err != nil {

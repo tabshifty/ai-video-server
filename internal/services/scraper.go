@@ -25,9 +25,12 @@ type ScraperService struct {
 	repo         *repository.VideoRepository
 	apiKey       string
 	baseURL      string
+	avBaseURL    string
+	avUserAgent  string
 	storageRoot  string
 	posterRoot   string
 	httpClient   *http.Client
+	avHTTPClient *http.Client
 	cacheTTL     time.Duration
 	cacheMu      sync.RWMutex
 	previewCache map[string]previewCacheEntry
@@ -39,17 +42,37 @@ type previewCacheEntry struct {
 }
 
 func NewScraperService(repo *repository.VideoRepository, apiKey, baseURL, storageRoot, posterRoot string, timeout time.Duration) *ScraperService {
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
 	return &ScraperService{
 		repo:        repo,
 		apiKey:      apiKey,
 		baseURL:     strings.TrimSuffix(baseURL, "/"),
+		avBaseURL:   "https://javdb.com",
+		avUserAgent: "Mozilla/5.0 (compatible; VideoServerBot/1.0; +https://example.invalid/bot)",
 		storageRoot: storageRoot,
 		posterRoot:  posterRoot,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		avHTTPClient: &http.Client{
+			Timeout: timeout,
+		},
 		cacheTTL:     5 * time.Minute,
 		previewCache: map[string]previewCacheEntry{},
+	}
+}
+
+func (s *ScraperService) ConfigureAVScraper(baseURL, userAgent string, timeout time.Duration) {
+	if strings.TrimSpace(baseURL) != "" {
+		s.avBaseURL = strings.TrimSuffix(strings.TrimSpace(baseURL), "/")
+	}
+	if strings.TrimSpace(userAgent) != "" {
+		s.avUserAgent = strings.TrimSpace(userAgent)
+	}
+	if timeout > 0 {
+		s.avHTTPClient = &http.Client{Timeout: timeout}
 	}
 }
 

@@ -22,6 +22,7 @@ request.interceptors.response.use(
     if (payload.code !== 0) {
       const err = new Error(payload.msg || 'request failed')
       err.code = payload.code
+      err.data = payload.data
       throw err
     }
     return payload.data
