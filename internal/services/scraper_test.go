@@ -204,3 +204,139 @@ func TestExtractCastNames(t *testing.T) {
 		t.Fatalf("extractCastNames() = %v, want %v", got, want)
 	}
 }
+
+func TestPreviewActorByNameTMDB(t *testing.T) {
+	var searchLangs []string
+	var detailLangs []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/search/person":
+			searchLangs = append(searchLangs, r.URL.Query().Get("language"))
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{
+					{"id": 1001},
+				},
+			})
+		case "/person/1001":
+			lang := r.URL.Query().Get("language")
+			detailLangs = append(detailLangs, lang)
+			if lang == "zh-CN" {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id":           1001,
+					"name":         "演员甲",
+					"gender":       2,
+					"biography":    "",
+					"profile_path": "/actor-zh.jpg",
+					"also_known_as": []string{
+						"演员甲A",
+					},
+					"birthday":       "1995-01-01",
+					"place_of_birth": "Japan, Tokyo",
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":           1001,
+				"name":         "Actor A",
+				"gender":       2,
+				"biography":    "fallback bio",
+				"profile_path": "/actor-en.jpg",
+				"also_known_as": []string{
+					"Actor A",
+				},
+				"birthday":       "1995-01-01",
+				"place_of_birth": "Japan, Tokyo",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "demo-key", server.URL, "", "", 2*time.Second)
+	got, err := svc.PreviewActorByName(context.Background(), "演员甲", "tmdb", 10)
+	if err != nil {
+		t.Fatalf("PreviewActorByName returned error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 candidate, got=%d", len(got))
+	}
+	if !slices.Contains(searchLangs, "zh-CN") {
+		t.Fatalf("expected search/person to request language=zh-CN, got=%v", searchLangs)
+	}
+	if !slices.Contains(detailLangs, "zh-CN") {
+		t.Fatalf("expected person detail to request language=zh-CN, got=%v", detailLangs)
+	}
+	if !slices.Contains(detailLangs, "") {
+		t.Fatalf("expected fallback person detail without language, got=%v", detailLangs)
+	}
+
+	item := got[0]
+	if item.Source != "tmdb" {
+		t.Fatalf("expected source tmdb, got=%s", item.Source)
+	}
+	if item.Name != "演员甲" {
+		t.Fatalf("expected chinese name, got=%s", item.Name)
+	}
+	if item.Gender != "男" {
+		t.Fatalf("expected gender 男, got=%s", item.Gender)
+	}
+	if item.Notes != "fallback bio" {
+		t.Fatalf("expected fallback bio, got=%s", item.Notes)
+	}
+	if item.AvatarURL != "https://image.tmdb.org/t/p/w500/actor-zh.jpg" {
+		t.Fatalf("unexpected avatar url: %s", item.AvatarURL)
+	}
+	if len(item.Aliases) != 1 || item.Aliases[0] != "演员甲A" {
+		t.Fatalf("unexpected aliases: %v", item.Aliases)
+	}
+}
+
+func TestPreviewActorByNameJavDB(t *testing.T) {
+	var userAgents []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgents = append(userAgents, r.Header.Get("User-Agent"))
+		if r.URL.Path != "/search" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Query().Get("f") != "actor" {
+			t.Fatalf("expected f=actor, got=%s", r.URL.Query().Get("f"))
+		}
+		_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/actors/abc123" title="演员甲"><img src="/avatars/a.jpg" /></a>
+    <a href="/actors/def456"><span>演员乙</span></a>
+    <a href="/actors/abc123"><span>演员甲</span></a>
+  </body>
+</html>
+`))
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "https://api.themoviedb.org/3", "", "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "actor-scraper-test", time.Second)
+
+	got, err := svc.PreviewActorByName(context.Background(), "演员", "javdb", 10)
+	if err != nil {
+		t.Fatalf("PreviewActorByName returned error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 candidates, got=%d", len(got))
+	}
+	if len(userAgents) == 0 || userAgents[0] != "actor-scraper-test" {
+		t.Fatalf("expected custom user-agent, got=%v", userAgents)
+	}
+	if got[0].Source != "javdb" || got[0].ExternalID != "abc123" {
+		t.Fatalf("unexpected first candidate: %+v", got[0])
+	}
+	if got[0].AvatarURL != server.URL+"/avatars/a.jpg" {
+		t.Fatalf("unexpected first avatar: %s", got[0].AvatarURL)
+	}
+	if got[1].Name != "演员乙" {
+		t.Fatalf("unexpected second name: %s", got[1].Name)
+	}
+}

@@ -23,11 +23,14 @@ type Config struct {
 	UploadTempDir       string
 	TMDBAPIKey          string
 	TMDBBaseURL         string
+	AVScraperBaseURL    string
+	AVScraperUserAgent  string
 	MaxTranscodeWorkers int
 	AsynqQueue          string
 	MaxVideoSize        int64
 	EnableSwagger       bool
 	TMDBTimeout         time.Duration
+	AVScraperTimeout    time.Duration
 	AccessTokenTTL      time.Duration
 	RefreshTokenTTL     time.Duration
 }
@@ -48,11 +51,14 @@ func Load() (Config, error) {
 		UploadTempDir:       getEnv("UPLOAD_TEMP_DIR", "./tmp/uploads"),
 		TMDBAPIKey:          os.Getenv("TMDB_API_KEY"),
 		TMDBBaseURL:         getEnv("TMDB_BASE_URL", "https://api.themoviedb.org/3"),
+		AVScraperBaseURL:    getEnv("AV_SCRAPER_BASE_URL", "https://javdb.com"),
+		AVScraperUserAgent:  getEnv("AV_SCRAPER_USER_AGENT", "Mozilla/5.0 (compatible; VideoServerBot/1.0; +https://example.invalid/bot)"),
 		AsynqQueue:          getEnv("ASYNQ_QUEUE", "transcode"),
 		MaxTranscodeWorkers: getIntEnv("MAX_TRANSCODE_WORKERS", 2),
 		MaxVideoSize:        getInt64Env("MAX_VIDEO_SIZE", 2*1024*1024*1024),
 		EnableSwagger:       getBoolEnv("ENABLE_SWAGGER", false),
 		TMDBTimeout:         time.Duration(getIntEnv("TMDB_TIMEOUT_SECONDS", 10)) * time.Second,
+		AVScraperTimeout:    time.Duration(getIntEnv("AV_SCRAPER_TIMEOUT_SECONDS", 10)) * time.Second,
 		AccessTokenTTL:      time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 24)) * time.Hour,
 		RefreshTokenTTL:     time.Duration(getIntEnv("REFRESH_TOKEN_TTL_HOURS", 168)) * time.Hour,
 	}

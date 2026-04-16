@@ -41,3 +41,9 @@ type AdminScrapeConfirmRequest struct {
 	SeasonNumber  int                    `json:"season_number" example:"1"`
 	EpisodeNumber int                    `json:"episode_number" example:"2"`
 }
+
+type AdminActorScrapePreviewRequest struct {
+	Name   string `json:"name" example:"三上悠亚"`
+	Source string `json:"source" example:"javdb"`
+	Limit  int    `json:"limit" example:"10"`
+}

@@ -123,6 +123,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.PUT("/users/:id/role", a.AdminUpdateUserRole)
 			admin.GET("/actors", a.AdminActors)
 			admin.POST("/actors", a.AdminCreateActor)
+			admin.POST("/actors/scrape/preview", a.AdminActorScrapePreview)
 			admin.PUT("/actors/:id", a.AdminUpdateActor)
 			admin.GET("/tasks", a.AdminTasks)
 			admin.POST("/system/cleanup", a.AdminSystemCleanup)

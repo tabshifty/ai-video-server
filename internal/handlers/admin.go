@@ -326,7 +326,15 @@ func (a *API) AdminCreateActor(c *gin.Context) {
 	actor, err := a.repo.CreateActor(c.Request.Context(), req)
 	if err != nil {
 		if repository.IsUniqueViolation(err) {
-			response.Error(c, 1025, "演员名称已存在")
+			payload := gin.H{
+				"existing_actor_name": strings.TrimSpace(req.Name),
+			}
+			if existing, lookupErr := a.repo.GetActorByName(c.Request.Context(), req.Name); lookupErr == nil {
+				payload["existing_actor_id"] = existing.ID
+				payload["existing_actor"] = existing
+				payload["existing_actor_name"] = existing.Name
+			}
+			response.JSON(c, 1025, "演员名称已存在", payload)
 			return
 		}
 		response.Error(c, 1025, err.Error())
