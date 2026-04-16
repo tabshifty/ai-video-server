@@ -74,6 +74,8 @@ type ConfirmScrapeInput struct {
 	EpisodeNumber int
 }
 
+const tmdbLangChinese = "zh-CN"
+
 func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year int) ([]map[string]any, error) {
 	if s.apiKey == "" {
 		return nil, fmt.Errorf("TMDB_API_KEY is empty")
@@ -84,12 +86,11 @@ func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year in
 	}
 
 	q := url.Values{}
-	q.Set("api_key", s.apiKey)
 	q.Set("query", strings.TrimSpace(title))
 	if year > 0 {
 		q.Set("year", fmt.Sprintf("%d", year))
 	}
-	raw, err := s.getJSON(ctx, fmt.Sprintf("%s/search/movie?%s", s.baseURL, q.Encode()))
+	raw, err := s.getTMDBJSON(ctx, "/search/movie", q, tmdbLangChinese)
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +105,14 @@ func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year in
 		if id <= 0 {
 			continue
 		}
-		detail, dErr := s.getJSON(ctx, fmt.Sprintf("%s/movie/%d?%s", s.baseURL, id, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+		detail, dErr := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", id), nil, tmdbLangChinese)
 		if dErr != nil {
 			detail = item
+		} else if needsLocalizedFallback(detail, "movie") {
+			fallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", id), nil, "")
+			if fErr == nil {
+				detail = mergeLocalizedDetail(detail, fallback, "movie")
+			}
 		}
 		out = append(out, map[string]any{
 			"tmdb_id":         id,
@@ -135,9 +141,8 @@ func (s *ScraperService) PreviewTV(ctx context.Context, title string, year int) 
 	}
 
 	q := url.Values{}
-	q.Set("api_key", s.apiKey)
 	q.Set("query", strings.TrimSpace(title))
-	raw, err := s.getJSON(ctx, fmt.Sprintf("%s/search/tv?%s", s.baseURL, q.Encode()))
+	raw, err := s.getTMDBJSON(ctx, "/search/tv", q, tmdbLangChinese)
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +157,14 @@ func (s *ScraperService) PreviewTV(ctx context.Context, title string, year int) 
 		if id <= 0 {
 			continue
 		}
-		detail, dErr := s.getJSON(ctx, fmt.Sprintf("%s/tv/%d?%s", s.baseURL, id, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+		detail, dErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", id), nil, tmdbLangChinese)
 		if dErr != nil {
 			detail = item
+		} else if needsLocalizedFallback(detail, "tv") {
+			fallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", id), nil, "")
+			if fErr == nil {
+				detail = mergeLocalizedDetail(detail, fallback, "tv")
+			}
 		}
 		firstYear := 0
 		if fd := asString(detail["first_air_date"]); len(fd) >= 4 {
@@ -188,9 +198,15 @@ func (s *ScraperService) ConfirmMovie(ctx context.Context, in ConfirmScrapeInput
 	if err != nil {
 		return err
 	}
-	detail, err := s.getJSON(ctx, fmt.Sprintf("%s/movie/%d?%s", s.baseURL, in.TMDBID, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+	detail, err := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", in.TMDBID), nil, tmdbLangChinese)
 	if err != nil {
 		return err
+	}
+	if needsLocalizedFallback(detail, "movie") {
+		fallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", in.TMDBID), nil, "")
+		if fErr == nil {
+			detail = mergeLocalizedDetail(detail, fallback, "movie")
+		}
 	}
 
 	title := strings.TrimSpace(in.Title)
@@ -242,9 +258,15 @@ func (s *ScraperService) ConfirmEpisode(ctx context.Context, in ConfirmScrapeInp
 		return fmt.Errorf("season_number and episode_number are required for episode")
 	}
 
-	tvRaw, err := s.getJSON(ctx, fmt.Sprintf("%s/tv/%d?%s", s.baseURL, in.TMDBID, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+	tvRaw, err := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", in.TMDBID), nil, tmdbLangChinese)
 	if err != nil {
 		return err
+	}
+	if needsLocalizedFallback(tvRaw, "tv") {
+		tvFallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", in.TMDBID), nil, "")
+		if fErr == nil {
+			tvRaw = mergeLocalizedDetail(tvRaw, tvFallback, "tv")
+		}
 	}
 	seriesID, err := s.repo.UpsertSeries(
 		ctx,
@@ -261,7 +283,7 @@ func (s *ScraperService) ConfirmEpisode(ctx context.Context, in ConfirmScrapeInp
 		return err
 	}
 
-	seasonRaw, err := s.getJSON(ctx, fmt.Sprintf("%s/tv/%d/season/%d?%s", s.baseURL, in.TMDBID, seasonNum, url.Values{"api_key": []string{s.apiKey}}.Encode()))
+	seasonRaw, err := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d/season/%d", in.TMDBID, seasonNum), nil, tmdbLangChinese)
 	if err != nil {
 		return err
 	}
@@ -670,6 +692,148 @@ func (s *ScraperService) getJSON(ctx context.Context, endpoint string) (map[stri
 		return nil, fmt.Errorf("decode tmdb json: %w", err)
 	}
 	return out, nil
+}
+
+func (s *ScraperService) getTMDBJSON(ctx context.Context, path string, q url.Values, language string) (map[string]any, error) {
+	query := cloneURLValues(q)
+	query.Set("api_key", s.apiKey)
+	if strings.TrimSpace(language) != "" {
+		query.Set("language", language)
+	}
+	endpoint := fmt.Sprintf("%s/%s?%s", s.baseURL, strings.TrimPrefix(path, "/"), query.Encode())
+	return s.getJSON(ctx, endpoint)
+}
+
+func cloneURLValues(in url.Values) url.Values {
+	out := url.Values{}
+	for k, vals := range in {
+		cloned := make([]string, len(vals))
+		copy(cloned, vals)
+		out[k] = cloned
+	}
+	return out
+}
+
+func needsLocalizedFallback(detail map[string]any, mediaType string) bool {
+	switch mediaType {
+	case "movie":
+		if isBlankAnyString(detail["title"]) || isBlankAnyString(detail["overview"]) || isBlankAnyString(detail["release_date"]) {
+			return true
+		}
+		return len(extractGenres(detail["genres"])) == 0
+	case "tv":
+		if isBlankAnyString(detail["name"]) || isBlankAnyString(detail["overview"]) || isBlankAnyString(detail["first_air_date"]) {
+			return true
+		}
+		return len(extractGenres(detail["genres"])) == 0
+	default:
+		return false
+	}
+}
+
+func mergeLocalizedDetail(primary, fallback map[string]any, mediaType string) map[string]any {
+	if len(primary) == 0 {
+		return fallback
+	}
+	if len(fallback) == 0 {
+		return primary
+	}
+
+	switch mediaType {
+	case "movie":
+		fillBlankStringField(primary, fallback, "title")
+		fillBlankStringField(primary, fallback, "original_title")
+		fillBlankStringField(primary, fallback, "overview")
+		fillBlankStringField(primary, fallback, "release_date")
+		fillBlankGenresField(primary, fallback)
+	case "tv":
+		fillBlankStringField(primary, fallback, "name")
+		fillBlankStringField(primary, fallback, "original_name")
+		fillBlankStringField(primary, fallback, "overview")
+		fillBlankStringField(primary, fallback, "first_air_date")
+		fillBlankStringField(primary, fallback, "status")
+		fillBlankStringField(primary, fallback, "type")
+		fillBlankGenresField(primary, fallback)
+		fillBlankNestedObjectFields(primary, fallback, "last_episode_to_air", "name", "overview")
+		fillBlankNestedSliceObjectFields(primary, fallback, "seasons", "name", "overview")
+	}
+
+	return primary
+}
+
+func fillBlankStringField(dst, src map[string]any, key string) {
+	if !isBlankAnyString(dst[key]) {
+		return
+	}
+	fallback := strings.TrimSpace(asString(src[key]))
+	if fallback != "" {
+		dst[key] = fallback
+	}
+}
+
+func fillBlankGenresField(dst, src map[string]any) {
+	if len(extractGenres(dst["genres"])) > 0 {
+		return
+	}
+	if rows, ok := src["genres"].([]any); ok && len(rows) > 0 {
+		dst["genres"] = rows
+	}
+}
+
+func fillBlankNestedObjectFields(dst, src map[string]any, key string, fields ...string) {
+	srcObj, ok := src[key].(map[string]any)
+	if !ok {
+		return
+	}
+	dstObj, _ := dst[key].(map[string]any)
+	if dstObj == nil {
+		dstObj = map[string]any{}
+		dst[key] = dstObj
+	}
+	for _, field := range fields {
+		if !isBlankAnyString(dstObj[field]) {
+			continue
+		}
+		if value := strings.TrimSpace(asString(srcObj[field])); value != "" {
+			dstObj[field] = value
+		}
+	}
+}
+
+func fillBlankNestedSliceObjectFields(dst, src map[string]any, key string, fields ...string) {
+	srcRows, ok := src[key].([]any)
+	if !ok || len(srcRows) == 0 {
+		return
+	}
+	dstRows, _ := dst[key].([]any)
+	if len(dstRows) == 0 {
+		dst[key] = srcRows
+		return
+	}
+
+	limit := len(dstRows)
+	if len(srcRows) < limit {
+		limit = len(srcRows)
+	}
+	for i := 0; i < limit; i++ {
+		dstObj, okDst := dstRows[i].(map[string]any)
+		srcObj, okSrc := srcRows[i].(map[string]any)
+		if !okDst || !okSrc {
+			continue
+		}
+		for _, field := range fields {
+			if !isBlankAnyString(dstObj[field]) {
+				continue
+			}
+			if value := strings.TrimSpace(asString(srcObj[field])); value != "" {
+				dstObj[field] = value
+			}
+		}
+	}
+}
+
+func isBlankAnyString(v any) bool {
+	return strings.TrimSpace(asString(v)) == ""
 }
 
 func asString(v any) string {
