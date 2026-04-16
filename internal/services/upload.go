@@ -46,15 +46,17 @@ type UploadResult struct {
 }
 
 type LocalUploadInput struct {
-	UserID   uuid.UUID
-	FilePath string
-	Filename string
-	FileSize int64
-	Title    string
-	Desc     string
-	Type     string
-	Tags     []string
-	Hash     string
+	UserID     uuid.UUID
+	FilePath   string
+	Filename   string
+	FileSize   int64
+	Title      string
+	Desc       string
+	Type       string
+	Tags       []string
+	ActorIDs   []uuid.UUID
+	ActorNames []string
+	Hash       string
 }
 
 func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
@@ -141,6 +143,10 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		_ = s.repo.DeleteVideoByID(ctx, videoID)
 		return UploadResult{}, err
 	}
+	if err := s.repo.ReplaceVideoActorsByInput(ctx, videoID, in.ActorIDs, in.ActorNames, "upload_manual"); err != nil {
+		_ = s.repo.DeleteVideoByID(ctx, videoID)
+		return UploadResult{}, err
+	}
 	if err := s.repo.InsertFileHash(ctx, serverHash, videoID, info.Size()); err != nil {
 		if repository.IsUniqueViolation(err) {
 			_ = s.repo.DeleteVideoByID(ctx, videoID)
@@ -177,7 +183,7 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 	}, nil
 }
 
-func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, clientHash string, maxVideoSize int64) (UploadResult, error) {
+func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, clientHash string, maxVideoSize int64) (UploadResult, error) {
 	if fileHeader == nil {
 		return UploadResult{}, ErrInvalidUpload
 	}
@@ -225,15 +231,17 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 	}
 
 	result, err := s.SaveUploadedFile(ctx, LocalUploadInput{
-		UserID:   userID,
-		FilePath: originalPath,
-		Filename: fileHeader.Filename,
-		FileSize: info.Size(),
-		Title:    title,
-		Desc:     desc,
-		Type:     typ,
-		Tags:     tags,
-		Hash:     clientHash,
+		UserID:     userID,
+		FilePath:   originalPath,
+		Filename:   fileHeader.Filename,
+		FileSize:   info.Size(),
+		Title:      title,
+		Desc:       desc,
+		Type:       typ,
+		Tags:       tags,
+		ActorIDs:   actorIDs,
+		ActorNames: actorNames,
+		Hash:       clientHash,
 	}, maxVideoSize)
 	if err != nil {
 		_ = os.Remove(originalPath)

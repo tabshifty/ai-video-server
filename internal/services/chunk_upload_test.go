@@ -15,7 +15,7 @@ func TestChunkUploadCompleteFileSurvivesAbort(t *testing.T) {
 	svc := NewChunkUploadService(t.TempDir())
 	userID := uuid.New()
 
-	session, err := svc.Init(context.Background(), userID, "demo.mp4", 6, 3, 2, "hash", "short", "t", "d", nil)
+	session, err := svc.Init(context.Background(), userID, "demo.mp4", 6, 3, 2, "hash", "short", "t", "d", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("init session: %v", err)
 	}

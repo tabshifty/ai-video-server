@@ -38,22 +38,31 @@ type AdminVideoListItem struct {
 }
 
 type AdminVideoDetail struct {
-	ID              uuid.UUID       `json:"id"`
-	UserID          *uuid.UUID      `json:"user_id"`
-	Title           string          `json:"title"`
-	Description     string          `json:"description"`
-	Type            string          `json:"type"`
-	Status          string          `json:"status"`
-	DurationSeconds int             `json:"duration_seconds"`
-	Width           int             `json:"width"`
-	Height          int             `json:"height"`
-	OriginalPath    string          `json:"original_path"`
-	TranscodedPath  string          `json:"transcoded_path"`
-	ThumbnailPath   string          `json:"thumbnail_path"`
-	Metadata        json.RawMessage `json:"metadata"`
-	Tags            []string        `json:"tags"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID              uuid.UUID         `json:"id"`
+	UserID          *uuid.UUID        `json:"user_id"`
+	Title           string            `json:"title"`
+	Description     string            `json:"description"`
+	Type            string            `json:"type"`
+	Status          string            `json:"status"`
+	DurationSeconds int               `json:"duration_seconds"`
+	Width           int               `json:"width"`
+	Height          int               `json:"height"`
+	OriginalPath    string            `json:"original_path"`
+	TranscodedPath  string            `json:"transcoded_path"`
+	ThumbnailPath   string            `json:"thumbnail_path"`
+	Metadata        json.RawMessage   `json:"metadata"`
+	Tags            []string          `json:"tags"`
+	Actors          []AdminVideoActor `json:"actors"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+}
+
+type AdminVideoActor struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	AvatarURL  string    `json:"avatar_url"`
+	Active     bool      `json:"active"`
+	BindSource string    `json:"bind_source"`
 }
 
 type AdminVideoFilter struct {
@@ -85,4 +94,33 @@ type AdminTaskListItem struct {
 	Error      string     `json:"error"`
 	StartedAt  *time.Time `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at"`
+}
+
+type AdminActor struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	Aliases    []string  `json:"aliases"`
+	Gender     string    `json:"gender"`
+	Country    string    `json:"country"`
+	BirthDate  string    `json:"birth_date"`
+	AvatarURL  string    `json:"avatar_url"`
+	Source     string    `json:"source"`
+	ExternalID string    `json:"external_id"`
+	Notes      string    `json:"notes"`
+	Active     bool      `json:"active"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type AdminActorInput struct {
+	Name       string   `json:"name"`
+	Aliases    []string `json:"aliases"`
+	Gender     string   `json:"gender"`
+	Country    string   `json:"country"`
+	BirthDate  string   `json:"birth_date"`
+	AvatarURL  string   `json:"avatar_url"`
+	Source     string   `json:"source"`
+	ExternalID string   `json:"external_id"`
+	Notes      string   `json:"notes"`
+	Active     bool     `json:"active"`
 }

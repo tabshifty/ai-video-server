@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestParseUploadTags_JSON(t *testing.T) {
@@ -37,5 +40,40 @@ func TestIsAllowedVideoExt(t *testing.T) {
 	}
 	if isAllowedVideoExt("archive.zip") {
 		t.Fatalf("expected zip disallowed")
+	}
+}
+
+func TestParseUploadStringList(t *testing.T) {
+	got := parseUploadStringList(`[" 张三 ", "李四", ""]`)
+	want := []string{"张三", "李四"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected list: got=%v want=%v", got, want)
+	}
+
+	got = parseUploadStringList("Alice, Bob, ,Alice")
+	want = []string{"Alice", "Bob"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected csv list: got=%v want=%v", got, want)
+	}
+}
+
+func TestParseUploadActorIDs(t *testing.T) {
+	id1 := uuid.New()
+	id2 := uuid.New()
+	raw := `["` + id1.String() + `","` + id2.String() + `"]`
+	got, err := parseUploadActorIDs(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []uuid.UUID{id1, id2}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected actor ids: got=%v want=%v", got, want)
+	}
+}
+
+func TestParseUploadActorIDs_Invalid(t *testing.T) {
+	_, err := parseUploadActorIDs("not-a-uuid")
+	if !errors.Is(err, errInvalidActorID) {
+		t.Fatalf("expected errInvalidActorID, got=%v", err)
 	}
 }

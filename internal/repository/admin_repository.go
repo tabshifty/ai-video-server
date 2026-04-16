@@ -182,10 +182,19 @@ WHERE id=$1
 		tags = append(tags, tag)
 	}
 	out.Tags = tags
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return models.AdminVideoDetail{}, err
+	}
+
+	actors, err := r.ListVideoActors(ctx, videoID)
+	if err != nil {
+		return models.AdminVideoDetail{}, fmt.Errorf("admin video actors: %w", err)
+	}
+	out.Actors = actors
+	return out, nil
 }
 
-func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any) error {
+func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, actorIDs []uuid.UUID, actorNames []string, updateActors bool) error {
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("marshal admin metadata: %w", err)
@@ -218,6 +227,11 @@ WHERE id=$1
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit admin update video: %w", err)
+	}
+	if updateActors {
+		if err := r.ReplaceVideoActorsByInput(ctx, videoID, actorIDs, actorNames, "admin_edit"); err != nil {
+			return fmt.Errorf("replace video actors: %w", err)
+		}
 	}
 	return nil
 }

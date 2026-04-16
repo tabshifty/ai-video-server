@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '../components/Layout.vue'
 import {
   deleteAdminVideo,
+  getAdminActors,
   getAdminVideoDetail,
   getAdminVideoPlayURL,
   getAdminVideos,
@@ -18,8 +19,54 @@ const detailVisible = ref(false)
 const playURL = ref('')
 const playExpiresAt = ref(0)
 const loadingPlayURL = ref(false)
+const actorOptions = ref([])
+const loadingActors = ref(false)
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
+
+function statusLabel(status) {
+  const map = {
+    uploaded: '已上传',
+    scraping: '刮削中',
+    processing: '处理中',
+    ready: '可播放',
+    failed: '失败'
+  }
+  return map[status] || status || '-'
+}
+
+function splitActorSelection(values) {
+  const actorIDs = []
+  const actorNames = []
+  const seenID = new Set()
+  const seenName = new Set()
+  for (const item of values || []) {
+    const value = String(item || '').trim()
+    if (!value) continue
+    if (uuidPattern.test(value)) {
+      const key = value.toLowerCase()
+      if (seenID.has(key)) continue
+      seenID.add(key)
+      actorIDs.push(value)
+      continue
+    }
+    const key = value.toLowerCase()
+    if (seenName.has(key)) continue
+    seenName.add(key)
+    actorNames.push(value.replace(/\s+/g, ' '))
+  }
+  return { actorIDs, actorNames }
+}
+
+function mergeActorOptions(actors = []) {
+  const optionMap = new Map(actorOptions.value.map((item) => [item.value, item]))
+  for (const actor of actors) {
+    if (!actor?.id) continue
+    optionMap.set(actor.id, { value: actor.id, label: actor.name || actor.id })
+  }
+  actorOptions.value = Array.from(optionMap.values())
+}
 
 async function load() {
   const data = await getAdminVideos(query)
@@ -27,11 +74,37 @@ async function load() {
   total.value = data.total_count || 0
 }
 
+async function searchActors(keyword = '') {
+  loadingActors.value = true
+  try {
+    const data = await getAdminActors({
+      q: keyword,
+      active: 1,
+      page: 1,
+      page_size: 20
+    })
+    const options = (data.items || []).map((item) => ({
+      value: item.id,
+      label: item.name
+    }))
+    const optionMap = new Map(actorOptions.value.map((item) => [item.value, item]))
+    for (const item of options) {
+      optionMap.set(item.value, item)
+    }
+    actorOptions.value = Array.from(optionMap.values())
+  } finally {
+    loadingActors.value = false
+  }
+}
+
 async function showDetail(row) {
   detail.value = await getAdminVideoDetail(row.id)
+  detail.value.actor_tokens = (detail.value.actors || []).map((actor) => actor.id)
+  mergeActorOptions(detail.value.actors || [])
   detailVisible.value = true
   playURL.value = ''
   playExpiresAt.value = 0
+  await searchActors('')
   if (detail.value?.status === 'ready') {
     await refreshPlayURL()
   }
@@ -71,11 +144,14 @@ async function doRetranscode(row) {
 }
 
 async function saveDetail() {
+  const { actorIDs, actorNames } = splitActorSelection(detail.value.actor_tokens)
   const payload = {
     title: detail.value.title,
     description: detail.value.description,
     thumbnail: detail.value.thumbnail_path,
     tags: detail.value.tags || [],
+    actor_ids: actorIDs,
+    actor_names: actorNames,
     status: detail.value.status,
     metadata: detail.value.metadata || {}
   }
@@ -103,18 +179,18 @@ onMounted(load)
           <el-form-item><el-input v-model="query.q" placeholder="标题/标签搜索" /></el-form-item>
           <el-form-item>
             <el-select v-model="query.type" placeholder="类型" clearable style="width:120px">
-              <el-option label="short" value="short" />
-              <el-option label="movie" value="movie" />
-              <el-option label="episode" value="episode" />
+              <el-option label="短视频" value="short" />
+              <el-option label="电影" value="movie" />
+              <el-option label="剧集分集" value="episode" />
             </el-select>
           </el-form-item>
           <el-form-item>
             <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
-              <el-option label="uploaded" value="uploaded" />
-              <el-option label="scraping" value="scraping" />
-              <el-option label="processing" value="processing" />
-              <el-option label="ready" value="ready" />
-              <el-option label="failed" value="failed" />
+              <el-option label="已上传" value="uploaded" />
+              <el-option label="刮削中" value="scraping" />
+              <el-option label="处理中" value="processing" />
+              <el-option label="可播放" value="ready" />
+              <el-option label="失败" value="failed" />
             </el-select>
           </el-form-item>
           <el-form-item><el-button type="primary" @click="load">查询</el-button></el-form-item>
@@ -127,7 +203,7 @@ onMounted(load)
             <el-table-column prop="status" label="状态" width="120">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'ready' ? 'success' : row.status === 'failed' ? 'danger' : 'info'">
-                  {{ row.status }}
+                  {{ statusLabel(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -160,6 +236,36 @@ onMounted(load)
         <el-form-item label="标题"><el-input v-model="detail.title" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="detail.description" type="textarea" rows="4" /></el-form-item>
         <el-form-item label="封面"><el-input v-model="detail.thumbnail_path" /></el-form-item>
+        <el-form-item label="标签">
+          <el-select
+            v-model="detail.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="可新增标签"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="演员">
+          <el-select
+            v-model="detail.actor_tokens"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            allow-create
+            default-first-option
+            clearable
+            :remote-method="searchActors"
+            :loading="loadingActors"
+            placeholder="可搜索演员，也可输入新演员姓名"
+            style="width: 100%"
+          >
+            <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
+          </el-select>
+        </el-form-item>
 
         <el-form-item label="播放预览">
           <div class="play-preview">
@@ -181,7 +287,7 @@ onMounted(load)
               v-if="detail.status !== 'ready'"
               type="warning"
               :closable="false"
-              title="当前视频未就绪，只有 ready 状态才可播放。"
+              title="当前视频未就绪，只有“可播放”状态才可预览。"
             />
 
             <el-alert

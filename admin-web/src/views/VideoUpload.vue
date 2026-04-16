@@ -1,10 +1,11 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import UploadProgress from '../components/UploadProgress.vue'
 import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
+import { getAdminActors } from '../api/admin'
 import { sha256File } from '../utils/hash'
 
 const file = ref(null)
@@ -14,17 +15,62 @@ const uploading = ref(false)
 const result = ref(null)
 const abortController = ref(null)
 const sessionId = ref('')
+const actorOptions = ref([])
+const loadingActors = ref(false)
 
 const form = reactive({
   type: 'short',
   title: '',
   description: '',
-  tags: []
+  tags: [],
+  actors: []
 })
 const presetTags = ['action', 'comedy', 'drama', 'documentary', 'anime', 'music', 'sports', 'family']
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function onFileChange(raw) {
   file.value = raw.raw
+}
+
+function splitActorSelection(values) {
+  const actorIDs = []
+  const actorNames = []
+  const seenID = new Set()
+  const seenName = new Set()
+  for (const item of values || []) {
+    const value = String(item || '').trim()
+    if (!value) continue
+    if (uuidPattern.test(value)) {
+      const key = value.toLowerCase()
+      if (seenID.has(key)) continue
+      seenID.add(key)
+      actorIDs.push(value)
+      continue
+    }
+    const key = value.toLowerCase()
+    if (seenName.has(key)) continue
+    seenName.add(key)
+    actorNames.push(value.replace(/\s+/g, ' '))
+  }
+  return { actorIDs, actorNames }
+}
+
+async function searchActors(keyword = '') {
+  loadingActors.value = true
+  try {
+    const data = await getAdminActors({
+      q: keyword,
+      active: 1,
+      page: 1,
+      page_size: 20
+    })
+    actorOptions.value = (data.items || []).map((item) => ({
+      value: item.id,
+      label: item.name
+    }))
+  } finally {
+    loadingActors.value = false
+  }
 }
 
 async function submit() {
@@ -53,6 +99,7 @@ async function submit() {
           .map((tag) => [tag.toLowerCase(), tag.toLowerCase()])
       ).values()
     )
+    const { actorIDs, actorNames } = splitActorSelection(form.actors)
 
     const chunkSize = 4 * 1024 * 1024
     const totalChunks = Math.ceil(file.value.size / chunkSize)
@@ -65,7 +112,9 @@ async function submit() {
       type: form.type,
       title: form.title,
       description: form.description,
-      tags: normalizedTags
+      tags: normalizedTags,
+      actor_ids: actorIDs,
+      actor_names: actorNames
     })
     sessionId.value = initResp.upload_session_id
 
@@ -93,6 +142,10 @@ async function cancelUpload() {
   }
   ElMessage.warning('已取消上传')
 }
+
+onMounted(() => {
+  searchActors().catch(() => {})
+})
 </script>
 
 <template>
@@ -115,9 +168,9 @@ async function cancelUpload() {
         </el-form-item>
         <el-form-item label="类型">
           <el-select v-model="form.type" style="width: 220px">
-            <el-option label="short" value="short" />
-            <el-option label="movie" value="movie" />
-            <el-option label="episode" value="episode" />
+            <el-option label="短视频" value="short" />
+            <el-option label="电影" value="movie" />
+            <el-option label="剧集分集" value="episode" />
           </el-select>
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
@@ -134,6 +187,24 @@ async function cancelUpload() {
             style="width: 100%"
           >
             <el-option v-for="tag in presetTags" :key="tag" :label="tag" :value="tag" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="关联演员">
+          <el-select
+            v-model="form.actors"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            allow-create
+            default-first-option
+            clearable
+            :remote-method="searchActors"
+            :loading="loadingActors"
+            placeholder="可搜索演员，也可直接输入新演员姓名"
+            style="width: 100%"
+          >
+            <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
           </el-select>
         </el-form-item>
         <el-form-item>

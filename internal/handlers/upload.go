@@ -3,12 +3,14 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"video-server/internal/middleware"
 	"video-server/internal/queue"
@@ -27,6 +29,8 @@ import (
 // @Param title formData string false "title"
 // @Param description formData string false "description"
 // @Param tags formData string false "tags json array or csv"
+// @Param actor_ids formData string false "actor ids json array or csv"
+// @Param actor_names formData string false "actor names json array or csv"
 // @Param hash formData string true "sha256 hash"
 // @Success 202 {object} APIResponse
 // @Failure 200 {object} APIResponse
@@ -63,6 +67,12 @@ func (a *API) Upload(c *gin.Context) {
 	title := c.PostForm("title")
 	desc := c.PostForm("description")
 	tags := parseUploadTags(c.PostForm("tags"))
+	actorIDs, err := parseUploadActorIDs(c.PostForm("actor_ids"))
+	if err != nil {
+		bad(c, "演员ID格式错误")
+		return
+	}
+	actorNames := parseUploadStringList(c.PostForm("actor_names"))
 	userID, okUser := middleware.UserIDFromContext(c)
 	if !okUser {
 		response.Error(c, 401, "unauthorized")
@@ -78,7 +88,7 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 
-	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, hash, a.maxVideoSize)
+	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, actorIDs, actorNames, hash, a.maxVideoSize)
 	if err != nil {
 		a.logger.Error("upload failed", "error", err)
 		switch {
@@ -155,25 +165,54 @@ func (a *API) Upload(c *gin.Context) {
 }
 
 var hashPattern = regexp.MustCompile("^[a-fA-F0-9]{64}$")
+var errInvalidActorID = errors.New("invalid actor id")
 
 func isSHA256Hex(raw string) bool {
 	return hashPattern.MatchString(strings.TrimSpace(raw))
 }
 
 func parseUploadTags(raw string) []string {
+	list := parseUploadStringList(raw)
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	seen := map[string]struct{}{}
+	for _, item := range list {
+		tag := strings.ToLower(strings.TrimSpace(item))
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
+}
+
+func parseUploadStringList(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil
 	}
-	var jsonTags []string
+	var rawList []string
 	if strings.HasPrefix(raw, "[") {
-		if err := json.Unmarshal([]byte(raw), &jsonTags); err == nil {
-			out := make([]string, 0, len(jsonTags))
-			for _, item := range jsonTags {
-				t := strings.TrimSpace(item)
-				if t != "" {
-					out = append(out, t)
+		if err := json.Unmarshal([]byte(raw), &rawList); err == nil {
+			out := make([]string, 0, len(rawList))
+			seen := map[string]struct{}{}
+			for _, item := range rawList {
+				v := strings.Join(strings.Fields(strings.TrimSpace(item)), " ")
+				if v == "" {
+					continue
 				}
+				key := strings.ToLower(v)
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				out = append(out, v)
 			}
 			return out
 		}
@@ -181,13 +220,41 @@ func parseUploadTags(raw string) []string {
 
 	parts := strings.Split(raw, ",")
 	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
 	for _, part := range parts {
-		t := strings.TrimSpace(part)
-		if t != "" {
-			out = append(out, t)
+		v := strings.Join(strings.Fields(strings.TrimSpace(part)), " ")
+		if v == "" {
+			continue
 		}
+		key := strings.ToLower(v)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, v)
 	}
 	return out
+}
+
+func parseUploadActorIDs(raw string) ([]uuid.UUID, error) {
+	list := parseUploadStringList(raw)
+	if len(list) == 0 {
+		return nil, nil
+	}
+	out := make([]uuid.UUID, 0, len(list))
+	seen := map[uuid.UUID]struct{}{}
+	for _, item := range list {
+		id, err := uuid.Parse(item)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s", errInvalidActorID, item)
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func isAllowedVideoExt(name string) bool {
