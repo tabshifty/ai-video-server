@@ -240,7 +240,9 @@ async function save() {
     dialogVisible.value = false
     await load()
   } catch (error) {
-    if (!editingID.value && error?.code === 1025) {
+    const duplicateByMessage = typeof error?.message === 'string' && error.message.includes('演员名称已存在')
+    const duplicateByReason = error?.data?.reason === 'duplicate_name'
+    if (!editingID.value && (duplicateByReason || (error?.code === 1025 && duplicateByMessage))) {
       try {
         await ElMessageBox.confirm('同名演员已存在，是否打开现有演员进行编辑？', '演员已存在', {
           type: 'warning',

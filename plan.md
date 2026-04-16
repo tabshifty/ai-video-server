@@ -710,3 +710,19 @@
   - `npm --prefix admin-web run build` passed。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 21:20] 修复演员新增误报“同名已存在”
+- Type: `implementation`
+- Summary:
+  - 定位误报根因：前端把 `code=1025` 一律视为重名；后端创建演员的非重名错误也会返回 `1025`，导致误判。
+  - 后端修复：`AdminCreateActor` 仅在唯一约束冲突时返回 `1025`，并附带 `reason=duplicate_name`；其他创建失败改为 `1028`。
+  - 前端修复：仅在明确重名（`reason=duplicate_name` 或 `code=1025` 且消息为“演员名称已存在”）时才弹“去编辑已有演员”提示。
+- Changed Files:
+  - `internal/handlers/admin.go`
+  - `admin-web/src/views/ActorManage.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/handlers -run 'TestAdminActorScrapePreview' -count=1` passed。
+  - `npm --prefix admin-web run build` passed。
+- Rollback:
+  - `git revert <commit>`

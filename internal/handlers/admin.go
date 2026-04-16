@@ -328,6 +328,7 @@ func (a *API) AdminCreateActor(c *gin.Context) {
 		if repository.IsUniqueViolation(err) {
 			payload := gin.H{
 				"existing_actor_name": strings.TrimSpace(req.Name),
+				"reason":              "duplicate_name",
 			}
 			if existing, lookupErr := a.repo.GetActorByName(c.Request.Context(), req.Name); lookupErr == nil {
 				payload["existing_actor_id"] = existing.ID
@@ -337,7 +338,7 @@ func (a *API) AdminCreateActor(c *gin.Context) {
 			response.JSON(c, 1025, "演员名称已存在", payload)
 			return
 		}
-		response.Error(c, 1025, err.Error())
+		response.Error(c, 1028, err.Error())
 		return
 	}
 	ok(c, actor)
