@@ -726,3 +726,21 @@
   - `npm --prefix admin-web run build` passed。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 21:43] 修复 dev-up 仅执行首条迁移导致 actors 表缺失
+- Type: `implementation`
+- Summary:
+  - 线上报错 `create actor: relation "actors" does not exist (SQLSTATE 42P01)`，定位为数据库仅执行了 `0001_init.up.sql`。
+  - 根因是 `scripts/dev-up.sh` 在迁移遍历中依赖 `find ... -print0 | sort -z`，导致在当前环境迁移流异常，出现只处理首条文件的问题。
+  - 将迁移遍历改为 Bash 通配循环 `for file in "$ROOT_DIR"/migrations/*.up.sql`，按文件名顺序稳定执行并兼容当前环境。
+  - 已补齐当前数据库缺失迁移 `0002~0007`，确认 `actors` 与 `video_actors` 表存在。
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `plan.md`
+- Verification:
+  - `bash -n scripts/dev-up.sh` passed。
+  - `bash scripts/dev-up.sh` 日志可见按顺序检查 `0001~0007` 迁移。
+  - `SELECT version FROM schema_migrations ORDER BY version;` 返回 `0001~0007` 全部版本。
+  - `SELECT to_regclass('public.actors'), to_regclass('public.video_actors');` 返回 `actors|video_actors`。
+- Rollback:
+  - `git revert <commit>`

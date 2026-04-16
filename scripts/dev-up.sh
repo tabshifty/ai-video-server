@@ -318,7 +318,8 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 SQL
 
   local file
-  while IFS= read -r -d '' file; do
+  for file in "$ROOT_DIR"/migrations/*.up.sql; do
+    [[ -f "$file" ]] || continue
     local version
     version="$(basename "$file")"
 
@@ -335,7 +336,7 @@ SQL
 INSERT INTO schema_migrations(version) VALUES ('${version}')
 ON CONFLICT(version) DO NOTHING;
 SQL
-  done < <(find "$ROOT_DIR/migrations" -maxdepth 1 -type f -name '*.up.sql' -print0 | sort -z)
+  done
 }
 
 hash_file_sha256() {
