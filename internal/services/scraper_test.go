@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -338,5 +339,48 @@ func TestPreviewActorByNameJavDB(t *testing.T) {
 	}
 	if got[1].Name != "演员乙" {
 		t.Fatalf("unexpected second name: %s", got[1].Name)
+	}
+}
+
+func TestPreviewActorByNameTMDBNotesNotTruncated(t *testing.T) {
+	fullBio := strings.Repeat("这是一段完整中文简介。", 120)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/search/person":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{
+					{"id": 2002},
+				},
+			})
+		case "/person/2002":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":           2002,
+				"name":         "演员乙",
+				"gender":       1,
+				"biography":    fullBio,
+				"profile_path": "/actor-2.jpg",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "demo-key", server.URL, "", "", 2*time.Second)
+	got, err := svc.PreviewActorByName(context.Background(), "演员乙", "tmdb", 10)
+	if err != nil {
+		t.Fatalf("PreviewActorByName returned error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 candidate, got=%d", len(got))
+	}
+
+	if got[0].Notes != fullBio {
+		t.Fatalf("expected full notes without truncation, got length=%d want=%d", len(got[0].Notes), len(fullBio))
+	}
+	if strings.Contains(got[0].Notes, "\uFFFD") {
+		t.Fatalf("notes contains invalid replacement character: %q", got[0].Notes)
 	}
 }

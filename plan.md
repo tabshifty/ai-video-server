@@ -744,3 +744,19 @@
   - `SELECT to_regclass('public.actors'), to_regclass('public.video_actors');` 返回 `actors|video_actors`。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 22:09] 修复 TMDB 演员刮削 notes 被截断与乱码
+- Type: `implementation`
+- Summary:
+  - 定位到演员刮削返回中 `notes` 不完整的根因：`previewActorsTMDB` 对 `biography` 执行了 `500` 字节硬截断。
+  - 该截断会导致中文多字节字符被切断，出现 `\uFFFD` 替代字符，并且内容不完整。
+  - 移除该截断逻辑，`notes` 直接返回完整 `biography`。
+  - 新增回归测试：长中文简介场景下 `notes` 不被截断且不包含 `\uFFFD`。
+- Changed Files:
+  - `internal/services/scraper_actor.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run 'TestPreviewActorByNameTMDBNotesNotTruncated|TestPreviewActorByName(TMDB|JavDB)' -count=1` passed。
+- Rollback:
+  - `git revert <commit>`
