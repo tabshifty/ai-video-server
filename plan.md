@@ -595,3 +595,23 @@
   - `bash scripts/dev-up.sh --help` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 13:52] 刮削管理补全详情展示与中文化返回，并增加加载/报错反馈
+- Type: `implementation`
+- Summary:
+  - 后端 `ScraperService` 预览与确认流程接入 `language=zh-CN` 请求参数，优先返回中文字段。
+  - 新增“中文缺字段时英文兜底”的合并逻辑，覆盖标题/简介/日期/类型/题材及部分嵌套字段，避免空白展示。
+  - 新增 `scraper` 单测，验证预览接口会携带中文语言参数，并在中文缺失时执行英文兜底。
+  - 重构 `admin-web` 刮削管理页：从仅概览升级为“候选列表 + 结构化详情 + 原始 metadata JSON 折叠查看”。
+  - 前端新增查询与保存 `loading` 状态，以及失败场景的明确错误提示（优先显示后端返回消息）。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run 'TestPreview(Movie|TV)' -count=1` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -count=1` passed.
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
