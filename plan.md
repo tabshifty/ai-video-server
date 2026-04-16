@@ -577,3 +577,21 @@
   - `GOCACHE=$(pwd)/.gocache go test ./internal/repository` passed。
 - Rollback:
   - Revert the commit containing this feature entry, then执行 `migrations/0006_video_fk_cascade.down.sql`。
+
+### [2026-04-16 12:26] 优化开发脚本进程管理与前端依赖安装策略
+- Type: `implementation`
+- Summary:
+  - 优化 `dev-up/dev-down` 的 PID 管理：PID 文件升级为“PID+命令指纹”，避免 PID 复用导致误判或误杀。
+  - `dev-down` 新增优雅停止等待与超时强制终止，避免仅发信号后立即返回导致残留进程占端口。
+  - `dev-up` 新增启动失败自动清理机制：若后续步骤失败，会回收本次新启动的后台进程，减少半启动状态。
+  - 前端依赖安装改为基于 `package-lock.json` 哈希判断，锁文件变化或缺依赖时执行 `npm ci`，提升环境一致性。
+  - 迁移执行移除无必要管道（`cat | docker exec`），改为输入重定向，简化执行链路。
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `scripts/dev-down.sh`
+  - `plan.md`
+- Verification:
+  - `bash -n scripts/dev-up.sh scripts/dev-down.sh` passed.
+  - `bash scripts/dev-up.sh --help` passed.
+- Rollback:
+  - `git revert <commit>`

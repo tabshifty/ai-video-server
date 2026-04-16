@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
@@ -7,6 +7,7 @@ ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
 ENV_EXAMPLE="$ROOT_DIR/.env.example"
 FRONTEND_MODE="dev"
 FRONTEND_DIR="$ROOT_DIR/admin-web"
+STARTED_PID_FILES=()
 
 print_usage() {
   cat <<'EOF'
@@ -131,9 +132,65 @@ is_running() {
   if [[ ! -f "$pid_file" ]]; then
     return 1
   fi
-  local pid
-  pid="$(cat "$pid_file" 2>/dev/null || true)"
-  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+  local pid meta cmdline
+  IFS=$'\t' read -r pid meta <"$pid_file" || true
+  if [[ -z "${meta:-}" ]]; then
+    # backward compatibility with old pid files that only contain pid
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+  fi
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+
+  if [[ -n "${meta:-}" ]]; then
+    cmdline="$(ps -o command= -p "$pid" 2>/dev/null || true)"
+    [[ -n "$cmdline" ]] || return 1
+    [[ "$cmdline" == *"$meta"* ]] || return 1
+  fi
+
+  return 0
+}
+
+stop_pid_file() {
+  local pid_file="$1"
+  local name="$2"
+  local pid meta cmdline i
+
+  [[ -f "$pid_file" ]] || return 0
+  IFS=$'\t' read -r pid meta <"$pid_file" || true
+  if [[ -z "${meta:-}" ]]; then
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+  fi
+
+  if [[ ! "$pid" =~ ^[0-9]+$ ]]; then
+    rm -f "$pid_file"
+    return 0
+  fi
+
+  if ! kill -0 "$pid" 2>/dev/null; then
+    rm -f "$pid_file"
+    return 0
+  fi
+
+  if [[ -n "${meta:-}" ]]; then
+    cmdline="$(ps -o command= -p "$pid" 2>/dev/null || true)"
+    if [[ "$cmdline" != *"$meta"* ]]; then
+      log "$name pid $pid command mismatch; skip stop"
+      rm -f "$pid_file"
+      return 0
+    fi
+  fi
+
+  kill "$pid" 2>/dev/null || true
+  for ((i = 1; i <= 20; i++)); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      rm -f "$pid_file"
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  kill -9 "$pid" 2>/dev/null || true
+  rm -f "$pid_file"
 }
 
 start_bg_process() {
@@ -143,14 +200,14 @@ start_bg_process() {
   shift 3
 
   if is_running "$pid_file"; then
-    log "$name already running (pid $(cat "$pid_file"))"
+    log "$name already running (pid $(cut -f1 "$pid_file"))"
     return 0
   fi
 
   log "starting $name"
   nohup "$@" >"$log_file" 2>&1 &
   local pid="$!"
-  echo "$pid" >"$pid_file"
+  printf '%s\t%s\n' "$pid" "$*" >"$pid_file"
 
   sleep 1
   if ! kill -0 "$pid" 2>/dev/null; then
@@ -161,6 +218,7 @@ start_bg_process() {
     rm -f "$pid_file"
     return 1
   fi
+  STARTED_PID_FILES+=("$pid_file")
 }
 
 wait_postgres() {
@@ -199,13 +257,71 @@ SQL
     fi
 
     log "applying migration $version"
-    cat "$file" | docker exec -i "$container_id" psql -U video -d video_server -v ON_ERROR_STOP=1 >/dev/null
+    docker exec -i "$container_id" psql -U video -d video_server -v ON_ERROR_STOP=1 >/dev/null <"$file"
     docker exec -i "$container_id" psql -U video -d video_server -v ON_ERROR_STOP=1 >/dev/null <<SQL
 INSERT INTO schema_migrations(version) VALUES ('${version}')
 ON CONFLICT(version) DO NOTHING;
 SQL
   done < <(find "$ROOT_DIR/migrations" -maxdepth 1 -type f -name '*.up.sql' -print0 | sort -z)
 }
+
+hash_file_sha256() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+    return 0
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{print $1}'
+    return 0
+  fi
+  printf 'sha256 tool not found (need sha256sum or shasum)\n' >&2
+  return 1
+}
+
+ensure_frontend_deps() {
+  local lock_file="$FRONTEND_DIR/package-lock.json"
+  local state_file="$RUN_DIR/frontend.lock.sha256"
+  local current_hash="" previous_hash=""
+
+  if [[ ! -f "$lock_file" ]]; then
+    if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
+      log "installing frontend dependencies (npm install)"
+      npm --prefix "$FRONTEND_DIR" install
+    fi
+    return 0
+  fi
+
+  current_hash="$(hash_file_sha256 "$lock_file")"
+  if [[ -f "$state_file" ]]; then
+    previous_hash="$(cat "$state_file" 2>/dev/null || true)"
+  fi
+
+  if [[ ! -d "$FRONTEND_DIR/node_modules" || "$current_hash" != "$previous_hash" ]]; then
+    log "installing frontend dependencies (npm ci)"
+    npm --prefix "$FRONTEND_DIR" ci
+    printf '%s\n' "$current_hash" >"$state_file"
+  fi
+}
+
+cleanup_on_error() {
+  local exit_code="$?"
+  local i pid_file
+  if [[ "$exit_code" -eq 0 ]]; then
+    return 0
+  fi
+
+  log "startup failed, cleaning up started processes"
+  for ((i = ${#STARTED_PID_FILES[@]} - 1; i >= 0; i--)); do
+    pid_file="${STARTED_PID_FILES[i]}"
+    stop_pid_file "$pid_file" "$(basename "$pid_file" .pid)"
+  done
+
+  trap - EXIT
+  exit "$exit_code"
+}
+
+trap cleanup_on_error EXIT
 
 log "starting postgres and redis"
 "${COMPOSE_CMD[@]}" up -d postgres redis >/dev/null
@@ -233,10 +349,7 @@ elif [[ ! -d "$FRONTEND_DIR" ]]; then
   printf 'frontend directory not found: %s\n' "$FRONTEND_DIR" >&2
   exit 1
 else
-  if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
-    log "installing frontend dependencies"
-    npm --prefix "$FRONTEND_DIR" install
-  fi
+  ensure_frontend_deps
 
   if [[ "$FRONTEND_MODE" == "dev" ]]; then
     start_bg_process "frontend" "$RUN_DIR/frontend.pid" "$RUN_DIR/frontend.log" npm --prefix "$FRONTEND_DIR" run dev
@@ -250,6 +363,7 @@ else
   fi
 fi
 
+trap - EXIT
 log "done"
 log "server log: $RUN_DIR/server.log"
 log "worker log: $RUN_DIR/worker.log"
