@@ -20,15 +20,47 @@ fi
 stop_by_pid_file() {
   local pid_file="$1"
   local name="$2"
+  local pid meta cmdline i
   if [[ ! -f "$pid_file" ]]; then
     log "$name is not running"
     return 0
   fi
-  local pid
-  pid="$(cat "$pid_file" 2>/dev/null || true)"
-  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+
+  IFS=$'\t' read -r pid meta <"$pid_file" || true
+  if [[ -z "${meta:-}" ]]; then
+    # backward compatibility with old pid files that only contain pid
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+  fi
+
+  if [[ ! "$pid" =~ ^[0-9]+$ ]]; then
+    log "$name pid invalid, removing pid file"
+    rm -f "$pid_file"
+    return 0
+  fi
+
+  if kill -0 "$pid" 2>/dev/null; then
+    if [[ -n "${meta:-}" ]]; then
+      cmdline="$(ps -o command= -p "$pid" 2>/dev/null || true)"
+      if [[ "$cmdline" != *"$meta"* ]]; then
+        log "$name pid $pid command mismatch, skip stop"
+        rm -f "$pid_file"
+        return 0
+      fi
+    fi
+
     log "stopping $name (pid $pid)"
     kill "$pid" 2>/dev/null || true
+
+    for ((i = 1; i <= 20; i++)); do
+      if ! kill -0 "$pid" 2>/dev/null; then
+        rm -f "$pid_file"
+        return 0
+      fi
+      sleep 0.2
+    done
+
+    log "$name did not exit in time, force kill (pid $pid)"
+    kill -9 "$pid" 2>/dev/null || true
   else
     log "$name pid not active"
   fi
