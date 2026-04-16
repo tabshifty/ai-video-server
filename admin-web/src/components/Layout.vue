@@ -6,6 +6,7 @@ import {
   Film,
   UploadFilled,
   MagicStick,
+  Avatar,
   User,
   List,
   Setting,
@@ -24,11 +25,12 @@ const pageTitle = computed(() => {
     '/videos': '视频管理',
     '/upload': '上传中心',
     '/scrape': '刮削管理',
+    '/actors': '演员管理',
     '/users': '用户管理',
     '/tasks': '任务监控',
     '/settings': '系统设置'
   }
-  return map[route.path] || 'Admin Console'
+  return map[route.path] || '管理后台'
 })
 
 async function onLogout() {
@@ -43,8 +45,8 @@ async function onLogout() {
       <div class="brand-block">
         <div class="brand-badge">AV</div>
         <div>
-          <div class="brand-title">Admin Console</div>
-          <div class="brand-subtitle">Home Video Server</div>
+          <div class="brand-title">视频管理后台</div>
+          <div class="brand-subtitle">本地视频服务</div>
         </div>
       </div>
 
@@ -64,6 +66,10 @@ async function onLogout() {
         <el-menu-item index="/scrape">
           <el-icon><MagicStick /></el-icon>
           <span>刮削管理</span>
+        </el-menu-item>
+        <el-menu-item index="/actors">
+          <el-icon><Avatar /></el-icon>
+          <span>演员管理</span>
         </el-menu-item>
         <el-menu-item index="/users">
           <el-icon><User /></el-icon>

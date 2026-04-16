@@ -634,3 +634,46 @@
   - 通过模拟命令漂移场景（PID 文件为 `go run ...`，进程命令变化）执行 `dev-down`，进程可被清理。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 19:45] 实现演员管理与上传/刮削演员关联（管理端全中文）
+- Type: `implementation`
+- Summary:
+  - 新增数据库迁移 `0007_actor_support`，引入 `actors` 与 `video_actors`，支持演员主数据与视频多演员关联。
+  - 后端新增演员仓储能力：演员列表/创建/更新、按姓名自动入库、视频演员替换与追加关联。
+  - 扩展管理端视频详情：返回 `actors` 列表；视频更新接口支持 `actor_ids` + `actor_names`（可同时传已有演员与新建演员）。
+  - 新增管理端演员接口：`GET /api/v1/admin/actors`、`POST /api/v1/admin/actors`、`PUT /api/v1/admin/actors/:id`。
+  - 上传链路支持演员关联：`upload/init` 会话保存演员信息，`upload/complete` 落库并关联演员；普通上传同样支持 `actor_ids/actor_names`。
+  - 刮削链路接入 TMDB cast：电影/分集刮削与确认后会自动补充演员关联（非阻断式，失败不影响主流程）。
+  - 管理端前端新增“演员管理”页面，并在上传页、视频详情页接入演员搜索多选+可创建；本次新增/修改文案统一中文。
+- Changed Files:
+  - `migrations/0007_actor_support.up.sql`
+  - `migrations/0007_actor_support.down.sql`
+  - `internal/models/admin.go`
+  - `internal/repository/actor_repository.go`
+  - `internal/repository/actor_repository_test.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/upload.go`
+  - `internal/handlers/upload_chunk.go`
+  - `internal/handlers/upload_helpers_test.go`
+  - `internal/services/upload.go`
+  - `internal/services/chunk_upload.go`
+  - `internal/services/chunk_upload_test.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/router/index.js`
+  - `admin-web/src/components/Layout.vue`
+  - `admin-web/src/views/ActorManage.vue`
+  - `admin-web/src/views/VideoUpload.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/handlers -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run 'TestExtractCastNames|^$' -count=1` passed。
+  - `npm --prefix admin-web run build` passed。
+  - 说明：`internal/services` 全量测试在当前沙箱环境存在 `httptest` 端口监听限制，故本次使用定向用例与编译校验。
+- Rollback:
+  - `git revert <commit>`

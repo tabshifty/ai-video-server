@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"video-server/internal/middleware"
 	"video-server/internal/queue"
@@ -37,6 +38,8 @@ func (a *API) UploadInit(c *gin.Context) {
 		Title       string   `json:"title"`
 		Description string   `json:"description"`
 		Tags        []string `json:"tags"`
+		ActorIDs    []string `json:"actor_ids"`
+		ActorNames  []string `json:"actor_names"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
@@ -63,6 +66,12 @@ func (a *API) UploadInit(c *gin.Context) {
 		bad(c, "file size exceeds limit")
 		return
 	}
+	normalizedActorIDs, err := normalizeActorIDStrings(req.ActorIDs)
+	if err != nil {
+		bad(c, "演员ID格式错误")
+		return
+	}
+	normalizedActorNames := normalizeActorNames(req.ActorNames)
 
 	session, err := a.chunkUpload.Init(
 		c.Request.Context(),
@@ -76,6 +85,8 @@ func (a *API) UploadInit(c *gin.Context) {
 		req.Title,
 		req.Description,
 		req.Tags,
+		normalizedActorIDs,
+		normalizedActorNames,
 	)
 	if err != nil {
 		response.Error(c, 2001, err.Error())
@@ -136,16 +147,29 @@ func (a *API) UploadComplete(c *gin.Context) {
 		return
 	}
 
+	actorIDs := make([]uuid.UUID, 0, len(session.ActorIDs))
+	for _, rawID := range session.ActorIDs {
+		id, parseErr := uuid.Parse(rawID)
+		if parseErr != nil {
+			_ = os.Remove(mergedPath)
+			response.Error(c, 2004, "上传会话中的演员ID无效")
+			return
+		}
+		actorIDs = append(actorIDs, id)
+	}
+
 	result, err := a.uploadSvc.SaveUploadedFile(c.Request.Context(), services.LocalUploadInput{
-		UserID:   userID,
-		FilePath: mergedPath,
-		Filename: session.Filename,
-		FileSize: session.FileSize,
-		Title:    session.Title,
-		Desc:     session.Description,
-		Type:     session.Type,
-		Tags:     session.Tags,
-		Hash:     session.Hash,
+		UserID:     userID,
+		FilePath:   mergedPath,
+		Filename:   session.Filename,
+		FileSize:   session.FileSize,
+		Title:      session.Title,
+		Desc:       session.Description,
+		Type:       session.Type,
+		Tags:       session.Tags,
+		ActorIDs:   actorIDs,
+		ActorNames: normalizeActorNames(session.ActorNames),
+		Hash:       session.Hash,
 	}, a.maxVideoSize)
 	if err != nil {
 		_ = os.Remove(mergedPath)
@@ -232,4 +256,46 @@ func (a *API) UploadAbort(c *gin.Context) {
 		return
 	}
 	ok(c, gin.H{"aborted": true})
+}
+
+func normalizeActorIDStrings(rawIDs []string) ([]string, error) {
+	if len(rawIDs) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(rawIDs))
+	seen := map[string]struct{}{}
+	for _, raw := range rawIDs {
+		id, err := uuid.Parse(strings.TrimSpace(raw))
+		if err != nil {
+			return nil, err
+		}
+		key := id.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	return out, nil
+}
+
+func normalizeActorNames(raw []string) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	seen := map[string]struct{}{}
+	for _, item := range raw {
+		name := strings.Join(strings.Fields(strings.TrimSpace(item)), " ")
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+	return out
 }

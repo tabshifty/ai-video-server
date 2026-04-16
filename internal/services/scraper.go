@@ -75,6 +75,7 @@ type ConfirmScrapeInput struct {
 }
 
 const tmdbLangChinese = "zh-CN"
+const tmdbCastLimit = 20
 
 func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year int) ([]map[string]any, error) {
 	if s.apiKey == "" {
@@ -230,7 +231,11 @@ func (s *ScraperService) ConfirmMovie(ctx context.Context, in ConfirmScrapeInput
 		"manual":       in.Metadata,
 		"release_date": chooseStr(in.ReleaseDate, asString(detail["release_date"])),
 	}
-	return s.repo.UpdateVideoScrapeResult(ctx, video.ID, &in.TMDBID, title, overview, thumbPath, meta, "uploaded")
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &in.TMDBID, title, overview, thumbPath, meta, "uploaded"); err != nil {
+		return err
+	}
+	s.syncMovieActors(ctx, video.ID, in.TMDBID)
+	return nil
 }
 
 func (s *ScraperService) ConfirmEpisode(ctx context.Context, in ConfirmScrapeInput) error {
@@ -329,7 +334,11 @@ func (s *ScraperService) ConfirmEpisode(ctx context.Context, in ConfirmScrapeInp
 		"manual":       in.Metadata,
 		"release_date": chooseStr(in.ReleaseDate, asString(epRaw["air_date"])),
 	}
-	return s.repo.UpdateVideoScrapeResult(ctx, video.ID, &episodeTMDBID, title, overview, thumbPath, meta, "uploaded")
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &episodeTMDBID, title, overview, thumbPath, meta, "uploaded"); err != nil {
+		return err
+	}
+	s.syncEpisodeActors(ctx, video.ID, in.TMDBID, seasonNum, episodeNum)
+	return nil
 }
 
 // SearchMovieCandidates searches TMDB by file title/year pattern.
@@ -400,7 +409,11 @@ func (s *ScraperService) SyncMovieMetadata(ctx context.Context, videoID uuid.UUI
 	meta := map[string]any{
 		"tmdb": raw,
 	}
-	return s.repo.UpdateVideoScrapeResult(ctx, videoID, &tmdbID, title, overview, thumbPath, meta, "uploaded")
+	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &tmdbID, title, overview, thumbPath, meta, "uploaded"); err != nil {
+		return err
+	}
+	s.syncMovieActors(ctx, videoID, tmdbID)
+	return nil
 }
 
 // SyncTVEpisode syncs tv metadata and binds season/episode to the given video.
@@ -470,6 +483,7 @@ func (s *ScraperService) SyncTVEpisode(ctx context.Context, videoID uuid.UUID, t
 		if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &episodeTMDBID, title, description, thumbPath, meta, "uploaded"); err != nil {
 			return err
 		}
+		s.syncEpisodeActors(ctx, videoID, tmdbID, seasonNum, episodeNum)
 	}
 	return nil
 }
@@ -539,6 +553,7 @@ func (s *ScraperService) ScrapeMovieUpload(ctx context.Context, videoID uuid.UUI
 	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &scrape.TMDBID, scrape.Title, scrape.Description, scrape.ThumbnailPath, scrape.Metadata, "uploaded"); err != nil {
 		return ScrapeResult{}, err
 	}
+	s.syncMovieActors(ctx, videoID, scrape.TMDBID)
 	return scrape, nil
 }
 
@@ -669,7 +684,68 @@ func (s *ScraperService) ScrapeEpisodeUpload(ctx context.Context, videoID uuid.U
 	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &scrape.TMDBID, scrape.Title, scrape.Description, scrape.ThumbnailPath, scrape.Metadata, "uploaded"); err != nil {
 		return ScrapeResult{}, err
 	}
+	s.syncEpisodeActors(ctx, videoID, tvID, seasonNum, episodeNum)
 	return scrape, nil
+}
+
+func (s *ScraperService) syncMovieActors(ctx context.Context, videoID uuid.UUID, movieTMDBID int) {
+	if movieTMDBID <= 0 {
+		return
+	}
+	path := fmt.Sprintf("/movie/%d/credits", movieTMDBID)
+	credits, err := s.getTMDBJSON(ctx, path, nil, tmdbLangChinese)
+	if err != nil {
+		return
+	}
+	names := extractCastNames(credits, tmdbCastLimit)
+	if len(names) == 0 {
+		fallback, fallbackErr := s.getTMDBJSON(ctx, path, nil, "")
+		if fallbackErr == nil {
+			names = extractCastNames(fallback, tmdbCastLimit)
+		}
+	}
+	if len(names) == 0 {
+		return
+	}
+	actorIDs, err := s.repo.ResolveActorIDs(ctx, nil, names, "scrape_tmdb")
+	if err != nil {
+		return
+	}
+	_ = s.repo.AddVideoActors(ctx, videoID, actorIDs, "scrape_tmdb")
+}
+
+func (s *ScraperService) syncEpisodeActors(ctx context.Context, videoID uuid.UUID, tvTMDBID, seasonNum, episodeNum int) {
+	if tvTMDBID <= 0 || seasonNum <= 0 || episodeNum <= 0 {
+		return
+	}
+	episodeCreditsPath := fmt.Sprintf("/tv/%d/season/%d/episode/%d/credits", tvTMDBID, seasonNum, episodeNum)
+	names := s.tryFetchCastNames(ctx, episodeCreditsPath, tmdbCastLimit)
+	if len(names) == 0 {
+		tvCreditsPath := fmt.Sprintf("/tv/%d/credits", tvTMDBID)
+		names = s.tryFetchCastNames(ctx, tvCreditsPath, tmdbCastLimit)
+	}
+	if len(names) == 0 {
+		return
+	}
+	actorIDs, err := s.repo.ResolveActorIDs(ctx, nil, names, "scrape_tmdb")
+	if err != nil {
+		return
+	}
+	_ = s.repo.AddVideoActors(ctx, videoID, actorIDs, "scrape_tmdb")
+}
+
+func (s *ScraperService) tryFetchCastNames(ctx context.Context, path string, limit int) []string {
+	raw, err := s.getTMDBJSON(ctx, path, nil, tmdbLangChinese)
+	if err == nil {
+		if names := extractCastNames(raw, limit); len(names) > 0 {
+			return names
+		}
+	}
+	fallback, fallbackErr := s.getTMDBJSON(ctx, path, nil, "")
+	if fallbackErr != nil {
+		return nil
+	}
+	return extractCastNames(fallback, limit)
 }
 
 func (s *ScraperService) getJSON(ctx context.Context, endpoint string) (map[string]any, error) {
@@ -970,6 +1046,41 @@ func chooseStr(primary, fallback string) string {
 		return strings.TrimSpace(primary)
 	}
 	return strings.TrimSpace(fallback)
+}
+
+func extractCastNames(raw map[string]any, limit int) []string {
+	if limit <= 0 {
+		limit = tmdbCastLimit
+	}
+	castRows, ok := raw["cast"].([]any)
+	if !ok || len(castRows) == 0 {
+		return nil
+	}
+	out := make([]string, 0, limit)
+	seen := map[string]struct{}{}
+	for _, row := range castRows {
+		if len(out) >= limit {
+			break
+		}
+		item, ok := row.(map[string]any)
+		if !ok {
+			continue
+		}
+		name := strings.TrimSpace(asString(item["name"]))
+		if name == "" {
+			name = strings.TrimSpace(asString(item["original_name"]))
+		}
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+	return out
 }
 
 func normalizeCacheKey(raw string) string {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -183,5 +184,23 @@ func TestPreviewTVUsesChineseLanguageAndFallback(t *testing.T) {
 	}
 	if len(genres) != 1 || genres[0] != "剧情" {
 		t.Fatalf("expected chinese genres, got=%v", genres)
+	}
+}
+
+func TestExtractCastNames(t *testing.T) {
+	raw := map[string]any{
+		"cast": []any{
+			map[string]any{"name": "演员甲"},
+			map[string]any{"name": "演员乙"},
+			map[string]any{"name": "演员甲"},
+			map[string]any{"name": "", "original_name": "Actor C"},
+			map[string]any{"original_name": "  "},
+		},
+	}
+
+	got := extractCastNames(raw, 3)
+	want := []string{"演员甲", "演员乙", "Actor C"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("extractCastNames() = %v, want %v", got, want)
 	}
 }

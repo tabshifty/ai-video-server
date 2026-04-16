@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
 
@@ -173,6 +174,8 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		Description string         `json:"description"`
 		Thumbnail   string         `json:"thumbnail"`
 		Tags        []string       `json:"tags"`
+		ActorIDs    *[]string      `json:"actor_ids"`
+		ActorNames  *[]string      `json:"actor_names"`
 		Status      string         `json:"status"`
 		Metadata    map[string]any `json:"metadata"`
 	}
@@ -183,7 +186,23 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 	if req.Metadata == nil {
 		req.Metadata = map[string]any{}
 	}
-	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata); err != nil {
+	updateActors := req.ActorIDs != nil || req.ActorNames != nil
+	var actorIDs []uuid.UUID
+	var actorNames []string
+	if updateActors {
+		var err error
+		if req.ActorIDs != nil {
+			actorIDs, err = parseUUIDStrings(*req.ActorIDs)
+			if err != nil {
+				bad(c, "演员ID格式错误")
+				return
+			}
+		}
+		if req.ActorNames != nil {
+			actorNames = normalizeActorNames(*req.ActorNames)
+		}
+	}
+	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, actorIDs, actorNames, updateActors); err != nil {
 		response.Error(c, 1007, err.Error())
 		return
 	}
@@ -264,6 +283,85 @@ func (a *API) AdminUsers(c *gin.Context) {
 		"page":        page,
 		"page_size":   pageSize,
 	})
+}
+
+func (a *API) AdminActors(c *gin.Context) {
+	page := parsePage(c.Query("page"), 1)
+	pageSize := parsePageSize(c.Query("page_size"), 20)
+	keyword := c.Query("q")
+	var active *bool
+	if raw := strings.TrimSpace(c.Query("active")); raw != "" {
+		switch strings.ToLower(raw) {
+		case "1", "true":
+			v := true
+			active = &v
+		case "0", "false":
+			v := false
+			active = &v
+		default:
+			bad(c, "active 参数只能是 1 或 0")
+			return
+		}
+	}
+
+	items, total, err := a.repo.ListActors(c.Request.Context(), keyword, active, page, pageSize)
+	if err != nil {
+		response.Error(c, 1024, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"items":       items,
+		"total_count": total,
+		"page":        page,
+		"page_size":   pageSize,
+	})
+}
+
+func (a *API) AdminCreateActor(c *gin.Context) {
+	var req models.AdminActorInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	actor, err := a.repo.CreateActor(c.Request.Context(), req)
+	if err != nil {
+		if repository.IsUniqueViolation(err) {
+			response.Error(c, 1025, "演员名称已存在")
+			return
+		}
+		response.Error(c, 1025, err.Error())
+		return
+	}
+	ok(c, actor)
+}
+
+func (a *API) AdminUpdateActor(c *gin.Context) {
+	actorID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "演员ID格式错误")
+		return
+	}
+
+	var req models.AdminActorInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+
+	actor, err := a.repo.UpdateActor(c.Request.Context(), actorID, req)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			response.Error(c, 404, "演员不存在")
+			return
+		}
+		if repository.IsUniqueViolation(err) {
+			response.Error(c, 1026, "演员名称已存在")
+			return
+		}
+		response.Error(c, 1026, err.Error())
+		return
+	}
+	ok(c, actor)
 }
 
 func (a *API) AdminUpdateUserRole(c *gin.Context) {
@@ -391,4 +489,28 @@ func tailLines(f *os.File, n int) ([]string, error) {
 		return nil, err
 	}
 	return lines, nil
+}
+
+func parseUUIDStrings(raw []string) ([]uuid.UUID, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	out := make([]uuid.UUID, 0, len(raw))
+	seen := map[uuid.UUID]struct{}{}
+	for _, item := range raw {
+		v := strings.TrimSpace(item)
+		if v == "" {
+			continue
+		}
+		id, err := uuid.Parse(v)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
 }
