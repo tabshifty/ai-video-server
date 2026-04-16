@@ -150,10 +150,88 @@ is_running() {
   return 0
 }
 
+pid_is_alive() {
+  local pid="$1"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+collect_descendant_pids() {
+  local parent="$1"
+  local child
+  while IFS= read -r child; do
+    [[ "$child" =~ ^[0-9]+$ ]] || continue
+    printf '%s\n' "$child"
+    collect_descendant_pids "$child"
+  done < <(pgrep -P "$parent" 2>/dev/null || true)
+}
+
+pid_matches_service() {
+  local name="$1"
+  local cmdline="$2"
+  case "$name" in
+  server)
+    [[ "$cmdline" == *"-mode server"* || "$cmdline" == *"go run main.go -mode server"* ]]
+    ;;
+  worker)
+    [[ "$cmdline" == *"-mode worker"* || "$cmdline" == *"go run main.go -mode worker"* ]]
+    ;;
+  frontend)
+    [[ "$cmdline" == *"$ROOT_DIR/admin-web"* || "$cmdline" == *"vite"* ]]
+    ;;
+  *)
+    return 1
+    ;;
+  esac
+}
+
+stop_pid_tree() {
+  local pid="$1"
+  local name="$2"
+  local i child cmdline descendants_text
+
+  if ! pid_is_alive "$pid"; then
+    return 0
+  fi
+
+  descendants_text="$(collect_descendant_pids "$pid" 2>/dev/null || true)"
+  cmdline="$(ps -o command= -p "$pid" 2>/dev/null || true)"
+  log "stopping $name (pid $pid) cmd: ${cmdline:-unknown}"
+
+  while IFS= read -r child; do
+    [[ "$child" =~ ^[0-9]+$ ]] || continue
+    kill "$child" 2>/dev/null || true
+  done <<<"$descendants_text"
+  kill "$pid" 2>/dev/null || true
+
+  for ((i = 1; i <= 30; i++)); do
+    if ! pid_is_alive "$pid"; then
+      local alive_descendants=0
+      while IFS= read -r child; do
+        [[ "$child" =~ ^[0-9]+$ ]] || continue
+        if pid_is_alive "$child"; then
+          alive_descendants=1
+          break
+        fi
+      done <<<"$descendants_text"
+      if [[ "$alive_descendants" -eq 0 ]]; then
+        return 0
+      fi
+    fi
+    sleep 0.2
+  done
+
+  while IFS= read -r child; do
+    [[ "$child" =~ ^[0-9]+$ ]] || continue
+    kill -9 "$child" 2>/dev/null || true
+  done <<<"$descendants_text"
+  kill -9 "$pid" 2>/dev/null || true
+}
+
 stop_pid_file() {
   local pid_file="$1"
   local name="$2"
-  local pid meta cmdline i
+  local pid meta cmdline
 
   [[ -f "$pid_file" ]] || return 0
   IFS=$'\t' read -r pid meta <"$pid_file" || true
@@ -166,7 +244,7 @@ stop_pid_file() {
     return 0
   fi
 
-  if ! kill -0 "$pid" 2>/dev/null; then
+  if ! pid_is_alive "$pid"; then
     rm -f "$pid_file"
     return 0
   fi
@@ -174,22 +252,17 @@ stop_pid_file() {
   if [[ -n "${meta:-}" ]]; then
     cmdline="$(ps -o command= -p "$pid" 2>/dev/null || true)"
     if [[ "$cmdline" != *"$meta"* ]]; then
-      log "$name pid $pid command mismatch; skip stop"
-      rm -f "$pid_file"
-      return 0
+      if pid_matches_service "$name" "$cmdline"; then
+        log "$name pid $pid command changed after startup, continue stopping"
+      else
+        log "$name pid $pid command mismatch; skip stop"
+        rm -f "$pid_file"
+        return 0
+      fi
     fi
   fi
 
-  kill "$pid" 2>/dev/null || true
-  for ((i = 1; i <= 20; i++)); do
-    if ! kill -0 "$pid" 2>/dev/null; then
-      rm -f "$pid_file"
-      return 0
-    fi
-    sleep 0.2
-  done
-
-  kill -9 "$pid" 2>/dev/null || true
+  stop_pid_tree "$pid" "$name"
   rm -f "$pid_file"
 }
 

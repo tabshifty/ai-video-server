@@ -615,3 +615,22 @@
   - `npm --prefix admin-web run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 18:52] 修复 dev-down 未能关闭 server/worker/frontend 残留进程
+- Type: `implementation`
+- Summary:
+  - 定位根因：`dev-down` 对 PID 文件命令串做严格匹配，`go run` 启动后命令会漂移为临时 `main -mode ...`，导致误判并跳过停止。
+  - 强化 `dev-down` 停止逻辑：新增进程树终止（先 `TERM` 后超时 `KILL`）、服务命令漂移容错匹配、无 PID 文件时的兜底清理（按模式/端口/worker 日志 PID）。
+  - 同步增强 `dev-up` 启动失败清理逻辑，复用相同的进程树停止和命令漂移容错，避免半启动残留。
+  - 修复脚本兼容性：去除 `mapfile`，改为 `bash 3.2` 兼容写法（macOS 默认 bash 可运行）。
+- Changed Files:
+  - `scripts/dev-down.sh`
+  - `scripts/dev-up.sh`
+  - `plan.md`
+- Verification:
+  - `bash -n scripts/dev-up.sh scripts/dev-down.sh` passed.
+  - 执行 `bash scripts/dev-down.sh` 后，`lsof -nP -iTCP:8080 -sTCP:LISTEN` 无输出。
+  - 执行 `bash scripts/dev-down.sh` 后，`lsof -nP -iTCP:5173 -sTCP:LISTEN` 无输出。
+  - 通过模拟命令漂移场景（PID 文件为 `go run ...`，进程命令变化）执行 `dev-down`，进程可被清理。
+- Rollback:
+  - `git revert <commit>`
