@@ -15,6 +15,42 @@
 
 ---
 
+### [2026-04-17 12:50] AV 刮削框架化重构计划（参考 mdcx）与技能沉淀
+- Type: `plan`
+- Summary:
+  - 参考 `references/mdcx` 的 crawler provider、模板流程与 parser 抽象，重构 Go AV 刮削内部架构。
+  - 交付“技能+代码”：先沉淀可复用技能，再实现 JavDB 强化和多站点扩展预留。
+  - 保持现有外部接口兼容，增强编号解析、trace 可观测性、演员自动关联稳定性。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - 计划项，无需构建/测试。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-17 12:50] 实现 AV crawler provider + 模板流程重构、trace 与编号匹配增强
+- Type: `implementation`
+- Summary:
+  - 新增 AV 框架层：`avCrawlerProvider`、`avCrawler`、`avDetailParser`、`avScrapeRunContext`，并实现 JavDB crawler + parser + post-process。
+  - `ScrapeAVUpload` 与 `ConfirmAV` 写入 `scrape_trace`，包含搜索词、URL、步骤、错误与匹配策略，用于排障与持续优化。
+  - 升级番号提取逻辑，覆盖 `FC2PPV/FC2-PPV`、`HEYZO`、`259LUXU` 等变体，并改进候选排序规则。
+  - JavDB 搜索默认附带 `locale=zh`，提升中文内容命中稳定性。
+  - 新增技能 `.codex/skills/av-scraper-optimization`，沉淀 mdcx→Go 架构映射与编号策略实践。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_test.go`
+  - `.codex/skills/av-scraper-optimization/SKILL.md`
+  - `.codex/skills/av-scraper-optimization/references/architecture-map.md`
+  - `.codex/skills/av-scraper-optimization/references/number-normalization.md`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestScrapeAVUploadCodeFirstAndActorSync|TestExtractAVCodeVariants'` passed.
+  - `go test ./internal/services` passed.
+  - `go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 09:39] 自动刮削中文一致性修复计划（电影/剧集）
 - Type: `plan`
 - Summary:

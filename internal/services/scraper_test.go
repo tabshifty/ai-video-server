@@ -694,11 +694,13 @@ func TestScrapeEpisodeUploadUsesChineseLanguageAndFallback(t *testing.T) {
 
 func TestScrapeAVUploadCodeFirstAndActorSync(t *testing.T) {
 	var searchKeywords []string
+	var searchLocales []string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/search":
 			searchKeywords = append(searchKeywords, r.URL.Query().Get("q"))
+			searchLocales = append(searchLocales, r.URL.Query().Get("locale"))
 			_, _ = w.Write([]byte(`
 <html>
   <body>
@@ -760,6 +762,9 @@ func TestScrapeAVUploadCodeFirstAndActorSync(t *testing.T) {
 	if len(searchKeywords) == 0 || strings.ToUpper(searchKeywords[0]) != "ABP-123" {
 		t.Fatalf("expected code-first search keyword ABP-123, got=%v", searchKeywords)
 	}
+	if len(searchLocales) == 0 || searchLocales[0] != "zh" {
+		t.Fatalf("expected locale=zh for av search, got=%v", searchLocales)
+	}
 	if got.Title != "ABP-123 作品标题" {
 		t.Fatalf("unexpected title: %s", got.Title)
 	}
@@ -789,6 +794,17 @@ func TestScrapeAVUploadCodeFirstAndActorSync(t *testing.T) {
 	}
 	if repo.lastUpdate.metadata["external_id"] != "code-hit" {
 		t.Fatalf("expected external_id code-hit, got=%v", repo.lastUpdate.metadata["external_id"])
+	}
+	trace, ok := repo.lastUpdate.metadata["scrape_trace"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected scrape_trace metadata object, got=%T", repo.lastUpdate.metadata["scrape_trace"])
+	}
+	if trace["source"] != "javdb" {
+		t.Fatalf("expected scrape_trace.source=javdb, got=%v", trace["source"])
+	}
+	queries, ok := trace["search_queries"].([]string)
+	if !ok || len(queries) == 0 || queries[0] != "ABP-123" {
+		t.Fatalf("unexpected scrape_trace.search_queries: %v", trace["search_queries"])
 	}
 }
 
@@ -850,5 +866,49 @@ func TestPreviewAVFallbackByTitle(t *testing.T) {
 	actors, ok := candidate["actors"].([]string)
 	if !ok || len(actors) != 1 || actors[0] != "演员丙" {
 		t.Fatalf("unexpected actors: %v", candidate["actors"])
+	}
+}
+
+func TestExtractAVCodeVariants(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "standard code",
+			input: "ABP-123 sample",
+			want:  "ABP-123",
+		},
+		{
+			name:  "fc2 ppv merged",
+			input: "FC2PPV-123456 title",
+			want:  "FC2-123456",
+		},
+		{
+			name:  "fc2 with hyphen",
+			input: "FC2-PPV-654321",
+			want:  "FC2-654321",
+		},
+		{
+			name:  "heyzo no hyphen",
+			input: "HEYZO1234 trailer",
+			want:  "HEYZO-1234",
+		},
+		{
+			name:  "suren numeric prefix",
+			input: "259LUXU-1456 uncensored",
+			want:  "259LUXU-1456",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := extractAVCode(tc.input)
+			if got != tc.want {
+				t.Fatalf("extractAVCode(%q)=%q, want=%q", tc.input, got, tc.want)
+			}
+		})
 	}
 }

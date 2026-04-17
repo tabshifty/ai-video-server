@@ -39,6 +39,7 @@ type ScraperService struct {
 	baseURL      string
 	avBaseURL    string
 	avUserAgent  string
+	avProvider   avCrawlerProvider
 	storageRoot  string
 	posterRoot   string
 	httpClient   *http.Client
@@ -57,7 +58,7 @@ func NewScraperService(repo scraperRepo, apiKey, baseURL, storageRoot, posterRoo
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
-	return &ScraperService{
+	svc := &ScraperService{
 		repo:        repo,
 		apiKey:      apiKey,
 		baseURL:     strings.TrimSuffix(baseURL, "/"),
@@ -74,6 +75,8 @@ func NewScraperService(repo scraperRepo, apiKey, baseURL, storageRoot, posterRoo
 		cacheTTL:     5 * time.Minute,
 		previewCache: map[string]previewCacheEntry{},
 	}
+	svc.avProvider = newAVCrawlerProvider(svc)
+	return svc
 }
 
 func (s *ScraperService) ConfigureAVScraper(baseURL, userAgent string, timeout time.Duration) {
@@ -116,6 +119,10 @@ const avPreviewLimitDefault = 10
 
 var (
 	avCodePattern              = regexp.MustCompile(`(?i)\b([a-z]{2,10})[-_ ]?(\d{2,5})\b`)
+	avFC2CodePattern           = regexp.MustCompile(`(?i)\bFC2(?:-?PPV)?[-_ ]?(\d{5,7})\b`)
+	avHeyzoCodePattern         = regexp.MustCompile(`(?i)\bHEYZO[-_ ]?(\d{3,6})\b`)
+	avSurenCodePattern         = regexp.MustCompile(`(?i)\b(\d{2,}[a-z]{2,})[-_ ]?(\d{2,6}[a-z]?)\b`)
+	avGeneralCodePattern       = regexp.MustCompile(`(?i)\b([a-z]{2,12})[-_ ]?0*(\d{2,6}[a-z]?)\b`)
 	javDBVideoAnchorRe         = regexp.MustCompile(`(?is)<a[^>]*href=["']([^"']*/v/[^"']+)["'][^>]*>(.*?)</a>`)
 	javDBTitleRe               = regexp.MustCompile(`(?is)<h2[^>]*class=["'][^"']*title[^"']*["'][^>]*>(.*?)</h2>`)
 	javDBPageTitleRe           = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
@@ -449,7 +456,7 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 	}
 
 	detailURL := toAbsoluteURL(strings.TrimSpace(s.avBaseURL), "/v/"+externalID)
-	candidate, err := s.fetchAVCandidateByDetailURL(ctx, detailURL)
+	candidate, trace, err := s.fetchAVCandidateByDetailURLWithTrace(ctx, detailURL)
 	if err != nil {
 		return err
 	}
@@ -473,6 +480,7 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 		"release_date":  chooseStr(in.ReleaseDate, candidate.ReleaseDate),
 		"javdb":         candidate.Raw,
 		"manual":        in.Metadata,
+		"scrape_trace":  trace,
 	}
 	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, title, overview, thumbPath, meta, "uploaded"); err != nil {
 		return err
@@ -835,7 +843,7 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		return ScrapeResult{}, fmt.Errorf("invalid av filename")
 	}
 
-	candidates, err := s.searchAVCandidates(ctx, keyword, 6)
+	candidates, trace, err := s.searchAVCandidatesWithTrace(ctx, keyword, 6)
 	if err != nil {
 		return ScrapeResult{}, err
 	}
@@ -861,6 +869,7 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		"release_date":   candidate.ReleaseDate,
 		"search_keyword": keyword,
 		"javdb":          candidate.Raw,
+		"scrape_trace":   trace,
 	}
 	scrape := ScrapeResult{
 		TMDBID:        0,
@@ -935,189 +944,24 @@ func (s *ScraperService) syncAVActors(ctx context.Context, videoID uuid.UUID, ac
 }
 
 func (s *ScraperService) searchAVCandidates(ctx context.Context, keyword string, limit int) ([]avScrapeCandidate, error) {
-	normalizedKeyword := normalizeAVKeyword(keyword)
-	if normalizedKeyword == "" {
-		return nil, fmt.Errorf("av keyword is required")
-	}
-	if limit <= 0 {
-		limit = avPreviewLimitDefault
-	}
-
-	queryList := make([]string, 0, 2)
-	code := extractAVCode(normalizedKeyword)
-	if code != "" {
-		queryList = append(queryList, code)
-	}
-	if normalizedKeyword != "" && !strings.EqualFold(normalizedKeyword, code) {
-		queryList = append(queryList, normalizedKeyword)
-	}
-
-	seen := map[string]struct{}{}
-	out := make([]avScrapeCandidate, 0, limit)
-	for _, query := range queryList {
-		hits, err := s.searchAVByQuery(ctx, query, limit)
-		if err != nil {
-			if len(out) > 0 {
-				continue
-			}
-			return nil, err
-		}
-		for _, hit := range hits {
-			key := strings.TrimSpace(hit.ExternalID)
-			if key == "" {
-				key = strings.ToLower(strings.TrimSpace(hit.DetailURL))
-			}
-			if key == "" {
-				continue
-			}
-			if _, exists := seen[key]; exists {
-				continue
-			}
-			seen[key] = struct{}{}
-			out = append(out, hit)
-			if len(out) >= limit {
-				return prioritizeAVCandidatesByCode(out, code), nil
-			}
-		}
-	}
-
-	return prioritizeAVCandidatesByCode(out, code), nil
+	candidates, _, err := s.searchAVCandidatesWithTrace(ctx, keyword, limit)
+	return candidates, err
 }
 
 func (s *ScraperService) searchAVByQuery(ctx context.Context, keyword string, limit int) ([]avScrapeCandidate, error) {
-	baseURL := strings.TrimSpace(s.avBaseURL)
-	if baseURL == "" {
-		baseURL = "https://javdb.com"
-	}
-	baseURL = strings.TrimSuffix(baseURL, "/")
-
-	query := url.Values{}
-	query.Set("q", strings.TrimSpace(keyword))
-	searchURL := fmt.Sprintf("%s/search?%s", baseURL, query.Encode())
-	content, err := s.fetchAVHTML(ctx, searchURL)
-	if err != nil {
+	crawler := s.defaultAVCrawler()
+	run := newAVScrapeRunContext("search_by_query", "")
+	run.addSearchQuery(keyword)
+	out, err := crawler.SearchCandidates(ctx, run, keyword, limit)
+	if err != nil && len(out) == 0 {
 		return nil, err
 	}
-
-	matches := javDBVideoAnchorRe.FindAllStringSubmatch(content, -1)
-	if len(matches) == 0 {
-		return nil, nil
-	}
-
-	out := make([]avScrapeCandidate, 0, limit)
-	seen := map[string]struct{}{}
-	for _, match := range matches {
-		if len(out) >= limit {
-			break
-		}
-		if len(match) < 2 {
-			continue
-		}
-		detailURL := toAbsoluteURL(baseURL, strings.TrimSpace(match[1]))
-		externalID := extractJavDBVideoID(match[1])
-		if externalID == "" {
-			externalID = extractJavDBVideoID(detailURL)
-		}
-		key := strings.TrimSpace(externalID)
-		if key == "" {
-			key = strings.ToLower(detailURL)
-		}
-		if key == "" {
-			continue
-		}
-		if _, exists := seen[key]; exists {
-			continue
-		}
-		seen[key] = struct{}{}
-
-		candidate, err := s.fetchAVCandidateByDetailURL(ctx, detailURL)
-		if err != nil {
-			continue
-		}
-		if candidate.ExternalID == "" {
-			candidate.ExternalID = externalID
-		}
-		if candidate.ExternalID == "" && candidate.DetailURL != "" {
-			candidate.ExternalID = extractJavDBVideoID(candidate.DetailURL)
-		}
-		if candidate.ExternalID == "" {
-			candidate.ExternalID = key
-		}
-		out = append(out, candidate)
-	}
-
 	return out, nil
 }
 
 func (s *ScraperService) fetchAVCandidateByDetailURL(ctx context.Context, detailURL string) (avScrapeCandidate, error) {
-	content, err := s.fetchAVHTML(ctx, detailURL)
-	if err != nil {
-		return avScrapeCandidate{}, err
-	}
-	baseURL := strings.TrimSuffix(strings.TrimSpace(s.avBaseURL), "/")
-	if baseURL == "" {
-		baseURL = "https://javdb.com"
-	}
-
-	title := extractJavDBTitle(content)
-	code := extractAVCode(title)
-	if code == "" {
-		if mm := javDBVideoCodeFieldRe.FindStringSubmatch(content); len(mm) > 1 {
-			code = extractAVCode(stripHTMLText(mm[1]))
-		}
-	}
-	if code == "" {
-		code = extractAVCode(detailURL)
-	}
-
-	posterURL := ""
-	if mm := javDBOGImageRe.FindStringSubmatch(content); len(mm) > 1 {
-		posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
-	}
-	if posterURL == "" {
-		if mm := imgSrcRe.FindStringSubmatch(content); len(mm) > 1 {
-			posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
-		}
-	}
-
-	releaseDate := ""
-	if mm := javDBReleaseDateFieldRe.FindStringSubmatch(content); len(mm) > 1 {
-		releaseDate = normalizeAVDate(stripHTMLText(mm[1]))
-	}
-	if releaseDate == "" {
-		if mm := javDBGenericDateInlineRe.FindStringSubmatch(content); len(mm) > 0 {
-			releaseDate = normalizeAVDate(mm[0])
-		}
-	}
-
-	overview := ""
-	if mm := javDBDescriptionMetaRe.FindStringSubmatch(content); len(mm) > 1 {
-		overview = stripHTMLText(mm[1])
-	}
-
-	actors := parseJavDBDetailActors(content)
-	externalID := extractJavDBVideoID(detailURL)
-
-	return avScrapeCandidate{
-		ExternalID:  externalID,
-		Code:        code,
-		Title:       title,
-		Overview:    overview,
-		PosterURL:   posterURL,
-		ReleaseDate: releaseDate,
-		Actors:      actors,
-		DetailURL:   detailURL,
-		Raw: map[string]any{
-			"detail_url":   detailURL,
-			"external_id":  externalID,
-			"code":         code,
-			"title":        title,
-			"overview":     overview,
-			"poster_url":   posterURL,
-			"release_date": releaseDate,
-			"actors":       actors,
-		},
-	}, nil
+	candidate, _, err := s.fetchAVCandidateByDetailURLWithTrace(ctx, detailURL)
+	return candidate, err
 }
 
 func (s *ScraperService) tryFetchCastNames(ctx context.Context, path string, limit int) []string {
@@ -1447,33 +1291,59 @@ func normalizeAVKeyword(input string) string {
 }
 
 func extractAVCode(input string) string {
-	match := avCodePattern.FindStringSubmatch(strings.TrimSpace(input))
-	if len(match) < 3 {
+	raw := strings.ToUpper(strings.TrimSpace(input))
+	if raw == "" {
 		return ""
 	}
-	prefix := strings.ToUpper(strings.TrimSpace(match[1]))
-	number := strings.TrimSpace(match[2])
-	if prefix == "" || number == "" {
-		return ""
+	raw = strings.NewReplacer(".", "-", "_", "-", " ", "-").Replace(raw)
+	for strings.Contains(raw, "--") {
+		raw = strings.ReplaceAll(raw, "--", "-")
 	}
-	return prefix + "-" + number
+
+	if mm := avFC2CodePattern.FindStringSubmatch(raw); len(mm) > 1 {
+		number := strings.TrimLeft(strings.TrimSpace(mm[1]), "0")
+		if number == "" {
+			number = "0"
+		}
+		return "FC2-" + number
+	}
+	if mm := avHeyzoCodePattern.FindStringSubmatch(raw); len(mm) > 1 {
+		return "HEYZO-" + strings.TrimSpace(mm[1])
+	}
+	if mm := avSurenCodePattern.FindStringSubmatch(raw); len(mm) > 2 {
+		prefix := strings.TrimSpace(mm[1])
+		number := strings.TrimLeft(strings.TrimSpace(mm[2]), "0")
+		if number == "" {
+			number = "0"
+		}
+		return prefix + "-" + number
+	}
+	if mm := avGeneralCodePattern.FindStringSubmatch(raw); len(mm) > 2 {
+		prefix := strings.TrimSpace(mm[1])
+		number := strings.TrimLeft(strings.TrimSpace(mm[2]), "0")
+		if number == "" {
+			number = "0"
+		}
+		return prefix + "-" + number
+	}
+	if mm := avCodePattern.FindStringSubmatch(raw); len(mm) > 2 {
+		prefix := strings.TrimSpace(mm[1])
+		number := strings.TrimLeft(strings.TrimSpace(mm[2]), "0")
+		if number == "" {
+			number = "0"
+		}
+		return strings.ToUpper(prefix) + "-" + number
+	}
+	return ""
 }
 
-func prioritizeAVCandidatesByCode(candidates []avScrapeCandidate, code string) []avScrapeCandidate {
-	if len(candidates) <= 1 || strings.TrimSpace(code) == "" {
-		return candidates
+func normalizeAVCodeForCompare(input string) string {
+	if strings.TrimSpace(input) == "" {
+		return ""
 	}
-	normalizedCode := strings.ToUpper(strings.TrimSpace(code))
-	best := make([]avScrapeCandidate, 0, len(candidates))
-	others := make([]avScrapeCandidate, 0, len(candidates))
-	for _, item := range candidates {
-		if strings.EqualFold(strings.TrimSpace(item.Code), normalizedCode) {
-			best = append(best, item)
-			continue
-		}
-		others = append(others, item)
-	}
-	return append(best, others...)
+	code := strings.ToUpper(strings.TrimSpace(input))
+	code = strings.NewReplacer("-", "", "_", "", ".", "", " ", "").Replace(code)
+	return code
 }
 
 func extractJavDBTitle(content string) string {
