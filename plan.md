@@ -15,6 +15,22 @@
 
 ---
 
+### [2026-04-18 00:55] 修复管理端批量上传在 HTTP 环境下哈希计算失败（digest undefined）
+- Type: `implementation`
+- Summary:
+  - 修复管理端视频批量上传报错 `cannot read property of undefined('digest')`。
+  - `sha256File` 新增无 `crypto.subtle` 场景的回退路径：当浏览器不支持 `WebCrypto SubtleCrypto`（常见于 `http + 局域网IP`）时，使用 `js-sha256` 进行分片 SHA-256 计算。
+  - 保持原有进度回调与秒传逻辑不变，同时兼容图片上传复用哈希函数的场景。
+- Changed Files:
+  - `admin-web/package.json`
+  - `admin-web/package-lock.json`
+  - `admin-web/src/utils/hash.js`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 23:09] 修复短视频页演员解析空指针崩溃（actors/tags/collections 为空）
 - Type: `implementation`
 - Summary:
