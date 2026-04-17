@@ -15,6 +15,21 @@
 
 ---
 
+### [2026-04-17 19:50] 清理 Android 提交误纳入的 Gradle 本地缓存
+- Type: `implementation`
+- Summary:
+  - 修复 Android 首版提交中误纳入 `.gradle-local` 构建缓存的问题，避免仓库体积膨胀。
+  - 更新 `android-app/.gitignore`，新增 `/.gradle-local/` 忽略规则。
+  - 将已追踪的 `.gradle-local` 文件从版本库移除，仅保留源码与构建脚本。
+- Changed Files:
+  - `android-app/.gitignore`
+  - `plan.md`
+- Verification:
+  - `git rm -r --cached android-app/.gradle-local` executed.
+  - `git status --short` no longer tracks `android-app/.gradle-local/**`.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 19:46] Android 客户端首版实现（服务发现+登录+分类+短视频竖滑）
 - Type: `implementation`
 - Summary:
