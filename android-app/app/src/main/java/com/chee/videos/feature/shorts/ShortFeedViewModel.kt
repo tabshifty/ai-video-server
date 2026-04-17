@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.FeedVideoDto
+import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -19,12 +20,14 @@ data class ShortFeedUiState(
     val loaded: Boolean = false,
     val items: List<FeedVideoDto> = emptyList(),
     val errorMessage: String? = null,
+    val fitMode: VideoFitMode = VideoFitMode.FILL,
+    val pausedByUserVideoIds: Set<String> = emptySet(),
 )
 
 @HiltViewModel
 class ShortFeedViewModel @Inject constructor(
     private val videoRepository: VideoRepository,
-    store: AppPreferencesStore,
+    private val store: AppPreferencesStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ShortFeedUiState())
@@ -35,6 +38,14 @@ class ShortFeedViewModel @Inject constructor(
         started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
         initialValue = null,
     )
+
+    init {
+        viewModelScope.launch {
+            store.shortFitModeFlow.collect { mode ->
+                _uiState.update { it.copy(fitMode = mode) }
+            }
+        }
+    }
 
     fun load(force: Boolean = false) {
         if (_uiState.value.loaded && !force) {
@@ -50,6 +61,7 @@ class ShortFeedViewModel @Inject constructor(
                             loaded = true,
                             items = items,
                             errorMessage = null,
+                            pausedByUserVideoIds = it.pausedByUserVideoIds.filter { id -> items.any { video -> video.id == id } }.toSet(),
                         )
                     }
                 }
@@ -63,5 +75,29 @@ class ShortFeedViewModel @Inject constructor(
                     }
                 }
         }
+    }
+
+    fun toggleFitMode() {
+        val next = if (_uiState.value.fitMode == VideoFitMode.FILL) VideoFitMode.FIT else VideoFitMode.FILL
+        _uiState.update { it.copy(fitMode = next) }
+        viewModelScope.launch {
+            store.saveShortFitMode(next)
+        }
+    }
+
+    fun togglePauseByUser(videoId: String): Boolean {
+        var pausedNow = false
+        _uiState.update { state ->
+            val nextSet = state.pausedByUserVideoIds.toMutableSet()
+            if (nextSet.contains(videoId)) {
+                nextSet.remove(videoId)
+                pausedNow = false
+            } else {
+                nextSet.add(videoId)
+                pausedNow = true
+            }
+            state.copy(pausedByUserVideoIds = nextSet)
+        }
+        return pausedNow
     }
 }

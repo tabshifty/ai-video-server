@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.model.SessionTokens
+import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.util.UrlBuilder
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -25,6 +26,7 @@ class AppPreferencesStore @Inject constructor(
         val endpoints = stringPreferencesKey("server_endpoints")
         val accessToken = stringPreferencesKey("access_token")
         val refreshToken = stringPreferencesKey("refresh_token")
+        val shortFitMode = stringPreferencesKey("short_fit_mode")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -37,6 +39,10 @@ class AppPreferencesStore @Inject constructor(
 
     val refreshTokenFlow: Flow<String?> = dataStore.data.map { prefs ->
         prefs[Keys.refreshToken]?.takeIf { it.isNotBlank() }
+    }
+
+    val shortFitModeFlow: Flow<VideoFitMode> = dataStore.data.map { prefs ->
+        VideoFitMode.fromRaw(prefs[Keys.shortFitMode])
     }
 
     val endpointsFlow: Flow<List<ServerEndpoint>> = dataStore.data.map { prefs ->
@@ -68,6 +74,12 @@ class AppPreferencesStore @Inject constructor(
             prefs.remove(Keys.activeBaseUrl)
             prefs.remove(Keys.accessToken)
             prefs.remove(Keys.refreshToken)
+        }
+    }
+
+    suspend fun saveShortFitMode(mode: VideoFitMode) {
+        dataStore.edit { prefs ->
+            prefs[Keys.shortFitMode] = mode.rawValue
         }
     }
 

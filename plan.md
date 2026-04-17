@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-17 22:01] Android 短视频页新增抖音风播放模式切换与轻触暂停
+- Type: `implementation`
+- Summary:
+  - 在短视频播放页新增两种展示模式：`铺满（fill）` 与 `完整（fit）`，并通过 DataStore 持久化用户选择。
+  - 新增轻触视频区域暂停/继续播放能力，按视频粒度记忆暂停状态，翻页时仅当前页自动播放。
+  - 重构短视频单页 UI 为抖音风样式：右侧悬浮操作区（模式切换/详情）、底部渐变信息区、中心播放状态提示。
+  - 右侧按钮事件改为 `clickable`，降低与全屏轻触手势冲突风险。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/model/VideoFitMode.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/data/AppPreferencesStore.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 19:50] 清理 Android 提交误纳入的 Gradle 本地缓存
 - Type: `implementation`
 - Summary:
