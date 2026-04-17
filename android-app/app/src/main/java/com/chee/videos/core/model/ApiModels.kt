@@ -69,7 +69,22 @@ data class VideoDetailDto(
     @SerializedName("likes_count") val likesCount: Long = 0,
     @SerializedName("favorites_count") val favoritesCount: Long = 0,
     @SerializedName("tags") val tags: List<String> = emptyList(),
+    @SerializedName("actors") val actors: List<VideoActorDto> = emptyList(),
+    @SerializedName("collections") val collections: List<VideoCollectionDto> = emptyList(),
+    @SerializedName("metadata") val metadata: Map<String, Any?> = emptyMap(),
     @SerializedName("user_state") val userState: UserStateDto = UserStateDto(),
+)
+
+data class VideoActorDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("avatar_url") val avatarUrl: String? = null,
+)
+
+data class VideoCollectionDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("cover_url") val coverUrl: String? = null,
 )
 
 data class UserStateDto(

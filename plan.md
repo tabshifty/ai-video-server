@@ -15,6 +15,28 @@
 
 ---
 
+### [2026-04-17 22:50] Android 短视频页升级为抖音暗黑风：右侧互动、详情底部弹层与演员/合集展示
+- Type: `implementation`
+- Summary:
+  - 短视频右侧操作区改为纯图标并重排为“喜欢/收藏/播放模式/详情”，移除文字提示；播放模式图标样式与详情图标统一为低干扰暗色风格。
+  - 喜欢与收藏操作从详情页前移到短视频右侧交互，详情弹层只保留“不喜欢”动作。
+  - 短视频详情改为页内底部弹层（约 3/4 屏），弹层打开时视频区域收缩为顶部约 1/4 并持续播放，不再跳转独立详情页。
+  - 短视频底部文案仅保留标题；若存在关联演员则展示演员信息；详情弹层新增“关联合集”展示。
+  - 后端视频详情接口补充 `actors` 字段，Android 详情模型同步支持 `actors/collections/metadata`，并在演员缺失时回退解析 `metadata.actors`。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedViewModel.kt`
+  - `internal/models/app.go`
+  - `internal/repository/app_repository.go`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 22:01] Android 短视频页新增抖音风播放模式切换与轻触暂停
 - Type: `implementation`
 - Summary:

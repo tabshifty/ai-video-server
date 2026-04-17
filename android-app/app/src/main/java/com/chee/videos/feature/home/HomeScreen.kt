@@ -107,7 +107,6 @@ fun HomeScreen(
                     ShortFeedScreen(
                         baseUrl = baseUrl,
                         accessToken = accessToken,
-                        onOpenDetail = onOpenDetail,
                     )
                 }
 

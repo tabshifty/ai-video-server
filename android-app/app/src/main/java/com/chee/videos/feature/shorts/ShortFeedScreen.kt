@@ -1,8 +1,11 @@
 package com.chee.videos.feature.shorts
 
+import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,23 +14,38 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,18 +78,21 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.chee.videos.core.model.FeedVideoDto
+import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private val ShortsActionBg = Color(0x5A000000)
+private val ShortsActionActiveTint = Color(0xFFFF5E84)
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun ShortFeedScreen(
     baseUrl: String,
     accessToken: String,
-    onOpenDetail: (String) -> Unit,
     viewModel: ShortFeedViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,13 +103,13 @@ fun ShortFeedScreen(
 
     when {
         uiState.loading && uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color.White)
             }
         }
 
         !uiState.errorMessage.isNullOrBlank() && uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
                     Button(onClick = { viewModel.load(force = true) }) { Text("重试") }
@@ -97,30 +118,83 @@ fun ShortFeedScreen(
         }
 
         uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("暂无短视频")
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                Text("暂无短视频", color = Color.White)
             }
         }
 
         else -> {
             val pagerState = rememberPagerState(pageCount = { uiState.items.size })
-            VerticalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-            ) { page ->
-                val item = uiState.items[page]
-                val sourceUrl = UrlBuilder.source(baseUrl, item.id)
-                VerticalVideoPage(
-                    item = item,
-                    sourceUrl = sourceUrl,
-                    accessToken = accessToken,
-                    active = pagerState.currentPage == page,
-                    fitMode = uiState.fitMode,
-                    pausedByUser = item.id in uiState.pausedByUserVideoIds,
-                    onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
-                    onToggleMode = viewModel::toggleFitMode,
-                    onOpenDetail = onOpenDetail,
-                )
+            val sheetVideoId = uiState.detailSheetVideoId
+            val sheetOpen = sheetVideoId != null
+            val videoHeightFraction by animateFloatAsState(
+                targetValue = if (sheetOpen) 0.25f else 1f,
+                animationSpec = spring(stiffness = 450f),
+                label = "short_video_region_height",
+            )
+
+            LaunchedEffect(pagerState.currentPage, uiState.items) {
+                uiState.items.getOrNull(pagerState.currentPage)?.id?.let { currentVideoID ->
+                    viewModel.ensureDetailLoaded(currentVideoID)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(videoHeightFraction),
+                ) {
+                    VerticalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = !sheetOpen,
+                    ) { page ->
+                        val item = uiState.items[page]
+                        val detail = uiState.detailByVideoId[item.id]
+                        val sourceUrl = UrlBuilder.source(baseUrl, item.id)
+                        VerticalVideoPage(
+                            item = item,
+                            sourceUrl = sourceUrl,
+                            accessToken = accessToken,
+                            active = pagerState.currentPage == page,
+                            fitMode = uiState.fitMode,
+                            pausedByUser = item.id in uiState.pausedByUserVideoIds,
+                            actorNames = extractActorNames(detail),
+                            isLiked = detail?.userState?.isLiked == true,
+                            isFavorited = detail?.userState?.isFavorited == true,
+                            actionBusy = item.id in uiState.actionBusyVideoIds,
+                            onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
+                            onToggleLike = { viewModel.toggleLike(item.id) },
+                            onToggleFavorite = { viewModel.toggleFavorite(item.id) },
+                            onToggleMode = viewModel::toggleFitMode,
+                            onOpenDetail = { viewModel.openDetailSheet(item.id) },
+                        )
+                    }
+                }
+
+                if (sheetVideoId != null) {
+                    val detail = uiState.detailByVideoId[sheetVideoId]
+                    val loading = detail == null && sheetVideoId in uiState.detailLoadingVideoIds
+                    ShortDetailSheet(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.75f),
+                        detail = detail,
+                        loading = loading,
+                        errorMessage = uiState.detailErrorMessage,
+                        actionBusy = sheetVideoId in uiState.actionBusyVideoIds,
+                        onClose = viewModel::closeDetailSheet,
+                        onRetry = { viewModel.ensureDetailLoaded(sheetVideoId, force = true, reportError = true) },
+                        onToggleDislike = { viewModel.toggleDislike(sheetVideoId) },
+                    )
+                }
             }
         }
     }
@@ -134,9 +208,15 @@ private fun VerticalVideoPage(
     active: Boolean,
     fitMode: VideoFitMode,
     pausedByUser: Boolean,
+    actorNames: List<String>,
+    isLiked: Boolean,
+    isFavorited: Boolean,
+    actionBusy: Boolean,
     onTogglePauseByUser: () -> Boolean,
+    onToggleLike: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onToggleMode: () -> Unit,
-    onOpenDetail: (String) -> Unit,
+    onOpenDetail: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -212,7 +292,7 @@ private fun VerticalVideoPage(
                     PlayerView(it).apply {
                         this.player = player
                         useController = false
-                        setShutterBackgroundColor(android.graphics.Color.BLACK)
+                        setShutterBackgroundColor(AndroidColor.BLACK)
                     }
                 },
                 update = { view ->
@@ -233,7 +313,7 @@ private fun VerticalVideoPage(
                         colors = listOf(
                             Color.Transparent,
                             Color.Transparent,
-                            Color(0x99000000),
+                            Color(0xAA000000),
                         ),
                     ),
                 ),
@@ -271,19 +351,36 @@ private fun VerticalVideoPage(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             ShortsActionButton(
+                icon = Icons.Filled.ThumbUp,
+                active = isLiked,
+                enabled = !actionBusy,
+                onClick = onToggleLike,
+                contentDescription = "喜欢",
+            )
+            ShortsActionButton(
+                icon = Icons.Filled.Favorite,
+                active = isFavorited,
+                enabled = !actionBusy,
+                onClick = onToggleFavorite,
+                contentDescription = "收藏",
+            )
+            ShortsActionButton(
                 icon = Icons.Filled.AspectRatio,
-                label = if (fitMode == VideoFitMode.FILL) "铺满" else "完整",
-                selected = true,
+                active = false,
+                enabled = true,
                 onClick = onToggleMode,
+                contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
             )
             ShortsActionButton(
                 icon = Icons.Filled.Info,
-                label = "详情",
-                onClick = { onOpenDetail(item.id) },
+                active = false,
+                enabled = true,
+                onClick = onOpenDetail,
+                contentDescription = "详情",
             )
         }
 
@@ -292,7 +389,7 @@ private fun VerticalVideoPage(
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
                 .padding(horizontal = 16.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 text = item.title,
@@ -300,11 +397,188 @@ private fun VerticalVideoPage(
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
-            Text(
-                text = "轻触暂停/播放 · 上下滑切换",
-                color = Color.White.copy(alpha = 0.82f),
-                style = MaterialTheme.typography.bodySmall,
+            if (actorNames.isNotEmpty()) {
+                Text(
+                    text = "演员：${actorNames.joinToString(" / ")}",
+                    color = Color.White.copy(alpha = 0.86f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ShortDetailSheet(
+    modifier: Modifier = Modifier,
+    detail: VideoDetailDto?,
+    loading: Boolean,
+    errorMessage: String?,
+    actionBusy: Boolean,
+    onClose: () -> Unit,
+    onRetry: () -> Unit,
+    onToggleDislike: () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        color = Color(0xFF101114),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        tonalElevation = 0.dp,
+        shadowElevation = 10.dp,
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x55FFFFFF)),
             )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "详情",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                IconButton(onClick = onClose) {
+                    Icon(imageVector = Icons.Filled.Close, contentDescription = "关闭", tint = Color.White)
+                }
+            }
+
+            when {
+                loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                }
+
+                detail == null -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(errorMessage ?: "详情加载失败", color = MaterialTheme.colorScheme.error)
+                            Button(onClick = onRetry) { Text("重试") }
+                        }
+                    }
+                }
+
+                else -> {
+                    val actorNames = extractActorNames(detail)
+                    val dislikeActive = detail.userState.isDisliked
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = detail.title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+
+                        if (!detail.description.isNullOrBlank()) {
+                            Text(
+                                text = detail.description,
+                                color = Color(0xFFDDDDDD),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+
+                        Text(
+                            text = "播放 ${detail.viewsCount}  点赞 ${detail.likesCount}  收藏 ${detail.favoritesCount}",
+                            color = Color(0xFFB8B8B8),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+
+                        if (actorNames.isNotEmpty()) {
+                            Text(
+                                text = "演员：${actorNames.joinToString(" / ")}",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+
+                        if (detail.collections.isNotEmpty()) {
+                            Text(
+                                text = "关联合集",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                detail.collections.forEach { collection ->
+                                    AssistChip(
+                                        onClick = {},
+                                        enabled = false,
+                                        label = { Text(collection.name) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            disabledContainerColor = Color(0xFF22242A),
+                                            disabledLabelColor = Color(0xFFE7E7E7),
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+
+                        if (detail.tags.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                detail.tags.forEach { tag ->
+                                    AssistChip(
+                                        onClick = {},
+                                        enabled = false,
+                                        label = { Text(tag) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            disabledContainerColor = Color(0xFF1C1E23),
+                                            disabledLabelColor = Color(0xFFBDBDBD),
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = onToggleDislike,
+                            enabled = !actionBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (dislikeActive) Color(0xFF5A0E1B) else Color(0xFF2B2E36),
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Icon(imageVector = Icons.Filled.ThumbDown, contentDescription = null)
+                            Text(
+                                text = if (dislikeActive) "取消不喜欢" else "不喜欢",
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+
+                        if (!errorMessage.isNullOrBlank()) {
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -312,32 +586,60 @@ private fun VerticalVideoPage(
 @Composable
 private fun ShortsActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
+    active: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
-    selected: Boolean = false,
+    contentDescription: String,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(ShortsActionBg)
+            .clickable(
+                enabled = enabled,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(if (selected) Color(0xCCFE2C55) else Color(0x77000000))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = Color.White)
-        }
-        Text(
-            text = label,
-            color = Color.White,
-            style = MaterialTheme.typography.labelSmall,
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (active) ShortsActionActiveTint else Color.White,
         )
+    }
+}
+
+private fun extractActorNames(detail: VideoDetailDto?): List<String> {
+    if (detail == null) {
+        return emptyList()
+    }
+
+    val relationNames = detail.actors
+        .mapNotNull { actor -> actor.name.trim().takeIf { it.isNotBlank() } }
+        .distinct()
+    if (relationNames.isNotEmpty()) {
+        return relationNames
+    }
+
+    val raw = detail.metadata["actors"]
+    return when (raw) {
+        is List<*> -> raw.mapNotNull { row ->
+            when (row) {
+                is String -> row.trim().takeIf { it.isNotBlank() }
+                is Map<*, *> -> (row["name"] as? String)?.trim()?.takeIf { it.isNotBlank() }
+                else -> null
+            }
+        }.distinct()
+
+        is String -> raw
+            .split(",", "/", "|", "，", "、")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        else -> emptyList()
     }
 }

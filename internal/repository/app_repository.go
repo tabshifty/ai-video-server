@@ -52,6 +52,18 @@ WHERE id=$1 AND status='ready'
 		return models.VideoDetail{}, fmt.Errorf("query collections: %w", err)
 	}
 	detail.Collections = collections
+	videoActors, err := r.ListVideoActors(ctx, videoID)
+	if err != nil {
+		return models.VideoDetail{}, fmt.Errorf("query actors: %w", err)
+	}
+	detail.Actors = make([]models.VideoActor, 0, len(videoActors))
+	for _, actor := range videoActors {
+		detail.Actors = append(detail.Actors, models.VideoActor{
+			ID:        actor.ID,
+			Name:      actor.Name,
+			AvatarURL: actor.AvatarURL,
+		})
+	}
 
 	rows, err := r.pool.Query(ctx, `
 SELECT action_type, watch_seconds

@@ -20,9 +20,17 @@ type VideoDetail struct {
 	LikesCount     int64             `json:"likes_count"`
 	FavoritesCount int64             `json:"favorites_count"`
 	Tags           []string          `json:"tags"`
+	Actors         []VideoActor      `json:"actors"`
 	Collections    []VideoCollection `json:"collections"`
 	Metadata       json.RawMessage   `json:"metadata"`
 	UserState      VideoUserState    `json:"user_state"`
+}
+
+// VideoActor is a lightweight DTO for video-actor relation.
+type VideoActor struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	AvatarURL string    `json:"avatar_url"`
 }
 
 // VideoUserState is per-user interaction state for a video.
