@@ -15,6 +15,22 @@
 
 ---
 
+### [2026-04-17 23:09] 修复短视频页演员解析空指针崩溃（actors/tags/collections 为空）
+- Type: `implementation`
+- Summary:
+  - 修复短视频页 `extractActorNames` 在后端返回 `actors: null` 时触发的空指针崩溃。
+  - Android 详情模型中 `tags/actors/collections/metadata` 改为可空类型，避免 Gson 将 `null` 写入 Kotlin 非空字段导致运行时 NPE。
+  - 短视频详情弹层与旧详情页统一改为 `orEmpty()` 读取集合字段，兼容接口空值返回。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 22:50] Android 短视频页升级为抖音暗黑风：右侧互动、详情底部弹层与演员/合集展示
 - Type: `implementation`
 - Summary:

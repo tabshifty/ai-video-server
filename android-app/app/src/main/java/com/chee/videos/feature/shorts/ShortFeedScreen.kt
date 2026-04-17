@@ -509,7 +509,7 @@ private fun ShortDetailSheet(
                             )
                         }
 
-                        if (detail.collections.isNotEmpty()) {
+                        if (detail.collections.orEmpty().isNotEmpty()) {
                             Text(
                                 text = "关联合集",
                                 color = Color.White,
@@ -520,7 +520,7 @@ private fun ShortDetailSheet(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                detail.collections.forEach { collection ->
+                                detail.collections.orEmpty().forEach { collection ->
                                     AssistChip(
                                         onClick = {},
                                         enabled = false,
@@ -534,12 +534,12 @@ private fun ShortDetailSheet(
                             }
                         }
 
-                        if (detail.tags.isNotEmpty()) {
+                        if (detail.tags.orEmpty().isNotEmpty()) {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                detail.tags.forEach { tag ->
+                                detail.tags.orEmpty().forEach { tag ->
                                     AssistChip(
                                         onClick = {},
                                         enabled = false,
@@ -617,14 +617,14 @@ private fun extractActorNames(detail: VideoDetailDto?): List<String> {
         return emptyList()
     }
 
-    val relationNames = detail.actors
+    val relationNames = detail.actors.orEmpty()
         .mapNotNull { actor -> actor.name.trim().takeIf { it.isNotBlank() } }
         .distinct()
     if (relationNames.isNotEmpty()) {
         return relationNames
     }
 
-    val raw = detail.metadata["actors"]
+    val raw = detail.metadata?.get("actors")
     return when (raw) {
         is List<*> -> raw.mapNotNull { row ->
             when (row) {

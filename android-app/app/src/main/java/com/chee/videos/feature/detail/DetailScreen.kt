@@ -102,9 +102,9 @@ fun DetailScreen(
                     Text("时长：${detail.duration} 秒")
                     Text("播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}")
 
-                    if (detail.tags.isNotEmpty()) {
+                    if (detail.tags.orEmpty().isNotEmpty()) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            detail.tags.forEach { tag ->
+                            detail.tags.orEmpty().forEach { tag ->
                                 FilterChip(
                                     selected = false,
                                     onClick = {},
