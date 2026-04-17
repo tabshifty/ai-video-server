@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '../components/Layout.vue'
 import {
@@ -32,6 +32,7 @@ const query = reactive({
 const uploadRef = ref(null)
 const uploadFileList = ref([])
 const uploading = ref(false)
+const uploadDialogVisible = ref(false)
 const uploadForm = reactive({
   description: '',
   actor_tokens: [],
@@ -59,6 +60,10 @@ const preview = reactive({
   q: 82,
   zoom: 100
 })
+
+const readyCount = computed(() => list.value.filter((item) => item.status === 'ready').length)
+const failedCount = computed(() => list.value.filter((item) => item.status === 'failed').length)
+const inactiveCount = computed(() => list.value.filter((item) => !item.active).length)
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
@@ -225,6 +230,18 @@ function resetUploadForm() {
   uploadForm.description = ''
   uploadForm.actor_tokens = []
   uploadForm.collection_ids = []
+}
+
+function openUploadDialog() {
+  uploadDialogVisible.value = true
+  uploadSummary.value = null
+}
+
+function onUploadDialogClosed() {
+  if (uploading.value) return
+  uploadRef.value?.clearFiles()
+  uploadFileList.value = []
+  resetUploadForm()
 }
 
 function handleUploadExceed() {
@@ -496,105 +513,35 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <el-card class="soft-card">
-        <template #header>批量上传</template>
-        <el-form label-width="100px" class="upload-form">
-          <el-form-item label="批量选图">
-            <el-upload
-              ref="uploadRef"
-              v-model:file-list="uploadFileList"
-              drag
-              multiple
-              :auto-upload="false"
-              :limit="100"
-              accept="image/*"
-              @exceed="handleUploadExceed"
-            >
-              <div class="el-upload__text">将图片拖到这里，或<em>点击选择文件</em></div>
-              <template #tip>
-                <div class="el-upload__tip">
-                  支持批量上传；非 GIF 文件将自动转换并保存为 WebP，源文件会在转换后删除。
-                </div>
-              </template>
-            </el-upload>
-          </el-form-item>
-          <el-form-item label="默认演员">
-            <el-select
-              v-model="uploadForm.actor_tokens"
-              multiple
-              filterable
-              remote
-              reserve-keyword
-              allow-create
-              default-first-option
-              clearable
-              :remote-method="searchActors"
-              :loading="loadingActors"
-              placeholder="可搜索演员，也可输入新演员姓名"
-              style="width: 100%"
-            >
-              <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="默认合集">
-            <el-select
-              v-model="uploadForm.collection_ids"
-              multiple
-              filterable
-              remote
-              reserve-keyword
-              clearable
-              collapse-tags
-              collapse-tags-tooltip
-              :remote-method="searchImageCollections"
-              :loading="loadingCollections"
-              placeholder="可选，可多选"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="collection in imageCollectionOptions"
-                :key="collection.value"
-                :label="collection.label"
-                :value="collection.value"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="默认备注">
-            <el-input
-              v-model="uploadForm.description"
-              type="textarea"
-              :rows="2"
-              placeholder="可选，批量上传时会作为所有图片的描述"
-            />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="uploading" @click="submitUpload">开始上传</el-button>
-            <el-button @click="resetUploadForm">清空默认参数</el-button>
-          </el-form-item>
-        </el-form>
-
-        <div v-if="uploadSummary" class="upload-summary">
-          <el-alert
-            type="success"
-            :closable="false"
-            :title="`上传结果：总计 ${uploadSummary.total_count || 0}，成功 ${uploadSummary.success_count || 0}，失败 ${uploadSummary.failed_count || 0}`"
-          />
-          <el-table :data="uploadSummary.items || []" size="small" border>
-            <el-table-column prop="filename" label="文件名" min-width="220" show-overflow-tooltip />
-            <el-table-column label="结果" width="120">
-              <template #default="{ row }">
-                <el-tag :type="row.success ? 'success' : 'danger'">{{ row.success ? '成功' : '失败' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="message" label="说明" min-width="140" show-overflow-tooltip />
-            <el-table-column prop="image_id" label="图片ID" min-width="220" />
-            <el-table-column prop="error" label="失败原因" min-width="200" show-overflow-tooltip />
-          </el-table>
+      <div class="stats-strip">
+        <div class="stat-pill">
+          <div class="stat-label">总图片数</div>
+          <div class="stat-value">{{ total }}</div>
         </div>
-      </el-card>
+        <div class="stat-pill">
+          <div class="stat-label">当前页可用</div>
+          <div class="stat-value">{{ readyCount }}</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">当前页失败</div>
+          <div class="stat-value">{{ failedCount }}</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">当前页停用</div>
+          <div class="stat-value">{{ inactiveCount }}</div>
+        </div>
+      </div>
 
-      <el-card class="soft-card">
-        <template #header>图片列表</template>
+      <el-card class="soft-card list-card">
+        <template #header>
+          <div class="card-header-row">
+            <div>
+              <div class="card-title">图片列表</div>
+              <div class="card-subtitle">支持按状态、演员、图片合集进行组合筛选</div>
+            </div>
+            <el-button type="primary" @click="openUploadDialog">新增图片</el-button>
+          </div>
+        </template>
         <el-form inline class="filter-form">
           <el-form-item>
             <el-input v-model="query.q" placeholder="按标题或描述搜索" clearable @keyup.enter="load" />
@@ -696,6 +643,111 @@ onBeforeUnmount(() => {
         </div>
       </el-card>
     </div>
+
+    <el-dialog
+      v-model="uploadDialogVisible"
+      title="新增图片"
+      width="920px"
+      :close-on-click-modal="!uploading"
+      :close-on-press-escape="!uploading"
+      @closed="onUploadDialogClosed"
+    >
+      <el-form label-width="100px" class="upload-form">
+        <el-form-item label="批量选图">
+          <el-upload
+            ref="uploadRef"
+            v-model:file-list="uploadFileList"
+            drag
+            multiple
+            :auto-upload="false"
+            :limit="100"
+            accept="image/*"
+            @exceed="handleUploadExceed"
+          >
+            <div class="el-upload__text">将图片拖到这里，或<em>点击选择文件</em></div>
+            <template #tip>
+              <div class="el-upload__tip">
+                支持批量上传；非 GIF 文件会自动转换并保存为 WebP，源文件会在转换后删除。
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="默认演员">
+          <el-select
+            v-model="uploadForm.actor_tokens"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            allow-create
+            default-first-option
+            clearable
+            :remote-method="searchActors"
+            :loading="loadingActors"
+            placeholder="可搜索演员，也可输入新演员姓名"
+            style="width: 100%"
+          >
+            <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="默认合集">
+          <el-select
+            v-model="uploadForm.collection_ids"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            :remote-method="searchImageCollections"
+            :loading="loadingCollections"
+            placeholder="可选，可多选"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="collection in imageCollectionOptions"
+              :key="collection.value"
+              :label="collection.label"
+              :value="collection.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="默认备注">
+          <el-input
+            v-model="uploadForm.description"
+            type="textarea"
+            :rows="2"
+            placeholder="可选，批量上传时会作为所有图片的描述"
+          />
+        </el-form-item>
+      </el-form>
+
+      <div v-if="uploadSummary" class="upload-summary">
+        <el-alert
+          type="success"
+          :closable="false"
+          :title="`上传结果：总计 ${uploadSummary.total_count || 0}，成功 ${uploadSummary.success_count || 0}，失败 ${uploadSummary.failed_count || 0}`"
+        />
+        <el-table :data="uploadSummary.items || []" size="small" border>
+          <el-table-column prop="filename" label="文件名" min-width="220" show-overflow-tooltip />
+          <el-table-column label="结果" width="120">
+            <template #default="{ row }">
+              <el-tag :type="row.success ? 'success' : 'danger'">{{ row.success ? '成功' : '失败' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="message" label="说明" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="image_id" label="图片ID" min-width="220" />
+          <el-table-column prop="error" label="失败原因" min-width="200" show-overflow-tooltip />
+        </el-table>
+      </div>
+
+      <template #footer>
+        <el-button :disabled="uploading" @click="uploadDialogVisible = false">取消</el-button>
+        <el-button :disabled="uploading" @click="resetUploadForm">清空默认参数</el-button>
+        <el-button type="primary" :loading="uploading" @click="submitUpload">开始上传</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="detailVisible" title="图片详情" width="980px" @closed="onDetailClosed">
       <div v-if="detail" class="detail-grid">
@@ -804,15 +856,67 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .image-page {
-  gap: 14px;
+  gap: 16px;
+}
+
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat-pill {
+  border-radius: 14px;
+  border: 1px solid rgba(190, 24, 93, 0.16);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(251, 113, 133, 0.16), rgba(251, 113, 133, 0) 50%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.92), rgba(255, 241, 242, 0.75));
+  padding: 12px 14px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #9f1239;
+  letter-spacing: 0.3px;
+}
+
+.stat-value {
+  margin-top: 6px;
+  font-size: 24px;
+  line-height: 1;
+  color: #881337;
+  font-family: 'Fira Code', monospace;
+}
+
+.list-card {
+  overflow: hidden;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #7f1d1d;
+}
+
+.card-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .upload-form {
-  max-width: 980px;
+  width: 100%;
 }
 
 .upload-summary {
-  margin-top: 12px;
+  margin-top: 14px;
   display: grid;
   gap: 10px;
 }
@@ -883,8 +987,23 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1200px) {
+  .stats-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .stats-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .card-header-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

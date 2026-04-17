@@ -1028,3 +1028,17 @@
   - `npm --prefix admin-web run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-17 16:46] 图片上传改为弹窗入口并优化列表界面视觉
+- Type: `implementation`
+- Summary:
+  - 图片管理页将“批量上传”从页面内卡片改为独立弹窗，避免列表页被上传表单占用空间。
+  - 在图片列表卡片头新增“新增图片”按钮，点击后弹出上传窗口。
+  - 对图片管理页进行视觉优化：新增统计条、列表头信息区与按钮布局，提升信息层级与可读性。
+- Changed Files:
+  - `admin-web/src/views/ImageManage.vue`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
