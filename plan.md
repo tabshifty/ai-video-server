@@ -1062,3 +1062,19 @@
   - `npm --prefix admin-web run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-17 17:26] 修复视频截帧封面失败（临时文件扩展名导致 ffmpeg 无法识别输出格式）
+- Type: `implementation`
+- Summary:
+  - 修复 `AdminCaptureVideoThumbnail` 临时文件命名：改为保留目标封面的扩展名（例如 `.jpg`），避免生成 `thumb.jpg.tmp-uuid` 这种 ffmpeg 无法识别格式的路径。
+  - 新增 `buildCaptureTempPath`，统一生成“同目录 + 隐藏临时名 + 正确扩展名”的临时文件路径。
+  - 新增处理器层单测覆盖：验证临时文件路径扩展名保留与无扩展时回退 `.jpg`。
+- Changed Files:
+  - `internal/handlers/admin_video_thumbnail.go`
+  - `internal/handlers/admin_video_thumbnail_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/handlers -run 'TestBuildCaptureTempPath' -count=1` passed.
+  - `go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`

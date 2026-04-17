@@ -83,7 +83,7 @@ func (a *API) AdminCaptureVideoThumbnail(c *gin.Context) {
 		return
 	}
 
-	tempPath := targetPath + ".tmp-" + uuid.New().String()
+	tempPath := buildCaptureTempPath(targetPath)
 	defer func() {
 		_ = os.Remove(tempPath)
 	}()
@@ -114,6 +114,19 @@ func resolveVideoThumbnailPath(storageRoot string, videoID uuid.UUID, currentPat
 		return path
 	}
 	return filepath.Join(storageRoot, "videos", videoID.String(), "thumb.jpg")
+}
+
+func buildCaptureTempPath(targetPath string) string {
+	dir := filepath.Dir(targetPath)
+	ext := filepath.Ext(targetPath)
+	if strings.TrimSpace(ext) == "" {
+		ext = ".jpg"
+	}
+	base := strings.TrimSuffix(filepath.Base(targetPath), filepath.Ext(targetPath))
+	if strings.TrimSpace(base) == "" || base == "." {
+		base = "thumb"
+	}
+	return filepath.Join(dir, "."+base+".tmp-"+uuid.New().String()+ext)
 }
 
 func replaceFileAtomic(tempPath, targetPath string) error {
