@@ -760,3 +760,18 @@
   - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run 'TestPreviewActorByNameTMDBNotesNotTruncated|TestPreviewActorByName(TMDB|JavDB)' -count=1` passed。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-16 23:01] 上传中心支持“非电影批量上传”，电影保持单文件
+- Type: `implementation`
+- Summary:
+  - 管理端上传页改造为队列式上传：`short/episode` 支持批量选择并串行分片上传，`movie` 继续仅支持单文件。
+  - 类型切换为电影时，若已选择多个文件会自动仅保留第 1 个并提示，避免误提交。
+  - 批量流程支持“失败不中断”：单文件失败后继续后续文件，最终展示成功/失败/取消汇总与逐文件结果。
+  - 增加批次进度与当前文件进度展示，取消上传时终止当前会话并标记后续文件为未上传（已取消）。
+- Changed Files:
+  - `admin-web/src/views/VideoUpload.vue`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
