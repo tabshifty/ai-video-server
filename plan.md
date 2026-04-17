@@ -15,6 +15,36 @@
 
 ---
 
+### [2026-04-17 19:46] Android 客户端首版实现（服务发现+登录+分类+短视频竖滑）
+- Type: `implementation`
+- Summary:
+  - 新增独立 Android 工程 `android-app`，采用 Kotlin + Jetpack Compose + MVVM + Hilt + Retrofit。
+  - 实现首次启动连接流：局域网同网段嗅探 `/healthz`，失败后手动输入 IP/端口；支持历史地址保存、复用与删除。
+  - 实现登录与会话：对接 `/api/v1/auth/login`、`/api/v1/auth/refresh`，本地持久化 token 并在鉴权失败时自动刷新。
+  - 实现主页四分类展示：短视频、电影、电视剧（`episode`）、AV，按类型分流加载。
+  - 实现短视频“抖音式”全屏竖滑播放：`VerticalPager + ExoPlayer`，视频流地址走 `/api/v1/videos/:id/source`。
+  - 实现详情占位页与互动操作（点赞/收藏/不喜欢）基础能力。
+- Changed Files:
+  - `android-app/settings.gradle.kts`
+  - `android-app/build.gradle.kts`
+  - `android-app/gradle.properties`
+  - `android-app/gradle/wrapper/*`
+  - `android-app/gradlew`
+  - `android-app/gradlew.bat`
+  - `android-app/.gitignore`
+  - `android-app/README.md`
+  - `android-app/app/build.gradle.kts`
+  - `android-app/app/src/main/AndroidManifest.xml`
+  - `android-app/app/src/main/res/values/themes.xml`
+  - `android-app/app/src/main/res/values/strings.xml`
+  - `android-app/app/src/main/res/xml/network_security_config.xml`
+  - `android-app/app/src/main/java/com/chee/videos/**`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 14:12] 管理端 token 失效统一处理（提示+跳转登录）
 - Type: `implementation`
 - Summary:

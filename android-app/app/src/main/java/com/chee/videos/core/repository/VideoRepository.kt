@@ -1,0 +1,123 @@
+package com.chee.videos.core.repository
+
+import com.chee.videos.core.data.AppPreferencesStore
+import com.chee.videos.core.model.ActionTogglePayload
+import com.chee.videos.core.model.ApiEnvelope
+import com.chee.videos.core.model.AppException
+import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.FeedVideoDto
+import com.chee.videos.core.model.RecordHistoryRequest
+import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.model.VideoListItemDto
+import com.chee.videos.core.network.ApiService
+import com.chee.videos.core.util.UrlBuilder
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class VideoRepository @Inject constructor(
+    private val api: ApiService,
+    private val store: AppPreferencesStore,
+    private val authRepository: AuthRepository,
+) {
+    suspend fun fetchShortFeed(pageSize: Int = 20): Result<List<FeedVideoDto>> {
+        val baseUrl = store.readActiveBaseUrl()
+            ?: return Result.failure(AppException("请先配置服务器地址"))
+
+        return runCatching {
+            val resp = api.randomShort(UrlBuilder.randomShort(baseUrl), pageSize)
+            if (resp.code != 0 || resp.data == null) {
+                throw AppException(resp.msg.ifBlank { "短视频加载失败(code=${resp.code})" })
+            }
+            resp.data.items
+        }
+    }
+
+    suspend fun fetchCategory(type: String, page: Int = 1, pageSize: Int = 30): Result<List<VideoListItemDto>> {
+        return callWithAuth { baseUrl, bearer ->
+            api.search(
+                url = UrlBuilder.search(baseUrl),
+                authorization = bearer,
+                keyword = "",
+                type = type,
+                page = page,
+                pageSize = pageSize,
+            )
+        }.map { it.items }
+    }
+
+    suspend fun fetchDetail(videoId: String): Result<VideoDetailDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.detail(UrlBuilder.detail(baseUrl, videoId), bearer)
+        }
+    }
+
+    suspend fun toggleLike(videoId: String): Result<ActionTogglePayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.toggleLike(UrlBuilder.toggleLike(baseUrl, videoId), bearer)
+        }
+    }
+
+    suspend fun toggleFavorite(videoId: String): Result<ActionTogglePayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.toggleFavorite(UrlBuilder.toggleFavorite(baseUrl, videoId), bearer)
+        }
+    }
+
+    suspend fun toggleDislike(videoId: String): Result<ActionTogglePayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.toggleDislike(UrlBuilder.toggleDislike(baseUrl, videoId), bearer)
+        }
+    }
+
+    suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
+        callWithAuth { baseUrl, bearer ->
+            api.recordHistory(
+                url = UrlBuilder.history(baseUrl),
+                authorization = bearer,
+                body = RecordHistoryRequest(videoId, watchSeconds, completed),
+            )
+        }
+    }
+
+    suspend fun readActiveBaseUrl(): String? = store.readActiveBaseUrl()
+
+    suspend fun readAccessToken(): String? = store.readAccessToken()
+
+    suspend fun buildSourceUrl(videoId: String): String {
+        val baseUrl = store.readActiveBaseUrl().orEmpty()
+        return UrlBuilder.source(baseUrl, videoId)
+    }
+
+    private suspend fun <T> callWithAuth(
+        block: suspend (baseUrl: String, authorization: String) -> ApiEnvelope<T>,
+    ): Result<T> {
+        val baseUrl = store.readActiveBaseUrl()
+            ?: return Result.failure(AppException("请先配置服务器地址"))
+
+        var accessToken = store.readAccessToken()
+            ?: return Result.failure(AuthExpiredException())
+
+        var resp = runCatching {
+            block(baseUrl, "Bearer $accessToken")
+        }.getOrElse { return Result.failure(it) }
+
+        if (resp.code == 401) {
+            val refreshed = authRepository.refreshTokenIfPossible()
+            if (!refreshed) {
+                return Result.failure(AuthExpiredException())
+            }
+            accessToken = store.readAccessToken()
+                ?: return Result.failure(AuthExpiredException())
+            resp = runCatching {
+                block(baseUrl, "Bearer $accessToken")
+            }.getOrElse { return Result.failure(it) }
+        }
+
+        val data = resp.data
+        if (resp.code != 0 || data == null) {
+            return Result.failure(AppException(resp.msg.ifBlank { "请求失败(code=${resp.code})" }))
+        }
+        return Result.success(data)
+    }
+}
