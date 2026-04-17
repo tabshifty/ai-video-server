@@ -15,6 +15,21 @@
 
 ---
 
+### [2026-04-17 14:03] dev-up 启动增加镜像预检与 descriptor 异常重试提示
+- Type: `implementation`
+- Summary:
+  - 针对 `unable to fetch descriptor ... content size of zero` 启动失败场景，在 `dev-up.sh` 新增镜像预检流程。
+  - 新增镜像拉取重试逻辑：仅在镜像本地不存在时执行 `docker pull`，并对 descriptor 异常给出可执行修复指引（镜像源配置问题排查）。
+  - 新增 `compose_up_db_services`，在支持 `--pull` 时使用 `--pull missing`，减少重复启动时不必要拉取导致的失败概率。
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `plan.md`
+- Verification:
+  - `bash -n scripts/dev-up.sh` passed.
+  - `bash scripts/dev-up.sh --frontend off` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 12:50] AV 刮削框架化重构计划（参考 mdcx）与技能沉淀
 - Type: `plan`
 - Summary:

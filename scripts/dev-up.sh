@@ -127,6 +127,60 @@ load_env_file "$ENV_FILE"
 export ENV_FILE
 log "using env file: $ENV_FILE"
 
+list_compose_images() {
+  "${COMPOSE_CMD[@]}" config --images 2>/dev/null | awk 'NF{print $1}' | sort -u
+}
+
+pull_image_with_retry() {
+  local image="$1"
+  local retries="${2:-3}"
+  local delay=2
+  local attempt output
+  for ((attempt = 1; attempt <= retries; attempt++)); do
+    output="$(docker pull "$image" 2>&1)" && return 0
+    printf '%s\n' "$output" >&2
+    if [[ "$output" == *"unable to fetch descriptor"* && "$output" == *"content size of zero"* ]]; then
+      cat >&2 <<'EOF'
+[dev-up] 检测到 Docker 镜像源返回损坏 descriptor（content size of zero）。
+[dev-up] 这通常是 registry mirror 缓存异常，不是项目代码问题。
+[dev-up] 建议操作：
+[dev-up] 1) Docker Desktop -> Settings -> Docker Engine，移除异常镜像源后重启 Docker
+[dev-up] 2) 或暂时仅保留一个稳定镜像源再重试
+[dev-up] 3) 再执行: docker pull <image>
+EOF
+    fi
+    if [[ "$attempt" -lt "$retries" ]]; then
+      log "retry docker pull ($attempt/$retries): $image"
+      sleep "$delay"
+      delay=$((delay * 2))
+    fi
+  done
+  return 1
+}
+
+ensure_compose_images_ready() {
+  local image
+  while IFS= read -r image; do
+    [[ -n "$image" ]] || continue
+    if docker image inspect "$image" >/dev/null 2>&1; then
+      continue
+    fi
+    log "pulling image: $image"
+    if ! pull_image_with_retry "$image" 3; then
+      printf 'failed to pull image: %s\n' "$image" >&2
+      return 1
+    fi
+  done < <(list_compose_images)
+}
+
+compose_up_db_services() {
+  if "${COMPOSE_CMD[@]}" up --help 2>/dev/null | grep -q -- "--pull"; then
+    "${COMPOSE_CMD[@]}" up --pull missing -d postgres redis >/dev/null
+    return 0
+  fi
+  "${COMPOSE_CMD[@]}" up -d postgres redis >/dev/null
+}
+
 is_running() {
   local pid_file="$1"
   if [[ ! -f "$pid_file" ]]; then
@@ -397,8 +451,11 @@ cleanup_on_error() {
 
 trap cleanup_on_error EXIT
 
+log "ensuring docker images are available"
+ensure_compose_images_ready
+
 log "starting postgres and redis"
-"${COMPOSE_CMD[@]}" up -d postgres redis >/dev/null
+compose_up_db_services
 
 POSTGRES_CID="$("${COMPOSE_CMD[@]}" ps -q postgres)"
 if [[ -z "$POSTGRES_CID" ]]; then
