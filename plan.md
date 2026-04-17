@@ -15,6 +15,37 @@
 
 ---
 
+### [2026-04-17 09:39] 自动刮削中文一致性修复计划（电影/剧集）
+- Type: `plan`
+- Summary:
+  - 统一上传后自动刮削的 TMDB 语言策略为 `zh-CN` 优先，并在字段缺失时回退无语言详情补全。
+  - 保持演员自动关联链路不变，仅修复自动刮削元数据语言不一致问题。
+  - 通过服务层单测覆盖 `ScrapeMovieUpload` 与 `ScrapeEpisodeUpload` 的语言参数与回退行为。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - 计划项，无需构建/测试。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-17 09:39] 实现自动刮削 zh-CN 优先与回退补全（含单测）
+- Type: `implementation`
+- Summary:
+  - `ScrapeMovieUpload` 与 `ScrapeEpisodeUpload` 改为通过 `getTMDBJSON(..., "zh-CN")` 请求搜索与详情。
+  - 新增自动刮削详情回退流程：当中文字段缺失时，自动请求无语言详情并合并补全。
+  - 新增季/集级别合并逻辑，补全 `season/episode` 的标题、简介、日期等空字段。
+  - 新增两条服务层单测，验证自动电影/剧集刮削的语言参数与回退行为。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestScrape(Movie|Episode)UploadUsesChineseLanguageAndFallback'` passed.
+  - `go test ./internal/services` passed.
+  - `go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-09 09:40] Add change-management conventions
 - Type: `docs`
 - Summary:
