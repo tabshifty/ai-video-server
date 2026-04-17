@@ -27,7 +27,7 @@ import (
 )
 
 func (a *API) AdminStats(c *gin.Context) {
-	shorts, movies, episodes, err := a.repo.CountVideosByType(c.Request.Context())
+	shorts, movies, episodes, avs, err := a.repo.CountVideosByType(c.Request.Context())
 	if err != nil {
 		response.Error(c, 1001, err.Error())
 		return
@@ -64,10 +64,11 @@ func (a *API) AdminStats(c *gin.Context) {
 	}
 
 	ok(c, models.AdminStats{
-		TotalVideos:       shorts + movies + episodes,
+		TotalVideos:       shorts + movies + episodes + avs,
 		ShortVideos:       shorts,
 		MovieVideos:       movies,
 		EpisodeVideos:     episodes,
+		AVVideos:          avs,
 		TotalUsers:        totalUsers,
 		TodayUploads:      todayUploads,
 		QueueLength:       queueLength,
@@ -170,14 +171,15 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Title       string         `json:"title"`
-		Description string         `json:"description"`
-		Thumbnail   string         `json:"thumbnail"`
-		Tags        []string       `json:"tags"`
-		ActorIDs    *[]string      `json:"actor_ids"`
-		ActorNames  *[]string      `json:"actor_names"`
-		Status      string         `json:"status"`
-		Metadata    map[string]any `json:"metadata"`
+		Title         string         `json:"title"`
+		Description   string         `json:"description"`
+		Thumbnail     string         `json:"thumbnail"`
+		Tags          []string       `json:"tags"`
+		ActorIDs      *[]string      `json:"actor_ids"`
+		ActorNames    *[]string      `json:"actor_names"`
+		CollectionIDs *[]string      `json:"collection_ids"`
+		Status        string         `json:"status"`
+		Metadata      map[string]any `json:"metadata"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
@@ -187,8 +189,10 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		req.Metadata = map[string]any{}
 	}
 	updateActors := req.ActorIDs != nil || req.ActorNames != nil
+	updateCollections := req.CollectionIDs != nil
 	var actorIDs []uuid.UUID
 	var actorNames []string
+	var collectionIDs []uuid.UUID
 	if updateActors {
 		var err error
 		if req.ActorIDs != nil {
@@ -202,7 +206,19 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 			actorNames = normalizeActorNames(*req.ActorNames)
 		}
 	}
-	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, actorIDs, actorNames, updateActors); err != nil {
+	if updateCollections {
+		var err error
+		collectionIDs, err = parseUUIDStrings(*req.CollectionIDs)
+		if err != nil {
+			bad(c, "合集ID格式错误")
+			return
+		}
+	}
+	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, actorIDs, actorNames, updateActors, collectionIDs, updateCollections); err != nil {
+		if errors.Is(err, repository.ErrCollectionsOnlyForShort) {
+			bad(c, "仅短视频支持合集")
+			return
+		}
 		response.Error(c, 1007, err.Error())
 		return
 	}
@@ -314,6 +330,105 @@ func (a *API) AdminActors(c *gin.Context) {
 		"total_count": total,
 		"page":        page,
 		"page_size":   pageSize,
+	})
+}
+
+func (a *API) AdminCollections(c *gin.Context) {
+	page := parsePage(c.Query("page"), 1)
+	pageSize := parsePageSize(c.Query("page_size"), 20)
+	keyword := c.Query("q")
+	var active *bool
+	if raw := strings.TrimSpace(c.Query("active")); raw != "" {
+		switch strings.ToLower(raw) {
+		case "1", "true":
+			v := true
+			active = &v
+		case "0", "false":
+			v := false
+			active = &v
+		default:
+			bad(c, "active 参数只能是 1 或 0")
+			return
+		}
+	}
+
+	items, total, err := a.repo.ListCollections(c.Request.Context(), keyword, active, page, pageSize)
+	if err != nil {
+		response.Error(c, 1029, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"items":       items,
+		"total_count": total,
+		"page":        page,
+		"page_size":   pageSize,
+	})
+}
+
+func (a *API) AdminCreateCollection(c *gin.Context) {
+	var req models.AdminCollectionInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	item, err := a.repo.CreateCollection(c.Request.Context(), req)
+	if err != nil {
+		if repository.IsUniqueViolation(err) {
+			response.Error(c, 1030, "合集名称已存在")
+			return
+		}
+		response.Error(c, 1030, err.Error())
+		return
+	}
+	ok(c, item)
+}
+
+func (a *API) AdminUpdateCollection(c *gin.Context) {
+	collectionID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "合集ID格式错误")
+		return
+	}
+	var req models.AdminCollectionInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	item, err := a.repo.UpdateCollection(c.Request.Context(), collectionID, req)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			response.Error(c, 404, "合集不存在")
+			return
+		}
+		if repository.IsUniqueViolation(err) {
+			response.Error(c, 1031, "合集名称已存在")
+			return
+		}
+		response.Error(c, 1031, err.Error())
+		return
+	}
+	ok(c, item)
+}
+
+func (a *API) AdminDeleteCollection(c *gin.Context) {
+	collectionID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "合集ID格式错误")
+		return
+	}
+	detached, err := a.repo.DeleteCollection(c.Request.Context(), collectionID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			response.Error(c, 404, "合集不存在")
+			return
+		}
+		response.Error(c, 1032, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"deleted":         true,
+		"collection_id":   collectionID,
+		"detached_videos": detached,
 	})
 }
 

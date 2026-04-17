@@ -11,18 +11,19 @@ import (
 	"video-server/internal/models"
 )
 
-func (r *VideoRepository) CountVideosByType(ctx context.Context) (shorts, movies, episodes int64, err error) {
+func (r *VideoRepository) CountVideosByType(ctx context.Context) (shorts, movies, episodes, avs int64, err error) {
 	err = r.pool.QueryRow(ctx, `
 SELECT
   COUNT(*) FILTER (WHERE type='short') AS shorts,
   COUNT(*) FILTER (WHERE type='movie') AS movies,
-  COUNT(*) FILTER (WHERE type='episode') AS episodes
+  COUNT(*) FILTER (WHERE type='episode') AS episodes,
+  COUNT(*) FILTER (WHERE type='av') AS avs
 FROM videos
-`).Scan(&shorts, &movies, &episodes)
+`).Scan(&shorts, &movies, &episodes, &avs)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("count videos by type: %w", err)
+		return 0, 0, 0, 0, fmt.Errorf("count videos by type: %w", err)
 	}
-	return shorts, movies, episodes, nil
+	return shorts, movies, episodes, avs, nil
 }
 
 func (r *VideoRepository) CountUsers(ctx context.Context) (int64, error) {
@@ -191,13 +192,22 @@ WHERE id=$1
 		return models.AdminVideoDetail{}, fmt.Errorf("admin video actors: %w", err)
 	}
 	out.Actors = actors
+	collections, err := r.ListVideoCollectionsForAdmin(ctx, videoID)
+	if err != nil {
+		return models.AdminVideoDetail{}, fmt.Errorf("admin video collections: %w", err)
+	}
+	out.Collections = collections
 	return out, nil
 }
 
-func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, actorIDs []uuid.UUID, actorNames []string, updateActors bool) error {
+func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, actorIDs []uuid.UUID, actorNames []string, updateActors bool, collectionIDs []uuid.UUID, updateCollections bool) error {
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("marshal admin metadata: %w", err)
+	}
+	video, err := r.GetVideoByID(ctx, videoID)
+	if err != nil {
+		return fmt.Errorf("get video for admin update: %w", err)
 	}
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -231,6 +241,11 @@ WHERE id=$1
 	if updateActors {
 		if err := r.ReplaceVideoActorsByInput(ctx, videoID, actorIDs, actorNames, "admin_edit"); err != nil {
 			return fmt.Errorf("replace video actors: %w", err)
+		}
+	}
+	if updateCollections {
+		if err := r.ReplaceVideoCollectionsByIDs(ctx, videoID, video.Type, collectionIDs); err != nil {
+			return fmt.Errorf("replace video collections: %w", err)
 		}
 	}
 	return nil

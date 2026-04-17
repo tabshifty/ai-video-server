@@ -33,6 +33,7 @@ type AdminScrapePreviewRequest struct {
 type AdminScrapeConfirmRequest struct {
 	VideoID       string                 `json:"video_id" example:"8fbe33de-0189-4972-a7c5-b77c9e75b859"`
 	TMDBID        int                    `json:"tmdb_id" example:"27205"`
+	ExternalID    string                 `json:"external_id" example:"xYz123"`
 	Title         string                 `json:"title" example:"盗梦空间"`
 	Overview      string                 `json:"overview" example:"自定义简介"`
 	PosterURL     string                 `json:"poster_url" example:"https://image.tmdb.org/t/p/original/xxx.jpg"`

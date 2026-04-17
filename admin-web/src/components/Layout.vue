@@ -26,6 +26,7 @@ const pageTitle = computed(() => {
     '/upload': '上传中心',
     '/scrape': '刮削管理',
     '/actors': '演员管理',
+    '/collections': '合集管理',
     '/users': '用户管理',
     '/tasks': '任务监控',
     '/settings': '系统设置'
@@ -70,6 +71,10 @@ async function onLogout() {
         <el-menu-item index="/actors">
           <el-icon><Avatar /></el-icon>
           <span>演员管理</span>
+        </el-menu-item>
+        <el-menu-item index="/collections">
+          <el-icon><List /></el-icon>
+          <span>合集管理</span>
         </el-menu-item>
         <el-menu-item index="/users">
           <el-icon><User /></el-icon>

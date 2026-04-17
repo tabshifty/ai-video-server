@@ -14,6 +14,7 @@ import (
 
 	"video-server/internal/middleware"
 	"video-server/internal/queue"
+	"video-server/internal/repository"
 	"video-server/internal/response"
 	"video-server/internal/services"
 )
@@ -25,7 +26,7 @@ import (
 // @Produce json
 // @Security BearerAuth
 // @Param file formData file true "video file"
-// @Param type formData string true "short|movie|episode"
+// @Param type formData string true "short|movie|episode|av"
 // @Param title formData string false "title"
 // @Param description formData string false "description"
 // @Param tags formData string false "tags json array or csv"
@@ -42,8 +43,8 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 	typ := c.PostForm("type")
-	if typ != "short" && typ != "movie" && typ != "episode" {
-		bad(c, "type must be one of: short, movie, episode")
+	if typ != "short" && typ != "movie" && typ != "episode" && typ != "av" {
+		bad(c, "type must be one of: short, movie, episode, av")
 		return
 	}
 	hash := strings.TrimSpace(c.PostForm("hash"))
@@ -73,6 +74,15 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 	actorNames := parseUploadStringList(c.PostForm("actor_names"))
+	collectionIDs, err := parseUploadCollectionIDs(c.PostForm("collection_ids"))
+	if err != nil {
+		bad(c, "合集ID格式错误")
+		return
+	}
+	if err := validateCollectionsForType(typ, collectionIDs); err != nil {
+		bad(c, "仅短视频支持合集")
+		return
+	}
 	userID, okUser := middleware.UserIDFromContext(c)
 	if !okUser {
 		response.Error(c, 401, "unauthorized")
@@ -88,7 +98,7 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 
-	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, actorIDs, actorNames, hash, a.maxVideoSize)
+	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, actorIDs, actorNames, collectionIDs, hash, a.maxVideoSize)
 	if err != nil {
 		a.logger.Error("upload failed", "error", err)
 		switch {
@@ -100,6 +110,8 @@ func (a *API) Upload(c *gin.Context) {
 			bad(c, "invalid type")
 		case errors.Is(err, services.ErrHashTypeConflict):
 			response.Error(c, 409, "hash exists with another video type")
+		case errors.Is(err, repository.ErrCollectionsOnlyForShort):
+			bad(c, "仅短视频支持合集")
 		default:
 			response.Error(c, 2, err.Error())
 		}
@@ -127,7 +139,7 @@ func (a *API) Upload(c *gin.Context) {
 			return
 		}
 	}
-	if typ == "movie" || typ == "episode" {
+	if typ == "movie" || typ == "episode" || typ == "av" {
 		payload := queue.ScrapePayload{
 			VideoID:  result.VideoID.String(),
 			FilePath: result.InputPath,
@@ -140,9 +152,15 @@ func (a *API) Upload(c *gin.Context) {
 				response.Error(c, 3, err.Error())
 				return
 			}
-		} else {
+		} else if typ == "episode" {
 			if err := a.enqueuer.EnqueueScrapeTV(payload); err != nil {
 				a.logger.Error("enqueue scrape tv failed", "video_id", result.VideoID, "error", err)
+				response.Error(c, 3, err.Error())
+				return
+			}
+		} else {
+			if err := a.enqueuer.EnqueueScrapeAV(payload); err != nil {
+				a.logger.Error("enqueue scrape av failed", "video_id", result.VideoID, "error", err)
 				response.Error(c, 3, err.Error())
 				return
 			}
@@ -150,7 +168,7 @@ func (a *API) Upload(c *gin.Context) {
 	}
 
 	respStatus := result.Status
-	if typ == "movie" || typ == "episode" {
+	if typ == "movie" || typ == "episode" || typ == "av" {
 		respStatus = "scraping"
 	}
 
@@ -166,6 +184,8 @@ func (a *API) Upload(c *gin.Context) {
 
 var hashPattern = regexp.MustCompile("^[a-fA-F0-9]{64}$")
 var errInvalidActorID = errors.New("invalid actor id")
+var errInvalidCollectionID = errors.New("invalid collection id")
+var errCollectionsOnlyForShort = errors.New("collections only support short videos")
 
 func isSHA256Hex(raw string) bool {
 	return hashPattern.MatchString(strings.TrimSpace(raw))
@@ -255,6 +275,37 @@ func parseUploadActorIDs(raw string) ([]uuid.UUID, error) {
 		out = append(out, id)
 	}
 	return out, nil
+}
+
+func parseUploadCollectionIDs(raw string) ([]uuid.UUID, error) {
+	list := parseUploadStringList(raw)
+	if len(list) == 0 {
+		return nil, nil
+	}
+	out := make([]uuid.UUID, 0, len(list))
+	seen := map[uuid.UUID]struct{}{}
+	for _, item := range list {
+		id, err := uuid.Parse(item)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s", errInvalidCollectionID, item)
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+func validateCollectionsForType(typ string, collectionIDs []uuid.UUID) error {
+	if len(collectionIDs) == 0 {
+		return nil
+	}
+	if strings.ToLower(strings.TrimSpace(typ)) != "short" {
+		return errCollectionsOnlyForShort
+	}
+	return nil
 }
 
 func isAllowedVideoExt(name string) bool {

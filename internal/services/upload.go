@@ -46,17 +46,18 @@ type UploadResult struct {
 }
 
 type LocalUploadInput struct {
-	UserID     uuid.UUID
-	FilePath   string
-	Filename   string
-	FileSize   int64
-	Title      string
-	Desc       string
-	Type       string
-	Tags       []string
-	ActorIDs   []uuid.UUID
-	ActorNames []string
-	Hash       string
+	UserID        uuid.UUID
+	FilePath      string
+	Filename      string
+	FileSize      int64
+	Title         string
+	Desc          string
+	Type          string
+	Tags          []string
+	ActorIDs      []uuid.UUID
+	ActorNames    []string
+	CollectionIDs []uuid.UUID
+	Hash          string
 }
 
 func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
@@ -64,7 +65,7 @@ func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot s
 }
 
 func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInput, maxVideoSize int64) (UploadResult, error) {
-	if in.Type != "short" && in.Type != "movie" && in.Type != "episode" {
+	if in.Type != "short" && in.Type != "movie" && in.Type != "episode" && in.Type != "av" {
 		return UploadResult{}, ErrInvalidType
 	}
 	info, err := os.Stat(in.FilePath)
@@ -120,7 +121,7 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 	}
 	status := "uploaded"
 	enqueueTranscode := true
-	if in.Type == "movie" || in.Type == "episode" {
+	if in.Type == "movie" || in.Type == "episode" || in.Type == "av" {
 		status = "scraping"
 		enqueueTranscode = false
 	}
@@ -144,6 +145,10 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		return UploadResult{}, err
 	}
 	if err := s.repo.ReplaceVideoActorsByInput(ctx, videoID, in.ActorIDs, in.ActorNames, "upload_manual"); err != nil {
+		_ = s.repo.DeleteVideoByID(ctx, videoID)
+		return UploadResult{}, err
+	}
+	if err := s.repo.ReplaceVideoCollectionsByIDs(ctx, videoID, in.Type, in.CollectionIDs); err != nil {
 		_ = s.repo.DeleteVideoByID(ctx, videoID)
 		return UploadResult{}, err
 	}
@@ -183,11 +188,11 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 	}, nil
 }
 
-func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, clientHash string, maxVideoSize int64) (UploadResult, error) {
+func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, collectionIDs []uuid.UUID, clientHash string, maxVideoSize int64) (UploadResult, error) {
 	if fileHeader == nil {
 		return UploadResult{}, ErrInvalidUpload
 	}
-	if typ != "short" && typ != "movie" && typ != "episode" {
+	if typ != "short" && typ != "movie" && typ != "episode" && typ != "av" {
 		return UploadResult{}, ErrInvalidType
 	}
 	if maxVideoSize > 0 && fileHeader.Size > maxVideoSize {
@@ -231,17 +236,18 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 	}
 
 	result, err := s.SaveUploadedFile(ctx, LocalUploadInput{
-		UserID:     userID,
-		FilePath:   originalPath,
-		Filename:   fileHeader.Filename,
-		FileSize:   info.Size(),
-		Title:      title,
-		Desc:       desc,
-		Type:       typ,
-		Tags:       tags,
-		ActorIDs:   actorIDs,
-		ActorNames: actorNames,
-		Hash:       clientHash,
+		UserID:        userID,
+		FilePath:      originalPath,
+		Filename:      fileHeader.Filename,
+		FileSize:      info.Size(),
+		Title:         title,
+		Desc:          desc,
+		Type:          typ,
+		Tags:          tags,
+		ActorIDs:      actorIDs,
+		ActorNames:    actorNames,
+		CollectionIDs: collectionIDs,
+		Hash:          clientHash,
 	}, maxVideoSize)
 	if err != nil {
 		_ = os.Remove(originalPath)

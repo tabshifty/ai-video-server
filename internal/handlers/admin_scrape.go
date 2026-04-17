@@ -26,15 +26,15 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 		VideoID string `json:"video_id"`
 		Title   string `json:"title"`
 		Year    int    `json:"year"`
-		Type    string `json:"type"` // movie | tv
+		Type    string `json:"type"` // movie | tv | av
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
 		return
 	}
 	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
-	if req.Type != "" && req.Type != "movie" && req.Type != "tv" {
-		bad(c, "type must be movie or tv")
+	if req.Type != "" && req.Type != "movie" && req.Type != "tv" && req.Type != "av" {
+		bad(c, "type must be movie, tv or av")
 		return
 	}
 
@@ -49,12 +49,14 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 			response.Error(c, 2, err.Error())
 			return
 		}
-		if req.Type == "" {
-			if video.Type == "episode" {
-				req.Type = "tv"
-			} else {
-				req.Type = "movie"
-			}
+		derivedType := "movie"
+		if video.Type == "episode" {
+			derivedType = "tv"
+		} else if video.Type == "av" {
+			derivedType = "av"
+		}
+		if req.Type == "" || req.Type != derivedType {
+			req.Type = derivedType
 		}
 		if strings.TrimSpace(req.Title) == "" {
 			req.Title = strings.TrimSpace(video.Title)
@@ -69,9 +71,36 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 			}
 		}
 
-		if video.TMDBID != nil && len(video.Metadata) > 0 {
+		if len(video.Metadata) > 0 {
 			var raw map[string]any
 			if err := json.Unmarshal(video.Metadata, &raw); err == nil {
+				if req.Type == "av" {
+					externalID := stringFromAny(raw["external_id"])
+					if externalID == "" {
+						if javdb, ok := raw["javdb"].(map[string]any); ok {
+							externalID = stringFromAny(javdb["external_id"])
+						}
+					}
+					ok(c, gin.H{
+						"from_cache": true,
+						"video_id":   video.ID,
+						"candidates": []map[string]any{{
+							"external_id":     externalID,
+							"title":           video.Title,
+							"overview":        video.Description,
+							"poster_url":      video.ThumbnailPath,
+							"release_date":    raw["release_date"],
+							"metadata":        raw,
+							"media_type_hint": "av",
+							"scrape_source":   "javdb",
+						}},
+					})
+					return
+				}
+				if video.TMDBID == nil {
+					// 非 AV 类型确认刮削需要 tmdb_id，缓存中缺失时继续走在线预览
+					goto previewSearch
+				}
 				ok(c, gin.H{
 					"from_cache": true,
 					"video_id":   video.ID,
@@ -89,6 +118,7 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 		}
 	}
 
+previewSearch:
 	if strings.TrimSpace(req.Title) == "" {
 		bad(c, "title is required when preview cache is unavailable")
 		return
@@ -103,6 +133,8 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 	)
 	if req.Type == "tv" {
 		candidates, err = a.scrapeSvc.PreviewTV(c.Request.Context(), req.Title, req.Year)
+	} else if req.Type == "av" {
+		candidates, err = a.scrapeSvc.PreviewAV(c.Request.Context(), req.Title)
 	} else {
 		candidates, err = a.scrapeSvc.PreviewMovie(c.Request.Context(), req.Title, req.Year)
 	}
@@ -126,6 +158,7 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 	var req struct {
 		VideoID       string         `json:"video_id"`
 		TMDBID        int            `json:"tmdb_id"`
+		ExternalID    string         `json:"external_id"`
 		Title         string         `json:"title"`
 		Overview      string         `json:"overview"`
 		PosterURL     string         `json:"poster_url"`
@@ -143,20 +176,25 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 		bad(c, "invalid video_id")
 		return
 	}
-	if req.TMDBID <= 0 {
-		bad(c, "tmdb_id is required")
-		return
-	}
 
 	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
 	if err != nil {
 		response.Error(c, 2, err.Error())
 		return
 	}
+	if video.Type != "av" && req.TMDBID <= 0 {
+		bad(c, "tmdb_id is required")
+		return
+	}
+	if video.Type == "av" && strings.TrimSpace(req.ExternalID) == "" {
+		bad(c, "external_id is required for av")
+		return
+	}
 
 	input := services.ConfirmScrapeInput{
 		VideoID:       videoID,
 		TMDBID:        req.TMDBID,
+		ExternalID:    req.ExternalID,
 		Title:         req.Title,
 		Overview:      req.Overview,
 		PosterURL:     req.PosterURL,
@@ -177,8 +215,13 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 			response.Error(c, 3, err.Error())
 			return
 		}
+	case "av":
+		if err := a.scrapeSvc.ConfirmAV(c.Request.Context(), input); err != nil {
+			response.Error(c, 3, err.Error())
+			return
+		}
 	default:
-		response.Error(c, 4, "only movie or episode supports scrape confirm")
+		response.Error(c, 4, "only movie, episode or av supports scrape confirm")
 		return
 	}
 
@@ -186,4 +229,11 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 		"saved":    true,
 		"video_id": videoID,
 	})
+}
+
+func stringFromAny(v any) string {
+	if s, ok := v.(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return ""
 }

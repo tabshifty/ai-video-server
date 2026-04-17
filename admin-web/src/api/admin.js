@@ -14,6 +14,10 @@ export const getAdminActors = (params) => request.get('/admin/actors', { params 
 export const createAdminActor = (payload) => request.post('/admin/actors', payload)
 export const scrapeAdminActorPreview = (payload) => request.post('/admin/actors/scrape/preview', payload)
 export const updateAdminActor = (id, payload) => request.put(`/admin/actors/${id}`, payload)
+export const getAdminCollections = (params) => request.get('/admin/collections', { params })
+export const createAdminCollection = (payload) => request.post('/admin/collections', payload)
+export const updateAdminCollection = (id, payload) => request.put(`/admin/collections/${id}`, payload)
+export const deleteAdminCollection = (id) => request.delete(`/admin/collections/${id}`)
 
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
 

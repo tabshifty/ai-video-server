@@ -27,7 +27,12 @@ type fakeScrapeUpdate struct {
 }
 
 type fakeScraperRepo struct {
-	lastUpdate fakeScrapeUpdate
+	lastUpdate         fakeScrapeUpdate
+	resolveActorNames  []string
+	resolveActorSource string
+	addedActorIDs      []uuid.UUID
+	addedActorSource   string
+	nextActorIDs       []uuid.UUID
 }
 
 func (f *fakeScraperRepo) GetVideoByID(context.Context, uuid.UUID) (models.Video, error) {
@@ -63,11 +68,18 @@ func (f *fakeScraperRepo) FindVideoByTypeTMDB(context.Context, string, int, uuid
 	return uuid.Nil, false, nil
 }
 
-func (f *fakeScraperRepo) ResolveActorIDs(context.Context, []uuid.UUID, []string, string) ([]uuid.UUID, error) {
+func (f *fakeScraperRepo) ResolveActorIDs(_ context.Context, _ []uuid.UUID, actorNames []string, source string) ([]uuid.UUID, error) {
+	f.resolveActorNames = append([]string(nil), actorNames...)
+	f.resolveActorSource = source
+	if len(f.nextActorIDs) > 0 {
+		return append([]uuid.UUID(nil), f.nextActorIDs...), nil
+	}
 	return nil, nil
 }
 
-func (f *fakeScraperRepo) AddVideoActors(context.Context, uuid.UUID, []uuid.UUID, string) error {
+func (f *fakeScraperRepo) AddVideoActors(_ context.Context, _ uuid.UUID, actorIDs []uuid.UUID, source string) error {
+	f.addedActorIDs = append([]uuid.UUID(nil), actorIDs...)
+	f.addedActorSource = source
 	return nil
 }
 
@@ -677,5 +689,166 @@ func TestScrapeEpisodeUploadUsesChineseLanguageAndFallback(t *testing.T) {
 	}
 	if asString(epRaw["name"]) != "Episode Two" {
 		t.Fatalf("expected metadata.tmdb_episode.name fallback, got=%v", epRaw["name"])
+	}
+}
+
+func TestScrapeAVUploadCodeFirstAndActorSync(t *testing.T) {
+	var searchKeywords []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			searchKeywords = append(searchKeywords, r.URL.Query().Get("q"))
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/v/code-hit"><span>ABP-123 作品标题</span></a>
+    <a href="/v/title-hit"><span>RANDOM-999 备用标题</span></a>
+  </body>
+</html>
+`))
+		case "/v/code-hit":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-123 作品标题 - JavDB</title>
+    <meta property="og:image" content="/covers/abp123.jpg" />
+    <meta name="description" content="作品简介" />
+  </head>
+  <body>
+    <h2 class="title is-4">ABP-123 作品标题</h2>
+    <div><strong>番號:</strong><span>ABP-123</span></div>
+    <div><strong>日期:</strong><span>2024-01-02</span></div>
+    <a href="/actors/a1">演员甲</a>
+    <a href="/actors/a2">演员乙</a>
+  </body>
+</html>
+`))
+		case "/v/title-hit":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>RANDOM-999 备用标题 - JavDB</title>
+    <meta property="og:image" content="/covers/random999.jpg" />
+  </head>
+  <body>
+    <h2 class="title is-4">RANDOM-999 备用标题</h2>
+  </body>
+</html>
+`))
+		case "/covers/abp123.jpg", "/covers/random999.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	repo := &fakeScraperRepo{
+		nextActorIDs: []uuid.UUID{uuid.New(), uuid.New()},
+	}
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-scraper-test", time.Second)
+
+	videoID := uuid.New()
+	got, err := svc.ScrapeAVUpload(context.Background(), videoID, "/tmp/ABP-123.sample.mkv", "ABP-123.sample.mkv")
+	if err != nil {
+		t.Fatalf("ScrapeAVUpload returned error: %v", err)
+	}
+
+	if len(searchKeywords) == 0 || strings.ToUpper(searchKeywords[0]) != "ABP-123" {
+		t.Fatalf("expected code-first search keyword ABP-123, got=%v", searchKeywords)
+	}
+	if got.Title != "ABP-123 作品标题" {
+		t.Fatalf("unexpected title: %s", got.Title)
+	}
+	if got.Description != "作品简介" {
+		t.Fatalf("unexpected overview: %s", got.Description)
+	}
+	if repo.lastUpdate.tmdbID != nil {
+		t.Fatalf("expected tmdb id nil for av scrape, got=%v", repo.lastUpdate.tmdbID)
+	}
+	if repo.lastUpdate.status != "uploaded" {
+		t.Fatalf("expected status uploaded, got=%s", repo.lastUpdate.status)
+	}
+	if repo.resolveActorSource != "scrape_av" {
+		t.Fatalf("expected resolve actor source scrape_av, got=%s", repo.resolveActorSource)
+	}
+	if !reflect.DeepEqual(repo.resolveActorNames, []string{"演员甲", "演员乙"}) {
+		t.Fatalf("unexpected resolved actor names: %v", repo.resolveActorNames)
+	}
+	if repo.addedActorSource != "scrape_av" {
+		t.Fatalf("expected add actor source scrape_av, got=%s", repo.addedActorSource)
+	}
+	if !reflect.DeepEqual(repo.addedActorIDs, repo.nextActorIDs) {
+		t.Fatalf("unexpected added actor ids: %v", repo.addedActorIDs)
+	}
+	if repo.lastUpdate.metadata["scrape_source"] != "javdb" {
+		t.Fatalf("expected scrape_source javdb, got=%v", repo.lastUpdate.metadata["scrape_source"])
+	}
+	if repo.lastUpdate.metadata["external_id"] != "code-hit" {
+		t.Fatalf("expected external_id code-hit, got=%v", repo.lastUpdate.metadata["external_id"])
+	}
+}
+
+func TestPreviewAVFallbackByTitle(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/v/title-only"><span>无番号作品</span></a>
+  </body>
+</html>
+`))
+		case "/v/title-only":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>无番号作品 - JavDB</title>
+    <meta property="og:image" content="/covers/title-only.jpg" />
+    <meta name="description" content="标题检索简介" />
+  </head>
+  <body>
+    <h2 class="title is-4">无番号作品</h2>
+    <div><strong>日期:</strong><span>2023-11-09</span></div>
+    <a href="/actors/a1">演员丙</a>
+  </body>
+</html>
+`))
+		case "/covers/title-only.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-preview-test", time.Second)
+
+	got, err := svc.PreviewAV(context.Background(), "无番号标题")
+	if err != nil {
+		t.Fatalf("PreviewAV returned error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected one av candidate, got=%d", len(got))
+	}
+	candidate := got[0]
+	if candidate["title"] != "无番号作品" {
+		t.Fatalf("unexpected title: %v", candidate["title"])
+	}
+	if candidate["media_type_hint"] != "av" {
+		t.Fatalf("expected media_type_hint av, got=%v", candidate["media_type_hint"])
+	}
+	if candidate["release_date"] != "2023-11-09" {
+		t.Fatalf("unexpected release date: %v", candidate["release_date"])
+	}
+	actors, ok := candidate["actors"].([]string)
+	if !ok || len(actors) != 1 || actors[0] != "演员丙" {
+		t.Fatalf("unexpected actors: %v", candidate["actors"])
 	}
 }

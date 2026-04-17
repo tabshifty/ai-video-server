@@ -47,6 +47,11 @@ WHERE id=$1 AND status='ready'
 		tags = append(tags, tag)
 	}
 	detail.Tags = tags
+	collections, err := r.ListVideoCollections(ctx, videoID)
+	if err != nil {
+		return models.VideoDetail{}, fmt.Errorf("query collections: %w", err)
+	}
+	detail.Collections = collections
 
 	rows, err := r.pool.Query(ctx, `
 SELECT action_type, watch_seconds
@@ -334,7 +339,13 @@ LIMIT $3 OFFSET $4
 		}
 		items = append(items, item)
 	}
-	return items, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := r.attachCollectionsToVideoListItems(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 func (r *VideoRepository) GetUploadedVideos(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error) {
@@ -363,7 +374,13 @@ LIMIT $2 OFFSET $3
 		}
 		items = append(items, item)
 	}
-	return items, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := r.attachCollectionsToVideoListItems(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 func (r *VideoRepository) GetActionVideos(ctx context.Context, userID uuid.UUID, action string, limit, offset int) ([]models.VideoListItem, int, error) {
@@ -397,7 +414,31 @@ LIMIT $3 OFFSET $4
 		}
 		items = append(items, item)
 	}
-	return items, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := r.attachCollectionsToVideoListItems(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *VideoRepository) attachCollectionsToVideoListItems(ctx context.Context, items []models.VideoListItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+	videoIDs := make([]uuid.UUID, 0, len(items))
+	for _, item := range items {
+		videoIDs = append(videoIDs, item.ID)
+	}
+	collectionMap, err := r.ListCollectionsByVideoIDs(ctx, videoIDs)
+	if err != nil {
+		return fmt.Errorf("load list collections: %w", err)
+	}
+	for i := range items {
+		items[i].Collections = collectionMap[items[i].ID]
+	}
+	return nil
 }
 
 func (r *VideoRepository) UpdateUserProfile(ctx context.Context, userID uuid.UUID, oldPassword, newEmail, newPassword string) error {

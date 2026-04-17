@@ -5,7 +5,7 @@ import { UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import UploadProgress from '../components/UploadProgress.vue'
 import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
-import { getAdminActors } from '../api/admin'
+import { getAdminActors, getAdminCollections } from '../api/admin'
 import { sha256File } from '../utils/hash'
 
 const uploadFileList = ref([])
@@ -20,18 +20,22 @@ const uploadResults = ref([])
 const cancelRequested = ref(false)
 const actorOptions = ref([])
 const loadingActors = ref(false)
+const collectionOptions = ref([])
+const loadingCollections = ref(false)
 
 const form = reactive({
   type: 'short',
   title: '',
   description: '',
   tags: [],
-  actors: []
+  actors: [],
+  collections: []
 })
 const presetTags = ['action', 'comedy', 'drama', 'documentary', 'anime', 'music', 'sports', 'family']
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const isMovieType = computed(() => form.type === 'movie')
+const isShortType = computed(() => form.type === 'short')
 const selectedFiles = computed(() =>
   uploadFileList.value
     .map((item) => item.raw)
@@ -50,6 +54,9 @@ const batchProgress = computed(() => {
 watch(
   () => form.type,
   (nextType) => {
+    if (nextType !== 'short' && form.collections.length > 0) {
+      form.collections = []
+    }
     if (nextType !== 'movie' || uploadFileList.value.length <= 1) return
     uploadFileList.value = [uploadFileList.value[0]]
     ElMessage.warning('电影仅支持单文件上传，已保留第1个文件')
@@ -120,6 +127,43 @@ async function searchActors(keyword = '') {
   }
 }
 
+function normalizeCollectionSelection(values) {
+  const out = []
+  const seen = new Set()
+  for (const item of values || []) {
+    const value = String(item || '').trim()
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+  }
+  return out
+}
+
+async function searchCollections(keyword = '') {
+  loadingCollections.value = true
+  try {
+    const data = await getAdminCollections({
+      q: keyword,
+      active: 1,
+      page: 1,
+      page_size: 50
+    })
+    const options = (data.items || []).map((item) => ({
+      value: item.id,
+      label: item.name
+    }))
+    const optionMap = new Map(collectionOptions.value.map((item) => [item.value, item]))
+    for (const item of options) {
+      optionMap.set(item.value, item)
+    }
+    collectionOptions.value = Array.from(optionMap.values())
+  } finally {
+    loadingCollections.value = false
+  }
+}
+
 function buildNormalizedTags() {
   return Array.from(
     new Map(
@@ -178,7 +222,8 @@ async function uploadOneFile(targetFile, sharedPayload) {
       description: sharedPayload.description,
       tags: sharedPayload.tags,
       actor_ids: sharedPayload.actorIDs,
-      actor_names: sharedPayload.actorNames
+      actor_names: sharedPayload.actorNames,
+      collection_ids: sharedPayload.collectionIDs
     })
     activeSessionID = initResp.upload_session_id
     sessionId.value = activeSessionID
@@ -241,7 +286,8 @@ async function submit() {
     description: form.description,
     tags: normalizedTags,
     actorIDs,
-    actorNames
+    actorNames,
+    collectionIDs: isShortType.value ? normalizeCollectionSelection(form.collections) : []
   }
 
   for (let index = 0; index < queue.length; index += 1) {
@@ -302,6 +348,7 @@ async function cancelUpload() {
 
 onMounted(() => {
   searchActors().catch(() => {})
+  searchCollections().catch(() => {})
 })
 </script>
 
@@ -341,6 +388,7 @@ onMounted(() => {
             <el-option label="短视频" value="short" />
             <el-option label="电影" value="movie" />
             <el-option label="剧集分集" value="episode" />
+            <el-option label="AV" value="av" />
           </el-select>
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
@@ -357,6 +405,29 @@ onMounted(() => {
             style="width: 100%"
           >
             <el-option v-for="tag in presetTags" :key="tag" :label="tag" :value="tag" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="isShortType" label="所属合集">
+          <el-select
+            v-model="form.collections"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            :remote-method="searchCollections"
+            :loading="loadingCollections"
+            placeholder="可选，可多选"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="collection in collectionOptions"
+              :key="collection.value"
+              :label="collection.label"
+              :value="collection.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="关联演员">

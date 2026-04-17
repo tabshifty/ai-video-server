@@ -7,6 +7,7 @@ import VideoUpload from '../views/VideoUpload.vue'
 import ScrapePreview from '../views/ScrapePreview.vue'
 import UserManage from '../views/UserManage.vue'
 import ActorManage from '../views/ActorManage.vue'
+import CollectionManage from '../views/CollectionManage.vue'
 import SystemSettings from '../views/SystemSettings.vue'
 import TaskMonitor from '../views/TaskMonitor.vue'
 
@@ -18,6 +19,7 @@ const routes = [
   { path: '/upload', component: VideoUpload },
   { path: '/scrape', component: ScrapePreview },
   { path: '/actors', component: ActorManage },
+  { path: '/collections', component: CollectionManage },
   { path: '/users', component: UserManage },
   { path: '/settings', component: SystemSettings },
   { path: '/tasks', component: TaskMonitor }

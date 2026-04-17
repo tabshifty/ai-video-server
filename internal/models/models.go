@@ -28,10 +28,18 @@ type Video struct {
 
 // RecommendedVideo is a lightweight DTO for feed APIs.
 type RecommendedVideo struct {
-	ID             uuid.UUID `json:"id"`
-	Title          string    `json:"title"`
-	Type           string    `json:"type"`
-	TranscodedPath string    `json:"transcoded_path"`
-	Duration       int       `json:"duration_seconds"`
-	Score          float64   `json:"score,omitempty"`
+	ID             uuid.UUID         `json:"id"`
+	Title          string            `json:"title"`
+	Type           string            `json:"type"`
+	TranscodedPath string            `json:"transcoded_path"`
+	Duration       int               `json:"duration_seconds"`
+	Collections    []VideoCollection `json:"collections"`
+	Score          float64           `json:"score,omitempty"`
+}
+
+// VideoCollection is a lightweight DTO for video-collection relation.
+type VideoCollection struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	CoverURL string    `json:"cover_url"`
 }
