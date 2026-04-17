@@ -43,3 +43,25 @@ type VideoCollection struct {
 	Name     string    `json:"name"`
 	CoverURL string    `json:"cover_url"`
 }
+
+// Image is the primary image media entity.
+type Image struct {
+	ID           uuid.UUID
+	UserID       *uuid.UUID
+	Title        string
+	Description  string
+	Status       string
+	Active       bool
+	OriginalPath string
+	StoredPath   string
+	OriginalMIME string
+	StoredMIME   string
+	OriginalExt  string
+	StoredExt    string
+	FileSize     int64
+	Width        int
+	Height       int
+	Metadata     []byte
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}

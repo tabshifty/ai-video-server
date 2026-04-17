@@ -18,6 +18,23 @@ export const getAdminCollections = (params) => request.get('/admin/collections',
 export const createAdminCollection = (payload) => request.post('/admin/collections', payload)
 export const updateAdminCollection = (id, payload) => request.put(`/admin/collections/${id}`, payload)
 export const deleteAdminCollection = (id) => request.delete(`/admin/collections/${id}`)
+export const uploadAdminImages = (formData) =>
+  request.post('/admin/images/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+export const getAdminImages = (params) => request.get('/admin/images', { params })
+export const getAdminImageDetail = (id) => request.get(`/admin/images/${id}`)
+export const updateAdminImage = (id, payload) => request.put(`/admin/images/${id}`, payload)
+export const deleteAdminImage = (id) => request.delete(`/admin/images/${id}`)
+export const getAdminImageViewBlob = (id, params) =>
+  request.get(`/admin/images/${id}/view`, {
+    params,
+    responseType: 'blob'
+  })
+export const getAdminImageCollections = (params) => request.get('/admin/image-collections', { params })
+export const createAdminImageCollection = (payload) => request.post('/admin/image-collections', payload)
+export const updateAdminImageCollection = (id, payload) => request.put(`/admin/image-collections/${id}`, payload)
+export const deleteAdminImageCollection = (id) => request.delete(`/admin/image-collections/${id}`)
 
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
 

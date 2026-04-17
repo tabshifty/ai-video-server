@@ -978,3 +978,35 @@
   - `npm --prefix admin-web run build` passed。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-17 16:33] 图片上传管理功能落地（批量上传/演员合集关联/缩放查看/WebP 转换后删除源文件）
+- Type: `implementation`
+- Summary:
+  - 补齐后台图片管理后端接口：批量上传、列表筛选、详情编辑、删除、图片查看缩放接口，以及图片合集 CRUD。
+  - 图片上传链路强化：非 GIF 上传统一转为 WebP 存储，并在转换成功后立即删除源文件；若删除源文件失败则回滚已生成的 WebP，避免脏数据残留。
+  - 管理端新增“图片管理”和“图片合集”页面，支持批量上传、演员关联、合集关联、详情编辑、缩放参数预览。
+  - 将图片服务注入 API 并注册 admin 路由，确保服务端与管理端链路完整可用。
+- Changed Files:
+  - `internal/handlers/admin_image.go`
+  - `internal/handlers/router.go`
+  - `internal/services/image.go`
+  - `internal/repository/image_repository.go`
+  - `internal/repository/image_collection_repository.go`
+  - `internal/repository/actor_repository.go`
+  - `internal/models/models.go`
+  - `internal/models/admin.go`
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `migrations/0010_image_management.up.sql`
+  - `migrations/0010_image_management.down.sql`
+  - `main.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/router/index.js`
+  - `admin-web/src/components/Layout.vue`
+  - `admin-web/src/views/ImageManage.vue`
+  - `admin-web/src/views/ImageCollectionManage.vue`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`

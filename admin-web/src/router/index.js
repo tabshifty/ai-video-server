@@ -8,6 +8,8 @@ import ScrapePreview from '../views/ScrapePreview.vue'
 import UserManage from '../views/UserManage.vue'
 import ActorManage from '../views/ActorManage.vue'
 import CollectionManage from '../views/CollectionManage.vue'
+import ImageManage from '../views/ImageManage.vue'
+import ImageCollectionManage from '../views/ImageCollectionManage.vue'
 import SystemSettings from '../views/SystemSettings.vue'
 import TaskMonitor from '../views/TaskMonitor.vue'
 
@@ -20,6 +22,8 @@ const routes = [
   { path: '/scrape', component: ScrapePreview },
   { path: '/actors', component: ActorManage },
   { path: '/collections', component: CollectionManage },
+  { path: '/images', component: ImageManage },
+  { path: '/image-collections', component: ImageCollectionManage },
   { path: '/users', component: UserManage },
   { path: '/settings', component: SystemSettings },
   { path: '/tasks', component: TaskMonitor }

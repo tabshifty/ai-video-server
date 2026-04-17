@@ -101,6 +101,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
 	scrapeSvc.ConfigureAVScraper(cfg.AVScraperBaseURL, cfg.AVScraperUserAgent, cfg.AVScraperTimeout)
 	appSvc := services.NewAppService(repo)
+	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -112,6 +113,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 		recSvc,
 		scrapeSvc,
 		appSvc,
+		imageSvc,
 		enqueuer,
 		logger,
 		redisClient,

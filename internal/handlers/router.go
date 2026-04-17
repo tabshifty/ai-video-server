@@ -28,6 +28,7 @@ type API struct {
 	recSvc         *services.RecommendService
 	scrapeSvc      *services.ScraperService
 	appSvc         *services.AppService
+	imageSvc       *services.ImageService
 	enqueuer       *queue.Enqueuer
 	logger         *slog.Logger
 	redis          *redis.Client
@@ -46,7 +47,7 @@ type API struct {
 	enableSwagger  bool
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath string, enableSwagger bool) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath string, enableSwagger bool) *API {
 	return &API{
 		repo:           repo,
 		uploadSvc:      uploadSvc,
@@ -54,6 +55,7 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		recSvc:         recSvc,
 		scrapeSvc:      scrapeSvc,
 		appSvc:         appSvc,
+		imageSvc:       imageSvc,
 		enqueuer:       enqueuer,
 		logger:         logger,
 		redis:          redisClient,
@@ -129,6 +131,16 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/collections", a.AdminCreateCollection)
 			admin.PUT("/collections/:id", a.AdminUpdateCollection)
 			admin.DELETE("/collections/:id", a.AdminDeleteCollection)
+			admin.POST("/images/upload", a.AdminUploadImages)
+			admin.GET("/images", a.AdminImages)
+			admin.GET("/images/:id", a.AdminImageDetail)
+			admin.PUT("/images/:id", a.AdminUpdateImage)
+			admin.DELETE("/images/:id", a.AdminDeleteImage)
+			admin.GET("/images/:id/view", a.AdminImageView)
+			admin.GET("/image-collections", a.AdminImageCollections)
+			admin.POST("/image-collections", a.AdminCreateImageCollection)
+			admin.PUT("/image-collections/:id", a.AdminUpdateImageCollection)
+			admin.DELETE("/image-collections/:id", a.AdminDeleteImageCollection)
 			admin.GET("/tasks", a.AdminTasks)
 			admin.POST("/system/cleanup", a.AdminSystemCleanup)
 			admin.GET("/system/logs", a.AdminSystemLogs)

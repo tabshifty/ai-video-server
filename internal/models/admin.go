@@ -153,3 +153,80 @@ type AdminCollectionInput struct {
 	SortOrder   int    `json:"sort_order"`
 	Active      bool   `json:"active"`
 }
+
+type AdminImageListItem struct {
+	ID           uuid.UUID  `json:"id"`
+	Title        string     `json:"title"`
+	Description  string     `json:"description"`
+	Status       string     `json:"status"`
+	Active       bool       `json:"active"`
+	StoredPath   string     `json:"stored_path"`
+	StoredMIME   string     `json:"stored_mime"`
+	FileSize     int64      `json:"file_size"`
+	Width        int        `json:"width"`
+	Height       int        `json:"height"`
+	UploadUser   string     `json:"upload_user"`
+	UploadUserID *uuid.UUID `json:"upload_user_id"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type AdminImageActor struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	AvatarURL  string    `json:"avatar_url"`
+	Active     bool      `json:"active"`
+	BindSource string    `json:"bind_source"`
+}
+
+type AdminImageCollection struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CoverURL    string    `json:"cover_url"`
+	SortOrder   int       `json:"sort_order"`
+	Active      bool      `json:"active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type AdminImageDetail struct {
+	ID           uuid.UUID              `json:"id"`
+	UserID       *uuid.UUID             `json:"user_id"`
+	Title        string                 `json:"title"`
+	Description  string                 `json:"description"`
+	Status       string                 `json:"status"`
+	Active       bool                   `json:"active"`
+	OriginalPath string                 `json:"original_path"`
+	StoredPath   string                 `json:"stored_path"`
+	OriginalMIME string                 `json:"original_mime"`
+	StoredMIME   string                 `json:"stored_mime"`
+	OriginalExt  string                 `json:"original_ext"`
+	StoredExt    string                 `json:"stored_ext"`
+	FileSize     int64                  `json:"file_size"`
+	Width        int                    `json:"width"`
+	Height       int                    `json:"height"`
+	Metadata     json.RawMessage        `json:"metadata"`
+	Actors       []AdminImageActor      `json:"actors"`
+	Collections  []AdminImageCollection `json:"collections"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+}
+
+type AdminImageFilter struct {
+	Page         int
+	PageSize     int
+	Keyword      string
+	Status       string
+	Active       *bool
+	ActorID      *uuid.UUID
+	CollectionID *uuid.UUID
+}
+
+type AdminImageCollectionInput struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CoverURL    string `json:"cover_url"`
+	SortOrder   int    `json:"sort_order"`
+	Active      bool   `json:"active"`
+}

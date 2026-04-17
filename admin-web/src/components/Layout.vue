@@ -7,6 +7,8 @@ import {
   UploadFilled,
   MagicStick,
   Avatar,
+  PictureFilled,
+  Files,
   User,
   List,
   Setting,
@@ -27,6 +29,8 @@ const pageTitle = computed(() => {
     '/scrape': '刮削管理',
     '/actors': '演员管理',
     '/collections': '合集管理',
+    '/images': '图片管理',
+    '/image-collections': '图片合集',
     '/users': '用户管理',
     '/tasks': '任务监控',
     '/settings': '系统设置'
@@ -75,6 +79,14 @@ async function onLogout() {
         <el-menu-item index="/collections">
           <el-icon><List /></el-icon>
           <span>合集管理</span>
+        </el-menu-item>
+        <el-menu-item index="/images">
+          <el-icon><PictureFilled /></el-icon>
+          <span>图片管理</span>
+        </el-menu-item>
+        <el-menu-item index="/image-collections">
+          <el-icon><Files /></el-icon>
+          <span>图片合集</span>
         </el-menu-item>
         <el-menu-item index="/users">
           <el-icon><User /></el-icon>

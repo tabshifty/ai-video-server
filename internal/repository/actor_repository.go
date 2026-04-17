@@ -411,3 +411,62 @@ func (r *VideoRepository) ReplaceVideoActorsByInput(ctx context.Context, videoID
 	}
 	return r.ReplaceVideoActors(ctx, videoID, resolved, source)
 }
+
+func (r *VideoRepository) AddImageActors(ctx context.Context, imageID uuid.UUID, actorIDs []uuid.UUID, source string) error {
+	if strings.TrimSpace(source) == "" {
+		source = "manual"
+	}
+	actorIDs = dedupeActorIDs(actorIDs)
+	if len(actorIDs) == 0 {
+		return nil
+	}
+	batch := &pgx.Batch{}
+	for _, actorID := range actorIDs {
+		batch.Queue(
+			`INSERT INTO image_actors(image_id, actor_id, source) VALUES ($1,$2,$3)
+ON CONFLICT(image_id, actor_id) DO UPDATE SET source = EXCLUDED.source`,
+			imageID, actorID, source,
+		)
+	}
+	br := r.pool.SendBatch(ctx, batch)
+	defer br.Close()
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := br.Exec(); err != nil {
+			return fmt.Errorf("add image actor: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *VideoRepository) ReplaceImageActors(ctx context.Context, imageID uuid.UUID, actorIDs []uuid.UUID, source string) error {
+	if strings.TrimSpace(source) == "" {
+		source = "manual"
+	}
+	actorIDs = dedupeActorIDs(actorIDs)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx replace image actors: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM image_actors WHERE image_id=$1`, imageID); err != nil {
+		return fmt.Errorf("clear image actors: %w", err)
+	}
+	for _, actorID := range actorIDs {
+		if _, err := tx.Exec(ctx, `INSERT INTO image_actors(image_id, actor_id, source) VALUES ($1,$2,$3)`, imageID, actorID, source); err != nil {
+			return fmt.Errorf("insert image actor: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit replace image actors: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) ReplaceImageActorsByInput(ctx context.Context, imageID uuid.UUID, actorIDs []uuid.UUID, actorNames []string, source string) error {
+	resolved, err := r.ResolveActorIDs(ctx, actorIDs, actorNames, source)
+	if err != nil {
+		return err
+	}
+	return r.ReplaceImageActors(ctx, imageID, resolved, source)
+}
