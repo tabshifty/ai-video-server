@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '../components/Layout.vue'
 import {
+  checkAdminImageUpload,
   deleteAdminImage,
   getAdminActors,
   getAdminImageCollections,
@@ -12,6 +13,7 @@ import {
   updateAdminImage,
   uploadAdminImages
 } from '../api/admin'
+import { sha256File } from '../utils/hash'
 
 const loading = ref(false)
 const list = ref([])
@@ -234,38 +236,95 @@ async function submitUpload() {
     ElMessage.warning('请先选择图片文件')
     return
   }
-  const formData = new FormData()
-  for (const item of uploadFileList.value) {
-    if (item?.raw instanceof File) {
-      formData.append('files', item.raw)
-    }
-  }
-  if (!formData.has('files')) {
+  const rawFiles = uploadFileList.value
+    .map((item) => item?.raw)
+    .filter((item) => item instanceof File)
+  if (rawFiles.length === 0) {
     ElMessage.warning('未读取到可上传的图片文件')
     return
   }
 
   const { actorIDs, actorNames } = splitActorSelection(uploadForm.actor_tokens)
   const collectionIDs = normalizeCollectionSelection(uploadForm.collection_ids)
-  if (uploadForm.description?.trim()) {
-    formData.append('description', uploadForm.description.trim())
-  }
-  if (actorIDs.length > 0) {
-    formData.append('actor_ids', JSON.stringify(actorIDs))
-  }
-  if (actorNames.length > 0) {
-    formData.append('actor_names', JSON.stringify(actorNames))
-  }
-  if (collectionIDs.length > 0) {
-    formData.append('collection_ids', JSON.stringify(collectionIDs))
-  }
 
   uploading.value = true
   try {
-    const result = await uploadAdminImages(formData)
+    const instantItems = []
+    const pendingFiles = []
+    for (const file of rawFiles) {
+      let hit = false
+      try {
+        const hash = await sha256File(file)
+        const checked = await checkAdminImageUpload({ hash, file_size: file.size })
+        if (checked?.exists) {
+          instantItems.push({
+            filename: file.name,
+            success: true,
+            image_id: checked.image_id || '',
+            already_exists: true,
+            status: 'ready',
+            message: '秒传命中'
+          })
+          hit = true
+        }
+      } catch (_) {
+        // 预检失败时回退到正常上传，避免阻断主流程。
+      }
+      if (!hit) {
+        pendingFiles.push(file)
+      }
+    }
+
+    const buildFormData = () => {
+      const formData = new FormData()
+      for (const file of pendingFiles) {
+        formData.append('files', file)
+      }
+      if (uploadForm.description?.trim()) {
+        formData.append('description', uploadForm.description.trim())
+      }
+      if (actorIDs.length > 0) {
+        formData.append('actor_ids', JSON.stringify(actorIDs))
+      }
+      if (actorNames.length > 0) {
+        formData.append('actor_names', JSON.stringify(actorNames))
+      }
+      if (collectionIDs.length > 0) {
+        formData.append('collection_ids', JSON.stringify(collectionIDs))
+      }
+      return formData
+    }
+
+    let uploadedItems = []
+    let uploadSuccessCount = 0
+    let uploadFailedCount = 0
+    if (pendingFiles.length > 0) {
+      try {
+        const uploaded = await uploadAdminImages(buildFormData())
+        uploadedItems = uploaded.items || []
+        uploadSuccessCount = Number(uploaded.success_count || 0)
+        uploadFailedCount = Number(uploaded.failed_count || 0)
+      } catch (error) {
+        const message = extractErrorMessage(error, '上传失败')
+        uploadedItems = pendingFiles.map((file) => ({
+          filename: file.name,
+          success: false,
+          error: message
+        }))
+        uploadSuccessCount = 0
+        uploadFailedCount = pendingFiles.length
+      }
+    }
+
+    const result = {
+      items: [...instantItems, ...uploadedItems],
+      total_count: rawFiles.length,
+      success_count: instantItems.length + uploadSuccessCount,
+      failed_count: uploadFailedCount
+    }
     uploadSummary.value = result
-    const success = Number(result?.success_count || 0)
-    const failed = Number(result?.failed_count || 0)
+    const success = Number(result.success_count || 0)
+    const failed = Number(result.failed_count || 0)
     ElMessage.success(`上传完成：成功 ${success}，失败 ${failed}`)
     uploadRef.value?.clearFiles()
     uploadFileList.value = []
@@ -527,6 +586,7 @@ onBeforeUnmount(() => {
                 <el-tag :type="row.success ? 'success' : 'danger'">{{ row.success ? '成功' : '失败' }}</el-tag>
               </template>
             </el-table-column>
+            <el-table-column prop="message" label="说明" min-width="140" show-overflow-tooltip />
             <el-table-column prop="image_id" label="图片ID" min-width="220" />
             <el-table-column prop="error" label="失败原因" min-width="200" show-overflow-tooltip />
           </el-table>

@@ -1010,3 +1010,21 @@
   - `npm --prefix admin-web run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-17 16:41] 图片上传补齐秒传能力（对齐视频上传预检）
+- Type: `implementation`
+- Summary:
+  - 新增后台图片秒传预检接口 `POST /api/v1/admin/images/check`，按 `hash + file_size` 查询是否已存在图片。
+  - 管理端图片批量上传流程改为“先算 SHA-256 并逐个预检”：命中时直接返回“秒传命中”，未命中再走实际上传。
+  - 上传结果汇总支持混合展示“秒传命中”和普通上传结果，确保批量上传在有重复文件时不会重复传输。
+- Changed Files:
+  - `internal/handlers/router.go`
+  - `internal/handlers/admin_image.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/views/ImageManage.vue`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`

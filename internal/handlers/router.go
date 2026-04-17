@@ -132,6 +132,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.PUT("/collections/:id", a.AdminUpdateCollection)
 			admin.DELETE("/collections/:id", a.AdminDeleteCollection)
 			admin.POST("/images/upload", a.AdminUploadImages)
+			admin.POST("/images/check", a.AdminImageCheck)
 			admin.GET("/images", a.AdminImages)
 			admin.GET("/images/:id", a.AdminImageDetail)
 			admin.PUT("/images/:id", a.AdminUpdateImage)

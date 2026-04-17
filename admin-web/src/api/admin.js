@@ -22,6 +22,7 @@ export const uploadAdminImages = (formData) =>
   request.post('/admin/images/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
+export const checkAdminImageUpload = (payload) => request.post('/admin/images/check', payload)
 export const getAdminImages = (params) => request.get('/admin/images', { params })
 export const getAdminImageDetail = (id) => request.get(`/admin/images/${id}`)
 export const updateAdminImage = (id, payload) => request.put(`/admin/images/${id}`, payload)

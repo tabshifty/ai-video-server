@@ -104,6 +104,37 @@ func (a *API) AdminUploadImages(c *gin.Context) {
 	})
 }
 
+func (a *API) AdminImageCheck(c *gin.Context) {
+	var req struct {
+		Hash     string `json:"hash"`
+		FileSize int64  `json:"file_size"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	req.Hash = strings.TrimSpace(req.Hash)
+	if !isSHA256Hex(req.Hash) {
+		bad(c, "invalid hash")
+		return
+	}
+	if req.FileSize <= 0 {
+		bad(c, "invalid file_size")
+		return
+	}
+
+	imageID, exists, err := a.repo.FindImageByHash(c.Request.Context(), req.Hash, req.FileSize)
+	if err != nil {
+		response.Error(c, 1040, err.Error())
+		return
+	}
+	if exists {
+		ok(c, gin.H{"exists": true, "image_id": imageID})
+		return
+	}
+	ok(c, gin.H{"exists": false})
+}
+
 func collectImageUploadFiles(c *gin.Context) []*multipart.FileHeader {
 	form, err := c.MultipartForm()
 	if err != nil || form == nil {
