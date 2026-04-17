@@ -15,6 +15,20 @@
 
 ---
 
+### [2026-04-17 14:12] 管理端 token 失效统一处理（提示+跳转登录）
+- Type: `implementation`
+- Summary:
+  - 修复管理端在 token 失效时未统一报错或跳转登录的问题。
+  - 在前端请求响应拦截器中新增业务错误码鉴权判断：当返回 `code=401/403` 或消息包含 token/authorization/admin only 时，统一清理登录态并提示后跳转登录页。
+  - 保留 HTTP 401 分支处理，并改为复用统一逻辑，避免重复代码和多次重定向。
+- Changed Files:
+  - `admin-web/src/api/request.js`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-17 14:03] dev-up 启动增加镜像预检与 descriptor 异常重试提示
 - Type: `implementation`
 - Summary:
