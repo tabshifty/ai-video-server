@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"video-server/internal/models"
@@ -156,7 +156,13 @@ LIMIT $1`, limit)
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := r.attachCollectionsToRecommendedVideos(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *VideoRepository) UpsertAction(ctx context.Context, userID, videoID uuid.UUID, action string, watchSeconds int) error {
@@ -427,7 +433,13 @@ LIMIT $3`, userID, tags, limit)
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := r.attachCollectionsToRecommendedVideos(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *VideoRepository) FetchHotVideos(ctx context.Context, limit int) ([]models.RecommendedVideo, error) {
@@ -455,7 +467,31 @@ LIMIT $1`, limit)
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := r.attachCollectionsToRecommendedVideos(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *VideoRepository) attachCollectionsToRecommendedVideos(ctx context.Context, videos []models.RecommendedVideo) error {
+	if len(videos) == 0 {
+		return nil
+	}
+	videoIDs := make([]uuid.UUID, 0, len(videos))
+	for _, item := range videos {
+		videoIDs = append(videoIDs, item.ID)
+	}
+	collectionMap, err := r.ListCollectionsByVideoIDs(ctx, videoIDs)
+	if err != nil {
+		return fmt.Errorf("load recommended collections: %w", err)
+	}
+	for i := range videos {
+		videos[i].Collections = collectionMap[videos[i].ID]
+	}
+	return nil
 }
 
 func (r *VideoRepository) InsertTranscodingJob(ctx context.Context, videoID uuid.UUID, userID *uuid.UUID, status string) (int64, error) {

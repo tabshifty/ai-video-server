@@ -12,6 +12,7 @@ type AdminStats struct {
 	ShortVideos       int64          `json:"short_videos"`
 	MovieVideos       int64          `json:"movie_videos"`
 	EpisodeVideos     int64          `json:"episode_videos"`
+	AVVideos          int64          `json:"av_videos"`
 	TotalUsers        int64          `json:"total_users"`
 	TodayUploads      int64          `json:"today_uploads"`
 	QueueLength       int64          `json:"queue_length"`
@@ -38,23 +39,24 @@ type AdminVideoListItem struct {
 }
 
 type AdminVideoDetail struct {
-	ID              uuid.UUID         `json:"id"`
-	UserID          *uuid.UUID        `json:"user_id"`
-	Title           string            `json:"title"`
-	Description     string            `json:"description"`
-	Type            string            `json:"type"`
-	Status          string            `json:"status"`
-	DurationSeconds int               `json:"duration_seconds"`
-	Width           int               `json:"width"`
-	Height          int               `json:"height"`
-	OriginalPath    string            `json:"original_path"`
-	TranscodedPath  string            `json:"transcoded_path"`
-	ThumbnailPath   string            `json:"thumbnail_path"`
-	Metadata        json.RawMessage   `json:"metadata"`
-	Tags            []string          `json:"tags"`
-	Actors          []AdminVideoActor `json:"actors"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	ID              uuid.UUID              `json:"id"`
+	UserID          *uuid.UUID             `json:"user_id"`
+	Title           string                 `json:"title"`
+	Description     string                 `json:"description"`
+	Type            string                 `json:"type"`
+	Status          string                 `json:"status"`
+	DurationSeconds int                    `json:"duration_seconds"`
+	Width           int                    `json:"width"`
+	Height          int                    `json:"height"`
+	OriginalPath    string                 `json:"original_path"`
+	TranscodedPath  string                 `json:"transcoded_path"`
+	ThumbnailPath   string                 `json:"thumbnail_path"`
+	Metadata        json.RawMessage        `json:"metadata"`
+	Tags            []string               `json:"tags"`
+	Actors          []AdminVideoActor      `json:"actors"`
+	Collections     []AdminVideoCollection `json:"collections"`
+	CreatedAt       time.Time              `json:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
 }
 
 type AdminVideoActor struct {
@@ -63,6 +65,14 @@ type AdminVideoActor struct {
 	AvatarURL  string    `json:"avatar_url"`
 	Active     bool      `json:"active"`
 	BindSource string    `json:"bind_source"`
+}
+
+type AdminVideoCollection struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	CoverURL  string    `json:"cover_url"`
+	SortOrder int       `json:"sort_order"`
+	Active    bool      `json:"active"`
 }
 
 type AdminVideoFilter struct {
@@ -123,4 +133,23 @@ type AdminActorInput struct {
 	ExternalID string   `json:"external_id"`
 	Notes      string   `json:"notes"`
 	Active     bool     `json:"active"`
+}
+
+type AdminCollection struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CoverURL    string    `json:"cover_url"`
+	SortOrder   int       `json:"sort_order"`
+	Active      bool      `json:"active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type AdminCollectionInput struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CoverURL    string `json:"cover_url"`
+	SortOrder   int    `json:"sort_order"`
+	Active      bool   `json:"active"`
 }

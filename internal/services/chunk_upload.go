@@ -21,23 +21,24 @@ type ChunkUploadService struct {
 }
 
 type ChunkSession struct {
-	ID          string         `json:"id"`
-	UserID      string         `json:"user_id"`
-	Filename    string         `json:"filename"`
-	FileSize    int64          `json:"file_size"`
-	ChunkSize   int64          `json:"chunk_size"`
-	TotalChunks int            `json:"total_chunks"`
-	Hash        string         `json:"hash"`
-	Type        string         `json:"type"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	Tags        []string       `json:"tags"`
-	ActorIDs    []string       `json:"actor_ids"`
-	ActorNames  []string       `json:"actor_names"`
-	Uploaded    map[int]bool   `json:"uploaded"`
-	CreatedAt   time.Time      `json:"created_at"`
-	LastUpdated time.Time      `json:"last_updated"`
-	Extra       map[string]any `json:"extra,omitempty"`
+	ID            string         `json:"id"`
+	UserID        string         `json:"user_id"`
+	Filename      string         `json:"filename"`
+	FileSize      int64          `json:"file_size"`
+	ChunkSize     int64          `json:"chunk_size"`
+	TotalChunks   int            `json:"total_chunks"`
+	Hash          string         `json:"hash"`
+	Type          string         `json:"type"`
+	Title         string         `json:"title"`
+	Description   string         `json:"description"`
+	Tags          []string       `json:"tags"`
+	ActorIDs      []string       `json:"actor_ids"`
+	ActorNames    []string       `json:"actor_names"`
+	CollectionIDs []string       `json:"collection_ids"`
+	Uploaded      map[int]bool   `json:"uploaded"`
+	CreatedAt     time.Time      `json:"created_at"`
+	LastUpdated   time.Time      `json:"last_updated"`
+	Extra         map[string]any `json:"extra,omitempty"`
 }
 
 func NewChunkUploadService(uploadTempDir string) *ChunkUploadService {
@@ -47,28 +48,29 @@ func NewChunkUploadService(uploadTempDir string) *ChunkUploadService {
 	}
 }
 
-func (s *ChunkUploadService) Init(ctx context.Context, userID uuid.UUID, filename string, fileSize, chunkSize int64, totalChunks int, hash, typ, title, description string, tags []string, actorIDs, actorNames []string) (ChunkSession, error) {
+func (s *ChunkUploadService) Init(ctx context.Context, userID uuid.UUID, filename string, fileSize, chunkSize int64, totalChunks int, hash, typ, title, description string, tags []string, actorIDs, actorNames, collectionIDs []string) (ChunkSession, error) {
 	_ = ctx
 	if chunkSize <= 0 || totalChunks <= 0 {
 		return ChunkSession{}, fmt.Errorf("invalid chunk size or total chunks")
 	}
 	session := ChunkSession{
-		ID:          uuid.NewString(),
-		UserID:      userID.String(),
-		Filename:    filename,
-		FileSize:    fileSize,
-		ChunkSize:   chunkSize,
-		TotalChunks: totalChunks,
-		Hash:        strings.TrimSpace(hash),
-		Type:        strings.TrimSpace(typ),
-		Title:       title,
-		Description: description,
-		Tags:        tags,
-		ActorIDs:    actorIDs,
-		ActorNames:  actorNames,
-		Uploaded:    map[int]bool{},
-		CreatedAt:   time.Now().UTC(),
-		LastUpdated: time.Now().UTC(),
+		ID:            uuid.NewString(),
+		UserID:        userID.String(),
+		Filename:      filename,
+		FileSize:      fileSize,
+		ChunkSize:     chunkSize,
+		TotalChunks:   totalChunks,
+		Hash:          strings.TrimSpace(hash),
+		Type:          strings.TrimSpace(typ),
+		Title:         title,
+		Description:   description,
+		Tags:          tags,
+		ActorIDs:      actorIDs,
+		ActorNames:    actorNames,
+		CollectionIDs: collectionIDs,
+		Uploaded:      map[int]bool{},
+		CreatedAt:     time.Now().UTC(),
+		LastUpdated:   time.Now().UTC(),
 	}
 	if err := s.persist(session); err != nil {
 		return ChunkSession{}, err

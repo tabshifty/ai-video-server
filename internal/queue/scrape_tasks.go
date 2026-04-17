@@ -9,12 +9,12 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-// ScrapePayload carries metadata discovery input for movie/episode uploads.
+// ScrapePayload carries metadata discovery input for movie/episode/av uploads.
 type ScrapePayload struct {
 	VideoID  string `json:"video_id"`
 	FilePath string `json:"file_path"`
 	Filename string `json:"filename"`
-	Type     string `json:"type"` // movie | episode
+	Type     string `json:"type"` // movie | episode | av
 }
 
 func (e *Enqueuer) EnqueueScrapeMovie(payloadIn ScrapePayload) error {
@@ -23,6 +23,10 @@ func (e *Enqueuer) EnqueueScrapeMovie(payloadIn ScrapePayload) error {
 
 func (e *Enqueuer) EnqueueScrapeTV(payloadIn ScrapePayload) error {
 	return e.enqueueScrapeTask(TypeScrapeTV, payloadIn)
+}
+
+func (e *Enqueuer) EnqueueScrapeAV(payloadIn ScrapePayload) error {
+	return e.enqueueScrapeTask(TypeScrapeAV, payloadIn)
 }
 
 func (e *Enqueuer) enqueueScrapeTask(taskType string, payloadIn ScrapePayload) error {
@@ -47,6 +51,10 @@ func (p *Processor) HandleScrapeMovie(ctx context.Context, task *asynq.Task) err
 
 func (p *Processor) HandleScrapeTV(ctx context.Context, task *asynq.Task) error {
 	return p.handleScrape(ctx, task, "episode")
+}
+
+func (p *Processor) HandleScrapeAV(ctx context.Context, task *asynq.Task) error {
+	return p.handleScrape(ctx, task, "av")
 }
 
 func (p *Processor) handleScrape(ctx context.Context, task *asynq.Task, expectedType string) error {
@@ -77,6 +85,8 @@ func (p *Processor) handleScrape(ctx context.Context, task *asynq.Task, expected
 	var scrapeErr error
 	if expectedType == "movie" {
 		_, scrapeErr = p.scrape.ScrapeMovieUpload(ctx, videoID, payload.FilePath, payload.Filename)
+	} else if expectedType == "av" {
+		_, scrapeErr = p.scrape.ScrapeAVUpload(ctx, videoID, payload.FilePath, payload.Filename)
 	} else {
 		_, scrapeErr = p.scrape.ScrapeEpisodeUpload(ctx, videoID, payload.FilePath, payload.Filename)
 	}

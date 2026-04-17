@@ -9,19 +9,20 @@ import (
 
 // VideoDetail aggregates video info for detail page.
 type VideoDetail struct {
-	ID             uuid.UUID       `json:"id"`
-	Title          string          `json:"title"`
-	Description    string          `json:"description"`
-	PlayURL        string          `json:"play_url"`
-	TranscodedPath string          `json:"transcoded_path"`
-	ThumbnailPath  string          `json:"thumbnail_path"`
-	Duration       int             `json:"duration"`
-	ViewsCount     int64           `json:"views_count"`
-	LikesCount     int64           `json:"likes_count"`
-	FavoritesCount int64           `json:"favorites_count"`
-	Tags           []string        `json:"tags"`
-	Metadata       json.RawMessage `json:"metadata"`
-	UserState      VideoUserState  `json:"user_state"`
+	ID             uuid.UUID         `json:"id"`
+	Title          string            `json:"title"`
+	Description    string            `json:"description"`
+	PlayURL        string            `json:"play_url"`
+	TranscodedPath string            `json:"transcoded_path"`
+	ThumbnailPath  string            `json:"thumbnail_path"`
+	Duration       int               `json:"duration"`
+	ViewsCount     int64             `json:"views_count"`
+	LikesCount     int64             `json:"likes_count"`
+	FavoritesCount int64             `json:"favorites_count"`
+	Tags           []string          `json:"tags"`
+	Collections    []VideoCollection `json:"collections"`
+	Metadata       json.RawMessage   `json:"metadata"`
+	UserState      VideoUserState    `json:"user_state"`
 }
 
 // VideoUserState is per-user interaction state for a video.
@@ -62,11 +63,12 @@ type UserProfileView struct {
 
 // VideoListItem is a generic user video list item.
 type VideoListItem struct {
-	ID             uuid.UUID `json:"id"`
-	Title          string    `json:"title"`
-	Type           string    `json:"type"`
-	ThumbnailPath  string    `json:"thumbnail_path"`
-	TranscodedPath string    `json:"transcoded_path"`
-	Duration       int       `json:"duration"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             uuid.UUID         `json:"id"`
+	Title          string            `json:"title"`
+	Type           string            `json:"type"`
+	ThumbnailPath  string            `json:"thumbnail_path"`
+	TranscodedPath string            `json:"transcoded_path"`
+	Duration       int               `json:"duration"`
+	Collections    []VideoCollection `json:"collections"`
+	CreatedAt      time.Time         `json:"created_at"`
 }

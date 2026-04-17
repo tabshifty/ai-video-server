@@ -5,7 +5,16 @@ import Layout from '../components/Layout.vue'
 import { scrapeConfirm, scrapePreview } from '../api/admin'
 
 const form = reactive({ video_id: '', title: '', year: new Date().getFullYear(), type: 'movie' })
-const edit = reactive({ video_id: '', tmdb_id: 0, title: '', overview: '', poster_url: '', release_date: '', metadata: {} })
+const edit = reactive({
+  video_id: '',
+  tmdb_id: 0,
+  external_id: '',
+  title: '',
+  overview: '',
+  poster_url: '',
+  release_date: '',
+  metadata: {}
+})
 const candidates = ref([])
 const selectedIndex = ref(-1)
 const previewLoading = ref(false)
@@ -46,6 +55,9 @@ function mediaTypeLabel(type) {
   }
   if (type === 'movie') {
     return '电影'
+  }
+  if (type === 'av') {
+    return 'AV'
   }
   return type || '-'
 }
@@ -99,6 +111,25 @@ function displayGenres(item) {
   return joinObjectField(item?.metadata?.genres, 'name')
 }
 
+function candidateMediaType(item) {
+  return item?.media_type_hint || form.type
+}
+
+function candidateKey(item, index) {
+  return item?.external_id || item?.tmdb_id || `${index}`
+}
+
+function candidateIDLabel(item) {
+  return candidateMediaType(item) === 'av' ? 'AVID' : 'TMDB'
+}
+
+function candidateIDValue(item) {
+  if (candidateMediaType(item) === 'av') {
+    return toText(item?.external_id)
+  }
+  return toText(item?.tmdb_id)
+}
+
 function resolvePoster(urlOrPath) {
   const value = toText(urlOrPath, '')
   if (value === '') {
@@ -111,8 +142,13 @@ function resolvePoster(urlOrPath) {
 }
 
 function syncEditFromCandidate(item) {
+  const mediaType = item?.media_type_hint
+  if (mediaType === 'movie' || mediaType === 'tv' || mediaType === 'av') {
+    form.type = mediaType
+  }
   edit.video_id = item.video_id || form.video_id
   edit.tmdb_id = item.tmdb_id || 0
+  edit.external_id = item.external_id || ''
   edit.title = item.title || ''
   edit.overview = item.overview || ''
   edit.poster_url = item.poster_url || item.poster_path || ''
@@ -152,7 +188,12 @@ async function doSave() {
     ElMessage.warning('请先填写视频ID')
     return
   }
-  if (!edit.tmdb_id) {
+  if (form.type === 'av') {
+    if (!edit.external_id) {
+      ElMessage.warning('请先查询并选择一个 AV 候选结果')
+      return
+    }
+  } else if (!edit.tmdb_id) {
     ElMessage.warning('请先查询并选择一个候选结果')
     return
   }
@@ -187,12 +228,17 @@ async function doSave() {
             <el-input v-model="form.title" :disabled="previewLoading || saveLoading" />
           </el-form-item>
           <el-form-item label="年份">
-            <el-input-number v-model="form.year" :min="1900" :disabled="previewLoading || saveLoading" />
+            <el-input-number
+              v-model="form.year"
+              :min="1900"
+              :disabled="previewLoading || saveLoading || form.type === 'av'"
+            />
           </el-form-item>
           <el-form-item label="类型">
             <el-select v-model="form.type" style="width:120px" :disabled="previewLoading || saveLoading">
               <el-option label="电影" value="movie" />
               <el-option label="剧集" value="tv" />
+              <el-option label="AV" value="av" />
             </el-select>
           </el-form-item>
           <el-form-item>
@@ -209,7 +255,7 @@ async function doSave() {
             <div v-else class="candidate-list">
               <div
                 v-for="(item, index) in candidates"
-                :key="item.tmdb_id"
+                :key="candidateKey(item, index)"
                 class="candidate-item"
                 :class="{ active: index === selectedIndex }"
                 @click="choose(item, index)"
@@ -217,7 +263,7 @@ async function doSave() {
                 <div class="candidate-title">{{ toText(item.title) }}</div>
                 <div class="candidate-subtitle">{{ toText(item.original_title) }}</div>
                 <div class="candidate-meta">
-                  <span>类型：{{ mediaTypeLabel(item.media_type_hint || form.type) }}</span>
+                  <span>类型：{{ mediaTypeLabel(candidateMediaType(item)) }}</span>
                   <span>评分：{{ toText(item.vote_average) }}</span>
                 </div>
                 <div class="candidate-meta">日期：{{ toText(item.release_date) }}</div>
@@ -242,8 +288,8 @@ async function doSave() {
                   <h3>{{ toText(selectedCandidate.title) }}</h3>
                   <p class="origin-name">原名：{{ toText(selectedCandidate.original_title) }}</p>
                   <div class="tag-line">
-                    <el-tag size="small" type="danger">{{ mediaTypeLabel(selectedCandidate.media_type_hint || form.type) }}</el-tag>
-                    <el-tag size="small">TMDB: {{ toText(selectedCandidate.tmdb_id) }}</el-tag>
+                    <el-tag size="small" type="danger">{{ mediaTypeLabel(candidateMediaType(selectedCandidate)) }}</el-tag>
+                    <el-tag size="small">{{ candidateIDLabel(selectedCandidate) }}: {{ candidateIDValue(selectedCandidate) }}</el-tag>
                     <el-tag size="small" type="warning">评分: {{ toText(selectedCandidate.vote_average) }}</el-tag>
                   </div>
                 </div>
@@ -252,8 +298,14 @@ async function doSave() {
               <p class="detail-overview">{{ toText(selectedCandidate.overview) }}</p>
 
               <el-descriptions border :column="2" size="small" class="detail-table">
+                <el-descriptions-item v-if="candidateMediaType(selectedCandidate) === 'av'" label="番号">
+                  {{ toText(selectedCandidate.av_code) }}
+                </el-descriptions-item>
                 <el-descriptions-item label="上映/首播日期">{{ toText(selectedCandidate.release_date || selectedMetadata.first_air_date) }}</el-descriptions-item>
                 <el-descriptions-item label="题材">{{ displayGenres(selectedCandidate) }}</el-descriptions-item>
+                <el-descriptions-item v-if="candidateMediaType(selectedCandidate) === 'av'" label="演员">
+                  {{ joinArray(selectedCandidate.actors || selectedMetadata.actors) }}
+                </el-descriptions-item>
                 <el-descriptions-item label="状态">{{ toText(selectedMetadata.status) }}</el-descriptions-item>
                 <el-descriptions-item label="节目类型">{{ toText(selectedMetadata.type) }}</el-descriptions-item>
                 <el-descriptions-item label="季数">{{ toNumberText(selectedMetadata.number_of_seasons) }}</el-descriptions-item>
@@ -285,7 +337,12 @@ async function doSave() {
       <el-card class="soft-card">
         <template #header>编辑并确认</template>
         <el-form label-width="90px">
-          <el-form-item label="TMDB ID"><el-input v-model="edit.tmdb_id" :disabled="saveLoading" /></el-form-item>
+          <el-form-item v-if="form.type !== 'av'" label="TMDB ID">
+            <el-input v-model="edit.tmdb_id" :disabled="saveLoading" />
+          </el-form-item>
+          <el-form-item v-else label="AVID">
+            <el-input v-model="edit.external_id" :disabled="saveLoading" />
+          </el-form-item>
           <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
           <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" rows="3" :disabled="saveLoading" /></el-form-item>
           <el-form-item label="海报URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>

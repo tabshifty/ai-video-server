@@ -806,3 +806,110 @@
   - `npm --prefix admin-web run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-17 00:39] 新增短视频合集功能（上传可选多选、后续可修改、删除仅解关联）
+- Type: `implementation`
+- Summary:
+  - 新增数据库迁移 `0008_collections_support`，引入 `collections` 与 `video_collections`，支持视频与合集多对多关联。
+  - 新增合集仓储能力：合集列表/创建/更新/删除、名称规范化唯一约束、视频合集关联替换与按视频批量查询。
+  - 约束合集仅适用于 `short`：上传（普通/分片）与管理端视频编辑均支持 `collection_ids`，并在非短视频场景返回明确错误。
+  - 管理端新增合集管理页面与路由（增删改查）；删除合集时仅删除合集并自动解除关联，不删除视频，并返回解除关联数量。
+  - 管理端上传页新增“所属合集（可选、多选，仅短视频）”；视频详情页支持后续修改合集并保存。
+  - 应用侧视频返回补充合集信息：详情、推荐与列表搜索结果可携带 `collections` 字段。
+  - 补充合集相关单元测试：名称规范化、ID 去重、上传参数解析与类型约束校验。
+- Changed Files:
+  - `migrations/0008_collections_support.up.sql`
+  - `migrations/0008_collections_support.down.sql`
+  - `internal/models/models.go`
+  - `internal/models/app.go`
+  - `internal/models/admin.go`
+  - `internal/repository/collection_repository.go`
+  - `internal/repository/collection_repository_test.go`
+  - `internal/repository/video_repository.go`
+  - `internal/repository/app_repository.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/services/upload.go`
+  - `internal/services/chunk_upload.go`
+  - `internal/services/chunk_upload_test.go`
+  - `internal/handlers/upload.go`
+  - `internal/handlers/upload_chunk.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/upload_collection_test.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/router/index.js`
+  - `admin-web/src/components/Layout.vue`
+  - `admin-web/src/views/CollectionManage.vue`
+  - `admin-web/src/views/VideoUpload.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` failed（当前沙箱环境禁止 `httptest` 监听端口，`internal/handlers` 与 `internal/services` 的部分用例受限）。
+  - `GOCACHE=$(pwd)/.gocache go test ./... -run '^$'` passed（全量编译校验通过）。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository ./internal/handlers ./internal/services -run 'TestNormalizeCollectionName|TestDedupeCollectionIDs|TestParseUploadCollectionIDs|TestCollectionTypeValidation|TestChunkUploadCompleteFileSurvivesAbort' -count=1` passed。
+  - `npm --prefix admin-web run build` passed。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-17 00:49] 修正上传页合集远程搜索的选项保留
+- Type: `implementation`
+- Summary:
+  - 优化管理端上传页 `searchCollections`：改为合并选项而非覆盖，避免远程搜索后已选合集标签丢失显示。
+- Changed Files:
+  - `admin-web/src/views/VideoUpload.vue`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` passed。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-17 11:54] 新增 AV 视频分类与自动 AV 刮削（含演员自动关联）
+- Type: `implementation`
+- Summary:
+  - 新增视频类型 `av`（管理员可上传），上传后与电影/剧集一样进入 `scraping` 流程，由 worker 自动执行 AV 刮削。
+  - 扩展队列任务：新增 `video:scrape:av`，并在上传与分片上传完成后按类型路由到 AV 刮削任务。
+  - 新增 AV 刮削能力（JavDB）：支持“番号优先、标题兜底”检索，抓取标题/简介/封面/发行日期/演员，写入视频元数据并自动关联演员（`scrape_av`）。
+  - 扩展管理端刮削接口：`/admin/scrape/preview` 支持 `type=av`，`/admin/scrape/confirm` 对 AV 支持 `external_id` 确认；电影/剧集仍使用 `tmdb_id`。
+  - 新增数据库迁移 `0009_av_type_support`，将 `videos.type` 约束扩展为 `short/movie/episode/av`。
+  - 管理端界面新增 AV：上传类型、视频列表筛选、刮削页类型选择与 AV 候选保存；仪表盘新增 AV 数量统计卡片。
+  - 后端统计扩展：`AdminStats` 新增 `av_videos`，`CountVideosByType` 统计新增 `av`。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `internal/queue/tasks.go`
+  - `internal/queue/scrape_tasks.go`
+  - `internal/handlers/upload.go`
+  - `internal/handlers/upload_chunk.go`
+  - `internal/services/upload.go`
+  - `internal/handlers/admin_scrape.go`
+  - `internal/handlers/admin.go`
+  - `internal/models/admin.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/handlers/swagger_models.go`
+  - `internal/handlers/upload_collection_test.go`
+  - `migrations/0009_av_type_support.up.sql`
+  - `migrations/0009_av_type_support.down.sql`
+  - `admin-web/src/views/VideoUpload.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `admin-web/src/views/Dashboard.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run 'TestScrapeAVUploadCodeFirstAndActorSync|TestPreviewAVFallbackByTitle|TestScrape(Movie|Episode)UploadUsesChineseLanguageAndFallback' -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/handlers -run 'TestCollectionTypeValidation|TestParseUploadCollectionIDs|TestParseUploadTags_JSON' -count=1` passed。
+  - `GOCACHE=$(pwd)/.gocache go test ./... -run '^$'` passed。
+  - `npm --prefix admin-web run build` passed。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-17 11:58] AV 功能补充全量验证
+- Type: `implementation`
+- Summary:
+  - 在完成 AV 分类与自动刮削改造后，补充执行后端全量单测回归，确认不影响既有模块。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed。
+  - `npm --prefix admin-web run build` passed。
+- Rollback:
+  - `git revert <commit>`

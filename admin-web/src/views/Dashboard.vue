@@ -102,6 +102,10 @@ onBeforeUnmount(() => {
           <div class="pill-label">电视剧集</div>
         </el-card>
         <el-card class="soft-card">
+          <div class="pill-value">{{ stats.av_videos || 0 }}</div>
+          <div class="pill-label">AV</div>
+        </el-card>
+        <el-card class="soft-card">
           <div class="pill-value">{{ stats.total_users || 0 }}</div>
           <div class="pill-label">总用户数</div>
         </el-card>

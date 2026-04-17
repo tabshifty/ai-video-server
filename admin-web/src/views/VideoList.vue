@@ -5,6 +5,7 @@ import Layout from '../components/Layout.vue'
 import {
   deleteAdminVideo,
   getAdminActors,
+  getAdminCollections,
   getAdminVideoDetail,
   getAdminVideoPlayURL,
   getAdminVideos,
@@ -21,6 +22,8 @@ const playExpiresAt = ref(0)
 const loadingPlayURL = ref(false)
 const actorOptions = ref([])
 const loadingActors = ref(false)
+const collectionOptions = ref([])
+const loadingCollections = ref(false)
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
@@ -34,6 +37,16 @@ function statusLabel(status) {
     failed: '失败'
   }
   return map[status] || status || '-'
+}
+
+function typeLabel(type) {
+  const map = {
+    short: '短视频',
+    movie: '电影',
+    episode: '剧集分集',
+    av: 'AV'
+  }
+  return map[type] || type || '-'
 }
 
 function splitActorSelection(values) {
@@ -68,6 +81,29 @@ function mergeActorOptions(actors = []) {
   actorOptions.value = Array.from(optionMap.values())
 }
 
+function mergeCollectionOptions(collections = []) {
+  const optionMap = new Map(collectionOptions.value.map((item) => [item.value, item]))
+  for (const collection of collections) {
+    if (!collection?.id) continue
+    optionMap.set(collection.id, { value: collection.id, label: collection.name || collection.id })
+  }
+  collectionOptions.value = Array.from(optionMap.values())
+}
+
+function normalizeCollectionSelection(values) {
+  const out = []
+  const seen = new Set()
+  for (const item of values || []) {
+    const value = String(item || '').trim()
+    if (!value || !uuidPattern.test(value)) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+  }
+  return out
+}
+
 async function load() {
   const data = await getAdminVideos(query)
   list.value = data.items || []
@@ -97,14 +133,39 @@ async function searchActors(keyword = '') {
   }
 }
 
+async function searchCollections(keyword = '') {
+  loadingCollections.value = true
+  try {
+    const data = await getAdminCollections({
+      q: keyword,
+      active: 1,
+      page: 1,
+      page_size: 50
+    })
+    const options = (data.items || []).map((item) => ({
+      value: item.id,
+      label: item.name
+    }))
+    const optionMap = new Map(collectionOptions.value.map((item) => [item.value, item]))
+    for (const item of options) {
+      optionMap.set(item.value, item)
+    }
+    collectionOptions.value = Array.from(optionMap.values())
+  } finally {
+    loadingCollections.value = false
+  }
+}
+
 async function showDetail(row) {
   detail.value = await getAdminVideoDetail(row.id)
   detail.value.actor_tokens = (detail.value.actors || []).map((actor) => actor.id)
+  detail.value.collection_ids = (detail.value.collections || []).map((collection) => collection.id)
   mergeActorOptions(detail.value.actors || [])
+  mergeCollectionOptions(detail.value.collections || [])
   detailVisible.value = true
   playURL.value = ''
   playExpiresAt.value = 0
-  await searchActors('')
+  await Promise.all([searchActors(''), searchCollections('')])
   if (detail.value?.status === 'ready') {
     await refreshPlayURL()
   }
@@ -155,6 +216,9 @@ async function saveDetail() {
     status: detail.value.status,
     metadata: detail.value.metadata || {}
   }
+  if (detail.value.type === 'short') {
+    payload.collection_ids = normalizeCollectionSelection(detail.value.collection_ids)
+  }
   await updateAdminVideo(detail.value.id, payload)
   ElMessage.success('保存成功')
   detailVisible.value = false
@@ -182,6 +246,7 @@ onMounted(load)
               <el-option label="短视频" value="short" />
               <el-option label="电影" value="movie" />
               <el-option label="剧集分集" value="episode" />
+              <el-option label="AV" value="av" />
             </el-select>
           </el-form-item>
           <el-form-item>
@@ -199,7 +264,11 @@ onMounted(load)
         <div class="table-wrap">
           <el-table :data="list" border>
             <el-table-column prop="title" label="标题" min-width="220" />
-            <el-table-column prop="type" label="类型" width="110" />
+            <el-table-column prop="type" label="类型" width="110">
+              <template #default="{ row }">
+                {{ typeLabel(row.type) }}
+              </template>
+            </el-table-column>
             <el-table-column prop="status" label="状态" width="120">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'ready' ? 'success' : row.status === 'failed' ? 'danger' : 'info'">
@@ -264,6 +333,29 @@ onMounted(load)
             style="width: 100%"
           >
             <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="detail.type === 'short'" label="所属合集">
+          <el-select
+            v-model="detail.collection_ids"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            collapse-tags
+            collapse-tags-tooltip
+            :remote-method="searchCollections"
+            :loading="loadingCollections"
+            placeholder="可选，可多选"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="collection in collectionOptions"
+              :key="collection.value"
+              :label="collection.label"
+              :value="collection.value"
+            />
           </el-select>
         </el-form-item>
 
