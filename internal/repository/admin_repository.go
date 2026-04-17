@@ -259,6 +259,18 @@ func (r *VideoRepository) AdminUpdateVideoStatus(ctx context.Context, videoID uu
 	return nil
 }
 
+func (r *VideoRepository) AdminUpdateVideoThumbnail(ctx context.Context, videoID uuid.UUID, thumbnailPath string) error {
+	_, err := r.pool.Exec(ctx, `
+UPDATE videos
+SET thumbnail_path=$2, updated_at=NOW()
+WHERE id=$1
+`, videoID, strings.TrimSpace(thumbnailPath))
+	if err != nil {
+		return fmt.Errorf("admin update video thumbnail: %w", err)
+	}
+	return nil
+}
+
 func (r *VideoRepository) AdminListUsers(ctx context.Context, page, pageSize int) ([]models.AdminUserListItem, int, error) {
 	var total int
 	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&total); err != nil {

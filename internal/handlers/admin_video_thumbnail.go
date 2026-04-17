@@ -1,0 +1,130 @@
+package handlers
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
+	"video-server/internal/repository"
+	"video-server/internal/response"
+	"video-server/pkg/ffmpeg"
+)
+
+func (a *API) AdminCaptureVideoThumbnail(c *gin.Context) {
+	videoID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid video id")
+		return
+	}
+
+	var req struct {
+		TimeSeconds float64 `json:"time_seconds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	if req.TimeSeconds < 0 || math.IsNaN(req.TimeSeconds) || math.IsInf(req.TimeSeconds, 0) {
+		bad(c, "time_seconds must be a non-negative number")
+		return
+	}
+
+	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			response.Error(c, 404, "video not found")
+			return
+		}
+		response.Error(c, 1060, err.Error())
+		return
+	}
+	if strings.ToLower(strings.TrimSpace(video.Status)) != "ready" {
+		response.Error(c, 1061, "video not ready")
+		return
+	}
+
+	sourcePath := strings.TrimSpace(video.TranscodedPath)
+	if sourcePath == "" {
+		sourcePath = strings.TrimSpace(video.OriginalPath)
+	}
+	if sourcePath == "" {
+		response.Error(c, 1062, "video source not found")
+		return
+	}
+	if _, err := os.Stat(sourcePath); err != nil {
+		response.Error(c, 1063, fmt.Sprintf("video source missing: %v", err))
+		return
+	}
+
+	captureAt := req.TimeSeconds
+	if video.DurationSeconds > 0 {
+		maxSeconds := float64(video.DurationSeconds)
+		if captureAt >= maxSeconds {
+			if maxSeconds > 0.2 {
+				captureAt = maxSeconds - 0.2
+			} else {
+				captureAt = 0
+			}
+		}
+	}
+	if captureAt < 0 {
+		captureAt = 0
+	}
+
+	targetPath := resolveVideoThumbnailPath(a.storageRoot, videoID, video.ThumbnailPath)
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		response.Error(c, 1064, err.Error())
+		return
+	}
+
+	tempPath := targetPath + ".tmp-" + uuid.New().String()
+	defer func() {
+		_ = os.Remove(tempPath)
+	}()
+	if err := ffmpeg.ThumbnailAt(c.Request.Context(), sourcePath, tempPath, captureAt); err != nil {
+		response.Error(c, 1065, err.Error())
+		return
+	}
+	if err := replaceFileAtomic(tempPath, targetPath); err != nil {
+		response.Error(c, 1066, err.Error())
+		return
+	}
+	if err := a.repo.AdminUpdateVideoThumbnail(c.Request.Context(), videoID, targetPath); err != nil {
+		response.Error(c, 1067, err.Error())
+		return
+	}
+
+	ok(c, gin.H{
+		"video_id":            videoID,
+		"thumbnail_path":      targetPath,
+		"captured_at_seconds": captureAt,
+	})
+}
+
+func resolveVideoThumbnailPath(storageRoot string, videoID uuid.UUID, currentPath string) string {
+	path := strings.TrimSpace(currentPath)
+	lower := strings.ToLower(path)
+	if path != "" && !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return path
+	}
+	return filepath.Join(storageRoot, "videos", videoID.String(), "thumb.jpg")
+}
+
+func replaceFileAtomic(tempPath, targetPath string) error {
+	if err := os.Rename(tempPath, targetPath); err == nil {
+		return nil
+	}
+	if err := os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove old thumbnail: %w", err)
+	}
+	if err := os.Rename(tempPath, targetPath); err != nil {
+		return fmt.Errorf("replace thumbnail file: %w", err)
+	}
+	return nil
+}

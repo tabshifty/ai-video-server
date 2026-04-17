@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '../components/Layout.vue'
 import {
+  captureAdminVideoThumbnail,
   deleteAdminVideo,
   getAdminActors,
   getAdminCollections,
@@ -17,9 +18,11 @@ const list = ref([])
 const total = ref(0)
 const detail = ref(null)
 const detailVisible = ref(false)
+const previewPlayerRef = ref(null)
 const playURL = ref('')
 const playExpiresAt = ref(0)
 const loadingPlayURL = ref(false)
+const capturingThumbnail = ref(false)
 const actorOptions = ref([])
 const loadingActors = ref(false)
 const collectionOptions = ref([])
@@ -187,6 +190,43 @@ async function refreshPlayURL() {
     playExpiresAt.value = Number(data.expires_at || 0)
   } finally {
     loadingPlayURL.value = false
+  }
+}
+
+async function captureCurrentFrameThumbnail() {
+  if (!detail.value?.id) {
+    return
+  }
+  if (detail.value.status !== 'ready') {
+    ElMessage.warning('当前视频未就绪，无法截帧')
+    return
+  }
+  if (!playURL.value) {
+    ElMessage.warning('请先刷新播放链接并加载视频')
+    return
+  }
+  const player = previewPlayerRef.value
+  if (!player) {
+    ElMessage.warning('播放器未就绪，请稍后重试')
+    return
+  }
+  const currentTime = Number(player.currentTime || 0)
+  if (!Number.isFinite(currentTime) || currentTime < 0) {
+    ElMessage.warning('无法读取当前播放时间')
+    return
+  }
+
+  capturingThumbnail.value = true
+  try {
+    const data = await captureAdminVideoThumbnail(detail.value.id, { time_seconds: currentTime })
+    detail.value.thumbnail_path = data.thumbnail_path || detail.value.thumbnail_path
+    const usedSeconds = Number(data?.captured_at_seconds)
+    const displaySeconds = Number.isFinite(usedSeconds) ? usedSeconds : currentTime
+    ElMessage.success(`已截取 ${displaySeconds.toFixed(2)} 秒画面并更新封面`)
+  } catch (error) {
+    ElMessage.error(error?.message || '截帧更新封面失败')
+  } finally {
+    capturingThumbnail.value = false
   }
 }
 
@@ -372,6 +412,16 @@ onMounted(load)
               >
                 刷新播放链接
               </el-button>
+              <el-button
+                type="success"
+                plain
+                size="small"
+                :loading="capturingThumbnail"
+                :disabled="detail.status !== 'ready' || !playURL"
+                @click="captureCurrentFrameThumbnail"
+              >
+                设为封面（当前帧）
+              </el-button>
               <span v-if="playExpiresAt > 0" class="play-expire">有效期至：{{ new Date(playExpiresAt * 1000).toLocaleString() }}</span>
             </div>
 
@@ -390,6 +440,7 @@ onMounted(load)
             />
 
             <video
+              ref="previewPlayerRef"
               v-else
               class="preview-player"
               :src="playURL"

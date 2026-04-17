@@ -51,6 +51,26 @@ func Thumbnail(ctx context.Context, inputPath, outputPath string) error {
 	return nil
 }
 
+// ThumbnailAt captures a frame at target time (seconds) as thumbnail image.
+func ThumbnailAt(ctx context.Context, inputPath, outputPath string, atSeconds float64) error {
+	if atSeconds < 0 {
+		atSeconds = 0
+	}
+	timeArg := strconv.FormatFloat(atSeconds, 'f', 3, 64)
+	cmd := exec.CommandContext(ctx, "ffmpeg",
+		"-y",
+		"-ss", timeArg,
+		"-i", inputPath,
+		"-frames:v", "1",
+		"-q:v", "2",
+		outputPath,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("ffmpeg thumbnail at failed: %w, output=%s", err, string(out))
+	}
+	return nil
+}
+
 // Probe reads media metadata via ffprobe JSON output.
 func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 	cmd := exec.CommandContext(ctx, "ffprobe",

@@ -1042,3 +1042,23 @@
   - `npm --prefix admin-web run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-17 17:11] 视频预览扩展：按当前播放时间截帧并替换封面
+- Type: `implementation`
+- Summary:
+  - 新增管理员接口 `POST /api/v1/admin/videos/:id/thumbnail/capture`，支持传入 `time_seconds`，由 ffmpeg 按时间截取视频帧并更新为封面。
+  - 截帧逻辑优先使用转码文件路径（空时回退原始文件），并支持封面文件原子替换，避免写入半成品。
+  - 管理端视频详情页在“播放预览”区域新增“设为封面（当前帧）”按钮，读取播放器当前时间并调用新接口，成功后刷新当前详情封面路径。
+- Changed Files:
+  - `internal/handlers/admin_video_thumbnail.go`
+  - `internal/handlers/router.go`
+  - `internal/repository/admin_repository.go`
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/views/VideoList.vue`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`

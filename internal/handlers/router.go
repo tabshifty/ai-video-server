@@ -118,6 +118,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/videos", a.AdminVideos)
 			admin.GET("/videos/:id", a.AdminVideoDetail)
 			admin.GET("/videos/:id/play-url", a.AdminVideoPlayURL)
+			admin.POST("/videos/:id/thumbnail/capture", a.AdminCaptureVideoThumbnail)
 			admin.PUT("/videos/:id", a.AdminUpdateVideo)
 			admin.DELETE("/videos/:id", a.AdminDeleteVideo)
 			admin.POST("/videos/:id/retranscode", a.AdminRetranscodeVideo)
