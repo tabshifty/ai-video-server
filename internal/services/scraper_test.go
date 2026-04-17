@@ -10,7 +10,66 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+
+	"video-server/internal/models"
 )
+
+type fakeScrapeUpdate struct {
+	videoID       uuid.UUID
+	tmdbID        *int
+	title         string
+	description   string
+	thumbnailPath string
+	metadata      map[string]any
+	status        string
+}
+
+type fakeScraperRepo struct {
+	lastUpdate fakeScrapeUpdate
+}
+
+func (f *fakeScraperRepo) GetVideoByID(context.Context, uuid.UUID) (models.Video, error) {
+	return models.Video{}, nil
+}
+
+func (f *fakeScraperRepo) UpdateVideoScrapeResult(_ context.Context, videoID uuid.UUID, tmdbID *int, title, description, thumbnailPath string, metadata map[string]any, status string) error {
+	f.lastUpdate = fakeScrapeUpdate{
+		videoID:       videoID,
+		tmdbID:        tmdbID,
+		title:         title,
+		description:   description,
+		thumbnailPath: thumbnailPath,
+		metadata:      metadata,
+		status:        status,
+	}
+	return nil
+}
+
+func (f *fakeScraperRepo) UpsertSeries(context.Context, int, string, string, string, string, *time.Time, int, int) (int64, error) {
+	return 1, nil
+}
+
+func (f *fakeScraperRepo) UpsertSeason(context.Context, int64, int, string, string, string, *time.Time) (int64, error) {
+	return 1, nil
+}
+
+func (f *fakeScraperRepo) UpsertEpisode(context.Context, int64, int, string, string, string, int, *time.Time, uuid.UUID) error {
+	return nil
+}
+
+func (f *fakeScraperRepo) FindVideoByTypeTMDB(context.Context, string, int, uuid.UUID) (uuid.UUID, bool, error) {
+	return uuid.Nil, false, nil
+}
+
+func (f *fakeScraperRepo) ResolveActorIDs(context.Context, []uuid.UUID, []string, string) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (f *fakeScraperRepo) AddVideoActors(context.Context, uuid.UUID, []uuid.UUID, string) error {
+	return nil
+}
 
 func TestPreviewMovieUsesChineseLanguageAndEnglishFallback(t *testing.T) {
 	var searchLangs []string
@@ -382,5 +441,241 @@ func TestPreviewActorByNameTMDBNotesNotTruncated(t *testing.T) {
 	}
 	if strings.Contains(got[0].Notes, "\uFFFD") {
 		t.Fatalf("notes contains invalid replacement character: %q", got[0].Notes)
+	}
+}
+
+func TestScrapeMovieUploadUsesChineseLanguageAndFallback(t *testing.T) {
+	var searchLangs []string
+	var detailLangs []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/search/movie":
+			searchLangs = append(searchLangs, r.URL.Query().Get("language"))
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{
+					{"id": 301},
+				},
+			})
+		case "/movie/301":
+			lang := r.URL.Query().Get("language")
+			detailLangs = append(detailLangs, lang)
+			if lang == "zh-CN" {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id":           301,
+					"title":        "中文片名",
+					"overview":     "",
+					"release_date": "2021-01-01",
+					"genres": []map[string]any{
+						{"id": 18, "name": "剧情"},
+					},
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":           301,
+				"title":        "English Title",
+				"overview":     "English overview",
+				"release_date": "2021-01-01",
+				"genres": []map[string]any{
+					{"id": 18, "name": "Drama"},
+				},
+			})
+		case "/movie/301/credits":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"cast": []map[string]any{},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	repo := &fakeScraperRepo{}
+	svc := NewScraperService(repo, "demo-key", server.URL, t.TempDir(), "", 2*time.Second)
+
+	videoID := uuid.New()
+	got, err := svc.ScrapeMovieUpload(context.Background(), videoID, "/tmp/中文片名.2021.mkv", "中文片名.2021.mkv")
+	if err != nil {
+		t.Fatalf("ScrapeMovieUpload returned error: %v", err)
+	}
+
+	if !slices.Contains(searchLangs, "zh-CN") {
+		t.Fatalf("expected search/movie to request language=zh-CN, got=%v", searchLangs)
+	}
+	if !slices.Contains(detailLangs, "zh-CN") {
+		t.Fatalf("expected movie detail to request language=zh-CN, got=%v", detailLangs)
+	}
+	if !slices.Contains(detailLangs, "") {
+		t.Fatalf("expected fallback movie detail request without language, got=%v", detailLangs)
+	}
+
+	if got.Title != "中文片名" {
+		t.Fatalf("expected chinese title, got=%s", got.Title)
+	}
+	if got.Description != "English overview" {
+		t.Fatalf("expected english fallback overview, got=%s", got.Description)
+	}
+	if repo.lastUpdate.videoID != videoID {
+		t.Fatalf("unexpected update video id: %s", repo.lastUpdate.videoID)
+	}
+	if repo.lastUpdate.status != "uploaded" {
+		t.Fatalf("expected status uploaded, got=%s", repo.lastUpdate.status)
+	}
+	if repo.lastUpdate.tmdbID == nil || *repo.lastUpdate.tmdbID != 301 {
+		t.Fatalf("unexpected tmdb id in update: %v", repo.lastUpdate.tmdbID)
+	}
+	tmdbRaw, ok := repo.lastUpdate.metadata["tmdb"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected metadata.tmdb object, got=%T", repo.lastUpdate.metadata["tmdb"])
+	}
+	if asString(tmdbRaw["title"]) != "中文片名" {
+		t.Fatalf("expected metadata.tmdb.title chinese, got=%v", tmdbRaw["title"])
+	}
+	if asString(tmdbRaw["overview"]) != "English overview" {
+		t.Fatalf("expected metadata.tmdb.overview english fallback, got=%v", tmdbRaw["overview"])
+	}
+}
+
+func TestScrapeEpisodeUploadUsesChineseLanguageAndFallback(t *testing.T) {
+	var searchLangs []string
+	var tvDetailLangs []string
+	var seasonLangs []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/search/tv":
+			searchLangs = append(searchLangs, r.URL.Query().Get("language"))
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{
+					{"id": 88},
+				},
+			})
+		case "/tv/88":
+			lang := r.URL.Query().Get("language")
+			tvDetailLangs = append(tvDetailLangs, lang)
+			if lang == "zh-CN" {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id":                 88,
+					"name":               "",
+					"original_name":      "中文剧名",
+					"overview":           "中文剧简介",
+					"first_air_date":     "2020-01-01",
+					"number_of_seasons":  1,
+					"number_of_episodes": 10,
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":                 88,
+				"name":               "English Show",
+				"original_name":      "中文剧名",
+				"overview":           "English show overview",
+				"first_air_date":     "2020-01-01",
+				"number_of_seasons":  1,
+				"number_of_episodes": 10,
+			})
+		case "/tv/88/season/1":
+			lang := r.URL.Query().Get("language")
+			seasonLangs = append(seasonLangs, lang)
+			if lang == "zh-CN" {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"name":     "第一季",
+					"overview": "",
+					"air_date": "2020-02-01",
+					"episodes": []map[string]any{
+						{
+							"episode_number": 2,
+							"id":             5002,
+							"name":           "",
+							"overview":       "",
+							"runtime":        45,
+							"air_date":       "2020-02-02",
+						},
+					},
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"name":     "Season 1",
+				"overview": "Season overview EN",
+				"air_date": "2020-02-01",
+				"episodes": []map[string]any{
+					{
+						"episode_number": 2,
+						"id":             5002,
+						"name":           "Episode Two",
+						"overview":       "Episode overview EN",
+						"runtime":        45,
+						"air_date":       "2020-02-02",
+					},
+				},
+			})
+		case "/tv/88/season/1/episode/2/credits":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"cast": []map[string]any{},
+			})
+		case "/tv/88/credits":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"cast": []map[string]any{},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	repo := &fakeScraperRepo{}
+	svc := NewScraperService(repo, "demo-key", server.URL, t.TempDir(), "", 2*time.Second)
+
+	videoID := uuid.New()
+	got, err := svc.ScrapeEpisodeUpload(context.Background(), videoID, "/tmp/中文剧名.S01E02.mkv", "中文剧名.S01E02.mkv")
+	if err != nil {
+		t.Fatalf("ScrapeEpisodeUpload returned error: %v", err)
+	}
+
+	if !slices.Contains(searchLangs, "zh-CN") {
+		t.Fatalf("expected search/tv to request language=zh-CN, got=%v", searchLangs)
+	}
+	if !slices.Contains(tvDetailLangs, "zh-CN") {
+		t.Fatalf("expected tv detail to request language=zh-CN, got=%v", tvDetailLangs)
+	}
+	if !slices.Contains(tvDetailLangs, "") {
+		t.Fatalf("expected fallback tv detail request without language, got=%v", tvDetailLangs)
+	}
+	if !slices.Contains(seasonLangs, "zh-CN") {
+		t.Fatalf("expected season detail to request language=zh-CN, got=%v", seasonLangs)
+	}
+	if !slices.Contains(seasonLangs, "") {
+		t.Fatalf("expected fallback season detail request without language, got=%v", seasonLangs)
+	}
+
+	if got.Title != "Episode Two" {
+		t.Fatalf("expected episode title from fallback, got=%s", got.Title)
+	}
+	if got.Description != "Episode overview EN" {
+		t.Fatalf("expected episode overview from fallback, got=%s", got.Description)
+	}
+	if repo.lastUpdate.videoID != videoID {
+		t.Fatalf("unexpected update video id: %s", repo.lastUpdate.videoID)
+	}
+	if repo.lastUpdate.tmdbID == nil || *repo.lastUpdate.tmdbID != 5002 {
+		t.Fatalf("unexpected tmdb id in update: %v", repo.lastUpdate.tmdbID)
+	}
+	tvRaw, ok := repo.lastUpdate.metadata["tmdb_tv"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected metadata.tmdb_tv object, got=%T", repo.lastUpdate.metadata["tmdb_tv"])
+	}
+	if asString(tvRaw["name"]) != "English Show" {
+		t.Fatalf("expected metadata.tmdb_tv.name fallback, got=%v", tvRaw["name"])
+	}
+	epRaw, ok := repo.lastUpdate.metadata["tmdb_episode"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected metadata.tmdb_episode object, got=%T", repo.lastUpdate.metadata["tmdb_episode"])
+	}
+	if asString(epRaw["name"]) != "Episode Two" {
+		t.Fatalf("expected metadata.tmdb_episode.name fallback, got=%v", epRaw["name"])
 	}
 }

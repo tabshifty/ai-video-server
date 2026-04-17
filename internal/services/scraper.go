@@ -16,13 +16,24 @@ import (
 
 	"github.com/google/uuid"
 
-	"video-server/internal/repository"
+	"video-server/internal/models"
 	"video-server/internal/utils"
 )
 
+type scraperRepo interface {
+	GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error)
+	UpdateVideoScrapeResult(ctx context.Context, videoID uuid.UUID, tmdbID *int, title, description, thumbnailPath string, metadata map[string]any, status string) error
+	UpsertSeries(ctx context.Context, tmdbID int, title, overview, poster, backdrop string, firstAirDate *time.Time, seasons, episodes int) (int64, error)
+	UpsertSeason(ctx context.Context, seriesID int64, seasonNumber int, title, overview, poster string, airDate *time.Time) (int64, error)
+	UpsertEpisode(ctx context.Context, seasonID int64, episodeNumber int, title, overview, stillPath string, runtime int, airDate *time.Time, videoID uuid.UUID) error
+	FindVideoByTypeTMDB(ctx context.Context, typ string, tmdbID int, excludeVideoID uuid.UUID) (uuid.UUID, bool, error)
+	ResolveActorIDs(ctx context.Context, actorIDs []uuid.UUID, actorNames []string, source string) ([]uuid.UUID, error)
+	AddVideoActors(ctx context.Context, videoID uuid.UUID, actorIDs []uuid.UUID, source string) error
+}
+
 // ScraperService handles TMDB search and metadata syncing.
 type ScraperService struct {
-	repo         *repository.VideoRepository
+	repo         scraperRepo
 	apiKey       string
 	baseURL      string
 	avBaseURL    string
@@ -41,7 +52,7 @@ type previewCacheEntry struct {
 	Candidates []map[string]any
 }
 
-func NewScraperService(repo *repository.VideoRepository, apiKey, baseURL, storageRoot, posterRoot string, timeout time.Duration) *ScraperService {
+func NewScraperService(repo scraperRepo, apiKey, baseURL, storageRoot, posterRoot string, timeout time.Duration) *ScraperService {
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
@@ -524,13 +535,11 @@ func (s *ScraperService) ScrapeMovieUpload(ctx context.Context, videoID uuid.UUI
 	}
 
 	query := url.Values{}
-	query.Set("api_key", s.apiKey)
 	query.Set("query", title)
 	if year > 0 {
 		query.Set("year", fmt.Sprintf("%d", year))
 	}
-	searchAPI := fmt.Sprintf("%s/search/movie?%s", s.baseURL, query.Encode())
-	searchRaw, err := s.getJSON(ctx, searchAPI)
+	searchRaw, err := s.getTMDBJSON(ctx, "/search/movie", query, tmdbLangChinese)
 	if err != nil {
 		return ScrapeResult{}, err
 	}
@@ -549,8 +558,7 @@ func (s *ScraperService) ScrapeMovieUpload(ctx context.Context, videoID uuid.UUI
 		return ScrapeResult{}, fmt.Errorf("duplicate movie metadata, existing video_id=%s", existingID)
 	}
 
-	detailAPI := fmt.Sprintf("%s/movie/%d?%s", s.baseURL, movieID, url.Values{"api_key": []string{s.apiKey}}.Encode())
-	detailRaw, err := s.getJSON(ctx, detailAPI)
+	detailRaw, err := s.fetchLocalizedMediaDetail(ctx, fmt.Sprintf("/movie/%d", movieID), "movie")
 	if err != nil {
 		return ScrapeResult{}, err
 	}
@@ -593,10 +601,8 @@ func (s *ScraperService) ScrapeEpisodeUpload(ctx context.Context, videoID uuid.U
 	}
 
 	q := url.Values{}
-	q.Set("api_key", s.apiKey)
 	q.Set("query", title)
-	tvSearchAPI := fmt.Sprintf("%s/search/tv?%s", s.baseURL, q.Encode())
-	tvSearchRaw, err := s.getJSON(ctx, tvSearchAPI)
+	tvSearchRaw, err := s.getTMDBJSON(ctx, "/search/tv", q, tmdbLangChinese)
 	if err != nil {
 		return ScrapeResult{}, err
 	}
@@ -610,8 +616,7 @@ func (s *ScraperService) ScrapeEpisodeUpload(ctx context.Context, videoID uuid.U
 		return ScrapeResult{}, fmt.Errorf("invalid tv id from tmdb search")
 	}
 
-	tvDetailAPI := fmt.Sprintf("%s/tv/%d?%s", s.baseURL, tvID, url.Values{"api_key": []string{s.apiKey}}.Encode())
-	tvRaw, err := s.getJSON(ctx, tvDetailAPI)
+	tvRaw, err := s.fetchLocalizedMediaDetail(ctx, fmt.Sprintf("/tv/%d", tvID), "tv")
 	if err != nil {
 		return ScrapeResult{}, err
 	}
@@ -630,8 +635,7 @@ func (s *ScraperService) ScrapeEpisodeUpload(ctx context.Context, videoID uuid.U
 		return ScrapeResult{}, err
 	}
 
-	seasonAPI := fmt.Sprintf("%s/tv/%d/season/%d?%s", s.baseURL, tvID, seasonNum, url.Values{"api_key": []string{s.apiKey}}.Encode())
-	seasonRaw, err := s.getJSON(ctx, seasonAPI)
+	seasonRaw, err := s.fetchLocalizedSeasonDetail(ctx, tvID, seasonNum)
 	if err != nil {
 		return ScrapeResult{}, err
 	}
@@ -803,6 +807,35 @@ func (s *ScraperService) getTMDBJSON(ctx context.Context, path string, q url.Val
 	return s.getJSON(ctx, endpoint)
 }
 
+func (s *ScraperService) fetchLocalizedMediaDetail(ctx context.Context, path, mediaType string) (map[string]any, error) {
+	detail, err := s.getTMDBJSON(ctx, path, nil, tmdbLangChinese)
+	if err != nil {
+		return nil, err
+	}
+	if needsLocalizedFallback(detail, mediaType) {
+		fallback, fallbackErr := s.getTMDBJSON(ctx, path, nil, "")
+		if fallbackErr == nil {
+			detail = mergeLocalizedDetail(detail, fallback, mediaType)
+		}
+	}
+	return detail, nil
+}
+
+func (s *ScraperService) fetchLocalizedSeasonDetail(ctx context.Context, tvID, seasonNum int) (map[string]any, error) {
+	path := fmt.Sprintf("/tv/%d/season/%d", tvID, seasonNum)
+	seasonRaw, err := s.getTMDBJSON(ctx, path, nil, tmdbLangChinese)
+	if err != nil {
+		return nil, err
+	}
+	if needsSeasonLocalizedFallback(seasonRaw) {
+		fallback, fallbackErr := s.getTMDBJSON(ctx, path, nil, "")
+		if fallbackErr == nil {
+			seasonRaw = mergeSeasonLocalizedDetail(seasonRaw, fallback)
+		}
+	}
+	return seasonRaw, nil
+}
+
 func cloneURLValues(in url.Values) url.Values {
 	out := url.Values{}
 	for k, vals := range in {
@@ -828,6 +861,23 @@ func needsLocalizedFallback(detail map[string]any, mediaType string) bool {
 	default:
 		return false
 	}
+}
+
+func needsSeasonLocalizedFallback(detail map[string]any) bool {
+	if isBlankAnyString(detail["name"]) || isBlankAnyString(detail["overview"]) || isBlankAnyString(detail["air_date"]) {
+		return true
+	}
+	episodes, _ := detail["episodes"].([]any)
+	for _, episode := range episodes {
+		row, ok := episode.(map[string]any)
+		if !ok {
+			continue
+		}
+		if isBlankAnyString(row["name"]) || isBlankAnyString(row["overview"]) || isBlankAnyString(row["air_date"]) {
+			return true
+		}
+	}
+	return false
 }
 
 func mergeLocalizedDetail(primary, fallback map[string]any, mediaType string) map[string]any {
@@ -857,6 +907,21 @@ func mergeLocalizedDetail(primary, fallback map[string]any, mediaType string) ma
 		fillBlankNestedSliceObjectFields(primary, fallback, "seasons", "name", "overview")
 	}
 
+	return primary
+}
+
+func mergeSeasonLocalizedDetail(primary, fallback map[string]any) map[string]any {
+	if len(primary) == 0 {
+		return fallback
+	}
+	if len(fallback) == 0 {
+		return primary
+	}
+	fillBlankStringField(primary, fallback, "name")
+	fillBlankStringField(primary, fallback, "overview")
+	fillBlankStringField(primary, fallback, "air_date")
+	fillBlankStringField(primary, fallback, "poster_path")
+	fillBlankEpisodes(primary, fallback)
 	return primary
 }
 
@@ -927,6 +992,56 @@ func fillBlankNestedSliceObjectFields(dst, src map[string]any, key string, field
 			if value := strings.TrimSpace(asString(srcObj[field])); value != "" {
 				dstObj[field] = value
 			}
+		}
+	}
+}
+
+func fillBlankEpisodes(dst, src map[string]any) {
+	srcRows, ok := src["episodes"].([]any)
+	if !ok || len(srcRows) == 0 {
+		return
+	}
+	dstRows, _ := dst["episodes"].([]any)
+	if len(dstRows) == 0 {
+		dst["episodes"] = srcRows
+		return
+	}
+
+	fallbackByEpisode := map[int]map[string]any{}
+	for _, raw := range srcRows {
+		row, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		episodeNum := asInt(row["episode_number"])
+		if episodeNum <= 0 {
+			continue
+		}
+		fallbackByEpisode[episodeNum] = row
+	}
+
+	for _, raw := range dstRows {
+		row, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		episodeNum := asInt(row["episode_number"])
+		if episodeNum <= 0 {
+			continue
+		}
+		fallback := fallbackByEpisode[episodeNum]
+		if fallback == nil {
+			continue
+		}
+		fillBlankStringField(row, fallback, "name")
+		fillBlankStringField(row, fallback, "overview")
+		fillBlankStringField(row, fallback, "air_date")
+		fillBlankStringField(row, fallback, "still_path")
+		if asInt(row["id"]) <= 0 && asInt(fallback["id"]) > 0 {
+			row["id"] = fallback["id"]
+		}
+		if asInt(row["runtime"]) <= 0 && asInt(fallback["runtime"]) > 0 {
+			row["runtime"] = fallback["runtime"]
 		}
 	}
 }
