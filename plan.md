@@ -1544,3 +1544,17 @@
   - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-18 23:30] 修复 AV 详情页顶部多余空白（去除外层 Scaffold 顶部 inset 叠加）
+- Type: `implementation`
+- Summary:
+  - 定位到详情页顶部空白由嵌套 `Scaffold` 的系统窗口 inset 叠加导致：外层导航容器已添加顶部 inset，详情页内层继续处理后出现额外留白。
+  - 在 `VideoHomeApp` 的认证后主 `Scaffold` 上将 `contentWindowInsets` 显式设置为 `WindowInsets(0, 0, 0, 0)`，由各页面自行控制系统栏适配。
+  - 修复后 AV 详情页顶部不再额外空出一块，同时不影响现有详情页全屏/退出全屏逻辑。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
