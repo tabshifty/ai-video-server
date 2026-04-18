@@ -200,7 +200,7 @@ private fun VideoCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "时长：${item.duration} 秒",
+                    text = "时长：${if (item.type == "av") formatDurationHms(item.duration) else "${item.duration} 秒"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -232,4 +232,12 @@ private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {
         return null
     }
     return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
+}
+
+private fun formatDurationHms(totalSeconds: Int): String {
+    val safeSeconds = totalSeconds.coerceAtLeast(0)
+    val hours = safeSeconds / 3600
+    val minutes = (safeSeconds % 3600) / 60
+    val seconds = safeSeconds % 60
+    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
 }

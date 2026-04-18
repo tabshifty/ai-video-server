@@ -1,5 +1,6 @@
 package com.chee.videos.feature.detail
 
+import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,11 +9,16 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -20,18 +26,35 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.MediaItem
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
+import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.util.UrlBuilder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -81,6 +104,72 @@ fun DetailScreen(
 
             uiState.detail != null -> {
                 val detail = uiState.detail
+                val context = LocalContext.current
+                val lifecycleOwner = LocalLifecycleOwner.current
+                val playUrl = resolvePlayUrl(uiState.baseUrl, detail!!)
+                val posterUrl = resolvePosterUrl(uiState.baseUrl, detail)
+
+                val dataSourceFactory = remember(uiState.accessToken) {
+                    DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
+                        if (uiState.accessToken.isNotBlank()) {
+                            setDefaultRequestProperties(mapOf("Authorization" to "Bearer ${uiState.accessToken}"))
+                        }
+                    }
+                }
+                val exoPlayer = remember(uiState.accessToken) {
+                    ExoPlayer.Builder(context).build()
+                }
+                var userRequestedPlay by remember(detail.id) { mutableStateOf(false) }
+                var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+
+                LaunchedEffect(userRequestedPlay, playUrl, dataSourceFactory) {
+                    if (!userRequestedPlay) {
+                        exoPlayer.pause()
+                        return@LaunchedEffect
+                    }
+                    if (playUrl.isNullOrBlank()) {
+                        return@LaunchedEffect
+                    }
+
+                    if (preparedUrl != playUrl) {
+                        exoPlayer.stop()
+                        exoPlayer.clearMediaItems()
+                        val mediaItem = MediaItem.fromUri(playUrl)
+                        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+                        exoPlayer.setMediaSource(mediaSource, true)
+                        exoPlayer.prepare()
+                        preparedUrl = playUrl
+                    }
+
+                    exoPlayer.playWhenReady = true
+                    exoPlayer.play()
+                }
+
+                DisposableEffect(lifecycleOwner, exoPlayer, userRequestedPlay) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_PAUSE -> exoPlayer.pause()
+                            Lifecycle.Event.ON_RESUME -> {
+                                if (userRequestedPlay) {
+                                    exoPlayer.play()
+                                }
+                            }
+
+                            else -> Unit
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
+
+                DisposableEffect(exoPlayer) {
+                    onDispose {
+                        exoPlayer.release()
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -90,16 +179,58 @@ fun DetailScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(detail!!.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF1A1C20)),
+                    ) {
+                        if (!posterUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = posterUrl,
+                                contentDescription = "海报",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+
+                    Text(detail.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(
                         text = detail.description.orEmpty().ifBlank { "暂无简介" },
                         style = MaterialTheme.typography.bodyMedium,
                     )
 
-                    Text("播放入口（占位）：${detail.playUrl.orEmpty().ifBlank { "将使用 /videos/:id/source" }}")
+                    Button(
+                        onClick = { userRequestedPlay = !userRequestedPlay },
+                        enabled = !playUrl.isNullOrBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (userRequestedPlay) "暂停播放" else "播放")
+                    }
+
+                    if (userRequestedPlay && !playUrl.isNullOrBlank()) {
+                        AndroidView(
+                            factory = {
+                                PlayerView(it).apply {
+                                    useController = true
+                                    setShutterBackgroundColor(AndroidColor.BLACK)
+                                    player = exoPlayer
+                                }
+                            },
+                            update = { view ->
+                                view.player = exoPlayer
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .clip(RoundedCornerShape(14.dp)),
+                        )
+                    }
 
                     Text("播放数据")
-                    Text("时长：${detail.duration} 秒")
+                    Text("时长：${formatDurationHms(detail.duration)}")
                     Text("播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}")
 
                     if (detail.tags.orEmpty().isNotEmpty()) {
@@ -133,4 +264,56 @@ fun DetailScreen(
             }
         }
     }
+}
+
+private fun resolvePlayUrl(baseUrl: String, detail: VideoDetailDto): String? {
+    val raw = detail.playUrl?.trim().orEmpty()
+    if (raw.isNotBlank()) {
+        return resolveResourceUrl(baseUrl, raw)
+    }
+    val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
+    if (normalizedBase.isBlank()) {
+        return null
+    }
+    return UrlBuilder.source(normalizedBase, detail.id)
+}
+
+private fun resolvePosterUrl(baseUrl: String, detail: VideoDetailDto): String? {
+    val posterUrl = anyString(detail.metadata?.get("poster_url"))
+    val posterPath = anyString(detail.metadata?.get("poster_path"))
+    val candidates = listOf(posterUrl, posterPath, detail.thumbnailPath)
+    for (candidate in candidates) {
+        val resolved = resolveResourceUrl(baseUrl, candidate)
+        if (!resolved.isNullOrBlank()) {
+            return resolved
+        }
+    }
+    return null
+}
+
+private fun resolveResourceUrl(baseUrl: String, raw: String?): String? {
+    val path = raw?.trim().orEmpty()
+    if (path.isBlank()) {
+        return null
+    }
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path
+    }
+    val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
+    if (normalizedBase.isBlank()) {
+        return null
+    }
+    return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
+}
+
+private fun anyString(value: Any?): String? {
+    return (value as? String)?.trim()?.takeIf { it.isNotBlank() }
+}
+
+private fun formatDurationHms(totalSeconds: Int): String {
+    val safeSeconds = totalSeconds.coerceAtLeast(0)
+    val hours = safeSeconds / 3600
+    val minutes = (safeSeconds % 3600) / 60
+    val seconds = safeSeconds % 60
+    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
 }

@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 data class DetailUiState(
     val loading: Boolean = true,
     val detail: VideoDetailDto? = null,
+    val baseUrl: String = "",
+    val accessToken: String = "",
     val errorMessage: String? = null,
 )
 
@@ -40,7 +42,17 @@ class DetailViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            _uiState.update { it.copy(loading = true, errorMessage = null) }
+            val baseUrl = videoRepository.readActiveBaseUrl().orEmpty()
+            val accessToken = videoRepository.readAccessToken().orEmpty()
+
+            _uiState.update {
+                it.copy(
+                    loading = true,
+                    baseUrl = baseUrl,
+                    accessToken = accessToken,
+                    errorMessage = null,
+                )
+            }
             videoRepository.fetchDetail(videoId)
                 .onSuccess { detail ->
                     _uiState.update {

@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-18 22:01] Android AV 播放体验增强：时长格式化 + 详情内嵌播放 + 海报回退
+- Type: `implementation`
+- Summary:
+  - AV 列表时长改为 `HH:MM:SS` 显示，不再以“秒”直出。
+  - 详情页新增可点击“播放/暂停”按钮，并接入 Media3 内嵌播放器在详情页直接播放当前视频。
+  - 详情页新增海报区域：优先 `metadata.poster_url`，其次 `metadata.poster_path`，最后回退 `thumbnail_path`（视频封面）。
+  - 详情页播放地址与海报路径支持相对 URL 自动拼接 `baseUrl`，并复用登录 token 作为 `Authorization` 请求头。
+  - 详情页状态新增 `baseUrl/accessToken`，用于播放与海报 URL 解析。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailViewModel.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 21:33] 修复“我的”封面不显示：缩略图路径由本地绝对路径改为可访问 API URL
 - Type: `implementation`
 - Summary:
