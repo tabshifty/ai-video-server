@@ -15,6 +15,19 @@
 
 ---
 
+### [2026-04-18 09:03] 修复大视频分片上传在合并阶段前端超时
+- Type: `implementation`
+- Summary:
+  - 修复大视频上传时在 `upload/complete` 长时间等待后触发前端超时的问题。
+  - 为分片上传关键接口设置独立超时策略：`uploadChunk` 与 `uploadComplete` 关闭 axios 30 秒默认超时（`timeout: 0`），避免大文件慢网络或后端合并耗时导致请求被客户端提前中断。
+- Changed Files:
+  - `admin-web/src/api/video.js`
+  - `plan.md`
+- Verification:
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 08:40] 修复短视频封面预加载未命中导致切换黑屏
 - Type: `implementation`
 - Summary:

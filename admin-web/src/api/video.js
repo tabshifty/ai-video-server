@@ -13,8 +13,13 @@ export const uploadInit = (payload) => request.post('/upload/init', payload)
 export const uploadChunk = (sessionId, chunkIndex, chunkBlob, signal) =>
   request.put(`/upload/chunk?session_id=${encodeURIComponent(sessionId)}&chunk_index=${chunkIndex}`, chunkBlob, {
     signal,
+    timeout: 0,
     headers: { 'Content-Type': 'application/octet-stream' }
   })
 
-export const uploadComplete = (sessionId) => request.post('/upload/complete', { session_id: sessionId })
+export const uploadComplete = (sessionId) => request.post(
+  '/upload/complete',
+  { session_id: sessionId },
+  { timeout: 0 }
+)
 export const uploadAbort = (sessionId) => request.delete(`/upload/session/${sessionId}`)
