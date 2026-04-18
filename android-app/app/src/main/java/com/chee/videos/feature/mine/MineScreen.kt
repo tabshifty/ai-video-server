@@ -14,12 +14,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Router
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -29,7 +34,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +54,7 @@ private val MineSectionBackground = Color(0xFF14171D)
 private val MineCardBackground = Color(0xFF181B22)
 private val MineAccent = Color(0xFFFF5A7A)
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun MineScreen(
     baseUrl: String,
@@ -60,6 +68,32 @@ fun MineScreen(
         MineSection.HISTORY -> uiState.history
         MineSection.FAVORITE -> uiState.favorite
         MineSection.LIKE -> uiState.like
+    }
+
+    val listState = rememberLazyListState()
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = currentList.refreshing,
+        onRefresh = viewModel::refreshCurrentSection,
+    )
+
+    LaunchedEffect(
+        uiState.selectedSection,
+        currentList.items.size,
+        currentList.hasMore,
+        currentList.loading,
+        currentList.loadingMore,
+        currentList.refreshing,
+    ) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+            .collect { lastVisibleIndex ->
+                if (currentList.items.isEmpty()) {
+                    return@collect
+                }
+                val triggerIndex = (currentList.items.lastIndex - 2).coerceAtLeast(0)
+                if (lastVisibleIndex >= triggerIndex) {
+                    viewModel.loadNextPageForCurrentSection()
+                }
+            }
     }
 
     Column(
@@ -89,46 +123,103 @@ fun MineScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        when {
-            currentList.loading && currentList.items.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pullRefresh(pullRefreshState),
+        ) {
+            when {
+                currentList.loading && currentList.items.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
                 }
-            }
 
-            !currentList.errorMessage.isNullOrBlank() && currentList.items.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(currentList.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
-                        Button(onClick = viewModel::refreshCurrentSection) {
-                            Text("重试")
+                !currentList.errorMessage.isNullOrBlank() && currentList.items.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(currentList.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                            Button(onClick = viewModel::refreshCurrentSection) {
+                                Text("重试")
+                            }
+                        }
+                    }
+                }
+
+                currentList.items.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("暂无内容", color = Color(0xFFB9BEC9))
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(currentList.items, key = { item -> item.videoId }) { item ->
+                            MineVideoCard(
+                                baseUrl = baseUrl,
+                                item = item,
+                                onClick = {
+                                    onOpenPlayer(uiState.selectedSection.source, item.videoId)
+                                },
+                            )
+                        }
+
+                        item(key = "paging-footer") {
+                            when {
+                                currentList.loadingMore -> {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            color = MineAccent,
+                                            strokeWidth = 2.dp,
+                                        )
+                                    }
+                                }
+
+                                !currentList.hasMore -> {
+                                    Text(
+                                        text = "没有更多了",
+                                        color = Color(0xFF8F98AB),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                    )
+                                }
+
+                                !currentList.errorMessage.isNullOrBlank() -> {
+                                    Text(
+                                        text = "加载失败，点击重试",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewModel.loadNextPageForCurrentSection() }
+                                            .padding(vertical = 8.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            currentList.items.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("暂无内容", color = Color(0xFFB9BEC9))
-                }
-            }
-
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(currentList.items, key = { item -> item.videoId }) { item ->
-                        MineVideoCard(
-                            baseUrl = baseUrl,
-                            item = item,
-                            onClick = {
-                                onOpenPlayer(uiState.selectedSection.source, item.videoId)
-                            },
-                        )
-                    }
-                }
-            }
+            PullRefreshIndicator(
+                refreshing = currentList.refreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                contentColor = MineAccent,
+                backgroundColor = Color(0xFF1B1F28),
+            )
         }
     }
 }
@@ -335,7 +426,7 @@ private fun MineVideoCard(
                 }
                 item.progress?.let { progress ->
                     LinearProgressIndicator(
-                        progress = progress.coerceIn(0f, 1f),
+                        progress = { progress.coerceIn(0f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(3.dp)

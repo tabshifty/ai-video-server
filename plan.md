@@ -15,6 +15,23 @@
 
 ---
 
+### [2026-04-18 19:45] Android “我的”三分区新增分页下拉加载（下拉刷新 + 滚动加载更多）
+- Type: `implementation`
+- Summary:
+  - 为“历史记录 / 我的收藏 / 我的喜欢”三分区增加分页状态管理：`page / hasMore / loadingMore / refreshing`。
+  - 新增加载策略：首次加载、下拉刷新（重置到第 1 页）、滚动到底自动加载下一页。
+  - 列表底部新增分页状态反馈：加载中、无更多数据、加载失败点击重试。
+  - 引入 `compose material` 依赖并接入 `pullrefresh`，实现“我的”页面下拉刷新指示器。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineScreen.kt`
+  - `android-app/app/build.gradle.kts`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 17:48] Android App 新增“我的”面板 + 统一竖滑播放器（暗黑风格）
 - Type: `implementation`
 - Summary:
