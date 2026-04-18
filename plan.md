@@ -15,6 +15,22 @@
 
 ---
 
+### [2026-04-18 21:04] Android 首页全屏精简：移除顶部栏，Tab 标题改白
+- Type: `implementation`
+- Summary:
+  - 首页移除顶部标题栏及其操作按钮（路由切换、退出登录），将控制入口统一收敛到“我的”页面。
+  - 首页改为全屏内容布局，仅保留内容 Tab 与视频流区域，提升可视播放空间。
+  - 内容 Tab（短视频/电影/电视剧/AV）标题改为白色风格，未选中态使用白色低透明度。
+  - 导航层移除 `HomeScreen` 不再需要的 `onSwitchServer/onLogout` 参数传递。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 20:47] 修复“我的”三分区无数据：历史上报缺失 + 继续观看过滤过严
 - Type: `implementation`
 - Summary:

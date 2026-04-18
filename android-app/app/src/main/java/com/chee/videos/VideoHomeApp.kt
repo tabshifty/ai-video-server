@@ -145,8 +145,6 @@ private fun AuthenticatedNav(
                         baseUrl = baseUrl,
                         accessToken = accessToken,
                         onOpenDetail = { videoId -> navController.navigate("detail/$videoId") },
-                        onSwitchServer = onSwitchServer,
-                        onLogout = onLogout,
                     )
                 }
             }

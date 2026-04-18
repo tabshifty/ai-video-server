@@ -12,18 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Router
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -56,14 +50,11 @@ private val tabs = listOf(
     ContentTab("AV", "av"),
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     baseUrl: String,
     accessToken: String,
     onOpenDetail: (String) -> Unit,
-    onSwitchServer: () -> Unit,
-    onLogout: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -76,63 +67,58 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("家用视频") },
-                actions = {
-                    IconButton(onClick = onSwitchServer) {
-                        Icon(Icons.Default.Router, contentDescription = "切换服务器")
-                    }
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Logout, contentDescription = "退出登录")
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            TabRow(selectedTabIndex = selectedTab) {
-                tabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = { Text(tab.title) },
-                    )
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.Black,
+            contentColor = Color.White,
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                val selected = selectedTab == index
+                Tab(
+                    selected = selected,
+                    onClick = { selectedTab = index },
+                    selectedContentColor = Color.White,
+                    unselectedContentColor = Color.White.copy(alpha = 0.78f),
+                    text = { Text(tab.title) },
+                )
+            }
+        }
+
+        when (tabs[selectedTab].type) {
+            "short" -> {
+                ShortFeedScreen(
+                    baseUrl = baseUrl,
+                    accessToken = accessToken,
+                )
             }
 
-            when (tabs[selectedTab].type) {
-                "short" -> {
-                    ShortFeedScreen(
-                        baseUrl = baseUrl,
-                        accessToken = accessToken,
-                    )
-                }
+            "movie" -> {
+                CategoryListSection(
+                    state = uiState.movie,
+                    onRetry = { viewModel.loadCategory("movie", force = true) },
+                    onOpenDetail = onOpenDetail,
+                )
+            }
 
-                "movie" -> {
-                    CategoryListSection(
-                        state = uiState.movie,
-                        onRetry = { viewModel.loadCategory("movie", force = true) },
-                        onOpenDetail = onOpenDetail,
-                    )
-                }
+            "episode" -> {
+                CategoryListSection(
+                    state = uiState.episode,
+                    onRetry = { viewModel.loadCategory("episode", force = true) },
+                    onOpenDetail = onOpenDetail,
+                )
+            }
 
-                "episode" -> {
-                    CategoryListSection(
-                        state = uiState.episode,
-                        onRetry = { viewModel.loadCategory("episode", force = true) },
-                        onOpenDetail = onOpenDetail,
-                    )
-                }
-
-                "av" -> {
-                    CategoryListSection(
-                        state = uiState.av,
-                        onRetry = { viewModel.loadCategory("av", force = true) },
-                        onOpenDetail = onOpenDetail,
-                    )
-                }
+            "av" -> {
+                CategoryListSection(
+                    state = uiState.av,
+                    onRetry = { viewModel.loadCategory("av", force = true) },
+                    onOpenDetail = onOpenDetail,
+                )
             }
         }
     }
@@ -156,7 +142,7 @@ private fun CategoryListSection(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
                     Button(onClick = onRetry) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Icon(Icons.Filled.Refresh, contentDescription = null)
                         Text("重试", modifier = Modifier.padding(start = 6.dp))
                     }
                 }
