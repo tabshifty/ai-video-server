@@ -1527,3 +1527,20 @@
   - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-18 22:52] Android 详情播放器重构：海报内播放 + 同页横屏全屏/退出
+- Type: `implementation`
+- Summary:
+  - 将详情页播放流程改为“海报承载播放入口”：默认显示海报，点击海报中心播放按钮后原位切换为视频播放器。
+  - 全屏能力改为同页状态切换，不再跳转独立全屏页面：播放器内提供“全屏”按钮，全屏后提供“退出全屏”按钮。
+  - 全屏状态下锁定横屏并隐藏系统栏，退出全屏后恢复原方向与系统栏；系统返回键在全屏态优先执行“退出全屏”。
+  - 保留 AV 暗黑视觉、海报回退逻辑与播放鉴权头，避免破坏现有播放链路。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/FullscreenVideoPlayerScreen.kt` (deleted)
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

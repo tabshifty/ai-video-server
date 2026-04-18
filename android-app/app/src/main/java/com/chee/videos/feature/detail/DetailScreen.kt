@@ -1,22 +1,30 @@
 package com.chee.videos.feature.detail
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.graphics.Color as AndroidColor
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,16 +41,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -61,7 +74,6 @@ import com.chee.videos.core.util.UrlBuilder
 @Composable
 fun DetailScreen(
     onBack: () -> Unit,
-    onOpenFullscreen: (String) -> Unit = {},
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -69,19 +81,46 @@ fun DetailScreen(
     val pageBg = if (isAv) Color(0xFF0B0C0F) else Color(0xFFF7F8FA)
     val textColor = if (isAv) Color(0xFFEDEFF4) else Color.Unspecified
     val mutedTextColor = if (isAv) Color(0xFFB9C0CD) else MaterialTheme.colorScheme.onSurfaceVariant
+    val context = LocalContext.current
+    val activity = context as? Activity
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = isFullscreen) {
+        isFullscreen = false
+    }
+
+    DisposableEffect(activity, isFullscreen) {
+        if (activity == null || !isFullscreen) {
+            onDispose { }
+        } else {
+            val previousOrientation = activity.requestedOrientation
+            val window = activity.window
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+            onDispose {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                activity.requestedOrientation = previousOrientation
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("视频详情") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+            if (!isFullscreen) {
+                CenterAlignedTopAppBar(
+                    title = { Text("视频详情") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        }
                     }
-                },
-            )
+                )
+            }
         },
-        containerColor = pageBg,
+        containerColor = if (isFullscreen) Color.Black else pageBg,
     ) { innerPadding ->
         when {
             uiState.loading -> {
@@ -111,10 +150,10 @@ fun DetailScreen(
 
             uiState.detail != null -> {
                 val detail = uiState.detail!!
-                val context = LocalContext.current
                 val lifecycleOwner = LocalLifecycleOwner.current
                 val playUrl = resolvePlayUrl(uiState.baseUrl, detail)
                 val posterUrl = resolvePosterUrl(uiState.baseUrl, detail)
+                val canPlay = !playUrl.isNullOrBlank()
 
                 val dataSourceFactory = remember(uiState.accessToken) {
                     DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -126,8 +165,12 @@ fun DetailScreen(
                 val exoPlayer = remember(uiState.accessToken) {
                     ExoPlayer.Builder(context).build()
                 }
-                var userRequestedPlay by remember(detail.id) { mutableStateOf(false) }
+                var userRequestedPlay by rememberSaveable(detail.id) { mutableStateOf(false) }
                 var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+
+                LaunchedEffect(detail.id) {
+                    isFullscreen = false
+                }
 
                 LaunchedEffect(userRequestedPlay, playUrl, dataSourceFactory) {
                     if (!userRequestedPlay) {
@@ -177,120 +220,188 @@ fun DetailScreen(
                     }
                 }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .background(pageBg)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
+                val showPlayer = userRequestedPlay && canPlay
+
+                if (isFullscreen) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(220.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isAv) Color(0xFF181B21) else Color(0xFF1A1C20)),
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .background(Color.Black),
                     ) {
-                        if (!posterUrl.isNullOrBlank()) {
-                            AsyncImage(
-                                model = posterUrl,
-                                contentDescription = "海报",
-                                contentScale = ContentScale.Crop,
+                        if (showPlayer) {
+                            VideoPlayerSurface(
+                                exoPlayer = exoPlayer,
                                 modifier = Modifier.fillMaxSize(),
+                            )
+                            PlayerOverlayIconButton(
+                                icon = Icons.Filled.FullscreenExit,
+                                contentDescription = "退出全屏",
+                                onClick = { isFullscreen = false },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .statusBarsPadding()
+                                    .padding(12.dp),
+                            )
+                        } else {
+                            Text(
+                                text = "暂无可播放视频",
+                                color = Color(0xFFEDEFF4),
+                                modifier = Modifier.align(Alignment.Center),
                             )
                         }
                     }
-
-                    Text(
-                        detail.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor,
-                    )
-                    Text(
-                        text = detail.description.orEmpty().ifBlank { "暂无简介" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = textColor,
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .background(pageBg)
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Button(
-                            onClick = { userRequestedPlay = !userRequestedPlay },
-                            enabled = !playUrl.isNullOrBlank(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(if (userRequestedPlay) "暂停播放" else "播放")
-                        }
-                        Button(
-                            onClick = { onOpenFullscreen(detail.id) },
-                            enabled = !playUrl.isNullOrBlank(),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("横屏全屏播放")
-                        }
-                    }
-
-                    if (userRequestedPlay && !playUrl.isNullOrBlank()) {
-                        AndroidView(
-                            factory = {
-                                PlayerView(it).apply {
-                                    useController = true
-                                    setShutterBackgroundColor(AndroidColor.BLACK)
-                                    player = exoPlayer
-                                }
-                            },
-                            update = { view ->
-                                view.player = exoPlayer
-                            },
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(220.dp)
-                                .clip(RoundedCornerShape(14.dp)),
-                        )
-                    }
-
-                    Text("播放数据", color = textColor)
-                    Text("时长：${if (isAv) formatDurationHms(detail.duration) else "${detail.duration} 秒"}", color = mutedTextColor)
-                    Text(
-                        "播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}",
-                        color = mutedTextColor,
-                    )
-
-                    if (detail.tags.orEmpty().isNotEmpty()) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            detail.tags.orEmpty().forEach { tag ->
-                                FilterChip(
-                                    selected = false,
-                                    onClick = {},
-                                    label = { Text(tag) },
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (isAv) Color(0xFF181B21) else Color(0xFF1A1C20)),
+                        ) {
+                            if (showPlayer) {
+                                VideoPlayerSurface(
+                                    exoPlayer = exoPlayer,
+                                    modifier = Modifier.fillMaxSize(),
                                 )
+                                PlayerOverlayIconButton(
+                                    icon = Icons.Filled.Fullscreen,
+                                    contentDescription = "全屏播放",
+                                    onClick = { isFullscreen = true },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(10.dp),
+                                )
+                            } else {
+                                if (!posterUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = posterUrl,
+                                        contentDescription = "海报",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                                PlayerOverlayIconButton(
+                                    icon = Icons.Filled.PlayArrow,
+                                    contentDescription = "播放",
+                                    onClick = { userRequestedPlay = true },
+                                    enabled = canPlay,
+                                    modifier = Modifier.align(Alignment.Center),
+                                )
+                                if (!canPlay) {
+                                    Text(
+                                        text = "暂无可播放视频",
+                                        color = Color(0xFFB9C0CD),
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .padding(bottom = 12.dp),
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        Button(onClick = viewModel::toggleLike, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (detail.userState.isLiked) "取消点赞" else "点赞")
-                        }
-                        Button(onClick = viewModel::toggleFavorite, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (detail.userState.isFavorited) "取消收藏" else "收藏")
-                        }
-                        Button(onClick = viewModel::toggleDislike, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (detail.userState.isDisliked) "取消不喜欢" else "不喜欢")
-                        }
-                    }
+                        Text(
+                            detail.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = textColor,
+                        )
+                        Text(
+                            text = detail.description.orEmpty().ifBlank { "暂无简介" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor,
+                        )
 
-                    if (!uiState.errorMessage.isNullOrBlank()) {
-                        Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        Text("播放数据", color = textColor)
+                        Text("时长：${if (isAv) formatDurationHms(detail.duration) else "${detail.duration} 秒"}", color = mutedTextColor)
+                        Text(
+                            "播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}",
+                            color = mutedTextColor,
+                        )
+
+                        if (detail.tags.orEmpty().isNotEmpty()) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                detail.tags.orEmpty().forEach { tag ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = {},
+                                        label = { Text(tag) },
+                                    )
+                                }
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = viewModel::toggleLike, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (detail.userState.isLiked) "取消点赞" else "点赞")
+                            }
+                            Button(onClick = viewModel::toggleFavorite, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (detail.userState.isFavorited) "取消收藏" else "收藏")
+                            }
+                            Button(onClick = viewModel::toggleDislike, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (detail.userState.isDisliked) "取消不喜欢" else "不喜欢")
+                            }
+                        }
+
+                        if (!uiState.errorMessage.isNullOrBlank()) {
+                            Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun VideoPlayerSurface(
+    exoPlayer: ExoPlayer,
+    modifier: Modifier = Modifier,
+) {
+    AndroidView(
+        factory = {
+            PlayerView(it).apply {
+                useController = true
+                setShutterBackgroundColor(AndroidColor.BLACK)
+                player = exoPlayer
+            }
+        },
+        update = { view ->
+            view.player = exoPlayer
+        },
+        modifier = modifier.background(Color.Black),
+    )
+}
+
+@Composable
+private fun PlayerOverlayIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .size(46.dp)
+            .background(Color(0x5A0A0B0E), CircleShape),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) Color(0xFFEDEFF4) else Color(0xFF7D8593),
+        )
     }
 }
 
