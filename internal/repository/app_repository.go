@@ -162,13 +162,6 @@ JOIN videos v ON v.id = a.video_id
 WHERE a.user_id=$1
   AND a.action_type='view'
   AND a.watch_seconds > 0
-  AND a.watch_seconds < GREATEST(v.duration_seconds - 5, 0)
-  AND NOT EXISTS (
-      SELECT 1 FROM user_video_actions c
-      WHERE c.user_id = a.user_id
-        AND c.video_id = a.video_id
-        AND c.action_type='completed'
-  )
 `, userID).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count continue watching: %w", err)
@@ -181,13 +174,6 @@ JOIN videos v ON v.id = a.video_id
 WHERE a.user_id=$1
   AND a.action_type='view'
   AND a.watch_seconds > 0
-  AND a.watch_seconds < GREATEST(v.duration_seconds - 5, 0)
-  AND NOT EXISTS (
-      SELECT 1 FROM user_video_actions c
-      WHERE c.user_id = a.user_id
-        AND c.video_id = a.video_id
-        AND c.action_type='completed'
-  )
 ORDER BY a.updated_at DESC
 LIMIT $2 OFFSET $3
 `, userID, limit, offset)
@@ -204,6 +190,9 @@ LIMIT $2 OFFSET $3
 		}
 		if item.Duration > 0 {
 			item.Progress = float64(item.WatchSeconds) / float64(item.Duration)
+			if item.Progress > 1 {
+				item.Progress = 1
+			}
 		}
 		items = append(items, item)
 	}

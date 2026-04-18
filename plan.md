@@ -15,6 +15,28 @@
 
 ---
 
+### [2026-04-18 20:47] 修复“我的”三分区无数据：历史上报缺失 + 继续观看过滤过严
+- Type: `implementation`
+- Summary:
+  - 定位根因 1：Android 端此前未在短视频/统一播放器中上报观看进度，导致后端 `user_video_actions(view)` 无新增数据，历史记录长期为空。
+  - 定位根因 2：后端 `/history/continue` 查询逻辑只返回“未看完”视频，会过滤掉已看完视频，不符合“我的-历史记录”预期。
+  - 修复历史写入：在 `ShortFeedScreen` 与 `UnifiedPlayerScreen` 中，切换视频与页面销毁时自动上报 `watch_seconds/completed`。
+  - 修复历史查询：`ContinueWatching` 改为返回所有 `view` 记录（`watch_seconds>0`），并保留进度计算（上限 1）。
+  - 修复分区刷新：切换“历史记录/收藏/喜欢”分区时强制刷新，避免首次空数据后长期缓存不更新。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineViewModel.kt`
+  - `internal/repository/app_repository.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 19:45] Android “我的”三分区新增分页下拉加载（下拉刷新 + 滚动加载更多）
 - Type: `implementation`
 - Summary:

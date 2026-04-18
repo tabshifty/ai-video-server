@@ -70,10 +70,7 @@ class MineViewModel @Inject constructor(
 
     fun selectSection(section: MineSection) {
         _uiState.update { it.copy(selectedSection = section) }
-        val state = listStateFor(section)
-        if (!state.loaded) {
-            loadSection(section)
-        }
+        loadSection(section, forceRefresh = true)
     }
 
     fun refreshCurrentSection() {

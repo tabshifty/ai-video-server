@@ -53,6 +53,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -154,6 +155,8 @@ fun ShortFeedScreen(
             val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
             val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
             var renderedVideoId by remember { mutableStateOf<String?>(null) }
+            var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
+            val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
 
             DisposableEffect(sharedPlayer) {
                 val listener = object : Player.Listener {
@@ -163,6 +166,11 @@ fun ShortFeedScreen(
                 }
                 sharedPlayer.addListener(listener)
                 onDispose {
+                    val finalVideoId = latestCurrentVideoId ?: sharedPlayer.currentMediaItem?.mediaId
+                    if (!finalVideoId.isNullOrBlank()) {
+                        val (watchSeconds, completed) = readWatchSnapshot(sharedPlayer)
+                        viewModel.reportHistory(finalVideoId, watchSeconds, completed)
+                    }
                     sharedPlayer.removeListener(listener)
                     sharedPlayer.release()
                 }
@@ -182,6 +190,14 @@ fun ShortFeedScreen(
                     val thumbURL = resolveThumbnailUrl(baseUrl, item.thumbnailPath) ?: continue
                     imageLoader.enqueue(ImageRequest.Builder(context).data(thumbURL).build())
                 }
+            }
+            LaunchedEffect(currentVideoId) {
+                val previousVideoId = lastHistoryVideoId
+                if (!previousVideoId.isNullOrBlank() && previousVideoId != currentVideoId) {
+                    val (watchSeconds, completed) = readWatchSnapshot(sharedPlayer)
+                    viewModel.reportHistory(previousVideoId, watchSeconds, completed)
+                }
+                lastHistoryVideoId = currentVideoId
             }
             LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory) {
                 if (currentVideoId == null) {
@@ -706,6 +722,15 @@ private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {
         return null
     }
     return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
+}
+
+private fun readWatchSnapshot(player: ExoPlayer): Pair<Int, Boolean> {
+    val watchSeconds = (player.currentPosition.coerceAtLeast(0L) / 1000L).toInt()
+    val durationMs = player.duration
+    val durationSeconds = if (durationMs > 0) (durationMs / 1000L).toInt() else 0
+    val completedThreshold = (durationSeconds - 3).coerceAtLeast(1)
+    val completed = durationSeconds > 0 && watchSeconds >= completedThreshold
+    return watchSeconds to completed
 }
 
 private fun extractActorNames(detail: VideoDetailDto?): List<String> {

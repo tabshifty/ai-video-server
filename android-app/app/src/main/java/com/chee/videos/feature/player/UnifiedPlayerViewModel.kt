@@ -167,6 +167,15 @@ class UnifiedPlayerViewModel @Inject constructor(
         }
     }
 
+    fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
+        if (videoId.isBlank() || watchSeconds <= 0) {
+            return
+        }
+        viewModelScope.launch {
+            videoRepository.reportHistory(videoId, watchSeconds, completed)
+        }
+    }
+
     private fun handleAuthError(err: Throwable?) {
         if (err is AuthExpiredException) {
             viewModelScope.launch {

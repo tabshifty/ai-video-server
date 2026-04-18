@@ -149,6 +149,15 @@ class ShortFeedViewModel @Inject constructor(
         toggleAction(videoId) { videoRepository.toggleDislike(videoId) }
     }
 
+    fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
+        if (videoId.isBlank() || watchSeconds <= 0) {
+            return
+        }
+        viewModelScope.launch {
+            videoRepository.reportHistory(videoId, watchSeconds, completed)
+        }
+    }
+
     private fun toggleAction(videoId: String, actionCall: suspend () -> Result<com.chee.videos.core.model.ActionTogglePayload>) {
         if (_uiState.value.actionBusyVideoIds.contains(videoId)) {
             return
