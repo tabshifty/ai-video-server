@@ -21,6 +21,7 @@ const (
 	TypeScrapeMovie    = "video:scrape:movie"
 	TypeScrapeTV       = "video:scrape:tv"
 	TypeScrapeAV       = "video:scrape:av"
+	TypeScrapeRetag    = "video:scrape:retag"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -84,6 +85,7 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeMovie, p.HandleScrapeMovie)
 	mux.HandleFunc(TypeScrapeTV, p.HandleScrapeTV)
 	mux.HandleFunc(TypeScrapeAV, p.HandleScrapeAV)
+	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

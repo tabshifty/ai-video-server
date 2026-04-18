@@ -15,6 +15,27 @@
 
 ---
 
+### [2026-04-18 09:43] 短视频支持改类为电影/剧集/AV并自动异步刮削
+- Type: `implementation`
+- Summary:
+  - 管理端视频详情支持将 `short` 改为 `movie/episode/av`，并在改类后自动触发后台异步刮削。
+  - 后端 `AdminUpdateVideo` 增加改类校验：仅允许 `short -> movie|episode|av`，其中改为 `episode` 时强制要求 `season_number/episode_number > 0`。
+  - 改类为非短视频时自动清空视频合集关系；自动刮削任务会将状态置为 `scraping`，完成后置为 `ready`，失败时记录 `scrape_error` 并回退为 `uploaded`。
+  - 新增队列任务 `video:scrape:retag`，采用“预览候选取第一个 + Confirm*”流程执行自动刮削，且不再触发转码任务。
+  - 管理端详情弹窗新增“改为类型”和“季/集”输入（仅分集），并在触发改类时提示会后台自动刮削与清空合集。
+- Changed Files:
+  - `internal/handlers/admin.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/queue/tasks.go`
+  - `internal/queue/scrape_tasks.go`
+  - `admin-web/src/views/VideoList.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 09:03] 修复大视频分片上传在合并阶段前端超时
 - Type: `implementation`
 - Summary:

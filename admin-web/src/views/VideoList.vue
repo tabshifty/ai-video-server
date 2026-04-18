@@ -30,6 +30,11 @@ const loadingCollections = ref(false)
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
+const retagTypeOptions = [
+  { value: 'movie', label: '电影' },
+  { value: 'episode', label: '剧集分集' },
+  { value: 'av', label: 'AV' }
+]
 
 function statusLabel(status) {
   const map = {
@@ -50,6 +55,20 @@ function typeLabel(type) {
     av: 'AV'
   }
   return map[type] || type || '-'
+}
+
+function normalizeVideoType(type) {
+  return String(type || '')
+    .trim()
+    .toLowerCase()
+}
+
+function isRetaggingShortVideo(video = detail.value) {
+  if (!video || video.type !== 'short') {
+    return false
+  }
+  const targetType = normalizeVideoType(video.target_type)
+  return targetType === 'movie' || targetType === 'episode' || targetType === 'av'
 }
 
 function splitActorSelection(values) {
@@ -163,6 +182,10 @@ async function showDetail(row) {
   detail.value = await getAdminVideoDetail(row.id)
   detail.value.actor_tokens = (detail.value.actors || []).map((actor) => actor.id)
   detail.value.collection_ids = (detail.value.collections || []).map((collection) => collection.id)
+  detail.value.target_type = ''
+  detail.value.auto_scrape = true
+  detail.value.season_number = 1
+  detail.value.episode_number = 1
   mergeActorOptions(detail.value.actors || [])
   mergeCollectionOptions(detail.value.collections || [])
   detailVisible.value = true
@@ -245,6 +268,9 @@ async function doRetranscode(row) {
 }
 
 async function saveDetail() {
+  if (!detail.value?.id) {
+    return
+  }
   const { actorIDs, actorNames } = splitActorSelection(detail.value.actor_tokens)
   const payload = {
     title: detail.value.title,
@@ -253,14 +279,31 @@ async function saveDetail() {
     tags: detail.value.tags || [],
     actor_ids: actorIDs,
     actor_names: actorNames,
-    status: detail.value.status,
     metadata: detail.value.metadata || {}
   }
+  let enqueueAutoScrape = false
   if (detail.value.type === 'short') {
     payload.collection_ids = normalizeCollectionSelection(detail.value.collection_ids)
+    const targetType = normalizeVideoType(detail.value.target_type)
+    if (targetType === 'movie' || targetType === 'episode' || targetType === 'av') {
+      payload.type = targetType
+      payload.auto_scrape = detail.value.auto_scrape !== false
+      payload.collection_ids = []
+      enqueueAutoScrape = payload.auto_scrape === true
+      if (targetType === 'episode') {
+        const seasonNumber = Number(detail.value.season_number)
+        const episodeNumber = Number(detail.value.episode_number)
+        if (!Number.isInteger(seasonNumber) || seasonNumber <= 0 || !Number.isInteger(episodeNumber) || episodeNumber <= 0) {
+          ElMessage.warning('切换为剧集分集时，请填写季号和集号（正整数）')
+          return
+        }
+        payload.season_number = seasonNumber
+        payload.episode_number = episodeNumber
+      }
+    }
   }
   await updateAdminVideo(detail.value.id, payload)
-  ElMessage.success('保存成功')
+  ElMessage.success(enqueueAutoScrape ? '保存成功，已加入自动刮削队列' : '保存成功')
   detailVisible.value = false
   await load()
 }
@@ -375,7 +418,28 @@ onMounted(load)
             <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="detail.type === 'short'" label="所属合集">
+        <el-form-item v-if="detail.type === 'short'" label="改为类型">
+          <el-select v-model="detail.target_type" clearable placeholder="保持短视频" style="width: 100%">
+            <el-option label="保持短视频" value="" />
+            <el-option v-for="item in retagTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="detail.type === 'short' && normalizeVideoType(detail.target_type) === 'episode'" label="季/集">
+          <div class="episode-fields">
+            <el-input-number v-model="detail.season_number" :min="1" :step="1" controls-position="right" />
+            <span class="episode-divider">季</span>
+            <el-input-number v-model="detail.episode_number" :min="1" :step="1" controls-position="right" />
+            <span class="episode-divider">集</span>
+          </div>
+        </el-form-item>
+        <el-form-item v-if="isRetaggingShortVideo(detail)" label="自动刮削">
+          <el-alert
+            type="info"
+            :closable="false"
+            title="保存后将自动清空短视频合集，并在后台按标题自动刮削（默认选第一个候选）。"
+          />
+        </el-form-item>
+        <el-form-item v-if="detail.type === 'short' && !isRetaggingShortVideo(detail)" label="所属合集">
           <el-select
             v-model="detail.collection_ids"
             multiple
@@ -462,6 +526,17 @@ onMounted(load)
 <style scoped>
 .play-preview {
   width: 100%;
+}
+
+.episode-fields {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.episode-divider {
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .play-actions {

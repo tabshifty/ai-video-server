@@ -175,6 +175,10 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		Description   string         `json:"description"`
 		Thumbnail     string         `json:"thumbnail"`
 		Tags          []string       `json:"tags"`
+		Type          string         `json:"type"`
+		AutoScrape    *bool          `json:"auto_scrape"`
+		SeasonNumber  int            `json:"season_number"`
+		EpisodeNumber int            `json:"episode_number"`
 		ActorIDs      *[]string      `json:"actor_ids"`
 		ActorNames    *[]string      `json:"actor_names"`
 		CollectionIDs *[]string      `json:"collection_ids"`
@@ -188,13 +192,40 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 	if req.Metadata == nil {
 		req.Metadata = map[string]any{}
 	}
+
+	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			response.Error(c, 404, "video not found")
+			return
+		}
+		response.Error(c, 1007, err.Error())
+		return
+	}
+
+	targetType := strings.ToLower(strings.TrimSpace(req.Type))
+	typeChanged := targetType != "" && targetType != video.Type
+	if typeChanged {
+		if ok, msg := validateAdminVideoTypeMigration(video.Type, targetType); !ok {
+			bad(c, msg)
+			return
+		}
+	}
+	autoScrape := typeChanged
+	if req.AutoScrape != nil {
+		autoScrape = typeChanged && *req.AutoScrape
+	}
+	if typeChanged && targetType == "episode" && (req.SeasonNumber <= 0 || req.EpisodeNumber <= 0) {
+		bad(c, "切换为剧集分集时，season_number 和 episode_number 必须大于 0")
+		return
+	}
+
 	updateActors := req.ActorIDs != nil || req.ActorNames != nil
 	updateCollections := req.CollectionIDs != nil
 	var actorIDs []uuid.UUID
 	var actorNames []string
 	var collectionIDs []uuid.UUID
 	if updateActors {
-		var err error
 		if req.ActorIDs != nil {
 			actorIDs, err = parseUUIDStrings(*req.ActorIDs)
 			if err != nil {
@@ -207,14 +238,17 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		}
 	}
 	if updateCollections {
-		var err error
 		collectionIDs, err = parseUUIDStrings(*req.CollectionIDs)
 		if err != nil {
 			bad(c, "合集ID格式错误")
 			return
 		}
 	}
-	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, actorIDs, actorNames, updateActors, collectionIDs, updateCollections); err != nil {
+	if typeChanged && targetType != "short" {
+		updateCollections = true
+		collectionIDs = nil
+	}
+	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, targetType, actorIDs, actorNames, updateActors, collectionIDs, updateCollections); err != nil {
 		if errors.Is(err, repository.ErrCollectionsOnlyForShort) {
 			bad(c, "仅短视频支持合集")
 			return
@@ -222,13 +256,39 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		response.Error(c, 1007, err.Error())
 		return
 	}
-	if req.Status != "" {
+	enqueuedAutoScrape := false
+	if typeChanged && autoScrape {
+		if a.enqueuer == nil {
+			response.Error(c, 1008, "queue not configured")
+			return
+		}
+		if err := a.repo.AdminUpdateVideoStatus(c.Request.Context(), videoID, "scraping"); err != nil {
+			response.Error(c, 1008, err.Error())
+			return
+		}
+		payload := queue.RetagScrapePayload{
+			VideoID:       videoID.String(),
+			TargetType:    targetType,
+			SeasonNumber:  req.SeasonNumber,
+			EpisodeNumber: req.EpisodeNumber,
+		}
+		if err := a.enqueuer.EnqueueScrapeRetag(payload); err != nil {
+			_ = a.repo.AdminUpdateVideoStatus(c.Request.Context(), videoID, "uploaded")
+			response.Error(c, 1008, err.Error())
+			return
+		}
+		enqueuedAutoScrape = true
+	}
+	if req.Status != "" && !enqueuedAutoScrape {
 		if err := a.repo.AdminUpdateVideoStatus(c.Request.Context(), videoID, req.Status); err != nil {
 			response.Error(c, 1008, err.Error())
 			return
 		}
 	}
-	ok(c, gin.H{"updated": true})
+	ok(c, gin.H{
+		"updated":              true,
+		"auto_scrape_enqueued": enqueuedAutoScrape,
+	})
 }
 
 func (a *API) AdminDeleteVideo(c *gin.Context) {
@@ -637,4 +697,14 @@ func parseUUIDStrings(raw []string) ([]uuid.UUID, error) {
 		out = append(out, id)
 	}
 	return out, nil
+}
+
+func validateAdminVideoTypeMigration(currentType, targetType string) (bool, string) {
+	if currentType != "short" {
+		return false, "仅支持将短视频改为电影/剧集分集/AV"
+	}
+	if targetType != "movie" && targetType != "episode" && targetType != "av" {
+		return false, "type 仅支持 movie、episode、av"
+	}
+	return true, ""
 }

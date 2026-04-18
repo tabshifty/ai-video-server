@@ -200,7 +200,7 @@ WHERE id=$1
 	return out, nil
 }
 
-func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, actorIDs []uuid.UUID, actorNames []string, updateActors bool, collectionIDs []uuid.UUID, updateCollections bool) error {
+func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, targetType string, actorIDs []uuid.UUID, actorNames []string, updateActors bool, collectionIDs []uuid.UUID, updateCollections bool) error {
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("marshal admin metadata: %w", err)
@@ -214,12 +214,16 @@ func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUI
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	nextType := strings.ToLower(strings.TrimSpace(targetType))
+	if nextType == "" {
+		nextType = video.Type
+	}
 
 	if _, err := tx.Exec(ctx, `
-UPDATE videos
-SET title=$2, description=$3, thumbnail_path=$4, metadata=$5, updated_at=NOW()
-WHERE id=$1
-`, videoID, title, description, thumbnail, raw); err != nil {
+	UPDATE videos
+	SET title=$2, description=$3, thumbnail_path=$4, metadata=$5, type=$6, updated_at=NOW()
+	WHERE id=$1
+	`, videoID, title, description, thumbnail, raw, nextType); err != nil {
 		return fmt.Errorf("admin update video: %w", err)
 	}
 
@@ -244,7 +248,7 @@ WHERE id=$1
 		}
 	}
 	if updateCollections {
-		if err := r.ReplaceVideoCollectionsByIDs(ctx, videoID, video.Type, collectionIDs); err != nil {
+		if err := r.ReplaceVideoCollectionsByIDs(ctx, videoID, nextType, collectionIDs); err != nil {
 			return fmt.Errorf("replace video collections: %w", err)
 		}
 	}
