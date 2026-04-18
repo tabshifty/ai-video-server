@@ -15,6 +15,28 @@
 
 ---
 
+### [2026-04-18 15:20] AV 刮削增强：多站点接入 + 字段级置信合并（修复海报/简介/演员错抓）
+- Type: `implementation`
+- Summary:
+  - 扩展 AV crawler provider，新增 `javbus/javlibrary/fc2`，形成 `javdb + javbus + javlibrary + fc2` 多站点检索与详情抓取能力。
+  - 重构 AV 搜索结果聚合为“字段级置信合并”：按 `code/title` 分组后对 `title/code/poster/overview/release_date/actors` 分字段择优，输出融合候选并保留 `field_sources/merged_sources/raw_candidates` 追踪信息。
+  - 修复 JavDB 字段误抓：海报优先 `video-cover` 并过滤 logo；简介优先详情字段/正文块再回退 meta；演员改为演员区域优先提取，过滤噪音链接。
+  - 增强 AV 结果透传与确认链路：`PreviewAV` 返回 `detail_url/scrape_source`；`ScrapeAVUpload` 与 `ConfirmAV` 元数据改为动态来源存储，不再固定写死 `javdb`。
+  - 增强自动刮削任务参数：队列在 AV 自动确认时补齐 `detail_url/scrape_source` hint，确保多来源候选可正确回放详情抓取。
+  - 新增回归测试：覆盖 logo 海报误抓、SEO 简介误抓、演员噪音过滤，以及多站点冲突字段的择优合并。
+- Changed Files:
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `internal/queue/scrape_tasks.go`
+  - `internal/handlers/admin_scrape.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -count=1` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 12:52] 修复重转码仍不执行（输入输出同路径 + 失败收口 SQL 类型错误）
 - Type: `implementation`
 - Summary:

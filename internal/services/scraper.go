@@ -135,6 +135,7 @@ var (
 )
 
 type avScrapeCandidate struct {
+	Source      string
 	ExternalID  string
 	Code        string
 	Title       string
@@ -276,6 +277,10 @@ func (s *ScraperService) PreviewAV(ctx context.Context, title string) ([]map[str
 	}
 	out := make([]map[string]any, 0, len(candidates))
 	for _, candidate := range candidates {
+		scrapeSource := normalizeAVSourceName(candidate.Source)
+		if scrapeSource == "" {
+			scrapeSource = "javdb"
+		}
 		out = append(out, map[string]any{
 			"external_id":     candidate.ExternalID,
 			"av_code":         candidate.Code,
@@ -285,9 +290,10 @@ func (s *ScraperService) PreviewAV(ctx context.Context, title string) ([]map[str
 			"poster_url":      candidate.PosterURL,
 			"release_date":    candidate.ReleaseDate,
 			"actors":          candidate.Actors,
+			"detail_url":      candidate.DetailURL,
 			"metadata":        candidate.Raw,
 			"media_type_hint": "av",
-			"scrape_source":   "javdb",
+			"scrape_source":   scrapeSource,
 		})
 	}
 	s.setPreviewCache(cacheKey, out)
@@ -455,10 +461,27 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 		return fmt.Errorf("external_id is required")
 	}
 
-	detailURL := toAbsoluteURL(strings.TrimSpace(s.avBaseURL), "/v/"+externalID)
+	sourceHint := normalizeAVSourceName(asString(in.Metadata["scrape_source"]))
+	detailURL := strings.TrimSpace(asString(in.Metadata["detail_url"]))
+	if detailURL == "" {
+		detailURL = s.buildAVDetailURLBySource(sourceHint, externalID)
+	}
+	if detailURL == "" {
+		detailURL = toAbsoluteURL(strings.TrimSpace(s.avBaseURL), "/v/"+externalID)
+	}
 	candidate, trace, err := s.fetchAVCandidateByDetailURLWithTrace(ctx, detailURL)
 	if err != nil {
 		return err
+	}
+	if strings.TrimSpace(candidate.ExternalID) == "" {
+		candidate.ExternalID = externalID
+	}
+	if strings.TrimSpace(candidate.Source) == "" {
+		candidate.Source = sourceHint
+	}
+	scrapeSource := normalizeAVSourceName(candidate.Source)
+	if scrapeSource == "" {
+		scrapeSource = "javdb"
 	}
 
 	title := chooseStr(in.Title, candidate.Title)
@@ -473,14 +496,18 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 	}
 
 	meta := map[string]any{
-		"scrape_source": "javdb",
+		"scrape_source": scrapeSource,
 		"external_id":   candidate.ExternalID,
 		"av_code":       candidate.Code,
 		"actors":        candidate.Actors,
 		"release_date":  chooseStr(in.ReleaseDate, candidate.ReleaseDate),
-		"javdb":         candidate.Raw,
+		"detail_url":    candidate.DetailURL,
+		scrapeSource:    candidate.Raw,
 		"manual":        in.Metadata,
 		"scrape_trace":  trace,
+	}
+	if sources, ok := candidate.Raw["merged_sources"]; ok {
+		meta["scrape_sources"] = sources
 	}
 	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, title, overview, thumbPath, meta, "uploaded"); err != nil {
 		return err
@@ -861,15 +888,23 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 	if title == "" {
 		title = keyword
 	}
+	scrapeSource := normalizeAVSourceName(candidate.Source)
+	if scrapeSource == "" {
+		scrapeSource = "javdb"
+	}
 	meta := map[string]any{
-		"scrape_source":  "javdb",
+		"scrape_source":  scrapeSource,
 		"external_id":    candidate.ExternalID,
 		"av_code":        candidate.Code,
 		"actors":         candidate.Actors,
 		"release_date":   candidate.ReleaseDate,
+		"detail_url":     candidate.DetailURL,
 		"search_keyword": keyword,
-		"javdb":          candidate.Raw,
+		scrapeSource:     candidate.Raw,
 		"scrape_trace":   trace,
+	}
+	if sources, ok := candidate.Raw["merged_sources"]; ok {
+		meta["scrape_sources"] = sources
 	}
 	scrape := ScrapeResult{
 		TMDBID:        0,

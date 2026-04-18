@@ -81,6 +81,10 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 							externalID = stringFromAny(javdb["external_id"])
 						}
 					}
+					scrapeSource := stringFromAny(raw["scrape_source"])
+					if scrapeSource == "" {
+						scrapeSource = "javdb"
+					}
 					ok(c, gin.H{
 						"from_cache": true,
 						"video_id":   video.ID,
@@ -90,9 +94,10 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 							"overview":        video.Description,
 							"poster_url":      video.ThumbnailPath,
 							"release_date":    raw["release_date"],
+							"detail_url":      raw["detail_url"],
 							"metadata":        raw,
 							"media_type_hint": "av",
-							"scrape_source":   "javdb",
+							"scrape_source":   scrapeSource,
 						}},
 					})
 					return

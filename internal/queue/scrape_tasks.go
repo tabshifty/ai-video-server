@@ -252,6 +252,16 @@ func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title s
 		return fmt.Errorf("no av candidate for %q", title)
 	}
 	first := candidates[0]
+	meta := anyMap(first["metadata"])
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	if anyString(meta["detail_url"]) == "" {
+		meta["detail_url"] = anyString(first["detail_url"])
+	}
+	if anyString(meta["scrape_source"]) == "" {
+		meta["scrape_source"] = anyString(first["scrape_source"])
+	}
 	input := services.ConfirmScrapeInput{
 		VideoID:     videoID,
 		ExternalID:  anyString(first["external_id"]),
@@ -259,7 +269,7 @@ func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title s
 		Overview:    anyString(first["overview"]),
 		PosterURL:   firstNonEmpty(anyString(first["poster_url"]), anyString(first["poster_path"])),
 		ReleaseDate: anyString(first["release_date"]),
-		Metadata:    anyMap(first["metadata"]),
+		Metadata:    meta,
 	}
 	if input.ExternalID == "" {
 		return fmt.Errorf("invalid av external_id from first candidate")

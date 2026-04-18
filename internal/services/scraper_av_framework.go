@@ -4,8 +4,39 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
+)
+
+var (
+	javDBVideoCoverImgRe     = regexp.MustCompile(`(?is)<img[^>]*class=["'][^"']*video-cover[^"']*["'][^>]*src=["']([^"']+)["']`)
+	javDBCodeClipboardRe     = regexp.MustCompile(`(?is)copy-to-clipboard[^>]*data-clipboard-text=["']([^"']+)["']`)
+	javDBOverviewFieldRe     = regexp.MustCompile(`(?is)(?:簡介|简介|介紹|Description)[^<]{0,20}</strong>\s*<span[^>]*>(.*?)</span>`)
+	javDBOverviewBlockRe     = regexp.MustCompile(`(?is)<div[^>]*class=["'][^"']*(?:synopsis|introduction|overview|video-detail|content|description)[^"']*["'][^>]*>(.*?)</div>`)
+	javDBActorFieldBlockRe   = regexp.MustCompile(`(?is)<span[^>]*>\s*<strong[^>]*>(?:演員|演员|Actress|Actor)[^<]*</strong>(.*?)</span>`)
+	javDBInlineActorNameRe   = regexp.MustCompile(`(?is)<a[^>]*href=["'][^"']*/actors/[^"']+["'][^>]*>(.*?)</a>`)
+	javDBFemaleActorNameRe   = regexp.MustCompile(`(?is)<strong[^>]*class=["'][^"']*(?:female|male)[^"']*["'][^>]*>.*?</strong>(.*?)</span>`)
+	javBusMovieBoxHrefRe     = regexp.MustCompile(`(?is)<a[^>]*class=["'][^"']*movie-box[^"']*["'][^>]*href=["']([^"']+)["']`)
+	javBusTitleRe            = regexp.MustCompile(`(?is)<h3[^>]*>(.*?)</h3>`)
+	javBusCodeFieldRe        = regexp.MustCompile(`(?is)(?:識別碼|识别码|識別码|番号|ID)[^<]{0,12}</span>\s*([^<\s]+)`)
+	javBusCoverHrefRe        = regexp.MustCompile(`(?is)<a[^>]*class=["'][^"']*bigImage[^"']*["'][^>]*href=["']([^"']+)["']`)
+	javBusReleaseFieldRe     = regexp.MustCompile(`(?is)(?:發行日期|发行日期|発売日|Release Date)[^<]{0,20}</span>\s*([^<]+)`)
+	javBusActorNameRe        = regexp.MustCompile(`(?is)<div[^>]*class=["'][^"']*star-name[^"']*["'][^>]*>\s*<a[^>]*>(.*?)</a>`)
+	javBusExternalIDPathRe   = regexp.MustCompile(`(?i)/([a-z0-9][a-z0-9._-]*)/?$`)
+	javLibrarySearchLinkRe   = regexp.MustCompile(`(?is)<a[^>]*href=["']([^"']*\?v=jav[^"']+)["'][^>]*`)
+	javLibraryTitleRe        = regexp.MustCompile(`(?is)<div[^>]*id=["']video_title["'][^>]*>.*?<h3[^>]*>\s*<a[^>]*>(.*?)</a>\s*</h3>`)
+	javLibraryCodeFieldRe    = regexp.MustCompile(`(?is)<div[^>]*id=["']video_id["'][^>]*>.*?<td[^>]*class=["']text["'][^>]*>(.*?)</td>`)
+	javLibraryCoverImgRe     = regexp.MustCompile(`(?is)<img[^>]*id=["']video_jacket_img["'][^>]*src=["']([^"']+)["']`)
+	javLibraryReleaseFieldRe = regexp.MustCompile(`(?is)<div[^>]*id=["']video_date["'][^>]*>.*?<td[^>]*class=["']text["'][^>]*>(.*?)</td>`)
+	javLibraryActorNameRe    = regexp.MustCompile(`(?is)<div[^>]*id=["']video_cast["'][^>]*>.*?<a[^>]*>(.*?)</a>`)
+	fc2TitleRe               = regexp.MustCompile(`(?is)<div[^>]*data-section=["']userInfo["'][^>]*>.*?<h3[^>]*>(.*?)</h3>`)
+	fc2SampleCoverRe         = regexp.MustCompile(`(?is)<ul[^>]*class=["'][^"']*items_article_SampleImagesArea[^"']*["'][^>]*>.*?<a[^>]*href=["']([^"']+)["']`)
+	fc2MainThumbRe           = regexp.MustCompile(`(?is)<div[^>]*class=["'][^"']*items_article_MainitemThumb[^"']*["'][^>]*>.*?<img[^>]*src=["']([^"']+)["']`)
+	fc2ReleaseFieldRe        = regexp.MustCompile(`(?is)<div[^>]*class=["'][^"']*items_article_Releasedate[^"']*["'][^>]*>.*?<p[^>]*>(.*?)</p>`)
+	fc2OverviewMetaRe        = regexp.MustCompile(`(?is)<meta[^>]+name=["']description["'][^>]*content=["']([^"']+)["']`)
+	fc2ExternalIDPathRe      = regexp.MustCompile(`(?i)/article/(\d{5,8})/?`)
+	fc2NumberRe              = regexp.MustCompile(`(?i)\b(?:FC2(?:-?PPV)?)?[-_ ]?(\d{5,8})\b`)
 )
 
 type avCrawlerProvider interface {
@@ -25,7 +56,12 @@ type staticAVCrawlerProvider struct {
 
 func newAVCrawlerProvider(svc *ScraperService) avCrawlerProvider {
 	return &staticAVCrawlerProvider{
-		crawlers: []avCrawler{newJavDBAVCrawler(svc)},
+		crawlers: []avCrawler{
+			newJavDBAVCrawler(svc),
+			newJavBusAVCrawler(svc),
+			newJavLibraryAVCrawler(svc),
+			newFC2AVCrawler(svc),
+		},
 	}
 }
 
@@ -181,6 +217,41 @@ func appendUniqueString(dst []string, item string) []string {
 	return append(dst, item)
 }
 
+func (s *ScraperService) avSiteBaseURL(site, fallback string) string {
+	configured := strings.TrimSuffix(strings.TrimSpace(s.avBaseURL), "/")
+	if configured == "" {
+		return fallback
+	}
+	if site == "javdb" {
+		return configured
+	}
+	host := ""
+	if parsed, err := url.Parse(configured); err == nil {
+		host = strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	}
+	if isLocalHost(host) {
+		return configured
+	}
+	return fallback
+}
+
+func isLocalHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return false
+	}
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return true
+	}
+	if strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "172.") {
+		return true
+	}
+	if strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".lan") {
+		return true
+	}
+	return false
+}
+
 func (s *ScraperService) defaultAVCrawler() avCrawler {
 	if s.avProvider == nil {
 		s.avProvider = newAVCrawlerProvider(s)
@@ -216,17 +287,24 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 	}
 	crawlers := s.avProvider.Crawlers()
 	if len(crawlers) == 0 {
-		crawler := newJavDBAVCrawler(s)
-		crawlers = []avCrawler{crawler}
+		crawlers = []avCrawler{newJavDBAVCrawler(s)}
+	}
+
+	rawLimit := limit * 4
+	if rawLimit < 12 {
+		rawLimit = 12
 	}
 
 	seen := map[string]struct{}{}
-	out := make([]avScrapeCandidate, 0, limit)
+	raw := make([]avScrapeCandidate, 0, rawLimit)
 	var firstErr error
 
 	for _, crawler := range crawlers {
 		run.setSource(crawler.Name())
 		for _, query := range queries {
+			if len(raw) >= rawLimit {
+				break
+			}
 			hits, err := crawler.SearchCandidates(ctx, run, query, limit)
 			if err != nil {
 				run.addError(err)
@@ -236,10 +314,11 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 				continue
 			}
 			for _, hit := range hits {
-				key := strings.TrimSpace(hit.ExternalID)
-				if key == "" {
-					key = strings.ToLower(strings.TrimSpace(hit.DetailURL))
+				if len(raw) >= rawLimit {
+					break
 				}
+				hit.Source = normalizeAVSourceName(chooseStr(hit.Source, crawler.Name()))
+				key := avCandidateIdentityKey(hit)
 				if key == "" {
 					continue
 				}
@@ -247,45 +326,165 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 					continue
 				}
 				seen[key] = struct{}{}
-				out = append(out, hit)
-				if len(out) >= limit {
-					out = prioritizeAVCandidatesByCode(out, targetCode)
-					if len(out) > 0 {
-						_, reason := scoreAVCandidate(out[0], targetCode, normalizedKeyword)
-						run.setMatch(reason, out[0].Code)
-					}
-					return out, run.toMap(), nil
-				}
+				raw = append(raw, hit)
 			}
-		}
-		if len(out) > 0 {
-			break
 		}
 	}
 
-	out = prioritizeAVCandidatesByCode(out, targetCode)
-	if len(out) > 0 {
-		_, reason := scoreAVCandidate(out[0], targetCode, normalizedKeyword)
-		run.setMatch(reason, out[0].Code)
-		return out, run.toMap(), nil
+	raw = prioritizeAVCandidatesByCode(raw, targetCode)
+	if len(raw) == 0 {
+		if firstErr != nil {
+			return nil, run.toMap(), firstErr
+		}
+		return nil, run.toMap(), nil
 	}
-	if firstErr != nil {
-		return nil, run.toMap(), firstErr
+
+	final := append([]avScrapeCandidate(nil), raw...)
+	if merged, ok := mergeAVCandidatesByField(raw, targetCode, normalizedKeyword); ok {
+		mergedKey := avCandidateIdentityKey(merged)
+		replaced := false
+		for i := range final {
+			if mergedKey != "" && avCandidateIdentityKey(final[i]) == mergedKey {
+				final[i] = merged
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			final = append([]avScrapeCandidate{merged}, final...)
+		}
 	}
-	return nil, run.toMap(), nil
+
+	if len(final) > limit {
+		final = final[:limit]
+	}
+	if len(final) > 0 {
+		run.setSource(final[0].Source)
+		_, reason := scoreAVCandidate(final[0], targetCode, normalizedKeyword)
+		run.setMatch(reason, final[0].Code)
+	}
+	trace := run.toMap()
+	trace["sources"] = collectAVCandidateSources(final)
+	trace["raw_candidate_count"] = len(raw)
+	if len(final) > 0 && final[0].Raw != nil {
+		if v, ok := final[0].Raw["field_sources"]; ok {
+			trace["field_sources"] = v
+		}
+		if v, ok := final[0].Raw["merged_sources"]; ok {
+			trace["merged_sources"] = v
+		}
+	}
+	return final, trace, nil
 }
 
 func (s *ScraperService) fetchAVCandidateByDetailURLWithTrace(ctx context.Context, detailURL string) (avScrapeCandidate, map[string]any, error) {
 	run := newAVScrapeRunContext("", extractAVCode(detailURL))
-	crawler := s.defaultAVCrawler()
+	crawler := s.resolveAVCrawlerByDetailURL(detailURL)
 	run.setSource(crawler.Name())
 	candidate, err := crawler.FetchByDetailURL(ctx, run, detailURL)
 	if err != nil {
 		run.addError(err)
 		return avScrapeCandidate{}, run.toMap(), err
 	}
+	if candidate.Source == "" {
+		candidate.Source = crawler.Name()
+	}
+	run.setSource(candidate.Source)
 	run.setMatch("detail_url", candidate.Code)
-	return candidate, run.toMap(), nil
+	trace := run.toMap()
+	trace["resolved_source"] = candidate.Source
+	return candidate, trace, nil
+}
+
+func (s *ScraperService) resolveAVCrawlerByDetailURL(detailURL string) avCrawler {
+	if s.avProvider == nil {
+		s.avProvider = newAVCrawlerProvider(s)
+	}
+	crawlers := s.avProvider.Crawlers()
+	if len(crawlers) == 0 {
+		return s.defaultAVCrawler()
+	}
+
+	host := ""
+	path := ""
+	query := url.Values{}
+	if parsed, err := url.Parse(strings.TrimSpace(detailURL)); err == nil {
+		host = strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+		path = strings.ToLower(strings.TrimSpace(parsed.Path))
+		query = parsed.Query()
+	}
+
+	for _, crawler := range crawlers {
+		if matchAVCrawlerDetailURL(crawler.Name(), host, path, query) {
+			return crawler
+		}
+	}
+	for _, crawler := range crawlers {
+		if crawler.Name() == "javdb" {
+			return crawler
+		}
+	}
+	return crawlers[0]
+}
+
+func (s *ScraperService) buildAVDetailURLBySource(source, externalID string) string {
+	source = normalizeAVSourceName(source)
+	externalID = strings.TrimSpace(externalID)
+	if externalID == "" {
+		return ""
+	}
+	switch source {
+	case "javbus":
+		return toAbsoluteURL(s.avSiteBaseURL("javbus", "https://www.javbus.com"), "/"+externalID)
+	case "javlibrary":
+		base := s.avSiteBaseURL("javlibrary", "https://www.javlibrary.com")
+		q := url.Values{}
+		q.Set("v", externalID)
+		return fmt.Sprintf("%s/cn/?%s", strings.TrimSuffix(base, "/"), q.Encode())
+	case "fc2":
+		number := normalizeFC2NumericID(externalID)
+		if number == "" {
+			number = normalizeFC2NumericID(extractAVCode(externalID))
+		}
+		if number == "" {
+			number = normalizeFC2NumericID(externalID)
+		}
+		if number == "" {
+			return ""
+		}
+		return toAbsoluteURL(s.avSiteBaseURL("fc2", "https://adult.contents.fc2.com"), "/article/"+number+"/")
+	default:
+		return toAbsoluteURL(s.avSiteBaseURL("javdb", "https://javdb.com"), "/v/"+externalID)
+	}
+}
+
+func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	path = strings.ToLower(strings.TrimSpace(path))
+	switch normalizeAVSourceName(name) {
+	case "javdb":
+		if strings.Contains(host, "javdb") {
+			return true
+		}
+		return strings.HasPrefix(path, "/v/")
+	case "javbus":
+		if strings.Contains(host, "javbus") {
+			return true
+		}
+		return path != "" && !strings.Contains(path, "vl_searchbyid") && !strings.Contains(path, "/article/") && !strings.HasPrefix(path, "/v/")
+	case "javlibrary":
+		if strings.Contains(host, "javlibrary") {
+			return true
+		}
+		return strings.Contains(path, "vl_searchbyid") || strings.HasPrefix(strings.ToLower(strings.TrimSpace(query.Get("v"))), "jav")
+	case "fc2":
+		if strings.Contains(host, "fc2") {
+			return true
+		}
+		return strings.Contains(path, "/article/")
+	default:
+		return false
+	}
 }
 
 func buildAVSearchQueries(keyword, code string) []string {
@@ -405,10 +604,8 @@ func (c *javDBAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunC
 		if candidate.ExternalID == "" {
 			candidate.ExternalID = extractJavDBVideoID(candidate.DetailURL)
 		}
-		key := strings.TrimSpace(candidate.ExternalID)
-		if key == "" {
-			key = strings.ToLower(strings.TrimSpace(candidate.DetailURL))
-		}
+		candidate.Source = c.Name()
+		key := avCandidateIdentityKey(candidate)
 		if key == "" {
 			continue
 		}
@@ -435,11 +632,17 @@ func (c *javDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunC
 	}
 	baseURL := c.baseURL()
 	candidate, fieldState := c.parser.Parse(content, detailURL, baseURL)
+	candidate.Source = c.Name()
+	candidate.DetailURL = chooseStr(candidate.DetailURL, detailURL)
+	if candidate.ExternalID == "" {
+		candidate.ExternalID = extractJavDBVideoID(candidate.DetailURL)
+	}
 	c.postProcess(&candidate)
 	if candidate.Raw == nil {
 		candidate.Raw = map[string]any{}
 	}
 	candidate.Raw["field_state"] = fieldState
+	candidate.Raw["source"] = c.Name()
 	return candidate, nil
 }
 
@@ -511,11 +714,361 @@ func (c *javDBAVCrawler) postProcess(candidate *avScrapeCandidate) {
 }
 
 func (c *javDBAVCrawler) baseURL() string {
-	baseURL := strings.TrimSuffix(strings.TrimSpace(c.svc.avBaseURL), "/")
-	if baseURL == "" {
-		baseURL = "https://javdb.com"
+	return c.svc.avSiteBaseURL("javdb", "https://javdb.com")
+}
+
+type javBusAVCrawler struct {
+	svc    *ScraperService
+	parser avDetailParser
+}
+
+func newJavBusAVCrawler(svc *ScraperService) *javBusAVCrawler {
+	return &javBusAVCrawler{
+		svc:    svc,
+		parser: &javBusDetailParser{},
 	}
-	return baseURL
+}
+
+func (c *javBusAVCrawler) Name() string {
+	return "javbus"
+}
+
+func (c *javBusAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = avPreviewLimitDefault
+	}
+	searchURL := c.buildSearchURL(query)
+	run.addSearchURL(searchURL)
+	run.addStep("search %s", searchURL)
+
+	content, err := c.svc.fetchAVHTML(ctx, searchURL)
+	if err != nil {
+		return nil, err
+	}
+	hits := c.parseSearchHits(content, limit)
+	if len(hits) == 0 {
+		run.addStep("no search result for query=%s", query)
+		return nil, nil
+	}
+
+	out := make([]avScrapeCandidate, 0, len(hits))
+	seen := map[string]struct{}{}
+	for _, hit := range hits {
+		if len(out) >= limit {
+			break
+		}
+		candidate, err := c.FetchByDetailURL(ctx, run, hit.DetailURL)
+		if err != nil {
+			run.addError(err)
+			continue
+		}
+		if candidate.ExternalID == "" {
+			candidate.ExternalID = strings.TrimSpace(hit.ExternalID)
+		}
+		candidate.Source = c.Name()
+		key := avCandidateIdentityKey(candidate)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, candidate)
+	}
+	return out, nil
+}
+
+func (c *javBusAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
+	detailURL = strings.TrimSpace(detailURL)
+	if detailURL == "" {
+		return avScrapeCandidate{}, fmt.Errorf("detail url is required")
+	}
+	run.addDetailURL(detailURL)
+	run.addStep("fetch detail %s", detailURL)
+
+	content, err := c.svc.fetchAVHTML(ctx, detailURL)
+	if err != nil {
+		return avScrapeCandidate{}, err
+	}
+	baseURL := c.baseURL()
+	candidate, fieldState := c.parser.Parse(content, detailURL, baseURL)
+	candidate.Source = c.Name()
+	candidate.DetailURL = chooseStr(candidate.DetailURL, detailURL)
+	if candidate.ExternalID == "" {
+		candidate.ExternalID = extractJavBusVideoID(candidate.DetailURL)
+	}
+	if candidate.Raw == nil {
+		candidate.Raw = map[string]any{}
+	}
+	candidate.Raw["field_state"] = fieldState
+	candidate.Raw["source"] = c.Name()
+	return candidate, nil
+}
+
+func (c *javBusAVCrawler) buildSearchURL(query string) string {
+	baseURL := strings.TrimSuffix(c.baseURL(), "/")
+	q := url.PathEscape(strings.TrimSpace(query))
+	return fmt.Sprintf("%s/search/%s", baseURL, q)
+}
+
+func (c *javBusAVCrawler) parseSearchHits(content string, limit int) []avSearchHit {
+	if limit <= 0 {
+		limit = avPreviewLimitDefault
+	}
+	matches := javBusMovieBoxHrefRe.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	baseURL := c.baseURL()
+	out := make([]avSearchHit, 0, limit)
+	seen := map[string]struct{}{}
+	for _, match := range matches {
+		if len(out) >= limit {
+			break
+		}
+		if len(match) < 2 {
+			continue
+		}
+		detailURL := toAbsoluteURL(baseURL, strings.TrimSpace(match[1]))
+		externalID := extractJavBusVideoID(detailURL)
+		key := strings.TrimSpace(externalID)
+		if key == "" {
+			key = strings.ToLower(strings.TrimSpace(detailURL))
+		}
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, avSearchHit{DetailURL: detailURL, ExternalID: externalID})
+	}
+	return out
+}
+
+func (c *javBusAVCrawler) baseURL() string {
+	return c.svc.avSiteBaseURL("javbus", "https://www.javbus.com")
+}
+
+type javLibraryAVCrawler struct {
+	svc    *ScraperService
+	parser avDetailParser
+}
+
+func newJavLibraryAVCrawler(svc *ScraperService) *javLibraryAVCrawler {
+	return &javLibraryAVCrawler{
+		svc:    svc,
+		parser: &javLibraryDetailParser{},
+	}
+}
+
+func (c *javLibraryAVCrawler) Name() string {
+	return "javlibrary"
+}
+
+func (c *javLibraryAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = avPreviewLimitDefault
+	}
+	searchURL := c.buildSearchURL(query)
+	run.addSearchURL(searchURL)
+	run.addStep("search %s", searchURL)
+
+	content, err := c.svc.fetchAVHTML(ctx, searchURL)
+	if err != nil {
+		return nil, err
+	}
+	hits := c.parseSearchHits(content, limit)
+	if len(hits) == 0 {
+		run.addStep("no search result for query=%s", query)
+		return nil, nil
+	}
+
+	out := make([]avScrapeCandidate, 0, len(hits))
+	seen := map[string]struct{}{}
+	for _, hit := range hits {
+		if len(out) >= limit {
+			break
+		}
+		candidate, err := c.FetchByDetailURL(ctx, run, hit.DetailURL)
+		if err != nil {
+			run.addError(err)
+			continue
+		}
+		if candidate.ExternalID == "" {
+			candidate.ExternalID = strings.TrimSpace(hit.ExternalID)
+		}
+		candidate.Source = c.Name()
+		key := avCandidateIdentityKey(candidate)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, candidate)
+	}
+	return out, nil
+}
+
+func (c *javLibraryAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
+	detailURL = strings.TrimSpace(detailURL)
+	if detailURL == "" {
+		return avScrapeCandidate{}, fmt.Errorf("detail url is required")
+	}
+	run.addDetailURL(detailURL)
+	run.addStep("fetch detail %s", detailURL)
+
+	content, err := c.svc.fetchAVHTML(ctx, detailURL)
+	if err != nil {
+		return avScrapeCandidate{}, err
+	}
+	baseURL := c.baseURL()
+	candidate, fieldState := c.parser.Parse(content, detailURL, baseURL)
+	candidate.Source = c.Name()
+	candidate.DetailURL = chooseStr(candidate.DetailURL, detailURL)
+	if candidate.ExternalID == "" {
+		candidate.ExternalID = extractJavLibraryVideoID(candidate.DetailURL)
+	}
+	if candidate.Raw == nil {
+		candidate.Raw = map[string]any{}
+	}
+	candidate.Raw["field_state"] = fieldState
+	candidate.Raw["source"] = c.Name()
+	return candidate, nil
+}
+
+func (c *javLibraryAVCrawler) buildSearchURL(query string) string {
+	baseURL := strings.TrimSuffix(c.baseURL(), "/")
+	q := url.Values{}
+	q.Set("keyword", strings.TrimSpace(query))
+	return fmt.Sprintf("%s/cn/vl_searchbyid.php?%s", baseURL, q.Encode())
+}
+
+func (c *javLibraryAVCrawler) parseSearchHits(content string, limit int) []avSearchHit {
+	if limit <= 0 {
+		limit = avPreviewLimitDefault
+	}
+	matches := javLibrarySearchLinkRe.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	baseURL := c.baseURL()
+	out := make([]avSearchHit, 0, limit)
+	seen := map[string]struct{}{}
+	for _, match := range matches {
+		if len(out) >= limit {
+			break
+		}
+		if len(match) < 2 {
+			continue
+		}
+		detailURL := toAbsoluteURL(baseURL, strings.TrimSpace(match[1]))
+		externalID := extractJavLibraryVideoID(detailURL)
+		key := strings.TrimSpace(externalID)
+		if key == "" {
+			key = strings.ToLower(strings.TrimSpace(detailURL))
+		}
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, avSearchHit{DetailURL: detailURL, ExternalID: externalID})
+	}
+	return out
+}
+
+func (c *javLibraryAVCrawler) baseURL() string {
+	return c.svc.avSiteBaseURL("javlibrary", "https://www.javlibrary.com")
+}
+
+type fc2AVCrawler struct {
+	svc    *ScraperService
+	parser avDetailParser
+}
+
+func newFC2AVCrawler(svc *ScraperService) *fc2AVCrawler {
+	return &fc2AVCrawler{
+		svc:    svc,
+		parser: &fc2DetailParser{},
+	}
+}
+
+func (c *fc2AVCrawler) Name() string {
+	return "fc2"
+}
+
+func (c *fc2AVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
+	number := normalizeFC2NumericID(query)
+	if number == "" {
+		code := extractAVCode(query)
+		number = normalizeFC2NumericID(code)
+	}
+	if number == "" {
+		return nil, nil
+	}
+	detailURL := toAbsoluteURL(c.baseURL(), "/article/"+number+"/")
+	run.addSearchURL(detailURL)
+	run.addStep("fc2 direct detail %s", detailURL)
+	candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(candidate.Title) == "" {
+		return nil, nil
+	}
+	candidate.Source = c.Name()
+	if candidate.ExternalID == "" {
+		candidate.ExternalID = number
+	}
+	return []avScrapeCandidate{candidate}, nil
+}
+
+func (c *fc2AVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
+	detailURL = strings.TrimSpace(detailURL)
+	if detailURL == "" {
+		return avScrapeCandidate{}, fmt.Errorf("detail url is required")
+	}
+	run.addDetailURL(detailURL)
+	run.addStep("fetch detail %s", detailURL)
+	content, err := c.svc.fetchAVHTML(ctx, detailURL)
+	if err != nil {
+		return avScrapeCandidate{}, err
+	}
+	baseURL := c.baseURL()
+	candidate, fieldState := c.parser.Parse(content, detailURL, baseURL)
+	candidate.Source = c.Name()
+	candidate.DetailURL = chooseStr(candidate.DetailURL, detailURL)
+	if candidate.ExternalID == "" {
+		candidate.ExternalID = extractFC2VideoID(candidate.DetailURL)
+	}
+	if candidate.ExternalID != "" && strings.TrimSpace(candidate.Code) == "" {
+		candidate.Code = "FC2-" + normalizeFC2NumericID(candidate.ExternalID)
+	}
+	if candidate.Raw == nil {
+		candidate.Raw = map[string]any{}
+	}
+	candidate.Raw["field_state"] = fieldState
+	candidate.Raw["source"] = c.Name()
+	return candidate, nil
+}
+
+func (c *fc2AVCrawler) baseURL() string {
+	return c.svc.avSiteBaseURL("fc2", "https://adult.contents.fc2.com")
 }
 
 type avSearchHit struct {
@@ -530,15 +1083,7 @@ type avDetailParser interface {
 type javDBDetailParser struct{}
 
 func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeCandidate, map[string]string) {
-	fieldState := map[string]string{
-		"title":        "empty",
-		"code":         "empty",
-		"poster_url":   "empty",
-		"overview":     "empty",
-		"release_date": "empty",
-		"actors":       "empty",
-		"trailer":      "not_supported",
-	}
+	fieldState := defaultAVFieldState()
 
 	title := extractJavDBTitle(content)
 	if title != "" {
@@ -546,6 +1091,11 @@ func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeC
 	}
 
 	code := extractAVCode(title)
+	if code == "" {
+		if mm := javDBCodeClipboardRe.FindStringSubmatch(content); len(mm) > 1 {
+			code = extractAVCode(stripHTMLText(mm[1]))
+		}
+	}
 	if code == "" {
 		if mm := javDBVideoCodeFieldRe.FindStringSubmatch(content); len(mm) > 1 {
 			code = extractAVCode(stripHTMLText(mm[1]))
@@ -558,15 +1108,7 @@ func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeC
 		fieldState["code"] = "filled"
 	}
 
-	posterURL := ""
-	if mm := javDBOGImageRe.FindStringSubmatch(content); len(mm) > 1 {
-		posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
-	}
-	if posterURL == "" {
-		if mm := imgSrcRe.FindStringSubmatch(content); len(mm) > 1 {
-			posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
-		}
-	}
+	posterURL, posterSource := extractJavDBPosterURL(content, baseURL)
 	if posterURL != "" {
 		fieldState["poster_url"] = "filled"
 	}
@@ -584,21 +1126,19 @@ func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeC
 		fieldState["release_date"] = "filled"
 	}
 
-	overview := ""
-	if mm := javDBDescriptionMetaRe.FindStringSubmatch(content); len(mm) > 1 {
-		overview = stripHTMLText(mm[1])
-	}
+	overview, overviewSource := extractJavDBOverview(content)
 	if overview != "" {
 		fieldState["overview"] = "filled"
 	}
 
-	actors := parseJavDBDetailActors(content)
+	actors := parseJavDBDetailActorsStrict(content)
 	if len(actors) > 0 {
 		fieldState["actors"] = "filled"
 	}
 
 	externalID := extractJavDBVideoID(detailURL)
 	candidate := avScrapeCandidate{
+		Source:      "javdb",
 		ExternalID:  externalID,
 		Code:        code,
 		Title:       title,
@@ -608,17 +1148,1043 @@ func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeC
 		Actors:      actors,
 		DetailURL:   detailURL,
 		Raw: map[string]any{
-			"detail_url":   detailURL,
-			"external_id":  externalID,
-			"code":         code,
-			"title":        title,
-			"overview":     overview,
-			"poster_url":   posterURL,
-			"release_date": releaseDate,
-			"actors":       actors,
+			"source":          "javdb",
+			"detail_url":      detailURL,
+			"external_id":     externalID,
+			"code":            code,
+			"title":           title,
+			"overview":        overview,
+			"overview_source": overviewSource,
+			"poster_url":      posterURL,
+			"poster_source":   posterSource,
+			"release_date":    releaseDate,
+			"actors":          actors,
 		},
 	}
 	return candidate, fieldState
+}
+
+type javBusDetailParser struct{}
+
+func (p *javBusDetailParser) Parse(content, detailURL, baseURL string) (avScrapeCandidate, map[string]string) {
+	fieldState := defaultAVFieldState()
+
+	title := ""
+	if mm := javBusTitleRe.FindStringSubmatch(content); len(mm) > 1 {
+		title = stripHTMLText(mm[1])
+	}
+	if title != "" {
+		fieldState["title"] = "filled"
+	}
+
+	code := ""
+	if mm := javBusCodeFieldRe.FindStringSubmatch(content); len(mm) > 1 {
+		code = extractAVCode(stripHTMLText(mm[1]))
+	}
+	if code == "" {
+		code = extractAVCode(title)
+	}
+	if code == "" {
+		code = extractAVCode(detailURL)
+	}
+	if code != "" {
+		fieldState["code"] = "filled"
+	}
+
+	posterURL := ""
+	posterSource := ""
+	if mm := javBusCoverHrefRe.FindStringSubmatch(content); len(mm) > 1 {
+		posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+		posterSource = "big_image"
+	}
+	if posterURL == "" {
+		if mm := javLibraryCoverImgRe.FindStringSubmatch(content); len(mm) > 1 {
+			posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+			posterSource = "cover_img"
+		}
+	}
+	if isLikelyLogoURL(posterURL) {
+		posterURL = ""
+		posterSource = ""
+	}
+	if posterURL != "" {
+		fieldState["poster_url"] = "filled"
+	}
+
+	releaseDate := ""
+	if mm := javBusReleaseFieldRe.FindStringSubmatch(content); len(mm) > 1 {
+		releaseDate = normalizeAVDate(stripHTMLText(mm[1]))
+	}
+	if releaseDate == "" {
+		if mm := javDBGenericDateInlineRe.FindStringSubmatch(content); len(mm) > 0 {
+			releaseDate = normalizeAVDate(mm[0])
+		}
+	}
+	if releaseDate != "" {
+		fieldState["release_date"] = "filled"
+	}
+
+	overview := ""
+	overviewSource := ""
+	if mm := javDBDescriptionMetaRe.FindStringSubmatch(content); len(mm) > 1 {
+		overview = stripHTMLText(mm[1])
+		overviewSource = "meta_description"
+	}
+	if isLikelyGenericOverview(overview) {
+		overview = ""
+		overviewSource = ""
+	}
+	if overview != "" {
+		fieldState["overview"] = "filled"
+	}
+
+	actors := parseActorNamesByRegex(content, javBusActorNameRe)
+	if len(actors) > 0 {
+		fieldState["actors"] = "filled"
+	}
+
+	externalID := extractJavBusVideoID(detailURL)
+	candidate := avScrapeCandidate{
+		Source:      "javbus",
+		ExternalID:  externalID,
+		Code:        code,
+		Title:       title,
+		Overview:    overview,
+		PosterURL:   posterURL,
+		ReleaseDate: releaseDate,
+		Actors:      actors,
+		DetailURL:   detailURL,
+		Raw: map[string]any{
+			"source":          "javbus",
+			"detail_url":      detailURL,
+			"external_id":     externalID,
+			"code":            code,
+			"title":           title,
+			"overview":        overview,
+			"overview_source": overviewSource,
+			"poster_url":      posterURL,
+			"poster_source":   posterSource,
+			"release_date":    releaseDate,
+			"actors":          actors,
+		},
+	}
+	return candidate, fieldState
+}
+
+type javLibraryDetailParser struct{}
+
+func (p *javLibraryDetailParser) Parse(content, detailURL, baseURL string) (avScrapeCandidate, map[string]string) {
+	fieldState := defaultAVFieldState()
+
+	title := ""
+	if mm := javLibraryTitleRe.FindStringSubmatch(content); len(mm) > 1 {
+		title = stripHTMLText(mm[1])
+	}
+	if title != "" {
+		fieldState["title"] = "filled"
+	}
+
+	code := ""
+	if mm := javLibraryCodeFieldRe.FindStringSubmatch(content); len(mm) > 1 {
+		code = extractAVCode(stripHTMLText(mm[1]))
+	}
+	if code == "" {
+		code = extractAVCode(title)
+	}
+	if code == "" {
+		code = extractAVCode(detailURL)
+	}
+	if code != "" {
+		fieldState["code"] = "filled"
+	}
+
+	posterURL := ""
+	posterSource := ""
+	if mm := javLibraryCoverImgRe.FindStringSubmatch(content); len(mm) > 1 {
+		posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+		posterSource = "video_jacket"
+	}
+	if isLikelyLogoURL(posterURL) {
+		posterURL = ""
+		posterSource = ""
+	}
+	if posterURL != "" {
+		fieldState["poster_url"] = "filled"
+	}
+
+	releaseDate := ""
+	if mm := javLibraryReleaseFieldRe.FindStringSubmatch(content); len(mm) > 1 {
+		releaseDate = normalizeAVDate(stripHTMLText(mm[1]))
+	}
+	if releaseDate != "" {
+		fieldState["release_date"] = "filled"
+	}
+
+	overview := ""
+	overviewSource := ""
+	if mm := javDBDescriptionMetaRe.FindStringSubmatch(content); len(mm) > 1 {
+		overview = stripHTMLText(mm[1])
+		overviewSource = "meta_description"
+	}
+	if isLikelyGenericOverview(overview) {
+		overview = ""
+		overviewSource = ""
+	}
+	if overview != "" {
+		fieldState["overview"] = "filled"
+	}
+
+	actors := parseActorNamesByRegex(content, javLibraryActorNameRe)
+	if len(actors) > 0 {
+		fieldState["actors"] = "filled"
+	}
+
+	externalID := extractJavLibraryVideoID(detailURL)
+	candidate := avScrapeCandidate{
+		Source:      "javlibrary",
+		ExternalID:  externalID,
+		Code:        code,
+		Title:       title,
+		Overview:    overview,
+		PosterURL:   posterURL,
+		ReleaseDate: releaseDate,
+		Actors:      actors,
+		DetailURL:   detailURL,
+		Raw: map[string]any{
+			"source":          "javlibrary",
+			"detail_url":      detailURL,
+			"external_id":     externalID,
+			"code":            code,
+			"title":           title,
+			"overview":        overview,
+			"overview_source": overviewSource,
+			"poster_url":      posterURL,
+			"poster_source":   posterSource,
+			"release_date":    releaseDate,
+			"actors":          actors,
+		},
+	}
+	return candidate, fieldState
+}
+
+type fc2DetailParser struct{}
+
+func (p *fc2DetailParser) Parse(content, detailURL, baseURL string) (avScrapeCandidate, map[string]string) {
+	fieldState := defaultAVFieldState()
+
+	title := ""
+	if mm := fc2TitleRe.FindStringSubmatch(content); len(mm) > 1 {
+		title = stripHTMLText(mm[1])
+	}
+	if title == "" {
+		if mm := javDBPageTitleRe.FindStringSubmatch(content); len(mm) > 1 {
+			title = strings.TrimSpace(strings.TrimSuffix(stripHTMLText(mm[1]), "- FC2"))
+		}
+	}
+	if title != "" {
+		fieldState["title"] = "filled"
+	}
+
+	externalID := extractFC2VideoID(detailURL)
+	code := ""
+	if externalID != "" {
+		code = "FC2-" + normalizeFC2NumericID(externalID)
+	}
+	if code == "" {
+		code = extractAVCode(title)
+	}
+	if code != "" {
+		fieldState["code"] = "filled"
+	}
+
+	posterURL := ""
+	posterSource := ""
+	if mm := fc2SampleCoverRe.FindStringSubmatch(content); len(mm) > 1 {
+		posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+		posterSource = "sample_image"
+	}
+	if posterURL == "" {
+		if mm := fc2MainThumbRe.FindStringSubmatch(content); len(mm) > 1 {
+			posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+			posterSource = "main_thumb"
+		}
+	}
+	if isLikelyLogoURL(posterURL) {
+		posterURL = ""
+		posterSource = ""
+	}
+	if posterURL != "" {
+		fieldState["poster_url"] = "filled"
+	}
+
+	releaseDate := ""
+	if mm := fc2ReleaseFieldRe.FindStringSubmatch(content); len(mm) > 1 {
+		releaseDate = normalizeAVDate(stripHTMLText(mm[1]))
+	}
+	if releaseDate != "" {
+		fieldState["release_date"] = "filled"
+	}
+
+	overview := ""
+	overviewSource := ""
+	if mm := fc2OverviewMetaRe.FindStringSubmatch(content); len(mm) > 1 {
+		overview = stripHTMLText(mm[1])
+		overviewSource = "meta_description"
+	}
+	if isLikelyGenericOverview(overview) {
+		overview = ""
+		overviewSource = ""
+	}
+	if overview != "" {
+		fieldState["overview"] = "filled"
+	}
+
+	candidate := avScrapeCandidate{
+		Source:      "fc2",
+		ExternalID:  externalID,
+		Code:        code,
+		Title:       title,
+		Overview:    overview,
+		PosterURL:   posterURL,
+		ReleaseDate: releaseDate,
+		Actors:      nil,
+		DetailURL:   detailURL,
+		Raw: map[string]any{
+			"source":          "fc2",
+			"detail_url":      detailURL,
+			"external_id":     externalID,
+			"code":            code,
+			"title":           title,
+			"overview":        overview,
+			"overview_source": overviewSource,
+			"poster_url":      posterURL,
+			"poster_source":   posterSource,
+			"release_date":    releaseDate,
+			"actors":          []string{},
+		},
+	}
+	return candidate, fieldState
+}
+
+func defaultAVFieldState() map[string]string {
+	return map[string]string{
+		"title":        "empty",
+		"code":         "empty",
+		"poster_url":   "empty",
+		"overview":     "empty",
+		"release_date": "empty",
+		"actors":       "empty",
+		"trailer":      "not_supported",
+	}
+}
+
+func parseJavDBDetailActorsStrict(content string) []string {
+	out := make([]string, 0, 8)
+	seen := map[string]struct{}{}
+	appendName := func(raw string) {
+		name := strings.Join(strings.Fields(stripHTMLText(raw)), " ")
+		if !isLikelyActorName(name) {
+			return
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+
+	if mm := javDBActorFieldBlockRe.FindStringSubmatch(content); len(mm) > 1 {
+		for _, actorMM := range javDBInlineActorNameRe.FindAllStringSubmatch(mm[1], -1) {
+			if len(actorMM) > 1 {
+				appendName(actorMM[1])
+			}
+		}
+	}
+	if len(out) > 0 {
+		return out
+	}
+
+	if mm := javDBFemaleActorNameRe.FindStringSubmatch(content); len(mm) > 1 {
+		for _, actorMM := range javDBInlineActorNameRe.FindAllStringSubmatch(mm[1], -1) {
+			if len(actorMM) > 1 {
+				appendName(actorMM[1])
+			}
+		}
+	}
+	if len(out) > 0 {
+		return out
+	}
+
+	matches := javDBActorAnchorRe.FindAllStringSubmatch(content, -1)
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		appendName(match[2])
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func parseActorNamesByRegex(content string, re *regexp.Regexp) []string {
+	if re == nil {
+		return nil
+	}
+	matches := re.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(matches))
+	seen := map[string]struct{}{}
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		name := strings.Join(strings.Fields(stripHTMLText(match[1])), " ")
+		if !isLikelyActorName(name) {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func isLikelyActorName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	if len([]rune(name)) > 48 {
+		return false
+	}
+	low := strings.ToLower(name)
+	noise := []string{"more", "更多", "全部", "查看", "profile", "详情", "演員", "演员", "actress", "actor"}
+	for _, n := range noise {
+		if low == n {
+			return false
+		}
+	}
+	return true
+}
+
+func extractJavDBPosterURL(content, baseURL string) (string, string) {
+	if mm := javDBVideoCoverImgRe.FindStringSubmatch(content); len(mm) > 1 {
+		posterURL := toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+		if !isLikelyLogoURL(posterURL) {
+			return posterURL, "video_cover"
+		}
+	}
+	if mm := javDBOGImageRe.FindStringSubmatch(content); len(mm) > 1 {
+		posterURL := toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+		if !isLikelyLogoURL(posterURL) {
+			return posterURL, "og_image"
+		}
+	}
+	return "", ""
+}
+
+func extractJavDBOverview(content string) (string, string) {
+	if mm := javDBOverviewFieldRe.FindStringSubmatch(content); len(mm) > 1 {
+		overview := stripHTMLText(mm[1])
+		if !isLikelyGenericOverview(overview) {
+			return overview, "detail_field"
+		}
+	}
+	if mm := javDBOverviewBlockRe.FindStringSubmatch(content); len(mm) > 1 {
+		overview := stripHTMLText(mm[1])
+		if !isLikelyGenericOverview(overview) {
+			return overview, "detail_block"
+		}
+	}
+	if mm := javDBDescriptionMetaRe.FindStringSubmatch(content); len(mm) > 1 {
+		overview := stripHTMLText(mm[1])
+		if !isLikelyGenericOverview(overview) {
+			return overview, "meta_description"
+		}
+	}
+	return "", ""
+}
+
+func isLikelyLogoURL(raw string) bool {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	if v == "" {
+		return false
+	}
+	logoTokens := []string{"logo", "favicon", "icon", "navbar", "brand", "avatar", "banner"}
+	for _, token := range logoTokens {
+		if strings.Contains(v, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func isLikelyGenericOverview(raw string) bool {
+	text := strings.ToLower(strings.TrimSpace(raw))
+	if text == "" {
+		return false
+	}
+	if len([]rune(text)) < 4 {
+		return true
+	}
+	genericTokens := []string{"javdb", "javbus", "javlibrary", "adult.contents.fc2", "在线看", "在线观看", "線上看", "番号", "magnet", "torrent", "下载", "下載"}
+	count := 0
+	for _, token := range genericTokens {
+		if strings.Contains(text, token) {
+			count++
+		}
+	}
+	return count >= 2
+}
+
+func extractJavBusVideoID(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	path := strings.TrimSpace(parsed.Path)
+	if path == "" || path == "/" {
+		return ""
+	}
+	if mm := javBusExternalIDPathRe.FindStringSubmatch(path); len(mm) > 1 {
+		return strings.TrimSpace(mm[1])
+	}
+	return ""
+}
+
+func extractJavLibraryVideoID(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	if id := strings.TrimSpace(parsed.Query().Get("v")); id != "" {
+		return id
+	}
+	return ""
+}
+
+func normalizeFC2NumericID(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if mm := fc2NumberRe.FindStringSubmatch(raw); len(mm) > 1 {
+		num := strings.TrimLeft(strings.TrimSpace(mm[1]), "0")
+		if num == "" {
+			num = "0"
+		}
+		return num
+	}
+	if mm := fc2ExternalIDPathRe.FindStringSubmatch(raw); len(mm) > 1 {
+		num := strings.TrimLeft(strings.TrimSpace(mm[1]), "0")
+		if num == "" {
+			num = "0"
+		}
+		return num
+	}
+	return ""
+}
+
+func extractFC2VideoID(rawURL string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return ""
+	}
+	if mm := fc2ExternalIDPathRe.FindStringSubmatch(rawURL); len(mm) > 1 {
+		return normalizeFC2NumericID(mm[1])
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return normalizeFC2NumericID(rawURL)
+	}
+	if mm := fc2ExternalIDPathRe.FindStringSubmatch(parsed.Path); len(mm) > 1 {
+		return normalizeFC2NumericID(mm[1])
+	}
+	return normalizeFC2NumericID(rawURL)
+}
+
+func normalizeAVSourceName(source string) string {
+	source = strings.ToLower(strings.TrimSpace(source))
+	source = strings.ReplaceAll(source, "-", "")
+	source = strings.ReplaceAll(source, "_", "")
+	switch source {
+	case "javdb":
+		return "javdb"
+	case "javbus":
+		return "javbus"
+	case "javlibrary", "javlib":
+		return "javlibrary"
+	case "fc2", "fc2ppv", "adultfc2":
+		return "fc2"
+	default:
+		return source
+	}
+}
+
+func avCandidateIdentityKey(candidate avScrapeCandidate) string {
+	source := normalizeAVSourceName(candidate.Source)
+	externalID := strings.ToLower(strings.TrimSpace(candidate.ExternalID))
+	detailURL := strings.ToLower(strings.TrimSpace(candidate.DetailURL))
+	if source == "" {
+		source = "unknown"
+	}
+	if externalID != "" {
+		return source + "|id|" + externalID
+	}
+	if detailURL != "" {
+		return source + "|url|" + detailURL
+	}
+	if code := normalizeAVCodeForCompare(candidate.Code); code != "" {
+		return source + "|code|" + code
+	}
+	return ""
+}
+
+func collectAVCandidateSources(candidates []avScrapeCandidate) []string {
+	if len(candidates) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		source := normalizeAVSourceName(candidate.Source)
+		if source == "" {
+			continue
+		}
+		if _, ok := seen[source]; ok {
+			continue
+		}
+		seen[source] = struct{}{}
+		out = append(out, source)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func mergeAVCandidatesByField(candidates []avScrapeCandidate, targetCode, keyword string) (avScrapeCandidate, bool) {
+	if len(candidates) == 0 {
+		return avScrapeCandidate{}, false
+	}
+
+	groups := map[string][]avScrapeCandidate{}
+	groupOrder := make([]string, 0, len(candidates))
+	for i, candidate := range candidates {
+		candidate.Source = normalizeAVSourceName(candidate.Source)
+		key := avCandidateGroupKey(candidate)
+		if key == "" {
+			key = fmt.Sprintf("fallback:%d", i)
+		}
+		if _, exists := groups[key]; !exists {
+			groupOrder = append(groupOrder, key)
+		}
+		groups[key] = append(groups[key], candidate)
+	}
+	if len(groupOrder) == 0 {
+		return avScrapeCandidate{}, false
+	}
+
+	bestKey := ""
+	bestGroupScore := -1
+	for _, key := range groupOrder {
+		score := scoreAVCandidateGroup(groups[key], targetCode, keyword)
+		if score > bestGroupScore {
+			bestGroupScore = score
+			bestKey = key
+		}
+	}
+	selected := groups[bestKey]
+	if len(selected) == 0 {
+		return avScrapeCandidate{}, false
+	}
+
+	primary := pickPrimaryAVCandidate(selected, targetCode, keyword)
+	merged := primary
+	fieldSources := map[string]string{}
+
+	title, titleSource := selectBestTitle(selected, targetCode, keyword)
+	if title != "" {
+		merged.Title = title
+		fieldSources["title"] = titleSource
+	}
+
+	code, codeSource := selectBestCode(selected, targetCode)
+	if code != "" {
+		merged.Code = code
+		fieldSources["code"] = codeSource
+	}
+	if merged.Code == "" {
+		merged.Code = extractAVCode(chooseStr(merged.Title, merged.DetailURL))
+	}
+
+	posterURL, posterSource := selectBestPosterURL(selected)
+	if posterURL != "" {
+		merged.PosterURL = posterURL
+		fieldSources["poster_url"] = posterSource
+	}
+
+	overview, overviewSource := selectBestOverview(selected)
+	if overview != "" {
+		merged.Overview = overview
+		fieldSources["overview"] = overviewSource
+	}
+
+	releaseDate, releaseSource := selectBestReleaseDate(selected, targetCode, keyword)
+	if releaseDate != "" {
+		merged.ReleaseDate = releaseDate
+		fieldSources["release_date"] = releaseSource
+	}
+
+	actors, actorSource := mergeBestActors(selected)
+	if len(actors) > 0 {
+		merged.Actors = actors
+		fieldSources["actors"] = actorSource
+	}
+
+	if strings.TrimSpace(merged.ExternalID) == "" {
+		for _, candidate := range selected {
+			if strings.TrimSpace(candidate.ExternalID) != "" {
+				merged.ExternalID = strings.TrimSpace(candidate.ExternalID)
+				break
+			}
+		}
+	}
+	if strings.TrimSpace(merged.DetailURL) == "" {
+		for _, candidate := range selected {
+			if strings.TrimSpace(candidate.DetailURL) != "" {
+				merged.DetailURL = strings.TrimSpace(candidate.DetailURL)
+				break
+			}
+		}
+	}
+	if strings.TrimSpace(merged.Source) == "" {
+		merged.Source = "javdb"
+	}
+
+	rawCandidates := make([]map[string]any, 0, len(selected))
+	for _, candidate := range selected {
+		rawCandidates = append(rawCandidates, map[string]any{
+			"source":       candidate.Source,
+			"external_id":  candidate.ExternalID,
+			"detail_url":   candidate.DetailURL,
+			"code":         candidate.Code,
+			"title":        candidate.Title,
+			"overview":     candidate.Overview,
+			"poster_url":   candidate.PosterURL,
+			"release_date": candidate.ReleaseDate,
+			"actors":       append([]string(nil), candidate.Actors...),
+			"metadata":     candidate.Raw,
+		})
+	}
+
+	merged.Raw = map[string]any{
+		"source":         merged.Source,
+		"detail_url":     merged.DetailURL,
+		"external_id":    merged.ExternalID,
+		"code":           merged.Code,
+		"title":          merged.Title,
+		"overview":       merged.Overview,
+		"poster_url":     merged.PosterURL,
+		"release_date":   merged.ReleaseDate,
+		"actors":         append([]string(nil), merged.Actors...),
+		"field_sources":  fieldSources,
+		"merged":         true,
+		"merged_sources": collectAVCandidateSources(selected),
+		"raw_candidates": rawCandidates,
+	}
+	return merged, true
+}
+
+func avCandidateGroupKey(candidate avScrapeCandidate) string {
+	if code := normalizeAVCodeForCompare(candidate.Code); code != "" {
+		return "code:" + code
+	}
+	if code := normalizeAVCodeForCompare(extractAVCode(candidate.Title)); code != "" {
+		return "code:" + code
+	}
+	if code := normalizeAVCodeForCompare(extractAVCode(candidate.DetailURL)); code != "" {
+		return "code:" + code
+	}
+	title := normalizeAVCodeForCompare(candidate.Title)
+	if title != "" {
+		return "title:" + title
+	}
+	if detail := strings.ToLower(strings.TrimSpace(candidate.DetailURL)); detail != "" {
+		return "url:" + detail
+	}
+	return ""
+}
+
+func scoreAVCandidateGroup(group []avScrapeCandidate, targetCode, keyword string) int {
+	if len(group) == 0 {
+		return -1
+	}
+	best := -1
+	total := 0
+	hasPoster := false
+	hasActors := false
+	for _, candidate := range group {
+		score, _ := scoreAVCandidate(candidate, targetCode, keyword)
+		if score > best {
+			best = score
+		}
+		total += score
+		if !isLikelyLogoURL(candidate.PosterURL) && strings.TrimSpace(candidate.PosterURL) != "" {
+			hasPoster = true
+		}
+		if len(candidate.Actors) > 0 {
+			hasActors = true
+		}
+	}
+	groupScore := best*3 + total + len(group)*80
+	if hasPoster {
+		groupScore += 80
+	}
+	if hasActors {
+		groupScore += 40
+	}
+	return groupScore
+}
+
+func pickPrimaryAVCandidate(group []avScrapeCandidate, targetCode, keyword string) avScrapeCandidate {
+	primary := group[0]
+	best := -1
+	for _, candidate := range group {
+		score, _ := scoreAVCandidate(candidate, targetCode, keyword)
+		if strings.TrimSpace(candidate.DetailURL) != "" {
+			score += 20
+		}
+		if strings.TrimSpace(candidate.ExternalID) != "" {
+			score += 15
+		}
+		if score > best {
+			best = score
+			primary = candidate
+		}
+	}
+	return primary
+}
+
+func selectBestTitle(candidates []avScrapeCandidate, targetCode, keyword string) (string, string) {
+	bestValue := ""
+	bestSource := ""
+	bestScore := -1
+	for _, candidate := range candidates {
+		title := strings.TrimSpace(candidate.Title)
+		if title == "" {
+			continue
+		}
+		score, _ := scoreAVCandidate(candidate, targetCode, keyword)
+		score += minInt(len([]rune(title)), 80)
+		if strings.TrimSpace(candidate.Code) != "" && strings.Contains(normalizeAVCodeForCompare(title), normalizeAVCodeForCompare(candidate.Code)) {
+			score += 35
+		}
+		if score > bestScore {
+			bestScore = score
+			bestValue = title
+			bestSource = candidate.Source
+		}
+	}
+	return bestValue, bestSource
+}
+
+func selectBestCode(candidates []avScrapeCandidate, targetCode string) (string, string) {
+	bestValue := ""
+	bestSource := ""
+	bestScore := -1
+	targetNorm := normalizeAVCodeForCompare(targetCode)
+	for _, candidate := range candidates {
+		code := strings.TrimSpace(candidate.Code)
+		if code == "" {
+			code = extractAVCode(candidate.Title)
+		}
+		if code == "" {
+			continue
+		}
+		score := 100
+		codeNorm := normalizeAVCodeForCompare(code)
+		if targetNorm != "" {
+			if codeNorm == targetNorm {
+				score += 220
+			}
+			if strings.Contains(codeNorm, targetNorm) || strings.Contains(targetNorm, codeNorm) {
+				score += 120
+			}
+		}
+		if strings.TrimSpace(candidate.Title) != "" && strings.Contains(normalizeAVCodeForCompare(candidate.Title), codeNorm) {
+			score += 40
+		}
+		if score > bestScore {
+			bestScore = score
+			bestValue = code
+			bestSource = candidate.Source
+		}
+	}
+	return bestValue, bestSource
+}
+
+func selectBestPosterURL(candidates []avScrapeCandidate) (string, string) {
+	bestValue := ""
+	bestSource := ""
+	bestScore := -1
+	for _, candidate := range candidates {
+		posterURL := strings.TrimSpace(candidate.PosterURL)
+		if posterURL == "" || isLikelyLogoURL(posterURL) {
+			continue
+		}
+		score := 100
+		posterLower := strings.ToLower(posterURL)
+		if strings.Contains(posterLower, "/cover") || strings.Contains(posterLower, "video-cover") {
+			score += 120
+		}
+		if strings.Contains(posterLower, "jacket") {
+			score += 90
+		}
+		if strings.Contains(posterLower, "/thumb") || strings.Contains(posterLower, "sample") {
+			score += 40
+		}
+		if rawPosterSource, ok := candidate.Raw["poster_source"].(string); ok {
+			rawPosterSource = strings.ToLower(strings.TrimSpace(rawPosterSource))
+			switch rawPosterSource {
+			case "video_cover", "big_image", "video_jacket", "sample_image":
+				score += 100
+			case "og_image", "meta_og":
+				score += 20
+			}
+		}
+		if score > bestScore {
+			bestScore = score
+			bestValue = posterURL
+			bestSource = candidate.Source
+		}
+	}
+	return bestValue, bestSource
+}
+
+func selectBestOverview(candidates []avScrapeCandidate) (string, string) {
+	bestValue := ""
+	bestSource := ""
+	bestScore := -1
+	for _, candidate := range candidates {
+		overview := strings.TrimSpace(candidate.Overview)
+		if overview == "" || isLikelyGenericOverview(overview) {
+			continue
+		}
+		score := minInt(len([]rune(overview)), 220)
+		if rawOverviewSource, ok := candidate.Raw["overview_source"].(string); ok {
+			rawOverviewSource = strings.ToLower(strings.TrimSpace(rawOverviewSource))
+			switch rawOverviewSource {
+			case "detail_field", "detail_block":
+				score += 120
+			case "meta_description":
+				score += 20
+			}
+		}
+		if score > bestScore {
+			bestScore = score
+			bestValue = overview
+			bestSource = candidate.Source
+		}
+	}
+	return bestValue, bestSource
+}
+
+func selectBestReleaseDate(candidates []avScrapeCandidate, targetCode, keyword string) (string, string) {
+	bestValue := ""
+	bestSource := ""
+	bestScore := -1
+	for _, candidate := range candidates {
+		releaseDate := normalizeAVDate(candidate.ReleaseDate)
+		if releaseDate == "" {
+			continue
+		}
+		score, _ := scoreAVCandidate(candidate, targetCode, keyword)
+		score += 50
+		if score > bestScore {
+			bestScore = score
+			bestValue = releaseDate
+			bestSource = candidate.Source
+		}
+	}
+	return bestValue, bestSource
+}
+
+func mergeBestActors(candidates []avScrapeCandidate) ([]string, string) {
+	base := []string{}
+	baseSource := ""
+	baseScore := -1
+	for _, candidate := range candidates {
+		filtered := filterActorNames(candidate.Actors)
+		score := len(filtered)
+		if score > baseScore {
+			baseScore = score
+			base = filtered
+			baseSource = candidate.Source
+		}
+	}
+	if len(base) == 0 {
+		return nil, ""
+	}
+	merged := append([]string(nil), base...)
+	seen := map[string]struct{}{}
+	for _, actor := range merged {
+		seen[strings.ToLower(actor)] = struct{}{}
+	}
+	for _, candidate := range candidates {
+		if candidate.Source == baseSource {
+			continue
+		}
+		for _, actor := range filterActorNames(candidate.Actors) {
+			key := strings.ToLower(actor)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			merged = append(merged, actor)
+		}
+	}
+	return merged, baseSource
+}
+
+func filterActorNames(names []string) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(names))
+	seen := map[string]struct{}{}
+	for _, raw := range names {
+		name := strings.Join(strings.Fields(strings.TrimSpace(raw)), " ")
+		if !isLikelyActorName(name) {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, name)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func prioritizeAVCandidatesByCode(candidates []avScrapeCandidate, code string) []avScrapeCandidate {

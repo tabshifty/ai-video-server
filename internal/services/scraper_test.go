@@ -912,3 +912,167 @@ func TestExtractAVCodeVariants(t *testing.T) {
 		})
 	}
 }
+
+func TestPreviewAVJavDBPrefersCoverAndDetailOverview(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/v/logo-case"><span>ABP-456 示例标题</span></a>
+  </body>
+</html>
+`))
+		case "/v/logo-case":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-456 示例标题 - JavDB</title>
+    <meta property="og:image" content="/static/site-logo.png" />
+    <meta name="description" content="JavDB 在线番号资源" />
+  </head>
+  <body>
+    <h2 class="title is-4">ABP-456 示例标题</h2>
+    <img class="video-cover" src="/covers/real-cover.jpg" />
+    <div><strong>番號:</strong><span>ABP-456</span></div>
+    <div><strong>日期:</strong><span>2024-04-05</span></div>
+    <div><strong>簡介:</strong><span>这是正确的剧情简介</span></div>
+    <span><strong>演員:</strong><span><a href="/actors/a1">演员甲</a><a href="/actors/a2">演员乙</a></span></span>
+    <a href="/actors/rank">更多</a>
+  </body>
+</html>
+`))
+		case "/covers/real-cover.jpg", "/static/site-logo.png":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-cover-test", time.Second)
+
+	got, err := svc.PreviewAV(context.Background(), "ABP-456")
+	if err != nil {
+		t.Fatalf("PreviewAV returned error: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatalf("expected av candidates, got none")
+	}
+	candidate := got[0]
+	if candidate["poster_url"] != server.URL+"/covers/real-cover.jpg" {
+		t.Fatalf("expected real cover, got=%v", candidate["poster_url"])
+	}
+	if candidate["overview"] != "这是正确的剧情简介" {
+		t.Fatalf("expected detail overview, got=%v", candidate["overview"])
+	}
+	actors, ok := candidate["actors"].([]string)
+	if !ok {
+		t.Fatalf("expected actors []string, got=%T", candidate["actors"])
+	}
+	if !reflect.DeepEqual(actors, []string{"演员甲", "演员乙"}) {
+		t.Fatalf("unexpected actors: %v", actors)
+	}
+}
+
+func TestPreviewAVMergeUsesBestFieldsAcrossSources(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/search":
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/v/javdb-hit"><span>ABP-999 合并样例</span></a>
+  </body>
+</html>
+`))
+		case r.URL.Path == "/search/ABP-999":
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a class="movie-box" href="/abp-999"></a>
+  </body>
+</html>
+`))
+		case r.URL.Path == "/cn/vl_searchbyid.php":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/v/javdb-hit":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-999 合并样例 - JavDB</title>
+    <meta property="og:image" content="/static/site-logo.png" />
+    <meta name="description" content="JavDB 在线番号资源" />
+  </head>
+  <body>
+    <h2 class="title is-4">ABP-999 合并样例</h2>
+    <div><strong>番號:</strong><span>ABP-999</span></div>
+    <div><strong>日期:</strong><span>2024-05-06</span></div>
+  </body>
+</html>
+`))
+		case r.URL.Path == "/abp-999":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-999 合并样例 - JavBus</title>
+    <meta name="description" content="更完整的剧情简介，应该用于合并结果" />
+  </head>
+  <body>
+    <h3>ABP-999 合并样例</h3>
+    <span class="header">識別碼:</span> ABP-999
+    <a class="bigImage" href="/covers/javbus-cover.jpg"></a>
+    <span class="header">發行日期:</span> 2024-05-06
+    <div class="star-name"><a href="/star/a1">演员甲</a></div>
+    <div class="star-name"><a href="/star/a2">演员乙</a></div>
+  </body>
+</html>
+`))
+		case r.URL.Path == "/covers/javbus-cover.jpg", r.URL.Path == "/static/site-logo.png":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-merge-test", time.Second)
+
+	got, err := svc.PreviewAV(context.Background(), "ABP-999")
+	if err != nil {
+		t.Fatalf("PreviewAV returned error: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatalf("expected av candidates, got none")
+	}
+	first := got[0]
+	if first["poster_url"] != server.URL+"/covers/javbus-cover.jpg" {
+		t.Fatalf("expected merged poster from javbus, got=%v", first["poster_url"])
+	}
+	actors, ok := first["actors"].([]string)
+	if !ok {
+		t.Fatalf("expected actors []string, got=%T", first["actors"])
+	}
+	if !reflect.DeepEqual(actors, []string{"演员甲", "演员乙"}) {
+		t.Fatalf("unexpected merged actors: %v", actors)
+	}
+	metadata, ok := first["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected metadata object, got=%T", first["metadata"])
+	}
+	fieldSources, ok := metadata["field_sources"].(map[string]string)
+	if !ok {
+		t.Fatalf("expected field_sources map[string]string, got=%T", metadata["field_sources"])
+	}
+	if fieldSources["poster_url"] != "javbus" {
+		t.Fatalf("expected poster_url from javbus, got=%v", fieldSources["poster_url"])
+	}
+	if fieldSources["actors"] != "javbus" {
+		t.Fatalf("expected actors from javbus, got=%v", fieldSources["actors"])
+	}
+}
