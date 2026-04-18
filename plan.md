@@ -15,6 +15,25 @@
 
 ---
 
+### [2026-04-18 12:52] 修复重转码仍不执行（输入输出同路径 + 失败收口 SQL 类型错误）
+- Type: `implementation`
+- Summary:
+  - 定位并修复重转码不执行根因一：当 `original_path` 缺失并回退到 `transcoded_path` 时，转码输入与输出同一路径，ffmpeg 无法原地覆盖导致立即失败。
+  - 转码服务新增“同路径保护”：若输入路径与输出路径相同，先转码到同目录临时文件，完成后再替换目标输出，避免 `Output same as Input` 错误。
+  - 定位并修复根因二：失败收口 SQL 参数类型推断错误（`MarkVideoFailed/FinishTranscodingJob`），导致任务失败后仍卡在 `running`、视频卡在 `processing`。
+  - 为失败收口 SQL 增加显式类型转换（`::text`），确保失败时任务和视频状态能正确落库。
+  - 新增单测覆盖同路径判定与临时输出路径生成。
+- Changed Files:
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `internal/repository/video_repository.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/services -run 'TestIsSameFilePath|TestBuildTranscodeOutputTempPath|TestDecideVideoBitrate|TestResolveProbeFieldsWithValidProbeParsesValues' -count=1` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 12:33] 修复重转码假运行与任务监控剩余时间异常
 - Type: `implementation`
 - Summary:

@@ -66,6 +66,11 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 
 	outputPath := filepath.Join(outputDir, "video.mp4")
 	thumbPath := filepath.Join(outputDir, "thumb.jpg")
+	transcodeOutputPath := outputPath
+	useTempOutput := isSameFilePath(inputPath, outputPath)
+	if useTempOutput {
+		transcodeOutputPath = buildTranscodeOutputTempPath(outputPath)
+	}
 
 	inputProbe, inputProbeErr := ffmpeg.Probe(ctx, inputPath)
 	sourceDurationSeconds := probeDurationSeconds(inputProbe.Duration)
@@ -97,8 +102,17 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	if plan.Mode == transcodeModeCRFFallback {
 		transcodeOptions.VideoBitrateKbps = 0
 	}
-	if err := ffmpeg.TranscodeHEVC(ctx, inputPath, outputPath, transcodeOptions); err != nil {
+	if err := ffmpeg.TranscodeHEVC(ctx, inputPath, transcodeOutputPath, transcodeOptions); err != nil {
+		if useTempOutput {
+			_ = os.Remove(transcodeOutputPath)
+		}
 		return TranscodeResult{}, err
+	}
+	if useTempOutput {
+		if err := replaceOutputFile(transcodeOutputPath, outputPath); err != nil {
+			_ = os.Remove(transcodeOutputPath)
+			return TranscodeResult{}, fmt.Errorf("replace transcode output file: %w", err)
+		}
 	}
 	if err := ffmpeg.Thumbnail(ctx, outputPath, thumbPath); err != nil {
 		return TranscodeResult{}, err
@@ -222,4 +236,38 @@ func chooseCRF(videoType string) string {
 	default:
 		return "23"
 	}
+}
+
+func isSameFilePath(a, b string) bool {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a == "" || b == "" {
+		return false
+	}
+	aAbs, aErr := filepath.Abs(filepath.Clean(a))
+	bAbs, bErr := filepath.Abs(filepath.Clean(b))
+	if aErr != nil || bErr != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return aAbs == bAbs
+}
+
+func buildTranscodeOutputTempPath(target string) string {
+	ext := filepath.Ext(target)
+	if ext == "" {
+		ext = ".mp4"
+	}
+	base := strings.TrimSuffix(filepath.Base(target), filepath.Ext(target))
+	if base == "" {
+		base = "video"
+	}
+	return filepath.Join(filepath.Dir(target), fmt.Sprintf(".%s.retranscode.%s%s", base, uuid.NewString(), ext))
+}
+
+func replaceOutputFile(tempPath, outputPath string) error {
+	if err := os.Rename(tempPath, outputPath); err == nil {
+		return nil
+	}
+	_ = os.Remove(outputPath)
+	return os.Rename(tempPath, outputPath)
 }

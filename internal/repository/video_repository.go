@@ -196,8 +196,10 @@ WHERE id=$1`, videoID, transcodedPath, thumbPath, duration, width, height, metaR
 func (r *VideoRepository) MarkVideoFailed(ctx context.Context, videoID uuid.UUID, reason string) error {
 	_, err := r.pool.Exec(ctx, `
 UPDATE videos
-SET status='failed', metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object('error', $2), updated_at=NOW()
-WHERE id=$1`, videoID, reason)
+SET status = 'failed',
+    metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('error', $2::text),
+    updated_at = NOW()
+WHERE id = $1`, videoID, reason)
 	if err != nil {
 		return fmt.Errorf("mark video failed: %w", err)
 	}
@@ -524,24 +526,24 @@ WHERE id = $1
 func (r *VideoRepository) FinishTranscodingJob(ctx context.Context, jobID int64, status, errMsg string) error {
 	_, err := r.pool.Exec(ctx, `
 UPDATE transcoding_jobs
-SET status=$2,
-    error_message=$3,
-    finished_at=NOW(),
+SET status = $2::text,
+    error_message = $3::text,
+    finished_at = NOW(),
     processed_seconds = CASE
-        WHEN $2 = 'success' THEN COALESCE(source_duration_seconds, processed_seconds)
+        WHEN $2::text = 'success' THEN COALESCE(source_duration_seconds, processed_seconds)
         ELSE processed_seconds
     END,
     remaining_seconds = CASE
-        WHEN $2 = 'success' THEN 0
+        WHEN $2::text = 'success' THEN 0
         ELSE remaining_seconds
     END,
     progress_percent = CASE
-        WHEN $2 = 'success' THEN 100
-        WHEN progress_percent IS NULL AND $2 = 'failed' THEN 0
+        WHEN $2::text = 'success' THEN 100
+        WHEN progress_percent IS NULL AND $2::text = 'failed' THEN 0
         ELSE progress_percent
     END,
     progress_updated_at = NOW()
-WHERE id=$1`, jobID, status, errMsg)
+WHERE id = $1`, jobID, status, errMsg)
 	if err != nil {
 		return fmt.Errorf("finish transcoding job: %w", err)
 	}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"video-server/pkg/ffmpeg"
@@ -167,5 +168,35 @@ func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 	}
 	if _, ok := metadata["probe_error"]; ok {
 		t.Fatalf("did not expect probe_error metadata")
+	}
+}
+
+func TestIsSameFilePath(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "videos", "abc", "video.mp4")
+	same := filepath.Join(filepath.Dir(base), ".", "video.mp4")
+	other := filepath.Join(filepath.Dir(base), "video-2.mp4")
+
+	if !isSameFilePath(base, same) {
+		t.Fatalf("expected same file path")
+	}
+	if isSameFilePath(base, other) {
+		t.Fatalf("expected different file path")
+	}
+	if isSameFilePath("", base) {
+		t.Fatalf("expected empty path as different")
+	}
+}
+
+func TestBuildTranscodeOutputTempPath(t *testing.T) {
+	target := filepath.Join("/tmp", "videos", "abc", "video.mp4")
+	got := buildTranscodeOutputTempPath(target)
+	if got == target {
+		t.Fatalf("temp path should differ from target")
+	}
+	if filepath.Ext(got) != ".mp4" {
+		t.Fatalf("expected .mp4 extension, got %s", filepath.Ext(got))
+	}
+	if filepath.Dir(got) != filepath.Dir(target) {
+		t.Fatalf("expected same dir, got %s", filepath.Dir(got))
 	}
 }
