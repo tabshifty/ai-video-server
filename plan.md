@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-18 11:28] 调整转码策略（保持 Mac 硬件 H.265，加分辨率码率阈值）
+- Type: `implementation`
+- Summary:
+  - 转码链路保持 `hevc_videotoolbox`（Mac 硬件加速）不变，将“仅 CRF”策略升级为“分辨率+源码率”目标码率策略。
+  - 1080 档（宽>=1920 或 高>=1080，且非 4K）若源码率 > 4000k 则压到 4000k，否则保持源码率；4K 档（宽>=3840 或 高>=2160）若源码率 > 8000k 则压到 8000k，否则保持源码率。
+  - 当输入视频无法探测到有效源码率时，自动回退到原有 CRF 策略，避免任务失败。
+  - 扩展转码元数据：新增 `transcode_mode/resolution_tier/source_bitrate_kbps/target_bitrate_kbps/bitrate_capped`，并在 CRF 回退模式保留 `crf` 字段。
+- Changed Files:
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 09:43] 短视频支持改类为电影/剧集/AV并自动异步刮削
 - Type: `implementation`
 - Summary:

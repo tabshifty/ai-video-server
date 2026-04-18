@@ -8,27 +8,54 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // VideoProbe holds basic media attributes from ffprobe.
 type VideoProbe struct {
-	Duration float64 `json:"duration"`
-	Width    int     `json:"width"`
-	Height   int     `json:"height"`
-	Codec    string  `json:"codec"`
+	Duration    float64 `json:"duration"`
+	Width       int     `json:"width"`
+	Height      int     `json:"height"`
+	Codec       string  `json:"codec"`
+	BitrateKbps int     `json:"bitrate_kbps"`
+}
+
+// TranscodeOptions controls H.265 transcoding behavior.
+type TranscodeOptions struct {
+	CRF              string
+	VideoBitrateKbps int
 }
 
 // TranscodeHEVC transcodes source into H.265/AAC output using videotoolbox.
-func TranscodeHEVC(ctx context.Context, inputPath, outputPath, crf string) error {
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+func TranscodeHEVC(ctx context.Context, inputPath, outputPath string, options TranscodeOptions) error {
+	args := []string{
 		"-y",
 		"-i", inputPath,
 		"-c:v", "hevc_videotoolbox",
-		"-crf", crf,
 		"-preset", "medium",
+	}
+	if options.VideoBitrateKbps > 0 {
+		bitrate := strconv.Itoa(options.VideoBitrateKbps) + "k"
+		args = append(args,
+			"-b:v", bitrate,
+			"-maxrate", bitrate,
+			"-bufsize", strconv.Itoa(options.VideoBitrateKbps*2)+"k",
+		)
+	} else {
+		crf := strings.TrimSpace(options.CRF)
+		if crf == "" {
+			crf = "23"
+		}
+		args = append(args, "-crf", crf)
+	}
+	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",
 		outputPath,
+	)
+
+	cmd := exec.CommandContext(ctx, "ffmpeg",
+		args...,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ffmpeg transcode failed: %w, output=%s", err, string(out))
@@ -75,7 +102,8 @@ func ThumbnailAt(ctx context.Context, inputPath, outputPath string, atSeconds fl
 func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
-		"-show_entries", "stream=width,height,codec_name:format=duration",
+		"-select_streams", "v:0",
+		"-show_entries", "stream=width,height,codec_name,bit_rate:format=duration,bit_rate",
 		"-of", "json",
 		inputPath,
 	)
@@ -89,9 +117,11 @@ func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 			Width     int    `json:"width"`
 			Height    int    `json:"height"`
 			CodecName string `json:"codec_name"`
+			BitRate   string `json:"bit_rate"`
 		} `json:"streams"`
 		Format struct {
 			Duration string `json:"duration"`
+			BitRate  string `json:"bit_rate"`
 		} `json:"format"`
 	}
 	if err := json.Unmarshal(out, &raw); err != nil {
@@ -103,6 +133,7 @@ func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 		probe.Width = raw.Streams[0].Width
 		probe.Height = raw.Streams[0].Height
 		probe.Codec = raw.Streams[0].CodecName
+		probe.BitrateKbps = parseBitrateKbps(raw.Streams[0].BitRate, raw.Format.BitRate)
 	}
 	if raw.Format.Duration != "" {
 		var duration float64
@@ -110,7 +141,33 @@ func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 			probe.Duration = duration
 		}
 	}
+	if probe.BitrateKbps == 0 {
+		probe.BitrateKbps = parseBitrateKbps("", raw.Format.BitRate)
+	}
 	return probe, nil
+}
+
+func parseBitrateKbps(streamBitrate, formatBitrate string) int {
+	bitsPerSecond := parseBitrateBits(streamBitrate)
+	if bitsPerSecond <= 0 {
+		bitsPerSecond = parseBitrateBits(formatBitrate)
+	}
+	if bitsPerSecond <= 0 {
+		return 0
+	}
+	return int(bitsPerSecond / 1000)
+}
+
+func parseBitrateBits(raw string) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return 0
+	}
+	return value
 }
 
 // ConvertToWebP converts an input image to WebP format.

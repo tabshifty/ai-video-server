@@ -28,6 +28,24 @@ type TranscodeService struct {
 	storageRoot string
 }
 
+const (
+	transcodeModeBitrate     = "bitrate"
+	transcodeModeCRFFallback = "crf_fallback"
+
+	resolutionTier4K    = "4k"
+	resolutionTier1080  = "1080"
+	resolutionTierOther = "other"
+)
+
+type transcodePlan struct {
+	Mode              string
+	CRF               string
+	ResolutionTier    string
+	SourceBitrateKbps int
+	TargetBitrateKbps int
+	BitrateCapped     bool
+}
+
 func NewTranscodeService(storageRoot string) *TranscodeService {
 	return &TranscodeService{storageRoot: storageRoot}
 }
@@ -41,15 +59,23 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	outputPath := filepath.Join(outputDir, "video.mp4")
 	thumbPath := filepath.Join(outputDir, "thumb.jpg")
 
-	crf := chooseCRF(typ)
-	if err := ffmpeg.TranscodeHEVC(ctx, inputPath, outputPath, crf); err != nil {
+	inputProbe, inputProbeErr := ffmpeg.Probe(ctx, inputPath)
+	plan := buildTranscodePlan(inputProbe, inputProbeErr, typ)
+	transcodeOptions := ffmpeg.TranscodeOptions{
+		CRF:              plan.CRF,
+		VideoBitrateKbps: plan.TargetBitrateKbps,
+	}
+	if plan.Mode == transcodeModeCRFFallback {
+		transcodeOptions.VideoBitrateKbps = 0
+	}
+	if err := ffmpeg.TranscodeHEVC(ctx, inputPath, outputPath, transcodeOptions); err != nil {
 		return TranscodeResult{}, err
 	}
 	if err := ffmpeg.Thumbnail(ctx, outputPath, thumbPath); err != nil {
 		return TranscodeResult{}, err
 	}
 	probe, probeErr := ffmpeg.Probe(ctx, outputPath)
-	duration, width, height, metadata := resolveProbeFields(probe, probeErr, crf)
+	duration, width, height, metadata := resolveProbeFields(probe, probeErr, plan)
 
 	return TranscodeResult{
 		TranscodedPath: outputPath,
@@ -61,13 +87,20 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	}, nil
 }
 
-func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, crf string) (duration, width, height int, metadata map[string]any) {
+func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, plan transcodePlan) (duration, width, height int, metadata map[string]any) {
 	duration = 0
 	width = 0
 	height = 0
 	metadata = map[string]any{
-		"codec": "unknown",
-		"crf":   crf,
+		"codec":               "unknown",
+		"transcode_mode":      plan.Mode,
+		"resolution_tier":     plan.ResolutionTier,
+		"source_bitrate_kbps": plan.SourceBitrateKbps,
+		"target_bitrate_kbps": plan.TargetBitrateKbps,
+		"bitrate_capped":      plan.BitrateCapped,
+	}
+	if plan.Mode == transcodeModeCRFFallback {
+		metadata["crf"] = plan.CRF
 	}
 	if probeErr != nil {
 		metadata["probe_error"] = probeErr.Error()
@@ -87,6 +120,61 @@ func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, crf string) (du
 		metadata["codec"] = codec
 	}
 	return duration, width, height, metadata
+}
+
+func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType string) transcodePlan {
+	defaultPlan := transcodePlan{
+		Mode:              transcodeModeCRFFallback,
+		CRF:               chooseCRF(videoType),
+		ResolutionTier:    classifyResolutionTier(probe.Width, probe.Height),
+		SourceBitrateKbps: probe.BitrateKbps,
+		TargetBitrateKbps: 0,
+		BitrateCapped:     false,
+	}
+	if probeErr != nil || probe.BitrateKbps <= 0 {
+		return defaultPlan
+	}
+	target, tier, capped := decideVideoBitrate(probe.Width, probe.Height, probe.BitrateKbps)
+	return transcodePlan{
+		Mode:              transcodeModeBitrate,
+		CRF:               chooseCRF(videoType),
+		ResolutionTier:    tier,
+		SourceBitrateKbps: probe.BitrateKbps,
+		TargetBitrateKbps: target,
+		BitrateCapped:     capped,
+	}
+}
+
+func decideVideoBitrate(width, height, sourceBitrateKbps int) (targetBitrateKbps int, tier string, capped bool) {
+	tier = classifyResolutionTier(width, height)
+	capped = false
+	targetBitrateKbps = sourceBitrateKbps
+	if sourceBitrateKbps <= 0 {
+		return targetBitrateKbps, tier, capped
+	}
+	switch tier {
+	case resolutionTier4K:
+		if sourceBitrateKbps > 8000 {
+			targetBitrateKbps = 8000
+			capped = true
+		}
+	case resolutionTier1080:
+		if sourceBitrateKbps > 4000 {
+			targetBitrateKbps = 4000
+			capped = true
+		}
+	}
+	return targetBitrateKbps, tier, capped
+}
+
+func classifyResolutionTier(width, height int) string {
+	if width >= 3840 || height >= 2160 {
+		return resolutionTier4K
+	}
+	if width >= 1920 || height >= 1080 {
+		return resolutionTier1080
+	}
+	return resolutionTierOther
 }
 
 func chooseCRF(videoType string) string {
