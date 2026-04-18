@@ -1508,3 +1508,22 @@
   - `go test ./...` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-18 22:17] Android AV 暗黑风格延续 + 横屏全屏播放
+- Type: `implementation`
+- Summary:
+  - AV 分类列表延续暗黑视觉风格，卡片背景、文字与页面底色统一为深色主题，提升 AV 分区一致性。
+  - 首页到详情导航补充 `videoType` 参数透传，详情页可基于类型切换 AV 暗黑展示。
+  - AV 详情页新增“横屏全屏播放”按钮，点击后进入独立全屏播放器页面。
+  - 新增全屏播放器页面：进入即锁定横屏、隐藏系统栏，返回后恢复原方向与系统栏状态。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/FullscreenVideoPlayerScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

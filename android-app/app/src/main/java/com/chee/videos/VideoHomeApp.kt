@@ -1,5 +1,6 @@
 package com.chee.videos
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import com.chee.videos.feature.connection.ConnectionScreen
 import com.chee.videos.feature.detail.DetailScreen
 import com.chee.videos.feature.home.HomeScreen
 import com.chee.videos.feature.mine.MineScreen
+import com.chee.videos.feature.player.FullscreenVideoPlayerScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
 
 private val AppDarkColors = darkColorScheme(
@@ -144,7 +146,9 @@ private fun AuthenticatedNav(
                     HomeScreen(
                         baseUrl = baseUrl,
                         accessToken = accessToken,
-                        onOpenDetail = { videoId -> navController.navigate("detail/$videoId") },
+                        onOpenDetail = { videoId, videoType ->
+                            navController.navigate("detail/$videoId?type=${Uri.encode(videoType)}")
+                        },
                     )
                 }
             }
@@ -163,10 +167,21 @@ private fun AuthenticatedNav(
             }
 
             composable(
-                route = "detail/{videoId}",
-                arguments = listOf(navArgument("videoId") { type = NavType.StringType }),
+                route = "detail/{videoId}?type={videoType}",
+                arguments = listOf(
+                    navArgument("videoId") { type = NavType.StringType },
+                    navArgument("videoType") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
             ) {
-                DetailScreen(onBack = { navController.popBackStack() })
+                DetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenFullscreen = { videoId ->
+                        navController.navigate("fullscreen/$videoId")
+                    },
+                )
             }
 
             composable(
@@ -181,6 +196,18 @@ private fun AuthenticatedNav(
                     accessToken = accessToken,
                     source = entry.arguments?.getString("source").orEmpty(),
                     startVideoId = entry.arguments?.getString("videoId").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = "fullscreen/{videoId}",
+                arguments = listOf(navArgument("videoId") { type = NavType.StringType }),
+            ) { entry ->
+                FullscreenVideoPlayerScreen(
+                    baseUrl = baseUrl,
+                    accessToken = accessToken,
+                    videoId = entry.arguments?.getString("videoId").orEmpty(),
                     onBack = { navController.popBackStack() },
                 )
             }

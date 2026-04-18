@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 data class DetailUiState(
     val loading: Boolean = true,
     val detail: VideoDetailDto? = null,
+    val videoType: String = "",
     val baseUrl: String = "",
     val accessToken: String = "",
     val errorMessage: String? = null,
@@ -32,6 +33,7 @@ class DetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val videoId: String = checkNotNull(savedStateHandle["videoId"])
+    private val videoType: String = savedStateHandle.get<String>("videoType").orEmpty()
 
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
@@ -48,6 +50,7 @@ class DetailViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     loading = true,
+                    videoType = videoType,
                     baseUrl = baseUrl,
                     accessToken = accessToken,
                     errorMessage = null,

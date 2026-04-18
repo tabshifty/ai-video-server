@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,9 +61,14 @@ import com.chee.videos.core.util.UrlBuilder
 @Composable
 fun DetailScreen(
     onBack: () -> Unit,
+    onOpenFullscreen: (String) -> Unit = {},
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isAv = uiState.videoType.equals("av", ignoreCase = true)
+    val pageBg = if (isAv) Color(0xFF0B0C0F) else Color(0xFFF7F8FA)
+    val textColor = if (isAv) Color(0xFFEDEFF4) else Color.Unspecified
+    val mutedTextColor = if (isAv) Color(0xFFB9C0CD) else MaterialTheme.colorScheme.onSurfaceVariant
 
     Scaffold(
         topBar = {
@@ -75,6 +81,7 @@ fun DetailScreen(
                 },
             )
         },
+        containerColor = pageBg,
     ) { innerPadding ->
         when {
             uiState.loading -> {
@@ -103,10 +110,10 @@ fun DetailScreen(
             }
 
             uiState.detail != null -> {
-                val detail = uiState.detail
+                val detail = uiState.detail!!
                 val context = LocalContext.current
                 val lifecycleOwner = LocalLifecycleOwner.current
-                val playUrl = resolvePlayUrl(uiState.baseUrl, detail!!)
+                val playUrl = resolvePlayUrl(uiState.baseUrl, detail)
                 val posterUrl = resolvePosterUrl(uiState.baseUrl, detail)
 
                 val dataSourceFactory = remember(uiState.accessToken) {
@@ -174,7 +181,7 @@ fun DetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .background(Color(0xFFF7F8FA))
+                        .background(pageBg)
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -184,7 +191,7 @@ fun DetailScreen(
                             .fillMaxWidth()
                             .height(220.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF1A1C20)),
+                            .background(if (isAv) Color(0xFF181B21) else Color(0xFF1A1C20)),
                     ) {
                         if (!posterUrl.isNullOrBlank()) {
                             AsyncImage(
@@ -196,18 +203,36 @@ fun DetailScreen(
                         }
                     }
 
-                    Text(detail.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        detail.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor,
+                    )
                     Text(
                         text = detail.description.orEmpty().ifBlank { "暂无简介" },
                         style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
                     )
 
-                    Button(
-                        onClick = { userRequestedPlay = !userRequestedPlay },
-                        enabled = !playUrl.isNullOrBlank(),
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text(if (userRequestedPlay) "暂停播放" else "播放")
+                        Button(
+                            onClick = { userRequestedPlay = !userRequestedPlay },
+                            enabled = !playUrl.isNullOrBlank(),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(if (userRequestedPlay) "暂停播放" else "播放")
+                        }
+                        Button(
+                            onClick = { onOpenFullscreen(detail.id) },
+                            enabled = !playUrl.isNullOrBlank(),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("横屏全屏播放")
+                        }
                     }
 
                     if (userRequestedPlay && !playUrl.isNullOrBlank()) {
@@ -229,9 +254,12 @@ fun DetailScreen(
                         )
                     }
 
-                    Text("播放数据")
-                    Text("时长：${formatDurationHms(detail.duration)}")
-                    Text("播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}")
+                    Text("播放数据", color = textColor)
+                    Text("时长：${if (isAv) formatDurationHms(detail.duration) else "${detail.duration} 秒"}", color = mutedTextColor)
+                    Text(
+                        "播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}",
+                        color = mutedTextColor,
+                    )
 
                     if (detail.tags.orEmpty().isNotEmpty()) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
