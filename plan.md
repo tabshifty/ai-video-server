@@ -15,6 +15,19 @@
 
 ---
 
+### [2026-04-18 08:40] 修复短视频封面预加载未命中导致切换黑屏
+- Type: `implementation`
+- Summary:
+  - 修复短视频切换时短暂黑屏问题：此前预加载请求使用了自定义 `memory/disk cache key`，但页面展示 `AsyncImage` 走 URL 默认 key，导致预加载缓存无法命中渲染请求。
+  - 预加载策略改为统一使用 URL 作为缓存键，并扩大预加载范围为当前页前后各 2 条，提升连续滑动时封面命中率。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 08:32] 短视频封面预加载优化（前后相邻视频）
 - Type: `implementation`
 - Summary:

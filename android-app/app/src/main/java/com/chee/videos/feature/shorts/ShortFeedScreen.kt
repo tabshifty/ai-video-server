@@ -175,17 +175,12 @@ fun ShortFeedScreen(
             }
             LaunchedEffect(pagerState.currentPage, uiState.items, baseUrl) {
                 val page = pagerState.currentPage
-                val preloadIndexes = listOf(page - 1, page + 1)
-                preloadIndexes.forEach { idx ->
-                    val item = uiState.items.getOrNull(idx) ?: return@forEach
-                    val thumbURL = resolveThumbnailUrl(baseUrl, item.thumbnailPath) ?: return@forEach
-                    imageLoader.enqueue(
-                        ImageRequest.Builder(context)
-                            .data(thumbURL)
-                            .memoryCacheKey("short-thumb:${item.id}")
-                            .diskCacheKey("short-thumb:${item.id}")
-                            .build(),
-                    )
+                val start = (page - 2).coerceAtLeast(0)
+                val end = (page + 2).coerceAtMost(uiState.items.lastIndex)
+                for (idx in start..end) {
+                    val item = uiState.items.getOrNull(idx) ?: continue
+                    val thumbURL = resolveThumbnailUrl(baseUrl, item.thumbnailPath) ?: continue
+                    imageLoader.enqueue(ImageRequest.Builder(context).data(thumbURL).build())
                 }
             }
             LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory) {
