@@ -15,6 +15,20 @@
 
 ---
 
+### [2026-04-18 08:32] 短视频封面预加载优化（前后相邻视频）
+- Type: `implementation`
+- Summary:
+  - 在短视频流中新增相邻封面预加载：当前页变化时预热上一条与下一条视频 `thumbnail`，降低切换瞬间封面未命中导致的错帧感。
+  - 首帧渲染判定改为依据 `sharedPlayer.currentMediaItem.mediaId`，避免异步事件竞争导致占位图过早隐藏。
+  - 非当前页不再挂载 `PlayerView`，仅显示封面占位，减少播放器视图复用带来的串帧概率。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 08:25] 修复短视频切换后显示上一个视频封面的问题
 - Type: `implementation`
 - Summary:

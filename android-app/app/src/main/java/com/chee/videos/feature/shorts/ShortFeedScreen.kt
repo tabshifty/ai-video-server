@@ -71,15 +71,16 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
@@ -149,19 +150,15 @@ fun ShortFeedScreen(
                     repeatMode = Player.REPEAT_MODE_ONE
                 }
             }
+            val imageLoader = context.imageLoader
             val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
             val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
-            var loadingVideoId by remember { mutableStateOf<String?>(null) }
             var renderedVideoId by remember { mutableStateOf<String?>(null) }
 
             DisposableEffect(sharedPlayer) {
                 val listener = object : Player.Listener {
                     override fun onRenderedFirstFrame() {
-                        renderedVideoId = loadingVideoId
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        renderedVideoId = loadingVideoId
+                        renderedVideoId = sharedPlayer.currentMediaItem?.mediaId
                     }
                 }
                 sharedPlayer.addListener(listener)
@@ -176,21 +173,38 @@ fun ShortFeedScreen(
                     viewModel.ensureDetailLoaded(currentVideoID)
                 }
             }
+            LaunchedEffect(pagerState.currentPage, uiState.items, baseUrl) {
+                val page = pagerState.currentPage
+                val preloadIndexes = listOf(page - 1, page + 1)
+                preloadIndexes.forEach { idx ->
+                    val item = uiState.items.getOrNull(idx) ?: return@forEach
+                    val thumbURL = resolveThumbnailUrl(baseUrl, item.thumbnailPath) ?: return@forEach
+                    imageLoader.enqueue(
+                        ImageRequest.Builder(context)
+                            .data(thumbURL)
+                            .memoryCacheKey("short-thumb:${item.id}")
+                            .diskCacheKey("short-thumb:${item.id}")
+                            .build(),
+                    )
+                }
+            }
             LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory) {
                 if (currentVideoId == null) {
                     sharedPlayer.stop()
                     sharedPlayer.clearMediaItems()
-                    loadingVideoId = null
                     renderedVideoId = null
                     return@LaunchedEffect
                 }
-                loadingVideoId = currentVideoId
                 renderedVideoId = null
                 sharedPlayer.stop()
                 sharedPlayer.clearMediaItems()
                 val sourceUrl = UrlBuilder.source(baseUrl, currentVideoId)
+                val mediaItem = MediaItem.Builder()
+                    .setUri(sourceUrl)
+                    .setMediaId(currentVideoId)
+                    .build()
                 val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(MediaItem.fromUri(sourceUrl))
+                    .createMediaSource(mediaItem)
                 sharedPlayer.setMediaSource(mediaSource, true)
                 sharedPlayer.prepare()
             }
@@ -332,34 +346,48 @@ private fun VerticalVideoPage(
                     )
                 },
         ) {
-            AndroidView(
-                factory = {
-                    PlayerView(it).apply {
-                        useController = false
-                        setShutterBackgroundColor(AndroidColor.BLACK)
-                        setKeepContentOnPlayerReset(false)
-                    }
-                },
-                update = { view ->
-                    view.player = if (active) sharedPlayer else null
-                    view.resizeMode = when (fitMode) {
-                        VideoFitMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                        VideoFitMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (showPoster) {
+            if (active) {
+                AndroidView(
+                    factory = {
+                        PlayerView(it).apply {
+                            useController = false
+                            setShutterBackgroundColor(AndroidColor.BLACK)
+                            setKeepContentOnPlayerReset(false)
+                            player = sharedPlayer
+                        }
+                    },
+                    update = { view ->
+                        view.player = sharedPlayer
+                        view.resizeMode = when (fitMode) {
+                            VideoFitMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                            VideoFitMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
                 if (!posterUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = posterUrl,
-                        contentDescription = "${item.title} 封面",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    if (showPoster) {
+                        AsyncImage(
+                            model = posterUrl,
+                            contentDescription = "${item.title} 封面",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 } else {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                    if (showPoster) {
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                    }
                 }
+            } else if (!posterUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = posterUrl,
+                    contentDescription = "${item.title} 封面",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black))
             }
         }
 
