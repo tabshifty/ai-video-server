@@ -15,6 +15,20 @@
 
 ---
 
+### [2026-04-18 08:25] 修复短视频切换后显示上一个视频封面的问题
+- Type: `implementation`
+- Summary:
+  - 修复短视频切换后加载阶段显示上一条视频画面的视觉问题。
+  - 切换视频源时先 `stop + clearMediaItems` 清空旧画面，并显式关闭 `PlayerView` 的 `keepContentOnPlayerReset`，避免复用播放器时残留上一帧。
+  - 在当前活跃视频页面增加封面占位图（优先使用当前视频 `thumbnail_path`），待首帧渲染后自动隐藏，占位期间不再出现“上一条封面”错位。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 08:18] 修复短视频连续滑动触发 ExoPlayer OOM（单页多播放器并发）
 - Type: `implementation`
 - Summary:

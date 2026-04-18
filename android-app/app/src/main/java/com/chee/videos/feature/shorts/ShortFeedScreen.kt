@@ -71,12 +71,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
@@ -148,9 +151,22 @@ fun ShortFeedScreen(
             }
             val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
             val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
+            var loadingVideoId by remember { mutableStateOf<String?>(null) }
+            var renderedVideoId by remember { mutableStateOf<String?>(null) }
 
             DisposableEffect(sharedPlayer) {
+                val listener = object : Player.Listener {
+                    override fun onRenderedFirstFrame() {
+                        renderedVideoId = loadingVideoId
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        renderedVideoId = loadingVideoId
+                    }
+                }
+                sharedPlayer.addListener(listener)
                 onDispose {
+                    sharedPlayer.removeListener(listener)
                     sharedPlayer.release()
                 }
             }
@@ -164,8 +180,14 @@ fun ShortFeedScreen(
                 if (currentVideoId == null) {
                     sharedPlayer.stop()
                     sharedPlayer.clearMediaItems()
+                    loadingVideoId = null
+                    renderedVideoId = null
                     return@LaunchedEffect
                 }
+                loadingVideoId = currentVideoId
+                renderedVideoId = null
+                sharedPlayer.stop()
+                sharedPlayer.clearMediaItems()
                 val sourceUrl = UrlBuilder.source(baseUrl, currentVideoId)
                 val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
                     .createMediaSource(MediaItem.fromUri(sourceUrl))
@@ -224,6 +246,8 @@ fun ShortFeedScreen(
                             active = pagerState.currentPage == page,
                             fitMode = uiState.fitMode,
                             pausedByUser = item.id in uiState.pausedByUserVideoIds,
+                            posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                            showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
                             actorNames = extractActorNames(detail),
                             isLiked = detail?.userState?.isLiked == true,
                             isFavorited = detail?.userState?.isFavorited == true,
@@ -266,6 +290,8 @@ private fun VerticalVideoPage(
     active: Boolean,
     fitMode: VideoFitMode,
     pausedByUser: Boolean,
+    posterUrl: String?,
+    showPoster: Boolean,
     actorNames: List<String>,
     isLiked: Boolean,
     isFavorited: Boolean,
@@ -311,6 +337,7 @@ private fun VerticalVideoPage(
                     PlayerView(it).apply {
                         useController = false
                         setShutterBackgroundColor(AndroidColor.BLACK)
+                        setKeepContentOnPlayerReset(false)
                     }
                 },
                 update = { view ->
@@ -322,6 +349,18 @@ private fun VerticalVideoPage(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+            if (showPoster) {
+                if (!posterUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = posterUrl,
+                        contentDescription = "${item.title} 封面",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                }
+            }
         }
 
         Box(
@@ -629,6 +668,21 @@ private fun ShortsActionButton(
             tint = if (active) ShortsActionActiveTint else Color.White,
         )
     }
+}
+
+private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {
+    val path = rawPath?.trim().orEmpty()
+    if (path.isBlank()) {
+        return null
+    }
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path
+    }
+    val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
+    if (normalizedBase.isBlank()) {
+        return null
+    }
+    return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
 }
 
 private fun extractActorNames(detail: VideoDetailDto?): List<String> {
