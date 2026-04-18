@@ -323,8 +323,9 @@ func (a *API) AdminRetranscodeVideo(c *gin.Context) {
 		response.Error(c, 1011, err.Error())
 		return
 	}
-	if strings.TrimSpace(video.OriginalPath) == "" {
-		response.Error(c, 1012, "video has no original path")
+	inputPath, inputSource := selectRetranscodeInputPath(video)
+	if inputPath == "" {
+		response.Error(c, 1012, "未找到可用于重转码的源文件（原始文件与转码文件均不存在）")
 		return
 	}
 	if err := a.repo.UpdateVideoStatus(c.Request.Context(), videoID, "uploaded"); err != nil {
@@ -334,7 +335,7 @@ func (a *API) AdminRetranscodeVideo(c *gin.Context) {
 
 	payload := queue.TranscodePayload{
 		VideoID:      videoID.String(),
-		InputPath:    video.OriginalPath,
+		InputPath:    inputPath,
 		OutputDir:    filepath.Join(a.storageRoot, "videos"),
 		TargetFormat: "mp4",
 	}
@@ -342,7 +343,7 @@ func (a *API) AdminRetranscodeVideo(c *gin.Context) {
 		response.Error(c, 1014, err.Error())
 		return
 	}
-	ok(c, gin.H{"enqueued": true, "video_id": videoID})
+	ok(c, gin.H{"enqueued": true, "video_id": videoID, "input_source": inputSource})
 }
 
 func (a *API) AdminUsers(c *gin.Context) {
@@ -579,6 +580,26 @@ func (a *API) AdminUpdateUserRole(c *gin.Context) {
 }
 
 func (a *API) AdminTasks(c *gin.Context) {
+	const (
+		staleTaskStartedThreshold  = 15 * time.Minute
+		staleTaskProgressThreshold = 5 * time.Minute
+		staleTaskHealLimit         = 20
+		staleTaskHealReason        = "转码任务长时间无进度，系统已自动标记失败"
+	)
+	now := time.Now()
+	healed, healErr := a.repo.HealStaleRunningTranscodingJobs(
+		c.Request.Context(),
+		now.Add(-staleTaskStartedThreshold),
+		now.Add(-staleTaskProgressThreshold),
+		staleTaskHealLimit,
+		staleTaskHealReason,
+	)
+	if healErr != nil {
+		a.logger.Warn("heal stale running transcode jobs failed", "error", healErr)
+	} else if healed > 0 {
+		a.logger.Info("healed stale running transcode jobs", "count", healed)
+	}
+
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 20)
 	items, total, err := a.repo.AdminListTranscodingTasks(c.Request.Context(), page, pageSize)
@@ -673,6 +694,28 @@ func tailLines(f *os.File, n int) ([]string, error) {
 		return nil, err
 	}
 	return lines, nil
+}
+
+func selectRetranscodeInputPath(video models.Video) (inputPath, source string) {
+	if path := firstExistingFile(video.OriginalPath); path != "" {
+		return path, "original"
+	}
+	if path := firstExistingFile(video.TranscodedPath); path != "" {
+		return path, "transcoded"
+	}
+	return "", ""
+}
+
+func firstExistingFile(path string) string {
+	cleanPath := strings.TrimSpace(path)
+	if cleanPath == "" {
+		return ""
+	}
+	info, err := os.Stat(cleanPath)
+	if err != nil || info.IsDir() {
+		return ""
+	}
+	return cleanPath
 }
 
 func parseUUIDStrings(raw []string) ([]uuid.UUID, error) {

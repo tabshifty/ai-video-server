@@ -160,15 +160,13 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 
 	result, transcodeErr := p.trans.Process(ctx, video.ID, inputPath, video.Type, progressHandler)
 	if transcodeErr != nil {
-		_ = p.repo.MarkVideoFailed(ctx, videoID, transcodeErr.Error())
-		_ = p.repo.FinishTranscodingJob(ctx, jobID, "failed", transcodeErr.Error())
+		p.finalizeTranscodeFailure(ctx, videoID, jobID, transcodeErr.Error())
 		p.logger.Error("transcode failed", "video_id", videoID, "error", transcodeErr)
 		return transcodeErr
 	}
 
 	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, result.ThumbnailPath, result.Duration, result.Width, result.Height, result.Metadata); err != nil {
-		_ = p.repo.MarkVideoFailed(ctx, videoID, err.Error())
-		_ = p.repo.FinishTranscodingJob(ctx, jobID, "failed", err.Error())
+		p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
 		return err
 	}
 	if err := p.repo.FinishTranscodingJob(ctx, jobID, "success", ""); err != nil {
@@ -195,4 +193,20 @@ func intPtrIfPositive(v int) *int {
 
 func roundTo2(v float64) float64 {
 	return math.Round(v*100) / 100
+}
+
+func (p *Processor) finalizeTranscodeFailure(ctx context.Context, videoID uuid.UUID, jobID int64, reason string) {
+	finalizeCtx := ctx
+	cancel := func() {}
+	if ctx == nil || ctx.Err() != nil {
+		finalizeCtx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	}
+	defer cancel()
+
+	if err := p.repo.MarkVideoFailed(finalizeCtx, videoID, reason); err != nil {
+		p.logger.Error("mark video failed state failed", "video_id", videoID, "job_id", jobID, "error", err)
+	}
+	if err := p.repo.FinishTranscodingJob(finalizeCtx, jobID, "failed", reason); err != nil {
+		p.logger.Error("finish transcoding job failed state failed", "video_id", videoID, "job_id", jobID, "error", err)
+	}
 }

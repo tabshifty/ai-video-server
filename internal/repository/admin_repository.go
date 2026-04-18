@@ -376,6 +376,52 @@ LIMIT $1 OFFSET $2
 	return out, total, rows.Err()
 }
 
+func (r *VideoRepository) HealStaleRunningTranscodingJobs(ctx context.Context, startedBefore, progressBefore time.Time, limit int, reason string) (int64, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "转码任务长时间无进度，系统已自动标记失败"
+	}
+	var healed int64
+	err := r.pool.QueryRow(ctx, `
+WITH stale_jobs AS (
+    SELECT id, video_id
+    FROM transcoding_jobs
+    WHERE status = 'running'
+      AND started_at IS NOT NULL
+      AND started_at <= $1
+      AND (progress_updated_at IS NULL OR progress_updated_at <= $2)
+    ORDER BY started_at ASC
+    LIMIT $3
+),
+updated_jobs AS (
+    UPDATE transcoding_jobs t
+    SET status = 'failed',
+        error_message = CASE WHEN COALESCE(t.error_message, '') = '' THEN $4 ELSE t.error_message END,
+        finished_at = NOW(),
+        progress_percent = COALESCE(t.progress_percent, 0),
+        progress_updated_at = NOW()
+    FROM stale_jobs s
+    WHERE t.id = s.id
+    RETURNING t.video_id
+),
+updated_videos AS (
+    UPDATE videos v
+    SET status = 'failed',
+        metadata = COALESCE(v.metadata, '{}'::jsonb) || jsonb_build_object('error', $4),
+        updated_at = NOW()
+    WHERE v.id IN (SELECT video_id FROM updated_jobs WHERE video_id IS NOT NULL)
+)
+SELECT COUNT(*) FROM updated_jobs
+`, startedBefore, progressBefore, limit, reason).Scan(&healed)
+	if err != nil {
+		return 0, fmt.Errorf("heal stale running tasks: %w", err)
+	}
+	return healed, nil
+}
+
 func (r *VideoRepository) AdminRetryFailedTask(ctx context.Context, jobID int64) (*uuid.UUID, error) {
 	var videoID *uuid.UUID
 	err := r.pool.QueryRow(ctx, `

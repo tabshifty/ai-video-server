@@ -15,6 +15,26 @@
 
 ---
 
+### [2026-04-18 12:33] 修复重转码假运行与任务监控剩余时间异常
+- Type: `implementation`
+- Summary:
+  - 修复“重转码无 ffmpeg 进程”的入口问题：`AdminRetranscodeVideo` 改为优先使用存在的 `original_path`，不存在时回退 `transcoded_path`，两者都不存在时直接返回业务错误，避免入队无效任务。
+  - 修复“任务长期 running”风险：转码失败路径新增统一失败收口，`MarkVideoFailed` 与 `FinishTranscodingJob` 失败不再静默；当请求上下文已失效时自动切换短超时后台上下文继续收口并记录错误日志。
+  - 新增卡住任务自动修复：`AdminTasks` 查询前执行 `HealStaleRunningTranscodingJobs`，将长时间无进度的 `running` 任务自动标记为 `failed`，并同步回写视频状态与错误信息。
+  - 修复任务页剩余时间显示：前端 `TaskMonitor` 将 `null/undefined/''` 视为无值，`remaining_seconds` 为空时展示 `--`，不再误显示 `00:00`。
+- Changed Files:
+  - `internal/handlers/admin.go`
+  - `internal/handlers/admin_retranscode_test.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/queue/tasks.go`
+  - `admin-web/src/views/TaskMonitor.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 11:49] 管理端转码任务新增实时剩余时间（ETA）展示
 - Type: `implementation`
 - Summary:

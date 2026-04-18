@@ -15,6 +15,9 @@ async function load() {
 }
 
 function toNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return NaN
+  }
   const n = Number(value)
   return Number.isFinite(n) ? n : NaN
 }
