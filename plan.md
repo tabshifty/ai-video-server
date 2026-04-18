@@ -1558,3 +1558,17 @@
   - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-18 23:40] 调整 AV 详情页状态栏安全区（保留顶部留白，不遮挡系统状态栏）
+- Type: `implementation`
+- Summary:
+  - 按视觉预期修正详情页顶部布局：`TopAppBar` 显式使用 `statusBarsPadding()`，确保内容不覆盖系统状态栏区域。
+  - 为避免状态栏 inset 重复，`TopAppBar` 的 `windowInsets` 改为 `WindowInsets(0, 0, 0, 0)`，由 `statusBarsPadding()` 单独控制顶部留白。
+  - 保持此前“同页全屏”逻辑不变：仅非全屏详情页保留状态栏留白，全屏时继续沉浸式。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
