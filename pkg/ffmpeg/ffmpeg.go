@@ -1,9 +1,13 @@
 package ffmpeg
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +28,16 @@ type VideoProbe struct {
 type TranscodeOptions struct {
 	CRF              string
 	VideoBitrateKbps int
+	SourceDuration   int
+	ProgressHandler  func(TranscodeProgress)
+}
+
+// TranscodeProgress represents ffmpeg realtime progress.
+type TranscodeProgress struct {
+	SourceDurationSeconds int     `json:"source_duration_seconds"`
+	ProcessedSeconds      int     `json:"processed_seconds"`
+	RemainingSeconds      int     `json:"remaining_seconds"`
+	ProgressPercent       float64 `json:"progress_percent"`
 }
 
 // TranscodeHEVC transcodes source into H.265/AAC output using videotoolbox.
@@ -51,16 +65,133 @@ func TranscodeHEVC(ctx context.Context, inputPath, outputPath string, options Tr
 	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",
+		"-progress", "pipe:1",
+		"-nostats",
 		outputPath,
 	)
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
-		args...,
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("ffmpeg transcode failed: %w, output=%s", err, string(out))
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("ffmpeg setup stdout pipe: %w", err)
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("ffmpeg start failed: %w", err)
+	}
+
+	progressErrCh := make(chan error, 1)
+	go func() {
+		progressErrCh <- readTranscodeProgress(stdout, options.SourceDuration, options.ProgressHandler)
+	}()
+
+	waitErr := cmd.Wait()
+	progressErr := <-progressErrCh
+	if progressErr != nil {
+		return fmt.Errorf("ffmpeg progress read failed: %w", progressErr)
+	}
+	if waitErr != nil {
+		return fmt.Errorf("ffmpeg transcode failed: %w, output=%s", waitErr, stderr.String())
 	}
 	return nil
+}
+
+func readTranscodeProgress(r io.Reader, sourceDuration int, handler func(TranscodeProgress)) error {
+	if handler == nil {
+		_, err := io.Copy(io.Discard, r)
+		return err
+	}
+	scanner := bufio.NewScanner(r)
+	buffer := make([]byte, 0, 128*1024)
+	scanner.Buffer(buffer, 1024*1024)
+
+	processedSeconds := 0
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		seconds, parsed := parseProgressValueToSeconds(key, value)
+		if parsed {
+			processedSeconds = seconds
+			continue
+		}
+		if key == "progress" {
+			handler(buildTranscodeProgress(processedSeconds, sourceDuration))
+		}
+	}
+	return scanner.Err()
+}
+
+func parseProgressValueToSeconds(key, value string) (int, bool) {
+	switch key {
+	case "out_time_ms", "out_time_us":
+		raw, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		if err != nil || raw < 0 {
+			return 0, false
+		}
+		return int(math.Round(float64(raw) / 1_000_000.0)), true
+	case "out_time":
+		return parseFFmpegTimestamp(value)
+	default:
+		return 0, false
+	}
+}
+
+func parseFFmpegTimestamp(raw string) (int, bool) {
+	raw = strings.TrimSpace(raw)
+	parts := strings.Split(raw, ":")
+	if len(parts) != 3 {
+		return 0, false
+	}
+	hours, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || hours < 0 {
+		return 0, false
+	}
+	minutes, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || minutes < 0 {
+		return 0, false
+	}
+	secondsFloat, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil || secondsFloat < 0 {
+		return 0, false
+	}
+	total := float64(hours*3600+minutes*60) + secondsFloat
+	return int(math.Round(total)), true
+}
+
+func buildTranscodeProgress(processedSeconds, sourceDuration int) TranscodeProgress {
+	if processedSeconds < 0 {
+		processedSeconds = 0
+	}
+	remainingSeconds := 0
+	progressPercent := 0.0
+	if sourceDuration > 0 {
+		if processedSeconds > sourceDuration {
+			processedSeconds = sourceDuration
+		}
+		remainingSeconds = sourceDuration - processedSeconds
+		progressPercent = (float64(processedSeconds) / float64(sourceDuration)) * 100
+		if progressPercent < 0 {
+			progressPercent = 0
+		}
+		if progressPercent > 100 {
+			progressPercent = 100
+		}
+	}
+	return TranscodeProgress{
+		SourceDurationSeconds: sourceDuration,
+		ProcessedSeconds:      processedSeconds,
+		RemainingSeconds:      remainingSeconds,
+		ProgressPercent:       math.Round(progressPercent*100) / 100,
+	}
 }
 
 // Thumbnail captures first frame as thumbnail image.

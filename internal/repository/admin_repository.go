@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -316,7 +318,20 @@ func (r *VideoRepository) AdminListTranscodingTasks(ctx context.Context, page, p
 		return nil, 0, fmt.Errorf("count tasks: %w", err)
 	}
 	rows, err := r.pool.Query(ctx, `
-SELECT id, video_id, user_id, status, retry_count, COALESCE(error_message,''), started_at, finished_at
+SELECT
+  id,
+  video_id,
+  user_id,
+  status,
+  retry_count,
+  COALESCE(error_message, ''),
+  started_at,
+  finished_at,
+  source_duration_seconds,
+  processed_seconds,
+  remaining_seconds,
+  progress_percent,
+  progress_updated_at
 FROM transcoding_jobs
 ORDER BY id DESC
 LIMIT $1 OFFSET $2
@@ -329,9 +344,33 @@ LIMIT $1 OFFSET $2
 	out := make([]models.AdminTaskListItem, 0, pageSize)
 	for rows.Next() {
 		var item models.AdminTaskListItem
-		if err := rows.Scan(&item.ID, &item.VideoID, &item.UserID, &item.Status, &item.RetryCount, &item.Error, &item.StartedAt, &item.FinishedAt); err != nil {
+		var sourceDuration sql.NullInt32
+		var processed sql.NullInt32
+		var remaining sql.NullInt32
+		var progress sql.NullFloat64
+		var progressUpdatedAt sql.NullTime
+		if err := rows.Scan(
+			&item.ID,
+			&item.VideoID,
+			&item.UserID,
+			&item.Status,
+			&item.RetryCount,
+			&item.Error,
+			&item.StartedAt,
+			&item.FinishedAt,
+			&sourceDuration,
+			&processed,
+			&remaining,
+			&progress,
+			&progressUpdatedAt,
+		); err != nil {
 			return nil, 0, fmt.Errorf("scan task: %w", err)
 		}
+		item.SourceDurationSeconds = nullInt32Ptr(sourceDuration)
+		item.ProcessedSeconds = nullInt32Ptr(processed)
+		item.RemainingSeconds = nullInt32Ptr(remaining)
+		item.ProgressPercent = nullFloat64Ptr(progress)
+		item.ProgressUpdatedAt = nullTimePtr(progressUpdatedAt)
 		out = append(out, item)
 	}
 	return out, total, rows.Err()
@@ -341,7 +380,16 @@ func (r *VideoRepository) AdminRetryFailedTask(ctx context.Context, jobID int64)
 	var videoID *uuid.UUID
 	err := r.pool.QueryRow(ctx, `
 UPDATE transcoding_jobs
-SET status='queued', retry_count=retry_count+1, error_message='', started_at=NOW(), finished_at=NULL
+SET status='queued',
+    retry_count=retry_count+1,
+    error_message='',
+    started_at=NOW(),
+    finished_at=NULL,
+    source_duration_seconds=NULL,
+    processed_seconds=NULL,
+    remaining_seconds=NULL,
+    progress_percent=NULL,
+    progress_updated_at=NULL
 WHERE id=$1 AND status='failed'
 RETURNING video_id
 `, jobID).Scan(&videoID)
@@ -349,4 +397,28 @@ RETURNING video_id
 		return nil, fmt.Errorf("retry failed task: %w", err)
 	}
 	return videoID, nil
+}
+
+func nullInt32Ptr(v sql.NullInt32) *int {
+	if !v.Valid {
+		return nil
+	}
+	out := int(v.Int32)
+	return &out
+}
+
+func nullFloat64Ptr(v sql.NullFloat64) *float64 {
+	if !v.Valid {
+		return nil
+	}
+	out := v.Float64
+	return &out
+}
+
+func nullTimePtr(v sql.NullTime) *time.Time {
+	if !v.Valid {
+		return nil
+	}
+	out := v.Time
+	return &out
 }

@@ -15,6 +15,31 @@
 
 ---
 
+### [2026-04-18 11:49] 管理端转码任务新增实时剩余时间（ETA）展示
+- Type: `implementation`
+- Summary:
+  - 为 `transcoding_jobs` 新增进度字段：`source_duration_seconds/processed_seconds/remaining_seconds/progress_percent/progress_updated_at`，用于承载转码实时进度与 ETA。
+  - 转码执行保持 `hevc_videotoolbox` 不变，新增 ffmpeg 实时进度解析（`-progress pipe:1`），按媒体时间计算并回调上报进度；任务结束时自动收口为成功/失败终态。
+  - 后端任务列表接口 `/api/v1/admin/tasks` 返回新增进度字段，失败重试时会重置旧进度，避免展示脏状态。
+  - 管理端“任务监控”页面新增进度条、剩余时间、已耗时与进度更新时间列；剩余时间仅在 `running` 状态展示。
+- Changed Files:
+  - `migrations/0011_transcoding_job_progress.up.sql`
+  - `migrations/0011_transcoding_job_progress.down.sql`
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `internal/services/transcode.go`
+  - `internal/queue/tasks.go`
+  - `internal/models/admin.go`
+  - `internal/repository/video_repository.go`
+  - `internal/repository/admin_repository.go`
+  - `admin-web/src/views/TaskMonitor.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `npm --prefix admin-web run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 11:28] 调整转码策略（保持 Mac 硬件 H.265，加分辨率码率阈值）
 - Type: `implementation`
 - Summary:

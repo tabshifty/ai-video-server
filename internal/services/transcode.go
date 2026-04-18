@@ -28,6 +28,14 @@ type TranscodeService struct {
 	storageRoot string
 }
 
+// TranscodeProgress represents realtime transcode progress.
+type TranscodeProgress struct {
+	SourceDurationSeconds int
+	ProcessedSeconds      int
+	RemainingSeconds      int
+	ProgressPercent       float64
+}
+
 const (
 	transcodeModeBitrate     = "bitrate"
 	transcodeModeCRFFallback = "crf_fallback"
@@ -50,7 +58,7 @@ func NewTranscodeService(storageRoot string) *TranscodeService {
 	return &TranscodeService{storageRoot: storageRoot}
 }
 
-func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, inputPath, typ string) (TranscodeResult, error) {
+func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, inputPath, typ string, progressHandler func(TranscodeProgress)) (TranscodeResult, error) {
 	outputDir := filepath.Join(s.storageRoot, "videos", videoID.String())
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return TranscodeResult{}, fmt.Errorf("create output dir: %w", err)
@@ -60,10 +68,31 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	thumbPath := filepath.Join(outputDir, "thumb.jpg")
 
 	inputProbe, inputProbeErr := ffmpeg.Probe(ctx, inputPath)
+	sourceDurationSeconds := probeDurationSeconds(inputProbe.Duration)
 	plan := buildTranscodePlan(inputProbe, inputProbeErr, typ)
+	if progressHandler != nil && sourceDurationSeconds > 0 {
+		progressHandler(TranscodeProgress{
+			SourceDurationSeconds: sourceDurationSeconds,
+			ProcessedSeconds:      0,
+			RemainingSeconds:      sourceDurationSeconds,
+			ProgressPercent:       0,
+		})
+	}
 	transcodeOptions := ffmpeg.TranscodeOptions{
 		CRF:              plan.CRF,
 		VideoBitrateKbps: plan.TargetBitrateKbps,
+		SourceDuration:   sourceDurationSeconds,
+		ProgressHandler: func(progress ffmpeg.TranscodeProgress) {
+			if progressHandler == nil {
+				return
+			}
+			progressHandler(TranscodeProgress{
+				SourceDurationSeconds: progress.SourceDurationSeconds,
+				ProcessedSeconds:      progress.ProcessedSeconds,
+				RemainingSeconds:      progress.RemainingSeconds,
+				ProgressPercent:       progress.ProgressPercent,
+			})
+		},
 	}
 	if plan.Mode == transcodeModeCRFFallback {
 		transcodeOptions.VideoBitrateKbps = 0
@@ -120,6 +149,13 @@ func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, plan transcodeP
 		metadata["codec"] = codec
 	}
 	return duration, width, height, metadata
+}
+
+func probeDurationSeconds(duration float64) int {
+	if duration <= 0 {
+		return 0
+	}
+	return int(math.Round(duration))
 }
 
 func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType string) transcodePlan {

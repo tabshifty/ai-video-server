@@ -505,10 +505,42 @@ VALUES ($1,$2,$3,NOW()) RETURNING id`, videoID, userID, status).Scan(&id)
 	return id, nil
 }
 
+func (r *VideoRepository) UpdateTranscodingJobProgress(ctx context.Context, jobID int64, sourceDurationSeconds, processedSeconds, remainingSeconds *int, progressPercent *float64) error {
+	_, err := r.pool.Exec(ctx, `
+UPDATE transcoding_jobs
+SET source_duration_seconds = COALESCE($2, source_duration_seconds),
+    processed_seconds = $3,
+    remaining_seconds = $4,
+    progress_percent = $5,
+    progress_updated_at = NOW()
+WHERE id = $1
+`, jobID, sourceDurationSeconds, processedSeconds, remainingSeconds, progressPercent)
+	if err != nil {
+		return fmt.Errorf("update transcoding job progress: %w", err)
+	}
+	return nil
+}
+
 func (r *VideoRepository) FinishTranscodingJob(ctx context.Context, jobID int64, status, errMsg string) error {
 	_, err := r.pool.Exec(ctx, `
 UPDATE transcoding_jobs
-SET status=$2, error_message=$3, finished_at=NOW()
+SET status=$2,
+    error_message=$3,
+    finished_at=NOW(),
+    processed_seconds = CASE
+        WHEN $2 = 'success' THEN COALESCE(source_duration_seconds, processed_seconds)
+        ELSE processed_seconds
+    END,
+    remaining_seconds = CASE
+        WHEN $2 = 'success' THEN 0
+        ELSE remaining_seconds
+    END,
+    progress_percent = CASE
+        WHEN $2 = 'success' THEN 100
+        WHEN progress_percent IS NULL AND $2 = 'failed' THEN 0
+        ELSE progress_percent
+    END,
+    progress_updated_at = NOW()
 WHERE id=$1`, jobID, status, errMsg)
 	if err != nil {
 		return fmt.Errorf("finish transcoding job: %w", err)

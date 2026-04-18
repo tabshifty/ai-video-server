@@ -96,14 +96,19 @@ type AdminUserListItem struct {
 }
 
 type AdminTaskListItem struct {
-	ID         int64      `json:"id"`
-	VideoID    *uuid.UUID `json:"video_id"`
-	UserID     *uuid.UUID `json:"user_id"`
-	Status     string     `json:"status"`
-	RetryCount int        `json:"retry_count"`
-	Error      string     `json:"error"`
-	StartedAt  *time.Time `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at"`
+	ID                    int64      `json:"id"`
+	VideoID               *uuid.UUID `json:"video_id"`
+	UserID                *uuid.UUID `json:"user_id"`
+	Status                string     `json:"status"`
+	RetryCount            int        `json:"retry_count"`
+	Error                 string     `json:"error"`
+	StartedAt             *time.Time `json:"started_at"`
+	FinishedAt            *time.Time `json:"finished_at"`
+	SourceDurationSeconds *int       `json:"source_duration_seconds"`
+	ProcessedSeconds      *int       `json:"processed_seconds"`
+	RemainingSeconds      *int       `json:"remaining_seconds"`
+	ProgressPercent       *float64   `json:"progress_percent"`
+	ProgressUpdatedAt     *time.Time `json:"progress_updated_at"`
 }
 
 type AdminActor struct {

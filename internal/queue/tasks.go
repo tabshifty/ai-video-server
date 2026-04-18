@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"time"
 
@@ -121,7 +122,43 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	}
 	_ = p.repo.UpdateVideoStatus(ctx, videoID, "processing")
 
-	result, transcodeErr := p.trans.Process(ctx, video.ID, inputPath, video.Type)
+	var (
+		lastProgressUpdated time.Time
+		lastProcessed       = -1
+	)
+	progressHandler := func(progress services.TranscodeProgress) {
+		now := time.Now()
+		if progress.ProcessedSeconds < 0 {
+			progress.ProcessedSeconds = 0
+		}
+		if progress.SourceDurationSeconds > 0 && progress.ProcessedSeconds > progress.SourceDurationSeconds {
+			progress.ProcessedSeconds = progress.SourceDurationSeconds
+		}
+		if progress.RemainingSeconds < 0 {
+			progress.RemainingSeconds = 0
+		}
+		shouldPersist := lastProcessed < 0 ||
+			progress.ProcessedSeconds-lastProcessed >= 1 ||
+			now.Sub(lastProgressUpdated) >= time.Second ||
+			progress.RemainingSeconds == 0 ||
+			progress.ProgressPercent >= 100
+		if !shouldPersist {
+			return
+		}
+
+		progressPercent := roundTo2(progress.ProgressPercent)
+		sourceDuration := intPtrIfPositive(progress.SourceDurationSeconds)
+		processed := intPtr(progress.ProcessedSeconds)
+		remaining := intPtr(progress.RemainingSeconds)
+		if err := p.repo.UpdateTranscodingJobProgress(ctx, jobID, sourceDuration, processed, remaining, &progressPercent); err != nil {
+			p.logger.Warn("update transcode progress failed", "video_id", videoID, "job_id", jobID, "error", err)
+			return
+		}
+		lastProcessed = progress.ProcessedSeconds
+		lastProgressUpdated = now
+	}
+
+	result, transcodeErr := p.trans.Process(ctx, video.ID, inputPath, video.Type, progressHandler)
 	if transcodeErr != nil {
 		_ = p.repo.MarkVideoFailed(ctx, videoID, transcodeErr.Error())
 		_ = p.repo.FinishTranscodingJob(ctx, jobID, "failed", transcodeErr.Error())
@@ -143,4 +180,19 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 
 	p.logger.Info("transcode completed", "video_id", videoID, "output", result.TranscodedPath)
 	return nil
+}
+
+func intPtr(v int) *int {
+	return &v
+}
+
+func intPtrIfPositive(v int) *int {
+	if v <= 0 {
+		return nil
+	}
+	return &v
+}
+
+func roundTo2(v float64) float64 {
+	return math.Round(v*100) / 100
 }
