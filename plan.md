@@ -15,6 +15,20 @@
 
 ---
 
+### [2026-04-18 08:18] 修复短视频连续滑动触发 ExoPlayer OOM（单页多播放器并发）
+- Type: `implementation`
+- Summary:
+  - 修复短视频页 `OutOfMemoryError`：原实现在 `VerticalPager` 每个页面都创建并 `prepare` 独立 ExoPlayer，连续滑动时会并发占用解码与缓冲内存。
+  - 改为短视频页级别单实例 ExoPlayer 复用：仅当前页挂载 `PlayerView`，切页时切换 `MediaSource`，并释放页面级多实例。
+  - 保留轻触暂停/播放、模式切换、右侧交互与详情弹层行为不变，同时在生命周期 `ON_PAUSE/ON_RESUME` 统一控制单播放器。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 00:55] 修复管理端批量上传在 HTTP 环境下哈希计算失败（digest undefined）
 - Type: `implementation`
 - Summary:

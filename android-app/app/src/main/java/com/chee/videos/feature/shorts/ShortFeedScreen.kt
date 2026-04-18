@@ -124,6 +124,8 @@ fun ShortFeedScreen(
         }
 
         else -> {
+            val context = LocalContext.current
+            val lifecycleOwner = LocalLifecycleOwner.current
             val pagerState = rememberPagerState(pageCount = { uiState.items.size })
             val sheetVideoId = uiState.detailSheetVideoId
             val sheetOpen = sheetVideoId != null
@@ -132,10 +134,69 @@ fun ShortFeedScreen(
                 animationSpec = spring(stiffness = 450f),
                 label = "short_video_region_height",
             )
+            val dataSourceFactory = remember(accessToken) {
+                DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
+                    if (accessToken.isNotBlank()) {
+                        setDefaultRequestProperties(mapOf("Authorization" to "Bearer $accessToken"))
+                    }
+                }
+            }
+            val sharedPlayer = remember(accessToken) {
+                ExoPlayer.Builder(context).build().apply {
+                    repeatMode = Player.REPEAT_MODE_ONE
+                }
+            }
+            val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
+            val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
+
+            DisposableEffect(sharedPlayer) {
+                onDispose {
+                    sharedPlayer.release()
+                }
+            }
 
             LaunchedEffect(pagerState.currentPage, uiState.items) {
                 uiState.items.getOrNull(pagerState.currentPage)?.id?.let { currentVideoID ->
                     viewModel.ensureDetailLoaded(currentVideoID)
+                }
+            }
+            LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory) {
+                if (currentVideoId == null) {
+                    sharedPlayer.stop()
+                    sharedPlayer.clearMediaItems()
+                    return@LaunchedEffect
+                }
+                val sourceUrl = UrlBuilder.source(baseUrl, currentVideoId)
+                val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                    .createMediaSource(MediaItem.fromUri(sourceUrl))
+                sharedPlayer.setMediaSource(mediaSource, true)
+                sharedPlayer.prepare()
+            }
+            LaunchedEffect(currentVideoId, currentVideoPausedByUser) {
+                val shouldPlay = currentVideoId != null && !currentVideoPausedByUser
+                sharedPlayer.playWhenReady = shouldPlay
+                if (shouldPlay) {
+                    sharedPlayer.play()
+                } else {
+                    sharedPlayer.pause()
+                }
+            }
+            DisposableEffect(lifecycleOwner, sharedPlayer, currentVideoId, currentVideoPausedByUser) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_PAUSE -> sharedPlayer.pause()
+                        Lifecycle.Event.ON_RESUME -> {
+                            if (currentVideoId != null && !currentVideoPausedByUser) {
+                                sharedPlayer.play()
+                            }
+                        }
+
+                        else -> Unit
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
                 }
             }
 
@@ -157,11 +218,9 @@ fun ShortFeedScreen(
                     ) { page ->
                         val item = uiState.items[page]
                         val detail = uiState.detailByVideoId[item.id]
-                        val sourceUrl = UrlBuilder.source(baseUrl, item.id)
                         VerticalVideoPage(
                             item = item,
-                            sourceUrl = sourceUrl,
-                            accessToken = accessToken,
+                            sharedPlayer = sharedPlayer,
                             active = pagerState.currentPage == page,
                             fitMode = uiState.fitMode,
                             pausedByUser = item.id in uiState.pausedByUserVideoIds,
@@ -203,8 +262,7 @@ fun ShortFeedScreen(
 @Composable
 private fun VerticalVideoPage(
     item: FeedVideoDto,
-    sourceUrl: String,
-    accessToken: String,
+    sharedPlayer: ExoPlayer,
     active: Boolean,
     fitMode: VideoFitMode,
     pausedByUser: Boolean,
@@ -218,53 +276,14 @@ private fun VerticalVideoPage(
     onToggleMode: () -> Unit,
     onOpenDetail: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
     var showCenterIndicator by remember { mutableStateOf(false) }
     var centerIsPause by remember { mutableStateOf(false) }
     var hideIndicatorJob by remember { mutableStateOf<Job?>(null) }
-
-    val player = remember(sourceUrl, accessToken) {
-        val dataSourceFactory = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
-        if (accessToken.isNotBlank()) {
-            dataSourceFactory.setDefaultRequestProperties(mapOf("Authorization" to "Bearer $accessToken"))
-        }
-
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-            .createMediaSource(MediaItem.fromUri(sourceUrl))
-
-        ExoPlayer.Builder(context).build().apply {
-            setMediaSource(mediaSource)
-            repeatMode = Player.REPEAT_MODE_ONE
-            prepare()
-        }
-    }
-
-    LaunchedEffect(active, pausedByUser) {
-        val shouldPlay = active && !pausedByUser
-        player.playWhenReady = shouldPlay
-        if (shouldPlay) {
-            player.play()
-        } else {
-            player.pause()
-        }
-    }
-
-    DisposableEffect(player, lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE -> player.pause()
-                Lifecycle.Event.ON_RESUME -> if (active && !pausedByUser) player.play()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
+    DisposableEffect(Unit) {
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
             hideIndicatorJob?.cancel()
-            player.release()
         }
     }
 
@@ -290,12 +309,12 @@ private fun VerticalVideoPage(
             AndroidView(
                 factory = {
                     PlayerView(it).apply {
-                        this.player = player
                         useController = false
                         setShutterBackgroundColor(AndroidColor.BLACK)
                     }
                 },
                 update = { view ->
+                    view.player = if (active) sharedPlayer else null
                     view.resizeMode = when (fitMode) {
                         VideoFitMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         VideoFitMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
