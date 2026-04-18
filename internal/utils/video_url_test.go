@@ -14,3 +14,12 @@ func TestVideoPlayURL(t *testing.T) {
 		t.Fatalf("unexpected play url: got=%s want=%s", got, want)
 	}
 }
+
+func TestVideoThumbnailURL(t *testing.T) {
+	videoID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	got := VideoThumbnailURL(videoID)
+	want := "/api/v1/videos/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/thumbnail"
+	if got != want {
+		t.Fatalf("unexpected thumbnail url: got=%s want=%s", got, want)
+	}
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"video-server/internal/models"
+	"video-server/internal/utils"
 )
 
 // VideoRepository handles video persistence and feed queries.
@@ -138,7 +139,7 @@ func deleteVideoDependencies(ctx context.Context, db execer, videoID uuid.UUID) 
 
 func (r *VideoRepository) RandomShorts(ctx context.Context, limit int) ([]models.RecommendedVideo, error) {
 	rows, err := r.pool.Query(ctx, `
-SELECT id, title, type, transcoded_path, duration_seconds
+SELECT id, title, type, thumbnail_path, transcoded_path, duration_seconds
 FROM videos
 WHERE type = 'short' AND status = 'ready'
 ORDER BY random()
@@ -151,8 +152,11 @@ LIMIT $1`, limit)
 	out := make([]models.RecommendedVideo, 0, limit)
 	for rows.Next() {
 		var v models.RecommendedVideo
-		if err := rows.Scan(&v.ID, &v.Title, &v.Type, &v.TranscodedPath, &v.Duration); err != nil {
+		if err := rows.Scan(&v.ID, &v.Title, &v.Type, &v.ThumbnailPath, &v.TranscodedPath, &v.Duration); err != nil {
 			return nil, fmt.Errorf("scan random short: %w", err)
+		}
+		if strings.TrimSpace(v.ThumbnailPath) != "" {
+			v.ThumbnailPath = utils.VideoThumbnailURL(v.ID)
 		}
 		out = append(out, v)
 	}
@@ -415,6 +419,7 @@ WITH excluded AS (
 	SELECT DISTINCT video_id FROM user_video_actions WHERE user_id = $1 AND action_type IN ('view','dislike','skip')
 )
 SELECT DISTINCT v.id, v.title, v.type, v.transcoded_path, v.duration_seconds
+               , v.thumbnail_path
 FROM videos v
 JOIN video_tags vt ON vt.video_id = v.id
 WHERE v.status = 'ready'
@@ -430,8 +435,11 @@ LIMIT $3`, userID, tags, limit)
 	out := make([]models.RecommendedVideo, 0, limit)
 	for rows.Next() {
 		var v models.RecommendedVideo
-		if err := rows.Scan(&v.ID, &v.Title, &v.Type, &v.TranscodedPath, &v.Duration); err != nil {
+		if err := rows.Scan(&v.ID, &v.Title, &v.Type, &v.TranscodedPath, &v.Duration, &v.ThumbnailPath); err != nil {
 			return nil, fmt.Errorf("scan candidate: %w", err)
+		}
+		if strings.TrimSpace(v.ThumbnailPath) != "" {
+			v.ThumbnailPath = utils.VideoThumbnailURL(v.ID)
 		}
 		out = append(out, v)
 	}
@@ -446,7 +454,7 @@ LIMIT $3`, userID, tags, limit)
 
 func (r *VideoRepository) FetchHotVideos(ctx context.Context, limit int) ([]models.RecommendedVideo, error) {
 	rows, err := r.pool.Query(ctx, `
-SELECT v.id, v.title, v.type, v.transcoded_path, v.duration_seconds
+SELECT v.id, v.title, v.type, v.transcoded_path, v.duration_seconds, v.thumbnail_path
 FROM videos v
 LEFT JOIN LATERAL (
 	SELECT COUNT(*)::int AS views
@@ -464,8 +472,11 @@ LIMIT $1`, limit)
 	out := make([]models.RecommendedVideo, 0, limit)
 	for rows.Next() {
 		var v models.RecommendedVideo
-		if err := rows.Scan(&v.ID, &v.Title, &v.Type, &v.TranscodedPath, &v.Duration); err != nil {
+		if err := rows.Scan(&v.ID, &v.Title, &v.Type, &v.TranscodedPath, &v.Duration, &v.ThumbnailPath); err != nil {
 			return nil, fmt.Errorf("scan hot video: %w", err)
+		}
+		if strings.TrimSpace(v.ThumbnailPath) != "" {
+			v.ThumbnailPath = utils.VideoThumbnailURL(v.ID)
 		}
 		out = append(out, v)
 	}

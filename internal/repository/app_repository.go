@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"video-server/internal/models"
+	"video-server/internal/utils"
 )
 
 func (r *VideoRepository) GetVideoDetail(ctx context.Context, videoID, userID uuid.UUID) (models.VideoDetail, error) {
@@ -100,6 +101,9 @@ WHERE user_id=$1 AND video_id=$2 AND action_type IN ('like','favorite','dislike'
 	if len(detail.Metadata) == 0 {
 		detail.Metadata = []byte(`{}`)
 	}
+	if strings.TrimSpace(detail.ThumbnailPath) != "" {
+		detail.ThumbnailPath = utils.VideoThumbnailURL(detail.ID)
+	}
 	return detail, nil
 }
 
@@ -187,6 +191,9 @@ LIMIT $2 OFFSET $3
 		var item models.HistoryItem
 		if err := rows.Scan(&item.VideoID, &item.Title, &item.ThumbnailPath, &item.Duration, &item.WatchSeconds, &item.LastWatchedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan continue item: %w", err)
+		}
+		if strings.TrimSpace(item.ThumbnailPath) != "" {
+			item.ThumbnailPath = utils.VideoThumbnailURL(item.VideoID)
 		}
 		if item.Duration > 0 {
 			item.Progress = float64(item.WatchSeconds) / float64(item.Duration)
@@ -338,6 +345,9 @@ LIMIT $3 OFFSET $4
 		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan search item: %w", err)
 		}
+		if strings.TrimSpace(item.ThumbnailPath) != "" {
+			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
+		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -372,6 +382,9 @@ LIMIT $2 OFFSET $3
 		var item models.VideoListItem
 		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan uploaded item: %w", err)
+		}
+		if strings.TrimSpace(item.ThumbnailPath) != "" {
+			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
 		}
 		items = append(items, item)
 	}
@@ -412,6 +425,9 @@ LIMIT $3 OFFSET $4
 		var item models.VideoListItem
 		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan action item: %w", err)
+		}
+		if strings.TrimSpace(item.ThumbnailPath) != "" {
+			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
 		}
 		items = append(items, item)
 	}

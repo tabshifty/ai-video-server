@@ -98,6 +98,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/videos/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.VideoDetail)
 		v1.GET("/videos/:id/source", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.VideoSource)
 		v1.GET("/videos/:id/source/signed", a.VideoSourceSigned)
+		v1.GET("/videos/:id/thumbnail", a.VideoThumbnail)
 		v1.POST("/history", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.RecordHistory)
 		v1.GET("/history/continue", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ContinueHistory)
 		v1.DELETE("/history/:video_id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.DeleteHistory)

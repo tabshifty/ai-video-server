@@ -31,6 +31,7 @@ type RecommendedVideo struct {
 	ID             uuid.UUID         `json:"id"`
 	Title          string            `json:"title"`
 	Type           string            `json:"type"`
+	ThumbnailPath  string            `json:"thumbnail_path"`
 	TranscodedPath string            `json:"transcoded_path"`
 	Duration       int               `json:"duration_seconds"`
 	Collections    []VideoCollection `json:"collections"`

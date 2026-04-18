@@ -36,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoListItemDto
+import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.feature.shorts.ShortFeedScreen
 
 private data class ContentTab(
@@ -99,6 +100,7 @@ fun HomeScreen(
 
             "movie" -> {
                 CategoryListSection(
+                    baseUrl = baseUrl,
                     state = uiState.movie,
                     onRetry = { viewModel.loadCategory("movie", force = true) },
                     onOpenDetail = onOpenDetail,
@@ -107,6 +109,7 @@ fun HomeScreen(
 
             "episode" -> {
                 CategoryListSection(
+                    baseUrl = baseUrl,
                     state = uiState.episode,
                     onRetry = { viewModel.loadCategory("episode", force = true) },
                     onOpenDetail = onOpenDetail,
@@ -115,6 +118,7 @@ fun HomeScreen(
 
             "av" -> {
                 CategoryListSection(
+                    baseUrl = baseUrl,
                     state = uiState.av,
                     onRetry = { viewModel.loadCategory("av", force = true) },
                     onOpenDetail = onOpenDetail,
@@ -126,6 +130,7 @@ fun HomeScreen(
 
 @Composable
 private fun CategoryListSection(
+    baseUrl: String,
     state: CategoryState,
     onRetry: () -> Unit,
     onOpenDetail: (String) -> Unit,
@@ -158,7 +163,7 @@ private fun CategoryListSection(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(state.items, key = { it.id }) { item ->
-                    VideoCard(item = item, onOpenDetail = onOpenDetail)
+                    VideoCard(baseUrl = baseUrl, item = item, onOpenDetail = onOpenDetail)
                 }
             }
         }
@@ -167,6 +172,7 @@ private fun CategoryListSection(
 
 @Composable
 private fun VideoCard(
+    baseUrl: String,
     item: VideoListItemDto,
     onOpenDetail: (String) -> Unit,
 ) {
@@ -176,8 +182,8 @@ private fun VideoCard(
             .clickable { onOpenDetail(item.id) },
     ) {
         Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val thumb = item.thumbnailPath.orEmpty().trim()
-            if (thumb.startsWith("http://") || thumb.startsWith("https://")) {
+            val thumb = resolveThumbnailUrl(baseUrl, item.thumbnailPath)
+            if (!thumb.isNullOrBlank()) {
                 AsyncImage(
                     model = thumb,
                     contentDescription = item.title,
@@ -211,4 +217,19 @@ private fun typeLabel(type: String): String {
         "av" -> "AV"
         else -> type
     }
+}
+
+private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {
+    val path = rawPath?.trim().orEmpty()
+    if (path.isBlank()) {
+        return null
+    }
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path
+    }
+    val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
+    if (normalizedBase.isBlank()) {
+        return null
+    }
+    return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
 }

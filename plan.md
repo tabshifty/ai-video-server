@@ -15,6 +15,30 @@
 
 ---
 
+### [2026-04-18 21:33] 修复“我的”封面不显示：缩略图路径由本地绝对路径改为可访问 API URL
+- Type: `implementation`
+- Summary:
+  - 定位根因：后端在历史/喜欢/收藏等接口中直接返回 `thumbnail_path` 的本地绝对路径（如 `/Volumes/.../thumb.jpg`），App 无法通过 HTTP 访问导致封面不显示。
+  - 新增应用缩略图接口：`GET /api/v1/videos/:id/thumbnail`，按视频 ID 读取并返回缩略图文件。
+  - 统一 App 返回字段：在详情、历史、搜索、喜欢/收藏等应用查询中，将 `thumbnail_path` 映射为 `/api/v1/videos/{id}/thumbnail`。
+  - 补齐推荐/短视频返回：推荐视频模型新增 `thumbnail_path`，随机短视频/候选/热门查询返回并映射可访问封面 URL。
+  - 前端兼容增强：首页分类列表支持相对缩略图路径拼接（`baseUrl + thumbnail_path`），避免仅 http/https 才渲染的问题。
+- Changed Files:
+  - `internal/handlers/router.go`
+  - `internal/handlers/video_source.go`
+  - `internal/repository/app_repository.go`
+  - `internal/repository/video_repository.go`
+  - `internal/models/models.go`
+  - `internal/utils/video_url.go`
+  - `internal/utils/video_url_test.go`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 21:04] Android 首页全屏精简：移除顶部栏，Tab 标题改白
 - Type: `implementation`
 - Summary:

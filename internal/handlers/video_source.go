@@ -35,6 +35,20 @@ func (a *API) VideoSource(c *gin.Context) {
 	c.File(sourcePath)
 }
 
+func (a *API) VideoThumbnail(c *gin.Context) {
+	videoID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "invalid video id"})
+		return
+	}
+
+	thumbPath, ok := a.resolveThumbnailSource(c, videoID)
+	if !ok {
+		return
+	}
+	c.File(thumbPath)
+}
+
 func (a *API) VideoSourceSigned(c *gin.Context) {
 	videoID, okID := parseUUID(c.Param("id"))
 	if !okID {
@@ -96,4 +110,34 @@ func (a *API) resolvePlayableSource(c *gin.Context, videoID uuid.UUID) (string, 
 		return "", false
 	}
 	return sourcePath, true
+}
+
+func (a *API) resolveThumbnailSource(c *gin.Context, videoID uuid.UUID) (string, bool) {
+	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
+	if err != nil {
+		if repository.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, gin.H{"msg": "video not found"})
+			return "", false
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": "query video failed"})
+		return "", false
+	}
+	if video.Status != "ready" {
+		c.JSON(http.StatusConflict, gin.H{"msg": "video not ready"})
+		return "", false
+	}
+	thumbPath := strings.TrimSpace(video.ThumbnailPath)
+	if thumbPath == "" {
+		c.JSON(http.StatusNotFound, gin.H{"msg": "thumbnail not found"})
+		return "", false
+	}
+	if _, statErr := os.Stat(thumbPath); statErr != nil {
+		if errors.Is(statErr, os.ErrNotExist) {
+			c.JSON(http.StatusNotFound, gin.H{"msg": "thumbnail not found"})
+			return "", false
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": "read thumbnail failed"})
+		return "", false
+	}
+	return thumbPath, true
 }
