@@ -15,6 +15,28 @@
 
 ---
 
+### [2026-04-18 23:54] Android 全页面状态栏统一：留白暗黑背景 + 白色图标，保留全屏沉浸
+- Type: `implementation`
+- Summary:
+  - 统一 Activity 系统栏样式为暗色背景上的白色状态栏/导航栏图标，避免页面切换后状态栏图标明暗不一致。
+  - 为首页、登录页、连接页、我的页、统一播放器页补齐 `statusBarsPadding()`，保证非全屏页面顶部不遮挡状态栏并保留暗黑留白区域。
+  - 连接页背景改为暗黑色，与全局暗黑风格一致，避免状态栏留白区域出现亮色断层。
+  - 详情页 `Scaffold` 增加 `contentWindowInsets = WindowInsets(0, 0, 0, 0)`，与全局手动 inset 策略对齐，避免重复 inset。
+  - 全屏播放逻辑保持不变：全屏时隐藏系统栏，退出全屏后恢复系统栏显示与统一样式。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/MainActivity.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/auth/LoginScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 22:01] Android AV 播放体验增强：时长格式化 + 详情内嵌播放 + 海报回退
 - Type: `implementation`
 - Summary:

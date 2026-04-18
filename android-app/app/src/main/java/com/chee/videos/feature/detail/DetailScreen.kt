@@ -124,6 +124,7 @@ fun DetailScreen(
             }
         },
         containerColor = if (isFullscreen) Color.Black else pageBg,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { innerPadding ->
         when {
             uiState.loading -> {

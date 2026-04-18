@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -88,19 +89,28 @@ fun UnifiedPlayerScreen(
 
     when {
         uiState.loading && uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding(),
+                contentAlignment = Alignment.Center,
+            ) {
                 CircularProgressIndicator(color = Color.White)
             }
         }
 
         !uiState.errorMessage.isNullOrBlank() && uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding(),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
             }
         }
 
         uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding(),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text("暂无可播放内容", color = Color.White)
             }
         }
@@ -235,7 +245,7 @@ fun UnifiedPlayerScreen(
                 }
             }
 
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()) {
                 VerticalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
