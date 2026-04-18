@@ -5,8 +5,10 @@ import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.ApiEnvelope
 import com.chee.videos.core.model.AppException
 import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.RecordHistoryRequest
+import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.network.ApiService
@@ -76,6 +78,48 @@ class VideoRepository @Inject constructor(
                 url = UrlBuilder.history(baseUrl),
                 authorization = bearer,
                 body = RecordHistoryRequest(videoId, watchSeconds, completed),
+            )
+        }
+    }
+
+    suspend fun fetchContinueHistory(page: Int = 1, limit: Int = 30): Result<ContinueHistoryPayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.continueHistory(
+                url = UrlBuilder.historyContinue(baseUrl),
+                authorization = bearer,
+                page = page,
+                limit = limit,
+            )
+        }
+    }
+
+    suspend fun fetchLikedVideos(page: Int = 1, pageSize: Int = 30): Result<List<VideoListItemDto>> {
+        return callWithAuth { baseUrl, bearer ->
+            api.likedVideos(
+                url = UrlBuilder.likedVideos(baseUrl),
+                authorization = bearer,
+                page = page,
+                pageSize = pageSize,
+            )
+        }.map { it.items }
+    }
+
+    suspend fun fetchFavoritedVideos(page: Int = 1, pageSize: Int = 30): Result<List<VideoListItemDto>> {
+        return callWithAuth { baseUrl, bearer ->
+            api.favoritedVideos(
+                url = UrlBuilder.favoritedVideos(baseUrl),
+                authorization = bearer,
+                page = page,
+                pageSize = pageSize,
+            )
+        }.map { it.items }
+    }
+
+    suspend fun fetchUserProfile(): Result<UserProfileDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.userProfile(
+                url = UrlBuilder.userProfile(baseUrl),
+                authorization = bearer,
             )
         }
     }

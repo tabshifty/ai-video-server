@@ -15,6 +15,29 @@
 
 ---
 
+### [2026-04-18 17:48] Android App 新增“我的”面板 + 统一竖滑播放器（暗黑风格）
+- Type: `implementation`
+- Summary:
+  - 扩展 Android 数据层：新增 `history/continue`、`user/liked-videos`、`user/favorited-videos`、`user/profile` 四类接口与仓库方法，复用现有鉴权刷新链路。
+  - 重构已登录导航壳：新增底部主导航 `首页/我的`，保留详情页路由，并新增 `player/{source}/{videoId}` 统一播放器路由。
+  - 新增“我的”模块：暗黑风格个人面板，包含 `历史记录/我的收藏/我的喜欢` 三个分区，支持资料展示、列表加载态/空态/错误态、点击条目直达播放。
+  - 新增统一播放器模块：支持按来源（历史/收藏/喜欢）加载播放队列、竖向滑动切换、轻触暂停/继续、封面预加载及演员信息展示。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 15:20] AV 刮削增强：多站点接入 + 字段级置信合并（修复海报/简介/演员错抓）
 - Type: `implementation`
 - Summary:

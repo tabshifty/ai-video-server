@@ -40,4 +40,12 @@ object UrlBuilder {
         "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/dislike"
 
     fun history(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/history"
+
+    fun historyContinue(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/history/continue"
+
+    fun likedVideos(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/user/liked-videos"
+
+    fun favoritedVideos(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/user/favorited-videos"
+
+    fun userProfile(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/user/profile"
 }

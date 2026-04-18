@@ -2,12 +2,14 @@ package com.chee.videos.core.network
 
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.ApiEnvelope
+import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedPayload
 import com.chee.videos.core.model.LoginPayload
 import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -82,4 +84,34 @@ interface ApiService {
         @Header("Authorization") authorization: String,
         @Body body: RecordHistoryRequest,
     ): ApiEnvelope<Map<String, Boolean>>
+
+    @GET
+    suspend fun continueHistory(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int,
+        @Query("limit") limit: Int,
+    ): ApiEnvelope<ContinueHistoryPayload>
+
+    @GET
+    suspend fun likedVideos(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<SearchPayload>
+
+    @GET
+    suspend fun favoritedVideos(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<SearchPayload>
+
+    @GET
+    suspend fun userProfile(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<UserProfileDto>
 }

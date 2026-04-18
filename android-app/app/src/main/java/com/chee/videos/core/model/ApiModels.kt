@@ -49,6 +49,23 @@ data class SearchPayload(
     @SerializedName("page_size") val pageSize: Int = 20,
 )
 
+data class ContinueHistoryPayload(
+    @SerializedName("items") val items: List<HistoryItemDto> = emptyList(),
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("page_size") val pageSize: Int = 20,
+)
+
+data class HistoryItemDto(
+    @SerializedName("video_id") val videoId: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("thumbnail_path") val thumbnailPath: String? = null,
+    @SerializedName("duration") val duration: Int = 0,
+    @SerializedName("watch_seconds") val watchSeconds: Int = 0,
+    @SerializedName("progress") val progress: Float = 0f,
+    @SerializedName("last_watched_at") val lastWatchedAt: String? = null,
+)
+
 data class VideoListItemDto(
     @SerializedName("id") val id: String,
     @SerializedName("title") val title: String,
@@ -113,6 +130,13 @@ data class ServerEndpoint(
 data class SessionTokens(
     val accessToken: String,
     val refreshToken: String,
+)
+
+data class UserProfileDto(
+    @SerializedName("username") val username: String = "",
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("role") val role: String = "",
+    @SerializedName("created_at") val createdAt: String? = null,
 )
 
 sealed class AppRootState {
