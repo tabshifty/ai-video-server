@@ -97,7 +97,7 @@ fun DetailScreen(
             val previousOrientation = activity.requestedOrientation
             val window = activity.window
             val controller = WindowCompat.getInsetsController(window, window.decorView)
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 

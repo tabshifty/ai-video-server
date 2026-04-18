@@ -15,6 +15,22 @@
 
 ---
 
+### [2026-04-19 00:23] 修复 AV 详情点击全屏闪退回退：避免横竖屏切换触发 Activity 重建
+- Type: `implementation`
+- Summary:
+  - 定位问题：详情页进入全屏时会强制切换横屏，默认 Activity 会因 `orientation/screenSize` 变化重建，表现为点击全屏后页面闪退回退。
+  - 在 `MainActivity` 增加 `configChanges`，由当前 Activity 自行处理方向与屏幕配置变更，避免全屏切换导致重建丢失当前 UI 状态。
+  - 详情页全屏方向锁定从 `SCREEN_ORIENTATION_SENSOR_LANDSCAPE` 调整为 `SCREEN_ORIENTATION_USER_LANDSCAPE`，减少传感器抖动触发的方向切换波动。
+  - 保持原有沉浸式逻辑不变：全屏隐藏系统栏，退出后恢复系统栏与先前方向。
+- Changed Files:
+  - `android-app/app/src/main/AndroidManifest.xml`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-18 23:54] Android 全页面状态栏统一：留白暗黑背景 + 白色图标，保留全屏沉浸
 - Type: `implementation`
 - Summary:

@@ -17,6 +17,7 @@
         android:theme="@style/Theme.VideoHome">
         <activity
             android:name=".MainActivity"
+            android:configChanges="keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
             android:theme="@style/Theme.VideoHome">
             <intent-filter>
