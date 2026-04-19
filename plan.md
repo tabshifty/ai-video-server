@@ -1864,3 +1864,19 @@
   - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-19 21:35] 修复图片转 WebP 失败（ffmpeg 无 libwebp 编码器时自动回退）
+- Type: `implementation`
+- Summary:
+  - 修复图片上传转换 WebP 的兼容性：当 ffmpeg 返回 `Unknown encoder 'libwebp'` 时，自动从 `libwebp` 编码参数回退到 ffmpeg 内置 `webp` 编码器重试。
+  - 同步修复图片缩放接口中 `format=webp` 的编码路径：同样支持 `libwebp` 缺失时自动回退，避免生成图片变体失败。
+  - 新增编码器缺失错误识别单测，覆盖单引号/双引号与 `Encoder not found` 关键报错文本。
+- Changed Files:
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./pkg/ffmpeg -count=1` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`

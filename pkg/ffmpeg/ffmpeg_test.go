@@ -165,3 +165,41 @@ func TestBuildTranscodeProgress(t *testing.T) {
 		})
 	}
 }
+
+func TestIsLibWebPUnavailableOutput(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{
+			name:   "unknown encoder single quote",
+			output: "[vost#0:0] Unknown encoder 'libwebp'",
+			want:   true,
+		},
+		{
+			name:   "unknown encoder double quote",
+			output: `[vost#0:0] Unknown encoder "libwebp"`,
+			want:   true,
+		},
+		{
+			name:   "encoder not found with libwebp",
+			output: "Error opening output files: Encoder not found (libwebp)",
+			want:   true,
+		},
+		{
+			name:   "other ffmpeg error",
+			output: "Invalid argument",
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isLibWebPUnavailableOutput(tt.output)
+			if got != tt.want {
+				t.Fatalf("isLibWebPUnavailableOutput()=%v want=%v", got, tt.want)
+			}
+		})
+	}
+}
