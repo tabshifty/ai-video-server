@@ -26,14 +26,14 @@ func NewRecommendService(repo *repository.VideoRepository) *RecommendService {
 }
 
 // RandomShortFeed returns random short videos.
-func (s *RecommendService) RandomShortFeed(ctx context.Context, pageSize int) ([]models.RecommendedVideo, error) {
+func (s *RecommendService) RandomShortFeed(ctx context.Context, pageSize int, excludeIDs []uuid.UUID) ([]models.RecommendedVideo, error) {
 	if pageSize <= 0 {
 		pageSize = 20
 	}
 	if pageSize > 100 {
 		pageSize = 100
 	}
-	return s.repo.RandomShorts(ctx, pageSize)
+	return s.repo.RandomShorts(ctx, pageSize, excludeIDs)
 }
 
 // Recommend returns personalized recommendations for a user.

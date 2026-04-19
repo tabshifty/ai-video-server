@@ -22,12 +22,19 @@ class VideoRepository @Inject constructor(
     private val store: AppPreferencesStore,
     private val authRepository: AuthRepository,
 ) {
-    suspend fun fetchShortFeed(pageSize: Int = 20): Result<List<FeedVideoDto>> {
+    suspend fun fetchShortFeed(
+        pageSize: Int = 20,
+        excludeIds: List<String> = emptyList(),
+    ): Result<List<FeedVideoDto>> {
         val baseUrl = store.readActiveBaseUrl()
             ?: return Result.failure(AppException("请先配置服务器地址"))
 
         return runCatching {
-            val resp = api.randomShort(UrlBuilder.randomShort(baseUrl), pageSize)
+            val resp = api.randomShort(
+                url = UrlBuilder.randomShort(baseUrl),
+                pageSize = pageSize,
+                excludeIds = excludeIds.distinct().filter { it.isNotBlank() }.takeIf { it.isNotEmpty() }?.joinToString(","),
+            )
             if (resp.code != 0 || resp.data == null) {
                 throw AppException(resp.msg.ifBlank { "短视频加载失败(code=${resp.code})" })
             }

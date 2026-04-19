@@ -10,7 +10,12 @@ import (
 // RandomShort returns random short video feed.
 func (a *API) RandomShort(c *gin.Context) {
 	pageSize := parsePageSize(c.Query("page_size"), 20)
-	videos, err := a.recSvc.RandomShortFeed(c.Request.Context(), pageSize)
+	excludeIDs, err := parseUUIDCSV(c.Query("exclude_ids"))
+	if err != nil {
+		bad(c, "invalid exclude_ids")
+		return
+	}
+	videos, err := a.recSvc.RandomShortFeed(c.Request.Context(), pageSize, excludeIDs)
 	if err != nil {
 		response.Error(c, 7, err.Error())
 		return

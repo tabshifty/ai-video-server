@@ -42,6 +42,7 @@ interface ApiService {
     suspend fun randomShort(
         @Url url: String,
         @Query("page_size") pageSize: Int,
+        @Query("exclude_ids") excludeIds: String? = null,
     ): ApiEnvelope<FeedPayload>
 
     @GET

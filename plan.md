@@ -15,6 +15,36 @@
 
 ---
 
+### [2026-04-19 12:03] 修复短视频只能滑 20 条：尾部补货 + 滚动窗口 + 后端排重补货
+- Type: `implementation`
+- Summary:
+  - 后端短视频随机接口新增 `exclude_ids` 解析与排重能力，优先排除客户端当前窗口中的短视频；当排除后不足以凑满批次时，自动回退补货，避免把短视频流刷到死路。
+  - Android 短视频数据层接入 `exclude_ids` 参数，请求下一批短视频时携带当前窗口视频 ID，实现短距离内优先不重复。
+  - 新增 `ShortFeedWindowManager`，将短视频流改为“首批加载 + 尾部预取 + 60 条滚动窗口”，接近尾部时自动补货，超过窗口上限时裁掉头部旧视频并同步清理详情/暂停/操作缓存。
+  - `ShortFeedScreen` 的 `VerticalPager` 改为支持裁头后按当前视频重新定位，保证无限滑动过程中不会在窗口裁剪后错位到其他视频。
+  - 新增后端与 Android 单元测试，覆盖 `exclude_ids` 解析、随机短视频补齐合并、短视频窗口裁剪与锚点保留逻辑。
+- Changed Files:
+  - `internal/handlers/router.go`
+  - `internal/handlers/recommend.go`
+  - `internal/handlers/recommend_test.go`
+  - `internal/services/recommend.go`
+  - `internal/repository/video_repository.go`
+  - `internal/repository/video_repository_random_test.go`
+  - `android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedWindowManager.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedWindowManagerTest.kt`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/handlers ./internal/repository` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.shorts.ShortFeedWindowManagerTest` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 11:14] 修复长视频播放器暂停退回海报/空态，并收紧控制栏交互
 - Type: `implementation`
 - Summary:

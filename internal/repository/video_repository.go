@@ -137,13 +137,47 @@ func deleteVideoDependencies(ctx context.Context, db execer, videoID uuid.UUID) 
 	return nil
 }
 
-func (r *VideoRepository) RandomShorts(ctx context.Context, limit int) ([]models.RecommendedVideo, error) {
-	rows, err := r.pool.Query(ctx, `
+func (r *VideoRepository) RandomShorts(ctx context.Context, limit int, excludeIDs []uuid.UUID) ([]models.RecommendedVideo, error) {
+	out, err := r.queryRandomShorts(ctx, limit, excludeIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) < limit && len(excludeIDs) > 0 {
+		fallback, err := r.queryRandomShorts(ctx, limit-len(out), nil)
+		if err != nil {
+			return nil, err
+		}
+		out = mergeRecommendedVideos(out, fallback, limit)
+	}
+	if err := r.attachCollectionsToRecommendedVideos(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *VideoRepository) queryRandomShorts(ctx context.Context, limit int, excludeIDs []uuid.UUID) ([]models.RecommendedVideo, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	var (
+		rows pgx.Rows
+		err  error
+	)
+	if len(excludeIDs) > 0 {
+		rows, err = r.pool.Query(ctx, `
+SELECT id, title, type, thumbnail_path, transcoded_path, duration_seconds
+FROM videos
+WHERE type = 'short' AND status = 'ready' AND NOT (id = ANY($2::uuid[]))
+ORDER BY random()
+LIMIT $1`, limit, excludeIDs)
+	} else {
+		rows, err = r.pool.Query(ctx, `
 SELECT id, title, type, thumbnail_path, transcoded_path, duration_seconds
 FROM videos
 WHERE type = 'short' AND status = 'ready'
 ORDER BY random()
 LIMIT $1`, limit)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("query random shorts: %w", err)
 	}
@@ -163,10 +197,37 @@ LIMIT $1`, limit)
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if err := r.attachCollectionsToRecommendedVideos(ctx, out); err != nil {
-		return nil, err
-	}
 	return out, nil
+}
+
+func mergeRecommendedVideos(primary, fallback []models.RecommendedVideo, limit int) []models.RecommendedVideo {
+	if limit <= 0 {
+		return nil
+	}
+	out := make([]models.RecommendedVideo, 0, minIntForFeed(limit, len(primary)+len(fallback)))
+	seen := make(map[uuid.UUID]struct{}, len(primary)+len(fallback))
+	appendUnique := func(items []models.RecommendedVideo) {
+		for _, item := range items {
+			if len(out) >= limit {
+				return
+			}
+			if _, ok := seen[item.ID]; ok {
+				continue
+			}
+			seen[item.ID] = struct{}{}
+			out = append(out, item)
+		}
+	}
+	appendUnique(primary)
+	appendUnique(fallback)
+	return out
+}
+
+func minIntForFeed(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (r *VideoRepository) UpsertAction(ctx context.Context, userID, videoID uuid.UUID, action string, watchSeconds int) error {

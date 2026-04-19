@@ -229,6 +229,14 @@ func parseUUID(raw string) (uuid.UUID, bool) {
 	return id, true
 }
 
+func parseUUIDCSV(raw string) ([]uuid.UUID, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
+	}
+	return parseUUIDStrings(strings.Split(trimmed, ","))
+}
+
 func ok(c *gin.Context, data any) {
 	response.JSON(c, 0, "", data)
 }

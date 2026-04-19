@@ -3,8 +3,8 @@ package com.chee.videos.feature.shorts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
+import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
-import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.repository.AuthRepository
@@ -22,8 +22,10 @@ import kotlinx.coroutines.launch
 data class ShortFeedUiState(
     val loading: Boolean = false,
     val loaded: Boolean = false,
-    val items: List<FeedVideoDto> = emptyList(),
+    val loadingMore: Boolean = false,
+    val items: List<com.chee.videos.core.model.FeedVideoDto> = emptyList(),
     val errorMessage: String? = null,
+    val loadMoreErrorMessage: String? = null,
     val detailErrorMessage: String? = null,
     val fitMode: VideoFitMode = VideoFitMode.FILL,
     val pausedByUserVideoIds: Set<String> = emptySet(),
@@ -31,6 +33,8 @@ data class ShortFeedUiState(
     val detailByVideoId: Map<String, VideoDetailDto> = emptyMap(),
     val detailLoadingVideoIds: Set<String> = emptySet(),
     val actionBusyVideoIds: Set<String> = emptySet(),
+    val pagerResetToken: Int = 0,
+    val pagerInitialPage: Int = 0,
 )
 
 @HiltViewModel
@@ -58,25 +62,37 @@ class ShortFeedViewModel @Inject constructor(
     }
 
     fun load(force: Boolean = false) {
-        if (_uiState.value.loaded && !force) {
+        val currentState = _uiState.value
+        if ((currentState.loaded || currentState.loading) && !force) {
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(loading = true, errorMessage = null) }
-            videoRepository.fetchShortFeed()
+            _uiState.update {
+                it.copy(
+                    loading = true,
+                    loaded = false,
+                    errorMessage = null,
+                    loadMoreErrorMessage = null,
+                )
+            }
+            videoRepository.fetchShortFeed(pageSize = ShortFeedWindowManager.LoadBatchSize)
                 .onSuccess { items ->
                     val itemIDs = items.map { it.id }.toSet()
                     _uiState.update { state ->
                         state.copy(
                             loading = false,
                             loaded = true,
+                            loadingMore = false,
                             items = items,
                             errorMessage = null,
-                            pausedByUserVideoIds = state.pausedByUserVideoIds.filter { id -> itemIDs.contains(id) }.toSet(),
-                            detailByVideoId = state.detailByVideoId.filterKeys { id -> itemIDs.contains(id) },
-                            detailLoadingVideoIds = state.detailLoadingVideoIds.filter { id -> itemIDs.contains(id) }.toSet(),
-                            actionBusyVideoIds = state.actionBusyVideoIds.filter { id -> itemIDs.contains(id) }.toSet(),
-                            detailSheetVideoId = state.detailSheetVideoId?.takeIf { id -> itemIDs.contains(id) },
+                            loadMoreErrorMessage = null,
+                            pausedByUserVideoIds = state.pausedByUserVideoIds.filterTo(mutableSetOf()) { it in itemIDs },
+                            detailByVideoId = state.detailByVideoId.filterKeys { it in itemIDs },
+                            detailLoadingVideoIds = state.detailLoadingVideoIds.filterTo(mutableSetOf()) { it in itemIDs },
+                            actionBusyVideoIds = state.actionBusyVideoIds.filterTo(mutableSetOf()) { it in itemIDs },
+                            detailSheetVideoId = state.detailSheetVideoId?.takeIf { it in itemIDs },
+                            pagerInitialPage = 0,
+                            pagerResetToken = if (force || state.pagerInitialPage != 0) state.pagerResetToken + 1 else state.pagerResetToken,
                         )
                     }
                 }
@@ -86,10 +102,57 @@ class ShortFeedViewModel @Inject constructor(
                         it.copy(
                             loading = false,
                             loaded = true,
+                            loadingMore = false,
                             errorMessage = err.message ?: "短视频加载失败",
                         )
                     }
                 }
+        }
+    }
+
+    fun loadMoreIfNeeded(currentIndex: Int, currentVideoId: String?) {
+        val state = _uiState.value
+        if (!ShortFeedWindowManager.shouldLoadMore(currentIndex, state.items.size, state.loadingMore)) {
+            return
+        }
+        if (state.loading || !state.loaded || state.items.isEmpty()) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingMore = true, loadMoreErrorMessage = null) }
+            videoRepository.fetchShortFeed(
+                pageSize = ShortFeedWindowManager.LoadBatchSize,
+                excludeIds = state.items.map { it.id },
+            ).onSuccess { incoming ->
+                _uiState.update { latest ->
+                    val merged = ShortFeedWindowManager.mergeAppend(
+                        snapshot = latest.toWindowSnapshot(),
+                        incoming = incoming,
+                        anchorVideoId = currentVideoId,
+                    )
+                    latest.copy(
+                        loadingMore = false,
+                        loadMoreErrorMessage = null,
+                        items = merged.items,
+                        detailByVideoId = merged.detailByVideoId,
+                        detailLoadingVideoIds = merged.detailLoadingVideoIds,
+                        actionBusyVideoIds = merged.actionBusyVideoIds,
+                        pausedByUserVideoIds = merged.pausedByUserVideoIds,
+                        detailSheetVideoId = merged.detailSheetVideoId,
+                        pagerInitialPage = merged.anchorPageAfterTrim ?: latest.pagerInitialPage,
+                        pagerResetToken = if (merged.anchorPageAfterTrim != null) latest.pagerResetToken + 1 else latest.pagerResetToken,
+                    )
+                }
+            }.onFailure { err ->
+                handleAuthError(err)
+                _uiState.update {
+                    it.copy(
+                        loadingMore = false,
+                        loadMoreErrorMessage = err.message ?: "短视频补货失败",
+                    )
+                }
+            }
         }
     }
 
@@ -158,7 +221,7 @@ class ShortFeedViewModel @Inject constructor(
         }
     }
 
-    private fun toggleAction(videoId: String, actionCall: suspend () -> Result<com.chee.videos.core.model.ActionTogglePayload>) {
+    private fun toggleAction(videoId: String, actionCall: suspend () -> Result<ActionTogglePayload>) {
         if (_uiState.value.actionBusyVideoIds.contains(videoId)) {
             return
         }
@@ -242,6 +305,17 @@ class ShortFeedViewModel @Inject constructor(
             }
             false
         }
+    }
+
+    private fun ShortFeedUiState.toWindowSnapshot(): ShortFeedWindowSnapshot {
+        return ShortFeedWindowSnapshot(
+            items = items,
+            detailByVideoId = detailByVideoId,
+            detailLoadingVideoIds = detailLoadingVideoIds,
+            actionBusyVideoIds = actionBusyVideoIds,
+            pausedByUserVideoIds = pausedByUserVideoIds,
+            detailSheetVideoId = detailSheetVideoId,
+        )
     }
 
     private fun handleAuthError(err: Throwable?) {

@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -132,14 +133,6 @@ fun ShortFeedScreen(
         else -> {
             val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
-            val pagerState = rememberPagerState(pageCount = { uiState.items.size })
-            val sheetVideoId = uiState.detailSheetVideoId
-            val sheetOpen = sheetVideoId != null
-            val videoHeightFraction by animateFloatAsState(
-                targetValue = if (sheetOpen) 0.25f else 1f,
-                animationSpec = spring(stiffness = 450f),
-                label = "short_video_region_height",
-            )
             val dataSourceFactory = remember(accessToken) {
                 DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
                     if (accessToken.isNotBlank()) {
@@ -153,12 +146,10 @@ fun ShortFeedScreen(
                 }
             }
             val imageLoader = context.imageLoader
-            val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
-            val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
             var renderedVideoId by remember { mutableStateOf<String?>(null) }
             var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
             var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
-            val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
+            val latestCurrentVideoId by rememberUpdatedState(sharedPlayer.currentMediaItem?.mediaId)
 
             KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
@@ -186,132 +177,169 @@ fun ShortFeedScreen(
                 }
             }
 
-            LaunchedEffect(pagerState.currentPage, uiState.items) {
-                uiState.items.getOrNull(pagerState.currentPage)?.id?.let { currentVideoID ->
-                    viewModel.ensureDetailLoaded(currentVideoID)
-                }
-            }
-            LaunchedEffect(pagerState.currentPage, uiState.items, baseUrl) {
-                val page = pagerState.currentPage
-                val start = (page - 2).coerceAtLeast(0)
-                val end = (page + 2).coerceAtMost(uiState.items.lastIndex)
-                for (idx in start..end) {
-                    val item = uiState.items.getOrNull(idx) ?: continue
-                    val thumbURL = resolveThumbnailUrl(baseUrl, item.thumbnailPath) ?: continue
-                    imageLoader.enqueue(ImageRequest.Builder(context).data(thumbURL).build())
-                }
-            }
-            LaunchedEffect(currentVideoId) {
-                val previousVideoId = lastHistoryVideoId
-                if (!previousVideoId.isNullOrBlank() && previousVideoId != currentVideoId) {
-                    val (watchSeconds, completed) = readWatchSnapshot(sharedPlayer)
-                    viewModel.reportHistory(previousVideoId, watchSeconds, completed)
-                }
-                lastHistoryVideoId = currentVideoId
-            }
-            LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory) {
-                if (currentVideoId == null) {
-                    sharedPlayer.stop()
-                    sharedPlayer.clearMediaItems()
-                    renderedVideoId = null
-                    return@LaunchedEffect
-                }
-                renderedVideoId = null
-                sharedPlayer.stop()
-                sharedPlayer.clearMediaItems()
-                val sourceUrl = UrlBuilder.source(baseUrl, currentVideoId)
-                val mediaItem = MediaItem.Builder()
-                    .setUri(sourceUrl)
-                    .setMediaId(currentVideoId)
-                    .build()
-                val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(mediaItem)
-                sharedPlayer.setMediaSource(mediaSource, true)
-                sharedPlayer.prepare()
-            }
-            LaunchedEffect(currentVideoId, currentVideoPausedByUser) {
-                val shouldPlay = currentVideoId != null && !currentVideoPausedByUser
-                sharedPlayer.playWhenReady = shouldPlay
-                if (shouldPlay) {
-                    sharedPlayer.play()
-                } else {
-                    sharedPlayer.pause()
-                }
-            }
-            DisposableEffect(lifecycleOwner, sharedPlayer, currentVideoId, currentVideoPausedByUser) {
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_PAUSE -> sharedPlayer.pause()
-                        Lifecycle.Event.ON_RESUME -> {
-                            if (currentVideoId != null && !currentVideoPausedByUser) {
-                                sharedPlayer.play()
-                            }
-                        }
+            key(uiState.pagerResetToken) {
+                val pagerState = rememberPagerState(
+                    initialPage = uiState.pagerInitialPage.coerceIn(0, (uiState.items.lastIndex).coerceAtLeast(0)),
+                    pageCount = { uiState.items.size },
+                )
+                val sheetVideoId = uiState.detailSheetVideoId
+                val sheetOpen = sheetVideoId != null
+                val videoHeightFraction by animateFloatAsState(
+                    targetValue = if (sheetOpen) 0.25f else 1f,
+                    animationSpec = spring(stiffness = 450f),
+                    label = "short_video_region_height",
+                )
+                val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
+                val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
 
-                        else -> Unit
-                    }
-                }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .fillMaxHeight(videoHeightFraction),
-                ) {
-                    VerticalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxSize(),
-                        userScrollEnabled = !sheetOpen,
-                    ) { page ->
-                        val item = uiState.items[page]
-                        val detail = uiState.detailByVideoId[item.id]
-                        VerticalVideoPage(
-                            item = item,
-                            sharedPlayer = sharedPlayer,
-                            active = pagerState.currentPage == page,
-                            fitMode = uiState.fitMode,
-                            pausedByUser = item.id in uiState.pausedByUserVideoIds,
-                            posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
-                            showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
-                            actorNames = extractActorNames(detail),
-                            isLiked = detail?.userState?.isLiked == true,
-                            isFavorited = detail?.userState?.isFavorited == true,
-                            actionBusy = item.id in uiState.actionBusyVideoIds,
-                            onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
-                            onToggleLike = { viewModel.toggleLike(item.id) },
-                            onToggleFavorite = { viewModel.toggleFavorite(item.id) },
-                            onToggleMode = viewModel::toggleFitMode,
-                            onOpenDetail = { viewModel.openDetailSheet(item.id) },
+                LaunchedEffect(pagerState.currentPage, uiState.items) {
+                    uiState.items.getOrNull(pagerState.currentPage)?.id?.let { currentVideoID ->
+                        viewModel.ensureDetailLoaded(currentVideoID)
+                        viewModel.loadMoreIfNeeded(
+                            currentIndex = pagerState.currentPage,
+                            currentVideoId = currentVideoID,
                         )
                     }
                 }
+                LaunchedEffect(pagerState.currentPage, uiState.items, baseUrl) {
+                    val page = pagerState.currentPage
+                    val start = (page - 2).coerceAtLeast(0)
+                    val end = (page + 2).coerceAtMost(uiState.items.lastIndex)
+                    for (idx in start..end) {
+                        val item = uiState.items.getOrNull(idx) ?: continue
+                        val thumbURL = resolveThumbnailUrl(baseUrl, item.thumbnailPath) ?: continue
+                        imageLoader.enqueue(ImageRequest.Builder(context).data(thumbURL).build())
+                    }
+                }
+                LaunchedEffect(currentVideoId) {
+                    val previousVideoId = lastHistoryVideoId
+                    if (!previousVideoId.isNullOrBlank() && previousVideoId != currentVideoId) {
+                        val (watchSeconds, completed) = readWatchSnapshot(sharedPlayer)
+                        viewModel.reportHistory(previousVideoId, watchSeconds, completed)
+                    }
+                    lastHistoryVideoId = currentVideoId
+                }
+                LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory) {
+                    if (currentVideoId == null) {
+                        sharedPlayer.stop()
+                        sharedPlayer.clearMediaItems()
+                        renderedVideoId = null
+                        return@LaunchedEffect
+                    }
+                    renderedVideoId = null
+                    sharedPlayer.stop()
+                    sharedPlayer.clearMediaItems()
+                    val sourceUrl = UrlBuilder.source(baseUrl, currentVideoId)
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(sourceUrl)
+                        .setMediaId(currentVideoId)
+                        .build()
+                    val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                        .createMediaSource(mediaItem)
+                    sharedPlayer.setMediaSource(mediaSource, true)
+                    sharedPlayer.prepare()
+                }
+                LaunchedEffect(currentVideoId, currentVideoPausedByUser) {
+                    val shouldPlay = currentVideoId != null && !currentVideoPausedByUser
+                    sharedPlayer.playWhenReady = shouldPlay
+                    if (shouldPlay) {
+                        sharedPlayer.play()
+                    } else {
+                        sharedPlayer.pause()
+                    }
+                }
+                DisposableEffect(lifecycleOwner, sharedPlayer, currentVideoId, currentVideoPausedByUser) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_PAUSE -> sharedPlayer.pause()
+                            Lifecycle.Event.ON_RESUME -> {
+                                if (currentVideoId != null && !currentVideoPausedByUser) {
+                                    sharedPlayer.play()
+                                }
+                            }
 
-                if (sheetVideoId != null) {
-                    val detail = uiState.detailByVideoId[sheetVideoId]
-                    val loading = detail == null && sheetVideoId in uiState.detailLoadingVideoIds
-                    ShortDetailSheet(
+                            else -> Unit
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black),
+                ) {
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
+                            .align(Alignment.TopCenter)
                             .fillMaxWidth()
-                            .fillMaxHeight(0.75f),
-                        detail = detail,
-                        loading = loading,
-                        errorMessage = uiState.detailErrorMessage,
-                        actionBusy = sheetVideoId in uiState.actionBusyVideoIds,
-                        onClose = viewModel::closeDetailSheet,
-                        onRetry = { viewModel.ensureDetailLoaded(sheetVideoId, force = true, reportError = true) },
-                        onToggleDislike = { viewModel.toggleDislike(sheetVideoId) },
-                    )
+                            .fillMaxHeight(videoHeightFraction),
+                    ) {
+                        VerticalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            userScrollEnabled = !sheetOpen,
+                        ) { page ->
+                            val item = uiState.items[page]
+                            val detail = uiState.detailByVideoId[item.id]
+                            VerticalVideoPage(
+                                item = item,
+                                sharedPlayer = sharedPlayer,
+                                active = pagerState.currentPage == page,
+                                fitMode = uiState.fitMode,
+                                pausedByUser = item.id in uiState.pausedByUserVideoIds,
+                                posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                                showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
+                                actorNames = extractActorNames(detail),
+                                isLiked = detail?.userState?.isLiked == true,
+                                isFavorited = detail?.userState?.isFavorited == true,
+                                actionBusy = item.id in uiState.actionBusyVideoIds,
+                                onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
+                                onToggleLike = { viewModel.toggleLike(item.id) },
+                                onToggleFavorite = { viewModel.toggleFavorite(item.id) },
+                                onToggleMode = viewModel::toggleFitMode,
+                                onOpenDetail = { viewModel.openDetailSheet(item.id) },
+                            )
+                        }
+                    }
+
+                    if (!uiState.loadMoreErrorMessage.isNullOrBlank()) {
+                        Surface(
+                            color = Color(0xCC11141A),
+                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = if (sheetOpen) 16.dp else 32.dp),
+                        ) {
+                            Text(
+                                text = uiState.loadMoreErrorMessage.orEmpty(),
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+
+                    if (sheetVideoId != null) {
+                        val detail = uiState.detailByVideoId[sheetVideoId]
+                        val loading = detail == null && sheetVideoId in uiState.detailLoadingVideoIds
+                        ShortDetailSheet(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .fillMaxHeight(0.75f),
+                            detail = detail,
+                            loading = loading,
+                            errorMessage = uiState.detailErrorMessage,
+                            actionBusy = sheetVideoId in uiState.actionBusyVideoIds,
+                            onClose = viewModel::closeDetailSheet,
+                            onRetry = { viewModel.ensureDetailLoaded(sheetVideoId, force = true, reportError = true) },
+                            onToggleDislike = { viewModel.toggleDislike(sheetVideoId) },
+                        )
+                    }
                 }
             }
         }
