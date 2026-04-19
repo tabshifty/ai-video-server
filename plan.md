@@ -15,6 +15,20 @@
 
 ---
 
+### [2026-04-19 08:35] 修正 release 忽略规则位置：回退模块规则并在根 .gitignore 添加 `release`
+- Type: `implementation`
+- Summary:
+  - 回退上一版误加到 `android-app/.gitignore` 的 `/app/release/` 规则，恢复到变更前状态。
+  - 按要求在根 `.gitignore` 增加忽略规则 `release`，统一忽略名为 `release` 的目录/文件。
+  - 使 `android-app/app/release/` 不再出现在 `git status` 未跟踪列表中。
+- Changed Files:
+  - `.gitignore`
+  - `plan.md`
+- Verification:
+  - `git status --short` no longer shows `android-app/app/release/`.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 08:28] Android 视频播放防息屏：仅播放中保持亮屏，暂停/退出自动恢复
 - Type: `implementation`
 - Summary:
