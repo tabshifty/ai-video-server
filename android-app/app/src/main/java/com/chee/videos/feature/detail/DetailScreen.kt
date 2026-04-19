@@ -48,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +69,7 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.util.UrlBuilder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -80,6 +80,7 @@ fun DetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isAv = uiState.videoType.equals("av", ignoreCase = true)
+    val useLongFormPlayerControls = isLongFormVideoType(uiState.videoType)
     val pageBg = if (isAv) Color(0xFF0B0C0F) else Color(0xFFF7F8FA)
     val textColor = if (isAv) Color(0xFFEDEFF4) else Color.Unspecified
     val mutedTextColor = if (isAv) Color(0xFFB9C0CD) else MaterialTheme.colorScheme.onSurfaceVariant
@@ -111,7 +112,7 @@ fun DetailScreen(
 
     Scaffold(
         topBar = {
-            if (!isFullscreen) {
+            if (!isFullscreen && !useLongFormPlayerControls) {
                 CenterAlignedTopAppBar(
                     title = { Text("视频详情") },
                     modifier = Modifier.statusBarsPadding(),
@@ -246,19 +247,41 @@ fun DetailScreen(
                             .background(Color.Black),
                     ) {
                         if (showPlayer) {
-                            VideoPlayerSurface(
-                                exoPlayer = exoPlayer,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                            PlayerOverlayIconButton(
-                                icon = Icons.Filled.FullscreenExit,
-                                contentDescription = "退出全屏",
-                                onClick = { isFullscreen = false },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .statusBarsPadding()
-                                    .padding(12.dp),
-                            )
+                            if (useLongFormPlayerControls) {
+                                LongFormVideoPlayer(
+                                    title = detail.title,
+                                    player = exoPlayer,
+                                    isFullscreen = true,
+                                    onBack = { isFullscreen = false },
+                                    onTogglePlayPause = {
+                                        if (exoPlayer.isPlaying) {
+                                            userRequestedPlay = false
+                                            exoPlayer.pause()
+                                        } else {
+                                            userRequestedPlay = true
+                                            exoPlayer.playWhenReady = true
+                                            exoPlayer.play()
+                                        }
+                                    },
+                                    onToggleFullscreen = { isFullscreen = false },
+                                    modifier = Modifier.fillMaxSize(),
+                                    showStatusBarPadding = false,
+                                )
+                            } else {
+                                VideoPlayerSurface(
+                                    exoPlayer = exoPlayer,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                                PlayerOverlayIconButton(
+                                    icon = Icons.Filled.FullscreenExit,
+                                    contentDescription = "退出全屏",
+                                    onClick = { isFullscreen = false },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .statusBarsPadding()
+                                        .padding(12.dp),
+                                )
+                            }
                         } else {
                             Text(
                                 text = "暂无可播放视频",
@@ -285,18 +308,40 @@ fun DetailScreen(
                                 .background(if (isAv) Color(0xFF181B21) else Color(0xFF1A1C20)),
                         ) {
                             if (showPlayer) {
-                                VideoPlayerSurface(
-                                    exoPlayer = exoPlayer,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                                PlayerOverlayIconButton(
-                                    icon = Icons.Filled.Fullscreen,
-                                    contentDescription = "全屏播放",
-                                    onClick = { isFullscreen = true },
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(10.dp),
-                                )
+                                if (useLongFormPlayerControls) {
+                                    LongFormVideoPlayer(
+                                        title = detail.title,
+                                        player = exoPlayer,
+                                        isFullscreen = false,
+                                        onBack = onBack,
+                                        onTogglePlayPause = {
+                                            if (exoPlayer.isPlaying) {
+                                                userRequestedPlay = false
+                                                exoPlayer.pause()
+                                            } else {
+                                                userRequestedPlay = true
+                                                exoPlayer.playWhenReady = true
+                                                exoPlayer.play()
+                                            }
+                                        },
+                                        onToggleFullscreen = { isFullscreen = true },
+                                        modifier = Modifier.fillMaxSize(),
+                                        showStatusBarPadding = false,
+                                    )
+                                } else {
+                                    VideoPlayerSurface(
+                                        exoPlayer = exoPlayer,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                    PlayerOverlayIconButton(
+                                        icon = Icons.Filled.Fullscreen,
+                                        contentDescription = "全屏播放",
+                                        onClick = { isFullscreen = true },
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(10.dp),
+                                    )
+                                }
                             } else {
                                 if (!posterUrl.isNullOrBlank()) {
                                     AsyncImage(
@@ -400,7 +445,7 @@ private fun VideoPlayerSurface(
 
 @Composable
 private fun PlayerOverlayIconButton(
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -419,6 +464,11 @@ private fun PlayerOverlayIconButton(
             tint = if (enabled) Color(0xFFEDEFF4) else Color(0xFF7D8593),
         )
     }
+}
+
+private fun isLongFormVideoType(type: String): Boolean {
+    val normalized = type.trim().lowercase()
+    return normalized == "movie" || normalized == "episode" || normalized == "av"
 }
 
 private fun resolvePlayUrl(baseUrl: String, detail: VideoDetailDto): String? {

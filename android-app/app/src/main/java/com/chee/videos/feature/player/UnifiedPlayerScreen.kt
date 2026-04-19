@@ -1,6 +1,9 @@
 package com.chee.videos.feature.player
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.graphics.Color as AndroidColor
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -38,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +54,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -67,6 +74,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -139,8 +147,33 @@ fun UnifiedPlayerScreen(
             }
             val imageLoader = context.imageLoader
             val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
+            val currentVideoType = uiState.items.getOrNull(pagerState.currentPage)?.type.orEmpty()
+            val currentIsLongForm = isLongFormVideoType(currentVideoType)
             val currentVideoPausedByUser = currentVideoId?.let { id -> pausedByUserVideoIds.contains(id) } ?: false
             val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
+            val activity = context as? Activity
+            var isFullscreen by rememberSaveable { mutableStateOf(false) }
+
+            BackHandler(enabled = isFullscreen && currentIsLongForm) {
+                isFullscreen = false
+            }
+
+            DisposableEffect(activity, isFullscreen, currentIsLongForm) {
+                if (activity == null || !isFullscreen || !currentIsLongForm) {
+                    onDispose { }
+                } else {
+                    val previousOrientation = activity.requestedOrientation
+                    val window = activity.window
+                    val controller = WindowCompat.getInsetsController(window, window.decorView)
+                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
+                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    onDispose {
+                        controller.show(WindowInsetsCompat.Type.systemBars())
+                        activity.requestedOrientation = previousOrientation
+                    }
+                }
+            }
 
             KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
@@ -195,6 +228,11 @@ fun UnifiedPlayerScreen(
             LaunchedEffect(currentVideoId) {
                 if (!currentVideoId.isNullOrBlank()) {
                     viewModel.ensureDetailLoaded(currentVideoId)
+                }
+            }
+            LaunchedEffect(currentVideoType) {
+                if (!isLongFormVideoType(currentVideoType)) {
+                    isFullscreen = false
                 }
             }
             LaunchedEffect(currentVideoId) {
@@ -255,49 +293,82 @@ fun UnifiedPlayerScreen(
                 }
             }
 
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()) {
+            val fullscreenLongForm = isFullscreen && currentIsLongForm
+            val containerModifier = if (fullscreenLongForm) {
+                Modifier.fillMaxSize().background(Color.Black)
+            } else {
+                Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()
+            }
+
+            Box(modifier = containerModifier) {
                 VerticalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
+                    userScrollEnabled = !fullscreenLongForm,
                 ) { page ->
                     val item = uiState.items[page]
-                    UnifiedPlayerPage(
-                        item = item,
-                        detail = uiState.detailByVideoId[item.id],
-                        sharedPlayer = sharedPlayer,
-                        active = pagerState.currentPage == page,
-                        pausedByUser = item.id in pausedByUserVideoIds,
-                        posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
-                        showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
-                        onTogglePauseByUser = {
-                            val next = pausedByUserVideoIds.toMutableSet()
-                            if (next.contains(item.id)) {
-                                next.remove(item.id)
-                            } else {
-                                next.add(item.id)
-                            }
-                            pausedByUserVideoIds = next
-                        },
-                    )
+                    val isActive = pagerState.currentPage == page
+                    val isLongForm = isLongFormVideoType(item.type)
+                    val togglePauseState: () -> Unit = {
+                        val next = pausedByUserVideoIds.toMutableSet()
+                        if (next.contains(item.id)) {
+                            next.remove(item.id)
+                        } else {
+                            next.add(item.id)
+                        }
+                        pausedByUserVideoIds = next
+                    }
+                    if (isLongForm) {
+                        UnifiedLongFormPage(
+                            item = item,
+                            sharedPlayer = sharedPlayer,
+                            active = isActive,
+                            posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                            showPoster = isActive && renderedVideoId != item.id,
+                            isFullscreen = fullscreenLongForm && isActive,
+                            onBack = {
+                                if (fullscreenLongForm && isActive) {
+                                    isFullscreen = false
+                                } else {
+                                    onBack()
+                                }
+                            },
+                            onTogglePauseByUser = togglePauseState,
+                            onToggleFullscreen = { isFullscreen = !(fullscreenLongForm && isActive) },
+                        )
+                    } else {
+                        UnifiedShortVideoPage(
+                            item = item,
+                            detail = uiState.detailByVideoId[item.id],
+                            sharedPlayer = sharedPlayer,
+                            active = isActive,
+                            pausedByUser = item.id in pausedByUserVideoIds,
+                            posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                            showPoster = isActive && renderedVideoId != item.id,
+                            onTogglePauseByUser = togglePauseState,
+                        )
+                    }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .fillMaxWidth()
-                        .padding(top = 16.dp, start = 6.dp, end = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
+                if (!currentIsLongForm && !fullscreenLongForm) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .fillMaxWidth()
+                            .padding(top = 16.dp, start = 6.dp, end = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
+                        }
+                        Text(
+                            text = sourceLabel(source),
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
-                    Text(
-                        text = sourceLabel(source),
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
                 }
             }
         }
@@ -305,7 +376,7 @@ fun UnifiedPlayerScreen(
 }
 
 @Composable
-private fun UnifiedPlayerPage(
+private fun UnifiedShortVideoPage(
     item: PlayerVideoItem,
     detail: VideoDetailDto?,
     sharedPlayer: ExoPlayer,
@@ -449,6 +520,46 @@ private fun UnifiedPlayerPage(
     }
 }
 
+@Composable
+private fun UnifiedLongFormPage(
+    item: PlayerVideoItem,
+    sharedPlayer: ExoPlayer,
+    active: Boolean,
+    posterUrl: String?,
+    showPoster: Boolean,
+    isFullscreen: Boolean,
+    onBack: () -> Unit,
+    onTogglePauseByUser: () -> Unit,
+    onToggleFullscreen: () -> Unit,
+) {
+    if (active) {
+        LongFormVideoPlayer(
+            title = item.title,
+            player = sharedPlayer,
+            isFullscreen = isFullscreen,
+            onBack = onBack,
+            onTogglePlayPause = onTogglePauseByUser,
+            onToggleFullscreen = onToggleFullscreen,
+            modifier = Modifier.fillMaxSize(),
+            showStatusBarPadding = false,
+            posterUrl = posterUrl,
+            showPoster = showPoster,
+        )
+        return
+    }
+
+    if (!posterUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = posterUrl,
+            contentDescription = "${item.title} 封面",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    } else {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+    }
+}
+
 private fun readWatchSnapshot(player: ExoPlayer): Pair<Int, Boolean> {
     val watchSeconds = (player.currentPosition.coerceAtLeast(0L) / 1000L).toInt()
     val durationMs = player.duration
@@ -512,4 +623,9 @@ private fun sourceLabel(source: String): String {
         "like" -> "我的喜欢"
         else -> "视频播放"
     }
+}
+
+private fun isLongFormVideoType(type: String): Boolean {
+    val normalized = type.trim().lowercase()
+    return normalized == "movie" || normalized == "episode" || normalized == "av"
 }

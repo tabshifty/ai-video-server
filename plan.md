@@ -15,6 +15,29 @@
 
 ---
 
+### [2026-04-19 09:10] 长视频播放器改版（电影/剧集/AV）+ 历史类型分流（短视频保持旧逻辑）
+- Type: `implementation`
+- Summary:
+  - 新增长视频播放器控件 `LongFormVideoPlayer`：自定义顶部/底部控制栏、单击显隐、5 秒自动隐藏、左右滑动快进快退（中间浮层实时提示）、长按 2.0x 倍速松手恢复、全屏/退出全屏按钮。
+  - 详情页 `DetailScreen` 对 `movie/episode/av` 启用新长视频控件，保留 `short` 旧逻辑；全屏切换仅改方向与 UI，不重建播放器，播放进度无缝衔接。
+  - 统一播放器 `UnifiedPlayerScreen` 按视频类型分流：`short` 继续旧短视频交互，`movie/episode/av` 使用新长视频控件；新增长视频全屏横屏沉浸与返回键退出全屏。
+  - 后端 `history/continue` 返回项新增 `type` 字段；Android 端 `HistoryItemDto`/`MineViewModel`/`UnifiedPlayerViewModel` 全链路接入，确保历史列表可精确识别 short 并保持旧逻辑不变。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerViewModel.kt`
+  - `internal/models/app.go`
+  - `internal/repository/app_repository.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 08:35] 修正 release 忽略规则位置：回退模块规则并在根 .gitignore 添加 `release`
 - Type: `implementation`
 - Summary:

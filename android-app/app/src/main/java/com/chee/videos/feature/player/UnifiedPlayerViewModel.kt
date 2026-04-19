@@ -75,7 +75,7 @@ class UnifiedPlayerViewModel @Inject constructor(
                                 id = row.videoId,
                                 title = row.title,
                                 thumbnailPath = row.thumbnailPath,
-                                type = "history",
+                                type = row.type,
                                 duration = row.duration,
                             )
                         }

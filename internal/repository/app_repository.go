@@ -172,7 +172,7 @@ WHERE a.user_id=$1
 	}
 
 	rows, err := r.pool.Query(ctx, `
-SELECT v.id, v.title, v.thumbnail_path, v.duration_seconds, a.watch_seconds, a.updated_at
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.duration_seconds, a.watch_seconds, a.updated_at
 FROM user_video_actions a
 JOIN videos v ON v.id = a.video_id
 WHERE a.user_id=$1
@@ -189,7 +189,7 @@ LIMIT $2 OFFSET $3
 	items := make([]models.HistoryItem, 0, limit)
 	for rows.Next() {
 		var item models.HistoryItem
-		if err := rows.Scan(&item.VideoID, &item.Title, &item.ThumbnailPath, &item.Duration, &item.WatchSeconds, &item.LastWatchedAt); err != nil {
+		if err := rows.Scan(&item.VideoID, &item.Title, &item.Type, &item.ThumbnailPath, &item.Duration, &item.WatchSeconds, &item.LastWatchedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan continue item: %w", err)
 		}
 		if strings.TrimSpace(item.ThumbnailPath) != "" {

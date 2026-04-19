@@ -150,7 +150,7 @@ class MineViewModel @Inject constructor(
                                 MineVideoItem(
                                     videoId = history.videoId,
                                     title = history.title,
-                                    type = "history",
+                                    type = history.type,
                                     thumbnailPath = history.thumbnailPath,
                                     duration = history.duration,
                                     subtitle = "已观看 ${history.watchSeconds} 秒",

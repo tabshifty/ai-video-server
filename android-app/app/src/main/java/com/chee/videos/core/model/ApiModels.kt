@@ -59,6 +59,7 @@ data class ContinueHistoryPayload(
 data class HistoryItemDto(
     @SerializedName("video_id") val videoId: String,
     @SerializedName("title") val title: String,
+    @SerializedName("type") val type: String = "",
     @SerializedName("thumbnail_path") val thumbnailPath: String? = null,
     @SerializedName("duration") val duration: Int = 0,
     @SerializedName("watch_seconds") val watchSeconds: Int = 0,

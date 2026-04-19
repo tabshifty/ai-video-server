@@ -46,6 +46,7 @@ type VideoUserState struct {
 type HistoryItem struct {
 	VideoID       uuid.UUID `json:"video_id"`
 	Title         string    `json:"title"`
+	Type          string    `json:"type"`
 	ThumbnailPath string    `json:"thumbnail_path"`
 	Duration      int       `json:"duration"`
 	WatchSeconds  int       `json:"watch_seconds"`
