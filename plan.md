@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-19 08:28] Android 视频播放防息屏：仅播放中保持亮屏，暂停/退出自动恢复
+- Type: `implementation`
+- Summary:
+  - 新增通用 `KeepScreenOnEffect(enabled)`，统一管理 `FLAG_KEEP_SCREEN_ON`，支持进入播放时开启、暂停或退出时自动清除。
+  - 短视频流接入真实播放态监听（`Player.onIsPlayingChanged`），仅当前视频实际播放中保持亮屏。
+  - 统一播放器（历史/收藏/喜欢）接入真实播放态监听，滑动切片、暂停、返回页面时均按播放状态自动恢复息屏策略。
+  - 详情页内嵌播放器接入真实播放态监听，含 AV 详情全屏/非全屏场景；播放时防息屏，暂停或离开详情页后恢复系统息屏。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/KeepScreenOnEffect.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 00:23] 修复 AV 详情点击全屏闪退回退：避免横竖屏切换触发 Activity 重建
 - Type: `implementation`
 - Summary:

@@ -85,6 +85,7 @@ import coil.request.ImageRequest
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
+import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -156,14 +157,22 @@ fun ShortFeedScreen(
             val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
             var renderedVideoId by remember { mutableStateOf<String?>(null) }
             var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
+            var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
             val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
+
+            KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
             DisposableEffect(sharedPlayer) {
                 val listener = object : Player.Listener {
                     override fun onRenderedFirstFrame() {
                         renderedVideoId = sharedPlayer.currentMediaItem?.mediaId
                     }
+
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        isPlayerActuallyPlaying = isPlaying
+                    }
                 }
+                isPlayerActuallyPlaying = sharedPlayer.isPlaying
                 sharedPlayer.addListener(listener)
                 onDispose {
                     val finalVideoId = latestCurrentVideoId ?: sharedPlayer.currentMediaItem?.mediaId
@@ -172,6 +181,7 @@ fun ShortFeedScreen(
                         viewModel.reportHistory(finalVideoId, watchSeconds, completed)
                     }
                     sharedPlayer.removeListener(listener)
+                    isPlayerActuallyPlaying = false
                     sharedPlayer.release()
                 }
             }

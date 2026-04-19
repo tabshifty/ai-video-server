@@ -66,6 +66,7 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -122,6 +123,7 @@ fun UnifiedPlayerScreen(
             var pausedByUserVideoIds by remember { mutableStateOf(setOf<String>()) }
             var renderedVideoId by remember { mutableStateOf<String?>(null) }
             var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
+            var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
 
             val dataSourceFactory = remember(accessToken) {
                 DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -140,12 +142,19 @@ fun UnifiedPlayerScreen(
             val currentVideoPausedByUser = currentVideoId?.let { id -> pausedByUserVideoIds.contains(id) } ?: false
             val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
 
+            KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
+
             DisposableEffect(sharedPlayer) {
                 val listener = object : Player.Listener {
                     override fun onRenderedFirstFrame() {
                         renderedVideoId = sharedPlayer.currentMediaItem?.mediaId
                     }
+
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        isPlayerActuallyPlaying = isPlaying
+                    }
                 }
+                isPlayerActuallyPlaying = sharedPlayer.isPlaying
                 sharedPlayer.addListener(listener)
                 onDispose {
                     val finalVideoID = latestCurrentVideoId ?: sharedPlayer.currentMediaItem?.mediaId
@@ -154,6 +163,7 @@ fun UnifiedPlayerScreen(
                         viewModel.reportHistory(finalVideoID, watchSeconds, completed)
                     }
                     sharedPlayer.removeListener(listener)
+                    isPlayerActuallyPlaying = false
                     sharedPlayer.release()
                 }
             }

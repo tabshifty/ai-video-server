@@ -69,6 +69,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.util.UrlBuilder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -171,6 +172,7 @@ fun DetailScreen(
                 }
                 var userRequestedPlay by rememberSaveable(detail.id) { mutableStateOf(false) }
                 var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+                var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
 
                 LaunchedEffect(detail.id) {
                     isFullscreen = false
@@ -219,11 +221,21 @@ fun DetailScreen(
                 }
 
                 DisposableEffect(exoPlayer) {
+                    val listener = object : androidx.media3.common.Player.Listener {
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            isPlayerActuallyPlaying = isPlaying
+                        }
+                    }
+                    isPlayerActuallyPlaying = exoPlayer.isPlaying
+                    exoPlayer.addListener(listener)
                     onDispose {
+                        exoPlayer.removeListener(listener)
+                        isPlayerActuallyPlaying = false
                         exoPlayer.release()
                     }
                 }
 
+                KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
                 val showPlayer = userRequestedPlay && canPlay
 
                 if (isFullscreen) {
