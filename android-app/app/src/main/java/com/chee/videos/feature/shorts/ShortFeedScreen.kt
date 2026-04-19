@@ -95,6 +95,13 @@ import kotlinx.coroutines.launch
 private val ShortsActionBg = Color(0x5A000000)
 private val ShortsActionActiveTint = Color(0xFFFF5E84)
 
+internal fun shortPosterContentScale(fitMode: VideoFitMode): ContentScale {
+    return when (fitMode) {
+        VideoFitMode.FILL -> ContentScale.Crop
+        VideoFitMode.FIT -> ContentScale.Fit
+    }
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun ShortFeedScreen(
@@ -419,7 +426,7 @@ private fun VerticalVideoPage(
                         AsyncImage(
                             model = posterUrl,
                             contentDescription = "${item.title} 封面",
-                            contentScale = ContentScale.Crop,
+                            contentScale = shortPosterContentScale(fitMode),
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -432,7 +439,7 @@ private fun VerticalVideoPage(
                 AsyncImage(
                     model = posterUrl,
                     contentDescription = "${item.title} 封面",
-                    contentScale = ContentScale.Crop,
+                    contentScale = shortPosterContentScale(fitMode),
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {

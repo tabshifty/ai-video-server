@@ -15,6 +15,23 @@
 
 ---
 
+### [2026-04-19 12:26] 修复短视频尺寸模式切换时封面不跟随的问题
+- Type: `implementation`
+- Summary:
+  - 定位根因：短视频尺寸模式切换只影响 `PlayerView.resizeMode`，封面图仍固定使用 `ContentScale.Crop`，导致视频切到完整显示时封面没有同步切换。
+  - 在短视频页提取统一的封面缩放映射 `shortPosterContentScale(fitMode)`，使封面图与视频共用同一套 `VideoFitMode` 语义：`FILL -> Crop`，`FIT -> Fit`。
+  - 当前页显示中的封面与非当前页预览封面统一接入该映射，避免只修一条分支后再次出现模式不一致。
+  - 新增 Android 单元测试锁定短视频封面缩放映射，防止后续改动回归。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedPosterScaleTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.shorts.ShortFeedPosterScaleTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 12:03] 修复短视频只能滑 20 条：尾部补货 + 滚动窗口 + 后端排重补货
 - Type: `implementation`
 - Summary:
