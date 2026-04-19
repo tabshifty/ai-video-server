@@ -4,5 +4,4 @@
 /.idea/
 /build/
 /app/build/
-/app/release/
 *.iml

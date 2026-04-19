@@ -15,19 +15,6 @@
 
 ---
 
-### [2026-04-19 08:30] 忽略 Android release 目录
-- Type: `implementation`
-- Summary:
-  - 在 Android 模块级 `.gitignore` 增加 `/app/release/` 规则，忽略本地产生的 release 目录与构建产物文件。
-  - 解决 `git status` 持续出现 `android-app/app/release/` 未跟踪目录的问题，避免污染提交列表。
-- Changed Files:
-  - `android-app/.gitignore`
-  - `plan.md`
-- Verification:
-  - `git status --short` no longer shows `android-app/app/release/`.
-- Rollback:
-  - `git revert <commit>`
-
 ### [2026-04-19 08:28] Android 视频播放防息屏：仅播放中保持亮屏，暂停/退出自动恢复
 - Type: `implementation`
 - Summary:
