@@ -22,7 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
@@ -119,7 +119,7 @@ fun DetailScreen(
                     windowInsets = WindowInsets(0, 0, 0, 0),
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                         }
                     }
                 )
@@ -171,20 +171,28 @@ fun DetailScreen(
                 val exoPlayer = remember(uiState.accessToken) {
                     ExoPlayer.Builder(context).build()
                 }
-                var userRequestedPlay by rememberSaveable(detail.id) { mutableStateOf(false) }
+                var hasStartedPlayback by rememberSaveable(detail.id) { mutableStateOf(false) }
+                var isPausedByUser by rememberSaveable(detail.id) { mutableStateOf(false) }
                 var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
                 var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
+                val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
+                    LongFormPlaybackSession(
+                        hasStartedPlayback = hasStartedPlayback,
+                        isPausedByUser = isPausedByUser,
+                    )
+                }
+
+                fun updatePlaybackSession(nextSession: LongFormPlaybackSession) {
+                    hasStartedPlayback = nextSession.hasStartedPlayback
+                    isPausedByUser = nextSession.isPausedByUser
+                }
 
                 LaunchedEffect(detail.id) {
                     isFullscreen = false
                 }
 
-                LaunchedEffect(userRequestedPlay, playUrl, dataSourceFactory) {
-                    if (!userRequestedPlay) {
-                        exoPlayer.pause()
-                        return@LaunchedEffect
-                    }
-                    if (playUrl.isNullOrBlank()) {
+                LaunchedEffect(playbackSession.hasStartedPlayback, playUrl, dataSourceFactory) {
+                    if (!playbackSession.hasStartedPlayback || playUrl.isNullOrBlank()) {
                         return@LaunchedEffect
                     }
 
@@ -198,16 +206,37 @@ fun DetailScreen(
                         preparedUrl = playUrl
                     }
 
+                    if (!playbackSession.isPausedByUser) {
+                        exoPlayer.playWhenReady = true
+                        exoPlayer.play()
+                    }
+                }
+
+                LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, playUrl) {
+                    if (!playbackSession.hasStartedPlayback || playUrl.isNullOrBlank()) {
+                        exoPlayer.pause()
+                        return@LaunchedEffect
+                    }
+                    if (playbackSession.isPausedByUser) {
+                        exoPlayer.pause()
+                        return@LaunchedEffect
+                    }
                     exoPlayer.playWhenReady = true
                     exoPlayer.play()
                 }
 
-                DisposableEffect(lifecycleOwner, exoPlayer, userRequestedPlay) {
+                DisposableEffect(
+                    lifecycleOwner,
+                    exoPlayer,
+                    playbackSession.hasStartedPlayback,
+                    playbackSession.isPausedByUser,
+                ) {
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
                             Lifecycle.Event.ON_PAUSE -> exoPlayer.pause()
                             Lifecycle.Event.ON_RESUME -> {
-                                if (userRequestedPlay) {
+                                if (playbackSession.shouldResumeOnLifecycle()) {
+                                    exoPlayer.playWhenReady = true
                                     exoPlayer.play()
                                 }
                             }
@@ -237,7 +266,7 @@ fun DetailScreen(
                 }
 
                 KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
-                val showPlayer = userRequestedPlay && canPlay
+                val showPlayer = playbackSession.shouldShowPlayer(canPlay)
 
                 if (isFullscreen) {
                     Box(
@@ -254,14 +283,8 @@ fun DetailScreen(
                                     isFullscreen = true,
                                     onBack = { isFullscreen = false },
                                     onTogglePlayPause = {
-                                        if (exoPlayer.isPlaying) {
-                                            userRequestedPlay = false
-                                            exoPlayer.pause()
-                                        } else {
-                                            userRequestedPlay = true
-                                            exoPlayer.playWhenReady = true
-                                            exoPlayer.play()
-                                        }
+                                        val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
+                                        updatePlaybackSession(nextSession)
                                     },
                                     onToggleFullscreen = { isFullscreen = false },
                                     modifier = Modifier.fillMaxSize(),
@@ -315,14 +338,8 @@ fun DetailScreen(
                                         isFullscreen = false,
                                         onBack = onBack,
                                         onTogglePlayPause = {
-                                            if (exoPlayer.isPlaying) {
-                                                userRequestedPlay = false
-                                                exoPlayer.pause()
-                                            } else {
-                                                userRequestedPlay = true
-                                                exoPlayer.playWhenReady = true
-                                                exoPlayer.play()
-                                            }
+                                            val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
+                                            updatePlaybackSession(nextSession)
                                         },
                                         onToggleFullscreen = { isFullscreen = true },
                                         modifier = Modifier.fillMaxSize(),
@@ -354,7 +371,11 @@ fun DetailScreen(
                                 PlayerOverlayIconButton(
                                     icon = Icons.Filled.PlayArrow,
                                     contentDescription = "播放",
-                                    onClick = { userRequestedPlay = true },
+                                    onClick = {
+                                        updatePlaybackSession(
+                                            playbackSession.requestPlay(canPlay = canPlay),
+                                        )
+                                    },
                                     enabled = canPlay,
                                     modifier = Modifier.align(Alignment.Center),
                                 )

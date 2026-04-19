@@ -15,6 +15,25 @@
 
 ---
 
+### [2026-04-19 11:14] 修复长视频播放器暂停退回海报/空态，并收紧控制栏交互
+- Type: `implementation`
+- Summary:
+  - 新增长视频播放状态机 `LongFormPlaybackSession`，将“已进入播放态”和“用户主动暂停”拆分，修复详情页暂停后误卸载播放器，避免小屏退回海报、全屏退回“暂无可播放视频”。
+  - 详情页 `DetailScreen` 改为基于播放状态机驱动：首次播放后始终保留播放器挂载，生命周期恢复只在非用户暂停时自动继续播放。
+  - 长视频播放器 `LongFormVideoPlayer` 新增双击播放/暂停、中间反馈浮层、长按 2.0x 倍速提示，并将顶部/底部控制栏改为更紧凑的暗黑悬浮条，降低对画面的遮挡。
+  - 新增单元测试覆盖关键回归：开始播放后暂停仍应保留播放器挂载态，恢复播放后仍可自动续播。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/LongFormPlaybackSession.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/detail/LongFormPlaybackSessionTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.detail.LongFormPlaybackSessionTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 09:12] 清理长视频播放器重复导入并复核编译
 - Type: `implementation`
 - Summary:
