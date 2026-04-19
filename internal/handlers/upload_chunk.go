@@ -30,18 +30,19 @@ func (a *API) UploadInit(c *gin.Context) {
 	}
 
 	var req struct {
-		Filename      string   `json:"filename"`
-		FileSize      int64    `json:"file_size"`
-		ChunkSize     int64    `json:"chunk_size"`
-		TotalChunks   int      `json:"total_chunks"`
-		Hash          string   `json:"hash"`
-		Type          string   `json:"type"`
-		Title         string   `json:"title"`
-		Description   string   `json:"description"`
-		Tags          []string `json:"tags"`
-		ActorIDs      []string `json:"actor_ids"`
-		ActorNames    []string `json:"actor_names"`
-		CollectionIDs []string `json:"collection_ids"`
+		Filename          string   `json:"filename"`
+		FileSize          int64    `json:"file_size"`
+		ChunkSize         int64    `json:"chunk_size"`
+		TotalChunks       int      `json:"total_chunks"`
+		Hash              string   `json:"hash"`
+		Type              string   `json:"type"`
+		Title             string   `json:"title"`
+		Description       string   `json:"description"`
+		Tags              []string `json:"tags"`
+		ActorIDs          []string `json:"actor_ids"`
+		ActorNames        []string `json:"actor_names"`
+		ImageCollectionID string   `json:"image_collection_id"`
+		CollectionIDs     []string `json:"collection_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
@@ -74,6 +75,11 @@ func (a *API) UploadInit(c *gin.Context) {
 		return
 	}
 	normalizedActorNames := normalizeActorNames(req.ActorNames)
+	imageCollectionID, err := parseUploadImageCollectionID(req.ImageCollectionID)
+	if err != nil {
+		bad(c, "图片图集ID格式错误")
+		return
+	}
 	normalizedCollectionIDs, err := normalizeCollectionIDStrings(req.CollectionIDs)
 	if err != nil {
 		bad(c, "合集ID格式错误")
@@ -82,6 +88,11 @@ func (a *API) UploadInit(c *gin.Context) {
 	if err := validateCollectionStringsForType(req.Type, normalizedCollectionIDs); err != nil {
 		bad(c, "仅短视频支持合集")
 		return
+	}
+
+	imageCollectionIDRaw := ""
+	if imageCollectionID != nil {
+		imageCollectionIDRaw = imageCollectionID.String()
 	}
 
 	session, err := a.chunkUpload.Init(
@@ -98,6 +109,7 @@ func (a *API) UploadInit(c *gin.Context) {
 		req.Tags,
 		normalizedActorIDs,
 		normalizedActorNames,
+		imageCollectionIDRaw,
 		normalizedCollectionIDs,
 	)
 	if err != nil {
@@ -179,20 +191,27 @@ func (a *API) UploadComplete(c *gin.Context) {
 		}
 		collectionIDs = append(collectionIDs, id)
 	}
+	imageCollectionID, err := parseUploadImageCollectionID(session.ImageCollectionID)
+	if err != nil {
+		_ = os.Remove(mergedPath)
+		response.Error(c, 2004, "上传会话中的图片图集ID无效")
+		return
+	}
 
 	result, err := a.uploadSvc.SaveUploadedFile(c.Request.Context(), services.LocalUploadInput{
-		UserID:        userID,
-		FilePath:      mergedPath,
-		Filename:      session.Filename,
-		FileSize:      session.FileSize,
-		Title:         session.Title,
-		Desc:          session.Description,
-		Type:          session.Type,
-		Tags:          session.Tags,
-		ActorIDs:      actorIDs,
-		ActorNames:    normalizeActorNames(session.ActorNames),
-		CollectionIDs: collectionIDs,
-		Hash:          session.Hash,
+		UserID:            userID,
+		FilePath:          mergedPath,
+		Filename:          session.Filename,
+		FileSize:          session.FileSize,
+		Title:             session.Title,
+		Desc:              session.Description,
+		Type:              session.Type,
+		Tags:              session.Tags,
+		ActorIDs:          actorIDs,
+		ActorNames:        normalizeActorNames(session.ActorNames),
+		CollectionIDs:     collectionIDs,
+		ImageCollectionID: imageCollectionID,
+		Hash:              session.Hash,
 	}, a.maxVideoSize)
 	if err != nil {
 		_ = os.Remove(mergedPath)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,9 +30,9 @@ func NewVideoRepository(pool *pgxpool.Pool) *VideoRepository {
 
 func (r *VideoRepository) CreateVideo(ctx context.Context, v models.Video) error {
 	_, err := r.pool.Exec(ctx, `
-INSERT INTO videos (id, user_id, tmdb_id, title, description, type, status, original_path, metadata)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-`, v.ID, v.UserID, v.TMDBID, v.Title, v.Description, v.Type, v.Status, v.OriginalPath, v.Metadata)
+INSERT INTO videos (id, user_id, tmdb_id, title, description, type, status, original_path, metadata, image_collection_id)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+`, v.ID, v.UserID, v.TMDBID, v.Title, v.Description, v.Type, v.Status, v.OriginalPath, v.Metadata, v.ImageCollectionID)
 	if err != nil {
 		return fmt.Errorf("insert video: %w", err)
 	}
@@ -58,6 +59,63 @@ func (r *VideoRepository) AddTags(ctx context.Context, videoID uuid.UUID, tags [
 		}
 	}
 	return nil
+}
+
+func normalizePopularVideoTags(stats []models.VideoTagStat, limit int) []models.VideoTagStat {
+	if len(stats) == 0 || limit <= 0 {
+		return nil
+	}
+	normalized := make([]models.VideoTagStat, 0, len(stats))
+	for _, stat := range stats {
+		tag := strings.TrimSpace(strings.ToLower(stat.Tag))
+		if tag == "" || stat.UsedCount <= 0 {
+			continue
+		}
+		normalized = append(normalized, models.VideoTagStat{
+			Tag:       tag,
+			UsedCount: stat.UsedCount,
+		})
+	}
+	sort.SliceStable(normalized, func(i, j int) bool {
+		if normalized[i].UsedCount == normalized[j].UsedCount {
+			return normalized[i].Tag < normalized[j].Tag
+		}
+		return normalized[i].UsedCount > normalized[j].UsedCount
+	})
+	if len(normalized) > limit {
+		normalized = normalized[:limit]
+	}
+	return normalized
+}
+
+func (r *VideoRepository) ListPopularVideoTags(ctx context.Context, limit int) ([]models.VideoTagStat, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	rows, err := r.pool.Query(ctx, `
+SELECT tag, COUNT(*) AS used_count
+FROM video_tags
+GROUP BY tag
+ORDER BY used_count DESC, tag ASC
+LIMIT $1
+`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list popular video tags: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]models.VideoTagStat, 0, limit)
+	for rows.Next() {
+		var item models.VideoTagStat
+		if err := rows.Scan(&item.Tag, &item.UsedCount); err != nil {
+			return nil, fmt.Errorf("scan popular video tag: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return normalizePopularVideoTags(out, limit), nil
 }
 
 func (r *VideoRepository) FindVideoByHash(ctx context.Context, hash string, fileSize int64) (uuid.UUID, bool, error) {
@@ -284,11 +342,13 @@ func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (
 	var durationSeconds sql.NullInt32
 	var width sql.NullInt32
 	var height sql.NullInt32
+	var imageCollectionID string
 	err := r.pool.QueryRow(ctx, `
 SELECT
   id,
   user_id,
   tmdb_id,
+  COALESCE(image_collection_id::text, ''),
   COALESCE(title, ''),
   COALESCE(description, ''),
   type,
@@ -303,7 +363,7 @@ SELECT
   created_at,
   updated_at
 FROM videos WHERE id=$1`, videoID).Scan(
-		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
+		&v.ID, &v.UserID, &v.TMDBID, &imageCollectionID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {
@@ -312,6 +372,7 @@ FROM videos WHERE id=$1`, videoID).Scan(
 	v.DurationSeconds = nullInt32ToInt(durationSeconds)
 	v.Width = nullInt32ToInt(width)
 	v.Height = nullInt32ToInt(height)
+	v.ImageCollectionID = parseNullableUUIDText(imageCollectionID)
 	return v, nil
 }
 
@@ -342,11 +403,13 @@ func (r *VideoRepository) GetVideoByOriginalPath(ctx context.Context, originalPa
 	var durationSeconds sql.NullInt32
 	var width sql.NullInt32
 	var height sql.NullInt32
+	var imageCollectionID string
 	err := r.pool.QueryRow(ctx, `
 SELECT
   id,
   user_id,
   tmdb_id,
+  COALESCE(image_collection_id::text, ''),
   COALESCE(title, ''),
   COALESCE(description, ''),
   type,
@@ -361,7 +424,7 @@ SELECT
   created_at,
   updated_at
 FROM videos WHERE original_path=$1`, originalPath).Scan(
-		&v.ID, &v.UserID, &v.TMDBID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
+		&v.ID, &v.UserID, &v.TMDBID, &imageCollectionID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
 		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {
@@ -370,6 +433,7 @@ FROM videos WHERE original_path=$1`, originalPath).Scan(
 	v.DurationSeconds = nullInt32ToInt(durationSeconds)
 	v.Width = nullInt32ToInt(width)
 	v.Height = nullInt32ToInt(height)
+	v.ImageCollectionID = parseNullableUUIDText(imageCollectionID)
 	return v, nil
 }
 
@@ -378,6 +442,18 @@ func nullInt32ToInt(v sql.NullInt32) int {
 		return 0
 	}
 	return int(v.Int32)
+}
+
+func parseNullableUUIDText(raw string) *uuid.UUID {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil
+	}
+	id, err := uuid.Parse(value)
+	if err != nil {
+		return nil
+	}
+	return &id
 }
 
 func (r *VideoRepository) UpdateVideoMetadata(ctx context.Context, videoID uuid.UUID, title, description string, metadata map[string]any) error {

@@ -118,6 +118,30 @@ func (a *API) AdminVideos(c *gin.Context) {
 	})
 }
 
+func (a *API) AdminPopularVideoTags(c *gin.Context) {
+	limit := 5
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			bad(c, "limit 必须为正整数")
+			return
+		}
+		limit = n
+	}
+	if limit > 20 {
+		limit = 20
+	}
+	items, err := a.repo.ListPopularVideoTags(c.Request.Context(), limit)
+	if err != nil {
+		response.Error(c, 1033, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"items": items,
+		"limit": limit,
+	})
+}
+
 func (a *API) AdminVideoDetail(c *gin.Context) {
 	videoID, okID := parseUUID(c.Param("id"))
 	if !okID {
@@ -171,19 +195,20 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Title         string         `json:"title"`
-		Description   string         `json:"description"`
-		Thumbnail     string         `json:"thumbnail"`
-		Tags          []string       `json:"tags"`
-		Type          string         `json:"type"`
-		AutoScrape    *bool          `json:"auto_scrape"`
-		SeasonNumber  int            `json:"season_number"`
-		EpisodeNumber int            `json:"episode_number"`
-		ActorIDs      *[]string      `json:"actor_ids"`
-		ActorNames    *[]string      `json:"actor_names"`
-		CollectionIDs *[]string      `json:"collection_ids"`
-		Status        string         `json:"status"`
-		Metadata      map[string]any `json:"metadata"`
+		Title             string         `json:"title"`
+		Description       string         `json:"description"`
+		Thumbnail         string         `json:"thumbnail"`
+		Tags              []string       `json:"tags"`
+		Type              string         `json:"type"`
+		AutoScrape        *bool          `json:"auto_scrape"`
+		SeasonNumber      int            `json:"season_number"`
+		EpisodeNumber     int            `json:"episode_number"`
+		ActorIDs          *[]string      `json:"actor_ids"`
+		ActorNames        *[]string      `json:"actor_names"`
+		CollectionIDs     *[]string      `json:"collection_ids"`
+		ImageCollectionID *string        `json:"image_collection_id"`
+		Status            string         `json:"status"`
+		Metadata          map[string]any `json:"metadata"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
@@ -222,9 +247,11 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 
 	updateActors := req.ActorIDs != nil || req.ActorNames != nil
 	updateCollections := req.CollectionIDs != nil
+	updateImageCollection := req.ImageCollectionID != nil
 	var actorIDs []uuid.UUID
 	var actorNames []string
 	var collectionIDs []uuid.UUID
+	var imageCollectionID *uuid.UUID
 	if updateActors {
 		if req.ActorIDs != nil {
 			actorIDs, err = parseUUIDStrings(*req.ActorIDs)
@@ -244,11 +271,22 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 			return
 		}
 	}
+	if updateImageCollection {
+		rawID := strings.TrimSpace(*req.ImageCollectionID)
+		if rawID != "" {
+			parsedID, parseErr := uuid.Parse(rawID)
+			if parseErr != nil {
+				bad(c, "图片图集ID格式错误")
+				return
+			}
+			imageCollectionID = &parsedID
+		}
+	}
 	if typeChanged && targetType != "short" {
 		updateCollections = true
 		collectionIDs = nil
 	}
-	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, targetType, actorIDs, actorNames, updateActors, collectionIDs, updateCollections); err != nil {
+	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, targetType, actorIDs, actorNames, updateActors, collectionIDs, updateCollections, imageCollectionID, updateImageCollection); err != nil {
 		if errors.Is(err, repository.ErrCollectionsOnlyForShort) {
 			bad(c, "仅短视频支持合集")
 			return

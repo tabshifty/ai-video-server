@@ -79,6 +79,11 @@ func (a *API) Upload(c *gin.Context) {
 		bad(c, "合集ID格式错误")
 		return
 	}
+	imageCollectionID, err := parseUploadImageCollectionID(c.PostForm("image_collection_id"))
+	if err != nil {
+		bad(c, "图片图集ID格式错误")
+		return
+	}
 	if err := validateCollectionsForType(typ, collectionIDs); err != nil {
 		bad(c, "仅短视频支持合集")
 		return
@@ -98,7 +103,7 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 
-	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, actorIDs, actorNames, collectionIDs, hash, a.maxVideoSize)
+	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, actorIDs, actorNames, collectionIDs, imageCollectionID, hash, a.maxVideoSize)
 	if err != nil {
 		a.logger.Error("upload failed", "error", err)
 		switch {
@@ -185,6 +190,7 @@ func (a *API) Upload(c *gin.Context) {
 var hashPattern = regexp.MustCompile("^[a-fA-F0-9]{64}$")
 var errInvalidActorID = errors.New("invalid actor id")
 var errInvalidCollectionID = errors.New("invalid collection id")
+var errInvalidImageCollectionID = errors.New("invalid image collection id")
 var errCollectionsOnlyForShort = errors.New("collections only support short videos")
 
 func isSHA256Hex(raw string) bool {
@@ -296,6 +302,18 @@ func parseUploadCollectionIDs(raw string) ([]uuid.UUID, error) {
 		out = append(out, id)
 	}
 	return out, nil
+}
+
+func parseUploadImageCollectionID(raw string) (*uuid.UUID, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(value)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errInvalidImageCollectionID, value)
+	}
+	return &id, nil
 }
 
 func validateCollectionsForType(typ string, collectionIDs []uuid.UUID) error {

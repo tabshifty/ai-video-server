@@ -8,22 +8,23 @@ import (
 
 // Video is the primary media entity.
 type Video struct {
-	ID              uuid.UUID
-	UserID          *uuid.UUID
-	TMDBID          *int
-	Title           string
-	Description     string
-	Type            string
-	Status          string
-	DurationSeconds int
-	Width           int
-	Height          int
-	OriginalPath    string
-	TranscodedPath  string
-	ThumbnailPath   string
-	Metadata        []byte
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                uuid.UUID
+	UserID            *uuid.UUID
+	TMDBID            *int
+	ImageCollectionID *uuid.UUID
+	Title             string
+	Description       string
+	Type              string
+	Status            string
+	DurationSeconds   int
+	Width             int
+	Height            int
+	OriginalPath      string
+	TranscodedPath    string
+	ThumbnailPath     string
+	Metadata          []byte
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // RecommendedVideo is a lightweight DTO for feed APIs.

@@ -7,6 +7,7 @@ import {
   deleteAdminVideo,
   getAdminActors,
   getAdminCollections,
+  getAdminImageCollections,
   getAdminVideoDetail,
   getAdminVideoPlayURL,
   getAdminVideos,
@@ -27,6 +28,8 @@ const actorOptions = ref([])
 const loadingActors = ref(false)
 const collectionOptions = ref([])
 const loadingCollections = ref(false)
+const imageCollectionOptions = ref([])
+const loadingImageCollections = ref(false)
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
@@ -112,6 +115,15 @@ function mergeCollectionOptions(collections = []) {
   collectionOptions.value = Array.from(optionMap.values())
 }
 
+function mergeImageCollectionOptions(collections = []) {
+  const optionMap = new Map(imageCollectionOptions.value.map((item) => [item.value, item]))
+  for (const collection of collections) {
+    if (!collection?.id) continue
+    optionMap.set(collection.id, { value: collection.id, label: collection.name || collection.id })
+  }
+  imageCollectionOptions.value = Array.from(optionMap.values())
+}
+
 function normalizeCollectionSelection(values) {
   const out = []
   const seen = new Set()
@@ -178,20 +190,47 @@ async function searchCollections(keyword = '') {
   }
 }
 
+async function searchImageCollections(keyword = '') {
+  loadingImageCollections.value = true
+  try {
+    const data = await getAdminImageCollections({
+      q: keyword,
+      active: 1,
+      page: 1,
+      page_size: 50
+    })
+    const options = (data.items || []).map((item) => ({
+      value: item.id,
+      label: item.name
+    }))
+    const optionMap = new Map(imageCollectionOptions.value.map((item) => [item.value, item]))
+    for (const item of options) {
+      optionMap.set(item.value, item)
+    }
+    imageCollectionOptions.value = Array.from(optionMap.values())
+  } finally {
+    loadingImageCollections.value = false
+  }
+}
+
 async function showDetail(row) {
   detail.value = await getAdminVideoDetail(row.id)
   detail.value.actor_tokens = (detail.value.actors || []).map((actor) => actor.id)
   detail.value.collection_ids = (detail.value.collections || []).map((collection) => collection.id)
+  detail.value.image_collection_id = detail.value.image_collection?.id || ''
   detail.value.target_type = ''
   detail.value.auto_scrape = true
   detail.value.season_number = 1
   detail.value.episode_number = 1
   mergeActorOptions(detail.value.actors || [])
   mergeCollectionOptions(detail.value.collections || [])
+  if (detail.value.image_collection) {
+    mergeImageCollectionOptions([detail.value.image_collection])
+  }
   detailVisible.value = true
   playURL.value = ''
   playExpiresAt.value = 0
-  await Promise.all([searchActors(''), searchCollections('')])
+  await Promise.all([searchActors(''), searchCollections(''), searchImageCollections('')])
   if (detail.value?.status === 'ready') {
     await refreshPlayURL()
   }
@@ -279,7 +318,8 @@ async function saveDetail() {
     tags: detail.value.tags || [],
     actor_ids: actorIDs,
     actor_names: actorNames,
-    metadata: detail.value.metadata || {}
+    metadata: detail.value.metadata || {},
+    image_collection_id: String(detail.value.image_collection_id || '').trim()
   }
   let enqueueAutoScrape = false
   if (detail.value.type === 'short') {
@@ -416,6 +456,26 @@ onMounted(load)
             style="width: 100%"
           >
             <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="图片图集">
+          <el-select
+            v-model="detail.image_collection_id"
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            :remote-method="searchImageCollections"
+            :loading="loadingImageCollections"
+            placeholder="可选，仅可关联一个图片图集"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="collection in imageCollectionOptions"
+              :key="collection.value"
+              :label="collection.label"
+              :value="collection.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item v-if="detail.type === 'short'" label="改为类型">

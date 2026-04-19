@@ -46,18 +46,19 @@ type UploadResult struct {
 }
 
 type LocalUploadInput struct {
-	UserID        uuid.UUID
-	FilePath      string
-	Filename      string
-	FileSize      int64
-	Title         string
-	Desc          string
-	Type          string
-	Tags          []string
-	ActorIDs      []uuid.UUID
-	ActorNames    []string
-	CollectionIDs []uuid.UUID
-	Hash          string
+	UserID            uuid.UUID
+	FilePath          string
+	Filename          string
+	FileSize          int64
+	Title             string
+	Desc              string
+	Type              string
+	Tags              []string
+	ActorIDs          []uuid.UUID
+	ActorNames        []string
+	CollectionIDs     []uuid.UUID
+	ImageCollectionID *uuid.UUID
+	Hash              string
 }
 
 func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
@@ -100,6 +101,14 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 			Enqueue:       false,
 		}, nil
 	}
+	rawImageCollectionIDs := make([]uuid.UUID, 0, 1)
+	if in.ImageCollectionID != nil {
+		rawImageCollectionIDs = append(rawImageCollectionIDs, *in.ImageCollectionID)
+	}
+	resolvedImageCollectionID, err := s.repo.ResolveVideoImageCollectionID(ctx, rawImageCollectionIDs)
+	if err != nil {
+		return UploadResult{}, err
+	}
 
 	metaRaw, err := json.Marshal(map[string]any{
 		"original_filename": in.Filename,
@@ -127,14 +136,15 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 	}
 
 	v := models.Video{
-		ID:           videoID,
-		UserID:       &in.UserID,
-		Title:        finalTitle,
-		Description:  in.Desc,
-		Type:         in.Type,
-		Status:       status,
-		OriginalPath: in.FilePath,
-		Metadata:     metaRaw,
+		ID:                videoID,
+		UserID:            &in.UserID,
+		Title:             finalTitle,
+		Description:       in.Desc,
+		Type:              in.Type,
+		Status:            status,
+		OriginalPath:      in.FilePath,
+		Metadata:          metaRaw,
+		ImageCollectionID: resolvedImageCollectionID,
 	}
 
 	if err := s.repo.CreateVideo(ctx, v); err != nil {
@@ -188,7 +198,7 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 	}, nil
 }
 
-func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, collectionIDs []uuid.UUID, clientHash string, maxVideoSize int64) (UploadResult, error) {
+func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, collectionIDs []uuid.UUID, imageCollectionID *uuid.UUID, clientHash string, maxVideoSize int64) (UploadResult, error) {
 	if fileHeader == nil {
 		return UploadResult{}, ErrInvalidUpload
 	}
@@ -236,18 +246,19 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 	}
 
 	result, err := s.SaveUploadedFile(ctx, LocalUploadInput{
-		UserID:        userID,
-		FilePath:      originalPath,
-		Filename:      fileHeader.Filename,
-		FileSize:      info.Size(),
-		Title:         title,
-		Desc:          desc,
-		Type:          typ,
-		Tags:          tags,
-		ActorIDs:      actorIDs,
-		ActorNames:    actorNames,
-		CollectionIDs: collectionIDs,
-		Hash:          clientHash,
+		UserID:            userID,
+		FilePath:          originalPath,
+		Filename:          fileHeader.Filename,
+		FileSize:          info.Size(),
+		Title:             title,
+		Desc:              desc,
+		Type:              typ,
+		Tags:              tags,
+		ActorIDs:          actorIDs,
+		ActorNames:        actorNames,
+		CollectionIDs:     collectionIDs,
+		ImageCollectionID: imageCollectionID,
+		Hash:              clientHash,
 	}, maxVideoSize)
 	if err != nil {
 		_ = os.Remove(originalPath)

@@ -1744,3 +1744,42 @@
   - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-19 13:55] 视频上传新增图片图集单关联 + 热门标签 Top5 + 上传记录清空
+- Type: `implementation`
+- Summary:
+  - 数据库新增 `videos.image_collection_id`（外键到 `collections_images`，删除图片图集时自动置空），用于“视频仅关联一个图片图集”的能力。
+  - 后端上传链路（普通上传/分片上传）新增 `image_collection_id` 参数并落库；分片会话元数据新增该字段，完成合并后同样写入。
+  - 后台视频详情编辑新增图片图集单选编辑能力，可修改或清空；视频详情接口返回 `image_collection_id` 与关联图片图集对象。
+  - 新增管理端热门标签接口 `GET /api/v1/admin/video-tags/popular`，按使用次数统计并返回 TopN（默认 5，最大 20）。
+  - 管理端上传页改造：标签推荐改为调用热门标签接口；新增图片图集单选；新增“清空上传记录”按钮，仅清理前端本地上传进度与结果，不影响后端文件和数据库。
+  - 保留原有视频合集能力不变：`collection_ids` 仍仅用于短视频多选合集；新增图片图集能力与其并存。
+  - 新增仓储层单元测试覆盖：图片图集单选归一化约束、热门标签排序与 limit 逻辑。
+- Changed Files:
+  - `migrations/0012_video_image_collection.up.sql`
+  - `migrations/0012_video_image_collection.down.sql`
+  - `internal/models/models.go`
+  - `internal/models/admin.go`
+  - `internal/repository/video_repository.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/repository/image_collection_repository.go`
+  - `internal/repository/image_collection_repository_test.go`
+  - `internal/repository/video_repository_tags_test.go`
+  - `internal/services/upload.go`
+  - `internal/services/chunk_upload.go`
+  - `internal/services/chunk_upload_test.go`
+  - `internal/handlers/upload.go`
+  - `internal/handlers/upload_chunk.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/router.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/views/VideoUpload.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/repository -run 'TestNormalizeSingleImageCollectionID|TestNormalizePopularVideoTagsLimitAndSort'` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./internal/handlers -run 'TestParseUpload'` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`

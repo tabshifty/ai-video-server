@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -172,6 +173,37 @@ func dedupeImageCollectionIDs(ids []uuid.UUID) []uuid.UUID {
 		out = append(out, id)
 	}
 	return out
+}
+
+func normalizeSingleImageCollectionID(ids []uuid.UUID) (*uuid.UUID, error) {
+	deduped := dedupeImageCollectionIDs(ids)
+	if len(deduped) == 0 {
+		return nil, nil
+	}
+	if len(deduped) > 1 {
+		return nil, fmt.Errorf("视频仅支持关联一个图片合集")
+	}
+	id := deduped[0]
+	return &id, nil
+}
+
+func (r *VideoRepository) ResolveVideoImageCollectionID(ctx context.Context, collectionIDs []uuid.UUID) (*uuid.UUID, error) {
+	imageCollectionID, err := normalizeSingleImageCollectionID(collectionIDs)
+	if err != nil {
+		return nil, err
+	}
+	if imageCollectionID == nil {
+		return nil, nil
+	}
+
+	var existingID uuid.UUID
+	if err := r.pool.QueryRow(ctx, `SELECT id FROM collections_images WHERE id=$1`, *imageCollectionID).Scan(&existingID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("图片合集不存在: %s", imageCollectionID.String())
+		}
+		return nil, fmt.Errorf("query image collection by id: %w", err)
+	}
+	return &existingID, nil
 }
 
 func (r *VideoRepository) ResolveImageCollectionIDs(ctx context.Context, collectionIDs []uuid.UUID) ([]uuid.UUID, error) {

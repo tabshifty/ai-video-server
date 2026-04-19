@@ -39,24 +39,31 @@ type AdminVideoListItem struct {
 }
 
 type AdminVideoDetail struct {
-	ID              uuid.UUID              `json:"id"`
-	UserID          *uuid.UUID             `json:"user_id"`
-	Title           string                 `json:"title"`
-	Description     string                 `json:"description"`
-	Type            string                 `json:"type"`
-	Status          string                 `json:"status"`
-	DurationSeconds int                    `json:"duration_seconds"`
-	Width           int                    `json:"width"`
-	Height          int                    `json:"height"`
-	OriginalPath    string                 `json:"original_path"`
-	TranscodedPath  string                 `json:"transcoded_path"`
-	ThumbnailPath   string                 `json:"thumbnail_path"`
-	Metadata        json.RawMessage        `json:"metadata"`
-	Tags            []string               `json:"tags"`
-	Actors          []AdminVideoActor      `json:"actors"`
-	Collections     []AdminVideoCollection `json:"collections"`
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
+	ID                uuid.UUID              `json:"id"`
+	UserID            *uuid.UUID             `json:"user_id"`
+	ImageCollectionID *uuid.UUID             `json:"image_collection_id"`
+	Title             string                 `json:"title"`
+	Description       string                 `json:"description"`
+	Type              string                 `json:"type"`
+	Status            string                 `json:"status"`
+	DurationSeconds   int                    `json:"duration_seconds"`
+	Width             int                    `json:"width"`
+	Height            int                    `json:"height"`
+	OriginalPath      string                 `json:"original_path"`
+	TranscodedPath    string                 `json:"transcoded_path"`
+	ThumbnailPath     string                 `json:"thumbnail_path"`
+	Metadata          json.RawMessage        `json:"metadata"`
+	Tags              []string               `json:"tags"`
+	Actors            []AdminVideoActor      `json:"actors"`
+	Collections       []AdminVideoCollection `json:"collections"`
+	ImageCollection   *AdminImageCollection  `json:"image_collection,omitempty"`
+	CreatedAt         time.Time              `json:"created_at"`
+	UpdatedAt         time.Time              `json:"updated_at"`
+}
+
+type VideoTagStat struct {
+	Tag       string `json:"tag"`
+	UsedCount int64  `json:"used_count"`
 }
 
 type AdminVideoActor struct {

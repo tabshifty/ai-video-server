@@ -140,10 +140,12 @@ func (r *VideoRepository) AdminListVideos(ctx context.Context, f models.AdminVid
 func (r *VideoRepository) AdminVideoDetail(ctx context.Context, videoID uuid.UUID) (models.AdminVideoDetail, error) {
 	var out models.AdminVideoDetail
 	var metadata []byte
+	var imageCollectionID string
 	err := r.pool.QueryRow(ctx, `
 SELECT
   id,
   user_id,
+  COALESCE(image_collection_id::text, ''),
   COALESCE(title, ''),
   COALESCE(description, ''),
   type,
@@ -160,7 +162,7 @@ SELECT
 FROM videos
 WHERE id=$1
 `, videoID).Scan(
-		&out.ID, &out.UserID, &out.Title, &out.Description, &out.Type, &out.Status, &out.DurationSeconds,
+		&out.ID, &out.UserID, &imageCollectionID, &out.Title, &out.Description, &out.Type, &out.Status, &out.DurationSeconds,
 		&out.Width, &out.Height, &out.OriginalPath, &out.TranscodedPath, &out.ThumbnailPath, &metadata, &out.CreatedAt, &out.UpdatedAt,
 	)
 	if err != nil {
@@ -170,6 +172,7 @@ WHERE id=$1
 		metadata = []byte(`{}`)
 	}
 	out.Metadata = metadata
+	out.ImageCollectionID = parseNullableUUIDText(imageCollectionID)
 
 	rows, err := r.pool.Query(ctx, `SELECT tag FROM video_tags WHERE video_id=$1 ORDER BY tag`, videoID)
 	if err != nil {
@@ -199,13 +202,38 @@ WHERE id=$1
 		return models.AdminVideoDetail{}, fmt.Errorf("admin video collections: %w", err)
 	}
 	out.Collections = collections
+	if out.ImageCollectionID != nil {
+		row := r.pool.QueryRow(ctx, `
+SELECT id, name, COALESCE(description,''), COALESCE(cover_url,''), sort_order, active, created_at, updated_at
+FROM collections_images
+WHERE id=$1
+`, *out.ImageCollectionID)
+		imageCollection, imageCollectionErr := scanAdminImageCollection(row)
+		if imageCollectionErr != nil && !IsNotFound(imageCollectionErr) {
+			return models.AdminVideoDetail{}, fmt.Errorf("admin video image collection: %w", imageCollectionErr)
+		}
+		if imageCollectionErr == nil {
+			out.ImageCollection = &imageCollection
+		}
+	}
 	return out, nil
 }
 
-func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, targetType string, actorIDs []uuid.UUID, actorNames []string, updateActors bool, collectionIDs []uuid.UUID, updateCollections bool) error {
+func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, targetType string, actorIDs []uuid.UUID, actorNames []string, updateActors bool, collectionIDs []uuid.UUID, updateCollections bool, imageCollectionID *uuid.UUID, updateImageCollection bool) error {
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("marshal admin metadata: %w", err)
+	}
+	if updateImageCollection {
+		rawIDs := make([]uuid.UUID, 0, 1)
+		if imageCollectionID != nil {
+			rawIDs = append(rawIDs, *imageCollectionID)
+		}
+		resolvedImageCollectionID, resolveErr := r.ResolveVideoImageCollectionID(ctx, rawIDs)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		imageCollectionID = resolvedImageCollectionID
 	}
 	video, err := r.GetVideoByID(ctx, videoID)
 	if err != nil {
@@ -239,6 +267,15 @@ func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUI
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO video_tags(video_id, tag, weight) VALUES ($1,$2,1.0)`, videoID, tag); err != nil {
 			return fmt.Errorf("insert admin tag: %w", err)
+		}
+	}
+	if updateImageCollection {
+		if _, err := tx.Exec(ctx, `
+	UPDATE videos
+	SET image_collection_id=$2, updated_at=NOW()
+	WHERE id=$1
+	`, videoID, imageCollectionID); err != nil {
+			return fmt.Errorf("update video image collection: %w", err)
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {

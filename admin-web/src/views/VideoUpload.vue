@@ -5,7 +5,7 @@ import { UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import UploadProgress from '../components/UploadProgress.vue'
 import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
-import { getAdminActors, getAdminCollections } from '../api/admin'
+import { getAdminActors, getAdminCollections, getAdminImageCollections, getAdminPopularVideoTags } from '../api/admin'
 import { sha256File } from '../utils/hash'
 
 const uploadFileList = ref([])
@@ -22,6 +22,10 @@ const actorOptions = ref([])
 const loadingActors = ref(false)
 const collectionOptions = ref([])
 const loadingCollections = ref(false)
+const imageCollectionOptions = ref([])
+const loadingImageCollections = ref(false)
+const popularTagOptions = ref([])
+const loadingPopularTags = ref(false)
 
 const form = reactive({
   type: 'short',
@@ -29,9 +33,9 @@ const form = reactive({
   description: '',
   tags: [],
   actors: [],
-  collections: []
+  collections: [],
+  imageCollectionID: ''
 })
-const presetTags = ['action', 'comedy', 'drama', 'documentary', 'anime', 'music', 'sports', 'family']
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const isMovieType = computed(() => form.type === 'movie')
@@ -45,6 +49,15 @@ const completedCount = computed(() => uploadResults.value.length)
 const successCount = computed(() => uploadResults.value.filter((item) => item.status === 'success').length)
 const failedCount = computed(() => uploadResults.value.filter((item) => item.status === 'failed').length)
 const cancelledCount = computed(() => uploadResults.value.filter((item) => item.status === 'cancelled').length)
+const canClearRecords = computed(() =>
+  !uploading.value &&
+  (uploadResults.value.length > 0 ||
+    progress.value > 0 ||
+    hashProgress.value > 0 ||
+    totalFiles.value > 0 ||
+    currentFileName.value !== '' ||
+    sessionId.value !== '')
+)
 const batchProgress = computed(() => {
   if (totalFiles.value <= 0) return 0
   const currentProgress = uploading.value && !cancelRequested.value ? progress.value / 100 : 0
@@ -164,6 +177,48 @@ async function searchCollections(keyword = '') {
   }
 }
 
+async function searchImageCollections(keyword = '') {
+  loadingImageCollections.value = true
+  try {
+    const data = await getAdminImageCollections({
+      q: keyword,
+      active: 1,
+      page: 1,
+      page_size: 50
+    })
+    const options = (data.items || []).map((item) => ({
+      value: item.id,
+      label: item.name
+    }))
+    const optionMap = new Map(imageCollectionOptions.value.map((item) => [item.value, item]))
+    for (const item of options) {
+      optionMap.set(item.value, item)
+    }
+    imageCollectionOptions.value = Array.from(optionMap.values())
+  } finally {
+    loadingImageCollections.value = false
+  }
+}
+
+async function loadPopularTags() {
+  loadingPopularTags.value = true
+  try {
+    const data = await getAdminPopularVideoTags({ limit: 5 })
+    const items = data.items || []
+    popularTagOptions.value = items
+      .map((item) => String(item.tag || '').trim().toLowerCase())
+      .filter((tag) => tag !== '')
+  } finally {
+    loadingPopularTags.value = false
+  }
+}
+
+function resolveImageCollectionID(raw) {
+  const value = String(raw || '').trim()
+  if (!value || !uuidPattern.test(value)) return ''
+  return value
+}
+
 function buildNormalizedTags() {
   return Array.from(
     new Map(
@@ -223,6 +278,7 @@ async function uploadOneFile(targetFile, sharedPayload) {
       tags: sharedPayload.tags,
       actor_ids: sharedPayload.actorIDs,
       actor_names: sharedPayload.actorNames,
+      image_collection_id: sharedPayload.imageCollectionID,
       collection_ids: sharedPayload.collectionIDs
     })
     activeSessionID = initResp.upload_session_id
@@ -287,7 +343,8 @@ async function submit() {
     tags: normalizedTags,
     actorIDs,
     actorNames,
-    collectionIDs: isShortType.value ? normalizeCollectionSelection(form.collections) : []
+    collectionIDs: isShortType.value ? normalizeCollectionSelection(form.collections) : [],
+    imageCollectionID: resolveImageCollectionID(form.imageCollectionID)
   }
 
   for (let index = 0; index < queue.length; index += 1) {
@@ -346,9 +403,22 @@ async function cancelUpload() {
   ElMessage.warning('正在取消当前上传，后续文件将停止')
 }
 
+function clearUploadRecords() {
+  if (uploading.value) return
+  uploadResults.value = []
+  progress.value = 0
+  hashProgress.value = 0
+  currentFileName.value = ''
+  totalFiles.value = 0
+  cancelRequested.value = false
+  sessionId.value = ''
+}
+
 onMounted(() => {
   searchActors().catch(() => {})
   searchCollections().catch(() => {})
+  searchImageCollections().catch(() => {})
+  loadPopularTags().catch(() => {})
 })
 </script>
 
@@ -403,8 +473,29 @@ onMounted(() => {
             clearable
             placeholder="可选择或输入标签"
             style="width: 100%"
+            :loading="loadingPopularTags"
           >
-            <el-option v-for="tag in presetTags" :key="tag" :label="tag" :value="tag" />
+            <el-option v-for="tag in popularTagOptions" :key="tag" :label="tag" :value="tag" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="图片图集">
+          <el-select
+            v-model="form.imageCollectionID"
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            :remote-method="searchImageCollections"
+            :loading="loadingImageCollections"
+            placeholder="可选，仅可关联一个图片图集"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="collection in imageCollectionOptions"
+              :key="collection.value"
+              :label="collection.label"
+              :value="collection.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item v-if="isShortType" label="所属合集">
@@ -453,6 +544,7 @@ onMounted(() => {
             开始上传
           </el-button>
           <el-button v-if="uploading" type="danger" @click="cancelUpload">取消上传</el-button>
+          <el-button :disabled="!canClearRecords" @click="clearUploadRecords">清空上传记录</el-button>
         </el-form-item>
       </el-form>
 

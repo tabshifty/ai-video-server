@@ -2,6 +2,7 @@ import request from './request'
 
 export const getAdminStats = () => request.get('/admin/stats')
 export const getAdminVideos = (params) => request.get('/admin/videos', { params })
+export const getAdminPopularVideoTags = (params) => request.get('/admin/video-tags/popular', { params })
 export const getAdminVideoDetail = (id) => request.get(`/admin/videos/${id}`)
 export const getAdminVideoPlayURL = (id) => request.get(`/admin/videos/${id}/play-url`)
 export const captureAdminVideoThumbnail = (id, payload) => request.post(`/admin/videos/${id}/thumbnail/capture`, payload)
