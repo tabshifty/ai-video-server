@@ -1801,3 +1801,33 @@
   - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-19 19:02] 短视频详情美化 + 标签/合集可点击进入瀑布流并连续上下滑浏览
+- Type: `implementation`
+- Summary:
+  - 新增后端精确筛选接口 `GET /api/v1/short/discover`（鉴权），支持 `mode=tag|collection`，按标签或合集精确匹配短视频并返回分页列表。
+  - 扩展 App 服务与仓储：新增短视频发现查询链路，限制为 `ready + short`，按创建时间倒序，返回总数用于前端触底加载。
+  - Android 数据层新增短视频发现 API 适配（`ApiService` / `UrlBuilder` / `VideoRepository`）。
+  - 新增 Android `ShortDiscover` 模块：详情点击标签/合集进入瀑布流页，封面双列瀑布流展示，触底分页加载。
+  - 瀑布流点击封面进入全屏连续浏览覆盖层：上下滑切换下一个视频，临近底部自动继续补货，可连续浏览到全部结果。
+  - 美化短视频详情弹层（暗黑风格）：信息分区重排，统计卡片化，标签/合集芯片改为可点击并联动导航。
+  - 首页路由补充短视频发现页面导航参数透传（`mode/value/title`）。
+- Changed Files:
+  - `internal/handlers/router.go`
+  - `internal/handlers/short_discover.go`
+  - `internal/services/app.go`
+  - `internal/repository/app_repository.go`
+  - `android-app/app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

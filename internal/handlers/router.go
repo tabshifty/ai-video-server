@@ -93,6 +93,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.POST("/upload", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.Upload)
 		v1.POST("/scrape", a.Scrape)
 		v1.GET("/short/random", a.RandomShort)
+		v1.GET("/short/discover", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ShortDiscover)
 		v1.GET("/recommend", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.Recommend)
 		v1.POST("/actions", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.RecordAction)
 		v1.GET("/videos/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.VideoDetail)

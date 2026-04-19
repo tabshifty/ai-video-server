@@ -87,6 +87,7 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.chee.videos.core.model.FeedVideoDto
+import com.chee.videos.core.model.VideoCollectionDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.ui.KeepScreenOnEffect
@@ -111,6 +112,7 @@ internal fun shortPosterContentScale(fitMode: VideoFitMode): ContentScale {
 fun ShortFeedScreen(
     baseUrl: String,
     accessToken: String,
+    onOpenDiscover: (mode: String, value: String, title: String) -> Unit,
     viewModel: ShortFeedViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -422,6 +424,22 @@ fun ShortFeedScreen(
                             onClose = viewModel::closeDetailSheet,
                             onRetry = { viewModel.ensureDetailLoaded(sheetVideoId, force = true, reportError = true) },
                             onToggleDislike = { viewModel.toggleDislike(sheetVideoId) },
+                            onOpenTag = { tag ->
+                                val normalized = tag.trim()
+                                if (normalized.isBlank()) {
+                                    return@ShortDetailSheet
+                                }
+                                viewModel.closeDetailSheet()
+                                onOpenDiscover("tag", normalized, "#$normalized")
+                            },
+                            onOpenCollection = { collection ->
+                                val id = collection.id.trim()
+                                if (id.isBlank()) {
+                                    return@ShortDetailSheet
+                                }
+                                viewModel.closeDetailSheet()
+                                onOpenDiscover("collection", id, collection.name)
+                            },
                         )
                     }
                 }
@@ -720,10 +738,12 @@ private fun ShortDetailSheet(
     onClose: () -> Unit,
     onRetry: () -> Unit,
     onToggleDislike: () -> Unit,
+    onOpenTag: (String) -> Unit,
+    onOpenCollection: (VideoCollectionDto) -> Unit,
 ) {
     Surface(
         modifier = modifier,
-        color = Color(0xFF101114),
+        color = Color(0xFF090B11),
         shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
         tonalElevation = 0.dp,
         shadowElevation = 10.dp,
@@ -740,7 +760,7 @@ private fun ShortDetailSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -784,28 +804,44 @@ private fun ShortDetailSheet(
                         Text(
                             text = detail.title,
                             color = Color.White,
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                         )
 
-                        if (!detail.description.isNullOrBlank()) {
-                            Text(
-                                text = detail.description,
-                                color = Color(0xFFDDDDDD),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                        Surface(
+                            color = Color(0xFF121722),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text("播放 ${detail.viewsCount}", color = Color(0xFFE2E7F0), style = MaterialTheme.typography.bodySmall)
+                                Text("点赞 ${detail.likesCount}", color = Color(0xFFE2E7F0), style = MaterialTheme.typography.bodySmall)
+                                Text("收藏 ${detail.favoritesCount}", color = Color(0xFFE2E7F0), style = MaterialTheme.typography.bodySmall)
+                            }
                         }
 
-                        Text(
-                            text = "播放 ${detail.viewsCount}  点赞 ${detail.likesCount}  收藏 ${detail.favoritesCount}",
-                            color = Color(0xFFB8B8B8),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        if (!detail.description.isNullOrBlank()) {
+                            Surface(
+                                color = Color(0xFF10141D),
+                                shape = RoundedCornerShape(14.dp),
+                            ) {
+                                Text(
+                                    text = detail.description,
+                                    color = Color(0xFFD3D8E3),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                )
+                            }
+                        }
 
                         if (actorNames.isNotEmpty()) {
                             Text(
                                 text = "演员：${actorNames.joinToString(" / ")}",
-                                color = Color.White,
+                                color = Color(0xFFE9EDF5),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -813,8 +849,8 @@ private fun ShortDetailSheet(
                         if (detail.collections.orEmpty().isNotEmpty()) {
                             Text(
                                 text = "关联合集",
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
+                                color = Color(0xFFE9EDF5),
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             FlowRow(
@@ -823,12 +859,12 @@ private fun ShortDetailSheet(
                             ) {
                                 detail.collections.orEmpty().forEach { collection ->
                                     AssistChip(
-                                        onClick = {},
-                                        enabled = false,
+                                        onClick = { onOpenCollection(collection) },
+                                        enabled = true,
                                         label = { Text(collection.name) },
                                         colors = AssistChipDefaults.assistChipColors(
-                                            disabledContainerColor = Color(0xFF22242A),
-                                            disabledLabelColor = Color(0xFFE7E7E7),
+                                            containerColor = Color(0xFF1D2330),
+                                            labelColor = Color(0xFFF1F4FB),
                                         ),
                                     )
                                 }
@@ -836,18 +872,24 @@ private fun ShortDetailSheet(
                         }
 
                         if (detail.tags.orEmpty().isNotEmpty()) {
+                            Text(
+                                text = "标签",
+                                color = Color(0xFFE9EDF5),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 detail.tags.orEmpty().forEach { tag ->
                                     AssistChip(
-                                        onClick = {},
-                                        enabled = false,
+                                        onClick = { onOpenTag(tag) },
+                                        enabled = true,
                                         label = { Text(tag) },
                                         colors = AssistChipDefaults.assistChipColors(
-                                            disabledContainerColor = Color(0xFF1C1E23),
-                                            disabledLabelColor = Color(0xFFBDBDBD),
+                                            containerColor = Color(0xFF171B25),
+                                            labelColor = Color(0xFFCED5E4),
                                         ),
                                     )
                                 }

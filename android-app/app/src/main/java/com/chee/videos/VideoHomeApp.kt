@@ -38,6 +38,7 @@ import com.chee.videos.feature.detail.DetailScreen
 import com.chee.videos.feature.home.HomeScreen
 import com.chee.videos.feature.mine.MineScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
+import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
 
 private val AppDarkColors = darkColorScheme(
     primary = Color(0xFFFF5A7A),
@@ -150,6 +151,11 @@ private fun AuthenticatedNav(
                         onOpenDetail = { videoId, videoType ->
                             navController.navigate("detail/$videoId?type=${Uri.encode(videoType)}")
                         },
+                        onOpenShortDiscover = { mode, value, title ->
+                            navController.navigate(
+                                "short-discover/${Uri.encode(mode)}/${Uri.encode(value)}/${Uri.encode(title)}",
+                            )
+                        },
                     )
                 }
             }
@@ -192,6 +198,24 @@ private fun AuthenticatedNav(
                     accessToken = accessToken,
                     source = entry.arguments?.getString("source").orEmpty(),
                     startVideoId = entry.arguments?.getString("videoId").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = "short-discover/{mode}/{value}/{title}",
+                arguments = listOf(
+                    navArgument("mode") { type = NavType.StringType },
+                    navArgument("value") { type = NavType.StringType },
+                    navArgument("title") { type = NavType.StringType },
+                ),
+            ) { entry ->
+                ShortDiscoverScreen(
+                    baseUrl = baseUrl,
+                    accessToken = accessToken,
+                    mode = entry.arguments?.getString("mode").orEmpty(),
+                    value = entry.arguments?.getString("value").orEmpty(),
+                    title = entry.arguments?.getString("title").orEmpty(),
                     onBack = { navController.popBackStack() },
                 )
             }

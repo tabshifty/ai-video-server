@@ -58,6 +58,7 @@ fun HomeScreen(
     baseUrl: String,
     accessToken: String,
     onOpenDetail: (String, String) -> Unit,
+    onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -98,6 +99,7 @@ fun HomeScreen(
                 ShortFeedScreen(
                     baseUrl = baseUrl,
                     accessToken = accessToken,
+                    onOpenDiscover = onOpenShortDiscover,
                 )
             }
 

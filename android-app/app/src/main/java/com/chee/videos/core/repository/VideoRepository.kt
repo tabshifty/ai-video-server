@@ -8,6 +8,7 @@ import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.RecordHistoryRequest
+import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
@@ -58,6 +59,41 @@ class VideoRepository @Inject constructor(
     suspend fun fetchDetail(videoId: String): Result<VideoDetailDto> {
         return callWithAuth { baseUrl, bearer ->
             api.detail(UrlBuilder.detail(baseUrl, videoId), bearer)
+        }
+    }
+
+    suspend fun fetchShortDiscover(
+        mode: String,
+        value: String,
+        page: Int = 1,
+        pageSize: Int = 30,
+    ): Result<SearchPayload> {
+        val normalizedMode = mode.trim().lowercase()
+        val normalizedValue = value.trim()
+        return callWithAuth { baseUrl, bearer ->
+            when (normalizedMode) {
+                "tag" -> api.shortDiscover(
+                    url = UrlBuilder.shortDiscover(baseUrl),
+                    authorization = bearer,
+                    mode = "tag",
+                    tag = normalizedValue,
+                    collectionID = null,
+                    page = page,
+                    pageSize = pageSize,
+                )
+
+                "collection" -> api.shortDiscover(
+                    url = UrlBuilder.shortDiscover(baseUrl),
+                    authorization = bearer,
+                    mode = "collection",
+                    tag = null,
+                    collectionID = normalizedValue,
+                    page = page,
+                    pageSize = pageSize,
+                )
+
+                else -> throw AppException("不支持的发现模式: $mode")
+            }
         }
     }
 

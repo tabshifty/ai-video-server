@@ -22,6 +22,8 @@ object UrlBuilder {
 
     fun randomShort(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/short/random"
 
+    fun shortDiscover(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/short/discover"
+
     fun search(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/search"
 
     fun detail(baseUrl: String, videoId: String): String =

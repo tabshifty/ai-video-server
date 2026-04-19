@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"video-server/internal/models"
@@ -344,6 +345,100 @@ LIMIT $3 OFFSET $4
 		var item models.VideoListItem
 		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan search item: %w", err)
+		}
+		if strings.TrimSpace(item.ThumbnailPath) != "" {
+			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := r.attachCollectionsToVideoListItems(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *VideoRepository) DiscoverShortVideos(
+	ctx context.Context,
+	mode string,
+	tag string,
+	collectionID *uuid.UUID,
+	limit,
+	offset int,
+) ([]models.VideoListItem, int, error) {
+	var (
+		total int
+		rows  pgx.Rows
+		err   error
+	)
+
+	switch mode {
+	case "tag":
+		if tag == "" {
+			return nil, 0, fmt.Errorf("tag is required")
+		}
+		if err := r.pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM videos v
+JOIN video_tags vt ON vt.video_id = v.id
+WHERE v.status='ready'
+  AND v.type='short'
+  AND vt.tag = $1
+`, tag).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("count short discover by tag: %w", err)
+		}
+		rows, err = r.pool.Query(ctx, `
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at
+FROM videos v
+JOIN video_tags vt ON vt.video_id = v.id
+WHERE v.status='ready'
+  AND v.type='short'
+  AND vt.tag = $1
+ORDER BY v.created_at DESC
+LIMIT $2 OFFSET $3
+`, tag, limit, offset)
+		if err != nil {
+			return nil, 0, fmt.Errorf("query short discover by tag: %w", err)
+		}
+	case "collection":
+		if collectionID == nil {
+			return nil, 0, fmt.Errorf("collection_id is required")
+		}
+		if err := r.pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM videos v
+JOIN video_collections vc ON vc.video_id = v.id
+WHERE v.status='ready'
+  AND v.type='short'
+  AND vc.collection_id = $1
+`, *collectionID).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("count short discover by collection: %w", err)
+		}
+		rows, err = r.pool.Query(ctx, `
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at
+FROM videos v
+JOIN video_collections vc ON vc.video_id = v.id
+WHERE v.status='ready'
+  AND v.type='short'
+  AND vc.collection_id = $1
+ORDER BY v.created_at DESC
+LIMIT $2 OFFSET $3
+`, *collectionID, limit, offset)
+		if err != nil {
+			return nil, 0, fmt.Errorf("query short discover by collection: %w", err)
+		}
+	default:
+		return nil, 0, fmt.Errorf("invalid mode: %s", mode)
+	}
+	defer rows.Close()
+
+	items := make([]models.VideoListItem, 0, limit)
+	for rows.Next() {
+		var item models.VideoListItem
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan short discover item: %w", err)
 		}
 		if strings.TrimSpace(item.ThumbnailPath) != "" {
 			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)

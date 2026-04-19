@@ -46,6 +46,17 @@ interface ApiService {
     ): ApiEnvelope<FeedPayload>
 
     @GET
+    suspend fun shortDiscover(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("mode") mode: String,
+        @Query("tag") tag: String? = null,
+        @Query("collection_id") collectionID: String? = null,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<SearchPayload>
+
+    @GET
     suspend fun search(
         @Url url: String,
         @Header("Authorization") authorization: String,

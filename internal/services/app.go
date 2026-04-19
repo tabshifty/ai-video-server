@@ -89,6 +89,40 @@ func (s *AppService) Search(ctx context.Context, q, typ string, page, pageSize i
 	}, nil
 }
 
+func (s *AppService) ShortDiscover(
+	ctx context.Context,
+	mode string,
+	tag string,
+	collectionID *uuid.UUID,
+	page,
+	pageSize int,
+) (models.PageResult[models.VideoListItem], error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	tag = strings.ToLower(strings.TrimSpace(tag))
+	offset := (page - 1) * pageSize
+
+	items, total, err := s.repo.DiscoverShortVideos(ctx, mode, tag, collectionID, pageSize, offset)
+	if err != nil {
+		return models.PageResult[models.VideoListItem]{}, err
+	}
+	return models.PageResult[models.VideoListItem]{
+		Items:      items,
+		TotalCount: total,
+		Page:       page,
+		PageSize:   pageSize,
+	}, nil
+}
+
 func (s *AppService) Profile(ctx context.Context, userID uuid.UUID) (models.UserProfileView, error) {
 	u, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
