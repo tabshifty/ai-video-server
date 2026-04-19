@@ -312,7 +312,7 @@ func ConvertToWebP(ctx context.Context, inputPath, outputPath string, quality in
 	)
 	if out, err := runFFmpegCombinedOutput(ctx, primaryArgs...); err != nil {
 		primaryOutput := string(out)
-		if !isLibWebPUnavailableOutput(primaryOutput) {
+		if !isEncoderUnavailableOutput(primaryOutput, "libwebp") {
 			return fmt.Errorf("ffmpeg convert webp failed: %w, output=%s", err, primaryOutput)
 		}
 		fallbackArgs := append(
@@ -320,12 +320,26 @@ func ConvertToWebP(ctx context.Context, inputPath, outputPath string, quality in
 			append(webpEncodeArgs(false, quality), outputPath)...,
 		)
 		fallbackOut, fallbackErr := runFFmpegCombinedOutput(ctx, fallbackArgs...)
-		if fallbackErr != nil {
+		if fallbackErr == nil {
+			return nil
+		}
+		fallbackOutput := string(fallbackOut)
+		if !isEncoderUnavailableOutput(fallbackOutput, "webp") {
 			return fmt.Errorf(
 				"ffmpeg convert webp failed: %w, output=%s, fallback_output=%s",
 				fallbackErr,
 				primaryOutput,
-				string(fallbackOut),
+				fallbackOutput,
+			)
+		}
+		cwebpOut, cwebpErr := runCWebPEncode(ctx, inputPath, outputPath, quality)
+		if cwebpErr != nil {
+			return fmt.Errorf(
+				"ffmpeg convert webp failed: %w, output=%s, fallback_output=%s, cwebp_output=%s",
+				cwebpErr,
+				primaryOutput,
+				fallbackOutput,
+				string(cwebpOut),
 			)
 		}
 	}
@@ -363,18 +377,32 @@ func ResizeImage(ctx context.Context, inputPath, outputPath string, width, heigh
 		if primaryErr == nil {
 			return nil
 		}
-		if !isLibWebPUnavailableOutput(string(primaryOut)) {
+		primaryOutput := string(primaryOut)
+		if !isEncoderUnavailableOutput(primaryOutput, "libwebp") {
 			return fmt.Errorf("ffmpeg resize image failed: %w, output=%s", primaryErr, string(primaryOut))
 		}
 		fallbackArgs := append(append([]string{}, args...), webpEncodeArgs(false, quality)...)
 		fallbackArgs = append(fallbackArgs, outputPath)
 		fallbackOut, fallbackErr := runFFmpegCombinedOutput(ctx, fallbackArgs...)
-		if fallbackErr != nil {
+		if fallbackErr == nil {
+			return nil
+		}
+		fallbackOutput := string(fallbackOut)
+		if !isEncoderUnavailableOutput(fallbackOutput, "webp") {
 			return fmt.Errorf(
 				"ffmpeg resize image failed: %w, output=%s, fallback_output=%s",
 				fallbackErr,
-				string(primaryOut),
-				string(fallbackOut),
+				primaryOutput,
+				fallbackOutput,
+			)
+		}
+		if cwebpErr := resizeImageToWebPViaCWebP(ctx, inputPath, outputPath, scaleExpr, quality); cwebpErr != nil {
+			return fmt.Errorf(
+				"ffmpeg resize image failed: %w, output=%s, fallback_output=%s, cwebp_error=%v",
+				fallbackErr,
+				primaryOutput,
+				fallbackOutput,
+				cwebpErr,
 			)
 		}
 		return nil
@@ -389,6 +417,50 @@ func ResizeImage(ctx context.Context, inputPath, outputPath string, width, heigh
 func runFFmpegCombinedOutput(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	return cmd.CombinedOutput()
+}
+
+func runCWebPEncode(ctx context.Context, inputPath, outputPath string, quality int) ([]byte, error) {
+	cwebpPath, err := exec.LookPath("cwebp")
+	if err != nil {
+		return nil, fmt.Errorf("cwebp not found: %w", err)
+	}
+	args := []string{
+		"-q", strconv.Itoa(quality),
+		inputPath,
+		"-o", outputPath,
+	}
+	cmd := exec.CommandContext(ctx, cwebpPath, args...)
+	return cmd.CombinedOutput()
+}
+
+func resizeImageToWebPViaCWebP(ctx context.Context, inputPath, outputPath, scaleExpr string, quality int) error {
+	tmpFile, err := os.CreateTemp(filepath.Dir(outputPath), ".resize-webp-*.png")
+	if err != nil {
+		return fmt.Errorf("create resize temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	if closeErr := tmpFile.Close(); closeErr != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("close resize temp file: %w", closeErr)
+	}
+	defer os.Remove(tmpPath)
+
+	ffmpegArgs := []string{
+		"-y",
+		"-i", inputPath,
+		"-vf", scaleExpr,
+		"-frames:v", "1",
+		tmpPath,
+	}
+	ffmpegOut, ffmpegErr := runFFmpegCombinedOutput(ctx, ffmpegArgs...)
+	if ffmpegErr != nil {
+		return fmt.Errorf("prepare resize frame failed: %w, output=%s", ffmpegErr, string(ffmpegOut))
+	}
+	cwebpOut, cwebpErr := runCWebPEncode(ctx, tmpPath, outputPath, quality)
+	if cwebpErr != nil {
+		return fmt.Errorf("cwebp encode failed: %w, output=%s", cwebpErr, string(cwebpOut))
+	}
+	return nil
 }
 
 func webpEncodeArgs(preferLibWebP bool, quality int) []string {
@@ -406,11 +478,15 @@ func webpEncodeArgs(preferLibWebP bool, quality int) []string {
 	}
 }
 
-func isLibWebPUnavailableOutput(output string) bool {
+func isEncoderUnavailableOutput(output, encoder string) bool {
 	normalized := strings.ToLower(output)
-	return strings.Contains(normalized, "unknown encoder 'libwebp'") ||
-		strings.Contains(normalized, `unknown encoder "libwebp"`) ||
-		(strings.Contains(normalized, "encoder not found") && strings.Contains(normalized, "libwebp"))
+	encoder = strings.ToLower(strings.TrimSpace(encoder))
+	if encoder == "" {
+		return false
+	}
+	return strings.Contains(normalized, fmt.Sprintf("unknown encoder '%s'", encoder)) ||
+		strings.Contains(normalized, fmt.Sprintf(`unknown encoder "%s"`, encoder)) ||
+		(strings.Contains(normalized, "encoder not found") && strings.Contains(normalized, encoder))
 }
 
 // CopyFile copies a file using OS file IO.

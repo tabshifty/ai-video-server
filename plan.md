@@ -1880,3 +1880,19 @@
   - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-19 21:49] 修复图片转 WebP 失败（ffmpeg 无 webp 编码器时回退 cwebp）
+- Type: `implementation`
+- Summary:
+  - 增强 `ConvertToWebP`：先尝试 `libwebp`，再尝试 `webp`，两者均不可用时自动回退到 `cwebp` 编码，避免因 ffmpeg 编译裁剪导致上传失败。
+  - 增强 `ResizeImage(format=webp)`：同样采用三级回退；当 ffmpeg 两种 webp 编码器都缺失时，先用 ffmpeg 缩放到临时 PNG，再用 `cwebp` 编码生成目标 WebP。
+  - 新增/补充编码器不可用识别测试，覆盖 `Unknown encoder 'webp'` 场景，确保回退逻辑触发条件准确。
+- Changed Files:
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./pkg/ffmpeg -count=1` passed.
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`
