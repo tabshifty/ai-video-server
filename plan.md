@@ -15,6 +15,19 @@
 
 ---
 
+### [2026-04-19 09:12] 清理长视频播放器重复导入并复核编译
+- Type: `implementation`
+- Summary:
+  - 清理 `LongFormVideoPlayer.kt` 中重复 `import`，消除冗余引用，保持代码整洁。
+  - 复跑 Android 构建确认播放器改版在清理后仍可正常编译。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME=\"$PWD/.gradle-local\" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 09:10] 长视频播放器改版（电影/剧集/AV）+ 历史类型分流（短视频保持旧逻辑）
 - Type: `implementation`
 - Summary:
