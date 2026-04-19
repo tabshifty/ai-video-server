@@ -1831,3 +1831,20 @@
   - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-19 19:34] 瀑布流与“我的”短视频播放器新增底部进度条（安全区内）
+- Type: `implementation`
+- Summary:
+  - 新增可复用组件 `ShortVideoBottomProgressBar`，保持短视频进度条样式与拖动交互一致（拖动放大 + 时分秒浮层 + 拖动 seek）。
+  - 在“我的”入口对应的 `UnifiedPlayerScreen` 短视频模式接入进度状态同步与进度条显示。
+  - 在瀑布流播放器 `ShortDiscoverPlayerOverlay` 接入同样的进度状态同步与进度条显示。
+  - 两处进度条均使用底部安全区内边距（`navigationBarsPadding`），确保不压系统手势区/导航区。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/ShortVideoBottomProgressBar.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

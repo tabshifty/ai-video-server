@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -75,9 +76,11 @@ import coil.request.ImageRequest
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -150,6 +153,10 @@ fun UnifiedPlayerScreen(
             val currentVideoType = uiState.items.getOrNull(pagerState.currentPage)?.type.orEmpty()
             val currentIsLongForm = isLongFormVideoType(currentVideoType)
             val currentVideoPausedByUser = currentVideoId?.let { id -> pausedByUserVideoIds.contains(id) } ?: false
+            var durationMs by remember(currentVideoId) { mutableStateOf(0L) }
+            var positionMs by remember(currentVideoId) { mutableStateOf(0L) }
+            var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
+            var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
             val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
             val activity = context as? Activity
             var isFullscreen by rememberSaveable { mutableStateOf(false) }
@@ -198,6 +205,39 @@ fun UnifiedPlayerScreen(
                     sharedPlayer.removeListener(listener)
                     isPlayerActuallyPlaying = false
                     sharedPlayer.release()
+                }
+            }
+            DisposableEffect(sharedPlayer, currentVideoId) {
+                val listener = object : Player.Listener {
+                    override fun onEvents(player: Player, events: Player.Events) {
+                        val playerDuration = player.duration
+                        durationMs = if (playerDuration > 0L) playerDuration else 0L
+                        if (!isScrubbingShort) {
+                            positionMs = player.currentPosition.coerceAtLeast(0L)
+                        }
+                    }
+                }
+                durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: 0L
+                positionMs = sharedPlayer.currentPosition.coerceAtLeast(0L)
+                sharedPlayer.addListener(listener)
+                onDispose {
+                    sharedPlayer.removeListener(listener)
+                }
+            }
+            LaunchedEffect(currentVideoId) {
+                if (currentVideoId.isNullOrBlank()) {
+                    durationMs = 0L
+                    positionMs = 0L
+                    isScrubbingShort = false
+                    scrubTargetMs = 0L
+                    return@LaunchedEffect
+                }
+                while (isActive) {
+                    if (!isScrubbingShort) {
+                        durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: 0L
+                        positionMs = sharedPlayer.currentPosition.coerceAtLeast(0L)
+                    }
+                    delay(220)
                 }
             }
 
@@ -367,6 +407,43 @@ fun UnifiedPlayerScreen(
                             color = Color.White,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    if (!currentVideoId.isNullOrBlank()) {
+                        ShortVideoBottomProgressBar(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .navigationBarsPadding(),
+                            positionMs = positionMs,
+                            durationMs = durationMs,
+                            isScrubbing = isScrubbingShort,
+                            scrubTargetMs = scrubTargetMs,
+                            onScrubStart = {
+                                if (durationMs <= 0L) {
+                                    return@ShortVideoBottomProgressBar
+                                }
+                                isScrubbingShort = true
+                                scrubTargetMs = positionMs.coerceIn(0L, durationMs)
+                            },
+                            onScrubToFraction = { fraction ->
+                                if (durationMs <= 0L || !isScrubbingShort) {
+                                    return@ShortVideoBottomProgressBar
+                                }
+                                scrubTargetMs = (durationMs * fraction).toLong().coerceIn(0L, durationMs)
+                            },
+                            onScrubEnd = {
+                                if (!isScrubbingShort) {
+                                    return@ShortVideoBottomProgressBar
+                                }
+                                if (durationMs > 0L) {
+                                    val target = scrubTargetMs.coerceIn(0L, durationMs)
+                                    sharedPlayer.seekTo(target)
+                                    positionMs = target
+                                }
+                                isScrubbingShort = false
+                            },
                         )
                     }
                 }

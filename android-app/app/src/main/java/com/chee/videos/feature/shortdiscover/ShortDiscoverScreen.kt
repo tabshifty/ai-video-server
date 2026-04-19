@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -75,10 +76,12 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.util.UrlBuilder
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -365,6 +368,10 @@ private fun ShortDiscoverPlayerOverlay(
 
     val currentVideoId = items.getOrNull(pagerState.currentPage)?.id
     val currentVideoPausedByUser = currentVideoId?.let { it in pausedByUserVideoIds } ?: true
+    var durationMs by remember(currentVideoId) { mutableStateOf(0L) }
+    var positionMs by remember(currentVideoId) { mutableStateOf(0L) }
+    var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
+    var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     DisposableEffect(sharedPlayer) {
@@ -383,6 +390,39 @@ private fun ShortDiscoverPlayerOverlay(
             sharedPlayer.removeListener(listener)
             isPlayerActuallyPlaying = false
             sharedPlayer.release()
+        }
+    }
+    DisposableEffect(sharedPlayer, currentVideoId) {
+        val listener = object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) {
+                val playerDuration = player.duration
+                durationMs = if (playerDuration > 0L) playerDuration else 0L
+                if (!isScrubbingShort) {
+                    positionMs = player.currentPosition.coerceAtLeast(0L)
+                }
+            }
+        }
+        durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: 0L
+        positionMs = sharedPlayer.currentPosition.coerceAtLeast(0L)
+        sharedPlayer.addListener(listener)
+        onDispose {
+            sharedPlayer.removeListener(listener)
+        }
+    }
+    LaunchedEffect(currentVideoId) {
+        if (currentVideoId.isNullOrBlank()) {
+            durationMs = 0L
+            positionMs = 0L
+            isScrubbingShort = false
+            scrubTargetMs = 0L
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            if (!isScrubbingShort) {
+                durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: 0L
+                positionMs = sharedPlayer.currentPosition.coerceAtLeast(0L)
+            }
+            delay(220)
         }
     }
 
@@ -492,6 +532,43 @@ private fun ShortDiscoverPlayerOverlay(
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        if (!currentVideoId.isNullOrBlank()) {
+            ShortVideoBottomProgressBar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                positionMs = positionMs,
+                durationMs = durationMs,
+                isScrubbing = isScrubbingShort,
+                scrubTargetMs = scrubTargetMs,
+                onScrubStart = {
+                    if (durationMs <= 0L) {
+                        return@ShortVideoBottomProgressBar
+                    }
+                    isScrubbingShort = true
+                    scrubTargetMs = positionMs.coerceIn(0L, durationMs)
+                },
+                onScrubToFraction = { fraction ->
+                    if (durationMs <= 0L || !isScrubbingShort) {
+                        return@ShortVideoBottomProgressBar
+                    }
+                    scrubTargetMs = (durationMs * fraction).toLong().coerceIn(0L, durationMs)
+                },
+                onScrubEnd = {
+                    if (!isScrubbingShort) {
+                        return@ShortVideoBottomProgressBar
+                    }
+                    if (durationMs > 0L) {
+                        val target = scrubTargetMs.coerceIn(0L, durationMs)
+                        sharedPlayer.seekTo(target)
+                        positionMs = target
+                    }
+                    isScrubbingShort = false
+                },
             )
         }
     }
