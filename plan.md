@@ -1783,3 +1783,21 @@
   - `cd admin-web && npm run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-19 17:33] Android 短视频新增底部微型进度条（贴 Tab + 拖动 seek + 时分秒浮框）
+- Type: `implementation`
+- Summary:
+  - 在短视频流页面新增底部常驻微型进度条，位置贴近底部 Tab，尽量减少对画面的遮挡。
+  - 进度条接入当前激活视频的播放状态（时长/进度），并在详情弹层打开时自动隐藏，避免视觉冲突。
+  - 支持在进度条上水平拖动调整播放进度，拖动期间进度条高度动画放大，松手后执行 seek。
+  - 拖动中新增时间浮框，统一显示为 `HH:MM:SS / HH:MM:SS` 格式，提升定位精度。
+  - 新增短视频时间格式化单元测试，覆盖 0 秒、分钟边界与小时边界。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedTimeFormatTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.shorts.ShortFeedTimeFormatTest` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

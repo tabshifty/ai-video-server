@@ -4,11 +4,13 @@ import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.VerticalPager
@@ -90,6 +93,7 @@ import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private val ShortsActionBg = Color(0x5A000000)
@@ -198,6 +202,10 @@ fun ShortFeedScreen(
                 )
                 val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
                 val currentVideoPausedByUser = currentVideoId?.let { it in uiState.pausedByUserVideoIds } ?: true
+                var durationMs by remember(currentVideoId) { mutableStateOf(0L) }
+                var positionMs by remember(currentVideoId) { mutableStateOf(0L) }
+                var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
+                var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
 
                 LaunchedEffect(pagerState.currentPage, uiState.items) {
                     uiState.items.getOrNull(pagerState.currentPage)?.id?.let { currentVideoID ->
@@ -245,6 +253,39 @@ fun ShortFeedScreen(
                         .createMediaSource(mediaItem)
                     sharedPlayer.setMediaSource(mediaSource, true)
                     sharedPlayer.prepare()
+                }
+                DisposableEffect(sharedPlayer, currentVideoId) {
+                    val listener = object : Player.Listener {
+                        override fun onEvents(player: Player, events: Player.Events) {
+                            val playerDuration = player.duration
+                            durationMs = if (playerDuration > 0L) playerDuration else 0L
+                            if (!isScrubbingShort) {
+                                positionMs = player.currentPosition.coerceAtLeast(0L)
+                            }
+                        }
+                    }
+                    durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: 0L
+                    positionMs = sharedPlayer.currentPosition.coerceAtLeast(0L)
+                    sharedPlayer.addListener(listener)
+                    onDispose {
+                        sharedPlayer.removeListener(listener)
+                    }
+                }
+                LaunchedEffect(currentVideoId) {
+                    if (currentVideoId == null) {
+                        durationMs = 0L
+                        positionMs = 0L
+                        isScrubbingShort = false
+                        scrubTargetMs = 0L
+                        return@LaunchedEffect
+                    }
+                    while (isActive) {
+                        if (!isScrubbingShort) {
+                            durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: 0L
+                            positionMs = sharedPlayer.currentPosition.coerceAtLeast(0L)
+                        }
+                        delay(220)
+                    }
                 }
                 LaunchedEffect(currentVideoId, currentVideoPausedByUser) {
                     val shouldPlay = currentVideoId != null && !currentVideoPausedByUser
@@ -328,6 +369,42 @@ fun ShortFeedScreen(
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                             )
                         }
+                    }
+
+                    if (!sheetOpen && currentVideoId != null) {
+                        ShortBottomProgressBar(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                            positionMs = positionMs,
+                            durationMs = durationMs,
+                            isScrubbing = isScrubbingShort,
+                            scrubTargetMs = scrubTargetMs,
+                            onScrubStart = {
+                                if (durationMs <= 0L) {
+                                    return@ShortBottomProgressBar
+                                }
+                                isScrubbingShort = true
+                                scrubTargetMs = positionMs.coerceIn(0L, durationMs)
+                            },
+                            onScrubToFraction = { fraction ->
+                                if (durationMs <= 0L || !isScrubbingShort) {
+                                    return@ShortBottomProgressBar
+                                }
+                                scrubTargetMs = (durationMs * fraction).toLong().coerceIn(0L, durationMs)
+                            },
+                            onScrubEnd = {
+                                if (!isScrubbingShort) {
+                                    return@ShortBottomProgressBar
+                                }
+                                if (durationMs > 0L) {
+                                    val target = scrubTargetMs.coerceIn(0L, durationMs)
+                                    sharedPlayer.seekTo(target)
+                                    positionMs = target
+                                }
+                                isScrubbingShort = false
+                            },
+                        )
                     }
 
                     if (sheetVideoId != null) {
@@ -544,6 +621,88 @@ private fun VerticalVideoPage(
                     text = "演员：${actorNames.joinToString(" / ")}",
                     color = Color.White.copy(alpha = 0.86f),
                     style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShortBottomProgressBar(
+    modifier: Modifier = Modifier,
+    positionMs: Long,
+    durationMs: Long,
+    isScrubbing: Boolean,
+    scrubTargetMs: Long,
+    onScrubStart: () -> Unit,
+    onScrubToFraction: (Float) -> Unit,
+    onScrubEnd: () -> Unit,
+) {
+    val barHeight by animateDpAsState(
+        targetValue = if (isScrubbing) 6.dp else 2.dp,
+        animationSpec = spring(stiffness = 520f),
+        label = "short_progress_height",
+    )
+    val displayPositionMs = if (isScrubbing) scrubTargetMs else positionMs
+    val progress = shortProgressFraction(displayPositionMs, durationMs)
+    val canSeek = durationMs > 0L
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AnimatedVisibility(visible = isScrubbing) {
+            Surface(
+                color = Color(0xC91A1C23),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.padding(bottom = 6.dp),
+            ) {
+                Text(
+                    text = "${formatShortPlaybackTimeHms(displayPositionMs)} / ${formatShortPlaybackTimeHms(durationMs)}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+                .pointerInput(canSeek) {
+                    if (!canSeek) {
+                        return@pointerInput
+                    }
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            onScrubStart()
+                            val width = size.width.toFloat().coerceAtLeast(1f)
+                            onScrubToFraction((offset.x / width).coerceIn(0f, 1f))
+                        },
+                        onHorizontalDrag = { change, _ ->
+                            change.consume()
+                            val width = size.width.toFloat().coerceAtLeast(1f)
+                            onScrubToFraction((change.position.x / width).coerceIn(0f, 1f))
+                        },
+                        onDragEnd = onScrubEnd,
+                        onDragCancel = onScrubEnd,
+                    )
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(barHeight)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.28f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .background(Color.White.copy(alpha = 0.92f)),
                 )
             }
         }
@@ -776,6 +935,27 @@ private fun readWatchSnapshot(player: ExoPlayer): Pair<Int, Boolean> {
     val completedThreshold = (durationSeconds - 3).coerceAtLeast(1)
     val completed = durationSeconds > 0 && watchSeconds >= completedThreshold
     return watchSeconds to completed
+}
+
+internal fun formatShortPlaybackTimeHms(ms: Long): String {
+    val totalSeconds = (ms.coerceAtLeast(0L) / 1000L)
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    return buildString {
+        append(hours.toString().padStart(2, '0'))
+        append(':')
+        append(minutes.toString().padStart(2, '0'))
+        append(':')
+        append(seconds.toString().padStart(2, '0'))
+    }
+}
+
+private fun shortProgressFraction(positionMs: Long, durationMs: Long): Float {
+    if (durationMs <= 0L) {
+        return 0f
+    }
+    return (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
 }
 
 private fun extractActorNames(detail: VideoDetailDto?): List<String> {
