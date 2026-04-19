@@ -385,6 +385,7 @@ fun UnifiedPlayerScreen(
                             pausedByUser = item.id in pausedByUserVideoIds,
                             posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
                             showPoster = isActive && renderedVideoId != item.id,
+                            titleBottomPadding = 34.dp,
                             onTogglePauseByUser = togglePauseState,
                         )
                     }
@@ -461,6 +462,7 @@ private fun UnifiedShortVideoPage(
     pausedByUser: Boolean,
     posterUrl: String?,
     showPoster: Boolean,
+    titleBottomPadding: androidx.compose.ui.unit.Dp,
     onTogglePauseByUser: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -576,7 +578,9 @@ private fun UnifiedShortVideoPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
-                .padding(horizontal = 16.dp, vertical = 22.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = titleBottomPadding),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(

@@ -1848,3 +1848,19 @@
   - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-19 21:09] 修复短视频进度条与底部标题重叠（首页贴边 + 播放器标题上移）
+- Type: `implementation`
+- Summary:
+  - 首页短视频进度条去除左右与底部多余间距，修复为贴满内容宽度并紧贴底部 Tab 顶边。
+  - 修复“我的”短视频播放器（UnifiedPlayer）底部标题与进度条重叠：标题容器增加 `navigationBarsPadding` 与额外底部留白，始终在进度条上方。
+  - 修复瀑布流播放器（ShortDiscover）同类重叠问题：标题与进度条层级分离，标题上移到进度条上方。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

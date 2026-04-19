@@ -377,7 +377,7 @@ fun ShortFeedScreen(
                         ShortBottomProgressBar(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(horizontal = 12.dp, vertical = 2.dp),
+                                .fillMaxWidth(),
                             positionMs = positionMs,
                             durationMs = durationMs,
                             isScrubbing = isScrubbingShort,

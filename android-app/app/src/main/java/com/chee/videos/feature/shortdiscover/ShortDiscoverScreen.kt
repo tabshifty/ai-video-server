@@ -503,6 +503,7 @@ private fun ShortDiscoverPlayerOverlay(
                 pausedByUser = item.id in pausedByUserVideoIds,
                 posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
                 showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
+                titleBottomPadding = 34.dp,
                 onTogglePauseByUser = {
                     val next = pausedByUserVideoIds.toMutableSet()
                     if (next.contains(item.id)) {
@@ -582,6 +583,7 @@ private fun ShortDiscoverPlayerPage(
     pausedByUser: Boolean,
     posterUrl: String?,
     showPoster: Boolean,
+    titleBottomPadding: androidx.compose.ui.unit.Dp,
     onTogglePauseByUser: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -702,7 +704,9 @@ private fun ShortDiscoverPlayerPage(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(horizontal = 16.dp, vertical = 22.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = titleBottomPadding),
         )
     }
 }
