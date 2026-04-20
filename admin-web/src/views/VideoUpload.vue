@@ -9,6 +9,7 @@ import { getAdminActors, getAdminCollections, getAdminImageCollections, getAdmin
 import { sha256File } from '../utils/hash'
 
 const uploadFileList = ref([])
+const uploadRef = ref(null)
 const progress = ref(0)
 const hashProgress = ref(0)
 const uploading = ref(false)
@@ -45,6 +46,7 @@ const selectedFiles = computed(() =>
     .map((item) => item.raw)
     .filter((raw) => raw instanceof File)
 )
+const canClearSelectedFiles = computed(() => !uploading.value && selectedFiles.value.length > 0)
 const completedCount = computed(() => uploadResults.value.length)
 const successCount = computed(() => uploadResults.value.filter((item) => item.status === 'success').length)
 const failedCount = computed(() => uploadResults.value.filter((item) => item.status === 'failed').length)
@@ -97,6 +99,12 @@ function onFileChange(_file, fileList) {
     return
   }
   uploadFileList.value = normalized
+}
+
+function clearSelectedFiles() {
+  if (uploading.value) return
+  uploadRef.value?.clearFiles()
+  uploadFileList.value = []
 }
 
 function splitActorSelection(values) {
@@ -436,6 +444,7 @@ onMounted(() => {
       <el-form label-width="100px">
         <el-form-item label="视频文件">
           <el-upload
+            ref="uploadRef"
             v-model:file-list="uploadFileList"
             drag
             :auto-upload="false"
@@ -544,6 +553,7 @@ onMounted(() => {
             开始上传
           </el-button>
           <el-button v-if="uploading" type="danger" @click="cancelUpload">取消上传</el-button>
+          <el-button :disabled="!canClearSelectedFiles" @click="clearSelectedFiles">清空已选文件</el-button>
           <el-button :disabled="!canClearRecords" @click="clearUploadRecords">清空上传记录</el-button>
         </el-form-item>
       </el-form>

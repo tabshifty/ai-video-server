@@ -1896,3 +1896,17 @@
   - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-20 19:01] 管理端上传中心新增“清空已选文件”按钮
+- Type: `implementation`
+- Summary:
+  - 为管理端上传中心的 `el-upload` 增加实例引用，接入 Element Plus 的 `clearFiles()` 能力。
+  - 新增 `canClearSelectedFiles` 状态与 `clearSelectedFiles()` 方法，在非上传中场景下同时清空组件内部文件列表和受控 `uploadFileList`。
+  - 在上传操作区增加“清空已选文件”按钮，仅清除当前已选视频文件，不影响表单字段和上传记录，和现有“清空上传记录”职责分离。
+- Changed Files:
+  - `admin-web/src/views/VideoUpload.vue`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`
