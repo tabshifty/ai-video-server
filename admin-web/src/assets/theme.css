@@ -346,7 +346,7 @@ body {
   --el-input-focus-border-color: var(--primary);
   --el-select-border-color-hover: #b5c4d8;
   border-color: var(--el-input-border-color);
-  box-shadow: none;
+  box-shadow: 0 0 0 1px var(--el-input-border-color) inset;
   transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
 }
 
