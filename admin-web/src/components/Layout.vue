@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   DataAnalysis,
@@ -12,7 +12,8 @@ import {
   User,
   List,
   Setting,
-  SwitchButton
+  SwitchButton,
+  Menu
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
 
@@ -20,33 +21,66 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
+const navItems = [
+  { path: '/dashboard', label: '仪表盘', icon: DataAnalysis },
+  { path: '/videos', label: '视频管理', icon: Film },
+  { path: '/upload', label: '上传视频', icon: UploadFilled },
+  { path: '/scrape', label: '刮削管理', icon: MagicStick },
+  { path: '/actors', label: '演员管理', icon: Avatar },
+  { path: '/collections', label: '合集管理', icon: List },
+  { path: '/images', label: '图片管理', icon: PictureFilled },
+  { path: '/image-collections', label: '图片合集', icon: Files },
+  { path: '/users', label: '用户管理', icon: User },
+  { path: '/tasks', label: '任务监控', icon: List },
+  { path: '/settings', label: '系统设置', icon: Setting }
+]
+
+const pageMetaMap = {
+  '/dashboard': { title: '系统仪表盘', subtitle: '管理员工作台' },
+  '/videos': { title: '视频管理', subtitle: '管理员工作台' },
+  '/upload': { title: '上传中心', subtitle: '管理员工作台' },
+  '/scrape': { title: '刮削管理', subtitle: '管理员工作台' },
+  '/actors': { title: '演员管理', subtitle: '管理员工作台' },
+  '/collections': { title: '合集管理', subtitle: '管理员工作台' },
+  '/images': { title: '图片管理', subtitle: '管理员工作台' },
+  '/image-collections': { title: '图片合集', subtitle: '管理员工作台' },
+  '/users': { title: '用户管理', subtitle: '管理员工作台' },
+  '/tasks': { title: '任务监控', subtitle: '管理员工作台' },
+  '/settings': { title: '系统设置', subtitle: '管理员工作台' }
+}
+
+const mobileNavVisible = ref(false)
+
 const active = computed(() => route.path)
-const pageTitle = computed(() => {
-  const map = {
-    '/dashboard': '系统仪表盘',
-    '/videos': '视频管理',
-    '/upload': '上传中心',
-    '/scrape': '刮削管理',
-    '/actors': '演员管理',
-    '/collections': '合集管理',
-    '/images': '图片管理',
-    '/image-collections': '图片合集',
-    '/users': '用户管理',
-    '/tasks': '任务监控',
-    '/settings': '系统设置'
+const pageMeta = computed(() => pageMetaMap[route.path] || { title: '管理后台', subtitle: '管理员工作台' })
+
+watch(
+  () => route.fullPath,
+  () => {
+    mobileNavVisible.value = false
   }
-  return map[route.path] || '管理后台'
-})
+)
+
+function openMobileNav() {
+  mobileNavVisible.value = true
+}
+
+function onMobileNavSelect() {
+  mobileNavVisible.value = false
+}
 
 async function onLogout() {
   await auth.logout()
+  mobileNavVisible.value = false
   router.push('/login')
 }
 </script>
 
 <template>
-  <el-container class="admin-shell">
-    <el-aside width="240px" class="shell-aside">
+  <div class="admin-shell">
+    <a class="skip-link" href="#main-content">跳转到主要内容</a>
+
+    <aside class="shell-aside" aria-label="主导航">
       <div class="brand-block">
         <div class="brand-badge">AV</div>
         <div>
@@ -56,74 +90,90 @@ async function onLogout() {
       </div>
 
       <el-menu :default-active="active" router class="nav-menu">
-        <el-menu-item index="/dashboard">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>仪表盘</span>
-        </el-menu-item>
-        <el-menu-item index="/videos">
-          <el-icon><Film /></el-icon>
-          <span>视频管理</span>
-        </el-menu-item>
-        <el-menu-item index="/upload">
-          <el-icon><UploadFilled /></el-icon>
-          <span>上传视频</span>
-        </el-menu-item>
-        <el-menu-item index="/scrape">
-          <el-icon><MagicStick /></el-icon>
-          <span>刮削管理</span>
-        </el-menu-item>
-        <el-menu-item index="/actors">
-          <el-icon><Avatar /></el-icon>
-          <span>演员管理</span>
-        </el-menu-item>
-        <el-menu-item index="/collections">
-          <el-icon><List /></el-icon>
-          <span>合集管理</span>
-        </el-menu-item>
-        <el-menu-item index="/images">
-          <el-icon><PictureFilled /></el-icon>
-          <span>图片管理</span>
-        </el-menu-item>
-        <el-menu-item index="/image-collections">
-          <el-icon><Files /></el-icon>
-          <span>图片合集</span>
-        </el-menu-item>
-        <el-menu-item index="/users">
-          <el-icon><User /></el-icon>
-          <span>用户管理</span>
-        </el-menu-item>
-        <el-menu-item index="/tasks">
-          <el-icon><List /></el-icon>
-          <span>任务监控</span>
-        </el-menu-item>
-        <el-menu-item index="/settings">
-          <el-icon><Setting /></el-icon>
-          <span>系统设置</span>
+        <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <span>{{ item.label }}</span>
         </el-menu-item>
       </el-menu>
-    </el-aside>
+    </aside>
 
-    <el-container>
-      <el-header class="shell-header">
-        <div>
-          <div class="shell-header-title">{{ pageTitle }}</div>
-          <div class="shell-header-subtitle">管理员工作台</div>
+    <section class="shell-content">
+      <header class="shell-header">
+        <div class="shell-header-left">
+          <el-button class="mobile-nav-btn" text :icon="Menu" aria-label="打开导航菜单" @click="openMobileNav" />
+          <div>
+            <div class="shell-header-title">{{ pageMeta.title }}</div>
+            <div class="shell-header-subtitle">{{ pageMeta.subtitle }}</div>
+          </div>
         </div>
         <el-button plain type="danger" :icon="SwitchButton" @click="onLogout">退出登录</el-button>
-      </el-header>
-      <el-main class="shell-main"><slot /></el-main>
-    </el-container>
-  </el-container>
+      </header>
+
+      <main id="main-content" class="shell-main" tabindex="-1">
+        <slot />
+      </main>
+    </section>
+
+    <el-drawer v-model="mobileNavVisible" direction="ltr" size="260px" :with-header="false" class="mobile-nav-drawer">
+      <div class="brand-block brand-block--drawer">
+        <div class="brand-badge">AV</div>
+        <div>
+          <div class="brand-title">视频管理后台</div>
+          <div class="brand-subtitle">本地视频服务</div>
+        </div>
+      </div>
+
+      <el-menu :default-active="active" router class="nav-menu nav-menu--drawer" @select="onMobileNavSelect">
+        <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <span>{{ item.label }}</span>
+        </el-menu-item>
+      </el-menu>
+    </el-drawer>
+  </div>
 </template>
 
 <style scoped>
 .admin-shell {
-  min-height: 100vh;
+  height: 100vh;
+  background: #f8fafc;
+}
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 2000;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #7f1d1d;
+  background: #fff;
+  border: 1px solid rgba(127, 29, 29, 0.28);
+  transform: translateY(-160%);
+  transition: transform 0.2s ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 .shell-aside {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 100vh;
+  overflow-y: auto;
   background: linear-gradient(180deg, #881337 0%, #be123c 45%, #1e3a8a 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.shell-content {
+  margin-left: 240px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .brand-block {
@@ -132,6 +182,10 @@ async function onLogout() {
   gap: 10px;
   padding: 20px 16px 14px;
   color: #fff;
+}
+
+.brand-block--drawer {
+  background: linear-gradient(180deg, #881337 0%, #be123c 45%, #1e3a8a 100%);
 }
 
 .brand-badge {
@@ -180,15 +234,28 @@ async function onLogout() {
 }
 
 .shell-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
   z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+.shell-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-nav-btn {
+  display: none;
+  font-size: 18px;
 }
 
 .shell-header-title {
@@ -204,12 +271,52 @@ async function onLogout() {
 }
 
 .shell-main {
+  flex: 1;
   padding: 18px;
+}
+
+.nav-menu--drawer {
+  padding-top: 12px;
+  border-right: none;
+}
+
+.nav-menu--drawer.el-menu .el-menu-item {
+  color: #374151;
+}
+
+.nav-menu--drawer.el-menu .el-menu-item:hover {
+  color: #111827;
+  background: #f3f4f6;
+}
+
+.nav-menu--drawer.el-menu .el-menu-item.is-active {
+  color: #7f1d1d;
+  background: rgba(136, 19, 55, 0.12);
+}
+
+:deep(.mobile-nav-drawer .el-drawer__body) {
+  padding: 0;
 }
 
 @media (max-width: 992px) {
   .shell-aside {
-    width: 200px !important;
+    display: none;
+  }
+
+  .shell-content {
+    margin-left: 0;
+  }
+
+  .shell-header {
+    padding: 0 14px;
+  }
+
+  .mobile-nav-btn {
+    display: inline-flex;
+  }
+
+  .shell-main {
+    padding: 14px;
   }
 }
 </style>
