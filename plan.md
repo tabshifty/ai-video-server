@@ -15,6 +15,34 @@
 
 ---
 
+### [2026-04-20 22:13] 管理端固定侧栏与全站视觉提质
+- Type: `implementation`
+- Summary:
+  - 完成管理端共享壳层重构，固定侧栏导航在桌面端保持常驻，移动端切换为抽屉导航，统一信息结构与入口可达性。
+  - 收敛全站主题变量与组件覆盖策略，修复历史样式冲突并提升页面层级、间距、卡片与表格可读性。
+  - 将管理端核心页面统一迁移到新骨架布局，修复交互异常并保证页面在新视觉基线下的一致表现。
+- Changed Files:
+  - `admin-web/src/components/Layout.vue`
+  - `admin-web/src/assets/theme.css`
+  - `admin-web/src/views/ActorManage.vue`
+  - `admin-web/src/views/CollectionManage.vue`
+  - `admin-web/src/views/Dashboard.vue`
+  - `admin-web/src/views/ImageCollectionManage.vue`
+  - `admin-web/src/views/ImageManage.vue`
+  - `admin-web/src/views/Login.vue`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `admin-web/src/views/SystemSettings.vue`
+  - `admin-web/src/views/TaskMonitor.vue`
+  - `admin-web/src/views/UserManage.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/VideoUpload.vue`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm run build` passed.
+  - 管理端视觉与交互人工验收未在纯终端执行，待浏览器人工验收。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-19 12:26] 修复短视频尺寸模式切换时封面不跟随的问题
 - Type: `implementation`
 - Summary:
