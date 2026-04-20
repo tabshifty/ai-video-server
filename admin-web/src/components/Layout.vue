@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   DataAnalysis,
@@ -22,37 +22,38 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const navItems = [
-  { path: '/dashboard', label: '仪表盘', icon: DataAnalysis },
-  { path: '/videos', label: '视频管理', icon: Film },
-  { path: '/upload', label: '上传视频', icon: UploadFilled },
-  { path: '/scrape', label: '刮削管理', icon: MagicStick },
-  { path: '/actors', label: '演员管理', icon: Avatar },
-  { path: '/collections', label: '合集管理', icon: List },
-  { path: '/images', label: '图片管理', icon: PictureFilled },
-  { path: '/image-collections', label: '图片合集', icon: Files },
-  { path: '/users', label: '用户管理', icon: User },
-  { path: '/tasks', label: '任务监控', icon: List },
-  { path: '/settings', label: '系统设置', icon: Setting }
+  { path: '/dashboard', label: '仪表盘', title: '系统仪表盘', subtitle: '管理员工作台', icon: DataAnalysis },
+  { path: '/videos', label: '视频管理', title: '视频管理', subtitle: '管理员工作台', icon: Film },
+  { path: '/upload', label: '上传视频', title: '上传中心', subtitle: '管理员工作台', icon: UploadFilled },
+  { path: '/scrape', label: '刮削管理', title: '刮削管理', subtitle: '管理员工作台', icon: MagicStick },
+  { path: '/actors', label: '演员管理', title: '演员管理', subtitle: '管理员工作台', icon: Avatar },
+  { path: '/collections', label: '合集管理', title: '合集管理', subtitle: '管理员工作台', icon: List },
+  { path: '/images', label: '图片管理', title: '图片管理', subtitle: '管理员工作台', icon: PictureFilled },
+  { path: '/image-collections', label: '图片合集', title: '图片合集', subtitle: '管理员工作台', icon: Files },
+  { path: '/users', label: '用户管理', title: '用户管理', subtitle: '管理员工作台', icon: User },
+  { path: '/tasks', label: '任务监控', title: '任务监控', subtitle: '管理员工作台', icon: List },
+  { path: '/settings', label: '系统设置', title: '系统设置', subtitle: '管理员工作台', icon: Setting }
 ]
 
-const pageMetaMap = {
-  '/dashboard': { title: '系统仪表盘', subtitle: '管理员工作台' },
-  '/videos': { title: '视频管理', subtitle: '管理员工作台' },
-  '/upload': { title: '上传中心', subtitle: '管理员工作台' },
-  '/scrape': { title: '刮削管理', subtitle: '管理员工作台' },
-  '/actors': { title: '演员管理', subtitle: '管理员工作台' },
-  '/collections': { title: '合集管理', subtitle: '管理员工作台' },
-  '/images': { title: '图片管理', subtitle: '管理员工作台' },
-  '/image-collections': { title: '图片合集', subtitle: '管理员工作台' },
-  '/users': { title: '用户管理', subtitle: '管理员工作台' },
-  '/tasks': { title: '任务监控', subtitle: '管理员工作台' },
-  '/settings': { title: '系统设置', subtitle: '管理员工作台' }
+const mobileNavVisible = ref(false)
+const shellContentRef = ref(null)
+const mainContentRef = ref(null)
+
+const sortedNavItems = [...navItems].sort((a, b) => b.path.length - a.path.length)
+
+function findMatchedNavItem(path) {
+  return sortedNavItems.find((item) => path === item.path || path.startsWith(`${item.path}/`))
 }
 
-const mobileNavVisible = ref(false)
-
-const active = computed(() => route.path)
-const pageMeta = computed(() => pageMetaMap[route.path] || { title: '管理后台', subtitle: '管理员工作台' })
+const matchedNavItem = computed(() => findMatchedNavItem(route.path))
+const active = computed(() => matchedNavItem.value?.path || route.path)
+const pageMeta = computed(
+  () =>
+    matchedNavItem.value || {
+      title: route.meta?.title || '管理后台',
+      subtitle: '管理员工作台'
+    }
+)
 
 watch(
   () => route.fullPath,
@@ -61,12 +62,43 @@ watch(
   }
 )
 
+const restoreOverflow = { html: '', body: '' }
+watch(mobileNavVisible, (visible) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+  const html = document.documentElement
+  const body = document.body
+  if (visible) {
+    restoreOverflow.html = html.style.overflow
+    restoreOverflow.body = body.style.overflow
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+  } else {
+    html.style.overflow = restoreOverflow.html
+    body.style.overflow = restoreOverflow.body
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window === 'undefined') {
+    return
+  }
+  document.documentElement.style.overflow = restoreOverflow.html
+  document.body.style.overflow = restoreOverflow.body
+})
+
 function openMobileNav() {
   mobileNavVisible.value = true
 }
 
 function onMobileNavSelect() {
   mobileNavVisible.value = false
+}
+
+function onSkipLinkClick() {
+  shellContentRef.value?.scrollTo({ top: 0, behavior: 'auto' })
+  mainContentRef.value?.focus({ preventScroll: true })
 }
 
 async function onLogout() {
@@ -77,8 +109,8 @@ async function onLogout() {
 </script>
 
 <template>
-  <div class="admin-shell">
-    <a class="skip-link" href="#main-content">跳转到主要内容</a>
+  <div class="admin-shell" :class="{ 'is-mobile-nav-open': mobileNavVisible }">
+    <a class="skip-link" href="#main-content" @click.prevent="onSkipLinkClick">跳转到主要内容</a>
 
     <aside class="shell-aside" aria-label="主导航">
       <div class="brand-block">
@@ -97,7 +129,7 @@ async function onLogout() {
       </el-menu>
     </aside>
 
-    <section class="shell-content">
+    <section ref="shellContentRef" class="shell-content">
       <header class="shell-header">
         <div class="shell-header-left">
           <el-button class="mobile-nav-btn" text :icon="Menu" aria-label="打开导航菜单" @click="openMobileNav" />
@@ -109,7 +141,7 @@ async function onLogout() {
         <el-button plain type="danger" :icon="SwitchButton" @click="onLogout">退出登录</el-button>
       </header>
 
-      <main id="main-content" class="shell-main" tabindex="-1">
+      <main id="main-content" ref="mainContentRef" class="shell-main" tabindex="-1">
         <slot />
       </main>
     </section>
@@ -135,7 +167,13 @@ async function onLogout() {
 
 <style scoped>
 .admin-shell {
-  height: 100vh;
+  --shell-bg: #f8fafc;
+  --shell-title: #7f1d1d;
+  --shell-subtitle: #6b7280;
+  --shell-border: rgba(136, 19, 55, 0.12);
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   background: #f8fafc;
 }
 
@@ -162,7 +200,9 @@ async function onLogout() {
   top: 0;
   left: 0;
   width: 240px;
-  height: 100vh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   overflow-y: auto;
   background: linear-gradient(180deg, #881337 0%, #be123c 45%, #1e3a8a 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.15);
@@ -170,10 +210,16 @@ async function onLogout() {
 
 .shell-content {
   margin-left: 240px;
-  height: 100vh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+}
+
+.admin-shell.is-mobile-nav-open .shell-content {
+  overflow: hidden;
 }
 
 .brand-block {
@@ -217,18 +263,18 @@ async function onLogout() {
   border-right: none;
 }
 
-.nav-menu.el-menu .el-menu-item {
+:deep(.nav-menu.el-menu .el-menu-item) {
   margin: 4px 10px;
   border-radius: 10px;
   color: rgba(255, 255, 255, 0.8);
 }
 
-.nav-menu.el-menu .el-menu-item:hover {
+:deep(.nav-menu.el-menu .el-menu-item:hover) {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
 
-.nav-menu.el-menu .el-menu-item.is-active {
+:deep(.nav-menu.el-menu .el-menu-item.is-active) {
   color: #fff;
   background: rgba(255, 255, 255, 0.24);
 }
@@ -242,7 +288,7 @@ async function onLogout() {
   justify-content: space-between;
   min-height: 64px;
   padding: 0 20px;
-  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
+  border-bottom: 1px solid var(--shell-border);
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(8px);
 }
@@ -261,18 +307,24 @@ async function onLogout() {
 .shell-header-title {
   font-size: 18px;
   font-weight: 600;
-  color: #7f1d1d;
+  color: var(--shell-title);
 }
 
 .shell-header-subtitle {
   margin-top: 2px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--shell-subtitle);
 }
 
 .shell-main {
   flex: 1;
   padding: 18px;
+  scroll-margin-top: 76px;
+}
+
+.shell-main:focus-visible {
+  outline: 2px solid var(--shell-title);
+  outline-offset: 2px;
 }
 
 .nav-menu--drawer {
@@ -280,16 +332,16 @@ async function onLogout() {
   border-right: none;
 }
 
-.nav-menu--drawer.el-menu .el-menu-item {
+:deep(.nav-menu--drawer.el-menu .el-menu-item) {
   color: #374151;
 }
 
-.nav-menu--drawer.el-menu .el-menu-item:hover {
+:deep(.nav-menu--drawer.el-menu .el-menu-item:hover) {
   color: #111827;
   background: #f3f4f6;
 }
 
-.nav-menu--drawer.el-menu .el-menu-item.is-active {
+:deep(.nav-menu--drawer.el-menu .el-menu-item.is-active) {
   color: #7f1d1d;
   background: rgba(136, 19, 55, 0.12);
 }
