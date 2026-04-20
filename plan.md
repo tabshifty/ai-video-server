@@ -1966,3 +1966,25 @@
   - `文档变更，无需构建/测试。`
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-21 06:07] 修复管理端登录页回归、后台切页动画与内容区限宽
+- Type: `implementation`
+- Summary:
+  - 为管理端新增最小前端回归测试基建（Vitest），并补充路由过渡判定测试，锁定“登录页保留淡入淡出、后台页面禁用切页动画”的行为。
+  - 调整 `App.vue` 的路由渲染逻辑，将全局过渡收敛为仅公开页面启用，修复左侧菜单切换时整页跟随淡入淡出的问题，并补充 reduced-motion 兼容。
+  - 移除全局 `.page-shell` 的宽度限制，使后台内容区按壳层自然铺开；登录页改为独立的全屏双栏布局，修复上下居中、表单对齐与 `.hero-panel` 文案对比度不足的问题。
+- Changed Files:
+  - `admin-web/package.json`
+  - `admin-web/package-lock.json`
+  - `admin-web/src/App.vue`
+  - `admin-web/src/assets/theme.css`
+  - `admin-web/src/views/Login.vue`
+  - `admin-web/src/router/transition.js`
+  - `admin-web/src/router/transition.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm test -- src/router/transition.spec.js` passed.
+  - `cd admin-web && npm run build` passed.
+  - 登录页与后台切页的最终视觉效果未在真实浏览器中做人工验收，待补充页面级人工检查。
+- Rollback:
+  - `git revert <commit>`

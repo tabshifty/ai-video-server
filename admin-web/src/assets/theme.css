@@ -87,13 +87,11 @@ body {
 }
 
 #app :where(.page, .page-shell) {
+  width: 100%;
+  min-width: 0;
   display: grid;
   gap: var(--gap-page);
   align-content: start;
-}
-
-#app .page-shell {
-  max-width: 1400px;
 }
 
 #app :where(.page-header, .section-head) {
