@@ -29,9 +29,9 @@ async function submit() {
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-grid">
-      <div class="hero-panel">
+  <div class="login-page page-shell">
+    <div class="login-grid page-section">
+      <section class="hero-panel content-card">
         <h1 class="hero-title">家用视频服务器</h1>
         <p class="hero-subtitle">管理内容、用户与系统任务的统一控制台</p>
         <div class="hero-pills">
@@ -39,19 +39,28 @@ async function submit() {
           <span>Secure JWT</span>
           <span>Real-time Task</span>
         </div>
-      </div>
+      </section>
 
-      <el-card class="soft-card login-card">
-        <h2 class="login-title">管理员登录</h2>
-        <el-form @submit.prevent="submit">
-        <el-form-item label="用户名">
-          <el-input v-model="form.username" placeholder="admin" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="form.password" type="password" show-password />
-        </el-form-item>
-          <el-button type="primary" :loading="loading" @click="submit" class="login-btn">登录</el-button>
-        </el-form>
+      <el-card class="soft-card content-card login-card">
+        <template #header>
+          <div class="section-head">
+            <div>
+              <h2 class="login-title">管理员登录</h2>
+              <p class="login-subtitle">请使用具有后台权限的账号登录</p>
+            </div>
+          </div>
+        </template>
+        <div class="page-section">
+          <el-form @submit.prevent="submit">
+            <el-form-item label="用户名">
+              <el-input v-model="form.username" placeholder="admin" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input v-model="form.password" type="password" show-password />
+            </el-form-item>
+            <el-button type="primary" :loading="loading" @click="submit" class="login-btn">登录</el-button>
+          </el-form>
+        </div>
       </el-card>
     </div>
   </div>
@@ -63,6 +72,22 @@ async function submit() {
   display: grid;
   place-items: center;
   padding: 24px;
+}
+
+.page-shell {
+  gap: 16px;
+}
+
+.page-section {
+  display: grid;
+  gap: 12px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .login-grid {
@@ -114,11 +139,18 @@ async function submit() {
 
 .login-card {
   padding-top: 6px;
+  border-radius: 18px;
 }
 
 .login-title {
-  margin: 0 0 14px;
+  margin: 0;
   color: #881337;
+}
+
+.login-subtitle {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .login-btn {

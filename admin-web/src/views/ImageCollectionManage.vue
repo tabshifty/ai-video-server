@@ -156,69 +156,76 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page">
-      <div class="page-header">
+    <div class="page page-shell">
+      <section class="section-head">
         <div>
           <h1 class="page-title">图片合集管理</h1>
           <p class="page-subtitle">维护图片合集并统一管理图片归档关系</p>
         </div>
-      </div>
+      </section>
 
-      <el-card class="soft-card">
-        <el-form inline class="filter-form">
-          <el-form-item>
-            <el-input v-model="query.q" placeholder="按图片合集名称搜索" clearable @keyup.enter="load" />
-          </el-form-item>
-          <el-form-item>
-            <el-select v-model="query.active" style="width: 150px" clearable placeholder="状态筛选">
-              <el-option label="全部状态" value="" />
-              <el-option label="仅启用" value="1" />
-              <el-option label="仅停用" value="0" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="load">查询</el-button>
-          </el-form-item>
-          <el-form-item>
+      <section class="page-section">
+        <el-card class="soft-card content-card table-panel">
+          <div class="toolbar-row">
+            <el-form inline class="filter-form">
+              <el-form-item>
+                <el-input v-model="query.q" placeholder="按图片合集名称搜索" clearable @keyup.enter="load" />
+              </el-form-item>
+              <el-form-item>
+                <el-select v-model="query.active" style="width: 150px" clearable placeholder="状态筛选">
+                  <el-option label="全部状态" value="" />
+                  <el-option label="仅启用" value="1" />
+                  <el-option label="仅停用" value="0" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="load">查询</el-button>
+              </el-form-item>
+            </el-form>
             <el-button type="success" @click="openCreate">新增图片合集</el-button>
-          </el-form-item>
-        </el-form>
+          </div>
 
-        <div class="table-wrap">
-          <el-table :data="list" border v-loading="loading">
-            <el-table-column prop="name" label="图片合集名称" min-width="180" />
-            <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
-            <el-table-column prop="cover_url" label="封面地址" min-width="240" show-overflow-tooltip />
-            <el-table-column prop="sort_order" label="排序" width="90" />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="updated_at" label="更新时间" width="180" />
-            <el-table-column label="操作" width="180">
-              <template #default="{ row }">
-                <el-button size="small" @click="openEdit(row)">编辑</el-button>
-                <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+          <div class="table-wrap">
+            <el-table :data="list" border v-loading="loading">
+              <el-table-column prop="name" label="图片合集名称" min-width="180" />
+              <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
+              <el-table-column prop="cover_url" label="封面地址" min-width="240" show-overflow-tooltip />
+              <el-table-column prop="sort_order" label="排序" width="90" />
+              <el-table-column label="状态" width="100">
+                <template #default="{ row }">
+                  <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="updated_at" label="更新时间" width="180" />
+              <el-table-column label="操作" width="180">
+                <template #default="{ row }">
+                  <el-button size="small" @click="openEdit(row)">编辑</el-button>
+                  <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
 
-        <div class="action-row">
-          <el-pagination
-            v-model:current-page="query.page"
-            v-model:page-size="query.page_size"
-            layout="total, prev, pager, next"
-            :total="total"
-            @current-change="load"
-          />
-        </div>
-      </el-card>
+          <div class="action-row">
+            <el-pagination
+              v-model:current-page="query.page"
+              v-model:page-size="query.page_size"
+              layout="total, prev, pager, next"
+              :total="total"
+              @current-change="load"
+            />
+          </div>
+        </el-card>
+      </section>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="editingID ? '编辑图片合集' : '新增图片合集'" width="680px">
-      <el-form label-width="110px">
+    <el-dialog
+      v-model="dialogVisible"
+      class="crud-dialog"
+      :title="editingID ? '编辑图片合集' : '新增图片合集'"
+      width="680px"
+    >
+      <el-form label-width="110px" class="dialog-form">
         <el-form-item label="图片合集名称">
           <el-input v-model="form.name" placeholder="请输入图片合集名称" />
         </el-form-item>
@@ -243,3 +250,53 @@ onMounted(load)
     </el-dialog>
   </Layout>
 </template>
+
+<style scoped>
+.page-shell {
+  gap: 16px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-section {
+  display: grid;
+  gap: 12px;
+}
+
+.table-panel :deep(.el-card__body) {
+  display: grid;
+  gap: 12px;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-row .filter-form {
+  flex: 1;
+  min-width: 260px;
+}
+
+.dialog-form {
+  padding-right: 8px;
+}
+
+:deep(.crud-dialog .el-dialog__header) {
+  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
+  margin-right: 0;
+  padding-bottom: 14px;
+}
+
+:deep(.crud-dialog .el-dialog__body) {
+  padding-top: 18px;
+}
+</style>

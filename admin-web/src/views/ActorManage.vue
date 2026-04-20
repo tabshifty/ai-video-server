@@ -287,79 +287,81 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page">
-      <div class="page-header">
+    <div class="page page-shell">
+      <section class="section-head">
         <div>
           <h1 class="page-title">演员管理</h1>
           <p class="page-subtitle">支持演员录入、启停用与别名维护</p>
         </div>
-      </div>
+      </section>
 
-      <el-card class="soft-card">
-        <el-form inline class="filter-form">
-          <el-form-item>
-            <el-input v-model="query.q" placeholder="按姓名或别名搜索" clearable @keyup.enter="load" />
-          </el-form-item>
-          <el-form-item>
-            <el-select v-model="query.active" style="width: 150px" clearable placeholder="状态筛选">
-              <el-option label="全部状态" value="" />
-              <el-option label="仅启用" value="1" />
-              <el-option label="仅停用" value="0" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="load">查询</el-button>
-          </el-form-item>
-          <el-form-item>
+      <section class="page-section">
+        <el-card class="soft-card content-card table-panel">
+          <div class="toolbar-row">
+            <el-form inline class="filter-form">
+              <el-form-item>
+                <el-input v-model="query.q" placeholder="按姓名或别名搜索" clearable @keyup.enter="load" />
+              </el-form-item>
+              <el-form-item>
+                <el-select v-model="query.active" style="width: 150px" clearable placeholder="状态筛选">
+                  <el-option label="全部状态" value="" />
+                  <el-option label="仅启用" value="1" />
+                  <el-option label="仅停用" value="0" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="load">查询</el-button>
+              </el-form-item>
+            </el-form>
             <el-button type="success" @click="openCreate">新增演员</el-button>
-          </el-form-item>
-        </el-form>
+          </div>
 
-        <div class="table-wrap">
-          <el-table :data="list" border v-loading="loading">
-            <el-table-column prop="name" label="姓名" min-width="180" />
-            <el-table-column label="别名" min-width="220">
-              <template #default="{ row }">
-                <div class="alias-list">
-                  <el-tag v-for="alias in row.aliases || []" :key="alias" size="small">{{ alias }}</el-tag>
-                  <span v-if="!row.aliases || row.aliases.length === 0" class="muted">无</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="gender" label="性别" width="100" />
-            <el-table-column prop="country" label="国家/地区" width="120" />
-            <el-table-column prop="source" label="来源" width="130" />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="updated_at" label="更新时间" width="180" />
-            <el-table-column label="操作" width="220">
-              <template #default="{ row }">
-                <el-button size="small" @click="openEdit(row)">编辑</el-button>
-                <el-button size="small" :type="row.active ? 'warning' : 'success'" @click="toggleActive(row)">
-                  {{ row.active ? '停用' : '启用' }}
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+          <div class="table-wrap">
+            <el-table :data="list" border v-loading="loading">
+              <el-table-column prop="name" label="姓名" min-width="180" />
+              <el-table-column label="别名" min-width="220">
+                <template #default="{ row }">
+                  <div class="alias-list">
+                    <el-tag v-for="alias in row.aliases || []" :key="alias" size="small">{{ alias }}</el-tag>
+                    <span v-if="!row.aliases || row.aliases.length === 0" class="muted">无</span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="gender" label="性别" width="100" />
+              <el-table-column prop="country" label="国家/地区" width="120" />
+              <el-table-column prop="source" label="来源" width="130" />
+              <el-table-column label="状态" width="100">
+                <template #default="{ row }">
+                  <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="updated_at" label="更新时间" width="180" />
+              <el-table-column label="操作" width="220">
+                <template #default="{ row }">
+                  <el-button size="small" @click="openEdit(row)">编辑</el-button>
+                  <el-button size="small" :type="row.active ? 'warning' : 'success'" @click="toggleActive(row)">
+                    {{ row.active ? '停用' : '启用' }}
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
 
-        <div class="action-row">
-          <el-pagination
-            v-model:current-page="query.page"
-            v-model:page-size="query.page_size"
-            layout="total, prev, pager, next"
-            :total="total"
-            @current-change="load"
-          />
-        </div>
-      </el-card>
+          <div class="action-row">
+            <el-pagination
+              v-model:current-page="query.page"
+              v-model:page-size="query.page_size"
+              layout="total, prev, pager, next"
+              :total="total"
+              @current-change="load"
+            />
+          </div>
+        </el-card>
+      </section>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="editingID ? '编辑演员' : '新增演员'" width="760px">
-      <el-form label-width="96px">
+    <el-dialog v-model="dialogVisible" class="crud-dialog" :title="editingID ? '编辑演员' : '新增演员'" width="760px">
+      <el-form label-width="96px" class="dialog-form">
         <el-form-item label="姓名">
           <el-input v-model="form.name" placeholder="请输入演员姓名" />
         </el-form-item>
@@ -455,6 +457,54 @@ onMounted(load)
 </template>
 
 <style scoped>
+.page-shell {
+  gap: 16px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-section {
+  display: grid;
+  gap: 12px;
+}
+
+.table-panel :deep(.el-card__body) {
+  display: grid;
+  gap: 12px;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-row .filter-form {
+  flex: 1;
+  min-width: 260px;
+}
+
+.dialog-form {
+  padding-right: 8px;
+}
+
+:deep(.crud-dialog .el-dialog__header) {
+  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
+  margin-right: 0;
+  padding-bottom: 14px;
+}
+
+:deep(.crud-dialog .el-dialog__body) {
+  padding-top: 18px;
+}
+
 .alias-list {
   display: flex;
   flex-wrap: wrap;

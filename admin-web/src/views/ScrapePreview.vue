@@ -211,45 +211,56 @@ async function doSave() {
 
 <template>
   <Layout>
-    <div class="page">
-      <div class="page-header">
+    <div class="page page-shell">
+      <section class="section-head">
         <div>
           <h1 class="page-title">刮削管理</h1>
           <p class="page-subtitle">预览候选详情并确认保存，支持完整 metadata 检视</p>
         </div>
-      </div>
+      </section>
 
-      <el-card class="soft-card">
-        <el-form inline class="filter-form">
-          <el-form-item label="视频ID">
-            <el-input v-model="form.video_id" style="width:300px" :disabled="previewLoading || saveLoading" />
-          </el-form-item>
-          <el-form-item label="标题">
-            <el-input v-model="form.title" :disabled="previewLoading || saveLoading" />
-          </el-form-item>
-          <el-form-item label="年份">
-            <el-input-number
-              v-model="form.year"
-              :min="1900"
-              :disabled="previewLoading || saveLoading || form.type === 'av'"
-            />
-          </el-form-item>
-          <el-form-item label="类型">
-            <el-select v-model="form.type" style="width:120px" :disabled="previewLoading || saveLoading">
-              <el-option label="电影" value="movie" />
-              <el-option label="剧集" value="tv" />
-              <el-option label="AV" value="av" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="previewLoading" @click="doPreview">查询预览</el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
+      <section class="page-section">
+        <el-card class="soft-card content-card">
+          <template #header>
+            <div class="panel-head">
+              <div class="panel-title">刮削查询</div>
+              <p>输入视频信息后检索候选，支持电影、剧集和 AV 三种类型。</p>
+            </div>
+          </template>
+          <div class="toolbar-row">
+            <el-form inline class="filter-form">
+              <el-form-item label="视频ID">
+                <el-input v-model="form.video_id" style="width:300px" :disabled="previewLoading || saveLoading" />
+              </el-form-item>
+              <el-form-item label="标题">
+                <el-input v-model="form.title" :disabled="previewLoading || saveLoading" />
+              </el-form-item>
+              <el-form-item label="年份">
+                <el-input-number
+                  v-model="form.year"
+                  :min="1900"
+                  :disabled="previewLoading || saveLoading || form.type === 'av'"
+                />
+              </el-form-item>
+              <el-form-item label="类型">
+                <el-select v-model="form.type" style="width:120px" :disabled="previewLoading || saveLoading">
+                  <el-option label="电影" value="movie" />
+                  <el-option label="剧集" value="tv" />
+                  <el-option label="AV" value="av" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="previewLoading" @click="doPreview">查询预览</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+        </el-card>
+      </section>
 
+      <section class="page-section">
       <el-row :gutter="12" class="result-row">
         <el-col :xs="24" :lg="10">
-          <el-card class="soft-card" v-loading="previewLoading">
+          <el-card class="soft-card content-card" v-loading="previewLoading">
             <template #header>候选列表</template>
             <el-empty v-if="!candidates.length" description="暂无候选数据" />
             <div v-else class="candidate-list">
@@ -274,7 +285,7 @@ async function doSave() {
         </el-col>
 
         <el-col :xs="24" :lg="14">
-          <el-card class="soft-card">
+          <el-card class="soft-card content-card">
             <template #header>候选详情</template>
             <el-empty v-if="!selectedCandidate" description="请先查询并选择候选数据" />
             <div v-else class="detail-wrap">
@@ -333,8 +344,10 @@ async function doSave() {
           </el-card>
         </el-col>
       </el-row>
+      </section>
 
-      <el-card class="soft-card">
+      <section class="page-section">
+      <el-card class="soft-card content-card">
         <template #header>编辑并确认</template>
         <el-form label-width="90px">
           <el-form-item v-if="form.type !== 'av'" label="TMDB ID">
@@ -350,13 +363,54 @@ async function doSave() {
         </el-form>
         <el-button type="primary" :loading="saveLoading" @click="doSave">保存</el-button>
       </el-card>
+      </section>
     </div>
   </Layout>
 </template>
 
 <style scoped>
+.page-shell {
+  gap: 16px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-section {
+  display: grid;
+  gap: 12px;
+}
+
+.panel-head p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #7f1d1d;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-row .filter-form {
+  flex: 1;
+}
+
 .result-row {
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .candidate-list {
