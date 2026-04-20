@@ -1924,3 +1924,17 @@
   - `文档变更，无需构建/测试。`
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-20 19:43] 管理端固定侧栏与全站视觉提质实施计划
+- Type: `docs`
+- Summary:
+  - 新增实现计划文档，按共享壳层、全局主题、重点页、标准页和最终验收拆分任务。
+  - 计划明确本次不新增前端测试框架，验证方式为 `npm run build` 配合桌面/平板/移动端手工验收。
+  - 计划包含每阶段提交点与最终 `plan.md` 实施记录模板，便于后续按任务执行。
+- Changed Files:
+  - `docs/superpowers/plans/2026-04-20-admin-web-layout-refresh.md`
+  - `plan.md`
+- Verification:
+  - `文档变更，无需构建/测试。`
+- Rollback:
+  - `git revert <commit>`
