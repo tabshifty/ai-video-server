@@ -131,19 +131,32 @@ async function save() {
 
 async function doDelete(row) {
   const title = row?.name || '该合集'
-  await ElMessageBox.confirm(
-    `确认删除「${title}」？删除后仅解除关联，不会删除视频。`,
-    '删除合集',
-    {
-      type: 'warning',
-      confirmButtonText: '确认删除',
-      cancelButtonText: '取消'
+  try {
+    await ElMessageBox.confirm(
+      `确认删除「${title}」？删除后仅解除关联，不会删除视频。`,
+      '删除合集',
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
     }
-  )
-  const result = await deleteAdminCollection(row.id)
-  const detached = Number(result?.detached_videos || 0)
-  ElMessage.success(`已删除合集，解除 ${detached} 个视频关联（视频未删除）`)
-  await load()
+    ElMessage.error('删除确认失败，请重试')
+    return
+  }
+
+  try {
+    const result = await deleteAdminCollection(row.id)
+    const detached = Number(result?.detached_videos || 0)
+    ElMessage.success(`已删除合集，解除 ${detached} 个视频关联（视频未删除）`)
+    await load()
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '删除合集失败'))
+  }
 }
 
 onMounted(load)
@@ -159,7 +172,7 @@ onMounted(load)
         </div>
       </section>
 
-      <section class="page-section">
+      <section>
         <el-card class="soft-card content-card table-panel">
           <div class="toolbar-row">
             <el-form inline class="filter-form">
@@ -214,7 +227,12 @@ onMounted(load)
       </section>
     </div>
 
-    <el-dialog v-model="dialogVisible" class="crud-dialog" :title="editingID ? '编辑合集' : '新增合集'" width="680px">
+    <el-dialog
+      v-model="dialogVisible"
+      class="crud-dialog"
+      :title="editingID ? '编辑合集' : '新增合集'"
+      width="min(94vw, 680px)"
+    >
       <el-form label-width="100px" class="dialog-form">
         <el-form-item label="合集名称">
           <el-input v-model="form.name" placeholder="请输入合集名称" />
@@ -242,51 +260,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.page-shell {
-  gap: 16px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-section {
-  display: grid;
-  gap: 12px;
-}
-
-.table-panel :deep(.el-card__body) {
-  display: grid;
-  gap: 12px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar-row .filter-form {
-  flex: 1;
-  min-width: 260px;
-}
-
 .dialog-form {
   padding-right: 8px;
-}
-
-:deep(.crud-dialog .el-dialog__header) {
-  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
-  margin-right: 0;
-  padding-bottom: 14px;
-}
-
-:deep(.crud-dialog .el-dialog__body) {
-  padding-top: 18px;
 }
 </style>

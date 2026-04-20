@@ -7,6 +7,19 @@ import { getAdminUsers, updateUserRole } from '../api/admin'
 const list = ref([])
 const total = ref(0)
 const query = reactive({ page: 1, page_size: 20 })
+const roleUpdatingMap = reactive({})
+
+function extractErrorMessage(error, fallback) {
+  const responseMsg = error?.response?.data?.msg
+  if (typeof responseMsg === 'string' && responseMsg.trim() !== '') {
+    return responseMsg.trim()
+  }
+  const message = error?.message
+  if (typeof message === 'string' && message.trim() !== '') {
+    return message.trim()
+  }
+  return fallback
+}
 
 async function load() {
   const data = await getAdminUsers(query)
@@ -14,9 +27,27 @@ async function load() {
   total.value = data.total_count || 0
 }
 
-async function onRoleChange(row) {
-  await updateUserRole(row.id, { role: row.role })
-  ElMessage.success('角色已更新')
+function isRoleUpdating(userID) {
+  return !!roleUpdatingMap[userID]
+}
+
+async function onRoleChange(row, nextRole) {
+  if (!row?.id || !nextRole || row.role === nextRole) {
+    return
+  }
+
+  const prevRole = row.role
+  row.role = nextRole
+  roleUpdatingMap[row.id] = true
+  try {
+    await updateUserRole(row.id, { role: nextRole })
+    ElMessage.success('角色已更新')
+  } catch (error) {
+    row.role = prevRole
+    ElMessage.error(extractErrorMessage(error, '角色更新失败'))
+  } finally {
+    delete roleUpdatingMap[row.id]
+  }
 }
 
 onMounted(load)
@@ -32,7 +63,7 @@ onMounted(load)
         </div>
       </section>
 
-      <section class="page-section">
+      <section>
         <el-card class="soft-card content-card table-panel">
           <div class="toolbar-row">
             <div class="toolbar-copy">
@@ -48,7 +79,11 @@ onMounted(load)
               <el-table-column prop="created_at" label="注册时间" width="180" />
               <el-table-column label="角色" width="180">
                 <template #default="{ row }">
-                  <el-select v-model="row.role" @change="onRoleChange(row)">
+                  <el-select
+                    :model-value="row.role"
+                    :disabled="isRoleUpdating(row.id)"
+                    @change="(value) => onRoleChange(row, value)"
+                  >
                     <el-option label="user" value="user" />
                     <el-option label="admin" value="admin" />
                   </el-select>
@@ -66,34 +101,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.page-shell {
-  gap: 16px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-section {
-  display: grid;
-  gap: 12px;
-}
-
-.table-panel :deep(.el-card__body) {
-  display: grid;
-  gap: 12px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .toolbar-copy p {
   margin: 4px 0 0;
   font-size: 12px;

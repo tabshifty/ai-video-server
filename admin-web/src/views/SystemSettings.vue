@@ -6,20 +6,42 @@ import { getSystemLogs, systemCleanup } from '../api/admin'
 
 const logs = ref([])
 const loading = ref(false)
+const cleanupLoading = ref(false)
+
+function extractErrorMessage(error, fallback) {
+  const responseMsg = error?.response?.data?.msg
+  if (typeof responseMsg === 'string' && responseMsg.trim() !== '') {
+    return responseMsg.trim()
+  }
+  const message = error?.message
+  if (typeof message === 'string' && message.trim() !== '') {
+    return message.trim()
+  }
+  return fallback
+}
 
 async function loadLogs() {
   loading.value = true
   try {
     const data = await getSystemLogs({ lines: 300 })
     logs.value = data.lines || []
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '加载系统日志失败'))
   } finally {
     loading.value = false
   }
 }
 
 async function runCleanup() {
-  await systemCleanup({ older_than_hours: 24 })
-  ElMessage.success('清理任务已执行')
+  cleanupLoading.value = true
+  try {
+    await systemCleanup({ older_than_hours: 24 })
+    ElMessage.success('清理任务已执行')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '执行清理任务失败'))
+  } finally {
+    cleanupLoading.value = false
+  }
 }
 </script>
 
@@ -33,7 +55,7 @@ async function runCleanup() {
         </div>
       </section>
 
-      <section class="page-section">
+      <section>
         <el-card class="soft-card content-card">
           <template #header>
             <div class="card-title">控制中心</div>
@@ -42,7 +64,7 @@ async function runCleanup() {
             <div class="ops-item">
               <div class="ops-name">临时文件清理</div>
               <p>清理超过 24 小时的临时文件，释放磁盘占用。</p>
-              <el-button type="warning" @click="runCleanup">执行清理</el-button>
+              <el-button type="warning" :loading="cleanupLoading" @click="runCleanup">执行清理</el-button>
             </div>
             <div class="ops-item">
               <div class="ops-name">日志拉取</div>
@@ -53,7 +75,7 @@ async function runCleanup() {
         </el-card>
       </section>
 
-      <section class="page-section">
+      <section>
         <el-card class="soft-card content-card log-panel">
           <template #header>
             <div class="log-head">
@@ -64,7 +86,7 @@ async function runCleanup() {
               <el-button :loading="loading" @click="loadLogs">刷新</el-button>
             </div>
           </template>
-          <el-scrollbar height="520px" class="log-box">
+          <el-scrollbar max-height="60vh" class="log-box">
             <pre class="log-text">{{ logs.join('\n') }}</pre>
           </el-scrollbar>
         </el-card>
@@ -74,22 +96,6 @@ async function runCleanup() {
 </template>
 
 <style scoped>
-.page-shell {
-  gap: 16px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-section {
-  display: grid;
-  gap: 12px;
-}
-
 .card-title {
   font-size: 15px;
   font-weight: 600;

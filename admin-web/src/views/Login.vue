@@ -30,7 +30,7 @@ async function submit() {
 
 <template>
   <div class="login-page page-shell">
-    <div class="login-grid page-section">
+    <div class="login-grid">
       <section class="hero-panel content-card">
         <h1 class="hero-title">家用视频服务器</h1>
         <p class="hero-subtitle">管理内容、用户与系统任务的统一控制台</p>
@@ -50,7 +50,7 @@ async function submit() {
             </div>
           </div>
         </template>
-        <div class="page-section">
+        <div class="login-form-wrap">
           <el-form @submit.prevent="submit">
             <el-form-item label="用户名">
               <el-input v-model="form.username" placeholder="admin" />
@@ -74,27 +74,16 @@ async function submit() {
   padding: 24px;
 }
 
-.page-shell {
-  gap: 16px;
-}
-
-.page-section {
-  display: grid;
-  gap: 12px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-}
-
 .login-grid {
   width: min(980px, 100%);
   display: grid;
   grid-template-columns: 1.2fr 0.9fr;
   gap: 16px;
+}
+
+.login-form-wrap {
+  display: grid;
+  gap: 12px;
 }
 
 .hero-panel {

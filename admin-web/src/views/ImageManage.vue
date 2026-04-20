@@ -426,14 +426,27 @@ async function toggleActive(row) {
 }
 
 async function doDelete(row) {
-  await ElMessageBox.confirm(`确认删除图片「${row.title || row.id}」？`, '删除图片', {
-    type: 'warning',
-    confirmButtonText: '确认删除',
-    cancelButtonText: '取消'
-  })
-  await deleteAdminImage(row.id)
-  ElMessage.success('图片已删除')
-  await load()
+  try {
+    await ElMessageBox.confirm(`确认删除图片「${row.title || row.id}」？`, '删除图片', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消'
+    })
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    ElMessage.error('删除确认失败，请重试')
+    return
+  }
+
+  try {
+    await deleteAdminImage(row.id)
+    ElMessage.success('图片已删除')
+    await load()
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '删除图片失败'))
+  }
 }
 
 function currentPreviewParams() {
@@ -534,119 +547,119 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="page-section">
-      <el-card class="soft-card content-card table-panel list-card">
-        <template #header>
-          <div class="card-header-row">
-            <div>
-              <div class="card-title">图片列表</div>
-              <div class="card-subtitle">支持按状态、演员、图片合集进行组合筛选</div>
+      <section>
+        <el-card class="soft-card content-card table-panel list-card">
+          <template #header>
+            <div class="card-header-row">
+              <div>
+                <div class="card-title">图片列表</div>
+                <div class="card-subtitle">支持按状态、演员、图片合集进行组合筛选</div>
+              </div>
             </div>
+          </template>
+          <div class="toolbar-row">
+            <el-form inline class="filter-form image-filter-form">
+              <el-form-item>
+                <el-input v-model="query.q" placeholder="按标题或描述搜索" clearable @keyup.enter="load" />
+              </el-form-item>
+              <el-form-item>
+                <el-select v-model="query.status" placeholder="状态筛选" clearable style="width: 120px">
+                  <el-option label="可用" value="ready" />
+                  <el-option label="失败" value="failed" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-select v-model="query.active" placeholder="启用状态" clearable style="width: 120px">
+                  <el-option label="全部状态" value="" />
+                  <el-option label="仅启用" value="1" />
+                  <el-option label="仅停用" value="0" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-select
+                  v-model="query.actor_id"
+                  filterable
+                  remote
+                  clearable
+                  reserve-keyword
+                  placeholder="按演员筛选"
+                  style="width: 180px"
+                  :remote-method="searchActors"
+                  :loading="loadingActors"
+                >
+                  <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-select
+                  v-model="query.collection_id"
+                  filterable
+                  remote
+                  clearable
+                  reserve-keyword
+                  placeholder="按图片合集筛选"
+                  style="width: 190px"
+                  :remote-method="searchImageCollections"
+                  :loading="loadingCollections"
+                >
+                  <el-option
+                    v-for="collection in imageCollectionOptions"
+                    :key="collection.value"
+                    :label="collection.label"
+                    :value="collection.value"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="load">查询</el-button>
+              </el-form-item>
+            </el-form>
+            <el-button type="success" @click="openUploadDialog">新增图片</el-button>
           </div>
-        </template>
-        <div class="toolbar-row">
-          <el-form inline class="filter-form">
-            <el-form-item>
-              <el-input v-model="query.q" placeholder="按标题或描述搜索" clearable @keyup.enter="load" />
-            </el-form-item>
-            <el-form-item>
-              <el-select v-model="query.status" placeholder="状态筛选" clearable style="width: 120px">
-                <el-option label="可用" value="ready" />
-                <el-option label="失败" value="failed" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-select v-model="query.active" placeholder="启用状态" clearable style="width: 120px">
-                <el-option label="全部状态" value="" />
-                <el-option label="仅启用" value="1" />
-                <el-option label="仅停用" value="0" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-select
-                v-model="query.actor_id"
-                filterable
-                remote
-                clearable
-                reserve-keyword
-                placeholder="按演员筛选"
-                style="width: 180px"
-                :remote-method="searchActors"
-                :loading="loadingActors"
-              >
-                <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-select
-                v-model="query.collection_id"
-                filterable
-                remote
-                clearable
-                reserve-keyword
-                placeholder="按图片合集筛选"
-                style="width: 190px"
-                :remote-method="searchImageCollections"
-                :loading="loadingCollections"
-              >
-                <el-option
-                  v-for="collection in imageCollectionOptions"
-                  :key="collection.value"
-                  :label="collection.label"
-                  :value="collection.value"
-                />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="load">查询</el-button>
-            </el-form-item>
-          </el-form>
-          <el-button type="success" @click="openUploadDialog">新增图片</el-button>
-        </div>
 
-        <div class="table-wrap">
-          <el-table :data="list" border v-loading="loading">
-            <el-table-column prop="title" label="标题" min-width="220" />
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="启用" width="90">
-              <template #default="{ row }">
-                <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '是' : '否' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="stored_mime" label="格式" width="110" />
-            <el-table-column label="尺寸" width="130">
-              <template #default="{ row }">{{ row.width || 0 }} x {{ row.height || 0 }}</template>
-            </el-table-column>
-            <el-table-column label="文件大小" width="130">
-              <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
-            </el-table-column>
-            <el-table-column prop="created_at" label="上传时间" width="180" />
-            <el-table-column label="操作" width="250">
-              <template #default="{ row }">
-                <el-button size="small" @click="showDetail(row)">详情</el-button>
-                <el-button size="small" :type="row.active ? 'warning' : 'success'" @click="toggleActive(row)">
-                  {{ row.active ? '停用' : '启用' }}
-                </el-button>
-                <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+          <div class="table-wrap">
+            <el-table :data="list" border v-loading="loading">
+              <el-table-column prop="title" label="标题" min-width="220" />
+              <el-table-column prop="status" label="状态" width="100">
+                <template #default="{ row }">
+                  <el-tag :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="启用" width="90">
+                <template #default="{ row }">
+                  <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '是' : '否' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="stored_mime" label="格式" width="110" />
+              <el-table-column label="尺寸" width="130">
+                <template #default="{ row }">{{ row.width || 0 }} x {{ row.height || 0 }}</template>
+              </el-table-column>
+              <el-table-column label="文件大小" width="130">
+                <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
+              </el-table-column>
+              <el-table-column prop="created_at" label="上传时间" width="180" />
+              <el-table-column label="操作" width="250">
+                <template #default="{ row }">
+                  <el-button size="small" @click="showDetail(row)">详情</el-button>
+                  <el-button size="small" :type="row.active ? 'warning' : 'success'" @click="toggleActive(row)">
+                    {{ row.active ? '停用' : '启用' }}
+                  </el-button>
+                  <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
 
-        <div class="action-row">
-          <el-pagination
-            v-model:current-page="query.page"
-            v-model:page-size="query.page_size"
-            layout="total, prev, pager, next"
-            :total="total"
-            @current-change="load"
-          />
-        </div>
-      </el-card>
+          <div class="action-row">
+            <el-pagination
+              v-model:current-page="query.page"
+              v-model:page-size="query.page_size"
+              layout="total, prev, pager, next"
+              :total="total"
+              @current-change="load"
+            />
+          </div>
+        </el-card>
       </section>
     </div>
 
@@ -654,7 +667,7 @@ onBeforeUnmount(() => {
       v-model="uploadDialogVisible"
       class="crud-dialog"
       title="新增图片"
-      width="920px"
+      width="min(96vw, 920px)"
       :close-on-click-modal="!uploading"
       :close-on-press-escape="!uploading"
       @closed="onUploadDialogClosed"
@@ -756,7 +769,13 @@ onBeforeUnmount(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" class="crud-dialog" title="图片详情" width="980px" @closed="onDetailClosed">
+    <el-dialog
+      v-model="detailVisible"
+      class="crud-dialog"
+      title="图片详情"
+      width="min(96vw, 980px)"
+      @closed="onDetailClosed"
+    >
       <div v-if="detail" class="detail-grid">
         <el-card class="detail-card" shadow="never">
           <el-form label-width="100px">
@@ -866,37 +885,8 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
-.page-shell {
-  gap: 16px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-section {
-  display: grid;
-  gap: 12px;
-}
-
-.table-panel :deep(.el-card__body) {
-  display: grid;
-  gap: 12px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar-row .filter-form {
-  flex: 1;
+.image-filter-form {
+  flex: 1 1 auto;
   min-width: 320px;
 }
 
@@ -973,16 +963,6 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(136, 19, 55, 0.12);
 }
 
-:deep(.crud-dialog .el-dialog__header) {
-  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
-  margin-right: 0;
-  padding-bottom: 14px;
-}
-
-:deep(.crud-dialog .el-dialog__body) {
-  padding-top: 18px;
-}
-
 .preview-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1057,7 +1037,7 @@ onBeforeUnmount(() => {
     align-items: flex-start;
   }
 
-  .toolbar-row .filter-form {
+  .image-filter-form {
     min-width: 100%;
   }
 }

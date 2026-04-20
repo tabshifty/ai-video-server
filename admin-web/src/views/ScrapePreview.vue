@@ -146,8 +146,9 @@ function syncEditFromCandidate(item) {
   if (mediaType === 'movie' || mediaType === 'tv' || mediaType === 'av') {
     form.type = mediaType
   }
+  const tmdbID = Number(item?.tmdb_id || 0)
   edit.video_id = item.video_id || form.video_id
-  edit.tmdb_id = item.tmdb_id || 0
+  edit.tmdb_id = Number.isFinite(tmdbID) && tmdbID > 0 ? Math.trunc(tmdbID) : 0
   edit.external_id = item.external_id || ''
   edit.title = item.title || ''
   edit.overview = item.overview || ''
@@ -193,9 +194,13 @@ async function doSave() {
       ElMessage.warning('请先查询并选择一个 AV 候选结果')
       return
     }
-  } else if (!edit.tmdb_id) {
-    ElMessage.warning('请先查询并选择一个候选结果')
-    return
+  } else {
+    const tmdbID = Number(edit.tmdb_id)
+    if (!Number.isFinite(tmdbID) || tmdbID <= 0) {
+      ElMessage.warning('请先查询并选择一个候选结果')
+      return
+    }
+    edit.tmdb_id = Math.trunc(tmdbID)
   }
   saveLoading.value = true
   try {
@@ -219,7 +224,7 @@ async function doSave() {
         </div>
       </section>
 
-      <section class="page-section">
+      <section>
         <el-card class="soft-card content-card">
           <template #header>
             <div class="panel-head">
@@ -228,7 +233,7 @@ async function doSave() {
             </div>
           </template>
           <div class="toolbar-row">
-            <el-form inline class="filter-form">
+            <el-form inline class="filter-form scrape-filter-form">
               <el-form-item label="视频ID">
                 <el-input v-model="form.video_id" style="width:300px" :disabled="previewLoading || saveLoading" />
               </el-form-item>
@@ -257,134 +262,132 @@ async function doSave() {
         </el-card>
       </section>
 
-      <section class="page-section">
-      <el-row :gutter="12" class="result-row">
-        <el-col :xs="24" :lg="10">
-          <el-card class="soft-card content-card" v-loading="previewLoading">
-            <template #header>候选列表</template>
-            <el-empty v-if="!candidates.length" description="暂无候选数据" />
-            <div v-else class="candidate-list">
-              <div
-                v-for="(item, index) in candidates"
-                :key="candidateKey(item, index)"
-                class="candidate-item"
-                :class="{ active: index === selectedIndex }"
-                @click="choose(item, index)"
-              >
-                <div class="candidate-title">{{ toText(item.title) }}</div>
-                <div class="candidate-subtitle">{{ toText(item.original_title) }}</div>
-                <div class="candidate-meta">
-                  <span>类型：{{ mediaTypeLabel(candidateMediaType(item)) }}</span>
-                  <span>评分：{{ toText(item.vote_average) }}</span>
+      <section>
+        <el-row :gutter="12" class="result-row">
+          <el-col :xs="24" :lg="10">
+            <el-card class="soft-card content-card" v-loading="previewLoading">
+              <template #header>候选列表</template>
+              <el-empty v-if="!candidates.length" description="暂无候选数据" />
+              <div v-else class="candidate-list">
+                <div
+                  v-for="(item, index) in candidates"
+                  :key="candidateKey(item, index)"
+                  class="candidate-item"
+                  :class="{ active: index === selectedIndex }"
+                  role="button"
+                  tabindex="0"
+                  :aria-pressed="index === selectedIndex"
+                  @click="choose(item, index)"
+                  @keydown.enter.prevent="choose(item, index)"
+                  @keydown.space.prevent="choose(item, index)"
+                >
+                  <div class="candidate-title">{{ toText(item.title) }}</div>
+                  <div class="candidate-subtitle">{{ toText(item.original_title) }}</div>
+                  <div class="candidate-meta">
+                    <span>类型：{{ mediaTypeLabel(candidateMediaType(item)) }}</span>
+                    <span>评分：{{ toText(item.vote_average) }}</span>
+                  </div>
+                  <div class="candidate-meta">日期：{{ toText(item.release_date) }}</div>
+                  <div class="candidate-overview">{{ toText(item.overview) }}</div>
                 </div>
-                <div class="candidate-meta">日期：{{ toText(item.release_date) }}</div>
-                <div class="candidate-overview">{{ toText(item.overview) }}</div>
               </div>
-            </div>
-          </el-card>
-        </el-col>
+            </el-card>
+          </el-col>
 
-        <el-col :xs="24" :lg="14">
-          <el-card class="soft-card content-card">
-            <template #header>候选详情</template>
-            <el-empty v-if="!selectedCandidate" description="请先查询并选择候选数据" />
-            <div v-else class="detail-wrap">
-              <div class="detail-head">
-                <img
-                  v-if="resolvePoster(selectedCandidate.poster_url || selectedCandidate.poster_path)"
-                  :src="resolvePoster(selectedCandidate.poster_url || selectedCandidate.poster_path)"
-                  class="poster"
-                />
-                <div class="detail-head-info">
-                  <h3>{{ toText(selectedCandidate.title) }}</h3>
-                  <p class="origin-name">原名：{{ toText(selectedCandidate.original_title) }}</p>
-                  <div class="tag-line">
-                    <el-tag size="small" type="danger">{{ mediaTypeLabel(candidateMediaType(selectedCandidate)) }}</el-tag>
-                    <el-tag size="small">{{ candidateIDLabel(selectedCandidate) }}: {{ candidateIDValue(selectedCandidate) }}</el-tag>
-                    <el-tag size="small" type="warning">评分: {{ toText(selectedCandidate.vote_average) }}</el-tag>
+          <el-col :xs="24" :lg="14">
+            <el-card class="soft-card content-card">
+              <template #header>候选详情</template>
+              <el-empty v-if="!selectedCandidate" description="请先查询并选择候选数据" />
+              <div v-else class="detail-wrap">
+                <div class="detail-head">
+                  <img
+                    v-if="resolvePoster(selectedCandidate.poster_url || selectedCandidate.poster_path)"
+                    :src="resolvePoster(selectedCandidate.poster_url || selectedCandidate.poster_path)"
+                    :alt="`海报：${toText(selectedCandidate.title, '未命名')}`"
+                    class="poster"
+                  />
+                  <div class="detail-head-info">
+                    <h3>{{ toText(selectedCandidate.title) }}</h3>
+                    <p class="origin-name">原名：{{ toText(selectedCandidate.original_title) }}</p>
+                    <div class="tag-line">
+                      <el-tag size="small" type="danger">{{ mediaTypeLabel(candidateMediaType(selectedCandidate)) }}</el-tag>
+                      <el-tag size="small">{{ candidateIDLabel(selectedCandidate) }}: {{ candidateIDValue(selectedCandidate) }}</el-tag>
+                      <el-tag size="small" type="warning">评分: {{ toText(selectedCandidate.vote_average) }}</el-tag>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <p class="detail-overview">{{ toText(selectedCandidate.overview) }}</p>
+                <p class="detail-overview">{{ toText(selectedCandidate.overview) }}</p>
 
-              <el-descriptions border :column="2" size="small" class="detail-table">
-                <el-descriptions-item v-if="candidateMediaType(selectedCandidate) === 'av'" label="番号">
-                  {{ toText(selectedCandidate.av_code) }}
-                </el-descriptions-item>
-                <el-descriptions-item label="上映/首播日期">{{ toText(selectedCandidate.release_date || selectedMetadata.first_air_date) }}</el-descriptions-item>
-                <el-descriptions-item label="题材">{{ displayGenres(selectedCandidate) }}</el-descriptions-item>
-                <el-descriptions-item v-if="candidateMediaType(selectedCandidate) === 'av'" label="演员">
-                  {{ joinArray(selectedCandidate.actors || selectedMetadata.actors) }}
-                </el-descriptions-item>
-                <el-descriptions-item label="状态">{{ toText(selectedMetadata.status) }}</el-descriptions-item>
-                <el-descriptions-item label="节目类型">{{ toText(selectedMetadata.type) }}</el-descriptions-item>
-                <el-descriptions-item label="季数">{{ toNumberText(selectedMetadata.number_of_seasons) }}</el-descriptions-item>
-                <el-descriptions-item label="总集数">{{ toNumberText(selectedMetadata.number_of_episodes) }}</el-descriptions-item>
-                <el-descriptions-item label="语言">{{ joinArray(selectedMetadata.languages) }}</el-descriptions-item>
-                <el-descriptions-item label="原产国">{{ joinArray(selectedMetadata.origin_country) }}</el-descriptions-item>
-                <el-descriptions-item label="平台">{{ joinObjectField(selectedMetadata.networks, 'name') }}</el-descriptions-item>
-                <el-descriptions-item label="制作公司">{{ joinObjectField(selectedMetadata.production_companies, 'name') }}</el-descriptions-item>
-              </el-descriptions>
+                <el-descriptions border :column="2" size="small" class="detail-table">
+                  <el-descriptions-item v-if="candidateMediaType(selectedCandidate) === 'av'" label="番号">
+                    {{ toText(selectedCandidate.av_code) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="上映/首播日期">{{ toText(selectedCandidate.release_date || selectedMetadata.first_air_date) }}</el-descriptions-item>
+                  <el-descriptions-item label="题材">{{ displayGenres(selectedCandidate) }}</el-descriptions-item>
+                  <el-descriptions-item v-if="candidateMediaType(selectedCandidate) === 'av'" label="演员">
+                    {{ joinArray(selectedCandidate.actors || selectedMetadata.actors) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="状态">{{ toText(selectedMetadata.status) }}</el-descriptions-item>
+                  <el-descriptions-item label="节目类型">{{ toText(selectedMetadata.type) }}</el-descriptions-item>
+                  <el-descriptions-item label="季数">{{ toNumberText(selectedMetadata.number_of_seasons) }}</el-descriptions-item>
+                  <el-descriptions-item label="总集数">{{ toNumberText(selectedMetadata.number_of_episodes) }}</el-descriptions-item>
+                  <el-descriptions-item label="语言">{{ joinArray(selectedMetadata.languages) }}</el-descriptions-item>
+                  <el-descriptions-item label="原产国">{{ joinArray(selectedMetadata.origin_country) }}</el-descriptions-item>
+                  <el-descriptions-item label="平台">{{ joinObjectField(selectedMetadata.networks, 'name') }}</el-descriptions-item>
+                  <el-descriptions-item label="制作公司">{{ joinObjectField(selectedMetadata.production_companies, 'name') }}</el-descriptions-item>
+                </el-descriptions>
 
-              <div v-if="selectedMetadata.last_episode_to_air" class="episode-box">
-                <div class="episode-title">最近播出集</div>
-                <div class="episode-content">
-                  {{ toText(selectedMetadata.last_episode_to_air.name) }}
-                  （第 {{ toNumberText(selectedMetadata.last_episode_to_air.episode_number) }} 集，{{ toText(selectedMetadata.last_episode_to_air.air_date) }}）
+                <div v-if="selectedMetadata.last_episode_to_air" class="episode-box">
+                  <div class="episode-title">最近播出集</div>
+                  <div class="episode-content">
+                    {{ toText(selectedMetadata.last_episode_to_air.name) }}
+                    （第 {{ toNumberText(selectedMetadata.last_episode_to_air.episode_number) }} 集，{{ toText(selectedMetadata.last_episode_to_air.air_date) }}）
+                  </div>
                 </div>
-              </div>
 
-              <el-collapse>
-                <el-collapse-item title="查看原始 metadata JSON" name="metadata-json">
-                  <pre class="json-box">{{ prettyMetadata }}</pre>
-                </el-collapse-item>
-              </el-collapse>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
+                <el-collapse>
+                  <el-collapse-item title="查看原始 metadata JSON" name="metadata-json">
+                    <pre class="json-box">{{ prettyMetadata }}</pre>
+                  </el-collapse-item>
+                </el-collapse>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
       </section>
 
-      <section class="page-section">
-      <el-card class="soft-card content-card">
-        <template #header>编辑并确认</template>
-        <el-form label-width="90px">
-          <el-form-item v-if="form.type !== 'av'" label="TMDB ID">
-            <el-input v-model="edit.tmdb_id" :disabled="saveLoading" />
-          </el-form-item>
-          <el-form-item v-else label="AVID">
-            <el-input v-model="edit.external_id" :disabled="saveLoading" />
-          </el-form-item>
-          <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
-          <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" rows="3" :disabled="saveLoading" /></el-form-item>
-          <el-form-item label="海报URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>
-          <el-form-item label="发布日期"><el-input v-model="edit.release_date" :disabled="saveLoading" /></el-form-item>
-        </el-form>
-        <el-button type="primary" :loading="saveLoading" @click="doSave">保存</el-button>
-      </el-card>
+      <section>
+        <el-card class="soft-card content-card">
+          <template #header>编辑并确认</template>
+          <el-form label-width="90px">
+            <el-form-item v-if="form.type !== 'av'" label="TMDB ID">
+              <el-input-number
+                v-model="edit.tmdb_id"
+                :min="1"
+                :step="1"
+                :precision="0"
+                controls-position="right"
+                :disabled="saveLoading"
+                style="width: 220px"
+              />
+            </el-form-item>
+            <el-form-item v-else label="AVID">
+              <el-input v-model="edit.external_id" :disabled="saveLoading" />
+            </el-form-item>
+            <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
+            <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" rows="3" :disabled="saveLoading" /></el-form-item>
+            <el-form-item label="海报URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>
+            <el-form-item label="发布日期"><el-input v-model="edit.release_date" :disabled="saveLoading" /></el-form-item>
+          </el-form>
+          <el-button type="primary" :loading="saveLoading" @click="doSave">保存</el-button>
+        </el-card>
       </section>
     </div>
   </Layout>
 </template>
 
 <style scoped>
-.page-shell {
-  gap: 16px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-section {
-  display: grid;
-  gap: 12px;
-}
-
 .panel-head p {
   margin: 4px 0 0;
   color: #6b7280;
@@ -397,15 +400,7 @@ async function doSave() {
   color: #7f1d1d;
 }
 
-.toolbar-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar-row .filter-form {
+.scrape-filter-form {
   flex: 1;
 }
 
@@ -429,6 +424,11 @@ async function doSave() {
 .candidate-item:hover {
   border-color: #f43f5e;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+}
+
+.candidate-item:focus-visible {
+  outline: 2px solid #be123c;
+  outline-offset: 2px;
 }
 
 .candidate-item.active {

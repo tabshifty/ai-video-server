@@ -295,10 +295,10 @@ onMounted(load)
         </div>
       </section>
 
-      <section class="page-section">
+      <section>
         <el-card class="soft-card content-card table-panel">
           <div class="toolbar-row">
-            <el-form inline class="filter-form">
+            <el-form inline class="filter-form actor-filter-form">
               <el-form-item>
                 <el-input v-model="query.q" placeholder="按姓名或别名搜索" clearable @keyup.enter="load" />
               </el-form-item>
@@ -360,7 +360,12 @@ onMounted(load)
       </section>
     </div>
 
-    <el-dialog v-model="dialogVisible" class="crud-dialog" :title="editingID ? '编辑演员' : '新增演员'" width="760px">
+    <el-dialog
+      v-model="dialogVisible"
+      class="crud-dialog"
+      :title="editingID ? '编辑演员' : '新增演员'"
+      width="min(94vw, 760px)"
+    >
       <el-form label-width="96px" class="dialog-form">
         <el-form-item label="姓名">
           <el-input v-model="form.name" placeholder="请输入演员姓名" />
@@ -457,52 +462,13 @@ onMounted(load)
 </template>
 
 <style scoped>
-.page-shell {
-  gap: 16px;
-}
-
-.section-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-section {
-  display: grid;
-  gap: 12px;
-}
-
-.table-panel :deep(.el-card__body) {
-  display: grid;
-  gap: 12px;
-}
-
-.toolbar-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar-row .filter-form {
+.actor-filter-form {
   flex: 1;
   min-width: 260px;
 }
 
 .dialog-form {
   padding-right: 8px;
-}
-
-:deep(.crud-dialog .el-dialog__header) {
-  border-bottom: 1px solid rgba(136, 19, 55, 0.12);
-  margin-right: 0;
-  padding-bottom: 14px;
-}
-
-:deep(.crud-dialog .el-dialog__body) {
-  padding-top: 18px;
 }
 
 .alias-list {
