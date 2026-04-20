@@ -1910,3 +1910,17 @@
   - `cd admin-web && npm run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-20 19:36] 管理端固定侧栏与全站视觉提质设计稿
+- Type: `docs`
+- Summary:
+  - 新增管理端设计稿，明确固定侧栏、移动端抽屉导航、全站视觉系统、重点页与标准页的改造边界。
+  - 设计稿明确本次只调整后台壳层、全局主题和页面骨架，不改业务接口、路由结构和核心数据流。
+  - 定义了验收标准、风险控制和关键交互细节，作为后续实现计划的直接输入。
+- Changed Files:
+  - `docs/superpowers/specs/2026-04-20-admin-web-layout-refresh-design.md`
+  - `plan.md`
+- Verification:
+  - `文档变更，无需构建/测试。`
+- Rollback:
+  - `git revert <commit>`
