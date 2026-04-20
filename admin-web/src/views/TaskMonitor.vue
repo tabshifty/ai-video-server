@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { getAdminTasks } from '../api/admin'
 
@@ -7,6 +7,10 @@ const list = ref([])
 const total = ref(0)
 const query = reactive({ page: 1, page_size: 20 })
 let timer = null
+
+const runningCount = computed(() => list.value.filter((item) => item.status === 'running').length)
+const successCount = computed(() => list.value.filter((item) => item.status === 'success').length)
+const failedCount = computed(() => list.value.filter((item) => item.status === 'failed').length)
 
 async function load() {
   const data = await getAdminTasks(query)
@@ -95,7 +99,7 @@ onUnmounted(() => {
 
 <template>
   <Layout>
-    <div class="page">
+    <div class="page-shell task-monitor-page">
       <div class="page-header">
         <div>
           <h1 class="page-title">任务监控</h1>
@@ -103,41 +107,114 @@ onUnmounted(() => {
         </div>
       </div>
 
-    <el-card class="soft-card">
-      <div class="table-wrap">
-      <el-table :data="list" border>
-        <el-table-column prop="id" label="任务ID" width="90" />
-        <el-table-column prop="video_id" label="视频ID" min-width="220" />
-        <el-table-column prop="status" label="状态" width="120" />
-        <el-table-column label="进度" min-width="220">
-          <template #default="{ row }">
-            <el-progress
-              :stroke-width="14"
-              :percentage="resolveProgress(row)"
-              :status="progressStatus(row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="剩余时间" width="120">
-          <template #default="{ row }">
-            {{ formatRemaining(row) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="已耗时" width="120">
-          <template #default="{ row }">
-            {{ formatElapsed(row) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="retry_count" label="重试" width="80" />
-        <el-table-column prop="error" label="错误信息" min-width="280" />
-        <el-table-column prop="started_at" label="开始时间" width="180" />
-        <el-table-column prop="progress_updated_at" label="进度更新时间" width="180" />
-      </el-table>
-      </div>
-      <div class="action-row">
-        <el-pagination v-model:current-page="query.page" :total="total" @current-change="load" />
-      </div>
-    </el-card>
+      <section class="page-section">
+        <div class="section-head">
+          <div class="section-head__main">
+            <h2 class="section-head__title">任务概览</h2>
+            <p class="section-head__desc">展示当前分页内运行态、成功态与失败态分布</p>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <article class="content-card monitor-stat">
+            <div class="monitor-stat__label">任务总量</div>
+            <div class="monitor-stat__value">{{ total }}</div>
+          </article>
+          <article class="content-card monitor-stat">
+            <div class="monitor-stat__label">运行中</div>
+            <div class="monitor-stat__value">{{ runningCount }}</div>
+          </article>
+          <article class="content-card monitor-stat">
+            <div class="monitor-stat__label">已完成</div>
+            <div class="monitor-stat__value">{{ successCount }}</div>
+          </article>
+          <article class="content-card monitor-stat monitor-stat--danger">
+            <div class="monitor-stat__label">失败</div>
+            <div class="monitor-stat__value">{{ failedCount }}</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="table-panel monitor-table">
+        <div class="section-head">
+          <div class="section-head__main">
+            <h2 class="section-head__title">任务列表</h2>
+            <p class="section-head__desc">每 5 秒自动刷新，也可手动立即刷新</p>
+          </div>
+          <div class="section-head__actions">
+            <el-tag type="info" effect="plain">自动刷新：5 秒</el-tag>
+            <el-button @click="load">立即刷新</el-button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <el-table :data="list" border>
+            <el-table-column prop="id" label="任务ID" width="90" />
+            <el-table-column prop="video_id" label="视频ID" min-width="220" />
+            <el-table-column prop="status" label="状态" width="120" />
+            <el-table-column label="进度" min-width="220">
+              <template #default="{ row }">
+                <el-progress :stroke-width="14" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="剩余时间" width="120">
+              <template #default="{ row }">
+                {{ formatRemaining(row) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="已耗时" width="120">
+              <template #default="{ row }">
+                {{ formatElapsed(row) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="retry_count" label="重试" width="80" />
+            <el-table-column prop="error" label="错误信息" min-width="280" />
+            <el-table-column prop="started_at" label="开始时间" width="180" />
+            <el-table-column prop="progress_updated_at" label="进度更新时间" width="180" />
+          </el-table>
+        </div>
+        <div class="toolbar-row toolbar-row--end">
+          <el-pagination
+            v-model:current-page="query.page"
+            v-model:page-size="query.page_size"
+            layout="total, prev, pager, next"
+            :total="total"
+            @current-change="load"
+          />
+        </div>
+      </section>
     </div>
   </Layout>
 </template>
+
+<style scoped>
+.task-monitor-page {
+  padding-bottom: 4px;
+}
+
+.monitor-stat {
+  display: grid;
+  gap: 8px;
+  min-height: 108px;
+}
+
+.monitor-stat__label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.monitor-stat__value {
+  font-family: var(--font-code);
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.monitor-stat--danger .monitor-stat__value {
+  color: var(--danger);
+}
+
+.monitor-table {
+  display: grid;
+  gap: 12px;
+}
+</style>

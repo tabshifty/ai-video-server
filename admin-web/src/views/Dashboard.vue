@@ -80,7 +80,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Layout>
-    <div class="page">
+    <div class="page-shell dashboard-page">
       <div class="page-header">
         <div>
           <h1 class="page-title">系统概览</h1>
@@ -88,64 +88,105 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="kpi-grid">
-        <el-card class="soft-card">
-          <div class="pill-value">{{ stats.short_videos || 0 }}</div>
-          <div class="pill-label">短视频</div>
-        </el-card>
-        <el-card class="soft-card">
-          <div class="pill-value">{{ stats.movie_videos || 0 }}</div>
-          <div class="pill-label">电影</div>
-        </el-card>
-        <el-card class="soft-card">
-          <div class="pill-value">{{ stats.episode_videos || 0 }}</div>
-          <div class="pill-label">电视剧集</div>
-        </el-card>
-        <el-card class="soft-card">
-          <div class="pill-value">{{ stats.av_videos || 0 }}</div>
-          <div class="pill-label">AV</div>
-        </el-card>
-        <el-card class="soft-card">
-          <div class="pill-value">{{ stats.total_users || 0 }}</div>
-          <div class="pill-label">总用户数</div>
-        </el-card>
-      </div>
+      <section class="page-section">
+        <div class="section-head">
+          <div class="section-head__main">
+            <h2 class="section-head__title">核心指标</h2>
+            <p class="section-head__desc">覆盖视频存量、用户规模、当日上传与转码队列状态</p>
+          </div>
+        </div>
 
-      <div class="kpi-grid kpi-grid-3">
-        <el-card class="soft-card">
-          <div class="pill-value">{{ stats.today_uploads || 0 }}</div>
-          <div class="pill-label">今日上传</div>
-        </el-card>
-        <el-card class="soft-card">
-          <div class="pill-value">{{ stats.queue_length || 0 }}</div>
-          <div class="pill-label">转码队列长度</div>
-        </el-card>
-        <el-card class="soft-card">
-          <div class="pill-value">{{ ((stats.disk_free_bytes || 0) / 1024 / 1024 / 1024).toFixed(2) }} GB</div>
-          <div class="pill-label">磁盘剩余</div>
-        </el-card>
-      </div>
+        <div class="stats-grid">
+          <article class="content-card metric-card">
+            <div class="metric-card__label">短视频</div>
+            <div class="metric-card__value">{{ stats.short_videos || 0 }}</div>
+          </article>
+          <article class="content-card metric-card">
+            <div class="metric-card__label">电影</div>
+            <div class="metric-card__value">{{ stats.movie_videos || 0 }}</div>
+          </article>
+          <article class="content-card metric-card">
+            <div class="metric-card__label">电视剧集</div>
+            <div class="metric-card__value">{{ stats.episode_videos || 0 }}</div>
+          </article>
+          <article class="content-card metric-card">
+            <div class="metric-card__label">AV</div>
+            <div class="metric-card__value">{{ stats.av_videos || 0 }}</div>
+          </article>
+          <article class="content-card metric-card metric-card--accent">
+            <div class="metric-card__label">总用户数</div>
+            <div class="metric-card__value">{{ stats.total_users || 0 }}</div>
+          </article>
+          <article class="content-card metric-card">
+            <div class="metric-card__label">今日上传</div>
+            <div class="metric-card__value">{{ stats.today_uploads || 0 }}</div>
+          </article>
+          <article class="content-card metric-card">
+            <div class="metric-card__label">转码队列长度</div>
+            <div class="metric-card__value">{{ stats.queue_length || 0 }}</div>
+          </article>
+          <article class="content-card metric-card">
+            <div class="metric-card__label">磁盘剩余</div>
+            <div class="metric-card__value">{{ ((stats.disk_free_bytes || 0) / 1024 / 1024 / 1024).toFixed(2) }} GB</div>
+          </article>
+        </div>
+      </section>
 
-      <el-card class="soft-card">
-        <template #header>近 7 天上传趋势</template>
+      <section class="table-panel trend-panel">
+        <div class="section-head">
+          <div class="section-head__main">
+            <h2 class="section-head__title">近 7 天上传趋势</h2>
+            <p class="section-head__desc">按天统计上传数量，辅助判断高峰与队列压力</p>
+          </div>
+        </div>
         <div ref="chartRef" class="trend-chart" />
-      </el-card>
+      </section>
     </div>
   </Layout>
 </template>
 
 <style scoped>
-.kpi-grid-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.dashboard-page {
+  padding-bottom: 4px;
+}
+
+.metric-card {
+  display: grid;
+  gap: 8px;
+  min-height: 110px;
+}
+
+.metric-card__label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.metric-card__value {
+  font-family: var(--font-code);
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 600;
+  color: var(--text-main);
+  word-break: break-all;
+}
+
+.metric-card--accent {
+  background: linear-gradient(145deg, #edf3ff 0%, #ffffff 70%);
+  border-color: #cad8f5;
+}
+
+.trend-panel {
+  display: grid;
+  gap: 10px;
 }
 
 .trend-chart {
-  height: 340px;
+  height: 360px;
 }
 
 @media (max-width: 1200px) {
-  .kpi-grid-3 {
-    grid-template-columns: 1fr;
+  .metric-card__value {
+    font-size: 26px;
   }
 }
 </style>

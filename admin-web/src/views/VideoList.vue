@@ -144,6 +144,19 @@ async function load() {
   total.value = data.total_count || 0
 }
 
+function applyFilters() {
+  query.page = 1
+  load()
+}
+
+function resetFilters() {
+  query.q = ''
+  query.type = ''
+  query.status = ''
+  query.page = 1
+  load()
+}
+
 async function searchActors(keyword = '') {
   loadingActors.value = true
   try {
@@ -353,7 +366,7 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page">
+    <div class="page-shell video-list-page">
       <div class="page-header">
         <div>
           <h1 class="page-title">视频管理</h1>
@@ -361,11 +374,20 @@ onMounted(load)
         </div>
       </div>
 
-      <el-card class="soft-card">
-        <el-form inline class="filter-form">
-          <el-form-item><el-input v-model="query.q" placeholder="标题/标签搜索" /></el-form-item>
+      <section class="content-card filter-panel">
+        <div class="section-head">
+          <div class="section-head__main">
+            <h2 class="section-head__title">筛选区</h2>
+            <p class="section-head__desc">按标题、类型与状态定位目标视频</p>
+          </div>
+        </div>
+
+        <el-form class="filter-form" @submit.prevent>
           <el-form-item>
-            <el-select v-model="query.type" placeholder="类型" clearable style="width:120px">
+            <el-input v-model="query.q" placeholder="标题/标签搜索" clearable />
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="query.type" placeholder="类型" clearable style="width: 160px">
               <el-option label="短视频" value="short" />
               <el-option label="电影" value="movie" />
               <el-option label="剧集分集" value="episode" />
@@ -373,7 +395,7 @@ onMounted(load)
             </el-select>
           </el-form-item>
           <el-form-item>
-            <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
+            <el-select v-model="query.status" placeholder="状态" clearable style="width: 160px">
               <el-option label="已上传" value="uploaded" />
               <el-option label="刮削中" value="scraping" />
               <el-option label="处理中" value="processing" />
@@ -381,8 +403,20 @@ onMounted(load)
               <el-option label="失败" value="failed" />
             </el-select>
           </el-form-item>
-          <el-form-item><el-button type="primary" @click="load">查询</el-button></el-form-item>
+          <div class="toolbar-row toolbar-row--start filter-actions">
+            <el-button type="primary" @click="applyFilters">查询</el-button>
+            <el-button @click="resetFilters">重置</el-button>
+          </div>
         </el-form>
+      </section>
+
+      <section class="table-panel result-panel">
+        <div class="section-head">
+          <div class="section-head__main">
+            <h2 class="section-head__title">结果区</h2>
+            <p class="section-head__desc">当前共 {{ total }} 条视频记录</p>
+          </div>
+        </div>
 
         <div class="table-wrap">
           <el-table :data="list" border>
@@ -411,7 +445,7 @@ onMounted(load)
           </el-table>
         </div>
 
-        <div class="action-row">
+        <div class="toolbar-row toolbar-row--end">
           <el-pagination
             v-model:current-page="query.page"
             v-model:page-size="query.page_size"
@@ -420,7 +454,7 @@ onMounted(load)
             @current-change="load"
           />
         </div>
-      </el-card>
+      </section>
     </div>
 
     <el-dialog v-model="detailVisible" title="视频详情" width="760px">
@@ -584,6 +618,35 @@ onMounted(load)
 </template>
 
 <style scoped>
+.video-list-page {
+  padding-bottom: 4px;
+}
+
+.filter-panel,
+.result-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.filter-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.filter-form .el-form-item {
+  margin: 0;
+}
+
+.filter-actions {
+  margin-left: auto;
+}
+
+.result-panel :deep(.el-button + .el-button) {
+  margin-left: 8px;
+}
+
 .play-preview {
   width: 100%;
 }
@@ -615,7 +678,14 @@ onMounted(load)
   width: 100%;
   max-height: 360px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line-soft);
   background: #000;
+}
+
+@media (max-width: 992px) {
+  .filter-actions {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 </style>
