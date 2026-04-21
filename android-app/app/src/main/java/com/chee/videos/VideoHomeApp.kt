@@ -1,10 +1,16 @@
 package com.chee.videos
 
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -12,15 +18,17 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -31,6 +39,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.chee.videos.core.model.AppRootState
+import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.AppDarkColors
 import com.chee.videos.core.viewmodel.AppRootViewModel
 import com.chee.videos.feature.auth.LoginScreen
 import com.chee.videos.feature.connection.ConnectionScreen
@@ -40,26 +50,16 @@ import com.chee.videos.feature.mine.MineScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
 import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
 
-private val AppDarkColors = darkColorScheme(
-    primary = Color(0xFFFF5A7A),
-    secondary = Color(0xFFFF5A7A),
-    background = Color(0xFF090A0D),
-    surface = Color(0xFF101318),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = Color.White,
-    onSurface = Color.White,
-)
-
 private data class RootTab(
     val route: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val label: String,
+    val hint: String,
 )
 
 private val rootTabs = listOf(
-    RootTab(route = "home", icon = Icons.Filled.Home, label = "首页"),
-    RootTab(route = "mine", icon = Icons.Filled.Person, label = "我的"),
+    RootTab(route = "home", icon = Icons.Filled.Home, label = "首页", hint = "正在播放"),
+    RootTab(route = "mine", icon = Icons.Filled.Person, label = "我的", hint = "资料与记录"),
 )
 
 @Composable
@@ -69,11 +69,11 @@ fun VideoHomeApp(
     val appState by appRootViewModel.appState.collectAsStateWithLifecycle()
 
     MaterialTheme(colorScheme = AppDarkColors) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        Surface(modifier = Modifier.fillMaxSize(), color = AppChrome.Canvas) {
             when (val state = appState) {
                 AppRootState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = AppChrome.AccentStrong)
                     }
                 }
 
@@ -111,26 +111,80 @@ private fun AuthenticatedNav(
     val showBottomBar = currentRoute == "home" || currentRoute == "mine"
 
     Scaffold(
-        containerColor = Color(0xFF090A0D),
+        containerColor = AppChrome.Canvas,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(containerColor = Color(0xFF101318), contentColor = Color.White) {
-                    rootTabs.forEach { tab ->
-                        val selected = currentRoute == tab.route
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                Surface(
+                    color = AppChrome.Surface,
+                    contentColor = AppChrome.TextPrimary,
+                    shadowElevation = 18.dp,
+                    shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(AppChrome.Surface),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(AppChrome.Divider),
                         )
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                            contentColor = AppChrome.TextPrimary,
+                            tonalElevation = 0.dp,
+                            modifier = Modifier.navigationBarsPadding(),
+                        ) {
+                            rootTabs.forEach { tab ->
+                                val selected = currentRoute == tab.route
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = {
+                                        navController.navigate(tab.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = AppChrome.TextPrimary,
+                                        selectedTextColor = AppChrome.TextPrimary,
+                                        indicatorColor = AppChrome.AccentSoft,
+                                        unselectedIconColor = AppChrome.TextMuted,
+                                        unselectedTextColor = AppChrome.TextMuted,
+                                    ),
+                                    icon = {
+                                        Icon(
+                                            tab.icon,
+                                            contentDescription = tab.label,
+                                            tint = if (selected) AppChrome.AccentStrong else AppChrome.TextMuted,
+                                        )
+                                    },
+                                    label = {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            androidx.compose.material3.Text(
+                                                text = tab.label,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                            if (selected) {
+                                                androidx.compose.material3.Text(
+                                                    text = tab.hint,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = AppChrome.TextMuted,
+                                                )
+                                            }
+                                        }
+                                    },
+                                    alwaysShowLabel = true,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -144,7 +198,11 @@ private fun AuthenticatedNav(
                 .padding(innerPadding),
         ) {
             composable("home") {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppChrome.PageGradient),
+                ) {
                     HomeScreen(
                         baseUrl = baseUrl,
                         accessToken = accessToken,
@@ -161,7 +219,11 @@ private fun AuthenticatedNav(
             }
 
             composable("mine") {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppChrome.PageGradient),
+                ) {
                     MineScreen(
                         baseUrl = baseUrl,
                         onOpenPlayer = { source, videoId ->

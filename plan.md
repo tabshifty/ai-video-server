@@ -1988,3 +1988,30 @@
   - 登录页与后台切页的最终视觉效果未在真实浏览器中做人工验收，待补充页面级人工检查。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-21 13:01] Android 主流程影院感深色美化 + 首页短视频进度条贴底栏
+- Type: `implementation`
+- Summary:
+  - 为 Android app 新增统一的影院感深色视觉 token，收敛首页、我的页、底部导航、登录页和选服页的颜色、表面层级与强调色，减少主流程页面之间的视觉割裂。
+  - 重做首页主壳与内容结构：顶部改为影院感 segmented tabs，长内容列表统一为深色卡片排布；全局底部导航改为更稳定的沉浸式样式并增强选中态层级。
+  - 首页短视频页接入共用 `ShortVideoBottomProgressBar`，去除本地重复实现；进度条改为锚定内容底边，使其视觉上贴住底部 tabs 顶边，同时在短视频上下滑动或 pager 未稳定时隐藏，稳定后再恢复。
+  - 我的页、登录页、选服页同步做最小必要的视觉收口，保持现有业务流程不变。
+  - 新增短视频进度条显示条件单元测试，锁定“滑动中隐藏、稳定后恢复”的行为。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/AppChrome.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/ShortVideoBottomProgressBar.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/auth/LoginScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedProgressState.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedProgressVisibilityTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+  - 页面级视觉与手势体验未在真实 Android 设备上人工验收，待补充真机/模拟器检查。
+- Rollback:
+  - `git revert <commit>`

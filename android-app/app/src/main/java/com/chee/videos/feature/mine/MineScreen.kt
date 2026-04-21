@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -48,12 +48,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.util.UrlBuilder
 
-private val MineBackground = Color(0xFF090A0D)
-private val MineSectionBackground = Color(0xFF14171D)
-private val MineCardBackground = Color(0xFF181B22)
-private val MineAccent = Color(0xFFFF5A7A)
+private val MineSectionBackground = AppChrome.Surface
+private val MineCardBackground = AppChrome.SurfaceElevated
+private val MineAccent = AppChrome.AccentStrong
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -100,7 +100,7 @@ fun MineScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MineBackground)
+            .background(AppChrome.PageGradient)
             .statusBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
@@ -150,7 +150,7 @@ fun MineScreen(
 
                 currentList.items.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("暂无内容", color = Color(0xFFB9BEC9))
+                        Text("暂无内容", color = AppChrome.TextMuted)
                     }
                 }
 
@@ -220,7 +220,7 @@ fun MineScreen(
                 state = pullRefreshState,
                 modifier = Modifier.align(Alignment.TopCenter),
                 contentColor = MineAccent,
-                backgroundColor = Color(0xFF1B1F28),
+                backgroundColor = AppChrome.SurfaceElevated,
             )
         }
     }
@@ -240,7 +240,7 @@ private fun ProfileHeader(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = AppChrome.CardShape,
         color = MineSectionBackground,
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -255,7 +255,7 @@ private fun ProfileHeader(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(MineAccent.copy(alpha = 0.25f)),
+                            .background(MineAccent.copy(alpha = 0.18f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -275,7 +275,7 @@ private fun ProfileHeader(
                         )
                         Text(
                             text = role.ifBlank { "member" },
-                            color = Color(0xFFE2E6EF),
+                            color = AppChrome.TextSecondary,
                             style = MaterialTheme.typography.labelMedium,
                         )
                     }
@@ -289,7 +289,7 @@ private fun ProfileHeader(
                         Icon(Icons.Filled.Router, contentDescription = "切换服务器", tint = Color.White)
                     }
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Filled.Logout, contentDescription = "退出登录", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "退出登录", tint = Color.White)
                     }
                 }
             }
@@ -299,14 +299,14 @@ private fun ProfileHeader(
                 .removePrefix("https://")
             Text(
                 text = "服务地址：$endpoint",
-                color = Color(0xFFABB3C2),
+                color = AppChrome.TextMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
 
             if (!email.isNullOrBlank()) {
                 Text(
                     text = "邮箱：$email",
-                    color = Color(0xFFABB3C2),
+                    color = AppChrome.TextMuted,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -315,7 +315,7 @@ private fun ProfileHeader(
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
                     color = MineAccent,
-                    trackColor = Color(0xFF252A34),
+                    trackColor = AppChrome.SurfaceStrong,
                 )
             }
 
@@ -337,14 +337,14 @@ private fun SectionTabs(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = AppChrome.SectionShape,
         color = MineSectionBackground,
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             MineSection.values().forEach { section ->
                 val isSelected = section == selected
-                val bg = if (isSelected) MineAccent.copy(alpha = 0.22f) else Color.Transparent
-                val textColor = if (isSelected) Color.White else Color(0xFF9DA5B5)
+                val bg = if (isSelected) MineAccent.copy(alpha = 0.18f) else Color.Transparent
+                val textColor = if (isSelected) Color.White else AppChrome.TextMuted
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -375,9 +375,9 @@ private fun MineVideoCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppChrome.SectionShape)
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+        shape = AppChrome.SectionShape,
         color = MineCardBackground,
     ) {
         Row(
@@ -394,14 +394,14 @@ private fun MineVideoCard(
                     contentDescription = item.title,
                     modifier = Modifier
                         .size(width = 120.dp, height = 68.dp)
-                        .clip(RoundedCornerShape(10.dp)),
+                        .clip(RoundedCornerShape(12.dp)),
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(width = 120.dp, height = 68.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF242A33)),
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AppChrome.SurfaceStrong),
                 )
             }
 
@@ -420,7 +420,7 @@ private fun MineVideoCard(
                 if (!item.subtitle.isNullOrBlank()) {
                     Text(
                         text = item.subtitle,
-                        color = Color(0xFFADB4C4),
+                        color = AppChrome.TextMuted,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -434,7 +434,7 @@ private fun MineVideoCard(
                             .height(3.dp)
                             .clip(CircleShape),
                         color = MineAccent,
-                        trackColor = Color(0xFF2B3040),
+                        trackColor = AppChrome.SurfaceStrong,
                     )
                 }
             }

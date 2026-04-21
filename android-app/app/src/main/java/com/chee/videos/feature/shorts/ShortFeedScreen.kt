@@ -4,13 +4,11 @@ import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +65,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -82,7 +81,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -90,15 +88,18 @@ import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.VideoCollectionDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
+import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-private val ShortsActionBg = Color(0x5A000000)
-private val ShortsActionActiveTint = Color(0xFFFF5E84)
+private val ShortsActionBg = AppChrome.Surface.copy(alpha = 0.82f)
+private val ShortsActionActiveTint = AppChrome.AccentStrong
+private const val ProgressRevealDelayMs = 140L
 
 internal fun shortPosterContentScale(fitMode: VideoFitMode): ContentScale {
     return when (fitMode) {
@@ -123,13 +124,13 @@ fun ShortFeedScreen(
 
     when {
         uiState.loading && uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().background(AppChrome.Canvas), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color.White)
             }
         }
 
         !uiState.errorMessage.isNullOrBlank() && uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().background(AppChrome.Canvas), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
                     Button(onClick = { viewModel.load(force = true) }) { Text("重试") }
@@ -138,7 +139,7 @@ fun ShortFeedScreen(
         }
 
         uiState.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().background(AppChrome.Canvas), contentAlignment = Alignment.Center) {
                 Text("暂无短视频", color = Color.White)
             }
         }
@@ -208,6 +209,7 @@ fun ShortFeedScreen(
                 var positionMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
                 var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
+                var progressBarSettled by remember(currentVideoId) { mutableStateOf(false) }
 
                 LaunchedEffect(pagerState.currentPage, uiState.items) {
                     uiState.items.getOrNull(pagerState.currentPage)?.id?.let { currentVideoID ->
@@ -279,6 +281,7 @@ fun ShortFeedScreen(
                         positionMs = 0L
                         isScrubbingShort = false
                         scrubTargetMs = 0L
+                        progressBarSettled = false
                         return@LaunchedEffect
                     }
                     while (isActive) {
@@ -288,6 +291,18 @@ fun ShortFeedScreen(
                         }
                         delay(220)
                     }
+                }
+                LaunchedEffect(currentVideoId, pagerState.isScrollInProgress) {
+                    if (currentVideoId.isNullOrBlank()) {
+                        progressBarSettled = false
+                        return@LaunchedEffect
+                    }
+                    if (pagerState.isScrollInProgress) {
+                        progressBarSettled = false
+                        return@LaunchedEffect
+                    }
+                    delay(ProgressRevealDelayMs)
+                    progressBarSettled = true
                 }
                 LaunchedEffect(currentVideoId, currentVideoPausedByUser) {
                     val shouldPlay = currentVideoId != null && !currentVideoPausedByUser
@@ -317,10 +332,16 @@ fun ShortFeedScreen(
                     }
                 }
 
+                val showProgressBar = shouldShowShortFeedProgressBar(
+                    currentVideoId = currentVideoId,
+                    detailSheetOpen = sheetOpen,
+                    pagerSettled = progressBarSettled,
+                )
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black),
+                        .background(AppChrome.Canvas),
                 ) {
                     Box(
                         modifier = Modifier
@@ -373,8 +394,8 @@ fun ShortFeedScreen(
                         }
                     }
 
-                    if (!sheetOpen && currentVideoId != null) {
-                        ShortBottomProgressBar(
+                    if (showProgressBar) {
+                        ShortVideoBottomProgressBar(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth(),
@@ -384,20 +405,20 @@ fun ShortFeedScreen(
                             scrubTargetMs = scrubTargetMs,
                             onScrubStart = {
                                 if (durationMs <= 0L) {
-                                    return@ShortBottomProgressBar
+                                    return@ShortVideoBottomProgressBar
                                 }
                                 isScrubbingShort = true
                                 scrubTargetMs = positionMs.coerceIn(0L, durationMs)
                             },
                             onScrubToFraction = { fraction ->
                                 if (durationMs <= 0L || !isScrubbingShort) {
-                                    return@ShortBottomProgressBar
+                                    return@ShortVideoBottomProgressBar
                                 }
                                 scrubTargetMs = (durationMs * fraction).toLong().coerceIn(0L, durationMs)
                             },
                             onScrubEnd = {
                                 if (!isScrubbingShort) {
-                                    return@ShortBottomProgressBar
+                                    return@ShortVideoBottomProgressBar
                                 }
                                 if (durationMs > 0L) {
                                     val target = scrubTargetMs.coerceIn(0L, durationMs)
@@ -478,7 +499,7 @@ private fun VerticalVideoPage(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(AppChrome.Canvas)) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -550,7 +571,7 @@ private fun VerticalVideoPage(
                         colors = listOf(
                             Color.Transparent,
                             Color.Transparent,
-                            Color(0xAA000000),
+                            AppChrome.Canvas.copy(alpha = 0.88f),
                         ),
                     ),
                 ),
@@ -565,7 +586,7 @@ private fun VerticalVideoPage(
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Color(0x99000000))
+                    .background(AppChrome.Surface.copy(alpha = 0.82f))
                     .padding(horizontal = 18.dp, vertical = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -625,7 +646,7 @@ private fun VerticalVideoPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+                .padding(horizontal = 16.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
@@ -637,90 +658,8 @@ private fun VerticalVideoPage(
             if (actorNames.isNotEmpty()) {
                 Text(
                     text = "演员：${actorNames.joinToString(" / ")}",
-                    color = Color.White.copy(alpha = 0.86f),
+                    color = AppChrome.TextSecondary,
                     style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ShortBottomProgressBar(
-    modifier: Modifier = Modifier,
-    positionMs: Long,
-    durationMs: Long,
-    isScrubbing: Boolean,
-    scrubTargetMs: Long,
-    onScrubStart: () -> Unit,
-    onScrubToFraction: (Float) -> Unit,
-    onScrubEnd: () -> Unit,
-) {
-    val barHeight by animateDpAsState(
-        targetValue = if (isScrubbing) 6.dp else 2.dp,
-        animationSpec = spring(stiffness = 520f),
-        label = "short_progress_height",
-    )
-    val displayPositionMs = if (isScrubbing) scrubTargetMs else positionMs
-    val progress = shortProgressFraction(displayPositionMs, durationMs)
-    val canSeek = durationMs > 0L
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        AnimatedVisibility(visible = isScrubbing) {
-            Surface(
-                color = Color(0xC91A1C23),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.padding(bottom = 6.dp),
-            ) {
-                Text(
-                    text = "${formatShortPlaybackTimeHms(displayPositionMs)} / ${formatShortPlaybackTimeHms(durationMs)}",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .pointerInput(canSeek) {
-                    if (!canSeek) {
-                        return@pointerInput
-                    }
-                    detectHorizontalDragGestures(
-                        onDragStart = { offset ->
-                            onScrubStart()
-                            val width = size.width.toFloat().coerceAtLeast(1f)
-                            onScrubToFraction((offset.x / width).coerceIn(0f, 1f))
-                        },
-                        onHorizontalDrag = { change, _ ->
-                            change.consume()
-                            val width = size.width.toFloat().coerceAtLeast(1f)
-                            onScrubToFraction((change.position.x / width).coerceIn(0f, 1f))
-                        },
-                        onDragEnd = onScrubEnd,
-                        onDragCancel = onScrubEnd,
-                    )
-                },
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(barHeight)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.28f)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(progress)
-                        .fillMaxHeight()
-                        .background(Color.White.copy(alpha = 0.92f)),
                 )
             }
         }
@@ -991,13 +930,6 @@ internal fun formatShortPlaybackTimeHms(ms: Long): String {
         append(':')
         append(seconds.toString().padStart(2, '0'))
     }
-}
-
-private fun shortProgressFraction(positionMs: Long, durationMs: Long): Float {
-    if (durationMs <= 0L) {
-        return 0f
-    }
-    return (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
 }
 
 private fun extractActorNames(detail: VideoDetailDto?): List<String> {

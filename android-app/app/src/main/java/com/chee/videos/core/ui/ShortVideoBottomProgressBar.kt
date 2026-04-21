@@ -50,15 +50,16 @@ fun ShortVideoBottomProgressBar(
     ) {
         AnimatedVisibility(visible = isScrubbing) {
             Surface(
-                color = Color(0xC91A1C23),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.padding(bottom = 6.dp),
+                color = AppChrome.Surface.copy(alpha = 0.96f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.padding(bottom = 8.dp),
+                contentColor = AppChrome.TextPrimary,
             ) {
                 Text(
                     text = "${formatPlaybackTimeHms(displayPositionMs)} / ${formatPlaybackTimeHms(durationMs)}",
-                    color = Color.White,
+                    color = AppChrome.TextPrimary,
                     style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                 )
             }
         }
@@ -66,7 +67,7 @@ fun ShortVideoBottomProgressBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(24.dp)
+                .height(if (isScrubbing) 26.dp else 18.dp)
                 .pointerInput(canSeek) {
                     if (!canSeek) {
                         return@pointerInput
@@ -86,20 +87,20 @@ fun ShortVideoBottomProgressBar(
                         onDragCancel = onScrubEnd,
                     )
                 },
-            contentAlignment = Alignment.CenterStart,
+            contentAlignment = Alignment.BottomStart,
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(barHeight.value)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.28f)),
+                    .background(AppChrome.TextPrimary.copy(alpha = 0.18f)),
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(progress)
                         .fillMaxHeight()
-                        .background(Color.White.copy(alpha = 0.92f)),
+                        .background(AppChrome.AccentStrong),
                 )
             }
         }
@@ -126,4 +127,3 @@ private fun shortProgressFraction(positionMs: Long, durationMs: Long): Float {
     }
     return (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
 }
-

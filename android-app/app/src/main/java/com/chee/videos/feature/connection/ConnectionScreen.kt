@@ -2,7 +2,6 @@ package com.chee.videos.feature.connection
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,8 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -26,12 +25,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chee.videos.core.model.ServerEndpoint
+import com.chee.videos.core.ui.AppChrome
 
 @Composable
 fun ConnectionScreen(
@@ -46,7 +45,7 @@ fun ConnectionScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF090A0D))
+            .background(AppChrome.PageGradient)
             .statusBarsPadding()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -56,11 +55,12 @@ fun ConnectionScreen(
                 text = "连接家用服务器",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
+                color = AppChrome.TextPrimary,
             )
             Text(
                 text = "先自动扫描局域网服务，找不到再手动填写 IP 和端口。",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppChrome.TextMuted,
             )
         }
 
@@ -73,20 +73,27 @@ fun ConnectionScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("自动嗅探", style = MaterialTheme.typography.titleMedium)
-                        Button(onClick = { viewModel.scanLan() }, enabled = !uiState.scanning && !uiState.connecting) {
+                        Button(
+                            onClick = { viewModel.scanLan() },
+                            enabled = !uiState.scanning && !uiState.connecting,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AppChrome.Accent,
+                                contentColor = AppChrome.TextPrimary,
+                            ),
+                        ) {
                             Text(if (uiState.scanning) "扫描中..." else "重新扫描")
                         }
                     }
                     if (uiState.scanning) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CircularProgressIndicator(modifier = Modifier.height(20.dp))
-                            Text("正在扫描同网段可用服务")
+                            CircularProgressIndicator(modifier = Modifier.height(20.dp), color = AppChrome.AccentStrong)
+                            Text("正在扫描同网段可用服务", color = AppChrome.TextSecondary)
                         }
                     }
                     if (!uiState.message.isNullOrBlank()) {
                         Text(
                             text = uiState.message.orEmpty(),
-                            color = if (uiState.messageIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            color = if (uiState.messageIsError) MaterialTheme.colorScheme.error else AppChrome.AccentStrong,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -129,6 +136,10 @@ fun ConnectionScreen(
                         onClick = viewModel::manualConnect,
                         enabled = !uiState.connecting,
                         modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AppChrome.Accent,
+                            contentColor = AppChrome.TextPrimary,
+                        ),
                     ) {
                         Text(if (uiState.connecting) "连接中..." else "测试并保存")
                     }
@@ -173,22 +184,22 @@ private fun EndpointList(
                     Text(
                         text = "最近成功时间：${java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(endpoint.lastSuccessAt))}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = AppChrome.TextMuted,
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { onUse(endpoint) }) {
-                        Text(useLabel)
+                        Text(useLabel, color = AppChrome.AccentStrong)
                     }
                     if (onDelete != null) {
                         IconButton(onClick = { onDelete(endpoint) }) {
-                            Text("删")
+                            Text("删", color = AppChrome.TextSecondary)
                         }
                     }
                 }
             }
             if (index != endpoints.lastIndex) {
-                HorizontalDivider()
+                HorizontalDivider(color = AppChrome.Divider)
             }
         }
     }
