@@ -204,7 +204,7 @@ WHERE id=$1
 	out.Collections = collections
 	if out.ImageCollectionID != nil {
 		row := r.pool.QueryRow(ctx, `
-SELECT id, name, COALESCE(description,''), COALESCE(cover_url,''), sort_order, active, created_at, updated_at
+SELECT id, name, COALESCE(description,''), COALESCE(cover_url,''), COALESCE(cover_image_id::text,''), sort_order, active, created_at, updated_at
 FROM collections_images
 WHERE id=$1
 `, *out.ImageCollectionID)

@@ -10,6 +10,13 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/models"
+	"video-server/internal/utils"
+)
+
+const (
+	adminImageCollectionCoverWidth   = 320
+	adminImageCollectionCoverHeight  = 320
+	adminImageCollectionCoverQuality = 82
 )
 
 func normalizeImageCollectionName(raw string) string {
@@ -26,13 +33,22 @@ func normalizeImageCollectionInput(in models.AdminImageCollectionInput) (models.
 	return in, nil
 }
 
+func resolveAdminImageCollectionCoverURL(coverImageID *uuid.UUID, fallbackCoverURL string) string {
+	if coverImageID != nil {
+		return utils.AdminImageViewURL(*coverImageID, adminImageCollectionCoverWidth, adminImageCollectionCoverHeight, "cover", adminImageCollectionCoverQuality)
+	}
+	return strings.TrimSpace(fallbackCoverURL)
+}
+
 func scanAdminImageCollection(rows rowScanner) (models.AdminImageCollection, error) {
 	var out models.AdminImageCollection
+	var coverImageID string
 	if err := rows.Scan(
 		&out.ID,
 		&out.Name,
 		&out.Description,
 		&out.CoverURL,
+		&coverImageID,
 		&out.SortOrder,
 		&out.Active,
 		&out.CreatedAt,
@@ -40,6 +56,9 @@ func scanAdminImageCollection(rows rowScanner) (models.AdminImageCollection, err
 	); err != nil {
 		return models.AdminImageCollection{}, err
 	}
+	out.ManualCoverURL = strings.TrimSpace(out.CoverURL)
+	out.CoverImageID = parseNullableUUIDText(coverImageID)
+	out.CoverURL = resolveAdminImageCollectionCoverURL(out.CoverImageID, out.CoverURL)
 	return out, nil
 }
 
@@ -67,7 +86,7 @@ func (r *VideoRepository) ListImageCollections(ctx context.Context, q string, ac
 	}
 
 	args = append(args, pageSize, (page-1)*pageSize)
-	sql := "SELECT id, name, COALESCE(description,''), COALESCE(cover_url,''), sort_order, active, created_at, updated_at FROM collections_images WHERE " +
+	sql := "SELECT id, name, COALESCE(description,''), COALESCE(cover_url,''), COALESCE(cover_image_id::text,''), sort_order, active, created_at, updated_at FROM collections_images WHERE " +
 		baseWhere + " ORDER BY sort_order DESC, updated_at DESC, name ASC LIMIT $" + fmt.Sprintf("%d", len(args)-1) +
 		" OFFSET $" + fmt.Sprintf("%d", len(args))
 	rows, err := r.pool.Query(ctx, sql, args...)
@@ -92,14 +111,15 @@ func (r *VideoRepository) CreateImageCollection(ctx context.Context, input model
 	if err != nil {
 		return models.AdminImageCollection{}, err
 	}
+	input.CoverImageID = nil
 
 	row := r.pool.QueryRow(ctx, `
 INSERT INTO collections_images (
-  id, name, normalized_name, description, cover_url, sort_order, active
+  id, name, normalized_name, description, cover_url, cover_image_id, sort_order, active
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7)
-RETURNING id, name, COALESCE(description,''), COALESCE(cover_url,''), sort_order, active, created_at, updated_at
-`, uuid.New(), input.Name, normalizeImageCollectionName(input.Name), input.Description, input.CoverURL, input.SortOrder, input.Active)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+RETURNING id, name, COALESCE(description,''), COALESCE(cover_url,''), COALESCE(cover_image_id::text,''), sort_order, active, created_at, updated_at
+`, uuid.New(), input.Name, normalizeImageCollectionName(input.Name), input.Description, input.CoverURL, input.CoverImageID, input.SortOrder, input.Active)
 	out, err := scanAdminImageCollection(row)
 	if err != nil {
 		return models.AdminImageCollection{}, fmt.Errorf("create image collection: %w", err)
@@ -112,6 +132,21 @@ func (r *VideoRepository) UpdateImageCollection(ctx context.Context, collectionI
 	if err != nil {
 		return models.AdminImageCollection{}, err
 	}
+	if input.CoverImageID != nil {
+		var exists bool
+		if err := r.pool.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM image_collections
+  WHERE collection_id=$1 AND image_id=$2
+)
+`, collectionID, *input.CoverImageID).Scan(&exists); err != nil {
+			return models.AdminImageCollection{}, fmt.Errorf("validate image collection cover image: %w", err)
+		}
+		if !exists {
+			return models.AdminImageCollection{}, fmt.Errorf("封面图片必须属于当前图片合集")
+		}
+	}
 
 	row := r.pool.QueryRow(ctx, `
 UPDATE collections_images
@@ -120,12 +155,13 @@ SET
   normalized_name=$3,
   description=$4,
   cover_url=$5,
-  sort_order=$6,
-  active=$7,
+  cover_image_id=$6,
+  sort_order=$7,
+  active=$8,
   updated_at=NOW()
 WHERE id=$1
-RETURNING id, name, COALESCE(description,''), COALESCE(cover_url,''), sort_order, active, created_at, updated_at
-`, collectionID, input.Name, normalizeImageCollectionName(input.Name), input.Description, input.CoverURL, input.SortOrder, input.Active)
+RETURNING id, name, COALESCE(description,''), COALESCE(cover_url,''), COALESCE(cover_image_id::text,''), sort_order, active, created_at, updated_at
+`, collectionID, input.Name, normalizeImageCollectionName(input.Name), input.Description, input.CoverURL, input.CoverImageID, input.SortOrder, input.Active)
 	out, err := scanAdminImageCollection(row)
 	if err != nil {
 		return models.AdminImageCollection{}, fmt.Errorf("update image collection: %w", err)
@@ -268,7 +304,7 @@ func (r *VideoRepository) ReplaceImageCollectionsByIDs(ctx context.Context, imag
 
 func (r *VideoRepository) ListImageCollectionsForAdmin(ctx context.Context, imageID uuid.UUID) ([]models.AdminImageCollection, error) {
 	rows, err := r.pool.Query(ctx, `
-SELECT c.id, c.name, COALESCE(c.description,''), COALESCE(c.cover_url,''), c.sort_order, c.active, c.created_at, c.updated_at
+SELECT c.id, c.name, COALESCE(c.description,''), COALESCE(c.cover_url,''), COALESCE(c.cover_image_id::text,''), c.sort_order, c.active, c.created_at, c.updated_at
 FROM image_collections ic
 JOIN collections_images c ON c.id = ic.collection_id
 WHERE ic.image_id=$1

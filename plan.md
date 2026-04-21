@@ -15,6 +15,33 @@
 
 ---
 
+### [2026-04-21 23:24] 管理端图片合集查看关联图片并支持选图设封面
+- Type: `implementation`
+- Summary:
+  - 为图片合集增加 `cover_image_id` 数据能力与迁移，合集输出同时保留兼容 `cover_url` 和原始 `manual_cover_url`，并优先把封面图片映射为管理端图片缩放预览地址。
+  - 图片合集更新时新增封面图归属校验，只有当前合集已关联的图片才允许设为封面；删除封面图片后依赖外键自动清空 `cover_image_id`，回退到手填封面地址或空值。
+  - 管理端图片合集列表新增“查看图片”抽屉，复用现有图片列表筛选与图片缩放接口按 blob 加载小图预览，并支持在抽屉内将任意关联图片设为合集封面。
+  - 新增 Go/前端回归测试，锁定管理端图片预览 URL 生成、合集封面 URL 优先级、合集保存 payload 和 blob 预览 URL 释放逻辑。
+- Changed Files:
+  - `migrations/0013_image_collection_cover_image.up.sql`
+  - `migrations/0013_image_collection_cover_image.down.sql`
+  - `internal/models/admin.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/repository/image_collection_repository.go`
+  - `internal/repository/image_collection_repository_test.go`
+  - `internal/utils/video_url.go`
+  - `internal/utils/video_url_test.go`
+  - `admin-web/src/views/ImageCollectionManage.vue`
+  - `admin-web/src/views/imageCollectionManage.helpers.js`
+  - `admin-web/src/views/imageCollectionManage.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd .worktrees/image-collection-cover && GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `cd .worktrees/image-collection-cover/admin-web && npm test` passed.
+  - `cd .worktrees/image-collection-cover/admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-21 22:02] 管理端图片上传超时修复
 - Type: `implementation`
 - Summary:
