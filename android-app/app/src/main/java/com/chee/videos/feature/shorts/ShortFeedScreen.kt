@@ -10,7 +10,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,7 +78,6 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.imageLoader
@@ -90,14 +88,16 @@ import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.shortPosterContentScale as sharedShortPosterContentScale
+import com.chee.videos.core.ui.shortVideoResizeMode
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-private val ShortsActionBg = AppChrome.Surface.copy(alpha = 0.82f)
 private val ShortsActionActiveTint = AppChrome.AccentStrong
 private val ShortDetailSheetBg = AppChrome.CanvasRaised
 private val ShortDetailCardBg = AppChrome.Surface
@@ -106,10 +106,7 @@ private val ShortDetailPillBg = AppChrome.SurfaceStrong
 private const val ProgressRevealDelayMs = 140L
 
 internal fun shortPosterContentScale(fitMode: VideoFitMode): ContentScale {
-    return when (fitMode) {
-        VideoFitMode.FILL -> ContentScale.Crop
-        VideoFitMode.FIT -> ContentScale.Fit
-    }
+    return sharedShortPosterContentScale(fitMode)
 }
 
 @Composable
@@ -534,15 +531,13 @@ private fun VerticalVideoPage(
                             useController = false
                             setShutterBackgroundColor(AndroidColor.BLACK)
                             setKeepContentOnPlayerReset(false)
+                            resizeMode = shortVideoResizeMode(fitMode)
                             player = sharedPlayer
                         }
                     },
                     update = { view ->
                         view.player = sharedPlayer
-                        view.resizeMode = when (fitMode) {
-                            VideoFitMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                            VideoFitMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        }
+                        view.resizeMode = shortVideoResizeMode(fitMode)
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -1005,25 +1000,13 @@ private fun ShortsActionButton(
     onClick: () -> Unit,
     contentDescription: String,
 ) {
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(ShortsActionBg)
-            .clickable(
-                enabled = enabled,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = if (active) ShortsActionActiveTint else Color.White,
-        )
-    }
+    ShortVideoOverlayActionButton(
+        icon = icon,
+        active = active,
+        enabled = enabled,
+        onClick = onClick,
+        contentDescription = contentDescription,
+    )
 }
 
 private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {
