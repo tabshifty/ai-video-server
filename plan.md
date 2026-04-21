@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-21 19:39] Android 首页导航压缩：移除说明文案并扩大短视频首屏
+- Type: `implementation`
+- Summary:
+  - 首页顶部去掉“私人影库”和各分类解释文案，改为单行纯文字分类切换，保留 `短视频 / 电影 / 电视剧 / AV` 四类入口。
+  - 底部导航去掉 icon 与解释文案，收缩为 `首页 / 我的` 两项纯文字按钮，把更多垂直空间让给首页短视频画面。
+  - 新增可单测的导航配置 `AppNavigationConfig` 与 JVM 回归测试，锁定顶部四类和底部两项的精简结构，避免后续重新带回解释字段。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/AppNavigationConfig.kt`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/AppNavigationConfigTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.AppNavigationConfigTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-20 22:13] 管理端固定侧栏与全站视觉提质
 - Type: `implementation`
 - Summary:

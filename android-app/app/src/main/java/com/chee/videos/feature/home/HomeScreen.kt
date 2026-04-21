@@ -46,21 +46,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.homeContentTabs
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.feature.shorts.ShortFeedScreen
 
-private data class ContentTab(
-    val title: String,
-    val type: String,
-    val hint: String,
-)
-
-private val tabs = listOf(
-    ContentTab("短视频", "short", "沉浸连播"),
-    ContentTab("电影", "movie", "长片精选"),
-    ContentTab("电视剧", "episode", "连续观看"),
-    ContentTab("AV", "av", "深夜影库"),
-)
+private val tabs = homeContentTabs
 
 @Composable
 fun HomeScreen(
@@ -105,7 +95,7 @@ fun HomeScreen(
                     CategoryListSection(
                         baseUrl = baseUrl,
                         state = uiState.movie,
-                        categoryHint = tabs[selectedTab].hint,
+                        categoryTitle = tabs[selectedTab].title,
                         onRetry = { viewModel.loadCategory("movie", force = true) },
                         onOpenDetail = onOpenDetail,
                     )
@@ -115,7 +105,7 @@ fun HomeScreen(
                     CategoryListSection(
                         baseUrl = baseUrl,
                         state = uiState.episode,
-                        categoryHint = tabs[selectedTab].hint,
+                        categoryTitle = tabs[selectedTab].title,
                         onRetry = { viewModel.loadCategory("episode", force = true) },
                         onOpenDetail = onOpenDetail,
                     )
@@ -125,7 +115,7 @@ fun HomeScreen(
                     CategoryListSection(
                         baseUrl = baseUrl,
                         state = uiState.av,
-                        categoryHint = tabs[selectedTab].hint,
+                        categoryTitle = tabs[selectedTab].title,
                         onRetry = { viewModel.loadCategory("av", force = true) },
                         onOpenDetail = onOpenDetail,
                     )
@@ -144,68 +134,43 @@ private fun HomeHeader(
         modifier = Modifier.fillMaxWidth(),
         color = Color.Transparent,
     ) {
-        Column(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            color = AppChrome.Surface.copy(alpha = 0.92f),
+            shape = AppChrome.SectionShape,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "私人影库",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = AppChrome.TextMuted,
-                )
-                Text(
-                    text = tabs[selectedTab].hint,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = AppChrome.TextPrimary,
-                )
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = AppChrome.Surface.copy(alpha = 0.92f),
-                shape = AppChrome.SectionShape,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    tabs.forEachIndexed { index, tab ->
-                        val selected = index == selectedTab
-                        Surface(
+                tabs.forEachIndexed { index, tab ->
+                    val selected = index == selectedTab
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onSelectTab(index) },
+                        color = if (selected) AppChrome.AccentSoft else Color.Transparent,
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { onSelectTab(index) },
-                            color = if (selected) AppChrome.AccentSoft else Color.Transparent,
-                            shape = RoundedCornerShape(14.dp),
+                                .fillMaxWidth()
+                                .padding(horizontal = 6.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                Text(
-                                    text = tab.title,
-                                    color = if (selected) AppChrome.TextPrimary else AppChrome.TextMuted,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    text = tab.hint,
-                                    color = if (selected) AppChrome.TextSecondary else AppChrome.TextSubtle,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                            Text(
+                                text = tab.title,
+                                color = if (selected) AppChrome.TextPrimary else AppChrome.TextMuted,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
                     }
                 }
@@ -218,7 +183,7 @@ private fun HomeHeader(
 private fun CategoryListSection(
     baseUrl: String,
     state: CategoryState,
-    categoryHint: String,
+    categoryTitle: String,
     onRetry: () -> Unit,
     onOpenDetail: (String, String) -> Unit,
 ) {
@@ -240,7 +205,7 @@ private fun CategoryListSection(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text(categoryHint, color = AppChrome.TextMuted, style = MaterialTheme.typography.labelLarge)
+                        Text(categoryTitle, color = AppChrome.TextMuted, style = MaterialTheme.typography.labelLarge)
                         Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
                         Button(
                             onClick = onRetry,
@@ -274,7 +239,7 @@ private fun CategoryListSection(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
-                                text = categoryHint,
+                                text = categoryTitle,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = AppChrome.AccentWarm,
                                 fontWeight = FontWeight.SemiBold,
