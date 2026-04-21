@@ -15,6 +15,23 @@
 
 ---
 
+### [2026-04-21 22:02] 管理端图片上传超时修复
+- Type: `implementation`
+- Summary:
+  - 定位根因：管理端公共请求实例默认 `timeout: 30000`，而图片上传接口沿用了默认配置；当多图上传或服务端同步处理时间超过 30 秒时，会被前端 Axios 提前中断并表现为 timeout。
+  - 为管理端图片上传接口显式关闭请求超时，保持与大文件/长耗时上传场景一致，避免上传仍在服务端处理时前端先失败。
+  - 新增管理端 API 回归测试，锁定 `/admin/images/upload` 必须携带 `timeout: 0`，防止后续重构时再次回退到默认超时。
+- Changed Files:
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/api/admin.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm test -- src/api/admin.spec.js` passed.
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-21 21:18] Android 短视频独立展示模式与轻量化悬浮按钮
 - Type: `implementation`
 - Summary:

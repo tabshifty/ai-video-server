@@ -22,7 +22,8 @@ export const updateAdminCollection = (id, payload) => request.put(`/admin/collec
 export const deleteAdminCollection = (id) => request.delete(`/admin/collections/${id}`)
 export const uploadAdminImages = (formData) =>
   request.post('/admin/images/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0
   })
 export const checkAdminImageUpload = (payload) => request.post('/admin/images/check', payload)
 export const getAdminImages = (params) => request.get('/admin/images', { params })
