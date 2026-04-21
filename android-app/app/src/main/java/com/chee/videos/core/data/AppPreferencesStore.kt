@@ -27,6 +27,8 @@ class AppPreferencesStore @Inject constructor(
         val accessToken = stringPreferencesKey("access_token")
         val refreshToken = stringPreferencesKey("refresh_token")
         val shortFitMode = stringPreferencesKey("short_fit_mode")
+        val shortDiscoverFitMode = stringPreferencesKey("short_discover_fit_mode")
+        val unifiedShortFitMode = stringPreferencesKey("unified_short_fit_mode")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -43,6 +45,14 @@ class AppPreferencesStore @Inject constructor(
 
     val shortFitModeFlow: Flow<VideoFitMode> = dataStore.data.map { prefs ->
         VideoFitMode.fromRaw(prefs[Keys.shortFitMode])
+    }
+
+    val shortDiscoverFitModeFlow: Flow<VideoFitMode> = dataStore.data.map { prefs ->
+        VideoFitMode.fromRaw(prefs[Keys.shortDiscoverFitMode])
+    }
+
+    val unifiedShortFitModeFlow: Flow<VideoFitMode> = dataStore.data.map { prefs ->
+        VideoFitMode.fromRaw(prefs[Keys.unifiedShortFitMode])
     }
 
     val endpointsFlow: Flow<List<ServerEndpoint>> = dataStore.data.map { prefs ->
@@ -80,6 +90,18 @@ class AppPreferencesStore @Inject constructor(
     suspend fun saveShortFitMode(mode: VideoFitMode) {
         dataStore.edit { prefs ->
             prefs[Keys.shortFitMode] = mode.rawValue
+        }
+    }
+
+    suspend fun saveShortDiscoverFitMode(mode: VideoFitMode) {
+        dataStore.edit { prefs ->
+            prefs[Keys.shortDiscoverFitMode] = mode.rawValue
+        }
+    }
+
+    suspend fun saveUnifiedShortFitMode(mode: VideoFitMode) {
+        dataStore.edit { prefs ->
+            prefs[Keys.unifiedShortFitMode] = mode.rawValue
         }
     }
 

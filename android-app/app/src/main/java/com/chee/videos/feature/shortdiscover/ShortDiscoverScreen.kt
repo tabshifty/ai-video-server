@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,14 +70,17 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.shortPosterContentScale
+import com.chee.videos.core.ui.shortVideoResizeMode
 import com.chee.videos.core.util.UrlBuilder
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.Job
@@ -244,8 +248,10 @@ fun ShortDiscoverScreen(
                 accessToken = accessToken,
                 items = uiState.items,
                 initialIndex = playerStartIndex,
+                fitMode = uiState.fitMode,
                 onClose = { playingVideoId = null },
                 onNeedMore = viewModel::loadMoreIfNeeded,
+                onToggleFitMode = viewModel::toggleFitMode,
             )
         }
     }
@@ -337,8 +343,10 @@ private fun ShortDiscoverPlayerOverlay(
     accessToken: String,
     items: List<VideoListItemDto>,
     initialIndex: Int,
+    fitMode: VideoFitMode,
     onClose: () -> Unit,
     onNeedMore: (Int) -> Unit,
+    onToggleFitMode: () -> Unit,
 ) {
     if (items.isEmpty() || initialIndex !in items.indices) {
         return
@@ -500,6 +508,7 @@ private fun ShortDiscoverPlayerOverlay(
                 item = item,
                 sharedPlayer = sharedPlayer,
                 active = pagerState.currentPage == page,
+                fitMode = fitMode,
                 pausedByUser = item.id in pausedByUserVideoIds,
                 posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
                 showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
@@ -513,6 +522,7 @@ private fun ShortDiscoverPlayerOverlay(
                     }
                     pausedByUserVideoIds = next
                 },
+                onToggleFitMode = onToggleFitMode,
             )
         }
 
@@ -580,11 +590,13 @@ private fun ShortDiscoverPlayerPage(
     item: VideoListItemDto,
     sharedPlayer: ExoPlayer,
     active: Boolean,
+    fitMode: VideoFitMode,
     pausedByUser: Boolean,
     posterUrl: String?,
     showPoster: Boolean,
     titleBottomPadding: androidx.compose.ui.unit.Dp,
     onTogglePauseByUser: () -> Unit,
+    onToggleFitMode: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var showCenterIndicator by remember { mutableStateOf(false) }
@@ -624,12 +636,13 @@ private fun ShortDiscoverPlayerPage(
                         useController = false
                         setShutterBackgroundColor(AndroidColor.BLACK)
                         setKeepContentOnPlayerReset(false)
-                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        resizeMode = shortVideoResizeMode(fitMode)
                         player = sharedPlayer
                     }
                 },
                 update = { view ->
                     view.player = sharedPlayer
+                    view.resizeMode = shortVideoResizeMode(fitMode)
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -638,7 +651,7 @@ private fun ShortDiscoverPlayerPage(
                     AsyncImage(
                         model = posterUrl,
                         contentDescription = "${item.title} 封面",
-                        contentScale = ContentScale.Crop,
+                        contentScale = shortPosterContentScale(fitMode),
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -649,7 +662,7 @@ private fun ShortDiscoverPlayerPage(
             AsyncImage(
                 model = posterUrl,
                 contentDescription = "${item.title} 封面",
-                contentScale = ContentScale.Crop,
+                contentScale = shortPosterContentScale(fitMode),
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -693,6 +706,20 @@ private fun ShortDiscoverPlayerPage(
                     )
                 }
             }
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 10.dp),
+        ) {
+            ShortVideoOverlayActionButton(
+                icon = Icons.Filled.AspectRatio,
+                active = false,
+                enabled = true,
+                onClick = onToggleFitMode,
+                contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
+            )
         }
 
         Text(

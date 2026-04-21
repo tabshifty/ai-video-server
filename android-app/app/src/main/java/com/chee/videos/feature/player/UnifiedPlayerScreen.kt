@@ -25,7 +25,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -68,15 +69,18 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.shortPosterContentScale
+import com.chee.videos.core.ui.shortVideoResizeMode
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -382,11 +386,14 @@ fun UnifiedPlayerScreen(
                             detail = uiState.detailByVideoId[item.id],
                             sharedPlayer = sharedPlayer,
                             active = isActive,
+                            fitMode = uiState.shortFitMode,
                             pausedByUser = item.id in pausedByUserVideoIds,
                             posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
                             showPoster = isActive && renderedVideoId != item.id,
+                            showFitModeToggle = isActive && shouldShowUnifiedPlayerShortFitToggle(item.type),
                             titleBottomPadding = 34.dp,
                             onTogglePauseByUser = togglePauseState,
+                            onToggleFitMode = viewModel::toggleShortFitMode,
                         )
                     }
                 }
@@ -401,7 +408,7 @@ fun UnifiedPlayerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
                         }
                         Text(
                             text = sourceLabel(source),
@@ -459,11 +466,14 @@ private fun UnifiedShortVideoPage(
     detail: VideoDetailDto?,
     sharedPlayer: ExoPlayer,
     active: Boolean,
+    fitMode: VideoFitMode,
     pausedByUser: Boolean,
     posterUrl: String?,
     showPoster: Boolean,
+    showFitModeToggle: Boolean,
     titleBottomPadding: androidx.compose.ui.unit.Dp,
     onTogglePauseByUser: () -> Unit,
+    onToggleFitMode: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var showCenterIndicator by remember { mutableStateOf(false) }
@@ -503,12 +513,13 @@ private fun UnifiedShortVideoPage(
                         useController = false
                         setShutterBackgroundColor(AndroidColor.BLACK)
                         setKeepContentOnPlayerReset(false)
-                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        resizeMode = shortVideoResizeMode(fitMode)
                         player = sharedPlayer
                     }
                 },
                 update = { view ->
                     view.player = sharedPlayer
+                    view.resizeMode = shortVideoResizeMode(fitMode)
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -517,7 +528,7 @@ private fun UnifiedShortVideoPage(
                     AsyncImage(
                         model = posterUrl,
                         contentDescription = "${item.title} 封面",
-                        contentScale = ContentScale.Crop,
+                        contentScale = shortPosterContentScale(fitMode),
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -528,7 +539,7 @@ private fun UnifiedShortVideoPage(
             AsyncImage(
                 model = posterUrl,
                 contentDescription = "${item.title} 封面",
-                contentScale = ContentScale.Crop,
+                contentScale = shortPosterContentScale(fitMode),
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -571,6 +582,22 @@ private fun UnifiedShortVideoPage(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            }
+        }
+
+        if (showFitModeToggle) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 10.dp),
+            ) {
+                ShortVideoOverlayActionButton(
+                    icon = Icons.Filled.AspectRatio,
+                    active = false,
+                    enabled = true,
+                    onClick = onToggleFitMode,
+                    contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
+                )
             }
         }
 

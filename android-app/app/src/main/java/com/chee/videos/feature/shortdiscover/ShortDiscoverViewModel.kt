@@ -2,8 +2,10 @@ package com.chee.videos.feature.shortdiscover
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.VideoListItemDto
+import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,17 +26,27 @@ data class ShortDiscoverUiState(
     val page: Int = 0,
     val totalCount: Int = 0,
     val items: List<VideoListItemDto> = emptyList(),
+    val fitMode: VideoFitMode = VideoFitMode.FILL,
     val errorMessage: String? = null,
 )
 
 @HiltViewModel
 class ShortDiscoverViewModel @Inject constructor(
     private val videoRepository: VideoRepository,
+    private val store: AppPreferencesStore,
     private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ShortDiscoverUiState())
     val uiState: StateFlow<ShortDiscoverUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            store.shortDiscoverFitModeFlow.collect { mode ->
+                _uiState.update { it.copy(fitMode = mode) }
+            }
+        }
+    }
 
     fun initialize(mode: String, value: String, title: String) {
         val normalizedMode = mode.trim().lowercase()
@@ -82,6 +94,14 @@ class ShortDiscoverViewModel @Inject constructor(
             return
         }
         loadPage(page = state.page + 1, append = true)
+    }
+
+    fun toggleFitMode() {
+        val next = if (_uiState.value.fitMode == VideoFitMode.FILL) VideoFitMode.FIT else VideoFitMode.FILL
+        _uiState.update { it.copy(fitMode = next) }
+        viewModelScope.launch {
+            store.saveShortDiscoverFitMode(next)
+        }
     }
 
     private fun loadPage(page: Int, append: Boolean) {

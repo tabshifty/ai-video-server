@@ -15,6 +15,31 @@
 
 ---
 
+### [2026-04-21 21:18] Android 短视频独立展示模式与轻量化悬浮按钮
+- Type: `implementation`
+- Summary:
+  - 首页短视频右侧交互按钮统一改为更浅的半透明悬浮底色，减少深色块对视频画面的遮挡，同时保留点赞、收藏、比例切换和详情入口。
+  - 为瀑布流短视频播放页新增独立的比例切换按钮与持久化偏好，播放层视频与封面统一跟随 `FILL/FIT` 模式切换，且不影响首页短视频的既有模式。
+  - 为“我的”里的统一播放器短视频新增独立比例切换偏好，仅在 `type == "short"` 时展示切换按钮，长视频与 AV 播放保持现有逻辑不变。
+  - 新增共享短视频展示映射与 JVM 回归测试，锁定封面缩放、播放器 `resizeMode` 以及统一播放器短视频切换按钮的展示条件。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/data/AppPreferencesStore.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/ShortVideoPresentation.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerShortState.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/ShortVideoPresentationTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/player/UnifiedPlayerShortFitToggleTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd /Users/chee/Documents/workspace/ai-project/ai-video-server/.worktrees/short-fit-modes/android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.ShortVideoPresentationTest --tests com.chee.videos.feature.player.UnifiedPlayerShortFitToggleTest --tests com.chee.videos.feature.shorts.ShortFeedPosterScaleTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd /Users/chee/Documents/workspace/ai-project/ai-video-server/.worktrees/short-fit-modes/android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-21 20:41] Android 短视频详情与 AV 详情沉浸式改版
 - Type: `implementation`
 - Summary:

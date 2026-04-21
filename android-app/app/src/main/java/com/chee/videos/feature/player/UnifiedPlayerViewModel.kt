@@ -2,8 +2,10 @@ package com.chee.videos.feature.player
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +31,7 @@ data class UnifiedPlayerUiState(
     val startVideoId: String = "",
     val startIndex: Int = 0,
     val items: List<PlayerVideoItem> = emptyList(),
+    val shortFitMode: VideoFitMode = VideoFitMode.FILL,
     val errorMessage: String? = null,
     val detailByVideoId: Map<String, VideoDetailDto> = emptyMap(),
     val detailLoadingVideoIds: Set<String> = emptySet(),
@@ -37,11 +40,20 @@ data class UnifiedPlayerUiState(
 @HiltViewModel
 class UnifiedPlayerViewModel @Inject constructor(
     private val videoRepository: VideoRepository,
+    private val store: AppPreferencesStore,
     private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UnifiedPlayerUiState())
     val uiState: StateFlow<UnifiedPlayerUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            store.unifiedShortFitModeFlow.collect { mode ->
+                _uiState.update { it.copy(shortFitMode = mode) }
+            }
+        }
+    }
 
     fun load(source: String, startVideoId: String, force: Boolean = false) {
         val current = _uiState.value
@@ -173,6 +185,14 @@ class UnifiedPlayerViewModel @Inject constructor(
         }
         viewModelScope.launch {
             videoRepository.reportHistory(videoId, watchSeconds, completed)
+        }
+    }
+
+    fun toggleShortFitMode() {
+        val next = if (_uiState.value.shortFitMode == VideoFitMode.FILL) VideoFitMode.FIT else VideoFitMode.FILL
+        _uiState.update { it.copy(shortFitMode = next) }
+        viewModelScope.launch {
+            store.saveUnifiedShortFitMode(next)
         }
     }
 
