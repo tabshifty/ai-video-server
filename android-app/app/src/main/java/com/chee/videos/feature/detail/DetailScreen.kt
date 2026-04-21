@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -68,6 +71,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.util.UrlBuilder
@@ -321,14 +325,14 @@ fun DetailScreen(
                             .background(pageBg)
                             .verticalScroll(rememberScrollState())
                             .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isAv) 16.dp else 12.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(220.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (isAv) Color(0xFF181B21) else Color(0xFF1A1C20)),
+                                .height(if (isAv) 260.dp else 220.dp)
+                                .clip(if (isAv) AppChrome.CardShape else RoundedCornerShape(14.dp))
+                                .background(if (isAv) AppChrome.CanvasRaised else Color(0xFF1A1C20)),
                         ) {
                             if (showPlayer) {
                                 if (useLongFormPlayerControls) {
@@ -391,51 +395,61 @@ fun DetailScreen(
                             }
                         }
 
-                        Text(
-                            detail.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = textColor,
-                        )
-                        Text(
-                            text = detail.description.orEmpty().ifBlank { "暂无简介" },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = textColor,
-                        )
+                        if (isAv) {
+                            AvDetailOverview(
+                                detail = detail,
+                                errorMessage = uiState.errorMessage,
+                                onToggleLike = viewModel::toggleLike,
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                onToggleDislike = viewModel::toggleDislike,
+                            )
+                        } else {
+                            Text(
+                                detail.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = textColor,
+                            )
+                            Text(
+                                text = detail.description.orEmpty().ifBlank { "暂无简介" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = textColor,
+                            )
 
-                        Text("播放数据", color = textColor)
-                        Text("时长：${if (isAv) formatDurationHms(detail.duration) else "${detail.duration} 秒"}", color = mutedTextColor)
-                        Text(
-                            "播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}",
-                            color = mutedTextColor,
-                        )
+                            Text("播放数据", color = textColor)
+                            Text("时长：${detail.duration} 秒", color = mutedTextColor)
+                            Text(
+                                "播放：${detail.viewsCount}  点赞：${detail.likesCount}  收藏：${detail.favoritesCount}",
+                                color = mutedTextColor,
+                            )
 
-                        if (detail.tags.orEmpty().isNotEmpty()) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                detail.tags.orEmpty().forEach { tag ->
-                                    FilterChip(
-                                        selected = false,
-                                        onClick = {},
-                                        label = { Text(tag) },
-                                    )
+                            if (detail.tags.orEmpty().isNotEmpty()) {
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    detail.tags.orEmpty().forEach { tag ->
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = {},
+                                            label = { Text(tag) },
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            Button(onClick = viewModel::toggleLike, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (detail.userState.isLiked) "取消点赞" else "点赞")
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(onClick = viewModel::toggleLike, modifier = Modifier.fillMaxWidth()) {
+                                    Text(if (detail.userState.isLiked) "取消点赞" else "点赞")
+                                }
+                                Button(onClick = viewModel::toggleFavorite, modifier = Modifier.fillMaxWidth()) {
+                                    Text(if (detail.userState.isFavorited) "取消收藏" else "收藏")
+                                }
+                                Button(onClick = viewModel::toggleDislike, modifier = Modifier.fillMaxWidth()) {
+                                    Text(if (detail.userState.isDisliked) "取消不喜欢" else "不喜欢")
+                                }
                             }
-                            Button(onClick = viewModel::toggleFavorite, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (detail.userState.isFavorited) "取消收藏" else "收藏")
-                            }
-                            Button(onClick = viewModel::toggleDislike, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (detail.userState.isDisliked) "取消不喜欢" else "不喜欢")
-                            }
-                        }
 
-                        if (!uiState.errorMessage.isNullOrBlank()) {
-                            Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                            if (!uiState.errorMessage.isNullOrBlank()) {
+                                Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
@@ -484,6 +498,233 @@ private fun PlayerOverlayIconButton(
             contentDescription = contentDescription,
             tint = if (enabled) Color(0xFFEDEFF4) else Color(0xFF7D8593),
         )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AvDetailOverview(
+    detail: VideoDetailDto,
+    errorMessage: String?,
+    onToggleLike: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onToggleDislike: () -> Unit,
+) {
+    val actionSpecs = buildDetailActionSpecs(detail.userState)
+    val primaryActions = actionSpecs.take(2)
+    val secondaryAction = actionSpecs.last()
+    val metaLine = buildList {
+        if (detail.duration > 0) {
+            add("时长 ${formatDurationHms(detail.duration)}")
+        }
+        detail.tags.orEmpty().firstOrNull()?.trim()?.takeIf { it.isNotBlank() }?.let { add(it) }
+    }.joinToString(" · ")
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Surface(
+            color = AppChrome.Surface,
+            shape = AppChrome.CardShape,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = detail.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = AppChrome.TextPrimary,
+                )
+                if (metaLine.isNotBlank()) {
+                    Text(
+                        text = metaLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppChrome.TextSecondary,
+                    )
+                }
+            }
+        }
+
+        Surface(
+            color = AppChrome.Surface,
+            shape = AppChrome.CardShape,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AvMetricCard(
+                    modifier = Modifier.weight(1f),
+                    label = "播放",
+                    value = detail.viewsCount.toString(),
+                )
+                AvMetricCard(
+                    modifier = Modifier.weight(1f),
+                    label = "点赞",
+                    value = detail.likesCount.toString(),
+                )
+                AvMetricCard(
+                    modifier = Modifier.weight(1f),
+                    label = "收藏",
+                    value = detail.favoritesCount.toString(),
+                )
+            }
+        }
+
+        Surface(
+            color = AppChrome.SurfaceElevated,
+            shape = AppChrome.CardShape,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AvSectionTitle("简介")
+                Text(
+                    text = detail.description.orEmpty().ifBlank { "暂无简介" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppChrome.TextSecondary,
+                )
+            }
+        }
+
+        if (detail.tags.orEmpty().isNotEmpty()) {
+            Surface(
+                color = AppChrome.Surface,
+                shape = AppChrome.CardShape,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    AvSectionTitle("标签")
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        detail.tags.orEmpty().forEach { tag ->
+                            Surface(
+                                color = AppChrome.SurfaceStrong,
+                                shape = AppChrome.PillShape,
+                            ) {
+                                Text(
+                                    text = tag,
+                                    color = AppChrome.TextSecondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            primaryActions.forEach { spec ->
+                DetailActionButton(
+                    modifier = Modifier.weight(1f),
+                    spec = spec,
+                    onClick = when (spec.action) {
+                        DetailAction.Like -> onToggleLike
+                        DetailAction.Favorite -> onToggleFavorite
+                        DetailAction.Dislike -> onToggleDislike
+                    },
+                )
+            }
+        }
+        DetailActionButton(
+            modifier = Modifier.fillMaxWidth(),
+            spec = secondaryAction,
+            onClick = onToggleDislike,
+        )
+
+        if (!errorMessage.isNullOrBlank()) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AvMetricCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+) {
+    Surface(
+        modifier = modifier,
+        color = AppChrome.SurfaceElevated,
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = value,
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = label,
+                color = AppChrome.TextMuted,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AvSectionTitle(title: String) {
+    Text(
+        text = title,
+        color = AppChrome.TextPrimary,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+@Composable
+private fun DetailActionButton(
+    modifier: Modifier = Modifier,
+    spec: DetailActionSpec,
+    onClick: () -> Unit,
+) {
+    val containerColor = when (spec.tone) {
+        DetailActionTone.Primary -> if (spec.active) AppChrome.Accent else AppChrome.SurfaceStrong
+        DetailActionTone.SecondaryDanger -> if (spec.active) Color(0xFF5A0E1B) else AppChrome.SurfaceElevated
+    }
+
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = AppChrome.TextPrimary,
+        ),
+    ) {
+        Text(text = spec.label)
     }
 }
 

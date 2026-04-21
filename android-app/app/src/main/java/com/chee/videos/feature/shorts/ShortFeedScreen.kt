@@ -99,6 +99,10 @@ import kotlinx.coroutines.launch
 
 private val ShortsActionBg = AppChrome.Surface.copy(alpha = 0.82f)
 private val ShortsActionActiveTint = AppChrome.AccentStrong
+private val ShortDetailSheetBg = AppChrome.CanvasRaised
+private val ShortDetailCardBg = AppChrome.Surface
+private val ShortDetailCardMutedBg = AppChrome.SurfaceElevated
+private val ShortDetailPillBg = AppChrome.SurfaceStrong
 private const val ProgressRevealDelayMs = 140L
 
 internal fun shortPosterContentScale(fitMode: VideoFitMode): ContentScale {
@@ -337,6 +341,9 @@ fun ShortFeedScreen(
                     detailSheetOpen = sheetOpen,
                     pagerSettled = progressBarSettled,
                 )
+                val showActionRail = shouldShowShortFeedActionRail(
+                    detailSheetOpen = sheetOpen,
+                )
 
                 Box(
                     modifier = Modifier
@@ -368,6 +375,7 @@ fun ShortFeedScreen(
                                 isLiked = detail?.userState?.isLiked == true,
                                 isFavorited = detail?.userState?.isFavorited == true,
                                 actionBusy = item.id in uiState.actionBusyVideoIds,
+                                showActionRail = showActionRail,
                                 onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
                                 onToggleLike = { viewModel.toggleLike(item.id) },
                                 onToggleFavorite = { viewModel.toggleFavorite(item.id) },
@@ -482,6 +490,7 @@ private fun VerticalVideoPage(
     isLiked: Boolean,
     isFavorited: Boolean,
     actionBusy: Boolean,
+    showActionRail: Boolean,
     onTogglePauseByUser: () -> Boolean,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -605,41 +614,46 @@ private fun VerticalVideoPage(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        AnimatedVisibility(
+            visible = showActionRail,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.CenterEnd),
         ) {
-            ShortsActionButton(
-                icon = Icons.Filled.ThumbUp,
-                active = isLiked,
-                enabled = !actionBusy,
-                onClick = onToggleLike,
-                contentDescription = "喜欢",
-            )
-            ShortsActionButton(
-                icon = Icons.Filled.Favorite,
-                active = isFavorited,
-                enabled = !actionBusy,
-                onClick = onToggleFavorite,
-                contentDescription = "收藏",
-            )
-            ShortsActionButton(
-                icon = Icons.Filled.AspectRatio,
-                active = false,
-                enabled = true,
-                onClick = onToggleMode,
-                contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
-            )
-            ShortsActionButton(
-                icon = Icons.Filled.Info,
-                active = false,
-                enabled = true,
-                onClick = onOpenDetail,
-                contentDescription = "详情",
-            )
+            Column(
+                modifier = Modifier.padding(end = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ShortsActionButton(
+                    icon = Icons.Filled.ThumbUp,
+                    active = isLiked,
+                    enabled = !actionBusy,
+                    onClick = onToggleLike,
+                    contentDescription = "喜欢",
+                )
+                ShortsActionButton(
+                    icon = Icons.Filled.Favorite,
+                    active = isFavorited,
+                    enabled = !actionBusy,
+                    onClick = onToggleFavorite,
+                    contentDescription = "收藏",
+                )
+                ShortsActionButton(
+                    icon = Icons.Filled.AspectRatio,
+                    active = false,
+                    enabled = true,
+                    onClick = onToggleMode,
+                    contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
+                )
+                ShortsActionButton(
+                    icon = Icons.Filled.Info,
+                    active = false,
+                    enabled = true,
+                    onClick = onOpenDetail,
+                    contentDescription = "详情",
+                )
+            }
         }
 
         Column(
@@ -682,7 +696,7 @@ private fun ShortDetailSheet(
 ) {
     Surface(
         modifier = modifier,
-        color = Color(0xFF090B11),
+        color = ShortDetailSheetBg,
         shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
         tonalElevation = 0.dp,
         shadowElevation = 10.dp,
@@ -733,104 +747,132 @@ private fun ShortDetailSheet(
                 else -> {
                     val actorNames = extractActorNames(detail)
                     val dislikeActive = detail.userState.isDisliked
+                    val metaLine = buildList {
+                        if (actorNames.isNotEmpty()) {
+                            add("演员 ${actorNames.joinToString(" / ")}")
+                        }
+                        if (detail.duration > 0) {
+                            add("时长 ${formatShortPlaybackTimeHms(detail.duration.toLong() * 1000L)}")
+                        }
+                    }.joinToString(" · ")
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Text(
-                            text = detail.title,
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-
                         Surface(
-                            color = Color(0xFF121722),
-                            shape = RoundedCornerShape(14.dp),
+                            color = ShortDetailCardBg,
+                            shape = AppChrome.CardShape,
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text("播放 ${detail.viewsCount}", color = Color(0xFFE2E7F0), style = MaterialTheme.typography.bodySmall)
-                                Text("点赞 ${detail.likesCount}", color = Color(0xFFE2E7F0), style = MaterialTheme.typography.bodySmall)
-                                Text("收藏 ${detail.favoritesCount}", color = Color(0xFFE2E7F0), style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-
-                        if (!detail.description.isNullOrBlank()) {
-                            Surface(
-                                color = Color(0xFF10141D),
-                                shape = RoundedCornerShape(14.dp),
+                                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
                                 Text(
-                                    text = detail.description,
-                                    color = Color(0xFFD3D8E3),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    text = detail.title,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
                                 )
-                            }
-                        }
-
-                        if (actorNames.isNotEmpty()) {
-                            Text(
-                                text = "演员：${actorNames.joinToString(" / ")}",
-                                color = Color(0xFFE9EDF5),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-
-                        if (detail.collections.orEmpty().isNotEmpty()) {
-                            Text(
-                                text = "关联合集",
-                                color = Color(0xFFE9EDF5),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                detail.collections.orEmpty().forEach { collection ->
-                                    AssistChip(
-                                        onClick = { onOpenCollection(collection) },
-                                        enabled = true,
-                                        label = { Text(collection.name) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = Color(0xFF1D2330),
-                                            labelColor = Color(0xFFF1F4FB),
-                                        ),
+                                if (metaLine.isNotBlank()) {
+                                    Text(
+                                        text = metaLine,
+                                        color = AppChrome.TextSecondary,
+                                        style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
                             }
                         }
 
-                        if (detail.tags.orEmpty().isNotEmpty()) {
-                            Text(
-                                text = "标签",
-                                color = Color(0xFFE9EDF5),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                        Surface(
+                            color = ShortDetailCardBg,
+                            shape = AppChrome.CardShape,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                detail.tags.orEmpty().forEach { tag ->
-                                    AssistChip(
-                                        onClick = { onOpenTag(tag) },
-                                        enabled = true,
-                                        label = { Text(tag) },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = Color(0xFF171B25),
-                                            labelColor = Color(0xFFCED5E4),
-                                        ),
-                                    )
+                                ShortDetailMetricCard(
+                                    modifier = Modifier.weight(1f),
+                                    label = "播放",
+                                    value = detail.viewsCount.toString(),
+                                )
+                                ShortDetailMetricCard(
+                                    modifier = Modifier.weight(1f),
+                                    label = "点赞",
+                                    value = detail.likesCount.toString(),
+                                )
+                                ShortDetailMetricCard(
+                                    modifier = Modifier.weight(1f),
+                                    label = "收藏",
+                                    value = detail.favoritesCount.toString(),
+                                )
+                            }
+                        }
+
+                        ShortDetailInfoCard(
+                            title = "简介",
+                            body = detail.description.orEmpty().ifBlank { "暂无简介" },
+                        )
+
+                        if (detail.collections.orEmpty().isNotEmpty()) {
+                            Surface(
+                                color = ShortDetailCardBg,
+                                shape = AppChrome.CardShape,
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    ShortDetailSectionTitle("关联合集")
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        detail.collections.orEmpty().forEach { collection ->
+                                            ShortDetailPill(
+                                                text = collection.name,
+                                                emphasized = true,
+                                                onClick = { onOpenCollection(collection) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (detail.tags.orEmpty().isNotEmpty()) {
+                            Surface(
+                                color = ShortDetailCardBg,
+                                shape = AppChrome.CardShape,
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    ShortDetailSectionTitle("标签")
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        detail.tags.orEmpty().forEach { tag ->
+                                            ShortDetailPill(
+                                                text = tag,
+                                                emphasized = false,
+                                                onClick = { onOpenTag(tag) },
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -840,7 +882,7 @@ private fun ShortDetailSheet(
                             enabled = !actionBusy,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (dislikeActive) Color(0xFF5A0E1B) else Color(0xFF2B2E36),
+                                containerColor = if (dislikeActive) Color(0xFF5A0E1B) else ShortDetailCardMutedBg,
                                 contentColor = Color.White,
                             ),
                         ) {
@@ -862,6 +904,96 @@ private fun ShortDetailSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ShortDetailMetricCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+) {
+    Surface(
+        modifier = modifier,
+        color = ShortDetailCardMutedBg,
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = value,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = label,
+                color = AppChrome.TextMuted,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShortDetailInfoCard(
+    title: String,
+    body: String,
+) {
+    Surface(
+        color = ShortDetailCardBg,
+        shape = AppChrome.CardShape,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ShortDetailSectionTitle(title)
+            Text(
+                text = body,
+                color = AppChrome.TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShortDetailSectionTitle(title: String) {
+    Text(
+        text = title,
+        color = Color.White,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+@Composable
+private fun ShortDetailPill(
+    text: String,
+    emphasized: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(AppChrome.PillShape)
+            .clickable(onClick = onClick)
+            .background(if (emphasized) AppChrome.AccentSoft else ShortDetailPillBg)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = text,
+            color = if (emphasized) Color.White else AppChrome.TextSecondary,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 

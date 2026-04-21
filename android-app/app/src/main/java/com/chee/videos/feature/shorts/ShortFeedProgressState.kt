@@ -7,3 +7,9 @@ internal fun shouldShowShortFeedProgressBar(
 ): Boolean {
     return !currentVideoId.isNullOrBlank() && !detailSheetOpen && pagerSettled
 }
+
+internal fun shouldShowShortFeedActionRail(
+    detailSheetOpen: Boolean,
+): Boolean {
+    return !detailSheetOpen
+}

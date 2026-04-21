@@ -15,6 +15,27 @@
 
 ---
 
+### [2026-04-21 20:41] Android 短视频详情与 AV 详情沉浸式改版
+- Type: `implementation`
+- Summary:
+  - 短视频播放页新增右侧操作列显隐判定，详情层打开时自动隐藏点赞、收藏、比例切换和详情按钮，关闭后恢复，减少详情阅读时的画面干扰。
+  - 重构短视频详情层视觉层级：改为标题头部卡、三列统计卡、简介卡、合集与标签胶囊区，并将“不喜欢”下沉为次级危险操作，整体统一为深色影院感。
+  - 新增 AV 详情页动作规格模型，非全屏 AV 详情改为主视觉播放器 + 标题元信息卡 + 数据卡 + 简介卡 + 主次操作区的分层布局，保留原有播放、全屏和交互能力。
+  - 新增 Android 单元测试锁定短视频操作列显隐规则与 AV 详情操作规格，防止后续回归到原来的平铺式交互结构。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedProgressState.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailActionState.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedActionRailVisibilityTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/detail/DetailActionSpecTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.shorts.ShortFeedActionRailVisibilityTest --tests com.chee.videos.feature.shorts.ShortFeedProgressVisibilityTest --tests com.chee.videos.feature.detail.DetailActionSpecTest --tests com.chee.videos.feature.detail.LongFormPlaybackSessionTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-21 19:39] Android 首页导航压缩：移除说明文案并扩大短视频首屏
 - Type: `implementation`
 - Summary:
