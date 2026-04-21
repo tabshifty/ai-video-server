@@ -192,14 +192,16 @@ type AdminImageActor struct {
 }
 
 type AdminImageCollection struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CoverURL    string    `json:"cover_url"`
-	SortOrder   int       `json:"sort_order"`
-	Active      bool      `json:"active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             uuid.UUID  `json:"id"`
+	Name           string     `json:"name"`
+	Description    string     `json:"description"`
+	CoverURL       string     `json:"cover_url"`
+	ManualCoverURL string     `json:"manual_cover_url"`
+	CoverImageID   *uuid.UUID `json:"cover_image_id"`
+	SortOrder      int        `json:"sort_order"`
+	Active         bool       `json:"active"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 type AdminImageDetail struct {
@@ -236,9 +238,10 @@ type AdminImageFilter struct {
 }
 
 type AdminImageCollectionInput struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	CoverURL    string `json:"cover_url"`
-	SortOrder   int    `json:"sort_order"`
-	Active      bool   `json:"active"`
+	Name         string     `json:"name"`
+	Description  string     `json:"description"`
+	CoverURL     string     `json:"cover_url"`
+	CoverImageID *uuid.UUID `json:"cover_image_id"`
+	SortOrder    int        `json:"sort_order"`
+	Active       bool       `json:"active"`
 }
