@@ -32,7 +32,7 @@ fun ShortVideoBottomProgressBar(
     isScrubbing: Boolean,
     scrubTargetMs: Long,
     onScrubStart: () -> Unit,
-    onScrubToFraction: (Float) -> Unit,
+    onScrubByDeltaFraction: (Float) -> Unit,
     onScrubEnd: () -> Unit,
 ) {
     val barHeight = animateDpAsState(
@@ -72,16 +72,17 @@ fun ShortVideoBottomProgressBar(
                     if (!canSeek) {
                         return@pointerInput
                     }
+                    var totalDragPx = 0f
                     detectHorizontalDragGestures(
-                        onDragStart = { offset ->
+                        onDragStart = {
                             onScrubStart()
-                            val width = size.width.toFloat().coerceAtLeast(1f)
-                            onScrubToFraction((offset.x / width).coerceIn(0f, 1f))
+                            totalDragPx = 0f
                         },
-                        onHorizontalDrag = { change, _ ->
+                        onHorizontalDrag = { change, dragAmount ->
                             change.consume()
                             val width = size.width.toFloat().coerceAtLeast(1f)
-                            onScrubToFraction((change.position.x / width).coerceIn(0f, 1f))
+                            totalDragPx += dragAmount
+                            onScrubByDeltaFraction((totalDragPx / width).coerceIn(-1f, 1f))
                         },
                         onDragEnd = onScrubEnd,
                         onDragCancel = onScrubEnd,
@@ -126,4 +127,17 @@ private fun shortProgressFraction(positionMs: Long, durationMs: Long): Float {
         return 0f
     }
     return (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+}
+
+internal fun shortScrubTargetFromDelta(
+    anchorMs: Long,
+    durationMs: Long,
+    deltaFraction: Float,
+): Long {
+    if (durationMs <= 0L) {
+        return 0L
+    }
+    val clampedAnchor = anchorMs.coerceIn(0L, durationMs)
+    val deltaMs = (durationMs.toDouble() * deltaFraction.toDouble()).toLong()
+    return (clampedAnchor + deltaMs).coerceIn(0L, durationMs)
 }

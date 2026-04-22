@@ -15,6 +15,25 @@
 
 ---
 
+### [2026-04-23 05:57] 短视频进度条改为增量拖动，不再按首次触点跳转
+- Type: `implementation`
+- Summary:
+  - 重构 app 端短视频底部进度条手势语义：`onDragStart` 不再把进度映射到首次触点位置，仅进入拖动态；拖动过程中只按位移累计占比计算增量。
+  - 首页短视频、瀑布流短视频和我的短视频统一播放器三处统一引入 `scrubAnchorMs` 锚点，拖动目标时间由 `anchor + duration * deltaFraction` 计算并做边界钳制，避免按下瞬间跳帧。
+  - 新增短视频进度条数学回归测试，锁定“无拖动不跳转、正向/反向拖动按增量计算、越界钳制”的行为，防止后续回退到绝对触点跳转逻辑。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/ShortVideoBottomProgressBar.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/ShortVideoBottomProgressBarScrubMathTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.ShortVideoBottomProgressBarScrubMathTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-22 16:27] 增加 Android 开发产物忽略规则
 - Type: `docs`
 - Summary:

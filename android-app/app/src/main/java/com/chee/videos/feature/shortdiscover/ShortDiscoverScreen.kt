@@ -79,6 +79,7 @@ import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.shortScrubTargetFromDelta
 import com.chee.videos.core.ui.shortPosterContentScale
 import com.chee.videos.core.ui.shortVideoResizeMode
 import com.chee.videos.core.util.UrlBuilder
@@ -379,6 +380,7 @@ private fun ShortDiscoverPlayerOverlay(
     var durationMs by remember(currentVideoId) { mutableStateOf(0L) }
     var positionMs by remember(currentVideoId) { mutableStateOf(0L) }
     var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
+    var scrubAnchorMs by remember(currentVideoId) { mutableStateOf(0L) }
     var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
@@ -422,6 +424,7 @@ private fun ShortDiscoverPlayerOverlay(
             durationMs = 0L
             positionMs = 0L
             isScrubbingShort = false
+            scrubAnchorMs = 0L
             scrubTargetMs = 0L
             return@LaunchedEffect
         }
@@ -561,13 +564,18 @@ private fun ShortDiscoverPlayerOverlay(
                         return@ShortVideoBottomProgressBar
                     }
                     isScrubbingShort = true
-                    scrubTargetMs = positionMs.coerceIn(0L, durationMs)
+                    scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
+                    scrubTargetMs = scrubAnchorMs
                 },
-                onScrubToFraction = { fraction ->
+                onScrubByDeltaFraction = { deltaFraction ->
                     if (durationMs <= 0L || !isScrubbingShort) {
                         return@ShortVideoBottomProgressBar
                     }
-                    scrubTargetMs = (durationMs * fraction).toLong().coerceIn(0L, durationMs)
+                    scrubTargetMs = shortScrubTargetFromDelta(
+                        anchorMs = scrubAnchorMs,
+                        durationMs = durationMs,
+                        deltaFraction = deltaFraction,
+                    )
                 },
                 onScrubEnd = {
                     if (!isScrubbingShort) {

@@ -92,6 +92,7 @@ import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.ui.shortPosterContentScale as sharedShortPosterContentScale
+import com.chee.videos.core.ui.shortScrubTargetFromDelta
 import com.chee.videos.core.ui.shortVideoResizeMode
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
@@ -211,6 +212,7 @@ fun ShortFeedScreen(
                 var durationMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var positionMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
+                var scrubAnchorMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var progressBarSettled by remember(currentVideoId) { mutableStateOf(false) }
 
@@ -283,6 +285,7 @@ fun ShortFeedScreen(
                         durationMs = 0L
                         positionMs = 0L
                         isScrubbingShort = false
+                        scrubAnchorMs = 0L
                         scrubTargetMs = 0L
                         progressBarSettled = false
                         return@LaunchedEffect
@@ -415,13 +418,18 @@ fun ShortFeedScreen(
                                     return@ShortVideoBottomProgressBar
                                 }
                                 isScrubbingShort = true
-                                scrubTargetMs = positionMs.coerceIn(0L, durationMs)
+                                scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
+                                scrubTargetMs = scrubAnchorMs
                             },
-                            onScrubToFraction = { fraction ->
+                            onScrubByDeltaFraction = { deltaFraction ->
                                 if (durationMs <= 0L || !isScrubbingShort) {
                                     return@ShortVideoBottomProgressBar
                                 }
-                                scrubTargetMs = (durationMs * fraction).toLong().coerceIn(0L, durationMs)
+                                scrubTargetMs = shortScrubTargetFromDelta(
+                                    anchorMs = scrubAnchorMs,
+                                    durationMs = durationMs,
+                                    deltaFraction = deltaFraction,
+                                )
                             },
                             onScrubEnd = {
                                 if (!isScrubbingShort) {
