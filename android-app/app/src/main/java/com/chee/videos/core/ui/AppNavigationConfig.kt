@@ -19,5 +19,6 @@ internal val homeContentTabs = listOf(
 
 internal val rootNavigationTabs = listOf(
     RootNavigationTabSpec(route = "home", label = "首页"),
+    RootNavigationTabSpec(route = "image-collections", label = "图集"),
     RootNavigationTabSpec(route = "mine", label = "我的"),
 )

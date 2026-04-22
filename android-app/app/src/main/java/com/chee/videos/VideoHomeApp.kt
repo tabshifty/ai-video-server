@@ -97,7 +97,7 @@ private fun AuthenticatedNav(
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route.orEmpty()
-    val showBottomBar = currentRoute == "home" || currentRoute == "mine"
+    val showBottomBar = rootNavigationTabs.any { it.route == currentRoute }
 
     Scaffold(
         containerColor = AppChrome.Canvas,
@@ -185,9 +185,6 @@ private fun AuthenticatedNav(
                                 "short-discover/${Uri.encode(mode)}/${Uri.encode(value)}/${Uri.encode(title)}",
                             )
                         },
-                        onOpenImageCollections = {
-                            navController.navigate("image-collections")
-                        },
                         onOpenImageCollectionViewer = { route ->
                             navController.navigate(route)
                         },
@@ -262,7 +259,7 @@ private fun AuthenticatedNav(
             composable("image-collections") {
                 ImageCollectionsScreen(
                     baseUrl = baseUrl,
-                    onBack = { navController.popBackStack() },
+                    onBack = null,
                     onOpenCollection = { collectionId ->
                         navController.navigate("image-collections/$collectionId")
                     },

@@ -10,11 +10,15 @@ import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+private const val imageCollectionsSearchDebounceMillis = 350L
 
 data class ImageCollectionsUiState(
     val loading: Boolean = false,
@@ -22,6 +26,7 @@ data class ImageCollectionsUiState(
     val loaded: Boolean = false,
     val page: Int = 0,
     val totalCount: Int = 0,
+    val query: String = "",
     val items: List<ImageCollectionListItemDto> = emptyList(),
     val errorMessage: String? = null,
 )
@@ -40,36 +45,41 @@ class ImageCollectionsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ImageCollectionsUiState())
     val uiState: StateFlow<ImageCollectionsUiState> = _uiState.asStateFlow()
+    private var searchJob: Job? = null
+    private var requestVersion: Long = 0
 
     fun load(force: Boolean = false) {
         val state = _uiState.value
         if (state.loading || (state.loaded && !force)) {
             return
         }
-        _uiState.update {
-            it.copy(
-                loading = true,
-                errorMessage = null,
-                page = if (force) 0 else it.page,
-                totalCount = if (force) 0 else it.totalCount,
-                items = if (force) emptyList() else it.items,
-            )
+        if (force) {
+            _uiState.update { resetImageCollectionsForQuery(it, it.query) }
+        } else {
+            _uiState.update { it.copy(loading = true, errorMessage = null) }
         }
-        loadPage(page = 1, append = false)
+        requestVersion += 1
+        loadPage(page = 1, append = false, requestVersion = requestVersion)
     }
 
     fun retry() {
-        _uiState.update {
-            it.copy(
-                loading = true,
-                loadingMore = false,
-                errorMessage = null,
-                page = 0,
-                totalCount = 0,
-                items = emptyList(),
-            )
+        _uiState.update { resetImageCollectionsForQuery(it, it.query) }
+        requestVersion += 1
+        loadPage(page = 1, append = false, requestVersion = requestVersion)
+    }
+
+    fun onQueryChanged(query: String) {
+        if (query == _uiState.value.query) {
+            return
         }
-        loadPage(page = 1, append = false)
+        _uiState.update { resetImageCollectionsForQuery(it, query) }
+        searchJob?.cancel()
+        requestVersion += 1
+        val nextVersion = requestVersion
+        searchJob = viewModelScope.launch {
+            delay(imageCollectionsSearchDebounceMillis)
+            loadPage(page = 1, append = false, requestVersion = nextVersion)
+        }
     }
 
     fun loadMoreIfNeeded(currentIndex: Int) {
@@ -83,16 +93,20 @@ class ImageCollectionsViewModel @Inject constructor(
         if (state.totalCount > 0 && state.items.size >= state.totalCount) {
             return
         }
-        loadPage(page = state.page + 1, append = true)
+        loadPage(page = state.page + 1, append = true, requestVersion = requestVersion)
     }
 
-    private fun loadPage(page: Int, append: Boolean) {
+    private fun loadPage(page: Int, append: Boolean, requestVersion: Long) {
         viewModelScope.launch {
             if (append) {
                 _uiState.update { it.copy(loadingMore = true, errorMessage = null) }
             }
-            videoRepository.fetchImageCollections(page = page, pageSize = 24)
+            val query = normalizeImageCollectionsQuery(_uiState.value.query)
+            videoRepository.fetchImageCollections(query = query, page = page, pageSize = 24)
                 .onSuccess { payload ->
+                    if (requestVersion != this@ImageCollectionsViewModel.requestVersion) {
+                        return@onSuccess
+                    }
                     _uiState.update {
                         val mergedItems = if (append) {
                             (it.items + payload.items).distinctBy { row -> row.id }
@@ -111,6 +125,9 @@ class ImageCollectionsViewModel @Inject constructor(
                     }
                 }
                 .onFailure { err ->
+                    if (requestVersion != this@ImageCollectionsViewModel.requestVersion) {
+                        return@onFailure
+                    }
                     handleAuthError(err)
                     _uiState.update {
                         it.copy(
@@ -130,6 +147,33 @@ class ImageCollectionsViewModel @Inject constructor(
                 authRepository.logoutLocal()
             }
         }
+    }
+}
+
+internal fun normalizeImageCollectionsQuery(raw: String): String? {
+    val normalized = raw.trim()
+    return normalized.takeIf { it.isNotEmpty() }
+}
+
+internal fun resetImageCollectionsForQuery(
+    state: ImageCollectionsUiState,
+    query: String,
+): ImageCollectionsUiState = state.copy(
+    loading = true,
+    loadingMore = false,
+    loaded = false,
+    page = 0,
+    totalCount = 0,
+    query = query,
+    items = emptyList(),
+    errorMessage = null,
+)
+
+internal fun imageCollectionsEmptyMessage(query: String): String {
+    return if (normalizeImageCollectionsQuery(query) == null) {
+        "暂无可用图片合集"
+    } else {
+        "没有找到相关图集"
     }
 }
 

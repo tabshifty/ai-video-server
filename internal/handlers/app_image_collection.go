@@ -20,8 +20,9 @@ func (a *API) AppImageCollections(c *gin.Context) {
 
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 20)
+	query := c.Query("q")
 
-	result, err := a.appSvc.ImageCollections(c.Request.Context(), page, pageSize)
+	result, err := a.appSvc.ImageCollections(c.Request.Context(), query, page, pageSize)
 	if err != nil {
 		response.Error(c, 1051, err.Error())
 		return

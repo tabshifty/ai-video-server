@@ -123,7 +123,7 @@ func (s *AppService) ShortDiscover(
 	}, nil
 }
 
-func (s *AppService) ImageCollections(ctx context.Context, page, pageSize int) (models.PageResult[models.ImageCollectionListItem], error) {
+func (s *AppService) ImageCollections(ctx context.Context, q string, page, pageSize int) (models.PageResult[models.ImageCollectionListItem], error) {
 	if page < 1 {
 		page = 1
 	}
@@ -134,7 +134,7 @@ func (s *AppService) ImageCollections(ctx context.Context, page, pageSize int) (
 		pageSize = 100
 	}
 	offset := (page - 1) * pageSize
-	items, total, err := s.repo.ListAppImageCollections(ctx, pageSize, offset)
+	items, total, err := s.repo.ListAppImageCollections(ctx, q, pageSize, offset)
 	if err != nil {
 		return models.PageResult[models.ImageCollectionListItem]{}, err
 	}

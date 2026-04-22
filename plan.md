@@ -218,6 +218,34 @@
   - 在短视频页提取统一的封面缩放映射 `shortPosterContentScale(fitMode)`，使封面图与视频共用同一套 `VideoFitMode` 语义：`FILL -> Crop`，`FIT -> Fit`。
   - 当前页显示中的封面与非当前页预览封面统一接入该映射，避免只修一条分支后再次出现模式不一致。
   - 新增 Android 单元测试锁定短视频封面缩放映射，防止后续改动回归。
+
+### [2026-04-22 15:28] App 图集入口迁移到底栏并支持标题搜索
+- Type: `implementation`
+- Summary:
+  - 将 app 底部导航扩展为 `首页 / 图集 / 我的` 三项，图集列表页作为一级 tab 展示；首页短视频层移除原先占空间的图片合集悬浮入口，把更多首屏空间还给短视频。
+  - 为 app 图集瀑布流增加标题搜索框，输入后通过防抖自动触发服务端标题检索，清空搜索可回到默认图集列表，并保持现有沉浸式图集 viewer 入口与行为不变。
+  - 扩展 `/api/v1/image-collections` 支持 `q` 参数，后端仅按合集标题做大小写不敏感过滤，同时保留现有启用状态、可浏览图片和分页排序约束。
+  - 新增回归测试，锁定底部导航三项结构、图集搜索状态重置规则，以及后端标题搜索模式生成，防止入口回退到首页浮层或搜索参数丢失。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/AppNavigationConfig.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionsScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionsViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/AppNavigationConfigTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/imagecollections/ImageCollectionsSearchStateTest.kt`
+  - `internal/handlers/app_image_collection.go`
+  - `internal/repository/app_image_collection_repository.go`
+  - `internal/repository/app_image_collection_repository_search_test.go`
+  - `internal/services/app.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
 - Changed Files:
   - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
   - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedPosterScaleTest.kt`
