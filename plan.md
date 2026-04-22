@@ -15,6 +15,23 @@
 
 ---
 
+### [2026-04-23 06:10] App 图集预览支持按尺寸缩放与当前缩略图复位
+- Type: `implementation`
+- Summary:
+  - 为 app 图集预览主图增加双指缩放与平移能力，最小缩放固定 `0.6x`，并按图片原始尺寸与容器尺寸动态计算最大缩放比例。
+  - 对“小图”启用放大限制：当图片宽高都不超过当前可视容器时，最大缩放固定为 `1x`，仅支持缩小，不再允许放大。
+  - 保留双击显隐 chrome 的既有行为，同时新增“点击当前缩略图恢复尺寸”交互：点击当前项时直接回到 `1x` 并居中；点击其他缩略图切页时也默认 `1x` 展示。
+  - 新增图集 viewer 缩放数学回归测试，锁定小图禁放大、动态上限计算、低倍率回正与高倍率平移边界钳制，避免后续回退。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionsScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/imagecollections/ImageCollectionViewerZoomMathTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.imagecollections.ImageCollectionViewerZoomMathTest --tests com.chee.videos.feature.imagecollections.ImageCollectionViewerChromeTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 05:57] 短视频进度条改为增量拖动，不再按首次触点跳转
 - Type: `implementation`
 - Summary:

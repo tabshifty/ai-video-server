@@ -4,11 +4,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -53,10 +55,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +73,8 @@ import com.chee.videos.core.model.ImageCollectionListItemDto
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.util.UrlBuilder
 import kotlin.math.absoluteValue
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.launch
 
 @Composable
@@ -389,9 +396,13 @@ private fun ImageCollectionViewerContent(
     val thumbState = rememberLazyListState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var chromeVisible by rememberSaveable(detail.id) { mutableStateOf(true) }
+    var imageScale by rememberSaveable(detail.id) { mutableStateOf(1f) }
+    var imageOffset by rememberSaveable(detail.id) { mutableStateOf(Offset.Zero) }
 
     LaunchedEffect(pagerState.currentPage) {
         thumbState.animateScrollToItem(pagerState.currentPage)
+        imageScale = 1f
+        imageOffset = Offset.Zero
     }
 
     Box(
@@ -399,30 +410,109 @@ private fun ImageCollectionViewerContent(
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { page ->
-            val image = images[page]
-            val viewUrl = remember(baseUrl, image.viewUrl) { resolveImageUrl(baseUrl, image.viewUrl) }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(chromeVisible) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                chromeVisible = toggleImageCollectionViewerChrome(chromeVisible)
-                            },
-                        )
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                AsyncImage(
-                    model = viewUrl,
-                    contentDescription = image.title,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val density = LocalDensity.current
+            val containerWidthPx = with(density) { maxWidth.toPx() }
+            val containerHeightPx = with(density) { maxHeight.toPx() }
+            val currentImage = images[pagerState.currentPage]
+            val maxScale = remember(currentImage.id, containerWidthPx, containerHeightPx) {
+                imageViewerMaxScale(
+                    imageWidthPx = currentImage.width.toFloat(),
+                    imageHeightPx = currentImage.height.toFloat(),
+                    containerWidthPx = containerWidthPx,
+                    containerHeightPx = containerHeightPx,
                 )
+            }
+            val displayScale = imageScale.coerceIn(ImageViewerMinScale, maxScale)
+            val displayOffset = imageViewerClampOffset(
+                offset = imageOffset,
+                scale = displayScale,
+                imageWidthPx = currentImage.width.toFloat(),
+                imageHeightPx = currentImage.height.toFloat(),
+                containerWidthPx = containerWidthPx,
+                containerHeightPx = containerHeightPx,
+            )
+
+            HorizontalPager(
+                state = pagerState,
+                userScrollEnabled = displayScale <= 1.001f,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                val image = images[page]
+                val viewUrl = remember(baseUrl, image.viewUrl) { resolveImageUrl(baseUrl, image.viewUrl) }
+                val isCurrentPage = page == pagerState.currentPage
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(chromeVisible) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    chromeVisible = toggleImageCollectionViewerChrome(chromeVisible)
+                                },
+                            )
+                        }
+                        .pointerInput(
+                            image.id,
+                            isCurrentPage,
+                            maxScale,
+                            containerWidthPx,
+                            containerHeightPx,
+                            imageScale,
+                            imageOffset,
+                        ) {
+                            if (!isCurrentPage) {
+                                return@pointerInput
+                            }
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                val baseScale = imageScale.coerceIn(ImageViewerMinScale, maxScale)
+                                val baseOffset = imageViewerClampOffset(
+                                    offset = imageOffset,
+                                    scale = baseScale,
+                                    imageWidthPx = image.width.toFloat(),
+                                    imageHeightPx = image.height.toFloat(),
+                                    containerWidthPx = containerWidthPx,
+                                    containerHeightPx = containerHeightPx,
+                                )
+                                val nextScale = (baseScale * zoom).coerceIn(ImageViewerMinScale, maxScale)
+                                val rawOffset = if (nextScale <= 1f) {
+                                    Offset.Zero
+                                } else {
+                                    baseOffset + pan
+                                }
+                                imageScale = nextScale
+                                imageOffset = imageViewerClampOffset(
+                                    offset = rawOffset,
+                                    scale = nextScale,
+                                    imageWidthPx = image.width.toFloat(),
+                                    imageHeightPx = image.height.toFloat(),
+                                    containerWidthPx = containerWidthPx,
+                                    containerHeightPx = containerHeightPx,
+                                )
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AsyncImage(
+                        model = viewUrl,
+                        contentDescription = image.title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                if (isCurrentPage) {
+                                    scaleX = displayScale
+                                    scaleY = displayScale
+                                    translationX = displayOffset.x
+                                    translationY = displayOffset.y
+                                } else {
+                                    scaleX = 1f
+                                    scaleY = 1f
+                                    translationX = 0f
+                                    translationY = 0f
+                                }
+                            },
+                    )
+                }
             }
         }
 
@@ -527,8 +617,13 @@ private fun ImageCollectionViewerContent(
                                 .size(width = 74.dp, height = 92.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .clickable {
-                                    scope.launch {
-                                        pagerState.animateScrollToPage(index)
+                                    if (index == pagerState.currentPage) {
+                                        imageScale = 1f
+                                        imageOffset = Offset.Zero
+                                    } else {
+                                        scope.launch {
+                                            pagerState.animateScrollToPage(index)
+                                        }
                                     }
                                 },
                         ) {
@@ -612,4 +707,69 @@ private fun resolveImageUrl(baseUrl: String, rawPath: String?): String? {
         return path
     }
     return UrlBuilder.normalizeBaseUrl(baseUrl) + path
+}
+
+internal const val ImageViewerMinScale = 0.6f
+private const val ImageViewerMaxScaleCap = 4f
+
+internal fun imageViewerMaxScale(
+    imageWidthPx: Float,
+    imageHeightPx: Float,
+    containerWidthPx: Float,
+    containerHeightPx: Float,
+): Float {
+    if (imageWidthPx <= 0f || imageHeightPx <= 0f || containerWidthPx <= 0f || containerHeightPx <= 0f) {
+        return 1f
+    }
+    if (imageWidthPx <= containerWidthPx && imageHeightPx <= containerHeightPx) {
+        return 1f
+    }
+    val ratio = max(imageWidthPx / containerWidthPx, imageHeightPx / containerHeightPx)
+    return ratio.coerceIn(1f, ImageViewerMaxScaleCap)
+}
+
+internal fun imageViewerClampOffset(
+    offset: Offset,
+    scale: Float,
+    imageWidthPx: Float,
+    imageHeightPx: Float,
+    containerWidthPx: Float,
+    containerHeightPx: Float,
+): Offset {
+    if (scale <= 1f || imageWidthPx <= 0f || imageHeightPx <= 0f || containerWidthPx <= 0f || containerHeightPx <= 0f) {
+        return Offset.Zero
+    }
+    val baseSize = imageViewerFitSize(
+        imageWidthPx = imageWidthPx,
+        imageHeightPx = imageHeightPx,
+        containerWidthPx = containerWidthPx,
+        containerHeightPx = containerHeightPx,
+    )
+    val scaledWidth = baseSize.first * scale
+    val scaledHeight = baseSize.second * scale
+    val maxOffsetX = max(0f, (scaledWidth - containerWidthPx) / 2f)
+    val maxOffsetY = max(0f, (scaledHeight - containerHeightPx) / 2f)
+    return Offset(
+        x = offset.x.coerceIn(-maxOffsetX, maxOffsetX),
+        y = offset.y.coerceIn(-maxOffsetY, maxOffsetY),
+    )
+}
+
+private fun imageViewerFitSize(
+    imageWidthPx: Float,
+    imageHeightPx: Float,
+    containerWidthPx: Float,
+    containerHeightPx: Float,
+): Pair<Float, Float> {
+    val imageRatio = imageWidthPx / imageHeightPx
+    val containerRatio = containerWidthPx / containerHeightPx
+    return if (imageRatio >= containerRatio) {
+        val width = containerWidthPx
+        val height = width / imageRatio
+        width to min(height, containerHeightPx)
+    } else {
+        val height = containerHeightPx
+        val width = height * imageRatio
+        min(width, containerWidthPx) to height
+    }
 }
