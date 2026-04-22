@@ -99,11 +99,16 @@ class VideoRepository @Inject constructor(
         }
     }
 
-    suspend fun fetchImageCollections(page: Int = 1, pageSize: Int = 20): Result<ImageCollectionsPayload> {
+    suspend fun fetchImageCollections(
+        query: String? = null,
+        page: Int = 1,
+        pageSize: Int = 20,
+    ): Result<ImageCollectionsPayload> {
         return callWithAuth { baseUrl, bearer ->
             api.imageCollections(
                 url = UrlBuilder.imageCollections(baseUrl),
                 authorization = bearer,
+                keyword = query,
                 page = page,
                 pageSize = pageSize,
             )

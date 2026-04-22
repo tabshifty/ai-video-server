@@ -62,6 +62,7 @@ interface ApiService {
     suspend fun imageCollections(
         @Url url: String,
         @Header("Authorization") authorization: String,
+        @Query("q") keyword: String? = null,
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<ImageCollectionsPayload>

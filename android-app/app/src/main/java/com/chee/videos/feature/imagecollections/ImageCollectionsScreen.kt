@@ -32,11 +32,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -69,7 +73,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ImageCollectionsScreen(
     baseUrl: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onOpenCollection: (String) -> Unit,
     viewModel: ImageCollectionsViewModel = hiltViewModel(),
 ) {
@@ -88,8 +92,16 @@ fun ImageCollectionsScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             ImageCollectionsTopBar(
                 title = "图片合集",
-                subtitle = if (uiState.totalCount > 0) "共 ${uiState.totalCount} 个合集" else "打开合集后可沉浸式浏览原图",
+                subtitle = if (normalizeImageCollectionsQuery(uiState.query) == null) {
+                    if (uiState.totalCount > 0) "共 ${uiState.totalCount} 个合集" else "打开合集后可沉浸式浏览原图"
+                } else {
+                    "按标题搜索图片合集"
+                },
                 onBack = onBack,
+            )
+            ImageCollectionsSearchBar(
+                query = uiState.query,
+                onQueryChanged = viewModel::onQueryChanged,
             )
 
             when {
@@ -109,7 +121,7 @@ fun ImageCollectionsScreen(
 
                 uiState.items.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("暂无可用图片合集", color = AppChrome.TextSecondary)
+                        Text(imageCollectionsEmptyMessage(uiState.query), color = AppChrome.TextSecondary)
                     }
                 }
 
@@ -207,7 +219,7 @@ fun ImageCollectionViewerScreen(
 private fun ImageCollectionsTopBar(
     title: String,
     subtitle: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
 ) {
     Row(
         modifier = Modifier
@@ -216,8 +228,12 @@ private fun ImageCollectionsTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = AppChrome.TextPrimary)
+        if (onBack != null) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = AppChrome.TextPrimary)
+            }
+        } else {
+            Box(modifier = Modifier.size(16.dp))
         }
         Column(
             modifier = Modifier.weight(1f),
@@ -238,6 +254,44 @@ private fun ImageCollectionsTopBar(
             )
         }
     }
+}
+
+@Composable
+private fun ImageCollectionsSearchBar(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        singleLine = true,
+        placeholder = {
+            Text("搜索图集标题", color = AppChrome.TextMuted)
+        },
+        leadingIcon = {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = AppChrome.TextMuted)
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = { onQueryChanged("") }) {
+                    Icon(Icons.Filled.Close, contentDescription = "清空搜索", tint = AppChrome.TextMuted)
+                }
+            }
+        },
+        shape = RoundedCornerShape(18.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = AppChrome.TextPrimary,
+            unfocusedTextColor = AppChrome.TextPrimary,
+            focusedBorderColor = AppChrome.AccentStrong,
+            unfocusedBorderColor = AppChrome.Divider,
+            cursorColor = AppChrome.AccentStrong,
+            focusedContainerColor = AppChrome.Surface.copy(alpha = 0.92f),
+            unfocusedContainerColor = AppChrome.Surface.copy(alpha = 0.82f),
+        ),
+    )
 }
 
 @Composable

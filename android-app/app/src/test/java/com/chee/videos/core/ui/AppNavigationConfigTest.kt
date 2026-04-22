@@ -26,7 +26,7 @@ class AppNavigationConfigTest {
     @Test
     fun rootNavigationTabs_matchCompactBottomNavigation() {
         assertEquals(
-            listOf("home" to "首页", "mine" to "我的"),
+            listOf("home" to "首页", "image-collections" to "图集", "mine" to "我的"),
             rootNavigationTabs.map { it.route to it.label },
         )
     }

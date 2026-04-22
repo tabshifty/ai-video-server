@@ -19,6 +19,15 @@ const (
 	appImageThumbnailQuality       = 72
 )
 
+func buildAppImageCollectionTitleSearchPattern(raw string) *string {
+	keyword := strings.ToLower(strings.TrimSpace(raw))
+	if keyword == "" {
+		return nil
+	}
+	pattern := "%" + keyword + "%"
+	return &pattern
+}
+
 func resolveAppImageCollectionCoverURL(imageID *uuid.UUID, fallbackCoverURL string) string {
 	if imageID != nil {
 		return utils.AppImageViewURL(*imageID, appImageCollectionCoverWidth, appImageCollectionCoverHeight, "cover", appImageCollectionCoverQuality)
@@ -79,24 +88,34 @@ func scanAppImageCollectionImage(rows rowScanner) (models.ImageCollectionImage, 
 	return out, nil
 }
 
-func (r *VideoRepository) ListAppImageCollections(ctx context.Context, limit, offset int) ([]models.ImageCollectionListItem, int, error) {
-	var total int
-	if err := r.pool.QueryRow(ctx, `
-SELECT COUNT(*)
-FROM collections_images c
-WHERE c.active = TRUE
-  AND EXISTS (
+func (r *VideoRepository) ListAppImageCollections(ctx context.Context, q string, limit, offset int) ([]models.ImageCollectionListItem, int, error) {
+	where := []string{
+		"c.active = TRUE",
+		`EXISTS (
     SELECT 1
     FROM image_collections ic
     JOIN images i ON i.id = ic.image_id
     WHERE ic.collection_id = c.id
       AND i.active = TRUE
       AND i.status = 'ready'
-  )
-`).Scan(&total); err != nil {
+  )`,
+	}
+	args := make([]any, 0, 3)
+	if pattern := buildAppImageCollectionTitleSearchPattern(q); pattern != nil {
+		args = append(args, *pattern)
+		where = append(where, fmt.Sprintf("LOWER(c.name) LIKE $%d", len(args)))
+	}
+	baseWhere := strings.Join(where, "\n  AND ")
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM collections_images c
+WHERE `+baseWhere, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count app image collections: %w", err)
 	}
 
+	listArgs := append(args, limit, offset)
 	rows, err := r.pool.Query(ctx, `
 SELECT
   c.id,
@@ -126,10 +145,9 @@ JOIN LATERAL (
     AND i.active = TRUE
     AND i.status = 'ready'
 ) preview ON preview.image_count > 0
-WHERE c.active = TRUE
+WHERE `+baseWhere+`
 ORDER BY c.sort_order DESC, c.updated_at DESC, c.name ASC
-LIMIT $1 OFFSET $2
-`, limit, offset)
+LIMIT $`+fmt.Sprintf("%d", len(listArgs)-1)+` OFFSET $`+fmt.Sprintf("%d", len(listArgs)), listArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list app image collections: %w", err)
 	}
