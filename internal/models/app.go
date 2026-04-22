@@ -9,21 +9,22 @@ import (
 
 // VideoDetail aggregates video info for detail page.
 type VideoDetail struct {
-	ID             uuid.UUID         `json:"id"`
-	Title          string            `json:"title"`
-	Description    string            `json:"description"`
-	PlayURL        string            `json:"play_url"`
-	TranscodedPath string            `json:"transcoded_path"`
-	ThumbnailPath  string            `json:"thumbnail_path"`
-	Duration       int               `json:"duration"`
-	ViewsCount     int64             `json:"views_count"`
-	LikesCount     int64             `json:"likes_count"`
-	FavoritesCount int64             `json:"favorites_count"`
-	Tags           []string          `json:"tags"`
-	Actors         []VideoActor      `json:"actors"`
-	Collections    []VideoCollection `json:"collections"`
-	Metadata       json.RawMessage   `json:"metadata"`
-	UserState      VideoUserState    `json:"user_state"`
+	ID              uuid.UUID             `json:"id"`
+	Title           string                `json:"title"`
+	Description     string                `json:"description"`
+	PlayURL         string                `json:"play_url"`
+	TranscodedPath  string                `json:"transcoded_path"`
+	ThumbnailPath   string                `json:"thumbnail_path"`
+	Duration        int                   `json:"duration"`
+	ViewsCount      int64                 `json:"views_count"`
+	LikesCount      int64                 `json:"likes_count"`
+	FavoritesCount  int64                 `json:"favorites_count"`
+	Tags            []string              `json:"tags"`
+	Actors          []VideoActor          `json:"actors"`
+	Collections     []VideoCollection     `json:"collections"`
+	ImageCollection *VideoImageCollection `json:"image_collection,omitempty"`
+	Metadata        json.RawMessage       `json:"metadata"`
+	UserState       VideoUserState        `json:"user_state"`
 }
 
 // VideoActor is a lightweight DTO for video-actor relation.
@@ -80,6 +81,12 @@ type VideoListItem struct {
 	Duration       int               `json:"duration"`
 	Collections    []VideoCollection `json:"collections"`
 	CreatedAt      time.Time         `json:"created_at"`
+}
+
+type VideoImageCollection struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	CoverURL string    `json:"cover_url"`
 }
 
 type ImageCollectionListItem struct {

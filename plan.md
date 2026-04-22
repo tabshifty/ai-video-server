@@ -15,6 +15,30 @@
 
 ---
 
+### [2026-04-22 11:32] 短视频详情接入相关图片合集预览
+- Type: `implementation`
+- Summary:
+  - 扩展 app 端视频详情数据，在 `/api/v1/videos/:id` 中补充 `image_collection` 轻量字段，仅在图片合集启用且存在可浏览图片时返回，短视频详情可直接拿到关联图集入口。
+  - Android 短视频详情层新增“相关图片”卡片，展示关联图片合集名称与封面缩略图；点击后直接复用现有 `image-collections/{collectionId}` 预览页，不再跳到图集瀑布流。
+  - 调整短视频详情页到图片预览页的导航逻辑：打开图片合集时不关闭详情层，返回后恢复到原短视频详情状态，保持沉浸浏览链路连续。
+  - 新增回归测试，锁定相关图片入口显隐、viewer 路由生成，以及 app 端视频图片合集封面 URL 的派生规则，防止后续又回到短视频发现流或丢失图集字段。
+- Changed Files:
+  - `internal/models/app.go`
+  - `internal/repository/app_image_collection_repository.go`
+  - `internal/repository/app_repository.go`
+  - `internal/repository/image_collection_repository_test.go`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedImageCollectionTest.kt`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-22 10:28] App 图片合集瀑布流与沉浸式看图功能
 - Type: `implementation`
 - Summary:

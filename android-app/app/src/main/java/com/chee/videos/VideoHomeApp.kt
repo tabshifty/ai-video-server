@@ -188,6 +188,9 @@ private fun AuthenticatedNav(
                         onOpenImageCollections = {
                             navController.navigate("image-collections")
                         },
+                        onOpenImageCollectionViewer = { route ->
+                            navController.navigate(route)
+                        },
                     )
                 }
             }

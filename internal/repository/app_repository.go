@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -15,8 +16,9 @@ import (
 
 func (r *VideoRepository) GetVideoDetail(ctx context.Context, videoID, userID uuid.UUID) (models.VideoDetail, error) {
 	var detail models.VideoDetail
+	var imageCollectionID string
 	err := r.pool.QueryRow(ctx, `
-SELECT id, title, description, transcoded_path, thumbnail_path, duration_seconds, views_count, likes_count, favorites_count, metadata
+SELECT id, title, description, transcoded_path, thumbnail_path, duration_seconds, views_count, likes_count, favorites_count, metadata, COALESCE(image_collection_id::text, '')
 FROM videos
 WHERE id=$1 AND status='ready'
 `, videoID).Scan(
@@ -30,6 +32,7 @@ WHERE id=$1 AND status='ready'
 		&detail.LikesCount,
 		&detail.FavoritesCount,
 		&detail.Metadata,
+		&imageCollectionID,
 	)
 	if err != nil {
 		return models.VideoDetail{}, fmt.Errorf("get video detail: %w", err)
@@ -65,6 +68,16 @@ WHERE id=$1 AND status='ready'
 			Name:      actor.Name,
 			AvatarURL: actor.AvatarURL,
 		})
+	}
+	if collectionID := parseNullableUUIDText(imageCollectionID); collectionID != nil {
+		imageCollection, imageCollectionErr := r.GetAppVideoImageCollection(ctx, *collectionID)
+		if imageCollectionErr != nil {
+			if !errors.Is(imageCollectionErr, pgx.ErrNoRows) && !strings.Contains(strings.ToLower(imageCollectionErr.Error()), "no rows") {
+				return models.VideoDetail{}, fmt.Errorf("query image collection: %w", imageCollectionErr)
+			}
+		} else {
+			detail.ImageCollection = imageCollection
+		}
 	}
 
 	rows, err := r.pool.Query(ctx, `
