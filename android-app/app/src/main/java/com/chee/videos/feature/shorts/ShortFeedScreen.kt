@@ -85,6 +85,7 @@ import coil.request.ImageRequest
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.VideoCollectionDto
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.model.VideoImageCollectionDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
@@ -115,6 +116,7 @@ fun ShortFeedScreen(
     baseUrl: String,
     accessToken: String,
     onOpenDiscover: (mode: String, value: String, title: String) -> Unit,
+    onOpenImageCollectionViewer: (String) -> Unit,
     viewModel: ShortFeedViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -443,6 +445,7 @@ fun ShortFeedScreen(
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .fillMaxHeight(0.75f),
+                            baseUrl = baseUrl,
                             detail = detail,
                             loading = loading,
                             errorMessage = uiState.detailErrorMessage,
@@ -465,6 +468,11 @@ fun ShortFeedScreen(
                                 }
                                 viewModel.closeDetailSheet()
                                 onOpenDiscover("collection", id, collection.name)
+                            },
+                            onOpenImageCollection = { imageCollection ->
+                                val route = shortDetailImageCollectionViewerRoute(imageCollection)
+                                    ?: return@ShortDetailSheet
+                                onOpenImageCollectionViewer(route)
                             },
                         )
                     }
@@ -679,6 +687,7 @@ private fun VerticalVideoPage(
 @Composable
 private fun ShortDetailSheet(
     modifier: Modifier = Modifier,
+    baseUrl: String,
     detail: VideoDetailDto?,
     loading: Boolean,
     errorMessage: String?,
@@ -688,6 +697,7 @@ private fun ShortDetailSheet(
     onToggleDislike: () -> Unit,
     onOpenTag: (String) -> Unit,
     onOpenCollection: (VideoCollectionDto) -> Unit,
+    onOpenImageCollection: (VideoImageCollectionDto) -> Unit,
 ) {
     Surface(
         modifier = modifier,
@@ -815,6 +825,69 @@ private fun ShortDetailSheet(
                             title = "简介",
                             body = detail.description.orEmpty().ifBlank { "暂无简介" },
                         )
+
+                        val imageCollection = detail.imageCollection
+                        if (shouldShowShortDetailImageCollection(imageCollection)) {
+                            Surface(
+                                color = ShortDetailCardBg,
+                                shape = AppChrome.CardShape,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(AppChrome.CardShape)
+                                    .clickable { onOpenImageCollection(checkNotNull(imageCollection)) },
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    val coverUrl = resolveThumbnailUrl(baseUrl, imageCollection?.coverUrl)
+                                    if (!coverUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = coverUrl,
+                                            contentDescription = imageCollection?.name,
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .clip(RoundedCornerShape(16.dp)),
+                                            contentScale = ContentScale.Crop,
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(ShortDetailCardMutedBg),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Info,
+                                                contentDescription = null,
+                                                tint = AppChrome.TextMuted,
+                                            )
+                                        }
+                                    }
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        ShortDetailSectionTitle("相关图片")
+                                        Text(
+                                            text = imageCollection?.name.orEmpty(),
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                        Text(
+                                            text = "点击进入图片预览",
+                                            color = AppChrome.TextMuted,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         if (detail.collections.orEmpty().isNotEmpty()) {
                             Surface(
@@ -1045,6 +1118,18 @@ internal fun formatShortPlaybackTimeHms(ms: Long): String {
         append(':')
         append(seconds.toString().padStart(2, '0'))
     }
+}
+
+internal fun shouldShowShortDetailImageCollection(imageCollection: VideoImageCollectionDto?): Boolean {
+    return !imageCollection?.id?.trim().isNullOrBlank()
+}
+
+internal fun shortDetailImageCollectionViewerRoute(imageCollection: VideoImageCollectionDto?): String? {
+    val collectionId = imageCollection?.id?.trim().orEmpty()
+    if (collectionId.isBlank()) {
+        return null
+    }
+    return "image-collections/$collectionId"
 }
 
 private fun extractActorNames(detail: VideoDetailDto?): List<String> {

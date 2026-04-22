@@ -1,10 +1,13 @@
 package repository
 
 import (
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
+	"video-server/internal/models"
 	"video-server/internal/utils"
 )
 
@@ -64,4 +67,69 @@ func TestResolveAppImageCollectionCoverURLFallsBackToStoredURL(t *testing.T) {
 	if got != want {
 		t.Fatalf("expected fallback cover url, got=%s want=%s", got, want)
 	}
+}
+
+func TestScanAppVideoImageCollectionPrefersDerivedPreviewURL(t *testing.T) {
+	collectionID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	imageID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	now := time.Unix(1710000000, 0).UTC()
+
+	got, err := scanAppVideoImageCollection(stubRowScanner{
+		values: []any{
+			collectionID,
+			"剧照合集",
+			"https://legacy.example/cover.jpg",
+			imageID.String(),
+			now,
+			now,
+		},
+	})
+	if err != nil {
+		t.Fatalf("scanAppVideoImageCollection returned error: %v", err)
+	}
+
+	want := models.VideoImageCollection{
+		ID:       collectionID,
+		Name:     "剧照合集",
+		CoverURL: utils.AppImageViewURL(imageID, appImageCollectionCoverWidth, appImageCollectionCoverHeight, "cover", appImageCollectionCoverQuality),
+	}
+	if !reflect.DeepEqual(*got, want) {
+		t.Fatalf("unexpected video image collection: got=%#v want=%#v", *got, want)
+	}
+}
+
+func TestScanAppVideoImageCollectionFallsBackToStoredURL(t *testing.T) {
+	collectionID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	now := time.Unix(1710000000, 0).UTC()
+
+	got, err := scanAppVideoImageCollection(stubRowScanner{
+		values: []any{
+			collectionID,
+			"剧照合集",
+			" https://legacy.example/cover.jpg ",
+			"",
+			now,
+			now,
+		},
+	})
+	if err != nil {
+		t.Fatalf("scanAppVideoImageCollection returned error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected video image collection")
+	}
+	if got.CoverURL != "https://legacy.example/cover.jpg" {
+		t.Fatalf("unexpected fallback cover url: %s", got.CoverURL)
+	}
+}
+
+type stubRowScanner struct {
+	values []any
+}
+
+func (s stubRowScanner) Scan(dest ...any) error {
+	for idx := range dest {
+		reflect.ValueOf(dest[idx]).Elem().Set(reflect.ValueOf(s.values[idx]))
+	}
+	return nil
 }

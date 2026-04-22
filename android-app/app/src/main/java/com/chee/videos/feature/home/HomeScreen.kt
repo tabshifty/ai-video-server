@@ -60,6 +60,7 @@ fun HomeScreen(
     onOpenDetail: (String, String) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
     onOpenImageCollections: () -> Unit,
+    onOpenImageCollectionViewer: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +92,7 @@ fun HomeScreen(
                             baseUrl = baseUrl,
                             accessToken = accessToken,
                             onOpenDiscover = onOpenShortDiscover,
+                            onOpenImageCollectionViewer = onOpenImageCollectionViewer,
                         )
                         ImageCollectionsEntryCard(
                             modifier = Modifier

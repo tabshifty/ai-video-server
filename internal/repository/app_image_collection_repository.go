@@ -26,6 +26,24 @@ func resolveAppImageCollectionCoverURL(imageID *uuid.UUID, fallbackCoverURL stri
 	return strings.TrimSpace(fallbackCoverURL)
 }
 
+func scanAppVideoImageCollection(rows rowScanner) (*models.VideoImageCollection, error) {
+	var out models.VideoImageCollection
+	var coverImageID string
+	var createdAt, updatedAt any
+	if err := rows.Scan(
+		&out.ID,
+		&out.Name,
+		&out.CoverURL,
+		&coverImageID,
+		&createdAt,
+		&updatedAt,
+	); err != nil {
+		return nil, err
+	}
+	out.CoverURL = resolveAppImageCollectionCoverURL(parseNullableUUIDText(coverImageID), out.CoverURL)
+	return &out, nil
+}
+
 func scanAppImageCollectionListItem(rows rowScanner) (models.ImageCollectionListItem, error) {
 	var out models.ImageCollectionListItem
 	var coverImageID string
@@ -216,4 +234,42 @@ ORDER BY
 	}
 	detail.Images = images
 	return detail, nil
+}
+
+func (r *VideoRepository) GetAppVideoImageCollection(ctx context.Context, collectionID uuid.UUID) (*models.VideoImageCollection, error) {
+	row := r.pool.QueryRow(ctx, `
+SELECT
+  c.id,
+  c.name,
+  COALESCE(c.cover_url, ''),
+  COALESCE(preview.cover_image_id::text, ''),
+  c.created_at,
+  c.updated_at
+FROM collections_images c
+JOIN LATERAL (
+  SELECT
+    COUNT(*)::INT AS image_count,
+    (
+      ARRAY_AGG(
+        ic.image_id
+        ORDER BY
+          CASE WHEN c.cover_image_id IS NOT NULL AND ic.image_id = c.cover_image_id THEN 0 ELSE 1 END,
+          ic.created_at ASC,
+          ic.image_id ASC
+      )
+    )[1] AS cover_image_id
+  FROM image_collections ic
+  JOIN images i ON i.id = ic.image_id
+  WHERE ic.collection_id = c.id
+    AND i.active = TRUE
+    AND i.status = 'ready'
+) preview ON preview.image_count > 0
+WHERE c.id = $1
+  AND c.active = TRUE
+`, collectionID)
+	item, err := scanAppVideoImageCollection(row)
+	if err != nil {
+		return nil, fmt.Errorf("get app video image collection: %w", err)
+	}
+	return item, nil
 }
