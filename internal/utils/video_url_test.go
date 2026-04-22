@@ -32,3 +32,12 @@ func TestAdminImageViewURL(t *testing.T) {
 		t.Fatalf("unexpected admin image view url: got=%s want=%s", got, want)
 	}
 }
+
+func TestAppImageViewURL(t *testing.T) {
+	imageID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	got := AppImageViewURL(imageID, 320, 240, "cover", 82)
+	want := "/api/v1/images/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/view?fit=cover&h=240&q=82&w=320"
+	if got != want {
+		t.Fatalf("unexpected app image view url: got=%s want=%s", got, want)
+	}
+}

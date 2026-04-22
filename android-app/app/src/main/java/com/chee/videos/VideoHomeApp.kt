@@ -45,6 +45,8 @@ import com.chee.videos.feature.auth.LoginScreen
 import com.chee.videos.feature.connection.ConnectionScreen
 import com.chee.videos.feature.detail.DetailScreen
 import com.chee.videos.feature.home.HomeScreen
+import com.chee.videos.feature.imagecollections.ImageCollectionViewerScreen
+import com.chee.videos.feature.imagecollections.ImageCollectionsScreen
 import com.chee.videos.feature.mine.MineScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
 import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
@@ -183,6 +185,9 @@ private fun AuthenticatedNav(
                                 "short-discover/${Uri.encode(mode)}/${Uri.encode(value)}/${Uri.encode(title)}",
                             )
                         },
+                        onOpenImageCollections = {
+                            navController.navigate("image-collections")
+                        },
                     )
                 }
             }
@@ -247,6 +252,28 @@ private fun AuthenticatedNav(
                     mode = entry.arguments?.getString("mode").orEmpty(),
                     value = entry.arguments?.getString("value").orEmpty(),
                     title = entry.arguments?.getString("title").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable("image-collections") {
+                ImageCollectionsScreen(
+                    baseUrl = baseUrl,
+                    onBack = { navController.popBackStack() },
+                    onOpenCollection = { collectionId ->
+                        navController.navigate("image-collections/$collectionId")
+                    },
+                )
+            }
+
+            composable(
+                route = "image-collections/{collectionId}",
+                arguments = listOf(
+                    navArgument("collectionId") { type = NavType.StringType },
+                ),
+            ) {
+                ImageCollectionViewerScreen(
+                    baseUrl = baseUrl,
                     onBack = { navController.popBackStack() },
                 )
             }

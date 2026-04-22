@@ -15,6 +15,42 @@
 
 ---
 
+### [2026-04-22 10:28] App 图片合集瀑布流与沉浸式看图功能
+- Type: `implementation`
+- Summary:
+  - 新增 app 端图片合集能力：后端提供 `/api/v1/image-collections`、`/api/v1/image-collections/:id` 和 `/api/v1/images/:id/view`，仅返回启用且可浏览的图片合集与图片，并为封面、缩略图、原图统一生成 app 端访问地址。
+  - Android 首页短视频层增加“图片合集”浮层入口，进入后可浏览图集瀑布流卡片，展示合集标题与图片数量，并支持分页补货。
+  - 新增沉浸式图集查看页：单张原图横向切换、底部缩略图条、顶部标题与页码、双击显隐上下 chrome，整体沿用当前 app 的深色影院视觉。
+  - 新增回归测试，锁定后端路由注册、app 图片 URL 构建、viewer 双击显隐规则和封面 URL 生成，避免后续回退到管理端图片链路或丢失沉浸态交互。
+- Changed Files:
+  - `internal/handlers/app_image_collection.go`
+  - `internal/handlers/recommend_test.go`
+  - `internal/handlers/router.go`
+  - `internal/models/app.go`
+  - `internal/repository/app_image_collection_repository.go`
+  - `internal/repository/image_collection_repository_test.go`
+  - `internal/services/app.go`
+  - `internal/services/image.go`
+  - `internal/utils/video_url.go`
+  - `internal/utils/video_url_test.go`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionViewerChrome.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionsScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionsViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/util/UrlBuilderImageCollectionsTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/imagecollections/ImageCollectionViewerChromeTest.kt`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-21 23:24] 管理端图片合集查看关联图片并支持选图设封面
 - Type: `implementation`
 - Summary:

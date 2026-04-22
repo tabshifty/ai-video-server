@@ -272,6 +272,21 @@ func (s *ImageService) ResolveViewPath(ctx context.Context, imageID uuid.UUID, w
 	if err != nil {
 		return "", "", err
 	}
+	return s.resolveViewPathFromImage(ctx, img, width, height, fit, quality)
+}
+
+func (s *ImageService) ResolveAppViewPath(ctx context.Context, imageID uuid.UUID, width, height int, fit string, quality int) (string, string, error) {
+	img, err := s.repo.GetImageByID(ctx, imageID)
+	if err != nil {
+		return "", "", err
+	}
+	if !img.Active {
+		return "", "", fmt.Errorf("image not active")
+	}
+	return s.resolveViewPathFromImage(ctx, img, width, height, fit, quality)
+}
+
+func (s *ImageService) resolveViewPathFromImage(ctx context.Context, img models.Image, width, height int, fit string, quality int) (string, string, error) {
 	if img.Status != "ready" {
 		return "", "", fmt.Errorf("image not ready")
 	}
@@ -295,7 +310,7 @@ func (s *ImageService) ResolveViewPath(ctx context.Context, imageID uuid.UUID, w
 	}
 
 	key := fmt.Sprintf("w%d_h%d_fit%s_q%d_%s", width, height, fit, quality, format)
-	if p, m, _, _, exists, err := s.repo.GetImageVariantByKey(ctx, imageID, key); err == nil && exists {
+	if p, m, _, _, exists, err := s.repo.GetImageVariantByKey(ctx, img.ID, key); err == nil && exists {
 		if _, statErr := os.Stat(p); statErr == nil {
 			if strings.TrimSpace(m) != "" {
 				mime = m
@@ -304,7 +319,7 @@ func (s *ImageService) ResolveViewPath(ctx context.Context, imageID uuid.UUID, w
 		}
 	}
 
-	variantDir := filepath.Join(s.storage, "images", "variants", imageID.String())
+	variantDir := filepath.Join(s.storage, "images", "variants", img.ID.String())
 	if err := os.MkdirAll(variantDir, 0o755); err != nil {
 		return "", "", fmt.Errorf("create image variant dir: %w", err)
 	}
@@ -322,7 +337,7 @@ func (s *ImageService) ResolveViewPath(ctx context.Context, imageID uuid.UUID, w
 			h = probe.Height
 		}
 	}
-	if err := s.repo.UpsertImageVariant(ctx, imageID, key, variantPath, mime, w, h); err != nil {
+	if err := s.repo.UpsertImageVariant(ctx, img.ID, key, variantPath, mime, w, h); err != nil {
 		return "", "", err
 	}
 	return variantPath, mime, nil

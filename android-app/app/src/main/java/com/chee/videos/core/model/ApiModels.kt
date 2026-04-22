@@ -49,6 +49,13 @@ data class SearchPayload(
     @SerializedName("page_size") val pageSize: Int = 20,
 )
 
+data class ImageCollectionsPayload(
+    @SerializedName("items") val items: List<ImageCollectionListItemDto> = emptyList(),
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("page_size") val pageSize: Int = 20,
+)
+
 data class ContinueHistoryPayload(
     @SerializedName("items") val items: List<HistoryItemDto> = emptyList(),
     @SerializedName("total_count") val totalCount: Int = 0,
@@ -91,6 +98,37 @@ data class VideoDetailDto(
     @SerializedName("collections") val collections: List<VideoCollectionDto>? = emptyList(),
     @SerializedName("metadata") val metadata: Map<String, Any?>? = emptyMap(),
     @SerializedName("user_state") val userState: UserStateDto = UserStateDto(),
+)
+
+data class ImageCollectionListItemDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("cover_url") val coverUrl: String? = null,
+    @SerializedName("image_count") val imageCount: Int = 0,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null,
+)
+
+data class ImageCollectionDetailDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("cover_url") val coverUrl: String? = null,
+    @SerializedName("image_count") val imageCount: Int = 0,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null,
+    @SerializedName("images") val images: List<ImageCollectionImageDto> = emptyList(),
+)
+
+data class ImageCollectionImageDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("thumbnail_url") val thumbnailUrl: String? = null,
+    @SerializedName("view_url") val viewUrl: String? = null,
+    @SerializedName("width") val width: Int = 0,
+    @SerializedName("height") val height: Int = 0,
 )
 
 data class VideoActorDto(

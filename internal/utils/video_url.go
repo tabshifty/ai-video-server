@@ -17,7 +17,15 @@ func VideoThumbnailURL(videoID uuid.UUID) string {
 }
 
 func AdminImageViewURL(imageID uuid.UUID, width, height int, fit string, quality int) string {
-	base := fmt.Sprintf("/api/v1/admin/images/%s/view", imageID.String())
+	return imageViewURL("/api/v1/admin/images", imageID, width, height, fit, quality)
+}
+
+func AppImageViewURL(imageID uuid.UUID, width, height int, fit string, quality int) string {
+	return imageViewURL("/api/v1/images", imageID, width, height, fit, quality)
+}
+
+func imageViewURL(prefix string, imageID uuid.UUID, width, height int, fit string, quality int) string {
+	base := fmt.Sprintf("%s/%s/view", prefix, imageID.String())
 	params := url.Values{}
 	if fit != "" {
 		params.Set("fit", fit)

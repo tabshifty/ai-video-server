@@ -123,6 +123,33 @@ func (s *AppService) ShortDiscover(
 	}, nil
 }
 
+func (s *AppService) ImageCollections(ctx context.Context, page, pageSize int) (models.PageResult[models.ImageCollectionListItem], error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	items, total, err := s.repo.ListAppImageCollections(ctx, pageSize, offset)
+	if err != nil {
+		return models.PageResult[models.ImageCollectionListItem]{}, err
+	}
+	return models.PageResult[models.ImageCollectionListItem]{
+		Items:      items,
+		TotalCount: total,
+		Page:       page,
+		PageSize:   pageSize,
+	}, nil
+}
+
+func (s *AppService) ImageCollectionDetail(ctx context.Context, collectionID uuid.UUID) (models.ImageCollectionDetail, error) {
+	return s.repo.GetAppImageCollectionDetail(ctx, collectionID)
+}
+
 func (s *AppService) Profile(ctx context.Context, userID uuid.UUID) (models.UserProfileView, error) {
 	u, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {

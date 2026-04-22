@@ -81,3 +81,34 @@ type VideoListItem struct {
 	Collections    []VideoCollection `json:"collections"`
 	CreatedAt      time.Time         `json:"created_at"`
 }
+
+type ImageCollectionListItem struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CoverURL    string    `json:"cover_url"`
+	ImageCount  int       `json:"image_count"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type ImageCollectionImage struct {
+	ID           uuid.UUID `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	ThumbnailURL string    `json:"thumbnail_url"`
+	ViewURL      string    `json:"view_url"`
+	Width        int       `json:"width"`
+	Height       int       `json:"height"`
+}
+
+type ImageCollectionDetail struct {
+	ID          uuid.UUID              `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	CoverURL    string                 `json:"cover_url"`
+	ImageCount  int                    `json:"image_count"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	Images      []ImageCollectionImage `json:"images"`
+}
