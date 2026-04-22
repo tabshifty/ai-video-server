@@ -47,3 +47,21 @@ func TestResolveAdminImageCollectionCoverURLFallsBackToStoredURL(t *testing.T) {
 		t.Fatalf("expected fallback cover url, got=%s want=%s", got, want)
 	}
 }
+
+func TestResolveAppImageCollectionCoverURLPrefersDerivedPreviewURL(t *testing.T) {
+	imageID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+	got := resolveAppImageCollectionCoverURL(&imageID, "https://legacy.example/cover.jpg")
+	want := utils.AppImageViewURL(imageID, appImageCollectionCoverWidth, appImageCollectionCoverHeight, "cover", appImageCollectionCoverQuality)
+	if got != want {
+		t.Fatalf("expected derived preview url, got=%s want=%s", got, want)
+	}
+}
+
+func TestResolveAppImageCollectionCoverURLFallsBackToStoredURL(t *testing.T) {
+	got := resolveAppImageCollectionCoverURL(nil, " https://legacy.example/cover.jpg ")
+	want := "https://legacy.example/cover.jpg"
+	if got != want {
+		t.Fatalf("expected fallback cover url, got=%s want=%s", got, want)
+	}
+}

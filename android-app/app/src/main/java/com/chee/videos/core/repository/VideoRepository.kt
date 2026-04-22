@@ -7,6 +7,8 @@ import com.chee.videos.core.model.AppException
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedVideoDto
+import com.chee.videos.core.model.ImageCollectionDetailDto
+import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.UserProfileDto
@@ -94,6 +96,26 @@ class VideoRepository @Inject constructor(
 
                 else -> throw AppException("不支持的发现模式: $mode")
             }
+        }
+    }
+
+    suspend fun fetchImageCollections(page: Int = 1, pageSize: Int = 20): Result<ImageCollectionsPayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.imageCollections(
+                url = UrlBuilder.imageCollections(baseUrl),
+                authorization = bearer,
+                page = page,
+                pageSize = pageSize,
+            )
+        }
+    }
+
+    suspend fun fetchImageCollectionDetail(collectionId: String): Result<ImageCollectionDetailDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.imageCollectionDetail(
+                url = UrlBuilder.imageCollectionDetail(baseUrl, collectionId),
+                authorization = bearer,
+            )
         }
     }
 

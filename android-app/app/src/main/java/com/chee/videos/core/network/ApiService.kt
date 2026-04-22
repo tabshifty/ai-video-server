@@ -4,6 +4,8 @@ import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.ApiEnvelope
 import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedPayload
+import com.chee.videos.core.model.ImageCollectionDetailDto
+import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.LoginPayload
 import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
@@ -55,6 +57,20 @@ interface ApiService {
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<SearchPayload>
+
+    @GET
+    suspend fun imageCollections(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<ImageCollectionsPayload>
+
+    @GET
+    suspend fun imageCollectionDetail(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<ImageCollectionDetailDto>
 
     @GET
     suspend fun search(

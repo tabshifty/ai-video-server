@@ -24,6 +24,14 @@ object UrlBuilder {
 
     fun shortDiscover(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/short/discover"
 
+    fun imageCollections(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/image-collections"
+
+    fun imageCollectionDetail(baseUrl: String, collectionId: String): String =
+        "${normalizeBaseUrl(baseUrl)}/api/v1/image-collections/$collectionId"
+
+    fun appImageView(baseUrl: String, imageId: String): String =
+        "${normalizeBaseUrl(baseUrl)}/api/v1/images/$imageId/view"
+
     fun search(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/search"
 
     fun detail(baseUrl: String, videoId: String): String =

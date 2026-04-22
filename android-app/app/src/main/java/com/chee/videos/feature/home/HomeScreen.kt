@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -58,6 +59,7 @@ fun HomeScreen(
     accessToken: String,
     onOpenDetail: (String, String) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
+    onOpenImageCollections: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,11 +86,19 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             when (tabs[selectedTab].type) {
                 "short" -> {
-                    ShortFeedScreen(
-                        baseUrl = baseUrl,
-                        accessToken = accessToken,
-                        onOpenDiscover = onOpenShortDiscover,
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        ShortFeedScreen(
+                            baseUrl = baseUrl,
+                            accessToken = accessToken,
+                            onOpenDiscover = onOpenShortDiscover,
+                        )
+                        ImageCollectionsEntryCard(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            onClick = onOpenImageCollections,
+                        )
+                    }
                 }
 
                 "movie" -> {
@@ -120,6 +130,55 @@ fun HomeScreen(
                         onOpenDetail = onOpenDetail,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageCollectionsEntryCard(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick),
+        color = AppChrome.Surface.copy(alpha = 0.84f),
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AppChrome.AccentSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Collections,
+                    contentDescription = null,
+                    tint = AppChrome.AccentStrong,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "图片合集",
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "瀑布流浏览与沉浸翻看",
+                    color = AppChrome.TextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }
