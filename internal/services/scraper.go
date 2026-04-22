@@ -490,21 +490,36 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 	}
 	overview := chooseStr(in.Overview, candidate.Overview)
 	posterURL := chooseStr(in.PosterURL, candidate.PosterURL)
-	thumbPath, err := s.DownloadPoster(ctx, posterURL, in.VideoID)
+	posterSource := avPosterSourceFromCandidate(candidate)
+	posterQuality := candidatePosterQuality(candidate)
+	if strings.TrimSpace(in.PosterURL) != "" {
+		posterSource = "manual"
+		posterQuality = classifyAVPosterURL(posterURL, "")
+	}
+	thumbPath, posterDecision, err := s.resolveAVThumbnailPath(ctx, in.VideoID, video.ThumbnailPath, posterURL, posterSource, posterQuality)
 	if err != nil {
 		return err
 	}
+	if trace == nil {
+		trace = map[string]any{}
+	}
+	trace["poster_source"] = posterSource
+	trace["poster_quality"] = posterQuality
+	trace["poster_decision"] = posterDecision
 
 	meta := map[string]any{
-		"scrape_source": scrapeSource,
-		"external_id":   candidate.ExternalID,
-		"av_code":       candidate.Code,
-		"actors":        candidate.Actors,
-		"release_date":  chooseStr(in.ReleaseDate, candidate.ReleaseDate),
-		"detail_url":    candidate.DetailURL,
-		scrapeSource:    candidate.Raw,
-		"manual":        in.Metadata,
-		"scrape_trace":  trace,
+		"scrape_source":   scrapeSource,
+		"external_id":     candidate.ExternalID,
+		"av_code":         candidate.Code,
+		"actors":          candidate.Actors,
+		"release_date":    chooseStr(in.ReleaseDate, candidate.ReleaseDate),
+		"detail_url":      candidate.DetailURL,
+		"poster_source":   posterSource,
+		"poster_quality":  posterQuality,
+		"poster_decision": posterDecision,
+		scrapeSource:      candidate.Raw,
+		"manual":          in.Metadata,
+		"scrape_trace":    trace,
 	}
 	if sources, ok := candidate.Raw["merged_sources"]; ok {
 		meta["scrape_sources"] = sources
@@ -878,11 +893,23 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		return ScrapeResult{}, fmt.Errorf("no av result for %q", keyword)
 	}
 	candidate := candidates[0]
-
-	thumbPath, err := s.DownloadPoster(ctx, candidate.PosterURL, videoID)
+	video, err := s.repo.GetVideoByID(ctx, videoID)
 	if err != nil {
 		return ScrapeResult{}, err
 	}
+
+	posterSource := avPosterSourceFromCandidate(candidate)
+	posterQuality := candidatePosterQuality(candidate)
+	thumbPath, posterDecision, err := s.resolveAVThumbnailPath(ctx, videoID, video.ThumbnailPath, candidate.PosterURL, posterSource, posterQuality)
+	if err != nil {
+		return ScrapeResult{}, err
+	}
+	if trace == nil {
+		trace = map[string]any{}
+	}
+	trace["poster_source"] = posterSource
+	trace["poster_quality"] = posterQuality
+	trace["poster_decision"] = posterDecision
 
 	title := strings.TrimSpace(candidate.Title)
 	if title == "" {
@@ -893,15 +920,18 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		scrapeSource = "javdb"
 	}
 	meta := map[string]any{
-		"scrape_source":  scrapeSource,
-		"external_id":    candidate.ExternalID,
-		"av_code":        candidate.Code,
-		"actors":         candidate.Actors,
-		"release_date":   candidate.ReleaseDate,
-		"detail_url":     candidate.DetailURL,
-		"search_keyword": keyword,
-		scrapeSource:     candidate.Raw,
-		"scrape_trace":   trace,
+		"scrape_source":   scrapeSource,
+		"external_id":     candidate.ExternalID,
+		"av_code":         candidate.Code,
+		"actors":          candidate.Actors,
+		"release_date":    candidate.ReleaseDate,
+		"detail_url":      candidate.DetailURL,
+		"poster_source":   posterSource,
+		"poster_quality":  posterQuality,
+		"poster_decision": posterDecision,
+		"search_keyword":  keyword,
+		scrapeSource:      candidate.Raw,
+		"scrape_trace":    trace,
 	}
 	if sources, ok := candidate.Raw["merged_sources"]; ok {
 		meta["scrape_sources"] = sources
@@ -1471,6 +1501,57 @@ func normalizeAVDate(raw string) string {
 		return v
 	}
 	return ""
+}
+
+func isAbsoluteHTTPURL(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	return strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://")
+}
+
+func (s *ScraperService) resolveAVThumbnailPath(ctx context.Context, videoID uuid.UUID, existingThumbPath, posterURL, posterSource, posterQuality string) (string, string, error) {
+	posterURL = strings.TrimSpace(posterURL)
+	existingThumbPath = strings.TrimSpace(existingThumbPath)
+	posterSource = strings.ToLower(strings.TrimSpace(posterSource))
+	posterQuality = strings.ToLower(strings.TrimSpace(posterQuality))
+	if posterQuality == "" {
+		posterQuality = classifyAVPosterURL(posterURL, posterSource)
+	}
+
+	keepExisting := func(decision string) (string, string, error) {
+		return existingThumbPath, decision, nil
+	}
+
+	switch posterQuality {
+	case avPosterQualityPrimary:
+		if !isAbsoluteHTTPURL(posterURL) {
+			if existingThumbPath != "" {
+				return keepExisting("invalid_keep_old")
+			}
+			return "", "invalid_no_existing", nil
+		}
+		thumbPath, err := s.DownloadPoster(ctx, posterURL, videoID)
+		if err != nil {
+			return "", "", err
+		}
+		return thumbPath, "primary_selected", nil
+	case avPosterQualityFallback:
+		if existingThumbPath != "" {
+			return keepExisting("fallback_kept_old")
+		}
+		if !isAbsoluteHTTPURL(posterURL) {
+			return "", "invalid_no_existing", nil
+		}
+		thumbPath, err := s.DownloadPoster(ctx, posterURL, videoID)
+		if err != nil {
+			return "", "", err
+		}
+		return thumbPath, "fallback_used_no_existing", nil
+	default:
+		if existingThumbPath != "" {
+			return keepExisting("invalid_keep_old")
+		}
+		return "", "invalid_no_existing", nil
+	}
 }
 
 func (s *ScraperService) DownloadPoster(ctx context.Context, posterURL string, videoID uuid.UUID) (string, error) {

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -33,10 +34,23 @@ type fakeScraperRepo struct {
 	addedActorIDs      []uuid.UUID
 	addedActorSource   string
 	nextActorIDs       []uuid.UUID
+	videoByID          map[uuid.UUID]models.Video
+	getVideoErr        error
 }
 
-func (f *fakeScraperRepo) GetVideoByID(context.Context, uuid.UUID) (models.Video, error) {
-	return models.Video{}, nil
+func (f *fakeScraperRepo) GetVideoByID(_ context.Context, videoID uuid.UUID) (models.Video, error) {
+	if f.getVideoErr != nil {
+		return models.Video{}, f.getVideoErr
+	}
+	if f.videoByID != nil {
+		if video, ok := f.videoByID[videoID]; ok {
+			if video.ID == uuid.Nil {
+				video.ID = videoID
+			}
+			return video, nil
+		}
+	}
+	return models.Video{ID: videoID}, nil
 }
 
 func (f *fakeScraperRepo) UpdateVideoScrapeResult(_ context.Context, videoID uuid.UUID, tmdbID *int, title, description, thumbnailPath string, metadata map[string]any, status string) error {
@@ -1074,5 +1088,197 @@ func TestPreviewAVMergeUsesBestFieldsAcrossSources(t *testing.T) {
 	}
 	if fieldSources["actors"] != "javbus" {
 		t.Fatalf("expected actors from javbus, got=%v", fieldSources["actors"])
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+func TestConfirmAVKeepsExistingThumbnailWhenOnlyFallbackPoster(t *testing.T) {
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:            videoID,
+				Title:         "旧标题",
+				ThumbnailPath: "/keep/existing.jpg",
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v/fallback-only":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-111 标题 - JavDB</title>
+    <meta property="og:image" content="/thumbs/fallback.jpg" />
+  </head>
+  <body>
+    <h2 class="title is-4">ABP-111 标题</h2>
+    <div><strong>番號:</strong><span>ABP-111</span></div>
+  </body>
+</html>
+`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-confirm-fallback-test", time.Second)
+
+	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:     videoID,
+		ExternalID:  "fallback-only",
+		ReleaseDate: "2024-06-01",
+		Metadata: map[string]any{
+			"scrape_source": "javdb",
+			"detail_url":    server.URL + "/v/fallback-only",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+	if repo.lastUpdate.thumbnailPath != "/keep/existing.jpg" {
+		t.Fatalf("expected keep existing thumbnail, got=%s", repo.lastUpdate.thumbnailPath)
+	}
+	if repo.lastUpdate.metadata["poster_decision"] != "fallback_kept_old" {
+		t.Fatalf("expected poster_decision fallback_kept_old, got=%v", repo.lastUpdate.metadata["poster_decision"])
+	}
+}
+
+func TestConfirmAVUsesFallbackPosterWhenNoExistingThumbnail(t *testing.T) {
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:    videoID,
+				Title: "新视频",
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v/fallback-only":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-222 标题 - JavDB</title>
+    <meta property="og:image" content="/thumbs/fallback.jpg" />
+  </head>
+  <body>
+    <h2 class="title is-4">ABP-222 标题</h2>
+    <div><strong>番號:</strong><span>ABP-222</span></div>
+  </body>
+</html>
+`))
+		case "/thumbs/fallback.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-confirm-fallback-no-existing-test", time.Second)
+
+	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:     videoID,
+		ExternalID:  "fallback-only",
+		ReleaseDate: "2024-06-02",
+		Metadata: map[string]any{
+			"scrape_source": "javdb",
+			"detail_url":    server.URL + "/v/fallback-only",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+	if strings.TrimSpace(repo.lastUpdate.thumbnailPath) == "" {
+		t.Fatalf("expected thumbnail path downloaded from fallback poster")
+	}
+	if repo.lastUpdate.metadata["poster_decision"] != "fallback_used_no_existing" {
+		t.Fatalf("expected poster_decision fallback_used_no_existing, got=%v", repo.lastUpdate.metadata["poster_decision"])
+	}
+}
+
+func TestConfirmAVRejectsRelativePosterURLWithoutTMDBFallback(t *testing.T) {
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:            videoID,
+				Title:         "已有标题",
+				ThumbnailPath: "/keep/existing.jpg",
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v/relative-poster":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-333 标题 - JavDB</title>
+  </head>
+  <body>
+    <h2 class="title is-4">ABP-333 标题</h2>
+    <div><strong>番號:</strong><span>ABP-333</span></div>
+  </body>
+</html>
+`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-confirm-relative-poster-test", time.Second)
+
+	requested := make([]string, 0, 1)
+	svc.httpClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			requested = append(requested, req.URL.String())
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader("fake-image")),
+				Request:    req,
+			}, nil
+		}),
+	}
+
+	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:     videoID,
+		ExternalID:  "relative-poster",
+		PosterURL:   "/relative-av.jpg",
+		ReleaseDate: "2024-06-03",
+		Metadata: map[string]any{
+			"scrape_source": "javdb",
+			"detail_url":    server.URL + "/v/relative-poster",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+	if len(requested) != 0 {
+		t.Fatalf("expected no poster download request for relative av poster url, got=%v", requested)
+	}
+	if repo.lastUpdate.thumbnailPath != "/keep/existing.jpg" {
+		t.Fatalf("expected keep existing thumbnail, got=%s", repo.lastUpdate.thumbnailPath)
+	}
+	if repo.lastUpdate.metadata["poster_decision"] != "invalid_keep_old" {
+		t.Fatalf("expected poster_decision invalid_keep_old, got=%v", repo.lastUpdate.metadata["poster_decision"])
 	}
 }

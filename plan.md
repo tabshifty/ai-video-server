@@ -15,6 +15,25 @@
 
 ---
 
+### [2026-04-23 06:36] AV 海报精准刮削：主封面优先与降级覆盖策略
+- Type: `implementation`
+- Summary:
+  - 对齐 references 规则重构 AV 海报质量分级：新增 `primary/fallback/invalid` 三档判定，并把 `noimage/logo/icon/banner` 等噪声 URL 统一判为无效，避免误抓站点标识图。
+  - 重写 AV 合并海报选择逻辑：从“单一分数”改为“先 primary 后 fallback”的分层选择，输出 `poster_source/poster_quality/poster_decision` 到候选 metadata 与 scrape trace，增强可追踪性。
+  - 调整 AV 落库封面策略（上传与确认共用）：`primary` 才覆盖；仅 `fallback` 时若已有封面则保留旧图、无旧图才下载使用；无效或相对路径海报不再触发 TMDB 前缀拼接。
+  - 新增回归测试覆盖 `fallback` 保留旧封面、无旧封面使用 fallback、AV 相对路径不走 TMDB 下载，锁定本次行为变更。
+- Changed Files:
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVKeepsExistingThumbnailWhenOnlyFallbackPoster|TestConfirmAVUsesFallbackPosterWhenNoExistingThumbnail|TestConfirmAVRejectsRelativePosterURLWithoutTMDBFallback' -v` passed.
+  - `go test ./internal/services -run AV -v` passed.
+  - `go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 06:17] 首页短视频切页后返回保持观看位置
 - Type: `implementation`
 - Summary:

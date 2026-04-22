@@ -373,6 +373,15 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 		if v, ok := final[0].Raw["merged_sources"]; ok {
 			trace["merged_sources"] = v
 		}
+		if v, ok := final[0].Raw["poster_source"]; ok {
+			trace["poster_source"] = v
+		}
+		if v, ok := final[0].Raw["poster_quality"]; ok {
+			trace["poster_quality"] = v
+		}
+		if v, ok := final[0].Raw["poster_decision"]; ok {
+			trace["poster_decision"] = v
+		}
 	}
 	return final, trace, nil
 }
@@ -643,6 +652,7 @@ func (c *javDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunC
 	}
 	candidate.Raw["field_state"] = fieldState
 	candidate.Raw["source"] = c.Name()
+	enrichAVCandidatePoster(&candidate)
 	return candidate, nil
 }
 
@@ -807,6 +817,7 @@ func (c *javBusAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRun
 	}
 	candidate.Raw["field_state"] = fieldState
 	candidate.Raw["source"] = c.Name()
+	enrichAVCandidatePoster(&candidate)
 	return candidate, nil
 }
 
@@ -946,6 +957,7 @@ func (c *javLibraryAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrap
 	}
 	candidate.Raw["field_state"] = fieldState
 	candidate.Raw["source"] = c.Name()
+	enrichAVCandidatePoster(&candidate)
 	return candidate, nil
 }
 
@@ -1064,6 +1076,7 @@ func (c *fc2AVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunCon
 	}
 	candidate.Raw["field_state"] = fieldState
 	candidate.Raw["source"] = c.Name()
+	enrichAVCandidatePoster(&candidate)
 	return candidate, nil
 }
 
@@ -1621,13 +1634,84 @@ func isLikelyLogoURL(raw string) bool {
 	if v == "" {
 		return false
 	}
-	logoTokens := []string{"logo", "favicon", "icon", "navbar", "brand", "avatar", "banner"}
+	logoTokens := []string{"logo", "favicon", "icon", "navbar", "brand", "avatar", "banner", "noimage", "placeholder"}
 	for _, token := range logoTokens {
 		if strings.Contains(v, token) {
 			return true
 		}
 	}
 	return false
+}
+
+const (
+	avPosterQualityPrimary  = "primary"
+	avPosterQualityFallback = "fallback"
+	avPosterQualityInvalid  = "invalid"
+)
+
+func avPosterSourceFromCandidate(candidate avScrapeCandidate) string {
+	if candidate.Raw == nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(asString(candidate.Raw["poster_source"])))
+}
+
+func classifyAVPosterURL(posterURL, posterSource string) string {
+	posterURL = strings.TrimSpace(posterURL)
+	if posterURL == "" {
+		return avPosterQualityInvalid
+	}
+	if isLikelyLogoURL(posterURL) {
+		return avPosterQualityInvalid
+	}
+
+	source := strings.ToLower(strings.TrimSpace(posterSource))
+	switch source {
+	case "video_cover", "big_image", "video_jacket", "sample_image":
+		return avPosterQualityPrimary
+	case "og_image", "meta_og", "main_thumb", "cover_img":
+		return avPosterQualityFallback
+	}
+
+	lower := strings.ToLower(posterURL)
+	if strings.Contains(lower, "/thumb") || strings.Contains(lower, "sample") || strings.Contains(lower, "preview") {
+		return avPosterQualityFallback
+	}
+	if strings.Contains(lower, "/cover") || strings.Contains(lower, "video-cover") || strings.Contains(lower, "jacket") {
+		return avPosterQualityPrimary
+	}
+	return avPosterQualityPrimary
+}
+
+func candidatePosterQuality(candidate avScrapeCandidate) string {
+	if candidate.Raw != nil {
+		if quality := strings.ToLower(strings.TrimSpace(asString(candidate.Raw["poster_quality"]))); quality != "" {
+			switch quality {
+			case avPosterQualityPrimary, avPosterQualityFallback, avPosterQualityInvalid:
+				return quality
+			}
+		}
+	}
+	return classifyAVPosterURL(candidate.PosterURL, avPosterSourceFromCandidate(candidate))
+}
+
+func enrichAVCandidatePoster(candidate *avScrapeCandidate) {
+	if candidate == nil {
+		return
+	}
+	if candidate.Raw == nil {
+		candidate.Raw = map[string]any{}
+	}
+	source := avPosterSourceFromCandidate(*candidate)
+	quality := classifyAVPosterURL(candidate.PosterURL, source)
+	candidate.Raw["poster_source"] = source
+	candidate.Raw["poster_quality"] = quality
+	if quality == avPosterQualityInvalid {
+		candidate.PosterURL = ""
+		candidate.Raw["poster_url"] = ""
+		return
+	}
+	candidate.Raw["poster_url"] = strings.TrimSpace(candidate.PosterURL)
 }
 
 func isLikelyGenericOverview(raw string) bool {
@@ -1827,10 +1911,19 @@ func mergeAVCandidatesByField(candidates []avScrapeCandidate, targetCode, keywor
 		merged.Code = extractAVCode(chooseStr(merged.Title, merged.DetailURL))
 	}
 
-	posterURL, posterSource := selectBestPosterURL(selected)
+	posterURL, posterSource, posterRawSource, posterQuality := selectBestPosterURL(selected, targetCode, keyword)
+	posterDecision := ""
 	if posterURL != "" {
 		merged.PosterURL = posterURL
 		fieldSources["poster_url"] = posterSource
+		switch posterQuality {
+		case avPosterQualityPrimary:
+			posterDecision = "primary_selected"
+		case avPosterQualityFallback:
+			posterDecision = "fallback_selected"
+		default:
+			posterDecision = "invalid_selected"
+		}
 	}
 
 	overview, overviewSource := selectBestOverview(selected)
@@ -1888,19 +1981,22 @@ func mergeAVCandidatesByField(candidates []avScrapeCandidate, targetCode, keywor
 	}
 
 	merged.Raw = map[string]any{
-		"source":         merged.Source,
-		"detail_url":     merged.DetailURL,
-		"external_id":    merged.ExternalID,
-		"code":           merged.Code,
-		"title":          merged.Title,
-		"overview":       merged.Overview,
-		"poster_url":     merged.PosterURL,
-		"release_date":   merged.ReleaseDate,
-		"actors":         append([]string(nil), merged.Actors...),
-		"field_sources":  fieldSources,
-		"merged":         true,
-		"merged_sources": collectAVCandidateSources(selected),
-		"raw_candidates": rawCandidates,
+		"source":          merged.Source,
+		"detail_url":      merged.DetailURL,
+		"external_id":     merged.ExternalID,
+		"code":            merged.Code,
+		"title":           merged.Title,
+		"overview":        merged.Overview,
+		"poster_url":      merged.PosterURL,
+		"release_date":    merged.ReleaseDate,
+		"actors":          append([]string(nil), merged.Actors...),
+		"field_sources":   fieldSources,
+		"merged":          true,
+		"merged_sources":  collectAVCandidateSources(selected),
+		"poster_source":   posterRawSource,
+		"poster_quality":  posterQuality,
+		"poster_decision": posterDecision,
+		"raw_candidates":  rawCandidates,
 	}
 	return merged, true
 }
@@ -1939,7 +2035,7 @@ func scoreAVCandidateGroup(group []avScrapeCandidate, targetCode, keyword string
 			best = score
 		}
 		total += score
-		if !isLikelyLogoURL(candidate.PosterURL) && strings.TrimSpace(candidate.PosterURL) != "" {
+		if strings.TrimSpace(candidate.PosterURL) != "" && candidatePosterQuality(candidate) != avPosterQualityInvalid {
 			hasPoster = true
 		}
 		if len(candidate.Actors) > 0 {
@@ -2033,42 +2129,54 @@ func selectBestCode(candidates []avScrapeCandidate, targetCode string) (string, 
 	return bestValue, bestSource
 }
 
-func selectBestPosterURL(candidates []avScrapeCandidate) (string, string) {
-	bestValue := ""
-	bestSource := ""
-	bestScore := -1
+func selectBestPosterURL(candidates []avScrapeCandidate, targetCode, keyword string) (string, string, string, string) {
+	bestPrimaryValue := ""
+	bestPrimarySource := ""
+	bestPrimaryRawSource := ""
+	bestPrimaryScore := -1
+	bestFallbackValue := ""
+	bestFallbackSource := ""
+	bestFallbackRawSource := ""
+	bestFallbackScore := -1
 	for _, candidate := range candidates {
 		posterURL := strings.TrimSpace(candidate.PosterURL)
-		if posterURL == "" || isLikelyLogoURL(posterURL) {
+		if posterURL == "" {
 			continue
 		}
-		score := 100
-		posterLower := strings.ToLower(posterURL)
-		if strings.Contains(posterLower, "/cover") || strings.Contains(posterLower, "video-cover") {
+		quality := candidatePosterQuality(candidate)
+		if quality == avPosterQualityInvalid {
+			continue
+		}
+		score, _ := scoreAVCandidate(candidate, targetCode, keyword)
+		if strings.TrimSpace(candidate.DetailURL) != "" {
+			score += 20
+		}
+		rawSource := avPosterSourceFromCandidate(candidate)
+		if quality == avPosterQualityPrimary {
 			score += 120
-		}
-		if strings.Contains(posterLower, "jacket") {
-			score += 90
-		}
-		if strings.Contains(posterLower, "/thumb") || strings.Contains(posterLower, "sample") {
-			score += 40
-		}
-		if rawPosterSource, ok := candidate.Raw["poster_source"].(string); ok {
-			rawPosterSource = strings.ToLower(strings.TrimSpace(rawPosterSource))
-			switch rawPosterSource {
-			case "video_cover", "big_image", "video_jacket", "sample_image":
-				score += 100
-			case "og_image", "meta_og":
-				score += 20
+			if score > bestPrimaryScore {
+				bestPrimaryScore = score
+				bestPrimaryValue = posterURL
+				bestPrimarySource = candidate.Source
+				bestPrimaryRawSource = rawSource
 			}
+			continue
 		}
-		if score > bestScore {
-			bestScore = score
-			bestValue = posterURL
-			bestSource = candidate.Source
+		score += 60
+		if score > bestFallbackScore {
+			bestFallbackScore = score
+			bestFallbackValue = posterURL
+			bestFallbackSource = candidate.Source
+			bestFallbackRawSource = rawSource
 		}
 	}
-	return bestValue, bestSource
+	if bestPrimaryValue != "" {
+		return bestPrimaryValue, bestPrimarySource, bestPrimaryRawSource, avPosterQualityPrimary
+	}
+	if bestFallbackValue != "" {
+		return bestFallbackValue, bestFallbackSource, bestFallbackRawSource, avPosterQualityFallback
+	}
+	return "", "", "", avPosterQualityInvalid
 }
 
 func selectBestOverview(candidates []avScrapeCandidate) (string, string) {
