@@ -15,6 +15,19 @@
 
 ---
 
+### [2026-04-22 16:27] 增加 Android 开发产物忽略规则
+- Type: `docs`
+- Summary:
+  - 在仓库根 `.gitignore` 追加 Android 开发常见本地文件与构建产物忽略项，避免 `Gradle` 缓存、`IDE` 配置、`build` 目录、原生中间产物与本地签名文件被误提交。
+  - 同时覆盖当前项目已使用的 `android-app/.gradle-local/` 目录，保持本地构建缓存与代码仓库隔离。
+- Changed Files:
+  - `.gitignore`
+  - `plan.md`
+- Verification:
+  - `git status --short` passed (仅包含预期文件变更)。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-22 11:32] 短视频详情接入相关图片合集预览
 - Type: `implementation`
 - Summary:
