@@ -216,6 +216,15 @@ fun ShortFeedScreen(
                 var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var progressBarSettled by remember(currentVideoId) { mutableStateOf(false) }
 
+                LaunchedEffect(pagerState.currentPage, currentVideoId) {
+                    if (!currentVideoId.isNullOrBlank()) {
+                        viewModel.rememberPagerAnchor(
+                            page = pagerState.currentPage,
+                            videoId = currentVideoId,
+                        )
+                    }
+                }
+
                 LaunchedEffect(pagerState.currentPage, uiState.items) {
                     uiState.items.getOrNull(pagerState.currentPage)?.id?.let { currentVideoID ->
                         viewModel.ensureDetailLoaded(currentVideoID)

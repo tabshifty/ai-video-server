@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-23 06:17] 首页短视频切页后返回保持观看位置
+- Type: `implementation`
+- Summary:
+  - 修复首页短视频在切换到其他页面再返回后回到第一个视频的问题：新增 pager 锚点记忆逻辑，持续记录当前页码与当前视频 ID，页面重建时优先恢复到上次观看位置。
+  - 短视频数据重新加载时引入“锚点优先恢复页”策略：若锚点视频仍在列表中则恢复到该视频所在页；锚点缺失时回退到上一页码（并做边界钳制），避免无故回到首条。
+  - 补货裁剪场景同步维护锚点视频 ID，确保窗口 trim 后 pager 重置仍对齐当前观看内容，保持回到首页时的连续观看体验。
+  - 新增回归测试锁定 pager 恢复页解析规则，覆盖锚点命中、锚点缺失回退和页码越界钳制。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/shorts/ShortFeedPagerRestoreTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.shorts.ShortFeedPagerRestoreTest --tests com.chee.videos.feature.shorts.ShortFeedWindowManagerTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 06:10] App 图集预览支持按尺寸缩放与当前缩略图复位
 - Type: `implementation`
 - Summary:

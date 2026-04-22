@@ -35,6 +35,7 @@ data class ShortFeedUiState(
     val actionBusyVideoIds: Set<String> = emptySet(),
     val pagerResetToken: Int = 0,
     val pagerInitialPage: Int = 0,
+    val pagerAnchorVideoId: String? = null,
 )
 
 @HiltViewModel
@@ -79,6 +80,16 @@ class ShortFeedViewModel @Inject constructor(
                 .onSuccess { items ->
                     val itemIDs = items.map { it.id }.toSet()
                     _uiState.update { state ->
+                        val nextInitialPage = if (force) {
+                            0
+                        } else {
+                            resolveShortFeedInitialPage(
+                                incomingItems = items,
+                                anchorVideoId = state.pagerAnchorVideoId,
+                                fallbackPage = state.pagerInitialPage,
+                            )
+                        }
+                        val nextAnchorVideoId = items.getOrNull(nextInitialPage)?.id
                         state.copy(
                             loading = false,
                             loaded = true,
@@ -91,8 +102,13 @@ class ShortFeedViewModel @Inject constructor(
                             detailLoadingVideoIds = state.detailLoadingVideoIds.filterTo(mutableSetOf()) { it in itemIDs },
                             actionBusyVideoIds = state.actionBusyVideoIds.filterTo(mutableSetOf()) { it in itemIDs },
                             detailSheetVideoId = state.detailSheetVideoId?.takeIf { it in itemIDs },
-                            pagerInitialPage = 0,
-                            pagerResetToken = if (force || state.pagerInitialPage != 0) state.pagerResetToken + 1 else state.pagerResetToken,
+                            pagerInitialPage = nextInitialPage,
+                            pagerAnchorVideoId = nextAnchorVideoId,
+                            pagerResetToken = if (force || nextInitialPage != state.pagerInitialPage) {
+                                state.pagerResetToken + 1
+                            } else {
+                                state.pagerResetToken
+                            },
                         )
                     }
                 }
@@ -141,6 +157,9 @@ class ShortFeedViewModel @Inject constructor(
                         pausedByUserVideoIds = merged.pausedByUserVideoIds,
                         detailSheetVideoId = merged.detailSheetVideoId,
                         pagerInitialPage = merged.anchorPageAfterTrim ?: latest.pagerInitialPage,
+                        pagerAnchorVideoId = merged.anchorPageAfterTrim
+                            ?.let { merged.items.getOrNull(it)?.id }
+                            ?: latest.pagerAnchorVideoId,
                         pagerResetToken = if (merged.anchorPageAfterTrim != null) latest.pagerResetToken + 1 else latest.pagerResetToken,
                     )
                 }
@@ -152,6 +171,21 @@ class ShortFeedViewModel @Inject constructor(
                         loadMoreErrorMessage = err.message ?: "短视频补货失败",
                     )
                 }
+            }
+        }
+    }
+
+    fun rememberPagerAnchor(page: Int, videoId: String?) {
+        _uiState.update { state ->
+            val normalizedPage = page.coerceAtLeast(0)
+            val normalizedVideoId = videoId?.takeIf { it.isNotBlank() }
+            if (state.pagerInitialPage == normalizedPage && state.pagerAnchorVideoId == normalizedVideoId) {
+                state
+            } else {
+                state.copy(
+                    pagerInitialPage = normalizedPage,
+                    pagerAnchorVideoId = normalizedVideoId,
+                )
             }
         }
     }
@@ -325,4 +359,22 @@ class ShortFeedViewModel @Inject constructor(
             }
         }
     }
+}
+
+internal fun resolveShortFeedInitialPage(
+    incomingItems: List<com.chee.videos.core.model.FeedVideoDto>,
+    anchorVideoId: String?,
+    fallbackPage: Int,
+): Int {
+    if (incomingItems.isEmpty()) {
+        return 0
+    }
+    val anchorIndex = anchorVideoId
+        ?.takeIf { it.isNotBlank() }
+        ?.let { id -> incomingItems.indexOfFirst { it.id == id } }
+        ?: -1
+    if (anchorIndex >= 0) {
+        return anchorIndex
+    }
+    return fallbackPage.coerceIn(0, incomingItems.lastIndex)
 }
