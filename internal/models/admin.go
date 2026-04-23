@@ -245,3 +245,83 @@ type AdminImageCollectionInput struct {
 	SortOrder    int        `json:"sort_order"`
 	Active       bool       `json:"active"`
 }
+
+type AdminTvSeriesListItem struct {
+	ID               int64  `json:"id"`
+	Title            string `json:"title"`
+	Overview         string `json:"overview"`
+	PosterURL        string `json:"poster_url"`
+	BackdropURL      string `json:"backdrop_url"`
+	FirstAirDate     string `json:"first_air_date"`
+	TotalSeasons     int    `json:"total_seasons"`
+	TotalEpisodes    int    `json:"total_episodes"`
+	PlayableEpisodes int    `json:"playable_episodes"`
+	Active           bool   `json:"active"`
+}
+
+type AdminTvSeriesDetail struct {
+	ID               int64                 `json:"id"`
+	Title            string                `json:"title"`
+	Overview         string                `json:"overview"`
+	PosterURL        string                `json:"poster_url"`
+	BackdropURL      string                `json:"backdrop_url"`
+	FirstAirDate     string                `json:"first_air_date"`
+	TotalSeasons     int                   `json:"total_seasons"`
+	TotalEpisodes    int                   `json:"total_episodes"`
+	PlayableEpisodes int                   `json:"playable_episodes"`
+	Active           bool                  `json:"active"`
+	Seasons          []AdminTvSeasonDetail `json:"seasons"`
+}
+
+type AdminTvSeasonDetail struct {
+	ID           int64                  `json:"id"`
+	SeriesID     int64                  `json:"series_id"`
+	SeasonNumber int                    `json:"season_number"`
+	Title        string                 `json:"title"`
+	Overview     string                 `json:"overview"`
+	PosterURL    string                 `json:"poster_url"`
+	AirDate      string                 `json:"air_date"`
+	Episodes     []AdminTvEpisodeDetail `json:"episodes"`
+}
+
+type AdminTvEpisodeDetail struct {
+	ID            int64  `json:"id"`
+	SeasonID      int64  `json:"season_id"`
+	EpisodeNumber int    `json:"episode_number"`
+	Title         string `json:"title"`
+	Overview      string `json:"overview"`
+	Runtime       int    `json:"runtime"`
+	AirDate       string `json:"air_date"`
+	StillURL      string `json:"still_url"`
+	VideoID       string `json:"video_id"`
+	VideoTitle    string `json:"video_title"`
+	VideoStatus   string `json:"video_status"`
+	Playable      bool   `json:"playable"`
+}
+
+type AdminTvSeriesInput struct {
+	Title        string `json:"title"`
+	Overview     string `json:"overview"`
+	PosterURL    string `json:"poster_url"`
+	BackdropURL  string `json:"backdrop_url"`
+	FirstAirDate string `json:"first_air_date"`
+	Active       bool   `json:"active"`
+}
+
+type AdminTvSeasonInput struct {
+	SeasonNumber int    `json:"season_number"`
+	Title        string `json:"title"`
+	Overview     string `json:"overview"`
+	PosterURL    string `json:"poster_url"`
+	AirDate      string `json:"air_date"`
+}
+
+type AdminTvEpisodeInput struct {
+	EpisodeNumber int    `json:"episode_number"`
+	Title         string `json:"title"`
+	Overview      string `json:"overview"`
+	Runtime       int    `json:"runtime"`
+	AirDate       string `json:"air_date"`
+	StillURL      string `json:"still_url"`
+	VideoID       string `json:"video_id"`
+}

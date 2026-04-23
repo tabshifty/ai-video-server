@@ -2,12 +2,14 @@ package com.chee.videos.feature.tv
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 private val supportedPlaybackSpeeds = listOf(1f, 1.25f, 1.5f, 2f)
 
@@ -16,42 +18,28 @@ data class TvSeriesPlayerUiState(
     val series: TvSeriesUiModel? = null,
     val selectedSeasonNumber: Int = 1,
     val selectedEpisodeNumber: Int = 1,
-    val isPlaying: Boolean = true,
     val playbackSpeed: Float = 1f,
     val selectorVisible: Boolean = false,
+    val currentVideoId: String = "",
+    val currentSourceUrl: String = "",
+    val canPlayCurrentEpisode: Boolean = false,
+    val errorMessage: String? = null,
 )
 
 @HiltViewModel
 class TvSeriesPlayerViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val repository: TvRepository,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+    private val seriesId = savedStateHandle.get<String>(TvSeriesIdArg).orEmpty()
+    private val requestedSeason = savedStateHandle.get<Int>(TvSeasonArg) ?: 1
+    private val requestedEpisode = savedStateHandle.get<Int>(TvEpisodeArg) ?: 1
 
     private val _uiState = MutableStateFlow(TvSeriesPlayerUiState())
     val uiState: StateFlow<TvSeriesPlayerUiState> = _uiState.asStateFlow()
 
     init {
-        val seriesId = savedStateHandle.get<String>(TvSeriesIdArg).orEmpty()
-        val requestedSeason = savedStateHandle.get<Int>(TvSeasonArg) ?: 1
-        val requestedEpisode = savedStateHandle.get<Int>(TvEpisodeArg) ?: 1
-        val series = TvMockData.findSeries(seriesId) ?: TvMockData.allSeries().firstOrNull()
-        val firstSeason = series?.seasons?.firstOrNull()
-        val resolvedSeason = series?.seasons?.firstOrNull { it.number == requestedSeason.coerceAtLeast(1) } ?: firstSeason
-        val resolvedEpisodeNumber = resolvedSeason?.episodes
-            ?.firstOrNull { it.number == requestedEpisode.coerceAtLeast(1) }
-            ?.number ?: resolvedSeason?.episodes?.firstOrNull()?.number ?: 1
-        _uiState.value = TvSeriesPlayerUiState(
-            loading = false,
-            series = series,
-            selectedSeasonNumber = resolvedSeason?.number ?: 1,
-            selectedEpisodeNumber = resolvedEpisodeNumber,
-            isPlaying = true,
-            playbackSpeed = 1f,
-            selectorVisible = false,
-        )
-    }
-
-    fun togglePlay() {
-        _uiState.update { state -> state.copy(isPlaying = !state.isPlaying) }
+        load()
     }
 
     fun cycleSpeed() {
@@ -69,12 +57,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
     fun selectSeason(seasonNumber: Int) {
         val series = _uiState.value.series ?: return
         val season = series.seasons.firstOrNull { it.number == seasonNumber } ?: return
-        _uiState.update { state ->
-            state.copy(
-                selectedSeasonNumber = season.number,
-                selectedEpisodeNumber = season.episodes.firstOrNull()?.number ?: 1,
-            )
-        }
+        updateSelectedEpisode(season.number, findPreferredEpisodeNumber(season))
     }
 
     fun selectEpisode(episodeNumber: Int) {
@@ -82,9 +65,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
         if (season.episodes.none { it.number == episodeNumber }) {
             return
         }
-        _uiState.update { state ->
-            state.copy(selectedEpisodeNumber = episodeNumber)
-        }
+        updateSelectedEpisode(season.number, episodeNumber)
     }
 
     fun nextEpisode() {
@@ -92,7 +73,80 @@ class TvSeriesPlayerViewModel @Inject constructor(
         val season = selectedSeason(state) ?: return
         val currentIndex = season.episodes.indexOfFirst { it.number == state.selectedEpisodeNumber }
         val next = season.episodes.getOrNull(currentIndex + 1) ?: return
-        _uiState.update { it.copy(selectedEpisodeNumber = next.number, isPlaying = true) }
+        updateSelectedEpisode(season.number, next.number)
+    }
+
+    fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
+        if (videoId.isBlank() || watchSeconds <= 0) {
+            return
+        }
+        viewModelScope.launch {
+            repository.reportHistory(videoId, watchSeconds, completed)
+        }
+    }
+
+    private fun load() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loading = true, errorMessage = null) }
+            repository.fetchSeriesDetail(seriesId)
+                .onSuccess { dto ->
+                    val series = tvSeriesDetailToUiModel(dto)
+                    val resolvedSeason = series.seasons.firstOrNull { it.number == requestedSeason.coerceAtLeast(1) } ?: series.seasons.firstOrNull()
+                    val resolvedEpisode = resolvedSeason?.episodes?.firstOrNull { it.number == requestedEpisode.coerceAtLeast(1) }
+                        ?: resolvedSeason?.episodes?.firstOrNull { it.playable }
+                        ?: resolvedSeason?.episodes?.firstOrNull()
+                    _uiState.value = TvSeriesPlayerUiState(
+                        loading = false,
+                        series = series,
+                        selectedSeasonNumber = resolvedSeason?.number ?: 1,
+                        selectedEpisodeNumber = resolvedEpisode?.number ?: 1,
+                        playbackSpeed = 1f,
+                        selectorVisible = false,
+                        errorMessage = null,
+                    )
+                    updatePlaybackTarget()
+                }
+                .onFailure { error ->
+                    _uiState.value = TvSeriesPlayerUiState(
+                        loading = false,
+                        errorMessage = error.message ?: "电视剧播放页加载失败",
+                    )
+                }
+        }
+    }
+
+    private fun updateSelectedEpisode(seasonNumber: Int, episodeNumber: Int) {
+        _uiState.update {
+            it.copy(
+                selectedSeasonNumber = seasonNumber,
+                selectedEpisodeNumber = episodeNumber,
+            )
+        }
+        updatePlaybackTarget()
+    }
+
+    private fun updatePlaybackTarget() {
+        val episode = selectedEpisode(_uiState.value)
+        if (episode == null || !episode.playable || episode.videoId.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    currentVideoId = "",
+                    currentSourceUrl = "",
+                    canPlayCurrentEpisode = false,
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            val sourceUrl = repository.buildSourceUrl(episode.videoId)
+            _uiState.update {
+                it.copy(
+                    currentVideoId = episode.videoId,
+                    currentSourceUrl = sourceUrl,
+                    canPlayCurrentEpisode = true,
+                )
+            }
+        }
     }
 }
 

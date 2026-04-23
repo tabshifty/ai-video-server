@@ -4,6 +4,7 @@ import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
 import VideoList from '../views/VideoList.vue'
 import VideoUpload from '../views/VideoUpload.vue'
+import TvSeriesManage from '../views/TvSeriesManage.vue'
 import ScrapePreview from '../views/ScrapePreview.vue'
 import UserManage from '../views/UserManage.vue'
 import ActorManage from '../views/ActorManage.vue'
@@ -18,6 +19,7 @@ const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', component: Dashboard },
   { path: '/videos', component: VideoList },
+  { path: '/tv-series', component: TvSeriesManage },
   { path: '/upload', component: VideoUpload },
   { path: '/scrape', component: ScrapePreview },
   { path: '/actors', component: ActorManage },

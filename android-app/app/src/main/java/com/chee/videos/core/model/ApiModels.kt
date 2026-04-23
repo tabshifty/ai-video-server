@@ -63,6 +63,88 @@ data class ContinueHistoryPayload(
     @SerializedName("page_size") val pageSize: Int = 20,
 )
 
+data class TvHomePayload(
+    @SerializedName("continue_watching") val continueWatching: TvContinueWatchingDto? = null,
+    @SerializedName("sections") val sections: List<TvSectionDto> = emptyList(),
+    @SerializedName("search_results") val searchResults: List<TvSeriesSummaryDto> = emptyList(),
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("page_size") val pageSize: Int = 20,
+)
+
+data class TvContinueWatchingDto(
+    @SerializedName("series_id") val seriesId: String,
+    @SerializedName("series_title") val seriesTitle: String,
+    @SerializedName("season_number") val seasonNumber: Int = 1,
+    @SerializedName("episode_number") val episodeNumber: Int = 1,
+    @SerializedName("episode_title") val episodeTitle: String = "",
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("backdrop_url") val backdropUrl: String? = null,
+    @SerializedName("watch_seconds") val watchSeconds: Int = 0,
+    @SerializedName("duration_seconds") val durationSeconds: Int = 0,
+    @SerializedName("progress_percent") val progressPercent: Int = 0,
+)
+
+data class TvSectionDto(
+    @SerializedName("title") val title: String = "",
+    @SerializedName("subtitle") val subtitle: String = "",
+    @SerializedName("items") val items: List<TvSeriesSummaryDto> = emptyList(),
+)
+
+data class TvSeriesSummaryDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("overview") val overview: String? = null,
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("backdrop_url") val backdropUrl: String? = null,
+    @SerializedName("first_air_date") val firstAirDate: String? = null,
+    @SerializedName("total_seasons") val totalSeasons: Int = 0,
+    @SerializedName("total_episodes") val totalEpisodes: Int = 0,
+    @SerializedName("playable_episodes") val playableEpisodes: Int = 0,
+    @SerializedName("latest_episode_air_date") val latestEpisodeAirDate: String? = null,
+)
+
+data class TvSeriesDetailDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("overview") val overview: String? = null,
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("backdrop_url") val backdropUrl: String? = null,
+    @SerializedName("first_air_date") val firstAirDate: String? = null,
+    @SerializedName("total_seasons") val totalSeasons: Int = 0,
+    @SerializedName("total_episodes") val totalEpisodes: Int = 0,
+    @SerializedName("playable_episodes") val playableEpisodes: Int = 0,
+    @SerializedName("tags") val tags: List<String> = emptyList(),
+    @SerializedName("cast") val cast: List<String> = emptyList(),
+    @SerializedName("seasons") val seasons: List<TvSeasonDto> = emptyList(),
+)
+
+data class TvSeasonDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("season_number") val seasonNumber: Int = 1,
+    @SerializedName("title") val title: String = "",
+    @SerializedName("overview") val overview: String? = null,
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("air_date") val airDate: String? = null,
+    @SerializedName("episodes") val episodes: List<TvEpisodeDto> = emptyList(),
+)
+
+data class TvEpisodeDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("episode_number") val episodeNumber: Int = 1,
+    @SerializedName("title") val title: String = "",
+    @SerializedName("overview") val overview: String? = null,
+    @SerializedName("runtime") val runtime: Int = 0,
+    @SerializedName("air_date") val airDate: String? = null,
+    @SerializedName("still_url") val stillUrl: String? = null,
+    @SerializedName("video_id") val videoId: String = "",
+    @SerializedName("video_title") val videoTitle: String? = null,
+    @SerializedName("video_status") val videoStatus: String? = null,
+    @SerializedName("watch_seconds") val watchSeconds: Int = 0,
+    @SerializedName("progress_percent") val progressPercent: Int = 0,
+    @SerializedName("last_watched_at") val lastWatchedAt: String? = null,
+    @SerializedName("playable") val playable: Boolean = false,
+)
+
 data class HistoryItemDto(
     @SerializedName("video_id") val videoId: String,
     @SerializedName("title") val title: String,

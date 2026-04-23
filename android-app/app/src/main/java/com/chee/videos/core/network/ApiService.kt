@@ -11,6 +11,8 @@ import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import retrofit2.http.Body
@@ -57,6 +59,21 @@ interface ApiService {
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<SearchPayload>
+
+    @GET
+    suspend fun tvHome(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("q") keyword: String? = null,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<TvHomePayload>
+
+    @GET
+    suspend fun tvSeriesDetail(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<TvSeriesDetailDto>
 
     @GET
     suspend fun imageCollections(

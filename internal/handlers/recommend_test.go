@@ -45,6 +45,19 @@ func TestRegisterIncludesImageCollectionRoutes(t *testing.T) {
 		"GET /api/v1/image-collections",
 		"GET /api/v1/image-collections/:id",
 		"GET /api/v1/images/:id/view",
+		"GET /api/v1/tv/home",
+		"GET /api/v1/tv/series/:id",
+		"GET /api/v1/admin/tv/series",
+		"GET /api/v1/admin/tv/series/:id",
+		"POST /api/v1/admin/tv/series",
+		"PUT /api/v1/admin/tv/series/:id",
+		"DELETE /api/v1/admin/tv/series/:id",
+		"POST /api/v1/admin/tv/series/:id/seasons",
+		"PUT /api/v1/admin/tv/seasons/:id",
+		"DELETE /api/v1/admin/tv/seasons/:id",
+		"POST /api/v1/admin/tv/seasons/:id/episodes",
+		"PUT /api/v1/admin/tv/episodes/:id",
+		"DELETE /api/v1/admin/tv/episodes/:id",
 	} {
 		if _, ok := routes[want]; !ok {
 			t.Fatalf("expected route %s to be registered", want)

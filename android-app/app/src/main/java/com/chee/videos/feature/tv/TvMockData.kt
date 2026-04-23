@@ -124,8 +124,10 @@ private fun tvSeries(
 ): TvSeriesUiModel {
     val seasons = (1..seasonCount).map { season ->
         TvSeasonUiModel(
+            id = "$id-s$season",
             number = season,
             title = "第 $season 季",
+            overview = "第 $season 季剧情概览",
             episodes = (1..episodesPerSeason).map { episode ->
                 TvEpisodeUiModel(
                     id = "$id-s$season-e$episode",
@@ -134,6 +136,9 @@ private fun tvSeries(
                     durationLabel = "${42 + (episode % 6)} 分钟",
                     summary = "围绕关键角色展开的主线推进与情绪爆发，保留多处伏笔。",
                     progressPercent = if (season == 1 && episode == 1) 100 else if (season == 1 && episode <= 3) 48 else 0,
+                    videoId = "mock-$id-s$season-e$episode",
+                    videoStatus = "ready",
+                    playable = true,
                 )
             },
         )

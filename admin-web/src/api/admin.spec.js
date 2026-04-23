@@ -16,7 +16,20 @@ vi.mock('./request', () => ({
   }
 }))
 
-import { uploadAdminImages } from './admin'
+import {
+  createAdminTvEpisode,
+  createAdminTvSeason,
+  createAdminTvSeries,
+  deleteAdminTvEpisode,
+  deleteAdminTvSeason,
+  deleteAdminTvSeries,
+  getAdminTvSeries,
+  getAdminTvSeriesDetail,
+  updateAdminTvEpisode,
+  updateAdminTvSeason,
+  updateAdminTvSeries,
+  uploadAdminImages
+} from './admin'
 
 describe('uploadAdminImages', () => {
   beforeEach(() => {
@@ -33,5 +46,68 @@ describe('uploadAdminImages', () => {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0
     })
+  })
+})
+
+describe('tv series apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    put.mockReset()
+    remove.mockReset()
+  })
+
+  it('requests admin tv series list with query params', async () => {
+    await getAdminTvSeries({ q: '雾城', active: 1 })
+
+    expect(get).toHaveBeenCalledWith('/admin/tv/series', {
+      params: { q: '雾城', active: 1 }
+    })
+  })
+
+  it('requests admin tv series detail by id', async () => {
+    await getAdminTvSeriesDetail(12)
+
+    expect(get).toHaveBeenCalledWith('/admin/tv/series/12')
+  })
+
+  it('creates and updates admin tv series resources', async () => {
+    const payload = { title: '雾城档案' }
+
+    await createAdminTvSeries(payload)
+    await updateAdminTvSeries(12, payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/tv/series', payload)
+    expect(put).toHaveBeenCalledWith('/admin/tv/series/12', payload)
+  })
+
+  it('creates and updates admin tv season resources', async () => {
+    const payload = { season_number: 2 }
+
+    await createAdminTvSeason(12, payload)
+    await updateAdminTvSeason(22, payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/tv/series/12/seasons', payload)
+    expect(put).toHaveBeenCalledWith('/admin/tv/seasons/22', payload)
+  })
+
+  it('creates and updates admin tv episode resources', async () => {
+    const payload = { episode_number: 6 }
+
+    await createAdminTvEpisode(22, payload)
+    await updateAdminTvEpisode(33, payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/tv/seasons/22/episodes', payload)
+    expect(put).toHaveBeenCalledWith('/admin/tv/episodes/33', payload)
+  })
+
+  it('deletes admin tv resources', async () => {
+    await deleteAdminTvSeries(12)
+    await deleteAdminTvSeason(22)
+    await deleteAdminTvEpisode(33)
+
+    expect(remove).toHaveBeenCalledWith('/admin/tv/series/12')
+    expect(remove).toHaveBeenCalledWith('/admin/tv/seasons/22')
+    expect(remove).toHaveBeenCalledWith('/admin/tv/episodes/33')
   })
 })

@@ -26,34 +26,55 @@ import androidx.compose.material.icons.filled.SlowMotionVideo
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.MediaItem
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.feature.detail.LongFormPlaybackSession
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TvSeriesPlayerScreen(
+    accessToken: String,
     onBack: () -> Unit,
     viewModel: TvSeriesPlayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     if (uiState.loading) {
         Box(
             modifier = Modifier
@@ -65,6 +86,7 @@ fun TvSeriesPlayerScreen(
         }
         return
     }
+
     val series = uiState.series
     if (series == null) {
         Box(
@@ -73,12 +95,119 @@ fun TvSeriesPlayerScreen(
                 .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
-            Text("播放器占位数据不存在", color = AppChrome.TextSecondary)
+            Text(uiState.errorMessage ?: "播放器数据不存在", color = AppChrome.TextSecondary)
         }
         return
     }
+
     val currentEpisode = selectedEpisode(uiState)
     val currentSeason = selectedSeason(uiState)
+    val canPlay = uiState.canPlayCurrentEpisode && uiState.currentSourceUrl.isNotBlank()
+    val dataSourceFactory = remember(accessToken) {
+        DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
+            if (accessToken.isNotBlank()) {
+                setDefaultRequestProperties(mapOf("Authorization" to "Bearer $accessToken"))
+            }
+        }
+    }
+    val exoPlayer = remember(accessToken) { ExoPlayer.Builder(context).build() }
+    var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
+    var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
+    var preparedUrl by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
+    var lastHistoryVideoId by remember { mutableStateOf("") }
+
+    val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
+        LongFormPlaybackSession(
+            hasStartedPlayback = hasStartedPlayback,
+            isPausedByUser = isPausedByUser,
+        )
+    }
+
+    fun updatePlaybackSession(nextSession: LongFormPlaybackSession) {
+        hasStartedPlayback = nextSession.hasStartedPlayback
+        isPausedByUser = nextSession.isPausedByUser
+    }
+
+    LaunchedEffect(uiState.currentSourceUrl, canPlay) {
+        if (!canPlay) {
+            exoPlayer.pause()
+            exoPlayer.clearMediaItems()
+            preparedUrl = null
+            return@LaunchedEffect
+        }
+        if (preparedUrl != uiState.currentSourceUrl) {
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
+            val mediaItem = MediaItem.fromUri(uiState.currentSourceUrl)
+            val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+            exoPlayer.setMediaSource(mediaSource, true)
+            exoPlayer.prepare()
+            preparedUrl = uiState.currentSourceUrl
+            hasStartedPlayback = true
+            isPausedByUser = false
+        }
+    }
+
+    LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
+        if (!playbackSession.hasStartedPlayback || !canPlay) {
+            exoPlayer.pause()
+            return@LaunchedEffect
+        }
+        if (playbackSession.isPausedByUser) {
+            exoPlayer.pause()
+            return@LaunchedEffect
+        }
+        exoPlayer.playWhenReady = true
+        exoPlayer.play()
+    }
+
+    LaunchedEffect(uiState.currentVideoId) {
+        if (lastHistoryVideoId.isNotBlank() && lastHistoryVideoId != uiState.currentVideoId) {
+            val (watchSeconds, completed) = readWatchSnapshot(exoPlayer)
+            viewModel.reportHistory(lastHistoryVideoId, watchSeconds, completed)
+        }
+        lastHistoryVideoId = uiState.currentVideoId
+    }
+
+    DisposableEffect(exoPlayer) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                isPlayerActuallyPlaying = isPlaying
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            if (uiState.currentVideoId.isNotBlank()) {
+                val (watchSeconds, completed) = readWatchSnapshot(exoPlayer)
+                viewModel.reportHistory(uiState.currentVideoId, watchSeconds, completed)
+            }
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, exoPlayer, playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> exoPlayer.pause()
+                Lifecycle.Event.ON_RESUME -> {
+                    if (playbackSession.shouldResumeOnLifecycle() && canPlay) {
+                        exoPlayer.playWhenReady = true
+                        exoPlayer.play()
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     Box(
         modifier = Modifier
@@ -133,29 +262,26 @@ fun TvSeriesPlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
+                    .height(260.dp)
                     .padding(horizontal = 12.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color(0xFF2B1F4A), Color(0xFF0D111A)),
-                        ),
-                    ),
-                contentAlignment = Alignment.Center,
+                    .background(Color(0xFF0D111A)),
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.Tv,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.82f),
-                        modifier = Modifier.size(40.dp),
+                if (canPlay) {
+                    LongFormVideoPlayer(
+                        title = currentEpisode?.title ?: series.title,
+                        player = exoPlayer,
+                        isFullscreen = false,
+                        onBack = onBack,
+                        onTogglePlayPause = {
+                            updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
+                        },
+                        onToggleFullscreen = {},
+                        modifier = Modifier.fillMaxSize(),
+                        showStatusBarPadding = false,
                     )
-                    Text("电视剧播放占位区域", color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        text = currentEpisode?.durationLabel ?: "45 分钟",
-                        color = AppChrome.TextMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                } else {
+                    EmptyTvPlayerState()
                 }
             }
 
@@ -167,7 +293,7 @@ fun TvSeriesPlayerScreen(
             ) {
                 Surface(color = AppChrome.SurfaceElevated, shape = RoundedCornerShape(14.dp)) {
                     Text(
-                        text = currentEpisode?.summary ?: "当前集剧情占位文案",
+                        text = currentEpisode?.summary ?: "暂无剧情简介",
                         color = AppChrome.TextSecondary,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -175,10 +301,13 @@ fun TvSeriesPlayerScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     TvPlayerActionButton(
-                        label = if (uiState.isPlaying) "暂停" else "播放",
+                        label = if (playbackSession.isPausedByUser) "继续" else "暂停",
                         icon = Icons.Filled.PlayArrow,
                         modifier = Modifier.weight(1f),
-                        onClick = viewModel::togglePlay,
+                        enabled = canPlay,
+                        onClick = {
+                            updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
+                        },
                     )
                     TvPlayerActionButton(
                         label = "${uiState.playbackSpeed}x",
@@ -294,7 +423,7 @@ fun TvSeriesPlayerScreen(
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
-                                        text = episode.durationLabel,
+                                        text = if (episode.playable) episode.durationLabel else "待绑定 / 未就绪",
                                         color = AppChrome.TextMuted,
                                         style = MaterialTheme.typography.bodySmall,
                                     )
@@ -309,16 +438,34 @@ fun TvSeriesPlayerScreen(
 }
 
 @Composable
+private fun EmptyTvPlayerState() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Tv,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.82f),
+            modifier = Modifier.size(40.dp),
+        )
+        Text("当前分集暂无可播放视频", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
 private fun TvPlayerActionButton(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(12.dp),
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
     ) {
         Row(
             modifier = Modifier
@@ -336,4 +483,13 @@ private fun TvPlayerActionButton(
             )
         }
     }
+}
+
+private fun readWatchSnapshot(player: ExoPlayer): Pair<Int, Boolean> {
+    val watchSeconds = (player.currentPosition.coerceAtLeast(0L) / 1000L).toInt()
+    val durationMs = player.duration
+    val durationSeconds = if (durationMs > 0) (durationMs / 1000L).toInt() else 0
+    val completedThreshold = (durationSeconds - 3).coerceAtLeast(1)
+    val completed = durationSeconds > 0 && watchSeconds >= completedThreshold
+    return watchSeconds to completed
 }

@@ -2375,3 +2375,58 @@
   - 页面级视觉与手势体验未在真实 Android 设备上人工验收，待补充真机/模拟器检查。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-23 20:50] 电视剧接口化与管理端补全
+- Type: `implementation`
+- Summary:
+  - 后端新增 app 端电视剧专区与详情接口、管理端电视剧系列/季/集 CRUD 路由，并补充 `series.active` 与 `episodes.video_id` 删除置空迁移，避免删除底层视频后直接级联丢失分集。
+  - 管理端新增独立“电视剧管理”页与菜单，支持系列筛选、系列详情编辑、季/集折叠编辑、分集绑定现有 `type=episode` 视频，以及对应 API 封装与 helper 单测。
+  - Android 电视剧模块改为真实接口驱动：新增 TV DTO、Repository、映射与 Hilt 绑定，目录页/详情页/播放器页不再依赖 `TvMockData`，播放器按真实 `video_id` 播放并继续沿用历史上报。
+- Changed Files:
+  - `migrations/0014_tv_series_management.up.sql`
+  - `migrations/0014_tv_series_management.down.sql`
+  - `internal/models/app.go`
+  - `internal/models/admin.go`
+  - `internal/repository/tv_repository.go`
+  - `internal/services/tv.go`
+  - `internal/services/tv_service_test.go`
+  - `internal/handlers/tv.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/recommend_test.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/api/admin.spec.js`
+  - `admin-web/src/components/Layout.vue`
+  - `admin-web/src/router/index.js`
+  - `admin-web/src/views/TvSeriesManage.vue`
+  - `admin-web/src/views/tvSeriesManage.helpers.js`
+  - `admin-web/src/views/tvSeriesManage.helpers.spec.js`
+  - `android-app/app/build.gradle.kts`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/di/TvRepositoryModule.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMockData.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvRepositoryMappingTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+  - `cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

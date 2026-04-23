@@ -1,11 +1,14 @@
 package com.chee.videos.feature.tv
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class TvCatalogUiState(
     val loading: Boolean = true,
@@ -13,42 +16,57 @@ data class TvCatalogUiState(
     val continueWatching: TvContinueWatchingUiModel? = null,
     val sections: List<TvCatalogSectionUiModel> = emptyList(),
     val searchResults: List<TvSeriesUiModel> = emptyList(),
+    val errorMessage: String? = null,
 )
 
 @HiltViewModel
-class TvCatalogViewModel @Inject constructor() : ViewModel() {
-    private val allSeries = TvMockData.allSeries()
-    private val catalogSections = TvMockData.catalogSections()
-    private val continueWatching = TvMockData.continueWatching()
-
+class TvCatalogViewModel @Inject constructor(
+    private val repository: TvRepository,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(TvCatalogUiState())
     val uiState: StateFlow<TvCatalogUiState> = _uiState.asStateFlow()
 
     init {
-        _uiState.value = TvCatalogUiState(
-            loading = false,
-            continueWatching = continueWatching,
-            sections = catalogSections,
-        )
+        loadHome()
     }
 
     fun updateQuery(query: String) {
-        _uiState.value = _uiState.value.copy(
-            query = query,
-            searchResults = filterTvSeriesByQuery(allSeries, query),
-        )
+        _uiState.update { it.copy(query = query) }
+        loadHome(query)
     }
-}
 
-internal fun filterTvSeriesByQuery(
-    seriesList: List<TvSeriesUiModel>,
-    query: String,
-): List<TvSeriesUiModel> {
-    val normalizedQuery = query.trim()
-    if (normalizedQuery.isBlank()) {
-        return emptyList()
-    }
-    return seriesList.filter { series ->
-        series.title.contains(normalizedQuery, ignoreCase = true)
+    private fun loadHome(query: String = _uiState.value.query) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    loading = true,
+                    errorMessage = null,
+                    searchResults = if (query.isBlank()) emptyList() else it.searchResults,
+                )
+            }
+            repository.fetchHome(query)
+                .onSuccess { payload ->
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            continueWatching = payload.continueWatching?.let(::tvContinueWatchingToUiModel),
+                            sections = payload.sections.map(::tvSectionToUiModel),
+                            searchResults = payload.searchResults.map(::tvSeriesSummaryToUiModel),
+                            errorMessage = null,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            continueWatching = null,
+                            sections = emptyList(),
+                            searchResults = emptyList(),
+                            errorMessage = error.message ?: "电视剧专区加载失败",
+                        )
+                    }
+                }
+        }
     }
 }
