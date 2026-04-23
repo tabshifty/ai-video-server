@@ -50,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -397,7 +398,7 @@ private fun ImageCollectionViewerContent(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var chromeVisible by rememberSaveable(detail.id) { mutableStateOf(true) }
     var imageScale by rememberSaveable(detail.id) { mutableStateOf(1f) }
-    var imageOffset by rememberSaveable(detail.id) { mutableStateOf(Offset.Zero) }
+    var imageOffset by rememberSaveable(detail.id, stateSaver = ImageViewerOffsetSaver) { mutableStateOf(Offset.Zero) }
 
     LaunchedEffect(pagerState.currentPage) {
         thumbState.animateScrollToItem(pagerState.currentPage)
@@ -711,6 +712,19 @@ private fun resolveImageUrl(baseUrl: String, rawPath: String?): String? {
 
 internal const val ImageViewerMinScale = 0.6f
 private const val ImageViewerMaxScaleCap = 4f
+internal val ImageViewerOffsetSaver = listSaver<Offset, Float>(
+    save = { offset -> saveImageViewerOffset(offset) },
+    restore = { values -> restoreImageViewerOffset(values) },
+)
+
+internal fun saveImageViewerOffset(offset: Offset): List<Float> = listOf(offset.x, offset.y)
+
+internal fun restoreImageViewerOffset(values: List<Float>): Offset {
+    if (values.size < 2) {
+        return Offset.Zero
+    }
+    return Offset(values[0], values[1])
+}
 
 internal fun imageViewerMaxScale(
     imageWidthPx: Float,

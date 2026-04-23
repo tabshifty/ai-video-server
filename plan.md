@@ -15,6 +15,23 @@
 
 ---
 
+### [2026-04-23 12:49] Android 图集查看闪退修复（Offset Saveable）
+- Type: `implementation`
+- Summary:
+  - 修复图集查看页进入即崩溃问题：`rememberSaveable` 直接保存 `Offset` 触发 `SaveableStateRegistry` 非 Bundle 类型异常。
+  - 在图集 viewer 中为 `imageOffset` 引入自定义 `ImageViewerOffsetSaver`，把 `Offset` 序列化为可保存的 `List<Float>`，恢复时支持异常数据回退 `Offset.Zero`。
+  - 新增 `saveImageViewerOffset/restoreImageViewerOffset` 内部函数，并补充单测覆盖“正常保存恢复”和“异常恢复回零”场景，确保后续不回归。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionsScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/imagecollections/ImageCollectionViewerZoomMathTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.imagecollections.ImageCollectionViewerZoomMathTest` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.feature.imagecollections.*'` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 06:36] AV 海报精准刮削：主封面优先与降级覆盖策略
 - Type: `implementation`
 - Summary:

@@ -72,4 +72,21 @@ class ImageCollectionViewerZoomMathTest {
         assertTrue(clamped.x <= 540.0001f)
         assertTrue(clamped.y <= 960.0001f)
     }
+
+    @Test
+    fun offsetSaver_savesAndRestoresOffset() {
+        val saved = saveImageViewerOffset(Offset(24.5f, -13.25f))
+        val restored = restoreImageViewerOffset(saved)
+
+        assertEquals(24.5f, restored.x, 0.0001f)
+        assertEquals(-13.25f, restored.y, 0.0001f)
+    }
+
+    @Test
+    fun offsetSaver_invalidRestoreValueFallsBackToZero() {
+        val restored = restoreImageViewerOffset(listOf(1f))
+
+        assertEquals(0f, restored.x, 0.0001f)
+        assertEquals(0f, restored.y, 0.0001f)
+    }
 }
