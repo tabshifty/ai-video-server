@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-23 18:32] Android 电视剧首页空列表空指针崩溃修复
+- Type: `implementation`
+- Summary:
+  - 修复电视剧专区打开即崩溃问题：后端返回 `sections=null` 或 `search_results=null` 时，Gson 会把运行时空值灌入 Kotlin 非空列表字段，导致 `TvCatalogViewModel` 在映射时触发空指针。
+  - 在电视剧映射层新增空列表兜底，统一对首页分组、搜索结果、详情标签、演员、季列表与分集列表做 `null -> emptyList()` 兼容，避免接口字段缺失或返回 `null` 时崩溃。
+  - 新增回归测试，直接用 `Gson` 反序列化 `null` 数组字段，锁定首页与详情映射在异常返回下仍能稳定回退为空集合。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvRepositoryMappingTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.*'` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew clean :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 17:42] Android 电视剧列表页标题搜索
 - Type: `implementation`
 - Summary:

@@ -3,8 +3,12 @@ package com.chee.videos.feature.tv
 import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.TvSectionDto
+import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
+
+@Suppress("UNCHECKED_CAST")
+internal fun <T> coerceListOrEmpty(value: Any?): List<T> = value as? List<T> ?: emptyList()
 
 internal fun tvSeriesSummaryToUiModel(dto: TvSeriesSummaryDto): TvSeriesUiModel {
     val yearText = dto.firstAirDate?.take(4).orEmpty().ifBlank { "待定档" }
@@ -40,7 +44,7 @@ internal fun tvSectionToUiModel(dto: TvSectionDto): TvCatalogSectionUiModel =
     TvCatalogSectionUiModel(
         title = dto.title,
         subtitle = dto.subtitle,
-        items = dto.items.map(::tvSeriesSummaryToUiModel),
+        items = coerceListOrEmpty<TvSeriesSummaryDto>(dto.items).map(::tvSeriesSummaryToUiModel),
     )
 
 internal fun tvContinueWatchingToUiModel(dto: TvContinueWatchingDto): TvContinueWatchingUiModel =
@@ -67,13 +71,13 @@ internal fun tvEpisodeToUiModel(dto: TvEpisodeDto): TvEpisodeUiModel =
     )
 
 internal fun tvSeriesDetailToUiModel(dto: TvSeriesDetailDto): TvSeriesUiModel {
-    val seasons = dto.seasons.map { season ->
+    val seasons = coerceListOrEmpty<TvSeasonDto>(dto.seasons).map { season ->
         TvSeasonUiModel(
             id = season.id,
             number = season.seasonNumber,
             title = season.title.ifBlank { "第 ${season.seasonNumber} 季" },
             overview = season.overview.orEmpty(),
-            episodes = season.episodes.map(::tvEpisodeToUiModel),
+            episodes = coerceListOrEmpty<TvEpisodeDto>(season.episodes).map(::tvEpisodeToUiModel),
         )
     }
     val yearText = dto.firstAirDate?.take(4).orEmpty().ifBlank { "待定档" }
@@ -88,8 +92,8 @@ internal fun tvSeriesDetailToUiModel(dto: TvSeriesDetailDto): TvSeriesUiModel {
         ratingText = if (dto.playableEpisodes > 0) "可播 ${dto.playableEpisodes}" else "待更新",
         updateText = if (dto.playableEpisodes > 0) "${dto.playableEpisodes} 集可播" else "待绑定视频",
         description = dto.overview.orEmpty().ifBlank { "暂无简介" },
-        tags = dto.tags,
-        cast = dto.cast,
+        tags = coerceListOrEmpty<String>(dto.tags),
+        cast = coerceListOrEmpty<String>(dto.cast),
         seasons = seasons,
         posterSeed = dto.title.hashCode(),
         posterUrl = dto.posterUrl,

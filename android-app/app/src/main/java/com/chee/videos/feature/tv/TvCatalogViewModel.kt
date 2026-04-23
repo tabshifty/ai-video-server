@@ -2,6 +2,8 @@ package com.chee.videos.feature.tv
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chee.videos.core.model.TvSectionDto
+import com.chee.videos.core.model.TvSeriesSummaryDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,8 +52,8 @@ class TvCatalogViewModel @Inject constructor(
                         it.copy(
                             loading = false,
                             continueWatching = payload.continueWatching?.let(::tvContinueWatchingToUiModel),
-                            sections = payload.sections.map(::tvSectionToUiModel),
-                            searchResults = payload.searchResults.map(::tvSeriesSummaryToUiModel),
+                            sections = coerceListOrEmpty<TvSectionDto>(payload.sections).map(::tvSectionToUiModel),
+                            searchResults = coerceListOrEmpty<TvSeriesSummaryDto>(payload.searchResults).map(::tvSeriesSummaryToUiModel),
                             errorMessage = null,
                         )
                     }

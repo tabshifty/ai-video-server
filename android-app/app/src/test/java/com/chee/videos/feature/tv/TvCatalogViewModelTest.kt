@@ -4,6 +4,7 @@ import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvSectionDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
+import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -79,5 +80,32 @@ class TvCatalogViewModelTest {
         assertFalse(state.loading)
         assertEquals("加载失败", state.errorMessage)
         assertTrue(state.sections.isEmpty())
+    }
+
+    @Test
+    fun nullListsInPayload_doNotCrashAndFallbackToEmpty() = runTest {
+        val payload = Gson().fromJson(
+            """
+            {
+              "continue_watching": null,
+              "sections": null,
+              "search_results": null,
+              "page": 1,
+              "page_size": 20
+            }
+            """.trimIndent(),
+            TvHomePayload::class.java,
+        )
+        val viewModel = TvCatalogViewModel(
+            repository = FakeTvRepository(homePayload = payload),
+        )
+
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertTrue(state.sections.isEmpty())
+        assertTrue(state.searchResults.isEmpty())
+        assertEquals(null, state.errorMessage)
     }
 }
