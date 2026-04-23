@@ -7,24 +7,29 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,6 +52,7 @@ fun TvCatalogScreen(
     viewModel: TvCatalogViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isSearching = uiState.query.isNotBlank()
 
     if (uiState.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -60,6 +66,30 @@ fun TvCatalogScreen(
         contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        item(key = "search") {
+            TvCatalogSearchBar(
+                query = uiState.query,
+                onQueryChanged = viewModel::updateQuery,
+            )
+        }
+        if (isSearching) {
+            item(key = "search-header") {
+                TvSearchResultHeader(resultCount = uiState.searchResults.size)
+            }
+            if (uiState.searchResults.isEmpty()) {
+                item(key = "search-empty") {
+                    TvSearchEmptyState()
+                }
+            } else {
+                items(uiState.searchResults, key = { series -> series.id }) { series ->
+                    TvSearchResultCard(
+                        series = series,
+                        onClick = { onOpenSeries(series.id) },
+                    )
+                }
+            }
+            return@LazyColumn
+        }
         uiState.continueWatching?.let { continueWatching ->
             item(key = "continue-watching") {
                 TvContinueWatchingBanner(
@@ -73,6 +103,160 @@ fun TvCatalogScreen(
                 section = section,
                 onOpenSeries = onOpenSeries,
             )
+        }
+    }
+}
+
+@Composable
+private fun TvCatalogSearchBar(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        placeholder = {
+            Text("搜索剧名", color = AppChrome.TextMuted)
+        },
+        leadingIcon = {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = AppChrome.TextMuted)
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = { onQueryChanged("") }) {
+                    Icon(Icons.Filled.Close, contentDescription = "清空搜索", tint = AppChrome.TextMuted)
+                }
+            }
+        },
+        shape = RoundedCornerShape(18.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = AppChrome.TextPrimary,
+            unfocusedTextColor = AppChrome.TextPrimary,
+            focusedBorderColor = AppChrome.AccentStrong,
+            unfocusedBorderColor = AppChrome.Divider,
+            cursorColor = AppChrome.AccentStrong,
+            focusedContainerColor = AppChrome.Surface.copy(alpha = 0.92f),
+            unfocusedContainerColor = AppChrome.Surface.copy(alpha = 0.82f),
+        ),
+    )
+}
+
+@Composable
+private fun TvSearchResultHeader(resultCount: Int) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "搜索结果",
+            color = AppChrome.TextPrimary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = if (resultCount > 0) "共找到 $resultCount 部剧集" else "没有匹配的剧集",
+            color = AppChrome.TextMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun TvSearchEmptyState() {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.SectionShape,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+                tint = AppChrome.TextMuted,
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                text = "没有找到相关剧集",
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "试试输入更完整的剧名关键词",
+                color = AppChrome.TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvSearchResultCard(
+    series: TvSeriesUiModel,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.SectionShape,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AppChrome.SectionShape)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(84.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(tvPosterBrush(series.posterSeed)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Tv,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.82f),
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = series.title,
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${series.subtitle} · ${series.updateText}",
+                    color = AppChrome.TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = series.description,
+                    color = AppChrome.TextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

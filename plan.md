@@ -15,6 +15,24 @@
 
 ---
 
+### [2026-04-23 17:42] Android 电视剧列表页标题搜索
+- Type: `implementation`
+- Summary:
+  - 为电视剧列表页增加顶部搜索框，按剧名关键词实时过滤本地占位数据，清空搜索后恢复原有“继续追剧 + 分组推荐”的浏览流。
+  - 搜索态切换为独立结果列表，补充结果标题、无结果空状态和可点击结果卡片，保持与现有深色影院风格一致。
+  - 为电视剧目录 ViewModel 增加查询状态与过滤逻辑，并新增回归测试锁定“命中过滤”和“清空恢复”两类行为。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvCatalogViewModelTest` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.*'` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 16:55] Android 电视剧播放页顶部安全区修复
 - Type: `implementation`
 - Summary:
