@@ -2,38 +2,35 @@ package com.chee.videos.feature.tv
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class TvSeriesDetailUiState(
     val loading: Boolean = true,
     val series: TvSeriesUiModel? = null,
     val selectedSeasonNumber: Int = 1,
     val selectedEpisodeNumber: Int = 1,
+    val errorMessage: String? = null,
 )
 
 @HiltViewModel
 class TvSeriesDetailViewModel @Inject constructor(
+    private val repository: TvRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+    private val seriesId = savedStateHandle.get<String>(TvSeriesIdArg).orEmpty()
 
     private val _uiState = MutableStateFlow(TvSeriesDetailUiState())
     val uiState: StateFlow<TvSeriesDetailUiState> = _uiState.asStateFlow()
 
     init {
-        val seriesId = savedStateHandle.get<String>(TvSeriesIdArg).orEmpty()
-        val series = TvMockData.findSeries(seriesId) ?: TvMockData.allSeries().firstOrNull()
-        val defaultSeason = series?.seasons?.firstOrNull()
-        _uiState.value = TvSeriesDetailUiState(
-            loading = false,
-            series = series,
-            selectedSeasonNumber = defaultSeason?.number ?: 1,
-            selectedEpisodeNumber = defaultSeason?.episodes?.firstOrNull()?.number ?: 1,
-        )
+        load()
     }
 
     fun selectSeason(seasonNumber: Int) {
@@ -42,7 +39,7 @@ class TvSeriesDetailViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 selectedSeasonNumber = season.number,
-                selectedEpisodeNumber = season.episodes.firstOrNull()?.number ?: 1,
+                selectedEpisodeNumber = findPreferredEpisodeNumber(season),
             )
         }
     }
@@ -54,6 +51,30 @@ class TvSeriesDetailViewModel @Inject constructor(
         }
         _uiState.update { state ->
             state.copy(selectedEpisodeNumber = episodeNumber)
+        }
+    }
+
+    private fun load() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loading = true, errorMessage = null) }
+            repository.fetchSeriesDetail(seriesId)
+                .onSuccess { dto ->
+                    val series = tvSeriesDetailToUiModel(dto)
+                    val defaultSeason = series.seasons.firstOrNull()
+                    _uiState.value = TvSeriesDetailUiState(
+                        loading = false,
+                        series = series,
+                        selectedSeasonNumber = defaultSeason?.number ?: 1,
+                        selectedEpisodeNumber = defaultSeason?.let(::findPreferredEpisodeNumber) ?: 1,
+                        errorMessage = null,
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = TvSeriesDetailUiState(
+                        loading = false,
+                        errorMessage = error.message ?: "电视剧详情加载失败",
+                    )
+                }
         }
     }
 }

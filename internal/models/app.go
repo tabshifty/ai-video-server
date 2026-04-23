@@ -119,3 +119,85 @@ type ImageCollectionDetail struct {
 	UpdatedAt   time.Time              `json:"updated_at"`
 	Images      []ImageCollectionImage `json:"images"`
 }
+
+type TvHomePayload struct {
+	ContinueWatching *TvContinueWatchingDto `json:"continue_watching,omitempty"`
+	Sections         []TvSectionDto         `json:"sections"`
+	SearchResults    []TvSeriesSummaryDto   `json:"search_results"`
+	Page             int                    `json:"page"`
+	PageSize         int                    `json:"page_size"`
+}
+
+type TvContinueWatchingDto struct {
+	SeriesID        int64  `json:"series_id"`
+	SeriesTitle     string `json:"series_title"`
+	SeasonNumber    int    `json:"season_number"`
+	EpisodeNumber   int    `json:"episode_number"`
+	EpisodeTitle    string `json:"episode_title"`
+	PosterURL       string `json:"poster_url"`
+	BackdropURL     string `json:"backdrop_url"`
+	WatchSeconds    int    `json:"watch_seconds"`
+	DurationSeconds int    `json:"duration_seconds"`
+	ProgressPercent int    `json:"progress_percent"`
+}
+
+type TvSectionDto struct {
+	Title    string               `json:"title"`
+	Subtitle string               `json:"subtitle"`
+	Items    []TvSeriesSummaryDto `json:"items"`
+}
+
+type TvSeriesSummaryDto struct {
+	ID                   int64  `json:"id"`
+	Title                string `json:"title"`
+	Overview             string `json:"overview"`
+	PosterURL            string `json:"poster_url"`
+	BackdropURL          string `json:"backdrop_url"`
+	FirstAirDate         string `json:"first_air_date"`
+	TotalSeasons         int    `json:"total_seasons"`
+	TotalEpisodes        int    `json:"total_episodes"`
+	PlayableEpisodes     int    `json:"playable_episodes"`
+	LatestEpisodeAirDate string `json:"latest_episode_air_date"`
+}
+
+type TvSeriesDetailDto struct {
+	ID               int64         `json:"id"`
+	Title            string        `json:"title"`
+	Overview         string        `json:"overview"`
+	PosterURL        string        `json:"poster_url"`
+	BackdropURL      string        `json:"backdrop_url"`
+	FirstAirDate     string        `json:"first_air_date"`
+	TotalSeasons     int           `json:"total_seasons"`
+	TotalEpisodes    int           `json:"total_episodes"`
+	PlayableEpisodes int           `json:"playable_episodes"`
+	Tags             []string      `json:"tags"`
+	Cast             []string      `json:"cast"`
+	Seasons          []TvSeasonDto `json:"seasons"`
+}
+
+type TvSeasonDto struct {
+	ID           int64          `json:"id"`
+	SeasonNumber int            `json:"season_number"`
+	Title        string         `json:"title"`
+	Overview     string         `json:"overview"`
+	PosterURL    string         `json:"poster_url"`
+	AirDate      string         `json:"air_date"`
+	Episodes     []TvEpisodeDto `json:"episodes"`
+}
+
+type TvEpisodeDto struct {
+	ID              int64  `json:"id"`
+	EpisodeNumber   int    `json:"episode_number"`
+	Title           string `json:"title"`
+	Overview        string `json:"overview"`
+	Runtime         int    `json:"runtime"`
+	AirDate         string `json:"air_date"`
+	StillURL        string `json:"still_url"`
+	VideoID         string `json:"video_id"`
+	VideoTitle      string `json:"video_title"`
+	VideoStatus     string `json:"video_status"`
+	WatchSeconds    int    `json:"watch_seconds"`
+	ProgressPercent int    `json:"progress_percent"`
+	LastWatchedAt   string `json:"last_watched_at"`
+	Playable        bool   `json:"playable"`
+}

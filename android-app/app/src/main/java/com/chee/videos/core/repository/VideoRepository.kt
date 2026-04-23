@@ -11,6 +11,8 @@ import com.chee.videos.core.model.ImageCollectionDetailDto
 import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
@@ -96,6 +98,31 @@ class VideoRepository @Inject constructor(
 
                 else -> throw AppException("不支持的发现模式: $mode")
             }
+        }
+    }
+
+    suspend fun fetchTvHome(
+        query: String = "",
+        page: Int = 1,
+        pageSize: Int = 20,
+    ): Result<TvHomePayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvHome(
+                url = UrlBuilder.tvHome(baseUrl),
+                authorization = bearer,
+                keyword = query.trim().takeIf { it.isNotBlank() },
+                page = page,
+                pageSize = pageSize,
+            )
+        }
+    }
+
+    suspend fun fetchTvSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvSeriesDetail(
+                url = UrlBuilder.tvSeriesDetail(baseUrl, seriesId),
+                authorization = bearer,
+            )
         }
     }
 

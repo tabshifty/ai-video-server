@@ -72,6 +72,22 @@ fun TvCatalogScreen(
                 onQueryChanged = viewModel::updateQuery,
             )
         }
+        uiState.errorMessage?.let { message ->
+            item(key = "error") {
+                Surface(
+                    color = AppChrome.SurfaceElevated,
+                    shape = AppChrome.SectionShape,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    )
+                }
+            }
+        }
         if (isSearching) {
             item(key = "search-header") {
                 TvSearchResultHeader(resultCount = uiState.searchResults.size)

@@ -76,6 +76,7 @@ fun TvSeriesDetailScreen(
         return
     }
     val season = selectedDetailSeason(uiState)
+    val currentEpisode = selectedDetailEpisode(uiState)
     val episodes = season?.episodes.orEmpty()
 
     LazyColumn(
@@ -131,7 +132,7 @@ fun TvSeriesDetailScreen(
                         Surface(
                             color = AppChrome.Accent,
                             shape = AppChrome.PillShape,
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.clickable(enabled = currentEpisode?.playable == true) {
                                 onPlayEpisode(
                                     series.id,
                                     uiState.selectedSeasonNumber,
@@ -157,7 +158,11 @@ fun TvSeriesDetailScreen(
                             shape = AppChrome.PillShape,
                         ) {
                             Text(
-                                text = "继续观看 S${uiState.selectedSeasonNumber}E${uiState.selectedEpisodeNumber}",
+                                text = if (currentEpisode?.playable == true) {
+                                    "继续观看 S${uiState.selectedSeasonNumber}E${uiState.selectedEpisodeNumber}"
+                                } else {
+                                    "当前分集暂无可播放视频"
+                                },
                                 color = Color.White,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -244,7 +249,7 @@ fun TvSeriesDetailScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clickable {
+                                    .clickable(enabled = episode.playable) {
                                         viewModel.selectEpisode(episode.number)
                                         onPlayEpisode(
                                             series.id,
@@ -266,6 +271,11 @@ fun TvSeriesDetailScreen(
                                     Text(
                                         text = episode.durationLabel,
                                         color = AppChrome.TextMuted,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                    Text(
+                                        text = if (episode.playable) "可播放" else "待绑定",
+                                        color = if (episode.playable) AppChrome.AccentWarm else AppChrome.TextMuted,
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }

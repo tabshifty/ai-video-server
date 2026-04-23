@@ -297,6 +297,7 @@ private fun AuthenticatedNav(
                 ),
             ) {
                 TvSeriesPlayerScreen(
+                    accessToken = accessToken,
                     onBack = { navController.popBackStack() },
                 )
             }

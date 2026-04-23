@@ -7,11 +7,16 @@ data class TvEpisodeUiModel(
     val durationLabel: String,
     val summary: String,
     val progressPercent: Int = 0,
+    val videoId: String = "",
+    val videoStatus: String = "",
+    val playable: Boolean = false,
 )
 
 data class TvSeasonUiModel(
+    val id: String,
     val number: Int,
     val title: String,
+    val overview: String = "",
     val episodes: List<TvEpisodeUiModel>,
 )
 
@@ -26,6 +31,10 @@ data class TvSeriesUiModel(
     val cast: List<String>,
     val seasons: List<TvSeasonUiModel>,
     val posterSeed: Int,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val playableEpisodes: Int = 0,
+    val totalEpisodes: Int = 0,
 )
 
 data class TvCatalogSectionUiModel(

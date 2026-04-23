@@ -24,6 +24,7 @@ const auth = useAuthStore()
 const navItems = [
   { path: '/dashboard', label: '仪表盘', title: '系统仪表盘', subtitle: '管理员工作台', icon: DataAnalysis },
   { path: '/videos', label: '视频管理', title: '视频管理', subtitle: '管理员工作台', icon: Film },
+  { path: '/tv-series', label: '电视剧管理', title: '电视剧管理', subtitle: '管理员工作台', icon: Files },
   { path: '/upload', label: '上传视频', title: '上传中心', subtitle: '管理员工作台', icon: UploadFilled },
   { path: '/scrape', label: '刮削管理', title: '刮削管理', subtitle: '管理员工作台', icon: MagicStick },
   { path: '/actors', label: '演员管理', title: '演员管理', subtitle: '管理员工作台', icon: Avatar },

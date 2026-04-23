@@ -94,6 +94,8 @@ func (a *API) Register(r *gin.Engine) {
 		v1.POST("/scrape", a.Scrape)
 		v1.GET("/short/random", a.RandomShort)
 		v1.GET("/short/discover", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ShortDiscover)
+		v1.GET("/tv/home", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVHome)
+		v1.GET("/tv/series/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVSeriesDetail)
 		v1.GET("/image-collections", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppImageCollections)
 		v1.GET("/image-collections/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppImageCollectionDetail)
 		v1.GET("/images/:id/view", a.AppImageView)
@@ -127,6 +129,17 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/videos/:id/thumbnail/capture", a.AdminCaptureVideoThumbnail)
 			admin.PUT("/videos/:id", a.AdminUpdateVideo)
 			admin.DELETE("/videos/:id", a.AdminDeleteVideo)
+			admin.GET("/tv/series", a.AdminTVSeries)
+			admin.GET("/tv/series/:id", a.AdminTVSeriesDetail)
+			admin.POST("/tv/series", a.AdminCreateTVSeries)
+			admin.PUT("/tv/series/:id", a.AdminUpdateTVSeries)
+			admin.DELETE("/tv/series/:id", a.AdminDeleteTVSeries)
+			admin.POST("/tv/series/:id/seasons", a.AdminCreateTVSeason)
+			admin.PUT("/tv/seasons/:id", a.AdminUpdateTVSeason)
+			admin.DELETE("/tv/seasons/:id", a.AdminDeleteTVSeason)
+			admin.POST("/tv/seasons/:id/episodes", a.AdminCreateTVEpisode)
+			admin.PUT("/tv/episodes/:id", a.AdminUpdateTVEpisode)
+			admin.DELETE("/tv/episodes/:id", a.AdminDeleteTVEpisode)
 			admin.POST("/videos/:id/retranscode", a.AdminRetranscodeVideo)
 			admin.GET("/users", a.AdminUsers)
 			admin.PUT("/users/:id/role", a.AdminUpdateUserRole)
@@ -240,6 +253,14 @@ func parseUUIDCSV(raw string) ([]uuid.UUID, error) {
 		return nil, nil
 	}
 	return parseUUIDStrings(strings.Split(trimmed, ","))
+}
+
+func parseInt64(raw string) (int64, bool) {
+	value, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || value <= 0 {
+		return 0, false
+	}
+	return value, true
 }
 
 func ok(c *gin.Context, data any) {
