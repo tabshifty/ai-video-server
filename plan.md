@@ -15,6 +15,19 @@
 
 ---
 
+### [2026-04-23 16:55] Android 电视剧播放页顶部安全区修复
+- Type: `implementation`
+- Summary:
+  - 修复电视剧详情进入播放页后，顶部返回栏与标题内容压到系统状态栏的问题。
+  - 为电视剧播放页顶部标题栏补充 `statusBarsPadding()`，仅让头部区域进入安全区，不改动下方播放器占位区和操作区布局高度。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 16:44] Android 电视剧专区占位 UI 与独立播放流
 - Type: `implementation`
 - Summary:
