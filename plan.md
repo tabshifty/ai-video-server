@@ -15,6 +15,36 @@
 
 ---
 
+### [2026-04-23 16:44] Android 电视剧专区占位 UI 与独立播放流
+- Type: `implementation`
+- Summary:
+  - 将首页原“电视剧”内容替换为独立的电视剧专区占位 UI，不再走现有分类接口加载；首页内提供继续观看、分组推荐和横向卡片浏览，整体采用深色影院风格。
+  - 新增电视剧详情页与电视剧播放器页，使用本地 mock 数据驱动，覆盖剧集基础信息、分季选集、剧集播放占位区与底部选集抽屉，保持后续接真实接口时的路由结构稳定。
+  - 为电视剧模块补充路由构建、mock 数据和 ViewModel 单测，修复实现阶段的 Compose 编译问题，包括字符串模板变量歧义、`RowScope.weight` 用法和 `ModalBottomSheet` 的 Material3 opt-in。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMockData.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvRoutes.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvMockDataTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvRoutesTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.*'` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 12:49] Android 图集查看闪退修复（Offset Saveable）
 - Type: `implementation`
 - Summary:

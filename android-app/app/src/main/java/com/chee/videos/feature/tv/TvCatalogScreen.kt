@@ -1,0 +1,264 @@
+package com.chee.videos.feature.tv
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chee.videos.core.ui.AppChrome
+
+@Composable
+fun TvCatalogScreen(
+    onOpenSeries: (String) -> Unit,
+    viewModel: TvCatalogViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    if (uiState.loading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = AppChrome.AccentStrong)
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        uiState.continueWatching?.let { continueWatching ->
+            item(key = "continue-watching") {
+                TvContinueWatchingBanner(
+                    data = continueWatching,
+                    onClick = { onOpenSeries(continueWatching.seriesId) },
+                )
+            }
+        }
+        items(uiState.sections, key = { section -> section.title }) { section ->
+            TvCatalogSection(
+                section = section,
+                onOpenSeries = onOpenSeries,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvContinueWatchingBanner(
+    data: TvContinueWatchingUiModel,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.CardShape,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AppChrome.CardShape)
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(Color(0xFF1A2031), Color(0xFF111827)),
+                    ),
+                )
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "继续追剧",
+                    color = AppChrome.AccentWarm,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = data.seriesTitle,
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "S${data.seasonNumber} · E${data.episodeNumber}  ${data.episodeTitle}",
+                    color = AppChrome.TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Surface(color = AppChrome.Accent, shape = AppChrome.PillShape) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text("继续播放", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    Text(
+                        text = "已观看 ${data.progressPercent.coerceIn(0, 100)}%",
+                        color = AppChrome.TextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvCatalogSection(
+    section: TvCatalogSectionUiModel,
+    onOpenSeries: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = section.title,
+            color = AppChrome.TextPrimary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = section.subtitle,
+            color = AppChrome.TextMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 2.dp),
+        ) {
+            items(section.items, key = { item -> item.id }) { series ->
+                TvSeriesPosterCard(
+                    series = series,
+                    onClick = { onOpenSeries(series.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvSeriesPosterCard(
+    series: TvSeriesUiModel,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .size(width = 146.dp, height = 256.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .background(tvPosterBrush(series.posterSeed)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Tv,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.82f),
+                    modifier = Modifier.size(34.dp),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = series.title,
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = series.updateText,
+                    color = AppChrome.TextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = AppChrome.AccentWarm,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = series.ratingText,
+                        color = AppChrome.TextSecondary,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun tvPosterBrush(seed: Int): Brush {
+    return when (seed % 5) {
+        0 -> Brush.verticalGradient(listOf(Color(0xFF2D1A48), Color(0xFF0B1220)))
+        1 -> Brush.verticalGradient(listOf(Color(0xFF3C1D2E), Color(0xFF111827)))
+        2 -> Brush.verticalGradient(listOf(Color(0xFF1F3A56), Color(0xFF111827)))
+        3 -> Brush.verticalGradient(listOf(Color(0xFF3D3420), Color(0xFF121826)))
+        else -> Brush.verticalGradient(listOf(Color(0xFF1C3D36), Color(0xFF101820)))
+    }
+}

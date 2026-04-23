@@ -49,6 +49,7 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.homeContentTabs
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.feature.shorts.ShortFeedScreen
+import com.chee.videos.feature.tv.TvCatalogScreen
 
 private val tabs = homeContentTabs
 
@@ -57,6 +58,7 @@ fun HomeScreen(
     baseUrl: String,
     accessToken: String,
     onOpenDetail: (String, String) -> Unit,
+    onOpenTvSeries: (String) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
     onOpenImageCollectionViewer: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -66,7 +68,7 @@ fun HomeScreen(
 
     LaunchedEffect(selectedTab) {
         val tab = tabs[selectedTab]
-        if (tab.type != "short") {
+        if (tab.type == "movie" || tab.type == "av") {
             viewModel.loadCategory(tab.type)
         }
     }
@@ -104,12 +106,8 @@ fun HomeScreen(
                 }
 
                 "episode" -> {
-                    CategoryListSection(
-                        baseUrl = baseUrl,
-                        state = uiState.episode,
-                        categoryTitle = tabs[selectedTab].title,
-                        onRetry = { viewModel.loadCategory("episode", force = true) },
-                        onOpenDetail = onOpenDetail,
+                    TvCatalogScreen(
+                        onOpenSeries = onOpenTvSeries,
                     )
                 }
 

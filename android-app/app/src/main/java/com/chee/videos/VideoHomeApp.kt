@@ -50,6 +50,15 @@ import com.chee.videos.feature.imagecollections.ImageCollectionsScreen
 import com.chee.videos.feature.mine.MineScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
 import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
+import com.chee.videos.feature.tv.TvEpisodeArg
+import com.chee.videos.feature.tv.TvPlayerRoutePattern
+import com.chee.videos.feature.tv.TvSeasonArg
+import com.chee.videos.feature.tv.TvSeriesDetailScreen
+import com.chee.videos.feature.tv.TvSeriesIdArg
+import com.chee.videos.feature.tv.TvSeriesPlayerScreen
+import com.chee.videos.feature.tv.TvSeriesRoutePattern
+import com.chee.videos.feature.tv.buildTvPlayerRoute
+import com.chee.videos.feature.tv.buildTvSeriesRoute
 
 @Composable
 fun VideoHomeApp(
@@ -180,6 +189,9 @@ private fun AuthenticatedNav(
                         onOpenDetail = { videoId, videoType ->
                             navController.navigate("detail/$videoId?type=${Uri.encode(videoType)}")
                         },
+                        onOpenTvSeries = { seriesId ->
+                            navController.navigate(buildTvSeriesRoute(seriesId))
+                        },
                         onOpenShortDiscover = { mode, value, title ->
                             navController.navigate(
                                 "short-discover/${Uri.encode(mode)}/${Uri.encode(value)}/${Uri.encode(title)}",
@@ -252,6 +264,39 @@ private fun AuthenticatedNav(
                     mode = entry.arguments?.getString("mode").orEmpty(),
                     value = entry.arguments?.getString("value").orEmpty(),
                     title = entry.arguments?.getString("title").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = TvSeriesRoutePattern,
+                arguments = listOf(
+                    navArgument(TvSeriesIdArg) { type = NavType.StringType },
+                ),
+            ) {
+                TvSeriesDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onPlayEpisode = { seriesId, season, episode ->
+                        navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
+                    },
+                )
+            }
+
+            composable(
+                route = TvPlayerRoutePattern,
+                arguments = listOf(
+                    navArgument(TvSeriesIdArg) { type = NavType.StringType },
+                    navArgument(TvSeasonArg) {
+                        type = NavType.IntType
+                        defaultValue = 1
+                    },
+                    navArgument(TvEpisodeArg) {
+                        type = NavType.IntType
+                        defaultValue = 1
+                    },
+                ),
+            ) {
+                TvSeriesPlayerScreen(
                     onBack = { navController.popBackStack() },
                 )
             }
