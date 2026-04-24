@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"video-server/internal/models"
+	"video-server/internal/queue"
 	"video-server/internal/response"
 	"video-server/internal/services"
 	"video-server/internal/utils"
@@ -229,11 +231,31 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 		response.Error(c, 4, "only movie, episode or av supports scrape confirm")
 		return
 	}
+	if shouldEnqueueAdminScrapeConfirmTranscode(video) {
+		if a.enqueuer == nil {
+			response.Error(c, 5, "queue not configured")
+			return
+		}
+		payload := queue.TranscodePayload{
+			VideoID:      videoID.String(),
+			InputPath:    video.OriginalPath,
+			OutputDir:    filepath.Join(a.storageRoot, "videos"),
+			TargetFormat: "mp4",
+		}
+		if err := a.enqueuer.EnqueueTranscode(payload); err != nil {
+			response.Error(c, 5, err.Error())
+			return
+		}
+	}
 
 	ok(c, gin.H{
 		"saved":    true,
 		"video_id": videoID,
 	})
+}
+
+func shouldEnqueueAdminScrapeConfirmTranscode(video models.Video) bool {
+	return strings.TrimSpace(video.OriginalPath) != "" && video.Status != "ready" && video.Status != "processing"
 }
 
 func stringFromAny(v any) string {

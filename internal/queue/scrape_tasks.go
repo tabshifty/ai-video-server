@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,12 @@ import (
 
 	"video-server/internal/services"
 )
+
+type scrapeFailureDecision struct {
+	status           string
+	enqueueTranscode bool
+	metadata         map[string]any
+}
 
 // ScrapePayload carries metadata discovery input for movie/episode/av uploads.
 type ScrapePayload struct {
@@ -132,9 +139,13 @@ func (p *Processor) HandleScrapeRetag(ctx context.Context, task *asynq.Task) err
 		scrapeErr = p.autoScrapeAV(ctx, videoID, searchTitle)
 	}
 	if scrapeErr != nil {
-		_ = p.repo.AppendVideoMetadata(ctx, videoID, "scrape_error", scrapeErr.Error())
-		_ = p.repo.UpdateVideoStatus(ctx, videoID, "uploaded")
-		p.logger.Error("retag scrape failed", "video_id", videoID, "target_type", targetType, "error", scrapeErr)
+		decision := buildScrapeFailureDecision(targetType, scrapeErr)
+		_ = p.repo.MergeVideoMetadata(ctx, videoID, decision.metadata)
+		_ = p.repo.UpdateVideoStatus(ctx, videoID, decision.status)
+		p.logger.Error("retag scrape failed", "video_id", videoID, "target_type", targetType, "status", decision.status, "error", scrapeErr)
+		if targetType == "episode" {
+			return nil
+		}
 		return scrapeErr
 	}
 	if err := p.repo.UpdateVideoStatus(ctx, videoID, "ready"); err != nil {
@@ -178,8 +189,13 @@ func (p *Processor) handleScrape(ctx context.Context, task *asynq.Task, expected
 		_, scrapeErr = p.scrape.ScrapeEpisodeUpload(ctx, videoID, payload.FilePath, payload.Filename)
 	}
 	if scrapeErr != nil {
-		_ = p.repo.AppendVideoMetadata(ctx, videoID, "scrape_error", scrapeErr.Error())
-		_ = p.repo.UpdateVideoStatus(ctx, videoID, "uploaded")
+		decision := buildScrapeFailureDecision(expectedType, scrapeErr)
+		_ = p.repo.MergeVideoMetadata(ctx, videoID, decision.metadata)
+		_ = p.repo.UpdateVideoStatus(ctx, videoID, decision.status)
+		if !decision.enqueueTranscode {
+			p.logger.Warn("scrape failed, moved to pending state", "video_id", videoID, "status", decision.status, "error", scrapeErr)
+			return nil
+		}
 		p.logger.Error("scrape failed, continue to transcode", "video_id", videoID, "error", scrapeErr)
 	}
 
@@ -320,4 +336,55 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func buildScrapeFailureDecision(expectedType string, err error) scrapeFailureDecision {
+	if expectedType != "episode" {
+		return scrapeFailureDecision{
+			status:           "uploaded",
+			enqueueTranscode: true,
+			metadata: map[string]any{
+				"scrape_error": err.Error(),
+			},
+		}
+	}
+
+	return scrapeFailureDecision{
+		status:           "tv_pending",
+		enqueueTranscode: false,
+		metadata:         buildEpisodePendingMetadata(err),
+	}
+}
+
+func buildEpisodePendingMetadata(err error) map[string]any {
+	metadata := map[string]any{
+		"scrape_error": err.Error(),
+	}
+	var pendingErr *services.EpisodeAutoScrapeError
+	if !errors.As(err, &pendingErr) {
+		metadata["scrape_stage"] = services.EpisodeAutoScrapeStageAPIError
+		return metadata
+	}
+
+	stage := strings.TrimSpace(pendingErr.Stage)
+	if stage == "" {
+		stage = services.EpisodeAutoScrapeStageAPIError
+	}
+	metadata["scrape_stage"] = stage
+	if strings.TrimSpace(pendingErr.ParsedTitle) != "" {
+		metadata["parsed_title"] = pendingErr.ParsedTitle
+	}
+	if pendingErr.ParsedSeasonNumber > 0 {
+		metadata["parsed_season_number"] = pendingErr.ParsedSeasonNumber
+	}
+	if pendingErr.ParsedEpisodeNumber > 0 {
+		metadata["parsed_episode_number"] = pendingErr.ParsedEpisodeNumber
+	}
+	if pendingErr.CandidateCount > 0 {
+		metadata["candidate_count"] = pendingErr.CandidateCount
+	}
+	if len(pendingErr.CandidatePreview) > 0 {
+		metadata["candidate_preview"] = pendingErr.CandidatePreview
+	}
+	return metadata
 }

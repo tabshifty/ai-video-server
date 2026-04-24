@@ -1,6 +1,7 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import { scrapeConfirm, scrapePreview } from '../api/admin'
 
@@ -19,6 +20,7 @@ const candidates = ref([])
 const selectedIndex = ref(-1)
 const previewLoading = ref(false)
 const saveLoading = ref(false)
+const route = useRoute()
 
 const selectedCandidate = computed(() => {
   if (selectedIndex.value < 0 || selectedIndex.value >= candidates.value.length) {
@@ -36,6 +38,21 @@ const selectedMetadata = computed(() => {
 })
 
 const prettyMetadata = computed(() => JSON.stringify(selectedMetadata.value, null, 2))
+
+onMounted(() => {
+  const videoID = typeof route.query.video_id === 'string' ? route.query.video_id.trim() : ''
+  const title = typeof route.query.title === 'string' ? route.query.title.trim() : ''
+  const type = typeof route.query.type === 'string' ? route.query.type.trim() : ''
+  if (videoID) {
+    form.video_id = videoID
+  }
+  if (title) {
+    form.title = title
+  }
+  if (type === 'tv' || type === 'movie' || type === 'av') {
+    form.type = type
+  }
+})
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg

@@ -221,6 +221,35 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-04-24 10:48] 电视剧上传自动并入电视剧树与待绑定状态
+- Type: `implementation`
+- Summary:
+  - 将 `type=episode` 自动刮削从“失败后静默回退普通上传视频”改为“高置信命中才自动并入电视剧树，失败则进入 `tv_pending` 待处理状态”，并在 metadata 中写入 `scrape_stage`、解析结果与候选摘要。
+  - 重构 TMDB 电视剧同步逻辑：自动刮削、手工确认和旧 `SyncTVEpisode` 均改为同步整剧季/集骨架；命中分集绑定当前视频，其他分集仅补齐元数据且不覆盖已绑定 `video_id`，同时允许同一分集后续上传重新绑定到新视频。
+  - 管理端视频列表新增 `tv_pending` 状态筛选与详情诊断面板，并提供跳转到刮削确认页、电视剧管理页的入口；手工确认成功后会自动补入转码队列。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `internal/services/scraper_episode_sync_test.go`
+  - `internal/queue/scrape_tasks.go`
+  - `internal/queue/scrape_tasks_test.go`
+  - `internal/repository/video_repository.go`
+  - `internal/handlers/admin_scrape.go`
+  - `migrations/0015_episode_tv_pending.up.sql`
+  - `migrations/0015_episode_tv_pending.down.sql`
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/videoList.helpers.js`
+  - `admin-web/src/views/videoList.helpers.spec.js`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `admin-web/src/views/TvSeriesManage.vue`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-22 10:28] App 图片合集瀑布流与沉浸式看图功能
 - Type: `implementation`
 - Summary:
