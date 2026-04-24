@@ -380,7 +380,7 @@ func (r *VideoRepository) ListActiveOriginalPaths(ctx context.Context) ([]string
 	rows, err := r.pool.Query(ctx, `
 SELECT original_path
 FROM videos
-WHERE status IN ('uploaded','scraping','processing','failed') AND original_path IS NOT NULL AND original_path <> ''
+WHERE status IN ('uploaded','scraping','tv_pending','processing','failed') AND original_path IS NOT NULL AND original_path <> ''
 `)
 	if err != nil {
 		return nil, fmt.Errorf("list active original paths: %w", err)
@@ -496,6 +496,26 @@ WHERE id=$1
 `, videoID, key, value)
 	if err != nil {
 		return fmt.Errorf("append video metadata: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) MergeVideoMetadata(ctx context.Context, videoID uuid.UUID, patch map[string]any) error {
+	if len(patch) == 0 {
+		return nil
+	}
+	raw, err := json.Marshal(patch)
+	if err != nil {
+		return fmt.Errorf("marshal metadata patch: %w", err)
+	}
+	_, err = r.pool.Exec(ctx, `
+UPDATE videos
+SET metadata = coalesce(metadata, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+WHERE id=$1
+`, videoID, raw)
+	if err != nil {
+		return fmt.Errorf("merge video metadata: %w", err)
 	}
 	return nil
 }
@@ -728,14 +748,22 @@ RETURNING id`, seriesID, seasonNumber, name, overview, poster, airDate).Scan(&id
 	return id, nil
 }
 
-func (r *VideoRepository) UpsertEpisode(ctx context.Context, seasonID int64, episodeNumber int, title, overview, still string, runtime int, airDate *time.Time, videoID uuid.UUID) error {
+func (r *VideoRepository) UpsertEpisode(ctx context.Context, seasonID int64, episodeNumber int, title, overview, still string, runtime int, airDate *time.Time, videoID uuid.UUID, bindVideo bool) error {
+	var bindVideoID *uuid.UUID
+	if bindVideo && videoID != uuid.Nil {
+		bindVideoID = &videoID
+	}
 	_, err := r.pool.Exec(ctx, `
 INSERT INTO episodes(season_id, episode_number, title, overview, still_path, runtime, air_date, video_id)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 ON CONFLICT(season_id, episode_number)
 DO UPDATE SET title=EXCLUDED.title, overview=EXCLUDED.overview, still_path=EXCLUDED.still_path,
-              runtime=EXCLUDED.runtime, air_date=EXCLUDED.air_date, video_id=EXCLUDED.video_id
-`, seasonID, episodeNumber, title, overview, still, runtime, airDate, videoID)
+              runtime=EXCLUDED.runtime, air_date=EXCLUDED.air_date,
+              video_id=CASE
+                WHEN $9::boolean THEN EXCLUDED.video_id
+                ELSE episodes.video_id
+              END
+`, seasonID, episodeNumber, title, overview, still, runtime, airDate, bindVideoID, bindVideo)
 	if err != nil {
 		return fmt.Errorf("upsert episode: %w", err)
 	}

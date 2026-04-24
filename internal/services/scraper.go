@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,10 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 
@@ -26,7 +29,7 @@ type scraperRepo interface {
 	UpdateVideoScrapeResult(ctx context.Context, videoID uuid.UUID, tmdbID *int, title, description, thumbnailPath string, metadata map[string]any, status string) error
 	UpsertSeries(ctx context.Context, tmdbID int, title, overview, poster, backdrop string, firstAirDate *time.Time, seasons, episodes int) (int64, error)
 	UpsertSeason(ctx context.Context, seriesID int64, seasonNumber int, title, overview, poster string, airDate *time.Time) (int64, error)
-	UpsertEpisode(ctx context.Context, seasonID int64, episodeNumber int, title, overview, stillPath string, runtime int, airDate *time.Time, videoID uuid.UUID) error
+	UpsertEpisode(ctx context.Context, seasonID int64, episodeNumber int, title, overview, stillPath string, runtime int, airDate *time.Time, videoID uuid.UUID, bindVideo bool) error
 	FindVideoByTypeTMDB(ctx context.Context, typ string, tmdbID int, excludeVideoID uuid.UUID) (uuid.UUID, bool, error)
 	ResolveActorIDs(ctx context.Context, actorIDs []uuid.UUID, actorNames []string, source string) ([]uuid.UUID, error)
 	AddVideoActors(ctx context.Context, videoID uuid.UUID, actorIDs []uuid.UUID, source string) error
@@ -116,6 +119,51 @@ type ConfirmScrapeInput struct {
 const tmdbLangChinese = "zh-CN"
 const tmdbCastLimit = 20
 const avPreviewLimitDefault = 10
+
+const (
+	EpisodeAutoScrapeStageParseFailed        = "parse_failed"
+	EpisodeAutoScrapeStageCandidateAmbiguous = "candidate_ambiguous"
+	EpisodeAutoScrapeStageCandidateNotFound  = "candidate_not_found"
+	EpisodeAutoScrapeStageTMDBMissingEpisode = "tmdb_missing_episode"
+	EpisodeAutoScrapeStageAPIError           = "api_error"
+)
+
+type EpisodeAutoScrapeError struct {
+	Stage               string
+	ParsedTitle         string
+	ParsedSeasonNumber  int
+	ParsedEpisodeNumber int
+	CandidateCount      int
+	CandidatePreview    []map[string]any
+	Err                 error
+}
+
+func (e *EpisodeAutoScrapeError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	if strings.TrimSpace(e.Stage) != "" {
+		return e.Stage
+	}
+	return "episode auto scrape failed"
+}
+
+func (e *EpisodeAutoScrapeError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+type syncedEpisodeResult struct {
+	tvRaw         map[string]any
+	seasonRaw     map[string]any
+	episodeRaw    map[string]any
+	episodeTMDBID int
+}
 
 var (
 	avCodePattern              = regexp.MustCompile(`(?i)\b([a-z]{2,10})[-_ ]?(\d{2,5})\b`)
@@ -246,7 +294,7 @@ func (s *ScraperService) PreviewTV(ctx context.Context, title string, year int) 
 		}
 		out = append(out, map[string]any{
 			"tmdb_id":         id,
-			"title":           asString(detail["name"]),
+			"title":           chooseStr(asString(detail["name"]), asString(detail["original_name"])),
 			"original_title":  asString(detail["original_name"]),
 			"overview":        asString(detail["overview"]),
 			"poster_path":     asString(detail["poster_path"]),
@@ -372,78 +420,25 @@ func (s *ScraperService) ConfirmEpisode(ctx context.Context, in ConfirmScrapeInp
 		return fmt.Errorf("season_number and episode_number are required for episode")
 	}
 
-	tvRaw, err := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", in.TMDBID), nil, tmdbLangChinese)
+	synced, err := s.syncTVSeriesAndBindEpisode(ctx, in.VideoID, in.TMDBID, seasonNum, episodeNum)
 	if err != nil {
 		return err
 	}
-	if needsLocalizedFallback(tvRaw, "tv") {
-		tvFallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", in.TMDBID), nil, "")
-		if fErr == nil {
-			tvRaw = mergeLocalizedDetail(tvRaw, tvFallback, "tv")
-		}
-	}
-	seriesID, err := s.repo.UpsertSeries(
-		ctx,
-		in.TMDBID,
-		asString(tvRaw["name"]),
-		asString(tvRaw["overview"]),
-		asString(tvRaw["poster_path"]),
-		asString(tvRaw["backdrop_path"]),
-		parseDate(tvRaw["first_air_date"]),
-		asInt(tvRaw["number_of_seasons"]),
-		asInt(tvRaw["number_of_episodes"]),
-	)
-	if err != nil {
-		return err
-	}
-
-	seasonRaw, err := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d/season/%d", in.TMDBID, seasonNum), nil, tmdbLangChinese)
-	if err != nil {
-		return err
-	}
-	seasonID, err := s.repo.UpsertSeason(ctx, seriesID, seasonNum, asString(seasonRaw["name"]), asString(seasonRaw["overview"]), asString(seasonRaw["poster_path"]), parseDate(seasonRaw["air_date"]))
-	if err != nil {
-		return err
-	}
-
-	var epRaw map[string]any
-	episodes, _ := seasonRaw["episodes"].([]any)
-	for _, ep := range episodes {
-		row, ok := ep.(map[string]any)
-		if !ok {
-			continue
-		}
-		if asInt(row["episode_number"]) == episodeNum {
-			epRaw = row
-			break
-		}
-	}
-	if epRaw == nil {
-		return fmt.Errorf("episode S%02dE%02d not found", seasonNum, episodeNum)
-	}
-	episodeTMDBID := asInt(epRaw["id"])
-	if episodeTMDBID <= 0 {
-		return fmt.Errorf("invalid episode tmdb id")
-	}
-
-	if err := s.repo.UpsertEpisode(ctx, seasonID, episodeNum, asString(epRaw["name"]), asString(epRaw["overview"]), asString(epRaw["still_path"]), asInt(epRaw["runtime"]), parseDate(epRaw["air_date"]), in.VideoID); err != nil {
-		return err
-	}
-	title := chooseStr(in.Title, asString(epRaw["name"]))
-	overview := chooseStr(in.Overview, asString(epRaw["overview"]))
-	posterURL := chooseStr(in.PosterURL, chooseStr(asString(epRaw["still_path"]), asString(tvRaw["poster_path"])))
+	title := chooseStr(in.Title, asString(synced.episodeRaw["name"]))
+	overview := chooseStr(in.Overview, asString(synced.episodeRaw["overview"]))
+	posterURL := chooseStr(in.PosterURL, chooseStr(asString(synced.episodeRaw["still_path"]), asString(synced.tvRaw["poster_path"])))
 	thumbPath, err := s.DownloadPoster(ctx, posterURL, in.VideoID)
 	if err != nil {
 		return err
 	}
 	meta := map[string]any{
-		"tmdb_tv":      tvRaw,
-		"tmdb_season":  seasonRaw,
-		"tmdb_episode": epRaw,
+		"tmdb_tv":      synced.tvRaw,
+		"tmdb_season":  synced.seasonRaw,
+		"tmdb_episode": synced.episodeRaw,
 		"manual":       in.Metadata,
-		"release_date": chooseStr(in.ReleaseDate, asString(epRaw["air_date"])),
+		"release_date": chooseStr(in.ReleaseDate, asString(synced.episodeRaw["air_date"])),
 	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &episodeTMDBID, title, overview, thumbPath, meta, "uploaded"); err != nil {
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &synced.episodeTMDBID, title, overview, thumbPath, meta, "uploaded"); err != nil {
 		return err
 	}
 	s.syncEpisodeActors(ctx, video.ID, in.TMDBID, seasonNum, episodeNum)
@@ -611,70 +606,25 @@ func (s *ScraperService) SyncTVEpisode(ctx context.Context, videoID uuid.UUID, t
 	if s.apiKey == "" {
 		return fmt.Errorf("TMDB_API_KEY is empty")
 	}
-	q := url.Values{}
-	q.Set("api_key", s.apiKey)
-
-	tvAPI := fmt.Sprintf("%s/tv/%d?%s", s.baseURL, tmdbID, q.Encode())
-	tvRaw, err := s.getJSON(ctx, tvAPI)
+	synced, err := s.syncTVSeriesAndBindEpisode(ctx, videoID, tmdbID, seasonNum, episodeNum)
 	if err != nil {
 		return err
 	}
-
-	seriesID, err := s.repo.UpsertSeries(
-		ctx,
-		tmdbID,
-		asString(tvRaw["name"]),
-		asString(tvRaw["overview"]),
-		asString(tvRaw["poster_path"]),
-		asString(tvRaw["backdrop_path"]),
-		parseDate(tvRaw["first_air_date"]),
-		asInt(tvRaw["number_of_seasons"]),
-		asInt(tvRaw["number_of_episodes"]),
-	)
+	title := chooseStr(asString(synced.episodeRaw["name"]), fmt.Sprintf("S%02dE%02d", seasonNum, episodeNum))
+	description := asString(synced.episodeRaw["overview"])
+	thumbPath, err := s.downloadTMDBImage(ctx, chooseStr(asString(synced.episodeRaw["still_path"]), asString(synced.tvRaw["poster_path"])), videoID)
 	if err != nil {
 		return err
 	}
-
-	seasonAPI := fmt.Sprintf("%s/tv/%d/season/%d?%s", s.baseURL, tmdbID, seasonNum, q.Encode())
-	seasonRaw, err := s.getJSON(ctx, seasonAPI)
-	if err != nil {
+	meta := map[string]any{
+		"tmdb_tv":      synced.tvRaw,
+		"tmdb_season":  synced.seasonRaw,
+		"tmdb_episode": synced.episodeRaw,
+	}
+	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &synced.episodeTMDBID, title, description, thumbPath, meta, "uploaded"); err != nil {
 		return err
 	}
-
-	seasonID, err := s.repo.UpsertSeason(ctx, seriesID, seasonNum, asString(seasonRaw["name"]), asString(seasonRaw["overview"]), asString(seasonRaw["poster_path"]), parseDate(seasonRaw["air_date"]))
-	if err != nil {
-		return err
-	}
-
-	episodeTMDBID := 0
-	title := ""
-	description := ""
-	thumbPath := ""
-	episodes, _ := seasonRaw["episodes"].([]any)
-	for _, ep := range episodes {
-		epRaw, ok := ep.(map[string]any)
-		if !ok || asInt(epRaw["episode_number"]) != episodeNum {
-			continue
-		}
-		episodeTMDBID = asInt(epRaw["id"])
-		title = asString(epRaw["name"])
-		description = asString(epRaw["overview"])
-		thumbPath, err = s.downloadTMDBImage(ctx, asString(epRaw["still_path"]), videoID)
-		if err != nil {
-			return err
-		}
-		if err := s.repo.UpsertEpisode(ctx, seasonID, episodeNum, title, description, asString(epRaw["still_path"]), asInt(epRaw["runtime"]), parseDate(epRaw["air_date"]), videoID); err != nil {
-			return err
-		}
-		break
-	}
-	if episodeTMDBID > 0 {
-		meta := map[string]any{"tmdb_tv": tvRaw, "tmdb_season": seasonRaw}
-		if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &episodeTMDBID, title, description, thumbPath, meta, "uploaded"); err != nil {
-			return err
-		}
-		s.syncEpisodeActors(ctx, videoID, tmdbID, seasonNum, episodeNum)
-	}
+	s.syncEpisodeActors(ctx, videoID, tmdbID, seasonNum, episodeNum)
 	return nil
 }
 
@@ -751,35 +701,102 @@ func (s *ScraperService) ScrapeEpisodeUpload(ctx context.Context, videoID uuid.U
 	if filename == "" {
 		filename = filepath.Base(filePath)
 	}
-	title, _, seasonNum, episodeNum, ok := utils.ParseFilename(filename)
+	title, year, seasonNum, episodeNum, ok := utils.ParseFilename(filename)
 	if !ok || seasonNum <= 0 || episodeNum <= 0 || strings.TrimSpace(title) == "" {
-		return ScrapeResult{}, fmt.Errorf("cannot parse episode info from filename: %s", filename)
+		return ScrapeResult{}, &EpisodeAutoScrapeError{
+			Stage: EpisodeAutoScrapeStageParseFailed,
+			Err:   fmt.Errorf("cannot parse episode info from filename: %s", filename),
+		}
 	}
 
-	q := url.Values{}
-	q.Set("query", title)
-	tvSearchRaw, err := s.getTMDBJSON(ctx, "/search/tv", q, tmdbLangChinese)
+	candidates, err := s.PreviewTV(ctx, title, year)
 	if err != nil {
+		return ScrapeResult{}, &EpisodeAutoScrapeError{
+			Stage:               EpisodeAutoScrapeStageAPIError,
+			ParsedTitle:         title,
+			ParsedSeasonNumber:  seasonNum,
+			ParsedEpisodeNumber: episodeNum,
+			Err:                 err,
+		}
+	}
+	selected, err := selectReliableTVCandidate(title, candidates)
+	if err != nil {
+		var pendingErr *EpisodeAutoScrapeError
+		if errors.As(err, &pendingErr) {
+			pendingErr.ParsedTitle = title
+			pendingErr.ParsedSeasonNumber = seasonNum
+			pendingErr.ParsedEpisodeNumber = episodeNum
+			return ScrapeResult{}, pendingErr
+		}
+		return ScrapeResult{}, &EpisodeAutoScrapeError{
+			Stage:               EpisodeAutoScrapeStageAPIError,
+			ParsedTitle:         title,
+			ParsedSeasonNumber:  seasonNum,
+			ParsedEpisodeNumber: episodeNum,
+			Err:                 err,
+		}
+	}
+	tvID := asInt(selected["tmdb_id"])
+	if tvID <= 0 {
+		return ScrapeResult{}, &EpisodeAutoScrapeError{
+			Stage:               EpisodeAutoScrapeStageCandidateNotFound,
+			ParsedTitle:         title,
+			ParsedSeasonNumber:  seasonNum,
+			ParsedEpisodeNumber: episodeNum,
+			CandidateCount:      len(candidates),
+			CandidatePreview:    summarizeAutoTVCandidates(candidates),
+			Err:                 fmt.Errorf("invalid tv id from tmdb candidate"),
+		}
+	}
+	synced, err := s.syncTVSeriesAndBindEpisode(ctx, videoID, tvID, seasonNum, episodeNum)
+	if err != nil {
+		return ScrapeResult{}, wrapEpisodeSyncError(err, title, seasonNum, episodeNum, candidates)
+	}
+	posterRel := chooseStr(asString(synced.episodeRaw["still_path"]), asString(synced.tvRaw["poster_path"]))
+	thumbPath, err := s.downloadTMDBImage(ctx, posterRel, videoID)
+	if err != nil {
+		return ScrapeResult{}, &EpisodeAutoScrapeError{
+			Stage:               EpisodeAutoScrapeStageAPIError,
+			ParsedTitle:         title,
+			ParsedSeasonNumber:  seasonNum,
+			ParsedEpisodeNumber: episodeNum,
+			CandidateCount:      len(candidates),
+			CandidatePreview:    summarizeAutoTVCandidates(candidates),
+			Err:                 err,
+		}
+	}
+
+	episodeTitle := asString(synced.episodeRaw["name"])
+	if episodeTitle == "" {
+		episodeTitle = fmt.Sprintf("%s S%02dE%02d", title, seasonNum, episodeNum)
+	}
+	scrape := ScrapeResult{
+		TMDBID:        synced.episodeTMDBID,
+		Title:         episodeTitle,
+		Description:   asString(synced.episodeRaw["overview"]),
+		ThumbnailPath: thumbPath,
+		Metadata: map[string]any{
+			"tmdb_tv":      synced.tvRaw,
+			"tmdb_season":  synced.seasonRaw,
+			"tmdb_episode": synced.episodeRaw,
+		},
+	}
+	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &scrape.TMDBID, scrape.Title, scrape.Description, scrape.ThumbnailPath, scrape.Metadata, "uploaded"); err != nil {
 		return ScrapeResult{}, err
 	}
-	tvResults, _ := tvSearchRaw["results"].([]any)
-	if len(tvResults) == 0 {
-		return ScrapeResult{}, fmt.Errorf("no tv result for %q", title)
-	}
-	tvFirst, _ := tvResults[0].(map[string]any)
-	tvID := asInt(tvFirst["id"])
-	if tvID <= 0 {
-		return ScrapeResult{}, fmt.Errorf("invalid tv id from tmdb search")
-	}
+	s.syncEpisodeActors(ctx, videoID, tvID, seasonNum, episodeNum)
+	return scrape, nil
+}
 
+func (s *ScraperService) syncTVSeriesAndBindEpisode(ctx context.Context, videoID uuid.UUID, tvID, targetSeasonNum, targetEpisodeNum int) (syncedEpisodeResult, error) {
 	tvRaw, err := s.fetchLocalizedMediaDetail(ctx, fmt.Sprintf("/tv/%d", tvID), "tv")
 	if err != nil {
-		return ScrapeResult{}, err
+		return syncedEpisodeResult{}, err
 	}
 	seriesID, err := s.repo.UpsertSeries(
 		ctx,
 		tvID,
-		asString(tvRaw["name"]),
+		chooseStr(asString(tvRaw["name"]), asString(tvRaw["original_name"])),
 		asString(tvRaw["overview"]),
 		asString(tvRaw["poster_path"]),
 		asString(tvRaw["backdrop_path"]),
@@ -788,87 +805,219 @@ func (s *ScraperService) ScrapeEpisodeUpload(ctx context.Context, videoID uuid.U
 		asInt(tvRaw["number_of_episodes"]),
 	)
 	if err != nil {
-		return ScrapeResult{}, err
+		return syncedEpisodeResult{}, err
 	}
 
-	seasonRaw, err := s.fetchLocalizedSeasonDetail(ctx, tvID, seasonNum)
-	if err != nil {
-		return ScrapeResult{}, err
-	}
-	seasonID, err := s.repo.UpsertSeason(ctx, seriesID, seasonNum, asString(seasonRaw["name"]), asString(seasonRaw["overview"]), asString(seasonRaw["poster_path"]), parseDate(seasonRaw["air_date"]))
-	if err != nil {
-		return ScrapeResult{}, err
+	seasonNumbers := extractTVSeasonNumbers(tvRaw)
+	if len(seasonNumbers) == 0 {
+		for seasonNumber := 1; seasonNumber <= asInt(tvRaw["number_of_seasons"]); seasonNumber++ {
+			seasonNumbers = append(seasonNumbers, seasonNumber)
+		}
 	}
 
-	var epRaw map[string]any
-	episodes, _ := seasonRaw["episodes"].([]any)
-	for _, ep := range episodes {
-		item, ok := ep.(map[string]any)
+	result := syncedEpisodeResult{tvRaw: tvRaw}
+	for _, seasonNumber := range seasonNumbers {
+		if seasonNumber <= 0 {
+			continue
+		}
+		seasonRaw, seasonErr := s.fetchLocalizedSeasonDetail(ctx, tvID, seasonNumber)
+		if seasonErr != nil {
+			return syncedEpisodeResult{}, seasonErr
+		}
+		seasonID, seasonErr := s.repo.UpsertSeason(
+			ctx,
+			seriesID,
+			seasonNumber,
+			asString(seasonRaw["name"]),
+			asString(seasonRaw["overview"]),
+			asString(seasonRaw["poster_path"]),
+			parseDate(seasonRaw["air_date"]),
+		)
+		if seasonErr != nil {
+			return syncedEpisodeResult{}, seasonErr
+		}
+
+		episodes, _ := seasonRaw["episodes"].([]any)
+		for _, row := range episodes {
+			epRaw, ok := row.(map[string]any)
+			if !ok {
+				continue
+			}
+			episodeNumber := asInt(epRaw["episode_number"])
+			if episodeNumber <= 0 {
+				continue
+			}
+			bindVideo := seasonNumber == targetSeasonNum && episodeNumber == targetEpisodeNum
+			boundVideoID := uuid.Nil
+			if bindVideo {
+				boundVideoID = videoID
+			}
+			if err := s.repo.UpsertEpisode(
+				ctx,
+				seasonID,
+				episodeNumber,
+				asString(epRaw["name"]),
+				asString(epRaw["overview"]),
+				asString(epRaw["still_path"]),
+				asInt(epRaw["runtime"]),
+				parseDate(epRaw["air_date"]),
+				boundVideoID,
+				bindVideo,
+			); err != nil {
+				return syncedEpisodeResult{}, err
+			}
+			if bindVideo {
+				result.seasonRaw = seasonRaw
+				result.episodeRaw = epRaw
+				result.episodeTMDBID = asInt(epRaw["id"])
+			}
+		}
+	}
+
+	if result.episodeRaw == nil {
+		return syncedEpisodeResult{}, fmt.Errorf("episode S%02dE%02d not found in tmdb", targetSeasonNum, targetEpisodeNum)
+	}
+	if result.episodeTMDBID <= 0 {
+		return syncedEpisodeResult{}, fmt.Errorf("invalid episode tmdb id")
+	}
+	return result, nil
+}
+
+func selectReliableTVCandidate(parsedTitle string, candidates []map[string]any) (map[string]any, error) {
+	if len(candidates) == 0 {
+		return nil, &EpisodeAutoScrapeError{
+			Stage: EpisodeAutoScrapeStageCandidateNotFound,
+			Err:   fmt.Errorf("no tv candidate found"),
+		}
+	}
+	normalizedParsed := normalizeAutoMatchTitle(parsedTitle)
+	if normalizedParsed == "" {
+		return nil, &EpisodeAutoScrapeError{
+			Stage:            EpisodeAutoScrapeStageCandidateNotFound,
+			CandidateCount:   len(candidates),
+			CandidatePreview: summarizeAutoTVCandidates(candidates),
+			Err:              fmt.Errorf("parsed title is empty"),
+		}
+	}
+
+	exactMatches := make([]map[string]any, 0, len(candidates))
+	for _, candidate := range candidates {
+		if autoTVCandidateMatches(normalizedParsed, candidate) {
+			exactMatches = append(exactMatches, candidate)
+		}
+	}
+	if len(exactMatches) == 1 {
+		return exactMatches[0], nil
+	}
+	stage := EpisodeAutoScrapeStageCandidateAmbiguous
+	if len(exactMatches) == 0 {
+		stage = EpisodeAutoScrapeStageCandidateNotFound
+	}
+	previewSource := exactMatches
+	if len(previewSource) == 0 {
+		previewSource = candidates
+	}
+	return nil, &EpisodeAutoScrapeError{
+		Stage:            stage,
+		CandidateCount:   len(previewSource),
+		CandidatePreview: summarizeAutoTVCandidates(previewSource),
+		Err:              fmt.Errorf("unable to find unique reliable tv candidate for %q", parsedTitle),
+	}
+}
+
+func autoTVCandidateMatches(normalizedParsed string, candidate map[string]any) bool {
+	for _, raw := range autoTVCandidateTitles(candidate) {
+		if normalizeAutoMatchTitle(raw) == normalizedParsed {
+			return true
+		}
+	}
+	return false
+}
+
+func autoTVCandidateTitles(candidate map[string]any) []string {
+	out := []string{
+		asString(candidate["title"]),
+		asString(candidate["original_title"]),
+	}
+	if metadata, ok := candidate["metadata"].(map[string]any); ok {
+		out = append(out, asString(metadata["name"]), asString(metadata["original_name"]))
+	}
+	return out
+}
+
+func normalizeAutoMatchTitle(raw string) string {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	if normalized == "" {
+		return ""
+	}
+	var builder strings.Builder
+	builder.Grow(len(normalized))
+	for _, r := range normalized {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			builder.WriteRune(r)
+		}
+	}
+	return builder.String()
+}
+
+func summarizeAutoTVCandidates(candidates []map[string]any) []map[string]any {
+	limit := len(candidates)
+	if limit > 5 {
+		limit = 5
+	}
+	out := make([]map[string]any, 0, limit)
+	for i := 0; i < limit; i++ {
+		item := candidates[i]
+		out = append(out, map[string]any{
+			"tmdb_id":        item["tmdb_id"],
+			"title":          chooseStr(asString(item["title"]), asString(item["original_title"])),
+			"original_title": asString(item["original_title"]),
+			"release_date":   asString(item["release_date"]),
+		})
+	}
+	return out
+}
+
+func wrapEpisodeSyncError(err error, parsedTitle string, seasonNum, episodeNum int, candidates []map[string]any) error {
+	if err == nil {
+		return nil
+	}
+	stage := EpisodeAutoScrapeStageAPIError
+	if strings.Contains(strings.ToLower(err.Error()), "episode s") || strings.Contains(strings.ToLower(err.Error()), "episode tmdb id") {
+		stage = EpisodeAutoScrapeStageTMDBMissingEpisode
+	}
+	return &EpisodeAutoScrapeError{
+		Stage:               stage,
+		ParsedTitle:         parsedTitle,
+		ParsedSeasonNumber:  seasonNum,
+		ParsedEpisodeNumber: episodeNum,
+		CandidateCount:      len(candidates),
+		CandidatePreview:    summarizeAutoTVCandidates(candidates),
+		Err:                 err,
+	}
+}
+
+func extractTVSeasonNumbers(tvRaw map[string]any) []int {
+	rows, _ := tvRaw["seasons"].([]any)
+	seen := map[int]struct{}{}
+	out := make([]int, 0, len(rows))
+	for _, row := range rows {
+		item, ok := row.(map[string]any)
 		if !ok {
 			continue
 		}
-		if asInt(item["episode_number"]) == episodeNum {
-			epRaw = item
-			break
+		seasonNumber := asInt(item["season_number"])
+		if seasonNumber <= 0 {
+			continue
 		}
+		if _, exists := seen[seasonNumber]; exists {
+			continue
+		}
+		seen[seasonNumber] = struct{}{}
+		out = append(out, seasonNumber)
 	}
-	if epRaw == nil {
-		return ScrapeResult{}, fmt.Errorf("episode S%02dE%02d not found in tmdb", seasonNum, episodeNum)
-	}
-
-	episodeTMDBID := asInt(epRaw["id"])
-	if episodeTMDBID <= 0 {
-		return ScrapeResult{}, fmt.Errorf("invalid episode tmdb id")
-	}
-	if existingID, exists, err := s.repo.FindVideoByTypeTMDB(ctx, "episode", episodeTMDBID, videoID); err != nil {
-		return ScrapeResult{}, err
-	} else if exists {
-		return ScrapeResult{}, fmt.Errorf("duplicate episode metadata, existing video_id=%s", existingID)
-	}
-
-	if err := s.repo.UpsertEpisode(
-		ctx,
-		seasonID,
-		episodeNum,
-		asString(epRaw["name"]),
-		asString(epRaw["overview"]),
-		asString(epRaw["still_path"]),
-		asInt(epRaw["runtime"]),
-		parseDate(epRaw["air_date"]),
-		videoID,
-	); err != nil {
-		return ScrapeResult{}, err
-	}
-
-	posterRel := asString(epRaw["still_path"])
-	if posterRel == "" {
-		posterRel = asString(tvRaw["poster_path"])
-	}
-	thumbPath, err := s.downloadTMDBImage(ctx, posterRel, videoID)
-	if err != nil {
-		return ScrapeResult{}, err
-	}
-
-	episodeTitle := asString(epRaw["name"])
-	if episodeTitle == "" {
-		episodeTitle = fmt.Sprintf("%s S%02dE%02d", title, seasonNum, episodeNum)
-	}
-	scrape := ScrapeResult{
-		TMDBID:        episodeTMDBID,
-		Title:         episodeTitle,
-		Description:   asString(epRaw["overview"]),
-		ThumbnailPath: thumbPath,
-		Metadata: map[string]any{
-			"tmdb_tv":      tvRaw,
-			"tmdb_season":  seasonRaw,
-			"tmdb_episode": epRaw,
-		},
-	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &scrape.TMDBID, scrape.Title, scrape.Description, scrape.ThumbnailPath, scrape.Metadata, "uploaded"); err != nil {
-		return ScrapeResult{}, err
-	}
-	s.syncEpisodeActors(ctx, videoID, tvID, seasonNum, episodeNum)
-	return scrape, nil
+	slices.Sort(out)
+	return out
 }
 
 func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, filePath, filename string) (ScrapeResult, error) {

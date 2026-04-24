@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import {
   createAdminTvEpisode,
@@ -33,6 +34,7 @@ const detail = ref(createEmptySeriesDetail())
 const episodeVideoOptions = ref([])
 const loadingVideoOptions = ref(false)
 const activeSeasons = ref([])
+const route = useRoute()
 
 const query = reactive({
   page: 1,
@@ -305,6 +307,9 @@ async function searchEpisodeVideos(keyword = '') {
 }
 
 onMounted(async () => {
+  if (typeof route.query.q === 'string' && route.query.q.trim()) {
+    query.q = route.query.q.trim()
+  }
   await Promise.all([loadList(), searchEpisodeVideos('')])
 })
 </script>

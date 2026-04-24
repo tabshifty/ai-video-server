@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import {
   captureAdminVideoThumbnail,
@@ -14,6 +15,7 @@ import {
   retranscodeVideo,
   updateAdminVideo
 } from '../api/admin'
+import { extractTvPendingDiagnostics, getVideoStatusMeta, tvPendingStageLabel } from './videoList.helpers'
 
 const list = ref([])
 const total = ref(0)
@@ -31,6 +33,7 @@ const loadingCollections = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const router = useRouter()
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
 const retagTypeOptions = [
@@ -40,14 +43,7 @@ const retagTypeOptions = [
 ]
 
 function statusLabel(status) {
-  const map = {
-    uploaded: '已上传',
-    scraping: '刮削中',
-    processing: '处理中',
-    ready: '可播放',
-    failed: '失败'
-  }
-  return map[status] || status || '-'
+  return getVideoStatusMeta(status).label
 }
 
 function typeLabel(type) {
@@ -136,6 +132,41 @@ function normalizeCollectionSelection(values) {
     out.push(value)
   }
   return out
+}
+
+function statusTagType(status) {
+  return getVideoStatusMeta(status).tagType
+}
+
+function tvPendingDiagnostics(video = detail.value) {
+  return extractTvPendingDiagnostics(video?.metadata)
+}
+
+function openTvPendingScrapeConfirm() {
+  if (!detail.value?.id) {
+    return
+  }
+  const diagnostics = tvPendingDiagnostics()
+  detailVisible.value = false
+  router.push({
+    path: '/scrape',
+    query: {
+      video_id: detail.value.id,
+      type: 'tv',
+      title: diagnostics.parsedTitle || detail.value.title || ''
+    }
+  })
+}
+
+function openTvSeriesManage() {
+  const diagnostics = tvPendingDiagnostics()
+  detailVisible.value = false
+  router.push({
+    path: '/tv-series',
+    query: {
+      q: diagnostics.parsedTitle || detail.value?.title || ''
+    }
+  })
 }
 
 async function load() {
@@ -398,6 +429,7 @@ onMounted(load)
             <el-select v-model="query.status" placeholder="状态" clearable style="width: 160px">
               <el-option label="已上传" value="uploaded" />
               <el-option label="刮削中" value="scraping" />
+              <el-option label="待绑定" value="tv_pending" />
               <el-option label="处理中" value="processing" />
               <el-option label="可播放" value="ready" />
               <el-option label="失败" value="failed" />
@@ -428,7 +460,7 @@ onMounted(load)
             </el-table-column>
             <el-table-column prop="status" label="状态" width="120">
               <template #default="{ row }">
-                <el-tag :type="row.status === 'ready' ? 'success' : row.status === 'failed' ? 'danger' : 'info'">
+                <el-tag :type="statusTagType(row.status)">
                   {{ statusLabel(row.status) }}
                 </el-tag>
               </template>
@@ -459,6 +491,51 @@ onMounted(load)
 
     <el-dialog v-model="detailVisible" title="视频详情" width="760px">
       <el-form v-if="detail" label-width="90px">
+        <el-form-item v-if="detail.type === 'episode' && detail.status === 'tv_pending'" label="待处理">
+          <div class="tv-pending-panel">
+            <el-alert
+              type="warning"
+              :closable="false"
+              title="该剧集未自动并入电视剧树，当前处于待确认/待绑定状态。"
+            />
+            <div class="tv-pending-actions">
+              <el-button type="primary" plain @click="openTvPendingScrapeConfirm">去刮削确认</el-button>
+              <el-button plain @click="openTvSeriesManage">去电视剧管理</el-button>
+            </div>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="失败阶段">
+                {{ tvPendingStageLabel(tvPendingDiagnostics().stage) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="解析剧名">
+                {{ tvPendingDiagnostics().parsedTitle || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="解析季集">
+                {{
+                  tvPendingDiagnostics().parsedSeasonNumber > 0 && tvPendingDiagnostics().parsedEpisodeNumber > 0
+                    ? `S${String(tvPendingDiagnostics().parsedSeasonNumber).padStart(2, '0')}E${String(tvPendingDiagnostics().parsedEpisodeNumber).padStart(2, '0')}`
+                    : '-'
+                }}
+              </el-descriptions-item>
+              <el-descriptions-item label="候选数量">
+                {{ tvPendingDiagnostics().candidateCount || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="错误信息">
+                {{ tvPendingDiagnostics().error || '-' }}
+              </el-descriptions-item>
+            </el-descriptions>
+            <div v-if="tvPendingDiagnostics().candidatePreview.length > 0" class="tv-pending-candidates">
+              <div class="tv-pending-candidates__title">候选摘要</div>
+              <div
+                v-for="candidate in tvPendingDiagnostics().candidatePreview"
+                :key="`${candidate.tmdb_id || candidate.title}-${candidate.release_date || ''}`"
+                class="tv-pending-candidate"
+              >
+                <span>{{ candidate.title || '-' }}</span>
+                <span class="tv-pending-candidate__meta">TMDB {{ candidate.tmdb_id || '-' }} / {{ candidate.release_date || '-' }}</span>
+              </div>
+            </div>
+          </div>
+        </el-form-item>
         <el-form-item label="标题"><el-input v-model="detail.title" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="detail.description" type="textarea" rows="4" /></el-form-item>
         <el-form-item label="封面"><el-input v-model="detail.thumbnail_path" /></el-form-item>
@@ -649,6 +726,43 @@ onMounted(load)
 
 .play-preview {
   width: 100%;
+}
+
+.tv-pending-panel {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.tv-pending-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tv-pending-candidates {
+  display: grid;
+  gap: 8px;
+}
+
+.tv-pending-candidates__title {
+  color: var(--el-text-color-regular);
+  font-size: 13px;
+}
+
+.tv-pending-candidate {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--el-text-color-primary);
+}
+
+.tv-pending-candidate__meta {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .episode-fields {

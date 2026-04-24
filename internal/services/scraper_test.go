@@ -27,6 +27,18 @@ type fakeScrapeUpdate struct {
 	status        string
 }
 
+type fakeEpisodeUpsert struct {
+	seasonID      int64
+	episodeNumber int
+	title         string
+	overview      string
+	stillPath     string
+	runtime       int
+	airDate       *time.Time
+	videoID       uuid.UUID
+	bindVideo     bool
+}
+
 type fakeScraperRepo struct {
 	lastUpdate         fakeScrapeUpdate
 	resolveActorNames  []string
@@ -36,6 +48,10 @@ type fakeScraperRepo struct {
 	nextActorIDs       []uuid.UUID
 	videoByID          map[uuid.UUID]models.Video
 	getVideoErr        error
+	episodeUpserts     []fakeEpisodeUpsert
+	findVideoTMDBCalls []string
+	findVideoExists    bool
+	findVideoID        uuid.UUID
 }
 
 func (f *fakeScraperRepo) GetVideoByID(_ context.Context, videoID uuid.UUID) (models.Video, error) {
@@ -74,11 +90,26 @@ func (f *fakeScraperRepo) UpsertSeason(context.Context, int64, int, string, stri
 	return 1, nil
 }
 
-func (f *fakeScraperRepo) UpsertEpisode(context.Context, int64, int, string, string, string, int, *time.Time, uuid.UUID) error {
+func (f *fakeScraperRepo) UpsertEpisode(_ context.Context, seasonID int64, episodeNumber int, title, overview, stillPath string, runtime int, airDate *time.Time, videoID uuid.UUID, bindVideo bool) error {
+	f.episodeUpserts = append(f.episodeUpserts, fakeEpisodeUpsert{
+		seasonID:      seasonID,
+		episodeNumber: episodeNumber,
+		title:         title,
+		overview:      overview,
+		stillPath:     stillPath,
+		runtime:       runtime,
+		airDate:       airDate,
+		videoID:       videoID,
+		bindVideo:     bindVideo,
+	})
 	return nil
 }
 
-func (f *fakeScraperRepo) FindVideoByTypeTMDB(context.Context, string, int, uuid.UUID) (uuid.UUID, bool, error) {
+func (f *fakeScraperRepo) FindVideoByTypeTMDB(_ context.Context, typ string, _ int, _ uuid.UUID) (uuid.UUID, bool, error) {
+	f.findVideoTMDBCalls = append(f.findVideoTMDBCalls, typ)
+	if f.findVideoExists {
+		return f.findVideoID, true, nil
+	}
 	return uuid.Nil, false, nil
 }
 
