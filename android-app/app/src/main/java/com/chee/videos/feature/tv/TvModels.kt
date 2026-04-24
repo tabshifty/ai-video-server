@@ -1,5 +1,7 @@
 package com.chee.videos.feature.tv
 
+import com.chee.videos.core.model.SubtitleTrackDto
+
 data class TvEpisodeUiModel(
     val id: String,
     val number: Int,
@@ -10,6 +12,7 @@ data class TvEpisodeUiModel(
     val videoId: String = "",
     val videoStatus: String = "",
     val playable: Boolean = false,
+    val subtitleTracks: List<SubtitleTrackDto> = emptyList(),
 )
 
 data class TvSeasonUiModel(

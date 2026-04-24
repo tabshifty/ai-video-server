@@ -363,6 +363,41 @@ ORDER BY se.season_number ASC, e.episode_number ASC
 		detail.Seasons[index].Episodes = append(detail.Seasons[index].Episodes, episode)
 	}
 	episodeRows.Close()
+
+	videoIDs := make([]uuid.UUID, 0, len(detail.Seasons)*4)
+	for _, season := range detail.Seasons {
+		for _, episode := range season.Episodes {
+			if strings.TrimSpace(episode.VideoID) == "" {
+				continue
+			}
+			videoID, err := uuid.Parse(episode.VideoID)
+			if err != nil {
+				continue
+			}
+			videoIDs = append(videoIDs, videoID)
+		}
+	}
+	subtitlesByVideoID, err := r.ListVideoSubtitlesByVideoIDs(ctx, videoIDs)
+	if err != nil {
+		return models.TvSeriesDetailDto{}, fmt.Errorf("query tv subtitles: %w", err)
+	}
+	for seasonIndex := range detail.Seasons {
+		for episodeIndex := range detail.Seasons[seasonIndex].Episodes {
+			videoIDRaw := strings.TrimSpace(detail.Seasons[seasonIndex].Episodes[episodeIndex].VideoID)
+			if videoIDRaw == "" {
+				continue
+			}
+			videoID, err := uuid.Parse(videoIDRaw)
+			if err != nil {
+				continue
+			}
+			subtitles := subtitlesByVideoID[videoID]
+			detail.Seasons[seasonIndex].Episodes[episodeIndex].SubtitleTracks = make([]models.SubtitleTrack, 0, len(subtitles))
+			for _, subtitle := range subtitles {
+				detail.Seasons[seasonIndex].Episodes[episodeIndex].SubtitleTracks = append(detail.Seasons[seasonIndex].Episodes[episodeIndex].SubtitleTracks, BuildAppSubtitleTrack(subtitle))
+			}
+		}
+	}
 	return detail, nil
 }
 

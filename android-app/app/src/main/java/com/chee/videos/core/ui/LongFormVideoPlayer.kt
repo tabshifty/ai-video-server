@@ -10,12 +10,15 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,9 +28,11 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -57,11 +62,13 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import com.chee.videos.core.model.SubtitleTrackDto
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun LongFormVideoPlayer(
     title: String,
@@ -74,6 +81,9 @@ fun LongFormVideoPlayer(
     showStatusBarPadding: Boolean = false,
     posterUrl: String? = null,
     showPoster: Boolean = false,
+    subtitleTracks: List<SubtitleTrackDto> = emptyList(),
+    selectedSubtitleTrackId: String? = null,
+    onSelectSubtitleTrack: (String?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
 
@@ -98,6 +108,7 @@ fun LongFormVideoPlayer(
     var showCenterFeedback by remember { mutableStateOf(false) }
     var centerFeedbackText by remember { mutableStateOf("") }
     var centerFeedbackIcon by remember { mutableStateOf(Icons.Filled.PlayArrow) }
+    var subtitleSheetVisible by remember { mutableStateOf(false) }
 
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
     var hideSeekPreviewJob by remember { mutableStateOf<Job?>(null) }
@@ -505,6 +516,14 @@ fun LongFormVideoPlayer(
                             style = MaterialTheme.typography.labelSmall,
                         )
                         CompactPlayerControlButton(
+                            icon = Icons.Filled.Subtitles,
+                            contentDescription = "字幕",
+                            onClick = {
+                                subtitleSheetVisible = true
+                                showControlsTemporarily()
+                            },
+                        )
+                        CompactPlayerControlButton(
                             icon = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                             contentDescription = if (isFullscreen) "退出全屏" else "全屏",
                             onClick = {
@@ -512,6 +531,50 @@ fun LongFormVideoPlayer(
                                 showControlsTemporarily()
                             },
                         )
+                    }
+                }
+            }
+        }
+
+        if (subtitleSheetVisible) {
+            ModalBottomSheet(
+                onDismissRequest = { subtitleSheetVisible = false },
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "字幕",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item {
+                            SubtitleOptionRow(
+                                label = "关闭字幕",
+                                selected = selectedSubtitleTrackId.isNullOrBlank(),
+                                onClick = {
+                                    onSelectSubtitleTrack(null)
+                                    subtitleSheetVisible = false
+                                },
+                            )
+                        }
+                        items(subtitleTracks, key = { it.id }) { track ->
+                            SubtitleOptionRow(
+                                label = subtitleTrackDisplayLabel(track),
+                                selected = selectedSubtitleTrackId == track.id,
+                                onClick = {
+                                    onSelectSubtitleTrack(track.id)
+                                    subtitleSheetVisible = false
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -556,5 +619,42 @@ private fun formatPlaybackTime(ms: Long): String {
         String.format("%d:%02d:%02d", hours, minutes, seconds)
     } else {
         String.format("%02d:%02d", minutes, seconds)
+    }
+}
+
+@Composable
+private fun SubtitleOptionRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = if (selected) Color(0x26FFFFFF) else Color(0x12000000),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .pointerInput(label, selected) {
+                    detectTapGestures(onTap = { onClick() })
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            if (selected) {
+                Text(
+                    text = "已选中",
+                    color = Color.White.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
     }
 }

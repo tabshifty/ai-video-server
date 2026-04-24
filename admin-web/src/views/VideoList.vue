@@ -5,15 +5,20 @@ import { useRouter } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import {
   captureAdminVideoThumbnail,
+  deleteAdminVideoSubtitle,
   deleteAdminVideo,
   getAdminActors,
   getAdminCollections,
   getAdminImageCollections,
   getAdminVideoDetail,
   getAdminVideoPlayURL,
+  getAdminVideoSubtitles,
   getAdminVideos,
+  rescanAdminVideoSubtitles,
   retranscodeVideo,
-  updateAdminVideo
+  updateAdminVideo,
+  updateAdminVideoSubtitle,
+  uploadAdminVideoSubtitle
 } from '../api/admin'
 import { extractTvPendingDiagnostics, getVideoStatusMeta, tvPendingStageLabel } from './videoList.helpers'
 
@@ -32,6 +37,16 @@ const collectionOptions = ref([])
 const loadingCollections = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
+const subtitleItems = ref([])
+const subtitleLoading = ref(false)
+const subtitleUploadRef = ref(null)
+const subtitleUploadFileList = ref([])
+const subtitleUploading = ref(false)
+const subtitleForm = reactive({
+  language_code: '',
+  label: '',
+  is_default: false
+})
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const router = useRouter()
 
@@ -60,6 +75,11 @@ function normalizeVideoType(type) {
   return String(type || '')
     .trim()
     .toLowerCase()
+}
+
+function supportsSubtitleManage(type = detail.value?.type) {
+  const normalized = normalizeVideoType(type)
+  return normalized === 'movie' || normalized === 'episode' || normalized === 'av'
 }
 
 function isRetaggingShortVideo(video = detail.value) {
@@ -274,7 +294,17 @@ async function showDetail(row) {
   detailVisible.value = true
   playURL.value = ''
   playExpiresAt.value = 0
-  await Promise.all([searchActors(''), searchCollections(''), searchImageCollections('')])
+  subtitleItems.value = []
+  subtitleForm.language_code = ''
+  subtitleForm.label = ''
+  subtitleForm.is_default = false
+  subtitleUploadFileList.value = []
+  await Promise.all([
+    searchActors(''),
+    searchCollections(''),
+    searchImageCollections(''),
+    supportsSubtitleManage(detail.value?.type) ? loadSubtitles(detail.value.id) : Promise.resolve()
+  ])
   if (detail.value?.status === 'ready') {
     await refreshPlayURL()
   }
@@ -390,6 +420,114 @@ async function saveDetail() {
   ElMessage.success(enqueueAutoScrape ? '保存成功，已加入自动刮削队列' : '保存成功')
   detailVisible.value = false
   await load()
+}
+
+async function loadSubtitles(videoID = detail.value?.id) {
+  if (!videoID || !supportsSubtitleManage(detail.value?.type)) {
+    subtitleItems.value = []
+    return
+  }
+  subtitleLoading.value = true
+  try {
+    const data = await getAdminVideoSubtitles(videoID)
+    subtitleItems.value = data.items || []
+  } finally {
+    subtitleLoading.value = false
+  }
+}
+
+async function uploadSubtitle() {
+  if (!detail.value?.id || subtitleUploading.value) {
+    return
+  }
+  if (subtitleUploadFileList.value.length === 0) {
+    ElMessage.warning('请先选择字幕文件')
+    return
+  }
+  const file = subtitleUploadFileList.value[0]?.raw
+  if (!file) {
+    ElMessage.warning('字幕文件读取失败')
+    return
+  }
+  const formData = new FormData()
+  formData.append('file', file)
+  if (subtitleForm.language_code?.trim()) {
+    formData.append('language_code', subtitleForm.language_code.trim())
+  }
+  if (subtitleForm.label?.trim()) {
+    formData.append('label', subtitleForm.label.trim())
+  }
+  formData.append('is_default', subtitleForm.is_default ? 'true' : 'false')
+  subtitleUploading.value = true
+  try {
+    await uploadAdminVideoSubtitle(detail.value.id, formData)
+    ElMessage.success('字幕上传成功')
+    subtitleUploadRef.value?.clearFiles()
+    subtitleUploadFileList.value = []
+    subtitleForm.language_code = ''
+    subtitleForm.label = ''
+    subtitleForm.is_default = false
+    await loadSubtitles(detail.value.id)
+  } catch (error) {
+    ElMessage.error(error?.message || '字幕上传失败')
+  } finally {
+    subtitleUploading.value = false
+  }
+}
+
+async function rescanSubtitles() {
+  if (!detail.value?.id) {
+    return
+  }
+  subtitleLoading.value = true
+  try {
+    await rescanAdminVideoSubtitles(detail.value.id)
+    ElMessage.success('内嵌字幕重扫完成')
+    await loadSubtitles(detail.value.id)
+  } catch (error) {
+    ElMessage.error(error?.message || '内嵌字幕重扫失败')
+  } finally {
+    subtitleLoading.value = false
+  }
+}
+
+function subtitleSourceLabel(sourceType) {
+  return sourceType === 'embedded' ? '内嵌' : '外挂'
+}
+
+function subtitleDefaultLabel(item) {
+  if (item?.is_default) {
+    return '默认'
+  }
+  return item?.source_type === 'embedded' ? '媒体候选' : '-'
+}
+
+async function toggleSubtitleDefault(row) {
+  if (!detail.value?.id || row?.source_type !== 'uploaded') {
+    return
+  }
+  try {
+    await updateAdminVideoSubtitle(detail.value.id, row.id, {
+      language_code: row.language_code || '',
+      label: row.label || '',
+      sort_order: Number(row.sort_order || 0),
+      is_default: !row.is_default
+    })
+    ElMessage.success(!row.is_default ? '已设为默认字幕' : '已取消默认字幕')
+    await loadSubtitles(detail.value.id)
+  } catch (error) {
+    ElMessage.error(error?.message || '默认字幕更新失败')
+  }
+}
+
+async function removeSubtitle(row) {
+  if (!detail.value?.id || row?.source_type !== 'uploaded') {
+    return
+  }
+  await ElMessageBox.confirm(`确认删除字幕 ${row.label || row.language_code || row.id} ?`, '提示')
+  await deleteAdminVideoSubtitle(detail.value.id, row.id)
+  ElMessage.success('字幕已删除')
+  await loadSubtitles(detail.value.id)
 }
 
 onMounted(load)
@@ -684,6 +822,98 @@ onMounted(load)
             />
           </div>
         </el-form-item>
+
+        <el-form-item v-if="supportsSubtitleManage(detail.type)" label="字幕管理">
+          <div class="subtitle-panel">
+            <div class="subtitle-panel__actions">
+              <el-button
+                type="primary"
+                plain
+                size="small"
+                :loading="subtitleLoading"
+                @click="loadSubtitles(detail.id)"
+              >
+                刷新字幕列表
+              </el-button>
+              <el-button
+                plain
+                size="small"
+                :loading="subtitleLoading"
+                @click="rescanSubtitles"
+              >
+                重扫内嵌字幕
+              </el-button>
+            </div>
+
+            <el-table :data="subtitleItems" border size="small" v-loading="subtitleLoading">
+              <el-table-column label="来源" width="84">
+                <template #default="{ row }">
+                  {{ subtitleSourceLabel(row.source_type) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="language_code" label="语言" width="120" />
+              <el-table-column prop="label" label="名称" min-width="180" />
+              <el-table-column prop="format" label="格式" width="90" />
+              <el-table-column label="默认" width="90">
+                <template #default="{ row }">
+                  {{ subtitleDefaultLabel(row) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="附加信息" min-width="160">
+                <template #default="{ row }">
+                  <span v-if="row.source_type === 'embedded'">索引 {{ row.embedded_index || '-' }}</span>
+                  <span v-else>{{ Math.round(Number(row.file_size || 0) / 1024) }} KB</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="180">
+                <template #default="{ row }">
+                  <el-button
+                    v-if="row.source_type === 'uploaded'"
+                    size="small"
+                    type="primary"
+                    plain
+                    @click="toggleSubtitleDefault(row)"
+                  >
+                    {{ row.is_default ? '取消默认' : '设默认' }}
+                  </el-button>
+                  <el-button
+                    v-if="row.source_type === 'uploaded'"
+                    size="small"
+                    type="danger"
+                    plain
+                    @click="removeSubtitle(row)"
+                  >
+                    删除
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <div class="subtitle-upload">
+              <el-upload
+                ref="subtitleUploadRef"
+                v-model:file-list="subtitleUploadFileList"
+                :auto-upload="false"
+                :limit="1"
+                accept=".srt,.vtt"
+              >
+                <el-button size="small">选择字幕文件</el-button>
+              </el-upload>
+              <el-input
+                v-model="subtitleForm.language_code"
+                placeholder="语言代码，如 zh-CN / en"
+                clearable
+              />
+              <el-input
+                v-model="subtitleForm.label"
+                placeholder="字幕名称，可选"
+                clearable
+              />
+              <el-checkbox v-model="subtitleForm.is_default">设为默认字幕</el-checkbox>
+              <el-button type="success" :loading="subtitleUploading" @click="uploadSubtitle">上传字幕</el-button>
+            </div>
+          </div>
+        </el-form-item>
       </el-form>
 
       <template #footer>
@@ -794,6 +1024,27 @@ onMounted(load)
   border-radius: 12px;
   border: 1px solid var(--line-soft);
   background: #000;
+}
+
+.subtitle-panel {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.subtitle-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.subtitle-upload {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-muted);
 }
 
 @media (max-width: 992px) {

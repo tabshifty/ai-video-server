@@ -102,6 +102,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	scrapeSvc.ConfigureAVScraper(cfg.AVScraperBaseURL, cfg.AVScraperUserAgent, cfg.AVScraperTimeout)
 	appSvc := services.NewAppService(repo)
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
+	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -114,6 +115,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 		scrapeSvc,
 		appSvc,
 		imageSvc,
+		subtitleSvc,
 		enqueuer,
 		logger,
 		redisClient,
@@ -170,7 +172,8 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	defer enqueuer.Close()
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
 	scrapeSvc.ConfigureAVScraper(cfg.AVScraperBaseURL, cfg.AVScraperUserAgent, cfg.AVScraperTimeout)
-	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, enqueuer, logger)
+	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
+	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger)
 	processor.Register(mux)
 
 	srv := asynq.NewServer(

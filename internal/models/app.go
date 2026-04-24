@@ -23,6 +23,7 @@ type VideoDetail struct {
 	Actors          []VideoActor          `json:"actors"`
 	Collections     []VideoCollection     `json:"collections"`
 	ImageCollection *VideoImageCollection `json:"image_collection,omitempty"`
+	SubtitleTracks  []SubtitleTrack       `json:"subtitle_tracks"`
 	Metadata        json.RawMessage       `json:"metadata"`
 	UserState       VideoUserState        `json:"user_state"`
 }
@@ -186,18 +187,34 @@ type TvSeasonDto struct {
 }
 
 type TvEpisodeDto struct {
-	ID              int64  `json:"id"`
-	EpisodeNumber   int    `json:"episode_number"`
-	Title           string `json:"title"`
-	Overview        string `json:"overview"`
-	Runtime         int    `json:"runtime"`
-	AirDate         string `json:"air_date"`
-	StillURL        string `json:"still_url"`
-	VideoID         string `json:"video_id"`
-	VideoTitle      string `json:"video_title"`
-	VideoStatus     string `json:"video_status"`
-	WatchSeconds    int    `json:"watch_seconds"`
-	ProgressPercent int    `json:"progress_percent"`
-	LastWatchedAt   string `json:"last_watched_at"`
-	Playable        bool   `json:"playable"`
+	ID              int64           `json:"id"`
+	EpisodeNumber   int             `json:"episode_number"`
+	Title           string          `json:"title"`
+	Overview        string          `json:"overview"`
+	Runtime         int             `json:"runtime"`
+	AirDate         string          `json:"air_date"`
+	StillURL        string          `json:"still_url"`
+	VideoID         string          `json:"video_id"`
+	VideoTitle      string          `json:"video_title"`
+	VideoStatus     string          `json:"video_status"`
+	WatchSeconds    int             `json:"watch_seconds"`
+	ProgressPercent int             `json:"progress_percent"`
+	LastWatchedAt   string          `json:"last_watched_at"`
+	Playable        bool            `json:"playable"`
+	SubtitleTracks  []SubtitleTrack `json:"subtitle_tracks"`
+}
+
+type SubtitleTrack struct {
+	ID            uuid.UUID `json:"id"`
+	SourceType    string    `json:"source_type"`
+	LanguageCode  string    `json:"language_code"`
+	LanguageLabel string    `json:"language_label"`
+	Label         string    `json:"label"`
+	Format        string    `json:"format"`
+	URL           string    `json:"url"`
+	MIMEType      string    `json:"mime_type"`
+	IsDefault     bool      `json:"is_default"`
+	IsEmbedded    bool      `json:"is_embedded"`
+	EmbeddedIndex int       `json:"embedded_index"`
+	Available     bool      `json:"available"`
 }

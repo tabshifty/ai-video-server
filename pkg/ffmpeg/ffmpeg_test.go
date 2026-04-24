@@ -214,3 +214,60 @@ func TestIsEncoderUnavailableOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestParseSubtitleProbeOutput(t *testing.T) {
+	raw := []byte(`{
+  "streams": [
+    {
+      "index": 2,
+      "codec_name": "subrip",
+      "codec_type": "subtitle",
+      "tags": {
+        "language": "zh",
+        "title": "简体中文"
+      },
+      "disposition": {
+        "default": 1
+      }
+    },
+    {
+      "index": 3,
+      "codec_name": "ass",
+      "codec_type": "subtitle",
+      "tags": {
+        "language": "en",
+        "title": "English Signs"
+      },
+      "disposition": {
+        "default": 0
+      }
+    },
+    {
+      "index": 4,
+      "codec_name": "h264",
+      "codec_type": "video"
+    }
+  ]
+}`)
+
+	tracks, err := parseSubtitleProbeOutput(raw)
+	if err != nil {
+		t.Fatalf("parseSubtitleProbeOutput() error = %v", err)
+	}
+	if len(tracks) != 2 {
+		t.Fatalf("subtitle track count = %d, want 2", len(tracks))
+	}
+
+	if tracks[0].Index != 2 || tracks[0].Codec != "subrip" || tracks[0].Language != "zh" || tracks[0].Title != "简体中文" || !tracks[0].IsDefault {
+		t.Fatalf("tracks[0] = %+v", tracks[0])
+	}
+	if tracks[1].Index != 3 || tracks[1].Codec != "ass" || tracks[1].Language != "en" || tracks[1].Title != "English Signs" || tracks[1].IsDefault {
+		t.Fatalf("tracks[1] = %+v", tracks[1])
+	}
+}
+
+func TestParseSubtitleProbeOutputRejectsInvalidJSON(t *testing.T) {
+	if _, err := parseSubtitleProbeOutput([]byte(`{`)); err == nil {
+		t.Fatal("expected error for invalid json")
+	}
+}

@@ -79,6 +79,14 @@ WHERE id=$1 AND status='ready'
 			detail.ImageCollection = imageCollection
 		}
 	}
+	subtitles, err := r.ListVideoSubtitles(ctx, videoID)
+	if err != nil {
+		return models.VideoDetail{}, fmt.Errorf("query subtitles: %w", err)
+	}
+	detail.SubtitleTracks = make([]models.SubtitleTrack, 0, len(subtitles))
+	for _, subtitle := range subtitles {
+		detail.SubtitleTracks = append(detail.SubtitleTracks, BuildAppSubtitleTrack(subtitle))
+	}
 
 	rows, err := r.pool.Query(ctx, `
 SELECT action_type, watch_seconds

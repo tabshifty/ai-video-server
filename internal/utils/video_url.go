@@ -16,6 +16,10 @@ func VideoThumbnailURL(videoID uuid.UUID) string {
 	return fmt.Sprintf("/api/v1/videos/%s/thumbnail", videoID.String())
 }
 
+func VideoSubtitleURL(videoID, subtitleID uuid.UUID) string {
+	return fmt.Sprintf("/api/v1/videos/%s/subtitles/%s/file", videoID.String(), subtitleID.String())
+}
+
 func AdminImageViewURL(imageID uuid.UUID, width, height int, fit string, quality int) string {
 	return imageViewURL("/api/v1/admin/images", imageID, width, height, fit, quality)
 }

@@ -314,6 +314,43 @@ WHERE id=$1
 	return nil
 }
 
+func (r *VideoRepository) AdminListVideoSubtitles(ctx context.Context, videoID uuid.UUID) ([]models.AdminVideoSubtitle, error) {
+	subtitles, err := r.ListVideoSubtitles(ctx, videoID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]models.AdminVideoSubtitle, 0, len(subtitles))
+	for _, subtitle := range subtitles {
+		item := models.AdminVideoSubtitle{
+			ID:           subtitle.ID,
+			VideoID:      subtitle.VideoID,
+			SourceType:   subtitle.SourceType,
+			Status:       subtitle.Status,
+			LanguageCode: subtitle.LanguageCode,
+			Label:        subtitle.Label,
+			Format:       subtitle.Format,
+			MIMEType:     subtitle.MIMEType,
+			StoredPath:   subtitle.StoredPath,
+			FileSize:     subtitle.FileSize,
+			IsDefault:    subtitle.IsDefault,
+			SortOrder:    subtitle.SortOrder,
+			Metadata:     subtitle.Metadata,
+			CreatedAt:    subtitle.CreatedAt,
+			UpdatedAt:    subtitle.UpdatedAt,
+		}
+		if len(subtitle.Metadata) > 0 {
+			var meta map[string]any
+			if err := json.Unmarshal(subtitle.Metadata, &meta); err == nil {
+				if value, ok := meta["embedded_index"].(float64); ok {
+					item.EmbeddedIndex = int(value)
+				}
+			}
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 func (r *VideoRepository) AdminListUsers(ctx context.Context, page, pageSize int) ([]models.AdminUserListItem, int, error) {
 	var total int
 	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&total); err != nil {

@@ -61,6 +61,25 @@ type AdminVideoDetail struct {
 	UpdatedAt         time.Time              `json:"updated_at"`
 }
 
+type AdminVideoSubtitle struct {
+	ID            uuid.UUID       `json:"id"`
+	VideoID       uuid.UUID       `json:"video_id"`
+	SourceType    string          `json:"source_type"`
+	Status        string          `json:"status"`
+	LanguageCode  string          `json:"language_code"`
+	Label         string          `json:"label"`
+	Format        string          `json:"format"`
+	MIMEType      string          `json:"mime_type"`
+	StoredPath    string          `json:"stored_path"`
+	FileSize      int64           `json:"file_size"`
+	IsDefault     bool            `json:"is_default"`
+	SortOrder     int             `json:"sort_order"`
+	Metadata      json.RawMessage `json:"metadata"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+	EmbeddedIndex int             `json:"embedded_index"`
+}
+
 type VideoTagStat struct {
 	Tag       string `json:"tag"`
 	UsedCount int64  `json:"used_count"`

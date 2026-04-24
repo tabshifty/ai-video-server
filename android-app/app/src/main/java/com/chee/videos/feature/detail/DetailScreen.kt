@@ -67,13 +67,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.buildLongFormMediaItem
+import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
+import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.util.UrlBuilder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -178,6 +181,8 @@ fun DetailScreen(
                 var hasStartedPlayback by rememberSaveable(detail.id) { mutableStateOf(false) }
                 var isPausedByUser by rememberSaveable(detail.id) { mutableStateOf(false) }
                 var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+                var preparedSubtitleTrackId by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+                var selectedSubtitleTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
                 var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
                 val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
                     LongFormPlaybackSession(
@@ -195,19 +200,38 @@ fun DetailScreen(
                     isFullscreen = false
                 }
 
-                LaunchedEffect(playbackSession.hasStartedPlayback, playUrl, dataSourceFactory) {
+                LaunchedEffect(detail.id, detail.subtitleTracks) {
+                    selectedSubtitleTrackId = resolveInitialSubtitleTrackId(detail.subtitleTracks)
+                }
+
+                LaunchedEffect(playbackSession.hasStartedPlayback, playUrl, dataSourceFactory, selectedSubtitleTrackId) {
                     if (!playbackSession.hasStartedPlayback || playUrl.isNullOrBlank()) {
                         return@LaunchedEffect
                     }
 
-                    if (preparedUrl != playUrl) {
+                    if (preparedUrl != playUrl || preparedSubtitleTrackId != selectedSubtitleTrackId) {
+                        val restorePositionMs = if (preparedUrl == playUrl) {
+                            exoPlayer.currentPosition.coerceAtLeast(0L)
+                        } else {
+                            0L
+                        }
                         exoPlayer.stop()
                         exoPlayer.clearMediaItems()
-                        val mediaItem = MediaItem.fromUri(playUrl)
-                        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+                        val mediaItem = buildLongFormMediaItem(
+                            sourceUrl = playUrl,
+                            mediaId = detail.id,
+                            title = detail.title,
+                            baseUrl = uiState.baseUrl,
+                            selectedSubtitleTrack = resolveSelectedSubtitleTrack(detail.subtitleTracks, selectedSubtitleTrackId),
+                        )
+                        val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
                         exoPlayer.setMediaSource(mediaSource, true)
                         exoPlayer.prepare()
+                        if (restorePositionMs > 0L) {
+                            exoPlayer.seekTo(restorePositionMs)
+                        }
                         preparedUrl = playUrl
+                        preparedSubtitleTrackId = selectedSubtitleTrackId
                     }
 
                     if (!playbackSession.isPausedByUser) {
@@ -293,6 +317,9 @@ fun DetailScreen(
                                     onToggleFullscreen = { isFullscreen = false },
                                     modifier = Modifier.fillMaxSize(),
                                     showStatusBarPadding = false,
+                                    subtitleTracks = detail.subtitleTracks,
+                                    selectedSubtitleTrackId = selectedSubtitleTrackId,
+                                    onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
                                 )
                             } else {
                                 VideoPlayerSurface(
@@ -348,6 +375,9 @@ fun DetailScreen(
                                         onToggleFullscreen = { isFullscreen = true },
                                         modifier = Modifier.fillMaxSize(),
                                         showStatusBarPadding = false,
+                                        subtitleTracks = detail.subtitleTracks,
+                                        selectedSubtitleTrackId = selectedSubtitleTrackId,
+                                        onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
                                     )
                                 } else {
                                     VideoPlayerSurface(

@@ -23,11 +23,16 @@ import {
   deleteAdminTvEpisode,
   deleteAdminTvSeason,
   deleteAdminTvSeries,
+  deleteAdminVideoSubtitle,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
+  getAdminVideoSubtitles,
+  rescanAdminVideoSubtitles,
+  updateAdminVideoSubtitle,
   updateAdminTvEpisode,
   updateAdminTvSeason,
   updateAdminTvSeries,
+  uploadAdminVideoSubtitle,
   uploadAdminImages
 } from './admin'
 
@@ -109,5 +114,43 @@ describe('tv series apis', () => {
     expect(remove).toHaveBeenCalledWith('/admin/tv/series/12')
     expect(remove).toHaveBeenCalledWith('/admin/tv/seasons/22')
     expect(remove).toHaveBeenCalledWith('/admin/tv/episodes/33')
+  })
+})
+
+describe('video subtitle apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    put.mockReset()
+    remove.mockReset()
+  })
+
+  it('requests subtitle list and rescan by video id', async () => {
+    await getAdminVideoSubtitles('video-1')
+    await rescanAdminVideoSubtitles('video-1')
+
+    expect(get).toHaveBeenCalledWith('/admin/videos/video-1/subtitles')
+    expect(post).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/scan')
+  })
+
+  it('uploads subtitle files with multipart form data', async () => {
+    const formData = new FormData()
+
+    await uploadAdminVideoSubtitle('video-1', formData)
+
+    expect(post).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0
+    })
+  })
+
+  it('updates and deletes subtitle records', async () => {
+    const payload = { language_code: 'zh-CN', is_default: true }
+
+    await updateAdminVideoSubtitle('video-1', 'subtitle-1', payload)
+    await deleteAdminVideoSubtitle('video-1', 'subtitle-1')
+
+    expect(put).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1', payload)
+    expect(remove).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1')
   })
 })

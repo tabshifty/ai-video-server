@@ -143,6 +143,7 @@ data class TvEpisodeDto(
     @SerializedName("progress_percent") val progressPercent: Int = 0,
     @SerializedName("last_watched_at") val lastWatchedAt: String? = null,
     @SerializedName("playable") val playable: Boolean = false,
+    @SerializedName("subtitle_tracks") val subtitleTracks: List<SubtitleTrackDto> = emptyList(),
 )
 
 data class HistoryItemDto(
@@ -179,8 +180,24 @@ data class VideoDetailDto(
     @SerializedName("actors") val actors: List<VideoActorDto>? = emptyList(),
     @SerializedName("collections") val collections: List<VideoCollectionDto>? = emptyList(),
     @SerializedName("image_collection") val imageCollection: VideoImageCollectionDto? = null,
+    @SerializedName("subtitle_tracks") val subtitleTracks: List<SubtitleTrackDto> = emptyList(),
     @SerializedName("metadata") val metadata: Map<String, Any?>? = emptyMap(),
     @SerializedName("user_state") val userState: UserStateDto = UserStateDto(),
+)
+
+data class SubtitleTrackDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("source_type") val sourceType: String = "",
+    @SerializedName("language_code") val languageCode: String = "",
+    @SerializedName("language_label") val languageLabel: String = "",
+    @SerializedName("label") val label: String = "",
+    @SerializedName("format") val format: String = "",
+    @SerializedName("url") val url: String = "",
+    @SerializedName("mime_type") val mimeType: String = "",
+    @SerializedName("is_default") val isDefault: Boolean = false,
+    @SerializedName("is_embedded") val isEmbedded: Boolean = false,
+    @SerializedName("embedded_index") val embeddedIndex: Int = 0,
+    @SerializedName("available") val available: Boolean = false,
 )
 
 data class ImageCollectionListItemDto(

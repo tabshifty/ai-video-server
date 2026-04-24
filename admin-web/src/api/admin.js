@@ -4,6 +4,17 @@ export const getAdminStats = () => request.get('/admin/stats')
 export const getAdminVideos = (params) => request.get('/admin/videos', { params })
 export const getAdminPopularVideoTags = (params) => request.get('/admin/video-tags/popular', { params })
 export const getAdminVideoDetail = (id) => request.get(`/admin/videos/${id}`)
+export const getAdminVideoSubtitles = (id) => request.get(`/admin/videos/${id}/subtitles`)
+export const uploadAdminVideoSubtitle = (id, formData) =>
+  request.post(`/admin/videos/${id}/subtitles/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0
+  })
+export const rescanAdminVideoSubtitles = (id) => request.post(`/admin/videos/${id}/subtitles/scan`)
+export const updateAdminVideoSubtitle = (id, subtitleId, payload) =>
+  request.put(`/admin/videos/${id}/subtitles/${subtitleId}`, payload)
+export const deleteAdminVideoSubtitle = (id, subtitleId) =>
+  request.delete(`/admin/videos/${id}/subtitles/${subtitleId}`)
 export const getAdminVideoPlayURL = (id) => request.get(`/admin/videos/${id}/play-url`)
 export const captureAdminVideoThumbnail = (id, payload) => request.post(`/admin/videos/${id}/thumbnail/capture`, payload)
 export const updateAdminVideo = (id, payload) => request.put(`/admin/videos/${id}`, payload)

@@ -68,7 +68,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.imageLoader
@@ -77,6 +77,9 @@ import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.buildLongFormMediaItem
+import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
+import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.ui.shortScrubTargetFromDelta
@@ -140,6 +143,8 @@ fun UnifiedPlayerScreen(
             var renderedVideoId by remember { mutableStateOf<String?>(null) }
             var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
             var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
+            var subtitleSelectionByVideoId by remember { mutableStateOf(mapOf<String, String?>()) }
+            var preparedSubtitleTrackId by remember { mutableStateOf<String?>(null) }
 
             val dataSourceFactory = remember(accessToken) {
                 DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -156,6 +161,7 @@ fun UnifiedPlayerScreen(
             val imageLoader = context.imageLoader
             val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
             val currentVideoType = uiState.items.getOrNull(pagerState.currentPage)?.type.orEmpty()
+            val currentDetail = currentVideoId?.let { uiState.detailByVideoId[it] }
             val currentIsLongForm = isLongFormVideoType(currentVideoType)
             val currentVideoPausedByUser = currentVideoId?.let { id -> pausedByUserVideoIds.contains(id) } ?: false
             var durationMs by remember(currentVideoId) { mutableStateOf(0L) }
@@ -277,6 +283,15 @@ fun UnifiedPlayerScreen(
                     viewModel.ensureDetailLoaded(currentVideoId)
                 }
             }
+            LaunchedEffect(currentVideoId, currentDetail?.subtitleTracks) {
+                val videoId = currentVideoId ?: return@LaunchedEffect
+                val tracks = currentDetail?.subtitleTracks.orEmpty()
+                val currentSelection = subtitleSelectionByVideoId[videoId]
+                val stillValid = tracks.any { it.id == currentSelection && it.available }
+                if (!stillValid) {
+                    subtitleSelectionByVideoId = subtitleSelectionByVideoId + (videoId to resolveInitialSubtitleTrackId(tracks))
+                }
+            }
             LaunchedEffect(currentVideoType) {
                 if (!isLongFormVideoType(currentVideoType)) {
                     isFullscreen = false
@@ -291,24 +306,36 @@ fun UnifiedPlayerScreen(
                 lastHistoryVideoId = currentVideoId
             }
 
-            LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory) {
+            LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory, currentDetail?.subtitleTracks, subtitleSelectionByVideoId) {
                 if (currentVideoId.isNullOrBlank()) {
                     sharedPlayer.stop()
                     sharedPlayer.clearMediaItems()
                     renderedVideoId = null
+                    preparedSubtitleTrackId = null
                     return@LaunchedEffect
                 }
                 renderedVideoId = null
+                val selectedSubtitleTrackId = subtitleSelectionByVideoId[currentVideoId]
+                val sourceUrl = UrlBuilder.source(baseUrl, currentVideoId)
+                val shouldPreservePosition = sharedPlayer.currentMediaItem?.mediaId == currentVideoId && preparedSubtitleTrackId != selectedSubtitleTrackId
+                val restorePositionMs = if (shouldPreservePosition) sharedPlayer.currentPosition.coerceAtLeast(0L) else 0L
                 sharedPlayer.stop()
                 sharedPlayer.clearMediaItems()
 
-                val mediaItem = MediaItem.Builder()
-                    .setUri(UrlBuilder.source(baseUrl, currentVideoId))
-                    .setMediaId(currentVideoId)
-                    .build()
-                val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+                val mediaItem = buildLongFormMediaItem(
+                    sourceUrl = sourceUrl,
+                    mediaId = currentVideoId,
+                    title = currentDetail?.title ?: uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+                    baseUrl = baseUrl,
+                    selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentDetail?.subtitleTracks.orEmpty(), selectedSubtitleTrackId),
+                )
+                val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
                 sharedPlayer.setMediaSource(mediaSource, true)
                 sharedPlayer.prepare()
+                if (restorePositionMs > 0L) {
+                    sharedPlayer.seekTo(restorePositionMs)
+                }
+                preparedSubtitleTrackId = selectedSubtitleTrackId
             }
 
             LaunchedEffect(currentVideoId, currentVideoPausedByUser) {
@@ -370,9 +397,11 @@ fun UnifiedPlayerScreen(
                             item = item,
                             sharedPlayer = sharedPlayer,
                             active = isActive,
+                            detail = uiState.detailByVideoId[item.id],
                             posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
                             showPoster = isActive && renderedVideoId != item.id,
                             isFullscreen = fullscreenLongForm && isActive,
+                            selectedSubtitleTrackId = subtitleSelectionByVideoId[item.id],
                             onBack = {
                                 if (fullscreenLongForm && isActive) {
                                     isFullscreen = false
@@ -382,6 +411,9 @@ fun UnifiedPlayerScreen(
                             },
                             onTogglePauseByUser = togglePauseState,
                             onToggleFullscreen = { isFullscreen = !(fullscreenLongForm && isActive) },
+                            onSelectSubtitleTrack = { selectedId ->
+                                subtitleSelectionByVideoId = subtitleSelectionByVideoId + (item.id to selectedId)
+                            },
                         )
                     } else {
                         UnifiedShortVideoPage(
@@ -641,12 +673,15 @@ private fun UnifiedLongFormPage(
     item: PlayerVideoItem,
     sharedPlayer: ExoPlayer,
     active: Boolean,
+    detail: VideoDetailDto?,
     posterUrl: String?,
     showPoster: Boolean,
     isFullscreen: Boolean,
+    selectedSubtitleTrackId: String?,
     onBack: () -> Unit,
     onTogglePauseByUser: () -> Unit,
     onToggleFullscreen: () -> Unit,
+    onSelectSubtitleTrack: (String?) -> Unit,
 ) {
     if (active) {
         LongFormVideoPlayer(
@@ -660,6 +695,9 @@ private fun UnifiedLongFormPage(
             showStatusBarPadding = false,
             posterUrl = posterUrl,
             showPoster = showPoster,
+            subtitleTracks = detail?.subtitleTracks.orEmpty(),
+            selectedSubtitleTrackId = selectedSubtitleTrackId,
+            onSelectSubtitleTrack = onSelectSubtitleTrack,
         )
         return
     }

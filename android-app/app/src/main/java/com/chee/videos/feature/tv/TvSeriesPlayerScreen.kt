@@ -55,13 +55,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.buildLongFormMediaItem
+import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
+import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -114,6 +116,8 @@ fun TvSeriesPlayerScreen(
     var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var preparedUrl by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    var preparedSubtitleTrackId by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    var selectedSubtitleTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
 
@@ -129,24 +133,40 @@ fun TvSeriesPlayerScreen(
         isPausedByUser = nextSession.isPausedByUser
     }
 
-    LaunchedEffect(uiState.currentSourceUrl, canPlay) {
+    LaunchedEffect(uiState.currentSourceUrl, canPlay, selectedSubtitleTrackId, currentEpisode?.subtitleTracks) {
         if (!canPlay) {
             exoPlayer.pause()
             exoPlayer.clearMediaItems()
             preparedUrl = null
+            preparedSubtitleTrackId = null
             return@LaunchedEffect
         }
-        if (preparedUrl != uiState.currentSourceUrl) {
+        if (preparedUrl != uiState.currentSourceUrl || preparedSubtitleTrackId != selectedSubtitleTrackId) {
+            val restorePositionMs = if (preparedUrl == uiState.currentSourceUrl) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
-            val mediaItem = MediaItem.fromUri(uiState.currentSourceUrl)
-            val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+            val mediaItem = buildLongFormMediaItem(
+                sourceUrl = uiState.currentSourceUrl,
+                mediaId = uiState.currentVideoId,
+                title = currentEpisode?.title ?: series.title,
+                baseUrl = "",
+                selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentEpisode?.subtitleTracks.orEmpty(), selectedSubtitleTrackId),
+            )
+            val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
             exoPlayer.setMediaSource(mediaSource, true)
             exoPlayer.prepare()
+            if (restorePositionMs > 0L) {
+                exoPlayer.seekTo(restorePositionMs)
+            }
             preparedUrl = uiState.currentSourceUrl
+            preparedSubtitleTrackId = selectedSubtitleTrackId
             hasStartedPlayback = true
             isPausedByUser = false
         }
+    }
+
+    LaunchedEffect(uiState.currentVideoId, currentEpisode?.subtitleTracks) {
+        selectedSubtitleTrackId = resolveInitialSubtitleTrackId(currentEpisode?.subtitleTracks.orEmpty())
     }
 
     LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
@@ -278,6 +298,9 @@ fun TvSeriesPlayerScreen(
                         },
                         onToggleFullscreen = {},
                         modifier = Modifier.fillMaxSize(),
+                        subtitleTracks = currentEpisode?.subtitleTracks.orEmpty(),
+                        selectedSubtitleTrackId = selectedSubtitleTrackId,
+                        onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
                         showStatusBarPadding = false,
                     )
                 } else {

@@ -221,6 +221,54 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-04-25 00:38] 长视频字幕选择、后台上传与内嵌字幕抽取
+- Type: `implementation`
+- Summary:
+  - 为 `movie`、`episode`、`av` 新增独立字幕资源模型与迁移，后端在视频详情和电视剧分集详情中返回 `subtitle_tracks`，并暴露字幕文件访问接口。
+  - 新增字幕 service 与管理端接口，支持后台上传 `SRT/VTT` 外挂字幕、设默认轨、删除外挂字幕，以及在转码完成后自动探测并抽取内嵌字幕为可播放的 `VTT` 文件。
+  - app 端长视频播放器新增字幕选择入口，电影详情、统一播放页和电视剧播放页都可按默认轨或手动选择字幕；管理端视频详情弹窗新增字幕管理区。
+- Changed Files:
+  - `migrations/0016_video_subtitles.up.sql`
+  - `migrations/0016_video_subtitles.down.sql`
+  - `internal/models/app.go`
+  - `internal/models/admin.go`
+  - `internal/models/models.go`
+  - `internal/repository/video_subtitle_repository.go`
+  - `internal/repository/app_repository.go`
+  - `internal/repository/tv_repository.go`
+  - `internal/repository/admin_repository.go`
+  - `internal/repository/video_repository.go`
+  - `internal/services/subtitle.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/video_subtitle.go`
+  - `internal/handlers/admin_video_subtitle.go`
+  - `internal/handlers/admin.go`
+  - `internal/queue/tasks.go`
+  - `internal/utils/video_url.go`
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `internal/repository/video_delete_test.go`
+  - `main.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/api/admin.spec.js`
+  - `admin-web/src/views/VideoList.vue`
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormSubtitleSupport.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/SubtitleSelectionTest.kt`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `cd admin-web && npm test && npm run build` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-24 10:48] 电视剧上传自动并入电视剧树与待绑定状态
 - Type: `implementation`
 - Summary:

@@ -68,6 +68,7 @@ internal fun tvEpisodeToUiModel(dto: TvEpisodeDto): TvEpisodeUiModel =
         videoId = dto.videoId,
         videoStatus = dto.videoStatus.orEmpty(),
         playable = dto.playable || (dto.videoId.isNotBlank() && dto.videoStatus == "ready"),
+        subtitleTracks = coerceListOrEmpty(dto.subtitleTracks),
     )
 
 internal fun tvSeriesDetailToUiModel(dto: TvSeriesDetailDto): TvSeriesUiModel {

@@ -24,6 +24,14 @@ type VideoProbe struct {
 	BitrateKbps int     `json:"bitrate_kbps"`
 }
 
+type SubtitleProbe struct {
+	Index     int
+	Codec     string
+	Language  string
+	Title     string
+	IsDefault bool
+}
+
 // TranscodeOptions controls H.265 transcoding behavior.
 type TranscodeOptions struct {
 	CRF              string
@@ -276,6 +284,73 @@ func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 		probe.BitrateKbps = parseBitrateKbps("", raw.Format.BitRate)
 	}
 	return probe, nil
+}
+
+func ProbeSubtitles(ctx context.Context, inputPath string) ([]SubtitleProbe, error) {
+	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error",
+		"-show_entries", "stream=index,codec_name,codec_type:stream_tags=language,title:stream_disposition=default",
+		"-of", "json",
+		inputPath,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("ffprobe subtitle probe failed: %w", err)
+	}
+	return parseSubtitleProbeOutput(out)
+}
+
+func parseSubtitleProbeOutput(raw []byte) ([]SubtitleProbe, error) {
+	var payload struct {
+		Streams []struct {
+			Index     int    `json:"index"`
+			CodecName string `json:"codec_name"`
+			CodecType string `json:"codec_type"`
+			Tags      struct {
+				Language string `json:"language"`
+				Title    string `json:"title"`
+			} `json:"tags"`
+			Disposition struct {
+				Default int `json:"default"`
+			} `json:"disposition"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("unmarshal subtitle probe output: %w", err)
+	}
+	tracks := make([]SubtitleProbe, 0, len(payload.Streams))
+	for _, stream := range payload.Streams {
+		if strings.TrimSpace(stream.CodecType) != "subtitle" {
+			continue
+		}
+		tracks = append(tracks, SubtitleProbe{
+			Index:     stream.Index,
+			Codec:     strings.TrimSpace(stream.CodecName),
+			Language:  strings.TrimSpace(stream.Tags.Language),
+			Title:     strings.TrimSpace(stream.Tags.Title),
+			IsDefault: stream.Disposition.Default == 1,
+		})
+	}
+	return tracks, nil
+}
+
+func ExtractSubtitleToWebVTT(ctx context.Context, inputPath string, streamIndex int, outputPath string) error {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return fmt.Errorf("create subtitle output dir: %w", err)
+	}
+	cmd := exec.CommandContext(ctx, "ffmpeg",
+		"-y",
+		"-i", inputPath,
+		"-map", fmt.Sprintf("0:%d", streamIndex),
+		"-vn",
+		"-an",
+		"-c:s", "webvtt",
+		outputPath,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("ffmpeg extract subtitle failed: %w, output=%s", err, string(out))
+	}
+	return nil
 }
 
 func parseBitrateKbps(streamBitrate, formatBitrate string) int {

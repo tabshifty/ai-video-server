@@ -72,13 +72,14 @@ type Processor struct {
 	repo     *repository.VideoRepository
 	trans    *services.TranscodeService
 	scrape   *services.ScraperService
+	subtitle *services.SubtitleService
 	enqueuer *Enqueuer
 	logger   *slog.Logger
 	uploadGC bool
 }
 
-func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, enqueuer *Enqueuer, logger *slog.Logger) *Processor {
-	return &Processor{repo: repo, trans: trans, scrape: scrape, enqueuer: enqueuer, logger: logger, uploadGC: true}
+func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, logger *slog.Logger) *Processor {
+	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, logger: logger, uploadGC: true}
 }
 
 func (p *Processor) Register(mux *asynq.ServeMux) {
@@ -168,6 +169,11 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, result.ThumbnailPath, result.Duration, result.Width, result.Height, result.Metadata); err != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
 		return err
+	}
+	if p.subtitle != nil {
+		if _, err := p.subtitle.SyncEmbeddedSubtitles(ctx, videoID, inputPath); err != nil {
+			p.logger.Warn("sync embedded subtitles failed", "video_id", videoID, "input_path", inputPath, "error", err)
+		}
 	}
 	if err := p.repo.FinishTranscodingJob(ctx, jobID, "success", ""); err != nil {
 		return err

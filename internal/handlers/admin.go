@@ -340,13 +340,23 @@ func (a *API) AdminDeleteVideo(c *gin.Context) {
 		response.Error(c, 1009, err.Error())
 		return
 	}
-	if err := a.repo.DeleteVideoByID(c.Request.Context(), videoID); err != nil {
+	subtitles, err := a.repo.ListVideoSubtitles(c.Request.Context(), videoID)
+	if err != nil {
 		response.Error(c, 1010, err.Error())
+		return
+	}
+	if err := a.repo.DeleteVideoByID(c.Request.Context(), videoID); err != nil {
+		response.Error(c, 1011, err.Error())
 		return
 	}
 	_ = os.Remove(video.OriginalPath)
 	_ = os.Remove(video.TranscodedPath)
 	_ = os.Remove(video.ThumbnailPath)
+	for _, subtitle := range subtitles {
+		if strings.TrimSpace(subtitle.StoredPath) != "" {
+			_ = os.Remove(subtitle.StoredPath)
+		}
+	}
 	ok(c, gin.H{"deleted": true, "video_id": videoID})
 }
 

@@ -189,6 +189,9 @@ func deleteVideoDependencies(ctx context.Context, db execer, videoID uuid.UUID) 
 	if _, err := db.Exec(ctx, "DELETE FROM user_video_actions WHERE video_id = $1", videoID); err != nil {
 		return fmt.Errorf("delete user actions by video id: %w", err)
 	}
+	if _, err := db.Exec(ctx, "DELETE FROM video_subtitles WHERE video_id = $1", videoID); err != nil {
+		return fmt.Errorf("delete video subtitles by video id: %w", err)
+	}
 	if _, err := db.Exec(ctx, "DELETE FROM videos WHERE id = $1", videoID); err != nil {
 		return fmt.Errorf("delete video by id: %w", err)
 	}

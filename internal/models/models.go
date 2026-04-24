@@ -67,3 +67,21 @@ type Image struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
+
+type VideoSubtitle struct {
+	ID           uuid.UUID
+	VideoID      uuid.UUID
+	SourceType   string
+	Status       string
+	LanguageCode string
+	Label        string
+	Format       string
+	MIMEType     string
+	StoredPath   string
+	FileSize     int64
+	IsDefault    bool
+	SortOrder    int
+	Metadata     []byte
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
