@@ -3,6 +3,7 @@ package com.chee.videos.feature.imagecollections
 import androidx.compose.ui.geometry.Offset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 class ImageCollectionViewerZoomMathTest {
@@ -88,5 +89,20 @@ class ImageCollectionViewerZoomMathTest {
 
         assertEquals(0f, restored.x, 0.0001f)
         assertEquals(0f, restored.y, 0.0001f)
+    }
+
+    @Test
+    fun imageViewerPagerSwipeEnabled_allowsSwipeOnlyAtBaseScale() {
+        val klass = Class.forName("com.chee.videos.feature.imagecollections.ImageCollectionsScreenKt")
+        val method = try {
+            klass.getDeclaredMethod("imageViewerPagerSwipeEnabled", Float::class.javaPrimitiveType)
+        } catch (error: NoSuchMethodException) {
+            fail("expected imageViewerPagerSwipeEnabled helper to exist")
+            return
+        }
+
+        assertEquals(true, method.invoke(null, 1f))
+        assertEquals(true, method.invoke(null, 1.001f))
+        assertEquals(false, method.invoke(null, 1.01f))
     }
 }
