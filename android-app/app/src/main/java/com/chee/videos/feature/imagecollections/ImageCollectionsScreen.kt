@@ -4,10 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -433,15 +434,45 @@ private fun ImageCollectionViewerContent(
                 containerWidthPx = containerWidthPx,
                 containerHeightPx = containerHeightPx,
             )
+            val pagerSwipeEnabled = imageViewerPagerSwipeEnabled(displayScale)
 
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = displayScale <= 1.001f,
+                userScrollEnabled = pagerSwipeEnabled,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val image = images[page]
                 val viewUrl = remember(baseUrl, image.viewUrl) { resolveImageUrl(baseUrl, image.viewUrl) }
                 val isCurrentPage = page == pagerState.currentPage
+                val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+                    if (!isCurrentPage) {
+                        return@rememberTransformableState
+                    }
+                    val baseScale = imageScale.coerceIn(ImageViewerMinScale, maxScale)
+                    val baseOffset = imageViewerClampOffset(
+                        offset = imageOffset,
+                        scale = baseScale,
+                        imageWidthPx = image.width.toFloat(),
+                        imageHeightPx = image.height.toFloat(),
+                        containerWidthPx = containerWidthPx,
+                        containerHeightPx = containerHeightPx,
+                    )
+                    val nextScale = (baseScale * zoomChange).coerceIn(ImageViewerMinScale, maxScale)
+                    val rawOffset = if (nextScale <= 1f) {
+                        Offset.Zero
+                    } else {
+                        baseOffset + panChange
+                    }
+                    imageScale = nextScale
+                    imageOffset = imageViewerClampOffset(
+                        offset = rawOffset,
+                        scale = nextScale,
+                        imageWidthPx = image.width.toFloat(),
+                        imageHeightPx = image.height.toFloat(),
+                        containerWidthPx = containerWidthPx,
+                        containerHeightPx = containerHeightPx,
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -452,45 +483,12 @@ private fun ImageCollectionViewerContent(
                                 },
                             )
                         }
-                        .pointerInput(
-                            image.id,
-                            isCurrentPage,
-                            maxScale,
-                            containerWidthPx,
-                            containerHeightPx,
-                            imageScale,
-                            imageOffset,
-                        ) {
-                            if (!isCurrentPage) {
-                                return@pointerInput
-                            }
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                val baseScale = imageScale.coerceIn(ImageViewerMinScale, maxScale)
-                                val baseOffset = imageViewerClampOffset(
-                                    offset = imageOffset,
-                                    scale = baseScale,
-                                    imageWidthPx = image.width.toFloat(),
-                                    imageHeightPx = image.height.toFloat(),
-                                    containerWidthPx = containerWidthPx,
-                                    containerHeightPx = containerHeightPx,
-                                )
-                                val nextScale = (baseScale * zoom).coerceIn(ImageViewerMinScale, maxScale)
-                                val rawOffset = if (nextScale <= 1f) {
-                                    Offset.Zero
-                                } else {
-                                    baseOffset + pan
-                                }
-                                imageScale = nextScale
-                                imageOffset = imageViewerClampOffset(
-                                    offset = rawOffset,
-                                    scale = nextScale,
-                                    imageWidthPx = image.width.toFloat(),
-                                    imageHeightPx = image.height.toFloat(),
-                                    containerWidthPx = containerWidthPx,
-                                    containerHeightPx = containerHeightPx,
-                                )
-                            }
-                        },
+                        .transformable(
+                            state = transformState,
+                            canPan = { imageViewerImagePanEnabled(imageScale) },
+                            lockRotationOnZoomPan = true,
+                            enabled = isCurrentPage,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     AsyncImage(
@@ -725,6 +723,10 @@ internal fun restoreImageViewerOffset(values: List<Float>): Offset {
     }
     return Offset(values[0], values[1])
 }
+
+internal fun imageViewerPagerSwipeEnabled(scale: Float): Boolean = scale <= 1.001f
+
+private fun imageViewerImagePanEnabled(scale: Float): Boolean = !imageViewerPagerSwipeEnabled(scale)
 
 internal fun imageViewerMaxScale(
     imageWidthPx: Float,

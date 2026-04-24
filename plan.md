@@ -250,6 +250,23 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-04-24 16:05] Android 图集查看页恢复左右滑动翻页
+- Type: `implementation`
+- Summary:
+  - 修复图片查看页在未缩放状态下无法左右滑动切图的问题：根因是 `detectTransformGestures` 无条件挂在当前图片层上，单指横向拖动也会被图片手势先消费，`HorizontalPager` 收不到翻页手势。
+  - 将图集查看页的缩放/平移手势切换为 Compose `transformable`，并用显式 helper 控制手势归属：`1x` 基础倍率时允许 pager 接管左右滑动；放大后才允许图片自身横向/纵向平移。
+  - 新增回归测试锁定 `imageViewerPagerSwipeEnabled` 行为，避免后续再把基础倍率下的翻页手势吃掉。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/imagecollections/ImageCollectionsScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/imagecollections/ImageCollectionViewerZoomMathTest.kt`
+  - `plan.md`
+- Verification:
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.imagecollections.ImageCollectionViewerZoomMathTest` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.feature.imagecollections.*'` passed.
+  - `source ~/.zprofile >/dev/null 2>&1; cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-22 10:28] App 图片合集瀑布流与沉浸式看图功能
 - Type: `implementation`
 - Summary:
