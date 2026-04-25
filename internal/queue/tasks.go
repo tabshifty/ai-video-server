@@ -35,14 +35,19 @@ type TranscodePayload struct {
 
 // Enqueuer wraps asynq client operations.
 type Enqueuer struct {
-	client *asynq.Client
-	queue  string
+	client               *asynq.Client
+	queue                string
+	transcodeTaskTimeout time.Duration
 }
 
-func NewEnqueuer(redisAddr, redisPassword, queue string) *Enqueuer {
+func NewEnqueuer(redisAddr, redisPassword, queue string, transcodeTaskTimeout time.Duration) *Enqueuer {
+	if transcodeTaskTimeout <= 0 {
+		transcodeTaskTimeout = 6 * time.Hour
+	}
 	return &Enqueuer{
-		client: asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword}),
-		queue:  queue,
+		client:               asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword}),
+		queue:                queue,
+		transcodeTaskTimeout: transcodeTaskTimeout,
 	}
 }
 
@@ -57,14 +62,24 @@ func (e *Enqueuer) EnqueueTranscode(payloadIn TranscodePayload) error {
 	}
 	_, err = e.client.Enqueue(
 		asynq.NewTask(TypeVideoTranscode, payload),
-		asynq.MaxRetry(3),
-		asynq.ProcessIn(2*time.Second),
-		asynq.Queue(e.queue),
+		buildTranscodeTaskOptions(e.queue, e.transcodeTaskTimeout)...,
 	)
 	if err != nil {
 		return fmt.Errorf("enqueue transcode task: %w", err)
 	}
 	return nil
+}
+
+func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Option {
+	if timeout <= 0 {
+		timeout = 6 * time.Hour
+	}
+	return []asynq.Option{
+		asynq.MaxRetry(3),
+		asynq.ProcessIn(2 * time.Second),
+		asynq.Queue(queue),
+		asynq.Timeout(timeout),
+	}
 }
 
 // Processor handles task registration and processing logic.

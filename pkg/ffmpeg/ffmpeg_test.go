@@ -22,6 +22,7 @@ func TestBuildTranscodeVideoArgsForHevcPrimary(t *testing.T) {
 	assertArgPair(t, args, "-tag:v", "hvc1")
 	assertArgPair(t, args, "-crf", "21")
 	assertArgPair(t, args, "-ac", "2")
+	assertArgAbsent(t, args, "-preset")
 }
 
 func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
@@ -33,6 +34,7 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	assertArgPair(t, args, "-maxrate", "4200k")
 	assertArgPair(t, args, "-bufsize", "8400k")
 	assertArgPair(t, args, "-ac", "2")
+	assertArgAbsent(t, args, "-preset")
 }
 
 func TestParseBitrateKbps(t *testing.T) {
@@ -86,6 +88,15 @@ func assertArgPair(t *testing.T, args []string, key, value string) {
 		}
 	}
 	t.Fatalf("expected args to contain %s %s, got=%v", key, value, args)
+}
+
+func assertArgAbsent(t *testing.T, args []string, key string) {
+	t.Helper()
+	for _, arg := range args {
+		if arg == key {
+			t.Fatalf("expected args not to contain %s, got=%v", key, args)
+		}
+	}
 }
 
 func TestParseProgressValueToSeconds(t *testing.T) {
