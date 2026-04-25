@@ -122,6 +122,12 @@ func TestResolveProbeFieldsWithProbeErrorUsesDefaults(t *testing.T) {
 	if metadata["crf"] != "23" {
 		t.Fatalf("expected crf=23, got %v", metadata["crf"])
 	}
+	if metadata["audio_codec"] != "aac" {
+		t.Fatalf("expected audio_codec aac, got %v", metadata["audio_codec"])
+	}
+	if metadata["audio_channels"] != 2 {
+		t.Fatalf("expected audio_channels 2, got %v", metadata["audio_channels"])
+	}
 	if _, ok := metadata["probe_error"]; !ok {
 		t.Fatalf("expected probe_error metadata")
 	}
@@ -163,11 +169,49 @@ func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 	if metadata["bitrate_capped"] != true {
 		t.Fatalf("expected bitrate_capped true, got %v", metadata["bitrate_capped"])
 	}
+	if metadata["audio_codec"] != "aac" {
+		t.Fatalf("expected audio_codec aac, got %v", metadata["audio_codec"])
+	}
+	if metadata["audio_channels"] != 2 {
+		t.Fatalf("expected audio_channels 2, got %v", metadata["audio_channels"])
+	}
+	if metadata["audio_downmixed"] != false {
+		t.Fatalf("expected audio_downmixed false, got %v", metadata["audio_downmixed"])
+	}
 	if _, ok := metadata["crf"]; ok {
 		t.Fatalf("did not expect crf metadata in bitrate mode")
 	}
 	if _, ok := metadata["probe_error"]; ok {
 		t.Fatalf("did not expect probe_error metadata")
+	}
+}
+
+func TestResolveProbeFieldsMarksAudioDownmixedWhenSourceHasMoreChannels(t *testing.T) {
+	plan := transcodePlan{
+		Mode:                transcodeModeBitrate,
+		ResolutionTier:      resolutionTier1080,
+		SourceBitrateKbps:   5200,
+		TargetBitrateKbps:   4000,
+		BitrateCapped:       true,
+		SourceAudioChannels: 6,
+	}
+	_, _, _, metadata := resolveProbeFields(ffmpeg.VideoProbe{
+		Duration:      12.6,
+		Width:         1920,
+		Height:        1080,
+		Codec:         "h265",
+		AudioCodec:    "aac",
+		AudioChannels: 2,
+	}, nil, plan)
+
+	if metadata["audio_codec"] != "aac" {
+		t.Fatalf("expected audio_codec aac, got %v", metadata["audio_codec"])
+	}
+	if metadata["audio_channels"] != 2 {
+		t.Fatalf("expected audio_channels 2, got %v", metadata["audio_channels"])
+	}
+	if metadata["audio_downmixed"] != true {
+		t.Fatalf("expected audio_downmixed true, got %v", metadata["audio_downmixed"])
 	}
 }
 

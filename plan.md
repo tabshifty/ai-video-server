@@ -15,6 +15,38 @@
 
 ---
 
+### [2026-04-25 14:53] 修复长视频重转码 5.1 音频失败
+- Type: `implementation`
+- Summary:
+  - 播放用转码产物的音频统一显式降混为 `AAC 2.0`：HEVC 主档与 AVC 兼容档的 ffmpeg 参数都新增 `-ac 2`，避免 5.1 输入在 `aac` 编码器阶段触发 `Unsupported channel layout "6 channels"` 一类失败。
+  - 扩展 ffprobe 解析，补充音频流 `codec/channels` 探测；转码 metadata 新增 `audio_codec`、`audio_channels`、`audio_downmixed`，并基于输入音轨声道数判断是否发生降混。
+  - 新增回归测试覆盖主档/兼容档音频参数、音频 probe 解析和转码 metadata，锁定后续播放产物持续为稳定的 `AAC 2.0`。
+- Changed Files:
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` failed: Gradle Wrapper 下载 `https://services.gradle.org/distributions/gradle-8.7-bin.zip` 超时，未能完成代码层验证。
+  - 手工重转码验证未执行：仓库内未提供本次故障电视剧样本或可复用 5.1 测试素材。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-25 14:52] 长视频重转码 5.1 音频失败修复计划
+- Type: `plan`
+- Summary:
+  - 现有长视频重转码对 `AAC 5.1` 输入未显式做播放产物音频归一化，导致电视剧重转码可能在 `aac` 编码器打开阶段失败。
+  - 计划把播放用 HEVC 主档与 AVC 兼容档的音频统一为 `AAC 2.0`，并在 metadata 中补充 `audio_codec`、`audio_channels`、`audio_downmixed`，优先恢复“可稳定重转码、可稳定播放”。
+  - 验证目标包含 Go 单测、`go test ./...`、Android 单测与 assemble，以及有样本时的手工重转码回归。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `git status --short` 预期仅包含本次计划相关改动。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-25 14:21] HEVC 主档与 AVC 兼容档自动选路落地
 - Type: `implementation`
 - Summary:

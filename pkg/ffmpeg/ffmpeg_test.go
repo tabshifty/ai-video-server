@@ -21,6 +21,7 @@ func TestBuildTranscodeVideoArgsForHevcPrimary(t *testing.T) {
 	assertArgPair(t, args, "-pix_fmt", "yuv420p")
 	assertArgPair(t, args, "-tag:v", "hvc1")
 	assertArgPair(t, args, "-crf", "21")
+	assertArgPair(t, args, "-ac", "2")
 }
 
 func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
@@ -31,6 +32,7 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	assertArgPair(t, args, "-b:v", "4200k")
 	assertArgPair(t, args, "-maxrate", "4200k")
 	assertArgPair(t, args, "-bufsize", "8400k")
+	assertArgPair(t, args, "-ac", "2")
 }
 
 func TestParseBitrateKbps(t *testing.T) {
@@ -310,5 +312,51 @@ func TestParseSubtitleProbeOutput(t *testing.T) {
 func TestParseSubtitleProbeOutputRejectsInvalidJSON(t *testing.T) {
 	if _, err := parseSubtitleProbeOutput([]byte(`{`)); err == nil {
 		t.Fatal("expected error for invalid json")
+	}
+}
+
+func TestParseProbeOutputIncludesAudioStreamMetadata(t *testing.T) {
+	raw := []byte(`{
+  "streams": [
+    {
+      "codec_type": "video",
+      "width": 1920,
+      "height": 1080,
+      "codec_name": "hevc",
+      "bit_rate": "8200000"
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "aac",
+      "channels": 6
+    }
+  ],
+  "format": {
+    "duration": "120.5",
+    "bit_rate": "9000000"
+  }
+}`)
+
+	probe, err := parseProbeOutput(raw)
+	if err != nil {
+		t.Fatalf("parseProbeOutput() error = %v", err)
+	}
+	if probe.Width != 1920 || probe.Height != 1080 {
+		t.Fatalf("unexpected video size: %+v", probe)
+	}
+	if probe.Codec != "hevc" {
+		t.Fatalf("expected video codec hevc, got %s", probe.Codec)
+	}
+	if probe.BitrateKbps != 8200 {
+		t.Fatalf("expected bitrate 8200, got %d", probe.BitrateKbps)
+	}
+	if probe.AudioCodec != "aac" {
+		t.Fatalf("expected audio codec aac, got %s", probe.AudioCodec)
+	}
+	if probe.AudioChannels != 6 {
+		t.Fatalf("expected audio channels 6, got %d", probe.AudioChannels)
+	}
+	if probe.Duration != 120.5 {
+		t.Fatalf("expected duration 120.5, got %v", probe.Duration)
 	}
 }

@@ -17,11 +17,13 @@ import (
 
 // VideoProbe holds basic media attributes from ffprobe.
 type VideoProbe struct {
-	Duration    float64 `json:"duration"`
-	Width       int     `json:"width"`
-	Height      int     `json:"height"`
-	Codec       string  `json:"codec"`
-	BitrateKbps int     `json:"bitrate_kbps"`
+	Duration      float64 `json:"duration"`
+	Width         int     `json:"width"`
+	Height        int     `json:"height"`
+	Codec         string  `json:"codec"`
+	BitrateKbps   int     `json:"bitrate_kbps"`
+	AudioCodec    string  `json:"audio_codec"`
+	AudioChannels int     `json:"audio_channels"`
 }
 
 type SubtitleProbe struct {
@@ -93,6 +95,7 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",
+		"-ac", "2",
 		"-movflags", "+faststart",
 		"-progress", "pipe:1",
 		"-nostats",
@@ -279,8 +282,7 @@ func ThumbnailAt(ctx context.Context, inputPath, outputPath string, atSeconds fl
 func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
-		"-select_streams", "v:0",
-		"-show_entries", "stream=width,height,codec_name,bit_rate:format=duration,bit_rate",
+		"-show_entries", "stream=codec_type,width,height,codec_name,bit_rate,channels:format=duration,bit_rate",
 		"-of", "json",
 		inputPath,
 	)
@@ -288,38 +290,61 @@ func Probe(ctx context.Context, inputPath string) (VideoProbe, error) {
 	if err != nil {
 		return VideoProbe{}, fmt.Errorf("ffprobe failed: %w", err)
 	}
+	return parseProbeOutput(out)
+}
 
-	var raw struct {
+func parseProbeOutput(raw []byte) (VideoProbe, error) {
+	var payload struct {
 		Streams []struct {
+			CodecType string `json:"codec_type"`
 			Width     int    `json:"width"`
 			Height    int    `json:"height"`
 			CodecName string `json:"codec_name"`
 			BitRate   string `json:"bit_rate"`
+			Channels  int    `json:"channels"`
 		} `json:"streams"`
 		Format struct {
 			Duration string `json:"duration"`
 			BitRate  string `json:"bit_rate"`
 		} `json:"format"`
 	}
-	if err := json.Unmarshal(out, &raw); err != nil {
+	if err := json.Unmarshal(raw, &payload); err != nil {
 		return VideoProbe{}, fmt.Errorf("unmarshal ffprobe output: %w", err)
 	}
 
 	probe := VideoProbe{}
-	if len(raw.Streams) > 0 {
-		probe.Width = raw.Streams[0].Width
-		probe.Height = raw.Streams[0].Height
-		probe.Codec = raw.Streams[0].CodecName
-		probe.BitrateKbps = parseBitrateKbps(raw.Streams[0].BitRate, raw.Format.BitRate)
+	for _, stream := range payload.Streams {
+		switch strings.TrimSpace(stream.CodecType) {
+		case "video":
+			if probe.Width == 0 {
+				probe.Width = stream.Width
+			}
+			if probe.Height == 0 {
+				probe.Height = stream.Height
+			}
+			if probe.Codec == "" {
+				probe.Codec = strings.TrimSpace(stream.CodecName)
+			}
+			if probe.BitrateKbps == 0 {
+				probe.BitrateKbps = parseBitrateKbps(stream.BitRate, payload.Format.BitRate)
+			}
+		case "audio":
+			if probe.AudioCodec == "" {
+				probe.AudioCodec = strings.TrimSpace(stream.CodecName)
+			}
+			if probe.AudioChannels == 0 {
+				probe.AudioChannels = stream.Channels
+			}
+		}
 	}
-	if raw.Format.Duration != "" {
+	if payload.Format.Duration != "" {
 		var duration float64
-		if _, err := fmt.Sscanf(raw.Format.Duration, "%f", &duration); err == nil {
+		if _, err := fmt.Sscanf(payload.Format.Duration, "%f", &duration); err == nil {
 			probe.Duration = duration
 		}
 	}
 	if probe.BitrateKbps == 0 {
-		probe.BitrateKbps = parseBitrateKbps("", raw.Format.BitRate)
+		probe.BitrateKbps = parseBitrateKbps("", payload.Format.BitRate)
 	}
 	return probe, nil
 }
