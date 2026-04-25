@@ -3,6 +3,8 @@ package com.chee.videos.core.ui
 import com.chee.videos.core.model.SubtitleTrackDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SubtitleSelectionTest {
@@ -119,5 +121,47 @@ class SubtitleSelectionTest {
         )
 
         assertEquals("uploaded-1", trackId)
+    }
+
+    @Test
+    fun resolveLongFormPlayerUpdate_clearsWhenNextUrlMissing() {
+        val decision = resolveLongFormPlayerUpdate(
+            preparedUrl = "https://example.com/video.mp4",
+            nextUrl = "",
+            preparedSubtitleTrackId = null,
+            nextSubtitleTrackId = null,
+        )
+
+        assertTrue(decision.shouldClear)
+        assertFalse(decision.shouldReplaceSource)
+        assertFalse(decision.preservePosition)
+    }
+
+    @Test
+    fun resolveLongFormPlayerUpdate_replacesAndPreservesPositionForSubtitleOnlyChange() {
+        val decision = resolveLongFormPlayerUpdate(
+            preparedUrl = "https://example.com/video.mp4",
+            nextUrl = "https://example.com/video.mp4",
+            preparedSubtitleTrackId = null,
+            nextSubtitleTrackId = "sub-1",
+        )
+
+        assertFalse(decision.shouldClear)
+        assertTrue(decision.shouldReplaceSource)
+        assertTrue(decision.preservePosition)
+    }
+
+    @Test
+    fun resolveLongFormPlayerUpdate_noopWhenTargetUnchanged() {
+        val decision = resolveLongFormPlayerUpdate(
+            preparedUrl = "https://example.com/video.mp4",
+            nextUrl = "https://example.com/video.mp4",
+            preparedSubtitleTrackId = "sub-1",
+            nextSubtitleTrackId = "sub-1",
+        )
+
+        assertFalse(decision.shouldClear)
+        assertFalse(decision.shouldReplaceSource)
+        assertFalse(decision.preservePosition)
     }
 }

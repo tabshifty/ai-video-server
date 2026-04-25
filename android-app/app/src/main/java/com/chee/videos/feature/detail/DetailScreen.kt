@@ -75,7 +75,7 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.buildLongFormMediaItem
-import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
+import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.core.util.UrlBuilder
@@ -210,18 +210,18 @@ fun DetailScreen(
                 }
 
                 LaunchedEffect(playbackSession.hasStartedPlayback, playUrl, dataSourceFactory, selectedSubtitleTrackId) {
+                    val updateDecision = resolveLongFormPlayerUpdate(
+                        preparedUrl = preparedUrl,
+                        nextUrl = playUrl,
+                        preparedSubtitleTrackId = preparedSubtitleTrackId,
+                        nextSubtitleTrackId = selectedSubtitleTrackId,
+                    )
                     if (!playbackSession.hasStartedPlayback || playUrl.isNullOrBlank()) {
                         return@LaunchedEffect
                     }
 
-                    if (preparedUrl != playUrl || preparedSubtitleTrackId != selectedSubtitleTrackId) {
-                        val restorePositionMs = if (preparedUrl == playUrl) {
-                            exoPlayer.currentPosition.coerceAtLeast(0L)
-                        } else {
-                            0L
-                        }
-                        exoPlayer.stop()
-                        exoPlayer.clearMediaItems()
+                    if (updateDecision.shouldReplaceSource) {
+                        val restorePositionMs = if (updateDecision.preservePosition) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L
                         val mediaItem = buildLongFormMediaItem(
                             sourceUrl = playUrl,
                             mediaId = detail.id,

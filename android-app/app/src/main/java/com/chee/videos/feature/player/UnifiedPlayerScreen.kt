@@ -78,7 +78,7 @@ import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.buildLongFormMediaItem
-import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
+import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
@@ -145,6 +145,7 @@ fun UnifiedPlayerScreen(
             var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
             var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
             var subtitleSelectionByVideoId by remember { mutableStateOf(mapOf<String, String?>()) }
+            var preparedUrl by remember(accessToken) { mutableStateOf<String?>(null) }
             var preparedSubtitleTrackId by remember { mutableStateOf<String?>(null) }
 
             val dataSourceFactory = remember(accessToken) {
@@ -311,33 +312,46 @@ fun UnifiedPlayerScreen(
             }
 
             LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory, currentDetail?.subtitleTracks, subtitleSelectionByVideoId) {
+                val selectedSubtitleTrackId = currentVideoId?.let { subtitleSelectionByVideoId[it] }
+                val sourceUrl = currentVideoId?.let { UrlBuilder.source(baseUrl, it) }
+                val updateDecision = resolveLongFormPlayerUpdate(
+                    preparedUrl = preparedUrl,
+                    nextUrl = sourceUrl,
+                    preparedSubtitleTrackId = preparedSubtitleTrackId,
+                    nextSubtitleTrackId = selectedSubtitleTrackId,
+                )
                 if (currentVideoId.isNullOrBlank()) {
-                    sharedPlayer.stop()
-                    sharedPlayer.clearMediaItems()
+                    if (updateDecision.shouldClear) {
+                        sharedPlayer.pause()
+                        sharedPlayer.clearMediaItems()
+                    }
                     renderedVideoId = null
+                    preparedUrl = null
                     preparedSubtitleTrackId = null
                     return@LaunchedEffect
                 }
                 renderedVideoId = null
-                val selectedSubtitleTrackId = subtitleSelectionByVideoId[currentVideoId]
-                val sourceUrl = UrlBuilder.source(baseUrl, currentVideoId)
-                val shouldPreservePosition = sharedPlayer.currentMediaItem?.mediaId == currentVideoId && preparedSubtitleTrackId != selectedSubtitleTrackId
-                val restorePositionMs = if (shouldPreservePosition) sharedPlayer.currentPosition.coerceAtLeast(0L) else 0L
-                sharedPlayer.stop()
-                sharedPlayer.clearMediaItems()
-
-                val mediaItem = buildLongFormMediaItem(
-                    sourceUrl = sourceUrl,
-                    mediaId = currentVideoId,
-                    title = currentDetail?.title ?: uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
-                    baseUrl = baseUrl,
-                    selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentDetail?.subtitleTracks.orEmpty(), selectedSubtitleTrackId),
-                )
-                val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
-                sharedPlayer.setMediaSource(mediaSource, true)
-                sharedPlayer.prepare()
-                if (restorePositionMs > 0L) {
-                    sharedPlayer.seekTo(restorePositionMs)
+                if (updateDecision.shouldClear) {
+                    sharedPlayer.pause()
+                    sharedPlayer.clearMediaItems()
+                    preparedUrl = null
+                }
+                if (updateDecision.shouldReplaceSource && sourceUrl != null) {
+                    val restorePositionMs = if (updateDecision.preservePosition) sharedPlayer.currentPosition.coerceAtLeast(0L) else 0L
+                    val mediaItem = buildLongFormMediaItem(
+                        sourceUrl = sourceUrl,
+                        mediaId = currentVideoId,
+                        title = currentDetail?.title ?: uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+                        baseUrl = baseUrl,
+                        selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentDetail?.subtitleTracks.orEmpty(), selectedSubtitleTrackId),
+                    )
+                    val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
+                    sharedPlayer.setMediaSource(mediaSource, true)
+                    sharedPlayer.prepare()
+                    if (restorePositionMs > 0L) {
+                        sharedPlayer.seekTo(restorePositionMs)
+                    }
+                    preparedUrl = sourceUrl
                 }
                 preparedSubtitleTrackId = selectedSubtitleTrackId
             }

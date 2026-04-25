@@ -9,6 +9,12 @@ import com.chee.videos.core.model.SubtitleTrackDto
 import com.chee.videos.core.util.UrlBuilder
 import java.net.URI
 
+internal data class LongFormPlayerUpdateDecision(
+    val shouldClear: Boolean,
+    val shouldReplaceSource: Boolean,
+    val preservePosition: Boolean,
+)
+
 fun resolveInitialSubtitleTrackId(tracks: List<SubtitleTrackDto>): String? {
     return tracks.firstOrNull { it.sourceType == "uploaded" && it.isDefault }?.id
         ?: tracks.firstOrNull { it.isDefault }?.id
@@ -28,6 +34,49 @@ fun resolveSubtitleSelectionOnTrackLoad(
         return null
     }
     return resolveInitialSubtitleTrackId(tracks)
+}
+
+internal fun resolveLongFormPlayerUpdate(
+    preparedUrl: String?,
+    nextUrl: String?,
+    preparedSubtitleTrackId: String?,
+    nextSubtitleTrackId: String?,
+): LongFormPlayerUpdateDecision {
+    val normalizedPreparedUrl = preparedUrl?.trim().orEmpty()
+    val normalizedNextUrl = nextUrl?.trim().orEmpty()
+    if (normalizedNextUrl.isBlank()) {
+        return LongFormPlayerUpdateDecision(
+            shouldClear = normalizedPreparedUrl.isNotBlank(),
+            shouldReplaceSource = false,
+            preservePosition = false,
+        )
+    }
+    if (normalizedPreparedUrl.isBlank()) {
+        return LongFormPlayerUpdateDecision(
+            shouldClear = false,
+            shouldReplaceSource = true,
+            preservePosition = false,
+        )
+    }
+    if (normalizedPreparedUrl != normalizedNextUrl) {
+        return LongFormPlayerUpdateDecision(
+            shouldClear = false,
+            shouldReplaceSource = true,
+            preservePosition = false,
+        )
+    }
+    if (preparedSubtitleTrackId != nextSubtitleTrackId) {
+        return LongFormPlayerUpdateDecision(
+            shouldClear = false,
+            shouldReplaceSource = true,
+            preservePosition = true,
+        )
+    }
+    return LongFormPlayerUpdateDecision(
+        shouldClear = false,
+        shouldReplaceSource = false,
+        preservePosition = false,
+    )
 }
 
 fun resolveSelectedSubtitleTrack(tracks: List<SubtitleTrackDto>, selectedTrackId: String?): SubtitleTrackDto? {

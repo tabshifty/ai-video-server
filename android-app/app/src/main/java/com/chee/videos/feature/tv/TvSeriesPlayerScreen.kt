@@ -62,7 +62,7 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.buildLongFormMediaItem
-import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
+import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.feature.detail.LongFormPlaybackSession
@@ -135,17 +135,23 @@ fun TvSeriesPlayerScreen(
     }
 
     LaunchedEffect(uiState.currentSourceUrl, canPlay, selectedSubtitleTrackId, currentEpisode?.subtitleTracks) {
+        val updateDecision = resolveLongFormPlayerUpdate(
+            preparedUrl = preparedUrl,
+            nextUrl = uiState.currentSourceUrl,
+            preparedSubtitleTrackId = preparedSubtitleTrackId,
+            nextSubtitleTrackId = selectedSubtitleTrackId,
+        )
         if (!canPlay) {
             exoPlayer.pause()
-            exoPlayer.clearMediaItems()
+            if (updateDecision.shouldClear) {
+                exoPlayer.clearMediaItems()
+            }
             preparedUrl = null
             preparedSubtitleTrackId = null
             return@LaunchedEffect
         }
-        if (preparedUrl != uiState.currentSourceUrl || preparedSubtitleTrackId != selectedSubtitleTrackId) {
-            val restorePositionMs = if (preparedUrl == uiState.currentSourceUrl) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
+        if (updateDecision.shouldReplaceSource) {
+            val restorePositionMs = if (updateDecision.preservePosition) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L
             val mediaItem = buildLongFormMediaItem(
                 sourceUrl = uiState.currentSourceUrl,
                 mediaId = uiState.currentVideoId,

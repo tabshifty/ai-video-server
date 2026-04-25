@@ -15,6 +15,25 @@
 
 ---
 
+### [2026-04-25 09:54] Android 长视频播放器重配编解码器竞态修复
+- Type: `implementation`
+- Summary:
+  - 针对字幕切换、详情异步补齐和页面退出并发时的播放器重配路径，新增统一的长视频媒体更新决策，区分“清空播放器”“替换媒体源”“保留播放位置”三种行为，避免继续走高风险的 `stop() + clearMediaItems()`。
+  - 详情页、统一播放页和电视剧播放页全部改为基于已准备 URL 与字幕轨状态的显式重配逻辑；其中统一播放页补上 `preparedUrl` 显式状态，不再从 `currentMediaItem` 反推播放器准备状态，降低 release 阶段竞态。
+  - 新增单测覆盖“目标 URL 为空时清空”“仅字幕变化时保留播放位置替换源”“目标未变化时不重配”三类行为，锁定本次回归。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormSubtitleSupport.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/SubtitleSelectionTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.SubtitleSelectionTest` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-23 18:32] Android 电视剧首页空列表空指针崩溃修复
 - Type: `implementation`
 - Summary:
