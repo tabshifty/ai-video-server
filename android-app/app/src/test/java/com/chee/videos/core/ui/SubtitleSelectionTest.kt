@@ -74,4 +74,50 @@ class SubtitleSelectionTest {
 
         assertNull(trackId)
     }
+
+    @Test
+    fun resolveSubtitleSelectionOnTrackLoad_keepsDefaultNullAfterPlaybackStarted() {
+        val trackId = resolveSubtitleSelectionOnTrackLoad(
+            currentSelection = null,
+            tracks = listOf(
+                SubtitleTrackDto(
+                    id = "uploaded-1",
+                    sourceType = "uploaded",
+                    languageCode = "zh-CN",
+                    label = "外挂简中",
+                    format = "srt",
+                    url = "/api/v1/videos/v1/subtitles/uploaded-1/file",
+                    mimeType = "application/x-subrip",
+                    isDefault = true,
+                    available = true,
+                ),
+            ),
+            hasStartedPlayback = true,
+        )
+
+        assertNull(trackId)
+    }
+
+    @Test
+    fun resolveSubtitleSelectionOnTrackLoad_appliesDefaultBeforePlaybackStarts() {
+        val trackId = resolveSubtitleSelectionOnTrackLoad(
+            currentSelection = null,
+            tracks = listOf(
+                SubtitleTrackDto(
+                    id = "uploaded-1",
+                    sourceType = "uploaded",
+                    languageCode = "zh-CN",
+                    label = "外挂简中",
+                    format = "srt",
+                    url = "/api/v1/videos/v1/subtitles/uploaded-1/file",
+                    mimeType = "application/x-subrip",
+                    isDefault = true,
+                    available = true,
+                ),
+            ),
+            hasStartedPlayback = false,
+        )
+
+        assertEquals("uploaded-1", trackId)
+    }
 }

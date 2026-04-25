@@ -269,6 +269,25 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-04-25 09:22] Android 长视频字幕默认轨热切换崩溃修复
+- Type: `implementation`
+- Summary:
+  - 修复长视频播放器在已开始播放后，因详情异步返回字幕轨而自动套用默认字幕、重建同一 `MediaItem` 导致的播放期热切换风险。
+  - 新增字幕选择决策函数：仅在“尚未开始播放”时自动应用默认字幕；若视频已经开始播放且当前没有字幕选择，则保持关闭字幕，避免播放中因异步字幕到达触发播放器重配。
+  - 详情页、统一播放页和电视剧播放页统一接入该策略，并补充回归测试锁定“播放前套默认、播放后不自动热切”的行为。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormSubtitleSupport.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/SubtitleSelectionTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.SubtitleSelectionTest` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-24 10:48] 电视剧上传自动并入电视剧树与待绑定状态
 - Type: `implementation`
 - Summary:

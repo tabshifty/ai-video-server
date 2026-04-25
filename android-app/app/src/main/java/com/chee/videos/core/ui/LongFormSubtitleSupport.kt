@@ -14,6 +14,22 @@ fun resolveInitialSubtitleTrackId(tracks: List<SubtitleTrackDto>): String? {
         ?: tracks.firstOrNull { it.isDefault }?.id
 }
 
+fun resolveSubtitleSelectionOnTrackLoad(
+    currentSelection: String?,
+    tracks: List<SubtitleTrackDto>,
+    hasStartedPlayback: Boolean,
+): String? {
+    val normalizedSelection = currentSelection?.trim().orEmpty()
+    val selectedStillValid = normalizedSelection.isNotBlank() && tracks.any { it.id == normalizedSelection && it.available }
+    if (selectedStillValid) {
+        return normalizedSelection
+    }
+    if (hasStartedPlayback) {
+        return null
+    }
+    return resolveInitialSubtitleTrackId(tracks)
+}
+
 fun resolveSelectedSubtitleTrack(tracks: List<SubtitleTrackDto>, selectedTrackId: String?): SubtitleTrackDto? {
     val normalizedId = selectedTrackId?.trim().orEmpty()
     if (normalizedId.isBlank()) {

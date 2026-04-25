@@ -80,6 +80,7 @@ import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.buildLongFormMediaItem
 import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
+import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.ui.shortScrubTargetFromDelta
@@ -286,10 +287,13 @@ fun UnifiedPlayerScreen(
             LaunchedEffect(currentVideoId, currentDetail?.subtitleTracks) {
                 val videoId = currentVideoId ?: return@LaunchedEffect
                 val tracks = currentDetail?.subtitleTracks.orEmpty()
-                val currentSelection = subtitleSelectionByVideoId[videoId]
-                val stillValid = tracks.any { it.id == currentSelection && it.available }
-                if (!stillValid) {
-                    subtitleSelectionByVideoId = subtitleSelectionByVideoId + (videoId to resolveInitialSubtitleTrackId(tracks))
+                val nextSelection = resolveSubtitleSelectionOnTrackLoad(
+                    currentSelection = subtitleSelectionByVideoId[videoId],
+                    tracks = tracks,
+                    hasStartedPlayback = sharedPlayer.currentMediaItem?.mediaId == videoId,
+                )
+                if (subtitleSelectionByVideoId[videoId] != nextSelection) {
+                    subtitleSelectionByVideoId = subtitleSelectionByVideoId + (videoId to nextSelection)
                 }
             }
             LaunchedEffect(currentVideoType) {

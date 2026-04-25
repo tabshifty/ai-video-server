@@ -77,6 +77,7 @@ import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.buildLongFormMediaItem
 import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
+import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.core.util.UrlBuilder
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -200,8 +201,12 @@ fun DetailScreen(
                     isFullscreen = false
                 }
 
-                LaunchedEffect(detail.id, detail.subtitleTracks) {
-                    selectedSubtitleTrackId = resolveInitialSubtitleTrackId(detail.subtitleTracks)
+                LaunchedEffect(detail.id, detail.subtitleTracks, hasStartedPlayback) {
+                    selectedSubtitleTrackId = resolveSubtitleSelectionOnTrackLoad(
+                        currentSelection = selectedSubtitleTrackId,
+                        tracks = detail.subtitleTracks,
+                        hasStartedPlayback = hasStartedPlayback,
+                    )
                 }
 
                 LaunchedEffect(playbackSession.hasStartedPlayback, playUrl, dataSourceFactory, selectedSubtitleTrackId) {

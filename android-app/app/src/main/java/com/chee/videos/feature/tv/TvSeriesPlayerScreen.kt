@@ -64,6 +64,7 @@ import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.buildLongFormMediaItem
 import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
+import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -165,8 +166,12 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    LaunchedEffect(uiState.currentVideoId, currentEpisode?.subtitleTracks) {
-        selectedSubtitleTrackId = resolveInitialSubtitleTrackId(currentEpisode?.subtitleTracks.orEmpty())
+    LaunchedEffect(uiState.currentVideoId, currentEpisode?.subtitleTracks, hasStartedPlayback) {
+        selectedSubtitleTrackId = resolveSubtitleSelectionOnTrackLoad(
+            currentSelection = selectedSubtitleTrackId,
+            tracks = currentEpisode?.subtitleTracks.orEmpty(),
+            hasStartedPlayback = hasStartedPlayback,
+        )
     }
 
     LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
