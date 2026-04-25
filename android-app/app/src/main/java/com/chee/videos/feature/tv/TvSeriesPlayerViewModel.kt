@@ -37,6 +37,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(TvSeriesPlayerUiState())
     val uiState: StateFlow<TvSeriesPlayerUiState> = _uiState.asStateFlow()
+    private var playbackTargetRequestId: Long = 0
 
     init {
         load()
@@ -116,6 +117,10 @@ class TvSeriesPlayerViewModel @Inject constructor(
     }
 
     private fun updateSelectedEpisode(seasonNumber: Int, episodeNumber: Int) {
+        val currentState = _uiState.value
+        if (currentState.selectedSeasonNumber == seasonNumber && currentState.selectedEpisodeNumber == episodeNumber) {
+            return
+        }
         _uiState.update {
             it.copy(
                 selectedSeasonNumber = seasonNumber,
@@ -126,6 +131,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
     }
 
     private fun updatePlaybackTarget() {
+        val requestId = ++playbackTargetRequestId
         val episode = selectedEpisode(_uiState.value)
         if (episode == null || !episode.playable || episode.videoId.isBlank()) {
             _uiState.update {
@@ -137,9 +143,23 @@ class TvSeriesPlayerViewModel @Inject constructor(
             }
             return
         }
+        _uiState.update {
+            it.copy(
+                currentVideoId = "",
+                currentSourceUrl = "",
+                canPlayCurrentEpisode = false,
+            )
+        }
         viewModelScope.launch {
             val sourceUrl = repository.buildSourceUrl(episode.videoId)
+            if (requestId != playbackTargetRequestId) {
+                return@launch
+            }
             _uiState.update {
+                val selected = selectedEpisode(it)
+                if (selected?.videoId != episode.videoId) {
+                    return@update it
+                }
                 it.copy(
                     currentVideoId = episode.videoId,
                     currentSourceUrl = sourceUrl,

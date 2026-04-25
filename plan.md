@@ -15,6 +15,23 @@
 
 ---
 
+### [2026-04-25 10:29] Android 电视剧切集播放目标竞态修复
+- Type: `implementation`
+- Summary:
+  - 修复电视剧播放页切换分集时的状态撕裂：此前 `selectedEpisodeNumber` 会先切到新分集，但 `currentVideoId/currentSourceUrl` 仍短暂保留旧分集，导致播放器在“新分集元数据 + 旧媒体源”组合下重复 reset，放大 `MediaCodec flush/release` 竞态。
+  - 为电视剧播放器 ViewModel 增加播放目标请求版本控制；每次切集先清空旧播放目标，再异步解析新 `sourceUrl`，并丢弃过期请求返回，避免旧分集 URL 晚到后覆盖当前选集。
+  - 新增延迟 `sourceUrl` 测试仓库与两条回归测试，覆盖“切集后在新 URL 就绪前必须脱离旧视频目标”和“上一集异步结果晚到时不得反写当前播放目标”。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-25 09:54] Android 长视频播放器重配编解码器竞态修复
 - Type: `implementation`
 - Summary:

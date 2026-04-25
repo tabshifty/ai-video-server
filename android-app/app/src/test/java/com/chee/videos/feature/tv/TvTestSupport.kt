@@ -6,6 +6,7 @@ import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -34,6 +35,27 @@ class FakeTvRepository(
     override suspend fun buildSourceUrl(videoId: String): String = "https://example.com/$videoId.m3u8"
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
+}
+
+class DelayedSourceTvRepository(
+    private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
+) : TvRepository {
+    private val pendingSourceUrls = linkedMapOf<String, CompletableDeferred<String>>()
+
+    override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
+        Result.success(TvHomePayload())
+
+    override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
+        Result.success(detailPayload)
+
+    override suspend fun buildSourceUrl(videoId: String): String =
+        pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.await()
+
+    override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
+
+    fun completeSourceUrl(videoId: String, url: String = "https://example.com/$videoId.m3u8") {
+        pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.complete(url)
+    }
 }
 
 fun tvSeriesSummary(
