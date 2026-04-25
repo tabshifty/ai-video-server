@@ -67,7 +67,6 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		"-y",
 		"-i", inputPath,
 		"-c:v", encoder,
-		"-preset", "medium",
 		"-pix_fmt", "yuv420p",
 	}
 	switch profile {

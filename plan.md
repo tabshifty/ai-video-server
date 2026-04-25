@@ -15,6 +15,39 @@
 
 ---
 
+### [2026-04-25 15:58] 修复长视频重转码被 30 分钟任务超时杀死
+- Type: `implementation`
+- Summary:
+  - 定位本次“`ffmpeg transcode failed: signal: killed`”的真实根因不是音频，而是 `asynq` 未显式设置任务超时，落回框架默认 `30 minutes`；对 58 分钟的 4K 电视剧重转码来说，worker 上下文到点取消后会由 `exec.CommandContext` 直接杀掉 ffmpeg。
+  - 转码入队现在显式附带 `Timeout`，新增环境变量 `TRANSCODE_TASK_TIMEOUT_MINUTES`，默认 `360` 分钟，避免长视频重转码被默认超时提前终止。
+  - 同步移除 `videotoolbox` 转码参数中的无效 `-preset`，清掉 `Codec AVOption preset ... has not been used` 的噪声日志；补充单测锁定任务 timeout 和 ffmpeg 参数构造。
+- Changed Files:
+  - `internal/config/config.go`
+  - `internal/queue/tasks.go`
+  - `internal/queue/tasks_test.go`
+  - `main.go`
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - 手工重转码未在本地复放：当前会话仅基于 `.run/worker.log` 与本地 `asynq` 源码确认默认 timeout=30min 的根因。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-25 15:57] 长视频重转码超时杀进程修复计划
+- Type: `plan`
+- Summary:
+  - 依据 `.run/worker.log`，5.1 音频已成功降混为 stereo，当前失败点转为 ffmpeg 运行中被 `SIGKILL`。
+  - 本地 `github.com/hibiken/asynq@v0.25.1` 源码确认：未显式配置 `Timeout` 时默认超时为 `30 minutes`，与日志中 worker 启动到失败约 30 分钟完全一致。
+  - 修复方案是为转码任务显式设置长超时并做成可配置，同时顺手移除 `videotoolbox` 下无效的 `-preset` 参数，减少误导性日志。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `git status --short` 预期仅包含本次修复相关改动。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-25 14:53] 修复长视频重转码 5.1 音频失败
 - Type: `implementation`
 - Summary:
