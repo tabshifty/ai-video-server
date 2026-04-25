@@ -22,6 +22,7 @@ data class DetailUiState(
     val videoType: String = "",
     val baseUrl: String = "",
     val accessToken: String = "",
+    val preferredPlaybackProfile: String = "",
     val errorMessage: String? = null,
 )
 
@@ -53,6 +54,7 @@ class DetailViewModel @Inject constructor(
                     videoType = videoType,
                     baseUrl = baseUrl,
                     accessToken = accessToken,
+                    preferredPlaybackProfile = videoRepository.preferredLongFormPlaybackProfile().wireValue,
                     errorMessage = null,
                 )
             }

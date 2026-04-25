@@ -42,8 +42,11 @@ object UrlBuilder {
     fun detail(baseUrl: String, videoId: String): String =
         "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId"
 
-    fun source(baseUrl: String, videoId: String): String =
-        "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/source"
+    fun source(baseUrl: String, videoId: String, profile: String? = null): String {
+        val base = "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/source"
+        val normalizedProfile = profile?.trim().orEmpty()
+        return if (normalizedProfile.isBlank()) base else "$base?profile=$normalizedProfile"
+    }
 
     fun toggleLike(baseUrl: String, videoId: String): String =
         "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/like"

@@ -2,6 +2,37 @@ package ffmpeg
 
 import "testing"
 
+func TestPreferredHardwareHevcEncoder(t *testing.T) {
+	if got := preferredHardwareHevcEncoder(); got != "hevc_videotoolbox" {
+		t.Fatalf("preferredHardwareHevcEncoder()=%s want=hevc_videotoolbox", got)
+	}
+}
+
+func TestPreferredHardwareAvcEncoder(t *testing.T) {
+	if got := preferredHardwareAvcEncoder(); got != "h264_videotoolbox" {
+		t.Fatalf("preferredHardwareAvcEncoder()=%s want=h264_videotoolbox", got)
+	}
+}
+
+func TestBuildTranscodeVideoArgsForHevcPrimary(t *testing.T) {
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileHEVCPrimary, TranscodeOptions{CRF: "21"})
+
+	assertArgPair(t, args, "-c:v", "hevc_videotoolbox")
+	assertArgPair(t, args, "-pix_fmt", "yuv420p")
+	assertArgPair(t, args, "-tag:v", "hvc1")
+	assertArgPair(t, args, "-crf", "21")
+}
+
+func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileAVCCompat, TranscodeOptions{VideoBitrateKbps: 4200})
+
+	assertArgPair(t, args, "-c:v", "h264_videotoolbox")
+	assertArgPair(t, args, "-pix_fmt", "yuv420p")
+	assertArgPair(t, args, "-b:v", "4200k")
+	assertArgPair(t, args, "-maxrate", "4200k")
+	assertArgPair(t, args, "-bufsize", "8400k")
+}
+
 func TestParseBitrateKbps(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -43,6 +74,16 @@ func TestParseBitrateKbps(t *testing.T) {
 			}
 		})
 	}
+}
+
+func assertArgPair(t *testing.T, args []string, key, value string) {
+	t.Helper()
+	for idx := 0; idx < len(args)-1; idx++ {
+		if args[idx] == key && args[idx+1] == value {
+			return
+		}
+	}
+	t.Fatalf("expected args to contain %s %s, got=%v", key, value, args)
 }
 
 func TestParseProgressValueToSeconds(t *testing.T) {

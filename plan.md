@@ -15,6 +15,55 @@
 
 ---
 
+### [2026-04-25 14:21] HEVC 主档与 AVC 兼容档自动选路落地
+- Type: `implementation`
+- Summary:
+  - 后端转码从“单一 HEVC 成品”扩展为“硬件 HEVC 主档 + 硬件 AVC 兼容档”双产物：主档继续走 H.265 小体积策略，兼容档落到 metadata 中的 `compat_transcoded_path` / `playback_profiles`，播放源接口新增 `profile` 选择。
+  - app 端新增长视频播放档位解析器：模拟器或无 HEVC 解码能力设备默认走 `compat`，支持 HEVC 的设备继续走 `primary`；电视剧页、详情页和统一长视频播放页统一接入，并在编解码失败时展示明确中文错误提示。
+  - ffmpeg 与后端补充了编码档位/播放源选择单测，Android 补充了播放档位解析和带 `profile` 的 source URL 单测，避免后续又回到“默认打 HEVC 导致首播失败”的行为。
+- Changed Files:
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `internal/handlers/video_source.go`
+  - `internal/handlers/video_source_test.go`
+  - `internal/utils/video_url.go`
+  - `internal/utils/video_url_test.go`
+  - `android-app/app/src/main/java/com/chee/videos/core/player/PlaybackProfileResolver.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/player/PlaybackErrorMessage.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/player/PlaybackProfileResolverTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/util/UrlBuilderSourceProfileTest.kt`
+  - `docs/superpowers/plans/2026-04-25-hevc-hardware-compatible-playback.md`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.core.player.*' --tests 'com.chee.videos.core.util.UrlBuilderSourceProfileTest' --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest'` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-25 12:18] HEVC 硬件转码与兼容播放方案
+- Type: `plan`
+- Summary:
+  - 当前 app 端电视剧立即播放失败的首因不是页面生命周期，而是后端“转码成品”本身输出为 HEVC 10-bit/4K；Android 模拟器对该 profile 不支持，导致首播即 `MediaCodecVideoRenderer` 报错。
+  - 按最新要求，后续实现不改成“纯 AVC”，而是保持“硬件加速优先、主产物优先 H.265、体积最小优先”，同时补一条硬件 AVC 兼容产物与播放档位选择链路，解决 Android 兼容性。
+  - 计划文件已保存到 `docs/superpowers/plans/2026-04-25-hevc-hardware-compatible-playback.md`，后续按该方案分任务实施。
+- Changed Files:
+  - `docs/superpowers/plans/2026-04-25-hevc-hardware-compatible-playback.md`
+  - `plan.md`
+- Verification:
+  - `git status --short` 预期仅包含计划文档改动。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-25 10:29] Android 电视剧切集播放目标竞态修复
 - Type: `implementation`
 - Summary:

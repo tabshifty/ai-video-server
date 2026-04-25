@@ -75,6 +75,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.buildLongFormMediaItem
@@ -147,6 +148,7 @@ fun UnifiedPlayerScreen(
             var subtitleSelectionByVideoId by remember { mutableStateOf(mapOf<String, String?>()) }
             var preparedUrl by remember(accessToken) { mutableStateOf<String?>(null) }
             var preparedSubtitleTrackId by remember { mutableStateOf<String?>(null) }
+            var playerErrorMessage by remember { mutableStateOf<String?>(null) }
 
             val dataSourceFactory = remember(accessToken) {
                 DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -202,10 +204,16 @@ fun UnifiedPlayerScreen(
                 val listener = object : Player.Listener {
                     override fun onRenderedFirstFrame() {
                         renderedVideoId = sharedPlayer.currentMediaItem?.mediaId
+                        playerErrorMessage = null
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         isPlayerActuallyPlaying = isPlaying
+                    }
+
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        playerErrorMessage = friendlyLongFormPlaybackErrorMessage(error)
+                        isPlayerActuallyPlaying = false
                     }
                 }
                 isPlayerActuallyPlaying = sharedPlayer.isPlaying
@@ -313,7 +321,7 @@ fun UnifiedPlayerScreen(
 
             LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory, currentDetail?.subtitleTracks, subtitleSelectionByVideoId) {
                 val selectedSubtitleTrackId = currentVideoId?.let { subtitleSelectionByVideoId[it] }
-                val sourceUrl = currentVideoId?.let { UrlBuilder.source(baseUrl, it) }
+                val sourceUrl = currentVideoId?.let { UrlBuilder.source(baseUrl, it, uiState.preferredPlaybackProfile) }
                 val updateDecision = resolveLongFormPlayerUpdate(
                     preparedUrl = preparedUrl,
                     nextUrl = sourceUrl,
@@ -337,6 +345,7 @@ fun UnifiedPlayerScreen(
                     preparedUrl = null
                 }
                 if (updateDecision.shouldReplaceSource && sourceUrl != null) {
+                    playerErrorMessage = null
                     val restorePositionMs = if (updateDecision.preservePosition) sharedPlayer.currentPosition.coerceAtLeast(0L) else 0L
                     val mediaItem = buildLongFormMediaItem(
                         sourceUrl = sourceUrl,
@@ -510,6 +519,23 @@ fun UnifiedPlayerScreen(
                                 }
                                 isScrubbingShort = false
                             },
+                        )
+                    }
+                }
+
+                if ((currentIsLongForm || fullscreenLongForm) && !playerErrorMessage.isNullOrBlank()) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 12.dp, vertical = 18.dp),
+                        color = Color(0xCC2B0F12),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text(
+                            text = playerErrorMessage.orEmpty(),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }

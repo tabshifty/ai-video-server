@@ -171,6 +171,50 @@ func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 	}
 }
 
+func TestBuildPlaybackProfilesMetadataSupportsPrimaryAndCompatProfiles(t *testing.T) {
+	metadata := buildPlaybackProfilesMetadata(
+		transcodeOutputProfile{
+			Key:   playbackProfilePrimary,
+			Path:  "/tmp/video-hevc.mp4",
+			Codec: "hevc",
+		},
+		transcodeOutputProfile{
+			Key:   playbackProfileCompat,
+			Path:  "/tmp/video-avc.mp4",
+			Codec: "h264",
+		},
+	)
+
+	if metadata["primary_codec"] != "hevc" {
+		t.Fatalf("expected primary_codec hevc, got %v", metadata["primary_codec"])
+	}
+	if metadata["compat_codec"] != "h264" {
+		t.Fatalf("expected compat_codec h264, got %v", metadata["compat_codec"])
+	}
+	if metadata["compat_available"] != true {
+		t.Fatalf("expected compat_available true, got %v", metadata["compat_available"])
+	}
+
+	profiles, ok := metadata["playback_profiles"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected playback_profiles map, got %T", metadata["playback_profiles"])
+	}
+	primary, ok := profiles[playbackProfilePrimary].(map[string]any)
+	if !ok {
+		t.Fatalf("expected primary profile map, got %T", profiles[playbackProfilePrimary])
+	}
+	if primary["path"] != "/tmp/video-hevc.mp4" || primary["codec"] != "hevc" {
+		t.Fatalf("unexpected primary profile: %+v", primary)
+	}
+	compat, ok := profiles[playbackProfileCompat].(map[string]any)
+	if !ok {
+		t.Fatalf("expected compat profile map, got %T", profiles[playbackProfileCompat])
+	}
+	if compat["path"] != "/tmp/video-avc.mp4" || compat["codec"] != "h264" {
+		t.Fatalf("unexpected compat profile: %+v", compat)
+	}
+}
+
 func TestIsSameFilePath(t *testing.T) {
 	base := filepath.Join(t.TempDir(), "videos", "abc", "video.mp4")
 	same := filepath.Join(filepath.Dir(base), ".", "video.mp4")

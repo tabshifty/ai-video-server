@@ -29,6 +29,7 @@ data class UnifiedPlayerUiState(
     val loaded: Boolean = false,
     val source: String = "",
     val startVideoId: String = "",
+    val preferredPlaybackProfile: String = "",
     val startIndex: Int = 0,
     val items: List<PlayerVideoItem> = emptyList(),
     val shortFitMode: VideoFitMode = VideoFitMode.FILL,
@@ -75,6 +76,7 @@ class UnifiedPlayerViewModel @Inject constructor(
                     loaded = true,
                     source = source,
                     startVideoId = startVideoId,
+                    preferredPlaybackProfile = videoRepository.preferredLongFormPlaybackProfile().wireValue,
                     errorMessage = null,
                 )
             }

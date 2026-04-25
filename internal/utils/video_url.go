@@ -4,12 +4,24 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 )
 
 func VideoPlayURL(videoID uuid.UUID) string {
 	return fmt.Sprintf("/api/v1/videos/%s/source", videoID.String())
+}
+
+func VideoPlayURLWithProfile(videoID uuid.UUID, profile string) string {
+	base := VideoPlayURL(videoID)
+	profile = strings.TrimSpace(profile)
+	if profile == "" {
+		return base
+	}
+	params := url.Values{}
+	params.Set("profile", profile)
+	return base + "?" + params.Encode()
 }
 
 func VideoThumbnailURL(videoID uuid.UUID) string {

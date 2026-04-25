@@ -15,6 +15,15 @@ func TestVideoPlayURL(t *testing.T) {
 	}
 }
 
+func TestVideoPlayURLWithProfile(t *testing.T) {
+	videoID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	got := VideoPlayURLWithProfile(videoID, "compat")
+	want := "/api/v1/videos/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/source?profile=compat"
+	if got != want {
+		t.Fatalf("unexpected profiled play url: got=%s want=%s", got, want)
+	}
+}
+
 func TestVideoThumbnailURL(t *testing.T) {
 	videoID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	got := VideoThumbnailURL(videoID)

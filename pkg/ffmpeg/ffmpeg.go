@@ -40,6 +40,13 @@ type TranscodeOptions struct {
 	ProgressHandler  func(TranscodeProgress)
 }
 
+type TranscodeProfile string
+
+const (
+	TranscodeProfileHEVCPrimary TranscodeProfile = "hevc_primary"
+	TranscodeProfileAVCCompat   TranscodeProfile = "avc_compat"
+)
+
 // TranscodeProgress represents ffmpeg realtime progress.
 type TranscodeProgress struct {
 	SourceDurationSeconds int     `json:"source_duration_seconds"`
@@ -48,13 +55,26 @@ type TranscodeProgress struct {
 	ProgressPercent       float64 `json:"progress_percent"`
 }
 
-// TranscodeHEVC transcodes source into H.265/AAC output using videotoolbox.
-func TranscodeHEVC(ctx context.Context, inputPath, outputPath string, options TranscodeOptions) error {
+func preferredHardwareHevcEncoder() string { return "hevc_videotoolbox" }
+
+func preferredHardwareAvcEncoder() string { return "h264_videotoolbox" }
+
+func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProfile, options TranscodeOptions) []string {
+	encoder := preferredHardwareHevcEncoder()
 	args := []string{
 		"-y",
 		"-i", inputPath,
-		"-c:v", "hevc_videotoolbox",
+		"-c:v", encoder,
 		"-preset", "medium",
+		"-pix_fmt", "yuv420p",
+	}
+	switch profile {
+	case TranscodeProfileAVCCompat:
+		args[4] = preferredHardwareAvcEncoder()
+	case TranscodeProfileHEVCPrimary:
+		args = append(args, "-tag:v", "hvc1")
+	default:
+		panic(fmt.Sprintf("unsupported transcode profile: %s", profile))
 	}
 	if options.VideoBitrateKbps > 0 {
 		bitrate := strconv.Itoa(options.VideoBitrateKbps) + "k"
@@ -73,11 +93,16 @@ func TranscodeHEVC(ctx context.Context, inputPath, outputPath string, options Tr
 	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",
+		"-movflags", "+faststart",
 		"-progress", "pipe:1",
 		"-nostats",
 		outputPath,
 	)
+	return args
+}
 
+func TranscodeVideo(ctx context.Context, inputPath, outputPath string, profile TranscodeProfile, options TranscodeOptions) error {
+	args := buildTranscodeVideoArgs(inputPath, outputPath, profile, options)
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -100,9 +125,22 @@ func TranscodeHEVC(ctx context.Context, inputPath, outputPath string, options Tr
 		return fmt.Errorf("ffmpeg progress read failed: %w", progressErr)
 	}
 	if waitErr != nil {
-		return fmt.Errorf("ffmpeg transcode failed: %w, output=%s", waitErr, stderr.String())
+		output := stderr.String()
+		encoder := preferredHardwareHevcEncoder()
+		if profile == TranscodeProfileAVCCompat {
+			encoder = preferredHardwareAvcEncoder()
+		}
+		if isEncoderUnavailableOutput(output, encoder) {
+			return fmt.Errorf("hardware encoder unavailable for %s: %s", profile, encoder)
+		}
+		return fmt.Errorf("ffmpeg transcode failed: %w, output=%s", waitErr, output)
 	}
 	return nil
+}
+
+// TranscodeHEVC transcodes source into H.265/AAC output using videotoolbox.
+func TranscodeHEVC(ctx context.Context, inputPath, outputPath string, options TranscodeOptions) error {
+	return TranscodeVideo(ctx, inputPath, outputPath, TranscodeProfileHEVCPrimary, options)
 }
 
 func readTranscodeProgress(r io.Reader, sourceDuration int, handler func(TranscodeProgress)) error {

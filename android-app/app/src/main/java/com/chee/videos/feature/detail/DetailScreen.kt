@@ -71,6 +71,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
@@ -165,7 +166,7 @@ fun DetailScreen(
             uiState.detail != null -> {
                 val detail = uiState.detail!!
                 val lifecycleOwner = LocalLifecycleOwner.current
-                val playUrl = resolvePlayUrl(uiState.baseUrl, detail)
+                val playUrl = resolvePlayUrl(uiState.baseUrl, detail, uiState.preferredPlaybackProfile)
                 val posterUrl = resolvePosterUrl(uiState.baseUrl, detail)
                 val canPlay = !playUrl.isNullOrBlank()
 
@@ -185,6 +186,7 @@ fun DetailScreen(
                 var preparedSubtitleTrackId by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
                 var selectedSubtitleTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
                 var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
+                var playerErrorMessage by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
                 val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
                     LongFormPlaybackSession(
                         hasStartedPlayback = hasStartedPlayback,
@@ -221,6 +223,7 @@ fun DetailScreen(
                     }
 
                     if (updateDecision.shouldReplaceSource) {
+                        playerErrorMessage = null
                         val restorePositionMs = if (updateDecision.preservePosition) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L
                         val mediaItem = buildLongFormMediaItem(
                             sourceUrl = playUrl,
@@ -288,6 +291,15 @@ fun DetailScreen(
                         override fun onIsPlayingChanged(isPlaying: Boolean) {
                             isPlayerActuallyPlaying = isPlaying
                         }
+
+                        override fun onRenderedFirstFrame() {
+                            playerErrorMessage = null
+                        }
+
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                            playerErrorMessage = friendlyLongFormPlaybackErrorMessage(error)
+                            isPlayerActuallyPlaying = false
+                        }
                     }
                     isPlayerActuallyPlaying = exoPlayer.isPlaying
                     exoPlayer.addListener(listener)
@@ -310,22 +322,30 @@ fun DetailScreen(
                     ) {
                         if (showPlayer) {
                             if (useLongFormPlayerControls) {
-                                LongFormVideoPlayer(
-                                    title = detail.title,
-                                    player = exoPlayer,
-                                    isFullscreen = true,
-                                    onBack = { isFullscreen = false },
-                                    onTogglePlayPause = {
-                                        val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
-                                        updatePlaybackSession(nextSession)
-                                    },
-                                    onToggleFullscreen = { isFullscreen = false },
-                                    modifier = Modifier.fillMaxSize(),
-                                    showStatusBarPadding = false,
-                                    subtitleTracks = detail.subtitleTracks,
-                                    selectedSubtitleTrackId = selectedSubtitleTrackId,
-                                    onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
-                                )
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    LongFormVideoPlayer(
+                                        title = detail.title,
+                                        player = exoPlayer,
+                                        isFullscreen = true,
+                                        onBack = { isFullscreen = false },
+                                        onTogglePlayPause = {
+                                            val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
+                                            updatePlaybackSession(nextSession)
+                                        },
+                                        onToggleFullscreen = { isFullscreen = false },
+                                        modifier = Modifier.fillMaxSize(),
+                                        showStatusBarPadding = false,
+                                        subtitleTracks = detail.subtitleTracks,
+                                        selectedSubtitleTrackId = selectedSubtitleTrackId,
+                                        onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
+                                    )
+                                    PlaybackErrorBanner(
+                                        message = playerErrorMessage,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .padding(12.dp),
+                                    )
+                                }
                             } else {
                                 VideoPlayerSurface(
                                     exoPlayer = exoPlayer,
@@ -368,22 +388,30 @@ fun DetailScreen(
                         ) {
                             if (showPlayer) {
                                 if (useLongFormPlayerControls) {
-                                    LongFormVideoPlayer(
-                                        title = detail.title,
-                                        player = exoPlayer,
-                                        isFullscreen = false,
-                                        onBack = onBack,
-                                        onTogglePlayPause = {
-                                            val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
-                                            updatePlaybackSession(nextSession)
-                                        },
-                                        onToggleFullscreen = { isFullscreen = true },
-                                        modifier = Modifier.fillMaxSize(),
-                                        showStatusBarPadding = false,
-                                        subtitleTracks = detail.subtitleTracks,
-                                        selectedSubtitleTrackId = selectedSubtitleTrackId,
-                                        onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
-                                    )
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        LongFormVideoPlayer(
+                                            title = detail.title,
+                                            player = exoPlayer,
+                                            isFullscreen = false,
+                                            onBack = onBack,
+                                            onTogglePlayPause = {
+                                                val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
+                                                updatePlaybackSession(nextSession)
+                                            },
+                                            onToggleFullscreen = { isFullscreen = true },
+                                            modifier = Modifier.fillMaxSize(),
+                                            showStatusBarPadding = false,
+                                            subtitleTracks = detail.subtitleTracks,
+                                            selectedSubtitleTrackId = selectedSubtitleTrackId,
+                                            onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
+                                        )
+                                        PlaybackErrorBanner(
+                                            message = playerErrorMessage,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .padding(12.dp),
+                                        )
+                                    }
                                 } else {
                                     VideoPlayerSurface(
                                         exoPlayer = exoPlayer,
@@ -768,16 +796,40 @@ private fun isLongFormVideoType(type: String): Boolean {
     return normalized == "movie" || normalized == "episode" || normalized == "av"
 }
 
-private fun resolvePlayUrl(baseUrl: String, detail: VideoDetailDto): String? {
+@Composable
+private fun PlaybackErrorBanner(
+    message: String?,
+    modifier: Modifier = Modifier,
+) {
+    val text = message?.trim().orEmpty()
+    if (text.isBlank()) {
+        return
+    }
+    Surface(
+        modifier = modifier,
+        color = Color(0xCC2B0F12),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+private fun resolvePlayUrl(baseUrl: String, detail: VideoDetailDto, preferredPlaybackProfile: String): String? {
     val raw = detail.playUrl?.trim().orEmpty()
     if (raw.isNotBlank()) {
-        return resolveResourceUrl(baseUrl, raw)
+        val resolved = resolveResourceUrl(baseUrl, raw) ?: return null
+        return appendPlaybackProfileQuery(resolved, preferredPlaybackProfile)
     }
     val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
     if (normalizedBase.isBlank()) {
         return null
     }
-    return UrlBuilder.source(normalizedBase, detail.id)
+    return UrlBuilder.source(normalizedBase, detail.id, preferredPlaybackProfile)
 }
 
 private fun resolvePosterUrl(baseUrl: String, detail: VideoDetailDto): String? {
@@ -806,6 +858,15 @@ private fun resolveResourceUrl(baseUrl: String, raw: String?): String? {
         return null
     }
     return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
+}
+
+private fun appendPlaybackProfileQuery(rawUrl: String, preferredPlaybackProfile: String): String {
+    val normalizedProfile = preferredPlaybackProfile.trim()
+    if (normalizedProfile.isBlank() || !rawUrl.contains("/source")) {
+        return rawUrl
+    }
+    val separator = if (rawUrl.contains("?")) "&" else "?"
+    return "$rawUrl${separator}profile=$normalizedProfile"
 }
 
 private fun anyString(value: Any?): String? {

@@ -17,6 +17,8 @@ import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.network.ApiService
+import com.chee.videos.core.player.PlaybackProfile
+import com.chee.videos.core.player.PlaybackProfileResolver
 import com.chee.videos.core.util.UrlBuilder
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,6 +28,7 @@ class VideoRepository @Inject constructor(
     private val api: ApiService,
     private val store: AppPreferencesStore,
     private val authRepository: AuthRepository,
+    private val playbackProfileResolver: PlaybackProfileResolver,
 ) {
     suspend fun fetchShortFeed(
         pageSize: Int = 20,
@@ -225,9 +228,12 @@ class VideoRepository @Inject constructor(
 
     suspend fun readAccessToken(): String? = store.readAccessToken()
 
+    fun preferredLongFormPlaybackProfile(): PlaybackProfile =
+        playbackProfileResolver.preferredLongFormProfile()
+
     suspend fun buildSourceUrl(videoId: String): String {
         val baseUrl = store.readActiveBaseUrl().orEmpty()
-        return UrlBuilder.source(baseUrl, videoId)
+        return UrlBuilder.source(baseUrl, videoId, preferredLongFormPlaybackProfile().wireValue)
     }
 
     private suspend fun <T> callWithAuth(

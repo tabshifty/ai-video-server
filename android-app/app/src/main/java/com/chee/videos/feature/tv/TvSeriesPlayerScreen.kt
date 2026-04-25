@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
@@ -120,6 +121,7 @@ fun TvSeriesPlayerScreen(
     var preparedSubtitleTrackId by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var selectedSubtitleTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
+    var playerErrorMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
 
     val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
@@ -151,6 +153,7 @@ fun TvSeriesPlayerScreen(
             return@LaunchedEffect
         }
         if (updateDecision.shouldReplaceSource) {
+            playerErrorMessage = null
             val restorePositionMs = if (updateDecision.preservePosition) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L
             val mediaItem = buildLongFormMediaItem(
                 sourceUrl = uiState.currentSourceUrl,
@@ -205,6 +208,15 @@ fun TvSeriesPlayerScreen(
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 isPlayerActuallyPlaying = isPlaying
+            }
+
+            override fun onRenderedFirstFrame() {
+                playerErrorMessage = null
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                playerErrorMessage = friendlyLongFormPlaybackErrorMessage(error)
+                isPlayerActuallyPlaying = false
             }
         }
         exoPlayer.addListener(listener)
@@ -299,21 +311,39 @@ fun TvSeriesPlayerScreen(
                     .background(Color(0xFF0D111A)),
             ) {
                 if (canPlay) {
-                    LongFormVideoPlayer(
-                        title = currentEpisode?.title ?: series.title,
-                        player = exoPlayer,
-                        isFullscreen = false,
-                        onBack = onBack,
-                        onTogglePlayPause = {
-                            updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
-                        },
-                        onToggleFullscreen = {},
-                        modifier = Modifier.fillMaxSize(),
-                        subtitleTracks = currentEpisode?.subtitleTracks.orEmpty(),
-                        selectedSubtitleTrackId = selectedSubtitleTrackId,
-                        onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
-                        showStatusBarPadding = false,
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LongFormVideoPlayer(
+                            title = currentEpisode?.title ?: series.title,
+                            player = exoPlayer,
+                            isFullscreen = false,
+                            onBack = onBack,
+                            onTogglePlayPause = {
+                                updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
+                            },
+                            onToggleFullscreen = {},
+                            modifier = Modifier.fillMaxSize(),
+                            subtitleTracks = currentEpisode?.subtitleTracks.orEmpty(),
+                            selectedSubtitleTrackId = selectedSubtitleTrackId,
+                            onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
+                            showStatusBarPadding = false,
+                        )
+                        if (!playerErrorMessage.isNullOrBlank()) {
+                            Surface(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(12.dp),
+                                color = Color(0xCC2B0F12),
+                                shape = RoundedCornerShape(14.dp),
+                            ) {
+                                Text(
+                                    text = playerErrorMessage.orEmpty(),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
                 } else {
                     EmptyTvPlayerState()
                 }
