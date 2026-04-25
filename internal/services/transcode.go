@@ -47,12 +47,13 @@ const (
 )
 
 type transcodePlan struct {
-	Mode              string
-	CRF               string
-	ResolutionTier    string
-	SourceBitrateKbps int
-	TargetBitrateKbps int
-	BitrateCapped     bool
+	Mode                string
+	CRF                 string
+	ResolutionTier      string
+	SourceBitrateKbps   int
+	TargetBitrateKbps   int
+	BitrateCapped       bool
+	SourceAudioChannels int
 }
 
 const (
@@ -199,6 +200,10 @@ func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, plan transcodeP
 		"target_bitrate_kbps": plan.TargetBitrateKbps,
 		"bitrate_capped":      plan.BitrateCapped,
 	}
+	audioCodec, audioChannels, audioDownmixed := resolvePlaybackAudioMetadata(probe, plan)
+	metadata["audio_codec"] = audioCodec
+	metadata["audio_channels"] = audioChannels
+	metadata["audio_downmixed"] = audioDownmixed
 	if plan.Mode == transcodeModeCRFFallback {
 		metadata["crf"] = plan.CRF
 	}
@@ -220,6 +225,19 @@ func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, plan transcodeP
 		metadata["codec"] = codec
 	}
 	return duration, width, height, metadata
+}
+
+func resolvePlaybackAudioMetadata(probe ffmpeg.VideoProbe, plan transcodePlan) (codec string, channels int, downmixed bool) {
+	codec = "aac"
+	channels = 2
+	if value := strings.TrimSpace(probe.AudioCodec); value != "" {
+		codec = value
+	}
+	if probe.AudioChannels > 0 {
+		channels = probe.AudioChannels
+	}
+	downmixed = plan.SourceAudioChannels > channels && channels > 0
+	return codec, channels, downmixed
 }
 
 func buildPlaybackProfilesMetadata(primary, compat transcodeOutputProfile) map[string]any {
@@ -256,24 +274,26 @@ func probeDurationSeconds(duration float64) int {
 
 func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType string) transcodePlan {
 	defaultPlan := transcodePlan{
-		Mode:              transcodeModeCRFFallback,
-		CRF:               chooseCRF(videoType),
-		ResolutionTier:    classifyResolutionTier(probe.Width, probe.Height),
-		SourceBitrateKbps: probe.BitrateKbps,
-		TargetBitrateKbps: 0,
-		BitrateCapped:     false,
+		Mode:                transcodeModeCRFFallback,
+		CRF:                 chooseCRF(videoType),
+		ResolutionTier:      classifyResolutionTier(probe.Width, probe.Height),
+		SourceBitrateKbps:   probe.BitrateKbps,
+		TargetBitrateKbps:   0,
+		BitrateCapped:       false,
+		SourceAudioChannels: probe.AudioChannels,
 	}
 	if probeErr != nil || probe.BitrateKbps <= 0 {
 		return defaultPlan
 	}
 	target, tier, capped := decideVideoBitrate(probe.Width, probe.Height, probe.BitrateKbps)
 	return transcodePlan{
-		Mode:              transcodeModeBitrate,
-		CRF:               chooseCRF(videoType),
-		ResolutionTier:    tier,
-		SourceBitrateKbps: probe.BitrateKbps,
-		TargetBitrateKbps: target,
-		BitrateCapped:     capped,
+		Mode:                transcodeModeBitrate,
+		CRF:                 chooseCRF(videoType),
+		ResolutionTier:      tier,
+		SourceBitrateKbps:   probe.BitrateKbps,
+		TargetBitrateKbps:   target,
+		BitrateCapped:       capped,
+		SourceAudioChannels: probe.AudioChannels,
 	}
 }
 
