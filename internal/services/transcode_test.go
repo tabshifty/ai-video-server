@@ -215,47 +215,25 @@ func TestResolveProbeFieldsMarksAudioDownmixedWhenSourceHasMoreChannels(t *testi
 	}
 }
 
-func TestBuildPlaybackProfilesMetadataSupportsPrimaryAndCompatProfiles(t *testing.T) {
-	metadata := buildPlaybackProfilesMetadata(
+func TestBuildPlaybackMetadataUsesSingleAVCOutput(t *testing.T) {
+	metadata := buildPlaybackMetadata(
 		transcodeOutputProfile{
-			Key:   playbackProfilePrimary,
-			Path:  "/tmp/video-hevc.mp4",
-			Codec: "hevc",
-		},
-		transcodeOutputProfile{
-			Key:   playbackProfileCompat,
 			Path:  "/tmp/video-avc.mp4",
 			Codec: "h264",
 		},
 	)
 
-	if metadata["primary_codec"] != "hevc" {
-		t.Fatalf("expected primary_codec hevc, got %v", metadata["primary_codec"])
+	if metadata["playback_codec"] != "h264" {
+		t.Fatalf("expected playback_codec h264, got %v", metadata["playback_codec"])
 	}
-	if metadata["compat_codec"] != "h264" {
-		t.Fatalf("expected compat_codec h264, got %v", metadata["compat_codec"])
+	if metadata["playback_path"] != "/tmp/video-avc.mp4" {
+		t.Fatalf("expected playback_path /tmp/video-avc.mp4, got %v", metadata["playback_path"])
 	}
-	if metadata["compat_available"] != true {
-		t.Fatalf("expected compat_available true, got %v", metadata["compat_available"])
+	if _, ok := metadata["compat_transcoded_path"]; ok {
+		t.Fatalf("did not expect compat_transcoded_path, got %v", metadata["compat_transcoded_path"])
 	}
-
-	profiles, ok := metadata["playback_profiles"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected playback_profiles map, got %T", metadata["playback_profiles"])
-	}
-	primary, ok := profiles[playbackProfilePrimary].(map[string]any)
-	if !ok {
-		t.Fatalf("expected primary profile map, got %T", profiles[playbackProfilePrimary])
-	}
-	if primary["path"] != "/tmp/video-hevc.mp4" || primary["codec"] != "hevc" {
-		t.Fatalf("unexpected primary profile: %+v", primary)
-	}
-	compat, ok := profiles[playbackProfileCompat].(map[string]any)
-	if !ok {
-		t.Fatalf("expected compat profile map, got %T", profiles[playbackProfileCompat])
-	}
-	if compat["path"] != "/tmp/video-avc.mp4" || compat["codec"] != "h264" {
-		t.Fatalf("unexpected compat profile: %+v", compat)
+	if _, ok := metadata["playback_profiles"]; ok {
+		t.Fatalf("did not expect playback_profiles, got %v", metadata["playback_profiles"])
 	}
 }
 

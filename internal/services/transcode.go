@@ -15,13 +15,12 @@ import (
 
 // TranscodeResult captures generated assets and parsed metadata.
 type TranscodeResult struct {
-	TranscodedPath       string
-	CompatTranscodedPath string
-	ThumbnailPath        string
-	Duration             int
-	Width                int
-	Height               int
-	Metadata             map[string]any
+	TranscodedPath string
+	ThumbnailPath  string
+	Duration       int
+	Width          int
+	Height         int
+	Metadata       map[string]any
 }
 
 // TranscodeService performs ffmpeg processing for uploaded videos.
@@ -56,13 +55,7 @@ type transcodePlan struct {
 	SourceAudioChannels int
 }
 
-const (
-	playbackProfilePrimary = "primary"
-	playbackProfileCompat  = "compat"
-)
-
 type transcodeOutputProfile struct {
-	Key   string
 	Path  string
 	Codec string
 }
@@ -77,12 +70,11 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 		return TranscodeResult{}, fmt.Errorf("create output dir: %w", err)
 	}
 
-	outputPath := filepath.Join(outputDir, "video-hevc.mp4")
-	compatPath := filepath.Join(outputDir, "video-avc.mp4")
+	outputPath := filepath.Join(outputDir, "video-avc.mp4")
 	thumbPath := filepath.Join(outputDir, "thumb.jpg")
 	sourcePath := inputPath
 	cleanupSourceCopy := func() {}
-	if isSameFilePath(inputPath, outputPath) || isSameFilePath(inputPath, compatPath) {
+	if isSameFilePath(inputPath, outputPath) {
 		sourcePath = buildTranscodeOutputTempPath(filepath.Join(outputDir, "source-copy.mp4"))
 		if err := ffmpeg.CopyFile(sourcePath, inputPath); err != nil {
 			return TranscodeResult{}, fmt.Errorf("copy stable transcode input: %w", err)
@@ -96,11 +88,6 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	useTempOutput := isSameFilePath(inputPath, outputPath)
 	if useTempOutput {
 		transcodeOutputPath = buildTranscodeOutputTempPath(outputPath)
-	}
-	compatOutputPath := compatPath
-	useCompatTempOutput := isSameFilePath(inputPath, compatPath)
-	if useCompatTempOutput {
-		compatOutputPath = buildTranscodeOutputTempPath(compatPath)
 	}
 
 	inputProbe, inputProbeErr := ffmpeg.Probe(ctx, sourcePath)
@@ -133,7 +120,7 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	if plan.Mode == transcodeModeCRFFallback {
 		transcodeOptions.VideoBitrateKbps = 0
 	}
-	if err := ffmpeg.TranscodeVideo(ctx, sourcePath, transcodeOutputPath, ffmpeg.TranscodeProfileHEVCPrimary, transcodeOptions); err != nil {
+	if err := ffmpeg.TranscodeVideo(ctx, sourcePath, transcodeOutputPath, ffmpeg.TranscodeProfileAVCCompat, transcodeOptions); err != nil {
 		if useTempOutput {
 			_ = os.Remove(transcodeOutputPath)
 		}
@@ -145,46 +132,25 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 			return TranscodeResult{}, fmt.Errorf("replace transcode output file: %w", err)
 		}
 	}
-	if err := ffmpeg.TranscodeVideo(ctx, sourcePath, compatOutputPath, ffmpeg.TranscodeProfileAVCCompat, transcodeOptions); err != nil {
-		if useCompatTempOutput {
-			_ = os.Remove(compatOutputPath)
-		}
-		return TranscodeResult{}, err
-	}
-	if useCompatTempOutput {
-		if err := replaceOutputFile(compatOutputPath, compatPath); err != nil {
-			_ = os.Remove(compatOutputPath)
-			return TranscodeResult{}, fmt.Errorf("replace compat transcode output file: %w", err)
-		}
-	}
 	if err := ffmpeg.Thumbnail(ctx, outputPath, thumbPath); err != nil {
 		return TranscodeResult{}, err
 	}
 	probe, probeErr := ffmpeg.Probe(ctx, outputPath)
 	duration, width, height, metadata := resolveProbeFields(probe, probeErr, plan)
-	for key, value := range buildPlaybackProfilesMetadata(
-		transcodeOutputProfile{
-			Key:   playbackProfilePrimary,
-			Path:  outputPath,
-			Codec: "hevc",
-		},
-		transcodeOutputProfile{
-			Key:   playbackProfileCompat,
-			Path:  compatPath,
-			Codec: "h264",
-		},
-	) {
+	for key, value := range buildPlaybackMetadata(transcodeOutputProfile{
+		Path:  outputPath,
+		Codec: "h264",
+	}) {
 		metadata[key] = value
 	}
 
 	return TranscodeResult{
-		TranscodedPath:       outputPath,
-		CompatTranscodedPath: compatPath,
-		ThumbnailPath:        thumbPath,
-		Duration:             duration,
-		Width:                width,
-		Height:               height,
-		Metadata:             metadata,
+		TranscodedPath: outputPath,
+		ThumbnailPath:  thumbPath,
+		Duration:       duration,
+		Width:          width,
+		Height:         height,
+		Metadata:       metadata,
 	}, nil
 }
 
@@ -240,27 +206,10 @@ func resolvePlaybackAudioMetadata(probe ffmpeg.VideoProbe, plan transcodePlan) (
 	return codec, channels, downmixed
 }
 
-func buildPlaybackProfilesMetadata(primary, compat transcodeOutputProfile) map[string]any {
-	profiles := map[string]any{
-		primary.Key: map[string]any{
-			"path":  primary.Path,
-			"codec": primary.Codec,
-		},
-	}
+func buildPlaybackMetadata(output transcodeOutputProfile) map[string]any {
 	metadata := map[string]any{
-		"primary_codec":          primary.Codec,
-		"compat_available":       false,
-		"playback_profiles":      profiles,
-		"compat_transcoded_path": "",
-	}
-	if compat.Path != "" {
-		profiles[compat.Key] = map[string]any{
-			"path":  compat.Path,
-			"codec": compat.Codec,
-		}
-		metadata["compat_available"] = true
-		metadata["compat_codec"] = compat.Codec
-		metadata["compat_transcoded_path"] = compat.Path
+		"playback_path":  output.Path,
+		"playback_codec": output.Codec,
 	}
 	return metadata
 }

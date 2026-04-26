@@ -20,7 +20,6 @@ import (
 
 var (
 	errInvalidPlaybackProfile = errors.New("invalid playback profile")
-	errCompatSourceNotFound   = errors.New("video compat source not found")
 )
 
 func (a *API) VideoSource(c *gin.Context) {
@@ -105,11 +104,7 @@ func (a *API) resolvePlayableSource(c *gin.Context, videoID uuid.UUID) (string, 
 	}
 	sourcePath, err := resolveProfiledPlayableSource(video, c.Query("profile"))
 	if err != nil {
-		if errors.Is(err, errCompatSourceNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"msg": err.Error()})
-		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": err.Error()})
-		}
+		c.JSON(http.StatusBadRequest, gin.H{"msg": err.Error()})
 		return "", false
 	}
 	if sourcePath == "" {
@@ -133,10 +128,10 @@ func resolveProfiledPlayableSource(video models.Video, requestedProfile string) 
 		return strings.TrimSpace(video.TranscodedPath), nil
 	case "compat":
 		path := compatTranscodedPathFromMetadata(video.Metadata)
-		if path == "" {
-			return "", errCompatSourceNotFound
+		if path != "" {
+			return path, nil
 		}
-		return path, nil
+		return strings.TrimSpace(video.TranscodedPath), nil
 	default:
 		return "", errInvalidPlaybackProfile
 	}

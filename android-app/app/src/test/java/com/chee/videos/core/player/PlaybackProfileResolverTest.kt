@@ -5,13 +5,13 @@ import org.junit.Test
 
 class PlaybackProfileResolverTest {
     @Test
-    fun resolvePreferredLongFormPlaybackProfile_prefersPrimaryWhenHevcSupported() {
+    fun resolvePreferredLongFormPlaybackProfile_usesCompatWhenHevcSupported() {
         val profile = resolvePreferredLongFormPlaybackProfile(
             deviceSupportsHevc = true,
             isProbablyEmulator = false,
         )
 
-        assertEquals(PlaybackProfile.PRIMARY, profile)
+        assertEquals(PlaybackProfile.COMPAT, profile)
     }
 
     @Test

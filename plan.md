@@ -15,6 +15,39 @@
 
 ---
 
+### [2026-04-26 08:51] 长视频播放产物收敛为单 AVC
+- Type: `implementation`
+- Summary:
+  - 长视频转码从“HEVC 主档 + AVC 兼容档”收敛为“单一 AVC 播放产物”：新上传与新重转码统一只生成 `video-avc.mp4`，停止写入新的双档 metadata。
+  - 播放接口继续兼容 `profile=primary|compat`，但对新视频无论请求哪个 profile 都回落到同一份 `transcoded_path`；对历史双产物视频仍保留旧 `compat_transcoded_path` / `playback_profiles` 解析兼容。
+  - Android 端不再按 HEVC 能力做分流，长视频 profile resolver 固定返回 `compat`，避免继续依赖 HEVC/模拟器能力探测。
+- Changed Files:
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `internal/handlers/video_source.go`
+  - `internal/handlers/video_source_test.go`
+  - `android-app/app/src/main/java/com/chee/videos/core/player/PlaybackProfileResolver.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/player/PlaybackProfileResolverTest.kt`
+  - `plan.md`
+- Verification:
+  - `GOCACHE=$(pwd)/.gocache go test ./...` passed.
+  - `cd android-app && GRADLE_USER_HOME="$PWD/.gradle-local" ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.core.player.PlaybackProfileResolverTest'` failed: Gradle Wrapper 下载 `https://services.gradle.org/distributions/gradle-8.7-bin.zip` 连接超时，未能完成代码层验证。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-26 08:49] 长视频播放产物收敛为单 AVC 计划
+- Type: `plan`
+- Summary:
+  - 目标从“双档兼容”调整为“安卓稳定可播优先、存储占用优先”，因此新长视频播放产物统一收敛为单一 AVC/H.264。
+  - 历史双产物数据本次不做批量清理，但播放接口需要兼容解析旧 metadata，避免旧视频立即失效。
+  - Android 端本次同步取消 HEVC 能力分流，避免仍然保留“主档/兼容档”选择逻辑。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `git status --short` 预期仅包含本次收敛改动。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-25 15:58] 修复长视频重转码被 30 分钟任务超时杀死
 - Type: `implementation`
 - Summary:
