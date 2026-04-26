@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/models"
+	"video-server/internal/utils"
 )
 
 type AdminTVSeriesFilter struct {
@@ -113,6 +114,8 @@ LIMIT $`+fmt.Sprintf("%d", len(args)-1)+` OFFSET $`+fmt.Sprintf("%d", len(args))
 		}
 		item.FirstAirDate = formatNullDate(firstAirDate)
 		item.LatestEpisodeAirDate = formatNullDate(latestAirDate)
+		item.PosterURL = resolveTVSeriesPosterURL(item.ID, item.PosterURL)
+		item.BackdropURL = resolveTVSeriesBackdropURL(item.ID, item.BackdropURL)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -172,6 +175,8 @@ LIMIT 1
 		return nil, fmt.Errorf("get tv continue watching: %w", err)
 	}
 	item.DurationSeconds = nullInt32ToInt(durationSeconds)
+	item.PosterURL = resolveTVSeriesPosterURL(item.SeriesID, item.PosterURL)
+	item.BackdropURL = resolveTVSeriesBackdropURL(item.SeriesID, item.BackdropURL)
 	if item.DurationSeconds > 0 {
 		item.ProgressPercent = (item.WatchSeconds * 100) / item.DurationSeconds
 		if item.ProgressPercent > 100 {
@@ -225,6 +230,8 @@ WHERE s.id = $1 AND s.active = TRUE
 		return models.TvSeriesDetailDto{}, fmt.Errorf("get tv series detail: %w", err)
 	}
 	detail.FirstAirDate = formatNullDate(firstAirDate)
+	detail.PosterURL = resolveTVSeriesPosterURL(detail.ID, detail.PosterURL)
+	detail.BackdropURL = resolveTVSeriesBackdropURL(detail.ID, detail.BackdropURL)
 
 	tagRows, err := r.pool.Query(ctx, `
 SELECT DISTINCT vt.tag
@@ -399,6 +406,32 @@ ORDER BY se.season_number ASC, e.episode_number ASC
 		}
 	}
 	return detail, nil
+}
+
+func (r *VideoRepository) GetTVSeriesArtworkPaths(ctx context.Context, seriesID int64) (posterPath, backdropPath string, err error) {
+	err = r.pool.QueryRow(ctx, `
+SELECT COALESCE(poster_path, ''), COALESCE(backdrop_path, '')
+FROM series
+WHERE id = $1
+`, seriesID).Scan(&posterPath, &backdropPath)
+	if err != nil {
+		return "", "", fmt.Errorf("get tv series artwork: %w", err)
+	}
+	return posterPath, backdropPath, nil
+}
+
+func resolveTVSeriesPosterURL(seriesID int64, raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	return utils.TVSeriesPosterURL(seriesID)
+}
+
+func resolveTVSeriesBackdropURL(seriesID int64, raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	return utils.TVSeriesBackdropURL(seriesID)
 }
 
 func (r *VideoRepository) ListAdminTVSeries(ctx context.Context, filter AdminTVSeriesFilter) ([]models.AdminTvSeriesListItem, int, error) {

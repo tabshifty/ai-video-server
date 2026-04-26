@@ -28,6 +28,14 @@ func VideoThumbnailURL(videoID uuid.UUID) string {
 	return fmt.Sprintf("/api/v1/videos/%s/thumbnail", videoID.String())
 }
 
+func TVSeriesPosterURL(seriesID int64) string {
+	return fmt.Sprintf("/api/v1/tv/series/%d/poster", seriesID)
+}
+
+func TVSeriesBackdropURL(seriesID int64) string {
+	return fmt.Sprintf("/api/v1/tv/series/%d/backdrop", seriesID)
+}
+
 func VideoSubtitleURL(videoID, subtitleID uuid.UUID) string {
 	return fmt.Sprintf("/api/v1/videos/%s/subtitles/%s/file", videoID.String(), subtitleID.String())
 }

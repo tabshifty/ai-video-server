@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -129,6 +131,81 @@ func TestScrapeEpisodeUploadSyncsWholeSeriesAndBindsOnlyTargetEpisode(t *testing
 	}
 	if boundCount != 1 {
 		t.Fatalf("expected exactly one bound episode, got=%d", boundCount)
+	}
+}
+
+func TestScrapeEpisodeUploadDownloadsSeriesArtworkLocally(t *testing.T) {
+	t.Parallel()
+
+	var baseURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/search/tv":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{
+					{"id": 88},
+				},
+			})
+		case "/tv/88":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":                 88,
+				"name":               "中文剧名",
+				"original_name":      "中文剧名",
+				"overview":           "整剧简介",
+				"first_air_date":     "2020-01-01",
+				"number_of_seasons":  1,
+				"number_of_episodes": 1,
+				"poster_path":        baseURL + "/images/show-poster.jpg",
+				"backdrop_path":      baseURL + "/images/show-backdrop.jpg",
+				"seasons": []map[string]any{
+					{"season_number": 1},
+				},
+			})
+		case "/tv/88/season/1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"name":     "第一季",
+				"overview": "第一季简介",
+				"air_date": "2020-01-01",
+				"episodes": []map[string]any{
+					{
+						"id":             5002,
+						"episode_number": 2,
+						"name":           "第二集",
+						"overview":       "第二集简介",
+						"runtime":        46,
+						"air_date":       "2020-01-08",
+						"still_path":     baseURL + "/images/s1e2.jpg",
+					},
+				},
+			})
+		case "/images/show-poster.jpg", "/images/show-backdrop.jpg", "/images/s1e2.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		case "/tv/88/season/1/episode/2/credits", "/tv/88/credits":
+			_ = json.NewEncoder(w).Encode(map[string]any{"cast": []map[string]any{}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	baseURL = server.URL
+
+	storageRoot := t.TempDir()
+	svc := NewScraperService(&fakeScraperRepo{}, "demo-key", server.URL, storageRoot, "", 2*time.Second)
+
+	_, err := svc.ScrapeEpisodeUpload(context.Background(), uuid.New(), "/tmp/中文剧名.S01E02.mkv", "中文剧名.S01E02.mkv")
+	if err != nil {
+		t.Fatalf("ScrapeEpisodeUpload returned error: %v", err)
+	}
+
+	for _, target := range []string{
+		filepath.Join(storageRoot, "tv", "series", "1", "poster.jpg"),
+		filepath.Join(storageRoot, "tv", "series", "1", "backdrop.jpg"),
+	} {
+		if _, statErr := os.Stat(target); statErr != nil {
+			t.Fatalf("expected series artwork downloaded to %s, stat err=%v", target, statErr)
+		}
 	}
 }
 

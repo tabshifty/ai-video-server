@@ -113,6 +113,7 @@ fun tvEpisode(
     videoId: String = "",
     videoStatus: String = "",
     watchSeconds: Int = 0,
+    lastWatchedAt: String? = null,
 ): TvEpisodeDto = TvEpisodeDto(
     id = id,
     episodeNumber = number,
@@ -120,6 +121,7 @@ fun tvEpisode(
     videoId = videoId,
     videoStatus = videoStatus,
     watchSeconds = watchSeconds,
+    lastWatchedAt = lastWatchedAt,
     playable = videoId.isNotBlank() && videoStatus == "ready",
 )
 

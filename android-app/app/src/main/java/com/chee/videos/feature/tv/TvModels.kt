@@ -9,6 +9,7 @@ data class TvEpisodeUiModel(
     val durationLabel: String,
     val summary: String,
     val watchSeconds: Int = 0,
+    val lastWatchedAt: String = "",
     val progressPercent: Int = 0,
     val videoId: String = "",
     val videoStatus: String = "",

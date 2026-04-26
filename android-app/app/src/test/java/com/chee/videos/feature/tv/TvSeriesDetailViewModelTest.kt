@@ -57,4 +57,54 @@ class TvSeriesDetailViewModelTest {
         assertEquals(targetSeason.number, after.selectedSeasonNumber)
         assertEquals(2, after.selectedEpisodeNumber)
     }
+
+    @Test
+    fun init_prefersMostRecentlyWatchedEpisodeAcrossSeasons() = runTest {
+        val viewModel = TvSeriesDetailViewModel(
+            repository = FakeTvRepository(
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(
+                                    id = "e1",
+                                    number = 1,
+                                    title = "第1集",
+                                    videoId = "video-1",
+                                    videoStatus = "ready",
+                                    watchSeconds = 90,
+                                    lastWatchedAt = "2026-04-25T08:00:00Z",
+                                ),
+                            ),
+                        ),
+                        TvSeasonDto(
+                            id = "s2",
+                            seasonNumber = 2,
+                            title = "第二季",
+                            episodes = listOf(
+                                tvEpisode(
+                                    id = "e2",
+                                    number = 3,
+                                    title = "第3集",
+                                    videoId = "video-2",
+                                    videoStatus = "ready",
+                                    watchSeconds = 45,
+                                    lastWatchedAt = "2026-04-26T09:30:00Z",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.selectedSeasonNumber)
+        assertEquals(3, state.selectedEpisodeNumber)
+    }
 }

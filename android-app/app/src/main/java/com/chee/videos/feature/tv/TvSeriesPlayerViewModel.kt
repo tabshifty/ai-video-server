@@ -34,8 +34,8 @@ class TvSeriesPlayerViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val seriesId = savedStateHandle.get<String>(TvSeriesIdArg).orEmpty()
-    private val requestedSeason = savedStateHandle.get<Int>(TvSeasonArg) ?: 1
-    private val requestedEpisode = savedStateHandle.get<Int>(TvEpisodeArg) ?: 1
+    private val requestedSeason = savedStateHandle.get<Int>(TvSeasonArg)
+    private val requestedEpisode = savedStateHandle.get<Int>(TvEpisodeArg)
 
     private val _uiState = MutableStateFlow(TvSeriesPlayerUiState())
     val uiState: StateFlow<TvSeriesPlayerUiState> = _uiState.asStateFlow()
@@ -106,8 +106,17 @@ class TvSeriesPlayerViewModel @Inject constructor(
             repository.fetchSeriesDetail(seriesId)
                 .onSuccess { dto ->
                     val series = tvSeriesDetailToUiModel(dto)
-                    val resolvedSeason = series.seasons.firstOrNull { it.number == requestedSeason.coerceAtLeast(1) } ?: series.seasons.firstOrNull()
-                    val resolvedEpisode = resolvedSeason?.episodes?.firstOrNull { it.number == requestedEpisode.coerceAtLeast(1) }
+                    val preferredSelection = if (requestedSeason != null && requestedEpisode != null) {
+                        TvPreferredEpisodeSelection(
+                            seasonNumber = requestedSeason.coerceAtLeast(1),
+                            episodeNumber = requestedEpisode.coerceAtLeast(1),
+                        )
+                    } else {
+                        findPreferredSeriesSelection(series)
+                    }
+                    val resolvedSeason = series.seasons.firstOrNull { it.number == preferredSelection?.seasonNumber }
+                        ?: series.seasons.firstOrNull()
+                    val resolvedEpisode = resolvedSeason?.episodes?.firstOrNull { it.number == preferredSelection?.episodeNumber }
                         ?: resolvedSeason?.episodes?.firstOrNull { it.playable }
                         ?: resolvedSeason?.episodes?.firstOrNull()
                     _uiState.value = TvSeriesPlayerUiState(

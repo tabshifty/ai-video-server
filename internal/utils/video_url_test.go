@@ -50,3 +50,19 @@ func TestAppImageViewURL(t *testing.T) {
 		t.Fatalf("unexpected app image view url: got=%s want=%s", got, want)
 	}
 }
+
+func TestTVSeriesPosterURL(t *testing.T) {
+	got := TVSeriesPosterURL(42)
+	want := "/api/v1/tv/series/42/poster"
+	if got != want {
+		t.Fatalf("unexpected tv poster url: got=%s want=%s", got, want)
+	}
+}
+
+func TestTVSeriesBackdropURL(t *testing.T) {
+	got := TVSeriesBackdropURL(42)
+	want := "/api/v1/tv/series/42/backdrop"
+	if got != want {
+		t.Fatalf("unexpected tv backdrop url: got=%s want=%s", got, want)
+	}
+}

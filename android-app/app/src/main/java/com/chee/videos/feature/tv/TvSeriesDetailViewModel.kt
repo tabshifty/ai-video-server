@@ -60,12 +60,16 @@ class TvSeriesDetailViewModel @Inject constructor(
             repository.fetchSeriesDetail(seriesId)
                 .onSuccess { dto ->
                     val series = tvSeriesDetailToUiModel(dto)
-                    val defaultSeason = series.seasons.firstOrNull()
+                    val defaultSelection = findPreferredSeriesSelection(series)
+                    val defaultSeason = series.seasons.firstOrNull { it.number == defaultSelection?.seasonNumber }
+                        ?: series.seasons.firstOrNull()
                     _uiState.value = TvSeriesDetailUiState(
                         loading = false,
                         series = series,
                         selectedSeasonNumber = defaultSeason?.number ?: 1,
-                        selectedEpisodeNumber = defaultSeason?.let(::findPreferredEpisodeNumber) ?: 1,
+                        selectedEpisodeNumber = defaultSelection?.episodeNumber
+                            ?: defaultSeason?.let(::findPreferredEpisodeNumber)
+                            ?: 1,
                         errorMessage = null,
                     )
                 }

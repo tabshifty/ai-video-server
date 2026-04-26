@@ -2881,3 +2881,46 @@
   - `cd android-app && GRADLE_USER_HOME="/Users/chee/Documents/workspace/ai-project/ai-video-server/android-app/.gradle-local" ./gradlew :app:testDebugUnitTest :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-26 22:03] 电视剧海报落盘与最近观看优先修复计划
+- Type: `plan`
+- Summary:
+  - 用户反馈电视剧仍存在三类问题：海报/封面缺失、退出后无法恢复上次播放时间，以及“继续播放”与详情/播放器默认落点没有优先回到最近观看的剧集与分集。
+  - 本轮修复范围覆盖后端电视剧 artwork 与 Android 电视剧选择逻辑：后端为电视剧系列补稳定 artwork 路由，并在刮削同步时把海报/背景图下载到本地硬盘；Android 详情页与播放器在未显式指定季/集时，统一优先最近观看记录。
+  - 延续已完成的继续播放直达播放器、续播 seek 与字幕偏好记忆，不改后端字幕接口；验证目标包含新增 Go/Android 回归测试，以及 `go test ./...`、`:app:testDebugUnitTest`、`:app:assembleDebug` 全量回归。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./...`
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug`
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-26 22:04] 修复电视剧海报缺失、最近观看默认落点与本地 artwork 落盘
+- Type: `implementation`
+- Summary:
+  - 后端为电视剧系列补了稳定 artwork 访问链路：列表、详情和继续播放现在统一返回 `/api/v1/tv/series/:id/poster|backdrop`，新 handler 会优先服务本地落盘图片，并兼容旧数据里已有的本地绝对路径、远程绝对 URL 与 TMDB 相对路径。
+  - 电视剧刮削同步现在会把系列 poster/backdrop 最佳努力下载到 `storageRoot/tv/series/<seriesID>/poster.jpg|backdrop.jpg`，满足“刮削图片落到硬盘而不是直接走网络图”的要求，同时不让 artwork 下载失败阻断剧集入库。
+  - Android 电视剧详情页与播放器在没有显式季/集参数时，都会优先最近观看分集；同季内默认分集选择也会先比 `lastWatchedAt`、再比 `watchSeconds`，让继续播放与详情默认落点和历史记录保持一致。
+- Changed Files:
+  - `internal/utils/video_url.go`
+  - `internal/utils/video_url_test.go`
+  - `internal/repository/tv_repository.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/tv_artwork.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_episode_sync_test.go`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvSeriesDetailViewModelTest' --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

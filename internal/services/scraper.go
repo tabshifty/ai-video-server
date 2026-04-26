@@ -807,6 +807,8 @@ func (s *ScraperService) syncTVSeriesAndBindEpisode(ctx context.Context, videoID
 	if err != nil {
 		return syncedEpisodeResult{}, err
 	}
+	_ = s.downloadTVSeriesArtwork(ctx, asString(tvRaw["poster_path"]), seriesID, "poster")
+	_ = s.downloadTVSeriesArtwork(ctx, asString(tvRaw["backdrop_path"]), seriesID, "backdrop")
 
 	seasonNumbers := extractTVSeasonNumbers(tvRaw)
 	if len(seasonNumbers) == 0 {
@@ -1783,6 +1785,46 @@ func (s *ScraperService) downloadTMDBImage(ctx context.Context, relativePath str
 		return "", fmt.Errorf("write poster file: %w", err)
 	}
 	return outputPath, nil
+}
+
+func (s *ScraperService) downloadTVSeriesArtwork(ctx context.Context, relativePath string, seriesID int64, kind string) error {
+	relativePath = strings.TrimSpace(relativePath)
+	if relativePath == "" || seriesID <= 0 {
+		return nil
+	}
+	imageURL := relativePath
+	if !strings.HasPrefix(relativePath, "http://") && !strings.HasPrefix(relativePath, "https://") {
+		imageURL = "https://image.tmdb.org/t/p/original" + relativePath
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+	if err != nil {
+		return fmt.Errorf("create tv artwork request: %w", err)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("download tv artwork failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("tv artwork status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	outputDir := filepath.Join(s.storageRoot, "tv", "series", strconv.FormatInt(seriesID, 10))
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("create tv artwork dir: %w", err)
+	}
+	outputPath := filepath.Join(outputDir, kind+".jpg")
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("create tv artwork file: %w", err)
+	}
+	defer f.Close()
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return fmt.Errorf("write tv artwork file: %w", err)
+	}
+	return nil
 }
 
 func extractGenres(v any) []string {
