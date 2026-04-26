@@ -60,6 +60,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.SubtitleTrackDto
@@ -333,10 +334,12 @@ fun LongFormVideoPlayer(
                     setKeepContentOnPlayerReset(true)
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     this.player = player
+                    applyLongFormSubtitleStyle()
                 }
             },
             update = { view ->
                 view.player = player
+                view.applyLongFormSubtitleStyle()
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -620,6 +623,24 @@ private fun formatPlaybackTime(ms: Long): String {
     } else {
         String.format("%02d:%02d", minutes, seconds)
     }
+}
+
+private fun PlayerView.applyLongFormSubtitleStyle() {
+    val subtitleView = getSubtitleView() ?: return
+    subtitleView.setStyle(buildLongFormSubtitleStyle())
+    subtitleView.setApplyEmbeddedStyles(true)
+    subtitleView.setApplyEmbeddedFontSizes(true)
+}
+
+private fun buildLongFormSubtitleStyle(): CaptionStyleCompat {
+    return CaptionStyleCompat(
+        0xFFFFFFFF.toInt(),
+        0x00000000,
+        0x00000000,
+        CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+        0xB3000000.toInt(),
+        null,
+    )
 }
 
 @Composable

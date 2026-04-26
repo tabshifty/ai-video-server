@@ -15,6 +15,36 @@
 
 ---
 
+### [2026-04-26 20:07] 去掉长视频字幕黑底并改为轻量描边
+- Type: `implementation`
+- Summary:
+  - 长视频字幕黑底来自 app 端 `PlayerView` 的默认 `SubtitleView` 样式，而不是后端字幕内容；本次在共享长视频播放器里统一覆写字幕样式，改成“透明背景 + 细描边”，减少字幕底色对画面的遮挡。
+  - `LongFormVideoPlayer` 现在会在创建和更新 `PlayerView` 时统一应用 app 字幕样式：白字、背景透明、窗口透明、轻量描边，并保持内嵌样式与字号支持开启，不影响已有字幕内容解析。
+  - 新增样式回归测试，锁定共享长视频字幕样式的关键颜色与描边配置，避免后续又退回 Media3 默认黑底。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/LongFormVideoPlayerStyleTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.ui.LongFormVideoPlayerStyleTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-26 20:06] 长视频字幕黑底样式修复计划
+- Type: `plan`
+- Summary:
+  - 用户确认字幕已经正常显示，但黑色背景会遮挡画面，希望尽量去掉，优先在 app 端处理。
+  - 本地检查确认：电视剧页、详情页和统一长视频页共用 `LongFormVideoPlayer`，当前 `PlayerView` 未对内部 `SubtitleView` 做任何样式覆写，因此直接沿用了 Media3 的默认字幕黑底。
+  - 本轮按共享长视频播放器统一修复，目标样式锁定为“透明背景 + 细描边”；先补失败测试锁定样式，再在 `LongFormVideoPlayer` 统一应用。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `git status --short` 预期仅包含本轮字幕样式修复相关文件。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-26 19:33] 修复长视频内嵌字幕手动选择后不自动启用
 - Type: `implementation`
 - Summary:
