@@ -52,6 +52,31 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_exposesActiveBaseUrlForSubtitleResolution() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                baseUrl = "https://media.example.com",
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(id = "e1", number = 1, title = "第1集", videoId = "video-1", videoStatus = "ready"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        assertEquals("https://media.example.com", viewModel.uiState.value.baseUrl)
+    }
+
+    @Test
     fun nextEpisode_skipsToFollowingEpisodeAndUpdatesVideoId() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(

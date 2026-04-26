@@ -15,6 +15,40 @@
 
 ---
 
+### [2026-04-26 16:15] 修复电视剧播放器选择字幕后不显示字幕
+- Type: `implementation`
+- Summary:
+  - 修复电视剧播放页字幕重配缺少 `baseUrl` 的问题：`TvSeriesPlayerViewModel` 现在会读取并透传当前服务端地址，`TvSeriesPlayerScreen` 在重建长视频 `MediaItem` 时改为使用真实 `baseUrl`，让相对路径字幕 URL 能被解析并挂入播放器。
+  - 保持现有字幕切换重配策略不变，电视剧页仍沿用 `resolveLongFormPlayerUpdate(... preservePosition=true)` 的“仅换字幕时保留播放进度”行为，本次不改字幕轨优先级、不改后端字幕接口。
+  - 补充两类回归测试：一条锁定相对字幕路径在存在 `baseUrl` 时必须解析成绝对地址；一条锁定电视剧播放器状态必须暴露 `baseUrl`，避免后续再次把字幕解析前提丢掉。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/SubtitleSelectionTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.ui.SubtitleSelectionTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-26 16:14] 电视剧播放器字幕不显示修复计划
+- Type: `plan`
+- Summary:
+  - 已确认这次问题集中在电视剧播放器页面：字幕切换后重建长视频 `MediaItem` 时把 `baseUrl` 传成空字符串，导致相对路径字幕 URL 无法解析，播放器拿不到有效字幕配置。
+  - 修复范围限制在电视剧播放链路：`TvRepository` / `TvSeriesPlayerViewModel` 补齐 `baseUrl` 透传，`TvSeriesPlayerScreen` 改为使用真实地址构造字幕资源；不改后端接口、不改字幕选择策略。
+  - 验证目标是补一条字幕 URL 解析回归、一条电视剧播放器 `baseUrl` 状态回归，并执行 Android 单测和 `assembleDebug` 全量验证。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `git status --short` 预期仅包含本次电视剧字幕修复相关文件。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-26 08:51] 长视频播放产物收敛为单 AVC
 - Type: `implementation`
 - Summary:

@@ -159,7 +159,7 @@ fun TvSeriesPlayerScreen(
                 sourceUrl = uiState.currentSourceUrl,
                 mediaId = uiState.currentVideoId,
                 title = currentEpisode?.title ?: series.title,
-                baseUrl = "",
+                baseUrl = uiState.baseUrl,
                 selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentEpisode?.subtitleTracks.orEmpty(), selectedSubtitleTrackId),
             )
             val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)

@@ -16,6 +16,7 @@ import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 
 class FakeTvRepository(
+    private val baseUrl: String = "https://example.com",
     private val homePayload: TvHomePayload = TvHomePayload(),
     private val searchPayload: TvHomePayload = homePayload,
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
@@ -32,12 +33,15 @@ class FakeTvRepository(
         return Result.success(detailPayload)
     }
 
+    override suspend fun readActiveBaseUrl(): String = baseUrl
+
     override suspend fun buildSourceUrl(videoId: String): String = "https://example.com/$videoId.m3u8"
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
 }
 
 class DelayedSourceTvRepository(
+    private val baseUrl: String = "https://example.com",
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
 ) : TvRepository {
     private val pendingSourceUrls = linkedMapOf<String, CompletableDeferred<String>>()
@@ -47,6 +51,8 @@ class DelayedSourceTvRepository(
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(detailPayload)
+
+    override suspend fun readActiveBaseUrl(): String = baseUrl
 
     override suspend fun buildSourceUrl(videoId: String): String =
         pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.await()

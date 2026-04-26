@@ -2,8 +2,8 @@ package com.chee.videos.core.ui
 
 import com.chee.videos.core.model.SubtitleTrackDto
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -163,5 +163,24 @@ class SubtitleSelectionTest {
         assertFalse(decision.shouldClear)
         assertFalse(decision.shouldReplaceSource)
         assertFalse(decision.preservePosition)
+    }
+
+    @Test
+    fun resolvePlaybackAssetUrl_buildsAbsoluteSubtitleUrlForRelativePathWhenBaseUrlAvailable() {
+        val method = Class
+            .forName("com.chee.videos.core.ui.LongFormSubtitleSupportKt")
+            .getDeclaredMethod("resolvePlaybackAssetUrl", String::class.java, String::class.java)
+            .apply { isAccessible = true }
+
+        val resolvedUrl = method.invoke(
+            null,
+            "https://example.com",
+            "/api/v1/videos/video-1/subtitles/sub-1/file",
+        ) as String?
+
+        assertEquals(
+            "https://example.com/api/v1/videos/video-1/subtitles/sub-1/file",
+            resolvedUrl,
+        )
     }
 }

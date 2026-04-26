@@ -9,6 +9,7 @@ import javax.inject.Singleton
 interface TvRepository {
     suspend fun fetchHome(query: String = "", page: Int = 1, pageSize: Int = 20): Result<TvHomePayload>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
+    suspend fun readActiveBaseUrl(): String?
     suspend fun buildSourceUrl(videoId: String): String
     suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean)
 }
@@ -22,6 +23,9 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         videoRepository.fetchTvSeriesDetail(seriesId)
+
+    override suspend fun readActiveBaseUrl(): String? =
+        videoRepository.readActiveBaseUrl()
 
     override suspend fun buildSourceUrl(videoId: String): String =
         videoRepository.buildSourceUrl(videoId)

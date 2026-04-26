@@ -16,6 +16,7 @@ private val supportedPlaybackSpeeds = listOf(1f, 1.25f, 1.5f, 2f)
 data class TvSeriesPlayerUiState(
     val loading: Boolean = true,
     val series: TvSeriesUiModel? = null,
+    val baseUrl: String = "",
     val selectedSeasonNumber: Int = 1,
     val selectedEpisodeNumber: Int = 1,
     val playbackSpeed: Float = 1f,
@@ -89,6 +90,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
     private fun load() {
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, errorMessage = null) }
+            val baseUrl = repository.readActiveBaseUrl().orEmpty()
             repository.fetchSeriesDetail(seriesId)
                 .onSuccess { dto ->
                     val series = tvSeriesDetailToUiModel(dto)
@@ -99,6 +101,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     _uiState.value = TvSeriesPlayerUiState(
                         loading = false,
                         series = series,
+                        baseUrl = baseUrl,
                         selectedSeasonNumber = resolvedSeason?.number ?: 1,
                         selectedEpisodeNumber = resolvedEpisode?.number ?: 1,
                         playbackSpeed = 1f,
@@ -110,6 +113,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 .onFailure { error ->
                     _uiState.value = TvSeriesPlayerUiState(
                         loading = false,
+                        baseUrl = baseUrl,
                         errorMessage = error.message ?: "电视剧播放页加载失败",
                     )
                 }
