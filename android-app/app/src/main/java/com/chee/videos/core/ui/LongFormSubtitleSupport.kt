@@ -99,7 +99,7 @@ fun buildLongFormMediaItem(
         val resolvedUrl = resolvePlaybackAssetUrl(baseUrl, track.url) ?: return@buildList
         val builder = MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolvedUrl))
             .setRoleFlags(C.ROLE_FLAG_SUBTITLE)
-            .setSelectionFlags(if (track.isDefault) C.SELECTION_FLAG_DEFAULT else 0)
+            .setSelectionFlags(resolveSubtitleSelectionFlags(track))
         val mimeType = resolveSubtitleMimeType(track)
         if (mimeType.isNotBlank()) {
             builder.setMimeType(mimeType)
@@ -130,6 +130,13 @@ fun subtitleTrackDisplayLabel(track: SubtitleTrackDto): String {
         return label
     }
     return if (track.sourceType == "embedded") "内嵌字幕" else "外挂字幕"
+}
+
+private fun resolveSubtitleSelectionFlags(track: SubtitleTrackDto): Int {
+    if (!track.available || track.url.isBlank()) {
+        return 0
+    }
+    return C.SELECTION_FLAG_DEFAULT
 }
 
 private fun resolvePlaybackAssetUrl(baseUrl: String, rawUrl: String): String? {

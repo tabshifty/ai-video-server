@@ -15,6 +15,36 @@
 
 ---
 
+### [2026-04-26 19:33] 修复长视频内嵌字幕手动选择后不自动启用
+- Type: `implementation`
+- Summary:
+  - 这次“电视剧页选了内嵌字幕仍不显示”的直接根因不在 `baseUrl`，而在共享长视频字幕挂载逻辑：播放器重建 `MediaItem` 时只会挂载“当前选中的单条字幕轨”，但只有后端原始 `is_default=true` 的轨道才会被打上 `SELECTION_FLAG_DEFAULT`，导致用户手动选择的非默认内嵌字幕虽然被挂进 `MediaItem`，Media3 仍可能保持文本轨关闭。
+  - `buildLongFormMediaItem` 现在改为把“当前唯一挂载的、可用的字幕轨”统一标记为默认选中轨，确保用户在电视剧页、详情页或统一长视频页显式切换到某条内嵌字幕后，播放器会实际启用这条字幕。
+  - 新增回归测试锁定“手动选中的非默认内嵌字幕必须带 `SELECTION_FLAG_DEFAULT`”，避免后续再次回到“选中了但未启用”的状态。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormSubtitleSupport.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/SubtitleSelectionTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.ui.SubtitleSelectionTest.resolveSubtitleSelectionFlags_marksExplicitlySelectedEmbeddedTrackAsDefault'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-26 19:32] 内嵌字幕不显示二次排查计划
+- Type: `plan`
+- Summary:
+  - 用户反馈上一次修复后“仍然没有看到字幕”，且补充说明当前复现的是内嵌字幕，不是外挂字幕。
+  - 重新核对后确认：电视剧页、电影详情页和统一长视频页共用同一套 `buildLongFormMediaItem(...)` 字幕挂载逻辑；本轮优先按共享长视频字幕链路排查，而不是继续只做电视剧页局部补丁。
+  - 初步假设是“用户手动选择的非默认内嵌字幕未被标记为播放器默认选中轨”，验证目标是先补失败测试，再最小化修正 Media3 `SubtitleConfiguration` 的 selection flags。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `git status --short` 预期仅包含本轮内嵌字幕修复相关文件。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-26 16:15] 修复电视剧播放器选择字幕后不显示字幕
 - Type: `implementation`
 - Summary:
