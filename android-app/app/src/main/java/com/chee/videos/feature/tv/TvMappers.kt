@@ -54,6 +54,9 @@ internal fun tvContinueWatchingToUiModel(dto: TvContinueWatchingDto): TvContinue
         seasonNumber = dto.seasonNumber,
         episodeNumber = dto.episodeNumber,
         episodeTitle = dto.episodeTitle,
+        posterUrl = dto.posterUrl,
+        backdropUrl = dto.backdropUrl,
+        watchSeconds = dto.watchSeconds,
         progressPercent = dto.progressPercent,
     )
 
@@ -64,6 +67,7 @@ internal fun tvEpisodeToUiModel(dto: TvEpisodeDto): TvEpisodeUiModel =
         title = dto.title.ifBlank { "第${dto.episodeNumber}集" },
         durationLabel = if (dto.runtime > 0) "${dto.runtime} 分钟" else "时长待更新",
         summary = dto.overview.orEmpty().ifBlank { "暂无剧情简介" },
+        watchSeconds = dto.watchSeconds,
         progressPercent = dto.progressPercent,
         videoId = dto.videoId,
         videoStatus = dto.videoStatus.orEmpty(),

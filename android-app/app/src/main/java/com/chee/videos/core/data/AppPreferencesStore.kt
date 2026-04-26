@@ -29,6 +29,7 @@ class AppPreferencesStore @Inject constructor(
         val shortFitMode = stringPreferencesKey("short_fit_mode")
         val shortDiscoverFitMode = stringPreferencesKey("short_discover_fit_mode")
         val unifiedShortFitMode = stringPreferencesKey("unified_short_fit_mode")
+        val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_preferences")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -105,6 +106,36 @@ class AppPreferencesStore @Inject constructor(
         }
     }
 
+    suspend fun readTvSubtitlePreference(videoId: String): String? {
+        val key = videoId.trim()
+        if (key.isBlank()) {
+            return null
+        }
+        return dataStore.data.first()[Keys.tvSubtitlePreferences]
+            ?.let(::decodeStringMap)
+            ?.get(key)
+    }
+
+    suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
+        val key = videoId.trim()
+        if (key.isBlank()) {
+            return
+        }
+        dataStore.edit { prefs ->
+            val current = decodeStringMap(prefs[Keys.tvSubtitlePreferences].orEmpty()).toMutableMap()
+            if (subtitleTrackId == null) {
+                current.remove(key)
+            } else {
+                current[key] = subtitleTrackId
+            }
+            if (current.isEmpty()) {
+                prefs.remove(Keys.tvSubtitlePreferences)
+            } else {
+                prefs[Keys.tvSubtitlePreferences] = gson.toJson(current)
+            }
+        }
+    }
+
     suspend fun setActiveBaseUrl(baseUrl: String) {
         val normalized = UrlBuilder.normalizeBaseUrl(baseUrl)
         dataStore.edit { prefs ->
@@ -162,6 +193,20 @@ class AppPreferencesStore @Inject constructor(
                 ?: emptyList()
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    private fun decodeStringMap(raw: String): Map<String, String> {
+        if (raw.isBlank()) {
+            return emptyMap()
+        }
+        return try {
+            val type = object : TypeToken<Map<String, String>>() {}.type
+            gson.fromJson<Map<String, String>>(raw, type)
+                ?.filterKeys { it.isNotBlank() }
+                ?: emptyMap()
+        } catch (_: Exception) {
+            emptyMap()
         }
     }
 }

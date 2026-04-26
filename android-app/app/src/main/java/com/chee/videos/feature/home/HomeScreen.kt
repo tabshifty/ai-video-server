@@ -59,6 +59,7 @@ fun HomeScreen(
     accessToken: String,
     onOpenDetail: (String, String) -> Unit,
     onOpenTvSeries: (String) -> Unit,
+    onOpenTvContinueWatching: (String, Int, Int) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
     onOpenImageCollectionViewer: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -108,6 +109,7 @@ fun HomeScreen(
                 "episode" -> {
                     TvCatalogScreen(
                         onOpenSeries = onOpenTvSeries,
+                        onOpenContinueWatching = onOpenTvContinueWatching,
                     )
                 }
 

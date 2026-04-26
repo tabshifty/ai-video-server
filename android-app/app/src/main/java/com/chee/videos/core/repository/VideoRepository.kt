@@ -228,6 +228,13 @@ class VideoRepository @Inject constructor(
 
     suspend fun readAccessToken(): String? = store.readAccessToken()
 
+    suspend fun readTvSubtitlePreference(videoId: String): String? =
+        store.readTvSubtitlePreference(videoId)
+
+    suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
+        store.saveTvSubtitlePreference(videoId, subtitleTrackId)
+    }
+
     fun preferredLongFormPlaybackProfile(): PlaybackProfile =
         playbackProfileResolver.preferredLongFormProfile()
 

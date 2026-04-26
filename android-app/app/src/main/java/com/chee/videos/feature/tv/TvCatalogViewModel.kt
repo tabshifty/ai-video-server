@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 data class TvCatalogUiState(
     val loading: Boolean = true,
     val query: String = "",
+    val baseUrl: String = "",
     val continueWatching: TvContinueWatchingUiModel? = null,
     val sections: List<TvCatalogSectionUiModel> = emptyList(),
     val searchResults: List<TvSeriesUiModel> = emptyList(),
@@ -39,9 +40,11 @@ class TvCatalogViewModel @Inject constructor(
 
     private fun loadHome(query: String = _uiState.value.query) {
         viewModelScope.launch {
+            val baseUrl = repository.readActiveBaseUrl().orEmpty()
             _uiState.update {
                 it.copy(
                     loading = true,
+                    baseUrl = baseUrl,
                     errorMessage = null,
                     searchResults = if (query.isBlank()) emptyList() else it.searchResults,
                 )
@@ -51,6 +54,7 @@ class TvCatalogViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             loading = false,
+                            baseUrl = baseUrl,
                             continueWatching = payload.continueWatching?.let(::tvContinueWatchingToUiModel),
                             sections = coerceListOrEmpty<TvSectionDto>(payload.sections).map(::tvSectionToUiModel),
                             searchResults = coerceListOrEmpty<TvSeriesSummaryDto>(payload.searchResults).map(::tvSeriesSummaryToUiModel),
@@ -62,6 +66,7 @@ class TvCatalogViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             loading = false,
+                            baseUrl = baseUrl,
                             continueWatching = null,
                             sections = emptyList(),
                             searchResults = emptyList(),

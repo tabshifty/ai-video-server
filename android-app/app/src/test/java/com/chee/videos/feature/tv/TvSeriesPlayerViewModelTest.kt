@@ -77,6 +77,68 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_exposesEpisodeWatchSecondsForResume() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(
+                                    id = "e1",
+                                    number = 1,
+                                    title = "第1集",
+                                    videoId = "video-1",
+                                    videoStatus = "ready",
+                                    watchSeconds = 187,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        assertEquals(187, selectedEpisode(viewModel.uiState.value)?.watchSeconds)
+    }
+
+    @Test
+    fun init_restoresSavedSubtitleSelectionForCurrentVideo() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                subtitlePreferences = mapOf("video-1" to "subtitle-zh"),
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(
+                                    id = "e1",
+                                    number = 1,
+                                    title = "第1集",
+                                    videoId = "video-1",
+                                    videoStatus = "ready",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        assertEquals("subtitle-zh", viewModel.uiState.value.selectedSubtitleTrackId)
+    }
+
+    @Test
     fun nextEpisode_skipsToFollowingEpisodeAndUpdatesVideoId() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(

@@ -27,6 +27,9 @@ class TvCatalogViewModelTest {
                         seasonNumber = 2,
                         episodeNumber = 4,
                         episodeTitle = "暗线浮现",
+                        posterUrl = "/poster.jpg",
+                        backdropUrl = "/backdrop.jpg",
+                        watchSeconds = 128,
                         progressPercent = 64,
                     ),
                     sections = listOf(
@@ -44,7 +47,11 @@ class TvCatalogViewModelTest {
 
         val state = viewModel.uiState.value
         assertFalse(state.loading)
+        assertEquals("https://example.com", state.baseUrl)
         assertEquals("雾城档案", state.continueWatching?.seriesTitle)
+        assertEquals("/poster.jpg", state.continueWatching?.posterUrl)
+        assertEquals("/backdrop.jpg", state.continueWatching?.backdropUrl)
+        assertEquals(128, state.continueWatching?.watchSeconds)
         assertEquals(1, state.sections.size)
     }
 

@@ -12,6 +12,8 @@ interface TvRepository {
     suspend fun readActiveBaseUrl(): String?
     suspend fun buildSourceUrl(videoId: String): String
     suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean)
+    suspend fun readTvSubtitlePreference(videoId: String): String?
+    suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?)
 }
 
 @Singleton
@@ -32,5 +34,12 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
         videoRepository.reportHistory(videoId, watchSeconds, completed)
+    }
+
+    override suspend fun readTvSubtitlePreference(videoId: String): String? =
+        videoRepository.readTvSubtitlePreference(videoId)
+
+    override suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
+        videoRepository.saveTvSubtitlePreference(videoId, subtitleTrackId)
     }
 }

@@ -39,16 +39,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.util.UrlBuilder
 
 @Composable
 fun TvCatalogScreen(
     onOpenSeries: (String) -> Unit,
+    onOpenContinueWatching: (String, Int, Int) -> Unit,
     viewModel: TvCatalogViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -99,6 +103,7 @@ fun TvCatalogScreen(
             } else {
                 items(uiState.searchResults, key = { series -> series.id }) { series ->
                     TvSearchResultCard(
+                        baseUrl = uiState.baseUrl,
                         series = series,
                         onClick = { onOpenSeries(series.id) },
                     )
@@ -109,13 +114,21 @@ fun TvCatalogScreen(
         uiState.continueWatching?.let { continueWatching ->
             item(key = "continue-watching") {
                 TvContinueWatchingBanner(
+                    baseUrl = uiState.baseUrl,
                     data = continueWatching,
-                    onClick = { onOpenSeries(continueWatching.seriesId) },
+                    onClick = {
+                        onOpenContinueWatching(
+                            continueWatching.seriesId,
+                            continueWatching.seasonNumber,
+                            continueWatching.episodeNumber,
+                        )
+                    },
                 )
             }
         }
         items(uiState.sections, key = { section -> section.title }) { section ->
             TvCatalogSection(
+                baseUrl = uiState.baseUrl,
                 section = section,
                 onOpenSeries = onOpenSeries,
             )
@@ -213,6 +226,7 @@ private fun TvSearchEmptyState() {
 
 @Composable
 private fun TvSearchResultCard(
+    baseUrl: String,
     series: TvSeriesUiModel,
     onClick: () -> Unit,
 ) {
@@ -231,21 +245,14 @@ private fun TvSearchResultCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .width(84.dp)
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(tvPosterBrush(series.posterSeed)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Tv,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.82f),
-                    modifier = Modifier.size(26.dp),
-                )
-            }
+            TvPosterArtwork(
+                title = series.title,
+                baseUrl = baseUrl,
+                posterUrl = series.posterUrl,
+                posterSeed = series.posterSeed,
+                width = 84.dp,
+                iconSize = 26.dp,
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -279,9 +286,12 @@ private fun TvSearchResultCard(
 
 @Composable
 private fun TvContinueWatchingBanner(
+    baseUrl: String,
     data: TvContinueWatchingUiModel,
     onClick: () -> Unit,
 ) {
+    val artworkUrl = resolveTvArtworkUrl(baseUrl, data.backdropUrl)
+        ?: resolveTvArtworkUrl(baseUrl, data.posterUrl)
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = AppChrome.CardShape,
@@ -290,17 +300,38 @@ private fun TvContinueWatchingBanner(
             .clip(AppChrome.CardShape)
             .clickable(onClick = onClick),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color(0xFF1A2031), Color(0xFF111827)),
-                    ),
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (!artworkUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = artworkUrl,
+                    contentDescription = data.seriesTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFF1A2031), Color(0xFF111827)),
+                            ),
+                        ),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xE61A2031), Color(0xF0111827)),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
                     text = "继续追剧",
                     color = AppChrome.AccentWarm,
@@ -354,6 +385,7 @@ private fun TvContinueWatchingBanner(
 
 @Composable
 private fun TvCatalogSection(
+    baseUrl: String,
     section: TvCatalogSectionUiModel,
     onOpenSeries: (String) -> Unit,
 ) {
@@ -375,6 +407,7 @@ private fun TvCatalogSection(
         ) {
             items(section.items, key = { item -> item.id }) { series ->
                 TvSeriesPosterCard(
+                    baseUrl = baseUrl,
                     series = series,
                     onClick = { onOpenSeries(series.id) },
                 )
@@ -385,6 +418,7 @@ private fun TvCatalogSection(
 
 @Composable
 private fun TvSeriesPosterCard(
+    baseUrl: String,
     series: TvSeriesUiModel,
     onClick: () -> Unit,
 ) {
@@ -397,20 +431,14 @@ private fun TvSeriesPosterCard(
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-                    .background(tvPosterBrush(series.posterSeed)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Tv,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.82f),
-                    modifier = Modifier.size(34.dp),
-                )
-            }
+            TvPosterArtwork(
+                title = series.title,
+                baseUrl = baseUrl,
+                posterUrl = series.posterUrl,
+                posterSeed = series.posterSeed,
+                width = 146.dp,
+                iconSize = 34.dp,
+            )
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -453,6 +481,45 @@ private fun TvSeriesPosterCard(
     }
 }
 
+@Composable
+private fun TvPosterArtwork(
+    title: String,
+    baseUrl: String,
+    posterUrl: String?,
+    posterSeed: Int,
+    width: androidx.compose.ui.unit.Dp,
+    iconSize: androidx.compose.ui.unit.Dp,
+) {
+    val resolvedPosterUrl = resolveTvArtworkUrl(baseUrl, posterUrl)
+    if (!resolvedPosterUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = resolvedPosterUrl,
+            contentDescription = title,
+            modifier = Modifier
+                .width(width)
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(14.dp)),
+            contentScale = ContentScale.Crop,
+        )
+        return
+    }
+    Box(
+        modifier = Modifier
+            .width(width)
+            .aspectRatio(2f / 3f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(tvPosterBrush(posterSeed)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Tv,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.82f),
+            modifier = Modifier.size(iconSize),
+        )
+    }
+}
+
 private fun tvPosterBrush(seed: Int): Brush {
     return when (seed % 5) {
         0 -> Brush.verticalGradient(listOf(Color(0xFF2D1A48), Color(0xFF0B1220)))
@@ -461,4 +528,19 @@ private fun tvPosterBrush(seed: Int): Brush {
         3 -> Brush.verticalGradient(listOf(Color(0xFF3D3420), Color(0xFF121826)))
         else -> Brush.verticalGradient(listOf(Color(0xFF1C3D36), Color(0xFF101820)))
     }
+}
+
+private fun resolveTvArtworkUrl(baseUrl: String, rawUrl: String?): String? {
+    val path = rawUrl?.trim().orEmpty()
+    if (path.isBlank()) {
+        return null
+    }
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path
+    }
+    val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
+    if (normalizedBase.isBlank()) {
+        return null
+    }
+    return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
 }

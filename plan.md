@@ -12,6 +12,49 @@
   - `command/result`
 - Rollback:
   - `git revert <commit>`
+ 
+### [2026-04-26 21:05] 电视继续播放与字幕记忆修复计划
+- Type: `plan`
+- Summary:
+  - 用户反馈电视首页缺少海报/封面、继续播放入口不会直接恢复到上次剧集，且电视剧页没有稳定恢复上次播放时间与上次选择的字幕。
+  - 本轮修复范围限定在 Android app：电视目录页补齐 `baseUrl` 与继续播放 artwork/直达播放器链路；电视剧播放器补齐 `watchSeconds` 恢复和本地字幕偏好记忆；后端接口与字幕 DTO 契约保持不变。
+  - 执行策略遵循先补失败测试再改实现，验证目标包含定向电视单测，以及 `:app:testDebugUnitTest :app:assembleDebug` 全量回归。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvCatalogViewModelTest' --tests 'com.chee.videos.feature.tv.TvRepositoryMappingTest' --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest' --tests 'com.chee.videos.core.data.AppPreferencesStoreTest'` 先红后用于回归。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-26 21:06] 修复电视继续播放封面、续播时间与字幕记忆
+- Type: `implementation`
+- Summary:
+  - 电视首页现在会保留并使用服务端 `baseUrl`，继续播放卡片与电视剧列表/搜索卡片优先显示真实海报或横版 backdrop；继续播放点击路径改为直接进入 `buildTvPlayerRoute(seriesId, season, episode)`，不再绕回详情页。
+  - 电视剧播放数据链路补齐 `watchSeconds` 与本地字幕偏好：`TvEpisodeUiModel` / `TvContinueWatchingUiModel` 增加续播与 artwork 字段，`AppPreferencesStore` 新增按 `videoId` 读写字幕选择，`TvSeriesPlayerViewModel` 会在切换分集时恢复上次字幕选择。
+  - 电视剧播放器现在会在首次装载某个 `videoId` 时按历史 `watchSeconds` seek，并在退出页面时通过最新 `currentVideoId` 上报历史，避免继续播放时间丢失；字幕切换仍保持现有“只换字幕不丢进度”的重配路径。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/data/AppPreferencesStore.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/data/AppPreferencesStoreTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvRepositoryMappingTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvCatalogViewModelTest' --tests 'com.chee.videos.feature.tv.TvRepositoryMappingTest' --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest' --tests 'com.chee.videos.core.data.AppPreferencesStoreTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
 
 ---
 

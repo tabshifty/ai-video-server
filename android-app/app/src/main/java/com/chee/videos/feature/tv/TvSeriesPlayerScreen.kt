@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -58,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.chee.videos.core.model.SubtitleTrackDto
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
@@ -115,6 +117,7 @@ fun TvSeriesPlayerScreen(
         }
     }
     val exoPlayer = remember(accessToken) { ExoPlayer.Builder(context).build() }
+    val latestCurrentVideoId by rememberUpdatedState(uiState.currentVideoId)
     var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var preparedUrl by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
@@ -123,6 +126,7 @@ fun TvSeriesPlayerScreen(
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var playerErrorMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
+    var resumedFromHistoryVideoId by remember { mutableStateOf("") }
 
     val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
         LongFormPlaybackSession(
@@ -137,11 +141,12 @@ fun TvSeriesPlayerScreen(
     }
 
     LaunchedEffect(uiState.currentSourceUrl, canPlay, selectedSubtitleTrackId, currentEpisode?.subtitleTracks) {
+        val effectiveSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId)
         val updateDecision = resolveLongFormPlayerUpdate(
             preparedUrl = preparedUrl,
             nextUrl = uiState.currentSourceUrl,
             preparedSubtitleTrackId = preparedSubtitleTrackId,
-            nextSubtitleTrackId = selectedSubtitleTrackId,
+            nextSubtitleTrackId = effectiveSubtitleTrackId,
         )
         if (!canPlay) {
             exoPlayer.pause()
@@ -154,13 +159,22 @@ fun TvSeriesPlayerScreen(
         }
         if (updateDecision.shouldReplaceSource) {
             playerErrorMessage = null
-            val restorePositionMs = if (updateDecision.preservePosition) exoPlayer.currentPosition.coerceAtLeast(0L) else 0L
+            val initialResumePositionMs = if (!updateDecision.preservePosition && resumedFromHistoryVideoId != uiState.currentVideoId) {
+                currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
+            } else {
+                0L
+            }
+            val restorePositionMs = if (updateDecision.preservePosition) {
+                exoPlayer.currentPosition.coerceAtLeast(0L)
+            } else {
+                initialResumePositionMs
+            }
             val mediaItem = buildLongFormMediaItem(
                 sourceUrl = uiState.currentSourceUrl,
                 mediaId = uiState.currentVideoId,
                 title = currentEpisode?.title ?: series.title,
                 baseUrl = uiState.baseUrl,
-                selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentEpisode?.subtitleTracks.orEmpty(), selectedSubtitleTrackId),
+                selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentEpisode?.subtitleTracks.orEmpty(), effectiveSubtitleTrackId),
             )
             val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
             exoPlayer.setMediaSource(mediaSource, true)
@@ -168,16 +182,20 @@ fun TvSeriesPlayerScreen(
             if (restorePositionMs > 0L) {
                 exoPlayer.seekTo(restorePositionMs)
             }
+            if (!updateDecision.preservePosition && uiState.currentVideoId.isNotBlank()) {
+                resumedFromHistoryVideoId = uiState.currentVideoId
+            }
             preparedUrl = uiState.currentSourceUrl
-            preparedSubtitleTrackId = selectedSubtitleTrackId
+            preparedSubtitleTrackId = effectiveSubtitleTrackId
             hasStartedPlayback = true
             isPausedByUser = false
         }
     }
 
-    LaunchedEffect(uiState.currentVideoId, currentEpisode?.subtitleTracks, hasStartedPlayback) {
-        selectedSubtitleTrackId = resolveSubtitleSelectionOnTrackLoad(
+    LaunchedEffect(uiState.currentVideoId, uiState.selectedSubtitleTrackId, currentEpisode?.subtitleTracks, hasStartedPlayback) {
+        selectedSubtitleTrackId = resolveTvSubtitleSelectionOnTrackLoad(
             currentSelection = selectedSubtitleTrackId,
+            storedSelection = uiState.selectedSubtitleTrackId,
             tracks = currentEpisode?.subtitleTracks.orEmpty(),
             hasStartedPlayback = hasStartedPlayback,
         )
@@ -221,9 +239,9 @@ fun TvSeriesPlayerScreen(
         }
         exoPlayer.addListener(listener)
         onDispose {
-            if (uiState.currentVideoId.isNotBlank()) {
+            if (latestCurrentVideoId.isNotBlank()) {
                 val (watchSeconds, completed) = readWatchSnapshot(exoPlayer)
-                viewModel.reportHistory(uiState.currentVideoId, watchSeconds, completed)
+                viewModel.reportHistory(latestCurrentVideoId, watchSeconds, completed)
             }
             exoPlayer.removeListener(listener)
             exoPlayer.release()
@@ -323,8 +341,11 @@ fun TvSeriesPlayerScreen(
                             onToggleFullscreen = {},
                             modifier = Modifier.fillMaxSize(),
                             subtitleTracks = currentEpisode?.subtitleTracks.orEmpty(),
-                            selectedSubtitleTrackId = selectedSubtitleTrackId,
-                            onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
+                            selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
+                            onSelectSubtitleTrack = {
+                                selectedSubtitleTrackId = it ?: ""
+                                viewModel.selectSubtitleTrack(it)
+                            },
                             showStatusBarPadding = false,
                         )
                         if (!playerErrorMessage.isNullOrBlank()) {
@@ -557,3 +578,23 @@ private fun readWatchSnapshot(player: ExoPlayer): Pair<Int, Boolean> {
     val completed = durationSeconds > 0 && watchSeconds >= completedThreshold
     return watchSeconds to completed
 }
+
+private fun resolveTvSubtitleSelectionOnTrackLoad(
+    currentSelection: String?,
+    storedSelection: String?,
+    tracks: List<SubtitleTrackDto>,
+    hasStartedPlayback: Boolean,
+): String? {
+    val preferredSelection = currentSelection ?: storedSelection
+    if (preferredSelection != null && preferredSelection.isBlank()) {
+        return ""
+    }
+    return resolveSubtitleSelectionOnTrackLoad(
+        currentSelection = preferredSelection,
+        tracks = tracks,
+        hasStartedPlayback = hasStartedPlayback,
+    )
+}
+
+private fun normalizeTvSubtitleSelection(selection: String?): String? =
+    selection?.takeIf { it.isNotBlank() }

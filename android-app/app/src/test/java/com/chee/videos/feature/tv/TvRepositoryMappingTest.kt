@@ -1,5 +1,6 @@
 package com.chee.videos.feature.tv
 
+import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
@@ -10,6 +11,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TvRepositoryMappingTest {
+    @Test
+    fun mapContinueWatching_preservesArtworkAndResumeState() {
+        val uiModel = tvContinueWatchingToUiModel(
+            TvContinueWatchingDto(
+                seriesId = "series-1",
+                seriesTitle = "雾城档案",
+                seasonNumber = 2,
+                episodeNumber = 4,
+                episodeTitle = "暗线浮现",
+                posterUrl = "/poster.jpg",
+                backdropUrl = "/backdrop.jpg",
+                watchSeconds = 512,
+                progressPercent = 64,
+            ),
+        )
+
+        assertEquals("/poster.jpg", uiModel.posterUrl)
+        assertEquals("/backdrop.jpg", uiModel.backdropUrl)
+        assertEquals(512, uiModel.watchSeconds)
+        assertEquals(64, uiModel.progressPercent)
+    }
 
     @Test
     fun mapSeriesDetail_handlesMissingCollections() {
@@ -31,6 +53,7 @@ class TvRepositoryMappingTest {
                                 videoId = "",
                                 videoStatus = "",
                                 runtime = 45,
+                                watchSeconds = 93,
                             ),
                         ),
                     ),
@@ -41,6 +64,7 @@ class TvRepositoryMappingTest {
         assertEquals("雾城档案", uiModel.title)
         assertEquals(1, uiModel.seasons.size)
         assertFalse(uiModel.seasons.first().episodes.first().playable)
+        assertEquals(93, uiModel.seasons.first().episodes.first().watchSeconds)
     }
 
     @Test

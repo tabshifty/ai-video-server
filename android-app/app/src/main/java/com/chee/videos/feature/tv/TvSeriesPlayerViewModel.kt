@@ -19,6 +19,7 @@ data class TvSeriesPlayerUiState(
     val baseUrl: String = "",
     val selectedSeasonNumber: Int = 1,
     val selectedEpisodeNumber: Int = 1,
+    val selectedSubtitleTrackId: String? = null,
     val playbackSpeed: Float = 1f,
     val selectorVisible: Boolean = false,
     val currentVideoId: String = "",
@@ -87,6 +88,17 @@ class TvSeriesPlayerViewModel @Inject constructor(
         }
     }
 
+    fun selectSubtitleTrack(subtitleTrackId: String?) {
+        val currentVideoId = _uiState.value.currentVideoId
+        if (currentVideoId.isBlank()) {
+            return
+        }
+        _uiState.update { it.copy(selectedSubtitleTrackId = subtitleTrackId ?: "") }
+        viewModelScope.launch {
+            repository.saveTvSubtitlePreference(currentVideoId, subtitleTrackId ?: "")
+        }
+    }
+
     private fun load() {
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, errorMessage = null) }
@@ -142,6 +154,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 it.copy(
                     currentVideoId = "",
                     currentSourceUrl = "",
+                    selectedSubtitleTrackId = null,
                     canPlayCurrentEpisode = false,
                 )
             }
@@ -151,11 +164,13 @@ class TvSeriesPlayerViewModel @Inject constructor(
             it.copy(
                 currentVideoId = "",
                 currentSourceUrl = "",
+                selectedSubtitleTrackId = null,
                 canPlayCurrentEpisode = false,
             )
         }
         viewModelScope.launch {
             val sourceUrl = repository.buildSourceUrl(episode.videoId)
+            val preferredSubtitleTrackId = repository.readTvSubtitlePreference(episode.videoId)
             if (requestId != playbackTargetRequestId) {
                 return@launch
             }
@@ -167,6 +182,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 it.copy(
                     currentVideoId = episode.videoId,
                     currentSourceUrl = sourceUrl,
+                    selectedSubtitleTrackId = preferredSubtitleTrackId,
                     canPlayCurrentEpisode = true,
                 )
             }

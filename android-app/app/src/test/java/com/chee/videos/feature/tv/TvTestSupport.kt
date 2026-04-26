@@ -22,7 +22,10 @@ class FakeTvRepository(
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
     private val homeError: Throwable? = null,
     private val detailError: Throwable? = null,
+    subtitlePreferences: Map<String, String> = emptyMap(),
 ) : TvRepository {
+    private val storedSubtitlePreferences = subtitlePreferences.toMutableMap()
+
     override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeError?.let { return Result.failure(it) }
         return Result.success(if (query.isBlank()) homePayload else searchPayload)
@@ -38,6 +41,16 @@ class FakeTvRepository(
     override suspend fun buildSourceUrl(videoId: String): String = "https://example.com/$videoId.m3u8"
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
+
+    override suspend fun readTvSubtitlePreference(videoId: String): String? = storedSubtitlePreferences[videoId]
+
+    override suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
+        if (subtitleTrackId == null) {
+            storedSubtitlePreferences.remove(videoId)
+        } else {
+            storedSubtitlePreferences[videoId] = subtitleTrackId
+        }
+    }
 }
 
 class DelayedSourceTvRepository(
@@ -58,6 +71,10 @@ class DelayedSourceTvRepository(
         pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.await()
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
+
+    override suspend fun readTvSubtitlePreference(videoId: String): String? = null
+
+    override suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) = Unit
 
     fun completeSourceUrl(videoId: String, url: String = "https://example.com/$videoId.m3u8") {
         pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.complete(url)
@@ -95,12 +112,14 @@ fun tvEpisode(
     title: String,
     videoId: String = "",
     videoStatus: String = "",
+    watchSeconds: Int = 0,
 ): TvEpisodeDto = TvEpisodeDto(
     id = id,
     episodeNumber = number,
     title = title,
     videoId = videoId,
     videoStatus = videoStatus,
+    watchSeconds = watchSeconds,
     playable = videoId.isNotBlank() && videoStatus == "ready",
 )
 

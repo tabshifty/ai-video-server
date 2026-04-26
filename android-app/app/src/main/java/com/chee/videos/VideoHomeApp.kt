@@ -192,6 +192,9 @@ private fun AuthenticatedNav(
                         onOpenTvSeries = { seriesId ->
                             navController.navigate(buildTvSeriesRoute(seriesId))
                         },
+                        onOpenTvContinueWatching = { seriesId, season, episode ->
+                            navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
+                        },
                         onOpenShortDiscover = { mode, value, title ->
                             navController.navigate(
                                 "short-discover/${Uri.encode(mode)}/${Uri.encode(value)}/${Uri.encode(title)}",
