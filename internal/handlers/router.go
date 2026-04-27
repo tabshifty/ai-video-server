@@ -128,6 +128,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/events/ws", a.AdminEventsStream)
 			admin.GET("/stats", a.AdminStats)
 			admin.GET("/videos", a.AdminVideos)
+			admin.GET("/video-tags", a.AdminVideoTags)
 			admin.GET("/video-tags/popular", a.AdminPopularVideoTags)
 			admin.GET("/videos/:id", a.AdminVideoDetail)
 			admin.GET("/videos/:id/subtitles", a.AdminVideoSubtitles)

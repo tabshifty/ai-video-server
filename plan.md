@@ -2924,3 +2924,45 @@
   - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-27 11:15] 管理端上传页远程过滤提示计划
+- Type: `plan`
+- Summary:
+  - 用户希望管理端上传时，标签、所属合集、图片图集都能根据输入内容做远程请求过滤提示，而不是只依赖静态候选或本地过滤。
+  - 现状确认：所属合集与图片图集接口已经支持 `q` 查询；视频标签只有热门标签接口，缺少按关键字搜索的管理端入口。
+  - 本轮修复范围限定在管理端上传页与其依赖 API：后端补标签搜索接口，前端统一三类选择器的远程搜索体验，标签仍允许自由输入新值；验证目标包含 Go 单测、admin-web 单测与构建。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./...`
+  - `cd admin-web && npm test`
+  - `cd admin-web && npm run build`
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-27 11:15] 实现管理端上传页标签与合集远程过滤提示
+- Type: `implementation`
+- Summary:
+  - 后端新增 `GET /api/v1/admin/video-tags`，支持按 `q` 与 `limit` 返回标签候选；空查询时回退到热门标签，继续沿用现有标签使用次数排序和归一化逻辑。
+  - 管理端 API 层补 `getAdminVideoTags`，上传页把“视频标签、所属合集、图片图集”统一切到远程搜索流：空输入显示默认推荐，输入后按关键字请求过滤候选。
+  - 新增上传页远程搜索 helper，统一处理防抖、只采纳最后一次请求结果、以及“保留当前已选项但不保留旧关键字残留候选”；标签仍允许自由创建新值，不改现有提交时的归一化逻辑。
+- Changed Files:
+  - `internal/repository/video_repository.go`
+  - `internal/repository/video_repository_tags_test.go`
+  - `internal/handlers/admin.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/recommend_test.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/api/admin.spec.js`
+  - `admin-web/src/views/VideoUpload.vue`
+  - `admin-web/src/views/videoUpload.remote.js`
+  - `admin-web/src/views/videoUpload.remote.spec.js`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/repository ./internal/handlers` passed.
+  - `cd admin-web && npm test -- src/api/admin.spec.js src/views/videoUpload.remote.spec.js` passed.
+  - `go test ./...` passed.
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`

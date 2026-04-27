@@ -5,8 +5,9 @@ import { UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import UploadProgress from '../components/UploadProgress.vue'
 import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
-import { getAdminActors, getAdminCollections, getAdminImageCollections, getAdminPopularVideoTags } from '../api/admin'
+import { getAdminActors, getAdminCollections, getAdminImageCollections, getAdminPopularVideoTags, getAdminVideoTags } from '../api/admin'
 import { sha256File } from '../utils/hash'
+import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
 
 const uploadFileList = ref([])
 const uploadRef = ref(null)
@@ -25,8 +26,8 @@ const collectionOptions = ref([])
 const loadingCollections = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
-const popularTagOptions = ref([])
-const loadingPopularTags = ref(false)
+const tagOptions = ref([])
+const loadingTags = ref(false)
 
 const form = reactive({
   type: 'short',
@@ -163,62 +164,44 @@ function normalizeCollectionSelection(values) {
 }
 
 async function searchCollections(keyword = '') {
-  loadingCollections.value = true
-  try {
-    const data = await getAdminCollections({
-      q: keyword,
-      active: 1,
-      page: 1,
-      page_size: 50
-    })
-    const options = (data.items || []).map((item) => ({
-      value: item.id,
-      label: item.name
-    }))
-    const optionMap = new Map(collectionOptions.value.map((item) => [item.value, item]))
-    for (const item of options) {
-      optionMap.set(item.value, item)
-    }
-    collectionOptions.value = Array.from(optionMap.values())
-  } finally {
-    loadingCollections.value = false
-  }
+  const data = await getAdminCollections({
+    q: keyword,
+    active: 1,
+    page: 1,
+    page_size: 20
+  })
+  return (data.items || []).map((item) => ({
+    value: item.id,
+    label: item.name
+  }))
 }
 
 async function searchImageCollections(keyword = '') {
-  loadingImageCollections.value = true
-  try {
-    const data = await getAdminImageCollections({
-      q: keyword,
-      active: 1,
-      page: 1,
-      page_size: 50
-    })
-    const options = (data.items || []).map((item) => ({
-      value: item.id,
-      label: item.name
-    }))
-    const optionMap = new Map(imageCollectionOptions.value.map((item) => [item.value, item]))
-    for (const item of options) {
-      optionMap.set(item.value, item)
-    }
-    imageCollectionOptions.value = Array.from(optionMap.values())
-  } finally {
-    loadingImageCollections.value = false
-  }
+  const data = await getAdminImageCollections({
+    q: keyword,
+    active: 1,
+    page: 1,
+    page_size: 20
+  })
+  return (data.items || []).map((item) => ({
+    value: item.id,
+    label: item.name
+  }))
 }
 
-async function loadPopularTags() {
-  loadingPopularTags.value = true
-  try {
+async function searchTags(keyword = '') {
+  if (!keyword) {
     const data = await getAdminPopularVideoTags({ limit: 5 })
     const items = data.items || []
-    popularTagOptions.value = items
+    return items
       .map((item) => String(item.tag || '').trim().toLowerCase())
       .filter((tag) => tag !== '')
-  } finally {
-    loadingPopularTags.value = false
   }
+
+  const data = await getAdminVideoTags({ q: keyword, limit: 12 })
+  return (data.items || [])
+    .map((item) => String(item.tag || '').trim().toLowerCase())
+    .filter((tag) => tag !== '')
 }
 
 function resolveImageCollectionID(raw) {
@@ -422,11 +405,47 @@ function clearUploadRecords() {
   sessionId.value = ''
 }
 
+const loadTagSuggestions = createRemoteSuggestionLoader({
+  fetcher: searchTags,
+  getOptions: () => form.tags,
+  setOptions: (next) => {
+    tagOptions.value = next
+  },
+  setLoading: (next) => {
+    loadingTags.value = next
+  },
+  mergeOptions: mergeRemoteStringOptions
+})
+
+const loadCollectionSuggestions = createRemoteSuggestionLoader({
+  fetcher: searchCollections,
+  getOptions: () => collectionOptions.value.filter((item) => form.collections.includes(item.value)),
+  setOptions: (next) => {
+    collectionOptions.value = next
+  },
+  setLoading: (next) => {
+    loadingCollections.value = next
+  },
+  mergeOptions: mergeRemoteValueOptions
+})
+
+const loadImageCollectionSuggestions = createRemoteSuggestionLoader({
+  fetcher: searchImageCollections,
+  getOptions: () => imageCollectionOptions.value.filter((item) => item.value === form.imageCollectionID),
+  setOptions: (next) => {
+    imageCollectionOptions.value = next
+  },
+  setLoading: (next) => {
+    loadingImageCollections.value = next
+  },
+  mergeOptions: mergeRemoteValueOptions
+})
+
 onMounted(() => {
   searchActors().catch(() => {})
-  searchCollections().catch(() => {})
-  searchImageCollections().catch(() => {})
-  loadPopularTags().catch(() => {})
+  loadCollectionSuggestions('')
+  loadImageCollectionSuggestions('')
+  loadTagSuggestions('')
 })
 </script>
 
@@ -483,14 +502,17 @@ onMounted(() => {
               v-model="form.tags"
               multiple
               filterable
+              remote
+              reserve-keyword
+              :remote-method="loadTagSuggestions"
               allow-create
               default-first-option
               clearable
               placeholder="可选择或输入标签"
               style="width: 100%"
-              :loading="loadingPopularTags"
+              :loading="loadingTags"
             >
-              <el-option v-for="tag in popularTagOptions" :key="tag" :label="tag" :value="tag" />
+              <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
             </el-select>
           </el-form-item>
           <el-form-item label="图片图集">
@@ -500,7 +522,7 @@ onMounted(() => {
               remote
               reserve-keyword
               clearable
-              :remote-method="searchImageCollections"
+              :remote-method="loadImageCollectionSuggestions"
               :loading="loadingImageCollections"
               placeholder="可选，仅可关联一个图片图集"
               style="width: 100%"
@@ -523,7 +545,7 @@ onMounted(() => {
               clearable
               collapse-tags
               collapse-tags-tooltip
-              :remote-method="searchCollections"
+              :remote-method="loadCollectionSuggestions"
               :loading="loadingCollections"
               placeholder="可选，可多选"
               style="width: 100%"

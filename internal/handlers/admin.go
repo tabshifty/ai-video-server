@@ -142,6 +142,41 @@ func (a *API) AdminPopularVideoTags(c *gin.Context) {
 	})
 }
 
+func (a *API) AdminVideoTags(c *gin.Context) {
+	limit := 10
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			bad(c, "limit 必须为正整数")
+			return
+		}
+		limit = n
+	}
+	if limit > 20 {
+		limit = 20
+	}
+
+	query := strings.TrimSpace(c.Query("q"))
+	var (
+		items []models.VideoTagStat
+		err   error
+	)
+	if query == "" {
+		items, err = a.repo.ListPopularVideoTags(c.Request.Context(), limit)
+	} else {
+		items, err = a.repo.SearchVideoTags(c.Request.Context(), query, limit)
+	}
+	if err != nil {
+		response.Error(c, 1034, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"items": items,
+		"q":     query,
+		"limit": limit,
+	})
+}
+
 func (a *API) AdminVideoDetail(c *gin.Context) {
 	videoID, okID := parseUUID(c.Param("id"))
 	if !okID {

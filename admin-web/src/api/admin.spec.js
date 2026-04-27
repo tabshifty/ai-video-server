@@ -24,6 +24,7 @@ import {
   deleteAdminTvSeason,
   deleteAdminTvSeries,
   deleteAdminVideoSubtitle,
+  getAdminVideoTags,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
   getAdminVideoSubtitles,
@@ -50,6 +51,20 @@ describe('uploadAdminImages', () => {
     expect(post).toHaveBeenCalledWith('/admin/images/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0
+    })
+  })
+})
+
+describe('video tag apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+  })
+
+  it('requests admin video tags with query params', async () => {
+    await getAdminVideoTags({ q: '动作', limit: 12 })
+
+    expect(get).toHaveBeenCalledWith('/admin/video-tags', {
+      params: { q: '动作', limit: 12 }
     })
   })
 })

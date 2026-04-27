@@ -26,3 +26,23 @@ func TestNormalizePopularVideoTagsLimitAndSort(t *testing.T) {
 		t.Fatalf("unexpected popular tag order: got %#v want %#v", got, want)
 	}
 }
+
+func TestNormalizeVideoTagStatsTrimsAndNormalizesCase(t *testing.T) {
+	stats := []models.VideoTagStat{
+		{Tag: "  动作  ", UsedCount: 4},
+		{Tag: "", UsedCount: 3},
+		{Tag: "KeYWord", UsedCount: 2},
+		{Tag: "  ", UsedCount: 1},
+		{Tag: "爱情", UsedCount: 0},
+	}
+
+	got := normalizeVideoTagStats(stats, 5)
+	want := []models.VideoTagStat{
+		{Tag: "动作", UsedCount: 4},
+		{Tag: "keyword", UsedCount: 2},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected normalized tags: got %#v want %#v", got, want)
+	}
+}

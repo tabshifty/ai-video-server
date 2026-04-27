@@ -61,7 +61,7 @@ func (r *VideoRepository) AddTags(ctx context.Context, videoID uuid.UUID, tags [
 	return nil
 }
 
-func normalizePopularVideoTags(stats []models.VideoTagStat, limit int) []models.VideoTagStat {
+func normalizeVideoTagStats(stats []models.VideoTagStat, limit int) []models.VideoTagStat {
 	if len(stats) == 0 || limit <= 0 {
 		return nil
 	}
@@ -86,6 +86,10 @@ func normalizePopularVideoTags(stats []models.VideoTagStat, limit int) []models.
 		normalized = normalized[:limit]
 	}
 	return normalized
+}
+
+func normalizePopularVideoTags(stats []models.VideoTagStat, limit int) []models.VideoTagStat {
+	return normalizeVideoTagStats(stats, limit)
 }
 
 func (r *VideoRepository) ListPopularVideoTags(ctx context.Context, limit int) ([]models.VideoTagStat, error) {
@@ -116,6 +120,42 @@ LIMIT $1
 		return nil, err
 	}
 	return normalizePopularVideoTags(out, limit), nil
+}
+
+func (r *VideoRepository) SearchVideoTags(ctx context.Context, q string, limit int) ([]models.VideoTagStat, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	keyword := strings.ToLower(strings.TrimSpace(q))
+	args := []any{limit}
+	sql := `
+SELECT tag, COUNT(*) AS used_count
+FROM video_tags
+`
+	if keyword != "" {
+		sql += "WHERE LOWER(tag) LIKE $2\n"
+		args = append(args, "%"+keyword+"%")
+	}
+	sql += "GROUP BY tag\nORDER BY used_count DESC, tag ASC\nLIMIT $1"
+
+	rows, err := r.pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("search video tags: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]models.VideoTagStat, 0, limit)
+	for rows.Next() {
+		var item models.VideoTagStat
+		if err := rows.Scan(&item.Tag, &item.UsedCount); err != nil {
+			return nil, fmt.Errorf("scan searched video tag: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return normalizeVideoTagStats(out, limit), nil
 }
 
 func (r *VideoRepository) FindVideoByHash(ctx context.Context, hash string, fileSize int64) (uuid.UUID, bool, error) {
