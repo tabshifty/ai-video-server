@@ -3070,3 +3070,37 @@
   - `go test -race ./internal/services ./internal/queue` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-30 20:52] AV mdcx 第四批站点迁移计划
+- Type: `plan`
+- Summary:
+  - 在第三批之后继续补 `references/mdcx` 的剩余最小 HTML 站点，优先选择结构最相近的一组：`avsox`、`freejavbt`、`madouqu`、`mdtv.com`、`cnmdb`。
+  - 本轮除站点 crawler、detail URL 构造和匹配规则外，还需要处理 `mdtv.com` 与 `cnmdb` 都使用 `/video/<id>` 路径带来的本地 override host 歧义。
+  - 执行策略保持 TDD：先补第四批 `ConfirmAV` 红测，再实现站点接入和 source-hint 优先选 crawler，最后回归验证并提交。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForFourthBatchSites'` 预期先红后绿。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-30 20:52] 接入 mdcx 第四批 AV 站点 crawler
+- Type: `implementation`
+- Summary:
+  - 接入 `avsox`、`freejavbt`、`madouqu`、`mdtv.com`、`cnmdb` 五个最小 HTML 站点，复用现有 minimal detail parser 并补充对应的 detail URL 构造与 URL 匹配规则，`ConfirmAV` 现在可以按 `scrape_source + external_id` 直接回抓这批站点的标题与番号。
+  - `ConfirmAV` 的 detail 抓取新增 source-hint 优先选 crawler 逻辑，避免 `mdtv.com` / `cnmdb` 这类同路径站点在本地 override host 下被 path-only 规则误判；同时 `ConfigureAVScraperConfig` 与 source 规范化补充了 `mdtv` 别名处理。
+  - 新增第四批回归测试，覆盖上述五个站点和 `mdtv` 别名路径，锁定本轮新增规则及编号提取行为。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForFourthBatchSites'` passed.
+  - `go test ./internal/services` passed.
+  - `go test ./...` passed.
+  - `go vet ./...` passed.
+  - `go test -race ./internal/services ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`

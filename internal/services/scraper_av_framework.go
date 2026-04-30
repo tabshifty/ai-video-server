@@ -80,6 +80,11 @@ func newAVCrawlerProvider(svc *ScraperService) avCrawlerProvider {
 			newAirAVAVCrawler(svc),
 			newJav321AVCrawler(svc),
 			newMywifeAVCrawler(svc),
+			newAVSOXAVCrawler(svc),
+			newFreeJAVBTAVCrawler(svc),
+			newMadouquAVCrawler(svc),
+			newMDTVAVCrawler(svc),
+			newCNMDBAVCrawler(svc),
 		},
 	}
 }
@@ -412,8 +417,12 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 }
 
 func (s *ScraperService) fetchAVCandidateByDetailURLWithTrace(ctx context.Context, detailURL string) (avScrapeCandidate, map[string]any, error) {
+	return s.fetchAVCandidateBySourceAndDetailURLWithTrace(ctx, "", detailURL)
+}
+
+func (s *ScraperService) fetchAVCandidateBySourceAndDetailURLWithTrace(ctx context.Context, sourceHint, detailURL string) (avScrapeCandidate, map[string]any, error) {
 	run := newAVScrapeRunContext("", extractAVCode(detailURL))
-	crawler := s.resolveAVCrawlerByDetailURL(detailURL)
+	crawler := s.resolveAVCrawlerBySourceOrDetailURL(sourceHint, detailURL)
 	run.setSource(crawler.Name())
 	candidate, err := crawler.FetchByDetailURL(ctx, run, detailURL)
 	if err != nil {
@@ -428,6 +437,29 @@ func (s *ScraperService) fetchAVCandidateByDetailURLWithTrace(ctx context.Contex
 	trace := run.toMap()
 	trace["resolved_source"] = candidate.Source
 	return candidate, trace, nil
+}
+
+func (s *ScraperService) resolveAVCrawlerBySourceOrDetailURL(sourceHint, detailURL string) avCrawler {
+	if crawler := s.resolveAVCrawlerBySource(sourceHint); crawler != nil {
+		return crawler
+	}
+	return s.resolveAVCrawlerByDetailURL(detailURL)
+}
+
+func (s *ScraperService) resolveAVCrawlerBySource(source string) avCrawler {
+	source = normalizeAVSourceName(source)
+	if source == "" {
+		return nil
+	}
+	if s.avProvider == nil {
+		s.avProvider = newAVCrawlerProvider(s)
+	}
+	for _, crawler := range s.avProvider.Crawlers() {
+		if normalizeAVSourceName(crawler.Name()) == source {
+			return crawler
+		}
+	}
+	return nil
 }
 
 func (s *ScraperService) resolveAVCrawlerByDetailURL(detailURL string) avCrawler {
@@ -535,6 +567,19 @@ func (s *ScraperService) buildAVDetailURLBySource(source, externalID string) str
 		return toAbsoluteURL(s.avSiteBaseURL("jav321", "https://www.jav321.com"), "/video/"+url.PathEscape(strings.ToLower(externalID)))
 	case "mywife":
 		return toAbsoluteURL(s.avSiteBaseURL("mywife", "https://www.mywife.cc"), "/teigaku/model/no/"+url.PathEscape(externalID))
+	case "avsox":
+		return toAbsoluteURL(s.avSiteBaseURL("avsox", "https://avsox.host"), "/cn/movie/"+url.PathEscape(strings.ToLower(externalID)))
+	case "freejavbt":
+		if code := buildFC2PPVPathCode(externalID); code != "" {
+			return toAbsoluteURL(s.avSiteBaseURL("freejavbt", "https://freejavbt.com"), "/detail/"+url.PathEscape(code))
+		}
+		return ""
+	case "madouqu":
+		return toAbsoluteURL(s.avSiteBaseURL("madouqu", "https://madouqu.com"), "/archives/"+url.PathEscape(externalID))
+	case "mdtv.com":
+		return toAbsoluteURL(s.avSiteBaseURL("mdtv.com", "https://mdtv.com.cn"), "/video/"+url.PathEscape(externalID))
+	case "cnmdb":
+		return toAbsoluteURL(s.avSiteBaseURL("cnmdb", "https://cnmdb.com"), "/video/"+url.PathEscape(externalID))
 	default:
 		return toAbsoluteURL(s.avSiteBaseURL("javdb", "https://javdb.com"), "/v/"+externalID)
 	}
@@ -614,6 +659,31 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 		return jav321DetailPathRe.MatchString(path) && !strings.Contains(path, "fc2-ppv-")
 	case "mywife":
 		return mywifeDetailPathRe.MatchString(path)
+	case "avsox":
+		if strings.Contains(host, "avsox") {
+			return true
+		}
+		return avsoxDetailPathRe.MatchString(path)
+	case "freejavbt":
+		if strings.Contains(host, "freejavbt") {
+			return true
+		}
+		return freeJAVBTDetailPathRe.MatchString(path)
+	case "madouqu":
+		if strings.Contains(host, "madouqu") {
+			return true
+		}
+		return madouquDetailPathRe.MatchString(path)
+	case "mdtv.com":
+		if strings.Contains(host, "mdtv") {
+			return true
+		}
+		return false
+	case "cnmdb":
+		if strings.Contains(host, "cnmdb") {
+			return true
+		}
+		return false
 	case "javdb":
 		if strings.Contains(host, "javdb") {
 			return true
@@ -1951,6 +2021,8 @@ func normalizeAVSourceName(source string) string {
 		return "javdb"
 	case "airavcc":
 		return "airav_cc"
+	case "mdtv", "mdtv.com", "mdtvcom":
+		return "mdtv.com"
 	case "javbus":
 		return "javbus"
 	case "javlibrary", "javlib":

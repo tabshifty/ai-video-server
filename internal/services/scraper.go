@@ -121,8 +121,11 @@ func (s *ScraperService) ConfigureAVScraperConfig(cfg AVScraperConfig) {
 		if s.avSiteURLs == nil {
 			s.avSiteURLs = map[string]string{}
 		}
-		for site, rawURL := range cfg.SiteURLs {
-			site = strings.ToLower(strings.TrimSpace(site))
+		for rawSite, rawURL := range cfg.SiteURLs {
+			site := normalizeAVSourceName(rawSite)
+			if site == "" {
+				site = strings.ToLower(strings.TrimSpace(rawSite))
+			}
 			rawURL = strings.TrimSuffix(strings.TrimSpace(rawURL), "/")
 			if site == "" || rawURL == "" {
 				continue
@@ -514,7 +517,7 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 	if detailURL == "" {
 		detailURL = toAbsoluteURL(strings.TrimSpace(s.avBaseURL), "/v/"+externalID)
 	}
-	candidate, trace, err := s.fetchAVCandidateByDetailURLWithTrace(ctx, detailURL)
+	candidate, trace, err := s.fetchAVCandidateBySourceAndDetailURLWithTrace(ctx, sourceHint, detailURL)
 	if err != nil {
 		return err
 	}

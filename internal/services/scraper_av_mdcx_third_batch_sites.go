@@ -10,14 +10,17 @@ import (
 )
 
 var (
-	fc2HubDetailPathRe   = regexp.MustCompile(`^/detail/\d+/?$`)
-	fc2PPVDBDetailPathRe = regexp.MustCompile(`^/articles/fc2-ppv-\d+/?$`)
-	airAVDetailPathRe    = regexp.MustCompile(`^/video/fc2-ppv-\d+/?$`)
-	jav321DetailPathRe   = regexp.MustCompile(`^/video/[a-z0-9]+/?$`)
-	mywifeDetailPathRe   = regexp.MustCompile(`^/teigaku/model/no/\d+/?$`)
+	fc2HubDetailPathRe    = regexp.MustCompile(`^/detail/\d+/?$`)
+	fc2PPVDBDetailPathRe  = regexp.MustCompile(`^/articles/fc2-ppv-\d+/?$`)
+	airAVDetailPathRe     = regexp.MustCompile(`^/video/fc2-ppv-\d+/?$`)
+	jav321DetailPathRe    = regexp.MustCompile(`^/video/[a-z0-9]+/?$`)
+	mywifeDetailPathRe    = regexp.MustCompile(`^/teigaku/model/no/\d+/?$`)
+	avsoxDetailPathRe     = regexp.MustCompile(`^/cn/movie/[a-z0-9]+/?$`)
+	freeJAVBTDetailPathRe = regexp.MustCompile(`^/detail/fc2-ppv-\d+/?$`)
+	madouquDetailPathRe   = regexp.MustCompile(`^/archives/\d+/?$`)
 )
 
-type minimalThirdBatchAVCrawler struct {
+type minimalHTMLAVCrawler struct {
 	svc  *ScraperService
 	site string
 }
@@ -27,38 +30,58 @@ type mywifeAVCrawler struct {
 }
 
 func newFC2ClubAVCrawler(svc *ScraperService) avCrawler {
-	return &minimalThirdBatchAVCrawler{svc: svc, site: "fc2club"}
+	return &minimalHTMLAVCrawler{svc: svc, site: "fc2club"}
 }
 
 func newFC2HubAVCrawler(svc *ScraperService) avCrawler {
-	return &minimalThirdBatchAVCrawler{svc: svc, site: "fc2hub"}
+	return &minimalHTMLAVCrawler{svc: svc, site: "fc2hub"}
 }
 
 func newFC2PPVDBAVCrawler(svc *ScraperService) avCrawler {
-	return &minimalThirdBatchAVCrawler{svc: svc, site: "fc2ppvdb"}
+	return &minimalHTMLAVCrawler{svc: svc, site: "fc2ppvdb"}
 }
 
 func newAirAVAVCrawler(svc *ScraperService) avCrawler {
-	return &minimalThirdBatchAVCrawler{svc: svc, site: "airav"}
+	return &minimalHTMLAVCrawler{svc: svc, site: "airav"}
 }
 
 func newJav321AVCrawler(svc *ScraperService) avCrawler {
-	return &minimalThirdBatchAVCrawler{svc: svc, site: "jav321"}
+	return &minimalHTMLAVCrawler{svc: svc, site: "jav321"}
+}
+
+func newAVSOXAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "avsox"}
+}
+
+func newFreeJAVBTAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "freejavbt"}
+}
+
+func newMadouquAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "madouqu"}
+}
+
+func newMDTVAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "mdtv.com"}
+}
+
+func newCNMDBAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "cnmdb"}
 }
 
 func newMywifeAVCrawler(svc *ScraperService) avCrawler {
 	return &mywifeAVCrawler{svc: svc}
 }
 
-func (c *minimalThirdBatchAVCrawler) Name() string {
+func (c *minimalHTMLAVCrawler) Name() string {
 	return c.site
 }
 
-func (c *minimalThirdBatchAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
+func (c *minimalHTMLAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
 	return nil, nil
 }
 
-func (c *minimalThirdBatchAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
+func (c *minimalHTMLAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
 	if run != nil {
 		run.addDetailURL(detailURL)
 	}
@@ -99,17 +122,31 @@ func (c *minimalThirdBatchAVCrawler) FetchByDetailURL(ctx context.Context, run *
 	return candidate, nil
 }
 
-func (c *minimalThirdBatchAVCrawler) extractCode(root *html.Node, detailURL string) string {
+func (c *minimalHTMLAVCrawler) extractCode(root *html.Node, detailURL string) string {
 	content := nodeText(root)
 	switch c.site {
-	case "fc2club", "fc2hub", "fc2ppvdb", "airav":
+	case "fc2club", "fc2hub", "fc2ppvdb", "airav", "freejavbt":
 		if number := normalizeFC2NumericID(content); number != "" {
 			return "FC2-PPV-" + number
 		}
 		if number := normalizeFC2NumericID(detailURL); number != "" {
 			return "FC2-PPV-" + number
 		}
-	case "jav321":
+	case "jav321", "avsox", "madouqu", "mdtv.com", "cnmdb":
+		switch c.site {
+		case "madouqu":
+			if code := regexp.MustCompile(`(?i)\bMD-\d+\b`).FindString(content); code != "" {
+				return strings.ToUpper(strings.TrimSpace(code))
+			}
+		case "mdtv.com":
+			if code := regexp.MustCompile(`(?i)\bMDTV-\d+\b`).FindString(content); code != "" {
+				return strings.ToUpper(strings.TrimSpace(code))
+			}
+		case "cnmdb":
+			if code := regexp.MustCompile(`(?i)\bCNMDB-\d+\b`).FindString(content); code != "" {
+				return strings.ToUpper(strings.TrimSpace(code))
+			}
+		}
 		if code := extractAggregateSupplementNumber(content); code != "" {
 			return code
 		}

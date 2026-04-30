@@ -1785,6 +1785,160 @@ func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
 	}
 }
 
+func TestConfirmAVBuildsMDCXDetailURLsForFourthBatchSites(t *testing.T) {
+	cases := []struct {
+		name         string
+		source       string
+		siteURLKey   string
+		externalID   string
+		path         string
+		responseBody string
+		wantSource   string
+		wantTitle    string
+		wantCode     string
+	}{
+		{
+			name:       "avsox",
+			source:     "avsox",
+			siteURLKey: "avsox",
+			externalID: "abc123",
+			path:       "/cn/movie/abc123",
+			responseBody: `<!doctype html>
+<html><body>
+  <h3>AVSOX First Impression</h3>
+  <div><span>识别码:</span><span>ABC-123</span></div>
+</body></html>`,
+			wantSource: "avsox",
+			wantTitle:  "AVSOX First Impression",
+			wantCode:   "ABC-123",
+		},
+		{
+			name:       "freejavbt",
+			source:     "freejavbt",
+			siteURLKey: "freejavbt",
+			externalID: "fc2-ppv-1234567",
+			path:       "/detail/FC2-PPV-1234567",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>FreeJAVBT First Impression</h1>
+  <div>番号 FC2-PPV-1234567</div>
+</body></html>`,
+			wantSource: "freejavbt",
+			wantTitle:  "FreeJAVBT First Impression",
+			wantCode:   "FC2-PPV-1234567",
+		},
+		{
+			name:       "madouqu",
+			source:     "madouqu",
+			siteURLKey: "madouqu",
+			externalID: "54321",
+			path:       "/archives/54321",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>MadouQu First Impression</h1>
+  <div>编号: MD-54321</div>
+</body></html>`,
+			wantSource: "madouqu",
+			wantTitle:  "MadouQu First Impression",
+			wantCode:   "MD-54321",
+		},
+		{
+			name:       "mdtv",
+			source:     "mdtv",
+			siteURLKey: "mdtv",
+			externalID: "98765",
+			path:       "/video/98765",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>MDTV First Impression</h1>
+  <div>编号: MDTV-98765</div>
+</body></html>`,
+			wantSource: "mdtv.com",
+			wantTitle:  "MDTV First Impression",
+			wantCode:   "MDTV-98765",
+		},
+		{
+			name:       "cnmdb",
+			source:     "cnmdb",
+			siteURLKey: "cnmdb",
+			externalID: "112233",
+			path:       "/video/112233",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>CNMDB First Impression</h1>
+  <div>编号: CNMDB-112233</div>
+</body></html>`,
+			wantSource: "cnmdb",
+			wantTitle:  "CNMDB First Impression",
+			wantCode:   "CNMDB-112233",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			videoID := uuid.New()
+			repo := &fakeScraperRepo{
+				videoByID: map[uuid.UUID]models.Video{
+					videoID: {ID: videoID, Title: "旧标题"},
+				},
+			}
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == tc.path {
+					_, _ = w.Write([]byte(tc.responseBody))
+					return
+				}
+				http.NotFound(w, r)
+			}))
+			defer server.Close()
+
+			svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+			svc.ConfigureAVScraperConfig(AVScraperConfig{
+				BaseURL: server.URL,
+				SiteURLs: map[string]string{
+					tc.siteURLKey: server.URL,
+				},
+				UserAgent: "mdcx-confirm-fourth-batch-test",
+				Timeout:   time.Second,
+			})
+			svc.httpClient = &http.Client{
+				Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     make(http.Header),
+						Body:       io.NopCloser(strings.NewReader("fake-image")),
+						Request:    req,
+					}, nil
+				}),
+			}
+
+			err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+				VideoID:    videoID,
+				ExternalID: tc.externalID,
+				Metadata: map[string]any{
+					"scrape_source": tc.source,
+				},
+			})
+			if err != nil {
+				t.Fatalf("ConfirmAV returned error: %v", err)
+			}
+			if repo.lastUpdate.title != tc.wantTitle {
+				t.Fatalf("expected title %q, got=%q", tc.wantTitle, repo.lastUpdate.title)
+			}
+			if repo.lastUpdate.metadata["scrape_source"] != tc.wantSource {
+				t.Fatalf("expected scrape_source %s, got=%v", tc.wantSource, repo.lastUpdate.metadata["scrape_source"])
+			}
+			if repo.lastUpdate.metadata["detail_url"] != server.URL+tc.path {
+				t.Fatalf("expected detail_url %s, got=%v", server.URL+tc.path, repo.lastUpdate.metadata["detail_url"])
+			}
+			if repo.lastUpdate.metadata["av_code"] != tc.wantCode {
+				t.Fatalf("expected av_code %s, got=%v", tc.wantCode, repo.lastUpdate.metadata["av_code"])
+			}
+		})
+	}
+}
+
 func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
