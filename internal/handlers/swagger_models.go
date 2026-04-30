@@ -24,10 +24,12 @@ type UploadCheckRequest struct {
 }
 
 type AdminScrapePreviewRequest struct {
-	VideoID string `json:"video_id" example:"8fbe33de-0189-4972-a7c5-b77c9e75b859"`
-	Title   string `json:"title" example:"Inception"`
-	Year    int    `json:"year" example:"2010"`
-	Type    string `json:"type" example:"movie"`
+	VideoID       string `json:"video_id" example:"8fbe33de-0189-4972-a7c5-b77c9e75b859"`
+	Title         string `json:"title" example:"庆余年第一季第一集"`
+	Year          int    `json:"year" example:"2019"`
+	Type          string `json:"type" example:"tv"`
+	SeasonNumber  int    `json:"season_number" example:"1"`
+	EpisodeNumber int    `json:"episode_number" example:"1"`
 }
 
 type AdminScrapeConfirmRequest struct {

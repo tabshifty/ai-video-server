@@ -3294,3 +3294,45 @@
   - `cd android-app && ./gradlew :app:compileDebugKotlin` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-01 07:57] 管理端电视剧手动刮削季集支持计划
+- Type: `plan`
+- Summary:
+  - 为管理端 `/scrape` 的 `type=tv` 模式补齐“剧名 + 季集”支持：后端预览接口要能从 `庆余年第一季第一集`、`Breaking Bad S01E01` 这类输入中拆出剧名与季集，前端要允许显式填写并在确认时透传 `season_number/episode_number`。
+  - 这次实现同时修正手动电视剧确认默认覆写分集元数据的问题：候选选择后不再默认把整剧标题/简介/海报写回确认表单，而是让后端优先落目标分集的标题、简介、still 和播出日期。
+  - 验证覆盖 Go handler/utils 单测、管理端 vitest 回归与 `admin-web` 生产构建，确保搜索清洗、payload 透传和页面语法一起稳定。
+- Changed Files:
+  - `internal/utils/filename_parser.go`
+  - `internal/handlers/admin_scrape.go`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/utils ./internal/handlers`
+  - `cd admin-web && npm test -- src/views/scrapePreview.helpers.spec.js src/views/videoList.helpers.spec.js src/api/admin.spec.js`
+  - `cd admin-web && npm run build`
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 07:57] 实现管理端电视剧手动刮削季集支持
+- Type: `implementation`
+- Summary:
+  - 扩展文件名/标题解析器，新增中文季集模式支持：`第1季第2集`、`第一季第一集` 等标题现在可解析为清洗后的剧名和季集，`AdminScrapePreview` 在 `type=tv` 时会先用清洗后的剧名搜 TMDB，并把 `parsed_title/parsed_season_number/parsed_episode_number` 回传给前端。
+  - 管理端刮削页新增电视剧季/集输入与回填逻辑，待绑定视频跳转 `/scrape` 时也会把解析出的季集带入；电视剧确认保存时会稳定透传 `season_number/episode_number`，同时默认留空标题/简介/海报/日期，让后端优先落目标分集元数据而不是整剧元数据。
+  - 新增 Go handler 回归测试与前端 helper/vitest 回归，锁定“中文标题清洗后搜索 TMDB”、“电视剧 payload 带季集”和“候选解析状态回填”三条关键行为。
+- Changed Files:
+  - `internal/utils/filename_parser.go`
+  - `internal/utils/filename_test.go`
+  - `internal/handlers/admin_scrape.go`
+  - `internal/handlers/admin_scrape_test.go`
+  - `internal/handlers/swagger_models.go`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/scrapePreview.helpers.js`
+  - `admin-web/src/views/scrapePreview.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/utils ./internal/handlers` passed.
+  - `cd admin-web && npm test -- src/views/scrapePreview.helpers.spec.js src/views/videoList.helpers.spec.js src/api/admin.spec.js` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`

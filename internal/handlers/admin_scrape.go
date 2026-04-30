@@ -25,10 +25,12 @@ import (
 // @Router /admin/scrape/preview [post]
 func (a *API) AdminScrapePreview(c *gin.Context) {
 	var req struct {
-		VideoID string `json:"video_id"`
-		Title   string `json:"title"`
-		Year    int    `json:"year"`
-		Type    string `json:"type"` // movie | tv | av
+		VideoID       string `json:"video_id"`
+		Title         string `json:"title"`
+		Year          int    `json:"year"`
+		Type          string `json:"type"` // movie | tv | av
+		SeasonNumber  int    `json:"season_number"`
+		EpisodeNumber int    `json:"episode_number"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
@@ -65,13 +67,21 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 		}
 		if strings.TrimSpace(req.Title) == "" && strings.TrimSpace(video.OriginalPath) != "" {
 			name := filepath.Base(video.OriginalPath)
-			if title, year, _, _, parsed := utils.ParseFilename(name); parsed {
+			if title, year, season, episode, parsed := utils.ParseFilename(name); parsed {
 				req.Title = title
 				if req.Year == 0 {
 					req.Year = year
 				}
+				if req.SeasonNumber <= 0 {
+					req.SeasonNumber = season
+				}
+				if req.EpisodeNumber <= 0 {
+					req.EpisodeNumber = episode
+				}
 			}
 		}
+
+		req.Title, req.SeasonNumber, req.EpisodeNumber = normalizeTVPreviewRequest(req.Type, req.Title, req.SeasonNumber, req.EpisodeNumber)
 
 		if len(video.Metadata) > 0 {
 			var raw map[string]any
@@ -111,14 +121,14 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 				ok(c, gin.H{
 					"from_cache": true,
 					"video_id":   video.ID,
-					"candidates": []map[string]any{{
+					"candidates": []map[string]any{withTVPreviewContext(map[string]any{
 						"tmdb_id":      *video.TMDBID,
 						"title":        video.Title,
 						"overview":     video.Description,
 						"poster_path":  video.ThumbnailPath,
 						"metadata":     raw,
 						"release_date": raw["release_date"],
-					}},
+					}, req.Type, req.Title, req.SeasonNumber, req.EpisodeNumber)},
 				})
 				return
 			}
@@ -126,6 +136,7 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 	}
 
 previewSearch:
+	req.Title, req.SeasonNumber, req.EpisodeNumber = normalizeTVPreviewRequest(req.Type, req.Title, req.SeasonNumber, req.EpisodeNumber)
 	if strings.TrimSpace(req.Title) == "" {
 		bad(c, "title is required when preview cache is unavailable")
 		return
@@ -148,6 +159,9 @@ previewSearch:
 	if err != nil {
 		response.Error(c, 3, err.Error())
 		return
+	}
+	for _, candidate := range candidates {
+		withTVPreviewContext(candidate, req.Type, req.Title, req.SeasonNumber, req.EpisodeNumber)
 	}
 	ok(c, gin.H{"candidates": candidates})
 }
@@ -256,6 +270,40 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 
 func shouldEnqueueAdminScrapeConfirmTranscode(video models.Video) bool {
 	return strings.TrimSpace(video.OriginalPath) != "" && video.Status != "ready" && video.Status != "processing"
+}
+
+func normalizeTVPreviewRequest(typ, title string, seasonNumber, episodeNumber int) (string, int, int) {
+	if typ != "tv" {
+		return strings.TrimSpace(title), seasonNumber, episodeNumber
+	}
+
+	parsedTitle, parsedSeason, parsedEpisode, ok := utils.ParseSeriesEpisode(title)
+	if !ok {
+		return strings.TrimSpace(title), seasonNumber, episodeNumber
+	}
+	if seasonNumber <= 0 {
+		seasonNumber = parsedSeason
+	}
+	if episodeNumber <= 0 {
+		episodeNumber = parsedEpisode
+	}
+	return strings.TrimSpace(parsedTitle), seasonNumber, episodeNumber
+}
+
+func withTVPreviewContext(candidate map[string]any, typ, parsedTitle string, seasonNumber, episodeNumber int) map[string]any {
+	if typ != "tv" || candidate == nil {
+		return candidate
+	}
+	if strings.TrimSpace(parsedTitle) != "" {
+		candidate["parsed_title"] = strings.TrimSpace(parsedTitle)
+	}
+	if seasonNumber > 0 {
+		candidate["parsed_season_number"] = seasonNumber
+	}
+	if episodeNumber > 0 {
+		candidate["parsed_episode_number"] = episodeNumber
+	}
+	return candidate
 }
 
 func stringFromAny(v any) string {

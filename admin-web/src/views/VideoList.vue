@@ -173,7 +173,9 @@ function openTvPendingScrapeConfirm() {
     query: {
       video_id: detail.value.id,
       type: 'tv',
-      title: diagnostics.parsedTitle || detail.value.title || ''
+      title: diagnostics.parsedTitle || detail.value.title || '',
+      season_number: diagnostics.parsedSeasonNumber || undefined,
+      episode_number: diagnostics.parsedEpisodeNumber || undefined
     }
   })
 }

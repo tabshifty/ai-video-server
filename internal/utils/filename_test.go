@@ -25,6 +25,16 @@ func TestParseSeriesEpisode(t *testing.T) {
 	}
 }
 
+func TestParseSeriesEpisode_ChineseSeasonEpisode(t *testing.T) {
+	name, season, episode, ok := ParseSeriesEpisode("庆余年第一季第一集")
+	if !ok {
+		t.Fatalf("expected parse success")
+	}
+	if name != "庆余年" || season != 1 || episode != 1 {
+		t.Fatalf("unexpected parsed result: %s S%02dE%02d", name, season, episode)
+	}
+}
+
 func TestParseFilename_Movie(t *testing.T) {
 	title, year, season, episode, ok := ParseFilename("Inception (2010).mp4")
 	if !ok {
@@ -51,6 +61,26 @@ func TestParseFilename_SeriesWithSpace(t *testing.T) {
 		t.Fatalf("expected parse success")
 	}
 	if title != "剧名" || year != 0 || season != 1 || episode != 2 {
+		t.Fatalf("unexpected parse result: title=%q year=%d season=%d episode=%d", title, year, season, episode)
+	}
+}
+
+func TestParseFilename_SeriesWithChineseDigits(t *testing.T) {
+	title, year, season, episode, ok := ParseFilename("庆余年 第1季 第2集.mkv")
+	if !ok {
+		t.Fatalf("expected parse success")
+	}
+	if title != "庆余年" || year != 0 || season != 1 || episode != 2 {
+		t.Fatalf("unexpected parse result: title=%q year=%d season=%d episode=%d", title, year, season, episode)
+	}
+}
+
+func TestParseFilename_SeriesWithChineseNumerals(t *testing.T) {
+	title, year, season, episode, ok := ParseFilename("庆余年第二季第十集.mkv")
+	if !ok {
+		t.Fatalf("expected parse success")
+	}
+	if title != "庆余年" || year != 0 || season != 2 || episode != 10 {
 		t.Fatalf("unexpected parse result: title=%q year=%d season=%d episode=%d", title, year, season, episode)
 	}
 }

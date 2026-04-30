@@ -4,8 +4,14 @@ import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import { scrapeConfirm, scrapePreview } from '../api/admin'
+import {
+  buildScrapeConfirmPayload,
+  buildScrapePreviewPayload,
+  resolveTVPreviewState,
+  toPositiveInt
+} from './scrapePreview.helpers'
 
-const form = reactive({ video_id: '', title: '', year: new Date().getFullYear(), type: 'movie' })
+const form = reactive({ video_id: '', title: '', year: null, type: 'movie', season_number: null, episode_number: null })
 const edit = reactive({
   video_id: '',
   tmdb_id: 0,
@@ -43,6 +49,9 @@ onMounted(() => {
   const videoID = typeof route.query.video_id === 'string' ? route.query.video_id.trim() : ''
   const title = typeof route.query.title === 'string' ? route.query.title.trim() : ''
   const type = typeof route.query.type === 'string' ? route.query.type.trim() : ''
+  const year = toPositiveInt(route.query.year)
+  const seasonNumber = toPositiveInt(route.query.season_number)
+  const episodeNumber = toPositiveInt(route.query.episode_number)
   if (videoID) {
     form.video_id = videoID
   }
@@ -51,6 +60,15 @@ onMounted(() => {
   }
   if (type === 'tv' || type === 'movie' || type === 'av') {
     form.type = type
+  }
+  if (year > 0) {
+    form.year = year
+  }
+  if (seasonNumber > 0) {
+    form.season_number = seasonNumber
+  }
+  if (episodeNumber > 0) {
+    form.episode_number = episodeNumber
   }
 })
 
@@ -163,21 +181,36 @@ function syncEditFromCandidate(item) {
   if (mediaType === 'movie' || mediaType === 'tv' || mediaType === 'av') {
     form.type = mediaType
   }
+  if (mediaType === 'tv') {
+    const parsedState = resolveTVPreviewState(item, form)
+    if (parsedState.title) {
+      form.title = parsedState.title
+    }
+    form.season_number = parsedState.season_number
+    form.episode_number = parsedState.episode_number
+  }
   const tmdbID = Number(item?.tmdb_id || 0)
   edit.video_id = item.video_id || form.video_id
   edit.tmdb_id = Number.isFinite(tmdbID) && tmdbID > 0 ? Math.trunc(tmdbID) : 0
   edit.external_id = item.external_id || ''
-  edit.title = item.title || ''
-  edit.overview = item.overview || ''
-  edit.poster_url = item.poster_url || item.poster_path || ''
-  edit.release_date = item.release_date || ''
+  if (mediaType === 'tv') {
+    edit.title = ''
+    edit.overview = ''
+    edit.poster_url = ''
+    edit.release_date = ''
+  } else {
+    edit.title = item.title || ''
+    edit.overview = item.overview || ''
+    edit.poster_url = item.poster_url || item.poster_path || ''
+    edit.release_date = item.release_date || ''
+  }
   edit.metadata = item.metadata || {}
 }
 
 async function doPreview() {
   previewLoading.value = true
   try {
-    const data = await scrapePreview({ ...form })
+    const data = await scrapePreview(buildScrapePreviewPayload(form))
     const list = Array.isArray(data?.candidates) ? data.candidates : []
     candidates.value = list
     if (list.length === 0) {
@@ -211,6 +244,19 @@ async function doSave() {
       ElMessage.warning('请先查询并选择一个 AV 候选结果')
       return
     }
+  } else if (form.type === 'tv') {
+    const seasonNumber = toPositiveInt(form.season_number)
+    const episodeNumber = toPositiveInt(form.episode_number)
+    const tmdbID = Number(edit.tmdb_id)
+    if (!Number.isFinite(tmdbID) || tmdbID <= 0) {
+      ElMessage.warning('请先查询并选择一个剧集候选结果')
+      return
+    }
+    if (seasonNumber <= 0 || episodeNumber <= 0) {
+      ElMessage.warning('剧集刮削必须填写季数和集数')
+      return
+    }
+    edit.tmdb_id = Math.trunc(tmdbID)
   } else {
     const tmdbID = Number(edit.tmdb_id)
     if (!Number.isFinite(tmdbID) || tmdbID <= 0) {
@@ -221,7 +267,7 @@ async function doSave() {
   }
   saveLoading.value = true
   try {
-    await scrapeConfirm({ ...edit })
+    await scrapeConfirm(buildScrapeConfirmPayload(form, edit))
     ElMessage.success('刮削信息已保存')
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '保存刮削信息失败'))
@@ -270,6 +316,26 @@ async function doSave() {
                   <el-option label="剧集" value="tv" />
                   <el-option label="AV" value="av" />
                 </el-select>
+              </el-form-item>
+              <el-form-item v-if="form.type === 'tv'" label="季/集">
+                <div class="tv-episode-fields">
+                  <el-input-number
+                    v-model="form.season_number"
+                    :min="1"
+                    :step="1"
+                    controls-position="right"
+                    :disabled="previewLoading || saveLoading"
+                  />
+                  <span class="tv-episode-divider">季</span>
+                  <el-input-number
+                    v-model="form.episode_number"
+                    :min="1"
+                    :step="1"
+                    controls-position="right"
+                    :disabled="previewLoading || saveLoading"
+                  />
+                  <span class="tv-episode-divider">集</span>
+                </div>
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="previewLoading" @click="doPreview">查询预览</el-button>
@@ -336,6 +402,13 @@ async function doSave() {
 
                 <p class="detail-overview">{{ toText(selectedCandidate.overview) }}</p>
 
+                <div v-if="candidateMediaType(selectedCandidate) === 'tv' && form.season_number && form.episode_number" class="episode-box">
+                  <div class="episode-title">目标分集</div>
+                  <div class="episode-content">
+                    第 {{ toNumberText(form.season_number) }} 季 · 第 {{ toNumberText(form.episode_number) }} 集
+                  </div>
+                </div>
+
                 <el-descriptions border :column="2" size="small" class="detail-table">
                   <el-descriptions-item v-if="candidateMediaType(selectedCandidate) === 'av'" label="番号">
                     {{ toText(selectedCandidate.av_code) }}
@@ -392,6 +465,13 @@ async function doSave() {
             <el-form-item v-else label="AVID">
               <el-input v-model="edit.external_id" :disabled="saveLoading" />
             </el-form-item>
+            <el-alert
+              v-if="form.type === 'tv'"
+              type="info"
+              :closable="false"
+              title="电视剧确认会按上方季/集绑定具体分集；标题、简介、海报和日期留空时将自动使用目标分集元数据。"
+              style="margin-bottom: 16px"
+            />
             <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" rows="3" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="海报URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>
@@ -419,6 +499,17 @@ async function doSave() {
 
 .scrape-filter-form {
   flex: 1;
+}
+
+.tv-episode-fields {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tv-episode-divider {
+  color: #6b7280;
+  font-size: 13px;
 }
 
 .result-row {
