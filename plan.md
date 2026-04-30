@@ -12,6 +12,42 @@
   - `command/result`
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-01 01:41] MDCX AV 迁移收尾修复计划
+- Type: `plan`
+- Summary:
+  - 针对最后 review 明确的 3 个缺口收尾：`love6` `external_id` 大小写往返不一致、MDCX 迁入站点的 URL 覆写配置仍停留在 4 个特例、以及 `resolveRelativeAVURL` 会把 query 错当 path 编码。
+  - 方案固定为保留 `love6` 原始 path segment、把 `AV_SITE_URL_` 扩展成通用站点映射并保持 `AV_SCRAPER_BASE_URL` 仅为 `javdb` fallback、同时让相对 URL helper 直接复用现有浏览器语义解析。
+  - 执行方式采用分治并行：分别补服务回归测试、配置/装配测试和 URL 解析回归，再在主线做交叉复查和全量 Go 回归。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/config . -run 'TestLoadBuildsAVSiteURLsFromPrefixedEnvVars|TestLoadIncludesAVSiteOverridesAndTokens|TestLoadFallsBackToBaseURLForJavDBSiteURL|TestConfigureAVScraperPassesThroughSharedSiteURLs' -count=1` passed.
+  - `go test ./... -count=1` 作为最终回归目标。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 01:41] 修复 MDCX AV 迁移收尾的 3 个逻辑缺口
+- Type: `implementation`
+- Summary:
+  - `love6` crawler 现在保留详情页 URL 中原始 `external_id`，不再强制 lower-case；新增独立回归测试锁定 `ConfirmAV` 落库后的顶层与站点块 metadata 都保持原值。
+  - MDCX 相对 URL 解析改为复用统一 `toAbsoluteURL(...)` 语义，修复 `avsex` 搜索结果详情链接和图片链接的 query/协议相对 URL 解析错误；新增 helper 与搜索回归测试。
+  - 配置层新增通用 `AVSiteURLs`，扫描全部 `AV_SITE_URL_` 环境变量并通过共享装配逻辑传入 scraper；主线补齐 `MDTV`、`AIRAV_CC` 这类 key 的 canonical 归一化，避免未来直接读取 `cfg.AVSiteURLs` 时与服务层来源名规则不一致。
+- Changed Files:
+  - `internal/config/config.go`
+  - `internal/config/config_test.go`
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `internal/services/scraper_av_mdcx_sites.go`
+  - `internal/services/scraper_love6_regression_test.go`
+  - `internal/services/scraper_av_relative_url_test.go`
+  - `main.go`
+  - `main_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/config . -run 'TestLoadBuildsAVSiteURLsFromPrefixedEnvVars|TestLoadIncludesAVSiteOverridesAndTokens|TestLoadFallsBackToBaseURLForJavDBSiteURL|TestConfigureAVScraperPassesThroughSharedSiteURLs' -count=1` passed.
+  - `go test ./... -count=1` passed.
+- Rollback:
+  - `git revert <commit>`
  
 ### [2026-04-26 21:05] 电视继续播放与字幕记忆修复计划
 - Type: `plan`

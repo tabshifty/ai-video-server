@@ -124,7 +124,25 @@ func loadAVSiteURLs() map[string]string {
 }
 
 func normalizeAVSiteURLKey(key string) string {
-	return strings.ToLower(strings.TrimSpace(key))
+	raw := strings.ToLower(strings.TrimSpace(key))
+	compact := strings.ReplaceAll(raw, "-", "")
+	compact = strings.ReplaceAll(compact, "_", "")
+	switch compact {
+	case "javdb":
+		return "javdb"
+	case "airavcc":
+		return "airav_cc"
+	case "mdtv", "mdtvcom":
+		return "mdtv.com"
+	case "javbus":
+		return "javbus"
+	case "javlibrary", "javlib":
+		return "javlibrary"
+	case "theporndb", "porndb", "tpdb":
+		return "theporndb"
+	default:
+		return raw
+	}
 }
 
 func getEnv(key, fallback string) string {

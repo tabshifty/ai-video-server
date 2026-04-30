@@ -66,6 +66,8 @@ func TestLoadBuildsAVSiteURLsFromPrefixedEnvVars(t *testing.T) {
 	t.Setenv("AV_SITE_URL_JAVDB", "https://javdb.example")
 	t.Setenv("AV_SITE_URL_JAVBUS", "https://javbus.example")
 	t.Setenv("AV_SITE_URL_Foo_Bar", "https://custom.example")
+	t.Setenv("AV_SITE_URL_AIRAV_CC", "https://airav.example")
+	t.Setenv("AV_SITE_URL_MDTV", "https://mdtv.example")
 	t.Setenv("AV_SCRAPER_BASE_URL", "https://base.example")
 
 	cfg, err := Load()
@@ -82,7 +84,13 @@ func TestLoadBuildsAVSiteURLsFromPrefixedEnvVars(t *testing.T) {
 	if got := cfg.AVSiteURLs["foo_bar"]; got != "https://custom.example" {
 		t.Fatalf("unexpected AVSiteURLs[foo_bar]: %s", got)
 	}
-	if len(cfg.AVSiteURLs) != 3 {
+	if got := cfg.AVSiteURLs["airav_cc"]; got != "https://airav.example" {
+		t.Fatalf("unexpected AVSiteURLs[airav_cc]: %s", got)
+	}
+	if got := cfg.AVSiteURLs["mdtv.com"]; got != "https://mdtv.example" {
+		t.Fatalf("unexpected AVSiteURLs[mdtv.com]: %s", got)
+	}
+	if len(cfg.AVSiteURLs) != 5 {
 		t.Fatalf("unexpected AVSiteURLs length: %d", len(cfg.AVSiteURLs))
 	}
 	if cfg.AVSiteURLJavDB != "https://javdb.example" {
