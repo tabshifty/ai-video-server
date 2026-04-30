@@ -13,6 +13,37 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 03:08] 将 JavDB 切换到 MDCX 风格解析计划
+- Type: `plan`
+- Summary:
+  - 用户确认 JavDB 不应继续使用仓库内自写正则解析，而应切换到 MDCX 迁移过来的搜索与详情解析思路。
+  - 本轮修复范围限定在 `javdb` 站点：搜索页补封禁/Cloudflare 显式错误与 MDCX 风格匹配策略，详情页补 DOM 版标题、海报、LDJSON 简介与演员提取。
+  - 现有 provider、候选合并、落库与下载策略保持不变，只替换 JavDB 内核解析，避免影响其他已迁移站点。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestPreviewAVJavDBUsesMDCXStyleDOMDetailParsing|TestPreviewAVJavDBReturnsExplicitErrorOnCloudflareBlock' -count=1` 先红后用于回归。
+  - `go test ./internal/services -run 'TestScrapeAVUploadCodeFirstAndActorSync|TestPreviewAVFallbackByTitle|TestPreviewAVJavDBPrefersCoverAndDetailOverview|TestPreviewAVMergeUsesBestFieldsAcrossSources|TestConfirmAVKeepsExistingThumbnailWhenOnlyFallbackPoster|TestConfirmAVUsesFallbackPosterWhenNoExistingThumbnail' -count=1` 用于兼容回归。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 03:08] 将 JavDB AV 刮削切到 MDCX 风格搜索与 DOM 解析
+- Type: `implementation`
+- Summary:
+  - JavDB 搜索页现在会识别 MDCX 参考实现中的封禁/版权限制/Cloudflare 拦截文本，并返回显式错误，不再静默退化成空结果或被其他站点 404 覆盖。
+  - JavDB 详情页现在优先走 MDCX 风格 DOM 提取：`current-title`、`copy-to-clipboard`、`img.video-cover`、`application/ld+json` 简介、以及 `female/male` 演员结构；正则逻辑仅保留为兼容 fallback。
+  - 搜索命中策略改为“精确匹配优先、清洗后模糊匹配次之、最后才回退到当前宽松候选收集”，兼容现有标题兜底行为，同时更接近 MDCX 原始 crawler。
+- Changed Files:
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_javdb_mdcx_regression_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestPreviewAVJavDBUsesMDCXStyleDOMDetailParsing|TestPreviewAVJavDBReturnsExplicitErrorOnCloudflareBlock' -count=1` passed.
+  - `go test ./internal/services -run 'TestScrapeAVUploadCodeFirstAndActorSync|TestPreviewAVFallbackByTitle|TestPreviewAVJavDBPrefersCoverAndDetailOverview|TestPreviewAVMergeUsesBestFieldsAcrossSources|TestConfirmAVKeepsExistingThumbnailWhenOnlyFallbackPoster|TestConfirmAVUsesFallbackPosterWhenNoExistingThumbnail' -count=1` passed.
+  - `go test ./... -count=1` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 02:56] 延长 AV 刮削运行超时计划
 - Type: `plan`
 - Summary:

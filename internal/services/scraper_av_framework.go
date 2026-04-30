@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
 	"sort"
 	"strings"
+
+	"golang.org/x/net/html"
 )
 
 var (
@@ -859,8 +862,11 @@ func (c *javDBAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunC
 	if err != nil {
 		return nil, err
 	}
+	if err := validateJavDBSearchPage(content, searchURL); err != nil {
+		return nil, err
+	}
 
-	hits := c.parseSearchHits(content, limit)
+	hits := c.parseSearchHits(content, query, limit)
 	if len(hits) == 0 {
 		run.addStep("no search result for query=%s", query)
 		return nil, nil
@@ -934,7 +940,7 @@ func (c *javDBAVCrawler) buildSearchURL(query string) string {
 	return fmt.Sprintf("%s/search?%s", baseURL, q.Encode())
 }
 
-func (c *javDBAVCrawler) parseSearchHits(content string, limit int) []avSearchHit {
+func (c *javDBAVCrawler) parseSearchHits(content string, query string, limit int) []avSearchHit {
 	if limit <= 0 {
 		limit = avPreviewLimitDefault
 	}
@@ -944,11 +950,12 @@ func (c *javDBAVCrawler) parseSearchHits(content string, limit int) []avSearchHi
 	}
 	baseURL := c.baseURL()
 	out := make([]avSearchHit, 0, limit)
+	exactMatches := make([]avSearchHit, 0, limit)
+	fuzzyMatches := make([]avSearchHit, 0, limit)
 	seen := map[string]struct{}{}
+	upperQuery := strings.ToUpper(strings.TrimSpace(query))
+	cleanQuery := normalizeJavDBSearchCompare(query)
 	for _, match := range matches {
-		if len(out) >= limit {
-			break
-		}
 		if len(match) < 2 {
 			continue
 		}
@@ -968,7 +975,34 @@ func (c *javDBAVCrawler) parseSearchHits(content string, limit int) []avSearchHi
 			continue
 		}
 		seen[key] = struct{}{}
-		out = append(out, avSearchHit{DetailURL: detailURL, ExternalID: externalID})
+		hit := avSearchHit{DetailURL: detailURL, ExternalID: externalID}
+		out = append(out, hit)
+
+		text := ""
+		if len(match) > 2 {
+			text = strings.ToUpper(normalizeWhitespace(stripHTMLText(match[2])))
+		}
+		switch {
+		case upperQuery != "" && strings.Contains(text, upperQuery):
+			exactMatches = append(exactMatches, hit)
+		case cleanQuery != "" && strings.Contains(normalizeJavDBSearchCompare(text), cleanQuery):
+			fuzzyMatches = append(fuzzyMatches, hit)
+		}
+	}
+	if len(exactMatches) > 0 {
+		if len(exactMatches) > limit {
+			return exactMatches[:limit]
+		}
+		return exactMatches
+	}
+	if len(fuzzyMatches) > 0 {
+		if len(fuzzyMatches) > limit {
+			return fuzzyMatches[:limit]
+		}
+		return fuzzyMatches
+	}
+	if len(out) > limit {
+		return out[:limit]
 	}
 	return out
 }
@@ -1367,13 +1401,20 @@ type javDBDetailParser struct{}
 
 func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeCandidate, map[string]string) {
 	fieldState := defaultAVFieldState()
+	root, _ := html.Parse(strings.NewReader(content))
 
-	title := extractJavDBTitle(content)
+	title := extractJavDBTitleFromDOM(root)
+	if title == "" {
+		title = extractJavDBTitle(content)
+	}
 	if title != "" {
 		fieldState["title"] = "filled"
 	}
 
-	code := extractAVCode(title)
+	code := extractJavDBCodeFromDOM(root)
+	if code == "" {
+		code = extractAVCode(title)
+	}
 	if code == "" {
 		if mm := javDBCodeClipboardRe.FindStringSubmatch(content); len(mm) > 1 {
 			code = extractAVCode(stripHTMLText(mm[1]))
@@ -1391,14 +1432,19 @@ func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeC
 		fieldState["code"] = "filled"
 	}
 
-	posterURL, posterSource := extractJavDBPosterURL(content, baseURL)
+	posterURL, posterSource := extractJavDBPosterURLFromDOM(root, detailURL, baseURL)
+	if posterURL == "" {
+		posterURL, posterSource = extractJavDBPosterURL(content, baseURL)
+	}
 	if posterURL != "" {
 		fieldState["poster_url"] = "filled"
 	}
 
-	releaseDate := ""
+	releaseDate := extractJavDBReleaseDateFromDOM(root)
 	if mm := javDBReleaseDateFieldRe.FindStringSubmatch(content); len(mm) > 1 {
-		releaseDate = normalizeAVDate(stripHTMLText(mm[1]))
+		if releaseDate == "" {
+			releaseDate = normalizeAVDate(stripHTMLText(mm[1]))
+		}
 	}
 	if releaseDate == "" {
 		if mm := javDBGenericDateInlineRe.FindStringSubmatch(content); len(mm) > 0 {
@@ -1409,12 +1455,18 @@ func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeC
 		fieldState["release_date"] = "filled"
 	}
 
-	overview, overviewSource := extractJavDBOverview(content)
+	overview, overviewSource := extractJavDBOverviewFromDOM(root)
+	if overview == "" {
+		overview, overviewSource = extractJavDBOverview(content)
+	}
 	if overview != "" {
 		fieldState["overview"] = "filled"
 	}
 
-	actors := parseJavDBDetailActorsStrict(content)
+	actors := extractJavDBActorsFromDOM(root)
+	if len(actors) == 0 {
+		actors = parseJavDBDetailActorsStrict(content)
+	}
 	if len(actors) > 0 {
 		fieldState["actors"] = "filled"
 	}
@@ -1445,6 +1497,166 @@ func (p *javDBDetailParser) Parse(content, detailURL, baseURL string) (avScrapeC
 		},
 	}
 	return candidate, fieldState
+}
+
+func validateJavDBSearchPage(content string, searchURL string) error {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil
+	}
+	switch {
+	case strings.Contains(content, "The owner of this website has banned your access based on your browser's behaving"):
+		return fmt.Errorf("javdb 搜索被封禁：%s", searchURL)
+	case strings.Contains(content, "Due to copyright restrictions"):
+		return fmt.Errorf("javdb 搜索因版权限制被拦截：%s", searchURL)
+	case strings.Contains(strings.ToLower(content), "ray-id"):
+		return fmt.Errorf("javdb 搜索被 Cloudflare 拦截")
+	default:
+		return nil
+	}
+}
+
+func normalizeJavDBSearchCompare(value string) string {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	return strings.NewReplacer(".", "", "-", "", " ", "").Replace(value)
+}
+
+func extractJavDBTitleFromDOM(root *html.Node) string {
+	title := nodeText(findFirst(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "strong" && hasClass(n, "current-title")
+	}))
+	if title != "" {
+		return title
+	}
+	return ""
+}
+
+func extractJavDBCodeFromDOM(root *html.Node) string {
+	code := strings.TrimSpace(findFirstAttr(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "a" && hasClass(n, "copy-to-clipboard")
+	}, "data-clipboard-text"))
+	return extractAVCode(code)
+}
+
+func extractJavDBPosterURLFromDOM(root *html.Node, detailURL, baseURL string) (string, string) {
+	posterURL := strings.TrimSpace(findFirstAttr(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "img" && hasClass(n, "video-cover")
+	}, "src"))
+	if posterURL == "" {
+		return "", ""
+	}
+	posterURL = toAbsoluteURL(chooseStr(detailURL, baseURL), posterURL)
+	if isLikelyLogoURL(posterURL) {
+		return "", ""
+	}
+	return posterURL, "video_cover"
+}
+
+func extractJavDBReleaseDateFromDOM(root *html.Node) string {
+	return normalizeAVDate(extractJavDBPanelValue(root, "Released Date:", "日期:"))
+}
+
+func extractJavDBOverviewFromDOM(root *html.Node) (string, string) {
+	for _, script := range findAll(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "script" && strings.EqualFold(attrValue(n, "type"), "application/ld+json")
+	}) {
+		payload := strings.TrimSpace(rawNodeText(script))
+		if payload == "" {
+			continue
+		}
+		var object map[string]any
+		if err := json.Unmarshal([]byte(payload), &object); err == nil {
+			if description := normalizeWhitespace(asString(object["description"])); description != "" && !isLikelyGenericOverview(description) {
+				return description, "ld_json"
+			}
+		}
+		var objects []map[string]any
+		if err := json.Unmarshal([]byte(payload), &objects); err == nil {
+			for _, object := range objects {
+				if description := normalizeWhitespace(asString(object["description"])); description != "" && !isLikelyGenericOverview(description) {
+					return description, "ld_json"
+				}
+			}
+		}
+	}
+	return "", ""
+}
+
+func extractJavDBActorsFromDOM(root *html.Node) []string {
+	if root == nil {
+		return nil
+	}
+	actors := make([]string, 0, 4)
+	seen := map[string]struct{}{}
+	for _, span := range findAll(root, func(n *html.Node) bool { return n.Type == html.ElementNode && n.Data == "span" }) {
+		if findFirst(span, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && (hasClass(n, "female") || hasClass(n, "male"))
+		}) == nil {
+			continue
+		}
+		for _, actorNode := range findAll(span, func(n *html.Node) bool { return n.Type == html.ElementNode && n.Data == "a" }) {
+			name := normalizeWhitespace(nodeText(actorNode))
+			if !isLikelyActorName(name) {
+				continue
+			}
+			key := strings.ToLower(name)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			actors = append(actors, name)
+		}
+	}
+	if len(actors) == 0 {
+		return nil
+	}
+	return actors
+}
+
+func extractJavDBPanelValue(root *html.Node, labels ...string) string {
+	for _, strong := range findAll(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "strong"
+	}) {
+		text := normalizeWhitespace(nodeText(strong))
+		for _, label := range labels {
+			if strings.EqualFold(text, strings.TrimSpace(label)) {
+				parent := strong.Parent
+				if parent == nil {
+					continue
+				}
+				for child := parent.FirstChild; child != nil; child = child.NextSibling {
+					if child == strong {
+						continue
+					}
+					if value := normalizeWhitespace(nodeText(child)); value != "" {
+						return value
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func rawNodeText(node *html.Node) string {
+	if node == nil {
+		return ""
+	}
+	var parts []string
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n == nil {
+			return
+		}
+		if n.Type == html.TextNode {
+			parts = append(parts, n.Data)
+		}
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
+		}
+	}
+	walk(node)
+	return strings.Join(parts, "")
 }
 
 type javBusDetailParser struct{}
