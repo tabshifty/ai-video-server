@@ -29,6 +29,7 @@ type Config struct {
 	AVSiteURLJavBus            string
 	AVSiteURLJavLibrary        string
 	AVSiteURLThePornDB         string
+	AVSiteURLs                 map[string]string
 	AVScraperJavDBCookie       string
 	AVScraperJavBusCookie      string
 	AVScraperThePornDBAPIToken string
@@ -66,6 +67,7 @@ func Load() (Config, error) {
 		AVSiteURLJavBus:            os.Getenv("AV_SITE_URL_JAVBUS"),
 		AVSiteURLJavLibrary:        os.Getenv("AV_SITE_URL_JAVLIBRARY"),
 		AVSiteURLThePornDB:         os.Getenv("AV_SITE_URL_THEPORNDB"),
+		AVSiteURLs:                 loadAVSiteURLs(),
 		AVScraperJavDBCookie:       os.Getenv("AV_SCRAPER_JAVDB_COOKIE"),
 		AVScraperJavBusCookie:      os.Getenv("AV_SCRAPER_JAVBUS_COOKIE"),
 		AVScraperThePornDBAPIToken: os.Getenv("AV_SCRAPER_THEPORNDB_API_TOKEN"),
@@ -90,8 +92,39 @@ func Load() (Config, error) {
 	if strings.TrimSpace(cfg.PlayURLSignSecret) == "" {
 		cfg.PlayURLSignSecret = cfg.JWTSecret
 	}
+	if cfg.AVSiteURLs == nil {
+		cfg.AVSiteURLs = map[string]string{}
+	}
+	if cfg.AVSiteURLJavDB != "" {
+		cfg.AVSiteURLs["javdb"] = strings.TrimSuffix(strings.TrimSpace(cfg.AVSiteURLJavDB), "/")
+	}
+	cfg.AVSiteURLJavDB = cfg.AVSiteURLs["javdb"]
 
 	return cfg, nil
+}
+
+func loadAVSiteURLs() map[string]string {
+	urls := map[string]string{}
+	for _, entry := range os.Environ() {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok || !strings.HasPrefix(key, "AV_SITE_URL_") {
+			continue
+		}
+		site := normalizeAVSiteURLKey(strings.TrimPrefix(key, "AV_SITE_URL_"))
+		value = strings.TrimSuffix(strings.TrimSpace(value), "/")
+		if site == "" || value == "" {
+			continue
+		}
+		urls[site] = value
+	}
+	if fallback := strings.TrimSuffix(strings.TrimSpace(firstNonEmptyEnv("AV_SITE_URL_JAVDB", "AV_SCRAPER_BASE_URL")), "/"); fallback != "" {
+		urls["javdb"] = fallback
+	}
+	return urls
+}
+
+func normalizeAVSiteURLKey(key string) string {
+	return strings.ToLower(strings.TrimSpace(key))
 }
 
 func getEnv(key, fallback string) string {
