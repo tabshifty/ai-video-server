@@ -3137,3 +3137,35 @@
   - `go test -race ./internal/services ./internal/queue` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-30 21:15] AV mdcx 收尾检查计划
+- Type: `plan`
+- Summary:
+  - 对照 `references/mdcx` 的 single scrape 站点与当前 provider 做收尾检查，确认站点清单本身已经全部对齐，重点转向搜索回退能力缺口。
+  - 检查结果显示：当前范围内唯一明确未补齐的功能是 `getchu`，它已有 detail parser，但 `PreviewAV` 使用的 `SearchCandidates` 仍为空实现，与 reference 的搜索回退能力不一致。
+  - 本轮按最小修复处理：补 `getchu` 的 `PreviewAV` 回归测试与搜索实现，完成后再做一次全量 Go 验证，作为这阶段迁移的收尾。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestPreviewAVFallsBackTo(Getchu|ThePornDB)WhenConfigured|TestPreviewAVFallsBackToAVSexWhenPrimarySitesHaveNoResult'`
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-30 21:15] 补齐 getchu 搜索回退并完成收尾验证
+- Type: `implementation`
+- Summary:
+  - 为 `getchu` 补上 `SearchCandidates`，现在 `PreviewAV` 可以按 reference 逻辑请求 `/php/search.phtml?genre=all&search_keyword=...&gc=gc`，解析搜索页里的 `a.blueb` 命中并回抓 detail。
+  - 新增 `PreviewAV` 对 `getchu` 的回归测试，同时修正 `getchu` 搜索命中后的 detail URL 组装，避免相对链接里的 query 被误当成 path 导致 404。
+  - 收尾检查结论：当前 `references/mdcx` 已进入本次迁移范围的站点和核心预览/确认链路已全部对齐，后续若继续扩展，重点会转向更细的搜索策略或字段丰富度，而不是站点缺口。
+- Changed Files:
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestPreviewAVFallsBackTo(Getchu|ThePornDB)WhenConfigured|TestPreviewAVFallsBackToAVSexWhenPrimarySitesHaveNoResult'` passed.
+  - `go test ./internal/services` passed.
+  - `go test ./...` passed.
+  - `go vet ./...` passed.
+  - `go test -race ./internal/services ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`

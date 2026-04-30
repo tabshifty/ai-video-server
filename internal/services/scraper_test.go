@@ -2188,3 +2188,56 @@ func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 		t.Fatalf("expected theporndb detail url, got=%v", first["detail_url"])
 	}
 }
+
+func TestPreviewAVFallsBackToGetchuWhenConfigured(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/search":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/search/ISTU-5391":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/cn/vl_searchbyid.php":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/php/search.phtml" && r.URL.Query().Get("search_keyword") == "ISTU-5391":
+			_, _ = w.Write([]byte(`<!doctype html><html><body><a class="blueb" href="../soft.phtml?id=1180483">Getchu Hit</a></body></html>`))
+		case r.URL.Path == "/soft.phtml" && r.URL.RawQuery == "id=1180483&gc=gc":
+			_, _ = w.Write([]byte(`<!doctype html>
+<html><head><meta property="og:image" content="/images/covers/istu5391.jpg"></head>
+<body>
+  <h1 id="soft-title">Getchu First Impression</h1>
+  <table><tr><td>Item Code</td><td>ISTU-5391</td></tr></table>
+</body></html>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraperConfig(AVScraperConfig{
+		BaseURL: server.URL,
+		SiteURLs: map[string]string{
+			"getchu": server.URL,
+		},
+		UserAgent: "getchu-preview-test",
+		Timeout:   time.Second,
+	})
+
+	got, err := svc.PreviewAV(context.Background(), "ISTU-5391")
+	if err != nil {
+		t.Fatalf("PreviewAV returned error: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatalf("expected av candidates, got none")
+	}
+	first := got[0]
+	if first["scrape_source"] != "getchu" {
+		t.Fatalf("expected scrape_source getchu, got=%v", first["scrape_source"])
+	}
+	if first["title"] != "Getchu First Impression" {
+		t.Fatalf("expected title Getchu First Impression, got=%v", first["title"])
+	}
+	if first["detail_url"] != server.URL+"/soft.phtml?id=1180483&gc=gc" {
+		t.Fatalf("expected getchu detail url, got=%v", first["detail_url"])
+	}
+}

@@ -69,8 +69,47 @@ func (c *xcityAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, 
 	return nil, nil
 }
 
-func (c *getchuAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
-	return nil, nil
+func (c *getchuAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil
+	}
+	base := strings.TrimRight(c.svc.avSiteBaseURL("getchu", "https://www.getchu.com"), "/")
+	searchURL := fmt.Sprintf("%s/php/search.phtml?genre=all&search_keyword=%s&gc=gc", base, url.QueryEscape(query))
+	if run != nil {
+		run.addSearchURL(searchURL)
+	}
+	content, err := c.svc.fetchAVHTML(ctx, searchURL)
+	if err != nil {
+		return nil, err
+	}
+	root, err := html.Parse(strings.NewReader(content))
+	if err != nil {
+		return nil, fmt.Errorf("parse getchu search html: %w", err)
+	}
+	link := findFirst(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "a" && hasClass(n, "blueb")
+	})
+	href := strings.TrimSpace(attrValue(link, "href"))
+	if href == "" {
+		return nil, nil
+	}
+	detailURL := toAbsoluteURL(base+"/", strings.Replace(href, "../", "/", 1))
+	if detailURL == "" {
+		return nil, nil
+	}
+	if !strings.Contains(detailURL, "gc=gc") {
+		if strings.Contains(detailURL, "?") {
+			detailURL += "&gc=gc"
+		} else {
+			detailURL += "?gc=gc"
+		}
+	}
+	candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+	if err != nil {
+		return nil, err
+	}
+	return []avScrapeCandidate{candidate}, nil
 }
 
 func (c *dmmAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
