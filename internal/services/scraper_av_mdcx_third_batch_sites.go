@@ -227,7 +227,7 @@ func minimalHTMLExternalID(rawURL string, site string) string {
 	case "love6":
 		parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
 		if len(parts) > 0 {
-			return strings.ToLower(strings.TrimSpace(parts[len(parts)-1]))
+			return strings.TrimSpace(parts[len(parts)-1])
 		}
 	}
 	return strings.ToLower(extractSingleSitePathID(rawURL))
