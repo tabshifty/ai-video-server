@@ -1122,6 +1122,73 @@ func TestPreviewAVMergeUsesBestFieldsAcrossSources(t *testing.T) {
 	}
 }
 
+func TestPreviewAVFallsBackToAVSexWhenPrimarySitesHaveNoResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/search":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/search/CAWD-582":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/cn/vl_searchbyid.php":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/tw/search" && strings.EqualFold(r.URL.Query().Get("query"), "cawd-582"):
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <ul class="grid">
+      <li>
+        <a href="/cn/video/detail/359635">
+          <div><h4 class="truncate">CAWD-582 AVSex First Impression</h4></div>
+          <div class="relative overflow-hidden rounded-t-md"><img src="/covers/avsex-cover.jpg" /></div>
+        </a>
+      </li>
+    </ul>
+  </body>
+</html>
+`))
+		case r.URL.Path == "/cn/video/detail/359635":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>AVSex First Impression</title>
+  </head>
+  <body>
+    <span class="truncate p-2 text-primary font-bold dark:text-primary-200">CAWD-582 AVSex First Impression</span>
+    <dd class="flex gap-2 flex-wrap"><a href="/actor/a1">演员甲</a></dd>
+  </body>
+</html>
+`))
+		case r.URL.Path == "/covers/avsex-cover.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "avsex-preview-test", time.Second)
+
+	got, err := svc.PreviewAV(context.Background(), "CAWD-582")
+	if err != nil {
+		t.Fatalf("PreviewAV returned error: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatalf("expected av candidates, got none")
+	}
+	first := got[0]
+	if first["scrape_source"] != "avsex" {
+		t.Fatalf("expected scrape_source avsex, got=%v", first["scrape_source"])
+	}
+	if first["title"] != "AVSex First Impression" {
+		t.Fatalf("expected avsex title, got=%v", first["title"])
+	}
+	if first["detail_url"] != server.URL+"/cn/video/detail/359635" {
+		t.Fatalf("expected avsex detail_url, got=%v", first["detail_url"])
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -1311,5 +1378,73 @@ func TestConfirmAVRejectsRelativePosterURLWithoutTMDBFallback(t *testing.T) {
 	}
 	if repo.lastUpdate.metadata["poster_decision"] != "invalid_keep_old" {
 		t.Fatalf("expected poster_decision invalid_keep_old, got=%v", repo.lastUpdate.metadata["poster_decision"])
+	}
+}
+
+func TestConfirmAVBuildsAVSexDetailURLFromSourceAndExternalID(t *testing.T) {
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:    videoID,
+				Title: "旧标题",
+			},
+		},
+		nextActorIDs: []uuid.UUID{uuid.New()},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/cn/video/detail/359635":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>AVSex First Impression</title>
+  </head>
+  <body>
+    <span class="truncate p-2 text-primary font-bold dark:text-primary-200">CAWD-582 AVSex First Impression</span>
+    <dd class="flex gap-2 flex-wrap"><a href="/actor/a1">演员甲</a></dd>
+  </body>
+</html>
+`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "avsex-confirm-test", time.Second)
+
+	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:    videoID,
+		ExternalID: "359635",
+		Metadata: map[string]any{
+			"scrape_source": "avsex",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+	if repo.lastUpdate.title != "AVSex First Impression" {
+		t.Fatalf("expected avsex title, got=%s", repo.lastUpdate.title)
+	}
+	if repo.lastUpdate.metadata["scrape_source"] != "avsex" {
+		t.Fatalf("expected scrape_source avsex, got=%v", repo.lastUpdate.metadata["scrape_source"])
+	}
+	if repo.lastUpdate.metadata["external_id"] != "359635" {
+		t.Fatalf("expected external_id 359635, got=%v", repo.lastUpdate.metadata["external_id"])
+	}
+	if repo.lastUpdate.metadata["detail_url"] != server.URL+"/cn/video/detail/359635" {
+		t.Fatalf("expected avsex detail_url, got=%v", repo.lastUpdate.metadata["detail_url"])
+	}
+	if repo.lastUpdate.metadata["av_code"] != "CAWD-582" {
+		t.Fatalf("expected av_code CAWD-582, got=%v", repo.lastUpdate.metadata["av_code"])
+	}
+	if repo.resolveActorSource != "scrape_av" {
+		t.Fatalf("expected resolve actor source scrape_av, got=%s", repo.resolveActorSource)
+	}
+	if !reflect.DeepEqual(repo.resolveActorNames, []string{"演员甲"}) {
+		t.Fatalf("unexpected resolved actor names: %v", repo.resolveActorNames)
 	}
 }

@@ -58,6 +58,13 @@ func newAVCrawlerProvider(svc *ScraperService) avCrawlerProvider {
 	return &staticAVCrawlerProvider{
 		crawlers: []avCrawler{
 			newJavDBAVCrawler(svc),
+			newAirAVCCAVCrawler(svc),
+			newAVSexAVCrawler(svc),
+			newCableAVAVCrawler(svc),
+			newHDOUBANAVCrawler(svc),
+			newHSCangkuAVCrawler(svc),
+			newIQQTVAVCrawler(svc),
+			newSevenMMTVAVCrawler(svc),
 			newJavBusAVCrawler(svc),
 			newJavLibraryAVCrawler(svc),
 			newFC2AVCrawler(svc),
@@ -218,6 +225,12 @@ func appendUniqueString(dst []string, item string) []string {
 }
 
 func (s *ScraperService) avSiteBaseURL(site, fallback string) string {
+	site = strings.ToLower(strings.TrimSpace(site))
+	if s.avSiteURLs != nil {
+		if base := strings.TrimSuffix(strings.TrimSpace(s.avSiteURLs[site]), "/"); base != "" {
+			return base
+		}
+	}
 	configured := strings.TrimSuffix(strings.TrimSpace(s.avBaseURL), "/")
 	if configured == "" {
 		return fallback
@@ -443,6 +456,18 @@ func (s *ScraperService) buildAVDetailURLBySource(source, externalID string) str
 		return ""
 	}
 	switch source {
+	case "airav_cc":
+		return toAbsoluteURL(s.avSiteBaseURL("airav_cc", "https://airav.io"), "/jp/playon.aspx?hid="+url.QueryEscape(externalID))
+	case "avsex":
+		return toAbsoluteURL(s.avSiteBaseURL("avsex", "https://gg5.co"), "/cn/video/detail/"+url.PathEscape(externalID))
+	case "cableav":
+		return toAbsoluteURL(s.avSiteBaseURL("cableav", "https://cableav.tv"), "/"+url.PathEscape(externalID)+"/")
+	case "hdouban":
+		return toAbsoluteURL(s.avSiteBaseURL("hdouban", "https://ormtgu.com"), "/moviedetail/"+url.PathEscape(externalID))
+	case "iqqtv":
+		return toAbsoluteURL(s.avSiteBaseURL("iqqtv", "https://iqq5.xyz"), "/jp/player/"+url.PathEscape(externalID))
+	case "7mmtv":
+		return toAbsoluteURL(s.avSiteBaseURL("7mmtv", "https://www.7mmtv.sx"), "/zh/view_video/"+url.PathEscape(externalID)+".html")
 	case "javbus":
 		return toAbsoluteURL(s.avSiteBaseURL("javbus", "https://www.javbus.com"), "/"+externalID)
 	case "javlibrary":
@@ -471,6 +496,36 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 	host = strings.ToLower(strings.TrimSpace(host))
 	path = strings.ToLower(strings.TrimSpace(path))
 	switch normalizeAVSourceName(name) {
+	case "airav_cc":
+		if strings.Contains(host, "airav") {
+			return true
+		}
+		return strings.Contains(path, "playon.aspx") || query.Get("hid") != ""
+	case "avsex":
+		if strings.Contains(host, "gg5.") || strings.Contains(host, "9sex.") || strings.Contains(host, "paycalling") || strings.Contains(host, "avsex.") {
+			return true
+		}
+		return strings.Contains(path, "/video/detail/")
+	case "cableav":
+		if strings.Contains(host, "cableav") {
+			return true
+		}
+		return strings.Count(strings.Trim(path, "/"), "/") == 0 && strings.Trim(path, "/") != ""
+	case "hdouban":
+		if strings.Contains(host, "ormtgu") || strings.Contains(host, "byym21") || strings.Contains(host, "huangdb2") {
+			return true
+		}
+		return strings.Contains(path, "/moviedetail/")
+	case "iqqtv":
+		if strings.Contains(host, "iqq") {
+			return true
+		}
+		return strings.Contains(path, "/player/")
+	case "7mmtv":
+		if strings.Contains(host, "7mmtv") {
+			return true
+		}
+		return strings.Contains(path, "/view_video/")
 	case "javdb":
 		if strings.Contains(host, "javdb") {
 			return true

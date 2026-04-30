@@ -37,24 +37,40 @@ type scraperRepo interface {
 
 // ScraperService handles TMDB search and metadata syncing.
 type ScraperService struct {
-	repo         scraperRepo
-	apiKey       string
-	baseURL      string
-	avBaseURL    string
-	avUserAgent  string
-	avProvider   avCrawlerProvider
-	storageRoot  string
-	posterRoot   string
-	httpClient   *http.Client
-	avHTTPClient *http.Client
-	cacheTTL     time.Duration
-	cacheMu      sync.RWMutex
-	previewCache map[string]previewCacheEntry
+	repo                scraperRepo
+	apiKey              string
+	baseURL             string
+	avBaseURL           string
+	avUserAgent         string
+	avSiteURLs          map[string]string
+	avJavDBCookie       string
+	avJavBusCookie      string
+	avThePornDBAPIToken string
+	avThePornDBNoHash   bool
+	avProvider          avCrawlerProvider
+	storageRoot         string
+	posterRoot          string
+	httpClient          *http.Client
+	avHTTPClient        *http.Client
+	cacheTTL            time.Duration
+	cacheMu             sync.RWMutex
+	previewCache        map[string]previewCacheEntry
 }
 
 type previewCacheEntry struct {
 	ExpireAt   time.Time
 	Candidates []map[string]any
+}
+
+type AVScraperConfig struct {
+	BaseURL           string
+	UserAgent         string
+	Timeout           time.Duration
+	SiteURLs          map[string]string
+	JavDBCookie       string
+	JavBusCookie      string
+	ThePornDBAPIToken string
+	ThePornDBNoHash   bool
 }
 
 func NewScraperService(repo scraperRepo, apiKey, baseURL, storageRoot, posterRoot string, timeout time.Duration) *ScraperService {
@@ -67,6 +83,7 @@ func NewScraperService(repo scraperRepo, apiKey, baseURL, storageRoot, posterRoo
 		baseURL:     strings.TrimSuffix(baseURL, "/"),
 		avBaseURL:   "https://javdb.com",
 		avUserAgent: "Mozilla/5.0 (compatible; VideoServerBot/1.0; +https://example.invalid/bot)",
+		avSiteURLs:  map[string]string{},
 		storageRoot: storageRoot,
 		posterRoot:  posterRoot,
 		httpClient: &http.Client{
@@ -83,15 +100,48 @@ func NewScraperService(repo scraperRepo, apiKey, baseURL, storageRoot, posterRoo
 }
 
 func (s *ScraperService) ConfigureAVScraper(baseURL, userAgent string, timeout time.Duration) {
-	if strings.TrimSpace(baseURL) != "" {
-		s.avBaseURL = strings.TrimSuffix(strings.TrimSpace(baseURL), "/")
+	s.ConfigureAVScraperConfig(AVScraperConfig{
+		BaseURL:   baseURL,
+		UserAgent: userAgent,
+		Timeout:   timeout,
+	})
+}
+
+func (s *ScraperService) ConfigureAVScraperConfig(cfg AVScraperConfig) {
+	if strings.TrimSpace(cfg.BaseURL) != "" {
+		s.avBaseURL = strings.TrimSuffix(strings.TrimSpace(cfg.BaseURL), "/")
 	}
-	if strings.TrimSpace(userAgent) != "" {
-		s.avUserAgent = strings.TrimSpace(userAgent)
+	if strings.TrimSpace(cfg.UserAgent) != "" {
+		s.avUserAgent = strings.TrimSpace(cfg.UserAgent)
 	}
-	if timeout > 0 {
-		s.avHTTPClient = &http.Client{Timeout: timeout}
+	if cfg.Timeout > 0 {
+		s.avHTTPClient = &http.Client{Timeout: cfg.Timeout}
 	}
+	if len(cfg.SiteURLs) > 0 {
+		if s.avSiteURLs == nil {
+			s.avSiteURLs = map[string]string{}
+		}
+		for site, rawURL := range cfg.SiteURLs {
+			site = strings.ToLower(strings.TrimSpace(site))
+			rawURL = strings.TrimSuffix(strings.TrimSpace(rawURL), "/")
+			if site == "" || rawURL == "" {
+				continue
+			}
+			s.avSiteURLs[site] = rawURL
+		}
+	}
+	if strings.TrimSpace(s.avBaseURL) != "" {
+		if s.avSiteURLs == nil {
+			s.avSiteURLs = map[string]string{}
+		}
+		if strings.TrimSpace(s.avSiteURLs["javdb"]) == "" {
+			s.avSiteURLs["javdb"] = strings.TrimSuffix(strings.TrimSpace(s.avBaseURL), "/")
+		}
+	}
+	s.avJavDBCookie = strings.TrimSpace(cfg.JavDBCookie)
+	s.avJavBusCookie = strings.TrimSpace(cfg.JavBusCookie)
+	s.avThePornDBAPIToken = strings.TrimSpace(cfg.ThePornDBAPIToken)
+	s.avThePornDBNoHash = cfg.ThePornDBNoHash
 }
 
 type ScrapeResult struct {

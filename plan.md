@@ -218,6 +218,45 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-04-30 19:47] AV 刮削切换到 mdcx Go 迁移内核计划
+- Type: `plan`
+- Summary:
+  - 目标是在不改现有 `/api/v1/admin/scrape/*`、上传自动刮削和 `videos.metadata` 外部结构的前提下，把 AV 站点解析切到 `references/mdcx` 风格的 crawler/provider 内核。
+  - 本轮优先补三类能力：结构化 AV 配置加载、mdcx 聚合补充站点 detail URL 回抓、以及至少一个新增站点的预览搜索回退链路。
+  - 实施方式遵循 TDD：先补 `avsex` 预览/确认与配置加载红测，再最小化接入新 crawler，并跑 Go 全量回归。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/config -run 'TestLoad(IncludesAVSiteOverridesAndTokens|FallsBackToBaseURLForJavDBSiteURL)'` 预期先红。
+  - `go test ./internal/services -run 'TestConfirmAVBuildsAVSexDetailURLFromSourceAndExternalID|TestPreviewAVFallsBackToAVSexWhenPrimarySitesHaveNoResult'` 预期先红。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-30 19:47] AV 刮削接入 mdcx 站点配置与聚合补充站点内核
+- Type: `implementation`
+- Summary:
+  - `internal/config.Config` 新增 AV 站点 URL、JavDB/JavBus cookie、ThePornDB token/no-hash 字段；`main.go` 改为通过结构化 `AVScraperConfig` 注入 `ScraperService`，保留 `AV_SCRAPER_BASE_URL` 作为 JavDB 默认回退。
+  - `ScraperService` 新增结构化 AV 配置入口与站点 URL 映射，`avSiteBaseURL` 现在优先读站点级配置；同时引入 mdcx 风格聚合补充站点 crawler，先接入 `airav_cc`、`avsex`、`cableav`、`hdouban`、`hscangku`、`iqqtv`、`7mmtv` 的 detail URL 识别与抓取。
+  - `avsex` 额外补齐搜索回退链路：当前主站点无结果时，`PreviewAV` 可通过 `avsex` 搜索页拿到候选并复用 detail 抓取；`ConfirmAV` 也能按 `scrape_source=avsex + external_id` 自动构造详情 URL 完成落库与演员同步。
+- Changed Files:
+  - `internal/config/config.go`
+  - `internal/config/config_test.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_mdcx_sites.go`
+  - `internal/services/scraper_test.go`
+  - `main.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/config -run 'TestLoad(IncludesAVSiteOverridesAndTokens|FallsBackToBaseURLForJavDBSiteURL)'` passed.
+  - `go test ./internal/services -run 'TestConfirmAVBuildsAVSexDetailURLFromSourceAndExternalID|TestPreviewAVFallsBackToAVSexWhenPrimarySitesHaveNoResult'` passed.
+  - `go test ./...` passed.
+  - `go vet ./...` passed.
+  - `go test -race ./internal/config ./internal/services ./internal/queue` passed.
+  - `go test -race ./internal/config ./internal/services ./internal/queue ./internal/handlers` failed: `internal/handlers/admin_actor_scrape_test.go` 并行调用 `gin.SetMode()` 触发预存数据竞争，与本次 AV 迁移改动无直接关系。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-25 14:53] 修复长视频重转码 5.1 音频失败
 - Type: `implementation`
 - Summary:

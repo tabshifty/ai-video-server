@@ -99,7 +99,21 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	chunkUploadSvc := services.NewChunkUploadService(cfg.UploadTempDir)
 	recSvc := services.NewRecommendService(repo)
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
-	scrapeSvc.ConfigureAVScraper(cfg.AVScraperBaseURL, cfg.AVScraperUserAgent, cfg.AVScraperTimeout)
+	scrapeSvc.ConfigureAVScraperConfig(services.AVScraperConfig{
+		BaseURL:   cfg.AVScraperBaseURL,
+		UserAgent: cfg.AVScraperUserAgent,
+		Timeout:   cfg.AVScraperTimeout,
+		SiteURLs: map[string]string{
+			"javdb":      cfg.AVSiteURLJavDB,
+			"javbus":     cfg.AVSiteURLJavBus,
+			"javlibrary": cfg.AVSiteURLJavLibrary,
+			"theporndb":  cfg.AVSiteURLThePornDB,
+		},
+		JavDBCookie:       cfg.AVScraperJavDBCookie,
+		JavBusCookie:      cfg.AVScraperJavBusCookie,
+		ThePornDBAPIToken: cfg.AVScraperThePornDBAPIToken,
+		ThePornDBNoHash:   cfg.AVScraperThePornDBNoHash,
+	})
 	appSvc := services.NewAppService(repo)
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
@@ -171,7 +185,21 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.TranscodeTaskTimeout)
 	defer enqueuer.Close()
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
-	scrapeSvc.ConfigureAVScraper(cfg.AVScraperBaseURL, cfg.AVScraperUserAgent, cfg.AVScraperTimeout)
+	scrapeSvc.ConfigureAVScraperConfig(services.AVScraperConfig{
+		BaseURL:   cfg.AVScraperBaseURL,
+		UserAgent: cfg.AVScraperUserAgent,
+		Timeout:   cfg.AVScraperTimeout,
+		SiteURLs: map[string]string{
+			"javdb":      cfg.AVSiteURLJavDB,
+			"javbus":     cfg.AVSiteURLJavBus,
+			"javlibrary": cfg.AVSiteURLJavLibrary,
+			"theporndb":  cfg.AVSiteURLThePornDB,
+		},
+		JavDBCookie:       cfg.AVScraperJavDBCookie,
+		JavBusCookie:      cfg.AVScraperJavBusCookie,
+		ThePornDBAPIToken: cfg.AVScraperThePornDBAPIToken,
+		ThePornDBNoHash:   cfg.AVScraperThePornDBNoHash,
+	})
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
 	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger)
 	processor.Register(mux)
