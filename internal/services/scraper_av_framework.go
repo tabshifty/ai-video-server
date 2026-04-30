@@ -65,6 +65,12 @@ func newAVCrawlerProvider(svc *ScraperService) avCrawlerProvider {
 			newHSCangkuAVCrawler(svc),
 			newIQQTVAVCrawler(svc),
 			newSevenMMTVAVCrawler(svc),
+			newDMMAVCrawler(svc),
+			newMGStageAVCrawler(svc),
+			newPrestigeAVCrawler(svc),
+			newXCityAVCrawler(svc),
+			newGetchuAVCrawler(svc),
+			newThePornDBAVCrawler(svc),
 			newJavBusAVCrawler(svc),
 			newJavLibraryAVCrawler(svc),
 			newFC2AVCrawler(svc),
@@ -468,6 +474,18 @@ func (s *ScraperService) buildAVDetailURLBySource(source, externalID string) str
 		return toAbsoluteURL(s.avSiteBaseURL("iqqtv", "https://iqq5.xyz"), "/jp/player/"+url.PathEscape(externalID))
 	case "7mmtv":
 		return toAbsoluteURL(s.avSiteBaseURL("7mmtv", "https://www.7mmtv.sx"), "/zh/view_video/"+url.PathEscape(externalID)+".html")
+	case "dmm":
+		return toAbsoluteURL(s.avSiteBaseURL("dmm", "https://www.dmm.co.jp"), "/mono/dvd/-/detail/=/cid="+url.PathEscape(strings.ToLower(externalID))+"/")
+	case "mgstage":
+		return toAbsoluteURL(s.avSiteBaseURL("mgstage", "https://www.mgstage.com"), "/product/product_detail/"+url.PathEscape(externalID)+"/")
+	case "prestige":
+		return toAbsoluteURL(s.avSiteBaseURL("prestige", "https://www.prestige-av.com"), "/api/product/"+url.PathEscape(externalID))
+	case "xcity":
+		return toAbsoluteURL(s.avSiteBaseURL("xcity", "https://xcity.jp"), "/avod/detail/?id="+url.QueryEscape(externalID))
+	case "getchu":
+		return toAbsoluteURL(s.avSiteBaseURL("getchu", "https://www.getchu.com"), "/soft.phtml?id="+url.QueryEscape(externalID)+"&gc=gc")
+	case "theporndb":
+		return toAbsoluteURL(s.avSiteBaseURL("theporndb", "https://api.theporndb.net"), "/scenes/"+url.PathEscape(externalID))
 	case "javbus":
 		return toAbsoluteURL(s.avSiteBaseURL("javbus", "https://www.javbus.com"), "/"+externalID)
 	case "javlibrary":
@@ -510,7 +528,8 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 		if strings.Contains(host, "cableav") {
 			return true
 		}
-		return strings.Count(strings.Trim(path, "/"), "/") == 0 && strings.Trim(path, "/") != ""
+		trimmed := strings.Trim(path, "/")
+		return trimmed != "" && strings.Count(trimmed, "/") == 0 && !strings.Contains(trimmed, ".")
 	case "hdouban":
 		if strings.Contains(host, "ormtgu") || strings.Contains(host, "byym21") || strings.Contains(host, "huangdb2") {
 			return true
@@ -526,6 +545,36 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 			return true
 		}
 		return strings.Contains(path, "/view_video/")
+	case "dmm":
+		if strings.Contains(host, "dmm.") {
+			return true
+		}
+		return strings.Contains(path, "/mono/dvd/-/detail/")
+	case "mgstage":
+		if strings.Contains(host, "mgstage") {
+			return true
+		}
+		return strings.Contains(path, "/product/product_detail/")
+	case "prestige":
+		if strings.Contains(host, "prestige-av") {
+			return true
+		}
+		return strings.Contains(path, "/api/product/")
+	case "xcity":
+		if strings.Contains(host, "xcity") {
+			return true
+		}
+		return strings.Contains(path, "/avod/detail/")
+	case "getchu":
+		if strings.Contains(host, "getchu") {
+			return true
+		}
+		return strings.Contains(path, "/soft.phtml")
+	case "theporndb":
+		if strings.Contains(host, "theporndb") {
+			return true
+		}
+		return strings.Contains(path, "/scenes/")
 	case "javdb":
 		if strings.Contains(host, "javdb") {
 			return true
@@ -535,7 +584,8 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 		if strings.Contains(host, "javbus") {
 			return true
 		}
-		return path != "" && !strings.Contains(path, "vl_searchbyid") && !strings.Contains(path, "/article/") && !strings.HasPrefix(path, "/v/")
+		trimmed := strings.Trim(path, "/")
+		return trimmed != "" && strings.Count(trimmed, "/") == 0 && !strings.Contains(trimmed, ".") && !strings.Contains(path, "vl_searchbyid") && !strings.Contains(path, "/article/") && !strings.HasPrefix(path, "/v/")
 	case "javlibrary":
 		if strings.Contains(host, "javlibrary") {
 			return true
@@ -1866,6 +1916,8 @@ func normalizeAVSourceName(source string) string {
 		return "javlibrary"
 	case "fc2", "fc2ppv", "adultfc2":
 		return "fc2"
+	case "theporndb", "porndb", "tpdb":
+		return "theporndb"
 	default:
 		return source
 	}

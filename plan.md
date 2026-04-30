@@ -257,6 +257,38 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-04-30 20:16] AV 刮削继续补入 mdcx 第二批站点计划
+- Type: `plan`
+- Summary:
+  - 在首批 `avsex/airav_cc/...` 补充站点落地后，继续把参考实现里结构清晰、fixture 完整的站点接入当前 AV provider。
+  - 本轮优先目标是 `dmm`、`mgstage`、`prestige`、`xcity`、`theporndb`，并通过红测锁定两条现有链路：`ConfirmAV` 的 detail URL 自动构造/回抓，以及 `PreviewAV` 在主站点无结果时对 `theporndb` 的搜索回退。
+  - 实施策略保持最小替换：不改外部接口，不引入 mdcx 批处理，只在服务层内部新增 crawler 和站点识别规则。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForAdditionalSites|TestPreviewAVFallsBackToThePornDBWhenConfigured'` 预期先红。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-30 20:16] AV 刮削接入 DMM/MGStage/Prestige/XCity/ThePornDB crawler
+- Type: `implementation`
+- Summary:
+  - `internal/services` 新增第二批 mdcx 风格 detail/API crawler：`dmm`、`mgstage`、`prestige`、`xcity`、`theporndb`，并补充本地 HTML/JSON 辅助解析函数，维持当前 `avScrapeCandidate -> PreviewAV/ConfirmAV` 的映射结构不变。
+  - `scraper_av_framework.go` 扩展 provider 注册、detail URL 构造与站点识别规则；同时收紧 `cableav`、`javbus` 的宽路径匹配，避免在本地 host 或自定义站点 URL 下误判其他站点详情页。
+  - `theporndb` 现在可在配置了 token 时参与 `PreviewAV` 搜索回退；`ConfirmAV` 现在可基于 `scrape_source + external_id` 自动回抓 `dmm/mgstage/prestige/xcity/theporndb` 详情并落库。
+- Changed Files:
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForAdditionalSites|TestPreviewAVFallsBackToThePornDBWhenConfigured'` passed.
+  - `go test ./...` passed.
+  - `go vet ./...` passed.
+  - `go test -race ./internal/services ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-25 14:53] 修复长视频重转码 5.1 音频失败
 - Type: `implementation`
 - Summary:

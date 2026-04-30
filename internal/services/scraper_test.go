@@ -1448,3 +1448,238 @@ func TestConfirmAVBuildsAVSexDetailURLFromSourceAndExternalID(t *testing.T) {
 		t.Fatalf("unexpected resolved actor names: %v", repo.resolveActorNames)
 	}
 }
+
+func TestConfirmAVBuildsMDCXDetailURLsForAdditionalSites(t *testing.T) {
+	cases := []struct {
+		name         string
+		source       string
+		externalID   string
+		path         string
+		responseBody string
+		wantTitle    string
+		wantCode     string
+	}{
+		{
+			name:       "dmm",
+			source:     "dmm",
+			externalID: "ssis001",
+			path:       "/mono/dvd/-/detail/=/cid=ssis001/",
+			responseBody: `<!doctype html>
+<html>
+<head>
+  <meta property="og:image" content="https://pics.dmm.co.jp/mono/movie/adult/ssis001/ssis001ps.jpg">
+  <script type="application/ld+json">
+  {
+    "name":"DMM First Impression",
+    "description":"DMM outline.",
+    "brand":{"name":"S1"},
+    "subjectOf":{"contentUrl":"https://video.example.test/ssis001.mp4","uploadDate":"2024-05-02","actor":[{"name":"Yua Mikami"}],"genre":["Drama"]}
+  }
+  </script>
+</head>
+<body>
+  <h1 id="title">DMM First Impression</h1>
+  <table><tr><th>Number</th><td>SSIS-001</td></tr></table>
+</body>
+</html>`,
+			wantTitle: "DMM First Impression",
+			wantCode:  "SSIS-001",
+		},
+		{
+			name:       "mgstage",
+			source:     "mgstage",
+			externalID: "300MIUM-382",
+			path:       "/product/product_detail/300MIUM-382/",
+			responseBody: `<!doctype html>
+<html><body>
+  <div id="center_column"><div><h1>MGStage First Impression</h1></div></div>
+  <table><tr><th>Number</th><td>300MIUM-382</td></tr></table>
+</body></html>`,
+			wantTitle: "MGStage First Impression",
+			wantCode:  "300MIUM-382",
+		},
+		{
+			name:       "prestige",
+			source:     "prestige",
+			externalID: "2e4a2de8-7275-4803-bb07-7585fd4f2ff3",
+			path:       "/api/product/2e4a2de8-7275-4803-bb07-7585fd4f2ff3",
+			responseBody: `{
+  "title": "Prestige First Impression",
+  "body": "Prestige outline.",
+  "actress": [{"name": "Yua Mikami"}],
+  "sku": [{"salesStartAt": "2024-07-01T00:00:00"}],
+  "playTime": 160,
+  "series": {"name": "Prestige Series"},
+  "genre": [{"name": "Drama"}],
+  "maker": {"name": "Prestige"},
+  "label": {"name": "PRESTIGE LABEL"}
+}`,
+			wantTitle: "Prestige First Impression",
+			wantCode:  "",
+		},
+		{
+			name:       "xcity",
+			source:     "xcity",
+			externalID: "147036",
+			path:       "/avod/detail/",
+			responseBody: `<!doctype html>
+<html><body>
+  <span id="program_detail_title">XCity First Impression XC-1280</span>
+  <span id="hinban">XC-1280</span>
+</body></html>`,
+			wantTitle: "XCity First Impression",
+			wantCode:  "XC-1280",
+		},
+		{
+			name:       "getchu",
+			source:     "getchu",
+			externalID: "1180483",
+			path:       "/soft.phtml",
+			responseBody: `<!doctype html>
+<html><head><meta property="og:image" content="/images/covers/istu5391.jpg"></head>
+<body>
+  <h1 id="soft-title">Getchu First Impression</h1>
+  <table><tr><td>Item Code</td><td>ISTU-5391</td></tr></table>
+</body></html>`,
+			wantTitle: "Getchu First Impression",
+			wantCode:  "ISTU-5391",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			videoID := uuid.New()
+			repo := &fakeScraperRepo{
+				videoByID: map[uuid.UUID]models.Video{
+					videoID: {ID: videoID, Title: "旧标题"},
+				},
+			}
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch tc.name {
+				case "xcity":
+					if r.URL.Path == tc.path && r.URL.RawQuery == "id=147036" {
+						_, _ = w.Write([]byte(tc.responseBody))
+						return
+					}
+				case "getchu":
+					if r.URL.Path == tc.path && r.URL.RawQuery == "id=1180483&gc=gc" {
+						_, _ = w.Write([]byte(tc.responseBody))
+						return
+					}
+				default:
+					if r.URL.Path == tc.path {
+						_, _ = w.Write([]byte(tc.responseBody))
+						return
+					}
+				}
+				http.NotFound(w, r)
+			}))
+			defer server.Close()
+
+			svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+			svc.ConfigureAVScraperConfig(AVScraperConfig{
+				BaseURL: server.URL,
+				SiteURLs: map[string]string{
+					tc.source: server.URL,
+				},
+				UserAgent: "mdcx-confirm-test",
+				Timeout:   time.Second,
+			})
+			svc.httpClient = &http.Client{
+				Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     make(http.Header),
+						Body:       io.NopCloser(strings.NewReader("fake-image")),
+						Request:    req,
+					}, nil
+				}),
+			}
+
+			err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+				VideoID:    videoID,
+				ExternalID: tc.externalID,
+				Metadata: map[string]any{
+					"scrape_source": tc.source,
+				},
+			})
+			if err != nil {
+				t.Fatalf("ConfirmAV returned error: %v", err)
+			}
+			if repo.lastUpdate.title != tc.wantTitle {
+				t.Fatalf("expected title %q, got=%q", tc.wantTitle, repo.lastUpdate.title)
+			}
+			if repo.lastUpdate.metadata["scrape_source"] != tc.source {
+				t.Fatalf("expected scrape_source %s, got=%v", tc.source, repo.lastUpdate.metadata["scrape_source"])
+			}
+			if repo.lastUpdate.metadata["av_code"] != tc.wantCode {
+				t.Fatalf("expected av_code %s, got=%v", tc.wantCode, repo.lastUpdate.metadata["av_code"])
+			}
+		})
+	}
+}
+
+func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/search":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/search/ABW-123":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/cn/vl_searchbyid.php":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case r.URL.Path == "/scenes" && r.URL.Query().Get("parse") == "ABW 123":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"slug":"abw-123-scene"}]}`))
+		case r.URL.Path == "/scenes/abw-123-scene":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+  "data":{
+    "slug":"abw-123-scene",
+    "title":"ThePornDB First Impression",
+    "description":"ThePornDB outline.",
+    "date":"2024-10-01",
+    "poster":"https://image.example/abw-123-poster.jpg",
+    "performers":[{"name":"Yua Mikami","parent":{"extras":{"gender":"female"}}}],
+    "tags":[{"name":"Drama"}],
+    "site":{"name":"Prestige","network":{"name":"Prestige"}}
+  }
+}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraperConfig(AVScraperConfig{
+		BaseURL: server.URL,
+		SiteURLs: map[string]string{
+			"theporndb": server.URL,
+		},
+		ThePornDBAPIToken: "token-123",
+		ThePornDBNoHash:   true,
+		UserAgent:         "tpdb-preview-test",
+		Timeout:           time.Second,
+	})
+
+	got, err := svc.PreviewAV(context.Background(), "ABW-123")
+	if err != nil {
+		t.Fatalf("PreviewAV returned error: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatalf("expected av candidates, got none")
+	}
+	first := got[0]
+	if first["scrape_source"] != "theporndb" {
+		t.Fatalf("expected scrape_source theporndb, got=%v", first["scrape_source"])
+	}
+	if first["title"] != "ThePornDB First Impression" {
+		t.Fatalf("expected title ThePornDB First Impression, got=%v", first["title"])
+	}
+	if first["detail_url"] != server.URL+"/scenes/abw-123-scene" {
+		t.Fatalf("expected theporndb detail url, got=%v", first["detail_url"])
+	}
+}
