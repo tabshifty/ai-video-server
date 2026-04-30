@@ -13,6 +13,36 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 02:56] 延长 AV 刮削运行超时计划
+- Type: `plan`
+- Summary:
+  - 只调整运行配置，不改 Go 代码默认值，继续沿用现有 `AV_SCRAPER_TIMEOUT_SECONDS` 配置入口。
+  - 当前代码默认超时仍保留 `10` 秒，但项目实际运行环境通过根目录 `.env` 显式覆盖到 `120` 秒。
+  - 同步更新 `.env.example`，避免后续新环境仍按旧示例值 `10` 秒启动。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/config . -count=1` 作为配置链路回归验证。
+  - `rg -n 'AV_SCRAPER_TIMEOUT_SECONDS' .env .env.example` 确认实际配置和示例值。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 02:56] 将 AV 刮削运行超时提高到 120 秒
+- Type: `implementation`
+- Summary:
+  - 在项目根目录 `.env` 中新增 `AV_SCRAPER_TIMEOUT_SECONDS=120`，让当前 server/worker 启动链路统一使用更长的 AV 刮削超时。
+  - 在 `.env.example` 中把 AV 刮削超时示例值从 `10` 秒更新为 `120` 秒，和当前运行建议保持一致。
+  - 本次不改 `internal/config/config.go` 中的默认值，仍保留代码 fallback 为 `10` 秒，仅通过运行配置实现延长。
+- Changed Files:
+  - `.env`
+  - `.env.example`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/config . -count=1` passed.
+  - `rg -n 'AV_SCRAPER_TIMEOUT_SECONDS' .env .env.example` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 01:41] MDCX AV 迁移收尾修复计划
 - Type: `plan`
 - Summary:
