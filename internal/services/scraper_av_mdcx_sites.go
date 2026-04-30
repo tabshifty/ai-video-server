@@ -412,18 +412,5 @@ func extractSingleSitePathID(rawURL string) string {
 }
 
 func resolveRelativeAVURL(baseURL, rawPath string) string {
-	baseURL = strings.TrimSpace(baseURL)
-	rawPath = strings.TrimSpace(rawPath)
-	if rawPath == "" {
-		return ""
-	}
-	parsed, err := url.Parse(rawPath)
-	if err == nil && parsed.IsAbs() {
-		return parsed.String()
-	}
-	base, err := url.Parse(baseURL)
-	if err != nil {
-		return rawPath
-	}
-	return base.ResolveReference(&url.URL{Path: rawPath}).String()
+	return toAbsoluteURL(baseURL, rawPath)
 }
