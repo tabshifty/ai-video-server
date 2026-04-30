@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -10,14 +11,21 @@ import (
 )
 
 var (
-	fc2HubDetailPathRe    = regexp.MustCompile(`^/detail/\d+/?$`)
-	fc2PPVDBDetailPathRe  = regexp.MustCompile(`^/articles/fc2-ppv-\d+/?$`)
-	airAVDetailPathRe     = regexp.MustCompile(`^/video/fc2-ppv-\d+/?$`)
-	jav321DetailPathRe    = regexp.MustCompile(`^/video/[a-z0-9]+/?$`)
-	mywifeDetailPathRe    = regexp.MustCompile(`^/teigaku/model/no/\d+/?$`)
-	avsoxDetailPathRe     = regexp.MustCompile(`^/cn/movie/[a-z0-9]+/?$`)
-	freeJAVBTDetailPathRe = regexp.MustCompile(`^/detail/fc2-ppv-\d+/?$`)
-	madouquDetailPathRe   = regexp.MustCompile(`^/archives/\d+/?$`)
+	fc2HubDetailPathRe     = regexp.MustCompile(`^/detail/\d+/?$`)
+	fc2PPVDBDetailPathRe   = regexp.MustCompile(`^/articles/fc2-ppv-\d+/?$`)
+	airAVDetailPathRe      = regexp.MustCompile(`^/video/fc2-ppv-\d+/?$`)
+	jav321DetailPathRe     = regexp.MustCompile(`^/video/[a-z0-9]+/?$`)
+	mywifeDetailPathRe     = regexp.MustCompile(`^/teigaku/model/no/\d+/?$`)
+	avsoxDetailPathRe      = regexp.MustCompile(`^/cn/movie/[a-z0-9]+/?$`)
+	freeJAVBTDetailPathRe  = regexp.MustCompile(`^/detail/fc2-ppv-\d+/?$`)
+	madouquDetailPathRe    = regexp.MustCompile(`^/archives/\d+/?$`)
+	falenoDetailPathRe     = regexp.MustCompile(`^/top/works/[a-z0-9-]+/?$`)
+	fantasticaDetailPathRe = regexp.MustCompile(`^/items/detail/[a-z0-9-]+/?$`)
+	gigaDetailPathRe       = regexp.MustCompile(`^/product/index\.php$`)
+	javdayDetailPathRe     = regexp.MustCompile(`^/videos/[a-z0-9-]+/?$`)
+	kin8DetailPathRe       = regexp.MustCompile(`^/moviepages/\d+/index\.html$`)
+	love6DetailPathRe      = regexp.MustCompile(`^/albums/view/[a-z0-9=]+/?$`)
+	lulubarDetailPathRe    = regexp.MustCompile(`^/video/detail/?$`)
 )
 
 type minimalHTMLAVCrawler struct {
@@ -69,6 +77,34 @@ func newCNMDBAVCrawler(svc *ScraperService) avCrawler {
 	return &minimalHTMLAVCrawler{svc: svc, site: "cnmdb"}
 }
 
+func newFalenoAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "faleno"}
+}
+
+func newFantasticaAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "fantastica"}
+}
+
+func newGigaAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "giga"}
+}
+
+func newJavdayAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "javday"}
+}
+
+func newKin8AVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "kin8"}
+}
+
+func newLove6AVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "love6"}
+}
+
+func newLulubarAVCrawler(svc *ScraperService) avCrawler {
+	return &minimalHTMLAVCrawler{svc: svc, site: "lulubar"}
+}
+
 func newMywifeAVCrawler(svc *ScraperService) avCrawler {
 	return &mywifeAVCrawler{svc: svc}
 }
@@ -104,7 +140,7 @@ func (c *minimalHTMLAVCrawler) FetchByDetailURL(ctx context.Context, run *avScra
 		return avScrapeCandidate{}, fmt.Errorf("empty scrape result for url %q", detailURL)
 	}
 
-	externalID := strings.ToLower(extractSingleSitePathID(detailURL))
+	externalID := minimalHTMLExternalID(detailURL, c.site)
 	candidate := avScrapeCandidate{
 		Source:     c.site,
 		ExternalID: externalID,
@@ -132,7 +168,7 @@ func (c *minimalHTMLAVCrawler) extractCode(root *html.Node, detailURL string) st
 		if number := normalizeFC2NumericID(detailURL); number != "" {
 			return "FC2-PPV-" + number
 		}
-	case "jav321", "avsox", "madouqu", "mdtv.com", "cnmdb":
+	case "jav321", "avsox", "madouqu", "mdtv.com", "cnmdb", "faleno", "fantastica", "giga", "javday", "kin8", "love6", "lulubar":
 		switch c.site {
 		case "madouqu":
 			if code := regexp.MustCompile(`(?i)\bMD-\d+\b`).FindString(content); code != "" {
@@ -144,6 +180,18 @@ func (c *minimalHTMLAVCrawler) extractCode(root *html.Node, detailURL string) st
 			}
 		case "cnmdb":
 			if code := regexp.MustCompile(`(?i)\bCNMDB-\d+\b`).FindString(content); code != "" {
+				return strings.ToUpper(strings.TrimSpace(code))
+			}
+		case "kin8":
+			if code := regexp.MustCompile(`(?i)\bKIN8-\d+\b`).FindString(content); code != "" {
+				return strings.ToUpper(strings.TrimSpace(code))
+			}
+		case "love6":
+			if code := regexp.MustCompile(`(?i)\bLOVE6-\d+\b`).FindString(content); code != "" {
+				return strings.ToUpper(strings.TrimSpace(code))
+			}
+		case "lulubar":
+			if code := regexp.MustCompile(`(?i)\bLULU-\d+\b`).FindString(content); code != "" {
 				return strings.ToUpper(strings.TrimSpace(code))
 			}
 		}
@@ -158,6 +206,31 @@ func (c *minimalHTMLAVCrawler) extractCode(root *html.Node, detailURL string) st
 		}
 	}
 	return extractAggregateSupplementNumber(content)
+}
+
+func minimalHTMLExternalID(rawURL string, site string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+
+	switch site {
+	case "giga":
+		return strings.ToLower(strings.TrimSpace(parsed.Query().Get("product_id")))
+	case "lulubar":
+		return strings.ToLower(strings.TrimSpace(parsed.Query().Get("id")))
+	case "kin8":
+		parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+		if len(parts) >= 2 && parts[0] == "moviepages" {
+			return strings.ToLower(strings.TrimSpace(parts[1]))
+		}
+	case "love6":
+		parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+		if len(parts) > 0 {
+			return strings.ToLower(strings.TrimSpace(parts[len(parts)-1]))
+		}
+	}
+	return strings.ToLower(extractSingleSitePathID(rawURL))
 }
 
 func (c *mywifeAVCrawler) Name() string {

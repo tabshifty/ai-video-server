@@ -1939,6 +1939,193 @@ func TestConfirmAVBuildsMDCXDetailURLsForFourthBatchSites(t *testing.T) {
 	}
 }
 
+func TestConfirmAVBuildsMDCXDetailURLsForFifthBatchSites(t *testing.T) {
+	cases := []struct {
+		name         string
+		source       string
+		externalID   string
+		path         string
+		rawQuery     string
+		responseBody string
+		wantSource   string
+		wantTitle    string
+		wantCode     string
+	}{
+		{
+			name:       "faleno",
+			source:     "faleno",
+			externalID: "fsdss564",
+			path:       "/top/works/fsdss564/",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>Faleno First Impression</h1>
+  <div class="number">FSDSS-564</div>
+</body></html>`,
+			wantSource: "faleno",
+			wantTitle:  "Faleno First Impression",
+			wantCode:   "FSDSS-564",
+		},
+		{
+			name:       "fantastica",
+			source:     "fantastica",
+			externalID: "fakwm-001",
+			path:       "/items/detail/FAKWM-001",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>Fantastica First Impression</h1>
+  <div class="sku">FAKWM-001</div>
+</body></html>`,
+			wantSource: "fantastica",
+			wantTitle:  "Fantastica First Impression",
+			wantCode:   "FAKWM-001",
+		},
+		{
+			name:       "giga",
+			source:     "giga",
+			externalID: "6841",
+			path:       "/product/index.php",
+			rawQuery:   "product_id=6841",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>GIGA First Impression</h1>
+  <div class="product-code">GHOV-28</div>
+</body></html>`,
+			wantSource: "giga",
+			wantTitle:  "GIGA First Impression",
+			wantCode:   "GHOV-28",
+		},
+		{
+			name:       "javday",
+			source:     "javday",
+			externalID: "ssis-001",
+			path:       "/videos/ssis-001/",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>Javday First Impression</h1>
+  <div>番号: SSIS-001</div>
+</body></html>`,
+			wantSource: "javday",
+			wantTitle:  "Javday First Impression",
+			wantCode:   "SSIS-001",
+		},
+		{
+			name:       "kin8",
+			source:     "kin8",
+			externalID: "3681",
+			path:       "/moviepages/3681/index.html",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>Kin8 First Impression</h1>
+  <div>KIN8-3681</div>
+</body></html>`,
+			wantSource: "kin8",
+			wantTitle:  "Kin8 First Impression",
+			wantCode:   "KIN8-3681",
+		},
+		{
+			name:       "love6",
+			source:     "love6",
+			externalID: "NDI2Mw==",
+			path:       "/albums/view/NDI2Mw==",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>Love6 First Impression</h1>
+  <div>番号: LOVE6-4263</div>
+</body></html>`,
+			wantSource: "love6",
+			wantTitle:  "Love6 First Impression",
+			wantCode:   "LOVE6-4263",
+		},
+		{
+			name:       "lulubar",
+			source:     "lulubar",
+			externalID: "340460",
+			path:       "/video/detail",
+			rawQuery:   "id=340460",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>Lulubar First Impression</h1>
+  <div>番号: LULU-340460</div>
+</body></html>`,
+			wantSource: "lulubar",
+			wantTitle:  "Lulubar First Impression",
+			wantCode:   "LULU-340460",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			videoID := uuid.New()
+			repo := &fakeScraperRepo{
+				videoByID: map[uuid.UUID]models.Video{
+					videoID: {ID: videoID, Title: "旧标题"},
+				},
+			}
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == tc.path && r.URL.RawQuery == tc.rawQuery {
+					_, _ = w.Write([]byte(tc.responseBody))
+					return
+				}
+				if r.URL.Path == tc.path && tc.rawQuery == "" {
+					_, _ = w.Write([]byte(tc.responseBody))
+					return
+				}
+				http.NotFound(w, r)
+			}))
+			defer server.Close()
+
+			svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+			svc.ConfigureAVScraperConfig(AVScraperConfig{
+				BaseURL: server.URL,
+				SiteURLs: map[string]string{
+					tc.source: server.URL,
+				},
+				UserAgent: "mdcx-confirm-fifth-batch-test",
+				Timeout:   time.Second,
+			})
+			svc.httpClient = &http.Client{
+				Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     make(http.Header),
+						Body:       io.NopCloser(strings.NewReader("fake-image")),
+						Request:    req,
+					}, nil
+				}),
+			}
+
+			err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+				VideoID:    videoID,
+				ExternalID: tc.externalID,
+				Metadata: map[string]any{
+					"scrape_source": tc.source,
+				},
+			})
+			if err != nil {
+				t.Fatalf("ConfirmAV returned error: %v", err)
+			}
+			if repo.lastUpdate.title != tc.wantTitle {
+				t.Fatalf("expected title %q, got=%q", tc.wantTitle, repo.lastUpdate.title)
+			}
+			if repo.lastUpdate.metadata["scrape_source"] != tc.wantSource {
+				t.Fatalf("expected scrape_source %s, got=%v", tc.wantSource, repo.lastUpdate.metadata["scrape_source"])
+			}
+			wantDetailURL := server.URL + tc.path
+			if tc.rawQuery != "" {
+				wantDetailURL += "?" + tc.rawQuery
+			}
+			if repo.lastUpdate.metadata["detail_url"] != wantDetailURL {
+				t.Fatalf("expected detail_url %s, got=%v", wantDetailURL, repo.lastUpdate.metadata["detail_url"])
+			}
+			if repo.lastUpdate.metadata["av_code"] != tc.wantCode {
+				t.Fatalf("expected av_code %s, got=%v", tc.wantCode, repo.lastUpdate.metadata["av_code"])
+			}
+		})
+	}
+}
+
 func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {

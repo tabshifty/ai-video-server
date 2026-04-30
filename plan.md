@@ -3104,3 +3104,36 @@
   - `go test -race ./internal/services ./internal/queue` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-30 21:09] AV mdcx 第五批站点迁移计划
+- Type: `plan`
+- Summary:
+  - 在第四批之后继续补 `references/mdcx` 的剩余日站点最小 HTML 组：`faleno`、`fantastica`、`giga`、`javday`、`kin8`、`love6`、`lulubar`。
+  - 本轮除补站点 crawler、detail URL 构造和匹配规则外，还需要把 `giga`、`kin8`、`lulubar` 等站点的 site-specific external_id 规则带进当前 minimal HTML 内核，避免沿用通用 path 提取时取错值。
+  - 执行策略保持 TDD：先补第五批 `ConfirmAV` 红测，再扩展现有 minimal HTML crawler 的 URL 与 external_id helper，最后做 Go 回归和 race 校验。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForFifthBatchSites'` 预期先红后绿。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-30 21:09] 接入 mdcx 第五批 AV 站点 crawler
+- Type: `implementation`
+- Summary:
+  - 接入 `faleno`、`fantastica`、`giga`、`javday`、`kin8`、`love6`、`lulubar` 七个日站点，复用现有 minimal HTML parser 并补充对应的 detail URL 构造、URL 匹配和 external_id 提取规则，`ConfirmAV` 现在可以按 `scrape_source + external_id` 直接回抓这批站点的标题与番号。
+  - 扩展 minimal HTML crawler 的站点特化逻辑，覆盖 `giga.product_id`、`kin8.moviepages/<id>`、`love6` 路径片段和 `lulubar?id=` 等 external_id 规则；同时新增 `faleno`、`fantastica`、`giga`、`javday`、`kin8`、`love6`、`lulubar` 的 detail URL 匹配规则。
+  - `love6` 的 detail URL 构造改为保留传入 external_id 原样，避免误改大小写导致 query 命中失败；第五批回归测试已覆盖这类 query/path 细节。
+- Changed Files:
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForFifthBatchSites'` passed.
+  - `go test ./internal/services` passed.
+  - `go test ./...` passed.
+  - `go vet ./...` passed.
+  - `go test -race ./internal/services ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`

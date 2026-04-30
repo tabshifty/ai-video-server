@@ -85,6 +85,13 @@ func newAVCrawlerProvider(svc *ScraperService) avCrawlerProvider {
 			newMadouquAVCrawler(svc),
 			newMDTVAVCrawler(svc),
 			newCNMDBAVCrawler(svc),
+			newFalenoAVCrawler(svc),
+			newFantasticaAVCrawler(svc),
+			newGigaAVCrawler(svc),
+			newJavdayAVCrawler(svc),
+			newKin8AVCrawler(svc),
+			newLove6AVCrawler(svc),
+			newLulubarAVCrawler(svc),
 		},
 	}
 }
@@ -580,6 +587,20 @@ func (s *ScraperService) buildAVDetailURLBySource(source, externalID string) str
 		return toAbsoluteURL(s.avSiteBaseURL("mdtv.com", "https://mdtv.com.cn"), "/video/"+url.PathEscape(externalID))
 	case "cnmdb":
 		return toAbsoluteURL(s.avSiteBaseURL("cnmdb", "https://cnmdb.com"), "/video/"+url.PathEscape(externalID))
+	case "faleno":
+		return toAbsoluteURL(s.avSiteBaseURL("faleno", "https://faleno.jp"), "/top/works/"+url.PathEscape(strings.ToLower(externalID))+"/")
+	case "fantastica":
+		return toAbsoluteURL(s.avSiteBaseURL("fantastica", "https://fantastica-vr.com"), "/items/detail/"+url.PathEscape(strings.ToUpper(externalID)))
+	case "giga":
+		return toAbsoluteURL(s.avSiteBaseURL("giga", "https://www.giga-web.jp"), "/product/index.php?product_id="+url.QueryEscape(externalID))
+	case "javday":
+		return toAbsoluteURL(s.avSiteBaseURL("javday", "https://javday.tv"), "/videos/"+url.PathEscape(strings.ToLower(externalID))+"/")
+	case "kin8":
+		return toAbsoluteURL(s.avSiteBaseURL("kin8", "https://www.kin8tengoku.com"), "/moviepages/"+url.PathEscape(externalID)+"/index.html")
+	case "love6":
+		return toAbsoluteURL(s.avSiteBaseURL("love6", "https://love6.tv"), "/albums/view/"+url.PathEscape(externalID))
+	case "lulubar":
+		return toAbsoluteURL(s.avSiteBaseURL("lulubar", "https://lulubar.co"), "/video/detail?id="+url.QueryEscape(externalID))
 	default:
 		return toAbsoluteURL(s.avSiteBaseURL("javdb", "https://javdb.com"), "/v/"+externalID)
 	}
@@ -684,6 +705,41 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 			return true
 		}
 		return false
+	case "faleno":
+		if strings.Contains(host, "faleno") || strings.Contains(host, "falenogroup") {
+			return true
+		}
+		return falenoDetailPathRe.MatchString(path)
+	case "fantastica":
+		if strings.Contains(host, "fantastica") {
+			return true
+		}
+		return fantasticaDetailPathRe.MatchString(path)
+	case "giga":
+		if strings.Contains(host, "giga-web") {
+			return true
+		}
+		return gigaDetailPathRe.MatchString(path) && query.Get("product_id") != ""
+	case "javday":
+		if strings.Contains(host, "javday") {
+			return true
+		}
+		return javdayDetailPathRe.MatchString(path)
+	case "kin8":
+		if strings.Contains(host, "kin8") {
+			return true
+		}
+		return kin8DetailPathRe.MatchString(path)
+	case "love6":
+		if strings.Contains(host, "love6") {
+			return true
+		}
+		return love6DetailPathRe.MatchString(path)
+	case "lulubar":
+		if strings.Contains(host, "lulubar") {
+			return true
+		}
+		return lulubarDetailPathRe.MatchString(path) && query.Get("id") != ""
 	case "javdb":
 		if strings.Contains(host, "javdb") {
 			return true
