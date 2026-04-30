@@ -3266,3 +3266,31 @@
   - `go test -race ./internal/services ./internal/queue` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-01 03:51] Android 电视剧播放页全屏与季数滚动修复计划
+- Type: `plan`
+- Summary:
+  - 修复 `TvSeriesPlayerScreen` 的两个 Android 播放问题：播放器全屏按钮无效，以及选集抽屉里的季数标签超过 5 个后无法横向滚动。
+  - 采用最小改动方案，在页面层直接接入现有 `LongFormVideoPlayer` 的全屏状态管理，并将抽屉季数条改成与电视剧详情页一致的横向滚动 `Row`。
+  - 验证以 Android Kotlin 编译通过为准，并手工覆盖全屏进入/退出、系统返回键和多季滚动场景。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew :app:compileDebugKotlin`
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 03:51] 修复 Android 电视剧播放页全屏按钮与选集季数滚动
+- Type: `implementation`
+- Summary:
+  - 在 `TvSeriesPlayerScreen` 接入 `isFullscreen`、`BackHandler` 和沉浸式横屏控制，非全屏状态下全屏按钮现在会切入独立黑底全屏播放器，退出全屏时恢复页面布局与系统栏。
+  - 补上切集时退出全屏的状态复位，并抽出页面内共用的播放器错误提示 banner，保持普通模式和全屏模式下的错误提示表现一致。
+  - 将选集抽屉中的季数选择条改为 `fillMaxWidth() + horizontalScroll(rememberScrollState())`，多季场景下可左右滑动，不再被压缩换行。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew :app:compileDebugKotlin` passed.
+- Rollback:
+  - `git revert <commit>`
