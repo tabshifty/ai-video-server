@@ -74,6 +74,12 @@ func newAVCrawlerProvider(svc *ScraperService) avCrawlerProvider {
 			newJavBusAVCrawler(svc),
 			newJavLibraryAVCrawler(svc),
 			newFC2AVCrawler(svc),
+			newFC2ClubAVCrawler(svc),
+			newFC2HubAVCrawler(svc),
+			newFC2PPVDBAVCrawler(svc),
+			newAirAVAVCrawler(svc),
+			newJav321AVCrawler(svc),
+			newMywifeAVCrawler(svc),
 		},
 	}
 }
@@ -505,6 +511,30 @@ func (s *ScraperService) buildAVDetailURLBySource(source, externalID string) str
 			return ""
 		}
 		return toAbsoluteURL(s.avSiteBaseURL("fc2", "https://adult.contents.fc2.com"), "/article/"+number+"/")
+	case "fc2club":
+		if code := buildFC2PPVPathCode(externalID); code != "" {
+			return toAbsoluteURL(s.avSiteBaseURL("fc2club", "https://fc2club.com"), "/html/"+url.PathEscape(code)+".html")
+		}
+		return ""
+	case "fc2hub":
+		if number := normalizeFC2NumericID(externalID); number != "" {
+			return toAbsoluteURL(s.avSiteBaseURL("fc2hub", "https://fc2hub.com"), "/detail/"+url.PathEscape(number))
+		}
+		return ""
+	case "fc2ppvdb":
+		if code := buildFC2PPVPathCode(externalID); code != "" {
+			return toAbsoluteURL(s.avSiteBaseURL("fc2ppvdb", "https://fc2ppvdb.com"), "/articles/"+url.PathEscape(code))
+		}
+		return ""
+	case "airav":
+		if code := buildFC2PPVPathCode(externalID); code != "" {
+			return toAbsoluteURL(s.avSiteBaseURL("airav", "https://www.airav.wiki"), "/video/"+url.PathEscape(code))
+		}
+		return ""
+	case "jav321":
+		return toAbsoluteURL(s.avSiteBaseURL("jav321", "https://www.jav321.com"), "/video/"+url.PathEscape(strings.ToLower(externalID)))
+	case "mywife":
+		return toAbsoluteURL(s.avSiteBaseURL("mywife", "https://www.mywife.cc"), "/teigaku/model/no/"+url.PathEscape(externalID))
 	default:
 		return toAbsoluteURL(s.avSiteBaseURL("javdb", "https://javdb.com"), "/v/"+externalID)
 	}
@@ -515,9 +545,6 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 	path = strings.ToLower(strings.TrimSpace(path))
 	switch normalizeAVSourceName(name) {
 	case "airav_cc":
-		if strings.Contains(host, "airav") {
-			return true
-		}
 		return strings.Contains(path, "playon.aspx") || query.Get("hid") != ""
 	case "avsex":
 		if strings.Contains(host, "gg5.") || strings.Contains(host, "9sex.") || strings.Contains(host, "paycalling") || strings.Contains(host, "avsex.") {
@@ -575,6 +602,18 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 			return true
 		}
 		return strings.Contains(path, "/scenes/")
+	case "fc2club":
+		return strings.HasPrefix(path, "/html/") && strings.HasSuffix(path, ".html")
+	case "fc2hub":
+		return fc2HubDetailPathRe.MatchString(path)
+	case "fc2ppvdb":
+		return fc2PPVDBDetailPathRe.MatchString(path)
+	case "airav":
+		return airAVDetailPathRe.MatchString(path)
+	case "jav321":
+		return jav321DetailPathRe.MatchString(path) && !strings.Contains(path, "fc2-ppv-")
+	case "mywife":
+		return mywifeDetailPathRe.MatchString(path)
 	case "javdb":
 		if strings.Contains(host, "javdb") {
 			return true
@@ -592,7 +631,7 @@ func matchAVCrawlerDetailURL(name, host, path string, query url.Values) bool {
 		}
 		return strings.Contains(path, "vl_searchbyid") || strings.HasPrefix(strings.ToLower(strings.TrimSpace(query.Get("v"))), "jav")
 	case "fc2":
-		if strings.Contains(host, "fc2") {
+		if strings.Contains(host, "adult.contents.fc2.com") {
 			return true
 		}
 		return strings.Contains(path, "/article/")
@@ -1910,6 +1949,8 @@ func normalizeAVSourceName(source string) string {
 	switch source {
 	case "javdb":
 		return "javdb"
+	case "airavcc":
+		return "airav_cc"
 	case "javbus":
 		return "javbus"
 	case "javlibrary", "javlib":

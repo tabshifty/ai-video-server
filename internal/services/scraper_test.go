@@ -1621,6 +1621,170 @@ func TestConfirmAVBuildsMDCXDetailURLsForAdditionalSites(t *testing.T) {
 	}
 }
 
+func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
+	cases := []struct {
+		name         string
+		source       string
+		externalID   string
+		path         string
+		responseBody string
+		wantTitle    string
+		wantCode     string
+	}{
+		{
+			name:       "fc2club",
+			source:     "fc2club",
+			externalID: "fc2-ppv-1234567",
+			path:       "/html/FC2-PPV-1234567.html",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>FC2Club First Impression</h1>
+  <div>番號：FC2-PPV-1234567</div>
+</body></html>`,
+			wantTitle: "FC2Club First Impression",
+			wantCode:  "FC2-PPV-1234567",
+		},
+		{
+			name:       "fc2hub",
+			source:     "fc2hub",
+			externalID: "1234567",
+			path:       "/detail/1234567",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>FC2Hub First Impression</h1>
+  <div>番号: FC2-PPV-1234567</div>
+</body></html>`,
+			wantTitle: "FC2Hub First Impression",
+			wantCode:  "FC2-PPV-1234567",
+		},
+		{
+			name:       "fc2ppvdb",
+			source:     "fc2ppvdb",
+			externalID: "fc2-ppv-1234567",
+			path:       "/articles/FC2-PPV-1234567",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>FC2PPVDB First Impression</h1>
+  <div>品番 FC2-PPV-1234567</div>
+</body></html>`,
+			wantTitle: "FC2PPVDB First Impression",
+			wantCode:  "FC2-PPV-1234567",
+		},
+		{
+			name:       "airav",
+			source:     "airav",
+			externalID: "fc2-ppv-1234567",
+			path:       "/video/FC2-PPV-1234567",
+			responseBody: `<!doctype html>
+<html><body>
+  <h1>AIRAV First Impression</h1>
+  <div>番號: FC2-PPV-1234567</div>
+</body></html>`,
+			wantTitle: "AIRAV First Impression",
+			wantCode:  "FC2-PPV-1234567",
+		},
+		{
+			name:       "jav321",
+			source:     "jav321",
+			externalID: "ymdd00173",
+			path:       "/video/ymdd00173",
+			responseBody: `<!doctype html>
+<html><body>
+  <h3>JAV321 First Impression</h3>
+  <div><b>番号</b><span>YMDD-173</span></div>
+</body></html>`,
+			wantTitle: "JAV321 First Impression",
+			wantCode:  "YMDD-173",
+		},
+		{
+			name:       "mywife",
+			source:     "mywife",
+			externalID: "1307",
+			path:       "/teigaku/model/no/1307",
+			responseBody: `<!doctype html>
+<html>
+<head>
+  <title>No.1307 Mywife First Impression</title>
+</head>
+<body>
+  <div class="modelsamplephototop">Mywife outline text.</div>
+  <div class="modelwaku0"><img alt="Yua Mikami"></div>
+  <video id="video" poster="https://cdn.mywife.test/movie/1307/topview.jpg" src="https://cdn.mywife.test/movie/1307/preview.mp4"></video>
+</body>
+</html>`,
+			wantTitle: "Mywife First Impression",
+			wantCode:  "Mywife No.1307",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			videoID := uuid.New()
+			repo := &fakeScraperRepo{
+				videoByID: map[uuid.UUID]models.Video{
+					videoID: {ID: videoID, Title: "旧标题"},
+				},
+			}
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == tc.path {
+					_, _ = w.Write([]byte(tc.responseBody))
+					return
+				}
+				http.NotFound(w, r)
+			}))
+			defer server.Close()
+
+			svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+			svc.ConfigureAVScraperConfig(AVScraperConfig{
+				BaseURL: server.URL,
+				SiteURLs: map[string]string{
+					tc.source: server.URL,
+				},
+				UserAgent: "mdcx-confirm-third-batch-test",
+				Timeout:   time.Second,
+			})
+			svc.httpClient = &http.Client{
+				Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     make(http.Header),
+						Body:       io.NopCloser(strings.NewReader("fake-image")),
+						Request:    req,
+					}, nil
+				}),
+			}
+
+			err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+				VideoID:    videoID,
+				ExternalID: tc.externalID,
+				Metadata: map[string]any{
+					"scrape_source": tc.source,
+				},
+			})
+			if err != nil {
+				t.Fatalf("ConfirmAV returned error: %v", err)
+			}
+			if repo.lastUpdate.title != tc.wantTitle {
+				t.Fatalf("expected title %q, got=%q", tc.wantTitle, repo.lastUpdate.title)
+			}
+			if repo.lastUpdate.metadata["scrape_source"] != tc.source {
+				t.Fatalf("expected scrape_source %s, got=%v", tc.source, repo.lastUpdate.metadata["scrape_source"])
+			}
+			if repo.lastUpdate.metadata["external_id"] != strings.ToLower(tc.externalID) {
+				t.Fatalf("expected external_id %s, got=%v", strings.ToLower(tc.externalID), repo.lastUpdate.metadata["external_id"])
+			}
+			if repo.lastUpdate.metadata["detail_url"] != server.URL+tc.path {
+				t.Fatalf("expected detail_url %s, got=%v", server.URL+tc.path, repo.lastUpdate.metadata["detail_url"])
+			}
+			if repo.lastUpdate.metadata["av_code"] != tc.wantCode {
+				t.Fatalf("expected av_code %s, got=%v", tc.wantCode, repo.lastUpdate.metadata["av_code"])
+			}
+		})
+	}
+}
+
 func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {

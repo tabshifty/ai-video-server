@@ -3037,3 +3037,36 @@
   - `cd admin-web && npm run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-04-30 20:29] AV mdcx 第三批站点迁移计划
+- Type: `plan`
+- Summary:
+  - 用户要求继续把 `references/mdcx` 的 Go 迁移代码补进当前 AV 刮削内核，本轮聚焦第三批站点：`fc2club`、`fc2hub`、`fc2ppvdb`、`airav`、`jav321`、`mywife`。
+  - 范围限定在 `internal/services` 的 provider/crawler 与 `ConfirmAV` detail URL 构造，不改现有上传触发、预览/确认 API 和 `videos.metadata` 结构。
+  - 执行策略保持 TDD：先补 `ConfirmAV` 红测锁定 detail URL 与最小元数据，再补站点实现，最后做 Go 回归和 race 校验。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites'` 预期先红后绿。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-04-30 20:30] 接入 mdcx 第三批 AV 站点 crawler
+- Type: `implementation`
+- Summary:
+  - 新增第三批站点 crawler：`fc2club`、`fc2hub`、`fc2ppvdb`、`airav`、`jav321` 走最小 HTML detail 抓取，`mywife` 走专用 detail parser，现已支持 `ConfirmAV` 按 `scrape_source + external_id` 构造 URL 并回抓标题、番号、演员与概要等基础字段。
+  - 扩展 AV provider、detail URL 构造与 URL 匹配规则，并收紧 `airav_cc` / `fc2` 的 detail URL 识别，避免新站点被旧宽匹配规则误判；同时补齐 `airav_cc` 的 source 规范化映射。
+  - 新增第三批回归测试，覆盖上述 6 个站点的 `ConfirmAV` 路径，确保新接入站点在本地 override host 下也能正确命中 crawler。
+- Changed Files:
+  - `internal/services/scraper_test.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites'` passed.
+  - `go test ./internal/services` passed.
+  - `go test ./...` passed.
+  - `go vet ./...` passed.
+  - `go test -race ./internal/services ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`
