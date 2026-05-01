@@ -13,6 +13,37 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 22:43] Android AV 详情页显示演员头像
+- Type: `implementation`
+- Summary:
+  - Android AV 详情页新增独立演员区块，优先展示接口返回的 `detail.actors`，每个演员显示头像与姓名；无头像时显示姓名首字占位。
+  - 演员头像地址接入现有 `baseUrl` 解析链路，支持相对路径 `/api/v1/actors/:id/avatar` 和绝对 URL，两种形式都能在详情页正常出图。
+  - 保留 metadata `actors` 作为无 `detail.actors` 时的名字回退来源，但不再伪造头像，避免把演员展示和旧 metadata 混成单行文本。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/AvDetailPresentation.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/detail/AvDetailPresentationTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.detail.AvDetailPresentationTest' --tests 'com.chee.videos.feature.detail.AvDetailLayoutSpecTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 22:42] Android AV 详情页显示演员头像计划
+- Type: `plan`
+- Summary:
+  - 在已补齐后端演员头像抓取与本地访问的前提下，Android AV 详情页从“只显示演员名字”扩展为“显示头像 + 姓名”。
+  - 详情页优先消费 `detail.actors[].avatar_url`，并沿用现有 `baseUrl` 拼接逻辑解析相对地址；metadata 仅用于演员名字回退。
+  - 变更范围限定在 Android AV 详情页 presentation/UI 与相关单测，不扩展演员详情页、列表页或其他端。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.detail.AvDetailPresentationTest'`
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug`
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 22:10] AV 刮削联动演员头像补全并落地本地访问
 - Type: `implementation`
 - Summary:

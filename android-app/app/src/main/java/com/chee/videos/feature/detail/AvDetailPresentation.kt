@@ -12,6 +12,12 @@ internal data class AvDetailHeroModel(
     val releaseDate: String?,
 )
 
+internal data class AvDetailActorModel(
+    val name: String,
+    val avatarUrl: String?,
+    val hasAvatar: Boolean,
+)
+
 internal fun buildAvDetailHeroModel(detail: VideoDetailDto): AvDetailHeroModel {
     val primaryText = anyString(detail.metadata?.get("av_code"))
         ?: extractNormalizedAvCode(detail.title)
@@ -38,6 +44,34 @@ internal fun buildAvDetailHeroModel(detail: VideoDetailDto): AvDetailHeroModel {
         overviewText = detail.description.orEmpty().ifBlank { "暂无简介" },
         releaseDate = releaseDate,
     )
+}
+
+internal fun buildAvDetailActorModels(baseUrl: String, detail: VideoDetailDto): List<AvDetailActorModel> {
+    val apiActors = detail.actors.orEmpty()
+        .mapNotNull { actor ->
+            val name = actor.name.trim()
+            if (name.isBlank()) {
+                return@mapNotNull null
+            }
+            val resolvedAvatarUrl = resolveResourceUrl(baseUrl, actor.avatarUrl)
+            AvDetailActorModel(
+                name = name,
+                avatarUrl = resolvedAvatarUrl,
+                hasAvatar = !resolvedAvatarUrl.isNullOrBlank(),
+            )
+        }
+        .distinctBy { it.name.lowercase(Locale.ROOT) }
+    if (apiActors.isNotEmpty()) {
+        return apiActors
+    }
+    return anyStringList(detail.metadata?.get("actors"))
+        .map { name ->
+            AvDetailActorModel(
+                name = name,
+                avatarUrl = null,
+                hasAvatar = false,
+            )
+        }
 }
 
 private fun anyString(value: Any?): String? {

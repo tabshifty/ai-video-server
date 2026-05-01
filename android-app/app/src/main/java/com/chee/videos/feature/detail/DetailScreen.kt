@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
@@ -56,6 +57,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
@@ -170,6 +172,9 @@ fun DetailScreen(
                 val lifecycleOwner = LocalLifecycleOwner.current
                 val playUrl = resolvePlayUrl(uiState.baseUrl, detail, uiState.preferredPlaybackProfile)
                 val posterUrl = resolvePosterUrl(uiState.baseUrl, detail)
+                val actorModels = remember(uiState.baseUrl, detail) {
+                    buildAvDetailActorModels(uiState.baseUrl, detail)
+                }
                 val canPlay = !playUrl.isNullOrBlank()
 
                 val dataSourceFactory = remember(uiState.accessToken) {
@@ -376,6 +381,7 @@ fun DetailScreen(
                         AvDetailPage(
                             detail = detail,
                             posterUrl = posterUrl,
+                            actorModels = actorModels,
                             showPlayer = showPlayer,
                             canPlay = canPlay,
                             useLongFormPlayerControls = useLongFormPlayerControls,
@@ -549,6 +555,7 @@ fun DetailScreen(
 private fun AvDetailPage(
     detail: VideoDetailDto,
     posterUrl: String?,
+    actorModels: List<AvDetailActorModel>,
     showPlayer: Boolean,
     canPlay: Boolean,
     useLongFormPlayerControls: Boolean,
@@ -704,6 +711,7 @@ private fun AvDetailPage(
         AvDetailOverview(
             detail = detail,
             heroModel = heroModel,
+            actorModels = actorModels,
             errorMessage = errorMessage,
             onToggleLike = onToggleLike,
             onToggleFavorite = onToggleFavorite,
@@ -772,13 +780,13 @@ private fun PlayerOverlayIconButton(
 private fun AvDetailOverview(
     detail: VideoDetailDto,
     heroModel: AvDetailHeroModel,
+    actorModels: List<AvDetailActorModel>,
     errorMessage: String?,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleDislike: () -> Unit,
 ) {
     val actionSpecs = buildDetailActionSpecs(detail.userState)
-    val actorLine = heroModel.actorNames.joinToString(" / ").ifBlank { "暂无演员信息" }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -859,7 +867,36 @@ private fun AvDetailOverview(
                 heroModel.releaseDate?.let {
                     AvInfoRow(label = "发布时间", value = it)
                 }
-                AvInfoRow(label = "演员", value = actorLine)
+            }
+        }
+
+        Surface(
+            color = AppChrome.Surface,
+            shape = AppChrome.CardShape,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AvSectionTitle("演员")
+                if (actorModels.isEmpty()) {
+                    Text(
+                        text = "暂无演员信息",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppChrome.TextMuted,
+                    )
+                } else {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        actorModels.forEach { actor ->
+                            AvActorCard(actor = actor)
+                        }
+                    }
+                }
             }
         }
 
@@ -943,6 +980,54 @@ private fun AvDetailOverview(
                 text = errorMessage,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AvActorCard(actor: AvDetailActorModel) {
+    Surface(
+        color = AppChrome.SurfaceStrong,
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .width(92.dp)
+                .padding(horizontal = 10.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (actor.hasAvatar && !actor.avatarUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = actor.avatarUrl,
+                    contentDescription = "${actor.name}头像",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AppChrome.CanvasRaised),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = actor.name.take(1),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AppChrome.TextSecondary,
+                    )
+                }
+            }
+            Text(
+                text = actor.name,
+                style = MaterialTheme.typography.bodySmall,
+                color = AppChrome.TextPrimary,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -1081,7 +1166,7 @@ private fun resolvePosterUrl(baseUrl: String, detail: VideoDetailDto): String? {
     return resolveAvPosterUrl(baseUrl, detail)
 }
 
-private fun resolveResourceUrl(baseUrl: String, raw: String?): String? {
+internal fun resolveResourceUrl(baseUrl: String, raw: String?): String? {
     val path = raw?.trim().orEmpty()
     if (path.isBlank()) {
         return null
