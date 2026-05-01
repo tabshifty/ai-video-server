@@ -158,6 +158,22 @@ LIMIT 1
 	return out, nil
 }
 
+func (r *VideoRepository) GetActorByID(ctx context.Context, actorID uuid.UUID) (models.AdminActor, error) {
+	row := r.pool.QueryRow(ctx, `
+SELECT
+  id, name, aliases, COALESCE(gender,''), COALESCE(country,''), COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''),
+  COALESCE(avatar_url,''), COALESCE(source,''), COALESCE(external_id,''), COALESCE(notes,''), active, created_at, updated_at
+FROM actors
+WHERE id=$1
+LIMIT 1
+`, actorID)
+	out, err := scanAdminActor(row)
+	if err != nil {
+		return models.AdminActor{}, fmt.Errorf("get actor by id: %w", err)
+	}
+	return out, nil
+}
+
 func (r *VideoRepository) CreateActor(ctx context.Context, input models.AdminActorInput) (models.AdminActor, error) {
 	input, err := normalizeActorInput(input)
 	if err != nil {
@@ -219,6 +235,24 @@ RETURNING
 		return models.AdminActor{}, fmt.Errorf("update actor: %w", err)
 	}
 	return out, nil
+}
+
+func (r *VideoRepository) UpdateActorAvatar(ctx context.Context, actorID uuid.UUID, avatarURL, source, externalID string) error {
+	avatarURL = strings.TrimSpace(avatarURL)
+	source = strings.ToLower(strings.TrimSpace(source))
+	externalID = strings.TrimSpace(externalID)
+	if source == "" {
+		source = "manual"
+	}
+	_, err := r.pool.Exec(ctx, `
+UPDATE actors
+SET avatar_url=$2, source=$3, external_id=$4, updated_at=NOW()
+WHERE id=$1
+`, actorID, avatarURL, source, externalID)
+	if err != nil {
+		return fmt.Errorf("update actor avatar: %w", err)
+	}
+	return nil
 }
 
 func (r *VideoRepository) ListVideoActors(ctx context.Context, videoID uuid.UUID) ([]models.AdminVideoActor, error) {

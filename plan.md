@@ -13,6 +13,42 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 22:10] AV 刮削联动演员头像补全并落地本地访问
+- Type: `implementation`
+- Summary:
+  - AV 演员绑定后新增头像补全过程：仅对启用且 `avatar_url` 为空的演员执行补全，按 `JavDB -> TMDB` 顺序查找候选头像。
+  - 命中头像后下载到 `storageRoot/actors/<actor_id>/avatar.*`，并把演员 `avatar_url` 更新为 `/api/v1/actors/:id/avatar`，同时回写来源与外部 ID。
+  - 新增演员头像读取路由，优先返回本地头像文件；原有 AV 手动刮削状态保留、自动 AV 刮削入库与演员管理预览接口保持兼容。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_actor_avatar.go`
+  - `internal/services/scraper_test.go`
+  - `internal/repository/actor_repository.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/actor_avatar.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestSyncAVActorsCompletesMissingAvatarToLocalRoute|TestSyncAVActorsFallsBackToTMDBAvatarWhenJavDBHasNoImage|TestSyncAVActorsDoesNotOverrideExistingAvatar|TestScrapeAVUploadCodeFirstAndActorSync|TestConfirmAVPreservesExplicitReadyStatus|TestPreviewActorByNameTMDB|TestPreviewActorByNameJavDB' -count=1` passed.
+  - `go test ./internal/handlers -run 'TestAdminActorScrapePreviewInvalidSource|TestAdminActorScrapePreviewTMDBSuccess' -count=1` passed.
+  - `go test ./... -count=1` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 22:10] AV 刮削联动演员头像补全计划
+- Type: `plan`
+- Summary:
+  - 为当前仓库补齐“AV 刮削后联动演员头像补全”，而不是修改 MDCX 单次刮削结果结构；头像来源默认固定为 `JavDB` 优先、`TMDB` 回退。
+  - 头像补全默认只处理 `avatar_url` 为空的演员，避免覆盖人工维护；下载成功后优先改为本地访问地址，不新增新的演员头像字段。
+  - 后端需要新增本地头像存储与读取路由，但管理端和 App 的 `avatar_url` 字段协议保持不变。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestSyncAVActorsCompletesMissingAvatarToLocalRoute|TestSyncAVActorsFallsBackToTMDBAvatarWhenJavDBHasNoImage|TestSyncAVActorsDoesNotOverrideExistingAvatar' -count=1`
+  - `go test ./internal/handlers -run 'TestAdminActorScrapePreviewInvalidSource|TestAdminActorScrapePreviewTMDBSuccess' -count=1`
+  - `go test ./... -count=1`
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 21:31] AV 详情页播放器改为 16:9 并腾出顶部安全区
 - Type: `implementation`
 - Summary:

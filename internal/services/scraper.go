@@ -33,6 +33,8 @@ type scraperRepo interface {
 	FindVideoByTypeTMDB(ctx context.Context, typ string, tmdbID int, excludeVideoID uuid.UUID) (uuid.UUID, bool, error)
 	ResolveActorIDs(ctx context.Context, actorIDs []uuid.UUID, actorNames []string, source string) ([]uuid.UUID, error)
 	AddVideoActors(ctx context.Context, videoID uuid.UUID, actorIDs []uuid.UUID, source string) error
+	ListVideoActors(ctx context.Context, videoID uuid.UUID) ([]models.AdminVideoActor, error)
+	UpdateActorAvatar(ctx context.Context, actorID uuid.UUID, avatarURL, source, externalID string) error
 }
 
 // ScraperService handles TMDB search and metadata syncing.
@@ -1283,6 +1285,7 @@ func (s *ScraperService) syncAVActors(ctx context.Context, videoID uuid.UUID, ac
 		return
 	}
 	_ = s.repo.AddVideoActors(ctx, videoID, actorIDs, "scrape_av")
+	_ = s.completeAVActorAvatars(ctx, videoID)
 }
 
 func (s *ScraperService) searchAVCandidates(ctx context.Context, keyword string, limit int) ([]avScrapeCandidate, error) {

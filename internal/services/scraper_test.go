@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -39,6 +41,13 @@ type fakeEpisodeUpsert struct {
 	bindVideo     bool
 }
 
+type fakeActorAvatarUpdate struct {
+	actorID    uuid.UUID
+	avatarURL  string
+	source     string
+	externalID string
+}
+
 type fakeScraperRepo struct {
 	lastUpdate         fakeScrapeUpdate
 	resolveActorNames  []string
@@ -47,6 +56,8 @@ type fakeScraperRepo struct {
 	addedActorSource   string
 	nextActorIDs       []uuid.UUID
 	videoByID          map[uuid.UUID]models.Video
+	videoActorsByID    map[uuid.UUID][]models.AdminVideoActor
+	actorAvatarUpdates []fakeActorAvatarUpdate
 	getVideoErr        error
 	episodeUpserts     []fakeEpisodeUpsert
 	findVideoTMDBCalls []string
@@ -125,6 +136,32 @@ func (f *fakeScraperRepo) ResolveActorIDs(_ context.Context, _ []uuid.UUID, acto
 func (f *fakeScraperRepo) AddVideoActors(_ context.Context, _ uuid.UUID, actorIDs []uuid.UUID, source string) error {
 	f.addedActorIDs = append([]uuid.UUID(nil), actorIDs...)
 	f.addedActorSource = source
+	return nil
+}
+
+func (f *fakeScraperRepo) ListVideoActors(_ context.Context, videoID uuid.UUID) ([]models.AdminVideoActor, error) {
+	items := f.videoActorsByID[videoID]
+	out := make([]models.AdminVideoActor, len(items))
+	copy(out, items)
+	return out, nil
+}
+
+func (f *fakeScraperRepo) UpdateActorAvatar(_ context.Context, actorID uuid.UUID, avatarURL, source, externalID string) error {
+	f.actorAvatarUpdates = append(f.actorAvatarUpdates, fakeActorAvatarUpdate{
+		actorID:    actorID,
+		avatarURL:  avatarURL,
+		source:     source,
+		externalID: externalID,
+	})
+	for videoID, items := range f.videoActorsByID {
+		for idx := range items {
+			if items[idx].ID != actorID {
+				continue
+			}
+			items[idx].AvatarURL = avatarURL
+		}
+		f.videoActorsByID[videoID] = items
+	}
 	return nil
 }
 
@@ -1305,6 +1342,196 @@ func TestConfirmAVPreservesExplicitReadyStatus(t *testing.T) {
 	}
 	if repo.lastUpdate.status != "ready" {
 		t.Fatalf("expected manual av confirm to preserve ready status, got=%s", repo.lastUpdate.status)
+	}
+}
+
+func TestSyncAVActorsCompletesMissingAvatarToLocalRoute(t *testing.T) {
+	videoID := uuid.New()
+	actorID := uuid.New()
+	storageRoot := t.TempDir()
+	repo := &fakeScraperRepo{
+		nextActorIDs: []uuid.UUID{actorID},
+		videoActorsByID: map[uuid.UUID][]models.AdminVideoActor{
+			videoID: {
+				{
+					ID:        actorID,
+					Name:      "演员甲",
+					AvatarURL: "",
+					Active:    true,
+				},
+			},
+		},
+	}
+
+	var tmdbSearchCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/actors/javdb-actor-1" title="演员甲"><img src="/avatars/javdb.jpg" /></a>
+  </body>
+</html>
+`))
+		case "/avatars/javdb.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("javdb-avatar"))
+		case "/search/person":
+			tmdbSearchCount++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"results":[{"id":101}]}`))
+		case "/person/101":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":101,"name":"演员甲","profile_path":"/actor.jpg"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "demo-key", server.URL, storageRoot, "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-actor-avatar-test", time.Second)
+
+	svc.syncAVActors(context.Background(), videoID, []string{"演员甲"})
+
+	if len(repo.actorAvatarUpdates) != 1 {
+		t.Fatalf("expected one actor avatar update, got=%d", len(repo.actorAvatarUpdates))
+	}
+	update := repo.actorAvatarUpdates[0]
+	if update.actorID != actorID {
+		t.Fatalf("unexpected updated actor id: %s", update.actorID)
+	}
+	if update.avatarURL != "/api/v1/actors/"+actorID.String()+"/avatar" {
+		t.Fatalf("unexpected avatar url: %s", update.avatarURL)
+	}
+	if update.source != "scrape_av" {
+		t.Fatalf("expected actor source scrape_av, got=%s", update.source)
+	}
+	if update.externalID != "javdb-actor-1" {
+		t.Fatalf("expected javdb external id, got=%s", update.externalID)
+	}
+	if tmdbSearchCount != 0 {
+		t.Fatalf("expected javdb hit without tmdb fallback, tmdb search count=%d", tmdbSearchCount)
+	}
+	matches, err := filepath.Glob(filepath.Join(storageRoot, "actors", actorID.String(), "avatar.*"))
+	if err != nil {
+		t.Fatalf("glob avatar file: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected one local avatar file, got=%v", matches)
+	}
+}
+
+func TestSyncAVActorsFallsBackToTMDBAvatarWhenJavDBHasNoImage(t *testing.T) {
+	videoID := uuid.New()
+	actorID := uuid.New()
+	storageRoot := t.TempDir()
+	repo := &fakeScraperRepo{
+		nextActorIDs: []uuid.UUID{actorID},
+		videoActorsByID: map[uuid.UUID][]models.AdminVideoActor{
+			videoID: {
+				{
+					ID:        actorID,
+					Name:      "演员乙",
+					AvatarURL: "",
+					Active:    true,
+				},
+			},
+		},
+	}
+
+	var tmdbSearchCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/actors/javdb-actor-2"><span>演员乙</span></a>
+  </body>
+</html>
+`))
+		case "/search/person":
+			tmdbSearchCount++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"results":[{"id":202}]}`))
+		case "/person/202":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":202,"name":"演员乙","profile_path":"/actor-202.jpg"}`))
+		case "/actor-202.jpg", "/t/p/w500/actor-202.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("tmdb-avatar"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "demo-key", server.URL, storageRoot, "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-actor-avatar-test", time.Second)
+	targetURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse server url: %v", err)
+	}
+	svc.httpClient = &http.Client{
+		Timeout: 2 * time.Second,
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Host == "image.tmdb.org" {
+				cloned := req.Clone(req.Context())
+				cloned.URL.Scheme = targetURL.Scheme
+				cloned.URL.Host = targetURL.Host
+				cloned.Host = targetURL.Host
+				return http.DefaultTransport.RoundTrip(cloned)
+			}
+			return http.DefaultTransport.RoundTrip(req)
+		}),
+	}
+
+	svc.syncAVActors(context.Background(), videoID, []string{"演员乙"})
+
+	if len(repo.actorAvatarUpdates) != 1 {
+		t.Fatalf("expected one actor avatar update, got=%d", len(repo.actorAvatarUpdates))
+	}
+	update := repo.actorAvatarUpdates[0]
+	if update.source != "scrape_tmdb" {
+		t.Fatalf("expected tmdb fallback source, got=%s", update.source)
+	}
+	if update.externalID != "202" {
+		t.Fatalf("expected tmdb external id, got=%s", update.externalID)
+	}
+	if tmdbSearchCount != 1 {
+		t.Fatalf("expected one tmdb fallback search, got=%d", tmdbSearchCount)
+	}
+}
+
+func TestSyncAVActorsDoesNotOverrideExistingAvatar(t *testing.T) {
+	videoID := uuid.New()
+	actorID := uuid.New()
+	repo := &fakeScraperRepo{
+		nextActorIDs: []uuid.UUID{actorID},
+		videoActorsByID: map[uuid.UUID][]models.AdminVideoActor{
+			videoID: {
+				{
+					ID:        actorID,
+					Name:      "演员丙",
+					AvatarURL: "https://cdn.example/avatar.jpg",
+					Active:    true,
+				},
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+
+	svc := NewScraperService(repo, "demo-key", server.URL, t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-actor-avatar-test", time.Second)
+
+	svc.syncAVActors(context.Background(), videoID, []string{"演员丙"})
+
+	if len(repo.actorAvatarUpdates) != 0 {
+		t.Fatalf("expected no actor avatar update, got=%d", len(repo.actorAvatarUpdates))
 	}
 }
 
