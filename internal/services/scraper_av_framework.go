@@ -303,7 +303,7 @@ func (s *ScraperService) defaultAVCrawler() avCrawler {
 	return crawler
 }
 
-func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keyword string, limit int) ([]avScrapeCandidate, map[string]any, error) {
+func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keyword string, limit int, plan avSearchPlan) ([]avScrapeCandidate, map[string]any, error) {
 	normalizedKeyword := normalizeAVKeyword(keyword)
 	if normalizedKeyword == "" {
 		return nil, nil, fmt.Errorf("av keyword is required")
@@ -322,13 +322,7 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 		run.addSearchQuery(query)
 	}
 
-	if s.avProvider == nil {
-		s.avProvider = newAVCrawlerProvider(s)
-	}
-	crawlers := s.avProvider.Crawlers()
-	if len(crawlers) == 0 {
-		crawlers = []avCrawler{newJavDBAVCrawler(s)}
-	}
+	crawlers := s.resolveAVCrawlersForPlan(plan)
 
 	rawLimit := limit * 4
 	if rawLimit < 12 {
@@ -405,6 +399,9 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 	}
 	trace := run.toMap()
 	trace["sources"] = collectAVCandidateSources(final)
+	trace["site_category"] = plan.SiteCategory
+	trace["recommended_source"] = plan.RecommendedSource
+	trace["requested_sources"] = append([]string(nil), plan.Sources...)
 	trace["raw_candidate_count"] = len(raw)
 	if len(final) > 0 && final[0].Raw != nil {
 		if v, ok := final[0].Raw["field_sources"]; ok {
@@ -424,6 +421,43 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 		}
 	}
 	return final, trace, nil
+}
+
+func (s *ScraperService) resolveAVCrawlersForPlan(plan avSearchPlan) []avCrawler {
+	if s.avProvider == nil {
+		s.avProvider = newAVCrawlerProvider(s)
+	}
+	available := s.avProvider.Crawlers()
+	if len(available) == 0 {
+		available = []avCrawler{newJavDBAVCrawler(s)}
+	}
+	if len(plan.Sources) == 0 {
+		return available
+	}
+	index := map[string]avCrawler{}
+	used := map[string]struct{}{}
+	for _, crawler := range available {
+		index[normalizeAVSourceName(crawler.Name())] = crawler
+	}
+	out := make([]avCrawler, 0, len(plan.Sources))
+	for _, source := range plan.Sources {
+		if crawler, ok := index[normalizeAVSourceName(source)]; ok {
+			out = append(out, crawler)
+			used[normalizeAVSourceName(source)] = struct{}{}
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, available...)
+		return out
+	}
+	for _, crawler := range available {
+		name := normalizeAVSourceName(crawler.Name())
+		if _, ok := used[name]; ok {
+			continue
+		}
+		out = append(out, crawler)
+	}
+	return out
 }
 
 func (s *ScraperService) fetchAVCandidateByDetailURLWithTrace(ctx context.Context, detailURL string) (avScrapeCandidate, map[string]any, error) {

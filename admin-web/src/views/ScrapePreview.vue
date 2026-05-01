@@ -58,7 +58,7 @@ onMounted(() => {
   if (title) {
     form.title = title
   }
-  if (type === 'tv' || type === 'movie' || type === 'av') {
+  if (type === 'tv' || type === 'movie') {
     form.type = type
   }
   if (year > 0) {
@@ -282,8 +282,8 @@ async function doSave() {
     <div class="page page-shell">
       <section class="section-head">
         <div>
-          <h1 class="page-title">刮削管理</h1>
-          <p class="page-subtitle">预览候选详情并确认保存，支持完整 metadata 检视</p>
+          <h1 class="page-title">通用刮削</h1>
+          <p class="page-subtitle">用于电影与剧集的预览候选确认，支持完整 metadata 检视</p>
         </div>
       </section>
 
@@ -292,7 +292,7 @@ async function doSave() {
           <template #header>
             <div class="panel-head">
               <div class="panel-title">刮削查询</div>
-              <p>输入视频信息后检索候选，支持电影、剧集和 AV 三种类型。</p>
+              <p>输入视频信息后检索候选，支持电影与剧集两种类型。</p>
             </div>
           </template>
           <div class="toolbar-row">
@@ -314,7 +314,6 @@ async function doSave() {
                 <el-select v-model="form.type" style="width:120px" :disabled="previewLoading || saveLoading">
                   <el-option label="电影" value="movie" />
                   <el-option label="剧集" value="tv" />
-                  <el-option label="AV" value="av" />
                 </el-select>
               </el-form-item>
               <el-form-item v-if="form.type === 'tv'" label="季/集">

@@ -28,6 +28,15 @@ func VideoThumbnailURL(videoID uuid.UUID) string {
 	return fmt.Sprintf("/api/v1/videos/%s/thumbnail", videoID.String())
 }
 
+func VideoThumbnailURLWithVariant(videoID uuid.UUID, variant string) string {
+	base := VideoThumbnailURL(videoID)
+	variant = strings.TrimSpace(variant)
+	if variant == "" {
+		return base
+	}
+	return base + "?variant=" + url.QueryEscape(variant)
+}
+
 func TVSeriesPosterURL(seriesID int64) string {
 	return fmt.Sprintf("/api/v1/tv/series/%d/poster", seriesID)
 }

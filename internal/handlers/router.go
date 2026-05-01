@@ -178,6 +178,10 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/system/logs", a.AdminSystemLogs)
 			admin.POST("/scrape/preview", a.AdminScrapePreview)
 			admin.PUT("/scrape/confirm", a.AdminScrapeConfirm)
+			admin.GET("/av-scrape/config", a.AdminAVScrapeConfig)
+			admin.PUT("/av-scrape/config", a.AdminAVScrapeConfig)
+			admin.POST("/av-scrape/preview", a.AdminAVScrapePreview)
+			admin.PUT("/av-scrape/confirm", a.AdminAVScrapeConfirm)
 		}
 	}
 	if a.enableSwagger {

@@ -26,6 +26,14 @@ type DailyUploads struct {
 	Count int64  `json:"count"`
 }
 
+type AVScraperSiteConfig struct {
+	EnabledSites         []string            `json:"enabled_sites"`
+	CategorySiteOrder    map[string][]string `json:"category_site_order"`
+	PosterCropEnabled    bool                `json:"poster_crop_enabled"`
+	PosterCropMode       string              `json:"poster_crop_mode"`
+	PosterCropConfigured bool                `json:"-"`
+}
+
 type AdminVideoListItem struct {
 	ID           uuid.UUID  `json:"id"`
 	Title        string     `json:"title"`

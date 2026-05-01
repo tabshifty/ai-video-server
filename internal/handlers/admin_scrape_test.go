@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"video-server/internal/models"
 	"video-server/internal/services"
 )
 
@@ -68,5 +69,18 @@ func TestAdminScrapePreviewTVNormalizesSeasonEpisodeTitle(t *testing.T) {
 	}
 	if candidate["parsed_episode_number"] != float64(1) {
 		t.Fatalf("expected parsed_episode_number=1, got=%v", candidate["parsed_episode_number"])
+	}
+}
+
+func TestShouldEnqueueAdminScrapeConfirmTranscodeSkipsAV(t *testing.T) {
+	t.Parallel()
+
+	video := models.Video{
+		Type:         "av",
+		Status:       "uploaded",
+		OriginalPath: "/tmp/demo.mkv",
+	}
+	if shouldEnqueueAdminScrapeConfirmTranscode(video) {
+		t.Fatalf("expected av manual confirm to skip transcode enqueue")
 	}
 }

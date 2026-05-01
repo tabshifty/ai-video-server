@@ -179,6 +179,9 @@ func (a *API) resolveThumbnailSource(c *gin.Context, videoID uuid.UUID) (string,
 		return "", false
 	}
 	thumbPath := strings.TrimSpace(video.ThumbnailPath)
+	if video.Type == "av" {
+		thumbPath = chooseAVThumbnailVariantPath(video.Metadata, c.Query("variant"), thumbPath)
+	}
 	if thumbPath == "" {
 		c.JSON(http.StatusNotFound, gin.H{"msg": "thumbnail not found"})
 		return "", false
@@ -192,4 +195,45 @@ func (a *API) resolveThumbnailSource(c *gin.Context, videoID uuid.UUID) (string,
 		return "", false
 	}
 	return thumbPath, true
+}
+
+func chooseAVThumbnailVariantPath(rawMetadata []byte, requestedVariant, fallback string) string {
+	fallback = strings.TrimSpace(fallback)
+	if len(rawMetadata) == 0 {
+		return fallback
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal(rawMetadata, &metadata); err != nil {
+		return fallback
+	}
+	requestedVariant = strings.ToLower(strings.TrimSpace(requestedVariant))
+	if requestedVariant == "" {
+		requestedVariant = strings.ToLower(strings.TrimSpace(stringFromAny(metadata["poster_variant"])))
+	}
+	originalFilePath := strings.TrimSpace(stringFromAny(metadata["poster_original_file_path"]))
+	croppedFilePath := strings.TrimSpace(stringFromAny(metadata["poster_cropped_file_path"]))
+	switch requestedVariant {
+	case "cropped":
+		if croppedFilePath != "" {
+			return croppedFilePath
+		}
+		if originalFilePath != "" {
+			return originalFilePath
+		}
+	case "original":
+		if originalFilePath != "" {
+			return originalFilePath
+		}
+		if croppedFilePath != "" {
+			return croppedFilePath
+		}
+	default:
+		if croppedFilePath != "" {
+			return croppedFilePath
+		}
+		if originalFilePath != "" {
+			return originalFilePath
+		}
+	}
+	return fallback
 }

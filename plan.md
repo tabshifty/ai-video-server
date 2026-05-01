@@ -13,6 +13,46 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 18:45] AV 手动刮削与站点配置重构落地
+- Type: `implementation`
+- Summary:
+  - 后端新增 AV 站点配置与分类路由：自动/手动 AV 统一走“配置优先、标题分类兜底”的选站策略，支持 `fc2`、`western`、`japanese` 三类，手动 AV 预览新增专用接口并默认 `bypass_cache=true`，不再复用旧 metadata/from_cache 结果。
+  - AV 海报落地改为“原图 + 裁剪图 + 展示变体”双产物：保存时写入 `poster_original_path`、`poster_cropped_path`、`poster_variant` 等 metadata，服务端 `/api/v1/videos/:id/thumbnail` 支持按变体回源本地文件，手动 AV 保存明确不再触发转码。
+  - 管理端新增独立 `AV 手动刮削` 菜单页与配置面板；Android AV 海报解析优先裁剪图、再原图、最后回退旧缩略图；补齐 Go、Vitest 与 Android 单测回归。
+- Changed Files:
+  - `internal/models/admin.go`
+  - `internal/repository/admin_settings_repository.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `internal/services/scraper_av_poster.go`
+  - `internal/services/scraper_av_strategy_test.go`
+  - `internal/services/scraper_av_poster_assets_test.go`
+  - `internal/handlers/admin_scrape.go`
+  - `internal/handlers/admin_scrape_test.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/video_source.go`
+  - `internal/utils/video_url.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/components/Layout.vue`
+  - `admin-web/src/router/index.js`
+  - `admin-web/src/views/ScrapePreview.vue`
+  - `admin-web/src/views/AVManualScrape.vue`
+  - `admin-web/src/views/avManualScrape.helpers.js`
+  - `admin-web/src/views/avManualScrape.helpers.spec.js`
+  - `android-app/app/src/main/java/com/chee/videos/core/model/AvPosterSupport.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/model/AvPosterSupportVariantTest.kt`
+  - `migrations/0017_admin_settings.up.sql`
+  - `migrations/0017_admin_settings.down.sql`
+  - `plan.md`
+- Verification:
+  - `go test ./...` passed.
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+  - `cd android-app && ./gradlew app:testDebugUnitTest --tests 'com.chee.videos.core.model.AvPosterSupportTest' --tests 'com.chee.videos.core.model.AvPosterSupportVariantTest'` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 11:43] Android AV 首页与详情页重设计落地
 - Type: `implementation`
 - Summary:

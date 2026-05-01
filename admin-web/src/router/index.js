@@ -6,6 +6,7 @@ import VideoList from '../views/VideoList.vue'
 import VideoUpload from '../views/VideoUpload.vue'
 import TvSeriesManage from '../views/TvSeriesManage.vue'
 import ScrapePreview from '../views/ScrapePreview.vue'
+import AVManualScrape from '../views/AVManualScrape.vue'
 import UserManage from '../views/UserManage.vue'
 import ActorManage from '../views/ActorManage.vue'
 import CollectionManage from '../views/CollectionManage.vue'
@@ -22,6 +23,7 @@ const routes = [
   { path: '/tv-series', component: TvSeriesManage },
   { path: '/upload', component: VideoUpload },
   { path: '/scrape', component: ScrapePreview },
+  { path: '/av-scrape', component: AVManualScrape },
   { path: '/actors', component: ActorManage },
   { path: '/collections', component: CollectionManage },
   { path: '/images', component: ImageManage },

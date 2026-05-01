@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -83,37 +84,9 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 
 		req.Title, req.SeasonNumber, req.EpisodeNumber = normalizeTVPreviewRequest(req.Type, req.Title, req.SeasonNumber, req.EpisodeNumber)
 
-		if len(video.Metadata) > 0 {
+		if req.Type != "av" && len(video.Metadata) > 0 {
 			var raw map[string]any
 			if err := json.Unmarshal(video.Metadata, &raw); err == nil {
-				if req.Type == "av" {
-					externalID := stringFromAny(raw["external_id"])
-					if externalID == "" {
-						if javdb, ok := raw["javdb"].(map[string]any); ok {
-							externalID = stringFromAny(javdb["external_id"])
-						}
-					}
-					scrapeSource := stringFromAny(raw["scrape_source"])
-					if scrapeSource == "" {
-						scrapeSource = "javdb"
-					}
-					ok(c, gin.H{
-						"from_cache": true,
-						"video_id":   video.ID,
-						"candidates": []map[string]any{{
-							"external_id":     externalID,
-							"title":           video.Title,
-							"overview":        video.Description,
-							"poster_url":      video.ThumbnailPath,
-							"release_date":    raw["release_date"],
-							"detail_url":      raw["detail_url"],
-							"metadata":        raw,
-							"media_type_hint": "av",
-							"scrape_source":   scrapeSource,
-						}},
-					})
-					return
-				}
 				if video.TMDBID == nil {
 					// 非 AV 类型确认刮削需要 tmdb_id，缓存中缺失时继续走在线预览
 					goto previewSearch
@@ -164,6 +137,151 @@ previewSearch:
 		withTVPreviewContext(candidate, req.Type, req.Title, req.SeasonNumber, req.EpisodeNumber)
 	}
 	ok(c, gin.H{"candidates": candidates})
+}
+
+func (a *API) AdminAVScrapeConfig(c *gin.Context) {
+	switch c.Request.Method {
+	case http.MethodGet:
+		cfg, err := a.repo.GetAVScraperConfig(c.Request.Context())
+		if err != nil {
+			response.Error(c, 2, err.Error())
+			return
+		}
+		ok(c, cfg)
+	case http.MethodPut:
+		var req models.AVScraperSiteConfig
+		if err := c.ShouldBindJSON(&req); err != nil {
+			bad(c, "invalid payload")
+			return
+		}
+		if err := a.repo.UpsertAVScraperConfig(c.Request.Context(), req); err != nil {
+			response.Error(c, 3, err.Error())
+			return
+		}
+		ok(c, gin.H{"saved": true})
+	default:
+		c.Status(http.StatusMethodNotAllowed)
+	}
+}
+
+func (a *API) AdminAVScrapePreview(c *gin.Context) {
+	var req struct {
+		VideoID      string `json:"video_id"`
+		Title        string `json:"title"`
+		SiteCategory string `json:"site_category"`
+		SiteSource   string `json:"site_source"`
+		BypassCache  *bool  `json:"bypass_cache"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+
+	if strings.TrimSpace(req.VideoID) != "" {
+		videoID, okUUID := parseUUID(req.VideoID)
+		if !okUUID {
+			bad(c, "invalid video_id")
+			return
+		}
+		video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
+		if err != nil {
+			response.Error(c, 2, err.Error())
+			return
+		}
+		if strings.TrimSpace(req.Title) == "" {
+			req.Title = strings.TrimSpace(video.Title)
+		}
+		if strings.TrimSpace(req.Title) == "" && strings.TrimSpace(video.OriginalPath) != "" {
+			req.Title = strings.TrimSpace(strings.TrimSuffix(filepath.Base(video.OriginalPath), filepath.Ext(video.OriginalPath)))
+		}
+	}
+	if strings.TrimSpace(req.Title) == "" {
+		bad(c, "title is required")
+		return
+	}
+
+	bypassCache := true
+	if req.BypassCache != nil {
+		bypassCache = *req.BypassCache
+	}
+	result, err := a.scrapeSvc.PreviewAVSearch(c.Request.Context(), req.Title, services.AVPreviewOptions{
+		BypassCache:  bypassCache,
+		SiteCategory: req.SiteCategory,
+		SiteSource:   req.SiteSource,
+	})
+	if err != nil {
+		response.Error(c, 3, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"from_cache":         false,
+		"recommended_source": result.RecommendedSource,
+		"used_source":        result.UsedSource,
+		"site_category":      result.SiteCategory,
+		"enabled_sources":    result.EnabledSources,
+		"candidates":         result.Candidates,
+	})
+}
+
+func (a *API) AdminAVScrapeConfirm(c *gin.Context) {
+	var req struct {
+		VideoID      string         `json:"video_id"`
+		ExternalID   string         `json:"external_id"`
+		Title        string         `json:"title"`
+		Overview     string         `json:"overview"`
+		PosterURL    string         `json:"poster_url"`
+		ReleaseDate  string         `json:"release_date"`
+		SiteCategory string         `json:"site_category"`
+		SiteSource   string         `json:"site_source"`
+		Metadata     map[string]any `json:"metadata"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	videoID, okID := parseUUID(req.VideoID)
+	if !okID {
+		bad(c, "invalid video_id")
+		return
+	}
+	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
+	if err != nil {
+		response.Error(c, 2, err.Error())
+		return
+	}
+	if video.Type != "av" {
+		bad(c, "video type must be av")
+		return
+	}
+	if strings.TrimSpace(req.ExternalID) == "" {
+		bad(c, "external_id is required for av")
+		return
+	}
+	if req.Metadata == nil {
+		req.Metadata = map[string]any{}
+	}
+	if strings.TrimSpace(req.SiteSource) != "" {
+		req.Metadata["scrape_source"] = req.SiteSource
+	}
+	if strings.TrimSpace(req.SiteCategory) != "" {
+		req.Metadata["site_category"] = req.SiteCategory
+	}
+	if err := a.scrapeSvc.ConfirmAV(c.Request.Context(), services.ConfirmScrapeInput{
+		VideoID:     videoID,
+		ExternalID:  req.ExternalID,
+		Title:       req.Title,
+		Overview:    req.Overview,
+		PosterURL:   req.PosterURL,
+		ReleaseDate: req.ReleaseDate,
+		Metadata:    req.Metadata,
+	}); err != nil {
+		response.Error(c, 3, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"saved":    true,
+		"video_id": videoID,
+	})
 }
 
 // @Summary Admin confirm scrape metadata
@@ -269,6 +387,9 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 }
 
 func shouldEnqueueAdminScrapeConfirmTranscode(video models.Video) bool {
+	if video.Type == "av" {
+		return false
+	}
 	return strings.TrimSpace(video.OriginalPath) != "" && video.Status != "ready" && video.Status != "processing"
 }
 

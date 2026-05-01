@@ -48,11 +48,20 @@ private fun buildAvPoster(
     val posterDecision = anyString(metadata?.get("poster_decision"))
     val posterSource = anyString(metadata?.get("poster_source"))
     val posterQuality = anyString(metadata?.get("poster_quality"))
+    val posterVariant = anyString(metadata?.get("poster_variant"))
+    val croppedPosterPath = anyString(metadata?.get("poster_cropped_path"))
+    val originalPosterPath = anyString(metadata?.get("poster_original_path"))
     val scrapeSource = anyString(metadata?.get("scrape_source"))
     val sourceBlock = metadata?.get(scrapeSource) as? Map<*, *>
     val sourcePosterUrl = anyString(sourceBlock?.get("poster_url"))
     val sourcePosterPath = anyString(sourceBlock?.get("poster_path"))
+    val localizedPosterPath = when (posterVariant) {
+        "cropped" -> croppedPosterPath ?: originalPosterPath
+        "original" -> originalPosterPath ?: croppedPosterPath
+        else -> croppedPosterPath ?: originalPosterPath
+    }
     val rawScrapedPoster = listOf(
+        localizedPosterPath,
         anyString(metadata?.get("poster_url")),
         anyString(metadata?.get("poster_path")),
         sourcePosterUrl,
