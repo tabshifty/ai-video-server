@@ -13,6 +13,36 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 21:31] AV 详情页播放器改为 16:9 并腾出顶部安全区
+- Type: `implementation`
+- Summary:
+  - Android AV 详情页媒体区从固定 `440.dp` 高度改为按宽度使用 `16:9` 比例，避免播放器在详情页中占用过高竖向空间。
+  - AV 详情页内容容器新增顶部状态栏安全区留白，由页面统一承担顶部 inset；海报态的返回按钮移除重复的 `statusBarsPadding()`，避免双重下推。
+  - 新增 detail 布局 spec 单测，锁定“16:9 比例 + 顶部安全区留白”这两个布局约束。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/detail/AvDetailLayoutSpecTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.detail.AvDetailPresentationTest' --tests 'com.chee.videos.feature.detail.AvDetailLayoutSpecTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 21:31] AV 详情页播放器改为 16:9 并腾出顶部安全区计划
+- Type: `plan`
+- Summary:
+  - 将 Android AV 详情页媒体区从固定高度改成 `16:9` 比例，并让顶部状态栏安全区独立留白，避免播放器贴到屏幕最顶端。
+  - 变更范围限定在 `DetailScreen` 的 AV 详情布局与对应单测，不改播放器内部手势/控制条逻辑，也不改非 AV 详情页。
+  - 验证目标为 detail 相关单测与 `:app:assembleDebug`。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.detail.AvDetailLayoutSpecTest'`
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug`
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 21:08] Android AV 列表/详情页海报分流显示
 - Type: `implementation`
 - Summary:

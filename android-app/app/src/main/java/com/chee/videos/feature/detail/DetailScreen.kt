@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -566,10 +567,18 @@ private fun AvDetailPage(
     modifier: Modifier = Modifier,
 ) {
     val heroModel = buildAvDetailHeroModel(detail)
+    val mediaLayoutSpec = buildAvDetailMediaLayoutSpec()
 
     Column(
         modifier = modifier
             .background(Color(0xFF0B0C0F))
+            .then(
+                if (mediaLayoutSpec.applyStatusBarPadding) {
+                    Modifier.statusBarsPadding()
+                } else {
+                    Modifier
+                },
+            )
             .verticalScroll(rememberScrollState())
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -577,7 +586,7 @@ private fun AvDetailPage(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(440.dp)
+                .aspectRatio(mediaLayoutSpec.aspectRatio)
                 .clip(AppChrome.CardShape)
                 .background(AppChrome.CanvasRaised),
         ) {
@@ -646,7 +655,6 @@ private fun AvDetailPage(
                     onClick = onBack,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .statusBarsPadding()
                         .padding(14.dp),
                 )
                 PlayerOverlayIconButton(
@@ -702,6 +710,18 @@ private fun AvDetailPage(
             onToggleDislike = onToggleDislike,
         )
     }
+}
+
+private data class AvDetailMediaLayoutSpec(
+    val aspectRatio: Float,
+    val applyStatusBarPadding: Boolean,
+)
+
+private fun buildAvDetailMediaLayoutSpec(): AvDetailMediaLayoutSpec {
+    return AvDetailMediaLayoutSpec(
+        aspectRatio = 16f / 9f,
+        applyStatusBarPadding = true,
+    )
 }
 
 @Composable
