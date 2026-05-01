@@ -12,6 +12,12 @@ export const AV_SITE_OPTIONS = [
   'fc2ppvdb'
 ]
 
+export const AV_POSTER_CROP_MODE_OPTIONS = [
+  'portrait_center',
+  'portrait_left',
+  'portrait_right'
+]
+
 export function buildAVManualScrapePreviewPayload(form) {
   return {
     video_id: normalizeText(form?.video_id),
@@ -55,7 +61,7 @@ export function buildAVScrapeConfigPayload(form) {
       japanese: parseSiteOrderInput(form?.japanese_order)
     },
     poster_crop_enabled: form?.poster_crop_enabled !== false,
-    poster_crop_mode: normalizeText(form?.poster_crop_mode) || 'portrait_center'
+    poster_crop_mode: normalizePosterCropMode(form?.poster_crop_mode)
   }
 }
 
@@ -68,7 +74,7 @@ export function applyAVScrapeConfig(form, payload) {
   form.western_order = toSiteOrderText(categoryOrder.western)
   form.japanese_order = toSiteOrderText(categoryOrder.japanese)
   form.poster_crop_enabled = payload?.poster_crop_enabled !== false
-  form.poster_crop_mode = normalizeText(payload?.poster_crop_mode) || 'portrait_center'
+  form.poster_crop_mode = normalizePosterCropMode(payload?.poster_crop_mode)
 }
 
 export function toSiteOrderText(value) {
@@ -77,4 +83,9 @@ export function toSiteOrderText(value) {
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizePosterCropMode(value) {
+  const mode = normalizeText(value)
+  return AV_POSTER_CROP_MODE_OPTIONS.includes(mode) ? mode : 'portrait_center'
 }

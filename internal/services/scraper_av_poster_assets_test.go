@@ -3,6 +3,8 @@ package services
 import (
 	"bytes"
 	"context"
+	"image"
+	"image/color"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,8 +15,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"image"
-	"image/color"
 	"image/jpeg"
 	"video-server/internal/models"
 )
@@ -172,6 +172,60 @@ func TestConfirmAVFallsBackToOriginalPosterWhenCropFails(t *testing.T) {
 	}
 }
 
+func TestResolveAVPosterAssetsUsesConfiguredHorizontalCropAnchor(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/poster/wide-anchor.jpg" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write(testJPEGWideAnchorBytes(t))
+	}))
+	defer server.Close()
+
+	cases := []struct {
+		name          string
+		mode          string
+		wantLeftEdge  string
+		wantRightEdge string
+	}{
+		{name: "center", mode: "portrait_center", wantLeftEdge: "red", wantRightEdge: "blue"},
+		{name: "left", mode: "portrait_left", wantLeftEdge: "red", wantRightEdge: "green"},
+		{name: "right", mode: "portrait_right", wantLeftEdge: "green", wantRightEdge: "blue"},
+		{name: "invalid_falls_back_to_center", mode: "unexpected", wantLeftEdge: "red", wantRightEdge: "blue"},
+		{name: "empty_falls_back_to_center", mode: "", wantLeftEdge: "red", wantRightEdge: "blue"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			svc := NewScraperService(nil, "", "", t.TempDir(), "", 2*time.Second)
+			assets, _, err := svc.resolveAVPosterAssets(
+				context.Background(),
+				uuid.New(),
+				"",
+				server.URL+"/poster/wide-anchor.jpg",
+				"manual",
+				avPosterQualityPrimary,
+				AVScraperSiteConfig{
+					PosterCropEnabled: true,
+					PosterCropMode:    tc.mode,
+				},
+			)
+			if err != nil {
+				t.Fatalf("resolveAVPosterAssets returned error: %v", err)
+			}
+			if assets.Variant != avPosterVariantCropped {
+				t.Fatalf("expected cropped variant, got=%s", assets.Variant)
+			}
+
+			cropped := decodeJPEGFile(t, assets.CroppedPath)
+			assertNamedEdgeColor(t, cropped, 10, cropped.Bounds().Dy()/2, tc.wantLeftEdge)
+			assertNamedEdgeColor(t, cropped, cropped.Bounds().Dx()-11, cropped.Bounds().Dy()/2, tc.wantRightEdge)
+		})
+	}
+}
+
 func testJPEGPortraitBytes(t *testing.T) []byte {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 240, 360))
@@ -185,6 +239,68 @@ func testJPEGPortraitBytes(t *testing.T) []byte {
 		t.Fatalf("encode jpeg fixture: %v", err)
 	}
 	return buf.Bytes()
+}
+
+func testJPEGWideAnchorBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 900, 900))
+	for y := 0; y < 900; y++ {
+		for x := 0; x < 900; x++ {
+			switch {
+			case x < 300:
+				img.Set(x, y, color.RGBA{R: 255, A: 255})
+			case x < 600:
+				img.Set(x, y, color.RGBA{G: 255, A: 255})
+			default:
+				img.Set(x, y, color.RGBA{B: 255, A: 255})
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatalf("encode wide jpeg fixture: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func decodeJPEGFile(t *testing.T, path string) image.Image {
+	t.Helper()
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open jpeg file: %v", err)
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		t.Fatalf("decode jpeg file: %v", err)
+	}
+	return img
+}
+
+func assertNamedEdgeColor(t *testing.T, img image.Image, x, y int, want string) {
+	t.Helper()
+	r16, g16, b16, _ := img.At(x, y).RGBA()
+	r := int(r16 >> 8)
+	g := int(g16 >> 8)
+	b := int(b16 >> 8)
+
+	switch want {
+	case "red":
+		if !(r > g+40 && r > b+40) {
+			t.Fatalf("expected red edge at (%d,%d), got rgb=(%d,%d,%d)", x, y, r, g, b)
+		}
+	case "green":
+		if !(g > r+40 && g > b+40) {
+			t.Fatalf("expected green edge at (%d,%d), got rgb=(%d,%d,%d)", x, y, r, g, b)
+		}
+	case "blue":
+		if !(b > r+40 && b > g+40) {
+			t.Fatalf("expected blue edge at (%d,%d), got rgb=(%d,%d,%d)", x, y, r, g, b)
+		}
+	default:
+		t.Fatalf("unsupported expected color %q", want)
+	}
 }
 
 func serverURLFromRequest(r *http.Request) string {

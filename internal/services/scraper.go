@@ -162,6 +162,7 @@ type ScrapeResult struct {
 type ConfirmScrapeInput struct {
 	VideoID       uuid.UUID
 	Type          string // movie | tv | episode | av
+	Status        string
 	TMDBID        int
 	ExternalID    string
 	Title         string
@@ -629,7 +630,11 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 	if sources, ok := candidate.Raw["merged_sources"]; ok {
 		meta["scrape_sources"] = sources
 	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, title, overview, posterAssets.SelectedPath, meta, "uploaded"); err != nil {
+	targetStatus := strings.TrimSpace(in.Status)
+	if targetStatus == "" {
+		targetStatus = "uploaded"
+	}
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, title, overview, posterAssets.SelectedPath, meta, targetStatus); err != nil {
 		return err
 	}
 	s.syncAVActors(ctx, video.ID, candidate.Actors)

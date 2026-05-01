@@ -10,6 +10,7 @@ import {
   updateAVScrapeConfig
 } from '../api/admin'
 import {
+  AV_POSTER_CROP_MODE_OPTIONS,
   applyAVScrapeConfig,
   AV_SITE_OPTIONS,
   buildAVManualScrapeConfirmPayload,
@@ -236,7 +237,19 @@ async function doSave() {
               <el-switch v-model="configForm.poster_crop_enabled" active-text="启用裁剪" inactive-text="仅保留原图" />
             </el-form-item>
             <el-form-item label="裁剪模式">
-              <el-input v-model="configForm.poster_crop_mode" :disabled="!configForm.poster_crop_enabled" />
+              <el-select
+                v-model="configForm.poster_crop_mode"
+                :disabled="!configForm.poster_crop_enabled"
+                placeholder="选择海报裁剪锚点"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="mode in AV_POSTER_CROP_MODE_OPTIONS"
+                  :key="mode"
+                  :label="mode"
+                  :value="mode"
+                />
+              </el-select>
             </el-form-item>
           </el-form>
           <el-button type="primary" :loading="configSaving" @click="saveConfig">保存 AV 配置</el-button>

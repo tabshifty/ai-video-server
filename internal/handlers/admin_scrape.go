@@ -268,6 +268,7 @@ func (a *API) AdminAVScrapeConfirm(c *gin.Context) {
 	}
 	if err := a.scrapeSvc.ConfirmAV(c.Request.Context(), services.ConfirmScrapeInput{
 		VideoID:     videoID,
+		Status:      video.Status,
 		ExternalID:  req.ExternalID,
 		Title:       req.Title,
 		Overview:    req.Overview,
@@ -355,6 +356,7 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 			return
 		}
 	case "av":
+		input.Status = video.Status
 		if err := a.scrapeSvc.ConfirmAV(c.Request.Context(), input); err != nil {
 			response.Error(c, 3, err.Error())
 			return

@@ -13,6 +13,31 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 20:26] AV 裁剪模式补齐与手动刮削状态保留修正
+- Type: `implementation`
+- Summary:
+  - AV 海报裁剪模式扩展为 `portrait_center`、`portrait_left`、`portrait_right` 三种枚举；后端在横向裁切时按模式决定左右锚点，空值或非法值统一回退到 `portrait_center`。
+  - AV 手动刮削确认保存新增显式状态透传：管理端 handler 会把当前视频状态传给 `ConfirmAV`，从而让已 `ready` 的视频在手动保存后继续保持 `ready`；自动链路与 `ScrapeAVUpload` 仍维持原有 `uploaded` 行为。
+  - 管理端 AV 配置页把 `poster_crop_mode` 从自由输入收敛为枚举下拉，前端 helper 同步只接受这 3 个值并在远端配置异常时回退到 `portrait_center`。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `internal/services/scraper_av_poster.go`
+  - `internal/services/scraper_av_poster_assets_test.go`
+  - `internal/services/scraper_test.go`
+  - `internal/handlers/admin_scrape.go`
+  - `admin-web/src/views/AVManualScrape.vue`
+  - `admin-web/src/views/avManualScrape.helpers.js`
+  - `admin-web/src/views/avManualScrape.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestResolveAVPosterAssetsUsesConfiguredHorizontalCropAnchor|TestConfirmAVPreservesExplicitReadyStatus|TestConfirmAVStoresOriginalAndCroppedPosterAssets|TestConfirmAVFallsBackToOriginalPosterWhenCropFails|TestScrapeAVUploadCodeFirstAndActorSync' -count=1` passed.
+  - `go test ./... -count=1` passed.
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 18:45] AV 手动刮削与站点配置重构落地
 - Type: `implementation`
 - Summary:

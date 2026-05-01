@@ -1254,6 +1254,60 @@ func TestConfirmAVReplacesExistingThumbnailWhenFallbackPosterIsUsable(t *testing
 	}
 }
 
+func TestConfirmAVPreservesExplicitReadyStatus(t *testing.T) {
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:            videoID,
+				Title:         "SSIS-125",
+				Type:          "av",
+				Status:        "ready",
+				ThumbnailPath: "/keep/existing.jpg",
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v/ssis-125":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>SSIS-125 标题 - JavDB</title>
+  </head>
+  <body>
+    <h2 class="title is-4">SSIS-125 标题</h2>
+    <div><strong>番號:</strong><span>SSIS-125</span></div>
+  </body>
+</html>
+`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-confirm-ready-status-test", time.Second)
+
+	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:    videoID,
+		ExternalID: "ssis-125",
+		Status:     "ready",
+		Metadata: map[string]any{
+			"scrape_source": "javdb",
+			"detail_url":    server.URL + "/v/ssis-125",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+	if repo.lastUpdate.status != "ready" {
+		t.Fatalf("expected manual av confirm to preserve ready status, got=%s", repo.lastUpdate.status)
+	}
+}
+
 func TestConfirmAVUsesFallbackPosterWhenNoExistingThumbnail(t *testing.T) {
 	videoID := uuid.New()
 	repo := &fakeScraperRepo{

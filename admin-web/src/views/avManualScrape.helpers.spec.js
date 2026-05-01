@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AV_POSTER_CROP_MODE_OPTIONS,
   applyAVScrapeConfig,
   buildAVManualScrapeConfirmPayload,
   buildAVManualScrapePreviewPayload,
@@ -61,6 +62,26 @@ describe('avManualScrape helpers', () => {
     })
   })
 
+  it('only accepts the three allowed poster crop modes in config payload', () => {
+    expect(AV_POSTER_CROP_MODE_OPTIONS).toEqual([
+      'portrait_center',
+      'portrait_left',
+      'portrait_right'
+    ])
+
+    expect(buildAVScrapeConfigPayload({
+      poster_crop_mode: 'portrait_left'
+    }).poster_crop_mode).toBe('portrait_left')
+
+    expect(buildAVScrapeConfigPayload({
+      poster_crop_mode: 'portrait_right'
+    }).poster_crop_mode).toBe('portrait_right')
+
+    expect(buildAVScrapeConfigPayload({
+      poster_crop_mode: 'unexpected-mode'
+    }).poster_crop_mode).toBe('portrait_center')
+  })
+
   it('applies remote config into editable form state', () => {
     const form = {}
     applyAVScrapeConfig(form, {
@@ -82,5 +103,21 @@ describe('avManualScrape helpers', () => {
       poster_crop_enabled: true,
       poster_crop_mode: 'portrait_center'
     })
+  })
+
+  it('falls back to portrait_center when remote crop mode is empty or invalid', () => {
+    const form = {}
+    applyAVScrapeConfig(form, {
+      poster_crop_mode: 'unexpected-mode'
+    })
+    expect(form.poster_crop_mode).toBe('portrait_center')
+
+    applyAVScrapeConfig(form, {
+      poster_crop_mode: 'portrait_right'
+    })
+    expect(form.poster_crop_mode).toBe('portrait_right')
+
+    applyAVScrapeConfig(form, {})
+    expect(form.poster_crop_mode).toBe('portrait_center')
   })
 })

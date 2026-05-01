@@ -45,6 +45,9 @@ const (
 
 	avPosterVariantOriginal = "original"
 	avPosterVariantCropped  = "cropped"
+	avPosterCropModeCenter  = "portrait_center"
+	avPosterCropModeLeft    = "portrait_left"
+	avPosterCropModeRight   = "portrait_right"
 )
 
 var errAVScraperConfigNotFound = errors.New("av scraper config not found")
@@ -58,7 +61,7 @@ func defaultAVScraperSiteConfig() AVScraperSiteConfig {
 			avSiteCategoryJapanese: {"javdb", "javbus", "javlibrary", "airav_cc", "avsex"},
 		},
 		PosterCropEnabled: true,
-		PosterCropMode:    "portrait_center",
+		PosterCropMode:    avPosterCropModeCenter,
 	}
 }
 
@@ -170,12 +173,23 @@ func (s *ScraperService) loadAVScraperSiteConfig(ctx context.Context) AVScraperS
 			cfg.CategorySiteOrder[category] = normalizeSourceList(rawSources)
 		}
 	}
-	if stored.PosterCropMode != "" {
-		cfg.PosterCropMode = strings.TrimSpace(stored.PosterCropMode)
-	}
+	cfg.PosterCropMode = normalizeAVPosterCropMode(stored.PosterCropMode)
 	cfg.PosterCropEnabled = stored.PosterCropEnabled || !stored.PosterCropConfigured
 	cfg.PosterCropConfigured = true
 	return cfg
+}
+
+func normalizeAVPosterCropMode(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case avPosterCropModeLeft:
+		return avPosterCropModeLeft
+	case avPosterCropModeRight:
+		return avPosterCropModeRight
+	case avPosterCropModeCenter:
+		return avPosterCropModeCenter
+	default:
+		return avPosterCropModeCenter
+	}
 }
 
 func normalizeSourceList(raw []string) []string {

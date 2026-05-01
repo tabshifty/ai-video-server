@@ -54,7 +54,7 @@ func (s *ScraperService) resolveAVPosterAssets(ctx context.Context, videoID uuid
 			Variant:      avPosterVariantOriginal,
 		}
 		if cropCfg.PosterCropEnabled {
-			croppedPath, cropErr := s.cropAVPosterImage(originalPath, videoID)
+			croppedPath, cropErr := s.cropAVPosterImage(originalPath, videoID, cropCfg.PosterCropMode)
 			if cropErr == nil {
 				assets.SelectedPath = croppedPath
 				assets.CroppedPath = croppedPath
@@ -95,7 +95,7 @@ func (s *ScraperService) downloadPosterVariant(ctx context.Context, posterURL st
 	return outputPath, nil
 }
 
-func (s *ScraperService) cropAVPosterImage(originalPath string, videoID uuid.UUID) (string, error) {
+func (s *ScraperService) cropAVPosterImage(originalPath string, videoID uuid.UUID, cropMode string) (string, error) {
 	file, err := os.Open(originalPath)
 	if err != nil {
 		return "", fmt.Errorf("open original poster: %w", err)
@@ -128,7 +128,17 @@ func (s *ScraperService) cropAVPosterImage(originalPath string, videoID uuid.UUI
 		}
 	}
 
-	offsetX := bounds.Min.X + (width-cropWidth)/2
+	offsetX := bounds.Min.X
+	if width > cropWidth {
+		switch normalizeAVPosterCropMode(cropMode) {
+		case avPosterCropModeLeft:
+			offsetX = bounds.Min.X
+		case avPosterCropModeRight:
+			offsetX = bounds.Max.X - cropWidth
+		default:
+			offsetX = bounds.Min.X + (width-cropWidth)/2
+		}
+	}
 	offsetY := bounds.Min.Y + maxInt((height-cropHeight)/10, 0)
 	if offsetY+cropHeight > bounds.Max.Y {
 		offsetY = bounds.Max.Y - cropHeight
