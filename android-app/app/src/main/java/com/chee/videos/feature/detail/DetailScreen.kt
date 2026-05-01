@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -64,7 +65,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -370,103 +370,125 @@ fun DetailScreen(
                         }
                     }
                 } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                            .background(pageBg)
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(if (isAv) 16.dp else 12.dp),
-                    ) {
-                        Box(
+                    if (isAv) {
+                        AvDetailPage(
+                            detail = detail,
+                            posterUrl = posterUrl,
+                            showPlayer = showPlayer,
+                            canPlay = canPlay,
+                            useLongFormPlayerControls = useLongFormPlayerControls,
+                            exoPlayer = exoPlayer,
+                            playerErrorMessage = playerErrorMessage,
+                            selectedSubtitleTrackId = selectedSubtitleTrackId,
+                            onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
+                            onBack = onBack,
+                            onToggleFullscreen = { isFullscreen = true },
+                            onTogglePlayPause = {
+                                val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
+                                updatePlaybackSession(nextSession)
+                            },
+                            onRequestPlay = {
+                                updatePlaybackSession(
+                                    playbackSession.requestPlay(canPlay = canPlay),
+                                )
+                            },
+                            errorMessage = uiState.errorMessage,
+                            onToggleLike = viewModel::toggleLike,
+                            onToggleFavorite = viewModel::toggleFavorite,
+                            onToggleDislike = viewModel::toggleDislike,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(if (isAv) 260.dp else 220.dp)
-                                .clip(if (isAv) AppChrome.CardShape else RoundedCornerShape(14.dp))
-                                .background(if (isAv) AppChrome.CanvasRaised else Color(0xFF1A1C20)),
+                                .fillMaxSize()
+                                .padding(innerPadding),
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding)
+                                .background(pageBg)
+                                .verticalScroll(rememberScrollState())
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            if (showPlayer) {
-                                if (useLongFormPlayerControls) {
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        LongFormVideoPlayer(
-                                            title = detail.title,
-                                            player = exoPlayer,
-                                            isFullscreen = false,
-                                            onBack = onBack,
-                                            onTogglePlayPause = {
-                                                val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
-                                                updatePlaybackSession(nextSession)
-                                            },
-                                            onToggleFullscreen = { isFullscreen = true },
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(220.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF1A1C20)),
+                            ) {
+                                if (showPlayer) {
+                                    if (useLongFormPlayerControls) {
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            LongFormVideoPlayer(
+                                                title = detail.title,
+                                                player = exoPlayer,
+                                                isFullscreen = false,
+                                                onBack = onBack,
+                                                onTogglePlayPause = {
+                                                    val nextSession = playbackSession.togglePlayPause(canPlay = canPlay)
+                                                    updatePlaybackSession(nextSession)
+                                                },
+                                                onToggleFullscreen = { isFullscreen = true },
+                                                modifier = Modifier.fillMaxSize(),
+                                                showStatusBarPadding = false,
+                                                subtitleTracks = detail.subtitleTracks,
+                                                selectedSubtitleTrackId = selectedSubtitleTrackId,
+                                                onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
+                                            )
+                                            PlaybackErrorBanner(
+                                                message = playerErrorMessage,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .padding(12.dp),
+                                            )
+                                        }
+                                    } else {
+                                        VideoPlayerSurface(
+                                            exoPlayer = exoPlayer,
                                             modifier = Modifier.fillMaxSize(),
-                                            showStatusBarPadding = false,
-                                            subtitleTracks = detail.subtitleTracks,
-                                            selectedSubtitleTrackId = selectedSubtitleTrackId,
-                                            onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
                                         )
-                                        PlaybackErrorBanner(
-                                            message = playerErrorMessage,
+                                        PlayerOverlayIconButton(
+                                            icon = Icons.Filled.Fullscreen,
+                                            contentDescription = "全屏播放",
+                                            onClick = { isFullscreen = true },
                                             modifier = Modifier
-                                                .align(Alignment.BottomCenter)
-                                                .padding(12.dp),
+                                                .align(Alignment.BottomEnd)
+                                                .padding(10.dp),
                                         )
                                     }
                                 } else {
-                                    VideoPlayerSurface(
-                                        exoPlayer = exoPlayer,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                    PlayerOverlayIconButton(
-                                        icon = Icons.Filled.Fullscreen,
-                                        contentDescription = "全屏播放",
-                                        onClick = { isFullscreen = true },
-                                        modifier = Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .padding(10.dp),
-                                    )
-                                }
-                            } else {
-                                if (!posterUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = posterUrl,
-                                        contentDescription = "海报",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                                PlayerOverlayIconButton(
-                                    icon = Icons.Filled.PlayArrow,
-                                    contentDescription = "播放",
-                                    onClick = {
-                                        updatePlaybackSession(
-                                            playbackSession.requestPlay(canPlay = canPlay),
+                                    if (!posterUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = posterUrl,
+                                            contentDescription = "海报",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize(),
                                         )
-                                    },
-                                    enabled = canPlay,
-                                    modifier = Modifier.align(Alignment.Center),
-                                )
-                                if (!canPlay) {
-                                    Text(
-                                        text = "暂无可播放视频",
-                                        color = Color(0xFFB9C0CD),
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .padding(bottom = 12.dp),
+                                    }
+                                    PlayerOverlayIconButton(
+                                        icon = Icons.Filled.PlayArrow,
+                                        contentDescription = "播放",
+                                        onClick = {
+                                            updatePlaybackSession(
+                                                playbackSession.requestPlay(canPlay = canPlay),
+                                            )
+                                        },
+                                        enabled = canPlay,
+                                        modifier = Modifier.align(Alignment.Center),
                                     )
+                                    if (!canPlay) {
+                                        Text(
+                                            text = "暂无可播放视频",
+                                            color = Color(0xFFB9C0CD),
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .padding(bottom = 12.dp),
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        if (isAv) {
-                            AvDetailOverview(
-                                detail = detail,
-                                errorMessage = uiState.errorMessage,
-                                onToggleLike = viewModel::toggleLike,
-                                onToggleFavorite = viewModel::toggleFavorite,
-                                onToggleDislike = viewModel::toggleDislike,
-                            )
-                        } else {
                             Text(
                                 detail.title,
                                 style = MaterialTheme.typography.headlineSmall,
@@ -522,6 +544,166 @@ fun DetailScreen(
 }
 
 @Composable
+private fun AvDetailPage(
+    detail: VideoDetailDto,
+    posterUrl: String?,
+    showPlayer: Boolean,
+    canPlay: Boolean,
+    useLongFormPlayerControls: Boolean,
+    exoPlayer: ExoPlayer,
+    playerErrorMessage: String?,
+    selectedSubtitleTrackId: String?,
+    onSelectSubtitleTrack: (String?) -> Unit,
+    onBack: () -> Unit,
+    onToggleFullscreen: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onRequestPlay: () -> Unit,
+    errorMessage: String?,
+    onToggleLike: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onToggleDislike: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val heroModel = buildAvDetailHeroModel(detail)
+
+    Column(
+        modifier = modifier
+            .background(Color(0xFF0B0C0F))
+            .verticalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(440.dp)
+                .clip(AppChrome.CardShape)
+                .background(AppChrome.CanvasRaised),
+        ) {
+            if (showPlayer) {
+                if (useLongFormPlayerControls) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LongFormVideoPlayer(
+                            title = detail.title,
+                            player = exoPlayer,
+                            isFullscreen = false,
+                            onBack = onBack,
+                            onTogglePlayPause = onTogglePlayPause,
+                            onToggleFullscreen = onToggleFullscreen,
+                            modifier = Modifier.fillMaxSize(),
+                            showStatusBarPadding = false,
+                            subtitleTracks = detail.subtitleTracks,
+                            selectedSubtitleTrackId = selectedSubtitleTrackId,
+                            onSelectSubtitleTrack = onSelectSubtitleTrack,
+                        )
+                        PlaybackErrorBanner(
+                            message = playerErrorMessage,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(12.dp),
+                        )
+                    }
+                } else {
+                    VideoPlayerSurface(
+                        exoPlayer = exoPlayer,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    PlayerOverlayIconButton(
+                        icon = Icons.Filled.Fullscreen,
+                        contentDescription = "全屏播放",
+                        onClick = onToggleFullscreen,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(10.dp),
+                    )
+                }
+            } else {
+                if (!posterUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = posterUrl,
+                        contentDescription = "海报",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x22090A0D),
+                                    Color(0x55090A0D),
+                                    Color(0xE5090A0D),
+                                ),
+                            ),
+                        ),
+                )
+                PlayerOverlayIconButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    onClick = onBack,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(14.dp),
+                )
+                PlayerOverlayIconButton(
+                    icon = Icons.Filled.PlayArrow,
+                    contentDescription = "播放",
+                    onClick = onRequestPlay,
+                    enabled = canPlay,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = heroModel.primaryText,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AppChrome.TextPrimary,
+                    )
+                    Text(
+                        text = heroModel.secondaryTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AppChrome.TextSecondary,
+                    )
+                    if (heroModel.metaItems.isNotEmpty()) {
+                        Text(
+                            text = heroModel.metaItems.joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppChrome.TextMuted,
+                        )
+                    }
+                }
+                if (!canPlay) {
+                    Text(
+                        text = "暂无可播放视频",
+                        color = Color(0xFFB9C0CD),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp),
+                    )
+                }
+            }
+        }
+
+        AvDetailOverview(
+            detail = detail,
+            heroModel = heroModel,
+            errorMessage = errorMessage,
+            onToggleLike = onToggleLike,
+            onToggleFavorite = onToggleFavorite,
+            onToggleDislike = onToggleDislike,
+        )
+    }
+}
+
+@Composable
 private fun VideoPlayerSurface(
     exoPlayer: ExoPlayer,
     modifier: Modifier = Modifier,
@@ -568,20 +750,14 @@ private fun PlayerOverlayIconButton(
 @Composable
 private fun AvDetailOverview(
     detail: VideoDetailDto,
+    heroModel: AvDetailHeroModel,
     errorMessage: String?,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleDislike: () -> Unit,
 ) {
     val actionSpecs = buildDetailActionSpecs(detail.userState)
-    val primaryActions = actionSpecs.take(2)
-    val secondaryAction = actionSpecs.last()
-    val metaLine = buildList {
-        if (detail.duration > 0) {
-            add("时长 ${formatDurationHms(detail.duration)}")
-        }
-        detail.tags.orEmpty().firstOrNull()?.trim()?.takeIf { it.isNotBlank() }?.let { add(it) }
-    }.joinToString(" · ")
+    val actorLine = heroModel.actorNames.joinToString(" / ").ifBlank { "暂无演员信息" }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -597,14 +773,19 @@ private fun AvDetailOverview(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = detail.title,
-                    style = MaterialTheme.typography.headlineSmall,
+                    text = heroModel.primaryText,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = AppChrome.TextPrimary,
                 )
-                if (metaLine.isNotBlank()) {
+                Text(
+                    text = heroModel.secondaryTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = AppChrome.TextSecondary,
+                )
+                if (heroModel.metaItems.isNotEmpty()) {
                     Text(
-                        text = metaLine,
+                        text = heroModel.metaItems.joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = AppChrome.TextSecondary,
                     )
@@ -641,6 +822,27 @@ private fun AvDetailOverview(
         }
 
         Surface(
+            color = AppChrome.Surface,
+            shape = AppChrome.CardShape,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AvSectionTitle("作品信息")
+                AvInfoRow(label = "番号", value = heroModel.primaryText)
+                AvInfoRow(label = "标题", value = heroModel.secondaryTitle)
+                AvInfoRow(label = "时长", value = formatDurationHms(detail.duration))
+                heroModel.releaseDate?.let {
+                    AvInfoRow(label = "发布时间", value = it)
+                }
+                AvInfoRow(label = "演员", value = actorLine)
+            }
+        }
+
+        Surface(
             color = AppChrome.SurfaceElevated,
             shape = AppChrome.CardShape,
         ) {
@@ -652,7 +854,7 @@ private fun AvDetailOverview(
             ) {
                 AvSectionTitle("简介")
                 Text(
-                    text = detail.description.orEmpty().ifBlank { "暂无简介" },
+                    text = heroModel.overviewText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = AppChrome.TextSecondary,
                 )
@@ -697,7 +899,7 @@ private fun AvDetailOverview(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            primaryActions.forEach { spec ->
+            actionSpecs.take(2).forEach { spec ->
                 DetailActionButton(
                     modifier = Modifier.weight(1f),
                     spec = spec,
@@ -711,7 +913,7 @@ private fun AvDetailOverview(
         }
         DetailActionButton(
             modifier = Modifier.fillMaxWidth(),
-            spec = secondaryAction,
+            spec = actionSpecs.last(),
             onClick = onToggleDislike,
         )
 
@@ -722,6 +924,27 @@ private fun AvDetailOverview(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+    }
+}
+
+@Composable
+private fun AvInfoRow(
+    label: String,
+    value: String,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = AppChrome.TextMuted,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            color = AppChrome.TextPrimary,
+        )
     }
 }
 
@@ -782,6 +1005,7 @@ private fun DetailActionButton(
     Button(
         onClick = onClick,
         modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = AppChrome.TextPrimary,

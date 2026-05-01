@@ -13,6 +13,29 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 11:43] Android AV 首页与详情页重设计落地
+- Type: `implementation`
+- Summary:
+  - 首页 `AV` tab 改为独立海报墙布局，不再复用通用横向列表；顶部加入 AV 专属搜索头部、远程搜索状态文案和大海报竖版卡片。
+  - `HomeViewModel` 新增 AV 搜索双态：默认浏览继续走 `fetchCategory("av")`，输入关键词后走新的 `VideoRepository.searchAv(...)` 远程搜索，清空查询可恢复默认浏览且不污染原列表。
+  - AV 详情页重排为海报主导版式：首屏 Hero 强调海报、番号和播放入口，中段补作品信息/演员/简介/标签/操作胶囊；同时新增“番号优先、标题回退”的展示 helper 与对应单测。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeAvPresentation.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/AvDetailPresentation.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/home/HomeAvPresentationTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/detail/AvDetailPresentationTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 03:08] 将 JavDB 切换到 MDCX 风格解析计划
 - Type: `plan`
 - Summary:

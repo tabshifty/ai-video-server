@@ -164,6 +164,7 @@ data class VideoListItemDto(
     @SerializedName("thumbnail_path") val thumbnailPath: String? = null,
     @SerializedName("duration") val duration: Int = 0,
     @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("metadata") val metadata: Map<String, Any?>? = emptyMap(),
 )
 
 data class VideoDetailDto(

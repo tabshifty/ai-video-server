@@ -63,6 +63,19 @@ class VideoRepository @Inject constructor(
         }.map { it.items }
     }
 
+    suspend fun searchAv(query: String, page: Int = 1, pageSize: Int = 30): Result<SearchPayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.search(
+                url = UrlBuilder.search(baseUrl),
+                authorization = bearer,
+                keyword = query.trim(),
+                type = "av",
+                page = page,
+                pageSize = pageSize,
+            )
+        }
+    }
+
     suspend fun fetchDetail(videoId: String): Result<VideoDetailDto> {
         return callWithAuth { baseUrl, bearer ->
             api.detail(UrlBuilder.detail(baseUrl, videoId), bearer)
