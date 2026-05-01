@@ -11,11 +11,11 @@ internal data class AvPoster(
 )
 
 internal fun resolveAvPoster(item: VideoListItemDto): AvPoster {
-    return buildAvPoster(item.metadata, item.thumbnailPath)
+    return buildAvPoster(item.metadata, item.thumbnailPath, preferOriginalPoster = false)
 }
 
 internal fun resolveAvPoster(detail: VideoDetailDto): AvPoster {
-    return buildAvPoster(detail.metadata, detail.thumbnailPath)
+    return buildAvPoster(detail.metadata, detail.thumbnailPath, preferOriginalPoster = true)
 }
 
 internal fun resolveAvPosterUrl(baseUrl: String, item: VideoListItemDto): String? {
@@ -44,6 +44,7 @@ private fun resolveAvPosterUrl(baseUrl: String, poster: AvPoster): String? {
 private fun buildAvPoster(
     metadata: Map<String, Any?>?,
     thumbnailPath: String?,
+    preferOriginalPoster: Boolean,
 ): AvPoster {
     val posterDecision = anyString(metadata?.get("poster_decision"))
     val posterSource = anyString(metadata?.get("poster_source"))
@@ -55,11 +56,12 @@ private fun buildAvPoster(
     val sourceBlock = metadata?.get(scrapeSource) as? Map<*, *>
     val sourcePosterUrl = anyString(sourceBlock?.get("poster_url"))
     val sourcePosterPath = anyString(sourceBlock?.get("poster_path"))
-    val localizedPosterPath = when (posterVariant) {
-        "cropped" -> croppedPosterPath ?: originalPosterPath
-        "original" -> originalPosterPath ?: croppedPosterPath
-        else -> croppedPosterPath ?: originalPosterPath
-    }
+    val localizedPosterPath = selectLocalizedPosterPath(
+        posterVariant = posterVariant,
+        croppedPosterPath = croppedPosterPath,
+        originalPosterPath = originalPosterPath,
+        preferOriginalPoster = preferOriginalPoster,
+    )
     val rawScrapedPoster = listOf(
         localizedPosterPath,
         anyString(metadata?.get("poster_url")),
@@ -95,6 +97,26 @@ private fun buildAvPoster(
         posterQuality = posterQuality,
         posterDecision = posterDecision,
     )
+}
+
+private fun selectLocalizedPosterPath(
+    posterVariant: String?,
+    croppedPosterPath: String?,
+    originalPosterPath: String?,
+    preferOriginalPoster: Boolean,
+): String? {
+    if (preferOriginalPoster) {
+        return when (posterVariant) {
+            "original" -> originalPosterPath ?: croppedPosterPath
+            "cropped" -> originalPosterPath ?: croppedPosterPath
+            else -> originalPosterPath ?: croppedPosterPath
+        }
+    }
+    return when (posterVariant) {
+        "cropped" -> croppedPosterPath ?: originalPosterPath
+        "original" -> croppedPosterPath ?: originalPosterPath
+        else -> croppedPosterPath ?: originalPosterPath
+    }
 }
 
 private fun anyString(value: Any?): String? {

@@ -13,6 +13,37 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 21:08] Android AV 列表/详情页海报分流显示
+- Type: `implementation`
+- Summary:
+  - Android AV 海报 helper 改为按场景分流：列表项继续优先使用 `poster_cropped_path`，详情页优先使用 `poster_original_path`，两端都保留现有 scraped poster 与 `thumbnailPath` 的回退链路。
+  - 扩展 Android 单测覆盖：锁定“列表裁剪图优先、详情原图优先、缺图时互相回退”的行为，避免后续再次把两个场景收敛成同一张海报。
+  - 全量 `:app:testDebugUnitTest` 仍被仓库既有失败 `HomeViewModelTest.loadCategory loads default av list` 阻断；已在未改动的 `master` 上复现，确认不是本次变更引入。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/model/AvPosterSupport.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/model/AvPosterSupportVariantTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.model.AvPosterSupportTest' --tests 'com.chee.videos.core.model.AvPosterSupportVariantTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.home.HomeViewModelTest.loadCategory loads default av list'` failed on branch and `master` with the same assertion, treated as pre-existing.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 21:07] Android AV 列表/详情页海报分流显示计划
+- Type: `plan`
+- Summary:
+  - 将 Android AV 海报解析从“列表页与详情页共用同一优先级”改为“列表优先裁剪图、详情优先原图”，后端接口与 metadata 字段保持不变。
+  - 实施范围限定在 Android `AvPosterSupport` helper 与其单测，不改服务端返回值、不改管理端海报落地逻辑。
+  - 验证目标为相关 Android 单测与 `:app:assembleDebug`；若全量单测存在无关红测，则需先独立确认是否为既有问题。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.model.AvPosterSupportTest' --tests 'com.chee.videos.core.model.AvPosterSupportVariantTest'`
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug`
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 20:26] AV 裁剪模式补齐与手动刮削状态保留修正
 - Type: `implementation`
 - Summary:
