@@ -259,6 +259,49 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-01 13:42] Android AV 海报数据源修正计划
+- Type: `plan`
+- Summary:
+  - 按既有方案先修数据链路，不在本轮强行并入横竖版适配与安全区重构。
+  - 后端 `VideoListItem` 补充 `metadata` 出口，Android AV 列表与详情统一改为读取同一套 AV 海报解析 helper，并保留 `thumbnail_path` 兜底。
+  - AV fallback 海报保留策略改为“可用 fallback 海报可覆盖旧上传截帧封面”，同时继续保护无效 URL 场景。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/models ./internal/repository ./internal/services -run 'TestVideoListItemJSONIncludesMetadata|TestNormalizeVideoListItemMetadataDefaultsToJSONObject|TestNormalizeVideoListItemMetadataPreservesScrapedPosterFields|TestConfirmAVReplacesExistingThumbnailWhenFallbackPosterIsUsable|TestConfirmAVUsesFallbackPosterWhenNoExistingThumbnail|TestConfirmAVRejectsRelativePosterURLWithoutTMDBFallback' -count=1` 先红后用于回归。
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.model.AvPosterSupportTest' --tests 'com.chee.videos.feature.home.HomeAvPresentationTest' --tests 'com.chee.videos.feature.detail.AvDetailPresentationTest'` 先红后用于回归。
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-01 13:42] 修复 Android AV 列表与详情页海报数据链路
+- Type: `implementation`
+- Summary:
+  - 后端 `VideoListItem` 现在会返回 `metadata`，搜索/分类/用户视频列表查询统一补扫 `videos.metadata`，让 Android AV 列表能拿到 `scrape_source`、站点块 `poster_url`、`poster_decision` 等真实刮削海报信息。
+  - Android 新增共享 AV 海报解析 helper，优先读取顶层或 `metadata.<scrape_source>` 下的真实刮削海报，遇到 `invalid_*` 决策时回退 `thumbnail_path`；首页 AV 海报墙与详情页统一复用这套解析逻辑，避免列表和详情取图分叉。
+  - 后端 AV fallback 海报策略改为可用时覆盖旧上传截帧封面，`poster_decision` 新增 `fallback_replaced_existing` 回归语义；同时补充模型/仓储/Android helper 测试。为降低验证噪声，顺手把 `AppPreferencesStoreTest` 的 DataStore scope 绑定到 `backgroundScope`。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/model/AvPosterSupport.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/data/AppPreferencesStoreTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/model/AvPosterSupportTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`
+  - `internal/models/app.go`
+  - `internal/models/app_test.go`
+  - `internal/repository/app_repository.go`
+  - `internal/repository/app_video_list_item_test.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/models ./internal/repository ./internal/services -run 'TestVideoListItemJSONIncludesMetadata|TestNormalizeVideoListItemMetadataDefaultsToJSONObject|TestNormalizeVideoListItemMetadataPreservesScrapedPosterFields|TestConfirmAVReplacesExistingThumbnailWhenFallbackPosterIsUsable|TestConfirmAVUsesFallbackPosterWhenNoExistingThumbnail|TestConfirmAVRejectsRelativePosterURLWithoutTMDBFallback' -count=1` passed.
+  - `go test ./... -count=1` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.model.AvPosterSupportTest' --tests 'com.chee.videos.feature.home.HomeAvPresentationTest' --tests 'com.chee.videos.feature.detail.AvDetailPresentationTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` failed：现有 `HomeViewModelTest` 仍受 `DataStore`/`Dispatchers.Main` 清理时序影响，失败与本轮 AV 海报 helper 断言无直接对应关系。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-04-26 16:14] 电视剧播放器字幕不显示修复计划
 - Type: `plan`
 - Summary:

@@ -71,6 +71,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
@@ -1057,16 +1058,7 @@ private fun resolvePlayUrl(baseUrl: String, detail: VideoDetailDto, preferredPla
 }
 
 private fun resolvePosterUrl(baseUrl: String, detail: VideoDetailDto): String? {
-    val posterUrl = anyString(detail.metadata?.get("poster_url"))
-    val posterPath = anyString(detail.metadata?.get("poster_path"))
-    val candidates = listOf(posterUrl, posterPath, detail.thumbnailPath)
-    for (candidate in candidates) {
-        val resolved = resolveResourceUrl(baseUrl, candidate)
-        if (!resolved.isNullOrBlank()) {
-            return resolved
-        }
-    }
-    return null
+    return resolveAvPosterUrl(baseUrl, detail)
 }
 
 private fun resolveResourceUrl(baseUrl: String, raw: String?): String? {
@@ -1091,10 +1083,6 @@ private fun appendPlaybackProfileQuery(rawUrl: String, preferredPlaybackProfile:
     }
     val separator = if (rawUrl.contains("?")) "&" else "?"
     return "$rawUrl${separator}profile=$normalizedProfile"
-}
-
-private fun anyString(value: Any?): String? {
-    return (value as? String)?.trim()?.takeIf { it.isNotBlank() }
 }
 
 private fun formatDurationHms(totalSeconds: Int): String {

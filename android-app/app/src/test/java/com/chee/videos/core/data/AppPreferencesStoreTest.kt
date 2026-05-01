@@ -12,6 +12,7 @@ class AppPreferencesStoreTest {
     @Test
     fun tvSubtitlePreference_persistsPerVideoId() = runTest {
         val dataStore = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
             produceFile = {
                 File.createTempFile("app-preferences-store", ".preferences_pb").apply {
                     deleteOnExit()

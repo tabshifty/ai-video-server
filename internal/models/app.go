@@ -82,6 +82,7 @@ type VideoListItem struct {
 	Duration       int               `json:"duration"`
 	Collections    []VideoCollection `json:"collections"`
 	CreatedAt      time.Time         `json:"created_at"`
+	Metadata       json.RawMessage   `json:"metadata"`
 }
 
 type VideoImageCollection struct {

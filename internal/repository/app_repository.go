@@ -1,7 +1,9 @@
 package repository
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -343,7 +345,7 @@ WHERE v.status='ready'
 	}
 
 	rows, err := r.pool.Query(ctx, `
-SELECT DISTINCT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at
+SELECT DISTINCT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)
 FROM videos v
 LEFT JOIN video_tags vt ON vt.video_id=v.id
 WHERE v.status='ready'
@@ -364,12 +366,11 @@ LIMIT $3 OFFSET $4
 	items := make([]models.VideoListItem, 0, limit)
 	for rows.Next() {
 		var item models.VideoListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
+		var rawMetadata []byte
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt, &rawMetadata); err != nil {
 			return nil, 0, fmt.Errorf("scan search item: %w", err)
 		}
-		if strings.TrimSpace(item.ThumbnailPath) != "" {
-			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
-		}
+		finalizeVideoListItem(&item, rawMetadata)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -411,7 +412,7 @@ WHERE v.status='ready'
 			return nil, 0, fmt.Errorf("count short discover by tag: %w", err)
 		}
 		rows, err = r.pool.Query(ctx, `
-SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)
 FROM videos v
 JOIN video_tags vt ON vt.video_id = v.id
 WHERE v.status='ready'
@@ -438,7 +439,7 @@ WHERE v.status='ready'
 			return nil, 0, fmt.Errorf("count short discover by collection: %w", err)
 		}
 		rows, err = r.pool.Query(ctx, `
-SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)
 FROM videos v
 JOIN video_collections vc ON vc.video_id = v.id
 WHERE v.status='ready'
@@ -458,12 +459,11 @@ LIMIT $2 OFFSET $3
 	items := make([]models.VideoListItem, 0, limit)
 	for rows.Next() {
 		var item models.VideoListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
+		var rawMetadata []byte
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt, &rawMetadata); err != nil {
 			return nil, 0, fmt.Errorf("scan short discover item: %w", err)
 		}
-		if strings.TrimSpace(item.ThumbnailPath) != "" {
-			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
-		}
+		finalizeVideoListItem(&item, rawMetadata)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -482,7 +482,7 @@ func (r *VideoRepository) GetUploadedVideos(ctx context.Context, userID uuid.UUI
 	}
 
 	rows, err := r.pool.Query(ctx, `
-SELECT id, title, type, thumbnail_path, transcoded_path, duration_seconds, created_at
+SELECT id, title, type, thumbnail_path, transcoded_path, duration_seconds, created_at, COALESCE(metadata, '{}'::jsonb)
 FROM videos
 WHERE user_id=$1
 ORDER BY created_at DESC
@@ -496,12 +496,11 @@ LIMIT $2 OFFSET $3
 	items := make([]models.VideoListItem, 0, limit)
 	for rows.Next() {
 		var item models.VideoListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
+		var rawMetadata []byte
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt, &rawMetadata); err != nil {
 			return nil, 0, fmt.Errorf("scan uploaded item: %w", err)
 		}
-		if strings.TrimSpace(item.ThumbnailPath) != "" {
-			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
-		}
+		finalizeVideoListItem(&item, rawMetadata)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -524,7 +523,7 @@ WHERE a.user_id=$1 AND a.action_type=$2
 	}
 
 	rows, err := r.pool.Query(ctx, `
-SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, a.updated_at
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, a.updated_at, COALESCE(v.metadata, '{}'::jsonb)
 FROM user_video_actions a
 JOIN videos v ON v.id = a.video_id
 WHERE a.user_id=$1 AND a.action_type=$2
@@ -539,12 +538,11 @@ LIMIT $3 OFFSET $4
 	items := make([]models.VideoListItem, 0, limit)
 	for rows.Next() {
 		var item models.VideoListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt); err != nil {
+		var rawMetadata []byte
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt, &rawMetadata); err != nil {
 			return nil, 0, fmt.Errorf("scan action item: %w", err)
 		}
-		if strings.TrimSpace(item.ThumbnailPath) != "" {
-			item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
-		}
+		finalizeVideoListItem(&item, rawMetadata)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -572,6 +570,21 @@ func (r *VideoRepository) attachCollectionsToVideoListItems(ctx context.Context,
 		items[i].Collections = collectionMap[items[i].ID]
 	}
 	return nil
+}
+
+func finalizeVideoListItem(item *models.VideoListItem, rawMetadata []byte) {
+	if strings.TrimSpace(item.ThumbnailPath) != "" {
+		item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
+	}
+	item.Metadata = normalizeVideoListItemMetadata(rawMetadata)
+}
+
+func normalizeVideoListItemMetadata(raw []byte) json.RawMessage {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return json.RawMessage(`{}`)
+	}
+	return append(json.RawMessage(nil), trimmed...)
 }
 
 func (r *VideoRepository) UpdateUserProfile(ctx context.Context, userID uuid.UUID, oldPassword, newEmail, newPassword string) error {

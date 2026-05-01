@@ -1195,7 +1195,7 @@ func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
 }
 
-func TestConfirmAVKeepsExistingThumbnailWhenOnlyFallbackPoster(t *testing.T) {
+func TestConfirmAVReplacesExistingThumbnailWhenFallbackPosterIsUsable(t *testing.T) {
 	videoID := uuid.New()
 	repo := &fakeScraperRepo{
 		videoByID: map[uuid.UUID]models.Video{
@@ -1222,6 +1222,9 @@ func TestConfirmAVKeepsExistingThumbnailWhenOnlyFallbackPoster(t *testing.T) {
   </body>
 </html>
 `))
+		case "/thumbs/fallback.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
 		default:
 			http.NotFound(w, r)
 		}
@@ -1243,11 +1246,11 @@ func TestConfirmAVKeepsExistingThumbnailWhenOnlyFallbackPoster(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ConfirmAV returned error: %v", err)
 	}
-	if repo.lastUpdate.thumbnailPath != "/keep/existing.jpg" {
-		t.Fatalf("expected keep existing thumbnail, got=%s", repo.lastUpdate.thumbnailPath)
+	if repo.lastUpdate.thumbnailPath == "/keep/existing.jpg" {
+		t.Fatalf("expected usable fallback poster to replace existing upload thumbnail")
 	}
-	if repo.lastUpdate.metadata["poster_decision"] != "fallback_kept_old" {
-		t.Fatalf("expected poster_decision fallback_kept_old, got=%v", repo.lastUpdate.metadata["poster_decision"])
+	if repo.lastUpdate.metadata["poster_decision"] != "fallback_replaced_existing" {
+		t.Fatalf("expected poster_decision fallback_replaced_existing, got=%v", repo.lastUpdate.metadata["poster_decision"])
 	}
 }
 

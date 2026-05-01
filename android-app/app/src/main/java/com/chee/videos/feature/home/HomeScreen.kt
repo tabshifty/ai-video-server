@@ -57,6 +57,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoListItemDto
+import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.homeContentTabs
 import com.chee.videos.core.util.UrlBuilder
@@ -480,7 +481,7 @@ private fun AvPosterCard(
     onOpenDetail: (String, String) -> Unit,
 ) {
     val cardModel = buildAvCatalogCardModel(item)
-    val thumb = resolveThumbnailUrl(baseUrl, item.thumbnailPath)
+    val thumb = resolveAvPosterUrl(baseUrl, item)
 
     Surface(
         modifier = Modifier

@@ -195,6 +195,7 @@ class HomeViewModelTest {
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 private suspend fun TestScope.withMainDispatcher(block: suspend TestScope.() -> Unit) {
     Dispatchers.setMain(StandardTestDispatcher(testScheduler))
     try {

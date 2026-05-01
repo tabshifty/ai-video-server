@@ -1739,15 +1739,18 @@ func (s *ScraperService) resolveAVThumbnailPath(ctx context.Context, videoID uui
 		}
 		return thumbPath, "primary_selected", nil
 	case avPosterQualityFallback:
-		if existingThumbPath != "" {
-			return keepExisting("fallback_kept_old")
-		}
 		if !isAbsoluteHTTPURL(posterURL) {
+			if existingThumbPath != "" {
+				return keepExisting("invalid_keep_old")
+			}
 			return "", "invalid_no_existing", nil
 		}
 		thumbPath, err := s.DownloadPoster(ctx, posterURL, videoID)
 		if err != nil {
 			return "", "", err
+		}
+		if existingThumbPath != "" {
+			return thumbPath, "fallback_replaced_existing", nil
 		}
 		return thumbPath, "fallback_used_no_existing", nil
 	default:
