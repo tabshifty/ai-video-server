@@ -24,6 +24,26 @@ type VideoRepository struct {
 	pool *pgxpool.Pool
 }
 
+type ImportedReadyVideo struct {
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	Type            string
+	Status          string
+	OriginalPath    string
+	TranscodedPath  string
+	ThumbnailPath   string
+	DurationSeconds int
+	Width           int
+	Height          int
+	Hash            string
+	FileSize        int64
+	Tags            []string
+	Metadata        map[string]any
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 func NewVideoRepository(pool *pgxpool.Pool) *VideoRepository {
 	return &VideoRepository{pool: pool}
 }
@@ -196,6 +216,75 @@ WHERE hash = $1
 		return uuid.Nil, fmt.Errorf("get video id by hash: %w", err)
 	}
 	return videoID, nil
+}
+
+func (r *VideoRepository) CreateImportedReadyVideo(ctx context.Context, spec ImportedReadyVideo) error {
+	if spec.ID == uuid.Nil {
+		return fmt.Errorf("create imported ready video: missing video id")
+	}
+	if spec.Type == "" {
+		spec.Type = "short"
+	}
+	if spec.Status == "" {
+		spec.Status = "ready"
+	}
+	if spec.CreatedAt.IsZero() {
+		spec.CreatedAt = time.Now().UTC()
+	}
+	if spec.UpdatedAt.IsZero() || spec.UpdatedAt.Before(spec.CreatedAt) {
+		spec.UpdatedAt = spec.CreatedAt
+	}
+	if spec.Metadata == nil {
+		spec.Metadata = map[string]any{}
+	}
+
+	metaRaw, err := json.Marshal(spec.Metadata)
+	if err != nil {
+		return fmt.Errorf("marshal imported ready video metadata: %w", err)
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx for imported ready video: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO videos (
+  id, user_id, tmdb_id, title, description, type, status,
+  duration_seconds, width, height, original_path, transcoded_path,
+  thumbnail_path, metadata, created_at, updated_at
+)
+VALUES ($1,NULL,NULL,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+`, spec.ID, spec.Title, spec.Description, spec.Type, spec.Status, spec.DurationSeconds, spec.Width, spec.Height, spec.OriginalPath, spec.TranscodedPath, spec.ThumbnailPath, metaRaw, spec.CreatedAt, spec.UpdatedAt); err != nil {
+		return fmt.Errorf("insert imported ready video: %w", err)
+	}
+
+	for _, tag := range spec.Tags {
+		normalized := strings.TrimSpace(strings.ToLower(tag))
+		if normalized == "" {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO video_tags(video_id, tag, weight)
+VALUES ($1,$2,1.0)
+ON CONFLICT(video_id, tag) DO NOTHING
+`, spec.ID, normalized); err != nil {
+			return fmt.Errorf("insert imported ready video tag: %w", err)
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO file_hashes(hash, video_id, file_size)
+VALUES ($1,$2,$3)
+`, spec.Hash, spec.ID, spec.FileSize); err != nil {
+		return fmt.Errorf("insert imported ready video hash: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit imported ready video tx: %w", err)
+	}
+	return nil
 }
 
 func (r *VideoRepository) DeleteVideoByID(ctx context.Context, videoID uuid.UUID) error {

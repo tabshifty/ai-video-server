@@ -13,6 +13,41 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-02 22:38] flick-server 已转码可播放视频数据库迁移实现
+- Type: `implementation`
+- Summary:
+  - 新增离线命令 `cmd/import-flick`，通过本机 `mongoexport` 读取 `flick-server` 的 `videos` 数据，只筛选 `canplay=true` 的已转码可播放视频，并支持 `tag`、`since`、`limit`、`dry-run` 等过滤参数。
+  - 新增 `FlickImportService`，统一处理源视频解析、标签标准化、SHA256 去重、封面/视频复制、源时间保留与导入结果分类；导入目标统一落为当前项目的 `short + ready` 视频。
+  - 仓储层新增 `CreateImportedReadyVideo` 原子写入入口，一次完成 `videos`、`video_tags`、`file_hashes` 落库；补齐命令与服务层单测，并生成 JSON 导入报告。
+- Changed Files:
+  - `cmd/import-flick/main.go`
+  - `cmd/import-flick/main_test.go`
+  - `internal/services/flick_import.go`
+  - `internal/services/flick_import_test.go`
+  - `internal/repository/video_repository.go`
+  - `plan.md`
+- Verification:
+  - `go test ./cmd/import-flick -count=1` passed.
+  - `go test ./internal/services -run 'TestFlickImportServiceImportPlayableVideo' -count=1` passed.
+  - `go test ./... -count=1` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-02 22:38] flick-server 已转码可播放视频数据库迁移计划
+- Type: `plan`
+- Summary:
+  - 实现一个一次性离线导入命令，源数据来自 `flick-server` Mongo `videos` 集合，只处理 `canplay=true` 且已存在转码视频与封面的记录。
+  - 导入时统一把视频写入当前项目 `short` 类型，并保留源 `createdAt/updatedAt`、源 `tags[]`、源 `md5` 与来源路径等迁移元数据。
+  - 标签以视频级 `tags[]` 为准，不迁移源标签统计；媒体文件复制到当前项目 `storageRoot/videos/<uuid>/`，不直接依赖旧盘绝对路径。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./cmd/import-flick -count=1`
+  - `go test ./internal/services -run 'TestFlickImportServiceImportPlayableVideo' -count=1`
+  - `go test ./... -count=1`
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 22:43] Android AV 详情页显示演员头像
 - Type: `implementation`
 - Summary:
