@@ -33,6 +33,21 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-02 23:00] flick 迁移命令修正 mongoexport 参数兼容性
+- Type: `implementation`
+- Summary:
+  - 修正 `cmd/import-flick` 对本机 `mongoexport 100.9.5` 的参数适配，移除不受支持的 `--batchSize`，避免 dry-run 启动即因命令行选项解析失败退出。
+  - 实际排查确认本地 `flick` 库 `canplay=true` 的记录量为 `152647` 条，这也是本次 dry-run 扫描耗时较长的直接原因。
+- Changed Files:
+  - `cmd/import-flick/main.go`
+  - `plan.md`
+- Verification:
+  - `mongoexport --help` confirmed no `--batchSize` option.
+  - `go test ./cmd/import-flick -count=1` passed.
+  - `mongosh 'mongodb://localhost:27017/flick' --quiet --eval 'db.videos.countDocuments({canplay:true})'` returned `152647`.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-02 22:38] flick-server 已转码可播放视频数据库迁移计划
 - Type: `plan`
 - Summary:

@@ -324,7 +324,6 @@ func streamMongoExport(ctx context.Context, cfg importConfig, handle func(mongoE
 		"--sort={\"createdAt\":1}",
 		"--fields=_id,md5,tags,desc,canplay,createdAt,updatedAt",
 		"--query=" + string(queryJSON),
-		"--batchSize=" + fmt.Sprintf("%d", cfg.BatchSize),
 	}
 	if cfg.Limit > 0 {
 		args = append(args, "--limit="+fmt.Sprintf("%d", cfg.Limit))
