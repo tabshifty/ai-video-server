@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"video-server/internal/database"
 	"video-server/internal/repository"
 	"video-server/internal/services"
@@ -33,6 +35,7 @@ type importConfig struct {
 	Limit          int64
 	BatchSize      int
 	DryRun         bool
+	BackfillTitle  bool
 	ReportPath     string
 }
 
@@ -201,6 +204,15 @@ func main() {
 
 	repo := repository.NewVideoRepository(pool)
 	svc := services.NewFlickImportService(repo)
+	if cfg.BackfillTitle {
+		updated, err := backfillFlickTitles(ctx, pool)
+		if err != nil {
+			slog.Error("backfill flick titles failed", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("backfill flick titles finished", "updated", updated)
+		return
+	}
 
 	buffer := make([]mongoExportVideo, 0, cfg.BatchSize)
 	batchIndex := 0
@@ -278,11 +290,15 @@ func parseFlags() (importConfig, error) {
 	flag.Int64Var(&cfg.Limit, "limit", 0, "Optional max documents to scan")
 	flag.IntVar(&cfg.BatchSize, "batch-size", 1000, "import processing batch size")
 	flag.BoolVar(&cfg.DryRun, "dry-run", false, "Only evaluate candidates, do not copy or insert")
+	flag.BoolVar(&cfg.BackfillTitle, "backfill-title-only", false, "Only backfill flick migrated video titles from tags")
 	flag.StringVar(&cfg.ReportPath, "report-path", defaultReportPath(), "JSON report path")
 	flag.Parse()
 
 	if strings.TrimSpace(cfg.PostgresDSN) == "" {
 		return importConfig{}, fmt.Errorf("postgres-dsn is required")
+	}
+	if cfg.BackfillTitle {
+		return cfg, nil
 	}
 	if strings.TrimSpace(cfg.MongoURI) == "" {
 		return importConfig{}, fmt.Errorf("mongo-dsn is required")
@@ -490,4 +506,31 @@ func redactDSN(dsn string) string {
 	}
 	re := regexp.MustCompile(`:[^:@/]+@`)
 	return re.ReplaceAllString(dsn, ":***@")
+}
+
+func backfillFlickTitles(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
+	var count int64
+	err := pool.QueryRow(ctx, `
+WITH tag_titles AS (
+  SELECT
+    vt.video_id,
+    string_agg('#' || vt.tag, ' ' ORDER BY vt.tag) AS title
+  FROM video_tags vt
+  GROUP BY vt.video_id
+),
+updated AS (
+  UPDATE videos v
+  SET title = tt.title, updated_at = NOW()
+  FROM tag_titles tt
+  WHERE v.id = tt.video_id
+    AND v.metadata->>'migration_source' = 'flick-server'
+    AND COALESCE(v.title, '') <> tt.title
+  RETURNING v.id
+)
+SELECT count(*) FROM updated;
+`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("execute backfill update: %w", err)
+	}
+	return count, nil
 }

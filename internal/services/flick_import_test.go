@@ -196,6 +196,9 @@ func TestFlickImportServiceImportPlayableVideoCreatesReadyVideo(t *testing.T) {
 	if !reflect.DeepEqual(created.Tags, []string{"dance", "music"}) {
 		t.Fatalf("unexpected normalized tags: %#v", created.Tags)
 	}
+	if created.Title != "#dance #music" {
+		t.Fatalf("expected title '#dance #music', got %q", created.Title)
+	}
 	if created.Hash != "hash-2" {
 		t.Fatalf("expected stored hash hash-2, got %s", created.Hash)
 	}

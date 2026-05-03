@@ -188,7 +188,7 @@ func (s *FlickImportService) ImportPlayableVideo(ctx context.Context, src FlickS
 
 	spec := repository.ImportedReadyVideo{
 		ID:              videoID,
-		Title:           deriveImportedTitle(videoPath, src.MD5),
+		Title:           deriveImportedTitle(tags),
 		Description:     strings.TrimSpace(src.Description),
 		Type:            "short",
 		Status:          "ready",
@@ -265,16 +265,22 @@ func resolveFlickPlayableVideoPath(root, md5 string) (string, bool, error) {
 	return "", false, nil
 }
 
-func deriveImportedTitle(videoPath, md5 string) string {
-	base := strings.TrimSpace(filepath.Base(videoPath))
-	base = strings.TrimSuffix(base, filepath.Ext(base))
-	if base != "" {
-		return base
+func deriveImportedTitle(tags []string) string {
+	if len(tags) == 0 {
+		return "untitled"
 	}
-	if strings.TrimSpace(md5) != "" {
-		return strings.TrimSpace(md5)
+	parts := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		normalized := strings.TrimSpace(tag)
+		if normalized == "" {
+			continue
+		}
+		parts = append(parts, "#"+normalized)
 	}
-	return "untitled"
+	if len(parts) == 0 {
+		return "untitled"
+	}
+	return strings.Join(parts, " ")
 }
 
 func buildImportedAssetPaths(storageRoot string, videoID uuid.UUID, ext string) (string, string) {

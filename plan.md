@@ -13,6 +13,25 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-03 20:12] flick 迁移标题改为标签组合并回填历史
+- Type: `implementation`
+- Summary:
+  - 停止当前迁移后，调整 `FlickImportService` 标题生成逻辑：新迁移视频标题改为标签组合形式 `#tag1 #tag2`，不再使用文件名或 md5。
+  - 在 `cmd/import-flick` 增加 `--backfill-title-only` 模式，用于只回填 `migration_source=flick-server` 的历史数据标题，按 `video_tags` 聚合生成 `#标签` 标题并批量更新。
+  - 已执行一次历史回填，确保既有 flick 迁移数据与后续迁移数据都采用统一标题规则。
+- Changed Files:
+  - `internal/services/flick_import.go`
+  - `internal/services/flick_import_test.go`
+  - `cmd/import-flick/main.go`
+  - `plan.md`
+- Verification:
+  - `go test ./cmd/import-flick -count=1` passed.
+  - `go test ./internal/services -run 'TestFlickImportServiceImportPlayableVideo' -count=1` passed.
+  - `go run ./cmd/import-flick --postgres-dsn 'postgres://video:video@127.0.0.1:5432/video_server?sslmode=disable' --backfill-title-only` logged `updated=46389`.
+  - `select count(*) from videos where metadata->>'migration_source'='flick-server' and title like '#%';` returned `46389`.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-03 12:04] flick 迁移恢复运行并切回外部盘批处理
 - Type: `implementation`
 - Summary:
