@@ -13,6 +13,23 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-03 12:04] flick 迁移恢复运行并切回外部盘批处理
+- Type: `implementation`
+- Summary:
+  - 恢复本机 MongoDB 源库后，重新启动 `cmd/import-flick`，迁移参数固定为 `--batch-size 1000` 和 `--storage-root /Volumes/large/video-server-storage`，避免继续写入内部盘。
+  - 停掉了之前残留的 `--dry-run` 迁移进程和未指定外部盘根目录的旧批量迁移进程，避免它们继续占用资源或把数据迁回内部盘。
+  - 当前批处理迁移已跑完前 2 批，每批 1000 条，累计处理 2000 条，当前都被判定为跳过，没有失败，迁移仍在继续推进。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `brew services info mongodb-community` showed Mongo was installed but not running, then `mongod --config /opt/homebrew/etc/mongod.conf --fork` started the server successfully.
+  - `lsof -nP -iTCP:27017 -sTCP:LISTEN` confirmed Mongo was listening on `127.0.0.1:27017`.
+  - `go test ./cmd/import-flick -count=1` passed.
+  - `go test ./internal/services -run 'TestFlickImportServiceImportPlayableVideo' -count=1` passed.
+  - 迁移进程日志显示 `batch=1` 和 `batch=2` 均已完成，`batch_size=1000`，`batch_failed=0`。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-02 22:38] flick-server 已转码可播放视频数据库迁移实现
 - Type: `implementation`
 - Summary:

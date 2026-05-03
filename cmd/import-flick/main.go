@@ -147,6 +147,20 @@ type importFailure struct {
 	Error    string `json:"error"`
 }
 
+type batchRunStats struct {
+	processed   int
+	imported    int
+	wouldImport int
+	skipped     int
+	failed      int
+	skipReasons map[string]int
+	failures    []importFailure
+}
+
+type flickImporter interface {
+	ImportPlayableVideo(context.Context, services.FlickSourceVideo, services.FlickImportOptions) (services.FlickImportOutcome, error)
+}
+
 func main() {
 	cfg, err := parseFlags()
 	if err != nil {
@@ -188,44 +202,54 @@ func main() {
 	repo := repository.NewVideoRepository(pool)
 	svc := services.NewFlickImportService(repo)
 
-	err = streamMongoExport(ctx, cfg, func(doc mongoExportVideo) error {
-		report.Processed++
-		outcome, err := svc.ImportPlayableVideo(ctx, services.FlickSourceVideo{
-			SourceID:    string(doc.ID),
-			MD5:         strings.TrimSpace(doc.MD5),
-			Tags:        doc.Tags,
-			Description: doc.Desc,
-			CanPlay:     doc.CanPlay,
-			CreatedAt:   doc.CreatedAt.Time,
-			UpdatedAt:   doc.UpdatedAt.Time,
-		}, services.FlickImportOptions{
-			SourceVideoDir: cfg.SourceVideoDir,
-			SourceCoverDir: cfg.SourceCoverDir,
-			StorageRoot:    cfg.StorageRoot,
-			DryRun:         cfg.DryRun,
-		})
-		if err != nil {
-			report.Failed++
-			report.Failures = append(report.Failures, importFailure{
-				SourceID: string(doc.ID),
-				MD5:      doc.MD5,
-				Error:    err.Error(),
-			})
+	buffer := make([]mongoExportVideo, 0, cfg.BatchSize)
+	batchIndex := 0
+	flushBatch := func() error {
+		if len(buffer) == 0 {
 			return nil
 		}
-		switch outcome.Status {
-		case services.FlickImportStatusImported:
-			report.Imported++
-		case services.FlickImportStatusDryRun:
-			report.WouldImport++
-		case services.FlickImportStatusSkipped:
-			report.Skipped++
-			report.SkipReasons[outcome.Reason]++
+		batchIndex++
+		stats := runImportBatch(ctx, svc, cfg, buffer)
+		report.Processed += stats.processed
+		report.Imported += stats.imported
+		report.WouldImport += stats.wouldImport
+		report.Skipped += stats.skipped
+		report.Failed += stats.failed
+		for reason, count := range stats.skipReasons {
+			report.SkipReasons[reason] += count
 		}
+		report.Failures = append(report.Failures, stats.failures...)
+		slog.Info("flick import batch finished",
+			"batch", batchIndex,
+			"batch_size", len(buffer),
+			"batch_processed", stats.processed,
+			"batch_imported", stats.imported,
+			"batch_would_import", stats.wouldImport,
+			"batch_skipped", stats.skipped,
+			"batch_failed", stats.failed,
+			"total_processed", report.Processed,
+			"total_imported", report.Imported,
+			"total_would_import", report.WouldImport,
+			"total_skipped", report.Skipped,
+			"total_failed", report.Failed,
+		)
+		buffer = buffer[:0]
 		return nil
+	}
+
+	err = streamMongoExport(ctx, cfg, func(doc mongoExportVideo) error {
+		buffer = append(buffer, doc)
+		if len(buffer) < cfg.BatchSize {
+			return nil
+		}
+		return flushBatch()
 	})
 	if err != nil {
 		slog.Error("stream mongoexport failed", "error", err)
+		os.Exit(1)
+	}
+	if err := flushBatch(); err != nil {
+		slog.Error("flush final batch failed", "error", err)
 		os.Exit(1)
 	}
 
@@ -252,7 +276,7 @@ func parseFlags() (importConfig, error) {
 	flag.StringVar(&cfg.Tag, "tag", "", "Optional tag filter")
 	flag.StringVar(&sinceRaw, "since", "", "Optional createdAt lower bound, supports YYYY-MM-DD or RFC3339")
 	flag.Int64Var(&cfg.Limit, "limit", 0, "Optional max documents to scan")
-	flag.IntVar(&cfg.BatchSize, "batch-size", 100, "mongoexport batch size")
+	flag.IntVar(&cfg.BatchSize, "batch-size", 1000, "import processing batch size")
 	flag.BoolVar(&cfg.DryRun, "dry-run", false, "Only evaluate candidates, do not copy or insert")
 	flag.StringVar(&cfg.ReportPath, "report-path", defaultReportPath(), "JSON report path")
 	flag.Parse()
@@ -263,6 +287,9 @@ func parseFlags() (importConfig, error) {
 	if strings.TrimSpace(cfg.MongoURI) == "" {
 		return importConfig{}, fmt.Errorf("mongo-dsn is required")
 	}
+	if cfg.BatchSize <= 0 {
+		return importConfig{}, fmt.Errorf("batch-size must be greater than 0")
+	}
 	if sinceRaw != "" {
 		since, err := parseSinceFlag(sinceRaw)
 		if err != nil {
@@ -271,6 +298,48 @@ func parseFlags() (importConfig, error) {
 		cfg.Since = since
 	}
 	return cfg, nil
+}
+
+func runImportBatch(ctx context.Context, svc flickImporter, cfg importConfig, docs []mongoExportVideo) batchRunStats {
+	stats := batchRunStats{
+		skipReasons: map[string]int{},
+	}
+	for _, doc := range docs {
+		stats.processed++
+		outcome, err := svc.ImportPlayableVideo(ctx, services.FlickSourceVideo{
+			SourceID:    string(doc.ID),
+			MD5:         strings.TrimSpace(doc.MD5),
+			Tags:        doc.Tags,
+			Description: doc.Desc,
+			CanPlay:     doc.CanPlay,
+			CreatedAt:   doc.CreatedAt.Time,
+			UpdatedAt:   doc.UpdatedAt.Time,
+		}, services.FlickImportOptions{
+			SourceVideoDir: cfg.SourceVideoDir,
+			SourceCoverDir: cfg.SourceCoverDir,
+			StorageRoot:    cfg.StorageRoot,
+			DryRun:         cfg.DryRun,
+		})
+		if err != nil {
+			stats.failed++
+			stats.failures = append(stats.failures, importFailure{
+				SourceID: string(doc.ID),
+				MD5:      doc.MD5,
+				Error:    err.Error(),
+			})
+			continue
+		}
+		switch outcome.Status {
+		case services.FlickImportStatusImported:
+			stats.imported++
+		case services.FlickImportStatusDryRun:
+			stats.wouldImport++
+		case services.FlickImportStatusSkipped:
+			stats.skipped++
+			stats.skipReasons[outcome.Reason]++
+		}
+	}
+	return stats
 }
 
 func buildMongoFilter(tag string, since time.Time) map[string]any {
