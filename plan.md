@@ -3706,3 +3706,21 @@
   - `cd android-app && ./gradlew testDebugUnitTest --tests "com.chee.videos.core.data.AppPreferencesStoreTest" --tests "com.chee.videos.core.ui.AppNavigationConfigTest" --tests "com.chee.videos.core.model.ShortPlaybackModeTest" --tests "com.chee.videos.feature.shortsearch.ShortSearchViewModelStateTest" --tests "com.chee.videos.feature.player.UnifiedPlayerShortFitToggleTest"`
   - 结果：通过（BUILD SUCCESSFUL）。
 - 备注：未改动 `.codex/skills/*`；后续可继续补充 `ShortFeed/ShortDiscover/UnifiedPlayer` 播放模式行为断言的更细粒度测试。
+
+### [2026-05-05 07:29] flick 迁移支持 checkpoint 断点续跑（不再每次全量重扫）
+- Type: `implementation`
+- Summary:
+  - 为 `cmd/import-flick` 增加断点续跑能力，新增 `--checkpoint-path` 与 `--resume`（默认开启）。
+  - 每批次完成后把最后一条源记录的 `createdAt + _id` 持久化到 checkpoint 文件。
+  - 启动时自动读取 checkpoint 并构造 Mongo 条件：`createdAt > checkpoint.createdAt` 或 `createdAt == checkpoint.createdAt 且 _id > checkpoint._id`，避免从头扫描。
+  - Mongo 导出排序改为 `createdAt asc, _id asc`，保证断点语义稳定可重复。
+  - 报告中增加 checkpoint 相关元数据，便于排查是否启用续跑。
+- Changed Files:
+  - `cmd/import-flick/main.go`
+  - `cmd/import-flick/main_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./cmd/import-flick -count=1` passed.
+  - 运行参数已切到新二进制并启用 checkpoint：`--checkpoint-path .run/reports/flick-import.checkpoint.json --resume=true`。
+- Rollback:
+  - `git revert <commit>`

@@ -37,6 +37,8 @@ type importConfig struct {
 	DryRun         bool
 	BackfillTitle  bool
 	ReportPath     string
+	CheckpointPath string
+	Resume         bool
 }
 
 type mongoExportVideo struct {
@@ -142,6 +144,13 @@ type importReport struct {
 	SourceCoverDir string            `json:"source_cover_dir"`
 	StorageRoot    string            `json:"storage_root"`
 	Filters        map[string]string `json:"filters"`
+	CheckpointPath string            `json:"checkpoint_path"`
+	ResumeEnabled  bool              `json:"resume_enabled"`
+}
+
+type importCheckpoint struct {
+	CreatedAt time.Time `json:"created_at"`
+	ObjectID  string    `json:"object_id"`
 }
 
 type importFailure struct {
@@ -182,6 +191,8 @@ func main() {
 		SourceVideoDir: cfg.SourceVideoDir,
 		SourceCoverDir: cfg.SourceCoverDir,
 		StorageRoot:    cfg.StorageRoot,
+		CheckpointPath: cfg.CheckpointPath,
+		ResumeEnabled:  cfg.Resume,
 		Filters: map[string]string{
 			"tag":   strings.TrimSpace(cfg.Tag),
 			"since": cfg.Since.Format(time.RFC3339),
@@ -221,7 +232,8 @@ func main() {
 			return nil
 		}
 		batchIndex++
-		stats := runImportBatch(ctx, svc, cfg, buffer)
+		docs := append([]mongoExportVideo(nil), buffer...)
+		stats := runImportBatch(ctx, svc, cfg, docs)
 		report.Processed += stats.processed
 		report.Imported += stats.imported
 		report.WouldImport += stats.wouldImport
@@ -245,6 +257,16 @@ func main() {
 			"total_skipped", report.Skipped,
 			"total_failed", report.Failed,
 		)
+		if cfg.Resume {
+			last := docs[len(docs)-1]
+			cp := importCheckpoint{
+				CreatedAt: last.CreatedAt.Time.UTC(),
+				ObjectID:  strings.TrimSpace(string(last.ID)),
+			}
+			if err := writeCheckpoint(cfg.CheckpointPath, cp); err != nil {
+				return fmt.Errorf("write checkpoint: %w", err)
+			}
+		}
 		buffer = buffer[:0]
 		return nil
 	}
@@ -292,6 +314,8 @@ func parseFlags() (importConfig, error) {
 	flag.BoolVar(&cfg.DryRun, "dry-run", false, "Only evaluate candidates, do not copy or insert")
 	flag.BoolVar(&cfg.BackfillTitle, "backfill-title-only", false, "Only backfill flick migrated video titles from tags")
 	flag.StringVar(&cfg.ReportPath, "report-path", defaultReportPath(), "JSON report path")
+	flag.StringVar(&cfg.CheckpointPath, "checkpoint-path", defaultCheckpointPath(), "Checkpoint file path for resume")
+	flag.BoolVar(&cfg.Resume, "resume", true, "Resume from checkpoint to avoid full rescan")
 	flag.Parse()
 
 	if strings.TrimSpace(cfg.PostgresDSN) == "" {
@@ -312,6 +336,15 @@ func parseFlags() (importConfig, error) {
 			return importConfig{}, err
 		}
 		cfg.Since = since
+	}
+	if cfg.Resume {
+		cp, err := readCheckpoint(cfg.CheckpointPath)
+		if err != nil {
+			return importConfig{}, err
+		}
+		if cp != nil && (cp.CreatedAt.After(cfg.Since) || cp.CreatedAt.Equal(cfg.Since)) {
+			cfg.Since = cp.CreatedAt.UTC()
+		}
 	}
 	return cfg, nil
 }
@@ -358,7 +391,7 @@ func runImportBatch(ctx context.Context, svc flickImporter, cfg importConfig, do
 	return stats
 }
 
-func buildMongoFilter(tag string, since time.Time) map[string]any {
+func buildMongoFilter(tag string, since time.Time, afterObjectID string) map[string]any {
 	filter := map[string]any{
 		"canplay": true,
 	}
@@ -369,7 +402,23 @@ func buildMongoFilter(tag string, since time.Time) map[string]any {
 			"$options": "i",
 		}
 	}
-	if !since.IsZero() {
+	if !since.IsZero() && strings.TrimSpace(afterObjectID) != "" {
+		filter["$or"] = []any{
+			map[string]any{
+				"createdAt": map[string]any{
+					"$gt": since.UTC(),
+				},
+			},
+			map[string]any{
+				"createdAt": since.UTC(),
+				"_id": map[string]any{
+					"$gt": map[string]any{
+						"$oid": strings.TrimSpace(afterObjectID),
+					},
+				},
+			},
+		}
+	} else if !since.IsZero() {
 		filter["createdAt"] = map[string]any{
 			"$gte": since.UTC(),
 		}
@@ -396,7 +445,17 @@ func parseSinceFlag(raw string) (time.Time, error) {
 }
 
 func streamMongoExport(ctx context.Context, cfg importConfig, handle func(mongoExportVideo) error) error {
-	queryJSON, err := json.Marshal(toMongoExtendedJSON(buildMongoFilter(cfg.Tag, cfg.Since)))
+	afterObjectID := ""
+	if cfg.Resume {
+		cp, err := readCheckpoint(cfg.CheckpointPath)
+		if err != nil {
+			return err
+		}
+		if cp != nil && cp.CreatedAt.Equal(cfg.Since) {
+			afterObjectID = cp.ObjectID
+		}
+	}
+	queryJSON, err := json.Marshal(toMongoExtendedJSON(buildMongoFilter(cfg.Tag, cfg.Since, afterObjectID)))
 	if err != nil {
 		return fmt.Errorf("marshal mongo filter: %w", err)
 	}
@@ -406,7 +465,7 @@ func streamMongoExport(ctx context.Context, cfg importConfig, handle func(mongoE
 		"--collection=" + cfg.Collection,
 		"--type=json",
 		"--jsonFormat=canonical",
-		"--sort={\"createdAt\":1}",
+		"--sort={\"createdAt\":1,\"_id\":1}",
 		"--fields=_id,md5,tags,desc,canplay,createdAt,updatedAt",
 		"--query=" + string(queryJSON),
 	}
@@ -489,6 +548,52 @@ func writeReport(path string, report importReport) error {
 func defaultReportPath() string {
 	name := "flick-import-" + time.Now().UTC().Format("20060102-150405") + ".json"
 	return filepath.Join(".run", "reports", name)
+}
+
+func defaultCheckpointPath() string {
+	return filepath.Join(".run", "reports", "flick-import.checkpoint.json")
+}
+
+func readCheckpoint(path string) (*importCheckpoint, error) {
+	target := strings.TrimSpace(path)
+	if target == "" {
+		return nil, nil
+	}
+	raw, err := os.ReadFile(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read checkpoint file: %w", err)
+	}
+	var cp importCheckpoint
+	if err := json.Unmarshal(raw, &cp); err != nil {
+		return nil, fmt.Errorf("decode checkpoint file: %w", err)
+	}
+	if cp.CreatedAt.IsZero() || strings.TrimSpace(cp.ObjectID) == "" {
+		return nil, nil
+	}
+	cp.CreatedAt = cp.CreatedAt.UTC()
+	cp.ObjectID = strings.TrimSpace(cp.ObjectID)
+	return &cp, nil
+}
+
+func writeCheckpoint(path string, cp importCheckpoint) error {
+	target := strings.TrimSpace(path)
+	if target == "" || cp.CreatedAt.IsZero() || strings.TrimSpace(cp.ObjectID) == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return fmt.Errorf("mkdir checkpoint dir: %w", err)
+	}
+	raw, err := json.MarshalIndent(cp, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal checkpoint: %w", err)
+	}
+	if err := os.WriteFile(target, raw, 0o644); err != nil {
+		return fmt.Errorf("write checkpoint file: %w", err)
+	}
+	return nil
 }
 
 func firstNonEmpty(values ...string) string {

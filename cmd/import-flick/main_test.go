@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -14,7 +16,7 @@ func TestBuildMongoFilterIncludesPlayableTagAndSince(t *testing.T) {
 	t.Parallel()
 
 	since := time.Date(2024, 4, 5, 6, 7, 8, 0, time.UTC)
-	filter := buildMongoFilter("Dance", since)
+	filter := buildMongoFilter("Dance", since, "")
 
 	if got := filter["canplay"]; got != true {
 		t.Fatalf("expected canplay=true, got %#v", got)
@@ -32,6 +34,20 @@ func TestBuildMongoFilterIncludesPlayableTagAndSince(t *testing.T) {
 	}
 	if !reflect.DeepEqual(createdFilter["$gte"], since) {
 		t.Fatalf("expected createdAt >= since, got %#v", createdFilter)
+	}
+}
+
+func TestBuildMongoFilterSupportsResumeCheckpoint(t *testing.T) {
+	t.Parallel()
+
+	since := time.Date(2024, 4, 5, 6, 7, 8, 0, time.UTC)
+	filter := buildMongoFilter("Dance", since, "66112233445566778899aabb")
+	if _, ok := filter["createdAt"]; ok {
+		t.Fatalf("createdAt direct filter should not exist when resume checkpoint is set")
+	}
+	orFilter, ok := filter["$or"].([]any)
+	if !ok || len(orFilter) != 2 {
+		t.Fatalf("expected $or resume filter, got %#v", filter["$or"])
 	}
 }
 
@@ -103,6 +119,53 @@ func TestRunImportBatchCollectsStats(t *testing.T) {
 	}
 	if len(stats.failures) != 1 || stats.failures[0].SourceID != "d" {
 		t.Fatalf("expected one failure for source d, got=%#v", stats.failures)
+	}
+}
+
+func TestCheckpointReadWriteRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checkpoint.json")
+	in := importCheckpoint{
+		CreatedAt: time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC),
+		ObjectID:  "66112233445566778899aabb",
+	}
+	if err := writeCheckpoint(path, in); err != nil {
+		t.Fatalf("write checkpoint failed: %v", err)
+	}
+	out, err := readCheckpoint(path)
+	if err != nil {
+		t.Fatalf("read checkpoint failed: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected non-nil checkpoint")
+	}
+	if !out.CreatedAt.Equal(in.CreatedAt) || out.ObjectID != in.ObjectID {
+		t.Fatalf("checkpoint mismatch: got=%+v want=%+v", out, in)
+	}
+}
+
+func TestReadCheckpointMissingFileReturnsNil(t *testing.T) {
+	t.Parallel()
+	out, err := readCheckpoint(filepath.Join(t.TempDir(), "missing.json"))
+	if err != nil {
+		t.Fatalf("read missing checkpoint should not fail: %v", err)
+	}
+	if out != nil {
+		t.Fatalf("expected nil checkpoint for missing file, got %+v", out)
+	}
+}
+
+func TestWriteCheckpointSkipsInvalidPayload(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "checkpoint.json")
+	err := writeCheckpoint(path, importCheckpoint{})
+	if err != nil {
+		t.Fatalf("write invalid checkpoint should not fail: %v", err)
+	}
+	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+		t.Fatalf("expected no checkpoint file, stat err=%v", statErr)
 	}
 }
 
