@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.chee.videos.core.model.ServerEndpoint
+import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.util.UrlBuilder
@@ -29,6 +30,7 @@ class AppPreferencesStore @Inject constructor(
         val shortFitMode = stringPreferencesKey("short_fit_mode")
         val shortDiscoverFitMode = stringPreferencesKey("short_discover_fit_mode")
         val unifiedShortFitMode = stringPreferencesKey("unified_short_fit_mode")
+        val shortPlaybackMode = stringPreferencesKey("short_playback_mode")
         val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_preferences")
     }
 
@@ -54,6 +56,10 @@ class AppPreferencesStore @Inject constructor(
 
     val unifiedShortFitModeFlow: Flow<VideoFitMode> = dataStore.data.map { prefs ->
         VideoFitMode.fromRaw(prefs[Keys.unifiedShortFitMode])
+    }
+
+    val shortPlaybackModeFlow: Flow<ShortPlaybackMode> = dataStore.data.map { prefs ->
+        ShortPlaybackMode.fromRaw(prefs[Keys.shortPlaybackMode])
     }
 
     val endpointsFlow: Flow<List<ServerEndpoint>> = dataStore.data.map { prefs ->
@@ -103,6 +109,12 @@ class AppPreferencesStore @Inject constructor(
     suspend fun saveUnifiedShortFitMode(mode: VideoFitMode) {
         dataStore.edit { prefs ->
             prefs[Keys.unifiedShortFitMode] = mode.rawValue
+        }
+    }
+
+    suspend fun saveShortPlaybackMode(mode: ShortPlaybackMode) {
+        dataStore.edit { prefs ->
+            prefs[Keys.shortPlaybackMode] = mode.rawValue
         }
     }
 

@@ -74,6 +74,7 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.chee.videos.core.model.VideoFitMode
+import com.chee.videos.core.model.toPlayerRepeatMode
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.KeepScreenOnEffect
@@ -159,9 +160,10 @@ fun UnifiedPlayerScreen(
             }
             val sharedPlayer = remember(accessToken) {
                 ExoPlayer.Builder(context).build().apply {
-                    repeatMode = Player.REPEAT_MODE_ONE
+                    repeatMode = uiState.playbackMode.toPlayerRepeatMode()
                 }
             }
+            val pagerScope = rememberCoroutineScope()
             val imageLoader = context.imageLoader
             val currentVideoId = uiState.items.getOrNull(pagerState.currentPage)?.id
             val currentVideoType = uiState.items.getOrNull(pagerState.currentPage)?.type.orEmpty()
@@ -262,6 +264,27 @@ fun UnifiedPlayerScreen(
                     }
                     delay(220)
                 }
+            }
+            LaunchedEffect(uiState.playbackMode) {
+                sharedPlayer.repeatMode = uiState.playbackMode.toPlayerRepeatMode()
+            }
+            val latestPlaybackMode by rememberUpdatedState(uiState.playbackMode)
+            val latestPage by rememberUpdatedState(pagerState.currentPage)
+            val latestLastIndex by rememberUpdatedState(uiState.items.lastIndex)
+            DisposableEffect(sharedPlayer, pagerState) {
+                val listener = object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (
+                            playbackState == Player.STATE_ENDED &&
+                            latestPlaybackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT &&
+                            latestPage < latestLastIndex
+                        ) {
+                            pagerScope.launch { pagerState.animateScrollToPage(latestPage + 1) }
+                        }
+                    }
+                }
+                sharedPlayer.addListener(listener)
+                onDispose { sharedPlayer.removeListener(listener) }
             }
 
             LaunchedEffect(uiState.startIndex, uiState.items.size) {
@@ -456,6 +479,8 @@ fun UnifiedPlayerScreen(
                             titleBottomPadding = 34.dp,
                             onTogglePauseByUser = togglePauseState,
                             onToggleFitMode = viewModel::toggleShortFitMode,
+                            onTogglePlaybackMode = viewModel::toggleShortPlaybackMode,
+                            playbackMode = uiState.playbackMode,
                         )
                     }
                 }
@@ -558,6 +583,8 @@ private fun UnifiedShortVideoPage(
     titleBottomPadding: androidx.compose.ui.unit.Dp,
     onTogglePauseByUser: () -> Unit,
     onToggleFitMode: () -> Unit,
+    onTogglePlaybackMode: () -> Unit,
+    playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
 ) {
     val scope = rememberCoroutineScope()
     var showCenterIndicator by remember { mutableStateOf(false) }
@@ -681,6 +708,13 @@ private fun UnifiedShortVideoPage(
                     enabled = true,
                     onClick = onToggleFitMode,
                     contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
+                )
+                ShortVideoOverlayActionButton(
+                    icon = Icons.Filled.PlayArrow,
+                    active = playbackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT,
+                    enabled = true,
+                    onClick = onTogglePlaybackMode,
+                    contentDescription = if (playbackMode == com.chee.videos.core.model.ShortPlaybackMode.LOOP_ONE) "播放模式：循环单视频" else "播放模式：自动播放下一个",
                 )
             }
         }

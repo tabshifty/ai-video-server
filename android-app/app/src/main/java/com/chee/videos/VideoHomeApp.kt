@@ -50,6 +50,7 @@ import com.chee.videos.feature.imagecollections.ImageCollectionsScreen
 import com.chee.videos.feature.mine.MineScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
 import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
+import com.chee.videos.feature.shortsearch.ShortSearchScreen
 import com.chee.videos.feature.tv.TvEpisodeArg
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
@@ -220,6 +221,19 @@ private fun AuthenticatedNav(
                         },
                         onSwitchServer = onSwitchServer,
                         onLogout = onLogout,
+                    )
+                }
+            }
+
+            composable("search") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppChrome.PageGradient),
+                ) {
+                    ShortSearchScreen(
+                        baseUrl = baseUrl,
+                        accessToken = accessToken,
                     )
                 }
             }

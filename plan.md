@@ -3681,3 +3681,28 @@
   - `cd admin-web && npm run build` passed.
 - Rollback:
   - `git revert <commit>`
+
+## [2026-05-05 06:47 +0800] Android：短视频搜索 Tab + 短视频播放模式切换（增量实施）
+- 摘要：完成底栏 `搜索` Tab、仅短视频搜索页（标题/标签搜索、瀑布流、点击进入上下滑沉浸播放）以及三处上下滑短视频入口统一播放模式切换（`循环单视频` / `自动播放下一个`，默认循环单视频并持久化）。
+- 变更文件：
+  - android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt
+  - android-app/app/src/main/java/com/chee/videos/core/ui/AppNavigationConfig.kt
+  - android-app/app/src/main/java/com/chee/videos/core/model/ShortPlaybackMode.kt
+  - android-app/app/src/main/java/com/chee/videos/core/data/AppPreferencesStore.kt
+  - android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchViewModel.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedViewModel.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverViewModel.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerViewModel.kt
+  - android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt
+  - android-app/app/src/test/java/com/chee/videos/core/data/AppPreferencesStoreTest.kt
+  - android-app/app/src/test/java/com/chee/videos/core/ui/AppNavigationConfigTest.kt
+  - android-app/app/src/test/java/com/chee/videos/core/model/ShortPlaybackModeTest.kt
+  - android-app/app/src/test/java/com/chee/videos/feature/shortsearch/ShortSearchViewModelStateTest.kt
+- 验证：
+  - `cd android-app && ./gradlew testDebugUnitTest --tests "com.chee.videos.core.data.AppPreferencesStoreTest" --tests "com.chee.videos.core.ui.AppNavigationConfigTest" --tests "com.chee.videos.core.model.ShortPlaybackModeTest" --tests "com.chee.videos.feature.shortsearch.ShortSearchViewModelStateTest" --tests "com.chee.videos.feature.player.UnifiedPlayerShortFitToggleTest"`
+  - 结果：通过（BUILD SUCCESSFUL）。
+- 备注：未改动 `.codex/skills/*`；后续可继续补充 `ShortFeed/ShortDiscover/UnifiedPlayer` 播放模式行为断言的更细粒度测试。

@@ -46,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,6 +77,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
+import com.chee.videos.core.model.toPlayerRepeatMode
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
@@ -250,9 +252,11 @@ fun ShortDiscoverScreen(
                 items = uiState.items,
                 initialIndex = playerStartIndex,
                 fitMode = uiState.fitMode,
+                playbackMode = uiState.playbackMode,
                 onClose = { playingVideoId = null },
                 onNeedMore = viewModel::loadMoreIfNeeded,
                 onToggleFitMode = viewModel::toggleFitMode,
+                onTogglePlaybackMode = viewModel::togglePlaybackMode,
             )
         }
     }
@@ -345,9 +349,11 @@ private fun ShortDiscoverPlayerOverlay(
     items: List<VideoListItemDto>,
     initialIndex: Int,
     fitMode: VideoFitMode,
+    playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
     onClose: () -> Unit,
     onNeedMore: (Int) -> Unit,
     onToggleFitMode: () -> Unit,
+    onTogglePlaybackMode: () -> Unit,
 ) {
     if (items.isEmpty() || initialIndex !in items.indices) {
         return
@@ -364,9 +370,10 @@ private fun ShortDiscoverPlayerOverlay(
     }
     val sharedPlayer = remember(accessToken) {
         ExoPlayer.Builder(context).build().apply {
-            repeatMode = Player.REPEAT_MODE_ONE
+            repeatMode = playbackMode.toPlayerRepeatMode()
         }
     }
+    val pagerScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, items.lastIndex),
         pageCount = { items.size },
@@ -382,6 +389,9 @@ private fun ShortDiscoverPlayerOverlay(
     var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
     var scrubAnchorMs by remember(currentVideoId) { mutableStateOf(0L) }
     var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
+    val latestMode by rememberUpdatedState(playbackMode)
+    val latestPage by rememberUpdatedState(pagerState.currentPage)
+    val latestLastIndex by rememberUpdatedState(items.lastIndex)
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     DisposableEffect(sharedPlayer) {
@@ -393,6 +403,16 @@ private fun ShortDiscoverPlayerOverlay(
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 isPlayerActuallyPlaying = isPlaying
             }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (
+                    playbackState == Player.STATE_ENDED &&
+                    latestMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT &&
+                    latestPage < latestLastIndex
+                ) {
+                    pagerScope.launch { pagerState.animateScrollToPage(latestPage + 1) }
+                }
+            }
         }
         isPlayerActuallyPlaying = sharedPlayer.isPlaying
         sharedPlayer.addListener(listener)
@@ -401,6 +421,9 @@ private fun ShortDiscoverPlayerOverlay(
             isPlayerActuallyPlaying = false
             sharedPlayer.release()
         }
+    }
+    LaunchedEffect(playbackMode) {
+        sharedPlayer.repeatMode = playbackMode.toPlayerRepeatMode()
     }
     DisposableEffect(sharedPlayer, currentVideoId) {
         val listener = object : Player.Listener {
@@ -526,6 +549,8 @@ private fun ShortDiscoverPlayerOverlay(
                     pausedByUserVideoIds = next
                 },
                 onToggleFitMode = onToggleFitMode,
+                onTogglePlaybackMode = onTogglePlaybackMode,
+                playbackMode = playbackMode,
             )
         }
 
@@ -605,6 +630,8 @@ private fun ShortDiscoverPlayerPage(
     titleBottomPadding: androidx.compose.ui.unit.Dp,
     onTogglePauseByUser: () -> Unit,
     onToggleFitMode: () -> Unit,
+    onTogglePlaybackMode: () -> Unit,
+    playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
 ) {
     val scope = rememberCoroutineScope()
     var showCenterIndicator by remember { mutableStateOf(false) }
@@ -721,13 +748,22 @@ private fun ShortDiscoverPlayerPage(
                 .align(Alignment.CenterEnd)
                 .padding(end = 10.dp),
         ) {
-            ShortVideoOverlayActionButton(
-                icon = Icons.Filled.AspectRatio,
-                active = false,
-                enabled = true,
-                onClick = onToggleFitMode,
-                contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ShortVideoOverlayActionButton(
+                    icon = Icons.Filled.AspectRatio,
+                    active = false,
+                    enabled = true,
+                    onClick = onToggleFitMode,
+                    contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
+                )
+                ShortVideoOverlayActionButton(
+                    icon = Icons.Filled.PlayArrow,
+                    active = playbackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT,
+                    enabled = true,
+                    onClick = onTogglePlaybackMode,
+                    contentDescription = if (playbackMode == com.chee.videos.core.model.ShortPlaybackMode.LOOP_ONE) "播放模式：循环单视频" else "播放模式：自动播放下一个",
+                )
+            }
         }
 
         Text(

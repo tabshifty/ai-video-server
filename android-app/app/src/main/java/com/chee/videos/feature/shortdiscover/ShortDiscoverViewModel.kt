@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.repository.AuthRepository
@@ -27,6 +28,7 @@ data class ShortDiscoverUiState(
     val totalCount: Int = 0,
     val items: List<VideoListItemDto> = emptyList(),
     val fitMode: VideoFitMode = VideoFitMode.FILL,
+    val playbackMode: ShortPlaybackMode = ShortPlaybackMode.LOOP_ONE,
     val errorMessage: String? = null,
 )
 
@@ -44,6 +46,11 @@ class ShortDiscoverViewModel @Inject constructor(
         viewModelScope.launch {
             store.shortDiscoverFitModeFlow.collect { mode ->
                 _uiState.update { it.copy(fitMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            store.shortPlaybackModeFlow.collect { mode ->
+                _uiState.update { it.copy(playbackMode = mode) }
             }
         }
     }
@@ -101,6 +108,14 @@ class ShortDiscoverViewModel @Inject constructor(
         _uiState.update { it.copy(fitMode = next) }
         viewModelScope.launch {
             store.saveShortDiscoverFitMode(next)
+        }
+    }
+
+    fun togglePlaybackMode() {
+        val next = if (_uiState.value.playbackMode == ShortPlaybackMode.LOOP_ONE) ShortPlaybackMode.AUTO_NEXT else ShortPlaybackMode.LOOP_ONE
+        _uiState.update { it.copy(playbackMode = next) }
+        viewModelScope.launch {
+            store.saveShortPlaybackMode(next)
         }
     }
 

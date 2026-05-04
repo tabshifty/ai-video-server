@@ -87,6 +87,7 @@ import com.chee.videos.core.model.VideoCollectionDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoImageCollectionDto
 import com.chee.videos.core.model.VideoFitMode
+import com.chee.videos.core.model.toPlayerRepeatMode
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
@@ -160,13 +161,14 @@ fun ShortFeedScreen(
             }
             val sharedPlayer = remember(accessToken) {
                 ExoPlayer.Builder(context).build().apply {
-                    repeatMode = Player.REPEAT_MODE_ONE
+                    repeatMode = uiState.playbackMode.toPlayerRepeatMode()
                 }
             }
             val imageLoader = context.imageLoader
             var renderedVideoId by remember { mutableStateOf<String?>(null) }
             var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
             var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
+            val coroutineScope = rememberCoroutineScope()
             val latestCurrentVideoId by rememberUpdatedState(sharedPlayer.currentMediaItem?.mediaId)
 
             KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
@@ -233,6 +235,27 @@ fun ShortFeedScreen(
                             currentVideoId = currentVideoID,
                         )
                     }
+                }
+                LaunchedEffect(uiState.playbackMode) {
+                    sharedPlayer.repeatMode = uiState.playbackMode.toPlayerRepeatMode()
+                }
+                val latestPlaybackMode by rememberUpdatedState(uiState.playbackMode)
+                val latestPage by rememberUpdatedState(pagerState.currentPage)
+                val latestLastIndex by rememberUpdatedState(uiState.items.lastIndex)
+                DisposableEffect(sharedPlayer, pagerState) {
+                    val listener = object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            if (
+                                playbackState == Player.STATE_ENDED &&
+                                latestPlaybackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT &&
+                                latestPage < latestLastIndex
+                            ) {
+                                coroutineScope.launch { pagerState.animateScrollToPage(latestPage + 1) }
+                            }
+                        }
+                    }
+                    sharedPlayer.addListener(listener)
+                    onDispose { sharedPlayer.removeListener(listener) }
                 }
                 LaunchedEffect(pagerState.currentPage, uiState.items, baseUrl) {
                     val page = pagerState.currentPage
@@ -391,6 +414,8 @@ fun ShortFeedScreen(
                                 onToggleLike = { viewModel.toggleLike(item.id) },
                                 onToggleFavorite = { viewModel.toggleFavorite(item.id) },
                                 onToggleMode = viewModel::toggleFitMode,
+                                onTogglePlaybackMode = viewModel::togglePlaybackMode,
+                                playbackMode = uiState.playbackMode,
                                 onOpenDetail = { viewModel.openDetailSheet(item.id) },
                             )
                         }
@@ -517,6 +542,8 @@ private fun VerticalVideoPage(
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleMode: () -> Unit,
+    onTogglePlaybackMode: () -> Unit,
+    playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
     onOpenDetail: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -665,6 +692,13 @@ private fun VerticalVideoPage(
                     enabled = true,
                     onClick = onToggleMode,
                     contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
+                )
+                ShortsActionButton(
+                    icon = Icons.Filled.PlayArrow,
+                    active = playbackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT,
+                    enabled = true,
+                    onClick = onTogglePlaybackMode,
+                    contentDescription = if (playbackMode == com.chee.videos.core.model.ShortPlaybackMode.LOOP_ONE) "播放模式：循环单视频" else "播放模式：自动播放下一个",
                 )
                 ShortsActionButton(
                     icon = Icons.Filled.Info,

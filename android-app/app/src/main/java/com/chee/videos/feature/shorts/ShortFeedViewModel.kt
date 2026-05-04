@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.repository.AuthRepository
@@ -36,6 +37,7 @@ data class ShortFeedUiState(
     val pagerResetToken: Int = 0,
     val pagerInitialPage: Int = 0,
     val pagerAnchorVideoId: String? = null,
+    val playbackMode: ShortPlaybackMode = ShortPlaybackMode.LOOP_ONE,
 )
 
 @HiltViewModel
@@ -58,6 +60,11 @@ class ShortFeedViewModel @Inject constructor(
         viewModelScope.launch {
             store.shortFitModeFlow.collect { mode ->
                 _uiState.update { it.copy(fitMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            store.shortPlaybackModeFlow.collect { mode ->
+                _uiState.update { it.copy(playbackMode = mode) }
             }
         }
     }
@@ -195,6 +202,18 @@ class ShortFeedViewModel @Inject constructor(
         _uiState.update { it.copy(fitMode = next) }
         viewModelScope.launch {
             store.saveShortFitMode(next)
+        }
+    }
+
+    fun togglePlaybackMode() {
+        val next = if (_uiState.value.playbackMode == ShortPlaybackMode.LOOP_ONE) {
+            ShortPlaybackMode.AUTO_NEXT
+        } else {
+            ShortPlaybackMode.LOOP_ONE
+        }
+        _uiState.update { it.copy(playbackMode = next) }
+        viewModelScope.launch {
+            store.saveShortPlaybackMode(next)
         }
     }
 

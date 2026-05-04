@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.repository.AuthRepository
@@ -33,6 +34,7 @@ data class UnifiedPlayerUiState(
     val startIndex: Int = 0,
     val items: List<PlayerVideoItem> = emptyList(),
     val shortFitMode: VideoFitMode = VideoFitMode.FILL,
+    val playbackMode: ShortPlaybackMode = ShortPlaybackMode.LOOP_ONE,
     val errorMessage: String? = null,
     val detailByVideoId: Map<String, VideoDetailDto> = emptyMap(),
     val detailLoadingVideoIds: Set<String> = emptySet(),
@@ -52,6 +54,11 @@ class UnifiedPlayerViewModel @Inject constructor(
         viewModelScope.launch {
             store.unifiedShortFitModeFlow.collect { mode ->
                 _uiState.update { it.copy(shortFitMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            store.shortPlaybackModeFlow.collect { mode ->
+                _uiState.update { it.copy(playbackMode = mode) }
             }
         }
     }
@@ -195,6 +202,14 @@ class UnifiedPlayerViewModel @Inject constructor(
         _uiState.update { it.copy(shortFitMode = next) }
         viewModelScope.launch {
             store.saveUnifiedShortFitMode(next)
+        }
+    }
+
+    fun toggleShortPlaybackMode() {
+        val next = if (_uiState.value.playbackMode == ShortPlaybackMode.LOOP_ONE) ShortPlaybackMode.AUTO_NEXT else ShortPlaybackMode.LOOP_ONE
+        _uiState.update { it.copy(playbackMode = next) }
+        viewModelScope.launch {
+            store.saveShortPlaybackMode(next)
         }
     }
 
