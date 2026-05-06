@@ -17,6 +17,7 @@ vi.mock('./request', () => ({
 }))
 
 import {
+  batchDeleteAdminVideos,
   createAdminTvEpisode,
   createAdminTvSeason,
   createAdminTvSeries,
@@ -167,5 +168,19 @@ describe('video subtitle apis', () => {
 
     expect(put).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1', payload)
     expect(remove).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1')
+  })
+})
+
+describe('video delete apis', () => {
+  beforeEach(() => {
+    post.mockReset()
+  })
+
+  it('requests batch delete for selected video ids', async () => {
+    const payload = { video_ids: ['video-1', 'video-2'] }
+
+    await batchDeleteAdminVideos(payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/videos/batch-delete', payload)
   })
 })

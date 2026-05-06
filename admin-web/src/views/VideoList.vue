@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import {
+  batchDeleteAdminVideos,
   captureAdminVideoThumbnail,
   deleteAdminVideoSubtitle,
   deleteAdminVideo,
@@ -24,6 +25,7 @@ import { extractTvPendingDiagnostics, getVideoStatusMeta, tvPendingStageLabel } 
 
 const list = ref([])
 const total = ref(0)
+const tableRef = ref(null)
 const detail = ref(null)
 const detailVisible = ref(false)
 const previewPlayerRef = ref(null)
@@ -42,6 +44,8 @@ const subtitleLoading = ref(false)
 const subtitleUploadRef = ref(null)
 const subtitleUploadFileList = ref([])
 const subtitleUploading = ref(false)
+const deletingBatch = ref(false)
+const selectedRows = ref([])
 const subtitleForm = reactive({
   language_code: '',
   label: '',
@@ -195,6 +199,7 @@ async function load() {
   const data = await getAdminVideos(query)
   list.value = data.items || []
   total.value = data.total_count || 0
+  clearSelection()
 }
 
 function applyFilters() {
@@ -372,7 +377,70 @@ async function doDelete(row) {
   await ElMessageBox.confirm(`确认删除 ${row.title} ?`, '警告')
   await deleteAdminVideo(row.id)
   ElMessage.success('删除成功')
+  await reloadAfterDeletion(1)
+}
+
+function onSelectionChange(rows) {
+  selectedRows.value = Array.isArray(rows) ? rows : []
+}
+
+function clearSelection() {
+  selectedRows.value = []
+  tableRef.value?.clearSelection?.()
+}
+
+function selectedVideoIDs() {
+  return selectedRows.value
+    .map((item) => String(item?.id || '').trim())
+    .filter((item) => item !== '')
+}
+
+function buildBatchDeleteMessage(data) {
+  const successCount = Number(data?.success_count || 0)
+  const failureCount = Number(data?.failure_count || 0)
+  const failures = Array.isArray(data?.results) ? data.results.filter((item) => !item?.deleted) : []
+  if (failureCount <= 0) {
+    return `已删除 ${successCount} 条视频`
+  }
+  const failureSummary = failures
+    .slice(0, 3)
+    .map((item) => item?.message || item?.video_id || '未知错误')
+    .join('；')
+  return `删除完成，成功 ${successCount} 条，失败 ${failureCount} 条${failureSummary ? `：${failureSummary}` : ''}`
+}
+
+async function reloadAfterDeletion(deletedCount = 0) {
+  const currentCount = list.value.length
+  if (query.page > 1 && deletedCount > 0 && deletedCount >= currentCount) {
+    query.page -= 1
+  }
   await load()
+}
+
+async function doBatchDelete() {
+  const videoIDs = selectedVideoIDs()
+  if (videoIDs.length === 0 || deletingBatch.value) {
+    return
+  }
+  await ElMessageBox.confirm(`确认批量删除已勾选的 ${videoIDs.length} 条视频？此操作不可恢复。`, '警告', {
+    type: 'warning'
+  })
+  deletingBatch.value = true
+  try {
+    const data = await batchDeleteAdminVideos({ video_ids: videoIDs })
+    const successCount = Number(data?.success_count || 0)
+    const failureCount = Number(data?.failure_count || 0)
+    if (failureCount > 0) {
+      ElMessage.warning(buildBatchDeleteMessage(data))
+    } else {
+      ElMessage.success(buildBatchDeleteMessage(data))
+    }
+    await reloadAfterDeletion(successCount)
+  } catch (error) {
+    ElMessage.error(error?.message || '批量删除失败')
+  } finally {
+    deletingBatch.value = false
+  }
 }
 
 async function doRetranscode(row) {
@@ -588,10 +656,22 @@ onMounted(load)
             <h2 class="section-head__title">结果区</h2>
             <p class="section-head__desc">当前共 {{ total }} 条视频记录</p>
           </div>
+          <div class="section-head__actions">
+            <el-button
+              type="danger"
+              plain
+              :disabled="selectedRows.length === 0"
+              :loading="deletingBatch"
+              @click="doBatchDelete"
+            >
+              批量删除
+            </el-button>
+          </div>
         </div>
 
         <div class="table-wrap">
-          <el-table :data="list" border>
+          <el-table ref="tableRef" :data="list" border @selection-change="onSelectionChange">
+            <el-table-column type="selection" width="52" />
             <el-table-column prop="title" label="标题" min-width="220" />
             <el-table-column prop="type" label="类型" width="110">
               <template #default="{ row }">

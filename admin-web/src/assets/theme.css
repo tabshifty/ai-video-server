@@ -235,6 +235,8 @@ body {
 }
 
 .table-wrap .el-table {
+  width: 100%;
+  min-width: 0;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--line-soft);
@@ -243,6 +245,16 @@ body {
   --el-table-row-hover-bg-color: #f5f8fc;
   --el-table-text-color: var(--text-main);
   --el-table-header-text-color: #2b3c51;
+}
+
+.table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+#app :where(.table-panel, .content-card, .page-section, .shell-main, .shell-content) {
+  min-width: 0;
 }
 
 .table-wrap .el-table th.el-table__cell {

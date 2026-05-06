@@ -20,6 +20,7 @@ export const getAdminVideoPlayURL = (id) => request.get(`/admin/videos/${id}/pla
 export const captureAdminVideoThumbnail = (id, payload) => request.post(`/admin/videos/${id}/thumbnail/capture`, payload)
 export const updateAdminVideo = (id, payload) => request.put(`/admin/videos/${id}`, payload)
 export const deleteAdminVideo = (id) => request.delete(`/admin/videos/${id}`)
+export const batchDeleteAdminVideos = (payload) => request.post('/admin/videos/batch-delete', payload)
 export const retranscodeVideo = (id) => request.post(`/admin/videos/${id}/retranscode`)
 export const getAdminTvSeries = (params) => request.get('/admin/tv/series', { params })
 export const getAdminTvSeriesDetail = (id) => request.get(`/admin/tv/series/${id}`)

@@ -3724,3 +3724,26 @@
   - 运行参数已切到新二进制并启用 checkpoint：`--checkpoint-path .run/reports/flick-import.checkpoint.json --resume=true`。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-06 13:27] 管理端视频批量删除与空表宽度修复
+- Type: `implementation`
+- Summary:
+  - 管理端视频列表新增勾选批量删除能力，前后端增加 `/admin/videos/batch-delete` 批量删除接口，按逐条执行并返回成功/失败汇总结果。
+  - 视频管理页保留单条删除，同时新增批量删除按钮、选择列、二次确认、汇总提示与删除后分页回退处理。
+  - 管理端公共表格容器样式补齐 `min-width` 与横向滚动约束，修复空查询结果时表格无限变宽问题，覆盖所有使用 `.table-wrap` 的页面。
+- Changed Files:
+  - `internal/handlers/admin.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/admin_batch_delete_test.go`
+  - `admin-web/src/api/admin.js`
+  - `admin-web/src/api/admin.spec.js`
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/assets/theme.css`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/handlers -run 'TestDeleteVideosIndividuallySummarizesPartialFailures|TestAdminBatchDeleteVideosRejectsEmptyVideoIDs|TestAdminBatchDeleteVideosRejectsInvalidUUID' -count=1` passed.
+  - `cd admin-web && npm test -- --run admin.spec.js` passed.
+  - `cd admin-web && npm run build` passed.
+  - `go test ./...` passed.
+- Rollback:
+  - `git revert <commit>`

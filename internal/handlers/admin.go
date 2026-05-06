@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -370,19 +371,85 @@ func (a *API) AdminDeleteVideo(c *gin.Context) {
 		bad(c, "invalid video id")
 		return
 	}
-	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
-	if err != nil {
-		response.Error(c, 1009, err.Error())
-		return
-	}
-	subtitles, err := a.repo.ListVideoSubtitles(c.Request.Context(), videoID)
-	if err != nil {
-		response.Error(c, 1010, err.Error())
-		return
-	}
-	if err := a.repo.DeleteVideoByID(c.Request.Context(), videoID); err != nil {
+	if err := a.deleteVideoResources(c.Request.Context(), videoID); err != nil {
 		response.Error(c, 1011, err.Error())
 		return
+	}
+	ok(c, gin.H{"deleted": true, "video_id": videoID})
+}
+
+func (a *API) AdminBatchDeleteVideos(c *gin.Context) {
+	var req struct {
+		VideoIDs []string `json:"video_ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	if len(req.VideoIDs) == 0 {
+		bad(c, "video_ids is required")
+		return
+	}
+
+	videoIDs, err := parseUUIDStrings(req.VideoIDs)
+	if err != nil {
+		bad(c, "invalid video_ids")
+		return
+	}
+	if len(videoIDs) == 0 {
+		bad(c, "video_ids is required")
+		return
+	}
+
+	result := deleteVideosIndividually(videoIDs, func(videoID uuid.UUID) error {
+		return a.deleteVideoResources(c.Request.Context(), videoID)
+	})
+	ok(c, result)
+}
+
+type adminBatchDeleteResult struct {
+	RequestedCount int                          `json:"requested_count"`
+	SuccessCount   int                          `json:"success_count"`
+	FailureCount   int                          `json:"failure_count"`
+	Results        []adminBatchDeleteResultItem `json:"results"`
+}
+
+type adminBatchDeleteResultItem struct {
+	VideoID uuid.UUID `json:"video_id"`
+	Deleted bool      `json:"deleted"`
+	Message string    `json:"message"`
+}
+
+func deleteVideosIndividually(videoIDs []uuid.UUID, deleteFn func(videoID uuid.UUID) error) adminBatchDeleteResult {
+	result := adminBatchDeleteResult{
+		RequestedCount: len(videoIDs),
+		Results:        make([]adminBatchDeleteResultItem, 0, len(videoIDs)),
+	}
+	for _, videoID := range videoIDs {
+		item := adminBatchDeleteResultItem{VideoID: videoID}
+		if err := deleteFn(videoID); err != nil {
+			item.Message = err.Error()
+			result.FailureCount++
+		} else {
+			item.Deleted = true
+			result.SuccessCount++
+		}
+		result.Results = append(result.Results, item)
+	}
+	return result
+}
+
+func (a *API) deleteVideoResources(ctx context.Context, videoID uuid.UUID) error {
+	video, err := a.repo.GetVideoByID(ctx, videoID)
+	if err != nil {
+		return err
+	}
+	subtitles, err := a.repo.ListVideoSubtitles(ctx, videoID)
+	if err != nil {
+		return err
+	}
+	if err := a.repo.DeleteVideoByID(ctx, videoID); err != nil {
+		return err
 	}
 	_ = os.Remove(video.OriginalPath)
 	_ = os.Remove(video.TranscodedPath)
@@ -392,7 +459,7 @@ func (a *API) AdminDeleteVideo(c *gin.Context) {
 			_ = os.Remove(subtitle.StoredPath)
 		}
 	}
-	ok(c, gin.H{"deleted": true, "video_id": videoID})
+	return nil
 }
 
 func (a *API) AdminRetranscodeVideo(c *gin.Context) {

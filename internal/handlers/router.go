@@ -131,6 +131,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/videos", a.AdminVideos)
 			admin.GET("/video-tags", a.AdminVideoTags)
 			admin.GET("/video-tags/popular", a.AdminPopularVideoTags)
+			admin.POST("/videos/batch-delete", a.AdminBatchDeleteVideos)
 			admin.GET("/videos/:id", a.AdminVideoDetail)
 			admin.GET("/videos/:id/subtitles", a.AdminVideoSubtitles)
 			admin.POST("/videos/:id/subtitles/upload", a.AdminUploadVideoSubtitle)
