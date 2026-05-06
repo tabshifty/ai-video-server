@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -77,10 +76,18 @@ import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.toPlayerRepeatMode
+import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
+import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
+import com.chee.videos.core.ui.shouldShowShortOverlayProgressBar
+import com.chee.videos.core.ui.shortNonHomeProgressBarPadding
 import com.chee.videos.core.ui.shortPosterContentScale
+import com.chee.videos.core.ui.shortPlaybackModeLabel
+import com.chee.videos.core.ui.shortScrubTargetFromDelta
 import com.chee.videos.core.ui.shortVideoResizeMode
 import com.chee.videos.core.util.UrlBuilder
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -193,6 +200,11 @@ private fun ShortSearchPlayerOverlay(
     var renderedVideoId by remember { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
     var showController by rememberSaveable { mutableStateOf(true) }
+    var durationMs by remember { mutableStateOf(0L) }
+    var positionMs by remember { mutableStateOf(0L) }
+    var isScrubbingShort by remember { mutableStateOf(false) }
+    var scrubAnchorMs by remember { mutableStateOf(0L) }
+    var scrubTargetMs by remember { mutableStateOf(0L) }
 
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -214,6 +226,13 @@ private fun ShortSearchPlayerOverlay(
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 isPlayerActuallyPlaying = isPlaying
+            }
+
+            override fun onEvents(player: Player, events: Player.Events) {
+                durationMs = player.duration.takeIf { it > 0L } ?: 0L
+                if (!isScrubbingShort) {
+                    positionMs = player.currentPosition.coerceAtLeast(0L)
+                }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -247,6 +266,24 @@ private fun ShortSearchPlayerOverlay(
 
     val currentItem = items.getOrNull(pagerState.currentPage)
     val currentPausedByUser = currentItem?.id?.let { it in pausedByUserVideoIds } ?: false
+
+    LaunchedEffect(currentItem?.id) {
+        if (currentItem == null) {
+            durationMs = 0L
+            positionMs = 0L
+            isScrubbingShort = false
+            scrubAnchorMs = 0L
+            scrubTargetMs = 0L
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            if (!isScrubbingShort) {
+                durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: 0L
+                positionMs = sharedPlayer.currentPosition.coerceAtLeast(0L)
+            }
+            delay(220)
+        }
+    }
 
     LaunchedEffect(currentItem?.id, baseUrl, dataSourceFactory) {
         val item = currentItem ?: return@LaunchedEffect
@@ -293,15 +330,57 @@ private fun ShortSearchPlayerOverlay(
                 AnimatedVisibility(visible = showController, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterEnd)) {
                     Column(modifier = Modifier.padding(end = 10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         ShortVideoOverlayActionButton(icon = Icons.Filled.AspectRatio, active = false, enabled = true, onClick = onToggleFitMode, contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示")
-                        ShortVideoOverlayActionButton(icon = Icons.Filled.Cached, active = playbackMode == ShortPlaybackMode.AUTO_NEXT, enabled = true, onClick = onTogglePlaybackMode, contentDescription = if (playbackMode == ShortPlaybackMode.LOOP_ONE) "播放模式：循环单视频" else "播放模式：自动播放下一个")
+                        ShortPlaybackModeToggleButton(playbackMode = playbackMode, onClick = onTogglePlaybackMode)
                     }
                 }
                 Text(text = item.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 24.dp))
             }
         }
 
-        Text(text = if (playbackMode == ShortPlaybackMode.LOOP_ONE) "循环单视频" else "自动播放下一个", color = Color.White, style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
+        Text(text = shortPlaybackModeLabel(playbackMode), color = Color.White, style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
         Text(text = "关闭", color = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClose).padding(horizontal = 10.dp, vertical = 6.dp))
+
+        if (shouldShowShortOverlayProgressBar(currentItem?.id)) {
+            ShortVideoBottomProgressBar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .shortNonHomeProgressBarPadding(),
+                positionMs = positionMs,
+                durationMs = durationMs,
+                isScrubbing = isScrubbingShort,
+                scrubTargetMs = scrubTargetMs,
+                onScrubStart = {
+                    if (durationMs <= 0L) {
+                        return@ShortVideoBottomProgressBar
+                    }
+                    isScrubbingShort = true
+                    scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
+                    scrubTargetMs = scrubAnchorMs
+                },
+                onScrubByDeltaFraction = { deltaFraction ->
+                    if (durationMs <= 0L || !isScrubbingShort) {
+                        return@ShortVideoBottomProgressBar
+                    }
+                    scrubTargetMs = shortScrubTargetFromDelta(
+                        anchorMs = scrubAnchorMs,
+                        durationMs = durationMs,
+                        deltaFraction = deltaFraction,
+                    )
+                },
+                onScrubEnd = {
+                    if (!isScrubbingShort) {
+                        return@ShortVideoBottomProgressBar
+                    }
+                    if (durationMs > 0L) {
+                        val target = scrubTargetMs.coerceIn(0L, durationMs)
+                        sharedPlayer.seekTo(target)
+                        positionMs = target
+                    }
+                    isScrubbingShort = false
+                },
+            )
+        }
     }
 }
 

@@ -13,6 +13,28 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-07 07:59] Android 短视频播放器控件统一与非首页进度条间距调整
+- Type: `implementation`
+- Summary:
+  - 将 Android 短视频播放器的播放模式切换按钮收敛到公共 UI helper，统一首页、发现页、搜索页和统一播放器的图标、激活态与无障碍文案；搜索页不再单独使用 `Cached` 图标分支。
+  - 为非首页短视频播放器补齐公共进度条显示约定与底部间距约定：`ShortSearchScreen` 新增可拖拽进度条，`ShortDiscoverScreen` 与 `UnifiedPlayerScreen` 改为使用“底部安全区 + 额外 12.dp” 的统一抬高规则，首页 `ShortFeedScreen` 保持无进度条。
+  - 新增 Android 单测，锁定播放模式文案、非首页进度条显示条件和额外底部间距常量，避免后续播放器入口再次分叉。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/ShortVideoPresentation.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/ShortVideoPlaybackChromeTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --stop` stopped Gradle daemons before rerun.
+  - `cd android-app && rm -rf app/build .gradle/kotlin` cleared collided Kotlin/KAPT build caches after parallel verification invalidated them.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.core.ui.ShortVideoBottomProgressBarScrubMathTest' --tests 'com.chee.videos.core.ui.ShortVideoPlaybackChromeTest' --tests 'com.chee.videos.feature.shorts.ShortFeedProgressVisibilityTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-03 20:12] flick 迁移标题改为标签组合并回填历史
 - Type: `implementation`
 - Summary:

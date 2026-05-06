@@ -84,7 +84,10 @@ import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
+import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.shouldShowShortOverlayProgressBar
+import com.chee.videos.core.ui.shortNonHomeProgressBarPadding
 import com.chee.videos.core.ui.shortScrubTargetFromDelta
 import com.chee.videos.core.ui.shortPosterContentScale
 import com.chee.videos.core.ui.shortVideoResizeMode
@@ -505,12 +508,12 @@ fun UnifiedPlayerScreen(
                         )
                     }
 
-                    if (!currentVideoId.isNullOrBlank()) {
+                    if (shouldShowShortOverlayProgressBar(currentVideoId)) {
                         ShortVideoBottomProgressBar(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
-                                .navigationBarsPadding(),
+                                .shortNonHomeProgressBarPadding(),
                             positionMs = positionMs,
                             durationMs = durationMs,
                             isScrubbing = isScrubbingShort,
@@ -709,12 +712,9 @@ private fun UnifiedShortVideoPage(
                     onClick = onToggleFitMode,
                     contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
                 )
-                ShortVideoOverlayActionButton(
-                    icon = Icons.Filled.PlayArrow,
-                    active = playbackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT,
-                    enabled = true,
+                ShortPlaybackModeToggleButton(
+                    playbackMode = playbackMode,
                     onClick = onTogglePlaybackMode,
-                    contentDescription = if (playbackMode == com.chee.videos.core.model.ShortPlaybackMode.LOOP_ONE) "播放模式：循环单视频" else "播放模式：自动播放下一个",
                 )
             }
         }
