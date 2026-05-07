@@ -51,7 +51,7 @@ internal fun tvSectionToUiModel(dto: TvSectionDto): TvCatalogSectionUiModel =
 
 internal fun tvContinueWatchingToUiModel(dto: TvContinueWatchingDto): TvContinueWatchingUiModel =
     TvContinueWatchingUiModel(
-        type = dto.type,
+        type = normalizeTvVideoType(dto.type as String?, fallback = "tv"),
         seriesId = dto.seriesId,
         seriesTitle = dto.seriesTitle,
         seasonNumber = dto.seasonNumber,
@@ -67,7 +67,7 @@ internal fun tvContinueWatchingToUiModel(dto: TvContinueWatchingDto): TvContinue
 internal fun tvHomeVideoToUiModel(dto: TvHomeVideoDto): TvHomeShelfItemUiModel =
     TvHomeShelfItemUiModel(
         id = dto.id,
-        type = dto.type,
+        type = normalizeTvVideoType(dto.type as String?, fallback = "movie"),
         title = dto.title,
         description = dto.overview.orEmpty().ifBlank { "暂无简介" },
         posterUrl = dto.posterUrl,
@@ -81,12 +81,19 @@ internal fun tvHomeVideoToUiModel(dto: TvHomeVideoDto): TvHomeShelfItemUiModel =
 internal fun tvSearchResultToUiModel(dto: TvSearchResultDto): TvSearchResultUiModel =
     TvSearchResultUiModel(
         id = dto.id,
-        type = dto.type,
+        type = normalizeTvVideoType(dto.type as String?, fallback = "movie"),
         title = dto.title,
         description = dto.overview.orEmpty().ifBlank { "暂无简介" },
         posterUrl = dto.posterUrl,
         backdropUrl = dto.backdropUrl,
     )
+
+private fun normalizeTvVideoType(raw: String?, fallback: String): String {
+    return when (raw?.trim()?.lowercase()) {
+        "tv", "movie", "av" -> raw.trim().lowercase()
+        else -> fallback
+    }
+}
 
 internal fun tvEpisodeToUiModel(dto: TvEpisodeDto): TvEpisodeUiModel =
     TvEpisodeUiModel(

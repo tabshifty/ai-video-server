@@ -3894,3 +3894,19 @@
   - `cd android-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.tv.TvQrCodeEncoderTest' --tests 'com.chee.videos.tv.TvAccountMenuActionTest'` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 19:15 +0800] Android：修复 TV 首页 continue_watching.type 为空导致的崩溃
+- Type: `implementation`
+- Summary:
+  - 复现并修复 TV 首页 `continue_watching.type = null` 时映射层空指针，避免 `TvContinueWatchingUiModel` 构造时因非空参数收到 `null` 而崩溃。
+  - TV 映射层新增视频类型归一化，统一兜底 `tv/movie/av` 三种合法值，脏数据或空串时按场景回退默认类型。
+  - 补充回归测试，覆盖 `continue_watching.type = null` 的真实输入形态。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvRepositoryMappingTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvRepositoryMappingTest.mapContinueWatching_fallsBackWhenTypeIsNull' --tests 'com.chee.videos.feature.tv.TvCatalogViewModelTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`

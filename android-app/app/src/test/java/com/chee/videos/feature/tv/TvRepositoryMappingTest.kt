@@ -34,6 +34,29 @@ class TvRepositoryMappingTest {
     }
 
     @Test
+    fun mapContinueWatching_fallsBackWhenTypeIsNull() {
+        val dto = Gson().fromJson(
+            """
+            {
+              "type": null,
+              "series_id": "series-1",
+              "series_title": "雾城档案",
+              "season_number": 2,
+              "episode_number": 4,
+              "episode_title": "暗线浮现",
+              "progress_percent": 64
+            }
+            """.trimIndent(),
+            TvContinueWatchingDto::class.java,
+        )
+
+        val uiModel = tvContinueWatchingToUiModel(dto)
+
+        assertEquals("tv", uiModel.type)
+        assertEquals("series-1", uiModel.seriesId)
+    }
+
+    @Test
     fun mapSeriesDetail_handlesMissingCollections() {
         val uiModel = tvSeriesDetailToUiModel(
             TvSeriesDetailDto(
