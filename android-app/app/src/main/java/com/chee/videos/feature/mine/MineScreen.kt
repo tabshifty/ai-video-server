@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -60,6 +61,7 @@ private val MineAccent = AppChrome.AccentStrong
 fun MineScreen(
     baseUrl: String,
     onOpenPlayer: (source: String, videoId: String) -> Unit,
+    onScanTvLogin: () -> Unit,
     onSwitchServer: () -> Unit,
     onLogout: () -> Unit,
     viewModel: MineViewModel = hiltViewModel(),
@@ -112,6 +114,7 @@ fun MineScreen(
             profileLoading = uiState.profileLoading,
             profileError = uiState.profileErrorMessage,
             onRefreshProfile = viewModel::refreshProfile,
+            onScanTvLogin = onScanTvLogin,
             onSwitchServer = onSwitchServer,
             onLogout = onLogout,
         )
@@ -235,6 +238,7 @@ private fun ProfileHeader(
     profileLoading: Boolean,
     profileError: String?,
     onRefreshProfile: () -> Unit,
+    onScanTvLogin: () -> Unit,
     onSwitchServer: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -284,6 +288,9 @@ private fun ProfileHeader(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(onClick = onRefreshProfile) {
                         Icon(Icons.Filled.Refresh, contentDescription = "刷新资料", tint = Color.White)
+                    }
+                    IconButton(onClick = onScanTvLogin) {
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "扫码登录 TV", tint = Color.White)
                     }
                     IconButton(onClick = onSwitchServer) {
                         Icon(Icons.Filled.Router, contentDescription = "切换服务器", tint = Color.White)

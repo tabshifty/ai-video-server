@@ -23,4 +23,28 @@ class TvAuthDeepLinkParserTest {
         assertNull(TvAuthDeepLinkParser.parse("https://example.com"))
         assertNull(TvAuthDeepLinkParser.parse("cheevideos://tv-auth?pair_code=ONLYCODE"))
     }
+
+    @Test
+    fun `resolve prefers scanned payload over launch deep link`() {
+        val link = resolveTvAuthDeepLink(
+            launchPayload = "cheevideos://tv-auth?session_id=launch-session&pair_code=LAUNCH1",
+            scannedPayload = "cheevideos://tv-auth?session_id=scanned-session&pair_code=SCAN01",
+        )
+
+        requireNotNull(link)
+        assertEquals("scanned-session", link.sessionId)
+        assertEquals("SCAN01", link.pairCode)
+    }
+
+    @Test
+    fun `resolve falls back to launch deep link when scanned payload is invalid`() {
+        val link = resolveTvAuthDeepLink(
+            launchPayload = "cheevideos://tv-auth?session_id=launch-session&pair_code=LAUNCH1",
+            scannedPayload = "https://example.com/not-tv-auth",
+        )
+
+        requireNotNull(link)
+        assertEquals("launch-session", link.sessionId)
+        assertEquals("LAUNCH1", link.pairCode)
+    }
 }

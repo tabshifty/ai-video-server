@@ -49,3 +49,10 @@ object TvAuthDeepLinkParser {
         )
     }
 }
+
+fun resolveTvAuthDeepLink(
+    launchPayload: String?,
+    scannedPayload: String?,
+): TvAuthDeepLink? {
+    return TvAuthDeepLinkParser.parse(scannedPayload) ?: TvAuthDeepLinkParser.parse(launchPayload)
+}

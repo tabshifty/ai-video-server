@@ -17,11 +17,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +44,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.zxing.client.android.Intents
 import com.chee.videos.core.model.AppRootState
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.AppDarkColors
@@ -61,8 +69,12 @@ import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tvauth.TvAuthApprovalScreen
 import com.chee.videos.feature.tvauth.TvAuthDeepLinkParser
+import com.chee.videos.feature.tvauth.resolveTvAuthDeepLink
 import com.chee.videos.feature.tv.buildTvPlayerRoute
 import com.chee.videos.feature.tv.buildTvSeriesRoute
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.launch
 
 @Composable
 fun VideoHomeApp(
@@ -71,7 +83,11 @@ fun VideoHomeApp(
     onConsumeTvAuthDeepLink: () -> Unit = {},
 ) {
     val appState by appRootViewModel.appState.collectAsStateWithLifecycle()
-    val tvAuthDeepLink = TvAuthDeepLinkParser.parse(initialTvAuthDeepLink)
+    var scannedTvAuthPayload by rememberSaveable { mutableStateOf<String?>(null) }
+    val tvAuthDeepLink = resolveTvAuthDeepLink(
+        launchPayload = initialTvAuthDeepLink,
+        scannedPayload = scannedTvAuthPayload,
+    )
 
     LaunchedEffect(tvAuthDeepLink?.serverBaseUrl) {
         appRootViewModel.applyTvAuthServer(tvAuthDeepLink?.serverBaseUrl)
@@ -98,7 +114,10 @@ fun VideoHomeApp(
                     if (tvAuthDeepLink != null) {
                         TvAuthApprovalScreen(
                             deepLink = tvAuthDeepLink,
-                            onFinished = onConsumeTvAuthDeepLink,
+                            onFinished = {
+                                scannedTvAuthPayload = null
+                                onConsumeTvAuthDeepLink()
+                            },
                         )
                     } else {
                         AuthenticatedNav(
@@ -106,6 +125,9 @@ fun VideoHomeApp(
                             accessToken = state.accessToken,
                             onSwitchServer = appRootViewModel::switchToServerSelection,
                             onLogout = appRootViewModel::logout,
+                            onScannedTvAuthPayload = { payload ->
+                                scannedTvAuthPayload = payload
+                            },
                         )
                     }
                 }
@@ -120,15 +142,33 @@ private fun AuthenticatedNav(
     accessToken: String,
     onSwitchServer: () -> Unit,
     onLogout: () -> Unit,
+    onScannedTvAuthPayload: (String) -> Unit,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route.orEmpty()
     val showBottomBar = rootNavigationTabs.any { it.route == currentRoute }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val scannerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents?.trim().orEmpty()
+        when {
+            contents.isBlank() -> Unit
+            TvAuthDeepLinkParser.parse(contents) != null -> onScannedTvAuthPayload(contents)
+            else -> {
+                scope.launch {
+                    snackbarHostState.showSnackbar("未识别为 TV 登录二维码")
+                }
+            }
+        }
+    }
 
     Scaffold(
         containerColor = AppChrome.Canvas,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         bottomBar = {
             if (showBottomBar) {
                 Surface(
@@ -235,6 +275,17 @@ private fun AuthenticatedNav(
                         baseUrl = baseUrl,
                         onOpenPlayer = { source, videoId ->
                             navController.navigate("player/$source/$videoId")
+                        },
+                        onScanTvLogin = {
+                            scannerLauncher.launch(
+                                ScanOptions().apply {
+                                    setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                    setPrompt("扫描 TV 登录二维码")
+                                    setBeepEnabled(false)
+                                    setOrientationLocked(false)
+                                    addExtra(Intents.Scan.FORMATS, ScanOptions.QR_CODE)
+                                },
+                            )
                         },
                         onSwitchServer = onSwitchServer,
                         onLogout = onLogout,

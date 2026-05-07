@@ -3965,3 +3965,24 @@
   - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 20:43 +0800] Android：补齐手机端 TV 扫码入口
+- Type: `implementation`
+- Summary:
+  - 手机端新增应用内 TV 扫码入口，在“我的”页资料头部提供扫码按钮，直接拉起相机扫描 TV 登录二维码。
+  - 扫码结果接入现有 TV 授权确认流：应用内扫码结果优先于外部 deep link，扫码无效时给出提示，不另起第二套确认逻辑。
+  - 新增 `resolveTvAuthDeepLink` 合流逻辑与回归测试，补充扫码依赖、相机权限与工程约束，明确手机端 TV 授权不能只做 deep link 解析。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/mine/MineScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tvauth/TvAuthDeepLink.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tvauth/TvAuthDeepLinkParserTest.kt`
+  - `android-app/app/src/main/AndroidManifest.xml`
+  - `android-app/app/build.gradle.kts`
+  - `android-app/AGENTS.md`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tvauth.TvAuthDeepLinkParserTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
