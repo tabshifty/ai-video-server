@@ -3874,3 +3874,23 @@
   - `go test ./...` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 18:54 +0800] Android TV：补齐二维码渲染与账户/设备菜单
+- Type: `implementation`
+- Summary:
+  - TV 配对页改为真实渲染二维码位图，继续保留配对码文案，适配手机扫码失败时的备用输入路径。
+  - TV 配对页新增 `切换服务器` 入口，补齐“先选服务器，再生成配对会话”的回退链路。
+  - TV 已登录态新增顶部 `账户与设备菜单`，提供 `重新配对`、`退出登录`、`切换服务器` 三个动作。
+  - 新增 QR 编码器与菜单动作单测，保证新增 TV 闭环能力可回归验证。
+- Changed Files:
+  - `android-app/tv-app/build.gradle.kts`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvPairingScreen.kt`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvQrCodeEncoder.kt`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvAccountMenuAction.kt`
+  - `android-app/tv-app/src/test/java/com/chee/videos/tv/TvQrCodeEncoderTest.kt`
+  - `android-app/tv-app/src/test/java/com/chee/videos/tv/TvAccountMenuActionTest.kt`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.tv.TvQrCodeEncoderTest' --tests 'com.chee.videos.tv.TvAccountMenuActionTest'` passed.
+- Rollback:
+  - `git revert <commit>`

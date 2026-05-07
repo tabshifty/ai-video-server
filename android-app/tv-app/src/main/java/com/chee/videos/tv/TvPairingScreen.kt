@@ -1,17 +1,21 @@
 package com.chee.videos.tv
 
 import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.runtime.remember
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -113,9 +117,13 @@ class TvPairingViewModel @Inject constructor(
 
 @Composable
 fun TvPairingScreen(
+    onSwitchServer: () -> Unit,
     viewModel: TvPairingViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val qrBitmap = remember(uiState.qrContent) {
+        uiState.qrContent.takeIf { it.isNotBlank() }?.let { TvQrCodeEncoder.encodeImage(it, size = 320) }
+    }
 
     LaunchedEffect(Unit) {
         if (uiState.sessionId.isBlank()) {
@@ -152,13 +160,27 @@ fun TvPairingScreen(
                     color = AppChrome.TextSecondary,
                 )
                 if (uiState.pairCode.isNotBlank()) {
+                    qrBitmap?.let { image ->
+                        Surface(
+                            color = AppChrome.TextPrimary,
+                            shape = AppChrome.SectionShape,
+                        ) {
+                            Image(
+                                bitmap = image,
+                                contentDescription = "TV 登录二维码",
+                                modifier = Modifier
+                                    .padding(12.dp)
+                                    .size(220.dp),
+                            )
+                        }
+                    }
                     Text(
                         text = "配对码：${uiState.pairCode}",
                         style = MaterialTheme.typography.headlineSmall,
                         color = AppChrome.AccentStrong,
                     )
                     Text(
-                        text = "扫码内容：${uiState.qrContent}",
+                        text = "若手机无法扫码，可在手机端输入配对码完成确认。",
                         color = AppChrome.TextMuted,
                     )
                 }
@@ -177,6 +199,12 @@ fun TvPairingScreen(
                     ),
                 ) {
                     Text(if (uiState.loading) "生成中..." else "重新生成配对码")
+                }
+                OutlinedButton(
+                    onClick = onSwitchServer,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("切换服务器")
                 }
             }
         }
