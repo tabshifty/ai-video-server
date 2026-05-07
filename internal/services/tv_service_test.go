@@ -44,6 +44,26 @@ func TestBuildTVHomePayloadBrowseMode(t *testing.T) {
 	}
 }
 
+func TestBuildTVHomePayloadFixedSectionsRemainAvailable(t *testing.T) {
+	t.Parallel()
+
+	payload := models.TvHomePayload{
+		TvSeries: []models.TvHomeVideoDto{{ID: "7", Type: "tv", Title: "雾城档案"}},
+		Movies:   []models.TvHomeVideoDto{{ID: "m-1", Type: "movie", Title: "午夜列车"}},
+		AV:       []models.TvHomeVideoDto{{ID: "a-1", Type: "av", Title: "SNIS-001"}},
+	}
+
+	if len(payload.TvSeries) != 1 || payload.TvSeries[0].Type != "tv" {
+		t.Fatalf("expected tv_series fixed section, got=%#v", payload.TvSeries)
+	}
+	if len(payload.Movies) != 1 || payload.Movies[0].Type != "movie" {
+		t.Fatalf("expected movies fixed section, got=%#v", payload.Movies)
+	}
+	if len(payload.AV) != 1 || payload.AV[0].Type != "av" {
+		t.Fatalf("expected av fixed section, got=%#v", payload.AV)
+	}
+}
+
 func TestBuildTVHomePayloadSearchMode(t *testing.T) {
 	t.Parallel()
 

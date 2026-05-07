@@ -255,6 +255,53 @@
   - AV 海报裁剪模式扩展为 `portrait_center`、`portrait_left`、`portrait_right` 三种枚举；后端在横向裁切时按模式决定左右锚点，空值或非法值统一回退到 `portrait_center`。
   - AV 手动刮削确认保存新增显式状态透传：管理端 handler 会把当前视频状态传给 `ConfirmAV`，从而让已 `ready` 的视频在手动保存后继续保持 `ready`；自动链路与 `ScrapeAVUpload` 仍维持原有 `uploaded` 行为。
   - 管理端 AV 配置页把 `poster_crop_mode` 从自由输入收敛为枚举下拉，前端 helper 同步只接受这 3 个值并在远端配置异常时回退到 `portrait_center`。
+
+### [2026-05-07 12:41] 新增 TV 配对授权链路与独立 Android TV 模块
+- Type: `implementation`
+- Summary:
+  - 后端新增 `tv-auth` 配对授权协议与存储：增加 `tv_devices` / `tv_auth_sessions` migration、配对会话创建/轮询/批准/拒绝 handler、repo 与 service；`/api/v1/tv/home` 扩展为固定长视频分区字段，新增 `/api/v1/tv/search` 聚合搜索电影、剧集与 AV。
+  - Android 手机 App 新增 TV 授权协议模型、深链解析与确认授权页：`MainActivity` 支持 `cheevideos://tv-auth` 深链，登录后可进入确认页并调用批准/拒绝接口；补齐相关 repository、URL builder、API service 与解析单测。
+  - 新增独立 `:tv-app` Android TV 模块，复用现有共享源码，提供独立 launcher / Leanback 入口、服务器选择、配对登录页与 TV 长视频导航壳，兼容当前 Android 10 测试机（API 29）运行基线。
+- Changed Files:
+  - `migrations/0018_tv_auth_support.up.sql`
+  - `migrations/0018_tv_auth_support.down.sql`
+  - `internal/models/app.go`
+  - `internal/models/user.go`
+  - `internal/repository/tv_auth_repository.go`
+  - `internal/services/tv.go`
+  - `internal/services/tv_auth.go`
+  - `internal/services/tv_auth_test.go`
+  - `internal/services/tv_service_test.go`
+  - `internal/handlers/router.go`
+  - `internal/handlers/tv.go`
+  - `internal/handlers/tv_auth.go`
+  - `android-app/app/src/main/AndroidManifest.xml`
+  - `android-app/app/src/main/java/com/chee/videos/MainActivity.kt`
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/TvAuthRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tvauth/TvAuthDeepLink.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tvauth/TvAuthApprovalScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tvauth/TvAuthApprovalViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tvauth/TvAuthDeepLinkParserTest.kt`
+  - `android-app/settings.gradle.kts`
+  - `android-app/tv-app/build.gradle.kts`
+  - `android-app/tv-app/src/main/AndroidManifest.xml`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvMainActivity.kt`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvPairingScreen.kt`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services ./internal/handlers -count=1` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tvauth.TvAuthDeepLinkParserTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+  - `cd android-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
 - Changed Files:
   - `internal/services/scraper.go`
   - `internal/services/scraper_av_strategy.go`

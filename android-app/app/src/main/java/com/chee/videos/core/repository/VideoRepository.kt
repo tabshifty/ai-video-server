@@ -12,6 +12,7 @@ import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
@@ -151,6 +152,22 @@ class VideoRepository @Inject constructor(
             api.tvSeriesDetail(
                 url = UrlBuilder.tvSeriesDetail(baseUrl, seriesId),
                 authorization = bearer,
+            )
+        }
+    }
+
+    suspend fun fetchTvSearch(
+        query: String,
+        page: Int = 1,
+        pageSize: Int = 20,
+    ): Result<TvSearchPayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvSearch(
+                url = UrlBuilder.tvSearch(baseUrl),
+                authorization = bearer,
+                keyword = query.trim(),
+                page = page,
+                pageSize = pageSize,
             )
         }
     }

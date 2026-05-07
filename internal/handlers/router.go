@@ -87,6 +87,13 @@ func (a *API) Register(r *gin.Engine) {
 			auth.POST("/refresh", a.RefreshAuth)
 			auth.POST("/logout", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.LogoutAuth)
 		}
+		tvAuth := v1.Group("/tv-auth")
+		{
+			tvAuth.POST("/sessions", a.CreateTVAuthSession)
+			tvAuth.GET("/sessions/:session_id", a.GetTVAuthSession)
+			tvAuth.POST("/sessions/:session_id/approve", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ApproveTVAuthSession)
+			tvAuth.POST("/sessions/:session_id/deny", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.DenyTVAuthSession)
+		}
 		v1.POST("/upload/check", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadCheck)
 		v1.POST("/upload/init", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadInit)
 		v1.PUT("/upload/chunk", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadChunk)
@@ -97,6 +104,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/short/random", a.RandomShort)
 		v1.GET("/short/discover", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ShortDiscover)
 		v1.GET("/tv/home", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVHome)
+		v1.GET("/tv/search", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVSearch)
 		v1.GET("/tv/series/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVSeriesDetail)
 		v1.GET("/tv/series/:id/poster", a.TVSeriesPoster)
 		v1.GET("/tv/series/:id/backdrop", a.TVSeriesBackdrop)

@@ -58,14 +58,19 @@ import com.chee.videos.feature.tv.TvSeriesDetailScreen
 import com.chee.videos.feature.tv.TvSeriesIdArg
 import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
+import com.chee.videos.feature.tvauth.TvAuthApprovalScreen
+import com.chee.videos.feature.tvauth.TvAuthDeepLinkParser
 import com.chee.videos.feature.tv.buildTvPlayerRoute
 import com.chee.videos.feature.tv.buildTvSeriesRoute
 
 @Composable
 fun VideoHomeApp(
     appRootViewModel: AppRootViewModel = hiltViewModel(),
+    initialTvAuthDeepLink: String? = null,
+    onConsumeTvAuthDeepLink: () -> Unit = {},
 ) {
     val appState by appRootViewModel.appState.collectAsStateWithLifecycle()
+    val tvAuthDeepLink = TvAuthDeepLinkParser.parse(initialTvAuthDeepLink)
 
     MaterialTheme(colorScheme = AppDarkColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = AppChrome.Canvas) {
@@ -85,12 +90,19 @@ fun VideoHomeApp(
                 }
 
                 is AppRootState.Ready -> {
-                    AuthenticatedNav(
-                        baseUrl = state.baseUrl,
-                        accessToken = state.accessToken,
-                        onSwitchServer = appRootViewModel::switchToServerSelection,
-                        onLogout = appRootViewModel::logout,
-                    )
+                    if (tvAuthDeepLink != null) {
+                        TvAuthApprovalScreen(
+                            deepLink = tvAuthDeepLink,
+                            onFinished = onConsumeTvAuthDeepLink,
+                        )
+                    } else {
+                        AuthenticatedNav(
+                            baseUrl = state.baseUrl,
+                            accessToken = state.accessToken,
+                            onSwitchServer = appRootViewModel::switchToServerSelection,
+                            onLogout = appRootViewModel::logout,
+                        )
+                    }
                 }
             }
         }

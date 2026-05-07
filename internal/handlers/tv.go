@@ -29,6 +29,23 @@ func (a *API) TVHome(c *gin.Context) {
 	ok(c, payload)
 }
 
+func (a *API) TVSearch(c *gin.Context) {
+	userID, okUser := middleware.UserIDFromContext(c)
+	if !okUser {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	_ = userID
+	page := parsePage(c.Query("page"), 1)
+	pageSize := parsePageSize(c.Query("page_size"), 20)
+	payload, err := a.appSvc.TVSearch(c.Request.Context(), c.Query("q"), page, pageSize)
+	if err != nil {
+		response.Error(c, 2103, err.Error())
+		return
+	}
+	ok(c, payload)
+}
+
 func (a *API) TVSeriesDetail(c *gin.Context) {
 	userID, okUser := middleware.UserIDFromContext(c)
 	if !okUser {

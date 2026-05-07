@@ -126,21 +126,55 @@ type TvHomePayload struct {
 	ContinueWatching *TvContinueWatchingDto `json:"continue_watching,omitempty"`
 	Sections         []TvSectionDto         `json:"sections"`
 	SearchResults    []TvSeriesSummaryDto   `json:"search_results"`
+	TvSeries         []TvHomeVideoDto       `json:"tv_series"`
+	Movies           []TvHomeVideoDto       `json:"movies"`
+	AV               []TvHomeVideoDto       `json:"av"`
 	Page             int                    `json:"page"`
 	PageSize         int                    `json:"page_size"`
 }
 
 type TvContinueWatchingDto struct {
+	Type            string `json:"type"`
 	SeriesID        int64  `json:"series_id"`
 	SeriesTitle     string `json:"series_title"`
 	SeasonNumber    int    `json:"season_number"`
 	EpisodeNumber   int    `json:"episode_number"`
 	EpisodeTitle    string `json:"episode_title"`
+	VideoID         string `json:"video_id"`
 	PosterURL       string `json:"poster_url"`
 	BackdropURL     string `json:"backdrop_url"`
 	WatchSeconds    int    `json:"watch_seconds"`
 	DurationSeconds int    `json:"duration_seconds"`
 	ProgressPercent int    `json:"progress_percent"`
+}
+
+type TvHomeVideoDto struct {
+	ID              string `json:"id"`
+	Type            string `json:"type"`
+	Title           string `json:"title"`
+	Overview        string `json:"overview"`
+	PosterURL       string `json:"poster_url"`
+	BackdropURL     string `json:"backdrop_url"`
+	VideoID         string `json:"video_id,omitempty"`
+	SeasonNumber    int    `json:"season_number,omitempty"`
+	EpisodeNumber   int    `json:"episode_number,omitempty"`
+	ProgressPercent int    `json:"progress_percent,omitempty"`
+}
+
+type TvSearchPayload struct {
+	Items      []TvSearchResultDto `json:"items"`
+	TotalCount int                 `json:"total_count"`
+	Page       int                 `json:"page"`
+	PageSize   int                 `json:"page_size"`
+}
+
+type TvSearchResultDto struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	Title       string `json:"title"`
+	Overview    string `json:"overview"`
+	PosterURL   string `json:"poster_url"`
+	BackdropURL string `json:"backdrop_url"`
 }
 
 type TvSectionDto struct {

@@ -102,44 +102,6 @@ func buildTVHomePayload(
 	return payload
 }
 
-func (s *AppService) TVHome(ctx context.Context, userID uuid.UUID, q string, page, pageSize int) (models.TvHomePayload, error) {
-	if page < 1 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-
-	offset := (page - 1) * pageSize
-	if strings.TrimSpace(q) != "" {
-		items, _, err := s.repo.SearchTVSeriesSummaries(ctx, q, pageSize, offset)
-		if err != nil {
-			return models.TvHomePayload{}, err
-		}
-		return buildTVHomePayload(q, nil, items, page, pageSize), nil
-	}
-
-	series, _, err := s.repo.ListActiveTVSeriesSummaries(ctx, max(pageSize*3, 24), 0)
-	if err != nil {
-		return models.TvHomePayload{}, err
-	}
-	continueWatching, err := s.repo.GetTVContinueWatching(ctx, userID)
-	if err != nil {
-		return models.TvHomePayload{}, err
-	}
-	return buildTVHomePayload("", continueWatching, series, page, pageSize), nil
-}
-
 func (s *AppService) TVSeriesDetail(ctx context.Context, userID uuid.UUID, seriesID int64) (models.TvSeriesDetailDto, error) {
 	return s.repo.GetTVSeriesDetail(ctx, userID, seriesID)
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

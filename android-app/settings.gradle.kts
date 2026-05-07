@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "video-home-app"
 include(":app")
+include(":tv-app")

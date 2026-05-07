@@ -11,7 +11,11 @@ import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.TvAuthSessionCreatePayload
+import com.chee.videos.core.model.TvAuthSessionCreateRequest
+import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
@@ -70,10 +74,42 @@ interface ApiService {
     ): ApiEnvelope<TvHomePayload>
 
     @GET
+    suspend fun tvSearch(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("q") keyword: String,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<TvSearchPayload>
+
+    @GET
     suspend fun tvSeriesDetail(
         @Url url: String,
         @Header("Authorization") authorization: String,
     ): ApiEnvelope<TvSeriesDetailDto>
+
+    @POST
+    suspend fun createTvAuthSession(
+        @Url url: String,
+        @Body body: TvAuthSessionCreateRequest,
+    ): ApiEnvelope<TvAuthSessionCreatePayload>
+
+    @GET
+    suspend fun getTvAuthSession(
+        @Url url: String,
+    ): ApiEnvelope<TvAuthSessionStatusPayload>
+
+    @POST
+    suspend fun approveTvAuthSession(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<Map<String, Boolean>>
+
+    @POST
+    suspend fun denyTvAuthSession(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<Map<String, Boolean>>
 
     @GET
     suspend fun imageCollections(

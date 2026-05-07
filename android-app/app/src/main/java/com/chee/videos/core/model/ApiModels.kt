@@ -67,21 +67,86 @@ data class TvHomePayload(
     @SerializedName("continue_watching") val continueWatching: TvContinueWatchingDto? = null,
     @SerializedName("sections") val sections: List<TvSectionDto> = emptyList(),
     @SerializedName("search_results") val searchResults: List<TvSeriesSummaryDto> = emptyList(),
+    @SerializedName("tv_series") val tvSeries: List<TvHomeVideoDto> = emptyList(),
+    @SerializedName("movies") val movies: List<TvHomeVideoDto> = emptyList(),
+    @SerializedName("av") val av: List<TvHomeVideoDto> = emptyList(),
     @SerializedName("page") val page: Int = 1,
     @SerializedName("page_size") val pageSize: Int = 20,
 )
 
 data class TvContinueWatchingDto(
+    @SerializedName("type") val type: String = "tv",
     @SerializedName("series_id") val seriesId: String,
     @SerializedName("series_title") val seriesTitle: String,
     @SerializedName("season_number") val seasonNumber: Int = 1,
     @SerializedName("episode_number") val episodeNumber: Int = 1,
     @SerializedName("episode_title") val episodeTitle: String = "",
+    @SerializedName("video_id") val videoId: String? = null,
     @SerializedName("poster_url") val posterUrl: String? = null,
     @SerializedName("backdrop_url") val backdropUrl: String? = null,
     @SerializedName("watch_seconds") val watchSeconds: Int = 0,
     @SerializedName("duration_seconds") val durationSeconds: Int = 0,
     @SerializedName("progress_percent") val progressPercent: Int = 0,
+)
+
+data class TvHomeVideoDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("overview") val overview: String? = null,
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("backdrop_url") val backdropUrl: String? = null,
+    @SerializedName("video_id") val videoId: String? = null,
+    @SerializedName("season_number") val seasonNumber: Int = 0,
+    @SerializedName("episode_number") val episodeNumber: Int = 0,
+    @SerializedName("progress_percent") val progressPercent: Int = 0,
+)
+
+data class TvSearchPayload(
+    @SerializedName("items") val items: List<TvSearchResultDto> = emptyList(),
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("page_size") val pageSize: Int = 20,
+)
+
+data class TvSearchResultDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("overview") val overview: String? = null,
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("backdrop_url") val backdropUrl: String? = null,
+)
+
+data class TvAuthSessionCreateRequest(
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("device_name") val deviceName: String,
+)
+
+data class TvAuthSessionCreatePayload(
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("pair_code") val pairCode: String,
+    @SerializedName("qr_content") val qrContent: String,
+    @SerializedName("expires_at") val expiresAt: String,
+    @SerializedName("poll_interval_seconds") val pollIntervalSeconds: Int = 5,
+)
+
+data class TvAuthUserBriefDto(
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("username") val username: String,
+    @SerializedName("role") val role: String,
+)
+
+data class TvAuthSessionStatusPayload(
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("status") val status: String,
+    @SerializedName("expires_at") val expiresAt: String,
+    @SerializedName("access_token") val accessToken: String? = null,
+    @SerializedName("refresh_token") val refreshToken: String? = null,
+    @SerializedName("user") val user: TvAuthUserBriefDto? = null,
+    @SerializedName("device_name") val deviceName: String? = null,
+    @SerializedName("pair_code") val pairCode: String? = null,
+    @SerializedName("server_base_url") val serverBaseUrl: String? = null,
 )
 
 data class TvSectionDto(
