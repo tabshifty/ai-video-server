@@ -2,6 +2,8 @@
 
 家用视频 Android 客户端（Kotlin + Jetpack Compose）。
 
+当前目录仅承载手机端工程；Android TV 客户端已拆分到同级目录 `android-tv-app/`。
+
 ## 当前已实现
 
 - 首次启动局域网嗅探（`/healthz`）+ 手动输入 IP/端口兜底

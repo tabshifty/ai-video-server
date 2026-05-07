@@ -6,9 +6,10 @@
 
 ## Repository Snapshot
 - This repo currently contains:
+  - `android-app`（Android 手机端工程）
+  - `android-tv-app`（Android TV 独立工程）
   - `.codex/skills/agents-md` (skill definition for generating AGENTS docs)
   - `.codex/skills/ui-ux-pro-max` (UI/UX skill assets/scripts)
-- No application runtime modules (`frontend/`, `backend/`, `infra/`) are present yet.
 
 ## Global Rules
 - Keep changes minimal and scoped to the requested task.
@@ -33,6 +34,8 @@
 | Module | Path | Purpose | Notes |
 |---|---|---|---|
 | Root workspace | `.` | Project root and coordination point | Put cross-module rules here |
+| Android app | `android-app` | 手机端 Android 工程 | 已有模块级 AGENTS.md |
+| Android TV app | `android-tv-app` | TV 独立 Android 工程 | 已与手机端源码目录隔离 |
 | Agents skill | `.codex/skills/agents-md` | AGENTS.md generation guidance | Treat as managed skill content |
 | UI/UX skill | `.codex/skills/ui-ux-pro-max` | UI/UX reference assets and scripts | Read-only unless requested |
 

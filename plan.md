@@ -3910,3 +3910,27 @@
   - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 19:31 +0800] Android：拆分独立 TV 工程目录并移除手机工程内 TV module
+- Type: `implementation`
+- Summary:
+  - 新增顶级独立工程 `android-tv-app/`，复制并承接原 TV 运行所需源码，TV 工程可单独在 Android Studio 打开并独立构建。
+  - 旧 `android-app/tv-app` 从手机工程中移除，`android-app/settings.gradle.kts` 不再包含 `:tv-app`，手机工程只保留 `:app`。
+  - 新 TV 工程的 `tv-app` 取消对 `../app/src/*` 的 `sourceSets` 相对路径引用，真正改为目录隔离。
+  - 补充 `android-tv-app/README.md`、`android-tv-app/AGENTS.md`，并更新根 `AGENTS.md` 与手机工程 `README.md` 说明新的目录边界。
+- Changed Files:
+  - `android-app/settings.gradle.kts`
+  - `android-app/README.md`
+  - `android-app/tv-app/*`（删除）
+  - `android-tv-app/**`
+  - `AGENTS.md`
+  - `plan.md`
+- Verification:
+  - `test -d android-tv-app` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.tv.TvQrCodeEncoderTest' --tests 'com.chee.videos.feature.tv.TvCatalogViewModelTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tvauth.TvAuthDeepLinkParserTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :tv-app:assembleDebug` failed as expected with `project 'tv-app' not found`。
+- Rollback:
+  - `git revert <commit>`
