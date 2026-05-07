@@ -329,6 +329,22 @@
   - `cd android-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 18:41] 手机扫码授权按深链服务器自动切换登录上下文
+- Type: `implementation`
+- Summary:
+  - 手机 App 收到 `cheevideos://tv-auth` 深链且其中带有 `server` 参数时，`VideoHomeApp` 会在进入登录/授权流程前先触发服务器同步，不再要求用户手动切回对应服务。
+  - `AppRootViewModel` 新增 TV 授权场景下的服务器应用入口：仅当深链服务器与当前活动服务器不同才切换，并在切换时清空旧 token，避免把 A 服务器扫码授权误发到 B 服务器登录态。
+  - `ServerRepository.activateEndpoint` 补充可选 `clearTokens` 语义，供跨服务器扫码授权场景安全复用，现有普通连接页逻辑保持不变。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/ServerRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/viewmodel/AppRootViewModel.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
 - Changed Files:
   - `internal/services/scraper.go`
   - `internal/services/scraper_av_strategy.go`

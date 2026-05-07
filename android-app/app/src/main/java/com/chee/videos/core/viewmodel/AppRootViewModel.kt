@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.AppRootState
 import com.chee.videos.core.repository.AuthRepository
+import com.chee.videos.core.repository.ServerRepository
+import com.chee.videos.core.util.UrlBuilder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,6 +19,7 @@ import kotlinx.coroutines.launch
 class AppRootViewModel @Inject constructor(
     private val store: AppPreferencesStore,
     private val authRepository: AuthRepository,
+    private val serverRepository: ServerRepository,
 ) : ViewModel() {
 
     val appState: StateFlow<AppRootState> = combine(
@@ -43,6 +46,20 @@ class AppRootViewModel @Inject constructor(
     fun logout() {
         viewModelScope.launch {
             authRepository.logoutLocal()
+        }
+    }
+
+    fun applyTvAuthServer(serverBaseUrl: String?) {
+        val normalized = serverBaseUrl?.let(UrlBuilder::normalizeBaseUrl).orEmpty()
+        if (normalized.isBlank()) {
+            return
+        }
+        viewModelScope.launch {
+            val current = store.readActiveBaseUrl().orEmpty()
+            if (current == normalized) {
+                return@launch
+            }
+            serverRepository.activateEndpoint(normalized, clearTokens = true)
         }
     }
 }

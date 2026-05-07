@@ -32,8 +32,11 @@ class ServerRepository @Inject constructor(
         return scanner.probe(baseUrl)
     }
 
-    suspend fun activateEndpoint(baseUrl: String) {
+    suspend fun activateEndpoint(baseUrl: String, clearTokens: Boolean = false) {
         val endpoint = store.upsertEndpoint(baseUrl)
+        if (clearTokens) {
+            store.clearTokens()
+        }
         store.setActiveBaseUrl(endpoint.baseUrl)
     }
 
