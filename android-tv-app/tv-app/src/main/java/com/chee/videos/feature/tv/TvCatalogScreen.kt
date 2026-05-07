@@ -2,6 +2,7 @@ package com.chee.videos.feature.tv
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,10 +34,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -58,6 +63,31 @@ fun TvCatalogScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isSearching = uiState.query.isNotBlank()
+    val searchFocusRequester = remember { FocusRequester() }
+    val continueFocusRequester = remember { FocusRequester() }
+    val firstSectionItemFocusRequester = remember { FocusRequester() }
+    val tvSeriesFocusRequester = remember { FocusRequester() }
+    val movieFocusRequester = remember { FocusRequester() }
+    val avFocusRequester = remember { FocusRequester() }
+    val initialFocusTarget = resolveTvCatalogInitialFocusTarget(
+        hasContinueWatching = uiState.continueWatching != null,
+        sectionItemCounts = uiState.sections.map { it.items.size },
+        tvSeriesCount = uiState.tvSeries.size,
+        movieCount = uiState.movies.size,
+        avCount = uiState.av.size,
+    )
+
+    LaunchedEffect(uiState.loading, isSearching, initialFocusTarget) {
+        if (uiState.loading || isSearching) return@LaunchedEffect
+        when (initialFocusTarget) {
+            TvCatalogInitialFocusTarget.CONTINUE_WATCHING -> continueFocusRequester.requestFocus()
+            TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM -> firstSectionItemFocusRequester.requestFocus()
+            TvCatalogInitialFocusTarget.TV_SERIES_ITEM -> tvSeriesFocusRequester.requestFocus()
+            TvCatalogInitialFocusTarget.MOVIE_ITEM -> movieFocusRequester.requestFocus()
+            TvCatalogInitialFocusTarget.AV_ITEM -> avFocusRequester.requestFocus()
+            TvCatalogInitialFocusTarget.SEARCH -> searchFocusRequester.requestFocus()
+        }
+    }
 
     if (uiState.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -75,6 +105,9 @@ fun TvCatalogScreen(
             TvCatalogSearchBar(
                 query = uiState.query,
                 onQueryChanged = viewModel::updateQuery,
+                modifier = Modifier
+                    .focusRequester(searchFocusRequester)
+                    .focusable(),
             )
         }
         uiState.errorMessage?.let { message ->
@@ -119,6 +152,9 @@ fun TvCatalogScreen(
                 TvContinueWatchingBanner(
                     baseUrl = uiState.baseUrl,
                     data = continueWatching,
+                    modifier = Modifier
+                        .focusRequester(continueFocusRequester)
+                        .focusable(),
                     onClick = {
                         if (continueWatching.type == "tv") {
                             onOpenContinueWatching(
@@ -138,6 +174,8 @@ fun TvCatalogScreen(
                 baseUrl = uiState.baseUrl,
                 section = section,
                 onOpenSeries = onOpenSeries,
+                firstItemFocusRequester = firstSectionItemFocusRequester,
+                requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM,
             )
         }
         if (uiState.tvSeries.isNotEmpty()) {
@@ -147,6 +185,8 @@ fun TvCatalogScreen(
                     subtitle = "全部长剧集",
                     baseUrl = uiState.baseUrl,
                     items = uiState.tvSeries,
+                    firstItemFocusRequester = tvSeriesFocusRequester,
+                    requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.TV_SERIES_ITEM,
                     onClick = { item -> onOpenSeries(item.id) },
                 )
             }
@@ -158,6 +198,8 @@ fun TvCatalogScreen(
                     subtitle = "可直接播放的长片",
                     baseUrl = uiState.baseUrl,
                     items = uiState.movies,
+                    firstItemFocusRequester = movieFocusRequester,
+                    requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.MOVIE_ITEM,
                     onClick = { item -> onOpenLongForm(item.id, item.type) },
                 )
             }
@@ -169,6 +211,8 @@ fun TvCatalogScreen(
                     subtitle = "仅包含长视频",
                     baseUrl = uiState.baseUrl,
                     items = uiState.av,
+                    firstItemFocusRequester = avFocusRequester,
+                    requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.AV_ITEM,
                     onClick = { item -> onOpenLongForm(item.id, item.type) },
                 )
             }
@@ -180,11 +224,12 @@ fun TvCatalogScreen(
 private fun TvCatalogSearchBar(
     query: String,
     onQueryChanged: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChanged,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         singleLine = true,
         placeholder = {
             Text("搜索剧名", color = AppChrome.TextMuted)
@@ -276,6 +321,7 @@ private fun TvSearchResultCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(AppChrome.SectionShape)
+            .focusable()
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -328,6 +374,7 @@ private fun TvSearchResultCard(
 private fun TvContinueWatchingBanner(
     baseUrl: String,
     data: TvContinueWatchingUiModel,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val artworkUrl = resolveTvArtworkUrl(baseUrl, data.backdropUrl)
@@ -335,7 +382,7 @@ private fun TvContinueWatchingBanner(
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = AppChrome.CardShape,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(AppChrome.CardShape)
             .clickable(onClick = onClick),
@@ -435,6 +482,8 @@ private fun TvCatalogSection(
     baseUrl: String,
     section: TvCatalogSectionUiModel,
     onOpenSeries: (String) -> Unit,
+    firstItemFocusRequester: FocusRequester,
+    requestInitialFocus: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -456,6 +505,11 @@ private fun TvCatalogSection(
                 TvSeriesPosterCard(
                     baseUrl = baseUrl,
                     series = series,
+                    modifier = if (requestInitialFocus && section.items.firstOrNull()?.id == series.id) {
+                        Modifier.focusRequester(firstItemFocusRequester).focusable()
+                    } else {
+                        Modifier.focusable()
+                    },
                     onClick = { onOpenSeries(series.id) },
                 )
             }
@@ -467,12 +521,13 @@ private fun TvCatalogSection(
 private fun TvSeriesPosterCard(
     baseUrl: String,
     series: TvSeriesUiModel,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
+        modifier = modifier
             .size(width = 146.dp, height = 256.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
@@ -534,6 +589,8 @@ private fun TvHomeShelf(
     subtitle: String,
     baseUrl: String,
     items: List<TvHomeShelfItemUiModel>,
+    firstItemFocusRequester: FocusRequester,
+    requestInitialFocus: Boolean,
     onClick: (TvHomeShelfItemUiModel) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -556,6 +613,11 @@ private fun TvHomeShelf(
                 TvHomeShelfCard(
                     baseUrl = baseUrl,
                     item = item,
+                    modifier = if (requestInitialFocus && items.firstOrNull()?.id == item.id) {
+                        Modifier.focusRequester(firstItemFocusRequester).focusable()
+                    } else {
+                        Modifier.focusable()
+                    },
                     onClick = { onClick(item) },
                 )
             }
@@ -567,12 +629,13 @@ private fun TvHomeShelf(
 private fun TvHomeShelfCard(
     baseUrl: String,
     item: TvHomeShelfItemUiModel,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
+        modifier = modifier
             .size(width = 146.dp, height = 256.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
@@ -688,4 +751,38 @@ private fun tvTypeLabel(type: String): String = when (type) {
     "movie" -> "电影"
     "av" -> "AV"
     else -> type.ifBlank { "长视频" }
+}
+
+internal enum class TvCatalogInitialFocusTarget {
+    CONTINUE_WATCHING,
+    FIRST_SECTION_ITEM,
+    TV_SERIES_ITEM,
+    MOVIE_ITEM,
+    AV_ITEM,
+    SEARCH,
+}
+
+internal fun resolveTvCatalogInitialFocusTarget(
+    hasContinueWatching: Boolean,
+    sectionItemCounts: List<Int>,
+    tvSeriesCount: Int,
+    movieCount: Int,
+    avCount: Int,
+): TvCatalogInitialFocusTarget {
+    if (hasContinueWatching) {
+        return TvCatalogInitialFocusTarget.CONTINUE_WATCHING
+    }
+    if (sectionItemCounts.any { it > 0 }) {
+        return TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM
+    }
+    if (tvSeriesCount > 0) {
+        return TvCatalogInitialFocusTarget.TV_SERIES_ITEM
+    }
+    if (movieCount > 0) {
+        return TvCatalogInitialFocusTarget.MOVIE_ITEM
+    }
+    if (avCount > 0) {
+        return TvCatalogInitialFocusTarget.AV_ITEM
+    }
+    return TvCatalogInitialFocusTarget.SEARCH
 }

@@ -3,6 +3,7 @@ package com.chee.videos.tv
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -121,6 +124,7 @@ fun TvPairingScreen(
     viewModel: TvPairingViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val primaryActionFocusRequester = remember { FocusRequester() }
     val qrBitmap = remember(uiState.qrContent) {
         uiState.qrContent.takeIf { it.isNotBlank() }?.let { TvQrCodeEncoder.encodeImage(it, size = 320) }
     }
@@ -128,6 +132,11 @@ fun TvPairingScreen(
     LaunchedEffect(Unit) {
         if (uiState.sessionId.isBlank()) {
             viewModel.startPairing()
+        }
+    }
+    LaunchedEffect(uiState.loading, uiState.sessionId, uiState.errorMessage) {
+        if (!uiState.loading) {
+            primaryActionFocusRequester.requestFocus()
         }
     }
 
@@ -192,7 +201,10 @@ fun TvPairingScreen(
                 }
                 Button(
                     onClick = viewModel::startPairing,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(primaryActionFocusRequester)
+                        .focusable(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AppChrome.Accent,
                         contentColor = AppChrome.TextPrimary,
@@ -202,7 +214,9 @@ fun TvPairingScreen(
                 }
                 OutlinedButton(
                     onClick = onSwitchServer,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusable(),
                 ) {
                     Text("切换服务器")
                 }

@@ -1,6 +1,7 @@
 package com.chee.videos.tv
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -158,7 +159,10 @@ private fun TvAuthenticatedNav(
         ) {
             Box(modifier = Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
-                IconButton(onClick = { menuExpanded = true }) {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.focusable(),
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Settings,
                         contentDescription = "账户与设备菜单",

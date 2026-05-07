@@ -13,6 +13,25 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-07 21:50] Android TV 焦点链路补齐并修复遥控器不可操作
+- Type: `implementation`
+- Summary:
+  - 为独立 TV App 首页补齐默认焦点策略，按“继续观看 -> 首页分区首卡 -> 电视剧 -> 电影 -> AV -> 搜索框”的顺序选择首个可聚焦目标，解决安卓 10 TV 设备首次进入页面后遥控器无法落焦的问题。
+  - 为 TV 首页卡片、搜索结果、配对页主按钮/切换服务器按钮以及右上角账户菜单入口补齐 `focusable`/`FocusRequester`，确保 D-pad 确认键可以真实触发点击，而不是仅在触屏语义下可点。
+  - 新增 TV 焦点策略单测，锁定首页初始焦点回退规则，避免后续再次引入“页面可见但按钮不可操作”的回归。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvPairingScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvCatalogFocusPolicyTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvCatalogViewModelTest' --tests 'com.chee.videos.tv.TvQrCodeEncoderTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-07 07:59] Android 短视频播放器控件统一与非首页进度条间距调整
 - Type: `implementation`
 - Summary:
