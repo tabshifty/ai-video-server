@@ -1,6 +1,7 @@
 package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.repository.VideoRepository
 import javax.inject.Inject
@@ -8,6 +9,7 @@ import javax.inject.Singleton
 
 interface TvRepository {
     suspend fun fetchHome(query: String = "", page: Int = 1, pageSize: Int = 20): Result<TvHomePayload>
+    suspend fun fetchSearch(query: String, page: Int = 1, pageSize: Int = 20): Result<TvSearchPayload>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
     suspend fun readActiveBaseUrl(): String?
     suspend fun buildSourceUrl(videoId: String): String
@@ -22,6 +24,9 @@ class NetworkTvRepository @Inject constructor(
 ) : TvRepository {
     override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
         videoRepository.fetchTvHome(query, page, pageSize)
+
+    override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
+        videoRepository.fetchTvSearch(query, page, pageSize)
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         videoRepository.fetchTvSeriesDetail(seriesId)

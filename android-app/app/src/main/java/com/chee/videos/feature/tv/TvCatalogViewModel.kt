@@ -2,8 +2,10 @@ package com.chee.videos.feature.tv
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chee.videos.core.model.TvHomeVideoDto
 import com.chee.videos.core.model.TvSectionDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
+import com.chee.videos.core.model.TvSearchResultDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +20,10 @@ data class TvCatalogUiState(
     val baseUrl: String = "",
     val continueWatching: TvContinueWatchingUiModel? = null,
     val sections: List<TvCatalogSectionUiModel> = emptyList(),
-    val searchResults: List<TvSeriesUiModel> = emptyList(),
+    val tvSeries: List<TvHomeShelfItemUiModel> = emptyList(),
+    val movies: List<TvHomeShelfItemUiModel> = emptyList(),
+    val av: List<TvHomeShelfItemUiModel> = emptyList(),
+    val searchResults: List<TvSearchResultUiModel> = emptyList(),
     val errorMessage: String? = null,
 )
 
@@ -35,10 +40,14 @@ class TvCatalogViewModel @Inject constructor(
 
     fun updateQuery(query: String) {
         _uiState.update { it.copy(query = query) }
-        loadHome(query)
+        if (query.isBlank()) {
+            loadHome()
+        } else {
+            loadSearch(query)
+        }
     }
 
-    private fun loadHome(query: String = _uiState.value.query) {
+    private fun loadHome() {
         viewModelScope.launch {
             val baseUrl = repository.readActiveBaseUrl().orEmpty()
             _uiState.update {
@@ -46,10 +55,10 @@ class TvCatalogViewModel @Inject constructor(
                     loading = true,
                     baseUrl = baseUrl,
                     errorMessage = null,
-                    searchResults = if (query.isBlank()) emptyList() else it.searchResults,
+                    searchResults = emptyList(),
                 )
             }
-            repository.fetchHome(query)
+            repository.fetchHome()
                 .onSuccess { payload ->
                     _uiState.update {
                         it.copy(
@@ -57,7 +66,10 @@ class TvCatalogViewModel @Inject constructor(
                             baseUrl = baseUrl,
                             continueWatching = payload.continueWatching?.let(::tvContinueWatchingToUiModel),
                             sections = coerceListOrEmpty<TvSectionDto>(payload.sections).map(::tvSectionToUiModel),
-                            searchResults = coerceListOrEmpty<TvSeriesSummaryDto>(payload.searchResults).map(::tvSeriesSummaryToUiModel),
+                            tvSeries = coerceListOrEmpty<TvHomeVideoDto>(payload.tvSeries).map(::tvHomeVideoToUiModel),
+                            movies = coerceListOrEmpty<TvHomeVideoDto>(payload.movies).map(::tvHomeVideoToUiModel),
+                            av = coerceListOrEmpty<TvHomeVideoDto>(payload.av).map(::tvHomeVideoToUiModel),
+                            searchResults = emptyList(),
                             errorMessage = null,
                         )
                     }
@@ -69,8 +81,46 @@ class TvCatalogViewModel @Inject constructor(
                             baseUrl = baseUrl,
                             continueWatching = null,
                             sections = emptyList(),
+                            tvSeries = emptyList(),
+                            movies = emptyList(),
+                            av = emptyList(),
                             searchResults = emptyList(),
-                            errorMessage = error.message ?: "电视剧专区加载失败",
+                            errorMessage = error.message ?: "TV 首页加载失败",
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun loadSearch(query: String) {
+        viewModelScope.launch {
+            val baseUrl = repository.readActiveBaseUrl().orEmpty()
+            _uiState.update {
+                it.copy(
+                    loading = true,
+                    baseUrl = baseUrl,
+                    errorMessage = null,
+                )
+            }
+            repository.fetchSearch(query)
+                .onSuccess { payload ->
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            baseUrl = baseUrl,
+                            continueWatching = null,
+                            searchResults = coerceListOrEmpty<TvSearchResultDto>(payload.items).map(::tvSearchResultToUiModel),
+                            errorMessage = null,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            baseUrl = baseUrl,
+                            searchResults = emptyList(),
+                            errorMessage = error.message ?: "TV 搜索失败",
                         )
                     }
                 }

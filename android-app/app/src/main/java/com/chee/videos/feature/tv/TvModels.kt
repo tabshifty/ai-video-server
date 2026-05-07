@@ -48,12 +48,36 @@ data class TvCatalogSectionUiModel(
     val items: List<TvSeriesUiModel>,
 )
 
+data class TvHomeShelfItemUiModel(
+    val id: String,
+    val type: String,
+    val title: String,
+    val description: String,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val videoId: String? = null,
+    val seasonNumber: Int = 0,
+    val episodeNumber: Int = 0,
+    val progressPercent: Int = 0,
+)
+
+data class TvSearchResultUiModel(
+    val id: String,
+    val type: String,
+    val title: String,
+    val description: String,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+)
+
 data class TvContinueWatchingUiModel(
+    val type: String,
     val seriesId: String,
     val seriesTitle: String,
     val seasonNumber: Int,
     val episodeNumber: Int,
     val episodeTitle: String,
+    val videoId: String? = null,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
     val watchSeconds: Int = 0,

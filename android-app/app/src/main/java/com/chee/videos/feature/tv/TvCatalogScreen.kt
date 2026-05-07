@@ -53,6 +53,7 @@ import com.chee.videos.core.util.UrlBuilder
 fun TvCatalogScreen(
     onOpenSeries: (String) -> Unit,
     onOpenContinueWatching: (String, Int, Int) -> Unit,
+    onOpenLongForm: (String, String) -> Unit,
     viewModel: TvCatalogViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -101,11 +102,13 @@ fun TvCatalogScreen(
                     TvSearchEmptyState()
                 }
             } else {
-                items(uiState.searchResults, key = { series -> series.id }) { series ->
+                items(uiState.searchResults, key = { item -> item.id }) { item ->
                     TvSearchResultCard(
                         baseUrl = uiState.baseUrl,
-                        series = series,
-                        onClick = { onOpenSeries(series.id) },
+                        item = item,
+                        onClick = {
+                            if (item.type == "tv") onOpenSeries(item.id) else onOpenLongForm(item.id, item.type)
+                        },
                     )
                 }
             }
@@ -117,11 +120,15 @@ fun TvCatalogScreen(
                     baseUrl = uiState.baseUrl,
                     data = continueWatching,
                     onClick = {
-                        onOpenContinueWatching(
-                            continueWatching.seriesId,
-                            continueWatching.seasonNumber,
-                            continueWatching.episodeNumber,
-                        )
+                        if (continueWatching.type == "tv") {
+                            onOpenContinueWatching(
+                                continueWatching.seriesId,
+                                continueWatching.seasonNumber,
+                                continueWatching.episodeNumber,
+                            )
+                        } else {
+                            onOpenLongForm(continueWatching.videoId.orEmpty(), continueWatching.type)
+                        }
                     },
                 )
             }
@@ -132,6 +139,39 @@ fun TvCatalogScreen(
                 section = section,
                 onOpenSeries = onOpenSeries,
             )
+        }
+        if (uiState.tvSeries.isNotEmpty()) {
+            item(key = "tv-series-shelf") {
+                TvHomeShelf(
+                    title = "电视剧",
+                    subtitle = "全部长剧集",
+                    baseUrl = uiState.baseUrl,
+                    items = uiState.tvSeries,
+                    onClick = { item -> onOpenSeries(item.id) },
+                )
+            }
+        }
+        if (uiState.movies.isNotEmpty()) {
+            item(key = "movies-shelf") {
+                TvHomeShelf(
+                    title = "电影",
+                    subtitle = "可直接播放的长片",
+                    baseUrl = uiState.baseUrl,
+                    items = uiState.movies,
+                    onClick = { item -> onOpenLongForm(item.id, item.type) },
+                )
+            }
+        }
+        if (uiState.av.isNotEmpty()) {
+            item(key = "av-shelf") {
+                TvHomeShelf(
+                    title = "AV",
+                    subtitle = "仅包含长视频",
+                    baseUrl = uiState.baseUrl,
+                    items = uiState.av,
+                    onClick = { item -> onOpenLongForm(item.id, item.type) },
+                )
+            }
         }
     }
 }
@@ -227,7 +267,7 @@ private fun TvSearchEmptyState() {
 @Composable
 private fun TvSearchResultCard(
     baseUrl: String,
-    series: TvSeriesUiModel,
+    item: TvSearchResultUiModel,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -246,10 +286,10 @@ private fun TvSearchResultCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TvPosterArtwork(
-                title = series.title,
+                title = item.title,
                 baseUrl = baseUrl,
-                posterUrl = series.posterUrl,
-                posterSeed = series.posterSeed,
+                posterUrl = item.posterUrl,
+                posterSeed = item.title.hashCode(),
                 width = 84.dp,
                 iconSize = 26.dp,
             )
@@ -258,7 +298,7 @@ private fun TvSearchResultCard(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = series.title,
+                    text = item.title,
                     color = AppChrome.TextPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
@@ -266,14 +306,14 @@ private fun TvSearchResultCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${series.subtitle} · ${series.updateText}",
+                    text = tvTypeLabel(item.type),
                     color = AppChrome.TextSecondary,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = series.description,
+                    text = item.description,
                     color = AppChrome.TextMuted,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
@@ -333,7 +373,11 @@ private fun TvContinueWatchingBanner(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "继续追剧",
+                    text = when (data.type) {
+                        "movie" -> "继续看电影"
+                        "av" -> "继续播放 AV"
+                        else -> "继续追剧"
+                    },
                     color = AppChrome.AccentWarm,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -347,7 +391,10 @@ private fun TvContinueWatchingBanner(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "S${data.seasonNumber} · E${data.episodeNumber}  ${data.episodeTitle}",
+                    text = when (data.type) {
+                        "movie", "av" -> data.episodeTitle.ifBlank { "继续播放" }
+                        else -> "S${data.seasonNumber} · E${data.episodeNumber}  ${data.episodeTitle}"
+                    },
                     color = AppChrome.TextSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
@@ -482,6 +529,97 @@ private fun TvSeriesPosterCard(
 }
 
 @Composable
+private fun TvHomeShelf(
+    title: String,
+    subtitle: String,
+    baseUrl: String,
+    items: List<TvHomeShelfItemUiModel>,
+    onClick: (TvHomeShelfItemUiModel) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            color = AppChrome.TextPrimary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = subtitle,
+            color = AppChrome.TextMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 2.dp),
+        ) {
+            items(items, key = { item -> "${item.type}-${item.id}" }) { item ->
+                TvHomeShelfCard(
+                    baseUrl = baseUrl,
+                    item = item,
+                    onClick = { onClick(item) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvHomeShelfCard(
+    baseUrl: String,
+    item: TvHomeShelfItemUiModel,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .size(width = 146.dp, height = 256.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TvPosterArtwork(
+                title = item.title,
+                baseUrl = baseUrl,
+                posterUrl = item.posterUrl,
+                posterSeed = item.title.hashCode(),
+                width = 146.dp,
+                iconSize = 34.dp,
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = item.title,
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = tvTypeLabel(item.type),
+                    color = AppChrome.TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (item.progressPercent > 0) {
+                    Text(
+                        text = "已观看 ${item.progressPercent.coerceIn(0, 100)}%",
+                        color = AppChrome.TextMuted,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TvPosterArtwork(
     title: String,
     baseUrl: String,
@@ -543,4 +681,11 @@ private fun resolveTvArtworkUrl(baseUrl: String, rawUrl: String?): String? {
         return null
     }
     return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
+}
+
+private fun tvTypeLabel(type: String): String = when (type) {
+    "tv" -> "电视剧"
+    "movie" -> "电影"
+    "av" -> "AV"
+    else -> type.ifBlank { "长视频" }
 }

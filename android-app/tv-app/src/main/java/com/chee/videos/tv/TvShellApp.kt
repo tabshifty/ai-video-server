@@ -22,6 +22,7 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.AppDarkColors
 import com.chee.videos.core.viewmodel.AppRootViewModel
 import com.chee.videos.feature.connection.ConnectionScreen
+import com.chee.videos.feature.detail.DetailScreen
 import com.chee.videos.feature.tv.TvEpisodeArg
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
@@ -73,7 +74,22 @@ private fun TvAuthenticatedNav(accessToken: String) {
                 onOpenContinueWatching = { seriesId, season, episode ->
                     navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
                 },
+                onOpenLongForm = { videoId, videoType ->
+                    navController.navigate("detail/$videoId?type=$videoType")
+                },
             )
+        }
+        composable(
+            route = "detail/{videoId}?type={videoType}",
+            arguments = listOf(
+                navArgument("videoId") { type = NavType.StringType },
+                navArgument("videoType") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) {
+            DetailScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = TvSeriesRoutePattern,

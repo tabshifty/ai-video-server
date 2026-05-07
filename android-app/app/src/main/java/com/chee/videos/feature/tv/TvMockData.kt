@@ -76,6 +76,7 @@ object TvMockData {
     fun continueWatching(): TvContinueWatchingUiModel {
         val focus = series.first()
         return TvContinueWatchingUiModel(
+            type = "tv",
             seriesId = focus.id,
             seriesTitle = focus.title,
             seasonNumber = 2,

@@ -123,6 +123,7 @@ fun HomeScreen(
                     TvCatalogScreen(
                         onOpenSeries = onOpenTvSeries,
                         onOpenContinueWatching = onOpenTvContinueWatching,
+                        onOpenLongForm = onOpenDetail,
                     )
                 }
 

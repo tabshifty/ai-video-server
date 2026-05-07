@@ -302,6 +302,33 @@
   - `cd android-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 13:34] TV 端消费四分区聚合首页与长视频聚合搜索
+- Type: `implementation`
+- Summary:
+  - 将 Android `feature/tv` 从“仅电视剧专区”扩展为“TV 长视频入口”：`TvCatalogViewModel` 改为消费后端 `tv/home` 的固定分区字段 `tv_series`、`movies`、`av`，搜索改走独立 `tv/search` 聚合接口，不再复用旧的 `search_results` 剧集结果。
+  - `TvCatalogScreen` 新增电影/AV 分区卡片流、混合类型搜索结果卡片与按类型分流的继续观看入口；电视剧继续进入剧集详情，电影/AV 直接进入现有长视频详情页。
+  - `tv-app` 导航壳补齐电影/AV 详情路由，使独立 TV 应用现在可以从首页与搜索进入电视剧、电影、AV 三类长视频内容。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvMockData.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tv/TvRepository.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `android-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --stop` stopped stale daemons before rerun.
+  - `cd android-app && rm -rf app/build tv-app/build .gradle/kotlin` cleared corrupted Kotlin/KAPT incremental caches before final sequential verification.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvCatalogViewModelTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+  - `cd android-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
 - Changed Files:
   - `internal/services/scraper.go`
   - `internal/services/scraper_av_strategy.go`

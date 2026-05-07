@@ -1,7 +1,9 @@
 package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.TvContinueWatchingDto
+import com.chee.videos.core.model.TvHomeVideoDto
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSectionDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
 import com.google.gson.Gson
@@ -39,6 +41,12 @@ class TvCatalogViewModelTest {
                             items = listOf(tvSeriesSummary(id = "7", title = "雾城档案")),
                         ),
                     ),
+                    movies = listOf(
+                        TvHomeVideoDto(id = "movie-1", type = "movie", title = "午夜列车"),
+                    ),
+                    av = listOf(
+                        TvHomeVideoDto(id = "av-1", type = "av", title = "SNIS-001"),
+                    ),
                 ),
             ),
         )
@@ -53,14 +61,16 @@ class TvCatalogViewModelTest {
         assertEquals("/backdrop.jpg", state.continueWatching?.backdropUrl)
         assertEquals(128, state.continueWatching?.watchSeconds)
         assertEquals(1, state.sections.size)
+        assertEquals(1, state.movies.size)
+        assertEquals(1, state.av.size)
     }
 
     @Test
     fun updateQuery_requestsSearchPayload() = runTest {
         val repository = FakeTvRepository(
             homePayload = TvHomePayload(),
-            searchPayload = TvHomePayload(
-                searchResults = listOf(tvSeriesSummary(id = "11", title = "静默轨道")),
+            searchPayload = TvSearchPayload(
+                items = listOf(tvSearchResult(id = "11", type = "tv", title = "静默轨道")),
             ),
         )
         val viewModel = TvCatalogViewModel(repository = repository)
@@ -73,6 +83,7 @@ class TvCatalogViewModelTest {
         assertEquals("静默", state.query)
         assertEquals(1, state.searchResults.size)
         assertEquals("静默轨道", state.searchResults.first().title)
+        assertEquals("tv", state.searchResults.first().type)
     }
 
     @Test
@@ -96,7 +107,9 @@ class TvCatalogViewModelTest {
             {
               "continue_watching": null,
               "sections": null,
-              "search_results": null,
+              "tv_series": null,
+              "movies": null,
+              "av": null,
               "page": 1,
               "page_size": 20
             }
@@ -112,6 +125,8 @@ class TvCatalogViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.loading)
         assertTrue(state.sections.isEmpty())
+        assertTrue(state.movies.isEmpty())
+        assertTrue(state.av.isEmpty())
         assertTrue(state.searchResults.isEmpty())
         assertEquals(null, state.errorMessage)
     }

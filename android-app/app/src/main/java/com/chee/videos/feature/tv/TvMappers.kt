@@ -2,6 +2,8 @@ package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvEpisodeDto
+import com.chee.videos.core.model.TvHomeVideoDto
+import com.chee.videos.core.model.TvSearchResultDto
 import com.chee.videos.core.model.TvSectionDto
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
@@ -49,15 +51,41 @@ internal fun tvSectionToUiModel(dto: TvSectionDto): TvCatalogSectionUiModel =
 
 internal fun tvContinueWatchingToUiModel(dto: TvContinueWatchingDto): TvContinueWatchingUiModel =
     TvContinueWatchingUiModel(
+        type = dto.type,
         seriesId = dto.seriesId,
         seriesTitle = dto.seriesTitle,
         seasonNumber = dto.seasonNumber,
         episodeNumber = dto.episodeNumber,
         episodeTitle = dto.episodeTitle,
+        videoId = dto.videoId,
         posterUrl = dto.posterUrl,
         backdropUrl = dto.backdropUrl,
         watchSeconds = dto.watchSeconds,
         progressPercent = dto.progressPercent,
+    )
+
+internal fun tvHomeVideoToUiModel(dto: TvHomeVideoDto): TvHomeShelfItemUiModel =
+    TvHomeShelfItemUiModel(
+        id = dto.id,
+        type = dto.type,
+        title = dto.title,
+        description = dto.overview.orEmpty().ifBlank { "暂无简介" },
+        posterUrl = dto.posterUrl,
+        backdropUrl = dto.backdropUrl,
+        videoId = dto.videoId,
+        seasonNumber = dto.seasonNumber,
+        episodeNumber = dto.episodeNumber,
+        progressPercent = dto.progressPercent,
+    )
+
+internal fun tvSearchResultToUiModel(dto: TvSearchResultDto): TvSearchResultUiModel =
+    TvSearchResultUiModel(
+        id = dto.id,
+        type = dto.type,
+        title = dto.title,
+        description = dto.overview.orEmpty().ifBlank { "暂无简介" },
+        posterUrl = dto.posterUrl,
+        backdropUrl = dto.backdropUrl,
     )
 
 internal fun tvEpisodeToUiModel(dto: TvEpisodeDto): TvEpisodeUiModel =

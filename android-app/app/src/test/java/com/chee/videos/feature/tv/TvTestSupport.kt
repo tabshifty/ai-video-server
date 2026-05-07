@@ -3,6 +3,8 @@ package com.chee.videos.feature.tv
 import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvSearchPayload
+import com.chee.videos.core.model.TvSearchResultDto
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
@@ -18,7 +20,7 @@ import org.junit.runner.Description
 class FakeTvRepository(
     private val baseUrl: String = "https://example.com",
     private val homePayload: TvHomePayload = TvHomePayload(),
-    private val searchPayload: TvHomePayload = homePayload,
+    private val searchPayload: TvSearchPayload = TvSearchPayload(),
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
     private val homeError: Throwable? = null,
     private val detailError: Throwable? = null,
@@ -28,7 +30,12 @@ class FakeTvRepository(
 
     override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeError?.let { return Result.failure(it) }
-        return Result.success(if (query.isBlank()) homePayload else searchPayload)
+        return Result.success(homePayload)
+    }
+
+    override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> {
+        homeError?.let { return Result.failure(it) }
+        return Result.success(searchPayload)
     }
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
@@ -61,6 +68,9 @@ class DelayedSourceTvRepository(
 
     override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
         Result.success(TvHomePayload())
+
+    override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
+        Result.success(TvSearchPayload())
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(detailPayload)
@@ -128,6 +138,17 @@ fun tvEpisode(
 suspend fun TvCatalogViewModel.awaitIdle() = Unit
 suspend fun TvSeriesDetailViewModel.awaitIdle() = Unit
 suspend fun TvSeriesPlayerViewModel.awaitIdle() = Unit
+
+fun tvSearchResult(
+    id: String = "movie-1",
+    type: String = "movie",
+    title: String = "午夜列车",
+): TvSearchResultDto = TvSearchResultDto(
+    id = id,
+    type = type,
+    title = title,
+    overview = "悬疑长片",
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule : TestWatcher() {
