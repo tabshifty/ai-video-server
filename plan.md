@@ -3934,3 +3934,16 @@
   - `cd android-app && ./gradlew --no-daemon :tv-app:assembleDebug` failed as expected with `project 'tv-app' not found`。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 19:34 +0800] Android TV：补充独立工程构建产物忽略规则
+- Type: `implementation`
+- Summary:
+  - 为 `android-tv-app/.gitignore` 增加 `tv-app/build/` 忽略规则，避免独立 TV 工程模块内的 Gradle 产物再次进入版本库。
+  - 清理已被误纳入版本库的 `android-tv-app/tv-app/build/**` 生成文件，保持独立工程只提交源码、资源和构建脚本。
+- Changed Files:
+  - `android-tv-app/.gitignore`
+  - `plan.md`
+- Verification:
+  - `git status --short` 仅保留预期源码变更与未跟踪的 `storage/`。
+- Rollback:
+  - `git revert <commit>`

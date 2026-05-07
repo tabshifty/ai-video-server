@@ -3,5 +3,6 @@
 /local.properties
 /.idea/
 /build/
+/tv-app/build/
 /app/build/
 *.iml
