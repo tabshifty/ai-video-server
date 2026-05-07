@@ -73,6 +73,10 @@ fun TvAuthApprovalScreen(
                     text = "服务器：${uiState.serverBaseUrl.ifBlank { "当前已连接服务器" }}",
                     color = AppChrome.TextSecondary,
                 )
+                Text(
+                    text = "状态：${tvAuthStatusLabel(uiState.sessionStatus)}",
+                    color = AppChrome.TextSecondary,
+                )
                 if (!uiState.message.isNullOrBlank()) {
                     Text(
                         text = uiState.message.orEmpty(),
@@ -82,21 +86,27 @@ fun TvAuthApprovalScreen(
 
                 Button(
                     onClick = viewModel::approve,
-                    enabled = !uiState.submitting,
+                    enabled = !uiState.loading && !uiState.submitting && uiState.sessionStatus == "pending",
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AppChrome.Accent,
                         contentColor = AppChrome.TextPrimary,
                     ),
                 ) {
-                    Text(if (uiState.submitting) "授权中..." else "确认登录这台 TV")
+                    Text(
+                        when {
+                            uiState.loading -> "读取会话中..."
+                            uiState.submitting -> "授权中..."
+                            else -> "确认登录这台 TV"
+                        },
+                    )
                 }
                 OutlinedButton(
                     onClick = {
                         viewModel.deny()
                         onFinished()
                     },
-                    enabled = !uiState.submitting,
+                    enabled = !uiState.loading && !uiState.submitting && uiState.sessionStatus == "pending",
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("拒绝")
@@ -107,4 +117,11 @@ fun TvAuthApprovalScreen(
             }
         }
     }
+}
+
+private fun tvAuthStatusLabel(status: String): String = when (status) {
+    "approved" -> "已授权"
+    "expired" -> "已过期"
+    "denied" -> "已拒绝"
+    else -> "待确认"
 }

@@ -345,6 +345,21 @@
   - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 18:44] 手机 TV 授权确认页改为预加载服务端会话摘要
+- Type: `implementation`
+- Summary:
+  - `TvAuthApprovalViewModel.bind()` 现在会在接收深链后主动请求 `tv-auth session` 状态，优先展示服务端返回的设备名、配对码、服务器地址和当前状态，而不是只依赖二维码里的静态参数。
+  - 授权确认页新增会话状态展示，并把按钮可用性收敛到 `pending` 状态；对 `approved`、`expired`、`denied` 三种状态给出明确中文提示，避免用户在已失效会话上继续点击授权。
+  - 手机端授权成功后会把本地状态同步成 `approved`，拒绝后同步成 `denied`，保证当前页与 TV 端轮询结果一致。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/tvauth/TvAuthApprovalScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/tvauth/TvAuthApprovalViewModel.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
 - Changed Files:
   - `internal/services/scraper.go`
   - `internal/services/scraper_av_strategy.go`
