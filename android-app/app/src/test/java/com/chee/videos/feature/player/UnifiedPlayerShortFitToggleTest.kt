@@ -2,6 +2,7 @@ package com.chee.videos.feature.player
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class UnifiedPlayerShortFitToggleTest {
@@ -15,5 +16,15 @@ class UnifiedPlayerShortFitToggleTest {
         assertFalse(shouldShowUnifiedPlayerShortFitToggle("episode"))
         assertFalse(shouldShowUnifiedPlayerShortFitToggle("av"))
         assertFalse(shouldShowUnifiedPlayerShortFitToggle(""))
+    }
+
+    @Test
+    fun `uses vertical action rail when short player exposes two utility buttons`() {
+        val layout = buildUnifiedPlayerShortUtilityRailLayout(showFitModeToggle = true)
+
+        assertTrue(layout.showFitModeToggle)
+        assertTrue(layout.showPlaybackModeToggle)
+        assertTrue(layout.stackVertically)
+        assertEquals(12, layout.spacingDp)
     }
 }

@@ -699,23 +699,30 @@ private fun UnifiedShortVideoPage(
             }
         }
 
-        if (showFitModeToggle) {
-            Box(
+        val utilityRailLayout = buildUnifiedPlayerShortUtilityRailLayout(showFitModeToggle = showFitModeToggle)
+        if (utilityRailLayout.showFitModeToggle || utilityRailLayout.showPlaybackModeToggle) {
+            Column(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(utilityRailLayout.spacingDp.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                ShortVideoOverlayActionButton(
-                    icon = Icons.Filled.AspectRatio,
-                    active = false,
-                    enabled = true,
-                    onClick = onToggleFitMode,
-                    contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
-                )
-                ShortPlaybackModeToggleButton(
-                    playbackMode = playbackMode,
-                    onClick = onTogglePlaybackMode,
-                )
+                if (utilityRailLayout.showFitModeToggle) {
+                    ShortVideoOverlayActionButton(
+                        icon = Icons.Filled.AspectRatio,
+                        active = false,
+                        enabled = true,
+                        onClick = onToggleFitMode,
+                        contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示",
+                    )
+                }
+                if (utilityRailLayout.showPlaybackModeToggle) {
+                    ShortPlaybackModeToggleButton(
+                        playbackMode = playbackMode,
+                        onClick = onTogglePlaybackMode,
+                    )
+                }
             }
         }
 

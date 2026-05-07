@@ -3947,3 +3947,21 @@
   - `git status --short` 仅保留预期源码变更与未跟踪的 `storage/`。
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-07 20:35 +0800] Android：修复“我的”页来源短视频播放器工具按钮重合
+- Type: `implementation`
+- Summary:
+  - 修复从 `历史记录 / 我的收藏 / 我的喜欢` 进入短视频播放器时，画面比例切换与播放模式切换两个覆盖按钮直接叠在同一 `Box` 中导致重合的问题。
+  - 为短视频播放器新增可测试的工具动作栏布局规则：当两个工具按钮同时出现时，必须使用显式纵向排布并保留固定间距。
+  - 在 `android-app/AGENTS.md` 增加约束：短视频覆盖层的多个按钮不得依赖默认叠放，必须有显式布局约束。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerShortState.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/player/UnifiedPlayerShortFitToggleTest.kt`
+  - `android-app/AGENTS.md`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.player.UnifiedPlayerShortFitToggleTest'` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
