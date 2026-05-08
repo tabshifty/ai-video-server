@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute } from 'vue-router'
+import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import {
   createAdminTvEpisode,
@@ -364,7 +365,7 @@ onMounted(async () => {
           </el-scrollbar>
 
           <div class="pager-wrap">
-            <el-pagination
+            <AdminTablePagination
               v-model:current-page="query.page"
               v-model:page-size="query.page_size"
               layout="prev, pager, next"

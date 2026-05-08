@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import { getAdminUsers, updateUserRole } from '../api/admin'
 
@@ -92,7 +93,13 @@ onMounted(load)
             </el-table>
           </div>
           <div class="action-row">
-            <el-pagination v-model:current-page="query.page" :total="total" @current-change="load" />
+            <AdminTablePagination
+              v-model:current-page="query.page"
+              v-model:page-size="query.page_size"
+              layout="total, prev, pager, next"
+              :total="total"
+              @current-change="load"
+            />
           </div>
         </el-card>
       </section>

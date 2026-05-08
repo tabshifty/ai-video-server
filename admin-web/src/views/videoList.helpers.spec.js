@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { extractTvPendingDiagnostics, getVideoStatusMeta } from './videoList.helpers'
+import { describe, expect, it, vi } from 'vitest'
+import { extractTvPendingDiagnostics, getVideoStatusMeta, teardownPreviewPlayer } from './videoList.helpers'
 
 describe('videoList helpers', () => {
   it('includes tv_pending status label and tag type', () => {
@@ -29,5 +29,29 @@ describe('videoList helpers', () => {
       candidateCount: 2,
       candidatePreview: [{ tmdb_id: 1, title: '三体' }]
     })
+  })
+
+  it('tears down the preview player and releases the media source', () => {
+    const pause = vi.fn()
+    const removeAttribute = vi.fn()
+    const load = vi.fn()
+    const player = {
+      pause,
+      removeAttribute,
+      load,
+      src: 'https://example.com/video.mp4'
+    }
+
+    teardownPreviewPlayer(player)
+
+    expect(pause).toHaveBeenCalledTimes(1)
+    expect(removeAttribute).toHaveBeenCalledWith('src')
+    expect(player.src).toBe('')
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores null players and partial player objects', () => {
+    expect(() => teardownPreviewPlayer(null)).not.toThrow()
+    expect(() => teardownPreviewPlayer({ src: 'blob:1' })).not.toThrow()
   })
 })

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import {
   createAdminImageCollection,
@@ -401,7 +402,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="action-row">
-            <el-pagination
+            <AdminTablePagination
               v-model:current-page="query.page"
               v-model:page-size="query.page_size"
               layout="total, prev, pager, next"
@@ -499,7 +500,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="action-row drawer-pagination">
-          <el-pagination
+          <AdminTablePagination
             v-model:current-page="imageDrawerQuery.page"
             v-model:page-size="imageDrawerQuery.page_size"
             layout="total, prev, pager, next"

@@ -36,6 +36,33 @@ export function tvPendingStageLabel(stage) {
   return map[normalized] || (normalized || '-')
 }
 
+export function teardownPreviewPlayer(player) {
+  if (!player || typeof player !== 'object') {
+    return
+  }
+
+  try {
+    if (typeof player.pause === 'function') {
+      player.pause()
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof player.removeAttribute === 'function') {
+      player.removeAttribute('src')
+    }
+    if ('src' in player) {
+      player.src = ''
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof player.load === 'function') {
+      player.load()
+    }
+  } catch (_) {}
+}
+
 function toText(value) {
   if (typeof value === 'string') {
     const trimmed = value.trim()

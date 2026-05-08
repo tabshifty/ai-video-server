@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import {
   checkAdminImageUpload,
@@ -651,7 +652,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="action-row">
-            <el-pagination
+            <AdminTablePagination
               v-model:current-page="query.page"
               v-model:page-size="query.page_size"
               layout="total, prev, pager, next"

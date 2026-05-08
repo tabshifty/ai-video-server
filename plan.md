@@ -222,6 +222,47 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-08 10:26] 管理端统一分页跳转与视频预览销毁计划
+- Type: `plan`
+- Summary:
+  - 为管理端所有列表页和图片合集抽屉分页新增统一的手动页码输入与跳转能力，避免各页面重复实现。
+  - 修复视频管理详情弹窗关闭后预览视频继续播放的问题，要求关闭弹窗、切换详情和刷新播放链接时都显式销毁预览播放器资源。
+  - 变更范围限定在 `admin-web` 的共享分页组件、视频预览 helper、相关页面接入与单测，不调整后端接口。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm run test`
+  - `cd admin-web && npm run build`
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-08 10:26] 管理端统一分页跳转并修复视频预览关闭未销毁
+- Type: `implementation`
+- Summary:
+  - 新增 `AdminTablePagination` 共享组件和页码跳转 helper，为管理端所有表格分页统一提供“输入页码 + 回车/按钮跳转”能力，并对非法页码、越界页码和空数据场景做统一钳制。
+  - 将 `视频管理、图片管理、图片合集管理、任务监控、电视剧管理、演员管理、用户管理、合集管理` 的分页全部切换到共享组件，包含图片合集抽屉内的二级分页。
+  - 为 `VideoList` 新增预览播放器销毁逻辑和详情弹窗关闭回调，确保关闭详情、刷新播放链接、离开页面时都暂停播放、清空 `src` 并释放媒体资源。
+- Changed Files:
+  - `admin-web/src/components/AdminTablePagination.vue`
+  - `admin-web/src/components/adminTablePagination.helpers.js`
+  - `admin-web/src/components/adminTablePagination.helpers.spec.js`
+  - `admin-web/src/views/ActorManage.vue`
+  - `admin-web/src/views/CollectionManage.vue`
+  - `admin-web/src/views/ImageCollectionManage.vue`
+  - `admin-web/src/views/ImageManage.vue`
+  - `admin-web/src/views/TaskMonitor.vue`
+  - `admin-web/src/views/TvSeriesManage.vue`
+  - `admin-web/src/views/UserManage.vue`
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/videoList.helpers.js`
+  - `admin-web/src/views/videoList.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm run test` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 22:10] AV 刮削联动演员头像补全并落地本地访问
 - Type: `implementation`
 - Summary:

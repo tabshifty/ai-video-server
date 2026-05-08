@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import { getAdminTasks } from '../api/admin'
 
@@ -173,7 +174,7 @@ onUnmounted(() => {
           </el-table>
         </div>
         <div class="toolbar-row toolbar-row--end">
-          <el-pagination
+          <AdminTablePagination
             v-model:current-page="query.page"
             v-model:page-size="query.page_size"
             layout="total, prev, pager, next"

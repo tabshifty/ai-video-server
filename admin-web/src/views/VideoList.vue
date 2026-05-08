@@ -1,7 +1,8 @@
 ﻿<script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
+import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import {
   batchDeleteAdminVideos,
@@ -21,7 +22,7 @@ import {
   updateAdminVideoSubtitle,
   uploadAdminVideoSubtitle
 } from '../api/admin'
-import { extractTvPendingDiagnostics, getVideoStatusMeta, tvPendingStageLabel } from './videoList.helpers'
+import { extractTvPendingDiagnostics, getVideoStatusMeta, teardownPreviewPlayer, tvPendingStageLabel } from './videoList.helpers'
 
 const list = ref([])
 const total = ref(0)
@@ -285,6 +286,8 @@ async function searchImageCollections(keyword = '') {
 }
 
 async function showDetail(row) {
+  handleDetailClose()
+  resetDetailState()
   detail.value = await getAdminVideoDetail(row.id)
   detail.value.actor_tokens = (detail.value.actors || []).map((actor) => actor.id)
   detail.value.collection_ids = (detail.value.collections || []).map((collection) => collection.id)
@@ -299,13 +302,6 @@ async function showDetail(row) {
     mergeImageCollectionOptions([detail.value.image_collection])
   }
   detailVisible.value = true
-  playURL.value = ''
-  playExpiresAt.value = 0
-  subtitleItems.value = []
-  subtitleForm.language_code = ''
-  subtitleForm.label = ''
-  subtitleForm.is_default = false
-  subtitleUploadFileList.value = []
   await Promise.all([
     searchActors(''),
     searchCollections(''),
@@ -321,19 +317,47 @@ async function refreshPlayURL() {
   if (!detail.value?.id) {
     return
   }
+  const videoID = detail.value.id
+  handleDetailClose()
   if (detail.value.status !== 'ready') {
-    playURL.value = ''
-    playExpiresAt.value = 0
     return
   }
   loadingPlayURL.value = true
   try {
-    const data = await getAdminVideoPlayURL(detail.value.id)
+    const data = await getAdminVideoPlayURL(videoID)
+    if (!detailVisible.value || detail.value?.id !== videoID) {
+      return
+    }
     playURL.value = data.signed_url || ''
     playExpiresAt.value = Number(data.expires_at || 0)
   } finally {
     loadingPlayURL.value = false
   }
+}
+
+function resetSubtitleState() {
+  subtitleItems.value = []
+  subtitleForm.language_code = ''
+  subtitleForm.label = ''
+  subtitleForm.is_default = false
+  subtitleUploadFileList.value = []
+}
+
+function resetDetailState() {
+  detail.value = null
+  playURL.value = ''
+  playExpiresAt.value = 0
+  resetSubtitleState()
+}
+
+function handleDetailClose() {
+  teardownPreviewPlayer(previewPlayerRef.value)
+  playURL.value = ''
+  playExpiresAt.value = 0
+}
+
+function handleDetailClosed() {
+  resetDetailState()
 }
 
 async function captureCurrentFrameThumbnail() {
@@ -601,6 +625,10 @@ async function removeSubtitle(row) {
 }
 
 onMounted(load)
+onBeforeUnmount(() => {
+  handleDetailClose()
+  resetDetailState()
+})
 </script>
 
 <template>
@@ -698,7 +726,7 @@ onMounted(load)
         </div>
 
         <div class="toolbar-row toolbar-row--end">
-          <el-pagination
+          <AdminTablePagination
             v-model:current-page="query.page"
             v-model:page-size="query.page_size"
             layout="total, prev, pager, next"
@@ -709,7 +737,14 @@ onMounted(load)
       </section>
     </div>
 
-    <el-dialog v-model="detailVisible" title="视频详情" width="760px">
+    <el-dialog
+      v-model="detailVisible"
+      title="视频详情"
+      width="760px"
+      destroy-on-close
+      @close="handleDetailClose"
+      @closed="handleDetailClosed"
+    >
       <el-form v-if="detail" label-width="90px">
         <el-form-item v-if="detail.type === 'episode' && detail.status === 'tv_pending'" label="待处理">
           <div class="tv-pending-panel">
