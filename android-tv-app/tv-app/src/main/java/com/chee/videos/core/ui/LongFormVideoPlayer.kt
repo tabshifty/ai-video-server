@@ -47,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,6 +124,8 @@ fun LongFormVideoPlayer(
     var centerFeedbackText by remember { mutableStateOf("") }
     var centerFeedbackIcon by remember { mutableStateOf(Icons.Filled.PlayArrow) }
     var subtitleSheetVisible by remember { mutableStateOf(false) }
+    var pendingRootFocusRequest by remember { mutableStateOf(false) }
+    var pendingPlayPauseFocusRequest by remember { mutableStateOf(false) }
 
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
     var hideSeekPreviewJob by remember { mutableStateOf<Job?>(null) }
@@ -147,6 +150,14 @@ fun LongFormVideoPlayer(
     fun showControlsTemporarily() {
         controlsVisible = true
         scheduleAutoHideControls()
+    }
+
+    fun requestRootFocusWhenReady() {
+        pendingRootFocusRequest = true
+    }
+
+    fun requestPlayPauseFocusWhenReady() {
+        pendingPlayPauseFocusRequest = true
     }
 
     fun showTransientFeedback(
@@ -217,7 +228,7 @@ fun LongFormVideoPlayer(
             -> {
                 if (!controlsVisible) {
                     showControlsTemporarily()
-                    scope.launch { playPauseFocusRequester.requestFocus() }
+                    requestPlayPauseFocusWhenReady()
                     true
                 } else {
                     false
@@ -307,10 +318,28 @@ fun LongFormVideoPlayer(
     LaunchedEffect(tvMode) {
         if (tvMode) {
             controlsVisible = true
-            rootFocusRequester.requestFocus()
+            requestRootFocusWhenReady()
+            requestPlayPauseFocusWhenReady()
             scheduleAutoHideControls()
-            playPauseFocusRequester.requestFocus()
         }
+    }
+
+    LaunchedEffect(tvMode, pendingRootFocusRequest) {
+        if (!tvMode || !pendingRootFocusRequest) {
+            return@LaunchedEffect
+        }
+        withFrameNanos { }
+        rootFocusRequester.requestFocus()
+        pendingRootFocusRequest = false
+    }
+
+    LaunchedEffect(tvMode, controlsVisible, pendingPlayPauseFocusRequest) {
+        if (!tvMode || !controlsVisible || !pendingPlayPauseFocusRequest) {
+            return@LaunchedEffect
+        }
+        withFrameNanos { }
+        playPauseFocusRequester.requestFocus()
+        pendingPlayPauseFocusRequest = false
     }
 
     val actualDurationMs = effectiveDurationMs()

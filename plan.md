@@ -13,6 +13,39 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-08 19:12] TV 播放器焦点请求崩溃修复实现
+- Type: `implementation`
+- Summary:
+  - 修复 `LongFormVideoPlayer` 在 TV 模式下的焦点请求时序：首次进入和控件隐藏后重新唤起时，不再在状态切换同一拍直接调用 `FocusRequester.requestFocus()`，改为先标记待请求并在下一帧、且控件可见时再申请焦点。
+  - 新增 TV 播放器 Compose 仪器测试，覆盖“首次渲染时播放按钮应获取焦点且不崩溃”的回归场景。
+  - 保持修复范围最小，仅调整播放器焦点调度，不改动播放交互与 UI 结构。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-tv-app/tv-app/src/androidTest/java/com/chee/videos/core/ui/LongFormVideoPlayerFocusTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:compileDebugAndroidTestKotlin` passed.
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.ui.LongFormVideoPlayerStyleTest'` passed.
+  - `cd android-tv-app && ./gradlew :tv-app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.chee.videos.core.ui.LongFormVideoPlayerFocusTest` blocked by device install error `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because `com.chee.videos.tv` had a conflicting existing signature record on the connected BRAVIA device.
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest` failed on unrelated existing test `com.chee.videos.feature.home.HomeViewModelTest > loadCategory loads default av list`.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-08 19:08] TV 播放器焦点请求崩溃修复计划
+- Type: `plan`
+- Summary:
+  - 排查 TV 端点击播放后 `LongFormVideoPlayer` 抛出的 `FocusRequester is not initialized`，重点检查 TV 模式首次进入和播放控件显隐切换时的焦点请求时序。
+  - 通过最小代码改动把焦点申请延后到目标节点真正挂载后，再补一条播放器级回归测试锁住该崩溃。
+  - 验证以 TV 工程构建、播放器相关测试和真机仪器测试为主，若设备环境阻塞则明确记录阻塞原因。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-tv-app/tv-app/src/androidTest/java/com/chee/videos/core/ui/LongFormVideoPlayerFocusTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew :tv-app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.chee.videos.core.ui.LongFormVideoPlayerFocusTest` first surfaced test setup issues, then was re-run after test compile fixes.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-08 17:54] AV 手动刮削站点选择失效修复实现
 - Type: `implementation`
 - Summary:
