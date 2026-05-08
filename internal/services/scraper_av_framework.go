@@ -322,7 +322,11 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 		run.addSearchQuery(query)
 	}
 
-	crawlers := s.resolveAVCrawlersForPlan(plan)
+	crawlers, err := s.resolveAVCrawlersForPlan(plan)
+	if err != nil {
+		run.addError(err)
+		return nil, run.toMap(), err
+	}
 
 	rawLimit := limit * 4
 	if rawLimit < 12 {
@@ -423,7 +427,7 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 	return final, trace, nil
 }
 
-func (s *ScraperService) resolveAVCrawlersForPlan(plan avSearchPlan) []avCrawler {
+func (s *ScraperService) resolveAVCrawlersForPlan(plan avSearchPlan) ([]avCrawler, error) {
 	if s.avProvider == nil {
 		s.avProvider = newAVCrawlerProvider(s)
 	}
@@ -432,10 +436,9 @@ func (s *ScraperService) resolveAVCrawlersForPlan(plan avSearchPlan) []avCrawler
 		available = []avCrawler{newJavDBAVCrawler(s)}
 	}
 	if len(plan.Sources) == 0 {
-		return available
+		return available, nil
 	}
 	index := map[string]avCrawler{}
-	used := map[string]struct{}{}
 	for _, crawler := range available {
 		index[normalizeAVSourceName(crawler.Name())] = crawler
 	}
@@ -443,21 +446,18 @@ func (s *ScraperService) resolveAVCrawlersForPlan(plan avSearchPlan) []avCrawler
 	for _, source := range plan.Sources {
 		if crawler, ok := index[normalizeAVSourceName(source)]; ok {
 			out = append(out, crawler)
-			used[normalizeAVSourceName(source)] = struct{}{}
 		}
 	}
 	if len(out) == 0 {
-		out = append(out, available...)
-		return out
-	}
-	for _, crawler := range available {
-		name := normalizeAVSourceName(crawler.Name())
-		if _, ok := used[name]; ok {
-			continue
+		if plan.ExplicitSource {
+			return nil, fmt.Errorf("av source %q is not supported", plan.RecommendedSource)
 		}
-		out = append(out, crawler)
+		return nil, fmt.Errorf("no crawler available for av sources: %s", strings.Join(plan.Sources, ", "))
 	}
-	return out
+	if plan.ExplicitSource && len(out) != len(plan.Sources) {
+		return nil, fmt.Errorf("av source %q is not supported", plan.RecommendedSource)
+	}
+	return out, nil
 }
 
 func (s *ScraperService) fetchAVCandidateByDetailURLWithTrace(ctx context.Context, detailURL string) (avScrapeCandidate, map[string]any, error) {

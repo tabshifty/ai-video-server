@@ -35,6 +35,7 @@ type avSearchPlan struct {
 	SiteCategory      string
 	RecommendedSource string
 	Sources           []string
+	ExplicitSource    bool
 	Config            AVScraperSiteConfig
 }
 
@@ -58,7 +59,7 @@ func defaultAVScraperSiteConfig() AVScraperSiteConfig {
 		CategorySiteOrder: map[string][]string{
 			avSiteCategoryFC2:      {"fc2", "fc2club", "fc2hub", "fc2ppvdb", "javdb"},
 			avSiteCategoryWestern:  {"theporndb", "javdb", "mywife"},
-			avSiteCategoryJapanese: {"javdb", "javbus", "javlibrary", "airav_cc", "avsex"},
+			avSiteCategoryJapanese: {"javdb", "javbus", "javlibrary", "airav_cc", "avsex", "theporndb", "getchu"},
 		},
 		PosterCropEnabled: true,
 		PosterCropMode:    avPosterCropModeCenter,
@@ -73,6 +74,7 @@ func defaultAVEnabledSites() []string {
 		"airav_cc",
 		"avsex",
 		"theporndb",
+		"getchu",
 		"mywife",
 		"fc2",
 		"fc2club",
@@ -228,6 +230,7 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 			SiteCategory:      category,
 			RecommendedSource: explicitSource,
 			Sources:           []string{explicitSource},
+			ExplicitSource:    true,
 			Config:            cfg,
 		}, nil
 	}

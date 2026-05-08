@@ -390,18 +390,21 @@ func (s *ScraperService) PreviewAVSearch(ctx context.Context, title string, opts
 	if keyword == "" {
 		return AVPreviewResult{}, fmt.Errorf("title is required")
 	}
-	cacheKey := fmt.Sprintf("av|%s", normalizeCacheKey(keyword))
-	if !opts.BypassCache {
-		if c, ok := s.getPreviewCache(cacheKey); ok {
-			return AVPreviewResult{
-				Candidates: c,
-			}, nil
-		}
-	}
-
 	plan, err := s.resolveAVSearchPlan(ctx, keyword, opts)
 	if err != nil {
 		return AVPreviewResult{}, err
+	}
+	cacheKey := s.buildAVPreviewCacheKey(keyword, plan)
+	if !opts.BypassCache {
+		if c, ok := s.getPreviewCache(cacheKey); ok {
+			return AVPreviewResult{
+				Candidates:        c,
+				SiteCategory:      plan.SiteCategory,
+				RecommendedSource: plan.RecommendedSource,
+				UsedSource:        previewAVUsedSourceFromCandidates(c, plan.RecommendedSource),
+				EnabledSources:    append([]string(nil), plan.Config.EnabledSites...),
+			}, nil
+		}
 	}
 	candidates, trace, err := s.searchAVCandidatesWithTrace(ctx, keyword, avPreviewLimitDefault, plan)
 	if err != nil {
@@ -452,6 +455,25 @@ func (s *ScraperService) PreviewAVSearch(ctx context.Context, title string, opts
 		UsedSource:        usedSource,
 		EnabledSources:    append([]string(nil), plan.Config.EnabledSites...),
 	}, nil
+}
+
+func (s *ScraperService) buildAVPreviewCacheKey(keyword string, plan avSearchPlan) string {
+	return fmt.Sprintf(
+		"av|%s|%s|%s",
+		normalizeCacheKey(keyword),
+		normalizeCacheKey(plan.SiteCategory),
+		normalizeCacheKey(strings.Join(plan.Sources, ",")),
+	)
+}
+
+func previewAVUsedSourceFromCandidates(candidates []map[string]any, fallback string) string {
+	for _, candidate := range candidates {
+		source := normalizeAVSourceName(asString(candidate["scrape_source"]))
+		if source != "" {
+			return source
+		}
+	}
+	return fallback
 }
 
 func (s *ScraperService) ConfirmMovie(ctx context.Context, in ConfirmScrapeInput) error {

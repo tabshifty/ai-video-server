@@ -13,6 +13,42 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-08 17:54] AV 手动刮削站点选择失效修复实现
+- Type: `implementation`
+- Summary:
+  - 收紧 AV 预览执行层的 crawler 解析逻辑：显式 `site_source` 仅执行目标站点，按配置收敛后的自动站点集合也不再偷偷追加其他 crawler，未知显式站点会直接返回错误。
+  - 将 AV 预览缓存键改为包含 `site_category` 与归一化后的站点列表，并在缓存命中时回填 `recommended_source/used_source/enabled_sources`，避免跨站点复用旧结果。
+  - 扩充日系默认站点链路，把 `theporndb/getchu` 纳入明确默认 fallback 清单；新增服务层回归测试覆盖显式站点、配置限站点、缓存隔离和未知站点报错。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `internal/services/scraper_av_execution_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestPreviewAVSearchUsesExplicitSiteSourceOnly|TestPreviewAVSearchHonorsConfiguredEnabledSourcesOnly|TestPreviewAVSearchCacheKeyIncludesSiteSource|TestPreviewAVSearchRejectsUnknownExplicitSiteSource'` passed.
+  - `go test -count=1 ./internal/services` passed.
+  - `go test -count=1 ./internal/...` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-08 17:51] AV 手动刮削站点选择失效修复计划
+- Type: `plan`
+- Summary:
+  - 修复 AV 手动刮削中 `site_source` 与配置站点顺序未被执行层严格遵守的问题，避免显式指定其他站点时仍继续搜索并合并 `javdb`。
+  - 调整 AV 预览缓存键，使不同 `site_source/site_category` 不再复用同一标题缓存结果。
+  - 补充服务层回归测试，覆盖显式站点、配置限站点、缓存隔离与未知站点报错场景。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `internal/services/scraper_av_execution_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestPreviewAVSearchUsesExplicitSiteSourceOnly|TestPreviewAVSearchHonorsConfiguredEnabledSourcesOnly|TestPreviewAVSearchCacheKeyIncludesSiteSource|TestPreviewAVSearchRejectsUnknownExplicitSiteSource'` 先红后绿。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-08 09:56] Android TV 重设计最终验证收口
 - Type: `implementation`
 - Summary:
