@@ -13,6 +13,57 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-08 09:56] Android TV 重设计最终验证收口
+- Type: `implementation`
+- Summary:
+  - 补齐电视剧详情页的大海报展示所需 `baseUrl` 状态，确保 TV 详情首屏能正确解析并显示相对海报/背景地址。
+  - 将 TV 焦点 modifier 简化为更稳定的实现，规避 Kotlin/KAPT 在当前本地环境下对该文件的编译器异常。
+  - 最终验证过程中发现 TV 工程 Kotlin 增量缓存会放大 KAPT 内存占用，因此先清理 `.gradle/kotlin` 与 `tv-app/build` 后重新串行跑测试和构建，结果恢复稳定通过。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && rm -rf .gradle/kotlin tv-app/build` cleared Kotlin incremental caches and build outputs after KAPT `Java heap space` failures.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.*' --tests 'com.chee.videos.tv.TvQrCodeEncoderTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerStyleTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-08 09:52] Android TV 影院化首页、独立详情页与全屏播放器重设计
+- Type: `implementation`
+- Summary:
+  - 将独立 TV App 首页重做为“搜索栏 + 顶部推荐横幅 + 长视频货架”结构，新增推荐横幅内容选择逻辑，继续观看优先进入主视觉位；统一卡片和主按钮的焦点缩放、高亮边框和抬升反馈。
+  - 新增 TV 专用电影/AV 详情页与独立全屏播放器路由，TV 端不再使用原来的详情内嵌播放器模式；电视剧播放器也改为默认全屏进入，选集通过 TV 式面板打开。
+  - 改造长视频播放器控件以适配遥控器：支持可聚焦控制按钮、TV 模式下的快进快退、字幕选择、退出播放、进度条常显于操作期间，并让字幕列表支持遥控器确认键。
+  - 电视剧详情页补齐大海报与横幅背景布局，并让详情主按钮默认落焦，统一电影/AV/电视剧三类长视频在 TV 上的视觉语言。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPresentation.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRoutes.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFeaturedContentTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormDetailPresentationTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRoutesTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvCatalogFeaturedContentTest' --tests 'com.chee.videos.feature.tv.TvLongFormDetailPresentationTest' --tests 'com.chee.videos.feature.tv.TvCatalogFocusPolicyTest' --tests 'com.chee.videos.feature.tv.TvRoutesTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.*' --tests 'com.chee.videos.tv.TvQrCodeEncoderTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvCatalogViewModelTest' --tests 'com.chee.videos.feature.tv.TvSeriesDetailViewModelTest' --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerStyleTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-07 21:50] Android TV 焦点链路补齐并修复遥控器不可操作
 - Type: `implementation`
 - Summary:

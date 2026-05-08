@@ -39,14 +39,21 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.AppDarkColors
 import com.chee.videos.core.viewmodel.AppRootViewModel
 import com.chee.videos.feature.connection.ConnectionScreen
-import com.chee.videos.feature.detail.DetailScreen
 import com.chee.videos.feature.tv.TvEpisodeArg
+import com.chee.videos.feature.tv.TvLongFormDetailRoutePattern
+import com.chee.videos.feature.tv.TvLongFormPlayerRoutePattern
+import com.chee.videos.feature.tv.TvLongFormVideoIdArg
+import com.chee.videos.feature.tv.TvLongFormVideoTypeArg
+import com.chee.videos.feature.tv.TvLongFormDetailScreen
+import com.chee.videos.feature.tv.TvLongFormPlayerScreen
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
 import com.chee.videos.feature.tv.TvSeriesDetailScreen
 import com.chee.videos.feature.tv.TvSeriesIdArg
 import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
+import com.chee.videos.feature.tv.buildTvLongFormDetailRoute
+import com.chee.videos.feature.tv.buildTvLongFormPlayerRoute
 import com.chee.videos.feature.tv.buildTvPlayerRoute
 
 @Composable
@@ -110,21 +117,43 @@ private fun TvAuthenticatedNav(
                         navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
                     },
                     onOpenLongForm = { videoId, videoType ->
-                        navController.navigate("detail/$videoId?type=$videoType")
+                        navController.navigate(buildTvLongFormDetailRoute(videoId, videoType))
+                    },
+                    onPlayLongForm = { videoId, videoType ->
+                        navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
                     },
                 )
             }
             composable(
-                route = "detail/{videoId}?type={videoType}",
+                route = TvLongFormDetailRoutePattern,
                 arguments = listOf(
-                    navArgument("videoId") { type = NavType.StringType },
-                    navArgument("videoType") {
+                    navArgument(TvLongFormVideoIdArg) { type = NavType.StringType },
+                    navArgument(TvLongFormVideoTypeArg) {
                         type = NavType.StringType
-                        defaultValue = ""
+                        defaultValue = "movie"
                     },
                 ),
             ) {
-                DetailScreen(onBack = { navController.popBackStack() })
+                TvLongFormDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onPlay = { videoId, videoType ->
+                        navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
+                    },
+                )
+            }
+            composable(
+                route = TvLongFormPlayerRoutePattern,
+                arguments = listOf(
+                    navArgument(TvLongFormVideoIdArg) { type = NavType.StringType },
+                    navArgument(TvLongFormVideoTypeArg) {
+                        type = NavType.StringType
+                        defaultValue = "movie"
+                    },
+                ),
+            ) {
+                TvLongFormPlayerScreen(
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(
                 route = TvSeriesRoutePattern,

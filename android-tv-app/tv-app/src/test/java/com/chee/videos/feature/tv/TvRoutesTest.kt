@@ -17,4 +17,20 @@ class TvRoutesTest {
             buildTvPlayerRoute("demo", season = 0, episode = -5),
         )
     }
+
+    @Test
+    fun buildTvLongFormDetailRoute_includesVideoType() {
+        assertEquals(
+            "tv/detail/movie-1?videoType=movie",
+            buildTvLongFormDetailRoute(videoId = "movie-1", videoType = "movie"),
+        )
+    }
+
+    @Test
+    fun buildTvLongFormPlayerRoute_defaultsToMovieForUnsupportedType() {
+        assertEquals(
+            "tv/long-form-player/demo?videoType=movie",
+            buildTvLongFormPlayerRoute(videoId = "demo", videoType = "unknown"),
+        )
+    }
 }

@@ -124,6 +124,7 @@ fun HomeScreen(
                         onOpenSeries = onOpenTvSeries,
                         onOpenContinueWatching = onOpenTvContinueWatching,
                         onOpenLongForm = onOpenDetail,
+                        onPlayLongForm = onOpenDetail,
                     )
                 }
 

@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 data class TvSeriesDetailUiState(
     val loading: Boolean = true,
     val series: TvSeriesUiModel? = null,
+    val baseUrl: String = "",
     val selectedSeasonNumber: Int = 1,
     val selectedEpisodeNumber: Int = 1,
     val errorMessage: String? = null,
@@ -56,6 +57,7 @@ class TvSeriesDetailViewModel @Inject constructor(
 
     private fun load() {
         viewModelScope.launch {
+            val baseUrl = repository.readActiveBaseUrl().orEmpty()
             _uiState.update { it.copy(loading = true, errorMessage = null) }
             repository.fetchSeriesDetail(seriesId)
                 .onSuccess { dto ->
@@ -66,6 +68,7 @@ class TvSeriesDetailViewModel @Inject constructor(
                     _uiState.value = TvSeriesDetailUiState(
                         loading = false,
                         series = series,
+                        baseUrl = baseUrl,
                         selectedSeasonNumber = defaultSeason?.number ?: 1,
                         selectedEpisodeNumber = defaultSelection?.episodeNumber
                             ?: defaultSeason?.let(::findPreferredEpisodeNumber)
@@ -76,6 +79,7 @@ class TvSeriesDetailViewModel @Inject constructor(
                 .onFailure { error ->
                     _uiState.value = TvSeriesDetailUiState(
                         loading = false,
+                        baseUrl = baseUrl,
                         errorMessage = error.message ?: "电视剧详情加载失败",
                     )
                 }

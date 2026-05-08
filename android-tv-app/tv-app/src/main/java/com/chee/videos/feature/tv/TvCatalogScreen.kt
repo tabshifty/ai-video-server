@@ -2,7 +2,6 @@ package com.chee.videos.feature.tv
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +51,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.util.UrlBuilder
 
 @Composable
@@ -59,17 +59,27 @@ fun TvCatalogScreen(
     onOpenSeries: (String) -> Unit,
     onOpenContinueWatching: (String, Int, Int) -> Unit,
     onOpenLongForm: (String, String) -> Unit,
+    onPlayLongForm: (String, String) -> Unit,
     viewModel: TvCatalogViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isSearching = uiState.query.isNotBlank()
     val searchFocusRequester = remember { FocusRequester() }
+    val featuredFocusRequester = remember { FocusRequester() }
     val continueFocusRequester = remember { FocusRequester() }
     val firstSectionItemFocusRequester = remember { FocusRequester() }
     val tvSeriesFocusRequester = remember { FocusRequester() }
     val movieFocusRequester = remember { FocusRequester() }
     val avFocusRequester = remember { FocusRequester() }
+    val featuredContent = resolveTvFeaturedContent(
+        continueWatching = uiState.continueWatching,
+        sections = uiState.sections,
+        tvSeries = uiState.tvSeries,
+        movies = uiState.movies,
+        av = uiState.av,
+    )
     val initialFocusTarget = resolveTvCatalogInitialFocusTarget(
+        hasFeaturedContent = featuredContent != null,
         hasContinueWatching = uiState.continueWatching != null,
         sectionItemCounts = uiState.sections.map { it.items.size },
         tvSeriesCount = uiState.tvSeries.size,
@@ -80,6 +90,7 @@ fun TvCatalogScreen(
     LaunchedEffect(uiState.loading, isSearching, initialFocusTarget) {
         if (uiState.loading || isSearching) return@LaunchedEffect
         when (initialFocusTarget) {
+            TvCatalogInitialFocusTarget.FEATURED -> featuredFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.CONTINUE_WATCHING -> continueFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM -> firstSectionItemFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.TV_SERIES_ITEM -> tvSeriesFocusRequester.requestFocus()
@@ -107,8 +118,40 @@ fun TvCatalogScreen(
                 onQueryChanged = viewModel::updateQuery,
                 modifier = Modifier
                     .focusRequester(searchFocusRequester)
-                    .focusable(),
+                    .tvFocusableGlow(shape = RoundedCornerShape(18.dp), focusedScale = 1.01f),
             )
+        }
+        featuredContent?.let { featured ->
+            item(key = "featured") {
+                TvFeaturedHero(
+                    baseUrl = uiState.baseUrl,
+                    data = featured,
+                    primaryModifier = Modifier.focusRequester(featuredFocusRequester),
+                    onPrimaryAction = {
+                        when {
+                            featured.targetType == "tv" && featured.source == TvFeaturedContentSource.CONTINUE_WATCHING -> onOpenContinueWatching(
+                                featured.targetId,
+                                featured.seasonNumber.coerceAtLeast(1),
+                                featured.episodeNumber.coerceAtLeast(1),
+                            )
+
+                            featured.targetType == "tv" -> onOpenSeries(featured.targetId)
+
+                            else -> onPlayLongForm(
+                                featured.videoId?.ifBlank { featured.targetId } ?: featured.targetId,
+                                featured.targetType,
+                            )
+                        }
+                    },
+                    onSecondaryAction = {
+                        if (featured.targetType == "tv") {
+                            onOpenSeries(featured.targetId)
+                        } else {
+                            onOpenLongForm(featured.targetId, featured.targetType)
+                        }
+                    },
+                )
+            }
         }
         uiState.errorMessage?.let { message ->
             item(key = "error") {
@@ -147,14 +190,14 @@ fun TvCatalogScreen(
             }
             return@LazyColumn
         }
-        uiState.continueWatching?.let { continueWatching ->
+        uiState.continueWatching?.takeIf { featuredContent?.source != TvFeaturedContentSource.CONTINUE_WATCHING }?.let { continueWatching ->
             item(key = "continue-watching") {
                 TvContinueWatchingBanner(
                     baseUrl = uiState.baseUrl,
                     data = continueWatching,
                     modifier = Modifier
                         .focusRequester(continueFocusRequester)
-                        .focusable(),
+                        .tvFocusableGlow(shape = AppChrome.CardShape),
                     onClick = {
                         if (continueWatching.type == "tv") {
                             onOpenContinueWatching(
@@ -163,7 +206,7 @@ fun TvCatalogScreen(
                                 continueWatching.episodeNumber,
                             )
                         } else {
-                            onOpenLongForm(continueWatching.videoId.orEmpty(), continueWatching.type)
+                            onPlayLongForm(continueWatching.videoId.orEmpty(), continueWatching.type)
                         }
                     },
                 )
@@ -321,7 +364,7 @@ private fun TvSearchResultCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(AppChrome.SectionShape)
-            .focusable()
+            .tvFocusableGlow(shape = AppChrome.SectionShape, focusedScale = 1.02f)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -367,6 +410,199 @@ private fun TvSearchResultCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TvFeaturedHero(
+    baseUrl: String,
+    data: TvFeaturedContentUiModel,
+    primaryModifier: Modifier = Modifier,
+    onPrimaryAction: () -> Unit,
+    onSecondaryAction: () -> Unit,
+) {
+    val backdropUrl = resolveTvArtworkUrl(baseUrl, data.backdropUrl)
+    val posterUrl = resolveTvArtworkUrl(baseUrl, data.posterUrl)
+
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.CardShape,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(324.dp),
+            shadowElevation = 12.dp,
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (!backdropUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = backdropUrl,
+                    contentDescription = data.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFF211527), Color(0xFF0B101A)),
+                            ),
+                        ),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xE80B0F17), Color(0xC4111520), Color(0xAA111827)),
+                        ),
+                    ),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 28.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                TvFeaturedPoster(
+                    title = data.title,
+                    posterUrl = posterUrl,
+                    posterSeed = data.title.hashCode(),
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = data.eyebrow,
+                        color = AppChrome.AccentWarm,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = data.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (data.subtitle.isNotBlank()) {
+                        Text(
+                            text = data.subtitle,
+                            color = AppChrome.TextSecondary,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Text(
+                        text = data.description,
+                        color = AppChrome.TextMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        TvHeroActionButton(
+                            text = if (data.source == TvFeaturedContentSource.CONTINUE_WATCHING) "继续播放" else "立即播放",
+                            icon = Icons.Filled.PlayArrow,
+                            modifier = primaryModifier,
+                            onClick = onPrimaryAction,
+                        )
+                        TvHeroSecondaryActionButton(
+                            text = "查看详情",
+                            onClick = onSecondaryAction,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvFeaturedPoster(
+    title: String,
+    posterUrl: String?,
+    posterSeed: Int,
+) {
+    if (!posterUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = posterUrl,
+            contentDescription = title,
+            modifier = Modifier
+                .width(186.dp)
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(24.dp)),
+            contentScale = ContentScale.Crop,
+        )
+        return
+    }
+    Box(
+        modifier = Modifier
+            .width(186.dp)
+            .aspectRatio(2f / 3f)
+            .clip(RoundedCornerShape(24.dp))
+            .background(tvPosterBrush(posterSeed)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Tv,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.84f),
+            modifier = Modifier.size(46.dp),
+        )
+    }
+}
+
+@Composable
+private fun TvHeroActionButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = AppChrome.Accent,
+        shape = AppChrome.PillShape,
+        modifier = modifier
+            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.06f)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White)
+            Text(text = text, color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun TvHeroSecondaryActionButton(
+    text: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = Color(0x33070B13),
+        shape = AppChrome.PillShape,
+        modifier = Modifier
+            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.05f)
+            .clickable(onClick = onClick),
+    ) {
+        Text(
+            text = text,
+            color = AppChrome.TextPrimary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+        )
     }
 }
 
@@ -506,9 +742,9 @@ private fun TvCatalogSection(
                     baseUrl = baseUrl,
                     series = series,
                     modifier = if (requestInitialFocus && section.items.firstOrNull()?.id == series.id) {
-                        Modifier.focusRequester(firstItemFocusRequester).focusable()
+                        Modifier.focusRequester(firstItemFocusRequester).tvFocusableGlow(shape = RoundedCornerShape(16.dp))
                     } else {
-                        Modifier.focusable()
+                        Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp))
                     },
                     onClick = { onOpenSeries(series.id) },
                 )
@@ -614,9 +850,9 @@ private fun TvHomeShelf(
                     baseUrl = baseUrl,
                     item = item,
                     modifier = if (requestInitialFocus && items.firstOrNull()?.id == item.id) {
-                        Modifier.focusRequester(firstItemFocusRequester).focusable()
+                        Modifier.focusRequester(firstItemFocusRequester).tvFocusableGlow(shape = RoundedCornerShape(16.dp))
                     } else {
-                        Modifier.focusable()
+                        Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp))
                     },
                     onClick = { onClick(item) },
                 )
@@ -754,6 +990,7 @@ private fun tvTypeLabel(type: String): String = when (type) {
 }
 
 internal enum class TvCatalogInitialFocusTarget {
+    FEATURED,
     CONTINUE_WATCHING,
     FIRST_SECTION_ITEM,
     TV_SERIES_ITEM,
@@ -763,12 +1000,16 @@ internal enum class TvCatalogInitialFocusTarget {
 }
 
 internal fun resolveTvCatalogInitialFocusTarget(
+    hasFeaturedContent: Boolean,
     hasContinueWatching: Boolean,
     sectionItemCounts: List<Int>,
     tvSeriesCount: Int,
     movieCount: Int,
     avCount: Int,
 ): TvCatalogInitialFocusTarget {
+    if (hasFeaturedContent) {
+        return TvCatalogInitialFocusTarget.FEATURED
+    }
     if (hasContinueWatching) {
         return TvCatalogInitialFocusTarget.CONTINUE_WATCHING
     }

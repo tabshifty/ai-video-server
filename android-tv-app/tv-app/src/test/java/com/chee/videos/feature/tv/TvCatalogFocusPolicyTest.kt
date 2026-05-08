@@ -8,8 +8,9 @@ class TvCatalogFocusPolicyTest {
     @Test
     fun `prefers continue watching when present`() {
         assertEquals(
-            TvCatalogInitialFocusTarget.CONTINUE_WATCHING,
+            TvCatalogInitialFocusTarget.FEATURED,
             resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = true,
                 hasContinueWatching = true,
                 sectionItemCounts = listOf(3, 2),
                 tvSeriesCount = 4,
@@ -22,8 +23,20 @@ class TvCatalogFocusPolicyTest {
     @Test
     fun `falls back to first section item before shelves`() {
         assertEquals(
+            TvCatalogInitialFocusTarget.FEATURED,
+            resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = true,
+                hasContinueWatching = false,
+                sectionItemCounts = listOf(0, 2),
+                tvSeriesCount = 4,
+                movieCount = 2,
+                avCount = 1,
+            ),
+        )
+        assertEquals(
             TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM,
             resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = false,
                 hasContinueWatching = false,
                 sectionItemCounts = listOf(0, 2),
                 tvSeriesCount = 4,
@@ -38,6 +51,7 @@ class TvCatalogFocusPolicyTest {
         assertEquals(
             TvCatalogInitialFocusTarget.TV_SERIES_ITEM,
             resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = false,
                 hasContinueWatching = false,
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 1,
@@ -48,6 +62,7 @@ class TvCatalogFocusPolicyTest {
         assertEquals(
             TvCatalogInitialFocusTarget.MOVIE_ITEM,
             resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = false,
                 hasContinueWatching = false,
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 0,
@@ -58,6 +73,7 @@ class TvCatalogFocusPolicyTest {
         assertEquals(
             TvCatalogInitialFocusTarget.AV_ITEM,
             resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = false,
                 hasContinueWatching = false,
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 0,
@@ -68,6 +84,7 @@ class TvCatalogFocusPolicyTest {
         assertEquals(
             TvCatalogInitialFocusTarget.SEARCH,
             resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = false,
                 hasContinueWatching = false,
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 0,

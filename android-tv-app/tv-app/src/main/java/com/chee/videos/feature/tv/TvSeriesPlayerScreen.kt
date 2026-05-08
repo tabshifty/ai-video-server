@@ -1,39 +1,20 @@
 package com.chee.videos.feature.tv
 
 import android.app.Activity
-import android.content.pm.ActivityInfo
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SlowMotionVideo
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -45,21 +26,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -67,7 +46,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import com.chee.videos.core.model.SubtitleTrackDto
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
@@ -116,7 +94,6 @@ fun TvSeriesPlayerScreen(
     }
 
     val currentEpisode = selectedEpisode(uiState)
-    val currentSeason = selectedSeason(uiState)
     val canPlay = uiState.canPlayCurrentEpisode && uiState.currentSourceUrl.isNotBlank()
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -127,7 +104,6 @@ fun TvSeriesPlayerScreen(
     }
     val exoPlayer = remember(accessToken) { ExoPlayer.Builder(context).build() }
     val latestCurrentVideoId by rememberUpdatedState(uiState.currentVideoId)
-    var isFullscreen by rememberSaveable { mutableStateOf(false) }
     var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var preparedUrl by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
@@ -150,24 +126,17 @@ fun TvSeriesPlayerScreen(
         isPausedByUser = nextSession.isPausedByUser
     }
 
-    BackHandler(enabled = isFullscreen) {
-        isFullscreen = false
-    }
-
-    DisposableEffect(activity, isFullscreen) {
-        if (activity == null || !isFullscreen) {
+    DisposableEffect(activity) {
+        if (activity == null) {
             onDispose { }
         } else {
-            val previousOrientation = activity.requestedOrientation
             val window = activity.window
             val controller = WindowCompat.getInsetsController(window, window.decorView)
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
             onDispose {
                 controller.show(WindowInsetsCompat.Type.systemBars())
-                activity.requestedOrientation = previousOrientation
             }
         }
     }
@@ -231,10 +200,6 @@ fun TvSeriesPlayerScreen(
             tracks = currentEpisode?.subtitleTracks.orEmpty(),
             hasStartedPlayback = hasStartedPlayback,
         )
-    }
-
-    LaunchedEffect(uiState.currentVideoId) {
-        isFullscreen = false
     }
 
     LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
@@ -311,184 +276,40 @@ fun TvSeriesPlayerScreen(
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        if (isFullscreen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-            ) {
-                if (canPlay) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        LongFormVideoPlayer(
-                            title = currentEpisode?.title ?: series.title,
-                            player = exoPlayer,
-                            isFullscreen = true,
-                            onBack = { isFullscreen = false },
-                            onTogglePlayPause = {
-                                updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
-                            },
-                            onToggleFullscreen = { isFullscreen = false },
-                            modifier = Modifier.fillMaxSize(),
-                            subtitleTracks = currentEpisode?.subtitleTracks.orEmpty(),
-                            selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
-                            onSelectSubtitleTrack = {
-                                selectedSubtitleTrackId = it ?: ""
-                                viewModel.selectSubtitleTrack(it)
-                            },
-                            showStatusBarPadding = false,
-                        )
-                        TvPlayerErrorBanner(
-                            message = playerErrorMessage,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(12.dp),
-                        )
-                    }
-                } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        EmptyTvPlayerState()
-                    }
-                }
+        if (canPlay) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                LongFormVideoPlayer(
+                    title = currentEpisode?.title ?: series.title,
+                    player = exoPlayer,
+                    isFullscreen = true,
+                    onBack = onBack,
+                    onTogglePlayPause = {
+                        updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
+                    },
+                    onToggleFullscreen = {},
+                    modifier = Modifier.fillMaxSize(),
+                    subtitleTracks = currentEpisode?.subtitleTracks.orEmpty(),
+                    selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
+                    onSelectSubtitleTrack = {
+                        selectedSubtitleTrackId = it ?: ""
+                        viewModel.selectSubtitleTrack(it)
+                    },
+                    showStatusBarPadding = false,
+                    tvMode = true,
+                    onOpenEpisodeSelector = { viewModel.setSelectorVisible(true) },
+                    onNextEpisode = viewModel::nextEpisode,
+                    onExitPlayback = onBack,
+                )
+                TvPlayerErrorBanner(
+                    message = playerErrorMessage,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(12.dp),
+                )
             }
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color(0xFF111827), Color(0xFF070B13), Color.Black),
-                        ),
-                    ),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Surface(color = Color(0x4DFFFFFF), shape = CircleShape) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回",
-                                tint = Color.White,
-                            )
-                        }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = series.title,
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = "S${uiState.selectedSeasonNumber} · E${uiState.selectedEpisodeNumber}  ${currentEpisode?.title.orEmpty()}",
-                            color = AppChrome.TextSecondary,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp)
-                        .padding(horizontal = 12.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFF0D111A)),
-                ) {
-                    if (canPlay) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            LongFormVideoPlayer(
-                                title = currentEpisode?.title ?: series.title,
-                                player = exoPlayer,
-                                isFullscreen = false,
-                                onBack = onBack,
-                                onTogglePlayPause = {
-                                    updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
-                                },
-                                onToggleFullscreen = { isFullscreen = true },
-                                modifier = Modifier.fillMaxSize(),
-                                subtitleTracks = currentEpisode?.subtitleTracks.orEmpty(),
-                                selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
-                                onSelectSubtitleTrack = {
-                                    selectedSubtitleTrackId = it ?: ""
-                                    viewModel.selectSubtitleTrack(it)
-                                },
-                                showStatusBarPadding = false,
-                            )
-                            TvPlayerErrorBanner(
-                                message = playerErrorMessage,
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(12.dp),
-                            )
-                        }
-                    } else {
-                        EmptyTvPlayerState()
-                    }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Surface(color = AppChrome.SurfaceElevated, shape = RoundedCornerShape(14.dp)) {
-                        Text(
-                            text = currentEpisode?.summary ?: "暂无剧情简介",
-                            color = AppChrome.TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        TvPlayerActionButton(
-                            label = if (playbackSession.isPausedByUser) "继续" else "暂停",
-                            icon = Icons.Filled.PlayArrow,
-                            modifier = Modifier.weight(1f),
-                            enabled = canPlay,
-                            onClick = {
-                                updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
-                            },
-                        )
-                        TvPlayerActionButton(
-                            label = "${uiState.playbackSpeed}x",
-                            icon = Icons.Filled.SlowMotionVideo,
-                            modifier = Modifier.weight(1f),
-                            onClick = viewModel::cycleSpeed,
-                        )
-                        TvPlayerActionButton(
-                            label = "下一集",
-                            icon = Icons.Filled.SkipNext,
-                            modifier = Modifier.weight(1f),
-                            onClick = viewModel::nextEpisode,
-                        )
-                    }
-                    Surface(
-                        color = AppChrome.AccentSoft,
-                        shape = AppChrome.PillShape,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { viewModel.setSelectorVisible(true) },
-                    ) {
-                        Text(
-                            text = "打开选集抽屉（${currentSeason?.title.orEmpty()}）",
-                            color = AppChrome.TextPrimary,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        )
-                    }
-                }
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                EmptyTvPlayerState()
             }
         }
     }
@@ -512,29 +333,6 @@ fun TvSeriesPlayerScreen(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
-                ) {
-                    series.seasons.forEach { season ->
-                        val selected = season.number == uiState.selectedSeasonNumber
-                        Surface(
-                            color = if (selected) AppChrome.AccentSoft else AppChrome.SurfaceElevated,
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.clickable { viewModel.selectSeason(season.number) },
-                        ) {
-                            Text(
-                                text = season.title,
-                                color = if (selected) AppChrome.TextPrimary else AppChrome.TextMuted,
-                                style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            )
-                        }
-                    }
-                }
                 LazyColumn(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 18.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -545,49 +343,58 @@ fun TvSeriesPlayerScreen(
                         Surface(
                             color = if (selected) AppChrome.AccentSoft else AppChrome.SurfaceElevated,
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            RowItem(
+                                title = "E${episode.number} ${episode.title}",
+                                subtitle = if (episode.playable) episode.durationLabel else "待绑定 / 未就绪",
+                                selected = selected,
+                                onClick = {
                                     viewModel.selectEpisode(episode.number)
                                     viewModel.setSelectorVisible(false)
                                 },
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(
-                                    text = "E${episode.number}",
-                                    color = if (selected) AppChrome.TextPrimary else AppChrome.TextSecondary,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.width(42.dp),
-                                )
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                                ) {
-                                    Text(
-                                        text = episode.title,
-                                        color = AppChrome.TextPrimary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = if (episode.playable) episode.durationLabel else "待绑定 / 未就绪",
-                                        color = AppChrome.TextMuted,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                            }
+                            )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RowItem(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                color = if (selected) AppChrome.TextPrimary else AppChrome.TextSecondary,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                color = AppChrome.TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -600,7 +407,6 @@ private fun TvPlayerErrorBanner(
     if (message.isNullOrBlank()) {
         return
     }
-
     Surface(
         modifier = modifier,
         color = Color(0xCC2B0F12),
@@ -617,77 +423,41 @@ private fun TvPlayerErrorBanner(
 
 @Composable
 private fun EmptyTvPlayerState() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Tv,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.82f),
-            modifier = Modifier.size(40.dp),
-        )
-        Text("当前分集暂无可播放视频", color = Color.White, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun TvPlayerActionButton(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = AppChrome.TextSecondary, modifier = Modifier.size(16.dp))
-            Text(
-                text = label,
-                color = AppChrome.TextSecondary,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
-    }
+    Text(
+        text = "当前分集暂无可播放视频",
+        color = AppChrome.TextSecondary,
+        style = MaterialTheme.typography.bodyLarge,
+    )
 }
 
 private fun readWatchSnapshot(player: ExoPlayer): Pair<Int, Boolean> {
-    val watchSeconds = (player.currentPosition.coerceAtLeast(0L) / 1000L).toInt()
-    val durationMs = player.duration
-    val durationSeconds = if (durationMs > 0) (durationMs / 1000L).toInt() else 0
-    val completedThreshold = (durationSeconds - 3).coerceAtLeast(1)
-    val completed = durationSeconds > 0 && watchSeconds >= completedThreshold
+    val durationMs = player.duration.coerceAtLeast(0L)
+    val positionMs = player.currentPosition.coerceAtLeast(0L)
+    val watchSeconds = (positionMs / 1000L).toInt()
+    val completed = durationMs > 0L && positionMs >= durationMs - 3_000L
     return watchSeconds to completed
 }
 
 private fun resolveTvSubtitleSelectionOnTrackLoad(
     currentSelection: String?,
     storedSelection: String?,
-    tracks: List<SubtitleTrackDto>,
+    tracks: List<com.chee.videos.core.model.SubtitleTrackDto>,
     hasStartedPlayback: Boolean,
 ): String? {
-    val preferredSelection = currentSelection ?: storedSelection
-    if (preferredSelection != null && preferredSelection.isBlank()) {
-        return ""
+    val current = normalizeTvSubtitleSelection(currentSelection)
+    if (hasStartedPlayback && !current.isNullOrBlank() && tracks.any { it.id == current }) {
+        return current
+    }
+    val stored = normalizeTvSubtitleSelection(storedSelection)
+    if (!stored.isNullOrBlank() && tracks.any { it.id == stored }) {
+        return stored
     }
     return resolveSubtitleSelectionOnTrackLoad(
-        currentSelection = preferredSelection,
+        currentSelection = current,
         tracks = tracks,
         hasStartedPlayback = hasStartedPlayback,
     )
 }
 
 private fun normalizeTvSubtitleSelection(selection: String?): String? =
-    selection?.takeIf { it.isNotBlank() }
+    selection?.trim()?.takeIf { it.isNotBlank() }

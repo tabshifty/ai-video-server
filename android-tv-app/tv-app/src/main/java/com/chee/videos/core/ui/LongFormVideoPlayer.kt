@@ -1,10 +1,12 @@
 package com.chee.videos.core.ui
 
+import android.view.KeyEvent as AndroidKeyEvent
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,10 +51,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,8 +92,14 @@ fun LongFormVideoPlayer(
     subtitleTracks: List<SubtitleTrackDto> = emptyList(),
     selectedSubtitleTrackId: String? = null,
     onSelectSubtitleTrack: (String?) -> Unit = {},
+    tvMode: Boolean = false,
+    onOpenEpisodeSelector: (() -> Unit)? = null,
+    onNextEpisode: (() -> Unit)? = null,
+    onExitPlayback: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val rootFocusRequester = remember { FocusRequester() }
+    val playPauseFocusRequester = remember { FocusRequester() }
 
     var controlsVisible by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
@@ -161,6 +174,92 @@ fun LongFormVideoPlayer(
         showControlsTemporarily()
     }
 
+    fun performStepSeek(deltaMs: Long) {
+        val duration = effectiveDurationMs()
+        val current = player.currentPosition.coerceAtLeast(0L)
+        val target = (current + deltaMs).coerceAtLeast(0L).let { next ->
+            if (duration > 0L) next.coerceAtMost(duration) else next
+        }
+        player.seekTo(target)
+        positionMs = target
+        val delta = target - current
+        val direction = if (delta >= 0) "快进" else "快退"
+        val sign = if (delta >= 0) "+" else "-"
+        seekPreviewText = buildString {
+            append(direction)
+            append(" ")
+            append(sign)
+            append(formatPlaybackTime(abs(delta)))
+            append("\n")
+            append(formatPlaybackTime(target))
+            if (duration > 0) {
+                append(" / ")
+                append(formatPlaybackTime(duration))
+            }
+        }
+        showSeekPreview = true
+        hideSeekPreviewJob?.cancel()
+        hideSeekPreviewJob = scope.launch {
+            delay(900)
+            showSeekPreview = false
+        }
+        showControlsTemporarily()
+    }
+
+    fun handleTvTransportKey(nativeKeyCode: Int, repeatCount: Int): Boolean {
+        return when (nativeKeyCode) {
+            AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
+            AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
+            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+            AndroidKeyEvent.KEYCODE_ENTER,
+            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+            -> {
+                if (!controlsVisible) {
+                    showControlsTemporarily()
+                    scope.launch { playPauseFocusRequester.requestFocus() }
+                    true
+                } else {
+                    false
+                }
+            }
+
+            AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+            AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
+            -> {
+                if (!controlsVisible) {
+                    performStepSeek(if (repeatCount > 0) -30_000L else -10_000L)
+                    true
+                } else {
+                    false
+                }
+            }
+
+            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+            AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+            -> {
+                if (!controlsVisible) {
+                    performStepSeek(if (repeatCount > 0) 30_000L else 10_000L)
+                    true
+                } else {
+                    false
+                }
+            }
+
+            AndroidKeyEvent.KEYCODE_MENU -> {
+                if (tvMode) {
+                    subtitleSheetVisible = true
+                    showControlsTemporarily()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            else -> false
+        }
+    }
+
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlayingValue: Boolean) {
@@ -205,6 +304,15 @@ fun LongFormVideoPlayer(
         }
     }
 
+    LaunchedEffect(tvMode) {
+        if (tvMode) {
+            controlsVisible = true
+            rootFocusRequester.requestFocus()
+            scheduleAutoHideControls()
+            playPauseFocusRequester.requestFocus()
+        }
+    }
+
     val actualDurationMs = effectiveDurationMs()
     val displayPositionMs = when {
         draggingSeek -> dragTargetPositionMs
@@ -221,6 +329,16 @@ fun LongFormVideoPlayer(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusRequester(rootFocusRequester)
+            .onPreviewKeyEvent { event ->
+                if (!tvMode || event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
+                    return@onPreviewKeyEvent false
+                }
+                handleTvTransportKey(
+                    nativeKeyCode = event.nativeKeyEvent.keyCode,
+                    repeatCount = event.nativeKeyEvent.repeatCount,
+                )
+            }
             .onSizeChanged {
                 viewWidthPx = it.width.toFloat().coerceAtLeast(1f)
             }
@@ -433,6 +551,7 @@ fun LongFormVideoPlayer(
                         CompactPlayerControlButton(
                             icon = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回",
+                            tvMode = tvMode,
                             onClick = {
                                 showControlsTemporarily()
                                 onBack()
@@ -476,8 +595,19 @@ fun LongFormVideoPlayer(
                         CompactPlayerControlButton(
                             icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) "暂停" else "播放",
+                            tvMode = tvMode,
+                            focusRequester = playPauseFocusRequester,
                             onClick = { togglePlaybackWithFeedback() },
                         )
+                        if (tvMode) {
+                            CompactPlayerControlButton(
+                                icon = Icons.Filled.FastForward,
+                                contentDescription = "快退 10 秒",
+                                tvMode = true,
+                                onClick = { performStepSeek(-10_000L) },
+                                reverseMirror = true,
+                            )
+                        }
                         Text(
                             text = formatPlaybackTime(displayPositionMs),
                             color = Color.White.copy(alpha = 0.86f),
@@ -518,22 +648,76 @@ fun LongFormVideoPlayer(
                             color = Color.White.copy(alpha = 0.68f),
                             style = MaterialTheme.typography.labelSmall,
                         )
+                        if (tvMode) {
+                            CompactPlayerControlButton(
+                                icon = Icons.Filled.FastForward,
+                                contentDescription = "快进 10 秒",
+                                tvMode = true,
+                                onClick = { performStepSeek(10_000L) },
+                            )
+                            onOpenEpisodeSelector?.let { openSelector ->
+                                CompactPlayerControlButton(
+                                    icon = Icons.Filled.Tv,
+                                    contentDescription = "选集",
+                                    tvMode = true,
+                                    onClick = {
+                                        openSelector()
+                                        showControlsTemporarily()
+                                    },
+                                )
+                            }
+                            onNextEpisode?.let { nextEpisode ->
+                                CompactPlayerControlButton(
+                                    icon = Icons.Filled.FastForward,
+                                    contentDescription = "下一集",
+                                    tvMode = true,
+                                    onClick = {
+                                        nextEpisode()
+                                        showControlsTemporarily()
+                                    },
+                                )
+                            }
+                        }
                         CompactPlayerControlButton(
                             icon = Icons.Filled.Subtitles,
                             contentDescription = "字幕",
+                            tvMode = tvMode,
                             onClick = {
                                 subtitleSheetVisible = true
                                 showControlsTemporarily()
                             },
                         )
-                        CompactPlayerControlButton(
-                            icon = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                            contentDescription = if (isFullscreen) "退出全屏" else "全屏",
-                            onClick = {
-                                onToggleFullscreen()
-                                showControlsTemporarily()
-                            },
-                        )
+                        if (tvMode) {
+                            CompactPlayerControlButton(
+                                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回详情",
+                                tvMode = true,
+                                onClick = {
+                                    onBack()
+                                    showControlsTemporarily()
+                                },
+                            )
+                            onExitPlayback?.let { exitPlayback ->
+                                CompactPlayerControlButton(
+                                    icon = Icons.Filled.FullscreenExit,
+                                    contentDescription = "退出播放",
+                                    tvMode = true,
+                                    onClick = {
+                                        exitPlayback()
+                                        showControlsTemporarily()
+                                    },
+                                )
+                            }
+                        } else {
+                            CompactPlayerControlButton(
+                                icon = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                                contentDescription = if (isFullscreen) "退出全屏" else "全屏",
+                                onClick = {
+                                    onToggleFullscreen()
+                                    showControlsTemporarily()
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -591,20 +775,41 @@ private fun CompactPlayerControlButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    tvMode: Boolean = false,
+    focusRequester: FocusRequester? = null,
+    reverseMirror: Boolean = false,
 ) {
     Surface(
         color = Color(0x24000000),
         shape = CircleShape,
         modifier = modifier,
     ) {
+        val buttonModifier = if (focusRequester != null) {
+            Modifier.focusRequester(focusRequester)
+        } else {
+            Modifier
+        }
         IconButton(
             onClick = onClick,
-            modifier = Modifier.size(34.dp),
+            modifier = buttonModifier
+                .size(if (tvMode) 42.dp else 34.dp)
+                .then(
+                    if (tvMode) {
+                        Modifier.tvFocusableGlow(shape = CircleShape, focusedScale = 1.12f)
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = Color.White,
+                modifier = Modifier.graphicsLayer {
+                    if (reverseMirror) {
+                        scaleX = -1f
+                    }
+                },
             )
         }
     }
@@ -658,9 +863,8 @@ private fun SubtitleOptionRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp)
-                .pointerInput(label, selected) {
-                    detectTapGestures(onTap = { onClick() })
-                },
+                .tvFocusableGlow(shape = RoundedCornerShape(14.dp), focusedScale = 1.02f)
+                .clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
