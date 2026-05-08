@@ -46,6 +46,23 @@ func (a *API) TVSearch(c *gin.Context) {
 	ok(c, payload)
 }
 
+func (a *API) TVCatalogWall(c *gin.Context) {
+	userID, okUser := middleware.UserIDFromContext(c)
+	if !okUser {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	_ = userID
+	page := parsePage(c.Query("page"), 1)
+	pageSize := parsePageSize(c.Query("page_size"), 24)
+	payload, err := a.appSvc.TVCatalogWall(c.Request.Context(), c.Query("kind"), page, pageSize)
+	if err != nil {
+		response.Error(c, 2104, err.Error())
+		return
+	}
+	ok(c, payload)
+}
+
 func (a *API) TVSeriesDetail(c *gin.Context) {
 	userID, okUser := middleware.UserIDFromContext(c)
 	if !okUser {

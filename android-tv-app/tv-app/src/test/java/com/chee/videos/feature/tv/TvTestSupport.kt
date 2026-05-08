@@ -1,6 +1,8 @@
 package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.TvContinueWatchingDto
+import com.chee.videos.core.model.TvCatalogWallItemDto
+import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvSearchPayload
@@ -21,6 +23,7 @@ class FakeTvRepository(
     private val baseUrl: String = "https://example.com",
     private val homePayload: TvHomePayload = TvHomePayload(),
     private val searchPayload: TvSearchPayload = TvSearchPayload(),
+    private val posterWallPages: List<TvCatalogWallPayload> = emptyList(),
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
     private val homeError: Throwable? = null,
     private val detailError: Throwable? = null,
@@ -36,6 +39,13 @@ class FakeTvRepository(
     override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> {
         homeError?.let { return Result.failure(it) }
         return Result.success(searchPayload)
+    }
+
+    override suspend fun fetchCatalogWall(kind: String, page: Int, pageSize: Int): Result<TvCatalogWallPayload> {
+        homeError?.let { return Result.failure(it) }
+        val payload = posterWallPages.firstOrNull { it.page == page }
+            ?: TvCatalogWallPayload(page = page, pageSize = pageSize)
+        return Result.success(payload)
     }
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
@@ -71,6 +81,9 @@ class DelayedSourceTvRepository(
 
     override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
         Result.success(TvSearchPayload())
+
+    override suspend fun fetchCatalogWall(kind: String, page: Int, pageSize: Int): Result<TvCatalogWallPayload> =
+        Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(detailPayload)
@@ -136,6 +149,7 @@ fun tvEpisode(
 )
 
 suspend fun TvCatalogViewModel.awaitIdle() = Unit
+suspend fun TvPosterWallViewModel.awaitIdle() = Unit
 suspend fun TvSeriesDetailViewModel.awaitIdle() = Unit
 suspend fun TvSeriesPlayerViewModel.awaitIdle() = Unit
 
@@ -148,6 +162,31 @@ fun tvSearchResult(
     type = type,
     title = title,
     overview = "悬疑长片",
+)
+
+fun tvPosterWallItem(
+    id: String = "tv-1",
+    type: String = "tv",
+    title: String = "雾城档案",
+): TvCatalogWallItemDto = TvCatalogWallItemDto(
+    id = id,
+    type = type,
+    title = title,
+    overview = "海报墙项目",
+    posterUrl = "/poster.jpg",
+    backdropUrl = "/backdrop.jpg",
+)
+
+fun tvPosterWallPage(
+    page: Int = 1,
+    pageSize: Int = 24,
+    totalCount: Int = 0,
+    items: List<TvCatalogWallItemDto> = emptyList(),
+): TvCatalogWallPayload = TvCatalogWallPayload(
+    items = items,
+    totalCount = totalCount,
+    page = page,
+    pageSize = pageSize,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)

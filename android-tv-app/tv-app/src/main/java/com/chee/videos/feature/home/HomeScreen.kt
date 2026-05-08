@@ -75,6 +75,7 @@ fun HomeScreen(
     onOpenTvContinueWatching: (String, Int, Int) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
     onOpenImageCollectionViewer: (String) -> Unit,
+    onOpenTvCatalogWall: (String, String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -125,6 +126,7 @@ fun HomeScreen(
                         onOpenContinueWatching = onOpenTvContinueWatching,
                         onOpenLongForm = onOpenDetail,
                         onPlayLongForm = onOpenDetail,
+                        onOpenCatalogWall = onOpenTvCatalogWall,
                     )
                 }
 

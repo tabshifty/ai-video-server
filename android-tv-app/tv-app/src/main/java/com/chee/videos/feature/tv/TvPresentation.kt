@@ -1,6 +1,7 @@
 package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.model.TvCatalogWallItemDto
 import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.util.UrlBuilder
 
@@ -35,6 +36,12 @@ internal data class TvLongFormDetailHeroUiModel(
     val backdropUrl: String? = null,
     val primaryActionLabel: String,
     val secondaryActionLabel: String,
+)
+
+internal data class TvCatalogWallSpec(
+    val kind: String,
+    val title: String,
+    val subtitle: String,
 )
 
 internal fun resolveTvContinueWatchingPlaybackTargetId(item: TvContinueWatchingUiModel): String {
@@ -137,6 +144,65 @@ internal fun buildTvLongFormDetailHero(
         primaryActionLabel = "立即播放",
         secondaryActionLabel = "更多信息",
     )
+}
+
+internal fun resolveTvCatalogWallSpec(kind: String, fallbackTitle: String = ""): TvCatalogWallSpec {
+    val normalizedKind = kind.trim().lowercase()
+    val title = fallbackTitle.trim().takeIf { it.isNotBlank() } ?: when (normalizedKind) {
+        "recent" -> "最近更新"
+        "binge" -> "高能连播"
+        "classic" -> "经典补档"
+        "tv" -> "电视剧"
+        "movie" -> "电影"
+        "av" -> "AV"
+        else -> "海报墙"
+    }
+    val subtitle = when (normalizedKind) {
+        "recent" -> "按最近播出时间排序"
+        "binge" -> "优先展示可直接播放的剧集"
+        "classic" -> "从较早首播的系列开始补看"
+        "tv" -> "全部电视剧"
+        "movie" -> "全部电影"
+        "av" -> "全部 AV"
+        else -> "滚动到底部自动加载下一页"
+    }
+    return TvCatalogWallSpec(
+        kind = normalizedKind,
+        title = title,
+        subtitle = subtitle,
+    )
+}
+
+internal fun tvCatalogWallItemToUiModel(item: TvCatalogWallItemDto): TvCatalogWallItemUiModel {
+    val normalizedType = normalizeTvWallItemType(item.type)
+    return TvCatalogWallItemUiModel(
+        id = item.id,
+        type = normalizedType,
+        title = item.title,
+        description = item.overview.ifBlank { tvCatalogWallTypeLabel(normalizedType) },
+        posterUrl = item.posterUrl,
+        backdropUrl = item.backdropUrl,
+        videoId = item.videoId,
+        seasonNumber = item.seasonNumber,
+        episodeNumber = item.episodeNumber,
+        progressPercent = item.progressPercent,
+    )
+}
+
+private fun normalizeTvWallItemType(raw: String): String {
+    return when (raw.trim().lowercase()) {
+        "episode" -> "tv"
+        else -> raw.trim().lowercase()
+    }
+}
+
+private fun tvCatalogWallTypeLabel(type: String): String {
+    return when (type) {
+        "tv" -> "电视剧"
+        "movie" -> "电影"
+        "av" -> "AV"
+        else -> type.ifBlank { "长视频" }
+    }
 }
 
 internal fun normalizeTvLongFormVideoType(videoType: String): String {

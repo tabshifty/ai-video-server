@@ -53,6 +53,9 @@ import com.chee.videos.feature.player.UnifiedPlayerScreen
 import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
 import com.chee.videos.feature.shortsearch.ShortSearchScreen
 import com.chee.videos.feature.tv.TvEpisodeArg
+import com.chee.videos.feature.tv.TvCatalogWallKindArg
+import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
+import com.chee.videos.feature.tv.TvCatalogWallTitleArg
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
 import com.chee.videos.feature.tv.TvSeriesDetailScreen
@@ -61,6 +64,7 @@ import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tvauth.TvAuthApprovalScreen
 import com.chee.videos.feature.tvauth.TvAuthDeepLinkParser
+import com.chee.videos.feature.tv.buildTvCatalogWallRoute
 import com.chee.videos.feature.tv.buildTvPlayerRoute
 import com.chee.videos.feature.tv.buildTvSeriesRoute
 
@@ -221,6 +225,9 @@ private fun AuthenticatedNav(
                         onOpenImageCollectionViewer = { route ->
                             navController.navigate(route)
                         },
+                        onOpenTvCatalogWall = { kind, title ->
+                            navController.navigate(buildTvCatalogWallRoute(kind, title))
+                        },
                     )
                 }
             }
@@ -312,6 +319,26 @@ private fun AuthenticatedNav(
                     onBack = { navController.popBackStack() },
                     onPlayEpisode = { seriesId, season, episode ->
                         navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
+                    },
+                )
+            }
+
+            composable(
+                route = TvCatalogWallRoutePattern,
+                arguments = listOf(
+                    navArgument(TvCatalogWallKindArg) { type = NavType.StringType },
+                    navArgument(TvCatalogWallTitleArg) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
+                com.chee.videos.feature.tv.TvPosterWallScreen(
+                    baseUrl = baseUrl,
+                    onBack = { navController.popBackStack() },
+                    onOpenSeries = { seriesId -> navController.navigate(buildTvSeriesRoute(seriesId)) },
+                    onOpenLongForm = { videoId, videoType ->
+                        navController.navigate("detail/$videoId?type=${Uri.encode(videoType)}")
                     },
                 )
             }

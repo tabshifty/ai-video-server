@@ -168,6 +168,54 @@ func buildTVHomeVideoFromListItem(item models.VideoListItem) models.TvHomeVideoD
 	}
 }
 
+func buildTVCatalogWallSeriesItems(items []models.TvSeriesSummaryDto) []models.TvCatalogWallItemDto {
+	out := make([]models.TvCatalogWallItemDto, 0, len(items))
+	for _, item := range items {
+		out = append(out, models.TvCatalogWallItemDto{
+			ID:          fmt.Sprintf("%d", item.ID),
+			Type:        "tv",
+			Title:       item.Title,
+			Overview:    item.Overview,
+			PosterURL:   item.PosterURL,
+			BackdropURL: item.BackdropURL,
+		})
+	}
+	return out
+}
+
+func buildTVCatalogWallVideoItems(items []models.VideoListItem, videoType string) []models.TvCatalogWallItemDto {
+	out := make([]models.TvCatalogWallItemDto, 0, len(items))
+	for _, item := range items {
+		normalizedType := normalizeTVSearchType(item.Type)
+		if normalizedType == "" {
+			normalizedType = normalizeTVSearchType(videoType)
+		}
+		out = append(out, models.TvCatalogWallItemDto{
+			ID:          item.ID.String(),
+			Type:        normalizedType,
+			Title:       item.Title,
+			Overview:    "",
+			PosterURL:   item.ThumbnailPath,
+			BackdropURL: item.ThumbnailPath,
+		})
+	}
+	return out
+}
+
+func buildTVCatalogWallPayload(
+	page int,
+	pageSize int,
+	totalCount int,
+	items []models.TvCatalogWallItemDto,
+) models.PageResult[models.TvCatalogWallItemDto] {
+	return models.PageResult[models.TvCatalogWallItemDto]{
+		Items:      items,
+		TotalCount: totalCount,
+		Page:       page,
+		PageSize:   pageSize,
+	}
+}
+
 func normalizeTVSearchType(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "episode":
@@ -349,6 +397,52 @@ func (s *AppService) TVHome(ctx context.Context, userID uuid.UUID, q string, pag
 		payload.AV = append(payload.AV, buildTVHomeVideoFromListItem(item))
 	}
 	return payload, nil
+}
+
+func (s *AppService) TVCatalogWall(
+	ctx context.Context,
+	kind string,
+	page,
+	pageSize int,
+) (models.PageResult[models.TvCatalogWallItemDto], error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 24
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	switch strings.TrimSpace(strings.ToLower(kind)) {
+	case "recent", "tv":
+		items, total, err := s.repo.ListActiveTVSeriesSummaries(ctx, pageSize, offset)
+		if err != nil {
+			return models.PageResult[models.TvCatalogWallItemDto]{}, err
+		}
+		return buildTVCatalogWallPayload(page, pageSize, total, buildTVCatalogWallSeriesItems(items)), nil
+	case "binge":
+		items, total, err := s.repo.ListBingeTVSeriesSummaries(ctx, pageSize, offset)
+		if err != nil {
+			return models.PageResult[models.TvCatalogWallItemDto]{}, err
+		}
+		return buildTVCatalogWallPayload(page, pageSize, total, buildTVCatalogWallSeriesItems(items)), nil
+	case "classic":
+		items, total, err := s.repo.ListClassicTVSeriesSummaries(ctx, pageSize, offset)
+		if err != nil {
+			return models.PageResult[models.TvCatalogWallItemDto]{}, err
+		}
+		return buildTVCatalogWallPayload(page, pageSize, total, buildTVCatalogWallSeriesItems(items)), nil
+	case "movie", "av":
+		items, total, err := s.repo.SearchVideos(ctx, "", kind, pageSize, offset)
+		if err != nil {
+			return models.PageResult[models.TvCatalogWallItemDto]{}, err
+		}
+		return buildTVCatalogWallPayload(page, pageSize, total, buildTVCatalogWallVideoItems(items, kind)), nil
+	default:
+		return models.PageResult[models.TvCatalogWallItemDto]{}, fmt.Errorf("unsupported tv wall kind: %s", kind)
+	}
 }
 
 func (s *AppService) tvHomeLegacy(ctx context.Context, userID uuid.UUID, q string, page, pageSize int) (models.TvHomePayload, error) {

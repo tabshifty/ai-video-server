@@ -65,4 +65,12 @@ class TvRoutesTest {
             buildTvLongFormPlayerRoute(videoId = "av/2026#scene-1", videoType = "av"),
         )
     }
+
+    @Test
+    fun buildTvCatalogWallRoute_encodesKindAndTitle() {
+        assertEquals(
+            "tv/wall/recent%2Fupdates?title=%E6%9C%80%E8%BF%91%E6%9B%B4%E6%96%B0",
+            buildTvCatalogWallRoute(kind = "recent/updates", title = "最近更新"),
+        )
+    }
 }

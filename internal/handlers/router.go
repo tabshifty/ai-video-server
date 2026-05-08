@@ -105,6 +105,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/short/discover", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ShortDiscover)
 		v1.GET("/tv/home", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVHome)
 		v1.GET("/tv/search", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVSearch)
+		v1.GET("/tv/catalog", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVCatalogWall)
 		v1.GET("/tv/series/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVSeriesDetail)
 		v1.GET("/tv/series/:id/poster", a.TVSeriesPoster)
 		v1.GET("/tv/series/:id/backdrop", a.TVSeriesBackdrop)

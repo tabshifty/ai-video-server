@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -60,6 +61,7 @@ fun TvCatalogScreen(
     onOpenContinueWatching: (String, Int, Int) -> Unit,
     onOpenLongForm: (String, String) -> Unit,
     onPlayLongForm: (String, String) -> Unit,
+    onOpenCatalogWall: (String, String) -> Unit = { _, _ -> },
     viewModel: TvCatalogViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -215,13 +217,14 @@ fun TvCatalogScreen(
                 )
             }
         }
-        items(uiState.sections, key = { section -> section.title }) { section ->
+        itemsIndexed(uiState.sections, key = { _, section -> section.title }) { _, section ->
             TvCatalogSection(
                 baseUrl = uiState.baseUrl,
                 section = section,
                 onOpenSeries = onOpenSeries,
                 firstItemFocusRequester = firstSectionItemFocusRequester,
                 requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM,
+                onOpenCatalogWall = onOpenCatalogWall,
             )
         }
         if (uiState.tvSeries.isNotEmpty()) {
@@ -229,10 +232,12 @@ fun TvCatalogScreen(
                 TvHomeShelf(
                     title = "电视剧",
                     subtitle = "全部长剧集",
+                    wallKind = "tv",
                     baseUrl = uiState.baseUrl,
                     items = uiState.tvSeries,
                     firstItemFocusRequester = tvSeriesFocusRequester,
                     requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.TV_SERIES_ITEM,
+                    onOpenCatalogWall = onOpenCatalogWall,
                     onClick = { item -> onOpenSeries(item.id) },
                 )
             }
@@ -242,10 +247,12 @@ fun TvCatalogScreen(
                 TvHomeShelf(
                     title = "电影",
                     subtitle = "可直接播放的长片",
+                    wallKind = "movie",
                     baseUrl = uiState.baseUrl,
                     items = uiState.movies,
                     firstItemFocusRequester = movieFocusRequester,
                     requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.MOVIE_ITEM,
+                    onOpenCatalogWall = onOpenCatalogWall,
                     onClick = { item -> onOpenLongForm(item.id, item.type) },
                 )
             }
@@ -255,10 +262,12 @@ fun TvCatalogScreen(
                 TvHomeShelf(
                     title = "AV",
                     subtitle = "仅包含长视频",
+                    wallKind = "av",
                     baseUrl = uiState.baseUrl,
                     items = uiState.av,
                     firstItemFocusRequester = avFocusRequester,
                     requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.AV_ITEM,
+                    onOpenCatalogWall = onOpenCatalogWall,
                     onClick = { item -> onOpenLongForm(item.id, item.type) },
                 )
             }
@@ -723,6 +732,7 @@ private fun TvCatalogSection(
     onOpenSeries: (String) -> Unit,
     firstItemFocusRequester: FocusRequester,
     requestInitialFocus: Boolean,
+    onOpenCatalogWall: (String, String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -740,7 +750,7 @@ private fun TvCatalogSection(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(top = 4.dp, bottom = 2.dp),
         ) {
-            items(section.items, key = { item -> item.id }) { series ->
+            items(section.items.take(TvCatalogShelfPreviewLimit), key = { item -> item.id }) { series ->
                 TvSeriesPosterCard(
                     baseUrl = baseUrl,
                     series = series,
@@ -751,6 +761,16 @@ private fun TvCatalogSection(
                     },
                     onClick = { onOpenSeries(series.id) },
                 )
+            }
+            if (section.items.isNotEmpty()) {
+                item(key = "${section.title}-more") {
+                    TvPosterMoreCard(
+                        label = "查看更多",
+                        subtitle = "共 ${section.items.size} 项",
+                        modifier = Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp)),
+                        onClick = { onOpenCatalogWall(resolveTvSectionWallKind(section.title), section.title) },
+                    )
+                }
             }
         }
     }
@@ -826,10 +846,12 @@ private fun TvSeriesPosterCard(
 private fun TvHomeShelf(
     title: String,
     subtitle: String,
+    wallKind: String,
     baseUrl: String,
     items: List<TvHomeShelfItemUiModel>,
     firstItemFocusRequester: FocusRequester,
     requestInitialFocus: Boolean,
+    onOpenCatalogWall: (String, String) -> Unit,
     onClick: (TvHomeShelfItemUiModel) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -848,7 +870,7 @@ private fun TvHomeShelf(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(top = 4.dp, bottom = 2.dp),
         ) {
-            items(items, key = { item -> "${item.type}-${item.id}" }) { item ->
+            items(items.take(TvCatalogShelfPreviewLimit), key = { item -> "${item.type}-${item.id}" }) { item ->
                 TvHomeShelfCard(
                     baseUrl = baseUrl,
                     item = item,
@@ -858,6 +880,78 @@ private fun TvHomeShelf(
                         Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp))
                     },
                     onClick = { onClick(item) },
+                )
+            }
+            if (items.isNotEmpty()) {
+                item(key = "$wallKind-more") {
+                    TvPosterMoreCard(
+                        label = "查看更多",
+                        subtitle = "共 ${items.size} 项",
+                        modifier = Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp)),
+                        onClick = { onOpenCatalogWall(wallKind, title) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvPosterMoreCard(
+    label: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .size(width = 146.dp, height = 256.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xFF23314A), Color(0xFF0B0F18)),
+                    ),
+                ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color(0x00000000), Color(0x7A0A0F16)),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Tv,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(38.dp),
+                )
+                Text(
+                    text = label,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = subtitle,
+                    color = AppChrome.TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
@@ -983,6 +1077,16 @@ private fun resolveTvArtworkUrl(baseUrl: String, rawUrl: String?): String? {
         return null
     }
     return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
+}
+
+private const val TvCatalogShelfPreviewLimit = 8
+
+private fun resolveTvSectionWallKind(sectionTitle: String): String {
+    return when (sectionTitle.trim()) {
+        "高能连播" -> "binge"
+        "经典补档" -> "classic"
+        else -> "recent"
+    }
 }
 
 private fun tvTypeLabel(type: String): String = when (type) {

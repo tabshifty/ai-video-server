@@ -118,6 +118,26 @@ data class TvSearchResultDto(
     @SerializedName("backdrop_url") val backdropUrl: String? = null,
 )
 
+data class TvCatalogWallPayload(
+    @SerializedName("items") val items: List<TvCatalogWallItemDto> = emptyList(),
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("page_size") val pageSize: Int = 20,
+)
+
+data class TvCatalogWallItemDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("overview") val overview: String = "",
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("backdrop_url") val backdropUrl: String? = null,
+    @SerializedName("video_id") val videoId: String? = null,
+    @SerializedName("season_number") val seasonNumber: Int = 0,
+    @SerializedName("episode_number") val episodeNumber: Int = 0,
+    @SerializedName("progress_percent") val progressPercent: Int = 0,
+)
+
 data class TvAuthSessionCreateRequest(
     @SerializedName("device_id") val deviceId: String,
     @SerializedName("device_name") val deviceName: String,
