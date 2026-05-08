@@ -17,6 +17,7 @@ import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
+import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
@@ -302,6 +303,14 @@ private class FakeHomeApiService(
         page: Int,
         pageSize: Int,
     ): ApiEnvelope<TvSearchPayload> = error("unused")
+
+    override suspend fun tvCatalogWall(
+        url: String,
+        authorization: String,
+        kind: String,
+        page: Int,
+        pageSize: Int,
+    ): ApiEnvelope<TvCatalogWallPayload> = error("unused")
 
     override suspend fun tvSeriesDetail(
         url: String,

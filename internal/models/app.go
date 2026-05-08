@@ -161,6 +161,19 @@ type TvHomeVideoDto struct {
 	ProgressPercent int    `json:"progress_percent,omitempty"`
 }
 
+type TvCatalogWallItemDto struct {
+	ID              string `json:"id"`
+	Type            string `json:"type"`
+	Title           string `json:"title"`
+	Overview        string `json:"overview"`
+	PosterURL       string `json:"poster_url"`
+	BackdropURL     string `json:"backdrop_url"`
+	VideoID         string `json:"video_id,omitempty"`
+	SeasonNumber    int    `json:"season_number,omitempty"`
+	EpisodeNumber   int    `json:"episode_number,omitempty"`
+	ProgressPercent int    `json:"progress_percent,omitempty"`
+}
+
 type TvSearchPayload struct {
 	Items      []TvSearchResultDto `json:"items"`
 	TotalCount int                 `json:"total_count"`

@@ -48,6 +48,19 @@ data class TvCatalogSectionUiModel(
     val items: List<TvSeriesUiModel>,
 )
 
+data class TvCatalogWallItemUiModel(
+    val id: String,
+    val type: String,
+    val title: String,
+    val description: String,
+    val posterUrl: String? = null,
+    val backdropUrl: String? = null,
+    val videoId: String? = null,
+    val seasonNumber: Int = 0,
+    val episodeNumber: Int = 0,
+    val progressPercent: Int = 0,
+)
+
 data class TvHomeShelfItemUiModel(
     val id: String,
     val type: String,
@@ -82,4 +95,17 @@ data class TvContinueWatchingUiModel(
     val backdropUrl: String? = null,
     val watchSeconds: Int = 0,
     val progressPercent: Int,
+)
+
+data class TvCatalogWallUiState(
+    val loading: Boolean = true,
+    val loadingMore: Boolean = false,
+    val refreshing: Boolean = false,
+    val kind: String = "",
+    val title: String = "",
+    val subtitle: String = "",
+    val page: Int = 0,
+    val totalCount: Int = 0,
+    val items: List<TvCatalogWallItemUiModel> = emptyList(),
+    val errorMessage: String? = null,
 )

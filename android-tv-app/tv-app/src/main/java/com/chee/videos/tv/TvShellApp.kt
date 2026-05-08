@@ -46,6 +46,9 @@ import com.chee.videos.feature.tv.TvLongFormVideoIdArg
 import com.chee.videos.feature.tv.TvLongFormVideoTypeArg
 import com.chee.videos.feature.tv.TvLongFormDetailScreen
 import com.chee.videos.feature.tv.TvLongFormPlayerScreen
+import com.chee.videos.feature.tv.TvCatalogWallKindArg
+import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
+import com.chee.videos.feature.tv.TvCatalogWallTitleArg
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
 import com.chee.videos.feature.tv.TvSeriesDetailScreen
@@ -53,6 +56,7 @@ import com.chee.videos.feature.tv.TvSeriesIdArg
 import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tv.buildTvSeriesRoute
+import com.chee.videos.feature.tv.buildTvCatalogWallRoute
 import com.chee.videos.feature.tv.buildTvLongFormDetailRoute
 import com.chee.videos.feature.tv.buildTvLongFormPlayerRoute
 import com.chee.videos.feature.tv.buildTvPlayerRoute
@@ -77,6 +81,7 @@ fun TvShellApp(
                     onSwitchServer = appRootViewModel::switchToServerSelection,
                 )
                 is AppRootState.Ready -> TvAuthenticatedNav(
+                    baseUrl = state.baseUrl,
                     accessToken = state.accessToken,
                     onLogout = appRootViewModel::logout,
                     onRepair = appRootViewModel::logout,
@@ -89,6 +94,7 @@ fun TvShellApp(
 
 @Composable
 private fun TvAuthenticatedNav(
+    baseUrl: String,
     accessToken: String,
     onLogout: () -> Unit,
     onRepair: () -> Unit,
@@ -122,6 +128,28 @@ private fun TvAuthenticatedNav(
                     },
                     onPlayLongForm = { videoId, videoType ->
                         navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
+                    },
+                    onOpenCatalogWall = { kind, title ->
+                        navController.navigate(buildTvCatalogWallRoute(kind, title))
+                    },
+                )
+            }
+            composable(
+                route = TvCatalogWallRoutePattern,
+                arguments = listOf(
+                    navArgument(TvCatalogWallKindArg) { type = NavType.StringType },
+                    navArgument(TvCatalogWallTitleArg) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
+                com.chee.videos.feature.tv.TvPosterWallScreen(
+                    baseUrl = baseUrl,
+                    onBack = { navController.popBackStack() },
+                    onOpenSeries = { seriesId -> navController.navigate(buildTvSeriesRoute(seriesId)) },
+                    onOpenLongForm = { videoId, videoType ->
+                        navController.navigate(buildTvLongFormDetailRoute(videoId, videoType))
                     },
                 )
             }

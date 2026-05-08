@@ -47,6 +47,24 @@ func boolPtr(value bool) *bool {
 }
 
 func (r *VideoRepository) listTVSeriesSummaries(ctx context.Context, active *bool, q string, limit, offset int) ([]models.TvSeriesSummaryDto, int, error) {
+	return r.listTVSeriesSummariesOrdered(
+		ctx,
+		active,
+		q,
+		limit,
+		offset,
+		"MAX(e.air_date) DESC NULLS LAST, s.title ASC",
+	)
+}
+
+func (r *VideoRepository) listTVSeriesSummariesOrdered(
+	ctx context.Context,
+	active *bool,
+	q string,
+	limit,
+	offset int,
+	orderClause string,
+) ([]models.TvSeriesSummaryDto, int, error) {
 	where := []string{"1=1"}
 	args := make([]any, 0, 8)
 	next := func(v any) string {
@@ -86,7 +104,7 @@ LEFT JOIN episodes e ON e.season_id = se.id
 LEFT JOIN videos v ON v.id = e.video_id
 WHERE `+baseWhere+`
 GROUP BY s.id, s.title, s.overview, s.poster_path, s.backdrop_path, s.first_air_date, s.number_of_seasons, s.number_of_episodes
-ORDER BY MAX(e.air_date) DESC NULLS LAST, s.title ASC
+ORDER BY `+orderClause+`
 LIMIT $`+fmt.Sprintf("%d", len(args)-1)+` OFFSET $`+fmt.Sprintf("%d", len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list tv series: %w", err)
@@ -126,6 +144,28 @@ LIMIT $`+fmt.Sprintf("%d", len(args)-1)+` OFFSET $`+fmt.Sprintf("%d", len(args))
 
 func (r *VideoRepository) ListActiveTVSeriesSummaries(ctx context.Context, limit, offset int) ([]models.TvSeriesSummaryDto, int, error) {
 	return r.listTVSeriesSummaries(ctx, boolPtr(true), "", limit, offset)
+}
+
+func (r *VideoRepository) ListBingeTVSeriesSummaries(ctx context.Context, limit, offset int) ([]models.TvSeriesSummaryDto, int, error) {
+	return r.listTVSeriesSummariesOrdered(
+		ctx,
+		boolPtr(true),
+		"",
+		limit,
+		offset,
+		"COUNT(e.id) FILTER (WHERE e.video_id IS NOT NULL AND COALESCE(v.status, '') = 'ready') DESC, MAX(e.air_date) DESC NULLS LAST, s.title ASC",
+	)
+}
+
+func (r *VideoRepository) ListClassicTVSeriesSummaries(ctx context.Context, limit, offset int) ([]models.TvSeriesSummaryDto, int, error) {
+	return r.listTVSeriesSummariesOrdered(
+		ctx,
+		boolPtr(true),
+		"",
+		limit,
+		offset,
+		"s.first_air_date ASC NULLS LAST, s.title ASC",
+	)
 }
 
 func (r *VideoRepository) SearchTVSeriesSummaries(ctx context.Context, q string, limit, offset int) ([]models.TvSeriesSummaryDto, int, error) {

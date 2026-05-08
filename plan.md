@@ -4157,3 +4157,42 @@
   - `cd android-app && ./gradlew --no-daemon :app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+
+### [2026-05-08 16:06] TV 首页货柜裁剪与分类海报墙
+- Type: `implementation`
+- Summary:
+  - TV 首页货柜统一裁剪为前 `8` 张海报并追加“查看更多”尾卡，入口按 section / 电视剧 / 电影 / AV 分类进入独立墙页，不再跳混合页。
+  - 新增 TV 分类海报墙路由、ViewModel 与页面，支持显式顶部刷新、底部自动续载下一页、返回与焦点高亮，后端补齐 `tv/catalog` 分页接口与墙页 DTO。
+  - 共享 `HomeScreen` / `TvShellApp` / `VideoHomeApp` 的 TV 导航链同步接入新墙页，补齐测试 fake 与相关单测。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/model/ApiModels.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/network/ApiService.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallViewModel.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPresentation.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRepository.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRoutes.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallViewModelTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRoutesTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `internal/handlers/router.go`
+  - `internal/handlers/tv.go`
+  - `internal/models/app.go`
+  - `internal/repository/tv_repository.go`
+  - `internal/services/tv_auth.go`
+  - `internal/services/tv_catalog_wall_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./... -count=1` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvRoutesTest' --tests 'com.chee.videos.feature.tv.TvPosterWallViewModelTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+- Rollback:
+  - `git revert <commit>`
