@@ -263,6 +263,39 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-08 12:52] Android 手机端 AV 海报墙瀑布流与分页刷新计划
+- Type: `plan`
+- Summary:
+  - 将手机端 `AV` 标签页海报墙从普通网格改为瀑布流布局，支持下拉刷新和上滑自动加载更多。
+  - 默认浏览态与搜索结果态统一支持分页、刷新和尾部补货失败反馈，不新增后端接口。
+  - 变更范围限定在 `android-app` 的 Home AV 列表 UI、ViewModel 分页状态机、仓储分页返回值与单测。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.home.HomeViewModelTest'`
+  - `cd android-app && ./gradlew --no-daemon :app:assembleDebug`
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-08 12:52] Android 手机端 AV 海报墙改为瀑布流并支持下拉刷新与上滑加载
+- Type: `implementation`
+- Summary:
+  - `HomeScreen` 的 AV 海报墙改为双列 `LazyVerticalStaggeredGrid`，保留顶部搜索 Hero，并接入下拉刷新指示器、尾部加载中/失败/无更多状态。
+  - `HomeViewModel` 新增 AV 浏览态与搜索态的统一分页状态机，支持默认列表分页、搜索分页、下拉刷新、清空搜索恢复浏览态和尾部补货错误保留已加载内容。
+  - `VideoRepository.fetchCategory` 改为保留搜索接口返回的分页元数据，`HomeViewModelTest` 补齐浏览分页、搜索分页、下拉刷新和分页失败回归用例。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-app/app/src/main/java/com/chee/videos/feature/home/HomeViewModel.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` passed after the parallel-run KAPT cache conflict was discarded.
+  - `cd android-app && ./gradlew --stop && rm -rf app/build .gradle/kotlin && ./gradlew --no-daemon :app:assembleDebug` passed.
+  - `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.home.HomeViewModelTest'` passed after removing temporary debug output.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-01 22:10] AV 刮削联动演员头像补全并落地本地访问
 - Type: `implementation`
 - Summary:

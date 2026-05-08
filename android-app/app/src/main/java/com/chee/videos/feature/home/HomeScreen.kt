@@ -17,16 +17,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -135,6 +142,8 @@ fun HomeScreen(
                         onQueryChange = viewModel::updateAvQuery,
                         onRetry = viewModel::retryAvState,
                         onClearQuery = { viewModel.updateAvQuery("") },
+                        onRefresh = viewModel::refreshAvState,
+                        onNeedMore = viewModel::loadMoreAvIfNeeded,
                         onOpenDetail = onOpenDetail,
                     )
                 }
@@ -197,105 +206,180 @@ private fun HomeHeader(
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 private fun AvCatalogSection(
     baseUrl: String,
-    browseState: CategoryState,
+    browseState: PagedVideoListState,
     searchState: AvSearchState,
     onQueryChange: (String) -> Unit,
     onRetry: () -> Unit,
     onClearQuery: () -> Unit,
+    onRefresh: () -> Unit,
+    onNeedMore: (Int) -> Unit,
     onOpenDetail: (String, String) -> Unit,
 ) {
-    val activeItems = if (searchState.isSearchMode) searchState.results else browseState.items
+    val activeState = if (searchState.isSearchMode) searchState.resultState else browseState
+    val activeItems = activeState.items
     val statusText = buildAvStatusText(browseState, searchState)
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = activeState.refreshing,
+        onRefresh = onRefresh,
+    )
 
-    LazyVerticalGrid(
-        modifier = Modifier.fillMaxSize(),
-        columns = GridCells.Adaptive(minSize = 156.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pullRefresh(pullRefreshState),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            AvCatalogHero(
-                query = searchState.query,
-                statusText = statusText,
-                isSearching = searchState.loading,
-                onQueryChange = onQueryChange,
-                onClearQuery = onClearQuery,
-            )
+        LazyVerticalStaggeredGrid(
+            modifier = Modifier.fillMaxSize(),
+            columns = StaggeredGridCells.Fixed(2),
+            verticalItemSpacing = 14.dp,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 20.dp),
+        ) {
+            item(span = StaggeredGridItemSpan.FullLine) {
+                AvCatalogHero(
+                    query = searchState.query,
+                    statusText = statusText,
+                    isSearching = activeState.loading || activeState.refreshing,
+                    onQueryChange = onQueryChange,
+                    onClearQuery = onClearQuery,
+                )
+            }
+
+            when {
+                browseState.loading && browseState.items.isEmpty() && !searchState.isSearchMode -> {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        LoadingStateCard(label = "正在加载 AV 海报墙")
+                    }
+                }
+
+                searchState.resultState.loading && searchState.resultState.items.isEmpty() -> {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        LoadingStateCard(label = "正在远程搜索“${searchState.query.trim()}”")
+                    }
+                }
+
+                !searchState.resultState.errorMessage.isNullOrBlank() && searchState.resultState.items.isEmpty() -> {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        AvCatalogStateCard(
+                            title = "搜索失败",
+                            message = searchState.resultState.errorMessage.orEmpty(),
+                            primaryLabel = "重试搜索",
+                            onPrimaryClick = onRetry,
+                            secondaryLabel = "清空搜索",
+                            onSecondaryClick = onClearQuery,
+                        )
+                    }
+                }
+
+                !browseState.errorMessage.isNullOrBlank() && browseState.items.isEmpty() -> {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        AvCatalogStateCard(
+                            title = "加载失败",
+                            message = browseState.errorMessage.orEmpty(),
+                            primaryLabel = "重新加载",
+                            onPrimaryClick = onRetry,
+                        )
+                    }
+                }
+
+                searchState.isSearchMode && activeItems.isEmpty() -> {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        AvCatalogStateCard(
+                            title = "没有找到结果",
+                            message = "换个番号试试，或者清空搜索回到默认浏览。",
+                            primaryLabel = "清空搜索",
+                            onPrimaryClick = onClearQuery,
+                        )
+                    }
+                }
+
+                activeItems.isEmpty() -> {
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        AvCatalogStateCard(
+                            title = "暂无内容",
+                            message = "当前还没有可展示的 AV 作品。",
+                            primaryLabel = "重新加载",
+                            onPrimaryClick = onRetry,
+                        )
+                    }
+                }
+
+                else -> {
+                    itemsIndexed(activeItems, key = { _, item -> item.id }) { index, item ->
+                        if (index >= activeItems.lastIndex - 5) {
+                            LaunchedEffect(index, activeItems.size, activeState.loadingMore, activeState.hasMore) {
+                                onNeedMore(index)
+                            }
+                        }
+                        AvPosterCard(
+                            baseUrl = baseUrl,
+                            item = item,
+                            onOpenDetail = onOpenDetail,
+                        )
+                    }
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        when {
+                            activeState.loadingMore -> {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = AppChrome.AccentStrong,
+                                        strokeWidth = 2.dp,
+                                    )
+                                    Text(
+                                        text = "正在加载更多",
+                                        color = AppChrome.TextSecondary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(start = 8.dp),
+                                    )
+                                }
+                            }
+
+                            !activeState.loadMoreErrorMessage.isNullOrBlank() -> {
+                                Text(
+                                    text = "加载失败，点击重试",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onNeedMore(activeItems.lastIndex) }
+                                        .padding(vertical = 8.dp),
+                                )
+                            }
+
+                            !activeState.hasMore -> {
+                                Text(
+                                    text = "没有更多了",
+                                    color = AppChrome.TextMuted,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        when {
-            browseState.loading && browseState.items.isEmpty() && !searchState.isSearchMode -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    LoadingStateCard(label = "正在加载 AV 海报墙")
-                }
-            }
-
-            searchState.loading && searchState.results.isEmpty() -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    LoadingStateCard(label = "正在远程搜索“${searchState.query.trim()}”")
-                }
-            }
-
-            !searchState.errorMessage.isNullOrBlank() && searchState.results.isEmpty() -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    AvCatalogStateCard(
-                        title = "搜索失败",
-                        message = searchState.errorMessage.orEmpty(),
-                        primaryLabel = "重试搜索",
-                        onPrimaryClick = onRetry,
-                        secondaryLabel = "清空搜索",
-                        onSecondaryClick = onClearQuery,
-                    )
-                }
-            }
-
-            !browseState.errorMessage.isNullOrBlank() && browseState.items.isEmpty() -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    AvCatalogStateCard(
-                        title = "加载失败",
-                        message = browseState.errorMessage.orEmpty(),
-                        primaryLabel = "重新加载",
-                        onPrimaryClick = onRetry,
-                    )
-                }
-            }
-
-            searchState.isSearchMode && activeItems.isEmpty() -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    AvCatalogStateCard(
-                        title = "没有找到结果",
-                        message = "换个番号试试，或者清空搜索回到默认浏览。",
-                        primaryLabel = "清空搜索",
-                        onPrimaryClick = onClearQuery,
-                    )
-                }
-            }
-
-            activeItems.isEmpty() -> {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    AvCatalogStateCard(
-                        title = "暂无内容",
-                        message = "当前还没有可展示的 AV 作品。",
-                        primaryLabel = "重新加载",
-                        onPrimaryClick = onRetry,
-                    )
-                }
-            }
-
-            else -> {
-                items(activeItems, key = { it.id }) { item ->
-                    AvPosterCard(
-                        baseUrl = baseUrl,
-                        item = item,
-                        onOpenDetail = onOpenDetail,
-                    )
-                }
-            }
-        }
+        PullRefreshIndicator(
+            refreshing = activeState.refreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            contentColor = AppChrome.AccentStrong,
+            backgroundColor = AppChrome.SurfaceElevated,
+        )
     }
 }
 
@@ -586,7 +670,7 @@ private fun AvPosterCard(
 @Composable
 private fun CategoryListSection(
     baseUrl: String,
-    state: CategoryState,
+    state: PagedVideoListState,
     categoryTitle: String,
     onRetry: () -> Unit,
     onOpenDetail: (String, String) -> Unit,
@@ -751,16 +835,19 @@ private fun VideoCard(
 }
 
 private fun buildAvStatusText(
-    browseState: CategoryState,
+    browseState: PagedVideoListState,
     searchState: AvSearchState,
 ): String {
     val searchLabel = searchState.query.trim().ifBlank { searchState.lastCompletedQuery }
+    val searchResultState = searchState.resultState
     return when {
-        searchState.loading && searchState.query.isNotBlank() -> "正在远程搜索“${searchState.query.trim()}”"
-        !searchState.errorMessage.isNullOrBlank() && searchLabel.isNotBlank() -> "搜索“$searchLabel”失败"
-        searchState.isSearchMode && searchState.results.isEmpty() && searchLabel.isNotBlank() -> "没有找到“$searchLabel”相关作品"
-        searchState.isSearchMode -> "共找到 ${searchState.totalCount.coerceAtLeast(searchState.results.size)} 条结果"
-        browseState.loaded -> "默认浏览 ${browseState.items.size} 部作品，直接按番号或标题定位"
+        searchResultState.loading && searchState.query.isNotBlank() -> "正在远程搜索“${searchState.query.trim()}”"
+        searchResultState.refreshing && searchLabel.isNotBlank() -> "正在刷新“$searchLabel”"
+        !searchResultState.errorMessage.isNullOrBlank() && searchLabel.isNotBlank() -> "搜索“$searchLabel”失败"
+        searchState.isSearchMode && searchResultState.items.isEmpty() && searchLabel.isNotBlank() -> "没有找到“$searchLabel”相关作品"
+        searchState.isSearchMode -> "共找到 ${searchResultState.totalCount.coerceAtLeast(searchResultState.items.size)} 条结果"
+        browseState.refreshing -> "正在刷新默认海报墙"
+        browseState.loaded -> "默认浏览 ${browseState.totalCount.coerceAtLeast(browseState.items.size)} 部作品，直接按番号或标题定位"
         else -> "远程搜索当前服务器里的全部 AV 内容"
     }
 }

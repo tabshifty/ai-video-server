@@ -48,9 +48,11 @@ class HomeViewModelTest {
     fun `loadCategory loads default av list`() = runTest {
         withMainDispatcher {
             val api = FakeHomeApiService(
-                browseItems = mapOf(
-                    "av" to listOf(
+                browsePages = mapOf(
+                    "av" to mapOf(
+                        1 to listOf(
                         avItem(id = "av-1", title = "SSIS-101 夜色标本"),
+                    ),
                     ),
                 ),
             )
@@ -58,7 +60,7 @@ class HomeViewModelTest {
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
-            advanceUntilIdle()
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
 
             val state = viewModel.uiState.value
             assertTrue(state.av.loaded)
@@ -72,10 +74,12 @@ class HomeViewModelTest {
     fun `updateAvQuery triggers remote av search after debounce`() = runTest {
         withMainDispatcher {
             val api = FakeHomeApiService(
-                browseItems = mapOf("av" to listOf(avItem(id = "av-1", title = "SSIS-101 夜色标本"))),
-                searchItems = mapOf(
-                    "ssis 222" to listOf(
-                        avItem(id = "av-2", title = "SSIS-222 清晨边界"),
+                browsePages = mapOf("av" to mapOf(1 to listOf(avItem(id = "av-1", title = "SSIS-101 夜色标本")))),
+                searchPages = mapOf(
+                    "ssis 222" to mapOf(
+                        1 to listOf(
+                            avItem(id = "av-2", title = "SSIS-222 清晨边界"),
+                        ),
                     ),
                 ),
             )
@@ -83,20 +87,24 @@ class HomeViewModelTest {
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
-            advanceUntilIdle()
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ssis 222")
-            advanceUntilIdle()
+            awaitUntil {
+                viewModel.uiState.value.avSearch.isSearchMode &&
+                    !viewModel.uiState.value.avSearch.resultState.loading &&
+                    viewModel.uiState.value.avSearch.resultState.items.isNotEmpty()
+            }
 
             val state = viewModel.uiState.value
             assertEquals("ssis 222", state.avSearch.query)
             assertTrue(state.avSearch.isSearchMode)
-            assertFalse(state.avSearch.loading)
-            assertEquals(1, state.avSearch.results.size)
-            assertEquals("SSIS-222 清晨边界", state.avSearch.results.first().title)
+            assertFalse(state.avSearch.resultState.loading)
+            assertEquals(1, state.avSearch.resultState.items.size)
+            assertEquals("SSIS-222 清晨边界", state.avSearch.resultState.items.first().title)
             assertEquals(
                 listOf(
-                    SearchCall(keyword = "", type = "av"),
-                    SearchCall(keyword = "ssis 222", type = "av"),
+                    SearchCall(keyword = "", type = "av", page = 1, pageSize = 30),
+                    SearchCall(keyword = "ssis 222", type = "av", page = 1, pageSize = 30),
                 ),
                 api.searchCalls,
             )
@@ -107,14 +115,18 @@ class HomeViewModelTest {
     fun `clearing query restores default av browse list`() = runTest {
         withMainDispatcher {
             val api = FakeHomeApiService(
-                browseItems = mapOf(
-                    "av" to listOf(
+                browsePages = mapOf(
+                    "av" to mapOf(
+                        1 to listOf(
                         avItem(id = "av-1", title = "IPX-901 雾面轮廓"),
                     ),
+                    ),
                 ),
-                searchItems = mapOf(
-                    "ipx" to listOf(
-                        avItem(id = "av-2", title = "IPX-902 逆光碎片"),
+                searchPages = mapOf(
+                    "ipx" to mapOf(
+                        1 to listOf(
+                            avItem(id = "av-2", title = "IPX-902 逆光碎片"),
+                        ),
                     ),
                 ),
             )
@@ -122,17 +134,21 @@ class HomeViewModelTest {
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
-            advanceUntilIdle()
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ipx")
-            advanceUntilIdle()
+            awaitUntil {
+                viewModel.uiState.value.avSearch.isSearchMode &&
+                    !viewModel.uiState.value.avSearch.resultState.loading &&
+                    viewModel.uiState.value.avSearch.resultState.items.isNotEmpty()
+            }
 
             viewModel.updateAvQuery("")
-            advanceUntilIdle()
+            awaitUntil { !viewModel.uiState.value.avSearch.isSearchMode }
 
             val state = viewModel.uiState.value
             assertFalse(state.avSearch.isSearchMode)
-            assertFalse(state.avSearch.loading)
-            assertTrue(state.avSearch.results.isEmpty())
+            assertFalse(state.avSearch.resultState.loading)
+            assertTrue(state.avSearch.resultState.items.isEmpty())
             assertEquals(1, state.av.items.size)
             assertEquals("IPX-901 雾面轮廓", state.av.items.first().title)
         }
@@ -142,27 +158,201 @@ class HomeViewModelTest {
     fun `search failure does not overwrite default av browse list`() = runTest {
         withMainDispatcher {
             val api = FakeHomeApiService(
-                browseItems = mapOf(
-                    "av" to listOf(
+                browsePages = mapOf(
+                    "av" to mapOf(
+                        1 to listOf(
                         avItem(id = "av-1", title = "CAWD-808 白昼残响"),
                     ),
+                    ),
                 ),
-                searchErrors = mapOf("broken" to IllegalStateException("搜索失败")),
+                searchErrors = mapOf(SearchErrorKey(keyword = "broken", page = 1) to IllegalStateException("搜索失败")),
             )
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
-            advanceUntilIdle()
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("broken")
-            advanceUntilIdle()
+            awaitUntil {
+                viewModel.uiState.value.avSearch.isSearchMode &&
+                    !viewModel.uiState.value.avSearch.resultState.loading &&
+                    !viewModel.uiState.value.avSearch.resultState.errorMessage.isNullOrBlank()
+            }
 
             val state = viewModel.uiState.value
             assertEquals(1, state.av.items.size)
             assertEquals("CAWD-808 白昼残响", state.av.items.first().title)
             assertTrue(state.avSearch.isSearchMode)
-            assertEquals("搜索失败", state.avSearch.errorMessage)
-            assertTrue(state.avSearch.results.isEmpty())
+            assertEquals("搜索失败", state.avSearch.resultState.errorMessage)
+            assertTrue(state.avSearch.resultState.items.isEmpty())
+        }
+    }
+
+    @Test
+    fun `loadMoreAvIfNeeded appends next browse page and marks no more when total reached`() = runTest {
+        withMainDispatcher {
+            val api = FakeHomeApiService(
+                browsePages = mapOf(
+                    "av" to mapOf(
+                        1 to listOf(
+                            avItem(id = "av-1", title = "SSIS-101 夜色标本"),
+                            avItem(id = "av-2", title = "SSIS-102 深夜边界"),
+                        ),
+                        2 to listOf(
+                            avItem(id = "av-3", title = "SSIS-103 余温残响"),
+                        ),
+                    ),
+                ),
+                browseTotalCounts = mapOf("av" to 3),
+            )
+            val viewModel = buildViewModel(api)
+            viewModel.avSearchDebounceMs = 0
+
+            viewModel.loadCategory("av")
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
+            viewModel.loadMoreAvIfNeeded(1)
+            awaitUntil { viewModel.uiState.value.av.page == 2 && !viewModel.uiState.value.av.loadingMore }
+
+            val state = viewModel.uiState.value
+            assertEquals(3, state.av.items.size)
+            assertEquals(2, state.av.page)
+            assertFalse(state.av.hasMore)
+            assertFalse(state.av.loadingMore)
+            assertEquals(
+                listOf(
+                    SearchCall(keyword = "", type = "av", page = 1, pageSize = 30),
+                    SearchCall(keyword = "", type = "av", page = 2, pageSize = 30),
+                ),
+                api.searchCalls,
+            )
+        }
+    }
+
+    @Test
+    fun `refreshAvState resets browse list back to first page`() = runTest {
+        withMainDispatcher {
+            val api = FakeHomeApiService(
+                browsePages = mapOf(
+                    "av" to mapOf(
+                        1 to listOf(
+                            avItem(id = "av-1", title = "IPX-901 雾面轮廓"),
+                            avItem(id = "av-2", title = "IPX-902 逆光碎片"),
+                        ),
+                        2 to listOf(
+                            avItem(id = "av-3", title = "IPX-903 冷调夜话"),
+                        ),
+                    ),
+                ),
+                browseTotalCounts = mapOf("av" to 3),
+            )
+            val viewModel = buildViewModel(api)
+            viewModel.avSearchDebounceMs = 0
+
+            viewModel.loadCategory("av")
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
+            viewModel.loadMoreAvIfNeeded(1)
+            awaitUntil { viewModel.uiState.value.av.page == 2 && !viewModel.uiState.value.av.loadingMore }
+            viewModel.refreshAvState()
+            awaitUntil { viewModel.uiState.value.av.page == 1 && !viewModel.uiState.value.av.refreshing }
+
+            val state = viewModel.uiState.value
+            assertEquals(2, state.av.items.size)
+            assertEquals(1, state.av.page)
+            assertFalse(state.av.refreshing)
+            assertTrue(state.av.hasMore)
+            assertEquals(
+                listOf(
+                    SearchCall(keyword = "", type = "av", page = 1, pageSize = 30),
+                    SearchCall(keyword = "", type = "av", page = 2, pageSize = 30),
+                    SearchCall(keyword = "", type = "av", page = 1, pageSize = 30),
+                ),
+                api.searchCalls,
+            )
+        }
+    }
+
+    @Test
+    fun `search results support load more and pull to refresh`() = runTest {
+        withMainDispatcher {
+            val api = FakeHomeApiService(
+                browsePages = mapOf("av" to mapOf(1 to listOf(avItem(id = "av-0", title = "默认浏览")))),
+                searchPages = mapOf(
+                    "ssis" to mapOf(
+                        1 to listOf(avItem(id = "av-1", title = "SSIS-111 潮汐边界")),
+                        2 to listOf(avItem(id = "av-2", title = "SSIS-112 月相回声")),
+                    ),
+                ),
+                searchTotalCounts = mapOf("ssis" to 2),
+            )
+            val viewModel = buildViewModel(api)
+            viewModel.avSearchDebounceMs = 0
+
+            viewModel.loadCategory("av")
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
+            viewModel.updateAvQuery("ssis")
+            awaitUntil {
+                viewModel.uiState.value.avSearch.isSearchMode &&
+                    viewModel.uiState.value.avSearch.resultState.page == 1 &&
+                    viewModel.uiState.value.avSearch.resultState.items.isNotEmpty()
+            }
+            viewModel.loadMoreAvIfNeeded(0)
+            awaitUntil {
+                viewModel.uiState.value.avSearch.resultState.page == 2 &&
+                    !viewModel.uiState.value.avSearch.resultState.loadingMore
+            }
+            viewModel.refreshAvState()
+            awaitUntil {
+                viewModel.uiState.value.avSearch.resultState.page == 1 &&
+                    !viewModel.uiState.value.avSearch.resultState.refreshing
+            }
+
+            val state = viewModel.uiState.value
+            assertTrue(state.avSearch.isSearchMode)
+            assertEquals(1, state.avSearch.resultState.page)
+            assertEquals(1, state.avSearch.resultState.items.size)
+            assertEquals("SSIS-111 潮汐边界", state.avSearch.resultState.items.first().title)
+            assertFalse(state.avSearch.resultState.refreshing)
+            assertEquals(
+                listOf(
+                    SearchCall(keyword = "", type = "av", page = 1, pageSize = 30),
+                    SearchCall(keyword = "ssis", type = "av", page = 1, pageSize = 30),
+                    SearchCall(keyword = "ssis", type = "av", page = 2, pageSize = 30),
+                    SearchCall(keyword = "ssis", type = "av", page = 1, pageSize = 30),
+                ),
+                api.searchCalls,
+            )
+        }
+    }
+
+    @Test
+    fun `browse load more failure keeps loaded items and exposes footer error`() = runTest {
+        withMainDispatcher {
+            val api = FakeHomeApiService(
+                browsePages = mapOf(
+                    "av" to mapOf(
+                        1 to listOf(avItem(id = "av-1", title = "CAWD-808 白昼残响")),
+                    ),
+                ),
+                browseTotalCounts = mapOf("av" to 2),
+                browseErrors = mapOf(BrowseErrorKey(type = "av", page = 2) to IllegalStateException("补货失败")),
+            )
+            val viewModel = buildViewModel(api)
+            viewModel.avSearchDebounceMs = 0
+
+            viewModel.loadCategory("av")
+            awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
+            viewModel.loadMoreAvIfNeeded(0)
+            awaitUntil {
+                !viewModel.uiState.value.av.loadingMore &&
+                    !viewModel.uiState.value.av.loadMoreErrorMessage.isNullOrBlank()
+            }
+
+            val state = viewModel.uiState.value
+            assertEquals(1, state.av.items.size)
+            assertEquals("补货失败", state.av.loadMoreErrorMessage)
+            assertEquals(1, state.av.page)
+            assertTrue(state.av.hasMore)
+            assertFalse(state.av.loadingMore)
         }
     }
 
@@ -209,9 +399,27 @@ private suspend fun TestScope.withMainDispatcher(block: suspend TestScope.() -> 
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
+private suspend fun TestScope.awaitUntil(
+    timeoutMs: Long = 1_000L,
+    condition: () -> Boolean,
+) {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+        advanceUntilIdle()
+        if (condition()) {
+            return
+        }
+        Thread.sleep(10)
+    }
+    advanceUntilIdle()
+}
+
 private data class SearchCall(
     val keyword: String,
     val type: String,
+    val page: Int,
+    val pageSize: Int,
 )
 
 private fun avItem(
@@ -226,9 +434,12 @@ private fun avItem(
 )
 
 private class FakeHomeApiService(
-    private val browseItems: Map<String, List<VideoListItemDto>> = emptyMap(),
-    private val searchItems: Map<String, List<VideoListItemDto>> = emptyMap(),
-    private val searchErrors: Map<String, Throwable> = emptyMap(),
+    private val browsePages: Map<String, Map<Int, List<VideoListItemDto>>> = emptyMap(),
+    private val browseTotalCounts: Map<String, Int> = emptyMap(),
+    private val browseErrors: Map<BrowseErrorKey, Throwable> = emptyMap(),
+    private val searchPages: Map<String, Map<Int, List<VideoListItemDto>>> = emptyMap(),
+    private val searchTotalCounts: Map<String, Int> = emptyMap(),
+    private val searchErrors: Map<SearchErrorKey, Throwable> = emptyMap(),
 ) : ApiService {
     val searchCalls = mutableListOf<SearchCall>()
 
@@ -241,18 +452,24 @@ private class FakeHomeApiService(
         pageSize: Int,
     ): ApiEnvelope<SearchPayload> {
         val normalizedKeyword = keyword.trim()
-        searchCalls += SearchCall(keyword = normalizedKeyword, type = type)
-        searchErrors[normalizedKeyword]?.let { throw it }
+        searchCalls += SearchCall(keyword = normalizedKeyword, type = type, page = page, pageSize = pageSize)
         val items = if (normalizedKeyword.isBlank()) {
-            browseItems[type].orEmpty()
+            browseErrors[BrowseErrorKey(type = type, page = page)]?.let { throw it }
+            browsePages[type]?.get(page).orEmpty()
         } else {
-            searchItems[normalizedKeyword].orEmpty()
+            searchErrors[SearchErrorKey(keyword = normalizedKeyword, page = page)]?.let { throw it }
+            searchPages[normalizedKeyword]?.get(page).orEmpty()
+        }
+        val totalCount = if (normalizedKeyword.isBlank()) {
+            browseTotalCounts[type] ?: browsePages[type]?.values?.sumOf { it.size } ?: items.size
+        } else {
+            searchTotalCounts[normalizedKeyword] ?: searchPages[normalizedKeyword]?.values?.sumOf { it.size } ?: items.size
         }
         return ApiEnvelope(
             code = 0,
             data = SearchPayload(
                 items = items,
-                totalCount = items.size,
+                totalCount = totalCount,
                 page = page,
                 pageSize = pageSize,
             ),
@@ -392,3 +609,13 @@ private class FakeHomeApiService(
         authorization: String,
     ): ApiEnvelope<UserProfileDto> = error("unused")
 }
+
+private data class BrowseErrorKey(
+    val type: String,
+    val page: Int,
+)
+
+private data class SearchErrorKey(
+    val keyword: String,
+    val page: Int,
+)

@@ -51,7 +51,7 @@ class VideoRepository @Inject constructor(
         }
     }
 
-    suspend fun fetchCategory(type: String, page: Int = 1, pageSize: Int = 30): Result<List<VideoListItemDto>> {
+    suspend fun fetchCategory(type: String, page: Int = 1, pageSize: Int = 30): Result<SearchPayload> {
         return callWithAuth { baseUrl, bearer ->
             api.search(
                 url = UrlBuilder.search(baseUrl),
@@ -61,7 +61,7 @@ class VideoRepository @Inject constructor(
                 page = page,
                 pageSize = pageSize,
             )
-        }.map { it.items }
+        }
     }
 
     suspend fun searchAv(query: String, page: Int = 1, pageSize: Int = 30): Result<SearchPayload> {
