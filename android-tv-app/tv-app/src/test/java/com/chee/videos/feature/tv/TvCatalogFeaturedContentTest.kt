@@ -127,4 +127,39 @@ class TvCatalogFeaturedContentTest {
             ),
         )
     }
+
+    @Test
+    fun `continue watching play target uses video id for long form and falls back to target id`() {
+        assertEquals(
+            "movie-7-playback",
+            resolveTvContinueWatchingPlaybackTargetId(
+                TvContinueWatchingUiModel(
+                    type = "movie",
+                    seriesId = "movie-7",
+                    seriesTitle = "午夜列车",
+                    seasonNumber = 1,
+                    episodeNumber = 1,
+                    episodeTitle = "继续播放",
+                    videoId = "movie-7-playback",
+                    progressPercent = 54,
+                ),
+            ),
+        )
+
+        assertEquals(
+            "movie-7",
+            resolveTvContinueWatchingPlaybackTargetId(
+                TvContinueWatchingUiModel(
+                    type = "movie",
+                    seriesId = "movie-7",
+                    seriesTitle = "午夜列车",
+                    seasonNumber = 1,
+                    episodeNumber = 1,
+                    episodeTitle = "继续播放",
+                    videoId = "   ",
+                    progressPercent = 54,
+                ),
+            ),
+        )
+    }
 }

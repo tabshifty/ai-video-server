@@ -222,6 +222,33 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-08 14:11] Android TV 播放路由防崩与继续观看兜底
+- Type: `implementation`
+- Summary:
+  - 修复独立 TV App 进入播放时的高风险路由问题：`seriesId/videoId` 统一按 URI segment 编码构建，避免 ID 中带 `/`、`?`、`#` 等字符时导航匹配失败或参数丢失。
+  - TV 首页“继续观看”长视频新增统一播放目标解析，优先使用 `videoId`，缺失时回退到 `seriesId`，避免生成空播放路由导致点击进入播放器直接闪退。
+  - 详情/播放器相关 ViewModel 读取路由参数时统一解码；`DetailViewModel` 对空 `videoId` 改为进入错误态而非主线程直接崩溃。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRoutes.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPresentation.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/detail/DetailViewModel.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRoutesTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFeaturedContentTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew --stop` confirmed no active Gradle daemons before rerun.
+  - `rm -rf android-tv-app/.gradle/kotlin android-tv-app/tv-app/build` cleared corrupted Kotlin incremental caches after local KAPT/IC cache exceptions.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvRoutesTest' --tests 'com.chee.videos.feature.tv.TvCatalogFeaturedContentTest'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.*' --tests 'com.chee.videos.feature.detail.*'` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` failed on pre-existing `com.chee.videos.feature.home.HomeViewModelTest` assertions unrelated to本次 TV 播放修复。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-08 10:26] 管理端统一分页跳转与视频预览销毁计划
 - Type: `plan`
 - Summary:

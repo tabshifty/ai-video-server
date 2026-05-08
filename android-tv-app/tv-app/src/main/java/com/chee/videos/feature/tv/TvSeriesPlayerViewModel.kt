@@ -33,7 +33,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
     private val repository: TvRepository,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val seriesId = savedStateHandle.get<String>(TvSeriesIdArg).orEmpty()
+    private val seriesId = decodeTvRouteArg(savedStateHandle.get<String>(TvSeriesIdArg))
     private val requestedSeason = savedStateHandle.get<Int>(TvSeasonArg)
     private val requestedEpisode = savedStateHandle.get<Int>(TvEpisodeArg)
 

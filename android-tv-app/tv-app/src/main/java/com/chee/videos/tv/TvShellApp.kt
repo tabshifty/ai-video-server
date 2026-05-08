@@ -52,6 +52,7 @@ import com.chee.videos.feature.tv.TvSeriesDetailScreen
 import com.chee.videos.feature.tv.TvSeriesIdArg
 import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
+import com.chee.videos.feature.tv.buildTvSeriesRoute
 import com.chee.videos.feature.tv.buildTvLongFormDetailRoute
 import com.chee.videos.feature.tv.buildTvLongFormPlayerRoute
 import com.chee.videos.feature.tv.buildTvPlayerRoute
@@ -111,7 +112,7 @@ private fun TvAuthenticatedNav(
             composable("tv-home") {
                 com.chee.videos.feature.tv.TvCatalogScreen(
                     onOpenSeries = { seriesId ->
-                        navController.navigate("tv/series/$seriesId")
+                        navController.navigate(buildTvSeriesRoute(seriesId))
                     },
                     onOpenContinueWatching = { seriesId, season, episode ->
                         navController.navigate(buildTvPlayerRoute(seriesId, season, episode))

@@ -8,6 +8,7 @@ import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
+import com.chee.videos.feature.tv.decodeTvRouteArg
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +34,7 @@ class DetailViewModel @Inject constructor(
     private val authRepository: AuthRepository,
 ) : ViewModel() {
 
-    private val videoId: String = checkNotNull(savedStateHandle["videoId"])
+    private val videoId: String = decodeTvRouteArg(savedStateHandle["videoId"])
     private val videoType: String = savedStateHandle.get<String>("videoType").orEmpty()
 
     private val _uiState = MutableStateFlow(DetailUiState())
@@ -57,6 +58,15 @@ class DetailViewModel @Inject constructor(
                     preferredPlaybackProfile = videoRepository.preferredLongFormPlaybackProfile().wireValue,
                     errorMessage = null,
                 )
+            }
+            if (videoId.isBlank()) {
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        errorMessage = "视频不存在或播放目标无效",
+                    )
+                }
+                return@launch
             }
             videoRepository.fetchDetail(videoId)
                 .onSuccess { detail ->

@@ -37,6 +37,14 @@ internal data class TvLongFormDetailHeroUiModel(
     val secondaryActionLabel: String,
 )
 
+internal fun resolveTvContinueWatchingPlaybackTargetId(item: TvContinueWatchingUiModel): String {
+    return if (item.type == "tv") {
+        item.seriesId
+    } else {
+        item.videoId?.trim()?.takeIf { it.isNotBlank() } ?: item.seriesId
+    }
+}
+
 internal fun resolveTvFeaturedContent(
     continueWatching: TvContinueWatchingUiModel?,
     sections: List<TvCatalogSectionUiModel>,
@@ -47,7 +55,7 @@ internal fun resolveTvFeaturedContent(
     continueWatching?.let { item ->
         return TvFeaturedContentUiModel(
             source = TvFeaturedContentSource.CONTINUE_WATCHING,
-            targetId = item.videoId?.takeIf { item.type != "tv" } ?: item.seriesId,
+            targetId = resolveTvContinueWatchingPlaybackTargetId(item),
             targetType = item.type,
             eyebrow = when (item.type) {
                 "movie" -> "继续看电影"

@@ -25,7 +25,7 @@ class TvSeriesDetailViewModel @Inject constructor(
     private val repository: TvRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val seriesId = savedStateHandle.get<String>(TvSeriesIdArg).orEmpty()
+    private val seriesId = decodeTvRouteArg(savedStateHandle.get<String>(TvSeriesIdArg))
 
     private val _uiState = MutableStateFlow(TvSeriesDetailUiState())
     val uiState: StateFlow<TvSeriesDetailUiState> = _uiState.asStateFlow()

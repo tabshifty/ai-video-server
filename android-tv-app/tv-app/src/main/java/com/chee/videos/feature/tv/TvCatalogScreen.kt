@@ -138,7 +138,7 @@ fun TvCatalogScreen(
                             featured.targetType == "tv" -> onOpenSeries(featured.targetId)
 
                             else -> onPlayLongForm(
-                                featured.videoId?.ifBlank { featured.targetId } ?: featured.targetId,
+                                featured.videoId?.trim()?.takeIf { it.isNotBlank() } ?: featured.targetId,
                                 featured.targetType,
                             )
                         }
@@ -206,7 +206,10 @@ fun TvCatalogScreen(
                                 continueWatching.episodeNumber,
                             )
                         } else {
-                            onPlayLongForm(continueWatching.videoId.orEmpty(), continueWatching.type)
+                            onPlayLongForm(
+                                resolveTvContinueWatchingPlaybackTargetId(continueWatching),
+                                continueWatching.type,
+                            )
                         }
                     },
                 )
