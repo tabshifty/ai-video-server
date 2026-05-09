@@ -4389,3 +4389,8 @@
 - 进度：开始执行 AV 刮削重写方案，先补 ThePornDB 公网详情 URL 归一化回归测试，再调整短视频转 AV 的状态保持逻辑。
 - 影响文件：`internal/services/scraper_test.go`、`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/queue/scrape_tasks.go`、`internal/services/scraper.go`、`internal/services/scraper_av_strategy.go`
 - 验证：待执行
+
+## 2026-05-10 00:00
+- 进度：继续对齐 `references/mdcx/scraper-preview-go` 的已迁移 AV 站点策略；DMM 改为 reference 的多搜索 URL、区域封锁识别、FANZA TV GraphQL 与 digital 分支解析；ThePornDB 改为 `detailUrl > filePath > number` 链路下的 scenes/movies 搜索、MDCx 文件名关键词和配置 base 归一化；MGStage 会话 cookie + `adc=1` 回抓与 trailer URL 对齐；DMM 图片字段改为 `poster=横版 ps`、`thumb=竖版 pl`。
+- 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_framework.go`、`internal/services/scraper_av_mdcx_sites_test.go`、`plan.md`
+- 验证：`go test ./internal/services`、`go test ./internal/handlers ./internal/queue`、`go test ./internal/services -run 'TestPreviewAVFallsBackToThePornDBWhenConfigured|TestConfirmAVNormalizesThePornDBPublicDetailURL|TestMDCxMigratedSitesSearchCandidates' -count=1`、`go vet ./...` 均通过。

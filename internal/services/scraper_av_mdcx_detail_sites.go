@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
+	"sort"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -37,6 +40,21 @@ type thePornDBAVCrawler struct {
 	svc *ScraperService
 }
 
+var (
+	dmmNumberPartsPattern = regexp.MustCompile(`(?i)(\d*[a-z]+)-?(\d+)`)
+	dmmDetailURLPattern   = regexp.MustCompile(`(?is)detailUrl\\":\\"(.*?)\\"`)
+	datedNumberPattern    = regexp.MustCompile(`(?i)(([A-Z0-9.-]{2,})[-_. ]2?0?(\d{2}[-.]\d{2}[-.]\d{2}))`)
+)
+
+const (
+	dmmCategoryFanzaTV = "fanza_tv"
+	dmmCategoryDMMTV   = "dmm_tv"
+	dmmCategoryDigital = "digital"
+	dmmCategoryMono    = "mono"
+	dmmCategoryRental  = "rental"
+	dmmCategoryOther   = "other"
+)
+
 func newDMMAVCrawler(svc *ScraperService) avCrawler       { return &dmmAVCrawler{svc: svc} }
 func newMGStageAVCrawler(svc *ScraperService) avCrawler   { return &mgstageAVCrawler{svc: svc} }
 func newPrestigeAVCrawler(svc *ScraperService) avCrawler  { return &prestigeAVCrawler{svc: svc} }
@@ -59,32 +77,52 @@ func (c *dmmAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunCon
 		return nil, nil
 	}
 	base := strings.TrimRight(c.svc.avSiteBaseURL("dmm", "https://www.dmm.co.jp"), "/")
-	searchURL := base + "/search/=/searchstr=" + url.PathEscape(query) + "/"
-	if run != nil {
-		run.addSearchURL(searchURL)
-	}
-	content, err := c.svc.fetchAVHTMLDocumentText(ctx, searchURL, map[string]string{
-		"Cookie": "age_check_done=1",
-	})
-	if err != nil {
-		return nil, err
-	}
-	detailURLs := parseDMMDetailURLs(content, query, base)
-	if len(detailURLs) == 0 {
+	searchURLs := dmmSearchURLs(base, query)
+	if len(searchURLs) == 0 {
 		return nil, nil
 	}
-	out := make([]avScrapeCandidate, 0, minPreviewLimit(limit, len(detailURLs)))
-	for _, detailURL := range detailURLs {
-		if limit > 0 && len(out) >= limit {
-			break
+	for _, searchURL := range searchURLs {
+		if run != nil {
+			run.addSearchURL(searchURL)
 		}
-		candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+		content, err := c.svc.fetchAVHTMLDocumentText(ctx, searchURL, map[string]string{
+			"Cookie": "age_check_done=1",
+		})
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, candidate)
+		if dmmIsRegionBlocked(content) {
+			return nil, fmt.Errorf("dmm: content is not available in this region")
+		}
+		hits := dmmParseSearchCandidates(content, query, base)
+		if len(hits) == 0 {
+			continue
+		}
+		out := make([]avScrapeCandidate, 0, minPreviewLimit(limit, len(hits)))
+		for _, hit := range hits {
+			if limit > 0 && len(out) >= limit {
+				break
+			}
+			candidate, err := c.FetchByDetailURL(ctx, run, hit.URL)
+			if err != nil {
+				return nil, err
+			}
+			if candidate.DetailURL == "" {
+				candidate.DetailURL = hit.URL
+			}
+			if candidate.Raw == nil {
+				candidate.Raw = map[string]any{}
+			}
+			if candidate.Raw["category"] == nil {
+				candidate.Raw["category"] = hit.Category
+			}
+			out = append(out, candidate)
+		}
+		if len(out) > 0 {
+			return out, nil
+		}
 	}
-	return out, nil
+	return nil, nil
 }
 
 func (c *mgstageAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
@@ -102,6 +140,34 @@ func (c *mgstageAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRu
 		return nil, err
 	}
 	return []avScrapeCandidate{candidate}, nil
+}
+
+func (c *mgstageAVCrawler) sessionCookies(ctx context.Context, detailURL string) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, detailURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36")
+	req.Header.Set("Accept-Language", "ja,en-US;q=0.9,en;q=0.8,zh-CN;q=0.7")
+	client := c.svc.avHTTPClient
+	if client == nil {
+		client = c.svc.httpClient
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch %s: %w", detailURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("fetch %s: status %d", detailURL, resp.StatusCode)
+	}
+	cookies := make([]string, 0, len(resp.Cookies()))
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name != "" && cookie.Value != "" {
+			cookies = append(cookies, cookie.Name+"="+cookie.Value)
+		}
+	}
+	return cookies, nil
 }
 
 func (c *prestigeAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
@@ -156,58 +222,49 @@ func (c *getchuAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRun
 }
 
 func (c *dmmAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
+	detailURL = strings.TrimSpace(detailURL)
+	if detailURL == "" {
+		return avScrapeCandidate{}, fmt.Errorf("detail url is required")
+	}
+	if run != nil {
+		run.addDetailURL(detailURL)
+	}
+	category := dmmParseCategory(detailURL)
+	if category == dmmCategoryFanzaTV || category == dmmCategoryDMMTV {
+		return c.fetchDMMFanzaTV(ctx, detailURL)
+	}
 	root, body, err := c.svc.fetchAVHTMLDocument(ctx, detailURL, map[string]string{
 		"Cookie": "age_check_done=1",
 	})
 	if err != nil {
 		return avScrapeCandidate{}, err
 	}
-	if run != nil {
-		run.addDetailURL(detailURL)
-	}
-	title := strings.TrimSpace(nodeText(findFirst(root, func(n *html.Node) bool {
-		return n.Type == html.ElementNode && n.Data == "h1"
-	})))
-	code := strings.TrimSpace(avTableValue(root, "Number"))
-	poster := strings.TrimSpace(findFirstAttr(root, func(n *html.Node) bool {
-		return n.Type == html.ElementNode && n.Data == "meta" && strings.EqualFold(attrValue(n, "property"), "og:image")
-	}, "content"))
-	if strings.TrimSpace(title) == "" {
-		title = strings.TrimSpace(extractJSONLDString(body, "name"))
-	}
-	if strings.TrimSpace(title) == "" {
-		return avScrapeCandidate{}, fmt.Errorf("empty scrape result for url %q", detailURL)
-	}
-	candidate := avScrapeCandidate{
-		Source:      c.Name(),
-		ExternalID:  extractDMMCID(detailURL),
-		Code:        code,
-		Title:       title,
-		Overview:    strings.TrimSpace(extractJSONLDString(body, "description")),
-		PosterURL:   dmmNormalizeImageURL(poster),
-		ReleaseDate: normalizeSlashDate(avTableValue(root, "Release Date")),
-		Actors:      extractJSONLDActorNames(body),
-		DetailURL:   strings.TrimSpace(detailURL),
-		Raw: map[string]any{
-			"site":        c.Name(),
-			"detail_url":  strings.TrimSpace(detailURL),
-			"external_id": extractDMMCID(detailURL),
-			"av_code":     code,
-			"title":       title,
-		},
-	}
-	return candidate, nil
-}
-
-func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
-	root, _, err := c.svc.fetchAVHTMLDocument(ctx, detailURL, map[string]string{
-		"Cookie": "adc=1",
-	})
+	metadata, err := dmmParseDigitalDetail(root, body, detailURL)
 	if err != nil {
 		return avScrapeCandidate{}, err
 	}
+	metadata.Source = c.Name()
+	metadata.DetailURL = detailURL
+	return metadata, nil
+}
+
+func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
+	detailURL = strings.TrimSpace(detailURL)
+	if detailURL == "" {
+		return avScrapeCandidate{}, fmt.Errorf("detail url is required")
+	}
 	if run != nil {
 		run.addDetailURL(detailURL)
+	}
+	cookies, err := c.sessionCookies(ctx, detailURL)
+	if err != nil {
+		return avScrapeCandidate{}, err
+	}
+	root, _, err := c.svc.fetchAVHTMLDocument(ctx, detailURL, map[string]string{
+		"Cookie": cookieHeader(cookies, "adc=1"),
+	})
+	if err != nil {
+		return avScrapeCandidate{}, err
 	}
 	title := strings.TrimSpace(nodeText(findFirst(root, func(n *html.Node) bool {
 		return n.Type == html.ElementNode && n.Data == "h1"
@@ -224,6 +281,13 @@ func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRu
 	poster := strings.TrimSpace(findAttrByID(root, "a", "EnlargeImage", "href"))
 	poster = toAbsoluteURL(detailURL, poster)
 	thumb := poster
+	trailerURL := ""
+	if review := strings.TrimSpace(findAttrByID(root, "a", "review-btn", "href")); review != "" {
+		trailerURL = toAbsoluteURL(detailURL, strings.Replace(review, "/mypage/review.php", "/sampleplayer/sampleRespons.php", 1))
+	}
+	actors := avTableLinksAny(root, "出演", "演员", "Actress", "Actor")
+	tags := avTableLinksAny(root, "ジャンル")
+	releaseDate := normalizeSlashDate(avTableValueAny(root, "Release", "配信開始日", "発売日"))
 	candidate := avScrapeCandidate{
 		Source:      c.Name(),
 		ExternalID:  strings.ToLower(extractSingleSitePathID(detailURL)),
@@ -232,8 +296,8 @@ func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRu
 		Overview:    strings.TrimSpace(nodeText(findFirst(root, func(n *html.Node) bool { return n.Type == html.ElementNode && attrValue(n, "id") == "introduction" }))),
 		PosterURL:   strings.Replace(poster, "/pb_", "/pf_", 1),
 		ThumbURL:    thumb,
-		ReleaseDate: normalizeSlashDate(avTableValueAny(root, "Release", "配信開始日", "発売日")),
-		Actors:      avTableLinksAny(root, "Actor", "出演"),
+		ReleaseDate: releaseDate,
+		Actors:      actors,
 		DetailURL:   strings.TrimSpace(detailURL),
 		Raw: map[string]any{
 			"site":        c.Name(),
@@ -243,9 +307,21 @@ func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRu
 			"title":       title,
 			"poster_url":  strings.Replace(poster, "/pb_", "/pf_", 1),
 			"thumb_url":   thumb,
+			"trailer_url": trailerURL,
+			"tags":        tags,
 		},
 	}
+	if trailerURL != "" {
+		candidate.Raw["trailer_url"] = trailerURL
+	}
 	return candidate, nil
+}
+
+func cookieHeader(values []string, extra ...string) string {
+	all := make([]string, 0, len(values)+len(extra))
+	all = append(all, values...)
+	all = append(all, extra...)
+	return strings.Join(all, "; ")
 }
 
 func (c *prestigeAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
@@ -389,98 +465,115 @@ func (c *getchuAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRun
 
 func (c *thePornDBAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
 	if strings.TrimSpace(c.svc.avThePornDBAPIToken) == "" {
-		return nil, nil
+		return nil, fmt.Errorf("theporndb: THEPORNDB_API_TOKEN is required")
 	}
-	query = buildThePornDBQuery(query)
+	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, nil
 	}
 	base := strings.TrimRight(c.svc.avSiteBaseURL("theporndb", "https://api.theporndb.net"), "/")
-	searchURL := fmt.Sprintf("%s/scenes?parse=%s", base, url.QueryEscape(query))
-	if run != nil {
-		run.addSearchURL(searchURL)
-	}
-	var payload thePornDBSearchResponse
-	if err := c.svc.fetchAVJSON(ctx, searchURL, map[string]string{
-		"Authorization": "Bearer " + c.svc.avThePornDBAPIToken,
-		"Accept":        "application/json",
-	}, &payload); err != nil {
-		return nil, err
-	}
-	if len(payload.Data) == 0 || strings.TrimSpace(payload.Data[0].Slug) == "" {
-		return nil, nil
-	}
-	candidates := make([]avScrapeCandidate, 0, minPreviewLimit(limit, len(payload.Data)))
-	for _, item := range payload.Data {
-		if len(candidates) >= limit && limit > 0 {
-			break
+	keywords, series, date := thePornDBSearchKeywords(query)
+	searchURLs := make([]string, 0, len(keywords)*2)
+	for _, category := range []string{"scenes", "movies"} {
+		for _, keyword := range keywords {
+			searchURL := thePornDBSearchURL(base, category, keyword)
+			searchURLs = append(searchURLs, searchURL)
+			if run != nil {
+				run.addSearchURL(searchURL)
+			}
+			var response thePornDBSearchListResponse
+			if err := c.svc.fetchAVJSON(ctx, searchURL, map[string]string{
+				"Authorization": "Bearer " + c.svc.avThePornDBAPIToken,
+				"Accept":        "application/json",
+			}, &response); err != nil {
+				return nil, err
+			}
+			detailURL := thePornDBBestMatchURL(response.Data, query, series, date, category, base)
+			if detailURL == "" {
+				continue
+			}
+			candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+			if err != nil {
+				return nil, err
+			}
+			if candidate.Title == "" {
+				continue
+			}
+			return []avScrapeCandidate{candidate}, nil
 		}
-		detailURL := base + "/scenes/" + strings.TrimSpace(item.Slug)
-		candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
-		if err != nil {
-			return nil, err
-		}
-		candidates = append(candidates, candidate)
 	}
-	return candidates, nil
+	return nil, fmt.Errorf("theporndb: no matched detail page for %s", query)
 }
 
 func (c *thePornDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
 	if strings.TrimSpace(c.svc.avThePornDBAPIToken) == "" {
-		return avScrapeCandidate{}, fmt.Errorf("theporndb api token is required")
+		return avScrapeCandidate{}, fmt.Errorf("theporndb: THEPORNDB_API_TOKEN is required")
 	}
-	detailURL = normalizeThePornDBDetailURL(detailURL, c.svc.avSiteBaseURL("theporndb", "https://api.theporndb.net"))
+	normalized, err := normalizeThePornDBDetailURL(detailURL, c.svc.avSiteBaseURL("theporndb", "https://api.theporndb.net"))
+	if err != nil {
+		return avScrapeCandidate{}, err
+	}
+	detailURL = normalized
 	if run != nil {
 		run.addDetailURL(detailURL)
 	}
-	var payload thePornDBSceneDetailResponse
+	var payload thePornDBItemResponse
 	if err := c.svc.fetchAVJSON(ctx, detailURL, map[string]string{
 		"Authorization": "Bearer " + c.svc.avThePornDBAPIToken,
 		"Accept":        "application/json",
 	}, &payload); err != nil {
 		return avScrapeCandidate{}, err
 	}
-	title := normalizeWhitespace(payload.Data.Title)
-	if title == "" {
-		return avScrapeCandidate{}, fmt.Errorf("empty scrape result for url %q", detailURL)
+	candidate := thePornDBMetadataFromItem(payload.Data, categoryFromThePornDBDetailURL(detailURL))
+	if candidate.Title == "" {
+		return avScrapeCandidate{}, fmt.Errorf("theporndb: empty detail data")
 	}
-	candidate := avScrapeCandidate{
-		Source:      c.Name(),
-		ExternalID:  normalizeWhitespace(payload.Data.Slug),
-		Title:       title,
-		Overview:    normalizeWhitespace(payload.Data.Description),
-		PosterURL:   firstNonEmptyString(payload.Data.Posters.Large, payload.Data.Poster),
-		ThumbURL:    firstNonEmptyString(payload.Data.Background.Large, payload.Data.Image),
-		ReleaseDate: normalizeWhitespace(payload.Data.Date),
-		Actors:      thePornDBActorNames(payload.Data.Performers),
-		DetailURL:   strings.TrimSpace(detailURL),
-		Raw: map[string]any{
-			"site":        c.Name(),
-			"detail_url":  strings.TrimSpace(detailURL),
-			"external_id": normalizeWhitespace(payload.Data.Slug),
-			"title":       title,
-		},
+	candidate.Source = c.Name()
+	candidate.DetailURL = detailURL
+	if candidate.Raw == nil {
+		candidate.Raw = map[string]any{}
 	}
+	candidate.Raw["site"] = c.Name()
+	candidate.Raw["detail_url"] = detailURL
+	candidate.Raw["external_id"] = candidate.ExternalID
 	return candidate, nil
 }
 
-func normalizeThePornDBDetailURL(rawURL, fallbackBase string) string {
-	rawURL = strings.TrimSpace(rawURL)
-	if rawURL == "" {
-		return ""
+func normalizeThePornDBDetailURL(rawURL string, fallbackBase ...string) (string, error) {
+	value := strings.TrimSpace(rawURL)
+	if value == "" {
+		return "", fmt.Errorf("theporndb: detailUrl is empty")
 	}
-	parsed, err := url.Parse(rawURL)
+	if !strings.Contains(value, "://") {
+		value = "https://" + value
+	}
+	parsed, err := url.Parse(value)
 	if err != nil {
-		return rawURL
+		return "", fmt.Errorf("theporndb: parse detailUrl: %w", err)
 	}
-	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
-	if strings.Contains(host, "theporndb") && !strings.Contains(host, "api.theporndb") {
-		return toAbsoluteURL(strings.TrimSpace(fallbackBase), parsed.RequestURI())
+	host := strings.TrimPrefix(strings.ToLower(parsed.Host), "www.")
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 2 || (parts[0] != "scenes" && parts[0] != "movies") || parts[1] == "" {
+		return "", fmt.Errorf("theporndb: detailUrl must point to scenes/<slug> or movies/<slug>")
 	}
-	if strings.Contains(host, "api.theporndb") {
-		return rawURL
+	if host == "theporndb.net" || host == "api.theporndb.net" {
+		base := "https://api.theporndb.net"
+		if len(fallbackBase) > 0 && strings.TrimSpace(fallbackBase[0]) != "" {
+			base = strings.TrimRight(strings.TrimSpace(fallbackBase[0]), "/")
+		}
+		baseParsed, err := url.Parse(base)
+		if err == nil && baseParsed.Scheme != "" && baseParsed.Host != "" {
+			parsed.Scheme = baseParsed.Scheme
+			parsed.Host = baseParsed.Host
+		} else {
+			parsed.Scheme = "https"
+			parsed.Host = "api.theporndb.net"
+		}
 	}
-	return rawURL
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	parsed.Path = "/" + parts[0] + "/" + parts[1]
+	return parsed.String(), nil
 }
 
 type prestigeAVPayload struct {
@@ -677,6 +770,44 @@ func (s *ScraperService) fetchAVJSON(ctx context.Context, endpoint string, extra
 	return nil
 }
 
+func (s *ScraperService) postAVJSON(ctx context.Context, endpoint string, body any, extraHeaders map[string]string, out any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("编码 AV JSON 请求失败: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(payload)))
+	if err != nil {
+		return fmt.Errorf("创建 AV JSON POST 请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(s.avUserAgent) != "" {
+		req.Header.Set("User-Agent", s.avUserAgent)
+	}
+	for key, value := range extraHeaders {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			continue
+		}
+		req.Header.Set(key, value)
+	}
+	client := s.avHTTPClient
+	if client == nil {
+		client = s.httpClient
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("AV JSON POST 请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("AV JSON POST 请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("解析 AV JSON POST 响应失败: %w", err)
+	}
+	return nil
+}
+
 func avTableValue(root *html.Node, label string) string {
 	for _, row := range findAll(root, func(n *html.Node) bool { return n.Type == html.ElementNode && n.Data == "tr" }) {
 		cells := findAll(row, func(n *html.Node) bool { return n.Type == html.ElementNode && (n.Data == "th" || n.Data == "td") })
@@ -725,6 +856,393 @@ func avTableLinksAny(root *html.Node, labels ...string) []string {
 		}
 	}
 	return nil
+}
+
+type dmmSearchHit struct {
+	URL      string
+	Category string
+}
+
+func dmmSearchURLs(baseURL, input string) []string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" {
+		baseURL = "https://www.dmm.co.jp"
+	}
+	number := strings.ToLower(strings.TrimSpace(input))
+	if match := dmmNumberPartsPattern.FindStringSubmatch(number); len(match) > 2 {
+		digits := match[2]
+		switch {
+		case len(digits) >= 5 && strings.HasPrefix(digits, "00"):
+			number = strings.Replace(number, digits, digits[2:], 1)
+		case len(digits) == 4:
+			number = strings.ReplaceAll(number, "-", "0")
+		}
+	}
+	number00 := strings.ReplaceAll(number, "-", "00")
+	numberNo00 := strings.ReplaceAll(number, "-", "")
+	return []string{
+		baseURL + "/search/=/searchstr=" + number00 + "/sort=ranking/",
+		baseURL + "/search/=/searchstr=" + numberNo00 + "/sort=ranking/",
+		strings.Replace(baseURL, "www.dmm.co.jp", "www.dmm.com", 1) + "/search/=/searchstr=" + numberNo00 + "/sort=ranking/",
+	}
+}
+
+func dmmIsRegionBlocked(body string) bool {
+	return strings.Contains(body, "not available in your region") ||
+		strings.Contains(body, "お住まいの地域から") ||
+		strings.Contains(body, "content is not available in this region")
+}
+
+func dmmParseSearchCandidates(content, input, baseURL string) []dmmSearchHit {
+	hits := dmmParseAnchorCandidates(content, input, baseURL)
+	if len(hits) > 0 {
+		return hits
+	}
+	matches := dmmDetailURLPattern.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	parts := dmmNumberPartsPattern.FindStringSubmatch(strings.ToLower(input))
+	if len(parts) < 3 {
+		return nil
+	}
+	prefix := parts[1]
+	digits := parts[2]
+	n1 := prefix + leftPad(digits, 5)
+	n2 := prefix + digits
+	result := make([]dmmSearchHit, 0, len(matches))
+	seen := map[string]struct{}{}
+	for _, match := range matches {
+		raw := strings.ReplaceAll(match[1], `\u0026`, "&")
+		raw = strings.Split(raw, "?")[0]
+		if !matchesDMMID(raw, n1, n2) {
+			continue
+		}
+		detailURL := toAbsoluteURL(baseURL+"/", raw)
+		if detailURL == "" {
+			continue
+		}
+		key := strings.ToLower(detailURL)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, dmmSearchHit{URL: detailURL, Category: dmmParseCategory(detailURL)})
+	}
+	return result
+}
+
+func dmmParseAnchorCandidates(content, input, baseURL string) []dmmSearchHit {
+	matches := regexp.MustCompile(`(?is)<a[^>]+href=["']([^"']*(?:cid=|content=)[^"']+)["'][^>]*>(.*?)</a>`).FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	parts := dmmNumberPartsPattern.FindStringSubmatch(strings.ToLower(input))
+	if len(parts) < 3 {
+		return nil
+	}
+	targetCode := normalizeAVCodeForCompare(input)
+	n1 := parts[1] + leftPad(parts[2], 5)
+	n2 := parts[1] + parts[2]
+	result := make([]dmmSearchHit, 0, len(matches))
+	seen := map[string]struct{}{}
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		href := strings.TrimSpace(html.UnescapeString(match[1]))
+		if href == "" {
+			continue
+		}
+		if targetCode != "" {
+			candidateCode := normalizeAVCodeForCompare(stripHTMLText(match[2]))
+			if candidateCode == "" {
+				candidateCode = normalizeAVCodeForCompare(href)
+			}
+			if candidateCode != "" && candidateCode != targetCode {
+				continue
+			}
+		}
+		if !matchesDMMID(href, n1, n2) {
+			continue
+		}
+		detailURL := toAbsoluteURL(baseURL+"/", href)
+		if detailURL == "" {
+			continue
+		}
+		key := strings.ToLower(detailURL)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, dmmSearchHit{URL: detailURL, Category: dmmParseCategory(detailURL)})
+	}
+	return result
+}
+
+func dmmParseCategory(rawURL string) string {
+	switch {
+	case strings.Contains(rawURL, "tv.dmm.co.jp"):
+		return dmmCategoryFanzaTV
+	case strings.Contains(rawURL, "tv.dmm.com"):
+		return dmmCategoryDMMTV
+	case strings.Contains(rawURL, "/digital/") || strings.Contains(rawURL, "video.dmm.co.jp"):
+		return dmmCategoryDigital
+	case strings.Contains(rawURL, "/mono/"):
+		return dmmCategoryMono
+	case strings.Contains(rawURL, "/rental/"):
+		return dmmCategoryRental
+	default:
+		return dmmCategoryOther
+	}
+}
+
+func dmmParseDigitalDetail(root *html.Node, body, detailURL string) (avScrapeCandidate, error) {
+	title := strings.TrimSpace(nodeText(findFirst(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "h1"
+	})))
+	if title == "" {
+		title = strings.TrimSpace(extractJSONLDString(body, "name"))
+	}
+	if title == "" {
+		return avScrapeCandidate{}, fmt.Errorf("empty scrape result for url %q", detailURL)
+	}
+	code := strings.TrimSpace(avTableValue(root, "Number"))
+	poster := strings.TrimSpace(findFirstAttr(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "meta" && strings.EqualFold(attrValue(n, "property"), "og:image")
+	}, "content"))
+	thumb := strings.Replace(poster, "ps.jpg", "pl.jpg", 1)
+	metadata := avScrapeCandidate{
+		ExternalID:  detailURL,
+		Code:        code,
+		Title:       title,
+		Overview:    strings.TrimSpace(extractJSONLDString(body, "description")),
+		PosterURL:   poster,
+		ThumbURL:    thumb,
+		ReleaseDate: normalizeSlashDate(avTableValue(root, "Release Date")),
+		Actors:      extractJSONLDActorNames(body),
+		DetailURL:   detailURL,
+		Raw: map[string]any{
+			"site":           "dmm",
+			"detail_url":     detailURL,
+			"external_id":    detailURL,
+			"av_code":        code,
+			"title":          title,
+			"poster_url":     poster,
+			"thumb_url":      thumb,
+			"release_date":   normalizeSlashDate(avTableValue(root, "Release Date")),
+			"actors":         extractJSONLDActorNames(body),
+			"overview":       strings.TrimSpace(extractJSONLDString(body, "description")),
+			"original_plot":   strings.TrimSpace(extractJSONLDString(body, "description")),
+			"mosaic":         "有码",
+			"mosaic_reason":  "dmm",
+			"external_url":   detailURL,
+			"search_category": dmmParseCategory(detailURL),
+		},
+	}
+	if metadata.ThumbURL == "" && metadata.PosterURL != "" {
+		metadata.ThumbURL = strings.Replace(metadata.PosterURL, "ps.jpg", "pl.jpg", 1)
+	}
+	return metadata, nil
+}
+
+func (c *dmmAVCrawler) fetchDMMFanzaTV(ctx context.Context, detailURL string) (avScrapeCandidate, error) {
+	contentID := extractDMMContentID(detailURL)
+	if contentID == "" {
+		return avScrapeCandidate{}, fmt.Errorf("dmm: cannot extract FANZA TV content id from %s", detailURL)
+	}
+	var resp dmmFanzaTVResponse
+	if err := c.svc.postAVJSON(ctx, "https://api.tv.dmm.co.jp/graphql", dmmFanzaTVPayload(contentID), map[string]string{
+		"Accept": "application/json",
+	}, &resp); err != nil {
+		return avScrapeCandidate{}, err
+	}
+	candidate, err := dmmParseFanzaTVResponse(resp, detailURL)
+	if err != nil {
+		return avScrapeCandidate{}, err
+	}
+	return candidate, nil
+}
+
+func dmmParseFanzaTVResponse(resp dmmFanzaTVResponse, detailURL string) (avScrapeCandidate, error) {
+	content := resp.Data.FanzaTVPlus.Content
+	if strings.TrimSpace(content.Title) == "" {
+		return avScrapeCandidate{}, fmt.Errorf("dmm: empty FANZA TV content response")
+	}
+	extrafanart := make([]string, 0, len(content.SamplePictures))
+	for _, sample := range content.SamplePictures {
+		if sample.ImageLarge != "" {
+			extrafanart = append(extrafanart, sample.ImageLarge)
+		}
+	}
+	trailer := dmmFanzaTrailer(content.SampleMovie.URL)
+	actors := dmmItemNames(content.Actresses)
+	directors := dmmItemNames(content.Directors)
+	tags := dmmItemNames(content.Genres)
+	release := content.StartDeliveryAt
+	if len(release) >= 10 {
+		release = release[:10]
+	}
+	thumb := content.PackageLargeImage
+	poster := content.PackageImage
+	candidate := avScrapeCandidate{
+		ExternalID:  detailURL,
+		Code:        extractDMMContentID(detailURL),
+		Title:       content.Title,
+		Overview:    content.Description,
+		PosterURL:   poster,
+		ThumbURL:    thumb,
+		ReleaseDate: release,
+		Actors:      actors,
+		DetailURL:   detailURL,
+		Raw: map[string]any{
+			"site":         "dmm",
+			"detail_url":   detailURL,
+			"external_id":  detailURL,
+			"av_code":      extractDMMContentID(detailURL),
+			"title":        content.Title,
+			"original_title": content.Title,
+			"outline":      content.Description,
+			"original_plot": content.Description,
+			"poster_url":   poster,
+			"thumb_url":    thumb,
+			"trailer_url":  trailer,
+			"release_date": release,
+			"actors":       actors,
+			"directors":    directors,
+			"tags":         tags,
+			"extrafanart":  extrafanart,
+			"mosaic":       "有码",
+		},
+	}
+	return candidate, nil
+}
+
+func dmmFanzaTVPayload(cid string) map[string]any {
+	return map[string]any{
+		"operationName": "FetchFanzaTvPlusContent",
+		"variables": map[string]any{
+			"id":         cid,
+			"device":     "BROWSER",
+			"isForeign":  false,
+			"withResume": false,
+		},
+		"query": `query FetchFanzaTvPlusContent($id: ID!, $device: Device!, $withResume: Boolean!, $isForeign: Boolean) {
+  fanzaTvPlus(device: $device) {
+    content(id: $id, isForeign: $isForeign) {
+      title
+      description(format: HTML)
+      packageImage
+      packageLargeImage
+      startDeliveryAt
+      sampleMovie { url }
+      samplePictures { imageLarge }
+      actresses { name }
+      directors { name }
+      series { name }
+      maker { name }
+      label { name }
+      genres { name }
+      reviewSummary { averagePoint }
+      playInfo(withResume: $withResume, device: $device) { duration }
+    }
+  }
+}`,
+	}
+}
+
+type dmmFanzaTVResponse struct {
+	Data struct {
+		FanzaTVPlus struct {
+			Content dmmFanzaTVContent `json:"content"`
+		} `json:"fanzaTvPlus"`
+	} `json:"data"`
+}
+
+type dmmFanzaTVContent struct {
+	Title             string           `json:"title"`
+	Description       string           `json:"description"`
+	PackageImage      string           `json:"packageImage"`
+	PackageLargeImage string           `json:"packageLargeImage"`
+	StartDeliveryAt    string           `json:"startDeliveryAt"`
+	SampleMovie       dmmFanzaTVMovie  `json:"sampleMovie"`
+	SamplePictures    []dmmFanzaTVPicture `json:"samplePictures"`
+	Actresses         []dmmFanzaTVItem `json:"actresses"`
+	Directors         []dmmFanzaTVItem `json:"directors"`
+	Series            dmmFanzaTVItem   `json:"series"`
+	Maker             dmmFanzaTVItem   `json:"maker"`
+	Label             dmmFanzaTVItem   `json:"label"`
+	Genres            []dmmFanzaTVItem `json:"genres"`
+	ReviewSummary     struct {
+		AveragePoint float64 `json:"averagePoint"`
+	} `json:"reviewSummary"`
+	PlayInfo struct {
+		Duration int `json:"duration"`
+	} `json:"playInfo"`
+}
+
+type dmmFanzaTVMovie struct {
+	URL string `json:"url"`
+}
+
+type dmmFanzaTVPicture struct {
+	ImageLarge string `json:"imageLarge"`
+}
+
+type dmmFanzaTVItem struct {
+	Name string `json:"name"`
+}
+
+func dmmItemNames(items []dmmFanzaTVItem) []string {
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		if name := normalizeWhitespace(item.Name); name != "" {
+			names = append(names, name)
+		}
+	}
+	return dedupeStrings(names)
+}
+
+func dmmFanzaTrailer(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	trailerURL := strings.Replace(rawURL, "hlsvideo", "litevideo", 1)
+	match := regexp.MustCompile(`/([^/]+)/playlist\.m3u8`).FindStringSubmatch(trailerURL)
+	if match == nil {
+		return ""
+	}
+	return strings.Replace(trailerURL, "playlist.m3u8", match[1]+"_sm_w.mp4", 1)
+}
+
+func leftPad(value string, size int) string {
+	for len(value) < size {
+		value = "0" + value
+	}
+	return value
+}
+
+func extractDMMContentID(rawURL string) string {
+	matches := regexp.MustCompile(`(?:content|cid)=([a-zA-Z0-9_]+)`).FindStringSubmatch(rawURL)
+	if len(matches) == 2 {
+		return strings.ToLower(matches[1])
+	}
+	return extractSingleSitePathID(rawURL)
+}
+
+func matchesDMMID(rawURL string, numbers ...string) bool {
+	lower := strings.ToLower(rawURL)
+	for _, number := range numbers {
+		if number == "" {
+			continue
+		}
+		if strings.Contains(lower, "cid="+number) ||
+			strings.Contains(lower, "content="+number) ||
+			strings.Contains(lower, "/"+number+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func parseDMMDetailURLs(content, query, baseURL string) []string {
@@ -1023,6 +1541,164 @@ func buildThePornDBQuery(number string) string {
 	return normalizeWhitespace(strings.ToUpper(replacer.Replace(number)))
 }
 
+func thePornDBSearchKeywords(filePath string) ([]string, string, string) {
+	value := strings.TrimSpace(filePath)
+	fileName := strings.ReplaceAll(value, "\\", "/")
+	fileName = path.Base(fileName)
+	fileName = strings.ReplaceAll(fileName, ",", ".")
+	fileName = strings.TrimSuffix(fileName, path.Ext(fileName))
+
+		matches := datedNumberPattern.FindStringSubmatch(value)
+	if len(matches) == 4 {
+		fullNumber := matches[1]
+		series := thePornDBLongName(strings.NewReplacer("-", "", ".", "").Replace(strings.ToLower(matches[2])))
+		date := "20" + strings.ReplaceAll(matches[3], ".", "-")
+		date = strings.ReplaceAll(date, "_", "-")
+		title := strings.TrimSpace(strings.Replace(fileName, fullNumber, "", 1))
+		title = regexp.MustCompile(`[-_&.]`).ReplaceAllString(title, " ")
+		titleParts := thePornDBMeaningfulParts(title, series)
+		keywords := []string{series + " " + date}
+		if len(titleParts) > 0 {
+			keywords = append(keywords, series+" "+strings.Join(titleParts[:min(2, len(titleParts))], " "))
+		}
+		return thePornDBUniqueStrings(keywords), series, date
+	}
+
+	plain := strings.ReplaceAll(fileName, "-", " ")
+	plain = strings.ReplaceAll(plain, "_", " ")
+	parts := strings.Split(plain, ".")
+	limit := min(2, len(parts))
+	if limit == 0 {
+		return []string{}, "", ""
+	}
+	keyword := strings.Join(parts[:limit], " ")
+	keyword = strings.Join(strings.Fields(keyword), " ")
+	if keyword == "" {
+		return []string{}, "", ""
+	}
+	return []string{keyword}, "", ""
+}
+
+func thePornDBSearchURL(baseURL, category, keyword string) string {
+	values := url.Values{}
+	values.Set("parse", keyword)
+	values.Set("per_page", "100")
+	return strings.TrimRight(baseURL, "/") + "/" + category + "?" + values.Encode()
+}
+
+func thePornDBBestMatchURL(items []thePornDBItem, filePath, series, date, category, baseURL string) string {
+	if len(items) == 0 {
+		return ""
+	}
+	fileName := strings.ToLower(path.Base(strings.ReplaceAll(filePath, "\\", "/")))
+	dateSuffix := regexp.MustCompile(`[\.-_]\d{2}\.\d{2}\.\d{2}(.+)`).FindStringSubmatch(fileName)
+	if len(dateSuffix) > 1 {
+		fileName = dateSuffix[1]
+	}
+	actorNumber := len(strings.Split(strings.ReplaceAll(fileName, ".and.", "&"), "&"))
+	fileSpace := thePornDBCleanWords(filePath)
+	fileNoSpace := strings.ReplaceAll(fileSpace, " ", "")
+
+	type candidate struct {
+		url   string
+		text  string
+		score float64
+	}
+	var dateMatches, titleMatches, actorMatches []candidate
+	for _, item := range items {
+		detailURL := thePornDBItemDetailURL(item, category, baseURL)
+		if detailURL == "" {
+			continue
+		}
+		itemSeries := strings.ToLower(item.Site.ShortName)
+		itemURL := strings.ReplaceAll(strings.ToLower(item.Site.URL), "-", "")
+		titleSpace := thePornDBCleanWords(item.Title)
+		titleNoSpace := strings.ReplaceAll(titleSpace, " ", "")
+		actorSpaces, actorNoSpaces := thePornDBPerformerWords(item.Performers)
+		actorTitle := strings.Join(append(actorSpaces, titleSpace), " ")
+		next := candidate{url: detailURL, text: actorTitle, score: thePornDBSimilarity(actorTitle, fileSpace)}
+
+		if series != "" {
+			if series == itemSeries || strings.Contains(itemURL, series) {
+				switch {
+				case date != "" && item.Date == date:
+					dateMatches = append(dateMatches, next)
+				case titleNoSpace != "" && strings.Contains(fileNoSpace, titleNoSpace):
+					titleMatches = append(titleMatches, next)
+				case len(actorNoSpaces) >= actorNumber && thePornDBAllContained(actorNoSpaces, fileNoSpace):
+					actorMatches = append(actorMatches, next)
+				}
+			} else if date != "" && item.Date == date && titleNoSpace != "" && strings.Contains(fileNoSpace, titleNoSpace) {
+				titleMatches = append(titleMatches, next)
+			}
+			continue
+		}
+		if titleNoSpace == "" || strings.Contains(fileNoSpace, titleNoSpace) || len(items) == 1 {
+			titleMatches = append(titleMatches, next)
+		}
+	}
+	for _, candidates := range [][]candidate{dateMatches, titleMatches, actorMatches} {
+		if len(candidates) > 0 {
+			sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].score > candidates[j].score })
+			return candidates[0].url
+		}
+	}
+	return ""
+}
+
+func thePornDBMetadataFromItem(item thePornDBItem, category string) avScrapeCandidate {
+	thumb := firstNonEmptyString(item.Background.Large, item.Image)
+	poster := firstNonEmptyString(item.Posters.Large, item.Poster)
+	actors, allActors := thePornDBActors(item.Performers)
+	release := item.Date
+	candidate := avScrapeCandidate{
+		ExternalID:  item.Slug,
+		Title:       item.Title,
+		Overview:    thePornDBCleanDescription(item.Description),
+		PosterURL:   poster,
+		ThumbURL:    thumb,
+		ReleaseDate: release,
+		Actors:      actors,
+		DetailURL:   thePornDBItemDetailURL(item, category, "https://api.theporndb.net"),
+		Raw: map[string]any{
+			"site":           "theporndb",
+			"external_id":    item.Slug,
+			"title":          item.Title,
+			"original_title": item.Title,
+			"outline":        thePornDBCleanDescription(item.Description),
+			"original_plot":  thePornDBCleanDescription(item.Description),
+			"poster_url":     poster,
+			"thumb_url":      thumb,
+			"release_date":   release,
+			"actors":         actors,
+			"all_actors":     allActors,
+			"tags":           thePornDBNames(item.Tags),
+			"mosaic":         "有码",
+		},
+	}
+	if len(release) >= 4 {
+		candidate.Raw["year"] = release[:4]
+	}
+	if item.Trailer != "" {
+		candidate.Raw["trailer_url"] = item.Trailer
+	}
+	if item.Director.Name != "" {
+		candidate.Raw["directors"] = []string{item.Director.Name}
+	}
+	if item.Site.Name != "" {
+		candidate.Raw["series"] = item.Site.Name
+	}
+	if item.Site.Network.Name != "" {
+		candidate.Raw["studio"] = item.Site.Network.Name
+		candidate.Raw["publisher"] = item.Site.Network.Name
+	}
+	return candidate
+}
+
+func thePornDBSearchListKeywords(input string) string {
+	return buildThePornDBQuery(input)
+}
+
 func thePornDBActorNames(items []struct {
 	Name   string `json:"name"`
 	Parent struct {
@@ -1041,6 +1717,211 @@ func thePornDBActorNames(items []struct {
 		}
 	}
 	return dedupeStrings(names)
+}
+
+func thePornDBActors(items []thePornDBPerformer) ([]string, []string) {
+	allActors := make([]string, 0, len(items))
+	actors := make([]string, 0, len(items))
+	for _, performer := range items {
+		name := strings.TrimSpace(performer.Name)
+		if name == "" {
+			continue
+		}
+		allActors = append(allActors, name)
+		if !strings.EqualFold(performer.Parent.Extras.Gender, "Male") {
+			actors = append(actors, name)
+		}
+	}
+	return thePornDBUniqueStrings(actors), thePornDBUniqueStrings(allActors)
+}
+
+func thePornDBNames(values []thePornDBNameRef) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value.Name) != "" {
+			result = append(result, strings.TrimSpace(value.Name))
+		}
+	}
+	return thePornDBUniqueStrings(result)
+}
+
+func thePornDBPerformerWords(values []thePornDBPerformer) ([]string, []string) {
+	spaces := make([]string, 0, len(values))
+	noSpaces := make([]string, 0, len(values))
+	for _, value := range values {
+		cleaned := thePornDBCleanWords(value.Name)
+		if cleaned == "" {
+			continue
+		}
+		spaces = append(spaces, cleaned)
+		noSpaces = append(noSpaces, strings.ReplaceAll(cleaned, " ", ""))
+	}
+	return spaces, noSpaces
+}
+
+func thePornDBAllContained(values []string, haystack string) bool {
+	for _, value := range values {
+		if !strings.Contains(haystack, value) {
+			return false
+		}
+	}
+	return len(values) > 0
+}
+
+func thePornDBCleanWords(value string) string {
+	cleaned := regexp.MustCompile(`[\W_]+`).ReplaceAllString(strings.ToLower(value), " ")
+	return strings.Join(strings.Fields(cleaned), " ")
+}
+
+func thePornDBMeaningfulParts(value string, series string) []string {
+	fields := strings.Fields(value)
+	result := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if strings.EqualFold(field, series) {
+			continue
+		}
+		result = append(result, field)
+	}
+	return result
+}
+
+func thePornDBCleanDescription(value string) string {
+	return strings.NewReplacer("＜p＞", "", "＜/p＞", "", "<p>", "", "</p>", "").Replace(value)
+}
+
+func thePornDBSimilarity(a string, b string) float64 {
+	if a == "" || b == "" {
+		return 0
+	}
+	ar := []rune(a)
+	br := []rune(b)
+	previous := make([]int, len(br)+1)
+	current := make([]int, len(br)+1)
+	for j := range previous {
+		previous[j] = j
+	}
+	for i := 1; i <= len(ar); i++ {
+		current[0] = i
+		for j := 1; j <= len(br); j++ {
+			cost := 1
+			if ar[i-1] == br[j-1] {
+				cost = 0
+			}
+				current[j] = min(previous[j]+1, min(current[j-1]+1, previous[j-1]+cost))
+		}
+		previous, current = current, previous
+	}
+	distance := previous[len(br)]
+	maxLen := math.Max(float64(len(ar)), float64(len(br)))
+	return 1 - float64(distance)/maxLen
+}
+
+func thePornDBLongName(shortName string) string {
+	names := map[string]string{
+		"clubseventeen": "clubsweethearts",
+	}
+	if value, ok := names[shortName]; ok {
+		return strings.ReplaceAll(strings.ReplaceAll(value, "-", ""), ".", "")
+	}
+	return shortName
+}
+
+func thePornDBUniqueStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+func categoryFromThePornDBDetailURL(detailURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(detailURL))
+	if err != nil {
+		return "scenes"
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) > 0 && parts[0] == "movies" {
+		return "movies"
+	}
+	return "scenes"
+}
+
+func thePornDBItemDetailURL(item thePornDBItem, category, baseURL string) string {
+	if strings.TrimSpace(item.Slug) == "" {
+		return ""
+	}
+	switch category {
+	case "movies":
+	case "scenes":
+	default:
+		category = "scenes"
+	}
+	return strings.TrimRight(baseURL, "/") + "/" + category + "/" + item.Slug
+}
+
+type thePornDBSearchListResponse struct {
+	Data []thePornDBItem `json:"data"`
+}
+
+type thePornDBItemResponse struct {
+	Data thePornDBItem `json:"data"`
+}
+
+type thePornDBItem struct {
+	Slug        string               `json:"slug"`
+	Title       string               `json:"title"`
+	Description string               `json:"description"`
+	Date        string               `json:"date"`
+	Duration    int                  `json:"duration"`
+	Trailer     string               `json:"trailer"`
+	Image       string               `json:"image"`
+	Poster      string               `json:"poster"`
+	Background  thePornDBImageSet    `json:"background"`
+	Posters     thePornDBImageSet    `json:"posters"`
+	Director    thePornDBNameRef     `json:"director"`
+	Site        thePornDBSiteRef     `json:"site"`
+	Tags        []thePornDBNameRef   `json:"tags"`
+	Performers  []thePornDBPerformer `json:"performers"`
+}
+
+type thePornDBImageSet struct {
+	Large string `json:"large"`
+}
+
+type thePornDBNameRef struct {
+	Name string `json:"name"`
+}
+
+type thePornDBSiteRef struct {
+	Name      string           `json:"name"`
+	ShortName string           `json:"short_name"`
+	URL       string           `json:"url"`
+	Network   thePornDBNameRef `json:"network"`
+}
+
+type thePornDBPerformer struct {
+	Name   string               `json:"name"`
+	Parent thePornDBPerformerParent `json:"parent"`
+}
+
+type thePornDBPerformerParent struct {
+	Extras thePornDBPerformerExtras `json:"extras"`
+}
+
+type thePornDBPerformerExtras struct {
+	Gender string `json:"gender"`
 }
 
 func firstNonEmptyString(values ...string) string {

@@ -339,8 +339,19 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 
 	for _, crawler := range crawlers {
 		run.setSource(crawler.Name())
+		crawlerQueries := queries
+		if crawler.Name() == "theporndb" && strings.TrimSpace(plan.FilePath) != "" {
+			crawlerQueries = []string{strings.TrimSpace(plan.FilePath)}
+		}
 		if crawler.Name() == "theporndb" && strings.TrimSpace(plan.DetailURL) != "" {
-			detailURL := normalizeThePornDBDetailURL(plan.DetailURL, s.avSiteBaseURL("theporndb", "https://api.theporndb.net"))
+			detailURL, normErr := normalizeThePornDBDetailURL(plan.DetailURL, s.avSiteBaseURL("theporndb", "https://api.theporndb.net"))
+			if normErr != nil {
+				run.addError(normErr)
+				if firstErr == nil {
+					firstErr = normErr
+				}
+				continue
+			}
 			if detailURL != "" {
 				candidate, err := crawler.FetchByDetailURL(ctx, run, detailURL)
 				if err != nil {
@@ -362,7 +373,7 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 				continue
 			}
 		}
-		for _, query := range queries {
+		for _, query := range crawlerQueries {
 			if len(raw) >= rawLimit {
 				break
 			}

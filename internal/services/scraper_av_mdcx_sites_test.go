@@ -63,7 +63,7 @@ func TestMDCxMigratedSitesSearchCandidates(t *testing.T) {
 		wantCode   string
 		wantPoster string
 	}{
-		{name: "dmm", crawler: newDMMAVCrawler(svc), query: "SSIS-001", wantTitle: "DMM Title", wantCode: "SSIS-001", wantPoster: server.URL + "/dmm/ssis001pl.jpg"},
+		{name: "dmm", crawler: newDMMAVCrawler(svc), query: "SSIS-001", wantTitle: "DMM Title", wantCode: "SSIS-001", wantPoster: server.URL + "/dmm/ssis001ps.jpg"},
 		{name: "mgstage", crawler: newMGStageAVCrawler(svc), query: "300MIUM-382", wantTitle: "MGStage Title", wantCode: "300MIUM-382", wantPoster: server.URL + "/mgstage/pf_300mium382.jpg"},
 		{name: "jav321", crawler: newJav321AVCrawler(svc), query: "SSIS-001", wantTitle: "SSIS-001 Jav321 Title", wantCode: "SSIS-001", wantPoster: server.URL + "/jav321/thumb.jpg"},
 		{name: "fc2ppvdb", crawler: newFC2PPVDBAVCrawler(svc), query: "FC2-PPV-3259498", wantTitle: "FC2PPVDB Title", wantCode: "FC2-PPV-3259498", wantPoster: server.URL + "/fc2ppvdb/3259498.jpg"},
@@ -92,5 +92,27 @@ func TestMDCxMigratedSitesSearchCandidates(t *testing.T) {
 				t.Fatalf("expected poster %q, got %q", tc.wantPoster, got.PosterURL)
 			}
 		})
+	}
+}
+
+func TestDMMSearchCandidatesReturnsRegionError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<html><body><p>Sorry! This content is not available in your region.</p></body></html>`))
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "", "", "", time.Second)
+	svc.ConfigureAVScraperConfig(AVScraperConfig{
+		BaseURL: server.URL,
+		SiteURLs: map[string]string{
+			"dmm": server.URL,
+		},
+		Timeout: time.Second,
+	})
+
+	_, err := newDMMAVCrawler(svc).SearchCandidates(context.Background(), newAVScrapeRunContext("SSIS-001", "SSIS-001"), "SSIS-001", 1)
+	if err == nil || !strings.Contains(err.Error(), "content is not available in this region") {
+		t.Fatalf("expected region error, got=%v", err)
 	}
 }
