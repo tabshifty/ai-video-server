@@ -28,6 +28,32 @@
 - Rollback:
   - `git revert <commit>`
 
+### [2026-05-09 22:15 +0800] AV 刮削共享配置与本地图片语义收口
+- Type: `implementation`
+- Summary:
+  - AV 预览链路补齐 `filePath/detailUrl` 输入优先级，手动刮削、AV 上传自动刮削、短视频转 AV 重刮削共用同一份站点配置和站点选路。
+  - 对齐 MDCx Go 字段语义：候选和最终 metadata 同时保留 `poster` 与 `thumb`，`poster` 优先为横版图，`thumb` 优先为站点提供的竖版图；没有独立竖图时从横版图裁切生成。
+  - 刮削图片全部落盘，新增 `poster_thumb_file_path/poster_thumb_path` 兼容实际竖图，同时保留既有 `poster_original_*` 与 `poster_cropped_*` 字段；ThePornDB、JavDB、FC2 的图片字段按 MDCx 结构补齐。
+  - 短视频转 AV 重刮削继续只产出候选和元数据，不改写视频状态；ThePornDB token 缺失保持站点级失败，不拖垮其他站点。
+- Changed Files:
+  - `internal/handlers/video_source.go`
+  - `internal/queue/scrape_tasks.go`
+  - `internal/queue/scrape_tasks_test.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_av_poster.go`
+  - `internal/services/scraper_av_poster_assets_test.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `internal/services/scraper_javdb_mdcx_regression_test.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services ./internal/queue -run 'TestConfirmAVStores|TestConfirmAVFalls|TestResolveAVPosterAssets|TestPreviewAVJavDB|TestPreviewAVFallsBackToThePornDB|TestConfirmAVNormalizesThePornDB|TestAutoScrapeAVPreservesCurrentStatus|TestPreviewAVJavDBPrefersCoverAndDetailOverview' -count=1` passed.
+  - `go test ./internal/services ./internal/handlers ./internal/queue -count=1` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-09 18:52 +0800] scraper-preview-go FC2 live 验证与 FC2Hub 样张修复
 - Type: `implementation`
 - Summary:
@@ -4332,3 +4358,7 @@
   - `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` passed.
 - Rollback:
   - `git revert <commit>`
+## 2026-05-09 19:20
+- 进度：开始执行 AV 刮削重写方案，先补 ThePornDB 公网详情 URL 归一化回归测试，再调整短视频转 AV 的状态保持逻辑。
+- 影响文件：`internal/services/scraper_test.go`、`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/queue/scrape_tasks.go`、`internal/services/scraper.go`、`internal/services/scraper_av_strategy.go`
+- 验证：待执行

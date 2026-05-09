@@ -339,6 +339,29 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 
 	for _, crawler := range crawlers {
 		run.setSource(crawler.Name())
+		if crawler.Name() == "theporndb" && strings.TrimSpace(plan.DetailURL) != "" {
+			detailURL := normalizeThePornDBDetailURL(plan.DetailURL, s.avSiteBaseURL("theporndb", "https://api.theporndb.net"))
+			if detailURL != "" {
+				candidate, err := crawler.FetchByDetailURL(ctx, run, detailURL)
+				if err != nil {
+					run.addError(err)
+					if firstErr == nil {
+						firstErr = err
+					}
+				} else {
+					hit := candidate
+					hit.Source = normalizeAVSourceName(chooseStr(hit.Source, crawler.Name()))
+					key := avCandidateIdentityKey(hit)
+					if key != "" {
+						if _, ok := seen[key]; !ok {
+							seen[key] = struct{}{}
+							raw = append(raw, hit)
+						}
+					}
+				}
+				continue
+			}
+		}
 		for _, query := range queries {
 			if len(raw) >= rawLimit {
 				break
@@ -1048,10 +1071,16 @@ func (c *javDBAVCrawler) postProcess(candidate *avScrapeCandidate) {
 	if candidate.Raw == nil {
 		candidate.Raw = map[string]any{}
 	}
-	if posterURL := strings.TrimSpace(candidate.PosterURL); posterURL != "" {
-		if strings.Contains(posterURL, "/covers/") {
-			candidate.Raw["poster_thumb_url"] = strings.Replace(posterURL, "/covers/", "/thumbs/", 1)
+	if thumbURL := strings.TrimSpace(candidate.PosterURL); thumbURL != "" {
+		candidate.ThumbURL = thumbURL
+		candidate.Raw["thumb_url"] = thumbURL
+		candidate.Raw["poster_thumb_url"] = thumbURL
+		posterURL := thumbURL
+		if strings.Contains(thumbURL, "/covers/") {
+			posterURL = strings.Replace(thumbURL, "/covers/", "/thumbs/", 1)
 		}
+		candidate.PosterURL = posterURL
+		candidate.Raw["poster_url"] = posterURL
 	}
 	title := strings.ToLower(strings.TrimSpace(candidate.Title))
 	if strings.Contains(title, "無碼") || strings.Contains(title, "无码") || strings.Contains(title, "uncensored") {
@@ -1926,24 +1955,32 @@ func (p *fc2DetailParser) Parse(content, detailURL, baseURL string) (avScrapeCan
 		fieldState["code"] = "filled"
 	}
 
+	thumbURL := ""
+	if mm := fc2SampleCoverRe.FindStringSubmatch(content); len(mm) > 1 {
+		thumbURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
+	}
 	posterURL := ""
 	posterSource := ""
-	if mm := fc2SampleCoverRe.FindStringSubmatch(content); len(mm) > 1 {
+	if mm := fc2MainThumbRe.FindStringSubmatch(content); len(mm) > 1 {
 		posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
-		posterSource = "sample_image"
+		posterSource = "main_thumb"
 	}
-	if posterURL == "" {
-		if mm := fc2MainThumbRe.FindStringSubmatch(content); len(mm) > 1 {
-			posterURL = toAbsoluteURL(baseURL, strings.TrimSpace(mm[1]))
-			posterSource = "main_thumb"
-		}
+	if posterURL == "" && thumbURL != "" {
+		posterURL = thumbURL
+		posterSource = "sample_image"
 	}
 	if isLikelyLogoURL(posterURL) {
 		posterURL = ""
 		posterSource = ""
 	}
+	if isLikelyLogoURL(thumbURL) {
+		thumbURL = ""
+	}
 	if posterURL != "" {
 		fieldState["poster_url"] = "filled"
+	}
+	if thumbURL != "" {
+		fieldState["thumb_url"] = "filled"
 	}
 
 	releaseDate := ""
@@ -1975,6 +2012,7 @@ func (p *fc2DetailParser) Parse(content, detailURL, baseURL string) (avScrapeCan
 		Title:       title,
 		Overview:    overview,
 		PosterURL:   posterURL,
+		ThumbURL:    thumbURL,
 		ReleaseDate: releaseDate,
 		Actors:      nil,
 		DetailURL:   detailURL,
@@ -1988,6 +2026,7 @@ func (p *fc2DetailParser) Parse(content, detailURL, baseURL string) (avScrapeCan
 			"overview_source": overviewSource,
 			"poster_url":      posterURL,
 			"poster_source":   posterSource,
+			"thumb_url":       thumbURL,
 			"release_date":    releaseDate,
 			"actors":          []string{},
 		},
@@ -2000,6 +2039,7 @@ func defaultAVFieldState() map[string]string {
 		"title":        "empty",
 		"code":         "empty",
 		"poster_url":   "empty",
+		"thumb_url":    "empty",
 		"overview":     "empty",
 		"release_date": "empty",
 		"actors":       "empty",
@@ -2211,6 +2251,22 @@ func candidatePosterQuality(candidate avScrapeCandidate) string {
 	return classifyAVPosterURL(candidate.PosterURL, avPosterSourceFromCandidate(candidate))
 }
 
+func candidateThumbURL(candidate avScrapeCandidate) string {
+	thumbURL := strings.TrimSpace(candidate.ThumbURL)
+	if thumbURL != "" {
+		return thumbURL
+	}
+	if candidate.Raw != nil {
+		if thumbURL = strings.TrimSpace(asString(candidate.Raw["thumb_url"])); thumbURL != "" {
+			return thumbURL
+		}
+		if thumbURL = strings.TrimSpace(asString(candidate.Raw["poster_thumb_url"])); thumbURL != "" {
+			return thumbURL
+		}
+	}
+	return ""
+}
+
 func enrichAVCandidatePoster(candidate *avScrapeCandidate) {
 	if candidate == nil {
 		return
@@ -2222,12 +2278,45 @@ func enrichAVCandidatePoster(candidate *avScrapeCandidate) {
 	quality := classifyAVPosterURL(candidate.PosterURL, source)
 	candidate.Raw["poster_source"] = source
 	candidate.Raw["poster_quality"] = quality
+	thumbURL := strings.TrimSpace(candidate.ThumbURL)
+	if thumbURL == "" {
+		thumbURL = strings.TrimSpace(asString(candidate.Raw["thumb_url"]))
+	}
+	if thumbURL == "" {
+		thumbURL = strings.TrimSpace(asString(candidate.Raw["poster_thumb_url"]))
+	}
+	if thumbURL != "" {
+		candidate.ThumbURL = thumbURL
+		candidate.Raw["thumb_url"] = thumbURL
+	}
 	if quality == avPosterQualityInvalid {
 		candidate.PosterURL = ""
 		candidate.Raw["poster_url"] = ""
 		return
 	}
 	candidate.Raw["poster_url"] = strings.TrimSpace(candidate.PosterURL)
+}
+
+func selectBestThumbURL(candidates []avScrapeCandidate, targetCode, keyword string) (string, string) {
+	bestValue := ""
+	bestSource := ""
+	bestScore := -1
+	for _, candidate := range candidates {
+		thumbURL := candidateThumbURL(candidate)
+		if thumbURL == "" {
+			continue
+		}
+		score, _ := scoreAVCandidate(candidate, targetCode, keyword)
+		if strings.TrimSpace(candidate.DetailURL) != "" {
+			score += 10
+		}
+		if score > bestScore {
+			bestScore = score
+			bestValue = thumbURL
+			bestSource = candidate.Source
+		}
+	}
+	return bestValue, bestSource
 }
 
 func isLikelyGenericOverview(raw string) bool {
@@ -2447,6 +2536,11 @@ func mergeAVCandidatesByField(candidates []avScrapeCandidate, targetCode, keywor
 			posterDecision = "invalid_selected"
 		}
 	}
+	thumbURL, thumbSource := selectBestThumbURL(selected, targetCode, keyword)
+	if thumbURL != "" {
+		merged.ThumbURL = thumbURL
+		fieldSources["thumb_url"] = thumbSource
+	}
 
 	overview, overviewSource := selectBestOverview(selected)
 	if overview != "" {
@@ -2496,6 +2590,7 @@ func mergeAVCandidatesByField(candidates []avScrapeCandidate, targetCode, keywor
 			"title":        candidate.Title,
 			"overview":     candidate.Overview,
 			"poster_url":   candidate.PosterURL,
+			"thumb_url":    candidateThumbURL(candidate),
 			"release_date": candidate.ReleaseDate,
 			"actors":       append([]string(nil), candidate.Actors...),
 			"metadata":     candidate.Raw,
@@ -2510,6 +2605,7 @@ func mergeAVCandidatesByField(candidates []avScrapeCandidate, targetCode, keywor
 		"title":           merged.Title,
 		"overview":        merged.Overview,
 		"poster_url":      merged.PosterURL,
+		"thumb_url":       candidateThumbURL(merged),
 		"release_date":    merged.ReleaseDate,
 		"actors":          append([]string(nil), merged.Actors...),
 		"field_sources":   fieldSources,

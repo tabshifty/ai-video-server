@@ -136,9 +136,13 @@ func (p *Processor) HandleScrapeRetag(ctx context.Context, task *asynq.Task) err
 		}
 		scrapeErr = p.autoScrapeEpisode(ctx, videoID, searchTitle, payload.SeasonNumber, payload.EpisodeNumber)
 	case "av":
-		scrapeErr = p.autoScrapeAV(ctx, videoID, searchTitle)
+		scrapeErr = p.autoScrapeAV(ctx, videoID, searchTitle, video.OriginalPath, video.Status)
 	}
 	if scrapeErr != nil {
+		if targetType == "av" {
+			p.logger.Error("retag scrape failed", "video_id", videoID, "target_type", targetType, "error", scrapeErr)
+			return scrapeErr
+		}
 		decision := buildScrapeFailureDecision(targetType, scrapeErr)
 		_ = p.repo.MergeVideoMetadata(ctx, videoID, decision.metadata)
 		_ = p.repo.UpdateVideoStatus(ctx, videoID, decision.status)
@@ -148,8 +152,10 @@ func (p *Processor) HandleScrapeRetag(ctx context.Context, task *asynq.Task) err
 		}
 		return scrapeErr
 	}
-	if err := p.repo.UpdateVideoStatus(ctx, videoID, "ready"); err != nil {
-		return err
+	if targetType != "av" {
+		if err := p.repo.UpdateVideoStatus(ctx, videoID, "ready"); err != nil {
+			return err
+		}
 	}
 	p.logger.Info("retag scrape completed", "video_id", videoID, "target_type", targetType)
 	return nil
@@ -259,11 +265,14 @@ func (p *Processor) autoScrapeEpisode(ctx context.Context, videoID uuid.UUID, ti
 	return p.scrape.ConfirmEpisode(ctx, input)
 }
 
-func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title string) error {
-	candidates, err := p.scrape.PreviewAV(ctx, title)
+func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title, filePath, currentStatus string) error {
+	result, err := p.scrape.PreviewAVSearch(ctx, title, services.AVPreviewOptions{
+		FilePath: filePath,
+	})
 	if err != nil {
 		return err
 	}
+	candidates := result.Candidates
 	if len(candidates) == 0 {
 		return fmt.Errorf("no av candidate for %q", title)
 	}
@@ -278,14 +287,22 @@ func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title s
 	if anyString(meta["scrape_source"]) == "" {
 		meta["scrape_source"] = anyString(first["scrape_source"])
 	}
+	if anyString(meta["thumb_url"]) == "" {
+		meta["thumb_url"] = anyString(first["thumb_url"])
+	}
+	if strings.TrimSpace(filePath) != "" {
+		meta["file_path"] = filePath
+	}
 	input := services.ConfirmScrapeInput{
 		VideoID:     videoID,
 		ExternalID:  anyString(first["external_id"]),
 		Title:       anyString(first["title"]),
 		Overview:    anyString(first["overview"]),
 		PosterURL:   firstNonEmpty(anyString(first["poster_url"]), anyString(first["poster_path"])),
+		ThumbURL:    anyString(first["thumb_url"]),
 		ReleaseDate: anyString(first["release_date"]),
 		Metadata:    meta,
+		Status:      currentStatus,
 	}
 	if input.ExternalID == "" {
 		return fmt.Errorf("invalid av external_id from first candidate")

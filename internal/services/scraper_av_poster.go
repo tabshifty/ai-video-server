@@ -19,12 +19,14 @@ import (
 type avPosterAssets struct {
 	SelectedPath string
 	OriginalPath string
+	ThumbPath    string
 	CroppedPath  string
 	Variant      string
 }
 
-func (s *ScraperService) resolveAVPosterAssets(ctx context.Context, videoID uuid.UUID, existingThumbPath, posterURL, posterSource, posterQuality string, cropCfg AVScraperSiteConfig) (avPosterAssets, string, error) {
+func (s *ScraperService) resolveAVPosterAssets(ctx context.Context, videoID uuid.UUID, existingThumbPath, posterURL, thumbURL, posterSource, posterQuality string, cropCfg AVScraperSiteConfig) (avPosterAssets, string, error) {
 	posterURL = strings.TrimSpace(posterURL)
+	thumbURL = strings.TrimSpace(thumbURL)
 	existingThumbPath = strings.TrimSpace(existingThumbPath)
 	posterSource = strings.ToLower(strings.TrimSpace(posterSource))
 	posterQuality = strings.ToLower(strings.TrimSpace(posterQuality))
@@ -34,6 +36,14 @@ func (s *ScraperService) resolveAVPosterAssets(ctx context.Context, videoID uuid
 
 	keepExisting := func(decision string) (avPosterAssets, string, error) {
 		return avPosterAssets{SelectedPath: existingThumbPath}, decision, nil
+	}
+	posterFromThumbOnly := false
+	if !isAbsoluteHTTPURL(posterURL) && isAbsoluteHTTPURL(thumbURL) {
+		posterURL = thumbURL
+		posterFromThumbOnly = true
+		if posterQuality == avPosterQualityInvalid {
+			posterQuality = classifyAVPosterURL(posterURL, posterSource)
+		}
 	}
 
 	switch posterQuality {
@@ -53,10 +63,21 @@ func (s *ScraperService) resolveAVPosterAssets(ctx context.Context, videoID uuid
 			OriginalPath: originalPath,
 			Variant:      avPosterVariantOriginal,
 		}
-		if cropCfg.PosterCropEnabled {
+		if posterFromThumbOnly {
+			assets.ThumbPath = originalPath
+			assets.Variant = "thumb"
+		} else if isAbsoluteHTTPURL(thumbURL) && thumbURL != posterURL {
+			if thumbPath, thumbErr := s.downloadPosterVariant(ctx, thumbURL, videoID, "thumb"); thumbErr == nil {
+				assets.SelectedPath = thumbPath
+				assets.ThumbPath = thumbPath
+				assets.Variant = "thumb"
+			}
+		}
+		if !posterFromThumbOnly && assets.SelectedPath == originalPath && cropCfg.PosterCropEnabled {
 			croppedPath, cropErr := s.cropAVPosterImage(originalPath, videoID, cropCfg.PosterCropMode)
 			if cropErr == nil {
 				assets.SelectedPath = croppedPath
+				assets.ThumbPath = croppedPath
 				assets.CroppedPath = croppedPath
 				assets.Variant = avPosterVariantCropped
 			}

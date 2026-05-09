@@ -21,6 +21,8 @@ type AVPreviewOptions struct {
 	BypassCache  bool
 	SiteCategory string
 	SiteSource   string
+	FilePath     string
+	DetailURL    string
 }
 
 type AVPreviewResult struct {
@@ -37,6 +39,8 @@ type avSearchPlan struct {
 	Sources           []string
 	ExplicitSource    bool
 	Config            AVScraperSiteConfig
+	FilePath          string
+	DetailURL         string
 }
 
 const (
@@ -232,6 +236,8 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 			Sources:           []string{explicitSource},
 			ExplicitSource:    true,
 			Config:            cfg,
+			FilePath:          strings.TrimSpace(opts.FilePath),
+			DetailURL:         strings.TrimSpace(opts.DetailURL),
 		}, nil
 	}
 
@@ -266,6 +272,8 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 		RecommendedSource: filtered[0],
 		Sources:           filtered,
 		Config:            cfg,
+		FilePath:          strings.TrimSpace(opts.FilePath),
+		DetailURL:         strings.TrimSpace(opts.DetailURL),
 	}, nil
 }
 

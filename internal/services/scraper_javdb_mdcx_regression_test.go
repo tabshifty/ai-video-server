@@ -82,8 +82,18 @@ func TestPreviewAVJavDBUsesMDCXStyleDOMDetailParsing(t *testing.T) {
 	if first["overview"] != "Elite office affair." {
 		t.Fatalf("expected ld+json overview, got=%v", first["overview"])
 	}
-	if first["poster_url"] != server.URL+"/covers/ssis-001.jpg" {
-		t.Fatalf("expected video-cover poster, got=%v", first["poster_url"])
+	if first["poster_url"] != server.URL+"/thumbs/ssis-001.jpg" {
+		t.Fatalf("expected derived poster, got=%v", first["poster_url"])
+	}
+	if first["thumb_url"] != server.URL+"/covers/ssis-001.jpg" {
+		t.Fatalf("expected video-cover thumb, got=%v", first["thumb_url"])
+	}
+	metadata, ok := first["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected metadata map, got=%T", first["metadata"])
+	}
+	if metadata["thumb_url"] != server.URL+"/covers/ssis-001.jpg" {
+		t.Fatalf("expected thumb_url in metadata, got=%v", metadata["thumb_url"])
 	}
 	actors, ok := first["actors"].([]string)
 	if !ok {

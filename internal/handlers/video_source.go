@@ -211,11 +211,25 @@ func chooseAVThumbnailVariantPath(rawMetadata []byte, requestedVariant, fallback
 		requestedVariant = strings.ToLower(strings.TrimSpace(stringFromAny(metadata["poster_variant"])))
 	}
 	originalFilePath := strings.TrimSpace(stringFromAny(metadata["poster_original_file_path"]))
+	thumbFilePath := strings.TrimSpace(stringFromAny(metadata["poster_thumb_file_path"]))
 	croppedFilePath := strings.TrimSpace(stringFromAny(metadata["poster_cropped_file_path"]))
 	switch requestedVariant {
+	case "thumb":
+		if thumbFilePath != "" {
+			return thumbFilePath
+		}
+		if croppedFilePath != "" {
+			return croppedFilePath
+		}
+		if originalFilePath != "" {
+			return originalFilePath
+		}
 	case "cropped":
 		if croppedFilePath != "" {
 			return croppedFilePath
+		}
+		if thumbFilePath != "" {
+			return thumbFilePath
 		}
 		if originalFilePath != "" {
 			return originalFilePath
@@ -224,10 +238,16 @@ func chooseAVThumbnailVariantPath(rawMetadata []byte, requestedVariant, fallback
 		if originalFilePath != "" {
 			return originalFilePath
 		}
+		if thumbFilePath != "" {
+			return thumbFilePath
+		}
 		if croppedFilePath != "" {
 			return croppedFilePath
 		}
 	default:
+		if thumbFilePath != "" {
+			return thumbFilePath
+		}
 		if croppedFilePath != "" {
 			return croppedFilePath
 		}

@@ -376,6 +376,7 @@ func (c *thePornDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrape
 	if strings.TrimSpace(c.svc.avThePornDBAPIToken) == "" {
 		return avScrapeCandidate{}, fmt.Errorf("theporndb api token is required")
 	}
+	detailURL = normalizeThePornDBDetailURL(detailURL, c.svc.avSiteBaseURL("theporndb", "https://api.theporndb.net"))
 	if run != nil {
 		run.addDetailURL(detailURL)
 	}
@@ -395,7 +396,8 @@ func (c *thePornDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrape
 		ExternalID:  normalizeWhitespace(payload.Data.Slug),
 		Title:       title,
 		Overview:    normalizeWhitespace(payload.Data.Description),
-		PosterURL:   firstNonEmptyString(payload.Data.Posters.Large, payload.Data.Poster, payload.Data.Background.Large, payload.Data.Image),
+		PosterURL:   firstNonEmptyString(payload.Data.Posters.Large, payload.Data.Poster),
+		ThumbURL:    firstNonEmptyString(payload.Data.Background.Large, payload.Data.Image),
 		ReleaseDate: normalizeWhitespace(payload.Data.Date),
 		Actors:      thePornDBActorNames(payload.Data.Performers),
 		DetailURL:   strings.TrimSpace(detailURL),
@@ -407,6 +409,25 @@ func (c *thePornDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrape
 		},
 	}
 	return candidate, nil
+}
+
+func normalizeThePornDBDetailURL(rawURL, fallbackBase string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if strings.Contains(host, "theporndb") && !strings.Contains(host, "api.theporndb") {
+		return toAbsoluteURL(strings.TrimSpace(fallbackBase), parsed.RequestURI())
+	}
+	if strings.Contains(host, "api.theporndb") {
+		return rawURL
+	}
+	return rawURL
 }
 
 type prestigeAVPayload struct {

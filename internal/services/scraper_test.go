@@ -820,7 +820,7 @@ func TestScrapeAVUploadCodeFirstAndActorSync(t *testing.T) {
   </body>
 </html>
 `))
-		case "/covers/abp123.jpg", "/covers/random999.jpg":
+		case "/covers/abp123.jpg", "/thumbs/abp123.jpg", "/covers/random999.jpg", "/thumbs/random999.jpg":
 			w.Header().Set("Content-Type", "image/jpeg")
 			_, _ = w.Write([]byte("fake-image"))
 		default:
@@ -1045,8 +1045,11 @@ func TestPreviewAVJavDBPrefersCoverAndDetailOverview(t *testing.T) {
 		t.Fatalf("expected av candidates, got none")
 	}
 	candidate := got[0]
-	if candidate["poster_url"] != server.URL+"/covers/real-cover.jpg" {
-		t.Fatalf("expected real cover, got=%v", candidate["poster_url"])
+	if candidate["poster_url"] != server.URL+"/thumbs/real-cover.jpg" {
+		t.Fatalf("expected derived poster from real cover, got=%v", candidate["poster_url"])
+	}
+	if candidate["thumb_url"] != server.URL+"/covers/real-cover.jpg" {
+		t.Fatalf("expected real cover as thumb, got=%v", candidate["thumb_url"])
 	}
 	if candidate["overview"] != "这是正确的剧情简介" {
 		t.Fatalf("expected detail overview, got=%v", candidate["overview"])
@@ -2425,12 +2428,14 @@ func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 		case r.URL.Path == "/scenes/abw-123-scene":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{
-  "data":{
+ "data":{
     "slug":"abw-123-scene",
     "title":"ThePornDB First Impression",
     "description":"ThePornDB outline.",
     "date":"2024-10-01",
     "poster":"https://image.example/abw-123-poster.jpg",
+    "posters":{"large":"https://image.example/abw-123-poster.jpg"},
+    "background":{"large":"https://image.example/abw-123-thumb.jpg"},
     "performers":[{"name":"Yua Mikami","parent":{"extras":{"gender":"female"}}}],
     "tags":[{"name":"Drama"}],
     "site":{"name":"Prestige","network":{"name":"Prestige"}}
@@ -2468,8 +2473,68 @@ func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 	if first["title"] != "ThePornDB First Impression" {
 		t.Fatalf("expected title ThePornDB First Impression, got=%v", first["title"])
 	}
+	if first["poster_url"] != "https://image.example/abw-123-poster.jpg" {
+		t.Fatalf("expected poster url from posters.large, got=%v", first["poster_url"])
+	}
+	if first["thumb_url"] != "https://image.example/abw-123-thumb.jpg" {
+		t.Fatalf("expected thumb url from background.large, got=%v", first["thumb_url"])
+	}
 	if first["detail_url"] != server.URL+"/scenes/abw-123-scene" {
 		t.Fatalf("expected theporndb detail url, got=%v", first["detail_url"])
+	}
+}
+
+func TestConfirmAVNormalizesThePornDBPublicDetailURL(t *testing.T) {
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {ID: videoID, Title: "旧标题"},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/scenes/abw-123-scene":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+  "data":{
+    "slug":"abw-123-scene",
+    "title":"ThePornDB Public URL Title",
+    "description":"ThePornDB Public URL Outline.",
+    "date":"2024-10-01",
+    "performers":[{"name":"Yua Mikami","parent":{"extras":{"gender":"female"}}}]
+  }
+}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraperConfig(AVScraperConfig{
+		BaseURL: server.URL,
+		SiteURLs: map[string]string{
+			"theporndb": server.URL,
+		},
+		ThePornDBAPIToken: "token-123",
+		UserAgent:         "tpdb-public-url-test",
+		Timeout:           time.Second,
+	})
+
+	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:    videoID,
+		ExternalID: "abw-123-scene",
+		Metadata: map[string]any{
+			"scrape_source": "theporndb",
+			"detail_url":    "https://theporndb.net/scenes/abw-123-scene",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+	if got := repo.lastUpdate.metadata["detail_url"]; got != server.URL+"/scenes/abw-123-scene" {
+		t.Fatalf("expected normalized detail_url %q, got=%v", server.URL+"/scenes/abw-123-scene", got)
 	}
 }
 

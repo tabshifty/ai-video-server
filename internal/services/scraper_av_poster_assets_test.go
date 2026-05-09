@@ -55,7 +55,7 @@ func TestConfirmAVStoresOriginalAndCroppedPosterAssets(t *testing.T) {
 			`))
 		case "/poster/ssis-123.jpg":
 			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write(testJPEGPortraitBytes(t))
+			_, _ = w.Write(testJPEGLandscapeBytes(t))
 		default:
 			http.NotFound(w, r)
 		}
@@ -81,11 +81,19 @@ func TestConfirmAVStoresOriginalAndCroppedPosterAssets(t *testing.T) {
 	croppedURL := asString(repo.lastUpdate.metadata["poster_cropped_path"])
 	originalFilePath := asString(repo.lastUpdate.metadata["poster_original_file_path"])
 	croppedFilePath := asString(repo.lastUpdate.metadata["poster_cropped_file_path"])
+	posterFilePath := asString(repo.lastUpdate.metadata["poster"])
+	thumbFilePath := asString(repo.lastUpdate.metadata["thumb"])
 	if strings.TrimSpace(originalURL) == "" {
 		t.Fatalf("expected poster_original_path, metadata=%v", repo.lastUpdate.metadata)
 	}
 	if strings.TrimSpace(croppedURL) == "" {
 		t.Fatalf("expected poster_cropped_path, metadata=%v", repo.lastUpdate.metadata)
+	}
+	if posterFilePath != originalFilePath {
+		t.Fatalf("expected poster to keep original file, got=%s want=%s", posterFilePath, originalFilePath)
+	}
+	if thumbFilePath != croppedFilePath {
+		t.Fatalf("expected thumb to use cropped file, got=%s want=%s", thumbFilePath, croppedFilePath)
 	}
 	if repo.lastUpdate.metadata["poster_variant"] != "cropped" {
 		t.Fatalf("expected poster_variant cropped, got=%v", repo.lastUpdate.metadata["poster_variant"])
@@ -158,8 +166,16 @@ func TestConfirmAVFallsBackToOriginalPosterWhenCropFails(t *testing.T) {
 	originalURL := asString(repo.lastUpdate.metadata["poster_original_path"])
 	croppedURL := asString(repo.lastUpdate.metadata["poster_cropped_path"])
 	originalFilePath := asString(repo.lastUpdate.metadata["poster_original_file_path"])
+	posterFilePath := asString(repo.lastUpdate.metadata["poster"])
+	thumbFilePath := asString(repo.lastUpdate.metadata["thumb"])
 	if strings.TrimSpace(originalURL) == "" {
 		t.Fatalf("expected poster_original_path, metadata=%v", repo.lastUpdate.metadata)
+	}
+	if posterFilePath != originalFilePath {
+		t.Fatalf("expected poster to keep original file, got=%s want=%s", posterFilePath, originalFilePath)
+	}
+	if thumbFilePath != originalFilePath {
+		t.Fatalf("expected thumb to fall back to original file, got=%s want=%s", thumbFilePath, originalFilePath)
 	}
 	if croppedURL != "" {
 		t.Fatalf("expected empty poster_cropped_path on crop failure, got=%s", croppedURL)
@@ -169,6 +185,92 @@ func TestConfirmAVFallsBackToOriginalPosterWhenCropFails(t *testing.T) {
 	}
 	if repo.lastUpdate.thumbnailPath != originalFilePath {
 		t.Fatalf("expected thumbnail path to fall back to original, got=%s want=%s", repo.lastUpdate.thumbnailPath, originalFilePath)
+	}
+}
+
+func TestConfirmAVStoresSeparateThumbWhenThumbURLIsAvailable(t *testing.T) {
+	t.Parallel()
+
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:     videoID,
+				Title:  "SSIS-125",
+				Type:   "av",
+				Status: "ready",
+			},
+		},
+	}
+	root := t.TempDir()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v/ssis-125":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte(`
+				<html>
+					<head>
+						<title>SSIS-125 Separate Thumb - JavDB</title>
+						<meta property="og:image" content="` + serverURLFromRequest(r) + `/covers/ssis-125.jpg" />
+					</head>
+					<body>
+						<h2 class="title is-4">SSIS-125 Separate Thumb</h2>
+						<strong>番號</strong><span>SSIS-125</span>
+						<strong>日期</strong><span>2024-01-03</span>
+					</body>
+				</html>
+			`))
+		case "/thumbs/ssis-125.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write(testJPEGLandscapeBytes(t))
+		case "/covers/ssis-125.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write(testJPEGPortraitBytes(t))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "", root, filepath.Join(root, "posters"), 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "poster-thumb-test", 2*time.Second)
+
+	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:    videoID,
+		ExternalID: "ssis-125",
+		Metadata: map[string]any{
+			"scrape_source": "javdb",
+			"detail_url":    server.URL + "/v/ssis-125",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+
+	posterFilePath := asString(repo.lastUpdate.metadata["poster"])
+	thumbFilePath := asString(repo.lastUpdate.metadata["thumb"])
+	if posterFilePath == "" || thumbFilePath == "" {
+		t.Fatalf("expected poster and thumb paths, metadata=%v", repo.lastUpdate.metadata)
+	}
+	if posterFilePath == thumbFilePath {
+		t.Fatalf("expected separate poster and thumb files, got=%s", posterFilePath)
+	}
+	if asString(repo.lastUpdate.metadata["poster_variant"]) != "thumb" {
+		t.Fatalf("expected poster_variant thumb, got=%v", repo.lastUpdate.metadata["poster_variant"])
+	}
+	posterImg := decodeJPEGFile(t, posterFilePath)
+	thumbImg := decodeJPEGFile(t, thumbFilePath)
+	if posterImg.Bounds().Dx() <= posterImg.Bounds().Dy() {
+		t.Fatalf("expected poster to stay landscape, got=%dx%d", posterImg.Bounds().Dx(), posterImg.Bounds().Dy())
+	}
+	if thumbImg.Bounds().Dx() >= thumbImg.Bounds().Dy() {
+		t.Fatalf("expected thumb to stay portrait, got=%dx%d", thumbImg.Bounds().Dx(), thumbImg.Bounds().Dy())
+	}
+	if _, err := os.Stat(posterFilePath); err != nil {
+		t.Fatalf("expected poster file: %v", err)
+	}
+	if _, err := os.Stat(thumbFilePath); err != nil {
+		t.Fatalf("expected thumb file: %v", err)
 	}
 }
 
@@ -205,6 +307,7 @@ func TestResolveAVPosterAssetsUsesConfiguredHorizontalCropAnchor(t *testing.T) {
 				uuid.New(),
 				"",
 				server.URL+"/poster/wide-anchor.jpg",
+				"",
 				"manual",
 				avPosterQualityPrimary,
 				AVScraperSiteConfig{
@@ -226,12 +329,27 @@ func TestResolveAVPosterAssetsUsesConfiguredHorizontalCropAnchor(t *testing.T) {
 	}
 }
 
+func testJPEGLandscapeBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 360, 240))
+	for y := 0; y < 240; y++ {
+		for x := 0; x < 360; x++ {
+			img.Set(x, y, color.RGBA{R: uint8((x * 255) / 359), G: uint8((y * 255) / 239), B: 160, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatalf("encode jpeg fixture: %v", err)
+	}
+	return buf.Bytes()
+}
+
 func testJPEGPortraitBytes(t *testing.T) []byte {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 240, 360))
 	for y := 0; y < 360; y++ {
 		for x := 0; x < 240; x++ {
-			img.Set(x, y, color.RGBA{R: uint8((x * 255) / 239), G: uint8((y * 255) / 359), B: 160, A: 255})
+			img.Set(x, y, color.RGBA{R: 200, G: uint8((y * 255) / 359), B: uint8((x * 255) / 239), A: 255})
 		}
 	}
 	var buf bytes.Buffer
