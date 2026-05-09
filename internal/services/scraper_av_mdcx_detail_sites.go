@@ -89,7 +89,7 @@ func (c *dmmAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunCon
 			"Cookie": "age_check_done=1",
 		})
 		if err != nil {
-			return nil, err
+			continue
 		}
 		if dmmIsRegionBlocked(content) {
 			return nil, fmt.Errorf("dmm: content is not available in this region")
@@ -122,7 +122,7 @@ func (c *dmmAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunCon
 			return out, nil
 		}
 	}
-	return nil, nil
+	return nil, fmt.Errorf("dmm: no matched detail page for %s", query)
 }
 
 func (c *mgstageAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {

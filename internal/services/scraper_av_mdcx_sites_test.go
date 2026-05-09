@@ -116,3 +116,37 @@ func TestDMMSearchCandidatesReturnsRegionError(t *testing.T) {
 		t.Fatalf("expected region error, got=%v", err)
 	}
 }
+
+func TestDMMSearchCandidatesSkipsFailedSearchURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		switch r.URL.Path {
+		case "/search/=/searchstr=ssis00001/sort=ranking/":
+			http.Error(w, "upstream timeout", http.StatusGatewayTimeout)
+		case "/search/=/searchstr=ssis001/sort=ranking/":
+			_, _ = w.Write([]byte(`<html><body><a href="/digital/videoa/-/detail/=/cid=ssis00001/">SSIS-001</a></body></html>`))
+		case "/digital/videoa/-/detail/=/cid=ssis00001/":
+			_, _ = w.Write([]byte(`<html><head><meta property="og:image" content="` + serverURLFromRequest(r) + `/dmm/ssis001ps.jpg"></head><body><h1>DMM Fallback Title</h1><table><tr><th>Number</th><td>SSIS-001</td></tr></table></body></html>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "", "", "", time.Second)
+	svc.ConfigureAVScraperConfig(AVScraperConfig{
+		BaseURL: server.URL,
+		SiteURLs: map[string]string{
+			"dmm": server.URL,
+		},
+		Timeout: time.Second,
+	})
+
+	hits, err := newDMMAVCrawler(svc).SearchCandidates(context.Background(), newAVScrapeRunContext("SSIS-001", "SSIS-001"), "SSIS-001", 1)
+	if err != nil {
+		t.Fatalf("SearchCandidates returned error: %v", err)
+	}
+	if len(hits) != 1 || hits[0].Title != "DMM Fallback Title" {
+		t.Fatalf("expected fallback hit, got=%v", hits)
+	}
+}

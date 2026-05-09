@@ -4394,3 +4394,8 @@
 - 进度：继续对齐 `references/mdcx/scraper-preview-go` 的已迁移 AV 站点策略；DMM 改为 reference 的多搜索 URL、区域封锁识别、FANZA TV GraphQL 与 digital 分支解析；ThePornDB 改为 `detailUrl > filePath > number` 链路下的 scenes/movies 搜索、MDCx 文件名关键词和配置 base 归一化；MGStage 会话 cookie + `adc=1` 回抓与 trailer URL 对齐；DMM 图片字段改为 `poster=横版 ps`、`thumb=竖版 pl`。
 - 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_framework.go`、`internal/services/scraper_av_mdcx_sites_test.go`、`plan.md`
 - 验证：`go test ./internal/services`、`go test ./internal/handlers ./internal/queue`、`go test ./internal/services -run 'TestPreviewAVFallsBackToThePornDBWhenConfigured|TestConfirmAVNormalizesThePornDBPublicDetailURL|TestMDCxMigratedSitesSearchCandidates' -count=1`、`go vet ./...` 均通过。
+
+## 2026-05-10 00:20
+- 进度：修复 DMM 搜索入口在单个搜索 URL 失败时直接返回的问题，改为按 reference 继续尝试后续搜索 URL；补充 DMM 回归测试，覆盖“首个搜索 URL 失败但第二个命中”的场景。
+- 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_mdcx_sites_test.go`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestDMMSearchCandidatesReturnsRegionError|TestDMMSearchCandidatesSkipsFailedSearchURL|TestMDCxMigratedSitesSearchCandidates' -count=1` 通过。
