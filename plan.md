@@ -2,6 +2,28 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-09 18:46 +0800] scraper-preview-go FC2 专站迁移实现
+- Type: `implementation`
+- Summary:
+  - 在 `references/mdcx/scraper-preview-go` 迁移 MDCx 的 FC2 官方站与 FC2Hub 两个专站，新增 `fc2` 与 `fc2hub` Go crawler，并保持 `/api/preview` 请求与响应结构不变。
+  - 新增离线测试覆盖 FC2 编号归一化、URL 构造、搜索候选排序、详情字段解析、无码标签处理和失败路径。
+  - 将两个新站点接入服务注册、Vue 站点选择和 README 返回格式说明；现有 `fc2ppvdb/fc2club` 逻辑未重写。
+- Changed Files:
+  - `references/mdcx/scraper-preview-go/internal/sites/fc2/fc2.go`
+  - `references/mdcx/scraper-preview-go/internal/sites/fc2/fc2_test.go`
+  - `references/mdcx/scraper-preview-go/internal/sites/fc2hub/fc2hub.go`
+  - `references/mdcx/scraper-preview-go/internal/sites/fc2hub/fc2hub_test.go`
+  - `references/mdcx/scraper-preview-go/cmd/server/main.go`
+  - `references/mdcx/scraper-preview-go/web/src/App.vue`
+  - `references/mdcx/scraper-preview-go/README.md`
+  - `plan.md`
+- Verification:
+  - `cd references/mdcx/scraper-preview-go && go test ./...` passed.
+  - `cd references/mdcx/scraper-preview-go && go vet ./...` passed.
+  - `cd references/mdcx/scraper-preview-go/web && npm run build` passed after `npm ci` installed missing local frontend dependencies.
+- Rollback:
+  - `git revert <commit>`
+
 ## Entry Template
 ### [YYYY-MM-DD HH:MM] Title
 - Type: `plan` | `implementation` | `docs`
