@@ -1,15 +1,18 @@
 export const AV_SITE_OPTIONS = [
+  'theporndb',
+  'dmm',
   'javdb',
+  'jav321',
+  'mgstage',
   'javbus',
   'javlibrary',
   'airav_cc',
   'avsex',
-  'theporndb',
   'mywife',
-  'fc2',
+  'fc2ppvdb',
   'fc2club',
-  'fc2hub',
-  'fc2ppvdb'
+  'fc2',
+  'fc2hub'
 ]
 
 export const AV_POSTER_CROP_MODE_OPTIONS = [

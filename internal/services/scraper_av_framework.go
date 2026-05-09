@@ -369,7 +369,7 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 			hits, err := crawler.SearchCandidates(ctx, run, query, limit)
 			if err != nil {
 				run.addError(err)
-				if firstErr == nil {
+				if firstErr == nil || isPreferredAVScrapeError(err, firstErr) {
 					firstErr = err
 				}
 				continue
@@ -448,6 +448,21 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 		}
 	}
 	return final, trace, nil
+}
+
+func isPreferredAVScrapeError(candidate, current error) bool {
+	if candidate == nil {
+		return false
+	}
+	if current == nil {
+		return true
+	}
+	candidateText := strings.ToLower(candidate.Error())
+	currentText := strings.ToLower(current.Error())
+	if strings.Contains(candidateText, "cloudflare") && !strings.Contains(currentText, "cloudflare") {
+		return true
+	}
+	return false
 }
 
 func (s *ScraperService) resolveAVCrawlersForPlan(plan avSearchPlan) ([]avCrawler, error) {
@@ -612,12 +627,12 @@ func (s *ScraperService) buildAVDetailURLBySource(source, externalID string) str
 		return toAbsoluteURL(s.avSiteBaseURL("fc2", "https://adult.contents.fc2.com"), "/article/"+number+"/")
 	case "fc2club":
 		if code := buildFC2PPVPathCode(externalID); code != "" {
-			return toAbsoluteURL(s.avSiteBaseURL("fc2club", "https://fc2club.com"), "/html/"+url.PathEscape(code)+".html")
+			return toAbsoluteURL(s.avSiteBaseURL("fc2club", "https://fc2club.top"), "/html/"+url.PathEscape(code)+".html")
 		}
 		return ""
 	case "fc2hub":
 		if number := normalizeFC2NumericID(externalID); number != "" {
-			return toAbsoluteURL(s.avSiteBaseURL("fc2hub", "https://fc2hub.com"), "/detail/"+url.PathEscape(number))
+			return toAbsoluteURL(s.avSiteBaseURL("fc2hub", "https://javten.com"), "/detail/"+url.PathEscape(number))
 		}
 		return ""
 	case "fc2ppvdb":

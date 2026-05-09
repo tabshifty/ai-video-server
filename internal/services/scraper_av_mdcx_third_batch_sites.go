@@ -12,7 +12,7 @@ import (
 
 var (
 	fc2HubDetailPathRe     = regexp.MustCompile(`^/detail/\d+/?$`)
-	fc2PPVDBDetailPathRe   = regexp.MustCompile(`^/articles/fc2-ppv-\d+/?$`)
+	fc2PPVDBDetailPathRe   = regexp.MustCompile(`^/articles/(?:fc2-ppv-)?\d+/?$`)
 	airAVDetailPathRe      = regexp.MustCompile(`^/video/fc2-ppv-\d+/?$`)
 	jav321DetailPathRe     = regexp.MustCompile(`^/video/[a-z0-9]+/?$`)
 	mywifeDetailPathRe     = regexp.MustCompile(`^/teigaku/model/no/\d+/?$`)
@@ -113,7 +113,76 @@ func (c *minimalHTMLAVCrawler) Name() string {
 	return c.site
 }
 
-func (c *minimalHTMLAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
+func (c *minimalHTMLAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil
+	}
+	switch c.site {
+	case "fc2club":
+		if number := normalizeFC2NumericID(query); number != "" {
+			detailURL := toAbsoluteURL(c.svc.avSiteBaseURL(c.site, "https://fc2club.top"), "/html/FC2-"+number+".html")
+			if run != nil {
+				run.addSearchURL(detailURL)
+			}
+			candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+			if err != nil {
+				return nil, err
+			}
+			return []avScrapeCandidate{candidate}, nil
+		}
+	case "fc2ppvdb":
+		if number := normalizeFC2NumericID(query); number != "" {
+			detailURL := toAbsoluteURL(c.svc.avSiteBaseURL(c.site, "https://fc2ppvdb.com"), "/articles/"+number)
+			if run != nil {
+				run.addSearchURL(detailURL)
+			}
+			candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+			if err != nil {
+				return nil, err
+			}
+			return []avScrapeCandidate{candidate}, nil
+		}
+	case "fc2hub":
+		if number := normalizeFC2NumericID(query); number != "" {
+			base := c.svc.avSiteBaseURL(c.site, "https://javten.com")
+			searchURL := toAbsoluteURL(base, "/search?kw="+url.QueryEscape(number))
+			if run != nil {
+				run.addSearchURL(searchURL)
+			}
+			content, err := c.svc.fetchAVHTML(ctx, searchURL)
+			if err != nil {
+				return nil, err
+			}
+			detailURL := parseFC2HubDetailURL(content, number, base)
+			if detailURL == "" {
+				return nil, nil
+			}
+			candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+			if err != nil {
+				return nil, err
+			}
+			return []avScrapeCandidate{candidate}, nil
+		}
+	case "jav321":
+		base := c.svc.avSiteBaseURL(c.site, "https://www.jav321.com")
+		searchURL := toAbsoluteURL(base, "/search")
+		if run != nil {
+			run.addSearchURL(searchURL)
+		}
+		content, err := c.svc.postAVFormText(ctx, searchURL, url.Values{"sn": {query}}, nil)
+		if err != nil {
+			return nil, err
+		}
+		candidate, err := parseJav321SearchCandidate(content, query, base)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(candidate.Title) == "" {
+			return nil, nil
+		}
+		return []avScrapeCandidate{candidate}, nil
+	}
 	return nil, nil
 }
 
@@ -136,16 +205,22 @@ func (c *minimalHTMLAVCrawler) FetchByDetailURL(ctx context.Context, run *avScra
 	}
 	code := c.extractCode(root, detailURL)
 	title = trimTitleByNumber(title, code)
+	if c.site == "fc2club" {
+		title = strings.TrimSpace(regexp.MustCompile(`(?i)^FC2[-_ ]?`+regexp.QuoteMeta(normalizeFC2NumericID(code))+`\s*`).ReplaceAllString(title, ""))
+	}
 	if title == "" {
 		return avScrapeCandidate{}, fmt.Errorf("empty scrape result for url %q", detailURL)
 	}
 
 	externalID := minimalHTMLExternalID(detailURL, c.site)
+	posterURL := c.extractPosterURL(root, detailURL)
 	candidate := avScrapeCandidate{
 		Source:     c.site,
 		ExternalID: externalID,
 		Code:       code,
 		Title:      title,
+		PosterURL:  posterURL,
+		ThumbURL:   posterURL,
 		DetailURL:  strings.TrimSpace(detailURL),
 		Raw: map[string]any{
 			"site":        c.site,
@@ -153,6 +228,8 @@ func (c *minimalHTMLAVCrawler) FetchByDetailURL(ctx context.Context, run *avScra
 			"external_id": externalID,
 			"av_code":     code,
 			"title":       title,
+			"poster_url":  posterURL,
+			"thumb_url":   posterURL,
 		},
 	}
 	return candidate, nil
@@ -162,10 +239,10 @@ func (c *minimalHTMLAVCrawler) extractCode(root *html.Node, detailURL string) st
 	content := nodeText(root)
 	switch c.site {
 	case "fc2club", "fc2hub", "fc2ppvdb", "airav", "freejavbt":
-		if number := normalizeFC2NumericID(content); number != "" {
+		if number := normalizeFC2NumericIDFromDetailPath(detailURL); number != "" {
 			return "FC2-PPV-" + number
 		}
-		if number := normalizeFC2NumericID(detailURL); number != "" {
+		if number := normalizeFC2NumericID(content); number != "" {
 			return "FC2-PPV-" + number
 		}
 	case "jav321", "avsox", "madouqu", "mdtv.com", "cnmdb", "faleno", "fantastica", "giga", "javday", "kin8", "love6", "lulubar":
@@ -206,6 +283,124 @@ func (c *minimalHTMLAVCrawler) extractCode(root *html.Node, detailURL string) st
 		}
 	}
 	return extractAggregateSupplementNumber(content)
+}
+
+func normalizeFC2NumericIDFromDetailPath(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	path := strings.TrimSpace(parsed.Path)
+	if path == "" {
+		return ""
+	}
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)/articles/(?:fc2-ppv-)?(\d{5,8})/?$`),
+		regexp.MustCompile(`(?i)/html/fc2-(\d{5,8})\.html$`),
+		regexp.MustCompile(`(?i)/detail/(\d{5,8})/?$`),
+		regexp.MustCompile(`(?i)/video/fc2-ppv-(\d{5,8})/?$`),
+	}
+	for _, pattern := range patterns {
+		if matches := pattern.FindStringSubmatch(path); len(matches) > 1 {
+			number := strings.TrimLeft(matches[1], "0")
+			if number == "" {
+				return "0"
+			}
+			return number
+		}
+	}
+	return ""
+}
+
+func (c *minimalHTMLAVCrawler) extractPosterURL(root *html.Node, detailURL string) string {
+	if poster := findFirstAttr(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "meta" && strings.EqualFold(attrValue(n, "property"), "og:image")
+	}, "content"); strings.TrimSpace(poster) != "" {
+		return toAbsoluteURL(detailURL, poster)
+	}
+	for _, image := range findAll(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "img"
+	}) {
+		src := strings.TrimSpace(attrValue(image, "src"))
+		if src == "" || isLikelyLogoURL(src) {
+			continue
+		}
+		return toAbsoluteURL(detailURL, src)
+	}
+	return ""
+}
+
+func parseFC2HubDetailURL(content, number, baseURL string) string {
+	number = normalizeFC2NumericID(number)
+	if number == "" {
+		return ""
+	}
+	matches := regexp.MustCompile(`(?is)<(?:a|link)[^>]+href=["']([^"']+)["']`).FindAllStringSubmatch(content, -1)
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		href := strings.TrimSpace(match[1])
+		if !strings.Contains(href, number) {
+			continue
+		}
+		if detailURL := toAbsoluteURL(baseURL, href); detailURL != "" {
+			return detailURL
+		}
+	}
+	return ""
+}
+
+func parseJav321SearchCandidate(content, query, baseURL string) (avScrapeCandidate, error) {
+	if strings.Contains(content, "AVが見つかりませんでした") {
+		return avScrapeCandidate{}, nil
+	}
+	title := stripHTMLText(regexp.MustCompile(`(?is)<h3[^>]*>(.*?)</h3>`).FindString(content))
+	title = strings.TrimSpace(regexp.MustCompile(`\s+sample\s*$`).ReplaceAllString(title, ""))
+	if title == "" {
+		title = stripHTMLText(extractRegexGroup(content, `(?is)<title[^>]*>(.*?)</title>`))
+	}
+	if title == "" {
+		return avScrapeCandidate{}, nil
+	}
+	detailURL := toAbsoluteURL(baseURL, extractRegexGroup(content, `(?is)<a[^>]+href=["']([^"']*/video/[^"']+)["']`))
+	code := firstNonEmptyString(
+		extractRegexGroup(content, `(?is)(?:品番|番号|品號)\s*[:：]\s*([A-Za-z0-9_-]+)`),
+		extractAVCode(title),
+		extractAVCode(query),
+	)
+	poster := toAbsoluteURL(baseURL, extractRegexGroup(content, `(?is)<img[^>]+src=["']([^"']+)["']`))
+	actors := splitDelimitedNames(extractRegexGroup(content, `(?is)(?:出演者|出演)\s*[:：]\s*([^<]+)`))
+	candidate := avScrapeCandidate{
+		Source:     "jav321",
+		ExternalID: strings.ToLower(extractSingleSitePathID(detailURL)),
+		Code:       strings.ToUpper(strings.TrimSpace(code)),
+		Title:      title,
+		PosterURL:  poster,
+		ThumbURL:   poster,
+		Actors:     actors,
+		DetailURL:  detailURL,
+		Raw: map[string]any{
+			"site":        "jav321",
+			"detail_url":  detailURL,
+			"external_id": strings.ToLower(extractSingleSitePathID(detailURL)),
+			"av_code":     strings.ToUpper(strings.TrimSpace(code)),
+			"title":       title,
+			"poster_url":  poster,
+			"thumb_url":   poster,
+			"actors":      actors,
+		},
+	}
+	return candidate, nil
+}
+
+func splitDelimitedNames(raw string) []string {
+	raw = strings.TrimSpace(stripHTMLText(raw))
+	if raw == "" {
+		return nil
+	}
+	parts := regexp.MustCompile(`[,，、/\s]+`).Split(raw, -1)
+	return dedupeStrings(parts)
 }
 
 func minimalHTMLExternalID(rawURL string, site string) string {

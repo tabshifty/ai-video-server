@@ -53,12 +53,55 @@ func (c *thePornDBAVCrawler) Name() string {
 	return "theporndb"
 }
 
-func (c *dmmAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
-	return nil, nil
+func (c *dmmAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil
+	}
+	base := strings.TrimRight(c.svc.avSiteBaseURL("dmm", "https://www.dmm.co.jp"), "/")
+	searchURL := base + "/search/=/searchstr=" + url.PathEscape(query) + "/"
+	if run != nil {
+		run.addSearchURL(searchURL)
+	}
+	content, err := c.svc.fetchAVHTMLDocumentText(ctx, searchURL, map[string]string{
+		"Cookie": "age_check_done=1",
+	})
+	if err != nil {
+		return nil, err
+	}
+	detailURLs := parseDMMDetailURLs(content, query, base)
+	if len(detailURLs) == 0 {
+		return nil, nil
+	}
+	out := make([]avScrapeCandidate, 0, minPreviewLimit(limit, len(detailURLs)))
+	for _, detailURL := range detailURLs {
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+		candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, candidate)
+	}
+	return out, nil
 }
 
-func (c *mgstageAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
-	return nil, nil
+func (c *mgstageAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunContext, query string, limit int) ([]avScrapeCandidate, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil
+	}
+	base := strings.TrimRight(c.svc.avSiteBaseURL("mgstage", "https://www.mgstage.com"), "/")
+	detailURL := base + "/product/product_detail/" + url.PathEscape(strings.ToUpper(query)) + "/"
+	if run != nil {
+		run.addSearchURL(detailURL)
+	}
+	candidate, err := c.FetchByDetailURL(ctx, run, detailURL)
+	if err != nil {
+		return nil, err
+	}
+	return []avScrapeCandidate{candidate}, nil
 }
 
 func (c *prestigeAVCrawler) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
@@ -167,13 +210,20 @@ func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRu
 		run.addDetailURL(detailURL)
 	}
 	title := strings.TrimSpace(nodeText(findFirst(root, func(n *html.Node) bool {
-		return n.Type == html.ElementNode && attrValue(n, "id") == "center_column"
+		return n.Type == html.ElementNode && n.Data == "h1"
 	})))
-	code := strings.TrimSpace(avTableValue(root, "Number"))
+	if title == "" {
+		title = strings.TrimSpace(nodeText(findFirst(root, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && attrValue(n, "id") == "center_column"
+		})))
+	}
+	code := strings.TrimSpace(avTableValueAny(root, "Number", "品番"))
 	if strings.TrimSpace(title) == "" {
 		return avScrapeCandidate{}, fmt.Errorf("empty scrape result for url %q", detailURL)
 	}
 	poster := strings.TrimSpace(findAttrByID(root, "a", "EnlargeImage", "href"))
+	poster = toAbsoluteURL(detailURL, poster)
+	thumb := poster
 	candidate := avScrapeCandidate{
 		Source:      c.Name(),
 		ExternalID:  strings.ToLower(extractSingleSitePathID(detailURL)),
@@ -181,8 +231,9 @@ func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRu
 		Title:       title,
 		Overview:    strings.TrimSpace(nodeText(findFirst(root, func(n *html.Node) bool { return n.Type == html.ElementNode && attrValue(n, "id") == "introduction" }))),
 		PosterURL:   strings.Replace(poster, "/pb_", "/pf_", 1),
-		ReleaseDate: normalizeSlashDate(avTableValue(root, "Release")),
-		Actors:      avTableLinks(root, "Actor"),
+		ThumbURL:    thumb,
+		ReleaseDate: normalizeSlashDate(avTableValueAny(root, "Release", "配信開始日", "発売日")),
+		Actors:      avTableLinksAny(root, "Actor", "出演"),
 		DetailURL:   strings.TrimSpace(detailURL),
 		Raw: map[string]any{
 			"site":        c.Name(),
@@ -190,6 +241,8 @@ func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRu
 			"external_id": strings.ToLower(extractSingleSitePathID(detailURL)),
 			"av_code":     code,
 			"title":       title,
+			"poster_url":  strings.Replace(poster, "/pb_", "/pf_", 1),
+			"thumb_url":   thumb,
 		},
 	}
 	return candidate, nil
@@ -511,9 +564,21 @@ type thePornDBSceneDetail struct {
 }
 
 func (s *ScraperService) fetchAVHTMLDocument(ctx context.Context, endpoint string, extraHeaders map[string]string) (*html.Node, string, error) {
+	body, err := s.fetchAVHTMLDocumentText(ctx, endpoint, extraHeaders)
+	if err != nil {
+		return nil, "", err
+	}
+	root, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, "", fmt.Errorf("解析 AV 响应失败: %w", err)
+	}
+	return root, body, nil
+}
+
+func (s *ScraperService) fetchAVHTMLDocumentText(ctx context.Context, endpoint string, extraHeaders map[string]string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, "", fmt.Errorf("创建 AV 刮削请求失败: %w", err)
+		return "", fmt.Errorf("创建 AV 刮削请求失败: %w", err)
 	}
 	if strings.TrimSpace(s.avUserAgent) != "" {
 		req.Header.Set("User-Agent", s.avUserAgent)
@@ -530,22 +595,53 @@ func (s *ScraperService) fetchAVHTMLDocument(ctx context.Context, endpoint strin
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("AV 站点请求失败: %w", err)
+		return "", fmt.Errorf("AV 站点请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, "", fmt.Errorf("AV 站点请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("AV 站点请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
-		return nil, "", fmt.Errorf("读取 AV 响应失败: %w", err)
+		return "", fmt.Errorf("读取 AV 响应失败: %w", err)
 	}
-	root, err := html.Parse(strings.NewReader(string(body)))
+	return string(body), nil
+}
+
+func (s *ScraperService) postAVFormText(ctx context.Context, endpoint string, form url.Values, extraHeaders map[string]string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return nil, "", fmt.Errorf("解析 AV 响应失败: %w", err)
+		return "", fmt.Errorf("创建 AV 表单请求失败: %w", err)
 	}
-	return root, string(body), nil
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if strings.TrimSpace(s.avUserAgent) != "" {
+		req.Header.Set("User-Agent", s.avUserAgent)
+	}
+	for key, value := range extraHeaders {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			continue
+		}
+		req.Header.Set(key, value)
+	}
+	client := s.avHTTPClient
+	if client == nil {
+		client = s.httpClient
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("AV 表单请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return "", fmt.Errorf("AV 表单请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return "", fmt.Errorf("读取 AV 表单响应失败: %w", err)
+	}
+	return string(body), nil
 }
 
 func (s *ScraperService) fetchAVJSON(ctx context.Context, endpoint string, extraHeaders map[string]string, out any) error {
@@ -594,6 +690,15 @@ func avTableValue(root *html.Node, label string) string {
 	return ""
 }
 
+func avTableValueAny(root *html.Node, labels ...string) string {
+	for _, label := range labels {
+		if value := avTableValue(root, label); strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
 func avTableLinks(root *html.Node, label string) []string {
 	for _, row := range findAll(root, func(n *html.Node) bool { return n.Type == html.ElementNode && n.Data == "tr" }) {
 		cells := findAll(row, func(n *html.Node) bool { return n.Type == html.ElementNode && (n.Data == "th" || n.Data == "td") })
@@ -611,6 +716,52 @@ func avTableLinks(root *html.Node, label string) []string {
 		}
 	}
 	return nil
+}
+
+func avTableLinksAny(root *html.Node, labels ...string) []string {
+	for _, label := range labels {
+		if values := avTableLinks(root, label); len(values) > 0 {
+			return values
+		}
+	}
+	return nil
+}
+
+func parseDMMDetailURLs(content, query, baseURL string) []string {
+	matches := regexp.MustCompile(`(?is)<a[^>]+href=["']([^"']*cid=[^"']+)["'][^>]*>(.*?)</a>`).FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	targetCode := normalizeAVCodeForCompare(query)
+	out := make([]string, 0, len(matches))
+	seen := map[string]struct{}{}
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		href := strings.TrimSpace(html.UnescapeString(match[1]))
+		anchorText := stripHTMLText(match[2])
+		if targetCode != "" {
+			candidateCode := normalizeAVCodeForCompare(anchorText)
+			if candidateCode == "" {
+				candidateCode = normalizeAVCodeForCompare(href)
+			}
+			if candidateCode != "" && candidateCode != targetCode {
+				continue
+			}
+		}
+		detailURL := toAbsoluteURL(baseURL+"/", href)
+		if detailURL == "" {
+			continue
+		}
+		key := strings.ToLower(detailURL)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, detailURL)
+	}
+	return out
 }
 
 func findAll(root *html.Node, predicate func(*html.Node) bool) []*html.Node {

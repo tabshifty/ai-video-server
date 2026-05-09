@@ -68,9 +68,11 @@ func (s *ScraperService) resolveAVPosterAssets(ctx context.Context, videoID uuid
 			assets.Variant = "thumb"
 		} else if isAbsoluteHTTPURL(thumbURL) && thumbURL != posterURL {
 			if thumbPath, thumbErr := s.downloadPosterVariant(ctx, thumbURL, videoID, "thumb"); thumbErr == nil {
-				assets.SelectedPath = thumbPath
-				assets.ThumbPath = thumbPath
-				assets.Variant = "thumb"
+				if isAVPortraitImage(thumbPath) {
+					assets.SelectedPath = thumbPath
+					assets.ThumbPath = thumbPath
+					assets.Variant = "thumb"
+				}
 			}
 		}
 		if !posterFromThumbOnly && assets.SelectedPath == originalPath && cropCfg.PosterCropEnabled {
@@ -114,6 +116,19 @@ func (s *ScraperService) downloadPosterVariant(ctx context.Context, posterURL st
 		return "", err
 	}
 	return outputPath, nil
+}
+
+func isAVPortraitImage(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	cfg, _, err := image.DecodeConfig(file)
+	if err != nil {
+		return false
+	}
+	return cfg.Height > cfg.Width
 }
 
 func (s *ScraperService) cropAVPosterImage(originalPath string, videoID uuid.UUID, cropMode string) (string, error) {

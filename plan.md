@@ -2,6 +2,33 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-09 23:41 +0800] MDCx AV 迁移站点补齐实现
+- Type: `implementation`
+- Summary:
+  - 补齐 MDCx 迁移站点默认配置和后台站点选项，新增 `dmm/jav321/mgstage` 并按 MDCx 优先级调整日系与 FC2 默认顺序。
+  - 为 `dmm/mgstage/jav321/fc2ppvdb/fc2club/fc2hub` 补上编号搜索入口，避免站点已注册但自动预览空返回。
+  - 修正 AV 图片本地保存选择：`poster` 保留横版原图，`thumb` 只采用竖版站点图；站点 thumb 非竖版时保留下载文件并从横版裁切竖版。
+  - 保持确认流程旧 FC2 detail URL 兼容，同时在自动搜索路径按 MDCx 参考 URL 迁移。
+- Changed Files:
+  - `admin-web/src/views/avManualScrape.helpers.js`
+  - `admin-web/src/views/avManualScrape.helpers.spec.js`
+  - `internal/services/scraper_av_framework.go`
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_av_mdcx_sites_test.go`
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `internal/services/scraper_av_poster.go`
+  - `internal/services/scraper_av_poster_assets_test.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `internal/services/scraper_av_strategy_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services` passed.
+  - `go test ./internal/services ./internal/handlers ./internal/queue` passed.
+  - `go vet ./internal/services ./internal/handlers ./internal/queue` passed.
+  - `cd admin-web && npm test -- avManualScrape.helpers.spec.js` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-09 23:10 +0800] scraper-preview-go ThePornDB 欧美站点迁移计划
 - Type: `plan`
 - Summary:

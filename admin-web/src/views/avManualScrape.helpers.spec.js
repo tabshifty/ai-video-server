@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AV_POSTER_CROP_MODE_OPTIONS,
+  AV_SITE_OPTIONS,
   applyAVScrapeConfig,
   buildAVManualScrapeConfirmPayload,
   buildAVManualScrapePreviewPayload,
@@ -9,6 +10,20 @@ import {
 } from './avManualScrape.helpers'
 
 describe('avManualScrape helpers', () => {
+  it('exposes all MDCx migrated AV sites', () => {
+    expect(AV_SITE_OPTIONS).toEqual(expect.arrayContaining([
+      'theporndb',
+      'dmm',
+      'javdb',
+      'jav321',
+      'mgstage',
+      'fc2ppvdb',
+      'fc2club',
+      'fc2',
+      'fc2hub'
+    ]))
+  })
+
   it('builds preview payload with cache bypass and site hints', () => {
     expect(buildAVManualScrapePreviewPayload({
       video_id: 'video-1',

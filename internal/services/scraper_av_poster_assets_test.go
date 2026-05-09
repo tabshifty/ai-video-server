@@ -274,6 +274,57 @@ func TestConfirmAVStoresSeparateThumbWhenThumbURLIsAvailable(t *testing.T) {
 	}
 }
 
+func TestResolveAVPosterAssetsCropsWhenThumbURLIsNotPortrait(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/poster/landscape.jpg", "/thumb/landscape.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write(testJPEGLandscapeBytes(t))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "", t.TempDir(), "", 2*time.Second)
+	assets, _, err := svc.resolveAVPosterAssets(
+		context.Background(),
+		uuid.New(),
+		"",
+		server.URL+"/poster/landscape.jpg",
+		server.URL+"/thumb/landscape.jpg",
+		"video_cover",
+		avPosterQualityPrimary,
+		AVScraperSiteConfig{
+			PosterCropEnabled: true,
+			PosterCropMode:    avPosterCropModeCenter,
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveAVPosterAssets returned error: %v", err)
+	}
+	if assets.OriginalPath == "" || assets.CroppedPath == "" {
+		t.Fatalf("expected original and cropped paths, assets=%+v", assets)
+	}
+	if assets.ThumbPath != assets.CroppedPath {
+		t.Fatalf("expected non-portrait thumb URL to be ignored in favor of crop, got thumb=%s cropped=%s", assets.ThumbPath, assets.CroppedPath)
+	}
+	if assets.Variant != avPosterVariantCropped {
+		t.Fatalf("expected cropped variant, got=%s", assets.Variant)
+	}
+
+	posterImg := decodeJPEGFile(t, assets.OriginalPath)
+	thumbImg := decodeJPEGFile(t, assets.ThumbPath)
+	if posterImg.Bounds().Dx() <= posterImg.Bounds().Dy() {
+		t.Fatalf("expected poster to stay landscape, got=%dx%d", posterImg.Bounds().Dx(), posterImg.Bounds().Dy())
+	}
+	if thumbImg.Bounds().Dx() >= thumbImg.Bounds().Dy() {
+		t.Fatalf("expected thumb to be portrait crop, got=%dx%d", thumbImg.Bounds().Dx(), thumbImg.Bounds().Dy())
+	}
+}
+
 func TestResolveAVPosterAssetsUsesConfiguredHorizontalCropAnchor(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/poster/wide-anchor.jpg" {

@@ -61,9 +61,9 @@ func defaultAVScraperSiteConfig() AVScraperSiteConfig {
 	return AVScraperSiteConfig{
 		EnabledSites: defaultAVEnabledSites(),
 		CategorySiteOrder: map[string][]string{
-			avSiteCategoryFC2:      {"fc2", "fc2club", "fc2hub", "fc2ppvdb", "javdb"},
+			avSiteCategoryFC2:      {"fc2ppvdb", "fc2club", "fc2", "fc2hub", "javdb"},
 			avSiteCategoryWestern:  {"theporndb", "javdb", "mywife"},
-			avSiteCategoryJapanese: {"javdb", "javbus", "javlibrary", "airav_cc", "avsex", "theporndb", "getchu"},
+			avSiteCategoryJapanese: {"theporndb", "dmm", "javdb", "jav321", "mgstage", "javbus", "javlibrary", "airav_cc", "avsex", "getchu"},
 		},
 		PosterCropEnabled: true,
 		PosterCropMode:    avPosterCropModeCenter,
@@ -72,18 +72,21 @@ func defaultAVScraperSiteConfig() AVScraperSiteConfig {
 
 func defaultAVEnabledSites() []string {
 	return []string{
+		"theporndb",
+		"dmm",
 		"javdb",
+		"jav321",
+		"mgstage",
 		"javbus",
 		"javlibrary",
 		"airav_cc",
 		"avsex",
-		"theporndb",
 		"getchu",
 		"mywife",
-		"fc2",
-		"fc2club",
-		"fc2hub",
 		"fc2ppvdb",
+		"fc2club",
+		"fc2",
+		"fc2hub",
 	}
 }
 
