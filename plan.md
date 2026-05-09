@@ -2,6 +2,25 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-09 18:52 +0800] scraper-preview-go FC2 live 验证与 FC2Hub 样张修复
+- Type: `implementation`
+- Summary:
+  - 启动 `scraper-preview-go` Go 预览服务并对 `fc2/fc2hub/fc2ppvdb/fc2club` 做真实 HTTP 预览验证。
+  - 修复 `fc2hub` live 页面中样张选择器过宽的问题，避免把 LAXD、tag、seller 和推荐视频链接误并入 `extrafanart`。
+  - 记录 live 验证现状：`fc2` 官方站可返回有效元数据，`fc2hub` 可返回有效元数据且样张已收敛为图片链接；`fc2ppvdb` 当前网络下被登录/Cloudflare Turnstile 页面拦截，`fc2club` 当前 live 页面未匹配既有标题结构。
+- Changed Files:
+  - `references/mdcx/scraper-preview-go/internal/sites/fc2hub/fc2hub.go`
+  - `references/mdcx/scraper-preview-go/internal/sites/fc2hub/fc2hub_test.go`
+  - `plan.md`
+- Verification:
+  - `cd references/mdcx/scraper-preview-go && go test ./...` passed.
+  - `cd references/mdcx/scraper-preview-go && go vet ./...` passed.
+  - `PORT=18080 STATIC_DIR= REQUEST_TIMEOUT_SECONDS=20 go run ./cmd/server` started the live preview service.
+  - `POST /api/preview {"number":"FC2-1723984","sites":["fc2"]}` returned `ok: true` with title, poster/thumb, tags and 10 extrafanart items.
+  - `POST /api/preview {"number":"FC2-1940476","sites":["fc2hub"]}` returned `ok: true` with title, thumb and 10 image-only extrafanart items after the selector fix.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-09 18:46 +0800] scraper-preview-go FC2 专站迁移实现
 - Type: `implementation`
 - Summary:
