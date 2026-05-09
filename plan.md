@@ -2,6 +2,32 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-09 23:10 +0800] scraper-preview-go ThePornDB 欧美站点迁移计划
+- Type: `plan`
+- Summary:
+  - 首批欧美站点只迁移 `theporndb`，保持 `/api/preview` 的 `number/sites` 兼容，并新增可选 `filePath/detailUrl`。
+  - 新增服务端环境变量 `THEPORNDB_API_TOKEN`，token 缺失时只让 `theporndb` 返回站点级失败，不影响其他站点聚合。
+  - 新增 ThePornDB crawler、Vue 表单入口与 README 中文说明；首版不读取本地媒体文件、不实现真实 hash 匹配。
+- Changed Files:
+  - `references/mdcx/scraper-preview-go/internal/config/config.go`
+  - `references/mdcx/scraper-preview-go/internal/crawler/types.go`
+  - `references/mdcx/scraper-preview-go/internal/preview/service.go`
+  - `references/mdcx/scraper-preview-go/internal/sites/theporndb/theporndb.go`
+  - `references/mdcx/scraper-preview-go/internal/sites/theporndb/theporndb_test.go`
+  - `references/mdcx/scraper-preview-go/cmd/server/main.go`
+  - `references/mdcx/scraper-preview-go/web/src/App.vue`
+  - `references/mdcx/scraper-preview-go/README.md`
+  - `plan.md`
+- Verification:
+  - `cd references/mdcx/scraper-preview-go && go test ./...` passed.
+  - `cd references/mdcx/scraper-preview-go && go vet ./...` passed.
+  - `cd references/mdcx/scraper-preview-go/web && npm run build` passed.
+  - `THEPORNDB_API_TOKEN=*** PORT=18081 STATIC_DIR= REQUEST_TIMEOUT_SECONDS=20 go run ./cmd/server` live service started; `POST /api/preview` with `sites:["theporndb"]` and `filePath:"x-art.19.11.03.A.Kitten.For.Christmas.mp4"` returned HTTP 200 with title, actor, release, poster/thumb and API detail URL.
+  - Same live service with public `detailUrl:"https://theporndb.net/scenes/xart-falling-in-love-with-alex-grey"` returned HTTP 200 and normalized `debug.detailUrl` to `https://api.theporndb.net/scenes/xart-falling-in-love-with-alex-grey`.
+  - No-token service on `PORT=18082` returned HTTP 502 with `siteResults[0].site="theporndb"`, `ok=false`, and `error="theporndb: THEPORNDB_API_TOKEN is required"`.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-09 18:52 +0800] scraper-preview-go FC2 live 验证与 FC2Hub 样张修复
 - Type: `implementation`
 - Summary:
