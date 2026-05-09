@@ -4399,3 +4399,13 @@
 - 进度：修复 DMM 搜索入口在单个搜索 URL 失败时直接返回的问题，改为按 reference 继续尝试后续搜索 URL；补充 DMM 回归测试，覆盖“首个搜索 URL 失败但第二个命中”的场景。
 - 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_mdcx_sites_test.go`、`plan.md`
 - 验证：`go test ./internal/services -run 'TestDMMSearchCandidatesReturnsRegionError|TestDMMSearchCandidatesSkipsFailedSearchURL|TestMDCxMigratedSitesSearchCandidates' -count=1` 通过。
+
+## 2026-05-10 02:20
+- 进度：进一步缓解 DMM 30 秒超时，把三个搜索 URL 改成并发探测，避免搜索失败按串行累积等待；保留区域封锁优先返回和失败 URL 跳过逻辑。
+- 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`plan.md`
+- 验证：`go test ./internal/services`、`go vet ./...` 通过。
+
+## 2026-05-10 02:52
+- 进度：修复 DMM 详情候选的失败回退逻辑，改为并发尝试当前搜索页里的多个候选，不再因首个候选超时或 504 直接中断；补回归测试覆盖“首个候选失败、第二个候选成功”。
+- 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_mdcx_sites_test.go`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestDMMSearchCandidatesReturnsRegionError|TestDMMSearchCandidatesSkipsFailedSearchURL|TestDMMSearchCandidatesSkipsFailedDetailURL|TestMDCxMigratedSitesSearchCandidates' -count=1`、`go test ./internal/services ./internal/handlers ./internal/queue`、`go vet ./...` 通过。

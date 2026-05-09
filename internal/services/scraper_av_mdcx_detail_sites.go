@@ -81,46 +81,95 @@ func (c *dmmAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunCon
 	if len(searchURLs) == 0 {
 		return nil, nil
 	}
-	for _, searchURL := range searchURLs {
+	type dmmSearchResult struct {
+		index         int
+		hits          []dmmSearchHit
+		regionBlocked bool
+	}
+	results := make(chan dmmSearchResult, len(searchURLs))
+	searchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	for i, searchURL := range searchURLs {
 		if run != nil {
 			run.addSearchURL(searchURL)
 		}
-		content, err := c.svc.fetchAVHTMLDocumentText(ctx, searchURL, map[string]string{
-			"Cookie": "age_check_done=1",
-		})
-		if err != nil {
-			continue
-		}
-		if dmmIsRegionBlocked(content) {
-			return nil, fmt.Errorf("dmm: content is not available in this region")
-		}
-		hits := dmmParseSearchCandidates(content, query, base)
-		if len(hits) == 0 {
-			continue
-		}
-		out := make([]avScrapeCandidate, 0, minPreviewLimit(limit, len(hits)))
-		for _, hit := range hits {
-			if limit > 0 && len(out) >= limit {
-				break
-			}
-			candidate, err := c.FetchByDetailURL(ctx, run, hit.URL)
+		go func(index int, searchURL string) {
+			content, err := c.svc.fetchAVHTMLDocumentText(searchCtx, searchURL, map[string]string{
+				"Cookie": "age_check_done=1",
+			})
 			if err != nil {
-				return nil, err
+				results <- dmmSearchResult{index: index}
+				return
 			}
+			if dmmIsRegionBlocked(content) {
+				results <- dmmSearchResult{index: index, regionBlocked: true}
+				return
+			}
+			results <- dmmSearchResult{index: index, hits: dmmParseSearchCandidates(content, query, base)}
+		}(i, searchURL)
+	}
+
+	var regionErr error
+	for range searchURLs {
+		result := <-results
+		if result.regionBlocked {
+			regionErr = fmt.Errorf("dmm: content is not available in this region")
+			continue
+		}
+		if len(result.hits) == 0 {
+			continue
+		}
+		cancel()
+		type dmmDetailResult struct {
+			index     int
+			candidate avScrapeCandidate
+			err       error
+		}
+		detailResults := make(chan dmmDetailResult, len(result.hits))
+		detailCtx, detailCancel := context.WithCancel(ctx)
+		defer detailCancel()
+		for i, hit := range result.hits {
+			hit := hit
+			go func(index int) {
+				candidate, err := c.FetchByDetailURL(detailCtx, run, hit.URL)
+				if err != nil {
+					detailResults <- dmmDetailResult{index: index, err: err}
+					return
+				}
+				detailResults <- dmmDetailResult{index: index, candidate: candidate}
+			}(i)
+		}
+		var firstErr error
+		for range result.hits {
+			detailResult := <-detailResults
+			if detailResult.err != nil {
+				if firstErr == nil {
+					firstErr = detailResult.err
+				}
+				if strings.Contains(detailResult.err.Error(), "content is not available in this region") {
+					regionErr = detailResult.err
+				}
+				continue
+			}
+			detailCancel()
+			candidate := detailResult.candidate
 			if candidate.DetailURL == "" {
-				candidate.DetailURL = hit.URL
+				candidate.DetailURL = result.hits[detailResult.index].URL
 			}
 			if candidate.Raw == nil {
 				candidate.Raw = map[string]any{}
 			}
 			if candidate.Raw["category"] == nil {
-				candidate.Raw["category"] = hit.Category
+				candidate.Raw["category"] = result.hits[detailResult.index].Category
 			}
-			out = append(out, candidate)
+			return []avScrapeCandidate{candidate}, nil
 		}
-		if len(out) > 0 {
-			return out, nil
+		if firstErr != nil {
+			return nil, firstErr
 		}
+	}
+	if regionErr != nil {
+		return nil, regionErr
 	}
 	return nil, fmt.Errorf("dmm: no matched detail page for %s", query)
 }
@@ -1023,20 +1072,20 @@ func dmmParseDigitalDetail(root *html.Node, body, detailURL string) (avScrapeCan
 		Actors:      extractJSONLDActorNames(body),
 		DetailURL:   detailURL,
 		Raw: map[string]any{
-			"site":           "dmm",
-			"detail_url":     detailURL,
-			"external_id":    detailURL,
-			"av_code":        code,
-			"title":          title,
-			"poster_url":     poster,
-			"thumb_url":      thumb,
-			"release_date":   normalizeSlashDate(avTableValue(root, "Release Date")),
-			"actors":         extractJSONLDActorNames(body),
-			"overview":       strings.TrimSpace(extractJSONLDString(body, "description")),
+			"site":            "dmm",
+			"detail_url":      detailURL,
+			"external_id":     detailURL,
+			"av_code":         code,
+			"title":           title,
+			"poster_url":      poster,
+			"thumb_url":       thumb,
+			"release_date":    normalizeSlashDate(avTableValue(root, "Release Date")),
+			"actors":          extractJSONLDActorNames(body),
+			"overview":        strings.TrimSpace(extractJSONLDString(body, "description")),
 			"original_plot":   strings.TrimSpace(extractJSONLDString(body, "description")),
-			"mosaic":         "有码",
-			"mosaic_reason":  "dmm",
-			"external_url":   detailURL,
+			"mosaic":          "有码",
+			"mosaic_reason":   "dmm",
+			"external_url":    detailURL,
 			"search_category": dmmParseCategory(detailURL),
 		},
 	}
@@ -1096,23 +1145,23 @@ func dmmParseFanzaTVResponse(resp dmmFanzaTVResponse, detailURL string) (avScrap
 		Actors:      actors,
 		DetailURL:   detailURL,
 		Raw: map[string]any{
-			"site":         "dmm",
-			"detail_url":   detailURL,
-			"external_id":  detailURL,
-			"av_code":      extractDMMContentID(detailURL),
-			"title":        content.Title,
+			"site":           "dmm",
+			"detail_url":     detailURL,
+			"external_id":    detailURL,
+			"av_code":        extractDMMContentID(detailURL),
+			"title":          content.Title,
 			"original_title": content.Title,
-			"outline":      content.Description,
-			"original_plot": content.Description,
-			"poster_url":   poster,
-			"thumb_url":    thumb,
-			"trailer_url":  trailer,
-			"release_date": release,
-			"actors":       actors,
-			"directors":    directors,
-			"tags":         tags,
-			"extrafanart":  extrafanart,
-			"mosaic":       "有码",
+			"outline":        content.Description,
+			"original_plot":  content.Description,
+			"poster_url":     poster,
+			"thumb_url":      thumb,
+			"trailer_url":    trailer,
+			"release_date":   release,
+			"actors":         actors,
+			"directors":      directors,
+			"tags":           tags,
+			"extrafanart":    extrafanart,
+			"mosaic":         "有码",
 		},
 	}
 	return candidate, nil
@@ -1160,19 +1209,19 @@ type dmmFanzaTVResponse struct {
 }
 
 type dmmFanzaTVContent struct {
-	Title             string           `json:"title"`
-	Description       string           `json:"description"`
-	PackageImage      string           `json:"packageImage"`
-	PackageLargeImage string           `json:"packageLargeImage"`
-	StartDeliveryAt    string           `json:"startDeliveryAt"`
-	SampleMovie       dmmFanzaTVMovie  `json:"sampleMovie"`
+	Title             string              `json:"title"`
+	Description       string              `json:"description"`
+	PackageImage      string              `json:"packageImage"`
+	PackageLargeImage string              `json:"packageLargeImage"`
+	StartDeliveryAt   string              `json:"startDeliveryAt"`
+	SampleMovie       dmmFanzaTVMovie     `json:"sampleMovie"`
 	SamplePictures    []dmmFanzaTVPicture `json:"samplePictures"`
-	Actresses         []dmmFanzaTVItem `json:"actresses"`
-	Directors         []dmmFanzaTVItem `json:"directors"`
-	Series            dmmFanzaTVItem   `json:"series"`
-	Maker             dmmFanzaTVItem   `json:"maker"`
-	Label             dmmFanzaTVItem   `json:"label"`
-	Genres            []dmmFanzaTVItem `json:"genres"`
+	Actresses         []dmmFanzaTVItem    `json:"actresses"`
+	Directors         []dmmFanzaTVItem    `json:"directors"`
+	Series            dmmFanzaTVItem      `json:"series"`
+	Maker             dmmFanzaTVItem      `json:"maker"`
+	Label             dmmFanzaTVItem      `json:"label"`
+	Genres            []dmmFanzaTVItem    `json:"genres"`
 	ReviewSummary     struct {
 		AveragePoint float64 `json:"averagePoint"`
 	} `json:"reviewSummary"`
@@ -1548,7 +1597,7 @@ func thePornDBSearchKeywords(filePath string) ([]string, string, string) {
 	fileName = strings.ReplaceAll(fileName, ",", ".")
 	fileName = strings.TrimSuffix(fileName, path.Ext(fileName))
 
-		matches := datedNumberPattern.FindStringSubmatch(value)
+	matches := datedNumberPattern.FindStringSubmatch(value)
 	if len(matches) == 4 {
 		fullNumber := matches[1]
 		series := thePornDBLongName(strings.NewReplacer("-", "", ".", "").Replace(strings.ToLower(matches[2])))
@@ -1807,7 +1856,7 @@ func thePornDBSimilarity(a string, b string) float64 {
 			if ar[i-1] == br[j-1] {
 				cost = 0
 			}
-				current[j] = min(previous[j]+1, min(current[j-1]+1, previous[j-1]+cost))
+			current[j] = min(previous[j]+1, min(current[j-1]+1, previous[j-1]+cost))
 		}
 		previous, current = current, previous
 	}
@@ -1912,7 +1961,7 @@ type thePornDBSiteRef struct {
 }
 
 type thePornDBPerformer struct {
-	Name   string               `json:"name"`
+	Name   string                   `json:"name"`
 	Parent thePornDBPerformerParent `json:"parent"`
 }
 
