@@ -87,7 +87,7 @@ func (c *dmmAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunCon
 		if run != nil {
 			run.addSearchURL(searchURL)
 		}
-		content, err := c.svc.fetchAVHTMLDocumentText(ctx, searchURL, map[string]string{
+		content, err := c.fetchDMMHTMLDocumentText(ctx, searchURL, map[string]string{
 			"Cookie": "age_check_done=1",
 		})
 		if err != nil {
@@ -244,7 +244,7 @@ func (c *dmmAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunCon
 	if category == dmmCategoryFanzaTV || category == dmmCategoryDMMTV {
 		return c.fetchDMMFanzaTV(ctx, detailURL)
 	}
-	root, body, err := c.svc.fetchAVHTMLDocument(ctx, detailURL, map[string]string{
+	root, body, err := c.fetchDMMHTMLDocument(ctx, detailURL, map[string]string{
 		"Cookie": "age_check_done=1",
 	})
 	if err != nil {
@@ -257,6 +257,96 @@ func (c *dmmAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunCon
 	metadata.Source = c.Name()
 	metadata.DetailURL = detailURL
 	return metadata, nil
+}
+
+func (c *dmmAVCrawler) fetchDMMHTMLDocument(ctx context.Context, endpoint string, extraHeaders map[string]string) (*html.Node, string, error) {
+	body, err := c.fetchDMMHTMLDocumentText(ctx, endpoint, extraHeaders)
+	if err != nil {
+		return nil, "", err
+	}
+	root, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, "", fmt.Errorf("解析 DMM 响应失败: %w", err)
+	}
+	return root, body, nil
+}
+
+func (c *dmmAVCrawler) fetchDMMHTMLDocumentText(ctx context.Context, endpoint string, extraHeaders map[string]string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("创建 DMM 刮削请求失败: %w", err)
+	}
+	if strings.TrimSpace(c.svc.avUserAgent) != "" {
+		req.Header.Set("User-Agent", c.svc.avUserAgent)
+	}
+	for key, value := range extraHeaders {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			continue
+		}
+		req.Header.Set(key, value)
+	}
+	client := c.dmmHTTPClient()
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("DMM 站点请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return "", fmt.Errorf("DMM 站点请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return "", fmt.Errorf("读取 DMM 响应失败: %w", err)
+	}
+	return string(body), nil
+}
+
+func (c *dmmAVCrawler) dmmHTTPClient() *http.Client {
+	client := c.svc.avHTTPClient
+	if client == nil {
+		client = c.svc.httpClient
+	}
+	if client == nil {
+		return http.DefaultClient
+	}
+	cloned := *client
+	cloned.Timeout = 0
+	return &cloned
+}
+
+func (c *dmmAVCrawler) postDMMJSON(ctx context.Context, endpoint string, body any, extraHeaders map[string]string, out any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("编码 DMM JSON 请求失败: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(payload)))
+	if err != nil {
+		return fmt.Errorf("创建 DMM JSON POST 请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(c.svc.avUserAgent) != "" {
+		req.Header.Set("User-Agent", c.svc.avUserAgent)
+	}
+	for key, value := range extraHeaders {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			continue
+		}
+		req.Header.Set(key, value)
+	}
+	resp, err := c.dmmHTTPClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("DMM JSON POST 请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("DMM JSON POST 请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("解析 DMM JSON POST 响应失败: %w", err)
+	}
+	return nil
 }
 
 func (c *mgstageAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
@@ -1063,7 +1153,7 @@ func (c *dmmAVCrawler) fetchDMMFanzaTV(ctx context.Context, detailURL string) (a
 		return avScrapeCandidate{}, fmt.Errorf("dmm: cannot extract FANZA TV content id from %s", detailURL)
 	}
 	var resp dmmFanzaTVResponse
-	if err := c.svc.postAVJSON(ctx, "https://api.tv.dmm.co.jp/graphql", dmmFanzaTVPayload(contentID), map[string]string{
+	if err := c.postDMMJSON(ctx, "https://api.tv.dmm.co.jp/graphql", dmmFanzaTVPayload(contentID), map[string]string{
 		"Accept": "application/json",
 	}, &resp); err != nil {
 		return avScrapeCandidate{}, err

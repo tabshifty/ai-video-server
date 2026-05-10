@@ -2,6 +2,23 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-10 09:02 +0800] DMM 刮削取消站点超时
+- Type: `implementation`
+- Summary:
+  - DMM 刮削不再使用全局 AV HTTP client timeout；搜索页、详情页和 FANZA TV JSON 请求都会一直等待上游响应，除非外层 context 被主动取消。
+  - 保持 DMM 迁移版顺序搜索策略不变，只调整 DMM HTTP 请求边界，避免 30 秒超时把 DMM 刮削中断。
+  - 新增回归测试覆盖 DMM 上游响应慢于全局 AV timeout 时仍能继续等待并返回结果。
+- Changed Files:
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_av_mdcx_sites_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestDMMSearchCandidatesWaitsPastConfiguredHTTPTimeout|TestDMMSearchCandidates' -count=1` passed.
+  - `go test ./internal/services ./internal/handlers ./internal/queue -count=1` passed.
+  - `go vet ./internal/services ./internal/handlers ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-10 08:38 +0800] AV 刮削迁移策略收口
 - Type: `implementation`
 - Summary:

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync/atomic"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -225,5 +225,38 @@ func TestDMMSearchCandidatesUsesFirstSearchURLOnly(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&firstSearchHits); got != 1 {
 		t.Fatalf("expected first search URL once, got=%d", got)
+	}
+}
+
+func TestDMMSearchCandidatesWaitsPastConfiguredHTTPTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/search/"):
+			time.Sleep(80 * time.Millisecond)
+			_, _ = io.WriteString(w, `<html><body><a href="/digital/videoa/-/detail/=/cid=ssis00001/">SSIS-001</a></body></html>`)
+		case r.URL.Path == "/digital/videoa/-/detail/=/cid=ssis00001/":
+			_, _ = w.Write([]byte(`<html><head><meta property="og:image" content="` + serverURLFromRequest(r) + `/dmm/ssis001ps.jpg"></head><body><h1>DMM Slow Search Title</h1><table><tr><th>Number</th><td>SSIS-001</td></tr></table></body></html>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "", "", "", "", time.Second)
+	svc.ConfigureAVScraperConfig(AVScraperConfig{
+		BaseURL: server.URL,
+		SiteURLs: map[string]string{
+			"dmm": server.URL,
+		},
+		Timeout: 30 * time.Millisecond,
+	})
+
+	hits, err := newDMMAVCrawler(svc).SearchCandidates(context.Background(), newAVScrapeRunContext("SSIS-001", "SSIS-001"), "SSIS-001", 1)
+	if err != nil {
+		t.Fatalf("SearchCandidates returned error: %v", err)
+	}
+	if len(hits) != 1 || hits[0].Title != "DMM Slow Search Title" {
+		t.Fatalf("expected DMM hit after slow response, got=%v", hits)
 	}
 }
