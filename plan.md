@@ -4453,3 +4453,8 @@
 - 进度：修复短视频转 AV 的状态收尾，成功后不再沿用 `scraping`，而是统一落回 `ready`；同步把自动重刮削回归测试改成验证成功后状态可放行给只认 `ready` 的资源接口。
 - 影响文件：`internal/queue/scrape_tasks.go`、`internal/queue/scrape_tasks_test.go`、`plan.md`
 - 验证：`go test ./internal/queue -run 'TestAutoScrapeAVMarksReadyOnSuccess|TestBuildScrapeFailureDecisionMarksEpisodeAsTVPending|TestBuildScrapeFailureDecisionKeepsMovieFallbackBehavior' -count=1`、`go test ./internal/services -run 'TestConfirmAVPreservesExplicitReadyStatus|TestScrapeAVUploadCodeFirstAndActorSync' -count=1`、`go test ./internal/services ./internal/handlers ./internal/queue`、`go vet ./...` 通过。
+
+## 2026-05-10 09:45
+- 进度：新增刮削内容中文翻译接入，支持通过 OpenAI-compatible 本地翻译接口连接 `HY-MT1.5-1.8B` 等模型；刮削写库前会保存中文标题/简介到展示字段，并在 `metadata` 中同步写入 `title_original`、`description_original`、`title_zh`、`description_zh`，演员名保持原样。
+- 影响文件：`main.go`、`.env.example`、`internal/config/config.go`、`internal/services/scraper.go`、`internal/services/translation.go`、`internal/config/config_test.go`、`internal/services/translation_test.go`、`internal/services/scraper_translation_test.go`、`plan.md`
+- 验证：`go test ./internal/config ./internal/services -run 'TestLoadIncludesTranslationConfig|TestOpenAITextTranslatorTranslateScrapeContent|TestScrapeMovieUploadStoresLocalizedFields|TestScrapeAVUploadStoresLocalizedFieldsAndKeepsActors'`、`go test ./...`、`go vet ./...` 均通过。

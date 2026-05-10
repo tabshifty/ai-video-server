@@ -43,6 +43,10 @@ type Config struct {
 	AVScraperTimeout           time.Duration
 	AccessTokenTTL             time.Duration
 	RefreshTokenTTL            time.Duration
+	TranslationAPIURL          string
+	TranslationAPIKey          string
+	TranslationModel           string
+	TranslationTimeout         time.Duration
 }
 
 // Load returns validated application config from environment.
@@ -81,6 +85,10 @@ func Load() (Config, error) {
 		AVScraperTimeout:           time.Duration(getIntEnv("AV_SCRAPER_TIMEOUT_SECONDS", 10)) * time.Second,
 		AccessTokenTTL:             time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 24)) * time.Hour,
 		RefreshTokenTTL:            time.Duration(getIntEnv("REFRESH_TOKEN_TTL_HOURS", 168)) * time.Hour,
+		TranslationAPIURL:          strings.TrimSuffix(strings.TrimSpace(os.Getenv("TRANSLATION_API_URL")), "/"),
+		TranslationAPIKey:          os.Getenv("TRANSLATION_API_KEY"),
+		TranslationModel:           getEnv("TRANSLATION_MODEL", "HY-MT1.5-1.8B"),
+		TranslationTimeout:         time.Duration(getIntEnv("TRANSLATION_TIMEOUT_SECONDS", 15)) * time.Second,
 	}
 
 	if cfg.PostgresDSN == "" {

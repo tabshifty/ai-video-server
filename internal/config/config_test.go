@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 func TestLoadIncludesAVSiteOverridesAndTokens(t *testing.T) {
@@ -114,5 +115,32 @@ func TestLoadFallsBackToBaseURLForJavDBSiteURL(t *testing.T) {
 	}
 	if got := cfg.AVSiteURLs["javdb"]; got != "https://javdb-fallback.example" {
 		t.Fatalf("expected AVSiteURLs[javdb] fallback to base url, got=%s", got)
+	}
+}
+
+func TestLoadIncludesTranslationConfig(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
+	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("TRANSLATION_API_URL", "http://127.0.0.1:9000/v1")
+	t.Setenv("TRANSLATION_API_KEY", "token-456")
+	t.Setenv("TRANSLATION_MODEL", "HY-MT1.5-1.8B")
+	t.Setenv("TRANSLATION_TIMEOUT_SECONDS", "23")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.TranslationAPIURL != "http://127.0.0.1:9000/v1" {
+		t.Fatalf("unexpected TranslationAPIURL: %s", cfg.TranslationAPIURL)
+	}
+	if cfg.TranslationAPIKey != "token-456" {
+		t.Fatalf("unexpected TranslationAPIKey: %s", cfg.TranslationAPIKey)
+	}
+	if cfg.TranslationModel != "HY-MT1.5-1.8B" {
+		t.Fatalf("unexpected TranslationModel: %s", cfg.TranslationModel)
+	}
+	if cfg.TranslationTimeout != 23*time.Second {
+		t.Fatalf("unexpected TranslationTimeout: %s", cfg.TranslationTimeout)
 	}
 }

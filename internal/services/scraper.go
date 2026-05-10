@@ -51,6 +51,7 @@ type ScraperService struct {
 	avThePornDBAPIToken string
 	avThePornDBNoHash   bool
 	avProvider          avCrawlerProvider
+	textTranslator      contentTranslator
 	storageRoot         string
 	posterRoot          string
 	httpClient          *http.Client
@@ -151,6 +152,56 @@ func (s *ScraperService) ConfigureAVScraperConfig(cfg AVScraperConfig) {
 	s.avJavBusCookie = strings.TrimSpace(cfg.JavBusCookie)
 	s.avThePornDBAPIToken = strings.TrimSpace(cfg.ThePornDBAPIToken)
 	s.avThePornDBNoHash = cfg.ThePornDBNoHash
+}
+
+func (s *ScraperService) ConfigureContentTranslation(cfg TranslationConfig) {
+	if strings.TrimSpace(cfg.APIURL) == "" {
+		s.textTranslator = nil
+		return
+	}
+	s.textTranslator = NewOpenAITextTranslator(cfg)
+}
+
+type localizedScrapeFields struct {
+	titleOriginal       string
+	descriptionOriginal string
+	titleZH             string
+	descriptionZH       string
+}
+
+func (s *ScraperService) localizeScrapeFields(ctx context.Context, title, description string) localizedScrapeFields {
+	fields := localizedScrapeFields{
+		titleOriginal:       strings.TrimSpace(title),
+		descriptionOriginal: strings.TrimSpace(description),
+	}
+	fields.titleZH = fields.titleOriginal
+	fields.descriptionZH = fields.descriptionOriginal
+	if s.textTranslator == nil || (fields.titleOriginal == "" && fields.descriptionOriginal == "") {
+		return fields
+	}
+	translated, err := s.textTranslator.TranslateScrapeContent(ctx, fields.titleOriginal, fields.descriptionOriginal)
+	if err != nil {
+		return fields
+	}
+	if strings.TrimSpace(translated.Title) != "" {
+		fields.titleZH = strings.TrimSpace(translated.Title)
+	}
+	if strings.TrimSpace(translated.Description) != "" {
+		fields.descriptionZH = strings.TrimSpace(translated.Description)
+	}
+	return fields
+}
+
+func withLocalizedScrapeMetadata(metadata map[string]any, fields localizedScrapeFields) map[string]any {
+	out := make(map[string]any, len(metadata)+4)
+	for k, v := range metadata {
+		out[k] = v
+	}
+	out["title_original"] = fields.titleOriginal
+	out["description_original"] = fields.descriptionOriginal
+	out["title_zh"] = fields.titleZH
+	out["description_zh"] = fields.descriptionZH
+	return out
 }
 
 type ScrapeResult struct {
@@ -535,7 +586,9 @@ func (s *ScraperService) ConfirmMovie(ctx context.Context, in ConfirmScrapeInput
 		"manual":       in.Metadata,
 		"release_date": chooseStr(in.ReleaseDate, asString(detail["release_date"])),
 	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &in.TMDBID, title, overview, thumbPath, meta, "uploaded"); err != nil {
+	localized := s.localizeScrapeFields(ctx, title, overview)
+	meta = withLocalizedScrapeMetadata(meta, localized)
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &in.TMDBID, localized.titleZH, localized.descriptionZH, thumbPath, meta, "uploaded"); err != nil {
 		return err
 	}
 	s.syncMovieActors(ctx, video.ID, in.TMDBID)
@@ -585,7 +638,9 @@ func (s *ScraperService) ConfirmEpisode(ctx context.Context, in ConfirmScrapeInp
 		"manual":       in.Metadata,
 		"release_date": chooseStr(in.ReleaseDate, asString(synced.episodeRaw["air_date"])),
 	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &synced.episodeTMDBID, title, overview, thumbPath, meta, "uploaded"); err != nil {
+	localized := s.localizeScrapeFields(ctx, title, overview)
+	meta = withLocalizedScrapeMetadata(meta, localized)
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, &synced.episodeTMDBID, localized.titleZH, localized.descriptionZH, thumbPath, meta, "uploaded"); err != nil {
 		return err
 	}
 	s.syncEpisodeActors(ctx, video.ID, in.TMDBID, seasonNum, episodeNum)
@@ -693,11 +748,13 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 	if sources, ok := candidate.Raw["merged_sources"]; ok {
 		meta["scrape_sources"] = sources
 	}
+	localized := s.localizeScrapeFields(ctx, title, overview)
+	meta = withLocalizedScrapeMetadata(meta, localized)
 	targetStatus := strings.TrimSpace(in.Status)
 	if targetStatus == "" {
 		targetStatus = "uploaded"
 	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, title, overview, thumbPath, meta, targetStatus); err != nil {
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, localized.titleZH, localized.descriptionZH, thumbPath, meta, targetStatus); err != nil {
 		return err
 	}
 	s.syncAVActors(ctx, video.ID, candidate.Actors)
@@ -772,7 +829,9 @@ func (s *ScraperService) SyncMovieMetadata(ctx context.Context, videoID uuid.UUI
 	meta := map[string]any{
 		"tmdb": raw,
 	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &tmdbID, title, overview, thumbPath, meta, "uploaded"); err != nil {
+	localized := s.localizeScrapeFields(ctx, title, overview)
+	meta = withLocalizedScrapeMetadata(meta, localized)
+	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &tmdbID, localized.titleZH, localized.descriptionZH, thumbPath, meta, "uploaded"); err != nil {
 		return err
 	}
 	s.syncMovieActors(ctx, videoID, tmdbID)
@@ -799,7 +858,9 @@ func (s *ScraperService) SyncTVEpisode(ctx context.Context, videoID uuid.UUID, t
 		"tmdb_season":  synced.seasonRaw,
 		"tmdb_episode": synced.episodeRaw,
 	}
-	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &synced.episodeTMDBID, title, description, thumbPath, meta, "uploaded"); err != nil {
+	localized := s.localizeScrapeFields(ctx, title, description)
+	meta = withLocalizedScrapeMetadata(meta, localized)
+	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &synced.episodeTMDBID, localized.titleZH, localized.descriptionZH, thumbPath, meta, "uploaded"); err != nil {
 		return err
 	}
 	s.syncEpisodeActors(ctx, videoID, tmdbID, seasonNum, episodeNum)
@@ -864,6 +925,10 @@ func (s *ScraperService) ScrapeMovieUpload(ctx context.Context, videoID uuid.UUI
 	if scrape.Title == "" {
 		scrape.Title = title
 	}
+	localized := s.localizeScrapeFields(ctx, scrape.Title, scrape.Description)
+	scrape.Title = localized.titleZH
+	scrape.Description = localized.descriptionZH
+	scrape.Metadata = withLocalizedScrapeMetadata(scrape.Metadata, localized)
 
 	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &scrape.TMDBID, scrape.Title, scrape.Description, scrape.ThumbnailPath, scrape.Metadata, "uploaded"); err != nil {
 		return ScrapeResult{}, err
@@ -959,6 +1024,10 @@ func (s *ScraperService) ScrapeEpisodeUpload(ctx context.Context, videoID uuid.U
 			"tmdb_episode": synced.episodeRaw,
 		},
 	}
+	localized := s.localizeScrapeFields(ctx, scrape.Title, scrape.Description)
+	scrape.Title = localized.titleZH
+	scrape.Description = localized.descriptionZH
+	scrape.Metadata = withLocalizedScrapeMetadata(scrape.Metadata, localized)
 	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, &scrape.TMDBID, scrape.Title, scrape.Description, scrape.ThumbnailPath, scrape.Metadata, "uploaded"); err != nil {
 		return ScrapeResult{}, err
 	}
@@ -1302,6 +1371,10 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		ThumbnailPath: thumbPath,
 		Metadata:      meta,
 	}
+	localized := s.localizeScrapeFields(ctx, scrape.Title, scrape.Description)
+	scrape.Title = localized.titleZH
+	scrape.Description = localized.descriptionZH
+	scrape.Metadata = withLocalizedScrapeMetadata(scrape.Metadata, localized)
 	if err := s.repo.UpdateVideoScrapeResult(ctx, videoID, nil, scrape.Title, scrape.Description, scrape.ThumbnailPath, scrape.Metadata, "uploaded"); err != nil {
 		return ScrapeResult{}, err
 	}

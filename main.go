@@ -104,6 +104,23 @@ func configureAVScraper(scrapeSvc avScraperConfigurer, cfg config.Config) {
 	scrapeSvc.ConfigureAVScraperConfig(buildAVScraperConfig(cfg))
 }
 
+type contentTranslationConfigurer interface {
+	ConfigureContentTranslation(services.TranslationConfig)
+}
+
+func buildTranslationConfig(cfg config.Config) services.TranslationConfig {
+	return services.TranslationConfig{
+		APIURL:  cfg.TranslationAPIURL,
+		APIKey:  cfg.TranslationAPIKey,
+		Model:   cfg.TranslationModel,
+		Timeout: cfg.TranslationTimeout,
+	}
+}
+
+func configureContentTranslation(scrapeSvc contentTranslationConfigurer, cfg config.Config) {
+	scrapeSvc.ConfigureContentTranslation(buildTranslationConfig(cfg))
+}
+
 func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
 	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.TranscodeTaskTimeout)
 	defer enqueuer.Close()
@@ -121,6 +138,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	recSvc := services.NewRecommendService(repo)
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
 	configureAVScraper(scrapeSvc, cfg)
+	configureContentTranslation(scrapeSvc, cfg)
 	appSvc := services.NewAppService(repo)
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
@@ -193,6 +211,7 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	defer enqueuer.Close()
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
 	configureAVScraper(scrapeSvc, cfg)
+	configureContentTranslation(scrapeSvc, cfg)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
 	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger)
 	processor.Register(mux)
