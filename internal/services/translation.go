@@ -62,6 +62,8 @@ type scrapeTranslationPayload struct {
 type scrapeTranslationResponse struct {
 	TitleZH       string `json:"title_zh"`
 	DescriptionZH string `json:"description_zh"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
 }
 
 func NewOpenAITextTranslator(cfg TranslationConfig) *OpenAITextTranslator {
@@ -150,6 +152,12 @@ func (t *OpenAITextTranslator) TranslateScrapeContent(ctx context.Context, title
 	var translated scrapeTranslationResponse
 	if err := json.Unmarshal([]byte(extractJSONObject(content)), &translated); err != nil {
 		return TranslationResult{}, fmt.Errorf("decode translation content: %w", err)
+	}
+	if strings.TrimSpace(translated.TitleZH) == "" {
+		translated.TitleZH = strings.TrimSpace(translated.Title)
+	}
+	if strings.TrimSpace(translated.DescriptionZH) == "" {
+		translated.DescriptionZH = strings.TrimSpace(translated.Description)
 	}
 	if strings.TrimSpace(translated.TitleZH) == "" {
 		translated.TitleZH = title

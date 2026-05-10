@@ -69,3 +69,36 @@ func TestOpenAITextTranslatorTranslateScrapeContent(t *testing.T) {
 		t.Fatalf("request payload did not include title JSON: %s", gotRequest.Messages[1].Content)
 	}
 }
+
+func TestOpenAITextTranslatorAcceptsGenericTitleAndDescriptionFields(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(openAIChatCompletionResponse{
+			Choices: []openAIChatCompletionChoice{{
+				Message: openAIChatMessage{Content: `{"title":"中文标题","description":"中文简介"}`},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	client := NewOpenAITextTranslator(TranslationConfig{
+		APIURL:  server.URL + "/v1",
+		Model:   "HY-MT1.5-1.8B",
+		Timeout: time.Second,
+	})
+
+	got, err := client.TranslateScrapeContent(context.Background(), "日本語タイトル", "日本語紹介")
+	if err != nil {
+		t.Fatalf("TranslateScrapeContent returned error: %v", err)
+	}
+	if got.Title != "中文标题" {
+		t.Fatalf("unexpected title: %s", got.Title)
+	}
+	if got.Description != "中文简介" {
+		t.Fatalf("unexpected description: %s", got.Description)
+	}
+}
