@@ -4,6 +4,7 @@ import {
   AV_POSTER_CROP_MODE_OPTIONS,
   AV_SITE_OPTIONS,
   applyAVScrapeConfig,
+  applyAVManualScrapeRouteQuery,
   buildAVManualScrapeConfirmPayload,
   buildAVManualScrapePreviewPayload,
   buildAVScrapeConfigPayload
@@ -54,6 +55,24 @@ describe('avManualScrape helpers', () => {
       site_category: 'fc2',
       site_source: 'fc2club',
       metadata: {}
+    })
+  })
+
+  it('hydrates manual scrape form inputs from route query', () => {
+    const form = {}
+    const edit = {}
+
+    applyAVManualScrapeRouteQuery(form, edit, {
+      video_id: 'video-1',
+      external_id: 'MXGS-888'
+    })
+
+    expect(form).toEqual({
+      video_id: 'video-1',
+      title: 'MXGS-888'
+    })
+    expect(edit).toEqual({
+      external_id: 'MXGS-888'
     })
   })
 

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { extractTvPendingDiagnostics, getVideoStatusMeta, teardownPreviewPlayer } from './videoList.helpers'
+import {
+  buildAVManualScrapeRoute,
+  extractTvPendingDiagnostics,
+  getVideoStatusMeta,
+  teardownPreviewPlayer
+} from './videoList.helpers'
 
 describe('videoList helpers', () => {
   it('includes tv_pending status label and tag type', () => {
@@ -53,5 +58,23 @@ describe('videoList helpers', () => {
   it('ignores null players and partial player objects', () => {
     expect(() => teardownPreviewPlayer(null)).not.toThrow()
     expect(() => teardownPreviewPlayer({ src: 'blob:1' })).not.toThrow()
+  })
+
+  it('builds the AV manual scrape route from video detail metadata', () => {
+    expect(buildAVManualScrapeRoute({
+      id: 'video-1',
+      title: '已刮削标题',
+      metadata: {
+        external_id: 'MXGS-888',
+        av_code: 'MXGS-888'
+      }
+    })).toEqual({
+      path: '/av-scrape',
+      query: {
+        video_id: 'video-1',
+        external_id: 'MXGS-888',
+        title: 'MXGS-888'
+      }
+    })
   })
 })

@@ -11,6 +11,7 @@ import {
 } from '../api/admin'
 import {
   AV_POSTER_CROP_MODE_OPTIONS,
+  applyAVManualScrapeRouteQuery,
   applyAVScrapeConfig,
   AV_SITE_OPTIONS,
   buildAVManualScrapeConfirmPayload,
@@ -66,14 +67,7 @@ const selectedCandidate = computed(() => {
 const prettyMetadata = computed(() => JSON.stringify(selectedCandidate.value?.metadata || {}, null, 2))
 
 onMounted(async () => {
-  const videoID = typeof route.query.video_id === 'string' ? route.query.video_id.trim() : ''
-  const title = typeof route.query.title === 'string' ? route.query.title.trim() : ''
-  if (videoID) {
-    form.video_id = videoID
-  }
-  if (title) {
-    form.title = title
-  }
+  applyAVManualScrapeRouteQuery(form, edit, route.query)
   await loadConfig()
 })
 

@@ -31,6 +31,23 @@ export function buildAVManualScrapePreviewPayload(form) {
   }
 }
 
+export function applyAVManualScrapeRouteQuery(form, edit, query) {
+  const videoID = normalizeText(query?.video_id)
+  const title = normalizeText(query?.title)
+  const externalID = normalizeText(query?.external_id)
+  if (videoID) {
+    form.video_id = videoID
+  }
+  if (title) {
+    form.title = title
+  } else if (externalID) {
+    form.title = externalID
+  }
+  if (externalID) {
+    edit.external_id = externalID
+  }
+}
+
 export function buildAVManualScrapeConfirmPayload(form, edit) {
   return {
     video_id: normalizeText(form?.video_id || edit?.video_id),

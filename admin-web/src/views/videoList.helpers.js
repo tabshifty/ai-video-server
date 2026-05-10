@@ -11,6 +11,19 @@ export function getVideoStatusMeta(status) {
   return map[normalized] || { label: normalized || '-', tagType: 'info' }
 }
 
+export function buildAVManualScrapeRoute(video) {
+  const videoID = toText(video?.id)
+  const externalID = extractAVManualScrapeExternalID(video)
+  return {
+    path: '/av-scrape',
+    query: {
+      video_id: videoID,
+      external_id: externalID,
+      title: externalID || toText(video?.title)
+    }
+  }
+}
+
 export function extractTvPendingDiagnostics(metadata) {
   const source = metadata && typeof metadata === 'object' ? metadata : {}
   return {
@@ -80,4 +93,9 @@ function toPositiveInt(value) {
     return 0
   }
   return parsed
+}
+
+function extractAVManualScrapeExternalID(video) {
+  const metadata = video && typeof video.metadata === 'object' && video.metadata !== null ? video.metadata : {}
+  return toText(video?.external_id) || toText(video?.av_code) || toText(metadata.external_id) || toText(metadata.av_code) || toText(metadata.number)
 }

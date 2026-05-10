@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
@@ -22,7 +23,13 @@ import {
   updateAdminVideoSubtitle,
   uploadAdminVideoSubtitle
 } from '../api/admin'
-import { extractTvPendingDiagnostics, getVideoStatusMeta, teardownPreviewPlayer, tvPendingStageLabel } from './videoList.helpers'
+import {
+  buildAVManualScrapeRoute,
+  extractTvPendingDiagnostics,
+  getVideoStatusMeta,
+  teardownPreviewPlayer,
+  tvPendingStageLabel
+} from './videoList.helpers'
 
 const list = ref([])
 const total = ref(0)
@@ -194,6 +201,14 @@ function openTvSeriesManage() {
       q: diagnostics.parsedTitle || detail.value?.title || ''
     }
   })
+}
+
+function openAVManualScrape() {
+  if (!detail.value?.id) {
+    return
+  }
+  detailVisible.value = false
+  router.push(buildAVManualScrapeRoute(detail.value))
 }
 
 async function load() {
@@ -892,6 +907,16 @@ onBeforeUnmount(() => {
         <el-form-item label="播放预览">
           <div class="play-preview">
             <div class="play-actions">
+              <el-button
+                v-if="detail.type === 'av'"
+                type="warning"
+                plain
+                size="small"
+                @click="openAVManualScrape"
+              >
+                <el-icon><MagicStick /></el-icon>
+                去 AV 手动刮削
+              </el-button>
               <el-button
                 type="primary"
                 plain

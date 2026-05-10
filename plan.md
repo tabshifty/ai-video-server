@@ -2,6 +2,26 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-10 19:37 +0800] AV 视频详情到手动刮削快捷入口
+- Type: `implementation`
+- Summary:
+  - 视频管理的 AV 详情弹窗新增“去 AV 手动刮削”快捷按钮，仅在 AV 视频上显示。
+  - 进入 `/av-scrape` 时自动携带 `video_id`、`external_id` 和用于搜索的 `title`，默认用番号作为搜索词。
+  - 手动刮削页补齐 route query 预填，`video_id` 和 `external_id` 会自动写入表单，减少复制粘贴。
+- Changed Files:
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/AVManualScrape.vue`
+  - `admin-web/src/views/videoList.helpers.js`
+  - `admin-web/src/views/videoList.helpers.spec.js`
+  - `admin-web/src/views/avManualScrape.helpers.js`
+  - `admin-web/src/views/avManualScrape.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm test -- src/views/videoList.helpers.spec.js src/views/avManualScrape.helpers.spec.js` passed.
+  - `cd admin-web && npm run build` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-10 17:52 +0800] 统一 AV 站点海报策略完成
 - Type: `implementation`
 - Summary:
