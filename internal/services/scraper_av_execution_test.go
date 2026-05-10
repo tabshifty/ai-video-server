@@ -3,6 +3,10 @@ package services
 import (
 	"context"
 	"testing"
+
+	"github.com/google/uuid"
+
+	"video-server/internal/models"
 )
 
 type fakeAVCrawlerProviderForExecution struct {
@@ -27,14 +31,18 @@ type fakeAVCrawlerForExecution struct {
 	searchResult []avScrapeCandidate
 	searchErr    error
 	searchCalls  int
+	searchQueries []string
+	detailCalls   int
+	detailURLs    []string
 }
 
 func (c *fakeAVCrawlerForExecution) Name() string {
 	return c.name
 }
 
-func (c *fakeAVCrawlerForExecution) SearchCandidates(context.Context, *avScrapeRunContext, string, int) ([]avScrapeCandidate, error) {
+func (c *fakeAVCrawlerForExecution) SearchCandidates(_ context.Context, _ *avScrapeRunContext, query string, _ int) ([]avScrapeCandidate, error) {
 	c.searchCalls++
+	c.searchQueries = append(c.searchQueries, query)
 	if c.searchErr != nil {
 		return nil, c.searchErr
 	}
@@ -43,8 +51,16 @@ func (c *fakeAVCrawlerForExecution) SearchCandidates(context.Context, *avScrapeR
 	return out, nil
 }
 
-func (c *fakeAVCrawlerForExecution) FetchByDetailURL(context.Context, *avScrapeRunContext, string) (avScrapeCandidate, error) {
-	return avScrapeCandidate{}, nil
+func (c *fakeAVCrawlerForExecution) FetchByDetailURL(_ context.Context, _ *avScrapeRunContext, detailURL string) (avScrapeCandidate, error) {
+	c.detailCalls++
+	c.detailURLs = append(c.detailURLs, detailURL)
+	if c.searchErr != nil {
+		return avScrapeCandidate{}, c.searchErr
+	}
+	if len(c.searchResult) > 0 {
+		return c.searchResult[0], nil
+	}
+	return avScrapeCandidate{Source: c.name, DetailURL: detailURL}, nil
 }
 
 func TestPreviewAVSearchUsesExplicitSiteSourceOnly(t *testing.T) {
@@ -207,5 +223,97 @@ func TestPreviewAVSearchRejectsUnknownExplicitSiteSource(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("expected error for unknown explicit site source")
+	}
+}
+
+func TestPreviewAVSearchDoesNotFallBackToDisabledCategorySource(t *testing.T) {
+	t.Parallel()
+
+	javDB := &fakeAVCrawlerForExecution{
+		name: "javdb",
+		searchResult: []avScrapeCandidate{{
+			Source:     "javdb",
+			ExternalID: "javdb-disabled",
+			Code:       "SSIS-001",
+			Title:      "Disabled JavDB Result",
+			DetailURL:  "https://javdb.com/v/javdb-disabled",
+		}},
+	}
+	dmm := &fakeAVCrawlerForExecution{
+		name: "dmm",
+		searchResult: []avScrapeCandidate{{
+			Source:     "dmm",
+			ExternalID: "dmm-enabled",
+			Code:       "SSIS-001",
+			Title:      "Enabled DMM Result",
+			DetailURL:  "https://www.dmm.co.jp/digital/videoa/-/detail/=/cid=dmm-enabled/",
+		}},
+	}
+
+	svc := NewScraperService(nil, "", "", "", "", 0)
+	svc.avConfigStore = fakeAVConfigStore{
+		config: AVScraperSiteConfig{
+			EnabledSites: []string{"dmm"},
+			CategorySiteOrder: map[string][]string{
+				avSiteCategoryJapanese: {"javdb"},
+			},
+		},
+	}
+	svc.avProvider = &fakeAVCrawlerProviderForExecution{crawlers: []avCrawler{javDB, dmm}}
+
+	got, err := svc.PreviewAVSearch(context.Background(), "SSIS-001", AVPreviewOptions{
+		BypassCache: true,
+	})
+	if err != nil {
+		t.Fatalf("PreviewAVSearch returned error: %v", err)
+	}
+	if javDB.searchCalls != 0 {
+		t.Fatalf("expected disabled category source to stay unused, calls=%d", javDB.searchCalls)
+	}
+	if dmm.searchCalls == 0 {
+		t.Fatal("expected enabled source dmm to be used")
+	}
+	if got.UsedSource != "dmm" {
+		t.Fatalf("expected used_source dmm, got=%s", got.UsedSource)
+	}
+}
+
+func TestScrapeAVUploadPassesFilePathToThePornDBCrawler(t *testing.T) {
+	t.Parallel()
+
+	filePath := "/videos/x-art.19.11.03.A.Kitten.For.Christmas.mp4"
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:           videoID,
+				Title:        "XART-123",
+				OriginalPath: filePath,
+			},
+		},
+	}
+	thePornDB := &fakeAVCrawlerForExecution{
+		name: "theporndb",
+		searchResult: []avScrapeCandidate{{
+			Source:     "theporndb",
+			ExternalID: "x-art-kitten-for-christmas",
+			Code:       "XART-123",
+			Title:      "ThePornDB Result",
+			DetailURL:  "https://api.theporndb.net/scenes/x-art-kitten-for-christmas",
+		}},
+	}
+
+	svc := NewScraperService(repo, "", "", t.TempDir(), "", 0)
+	svc.avProvider = &fakeAVCrawlerProviderForExecution{crawlers: []avCrawler{thePornDB}}
+
+	_, err := svc.ScrapeAVUpload(context.Background(), videoID, filePath, "")
+	if err != nil {
+		t.Fatalf("ScrapeAVUpload returned error: %v", err)
+	}
+	if thePornDB.searchCalls == 0 {
+		t.Fatal("expected ThePornDB crawler to be used")
+	}
+	if len(thePornDB.searchQueries) == 0 || thePornDB.searchQueries[0] != filePath {
+		t.Fatalf("expected first ThePornDB query to use raw file path, got=%v", thePornDB.searchQueries)
 	}
 }

@@ -81,92 +81,54 @@ func (c *dmmAVCrawler) SearchCandidates(ctx context.Context, run *avScrapeRunCon
 	if len(searchURLs) == 0 {
 		return nil, nil
 	}
-	type dmmSearchResult struct {
-		index         int
-		hits          []dmmSearchHit
-		regionBlocked bool
-	}
-	results := make(chan dmmSearchResult, len(searchURLs))
-	searchCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	for i, searchURL := range searchURLs {
+	var regionErr error
+	var firstErr error
+	for _, searchURL := range searchURLs {
 		if run != nil {
 			run.addSearchURL(searchURL)
 		}
-		go func(index int, searchURL string) {
-			content, err := c.svc.fetchAVHTMLDocumentText(searchCtx, searchURL, map[string]string{
-				"Cookie": "age_check_done=1",
-			})
-			if err != nil {
-				results <- dmmSearchResult{index: index}
-				return
+		content, err := c.svc.fetchAVHTMLDocumentText(ctx, searchURL, map[string]string{
+			"Cookie": "age_check_done=1",
+		})
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
 			}
-			if dmmIsRegionBlocked(content) {
-				results <- dmmSearchResult{index: index, regionBlocked: true}
-				return
-			}
-			results <- dmmSearchResult{index: index, hits: dmmParseSearchCandidates(content, query, base)}
-		}(i, searchURL)
-	}
-
-	var regionErr error
-	for range searchURLs {
-		result := <-results
-		if result.regionBlocked {
+			continue
+		}
+		if dmmIsRegionBlocked(content) {
 			regionErr = fmt.Errorf("dmm: content is not available in this region")
 			continue
 		}
-		if len(result.hits) == 0 {
+		hits := dmmParseSearchCandidates(content, query, base)
+		if len(hits) == 0 {
 			continue
 		}
-		cancel()
-		type dmmDetailResult struct {
-			index     int
-			candidate avScrapeCandidate
-			err       error
-		}
-		detailResults := make(chan dmmDetailResult, len(result.hits))
-		detailCtx, detailCancel := context.WithCancel(ctx)
-		defer detailCancel()
-		for i, hit := range result.hits {
-			hit := hit
-			go func(index int) {
-				candidate, err := c.FetchByDetailURL(detailCtx, run, hit.URL)
-				if err != nil {
-					detailResults <- dmmDetailResult{index: index, err: err}
-					return
-				}
-				detailResults <- dmmDetailResult{index: index, candidate: candidate}
-			}(i)
-		}
-		var firstErr error
-		for range result.hits {
-			detailResult := <-detailResults
-			if detailResult.err != nil {
+		for _, hit := range hits {
+			candidate, err := c.FetchByDetailURL(ctx, run, hit.URL)
+			if err != nil {
 				if firstErr == nil {
-					firstErr = detailResult.err
+					firstErr = err
 				}
-				if strings.Contains(detailResult.err.Error(), "content is not available in this region") {
-					regionErr = detailResult.err
+				if strings.Contains(err.Error(), "content is not available in this region") {
+					regionErr = err
 				}
 				continue
 			}
-			detailCancel()
-			candidate := detailResult.candidate
 			if candidate.DetailURL == "" {
-				candidate.DetailURL = result.hits[detailResult.index].URL
+				candidate.DetailURL = hit.URL
 			}
 			if candidate.Raw == nil {
 				candidate.Raw = map[string]any{}
 			}
 			if candidate.Raw["category"] == nil {
-				candidate.Raw["category"] = result.hits[detailResult.index].Category
+				candidate.Raw["category"] = hit.Category
 			}
 			return []avScrapeCandidate{candidate}, nil
 		}
-		if firstErr != nil {
-			return nil, firstErr
-		}
+	}
+	if firstErr != nil {
+		return nil, firstErr
 	}
 	if regionErr != nil {
 		return nil, regionErr

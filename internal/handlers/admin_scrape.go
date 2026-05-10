@@ -170,6 +170,8 @@ func (a *API) AdminAVScrapePreview(c *gin.Context) {
 		Title        string `json:"title"`
 		SiteCategory string `json:"site_category"`
 		SiteSource   string `json:"site_source"`
+		FilePath     string `json:"file_path"`
+		DetailURL    string `json:"detail_url"`
 		BypassCache  *bool  `json:"bypass_cache"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -208,6 +210,8 @@ func (a *API) AdminAVScrapePreview(c *gin.Context) {
 		BypassCache:  bypassCache,
 		SiteCategory: req.SiteCategory,
 		SiteSource:   req.SiteSource,
+		FilePath:     req.FilePath,
+		DetailURL:    req.DetailURL,
 	})
 	if err != nil {
 		response.Error(c, 3, err.Error())

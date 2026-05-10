@@ -1214,7 +1214,9 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		return ScrapeResult{}, fmt.Errorf("invalid av filename")
 	}
 
-	plan, err := s.resolveAVSearchPlan(ctx, keyword, AVPreviewOptions{})
+	plan, err := s.resolveAVSearchPlan(ctx, keyword, AVPreviewOptions{
+		FilePath: filePath,
+	})
 	if err != nil {
 		return ScrapeResult{}, err
 	}

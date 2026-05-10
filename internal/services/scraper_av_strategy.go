@@ -245,6 +245,9 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 	}
 
 	enabled := normalizeSourceList(cfg.EnabledSites)
+	if len(enabled) == 0 {
+		enabled = normalizeSourceList(defaultAVEnabledSites())
+	}
 	enabledSet := map[string]struct{}{}
 	for _, site := range enabled {
 		enabledSet[site] = struct{}{}
@@ -252,7 +255,7 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 
 	sources := normalizeSourceList(cfg.CategorySiteOrder[category])
 	if len(sources) == 0 {
-		sources = normalizeSourceList(defaultAVScraperSiteConfig().CategorySiteOrder[category])
+		sources = append([]string(nil), enabled...)
 	}
 	filtered := make([]string, 0, len(sources))
 	for _, source := range sources {
@@ -264,10 +267,7 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 		filtered = append(filtered, source)
 	}
 	if len(filtered) == 0 {
-		filtered = sources
-	}
-	if len(filtered) == 0 {
-		filtered = normalizeSourceList(defaultAVEnabledSites())
+		filtered = append([]string(nil), enabled...)
 	}
 
 	return avSearchPlan{

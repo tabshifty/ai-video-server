@@ -2,6 +2,28 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-10 08:38 +0800] AV 刮削迁移策略收口
+- Type: `implementation`
+- Summary:
+  - 将 AV 站点执行顺序收口到迁移版配置逻辑，保留 `EnabledSites` 顺序作为主执行序列，避免再从类别回退到被禁用的站点。
+  - DMM 刮削改为按迁移版顺序顺次请求搜索页，并只使用首个命中的结果，不再并发打满三条搜索 URL。
+  - AV 上传刮削把原始 `filePath` 继续传入统一预览链路，ThePornDB 继续按迁移策略优先吃 `detailUrl > filePath > number`。
+  - 管理端 AV 预览接口补充 `file_path/detail_url` 入参，统一走同一条迁移式预览链路。
+- Changed Files:
+  - `internal/handlers/admin_scrape.go`
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_av_execution_test.go`
+  - `internal/services/scraper_av_mdcx_sites_test.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestPreviewAVSearchDoesNotFallBackToDisabledCategorySource|TestScrapeAVUploadPassesFilePathToThePornDBCrawler|TestDMMSearchCandidatesUsesFirstSearchURLOnly' -count=1` passed.
+  - `go test ./internal/services ./internal/handlers ./internal/queue -count=1` passed.
+  - `go vet ./internal/services ./internal/handlers ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-09 23:41 +0800] MDCx AV 迁移站点补齐实现
 - Type: `implementation`
 - Summary:
