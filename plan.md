@@ -2,6 +2,26 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-10 11:22 +0800] 短视频转 AV 按标题选站修正
+- Type: `implementation`
+- Summary:
+  - 短视频转 AV 自动刮削不再把 `filePath` 传入预览流程，改为只根据标题自动选站，避免文件名里的 FC2 / 编号干扰站点分类。
+  - 默认 AV 站点顺序收口为：日系首选 `javdb`，欧美首选 `theporndb`，FC2 首选 FC2 站点；已保存的后台配置不迁移。
+  - 新增回归测试锁定“标题驱动选站”和默认日系顺序，防止后续再被文件路径或默认顺序回退。
+- Changed Files:
+  - `internal/queue/scrape_tasks.go`
+  - `internal/queue/scrape_tasks_test.go`
+  - `internal/services/scraper_av_strategy.go`
+  - `internal/services/scraper_av_strategy_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestDefaultAVScraperSiteConfigIncludesMDCxMigratedSites|TestResolveAVSearchPlanUsesDefaultFC2Sites|TestResolveAVSearchPlanUsesStoredWesternConfigOrder|TestResolveAVSearchPlanAllowsExplicitSiteSourceOverride' -count=1` passed.
+  - `go test ./internal/queue -run 'TestAutoScrapeAVMarksReadyOnSuccess|TestAutoScrapeAVUsesTitleToSelectSite' -count=1` passed.
+  - `go test ./internal/services ./internal/queue -count=1` passed.
+  - `go vet ./internal/services ./internal/queue` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-10 10:41 +0800] 开发脚本接入本地翻译模型
 - Type: `implementation`
 - Summary:

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -75,8 +77,12 @@ func TestBuildScrapeFailureDecisionKeepsMovieFallbackBehavior(t *testing.T) {
 }
 
 type queueRetagAVTestRepo struct {
-	videoByID  map[uuid.UUID]models.Video
-	lastStatus string
+	videoByID         map[uuid.UUID]models.Video
+	lastStatus        string
+	lastTitle         string
+	lastDescription   string
+	lastMetadata      map[string]any
+	lastThumbnailPath string
 }
 
 func (r *queueRetagAVTestRepo) GetVideoByID(_ context.Context, videoID uuid.UUID) (models.Video, error) {
@@ -91,8 +97,12 @@ func (r *queueRetagAVTestRepo) GetVideoByID(_ context.Context, videoID uuid.UUID
 	return models.Video{ID: videoID}, nil
 }
 
-func (r *queueRetagAVTestRepo) UpdateVideoScrapeResult(_ context.Context, _ uuid.UUID, _ *int, _ string, _ string, _ string, _ map[string]any, status string) error {
+func (r *queueRetagAVTestRepo) UpdateVideoScrapeResult(_ context.Context, _ uuid.UUID, _ *int, title, description, thumbnailPath string, metadata map[string]any, status string) error {
 	r.lastStatus = status
+	r.lastTitle = title
+	r.lastDescription = description
+	r.lastThumbnailPath = thumbnailPath
+	r.lastMetadata = metadata
 	return nil
 }
 
@@ -179,5 +189,80 @@ func TestAutoScrapeAVMarksReadyOnSuccess(t *testing.T) {
 	}
 	if repo.lastStatus != "ready" {
 		t.Fatalf("expected retag av to mark ready on success, got=%s", repo.lastStatus)
+	}
+}
+
+func TestAutoScrapeAVUsesTitleToSelectSite(t *testing.T) {
+	t.Parallel()
+
+	videoID := uuid.New()
+	repo := &queueRetagAVTestRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:           videoID,
+				Title:        "Brazzers office affair",
+				Status:       "scraping",
+				Type:         "av",
+				OriginalPath: "/videos/FC2-PPV-123456.mp4",
+			},
+		},
+	}
+
+	var fc2Hits int32
+	var searchHits int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/scenes") && r.URL.Query().Get("parse") != "":
+			atomic.AddInt32(&searchHits, 1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"slug":"brazzers-office-affair"}]}`))
+		case r.URL.Path == "/scenes/brazzers-office-affair":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"data": {
+					"slug": "brazzers-office-affair",
+					"title": "Brazzers Office Affair",
+					"description": "Western synopsis",
+					"date": "2024-01-02",
+					"performers": []
+				}
+			}`))
+		case strings.HasPrefix(r.URL.Path, "/article/"):
+			atomic.AddInt32(&fc2Hits, 1)
+			http.NotFound(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := services.NewScraperService(repo, "", server.URL, t.TempDir(), "", time.Second)
+	svc.ConfigureAVScraperConfig(services.AVScraperConfig{
+		BaseURL:           server.URL,
+		UserAgent:         "queue-retag-av-test",
+		Timeout:           time.Second,
+		SiteURLs:          map[string]string{"theporndb": server.URL, "fc2": server.URL},
+		ThePornDBAPIToken: "token-123",
+	})
+
+	processor := &Processor{scrape: svc}
+	if err := processor.autoScrapeAV(context.Background(), videoID, "Brazzers office affair", repo.videoByID[videoID].OriginalPath); err != nil {
+		t.Fatalf("autoScrapeAV returned error: %v", err)
+	}
+	if got := atomic.LoadInt32(&searchHits); got == 0 {
+		t.Fatalf("expected theporndb search to be used")
+	}
+	if got := atomic.LoadInt32(&fc2Hits); got != 0 {
+		t.Fatalf("expected fc2 crawler to stay unused, hits=%d", got)
+	}
+	if repo.lastStatus != "ready" {
+		t.Fatalf("expected retag av to mark ready on success, got=%s", repo.lastStatus)
+	}
+	if repo.lastMetadata["site_category"] != "western" {
+		t.Fatalf("expected western site category, got=%v", repo.lastMetadata["site_category"])
+	}
+	if repo.lastMetadata["scrape_source"] != "theporndb" {
+		t.Fatalf("expected theporndb scrape source, got=%v", repo.lastMetadata["scrape_source"])
 	}
 }

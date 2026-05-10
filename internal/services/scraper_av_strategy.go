@@ -63,7 +63,7 @@ func defaultAVScraperSiteConfig() AVScraperSiteConfig {
 		CategorySiteOrder: map[string][]string{
 			avSiteCategoryFC2:      {"fc2ppvdb", "fc2club", "fc2", "fc2hub", "javdb"},
 			avSiteCategoryWestern:  {"theporndb", "javdb", "mywife"},
-			avSiteCategoryJapanese: {"theporndb", "dmm", "javdb", "jav321", "mgstage", "javbus", "javlibrary", "airav_cc", "avsex", "getchu"},
+			avSiteCategoryJapanese: {"javdb", "dmm", "jav321", "mgstage", "javbus", "javlibrary", "airav_cc", "avsex", "getchu", "theporndb"},
 		},
 		PosterCropEnabled: true,
 		PosterCropMode:    avPosterCropModeCenter,

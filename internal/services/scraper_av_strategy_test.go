@@ -48,7 +48,7 @@ func TestDefaultAVScraperSiteConfigIncludesMDCxMigratedSites(t *testing.T) {
 		}
 	}
 
-	wantJapanesePrefix := []string{"theporndb", "dmm", "javdb", "jav321", "mgstage"}
+	wantJapanesePrefix := []string{"javdb", "dmm", "jav321", "mgstage", "javbus"}
 	if got := cfg.CategorySiteOrder[avSiteCategoryJapanese]; len(got) < len(wantJapanesePrefix) {
 		t.Fatalf("expected japanese order to include MDCx prefix %v, got=%v", wantJapanesePrefix, got)
 	} else {

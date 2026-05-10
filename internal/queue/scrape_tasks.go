@@ -266,9 +266,7 @@ func (p *Processor) autoScrapeEpisode(ctx context.Context, videoID uuid.UUID, ti
 }
 
 func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title, filePath string) error {
-	result, err := p.scrape.PreviewAVSearch(ctx, title, services.AVPreviewOptions{
-		FilePath: filePath,
-	})
+	result, err := p.scrape.PreviewAVSearch(ctx, title, services.AVPreviewOptions{})
 	if err != nil {
 		return err
 	}
