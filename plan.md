@@ -4458,3 +4458,8 @@
 - 进度：新增刮削内容中文翻译接入，支持通过 OpenAI-compatible 本地翻译接口连接 `HY-MT1.5-1.8B` 等模型；刮削写库前会保存中文标题/简介到展示字段，并在 `metadata` 中同步写入 `title_original`、`description_original`、`title_zh`、`description_zh`，演员名保持原样。
 - 影响文件：`main.go`、`.env.example`、`internal/config/config.go`、`internal/services/scraper.go`、`internal/services/translation.go`、`internal/config/config_test.go`、`internal/services/translation_test.go`、`internal/services/scraper_translation_test.go`、`plan.md`
 - 验证：`go test ./internal/config ./internal/services -run 'TestLoadIncludesTranslationConfig|TestOpenAITextTranslatorTranslateScrapeContent|TestScrapeMovieUploadStoresLocalizedFields|TestScrapeAVUploadStoresLocalizedFieldsAndKeepsActors'`、`go test ./...`、`go vet ./...` 均通过。
+
+## 2026-05-10 09:55
+- 进度：补齐本机 `.env` 翻译配置，并修复 `dev-up.sh` 后台进程保活问题；脚本改为先构建 `.run/bin/video-server`，再用 detached 方式启动后端、worker 与前端，避免脚本退出后服务进程被带走。
+- 影响文件：`.env`（本地忽略文件）、`scripts/dev-up.sh`、`plan.md`
+- 验证：`bash -n scripts/dev-up.sh`、`bash scripts/dev-down.sh`、`bash scripts/dev-up.sh`、`curl -fsS http://127.0.0.1:8080/healthz`、`curl -I -fsS http://127.0.0.1:5173/` 均通过。

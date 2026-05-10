@@ -70,6 +70,7 @@ fi
 
 require_cmd go
 require_cmd docker
+require_cmd python3
 if [[ "$FRONTEND_MODE" != "off" ]]; then
   require_cmd npm
 fi
@@ -231,7 +232,7 @@ pid_matches_service() {
     [[ "$cmdline" == *"-mode worker"* || "$cmdline" == *"go run main.go -mode worker"* ]]
     ;;
   frontend)
-    [[ "$cmdline" == *"$ROOT_DIR/admin-web"* || "$cmdline" == *"vite"* ]]
+    [[ "$cmdline" == *"$ROOT_DIR/admin-web"* || "$cmdline" == *"vite"* || "$cmdline" == *"npm run dev"* ]]
     ;;
   *)
     return 1
@@ -332,8 +333,27 @@ start_bg_process() {
   fi
 
   log "starting $name"
-  nohup "$@" >"$log_file" 2>&1 &
-  local pid="$!"
+  local pid
+  pid="$(python3 - "$log_file" "$@" <<'PY'
+import os
+import subprocess
+import sys
+
+log_file = sys.argv[1]
+args = sys.argv[2:]
+out = open(log_file, "ab", buffering=0)
+proc = subprocess.Popen(
+    args,
+    cwd=os.getcwd(),
+    env=os.environ.copy(),
+    stdout=out,
+    stderr=subprocess.STDOUT,
+    start_new_session=True,
+)
+out.close()
+print(proc.pid)
+PY
+)"
   printf '%s\t%s\n' "$pid" "$*" >"$pid_file"
 
   sleep 1
@@ -432,6 +452,12 @@ ensure_frontend_deps() {
   fi
 }
 
+build_backend_binary() {
+  mkdir -p "$RUN_DIR/bin"
+  log "building backend binary"
+  go build -o "$RUN_DIR/bin/video-server" .
+}
+
 cleanup_on_error() {
   local exit_code="$?"
   local i pid_file
@@ -471,8 +497,10 @@ fi
 
 apply_migrations "$POSTGRES_CID"
 
-start_bg_process "server" "$RUN_DIR/server.pid" "$RUN_DIR/server.log" go run main.go -mode server
-start_bg_process "worker" "$RUN_DIR/worker.pid" "$RUN_DIR/worker.log" go run main.go -mode worker
+build_backend_binary
+
+start_bg_process "server" "$RUN_DIR/server.pid" "$RUN_DIR/server.log" "$RUN_DIR/bin/video-server" -mode server
+start_bg_process "worker" "$RUN_DIR/worker.pid" "$RUN_DIR/worker.log" "$RUN_DIR/bin/video-server" -mode worker
 
 if [[ "$FRONTEND_MODE" == "off" ]]; then
   log "frontend is disabled"
