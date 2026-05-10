@@ -136,7 +136,7 @@ func (p *Processor) HandleScrapeRetag(ctx context.Context, task *asynq.Task) err
 		}
 		scrapeErr = p.autoScrapeEpisode(ctx, videoID, searchTitle, payload.SeasonNumber, payload.EpisodeNumber)
 	case "av":
-		scrapeErr = p.autoScrapeAV(ctx, videoID, searchTitle, video.OriginalPath, video.Status)
+		scrapeErr = p.autoScrapeAV(ctx, videoID, searchTitle, video.OriginalPath)
 	}
 	if scrapeErr != nil {
 		if targetType == "av" {
@@ -265,7 +265,7 @@ func (p *Processor) autoScrapeEpisode(ctx context.Context, videoID uuid.UUID, ti
 	return p.scrape.ConfirmEpisode(ctx, input)
 }
 
-func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title, filePath, currentStatus string) error {
+func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title, filePath string) error {
 	result, err := p.scrape.PreviewAVSearch(ctx, title, services.AVPreviewOptions{
 		FilePath: filePath,
 	})
@@ -302,7 +302,7 @@ func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title, 
 		ThumbURL:    anyString(first["thumb_url"]),
 		ReleaseDate: anyString(first["release_date"]),
 		Metadata:    meta,
-		Status:      currentStatus,
+		Status:      "ready",
 	}
 	if input.ExternalID == "" {
 		return fmt.Errorf("invalid av external_id from first candidate")

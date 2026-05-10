@@ -128,7 +128,7 @@ func (r *queueRetagAVTestRepo) UpdateActorAvatar(context.Context, uuid.UUID, str
 	return nil
 }
 
-func TestAutoScrapeAVPreservesCurrentStatus(t *testing.T) {
+func TestAutoScrapeAVMarksReadyOnSuccess(t *testing.T) {
 	videoID := uuid.New()
 	repo := &queueRetagAVTestRepo{
 		videoByID: map[uuid.UUID]models.Video{
@@ -174,10 +174,10 @@ func TestAutoScrapeAVPreservesCurrentStatus(t *testing.T) {
 	svc.ConfigureAVScraper(server.URL, "queue-retag-av-test", time.Second)
 
 	processor := &Processor{scrape: svc}
-	if err := processor.autoScrapeAV(context.Background(), videoID, "SSIS-123", repo.videoByID[videoID].OriginalPath, repo.videoByID[videoID].Status); err != nil {
+	if err := processor.autoScrapeAV(context.Background(), videoID, "SSIS-123", repo.videoByID[videoID].OriginalPath); err != nil {
 		t.Fatalf("autoScrapeAV returned error: %v", err)
 	}
-	if repo.lastStatus != "scraping" {
-		t.Fatalf("expected retag av to preserve current status scraping, got=%s", repo.lastStatus)
+	if repo.lastStatus != "ready" {
+		t.Fatalf("expected retag av to mark ready on success, got=%s", repo.lastStatus)
 	}
 }

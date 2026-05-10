@@ -4409,3 +4409,8 @@
 - 进度：修复 DMM 详情候选的失败回退逻辑，改为并发尝试当前搜索页里的多个候选，不再因首个候选超时或 504 直接中断；补回归测试覆盖“首个候选失败、第二个候选成功”。
 - 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_mdcx_sites_test.go`、`plan.md`
 - 验证：`go test ./internal/services -run 'TestDMMSearchCandidatesReturnsRegionError|TestDMMSearchCandidatesSkipsFailedSearchURL|TestDMMSearchCandidatesSkipsFailedDetailURL|TestMDCxMigratedSitesSearchCandidates' -count=1`、`go test ./internal/services ./internal/handlers ./internal/queue`、`go vet ./...` 通过。
+
+## 2026-05-10 08:20
+- 进度：修复短视频转 AV 的状态收尾，成功后不再沿用 `scraping`，而是统一落回 `ready`；同步把自动重刮削回归测试改成验证成功后状态可放行给只认 `ready` 的资源接口。
+- 影响文件：`internal/queue/scrape_tasks.go`、`internal/queue/scrape_tasks_test.go`、`plan.md`
+- 验证：`go test ./internal/queue -run 'TestAutoScrapeAVMarksReadyOnSuccess|TestBuildScrapeFailureDecisionMarksEpisodeAsTVPending|TestBuildScrapeFailureDecisionKeepsMovieFallbackBehavior' -count=1`、`go test ./internal/services -run 'TestConfirmAVPreservesExplicitReadyStatus|TestScrapeAVUploadCodeFirstAndActorSync' -count=1`、`go test ./internal/services ./internal/handlers ./internal/queue`、`go vet ./...` 通过。
