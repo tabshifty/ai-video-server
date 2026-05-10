@@ -1917,6 +1917,7 @@ func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
 		responseBody string
 		wantTitle    string
 		wantCode     string
+		wantPoster   string
 	}{
 		{
 			name:       "fc2club",
@@ -1999,8 +2000,9 @@ func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
   <video id="video" poster="https://cdn.mywife.test/movie/1307/topview.jpg" src="https://cdn.mywife.test/movie/1307/preview.mp4"></video>
 </body>
 </html>`,
-			wantTitle: "Mywife First Impression",
-			wantCode:  "Mywife No.1307",
+			wantTitle:  "Mywife First Impression",
+			wantCode:   "Mywife No.1307",
+			wantPoster: "https://cdn.mywife.test/movie/1307/topview.jpg",
 		},
 	}
 
@@ -2067,6 +2069,9 @@ func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
 			}
 			if repo.lastUpdate.metadata["av_code"] != tc.wantCode {
 				t.Fatalf("expected av_code %s, got=%v", tc.wantCode, repo.lastUpdate.metadata["av_code"])
+			}
+			if tc.wantPoster != "" && repo.lastUpdate.metadata["poster_url"] != tc.wantPoster {
+				t.Fatalf("expected poster_url %s, got=%v", tc.wantPoster, repo.lastUpdate.metadata["poster_url"])
 			}
 		})
 	}
@@ -2473,11 +2478,11 @@ func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 	if first["title"] != "ThePornDB First Impression" {
 		t.Fatalf("expected title ThePornDB First Impression, got=%v", first["title"])
 	}
-	if first["poster_url"] != "https://image.example/abw-123-poster.jpg" {
-		t.Fatalf("expected poster url from posters.large, got=%v", first["poster_url"])
+	if first["poster_url"] != "https://image.example/abw-123-thumb.jpg" {
+		t.Fatalf("expected poster url from background.large, got=%v", first["poster_url"])
 	}
-	if first["thumb_url"] != "https://image.example/abw-123-thumb.jpg" {
-		t.Fatalf("expected thumb url from background.large, got=%v", first["thumb_url"])
+	if first["thumb_url"] != "https://image.example/abw-123-poster.jpg" {
+		t.Fatalf("expected thumb url from posters.large, got=%v", first["thumb_url"])
 	}
 	if first["detail_url"] != server.URL+"/scenes/abw-123-scene" {
 		t.Fatalf("expected theporndb detail url, got=%v", first["detail_url"])

@@ -2,6 +2,49 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-10 17:52 +0800] 统一 AV 站点海报策略完成
+- Type: `implementation`
+- Summary:
+  - `poster_url` 统一表示主海报源图，确认落盘元数据同步记录 `poster_url`、`poster` 原图路径和 `thumb` 最终展示路径。
+  - 裁剪开启时优先从主 poster 生成 cropped thumb；只有裁剪关闭或裁剪失败时才使用站点 portrait `thumb_url`。
+  - ThePornDB 改用 `background.large/image` 作为主 poster，`posters.large/poster` 作为站点原始 thumb 候选；Mywife 保留 `topview.jpg` 为主 poster，并记录 `thumb.jpg` 为原始 thumb 候选。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `internal/services/scraper_av_poster.go`
+  - `internal/services/scraper_av_poster_assets_test.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVPrefersCroppedPosterOverSeparateThumbWhenCropEnabled|TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites|TestPreviewAVFallsBackToThePornDBWhenConfigured' -count=1` passed.
+  - `go test ./internal/services -run 'Poster|ThePornDB|Mywife|DMM|MGStage|JavDB|MDCx' -count=1` passed.
+  - `go test ./internal/services ./internal/queue ./internal/handlers -count=1` passed.
+  - `go test ./... -count=1` passed.
+  - `go vet ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
+### [2026-05-10 17:48 +0800] 统一 AV 站点海报策略实现进度
+- Type: `implementation`
+- Summary:
+  - 先新增/调整回归测试，确认旧实现下 ThePornDB、Mywife 和通用 thumb 优先逻辑会失败。
+  - 落盘层调整为裁剪开启时优先从主 poster 裁剪 thumb，裁剪不可用时再使用站点 portrait thumb。
+  - ThePornDB 主海报改用 `background.large/image`，Mywife 主海报保留 `topview.jpg`，确认元数据补充 `poster_url`。
+- Changed Files:
+  - `internal/services/scraper.go`
+  - `internal/services/scraper_av_mdcx_detail_sites.go`
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `internal/services/scraper_av_poster.go`
+  - `internal/services/scraper_av_poster_assets_test.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestConfirmAVPrefersCroppedPosterOverSeparateThumbWhenCropEnabled|TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites|TestPreviewAVFallsBackToThePornDBWhenConfigured' -count=1` passed.
+  - 全量验证待执行。
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-10 11:22 +0800] 短视频转 AV 按标题选站修正
 - Type: `implementation`
 - Summary:

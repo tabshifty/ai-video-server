@@ -458,7 +458,8 @@ func (c *mywifeAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRun
 	if code == "" && externalID != "" {
 		code = "Mywife No." + externalID
 	}
-	poster := strings.Replace(mywifeVideoAttr(root, "poster"), "topview.jpg", "thumb.jpg", 1)
+	poster := strings.TrimSpace(mywifeVideoAttr(root, "poster"))
+	thumb := strings.Replace(poster, "topview.jpg", "thumb.jpg", 1)
 	candidate := avScrapeCandidate{
 		Source:     c.Name(),
 		ExternalID: externalID,
@@ -466,6 +467,7 @@ func (c *mywifeAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRun
 		Title:      title,
 		Overview:   mywifeOutline(root),
 		PosterURL:  poster,
+		ThumbURL:   thumb,
 		Actors:     mywifeActors(root),
 		DetailURL:  strings.TrimSpace(detailURL),
 		Raw: map[string]any{
@@ -474,6 +476,8 @@ func (c *mywifeAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrapeRun
 			"external_id": externalID,
 			"av_code":     code,
 			"title":       title,
+			"poster_url":  poster,
+			"thumb_url":   thumb,
 		},
 	}
 	return candidate, nil

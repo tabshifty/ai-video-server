@@ -1748,8 +1748,8 @@ func thePornDBBestMatchURL(items []thePornDBItem, filePath, series, date, catego
 }
 
 func thePornDBMetadataFromItem(item thePornDBItem, category string) avScrapeCandidate {
-	thumb := firstNonEmptyString(item.Background.Large, item.Image)
-	poster := firstNonEmptyString(item.Posters.Large, item.Poster)
+	poster := firstNonEmptyString(item.Background.Large, item.Image, item.Posters.Large, item.Poster)
+	thumb := firstNonEmptyString(item.Posters.Large, item.Poster)
 	actors, allActors := thePornDBActors(item.Performers)
 	release := item.Date
 	candidate := avScrapeCandidate{

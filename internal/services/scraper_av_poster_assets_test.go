@@ -188,7 +188,7 @@ func TestConfirmAVFallsBackToOriginalPosterWhenCropFails(t *testing.T) {
 	}
 }
 
-func TestConfirmAVStoresSeparateThumbWhenThumbURLIsAvailable(t *testing.T) {
+func TestConfirmAVPrefersCroppedPosterOverSeparateThumbWhenCropEnabled(t *testing.T) {
 	t.Parallel()
 
 	videoID := uuid.New()
@@ -250,14 +250,15 @@ func TestConfirmAVStoresSeparateThumbWhenThumbURLIsAvailable(t *testing.T) {
 
 	posterFilePath := asString(repo.lastUpdate.metadata["poster"])
 	thumbFilePath := asString(repo.lastUpdate.metadata["thumb"])
+	croppedFilePath := asString(repo.lastUpdate.metadata["poster_cropped_file_path"])
 	if posterFilePath == "" || thumbFilePath == "" {
 		t.Fatalf("expected poster and thumb paths, metadata=%v", repo.lastUpdate.metadata)
 	}
-	if posterFilePath == thumbFilePath {
-		t.Fatalf("expected separate poster and thumb files, got=%s", posterFilePath)
+	if thumbFilePath != croppedFilePath {
+		t.Fatalf("expected thumb to use cropped poster, got=%s want=%s", thumbFilePath, croppedFilePath)
 	}
-	if asString(repo.lastUpdate.metadata["poster_variant"]) != "thumb" {
-		t.Fatalf("expected poster_variant thumb, got=%v", repo.lastUpdate.metadata["poster_variant"])
+	if asString(repo.lastUpdate.metadata["poster_variant"]) != avPosterVariantCropped {
+		t.Fatalf("expected poster_variant cropped, got=%v", repo.lastUpdate.metadata["poster_variant"])
 	}
 	posterImg := decodeJPEGFile(t, posterFilePath)
 	thumbImg := decodeJPEGFile(t, thumbFilePath)
@@ -265,7 +266,7 @@ func TestConfirmAVStoresSeparateThumbWhenThumbURLIsAvailable(t *testing.T) {
 		t.Fatalf("expected poster to stay landscape, got=%dx%d", posterImg.Bounds().Dx(), posterImg.Bounds().Dy())
 	}
 	if thumbImg.Bounds().Dx() >= thumbImg.Bounds().Dy() {
-		t.Fatalf("expected thumb to stay portrait, got=%dx%d", thumbImg.Bounds().Dx(), thumbImg.Bounds().Dy())
+		t.Fatalf("expected thumb to use portrait crop, got=%dx%d", thumbImg.Bounds().Dx(), thumbImg.Bounds().Dy())
 	}
 	if _, err := os.Stat(posterFilePath); err != nil {
 		t.Fatalf("expected poster file: %v", err)

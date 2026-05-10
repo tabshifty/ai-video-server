@@ -66,22 +66,21 @@ func (s *ScraperService) resolveAVPosterAssets(ctx context.Context, videoID uuid
 		if posterFromThumbOnly {
 			assets.ThumbPath = originalPath
 			assets.Variant = "thumb"
-		} else if isAbsoluteHTTPURL(thumbURL) && thumbURL != posterURL {
+		} else if cropCfg.PosterCropEnabled {
+			if croppedPath, cropErr := s.cropAVPosterImage(originalPath, videoID, cropCfg.PosterCropMode); cropErr == nil {
+				assets.SelectedPath = croppedPath
+				assets.ThumbPath = croppedPath
+				assets.CroppedPath = croppedPath
+				assets.Variant = avPosterVariantCropped
+			}
+		}
+		if !posterFromThumbOnly && assets.SelectedPath == originalPath && isAbsoluteHTTPURL(thumbURL) && thumbURL != posterURL {
 			if thumbPath, thumbErr := s.downloadPosterVariant(ctx, thumbURL, videoID, "thumb"); thumbErr == nil {
 				if isAVPortraitImage(thumbPath) {
 					assets.SelectedPath = thumbPath
 					assets.ThumbPath = thumbPath
 					assets.Variant = "thumb"
 				}
-			}
-		}
-		if !posterFromThumbOnly && assets.SelectedPath == originalPath && cropCfg.PosterCropEnabled {
-			croppedPath, cropErr := s.cropAVPosterImage(originalPath, videoID, cropCfg.PosterCropMode)
-			if cropErr == nil {
-				assets.SelectedPath = croppedPath
-				assets.ThumbPath = croppedPath
-				assets.CroppedPath = croppedPath
-				assets.Variant = avPosterVariantCropped
 			}
 		}
 		if posterQuality == avPosterQualityPrimary {
