@@ -1045,11 +1045,11 @@ func TestPreviewAVJavDBPrefersCoverAndDetailOverview(t *testing.T) {
 		t.Fatalf("expected av candidates, got none")
 	}
 	candidate := got[0]
-	if candidate["poster_url"] != server.URL+"/thumbs/real-cover.jpg" {
-		t.Fatalf("expected derived poster from real cover, got=%v", candidate["poster_url"])
+	if candidate["poster_url"] != server.URL+"/covers/real-cover.jpg" {
+		t.Fatalf("expected real cover as poster, got=%v", candidate["poster_url"])
 	}
 	if candidate["thumb_url"] != server.URL+"/covers/real-cover.jpg" {
-		t.Fatalf("expected real cover as thumb, got=%v", candidate["thumb_url"])
+		t.Fatalf("expected real cover as thumb source, got=%v", candidate["thumb_url"])
 	}
 	if candidate["overview"] != "这是正确的剧情简介" {
 		t.Fatalf("expected detail overview, got=%v", candidate["overview"])

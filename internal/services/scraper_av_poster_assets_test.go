@@ -222,10 +222,10 @@ func TestConfirmAVStoresSeparateThumbWhenThumbURLIsAvailable(t *testing.T) {
 			`))
 		case "/thumbs/ssis-125.jpg":
 			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write(testJPEGLandscapeBytes(t))
+			_, _ = w.Write(testJPEGPortraitBytes(t))
 		case "/covers/ssis-125.jpg":
 			w.Header().Set("Content-Type", "image/jpeg")
-			_, _ = w.Write(testJPEGPortraitBytes(t))
+			_, _ = w.Write(testJPEGLandscapeBytes(t))
 		default:
 			http.NotFound(w, r)
 		}
@@ -238,6 +238,7 @@ func TestConfirmAVStoresSeparateThumbWhenThumbURLIsAvailable(t *testing.T) {
 	err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
 		VideoID:    videoID,
 		ExternalID: "ssis-125",
+		ThumbURL:   server.URL + "/thumbs/ssis-125.jpg",
 		Metadata: map[string]any{
 			"scrape_source": "javdb",
 			"detail_url":    server.URL + "/v/ssis-125",

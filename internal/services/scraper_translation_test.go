@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"video-server/internal/models"
 )
 
 type fakeContentTranslator struct {
@@ -206,6 +208,89 @@ func TestScrapeAVUploadStoresLocalizedFieldsAndKeepsActors(t *testing.T) {
 		t.Fatalf("unexpected title_zh: %v", repo.lastUpdate.metadata["title_zh"])
 	}
 	if repo.lastUpdate.metadata["description_zh"] != "作品简介中文" {
+		t.Fatalf("unexpected description_zh: %v", repo.lastUpdate.metadata["description_zh"])
+	}
+}
+
+func TestConfirmAVStoresLocalizedFieldsAndOriginalFields(t *testing.T) {
+	t.Parallel()
+
+	videoID := uuid.New()
+	repo := &fakeScraperRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:     videoID,
+				Title:  "旧标题",
+				Type:   "av",
+				Status: "ready",
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v/abp-123":
+			_, _ = w.Write([]byte(`
+<html>
+  <head>
+    <title>ABP-123 English Title - JavDB</title>
+    <meta name="description" content="English overview" />
+  </head>
+  <body>
+    <h2 class="title is-4">ABP-123 English Title</h2>
+    <img class="video-cover" src="/covers/abp123.jpg" />
+    <div><strong>番號:</strong><span>ABP-123</span></div>
+    <div><strong>日期:</strong><span>2024-01-02</span></div>
+  </body>
+</html>
+`))
+		case "/covers/abp123.jpg":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write(testJPEGLandscapeBytes(t))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", 2*time.Second)
+	svc.ConfigureAVScraper(server.URL, "av-confirm-translation-test", time.Second)
+	svc.textTranslator = &fakeContentTranslator{
+		result: TranslationResult{
+			Title:       "中文片名",
+			Description: "中文简介",
+		},
+	}
+
+	if err := svc.ConfirmAV(context.Background(), ConfirmScrapeInput{
+		VideoID:    videoID,
+		ExternalID: "abp-123",
+		Title:      "English Title",
+		Overview:   "English overview",
+		Metadata: map[string]any{
+			"scrape_source": "javdb",
+			"detail_url":    server.URL + "/v/abp-123",
+		},
+	}); err != nil {
+		t.Fatalf("ConfirmAV returned error: %v", err)
+	}
+
+	if repo.lastUpdate.title != "中文片名" {
+		t.Fatalf("unexpected title: %s", repo.lastUpdate.title)
+	}
+	if repo.lastUpdate.description != "中文简介" {
+		t.Fatalf("unexpected description: %s", repo.lastUpdate.description)
+	}
+	if repo.lastUpdate.metadata["title_original"] != "English Title" {
+		t.Fatalf("unexpected title_original: %v", repo.lastUpdate.metadata["title_original"])
+	}
+	if repo.lastUpdate.metadata["description_original"] != "English overview" {
+		t.Fatalf("unexpected description_original: %v", repo.lastUpdate.metadata["description_original"])
+	}
+	if repo.lastUpdate.metadata["title_zh"] != "中文片名" {
+		t.Fatalf("unexpected title_zh: %v", repo.lastUpdate.metadata["title_zh"])
+	}
+	if repo.lastUpdate.metadata["description_zh"] != "中文简介" {
 		t.Fatalf("unexpected description_zh: %v", repo.lastUpdate.metadata["description_zh"])
 	}
 }

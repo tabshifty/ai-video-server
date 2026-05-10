@@ -192,6 +192,102 @@ func TestAutoScrapeAVMarksReadyOnSuccess(t *testing.T) {
 	}
 }
 
+func TestAutoScrapeAVStoresLocalizedFieldsAndMarksReady(t *testing.T) {
+	videoID := uuid.New()
+	repo := &queueRetagAVTestRepo{
+		videoByID: map[uuid.UUID]models.Video{
+			videoID: {
+				ID:           videoID,
+				Title:        "SSIS-123",
+				Status:       "scraping",
+				Type:         "av",
+				OriginalPath: "/videos/SSIS-123.mp4",
+			},
+		},
+	}
+
+	var translationCalls int32
+	translationServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		atomic.AddInt32(&translationCalls, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices":[{"message":{"content":"{\"title_zh\":\"中文标题\",\"description_zh\":\"中文简介\"}"}}]
+		}`))
+	}))
+	defer translationServer.Close()
+
+	avServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/search":
+			_, _ = w.Write([]byte(`
+<html>
+  <body>
+    <a href="/v/ssis-123">
+      <h2 class="title">SSIS-123 English Title</h2>
+    </a>
+  </body>
+</html>
+`))
+		case "/v/ssis-123":
+			_, _ = w.Write([]byte(`
+<!doctype html>
+<html>
+  <body>
+    <a class="button is-white copy-to-clipboard" data-clipboard-text="SSIS-123"></a>
+    <h2 class="title is-4">SSIS-123 English Title</h2>
+    <div><strong>番號:</strong><span>SSIS-123</span></div>
+    <meta name="description" content="English overview" />
+  </body>
+</html>
+`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer avServer.Close()
+
+	svc := services.NewScraperService(repo, "", "https://api.themoviedb.org/3", t.TempDir(), "", time.Second)
+	svc.ConfigureAVScraper(avServer.URL, "queue-retag-av-translation-test", time.Second)
+	svc.ConfigureContentTranslation(services.TranslationConfig{
+		APIURL:  translationServer.URL + "/v1",
+		Model:   "HY-MT1.5-1.8B",
+		Timeout: time.Second,
+	})
+
+	processor := &Processor{scrape: svc}
+	if err := processor.autoScrapeAV(context.Background(), videoID, "SSIS-123", repo.videoByID[videoID].OriginalPath); err != nil {
+		t.Fatalf("autoScrapeAV returned error: %v", err)
+	}
+	if repo.lastStatus != "ready" {
+		t.Fatalf("expected retag av to mark ready on success, got=%s", repo.lastStatus)
+	}
+	if atomic.LoadInt32(&translationCalls) == 0 {
+		t.Fatal("expected translation service to be called")
+	}
+	if repo.lastTitle != "中文标题" {
+		t.Fatalf("unexpected translated title: %s", repo.lastTitle)
+	}
+	if repo.lastDescription != "中文简介" {
+		t.Fatalf("unexpected translated description: %s", repo.lastDescription)
+	}
+	if repo.lastMetadata["title_original"] != "SSIS-123 English Title" {
+		t.Fatalf("unexpected title_original: %v", repo.lastMetadata["title_original"])
+	}
+	if repo.lastMetadata["description_original"] != "English overview" {
+		t.Fatalf("unexpected description_original: %v", repo.lastMetadata["description_original"])
+	}
+	if repo.lastMetadata["title_zh"] != "中文标题" {
+		t.Fatalf("unexpected title_zh: %v", repo.lastMetadata["title_zh"])
+	}
+	if repo.lastMetadata["description_zh"] != "中文简介" {
+		t.Fatalf("unexpected description_zh: %v", repo.lastMetadata["description_zh"])
+	}
+}
+
 func TestAutoScrapeAVUsesTitleToSelectSite(t *testing.T) {
 	t.Parallel()
 

@@ -1097,16 +1097,12 @@ func (c *javDBAVCrawler) postProcess(candidate *avScrapeCandidate) {
 	if candidate.Raw == nil {
 		candidate.Raw = map[string]any{}
 	}
-	if thumbURL := strings.TrimSpace(candidate.PosterURL); thumbURL != "" {
-		candidate.ThumbURL = thumbURL
-		candidate.Raw["thumb_url"] = thumbURL
-		candidate.Raw["poster_thumb_url"] = thumbURL
-		posterURL := thumbURL
-		if strings.Contains(thumbURL, "/covers/") {
-			posterURL = strings.Replace(thumbURL, "/covers/", "/thumbs/", 1)
-		}
+	if posterURL := strings.TrimSpace(candidate.PosterURL); posterURL != "" {
 		candidate.PosterURL = posterURL
+		candidate.ThumbURL = posterURL
 		candidate.Raw["poster_url"] = posterURL
+		candidate.Raw["thumb_url"] = posterURL
+		candidate.Raw["poster_thumb_url"] = posterURL
 	}
 	title := strings.ToLower(strings.TrimSpace(candidate.Title))
 	if strings.Contains(title, "無碼") || strings.Contains(title, "无码") || strings.Contains(title, "uncensored") {
