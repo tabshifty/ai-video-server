@@ -2,6 +2,25 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-10 10:41 +0800] 开发脚本接入本地翻译模型
+- Type: `implementation`
+- Summary:
+  - `dev-up.sh` 增加本地翻译模型启动与就绪检查，默认拉起 `llama-server` 监听 `127.0.0.1:8000`，对外提供 OpenAI-compatible `/v1` 接口。
+  - 新增 `TRANSLATION_SERVER_BIN` 与 `TRANSLATION_MODEL_PATH` 运行时覆盖能力，默认使用本机已验证的 HY-MT1.5-1.8B GGUF Q4 模型文件。
+  - `.env.example` 默认开启 `TRANSLATION_API_URL=http://127.0.0.1:8000/v1`，新建环境可直接走本地翻译服务。
+- Changed Files:
+  - `scripts/dev-up.sh`
+  - `.env.example`
+  - `plan.md`
+- Verification:
+  - `bash -n scripts/dev-up.sh` passed.
+  - 停掉既有翻译进程后执行 `bash scripts/dev-up.sh --frontend off` passed，脚本成功启动 translation，并识别既有 server/worker 进程。
+  - `GET http://127.0.0.1:8000/v1/models` returned HY-MT1.5-1.8B.
+  - `POST http://127.0.0.1:8000/v1/chat/completions` returned Chinese JSON translation.
+  - `GET http://127.0.0.1:8080/healthz` returned `{"status":"ok"}`.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-10 09:02 +0800] DMM 刮削取消站点超时
 - Type: `implementation`
 - Summary:

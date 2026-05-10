@@ -71,6 +71,7 @@ fi
 require_cmd go
 require_cmd docker
 require_cmd python3
+require_cmd curl
 if [[ "$FRONTEND_MODE" != "off" ]]; then
   require_cmd npm
 fi
@@ -125,6 +126,11 @@ load_env_file() {
 }
 
 load_env_file "$ENV_FILE"
+TRANSLATION_API_URL="${TRANSLATION_API_URL:-http://127.0.0.1:8000/v1}"
+TRANSLATION_MODEL="${TRANSLATION_MODEL:-HY-MT1.5-1.8B}"
+TRANSLATION_SERVER_BIN="${TRANSLATION_SERVER_BIN:-/tmp/llama.cpp-hunyuan/build/bin/llama-server}"
+TRANSLATION_MODEL_PATH="${TRANSLATION_MODEL_PATH:-$HOME/Library/Caches/llama.cpp/tencent_HY-MT1.5-1.8B-GGUF_HY-MT1.5-1.8B-Q4_K_M.gguf}"
+export TRANSLATION_API_URL TRANSLATION_MODEL TRANSLATION_SERVER_BIN TRANSLATION_MODEL_PATH
 export ENV_FILE
 log "using env file: $ENV_FILE"
 
@@ -233,6 +239,9 @@ pid_matches_service() {
     ;;
   frontend)
     [[ "$cmdline" == *"$ROOT_DIR/admin-web"* || "$cmdline" == *"vite"* || "$cmdline" == *"npm run dev"* ]]
+    ;;
+  translation)
+    [[ "$cmdline" == *"llama-server"* || "$cmdline" == *"mlx_lm.server"* ]]
     ;;
   *)
     return 1
@@ -458,6 +467,70 @@ build_backend_binary() {
   go build -o "$RUN_DIR/bin/video-server" .
 }
 
+translation_service_is_ready() {
+  curl -fsS "$TRANSLATION_API_URL/models" >/dev/null 2>&1
+}
+
+resolve_translation_server_bin() {
+  local bin="$TRANSLATION_SERVER_BIN"
+  if [[ -n "$bin" && -x "$bin" ]]; then
+    printf '%s' "$bin"
+    return 0
+  fi
+  if command -v llama-server >/dev/null 2>&1; then
+    command -v llama-server
+    return 0
+  fi
+  printf '%s' "$bin"
+}
+
+ensure_translation_service() {
+  if [[ "$TRANSLATION_API_URL" != "http://127.0.0.1:8000/v1" && "$TRANSLATION_API_URL" != "http://localhost:8000/v1" ]]; then
+    log "translation api url is external, skip local translation server: $TRANSLATION_API_URL"
+    return 0
+  fi
+
+  if translation_service_is_ready; then
+    log "translation already available: $TRANSLATION_API_URL"
+    return 0
+  fi
+
+  local bin
+  bin="$(resolve_translation_server_bin)"
+  if [[ ! -x "$bin" ]]; then
+    printf 'translation server binary not found: %s\n' "$bin" >&2
+    printf 'set TRANSLATION_SERVER_BIN or put llama-server on PATH\n' >&2
+    return 1
+  fi
+  if [[ ! -f "$TRANSLATION_MODEL_PATH" ]]; then
+    printf 'translation model file not found: %s\n' "$TRANSLATION_MODEL_PATH" >&2
+    return 1
+  fi
+
+  log "starting translation server"
+  start_bg_process "translation" "$RUN_DIR/translation.pid" "$RUN_DIR/translation.log" \
+    "$bin" -m "$TRANSLATION_MODEL_PATH" \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --alias "$TRANSLATION_MODEL" \
+    --ctx-size 4096 \
+    --gpu-layers 99 \
+    --temp 0 \
+    --jinja
+
+  local i
+  for ((i = 1; i <= 60; i++)); do
+    if translation_service_is_ready; then
+      log "translation ready: $TRANSLATION_API_URL"
+      return 0
+    fi
+    sleep 1
+  done
+
+  printf 'translation service did not become ready. check log: %s\n' "$RUN_DIR/translation.log" >&2
+  return 1
+}
+
 cleanup_on_error() {
   local exit_code="$?"
   local i pid_file
@@ -498,6 +571,8 @@ fi
 apply_migrations "$POSTGRES_CID"
 
 build_backend_binary
+
+ensure_translation_service
 
 start_bg_process "server" "$RUN_DIR/server.pid" "$RUN_DIR/server.log" "$RUN_DIR/bin/video-server" -mode server
 start_bg_process "worker" "$RUN_DIR/worker.pid" "$RUN_DIR/worker.log" "$RUN_DIR/bin/video-server" -mode worker
