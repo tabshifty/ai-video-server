@@ -291,67 +291,66 @@ private fun TvPosterWallCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val posterUrl = resolveTvResourceUrl(baseUrl, item.posterUrl)
-    val backdropUrl = resolveTvResourceUrl(baseUrl, item.backdropUrl)
+    val cardContent = buildTvPosterWallCardContent(baseUrl, item)
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(18.dp),
         modifier = modifier
-            .aspectRatio(0.72f)
+            .aspectRatio(2f / 3f)
             .clip(RoundedCornerShape(18.dp))
             .tvFocusableGlow(shape = RoundedCornerShape(18.dp), focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (!backdropUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = backdropUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color(0xFF20142D), Color(0xFF0C1018)),
-                            ),
-                        ),
-                )
-            }
+        Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(Color(0x00000000), Color(0xD90B0F17)),
+                            colors = listOf(Color(0xFF20142D), Color(0xFF0C1018)),
                         ),
                     ),
-            )
-            if (!posterUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = posterUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth(0.86f)
-                        .padding(top = 14.dp)
-                        .aspectRatio(2f / 3f)
-                        .clip(RoundedCornerShape(14.dp)),
-                    contentScale = ContentScale.Crop,
-                )
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!cardContent.showPosterPlaceholder) {
+                    AsyncImage(
+                        model = cardContent.posterUrl,
+                        contentDescription = "${cardContent.title} 海报",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Tv,
+                            contentDescription = null,
+                            tint = AppChrome.TextMuted,
+                            modifier = Modifier.size(30.dp),
+                        )
+                        Text(
+                            text = "暂无海报",
+                            color = AppChrome.TextMuted,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
             }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomStart)
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = item.title,
+                    text = cardContent.title,
                     color = Color.White,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
@@ -359,7 +358,7 @@ private fun TvPosterWallCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = item.description,
+                    text = cardContent.description,
                     color = AppChrome.TextSecondary,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
@@ -368,4 +367,24 @@ private fun TvPosterWallCard(
             }
         }
     }
+}
+
+internal data class TvPosterWallCardContent(
+    val posterUrl: String?,
+    val title: String,
+    val description: String,
+    val showPosterPlaceholder: Boolean,
+)
+
+internal fun buildTvPosterWallCardContent(
+    baseUrl: String,
+    item: TvCatalogWallItemUiModel,
+): TvPosterWallCardContent {
+    val posterUrl = resolveTvResourceUrl(baseUrl, item.posterUrl)
+    return TvPosterWallCardContent(
+        posterUrl = posterUrl,
+        title = item.title,
+        description = item.description,
+        showPosterPlaceholder = posterUrl.isNullOrBlank(),
+    )
 }
