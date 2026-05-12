@@ -40,6 +40,9 @@ const (
 	transcodeModeBitrate     = "bitrate"
 	transcodeModeCRFFallback = "crf_fallback"
 
+	transcodeProfileHEVCLongform = "hevc_longform"
+	transcodeProfileAVCCompat    = "avc_compat"
+
 	resolutionTier4K    = "4k"
 	resolutionTier1080  = "1080"
 	resolutionTierOther = "other"
@@ -53,11 +56,15 @@ type transcodePlan struct {
 	TargetBitrateKbps   int
 	BitrateCapped       bool
 	SourceAudioChannels int
+	TranscodeProfile    string
 }
 
 type transcodeOutputProfile struct {
-	Path  string
-	Codec string
+	Path             string
+	PlaybackCodec    string
+	TranscodeProfile string
+	FFmpegProfile    ffmpeg.TranscodeProfile
+	SpatialAQ        bool
 }
 
 func NewTranscodeService(storageRoot string) *TranscodeService {
@@ -70,7 +77,8 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 		return TranscodeResult{}, fmt.Errorf("create output dir: %w", err)
 	}
 
-	outputPath := filepath.Join(outputDir, "video-avc.mp4")
+	outputProfile := chooseTranscodeOutputProfile(outputDir, typ)
+	outputPath := outputProfile.Path
 	thumbPath := filepath.Join(outputDir, "thumb.jpg")
 	sourcePath := inputPath
 	cleanupSourceCopy := func() {}
@@ -105,6 +113,7 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 		CRF:              plan.CRF,
 		VideoBitrateKbps: plan.TargetBitrateKbps,
 		SourceDuration:   sourceDurationSeconds,
+		SpatialAQ:        outputProfile.SpatialAQ,
 		ProgressHandler: func(progress ffmpeg.TranscodeProgress) {
 			if progressHandler == nil {
 				return
@@ -120,7 +129,7 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	if plan.Mode == transcodeModeCRFFallback {
 		transcodeOptions.VideoBitrateKbps = 0
 	}
-	if err := ffmpeg.TranscodeVideo(ctx, sourcePath, transcodeOutputPath, ffmpeg.TranscodeProfileAVCCompat, transcodeOptions); err != nil {
+	if err := ffmpeg.TranscodeVideo(ctx, sourcePath, transcodeOutputPath, outputProfile.FFmpegProfile, transcodeOptions); err != nil {
 		if useTempOutput {
 			_ = os.Remove(transcodeOutputPath)
 		}
@@ -137,10 +146,8 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	}
 	probe, probeErr := ffmpeg.Probe(ctx, outputPath)
 	duration, width, height, metadata := resolveProbeFields(probe, probeErr, plan)
-	for key, value := range buildPlaybackMetadata(transcodeOutputProfile{
-		Path:  outputPath,
-		Codec: "h264",
-	}) {
+	outputProfile.Path = outputPath
+	for key, value := range buildPlaybackMetadata(outputProfile) {
 		metadata[key] = value
 	}
 
@@ -165,6 +172,7 @@ func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, plan transcodeP
 		"source_bitrate_kbps": plan.SourceBitrateKbps,
 		"target_bitrate_kbps": plan.TargetBitrateKbps,
 		"bitrate_capped":      plan.BitrateCapped,
+		"transcode_profile":   resolveTranscodeProfileMetadata(plan),
 	}
 	audioCodec, audioChannels, audioDownmixed := resolvePlaybackAudioMetadata(probe, plan)
 	metadata["audio_codec"] = audioCodec
@@ -209,7 +217,7 @@ func resolvePlaybackAudioMetadata(probe ffmpeg.VideoProbe, plan transcodePlan) (
 func buildPlaybackMetadata(output transcodeOutputProfile) map[string]any {
 	metadata := map[string]any{
 		"playback_path":  output.Path,
-		"playback_codec": output.Codec,
+		"playback_codec": output.PlaybackCodec,
 	}
 	return metadata
 }
@@ -222,6 +230,7 @@ func probeDurationSeconds(duration float64) int {
 }
 
 func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType string) transcodePlan {
+	profile := chooseTranscodeProfileName(videoType)
 	defaultPlan := transcodePlan{
 		Mode:                transcodeModeCRFFallback,
 		CRF:                 chooseCRF(videoType),
@@ -230,6 +239,10 @@ func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType strin
 		TargetBitrateKbps:   0,
 		BitrateCapped:       false,
 		SourceAudioChannels: probe.AudioChannels,
+		TranscodeProfile:    profile,
+	}
+	if isLongformVideoType(videoType) {
+		return defaultPlan
 	}
 	if probeErr != nil || probe.BitrateKbps <= 0 {
 		return defaultPlan
@@ -243,6 +256,7 @@ func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType strin
 		TargetBitrateKbps:   target,
 		BitrateCapped:       capped,
 		SourceAudioChannels: probe.AudioChannels,
+		TranscodeProfile:    profile,
 	}
 }
 
@@ -279,14 +293,58 @@ func classifyResolutionTier(width, height int) string {
 }
 
 func chooseCRF(videoType string) string {
-	switch videoType {
+	switch normalizeVideoType(videoType) {
 	case "short":
 		return "26"
-	case "movie":
-		return "21"
 	default:
 		return "23"
 	}
+}
+
+func chooseTranscodeOutputProfile(outputDir, videoType string) transcodeOutputProfile {
+	if isLongformVideoType(videoType) {
+		return transcodeOutputProfile{
+			Path:             filepath.Join(outputDir, "video-hevc.mp4"),
+			PlaybackCodec:    "hevc",
+			TranscodeProfile: transcodeProfileHEVCLongform,
+			FFmpegProfile:    ffmpeg.TranscodeProfileHEVCPrimary,
+			SpatialAQ:        true,
+		}
+	}
+	return transcodeOutputProfile{
+		Path:             filepath.Join(outputDir, "video-avc.mp4"),
+		PlaybackCodec:    "h264",
+		TranscodeProfile: transcodeProfileAVCCompat,
+		FFmpegProfile:    ffmpeg.TranscodeProfileAVCCompat,
+		SpatialAQ:        false,
+	}
+}
+
+func chooseTranscodeProfileName(videoType string) string {
+	if isLongformVideoType(videoType) {
+		return transcodeProfileHEVCLongform
+	}
+	return transcodeProfileAVCCompat
+}
+
+func resolveTranscodeProfileMetadata(plan transcodePlan) string {
+	if profile := strings.TrimSpace(plan.TranscodeProfile); profile != "" {
+		return profile
+	}
+	return transcodeProfileAVCCompat
+}
+
+func isLongformVideoType(videoType string) bool {
+	switch normalizeVideoType(videoType) {
+	case "movie", "episode":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeVideoType(videoType string) string {
+	return strings.ToLower(strings.TrimSpace(videoType))
 }
 
 func isSameFilePath(a, b string) bool {

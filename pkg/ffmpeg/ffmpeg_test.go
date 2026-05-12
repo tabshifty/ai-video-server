@@ -15,14 +15,17 @@ func TestPreferredHardwareAvcEncoder(t *testing.T) {
 }
 
 func TestBuildTranscodeVideoArgsForHevcPrimary(t *testing.T) {
-	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileHEVCPrimary, TranscodeOptions{CRF: "21"})
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileHEVCPrimary, TranscodeOptions{CRF: "23", SpatialAQ: true})
 
 	assertArgPair(t, args, "-c:v", "hevc_videotoolbox")
 	assertArgPair(t, args, "-pix_fmt", "yuv420p")
 	assertArgPair(t, args, "-tag:v", "hvc1")
-	assertArgPair(t, args, "-crf", "21")
+	assertArgPair(t, args, "-allow_sw", "0")
+	assertArgPair(t, args, "-spatial_aq", "1")
+	assertArgPair(t, args, "-crf", "23")
 	assertArgPair(t, args, "-ac", "2")
 	assertArgAbsent(t, args, "-preset")
+	assertArgAbsent(t, args, "-x265-params")
 }
 
 func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
@@ -30,11 +33,14 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 
 	assertArgPair(t, args, "-c:v", "h264_videotoolbox")
 	assertArgPair(t, args, "-pix_fmt", "yuv420p")
+	assertArgPair(t, args, "-allow_sw", "0")
 	assertArgPair(t, args, "-b:v", "4200k")
 	assertArgPair(t, args, "-maxrate", "4200k")
 	assertArgPair(t, args, "-bufsize", "8400k")
 	assertArgPair(t, args, "-ac", "2")
 	assertArgAbsent(t, args, "-preset")
+	assertArgAbsent(t, args, "-x265-params")
+	assertArgAbsent(t, args, "-spatial_aq")
 }
 
 func TestParseBitrateKbps(t *testing.T) {

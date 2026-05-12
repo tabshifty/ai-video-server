@@ -91,11 +91,69 @@ func TestBuildTranscodePlanWithoutSourceBitrateFallsBackToCRF(t *testing.T) {
 	if plan.Mode != transcodeModeCRFFallback {
 		t.Fatalf("expected fallback mode, got=%s", plan.Mode)
 	}
-	if plan.CRF != "21" {
-		t.Fatalf("expected crf=21, got=%s", plan.CRF)
+	if plan.CRF != "23" {
+		t.Fatalf("expected crf=23, got=%s", plan.CRF)
 	}
 	if plan.TargetBitrateKbps != 0 {
 		t.Fatalf("expected target bitrate 0 in fallback mode, got=%d", plan.TargetBitrateKbps)
+	}
+	if plan.TranscodeProfile != transcodeProfileHEVCLongform {
+		t.Fatalf("expected hevc longform profile, got=%s", plan.TranscodeProfile)
+	}
+}
+
+func TestBuildTranscodePlanLongformUsesCRFEvenWithSourceBitrate(t *testing.T) {
+	tests := []struct {
+		name      string
+		videoType string
+	}{
+		{name: "movie", videoType: "movie"},
+		{name: "episode", videoType: "episode"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := buildTranscodePlan(ffmpeg.VideoProbe{
+				Width:         3840,
+				Height:        2160,
+				BitrateKbps:   12000,
+				AudioChannels: 6,
+			}, nil, tt.videoType)
+
+			if plan.Mode != transcodeModeCRFFallback {
+				t.Fatalf("expected crf mode, got=%s", plan.Mode)
+			}
+			if plan.CRF != "23" {
+				t.Fatalf("expected crf=23, got=%s", plan.CRF)
+			}
+			if plan.TargetBitrateKbps != 0 {
+				t.Fatalf("expected no bitrate target for longform, got=%d", plan.TargetBitrateKbps)
+			}
+			if plan.SourceBitrateKbps != 12000 {
+				t.Fatalf("expected source bitrate preserved, got=%d", plan.SourceBitrateKbps)
+			}
+			if plan.TranscodeProfile != transcodeProfileHEVCLongform {
+				t.Fatalf("expected hevc longform profile, got=%s", plan.TranscodeProfile)
+			}
+		})
+	}
+}
+
+func TestBuildTranscodePlanNonLongformKeepsBitrateStrategy(t *testing.T) {
+	plan := buildTranscodePlan(ffmpeg.VideoProbe{
+		Width:       1920,
+		Height:      1080,
+		BitrateKbps: 6200,
+	}, nil, "av")
+
+	if plan.Mode != transcodeModeBitrate {
+		t.Fatalf("expected bitrate mode, got=%s", plan.Mode)
+	}
+	if plan.TargetBitrateKbps != 4000 {
+		t.Fatalf("expected capped bitrate 4000, got=%d", plan.TargetBitrateKbps)
+	}
+	if plan.TranscodeProfile != transcodeProfileAVCCompat {
+		t.Fatalf("expected avc compat profile, got=%s", plan.TranscodeProfile)
 	}
 }
 
@@ -118,6 +176,9 @@ func TestResolveProbeFieldsWithProbeErrorUsesDefaults(t *testing.T) {
 	}
 	if metadata["transcode_mode"] != transcodeModeCRFFallback {
 		t.Fatalf("expected transcode_mode fallback, got=%v", metadata["transcode_mode"])
+	}
+	if metadata["transcode_profile"] != transcodeProfileAVCCompat {
+		t.Fatalf("expected transcode_profile avc compat, got %v", metadata["transcode_profile"])
 	}
 	if metadata["crf"] != "23" {
 		t.Fatalf("expected crf=23, got %v", metadata["crf"])
@@ -156,6 +217,9 @@ func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 	}
 	if metadata["transcode_mode"] != transcodeModeBitrate {
 		t.Fatalf("expected transcode_mode bitrate, got %v", metadata["transcode_mode"])
+	}
+	if metadata["transcode_profile"] != transcodeProfileAVCCompat {
+		t.Fatalf("expected transcode_profile avc compat, got %v", metadata["transcode_profile"])
 	}
 	if metadata["resolution_tier"] != resolutionTier1080 {
 		t.Fatalf("expected resolution_tier 1080, got %v", metadata["resolution_tier"])
@@ -218,8 +282,9 @@ func TestResolveProbeFieldsMarksAudioDownmixedWhenSourceHasMoreChannels(t *testi
 func TestBuildPlaybackMetadataUsesSingleAVCOutput(t *testing.T) {
 	metadata := buildPlaybackMetadata(
 		transcodeOutputProfile{
-			Path:  "/tmp/video-avc.mp4",
-			Codec: "h264",
+			Path:             "/tmp/video-avc.mp4",
+			PlaybackCodec:    "h264",
+			TranscodeProfile: transcodeProfileAVCCompat,
 		},
 	)
 
@@ -234,6 +299,73 @@ func TestBuildPlaybackMetadataUsesSingleAVCOutput(t *testing.T) {
 	}
 	if _, ok := metadata["playback_profiles"]; ok {
 		t.Fatalf("did not expect playback_profiles, got %v", metadata["playback_profiles"])
+	}
+}
+
+func TestChooseTranscodeOutputProfileUsesHEVCForLongform(t *testing.T) {
+	outputDir := filepath.Join("/tmp", "videos", "abc")
+	tests := []struct {
+		name      string
+		videoType string
+	}{
+		{name: "movie", videoType: "movie"},
+		{name: "episode", videoType: "episode"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := chooseTranscodeOutputProfile(outputDir, tt.videoType)
+
+			if profile.Path != filepath.Join(outputDir, "video-hevc.mp4") {
+				t.Fatalf("expected hevc output path, got=%s", profile.Path)
+			}
+			if profile.PlaybackCodec != "hevc" {
+				t.Fatalf("expected playback codec hevc, got=%s", profile.PlaybackCodec)
+			}
+			if profile.FFmpegProfile != ffmpeg.TranscodeProfileHEVCPrimary {
+				t.Fatalf("expected ffmpeg hevc profile, got=%s", profile.FFmpegProfile)
+			}
+			if !profile.SpatialAQ {
+				t.Fatalf("expected spatial aq enabled for longform")
+			}
+			if profile.TranscodeProfile != transcodeProfileHEVCLongform {
+				t.Fatalf("expected hevc longform metadata profile, got=%s", profile.TranscodeProfile)
+			}
+		})
+	}
+}
+
+func TestChooseTranscodeOutputProfileKeepsAVCForOtherTypes(t *testing.T) {
+	outputDir := filepath.Join("/tmp", "videos", "abc")
+	tests := []struct {
+		name      string
+		videoType string
+	}{
+		{name: "short", videoType: "short"},
+		{name: "av", videoType: "av"},
+		{name: "unknown", videoType: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := chooseTranscodeOutputProfile(outputDir, tt.videoType)
+
+			if profile.Path != filepath.Join(outputDir, "video-avc.mp4") {
+				t.Fatalf("expected avc output path, got=%s", profile.Path)
+			}
+			if profile.PlaybackCodec != "h264" {
+				t.Fatalf("expected playback codec h264, got=%s", profile.PlaybackCodec)
+			}
+			if profile.FFmpegProfile != ffmpeg.TranscodeProfileAVCCompat {
+				t.Fatalf("expected ffmpeg avc profile, got=%s", profile.FFmpegProfile)
+			}
+			if profile.SpatialAQ {
+				t.Fatalf("did not expect spatial aq for non-longform")
+			}
+			if profile.TranscodeProfile != transcodeProfileAVCCompat {
+				t.Fatalf("expected avc compat metadata profile, got=%s", profile.TranscodeProfile)
+			}
+		})
 	}
 }
 

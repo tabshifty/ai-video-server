@@ -39,6 +39,7 @@ type TranscodeOptions struct {
 	CRF              string
 	VideoBitrateKbps int
 	SourceDuration   int
+	SpatialAQ        bool
 	ProgressHandler  func(TranscodeProgress)
 }
 
@@ -68,12 +69,16 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		"-i", inputPath,
 		"-c:v", encoder,
 		"-pix_fmt", "yuv420p",
+		"-allow_sw", "0",
 	}
 	switch profile {
 	case TranscodeProfileAVCCompat:
 		args[4] = preferredHardwareAvcEncoder()
 	case TranscodeProfileHEVCPrimary:
 		args = append(args, "-tag:v", "hvc1")
+		if options.SpatialAQ {
+			args = append(args, "-spatial_aq", "1")
+		}
 	default:
 		panic(fmt.Sprintf("unsupported transcode profile: %s", profile))
 	}

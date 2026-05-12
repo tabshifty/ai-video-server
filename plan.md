@@ -2,6 +2,28 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-12 10:44 +0800] 电影电视剧硬件 HEVC 压缩策略
+- Type: `implementation`
+- Summary:
+  - 电影 `movie` 和电视剧 `episode` 改用硬件 HEVC 长视频转码策略，输出 `video-hevc.mp4`，播放元数据记录 `playback_codec=hevc`。
+  - 长视频固定使用 CRF 23，并启用 VideoToolbox 支持的 `spatial_aq` 近似暗部优化；不使用 CPU `libx265` 专属的 `preset` 或 `x265-params`。
+  - 其他类型继续使用硬件 AVC 兼容策略，输出 `video-avc.mp4`，并保留现有码率上限/CRF 回退规则。
+  - 所有转码显式设置 `-allow_sw 0`，避免硬件编码不可用时静默回退软件编码。
+- Changed Files:
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgsFor(HevcPrimary|AvcCompat)' -count=1` passed.
+  - `go test ./internal/services -run 'TestBuildTranscodePlan|TestChooseTranscodeOutputProfile|TestBuildPlaybackMetadata|TestResolveProbeFields' -count=1` passed.
+  - `go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` passed.
+  - `go test ./... -count=1` passed.
+  - `go vet ./...` passed.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-10 19:37 +0800] AV 视频详情到手动刮削快捷入口
 - Type: `implementation`
 - Summary:
