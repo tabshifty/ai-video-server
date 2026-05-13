@@ -3,6 +3,9 @@ import {
   buildAVManualScrapeRoute,
   extractTvPendingDiagnostics,
   getVideoStatusMeta,
+  getVideoThumbnailPlaceholder,
+  getVideoThumbnailURL,
+  shouldShowVideoThumbnail,
   teardownPreviewPlayer
 } from './videoList.helpers'
 
@@ -76,5 +79,20 @@ describe('videoList helpers', () => {
         title: 'MXGS-888'
       }
     })
+  })
+
+  it('builds a thumbnail url only when the video has an id', () => {
+    expect(getVideoThumbnailURL({ id: 'video-1' })).toBe('/api/v1/videos/video-1/thumbnail')
+    expect(getVideoThumbnailURL({ id: '' })).toBe('')
+  })
+
+  it('shows thumbnails only for ready videos', () => {
+    expect(shouldShowVideoThumbnail({ id: 'video-1', status: 'ready' })).toBe(true)
+    expect(shouldShowVideoThumbnail({ id: 'video-1', status: 'processing' })).toBe(false)
+  })
+
+  it('returns a placeholder label for the thumbnail cell', () => {
+    expect(getVideoThumbnailPlaceholder({ id: 'video-1', status: 'ready' })).toBe('暂无封面')
+    expect(getVideoThumbnailPlaceholder({ id: 'video-1', status: 'processing' })).toBe('未就绪')
   })
 })

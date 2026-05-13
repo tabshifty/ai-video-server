@@ -27,7 +27,10 @@ import {
   buildAVManualScrapeRoute,
   extractTvPendingDiagnostics,
   getVideoStatusMeta,
+  getVideoThumbnailPlaceholder,
+  getVideoThumbnailURL,
   teardownPreviewPlayer,
+  shouldShowVideoThumbnail,
   tvPendingStageLabel
 } from './videoList.helpers'
 
@@ -716,6 +719,28 @@ onBeforeUnmount(() => {
           <el-table ref="tableRef" :data="list" border @selection-change="onSelectionChange">
             <el-table-column type="selection" width="52" />
             <el-table-column prop="title" label="标题" min-width="220" />
+            <el-table-column label="封面" width="120">
+              <template #default="{ row }">
+                <div class="video-cover-cell">
+                  <el-image
+                    v-if="shouldShowVideoThumbnail(row)"
+                    :src="getVideoThumbnailURL(row)"
+                    :preview-src-list="[getVideoThumbnailURL(row)]"
+                    fit="cover"
+                    preview-teleported
+                    class="video-cover-image"
+                  >
+                    <template #placeholder>
+                      <div class="video-cover-placeholder video-cover-placeholder--loading">加载中</div>
+                    </template>
+                    <template #error>
+                      <div class="video-cover-placeholder">暂无封面</div>
+                    </template>
+                  </el-image>
+                  <div v-else class="video-cover-placeholder">{{ getVideoThumbnailPlaceholder(row) }}</div>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column prop="type" label="类型" width="110">
               <template #default="{ row }">
                 {{ typeLabel(row.type) }}
@@ -1098,6 +1123,48 @@ onBeforeUnmount(() => {
 
 .play-preview {
   width: 100%;
+}
+
+.video-cover-cell {
+  width: 96px;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-cover-image {
+  width: 96px;
+  height: 54px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-muted);
+  cursor: zoom-in;
+}
+
+.video-cover-image :deep(.el-image__inner) {
+  object-fit: cover;
+}
+
+.video-cover-placeholder {
+  width: 96px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px dashed var(--line-soft);
+  background: var(--surface-muted);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.video-cover-placeholder--loading {
+  color: var(--el-text-color-regular);
 }
 
 .tv-pending-panel {

@@ -2,6 +2,35 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-13 17:12 +0800] 管理端视频列表封面预览验证完成
+- Type: `implementation`
+- Summary:
+  - 管理端视频列表已补上标题后的封面列，支持点击缩略图放大预览。
+  - 非 `ready` 状态使用占位卡片，`ready` 状态优先尝试加载可访问的封面接口。
+  - 前端封面地址统一走 `/api/v1/videos/:id/thumbnail`。
+- Changed Files:
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/videoList.helpers.js`
+  - `admin-web/src/views/videoList.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+
+### [2026-05-13 17:05 +0800] 管理端视频列表增加封面预览
+- Type: `implementation`
+- Summary:
+  - 视频管理页的表格在标题后新增固定宽度封面列，`ready` 视频直接展示缩略图，点击缩略图可放大预览。
+  - 非 `ready` 视频与加载失败场景显示固定尺寸占位卡片，避免表格行高抖动和破图。
+  - 前端统一通过 `/api/v1/videos/:id/thumbnail` 生成封面访问地址，不再把列表返回的本地路径直接当作图片源。
+- Changed Files:
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/videoList.helpers.js`
+  - `admin-web/src/views/videoList.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - pending
+
 ### [2026-05-13 06:38 +0800] TV 海报墙与播放遥控体验优化
 - Type: `implementation`
 - Summary:

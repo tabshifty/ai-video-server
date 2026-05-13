@@ -24,6 +24,19 @@ export function buildAVManualScrapeRoute(video) {
   }
 }
 
+export function getVideoThumbnailURL(video) {
+  const videoID = toText(video?.id)
+  return videoID ? `/api/v1/videos/${videoID}/thumbnail` : ''
+}
+
+export function shouldShowVideoThumbnail(video) {
+  return normalizeVideoStatus(video?.status) === 'ready' && getVideoThumbnailURL(video) !== ''
+}
+
+export function getVideoThumbnailPlaceholder(video) {
+  return shouldShowVideoThumbnail(video) ? '暂无封面' : '未就绪'
+}
+
 export function extractTvPendingDiagnostics(metadata) {
   const source = metadata && typeof metadata === 'object' ? metadata : {}
   return {
@@ -93,6 +106,10 @@ function toPositiveInt(value) {
     return 0
   }
   return parsed
+}
+
+function normalizeVideoStatus(status) {
+  return String(status || '').trim().toLowerCase()
 }
 
 function extractAVManualScrapeExternalID(video) {
