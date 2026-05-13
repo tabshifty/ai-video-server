@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.chee.videos.core.model.AppRootState
@@ -101,7 +102,15 @@ private fun TvAuthenticatedNav(
     onSwitchServer: () -> Unit,
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val showSettingsMenu = shouldShowTvGlobalSettings(navBackStackEntry?.destination?.route)
     var menuExpanded by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(showSettingsMenu) {
+        if (!showSettingsMenu) {
+            menuExpanded = false
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -209,43 +218,47 @@ private fun TvAuthenticatedNav(
                 )
             }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-        ) {
-            Box(modifier = Modifier.weight(1f))
-            Column(horizontalAlignment = Alignment.End) {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.focusable(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Settings,
-                        contentDescription = "账户与设备菜单",
-                        tint = AppChrome.TextPrimary,
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                ) {
-                    TvAccountMenuAction.defaults().forEach { action ->
-                        DropdownMenuItem(
-                            text = { Text(action.label, color = AppChrome.TextPrimary) },
-                            onClick = {
-                                menuExpanded = false
-                                when (action) {
-                                    TvAccountMenuAction.Repair -> onRepair()
-                                    TvAccountMenuAction.Logout -> onLogout()
-                                    TvAccountMenuAction.SwitchServer -> onSwitchServer()
-                                }
-                            },
+        if (showSettingsMenu) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+            ) {
+                Box(modifier = Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.focusable(),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "账户与设备菜单",
+                            tint = AppChrome.TextPrimary,
                         )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        TvAccountMenuAction.defaults().forEach { action ->
+                            DropdownMenuItem(
+                                text = { Text(action.label, color = AppChrome.TextPrimary) },
+                                onClick = {
+                                    menuExpanded = false
+                                    when (action) {
+                                        TvAccountMenuAction.Repair -> onRepair()
+                                        TvAccountMenuAction.Logout -> onLogout()
+                                        TvAccountMenuAction.SwitchServer -> onSwitchServer()
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+internal fun shouldShowTvGlobalSettings(route: String?): Boolean = route == "tv-home"

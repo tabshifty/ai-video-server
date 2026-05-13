@@ -2,6 +2,28 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-13 06:38 +0800] TV 海报墙与播放遥控体验优化
+- Type: `implementation`
+- Summary:
+  - TV 海报墙卡片改为单一竖版 poster 卡片，只从 `posterUrl` 渲染主视觉；无海报时显示占位封面，标题/描述放入固定信息区。
+  - 长视频播放器在 TV 隐藏控制栏状态下由根容器接收遥控：左右 10/30 秒快退快进，确认/播放键播放暂停，上下键唤出控制栏并聚焦播放按钮；隐藏时焦点回到根容器。
+  - TV 全局右上设置菜单只在 `tv-home` 路由显示，离开首页自动关闭已展开菜单。
+  - 新增纯函数回归测试覆盖海报墙卡片内容、隐藏控制栏按键动作和设置入口路由可见性。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallCardContentTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/LongFormVideoPlayerTransportKeyTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvShellAppRouteVisibilityTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPosterWallCardContentTest --tests com.chee.videos.core.ui.LongFormVideoPlayerTransportKeyTest --tests com.chee.videos.tv.TvShellAppRouteVisibilityTest --tests com.chee.videos.core.ui.LongFormVideoPlayerStyleTest --tests com.chee.videos.feature.tv.TvRoutesTest` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` failed on existing `com.chee.videos.feature.home.HomeViewModelTest.loadCategory loads default av list`; the same single test also fails in the original worktree before this branch's changes.
+  - `adb devices` showed no connected devices, so `connectedDebugAndroidTest` was not run.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-12 10:44 +0800] 电影电视剧硬件 HEVC 压缩策略
 - Type: `implementation`
 - Summary:

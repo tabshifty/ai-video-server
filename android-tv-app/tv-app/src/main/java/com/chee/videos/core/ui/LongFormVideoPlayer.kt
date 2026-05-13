@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -124,6 +125,7 @@ fun LongFormVideoPlayer(
     var centerFeedbackText by remember { mutableStateOf("") }
     var centerFeedbackIcon by remember { mutableStateOf(Icons.Filled.PlayArrow) }
     var subtitleSheetVisible by remember { mutableStateOf(false) }
+    var hasShownControlsOnce by remember { mutableStateOf(false) }
     var pendingRootFocusRequest by remember { mutableStateOf(false) }
     var pendingPlayPauseFocusRequest by remember { mutableStateOf(false) }
 
@@ -147,8 +149,11 @@ fun LongFormVideoPlayer(
         }
     }
 
-    fun showControlsTemporarily() {
+    fun showControlsTemporarily(requestPlayPauseFocus: Boolean = false) {
         controlsVisible = true
+        if (requestPlayPauseFocus) {
+            pendingPlayPauseFocusRequest = true
+        }
         scheduleAutoHideControls()
     }
 
@@ -175,17 +180,19 @@ fun LongFormVideoPlayer(
         }
     }
 
-    fun togglePlaybackWithFeedback() {
+    fun togglePlaybackWithFeedback(showControls: Boolean = true) {
         val shouldPause = isPlaying
         onTogglePlayPause()
         showTransientFeedback(
             icon = if (shouldPause) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             text = if (shouldPause) "已暂停" else "继续播放",
         )
-        showControlsTemporarily()
+        if (showControls) {
+            showControlsTemporarily()
+        }
     }
 
-    fun performStepSeek(deltaMs: Long) {
+    fun performStepSeek(deltaMs: Long, showControls: Boolean = true) {
         val duration = effectiveDurationMs()
         val current = player.currentPosition.coerceAtLeast(0L)
         val target = (current + deltaMs).coerceAtLeast(0L).let { next ->
@@ -214,60 +221,54 @@ fun LongFormVideoPlayer(
             delay(900)
             showSeekPreview = false
         }
-        showControlsTemporarily()
+        if (showControls) {
+            showControlsTemporarily()
+        }
     }
 
     fun handleTvTransportKey(nativeKeyCode: Int, repeatCount: Int): Boolean {
-        return when (nativeKeyCode) {
-            AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-            AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
-            AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
-            AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-            AndroidKeyEvent.KEYCODE_ENTER,
-            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-            -> {
-                if (!controlsVisible) {
-                    showControlsTemporarily()
-                    requestPlayPauseFocusWhenReady()
-                    true
-                } else {
-                    false
+        if (controlsVisible) {
+            return when (nativeKeyCode) {
+                AndroidKeyEvent.KEYCODE_MENU -> {
+                    if (tvMode) {
+                        subtitleSheetVisible = true
+                        showControlsTemporarily()
+                        true
+                    } else {
+                        false
+                    }
                 }
+
+                else -> false
+            }
+        }
+
+        return when (val action = resolveTvHiddenTransportKeyAction(nativeKeyCode, repeatCount)) {
+            is TvHiddenTransportKeyAction.Seek -> {
+                performStepSeek(
+                    deltaMs = action.deltaMs,
+                    showControls = false,
+                )
+                true
             }
 
-            AndroidKeyEvent.KEYCODE_DPAD_LEFT,
-            AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
-            -> {
-                if (!controlsVisible) {
-                    performStepSeek(if (repeatCount > 0) -30_000L else -10_000L)
-                    true
-                } else {
-                    false
-                }
+            TvHiddenTransportKeyAction.TogglePlayPause -> {
+                togglePlaybackWithFeedback(showControls = false)
+                true
             }
 
-            AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
-            AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-            -> {
-                if (!controlsVisible) {
-                    performStepSeek(if (repeatCount > 0) 30_000L else 10_000L)
-                    true
-                } else {
-                    false
-                }
+            TvHiddenTransportKeyAction.ShowControlsAndFocusPlayPause -> {
+                showControlsTemporarily(requestPlayPauseFocus = true)
+                true
             }
 
-            AndroidKeyEvent.KEYCODE_MENU -> {
-                if (tvMode) {
-                    subtitleSheetVisible = true
-                    showControlsTemporarily()
-                    true
-                } else {
-                    false
-                }
+            TvHiddenTransportKeyAction.OpenSubtitleSheet -> {
+                subtitleSheetVisible = true
+                showControlsTemporarily(requestPlayPauseFocus = true)
+                true
             }
 
-            else -> false
+            null -> false
         }
     }
 
@@ -318,9 +319,21 @@ fun LongFormVideoPlayer(
     LaunchedEffect(tvMode) {
         if (tvMode) {
             controlsVisible = true
-            requestRootFocusWhenReady()
-            requestPlayPauseFocusWhenReady()
             scheduleAutoHideControls()
+        }
+    }
+
+    LaunchedEffect(tvMode, controlsVisible) {
+        if (!tvMode) {
+            return@LaunchedEffect
+        }
+        if (controlsVisible) {
+            hasShownControlsOnce = true
+            pendingRootFocusRequest = false
+            requestPlayPauseFocusWhenReady()
+        } else if (hasShownControlsOnce) {
+            pendingPlayPauseFocusRequest = false
+            requestRootFocusWhenReady()
         }
     }
 
@@ -358,6 +371,7 @@ fun LongFormVideoPlayer(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusable()
             .focusRequester(rootFocusRequester)
             .onPreviewKeyEvent { event ->
                 if (!tvMode || event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
@@ -795,6 +809,44 @@ fun LongFormVideoPlayer(
                 }
             }
         }
+    }
+}
+
+internal sealed interface TvHiddenTransportKeyAction {
+    data class Seek(val deltaMs: Long) : TvHiddenTransportKeyAction
+    data object TogglePlayPause : TvHiddenTransportKeyAction
+    data object ShowControlsAndFocusPlayPause : TvHiddenTransportKeyAction
+    data object OpenSubtitleSheet : TvHiddenTransportKeyAction
+}
+
+internal fun resolveTvHiddenTransportKeyAction(
+    nativeKeyCode: Int,
+    repeatCount: Int,
+): TvHiddenTransportKeyAction? {
+    return when (nativeKeyCode) {
+        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+        AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
+        AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
+        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+        AndroidKeyEvent.KEYCODE_ENTER,
+        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+        -> TvHiddenTransportKeyAction.TogglePlayPause
+
+        AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+        AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
+        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) -30_000L else -10_000L)
+
+        AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+        AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) 30_000L else 10_000L)
+
+        AndroidKeyEvent.KEYCODE_DPAD_UP,
+        AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+        -> TvHiddenTransportKeyAction.ShowControlsAndFocusPlayPause
+
+        AndroidKeyEvent.KEYCODE_MENU -> TvHiddenTransportKeyAction.OpenSubtitleSheet
+
+        else -> null
     }
 }
 
