@@ -11,6 +11,27 @@ export function getVideoStatusMeta(status) {
   return map[normalized] || { label: normalized || '-', tagType: 'info' }
 }
 
+const manualVideoStatusValues = ['uploaded', 'scraping', 'tv_pending', 'ready', 'failed']
+
+export function getManualVideoStatusOptions() {
+  return manualVideoStatusValues.map((status) => ({
+    value: status,
+    label: getVideoStatusMeta(status).label
+  }))
+}
+
+export function canManuallyEditVideoStatus(status) {
+  return normalizeVideoStatus(status) !== 'processing'
+}
+
+export function getManualVideoStatusValue(status) {
+  const normalized = normalizeVideoStatus(status)
+  if (!canManuallyEditVideoStatus(normalized) || !manualVideoStatusValues.includes(normalized)) {
+    return ''
+  }
+  return normalized
+}
+
 export function buildAVManualScrapeRoute(video) {
   const videoID = toText(video?.id)
   const externalID = extractAVManualScrapeExternalID(video)

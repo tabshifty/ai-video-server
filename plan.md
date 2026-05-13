@@ -2,6 +2,36 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-13 18:00 +0800] 管理端视频详情手动状态修改完成
+- Type: `implementation`
+- Summary:
+  - 视频详情弹窗新增“状态”下拉，管理员可在 `uploaded`、`scraping`、`tv_pending`、`ready`、`failed` 之间手动切换状态。
+  - 当前状态为 `processing` 时，状态字段保持可见但禁用，并显示“处理中状态不支持手动修改”提示；标题、描述、封面等其他字段仍可继续编辑保存。
+  - 状态候选、`processing` 禁改判定与保存时是否传 `status` 的分支统一收口到 `videoList.helpers.js`，并补上对应回归测试。
+- Changed Files:
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/videoList.helpers.js`
+  - `admin-web/src/views/videoList.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm test` passed.
+  - `cd admin-web && npm run build` passed.
+
+### [2026-05-13 18:00 +0800] 管理端视频详情手动状态修改计划
+- Type: `plan`
+- Summary:
+  - 在视频详情弹窗增加状态编辑控件，候选状态限定为 `uploaded`、`scraping`、`tv_pending`、`ready`、`failed`，不提供 `processing` 作为手动目标状态。
+  - 当前状态为 `processing` 时仅禁用状态字段并提示“处理中状态不支持手动修改”，不影响标题、描述、封面等其他字段编辑保存。
+  - 保持现有 `updateAdminVideo` 接口不变，通过前端 helper 统一状态选项、禁改判定和保存时的 `status` 传参规则。
+- Changed Files:
+  - `admin-web/src/views/VideoList.vue`
+  - `admin-web/src/views/videoList.helpers.js`
+  - `admin-web/src/views/videoList.helpers.spec.js`
+  - `plan.md`
+- Verification:
+  - `cd admin-web && npm test`
+  - `cd admin-web && npm run build`
+
 ### [2026-05-13 17:12 +0800] 管理端视频列表封面预览验证完成
 - Type: `implementation`
 - Summary:

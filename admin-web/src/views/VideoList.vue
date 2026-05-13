@@ -25,7 +25,10 @@ import {
 } from '../api/admin'
 import {
   buildAVManualScrapeRoute,
+  canManuallyEditVideoStatus,
   extractTvPendingDiagnostics,
+  getManualVideoStatusOptions,
+  getManualVideoStatusValue,
   getVideoStatusMeta,
   getVideoThumbnailPlaceholder,
   getVideoThumbnailURL,
@@ -71,6 +74,7 @@ const retagTypeOptions = [
   { value: 'episode', label: '剧集分集' },
   { value: 'av', label: 'AV' }
 ]
+const manualStatusOptions = getManualVideoStatusOptions()
 
 function statusLabel(status) {
   return getVideoStatusMeta(status).label
@@ -171,6 +175,13 @@ function normalizeCollectionSelection(values) {
 
 function statusTagType(status) {
   return getVideoStatusMeta(status).tagType
+}
+
+function detailStatusOptions(status = detail.value?.status) {
+  if (canManuallyEditVideoStatus(status)) {
+    return manualStatusOptions
+  }
+  return [{ value: 'processing', label: statusLabel('processing'), disabled: true }, ...manualStatusOptions]
 }
 
 function tvPendingDiagnostics(video = detail.value) {
@@ -528,6 +539,10 @@ async function saveDetail() {
       }
     }
   }
+  const manualStatusValue = getManualVideoStatusValue(detail.value.status)
+  if (manualStatusValue) {
+    payload.status = manualStatusValue
+  }
   await updateAdminVideo(detail.value.id, payload)
   ElMessage.success(enqueueAutoScrape ? '保存成功，已加入自动刮削队列' : '保存成功')
   detailVisible.value = false
@@ -831,6 +846,27 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </el-form-item>
+        <el-form-item label="状态">
+          <div class="status-field">
+            <el-select
+              v-model="detail.status"
+              placeholder="请选择状态"
+              style="width: 100%"
+              :disabled="!canManuallyEditVideoStatus(detail.status)"
+            >
+              <el-option
+                v-for="item in detailStatusOptions(detail.status)"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+                :disabled="item.disabled === true"
+              />
+            </el-select>
+            <div v-if="!canManuallyEditVideoStatus(detail.status)" class="status-field__hint">
+              处理中状态不支持手动修改
+            </div>
+          </div>
+        </el-form-item>
         <el-form-item label="标题"><el-input v-model="detail.title" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="detail.description" type="textarea" rows="4" /></el-form-item>
         <el-form-item label="封面"><el-input v-model="detail.thumbnail_path" /></el-form-item>
@@ -1119,6 +1155,18 @@ onBeforeUnmount(() => {
 
 .result-panel :deep(.el-button + .el-button) {
   margin-left: 8px;
+}
+
+.status-field {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.status-field__hint {
+  color: var(--el-color-warning);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .play-preview {

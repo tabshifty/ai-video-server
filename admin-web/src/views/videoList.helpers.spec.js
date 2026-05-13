@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildAVManualScrapeRoute,
+  canManuallyEditVideoStatus,
   extractTvPendingDiagnostics,
+  getManualVideoStatusOptions,
+  getManualVideoStatusValue,
   getVideoStatusMeta,
   getVideoThumbnailPlaceholder,
   getVideoThumbnailURL,
@@ -15,6 +18,26 @@ describe('videoList helpers', () => {
       label: '待绑定',
       tagType: 'warning'
     })
+  })
+
+  it('returns only editable manual status options', () => {
+    expect(getManualVideoStatusOptions()).toEqual([
+      { value: 'uploaded', label: '已上传' },
+      { value: 'scraping', label: '刮削中' },
+      { value: 'tv_pending', label: '待绑定' },
+      { value: 'ready', label: '可播放' },
+      { value: 'failed', label: '失败' }
+    ])
+  })
+
+  it('blocks manual edits for processing only', () => {
+    expect(canManuallyEditVideoStatus('processing')).toBe(false)
+    expect(canManuallyEditVideoStatus('ready')).toBe(true)
+  })
+
+  it('omits processing from the manual update payload value', () => {
+    expect(getManualVideoStatusValue('processing')).toBe('')
+    expect(getManualVideoStatusValue('ready')).toBe('ready')
   })
 
   it('extracts tv pending diagnostics from metadata', () => {
