@@ -27,7 +27,16 @@ func TestMDCxMigratedSitesSearchCandidates(t *testing.T) {
 				http.Error(w, "unexpected jav321 search form", http.StatusBadRequest)
 				return
 			}
-			_, _ = w.Write([]byte(`<html><body><h3>SSIS-001 Jav321 Title <small>sample</small></h3><a href="/video/abc123">detail</a><p>品番: SSIS-001</p><p>出演者: Actor B</p><img class="img-responsive" src="` + serverURLFromRequest(r) + `/jav321/thumb.jpg"></body></html>`))
+			_, _ = w.Write([]byte(`<html><body>
+				<h3>SSIS-001 Jav321 Title <small>sample</small></h3>
+				<a href="/video/abc123">detail</a>
+				<b>品番</b>: SSIS-001<br>
+				<b>出演者</b>: <a href="/star/a">Actor B</a> &nbsp; <a href="/star/c">Actor C</a><br>
+				<div class="col-md-3">
+					<div class="col-xs-12 col-md-12"><p><a><img class="img-responsive" src="` + serverURLFromRequest(r) + `/jav321/thumb.jpg"></a></p></div>
+				</div>
+				<img class="img-responsive" src="` + serverURLFromRequest(r) + `/jav321/poster.jpg">
+			</body></html>`))
 		case r.URL.Path == "/articles/FC2-PPV-3259498" || r.URL.Path == "/articles/3259498":
 			_, _ = w.Write([]byte(`<html><body><h2><a>FC2PPVDB Title</a></h2><img src="` + serverURLFromRequest(r) + `/fc2ppvdb/3259498.jpg"><p>販売日：2024-03-04</p></body></html>`))
 		case r.URL.Path == "/html/FC2-743423.html":
@@ -64,10 +73,11 @@ func TestMDCxMigratedSitesSearchCandidates(t *testing.T) {
 		wantTitle  string
 		wantCode   string
 		wantPoster string
+		wantActors []string
 	}{
 		{name: "dmm", crawler: newDMMAVCrawler(svc), query: "SSIS-001", wantTitle: "DMM Title", wantCode: "SSIS-001", wantPoster: server.URL + "/dmm/ssis001ps.jpg"},
 		{name: "mgstage", crawler: newMGStageAVCrawler(svc), query: "300MIUM-382", wantTitle: "MGStage Title", wantCode: "300MIUM-382", wantPoster: server.URL + "/mgstage/pf_300mium382.jpg"},
-		{name: "jav321", crawler: newJav321AVCrawler(svc), query: "SSIS-001", wantTitle: "SSIS-001 Jav321 Title", wantCode: "SSIS-001", wantPoster: server.URL + "/jav321/thumb.jpg"},
+		{name: "jav321", crawler: newJav321AVCrawler(svc), query: "SSIS-001", wantTitle: "SSIS-001 Jav321 Title", wantCode: "SSIS-001", wantPoster: server.URL + "/jav321/poster.jpg", wantActors: []string{"Actor B", "Actor C"}},
 		{name: "fc2ppvdb", crawler: newFC2PPVDBAVCrawler(svc), query: "FC2-PPV-3259498", wantTitle: "FC2PPVDB Title", wantCode: "FC2-PPV-3259498", wantPoster: server.URL + "/fc2ppvdb/3259498.jpg"},
 		{name: "fc2club", crawler: newFC2ClubAVCrawler(svc), query: "FC2PPV-743423", wantTitle: "FC2Club Title", wantCode: "FC2-PPV-743423", wantPoster: server.URL + "/fc2club/743423.jpg"},
 		{name: "fc2hub", crawler: newFC2HubAVCrawler(svc), query: "FC2-1940476", wantTitle: "FC2Hub Title", wantCode: "FC2-PPV-1940476", wantPoster: server.URL + "/fc2hub/1940476.jpg"},
@@ -92,6 +102,9 @@ func TestMDCxMigratedSitesSearchCandidates(t *testing.T) {
 			}
 			if got.PosterURL != tc.wantPoster {
 				t.Fatalf("expected poster %q, got %q", tc.wantPoster, got.PosterURL)
+			}
+			if tc.wantActors != nil && strings.Join(got.Actors, ",") != strings.Join(tc.wantActors, ",") {
+				t.Fatalf("expected actors %v, got %v", tc.wantActors, got.Actors)
 			}
 		})
 	}

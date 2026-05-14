@@ -2,6 +2,34 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-14 17:36 +0800] 修复 Jav321 横版海报与演员解析
+- Type: `implementation`
+- Summary:
+  - 将 `jav321` 搜索页与详情页解析统一到专用 DOM parser，避免搜索页/确认页字段不一致。
+  - 补齐 `<b>品番/番号</b>` 标签式番号解析，避免标题兜底把 `SSIS-001` 归一成 `SSIS-1`。
+  - 补齐 `.img-responsive` 多图解析：首图作为 `thumb_url`，最后一张非首图作为横版 `poster_url`；同时从 `/star/`、`/heyzo_star/` 链接和标签文本兜底提取演员。
+  - 新增搜索预览与 `ConfirmAV` 详情确认的 Jav321 回归断言。
+- Changed Files:
+  - `internal/services/scraper_av_mdcx_third_batch_sites.go`
+  - `internal/services/scraper_av_mdcx_sites_test.go`
+  - `internal/services/scraper_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestMDCxMigratedSitesSearchCandidates|TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites/jav321' -count=1` passed.
+  - `go test ./internal/services -count=1` passed.
+  - `go vet ./...` passed.
+
+### [2026-05-14 17:25 +0800] Jav321 横版海报与演员刮削修复计划
+- Type: `plan`
+- Summary:
+  - 定位 `jav321` 搜索返回页解析缺字段的问题，优先对照 `references/mdcx` 的 Jav321 参考实现补齐横版大海报与演员解析。
+  - 先补回归测试覆盖 `.img-responsive` 多图场景和 `/star/` 演员链接，再修改当前 Go 刮削器。
+  - 保持改动限定在 Jav321 解析、相关单测和计划记录。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - 待执行 Jav321 定向测试。
+
 ### [2026-05-14 15:26 +0800] 忽略本地 storage 目录
 - Type: `implementation`
 - Summary:

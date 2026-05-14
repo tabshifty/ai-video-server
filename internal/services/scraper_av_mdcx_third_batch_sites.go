@@ -194,6 +194,27 @@ func (c *minimalHTMLAVCrawler) FetchByDetailURL(ctx context.Context, run *avScra
 	if err != nil {
 		return avScrapeCandidate{}, err
 	}
+	if c.site == "jav321" {
+		candidate, err := parseJav321SearchCandidate(content, "", detailURL)
+		if err != nil {
+			return avScrapeCandidate{}, err
+		}
+		if strings.TrimSpace(candidate.DetailURL) == "" {
+			candidate.DetailURL = strings.TrimSpace(detailURL)
+			if candidate.Raw == nil {
+				candidate.Raw = map[string]any{}
+			}
+			candidate.Raw["detail_url"] = candidate.DetailURL
+		}
+		if strings.TrimSpace(candidate.ExternalID) == "" {
+			candidate.ExternalID = strings.ToLower(extractSingleSitePathID(detailURL))
+			candidate.Raw["external_id"] = candidate.ExternalID
+		}
+		if strings.TrimSpace(candidate.Title) == "" {
+			return avScrapeCandidate{}, fmt.Errorf("empty scrape result for url %q", detailURL)
+		}
+		return candidate, nil
+	}
 	root, err := html.Parse(strings.NewReader(content))
 	if err != nil {
 		return avScrapeCandidate{}, fmt.Errorf("parse %s detail html: %w", c.site, err)
@@ -355,8 +376,11 @@ func parseJav321SearchCandidate(content, query, baseURL string) (avScrapeCandida
 	if strings.Contains(content, "AVが見つかりませんでした") {
 		return avScrapeCandidate{}, nil
 	}
-	title := stripHTMLText(regexp.MustCompile(`(?is)<h3[^>]*>(.*?)</h3>`).FindString(content))
-	title = strings.TrimSpace(regexp.MustCompile(`\s+sample\s*$`).ReplaceAllString(title, ""))
+	root, err := html.Parse(strings.NewReader(content))
+	if err != nil {
+		return avScrapeCandidate{}, fmt.Errorf("parse jav321 html: %w", err)
+	}
+	title := jav321Title(root)
 	if title == "" {
 		title = stripHTMLText(extractRegexGroup(content, `(?is)<title[^>]*>(.*?)</title>`))
 	}
@@ -365,33 +389,175 @@ func parseJav321SearchCandidate(content, query, baseURL string) (avScrapeCandida
 	}
 	detailURL := toAbsoluteURL(baseURL, extractRegexGroup(content, `(?is)<a[^>]+href=["']([^"']*/video/[^"']+)["']`))
 	code := firstNonEmptyString(
+		jav321LabeledText(root, "品番", "番号", "品號"),
 		extractRegexGroup(content, `(?is)(?:品番|番号|品號)\s*[:：]\s*([A-Za-z0-9_-]+)`),
 		extractAVCode(title),
 		extractAVCode(query),
 	)
-	poster := toAbsoluteURL(baseURL, extractRegexGroup(content, `(?is)<img[^>]+src=["']([^"']+)["']`))
-	actors := splitDelimitedNames(extractRegexGroup(content, `(?is)(?:出演者|出演)\s*[:：]\s*([^<]+)`))
+	thumb, poster := jav321Images(root, baseURL)
+	actors := jav321Actors(root)
+	if len(actors) == 0 {
+		actors = splitDelimitedNames(firstNonEmptyString(
+			jav321LabeledText(root, "出演者", "出演", "演员", "女優"),
+			extractRegexGroup(content, `(?is)(?:出演者|出演|演员|女優)\s*[:：]\s*([^<]+)`),
+		))
+	}
+	externalID := strings.ToLower(extractSingleSitePathID(detailURL))
 	candidate := avScrapeCandidate{
 		Source:     "jav321",
-		ExternalID: strings.ToLower(extractSingleSitePathID(detailURL)),
+		ExternalID: externalID,
 		Code:       strings.ToUpper(strings.TrimSpace(code)),
 		Title:      title,
 		PosterURL:  poster,
-		ThumbURL:   poster,
+		ThumbURL:   thumb,
 		Actors:     actors,
 		DetailURL:  detailURL,
 		Raw: map[string]any{
 			"site":        "jav321",
 			"detail_url":  detailURL,
-			"external_id": strings.ToLower(extractSingleSitePathID(detailURL)),
+			"external_id": externalID,
 			"av_code":     strings.ToUpper(strings.TrimSpace(code)),
 			"title":       title,
 			"poster_url":  poster,
-			"thumb_url":   poster,
+			"thumb_url":   thumb,
 			"actors":      actors,
 		},
 	}
 	return candidate, nil
+}
+
+func jav321Title(root *html.Node) string {
+	heading := findFirst(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "h3"
+	})
+	title := nodeTextSkipping(heading, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "small"
+	})
+	title = strings.TrimSpace(regexp.MustCompile(`(?i)\s+sample\s*$`).ReplaceAllString(title, ""))
+	return normalizeWhitespace(title)
+}
+
+func jav321Images(root *html.Node, baseURL string) (string, string) {
+	images := make([]string, 0, 4)
+	for _, image := range findAll(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "img" && hasClass(n, "img-responsive")
+	}) {
+		src := strings.TrimSpace(attrValue(image, "src"))
+		if src == "" || isLikelyLogoURL(src) {
+			continue
+		}
+		images = append(images, toAbsoluteURL(baseURL, src))
+	}
+	thumb := ""
+	if len(images) > 0 {
+		thumb = images[0]
+	}
+	if thumb == "" {
+		thumb = toAbsoluteURL(baseURL, findFirstAttr(root, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && n.Data == "video" && attrValue(n, "id") == "vjs_sample_player"
+		}, "poster"))
+	}
+	poster := thumb
+	for i := len(images) - 1; i >= 0; i-- {
+		if strings.TrimSpace(images[i]) != "" && images[i] != thumb {
+			poster = images[i]
+			break
+		}
+	}
+	return thumb, poster
+}
+
+func jav321Actors(root *html.Node) []string {
+	values := make([]string, 0, 4)
+	for _, link := range findAll(root, func(n *html.Node) bool {
+		if n.Type != html.ElementNode || n.Data != "a" {
+			return false
+		}
+		href := strings.ToLower(strings.TrimSpace(attrValue(n, "href")))
+		return strings.HasPrefix(href, "/star/") || strings.HasPrefix(href, "/heyzo_star/")
+	}) {
+		if name := normalizeWhitespace(nodeText(link)); name != "" {
+			values = append(values, name)
+		}
+	}
+	return dedupeStrings(values)
+}
+
+func jav321LabeledText(root *html.Node, labels ...string) string {
+	for _, bold := range findAll(root, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "b"
+	}) {
+		label := strings.TrimSuffix(normalizeWhitespace(nodeText(bold)), ":")
+		label = strings.TrimSuffix(label, "：")
+		if !jav321ContainsLabel(labels, label) {
+			continue
+		}
+		if value := normalizeJav321LabeledValue(textUntilBreak(bold.NextSibling)); value != "" {
+			return value
+		}
+		if bold.Parent != nil {
+			parentText := normalizeWhitespace(nodeText(bold.Parent))
+			for _, rawLabel := range labels {
+				pattern := regexp.MustCompile(`(?i)^` + regexp.QuoteMeta(rawLabel) + `\s*[:：]?\s*(.+)$`)
+				if matches := pattern.FindStringSubmatch(parentText); len(matches) > 1 {
+					if value := normalizeJav321LabeledValue(matches[1]); value != "" {
+						return value
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func textUntilBreak(start *html.Node) string {
+	parts := make([]string, 0, 4)
+	for node := start; node != nil; node = node.NextSibling {
+		if node.Type == html.ElementNode && node.Data == "br" {
+			break
+		}
+		if text := normalizeWhitespace(nodeText(node)); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return normalizeWhitespace(strings.Join(parts, " "))
+}
+
+func normalizeJav321LabeledValue(value string) string {
+	value = normalizeWhitespace(strings.TrimLeft(strings.TrimSpace(value), ":："))
+	return strings.TrimSpace(value)
+}
+
+func nodeTextSkipping(node *html.Node, skip func(*html.Node) bool) string {
+	if node == nil {
+		return ""
+	}
+	parts := make([]string, 0, 4)
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n == nil || skip(n) {
+			return
+		}
+		if n.Type == html.TextNode {
+			if text := normalizeWhitespace(n.Data); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
+		}
+	}
+	walk(node)
+	return normalizeWhitespace(strings.Join(parts, " "))
+}
+
+func jav321ContainsLabel(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func splitDelimitedNames(raw string) []string {

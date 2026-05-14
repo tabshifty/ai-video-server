@@ -1918,6 +1918,7 @@ func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
 		wantTitle    string
 		wantCode     string
 		wantPoster   string
+		wantActors   []string
 	}{
 		{
 			name:       "fc2club",
@@ -1978,11 +1979,18 @@ func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
 			path:       "/video/ymdd00173",
 			responseBody: `<!doctype html>
 <html><body>
-  <h3>JAV321 First Impression</h3>
-  <div><b>番号</b><span>YMDD-173</span></div>
+  <div class="col-md-3">
+    <div class="col-xs-12 col-md-12"><p><a><img class="img-responsive" src="https://cdn.jav321.test/thumb.jpg"></a></p></div>
+  </div>
+  <h3>JAV321 First Impression <small>YMDD-173</small></h3>
+  <b>番号</b>: YMDD-173<br>
+  <b>出演者</b>: <a href="/star/a">Actor One</a> &nbsp; <a href="/star/b">Actor Two</a><br>
+  <img class="img-responsive" src="https://cdn.jav321.test/poster.jpg">
 </body></html>`,
-			wantTitle: "JAV321 First Impression",
-			wantCode:  "YMDD-173",
+			wantTitle:  "JAV321 First Impression",
+			wantCode:   "YMDD-173",
+			wantPoster: "https://cdn.jav321.test/poster.jpg",
+			wantActors: []string{"Actor One", "Actor Two"},
 		},
 		{
 			name:       "mywife",
@@ -2072,6 +2080,9 @@ func TestConfirmAVBuildsMDCXDetailURLsForThirdBatchSites(t *testing.T) {
 			}
 			if tc.wantPoster != "" && repo.lastUpdate.metadata["poster_url"] != tc.wantPoster {
 				t.Fatalf("expected poster_url %s, got=%v", tc.wantPoster, repo.lastUpdate.metadata["poster_url"])
+			}
+			if tc.wantActors != nil && strings.Join(repo.resolveActorNames, ",") != strings.Join(tc.wantActors, ",") {
+				t.Fatalf("expected actor names %v, got=%v", tc.wantActors, repo.resolveActorNames)
 			}
 		})
 	}
