@@ -11,6 +11,7 @@ import (
 func TestDecideVideoBitrate(t *testing.T) {
 	tests := []struct {
 		name       string
+		videoType  string
 		width      int
 		height     int
 		source     int
@@ -19,16 +20,18 @@ func TestDecideVideoBitrate(t *testing.T) {
 		wantCapped bool
 	}{
 		{
-			name:       "1080 high bitrate capped to 4000k",
+			name:       "1080 high bitrate capped to 5000k",
+			videoType:  "movie",
 			width:      1920,
 			height:     1080,
 			source:     6200,
 			wantTier:   resolutionTier1080,
-			want:       4000,
+			want:       5000,
 			wantCapped: true,
 		},
 		{
 			name:       "1080 low bitrate keeps source",
+			videoType:  "movie",
 			width:      1920,
 			height:     1080,
 			source:     3200,
@@ -37,25 +40,28 @@ func TestDecideVideoBitrate(t *testing.T) {
 			wantCapped: false,
 		},
 		{
-			name:       "4k high bitrate capped to 8000k",
+			name:       "4k high bitrate capped to 12000k",
+			videoType:  "episode",
 			width:      3840,
 			height:     2160,
-			source:     12000,
+			source:     15000,
 			wantTier:   resolutionTier4K,
-			want:       8000,
+			want:       12000,
 			wantCapped: true,
 		},
 		{
 			name:       "4k lower bitrate keeps source",
+			videoType:  "movie",
 			width:      3840,
 			height:     2160,
-			source:     7600,
+			source:     9000,
 			wantTier:   resolutionTier4K,
-			want:       7600,
+			want:       9000,
 			wantCapped: false,
 		},
 		{
 			name:       "non 1080 and non 4k keeps source",
+			videoType:  "movie",
 			width:      1280,
 			height:     720,
 			source:     2500,
@@ -63,11 +69,21 @@ func TestDecideVideoBitrate(t *testing.T) {
 			want:       2500,
 			wantCapped: false,
 		},
+		{
+			name:       "av 1080 keeps previous 4000k cap",
+			videoType:  "av",
+			width:      1920,
+			height:     1080,
+			source:     6200,
+			wantTier:   resolutionTier1080,
+			want:       4000,
+			wantCapped: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			target, tier, capped := decideVideoBitrate(tt.width, tt.height, tt.source)
+			target, tier, capped := decideVideoBitrate(tt.videoType, tt.width, tt.height, tt.source)
 			if target != tt.want {
 				t.Fatalf("target bitrate mismatch: got=%d want=%d", target, tt.want)
 			}
@@ -113,8 +129,10 @@ func TestBuildTranscodePlanLongformUsesBitrateStrategyWhenSourceBitrateKnown(t *
 		wantCapped bool
 		wantTier   string
 	}{
-		{name: "movie 4k capped", videoType: "movie", width: 3840, height: 2160, sourceKbps: 12000, wantKbps: 8000, wantCapped: true, wantTier: resolutionTier4K},
-		{name: "episode 1080 capped", videoType: "episode", width: 1920, height: 1080, sourceKbps: 6200, wantKbps: 4000, wantCapped: true, wantTier: resolutionTier1080},
+		{name: "movie 4k capped", videoType: "movie", width: 3840, height: 2160, sourceKbps: 15000, wantKbps: 12000, wantCapped: true, wantTier: resolutionTier4K},
+		{name: "episode 1080 capped", videoType: "episode", width: 1920, height: 1080, sourceKbps: 6200, wantKbps: 5000, wantCapped: true, wantTier: resolutionTier1080},
+		{name: "episode 1080 keeps lower source", videoType: "episode", width: 1920, height: 1080, sourceKbps: 3200, wantKbps: 3200, wantCapped: false, wantTier: resolutionTier1080},
+		{name: "movie 4k keeps lower source", videoType: "movie", width: 3840, height: 2160, sourceKbps: 9000, wantKbps: 9000, wantCapped: false, wantTier: resolutionTier4K},
 		{name: "movie 720 keeps source", videoType: "movie", width: 1280, height: 720, sourceKbps: 2500, wantKbps: 2500, wantCapped: false, wantTier: resolutionTierOther},
 	}
 

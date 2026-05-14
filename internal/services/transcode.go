@@ -244,7 +244,7 @@ func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType strin
 	if probeErr != nil || probe.BitrateKbps <= 0 {
 		return defaultPlan
 	}
-	target, tier, capped := decideVideoBitrate(probe.Width, probe.Height, probe.BitrateKbps)
+	target, tier, capped := decideVideoBitrate(videoType, probe.Width, probe.Height, probe.BitrateKbps)
 	return transcodePlan{
 		Mode:                transcodeModeBitrate,
 		CRF:                 chooseCRF(videoType),
@@ -257,22 +257,30 @@ func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType strin
 	}
 }
 
-func decideVideoBitrate(width, height, sourceBitrateKbps int) (targetBitrateKbps int, tier string, capped bool) {
+func decideVideoBitrate(videoType string, width, height, sourceBitrateKbps int) (targetBitrateKbps int, tier string, capped bool) {
 	tier = classifyResolutionTier(width, height)
 	capped = false
 	targetBitrateKbps = sourceBitrateKbps
 	if sourceBitrateKbps <= 0 {
 		return targetBitrateKbps, tier, capped
 	}
+
+	cap4K := 8000
+	cap1080 := 4000
+	if isLongformVideoType(videoType) {
+		cap4K = 12000
+		cap1080 = 5000
+	}
+
 	switch tier {
 	case resolutionTier4K:
-		if sourceBitrateKbps > 8000 {
-			targetBitrateKbps = 8000
+		if sourceBitrateKbps > cap4K {
+			targetBitrateKbps = cap4K
 			capped = true
 		}
 	case resolutionTier1080:
-		if sourceBitrateKbps > 4000 {
-			targetBitrateKbps = 4000
+		if sourceBitrateKbps > cap1080 {
+			targetBitrateKbps = cap1080
 			capped = true
 		}
 	}

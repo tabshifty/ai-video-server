@@ -2,6 +2,52 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-14 13:58 +0800] 电影电视剧长视频码率策略验证补全
+- Type: `implementation`
+- Summary:
+  - 完成长视频码率策略调整后的汇总验证，确认 `movie`、`episode` 新封顶值与 `av` 旧阈值并存逻辑生效。
+  - 确认 ffmpeg bitrate mode 的 `-maxrate 2x`、`-bufsize 4x` 参数变更已覆盖到服务层与 ffmpeg 层回归测试。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestDecideVideoBitrate|TestBuildTranscodePlan' -count=1` passed.
+  - `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgsFor(HevcPrimary|AvcCompat)' -count=1` passed.
+  - `go test ./pkg/ffmpeg ./internal/services -count=1` passed.
+
+### [2026-05-14 13:52 +0800] 电影电视剧长视频码率策略调整完成
+- Type: `implementation`
+- Summary:
+  - 电影 `movie` 和剧集 `episode` 的 HEVC 长视频转码改为新的上限封顶策略：1080p 最高 `5000k`，4K 最高 `12000k`，低于上限时保持源码率，720p 等其他分辨率继续保持源码率。
+  - 非长视频 `av`、`short` 继续沿用既有分辨率目标码率阈值，仅同步使用新的 ffmpeg bitrate mode 参数倍数。
+  - ffmpeg bitrate mode 输出参数更新为 `-b:v <target>`、`-maxrate <2x>`、`-bufsize <4x>`，并补齐对应回归测试。
+- Changed Files:
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestDecideVideoBitrate|TestBuildTranscodePlan' -count=1` passed.
+  - `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgsFor(HevcPrimary|AvcCompat)' -count=1` passed.
+  - 全量定向验证待继续执行。
+
+### [2026-05-14 13:52 +0800] 电影电视剧长视频码率策略调整计划
+- Type: `plan`
+- Summary:
+  - 仅调整 `movie` 和 `episode` 的长视频 HEVC 码率上限：1080p 封顶 `5000k`，4K 封顶 `12000k`，不主动抬高低于目标的源码率。
+  - 保持长视频“有码率走 bitrate mode、无码率回退 `CRF 23`”和 HEVC 输出 profile 不变；`short`、`av` 的分辨率目标码率维持现状。
+  - ffmpeg bitrate mode 参数统一改为 `-maxrate` 为目标码率 `2x`、`-bufsize` 为目标码率 `4x`，并同步调整服务层与 ffmpeg 层测试期望。
+- Changed Files:
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `pkg/ffmpeg/ffmpeg.go`
+  - `pkg/ffmpeg/ffmpeg_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestDecideVideoBitrate|TestBuildTranscodePlan' -count=1`
+  - `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgsFor(HevcPrimary|AvcCompat)' -count=1`
+  - `go test ./pkg/ffmpeg ./internal/services -count=1`
+
 ### [2026-05-13 23:19 +0800] 电影电视剧 HEVC 压缩恢复码率约束完成
 - Type: `implementation`
 - Summary:

@@ -86,8 +86,8 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		bitrate := strconv.Itoa(options.VideoBitrateKbps) + "k"
 		args = append(args,
 			"-b:v", bitrate,
-			"-maxrate", bitrate,
-			"-bufsize", strconv.Itoa(options.VideoBitrateKbps*2)+"k",
+			"-maxrate", strconv.Itoa(options.VideoBitrateKbps*2)+"k",
+			"-bufsize", strconv.Itoa(options.VideoBitrateKbps*4)+"k",
 		)
 	} else {
 		crf := strings.TrimSpace(options.CRF)
