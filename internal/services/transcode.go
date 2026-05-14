@@ -241,9 +241,6 @@ func buildTranscodePlan(probe ffmpeg.VideoProbe, probeErr error, videoType strin
 		SourceAudioChannels: probe.AudioChannels,
 		TranscodeProfile:    profile,
 	}
-	if isLongformVideoType(videoType) {
-		return defaultPlan
-	}
 	if probeErr != nil || probe.BitrateKbps <= 0 {
 		return defaultPlan
 	}

@@ -102,35 +102,48 @@ func TestBuildTranscodePlanWithoutSourceBitrateFallsBackToCRF(t *testing.T) {
 	}
 }
 
-func TestBuildTranscodePlanLongformUsesCRFEvenWithSourceBitrate(t *testing.T) {
+func TestBuildTranscodePlanLongformUsesBitrateStrategyWhenSourceBitrateKnown(t *testing.T) {
 	tests := []struct {
-		name      string
-		videoType string
+		name       string
+		videoType  string
+		width      int
+		height     int
+		sourceKbps int
+		wantKbps   int
+		wantCapped bool
+		wantTier   string
 	}{
-		{name: "movie", videoType: "movie"},
-		{name: "episode", videoType: "episode"},
+		{name: "movie 4k capped", videoType: "movie", width: 3840, height: 2160, sourceKbps: 12000, wantKbps: 8000, wantCapped: true, wantTier: resolutionTier4K},
+		{name: "episode 1080 capped", videoType: "episode", width: 1920, height: 1080, sourceKbps: 6200, wantKbps: 4000, wantCapped: true, wantTier: resolutionTier1080},
+		{name: "movie 720 keeps source", videoType: "movie", width: 1280, height: 720, sourceKbps: 2500, wantKbps: 2500, wantCapped: false, wantTier: resolutionTierOther},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			plan := buildTranscodePlan(ffmpeg.VideoProbe{
-				Width:         3840,
-				Height:        2160,
-				BitrateKbps:   12000,
+				Width:         tt.width,
+				Height:        tt.height,
+				BitrateKbps:   tt.sourceKbps,
 				AudioChannels: 6,
 			}, nil, tt.videoType)
 
-			if plan.Mode != transcodeModeCRFFallback {
-				t.Fatalf("expected crf mode, got=%s", plan.Mode)
+			if plan.Mode != transcodeModeBitrate {
+				t.Fatalf("expected bitrate mode, got=%s", plan.Mode)
 			}
 			if plan.CRF != "23" {
 				t.Fatalf("expected crf=23, got=%s", plan.CRF)
 			}
-			if plan.TargetBitrateKbps != 0 {
-				t.Fatalf("expected no bitrate target for longform, got=%d", plan.TargetBitrateKbps)
+			if plan.TargetBitrateKbps != tt.wantKbps {
+				t.Fatalf("expected target bitrate %d, got=%d", tt.wantKbps, plan.TargetBitrateKbps)
 			}
-			if plan.SourceBitrateKbps != 12000 {
+			if plan.SourceBitrateKbps != tt.sourceKbps {
 				t.Fatalf("expected source bitrate preserved, got=%d", plan.SourceBitrateKbps)
+			}
+			if plan.BitrateCapped != tt.wantCapped {
+				t.Fatalf("expected bitrate capped=%v, got=%v", tt.wantCapped, plan.BitrateCapped)
+			}
+			if plan.ResolutionTier != tt.wantTier {
+				t.Fatalf("expected resolution tier %s, got=%s", tt.wantTier, plan.ResolutionTier)
 			}
 			if plan.TranscodeProfile != transcodeProfileHEVCLongform {
 				t.Fatalf("expected hevc longform profile, got=%s", plan.TranscodeProfile)

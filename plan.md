@@ -2,6 +2,34 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-13 23:19 +0800] 电影电视剧 HEVC 压缩恢复码率约束完成
+- Type: `implementation`
+- Summary:
+  - 电影 `movie` 和电视剧分集 `episode` 仍然保持 HEVC 硬件转码输出，但当探测到源视频码率时，不再走无上限 `CRF` 路径。
+  - 长视频转码计划改为复用现有分辨率码率策略：4K 最高 `8000k`，1080p 最高 `4000k`，更低分辨率保持源视频码率，避免转码后文件体积反向膨胀。
+  - 保留源码率不可用时回退到 `CRF 23` 的兜底逻辑，并补齐电影/剧集 HEVC 码率模式回归测试。
+- Changed Files:
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestBuildTranscodePlan(WithoutSourceBitrateFallsBackToCRF|LongformUsesBitrateStrategyWhenSourceBitrateKnown|NonLongformKeepsBitrateStrategy)' -count=1` passed.
+  - `go test ./pkg/ffmpeg ./internal/services -run 'TestBuildTranscodePlan|TestChooseTranscodeOutputProfile|TestResolveProbeFields|TestBuildPlaybackMetadata|TestBuildTranscodeVideoArgsFor(HevcPrimary|AvcCompat)|TestDecideVideoBitrate' -count=1` passed.
+
+### [2026-05-13 23:19 +0800] 电影电视剧 HEVC 压缩恢复码率约束计划
+- Type: `plan`
+- Summary:
+  - 保持电影和电视剧的 HEVC 输出不变，但移除“长视频有码率信息时仍强制走无上限 `CRF`”的策略。
+  - 当源视频码率可用时，长视频改为复用现有码率控制逻辑，按分辨率对目标码率做上限约束，避免输出体积明显大于输入。
+  - 对没有可用源码率的输入保留 `CRF 23` 兜底，测试覆盖电影、剧集和非长视频的分支差异。
+- Changed Files:
+  - `internal/services/transcode.go`
+  - `internal/services/transcode_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/services -run 'TestBuildTranscodePlan(WithoutSourceBitrateFallsBackToCRF|LongformUsesBitrateStrategyWhenSourceBitrateKnown|NonLongformKeepsBitrateStrategy)' -count=1`
+  - `go test ./pkg/ffmpeg ./internal/services -run 'TestBuildTranscodePlan|TestChooseTranscodeOutputProfile|TestResolveProbeFields|TestBuildPlaybackMetadata|TestBuildTranscodeVideoArgsFor(HevcPrimary|AvcCompat)|TestDecideVideoBitrate' -count=1`
+
 ### [2026-05-13 18:00 +0800] 管理端视频详情手动状态修改完成
 - Type: `implementation`
 - Summary:
