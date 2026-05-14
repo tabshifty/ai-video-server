@@ -2,6 +2,37 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-14 15:11 +0800] AV 刮削封面转码覆盖修复验证完成
+- Type: `verification`
+- Summary:
+  - 完成 AV 刮削封面转码覆盖修复后的定向与全量 Go 验证。
+  - 确认 `internal/queue` 新增决策测试覆盖 AV 有封面、AV 无封面兜底、AV 空默认路径恢复、非 AV 维持旧行为四类场景。
+  - 当前环境未安装 `golangci-lint`，未执行该项；已执行 `go vet ./...` 作为 Go 静态检查补充。
+- Changed Files:
+  - `plan.md`
+- Verification:
+  - `go test ./internal/queue -run 'TestResolveTranscodePersistence' -count=1` passed.
+  - `go test ./internal/queue` passed.
+  - `go test ./internal/services ./internal/queue ./internal/handlers ./internal/repository` passed.
+  - `go vet ./...` passed.
+  - `go test ./... -count=1` passed.
+
+### [2026-05-14 15:10 +0800] 修复 AV 上传后刮削封面被转码覆盖
+- Type: `implementation`
+- Summary:
+  - 确认根因为 AV 自动刮削先写入封面缩略图与 `poster_*` metadata，后续转码完成时 `UpdateTranscodeResult` 使用视频截图和转码 metadata 整体覆盖，导致默认封面与封面变体信息丢失。
+  - 转码落库前新增内部决策：非 AV 保持使用转码截图与转码 metadata；AV 已有刮削封面 metadata 时保留现有封面路径并合并 metadata；AV 无封面 metadata 时使用转码截图兜底，同时保留 `scrape_error` 等诊断信息。
+  - AV metadata 合并以旧 metadata 为基础补入转码播放字段，并在发现刮削封面时回写 `poster_*`、`thumb_url`、`poster`、`thumb` 等封面字段，避免同名转码字段覆盖封面决策。
+- Changed Files:
+  - `internal/queue/tasks.go`
+  - `internal/queue/tasks_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/queue -run 'TestResolveTranscodePersistence' -count=1` passed.
+  - `go test ./internal/queue` passed.
+  - `go test ./internal/services ./internal/queue ./internal/handlers ./internal/repository` baseline passed before implementation.
+  - Full planned verification pending after this entry.
+
 ### [2026-05-14 13:58 +0800] 电影电视剧长视频码率策略验证补全
 - Type: `implementation`
 - Summary:

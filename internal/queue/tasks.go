@@ -7,11 +7,13 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 
+	"video-server/internal/models"
 	"video-server/internal/repository"
 	"video-server/internal/services"
 )
@@ -181,7 +183,8 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 		return transcodeErr
 	}
 
-	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, result.ThumbnailPath, result.Duration, result.Width, result.Height, result.Metadata); err != nil {
+	thumbPath, metadata := resolveTranscodePersistence(video, result)
+	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, thumbPath, result.Duration, result.Width, result.Height, metadata); err != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
 		return err
 	}
@@ -214,6 +217,113 @@ func intPtrIfPositive(v int) *int {
 
 func roundTo2(v float64) float64 {
 	return math.Round(v*100) / 100
+}
+
+func resolveTranscodePersistence(video models.Video, result services.TranscodeResult) (string, map[string]any) {
+	if video.Type != "av" {
+		return result.ThumbnailPath, cloneMetadata(result.Metadata)
+	}
+
+	existingMetadata := decodeMetadataMap(video.Metadata)
+	metadata := mergeMetadata(existingMetadata, result.Metadata)
+	if !hasAVScrapedPosterMetadata(existingMetadata) {
+		return result.ThumbnailPath, metadata
+	}
+
+	for key, value := range existingMetadata {
+		if isAVPosterMetadataKey(key) {
+			metadata[key] = value
+		}
+	}
+	return chooseAVPosterThumbnailPath(existingMetadata, video.ThumbnailPath), metadata
+}
+
+func decodeMetadataMap(raw []byte) map[string]any {
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal(raw, &metadata); err != nil || metadata == nil {
+		return map[string]any{}
+	}
+	return metadata
+}
+
+func mergeMetadata(base, patch map[string]any) map[string]any {
+	merged := cloneMetadata(base)
+	for key, value := range patch {
+		merged[key] = value
+	}
+	return merged
+}
+
+func cloneMetadata(metadata map[string]any) map[string]any {
+	if metadata == nil {
+		return map[string]any{}
+	}
+	clone := make(map[string]any, len(metadata))
+	for key, value := range metadata {
+		clone[key] = value
+	}
+	return clone
+}
+
+func hasAVScrapedPosterMetadata(metadata map[string]any) bool {
+	for _, key := range []string{
+		"poster_original_file_path",
+		"poster_cropped_file_path",
+		"poster_thumb_file_path",
+		"poster_original_path",
+		"poster_cropped_path",
+		"poster_thumb_path",
+	} {
+		if strings.TrimSpace(stringFromAny(metadata[key])) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func isAVPosterMetadataKey(key string) bool {
+	key = strings.TrimSpace(key)
+	return strings.HasPrefix(key, "poster_") || key == "poster" || key == "thumb" || key == "thumb_url"
+}
+
+func chooseAVPosterThumbnailPath(metadata map[string]any, fallback string) string {
+	fallback = strings.TrimSpace(fallback)
+	if fallback != "" {
+		return fallback
+	}
+
+	originalFilePath := strings.TrimSpace(stringFromAny(metadata["poster_original_file_path"]))
+	thumbFilePath := strings.TrimSpace(stringFromAny(metadata["poster_thumb_file_path"]))
+	croppedFilePath := strings.TrimSpace(stringFromAny(metadata["poster_cropped_file_path"]))
+	switch strings.ToLower(strings.TrimSpace(stringFromAny(metadata["poster_variant"]))) {
+	case "thumb":
+		return firstNonEmptyString(thumbFilePath, croppedFilePath, originalFilePath)
+	case "original":
+		return firstNonEmptyString(originalFilePath, thumbFilePath, croppedFilePath)
+	default:
+		return firstNonEmptyString(croppedFilePath, thumbFilePath, originalFilePath)
+	}
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func stringFromAny(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	default:
+		return ""
+	}
 }
 
 func (p *Processor) finalizeTranscodeFailure(ctx context.Context, videoID uuid.UUID, jobID int64, reason string) {
