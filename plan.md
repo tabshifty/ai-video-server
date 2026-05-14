@@ -2,6 +2,18 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-14 15:26 +0800] 忽略本地 storage 目录
+- Type: `implementation`
+- Summary:
+  - 将 `storage/` 加入 `.gitignore`，避免本地存储目录或其软连接在 `git status` 中显示为未跟踪文件。
+  - 保持真实视频存储目录不变，仅调整 Git 忽略规则。
+- Changed Files:
+  - `.gitignore`
+  - `plan.md`
+- Verification:
+  - Documentation/config-only change; no build/test required.
+  - `git status --short --ignored storage` showed `!! storage/`.
+
 ### [2026-05-14 15:11 +0800] AV 刮削封面转码覆盖修复验证完成
 - Type: `verification`
 - Summary:

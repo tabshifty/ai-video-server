@@ -5,6 +5,7 @@
 admin-web/node_modules/
 admin-web/dist/
 .gocache/
+storage/
 referencesm/
 references/
 release
