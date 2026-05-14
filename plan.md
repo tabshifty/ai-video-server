@@ -2,6 +2,41 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-14 18:43 +0800] 修复 AV 手动保存长标题完成
+- Type: `implementation`
+- Summary:
+  - 新增 `0019` 迁移，将 `videos.title` 从 `VARCHAR(200)` 放宽为 `TEXT`，避免 AV 手动确认保存超长标题时报 PostgreSQL `SQLSTATE 22001`。
+  - 回滚迁移使用 `LEFT(title, 200)`，确保 down migration 可执行且行为明确。
+  - 通过现有 `ConfirmAV` 翻译链路继续将标题与简介写入中文字段，未改动接口或前端 payload。
+  - 增加迁移保护测试，扫描 `0019` up/down SQL，防止以后把 `videos.title` 重新收窄。
+- Changed Files:
+  - `migrations/0019_video_title_text.up.sql`
+  - `migrations/0019_video_title_text.down.sql`
+  - `internal/repository/migrations_test.go`
+  - `plan.md`
+- Verification:
+  - `go test ./internal/repository -count=1` passed.
+  - `go test ./internal/services -run TestConfirmAVStoresLocalizedFieldsAndOriginalFields -count=1` passed.
+  - `go test ./internal/services ./internal/handlers -count=1` passed.
+  - `go vet ./...` passed.
+
+### [2026-05-14 18:41 +0800] 修复 AV 手动保存长标题计划
+- Type: `plan`
+- Summary:
+  - 新增迁移将 `videos.title` 从 `VARCHAR(200)` 放宽为 `TEXT`，避免 AV 手动确认保存长标题时报 `SQLSTATE 22001`。
+  - 回滚迁移使用 `LEFT(title, 200)` 保证可执行，并明确回滚时会截断超长标题。
+  - 保持现有 `ConfirmAV` 中文翻译落库链路不变，补充迁移保护测试并执行现有 AV 确认翻译测试。
+- Changed Files:
+  - `migrations/0019_video_title_text.up.sql`
+  - `migrations/0019_video_title_text.down.sql`
+  - `internal/repository/migrations_test.go`
+  - `plan.md`
+- Verification:
+  - 待执行 `go test ./internal/repository -count=1`。
+  - 待执行 `go test ./internal/services -run TestConfirmAVStoresLocalizedFieldsAndOriginalFields -count=1`。
+  - 待执行 `go test ./internal/services ./internal/handlers -count=1`。
+  - 待执行 `go vet ./...`。
+
 ### [2026-05-14 17:36 +0800] 修复 Jav321 横版海报与演员解析
 - Type: `implementation`
 - Summary:

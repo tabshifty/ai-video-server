@@ -1,0 +1,2 @@
+ALTER TABLE videos
+    ALTER COLUMN title TYPE TEXT;
