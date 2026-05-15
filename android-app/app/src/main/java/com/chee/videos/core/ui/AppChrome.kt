@@ -42,8 +42,8 @@ object AppChrome {
             ),
         )
 
-    val CardShape = RoundedCornerShape(22.dp)
-    val SectionShape = RoundedCornerShape(18.dp)
+    val CardShape = RoundedCornerShape(18.dp)
+    val SectionShape = RoundedCornerShape(14.dp)
     val PillShape = RoundedCornerShape(999.dp)
 }
 

@@ -2,6 +2,38 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-15 23:08 CST] 手机端界面轻收紧完成
+- Type: `implementation`
+- Summary:
+  - 将手机端 `AppChrome` 通用卡片圆角从 `22dp` 收紧为 `18dp`，区块圆角从 `18dp` 收紧为 `14dp`，保留胶囊按钮形状不变。
+  - 长视频播放器新增本地 chrome 规格，统一控制 seek 预览、中心反馈、顶部栏、底部栏的圆角、外边距、内边距和控制按钮尺寸。
+  - 新增纯规格测试覆盖本次视觉密度目标，避免后续手机端圆角和播放器浮层参数漂移。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/AppChrome.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/AppChromeDensitySpecTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.AppChromeDensitySpecTest` passed.
+  - `cd android-app && ./gradlew :app:testDebugUnitTest` passed.
+  - `cd android-app && ./gradlew :app:assembleDebug` passed.
+
+### [2026-05-15 23:06 CST] 手机端界面轻收紧计划
+- Type: `plan`
+- Summary:
+  - 仅调整手机端通用形状与长视频播放器浮层密度，保持 TV 工程不变。
+  - 将 `AppChrome` 卡片、区块圆角整体下调一档，保留胶囊形状语义。
+  - 长视频播放器中心反馈、seek 预览、顶部栏、底部栏改用更紧凑的圆角、外边距、内边距和按钮尺寸，并用纯规格测试固定目标值。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/AppChrome.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/AppChromeDensitySpecTest.kt`
+  - `plan.md`
+- Verification:
+  - 待执行 `cd android-app && ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.AppChromeDensitySpecTest`。
+  - 待执行 `cd android-app && ./gradlew :app:testDebugUnitTest`。
+  - 待执行 `cd android-app && ./gradlew :app:assembleDebug`。
+
 ### [2026-05-15 20:47 CST] 增加手机端长视频全屏亮度音量手势
 - Type: `implementation`
 - Summary:

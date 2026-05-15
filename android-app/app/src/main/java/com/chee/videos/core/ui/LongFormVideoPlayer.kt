@@ -276,6 +276,7 @@ fun LongFormVideoPlayer(
     } else {
         0f
     }
+    val chromeSpec = remember { buildLongFormPlayerChromeSpec() }
 
     Box(
         modifier = modifier
@@ -442,14 +443,14 @@ fun LongFormVideoPlayer(
         ) {
             Surface(
                 color = Color(0xD610131A),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(chromeSpec.seekPreviewCornerDp.dp),
             ) {
                 Text(
                     text = seekPreviewText,
                     color = Color.White,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                         .widthIn(min = 112.dp),
                 )
             }
@@ -463,11 +464,11 @@ fun LongFormVideoPlayer(
         ) {
             Surface(
                 color = Color(0xCC0D1016),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(chromeSpec.centerFeedbackCornerDp.dp),
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -499,17 +500,23 @@ fun LongFormVideoPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(topPaddingModifier)
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .padding(
+                        horizontal = chromeSpec.controlBarOuterPaddingDp.dp,
+                        vertical = chromeSpec.controlBarOuterPaddingDp.dp,
+                    ),
             ) {
                 Surface(
                     color = Color(0x8C0D1016),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(chromeSpec.controlBarCornerDp.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(
+                            horizontal = chromeSpec.controlBarHorizontalPaddingDp.dp,
+                            vertical = chromeSpec.controlBarVerticalPaddingDp.dp,
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         CompactPlayerControlButton(
                             icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -542,17 +549,23 @@ fun LongFormVideoPlayer(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .padding(
+                        horizontal = chromeSpec.controlBarOuterPaddingDp.dp,
+                        vertical = chromeSpec.controlBarOuterPaddingDp.dp,
+                    ),
             ) {
                 Surface(
                     color = Color(0x910D1016),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(chromeSpec.controlBarCornerDp.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(
+                            horizontal = chromeSpec.controlBarHorizontalPaddingDp.dp,
+                            vertical = chromeSpec.controlBarVerticalPaddingDp.dp,
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
                         CompactPlayerControlButton(
                             icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -673,6 +686,7 @@ private fun CompactPlayerControlButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val chromeSpec = remember { buildLongFormPlayerChromeSpec() }
     Surface(
         color = Color(0x24000000),
         shape = CircleShape,
@@ -680,7 +694,7 @@ private fun CompactPlayerControlButton(
     ) {
         IconButton(
             onClick = onClick,
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(chromeSpec.controlButtonSizeDp.dp),
         ) {
             Icon(
                 imageVector = icon,
@@ -689,6 +703,20 @@ private fun CompactPlayerControlButton(
             )
         }
     }
+}
+
+private data class LongFormPlayerChromeSpec(
+    val seekPreviewCornerDp: Int = 14,
+    val centerFeedbackCornerDp: Int = 18,
+    val controlBarCornerDp: Int = 16,
+    val controlBarOuterPaddingDp: Int = 10,
+    val controlBarHorizontalPaddingDp: Int = 6,
+    val controlBarVerticalPaddingDp: Int = 5,
+    val controlButtonSizeDp: Int = 32,
+)
+
+private fun buildLongFormPlayerChromeSpec(): LongFormPlayerChromeSpec {
+    return LongFormPlayerChromeSpec()
 }
 
 private fun formatPlaybackTime(ms: Long): String {
