@@ -28,25 +28,31 @@ import com.chee.videos.core.network.ApiService
 import com.chee.videos.core.player.PlaybackProfileResolver
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
+import com.chee.videos.core.testing.MainDispatcherRule
 import com.google.gson.Gson
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.test.TestScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     @Test
-    fun `loadCategory loads default av list`() = runTest {
+    fun `loadCategory loads default av list`() = runTest(mainDispatcherRule.standardDispatcher) {
         withMainDispatcher {
             val api = FakeHomeApiService(
                 browseItems = mapOf(
@@ -55,7 +61,7 @@ class HomeViewModelTest {
                     ),
                 ),
             )
-            val viewModel = buildViewModel(api)
+            val viewModel = buildViewModel(api, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
@@ -70,7 +76,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `updateAvQuery triggers remote av search after debounce`() = runTest {
+    fun `updateAvQuery triggers remote av search after debounce`() = runTest(mainDispatcherRule.standardDispatcher) {
         withMainDispatcher {
             val api = FakeHomeApiService(
                 browseItems = mapOf("av" to listOf(avItem(id = "av-1", title = "SSIS-101 夜色标本"))),
@@ -80,7 +86,7 @@ class HomeViewModelTest {
                     ),
                 ),
             )
-            val viewModel = buildViewModel(api)
+            val viewModel = buildViewModel(api, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
@@ -105,7 +111,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `clearing query restores default av browse list`() = runTest {
+    fun `clearing query restores default av browse list`() = runTest(mainDispatcherRule.standardDispatcher) {
         withMainDispatcher {
             val api = FakeHomeApiService(
                 browseItems = mapOf(
@@ -119,7 +125,7 @@ class HomeViewModelTest {
                     ),
                 ),
             )
-            val viewModel = buildViewModel(api)
+            val viewModel = buildViewModel(api, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
@@ -140,7 +146,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `search failure does not overwrite default av browse list`() = runTest {
+    fun `search failure does not overwrite default av browse list`() = runTest(mainDispatcherRule.standardDispatcher) {
         withMainDispatcher {
             val api = FakeHomeApiService(
                 browseItems = mapOf(
@@ -150,7 +156,7 @@ class HomeViewModelTest {
                 ),
                 searchErrors = mapOf("broken" to IllegalStateException("搜索失败")),
             )
-            val viewModel = buildViewModel(api)
+            val viewModel = buildViewModel(api, CoroutineScope(UnconfinedTestDispatcher(testScheduler)))
             viewModel.avSearchDebounceMs = 0
 
             viewModel.loadCategory("av")
@@ -167,9 +173,13 @@ class HomeViewModelTest {
         }
     }
 
-    private suspend fun buildViewModel(api: FakeHomeApiService): HomeViewModel {
+    private suspend fun buildViewModel(
+        api: FakeHomeApiService,
+        dataStoreScope: CoroutineScope,
+    ): HomeViewModel {
         val store = AppPreferencesStore(
             dataStore = PreferenceDataStoreFactory.create(
+                scope = dataStoreScope,
                 produceFile = {
                     File.createTempFile("home-view-model", ".preferences_pb").apply {
                         deleteOnExit()
@@ -203,11 +213,7 @@ class HomeViewModelTest {
 @OptIn(ExperimentalCoroutinesApi::class)
 private suspend fun TestScope.withMainDispatcher(block: suspend TestScope.() -> Unit) {
     Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-    try {
-        block()
-    } finally {
-        Dispatchers.resetMain()
-    }
+    block()
 }
 
 private data class SearchCall(

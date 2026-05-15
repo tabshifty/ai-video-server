@@ -2,6 +2,65 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-15 16:54 CST] 修复 TV 海报焦点裁切验证完成
+- Type: `implementation`
+- Summary:
+  - 将 `MainDispatcherRule` 提取到 `core/testing`，TV 测试继续通过 typealias 复用，避免 core/home 测试依赖 feature.tv 包。
+  - HomeViewModel 单测绑定同一测试调度器与 DataStore scope，修复完整套件下后台协程调度不一致导致的偶发失败。
+  - 重新执行完整 TV 单测与 Debug 构建。
+- Changed Files:
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/core/testing/MainDispatcherRule.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest` passed.
+  - `cd android-tv-app && ./gradlew :tv-app:assembleDebug` passed.
+
+### [2026-05-15 16:32 CST] 修复 TV 海报焦点裁切完成
+- Type: `implementation`
+- Summary:
+  - 完成 TV 焦点安全规格、首页 AV/普通海报、TV 首页横向海报架、海报墙网格卡片的防裁切实现。
+  - 补充焦点安全规格测试、首页布局规格测试、TV 目录横向架规格测试、海报墙网格规格测试。
+  - 修复 TV 单测套件中 Main dispatcher 初始化不稳定的问题，确保新增测试和既有 Home/ViewModel/DataStore 测试可同套件运行。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvFocusSpecTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/home/HomeFocusLayoutSpecTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusLayoutSpecTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallFocusLayoutSpecTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/core/data/AppPreferencesStoreTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest` passed.
+  - `cd android-tv-app && ./gradlew :tv-app:assembleDebug` passed.
+
+### [2026-05-15 16:11 CST] 修复 TV 海报焦点裁切实现中
+- Type: `implementation`
+- Summary:
+  - 新增 TV 焦点安全规格与首页、TV 目录、海报墙布局规格测试，先确认缺少规格时测试失败，再补齐实现。
+  - 首页 AV 海报和普通视频卡片接入 `tvFocusableGlow`，卡片外层预留焦点安全空间，内部图片区域单独裁圆角。
+  - TV 首页横向海报架、查看更多卡片和海报墙卡片改为外层焦点容器，增加首尾/上下 padding 与 item spacing，避免缩放和描边被边界裁掉。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvFocusSpecTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/home/HomeFocusLayoutSpecTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusLayoutSpecTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallFocusLayoutSpecTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.ui.TvFocusSpecTest' --tests 'com.chee.videos.feature.home.HomeFocusLayoutSpecTest' --tests 'com.chee.videos.feature.tv.TvCatalogFocusLayoutSpecTest' --tests 'com.chee.videos.feature.tv.TvPosterWallFocusLayoutSpecTest'` passed.
+  - 待执行 `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest`。
+  - 待执行 `cd android-tv-app && ./gradlew :tv-app:assembleDebug`。
+
 ### [2026-05-15 12:29 CST] 调整手机端 AV 播放详情页
 - Type: `implementation`
 - Summary:

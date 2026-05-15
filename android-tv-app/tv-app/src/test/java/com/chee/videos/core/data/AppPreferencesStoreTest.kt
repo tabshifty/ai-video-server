@@ -2,15 +2,20 @@ package com.chee.videos.core.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.chee.videos.core.model.ShortPlaybackMode
+import com.chee.videos.core.testing.MainDispatcherRule
 import com.google.gson.Gson
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Rule
 import org.junit.Test
 
 class AppPreferencesStoreTest {
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
     @Test
     fun shortPlaybackMode_defaultsToLoopOne_andCanPersist() = runTest {
         val dataStore = PreferenceDataStoreFactory.create(

@@ -48,8 +48,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.tvFocusableGlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+
+private val tvPosterWallFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
+
+internal object TvPosterWallFocusLayoutSpec {
+    const val gridHorizontalPaddingDp: Float = 24f
+    const val gridTopPaddingDp: Float = 8f
+    const val gridBottomPaddingDp: Float = 24f
+    const val gridItemSpacingDp: Float = 16f
+    const val posterCardsUseFocusSafeContainer: Boolean = true
+}
 
 @Composable
 fun TvPosterWallScreen(
@@ -119,9 +130,14 @@ fun TvPosterWallScreen(
                 LazyVerticalGrid(
                     state = gridState,
                     columns = GridCells.Adaptive(minSize = 170.dp),
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    contentPadding = PaddingValues(
+                        start = TvPosterWallFocusLayoutSpec.gridHorizontalPaddingDp.dp,
+                        end = TvPosterWallFocusLayoutSpec.gridHorizontalPaddingDp.dp,
+                        top = TvPosterWallFocusLayoutSpec.gridTopPaddingDp.dp,
+                        bottom = TvPosterWallFocusLayoutSpec.gridBottomPaddingDp.dp,
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(TvPosterWallFocusLayoutSpec.gridItemSpacingDp.dp),
+                    verticalArrangement = Arrangement.spacedBy(TvPosterWallFocusLayoutSpec.gridItemSpacingDp.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(uiState.items, key = { item -> item.id }) { item ->
@@ -296,9 +312,9 @@ private fun TvPosterWallCard(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(18.dp),
         modifier = modifier
+            .padding(tvPosterWallFocusSafeSpace)
             .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(18.dp))
-            .tvFocusableGlow(shape = RoundedCornerShape(18.dp), focusedScale = 1.04f)
+            .tvFocusableGlow(shape = RoundedCornerShape(18.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

@@ -52,8 +52,18 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.util.UrlBuilder
+
+private val tvCatalogPosterFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
+
+internal object TvCatalogFocusLayoutSpec {
+    const val shelfHorizontalPaddingDp: Float = 8f
+    const val shelfVerticalPaddingDp: Float = 8f
+    const val shelfItemSpacingDp: Float = 16f
+    const val posterCardsUseFocusSafeContainer: Boolean = true
+}
 
 @Composable
 fun TvCatalogScreen(
@@ -747,17 +757,22 @@ private fun TvCatalogSection(
             style = MaterialTheme.typography.bodySmall,
         )
         LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(TvCatalogFocusLayoutSpec.shelfItemSpacingDp.dp),
+            contentPadding = PaddingValues(
+                start = TvCatalogFocusLayoutSpec.shelfHorizontalPaddingDp.dp,
+                end = TvCatalogFocusLayoutSpec.shelfHorizontalPaddingDp.dp,
+                top = TvCatalogFocusLayoutSpec.shelfVerticalPaddingDp.dp,
+                bottom = TvCatalogFocusLayoutSpec.shelfVerticalPaddingDp.dp,
+            ),
         ) {
             items(section.items.take(TvCatalogShelfPreviewLimit), key = { item -> item.id }) { series ->
                 TvSeriesPosterCard(
                     baseUrl = baseUrl,
                     series = series,
                     modifier = if (requestInitialFocus && section.items.firstOrNull()?.id == series.id) {
-                        Modifier.focusRequester(firstItemFocusRequester).tvFocusableGlow(shape = RoundedCornerShape(16.dp))
+                        Modifier.focusRequester(firstItemFocusRequester)
                     } else {
-                        Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp))
+                        Modifier
                     },
                     onClick = { onOpenSeries(series.id) },
                 )
@@ -767,7 +782,6 @@ private fun TvCatalogSection(
                     TvPosterMoreCard(
                         label = "查看更多",
                         subtitle = "共 ${section.items.size} 项",
-                        modifier = Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp)),
                         onClick = { onOpenCatalogWall(resolveTvSectionWallKind(section.title), section.title) },
                     )
                 }
@@ -787,8 +801,9 @@ private fun TvSeriesPosterCard(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(16.dp),
         modifier = modifier
+            .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 256.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .tvFocusableGlow(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -867,17 +882,22 @@ private fun TvHomeShelf(
             style = MaterialTheme.typography.bodySmall,
         )
         LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(TvCatalogFocusLayoutSpec.shelfItemSpacingDp.dp),
+            contentPadding = PaddingValues(
+                start = TvCatalogFocusLayoutSpec.shelfHorizontalPaddingDp.dp,
+                end = TvCatalogFocusLayoutSpec.shelfHorizontalPaddingDp.dp,
+                top = TvCatalogFocusLayoutSpec.shelfVerticalPaddingDp.dp,
+                bottom = TvCatalogFocusLayoutSpec.shelfVerticalPaddingDp.dp,
+            ),
         ) {
             items(items.take(TvCatalogShelfPreviewLimit), key = { item -> "${item.type}-${item.id}" }) { item ->
                 TvHomeShelfCard(
                     baseUrl = baseUrl,
                     item = item,
                     modifier = if (requestInitialFocus && items.firstOrNull()?.id == item.id) {
-                        Modifier.focusRequester(firstItemFocusRequester).tvFocusableGlow(shape = RoundedCornerShape(16.dp))
+                        Modifier.focusRequester(firstItemFocusRequester)
                     } else {
-                        Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp))
+                        Modifier
                     },
                     onClick = { onClick(item) },
                 )
@@ -887,7 +907,6 @@ private fun TvHomeShelf(
                     TvPosterMoreCard(
                         label = "查看更多",
                         subtitle = "共 ${items.size} 项",
-                        modifier = Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp)),
                         onClick = { onOpenCatalogWall(wallKind, title) },
                     )
                 }
@@ -907,8 +926,9 @@ private fun TvPosterMoreCard(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(16.dp),
         modifier = modifier
+            .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 256.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .tvFocusableGlow(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Box(
@@ -969,8 +989,9 @@ private fun TvHomeShelfCard(
         color = AppChrome.SurfaceElevated,
         shape = RoundedCornerShape(16.dp),
         modifier = modifier
+            .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 256.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .tvFocusableGlow(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

@@ -17,6 +17,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
+object TvFocusSafeSpec {
+    const val posterCardWidthDp: Float = 146f
+    const val posterFocusedScale: Float = 1.04f
+    const val focusedBorderWidthDp: Float = 2f
+    const val posterFocusSafeSpaceDp: Float = 8f
+
+    fun requiredSafeSpaceDp(
+        baseSizeDp: Float,
+        focusedScale: Float,
+        focusedBorderWidthDp: Float,
+    ): Float {
+        val scaleOverflow = baseSizeDp * (focusedScale - 1f) / 2f
+        return scaleOverflow + focusedBorderWidthDp
+    }
+}
+
 fun Modifier.tvFocusableGlow(
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(20.dp),

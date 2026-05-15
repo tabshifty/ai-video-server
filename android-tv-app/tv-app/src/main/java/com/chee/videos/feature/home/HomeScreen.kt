@@ -59,12 +59,24 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.homeContentTabs
+import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.feature.shorts.ShortFeedScreen
 import com.chee.videos.feature.tv.TvCatalogScreen
 
 private val tabs = homeContentTabs
+private val homeFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
+
+internal object HomeFocusLayoutSpec {
+    const val gridHorizontalPaddingDp: Float = 24f
+    const val gridTopPaddingDp: Float = 8f
+    const val gridBottomPaddingDp: Float = 24f
+    const val gridItemSpacingDp: Float = 16f
+    const val avPosterCardUsesFocusSafeContainer: Boolean = true
+    const val videoCardUsesFocusSafeContainer: Boolean = true
+}
 
 @Composable
 fun HomeScreen(
@@ -216,9 +228,14 @@ private fun AvCatalogSection(
     LazyVerticalGrid(
         modifier = Modifier.fillMaxSize(),
         columns = GridCells.Adaptive(minSize = 156.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(
+            start = HomeFocusLayoutSpec.gridHorizontalPaddingDp.dp,
+            end = HomeFocusLayoutSpec.gridHorizontalPaddingDp.dp,
+            top = HomeFocusLayoutSpec.gridTopPaddingDp.dp,
+            bottom = HomeFocusLayoutSpec.gridBottomPaddingDp.dp,
+        ),
+        horizontalArrangement = Arrangement.spacedBy(HomeFocusLayoutSpec.gridItemSpacingDp.dp),
+        verticalArrangement = Arrangement.spacedBy(HomeFocusLayoutSpec.gridItemSpacingDp.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             AvCatalogHero(
@@ -490,7 +507,8 @@ private fun AvPosterCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(AppChrome.CardShape)
+            .padding(homeFocusSafeSpace)
+            .tvFocusableGlow(shape = AppChrome.CardShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable { onOpenDetail(item.id, item.type) },
         color = AppChrome.Surface,
         shape = AppChrome.CardShape,
@@ -503,6 +521,7 @@ private fun AvPosterCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.72f)
+                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(AppChrome.CanvasRaised),
             ) {
                 if (!thumb.isNullOrBlank()) {
@@ -632,8 +651,13 @@ private fun CategoryListSection(
         else -> {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(
+                    start = HomeFocusLayoutSpec.gridHorizontalPaddingDp.dp,
+                    end = HomeFocusLayoutSpec.gridHorizontalPaddingDp.dp,
+                    top = HomeFocusLayoutSpec.gridTopPaddingDp.dp,
+                    bottom = HomeFocusLayoutSpec.gridBottomPaddingDp.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(HomeFocusLayoutSpec.gridItemSpacingDp.dp),
             ) {
                 item(key = "hero") {
                     Surface(
@@ -680,7 +704,8 @@ private fun VideoCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(AppChrome.CardShape)
+            .padding(homeFocusSafeSpace)
+            .tvFocusableGlow(shape = AppChrome.CardShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable { onOpenDetail(item.id, item.type) },
         color = AppChrome.SurfaceElevated,
         shape = AppChrome.CardShape,

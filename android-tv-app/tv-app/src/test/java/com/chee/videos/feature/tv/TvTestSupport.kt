@@ -11,13 +11,8 @@ import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
-import org.junit.rules.TestWatcher
-import org.junit.runner.Description
+
+typealias MainDispatcherRule = com.chee.videos.core.testing.MainDispatcherRule
 
 class FakeTvRepository(
     private val baseUrl: String = "https://example.com",
@@ -188,14 +183,3 @@ fun tvPosterWallPage(
     page = page,
     pageSize = pageSize,
 )
-
-@OptIn(ExperimentalCoroutinesApi::class)
-class MainDispatcherRule : TestWatcher() {
-    override fun starting(description: Description) {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-    }
-
-    override fun finished(description: Description) {
-        Dispatchers.resetMain()
-    }
-}
