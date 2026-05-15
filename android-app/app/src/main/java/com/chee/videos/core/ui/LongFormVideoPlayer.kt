@@ -1,11 +1,15 @@
 package com.chee.videos.core.ui
 
+import android.app.Activity
+import android.content.Context
+import android.media.AudioManager
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,9 +27,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Subtitles
@@ -49,9 +55,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +78,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +97,11 @@ fun LongFormVideoPlayer(
     selectedSubtitleTrackId: String? = null,
     onSelectSubtitleTrack: (String?) -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val activity = context.findActivity()
+    val audioManager = remember(context) {
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
     val scope = rememberCoroutineScope()
 
     var controlsVisible by remember { mutableStateOf(false) }
@@ -95,6 +111,7 @@ fun LongFormVideoPlayer(
     var isScrubbing by remember { mutableStateOf(false) }
     var scrubPositionMs by remember { mutableStateOf(0L) }
     var viewWidthPx by remember { mutableStateOf(1f) }
+    var viewHeightPx by remember { mutableStateOf(1f) }
 
     var draggingSeek by remember { mutableStateOf(false) }
     var dragStartPositionMs by remember { mutableStateOf(0L) }
@@ -102,6 +119,7 @@ fun LongFormVideoPlayer(
     var dragDistancePx by remember { mutableStateOf(0f) }
     var seekPreviewText by remember { mutableStateOf("") }
     var showSeekPreview by remember { mutableStateOf(false) }
+    var verticalAdjusting by remember { mutableStateOf(false) }
 
     var longPressBoosting by remember { mutableStateOf(false) }
     var ignoreTapAfterLongPress by remember { mutableStateOf(false) }
@@ -159,6 +177,48 @@ fun LongFormVideoPlayer(
             text = if (shouldPause) "已暂停" else "继续播放",
         )
         showControlsTemporarily()
+    }
+
+    fun currentBrightnessPercent(): Float {
+        val windowBrightness = activity?.window?.attributes?.screenBrightness ?: -1f
+        return longFormBrightnessPercent(windowBrightness)
+    }
+
+    fun setWindowBrightness(percent: Float) {
+        val window = activity?.window ?: return
+        val attributes = window.attributes
+        attributes.screenBrightness = percent.coerceIn(0.01f, 1f)
+        window.attributes = attributes
+    }
+
+    fun currentVolumePercent(): Float {
+        return longFormVolumePercent(
+            currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC),
+            maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+        )
+    }
+
+    fun setMediaVolume(percent: Float) {
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        if (maxVolume <= 0) {
+            return
+        }
+        val targetVolume = (percent.coerceIn(0f, 1f) * maxVolume).roundToInt().coerceIn(0, maxVolume)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+    }
+
+    fun showVerticalAdjustmentFeedback(
+        target: LongFormVerticalAdjustmentTarget,
+        percent: Float,
+    ) {
+        showTransientFeedback(
+            icon = when (target) {
+                LongFormVerticalAdjustmentTarget.Brightness -> Icons.Filled.LightMode
+                LongFormVerticalAdjustmentTarget.Volume -> Icons.AutoMirrored.Filled.VolumeUp
+            },
+            text = longFormAdjustmentFeedbackText(target, percent),
+            durationMs = 700L,
+        )
     }
 
     DisposableEffect(player) {
@@ -221,8 +281,9 @@ fun LongFormVideoPlayer(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .onSizeChanged {
-                viewWidthPx = it.width.toFloat().coerceAtLeast(1f)
+            .onSizeChanged { size ->
+                viewWidthPx = size.width.toFloat().coerceAtLeast(1f)
+                viewHeightPx = size.height.toFloat().coerceAtLeast(1f)
             }
             .pointerInput(player, isPlaying) {
                 detectTapGestures(
@@ -267,9 +328,12 @@ fun LongFormVideoPlayer(
                     },
                 )
             }
-            .pointerInput(player, viewWidthPx) {
-                detectHorizontalDragGestures(
-                    onDragStart = {
+            .pointerInput(player, isFullscreen, viewWidthPx, viewHeightPx, activity, audioManager) {
+                detectLongFormPlayerDragGestures(
+                    isFullscreen = isFullscreen,
+                    widthPx = viewWidthPx,
+                    heightPx = viewHeightPx,
+                    onSeekStart = {
                         draggingSeek = true
                         dragDistancePx = 0f
                         dragStartPositionMs = player.currentPosition.coerceAtLeast(0L)
@@ -277,8 +341,7 @@ fun LongFormVideoPlayer(
                         showSeekPreview = true
                         showControlsTemporarily()
                     },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
+                    onSeekDrag = { dragAmount ->
                         dragDistancePx += dragAmount
                         val deltaMs = (dragDistancePx / viewWidthPx) * 120_000f
                         val duration = effectiveDurationMs()
@@ -304,7 +367,7 @@ fun LongFormVideoPlayer(
                             }
                         }
                     },
-                    onDragEnd = {
+                    onSeekEnd = {
                         draggingSeek = false
                         player.seekTo(dragTargetPositionMs)
                         positionMs = dragTargetPositionMs
@@ -315,13 +378,31 @@ fun LongFormVideoPlayer(
                         }
                         scheduleAutoHideControls()
                     },
-                    onDragCancel = {
+                    onSeekCancel = {
                         draggingSeek = false
                         hideSeekPreviewJob?.cancel()
                         hideSeekPreviewJob = scope.launch {
                             delay(500)
                             showSeekPreview = false
                         }
+                    },
+                    onVerticalStartPercent = { target ->
+                        verticalAdjusting = true
+                        hideControlsJob?.cancel()
+                        when (target) {
+                            LongFormVerticalAdjustmentTarget.Brightness -> currentBrightnessPercent()
+                            LongFormVerticalAdjustmentTarget.Volume -> currentVolumePercent()
+                        }
+                    },
+                    onVerticalAdjust = { target, percent ->
+                        when (target) {
+                            LongFormVerticalAdjustmentTarget.Brightness -> setWindowBrightness(percent)
+                            LongFormVerticalAdjustmentTarget.Volume -> setMediaVolume(percent)
+                        }
+                        showVerticalAdjustmentFeedback(target, percent)
+                    },
+                    onVerticalEnd = {
+                        verticalAdjusting = false
                     },
                 )
             },
@@ -375,7 +456,7 @@ fun LongFormVideoPlayer(
         }
 
         AnimatedVisibility(
-            visible = showCenterFeedback,
+            visible = showCenterFeedback || verticalAdjusting,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center),
@@ -642,6 +723,116 @@ private fun buildLongFormSubtitleStyle(): CaptionStyleCompat {
         null,
     )
 }
+
+private fun Context.findActivity(): Activity? {
+    var current = this
+    while (current is android.content.ContextWrapper) {
+        if (current is Activity) {
+            return current
+        }
+        current = current.baseContext
+    }
+    return null
+}
+
+private enum class LongFormDragAxis {
+    Seek,
+    VerticalAdjustment,
+}
+
+private suspend fun PointerInputScope.detectLongFormPlayerDragGestures(
+    isFullscreen: Boolean,
+    widthPx: Float,
+    heightPx: Float,
+    onSeekStart: () -> Unit,
+    onSeekDrag: (Float) -> Unit,
+    onSeekEnd: () -> Unit,
+    onSeekCancel: () -> Unit,
+    onVerticalStartPercent: (LongFormVerticalAdjustmentTarget) -> Float,
+    onVerticalAdjust: (LongFormVerticalAdjustmentTarget, Float) -> Unit,
+    onVerticalEnd: () -> Unit,
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val verticalTarget = longFormVerticalAdjustmentTarget(
+            isFullscreen = isFullscreen,
+            startX = down.position.x,
+            widthPx = widthPx,
+        )
+        var axis: LongFormDragAxis? = null
+        var startPercent = 0f
+        var totalX = 0f
+        var totalY = 0f
+        var completed = false
+
+        while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (change.changedToUp()) {
+                completed = true
+                break
+            }
+            val delta = change.positionChange()
+            if (delta.x == 0f && delta.y == 0f) {
+                continue
+            }
+
+            totalX += delta.x
+            totalY += delta.y
+
+            if (axis == null) {
+                val absX = abs(totalX)
+                val absY = abs(totalY)
+                if (absX < LongFormDragAxisLockSlopPx && absY < LongFormDragAxisLockSlopPx) {
+                    continue
+                }
+                axis = if (absX >= absY) {
+                    onSeekStart()
+                    LongFormDragAxis.Seek
+                } else if (verticalTarget != null) {
+                    startPercent = onVerticalStartPercent(verticalTarget)
+                    LongFormDragAxis.VerticalAdjustment
+                } else {
+                    break
+                }
+            }
+
+            when (axis) {
+                LongFormDragAxis.Seek -> {
+                    change.consume()
+                    onSeekDrag(delta.x)
+                }
+                LongFormDragAxis.VerticalAdjustment -> {
+                    val target = verticalTarget ?: break
+                    change.consume()
+                    onVerticalAdjust(
+                        target,
+                        longFormAdjustedPercent(
+                            startPercent = startPercent,
+                            dragDistanceY = totalY,
+                            heightPx = heightPx,
+                        ),
+                    )
+                }
+                null -> Unit
+            }
+        }
+
+        when (axis) {
+            LongFormDragAxis.Seek -> {
+                if (completed) {
+                    onSeekEnd()
+                } else {
+                    onSeekCancel()
+                }
+            }
+            LongFormDragAxis.VerticalAdjustment -> onVerticalEnd()
+            null -> Unit
+        }
+    }
+}
+
+private const val LongFormDragAxisLockSlopPx = 12f
 
 @Composable
 private fun SubtitleOptionRow(

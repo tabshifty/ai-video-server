@@ -2,6 +2,22 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-15 20:47 CST] 增加手机端长视频全屏亮度音量手势
+- Type: `implementation`
+- Summary:
+  - 为手机端长视频播放器增加全屏纵向轴向锁定手势：左半屏调节当前窗口亮度，右半屏调节系统媒体音量。
+  - 将原横向快进/快退改为同一手势识别器内的横向锁定逻辑，保留 seek 预览、结束 seek、单击/双击/长按行为。
+  - 新增长视频手势纯逻辑规格，覆盖全屏启用、左右区域、上下滑方向、亮度默认值、音量百分比和反馈文案 clamp。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/LongFormGestureSpec.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/LongFormGestureSpecTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.LongFormGestureSpecTest` passed.
+  - `cd android-app && ./gradlew :app:testDebugUnitTest` passed.
+  - `cd android-app && ./gradlew :app:assembleDebug` passed.
+
 ### [2026-05-15 16:54 CST] 修复 TV 海报焦点裁切验证完成
 - Type: `implementation`
 - Summary:
