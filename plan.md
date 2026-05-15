@@ -2,6 +2,19 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-15 12:29 CST] 调整手机端 AV 播放详情页
+- Type: `implementation`
+- Summary:
+  - 手机端 AV 详情页在有播放地址时自动进入播放会话，保持非 AV 详情页现有行为不变。
+  - 移除 AV 播放器区域内的标题/番号叠加文案，将内容顺序调整为播放器、互动操作、作品信息、演员、简介、标签。
+  - 互动区改为小图标加数字展示播放、点赞、收藏和不喜欢；演员区改为横向可滑动列表并放大头像。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/feature/detail/AvDetailLayoutSpecTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew :app:testDebugUnitTest --tests 'com.chee.videos.feature.detail.*'` passed.
+
 ### [2026-05-15 11:26 CST] 修复手机端短视频搜索播放保活
 - Type: `implementation`
 - Summary:

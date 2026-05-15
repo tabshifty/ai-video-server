@@ -19,14 +19,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -208,6 +213,14 @@ fun DetailScreen(
 
                 LaunchedEffect(detail.id) {
                     isFullscreen = false
+                }
+
+                LaunchedEffect(isAv, canPlay, detail.id) {
+                    if (shouldAutoStartAvPlayback(isAv = isAv, canPlay = canPlay)) {
+                        updatePlaybackSession(
+                            playbackSession.requestPlay(canPlay = canPlay),
+                        )
+                    }
                 }
 
                 LaunchedEffect(detail.id, detail.subtitleTracks, hasStartedPlayback) {
@@ -671,31 +684,6 @@ private fun AvDetailPage(
                     enabled = canPlay,
                     modifier = Modifier.align(Alignment.Center),
                 )
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = heroModel.primaryText,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = AppChrome.TextPrimary,
-                    )
-                    Text(
-                        text = heroModel.secondaryTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AppChrome.TextSecondary,
-                    )
-                    if (heroModel.metaItems.isNotEmpty()) {
-                        Text(
-                            text = heroModel.metaItems.joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppChrome.TextMuted,
-                        )
-                    }
-                }
                 if (!canPlay) {
                     Text(
                         text = "暂无可播放视频",
@@ -725,11 +713,34 @@ private data class AvDetailMediaLayoutSpec(
     val applyStatusBarPadding: Boolean,
 )
 
+private data class AvDetailActorRailSpec(
+    val avatarSizeDp: Int,
+    val horizontalScroll: Boolean,
+)
+
 private fun buildAvDetailMediaLayoutSpec(): AvDetailMediaLayoutSpec {
     return AvDetailMediaLayoutSpec(
         aspectRatio = 16f / 9f,
         applyStatusBarPadding = true,
     )
+}
+
+private fun buildAvDetailContentOrder(): List<String> {
+    return listOf("player", "actions", "work_info", "actors", "overview", "tags")
+}
+
+private fun buildAvDetailActorRailSpec(): AvDetailActorRailSpec {
+    return AvDetailActorRailSpec(
+        avatarSizeDp = 76,
+        horizontalScroll = true,
+    )
+}
+
+private fun shouldAutoStartAvPlayback(
+    isAv: Boolean,
+    canPlay: Boolean,
+): Boolean {
+    return isAv && canPlay
 }
 
 @Composable
@@ -791,64 +802,13 @@ private fun AvDetailOverview(
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Surface(
-            color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = heroModel.primaryText,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = AppChrome.TextPrimary,
-                )
-                Text(
-                    text = heroModel.secondaryTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AppChrome.TextSecondary,
-                )
-                if (heroModel.metaItems.isNotEmpty()) {
-                    Text(
-                        text = heroModel.metaItems.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppChrome.TextSecondary,
-                    )
-                }
-            }
-        }
-
-        Surface(
-            color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                AvMetricCard(
-                    modifier = Modifier.weight(1f),
-                    label = "播放",
-                    value = detail.viewsCount.toString(),
-                )
-                AvMetricCard(
-                    modifier = Modifier.weight(1f),
-                    label = "点赞",
-                    value = detail.likesCount.toString(),
-                )
-                AvMetricCard(
-                    modifier = Modifier.weight(1f),
-                    label = "收藏",
-                    value = detail.favoritesCount.toString(),
-                )
-            }
-        }
+        AvQuickActions(
+            detail = detail,
+            actionSpecs = actionSpecs,
+            onToggleLike = onToggleLike,
+            onToggleFavorite = onToggleFavorite,
+            onToggleDislike = onToggleDislike,
+        )
 
         Surface(
             color = AppChrome.Surface,
@@ -861,8 +821,8 @@ private fun AvDetailOverview(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AvSectionTitle("作品信息")
-                AvInfoRow(label = "番号", value = heroModel.primaryText)
                 AvInfoRow(label = "标题", value = heroModel.secondaryTitle)
+                AvInfoRow(label = "番号", value = heroModel.primaryText)
                 AvInfoRow(label = "时长", value = formatDurationHms(detail.duration))
                 heroModel.releaseDate?.let {
                     AvInfoRow(label = "发布时间", value = it)
@@ -888,12 +848,17 @@ private fun AvDetailOverview(
                         color = AppChrome.TextMuted,
                     )
                 } else {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         actorModels.forEach { actor ->
-                            AvActorCard(actor = actor)
+                            AvActorCard(
+                                actor = actor,
+                                avatarSizeDp = buildAvDetailActorRailSpec().avatarSizeDp,
+                            )
                         }
                     }
                 }
@@ -953,28 +918,6 @@ private fun AvDetailOverview(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            actionSpecs.take(2).forEach { spec ->
-                DetailActionButton(
-                    modifier = Modifier.weight(1f),
-                    spec = spec,
-                    onClick = when (spec.action) {
-                        DetailAction.Like -> onToggleLike
-                        DetailAction.Favorite -> onToggleFavorite
-                        DetailAction.Dislike -> onToggleDislike
-                    },
-                )
-            }
-        }
-        DetailActionButton(
-            modifier = Modifier.fillMaxWidth(),
-            spec = actionSpecs.last(),
-            onClick = onToggleDislike,
-        )
-
         if (!errorMessage.isNullOrBlank()) {
             Text(
                 text = errorMessage,
@@ -986,15 +929,124 @@ private fun AvDetailOverview(
 }
 
 @Composable
-private fun AvActorCard(actor: AvDetailActorModel) {
+private fun AvQuickActions(
+    detail: VideoDetailDto,
+    actionSpecs: List<DetailActionSpec>,
+    onToggleLike: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onToggleDislike: () -> Unit,
+) {
+    val likeSpec = actionSpecs.first { it.action == DetailAction.Like }
+    val favoriteSpec = actionSpecs.first { it.action == DetailAction.Favorite }
+    val dislikeSpec = actionSpecs.first { it.action == DetailAction.Dislike }
+    Surface(
+        color = AppChrome.Surface,
+        shape = AppChrome.CardShape,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AvIconMetricButton(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Filled.Visibility,
+                value = detail.viewsCount.toString(),
+                label = "播放",
+                active = false,
+                onClick = {},
+                enabled = false,
+            )
+            AvIconMetricButton(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Filled.ThumbUp,
+                value = detail.likesCount.toString(),
+                label = likeSpec.label,
+                active = likeSpec.active,
+                onClick = onToggleLike,
+            )
+            AvIconMetricButton(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Filled.Favorite,
+                value = detail.favoritesCount.toString(),
+                label = favoriteSpec.label,
+                active = favoriteSpec.active,
+                onClick = onToggleFavorite,
+            )
+            AvIconMetricButton(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Filled.ThumbDown,
+                value = "",
+                label = dislikeSpec.label,
+                active = dislikeSpec.active,
+                onClick = onToggleDislike,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AvIconMetricButton(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    val containerColor = when {
+        active -> AppChrome.Accent
+        enabled -> AppChrome.SurfaceStrong
+        else -> AppChrome.SurfaceElevated
+    }
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = AppChrome.TextPrimary,
+            disabledContainerColor = AppChrome.SurfaceElevated,
+            disabledContentColor = AppChrome.TextSecondary,
+        ),
+        contentPadding = ButtonDefaults.ContentPadding,
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(18.dp),
+            )
+            if (value.isNotBlank()) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvActorCard(
+    actor: AvDetailActorModel,
+    avatarSizeDp: Int,
+) {
     Surface(
         color = AppChrome.SurfaceStrong,
         shape = RoundedCornerShape(18.dp),
     ) {
         Column(
             modifier = Modifier
-                .width(92.dp)
-                .padding(horizontal = 10.dp, vertical = 12.dp),
+                .width(108.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -1004,14 +1056,14 @@ private fun AvActorCard(actor: AvDetailActorModel) {
                     contentDescription = "${actor.name}头像",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp)),
+                        .size(avatarSizeDp.dp)
+                        .clip(RoundedCornerShape(20.dp)),
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .size(avatarSizeDp.dp)
+                        .clip(RoundedCornerShape(20.dp))
                         .background(AppChrome.CanvasRaised),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1055,39 +1107,6 @@ private fun AvInfoRow(
 }
 
 @Composable
-private fun AvMetricCard(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-) {
-    Surface(
-        modifier = modifier,
-        color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = value,
-                color = AppChrome.TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = label,
-                color = AppChrome.TextMuted,
-                style = MaterialTheme.typography.labelSmall,
-            )
-        }
-    }
-}
-
-@Composable
 private fun AvSectionTitle(title: String) {
     Text(
         text = title,
@@ -1095,30 +1114,6 @@ private fun AvSectionTitle(title: String) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
     )
-}
-
-@Composable
-private fun DetailActionButton(
-    modifier: Modifier = Modifier,
-    spec: DetailActionSpec,
-    onClick: () -> Unit,
-) {
-    val containerColor = when (spec.tone) {
-        DetailActionTone.Primary -> if (spec.active) AppChrome.Accent else AppChrome.SurfaceStrong
-        DetailActionTone.SecondaryDanger -> if (spec.active) Color(0xFF5A0E1B) else AppChrome.SurfaceElevated
-    }
-
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor,
-            contentColor = AppChrome.TextPrimary,
-        ),
-    ) {
-        Text(text = spec.label)
-    }
 }
 
 private fun isLongFormVideoType(type: String): Boolean {
