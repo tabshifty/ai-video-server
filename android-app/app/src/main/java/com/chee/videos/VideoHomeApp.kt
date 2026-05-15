@@ -1,6 +1,12 @@
 package com.chee.videos
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -46,8 +53,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.zxing.client.android.Intents
 import com.chee.videos.core.model.AppRootState
+import com.chee.videos.core.ui.AppNavigationTransitionDirection
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.AppDarkColors
+import com.chee.videos.core.ui.appNavigationTransitionDirection
+import com.chee.videos.core.ui.appNavigationTransitionSpec
 import com.chee.videos.core.ui.rootNavigationTabs
 import com.chee.videos.core.viewmodel.AppRootViewModel
 import com.chee.videos.feature.auth.LoginScreen
@@ -234,6 +244,18 @@ private fun AuthenticatedNav(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
+            enterTransition = {
+                appNavigationEnterTransition(isPop = false)
+            },
+            exitTransition = {
+                appNavigationExitTransition(isPop = false)
+            },
+            popEnterTransition = {
+                appNavigationEnterTransition(isPop = true)
+            },
+            popExitTransition = {
+                appNavigationExitTransition(isPop = true)
+            },
         ) {
             composable("home") {
                 Box(
@@ -410,4 +432,38 @@ private fun AuthenticatedNav(
             }
         }
     }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.appNavigationEnterTransition(
+    isPop: Boolean,
+): EnterTransition {
+    val spec = appNavigationTransitionSpec()
+    val direction = appNavigationTransitionDirection(
+        fromRoute = initialState.destination.route,
+        toRoute = targetState.destination.route,
+        isPop = isPop,
+    )
+    val slideDirection = when (direction) {
+        AppNavigationTransitionDirection.Forward -> AnimatedContentTransitionScope.SlideDirection.Left
+        AppNavigationTransitionDirection.Backward -> AnimatedContentTransitionScope.SlideDirection.Right
+    }
+    return slideIntoContainer(slideDirection, animationSpec = tween(spec.durationMillis)) +
+        fadeIn(animationSpec = tween(spec.durationMillis), initialAlpha = spec.fadeStartAlpha)
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.appNavigationExitTransition(
+    isPop: Boolean,
+): ExitTransition {
+    val spec = appNavigationTransitionSpec()
+    val direction = appNavigationTransitionDirection(
+        fromRoute = initialState.destination.route,
+        toRoute = targetState.destination.route,
+        isPop = isPop,
+    )
+    val slideDirection = when (direction) {
+        AppNavigationTransitionDirection.Forward -> AnimatedContentTransitionScope.SlideDirection.Left
+        AppNavigationTransitionDirection.Backward -> AnimatedContentTransitionScope.SlideDirection.Right
+    }
+    return slideOutOfContainer(slideDirection, animationSpec = tween(spec.durationMillis)) +
+        fadeOut(animationSpec = tween(spec.durationMillis))
 }

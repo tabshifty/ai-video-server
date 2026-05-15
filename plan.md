@@ -2,6 +2,38 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-16 00:41 CST] 手机端页面切换 iOS 动画完成
+- Type: `implementation`
+- Summary:
+  - 手机端 `NavHost` 接入 iOS 风格左右滑动转场，底部 tab 按显示顺序判断左右方向，二级页面 push/pop 使用导航栈方向。
+  - 新增内部导航转场方向与动效规格，保持路由结构、页面参数、ViewModel 和业务逻辑不变。
+  - 补充转场方向规格测试，覆盖 tab 顺序、二级页面 push、pop 返回和默认方向。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/AppNavigationConfig.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/AppNavigationTransitionSpecTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.AppNavigationTransitionSpecTest` passed.
+  - `cd android-app && ./gradlew :app:testDebugUnitTest` passed.
+  - `cd android-app && ./gradlew :app:assembleDebug` passed.
+
+### [2026-05-16 00:39 CST] 手机端页面切换 iOS 动画计划
+- Type: `plan`
+- Summary:
+  - 仅调整手机端 `NavHost` 页面转场动画，不改 TV 工程、路由结构或业务逻辑。
+  - 底部 tab 按 `首页 -> 搜索 -> 图集 -> 我的` 顺序左右切换，二级页面 push 从右进入，pop 返回向右退出。
+  - 新增内部导航转场方向规格与单测，再接入 Compose Navigation 动画。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`
+  - `android-app/app/src/main/java/com/chee/videos/core/ui/AppNavigationConfig.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/AppNavigationTransitionSpecTest.kt`
+  - `plan.md`
+- Verification:
+  - 待执行 `cd android-app && ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.AppNavigationTransitionSpecTest`。
+  - 待执行 `cd android-app && ./gradlew :app:testDebugUnitTest`。
+  - 待执行 `cd android-app && ./gradlew :app:assembleDebug`。
+
 ### [2026-05-15 23:08 CST] 手机端界面轻收紧完成
 - Type: `implementation`
 - Summary:
