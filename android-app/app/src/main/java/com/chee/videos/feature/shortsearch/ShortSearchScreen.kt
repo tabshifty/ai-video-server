@@ -76,6 +76,7 @@ import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.toPlayerRepeatMode
+import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
@@ -215,6 +216,8 @@ private fun ShortSearchPlayerOverlay(
     val latestMode by rememberUpdatedState(playbackMode)
     val latestPage by rememberUpdatedState(pagerState.currentPage)
     val latestLastIndex by rememberUpdatedState(items.lastIndex)
+
+    KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     LaunchedEffect(playbackMode) { sharedPlayer.repeatMode = playbackMode.toPlayerRepeatMode() }
 

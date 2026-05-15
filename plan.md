@@ -2,6 +2,18 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-15 11:26 CST] 修复手机端短视频搜索播放保活
+- Type: `implementation`
+- Summary:
+  - 为手机端短视频搜索播放浮层接入现有 `KeepScreenOnEffect`，按 `isPlayerActuallyPlaying` 在实际播放时保持屏幕常亮。
+  - 新增播放器保活覆盖测试，扫描手机端 `ExoPlayer` 页面，防止后续遗漏保活接入。
+- Changed Files:
+  - `android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt`
+  - `android-app/app/src/test/java/com/chee/videos/core/ui/PlayerKeepScreenOnCoverageTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-app && ./gradlew :app:testDebugUnitTest --tests com.chee.videos.core.ui.PlayerKeepScreenOnCoverageTest` passed.
+
 ### [2026-05-14 18:43 +0800] 修复 AV 手动保存长标题完成
 - Type: `implementation`
 - Summary:
