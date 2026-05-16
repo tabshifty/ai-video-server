@@ -30,8 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +75,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.ShortPlaybackMode
+import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.toPlayerRepeatMode
@@ -159,7 +162,13 @@ fun ShortSearchScreen(
             initialIndex = playerStartIndex,
             fitMode = uiState.fitMode,
             playbackMode = uiState.playbackMode,
+            detailByVideoId = uiState.detailByVideoId,
+            detailLoadingVideoIds = uiState.detailLoadingVideoIds,
+            actionBusyVideoIds = uiState.actionBusyVideoIds,
             onNeedMore = viewModel::loadMoreIfNeeded,
+            onEnsureDetailLoaded = viewModel::ensureDetailLoaded,
+            onToggleLike = viewModel::toggleLike,
+            onToggleFavorite = viewModel::toggleFavorite,
             onClose = viewModel::closePlayer,
             onToggleFitMode = viewModel::toggleFitMode,
             onTogglePlaybackMode = viewModel::togglePlaybackMode,
@@ -188,7 +197,13 @@ private fun ShortSearchPlayerOverlay(
     initialIndex: Int,
     fitMode: VideoFitMode,
     playbackMode: ShortPlaybackMode,
+    detailByVideoId: Map<String, VideoDetailDto>,
+    detailLoadingVideoIds: Set<String>,
+    actionBusyVideoIds: Set<String>,
     onNeedMore: (Int) -> Unit,
+    onEnsureDetailLoaded: (String) -> Unit,
+    onToggleLike: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
     onClose: () -> Unit,
     onToggleFitMode: () -> Unit,
     onTogglePlaybackMode: () -> Unit,
@@ -271,6 +286,13 @@ private fun ShortSearchPlayerOverlay(
     val currentPausedByUser = currentItem?.id?.let { it in pausedByUserVideoIds } ?: false
 
     LaunchedEffect(currentItem?.id) {
+        val videoId = currentItem?.id
+        if (!videoId.isNullOrBlank()) {
+            onEnsureDetailLoaded(videoId)
+        }
+    }
+
+    LaunchedEffect(currentItem?.id) {
         if (currentItem == null) {
             durationMs = 0L
             positionMs = 0L
@@ -302,6 +324,8 @@ private fun ShortSearchPlayerOverlay(
         VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             val item = items[page]
             val isActive = page == pagerState.currentPage
+            val detail = detailByVideoId[item.id]
+            val actionBusy = item.id in actionBusyVideoIds || item.id in detailLoadingVideoIds
             val posterUrl = remember(baseUrl, item.thumbnailPath) { resolveThumbnailUrl(baseUrl, item.thumbnailPath) }
             Box(modifier = Modifier.fillMaxSize().pointerInput(item.id) { detectTapGestures(onTap = {
                 showController = !showController
@@ -331,7 +355,25 @@ private fun ShortSearchPlayerOverlay(
                 }
                 Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0xB0000000)))))
                 AnimatedVisibility(visible = showController, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterEnd)) {
-                    Column(modifier = Modifier.padding(end = 10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.padding(end = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        ShortVideoOverlayActionButton(
+                            icon = Icons.Filled.ThumbUp,
+                            active = detail?.userState?.isLiked == true,
+                            enabled = !actionBusy,
+                            onClick = { onToggleLike(item.id) },
+                            contentDescription = "喜欢",
+                        )
+                        ShortVideoOverlayActionButton(
+                            icon = Icons.Filled.Favorite,
+                            active = detail?.userState?.isFavorited == true,
+                            enabled = !actionBusy,
+                            onClick = { onToggleFavorite(item.id) },
+                            contentDescription = "收藏",
+                        )
                         ShortVideoOverlayActionButton(icon = Icons.Filled.AspectRatio, active = false, enabled = true, onClick = onToggleFitMode, contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示")
                         ShortPlaybackModeToggleButton(playbackMode = playbackMode, onClick = onTogglePlaybackMode)
                     }

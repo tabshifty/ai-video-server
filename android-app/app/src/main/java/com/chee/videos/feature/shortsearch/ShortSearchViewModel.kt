@@ -3,8 +3,10 @@ package com.chee.videos.feature.shortsearch
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
+import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.ShortPlaybackMode
+import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.repository.AuthRepository
@@ -31,6 +33,9 @@ data class ShortSearchUiState(
     val fitMode: VideoFitMode = VideoFitMode.FILL,
     val playbackMode: ShortPlaybackMode = ShortPlaybackMode.LOOP_ONE,
     val playingVideoId: String? = null,
+    val detailByVideoId: Map<String, VideoDetailDto> = emptyMap(),
+    val detailLoadingVideoIds: Set<String> = emptySet(),
+    val actionBusyVideoIds: Set<String> = emptySet(),
     val errorMessage: String? = null,
 )
 
@@ -127,6 +132,20 @@ class ShortSearchViewModel @Inject constructor(
         viewModelScope.launch { store.saveShortPlaybackMode(next) }
     }
 
+    fun ensureDetailLoaded(videoId: String, force: Boolean = false) {
+        viewModelScope.launch {
+            loadDetail(videoId, force = force)
+        }
+    }
+
+    fun toggleLike(videoId: String) {
+        toggleAction(videoId) { videoRepository.toggleLike(videoId) }
+    }
+
+    fun toggleFavorite(videoId: String) {
+        toggleAction(videoId) { videoRepository.toggleFavorite(videoId) }
+    }
+
     private fun search(query: String, force: Boolean = false) {
         val state = _uiState.value
         if (!force && state.loading) return
@@ -149,6 +168,9 @@ class ShortSearchViewModel @Inject constructor(
                             page = payload.page.coerceAtLeast(page),
                             totalCount = payload.totalCount.coerceAtLeast(merged.size),
                             items = merged,
+                            detailByVideoId = it.detailByVideoId.filterKeys { key -> merged.any { row -> row.id == key } },
+                            detailLoadingVideoIds = it.detailLoadingVideoIds.filter { id -> merged.any { row -> row.id == id } }.toSet(),
+                            actionBusyVideoIds = it.actionBusyVideoIds.filter { id -> merged.any { row -> row.id == id } }.toSet(),
                             errorMessage = null,
                         )
                     }
@@ -159,6 +181,76 @@ class ShortSearchViewModel @Inject constructor(
                         it.copy(loading = false, loadingMore = false, loaded = true, errorMessage = err.message ?: "短视频搜索失败")
                     }
                 }
+        }
+    }
+
+    private fun toggleAction(videoId: String, actionCall: suspend () -> Result<ActionTogglePayload>) {
+        if (_uiState.value.actionBusyVideoIds.contains(videoId)) {
+            return
+        }
+        viewModelScope.launch {
+            val hasDetail = _uiState.value.detailByVideoId.containsKey(videoId)
+            if (!hasDetail) {
+                val loaded = loadDetail(videoId, force = true)
+                if (!loaded) {
+                    return@launch
+                }
+            }
+
+            _uiState.update { it.copy(actionBusyVideoIds = it.actionBusyVideoIds + videoId) }
+            actionCall()
+                .onSuccess { result ->
+                    _uiState.update { state ->
+                        val detail = state.detailByVideoId[videoId]
+                        if (detail == null) {
+                            return@update state.copy(actionBusyVideoIds = state.actionBusyVideoIds - videoId)
+                        }
+                        val nextUserState = when (result.action) {
+                            "like" -> detail.userState.copy(isLiked = result.enabled, isDisliked = false)
+                            "favorite" -> detail.userState.copy(isFavorited = result.enabled)
+                            else -> detail.userState
+                        }
+                        state.copy(
+                            detailByVideoId = state.detailByVideoId + (videoId to detail.copy(userState = nextUserState)),
+                            actionBusyVideoIds = state.actionBusyVideoIds - videoId,
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    handleAuthError(err)
+                    _uiState.update { it.copy(actionBusyVideoIds = it.actionBusyVideoIds - videoId) }
+                }
+        }
+    }
+
+    private suspend fun loadDetail(videoId: String, force: Boolean): Boolean {
+        if (videoId.isBlank()) {
+            return false
+        }
+        val state = _uiState.value
+        if (!force && state.detailByVideoId.containsKey(videoId)) {
+            return true
+        }
+        if (state.detailLoadingVideoIds.contains(videoId)) {
+            return false
+        }
+
+        _uiState.update { it.copy(detailLoadingVideoIds = it.detailLoadingVideoIds + videoId) }
+        val result = videoRepository.fetchDetail(videoId)
+        return if (result.isSuccess) {
+            val detail = result.getOrNull()!!
+            _uiState.update {
+                it.copy(
+                    detailByVideoId = it.detailByVideoId + (videoId to detail),
+                    detailLoadingVideoIds = it.detailLoadingVideoIds - videoId,
+                )
+            }
+            true
+        } else {
+            val err = result.exceptionOrNull()
+            handleAuthError(err)
+            _uiState.update { it.copy(detailLoadingVideoIds = it.detailLoadingVideoIds - videoId) }
+            false
         }
     }
 
