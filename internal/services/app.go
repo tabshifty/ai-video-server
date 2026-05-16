@@ -23,6 +23,35 @@ func (s *AppService) VideoDetail(ctx context.Context, userID, videoID uuid.UUID)
 	return s.repo.GetVideoDetail(ctx, videoID, userID)
 }
 
+func (s *AppService) ActorDetail(ctx context.Context, actorID uuid.UUID, page, pageSize int) (models.ActorWorksPayload, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 24
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	actor, err := s.repo.GetAppActorDetail(ctx, actorID)
+	if err != nil {
+		return models.ActorWorksPayload{}, err
+	}
+	offset := (page - 1) * pageSize
+	items, total, err := s.repo.ListActorReadyVideos(ctx, actorID, pageSize, offset)
+	if err != nil {
+		return models.ActorWorksPayload{}, err
+	}
+	return models.ActorWorksPayload{
+		Actor:      actor,
+		Items:      items,
+		TotalCount: total,
+		Page:       page,
+		PageSize:   pageSize,
+	}, nil
+}
+
 func (s *AppService) RecordHistory(ctx context.Context, userID, videoID uuid.UUID, watchSeconds int, completed bool) error {
 	if watchSeconds < 0 {
 		watchSeconds = 0

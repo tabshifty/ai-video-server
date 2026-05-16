@@ -49,6 +49,24 @@ data class SearchPayload(
     @SerializedName("page_size") val pageSize: Int = 20,
 )
 
+data class ActorWorksPayload(
+    @SerializedName("actor") val actor: ActorDetailDto,
+    @SerializedName("items") val items: List<VideoListItemDto> = emptyList(),
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("page_size") val pageSize: Int = 24,
+)
+
+data class ActorDetailDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("aliases") val aliases: List<String> = emptyList(),
+    @SerializedName("gender") val gender: String? = null,
+    @SerializedName("country") val country: String? = null,
+    @SerializedName("birth_date") val birthDate: String? = null,
+    @SerializedName("avatar_url") val avatarUrl: String? = null,
+)
+
 data class ImageCollectionsPayload(
     @SerializedName("items") val items: List<ImageCollectionListItemDto> = emptyList(),
     @SerializedName("total_count") val totalCount: Int = 0,

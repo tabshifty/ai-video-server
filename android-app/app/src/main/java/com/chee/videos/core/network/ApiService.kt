@@ -2,6 +2,7 @@ package com.chee.videos.core.network
 
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.ApiEnvelope
+import com.chee.videos.core.model.ActorWorksPayload
 import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedPayload
 import com.chee.videos.core.model.ImageCollectionDetailDto
@@ -141,6 +142,14 @@ interface ApiService {
         @Url url: String,
         @Header("Authorization") authorization: String,
     ): ApiEnvelope<VideoDetailDto>
+
+    @GET
+    suspend fun actorDetail(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<ActorWorksPayload>
 
     @POST
     suspend fun toggleLike(

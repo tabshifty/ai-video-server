@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.ApiEnvelope
+import com.chee.videos.core.model.ActorWorksPayload
 import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedPayload
 import com.chee.videos.core.model.ImageCollectionDetailDto
@@ -561,6 +562,13 @@ private class FakeHomeApiService(
         url: String,
         authorization: String,
     ): ApiEnvelope<VideoDetailDto> = error("unused")
+
+    override suspend fun actorDetail(
+        url: String,
+        authorization: String,
+        page: Int,
+        pageSize: Int,
+    ): ApiEnvelope<ActorWorksPayload> = error("unused")
 
     override suspend fun toggleLike(
         url: String,

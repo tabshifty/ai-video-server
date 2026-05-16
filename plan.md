@@ -2,6 +2,16 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-16 11:09 +0800
+- 进度：收尾检查演员页界面文案，移除空状态英文状态词并补齐作品类型中文标签；复跑完整后端与 Android 验证。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/actor/ActorDetailScreen.kt`、`plan.md`
+- 验证：`go test ./internal/handlers ./internal/repository ./internal/services -count=1`、`go vet ./...`、`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest`、`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 均通过。
+
+## 2026-05-16 11:06 +0800
+- 进度：开始实现手机端演员页与作品瀑布流；后端新增 App 演员详情/作品分页 DTO、仓储查询、服务方法与 `GET /api/v1/actors/:id` 路由，手机端新增演员详情 DTO、API/repository 调用、actor 路由、演员页 ViewModel/页面，并将 AV 详情演员卡按稳定 actor id 接入跳转。
+- 影响文件：`internal/models/app.go`、`internal/repository/actor_repository.go`、`internal/services/app.go`、`internal/handlers/actor.go`、`internal/handlers/router.go`、`internal/repository/actor_repository_test.go`、`internal/handlers/recommend_test.go`、`android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`、`android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`、`android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`、`android-app/app/src/main/java/com/chee/videos/core/util/UrlBuilder.kt`、`android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`、`android-app/app/src/main/java/com/chee/videos/feature/detail/AvDetailPresentation.kt`、`android-app/app/src/main/java/com/chee/videos/feature/detail/DetailScreen.kt`、`android-app/app/src/main/java/com/chee/videos/feature/actor/ActorRoutes.kt`、`android-app/app/src/main/java/com/chee/videos/feature/actor/ActorDetailViewModel.kt`、`android-app/app/src/main/java/com/chee/videos/feature/actor/ActorDetailScreen.kt`、`android-app/app/src/test/java/com/chee/videos/feature/detail/AvDetailPresentationTest.kt`、`android-app/app/src/test/java/com/chee/videos/feature/actor/ActorRoutesTest.kt`、`android-app/app/src/test/java/com/chee/videos/feature/actor/ActorDetailViewModelTest.kt`、`android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`、`plan.md`
+- 验证：`go test ./internal/repository ./internal/handlers -run 'TestBuildActorWorks|TestRegisterIncludesImageCollectionRoutes' -count=1`、`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.chee.videos.feature.detail.AvDetailPresentationTest' --tests 'com.chee.videos.feature.actor.ActorRoutesTest' --tests 'com.chee.videos.feature.actor.ActorDetailViewModelTest'`、`go test ./internal/handlers ./internal/repository ./internal/services -count=1`、`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest`、`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 均通过。
+
 ### [2026-05-16 09:23 CST] 修复 TV 遥控器返回键行为完成
 - Type: `implementation`
 - Summary:

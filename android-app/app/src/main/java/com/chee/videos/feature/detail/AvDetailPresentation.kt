@@ -13,10 +13,13 @@ internal data class AvDetailHeroModel(
 )
 
 internal data class AvDetailActorModel(
+    val id: String?,
     val name: String,
     val avatarUrl: String?,
     val hasAvatar: Boolean,
-)
+) {
+    val canOpenDetail: Boolean = !id.isNullOrBlank()
+}
 
 internal fun buildAvDetailHeroModel(detail: VideoDetailDto): AvDetailHeroModel {
     val primaryText = anyString(detail.metadata?.get("av_code"))
@@ -55,6 +58,7 @@ internal fun buildAvDetailActorModels(baseUrl: String, detail: VideoDetailDto): 
             }
             val resolvedAvatarUrl = resolveResourceUrl(baseUrl, actor.avatarUrl)
             AvDetailActorModel(
+                id = actor.id.trim().takeIf { it.isNotBlank() },
                 name = name,
                 avatarUrl = resolvedAvatarUrl,
                 hasAvatar = !resolvedAvatarUrl.isNullOrBlank(),
@@ -67,6 +71,7 @@ internal fun buildAvDetailActorModels(baseUrl: String, detail: VideoDetailDto): 
     return anyStringList(detail.metadata?.get("actors"))
         .map { name ->
             AvDetailActorModel(
+                id = null,
                 name = name,
                 avatarUrl = null,
                 hasAvatar = false,

@@ -45,6 +45,8 @@ func TestRegisterIncludesImageCollectionRoutes(t *testing.T) {
 		"GET /api/v1/image-collections",
 		"GET /api/v1/image-collections/:id",
 		"GET /api/v1/images/:id/view",
+		"GET /api/v1/actors/:id",
+		"GET /api/v1/actors/:id/avatar",
 		"GET /api/v1/tv/home",
 		"GET /api/v1/tv/series/:id",
 		"GET /api/v1/admin/video-tags",

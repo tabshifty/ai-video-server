@@ -4,6 +4,7 @@ import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.ApiEnvelope
 import com.chee.videos.core.model.AppException
+import com.chee.videos.core.model.ActorWorksPayload
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.ContinueHistoryPayload
 import com.chee.videos.core.model.FeedVideoDto
@@ -93,6 +94,17 @@ class VideoRepository @Inject constructor(
     suspend fun fetchDetail(videoId: String): Result<VideoDetailDto> {
         return callWithAuth { baseUrl, bearer ->
             api.detail(UrlBuilder.detail(baseUrl, videoId), bearer)
+        }
+    }
+
+    suspend fun fetchActorDetail(actorId: String, page: Int = 1, pageSize: Int = 24): Result<ActorWorksPayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.actorDetail(
+                url = UrlBuilder.actorDetail(baseUrl, actorId),
+                authorization = bearer,
+                page = page,
+                pageSize = pageSize,
+            )
         }
     }
 

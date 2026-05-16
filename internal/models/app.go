@@ -35,6 +35,24 @@ type VideoActor struct {
 	AvatarURL string    `json:"avatar_url"`
 }
 
+type ActorDetail struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Aliases   []string  `json:"aliases"`
+	Gender    string    `json:"gender"`
+	Country   string    `json:"country"`
+	BirthDate string    `json:"birth_date"`
+	AvatarURL string    `json:"avatar_url"`
+}
+
+type ActorWorksPayload struct {
+	Actor      ActorDetail     `json:"actor"`
+	Items      []VideoListItem `json:"items"`
+	TotalCount int             `json:"total_count"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"page_size"`
+}
+
 // VideoUserState is per-user interaction state for a video.
 type VideoUserState struct {
 	IsLiked      bool `json:"is_liked"`

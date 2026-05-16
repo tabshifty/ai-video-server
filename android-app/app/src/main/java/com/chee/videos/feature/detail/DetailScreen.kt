@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo
 import android.graphics.Color as AndroidColor
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -94,6 +95,7 @@ import com.chee.videos.core.util.UrlBuilder
 @Composable
 fun DetailScreen(
     onBack: () -> Unit,
+    onOpenActor: (String) -> Unit = {},
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -417,6 +419,7 @@ fun DetailScreen(
                             onToggleLike = viewModel::toggleLike,
                             onToggleFavorite = viewModel::toggleFavorite,
                             onToggleDislike = viewModel::toggleDislike,
+                            onOpenActor = onOpenActor,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(innerPadding),
@@ -584,6 +587,7 @@ private fun AvDetailPage(
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleDislike: () -> Unit,
+    onOpenActor: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val heroModel = buildAvDetailHeroModel(detail)
@@ -704,6 +708,7 @@ private fun AvDetailPage(
             onToggleLike = onToggleLike,
             onToggleFavorite = onToggleFavorite,
             onToggleDislike = onToggleDislike,
+            onOpenActor = onOpenActor,
         )
     }
 }
@@ -796,6 +801,7 @@ private fun AvDetailOverview(
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleDislike: () -> Unit,
+    onOpenActor: (String) -> Unit,
 ) {
     val actionSpecs = buildDetailActionSpecs(detail.userState)
 
@@ -858,6 +864,7 @@ private fun AvDetailOverview(
                             AvActorCard(
                                 actor = actor,
                                 avatarSizeDp = buildAvDetailActorRailSpec().avatarSizeDp,
+                                onClick = actor.id?.let { actorId -> { onOpenActor(actorId) } },
                             )
                         }
                     }
@@ -1038,8 +1045,10 @@ private fun AvIconMetricButton(
 private fun AvActorCard(
     actor: AvDetailActorModel,
     avatarSizeDp: Int,
+    onClick: (() -> Unit)? = null,
 ) {
     Surface(
+        modifier = if (onClick == null) Modifier else Modifier.clickable(onClick = onClick),
         color = AppChrome.SurfaceStrong,
         shape = RoundedCornerShape(18.dp),
     ) {

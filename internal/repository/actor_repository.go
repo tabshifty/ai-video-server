@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -172,6 +173,77 @@ LIMIT 1
 		return models.AdminActor{}, fmt.Errorf("get actor by id: %w", err)
 	}
 	return out, nil
+}
+
+func (r *VideoRepository) GetAppActorDetail(ctx context.Context, actorID uuid.UUID) (models.ActorDetail, error) {
+	actor, err := r.GetActorByID(ctx, actorID)
+	if err != nil {
+		return models.ActorDetail{}, err
+	}
+	return models.ActorDetail{
+		ID:        actor.ID,
+		Name:      actor.Name,
+		Aliases:   actor.Aliases,
+		Gender:    actor.Gender,
+		Country:   actor.Country,
+		BirthDate: actor.BirthDate,
+		AvatarURL: actor.AvatarURL,
+	}, nil
+}
+
+func buildActorWorksCountQuery(actorID uuid.UUID) (string, []any) {
+	return `
+SELECT COUNT(*)
+FROM video_actors va
+JOIN videos v ON v.id = va.video_id
+WHERE va.actor_id=$1
+  AND v.status='ready'
+`, []any{actorID}
+}
+
+func buildActorWorksQuery(actorID uuid.UUID, limit, offset int) (string, []any) {
+	return `
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)
+FROM videos v
+JOIN video_actors va ON va.video_id = v.id
+WHERE va.actor_id=$1
+  AND v.status='ready'
+ORDER BY v.created_at DESC
+LIMIT $2 OFFSET $3
+`, []any{actorID, limit, offset}
+}
+
+func (r *VideoRepository) ListActorReadyVideos(ctx context.Context, actorID uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error) {
+	countSQL, countArgs := buildActorWorksCountQuery(actorID)
+	var total int
+	if err := r.pool.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count actor videos: %w", err)
+	}
+
+	querySQL, queryArgs := buildActorWorksQuery(actorID, limit, offset)
+	rows, err := r.pool.Query(ctx, querySQL, queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query actor videos: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.VideoListItem, 0, limit)
+	for rows.Next() {
+		var item models.VideoListItem
+		var rawMetadata []byte
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt, &rawMetadata); err != nil {
+			return nil, 0, fmt.Errorf("scan actor video: %w", err)
+		}
+		finalizeVideoListItem(&item, json.RawMessage(rawMetadata))
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := r.attachCollectionsToVideoListItems(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 func (r *VideoRepository) CreateActor(ctx context.Context, input models.AdminActorInput) (models.AdminActor, error) {

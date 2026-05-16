@@ -53,9 +53,11 @@ class AvDetailPresentationTest {
         )
 
         assertEquals(1, models.size)
+        assertEquals("actor-1", models[0].id)
         assertEquals("演员甲", models[0].name)
         assertEquals("http://127.0.0.1:8080/api/v1/actors/actor-1/avatar", models[0].avatarUrl)
         assertTrue(models[0].hasAvatar)
+        assertTrue(models[0].canOpenDetail)
     }
 
     @Test
@@ -71,9 +73,13 @@ class AvDetailPresentationTest {
         )
 
         assertEquals(listOf("演员乙", "演员丙"), models.map { it.name })
+        assertNull(models[0].id)
         assertNull(models[0].avatarUrl)
         assertFalse(models[0].hasAvatar)
+        assertFalse(models[0].canOpenDetail)
+        assertNull(models[1].id)
         assertNull(models[1].avatarUrl)
         assertFalse(models[1].hasAvatar)
+        assertFalse(models[1].canOpenDetail)
     }
 }

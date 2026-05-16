@@ -60,6 +60,11 @@ import com.chee.videos.core.ui.appNavigationTransitionDirection
 import com.chee.videos.core.ui.appNavigationTransitionSpec
 import com.chee.videos.core.ui.rootNavigationTabs
 import com.chee.videos.core.viewmodel.AppRootViewModel
+import com.chee.videos.feature.actor.ActorDetailScreen
+import com.chee.videos.feature.actor.ActorIdArg
+import com.chee.videos.feature.actor.ActorRoutePattern
+import com.chee.videos.feature.actor.buildActorRoute
+import com.chee.videos.feature.actor.buildVideoDetailRoute
 import com.chee.videos.feature.auth.LoginScreen
 import com.chee.videos.feature.connection.ConnectionScreen
 import com.chee.videos.feature.detail.DetailScreen
@@ -267,7 +272,7 @@ private fun AuthenticatedNav(
                         baseUrl = baseUrl,
                         accessToken = accessToken,
                         onOpenDetail = { videoId, videoType ->
-                            navController.navigate("detail/$videoId?type=${Uri.encode(videoType)}")
+                            navController.navigate(buildVideoDetailRoute(videoId, videoType))
                         },
                         onOpenTvSeries = { seriesId ->
                             navController.navigate(buildTvSeriesRoute(seriesId))
@@ -338,7 +343,28 @@ private fun AuthenticatedNav(
                     },
                 ),
             ) {
-                DetailScreen(onBack = { navController.popBackStack() })
+                DetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenActor = { actorId ->
+                        navController.navigate(buildActorRoute(actorId))
+                    },
+                )
+            }
+
+            composable(
+                route = ActorRoutePattern,
+                arguments = listOf(
+                    navArgument(ActorIdArg) { type = NavType.StringType },
+                ),
+            ) { entry ->
+                ActorDetailScreen(
+                    actorId = entry.arguments?.getString(ActorIdArg).orEmpty(),
+                    baseUrl = baseUrl,
+                    onBack = { navController.popBackStack() },
+                    onOpenDetail = { videoId, videoType ->
+                        navController.navigate(buildVideoDetailRoute(videoId, videoType))
+                    },
+                )
             }
 
             composable(

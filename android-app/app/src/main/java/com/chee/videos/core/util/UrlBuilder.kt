@@ -55,6 +55,9 @@ object UrlBuilder {
     fun detail(baseUrl: String, videoId: String): String =
         "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId"
 
+    fun actorDetail(baseUrl: String, actorId: String): String =
+        "${normalizeBaseUrl(baseUrl)}/api/v1/actors/$actorId"
+
     fun source(baseUrl: String, videoId: String, profile: String? = null): String {
         val base = "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/source"
         val normalizedProfile = profile?.trim().orEmpty()
