@@ -19,7 +19,7 @@ class TvCatalogViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun init_loadsBrowsePayload() = runTest {
+    fun init_loadsBrowsePayloadWithoutAvContent() = runTest {
         val viewModel = TvCatalogViewModel(
             repository = FakeTvRepository(
                 homePayload = TvHomePayload(
@@ -62,7 +62,7 @@ class TvCatalogViewModelTest {
         assertEquals(128, state.continueWatching?.watchSeconds)
         assertEquals(1, state.sections.size)
         assertEquals(1, state.movies.size)
-        assertEquals(1, state.av.size)
+        assertTrue(state.av.isEmpty())
     }
 
     @Test
@@ -84,6 +84,48 @@ class TvCatalogViewModelTest {
         assertEquals(1, state.searchResults.size)
         assertEquals("静默轨道", state.searchResults.first().title)
         assertEquals("tv", state.searchResults.first().type)
+    }
+
+    @Test
+    fun updateQuery_filtersAvResultsFromTvCatalog() = runTest {
+        val repository = FakeTvRepository(
+            homePayload = TvHomePayload(),
+            searchPayload = TvSearchPayload(
+                items = listOf(
+                    tvSearchResult(id = "11", type = "tv", title = "静默轨道"),
+                    tvSearchResult(id = "av-11", type = "av", title = "SNIS-001"),
+                ),
+            ),
+        )
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        viewModel.awaitIdle()
+        viewModel.updateQuery("静默")
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.searchResults.size)
+        assertEquals("tv", state.searchResults.first().type)
+    }
+
+    @Test
+    fun init_filtersAvContinueWatchingFromTvCatalog() = runTest {
+        val viewModel = TvCatalogViewModel(
+            repository = FakeTvRepository(
+                homePayload = TvHomePayload(
+                    continueWatching = TvContinueWatchingDto(
+                        type = "av",
+                        seriesId = "av-1",
+                        seriesTitle = "SNIS-001",
+                    ),
+                ),
+            ),
+        )
+
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(null, state.continueWatching)
     }
 
     @Test

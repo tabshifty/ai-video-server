@@ -42,7 +42,6 @@ class TvCatalogFeaturedContentTest {
             ),
             tvSeries = emptyList(),
             movies = emptyList(),
-            av = emptyList(),
         )
 
         requireNotNull(featured)
@@ -87,7 +86,6 @@ class TvCatalogFeaturedContentTest {
                 ),
             ),
             movies = emptyList(),
-            av = emptyList(),
         )
         requireNotNull(sectionFeatured)
         assertEquals(TvFeaturedContentSource.SECTION, sectionFeatured.source)
@@ -106,7 +104,6 @@ class TvCatalogFeaturedContentTest {
                     backdropUrl = "/movie-backdrop.jpg",
                 ),
             ),
-            av = emptyList(),
         )
         requireNotNull(shelfFeatured)
         assertEquals(TvFeaturedContentSource.SHELF, shelfFeatured.source)
@@ -123,7 +120,25 @@ class TvCatalogFeaturedContentTest {
                 sections = emptyList(),
                 tvSeries = emptyList(),
                 movies = emptyList(),
-                av = emptyList(),
+            ),
+        )
+    }
+
+    fun `does not promote av continue watching to featured hero`() {
+        assertNull(
+            resolveTvFeaturedContent(
+                continueWatching = TvContinueWatchingUiModel(
+                    type = "av",
+                    seriesId = "av-1",
+                    seriesTitle = "SNIS-001",
+                    seasonNumber = 1,
+                    episodeNumber = 1,
+                    episodeTitle = "继续播放",
+                    progressPercent = 10,
+                ),
+                sections = emptyList(),
+                tvSeries = emptyList(),
+                movies = emptyList(),
             ),
         )
     }

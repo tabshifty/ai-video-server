@@ -91,7 +91,6 @@ fun TvLongFormDetailScreen(
             val hero = remember(uiState.baseUrl, uiState.videoType, detail) {
                 buildTvLongFormDetailHero(
                     baseUrl = uiState.baseUrl,
-                    videoType = uiState.videoType,
                     detail = detail,
                 )
             }
@@ -156,7 +155,6 @@ fun TvLongFormDetailScreen(
                             TvLongFormPoster(
                                 title = hero.title,
                                 posterUrl = hero.posterUrl,
-                                videoType = uiState.videoType,
                             )
                             Column(
                                 modifier = Modifier.weight(1f),
@@ -303,7 +301,6 @@ fun TvLongFormDetailScreen(
 private fun TvLongFormPoster(
     title: String,
     posterUrl: String?,
-    videoType: String,
 ) {
     if (!posterUrl.isNullOrBlank()) {
         AsyncImage(
@@ -324,11 +321,7 @@ private fun TvLongFormPoster(
             .clip(RoundedCornerShape(28.dp))
             .background(
                 Brush.verticalGradient(
-                    colors = if (normalizeTvLongFormVideoType(videoType) == "av") {
-                        listOf(Color(0xFF402030), Color(0xFF111827))
-                    } else {
-                        listOf(Color(0xFF1F3457), Color(0xFF111827))
-                    },
+                    colors = listOf(Color(0xFF1F3457), Color(0xFF111827)),
                 ),
             ),
         contentAlignment = Alignment.Center,

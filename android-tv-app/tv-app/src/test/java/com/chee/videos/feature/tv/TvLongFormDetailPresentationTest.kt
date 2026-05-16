@@ -10,7 +10,6 @@ class TvLongFormDetailPresentationTest {
     fun `builds cinematic hero with resolved backdrop poster and play labels`() {
         val hero = buildTvLongFormDetailHero(
             baseUrl = "https://media.example.com",
-            videoType = "movie",
             detail = VideoDetailDto(
                 id = "movie-1",
                 title = "午夜列车",

@@ -59,9 +59,9 @@ class TvRoutesTest {
     }
 
     @Test
-    fun buildTvLongFormPlayerRoute_encodesReservedCharactersInVideoId() {
+    fun buildTvLongFormPlayerRoute_encodesReservedCharactersInVideoIdAndNormalizesAvToMovie() {
         assertEquals(
-            "tv/long-form-player/av%2F2026%23scene-1?videoType=av",
+            "tv/long-form-player/av%2F2026%23scene-1?videoType=movie",
             buildTvLongFormPlayerRoute(videoId = "av/2026#scene-1", videoType = "av"),
         )
     }

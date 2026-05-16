@@ -90,7 +90,7 @@ internal fun tvSearchResultToUiModel(dto: TvSearchResultDto): TvSearchResultUiMo
 
 private fun normalizeTvVideoType(raw: String?, fallback: String): String {
     return when (raw?.trim()?.lowercase()) {
-        "tv", "movie", "av" -> raw.trim().lowercase()
+        "tv", "movie" -> raw.trim().lowercase()
         else -> fallback
     }
 }

@@ -82,13 +82,11 @@ fun TvCatalogScreen(
     val firstSectionItemFocusRequester = remember { FocusRequester() }
     val tvSeriesFocusRequester = remember { FocusRequester() }
     val movieFocusRequester = remember { FocusRequester() }
-    val avFocusRequester = remember { FocusRequester() }
     val featuredContent = resolveTvFeaturedContent(
         continueWatching = uiState.continueWatching,
         sections = uiState.sections,
         tvSeries = uiState.tvSeries,
         movies = uiState.movies,
-        av = uiState.av,
     )
     val initialFocusTarget = resolveTvCatalogInitialFocusTarget(
         hasFeaturedContent = featuredContent != null,
@@ -96,7 +94,6 @@ fun TvCatalogScreen(
         sectionItemCounts = uiState.sections.map { it.items.size },
         tvSeriesCount = uiState.tvSeries.size,
         movieCount = uiState.movies.size,
-        avCount = uiState.av.size,
     )
 
     LaunchedEffect(uiState.loading, isSearching, initialFocusTarget) {
@@ -107,7 +104,6 @@ fun TvCatalogScreen(
             TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM -> firstSectionItemFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.TV_SERIES_ITEM -> tvSeriesFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.MOVIE_ITEM -> movieFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.AV_ITEM -> avFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.SEARCH -> searchFocusRequester.requestFocus()
         }
     }
@@ -262,21 +258,6 @@ fun TvCatalogScreen(
                     items = uiState.movies,
                     firstItemFocusRequester = movieFocusRequester,
                     requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.MOVIE_ITEM,
-                    onOpenCatalogWall = onOpenCatalogWall,
-                    onClick = { item -> onOpenLongForm(item.id, item.type) },
-                )
-            }
-        }
-        if (uiState.av.isNotEmpty()) {
-            item(key = "av-shelf") {
-                TvHomeShelf(
-                    title = "AV",
-                    subtitle = "仅包含长视频",
-                    wallKind = "av",
-                    baseUrl = uiState.baseUrl,
-                    items = uiState.av,
-                    firstItemFocusRequester = avFocusRequester,
-                    requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.AV_ITEM,
                     onOpenCatalogWall = onOpenCatalogWall,
                     onClick = { item -> onOpenLongForm(item.id, item.type) },
                 )
@@ -680,7 +661,6 @@ private fun TvContinueWatchingBanner(
                 Text(
                     text = when (data.type) {
                         "movie" -> "继续看电影"
-                        "av" -> "继续播放 AV"
                         else -> "继续追剧"
                     },
                     color = AppChrome.AccentWarm,
@@ -697,7 +677,7 @@ private fun TvContinueWatchingBanner(
                 )
                 Text(
                     text = when (data.type) {
-                        "movie", "av" -> data.episodeTitle.ifBlank { "继续播放" }
+                        "movie" -> data.episodeTitle.ifBlank { "继续播放" }
                         else -> "S${data.seasonNumber} · E${data.episodeNumber}  ${data.episodeTitle}"
                     },
                     color = AppChrome.TextSecondary,
@@ -1113,7 +1093,6 @@ private fun resolveTvSectionWallKind(sectionTitle: String): String {
 private fun tvTypeLabel(type: String): String = when (type) {
     "tv" -> "电视剧"
     "movie" -> "电影"
-    "av" -> "AV"
     else -> type.ifBlank { "长视频" }
 }
 
@@ -1123,7 +1102,6 @@ internal enum class TvCatalogInitialFocusTarget {
     FIRST_SECTION_ITEM,
     TV_SERIES_ITEM,
     MOVIE_ITEM,
-    AV_ITEM,
     SEARCH,
 }
 
@@ -1133,7 +1111,6 @@ internal fun resolveTvCatalogInitialFocusTarget(
     sectionItemCounts: List<Int>,
     tvSeriesCount: Int,
     movieCount: Int,
-    avCount: Int,
 ): TvCatalogInitialFocusTarget {
     if (hasFeaturedContent) {
         return TvCatalogInitialFocusTarget.FEATURED
@@ -1149,9 +1126,6 @@ internal fun resolveTvCatalogInitialFocusTarget(
     }
     if (movieCount > 0) {
         return TvCatalogInitialFocusTarget.MOVIE_ITEM
-    }
-    if (avCount > 0) {
-        return TvCatalogInitialFocusTarget.AV_ITEM
     }
     return TvCatalogInitialFocusTarget.SEARCH
 }

@@ -2,7 +2,6 @@ package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.TvCatalogWallItemDto
-import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.util.UrlBuilder
 
 internal enum class TvFeaturedContentSource {
@@ -57,21 +56,22 @@ internal fun resolveTvFeaturedContent(
     sections: List<TvCatalogSectionUiModel>,
     tvSeries: List<TvHomeShelfItemUiModel>,
     movies: List<TvHomeShelfItemUiModel>,
-    av: List<TvHomeShelfItemUiModel>,
 ): TvFeaturedContentUiModel? {
     continueWatching?.let { item ->
+        if (item.type == "av") {
+            return@let
+        }
         return TvFeaturedContentUiModel(
             source = TvFeaturedContentSource.CONTINUE_WATCHING,
             targetId = resolveTvContinueWatchingPlaybackTargetId(item),
             targetType = item.type,
             eyebrow = when (item.type) {
                 "movie" -> "继续看电影"
-                "av" -> "继续播放 AV"
                 else -> "继续追剧"
             },
             title = item.seriesTitle,
             subtitle = when (item.type) {
-                "movie", "av" -> item.episodeTitle.ifBlank { "继续播放" }
+                "movie" -> item.episodeTitle.ifBlank { "继续播放" }
                 else -> "S${item.seasonNumber} · E${item.episodeNumber}  ${item.episodeTitle}".trim()
             },
             description = "已观看 ${item.progressPercent.coerceIn(0, 100)}%",
@@ -101,7 +101,6 @@ internal fun resolveTvFeaturedContent(
     listOf(
         "电视剧精选" to tvSeries.firstOrNull(),
         "电影精选" to movies.firstOrNull(),
-        "AV 精选" to av.firstOrNull(),
     ).firstOrNull { it.second != null }?.let { (eyebrow, item) ->
         item ?: return null
         return TvFeaturedContentUiModel(
@@ -122,20 +121,12 @@ internal fun resolveTvFeaturedContent(
 
 internal fun buildTvLongFormDetailHero(
     baseUrl: String,
-    videoType: String,
     detail: VideoDetailDto,
 ): TvLongFormDetailHeroUiModel {
-    val normalizedType = normalizeTvLongFormVideoType(videoType)
-    val posterUrl = when (normalizedType) {
-        "av" -> resolveAvPosterUrl(baseUrl, detail)
-        else -> resolveTvResourceUrl(baseUrl, detail.thumbnailPath)
-    }
+    val posterUrl = resolveTvResourceUrl(baseUrl, detail.thumbnailPath)
     val backdropUrl = resolveTvBackdropUrl(baseUrl, detail) ?: posterUrl
     return TvLongFormDetailHeroUiModel(
-        eyebrow = when (normalizedType) {
-            "av" -> "AV"
-            else -> "电影"
-        },
+        eyebrow = "电影",
         title = detail.title,
         metaLine = buildTvLongFormMetaLine(detail),
         summary = detail.description.orEmpty().ifBlank { "暂无简介" },
@@ -154,7 +145,6 @@ internal fun resolveTvCatalogWallSpec(kind: String, fallbackTitle: String = ""):
         "classic" -> "经典补档"
         "tv" -> "电视剧"
         "movie" -> "电影"
-        "av" -> "AV"
         else -> "海报墙"
     }
     val subtitle = when (normalizedKind) {
@@ -163,7 +153,6 @@ internal fun resolveTvCatalogWallSpec(kind: String, fallbackTitle: String = ""):
         "classic" -> "从较早首播的系列开始补看"
         "tv" -> "全部电视剧"
         "movie" -> "全部电影"
-        "av" -> "全部 AV"
         else -> "滚动到底部自动加载下一页"
     }
     return TvCatalogWallSpec(
@@ -200,16 +189,15 @@ private fun tvCatalogWallTypeLabel(type: String): String {
     return when (type) {
         "tv" -> "电视剧"
         "movie" -> "电影"
-        "av" -> "AV"
         else -> type.ifBlank { "长视频" }
     }
 }
 
 internal fun normalizeTvLongFormVideoType(videoType: String): String {
-    return when (videoType.trim().lowercase()) {
-        "av" -> "av"
-        else -> "movie"
+    if (videoType.isBlank()) {
+        return "movie"
     }
+    return "movie"
 }
 
 internal fun resolveTvLongFormPlayUrl(
@@ -298,6 +286,5 @@ private fun appendTvPlaybackProfileQuery(rawUrl: String, preferredPlaybackProfil
 private fun tvTypeLabel(type: String): String = when (type) {
     "tv" -> "电视剧"
     "movie" -> "电影"
-    "av" -> "AV"
     else -> type.ifBlank { "长视频" }
 }

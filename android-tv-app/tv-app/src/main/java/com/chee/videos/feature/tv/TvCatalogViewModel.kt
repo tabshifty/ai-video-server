@@ -64,11 +64,13 @@ class TvCatalogViewModel @Inject constructor(
                         it.copy(
                             loading = false,
                             baseUrl = baseUrl,
-                            continueWatching = payload.continueWatching?.let(::tvContinueWatchingToUiModel),
+                            continueWatching = payload.continueWatching
+                                ?.takeUnless { it.type.equals("av", ignoreCase = true) }
+                                ?.let(::tvContinueWatchingToUiModel),
                             sections = coerceListOrEmpty<TvSectionDto>(payload.sections).map(::tvSectionToUiModel),
                             tvSeries = coerceListOrEmpty<TvHomeVideoDto>(payload.tvSeries).map(::tvHomeVideoToUiModel),
                             movies = coerceListOrEmpty<TvHomeVideoDto>(payload.movies).map(::tvHomeVideoToUiModel),
-                            av = coerceListOrEmpty<TvHomeVideoDto>(payload.av).map(::tvHomeVideoToUiModel),
+                            av = emptyList(),
                             searchResults = emptyList(),
                             errorMessage = null,
                         )
@@ -109,7 +111,9 @@ class TvCatalogViewModel @Inject constructor(
                             loading = false,
                             baseUrl = baseUrl,
                             continueWatching = null,
-                            searchResults = coerceListOrEmpty<TvSearchResultDto>(payload.items).map(::tvSearchResultToUiModel),
+                            searchResults = coerceListOrEmpty<TvSearchResultDto>(payload.items)
+                                .filterNot { it.type.equals("av", ignoreCase = true) }
+                                .map(::tvSearchResultToUiModel),
                             errorMessage = null,
                         )
                     }
