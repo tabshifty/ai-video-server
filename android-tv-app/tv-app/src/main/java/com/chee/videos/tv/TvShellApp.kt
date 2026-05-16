@@ -1,5 +1,6 @@
 package com.chee.videos.tv
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -47,6 +48,7 @@ import com.chee.videos.feature.tv.TvLongFormVideoIdArg
 import com.chee.videos.feature.tv.TvLongFormVideoTypeArg
 import com.chee.videos.feature.tv.TvLongFormDetailScreen
 import com.chee.videos.feature.tv.TvLongFormPlayerScreen
+import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tv.TvCatalogWallKindArg
 import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
 import com.chee.videos.feature.tv.TvCatalogWallTitleArg
@@ -55,7 +57,6 @@ import com.chee.videos.feature.tv.TvSeasonArg
 import com.chee.videos.feature.tv.TvSeriesDetailScreen
 import com.chee.videos.feature.tv.TvSeriesIdArg
 import com.chee.videos.feature.tv.TvSeriesPlayerScreen
-import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tv.buildTvSeriesRoute
 import com.chee.videos.feature.tv.buildTvCatalogWallRoute
 import com.chee.videos.feature.tv.buildTvLongFormDetailRoute
@@ -104,7 +105,12 @@ private fun TvAuthenticatedNav(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val showSettingsMenu = shouldShowTvGlobalSettings(navBackStackEntry?.destination?.route)
+    val handleShellBack = shouldHandleTvShellBack(navBackStackEntry?.destination?.route)
     var menuExpanded by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = handleShellBack) {
+        navController.popBackStack()
+    }
 
     androidx.compose.runtime.LaunchedEffect(showSettingsMenu) {
         if (!showSettingsMenu) {
@@ -262,3 +268,25 @@ private fun TvAuthenticatedNav(
 }
 
 internal fun shouldShowTvGlobalSettings(route: String?): Boolean = route == "tv-home"
+
+internal fun shouldHandleTvShellBack(route: String?): Boolean {
+    val value = route ?: return false
+    if (value == "tv-home") {
+        return false
+    }
+    if (value.isTvPlaybackRoute()) {
+        return false
+    }
+    return value == TvCatalogWallRoutePattern ||
+        value.startsWith("tv/wall/") ||
+        value == TvLongFormDetailRoutePattern ||
+        value.startsWith("tv/detail/") ||
+        value == TvSeriesRoutePattern ||
+        value.startsWith("tv/series/")
+}
+
+private fun String.isTvPlaybackRoute(): Boolean =
+    this == TvPlayerRoutePattern ||
+        startsWith("tv/player/") ||
+        this == TvLongFormPlayerRoutePattern ||
+        startsWith("tv/long-form-player/")

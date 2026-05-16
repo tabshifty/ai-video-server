@@ -1,10 +1,13 @@
 package com.chee.videos.feature.tv
 
 import android.app.Activity
+import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,7 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -42,7 +45,7 @@ import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.feature.detail.DetailViewModel
 import com.chee.videos.feature.detail.LongFormPlaybackSession
-import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 @Composable
 fun TvLongFormPlayerScreen(
@@ -53,6 +56,36 @@ fun TvLongFormPlayerScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
+    var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
+    var showBackConfirmPrompt by remember { mutableStateOf(false) }
+
+    fun handlePlaybackBack() {
+        val now = SystemClock.uptimeMillis()
+        when (resolveTvPlayerBackAction(backPromptAtMillis, now)) {
+            TvPlayerBackAction.ShowPrompt -> {
+                backPromptAtMillis = now
+                showBackConfirmPrompt = true
+            }
+
+            TvPlayerBackAction.Exit -> {
+                backPromptAtMillis = null
+                showBackConfirmPrompt = false
+                onBack()
+            }
+        }
+    }
+
+    BackHandler(onBack = ::handlePlaybackBack)
+
+    LaunchedEffect(showBackConfirmPrompt, backPromptAtMillis) {
+        val promptAt = backPromptAtMillis
+        if (showBackConfirmPrompt && promptAt != null) {
+            delay(TvPlayerBackConfirmWindowMillis)
+            if (backPromptAtMillis == promptAt) {
+                showBackConfirmPrompt = false
+            }
+        }
+    }
 
     if (uiState.loading) {
         Box(
@@ -62,6 +95,13 @@ fun TvLongFormPlayerScreen(
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator(color = AppChrome.AccentStrong)
+            if (showBackConfirmPrompt) {
+                TvPlayerBackConfirmPrompt(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 48.dp),
+                )
+            }
         }
         return
     }
@@ -75,6 +115,13 @@ fun TvLongFormPlayerScreen(
             contentAlignment = Alignment.Center,
         ) {
             Text(uiState.errorMessage ?: "播放器数据不存在", color = AppChrome.TextSecondary)
+            if (showBackConfirmPrompt) {
+                TvPlayerBackConfirmPrompt(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 48.dp),
+                )
+            }
         }
         return
     }
@@ -263,12 +310,26 @@ fun TvLongFormPlayerScreen(
                     )
                 }
             }
+            if (showBackConfirmPrompt) {
+                TvPlayerBackConfirmPrompt(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 72.dp),
+                )
+            }
         } else {
             Text(
                 text = "暂无可播放视频",
                 color = AppChrome.TextSecondary,
                 modifier = Modifier.align(Alignment.Center),
             )
+            if (showBackConfirmPrompt) {
+                TvPlayerBackConfirmPrompt(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 48.dp),
+                )
+            }
         }
     }
 }

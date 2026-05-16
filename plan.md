@@ -2,6 +2,63 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+### [2026-05-16 09:23 CST] 修复 TV 遥控器返回键行为完成
+- Type: `implementation`
+- Summary:
+  - 完成 TV Shell Back 策略与播放器二次返回确认，保持 `tv-home` 默认退出行为，播放页由自身确认逻辑处理。
+  - 补充 Shell 路由策略与播放器确认窗口单测，覆盖二级页 pop、首页不拦截、播放页不走 Shell 策略、2 秒确认窗口。
+  - 执行 TV 定向 Back 单测、TV 全量单测与 Debug 构建。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlayerBackConfirm.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvShellAppBackPolicyTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlayerBackConfirmTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest --tests 'com.chee.videos.tv.*Back*' --tests 'com.chee.videos.feature.tv.*Back*'` passed.
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest` passed.
+  - `cd android-tv-app && ./gradlew :tv-app:assembleDebug` passed.
+
+### [2026-05-16 09:20 CST] 修复 TV 遥控器返回键行为实现中
+- Type: `implementation`
+- Summary:
+  - 新增 TV Shell Back 策略测试与播放器返回确认 helper 测试，先确认缺少策略/helper 时定向测试失败。
+  - `TvAuthenticatedNav` 接入 Shell 层 `BackHandler`：海报墙、长视频详情、电视剧详情执行 `popBackStack()`，首页与播放页不由 Shell 拦截。
+  - 长视频播放页与电视剧播放页接入系统 Back 二次确认：首次提示“再按一次返回”，确认窗口内第二次返回才调用既有 `onBack()`。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlayerBackConfirm.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvShellAppBackPolicyTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlayerBackConfirmTest.kt`
+  - `plan.md`
+- Verification:
+  - `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest --tests 'com.chee.videos.tv.*Back*' --tests 'com.chee.videos.feature.tv.*Back*'` passed.
+  - 待执行 `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest`。
+  - 待执行 `cd android-tv-app && ./gradlew :tv-app:assembleDebug`。
+
+### [2026-05-16 09:16 CST] 修复 TV 遥控器返回键行为计划
+- Type: `plan`
+- Summary:
+  - 仅修改 `android-tv-app` 独立 TV 工程，修复遥控器 Back 在二级页直接退出应用的问题。
+  - TV Shell 增加普通二级页返回策略：首页不拦截，海报墙、长视频详情、电视剧详情执行 `popBackStack()`，播放页交给播放器自身处理。
+  - 长视频播放页与电视剧播放页增加 2 秒内二次返回确认，首次返回只显示底部提示。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlayerBackConfirm.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvShellAppBackPolicyTest.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlayerBackConfirmTest.kt`
+  - `plan.md`
+- Verification:
+  - 待执行 `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest --tests 'com.chee.videos.tv.*Back*' --tests 'com.chee.videos.feature.tv.*Back*'`。
+  - 待执行 `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest`。
+  - 待执行 `cd android-tv-app && ./gradlew :tv-app:assembleDebug`。
+
 ### [2026-05-16 00:41 CST] 手机端页面切换 iOS 动画完成
 - Type: `implementation`
 - Summary:

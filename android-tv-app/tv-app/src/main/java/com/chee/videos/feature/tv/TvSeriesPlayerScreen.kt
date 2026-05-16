@@ -1,6 +1,8 @@
 package com.chee.videos.feature.tv
 
 import android.app.Activity
+import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +57,7 @@ import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.feature.detail.LongFormPlaybackSession
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +70,36 @@ fun TvSeriesPlayerScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
+    var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
+    var showBackConfirmPrompt by remember { mutableStateOf(false) }
+
+    fun handlePlaybackBack() {
+        val now = SystemClock.uptimeMillis()
+        when (resolveTvPlayerBackAction(backPromptAtMillis, now)) {
+            TvPlayerBackAction.ShowPrompt -> {
+                backPromptAtMillis = now
+                showBackConfirmPrompt = true
+            }
+
+            TvPlayerBackAction.Exit -> {
+                backPromptAtMillis = null
+                showBackConfirmPrompt = false
+                onBack()
+            }
+        }
+    }
+
+    BackHandler(onBack = ::handlePlaybackBack)
+
+    LaunchedEffect(showBackConfirmPrompt, backPromptAtMillis) {
+        val promptAt = backPromptAtMillis
+        if (showBackConfirmPrompt && promptAt != null) {
+            delay(TvPlayerBackConfirmWindowMillis)
+            if (backPromptAtMillis == promptAt) {
+                showBackConfirmPrompt = false
+            }
+        }
+    }
 
     if (uiState.loading) {
         Box(
@@ -76,6 +109,13 @@ fun TvSeriesPlayerScreen(
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator(color = AppChrome.AccentStrong)
+            if (showBackConfirmPrompt) {
+                TvPlayerBackConfirmPrompt(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 48.dp),
+                )
+            }
         }
         return
     }
@@ -89,6 +129,13 @@ fun TvSeriesPlayerScreen(
             contentAlignment = Alignment.Center,
         ) {
             Text(uiState.errorMessage ?: "播放器数据不存在", color = AppChrome.TextSecondary)
+            if (showBackConfirmPrompt) {
+                TvPlayerBackConfirmPrompt(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 48.dp),
+                )
+            }
         }
         return
     }
@@ -306,10 +353,24 @@ fun TvSeriesPlayerScreen(
                         .align(Alignment.BottomCenter)
                         .padding(12.dp),
                 )
+                if (showBackConfirmPrompt) {
+                    TvPlayerBackConfirmPrompt(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 72.dp),
+                    )
+                }
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 EmptyTvPlayerState()
+                if (showBackConfirmPrompt) {
+                    TvPlayerBackConfirmPrompt(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 48.dp),
+                    )
+                }
             }
         }
     }
