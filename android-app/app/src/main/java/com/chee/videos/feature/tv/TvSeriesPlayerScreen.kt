@@ -401,7 +401,7 @@ fun TvSeriesPlayerScreen(
                         .fillMaxWidth()
                         .height(260.dp)
                         .padding(horizontal = 12.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFF0D111A)),
                 ) {
                     if (canPlay) {
@@ -442,7 +442,7 @@ fun TvSeriesPlayerScreen(
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Surface(color = AppChrome.SurfaceElevated, shape = RoundedCornerShape(14.dp)) {
+                    Surface(color = AppChrome.SurfaceElevated, shape = RoundedCornerShape(8.dp)) {
                         Text(
                             text = currentEpisode?.summary ?: "暂无剧情简介",
                             color = AppChrome.TextSecondary,
@@ -604,7 +604,7 @@ private fun TvPlayerErrorBanner(
     Surface(
         modifier = modifier,
         color = Color(0xCC2B0F12),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Text(
             text = message,

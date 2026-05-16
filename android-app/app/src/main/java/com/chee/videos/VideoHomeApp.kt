@@ -190,7 +190,7 @@ private fun AuthenticatedNav(
                     color = AppChrome.Surface,
                     contentColor = AppChrome.TextPrimary,
                     shadowElevation = 18.dp,
-                    shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+                    shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
                 ) {
                     Column(
                         modifier = Modifier
@@ -215,7 +215,7 @@ private fun AuthenticatedNav(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clip(RoundedCornerShape(16.dp))
+                                        .clip(RoundedCornerShape(8.dp))
                                         .clickable {
                                             navController.navigate(tab.route) {
                                                 popUpTo(navController.graph.findStartDestination().id) {

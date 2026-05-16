@@ -290,7 +290,7 @@ private fun ImageCollectionsSearchBar(
                 }
             }
         },
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = AppChrome.TextPrimary,
             unfocusedTextColor = AppChrome.TextPrimary,
@@ -314,10 +314,10 @@ private fun ImageCollectionCard(
 
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
     ) {
         Box {
@@ -607,14 +607,14 @@ private fun ImageCollectionViewerContent(
                         val selected = index == pagerState.currentPage
                         Surface(
                             color = if (selected) Color(0x4DFFFFFF) else Color(0x1AFFFFFF),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(
                                 width = if (selected) 1.5.dp else 1.dp,
                                 color = if (selected) AppChrome.AccentStrong else Color.Transparent,
                             ),
                             modifier = Modifier
                                 .size(width = 74.dp, height = 92.dp)
-                                .clip(RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .clickable {
                                     if (index == pagerState.currentPage) {
                                         imageScale = 1f

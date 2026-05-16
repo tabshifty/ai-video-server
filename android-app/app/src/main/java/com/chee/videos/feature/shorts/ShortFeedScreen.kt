@@ -425,7 +425,7 @@ fun ShortFeedScreen(
                     if (!uiState.loadMoreErrorMessage.isNullOrBlank()) {
                         Surface(
                             color = Color(0xCC11141A),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = if (sheetOpen) 16.dp else 32.dp),
@@ -751,7 +751,7 @@ private fun ShortDetailSheet(
     Surface(
         modifier = modifier,
         color = ShortDetailSheetBg,
-        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
         tonalElevation = 0.dp,
         shadowElevation = 10.dp,
     ) {
@@ -899,14 +899,14 @@ private fun ShortDetailSheet(
                                             contentDescription = imageCollection?.name,
                                             modifier = Modifier
                                                 .size(64.dp)
-                                                .clip(RoundedCornerShape(16.dp)),
+                                                .clip(RoundedCornerShape(8.dp)),
                                             contentScale = ContentScale.Crop,
                                         )
                                     } else {
                                         Box(
                                             modifier = Modifier
                                                 .size(64.dp)
-                                                .clip(RoundedCornerShape(16.dp))
+                                                .clip(RoundedCornerShape(8.dp))
                                                 .background(ShortDetailCardMutedBg),
                                             contentAlignment = Alignment.Center,
                                         ) {
@@ -1033,7 +1033,7 @@ private fun ShortDetailMetricCard(
     Surface(
         modifier = modifier,
         color = ShortDetailCardMutedBg,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Column(
             modifier = Modifier

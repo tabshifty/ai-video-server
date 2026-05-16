@@ -557,7 +557,7 @@ fun UnifiedPlayerScreen(
                             .align(Alignment.BottomCenter)
                             .padding(horizontal = 12.dp, vertical = 18.dp),
                         color = Color(0xCC2B0F12),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Text(
                             text = playerErrorMessage.orEmpty(),

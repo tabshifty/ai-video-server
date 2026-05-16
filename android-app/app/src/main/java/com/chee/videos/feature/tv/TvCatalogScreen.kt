@@ -199,7 +199,7 @@ private fun TvCatalogSearchBar(
                 }
             }
         },
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = AppChrome.TextPrimary,
             unfocusedTextColor = AppChrome.TextPrimary,
@@ -471,10 +471,10 @@ private fun TvSeriesPosterCard(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier
             .size(width = 146.dp, height = 256.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -571,10 +571,10 @@ private fun TvHomeShelfCard(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier
             .size(width = 146.dp, height = 256.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -636,7 +636,7 @@ private fun TvPosterArtwork(
             modifier = Modifier
                 .width(width)
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(14.dp)),
+                .clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop,
         )
         return
@@ -645,7 +645,7 @@ private fun TvPosterArtwork(
         modifier = Modifier
             .width(width)
             .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(tvPosterBrush(posterSeed)),
         contentAlignment = Alignment.Center,
     ) {

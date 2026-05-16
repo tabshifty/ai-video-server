@@ -438,7 +438,7 @@ fun DetailScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(220.dp)
-                                    .clip(RoundedCornerShape(14.dp))
+                                    .clip(RoundedCornerShape(8.dp))
                                     .background(Color(0xFF1A1C20)),
                             ) {
                                 if (showPlayer) {
@@ -1012,7 +1012,7 @@ private fun AvIconMetricButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = AppChrome.TextPrimary,
@@ -1050,7 +1050,7 @@ private fun AvActorCard(
     Surface(
         modifier = if (onClick == null) Modifier else Modifier.clickable(onClick = onClick),
         color = AppChrome.SurfaceStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Column(
             modifier = Modifier
@@ -1066,13 +1066,13 @@ private fun AvActorCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(avatarSizeDp.dp)
-                        .clip(RoundedCornerShape(20.dp)),
+                        .clip(RoundedCornerShape(8.dp)),
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(avatarSizeDp.dp)
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(AppChrome.CanvasRaised),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1142,7 +1142,7 @@ private fun PlaybackErrorBanner(
     Surface(
         modifier = modifier,
         color = Color(0xCC2B0F12),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Text(
             text = text,

@@ -12,18 +12,18 @@ class AppChromeDensitySpecTest {
     private val density = Density(1f)
 
     @Test
-    fun `app chrome uses slightly tighter shared shapes`() {
-        assertCornerRadius(18, AppChrome.CardShape)
-        assertCornerRadius(14, AppChrome.SectionShape)
+    fun `app chrome uses restrained shared shapes`() {
+        assertCornerRadius(8, AppChrome.CardShape)
+        assertCornerRadius(8, AppChrome.SectionShape)
     }
 
     @Test
     fun `long form player overlays use compact chrome metrics`() {
         val spec = longFormPlayerChromeSpec()
 
-        assertEquals(14, spec.seekPreviewCornerDp)
-        assertEquals(18, spec.centerFeedbackCornerDp)
-        assertEquals(16, spec.controlBarCornerDp)
+        assertEquals(8, spec.seekPreviewCornerDp)
+        assertEquals(8, spec.centerFeedbackCornerDp)
+        assertEquals(8, spec.controlBarCornerDp)
         assertEquals(10, spec.controlBarOuterPaddingDp)
         assertEquals(6, spec.controlBarHorizontalPaddingDp)
         assertEquals(5, spec.controlBarVerticalPaddingDp)

@@ -277,10 +277,10 @@ private fun ShortDiscoverCoverCard(
     }
     Surface(
         color = Color(0xFF141821),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
     ) {
         Box {

@@ -215,7 +215,7 @@ private fun ActorAvatar(baseUrl: String, actor: ActorDetailDto?) {
     Box(
         modifier = Modifier
             .size(86.dp)
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(AppChrome.CanvasRaised),
         contentAlignment = Alignment.Center,
     ) {

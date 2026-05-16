@@ -170,7 +170,7 @@ fun ShortSearchScreen(
 @Composable
 private fun SearchCoverCard(baseUrl: String, item: VideoListItemDto, onClick: () -> Unit) {
     val thumbUrl = remember(baseUrl, item.thumbnailPath) { resolveThumbnailUrl(baseUrl, item.thumbnailPath) }
-    Surface(color = Color(0xFF141821), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick)) {
+    Surface(color = Color(0xFF141821), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)) {
         Box {
             AsyncImage(model = thumbUrl, contentDescription = item.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().aspectRatio(0.72f))
             Box(modifier = Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0xBF090B11)))))

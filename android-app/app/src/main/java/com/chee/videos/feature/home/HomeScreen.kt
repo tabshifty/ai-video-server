@@ -181,10 +181,10 @@ private fun HomeHeader(
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .clickable { onSelectTab(index) },
                         color = if (selected) AppChrome.AccentSoft else Color.Transparent,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Box(
                             modifier = Modifier
@@ -443,7 +443,7 @@ private fun AvCatalogHero(
                         }
                     }
                 },
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = AppChrome.Surface.copy(alpha = 0.92f),
                     unfocusedContainerColor = AppChrome.Surface.copy(alpha = 0.92f),
@@ -781,14 +781,14 @@ private fun VideoCard(
                     contentDescription = item.title,
                     modifier = Modifier
                         .size(width = 128.dp, height = 78.dp)
-                        .clip(RoundedCornerShape(14.dp)),
+                        .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop,
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(width = 128.dp, height = 78.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(AppChrome.SurfaceStrong),
                     contentAlignment = Alignment.Center,
                 ) {

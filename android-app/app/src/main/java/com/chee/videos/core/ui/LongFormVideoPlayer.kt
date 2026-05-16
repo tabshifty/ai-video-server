@@ -706,9 +706,9 @@ private fun CompactPlayerControlButton(
 }
 
 private data class LongFormPlayerChromeSpec(
-    val seekPreviewCornerDp: Int = 14,
-    val centerFeedbackCornerDp: Int = 18,
-    val controlBarCornerDp: Int = 16,
+    val seekPreviewCornerDp: Int = 8,
+    val centerFeedbackCornerDp: Int = 8,
+    val controlBarCornerDp: Int = 8,
     val controlBarOuterPaddingDp: Int = 10,
     val controlBarHorizontalPaddingDp: Int = 6,
     val controlBarVerticalPaddingDp: Int = 5,
@@ -870,7 +870,7 @@ private fun SubtitleOptionRow(
 ) {
     Surface(
         color = if (selected) Color(0x26FFFFFF) else Color(0x12000000),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
