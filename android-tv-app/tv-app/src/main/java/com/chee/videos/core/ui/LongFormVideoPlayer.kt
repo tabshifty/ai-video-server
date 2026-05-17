@@ -6,22 +6,18 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,7 +32,6 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -767,46 +762,21 @@ fun LongFormVideoPlayer(
         }
 
         if (subtitleSheetVisible) {
-            ModalBottomSheet(
-                onDismissRequest = { subtitleSheetVisible = false },
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text = "字幕",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        item {
-                            SubtitleOptionRow(
-                                label = "关闭字幕",
-                                selected = selectedSubtitleTrackId.isNullOrBlank(),
-                                onClick = {
-                                    onSelectSubtitleTrack(null)
-                                    subtitleSheetVisible = false
-                                },
-                            )
-                        }
-                        items(subtitleTracks, key = { it.id }) { track ->
-                            SubtitleOptionRow(
-                                label = subtitleTrackDisplayLabel(track),
-                                selected = selectedSubtitleTrackId == track.id,
-                                onClick = {
-                                    onSelectSubtitleTrack(track.id)
-                                    subtitleSheetVisible = false
-                                },
-                            )
-                        }
-                    }
-                }
+            val dismissSubtitlePicker = { subtitleSheetVisible = false }
+            when (resolveSubtitlePickerSurface(tvMode)) {
+                SubtitlePickerSurface.CenterDialog -> TvSubtitlePickerDialog(
+                    subtitleTracks = subtitleTracks,
+                    selectedSubtitleTrackId = selectedSubtitleTrackId,
+                    onSelectSubtitleTrack = onSelectSubtitleTrack,
+                    onDismissRequest = dismissSubtitlePicker,
+                )
+
+                SubtitlePickerSurface.BottomSheet -> LongFormSubtitleBottomSheet(
+                    subtitleTracks = subtitleTracks,
+                    selectedSubtitleTrackId = selectedSubtitleTrackId,
+                    onSelectSubtitleTrack = onSelectSubtitleTrack,
+                    onDismissRequest = dismissSubtitlePicker,
+                )
             }
         }
     }
@@ -927,40 +897,4 @@ private fun buildLongFormSubtitleStyle(): CaptionStyleCompat {
         0xB3000000.toInt(),
         null,
     )
-}
-
-@Composable
-private fun SubtitleOptionRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = if (selected) Color(0x26FFFFFF) else Color(0x12000000),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-                .tvFocusableGlow(shape = RoundedCornerShape(14.dp), focusedScale = 1.02f)
-                .clickable(onClick = onClick),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = label,
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            if (selected) {
-                Text(
-                    text = "已选中",
-                    color = Color.White.copy(alpha = 0.72f),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-        }
-    }
 }

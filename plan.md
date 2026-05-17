@@ -537,6 +537,27 @@
 - Verification:
   - pending
 
+### [2026-05-13 15:05 +0800] TV 字幕选择居中对话框改造
+- Type: `implementation`
+- Summary:
+  - 长视频播放器的字幕选择按 `tvMode` 分流：TV 模式渲染居中紧凑对话框，非 TV 模式继续使用原底部弹层。
+  - 新增 TV 字幕对话框，包含半透明遮罩、标题“字幕”、“关闭字幕”和字幕轨道列表，当前项显示高亮与“已选中”状态。
+  - 抽出字幕选项构造和弹层类型解析，保持 `selectedSubtitleTrackId`、`subtitleTracks`、`onSelectSubtitleTrack` 与 `subtitleTrackDisplayLabel` 数据流不变。
+  - 新增单测覆盖 TV/非 TV 分流，以及空选择和当前字幕轨道的选中状态。
+- Changed Files:
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`
+  - `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`
+  - `android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/SubtitleSelectionTest.kt`
+  - `plan.md`
+- Verification:
+  - Red: `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.core.ui.SubtitleSelectionTest` failed before implementation because `SubtitlePickerSurface`、`resolveSubtitlePickerSurface`、`buildSubtitlePickerItems` did not exist.
+  - Green: `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.core.ui.SubtitleSelectionTest` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.core.ui.SubtitleSelectionTest --tests com.chee.videos.core.ui.LongFormVideoPlayerTransportKeyTest --tests com.chee.videos.core.ui.LongFormVideoPlayerStyleTest` passed.
+  - `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` failed on existing `com.chee.videos.feature.home.HomeViewModelTest.loadCategory loads default av list`.
+  - `adb devices` showed no connected devices, so `connectedDebugAndroidTest` was not run.
+- Rollback:
+  - `git revert <commit>`
+
 ### [2026-05-13 06:38 +0800] TV 海报墙与播放遥控体验优化
 - Type: `implementation`
 - Summary:

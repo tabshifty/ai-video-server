@@ -10,6 +10,58 @@ import org.junit.Test
 
 class SubtitleSelectionTest {
     @Test
+    fun resolveSubtitlePickerSurface_usesCenteredDialogOnlyInTvMode() {
+        assertEquals(SubtitlePickerSurface.CenterDialog, resolveSubtitlePickerSurface(tvMode = true))
+        assertEquals(SubtitlePickerSurface.BottomSheet, resolveSubtitlePickerSurface(tvMode = false))
+    }
+
+    @Test
+    fun buildSubtitlePickerItems_marksClosedOptionSelectedWhenNoSubtitleIsSelected() {
+        val items = buildSubtitlePickerItems(
+            tracks = listOf(
+                SubtitleTrackDto(
+                    id = "uploaded-1",
+                    sourceType = "uploaded",
+                    languageCode = "zh-CN",
+                    label = "外挂简中",
+                    format = "srt",
+                    url = "/api/v1/videos/v1/subtitles/uploaded-1/file",
+                    mimeType = "application/x-subrip",
+                ),
+            ),
+            selectedSubtitleTrackId = null,
+        )
+
+        assertEquals(2, items.size)
+        assertNull(items[0].trackId)
+        assertEquals("关闭字幕", items[0].label)
+        assertTrue(items[0].selected)
+        assertFalse(items[1].selected)
+    }
+
+    @Test
+    fun buildSubtitlePickerItems_marksCurrentSubtitleTrackSelected() {
+        val items = buildSubtitlePickerItems(
+            tracks = listOf(
+                SubtitleTrackDto(
+                    id = "uploaded-1",
+                    sourceType = "uploaded",
+                    languageCode = "zh-CN",
+                    label = "外挂简中",
+                    format = "srt",
+                    url = "/api/v1/videos/v1/subtitles/uploaded-1/file",
+                    mimeType = "application/x-subrip",
+                ),
+            ),
+            selectedSubtitleTrackId = "uploaded-1",
+        )
+
+        assertFalse(items[0].selected)
+        assertEquals("uploaded-1", items[1].trackId)
+        assertTrue(items[1].selected)
+    }
+
+    @Test
     fun resolveInitialSubtitleTrackId_prefersUploadedDefault() {
         val trackId = resolveInitialSubtitleTrackId(
             listOf(
