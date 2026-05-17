@@ -72,11 +72,13 @@ fun TvCatalogScreen(
     onOpenLongForm: (String, String) -> Unit,
     onPlayLongForm: (String, String) -> Unit,
     onOpenCatalogWall: (String, String) -> Unit = { _, _ -> },
+    homeContentFocusRequester: FocusRequester? = null,
     viewModel: TvCatalogViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isSearching = uiState.query.isNotBlank()
-    val searchFocusRequester = remember { FocusRequester() }
+    val localSearchFocusRequester = remember { FocusRequester() }
+    val searchFocusRequester = homeContentFocusRequester ?: localSearchFocusRequester
     val featuredFocusRequester = remember { FocusRequester() }
     val continueFocusRequester = remember { FocusRequester() }
     val firstSectionItemFocusRequester = remember { FocusRequester() }

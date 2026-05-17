@@ -26,7 +26,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -106,6 +109,7 @@ private fun TvAuthenticatedNav(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val showSettingsMenu = shouldShowTvGlobalSettings(navBackStackEntry?.destination?.route)
     val handleShellBack = shouldHandleTvShellBack(navBackStackEntry?.destination?.route)
+    val homeContentFocusRequester = remember { FocusRequester() }
     var menuExpanded by remember { mutableStateOf(false) }
 
     BackHandler(enabled = handleShellBack) {
@@ -147,6 +151,7 @@ private fun TvAuthenticatedNav(
                     onOpenCatalogWall = { kind, title ->
                         navController.navigate(buildTvCatalogWallRoute(kind, title))
                     },
+                    homeContentFocusRequester = homeContentFocusRequester,
                 )
             }
             composable(
@@ -235,7 +240,26 @@ private fun TvAuthenticatedNav(
                 Column(horizontalAlignment = Alignment.End) {
                     IconButton(
                         onClick = { menuExpanded = true },
-                        modifier = Modifier.focusable(),
+                        modifier = Modifier
+                            .focusProperties {
+                                left = tvShellSettingsFocusRequesterFor(
+                                    TvShellSettingsFocusDirection.Left,
+                                    homeContentFocusRequester,
+                                )
+                                down = tvShellSettingsFocusRequesterFor(
+                                    TvShellSettingsFocusDirection.Down,
+                                    homeContentFocusRequester,
+                                )
+                                right = tvShellSettingsFocusRequesterFor(
+                                    TvShellSettingsFocusDirection.Right,
+                                    homeContentFocusRequester,
+                                )
+                                up = tvShellSettingsFocusRequesterFor(
+                                    TvShellSettingsFocusDirection.Up,
+                                    homeContentFocusRequester,
+                                )
+                            }
+                            .focusable(),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Settings,
@@ -268,6 +292,39 @@ private fun TvAuthenticatedNav(
 }
 
 internal fun shouldShowTvGlobalSettings(route: String?): Boolean = route == "tv-home"
+
+internal enum class TvShellSettingsFocusDirection {
+    Left,
+    Down,
+    Right,
+    Up,
+}
+
+internal enum class TvShellSettingsFocusTarget {
+    HomeContent,
+    Boundary,
+}
+
+internal fun resolveTvShellSettingsFocusTarget(
+    direction: TvShellSettingsFocusDirection,
+): TvShellSettingsFocusTarget = when (direction) {
+    TvShellSettingsFocusDirection.Left,
+    TvShellSettingsFocusDirection.Down,
+    -> TvShellSettingsFocusTarget.HomeContent
+
+    TvShellSettingsFocusDirection.Right,
+    TvShellSettingsFocusDirection.Up,
+    -> TvShellSettingsFocusTarget.Boundary
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+private fun tvShellSettingsFocusRequesterFor(
+    direction: TvShellSettingsFocusDirection,
+    homeContentFocusRequester: FocusRequester,
+): FocusRequester = when (resolveTvShellSettingsFocusTarget(direction)) {
+    TvShellSettingsFocusTarget.HomeContent -> homeContentFocusRequester
+    TvShellSettingsFocusTarget.Boundary -> FocusRequester.Cancel
+}
 
 internal fun shouldHandleTvShellBack(route: String?): Boolean {
     val value = route ?: return false
