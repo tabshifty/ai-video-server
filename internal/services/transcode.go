@@ -268,7 +268,7 @@ func decideVideoBitrate(videoType string, width, height, sourceBitrateKbps int) 
 	cap4K := 8000
 	cap1080 := 4000
 	if isLongformVideoType(videoType) {
-		cap4K = 12000
+		cap4K = 10000
 		cap1080 = 5000
 	}
 

@@ -40,13 +40,13 @@ func TestDecideVideoBitrate(t *testing.T) {
 			wantCapped: false,
 		},
 		{
-			name:       "4k high bitrate capped to 12000k",
+			name:       "4k high bitrate capped to 10000k",
 			videoType:  "episode",
 			width:      3840,
 			height:     2160,
 			source:     15000,
 			wantTier:   resolutionTier4K,
-			want:       12000,
+			want:       10000,
 			wantCapped: true,
 		},
 		{
@@ -129,7 +129,7 @@ func TestBuildTranscodePlanLongformUsesBitrateStrategyWhenSourceBitrateKnown(t *
 		wantCapped bool
 		wantTier   string
 	}{
-		{name: "movie 4k capped", videoType: "movie", width: 3840, height: 2160, sourceKbps: 15000, wantKbps: 12000, wantCapped: true, wantTier: resolutionTier4K},
+		{name: "movie 4k capped", videoType: "movie", width: 3840, height: 2160, sourceKbps: 15000, wantKbps: 10000, wantCapped: true, wantTier: resolutionTier4K},
 		{name: "episode 1080 capped", videoType: "episode", width: 1920, height: 1080, sourceKbps: 6200, wantKbps: 5000, wantCapped: true, wantTier: resolutionTier1080},
 		{name: "episode 1080 keeps lower source", videoType: "episode", width: 1920, height: 1080, sourceKbps: 3200, wantKbps: 3200, wantCapped: false, wantTier: resolutionTier1080},
 		{name: "movie 4k keeps lower source", videoType: "movie", width: 3840, height: 2160, sourceKbps: 9000, wantKbps: 9000, wantCapped: false, wantTier: resolutionTier4K},
