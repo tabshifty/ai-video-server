@@ -23,7 +23,11 @@ func TestBuildTranscodeVideoArgsForHevcPrimary(t *testing.T) {
 	assertArgPair(t, args, "-allow_sw", "0")
 	assertArgPair(t, args, "-spatial_aq", "1")
 	assertArgPair(t, args, "-crf", "23")
-	assertArgPair(t, args, "-ac", "2")
+	assertArgPair(t, args, "-map", "0:v:0")
+	assertArgPair(t, args, "-map", "0:a?")
+	assertArgPair(t, args, "-c:a", "aac")
+	assertArgPair(t, args, "-b:a", "128k")
+	assertArgAbsent(t, args, "-ac")
 	assertArgAbsent(t, args, "-preset")
 	assertArgAbsent(t, args, "-x265-params")
 }
@@ -37,7 +41,11 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	assertArgPair(t, args, "-b:v", "4200k")
 	assertArgPair(t, args, "-maxrate", "8400k")
 	assertArgPair(t, args, "-bufsize", "16800k")
-	assertArgPair(t, args, "-ac", "2")
+	assertArgPair(t, args, "-map", "0:v:0")
+	assertArgPair(t, args, "-map", "0:a?")
+	assertArgPair(t, args, "-c:a", "aac")
+	assertArgPair(t, args, "-b:a", "128k")
+	assertArgAbsent(t, args, "-ac")
 	assertArgAbsent(t, args, "-preset")
 	assertArgAbsent(t, args, "-x265-params")
 	assertArgAbsent(t, args, "-spatial_aq")
@@ -346,6 +354,11 @@ func TestParseProbeOutputIncludesAudioStreamMetadata(t *testing.T) {
       "codec_type": "audio",
       "codec_name": "aac",
       "channels": 6
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "ac3",
+      "channels": 2
     }
   ],
   "format": {
@@ -372,6 +385,9 @@ func TestParseProbeOutputIncludesAudioStreamMetadata(t *testing.T) {
 	}
 	if probe.AudioChannels != 6 {
 		t.Fatalf("expected audio channels 6, got %d", probe.AudioChannels)
+	}
+	if probe.AudioTrackCount != 2 {
+		t.Fatalf("expected audio track count 2, got %d", probe.AudioTrackCount)
 	}
 	if probe.Duration != 120.5 {
 		t.Fatalf("expected duration 120.5, got %v", probe.Duration)

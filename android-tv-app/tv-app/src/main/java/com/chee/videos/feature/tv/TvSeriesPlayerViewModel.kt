@@ -20,6 +20,7 @@ data class TvSeriesPlayerUiState(
     val selectedSeasonNumber: Int = 1,
     val selectedEpisodeNumber: Int = 1,
     val selectedSubtitleTrackId: String? = null,
+    val selectedAudioTrackId: String? = null,
     val playbackSpeed: Float = 1f,
     val selectorVisible: Boolean = false,
     val currentVideoId: String = "",
@@ -99,6 +100,17 @@ class TvSeriesPlayerViewModel @Inject constructor(
         }
     }
 
+    fun selectAudioTrack(audioTrackId: String?) {
+        val currentVideoId = _uiState.value.currentVideoId
+        if (currentVideoId.isBlank()) {
+            return
+        }
+        _uiState.update { it.copy(selectedAudioTrackId = audioTrackId ?: "") }
+        viewModelScope.launch {
+            repository.saveTvAudioPreference(currentVideoId, audioTrackId ?: "")
+        }
+    }
+
     private fun load() {
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, errorMessage = null) }
@@ -164,6 +176,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     currentVideoId = "",
                     currentSourceUrl = "",
                     selectedSubtitleTrackId = null,
+                    selectedAudioTrackId = null,
                     canPlayCurrentEpisode = false,
                 )
             }
@@ -174,12 +187,14 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 currentVideoId = "",
                 currentSourceUrl = "",
                 selectedSubtitleTrackId = null,
+                selectedAudioTrackId = null,
                 canPlayCurrentEpisode = false,
             )
         }
         viewModelScope.launch {
             val sourceUrl = repository.buildSourceUrl(episode.videoId)
             val preferredSubtitleTrackId = repository.readTvSubtitlePreference(episode.videoId)
+            val preferredAudioTrackId = repository.readTvAudioPreference(episode.videoId)
             if (requestId != playbackTargetRequestId) {
                 return@launch
             }
@@ -192,6 +207,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     currentVideoId = episode.videoId,
                     currentSourceUrl = sourceUrl,
                     selectedSubtitleTrackId = preferredSubtitleTrackId,
+                    selectedAudioTrackId = preferredAudioTrackId,
                     canPlayCurrentEpisode = true,
                 )
             }

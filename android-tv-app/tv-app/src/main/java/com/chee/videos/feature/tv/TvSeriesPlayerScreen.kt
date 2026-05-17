@@ -156,6 +156,7 @@ fun TvSeriesPlayerScreen(
     var preparedUrl by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var preparedSubtitleTrackId by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var selectedSubtitleTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    var selectedAudioTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var playerErrorMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
@@ -254,6 +255,10 @@ fun TvSeriesPlayerScreen(
             tracks = currentEpisode?.subtitleTracks.orEmpty(),
             hasStartedPlayback = hasStartedPlayback,
         )
+    }
+
+    LaunchedEffect(uiState.currentVideoId, uiState.selectedAudioTrackId) {
+        selectedAudioTrackId = uiState.selectedAudioTrackId
     }
 
     LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
@@ -361,6 +366,11 @@ fun TvSeriesPlayerScreen(
                     onSelectSubtitleTrack = {
                         selectedSubtitleTrackId = it ?: ""
                         viewModel.selectSubtitleTrack(it)
+                    },
+                    selectedAudioTrackId = selectedAudioTrackId,
+                    onSelectAudioTrack = {
+                        selectedAudioTrackId = it ?: ""
+                        viewModel.selectAudioTrack(it)
                     },
                     showStatusBarPadding = false,
                     tvMode = true,

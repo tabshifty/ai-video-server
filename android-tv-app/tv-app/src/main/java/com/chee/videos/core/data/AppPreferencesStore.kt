@@ -32,6 +32,7 @@ class AppPreferencesStore @Inject constructor(
         val unifiedShortFitMode = stringPreferencesKey("unified_short_fit_mode")
         val shortPlaybackMode = stringPreferencesKey("short_playback_mode")
         val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_preferences")
+        val tvAudioPreferences = stringPreferencesKey("tv_audio_preferences")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -129,23 +130,21 @@ class AppPreferencesStore @Inject constructor(
     }
 
     suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
+        saveStringMapPreference(Keys.tvSubtitlePreferences, videoId, subtitleTrackId)
+    }
+
+    suspend fun readTvAudioPreference(videoId: String): String? {
         val key = videoId.trim()
         if (key.isBlank()) {
-            return
+            return null
         }
-        dataStore.edit { prefs ->
-            val current = decodeStringMap(prefs[Keys.tvSubtitlePreferences].orEmpty()).toMutableMap()
-            if (subtitleTrackId == null) {
-                current.remove(key)
-            } else {
-                current[key] = subtitleTrackId
-            }
-            if (current.isEmpty()) {
-                prefs.remove(Keys.tvSubtitlePreferences)
-            } else {
-                prefs[Keys.tvSubtitlePreferences] = gson.toJson(current)
-            }
-        }
+        return dataStore.data.first()[Keys.tvAudioPreferences]
+            ?.let(::decodeStringMap)
+            ?.get(key)
+    }
+
+    suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
+        saveStringMapPreference(Keys.tvAudioPreferences, videoId, audioTrackId)
     }
 
     suspend fun setActiveBaseUrl(baseUrl: String) {
@@ -219,6 +218,30 @@ class AppPreferencesStore @Inject constructor(
                 ?: emptyMap()
         } catch (_: Exception) {
             emptyMap()
+        }
+    }
+
+    private suspend fun saveStringMapPreference(
+        prefsKey: Preferences.Key<String>,
+        videoId: String,
+        value: String?,
+    ) {
+        val key = videoId.trim()
+        if (key.isBlank()) {
+            return
+        }
+        dataStore.edit { prefs ->
+            val current = decodeStringMap(prefs[prefsKey].orEmpty()).toMutableMap()
+            if (value == null) {
+                current.remove(key)
+            } else {
+                current[key] = value
+            }
+            if (current.isEmpty()) {
+                prefs.remove(prefsKey)
+            } else {
+                prefs[prefsKey] = gson.toJson(current)
+            }
         }
     }
 }

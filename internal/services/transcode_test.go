@@ -217,8 +217,11 @@ func TestResolveProbeFieldsWithProbeErrorUsesDefaults(t *testing.T) {
 	if metadata["audio_codec"] != "aac" {
 		t.Fatalf("expected audio_codec aac, got %v", metadata["audio_codec"])
 	}
-	if metadata["audio_channels"] != 2 {
-		t.Fatalf("expected audio_channels 2, got %v", metadata["audio_channels"])
+	if metadata["audio_channels"] != 0 {
+		t.Fatalf("expected audio_channels 0, got %v", metadata["audio_channels"])
+	}
+	if metadata["audio_track_count"] != 0 {
+		t.Fatalf("expected audio_track_count 0, got %v", metadata["audio_track_count"])
 	}
 	if _, ok := metadata["probe_error"]; !ok {
 		t.Fatalf("expected probe_error metadata")
@@ -234,10 +237,11 @@ func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 		BitrateCapped:     true,
 	}
 	duration, width, height, metadata := resolveProbeFields(ffmpeg.VideoProbe{
-		Duration: 12.6,
-		Width:    1920,
-		Height:   1080,
-		Codec:    "h265",
+		Duration:        12.6,
+		Width:           1920,
+		Height:          1080,
+		Codec:           "h265",
+		AudioTrackCount: 2,
 	}, nil, plan)
 
 	if duration != 13 || width != 1920 || height != 1080 {
@@ -267,11 +271,14 @@ func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 	if metadata["audio_codec"] != "aac" {
 		t.Fatalf("expected audio_codec aac, got %v", metadata["audio_codec"])
 	}
-	if metadata["audio_channels"] != 2 {
-		t.Fatalf("expected audio_channels 2, got %v", metadata["audio_channels"])
+	if metadata["audio_channels"] != 0 {
+		t.Fatalf("expected audio_channels 0, got %v", metadata["audio_channels"])
 	}
 	if metadata["audio_downmixed"] != false {
 		t.Fatalf("expected audio_downmixed false, got %v", metadata["audio_downmixed"])
+	}
+	if metadata["audio_track_count"] != 2 {
+		t.Fatalf("expected audio_track_count 2, got %v", metadata["audio_track_count"])
 	}
 	if _, ok := metadata["crf"]; ok {
 		t.Fatalf("did not expect crf metadata in bitrate mode")
@@ -281,7 +288,7 @@ func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 	}
 }
 
-func TestResolveProbeFieldsMarksAudioDownmixedWhenSourceHasMoreChannels(t *testing.T) {
+func TestResolveProbeFieldsKeepsMultichannelAudioMetadataWithoutDownmix(t *testing.T) {
 	plan := transcodePlan{
 		Mode:                transcodeModeBitrate,
 		ResolutionTier:      resolutionTier1080,
@@ -291,22 +298,26 @@ func TestResolveProbeFieldsMarksAudioDownmixedWhenSourceHasMoreChannels(t *testi
 		SourceAudioChannels: 6,
 	}
 	_, _, _, metadata := resolveProbeFields(ffmpeg.VideoProbe{
-		Duration:      12.6,
-		Width:         1920,
-		Height:        1080,
-		Codec:         "h265",
-		AudioCodec:    "aac",
-		AudioChannels: 2,
+		Duration:        12.6,
+		Width:           1920,
+		Height:          1080,
+		Codec:           "h265",
+		AudioCodec:      "aac",
+		AudioChannels:   6,
+		AudioTrackCount: 3,
 	}, nil, plan)
 
 	if metadata["audio_codec"] != "aac" {
 		t.Fatalf("expected audio_codec aac, got %v", metadata["audio_codec"])
 	}
-	if metadata["audio_channels"] != 2 {
-		t.Fatalf("expected audio_channels 2, got %v", metadata["audio_channels"])
+	if metadata["audio_channels"] != 6 {
+		t.Fatalf("expected audio_channels 6, got %v", metadata["audio_channels"])
 	}
-	if metadata["audio_downmixed"] != true {
-		t.Fatalf("expected audio_downmixed true, got %v", metadata["audio_downmixed"])
+	if metadata["audio_track_count"] != 3 {
+		t.Fatalf("expected audio_track_count 3, got %v", metadata["audio_track_count"])
+	}
+	if metadata["audio_downmixed"] != false {
+		t.Fatalf("expected audio_downmixed false, got %v", metadata["audio_downmixed"])
 	}
 }
 

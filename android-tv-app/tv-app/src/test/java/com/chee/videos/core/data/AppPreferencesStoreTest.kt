@@ -60,4 +60,33 @@ class AppPreferencesStoreTest {
         assertEquals("", store.readTvSubtitlePreference("video-2"))
         assertNull(store.readTvSubtitlePreference("video-3"))
     }
+
+    @Test
+    fun tvAudioPreference_persistsPerVideoIdAndCanClear() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
+            produceFile = {
+                File.createTempFile("app-preferences-store", ".preferences_pb").apply {
+                    deleteOnExit()
+                }
+            },
+        )
+        val store = AppPreferencesStore(
+            dataStore = dataStore,
+            gson = Gson(),
+        )
+
+        assertNull(store.readTvAudioPreference("video-1"))
+
+        store.saveTvAudioPreference("video-1", "audio-zh-51")
+        store.saveTvAudioPreference("video-2", "")
+
+        assertEquals("audio-zh-51", store.readTvAudioPreference("video-1"))
+        assertEquals("", store.readTvAudioPreference("video-2"))
+        assertNull(store.readTvAudioPreference("video-3"))
+
+        store.saveTvAudioPreference("video-1", null)
+        assertNull(store.readTvAudioPreference("video-1"))
+        assertEquals("", store.readTvAudioPreference("video-2"))
+    }
 }

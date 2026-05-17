@@ -139,6 +139,72 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_restoresSavedAudioSelectionForCurrentVideo() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                audioPreferences = mapOf("video-1" to "audio-zh-51"),
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(
+                                    id = "e1",
+                                    number = 1,
+                                    title = "第1集",
+                                    videoId = "video-1",
+                                    videoStatus = "ready",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        assertEquals("audio-zh-51", viewModel.uiState.value.selectedAudioTrackId)
+    }
+
+    @Test
+    fun selectAudioTrack_savesCurrentVideoPreference() = runTest {
+        val repository = FakeTvRepository(
+            detailPayload = tvSeriesDetail(
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisode(
+                                id = "e1",
+                                number = 1,
+                                title = "第1集",
+                                videoId = "video-1",
+                                videoStatus = "ready",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        viewModel.selectAudioTrack("audio-zh-51")
+        advanceUntilIdle()
+
+        assertEquals("audio-zh-51", viewModel.uiState.value.selectedAudioTrackId)
+        assertEquals("audio-zh-51", repository.readTvAudioPreference("video-1"))
+    }
+
+    @Test
     fun init_withoutRouteEpisode_prefersMostRecentlyWatchedPlayableEpisode() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(

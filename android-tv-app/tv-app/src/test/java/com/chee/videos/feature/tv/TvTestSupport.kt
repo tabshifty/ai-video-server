@@ -23,8 +23,10 @@ class FakeTvRepository(
     private val homeError: Throwable? = null,
     private val detailError: Throwable? = null,
     subtitlePreferences: Map<String, String> = emptyMap(),
+    audioPreferences: Map<String, String> = emptyMap(),
 ) : TvRepository {
     private val storedSubtitlePreferences = subtitlePreferences.toMutableMap()
+    private val storedAudioPreferences = audioPreferences.toMutableMap()
     val historyReports = mutableListOf<TvHistoryReport>()
 
     override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
@@ -66,6 +68,16 @@ class FakeTvRepository(
             storedSubtitlePreferences[videoId] = subtitleTrackId
         }
     }
+
+    override suspend fun readTvAudioPreference(videoId: String): String? = storedAudioPreferences[videoId]
+
+    override suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
+        if (audioTrackId == null) {
+            storedAudioPreferences.remove(videoId)
+        } else {
+            storedAudioPreferences[videoId] = audioTrackId
+        }
+    }
 }
 
 data class TvHistoryReport(
@@ -102,6 +114,10 @@ class DelayedSourceTvRepository(
     override suspend fun readTvSubtitlePreference(videoId: String): String? = null
 
     override suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) = Unit
+
+    override suspend fun readTvAudioPreference(videoId: String): String? = null
+
+    override suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) = Unit
 
     fun completeSourceUrl(videoId: String, url: String = "https://example.com/$videoId.m3u8") {
         pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.complete(url)

@@ -148,6 +148,8 @@ fun TvLongFormPlayerScreen(
     var preparedSubtitleTrackId by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
     var resumedFromHistoryVideoId by remember(detail.id, uiState.accessToken) { mutableStateOf("") }
     var selectedSubtitleTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
+    var storedAudioTrackId by remember(detail.id) { mutableStateOf<String?>(null) }
+    var selectedAudioTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
     var playerErrorMessage by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
 
@@ -184,6 +186,14 @@ fun TvLongFormPlayerScreen(
             tracks = detail.subtitleTracks,
             hasStartedPlayback = hasStartedPlayback,
         )
+    }
+
+    LaunchedEffect(detail.id) {
+        storedAudioTrackId = viewModel.readTvAudioPreference(detail.id)
+    }
+
+    LaunchedEffect(detail.id, storedAudioTrackId) {
+        selectedAudioTrackId = storedAudioTrackId
     }
 
     LaunchedEffect(playUrl, dataSourceFactory, selectedSubtitleTrackId, playbackSession.hasStartedPlayback) {
@@ -336,6 +346,12 @@ fun TvLongFormPlayerScreen(
                 subtitleTracks = detail.subtitleTracks,
                 selectedSubtitleTrackId = selectedSubtitleTrackId,
                 onSelectSubtitleTrack = { selectedSubtitleTrackId = it },
+                selectedAudioTrackId = selectedAudioTrackId,
+                onSelectAudioTrack = {
+                    selectedAudioTrackId = it ?: ""
+                    storedAudioTrackId = it ?: ""
+                    viewModel.saveTvAudioPreference(detail.id, it ?: "")
+                },
                 tvMode = true,
                 onExitPlayback = onBack,
             )

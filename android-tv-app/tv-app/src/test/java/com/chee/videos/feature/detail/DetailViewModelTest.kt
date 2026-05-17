@@ -71,6 +71,20 @@ class DetailViewModelTest {
         assertEquals(emptyList<RecordHistoryRequest>(), api.historyRequests)
     }
 
+    @Test
+    fun tvAudioPreference_readsAndSavesThroughRepository() = runTest {
+        val api = FakeDetailApiService()
+        val viewModel = buildDetailViewModel(api, backgroundScope)
+
+        assertEquals(null, viewModel.readTvAudioPreference("video-1"))
+
+        viewModel.saveTvAudioPreference("video-1", "audio-zh-51")
+        mainDispatcherRule.scheduler.runCurrent()
+        advanceUntilIdle()
+
+        assertEquals("audio-zh-51", viewModel.readTvAudioPreference("video-1"))
+    }
+
     private suspend fun buildDetailViewModel(
         api: FakeDetailApiService,
         dataStoreScope: CoroutineScope,

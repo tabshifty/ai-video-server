@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Subtitles
@@ -89,6 +90,8 @@ fun LongFormVideoPlayer(
     subtitleTracks: List<SubtitleTrackDto> = emptyList(),
     selectedSubtitleTrackId: String? = null,
     onSelectSubtitleTrack: (String?) -> Unit = {},
+    selectedAudioTrackId: String? = null,
+    onSelectAudioTrack: (String?) -> Unit = {},
     tvMode: Boolean = false,
     onOpenEpisodeSelector: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null,
@@ -120,6 +123,8 @@ fun LongFormVideoPlayer(
     var centerFeedbackText by remember { mutableStateOf("") }
     var centerFeedbackIcon by remember { mutableStateOf(Icons.Filled.PlayArrow) }
     var subtitleSheetVisible by remember { mutableStateOf(false) }
+    var audioTrackSheetVisible by remember { mutableStateOf(false) }
+    var audioTracks by remember { mutableStateOf(emptyList<LongFormAudioTrack>()) }
     var hasShownControlsOnce by remember { mutableStateOf(false) }
     var pendingRootFocusRequest by remember { mutableStateOf(false) }
     var pendingPlayPauseFocusRequest by remember { mutableStateOf(false) }
@@ -281,12 +286,14 @@ fun LongFormVideoPlayer(
                 if (!isScrubbing && !draggingSeek) {
                     positionMs = playerObj.currentPosition.coerceAtLeast(0L)
                 }
+                audioTracks = buildLongFormAudioTracks(playerObj.currentTracks)
             }
         }
         player.addListener(listener)
         isPlaying = player.isPlaying
         durationMs = player.duration.coerceAtLeast(0L)
         positionMs = player.currentPosition.coerceAtLeast(0L)
+        audioTracks = buildLongFormAudioTracks(player.currentTracks)
         onDispose {
             player.removeListener(listener)
             if (longPressBoosting) {
@@ -348,6 +355,25 @@ fun LongFormVideoPlayer(
         withFrameNanos { }
         playPauseFocusRequester.requestFocus()
         pendingPlayPauseFocusRequest = false
+    }
+
+    LaunchedEffect(player, audioTracks, selectedAudioTrackId) {
+        if (audioTracks.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val resolvedSelection = resolveAudioSelectionOnTrackLoad(
+            storedSelection = selectedAudioTrackId,
+            tracks = audioTracks,
+        )
+        if (selectedAudioTrackId?.isNotBlank() == true && resolvedSelection == null) {
+            onSelectAudioTrack(null)
+        }
+        player.trackSelectionParameters = buildAudioTrackSelectionParameters(
+            currentParameters = player.trackSelectionParameters,
+            currentTracks = player.currentTracks,
+            audioTracks = audioTracks,
+            selectedAudioTrackId = resolvedSelection,
+        )
     }
 
     val actualDurationMs = effectiveDurationMs()
@@ -727,6 +753,15 @@ fun LongFormVideoPlayer(
                         )
                         if (tvMode) {
                             CompactPlayerControlButton(
+                                icon = Icons.Filled.GraphicEq,
+                                contentDescription = "音轨",
+                                tvMode = true,
+                                onClick = {
+                                    audioTrackSheetVisible = true
+                                    showControlsTemporarily()
+                                },
+                            )
+                            CompactPlayerControlButton(
                                 icon = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "返回详情",
                                 tvMode = true,
@@ -778,6 +813,14 @@ fun LongFormVideoPlayer(
                     onDismissRequest = dismissSubtitlePicker,
                 )
             }
+        }
+        if (audioTrackSheetVisible) {
+            TvAudioTrackPickerDialog(
+                audioTracks = audioTracks,
+                selectedAudioTrackId = selectedAudioTrackId,
+                onSelectAudioTrack = onSelectAudioTrack,
+                onDismissRequest = { audioTrackSheetVisible = false },
+            )
         }
     }
 }

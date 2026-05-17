@@ -177,6 +177,7 @@ func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, plan transcodeP
 	audioCodec, audioChannels, audioDownmixed := resolvePlaybackAudioMetadata(probe, plan)
 	metadata["audio_codec"] = audioCodec
 	metadata["audio_channels"] = audioChannels
+	metadata["audio_track_count"] = probe.AudioTrackCount
 	metadata["audio_downmixed"] = audioDownmixed
 	if plan.Mode == transcodeModeCRFFallback {
 		metadata["crf"] = plan.CRF
@@ -203,14 +204,14 @@ func resolveProbeFields(probe ffmpeg.VideoProbe, probeErr error, plan transcodeP
 
 func resolvePlaybackAudioMetadata(probe ffmpeg.VideoProbe, plan transcodePlan) (codec string, channels int, downmixed bool) {
 	codec = "aac"
-	channels = 2
+	channels = 0
 	if value := strings.TrimSpace(probe.AudioCodec); value != "" {
 		codec = value
 	}
 	if probe.AudioChannels > 0 {
 		channels = probe.AudioChannels
 	}
-	downmixed = plan.SourceAudioChannels > channels && channels > 0
+	downmixed = false
 	return codec, channels, downmixed
 }
 

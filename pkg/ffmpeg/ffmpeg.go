@@ -17,13 +17,14 @@ import (
 
 // VideoProbe holds basic media attributes from ffprobe.
 type VideoProbe struct {
-	Duration      float64 `json:"duration"`
-	Width         int     `json:"width"`
-	Height        int     `json:"height"`
-	Codec         string  `json:"codec"`
-	BitrateKbps   int     `json:"bitrate_kbps"`
-	AudioCodec    string  `json:"audio_codec"`
-	AudioChannels int     `json:"audio_channels"`
+	Duration        float64 `json:"duration"`
+	Width           int     `json:"width"`
+	Height          int     `json:"height"`
+	Codec           string  `json:"codec"`
+	BitrateKbps     int     `json:"bitrate_kbps"`
+	AudioCodec      string  `json:"audio_codec"`
+	AudioChannels   int     `json:"audio_channels"`
+	AudioTrackCount int     `json:"audio_track_count"`
 }
 
 type SubtitleProbe struct {
@@ -64,23 +65,28 @@ func preferredHardwareAvcEncoder() string { return "h264_videotoolbox" }
 
 func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProfile, options TranscodeOptions) []string {
 	encoder := preferredHardwareHevcEncoder()
+	switch profile {
+	case TranscodeProfileAVCCompat:
+		encoder = preferredHardwareAvcEncoder()
+	case TranscodeProfileHEVCPrimary:
+	default:
+		panic(fmt.Sprintf("unsupported transcode profile: %s", profile))
+	}
 	args := []string{
 		"-y",
 		"-i", inputPath,
+		"-map", "0:v:0",
+		"-map", "0:a?",
 		"-c:v", encoder,
 		"-pix_fmt", "yuv420p",
 		"-allow_sw", "0",
 	}
 	switch profile {
-	case TranscodeProfileAVCCompat:
-		args[4] = preferredHardwareAvcEncoder()
 	case TranscodeProfileHEVCPrimary:
 		args = append(args, "-tag:v", "hvc1")
 		if options.SpatialAQ {
 			args = append(args, "-spatial_aq", "1")
 		}
-	default:
-		panic(fmt.Sprintf("unsupported transcode profile: %s", profile))
 	}
 	if options.VideoBitrateKbps > 0 {
 		bitrate := strconv.Itoa(options.VideoBitrateKbps) + "k"
@@ -99,7 +105,6 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 	args = append(args,
 		"-c:a", "aac",
 		"-b:a", "128k",
-		"-ac", "2",
 		"-movflags", "+faststart",
 		"-progress", "pipe:1",
 		"-nostats",
@@ -333,6 +338,7 @@ func parseProbeOutput(raw []byte) (VideoProbe, error) {
 				probe.BitrateKbps = parseBitrateKbps(stream.BitRate, payload.Format.BitRate)
 			}
 		case "audio":
+			probe.AudioTrackCount++
 			if probe.AudioCodec == "" {
 				probe.AudioCodec = strings.TrimSpace(stream.CodecName)
 			}

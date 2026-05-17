@@ -107,6 +107,18 @@ class DetailViewModel @Inject constructor(
         }
     }
 
+    suspend fun readTvAudioPreference(videoId: String): String? =
+        videoRepository.readTvAudioPreference(videoId)
+
+    fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
+        if (videoId.isBlank()) {
+            return
+        }
+        viewModelScope.launch {
+            videoRepository.saveTvAudioPreference(videoId, audioTrackId)
+        }
+    }
+
     private fun toggleAction(call: suspend () -> Result<ActionTogglePayload>) {
         viewModelScope.launch {
             call().onSuccess { result ->

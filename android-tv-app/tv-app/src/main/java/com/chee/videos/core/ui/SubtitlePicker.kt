@@ -80,6 +80,12 @@ internal fun buildSubtitlePickerItems(
     }
 }
 
+private data class TrackPickerDialogItem(
+    val trackId: String?,
+    val label: String,
+    val selected: Boolean,
+)
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun LongFormSubtitleBottomSheet(
@@ -141,6 +147,57 @@ internal fun TvSubtitlePickerDialog(
             selectedSubtitleTrackId = selectedSubtitleTrackId,
         )
     }
+    LongFormTrackPickerDialog(
+        title = "字幕",
+        items = items.map { item ->
+            TrackPickerDialogItem(
+                trackId = item.trackId,
+                label = item.label,
+                selected = item.selected,
+            )
+        },
+        fallbackKey = "off",
+        onSelectTrack = onSelectSubtitleTrack,
+        onDismissRequest = onDismissRequest,
+    )
+}
+
+@Composable
+internal fun TvAudioTrackPickerDialog(
+    audioTracks: List<LongFormAudioTrack>,
+    selectedAudioTrackId: String?,
+    onSelectAudioTrack: (String?) -> Unit,
+    onDismissRequest: () -> Unit,
+) {
+    val items = remember(audioTracks, selectedAudioTrackId) {
+        buildAudioTrackPickerItems(
+            tracks = audioTracks,
+            selectedAudioTrackId = selectedAudioTrackId,
+        )
+    }
+    LongFormTrackPickerDialog(
+        title = "音轨",
+        items = items.map { item ->
+            TrackPickerDialogItem(
+                trackId = item.trackId,
+                label = item.label,
+                selected = item.selected,
+            )
+        },
+        fallbackKey = "auto",
+        onSelectTrack = onSelectAudioTrack,
+        onDismissRequest = onDismissRequest,
+    )
+}
+
+@Composable
+private fun LongFormTrackPickerDialog(
+    title: String,
+    items: List<TrackPickerDialogItem>,
+    fallbackKey: String,
+    onSelectTrack: (String?) -> Unit,
+    onDismissRequest: () -> Unit,
+) {
     val selectedIndex = items.indexOfFirst { it.selected }.let { if (it >= 0) it else 0 }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
 
@@ -183,7 +240,7 @@ internal fun TvSubtitlePickerDialog(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Text(
-                            text = "字幕",
+                            text = title,
                             color = Color.White,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
@@ -193,13 +250,13 @@ internal fun TvSubtitlePickerDialog(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            itemsIndexed(items, key = { _, item -> item.trackId ?: "off" }) { index, item ->
+                            itemsIndexed(items, key = { _, item -> item.trackId ?: fallbackKey }) { index, item ->
                                 val focusRequester = remember { FocusRequester() }
                                 SubtitleOptionRow(
                                     label = item.label,
                                     selected = item.selected,
                                     onClick = {
-                                        onSelectSubtitleTrack(item.trackId)
+                                        onSelectTrack(item.trackId)
                                         onDismissRequest()
                                     },
                                     tvMode = true,
