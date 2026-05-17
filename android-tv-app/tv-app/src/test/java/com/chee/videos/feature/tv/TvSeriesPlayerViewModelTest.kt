@@ -322,4 +322,35 @@ class TvSeriesPlayerViewModelTest {
         assertEquals("https://example.com/video-1.m3u8", viewModel.uiState.value.currentSourceUrl)
         assertTrue(viewModel.uiState.value.canPlayCurrentEpisode)
     }
+
+    @Test
+    fun reportHistory_withPositiveProgress_callsRepository() = runTest {
+        val repository = FakeTvRepository()
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        viewModel.reportHistory("video-1", watchSeconds = 38, completed = true)
+        advanceUntilIdle()
+
+        assertEquals(listOf(TvHistoryReport("video-1", 38, true)), repository.historyReports)
+    }
+
+    @Test
+    fun reportHistory_ignoresInvalidInput() = runTest {
+        val repository = FakeTvRepository()
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        viewModel.reportHistory("", watchSeconds = 38, completed = false)
+        viewModel.reportHistory("video-1", watchSeconds = 0, completed = false)
+        advanceUntilIdle()
+
+        assertTrue(repository.historyReports.isEmpty())
+    }
 }

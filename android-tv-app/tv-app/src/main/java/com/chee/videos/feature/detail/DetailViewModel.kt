@@ -98,6 +98,15 @@ class DetailViewModel @Inject constructor(
 
     fun toggleDislike() = toggleAction { videoRepository.toggleDislike(videoId) }
 
+    fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
+        if (videoId.isBlank() || watchSeconds <= 0) {
+            return
+        }
+        viewModelScope.launch {
+            videoRepository.reportHistory(videoId, watchSeconds, completed)
+        }
+    }
+
     private fun toggleAction(call: suspend () -> Result<ActionTogglePayload>) {
         viewModelScope.launch {
             call().onSuccess { result ->

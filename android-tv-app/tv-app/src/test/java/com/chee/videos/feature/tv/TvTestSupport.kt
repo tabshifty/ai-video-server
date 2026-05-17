@@ -25,6 +25,7 @@ class FakeTvRepository(
     subtitlePreferences: Map<String, String> = emptyMap(),
 ) : TvRepository {
     private val storedSubtitlePreferences = subtitlePreferences.toMutableMap()
+    val historyReports = mutableListOf<TvHistoryReport>()
 
     override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeError?.let { return Result.failure(it) }
@@ -52,7 +53,9 @@ class FakeTvRepository(
 
     override suspend fun buildSourceUrl(videoId: String): String = "https://example.com/$videoId.m3u8"
 
-    override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
+    override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
+        historyReports += TvHistoryReport(videoId, watchSeconds, completed)
+    }
 
     override suspend fun readTvSubtitlePreference(videoId: String): String? = storedSubtitlePreferences[videoId]
 
@@ -64,6 +67,12 @@ class FakeTvRepository(
         }
     }
 }
+
+data class TvHistoryReport(
+    val videoId: String,
+    val watchSeconds: Int,
+    val completed: Boolean,
+)
 
 class DelayedSourceTvRepository(
     private val baseUrl: String = "https://example.com",

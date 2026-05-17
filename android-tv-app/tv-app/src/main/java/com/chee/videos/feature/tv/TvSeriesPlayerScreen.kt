@@ -188,6 +188,13 @@ fun TvSeriesPlayerScreen(
         }
     }
 
+    LaunchedEffect(uiState.currentVideoId) {
+        if (lastHistoryVideoId.isNotBlank() && lastHistoryVideoId != uiState.currentVideoId) {
+            reportTvSeriesHistory(viewModel, lastHistoryVideoId, exoPlayer)
+        }
+        lastHistoryVideoId = uiState.currentVideoId
+    }
+
     LaunchedEffect(uiState.currentSourceUrl, canPlay, selectedSubtitleTrackId, currentEpisode?.subtitleTracks) {
         val effectiveSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId)
         val updateDecision = resolveLongFormPlayerUpdate(
@@ -262,12 +269,25 @@ fun TvSeriesPlayerScreen(
         exoPlayer.play()
     }
 
-    LaunchedEffect(uiState.currentVideoId) {
-        if (lastHistoryVideoId.isNotBlank() && lastHistoryVideoId != uiState.currentVideoId) {
-            val (watchSeconds, completed) = readWatchSnapshot(exoPlayer)
-            viewModel.reportHistory(lastHistoryVideoId, watchSeconds, completed)
+    LaunchedEffect(
+        uiState.currentVideoId,
+        canPlay,
+        playbackSession.hasStartedPlayback,
+        playbackSession.isPausedByUser,
+    ) {
+        if (!shouldStartPeriodicHistoryReport(
+                videoId = uiState.currentVideoId,
+                canPlay = canPlay,
+                hasStartedPlayback = playbackSession.hasStartedPlayback,
+                isPausedByUser = playbackSession.isPausedByUser,
+            )
+        ) {
+            return@LaunchedEffect
         }
-        lastHistoryVideoId = uiState.currentVideoId
+        while (true) {
+            delay(TvPeriodicHistoryReportIntervalMillis)
+            reportTvSeriesHistory(viewModel, uiState.currentVideoId, exoPlayer)
+        }
     }
 
     DisposableEffect(exoPlayer) {
@@ -287,10 +307,7 @@ fun TvSeriesPlayerScreen(
         }
         exoPlayer.addListener(listener)
         onDispose {
-            if (latestCurrentVideoId.isNotBlank()) {
-                val (watchSeconds, completed) = readWatchSnapshot(exoPlayer)
-                viewModel.reportHistory(latestCurrentVideoId, watchSeconds, completed)
-            }
+            reportTvSeriesHistory(viewModel, latestCurrentVideoId, exoPlayer)
             exoPlayer.removeListener(listener)
             exoPlayer.release()
         }
@@ -299,7 +316,11 @@ fun TvSeriesPlayerScreen(
     DisposableEffect(lifecycleOwner, exoPlayer, playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> exoPlayer.pause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    reportTvSeriesHistory(viewModel, latestCurrentVideoId, exoPlayer)
+                    exoPlayer.pause()
+                }
+
                 Lifecycle.Event.ON_RESUME -> {
                     if (playbackSession.shouldResumeOnLifecycle() && canPlay) {
                         exoPlayer.playWhenReady = true
@@ -491,12 +512,16 @@ private fun EmptyTvPlayerState() {
     )
 }
 
-private fun readWatchSnapshot(player: ExoPlayer): Pair<Int, Boolean> {
-    val durationMs = player.duration.coerceAtLeast(0L)
-    val positionMs = player.currentPosition.coerceAtLeast(0L)
-    val watchSeconds = (positionMs / 1000L).toInt()
-    val completed = durationMs > 0L && positionMs >= durationMs - 3_000L
-    return watchSeconds to completed
+private fun reportTvSeriesHistory(
+    viewModel: TvSeriesPlayerViewModel,
+    videoId: String,
+    player: ExoPlayer,
+) {
+    val snapshot = tvPlaybackHistorySnapshot(
+        positionMs = player.currentPosition,
+        durationMs = player.duration,
+    )
+    viewModel.reportHistory(videoId, snapshot.watchSeconds, snapshot.completed)
 }
 
 private fun resolveTvSubtitleSelectionOnTrackLoad(

@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -140,10 +141,12 @@ fun TvLongFormPlayerScreen(
         }
     }
     val exoPlayer = remember(uiState.accessToken) { ExoPlayer.Builder(context).build() }
+    val latestDetailId by rememberUpdatedState(detail.id)
     var hasStartedPlayback by rememberSaveable(detail.id) { mutableStateOf(true) }
     var isPausedByUser by rememberSaveable(detail.id) { mutableStateOf(false) }
     var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
     var preparedSubtitleTrackId by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+    var resumedFromHistoryVideoId by remember(detail.id, uiState.accessToken) { mutableStateOf("") }
     var selectedSubtitleTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
     var playerErrorMessage by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
@@ -195,6 +198,16 @@ fun TvLongFormPlayerScreen(
         }
         if (updateDecision.shouldReplaceSource) {
             playerErrorMessage = null
+            val initialResumePositionMs = if (!updateDecision.preservePosition && resumedFromHistoryVideoId != detail.id) {
+                detail.userState.watchSeconds.coerceAtLeast(0).times(1000L)
+            } else {
+                0L
+            }
+            val restorePositionMs = if (updateDecision.preservePosition) {
+                exoPlayer.currentPosition.coerceAtLeast(0L)
+            } else {
+                initialResumePositionMs
+            }
             val mediaItem = buildLongFormMediaItem(
                 sourceUrl = playUrl,
                 mediaId = detail.id,
@@ -205,6 +218,12 @@ fun TvLongFormPlayerScreen(
             val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
             exoPlayer.setMediaSource(mediaSource, true)
             exoPlayer.prepare()
+            if (restorePositionMs > 0L) {
+                exoPlayer.seekTo(restorePositionMs)
+            }
+            if (!updateDecision.preservePosition && detail.id.isNotBlank()) {
+                resumedFromHistoryVideoId = detail.id
+            }
             preparedUrl = playUrl
             preparedSubtitleTrackId = selectedSubtitleTrackId
         }
@@ -227,10 +246,35 @@ fun TvLongFormPlayerScreen(
         exoPlayer.play()
     }
 
+    LaunchedEffect(
+        detail.id,
+        canPlay,
+        playbackSession.hasStartedPlayback,
+        playbackSession.isPausedByUser,
+    ) {
+        if (!shouldStartPeriodicHistoryReport(
+                videoId = detail.id,
+                canPlay = canPlay,
+                hasStartedPlayback = playbackSession.hasStartedPlayback,
+                isPausedByUser = playbackSession.isPausedByUser,
+            )
+        ) {
+            return@LaunchedEffect
+        }
+        while (true) {
+            delay(TvPeriodicHistoryReportIntervalMillis)
+            reportTvLongFormHistory(viewModel, detail.id, exoPlayer)
+        }
+    }
+
     DisposableEffect(lifecycleOwner, exoPlayer, playbackSession.hasStartedPlayback, playbackSession.isPausedByUser) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> exoPlayer.pause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    reportTvLongFormHistory(viewModel, latestDetailId, exoPlayer)
+                    exoPlayer.pause()
+                }
+
                 Lifecycle.Event.ON_RESUME -> {
                     if (playbackSession.shouldResumeOnLifecycle()) {
                         exoPlayer.playWhenReady = true
@@ -264,6 +308,7 @@ fun TvLongFormPlayerScreen(
         }
         exoPlayer.addListener(listener)
         onDispose {
+            reportTvLongFormHistory(viewModel, latestDetailId, exoPlayer)
             exoPlayer.removeListener(listener)
             exoPlayer.release()
         }
@@ -332,4 +377,16 @@ fun TvLongFormPlayerScreen(
             }
         }
     }
+}
+
+private fun reportTvLongFormHistory(
+    viewModel: DetailViewModel,
+    videoId: String,
+    player: ExoPlayer,
+) {
+    val snapshot = tvPlaybackHistorySnapshot(
+        positionMs = player.currentPosition,
+        durationMs = player.duration,
+    )
+    viewModel.reportHistory(videoId, snapshot.watchSeconds, snapshot.completed)
 }
