@@ -42,4 +42,29 @@ class TvPosterWallViewModelTest {
         assertEquals(3, loaded.items.size)
         assertEquals("item-3", loaded.items.last().id)
     }
+
+    @Test
+    fun init_keepsAvWallKindAndItems() = runTest {
+        val viewModel = TvPosterWallViewModel(
+            repository = FakeTvRepository(
+                posterWallPages = listOf(
+                    tvPosterWallPage(
+                        page = 1,
+                        totalCount = 1,
+                        items = listOf(tvPosterWallItem(id = "av-1", type = "av", title = "SNIS-001")),
+                    ),
+                ),
+            ),
+            kind = "av",
+            title = "全部 AV",
+        )
+
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("av", state.kind)
+        assertEquals("全部 AV", state.title)
+        assertEquals(1, state.items.size)
+        assertEquals("av", state.items.first().type)
+    }
 }

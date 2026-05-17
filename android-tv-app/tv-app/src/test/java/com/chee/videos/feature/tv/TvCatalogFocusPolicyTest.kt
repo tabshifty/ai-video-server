@@ -15,6 +15,7 @@ class TvCatalogFocusPolicyTest {
                 sectionItemCounts = listOf(3, 2),
                 tvSeriesCount = 4,
                 movieCount = 2,
+                avCount = 1,
             ),
         )
     }
@@ -29,6 +30,7 @@ class TvCatalogFocusPolicyTest {
                 sectionItemCounts = listOf(0, 2),
                 tvSeriesCount = 4,
                 movieCount = 2,
+                avCount = 1,
             ),
         )
         assertEquals(
@@ -39,6 +41,7 @@ class TvCatalogFocusPolicyTest {
                 sectionItemCounts = listOf(0, 2),
                 tvSeriesCount = 4,
                 movieCount = 2,
+                avCount = 1,
             ),
         )
     }
@@ -53,6 +56,7 @@ class TvCatalogFocusPolicyTest {
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 1,
                 movieCount = 2,
+                avCount = 3,
             ),
         )
         assertEquals(
@@ -63,6 +67,18 @@ class TvCatalogFocusPolicyTest {
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 0,
                 movieCount = 2,
+                avCount = 3,
+            ),
+        )
+        assertEquals(
+            TvCatalogInitialFocusTarget.AV_ITEM,
+            resolveTvCatalogInitialFocusTarget(
+                hasFeaturedContent = false,
+                hasContinueWatching = false,
+                sectionItemCounts = emptyList(),
+                tvSeriesCount = 0,
+                movieCount = 0,
+                avCount = 3,
             ),
         )
         assertEquals(
@@ -73,6 +89,7 @@ class TvCatalogFocusPolicyTest {
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 0,
                 movieCount = 0,
+                avCount = 0,
             ),
         )
         assertEquals(
@@ -83,6 +100,7 @@ class TvCatalogFocusPolicyTest {
                 sectionItemCounts = emptyList(),
                 tvSeriesCount = 0,
                 movieCount = 0,
+                avCount = 0,
             ),
         )
     }

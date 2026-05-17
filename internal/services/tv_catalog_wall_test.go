@@ -65,6 +65,29 @@ func TestBuildTVCatalogWallVideoItems(t *testing.T) {
 	}
 }
 
+func TestBuildTVCatalogWallVideoItemsPreservesAVType(t *testing.T) {
+	t.Parallel()
+
+	items := buildTVCatalogWallVideoItems([]models.VideoListItem{
+		{
+			ID:            mustParseUUID(t, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+			Title:         "SNIS-001",
+			Type:          "av",
+			ThumbnailPath: "/av.jpg",
+		},
+	}, "av")
+
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].Type != "av" {
+		t.Fatalf("expected av type, got %s", items[0].Type)
+	}
+	if items[0].Title != "SNIS-001" || items[0].PosterURL != "/av.jpg" {
+		t.Fatalf("unexpected mapped item: %#v", items[0])
+	}
+}
+
 func TestBuildTVCatalogWallPayloadPreservesPaging(t *testing.T) {
 	t.Parallel()
 

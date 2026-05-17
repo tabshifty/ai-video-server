@@ -92,6 +92,7 @@ fun TvLongFormDetailScreen(
                 buildTvLongFormDetailHero(
                     baseUrl = uiState.baseUrl,
                     detail = detail,
+                    videoType = uiState.videoType,
                 )
             }
             val canPlay = resolveTvLongFormPlayUrl(

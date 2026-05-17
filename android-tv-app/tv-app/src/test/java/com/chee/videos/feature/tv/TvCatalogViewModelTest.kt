@@ -19,7 +19,7 @@ class TvCatalogViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun init_loadsBrowsePayloadWithoutAvContent() = runTest {
+    fun init_loadsBrowsePayloadWithAvContent() = runTest {
         val viewModel = TvCatalogViewModel(
             repository = FakeTvRepository(
                 homePayload = TvHomePayload(
@@ -62,7 +62,9 @@ class TvCatalogViewModelTest {
         assertEquals(128, state.continueWatching?.watchSeconds)
         assertEquals(1, state.sections.size)
         assertEquals(1, state.movies.size)
-        assertTrue(state.av.isEmpty())
+        assertEquals(1, state.av.size)
+        assertEquals("av", state.av.first().type)
+        assertEquals("SNIS-001", state.av.first().title)
     }
 
     @Test
@@ -87,7 +89,7 @@ class TvCatalogViewModelTest {
     }
 
     @Test
-    fun updateQuery_filtersAvResultsFromTvCatalog() = runTest {
+    fun updateQuery_keepsAvResultsInTvCatalog() = runTest {
         val repository = FakeTvRepository(
             homePayload = TvHomePayload(),
             searchPayload = TvSearchPayload(
@@ -104,12 +106,12 @@ class TvCatalogViewModelTest {
         viewModel.awaitIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(1, state.searchResults.size)
-        assertEquals("tv", state.searchResults.first().type)
+        assertEquals(2, state.searchResults.size)
+        assertEquals(listOf("tv", "av"), state.searchResults.map { it.type })
     }
 
     @Test
-    fun init_filtersAvContinueWatchingFromTvCatalog() = runTest {
+    fun init_keepsAvContinueWatchingInTvCatalog() = runTest {
         val viewModel = TvCatalogViewModel(
             repository = FakeTvRepository(
                 homePayload = TvHomePayload(
@@ -125,7 +127,8 @@ class TvCatalogViewModelTest {
         viewModel.awaitIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(null, state.continueWatching)
+        assertEquals("av", state.continueWatching?.type)
+        assertEquals("SNIS-001", state.continueWatching?.seriesTitle)
     }
 
     @Test

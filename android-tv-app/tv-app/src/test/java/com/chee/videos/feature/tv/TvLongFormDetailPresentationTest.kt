@@ -19,6 +19,7 @@ class TvLongFormDetailPresentationTest {
                 thumbnailPath = "/poster/movie-1.jpg",
                 tags = listOf("悬疑", "惊悚"),
             ),
+            videoType = "movie",
         )
 
         assertEquals("电影", hero.eyebrow)
@@ -27,5 +28,23 @@ class TvLongFormDetailPresentationTest {
         assertEquals("更多信息", hero.secondaryActionLabel)
         assertEquals("https://media.example.com/poster/movie-1.jpg", hero.posterUrl)
         assertEquals("https://media.example.com/poster/movie-1.jpg", hero.backdropUrl)
+    }
+
+    @Test
+    fun `builds av hero with av eyebrow`() {
+        val hero = buildTvLongFormDetailHero(
+            baseUrl = "https://media.example.com",
+            detail = VideoDetailDto(
+                id = "av-1",
+                title = "SNIS-001",
+                description = "AV 作品",
+                duration = 5400,
+                thumbnailPath = "/poster/av-1.jpg",
+            ),
+            videoType = "av",
+        )
+
+        assertEquals("AV", hero.eyebrow)
+        assertEquals("SNIS-001", hero.title)
     }
 }

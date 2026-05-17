@@ -58,7 +58,7 @@ func TestBuildTVQRContentCarriesServerAndSession(t *testing.T) {
 	}
 }
 
-func TestBuildTVSearchPayloadExcludesAVContent(t *testing.T) {
+func TestBuildTVSearchPayloadIncludesAVContent(t *testing.T) {
 	t.Parallel()
 
 	payload := buildTVSearchPayload(
@@ -70,11 +70,11 @@ func TestBuildTVSearchPayloadExcludesAVContent(t *testing.T) {
 		3,
 	)
 
-	if len(payload.Items) != 2 {
-		t.Fatalf("expected 2 items, got=%d", len(payload.Items))
+	if len(payload.Items) != 3 {
+		t.Fatalf("expected 3 items, got=%d", len(payload.Items))
 	}
-	gotTypes := []string{payload.Items[0].Type, payload.Items[1].Type}
-	if strings.Join(gotTypes, ",") != "movie,tv" {
+	gotTypes := []string{payload.Items[0].Type, payload.Items[1].Type, payload.Items[2].Type}
+	if strings.Join(gotTypes, ",") != "av,movie,tv" {
 		t.Fatalf("unexpected types ordering/content: %v", gotTypes)
 	}
 }

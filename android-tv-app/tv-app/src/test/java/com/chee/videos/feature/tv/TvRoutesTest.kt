@@ -51,6 +51,14 @@ class TvRoutesTest {
     }
 
     @Test
+    fun buildTvLongFormDetailRoute_preservesAvType() {
+        assertEquals(
+            "tv/detail/av-1?videoType=av",
+            buildTvLongFormDetailRoute(videoId = "av-1", videoType = "av"),
+        )
+    }
+
+    @Test
     fun buildTvLongFormPlayerRoute_defaultsToMovieForUnsupportedType() {
         assertEquals(
             "tv/long-form-player/demo?videoType=movie",
@@ -59,9 +67,9 @@ class TvRoutesTest {
     }
 
     @Test
-    fun buildTvLongFormPlayerRoute_encodesReservedCharactersInVideoIdAndNormalizesAvToMovie() {
+    fun buildTvLongFormPlayerRoute_encodesReservedCharactersInVideoIdAndPreservesAvType() {
         assertEquals(
-            "tv/long-form-player/av%2F2026%23scene-1?videoType=movie",
+            "tv/long-form-player/av%2F2026%23scene-1?videoType=av",
             buildTvLongFormPlayerRoute(videoId = "av/2026#scene-1", videoType = "av"),
         )
     }

@@ -42,6 +42,7 @@ class TvCatalogFeaturedContentTest {
             ),
             tvSeries = emptyList(),
             movies = emptyList(),
+            av = emptyList(),
         )
 
         requireNotNull(featured)
@@ -86,6 +87,7 @@ class TvCatalogFeaturedContentTest {
                 ),
             ),
             movies = emptyList(),
+            av = emptyList(),
         )
         requireNotNull(sectionFeatured)
         assertEquals(TvFeaturedContentSource.SECTION, sectionFeatured.source)
@@ -104,6 +106,7 @@ class TvCatalogFeaturedContentTest {
                     backdropUrl = "/movie-backdrop.jpg",
                 ),
             ),
+            av = emptyList(),
         )
         requireNotNull(shelfFeatured)
         assertEquals(TvFeaturedContentSource.SHELF, shelfFeatured.source)
@@ -120,27 +123,58 @@ class TvCatalogFeaturedContentTest {
                 sections = emptyList(),
                 tvSeries = emptyList(),
                 movies = emptyList(),
+                av = emptyList(),
             ),
         )
     }
 
-    fun `does not promote av continue watching to featured hero`() {
-        assertNull(
-            resolveTvFeaturedContent(
-                continueWatching = TvContinueWatchingUiModel(
+    @Test
+    fun `falls back to av shelf content when other catalog content is missing`() {
+        val featured = resolveTvFeaturedContent(
+            continueWatching = null,
+            sections = emptyList(),
+            tvSeries = emptyList(),
+            movies = emptyList(),
+            av = listOf(
+                TvHomeShelfItemUiModel(
+                    id = "av-1",
                     type = "av",
-                    seriesId = "av-1",
-                    seriesTitle = "SNIS-001",
-                    seasonNumber = 1,
-                    episodeNumber = 1,
-                    episodeTitle = "继续播放",
-                    progressPercent = 10,
+                    title = "SNIS-001",
+                    description = "AV 作品",
+                    backdropUrl = "/av-backdrop.jpg",
                 ),
-                sections = emptyList(),
-                tvSeries = emptyList(),
-                movies = emptyList(),
             ),
         )
+
+        requireNotNull(featured)
+        assertEquals(TvFeaturedContentSource.SHELF, featured.source)
+        assertEquals("av-1", featured.targetId)
+        assertEquals("av", featured.targetType)
+        assertEquals("AV 精选", featured.eyebrow)
+    }
+
+    @Test
+    fun `promotes av continue watching to featured hero`() {
+        val featured = resolveTvFeaturedContent(
+            continueWatching = TvContinueWatchingUiModel(
+                type = "av",
+                seriesId = "av-1",
+                seriesTitle = "SNIS-001",
+                seasonNumber = 1,
+                episodeNumber = 1,
+                episodeTitle = "继续播放",
+                progressPercent = 10,
+            ),
+            sections = emptyList(),
+            tvSeries = emptyList(),
+            movies = emptyList(),
+            av = emptyList(),
+        )
+
+        requireNotNull(featured)
+        assertEquals(TvFeaturedContentSource.CONTINUE_WATCHING, featured.source)
+        assertEquals("av", featured.targetType)
+        assertEquals("继续看 AV", featured.eyebrow)
     }
 
     @Test
