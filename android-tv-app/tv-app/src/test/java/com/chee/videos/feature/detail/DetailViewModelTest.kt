@@ -185,6 +185,7 @@ private class FakeDetailApiService : ApiService {
     override suspend fun tvHome(
         url: String,
         authorization: String,
+        kind: String?,
         keyword: String?,
         page: Int,
         pageSize: Int,

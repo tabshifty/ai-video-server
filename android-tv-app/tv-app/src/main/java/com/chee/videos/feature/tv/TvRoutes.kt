@@ -49,7 +49,7 @@ internal fun decodeTvRouteArg(value: String?): String {
     return URLDecoder.decode(raw, StandardCharsets.UTF_8.toString()).trim()
 }
 
-private fun encodeTvRouteSegment(value: String): String {
+internal fun encodeTvRouteSegment(value: String): String {
     return URLEncoder.encode(value.trim(), StandardCharsets.UTF_8.toString())
         .replace("+", "%20")
 }

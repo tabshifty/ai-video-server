@@ -56,14 +56,14 @@ class TvPosterWallViewModelTest {
                 ),
             ),
             kind = "av",
-            title = "全部 AV",
+            title = "全部18+",
         )
 
         viewModel.awaitIdle()
 
         val state = viewModel.uiState.value
         assertEquals("av", state.kind)
-        assertEquals("全部 AV", state.title)
+        assertEquals("全部18+", state.title)
         assertEquals(1, state.items.size)
         assertEquals("av", state.items.first().type)
     }

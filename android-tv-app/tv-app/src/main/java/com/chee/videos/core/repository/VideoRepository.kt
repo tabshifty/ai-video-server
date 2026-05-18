@@ -133,6 +133,7 @@ class VideoRepository @Inject constructor(
     }
 
     suspend fun fetchTvHome(
+        kind: String = "",
         query: String = "",
         page: Int = 1,
         pageSize: Int = 20,
@@ -141,6 +142,7 @@ class VideoRepository @Inject constructor(
             api.tvHome(
                 url = UrlBuilder.tvHome(baseUrl),
                 authorization = bearer,
+                kind = kind.trim().takeIf { it.isNotBlank() },
                 keyword = query.trim().takeIf { it.isNotBlank() },
                 page = page,
                 pageSize = pageSize,

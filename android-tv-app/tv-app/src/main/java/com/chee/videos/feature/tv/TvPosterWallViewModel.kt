@@ -43,7 +43,7 @@ class TvPosterWallViewModel @Inject constructor(
         SavedStateHandle(
             mapOf(
                 TvCatalogWallKindArg to kind,
-                TvCatalogWallTitleArg to title,
+                TvCatalogWallTitleArg to encodeTvRouteSegment(title),
             ),
         ),
         repository,

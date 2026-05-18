@@ -9,7 +9,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface TvRepository {
-    suspend fun fetchHome(query: String = "", page: Int = 1, pageSize: Int = 20): Result<TvHomePayload>
+    suspend fun fetchHome(kind: String = "tv", query: String = "", page: Int = 1, pageSize: Int = 20): Result<TvHomePayload>
     suspend fun fetchSearch(query: String, page: Int = 1, pageSize: Int = 20): Result<TvSearchPayload>
     suspend fun fetchCatalogWall(kind: String, page: Int = 1, pageSize: Int = 24): Result<TvCatalogWallPayload>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
@@ -26,8 +26,8 @@ interface TvRepository {
 class NetworkTvRepository @Inject constructor(
     private val videoRepository: VideoRepository,
 ) : TvRepository {
-    override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
-        videoRepository.fetchTvHome(query, page, pageSize)
+    override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
+        videoRepository.fetchTvHome(kind, query, page, pageSize)
 
     override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
         videoRepository.fetchTvSearch(query, page, pageSize)

@@ -69,6 +69,7 @@ interface ApiService {
     suspend fun tvHome(
         @Url url: String,
         @Header("Authorization") authorization: String,
+        @Query("kind") kind: String? = null,
         @Query("q") keyword: String? = null,
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,

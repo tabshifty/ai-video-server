@@ -140,7 +140,7 @@ class TvCatalogFeaturedContentTest {
                     id = "av-1",
                     type = "av",
                     title = "SNIS-001",
-                    description = "AV 作品",
+                    description = "18+作品",
                     backdropUrl = "/av-backdrop.jpg",
                 ),
             ),
@@ -150,7 +150,7 @@ class TvCatalogFeaturedContentTest {
         assertEquals(TvFeaturedContentSource.SHELF, featured.source)
         assertEquals("av-1", featured.targetId)
         assertEquals("av", featured.targetType)
-        assertEquals("AV 精选", featured.eyebrow)
+        assertEquals("18+精选", featured.eyebrow)
     }
 
     @Test
@@ -174,7 +174,7 @@ class TvCatalogFeaturedContentTest {
         requireNotNull(featured)
         assertEquals(TvFeaturedContentSource.CONTINUE_WATCHING, featured.source)
         assertEquals("av", featured.targetType)
-        assertEquals("继续看 AV", featured.eyebrow)
+        assertEquals("继续看18+", featured.eyebrow)
     }
 
     @Test

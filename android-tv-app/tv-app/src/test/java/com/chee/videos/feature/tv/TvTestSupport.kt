@@ -17,6 +17,7 @@ typealias MainDispatcherRule = com.chee.videos.core.testing.MainDispatcherRule
 class FakeTvRepository(
     private val baseUrl: String = "https://example.com",
     private val homePayload: TvHomePayload = TvHomePayload(),
+    private val homePayloads: Map<String, TvHomePayload> = emptyMap(),
     private val searchPayload: TvSearchPayload = TvSearchPayload(),
     private val posterWallPages: List<TvCatalogWallPayload> = emptyList(),
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
@@ -28,13 +29,17 @@ class FakeTvRepository(
     private val storedSubtitlePreferences = subtitlePreferences.toMutableMap()
     private val storedAudioPreferences = audioPreferences.toMutableMap()
     val historyReports = mutableListOf<TvHistoryReport>()
+    val homeRequests = mutableListOf<TvHomeRequest>()
+    val searchRequests = mutableListOf<TvSearchRequest>()
 
-    override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
+    override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
+        homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
         homeError?.let { return Result.failure(it) }
-        return Result.success(homePayload)
+        return Result.success(homePayloads[kind] ?: homePayload)
     }
 
     override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> {
+        searchRequests += TvSearchRequest(query = query, page = page, pageSize = pageSize)
         homeError?.let { return Result.failure(it) }
         return Result.success(searchPayload)
     }
@@ -86,13 +91,26 @@ data class TvHistoryReport(
     val completed: Boolean,
 )
 
+data class TvHomeRequest(
+    val kind: String,
+    val query: String,
+    val page: Int,
+    val pageSize: Int,
+)
+
+data class TvSearchRequest(
+    val query: String,
+    val page: Int,
+    val pageSize: Int,
+)
+
 class DelayedSourceTvRepository(
     private val baseUrl: String = "https://example.com",
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
 ) : TvRepository {
     private val pendingSourceUrls = linkedMapOf<String, CompletableDeferred<String>>()
 
-    override suspend fun fetchHome(query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
+    override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
         Result.success(TvHomePayload())
 
     override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =

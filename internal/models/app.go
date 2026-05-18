@@ -141,6 +141,10 @@ type ImageCollectionDetail struct {
 }
 
 type TvHomePayload struct {
+	Kind             string                 `json:"kind,omitempty"`
+	Featured         *TvHomeVideoDto        `json:"featured,omitempty"`
+	RecentWatching   []TvHomeVideoDto       `json:"recent_watching,omitempty"`
+	RecentUpdates    []TvHomeVideoDto       `json:"recent_updates,omitempty"`
 	ContinueWatching *TvContinueWatchingDto `json:"continue_watching,omitempty"`
 	Sections         []TvSectionDto         `json:"sections"`
 	SearchResults    []TvSeriesSummaryDto   `json:"search_results"`

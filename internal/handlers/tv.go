@@ -21,7 +21,7 @@ func (a *API) TVHome(c *gin.Context) {
 	}
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 20)
-	payload, err := a.appSvc.TVHome(c.Request.Context(), userID, c.Query("q"), page, pageSize)
+	payload, err := a.appSvc.TVHome(c.Request.Context(), userID, c.Query("q"), page, pageSize, c.Query("kind"))
 	if err != nil {
 		response.Error(c, 2101, err.Error())
 		return

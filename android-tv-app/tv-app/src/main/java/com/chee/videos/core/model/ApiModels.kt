@@ -64,6 +64,10 @@ data class ContinueHistoryPayload(
 )
 
 data class TvHomePayload(
+    @SerializedName("kind") val kind: String = "tv",
+    @SerializedName("featured") val featured: TvHomeVideoDto? = null,
+    @SerializedName("recent_watching") val recentWatching: List<TvHomeVideoDto> = emptyList(),
+    @SerializedName("recent_updates") val recentUpdates: List<TvHomeVideoDto> = emptyList(),
     @SerializedName("continue_watching") val continueWatching: TvContinueWatchingDto? = null,
     @SerializedName("sections") val sections: List<TvSectionDto> = emptyList(),
     @SerializedName("search_results") val searchResults: List<TvSeriesSummaryDto> = emptyList(),

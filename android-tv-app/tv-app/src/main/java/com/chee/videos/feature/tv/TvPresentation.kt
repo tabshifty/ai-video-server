@@ -65,7 +65,7 @@ internal fun resolveTvFeaturedContent(
             targetType = item.type,
             eyebrow = when (item.type) {
                 "movie" -> "继续看电影"
-                "av" -> "继续看 AV"
+                "av" -> "继续看18+"
                 else -> "继续追剧"
             },
             title = item.seriesTitle,
@@ -101,7 +101,7 @@ internal fun resolveTvFeaturedContent(
     listOf(
         "电视剧精选" to tvSeries.firstOrNull(),
         "电影精选" to movies.firstOrNull(),
-        "AV 精选" to av.firstOrNull(),
+        "18+精选" to av.firstOrNull(),
     ).firstOrNull { it.second != null }?.let { (eyebrow, item) ->
         item ?: return null
         return TvFeaturedContentUiModel(
@@ -147,7 +147,7 @@ internal fun resolveTvCatalogWallSpec(kind: String, fallbackTitle: String = ""):
         "classic" -> "经典补档"
         "tv" -> "电视剧"
         "movie" -> "电影"
-        "av" -> "AV"
+        "av" -> "18+"
         else -> "海报墙"
     }
     val subtitle = when (normalizedKind) {
@@ -156,7 +156,7 @@ internal fun resolveTvCatalogWallSpec(kind: String, fallbackTitle: String = ""):
         "classic" -> "从较早首播的系列开始补看"
         "tv" -> "全部电视剧"
         "movie" -> "全部电影"
-        "av" -> "全部 AV"
+        "av" -> "全部18+"
         else -> "滚动到底部自动加载下一页"
     }
     return TvCatalogWallSpec(
@@ -193,7 +193,7 @@ private fun tvCatalogWallTypeLabel(type: String): String {
     return when (type) {
         "tv" -> "电视剧"
         "movie" -> "电影"
-        "av" -> "AV"
+        "av" -> "18+"
         else -> type.ifBlank { "长视频" }
     }
 }
@@ -277,7 +277,7 @@ private fun formatTvDuration(totalSeconds: Int): String {
 
 private fun tvLongFormTypeLabel(videoType: String): String {
     return when (normalizeTvLongFormVideoType(videoType)) {
-        "av" -> "AV"
+        "av" -> "18+"
         else -> "电影"
     }
 }

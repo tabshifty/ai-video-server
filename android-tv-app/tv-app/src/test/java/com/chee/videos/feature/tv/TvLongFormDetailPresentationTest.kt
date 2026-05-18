@@ -31,20 +31,20 @@ class TvLongFormDetailPresentationTest {
     }
 
     @Test
-    fun `builds av hero with av eyebrow`() {
+    fun `builds av hero with adult eyebrow`() {
         val hero = buildTvLongFormDetailHero(
             baseUrl = "https://media.example.com",
             detail = VideoDetailDto(
                 id = "av-1",
                 title = "SNIS-001",
-                description = "AV 作品",
+                description = "18+作品",
                 duration = 5400,
                 thumbnailPath = "/poster/av-1.jpg",
             ),
             videoType = "av",
         )
 
-        assertEquals("AV", hero.eyebrow)
+        assertEquals("18+", hero.eyebrow)
         assertEquals("SNIS-001", hero.title)
     }
 }

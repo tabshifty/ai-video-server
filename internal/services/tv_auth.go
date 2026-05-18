@@ -342,7 +342,7 @@ func (s *AppService) buildTVHomeContinueWatching(ctx context.Context, userID uui
 	return nil, nil
 }
 
-func (s *AppService) TVHome(ctx context.Context, userID uuid.UUID, q string, page, pageSize int) (models.TvHomePayload, error) {
+func (s *AppService) TVHome(ctx context.Context, userID uuid.UUID, q string, page, pageSize int, kindOpt ...string) (models.TvHomePayload, error) {
 	if strings.TrimSpace(q) != "" {
 		legacy, err := s.tvHomeLegacy(ctx, userID, q, page, pageSize)
 		if err != nil {
@@ -358,6 +358,13 @@ func (s *AppService) TVHome(ctx context.Context, userID uuid.UUID, q string, pag
 	}
 	if pageSize > 100 {
 		pageSize = 100
+	}
+	kind := "tv"
+	if len(kindOpt) > 0 {
+		kind = normalizeTVHomeKind(kindOpt[0])
+	}
+	if len(kindOpt) > 0 && strings.TrimSpace(kindOpt[0]) != "" {
+		return s.tvHomeTyped(ctx, userID, kind, page, pageSize)
 	}
 
 	series, _, err := s.repo.ListActiveTVSeriesSummaries(ctx, min(pageSize, 12), 0)
@@ -397,6 +404,52 @@ func (s *AppService) TVHome(ctx context.Context, userID uuid.UUID, q string, pag
 		payload.AV = append(payload.AV, buildTVHomeVideoFromListItem(item))
 	}
 	return payload, nil
+}
+
+func (s *AppService) tvHomeTyped(
+	ctx context.Context,
+	userID uuid.UUID,
+	kind string,
+	page int,
+	pageSize int,
+) (models.TvHomePayload, error) {
+	limit := min(pageSize, 12)
+	switch normalizeTVHomeKind(kind) {
+	case "tv":
+		series, _, err := s.repo.ListActiveTVSeriesSummaries(ctx, limit, 0)
+		if err != nil {
+			return models.TvHomePayload{}, err
+		}
+		continueWatching, err := s.buildTVHomeContinueWatching(ctx, userID)
+		if err != nil {
+			return models.TvHomePayload{}, err
+		}
+		if continueWatching != nil && continueWatching.Type != "tv" {
+			continueWatching = nil
+		}
+		updates := make([]models.TvHomeVideoDto, 0, len(series))
+		for _, item := range series {
+			updates = append(updates, buildTVHomeVideoFromSeries(item))
+		}
+		return buildTypedTVHomePayload("tv", continueWatching, updates, page, pageSize), nil
+	case "movie", "av":
+		normalizedKind := normalizeTVHomeKind(kind)
+		updates, _, err := s.repo.SearchVideos(ctx, "", normalizedKind, limit, 0)
+		if err != nil {
+			return models.TvHomePayload{}, err
+		}
+		history, _, err := s.repo.ContinueWatching(ctx, userID, limit, 0)
+		if err != nil {
+			return models.TvHomePayload{}, err
+		}
+		updateDtos := make([]models.TvHomeVideoDto, 0, len(updates))
+		for _, item := range updates {
+			updateDtos = append(updateDtos, buildTVHomeVideoFromListItem(item))
+		}
+		return buildTypedTVHomePayload(normalizedKind, nil, updateDtos, page, pageSize, history...), nil
+	default:
+		return models.TvHomePayload{}, fmt.Errorf("unsupported tv home kind: %s", kind)
+	}
 }
 
 func (s *AppService) TVCatalogWall(

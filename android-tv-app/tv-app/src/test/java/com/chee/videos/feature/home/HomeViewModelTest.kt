@@ -297,6 +297,7 @@ private class FakeHomeApiService(
     override suspend fun tvHome(
         url: String,
         authorization: String,
+        kind: String?,
         keyword: String?,
         page: Int,
         pageSize: Int,
