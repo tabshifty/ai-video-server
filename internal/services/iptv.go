@@ -167,7 +167,7 @@ func ParseM3UPlaylist(r io.Reader) ([]models.IPTVChannel, int) {
 		if pending == nil {
 			continue
 		}
-		if validHTTPURL(line) && strings.TrimSpace(pending.name) != "" {
+		if validHTTPURL(line) && strings.TrimSpace(pending.name) != "" && playableIPTVVideoSource(*pending, line) {
 			sortOrder := len(channels)
 			channels = append(channels, models.IPTVChannel{
 				ID:        uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("%d:%s:%s", sortOrder, pending.name, line))).String(),
@@ -187,6 +187,31 @@ func ParseM3UPlaylist(r io.Reader) ([]models.IPTVChannel, int) {
 		skipped++
 	}
 	return channels, skipped
+}
+
+func playableIPTVVideoSource(entry pendingM3UEntry, rawURL string) bool {
+	group := strings.ToLower(strings.TrimSpace(entry.group))
+	name := strings.ToLower(strings.TrimSpace(entry.name))
+	if group == "audio" || group == "音频" || strings.Contains(group, "audio only") {
+		return false
+	}
+	if strings.Contains(name, "音频") || strings.Contains(name, "audio only") {
+		return false
+	}
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return true
+	}
+	path := strings.ToLower(parsed.EscapedPath())
+	if strings.Contains(path, "/audio/") || strings.Contains(path, "_audio/") {
+		return false
+	}
+	for _, suffix := range []string{".mp3", ".aac", ".m4a", ".flac", ".wav", ".ogg", ".opus"} {
+		if strings.HasSuffix(path, suffix) {
+			return false
+		}
+	}
+	return true
 }
 
 func parseEXTINF(line string) pendingM3UEntry {

@@ -38,6 +38,7 @@ class TvIptvViewModel @Inject constructor(
                     val channels = coerceListOrEmpty<TvIptvChannelDto>(payload.channels)
                         .map(::tvIptvChannelToUiModel)
                         .filter { it.id.isNotBlank() && it.name.isNotBlank() && it.url.isNotBlank() }
+                        .let(::filterPlayableIptvVideoChannels)
                     val current = resolveDefaultIptvChannel(channels)
                     _uiState.update {
                         it.copy(

@@ -47,4 +47,25 @@ class TvIptvViewModelTest {
         assertEquals("暂无可播放的 IPTV 频道", state.statusMessage)
         assertTrue(state.channels.isEmpty())
     }
+
+    @Test
+    fun initFiltersAudioOnlyChannelsBeforeSelectingDefault() = runTest {
+        val viewModel = TvIptvViewModel(
+            repository = FakeTvRepository(
+                iptvPayload = TvIptvPayload(
+                    channels = listOf(
+                        TvIptvChannelDto(id = "audio", name = "CCTV-1 音频", url = "https://piccpndali.v.myalicdn.com/audio/cctv1_2.m3u8", group = "Audio", sortOrder = 0),
+                        TvIptvChannelDto(id = "video", name = "CCTV-1 综合", url = "https://live.example/cctv1.m3u8", group = "央视频道", sortOrder = 1),
+                    ),
+                ),
+            ),
+        )
+
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(listOf("video"), state.channels.map { it.id })
+        assertEquals("video", state.currentChannel?.id)
+        assertEquals(listOf("央视频道"), state.groups.map { it.group })
+    }
 }

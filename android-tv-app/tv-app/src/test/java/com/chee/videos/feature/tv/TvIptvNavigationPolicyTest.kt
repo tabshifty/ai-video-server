@@ -17,6 +17,19 @@ class TvIptvNavigationPolicyTest {
     }
 
     @Test
+    fun audioOnlyUrlsAreNotPlayableChannels() {
+        val mixed = listOf(
+            TvIptvChannelUiModel(id = "audio", name = "CCTV-1 音频", url = "https://piccpndali.v.myalicdn.com/audio/cctv1_2.m3u8", group = "Audio", sortOrder = 0),
+            TvIptvChannelUiModel(id = "video", name = "CCTV-1 综合", url = "https://live.example/cctv1.m3u8", group = "央视频道", sortOrder = 1),
+        )
+
+        assertEquals(false, isPlayableIptvVideoChannel(mixed[0]))
+        assertEquals(true, isPlayableIptvVideoChannel(mixed[1]))
+        assertEquals("video", resolveDefaultIptvChannel(mixed)?.id)
+        assertEquals(listOf("video"), filterPlayableIptvVideoChannels(mixed).map { it.id })
+    }
+
+    @Test
     fun upAndDownCycleThroughChannels() {
         assertEquals("c2", resolveIptvChannelAfterStep(channels, currentChannelId = "c1", step = 1)?.id)
         assertEquals("c3", resolveIptvChannelAfterStep(channels, currentChannelId = "c1", step = -1)?.id)

@@ -47,6 +47,26 @@ http://live.example/news.m3u8
 	}
 }
 
+func TestParseM3UPlaylistSkipsAudioOnlyEntries(t *testing.T) {
+	t.Parallel()
+
+	raw := `#EXTM3U
+#EXTINF:-1 group-title="Audio",CCTV-1 音频
+https://piccpndali.v.myalicdn.com/audio/cctv1_2.m3u8
+#EXTINF:-1 group-title="央视频道",CCTV-1 综合
+https://live.example/cctv1.m3u8
+`
+
+	channels, skipped := ParseM3UPlaylist(strings.NewReader(raw))
+
+	if skipped != 1 {
+		t.Fatalf("expected audio-only entry to be skipped, got skipped=%d channels=%#v", skipped, channels)
+	}
+	if len(channels) != 1 || channels[0].Name != "CCTV-1 综合" {
+		t.Fatalf("expected only video channel to remain, got %#v", channels)
+	}
+}
+
 func TestBuildIPTVPlaylistStatusGroupsChannels(t *testing.T) {
 	t.Parallel()
 

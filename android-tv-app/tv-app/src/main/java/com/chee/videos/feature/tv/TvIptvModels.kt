@@ -48,19 +48,42 @@ fun tvIptvChannelToUiModel(dto: TvIptvChannelDto): TvIptvChannelUiModel =
     )
 
 fun resolveDefaultIptvChannel(channels: List<TvIptvChannelUiModel>): TvIptvChannelUiModel? =
-    channels.firstOrNull { it.url.isNotBlank() }
+    channels.firstOrNull(::isPlayableIptvVideoChannel)
+
+fun filterPlayableIptvVideoChannels(channels: List<TvIptvChannelUiModel>): List<TvIptvChannelUiModel> =
+    channels.filter(::isPlayableIptvVideoChannel)
+
+fun isPlayableIptvVideoChannel(channel: TvIptvChannelUiModel): Boolean {
+    if (channel.url.isBlank()) {
+        return false
+    }
+    val group = channel.group.trim().lowercase()
+    val name = channel.name.trim().lowercase()
+    if (group == "audio" || group == "音频" || group.contains("audio only")) {
+        return false
+    }
+    if (name.contains("音频") || name.contains("audio only")) {
+        return false
+    }
+    val path = channel.url.trim().lowercase().substringBefore('?').substringBefore('#')
+    if (path.contains("/audio/") || path.contains("_audio/")) {
+        return false
+    }
+    return !listOf(".mp3", ".aac", ".m4a", ".flac", ".wav", ".ogg", ".opus").any(path::endsWith)
+}
 
 fun resolveIptvChannelAfterStep(
     channels: List<TvIptvChannelUiModel>,
     currentChannelId: String?,
     step: Int,
 ): TvIptvChannelUiModel? {
-    if (channels.isEmpty()) {
+    val playableChannels = filterPlayableIptvVideoChannels(channels)
+    if (playableChannels.isEmpty()) {
         return null
     }
-    val currentIndex = channels.indexOfFirst { it.id == currentChannelId }.takeIf { it >= 0 } ?: 0
-    val nextIndex = Math.floorMod(currentIndex + step, channels.size)
-    return channels[nextIndex]
+    val currentIndex = playableChannels.indexOfFirst { it.id == currentChannelId }.takeIf { it >= 0 } ?: 0
+    val nextIndex = Math.floorMod(currentIndex + step, playableChannels.size)
+    return playableChannels[nextIndex]
 }
 
 fun groupIptvChannels(channels: List<TvIptvChannelUiModel>): List<TvIptvChannelGroupUiModel> {

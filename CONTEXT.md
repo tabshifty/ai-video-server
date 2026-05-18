@@ -29,3 +29,4 @@
 - Media3 `PlayerView` 的 `texture_view` 只能排除部分 Compose/Surface 渲染黑屏；如果 IPTV 日志中音频解码器已初始化但没有视频解码器初始化，且出现多个 `VideoCapabilities` 不支持提示，应按直播源视频编码兼容性处理。
 - TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并关闭硬解优先走软解；其他长视频播放器继续使用 Media3。IPTV 源常见 MPEG2、特殊 H.264 profile、Dolby Vision 或设备厂商解码缺口，不能只依赖 Android TV 设备硬解能力。
 - IPTV 播放无画面排查必须保留播放事件诊断：至少记录 LibVLC event、vout 数、视频轨/音频轨数量和当前视频轨 codec/分辨率。若 `videoTracks=0` 或无 `Vout`，优先检查 M3U 频道 URL、源站多码率/分片返回和是否需要后端转码；若有视频轨和 `Vout` 但仍黑屏，优先检查输出视图/系统合成层。
+- IPTV 频道清单不应包含音频专用源。明显音频源包括 `group-title=Audio/音频`、频道名包含 `音频` 或 `audio only`、URL 路径包含 `/audio/`、`_audio/`，以及 `.mp3/.aac/.m4a/.flac/.wav/.ogg/.opus` 等音频文件。后端解析时应跳过，TV 端也要过滤旧数据，避免默认播放只有声音没有画面的条目。
