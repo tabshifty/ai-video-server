@@ -44,4 +44,21 @@ class TvIptvPlayerViewLayoutTest {
             source.contains("videoTracks=${'$'}{vlcPlayer.videoTracksCount}"),
         )
     }
+
+    @Test
+    fun iptvScreenRendersChannelLogosWithFallbackIcon() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt")
+
+        assertTrue("IPTV 播放页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        assertTrue(
+            "IPTV 播放页必须使用 Coil AsyncImage 加载频道 logoUrl",
+            source.contains("AsyncImage(") && source.contains("model = channel.logoUrl"),
+        )
+        assertTrue(
+            "IPTV 频道台标加载失败或缺失时必须保留 TV 图标回退",
+            source.contains("Icons.Filled.Tv"),
+        )
+    }
 }

@@ -95,6 +95,26 @@ fun groupIptvChannels(channels: List<TvIptvChannelUiModel>): List<TvIptvChannelG
     return grouped.map { (group, items) -> TvIptvChannelGroupUiModel(group = group, channels = items) }
 }
 
+fun resolveIptvChannelListItemIndex(
+    groups: List<TvIptvChannelGroupUiModel>,
+    channelId: String?,
+): Int? {
+    if (channelId.isNullOrBlank()) {
+        return null
+    }
+    var itemIndex = 1
+    groups.forEach { group ->
+        itemIndex += 1
+        group.channels.forEach { channel ->
+            if (channel.id == channelId) {
+                return itemIndex
+            }
+            itemIndex += 1
+        }
+    }
+    return null
+}
+
 fun resolveIptvPlaybackRemoteAction(key: TvIptvRemoteKey): TvIptvRemoteAction? =
     when (key) {
         TvIptvRemoteKey.Up -> TvIptvRemoteAction.PreviousChannel

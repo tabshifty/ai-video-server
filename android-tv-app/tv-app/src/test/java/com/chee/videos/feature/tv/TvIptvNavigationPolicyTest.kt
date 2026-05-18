@@ -53,4 +53,17 @@ class TvIptvNavigationPolicyTest {
         assertEquals(listOf("新闻", "电影", "未分组"), grouped.map { it.group })
         assertEquals(listOf("c2", "c3"), grouped[1].channels.map { it.id })
     }
+
+    @Test
+    fun channelListItemIndexCountsTitleGroupHeadersAndChannelRows() {
+        val grouped = groupIptvChannels(
+            channels + TvIptvChannelUiModel(id = "c4", name = "未分组", url = "https://example.com/other.m3u8", group = "", sortOrder = 40),
+        )
+
+        assertEquals(2, resolveIptvChannelListItemIndex(grouped, channelId = "c1"))
+        assertEquals(4, resolveIptvChannelListItemIndex(grouped, channelId = "c2"))
+        assertEquals(5, resolveIptvChannelListItemIndex(grouped, channelId = "c3"))
+        assertEquals(7, resolveIptvChannelListItemIndex(grouped, channelId = "c4"))
+        assertEquals(null, resolveIptvChannelListItemIndex(grouped, channelId = "missing"))
+    }
 }

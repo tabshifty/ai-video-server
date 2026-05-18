@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -46,9 +47,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +63,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.chee.videos.tv.R
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
@@ -311,7 +315,20 @@ private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(Icons.Filled.Tv, contentDescription = null, tint = AppChrome.AccentWarm, modifier = Modifier.size(22.dp))
+            if (channel == null) {
+                TvIptvLogoFallback(
+                    modifier = Modifier.size(34.dp),
+                    iconSize = 22.dp,
+                    tint = AppChrome.AccentWarm,
+                )
+            } else {
+                TvIptvChannelLogo(
+                    channel = channel,
+                    modifier = Modifier.size(34.dp),
+                    iconSize = 22.dp,
+                    tint = AppChrome.AccentWarm,
+                )
+            }
             Text(
                 text = channel?.name ?: "IPTV",
                 color = Color.White,
@@ -381,6 +398,14 @@ private fun TvIptvChannelListOverlay(
     onSelect: (TvIptvChannelUiModel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(groups, focusedChannelId) {
+        resolveIptvChannelListItemIndex(groups, focusedChannelId)?.let { itemIndex ->
+            listState.animateScrollToItem(itemIndex)
+        }
+    }
+
     Surface(
         color = Color(0xE80B0F17),
         shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp),
@@ -389,6 +414,7 @@ private fun TvIptvChannelListOverlay(
             .width(360.dp),
     ) {
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -449,7 +475,12 @@ private fun TvIptvChannelRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(Icons.Filled.Tv, contentDescription = null, tint = if (current) Color.White else AppChrome.TextMuted, modifier = Modifier.size(18.dp))
+            TvIptvChannelLogo(
+                channel = channel,
+                modifier = Modifier.size(30.dp),
+                iconSize = 18.dp,
+                tint = if (current) Color.White else AppChrome.TextMuted,
+            )
             Text(
                 text = channel.name,
                 color = if (current) Color.White else AppChrome.TextPrimary,
@@ -464,6 +495,53 @@ private fun TvIptvChannelRow(
             }
             Spacer(modifier = Modifier.width(0.dp))
         }
+    }
+}
+
+@Composable
+private fun TvIptvChannelLogo(
+    channel: TvIptvChannelUiModel,
+    modifier: Modifier = Modifier,
+    iconSize: androidx.compose.ui.unit.Dp,
+    tint: Color,
+) {
+    var showFallback by remember(channel.logoUrl) { mutableStateOf(channel.logoUrl.isNullOrBlank()) }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.White.copy(alpha = 0.08f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (showFallback) {
+            Icon(Icons.Filled.Tv, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
+        } else {
+            AsyncImage(
+                model = channel.logoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                onError = { showFallback = true },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvIptvLogoFallback(
+    modifier: Modifier = Modifier,
+    iconSize: androidx.compose.ui.unit.Dp,
+    tint: Color,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.White.copy(alpha = 0.08f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Filled.Tv, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
     }
 }
 
