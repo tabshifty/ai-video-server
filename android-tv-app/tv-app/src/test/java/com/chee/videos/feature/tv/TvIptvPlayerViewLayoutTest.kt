@@ -23,4 +23,25 @@ class TvIptvPlayerViewLayoutTest {
             !xml.contains("androidx.media3.ui.PlayerView"),
         )
     }
+
+    @Test
+    fun iptvScreenAttachesVlcViewsWithTextureViewAndDiagnostics() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt")
+
+        assertTrue("IPTV 播放页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        assertTrue(
+            "IPTV 在 Compose AndroidView 中必须让 LibVLC 使用 TextureView 输出，避免 SurfaceView 黑屏",
+            source.contains("attachViews(this, null, false, true)"),
+        )
+        assertTrue(
+            "IPTV 播放页必须记录 LibVLC 事件和视频输出数量，方便区分无视频轨和输出层黑屏",
+            source.contains("Log.i(IPTV_LOG_TAG"),
+        )
+        assertTrue(
+            "IPTV 播放页必须记录 LibVLC 当前视频轨数量",
+            source.contains("videoTracks=${'$'}{vlcPlayer.videoTracksCount}"),
+        )
+    }
 }

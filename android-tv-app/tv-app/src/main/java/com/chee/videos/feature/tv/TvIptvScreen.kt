@@ -4,6 +4,7 @@ import android.app.Activity
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
@@ -41,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,12 +70,15 @@ import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 
+private const val IPTV_LOG_TAG = "TvIptv"
+
 @Composable
 fun TvIptvScreen(
     onBack: () -> Unit,
     viewModel: TvIptvViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentChannelForLog by rememberUpdatedState(uiState.currentChannel)
     val context = LocalContext.current
     val activity = context as? Activity
     val rootFocusRequester = remember { FocusRequester() }
@@ -127,13 +132,29 @@ fun TvIptvScreen(
 
     DisposableEffect(vlcPlayer) {
         val listener = MediaPlayer.EventListener { event ->
-            when (event.type) {
-                MediaPlayer.Event.EncounteredError -> {
-                    mainHandler.post { playerErrorMessage = "频道播放失败，请切换频道或重试" }
-                }
+            mainHandler.post {
+                Log.i(
+                    IPTV_LOG_TAG,
+                    "event=${event.type} vout=${event.getVoutCount()} " +
+                        "videoTracks=${vlcPlayer.videoTracksCount} audioTracks=${vlcPlayer.audioTracksCount} " +
+                        "videoTrack=${vlcPlayer.videoTrack} url=${currentChannelForLog?.url.orEmpty()}",
+                )
+                when (event.type) {
+                    MediaPlayer.Event.EncounteredError -> {
+                        playerErrorMessage = "频道播放失败，请切换频道或重试"
+                    }
 
-                MediaPlayer.Event.Playing -> {
-                    mainHandler.post { playerErrorMessage = null }
+                    MediaPlayer.Event.Playing -> {
+                        playerErrorMessage = null
+                        Log.i(IPTV_LOG_TAG, describeVlcTracks(vlcPlayer))
+                    }
+
+                    MediaPlayer.Event.Vout,
+                    MediaPlayer.Event.ESAdded,
+                    MediaPlayer.Event.ESSelected,
+                    -> {
+                        Log.i(IPTV_LOG_TAG, describeVlcTracks(vlcPlayer))
+                    }
                 }
             }
         }
@@ -237,7 +258,7 @@ fun TvIptvScreen(
         AndroidView(
             factory = { viewContext ->
                 (LayoutInflater.from(viewContext).inflate(R.layout.tv_iptv_player_view, null) as VLCVideoLayout).apply {
-                    vlcPlayer.attachViews(this, null, false, false)
+                    vlcPlayer.attachViews(this, null, false, true)
                 }
             },
             modifier = Modifier.fillMaxSize(),
@@ -459,3 +480,21 @@ private fun nativeKeyToIptvRemoteKey(keyCode: Int): TvIptvRemoteKey? =
 
         else -> null
     }
+
+private fun describeVlcTracks(player: MediaPlayer): String {
+    val videoTracks = player.videoTracks.orEmpty().joinToString(prefix = "[", postfix = "]") { track ->
+        "${track.id}:${track.name}"
+    }
+    val audioTracks = player.audioTracks.orEmpty().joinToString(prefix = "[", postfix = "]") { track ->
+        "${track.id}:${track.name}"
+    }
+    val currentVideo = player.currentVideoTrack
+    val currentVideoText = if (currentVideo == null) {
+        "none"
+    } else {
+        "${currentVideo.codec} ${currentVideo.width}x${currentVideo.height} profile=${currentVideo.profile} level=${currentVideo.level}"
+    }
+    return "tracks videoCount=${player.videoTracksCount} audioCount=${player.audioTracksCount} " +
+        "selectedVideo=${player.videoTrack} currentVideo=$currentVideoText " +
+        "videoTracks=$videoTracks audioTracks=$audioTracks"
+}

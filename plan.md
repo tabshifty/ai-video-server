@@ -2,6 +2,16 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-18 21:07 +0800
+- 进度：完成 IPTV LibVLC 输出层和诊断增强；LibVLC `attachViews` 改为 TextureView 输出，新增 `TvIptv` 日志记录 event、vout、视频轨/音频轨数量、当前视频轨 codec/分辨率，TV 版本更新为 `0.1.5` / `versionCode=6`，并在 `CONTEXT.md` 记录后续无画面排查依据。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：红灯阶段 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvIptvPlayerViewLayoutTest'` 因缺少 TextureView 绑定和诊断日志失败；实现后同命令通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过。并行复跑时曾触发 Kotlin/Kapt 增量缓存竞争，执行 `cd android-tv-app && ./gradlew --stop && ./gradlew --no-daemon :tv-app:assembleDebug` 串行重跑通过。待执行乱码检查和提交范围检查。
+
+## 2026-05-18 21:06 +0800
+- 进度：继续排查 TV App IPTV 切到 LibVLC 后仍无画面；最新日志显示 LibVLC 已将流识别为 TS 且 AAC 音频 packetizer 正常，但仍未看到视频 packetizer/decoder/vout 证据。计划先补 VLC 播放事件和轨道诊断日志，并将 LibVLC `attachViews` 改为 TextureView，区分是 Compose/Surface 输出层问题，还是当前频道 URL 未解析出视频轨。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行红灯静态测试、TV 定向单测、TV Debug 构建、乱码检查与提交范围检查。
+
 ## 2026-05-18 21:05 +0800
 - 进度：开始修复 TV App IPTV 仍然只有声音没有画面；用户日志显示 API 返回正常、AAC 音频解码器已初始化，但没有视频解码器初始化，且出现多个 `VideoCapabilities` 不支持提示。前一次 `texture_view` 修复未生效后，根因判断从 Compose/Surface 渲染转为 IPTV 频道视频编码兼容性；计划将 IPTV 播放页单独切换到 LibVLC 播放，保留其他长视频 Media3 播放器不变，并补依赖/实现静态回归测试、TV 版本号和技术沉淀。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/*`、`CONTEXT.md`、`plan.md`
