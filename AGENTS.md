@@ -19,6 +19,8 @@
 - 所有 Markdown 文件以及前端面向用户的界面文案默认必须使用中文；仅在任务明确要求其他语言时可例外。
 - 中文内容必须保证编码与显示正确，禁止出现乱码（包括 Markdown、注释、界面文案）。
 - Git 提交信息默认使用中文，且必须无乱码。
+- App 功能修改必须同步更新受影响 App 的版本号：手机端为 `android-app/app/build.gradle.kts`，TV 端为 `android-tv-app/tv-app/build.gradle.kts`；默认 `versionCode +1`，`versionName` 的 patch 位 `+1`。
+- 每次功能更新必须在根级 `CONTEXT.md` 追加技术沉淀，记录长期有效的术语、架构决策、接口约定、兼容策略或踩坑经验，避免只写临时进度流水账。
 
 ## Change Management Rules
 - Every change must be rollbackable:
@@ -40,7 +42,7 @@
 | UI/UX skill | `.codex/skills/ui-ux-pro-max` | UI/UX reference assets and scripts | Read-only unless requested |
 
 ## Cross-Domain Workflow
-- Current state: no cross-domain runtime workflow exists (no app modules yet).
+- Current state: `android-app` 与 `android-tv-app` 是相互隔离的独立 App 工程，暂无共享运行时代码依赖。
 - When adding a real module (for example `frontend/` or `backend/`):
   - Create a nested `AGENTS.md` in that module root.
   - Document run/test/build commands owned by that module.

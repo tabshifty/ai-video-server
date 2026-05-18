@@ -7,6 +7,12 @@
 - 构建：`cd android-app && ./gradlew :app:assembleDebug`
 - 单测：`cd android-app && ./gradlew :app:testDebugUnitTest`
 
+## 版本管理
+- 版本文件：`app/build.gradle.kts`。
+- 手机端功能修改必须同步更新 `versionCode` 和 `versionName`。
+- 默认递增规则：`versionCode +1`，`versionName` 的 patch 位 `+1`，例如 `0.1.0` -> `0.1.1`。
+- 功能更新后若形成长期有效的术语、决策、接口或踩坑经验，必须追加到根级 `CONTEXT.md`。
+
 ## Rules
 - 本工程仅承载手机端能力，禁止在此重新引入 `:tv-app` module 或 TV APK 构建入口。
 - 手机端保留 TV 扫码授权确认能力，但不承载 TV 首页、TV 导航、TV 播放器运行时代码。
