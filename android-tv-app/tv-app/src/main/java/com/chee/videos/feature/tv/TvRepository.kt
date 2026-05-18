@@ -2,6 +2,7 @@ package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvCatalogWallPayload
+import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.repository.VideoRepository
@@ -12,6 +13,7 @@ interface TvRepository {
     suspend fun fetchHome(kind: String = "tv", query: String = "", page: Int = 1, pageSize: Int = 20): Result<TvHomePayload>
     suspend fun fetchSearch(query: String, page: Int = 1, pageSize: Int = 20): Result<TvSearchPayload>
     suspend fun fetchCatalogWall(kind: String, page: Int = 1, pageSize: Int = 24): Result<TvCatalogWallPayload>
+    suspend fun fetchIptvChannels(): Result<TvIptvPayload>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
     suspend fun readActiveBaseUrl(): String?
     suspend fun buildSourceUrl(videoId: String): String
@@ -34,6 +36,9 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun fetchCatalogWall(kind: String, page: Int, pageSize: Int): Result<TvCatalogWallPayload> =
         videoRepository.fetchTvCatalogWall(kind, page, pageSize)
+
+    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
+        videoRepository.fetchTvIptvChannels()
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         videoRepository.fetchTvSeriesDetail(seriesId)

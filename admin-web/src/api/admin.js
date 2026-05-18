@@ -33,6 +33,14 @@ export const deleteAdminTvSeason = (id) => request.delete(`/admin/tv/seasons/${i
 export const createAdminTvEpisode = (seasonId, payload) => request.post(`/admin/tv/seasons/${seasonId}/episodes`, payload)
 export const updateAdminTvEpisode = (id, payload) => request.put(`/admin/tv/episodes/${id}`, payload)
 export const deleteAdminTvEpisode = (id) => request.delete(`/admin/tv/episodes/${id}`)
+export const getAdminIPTVPlaylist = () => request.get('/admin/iptv/playlist')
+export const uploadAdminIPTVPlaylist = (formData) =>
+  request.post('/admin/iptv/playlist/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0
+  })
+export const updateAdminIPTVSource = (payload) => request.put('/admin/iptv/playlist/source', payload)
+export const refreshAdminIPTVPlaylist = () => request.post('/admin/iptv/playlist/refresh')
 
 export const getAdminUsers = (params) => request.get('/admin/users', { params })
 export const updateUserRole = (id, payload) => request.put(`/admin/users/${id}/role`, payload)

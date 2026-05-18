@@ -60,6 +60,9 @@ class TvCatalogViewModel @Inject constructor(
             menuItem == TvHomeMenuItem.Settings -> {
                 _uiState.update { it.copy(loading = false, query = "", searchResults = emptyList()) }
             }
+            menuItem == TvHomeMenuItem.Iptv -> {
+                _uiState.update { it.copy(loading = false, query = "", searchResults = emptyList()) }
+            }
         }
     }
 

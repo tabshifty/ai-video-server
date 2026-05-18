@@ -17,13 +17,14 @@ class TvHomeNavigationTest {
     @Test
     fun menuDefaultsToSeriesWithFixedOrderAndAvLabel() {
         assertEquals(
-            listOf("电视剧", "电影", "18+", "搜索", "设置"),
+            listOf("电视剧", "电影", "18+", "IPTV", "搜索", "设置"),
             TvHomeMenuItem.defaults().map { it.label },
         )
         assertEquals(TvHomeMenuItem.Series, TvHomeMenuItem.defaultSelected())
         assertEquals("tv", TvHomeMenuItem.Series.homeKind)
         assertEquals("movie", TvHomeMenuItem.Movie.homeKind)
         assertEquals("av", TvHomeMenuItem.Adult.homeKind)
+        assertFalse(TvHomeMenuItem.Iptv.isContentKind)
     }
 
     @Test

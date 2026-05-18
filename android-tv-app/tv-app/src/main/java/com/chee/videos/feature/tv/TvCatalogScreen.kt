@@ -80,6 +80,7 @@ fun TvCatalogScreen(
     onOpenLongForm: (String, String) -> Unit,
     onPlayLongForm: (String, String) -> Unit,
     onOpenCatalogWall: (String, String) -> Unit = { _, _ -> },
+    onOpenIptv: () -> Unit = {},
     homeContentFocusRequester: FocusRequester? = null,
     onRepair: () -> Unit = {},
     onLogout: () -> Unit = {},
@@ -133,6 +134,7 @@ fun TvCatalogScreen(
                 menuFocusRequester = menuFocusRequester,
                 contentFocusRequester = featuredFocusRequester,
                 onSelect = viewModel::selectMenu,
+                onOpenIptv = onOpenIptv,
             )
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = AppChrome.AccentStrong)
@@ -147,6 +149,7 @@ fun TvCatalogScreen(
             menuFocusRequester = menuFocusRequester,
             contentFocusRequester = featuredFocusRequester,
             onSelect = viewModel::selectMenu,
+            onOpenIptv = onOpenIptv,
         )
         if (uiState.selectedMenu == TvHomeMenuItem.Settings) {
             TvHomeSettingsPanel(
@@ -386,6 +389,7 @@ private fun TvHomeSideMenu(
     menuFocusRequester: FocusRequester,
     contentFocusRequester: FocusRequester,
     onSelect: (TvHomeMenuItem) -> Unit,
+    onOpenIptv: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -403,7 +407,13 @@ private fun TvHomeSideMenu(
                 icon = tvHomeMenuIcon(item),
                 modifier = if (index == 0) Modifier.focusRequester(menuFocusRequester) else Modifier,
                 contentFocusRequester = contentFocusRequester,
-                onClick = { onSelect(item) },
+                onClick = {
+                    if (item == TvHomeMenuItem.Iptv) {
+                        onOpenIptv()
+                    } else {
+                        onSelect(item)
+                    }
+                },
             )
         }
     }
@@ -571,6 +581,7 @@ private fun tvHomeMenuIcon(item: TvHomeMenuItem): ImageVector {
         TvHomeMenuItem.Series -> Icons.Filled.Tv
         TvHomeMenuItem.Movie -> Icons.Filled.LocalMovies
         TvHomeMenuItem.Adult -> Icons.Filled.Warning
+        TvHomeMenuItem.Iptv -> Icons.Filled.Tv
         TvHomeMenuItem.Search -> Icons.Filled.Search
         TvHomeMenuItem.Settings -> Icons.Filled.Settings
     }

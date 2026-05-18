@@ -30,6 +30,7 @@ type API struct {
 	appSvc         *services.AppService
 	imageSvc       *services.ImageService
 	subtitleSvc    *services.SubtitleService
+	iptvSvc        iptvService
 	enqueuer       *queue.Enqueuer
 	logger         *slog.Logger
 	redis          *redis.Client
@@ -58,6 +59,7 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		appSvc:         appSvc,
 		imageSvc:       imageSvc,
 		subtitleSvc:    subtitleSvc,
+		iptvSvc:        services.NewIPTVService(repo, nil),
 		enqueuer:       enqueuer,
 		logger:         logger,
 		redis:          redisClient,
@@ -107,6 +109,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/tv/search", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVSearch)
 		v1.GET("/tv/catalog", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVCatalogWall)
 		v1.GET("/tv/series/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVSeriesDetail)
+		v1.GET("/tv/iptv/channels", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVIPTVChannels)
 		v1.GET("/tv/series/:id/poster", a.TVSeriesPoster)
 		v1.GET("/tv/series/:id/backdrop", a.TVSeriesBackdrop)
 		v1.GET("/image-collections", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppImageCollections)
@@ -138,6 +141,10 @@ func (a *API) Register(r *gin.Engine) {
 		{
 			admin.GET("/events/ws", a.AdminEventsStream)
 			admin.GET("/stats", a.AdminStats)
+			admin.GET("/iptv/playlist", a.AdminIPTVPlaylist)
+			admin.POST("/iptv/playlist/upload", a.AdminIPTVUploadPlaylist)
+			admin.PUT("/iptv/playlist/source", a.AdminIPTVSaveSource)
+			admin.POST("/iptv/playlist/refresh", a.AdminIPTVRefreshPlaylist)
 			admin.GET("/videos", a.AdminVideos)
 			admin.GET("/video-tags", a.AdminVideoTags)
 			admin.GET("/video-tags/popular", a.AdminPopularVideoTags)

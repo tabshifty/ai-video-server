@@ -5,6 +5,7 @@ import Dashboard from '../views/Dashboard.vue'
 import VideoList from '../views/VideoList.vue'
 import VideoUpload from '../views/VideoUpload.vue'
 import TvSeriesManage from '../views/TvSeriesManage.vue'
+import IPTVManage from '../views/IPTVManage.vue'
 import ScrapePreview from '../views/ScrapePreview.vue'
 import AVManualScrape from '../views/AVManualScrape.vue'
 import UserManage from '../views/UserManage.vue'
@@ -21,6 +22,7 @@ const routes = [
   { path: '/dashboard', component: Dashboard },
   { path: '/videos', component: VideoList },
   { path: '/tv-series', component: TvSeriesManage },
+  { path: '/iptv', component: IPTVManage },
   { path: '/upload', component: VideoUpload },
   { path: '/scrape', component: ScrapePreview },
   { path: '/av-scrape', component: AVManualScrape },

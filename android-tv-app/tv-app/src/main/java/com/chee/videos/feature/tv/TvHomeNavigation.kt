@@ -9,6 +9,7 @@ enum class TvHomeMenuItem(
     Series("电视剧", "tv"),
     Movie("电影", "movie"),
     Adult("18+", "av"),
+    Iptv("IPTV", ""),
     Search("搜索", ""),
     Settings("设置", ""),
     ;
@@ -17,7 +18,7 @@ enum class TvHomeMenuItem(
         get() = this == Series || this == Movie || this == Adult
 
     companion object {
-        fun defaults(): List<TvHomeMenuItem> = listOf(Series, Movie, Adult, Search, Settings)
+        fun defaults(): List<TvHomeMenuItem> = listOf(Series, Movie, Adult, Iptv, Search, Settings)
         fun defaultSelected(): TvHomeMenuItem = Series
     }
 }

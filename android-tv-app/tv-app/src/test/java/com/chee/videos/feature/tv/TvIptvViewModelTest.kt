@@ -1,0 +1,50 @@
+package com.chee.videos.feature.tv
+
+import com.chee.videos.core.model.TvIptvChannelDto
+import com.chee.videos.core.model.TvIptvPayload
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import kotlinx.coroutines.test.runTest
+
+class TvIptvViewModelTest {
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
+    @Test
+    fun initLoadsChannelsAndSelectsFirstChannel() = runTest {
+        val viewModel = TvIptvViewModel(
+            repository = FakeTvRepository(
+                iptvPayload = TvIptvPayload(
+                    channelCount = 2,
+                    channels = listOf(
+                        TvIptvChannelDto(id = "c1", name = "新闻一台", url = "https://example.com/news.m3u8", group = "新闻", sortOrder = 10),
+                        TvIptvChannelDto(id = "c2", name = "电影一台", url = "https://example.com/movie.m3u8", group = "电影", sortOrder = 20),
+                    ),
+                ),
+            ),
+        )
+
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals("c1", state.currentChannel?.id)
+        assertEquals("https://example.com/news.m3u8", state.currentChannel?.url)
+        assertEquals(listOf("新闻", "电影"), state.groups.map { it.group })
+    }
+
+    @Test
+    fun emptyPayloadShowsChineseEmptyState() = runTest {
+        val viewModel = TvIptvViewModel(repository = FakeTvRepository(iptvPayload = TvIptvPayload()))
+
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals("暂无可播放的 IPTV 频道", state.statusMessage)
+        assertTrue(state.channels.isEmpty())
+    }
+}

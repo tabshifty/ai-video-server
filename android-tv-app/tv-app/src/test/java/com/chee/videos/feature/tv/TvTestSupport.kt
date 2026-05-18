@@ -5,6 +5,7 @@ import com.chee.videos.core.model.TvCatalogWallItemDto
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSearchResultDto
 import com.chee.videos.core.model.TvSeasonDto
@@ -19,6 +20,7 @@ class FakeTvRepository(
     private val homePayload: TvHomePayload = TvHomePayload(),
     private val homePayloads: Map<String, TvHomePayload> = emptyMap(),
     private val searchPayload: TvSearchPayload = TvSearchPayload(),
+    private val iptvPayload: TvIptvPayload = TvIptvPayload(),
     private val posterWallPages: List<TvCatalogWallPayload> = emptyList(),
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
     private val homeError: Throwable? = null,
@@ -49,6 +51,11 @@ class FakeTvRepository(
         val payload = posterWallPages.firstOrNull { it.page == page }
             ?: TvCatalogWallPayload(page = page, pageSize = pageSize)
         return Result.success(payload)
+    }
+
+    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> {
+        homeError?.let { return Result.failure(it) }
+        return Result.success(iptvPayload)
     }
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
@@ -118,6 +125,9 @@ class DelayedSourceTvRepository(
 
     override suspend fun fetchCatalogWall(kind: String, page: Int, pageSize: Int): Result<TvCatalogWallPayload> =
         Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
+
+    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
+        Result.success(TvIptvPayload())
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(detailPayload)
@@ -190,6 +200,7 @@ suspend fun TvCatalogViewModel.awaitIdle() = Unit
 suspend fun TvPosterWallViewModel.awaitIdle() = Unit
 suspend fun TvSeriesDetailViewModel.awaitIdle() = Unit
 suspend fun TvSeriesPlayerViewModel.awaitIdle() = Unit
+suspend fun TvIptvViewModel.awaitIdle() = Unit
 
 fun tvSearchResult(
     id: String = "movie-1",

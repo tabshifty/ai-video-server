@@ -16,6 +16,7 @@ import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
@@ -92,6 +93,12 @@ interface ApiService {
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<TvCatalogWallPayload>
+
+    @GET
+    suspend fun tvIptvChannels(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<TvIptvPayload>
 
     @GET
     suspend fun tvSeriesDetail(

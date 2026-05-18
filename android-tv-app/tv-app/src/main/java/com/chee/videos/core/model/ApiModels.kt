@@ -129,6 +129,25 @@ data class TvCatalogWallPayload(
     @SerializedName("page_size") val pageSize: Int = 20,
 )
 
+data class TvIptvPayload(
+    @SerializedName("source_url") val sourceUrl: String = "",
+    @SerializedName("updated_at") val updatedAt: String? = null,
+    @SerializedName("channel_count") val channelCount: Int = 0,
+    @SerializedName("skipped_count") val skippedCount: Int = 0,
+    @SerializedName("groups") val groups: List<String> = emptyList(),
+    @SerializedName("channels") val channels: List<TvIptvChannelDto> = emptyList(),
+)
+
+data class TvIptvChannelDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("url") val url: String,
+    @SerializedName("group") val group: String = "",
+    @SerializedName("logo_url") val logoUrl: String? = null,
+    @SerializedName("tvg_id") val tvgId: String? = null,
+    @SerializedName("sort_order") val sortOrder: Int = 0,
+)
+
 data class TvCatalogWallItemDto(
     @SerializedName("id") val id: String,
     @SerializedName("type") val type: String,

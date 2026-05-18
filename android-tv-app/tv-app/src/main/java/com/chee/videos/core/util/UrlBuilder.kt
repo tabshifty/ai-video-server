@@ -30,6 +30,8 @@ object UrlBuilder {
 
     fun tvCatalogWall(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv/catalog"
 
+    fun tvIptvChannels(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv/iptv/channels"
+
     fun tvSeriesDetail(baseUrl: String, seriesId: String): String =
         "${normalizeBaseUrl(baseUrl)}/api/v1/tv/series/$seriesId"
 

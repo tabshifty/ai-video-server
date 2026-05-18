@@ -36,6 +36,8 @@ import com.chee.videos.feature.tv.TvLongFormVideoIdArg
 import com.chee.videos.feature.tv.TvLongFormVideoTypeArg
 import com.chee.videos.feature.tv.TvLongFormDetailScreen
 import com.chee.videos.feature.tv.TvLongFormPlayerScreen
+import com.chee.videos.feature.tv.TvIptvRoute
+import com.chee.videos.feature.tv.TvIptvScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tv.TvCatalogWallKindArg
 import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
@@ -128,6 +130,9 @@ private fun TvAuthenticatedNav(
                     onOpenCatalogWall = { kind, title ->
                         navController.navigate(buildTvCatalogWallRoute(kind, title))
                     },
+                    onOpenIptv = {
+                        navController.navigate(TvIptvRoute)
+                    },
                     homeContentFocusRequester = homeContentFocusRequester,
                     onRepair = onRepair,
                     onLogout = onLogout,
@@ -181,6 +186,11 @@ private fun TvAuthenticatedNav(
                 ),
             ) {
                 TvLongFormPlayerScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(TvIptvRoute) {
+                TvIptvScreen(
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -259,6 +269,7 @@ internal fun shouldHandleTvShellBack(route: String?): Boolean {
         value.startsWith("tv/wall/") ||
         value == TvLongFormDetailRoutePattern ||
         value.startsWith("tv/detail/") ||
+        value == TvIptvRoute ||
         value == TvSeriesRoutePattern ||
         value.startsWith("tv/series/")
 }
@@ -267,4 +278,5 @@ private fun String.isTvPlaybackRoute(): Boolean =
     this == TvPlayerRoutePattern ||
         startsWith("tv/player/") ||
         this == TvLongFormPlayerRoutePattern ||
-        startsWith("tv/long-form-player/")
+        startsWith("tv/long-form-player/") ||
+        this == TvIptvRoute
