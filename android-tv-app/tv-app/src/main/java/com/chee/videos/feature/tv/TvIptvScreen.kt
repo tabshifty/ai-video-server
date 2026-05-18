@@ -1,7 +1,7 @@
 package com.chee.videos.feature.tv
 
 import android.app.Activity
-import android.graphics.Color as AndroidColor
+import android.view.LayoutInflater
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -61,8 +61,8 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.chee.videos.tv.R
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.tvFocusableGlow
@@ -222,11 +222,7 @@ fun TvIptvScreen(
     ) {
         AndroidView(
             factory = { viewContext ->
-                PlayerView(viewContext).apply {
-                    useController = false
-                    setShutterBackgroundColor(AndroidColor.BLACK)
-                    setKeepContentOnPlayerReset(true)
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                (LayoutInflater.from(viewContext).inflate(R.layout.tv_iptv_player_view, null) as PlayerView).apply {
                     player = exoPlayer
                 }
             },
