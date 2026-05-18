@@ -1,0 +1,4 @@
+interface:
+  display_name: "仓库开发流程"
+  short_description: "按本仓库历史经验执行计划、TDD、验证、记录和提交。"
+  default_prompt: "在本仓库开始功能、修复或收尾提交前，使用这个流程对齐计划记录、验证命令和提交范围。"
