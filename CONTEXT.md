@@ -25,3 +25,4 @@
 - 后端负责保存和解析 M3U，Admin Web 负责上传文件、保存远程 URL、手动刷新和预览解析结果；TV App 只获取解析后的频道清单。
 - TV App 播放 IPTV 时直接连接 M3U 中的原始频道 URL；后端不代理、不转码、不隐藏源地址。
 - 远程 M3U URL 只在后台手动刷新时拉取，本期不做定时刷新和 EPG 节目单。
+- TV App 播放 M3U8/HLS 频道必须打包 Media3 HLS 扩展模块；仅引入 `media3-exoplayer` 时，`DefaultMediaSourceFactory` 会在运行时找不到 `HlsMediaSource.Factory` 并导致 IPTV 播放页崩溃。
