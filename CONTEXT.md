@@ -26,4 +26,5 @@
 - TV App 播放 IPTV 时直接连接 M3U 中的原始频道 URL；后端不代理、不转码、不隐藏源地址。
 - 远程 M3U URL 只在后台手动刷新时拉取，本期不做定时刷新和 EPG 节目单。
 - TV App 播放 M3U8/HLS 频道必须打包 Media3 HLS 扩展模块；仅引入 `media3-exoplayer` 时，`DefaultMediaSourceFactory` 会在运行时找不到 `HlsMediaSource.Factory` 并导致 IPTV 播放页崩溃。
-- TV App 的 IPTV 播放页在 Compose 中使用 Media3 `PlayerView` 时必须通过 XML 指定 `surface_type="texture_view"`；默认 `surface_view` 在部分 TV 设备/系统组合下可能出现有声音但无画面。
+- Media3 `PlayerView` 的 `texture_view` 只能排除部分 Compose/Surface 渲染黑屏；如果 IPTV 日志中音频解码器已初始化但没有视频解码器初始化，且出现多个 `VideoCapabilities` 不支持提示，应按直播源视频编码兼容性处理。
+- TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，并关闭硬解优先走软解；其他长视频播放器继续使用 Media3。IPTV 源常见 MPEG2、特殊 H.264 profile、Dolby Vision 或设备厂商解码缺口，不能只依赖 Android TV 设备硬解能力。

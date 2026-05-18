@@ -1,6 +1,9 @@
 package com.chee.videos.feature.tv
 
 import android.app.Activity
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
@@ -55,17 +58,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.PlayerView
 import com.chee.videos.tv.R
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.tvFocusableGlow
+import java.util.ArrayList
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.util.VLCVideoLayout
 
 @Composable
 fun TvIptvScreen(
@@ -76,13 +77,23 @@ fun TvIptvScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val rootFocusRequester = remember { FocusRequester() }
-    val exoPlayer = remember { ExoPlayer.Builder(context).build() }
-    val dataSourceFactory = remember {
-        DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val libVlc = remember {
+        LibVLC(
+            context.applicationContext,
+            ArrayList(
+                listOf(
+                    "--network-caching=1500",
+                    "--clock-jitter=0",
+                    "--clock-synchro=0",
+                    "--avcodec-hw=none",
+                ),
+            ),
+        )
     }
+    val vlcPlayer = remember(libVlc) { MediaPlayer(libVlc) }
     var channelListVisible by remember { mutableStateOf(false) }
     var focusedChannelIndex by remember { mutableIntStateOf(0) }
-    var preparedChannelId by remember { mutableStateOf<String?>(null) }
     var playbackRetryNonce by remember { mutableIntStateOf(0) }
     var playerErrorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -114,16 +125,25 @@ fun TvIptvScreen(
         }
     }
 
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                playerErrorMessage = "频道播放失败，请切换频道或重试"
+    DisposableEffect(vlcPlayer) {
+        val listener = MediaPlayer.EventListener { event ->
+            when (event.type) {
+                MediaPlayer.Event.EncounteredError -> {
+                    mainHandler.post { playerErrorMessage = "频道播放失败，请切换频道或重试" }
+                }
+
+                MediaPlayer.Event.Playing -> {
+                    mainHandler.post { playerErrorMessage = null }
+                }
             }
         }
-        exoPlayer.addListener(listener)
+        vlcPlayer.setEventListener(listener)
         onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
+            vlcPlayer.setEventListener(null)
+            vlcPlayer.stop()
+            vlcPlayer.detachViews()
+            vlcPlayer.release()
+            libVlc.release()
         }
     }
 
@@ -134,26 +154,20 @@ fun TvIptvScreen(
     LaunchedEffect(uiState.currentChannel?.id, playbackRetryNonce) {
         val channel = uiState.currentChannel
         if (channel == null) {
-            exoPlayer.clearMediaItems()
-            preparedChannelId = null
+            vlcPlayer.stop()
             return@LaunchedEffect
         }
         playerErrorMessage = null
-        val mediaItem = MediaItem.Builder()
-            .setUri(channel.url)
-            .setMediaId(channel.id)
-            .setMediaMetadata(
-                androidx.media3.common.MediaMetadata.Builder()
-                    .setTitle(channel.name)
-                    .build(),
-            )
-            .build()
-        val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
-        exoPlayer.setMediaSource(mediaSource, true)
-        exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
-        exoPlayer.play()
-        preparedChannelId = channel.id
+        vlcPlayer.stop()
+        val media = Media(libVlc, Uri.parse(channel.url)).apply {
+            setHWDecoderEnabled(false, false)
+            addOption(":network-caching=1500")
+            addOption(":clock-jitter=0")
+            addOption(":clock-synchro=0")
+        }
+        vlcPlayer.media = media
+        media.release()
+        vlcPlayer.play()
     }
 
     KeepScreenOnEffect(enabled = uiState.currentChannel != null && playerErrorMessage == null)
@@ -222,11 +236,10 @@ fun TvIptvScreen(
     ) {
         AndroidView(
             factory = { viewContext ->
-                (LayoutInflater.from(viewContext).inflate(R.layout.tv_iptv_player_view, null) as PlayerView).apply {
-                    player = exoPlayer
+                (LayoutInflater.from(viewContext).inflate(R.layout.tv_iptv_player_view, null) as VLCVideoLayout).apply {
+                    vlcPlayer.attachViews(this, null, false, false)
                 }
             },
-            update = { view -> view.player = exoPlayer },
             modifier = Modifier.fillMaxSize(),
         )
 
