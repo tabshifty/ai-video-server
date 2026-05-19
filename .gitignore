@@ -1,14 +1,32 @@
 .env
+*.env.local
+*.local
 .run/
 .DS_Store
+**/.DS_Store
 .worktrees/
-admin-web/node_modules/
-admin-web/dist/
 .gocache/
 storage/
-referencesm/
-references/
-release
+/referencesm/
+/references/
+/release/
+
+# Python / tool caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Go / server outputs
+*.test
+*.out
+*.log
+
+# Frontend development
+admin-web/node_modules/
+admin-web/dist/
 
 # Android development
 android-app/.gradle/
@@ -18,8 +36,28 @@ android-app/.idea/
 android-app/*.iml
 android-app/**/*.iml
 android-app/**/build/
+android-app/**/release/
 android-app/**/.cxx/
 android-app/**/.externalNativeBuild/
 android-app/captures/
 android-app/**/*.jks
 android-app/**/*.keystore
+android-app/**/*.apk
+android-app/**/*.aab
+
+# Android TV development
+android-tv-app/.gradle/
+android-tv-app/.gradle-local/
+android-tv-app/local.properties
+android-tv-app/.idea/
+android-tv-app/*.iml
+android-tv-app/**/*.iml
+android-tv-app/**/build/
+android-tv-app/**/release/
+android-tv-app/**/.cxx/
+android-tv-app/**/.externalNativeBuild/
+android-tv-app/captures/
+android-tv-app/**/*.jks
+android-tv-app/**/*.keystore
+android-tv-app/**/*.apk
+android-tv-app/**/*.aab

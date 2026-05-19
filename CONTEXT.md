@@ -4,6 +4,10 @@
 - 每次功能更新必须补充本文件，沉淀长期有效的术语、架构决策、接口约定、兼容策略、踩坑经验或后续维护注意事项。
 - 技术沉淀只记录会影响后续实现和维护的内容，不记录临时进度、命令流水账或一次性调试过程。
 
+## Git 忽略规则约定
+- 根级 `.gitignore` 中用于本地资料或发布产物的目录规则必须按意图锚定：仅忽略根目录时使用 `/references/`、`/release/`，避免误伤 `.codex/skills/*/references/`、`.agents/skills/*/references/` 等需要版本管理的技能参考文档。
+- Python 字节码、工具缓存、Android `build/` 与 `release/` 打包输出、Gradle/IDE 本地目录和系统 `.DS_Store` 都属于本地生成物，不应提交；若已进入索引，应使用 `git rm --cached` 从版本库移除，保留本地文件即可。
+
 ## 管理端手动刮削术语
 - `手动刮削`：管理员对已有视频主动发起候选预览、人工选择候选并确认覆盖视频 metadata 的操作，不等同于上传、改类型或后台任务触发的自动刮削。
 - 电影手动刮削复用通用刮削页 `/scrape` 和现有 `POST /admin/scrape/preview`、`PUT /admin/scrape/confirm` 接口；详情页入口只通过 query 预填 `video_id`、`type=movie`、`title`，可解析到发行年份时追加 `year`，进入页面后必须由管理员手动点击“查询预览”。
