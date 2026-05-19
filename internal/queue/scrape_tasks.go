@@ -230,6 +230,7 @@ func (p *Processor) autoScrapeMovie(ctx context.Context, videoID uuid.UUID, titl
 		Title:       anyString(first["title"]),
 		Overview:    anyString(first["overview"]),
 		PosterURL:   firstNonEmpty(anyString(first["poster_url"]), anyString(first["poster_path"])),
+		BackdropURL: firstNonEmpty(anyString(first["backdrop_url"]), anyString(first["backdrop_path"])),
 		ReleaseDate: anyString(first["release_date"]),
 		Metadata:    anyMap(first["metadata"]),
 	}

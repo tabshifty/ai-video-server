@@ -306,6 +306,7 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 		Title         string         `json:"title"`
 		Overview      string         `json:"overview"`
 		PosterURL     string         `json:"poster_url"`
+		BackdropURL   string         `json:"backdrop_url"`
 		ReleaseDate   string         `json:"release_date"`
 		Metadata      map[string]any `json:"metadata"`
 		SeasonNumber  int            `json:"season_number"`
@@ -342,6 +343,7 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 		Title:         req.Title,
 		Overview:      req.Overview,
 		PosterURL:     req.PosterURL,
+		BackdropURL:   req.BackdropURL,
 		ReleaseDate:   req.ReleaseDate,
 		Metadata:      req.Metadata,
 		SeasonNumber:  req.SeasonNumber,

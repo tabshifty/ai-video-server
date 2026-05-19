@@ -19,6 +19,7 @@ const edit = reactive({
   title: '',
   overview: '',
   poster_url: '',
+  backdrop_url: '',
   release_date: '',
   metadata: {}
 })
@@ -197,11 +198,13 @@ function syncEditFromCandidate(item) {
     edit.title = ''
     edit.overview = ''
     edit.poster_url = ''
+    edit.backdrop_url = ''
     edit.release_date = ''
   } else {
     edit.title = item.title || ''
     edit.overview = item.overview || ''
     edit.poster_url = item.poster_url || item.poster_path || ''
+    edit.backdrop_url = item.backdrop_url || item.backdrop_path || ''
     edit.release_date = item.release_date || ''
   }
   edit.metadata = item.metadata || {}
@@ -474,6 +477,7 @@ async function doSave() {
             <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" rows="3" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="海报URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>
+            <el-form-item v-if="form.type === 'movie'" label="横向背景"><el-input v-model="edit.backdrop_url" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="发布日期"><el-input v-model="edit.release_date" :disabled="saveLoading" /></el-form-item>
           </el-form>
           <el-button type="primary" :loading="saveLoading" @click="doSave">保存</el-button>

@@ -40,6 +40,7 @@ export function buildScrapeConfirmPayload(form, edit) {
     title: normalizeText(edit?.title),
     overview: normalizeText(edit?.overview),
     poster_url: normalizeText(edit?.poster_url),
+    backdrop_url: normalizeText(edit?.backdrop_url),
     release_date: normalizeText(edit?.release_date),
     metadata: edit?.metadata && typeof edit.metadata === 'object' ? edit.metadata : {}
   }

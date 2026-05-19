@@ -221,6 +221,7 @@ type ConfirmScrapeInput struct {
 	Title         string
 	Overview      string
 	PosterURL     string
+	BackdropURL   string
 	ThumbURL      string
 	ReleaseDate   string
 	Metadata      map[string]any
@@ -352,6 +353,7 @@ func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year in
 			"original_title":  asString(detail["original_title"]),
 			"overview":        asString(detail["overview"]),
 			"poster_path":     asString(detail["poster_path"]),
+			"backdrop_path":   asString(detail["backdrop_path"]),
 			"release_date":    asString(detail["release_date"]),
 			"vote_average":    detail["vote_average"],
 			"genres":          extractGenres(detail["genres"]),
@@ -581,10 +583,23 @@ func (s *ScraperService) ConfirmMovie(ctx context.Context, in ConfirmScrapeInput
 	if err != nil {
 		return err
 	}
+	backdropPath, err := s.downloadMovieBackdrop(ctx, chooseStr(in.BackdropURL, asString(detail["backdrop_path"])), in.VideoID)
+	if err != nil {
+		return err
+	}
+	if backdropPath != "" {
+		detail = cloneMetadataMap(detail)
+		detail["backdrop_path"] = backdropPath
+		detail["backdrop_url"] = backdropPath
+	}
 	meta := map[string]any{
 		"tmdb":         detail,
 		"manual":       in.Metadata,
 		"release_date": chooseStr(in.ReleaseDate, asString(detail["release_date"])),
+	}
+	if backdropPath != "" {
+		meta["backdrop_path"] = backdropPath
+		meta["backdrop_url"] = backdropPath
 	}
 	localized := s.localizeScrapeFields(ctx, title, overview)
 	meta = withLocalizedScrapeMetadata(meta, localized)
@@ -827,8 +842,21 @@ func (s *ScraperService) SyncMovieMetadata(ctx context.Context, videoID uuid.UUI
 	if err != nil {
 		return err
 	}
+	backdropPath, err := s.downloadMovieBackdrop(ctx, asString(raw["backdrop_path"]), videoID)
+	if err != nil {
+		return err
+	}
+	if backdropPath != "" {
+		raw = cloneMetadataMap(raw)
+		raw["backdrop_path"] = backdropPath
+		raw["backdrop_url"] = backdropPath
+	}
 	meta := map[string]any{
 		"tmdb": raw,
+	}
+	if backdropPath != "" {
+		meta["backdrop_path"] = backdropPath
+		meta["backdrop_url"] = backdropPath
 	}
 	localized := s.localizeScrapeFields(ctx, title, overview)
 	meta = withLocalizedScrapeMetadata(meta, localized)
@@ -913,6 +941,15 @@ func (s *ScraperService) ScrapeMovieUpload(ctx context.Context, videoID uuid.UUI
 	if err != nil {
 		return ScrapeResult{}, err
 	}
+	backdropPath, err := s.downloadMovieBackdrop(ctx, asString(detailRaw["backdrop_path"]), videoID)
+	if err != nil {
+		return ScrapeResult{}, err
+	}
+	if backdropPath != "" {
+		detailRaw = cloneMetadataMap(detailRaw)
+		detailRaw["backdrop_path"] = backdropPath
+		detailRaw["backdrop_url"] = backdropPath
+	}
 	scrape := ScrapeResult{
 		TMDBID:        movieID,
 		Title:         asString(detailRaw["title"]),
@@ -922,6 +959,10 @@ func (s *ScraperService) ScrapeMovieUpload(ctx context.Context, videoID uuid.UUI
 			"tmdb":        detailRaw,
 			"tmdb_search": first,
 		},
+	}
+	if backdropPath != "" {
+		scrape.Metadata["backdrop_path"] = backdropPath
+		scrape.Metadata["backdrop_url"] = backdropPath
 	}
 	if scrape.Title == "" {
 		scrape.Title = title
@@ -2001,9 +2042,21 @@ func (s *ScraperService) downloadPosterToPath(ctx context.Context, posterURL, ou
 }
 
 func (s *ScraperService) downloadTMDBImage(ctx context.Context, relativePath string, videoID uuid.UUID) (string, error) {
+	return s.downloadTMDBImageFile(ctx, relativePath, videoID, "poster.jpg")
+}
+
+func (s *ScraperService) downloadMovieBackdrop(ctx context.Context, relativePath string, videoID uuid.UUID) (string, error) {
+	return s.downloadTMDBImageFile(ctx, relativePath, videoID, "backdrop.jpg")
+}
+
+func (s *ScraperService) downloadTMDBImageFile(ctx context.Context, relativePath string, videoID uuid.UUID, filename string) (string, error) {
 	relativePath = strings.TrimSpace(relativePath)
 	if relativePath == "" {
 		return "", nil
+	}
+	filename = strings.TrimSpace(filename)
+	if filename == "" {
+		filename = "poster.jpg"
 	}
 	imageURL := relativePath
 	if !strings.HasPrefix(relativePath, "http://") && !strings.HasPrefix(relativePath, "https://") {
@@ -2028,7 +2081,7 @@ func (s *ScraperService) downloadTMDBImage(ctx context.Context, relativePath str
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return "", fmt.Errorf("create poster dir: %w", err)
 	}
-	outputPath := filepath.Join(outputDir, "poster.jpg")
+	outputPath := filepath.Join(outputDir, filename)
 	f, err := os.Create(outputPath)
 	if err != nil {
 		return "", fmt.Errorf("create poster file: %w", err)
@@ -2038,6 +2091,14 @@ func (s *ScraperService) downloadTMDBImage(ctx context.Context, relativePath str
 		return "", fmt.Errorf("write poster file: %w", err)
 	}
 	return outputPath, nil
+}
+
+func cloneMetadataMap(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 func (s *ScraperService) downloadTVSeriesArtwork(ctx context.Context, relativePath string, seriesID int64, kind string) error {

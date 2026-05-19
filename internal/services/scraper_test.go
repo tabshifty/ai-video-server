@@ -192,7 +192,8 @@ func TestPreviewMovieUsesChineseLanguageAndEnglishFallback(t *testing.T) {
 						{"id": 18, "name": "剧情"},
 						{"id": 10751, "name": "家庭"},
 					},
-					"poster_path": "/zh.jpg",
+					"poster_path":   "/zh.jpg",
+					"backdrop_path": "/zh-backdrop.jpg",
 				})
 				return
 			}
@@ -205,7 +206,8 @@ func TestPreviewMovieUsesChineseLanguageAndEnglishFallback(t *testing.T) {
 					{"id": 18, "name": "Drama"},
 					{"id": 10751, "name": "Family"},
 				},
-				"poster_path": "/en.jpg",
+				"poster_path":   "/en.jpg",
+				"backdrop_path": "/en-backdrop.jpg",
 			})
 		default:
 			http.NotFound(w, r)
@@ -239,6 +241,9 @@ func TestPreviewMovieUsesChineseLanguageAndEnglishFallback(t *testing.T) {
 	if candidate["overview"] != "English overview fallback." {
 		t.Fatalf("expected english overview fallback, got=%v", candidate["overview"])
 	}
+	if candidate["backdrop_path"] != "/zh-backdrop.jpg" {
+		t.Fatalf("expected movie backdrop path in preview, got=%v", candidate["backdrop_path"])
+	}
 	genres, ok := candidate["genres"].([]string)
 	if !ok {
 		t.Fatalf("expected genres []string, got=%T", candidate["genres"])
@@ -255,6 +260,65 @@ func TestPreviewMovieUsesChineseLanguageAndEnglishFallback(t *testing.T) {
 	}
 	if asString(metadata["overview"]) != "English overview fallback." {
 		t.Fatalf("expected metadata.overview fallback, got=%v", metadata["overview"])
+	}
+}
+
+func TestConfirmMovieDownloadsLocalBackdrop(t *testing.T) {
+	requestedImages := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/movie/301":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":            301,
+				"title":         "午夜列车",
+				"overview":      "列车驶向夜色。",
+				"release_date":  "2025-01-02",
+				"poster_path":   serverURLFromRequest(r) + "/images/movie-poster.jpg",
+				"backdrop_path": serverURLFromRequest(r) + "/images/movie-backdrop.jpg",
+			})
+		case "/movie/301/credits":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"cast": []map[string]any{}})
+		case "/images/movie-poster.jpg", "/images/movie-backdrop.jpg":
+			requestedImages[r.URL.Path] = true
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-image"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	videoID := uuid.New()
+	storageRoot := t.TempDir()
+	repo := &fakeScraperRepo{}
+	svc := NewScraperService(repo, "demo-key", server.URL, storageRoot, "", 2*time.Second)
+
+	err := svc.ConfirmMovie(context.Background(), ConfirmScrapeInput{
+		VideoID: videoID,
+		TMDBID:  301,
+	})
+	if err != nil {
+		t.Fatalf("ConfirmMovie returned error: %v", err)
+	}
+
+	if !requestedImages["/images/movie-poster.jpg"] {
+		t.Fatalf("expected poster image to be downloaded, got requests=%v", requestedImages)
+	}
+	if !requestedImages["/images/movie-backdrop.jpg"] {
+		t.Fatalf("expected backdrop image to be downloaded, got requests=%v", requestedImages)
+	}
+	wantBackdrop := filepath.Join(storageRoot, "videos", videoID.String(), "backdrop.jpg")
+	if repo.lastUpdate.metadata["backdrop_path"] != wantBackdrop {
+		t.Fatalf("expected local backdrop path %s, got=%v", wantBackdrop, repo.lastUpdate.metadata["backdrop_path"])
+	}
+	tmdbRaw, ok := repo.lastUpdate.metadata["tmdb"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected metadata.tmdb object, got=%T", repo.lastUpdate.metadata["tmdb"])
+	}
+	if tmdbRaw["backdrop_path"] != wantBackdrop {
+		t.Fatalf("expected tmdb.backdrop_path rewritten to local path, got=%v", tmdbRaw["backdrop_path"])
 	}
 }
 

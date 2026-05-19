@@ -35,8 +35,26 @@ describe('scrapePreview helpers', () => {
       title: '盗梦空间',
       overview: '',
       poster_url: '',
+      backdrop_url: '',
       release_date: '',
       metadata: {}
+    })
+  })
+
+  it('includes movie backdrop url in confirm payloads', () => {
+    expect(buildScrapeConfirmPayload(
+      { type: 'movie' },
+      {
+        video_id: 'video-1',
+        tmdb_id: 10,
+        title: '盗梦空间',
+        poster_url: ' /poster.jpg ',
+        backdrop_url: ' /backdrop.jpg ',
+        metadata: {}
+      }
+    )).toMatchObject({
+      poster_url: '/poster.jpg',
+      backdrop_url: '/backdrop.jpg'
     })
   })
 
