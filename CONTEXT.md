@@ -37,3 +37,4 @@
 - IPTV 频道清单不应包含音频专用源。明显音频源包括 `group-title=Audio/音频`、频道名包含 `音频` 或 `audio only`、URL 路径包含 `/audio/`、`_audio/`，以及 `.mp3/.aac/.m4a/.flac/.wav/.ogg/.opus` 等音频文件。后端解析时应跳过，TV 端也要过滤旧数据，避免默认播放只有声音没有画面的条目。
 - TV App IPTV 顶部频道信息不是常驻条：进入播放页和切换频道后仅显示 3 秒临时提示，频道列表打开、加载中、无可播放频道、状态错误或播放错误时必须隐藏。临时提示仍使用后端返回的 `logo_url`（M3U `tvg-logo`）展示台标，`logo_url` 为空或图片加载失败时使用 TV 图标回退，不新增占位资源。
 - IPTV 频道列表的 `LazyColumn` item 顺序固定为：标题、分组标题、频道行。遥控器打开列表时应直接初始化到当前播放频道附近，不应先从顶部出现再动画滚动；焦点上下移动时必须按频道 id 映射到实际 item index 并保留短动画滚动到可见区域，避免分组标题导致索引偏移。
+- TV App 分发仍使用 APK，不切换 AAB；由于 IPTV 播放兼容性优先保留 `libvlc-all`，APK 必须按 ARM ABI 拆分输出 `armeabi-v7a` 和 `arm64-v8a` 两个安装包，不生成 x86/x86_64 或 universal APK。手动侧载时按设备 ABI 选择对应 APK；仓库不保存 keystore，Release 签名继续由 Android Studio 本机签名配置完成。
