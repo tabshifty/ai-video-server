@@ -310,12 +310,18 @@ type avScrapeCandidate struct {
 }
 
 func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year int) ([]map[string]any, error) {
+	return s.PreviewMovieWithOptions(ctx, title, year, MoviePreviewOptions{})
+}
+
+func (s *ScraperService) PreviewMovieWithOptions(ctx context.Context, title string, year int, opts MoviePreviewOptions) ([]map[string]any, error) {
 	if s.apiKey == "" {
 		return nil, fmt.Errorf("TMDB_API_KEY is empty")
 	}
 	cacheKey := fmt.Sprintf("movie|%s|%d", normalizeCacheKey(title), year)
-	if c, ok := s.getPreviewCache(cacheKey); ok {
-		return c, nil
+	if !opts.BypassCache {
+		if c, ok := s.getPreviewCache(cacheKey); ok {
+			return c, nil
+		}
 	}
 
 	q := url.Values{}
@@ -361,7 +367,9 @@ func (s *ScraperService) PreviewMovie(ctx context.Context, title string, year in
 			"media_type_hint": "movie",
 		})
 	}
-	s.setPreviewCache(cacheKey, out)
+	if !opts.BypassCache {
+		s.setPreviewCache(cacheKey, out)
+	}
 	return out, nil
 }
 

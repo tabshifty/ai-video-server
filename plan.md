@@ -2,6 +2,36 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-19 20:37 +0800
+- 进度：完成电影重新刮削缓存修复的收尾检查；确认本次提交范围只包含电影重新刮削绕过缓存相关后端、管理端 helper、测试、`CONTEXT.md` 和 `plan.md`，不暂存无关 skill 删除或未跟踪目录。
+- 影响文件：`CONTEXT.md`、`internal/services/scraper.go`、`internal/services/scraper_av_strategy.go`、`internal/services/scraper_test.go`、`internal/handlers/admin_scrape.go`、`admin-web/src/views/scrapePreview.helpers.js`、`admin-web/src/views/scrapePreview.helpers.spec.js`、`plan.md`
+- 验证：`go test ./internal/handlers ./internal/services -count=1` 通过；`cd admin-web && npm run test -- --run` 通过；`rg -n $'\uFFFD' ...` 无命中；`git diff --check -- ...` 通过。
+
+## 2026-05-19 20:36 +0800
+- 进度：完成电影重新刮削缓存修复；管理端电影查询预览默认发送 `bypass_cache=true`，后端电影预览在该标记下跳过已有 metadata 复用和短期候选缓存，电视剧与 AV 预览逻辑不变。确认本次提交只纳入电影重新刮削缓存相关文件，不纳入既有 `.codex/skills/av-scraper-optimization` 删除和 openspec skill 未跟踪目录。
+- 影响文件：`CONTEXT.md`、`internal/services/scraper.go`、`internal/services/scraper_av_strategy.go`、`internal/services/scraper_test.go`、`internal/handlers/admin_scrape.go`、`admin-web/src/views/scrapePreview.helpers.js`、`admin-web/src/views/scrapePreview.helpers.spec.js`、`plan.md`
+- 验证：`go test ./internal/handlers ./internal/services -count=1` 通过；`cd admin-web && npm run test -- --run` 通过；待执行乱码检查、diff 检查和提交范围检查。
+
+## 2026-05-19 20:35 +0800
+- 进度：确认本次不新增管理端刮削页自动回显模式，只修“查询预览”按钮行为；用户点击电影查询预览时强制在线重抓，页面打开仍等待用户主动点击。
+- 影响文件：`plan.md`
+- 验证：待实现阶段执行后端/管理端定向测试和文档检查。
+
+## 2026-05-19 20:33 +0800
+- 进度：确认通用 `/admin/scrape/preview` 增加显式 `bypass_cache` 语义；电影手动点击“查询预览”默认传 `bypass_cache=true`，后端据此绕过已有 metadata 复用和 `PreviewMovie` 短期候选缓存。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 20:31 +0800
+- 进度：确认电影重新刮削绕过缓存规则本次只适用于 `type=movie`；电视剧和 AV 手动刮削流程暂不调整，避免扩大到季集绑定或 AV 站点缓存策略。
+- 影响文件：`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 20:29 +0800
+- 进度：进入 `$grill-with-docs` 讨论电影重新刮削缓存问题；代码确认当前管理端 `AdminScrapePreview` 会在视频已有 metadata 时返回 `from_cache=true`，`PreviewMovie` 也有 5 分钟候选缓存。已确认“电影重新刮削”必须实时查 TMDB，不复用已有 metadata 或短期预览缓存。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
 ## 2026-05-19 20:10 +0800
 - 进度：完成电影横向背景刮削第二阶段验证；确认第二提交只纳入后端电影横向背景预览/确认/自动刮削、管理端通用刮削横向背景字段和 `plan.md`，不纳入既有 `.codex/skills/av-scraper-optimization` 删除和 openspec skill 未跟踪目录。
 - 影响文件：`internal/services/scraper.go`、`internal/services/scraper_test.go`、`internal/handlers/admin_scrape.go`、`internal/queue/scrape_tasks.go`、`admin-web/src/views/ScrapePreview.vue`、`admin-web/src/views/scrapePreview.helpers.js`、`admin-web/src/views/scrapePreview.helpers.spec.js`、`plan.md`

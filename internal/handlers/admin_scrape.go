@@ -32,6 +32,7 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 		Type          string `json:"type"` // movie | tv | av
 		SeasonNumber  int    `json:"season_number"`
 		EpisodeNumber int    `json:"episode_number"`
+		BypassCache   bool   `json:"bypass_cache"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
@@ -84,7 +85,8 @@ func (a *API) AdminScrapePreview(c *gin.Context) {
 
 		req.Title, req.SeasonNumber, req.EpisodeNumber = normalizeTVPreviewRequest(req.Type, req.Title, req.SeasonNumber, req.EpisodeNumber)
 
-		if req.Type != "av" && len(video.Metadata) > 0 {
+		shouldUseExistingMetadata := req.Type != "av" && !(req.Type == "movie" && req.BypassCache)
+		if shouldUseExistingMetadata && len(video.Metadata) > 0 {
 			var raw map[string]any
 			if err := json.Unmarshal(video.Metadata, &raw); err == nil {
 				if video.TMDBID == nil {
@@ -127,7 +129,12 @@ previewSearch:
 	} else if req.Type == "av" {
 		candidates, err = a.scrapeSvc.PreviewAV(c.Request.Context(), req.Title)
 	} else {
-		candidates, err = a.scrapeSvc.PreviewMovie(c.Request.Context(), req.Title, req.Year)
+		candidates, err = a.scrapeSvc.PreviewMovieWithOptions(
+			c.Request.Context(),
+			req.Title,
+			req.Year,
+			services.MoviePreviewOptions{BypassCache: req.BypassCache},
+		)
 	}
 	if err != nil {
 		response.Error(c, 3, err.Error())

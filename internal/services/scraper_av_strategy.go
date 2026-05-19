@@ -33,6 +33,10 @@ type AVPreviewResult struct {
 	EnabledSources    []string
 }
 
+type MoviePreviewOptions struct {
+	BypassCache bool
+}
+
 type avSearchPlan struct {
 	SiteCategory      string
 	RecommendedSource string

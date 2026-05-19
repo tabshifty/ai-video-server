@@ -24,6 +24,31 @@ describe('scrapePreview helpers', () => {
     })
   })
 
+  it('adds bypass cache to movie preview payloads by default', () => {
+    expect(buildScrapePreviewPayload({
+      video_id: 'video-1',
+      title: '盗梦空间',
+      type: 'movie',
+      year: 2010
+    })).toEqual({
+      video_id: 'video-1',
+      title: '盗梦空间',
+      type: 'movie',
+      year: 2010,
+      bypass_cache: true
+    })
+  })
+
+  it('does not add bypass cache to tv preview payloads', () => {
+    expect(buildScrapePreviewPayload({
+      video_id: 'video-1',
+      title: '庆余年第一季第一集',
+      type: 'tv',
+      season_number: 1,
+      episode_number: 1
+    })).not.toHaveProperty('bypass_cache')
+  })
+
   it('keeps season and episode out of non-tv confirm payloads', () => {
     expect(buildScrapeConfirmPayload(
       { type: 'movie', season_number: 1, episode_number: 2 },

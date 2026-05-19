@@ -18,6 +18,10 @@ export function buildScrapePreviewPayload(form) {
     payload.year = year
   }
 
+  if (payload.type === 'movie') {
+    payload.bypass_cache = true
+  }
+
   if (payload.type === 'tv') {
     const seasonNumber = toPositiveInt(form?.season_number)
     const episodeNumber = toPositiveInt(form?.episode_number)

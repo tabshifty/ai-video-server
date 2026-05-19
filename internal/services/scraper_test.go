@@ -263,6 +263,59 @@ func TestPreviewMovieUsesChineseLanguageAndEnglishFallback(t *testing.T) {
 	}
 }
 
+func TestPreviewMovieBypassCacheFetchesFreshCandidates(t *testing.T) {
+	searchCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/search/movie":
+			searchCalls++
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{{"id": 100 + searchCalls}},
+			})
+		case "/movie/101":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":           101,
+				"title":        "旧候选",
+				"overview":     "旧简介",
+				"release_date": "2010-01-01",
+				"poster_path":  "/old.jpg",
+			})
+		case "/movie/102":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":           102,
+				"title":        "新候选",
+				"overview":     "新简介",
+				"release_date": "2010-01-02",
+				"poster_path":  "/new.jpg",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "demo-key", server.URL, "", "", 2*time.Second)
+	first, err := svc.PreviewMovie(context.Background(), "盗梦空间", 2010)
+	if err != nil {
+		t.Fatalf("first PreviewMovie returned error: %v", err)
+	}
+	second, err := svc.PreviewMovieWithOptions(context.Background(), "盗梦空间", 2010, MoviePreviewOptions{BypassCache: true})
+	if err != nil {
+		t.Fatalf("second PreviewMovie returned error: %v", err)
+	}
+
+	if searchCalls != 2 {
+		t.Fatalf("expected bypass cache to trigger a fresh TMDB search, got calls=%d", searchCalls)
+	}
+	if first[0]["tmdb_id"] == second[0]["tmdb_id"] {
+		t.Fatalf("expected fresh movie candidate, got first=%v second=%v", first[0]["tmdb_id"], second[0]["tmdb_id"])
+	}
+	if second[0]["title"] != "新候选" {
+		t.Fatalf("expected fresh candidate title, got=%v", second[0]["title"])
+	}
+}
+
 func TestConfirmMovieDownloadsLocalBackdrop(t *testing.T) {
 	requestedImages := map[string]bool{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
