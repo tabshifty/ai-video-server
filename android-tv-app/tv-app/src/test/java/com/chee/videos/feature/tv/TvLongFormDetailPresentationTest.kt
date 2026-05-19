@@ -47,4 +47,26 @@ class TvLongFormDetailPresentationTest {
         assertEquals("18+", hero.eyebrow)
         assertEquals("SNIS-001", hero.title)
     }
+
+    @Test
+    fun `builds av hero backdrop from original poster while keeping thumbnail poster`() {
+        val hero = buildTvLongFormDetailHero(
+            baseUrl = "https://media.example.com",
+            detail = VideoDetailDto(
+                id = "av-2",
+                title = "SNIS-002",
+                description = "18+作品",
+                duration = 5400,
+                thumbnailPath = "/poster/av-2-thumb.jpg",
+                metadata = mapOf(
+                    "poster_original_path" to "/poster/av-2-original.jpg",
+                    "poster_cropped_path" to "/poster/av-2-cropped.jpg",
+                ),
+            ),
+            videoType = "av",
+        )
+
+        assertEquals("https://media.example.com/poster/av-2-thumb.jpg", hero.posterUrl)
+        assertEquals("https://media.example.com/poster/av-2-original.jpg", hero.backdropUrl)
+    }
 }

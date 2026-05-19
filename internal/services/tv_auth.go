@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
@@ -157,15 +158,76 @@ func buildTVHomeVideoFromListItem(item models.VideoListItem) models.TvHomeVideoD
 	if len(item.Metadata) > 0 {
 		overview = ""
 	}
+	videoType := normalizeTVSearchType(item.Type)
 	return models.TvHomeVideoDto{
 		ID:          item.ID.String(),
-		Type:        normalizeTVSearchType(item.Type),
+		Type:        videoType,
 		Title:       item.Title,
 		Overview:    overview,
 		PosterURL:   item.ThumbnailPath,
-		BackdropURL: item.ThumbnailPath,
+		BackdropURL: resolveTVHomeVideoBackdropURL(item, videoType),
 		VideoID:     item.ID.String(),
 	}
+}
+
+func resolveTVHomeVideoBackdropURL(item models.VideoListItem, videoType string) string {
+	if videoType != "av" {
+		return item.ThumbnailPath
+	}
+	metadata := parseAVMetadata(item.Metadata)
+	return firstNonBlankString(
+		avMetadataString(metadata, "poster_original_path"),
+		avMetadataString(metadata, "poster_url"),
+		avMetadataString(metadata, "poster_path"),
+		avScrapeSourceString(metadata, "poster_url"),
+		avScrapeSourceString(metadata, "poster_path"),
+		avMetadataString(metadata, "poster_cropped_path"),
+		item.ThumbnailPath,
+	)
+}
+
+func avMetadataString(metadata map[string]any, key string) string {
+	return firstNonBlankString(valueAsString(metadata[key]))
+}
+
+func avScrapeSourceString(metadata map[string]any, key string) string {
+	sourceName := valueAsString(metadata["scrape_source"])
+	if sourceName == "" {
+		return ""
+	}
+	sourceBlock, ok := metadata[sourceName].(map[string]any)
+	if !ok {
+		return ""
+	}
+	return firstNonBlankString(valueAsString(sourceBlock[key]))
+}
+
+func parseAVMetadata(metadata json.RawMessage) map[string]any {
+	if len(metadata) == 0 {
+		return nil
+	}
+	var values map[string]any
+	if err := json.Unmarshal(metadata, &values); err != nil {
+		return nil
+	}
+	return values
+}
+
+func valueAsString(value any) string {
+	raw, ok := value.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(raw)
+}
+
+func firstNonBlankString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func buildTVCatalogWallSeriesItems(items []models.TvSeriesSummaryDto) []models.TvCatalogWallItemDto {

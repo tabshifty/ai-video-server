@@ -15,6 +15,11 @@
 - `电视剧`、`电影`、`18+` 共享类型化首页结构：巨幅推荐、最近播放、最近更新、全部入口。
 - 左侧菜单只属于 `tv-home` 一级页；海报墙、详情页、播放器页保持现有全屏返回体验。
 
+## TV 端 AV 海报约定
+- TV 端 `18+` 的大背景指首页/分类页巨幅推荐背景和详情页顶部背景，应优先使用 AV 元数据中的原始横幅海报 `poster_original_path`。
+- TV API 给首页和分类巨幅推荐使用的 AV `backdrop_url` 由后端统一解析；fallback 顺序为 `poster_original_path`、`poster_url`/`poster_path`、抓取来源块内的 `poster_url`/`poster_path`、`poster_cropped_path`、`thumbnail_path`。
+- AV 海报墙竖卡和详情页左侧小海报继续使用缩略图或裁剪图，不改成横幅图，避免破坏竖向卡片比例。
+
 ## IPTV 术语
 - `IPTV 播放列表`：后台维护的一份全局 M3U/M3U8 频道源；本期只允许一个播放列表生效，上传文件或远程刷新都会替换当前频道清单。
 - `频道/电视台`：M3U 中一条可播放的直播流，必须包含频道名和 `http/https` 播放 URL；`group-title`、`tvg-logo`、`tvg-id` 是可选信息。

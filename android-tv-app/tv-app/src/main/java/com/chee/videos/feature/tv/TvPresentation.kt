@@ -2,6 +2,7 @@ package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.TvCatalogWallItemDto
+import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.util.UrlBuilder
 
 internal enum class TvFeaturedContentSource {
@@ -126,9 +127,14 @@ internal fun buildTvLongFormDetailHero(
     videoType: String = "movie",
 ): TvLongFormDetailHeroUiModel {
     val posterUrl = resolveTvResourceUrl(baseUrl, detail.thumbnailPath)
-    val backdropUrl = resolveTvBackdropUrl(baseUrl, detail) ?: posterUrl
+    val normalizedVideoType = normalizeTvLongFormVideoType(videoType)
+    val backdropUrl = if (normalizedVideoType == "av") {
+        resolveAvPosterUrl(baseUrl, detail)
+    } else {
+        resolveTvBackdropUrl(baseUrl, detail)
+    } ?: posterUrl
     return TvLongFormDetailHeroUiModel(
-        eyebrow = tvLongFormTypeLabel(videoType),
+        eyebrow = tvLongFormTypeLabel(normalizedVideoType),
         title = detail.title,
         metaLine = buildTvLongFormMetaLine(detail),
         summary = detail.description.orEmpty().ifBlank { "暂无简介" },
