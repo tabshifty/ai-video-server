@@ -2,6 +2,76 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-19 19:47 +0800
+- 进度：完成 TV 播放器切轨和夜台玻璃面板第一阶段验证；确认第一提交只纳入 TV 播放器/轨道选择 UI、TV 版本号、`CONTEXT.md` 和 `plan.md`，不纳入既有 `.codex/skills/av-scraper-optimization` 删除和 openspec skill 未跟踪目录。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormAudioTrackSupport.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/AudioTrackSelectionTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvTrackPickerGlassPanelTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.ui.AudioTrackSelectionTest' --tests 'com.chee.videos.core.ui.TvTrackPickerGlassPanelTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过。待执行乱码检查、diff 检查和提交范围检查。
+
+## 2026-05-19 19:42 +0800
+- 进度：完成 TV 播放器红灯测试和核心实现；新增音轨选择运行时 selected 轨优先展示、自动选择文案和夜台玻璃面板静态约束测试，修复 TV 音轨列表项信息层级、切轨诊断日志、字幕/音轨共用夜台玻璃面板，并更新 TV 版本为 `0.1.14` / `versionCode=15`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormAudioTrackSupport.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/AudioTrackSelectionTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvTrackPickerGlassPanelTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：红灯阶段 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.ui.AudioTrackSelectionTest' --tests 'com.chee.videos.core.ui.TvTrackPickerGlassPanelTest'` 因缺少 `detail`、自动选择和夜台玻璃面板失败；实现后同命令通过。待执行 TV 全量单测、Debug 构建、乱码检查、diff 检查和第一提交范围检查。
+
+## 2026-05-19 19:19 +0800
+- 进度：确认播放器改动范围只覆盖 `android-tv-app`；手机端 `android-app` 暂不套用夜台玻璃面板，也不在本次同步修改相似播放器实现。
+- 影响文件：`plan.md`
+- 验证：待实现阶段执行 TV App 相关验证，提交范围不纳入手机端。
+
+## 2026-05-19 19:17 +0800
+- 进度：确认本次实现拆成两个小提交：第一个提交修 TV 播放器运行时切轨和字幕/音轨夜台玻璃面板并更新 TV 版本号；第二个提交修电影横向背景刮削与本地化保存。
+- 影响文件：`plan.md`
+- 验证：待实现阶段分别执行 TV 播放器相关验证、后端/管理端刮削相关验证和提交范围检查。
+
+## 2026-05-19 19:15 +0800
+- 进度：确认本次实现涉及 TV App 功能修改，交付时必须同步更新 `android-tv-app/tv-app/build.gradle.kts` 版本号，按仓库规则 `versionCode +1`、`versionName` patch 位 `+1`。
+- 影响文件：`plan.md`
+- 验证：待实现阶段执行 TV 定向/全量验证和文档检查。
+
+## 2026-05-19 19:13 +0800
+- 进度：确认为定位 TV 运行时切轨失败，允许在播放器选择音轨和 Tracks 变化时增加低噪声诊断日志；日志应包含选择的音轨 id、当前音轨列表、override 目标和切换后的 selected 轨，用于验证 Media3 是否实际切轨。
+- 影响文件：`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 19:11 +0800
+- 进度：确认已有电影重新确认刮削时允许覆盖旧电影横向背景；当前系统没有 artwork 锁定机制，先沿用“确认刮削即覆盖刮削来源 metadata”的语义。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 19:09 +0800
+- 进度：确认自动电影刮削和管理端手动电影刮削都必须补齐电影横向背景，并尽量收敛到同一个后端确认/保存逻辑，避免入口差异导致 TV 展示素材不一致。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 19:07 +0800
+- 进度：确认电影横向背景刮削结果应下载到本地并保存本地可访问路径到电影 metadata，不仅保存 TMDB 远程图片路径。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 19:05 +0800
+- 进度：确认 TV 音轨列表项的信息层级：主标题显示语言或原始 label，声道作为弱化信息，编码仅在有值且简短时弱化展示；默认项文案统一为“自动选择”，表示跟随视频默认音轨。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 19:03 +0800
+- 进度：确认 TV 字幕选择和音轨选择共用同一套“夜台玻璃面板”视觉语言，避免播放器相邻菜单出现割裂体验。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 19:00 +0800
+- 进度：确认 TV 音轨选择界面采用“夜台玻璃面板”：居中深色半透明玻璃浮层，背景可感知但压暗，边缘细高光，焦点态使用柔和蓝青色光感；不采用底部抽屉。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 18:57 +0800
+- 进度：确认 TV 电影音轨问题的验收口径为“运行时切轨”：选择音轨后应立即切换当前播放音频，不重启播放、不重新进入详情页，并且音轨列表应反映当前播放音轨；已补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 18:50 +0800
+- 进度：进入 `$grill-with-docs` 讨论 TV App 电影音轨选择、音轨选择界面升级和电影横向背景刮削；已确认“电影横幅海报”统一称为“电影横向背景”，指 TMDB 的 16:9 `backdrop_path`/`backdrop_url`，不是竖版 `poster_path` 裁切。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
 ## 2026-05-19 17:58 +0800
 - 进度：完成提交前复查；确认本次只纳入 Git 忽略规则、技术沉淀、计划记录和已跟踪 Python 字节码移出索引，不纳入既有 `.codex/skills/av-scraper-optimization` 删除和 openspec skill 未跟踪目录。
 - 影响文件：`.gitignore`、`CONTEXT.md`、`plan.md`、`.codex/skills/ui-ux-pro-max/scripts/__pycache__/core.cpython-314.pyc`、`.codex/skills/ui-ux-pro-max/scripts/__pycache__/design_system.cpython-314.pyc`、`.codex/skills/ui-ux-pro-max/scripts/__pycache__/search.cpython-314.pyc`

@@ -1,6 +1,7 @@
 package com.chee.videos.core.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,6 +85,7 @@ internal fun buildSubtitlePickerItems(
 private data class TrackPickerDialogItem(
     val trackId: String?,
     val label: String,
+    val supportingText: String = "",
     val selected: Boolean,
 )
 
@@ -153,6 +156,7 @@ internal fun TvSubtitlePickerDialog(
             TrackPickerDialogItem(
                 trackId = item.trackId,
                 label = item.label,
+                supportingText = "",
                 selected = item.selected,
             )
         },
@@ -181,6 +185,7 @@ internal fun TvAudioTrackPickerDialog(
             TrackPickerDialogItem(
                 trackId = item.trackId,
                 label = item.label,
+                supportingText = item.detail,
                 selected = item.selected,
             )
         },
@@ -221,19 +226,8 @@ private fun LongFormTrackPickerDialog(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                val panelInteractionSource = remember { MutableInteractionSource() }
-                Surface(
-                    color = Color(0xF20D1016),
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier
-                        .fillMaxWidth(0.68f)
-                        .widthIn(min = 520.dp, max = 640.dp)
-                        .heightIn(max = maxHeight * 0.7f)
-                        .clickable(
-                            indication = null,
-                            interactionSource = panelInteractionSource,
-                            onClick = {},
-                        ),
+                NightGlassTrackPickerPanel(
+                    modifier = Modifier.heightIn(max = maxHeight * 0.7f),
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
@@ -254,6 +248,7 @@ private fun LongFormTrackPickerDialog(
                                 val focusRequester = remember { FocusRequester() }
                                 SubtitleOptionRow(
                                     label = item.label,
+                                    supportingText = item.supportingText,
                                     selected = item.selected,
                                     onClick = {
                                         onSelectTrack(item.trackId)
@@ -272,8 +267,51 @@ private fun LongFormTrackPickerDialog(
 }
 
 @Composable
+private fun NightGlassTrackPickerPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    // 夜台玻璃：深色半透明基底、冷色高光边缘和低饱和焦点光感。
+    val panelInteractionSource = remember { MutableInteractionSource() }
+    Box(
+        modifier = modifier
+            .fillMaxWidth(0.68f)
+            .widthIn(min = 520.dp, max = 640.dp)
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color(0x66FFFFFF),
+                        Color(0x6625D9F2),
+                        Color(0x1AFFFFFF),
+                    ),
+                ),
+                shape = RoundedCornerShape(22.dp),
+            )
+            .background(
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color(0xE60A0E16),
+                        Color(0xCC111B2A),
+                        Color(0xE6070A10),
+                    ),
+                ),
+                shape = RoundedCornerShape(22.dp),
+            )
+            .clickable(
+                indication = null,
+                interactionSource = panelInteractionSource,
+                onClick = {},
+            ),
+    ) {
+        content()
+    }
+}
+
+@Composable
 private fun SubtitleOptionRow(
     label: String,
+    supportingText: String = "",
     selected: Boolean,
     onClick: () -> Unit,
     tvMode: Boolean = false,
@@ -281,9 +319,9 @@ private fun SubtitleOptionRow(
 ) {
     val rowShape = RoundedCornerShape(if (tvMode) 12.dp else 14.dp)
     val rowColor = when {
-        selected && tvMode -> Color(0xFF1D67D2)
+        selected && tvMode -> Color(0x3325D9F2)
         selected -> Color(0x26FFFFFF)
-        tvMode -> Color(0xFF171C24)
+        tvMode -> Color(0x1AFFFFFF)
         else -> Color(0x12000000)
     }
     val rowModifier = if (focusRequester != null) {
@@ -302,7 +340,19 @@ private fun SubtitleOptionRow(
     Surface(
         color = rowColor,
         shape = rowShape,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (tvMode) {
+                    Modifier.border(
+                        width = 1.dp,
+                        color = if (selected) Color(0x6625D9F2) else Color(0x1AFFFFFF),
+                        shape = rowShape,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Row(
             modifier = rowModifier
@@ -313,14 +363,24 @@ private fun SubtitleOptionRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = label,
-                color = Color.White,
-                style = if (tvMode) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    color = Color.White,
+                    style = if (tvMode) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (supportingText.isNotBlank()) {
+                    Text(
+                        text = supportingText,
+                        color = Color.White.copy(alpha = 0.62f),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (selected) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

@@ -1,5 +1,6 @@
 package com.chee.videos.core.ui
 
+import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
@@ -73,6 +74,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+
+private const val LongFormVideoPlayerLogTag = "LongFormVideoPlayer"
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -368,11 +371,23 @@ fun LongFormVideoPlayer(
         if (selectedAudioTrackId?.isNotBlank() == true && resolvedSelection == null) {
             onSelectAudioTrack(null)
         }
+        Log.d(
+            LongFormVideoPlayerLogTag,
+            "applyAudioSelection selectedAudioTrackId=$selectedAudioTrackId resolved=$resolvedSelection " +
+                "tracks=${audioTracks.joinToString { "${it.id}:${it.label}/${it.detail}:selected=${it.selected}" }}",
+        )
         player.trackSelectionParameters = buildAudioTrackSelectionParameters(
             currentParameters = player.trackSelectionParameters,
             currentTracks = player.currentTracks,
             audioTracks = audioTracks,
             selectedAudioTrackId = resolvedSelection,
+        )
+        val selectedAfterApply = buildLongFormAudioTracks(player.currentTracks)
+            .filter { it.selected }
+            .joinToString { it.id }
+        Log.d(
+            LongFormVideoPlayerLogTag,
+            "audioSelectionApplied override=$resolvedSelection selectedAfterApply=$selectedAfterApply",
         )
     }
 

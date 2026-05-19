@@ -10,6 +10,7 @@ import java.util.Locale
 data class LongFormAudioTrack(
     val id: String,
     val label: String,
+    val detail: String,
     val groupIndex: Int,
     val trackIndex: Int,
     val selected: Boolean,
@@ -18,6 +19,7 @@ data class LongFormAudioTrack(
 internal data class AudioTrackPickerItem(
     val trackId: String?,
     val label: String,
+    val detail: String,
     val selected: Boolean,
 )
 
@@ -35,7 +37,8 @@ fun buildLongFormAudioTracks(tracks: Tracks): List<LongFormAudioTrack> {
                 add(
                     LongFormAudioTrack(
                         id = buildAudioTrackId(groupIndex, trackIndex, format),
-                        label = audioTrackDisplayLabel(format, size + 1),
+                        label = audioTrackDisplayTitle(format, size + 1),
+                        detail = audioTrackDisplayDetail(format),
                         groupIndex = groupIndex,
                         trackIndex = trackIndex,
                         selected = group.isTrackSelected(trackIndex),
@@ -51,12 +54,18 @@ internal fun buildAudioTrackPickerItems(
     selectedAudioTrackId: String?,
 ): List<AudioTrackPickerItem> {
     val normalizedSelection = selectedAudioTrackId?.trim().orEmpty()
+    val selectedTrackId = if (normalizedSelection.isBlank()) {
+        ""
+    } else {
+        tracks.firstOrNull { it.selected }?.id ?: normalizedSelection
+    }
     return buildList {
         add(
             AudioTrackPickerItem(
                 trackId = null,
-                label = "默认音轨",
-                selected = normalizedSelection.isBlank(),
+                label = "自动选择",
+                detail = "跟随视频默认音轨",
+                selected = selectedTrackId.isBlank(),
             ),
         )
         tracks.forEach { track ->
@@ -64,7 +73,8 @@ internal fun buildAudioTrackPickerItems(
                 AudioTrackPickerItem(
                     trackId = track.id,
                     label = track.label,
-                    selected = normalizedSelection == track.id,
+                    detail = track.detail,
+                    selected = selectedTrackId == track.id,
                 ),
             )
         }
@@ -124,17 +134,17 @@ private fun buildAudioTrackId(groupIndex: Int, trackIndex: Int, format: Format):
         .ifBlank { "audio-$groupIndex-$trackIndex" }
 }
 
-private fun audioTrackDisplayLabel(format: Format, fallbackIndex: Int): String {
-    val base = format.label?.trim()
+private fun audioTrackDisplayTitle(format: Format, fallbackIndex: Int): String {
+    return format.label?.trim()
         ?.takeIf { it.isNotBlank() }
         ?: languageDisplayName(format.language)
         ?: "音轨 $fallbackIndex"
-    val channelLabel = audioChannelLabel(format.channelCount)
-    return if (channelLabel.isBlank() || base.contains(channelLabel)) {
-        base
-    } else {
-        "$base $channelLabel"
-    }
+}
+
+private fun audioTrackDisplayDetail(format: Format): String {
+    return listOf(audioChannelLabel(format.channelCount), audioCodecLabel(format.sampleMimeType))
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
 }
 
 private fun languageDisplayName(language: String?): String? {
@@ -161,5 +171,19 @@ private fun audioChannelLabel(channelCount: Int): String {
         6 -> "5.1"
         8 -> "7.1"
         else -> if (channelCount > 0) "${channelCount}声道" else ""
+    }
+}
+
+private fun audioCodecLabel(sampleMimeType: String?): String {
+    return when (sampleMimeType?.lowercase(Locale.ROOT)) {
+        "audio/mp4a-latm", "audio/aac" -> "AAC"
+        "audio/ac3" -> "AC-3"
+        "audio/eac3" -> "E-AC-3"
+        "audio/eac3-joc" -> "Atmos"
+        "audio/vnd.dts", "audio/dts" -> "DTS"
+        "audio/vnd.dts.hd", "audio/dts-hd" -> "DTS-HD"
+        "audio/true-hd" -> "TrueHD"
+        "audio/flac" -> "FLAC"
+        else -> ""
     }
 }

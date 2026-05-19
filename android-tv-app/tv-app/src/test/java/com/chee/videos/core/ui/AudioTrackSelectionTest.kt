@@ -13,16 +13,18 @@ class AudioTrackSelectionTest {
             LongFormAudioTrack(
                 id = "audio-0-0-eng-6",
                 label = "英语 5.1",
+                detail = "5.1",
                 groupIndex = 0,
                 trackIndex = 0,
-                selected = true,
+                selected = false,
             ),
             LongFormAudioTrack(
                 id = "audio-1-0-jpn-2",
                 label = "日语 2.0",
+                detail = "2.0",
                 groupIndex = 1,
                 trackIndex = 0,
-                selected = false,
+                selected = true,
             ),
         )
 
@@ -30,10 +32,39 @@ class AudioTrackSelectionTest {
 
         assertEquals(3, items.size)
         assertNull(items[0].trackId)
-        assertEquals("默认音轨", items[0].label)
+        assertEquals("自动选择", items[0].label)
+        assertEquals("跟随视频默认音轨", items[0].detail)
         assertFalse(items[0].selected)
         assertEquals("audio-1-0-jpn-2", items[2].trackId)
+        assertEquals("2.0", items[2].detail)
         assertTrue(items[2].selected)
+    }
+
+    @Test
+    fun buildAudioTrackPickerItems_usesCurrentlyPlayingTrackAsSelectedAfterRuntimeSwitch() {
+        val audioTracks = listOf(
+            LongFormAudioTrack(
+                id = "audio-0-0-eng-6",
+                label = "英语",
+                detail = "5.1",
+                groupIndex = 0,
+                trackIndex = 0,
+                selected = false,
+            ),
+            LongFormAudioTrack(
+                id = "audio-1-0-jpn-2",
+                label = "日语",
+                detail = "2.0",
+                groupIndex = 1,
+                trackIndex = 0,
+                selected = true,
+            ),
+        )
+
+        val items = buildAudioTrackPickerItems(audioTracks, selectedAudioTrackId = "audio-0-0-eng-6")
+
+        assertFalse(items.first { it.trackId == "audio-0-0-eng-6" }.selected)
+        assertTrue(items.first { it.trackId == "audio-1-0-jpn-2" }.selected)
     }
 
     @Test
@@ -44,6 +75,7 @@ class AudioTrackSelectionTest {
                 LongFormAudioTrack(
                     id = "audio-1",
                     label = "英语 5.1",
+                    detail = "5.1",
                     groupIndex = 0,
                     trackIndex = 0,
                     selected = false,
@@ -62,6 +94,7 @@ class AudioTrackSelectionTest {
                 LongFormAudioTrack(
                     id = "audio-1",
                     label = "英语 5.1",
+                    detail = "5.1",
                     groupIndex = 0,
                     trackIndex = 0,
                     selected = false,
@@ -79,6 +112,7 @@ class AudioTrackSelectionTest {
                 LongFormAudioTrack(
                     id = "audio-0-0-eng-6",
                     label = "英语 5.1",
+                    detail = "5.1",
                     groupIndex = 0,
                     trackIndex = 0,
                     selected = true,
