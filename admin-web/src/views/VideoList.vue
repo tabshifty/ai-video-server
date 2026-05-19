@@ -25,6 +25,7 @@ import {
 } from '../api/admin'
 import {
   buildAVManualScrapeRoute,
+  buildMovieManualScrapeRoute,
   canManuallyEditVideoStatus,
   extractTvPendingDiagnostics,
   getManualVideoStatusOptions,
@@ -223,6 +224,14 @@ function openAVManualScrape() {
   }
   detailVisible.value = false
   router.push(buildAVManualScrapeRoute(detail.value))
+}
+
+function openMovieManualScrape() {
+  if (!detail.value?.id) {
+    return
+  }
+  detailVisible.value = false
+  router.push(buildMovieManualScrapeRoute(detail.value))
 }
 
 async function load() {
@@ -977,6 +986,16 @@ onBeforeUnmount(() => {
               >
                 <el-icon><MagicStick /></el-icon>
                 去 AV 手动刮削
+              </el-button>
+              <el-button
+                v-if="detail.type === 'movie'"
+                type="warning"
+                plain
+                size="small"
+                @click="openMovieManualScrape"
+              >
+                <el-icon><MagicStick /></el-icon>
+                电影手动刮削
               </el-button>
               <el-button
                 type="primary"

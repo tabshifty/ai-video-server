@@ -45,6 +45,22 @@ export function buildAVManualScrapeRoute(video) {
   }
 }
 
+export function buildMovieManualScrapeRoute(video) {
+  const query = {
+    video_id: toText(video?.id),
+    type: 'movie',
+    title: toText(video?.title)
+  }
+  const year = extractMovieManualScrapeYear(video)
+  if (year > 0) {
+    query.year = year
+  }
+  return {
+    path: '/scrape',
+    query
+  }
+}
+
 export function getVideoThumbnailURL(video) {
   const videoID = toText(video?.id)
   return videoID ? `/api/v1/videos/${videoID}/thumbnail` : ''
@@ -136,4 +152,19 @@ function normalizeVideoStatus(status) {
 function extractAVManualScrapeExternalID(video) {
   const metadata = video && typeof video.metadata === 'object' && video.metadata !== null ? video.metadata : {}
   return toText(video?.external_id) || toText(video?.av_code) || toText(metadata.external_id) || toText(metadata.av_code) || toText(metadata.number)
+}
+
+function extractMovieManualScrapeYear(video) {
+  const metadata = video && typeof video.metadata === 'object' && video.metadata !== null ? video.metadata : {}
+  const tmdb = metadata.tmdb && typeof metadata.tmdb === 'object' ? metadata.tmdb : {}
+  return parseReleaseYear(metadata.release_date) || parseReleaseYear(tmdb.release_date)
+}
+
+function parseReleaseYear(value) {
+  const text = toText(value)
+  const match = text.match(/^(\d{4})-\d{2}-\d{2}$/)
+  if (!match) {
+    return 0
+  }
+  return toPositiveInt(match[1])
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildAVManualScrapeRoute,
+  buildMovieManualScrapeRoute,
   canManuallyEditVideoStatus,
   extractTvPendingDiagnostics,
   getManualVideoStatusOptions,
@@ -100,6 +101,64 @@ describe('videoList helpers', () => {
         video_id: 'video-1',
         external_id: 'MXGS-888',
         title: 'MXGS-888'
+      }
+    })
+  })
+
+  it('builds the movie manual scrape route from video detail metadata', () => {
+    expect(buildMovieManualScrapeRoute({
+      id: 'video-1',
+      title: '盗梦空间',
+      type: 'movie',
+      metadata: {
+        release_date: '2010-07-16'
+      }
+    })).toEqual({
+      path: '/scrape',
+      query: {
+        video_id: 'video-1',
+        type: 'movie',
+        title: '盗梦空间',
+        year: 2010
+      }
+    })
+  })
+
+  it('derives movie manual scrape year from nested tmdb release date', () => {
+    expect(buildMovieManualScrapeRoute({
+      id: 'video-2',
+      title: '星际穿越',
+      type: 'movie',
+      metadata: {
+        tmdb: {
+          release_date: '2014-11-07'
+        }
+      }
+    }).query).toEqual({
+      video_id: 'video-2',
+      type: 'movie',
+      title: '星际穿越',
+      year: 2014
+    })
+  })
+
+  it('omits invalid movie manual scrape years', () => {
+    expect(buildMovieManualScrapeRoute({
+      id: 'video-3',
+      title: '无年份电影',
+      type: 'movie',
+      metadata: {
+        release_date: 'unknown',
+        tmdb: {
+          release_date: ''
+        }
+      }
+    })).toEqual({
+      path: '/scrape',
+      query: {
+        video_id: 'video-3',
+        type: 'movie',
+        title: '无年份电影'
       }
     })
   })
