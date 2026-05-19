@@ -138,6 +138,22 @@ func (r *queueRetagAVTestRepo) UpdateActorAvatar(context.Context, uuid.UUID, str
 	return nil
 }
 
+func (r *queueRetagAVTestRepo) UpsertScrapedActorProfile(_ context.Context, input models.AdminActorInput) (models.AdminActor, error) {
+	return models.AdminActor{
+		ID:         uuid.New(),
+		Name:       input.Name,
+		Aliases:    input.Aliases,
+		Gender:     input.Gender,
+		Country:    input.Country,
+		BirthDate:  input.BirthDate,
+		AvatarURL:  input.AvatarURL,
+		Source:     input.Source,
+		ExternalID: input.ExternalID,
+		Notes:      input.Notes,
+		Active:     input.Active,
+	}, nil
+}
+
 func TestAutoScrapeAVMarksReadyOnSuccess(t *testing.T) {
 	videoID := uuid.New()
 	repo := &queueRetagAVTestRepo{

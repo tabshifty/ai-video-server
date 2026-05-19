@@ -2,6 +2,41 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-19 20:44 +0800
+- 进度：完成影视演员信息刮削收尾验证；确认本次提交只纳入电影/电视剧 TMDB 演员资料与本地头像入库相关后端、测试、`CONTEXT.md` 和 `plan.md`，不纳入既有 `.codex/skills/av-scraper-optimization` 删除和 openspec skill 未跟踪目录。
+- 影响文件：`CONTEXT.md`、`internal/services/scraper.go`、`internal/services/scraper_test.go`、`internal/repository/actor_repository.go`、`internal/repository/actor_repository_test.go`、`internal/queue/scrape_tasks_test.go`、`plan.md`
+- 验证：`go test ./internal/services ./internal/repository -count=1` 通过；`go test ./internal/handlers ./internal/services ./internal/repository -count=1` 通过；`go vet ./internal/handlers ./internal/services ./internal/repository` 通过；`go test ./... -count=1` 通过；`rg -n $'\uFFFD' ...` 无命中；`git diff --check -- ...` 通过。
+
+## 2026-05-19 20:43 +0800
+- 进度：完成影视演员信息刮削红灯测试与核心实现；新增电影 TMDB credits 全量演员资料/本地头像入库测试、已有头像/备注不覆盖测试和仓储合并 SQL 约束测试。后端新增 `UpsertScrapedActorProfile`，电影/电视剧演员同步改为按 TMDB person id 补齐资料并下载本地头像，AV 演员链路保持不变。
+- 影响文件：`internal/services/scraper.go`、`internal/services/scraper_test.go`、`internal/repository/actor_repository.go`、`internal/repository/actor_repository_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：红灯阶段 `go test ./internal/services -run 'TestSyncMovieActorsUpsertsFullTMDBProfilesAndLocalAvatarsWithoutLimit|TestSyncMovieActorsDoesNotOverrideExistingAvatarOrNotes' -count=1` 因未执行演员资料 upsert 失败；实现后同命令通过。待执行后端更宽验证、乱码检查、diff 检查和提交范围检查。
+
+## 2026-05-19 20:42 +0800
+- 进度：确认影视演员入库不设数量上限，按 TMDB credits 返回的演员集合处理；实现时仍只在落库阶段执行，单个演员资料或头像失败不应阻断整部电影/剧集刮削落库。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 20:41 +0800
+- 进度：确认影视演员信息刮削覆盖电影/电视剧自动上传刮削、管理端手动确认刮削、`SyncMovieMetadata` 和 `SyncTVEpisode` 等落库入口；候选预览阶段不下载演员头像，避免预览产生本地副作用。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 20:40 +0800
+- 进度：确认影视演员合并策略：优先按 `source=scrape_tmdb + external_id=TMDB person id` 匹配，其次按姓名匹配；同名演员为 AV 或人工来源且已有头像/备注时不覆盖，只补空字段并绑定视频。头像仅在演员无头像时下载本地头像。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 20:39 +0800
+- 进度：确认影视演员资料字段深度：电影/电视剧刮削补齐 TMDB person 的姓名、别名、性别、国家/地区、生日、简介、TMDB person id 与本地头像；本次不存 credits 角色名，避免扩展 `video_actors` 绑定语义。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
+## 2026-05-19 20:38 +0800
+- 进度：进入 `$grill-with-docs` 讨论演员信息刮削；代码确认已有 `actors` / `video_actors` 表、AV 演员头像补全链路，以及电影/电视剧当前只按 TMDB credits 演员姓名绑定。已确认本次“演员信息刮削”先覆盖电影和电视剧 TMDB 演员，不调整 AV 演员策略。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待完成讨论后执行文档乱码检查和 diff 检查。
+
 ## 2026-05-19 20:37 +0800
 - 进度：完成电影重新刮削缓存修复的收尾检查；确认本次提交范围只包含电影重新刮削绕过缓存相关后端、管理端 helper、测试、`CONTEXT.md` 和 `plan.md`，不暂存无关 skill 删除或未跟踪目录。
 - 影响文件：`CONTEXT.md`、`internal/services/scraper.go`、`internal/services/scraper_av_strategy.go`、`internal/services/scraper_test.go`、`internal/handlers/admin_scrape.go`、`admin-web/src/views/scrapePreview.helpers.js`、`admin-web/src/views/scrapePreview.helpers.spec.js`、`plan.md`

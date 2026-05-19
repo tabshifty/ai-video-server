@@ -35,6 +35,7 @@ type scraperRepo interface {
 	AddVideoActors(ctx context.Context, videoID uuid.UUID, actorIDs []uuid.UUID, source string) error
 	ListVideoActors(ctx context.Context, videoID uuid.UUID) ([]models.AdminVideoActor, error)
 	UpdateActorAvatar(ctx context.Context, actorID uuid.UUID, avatarURL, source, externalID string) error
+	UpsertScrapedActorProfile(ctx context.Context, input models.AdminActorInput) (models.AdminActor, error)
 }
 
 // ScraperService handles TMDB search and metadata syncing.
@@ -1438,25 +1439,8 @@ func (s *ScraperService) syncMovieActors(ctx context.Context, videoID uuid.UUID,
 		return
 	}
 	path := fmt.Sprintf("/movie/%d/credits", movieTMDBID)
-	credits, err := s.getTMDBJSON(ctx, path, nil, tmdbLangChinese)
-	if err != nil {
-		return
-	}
-	names := extractCastNames(credits, tmdbCastLimit)
-	if len(names) == 0 {
-		fallback, fallbackErr := s.getTMDBJSON(ctx, path, nil, "")
-		if fallbackErr == nil {
-			names = extractCastNames(fallback, tmdbCastLimit)
-		}
-	}
-	if len(names) == 0 {
-		return
-	}
-	actorIDs, err := s.repo.ResolveActorIDs(ctx, nil, names, "scrape_tmdb")
-	if err != nil {
-		return
-	}
-	_ = s.repo.AddVideoActors(ctx, videoID, actorIDs, "scrape_tmdb")
+	cast := s.tryFetchCastMembers(ctx, path)
+	s.syncTMDBCastActors(ctx, videoID, cast)
 }
 
 func (s *ScraperService) syncEpisodeActors(ctx context.Context, videoID uuid.UUID, tvTMDBID, seasonNum, episodeNum int) {
@@ -1464,19 +1448,12 @@ func (s *ScraperService) syncEpisodeActors(ctx context.Context, videoID uuid.UUI
 		return
 	}
 	episodeCreditsPath := fmt.Sprintf("/tv/%d/season/%d/episode/%d/credits", tvTMDBID, seasonNum, episodeNum)
-	names := s.tryFetchCastNames(ctx, episodeCreditsPath, tmdbCastLimit)
-	if len(names) == 0 {
+	cast := s.tryFetchCastMembers(ctx, episodeCreditsPath)
+	if len(cast) == 0 {
 		tvCreditsPath := fmt.Sprintf("/tv/%d/credits", tvTMDBID)
-		names = s.tryFetchCastNames(ctx, tvCreditsPath, tmdbCastLimit)
+		cast = s.tryFetchCastMembers(ctx, tvCreditsPath)
 	}
-	if len(names) == 0 {
-		return
-	}
-	actorIDs, err := s.repo.ResolveActorIDs(ctx, nil, names, "scrape_tmdb")
-	if err != nil {
-		return
-	}
-	_ = s.repo.AddVideoActors(ctx, videoID, actorIDs, "scrape_tmdb")
+	s.syncTMDBCastActors(ctx, videoID, cast)
 }
 
 func (s *ScraperService) syncAVActors(ctx context.Context, videoID uuid.UUID, actorNames []string) {
@@ -1529,6 +1506,117 @@ func (s *ScraperService) tryFetchCastNames(ctx context.Context, path string, lim
 		return nil
 	}
 	return extractCastNames(fallback, limit)
+}
+
+type tmdbCastMember struct {
+	TMDBID      int
+	Name        string
+	ProfilePath string
+}
+
+func (s *ScraperService) tryFetchCastMembers(ctx context.Context, path string) []tmdbCastMember {
+	raw, err := s.getTMDBJSON(ctx, path, nil, tmdbLangChinese)
+	if err == nil {
+		if cast := extractTMDBCastMembers(raw); len(cast) > 0 {
+			return cast
+		}
+	}
+	fallback, fallbackErr := s.getTMDBJSON(ctx, path, nil, "")
+	if fallbackErr != nil {
+		return nil
+	}
+	return extractTMDBCastMembers(fallback)
+}
+
+func (s *ScraperService) syncTMDBCastActors(ctx context.Context, videoID uuid.UUID, cast []tmdbCastMember) {
+	if len(cast) == 0 {
+		return
+	}
+	actorIDs := make([]uuid.UUID, 0, len(cast))
+	for _, member := range cast {
+		actor, err := s.upsertTMDBActorProfile(ctx, member)
+		if err != nil || actor.ID == uuid.Nil {
+			continue
+		}
+		actorIDs = append(actorIDs, actor.ID)
+	}
+	if len(actorIDs) == 0 {
+		return
+	}
+	_ = s.repo.AddVideoActors(ctx, videoID, actorIDs, "scrape_tmdb")
+}
+
+func (s *ScraperService) upsertTMDBActorProfile(ctx context.Context, member tmdbCastMember) (models.AdminActor, error) {
+	detail := map[string]any{}
+	if member.TMDBID > 0 {
+		var err error
+		detail, err = s.getTMDBJSON(ctx, fmt.Sprintf("/person/%d", member.TMDBID), nil, tmdbLangChinese)
+		if err != nil {
+			detail = map[string]any{}
+		} else if needsPersonLocalizedFallback(detail) {
+			if fallback, fallbackErr := s.getTMDBJSON(ctx, fmt.Sprintf("/person/%d", member.TMDBID), nil, ""); fallbackErr == nil {
+				detail = mergeLocalizedPersonDetail(detail, fallback)
+			}
+		}
+	}
+	input := tmdbActorInputFromDetail(member, detail)
+	if strings.TrimSpace(input.Name) == "" {
+		return models.AdminActor{}, nil
+	}
+	avatarURL := strings.TrimSpace(input.AvatarURL)
+	initialInput := input
+	initialInput.AvatarURL = ""
+	actor, err := s.repo.UpsertScrapedActorProfile(ctx, initialInput)
+	if err != nil {
+		return models.AdminActor{}, err
+	}
+	if strings.TrimSpace(actor.AvatarURL) != "" || avatarURL == "" {
+		return actor, nil
+	}
+	localURL, err := s.downloadActorAvatar(ctx, actor.ID, avatarURL)
+	if err != nil {
+		return actor, nil
+	}
+	updated := input
+	updated.AvatarURL = localURL
+	actor, err = s.repo.UpsertScrapedActorProfile(ctx, updated)
+	if err != nil {
+		return models.AdminActor{}, err
+	}
+	return actor, nil
+}
+
+func tmdbActorInputFromDetail(member tmdbCastMember, detail map[string]any) models.AdminActorInput {
+	name := strings.TrimSpace(asString(detail["name"]))
+	if name == "" {
+		name = member.Name
+	}
+	profilePath := strings.TrimSpace(asString(detail["profile_path"]))
+	if profilePath == "" {
+		profilePath = member.ProfilePath
+	}
+	avatarURL := ""
+	if profilePath != "" {
+		avatarURL = "https://image.tmdb.org/t/p/w500" + profilePath
+	}
+	externalID := ""
+	if id := asInt(detail["id"]); id > 0 {
+		externalID = strconv.Itoa(id)
+	} else if member.TMDBID > 0 {
+		externalID = strconv.Itoa(member.TMDBID)
+	}
+	return models.AdminActorInput{
+		Name:       name,
+		Aliases:    extractStringSlice(detail["also_known_as"]),
+		Gender:     tmdbGenderText(asInt(detail["gender"])),
+		Country:    normalizeTMDBPlace(asString(detail["place_of_birth"])),
+		BirthDate:  strings.TrimSpace(asString(detail["birthday"])),
+		AvatarURL:  avatarURL,
+		Source:     "scrape_tmdb",
+		ExternalID: externalID,
+		Notes:      strings.TrimSpace(asString(detail["biography"])),
+		Active:     true,
+	}
 }
 
 func (s *ScraperService) getJSON(ctx context.Context, endpoint string) (map[string]any, error) {
@@ -2206,6 +2294,43 @@ func extractCastNames(raw map[string]any, limit int) []string {
 		}
 		seen[key] = struct{}{}
 		out = append(out, name)
+	}
+	return out
+}
+
+func extractTMDBCastMembers(raw map[string]any) []tmdbCastMember {
+	castRows, ok := raw["cast"].([]any)
+	if !ok || len(castRows) == 0 {
+		return nil
+	}
+	out := make([]tmdbCastMember, 0, len(castRows))
+	seen := map[string]struct{}{}
+	for _, row := range castRows {
+		item, ok := row.(map[string]any)
+		if !ok {
+			continue
+		}
+		name := strings.TrimSpace(asString(item["name"]))
+		if name == "" {
+			name = strings.TrimSpace(asString(item["original_name"]))
+		}
+		personID := asInt(item["id"])
+		if name == "" && personID <= 0 {
+			continue
+		}
+		key := strings.ToLower(name)
+		if personID > 0 {
+			key = strconv.Itoa(personID)
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, tmdbCastMember{
+			TMDBID:      personID,
+			Name:        name,
+			ProfilePath: strings.TrimSpace(asString(item["profile_path"])),
+		})
 	}
 	return out
 }

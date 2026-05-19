@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -48,21 +49,29 @@ type fakeActorAvatarUpdate struct {
 	externalID string
 }
 
+type fakeActorProfileUpsert struct {
+	actorID uuid.UUID
+	input   models.AdminActorInput
+}
+
 type fakeScraperRepo struct {
-	lastUpdate         fakeScrapeUpdate
-	resolveActorNames  []string
-	resolveActorSource string
-	addedActorIDs      []uuid.UUID
-	addedActorSource   string
-	nextActorIDs       []uuid.UUID
-	videoByID          map[uuid.UUID]models.Video
-	videoActorsByID    map[uuid.UUID][]models.AdminVideoActor
-	actorAvatarUpdates []fakeActorAvatarUpdate
-	getVideoErr        error
-	episodeUpserts     []fakeEpisodeUpsert
-	findVideoTMDBCalls []string
-	findVideoExists    bool
-	findVideoID        uuid.UUID
+	lastUpdate          fakeScrapeUpdate
+	resolveActorNames   []string
+	resolveActorSource  string
+	addedActorIDs       []uuid.UUID
+	addedActorSource    string
+	nextActorIDs        []uuid.UUID
+	videoByID           map[uuid.UUID]models.Video
+	videoActorsByID     map[uuid.UUID][]models.AdminVideoActor
+	actorAvatarUpdates  []fakeActorAvatarUpdate
+	actorProfiles       map[string]models.AdminActor
+	actorProfileIDs     []uuid.UUID
+	actorProfileUpserts []fakeActorProfileUpsert
+	getVideoErr         error
+	episodeUpserts      []fakeEpisodeUpsert
+	findVideoTMDBCalls  []string
+	findVideoExists     bool
+	findVideoID         uuid.UUID
 }
 
 func (f *fakeScraperRepo) GetVideoByID(_ context.Context, videoID uuid.UUID) (models.Video, error) {
@@ -163,6 +172,99 @@ func (f *fakeScraperRepo) UpdateActorAvatar(_ context.Context, actorID uuid.UUID
 		f.videoActorsByID[videoID] = items
 	}
 	return nil
+}
+
+func (f *fakeScraperRepo) UpsertScrapedActorProfile(_ context.Context, input models.AdminActorInput) (models.AdminActor, error) {
+	actorID := uuid.Nil
+	if f.actorProfiles != nil {
+		if item, ok := f.actorProfiles[input.Source+"|"+input.ExternalID]; ok {
+			actorID = item.ID
+			if strings.TrimSpace(item.AvatarURL) != "" {
+				input.AvatarURL = item.AvatarURL
+			}
+			if strings.TrimSpace(item.Notes) != "" {
+				input.Notes = item.Notes
+			}
+		}
+		if actorID == uuid.Nil {
+			if item, ok := f.actorProfiles["name|"+strings.ToLower(strings.TrimSpace(input.Name))]; ok {
+				actorID = item.ID
+				if strings.TrimSpace(item.AvatarURL) != "" {
+					input.AvatarURL = item.AvatarURL
+				}
+				if strings.TrimSpace(item.Notes) != "" {
+					input.Notes = item.Notes
+				}
+			}
+		}
+	}
+	if actorID == uuid.Nil && len(f.actorProfileIDs) > 0 {
+		actorID = f.actorProfileIDs[0]
+		f.actorProfileIDs = f.actorProfileIDs[1:]
+	}
+	if actorID == uuid.Nil {
+		actorID = uuid.New()
+	}
+	f.actorProfileUpserts = append(f.actorProfileUpserts, fakeActorProfileUpsert{
+		actorID: actorID,
+		input:   input,
+	})
+	if f.actorProfiles == nil {
+		f.actorProfiles = map[string]models.AdminActor{}
+	}
+	actor := models.AdminActor{
+		ID:         actorID,
+		Name:       input.Name,
+		Aliases:    input.Aliases,
+		Gender:     input.Gender,
+		Country:    input.Country,
+		BirthDate:  input.BirthDate,
+		AvatarURL:  input.AvatarURL,
+		Source:     input.Source,
+		ExternalID: input.ExternalID,
+		Notes:      input.Notes,
+		Active:     input.Active,
+	}
+	if strings.TrimSpace(input.Source) != "" && strings.TrimSpace(input.ExternalID) != "" {
+		f.actorProfiles[input.Source+"|"+input.ExternalID] = actor
+	}
+	if strings.TrimSpace(input.Name) != "" {
+		f.actorProfiles["name|"+strings.ToLower(strings.TrimSpace(input.Name))] = actor
+	}
+	return models.AdminActor{
+		ID:         actorID,
+		Name:       input.Name,
+		Aliases:    input.Aliases,
+		Gender:     input.Gender,
+		Country:    input.Country,
+		BirthDate:  input.BirthDate,
+		AvatarURL:  input.AvatarURL,
+		Source:     input.Source,
+		ExternalID: input.ExternalID,
+		Notes:      input.Notes,
+		Active:     input.Active,
+	}, nil
+}
+
+func redirectTMDBImagesToTestServer(t *testing.T, svc *ScraperService, rawURL string) {
+	t.Helper()
+	targetURL, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatalf("parse server url: %v", err)
+	}
+	svc.httpClient = &http.Client{
+		Timeout: 2 * time.Second,
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Host == "image.tmdb.org" {
+				cloned := req.Clone(req.Context())
+				cloned.URL.Scheme = targetURL.Scheme
+				cloned.URL.Host = targetURL.Host
+				cloned.Host = targetURL.Host
+				return http.DefaultTransport.RoundTrip(cloned)
+			}
+			return http.DefaultTransport.RoundTrip(req)
+		}),
+	}
 }
 
 func TestPreviewMovieUsesChineseLanguageAndEnglishFallback(t *testing.T) {
@@ -1652,6 +1754,152 @@ func TestSyncAVActorsDoesNotOverrideExistingAvatar(t *testing.T) {
 
 	if len(repo.actorAvatarUpdates) != 0 {
 		t.Fatalf("expected no actor avatar update, got=%d", len(repo.actorAvatarUpdates))
+	}
+}
+
+func TestSyncMovieActorsUpsertsFullTMDBProfilesAndLocalAvatarsWithoutLimit(t *testing.T) {
+	videoID := uuid.New()
+	storageRoot := t.TempDir()
+	actorIDs := make([]uuid.UUID, 0, tmdbCastLimit+1)
+	cast := make([]map[string]any, 0, tmdbCastLimit+1)
+	for i := 1; i <= tmdbCastLimit+1; i++ {
+		actorIDs = append(actorIDs, uuid.New())
+		cast = append(cast, map[string]any{
+			"id":            1000 + i,
+			"name":          "演员" + strconv.Itoa(i),
+			"original_name": "Actor " + strconv.Itoa(i),
+			"order":         i - 1,
+			"profile_path":  "/credit-" + strconv.Itoa(i) + ".jpg",
+		})
+	}
+	repo := &fakeScraperRepo{actorProfileIDs: actorIDs}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/movie/88/credits":
+			_ = json.NewEncoder(w).Encode(map[string]any{"cast": cast})
+		case strings.HasPrefix(r.URL.Path, "/person/"):
+			personID, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/person/"))
+			idx := personID - 1000
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":             personID,
+				"name":           "演员" + strconv.Itoa(idx),
+				"also_known_as":  []string{"Actor " + strconv.Itoa(idx)},
+				"gender":         2,
+				"birthday":       "1980-01-02",
+				"place_of_birth": "Tokyo, Japan",
+				"biography":      "演员简介" + strconv.Itoa(idx),
+				"profile_path":   "/profile-" + strconv.Itoa(idx) + ".jpg",
+			})
+		case strings.HasPrefix(r.URL.Path, "/t/p/w500/profile-"):
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("avatar"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "demo-key", server.URL, storageRoot, "", 2*time.Second)
+	redirectTMDBImagesToTestServer(t, svc, server.URL)
+
+	svc.syncMovieActors(context.Background(), videoID, 88)
+
+	seenActorProfiles := map[uuid.UUID]struct{}{}
+	for _, upsert := range repo.actorProfileUpserts {
+		seenActorProfiles[upsert.actorID] = struct{}{}
+	}
+	if len(seenActorProfiles) != tmdbCastLimit+1 {
+		t.Fatalf("expected all cast members to be upserted, got=%d", len(seenActorProfiles))
+	}
+	var first fakeActorProfileUpsert
+	for _, upsert := range repo.actorProfileUpserts {
+		if upsert.actorID == actorIDs[0] && strings.TrimSpace(upsert.input.AvatarURL) != "" {
+			first = upsert
+			break
+		}
+	}
+	if first.actorID != actorIDs[0] {
+		t.Fatalf("expected final first actor profile with local avatar, got=%#v", first)
+	}
+	if first.input.Source != "scrape_tmdb" || first.input.ExternalID != "1001" {
+		t.Fatalf("expected tmdb source/id, got source=%s external_id=%s", first.input.Source, first.input.ExternalID)
+	}
+	if first.input.Name != "演员1" || first.input.Gender != "男" || first.input.Country != "Japan" || first.input.BirthDate != "1980-01-02" || first.input.Notes != "演员简介1" {
+		t.Fatalf("unexpected first actor profile: %#v", first.input)
+	}
+	if first.input.AvatarURL != "/api/v1/actors/"+actorIDs[0].String()+"/avatar" {
+		t.Fatalf("expected local avatar route, got=%s", first.input.AvatarURL)
+	}
+	if len(repo.addedActorIDs) != tmdbCastLimit+1 {
+		t.Fatalf("expected all actor ids bound to video, got=%d", len(repo.addedActorIDs))
+	}
+	matches, err := filepath.Glob(filepath.Join(storageRoot, "actors", actorIDs[0].String(), "avatar.*"))
+	if err != nil {
+		t.Fatalf("glob avatar file: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected local avatar file for first actor, got=%v", matches)
+	}
+}
+
+func TestSyncMovieActorsDoesNotOverrideExistingAvatarOrNotes(t *testing.T) {
+	videoID := uuid.New()
+	actorID := uuid.New()
+	repo := &fakeScraperRepo{
+		actorProfiles: map[string]models.AdminActor{
+			"scrape_tmdb|901": {
+				ID:         actorID,
+				Name:       "演员甲",
+				AvatarURL:  "https://manual.example/avatar.jpg",
+				Source:     "manual",
+				ExternalID: "901",
+				Notes:      "人工备注",
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/movie/99/credits":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"cast": []map[string]any{{"id": 901, "name": "演员甲", "profile_path": "/tmdb.jpg"}},
+			})
+		case "/person/901":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":           901,
+				"name":         "演员甲",
+				"gender":       1,
+				"biography":    "TMDB 简介",
+				"profile_path": "/tmdb.jpg",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(repo, "demo-key", server.URL, t.TempDir(), "", 2*time.Second)
+
+	svc.syncMovieActors(context.Background(), videoID, 99)
+
+	if len(repo.actorProfileUpserts) != 1 {
+		t.Fatalf("expected one actor profile upsert, got=%d", len(repo.actorProfileUpserts))
+	}
+	upsert := repo.actorProfileUpserts[0]
+	if upsert.input.AvatarURL != "https://manual.example/avatar.jpg" {
+		t.Fatalf("expected existing avatar to be preserved, got=%s", upsert.input.AvatarURL)
+	}
+	if upsert.input.Notes != "人工备注" {
+		t.Fatalf("expected existing notes to be preserved, got=%s", upsert.input.Notes)
+	}
+	if len(repo.actorAvatarUpdates) != 0 {
+		t.Fatalf("expected no avatar download/update, got=%d", len(repo.actorAvatarUpdates))
+	}
+	if len(repo.addedActorIDs) != 1 || repo.addedActorIDs[0] != actorID {
+		t.Fatalf("expected existing actor to be bound, got=%v", repo.addedActorIDs)
 	}
 }
 

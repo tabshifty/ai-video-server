@@ -51,6 +51,78 @@ func parseActorBirthDate(raw string) (*time.Time, error) {
 	return &t, nil
 }
 
+func buildUpsertScrapedActorProfileSQL() string {
+	return `
+WITH matched AS (
+  SELECT id
+  FROM actors
+  WHERE ($10 <> '' AND source=$9 AND external_id=$10)
+     OR normalized_name=$3
+  ORDER BY
+    CASE WHEN $10 <> '' AND source=$9 AND external_id=$10 THEN 0 ELSE 1 END,
+    updated_at DESC
+  LIMIT 1
+),
+updated AS (
+  UPDATE actors a
+  SET
+    name = CASE WHEN a.name = '' THEN $2 ELSE a.name END,
+    normalized_name = CASE WHEN a.normalized_name = '' THEN $3 ELSE a.normalized_name END,
+    aliases = (
+      SELECT ARRAY(
+        SELECT DISTINCT alias
+        FROM unnest(COALESCE(a.aliases, '{}'::text[]) || $4::text[]) AS alias
+        WHERE btrim(alias) <> ''
+      )
+    ),
+    gender = CASE WHEN COALESCE(a.gender,'') = '' THEN $5 ELSE a.gender END,
+    country = CASE WHEN COALESCE(a.country,'') = '' THEN $6 ELSE a.country END,
+    birth_date = CASE WHEN a.birth_date IS NULL THEN $7 ELSE a.birth_date END,
+    avatar_url = CASE WHEN COALESCE(a.avatar_url,'') = '' THEN $8 ELSE a.avatar_url END,
+    source = CASE WHEN COALESCE(a.external_id,'') = '' AND $10 <> '' THEN $9 ELSE a.source END,
+    external_id = CASE WHEN COALESCE(a.external_id,'') = '' THEN $10 ELSE a.external_id END,
+    notes = CASE WHEN COALESCE(a.notes,'') = '' THEN $11 ELSE a.notes END,
+    active = TRUE,
+    updated_at = NOW()
+  FROM matched
+  WHERE a.id = matched.id
+  RETURNING a.id, a.name, a.aliases, COALESCE(a.gender,''), COALESCE(a.country,''), COALESCE(to_char(a.birth_date, 'YYYY-MM-DD'), ''),
+    COALESCE(a.avatar_url,''), COALESCE(a.source,''), COALESCE(a.external_id,''), COALESCE(a.notes,''), a.active, a.created_at, a.updated_at
+),
+inserted AS (
+  INSERT INTO actors (
+    id, name, normalized_name, aliases, gender, country, birth_date, avatar_url, source, external_id, notes, active
+  )
+  SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE
+  WHERE NOT EXISTS (SELECT 1 FROM updated)
+  ON CONFLICT(normalized_name) DO UPDATE
+  SET
+    aliases = (
+      SELECT ARRAY(
+        SELECT DISTINCT alias
+        FROM unnest(COALESCE(actors.aliases, '{}'::text[]) || EXCLUDED.aliases) AS alias
+        WHERE btrim(alias) <> ''
+      )
+    ),
+    gender = CASE WHEN COALESCE(actors.gender,'') = '' THEN EXCLUDED.gender ELSE actors.gender END,
+    country = CASE WHEN COALESCE(actors.country,'') = '' THEN EXCLUDED.country ELSE actors.country END,
+    birth_date = CASE WHEN actors.birth_date IS NULL THEN EXCLUDED.birth_date ELSE actors.birth_date END,
+    avatar_url = CASE WHEN COALESCE(actors.avatar_url,'') = '' THEN EXCLUDED.avatar_url ELSE actors.avatar_url END,
+    source = CASE WHEN COALESCE(actors.external_id,'') = '' AND EXCLUDED.external_id <> '' THEN EXCLUDED.source ELSE actors.source END,
+    external_id = CASE WHEN COALESCE(actors.external_id,'') = '' THEN EXCLUDED.external_id ELSE actors.external_id END,
+    notes = CASE WHEN COALESCE(actors.notes,'') = '' THEN EXCLUDED.notes ELSE actors.notes END,
+    active = TRUE,
+    updated_at = NOW()
+  RETURNING id, name, aliases, COALESCE(gender,''), COALESCE(country,''), COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''),
+    COALESCE(avatar_url,''), COALESCE(source,''), COALESCE(external_id,''), COALESCE(notes,''), active, created_at, updated_at
+)
+SELECT * FROM updated
+UNION ALL
+SELECT * FROM inserted
+LIMIT 1
+`
+}
+
 func normalizeActorInput(in models.AdminActorInput) (models.AdminActorInput, error) {
 	in.Name = strings.Join(strings.Fields(strings.TrimSpace(in.Name)), " ")
 	if in.Name == "" {
@@ -325,6 +397,27 @@ WHERE id=$1
 		return fmt.Errorf("update actor avatar: %w", err)
 	}
 	return nil
+}
+
+func (r *VideoRepository) UpsertScrapedActorProfile(ctx context.Context, input models.AdminActorInput) (models.AdminActor, error) {
+	input, err := normalizeActorInput(input)
+	if err != nil {
+		return models.AdminActor{}, err
+	}
+	birthDate, err := parseActorBirthDate(input.BirthDate)
+	if err != nil {
+		return models.AdminActor{}, err
+	}
+	if input.Source == "" {
+		input.Source = "scrape_tmdb"
+	}
+
+	row := r.pool.QueryRow(ctx, buildUpsertScrapedActorProfileSQL(), uuid.New(), input.Name, normalizeActorName(input.Name), input.Aliases, input.Gender, input.Country, birthDate, input.AvatarURL, input.Source, input.ExternalID, input.Notes)
+	out, err := scanAdminActor(row)
+	if err != nil {
+		return models.AdminActor{}, fmt.Errorf("upsert scraped actor profile: %w", err)
+	}
+	return out, nil
 }
 
 func (r *VideoRepository) ListVideoActors(ctx context.Context, videoID uuid.UUID) ([]models.AdminVideoActor, error) {
