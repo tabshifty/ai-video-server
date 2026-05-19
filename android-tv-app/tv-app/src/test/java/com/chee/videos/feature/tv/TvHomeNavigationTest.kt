@@ -3,6 +3,9 @@ package com.chee.videos.feature.tv
 import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvHomeVideoDto
+import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.io.path.readText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -107,5 +110,25 @@ class TvHomeNavigationTest {
         assertFalse(shouldShowTvHomeSideMenu("tv/player/7/1/1"))
         assertFalse(shouldShowTvHomeSideMenu("tv/detail/movie-1?type=movie"))
         assertTrue(shouldShowTvHomeSideMenu("tv-home"))
+    }
+
+    @Test
+    fun sideMenuButtonsUseSingleFocusableTargetSoConfirmWorksOnce() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt")
+
+        assertTrue("TV 首页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        val buttonSource = source.substringAfter("private fun TvHomeSideMenuButton(")
+            .substringBefore("@Composable\nprivate fun TvHomeSettingsPanel(")
+
+        assertTrue(
+            "TV 首页侧边菜单按钮必须使用 tvFocusableGlow 提供唯一焦点目标",
+            buttonSource.contains(".tvFocusableGlow("),
+        )
+        assertFalse(
+            "TV 首页侧边菜单按钮不能在 tvFocusableGlow 之后再叠加 .focusable()，否则遥控确认键会先落到重复焦点层，表现为必须按两次才触发",
+            buttonSource.contains(".focusable()"),
+        )
     }
 }

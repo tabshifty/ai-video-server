@@ -2,7 +2,6 @@ package com.chee.videos.feature.tv
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -437,7 +436,6 @@ private fun TvHomeSideMenuButton(
             .height(48.dp)
             .focusProperties { right = contentFocusRequester }
             .tvFocusableGlow(shape = RoundedCornerShape(8.dp), focusedScale = 1.06f)
-            .focusable()
             .clickable(onClick = onClick),
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
