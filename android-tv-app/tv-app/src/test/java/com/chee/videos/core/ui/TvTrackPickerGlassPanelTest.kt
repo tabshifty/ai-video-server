@@ -45,6 +45,10 @@ class TvTrackPickerGlassPanelTest {
         assertTrue(text.contains("Color(0x6625D9F2)"))
         assertTrue(text.contains("Color(0x1AFFFFFF)"))
         assertTrue(text.contains("supportingText"))
+        assertTrue("音轨/字幕行必须显式处理遥控确认键", text.contains("handleTrackPickerConfirmKey"))
+        assertTrue("音轨/字幕行不能复用全局粉红焦点边框", !text.contains(".tvFocusableGlow("))
+        assertTrue("音轨/字幕行焦点态应使用低饱和蓝青描边", text.contains("Color(0x8039D7E8)"))
+        assertTrue("已选中态应使用细色条表达", text.contains("TrackPickerSelectionRail"))
 
         val audioTrackText = audioTrackSource.readText()
         assertTrue(audioTrackText.contains("自动选择"))

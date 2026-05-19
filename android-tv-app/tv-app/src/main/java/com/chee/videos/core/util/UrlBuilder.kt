@@ -65,6 +65,12 @@ object UrlBuilder {
         return if (normalizedProfile.isBlank()) base else "$base?profile=$normalizedProfile"
     }
 
+    fun thumbnail(baseUrl: String, videoId: String, variant: String? = null): String {
+        val base = "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/thumbnail"
+        val normalizedVariant = variant?.trim().orEmpty()
+        return if (normalizedVariant.isBlank()) base else "$base?variant=$normalizedVariant"
+    }
+
     fun toggleLike(baseUrl: String, videoId: String): String =
         "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/like"
 

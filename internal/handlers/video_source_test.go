@@ -59,3 +59,33 @@ func TestResolveProfiledPlayableSource_RejectsUnknownProfile(t *testing.T) {
 		t.Fatal("expected error for unknown profile")
 	}
 }
+
+func TestChooseMovieBackdropVariantPathUsesOnlyLocalDownloadedBackdrop(t *testing.T) {
+	metadata := []byte(`{
+		"backdrop_path": "/var/video-server/videos/movie-1/backdrop.jpg",
+		"tmdb": {
+			"backdrop_path": "/tmdb-remote-backdrop.jpg"
+		}
+	}`)
+
+	got := chooseVideoThumbnailVariantPath("movie", metadata, "backdrop", "/var/video-server/videos/movie-1/poster.jpg")
+
+	if got != "/var/video-server/videos/movie-1/backdrop.jpg" {
+		t.Fatalf("expected local movie backdrop file, got=%s", got)
+	}
+}
+
+func TestChooseMovieBackdropVariantPathRejectsTMDBRelativePath(t *testing.T) {
+	metadata := []byte(`{
+		"tmdb": {
+			"backdrop_path": "/tmdb-remote-backdrop.jpg"
+		}
+	}`)
+	fallback := "/var/video-server/videos/movie-1/poster.jpg"
+
+	got := chooseVideoThumbnailVariantPath("movie", metadata, "backdrop", fallback)
+
+	if got != fallback {
+		t.Fatalf("expected fallback when only TMDB relative path exists, got=%s", got)
+	}
+}

@@ -102,6 +102,28 @@ class TvLongFormDetailPresentationTest {
     }
 
     @Test
+    fun `movie hero uses local downloaded backdrop variant instead of tmdb relative path`() {
+        val hero = buildTvLongFormDetailHero(
+            baseUrl = "https://media.example.com",
+            detail = VideoDetailDto(
+                id = "movie-5",
+                title = "已下载横幅电影",
+                thumbnailPath = "/api/v1/videos/movie-5/thumbnail",
+                metadata = mapOf(
+                    "tmdb" to mapOf(
+                        "backdrop_path" to "/tmdb-remote-backdrop.jpg",
+                    ),
+                    "backdrop_path" to "/var/video-server/videos/movie-5/backdrop.jpg",
+                ),
+            ),
+            videoType = "movie",
+        )
+
+        assertEquals("https://media.example.com/api/v1/videos/movie-5/thumbnail?variant=backdrop", hero.backdropUrl)
+        assertFalse(hero.usesPosterAsBackdropFallback)
+    }
+
+    @Test
     fun `builds actor row with avatar and placeholder capped at five`() {
         val hero = buildTvLongFormDetailHero(
             baseUrl = "https://media.example.com",

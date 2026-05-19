@@ -179,9 +179,7 @@ func (a *API) resolveThumbnailSource(c *gin.Context, videoID uuid.UUID) (string,
 		return "", false
 	}
 	thumbPath := strings.TrimSpace(video.ThumbnailPath)
-	if video.Type == "av" {
-		thumbPath = chooseAVThumbnailVariantPath(video.Metadata, c.Query("variant"), thumbPath)
-	}
+	thumbPath = chooseVideoThumbnailVariantPath(video.Type, video.Metadata, c.Query("variant"), thumbPath)
 	if thumbPath == "" {
 		c.JSON(http.StatusNotFound, gin.H{"msg": "thumbnail not found"})
 		return "", false
@@ -195,6 +193,59 @@ func (a *API) resolveThumbnailSource(c *gin.Context, videoID uuid.UUID) (string,
 		return "", false
 	}
 	return thumbPath, true
+}
+
+func chooseVideoThumbnailVariantPath(videoType string, rawMetadata []byte, requestedVariant, fallback string) string {
+	videoType = strings.ToLower(strings.TrimSpace(videoType))
+	requestedVariant = strings.ToLower(strings.TrimSpace(requestedVariant))
+	if videoType == "av" {
+		return chooseAVThumbnailVariantPath(rawMetadata, requestedVariant, fallback)
+	}
+	if videoType == "movie" && requestedVariant == "backdrop" {
+		return chooseMovieBackdropVariantPath(rawMetadata, fallback)
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func chooseMovieBackdropVariantPath(rawMetadata []byte, fallback string) string {
+	fallback = strings.TrimSpace(fallback)
+	if len(rawMetadata) == 0 {
+		return fallback
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal(rawMetadata, &metadata); err != nil {
+		return fallback
+	}
+	for _, key := range []string{"backdrop_url", "backdrop_path"} {
+		candidate := strings.TrimSpace(stringFromAny(metadata[key]))
+		if isLocalMovieBackdropFilePath(candidate) {
+			return candidate
+		}
+	}
+	if tmdb, ok := metadata["tmdb"].(map[string]any); ok {
+		for _, key := range []string{"backdrop_url", "backdrop_path"} {
+			candidate := strings.TrimSpace(stringFromAny(tmdb[key]))
+			if isLocalMovieBackdropFilePath(candidate) {
+				return candidate
+			}
+		}
+	}
+	return fallback
+}
+
+func isLocalMovieBackdropFilePath(candidate string) bool {
+	candidate = strings.TrimSpace(candidate)
+	if candidate == "" {
+		return false
+	}
+	if strings.HasPrefix(candidate, "http://") || strings.HasPrefix(candidate, "https://") {
+		return false
+	}
+	if strings.HasPrefix(candidate, "/api/") {
+		return false
+	}
+	normalized := strings.ReplaceAll(candidate, "\\", "/")
+	return strings.Contains(normalized, "/videos/") && strings.Contains(strings.ToLower(normalized), "backdrop")
 }
 
 func chooseAVThumbnailVariantPath(rawMetadata []byte, requestedVariant, fallback string) string {

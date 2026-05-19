@@ -3,12 +3,14 @@ package com.chee.videos.core.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -28,16 +30,27 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -319,11 +332,13 @@ private fun SubtitleOptionRow(
 ) {
     val rowShape = RoundedCornerShape(if (tvMode) 12.dp else 14.dp)
     val rowColor = when {
-        selected && tvMode -> Color(0x3325D9F2)
+        selected && tvMode -> Color(0x2439D7E8)
         selected -> Color(0x26FFFFFF)
         tvMode -> Color(0x1AFFFFFF)
         else -> Color(0x12000000)
     }
+    val interactionSource = remember { MutableInteractionSource() }
+    var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
     val rowModifier = if (focusRequester != null) {
         Modifier.focusRequester(focusRequester)
     } else {
@@ -345,8 +360,12 @@ private fun SubtitleOptionRow(
             .then(
                 if (tvMode) {
                     Modifier.border(
-                        width = 1.dp,
-                        color = if (selected) Color(0x6625D9F2) else Color(0x1AFFFFFF),
+                        width = if (focused) 2.dp else 1.dp,
+                        color = when {
+                            focused -> Color(0x8039D7E8)
+                            selected -> Color(0x6639D7E8)
+                            else -> Color(0x1AFFFFFF)
+                        },
                         shape = rowShape,
                     )
                 } else {
@@ -357,12 +376,24 @@ private fun SubtitleOptionRow(
         Row(
             modifier = rowModifier
                 .fillMaxWidth()
+                .onFocusChanged { focused = it.isFocused || it.hasFocus }
+                .then(if (tvMode) Modifier.onPreviewKeyEvent { handleTrackPickerConfirmKey(it, onClick) } else Modifier)
                 .padding(horizontal = if (tvMode) 16.dp else 14.dp, vertical = if (tvMode) 14.dp else 12.dp)
-                .tvFocusableGlow(shape = rowShape, focusedScale = if (tvMode) 1.04f else 1.02f)
-                .clickable(onClick = onClick),
+                .focusable(enabled = tvMode)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (tvMode) {
+                TrackPickerSelectionRail(
+                    selected = selected,
+                    focused = focused,
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = label,
@@ -401,5 +432,42 @@ private fun SubtitleOptionRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TrackPickerSelectionRail(
+    selected: Boolean,
+    focused: Boolean,
+) {
+    val color = when {
+        selected -> Color(0xFF39D7E8)
+        focused -> Color(0x8039D7E8)
+        else -> Color.Transparent
+    }
+    Box(
+        modifier = Modifier
+            .width(3.dp)
+            .heightIn(min = 28.dp)
+            .background(color = color, shape = RoundedCornerShape(2.dp)),
+    )
+}
+
+private fun handleTrackPickerConfirmKey(
+    event: KeyEvent,
+    onConfirm: () -> Unit,
+): Boolean {
+    if (event.type != KeyEventType.KeyDown) {
+        return false
+    }
+    return when (event.key) {
+        Key.DirectionCenter,
+        Key.Enter,
+        Key.NumPadEnter,
+        -> {
+            onConfirm()
+            true
+        }
+        else -> false
     }
 }

@@ -269,6 +269,9 @@ internal fun resolveTvResourceUrl(baseUrl: String, rawUrl: String?): String? {
 }
 
 private fun resolveTvBackdropUrl(baseUrl: String, detail: VideoDetailDto): String? {
+    if (hasLocalMovieBackdrop(detail.metadata)) {
+        return UrlBuilder.thumbnail(baseUrl, detail.id, variant = "backdrop")
+    }
     val candidates = listOf(
         anyString(detail.metadata?.get("backdrop_url")),
         anyString(detail.metadata?.get("backdrop_path")),
@@ -276,6 +279,35 @@ private fun resolveTvBackdropUrl(baseUrl: String, detail: VideoDetailDto): Strin
         anyString(detail.metadata?.get("fanart_path")),
     )
     return candidates.firstNotNullOfOrNull { resolveTvResourceUrl(baseUrl, it) }
+}
+
+private fun hasLocalMovieBackdrop(metadata: Map<String, Any?>?): Boolean {
+    if (metadata.isNullOrEmpty()) {
+        return false
+    }
+    val direct = listOf(
+        anyString(metadata["backdrop_url"]),
+        anyString(metadata["backdrop_path"]),
+    )
+    if (direct.any(::isLocalMovieBackdropPath)) {
+        return true
+    }
+    val tmdb = metadata["tmdb"] as? Map<*, *> ?: return false
+    return listOf(
+        anyString(tmdb["backdrop_url"]),
+        anyString(tmdb["backdrop_path"]),
+    ).any(::isLocalMovieBackdropPath)
+}
+
+private fun isLocalMovieBackdropPath(raw: String?): Boolean {
+    val value = raw?.trim().orEmpty()
+    if (value.isBlank()) {
+        return false
+    }
+    if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/api/")) {
+        return false
+    }
+    return value.replace('\\', '/').contains("/videos/") && value.contains("backdrop", ignoreCase = true)
 }
 
 private fun buildTvLongFormMetaLine(detail: VideoDetailDto): String {
