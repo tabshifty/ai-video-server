@@ -1,6 +1,10 @@
 package com.chee.videos.feature.tv
 
+import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.io.path.readText
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TvCatalogFocusPolicyTest {
@@ -47,7 +51,7 @@ class TvCatalogFocusPolicyTest {
     }
 
     @Test
-    fun `falls back through shelves then search when content is empty`() {
+    fun `falls back through shelves then menu when content is empty`() {
         assertEquals(
             TvCatalogInitialFocusTarget.TV_SERIES_ITEM,
             resolveTvCatalogInitialFocusTarget(
@@ -82,7 +86,7 @@ class TvCatalogFocusPolicyTest {
             ),
         )
         assertEquals(
-            TvCatalogInitialFocusTarget.SEARCH,
+            TvCatalogInitialFocusTarget.MENU,
             resolveTvCatalogInitialFocusTarget(
                 hasFeaturedContent = false,
                 hasContinueWatching = false,
@@ -93,7 +97,7 @@ class TvCatalogFocusPolicyTest {
             ),
         )
         assertEquals(
-            TvCatalogInitialFocusTarget.SEARCH,
+            TvCatalogInitialFocusTarget.MENU,
             resolveTvCatalogInitialFocusTarget(
                 hasFeaturedContent = false,
                 hasContinueWatching = false,
@@ -102,6 +106,18 @@ class TvCatalogFocusPolicyTest {
                 movieCount = 0,
                 avCount = 0,
             ),
+        )
+    }
+
+    @Test
+    fun `empty home focus fallback requests composed menu instead of hidden search`() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt")
+        assertTrue("TV 首页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        assertTrue(
+            "TV 首页空内容启动时必须回退到已组合的左侧菜单焦点，避免请求未绑定搜索框导致启动崩溃",
+            source.contains("TvCatalogInitialFocusTarget.MENU -> menuFocusRequester.requestFocus()"),
         )
     }
 }

@@ -123,6 +123,7 @@ fun TvCatalogScreen(
             TvCatalogInitialFocusTarget.MOVIE_ITEM -> movieFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.AV_ITEM -> avFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.SEARCH -> searchFocusRequester.requestFocus()
+            TvCatalogInitialFocusTarget.MENU -> menuFocusRequester.requestFocus()
         }
     }
 
@@ -1389,6 +1390,7 @@ internal enum class TvCatalogInitialFocusTarget {
     MOVIE_ITEM,
     AV_ITEM,
     SEARCH,
+    MENU,
 }
 
 internal fun resolveTvCatalogInitialFocusTarget(
@@ -1417,5 +1419,5 @@ internal fun resolveTvCatalogInitialFocusTarget(
     if (avCount > 0) {
         return TvCatalogInitialFocusTarget.AV_ITEM
     }
-    return TvCatalogInitialFocusTarget.SEARCH
+    return TvCatalogInitialFocusTarget.MENU
 }
