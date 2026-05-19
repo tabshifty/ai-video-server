@@ -35,5 +35,5 @@
 - TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并关闭硬解优先走软解；其他长视频播放器继续使用 Media3。IPTV 源常见 MPEG2、特殊 H.264 profile、Dolby Vision 或设备厂商解码缺口，不能只依赖 Android TV 设备硬解能力。
 - IPTV 播放无画面排查必须保留播放事件诊断：至少记录 LibVLC event、vout 数、视频轨/音频轨数量和当前视频轨 codec/分辨率。若 `videoTracks=0` 或无 `Vout`，优先检查 M3U 频道 URL、源站多码率/分片返回和是否需要后端转码；若有视频轨和 `Vout` 但仍黑屏，优先检查输出视图/系统合成层。
 - IPTV 频道清单不应包含音频专用源。明显音频源包括 `group-title=Audio/音频`、频道名包含 `音频` 或 `audio only`、URL 路径包含 `/audio/`、`_audio/`，以及 `.mp3/.aac/.m4a/.flac/.wav/.ogg/.opus` 等音频文件。后端解析时应跳过，TV 端也要过滤旧数据，避免默认播放只有声音没有画面的条目。
-- TV App IPTV 顶部当前频道和右侧频道列表都应使用后端返回的 `logo_url`（M3U `tvg-logo`）展示台标；`logo_url` 为空或图片加载失败时使用 TV 图标回退，不新增占位资源。
-- IPTV 频道列表的 `LazyColumn` item 顺序固定为：标题、分组标题、频道行。遥控器打开列表时应定位当前播放频道；焦点上下移动时必须按频道 id 映射到实际 item index 并滚动到可见区域，避免分组标题导致索引偏移。
+- TV App IPTV 顶部频道信息不是常驻条：进入播放页和切换频道后仅显示 3 秒临时提示，频道列表打开、加载中、无可播放频道、状态错误或播放错误时必须隐藏。临时提示仍使用后端返回的 `logo_url`（M3U `tvg-logo`）展示台标，`logo_url` 为空或图片加载失败时使用 TV 图标回退，不新增占位资源。
+- IPTV 频道列表的 `LazyColumn` item 顺序固定为：标题、分组标题、频道行。遥控器打开列表时应直接初始化到当前播放频道附近，不应先从顶部出现再动画滚动；焦点上下移动时必须按频道 id 映射到实际 item index 并保留短动画滚动到可见区域，避免分组标题导致索引偏移。

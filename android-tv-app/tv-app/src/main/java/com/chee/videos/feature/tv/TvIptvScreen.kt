@@ -69,6 +69,7 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.tvFocusableGlow
 import java.util.ArrayList
+import kotlinx.coroutines.delay
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -103,6 +104,8 @@ fun TvIptvScreen(
     val vlcPlayer = remember(libVlc) { MediaPlayer(libVlc) }
     var channelListVisible by remember { mutableStateOf(false) }
     var focusedChannelIndex by remember { mutableIntStateOf(0) }
+    var channelListOpenNonce by remember { mutableIntStateOf(0) }
+    var showChannelHint by remember { mutableStateOf(false) }
     var playbackRetryNonce by remember { mutableIntStateOf(0) }
     var playerErrorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -117,6 +120,7 @@ fun TvIptvScreen(
     fun showChannelList() {
         val currentIndex = uiState.channels.indexOfFirst { it.id == uiState.currentChannel?.id }
         focusedChannelIndex = currentIndex.takeIf { it >= 0 } ?: 0
+        channelListOpenNonce += 1
         channelListVisible = true
     }
 
@@ -174,6 +178,16 @@ fun TvIptvScreen(
 
     LaunchedEffect(Unit) {
         rootFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(uiState.currentChannel?.id) {
+        if (uiState.currentChannel == null) {
+            showChannelHint = false
+            return@LaunchedEffect
+        }
+        showChannelHint = true
+        delay(3_000)
+        showChannelHint = false
     }
 
     LaunchedEffect(uiState.currentChannel?.id, playbackRetryNonce) {
@@ -268,7 +282,18 @@ fun TvIptvScreen(
             modifier = Modifier.fillMaxSize(),
         )
 
-        TvIptvTopOverlay(channel = uiState.currentChannel)
+        if (
+            shouldShowIptvChannelHint(
+                currentChannel = uiState.currentChannel,
+                hintActive = showChannelHint,
+                channelListVisible = channelListVisible,
+                loading = uiState.loading,
+                statusMessage = uiState.statusMessage,
+                playerErrorMessage = playerErrorMessage,
+            )
+        ) {
+            TvIptvTopOverlay(channel = uiState.currentChannel)
+        }
 
         if (uiState.loading) {
             TvIptvStatusOverlay(message = "正在加载 IPTV 频道", retryLabel = null, onRetry = {})
@@ -291,6 +316,7 @@ fun TvIptvScreen(
                 groups = uiState.groups,
                 focusedChannelId = uiState.channels.getOrNull(focusedChannelIndex)?.id,
                 currentChannelId = uiState.currentChannel?.id,
+                channelListOpenNonce = channelListOpenNonce,
                 onSelect = { channel ->
                     viewModel.selectChannel(channel.id)
                     channelListVisible = false
@@ -305,10 +331,9 @@ fun TvIptvScreen(
 private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
     Surface(
         color = Color(0x8C0D1016),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
-            .padding(18.dp)
-            .fillMaxWidth(),
+            .padding(start = 18.dp, top = 18.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -336,7 +361,7 @@ private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(220.dp),
             )
             channel?.group?.trim()?.takeIf { it.isNotBlank() }?.let { group ->
                 Text(text = group, color = AppChrome.TextSecondary, style = MaterialTheme.typography.bodySmall)
@@ -395,12 +420,21 @@ private fun TvIptvChannelListOverlay(
     groups: List<TvIptvChannelGroupUiModel>,
     focusedChannelId: String?,
     currentChannelId: String?,
+    channelListOpenNonce: Int,
     onSelect: (TvIptvChannelUiModel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
+    val initialFirstVisibleItemIndex = remember(groups, currentChannelId, channelListOpenNonce) {
+        resolveIptvChannelListInitialFirstVisibleItemIndex(groups, currentChannelId)
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialFirstVisibleItemIndex)
+    var skipInitialFocusScroll by remember(channelListOpenNonce) { mutableStateOf(true) }
 
-    LaunchedEffect(groups, focusedChannelId) {
+    LaunchedEffect(groups, focusedChannelId, channelListOpenNonce) {
+        if (skipInitialFocusScroll) {
+            skipInitialFocusScroll = false
+            return@LaunchedEffect
+        }
         resolveIptvChannelListItemIndex(groups, focusedChannelId)?.let { itemIndex ->
             listState.animateScrollToItem(itemIndex)
         }

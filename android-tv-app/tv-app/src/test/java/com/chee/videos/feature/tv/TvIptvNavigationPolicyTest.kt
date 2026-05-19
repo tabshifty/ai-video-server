@@ -66,4 +66,106 @@ class TvIptvNavigationPolicyTest {
         assertEquals(7, resolveIptvChannelListItemIndex(grouped, channelId = "c4"))
         assertEquals(null, resolveIptvChannelListItemIndex(grouped, channelId = "missing"))
     }
+
+    @Test
+    fun channelListInitialFirstVisibleIndexKeepsCurrentChannelNearMiddle() {
+        val longChannels = (1..12).map { index ->
+            TvIptvChannelUiModel(
+                id = "c$index",
+                name = "频道$index",
+                url = "https://example.com/c$index.m3u8",
+                group = "央视频道",
+                sortOrder = index,
+            )
+        }
+        val grouped = groupIptvChannels(longChannels)
+
+        assertEquals(3, resolveIptvChannelListInitialFirstVisibleItemIndex(grouped, channelId = "c7"))
+        assertEquals(0, resolveIptvChannelListInitialFirstVisibleItemIndex(grouped, channelId = "c1"))
+        assertEquals(0, resolveIptvChannelListInitialFirstVisibleItemIndex(grouped, channelId = "missing"))
+        assertEquals(0, resolveIptvChannelListInitialFirstVisibleItemIndex(grouped, channelId = null))
+    }
+
+    @Test
+    fun channelHintOnlyShowsForPlayableStateWhileHintIsActive() {
+        val current = channels.first()
+
+        assertEquals(
+            true,
+            shouldShowIptvChannelHint(
+                currentChannel = current,
+                hintActive = true,
+                channelListVisible = false,
+                loading = false,
+                statusMessage = null,
+                playerErrorMessage = null,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldShowIptvChannelHint(
+                currentChannel = current,
+                hintActive = true,
+                channelListVisible = true,
+                loading = false,
+                statusMessage = null,
+                playerErrorMessage = null,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldShowIptvChannelHint(
+                currentChannel = current,
+                hintActive = true,
+                channelListVisible = false,
+                loading = true,
+                statusMessage = null,
+                playerErrorMessage = null,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldShowIptvChannelHint(
+                currentChannel = current,
+                hintActive = true,
+                channelListVisible = false,
+                loading = false,
+                statusMessage = "暂无可播放的 IPTV 频道",
+                playerErrorMessage = null,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldShowIptvChannelHint(
+                currentChannel = null,
+                hintActive = true,
+                channelListVisible = false,
+                loading = false,
+                statusMessage = null,
+                playerErrorMessage = null,
+            ),
+        )
+        assertEquals(
+            false,
+            shouldShowIptvChannelHint(
+                currentChannel = current,
+                hintActive = true,
+                channelListVisible = false,
+                loading = false,
+                statusMessage = null,
+                playerErrorMessage = "频道播放失败，请切换频道或重试",
+            ),
+        )
+        assertEquals(
+            false,
+            shouldShowIptvChannelHint(
+                currentChannel = current,
+                hintActive = false,
+                channelListVisible = false,
+                loading = false,
+                statusMessage = null,
+                playerErrorMessage = null,
+            ),
+        )
+    }
 }

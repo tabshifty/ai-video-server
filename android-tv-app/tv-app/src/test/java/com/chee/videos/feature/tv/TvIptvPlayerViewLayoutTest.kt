@@ -61,4 +61,46 @@ class TvIptvPlayerViewLayoutTest {
             source.contains("Icons.Filled.Tv"),
         )
     }
+
+    @Test
+    fun iptvTopChannelHintIsTransientCompactAndHiddenByChannelList() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt")
+
+        assertTrue("IPTV 播放页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        assertTrue(
+            "IPTV 顶部频道信息必须通过 shouldShowIptvChannelHint 门控，频道列表打开或异常状态时不显示",
+            source.contains("shouldShowIptvChannelHint("),
+        )
+        assertTrue(
+            "IPTV 顶部频道提示应使用 LaunchedEffect 监听当前频道并延迟 3 秒关闭",
+            source.contains("delay(3_000)") && source.contains("showChannelHint = false"),
+        )
+        assertTrue(
+            "IPTV 顶部提示不应继续作为全宽常驻条显示",
+            !source.contains(".fillMaxWidth(),"),
+        )
+    }
+
+    @Test
+    fun iptvChannelListInitializesNearCurrentChannelWithoutOpeningAnimation() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt")
+
+        assertTrue("IPTV 播放页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        assertTrue(
+            "IPTV 频道列表打开时必须传入打开序号，用于按当前频道重新初始化 LazyListState",
+            source.contains("channelListOpenNonce"),
+        )
+        assertTrue(
+            "IPTV 频道列表初次显示必须使用 initialFirstVisibleItemIndex 直接定位，避免从顶部动画滚动",
+            source.contains("initialFirstVisibleItemIndex = initialFirstVisibleItemIndex"),
+        )
+        assertTrue(
+            "IPTV 频道列表打开后焦点上下移动仍应使用短动画跟随焦点",
+            source.contains("listState.animateScrollToItem(itemIndex)"),
+        )
+    }
 }

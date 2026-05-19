@@ -115,6 +115,30 @@ fun resolveIptvChannelListItemIndex(
     return null
 }
 
+fun resolveIptvChannelListInitialFirstVisibleItemIndex(
+    groups: List<TvIptvChannelGroupUiModel>,
+    channelId: String?,
+    leadingItemCount: Int = 5,
+): Int {
+    val itemIndex = resolveIptvChannelListItemIndex(groups, channelId) ?: return 0
+    return (itemIndex - leadingItemCount).coerceAtLeast(0)
+}
+
+fun shouldShowIptvChannelHint(
+    currentChannel: TvIptvChannelUiModel?,
+    hintActive: Boolean,
+    channelListVisible: Boolean,
+    loading: Boolean,
+    statusMessage: String?,
+    playerErrorMessage: String?,
+): Boolean =
+    currentChannel != null &&
+        hintActive &&
+        !channelListVisible &&
+        !loading &&
+        statusMessage == null &&
+        playerErrorMessage == null
+
 fun resolveIptvPlaybackRemoteAction(key: TvIptvRemoteKey): TvIptvRemoteAction? =
     when (key) {
         TvIptvRemoteKey.Up -> TvIptvRemoteAction.PreviousChannel
