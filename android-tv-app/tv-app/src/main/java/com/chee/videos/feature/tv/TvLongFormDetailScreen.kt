@@ -5,24 +5,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,9 +27,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -50,7 +45,6 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.feature.detail.DetailViewModel
-import kotlinx.coroutines.launch
 
 @Composable
 fun TvLongFormDetailScreen(
@@ -59,8 +53,6 @@ fun TvLongFormDetailScreen(
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val playFocusRequester = remember { FocusRequester() }
 
     when {
@@ -105,190 +97,94 @@ fun TvLongFormDetailScreen(
                 playFocusRequester.requestFocus()
             }
 
-            LazyColumn(
-                state = listState,
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(AppChrome.PageGradient),
-                contentPadding = PaddingValues(bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                item(key = "hero") {
-                    Box(
+                TvLongFormDetailBackground(hero = hero)
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x6610151F),
+                                    Color(0x3310151F),
+                                    Color(0xDD070A10),
+                                ),
+                            ),
+                        ),
+                )
+
+                TvRoundIconAction(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    onClick = onBack,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 28.dp, top = 28.dp),
+                )
+
+                Surface(
+                    color = Color(0xD20B1018),
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(),
+                ) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(468.dp),
+                            .padding(horizontal = 36.dp, vertical = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        if (!hero.backdropUrl.isNullOrBlank()) {
-                            AsyncImage(
-                                model = hero.backdropUrl,
-                                contentDescription = hero.title,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(Color(0xFF23131F), Color(0xFF090C12)),
-                                        ),
-                                    ),
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(Color(0x88060A10), Color(0xD4090B10), AppChrome.Canvas),
-                                    ),
-                                ),
+                        Text(
+                            text = hero.eyebrow,
+                            color = AppChrome.AccentWarm,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
                         )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 28.dp, vertical = 28.dp),
-                            horizontalArrangement = Arrangement.spacedBy(28.dp),
-                            verticalAlignment = Alignment.Bottom,
-                        ) {
-                            TvLongFormPoster(
-                                title = hero.title,
-                                posterUrl = hero.posterUrl,
+                        Text(
+                            text = hero.title,
+                            color = AppChrome.TextPrimary,
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (hero.metaLine.isNotBlank()) {
+                            Text(
+                                text = hero.metaLine,
+                                color = AppChrome.TextSecondary,
+                                style = MaterialTheme.typography.titleMedium,
                             )
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                TvRoundIconAction(
-                                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "返回",
-                                    onClick = onBack,
-                                )
-                                Text(
-                                    text = hero.eyebrow,
-                                    color = AppChrome.AccentWarm,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    text = hero.title,
-                                    color = AppChrome.TextPrimary,
-                                    style = MaterialTheme.typography.headlineLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                if (hero.metaLine.isNotBlank()) {
-                                    Text(
-                                        text = hero.metaLine,
-                                        color = AppChrome.TextSecondary,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                }
-                                Text(
-                                    text = hero.summary,
-                                    color = AppChrome.TextMuted,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    maxLines = 4,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    TvDetailPrimaryActionButton(
-                                        text = if (canPlay) hero.primaryActionLabel else "暂无片源",
-                                        modifier = Modifier.focusRequester(playFocusRequester),
-                                        enabled = canPlay,
-                                        onClick = {
-                                            if (canPlay) {
-                                                onPlay(detail.id, uiState.videoType)
-                                            }
-                                        },
-                                    )
-                                    TvDetailSecondaryActionButton(
-                                        text = hero.secondaryActionLabel,
-                                        onClick = {
-                                            scope.launch { listState.animateScrollToItem(1) }
-                                        },
-                                    )
-                                }
-                            }
                         }
-                    }
-                }
-
-                item(key = "summary") {
-                    TvDetailInfoCard(
-                        title = "剧情简介",
-                        content = detail.description.orEmpty().ifBlank { "暂无简介" },
-                    )
-                }
-
-                if (detail.tags.orEmpty().isNotEmpty()) {
-                    item(key = "tags") {
-                        Surface(
-                            color = AppChrome.Surface,
-                            shape = AppChrome.CardShape,
-                            modifier = Modifier.padding(horizontal = 18.dp),
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 18.dp, vertical = 18.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Text(
-                                    text = "标签",
-                                    color = AppChrome.TextPrimary,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    items(detail.tags.orEmpty().size) { index ->
-                                        Surface(
-                                            color = AppChrome.SurfaceStrong,
-                                            shape = AppChrome.PillShape,
-                                        ) {
-                                            Text(
-                                                text = detail.tags.orEmpty()[index],
-                                                color = AppChrome.TextSecondary,
-                                                style = MaterialTheme.typography.labelLarge,
-                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                            )
-                                        }
+                        Text(
+                            text = hero.summary,
+                            color = AppChrome.TextMuted,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (hero.actors.isNotEmpty()) {
+                            TvLongFormActorRow(actors = hero.actors)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            TvDetailPrimaryActionButton(
+                                text = if (canPlay) hero.primaryActionLabel else "暂无片源",
+                                modifier = Modifier.focusRequester(playFocusRequester),
+                                enabled = canPlay,
+                                onClick = {
+                                    if (canPlay) {
+                                        onPlay(detail.id, uiState.videoType)
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                item(key = "stats") {
-                    Surface(
-                        color = AppChrome.Surface,
-                        shape = AppChrome.CardShape,
-                        modifier = Modifier.padding(horizontal = 18.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 18.dp, vertical = 18.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            TvMetricCard(
-                                modifier = Modifier.weight(1f),
-                                label = "播放",
-                                value = detail.viewsCount.toString(),
+                                },
                             )
-                            TvMetricCard(
-                                modifier = Modifier.weight(1f),
-                                label = "点赞",
-                                value = detail.likesCount.toString(),
-                            )
-                            TvMetricCard(
-                                modifier = Modifier.weight(1f),
-                                label = "收藏",
-                                value = detail.favoritesCount.toString(),
+                            TvDetailSecondaryActionButton(
+                                text = hero.secondaryActionLabel,
+                                onClick = { viewModel.toggleFavorite() },
                             )
                         }
                     }
@@ -299,39 +195,92 @@ fun TvLongFormDetailScreen(
 }
 
 @Composable
-private fun TvLongFormPoster(
-    title: String,
-    posterUrl: String?,
-) {
-    if (!posterUrl.isNullOrBlank()) {
-        AsyncImage(
-            model = posterUrl,
-            contentDescription = title,
-            modifier = Modifier
-                .width(248.dp)
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(28.dp)),
-            contentScale = ContentScale.Crop,
-        )
+private fun TvLongFormDetailBackground(hero: TvLongFormDetailHeroUiModel) {
+    if (!hero.backdropUrl.isNullOrBlank()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = hero.backdropUrl,
+                contentDescription = hero.title,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (hero.usesPosterAsBackdropFallback) Modifier.blur(22.dp) else Modifier),
+                contentScale = ContentScale.Crop,
+            )
+            if (hero.usesPosterAsBackdropFallback) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xAA05070C)),
+                )
+            }
+        }
         return
     }
     Box(
         modifier = Modifier
-            .width(248.dp)
-            .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(28.dp))
+            .fillMaxSize()
             .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1F3457), Color(0xFF111827)),
+                Brush.horizontalGradient(
+                    colors = listOf(Color(0xFF23131F), Color(0xFF090C12)),
                 ),
             ),
-        contentAlignment = Alignment.Center,
+    )
+}
+
+@Composable
+private fun TvLongFormActorRow(actors: List<TvLongFormDetailActorUiModel>) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "演员",
+            color = AppChrome.TextPrimary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(actors.size) { index ->
+                TvLongFormActorAvatar(actor = actors[index])
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvLongFormActorAvatar(actor: TvLongFormDetailActorUiModel) {
+    Column(
+        modifier = Modifier.width(74.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(
-            imageVector = Icons.Filled.Tv,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.82f),
-            modifier = Modifier.size(56.dp),
+        Box(
+            modifier = Modifier
+                .size(58.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF253044)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (actor.hasAvatar) {
+                AsyncImage(
+                    model = actor.avatarUrl,
+                    contentDescription = actor.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+            if (!actor.hasAvatar) {
+                Text(
+                    text = actor.name.take(1),
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+        Text(
+            text = actor.name,
+            color = AppChrome.TextSecondary,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -341,11 +290,12 @@ private fun TvRoundIconAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
-        color = Color(0x44080B11),
+        color = Color(0x66080B11),
         shape = CircleShape,
-        modifier = Modifier
+        modifier = modifier
             .size(52.dp)
             .tvFocusableGlow(shape = CircleShape, focusedScale = 1.08f)
             .clickable(onClick = onClick),
@@ -398,75 +348,17 @@ private fun TvDetailSecondaryActionButton(
             .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.05f)
             .clickable(onClick = onClick),
     ) {
-        Text(
-            text = text,
-            color = AppChrome.TextPrimary,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+        Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-        )
-    }
-}
-
-@Composable
-private fun TvDetailInfoCard(
-    title: String,
-    content: String,
-) {
-    Surface(
-        color = AppChrome.Surface,
-        shape = AppChrome.CardShape,
-        modifier = Modifier.padding(horizontal = 18.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Icon(Icons.Filled.Star, contentDescription = null, tint = AppChrome.TextPrimary)
             Text(
-                text = title,
+                text = text,
                 color = AppChrome.TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = content,
-                color = AppChrome.TextSecondary,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TvMetricCard(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-) {
-    Surface(
-        modifier = modifier,
-        color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = value,
-                color = AppChrome.TextPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = label,
-                color = AppChrome.TextMuted,
-                style = MaterialTheme.typography.labelSmall,
             )
         }
     }

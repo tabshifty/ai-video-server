@@ -25,6 +25,12 @@
 - TV API 给首页和分类巨幅推荐使用的 AV `backdrop_url` 由后端统一解析；fallback 顺序为 `poster_original_path`、`poster_url`/`poster_path`、抓取来源块内的 `poster_url`/`poster_path`、`poster_cropped_path`、`thumbnail_path`。
 - AV 海报墙竖卡和详情页左侧小海报继续使用缩略图或裁剪图，不改成横幅图，避免破坏竖向卡片比例。
 
+## TV 沉浸式详情首屏
+- `沉浸式详情首屏`：TV 端电影和 `18+` 共用的长视频详情页首屏样式，使用全屏横向背景和底部半透明信息面板承载标题、年份/时长/标签、简介、演员头像与播放/收藏操作；电视剧详情页不套用此约定。
+- 长视频详情背景优先使用可识别的横向背景字段：电影使用 `backdrop_url`、`backdrop_path`、`fanart_url`、`fanart_path`；`18+` 保持 AV 原始横幅海报优先规则。缺少横向背景时才允许使用竖向海报作为模糊暗化兜底，并通过展示模型显式标记为兜底，避免把竖海报当作正常横幅裁切。
+- TV 电影/`18+` 详情页操作只保留“播放”和“收藏/取消收藏”；收藏状态复用详情 DTO 的 `user_state.is_favorited` 与 `DetailViewModel.toggleFavorite()`，不新增分享入口或更多信息滚动入口。
+- 详情页演员区最多展示 5 个演员，优先使用接口 `actors.avatar_url`，无头像时显示圆形文字占位；无演员数据时隐藏演员区，不发起额外抓取。
+
 ## IPTV 术语
 - `IPTV 播放列表`：后台维护的一份全局 M3U/M3U8 频道源；本期只允许一个播放列表生效，上传文件或远程刷新都会替换当前频道清单。
 - `频道/电视台`：M3U 中一条可播放的直播流，必须包含频道名和 `http/https` 播放 URL；`group-title`、`tvg-logo`、`tvg-id` 是可选信息。

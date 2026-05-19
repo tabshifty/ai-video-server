@@ -2,8 +2,10 @@ package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.TvCatalogWallItemDto
+import com.chee.videos.core.model.resolveAvPoster
 import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.util.UrlBuilder
+import java.util.Locale
 
 internal enum class TvFeaturedContentSource {
     CONTINUE_WATCHING,
@@ -34,8 +36,16 @@ internal data class TvLongFormDetailHeroUiModel(
     val summary: String,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
+    val usesPosterAsBackdropFallback: Boolean = false,
+    val actors: List<TvLongFormDetailActorUiModel> = emptyList(),
     val primaryActionLabel: String,
     val secondaryActionLabel: String,
+)
+
+internal data class TvLongFormDetailActorUiModel(
+    val name: String,
+    val avatarUrl: String?,
+    val hasAvatar: Boolean,
 )
 
 internal data class TvCatalogWallSpec(
@@ -128,11 +138,18 @@ internal fun buildTvLongFormDetailHero(
 ): TvLongFormDetailHeroUiModel {
     val posterUrl = resolveTvResourceUrl(baseUrl, detail.thumbnailPath)
     val normalizedVideoType = normalizeTvLongFormVideoType(videoType)
-    val backdropUrl = if (normalizedVideoType == "av") {
-        resolveAvPosterUrl(baseUrl, detail)
+    val preferredBackdrop = if (normalizedVideoType == "av") {
+        val avPoster = resolveAvPoster(detail)
+        val url = resolveAvPosterUrl(baseUrl, detail)
+        TvLongFormBackdropCandidate(
+            url = url,
+            isPosterFallback = url != null && !avPoster.isScrapedPoster,
+        )
     } else {
-        resolveTvBackdropUrl(baseUrl, detail)
-    } ?: posterUrl
+        TvLongFormBackdropCandidate(url = resolveTvBackdropUrl(baseUrl, detail))
+    }
+    val preferredBackdropUrl = preferredBackdrop.url
+    val backdropUrl = preferredBackdropUrl ?: posterUrl
     return TvLongFormDetailHeroUiModel(
         eyebrow = tvLongFormTypeLabel(normalizedVideoType),
         title = detail.title,
@@ -140,10 +157,18 @@ internal fun buildTvLongFormDetailHero(
         summary = detail.description.orEmpty().ifBlank { "暂无简介" },
         posterUrl = posterUrl,
         backdropUrl = backdropUrl,
-        primaryActionLabel = "立即播放",
-        secondaryActionLabel = "更多信息",
+        usesPosterAsBackdropFallback = preferredBackdrop.isPosterFallback ||
+            (preferredBackdropUrl.isNullOrBlank() && !posterUrl.isNullOrBlank()),
+        actors = buildTvLongFormDetailActors(baseUrl, detail),
+        primaryActionLabel = "播放",
+        secondaryActionLabel = if (detail.userState.isFavorited) "取消收藏" else "收藏",
     )
 }
+
+private data class TvLongFormBackdropCandidate(
+    val url: String?,
+    val isPosterFallback: Boolean = false,
+)
 
 internal fun resolveTvCatalogWallSpec(kind: String, fallbackTitle: String = ""): TvCatalogWallSpec {
     val normalizedKind = kind.trim().lowercase()
@@ -249,13 +274,13 @@ private fun resolveTvBackdropUrl(baseUrl: String, detail: VideoDetailDto): Strin
         anyString(detail.metadata?.get("backdrop_path")),
         anyString(detail.metadata?.get("fanart_url")),
         anyString(detail.metadata?.get("fanart_path")),
-        detail.thumbnailPath,
     )
     return candidates.firstNotNullOfOrNull { resolveTvResourceUrl(baseUrl, it) }
 }
 
 private fun buildTvLongFormMetaLine(detail: VideoDetailDto): String {
     val pieces = buildList {
+        extractTvLongFormYear(detail.metadata)?.let(::add)
         if (detail.duration > 0) {
             add(formatTvDuration(detail.duration))
         }
@@ -266,6 +291,48 @@ private fun buildTvLongFormMetaLine(detail: VideoDetailDto): String {
         }
     }
     return pieces.joinToString(" · ")
+}
+
+private fun buildTvLongFormDetailActors(
+    baseUrl: String,
+    detail: VideoDetailDto,
+): List<TvLongFormDetailActorUiModel> {
+    val apiActors = detail.actors.orEmpty()
+        .mapNotNull { actor ->
+            val name = actor.name.trim()
+            if (name.isBlank()) {
+                return@mapNotNull null
+            }
+            val avatarUrl = resolveTvResourceUrl(baseUrl, actor.avatarUrl)
+            TvLongFormDetailActorUiModel(
+                name = name,
+                avatarUrl = avatarUrl,
+                hasAvatar = !avatarUrl.isNullOrBlank(),
+            )
+        }
+        .distinctBy { it.name.lowercase(Locale.ROOT) }
+    val actors = apiActors.ifEmpty {
+        anyStringList(detail.metadata?.get("actors")).map { name ->
+            TvLongFormDetailActorUiModel(
+                name = name,
+                avatarUrl = null,
+                hasAvatar = false,
+            )
+        }
+    }
+    return actors.take(5)
+}
+
+private fun extractTvLongFormYear(metadata: Map<String, Any?>?): String? {
+    val directYear = metadata?.get("year")
+    when (directYear) {
+        is Number -> return directYear.toInt().takeIf { it > 0 }?.toString()
+        is String -> directYear.trim().takeIf { it.matches(Regex("""\d{4}""")) }?.let { return it }
+    }
+    return listOf("release_date", "released_at", "published_at", "premiered", "air_date")
+        .firstNotNullOfOrNull { key ->
+            anyString(metadata?.get(key))?.let { YEAR_REGEX.find(it)?.value }
+        }
 }
 
 private fun formatTvDuration(totalSeconds: Int): String {
@@ -292,6 +359,17 @@ private fun anyString(value: Any?): String? {
     return (value as? String)?.trim()?.takeIf { it.isNotBlank() }
 }
 
+private fun anyStringList(value: Any?): List<String> {
+    return when (value) {
+        is List<*> -> value.mapNotNull(::anyString).distinct()
+        is String -> value.split(',', '、', '/', '|')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+        else -> emptyList()
+    }
+}
+
 private fun appendTvPlaybackProfileQuery(rawUrl: String, preferredPlaybackProfile: String): String {
     val normalizedProfile = preferredPlaybackProfile.trim()
     if (normalizedProfile.isBlank() || !rawUrl.contains("/source")) {
@@ -306,3 +384,5 @@ private fun tvTypeLabel(type: String): String = when (type) {
     "movie" -> "电影"
     else -> type.ifBlank { "长视频" }
 }
+
+private val YEAR_REGEX = Regex("""\b(19|20)\d{2}\b""")
