@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
@@ -31,6 +31,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.ui.AppChrome
+
+private val ConnectionScanLoadingIndicatorSize = 14.dp
 
 @Composable
 fun ConnectionScreen(
@@ -86,7 +88,11 @@ fun ConnectionScreen(
                     }
                     if (uiState.scanning) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CircularProgressIndicator(modifier = Modifier.height(20.dp), color = AppChrome.AccentStrong)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(ConnectionScanLoadingIndicatorSize),
+                                color = AppChrome.AccentStrong,
+                                strokeWidth = 2.dp,
+                            )
                             Text("正在扫描同网段可用服务", color = AppChrome.TextSecondary)
                         }
                     }
