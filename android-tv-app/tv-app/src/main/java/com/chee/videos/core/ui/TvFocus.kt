@@ -66,3 +66,26 @@ fun Modifier.tvFocusableGlow(
         )
         .focusable(enabled = enabled)
 }
+
+fun Modifier.tvFocusableScaleOnly(
+    enabled: Boolean = true,
+    shape: Shape = RoundedCornerShape(20.dp),
+    focusedScale: Float = 1.04f,
+): Modifier = composed {
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused && enabled) focusedScale else 1f,
+        animationSpec = tween(durationMillis = 140),
+        label = "tvFocusScaleOnly",
+    )
+    this
+        .onFocusChanged { state -> isFocused = state.isFocused || state.hasFocus }
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            shadowElevation = if (isFocused && enabled) 28f else 0f
+            this.shape = shape
+            clip = false
+        }
+        .focusable(enabled = enabled)
+}

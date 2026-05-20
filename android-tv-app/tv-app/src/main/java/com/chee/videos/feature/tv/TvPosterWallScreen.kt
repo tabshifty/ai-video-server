@@ -51,9 +51,12 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.tvFocusableGlow
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 private val tvPosterWallFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
+private val TvPosterWallCardShape = RoundedCornerShape(14.dp)
+private val TvPosterWallTitleBackground = Color(0xE80A0E15)
 
 internal object TvPosterWallFocusLayoutSpec {
     const val gridHorizontalPaddingDp: Float = 24f
@@ -310,19 +313,22 @@ private fun TvPosterWallCard(
 ) {
     val cardContent = buildTvPosterWallCardContent(baseUrl, item)
     Surface(
-        color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(18.dp),
+        color = Color.Transparent,
+        shape = TvPosterWallCardShape,
         modifier = modifier
             .padding(tvPosterWallFocusSafeSpace)
-            .aspectRatio(2f / 3f)
-            .tvFocusableGlow(shape = RoundedCornerShape(18.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(shape = TvPosterWallCardShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(TvPosterWallCardShape),
+        ) {
             Box(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
+                    .aspectRatio(9f / 16f)
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(Color(0xFF20142D), Color(0xFF0C1018)),
@@ -334,10 +340,7 @@ private fun TvPosterWallCard(
                     AsyncImage(
                         model = cardContent.posterUrl,
                         contentDescription = "${cardContent.title} 海报",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp)
-                            .clip(RoundedCornerShape(14.dp)),
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                     )
                 } else {
@@ -360,24 +363,17 @@ private fun TvPosterWallCard(
                     }
                 }
             }
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .background(TvPosterWallTitleBackground)
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
             ) {
                 Text(
                     text = cardContent.title,
                     color = Color.White,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = cardContent.description,
-                    color = AppChrome.TextSecondary,
-                    style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -389,7 +385,7 @@ private fun TvPosterWallCard(
 internal data class TvPosterWallCardContent(
     val posterUrl: String?,
     val title: String,
-    val description: String,
+    val showDescription: Boolean,
     val showPosterPlaceholder: Boolean,
 )
 
@@ -401,7 +397,7 @@ internal fun buildTvPosterWallCardContent(
     return TvPosterWallCardContent(
         posterUrl = posterUrl,
         title = item.title,
-        description = item.description,
+        showDescription = false,
         showPosterPlaceholder = posterUrl.isNullOrBlank(),
     )
 }
