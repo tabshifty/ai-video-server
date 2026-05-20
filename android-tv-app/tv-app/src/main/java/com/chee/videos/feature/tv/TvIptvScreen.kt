@@ -67,6 +67,7 @@ import coil.compose.AsyncImage
 import com.chee.videos.tv.R
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.tvFocusableGlow
 import java.util.ArrayList
 import kotlinx.coroutines.delay
@@ -449,7 +450,12 @@ private fun TvIptvChannelListOverlay(
     ) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 18.dp, bottom = 18.dp),
+            contentPadding = PaddingValues(
+                start = 14.dp,
+                end = 14.dp,
+                top = 18.dp,
+                bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item("title") {

@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvFocusSafeSpec
+import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.tvFocusableGlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -57,7 +58,7 @@ private val tvPosterWallFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.
 internal object TvPosterWallFocusLayoutSpec {
     const val gridHorizontalPaddingDp: Float = 24f
     const val gridTopPaddingDp: Float = 8f
-    const val gridBottomPaddingDp: Float = 24f
+    const val gridBottomPaddingDp: Float = TvLayoutSpec.scrollBottomSafePaddingDp
     const val gridItemSpacingDp: Float = 16f
     const val posterCardsUseFocusSafeContainer: Boolean = true
 }

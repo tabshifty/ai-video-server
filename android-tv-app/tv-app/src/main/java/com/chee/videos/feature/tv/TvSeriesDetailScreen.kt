@@ -50,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.tvFocusableGlow
 
 @Composable
@@ -101,7 +102,7 @@ fun TvSeriesDetailScreen(
             .fillMaxSize()
             .background(AppChrome.PageGradient)
             .statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item(key = "hero") {

@@ -59,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvFocusSafeSpec
+import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.tv.TvAccountMenuAction
@@ -69,6 +70,7 @@ internal object TvCatalogFocusLayoutSpec {
     const val shelfHorizontalPaddingDp: Float = 8f
     const val shelfVerticalPaddingDp: Float = 8f
     const val shelfItemSpacingDp: Float = 16f
+    const val contentBottomPaddingDp: Float = TvLayoutSpec.scrollBottomSafePaddingDp
     const val posterCardsUseFocusSafeContainer: Boolean = true
 }
 
@@ -167,7 +169,12 @@ fun TvCatalogScreen(
         if (uiState.selectedMenu == TvHomeMenuItem.Search) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 18.dp, bottom = 20.dp),
+                contentPadding = PaddingValues(
+                    start = 14.dp,
+                    end = 14.dp,
+                    top = 18.dp,
+                    bottom = TvCatalogFocusLayoutSpec.contentBottomPaddingDp.dp,
+                ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item(key = "search") {
@@ -203,7 +210,12 @@ fun TvCatalogScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 18.dp, bottom = 20.dp),
+            contentPadding = PaddingValues(
+                start = 14.dp,
+                end = 14.dp,
+                top = 18.dp,
+                bottom = TvCatalogFocusLayoutSpec.contentBottomPaddingDp.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             featuredContent?.let { featured ->
