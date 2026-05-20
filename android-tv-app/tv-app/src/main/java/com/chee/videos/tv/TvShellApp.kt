@@ -1,20 +1,32 @@
 package com.chee.videos.tv
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,6 +64,7 @@ import com.chee.videos.feature.tv.buildTvCatalogWallRoute
 import com.chee.videos.feature.tv.buildTvLongFormDetailRoute
 import com.chee.videos.feature.tv.buildTvLongFormPlayerRoute
 import com.chee.videos.feature.tv.buildTvPlayerRoute
+import kotlinx.coroutines.delay
 
 @Composable
 fun TvShellApp(
@@ -94,11 +107,44 @@ private fun TvAuthenticatedNav(
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val handleShellBack = shouldHandleTvShellBack(navBackStackEntry?.destination?.route)
+    val currentRoute = navBackStackEntry?.destination?.route
+    val handleShellBack = shouldHandleTvShellBack(currentRoute)
+    val handleRootExitConfirm = shouldHandleTvRootExitConfirm(currentRoute)
     val homeContentFocusRequester = remember { FocusRequester() }
+    val activity = LocalContext.current.findActivity()
+    var rootExitPromptAtMillis by remember { mutableStateOf<Long?>(null) }
+    var showRootExitPrompt by remember { mutableStateOf(false) }
+
+    fun handleRootBack() {
+        val now = SystemClock.uptimeMillis()
+        when (resolveTvRootBackAction(rootExitPromptAtMillis, now)) {
+            TvRootBackAction.ShowPrompt -> {
+                rootExitPromptAtMillis = now
+                showRootExitPrompt = true
+            }
+
+            TvRootBackAction.Exit -> {
+                rootExitPromptAtMillis = null
+                showRootExitPrompt = false
+                activity?.finish()
+            }
+        }
+    }
 
     BackHandler(enabled = handleShellBack) {
         navController.popBackStack()
+    }
+
+    BackHandler(enabled = handleRootExitConfirm, onBack = ::handleRootBack)
+
+    LaunchedEffect(showRootExitPrompt, rootExitPromptAtMillis) {
+        val promptAt = rootExitPromptAtMillis
+        if (showRootExitPrompt && promptAt != null) {
+            delay(TvRootExitConfirmWindowMillis)
+            if (rootExitPromptAtMillis == promptAt) {
+                showRootExitPrompt = false
+            }
+        }
     }
 
     Box(
@@ -219,10 +265,65 @@ private fun TvAuthenticatedNav(
                 )
             }
         }
+
+        if (showRootExitPrompt) {
+            TvRootExitConfirmPrompt(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 48.dp),
+            )
+        }
     }
 }
 
 internal fun shouldShowTvGlobalSettings(route: String?): Boolean = route == "__disabled_tv_global_settings__"
+
+internal const val TvRootExitConfirmWindowMillis = 2_000L
+
+internal enum class TvRootBackAction {
+    ShowPrompt,
+    Exit,
+}
+
+internal fun shouldHandleTvRootExitConfirm(route: String?): Boolean = route == "tv-home"
+
+internal fun resolveTvRootBackAction(
+    previousPromptUptimeMillis: Long?,
+    nowUptimeMillis: Long,
+    confirmWindowMillis: Long = TvRootExitConfirmWindowMillis,
+): TvRootBackAction {
+    val previous = previousPromptUptimeMillis ?: return TvRootBackAction.ShowPrompt
+    val elapsed = nowUptimeMillis - previous
+    return if (elapsed in 0..confirmWindowMillis) {
+        TvRootBackAction.Exit
+    } else {
+        TvRootBackAction.ShowPrompt
+    }
+}
+
+@Composable
+private fun TvRootExitConfirmPrompt(
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = Color(0xCC121212),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Text(
+            text = "再按一次退出",
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 internal enum class TvShellSettingsFocusDirection {
     Left,
