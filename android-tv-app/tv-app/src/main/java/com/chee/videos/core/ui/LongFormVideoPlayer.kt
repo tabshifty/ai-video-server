@@ -119,6 +119,7 @@ fun LongFormVideoPlayer(
     var dragDistancePx by remember { mutableStateOf(0f) }
     var seekPreviewText by remember { mutableStateOf("") }
     var showSeekPreview by remember { mutableStateOf(false) }
+    var pendingStepSeek by remember { mutableStateOf<TvPendingStepSeekUpdate?>(null) }
 
     var longPressBoosting by remember { mutableStateOf(false) }
     var ignoreTapAfterLongPress by remember { mutableStateOf(false) }
@@ -136,6 +137,7 @@ fun LongFormVideoPlayer(
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
     var hideSeekPreviewJob by remember { mutableStateOf<Job?>(null) }
     var hideCenterFeedbackJob by remember { mutableStateOf<Job?>(null) }
+    var commitStepSeekJob by remember { mutableStateOf<Job?>(null) }
     val tvSeekStepMs = normalizeTvSeekStepSeconds(tvSeekStepSeconds) * 1_000L
 
     fun effectiveDurationMs(): Long {
@@ -231,6 +233,57 @@ fun LongFormVideoPlayer(
         }
     }
 
+    fun updateSeekPreview(anchor: Long, target: Long, duration: Long) {
+        val delta = target - anchor
+        val direction = if (delta >= 0) "快进" else "快退"
+        val sign = if (delta >= 0) "+" else "-"
+        seekPreviewText = buildString {
+            append(direction)
+            append(" ")
+            append(sign)
+            append(formatPlaybackTime(abs(delta)))
+            append("\n")
+            append(formatPlaybackTime(target))
+            if (duration > 0) {
+                append(" / ")
+                append(formatPlaybackTime(duration))
+            }
+        }
+        showSeekPreview = true
+    }
+
+    fun performDebouncedStepSeek(deltaMs: Long, showControls: Boolean = true) {
+        val duration = effectiveDurationMs()
+        val pending = resolveTvPendingStepSeek(
+            previous = pendingStepSeek,
+            currentPositionMs = player.currentPosition.coerceAtLeast(0L),
+            durationMs = duration,
+            deltaMs = deltaMs,
+        )
+        pendingStepSeek = pending
+        positionMs = pending.targetPositionMs
+        updateSeekPreview(
+            anchor = pending.anchorPositionMs,
+            target = pending.targetPositionMs,
+            duration = duration,
+        )
+        hideSeekPreviewJob?.cancel()
+        commitStepSeekJob?.cancel()
+        commitStepSeekJob = scope.launch {
+            delay(TvStepSeekDebounceMillis)
+            player.seekTo(pending.targetPositionMs)
+            positionMs = pending.targetPositionMs
+            pendingStepSeek = null
+            hideSeekPreviewJob = scope.launch {
+                delay(900)
+                showSeekPreview = false
+            }
+        }
+        if (showControls) {
+            showControlsTemporarily()
+        }
+    }
+
     fun handleTvTransportKey(nativeKeyCode: Int, repeatCount: Int): Boolean {
         if (controlsVisible) {
             return when (nativeKeyCode) {
@@ -250,7 +303,7 @@ fun LongFormVideoPlayer(
 
         return when (val action = resolveTvHiddenTransportKeyAction(nativeKeyCode, repeatCount, tvSeekStepSeconds)) {
             is TvHiddenTransportKeyAction.Seek -> {
-                performStepSeek(
+                performDebouncedStepSeek(
                     deltaMs = action.deltaMs,
                     showControls = false,
                 )
@@ -685,7 +738,7 @@ fun LongFormVideoPlayer(
                                 icon = Icons.Filled.FastForward,
                                 contentDescription = "快退 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
                                 tvMode = true,
-                                onClick = { performStepSeek(-tvSeekStepMs) },
+                                onClick = { performDebouncedStepSeek(-tvSeekStepMs) },
                                 reverseMirror = true,
                             )
                         }
@@ -734,7 +787,7 @@ fun LongFormVideoPlayer(
                                 icon = Icons.Filled.FastForward,
                                 contentDescription = "快进 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
                                 tvMode = true,
-                                onClick = { performStepSeek(tvSeekStepMs) },
+                                onClick = { performDebouncedStepSeek(tvSeekStepMs) },
                             )
                             onOpenEpisodeSelector?.let { openSelector ->
                                 CompactPlayerControlButton(
@@ -847,6 +900,34 @@ internal sealed interface TvHiddenTransportKeyAction {
     data object TogglePlayPause : TvHiddenTransportKeyAction
     data object ShowControlsAndFocusPlayPause : TvHiddenTransportKeyAction
     data object OpenSubtitleSheet : TvHiddenTransportKeyAction
+}
+
+internal const val TvStepSeekDebounceMillis = 300L
+
+internal data class TvPendingStepSeekUpdate(
+    val anchorPositionMs: Long,
+    val targetPositionMs: Long,
+    val accumulatedDeltaMs: Long,
+    val shouldCommitImmediately: Boolean,
+)
+
+internal fun resolveTvPendingStepSeek(
+    previous: TvPendingStepSeekUpdate?,
+    currentPositionMs: Long,
+    durationMs: Long,
+    deltaMs: Long,
+): TvPendingStepSeekUpdate {
+    val anchor = previous?.anchorPositionMs ?: currentPositionMs.coerceAtLeast(0L)
+    val rawTarget = (previous?.targetPositionMs ?: anchor) + deltaMs
+    val target = rawTarget.coerceAtLeast(0L).let { next ->
+        if (durationMs > 0L) next.coerceAtMost(durationMs) else next
+    }
+    return TvPendingStepSeekUpdate(
+        anchorPositionMs = anchor,
+        targetPositionMs = target,
+        accumulatedDeltaMs = target - anchor,
+        shouldCommitImmediately = false,
+    )
 }
 
 internal fun resolveTvHiddenTransportKeyAction(

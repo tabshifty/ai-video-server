@@ -1,8 +1,12 @@
 package com.chee.videos.core.ui
 
 import android.view.KeyEvent
+import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.io.path.readText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LongFormVideoPlayerTransportKeyTest {
@@ -94,5 +98,106 @@ class LongFormVideoPlayerTransportKeyTest {
     @Test
     fun unknownKeysReturnNull() {
         assertNull(resolveTvHiddenTransportKeyAction(KeyEvent.KEYCODE_BACK, repeatCount = 0))
+    }
+
+    @Test
+    fun pendingSeekStartsFromCurrentPositionAndDefersCommit() {
+        assertEquals(
+            TvPendingStepSeekUpdate(
+                anchorPositionMs = 10_000L,
+                targetPositionMs = 20_000L,
+                accumulatedDeltaMs = 10_000L,
+                shouldCommitImmediately = false,
+            ),
+            resolveTvPendingStepSeek(
+                previous = null,
+                currentPositionMs = 10_000L,
+                durationMs = 120_000L,
+                deltaMs = 10_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun pendingSeekAccumulatesRepeatedPressesBeforeCommit() {
+        val first = resolveTvPendingStepSeek(
+            previous = null,
+            currentPositionMs = 10_000L,
+            durationMs = 120_000L,
+            deltaMs = 10_000L,
+        )
+
+        assertEquals(
+            TvPendingStepSeekUpdate(
+                anchorPositionMs = 10_000L,
+                targetPositionMs = 30_000L,
+                accumulatedDeltaMs = 20_000L,
+                shouldCommitImmediately = false,
+            ),
+            resolveTvPendingStepSeek(
+                previous = first,
+                currentPositionMs = 10_000L,
+                durationMs = 120_000L,
+                deltaMs = 10_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun pendingSeekDirectionChangeContinuesFromAccumulatedTarget() {
+        val pending = TvPendingStepSeekUpdate(
+            anchorPositionMs = 10_000L,
+            targetPositionMs = 30_000L,
+            accumulatedDeltaMs = 20_000L,
+            shouldCommitImmediately = false,
+        )
+
+        assertEquals(
+            TvPendingStepSeekUpdate(
+                anchorPositionMs = 10_000L,
+                targetPositionMs = 20_000L,
+                accumulatedDeltaMs = 10_000L,
+                shouldCommitImmediately = false,
+            ),
+            resolveTvPendingStepSeek(
+                previous = pending,
+                currentPositionMs = 10_000L,
+                durationMs = 120_000L,
+                deltaMs = -10_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun pendingSeekClampsTargetToDuration() {
+        assertEquals(
+            TvPendingStepSeekUpdate(
+                anchorPositionMs = 95_000L,
+                targetPositionMs = 100_000L,
+                accumulatedDeltaMs = 5_000L,
+                shouldCommitImmediately = false,
+            ),
+            resolveTvPendingStepSeek(
+                previous = null,
+                currentPositionMs = 95_000L,
+                durationMs = 100_000L,
+                deltaMs = 10_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun playerUpdatesSeekPreviewImmediatelyButCommitsSeekAfterDebounce() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
+        assertTrue("长视频播放器必须存在", sourcePath.exists())
+
+        val source = sourcePath.readText()
+        val debouncedSeekSource = source
+            .substringAfter("fun performDebouncedStepSeek(")
+            .substringBefore("fun handleTvTransportKey(")
+
+        assertTrue(debouncedSeekSource.contains("updateSeekPreview("))
+        assertTrue(debouncedSeekSource.contains("delay(TvStepSeekDebounceMillis)"))
+        assertTrue(debouncedSeekSource.contains("player.seekTo(pending.targetPositionMs)"))
     }
 }
