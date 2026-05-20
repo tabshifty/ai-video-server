@@ -374,6 +374,7 @@ fun TvSeriesPlayerScreen(
                     },
                     showStatusBarPadding = false,
                     tvMode = true,
+                    tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                     onOpenEpisodeSelector = { viewModel.setSelectorVisible(true) },
                     onNextEpisode = viewModel::nextEpisode,
                     onExitPlayback = onBack,

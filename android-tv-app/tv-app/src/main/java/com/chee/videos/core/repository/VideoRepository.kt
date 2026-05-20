@@ -314,6 +314,13 @@ class VideoRepository @Inject constructor(
         store.saveTvAudioPreference(videoId, audioTrackId)
     }
 
+    suspend fun readTvSeekStepSeconds(): Int =
+        store.readTvSeekStepSeconds()
+
+    suspend fun saveTvSeekStepSeconds(seconds: Int) {
+        store.saveTvSeekStepSeconds(seconds)
+    }
+
     fun preferredLongFormPlaybackProfile(): PlaybackProfile =
         playbackProfileResolver.preferredLongFormProfile()
 

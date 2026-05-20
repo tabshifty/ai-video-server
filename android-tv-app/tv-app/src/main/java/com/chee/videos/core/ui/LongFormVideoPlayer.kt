@@ -96,6 +96,7 @@ fun LongFormVideoPlayer(
     selectedAudioTrackId: String? = null,
     onSelectAudioTrack: (String?) -> Unit = {},
     tvMode: Boolean = false,
+    tvSeekStepSeconds: Int = 10,
     onOpenEpisodeSelector: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null,
     onExitPlayback: (() -> Unit)? = null,
@@ -135,6 +136,7 @@ fun LongFormVideoPlayer(
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
     var hideSeekPreviewJob by remember { mutableStateOf<Job?>(null) }
     var hideCenterFeedbackJob by remember { mutableStateOf<Job?>(null) }
+    val tvSeekStepMs = normalizeTvSeekStepSeconds(tvSeekStepSeconds) * 1_000L
 
     fun effectiveDurationMs(): Long {
         val fromState = durationMs
@@ -246,7 +248,7 @@ fun LongFormVideoPlayer(
             }
         }
 
-        return when (val action = resolveTvHiddenTransportKeyAction(nativeKeyCode, repeatCount)) {
+        return when (val action = resolveTvHiddenTransportKeyAction(nativeKeyCode, repeatCount, tvSeekStepSeconds)) {
             is TvHiddenTransportKeyAction.Seek -> {
                 performStepSeek(
                     deltaMs = action.deltaMs,
@@ -681,9 +683,9 @@ fun LongFormVideoPlayer(
                         if (tvMode) {
                             CompactPlayerControlButton(
                                 icon = Icons.Filled.FastForward,
-                                contentDescription = "快退 10 秒",
+                                contentDescription = "快退 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
                                 tvMode = true,
-                                onClick = { performStepSeek(-10_000L) },
+                                onClick = { performStepSeek(-tvSeekStepMs) },
                                 reverseMirror = true,
                             )
                         }
@@ -730,9 +732,9 @@ fun LongFormVideoPlayer(
                         if (tvMode) {
                             CompactPlayerControlButton(
                                 icon = Icons.Filled.FastForward,
-                                contentDescription = "快进 10 秒",
+                                contentDescription = "快进 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
                                 tvMode = true,
-                                onClick = { performStepSeek(10_000L) },
+                                onClick = { performStepSeek(tvSeekStepMs) },
                             )
                             onOpenEpisodeSelector?.let { openSelector ->
                                 CompactPlayerControlButton(
@@ -850,7 +852,10 @@ internal sealed interface TvHiddenTransportKeyAction {
 internal fun resolveTvHiddenTransportKeyAction(
     nativeKeyCode: Int,
     repeatCount: Int,
+    seekStepSeconds: Int = 10,
 ): TvHiddenTransportKeyAction? {
+    val stepMs = normalizeTvSeekStepSeconds(seekStepSeconds) * 1_000L
+    val repeatedStepMs = stepMs * 3
     return when (nativeKeyCode) {
         AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
         AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
@@ -862,11 +867,11 @@ internal fun resolveTvHiddenTransportKeyAction(
 
         AndroidKeyEvent.KEYCODE_DPAD_LEFT,
         AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
-        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) -30_000L else -10_000L)
+        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) -repeatedStepMs else -stepMs)
 
         AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
         AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) 30_000L else 10_000L)
+        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) repeatedStepMs else stepMs)
 
         AndroidKeyEvent.KEYCODE_DPAD_UP,
         AndroidKeyEvent.KEYCODE_DPAD_DOWN,
@@ -875,6 +880,13 @@ internal fun resolveTvHiddenTransportKeyAction(
         AndroidKeyEvent.KEYCODE_MENU -> TvHiddenTransportKeyAction.OpenSubtitleSheet
 
         else -> null
+    }
+}
+
+internal fun normalizeTvSeekStepSeconds(seconds: Int): Int {
+    return when (seconds) {
+        5, 10, 15, 20, 30 -> seconds
+        else -> 10
     }
 }
 

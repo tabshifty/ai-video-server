@@ -29,6 +29,7 @@ data class TvCatalogUiState(
     val movies: List<TvHomeShelfItemUiModel> = emptyList(),
     val av: List<TvHomeShelfItemUiModel> = emptyList(),
     val searchResults: List<TvSearchResultUiModel> = emptyList(),
+    val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
     val errorMessage: String? = null,
 )
 
@@ -59,10 +60,19 @@ class TvCatalogViewModel @Inject constructor(
             }
             menuItem == TvHomeMenuItem.Settings -> {
                 _uiState.update { it.copy(loading = false, query = "", searchResults = emptyList()) }
+                loadTvPlaybackSettings()
             }
             menuItem == TvHomeMenuItem.Iptv -> {
                 _uiState.update { it.copy(loading = false, query = "", searchResults = emptyList()) }
             }
+        }
+    }
+
+    fun selectTvSeekStepSeconds(seconds: Int) {
+        val normalized = TvPlaybackSeekStepSetting.normalize(seconds)
+        _uiState.update { it.copy(tvSeekStepSeconds = normalized) }
+        viewModelScope.launch {
+            repository.saveTvSeekStepSeconds(normalized)
         }
     }
 
@@ -164,6 +174,13 @@ class TvCatalogViewModel @Inject constructor(
                         )
                     }
                 }
+        }
+    }
+
+    private fun loadTvPlaybackSettings() {
+        viewModelScope.launch {
+            val stepSeconds = TvPlaybackSeekStepSetting.normalize(repository.readTvSeekStepSeconds())
+            _uiState.update { it.copy(tvSeekStepSeconds = stepSeconds) }
         }
     }
 }

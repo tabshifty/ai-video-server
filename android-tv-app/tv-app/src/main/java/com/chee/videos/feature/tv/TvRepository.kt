@@ -22,6 +22,8 @@ interface TvRepository {
     suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?)
     suspend fun readTvAudioPreference(videoId: String): String?
     suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?)
+    suspend fun readTvSeekStepSeconds(): Int
+    suspend fun saveTvSeekStepSeconds(seconds: Int)
 }
 
 @Singleton
@@ -65,5 +67,12 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
         videoRepository.saveTvAudioPreference(videoId, audioTrackId)
+    }
+
+    override suspend fun readTvSeekStepSeconds(): Int =
+        videoRepository.readTvSeekStepSeconds()
+
+    override suspend fun saveTvSeekStepSeconds(seconds: Int) {
+        videoRepository.saveTvSeekStepSeconds(seconds)
     }
 }

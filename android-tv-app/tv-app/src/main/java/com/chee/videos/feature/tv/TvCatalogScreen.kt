@@ -153,6 +153,8 @@ fun TvCatalogScreen(
         )
         if (uiState.selectedMenu == TvHomeMenuItem.Settings) {
             TvHomeSettingsPanel(
+                tvSeekStepSeconds = uiState.tvSeekStepSeconds,
+                onSelectTvSeekStepSeconds = viewModel::selectTvSeekStepSeconds,
                 onRepair = onRepair,
                 onLogout = onLogout,
                 onSwitchServer = onSwitchServer,
@@ -461,6 +463,8 @@ private fun TvHomeSideMenuButton(
 
 @Composable
 private fun TvHomeSettingsPanel(
+    tvSeekStepSeconds: Int,
+    onSelectTvSeekStepSeconds: (Int) -> Unit,
     onRepair: () -> Unit,
     onLogout: () -> Unit,
     onSwitchServer: () -> Unit,
@@ -492,6 +496,75 @@ private fun TvHomeSettingsPanel(
                     }
                 },
             )
+        }
+        Text(
+            text = "播放设置",
+            color = AppChrome.TextMuted,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+        TvSeekStepSettingRow(
+            selectedSeconds = tvSeekStepSeconds,
+            onSelectSeconds = onSelectTvSeekStepSeconds,
+        )
+    }
+}
+
+@Composable
+private fun TvSeekStepSettingRow(
+    selectedSeconds: Int,
+    onSelectSeconds: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppChrome.SurfaceElevated, RoundedCornerShape(8.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "快进/快退步长",
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = TvPlaybackSeekStepSetting.labelFor(selectedSeconds),
+                color = AppChrome.AccentWarm,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TvPlaybackSeekStepSetting.allowedSeconds.forEach { seconds ->
+                val selected = TvPlaybackSeekStepSetting.normalize(selectedSeconds) == seconds
+                Surface(
+                    color = if (selected) AppChrome.Accent.copy(alpha = 0.92f) else AppChrome.Surface.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .width(72.dp)
+                        .height(44.dp)
+                        .tvFocusableGlow(shape = RoundedCornerShape(8.dp), focusedScale = 1.04f)
+                        .clickable { onSelectSeconds(seconds) },
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = TvPlaybackSeekStepSetting.labelFor(seconds),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -33,6 +33,7 @@ class AppPreferencesStore @Inject constructor(
         val shortPlaybackMode = stringPreferencesKey("short_playback_mode")
         val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_preferences")
         val tvAudioPreferences = stringPreferencesKey("tv_audio_preferences")
+        val tvSeekStepSeconds = stringPreferencesKey("tv_seek_step_seconds")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -61,6 +62,10 @@ class AppPreferencesStore @Inject constructor(
 
     val shortPlaybackModeFlow: Flow<ShortPlaybackMode> = dataStore.data.map { prefs ->
         ShortPlaybackMode.fromRaw(prefs[Keys.shortPlaybackMode])
+    }
+
+    val tvSeekStepSecondsFlow: Flow<Int> = dataStore.data.map { prefs ->
+        normalizeTvSeekStepSeconds(prefs[Keys.tvSeekStepSeconds]?.toIntOrNull())
     }
 
     val endpointsFlow: Flow<List<ServerEndpoint>> = dataStore.data.map { prefs ->
@@ -116,6 +121,14 @@ class AppPreferencesStore @Inject constructor(
     suspend fun saveShortPlaybackMode(mode: ShortPlaybackMode) {
         dataStore.edit { prefs ->
             prefs[Keys.shortPlaybackMode] = mode.rawValue
+        }
+    }
+
+    suspend fun readTvSeekStepSeconds(): Int = tvSeekStepSecondsFlow.first()
+
+    suspend fun saveTvSeekStepSeconds(seconds: Int) {
+        dataStore.edit { prefs ->
+            prefs[Keys.tvSeekStepSeconds] = normalizeTvSeekStepSeconds(seconds).toString()
         }
     }
 
@@ -242,6 +255,13 @@ class AppPreferencesStore @Inject constructor(
             } else {
                 prefs[prefsKey] = gson.toJson(current)
             }
+        }
+    }
+
+    private fun normalizeTvSeekStepSeconds(seconds: Int?): Int {
+        return when (seconds) {
+            5, 10, 15, 20, 30 -> seconds
+            else -> 10
         }
     }
 }

@@ -24,6 +24,7 @@ data class DetailUiState(
     val baseUrl: String = "",
     val accessToken: String = "",
     val preferredPlaybackProfile: String = "",
+    val tvSeekStepSeconds: Int = 10,
     val errorMessage: String? = null,
 )
 
@@ -56,6 +57,7 @@ class DetailViewModel @Inject constructor(
                     baseUrl = baseUrl,
                     accessToken = accessToken,
                     preferredPlaybackProfile = videoRepository.preferredLongFormPlaybackProfile().wireValue,
+                    tvSeekStepSeconds = videoRepository.readTvSeekStepSeconds(),
                     errorMessage = null,
                 )
             }

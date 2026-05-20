@@ -22,6 +22,7 @@ data class TvSeriesPlayerUiState(
     val selectedSubtitleTrackId: String? = null,
     val selectedAudioTrackId: String? = null,
     val playbackSpeed: Float = 1f,
+    val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
     val selectorVisible: Boolean = false,
     val currentVideoId: String = "",
     val currentSourceUrl: String = "",
@@ -115,6 +116,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, errorMessage = null) }
             val baseUrl = repository.readActiveBaseUrl().orEmpty()
+            val tvSeekStepSeconds = TvPlaybackSeekStepSetting.normalize(repository.readTvSeekStepSeconds())
             repository.fetchSeriesDetail(seriesId)
                 .onSuccess { dto ->
                     val series = tvSeriesDetailToUiModel(dto)
@@ -138,6 +140,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                         selectedSeasonNumber = resolvedSeason?.number ?: 1,
                         selectedEpisodeNumber = resolvedEpisode?.number ?: 1,
                         playbackSpeed = 1f,
+                        tvSeekStepSeconds = tvSeekStepSeconds,
                         selectorVisible = false,
                         errorMessage = null,
                     )
@@ -147,6 +150,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     _uiState.value = TvSeriesPlayerUiState(
                         loading = false,
                         baseUrl = baseUrl,
+                        tvSeekStepSeconds = tvSeekStepSeconds,
                         errorMessage = error.message ?: "电视剧播放页加载失败",
                     )
                 }

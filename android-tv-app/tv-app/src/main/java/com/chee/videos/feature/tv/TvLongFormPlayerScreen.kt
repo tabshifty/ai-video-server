@@ -353,6 +353,7 @@ fun TvLongFormPlayerScreen(
                     viewModel.saveTvAudioPreference(detail.id, it ?: "")
                 },
                 tvMode = true,
+                tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                 onExitPlayback = onBack,
             )
             if (!playerErrorMessage.isNullOrBlank()) {

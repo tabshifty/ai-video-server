@@ -37,6 +37,30 @@ class AppPreferencesStoreTest {
     }
 
     @Test
+    fun tvSeekStepSeconds_defaultsToTen_persistsAllowedValuesAndRejectsInvalidValues() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
+            produceFile = {
+                File.createTempFile("app-preferences-store", ".preferences_pb").apply {
+                    deleteOnExit()
+                }
+            },
+        )
+        val store = AppPreferencesStore(
+            dataStore = dataStore,
+            gson = Gson(),
+        )
+
+        assertEquals(10, store.tvSeekStepSecondsFlow.first())
+
+        store.saveTvSeekStepSeconds(20)
+        assertEquals(20, store.tvSeekStepSecondsFlow.first())
+
+        store.saveTvSeekStepSeconds(7)
+        assertEquals(10, store.tvSeekStepSecondsFlow.first())
+    }
+
+    @Test
     fun tvSubtitlePreference_persistsPerVideoId() = runTest {
         val dataStore = PreferenceDataStoreFactory.create(
             scope = backgroundScope,

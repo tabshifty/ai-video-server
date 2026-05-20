@@ -60,6 +60,16 @@ object TvHomeSettingsPanelAction {
     fun defaults(): List<TvAccountMenuAction> = TvAccountMenuAction.defaults()
 }
 
+object TvPlaybackSeekStepSetting {
+    val allowedSeconds: List<Int> = listOf(5, 10, 15, 20, 30)
+    const val defaultSeconds: Int = 10
+
+    fun normalize(seconds: Int): Int =
+        if (seconds in allowedSeconds) seconds else defaultSeconds
+
+    fun labelFor(seconds: Int): String = "${normalize(seconds)}秒"
+}
+
 fun shouldShowTvHomeSideMenu(route: String?): Boolean = route == "tv-home"
 
 fun buildTvTypedHomeSections(

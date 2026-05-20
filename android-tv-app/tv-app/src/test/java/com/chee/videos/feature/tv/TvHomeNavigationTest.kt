@@ -94,6 +94,15 @@ class TvHomeNavigationTest {
     }
 
     @Test
+    fun playbackSettingsExposeSeekStepPresets() {
+        assertEquals(listOf(5, 10, 15, 20, 30), TvPlaybackSeekStepSetting.allowedSeconds)
+        assertEquals(10, TvPlaybackSeekStepSetting.defaultSeconds)
+        assertEquals("10秒", TvPlaybackSeekStepSetting.labelFor(10))
+        assertEquals(10, TvPlaybackSeekStepSetting.normalize(7))
+        assertEquals(20, TvPlaybackSeekStepSetting.normalize(20))
+    }
+
+    @Test
     fun focusPolicyMovesPredictablyBetweenSideMenuAndContent() {
         assertEquals(
             TvHomeFocusArea.Content,
@@ -130,5 +139,9 @@ class TvHomeNavigationTest {
             "TV 首页侧边菜单按钮不能在 tvFocusableGlow 之后再叠加 .focusable()，否则遥控确认键会先落到重复焦点层，表现为必须按两次才触发",
             buttonSource.contains(".focusable()"),
         )
+
+        val settingsSource = source.substringAfter("@Composable\nprivate fun TvHomeSettingsPanel(")
+        assertTrue(settingsSource.contains("播放设置"))
+        assertTrue(settingsSource.contains("快进/快退步长"))
     }
 }

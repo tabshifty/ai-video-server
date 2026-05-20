@@ -89,6 +89,24 @@ class TvCatalogViewModelTest {
     }
 
     @Test
+    fun settingsStateLoadsAndSavesTvSeekStepSeconds() = runTest {
+        val repository = FakeTvRepository(tvSeekStepSeconds = 15)
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        viewModel.awaitIdle()
+        viewModel.selectMenu(TvHomeMenuItem.Settings)
+        viewModel.awaitIdle()
+
+        assertEquals(15, viewModel.uiState.value.tvSeekStepSeconds)
+
+        viewModel.selectTvSeekStepSeconds(30)
+        viewModel.awaitIdle()
+
+        assertEquals(30, viewModel.uiState.value.tvSeekStepSeconds)
+        assertEquals(30, repository.readTvSeekStepSeconds())
+    }
+
+    @Test
     fun updateQuery_keepsAvResultsInTvCatalog() = runTest {
         val repository = FakeTvRepository(
             homePayload = TvHomePayload(),

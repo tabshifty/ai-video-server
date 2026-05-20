@@ -7,22 +7,50 @@ import org.junit.Test
 
 class LongFormVideoPlayerTransportKeyTest {
     @Test
-    fun hiddenControls_leftAndRightSeekTenSecondsAndBoostToThirtyOnRepeat() {
+    fun hiddenControls_leftAndRightUseConfiguredSeekStepAndBoostTripleOnRepeat() {
         assertEquals(
-            TvHiddenTransportKeyAction.Seek(-10_000L),
-            resolveTvHiddenTransportKeyAction(KeyEvent.KEYCODE_DPAD_LEFT, repeatCount = 0),
+            TvHiddenTransportKeyAction.Seek(-15_000L),
+            resolveTvHiddenTransportKeyAction(
+                nativeKeyCode = KeyEvent.KEYCODE_DPAD_LEFT,
+                repeatCount = 0,
+                seekStepSeconds = 15,
+            ),
         )
         assertEquals(
-            TvHiddenTransportKeyAction.Seek(-30_000L),
-            resolveTvHiddenTransportKeyAction(KeyEvent.KEYCODE_DPAD_LEFT, repeatCount = 1),
+            TvHiddenTransportKeyAction.Seek(-45_000L),
+            resolveTvHiddenTransportKeyAction(
+                nativeKeyCode = KeyEvent.KEYCODE_DPAD_LEFT,
+                repeatCount = 1,
+                seekStepSeconds = 15,
+            ),
         )
+        assertEquals(
+            TvHiddenTransportKeyAction.Seek(20_000L),
+            resolveTvHiddenTransportKeyAction(
+                nativeKeyCode = KeyEvent.KEYCODE_DPAD_RIGHT,
+                repeatCount = 0,
+                seekStepSeconds = 20,
+            ),
+        )
+        assertEquals(
+            TvHiddenTransportKeyAction.Seek(60_000L),
+            resolveTvHiddenTransportKeyAction(
+                nativeKeyCode = KeyEvent.KEYCODE_DPAD_RIGHT,
+                repeatCount = 2,
+                seekStepSeconds = 20,
+            ),
+        )
+    }
+
+    @Test
+    fun hiddenControls_defaultSeekStepStaysTenSeconds() {
         assertEquals(
             TvHiddenTransportKeyAction.Seek(10_000L),
             resolveTvHiddenTransportKeyAction(KeyEvent.KEYCODE_DPAD_RIGHT, repeatCount = 0),
         )
         assertEquals(
             TvHiddenTransportKeyAction.Seek(30_000L),
-            resolveTvHiddenTransportKeyAction(KeyEvent.KEYCODE_DPAD_RIGHT, repeatCount = 2),
+            resolveTvHiddenTransportKeyAction(KeyEvent.KEYCODE_DPAD_RIGHT, repeatCount = 1),
         )
     }
 

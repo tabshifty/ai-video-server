@@ -108,6 +108,31 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_readsTvSeekStepSeconds() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                tvSeekStepSeconds = 20,
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(id = "e1", number = 1, title = "第1集", videoId = "video-1", videoStatus = "ready"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        assertEquals(20, viewModel.uiState.value.tvSeekStepSeconds)
+    }
+
+    @Test
     fun init_restoresSavedSubtitleSelectionForCurrentVideo() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
