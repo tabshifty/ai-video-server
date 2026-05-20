@@ -27,11 +27,25 @@ var (
 )
 
 type ImageService struct {
-	repo      *repository.VideoRepository
+	repo      imageRepository
 	uploadDir string
 	storage   string
 	logger    *slog.Logger
 }
+
+type imageRepository interface {
+	FindImageByHash(ctx context.Context, hash string, fileSize int64) (uuid.UUID, bool, error)
+	GetImageByID(ctx context.Context, imageID uuid.UUID) (models.Image, error)
+	CreateImage(ctx context.Context, img models.Image) error
+	DeleteImageByIDCascade(ctx context.Context, imageID uuid.UUID) error
+	ReplaceImageActorsByInput(ctx context.Context, imageID uuid.UUID, actorIDs []uuid.UUID, actorNames []string, source string) error
+	ReplaceImageCollectionsByIDs(ctx context.Context, imageID uuid.UUID, collectionIDs []uuid.UUID) error
+	InsertImageHash(ctx context.Context, hash string, imageID uuid.UUID, fileSize int64) error
+	GetImageVariantByKey(ctx context.Context, imageID uuid.UUID, key string) (path, mime string, width, height int, exists bool, err error)
+	UpsertImageVariant(ctx context.Context, imageID uuid.UUID, key, path, mime string, width, height int) error
+}
+
+var convertImageToWebP = ffmpeg.ConvertToWebP
 
 type SaveImageInput struct {
 	UserID        uuid.UUID
@@ -166,19 +180,24 @@ func (s *ImageService) saveFromLocalPath(ctx context.Context, in SaveImageInput,
 
 	if !strings.HasSuffix(strings.ToLower(originalMIME), "gif") {
 		storedPath = filepath.Join(storedDir, imageID.String()+".webp")
-		if err := ffmpeg.ConvertToWebP(ctx, originalPath, storedPath, 82); err != nil {
+		if err := convertImageToWebP(ctx, originalPath, storedPath, 82); err != nil {
 			_ = os.Remove(storedPath)
-			return SaveImageResult{}, fmt.Errorf("convert image to webp: %w", err)
+			if !errors.Is(err, ffmpeg.ErrWebPEncodingUnavailable) {
+				return SaveImageResult{}, fmt.Errorf("convert image to webp: %w", err)
+			}
+			storedPath = originalPath
+			s.logger.Warn("webp encoding unavailable, keeping original image", "image_id", imageID, "error", err)
+		} else {
+			storedMIME = "image/webp"
+			storedExt = ".webp"
+			convertedToWebP = true
+			if err := os.Remove(originalPath); err != nil && !os.IsNotExist(err) {
+				_ = os.Remove(storedPath)
+				return SaveImageResult{}, fmt.Errorf("remove source image after webp conversion: %w", err)
+			}
+			sourceDeleted = true
+			originalPath = ""
 		}
-		storedMIME = "image/webp"
-		storedExt = ".webp"
-		convertedToWebP = true
-		if err := os.Remove(originalPath); err != nil && !os.IsNotExist(err) {
-			_ = os.Remove(storedPath)
-			return SaveImageResult{}, fmt.Errorf("remove source image after webp conversion: %w", err)
-		}
-		sourceDeleted = true
-		originalPath = ""
 	}
 
 	probe, err := ffmpeg.Probe(ctx, storedPath)
@@ -302,12 +321,7 @@ func (s *ImageService) resolveViewPathFromImage(ctx context.Context, img models.
 	}
 	fit = normalizeFitMode(fit)
 
-	format := "webp"
-	mime := "image/webp"
-	if strings.HasSuffix(strings.ToLower(img.StoredMIME), "gif") || strings.HasSuffix(strings.ToLower(img.StoredExt), "gif") {
-		format = "gif"
-		mime = "image/gif"
-	}
+	format, mime := imageVariantFormat(img.StoredMIME, img.StoredExt)
 
 	key := fmt.Sprintf("w%d_h%d_fit%s_q%d_%s", width, height, fit, quality, format)
 	if p, m, _, _, exists, err := s.repo.GetImageVariantByKey(ctx, img.ID, key); err == nil && exists {
@@ -370,6 +384,21 @@ func normalizeImageExt(ext string) string {
 		return ".tiff"
 	default:
 		return ext
+	}
+}
+
+func imageVariantFormat(storedMIME, storedExt string) (format, mime string) {
+	storedMIME = strings.ToLower(strings.TrimSpace(storedMIME))
+	storedExt = strings.ToLower(strings.TrimSpace(storedExt))
+	switch {
+	case strings.HasSuffix(storedMIME, "gif") || strings.HasSuffix(storedExt, "gif"):
+		return "gif", "image/gif"
+	case strings.HasSuffix(storedMIME, "jpeg") || strings.HasSuffix(storedMIME, "jpg") || strings.HasSuffix(storedExt, "jpg"):
+		return "jpg", "image/jpeg"
+	case strings.HasSuffix(storedMIME, "png") || strings.HasSuffix(storedExt, "png"):
+		return "png", "image/png"
+	default:
+		return "webp", "image/webp"
 	}
 }
 

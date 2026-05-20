@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -14,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+var ErrWebPEncodingUnavailable = errors.New("webp encoding unavailable")
 
 // VideoProbe holds basic media attributes from ffprobe.
 type VideoProbe struct {
@@ -483,7 +486,8 @@ func ConvertToWebP(ctx context.Context, inputPath, outputPath string, quality in
 		cwebpOut, cwebpErr := runCWebPEncode(ctx, inputPath, outputPath, quality)
 		if cwebpErr != nil {
 			return fmt.Errorf(
-				"ffmpeg convert webp failed: %w, output=%s, fallback_output=%s, cwebp_output=%s",
+				"%w: ffmpeg convert webp failed: %v, output=%s, fallback_output=%s, cwebp_output=%s",
+				ErrWebPEncodingUnavailable,
 				cwebpErr,
 				primaryOutput,
 				fallbackOutput,
