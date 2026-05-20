@@ -206,6 +206,8 @@ private class FakeDetailApiService : ApiService {
         kind: String,
         page: Int,
         pageSize: Int,
+        sortBy: String,
+        sortOrder: String,
     ): ApiEnvelope<TvCatalogWallPayload> = error("unused")
 
     override suspend fun tvIptvChannels(

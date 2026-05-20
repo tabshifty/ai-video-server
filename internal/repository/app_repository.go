@@ -323,9 +323,16 @@ DO UPDATE SET updated_at=NOW()
 }
 
 func (r *VideoRepository) SearchVideos(ctx context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error) {
+	return r.SearchVideosOrdered(ctx, q, typ, "v.created_at DESC", limit, offset)
+}
+
+func (r *VideoRepository) SearchVideosOrdered(ctx context.Context, q, typ string, orderClause string, limit, offset int) ([]models.VideoListItem, int, error) {
 	keyword := "%" + strings.ToLower(strings.TrimSpace(q)) + "%"
 	if keyword == "%%" {
 		keyword = "%"
+	}
+	if strings.TrimSpace(orderClause) == "" {
+		orderClause = "v.created_at DESC"
 	}
 
 	var total int
@@ -355,7 +362,7 @@ WHERE v.status='ready'
 	LOWER(COALESCE(v.description,'')) LIKE $2 OR
 	LOWER(COALESCE(vt.tag,'')) LIKE $2
   )
-ORDER BY v.created_at DESC
+ORDER BY `+orderClause+`
 LIMIT $3 OFFSET $4
 `, typ, keyword, limit, offset)
 	if err != nil {

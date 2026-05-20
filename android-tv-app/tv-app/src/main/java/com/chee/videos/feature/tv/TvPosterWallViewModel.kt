@@ -62,6 +62,29 @@ class TvPosterWallViewModel @Inject constructor(
         loadPage(page = 1, append = false)
     }
 
+    fun changeSort(sortBy: String, sortOrder: String) {
+        val normalized = normalizeTvCatalogWallSort(sortBy, sortOrder)
+        val state = _uiState.value
+        if (state.sortBy == normalized.sortBy && state.sortOrder == normalized.sortOrder) {
+            return
+        }
+        requestVersion += 1
+        _uiState.update {
+            it.copy(
+                loading = true,
+                loadingMore = false,
+                refreshing = it.items.isNotEmpty(),
+                page = 0,
+                totalCount = 0,
+                items = emptyList(),
+                sortBy = normalized.sortBy,
+                sortOrder = normalized.sortOrder,
+                errorMessage = null,
+            )
+        }
+        loadPage(page = 1, append = false)
+    }
+
     fun loadMoreIfNeeded(currentIndex: Int) {
         val state = _uiState.value
         if (state.loading || state.loadingMore || state.refreshing || state.items.isEmpty()) {
@@ -78,11 +101,19 @@ class TvPosterWallViewModel @Inject constructor(
 
     private fun loadPage(page: Int, append: Boolean) {
         val versionAtRequest = requestVersion
+        val sortBy = _uiState.value.sortBy
+        val sortOrder = _uiState.value.sortOrder
         if (append) {
             _uiState.update { it.copy(loadingMore = true, errorMessage = null) }
         }
         viewModelScope.launch {
-            repository.fetchCatalogWall(wallKind, page = page, pageSize = WALL_PAGE_SIZE)
+            repository.fetchCatalogWall(
+                wallKind,
+                page = page,
+                pageSize = WALL_PAGE_SIZE,
+                sortBy = sortBy,
+                sortOrder = sortOrder,
+            )
                 .onSuccess { payload ->
                     if (versionAtRequest != requestVersion) {
                         return@onSuccess
@@ -124,4 +155,21 @@ class TvPosterWallViewModel @Inject constructor(
     private companion object {
         const val WALL_PAGE_SIZE = 24
     }
+}
+
+internal data class TvCatalogWallSortSelection(
+    val sortBy: String,
+    val sortOrder: String,
+)
+
+internal fun normalizeTvCatalogWallSort(sortBy: String, sortOrder: String): TvCatalogWallSortSelection {
+    val normalizedBy = when (sortBy.trim().lowercase()) {
+        "release" -> "release"
+        else -> "added"
+    }
+    val normalizedOrder = when (sortOrder.trim().lowercase()) {
+        "asc" -> "asc"
+        else -> "desc"
+    }
+    return TvCatalogWallSortSelection(sortBy = normalizedBy, sortOrder = normalizedOrder)
 }

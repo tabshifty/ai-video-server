@@ -180,6 +180,8 @@ class VideoRepository @Inject constructor(
         kind: String,
         page: Int = 1,
         pageSize: Int = 24,
+        sortBy: String = "added",
+        sortOrder: String = "desc",
     ): Result<TvCatalogWallPayload> {
         return callWithAuth { baseUrl, bearer ->
             api.tvCatalogWall(
@@ -188,6 +190,8 @@ class VideoRepository @Inject constructor(
                 kind = kind.trim(),
                 page = page,
                 pageSize = pageSize,
+                sortBy = sortBy.trim(),
+                sortOrder = sortOrder.trim(),
             )
         }
     }

@@ -107,5 +107,7 @@ data class TvCatalogWallUiState(
     val page: Int = 0,
     val totalCount: Int = 0,
     val items: List<TvCatalogWallItemUiModel> = emptyList(),
+    val sortBy: String = "added",
+    val sortOrder: String = "desc",
     val errorMessage: String? = null,
 )

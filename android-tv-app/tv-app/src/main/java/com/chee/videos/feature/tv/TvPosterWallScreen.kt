@@ -100,8 +100,11 @@ fun TvPosterWallScreen(
         TvPosterWallTopBar(
             title = wallSpec.title,
             subtitle = wallSpec.subtitle,
+            sortBy = uiState.sortBy,
+            sortOrder = uiState.sortOrder,
             onBack = onBack,
             onRefresh = viewModel::refresh,
+            onChangeSort = viewModel::changeSort,
             refreshFocusRequester = refreshFocusRequester,
         )
 
@@ -195,8 +198,11 @@ fun TvPosterWallScreen(
 private fun TvPosterWallTopBar(
     title: String,
     subtitle: String,
+    sortBy: String,
+    sortOrder: String,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
+    onChangeSort: (String, String) -> Unit,
     refreshFocusRequester: FocusRequester,
 ) {
     Row(
@@ -226,6 +232,14 @@ private fun TvPosterWallTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        TvPosterWallSortButton(
+            label = tvPosterWallSortByLabel(sortBy),
+            onClick = { onChangeSort(if (sortBy == "added") "release" else "added", sortOrder) },
+        )
+        TvPosterWallSortButton(
+            label = tvPosterWallSortOrderLabel(sortOrder),
+            onClick = { onChangeSort(sortBy, if (sortOrder == "desc") "asc" else "desc") },
+        )
         Surface(
             color = AppChrome.SurfaceElevated,
             shape = AppChrome.PillShape,
@@ -248,6 +262,44 @@ private fun TvPosterWallTopBar(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TvPosterWallSortButton(
+    label: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated.copy(alpha = 0.9f),
+        shape = AppChrome.PillShape,
+        modifier = Modifier
+            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+            .clickable(onClick = onClick),
+    ) {
+        Text(
+            text = label,
+            color = AppChrome.TextPrimary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+internal fun tvPosterWallSortByLabel(sortBy: String): String {
+    return when (sortBy) {
+        "release" -> "发售时间"
+        else -> "添加时间"
+    }
+}
+
+internal fun tvPosterWallSortOrderLabel(sortOrder: String): String {
+    return when (sortOrder) {
+        "asc" -> "正序"
+        else -> "倒序"
     }
 }
 

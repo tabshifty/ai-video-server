@@ -29,10 +29,55 @@ type tvAuthRepository interface {
 	DenyTVAuthSession(ctx context.Context, sessionID uuid.UUID) error
 	GetUserByID(ctx context.Context, userID uuid.UUID) (models.User, error)
 	ListActiveTVSeriesSummaries(ctx context.Context, limit, offset int) ([]models.TvSeriesSummaryDto, int, error)
+	ListTVSeriesSummariesOrdered(ctx context.Context, orderClause string, limit, offset int) ([]models.TvSeriesSummaryDto, int, error)
 	SearchTVSeriesSummaries(ctx context.Context, q string, limit, offset int) ([]models.TvSeriesSummaryDto, int, error)
 	SearchVideos(ctx context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error)
+	SearchVideosOrdered(ctx context.Context, q, typ string, orderClause string, limit, offset int) ([]models.VideoListItem, int, error)
 	GetTVContinueWatching(ctx context.Context, userID uuid.UUID) (*models.TvContinueWatchingDto, error)
 	ContinueWatching(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.HistoryItem, int, error)
+}
+
+type tvCatalogWallSort struct {
+	By    string
+	Order string
+}
+
+func normalizeTVCatalogWallSort(sortBy, sortOrder string) tvCatalogWallSort {
+	by := strings.TrimSpace(strings.ToLower(sortBy))
+	if by != "release" {
+		by = "added"
+	}
+	order := strings.TrimSpace(strings.ToLower(sortOrder))
+	if order != "asc" {
+		order = "desc"
+	}
+	return tvCatalogWallSort{By: by, Order: order}
+}
+
+func tvCatalogWallSeriesOrderClause(sort tvCatalogWallSort) string {
+	if sort.By == "release" {
+		if sort.Order == "asc" {
+			return "s.first_air_date ASC NULLS LAST, s.title ASC"
+		}
+		return "s.first_air_date DESC NULLS LAST, s.title ASC"
+	}
+	if sort.Order == "asc" {
+		return "MAX(v.created_at) ASC NULLS LAST, s.title ASC"
+	}
+	return "MAX(v.created_at) DESC NULLS LAST, s.title ASC"
+}
+
+func tvCatalogWallVideoOrderClause(sort tvCatalogWallSort) string {
+	if sort.By == "release" {
+		if sort.Order == "asc" {
+			return "NULLIF(v.metadata->>'release_date', '')::date ASC NULLS LAST, v.created_at DESC"
+		}
+		return "NULLIF(v.metadata->>'release_date', '')::date DESC NULLS LAST, v.created_at DESC"
+	}
+	if sort.Order == "asc" {
+		return "v.created_at ASC"
+	}
+	return "v.created_at DESC"
 }
 
 func newTVAuthSession(deviceID, deviceName string, now time.Time) (models.TvAuthSession, error) {
@@ -519,6 +564,8 @@ func (s *AppService) TVCatalogWall(
 	kind string,
 	page,
 	pageSize int,
+	sortBy string,
+	sortOrder string,
 ) (models.PageResult[models.TvCatalogWallItemDto], error) {
 	if page < 1 {
 		page = 1
@@ -530,9 +577,10 @@ func (s *AppService) TVCatalogWall(
 		pageSize = 100
 	}
 	offset := (page - 1) * pageSize
+	sort := normalizeTVCatalogWallSort(sortBy, sortOrder)
 	switch strings.TrimSpace(strings.ToLower(kind)) {
 	case "recent", "tv":
-		items, total, err := s.repo.ListActiveTVSeriesSummaries(ctx, pageSize, offset)
+		items, total, err := s.repo.ListTVSeriesSummariesOrdered(ctx, tvCatalogWallSeriesOrderClause(sort), pageSize, offset)
 		if err != nil {
 			return models.PageResult[models.TvCatalogWallItemDto]{}, err
 		}
@@ -550,7 +598,7 @@ func (s *AppService) TVCatalogWall(
 		}
 		return buildTVCatalogWallPayload(page, pageSize, total, buildTVCatalogWallSeriesItems(items)), nil
 	case "movie", "av":
-		items, total, err := s.repo.SearchVideos(ctx, "", kind, pageSize, offset)
+		items, total, err := s.repo.SearchVideosOrdered(ctx, "", kind, tvCatalogWallVideoOrderClause(sort), pageSize, offset)
 		if err != nil {
 			return models.PageResult[models.TvCatalogWallItemDto]{}, err
 		}

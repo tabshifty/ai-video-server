@@ -32,4 +32,17 @@ class TvPosterWallFocusLayoutSpecTest {
         assertTrue("海报墙卡片焦点态只能放大，不应使用带描边的 tvFocusableGlow", !source.contains(".tvFocusableGlow(shape = RoundedCornerShape(18.dp)"))
         assertTrue("海报墙卡片应使用无描边焦点修饰器", source.contains(".tvFocusableScaleOnly("))
     }
+
+    @Test
+    fun `poster wall top bar exposes sort controls`() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt")
+        val source = sourcePath.toFile().readText()
+
+        assertTrue("海报墙顶部应提供排序字段切换", source.contains("tvPosterWallSortByLabel"))
+        assertTrue("海报墙顶部应提供排序方向切换", source.contains("tvPosterWallSortOrderLabel"))
+        assertTrue("海报墙排序应支持添加时间", source.contains("添加时间"))
+        assertTrue("海报墙排序应支持发售时间", source.contains("发售时间"))
+        assertTrue("海报墙排序应支持正序", source.contains("正序"))
+        assertTrue("海报墙排序应支持倒序", source.contains("倒序"))
+    }
 }

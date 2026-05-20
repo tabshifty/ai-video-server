@@ -55,7 +55,7 @@ func (a *API) TVCatalogWall(c *gin.Context) {
 	_ = userID
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 24)
-	payload, err := a.appSvc.TVCatalogWall(c.Request.Context(), c.Query("kind"), page, pageSize)
+	payload, err := a.appSvc.TVCatalogWall(c.Request.Context(), c.Query("kind"), page, pageSize, c.Query("sort_by"), c.Query("sort_order"))
 	if err != nil {
 		response.Error(c, 2104, err.Error())
 		return

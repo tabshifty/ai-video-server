@@ -12,7 +12,13 @@ import javax.inject.Singleton
 interface TvRepository {
     suspend fun fetchHome(kind: String = "tv", query: String = "", page: Int = 1, pageSize: Int = 20): Result<TvHomePayload>
     suspend fun fetchSearch(query: String, page: Int = 1, pageSize: Int = 20): Result<TvSearchPayload>
-    suspend fun fetchCatalogWall(kind: String, page: Int = 1, pageSize: Int = 24): Result<TvCatalogWallPayload>
+    suspend fun fetchCatalogWall(
+        kind: String,
+        page: Int = 1,
+        pageSize: Int = 24,
+        sortBy: String = "added",
+        sortOrder: String = "desc",
+    ): Result<TvCatalogWallPayload>
     suspend fun fetchIptvChannels(): Result<TvIptvPayload>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
     suspend fun readActiveBaseUrl(): String?
@@ -36,8 +42,14 @@ class NetworkTvRepository @Inject constructor(
     override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
         videoRepository.fetchTvSearch(query, page, pageSize)
 
-    override suspend fun fetchCatalogWall(kind: String, page: Int, pageSize: Int): Result<TvCatalogWallPayload> =
-        videoRepository.fetchTvCatalogWall(kind, page, pageSize)
+    override suspend fun fetchCatalogWall(
+        kind: String,
+        page: Int,
+        pageSize: Int,
+        sortBy: String,
+        sortOrder: String,
+    ): Result<TvCatalogWallPayload> =
+        videoRepository.fetchTvCatalogWall(kind, page, pageSize, sortBy, sortOrder)
 
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
         videoRepository.fetchTvIptvChannels()

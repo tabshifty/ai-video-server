@@ -67,4 +67,38 @@ class TvPosterWallViewModelTest {
         assertEquals(1, state.items.size)
         assertEquals("av", state.items.first().type)
     }
+
+    @Test
+    fun init_andSortChange_passesSortToRepositoryAndReloadsFirstPage() = runTest {
+        val repository = FakeTvRepository(
+            posterWallPages = listOf(
+                tvPosterWallPage(page = 1, totalCount = 10, items = listOf(
+                    tvPosterWallItem(id = "item-1", type = "movie", title = "午夜列车"),
+                )),
+                tvPosterWallPage(page = 2, totalCount = 10, items = listOf(
+                    tvPosterWallItem(id = "item-2", type = "movie", title = "旧城往事"),
+                )),
+            ),
+        )
+        val viewModel = TvPosterWallViewModel(repository = repository, kind = "movie")
+
+        viewModel.awaitIdle()
+        assertEquals("added", repository.posterWallRequests.last().sortBy)
+        assertEquals("desc", repository.posterWallRequests.last().sortOrder)
+
+        viewModel.loadMoreIfNeeded(currentIndex = 0)
+        viewModel.awaitIdle()
+        assertEquals(2, viewModel.uiState.value.page)
+
+        viewModel.changeSort(sortBy = "release", sortOrder = "asc")
+        viewModel.awaitIdle()
+
+        val lastRequest = repository.posterWallRequests.last()
+        assertEquals("release", lastRequest.sortBy)
+        assertEquals("asc", lastRequest.sortOrder)
+        assertEquals(1, lastRequest.page)
+        assertEquals(1, viewModel.uiState.value.page)
+        assertEquals("release", viewModel.uiState.value.sortBy)
+        assertEquals("asc", viewModel.uiState.value.sortOrder)
+    }
 }

@@ -146,6 +146,10 @@ func (r *VideoRepository) ListActiveTVSeriesSummaries(ctx context.Context, limit
 	return r.listTVSeriesSummaries(ctx, boolPtr(true), "", limit, offset)
 }
 
+func (r *VideoRepository) ListTVSeriesSummariesOrdered(ctx context.Context, orderClause string, limit, offset int) ([]models.TvSeriesSummaryDto, int, error) {
+	return r.listTVSeriesSummariesOrdered(ctx, boolPtr(true), "", limit, offset, orderClause)
+}
+
 func (r *VideoRepository) ListBingeTVSeriesSummaries(ctx context.Context, limit, offset int) ([]models.TvSeriesSummaryDto, int, error) {
 	return r.listTVSeriesSummariesOrdered(
 		ctx,

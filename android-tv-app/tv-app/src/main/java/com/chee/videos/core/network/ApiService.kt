@@ -92,6 +92,8 @@ interface ApiService {
         @Query("kind") kind: String,
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
+        @Query("sort_by") sortBy: String,
+        @Query("sort_order") sortOrder: String,
     ): ApiEnvelope<TvCatalogWallPayload>
 
     @GET

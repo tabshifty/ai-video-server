@@ -34,6 +34,7 @@ class FakeTvRepository(
     val historyReports = mutableListOf<TvHistoryReport>()
     val homeRequests = mutableListOf<TvHomeRequest>()
     val searchRequests = mutableListOf<TvSearchRequest>()
+    val posterWallRequests = mutableListOf<TvPosterWallRequest>()
 
     override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
@@ -47,7 +48,20 @@ class FakeTvRepository(
         return Result.success(searchPayload)
     }
 
-    override suspend fun fetchCatalogWall(kind: String, page: Int, pageSize: Int): Result<TvCatalogWallPayload> {
+    override suspend fun fetchCatalogWall(
+        kind: String,
+        page: Int,
+        pageSize: Int,
+        sortBy: String,
+        sortOrder: String,
+    ): Result<TvCatalogWallPayload> {
+        posterWallRequests += TvPosterWallRequest(
+            kind = kind,
+            page = page,
+            pageSize = pageSize,
+            sortBy = sortBy,
+            sortOrder = sortOrder,
+        )
         homeError?.let { return Result.failure(it) }
         val payload = posterWallPages.firstOrNull { it.page == page }
             ?: TvCatalogWallPayload(page = page, pageSize = pageSize)
@@ -118,6 +132,14 @@ data class TvSearchRequest(
     val pageSize: Int,
 )
 
+data class TvPosterWallRequest(
+    val kind: String,
+    val page: Int,
+    val pageSize: Int,
+    val sortBy: String,
+    val sortOrder: String,
+)
+
 class DelayedSourceTvRepository(
     private val baseUrl: String = "https://example.com",
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
@@ -130,7 +152,13 @@ class DelayedSourceTvRepository(
     override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
         Result.success(TvSearchPayload())
 
-    override suspend fun fetchCatalogWall(kind: String, page: Int, pageSize: Int): Result<TvCatalogWallPayload> =
+    override suspend fun fetchCatalogWall(
+        kind: String,
+        page: Int,
+        pageSize: Int,
+        sortBy: String,
+        sortOrder: String,
+    ): Result<TvCatalogWallPayload> =
         Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
 
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
