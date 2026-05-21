@@ -26,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,6 +50,7 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tvFocusableGlow
 
@@ -173,22 +173,15 @@ fun TvSeriesDetailScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Surface(
-                            color = Color(0x44090C12),
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .size(52.dp)
-                                .tvFocusableGlow(shape = CircleShape)
-                                .clickable(onClick = onBack),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "返回",
-                                    tint = Color.White,
-                                )
-                            }
-                        }
+                        TvIconActionButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                            onClick = onBack,
+                            size = 52.dp,
+                            iconSize = 24.dp,
+                            containerColor = Color(0x44090C12),
+                            contentColor = Color.White,
+                        )
                         Text(
                             text = "电视剧详情",
                             color = AppChrome.AccentWarm,
