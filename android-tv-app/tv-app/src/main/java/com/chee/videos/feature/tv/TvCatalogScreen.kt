@@ -36,7 +36,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -56,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvEmptyState
@@ -118,8 +118,8 @@ fun TvCatalogScreen(
         avCount = uiState.av.size,
     )
 
-    LaunchedEffect(uiState.loading, isSearching, initialFocusTarget) {
-        if (uiState.loading || isSearching) return@LaunchedEffect
+    LaunchedTvInitialFocus(uiState.loading, isSearching, initialFocusTarget) {
+        if (uiState.loading || isSearching) return@LaunchedTvInitialFocus
         when (initialFocusTarget) {
             TvCatalogInitialFocusTarget.FEATURED -> featuredFocusRequester.requestFocus()
             TvCatalogInitialFocusTarget.CONTINUE_WATCHING -> continueFocusRequester.requestFocus()

@@ -97,11 +97,12 @@ class TvCatalogFocusPolicyTest {
             ),
         )
         assertEquals(
+            "sections 非空但全为 0 时仍应回退到 MENU",
             TvCatalogInitialFocusTarget.MENU,
             resolveTvCatalogInitialFocusTarget(
                 hasFeaturedContent = false,
                 hasContinueWatching = false,
-                sectionItemCounts = emptyList(),
+                sectionItemCounts = listOf(0, 0),
                 tvSeriesCount = 0,
                 movieCount = 0,
                 avCount = 0,
