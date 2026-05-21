@@ -2,6 +2,21 @@
 
 本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-21 20:08 +0800
+- 进度：完成海报墙发售时间排序 42P10 修复收尾验证；确认本次提交只纳入 `SearchVideosOrdered` SQL 重构、对应单测、`CONTEXT.md` 和 `plan.md`，不纳入既有 `.codex/skills/av-scraper-optimization` 删除、openspec skill 未跟踪目录和未跟踪 `package-lock.json`。后端无 Android 版本号需要 bump。
+- 影响文件：`internal/repository/app_repository.go`、`internal/repository/app_repository_search_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/repository/ -run 'TestSearchVideos' -count=1` 通过；`go test ./... -count=1` 通过；`go vet ./...` 无输出；待执行乱码检查、diff 检查和提交范围检查。
+
+## 2026-05-21 20:02 +0800
+- 进度：完成海报墙发售时间排序 42P10 红绿实现；把 `SearchVideosOrdered` 的 countSQL 和 selectSQL 抽成 `searchVideosCountSQL` 常量和 `searchVideosSelectSQL(orderClause)` helper，并用 `EXISTS (SELECT 1 FROM video_tags vt WHERE vt.video_id = v.id AND LOWER(COALESCE(vt.tag,'')) LIKE $2)` 替换原来的 `LEFT JOIN video_tags + SELECT DISTINCT`。结构上消除 DISTINCT 之后，发售时间排序使用的 `NULLIF(v.metadata->>'release_date', '')::date DESC NULLS LAST` 不再被 Postgres 42P10 拦截。语义不变：标题/描述/任一标签匹配即命中，且不会再因为多标签 JOIN 出现重复行，因此 COUNT 由 `COUNT(DISTINCT v.id)` 改为 `COUNT(*)`。`CONTEXT.md` 的 `TV 海报墙排序` 词条补充 EXISTS 子查询与 42P10 约束说明。
+- 影响文件：`internal/repository/app_repository.go`、`internal/repository/app_repository_search_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：红灯阶段 `go test ./internal/repository/ -run 'TestSearchVideos' -count=1` 因未定义 `searchVideosCountSQL` / `searchVideosSelectSQL` 编译失败；实现后同命令通过。待执行后端全量单测、`go vet`、乱码检查、diff 检查和提交范围检查。
+
+## 2026-05-21 19:56 +0800
+- 进度：进入系统化排查 TV 海报墙按发售时间排序失败；后端报 `for select distinct, order by expressions must appear in select list (sqlstate 42p10)`。代码确认 `internal/repository/app_repository.go` 的 `SearchVideosOrdered` 同时使用 `SELECT DISTINCT` 和外部传入的 `ORDER BY ` 表达式，电影/`18+` 海报墙发售时间排序使用 `NULLIF(v.metadata->>'release_date', '')::date DESC NULLS LAST, v.created_at DESC`，其中 `NULLIF(...)::date` 不在 SELECT 列表里，触发 Postgres `SELECT DISTINCT` 强制约束。DISTINCT 的存在原因是 `LEFT JOIN video_tags` 用于按 tag 模糊匹配，多标签匹配会产生重复行。电视剧路径走 `listTVSeriesSummariesOrdered` 的 `GROUP BY` 查询，`s.title` 在 GROUP BY 内、`MAX(v.created_at)` 是聚合函数，不受同类约束影响。推荐方向：用 `EXISTS` 子查询替换 `LEFT JOIN video_tags + SELECT DISTINCT`，结构上消除 DISTINCT 而非 SELECT 列表里硬塞排序表达式；同时保留 `SearchVideosOrdered` 的接口签名和外部 order clause 注入语义。
+- 影响文件：`internal/repository/app_repository.go`、`internal/repository/app_repository_search_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待先补 `SearchVideosOrdered` SQL 形状红灯测试（覆盖无 DISTINCT、使用 EXISTS、order clause 原样嵌入），再实现并执行后端定向/全量验证。
+
 ## 2026-05-21 19:32 +0800
 - 进度：完成 TV hover-exit 主 Looper 兜底收尾验证；确认本次提交只纳入 TV 主 Activity hover-exit 兜底扩展、相关测试、TV 版本号、`CONTEXT.md` 和 `plan.md`，不纳入既有 `.codex/skills/av-scraper-optimization` 删除、openspec skill 未跟踪目录和未跟踪 `package-lock.json`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvMainActivity.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvMainActivityInputPolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

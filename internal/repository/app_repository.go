@@ -326,6 +326,32 @@ func (r *VideoRepository) SearchVideos(ctx context.Context, q, typ string, limit
 	return r.SearchVideosOrdered(ctx, q, typ, "v.created_at DESC", limit, offset)
 }
 
+const searchVideosCountSQL = `
+SELECT COUNT(*)
+FROM videos v
+WHERE v.status='ready'
+  AND ($1 = 'all' OR v.type = $1)
+  AND (
+    LOWER(v.title) LIKE $2 OR
+    LOWER(COALESCE(v.description,'')) LIKE $2 OR
+    EXISTS (SELECT 1 FROM video_tags vt WHERE vt.video_id = v.id AND LOWER(COALESCE(vt.tag,'')) LIKE $2)
+  )`
+
+func searchVideosSelectSQL(orderClause string) string {
+	return `
+SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)
+FROM videos v
+WHERE v.status='ready'
+  AND ($1 = 'all' OR v.type = $1)
+  AND (
+    LOWER(v.title) LIKE $2 OR
+    LOWER(COALESCE(v.description,'')) LIKE $2 OR
+    EXISTS (SELECT 1 FROM video_tags vt WHERE vt.video_id = v.id AND LOWER(COALESCE(vt.tag,'')) LIKE $2)
+  )
+ORDER BY ` + orderClause + `
+LIMIT $3 OFFSET $4`
+}
+
 func (r *VideoRepository) SearchVideosOrdered(ctx context.Context, q, typ string, orderClause string, limit, offset int) ([]models.VideoListItem, int, error) {
 	keyword := "%" + strings.ToLower(strings.TrimSpace(q)) + "%"
 	if keyword == "%%" {
@@ -336,35 +362,11 @@ func (r *VideoRepository) SearchVideosOrdered(ctx context.Context, q, typ string
 	}
 
 	var total int
-	countSQL := `
-SELECT COUNT(DISTINCT v.id)
-FROM videos v
-LEFT JOIN video_tags vt ON vt.video_id=v.id
-WHERE v.status='ready'
-  AND ($1 = 'all' OR v.type = $1)
-  AND (
-	LOWER(v.title) LIKE $2 OR
-	LOWER(COALESCE(v.description,'')) LIKE $2 OR
-	LOWER(COALESCE(vt.tag,'')) LIKE $2
-  )`
-	if err := r.pool.QueryRow(ctx, countSQL, typ, keyword).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, searchVideosCountSQL, typ, keyword).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count search videos: %w", err)
 	}
 
-	rows, err := r.pool.Query(ctx, `
-SELECT DISTINCT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)
-FROM videos v
-LEFT JOIN video_tags vt ON vt.video_id=v.id
-WHERE v.status='ready'
-  AND ($1 = 'all' OR v.type = $1)
-  AND (
-	LOWER(v.title) LIKE $2 OR
-	LOWER(COALESCE(v.description,'')) LIKE $2 OR
-	LOWER(COALESCE(vt.tag,'')) LIKE $2
-  )
-ORDER BY `+orderClause+`
-LIMIT $3 OFFSET $4
-`, typ, keyword, limit, offset)
+	rows, err := r.pool.Query(ctx, searchVideosSelectSQL(orderClause), typ, keyword, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query search videos: %w", err)
 	}
