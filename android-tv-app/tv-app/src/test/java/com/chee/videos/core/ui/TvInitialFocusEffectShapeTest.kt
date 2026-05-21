@@ -41,16 +41,20 @@ class TvInitialFocusEffectShapeTest {
     }
 
     @Test
-    fun `helper filters only focus requester not initialized message`() {
+    fun `helper delegates to isFocusRequesterNotInitialized matcher`() {
         assertTrue(
-            "TV 初始焦点 helper 必须按消息前缀精确过滤，而不是吞掉所有 IllegalStateException",
-            source.contains("\"FocusRequester is not initialized\"") ||
-                source.contains("FOCUS_REQUESTER_NOT_INITIALIZED_PREFIX"),
+            "TV 初始焦点 helper 必须复用 isFocusRequesterNotInitialized 函数，避免散落的字符串比较",
+            source.contains("isFocusRequesterNotInitialized(err)"),
         )
         assertTrue(
-            "TV 初始焦点 helper 必须使用 startsWith 前缀匹配以兼容消息追加细节",
-            source.contains("startsWith(FOCUS_REQUESTER_NOT_INITIALIZED_PREFIX)") ||
-                source.contains("startsWith(\"FocusRequester is not initialized\")"),
+            "matcher 标识必须保留 'FocusRequester is not initialized' 关键字以匹配 Compose 1.6 异常 message",
+            source.contains("\"FocusRequester is not initialized\"") ||
+                source.contains("FOCUS_REQUESTER_NOT_INITIALIZED_MARKER"),
+        )
+        assertTrue(
+            "matcher 必须使用 contains 而不是 startsWith：Compose 1.6 raw multiline message 带前导换行+缩进，startsWith 会漏匹配并让真实 ISE 透出",
+            source.contains("message.contains(FOCUS_REQUESTER_NOT_INITIALIZED_MARKER)") ||
+                source.contains("contains(\"FocusRequester is not initialized\")"),
         )
     }
 

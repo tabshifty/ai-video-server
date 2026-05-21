@@ -5,8 +5,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import kotlin.coroutines.cancellation.CancellationException
 
-private const val FOCUS_REQUESTER_NOT_INITIALIZED_PREFIX =
+private const val FOCUS_REQUESTER_NOT_INITIALIZED_MARKER =
     "FocusRequester is not initialized"
+
+internal fun isFocusRequesterNotInitialized(err: Throwable): Boolean {
+    if (err !is IllegalStateException) return false
+    val message = err.message ?: return false
+    return message.contains(FOCUS_REQUESTER_NOT_INITIALIZED_MARKER)
+}
 
 @Composable
 fun LaunchedTvInitialFocus(
@@ -18,9 +24,7 @@ fun LaunchedTvInitialFocus(
         runCatching { block() }
             .onFailure { err ->
                 if (err is CancellationException) throw err
-                if (err is IllegalStateException &&
-                    err.message?.startsWith(FOCUS_REQUESTER_NOT_INITIALIZED_PREFIX) == true
-                ) {
+                if (isFocusRequesterNotInitialized(err)) {
                     return@onFailure
                 }
                 throw err
