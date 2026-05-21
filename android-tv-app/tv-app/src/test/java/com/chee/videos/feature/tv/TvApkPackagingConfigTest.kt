@@ -55,4 +55,41 @@ class TvApkPackagingConfigTest {
             gradle.contains("implementation(\"org.videolan.android:libvlc-all:3.6.0\")"),
         )
     }
+
+    @Test
+    fun tvBuildExcludesPhoneShortAndImageCollectionSources() {
+        assertTrue("TV App Gradle 配置必须存在", buildGradlePath.exists())
+
+        val gradle = buildGradlePath.readText()
+        assertTrue("TV 编译图必须声明主源码排除边界", gradle.contains("tvMainSourceExcludes"))
+        assertTrue("TV 编译图必须声明测试源码排除边界", gradle.contains("tvTestSourceExcludes"))
+        assertTrue("TV 源码排除边界必须接入 Kotlin sourceSets", gradle.contains("kotlin {"))
+        assertTrue("TV 源码排除边界必须调用 Kotlin exclude", gradle.contains("kotlin.exclude(it)"))
+        listOf(
+            "com/chee/videos/MainActivity.kt",
+            "com/chee/videos/VideoHomeApp.kt",
+            "com/chee/videos/feature/auth/**",
+            "com/chee/videos/feature/home/**",
+            "com/chee/videos/feature/mine/**",
+            "com/chee/videos/feature/player/**",
+            "com/chee/videos/feature/shorts/**",
+            "com/chee/videos/feature/shortdiscover/**",
+            "com/chee/videos/feature/shortsearch/**",
+            "com/chee/videos/feature/imagecollections/**",
+            "com/chee/videos/core/ui/ShortVideo*",
+        ).forEach { pattern ->
+            assertTrue("TV main 编译图应排除 $pattern", gradle.contains(pattern))
+        }
+        listOf(
+            "com/chee/videos/feature/shorts/**",
+            "com/chee/videos/feature/shortdiscover/**",
+            "com/chee/videos/feature/shortsearch/**",
+            "com/chee/videos/feature/imagecollections/**",
+            "com/chee/videos/feature/home/**",
+            "com/chee/videos/feature/player/**",
+            "com/chee/videos/core/ui/ShortVideo*",
+        ).forEach { pattern ->
+            assertTrue("TV test 编译图应排除 $pattern", gradle.contains(pattern))
+        }
+    }
 }

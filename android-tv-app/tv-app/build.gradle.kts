@@ -5,6 +5,30 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+val tvMainSourceExcludes = listOf(
+    "com/chee/videos/MainActivity.kt",
+    "com/chee/videos/VideoHomeApp.kt",
+    "com/chee/videos/feature/auth/**",
+    "com/chee/videos/feature/home/**",
+    "com/chee/videos/feature/mine/**",
+    "com/chee/videos/feature/player/**",
+    "com/chee/videos/feature/shorts/**",
+    "com/chee/videos/feature/shortdiscover/**",
+    "com/chee/videos/feature/shortsearch/**",
+    "com/chee/videos/feature/imagecollections/**",
+    "com/chee/videos/core/ui/ShortVideo*",
+)
+
+val tvTestSourceExcludes = listOf(
+    "com/chee/videos/feature/shorts/**",
+    "com/chee/videos/feature/shortdiscover/**",
+    "com/chee/videos/feature/shortsearch/**",
+    "com/chee/videos/feature/imagecollections/**",
+    "com/chee/videos/feature/home/**",
+    "com/chee/videos/feature/player/**",
+    "com/chee/videos/core/ui/ShortVideo*",
+)
+
 android {
     namespace = "com.chee.videos.tv"
     compileSdk = 35
@@ -13,8 +37,8 @@ android {
         applicationId = "com.chee.videos.tv"
         minSdk = 26
         targetSdk = 35
-        versionCode = 32
-        versionName = "0.1.31"
+        versionCode = 33
+        versionName = "0.1.32"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -67,6 +91,17 @@ android {
 
 kapt {
     correctErrorTypes = true
+}
+
+kotlin {
+    sourceSets {
+        getByName("main") {
+            tvMainSourceExcludes.forEach { kotlin.exclude(it) }
+        }
+        getByName("test") {
+            tvTestSourceExcludes.forEach { kotlin.exclude(it) }
+        }
+    }
 }
 
 dependencies {
