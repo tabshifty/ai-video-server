@@ -22,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +49,7 @@ import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvEmptyState
 import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tvFocusableGlow
@@ -197,9 +197,14 @@ private fun TvPosterWallTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconButton(onClick = onBack, modifier = Modifier.tvFocusableGlow(shape = RoundedCornerShape(16.dp))) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = AppChrome.TextPrimary)
-        }
+        TvIconActionButton(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "返回",
+            onClick = onBack,
+            shape = RoundedCornerShape(16.dp),
+            containerColor = AppChrome.SurfaceElevated,
+            contentColor = AppChrome.TextPrimary,
+        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = title,

@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -981,40 +980,27 @@ private fun CompactPlayerControlButton(
     focusRequester: FocusRequester? = null,
     reverseMirror: Boolean = false,
 ) {
-    Surface(
-        color = Color(0x24000000),
-        shape = CircleShape,
-        modifier = modifier,
-    ) {
-        val buttonModifier = if (focusRequester != null) {
-            Modifier.focusRequester(focusRequester)
-        } else {
-            Modifier
-        }
-        IconButton(
-            onClick = onClick,
-            modifier = buttonModifier
-                .size(if (tvMode) 42.dp else 34.dp)
-                .then(
-                    if (tvMode) {
-                        Modifier.tvFocusableGlow(shape = CircleShape, focusedScale = 1.12f)
-                    } else {
-                        Modifier
-                    },
-                ),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = Color.White,
-                modifier = Modifier.graphicsLayer {
-                    if (reverseMirror) {
-                        scaleX = -1f
-                    }
-                },
-            )
-        }
+    val buttonModifier = if (focusRequester != null) {
+        modifier.focusRequester(focusRequester)
+    } else {
+        modifier
     }
+    TvIconActionButton(
+        icon = icon,
+        contentDescription = contentDescription,
+        onClick = onClick,
+        modifier = buttonModifier,
+        iconModifier = Modifier.graphicsLayer {
+            if (reverseMirror) {
+                scaleX = -1f
+            }
+        },
+        size = if (tvMode) 42.dp else 34.dp,
+        iconSize = if (tvMode) 24.dp else 20.dp,
+        containerColor = Color(0x24000000),
+        contentColor = Color.White,
+        focusedScale = if (tvMode) 1.12f else 1.04f,
+    )
 }
 
 private fun formatPlaybackTime(ms: Long): String {

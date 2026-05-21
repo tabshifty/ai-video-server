@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -61,6 +60,7 @@ import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvEmptyState
 import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
@@ -377,9 +377,16 @@ private fun TvCatalogSearchBar(
         },
         trailingIcon = {
             if (query.isNotBlank()) {
-                IconButton(onClick = { onQueryChanged("") }) {
-                    Icon(Icons.Filled.Close, contentDescription = "清空搜索", tint = AppChrome.TextMuted)
-                }
+                TvIconActionButton(
+                    icon = Icons.Filled.Close,
+                    contentDescription = "清空搜索",
+                    onClick = { onQueryChanged("") },
+                    size = 34.dp,
+                    iconSize = 18.dp,
+                    containerColor = Color.Transparent,
+                    contentColor = AppChrome.TextMuted,
+                    focusedScale = 1.08f,
+                )
             }
         },
         shape = RoundedCornerShape(18.dp),
