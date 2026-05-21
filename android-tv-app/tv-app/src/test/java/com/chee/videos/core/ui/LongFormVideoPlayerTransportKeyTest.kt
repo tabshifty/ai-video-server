@@ -200,4 +200,15 @@ class LongFormVideoPlayerTransportKeyTest {
         assertTrue(debouncedSeekSource.contains("delay(TvStepSeekDebounceMillis)"))
         assertTrue(debouncedSeekSource.contains("player.seekTo(pending.targetPositionMs)"))
     }
+
+    @Test
+    fun tvControlBarBackButtonsRequestPlaybackExitConfirmation() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
+        assertTrue("长视频播放器必须存在", sourcePath.exists())
+
+        val source = sourcePath.readText()
+        assertTrue("播放器应暴露请求退出播放回调", source.contains("onRequestExitPlayback: (() -> Unit)? = null"))
+        assertTrue("TV 控制条返回详情应走退出确认", source.contains("onRequestExitPlayback?.invoke() ?: onBack()"))
+        assertTrue("TV 控制条退出播放应走退出确认", source.contains("onRequestExitPlayback?.invoke() ?: exitPlayback()"))
+    }
 }

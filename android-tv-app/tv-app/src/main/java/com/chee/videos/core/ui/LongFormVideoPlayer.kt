@@ -98,6 +98,7 @@ fun LongFormVideoPlayer(
     tvSeekStepSeconds: Int = 10,
     onOpenEpisodeSelector: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null,
+    onRequestExitPlayback: (() -> Unit)? = null,
     onExitPlayback: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -832,10 +833,10 @@ fun LongFormVideoPlayer(
                             )
                             CompactPlayerControlButton(
                                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回详情",
-                                tvMode = true,
-                                onClick = {
-                                    onBack()
+                            contentDescription = "返回详情",
+                            tvMode = true,
+                            onClick = {
+                                    onRequestExitPlayback?.invoke() ?: onBack()
                                     showControlsTemporarily()
                                 },
                             )
@@ -845,7 +846,7 @@ fun LongFormVideoPlayer(
                                     contentDescription = "退出播放",
                                     tvMode = true,
                                     onClick = {
-                                        exitPlayback()
+                                        onRequestExitPlayback?.invoke() ?: exitPlayback()
                                         showControlsTemporarily()
                                     },
                                 )

@@ -356,6 +356,7 @@ fun TvLongFormPlayerScreen(
                 },
                 tvMode = true,
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
+                onRequestExitPlayback = ::handlePlaybackBack,
                 onExitPlayback = onBack,
             )
             if (!playerErrorMessage.isNullOrBlank()) {

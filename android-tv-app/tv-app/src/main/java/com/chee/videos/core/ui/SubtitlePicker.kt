@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -331,14 +332,15 @@ private fun SubtitleOptionRow(
     focusRequester: FocusRequester? = null,
 ) {
     val rowShape = RoundedCornerShape(if (tvMode) 12.dp else 14.dp)
+    var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
     val rowColor = when {
+        focused && tvMode -> Color(0x2E39D7E8)
         selected && tvMode -> Color(0x2439D7E8)
         selected -> Color(0x26FFFFFF)
         tvMode -> Color(0x1AFFFFFF)
         else -> Color(0x12000000)
     }
     val interactionSource = remember { MutableInteractionSource() }
-    var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
     val rowModifier = if (focusRequester != null) {
         Modifier.focusRequester(focusRequester)
     } else {
@@ -357,21 +359,7 @@ private fun SubtitleOptionRow(
         shape = rowShape,
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (tvMode) {
-                    Modifier.border(
-                        width = if (focused) 2.dp else 1.dp,
-                        color = when {
-                            focused -> Color(0x8039D7E8)
-                            selected -> Color(0x6639D7E8)
-                            else -> Color(0x1AFFFFFF)
-                        },
-                        shape = rowShape,
-                    )
-                } else {
-                    Modifier
-                },
-            ),
+            .then(if (tvMode) Modifier.clip(rowShape) else Modifier),
     ) {
         Row(
             modifier = rowModifier

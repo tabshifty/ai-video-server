@@ -380,6 +380,7 @@ fun TvSeriesPlayerScreen(
                     tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                     onOpenEpisodeSelector = { viewModel.setSelectorVisible(true) },
                     onNextEpisode = viewModel::nextEpisode,
+                    onRequestExitPlayback = ::handlePlaybackBack,
                     onExitPlayback = onBack,
                 )
                 TvPlayerErrorBanner(
