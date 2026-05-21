@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.feature.detail.DetailViewModel
@@ -120,13 +121,18 @@ fun TvLongFormDetailScreen(
                         ),
                 )
 
-                TvRoundIconAction(
+                TvIconActionButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "返回",
                     onClick = onBack,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(start = 28.dp, top = 28.dp),
+                    size = 52.dp,
+                    iconSize = 24.dp,
+                    containerColor = Color(0x66080B11),
+                    contentColor = Color.White,
+                    focusedScale = 1.08f,
                 )
 
                 Surface(
@@ -284,27 +290,6 @@ private fun TvLongFormActorAvatar(actor: TvLongFormDetailActorUiModel) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-    }
-}
-
-@Composable
-private fun TvRoundIconAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = Color(0x66080B11),
-        shape = CircleShape,
-        modifier = modifier
-            .size(52.dp)
-            .tvFocusableGlow(shape = CircleShape, focusedScale = 1.08f)
-            .clickable(onClick = onClick),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = contentDescription, tint = Color.White)
-        }
     }
 }
 
