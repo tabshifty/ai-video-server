@@ -61,6 +61,7 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.tvFocusableGlow
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.tv.TvAccountMenuAction
 
@@ -1153,7 +1154,7 @@ private fun TvSeriesPosterCard(
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 256.dp)
-            .tvFocusableGlow(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -1278,7 +1279,7 @@ private fun TvPosterMoreCard(
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 256.dp)
-            .tvFocusableGlow(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Box(
@@ -1341,7 +1342,7 @@ private fun TvHomeShelfCard(
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 256.dp)
-            .tvFocusableGlow(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
