@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -22,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +48,10 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
+import com.chee.videos.core.ui.TvEmptyState
+import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvInlineLoadingState
+import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -110,22 +112,18 @@ fun TvPosterWallScreen(
 
         when {
             uiState.loading && uiState.items.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AppChrome.AccentStrong)
-                }
+                TvPageLoadingState(message = "正在加载${wallSpec.title}")
             }
 
             !uiState.errorMessage.isNullOrBlank() && uiState.items.isEmpty() -> {
-                TvPosterWallEmptyState(
-                    title = "加载失败",
+                TvErrorState(
                     message = uiState.errorMessage.orEmpty(),
-                    actionLabel = "重试",
                     onAction = viewModel::refresh,
                 )
             }
 
             uiState.items.isEmpty() -> {
-                TvPosterWallEmptyState(
+                TvEmptyState(
                     title = wallSpec.title,
                     message = "暂无可用内容",
                     actionLabel = "刷新",
@@ -167,25 +165,12 @@ fun TvPosterWallScreen(
                     }
                     if (uiState.loadingMore) {
                         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                            Row(
+                            TvInlineLoadingState(
+                                message = "正在加载更多",
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = AppChrome.AccentStrong,
-                                    strokeWidth = 2.dp,
-                                )
-                                Text(
-                                    text = "正在加载更多",
-                                    color = AppChrome.TextMuted,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(start = 8.dp),
-                                )
-                            }
+                            )
                         }
                     }
                 }
@@ -300,59 +285,6 @@ internal fun tvPosterWallSortOrderLabel(sortOrder: String): String {
     return when (sortOrder) {
         "asc" -> "正序"
         else -> "倒序"
-    }
-}
-
-@Composable
-private fun TvPosterWallEmptyState(
-    title: String,
-    message: String,
-    actionLabel: String,
-    onAction: () -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Surface(
-            color = AppChrome.SurfaceElevated,
-            shape = AppChrome.CardShape,
-            modifier = Modifier
-                .padding(horizontal = 20.dp)
-                .fillMaxWidth()
-                .height(180.dp)
-                .tvFocusableGlow(shape = AppChrome.CardShape)
-                .clickable(onClick = onAction),
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Tv,
-                    contentDescription = null,
-                    tint = AppChrome.TextMuted,
-                    modifier = Modifier.size(28.dp),
-                )
-                Text(
-                    text = title,
-                    color = AppChrome.TextPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = message,
-                    color = AppChrome.TextMuted,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = actionLabel,
-                    color = AppChrome.AccentStrong,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
     }
 }
 

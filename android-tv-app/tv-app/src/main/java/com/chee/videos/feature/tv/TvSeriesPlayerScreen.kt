@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -52,7 +51,9 @@ import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvLayoutSpec
+import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.buildLongFormMediaItem
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
@@ -107,9 +108,8 @@ fun TvSeriesPlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black),
-            contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator(color = AppChrome.AccentStrong)
+            TvPageLoadingState(message = "正在加载电视剧播放器")
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
                     modifier = Modifier
@@ -127,9 +127,11 @@ fun TvSeriesPlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black),
-            contentAlignment = Alignment.Center,
         ) {
-            Text(uiState.errorMessage ?: "播放器数据不存在", color = AppChrome.TextSecondary)
+            TvErrorState(
+                message = uiState.errorMessage ?: "播放器数据不存在",
+                onAction = viewModel::retry,
+            )
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
                     modifier = Modifier

@@ -164,6 +164,35 @@ class TvCatalogViewModelTest {
     }
 
     @Test
+    fun retry_afterHomeErrorRequestsCurrentKindAgain() = runTest {
+        val repository = FakeTvRepository(homeError = IllegalStateException("加载失败"))
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        viewModel.awaitIdle()
+        viewModel.retry()
+        viewModel.awaitIdle()
+
+        assertEquals(2, repository.homeRequests.size)
+        assertEquals("tv", repository.homeRequests.last().kind)
+    }
+
+    @Test
+    fun retry_afterSearchErrorRequestsCurrentQueryAgain() = runTest {
+        val repository = FakeTvRepository(homeError = IllegalStateException("搜索失败"))
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        viewModel.awaitIdle()
+        viewModel.selectMenu(TvHomeMenuItem.Search)
+        viewModel.updateQuery("静默")
+        viewModel.awaitIdle()
+        viewModel.retry()
+        viewModel.awaitIdle()
+
+        assertEquals(2, repository.searchRequests.size)
+        assertEquals("静默", repository.searchRequests.last().query)
+    }
+
+    @Test
     fun nullListsInPayload_doNotCrashAndFallbackToEmpty() = runTest {
         val payload = Gson().fromJson(
             """

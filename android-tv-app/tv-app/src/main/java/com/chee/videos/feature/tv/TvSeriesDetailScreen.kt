@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +50,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvLayoutSpec
+import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tvFocusableGlow
 
 @Composable
@@ -68,9 +69,8 @@ fun TvSeriesDetailScreen(
                 .fillMaxSize()
                 .background(AppChrome.PageGradient)
                 .statusBarsPadding(),
-            contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator(color = AppChrome.AccentStrong)
+            TvPageLoadingState(message = "正在加载电视剧详情")
         }
         return
     }
@@ -81,9 +81,11 @@ fun TvSeriesDetailScreen(
                 .fillMaxSize()
                 .background(AppChrome.PageGradient)
                 .statusBarsPadding(),
-            contentAlignment = Alignment.Center,
         ) {
-            Text("电视剧占位数据不可用", color = AppChrome.TextSecondary)
+            TvErrorState(
+                message = uiState.errorMessage ?: "电视剧详情加载失败",
+                onAction = viewModel::retry,
+            )
         }
         return
     }

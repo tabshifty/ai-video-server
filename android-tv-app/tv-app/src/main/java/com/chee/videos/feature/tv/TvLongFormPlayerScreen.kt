@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +39,8 @@ import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.buildLongFormMediaItem
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
@@ -93,9 +94,8 @@ fun TvLongFormPlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black),
-            contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator(color = AppChrome.AccentStrong)
+            TvPageLoadingState(message = "正在加载播放器")
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
                     modifier = Modifier
@@ -113,9 +113,11 @@ fun TvLongFormPlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black),
-            contentAlignment = Alignment.Center,
         ) {
-            Text(uiState.errorMessage ?: "播放器数据不存在", color = AppChrome.TextSecondary)
+            TvErrorState(
+                message = uiState.errorMessage ?: "播放器数据不存在",
+                onAction = viewModel::load,
+            )
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
                     modifier = Modifier

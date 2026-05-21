@@ -29,9 +29,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -67,8 +65,9 @@ import coil.compose.AsyncImage
 import com.chee.videos.tv.R
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvLayoutSpec
-import com.chee.videos.core.ui.tvFocusableGlow
+import com.chee.videos.core.ui.TvPageLoadingState
 import java.util.ArrayList
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.LibVLC
@@ -297,18 +296,17 @@ fun TvIptvScreen(
         }
 
         if (uiState.loading) {
-            TvIptvStatusOverlay(message = "正在加载 IPTV 频道", retryLabel = null, onRetry = {})
+            TvPageLoadingState(message = "正在加载 IPTV 频道")
         } else if (uiState.currentChannel == null || uiState.statusMessage != null) {
-            TvIptvStatusOverlay(
+            TvErrorState(
                 message = uiState.statusMessage ?: "暂无可播放的 IPTV 频道",
-                retryLabel = "重试",
-                onRetry = viewModel::reload,
+                onAction = viewModel::reload,
             )
         } else if (playerErrorMessage != null) {
-            TvIptvStatusOverlay(
+            TvErrorState(
                 message = playerErrorMessage.orEmpty(),
-                retryLabel = "重试播放",
-                onRetry = { playbackRetryNonce += 1 },
+                actionLabel = "重试播放",
+                onAction = { playbackRetryNonce += 1 },
             )
         }
 
@@ -366,51 +364,6 @@ private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
             )
             channel?.group?.trim()?.takeIf { it.isNotBlank() }?.let { group ->
                 Text(text = group, color = AppChrome.TextSecondary, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-@Composable
-private fun TvIptvStatusOverlay(
-    message: String,
-    retryLabel: String?,
-    onRetry: () -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Surface(color = Color(0xD610131A), shape = RoundedCornerShape(18.dp)) {
-            Column(
-                modifier = Modifier.padding(horizontal = 26.dp, vertical = 22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (retryLabel == null) {
-                    CircularProgressIndicator(color = AppChrome.AccentStrong)
-                }
-                Text(
-                    text = message,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (retryLabel != null) {
-                    Surface(
-                        color = AppChrome.Accent,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .tvFocusableGlow(shape = RoundedCornerShape(8.dp), focusedScale = 1.04f)
-                            .clickable(onClick = onRetry),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Text(text = retryLabel, color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
             }
         }
     }

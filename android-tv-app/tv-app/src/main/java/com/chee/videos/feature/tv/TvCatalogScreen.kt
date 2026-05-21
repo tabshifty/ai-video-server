@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +59,9 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
+import com.chee.videos.core.ui.TvEmptyState
+import com.chee.videos.core.ui.TvErrorState
+import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.util.UrlBuilder
@@ -139,9 +141,7 @@ fun TvCatalogScreen(
                 onSelect = viewModel::selectMenu,
                 onOpenIptv = onOpenIptv,
             )
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = AppChrome.AccentStrong)
-            }
+            TvPageLoadingState(message = "正在加载 TV 首页")
         }
         return
     }
@@ -192,7 +192,11 @@ fun TvCatalogScreen(
                 }
                 if (uiState.query.isNotBlank() && uiState.searchResults.isEmpty()) {
                     item(key = "search-empty") {
-                        TvSearchEmptyState()
+                        TvEmptyState(
+                            title = "没有找到相关内容",
+                            message = "试试输入更完整的关键词",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 } else {
                     items(uiState.searchResults, key = { item -> item.id }) { item ->
@@ -253,18 +257,11 @@ fun TvCatalogScreen(
             }
             uiState.errorMessage?.let { message ->
                 item(key = "error") {
-                    Surface(
-                        color = AppChrome.SurfaceElevated,
-                        shape = AppChrome.SectionShape,
+                    TvErrorState(
+                        message = message,
+                        onAction = viewModel::retry,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                        )
-                    }
+                    )
                 }
             }
             uiState.continueWatching?.takeIf { featuredContent?.source != TvFeaturedContentSource.CONTINUE_WATCHING }?.let { continueWatching ->
@@ -686,41 +683,6 @@ private fun TvSearchResultHeader(resultCount: Int) {
             color = AppChrome.TextMuted,
             style = MaterialTheme.typography.bodySmall,
         )
-    }
-}
-
-@Composable
-private fun TvSearchEmptyState() {
-    Surface(
-        color = AppChrome.SurfaceElevated,
-        shape = AppChrome.SectionShape,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = null,
-                tint = AppChrome.TextMuted,
-                modifier = Modifier.size(24.dp),
-            )
-            Text(
-                text = "没有找到相关内容",
-                color = AppChrome.TextPrimary,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "试试输入更完整的关键词",
-                color = AppChrome.TextMuted,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
     }
 }
 

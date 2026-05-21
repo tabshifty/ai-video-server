@@ -85,6 +85,15 @@ class TvCatalogViewModel @Inject constructor(
         }
     }
 
+    fun retry() {
+        val state = _uiState.value
+        if (state.selectedMenu == TvHomeMenuItem.Search && state.query.isNotBlank()) {
+            loadSearch(state.query)
+        } else {
+            loadHome(state.kind)
+        }
+    }
+
     private fun loadHome(kind: String = _uiState.value.selectedMenu.homeKind.ifBlank { "tv" }) {
         val normalizedKind = normalizeTvHomeKind(kind)
         viewModelScope.launch {

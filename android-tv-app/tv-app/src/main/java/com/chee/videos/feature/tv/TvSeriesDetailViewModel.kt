@@ -34,6 +34,10 @@ class TvSeriesDetailViewModel @Inject constructor(
         load()
     }
 
+    fun retry() {
+        load()
+    }
+
     fun selectSeason(seasonNumber: Int) {
         val series = _uiState.value.series ?: return
         val season = series.seasons.firstOrNull { it.number == seasonNumber } ?: return

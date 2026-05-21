@@ -47,6 +47,10 @@ class TvSeriesPlayerViewModel @Inject constructor(
         load()
     }
 
+    fun retry() {
+        load()
+    }
+
     fun cycleSpeed() {
         _uiState.update { state ->
             val currentIndex = supportedPlaybackSpeeds.indexOf(state.playbackSpeed).coerceAtLeast(0)

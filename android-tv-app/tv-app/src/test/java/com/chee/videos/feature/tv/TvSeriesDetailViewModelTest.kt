@@ -107,4 +107,19 @@ class TvSeriesDetailViewModelTest {
         assertEquals(2, state.selectedSeasonNumber)
         assertEquals(3, state.selectedEpisodeNumber)
     }
+
+    @Test
+    fun retry_afterErrorRequestsDetailAgain() = runTest {
+        val repository = FakeTvRepository(detailError = IllegalStateException("详情失败"))
+        val viewModel = TvSeriesDetailViewModel(
+            repository = repository,
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+
+        viewModel.awaitIdle()
+        viewModel.retry()
+        viewModel.awaitIdle()
+
+        assertEquals(listOf("series-1", "series-1"), repository.detailRequests)
+    }
 }

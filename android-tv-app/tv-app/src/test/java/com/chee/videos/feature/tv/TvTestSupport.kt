@@ -35,6 +35,7 @@ class FakeTvRepository(
     val homeRequests = mutableListOf<TvHomeRequest>()
     val searchRequests = mutableListOf<TvSearchRequest>()
     val posterWallRequests = mutableListOf<TvPosterWallRequest>()
+    val detailRequests = mutableListOf<String>()
 
     override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
@@ -74,6 +75,7 @@ class FakeTvRepository(
     }
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
+        detailRequests += seriesId
         detailError?.let { return Result.failure(it) }
         return Result.success(detailPayload)
     }

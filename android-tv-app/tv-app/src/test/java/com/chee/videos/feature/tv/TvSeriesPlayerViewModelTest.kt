@@ -77,6 +77,21 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun retry_afterErrorRequestsDetailAgain() = runTest {
+        val repository = FakeTvRepository(detailError = IllegalStateException("播放页失败"))
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+
+        viewModel.awaitIdle()
+        viewModel.retry()
+        viewModel.awaitIdle()
+
+        assertEquals(listOf("series-1", "series-1"), repository.detailRequests)
+    }
+
+    @Test
     fun init_exposesEpisodeWatchSecondsForResume() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
