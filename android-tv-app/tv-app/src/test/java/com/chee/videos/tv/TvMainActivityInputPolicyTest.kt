@@ -52,4 +52,54 @@ class TvMainActivityInputPolicyTest {
 
         assertFalse(shouldSwallowTvComposeHoverExitCrash(throwable))
     }
+
+    @Test
+    fun `swallows compose hover exit from main looper lambda`() {
+        val throwable = IllegalStateException("The ACTION_HOVER_EXIT event was not cleared.").apply {
+            stackTrace = arrayOf(
+                StackTraceElement(
+                    "androidx.compose.ui.platform.AndroidComposeView",
+                    "sendHoverExitEvent\$lambda\$5",
+                    "AndroidComposeView.android.kt",
+                    565,
+                ),
+                StackTraceElement(
+                    "androidx.compose.ui.platform.AndroidComposeView\$\$ExternalSyntheticLambda3",
+                    "run",
+                    "D8\$\$SyntheticClass",
+                    0,
+                ),
+                StackTraceElement(
+                    "android.os.Handler",
+                    "handleCallback",
+                    "Handler.java",
+                    883,
+                ),
+                StackTraceElement(
+                    "android.os.Looper",
+                    "loop",
+                    "Looper.java",
+                    214,
+                ),
+            )
+        }
+
+        assertTrue(shouldSwallowTvComposeHoverExitCrash(throwable))
+    }
+
+    @Test
+    fun `swallows compose dispatch hover lambda variant`() {
+        val throwable = IllegalStateException("The ACTION_HOVER_EXIT event was not cleared.").apply {
+            stackTrace = arrayOf(
+                StackTraceElement(
+                    "androidx.compose.ui.platform.AndroidComposeView",
+                    "dispatchHoverEvent\$lambda\$0",
+                    "AndroidComposeView.android.kt",
+                    1808,
+                ),
+            )
+        }
+
+        assertTrue(shouldSwallowTvComposeHoverExitCrash(throwable))
+    }
 }

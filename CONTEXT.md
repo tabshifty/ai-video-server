@@ -55,7 +55,7 @@
 - `TV 根退出确认`：TV App 仅在 `tv-home` 根页面拦截系统返回键，第一次返回显示“再按一次退出”，确认窗口内第二次返回才退出应用；海报墙、详情页和播放器页继续使用各自既有返回语义。
 - TV 首页左侧菜单按钮只能有一个焦点目标；`tvFocusableGlow()` 已经包含 `focusable()`，按钮自身不要再额外叠加 `.focusable()`，否则遥控确认键可能先落到重复焦点层，表现为必须按两次才触发菜单动作。
 - TV 首页初始焦点只能请求当前已经组合到界面树里的节点。默认首页内容为空或接口失败导致没有巨幅推荐/最近播放/货架时，应回退到左侧菜单焦点；不要请求仅在“搜索”菜单下才会组合的搜索框焦点，否则 Compose 会因为 `FocusRequester` 未绑定节点在冷启动时崩溃。
-- `TV hover 输入兼容兜底`：部分 Android TV 设备会向 Compose 根视图发送 hover/generic motion 事件，并触发 Compose 平台层 `ACTION_HOVER_EXIT` 未清理异常；该异常不代表业务状态损坏，可在 Activity 输入边界按精确异常消息和 Compose 根视图堆栈做窄范围吞掉，其他输入异常必须继续暴露。
+- `TV hover 输入兼容兜底`：部分 Android TV 设备会向 Compose 根视图发送 hover/generic motion 事件，并触发 Compose 平台层 `ACTION_HOVER_EXIT` 未清理异常；该异常不代表业务状态损坏，可在 Activity 输入边界按精确异常消息和 Compose 根视图堆栈做窄范围吞掉，其他输入异常必须继续暴露。Compose 平台层会通过 `Handler.post` 把 hover-exit 校验 lambda 调度到主 Looper 异步执行，调用栈不会再经过 `dispatchGenericMotionEvent`，因此兜底需要同时覆盖 Activity 输入边界和主 Looper：在主线程 `Handler.post` 一个外层 `Looper.loop()` try/catch 循环，仅吞掉同样匹配 `AndroidComposeView.sendHoverExitEvent` / `dispatchHoverEvent` 及其 `$lambda$` 合成方法名的特定异常，其他异常继续抛出。匹配方法名需要把合成 lambda 名（如 `sendHoverExitEvent$lambda$5`）一并纳入，否则 D8 生成的同步 lambda 帧会绕过过滤。
 
 ## TV 端 AV 海报约定
 - TV 端 `18+` 的大背景指首页/分类页巨幅推荐背景和详情页顶部背景，应优先使用 AV 元数据中的原始横幅海报 `poster_original_path`。
