@@ -1,8 +1,10 @@
 package com.chee.videos.feature.connection
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,16 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +29,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.TvLayoutSpec
+import com.chee.videos.core.ui.tvFocusableGlow
 
 private val ConnectionScanLoadingIndicatorSize = 14.dp
 
@@ -50,6 +50,7 @@ fun ConnectionScreen(
             .background(AppChrome.PageGradient)
             .statusBarsPadding()
             .padding(16.dp),
+        contentPadding = PaddingValues(bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -67,24 +68,19 @@ fun ConnectionScreen(
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            ConnectionPanel {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("自动嗅探", style = MaterialTheme.typography.titleMedium)
-                        Button(
-                            onClick = { viewModel.scanLan() },
+                        Text("自动嗅探", style = MaterialTheme.typography.titleMedium, color = AppChrome.TextPrimary)
+                        ConnectionActionButton(
+                            text = if (uiState.scanning) "扫描中..." else "重新扫描",
                             enabled = !uiState.scanning && !uiState.connecting,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = AppChrome.Accent,
-                                contentColor = AppChrome.TextPrimary,
-                            ),
-                        ) {
-                            Text(if (uiState.scanning) "扫描中..." else "重新扫描")
-                        }
+                            onClick = { viewModel.scanLan() },
+                        )
                     }
                     if (uiState.scanning) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -117,9 +113,9 @@ fun ConnectionScreen(
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("手动填写", style = MaterialTheme.typography.titleMedium)
+            ConnectionPanel {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("手动填写", style = MaterialTheme.typography.titleMedium, color = AppChrome.TextPrimary)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                         OutlinedTextField(
                             value = uiState.hostInput,
@@ -138,24 +134,19 @@ fun ConnectionScreen(
                             enabled = !uiState.connecting,
                         )
                     }
-                    Button(
-                        onClick = viewModel::manualConnect,
+                    ConnectionActionButton(
+                        text = if (uiState.connecting) "连接中..." else "测试并保存",
                         enabled = !uiState.connecting,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AppChrome.Accent,
-                            contentColor = AppChrome.TextPrimary,
-                        ),
-                    ) {
-                        Text(if (uiState.connecting) "连接中..." else "测试并保存")
-                    }
+                        onClick = viewModel::manualConnect,
+                    )
                 }
             }
         }
 
         if (uiState.savedEndpoints.isNotEmpty()) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                ConnectionPanel {
                     EndpointList(
                         title = "历史地址",
                         endpoints = uiState.savedEndpoints,
@@ -170,6 +161,52 @@ fun ConnectionScreen(
 }
 
 @Composable
+private fun ConnectionPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        color = AppChrome.Surface,
+        shape = AppChrome.CardShape,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            content = { content() },
+        )
+    }
+}
+
+@Composable
+private fun ConnectionActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    primary: Boolean = true,
+) {
+    Surface(
+        color = when {
+            !enabled -> AppChrome.SurfaceElevated.copy(alpha = 0.45f)
+            primary -> AppChrome.Accent
+            else -> AppChrome.SurfaceElevated.copy(alpha = 0.9f)
+        },
+        shape = AppChrome.PillShape,
+        modifier = modifier
+            .tvFocusableGlow(enabled = enabled, shape = AppChrome.PillShape, focusedScale = 1.04f)
+            .clickable(enabled = enabled, onClick = onClick),
+    ) {
+        Text(
+            text = text,
+            color = if (enabled) AppChrome.TextPrimary else AppChrome.TextMuted,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+        )
+    }
+}
+
+@Composable
 private fun EndpointList(
     title: String,
     endpoints: List<ServerEndpoint>,
@@ -177,8 +214,8 @@ private fun EndpointList(
     onUse: (ServerEndpoint) -> Unit,
     onDelete: ((ServerEndpoint) -> Unit)?,
 ) {
-    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = AppChrome.TextPrimary)
         endpoints.forEachIndexed { index, endpoint ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -186,21 +223,25 @@ private fun EndpointList(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(endpoint.baseUrl, style = MaterialTheme.typography.bodyLarge)
+                    Text(endpoint.baseUrl, style = MaterialTheme.typography.bodyLarge, color = AppChrome.TextPrimary)
                     Text(
                         text = "最近成功时间：${java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(endpoint.lastSuccessAt))}",
                         style = MaterialTheme.typography.labelSmall,
                         color = AppChrome.TextMuted,
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { onUse(endpoint) }) {
-                        Text(useLabel, color = AppChrome.AccentStrong)
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ConnectionActionButton(
+                        text = useLabel,
+                        primary = true,
+                        onClick = { onUse(endpoint) },
+                    )
                     if (onDelete != null) {
-                        IconButton(onClick = { onDelete(endpoint) }) {
-                            Text("删", color = AppChrome.TextSecondary)
-                        }
+                        ConnectionActionButton(
+                            text = "删除",
+                            primary = false,
+                            onClick = { onDelete(endpoint) },
+                        )
                     }
                 }
             }

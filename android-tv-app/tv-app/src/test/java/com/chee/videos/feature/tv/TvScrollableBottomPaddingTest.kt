@@ -24,6 +24,10 @@ class TvScrollableBottomPaddingTest {
             path = "src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt",
             pattern = "bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp",
         )
+        assertSourceContains(
+            path = "src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt",
+            pattern = "bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp",
+        )
     }
 
     private fun assertSourceContains(path: String, pattern: String) {
