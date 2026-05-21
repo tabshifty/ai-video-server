@@ -45,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvEmptyState
@@ -82,7 +83,7 @@ fun TvPosterWallScreen(
     val refreshFocusRequester = remember { FocusRequester() }
     val wallSpec = resolveTvCatalogWallSpec(uiState.kind, uiState.title)
 
-    LaunchedEffect(uiState.items.isNotEmpty(), uiState.page, uiState.loading, uiState.refreshing) {
+    LaunchedTvInitialFocus(uiState.items.isNotEmpty(), uiState.page, uiState.loading, uiState.refreshing) {
         if (uiState.items.isNotEmpty() && uiState.page == 1 && !uiState.loading && !uiState.refreshing) {
             firstItemFocusRequester.requestFocus()
         }

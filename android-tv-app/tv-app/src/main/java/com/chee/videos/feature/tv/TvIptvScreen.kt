@@ -65,6 +65,7 @@ import coil.compose.AsyncImage
 import com.chee.videos.tv.R
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvPageLoadingState
@@ -176,7 +177,7 @@ fun TvIptvScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedTvInitialFocus(Unit) {
         rootFocusRequester.requestFocus()
     }
 

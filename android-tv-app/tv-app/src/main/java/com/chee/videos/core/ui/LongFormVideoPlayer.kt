@@ -44,7 +44,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -397,22 +396,26 @@ fun LongFormVideoPlayer(
         }
     }
 
-    LaunchedEffect(tvMode, pendingRootFocusRequest) {
+    LaunchedTvInitialFocus(tvMode, pendingRootFocusRequest) {
         if (!tvMode || !pendingRootFocusRequest) {
-            return@LaunchedEffect
+            return@LaunchedTvInitialFocus
         }
-        withFrameNanos { }
-        rootFocusRequester.requestFocus()
-        pendingRootFocusRequest = false
+        try {
+            rootFocusRequester.requestFocus()
+        } finally {
+            pendingRootFocusRequest = false
+        }
     }
 
-    LaunchedEffect(tvMode, controlsVisible, pendingPlayPauseFocusRequest) {
+    LaunchedTvInitialFocus(tvMode, controlsVisible, pendingPlayPauseFocusRequest) {
         if (!tvMode || !controlsVisible || !pendingPlayPauseFocusRequest) {
-            return@LaunchedEffect
+            return@LaunchedTvInitialFocus
         }
-        withFrameNanos { }
-        playPauseFocusRequester.requestFocus()
-        pendingPlayPauseFocusRequest = false
+        try {
+            playPauseFocusRequester.requestFocus()
+        } finally {
+            pendingPlayPauseFocusRequest = false
+        }
     }
 
     LaunchedEffect(player, audioTracks, selectedAudioTrackId) {

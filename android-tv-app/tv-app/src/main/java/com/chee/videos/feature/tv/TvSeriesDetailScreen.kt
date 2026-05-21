@@ -30,7 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,6 +47,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
@@ -95,7 +95,7 @@ fun TvSeriesDetailScreen(
     val backdropUrl = resolveTvResourceUrl(uiState.baseUrl, series.backdropUrl)
     val posterUrl = resolveTvResourceUrl(uiState.baseUrl, series.posterUrl)
 
-    LaunchedEffect(series.id) {
+    LaunchedTvInitialFocus(series.id) {
         playFocusRequester.requestFocus()
     }
 

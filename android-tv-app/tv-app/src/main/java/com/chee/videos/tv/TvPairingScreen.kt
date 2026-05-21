@@ -33,6 +33,7 @@ import androidx.lifecycle.ViewModel
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.repository.TvAuthRepository
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.tvFocusableGlow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -133,7 +134,7 @@ fun TvPairingScreen(
             viewModel.startPairing()
         }
     }
-    LaunchedEffect(uiState.loading, uiState.sessionId, uiState.errorMessage) {
+    LaunchedTvInitialFocus(uiState.loading, uiState.sessionId, uiState.errorMessage) {
         if (!uiState.loading) {
             primaryActionFocusRequester.requestFocus()
         }
