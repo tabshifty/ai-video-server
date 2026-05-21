@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,6 +38,7 @@ import androidx.navigation.navArgument
 import com.chee.videos.core.model.AppRootState
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.AppDarkColors
+import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.viewmodel.AppRootViewModel
 import com.chee.videos.feature.connection.ConnectionScreen
 import com.chee.videos.feature.tv.TvEpisodeArg
@@ -76,9 +76,7 @@ fun TvShellApp(
         Surface(modifier = Modifier.fillMaxSize(), color = AppChrome.Canvas) {
             when (val state = appState) {
                 AppRootState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AppChrome.AccentStrong)
-                    }
+                    TvPageLoadingState(message = "正在准备 TV 首页")
                 }
 
                 AppRootState.NeedServer -> ConnectionScreen()

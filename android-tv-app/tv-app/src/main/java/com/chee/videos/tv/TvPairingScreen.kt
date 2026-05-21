@@ -3,7 +3,7 @@ package com.chee.videos.tv
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.remember
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -35,6 +33,7 @@ import androidx.lifecycle.ViewModel
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.repository.TvAuthRepository
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableGlow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.delay
@@ -199,28 +198,45 @@ fun TvPairingScreen(
                 if (!uiState.errorMessage.isNullOrBlank()) {
                     Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
                 }
-                Button(
+                TvPairingActionButton(
+                    text = if (uiState.loading) "生成中..." else "重新生成配对码",
                     onClick = viewModel::startPairing,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(primaryActionFocusRequester)
-                        .focusable(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AppChrome.Accent,
-                        contentColor = AppChrome.TextPrimary,
-                    ),
-                ) {
-                    Text(if (uiState.loading) "生成中..." else "重新生成配对码")
-                }
-                OutlinedButton(
+                        .focusRequester(primaryActionFocusRequester),
+                    primary = true,
+                )
+                TvPairingActionButton(
+                    text = "切换服务器",
                     onClick = onSwitchServer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusable(),
-                ) {
-                    Text("切换服务器")
-                }
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun TvPairingActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+) {
+    Surface(
+        color = if (primary) AppChrome.Accent else AppChrome.SurfaceElevated.copy(alpha = 0.9f),
+        shape = AppChrome.PillShape,
+        modifier = modifier
+            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+            .clickable(onClick = onClick),
+    ) {
+        Text(
+            text = text,
+            color = AppChrome.TextPrimary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+        )
     }
 }
