@@ -62,6 +62,22 @@ class ShortOverlayFullscreenSpecTest {
     }
 
     @Test
+    fun `all non home short overlays hide vertical pager while fullscreen`() {
+        assertShortFullscreenBranches(
+            "src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt",
+            "isFullscreen",
+        )
+        assertShortFullscreenBranches(
+            "src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt",
+            "isFullscreen",
+        )
+        assertShortFullscreenBranches(
+            "src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt",
+            "isShortFullscreen",
+        )
+    }
+
+    @Test
     fun `short fullscreen state must hide the app shell chrome`() {
         val appSource = Path.of("src/main/java/com/chee/videos/VideoHomeApp.kt").readText()
         val homeSource = Path.of("src/main/java/com/chee/videos/feature/home/HomeScreen.kt").readText()
@@ -75,5 +91,12 @@ class ShortOverlayFullscreenSpecTest {
         val source = Path.of(path).readText()
         assertTrue("$path 必须导入 ShortOverlayFullscreenHost", source.contains("ShortOverlayFullscreenHost"))
         assertTrue("$path 必须导入 ShortOverlayFullscreenButton", source.contains("ShortOverlayFullscreenButton"))
+    }
+
+    private fun assertShortFullscreenBranches(path: String, stateName: String) {
+        val source = Path.of(path).readText()
+        assertTrue("$path 全屏时必须进入独立分支", source.contains("if ($stateName)"))
+        assertTrue("$path 全屏分支必须渲染 ShortOverlayFullscreenHost", source.contains("ShortOverlayFullscreenHost("))
+        assertTrue("$path 竖屏 VerticalPager 必须放在非全屏 else 分支", source.contains("} else {"))
     }
 }

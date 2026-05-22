@@ -535,107 +535,108 @@ private fun ShortDiscoverPlayerOverlay(
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        VerticalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = !isFullscreen,
-        ) { page ->
-            val item = items[page]
-            ShortDiscoverPlayerPage(
-                item = item,
-                sharedPlayer = sharedPlayer,
-                active = pagerState.currentPage == page,
-                fitMode = fitMode,
-                pausedByUser = item.id in pausedByUserVideoIds,
-                posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
-                showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
-                titleBottomPadding = 34.dp,
-                onTogglePauseByUser = {
-                    val next = pausedByUserVideoIds.toMutableSet()
-                    if (next.contains(item.id)) {
-                        next.remove(item.id)
-                    } else {
-                        next.add(item.id)
-                    }
-                    pausedByUserVideoIds = next
-                },
-                onToggleFitMode = onToggleFitMode,
-                onTogglePlaybackMode = onTogglePlaybackMode,
-                onOpenFullscreen = { isFullscreen = true },
-                playbackMode = playbackMode,
+        if (isFullscreen) {
+            ShortOverlayFullscreenHost(
+                isFullscreen = isFullscreen,
+                onFullscreenChange = { isFullscreen = it },
+                player = sharedPlayer,
+                title = items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+                subtitleTracks = emptyList(),
+                fallbackPlaybackMode = playbackMode,
             )
-        }
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(top = 6.dp, start = 6.dp, end = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
+        } else {
+            VerticalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                val item = items[page]
+                ShortDiscoverPlayerPage(
+                    item = item,
+                    sharedPlayer = sharedPlayer,
+                    active = pagerState.currentPage == page,
+                    fitMode = fitMode,
+                    pausedByUser = item.id in pausedByUserVideoIds,
+                    posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                    showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
+                    titleBottomPadding = 34.dp,
+                    onTogglePauseByUser = {
+                        val next = pausedByUserVideoIds.toMutableSet()
+                        if (next.contains(item.id)) {
+                            next.remove(item.id)
+                        } else {
+                            next.add(item.id)
+                        }
+                        pausedByUserVideoIds = next
+                    },
+                    onToggleFitMode = onToggleFitMode,
+                    onTogglePlaybackMode = onTogglePlaybackMode,
+                    onOpenFullscreen = { isFullscreen = true },
+                    playbackMode = playbackMode,
+                )
             }
-            Text(
-                text = "瀑布流浏览",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
 
-        if (shouldShowShortOverlayProgressBar(currentVideoId)) {
-            ShortVideoBottomProgressBar(
+            Row(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.TopStart)
                     .fillMaxWidth()
-                    .shortNonHomeProgressBarPadding(),
-                positionMs = positionMs,
-                durationMs = durationMs,
-                isScrubbing = isScrubbingShort,
-                scrubTargetMs = scrubTargetMs,
-                onScrubStart = {
-                    if (durationMs <= 0L) {
-                        return@ShortVideoBottomProgressBar
-                    }
-                    isScrubbingShort = true
-                    scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
-                    scrubTargetMs = scrubAnchorMs
-                },
-                onScrubByDeltaFraction = { deltaFraction ->
-                    if (durationMs <= 0L || !isScrubbingShort) {
-                        return@ShortVideoBottomProgressBar
-                    }
-                    scrubTargetMs = shortScrubTargetFromDelta(
-                        anchorMs = scrubAnchorMs,
-                        durationMs = durationMs,
-                        deltaFraction = deltaFraction,
-                    )
-                },
-                onScrubEnd = {
-                    if (!isScrubbingShort) {
-                        return@ShortVideoBottomProgressBar
-                    }
-                    if (durationMs > 0L) {
-                        val target = scrubTargetMs.coerceIn(0L, durationMs)
-                        sharedPlayer.seekTo(target)
-                        positionMs = target
-                    }
-                    isScrubbingShort = false
-                },
-            )
-        }
+                    .statusBarsPadding()
+                    .padding(top = 6.dp, start = 6.dp, end = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
+                }
+                Text(
+                    text = "瀑布流浏览",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
 
-        ShortOverlayFullscreenHost(
-            isFullscreen = isFullscreen,
-            onFullscreenChange = { isFullscreen = it },
-            player = sharedPlayer,
-            title = items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
-            subtitleTracks = emptyList(),
-            fallbackPlaybackMode = playbackMode,
-        )
+            if (shouldShowShortOverlayProgressBar(currentVideoId)) {
+                ShortVideoBottomProgressBar(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .shortNonHomeProgressBarPadding(),
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    isScrubbing = isScrubbingShort,
+                    scrubTargetMs = scrubTargetMs,
+                    onScrubStart = {
+                        if (durationMs <= 0L) {
+                            return@ShortVideoBottomProgressBar
+                        }
+                        isScrubbingShort = true
+                        scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
+                        scrubTargetMs = scrubAnchorMs
+                    },
+                    onScrubByDeltaFraction = { deltaFraction ->
+                        if (durationMs <= 0L || !isScrubbingShort) {
+                            return@ShortVideoBottomProgressBar
+                        }
+                        scrubTargetMs = shortScrubTargetFromDelta(
+                            anchorMs = scrubAnchorMs,
+                            durationMs = durationMs,
+                            deltaFraction = deltaFraction,
+                        )
+                    },
+                    onScrubEnd = {
+                        if (!isScrubbingShort) {
+                            return@ShortVideoBottomProgressBar
+                        }
+                        if (durationMs > 0L) {
+                            val target = scrubTargetMs.coerceIn(0L, durationMs)
+                            sharedPlayer.seekTo(target)
+                            positionMs = target
+                        }
+                        isScrubbingShort = false
+                    },
+                )
+            }
+        }
     }
 }
 

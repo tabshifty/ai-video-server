@@ -334,124 +334,125 @@ private fun ShortSearchPlayerOverlay(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()) {
-        VerticalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = !isFullscreen,
-        ) { page ->
-            val item = items[page]
-            val isActive = page == pagerState.currentPage
-            val detail = detailByVideoId[item.id]
-            val actionBusy = item.id in actionBusyVideoIds || item.id in detailLoadingVideoIds
-            val posterUrl = remember(baseUrl, item.thumbnailPath) { resolveThumbnailUrl(baseUrl, item.thumbnailPath) }
-            Box(modifier = Modifier.fillMaxSize().pointerInput(item.id) { detectTapGestures(onTap = {
-                showController = !showController
-                if (isActive) {
-                    val nextPaused = pausedByUserVideoIds.toMutableSet().apply { if (contains(item.id)) remove(item.id) else add(item.id) }.toSet()
-                    pausedByUserVideoIds = nextPaused
-                    sharedPlayer.playWhenReady = !nextPaused.contains(item.id)
-                }
-            }) }) {
-                if (isActive) {
-                    AndroidView(factory = {
-                        PlayerView(it).apply {
-                            player = sharedPlayer
-                            useController = false
-                            setShutterBackgroundColor(AndroidColor.BLACK)
-                            resizeMode = shortVideoResizeMode(fitMode)
+        if (isFullscreen) {
+            ShortOverlayFullscreenHost(
+                isFullscreen = isFullscreen,
+                onFullscreenChange = { isFullscreen = it },
+                player = sharedPlayer,
+                title = currentItem?.title.orEmpty(),
+                subtitleTracks = currentItem?.id?.let { detailByVideoId[it]?.subtitleTracks }.orEmpty(),
+                fallbackPlaybackMode = playbackMode,
+            )
+        } else {
+            VerticalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                val item = items[page]
+                val isActive = page == pagerState.currentPage
+                val detail = detailByVideoId[item.id]
+                val actionBusy = item.id in actionBusyVideoIds || item.id in detailLoadingVideoIds
+                val posterUrl = remember(baseUrl, item.thumbnailPath) { resolveThumbnailUrl(baseUrl, item.thumbnailPath) }
+                Box(modifier = Modifier.fillMaxSize().pointerInput(item.id) { detectTapGestures(onTap = {
+                    showController = !showController
+                    if (isActive) {
+                        val nextPaused = pausedByUserVideoIds.toMutableSet().apply { if (contains(item.id)) remove(item.id) else add(item.id) }.toSet()
+                        pausedByUserVideoIds = nextPaused
+                        sharedPlayer.playWhenReady = !nextPaused.contains(item.id)
+                    }
+                }) }) {
+                    if (isActive) {
+                        AndroidView(factory = {
+                            PlayerView(it).apply {
+                                player = sharedPlayer
+                                useController = false
+                                setShutterBackgroundColor(AndroidColor.BLACK)
+                                resizeMode = shortVideoResizeMode(fitMode)
+                            }
+                        }, update = { view ->
+                            view.player = sharedPlayer
+                            view.resizeMode = shortVideoResizeMode(fitMode)
+                        }, modifier = Modifier.fillMaxSize())
+                        if (renderedVideoId != item.id && !posterUrl.isNullOrBlank()) {
+                            AsyncImage(model = posterUrl, contentDescription = "${item.title} 封面", contentScale = shortPosterContentScale(fitMode), modifier = Modifier.fillMaxSize())
                         }
-                    }, update = { view ->
-                        view.player = sharedPlayer
-                        view.resizeMode = shortVideoResizeMode(fitMode)
-                    }, modifier = Modifier.fillMaxSize())
-                    if (renderedVideoId != item.id && !posterUrl.isNullOrBlank()) {
+                    } else {
                         AsyncImage(model = posterUrl, contentDescription = "${item.title} 封面", contentScale = shortPosterContentScale(fitMode), modifier = Modifier.fillMaxSize())
                     }
-                } else {
-                    AsyncImage(model = posterUrl, contentDescription = "${item.title} 封面", contentScale = shortPosterContentScale(fitMode), modifier = Modifier.fillMaxSize())
-                }
-                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0xB0000000)))))
-                AnimatedVisibility(visible = showController, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterEnd)) {
-                    Column(
-                        modifier = Modifier.padding(end = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        ShortVideoOverlayActionButton(
-                            icon = Icons.Filled.ThumbUp,
-                            active = detail?.userState?.isLiked == true,
-                            enabled = !actionBusy,
-                            onClick = { onToggleLike(item.id) },
-                            contentDescription = "喜欢",
-                        )
-                        ShortVideoOverlayActionButton(
-                            icon = Icons.Filled.Favorite,
-                            active = detail?.userState?.isFavorited == true,
-                            enabled = !actionBusy,
-                            onClick = { onToggleFavorite(item.id) },
-                            contentDescription = "收藏",
-                        )
-                        ShortVideoOverlayActionButton(icon = Icons.Filled.AspectRatio, active = false, enabled = true, onClick = onToggleFitMode, contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示")
-                        ShortPlaybackModeToggleButton(playbackMode = playbackMode, onClick = onTogglePlaybackMode)
-                        ShortOverlayFullscreenButton(onClick = { isFullscreen = true })
+                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0xB0000000)))))
+                    AnimatedVisibility(visible = showController, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterEnd)) {
+                        Column(
+                            modifier = Modifier.padding(end = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            ShortVideoOverlayActionButton(
+                                icon = Icons.Filled.ThumbUp,
+                                active = detail?.userState?.isLiked == true,
+                                enabled = !actionBusy,
+                                onClick = { onToggleLike(item.id) },
+                                contentDescription = "喜欢",
+                            )
+                            ShortVideoOverlayActionButton(
+                                icon = Icons.Filled.Favorite,
+                                active = detail?.userState?.isFavorited == true,
+                                enabled = !actionBusy,
+                                onClick = { onToggleFavorite(item.id) },
+                                contentDescription = "收藏",
+                            )
+                            ShortVideoOverlayActionButton(icon = Icons.Filled.AspectRatio, active = false, enabled = true, onClick = onToggleFitMode, contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示")
+                            ShortPlaybackModeToggleButton(playbackMode = playbackMode, onClick = onTogglePlaybackMode)
+                            ShortOverlayFullscreenButton(onClick = { isFullscreen = true })
+                        }
                     }
+                    Text(text = item.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 24.dp))
                 }
-                Text(text = item.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 24.dp))
             }
-        }
 
-        Text(text = shortPlaybackModeLabel(playbackMode), color = Color.White, style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
-        Text(text = "关闭", color = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClose).padding(horizontal = 10.dp, vertical = 6.dp))
+            Text(text = shortPlaybackModeLabel(playbackMode), color = Color.White, style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
+            Text(text = "关闭", color = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClose).padding(horizontal = 10.dp, vertical = 6.dp))
 
-        ShortOverlayFullscreenHost(
-            isFullscreen = isFullscreen,
-            onFullscreenChange = { isFullscreen = it },
-            player = sharedPlayer,
-            title = currentItem?.title.orEmpty(),
-            subtitleTracks = currentItem?.id?.let { detailByVideoId[it]?.subtitleTracks }.orEmpty(),
-            fallbackPlaybackMode = playbackMode,
-        )
-
-        if (shouldShowShortOverlayProgressBar(currentItem?.id)) {
-            ShortVideoBottomProgressBar(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .shortNonHomeProgressBarPadding(),
-                positionMs = positionMs,
-                durationMs = durationMs,
-                isScrubbing = isScrubbingShort,
-                scrubTargetMs = scrubTargetMs,
-                onScrubStart = {
-                    if (durationMs <= 0L) {
-                        return@ShortVideoBottomProgressBar
-                    }
-                    isScrubbingShort = true
-                    scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
-                    scrubTargetMs = scrubAnchorMs
-                },
-                onScrubByDeltaFraction = { deltaFraction ->
-                    if (durationMs <= 0L || !isScrubbingShort) {
-                        return@ShortVideoBottomProgressBar
-                    }
-                    scrubTargetMs = shortScrubTargetFromDelta(
-                        anchorMs = scrubAnchorMs,
-                        durationMs = durationMs,
-                        deltaFraction = deltaFraction,
-                    )
-                },
-                onScrubEnd = {
-                    if (!isScrubbingShort) {
-                        return@ShortVideoBottomProgressBar
-                    }
-                    if (durationMs > 0L) {
-                        val target = scrubTargetMs.coerceIn(0L, durationMs)
-                        sharedPlayer.seekTo(target)
-                        positionMs = target
-                    }
-                    isScrubbingShort = false
-                },
-            )
+            if (shouldShowShortOverlayProgressBar(currentItem?.id)) {
+                ShortVideoBottomProgressBar(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .shortNonHomeProgressBarPadding(),
+                    positionMs = positionMs,
+                    durationMs = durationMs,
+                    isScrubbing = isScrubbingShort,
+                    scrubTargetMs = scrubTargetMs,
+                    onScrubStart = {
+                        if (durationMs <= 0L) {
+                            return@ShortVideoBottomProgressBar
+                        }
+                        isScrubbingShort = true
+                        scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
+                        scrubTargetMs = scrubAnchorMs
+                    },
+                    onScrubByDeltaFraction = { deltaFraction ->
+                        if (durationMs <= 0L || !isScrubbingShort) {
+                            return@ShortVideoBottomProgressBar
+                        }
+                        scrubTargetMs = shortScrubTargetFromDelta(
+                            anchorMs = scrubAnchorMs,
+                            durationMs = durationMs,
+                            deltaFraction = deltaFraction,
+                        )
+                    },
+                    onScrubEnd = {
+                        if (!isScrubbingShort) {
+                            return@ShortVideoBottomProgressBar
+                        }
+                        if (durationMs > 0L) {
+                            val target = scrubTargetMs.coerceIn(0L, durationMs)
+                            sharedPlayer.seekTo(target)
+                            positionMs = target
+                        }
+                        isScrubbingShort = false
+                    },
+                )
+            }
         }
     }
 }

@@ -437,77 +437,79 @@ fun UnifiedPlayerScreen(
             }
 
             Box(modifier = containerModifier) {
-                VerticalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = !fullscreenLongForm && !isShortFullscreen,
-                ) { page ->
-                    val item = uiState.items[page]
-                    val isActive = pagerState.currentPage == page
-                    val isLongForm = isLongFormVideoType(item.type)
-                    val togglePauseState: () -> Unit = {
-                        val next = pausedByUserVideoIds.toMutableSet()
-                        if (next.contains(item.id)) {
-                            next.remove(item.id)
-                        } else {
-                            next.add(item.id)
+                if (isShortFullscreen) {
+                    ShortOverlayFullscreenHost(
+                        isFullscreen = isShortFullscreen,
+                        onFullscreenChange = { isShortFullscreen = it },
+                        player = sharedPlayer,
+                        title = currentDetail?.title ?: uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+                        subtitleTracks = currentDetail?.subtitleTracks.orEmpty(),
+                        fallbackPlaybackMode = uiState.playbackMode,
+                    )
+                } else {
+                    VerticalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = !fullscreenLongForm,
+                    ) { page ->
+                        val item = uiState.items[page]
+                        val isActive = pagerState.currentPage == page
+                        val isLongForm = isLongFormVideoType(item.type)
+                        val togglePauseState: () -> Unit = {
+                            val next = pausedByUserVideoIds.toMutableSet()
+                            if (next.contains(item.id)) {
+                                next.remove(item.id)
+                            } else {
+                                next.add(item.id)
+                            }
+                            pausedByUserVideoIds = next
                         }
-                        pausedByUserVideoIds = next
-                    }
-                    if (isLongForm) {
-                        UnifiedLongFormPage(
-                            item = item,
-                            sharedPlayer = sharedPlayer,
-                            active = isActive,
-                            detail = uiState.detailByVideoId[item.id],
-                            posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
-                            showPoster = isActive && renderedVideoId != item.id,
-                            isFullscreen = fullscreenLongForm && isActive,
-                            selectedSubtitleTrackId = subtitleSelectionByVideoId[item.id],
-                            onBack = {
-                                if (fullscreenLongForm && isActive) {
-                                    isFullscreen = false
-                                } else {
-                                    onBack()
-                                }
-                            },
-                            onTogglePauseByUser = togglePauseState,
-                            onToggleFullscreen = { isFullscreen = !(fullscreenLongForm && isActive) },
-                            onSelectSubtitleTrack = { selectedId ->
-                                subtitleSelectionByVideoId = subtitleSelectionByVideoId + (item.id to selectedId)
-                            },
-                        )
-                    } else {
-                        UnifiedShortVideoPage(
-                            item = item,
-                            detail = uiState.detailByVideoId[item.id],
-                            sharedPlayer = sharedPlayer,
-                            active = isActive,
-                            fitMode = uiState.shortFitMode,
-                            pausedByUser = item.id in pausedByUserVideoIds,
-                            posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
-                            showPoster = isActive && renderedVideoId != item.id,
-                            showFitModeToggle = isActive && shouldShowUnifiedPlayerShortFitToggle(item.type),
-                            titleBottomPadding = 34.dp,
-                            onTogglePauseByUser = togglePauseState,
-                            onToggleFitMode = viewModel::toggleShortFitMode,
-                            onTogglePlaybackMode = viewModel::toggleShortPlaybackMode,
-                            onOpenFullscreen = { isShortFullscreen = true },
-                            playbackMode = uiState.playbackMode,
-                        )
+                        if (isLongForm) {
+                            UnifiedLongFormPage(
+                                item = item,
+                                sharedPlayer = sharedPlayer,
+                                active = isActive,
+                                detail = uiState.detailByVideoId[item.id],
+                                posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                                showPoster = isActive && renderedVideoId != item.id,
+                                isFullscreen = fullscreenLongForm && isActive,
+                                selectedSubtitleTrackId = subtitleSelectionByVideoId[item.id],
+                                onBack = {
+                                    if (fullscreenLongForm && isActive) {
+                                        isFullscreen = false
+                                    } else {
+                                        onBack()
+                                    }
+                                },
+                                onTogglePauseByUser = togglePauseState,
+                                onToggleFullscreen = { isFullscreen = !(fullscreenLongForm && isActive) },
+                                onSelectSubtitleTrack = { selectedId ->
+                                    subtitleSelectionByVideoId = subtitleSelectionByVideoId + (item.id to selectedId)
+                                },
+                            )
+                        } else {
+                            UnifiedShortVideoPage(
+                                item = item,
+                                detail = uiState.detailByVideoId[item.id],
+                                sharedPlayer = sharedPlayer,
+                                active = isActive,
+                                fitMode = uiState.shortFitMode,
+                                pausedByUser = item.id in pausedByUserVideoIds,
+                                posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                                showPoster = isActive && renderedVideoId != item.id,
+                                showFitModeToggle = isActive && shouldShowUnifiedPlayerShortFitToggle(item.type),
+                                titleBottomPadding = 34.dp,
+                                onTogglePauseByUser = togglePauseState,
+                                onToggleFitMode = viewModel::toggleShortFitMode,
+                                onTogglePlaybackMode = viewModel::toggleShortPlaybackMode,
+                                onOpenFullscreen = { isShortFullscreen = true },
+                                playbackMode = uiState.playbackMode,
+                            )
+                        }
                     }
                 }
 
-                ShortOverlayFullscreenHost(
-                    isFullscreen = isShortFullscreen,
-                    onFullscreenChange = { isShortFullscreen = it },
-                    player = sharedPlayer,
-                    title = currentDetail?.title ?: uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
-                    subtitleTracks = currentDetail?.subtitleTracks.orEmpty(),
-                    fallbackPlaybackMode = uiState.playbackMode,
-                )
-
-                if (!currentIsLongForm && !fullscreenLongForm) {
+                if (!currentIsLongForm && !fullscreenLongForm && !isShortFullscreen) {
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopStart)
