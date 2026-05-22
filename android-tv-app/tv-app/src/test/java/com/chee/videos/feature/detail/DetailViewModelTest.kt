@@ -15,9 +15,9 @@ import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.SessionTokens
-import com.chee.videos.core.model.TvAuthSessionCreatePayload
+import com.chee.videos.core.model.TvAuthCreateEnvelope
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
-import com.chee.videos.core.model.TvAuthSessionStatusPayload
+import com.chee.videos.core.model.TvAuthStatusEnvelope
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvIptvPayload
@@ -223,9 +223,9 @@ private class FakeDetailApiService : ApiService {
     override suspend fun createTvAuthSession(
         url: String,
         body: TvAuthSessionCreateRequest,
-    ): ApiEnvelope<TvAuthSessionCreatePayload> = error("unused")
+    ): TvAuthCreateEnvelope = error("unused")
 
-    override suspend fun getTvAuthSession(url: String): ApiEnvelope<TvAuthSessionStatusPayload> = error("unused")
+    override suspend fun getTvAuthSession(url: String): TvAuthStatusEnvelope = error("unused")
 
     override suspend fun approveTvAuthSession(
         url: String,

@@ -11,9 +11,9 @@ import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
-import com.chee.videos.core.model.TvAuthSessionCreatePayload
+import com.chee.videos.core.model.TvAuthCreateEnvelope
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
-import com.chee.videos.core.model.TvAuthSessionStatusPayload
+import com.chee.videos.core.model.TvAuthStatusEnvelope
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvIptvPayload
@@ -112,12 +112,12 @@ interface ApiService {
     suspend fun createTvAuthSession(
         @Url url: String,
         @Body body: TvAuthSessionCreateRequest,
-    ): ApiEnvelope<TvAuthSessionCreatePayload>
+    ): TvAuthCreateEnvelope
 
     @GET
     suspend fun getTvAuthSession(
         @Url url: String,
-    ): ApiEnvelope<TvAuthSessionStatusPayload>
+    ): TvAuthStatusEnvelope
 
     @POST
     suspend fun approveTvAuthSession(

@@ -400,6 +400,18 @@ sealed class AppRootState {
     data class Ready(val baseUrl: String, val accessToken: String) : AppRootState()
 }
 
+data class TvAuthCreateEnvelope(
+    @SerializedName("code") val code: Int = -1,
+    @SerializedName("msg") val msg: String = "",
+    @SerializedName("data") val data: TvAuthSessionCreatePayload? = null,
+)
+
+data class TvAuthStatusEnvelope(
+    @SerializedName("code") val code: Int = -1,
+    @SerializedName("msg") val msg: String = "",
+    @SerializedName("data") val data: TvAuthSessionStatusPayload? = null,
+)
+
 class AppException(message: String) : RuntimeException(message)
 
 class AuthExpiredException : RuntimeException("登录已失效，请重新登录")

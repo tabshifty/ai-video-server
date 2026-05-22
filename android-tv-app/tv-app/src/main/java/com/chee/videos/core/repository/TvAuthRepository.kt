@@ -5,9 +5,11 @@ import com.chee.videos.core.model.ApiEnvelope
 import com.chee.videos.core.model.AppException
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.SessionTokens
+import com.chee.videos.core.model.TvAuthCreateEnvelope
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
+import com.chee.videos.core.model.TvAuthStatusEnvelope
 import com.chee.videos.core.network.ApiService
 import com.chee.videos.core.util.UrlBuilder
 import javax.inject.Inject
@@ -119,6 +121,22 @@ class TvAuthRepository @Inject constructor(
             requireEnvelope(resp)
             Unit
         }
+    }
+
+    private fun requireEnvelope(resp: TvAuthCreateEnvelope): TvAuthSessionCreatePayload {
+        val data = resp.data
+        if (resp.code != 0 || data == null) {
+            throw AppException(resp.msg.ifBlank { "TV 授权请求失败(code=${resp.code})" })
+        }
+        return data
+    }
+
+    private fun requireEnvelope(resp: TvAuthStatusEnvelope): TvAuthSessionStatusPayload {
+        val data = resp.data
+        if (resp.code != 0 || data == null) {
+            throw AppException(resp.msg.ifBlank { "TV 授权请求失败(code=${resp.code})" })
+        }
+        return data
     }
 
     private fun <T> requireEnvelope(resp: ApiEnvelope<T>): T {
