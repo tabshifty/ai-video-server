@@ -1,5 +1,6 @@
 package com.chee.videos.core.ui
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -92,6 +93,136 @@ class TvFocusSpecTest {
         assertTrue(
             "光晕/提亮淡入刚度应高于焦点缩放刚度，让背景反馈追上 scale 起步",
             TvFocusMotionTokens.SurfaceStiffness > TvFocusMotionTokens.ScaleStiffness,
+        )
+    }
+
+    @Test
+    fun `press feedback tokens are defined within tv press range`() {
+        assertTrue(
+            "TV DPad 按下 scale 目标应落在 0.94-0.99 之间，给到可感知的下沉但不会过度形变",
+            TvFocusMotionTokens.PressedScale in 0.94f..0.99f,
+        )
+        assertTrue(
+            "TV DPad 按下阻尼应落在 0.55-0.85，按下的回弹比焦点放大略紧凑",
+            TvFocusMotionTokens.PressDampingRatio in 0.55f..0.85f,
+        )
+        assertTrue(
+            "TV DPad 按下刚度必须高于焦点放大刚度，让按下与回弹明显比悬停焦点快",
+            TvFocusMotionTokens.PressStiffness > TvFocusMotionTokens.ScaleStiffness,
+        )
+    }
+
+    @Test
+    fun `resolveTvFocusableScaleTarget collapses disabled to one regardless of focus or press`() {
+        assertEquals(
+            1f,
+            resolveTvFocusableScaleTarget(
+                focused = true,
+                pressed = true,
+                enabled = false,
+                focusedScale = 1.04f,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun `resolveTvFocusableScaleTarget collapses pressed to pressed scale ahead of focus`() {
+        assertEquals(
+            TvFocusMotionTokens.PressedScale,
+            resolveTvFocusableScaleTarget(
+                focused = true,
+                pressed = true,
+                enabled = true,
+                focusedScale = 1.04f,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun `resolveTvFocusableScaleTarget returns focused scale when focused not pressed`() {
+        assertEquals(
+            1.04f,
+            resolveTvFocusableScaleTarget(
+                focused = true,
+                pressed = false,
+                enabled = true,
+                focusedScale = 1.04f,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun `resolveTvFocusableScaleTarget returns one when neither focused nor pressed`() {
+        assertEquals(
+            1f,
+            resolveTvFocusableScaleTarget(
+                focused = false,
+                pressed = false,
+                enabled = true,
+                focusedScale = 1.04f,
+            ),
+            0f,
+        )
+    }
+
+    @Test
+    fun `tv focus modifiers handle dpad center key event with press feedback`() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
+
+        assertTrue(
+            "tvFocusable* 必须接 onPreviewKeyEvent 才能拦截 DPad center / Enter 按下反馈",
+            source.contains("onPreviewKeyEvent"),
+        )
+        assertTrue(
+            "DPad center 必须显式接入 Key.DirectionCenter",
+            source.contains("Key.DirectionCenter"),
+        )
+        assertTrue(
+            "遥控/键盘 Enter 必须显式接入 Key.Enter",
+            source.contains("Key.Enter"),
+        )
+        assertTrue(
+            "部分遥控/键盘 NumPad Enter 必须显式接入 Key.NumPadEnter",
+            source.contains("Key.NumPadEnter"),
+        )
+        assertTrue(
+            "必须区分 KeyDown 与 KeyUp，KeyDown 进入按下态，KeyUp 回弹并触发触觉",
+            source.contains("KeyEventType.KeyDown") && source.contains("KeyEventType.KeyUp"),
+        )
+    }
+
+    @Test
+    fun `tv focus modifiers route scale and press through shared helpers`() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
+
+        assertTrue(
+            "tvFocusable* 内 scale targetValue 必须通过 resolveTvFocusableScaleTarget 派生，不允许内联三元",
+            source.contains("resolveTvFocusableScaleTarget("),
+        )
+        assertTrue(
+            "tvFocusable* 必须按 pressed 状态选择不同 spring，集中在 tvFocusableScaleSpring",
+            source.contains("tvFocusableScaleSpring("),
+        )
+    }
+
+    @Test
+    fun `tv press feedback triggers haptic with api guarded fallback`() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
+
+        assertTrue(
+            "支持 CONFIRM 触觉的设备应使用 HapticFeedbackConstants.CONFIRM",
+            source.contains("HapticFeedbackConstants.CONFIRM"),
+        )
+        assertTrue(
+            "低于 API 30 的设备必须回退到 HapticFeedbackConstants.VIRTUAL_KEY，避免触觉直接失败",
+            source.contains("HapticFeedbackConstants.VIRTUAL_KEY"),
+        )
+        assertTrue(
+            "触觉 API 必须按 SDK_INT 守门到 Build.VERSION_CODES.R",
+            source.contains("Build.VERSION.SDK_INT") && source.contains("Build.VERSION_CODES.R"),
         )
     }
 }
