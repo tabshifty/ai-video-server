@@ -62,4 +62,14 @@ class TvAuthEnvelopeSpecTest {
         )
         assertTrue(ApiEnvelope(code = 0, data = mapOf("ok" to true)).data?.get("ok") == true)
     }
+
+    @Test
+    fun `release shrinker keeps tv auth gson models used through retrofit signatures`() {
+        val proguardRules = Path.of("proguard-rules.pro").readText()
+
+        assertTrue(
+            "Release R8 必须保留 TV 授权模型；否则 suspend Retrofit 返回类型只在 Signature 中出现时会被 shrink，设备上退化为错误类型",
+            proguardRules.contains("-keep class com.chee.videos.core.model.TvAuth* { *; }"),
+        )
+    }
 }
