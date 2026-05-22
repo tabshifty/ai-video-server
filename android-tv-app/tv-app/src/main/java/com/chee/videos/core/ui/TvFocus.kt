@@ -9,7 +9,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -100,7 +99,7 @@ internal fun performTvPressHapticFeedback(view: View) {
 
 fun Modifier.tvFocusableGlow(
     enabled: Boolean = true,
-    shape: Shape = RoundedCornerShape(20.dp),
+    shape: Shape = AppChrome.SurfaceShape,
     focusedScale: Float = 1.04f,
 ): Modifier = composed {
     var isFocused by remember { mutableStateOf(false) }
@@ -172,7 +171,7 @@ fun Modifier.tvFocusableGlow(
 
 fun Modifier.tvFocusableScaleOnly(
     enabled: Boolean = true,
-    shape: Shape = RoundedCornerShape(20.dp),
+    shape: Shape = AppChrome.SurfaceShape,
     focusedScale: Float = 1.04f,
 ): Modifier = composed {
     var isFocused by remember { mutableStateOf(false) }

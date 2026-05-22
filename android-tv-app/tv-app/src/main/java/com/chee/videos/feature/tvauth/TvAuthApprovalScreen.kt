@@ -48,7 +48,7 @@ fun TvAuthApprovalScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
+            shape = AppChrome.SurfaceShape,
             shadowElevation = 12.dp,
         ) {
             Column(

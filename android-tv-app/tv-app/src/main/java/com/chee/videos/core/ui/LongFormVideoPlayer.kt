@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FastForward
@@ -617,7 +616,7 @@ fun LongFormVideoPlayer(
         ) {
             Surface(
                 color = Color(0xD610131A),
-                shape = RoundedCornerShape(18.dp),
+                shape = AppChrome.SurfaceShape,
             ) {
                 Text(
                     text = seekPreviewText,
@@ -638,7 +637,7 @@ fun LongFormVideoPlayer(
         ) {
             Surface(
                 color = Color(0xCC0D1016),
-                shape = RoundedCornerShape(22.dp),
+                shape = AppChrome.SurfaceShape,
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -678,7 +677,7 @@ fun LongFormVideoPlayer(
             ) {
                 Surface(
                     color = Color(0x8C0D1016),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = AppChrome.SurfaceShape,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
@@ -722,7 +721,7 @@ fun LongFormVideoPlayer(
             ) {
                 Surface(
                     color = Color(0x910D1016),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = AppChrome.SurfaceShape,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(

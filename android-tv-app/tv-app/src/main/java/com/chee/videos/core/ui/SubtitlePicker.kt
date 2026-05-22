@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
@@ -298,7 +297,7 @@ private fun NightGlassTrackPickerPanel(
                         Color(0x1AFFFFFF),
                     ),
                 ),
-                shape = RoundedCornerShape(22.dp),
+                shape = AppChrome.SurfaceShape,
             )
             .background(
                 brush = Brush.linearGradient(
@@ -308,7 +307,7 @@ private fun NightGlassTrackPickerPanel(
                         Color(0xE6070A10),
                     ),
                 ),
-                shape = RoundedCornerShape(22.dp),
+                shape = AppChrome.SurfaceShape,
             )
             .clickable(
                 indication = null,
@@ -329,7 +328,7 @@ private fun SubtitleOptionRow(
     tvMode: Boolean = false,
     focusRequester: FocusRequester? = null,
 ) {
-    val rowShape = RoundedCornerShape(if (tvMode) 12.dp else 14.dp)
+    val rowShape = AppChrome.SurfaceShape
     var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
     val rowColor = when {
         focused && tvMode -> Color(0x2E39D7E8)
@@ -434,7 +433,7 @@ private fun TrackPickerSelectionRail(
         modifier = Modifier
             .width(3.dp)
             .heightIn(min = 28.dp)
-            .background(color = color, shape = RoundedCornerShape(2.dp)),
+            .background(color = color, shape = AppChrome.PillShape),
     )
 }
 

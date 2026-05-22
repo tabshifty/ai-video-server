@@ -332,7 +332,7 @@ fun TvIptvScreen(
 private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
     Surface(
         color = Color(0x8C0D1016),
-        shape = RoundedCornerShape(12.dp),
+        shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .padding(start = 18.dp, top = 18.dp),
     ) {
@@ -459,7 +459,7 @@ private fun TvIptvChannelRow(
     }
     Surface(
         color = rowColor,
-        shape = RoundedCornerShape(8.dp),
+        shape = AppChrome.ChipShape,
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
@@ -504,7 +504,7 @@ private fun TvIptvChannelLogo(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AppChrome.ChipShape)
             .background(Color.White.copy(alpha = 0.08f)),
         contentAlignment = Alignment.Center,
     ) {
@@ -532,7 +532,7 @@ private fun TvIptvLogoFallback(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AppChrome.ChipShape)
             .background(Color.White.copy(alpha = 0.08f)),
         contentAlignment = Alignment.Center,
     ) {

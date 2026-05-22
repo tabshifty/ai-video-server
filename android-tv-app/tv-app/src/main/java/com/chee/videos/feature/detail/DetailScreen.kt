@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -422,7 +421,7 @@ fun DetailScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(220.dp)
-                                    .clip(RoundedCornerShape(14.dp))
+                                    .clip(AppChrome.SurfaceShape)
                                     .background(Color(0xFF1A1C20)),
                             ) {
                                 if (showPlayer) {
@@ -594,7 +593,7 @@ private fun AvDetailPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(mediaLayoutSpec.aspectRatio)
-                .clip(AppChrome.CardShape)
+                .clip(AppChrome.SurfaceShape)
                 .background(AppChrome.CanvasRaised),
         ) {
             if (showPlayer) {
@@ -793,7 +792,7 @@ private fun AvDetailOverview(
     ) {
         Surface(
             color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
+            shape = AppChrome.SurfaceShape,
         ) {
             Column(
                 modifier = Modifier
@@ -824,7 +823,7 @@ private fun AvDetailOverview(
 
         Surface(
             color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
+            shape = AppChrome.SurfaceShape,
         ) {
             Row(
                 modifier = Modifier
@@ -852,7 +851,7 @@ private fun AvDetailOverview(
 
         Surface(
             color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
+            shape = AppChrome.SurfaceShape,
         ) {
             Column(
                 modifier = Modifier
@@ -872,7 +871,7 @@ private fun AvDetailOverview(
 
         Surface(
             color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
+            shape = AppChrome.SurfaceShape,
         ) {
             Column(
                 modifier = Modifier
@@ -902,7 +901,7 @@ private fun AvDetailOverview(
 
         Surface(
             color = AppChrome.SurfaceElevated,
-            shape = AppChrome.CardShape,
+            shape = AppChrome.SurfaceShape,
         ) {
             Column(
                 modifier = Modifier
@@ -922,7 +921,7 @@ private fun AvDetailOverview(
         if (detail.tags.orEmpty().isNotEmpty()) {
             Surface(
                 color = AppChrome.Surface,
-                shape = AppChrome.CardShape,
+                shape = AppChrome.SurfaceShape,
             ) {
                 Column(
                     modifier = Modifier
@@ -989,7 +988,7 @@ private fun AvDetailOverview(
 private fun AvActorCard(actor: AvDetailActorModel) {
     Surface(
         color = AppChrome.SurfaceStrong,
-        shape = RoundedCornerShape(18.dp),
+        shape = AppChrome.SurfaceShape,
     ) {
         Column(
             modifier = Modifier
@@ -1005,13 +1004,13 @@ private fun AvActorCard(actor: AvDetailActorModel) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp)),
+                        .clip(AppChrome.SurfaceShape),
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(AppChrome.SurfaceShape)
                         .background(AppChrome.CanvasRaised),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1063,7 +1062,7 @@ private fun AvMetricCard(
     Surface(
         modifier = modifier,
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(18.dp),
+        shape = AppChrome.SurfaceShape,
     ) {
         Column(
             modifier = Modifier
@@ -1111,7 +1110,7 @@ private fun DetailActionButton(
     Button(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = AppChrome.SurfaceShape,
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = AppChrome.TextPrimary,
@@ -1138,7 +1137,7 @@ private fun PlaybackErrorBanner(
     Surface(
         modifier = modifier,
         color = Color(0xCC2B0F12),
-        shape = RoundedCornerShape(14.dp),
+        shape = AppChrome.SurfaceShape,
     ) {
         Text(
             text = text,

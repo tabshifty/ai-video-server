@@ -1,7 +1,6 @@
 package com.chee.videos.feature.tv
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -9,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.chee.videos.core.ui.AppChrome
 
 internal const val TvPlayerBackConfirmWindowMillis = 2_000L
 
@@ -38,7 +38,7 @@ internal fun TvPlayerBackConfirmPrompt(
     Surface(
         modifier = modifier,
         color = Color(0xCC121212),
-        shape = RoundedCornerShape(14.dp),
+        shape = AppChrome.SurfaceShape,
     ) {
         Text(
             text = "再按一次返回",

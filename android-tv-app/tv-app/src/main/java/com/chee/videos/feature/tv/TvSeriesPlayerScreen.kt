@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -443,7 +442,7 @@ fun TvSeriesPlayerScreen(
                         val selected = episode.number == uiState.selectedEpisodeNumber
                         Surface(
                             color = if (selected) AppChrome.AccentSoft else AppChrome.SurfaceElevated,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = AppChrome.SurfaceShape,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             RowItem(
@@ -511,7 +510,7 @@ private fun TvPlayerErrorBanner(
     Surface(
         modifier = modifier,
         color = Color(0xCC2B0F12),
-        shape = RoundedCornerShape(14.dp),
+        shape = AppChrome.SurfaceShape,
     ) {
         Text(
             text = message,

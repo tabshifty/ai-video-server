@@ -4,6 +4,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 object AppChrome {
@@ -42,9 +44,11 @@ object AppChrome {
             ),
         )
 
-    val CardShape = RoundedCornerShape(22.dp)
-    val SectionShape = RoundedCornerShape(18.dp)
-    val PillShape = RoundedCornerShape(999.dp)
+    val RadiusDp: Dp = 16.dp
+    val SurfaceShape: Shape = RoundedCornerShape(RadiusDp)
+    val ChipRadiusDp: Dp = 8.dp
+    val ChipShape: Shape = RoundedCornerShape(ChipRadiusDp)
+    val PillShape: Shape = RoundedCornerShape(999.dp)
 }
 
 val AppDarkColors = darkColorScheme(

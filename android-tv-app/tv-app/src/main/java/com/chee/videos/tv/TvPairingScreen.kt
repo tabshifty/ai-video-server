@@ -152,7 +152,7 @@ fun TvPairingScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = AppChrome.Surface,
-            shape = AppChrome.CardShape,
+            shape = AppChrome.SurfaceShape,
             shadowElevation = 12.dp,
         ) {
             Column(
@@ -173,7 +173,7 @@ fun TvPairingScreen(
                     qrBitmap?.let { image ->
                         Surface(
                             color = AppChrome.TextPrimary,
-                            shape = AppChrome.SectionShape,
+                            shape = AppChrome.SurfaceShape,
                         ) {
                             Image(
                                 bitmap = image,

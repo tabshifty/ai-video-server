@@ -167,7 +167,7 @@ private fun ConnectionPanel(
 ) {
     Surface(
         color = AppChrome.Surface,
-        shape = AppChrome.CardShape,
+        shape = AppChrome.SurfaceShape,
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(

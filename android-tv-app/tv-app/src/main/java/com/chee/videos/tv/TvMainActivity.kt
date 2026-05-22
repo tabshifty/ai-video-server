@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -23,6 +24,19 @@ class TvMainActivity : ComponentActivity() {
         )
         setContent {
             TvShellApp()
+        }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        return try {
+            super.dispatchKeyEvent(event)
+        } catch (err: IllegalStateException) {
+            if (shouldSwallowTvComposeFocusRequesterCrash(err)) {
+                Log.w(TAG, "swallowed FocusRequester crash in dispatchKeyEvent — prevents input-dispatch ANR", err)
+                false
+            } else {
+                throw err
+            }
         }
     }
 

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tv
@@ -125,7 +124,7 @@ private fun TvStateContainer(
 private fun TvStatePanel(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         color = Color(0xD610131A),
-        shape = AppChrome.CardShape,
+        shape = AppChrome.SurfaceShape,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
@@ -173,9 +172,9 @@ private fun TvStateAction(actionLabel: String?, onAction: (() -> Unit)?) {
     }
     Surface(
         color = Color(0x2239D7E8),
-        shape = RoundedCornerShape(10.dp),
+        shape = AppChrome.SurfaceShape,
         modifier = Modifier
-            .tvFocusableGlow(shape = RoundedCornerShape(10.dp), focusedScale = 1.04f)
+            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.04f)
             .clickable(onClick = onAction),
     ) {
         Row(

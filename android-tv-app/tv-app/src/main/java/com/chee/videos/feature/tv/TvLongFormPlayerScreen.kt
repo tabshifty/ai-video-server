@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -362,7 +361,7 @@ fun TvLongFormPlayerScreen(
             if (!playerErrorMessage.isNullOrBlank()) {
                 Surface(
                     color = Color(0xCC2B0F12),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = AppChrome.SurfaceShape,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(14.dp),

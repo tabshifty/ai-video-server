@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -62,7 +61,7 @@ import com.chee.videos.core.ui.tvStaggerEntry
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 private val tvPosterWallFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
-private val TvPosterWallCardShape = RoundedCornerShape(14.dp)
+private val TvPosterWallCardShape = AppChrome.SurfaceShape
 private val TvPosterWallTitleBackground = Color(0xE80A0E15)
 
 internal object TvPosterWallFocusLayoutSpec {
@@ -211,7 +210,7 @@ private fun TvPosterWallTopBar(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "返回",
             onClick = onBack,
-            shape = RoundedCornerShape(16.dp),
+            shape = AppChrome.SurfaceShape,
             containerColor = AppChrome.SurfaceElevated,
             contentColor = AppChrome.TextPrimary,
         )

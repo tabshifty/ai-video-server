@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -153,7 +152,7 @@ fun TvSeriesDetailScreen(
                                 .width(228.dp)
                                 .aspectRatio(2f / 3f)
                                 .tvSharedSeriesPoster(series.id)
-                                .clip(RoundedCornerShape(26.dp)),
+                                .clip(AppChrome.SurfaceShape),
                             contentScale = ContentScale.Crop,
                         )
                     } else {
@@ -162,7 +161,7 @@ fun TvSeriesDetailScreen(
                                 .width(228.dp)
                                 .aspectRatio(2f / 3f)
                                 .tvSharedSeriesPoster(series.id)
-                                .clip(RoundedCornerShape(26.dp))
+                                .clip(AppChrome.SurfaceShape)
                                 .background(tvBackdropBrush(series.posterSeed)),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -300,9 +299,9 @@ fun TvSeriesDetailScreen(
                     val selected = item.number == uiState.selectedSeasonNumber
                     Surface(
                         color = if (selected) AppChrome.AccentSoft else AppChrome.Surface,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = AppChrome.ChipShape,
                         modifier = Modifier
-                            .tvFocusableGlow(shape = RoundedCornerShape(12.dp), focusedScale = 1.04f)
+                            .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.04f)
                             .clickable { viewModel.selectSeason(item.number) },
                     ) {
                         Text(
@@ -336,10 +335,10 @@ fun TvSeriesDetailScreen(
                             val selected = episode.number == uiState.selectedEpisodeNumber
                             Surface(
                                 color = if (selected) AppChrome.AccentSoft else AppChrome.SurfaceElevated,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = AppChrome.SurfaceShape,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .tvFocusableGlow(shape = RoundedCornerShape(12.dp), focusedScale = 1.03f)
+                                    .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.03f)
                                     .clickable(enabled = episode.playable) {
                                         viewModel.selectEpisode(episode.number)
                                         onPlayEpisode(

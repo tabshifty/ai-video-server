@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocalMovies
@@ -32,7 +31,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -197,7 +195,7 @@ fun TvCatalogScreen(
                         onQueryChanged = viewModel::updateQuery,
                         modifier = Modifier
                             .focusRequester(searchFocusRequester)
-                            .tvFocusableGlow(shape = RoundedCornerShape(18.dp), focusedScale = 1.01f),
+                            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.01f),
                     )
                 }
                 item(key = "search-header") {
@@ -284,7 +282,7 @@ fun TvCatalogScreen(
                         data = continueWatching,
                         modifier = Modifier
                             .focusRequester(continueFocusRequester)
-                            .tvFocusableGlow(shape = AppChrome.CardShape),
+                            .tvFocusableGlow(shape = AppChrome.SurfaceShape),
                         onClick = {
                             if (continueWatching.type == "tv") {
                                 onOpenContinueWatching(
@@ -402,7 +400,7 @@ private fun TvCatalogSearchBar(
                 )
             }
         },
-        shape = RoundedCornerShape(18.dp),
+        shape = AppChrome.SurfaceShape,
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = AppChrome.TextPrimary,
             unfocusedTextColor = AppChrome.TextPrimary,
@@ -463,12 +461,12 @@ private fun TvHomeSideMenuButton(
     val background = if (selected) AppChrome.Accent.copy(alpha = 0.92f) else AppChrome.Surface.copy(alpha = 0.72f)
     Surface(
         color = background,
-        shape = RoundedCornerShape(8.dp),
+        shape = AppChrome.ChipShape,
         modifier = modifier
             .width(56.dp)
             .height(48.dp)
             .focusProperties { right = contentFocusRequester }
-            .tvFocusableGlow(shape = RoundedCornerShape(8.dp), focusedScale = 1.06f)
+            .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.06f)
             .clickable(onClick = onClick),
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -548,7 +546,7 @@ private fun TvSeekStepSettingRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppChrome.SurfaceElevated, RoundedCornerShape(8.dp))
+            .background(AppChrome.SurfaceElevated, AppChrome.SurfaceShape)
             .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -578,11 +576,11 @@ private fun TvSeekStepSettingRow(
                 val selected = TvPlaybackSeekStepSetting.normalize(selectedSeconds) == seconds
                 Surface(
                     color = if (selected) AppChrome.Accent.copy(alpha = 0.92f) else AppChrome.Surface.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = AppChrome.ChipShape,
                     modifier = Modifier
                         .width(72.dp)
                         .height(44.dp)
-                        .tvFocusableGlow(shape = RoundedCornerShape(8.dp), focusedScale = 1.04f)
+                        .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.04f)
                         .clickable { onSelectSeconds(seconds) },
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -606,11 +604,11 @@ private fun TvSettingsActionRow(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(8.dp),
+        shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .fillMaxWidth()
             .height(62.dp)
-            .tvFocusableGlow(shape = RoundedCornerShape(8.dp), focusedScale = 1.02f)
+            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -643,11 +641,11 @@ private fun TvHomeAllEntry(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(8.dp),
+        shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .fillMaxWidth()
             .height(78.dp)
-            .tvFocusableGlow(shape = RoundedCornerShape(8.dp), focusedScale = 1.02f)
+            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
             .clickable(onClick = { onOpenCatalogWall(wallKind, title) }),
     ) {
         Row(
@@ -714,11 +712,11 @@ private fun TvSearchResultCard(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = AppChrome.SectionShape,
+        shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(AppChrome.SectionShape)
-            .tvFocusableGlow(shape = AppChrome.SectionShape, focusedScale = 1.02f)
+            .clip(AppChrome.SurfaceShape)
+            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -809,7 +807,7 @@ private fun TvFeaturedHero(
 
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = AppChrome.CardShape,
+        shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .fillMaxWidth()
             .height(324.dp),
@@ -927,7 +925,7 @@ private fun TvFeaturedPoster(
             modifier = Modifier
                 .width(186.dp)
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(24.dp)),
+                .clip(AppChrome.SurfaceShape),
             contentScale = ContentScale.Crop,
         )
         return
@@ -936,7 +934,7 @@ private fun TvFeaturedPoster(
         modifier = Modifier
             .width(186.dp)
             .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(AppChrome.SurfaceShape)
             .background(tvPosterBrush(posterSeed)),
         contentAlignment = Alignment.Center,
     ) {
@@ -1007,10 +1005,10 @@ private fun TvContinueWatchingBanner(
         ?: resolveTvArtworkUrl(baseUrl, data.posterUrl)
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = AppChrome.CardShape,
+        shape = AppChrome.SurfaceShape,
         modifier = modifier
             .fillMaxWidth()
-            .clip(AppChrome.CardShape)
+            .clip(AppChrome.SurfaceShape)
             .clickable(onClick = onClick),
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -1168,11 +1166,11 @@ private fun TvSeriesPosterCard(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(16.dp),
+        shape = AppChrome.SurfaceShape,
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
-            .size(width = 146.dp, height = 256.dp)
-            .tvFocusableScaleOnly(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .size(width = 146.dp, height = 310.dp)
+            .tvFocusableScaleOnly(shape = AppChrome.SurfaceShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -1187,13 +1185,13 @@ private fun TvSeriesPosterCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = series.title,
                     color = AppChrome.TextPrimary,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1205,22 +1203,6 @@ private fun TvSeriesPosterCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = AppChrome.AccentWarm,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Text(
-                        text = series.ratingText,
-                        color = AppChrome.TextSecondary,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
             }
         }
     }
@@ -1293,11 +1275,11 @@ private fun TvPosterMoreCard(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(16.dp),
+        shape = AppChrome.SurfaceShape,
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
-            .size(width = 146.dp, height = 256.dp)
-            .tvFocusableScaleOnly(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .size(width = 146.dp, height = 310.dp)
+            .tvFocusableScaleOnly(shape = AppChrome.SurfaceShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Box(
@@ -1356,11 +1338,11 @@ private fun TvHomeShelfCard(
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
-        shape = RoundedCornerShape(16.dp),
+        shape = AppChrome.SurfaceShape,
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
-            .size(width = 146.dp, height = 256.dp)
-            .tvFocusableScaleOnly(shape = RoundedCornerShape(16.dp), focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .size(width = 146.dp, height = 310.dp)
+            .tvFocusableScaleOnly(shape = AppChrome.SurfaceShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -1375,13 +1357,13 @@ private fun TvHomeShelfCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = item.title,
                     color = AppChrome.TextPrimary,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1422,7 +1404,7 @@ private fun TvPosterArtwork(
             modifier = Modifier
                 .width(width)
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(14.dp)),
+                .clip(AppChrome.SurfaceShape),
             contentScale = ContentScale.Crop,
         )
         return
@@ -1431,7 +1413,7 @@ private fun TvPosterArtwork(
         modifier = Modifier
             .width(width)
             .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(AppChrome.SurfaceShape)
             .background(tvPosterBrush(posterSeed)),
         contentAlignment = Alignment.Center,
     ) {

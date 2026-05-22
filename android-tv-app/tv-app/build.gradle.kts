@@ -37,8 +37,8 @@ android {
         applicationId = "com.chee.videos.tv"
         minSdk = 26
         targetSdk = 35
-        versionCode = 52
-        versionName = "0.1.51"
+        versionCode = 55
+        versionName = "0.1.54"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -102,6 +102,24 @@ kotlin {
             tvTestSourceExcludes.forEach { kotlin.exclude(it) }
         }
     }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    val excludes = if (name.contains("UnitTest", ignoreCase = true)) {
+        tvTestSourceExcludes
+    } else {
+        tvMainSourceExcludes
+    }
+    exclude(excludes)
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.internal.KaptGenerateStubsTask>().configureEach {
+    val excludes = if (name.contains("UnitTest", ignoreCase = true)) {
+        tvTestSourceExcludes
+    } else {
+        tvMainSourceExcludes
+    }
+    exclude(excludes)
 }
 
 dependencies {

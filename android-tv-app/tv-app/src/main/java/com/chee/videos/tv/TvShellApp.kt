@@ -13,7 +13,6 @@ import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -329,7 +328,7 @@ private fun TvRootExitConfirmPrompt(
     Surface(
         modifier = modifier,
         color = Color(0xCC121212),
-        shape = RoundedCornerShape(14.dp),
+        shape = AppChrome.SurfaceShape,
     ) {
         Text(
             text = "再按一次退出",
