@@ -225,4 +225,91 @@ class TvFocusSpecTest {
             source.contains("Build.VERSION.SDK_INT") && source.contains("Build.VERSION_CODES.R"),
         )
     }
+
+    @Test
+    fun `inner glow alpha target lives in viewable but non-occluding range`() {
+        assertTrue(
+            "内层 glow alpha 目标值应 ≥ 0.5，保证 10-foot 视距下焦点提亮可见",
+            TvFocusMotionTokens.InnerGlowAlphaTarget >= 0.5f,
+        )
+        assertTrue(
+            "内层 glow alpha 目标值应 ≤ 0.75，避免遮挡海报图色彩",
+            TvFocusMotionTokens.InnerGlowAlphaTarget <= 0.75f,
+        )
+    }
+
+    @Test
+    fun `outer halo elevation respects poster focus safe space`() {
+        assertTrue(
+            "外层 halo elevation 应 ≥ 8dp，看得见 tinted shadow 扩散",
+            TvFocusMotionTokens.OuterHaloElevationDp.value >= 8f,
+        )
+        assertTrue(
+            "外层 halo elevation 应 ≤ 16dp，与 posterFocusSafeSpaceDp = 8 留够余量，不漏到邻卡",
+            TvFocusMotionTokens.OuterHaloElevationDp.value <= 16f,
+        )
+    }
+
+    @Test
+    fun `tv focus modifiers route outer halo through Modifier shadow with tinted colors`() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
+
+        assertTrue(
+            "外层 halo 应升级为 Modifier.shadow(...)，而非 graphicsLayer.shadowElevation 裸字面量",
+            source.contains("Modifier.shadow(") || source.contains(".shadow("),
+        )
+        val shadowOccurrences = Regex("""\.shadow\(""").findAll(source).count()
+        assertTrue(
+            "tvFocusableGlow 与 tvFocusableScaleOnly 都应使用 .shadow(...) —— 至少出现 2 次",
+            shadowOccurrences >= 2,
+        )
+        assertTrue(
+            "外层 halo 必须 tint 到蓝青色：ambientColor = TvFocusGlowColor",
+            source.contains("ambientColor = TvFocusGlowColor"),
+        )
+        assertTrue(
+            "外层 halo 必须 tint 到蓝青色：spotColor = TvFocusGlowColor",
+            source.contains("spotColor = TvFocusGlowColor"),
+        )
+        assertTrue(
+            "外层 halo 必须不裁剪，才能溢出 shape 形成扩散感",
+            source.contains("clip = false"),
+        )
+    }
+
+    @Test
+    fun `tv focus modifiers no longer use bare shadow elevation literals`() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
+
+        assertTrue(
+            "旧的 graphicsLayer 裸 shadowElevation = 32f 应被替换为 Modifier.shadow",
+            !source.contains("shadowElevation = 32f"),
+        )
+        assertTrue(
+            "旧的 graphicsLayer 裸 shadowElevation = 28f 应被替换为 Modifier.shadow",
+            !source.contains("shadowElevation = 28f"),
+        )
+        assertTrue(
+            "旧的 alpha-写死字面量 Color(0x2639D7E8) 应被移除，改走 InnerGlowAlphaTarget * surfaceAlpha",
+            !source.contains("Color(0x2639D7E8)"),
+        )
+    }
+
+    @Test
+    fun `tv focus modifiers consume both inner and outer glow tokens`() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
+
+        assertTrue(
+            "tvFocusableGlow 必须引用 TvFocusMotionTokens.InnerGlowAlphaTarget 决定内层 alpha",
+            source.contains("TvFocusMotionTokens.InnerGlowAlphaTarget"),
+        )
+        assertTrue(
+            "tvFocusableGlow / tvFocusableScaleOnly 必须引用 TvFocusMotionTokens.OuterHaloElevationDp 决定外层扩散",
+            source.contains("TvFocusMotionTokens.OuterHaloElevationDp"),
+        )
+        assertTrue(
+            "halo elevation 应走 animateDpAsState，与内层 surfaceAlpha 同节奏，而非 jump cut",
+            source.contains("animateDpAsState("),
+        )
+    }
 }

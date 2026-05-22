@@ -4,6 +4,7 @@ import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -25,10 +27,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 val TvFocusGlowColor = Color(0xFF39D7E8)
-private val TvFocusGlowSurface = Color(0x2639D7E8)
 
 object TvFocusSafeSpec {
     const val posterCardWidthDp: Float = 146f
@@ -54,6 +56,9 @@ object TvFocusMotionTokens {
     const val PressedScale: Float = 0.97f
     const val PressDampingRatio: Float = 0.7f
     const val PressStiffness: Float = 720f
+
+    const val InnerGlowAlphaTarget: Float = 0.6f
+    val OuterHaloElevationDp: Dp = 12.dp
 }
 
 private val TvPressKeys: Set<Key> = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
@@ -119,52 +124,13 @@ fun Modifier.tvFocusableGlow(
         ),
         label = "tvFocusSurfaceAlpha",
     )
-    this
-        .onFocusChanged { state ->
-            isFocused = state.isFocused || state.hasFocus
-            if (!isFocused) isPressed = false
-        }
-        .onPreviewKeyEvent { event ->
-            if (!enabled || !isFocused) return@onPreviewKeyEvent false
-            if (!isTvPressKey(event.key)) return@onPreviewKeyEvent false
-            when (event.type) {
-                KeyEventType.KeyDown -> isPressed = true
-                KeyEventType.KeyUp -> {
-                    isPressed = false
-                    performTvPressHapticFeedback(view)
-                }
-                else -> {}
-            }
-            false
-        }
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-            shadowElevation = if (isFocused && enabled) 32f else 0f
-            this.shape = shape
-            clip = false
-        }
-        .background(color = TvFocusGlowSurface.copy(alpha = surfaceAlpha), shape = shape)
-        .focusable(enabled = enabled)
-}
-
-fun Modifier.tvFocusableScaleOnly(
-    enabled: Boolean = true,
-    shape: Shape = RoundedCornerShape(20.dp),
-    focusedScale: Float = 1.04f,
-): Modifier = composed {
-    var isFocused by remember { mutableStateOf(false) }
-    var isPressed by remember { mutableStateOf(false) }
-    val view = LocalView.current
-    val scale by animateFloatAsState(
-        targetValue = resolveTvFocusableScaleTarget(
-            focused = isFocused,
-            pressed = isPressed,
-            enabled = enabled,
-            focusedScale = focusedScale,
+    val haloElevation by animateDpAsState(
+        targetValue = if (isFocused && enabled) TvFocusMotionTokens.OuterHaloElevationDp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = TvFocusMotionTokens.SurfaceDampingRatio,
+            stiffness = TvFocusMotionTokens.SurfaceStiffness,
         ),
-        animationSpec = tvFocusableScaleSpring(isPressed),
-        label = "tvFocusScaleOnly",
+        label = "tvFocusHaloElevation",
     )
     this
         .onFocusChanged { state ->
@@ -187,9 +153,77 @@ fun Modifier.tvFocusableScaleOnly(
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
-            shadowElevation = if (isFocused && enabled) 28f else 0f
-            this.shape = shape
-            clip = false
         }
+        .shadow(
+            elevation = haloElevation,
+            shape = shape,
+            clip = false,
+            ambientColor = TvFocusGlowColor,
+            spotColor = TvFocusGlowColor,
+        )
+        .background(
+            color = TvFocusGlowColor.copy(
+                alpha = TvFocusMotionTokens.InnerGlowAlphaTarget * surfaceAlpha,
+            ),
+            shape = shape,
+        )
+        .focusable(enabled = enabled)
+}
+
+fun Modifier.tvFocusableScaleOnly(
+    enabled: Boolean = true,
+    shape: Shape = RoundedCornerShape(20.dp),
+    focusedScale: Float = 1.04f,
+): Modifier = composed {
+    var isFocused by remember { mutableStateOf(false) }
+    var isPressed by remember { mutableStateOf(false) }
+    val view = LocalView.current
+    val scale by animateFloatAsState(
+        targetValue = resolveTvFocusableScaleTarget(
+            focused = isFocused,
+            pressed = isPressed,
+            enabled = enabled,
+            focusedScale = focusedScale,
+        ),
+        animationSpec = tvFocusableScaleSpring(isPressed),
+        label = "tvFocusScaleOnly",
+    )
+    val haloElevation by animateDpAsState(
+        targetValue = if (isFocused && enabled) TvFocusMotionTokens.OuterHaloElevationDp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = TvFocusMotionTokens.SurfaceDampingRatio,
+            stiffness = TvFocusMotionTokens.SurfaceStiffness,
+        ),
+        label = "tvFocusScaleOnlyHaloElevation",
+    )
+    this
+        .onFocusChanged { state ->
+            isFocused = state.isFocused || state.hasFocus
+            if (!isFocused) isPressed = false
+        }
+        .onPreviewKeyEvent { event ->
+            if (!enabled || !isFocused) return@onPreviewKeyEvent false
+            if (!isTvPressKey(event.key)) return@onPreviewKeyEvent false
+            when (event.type) {
+                KeyEventType.KeyDown -> isPressed = true
+                KeyEventType.KeyUp -> {
+                    isPressed = false
+                    performTvPressHapticFeedback(view)
+                }
+                else -> {}
+            }
+            false
+        }
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .shadow(
+            elevation = haloElevation,
+            shape = shape,
+            clip = false,
+            ambientColor = TvFocusGlowColor,
+            spotColor = TvFocusGlowColor,
+        )
         .focusable(enabled = enabled)
 }
