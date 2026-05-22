@@ -20,7 +20,7 @@ object AppChrome {
     val AccentWarm = Color(0xFFD4A647)
     val TextPrimary = Color(0xFFF8FAFC)
     val TextSecondary = Color(0xFFCCD3DF)
-    val TextMuted = Color(0xFF96A0B2)
+    val TextMuted = Color(0xFFB0BAC8)
     val TextSubtle = Color(0xFF6F7B90)
     val Error = Color(0xFFFF7B8D)
 

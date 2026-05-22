@@ -47,6 +47,7 @@ import com.chee.videos.core.ui.LocalTvAnimatedContentScope
 import com.chee.videos.core.ui.LocalTvSharedTransitionScope
 import com.chee.videos.core.ui.TvMinimalBringIntoViewSpec
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.TvTypography
 import com.chee.videos.core.viewmodel.AppRootViewModel
 import com.chee.videos.feature.connection.ConnectionScreen
 import com.chee.videos.feature.tv.TvEpisodeArg
@@ -80,7 +81,7 @@ fun TvShellApp(
 ) {
     val appState by appRootViewModel.appState.collectAsStateWithLifecycle()
 
-    MaterialTheme(colorScheme = AppDarkColors) {
+    MaterialTheme(colorScheme = AppDarkColors, typography = TvTypography) {
         Surface(modifier = Modifier.fillMaxSize(), color = AppChrome.Canvas) {
             when (val state = appState) {
                 AppRootState.Loading -> {
