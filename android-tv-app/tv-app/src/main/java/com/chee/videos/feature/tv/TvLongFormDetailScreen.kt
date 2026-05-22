@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -43,6 +42,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
+import com.chee.videos.core.ui.TvDetailGlassPanel
+import com.chee.videos.core.ui.TvDetailPanelTokens
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvPageLoadingState
@@ -140,17 +141,16 @@ fun TvLongFormDetailScreen(
                     focusedScale = 1.08f,
                 )
 
-                Surface(
-                    color = Color(0xD20B1018),
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
+                TvDetailGlassPanel(
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 36.dp, vertical = 28.dp),
+                            .padding(
+                                horizontal = TvDetailPanelTokens.ContentPaddingHorizontalDp,
+                                vertical = TvDetailPanelTokens.ContentPaddingVerticalDp,
+                            ),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
