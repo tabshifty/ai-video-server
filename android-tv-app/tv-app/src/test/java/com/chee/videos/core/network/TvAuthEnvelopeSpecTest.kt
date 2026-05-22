@@ -72,4 +72,14 @@ class TvAuthEnvelopeSpecTest {
             proguardRules.contains("-keep class com.chee.videos.core.model.TvAuth* { *; }"),
         )
     }
+
+    @Test
+    fun `release shrinker keeps all gson api models used through retrofit envelopes`() {
+        val proguardRules = Path.of("proguard-rules.pro").readText()
+
+        assertTrue(
+            "Release R8 必须保留 core.model 下所有 Retrofit/Gson API DTO；否则首页等 ApiEnvelope<T> data 模型会被 shrink，设备上解析后进入加载失败",
+            proguardRules.contains("-keep class com.chee.videos.core.model.** { *; }"),
+        )
+    }
 }
