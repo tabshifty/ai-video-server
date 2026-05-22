@@ -27,6 +27,11 @@
   - Prefer small, scoped commits.
   - Keep migration and code changes reversible where practical.
 - Every completed change must be committed to git; do not leave accepted work only in the working tree.
+- When the user asks to complete tasks under `tasks/`, inspect each task directory and execute its documents in this order:
+  1. `prd.md`：先读需求与验收标准，确认范围、非目标和版本/文档要求。
+  2. `implement.md`：再按实现方案落地，若方案与代码现状冲突，先回到 PRD 校准并在 `plan.md` 记录取舍。
+  3. `review.md`：最后按评审/验收脚本逐项验证，不能跳过 review 阶段直接宣称完成。
+  - If a task directory lacks one of these files, record the gap in `plan.md` and proceed only when the missing step is unnecessary or can be reconstructed from local context.
 - `plan.md` is mandatory and append-only for progress tracking:
   - Every new plan must be appended as an incremental entry.
   - Every implementation update must append what changed (not overwrite old entries).
