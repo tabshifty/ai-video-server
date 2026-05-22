@@ -1,5 +1,10 @@
 package com.chee.videos.feature.tv
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,24 +50,30 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvFocusSafeSpec
+import com.chee.videos.core.ui.TvHeroMotionTokens
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvEmptyState
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
+import com.chee.videos.core.ui.TvMotionTokens
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.rememberTvReduceMotionEnabled
 import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
@@ -767,6 +778,35 @@ private fun TvFeaturedHero(
     val backdropUrl = resolveTvArtworkUrl(baseUrl, data.backdropUrl)
     val posterUrl = resolveTvArtworkUrl(baseUrl, data.posterUrl)
 
+    val reduceMotion = rememberTvReduceMotionEnabled()
+    val transition = rememberInfiniteTransition(label = "tvHeroKenBurns")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (reduceMotion) 0f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = TvHeroMotionTokens.RampDurationMs,
+                easing = TvMotionTokens.EasingStandard,
+            ),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "tvHeroKenBurnsProgress",
+    )
+    val density = LocalDensity.current
+    val panXPx = with(density) { TvHeroMotionTokens.PanOffsetXDp.toPx() }
+    val panYPx = with(density) { TvHeroMotionTokens.PanOffsetYDp.toPx() }
+    val heroScale = if (reduceMotion) {
+        TvHeroMotionTokens.ScaleStaticTarget
+    } else {
+        lerp(
+            TvHeroMotionTokens.ScaleStart,
+            TvHeroMotionTokens.ScaleEnd,
+            progress,
+        )
+    }
+    val heroTranslationX = if (reduceMotion) 0f else lerp(-panXPx, panXPx, progress)
+    val heroTranslationY = if (reduceMotion) 0f else lerp(-panYPx, panYPx, progress)
+
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = AppChrome.CardShape,
@@ -780,7 +820,14 @@ private fun TvFeaturedHero(
                 AsyncImage(
                     model = backdropUrl,
                     contentDescription = data.title,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = heroScale
+                            scaleY = heroScale
+                            translationX = heroTranslationX
+                            translationY = heroTranslationY
+                        },
                     contentScale = ContentScale.Crop,
                 )
             } else {
