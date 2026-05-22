@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 01:52 +0800
+- 进度：继续修复短视频全屏叠层混乱与退出后“有声音无画面”。根据用户截图确认，Dialog 全屏层只覆盖中间区域，竖屏短视频层仍在底下渲染，且两个 `PlayerView` 同时争用同一个 `ExoPlayer` surface。修法：撤掉 `ShortOverlayFullscreenHost` 的 Dialog 实现，改回同一 Compose 树内渲染；主页短视频全屏时采用二选一分支，只渲染 `ShortOverlayFullscreenHost`，不再同时渲染竖屏 `VerticalPager` 和竖屏 `PlayerView`。新增结构性红灯测试锁定“Host 不得使用 Dialog”和“主页短视频全屏必须隐藏竖屏 Pager”；`CONTEXT.md` 补充 PlayerView 独占渲染约束。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/core/ui/ShortOverlayFullscreenHost.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：红灯 `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.core.ui.ShortOverlayFullscreenSpecTest` 先失败于 Dialog/叠层约束；实现后同一命令通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过；`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过。
+
 ## 2026-05-23 01:36 +0800
 - 进度：继续修复“首页短视频点击全屏后仍不像长视频真正全屏播放”。根因确认：此前只把播放器覆盖层提升为 Dialog，但首页短视频仍处于 `HomeScreen` 的头部内容 tab 与 `VideoHomeApp` 根 `Scaffold` 底部 tabbar 之间，外层壳没有进入全屏状态，所以视觉上仍残留头部和底部导航。新增红灯结构测试锁定 `VideoHomeApp` / `HomeScreen` 必须感知 `isShortFullscreen`；实现为 `ShortFeedScreen` 将全屏状态回传给 `HomeScreen` 和 `VideoHomeApp`，全屏期间隐藏首页头部 tab 与根底部 tabbar，退出/离开时回传 `false`。同时删除此前误加的 `DONE.md`，该任务待用户重新验收后再标记完成。
 - 影响文件：`android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`、`android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-short-overlay-fullscreen-button/DONE.md`

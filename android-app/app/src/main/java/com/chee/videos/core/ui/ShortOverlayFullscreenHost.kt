@@ -15,8 +15,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -63,34 +61,24 @@ fun ShortOverlayFullscreenHost(
         return
     }
 
-    Dialog(
-        onDismissRequest = { onFullscreenChange(false) },
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnBackPress = false,
-            dismissOnClickOutside = false,
-        ),
+    BackHandler { onFullscreenChange(false) }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black),
     ) {
-        BackHandler { onFullscreenChange(false) }
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .background(Color.Black),
-        ) {
-            LongFormVideoPlayer(
-                title = title,
-                player = player,
-                isFullscreen = true,
-                onBack = { onFullscreenChange(false) },
-                onTogglePlayPause = { player.playWhenReady = !player.playWhenReady },
-                onToggleFullscreen = { onFullscreenChange(false) },
-                subtitleTracks = subtitleTracks,
-                selectedSubtitleTrackId = null,
-                onSelectSubtitleTrack = {},
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        LongFormVideoPlayer(
+            title = title,
+            player = player,
+            isFullscreen = true,
+            onBack = { onFullscreenChange(false) },
+            onTogglePlayPause = { player.playWhenReady = !player.playWhenReady },
+            onToggleFullscreen = { onFullscreenChange(false) },
+            subtitleTracks = subtitleTracks,
+            selectedSubtitleTrackId = null,
+            onSelectSubtitleTrack = {},
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 

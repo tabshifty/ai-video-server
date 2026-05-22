@@ -401,149 +401,151 @@ fun ShortFeedScreen(
                         .fillMaxSize()
                         .background(AppChrome.Canvas),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .fillMaxHeight(videoHeightFraction),
-                    ) {
-                        VerticalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxSize(),
-                            userScrollEnabled = !sheetOpen && !isFullscreen,
-                        ) { page ->
-                            val item = uiState.items[page]
-                            val detail = uiState.detailByVideoId[item.id]
-                            VerticalVideoPage(
-                                item = item,
-                                sharedPlayer = sharedPlayer,
-                                active = pagerState.currentPage == page,
-                                fitMode = uiState.fitMode,
-                                pausedByUser = item.id in uiState.pausedByUserVideoIds,
-                                posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
-                                showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
-                                actorNames = extractActorNames(detail),
-                                isLiked = detail?.userState?.isLiked == true,
-                                isFavorited = detail?.userState?.isFavorited == true,
-                                actionBusy = item.id in uiState.actionBusyVideoIds,
-                                showActionRail = showActionRail,
-                                onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
-                                onToggleLike = { viewModel.toggleLike(item.id) },
-                                onToggleFavorite = { viewModel.toggleFavorite(item.id) },
-                                onToggleMode = viewModel::toggleFitMode,
-                                onTogglePlaybackMode = viewModel::togglePlaybackMode,
-                                onOpenFullscreen = { isFullscreen = true },
-                                playbackMode = uiState.playbackMode,
-                                onOpenDetail = { viewModel.openDetailSheet(item.id) },
-                            )
-                        }
-                    }
-
-                    ShortOverlayFullscreenHost(
-                        isFullscreen = isFullscreen,
-                        onFullscreenChange = { isFullscreen = it },
-                        player = sharedPlayer,
-                        title = uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
-                        subtitleTracks = currentVideoId?.let { uiState.detailByVideoId[it]?.subtitleTracks }.orEmpty(),
-                        fallbackPlaybackMode = uiState.playbackMode,
-                    )
-
-                    if (!uiState.loadMoreErrorMessage.isNullOrBlank()) {
-                        Surface(
-                            color = Color(0xCC11141A),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = if (sheetOpen) 16.dp else 32.dp),
-                        ) {
-                            Text(
-                                text = uiState.loadMoreErrorMessage.orEmpty(),
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            )
-                        }
-                    }
-
-                    if (showProgressBar) {
-                        ShortVideoBottomProgressBar(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth(),
-                            positionMs = positionMs,
-                            durationMs = durationMs,
-                            isScrubbing = isScrubbingShort,
-                            scrubTargetMs = scrubTargetMs,
-                            onScrubStart = {
-                                if (durationMs <= 0L) {
-                                    return@ShortVideoBottomProgressBar
-                                }
-                                isScrubbingShort = true
-                                scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
-                                scrubTargetMs = scrubAnchorMs
-                            },
-                            onScrubByDeltaFraction = { deltaFraction ->
-                                if (durationMs <= 0L || !isScrubbingShort) {
-                                    return@ShortVideoBottomProgressBar
-                                }
-                                scrubTargetMs = shortScrubTargetFromDelta(
-                                    anchorMs = scrubAnchorMs,
-                                    durationMs = durationMs,
-                                    deltaFraction = deltaFraction,
-                                )
-                            },
-                            onScrubEnd = {
-                                if (!isScrubbingShort) {
-                                    return@ShortVideoBottomProgressBar
-                                }
-                                if (durationMs > 0L) {
-                                    val target = scrubTargetMs.coerceIn(0L, durationMs)
-                                    sharedPlayer.seekTo(target)
-                                    positionMs = target
-                                }
-                                isScrubbingShort = false
-                            },
+                    if (isFullscreen) {
+                        ShortOverlayFullscreenHost(
+                            isFullscreen = isFullscreen,
+                            onFullscreenChange = { isFullscreen = it },
+                            player = sharedPlayer,
+                            title = uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+                            subtitleTracks = currentVideoId?.let { uiState.detailByVideoId[it]?.subtitleTracks }.orEmpty(),
+                            fallbackPlaybackMode = uiState.playbackMode,
                         )
-                    }
-
-                    if (sheetVideoId != null) {
-                        val detail = uiState.detailByVideoId[sheetVideoId]
-                        val loading = detail == null && sheetVideoId in uiState.detailLoadingVideoIds
-                        ShortDetailSheet(
+                    } else {
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.BottomCenter)
+                                .align(Alignment.TopCenter)
                                 .fillMaxWidth()
-                                .fillMaxHeight(0.75f),
-                            baseUrl = baseUrl,
-                            detail = detail,
-                            loading = loading,
-                            errorMessage = uiState.detailErrorMessage,
-                            actionBusy = sheetVideoId in uiState.actionBusyVideoIds,
-                            onClose = viewModel::closeDetailSheet,
-                            onRetry = { viewModel.ensureDetailLoaded(sheetVideoId, force = true, reportError = true) },
-                            onToggleDislike = { viewModel.toggleDislike(sheetVideoId) },
-                            onOpenTag = { tag ->
-                                val normalized = tag.trim()
-                                if (normalized.isBlank()) {
-                                    return@ShortDetailSheet
-                                }
-                                viewModel.closeDetailSheet()
-                                onOpenDiscover("tag", normalized, "#$normalized")
-                            },
-                            onOpenCollection = { collection ->
-                                val id = collection.id.trim()
-                                if (id.isBlank()) {
-                                    return@ShortDetailSheet
-                                }
-                                viewModel.closeDetailSheet()
-                                onOpenDiscover("collection", id, collection.name)
-                            },
-                            onOpenImageCollection = { imageCollection ->
-                                val route = shortDetailImageCollectionViewerRoute(imageCollection)
-                                    ?: return@ShortDetailSheet
-                                onOpenImageCollectionViewer(route)
-                            },
-                        )
+                                .fillMaxHeight(videoHeightFraction),
+                        ) {
+                            VerticalPager(
+                                state = pagerState,
+                                modifier = Modifier.fillMaxSize(),
+                                userScrollEnabled = !sheetOpen,
+                            ) { page ->
+                                val item = uiState.items[page]
+                                val detail = uiState.detailByVideoId[item.id]
+                                VerticalVideoPage(
+                                    item = item,
+                                    sharedPlayer = sharedPlayer,
+                                    active = pagerState.currentPage == page,
+                                    fitMode = uiState.fitMode,
+                                    pausedByUser = item.id in uiState.pausedByUserVideoIds,
+                                    posterUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath),
+                                    showPoster = pagerState.currentPage == page && renderedVideoId != item.id,
+                                    actorNames = extractActorNames(detail),
+                                    isLiked = detail?.userState?.isLiked == true,
+                                    isFavorited = detail?.userState?.isFavorited == true,
+                                    actionBusy = item.id in uiState.actionBusyVideoIds,
+                                    showActionRail = showActionRail,
+                                    onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
+                                    onToggleLike = { viewModel.toggleLike(item.id) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(item.id) },
+                                    onToggleMode = viewModel::toggleFitMode,
+                                    onTogglePlaybackMode = viewModel::togglePlaybackMode,
+                                    onOpenFullscreen = { isFullscreen = true },
+                                    playbackMode = uiState.playbackMode,
+                                    onOpenDetail = { viewModel.openDetailSheet(item.id) },
+                                )
+                            }
+                        }
+
+                        if (!uiState.loadMoreErrorMessage.isNullOrBlank()) {
+                            Surface(
+                                color = Color(0xCC11141A),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = if (sheetOpen) 16.dp else 32.dp),
+                            ) {
+                                Text(
+                                    text = uiState.loadMoreErrorMessage.orEmpty(),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                )
+                            }
+                        }
+
+                        if (showProgressBar) {
+                            ShortVideoBottomProgressBar(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth(),
+                                positionMs = positionMs,
+                                durationMs = durationMs,
+                                isScrubbing = isScrubbingShort,
+                                scrubTargetMs = scrubTargetMs,
+                                onScrubStart = {
+                                    if (durationMs <= 0L) {
+                                        return@ShortVideoBottomProgressBar
+                                    }
+                                    isScrubbingShort = true
+                                    scrubAnchorMs = positionMs.coerceIn(0L, durationMs)
+                                    scrubTargetMs = scrubAnchorMs
+                                },
+                                onScrubByDeltaFraction = { deltaFraction ->
+                                    if (durationMs <= 0L || !isScrubbingShort) {
+                                        return@ShortVideoBottomProgressBar
+                                    }
+                                    scrubTargetMs = shortScrubTargetFromDelta(
+                                        anchorMs = scrubAnchorMs,
+                                        durationMs = durationMs,
+                                        deltaFraction = deltaFraction,
+                                    )
+                                },
+                                onScrubEnd = {
+                                    if (!isScrubbingShort) {
+                                        return@ShortVideoBottomProgressBar
+                                    }
+                                    if (durationMs > 0L) {
+                                        val target = scrubTargetMs.coerceIn(0L, durationMs)
+                                        sharedPlayer.seekTo(target)
+                                        positionMs = target
+                                    }
+                                    isScrubbingShort = false
+                                },
+                            )
+                        }
+
+                        if (sheetVideoId != null) {
+                            val detail = uiState.detailByVideoId[sheetVideoId]
+                            val loading = detail == null && sheetVideoId in uiState.detailLoadingVideoIds
+                            ShortDetailSheet(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(0.75f),
+                                baseUrl = baseUrl,
+                                detail = detail,
+                                loading = loading,
+                                errorMessage = uiState.detailErrorMessage,
+                                actionBusy = sheetVideoId in uiState.actionBusyVideoIds,
+                                onClose = viewModel::closeDetailSheet,
+                                onRetry = { viewModel.ensureDetailLoaded(sheetVideoId, force = true, reportError = true) },
+                                onToggleDislike = { viewModel.toggleDislike(sheetVideoId) },
+                                onOpenTag = { tag ->
+                                    val normalized = tag.trim()
+                                    if (normalized.isBlank()) {
+                                        return@ShortDetailSheet
+                                    }
+                                    viewModel.closeDetailSheet()
+                                    onOpenDiscover("tag", normalized, "#$normalized")
+                                },
+                                onOpenCollection = { collection ->
+                                    val id = collection.id.trim()
+                                    if (id.isBlank()) {
+                                        return@ShortDetailSheet
+                                    }
+                                    viewModel.closeDetailSheet()
+                                    onOpenDiscover("collection", id, collection.name)
+                                },
+                                onOpenImageCollection = { imageCollection ->
+                                    val route = shortDetailImageCollectionViewerRoute(imageCollection)
+                                        ?: return@ShortDetailSheet
+                                    onOpenImageCollectionViewer(route)
+                                },
+                            )
+                        }
                     }
                 }
             }

@@ -45,13 +45,20 @@ class ShortOverlayFullscreenSpecTest {
     }
 
     @Test
-    fun `shared fullscreen host uses fullscreen dialog to escape parent scaffold`() {
+    fun `shared fullscreen host stays in compose tree and avoids dialog surface overlap`() {
         val source = Path.of("src/main/java/com/chee/videos/core/ui/ShortOverlayFullscreenHost.kt").readText()
 
-        assertTrue("短视频全屏必须用 Dialog 跨过首页头部和底部导航所在的外层 Scaffold", source.contains("Dialog("))
-        assertTrue("短视频全屏 Dialog 必须显式配置 DialogProperties", source.contains("DialogProperties("))
-        assertTrue("短视频全屏 Dialog 不能使用平台默认窄宽度", source.contains("usePlatformDefaultWidth = false"))
-        assertTrue("短视频全屏 Dialog 必须关闭 decorFitsSystemWindows 才能铺满系统栏区域", source.contains("decorFitsSystemWindows = false"))
+        assertTrue("短视频全屏不能再用 Dialog 叠加，否则会和竖屏 PlayerView 争用 surface 并露出底层 UI", !source.contains("Dialog("))
+        assertTrue("短视频全屏不能再依赖 DialogProperties，外层壳应通过 isShortFullscreen 隐藏", !source.contains("DialogProperties("))
+    }
+
+    @Test
+    fun `home short feed hides vertical pager while fullscreen`() {
+        val source = Path.of("src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt").readText()
+
+        assertTrue("主页短视频全屏时不能继续渲染竖屏 VerticalPager，否则会和全屏播放器叠层", source.contains("if (isFullscreen)"))
+        assertTrue("主页短视频全屏时必须只渲染 ShortOverlayFullscreenHost", source.contains("ShortOverlayFullscreenHost("))
+        assertTrue("主页短视频竖屏内容必须放在 else 分支，避免 PlayerView surface 争用", source.contains("} else {"))
     }
 
     @Test
