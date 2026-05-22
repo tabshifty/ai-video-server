@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -371,8 +372,10 @@ private fun TvPosterWallCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 74.dp)
                     .background(TvPosterWallTitleBackground)
                     .padding(horizontal = 10.dp, vertical = 9.dp),
+                contentAlignment = Alignment.TopStart,
             ) {
                 Text(
                     text = cardContent.title,

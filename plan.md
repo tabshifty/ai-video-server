@@ -1,6 +1,11 @@
 ﻿# plan.md
 
-本文件用于增量记录“计划与修改”，不得覆盖历史记录，只能追加。
+本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
+
+## 2026-05-22 22:00 +0800
+- 进度：C 批视觉/交互打磨（C1-C4），版本 0.1.54 → 0.1.55（versionCode 55→56）。C1：海报墙卡片标题 Box 补 `heightIn(min=74.dp)` + `contentAlignment=TopStart`，同行 1 行/2 行标题卡片底边对齐。C2：状态屏图标 28→36dp、加载圈 24→32dp、操作按钮 icon 18→20dp + 纵向 padding 10→12dp，TV 10-foot 可读性提升。C3：电视剧详情”主演：”文本补 `maxLines=1, overflow=Ellipsis`，防超长演员列表换行破坏布局。C4：播放器居中反馈 icon 显式 `size(22.dp)`，反馈文本补 `maxLines=1, overflow=Ellipsis`，防长文案跳变。
+- 影响文件：`TvPosterWallScreen.kt`（import heightIn + 标题 Box 约束）、`TvStateFeedback.kt`（图标/圆圈/按钮尺寸）、`TvSeriesDetailScreen.kt`（主演行溢出保护）、`LongFormVideoPlayer.kt`（中心反馈 icon+文本约束）、`build.gradle.kts`（版本号）。
+- 验证：`testDebugUnitTest` BUILD SUCCESSFUL 22s，`assembleDebug` BUILD SUCCESSFUL 11s（arm64-v8a + armeabi-v7a）。
 
 ## 2026-05-22 19:50 +0800
 - 进度：修复 TV App ANR——`Input dispatching timed out (Wait queue length: 1)`。ANR 时间戳 2026-05-22 19:35:55，设备 Sony BRAVIA（Android 9，API 28），系统负载 31.4（Douyu TV 13% + 音频后处理 24% 等多 App 并行）。根因分两层：(1) **系统 CPU 饥饿**（负载 31.4，主线程偶发被抢占 >5s）为可能主因；(2) **代码级根因**：遥控器 DPad 按键触发 Compose 同步 focus 遍历路径（`FocusOwnerImpl.focusSearch → AndroidComposeView$keyInputModifier$1`）抛出 `FocusRequester is not initialized` ISE 时，异常沿 `ViewRootImpl.deliverInputEvent → InputStage.deliver → Activity.dispatchKeyEvent` 同步透出；`ViewRootImpl.deliverInputEvent` 没有 try/finally，异常被主 Looper 兜底（`installMainLooperHoverExitGuard`）吞掉后 `finishInputEvent()` 永远不调用，输入分发器等不到 ACK → 5s 超时 → ANR。修法：在 `TvMainActivity` 新增与 `dispatchGenericMotionEvent` 对称的 `override fun dispatchKeyEvent(event: KeyEvent): Boolean` —— 在 Activity 边界捕获 `shouldSwallowTvComposeFocusRequesterCrash` 命中的 ISE，返回 `false`（未消费），让 `ViewRootImpl` 正常调 `finishInputEvent()` 发回 ACK；主 Looper 兜底作为**异步路径**的最后防线继续保留不动，三层防线整体不削减。

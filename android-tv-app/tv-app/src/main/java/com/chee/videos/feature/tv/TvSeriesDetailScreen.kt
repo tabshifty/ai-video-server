@@ -283,6 +283,8 @@ fun TvSeriesDetailScreen(
                     text = "主演：${series.cast.joinToString(" · ")}",
                     color = AppChrome.TextMuted,
                     style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

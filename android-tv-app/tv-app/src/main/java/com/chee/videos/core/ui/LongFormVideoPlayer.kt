@@ -648,11 +648,14 @@ fun LongFormVideoPlayer(
                         imageVector = centerFeedbackIcon,
                         contentDescription = null,
                         tint = Color.White,
+                        modifier = Modifier.size(22.dp),
                     )
                     Text(
                         text = centerFeedbackText,
                         color = Color.White,
                         style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

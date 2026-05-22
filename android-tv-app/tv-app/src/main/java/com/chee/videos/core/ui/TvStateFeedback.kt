@@ -35,7 +35,7 @@ fun TvPageLoadingState(
     TvStateContainer(modifier = modifier) {
         TvStatePanel {
             CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(32.dp),
                 color = TvFocusGlowColor,
                 strokeWidth = 2.5.dp,
             )
@@ -144,7 +144,7 @@ private fun TvStateIcon(
         imageVector = imageVector,
         contentDescription = null,
         tint = tint,
-        modifier = Modifier.size(28.dp),
+        modifier = Modifier.size(36.dp),
     )
 }
 
@@ -178,11 +178,11 @@ private fun TvStateAction(actionLabel: String?, onAction: (() -> Unit)?) {
             .clickable(onClick = onAction),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Filled.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
             Text(text = actionLabel, color = Color.White, style = MaterialTheme.typography.bodyMedium)
         }
     }
