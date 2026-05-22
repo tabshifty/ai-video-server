@@ -101,6 +101,7 @@ import kotlinx.coroutines.launch
 fun ShortSearchScreen(
     baseUrl: String,
     accessToken: String,
+    onFullscreenChange: (Boolean) -> Unit = {},
     viewModel: ShortSearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -174,6 +175,7 @@ fun ShortSearchScreen(
             onClose = viewModel::closePlayer,
             onToggleFitMode = viewModel::toggleFitMode,
             onTogglePlaybackMode = viewModel::togglePlaybackMode,
+            onFullscreenChange = onFullscreenChange,
         )
     }
 }
@@ -209,6 +211,7 @@ private fun ShortSearchPlayerOverlay(
     onClose: () -> Unit,
     onToggleFitMode: () -> Unit,
     onTogglePlaybackMode: () -> Unit,
+    onFullscreenChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -235,8 +238,17 @@ private fun ShortSearchPlayerOverlay(
     val latestPage by rememberUpdatedState(pagerState.currentPage)
     val latestLastIndex by rememberUpdatedState(items.lastIndex)
     val latestIsFullscreen by rememberUpdatedState(isFullscreen)
+    val latestOnFullscreenChange by rememberUpdatedState(onFullscreenChange)
 
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
+
+    LaunchedEffect(isFullscreen) {
+        latestOnFullscreenChange(isFullscreen)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { latestOnFullscreenChange(false) }
+    }
 
     LaunchedEffect(playbackMode, isFullscreen) {
         if (!isFullscreen) {
@@ -333,7 +345,13 @@ private fun ShortSearchPlayerOverlay(
         renderedVideoId = null
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()) {
+    val overlayModifier = if (isFullscreen) {
+        Modifier.fillMaxSize().background(Color.Black)
+    } else {
+        Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()
+    }
+
+    Box(modifier = overlayModifier) {
         if (isFullscreen) {
             ShortOverlayFullscreenHost(
                 isFullscreen = isFullscreen,

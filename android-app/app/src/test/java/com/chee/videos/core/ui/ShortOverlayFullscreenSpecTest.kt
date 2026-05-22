@@ -87,6 +87,18 @@ class ShortOverlayFullscreenSpecTest {
         assertTrue("首页头部必须在短视频全屏时隐藏", homeSource.contains("if (!isShortFullscreen)"))
     }
 
+    @Test
+    fun `search short fullscreen state must hide the app shell bottom bar`() {
+        val appSource = Path.of("src/main/java/com/chee/videos/VideoHomeApp.kt").readText()
+        val searchSource = Path.of("src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt").readText()
+
+        assertTrue("搜索页必须暴露短视频全屏状态回调", searchSource.contains("onFullscreenChange: (Boolean) -> Unit = {}"))
+        assertTrue("搜索页播放器浮层必须接收短视频全屏状态回调", searchSource.contains("onFullscreenChange = onFullscreenChange"))
+        assertTrue("搜索页全屏状态变化必须回传应用壳", searchSource.contains("LaunchedEffect(isFullscreen)"))
+        assertTrue("搜索页离开播放器浮层时必须恢复应用壳底栏", searchSource.contains("onDispose { latestOnFullscreenChange(false) }"))
+        assertTrue("根搜索 tab 必须把短视频全屏状态写入 isShortFullscreen", appSource.contains("onFullscreenChange = { isShortFullscreen = it }"))
+    }
+
     private fun assertSourceUsesFullscreenHost(path: String) {
         val source = Path.of(path).readText()
         assertTrue("$path 必须导入 ShortOverlayFullscreenHost", source.contains("ShortOverlayFullscreenHost"))

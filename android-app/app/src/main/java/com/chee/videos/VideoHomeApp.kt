@@ -331,6 +331,7 @@ private fun AuthenticatedNav(
                     ShortSearchScreen(
                         baseUrl = baseUrl,
                         accessToken = accessToken,
+                        onFullscreenChange = { isShortFullscreen = it },
                     )
                 }
             }

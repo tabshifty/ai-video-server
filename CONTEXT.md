@@ -33,6 +33,7 @@
 ## 手机端短视频播放术语
 - `短视频全屏播放`：手机端短视频浮层中通过右侧「全屏播放」按钮触发的横屏长视频风格播放体验。进入后强制横屏、隐藏系统栏、复用同一个 `ExoPlayer` 和 `LongFormVideoPlayer` 控制条，并临时强制 `REPEAT_MODE_ONE`，屏蔽 VerticalPager 上下滑和播完自动切下一条；退出后恢复系统栏、方向和用户原 `ShortPlaybackMode` 对应的 repeatMode，继续停留在原短视频浮层。作用域仅限手机端短视频搜索、短视频发现、主页短视频信息流和 UnifiedPlayer 短视频分支；TV 端与长视频详情既有全屏路径不套用。
 - `首页短视频全屏壳层同步`：主页短视频信息流位于 `HomeScreen` 头部 tab 和 `VideoHomeApp` 根 `Scaffold` 底部 tabbar 之间，短视频播放器内部的覆盖层或 Dialog 不能单独保证“像长视频一样全屏”。进入主页短视频全屏时，`ShortFeedScreen` 必须把 `isFullscreen` 状态回传给 `HomeScreen` 和 `VideoHomeApp`，由首页隐藏头部内容 tab、由根壳隐藏底部导航；退出或离开首页时必须回传 `false`，避免底部导航残留隐藏。
+- `根 tab 短视频全屏壳层同步`：任何挂在 `VideoHomeApp` 根 tab 下的短视频浮层，只要进入横屏全屏，都必须把全屏状态回传给根应用壳并写入 `isShortFullscreen`，否则根 `Scaffold.bottomBar` 会继续显示在全屏播放器之上。当前覆盖首页和搜索页：主页链路为 `ShortFeedScreen -> HomeScreen -> VideoHomeApp`，搜索链路为 `ShortSearchPlayerOverlay -> ShortSearchScreen -> VideoHomeApp`；退出全屏或对应浮层销毁时必须回传 `false`。全屏分支自身不要额外叠加 `statusBarsPadding()` / `navigationBarsPadding()`，系统栏隐藏和横屏沉浸由共享全屏 Host 负责。
 - `短视频全屏 PlayerView 独占渲染`：短视频全屏不能用 `Dialog` 在竖屏短视频层之上叠加另一个 `PlayerView`。同一个 `ExoPlayer` 同时绑定竖屏 `PlayerView` 和全屏 `LongFormVideoPlayer` 的 `PlayerView` 时，容易出现画面叠层、底层 UI 泄露，以及退出全屏后“有声音无画面”的 surface 归属问题。进入全屏时必须在同一 Compose 树中二选一渲染：只保留全屏 `ShortOverlayFullscreenHost` / `LongFormVideoPlayer`，暂停渲染竖屏 `VerticalPager` 和竖屏 `PlayerView`；退出后再恢复竖屏树。该约束覆盖手机端四处短视频入口：主页短视频信息流、短视频搜索浮层、短视频发现浮层、UnifiedPlayer 短视频分支，不能只修其中一处。
 
 ## TV 首页术语
