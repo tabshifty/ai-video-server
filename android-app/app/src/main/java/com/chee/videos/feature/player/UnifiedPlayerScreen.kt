@@ -83,9 +83,11 @@ import com.chee.videos.core.ui.buildLongFormMediaItem
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
-import com.chee.videos.core.ui.ShortVideoOverlayActionButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenHost
 import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.shouldShowShortOverlayProgressBar
 import com.chee.videos.core.ui.shortNonHomeProgressBarPadding
 import com.chee.videos.core.ui.shortScrubTargetFromDelta
@@ -181,6 +183,7 @@ fun UnifiedPlayerScreen(
             val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
             val activity = context as? Activity
             var isFullscreen by rememberSaveable { mutableStateOf(false) }
+            var isShortFullscreen by rememberSaveable { mutableStateOf(false) }
 
             BackHandler(enabled = isFullscreen && currentIsLongForm) {
                 isFullscreen = false
@@ -268,17 +271,21 @@ fun UnifiedPlayerScreen(
                     delay(220)
                 }
             }
-            LaunchedEffect(uiState.playbackMode) {
-                sharedPlayer.repeatMode = uiState.playbackMode.toPlayerRepeatMode()
+            LaunchedEffect(uiState.playbackMode, isShortFullscreen) {
+                if (!isShortFullscreen) {
+                    sharedPlayer.repeatMode = uiState.playbackMode.toPlayerRepeatMode()
+                }
             }
             val latestPlaybackMode by rememberUpdatedState(uiState.playbackMode)
             val latestPage by rememberUpdatedState(pagerState.currentPage)
             val latestLastIndex by rememberUpdatedState(uiState.items.lastIndex)
+            val latestIsShortFullscreen by rememberUpdatedState(isShortFullscreen)
             DisposableEffect(sharedPlayer, pagerState) {
                 val listener = object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (
                             playbackState == Player.STATE_ENDED &&
+                            !latestIsShortFullscreen &&
                             latestPlaybackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT &&
                             latestPage < latestLastIndex
                         ) {
@@ -334,6 +341,8 @@ fun UnifiedPlayerScreen(
             LaunchedEffect(currentVideoType) {
                 if (!isLongFormVideoType(currentVideoType)) {
                     isFullscreen = false
+                } else {
+                    isShortFullscreen = false
                 }
             }
             LaunchedEffect(currentVideoId) {
@@ -431,7 +440,7 @@ fun UnifiedPlayerScreen(
                 VerticalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = !fullscreenLongForm,
+                    userScrollEnabled = !fullscreenLongForm && !isShortFullscreen,
                 ) { page ->
                     val item = uiState.items[page]
                     val isActive = pagerState.currentPage == page
@@ -483,10 +492,20 @@ fun UnifiedPlayerScreen(
                             onTogglePauseByUser = togglePauseState,
                             onToggleFitMode = viewModel::toggleShortFitMode,
                             onTogglePlaybackMode = viewModel::toggleShortPlaybackMode,
+                            onOpenFullscreen = { isShortFullscreen = true },
                             playbackMode = uiState.playbackMode,
                         )
                     }
                 }
+
+                ShortOverlayFullscreenHost(
+                    isFullscreen = isShortFullscreen,
+                    onFullscreenChange = { isShortFullscreen = it },
+                    player = sharedPlayer,
+                    title = currentDetail?.title ?: uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+                    subtitleTracks = currentDetail?.subtitleTracks.orEmpty(),
+                    fallbackPlaybackMode = uiState.playbackMode,
+                )
 
                 if (!currentIsLongForm && !fullscreenLongForm) {
                     Row(
@@ -587,6 +606,7 @@ private fun UnifiedShortVideoPage(
     onTogglePauseByUser: () -> Unit,
     onToggleFitMode: () -> Unit,
     onTogglePlaybackMode: () -> Unit,
+    onOpenFullscreen: () -> Unit,
     playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
 ) {
     val scope = rememberCoroutineScope()
@@ -723,6 +743,7 @@ private fun UnifiedShortVideoPage(
                         onClick = onTogglePlaybackMode,
                     )
                 }
+                ShortOverlayFullscreenButton(onClick = onOpenFullscreen)
             }
         }
 

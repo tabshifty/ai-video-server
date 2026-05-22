@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 01:13 +0800
+- 进度：完成手机端短视频浮层“全屏播放”任务收尾。共享 `ShortOverlayFullscreenHost` 已接入搜索、发现、主页短视频信息流和 `UnifiedPlayerScreen` 的短视频分支；`CONTEXT.md` 已补“短视频全屏播放”术语；`android-app/app/build.gradle.kts` 已按约定递增版本号。验证方面，手机端 `:app:testDebugUnitTest` 与 `:app:assembleDebug` 通过，TV 工程 `:tv-app:testDebugUnitTest` 也保持通过。ADB 已重新连接模拟器 `emulator-5554`，完成 `com.chee.videos` 安装与 `MainActivity` 启动确认，logcat 未见新的 `AndroidRuntime` 或 FATAL；由于当前设备侧不具备完整手测输入条件，本次仅记录到启动级现场校验。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/core/ui/ShortOverlayFullscreenHost.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`、`android-app/app/src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过；`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md android-app/app/src/main/java android-app/app/src/test/java` 无输出；ADB `install -r` 与 `am start -n com.chee.videos/.MainActivity` 成功。
+
+## 2026-05-23 00:56 +0800
+- 进度：开始执行 `tasks/2026-05-23-short-overlay-fullscreen-button/`。已按沉淀规则先读 `prd.md`，确认目标是手机端四处短视频浮层新增“全屏播放”按钮，进入后强制横屏、隐藏系统栏、复用 `LongFormVideoPlayer`、临时强制 `REPEAT_MODE_ONE`，退出后恢复方向/系统栏/repeatMode；已读 `implement.md`，确认实现为共享 `ShortOverlayFullscreenHost` + `ShortOverlayFullscreenButton`，四处入口接入；已读 `review.md`，确认自动化验收包含 `:app:testDebugUnitTest`、`:app:assembleDebug`、`:tv-app:testDebugUnitTest`，真机手测项后续需说明是否已执行。下一步先按 TDD 新增 `ShortOverlayFullscreenSpecTest` 红灯测试，再实现共享 Host 和四处接入。
+- 影响文件：预计 `android-app/app/src/main/java/com/chee/videos/core/ui/ShortOverlayFullscreenHost.kt`、四处短视频浮层、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md` 与新增单测。
+- 验证：待红灯 `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.core.ui.ShortOverlayFullscreenSpecTest`。
+
 ## 2026-05-23 00:54 +0800
 - 进度：沉淀 `tasks/` 任务执行顺序约定。确认当前 `tasks/2026-05-23-short-overlay-fullscreen-button/` 目录包含 `prd.md`、`implement.md`、`review.md` 三段文档；按用户要求，将后续“完成 tasks 里的任务”固定解释为先读 PRD、再按 Implement 实施、最后按 Review 验收。根级 `AGENTS.md` 增加代理执行规则，`CONTEXT.md` 增加长期技术/流程沉淀。
 - 影响文件：`AGENTS.md`、`CONTEXT.md`、`plan.md`。
@@ -6136,6 +6146,11 @@
 - 进度：修复短视频转 AV 的状态收尾，成功后不再沿用 `scraping`，而是统一落回 `ready`；同步把自动重刮削回归测试改成验证成功后状态可放行给只认 `ready` 的资源接口。
 - 影响文件：`internal/queue/scrape_tasks.go`、`internal/queue/scrape_tasks_test.go`、`plan.md`
 - 验证：`go test ./internal/queue -run 'TestAutoScrapeAVMarksReadyOnSuccess|TestBuildScrapeFailureDecisionMarksEpisodeAsTVPending|TestBuildScrapeFailureDecisionKeepsMovieFallbackBehavior' -count=1`、`go test ./internal/services -run 'TestConfirmAVPreservesExplicitReadyStatus|TestScrapeAVUploadCodeFirstAndActorSync' -count=1`、`go test ./internal/services ./internal/handlers ./internal/queue`、`go vet ./...` 通过。
+
+## 2026-05-23 01:17 +0800
+- 进度：修复手机端短视频全屏没有真正覆盖首页头部和底部 tabbar 的问题。根因是 `ShortOverlayFullscreenHost` 之前只挂在 `ShortFeedScreen` 子树里，受外层 `VideoHomeApp` 的 `Scaffold(topBar/bottomBar)` 限制，无法跨出内容区。修法：将全屏层改为 `Dialog(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)` 承载 `LongFormVideoPlayer`，让它提升到 window 级别覆盖；保留原有方向锁、系统栏隐藏、repeatMode 处理与返回键语义不变。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/core/ui/ShortOverlayFullscreenHost.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`plan.md`
+- 验证：新增结构性红灯测试 `shared fullscreen host uses fullscreen dialog to escape parent scaffold` 已先失败，确认抓到问题；随后实现后通过。手机端 `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过，`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过。
 
 ## 2026-05-10 09:45
 - 进度：新增刮削内容中文翻译接入，支持通过 OpenAI-compatible 本地翻译接口连接 `HY-MT1.5-1.8B` 等模型；刮削写库前会保存中文标题/简介到展示字段，并在 `metadata` 中同步写入 `title_original`、`description_original`、`title_zh`、`description_zh`，演员名保持原样。

@@ -81,6 +81,8 @@ import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.toPlayerRepeatMode
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenHost
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.shouldShowShortOverlayProgressBar
@@ -221,6 +223,7 @@ private fun ShortSearchPlayerOverlay(
     var isScrubbingShort by remember { mutableStateOf(false) }
     var scrubAnchorMs by remember { mutableStateOf(0L) }
     var scrubTargetMs by remember { mutableStateOf(0L) }
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
 
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -231,10 +234,15 @@ private fun ShortSearchPlayerOverlay(
     val latestMode by rememberUpdatedState(playbackMode)
     val latestPage by rememberUpdatedState(pagerState.currentPage)
     val latestLastIndex by rememberUpdatedState(items.lastIndex)
+    val latestIsFullscreen by rememberUpdatedState(isFullscreen)
 
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
-    LaunchedEffect(playbackMode) { sharedPlayer.repeatMode = playbackMode.toPlayerRepeatMode() }
+    LaunchedEffect(playbackMode, isFullscreen) {
+        if (!isFullscreen) {
+            sharedPlayer.repeatMode = playbackMode.toPlayerRepeatMode()
+        }
+    }
 
     DisposableEffect(sharedPlayer) {
         val listener = object : Player.Listener {
@@ -254,7 +262,12 @@ private fun ShortSearchPlayerOverlay(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED && latestMode == ShortPlaybackMode.AUTO_NEXT && latestPage < latestLastIndex) {
+                if (
+                    playbackState == Player.STATE_ENDED &&
+                    !latestIsFullscreen &&
+                    latestMode == ShortPlaybackMode.AUTO_NEXT &&
+                    latestPage < latestLastIndex
+                ) {
                     coroutineScope.launch { pagerState.animateScrollToPage(latestPage + 1) }
                 }
             }
@@ -321,7 +334,11 @@ private fun ShortSearchPlayerOverlay(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding()) {
-        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        VerticalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = !isFullscreen,
+        ) { page ->
             val item = items[page]
             val isActive = page == pagerState.currentPage
             val detail = detailByVideoId[item.id]
@@ -376,6 +393,7 @@ private fun ShortSearchPlayerOverlay(
                         )
                         ShortVideoOverlayActionButton(icon = Icons.Filled.AspectRatio, active = false, enabled = true, onClick = onToggleFitMode, contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示")
                         ShortPlaybackModeToggleButton(playbackMode = playbackMode, onClick = onTogglePlaybackMode)
+                        ShortOverlayFullscreenButton(onClick = { isFullscreen = true })
                     }
                 }
                 Text(text = item.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 24.dp))
@@ -384,6 +402,15 @@ private fun ShortSearchPlayerOverlay(
 
         Text(text = shortPlaybackModeLabel(playbackMode), color = Color.White, style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp))
         Text(text = "关闭", color = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClose).padding(horizontal = 10.dp, vertical = 6.dp))
+
+        ShortOverlayFullscreenHost(
+            isFullscreen = isFullscreen,
+            onFullscreenChange = { isFullscreen = it },
+            player = sharedPlayer,
+            title = currentItem?.title.orEmpty(),
+            subtitleTracks = currentItem?.id?.let { detailByVideoId[it]?.subtitleTracks }.orEmpty(),
+            fallbackPlaybackMode = playbackMode,
+        )
 
         if (shouldShowShortOverlayProgressBar(currentItem?.id)) {
             ShortVideoBottomProgressBar(

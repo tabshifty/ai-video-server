@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,9 +91,11 @@ import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.toPlayerRepeatMode
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
-import com.chee.videos.core.ui.ShortVideoOverlayActionButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenHost
 import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.shortPosterContentScale as sharedShortPosterContentScale
 import com.chee.videos.core.ui.shortScrubTargetFromDelta
 import com.chee.videos.core.ui.shortVideoResizeMode
@@ -218,6 +221,7 @@ fun ShortFeedScreen(
                 var scrubAnchorMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var progressBarSettled by remember(currentVideoId) { mutableStateOf(false) }
+                var isFullscreen by rememberSaveable { mutableStateOf(false) }
 
                 LaunchedEffect(pagerState.currentPage, currentVideoId) {
                     if (!currentVideoId.isNullOrBlank()) {
@@ -237,17 +241,21 @@ fun ShortFeedScreen(
                         )
                     }
                 }
-                LaunchedEffect(uiState.playbackMode) {
-                    sharedPlayer.repeatMode = uiState.playbackMode.toPlayerRepeatMode()
+                LaunchedEffect(uiState.playbackMode, isFullscreen) {
+                    if (!isFullscreen) {
+                        sharedPlayer.repeatMode = uiState.playbackMode.toPlayerRepeatMode()
+                    }
                 }
                 val latestPlaybackMode by rememberUpdatedState(uiState.playbackMode)
                 val latestPage by rememberUpdatedState(pagerState.currentPage)
                 val latestLastIndex by rememberUpdatedState(uiState.items.lastIndex)
+                val latestIsFullscreen by rememberUpdatedState(isFullscreen)
                 DisposableEffect(sharedPlayer, pagerState) {
                     val listener = object : Player.Listener {
                         override fun onPlaybackStateChanged(playbackState: Int) {
                             if (
                                 playbackState == Player.STATE_ENDED &&
+                                !latestIsFullscreen &&
                                 latestPlaybackMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT &&
                                 latestPage < latestLastIndex
                             ) {
@@ -394,7 +402,7 @@ fun ShortFeedScreen(
                         VerticalPager(
                             state = pagerState,
                             modifier = Modifier.fillMaxSize(),
-                            userScrollEnabled = !sheetOpen,
+                            userScrollEnabled = !sheetOpen && !isFullscreen,
                         ) { page ->
                             val item = uiState.items[page]
                             val detail = uiState.detailByVideoId[item.id]
@@ -416,11 +424,21 @@ fun ShortFeedScreen(
                                 onToggleFavorite = { viewModel.toggleFavorite(item.id) },
                                 onToggleMode = viewModel::toggleFitMode,
                                 onTogglePlaybackMode = viewModel::togglePlaybackMode,
+                                onOpenFullscreen = { isFullscreen = true },
                                 playbackMode = uiState.playbackMode,
                                 onOpenDetail = { viewModel.openDetailSheet(item.id) },
                             )
                         }
                     }
+
+                    ShortOverlayFullscreenHost(
+                        isFullscreen = isFullscreen,
+                        onFullscreenChange = { isFullscreen = it },
+                        player = sharedPlayer,
+                        title = uiState.items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+                        subtitleTracks = currentVideoId?.let { uiState.detailByVideoId[it]?.subtitleTracks }.orEmpty(),
+                        fallbackPlaybackMode = uiState.playbackMode,
+                    )
 
                     if (!uiState.loadMoreErrorMessage.isNullOrBlank()) {
                         Surface(
@@ -544,6 +562,7 @@ private fun VerticalVideoPage(
     onToggleFavorite: () -> Unit,
     onToggleMode: () -> Unit,
     onTogglePlaybackMode: () -> Unit,
+    onOpenFullscreen: () -> Unit,
     playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
     onOpenDetail: () -> Unit,
 ) {
@@ -698,6 +717,7 @@ private fun VerticalVideoPage(
                     playbackMode = playbackMode,
                     onClick = onTogglePlaybackMode,
                 )
+                ShortOverlayFullscreenButton(onClick = onOpenFullscreen)
                 ShortsActionButton(
                     icon = Icons.Filled.Info,
                     active = false,

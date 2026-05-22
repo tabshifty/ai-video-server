@@ -79,9 +79,11 @@ import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.toPlayerRepeatMode
 import com.chee.videos.core.ui.KeepScreenOnEffect
-import com.chee.videos.core.ui.ShortVideoOverlayActionButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenButton
+import com.chee.videos.core.ui.ShortOverlayFullscreenHost
 import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
+import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.shouldShowShortOverlayProgressBar
 import com.chee.videos.core.ui.shortNonHomeProgressBarPadding
 import com.chee.videos.core.ui.shortScrubTargetFromDelta
@@ -392,9 +394,11 @@ private fun ShortDiscoverPlayerOverlay(
     var isScrubbingShort by remember(currentVideoId) { mutableStateOf(false) }
     var scrubAnchorMs by remember(currentVideoId) { mutableStateOf(0L) }
     var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
     val latestMode by rememberUpdatedState(playbackMode)
     val latestPage by rememberUpdatedState(pagerState.currentPage)
     val latestLastIndex by rememberUpdatedState(items.lastIndex)
+    val latestIsFullscreen by rememberUpdatedState(isFullscreen)
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     DisposableEffect(sharedPlayer) {
@@ -410,6 +414,7 @@ private fun ShortDiscoverPlayerOverlay(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (
                     playbackState == Player.STATE_ENDED &&
+                    !latestIsFullscreen &&
                     latestMode == com.chee.videos.core.model.ShortPlaybackMode.AUTO_NEXT &&
                     latestPage < latestLastIndex
                 ) {
@@ -425,8 +430,10 @@ private fun ShortDiscoverPlayerOverlay(
             sharedPlayer.release()
         }
     }
-    LaunchedEffect(playbackMode) {
-        sharedPlayer.repeatMode = playbackMode.toPlayerRepeatMode()
+    LaunchedEffect(playbackMode, isFullscreen) {
+        if (!isFullscreen) {
+            sharedPlayer.repeatMode = playbackMode.toPlayerRepeatMode()
+        }
     }
     DisposableEffect(sharedPlayer, currentVideoId) {
         val listener = object : Player.Listener {
@@ -531,6 +538,7 @@ private fun ShortDiscoverPlayerOverlay(
         VerticalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = !isFullscreen,
         ) { page ->
             val item = items[page]
             ShortDiscoverPlayerPage(
@@ -553,6 +561,7 @@ private fun ShortDiscoverPlayerOverlay(
                 },
                 onToggleFitMode = onToggleFitMode,
                 onTogglePlaybackMode = onTogglePlaybackMode,
+                onOpenFullscreen = { isFullscreen = true },
                 playbackMode = playbackMode,
             )
         }
@@ -618,6 +627,15 @@ private fun ShortDiscoverPlayerOverlay(
                 },
             )
         }
+
+        ShortOverlayFullscreenHost(
+            isFullscreen = isFullscreen,
+            onFullscreenChange = { isFullscreen = it },
+            player = sharedPlayer,
+            title = items.getOrNull(pagerState.currentPage)?.title.orEmpty(),
+            subtitleTracks = emptyList(),
+            fallbackPlaybackMode = playbackMode,
+        )
     }
 }
 
@@ -634,6 +652,7 @@ private fun ShortDiscoverPlayerPage(
     onTogglePauseByUser: () -> Unit,
     onToggleFitMode: () -> Unit,
     onTogglePlaybackMode: () -> Unit,
+    onOpenFullscreen: () -> Unit,
     playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
 ) {
     val scope = rememberCoroutineScope()
@@ -763,6 +782,7 @@ private fun ShortDiscoverPlayerPage(
                     playbackMode = playbackMode,
                     onClick = onTogglePlaybackMode,
                 )
+                ShortOverlayFullscreenButton(onClick = onOpenFullscreen)
             }
         }
 
