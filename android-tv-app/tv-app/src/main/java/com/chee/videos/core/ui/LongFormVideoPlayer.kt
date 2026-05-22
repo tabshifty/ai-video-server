@@ -4,6 +4,7 @@ import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -610,8 +611,8 @@ fun LongFormVideoPlayer(
 
         AnimatedVisibility(
             visible = showSeekPreview || draggingSeek,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+            exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
             modifier = Modifier.align(Alignment.Center),
         ) {
             Surface(
@@ -631,8 +632,8 @@ fun LongFormVideoPlayer(
 
         AnimatedVisibility(
             visible = showCenterFeedback,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+            exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
             modifier = Modifier.align(Alignment.Center),
         ) {
             Surface(
@@ -660,8 +661,8 @@ fun LongFormVideoPlayer(
 
         AnimatedVisibility(
             visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+            exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             val topPaddingModifier = if (showStatusBarPadding) {
@@ -710,8 +711,8 @@ fun LongFormVideoPlayer(
 
         AnimatedVisibility(
             visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+            exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Box(

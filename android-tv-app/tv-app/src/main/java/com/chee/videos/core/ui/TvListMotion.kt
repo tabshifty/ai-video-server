@@ -1,6 +1,5 @@
 package com.chee.videos.core.ui
 
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -19,10 +18,10 @@ import kotlinx.coroutines.delay
 
 object TvListMotionTokens {
     const val StaggerPerItemMs: Long = 35L
-    const val StaggerEntryDurationMs: Int = 260
+    const val StaggerEntryDurationMs: Int = TvMotionTokens.DurationEmphasizedMs
     val StaggerEntryDistanceDp: Dp = 12.dp
     const val StaggerMaxSteps: Int = 12
-    val StaggerEntryEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    val StaggerEntryEasing: Easing = TvMotionTokens.EasingStandard
 }
 
 fun tvStaggerEntryDelayMs(
