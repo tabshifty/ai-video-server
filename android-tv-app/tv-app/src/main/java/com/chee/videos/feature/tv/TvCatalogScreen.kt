@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -62,6 +63,7 @@ import com.chee.videos.core.ui.TvEmptyState
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.util.UrlBuilder
@@ -121,19 +123,19 @@ fun TvCatalogScreen(
     LaunchedTvInitialFocus(uiState.loading, isSearching, initialFocusTarget) {
         if (uiState.loading || isSearching) return@LaunchedTvInitialFocus
         when (initialFocusTarget) {
-            TvCatalogInitialFocusTarget.FEATURED -> featuredFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.CONTINUE_WATCHING -> continueFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM -> firstSectionItemFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.TV_SERIES_ITEM -> tvSeriesFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.MOVIE_ITEM -> movieFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.AV_ITEM -> avFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.SEARCH -> searchFocusRequester.requestFocus()
-            TvCatalogInitialFocusTarget.MENU -> menuFocusRequester.requestFocus()
+            TvCatalogInitialFocusTarget.FEATURED -> featuredFocusRequester.tryRequestFocus()
+            TvCatalogInitialFocusTarget.CONTINUE_WATCHING -> continueFocusRequester.tryRequestFocus()
+            TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM -> firstSectionItemFocusRequester.tryRequestFocus()
+            TvCatalogInitialFocusTarget.TV_SERIES_ITEM -> tvSeriesFocusRequester.tryRequestFocus()
+            TvCatalogInitialFocusTarget.MOVIE_ITEM -> movieFocusRequester.tryRequestFocus()
+            TvCatalogInitialFocusTarget.AV_ITEM -> avFocusRequester.tryRequestFocus()
+            TvCatalogInitialFocusTarget.SEARCH -> searchFocusRequester.tryRequestFocus()
+            TvCatalogInitialFocusTarget.MENU -> menuFocusRequester.tryRequestFocus()
         }
     }
 
     if (uiState.loading) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             TvHomeSideMenu(
                 selectedMenu = uiState.selectedMenu,
                 menuFocusRequester = menuFocusRequester,
@@ -146,7 +148,7 @@ fun TvCatalogScreen(
         return
     }
 
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         TvHomeSideMenu(
             selectedMenu = uiState.selectedMenu,
             menuFocusRequester = menuFocusRequester,

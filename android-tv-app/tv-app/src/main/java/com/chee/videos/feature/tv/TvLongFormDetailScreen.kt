@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +46,7 @@ import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.feature.detail.DetailViewModel
 
@@ -62,7 +64,8 @@ fun TvLongFormDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(AppChrome.PageGradient),
+                    .background(AppChrome.PageGradient)
+                    .statusBarsPadding(),
             ) {
                 TvPageLoadingState(message = "正在加载详情")
             }
@@ -72,7 +75,8 @@ fun TvLongFormDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(AppChrome.PageGradient),
+                    .background(AppChrome.PageGradient)
+                    .statusBarsPadding(),
             ) {
                 TvErrorState(
                     message = uiState.errorMessage ?: "详情加载失败",
@@ -97,7 +101,7 @@ fun TvLongFormDetailScreen(
             ) != null
 
             LaunchedTvInitialFocus(detail.id) {
-                playFocusRequester.requestFocus()
+                playFocusRequester.tryRequestFocus()
             }
 
             Box(
@@ -118,7 +122,7 @@ fun TvLongFormDetailScreen(
                                     Color(0xDD070A10),
                                 ),
                             ),
-                        ),
+                    ),
                 )
 
                 TvIconActionButton(
@@ -127,6 +131,7 @@ fun TvLongFormDetailScreen(
                     onClick = onBack,
                     modifier = Modifier
                         .align(Alignment.TopStart)
+                        .statusBarsPadding()
                         .padding(start = 28.dp, top = 28.dp),
                     size = 52.dp,
                     iconSize = 24.dp,

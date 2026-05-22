@@ -34,6 +34,7 @@ import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.repository.TvAuthRepository
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
+import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -136,7 +137,7 @@ fun TvPairingScreen(
     }
     LaunchedTvInitialFocus(uiState.loading, uiState.sessionId, uiState.errorMessage) {
         if (!uiState.loading) {
-            primaryActionFocusRequester.requestFocus()
+            primaryActionFocusRequester.tryRequestFocus()
         }
     }
 

@@ -1,7 +1,7 @@
 package com.chee.videos.core.ui
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +36,13 @@ object TvFocusSafeSpec {
     }
 }
 
+object TvFocusMotionTokens {
+    const val ScaleDampingRatio: Float = 0.8f
+    const val ScaleStiffness: Float = 380f
+    const val SurfaceDampingRatio: Float = 1f
+    const val SurfaceStiffness: Float = 620f
+}
+
 fun Modifier.tvFocusableGlow(
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(20.dp),
@@ -44,12 +51,18 @@ fun Modifier.tvFocusableGlow(
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isFocused && enabled) focusedScale else 1f,
-        animationSpec = tween(durationMillis = 140),
+        animationSpec = spring(
+            dampingRatio = TvFocusMotionTokens.ScaleDampingRatio,
+            stiffness = TvFocusMotionTokens.ScaleStiffness,
+        ),
         label = "tvFocusScale",
     )
     val surfaceAlpha by animateFloatAsState(
         targetValue = if (isFocused && enabled) 1f else 0f,
-        animationSpec = tween(durationMillis = 140),
+        animationSpec = spring(
+            dampingRatio = TvFocusMotionTokens.SurfaceDampingRatio,
+            stiffness = TvFocusMotionTokens.SurfaceStiffness,
+        ),
         label = "tvFocusSurfaceAlpha",
     )
     this
@@ -73,7 +86,10 @@ fun Modifier.tvFocusableScaleOnly(
     var isFocused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isFocused && enabled) focusedScale else 1f,
-        animationSpec = tween(durationMillis = 140),
+        animationSpec = spring(
+            dampingRatio = TvFocusMotionTokens.ScaleDampingRatio,
+            stiffness = TvFocusMotionTokens.ScaleStiffness,
+        ),
         label = "tvFocusScaleOnly",
     )
     this

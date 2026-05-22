@@ -347,7 +347,7 @@ private fun SubtitleOptionRow(
 
     if (focusRequester != null) {
         LaunchedTvInitialFocus(focusRequester, label) {
-            focusRequester.requestFocus()
+            focusRequester.tryRequestFocus()
         }
     }
 

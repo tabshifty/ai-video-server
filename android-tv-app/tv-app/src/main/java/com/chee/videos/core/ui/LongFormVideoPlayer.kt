@@ -401,7 +401,7 @@ fun LongFormVideoPlayer(
             return@LaunchedTvInitialFocus
         }
         try {
-            rootFocusRequester.requestFocus()
+            rootFocusRequester.tryRequestFocus()
         } finally {
             pendingRootFocusRequest = false
         }
@@ -412,7 +412,7 @@ fun LongFormVideoPlayer(
             return@LaunchedTvInitialFocus
         }
         try {
-            playPauseFocusRequester.requestFocus()
+            playPauseFocusRequester.tryRequestFocus()
         } finally {
             pendingPlayPauseFocusRequest = false
         }

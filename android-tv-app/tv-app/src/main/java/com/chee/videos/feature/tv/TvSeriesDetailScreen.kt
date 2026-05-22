@@ -52,7 +52,9 @@ import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
+import com.chee.videos.core.ui.tvSharedSeriesPoster
 
 @Composable
 fun TvSeriesDetailScreen(
@@ -96,7 +98,7 @@ fun TvSeriesDetailScreen(
     val posterUrl = resolveTvResourceUrl(uiState.baseUrl, series.posterUrl)
 
     LaunchedTvInitialFocus(series.id) {
-        playFocusRequester.requestFocus()
+        playFocusRequester.tryRequestFocus()
     }
 
     LazyColumn(
@@ -150,6 +152,7 @@ fun TvSeriesDetailScreen(
                             modifier = Modifier
                                 .width(228.dp)
                                 .aspectRatio(2f / 3f)
+                                .tvSharedSeriesPoster(series.id)
                                 .clip(RoundedCornerShape(26.dp)),
                             contentScale = ContentScale.Crop,
                         )
@@ -158,6 +161,7 @@ fun TvSeriesDetailScreen(
                             modifier = Modifier
                                 .width(228.dp)
                                 .aspectRatio(2f / 3f)
+                                .tvSharedSeriesPoster(series.id)
                                 .clip(RoundedCornerShape(26.dp))
                                 .background(tvBackdropBrush(series.posterSeed)),
                             contentAlignment = Alignment.Center,

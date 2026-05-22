@@ -12,9 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,8 +54,11 @@ import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
+import com.chee.videos.core.ui.tvSharedSeriesPoster
+import com.chee.videos.core.ui.tvStaggerEntry
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 private val tvPosterWallFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
@@ -85,7 +89,7 @@ fun TvPosterWallScreen(
 
     LaunchedTvInitialFocus(uiState.items.isNotEmpty(), uiState.page, uiState.loading, uiState.refreshing) {
         if (uiState.items.isNotEmpty() && uiState.page == 1 && !uiState.loading && !uiState.refreshing) {
-            firstItemFocusRequester.requestFocus()
+            firstItemFocusRequester.tryRequestFocus()
         }
     }
 
@@ -98,7 +102,8 @@ fun TvPosterWallScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppChrome.PageGradient),
+            .background(AppChrome.PageGradient)
+            .statusBarsPadding(),
     ) {
         TvPosterWallTopBar(
             title = wallSpec.title,
@@ -146,15 +151,19 @@ fun TvPosterWallScreen(
                     verticalArrangement = Arrangement.spacedBy(TvPosterWallFocusLayoutSpec.gridItemSpacingDp.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(uiState.items, key = { item -> item.id }) { item ->
+                    itemsIndexed(
+                        uiState.items,
+                        key = { _, item -> item.id },
+                    ) { index, item ->
+                        val focusModifier = if (uiState.page == 1 && uiState.items.firstOrNull()?.id == item.id) {
+                            Modifier.focusRequester(firstItemFocusRequester)
+                        } else {
+                            Modifier
+                        }
                         TvPosterWallCard(
                             baseUrl = baseUrl,
                             item = item,
-                            modifier = if (uiState.page == 1 && uiState.items.firstOrNull()?.id == item.id) {
-                                Modifier.focusRequester(firstItemFocusRequester)
-                            } else {
-                                Modifier
-                            },
+                            modifier = focusModifier.tvStaggerEntry(index = index),
                             onClick = {
                                 if (item.type == "tv") {
                                     onOpenSeries(item.id)
@@ -319,6 +328,13 @@ private fun TvPosterWallCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(9f / 16f)
+                    .then(
+                        if (item.type == "tv") {
+                            Modifier.tvSharedSeriesPoster(item.id)
+                        } else {
+                            Modifier
+                        },
+                    )
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(Color(0xFF20142D), Color(0xFF0C1018)),

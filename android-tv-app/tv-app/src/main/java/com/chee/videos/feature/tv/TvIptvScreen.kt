@@ -69,6 +69,7 @@ import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.tryRequestFocus
 import java.util.ArrayList
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.LibVLC
@@ -178,7 +179,7 @@ fun TvIptvScreen(
     }
 
     LaunchedTvInitialFocus(Unit) {
-        rootFocusRequester.requestFocus()
+        rootFocusRequester.tryRequestFocus()
     }
 
     LaunchedEffect(uiState.currentChannel?.id) {

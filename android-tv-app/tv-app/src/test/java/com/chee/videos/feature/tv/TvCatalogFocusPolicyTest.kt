@@ -117,8 +117,9 @@ class TvCatalogFocusPolicyTest {
 
         val source = screenPath.readText()
         assertTrue(
-            "TV 首页空内容启动时必须回退到已组合的左侧菜单焦点，避免请求未绑定搜索框导致启动崩溃",
-            source.contains("TvCatalogInitialFocusTarget.MENU -> menuFocusRequester.requestFocus()"),
+            "TV 首页空内容启动时必须回退到已组合的左侧菜单焦点，避免请求未绑定搜索框导致启动崩溃；" +
+                "并且必须走 tryRequestFocus 这一兜底入口，防止 Compose 1.7 FocusRequester 未挂载时 ISE 透出主 Looper",
+            source.contains("TvCatalogInitialFocusTarget.MENU -> menuFocusRequester.tryRequestFocus()"),
         )
     }
 }

@@ -5,7 +5,11 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +43,9 @@ import androidx.navigation.navArgument
 import com.chee.videos.core.model.AppRootState
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.AppDarkColors
+import com.chee.videos.core.ui.LocalTvAnimatedContentScope
+import com.chee.videos.core.ui.LocalTvSharedTransitionScope
+import com.chee.videos.core.ui.TvMinimalBringIntoViewSpec
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.viewmodel.AppRootViewModel
 import com.chee.videos.feature.connection.ConnectionScreen
@@ -95,6 +103,7 @@ fun TvShellApp(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun TvAuthenticatedNav(
     baseUrl: String,
@@ -150,118 +159,131 @@ private fun TvAuthenticatedNav(
             .fillMaxSize()
             .background(AppChrome.PageGradient),
     ) {
-        NavHost(
-            navController = navController,
-            startDestination = "tv-home",
-            modifier = Modifier
-                .fillMaxSize()
-                .background(AppChrome.PageGradient),
-        ) {
-            composable("tv-home") {
-                com.chee.videos.feature.tv.TvCatalogScreen(
-                    onOpenSeries = { seriesId ->
-                        navController.navigate(buildTvSeriesRoute(seriesId))
-                    },
-                    onOpenContinueWatching = { seriesId, season, episode ->
-                        navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
-                    },
-                    onOpenLongForm = { videoId, videoType ->
-                        navController.navigate(buildTvLongFormDetailRoute(videoId, videoType))
-                    },
-                    onPlayLongForm = { videoId, videoType ->
-                        navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
-                    },
-                    onOpenCatalogWall = { kind, title ->
-                        navController.navigate(buildTvCatalogWallRoute(kind, title))
-                    },
-                    onOpenIptv = {
-                        navController.navigate(TvIptvRoute)
-                    },
-                    homeContentFocusRequester = homeContentFocusRequester,
-                    onRepair = onRepair,
-                    onLogout = onLogout,
-                    onSwitchServer = onSwitchServer,
-                )
+        // 用 TvMinimalBringIntoViewSpec 覆盖 Compose Foundation 1.7 在 leanback 设备上默认启用的
+        // PivotBringIntoViewSpec，避免焦点目标已可见时仍把 LazyColumn 拉到 30% pivot 位置；
+        // 否则 TV 首页 hero 大海报会在初始焦点落到底部播放按钮时被强制上滑裁切。
+        CompositionLocalProvider(LocalBringIntoViewSpec provides TvMinimalBringIntoViewSpec) {
+        SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+            CompositionLocalProvider(LocalTvSharedTransitionScope provides this@SharedTransitionLayout) {
+                NavHost(
+                    navController = navController,
+                    startDestination = "tv-home",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppChrome.PageGradient),
+                ) {
+                    composable("tv-home") {
+                        com.chee.videos.feature.tv.TvCatalogScreen(
+                            onOpenSeries = { seriesId ->
+                                navController.navigate(buildTvSeriesRoute(seriesId))
+                            },
+                            onOpenContinueWatching = { seriesId, season, episode ->
+                                navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
+                            },
+                            onOpenLongForm = { videoId, videoType ->
+                                navController.navigate(buildTvLongFormDetailRoute(videoId, videoType))
+                            },
+                            onPlayLongForm = { videoId, videoType ->
+                                navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
+                            },
+                            onOpenCatalogWall = { kind, title ->
+                                navController.navigate(buildTvCatalogWallRoute(kind, title))
+                            },
+                            onOpenIptv = {
+                                navController.navigate(TvIptvRoute)
+                            },
+                            homeContentFocusRequester = homeContentFocusRequester,
+                            onRepair = onRepair,
+                            onLogout = onLogout,
+                            onSwitchServer = onSwitchServer,
+                        )
+                    }
+                    composable(
+                        route = TvCatalogWallRoutePattern,
+                        arguments = listOf(
+                            navArgument(TvCatalogWallKindArg) { type = NavType.StringType },
+                            navArgument(TvCatalogWallTitleArg) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
+                    ) {
+                        CompositionLocalProvider(LocalTvAnimatedContentScope provides this@composable) {
+                            com.chee.videos.feature.tv.TvPosterWallScreen(
+                                baseUrl = baseUrl,
+                                onBack = { navController.popBackStack() },
+                                onOpenSeries = { seriesId -> navController.navigate(buildTvSeriesRoute(seriesId)) },
+                                onOpenLongForm = { videoId, videoType ->
+                                    navController.navigate(buildTvLongFormDetailRoute(videoId, videoType))
+                                },
+                            )
+                        }
+                    }
+                    composable(
+                        route = TvLongFormDetailRoutePattern,
+                        arguments = listOf(
+                            navArgument(TvLongFormVideoIdArg) { type = NavType.StringType },
+                            navArgument(TvLongFormVideoTypeArg) {
+                                type = NavType.StringType
+                                defaultValue = "movie"
+                            },
+                        ),
+                    ) {
+                        TvLongFormDetailScreen(
+                            onBack = { navController.popBackStack() },
+                            onPlay = { videoId, videoType ->
+                                navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
+                            },
+                        )
+                    }
+                    composable(
+                        route = TvLongFormPlayerRoutePattern,
+                        arguments = listOf(
+                            navArgument(TvLongFormVideoIdArg) { type = NavType.StringType },
+                            navArgument(TvLongFormVideoTypeArg) {
+                                type = NavType.StringType
+                                defaultValue = "movie"
+                            },
+                        ),
+                    ) {
+                        TvLongFormPlayerScreen(
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                    composable(TvIptvRoute) {
+                        TvIptvScreen(
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                    composable(
+                        route = TvSeriesRoutePattern,
+                        arguments = listOf(navArgument(TvSeriesIdArg) { type = NavType.StringType }),
+                    ) {
+                        CompositionLocalProvider(LocalTvAnimatedContentScope provides this@composable) {
+                            TvSeriesDetailScreen(
+                                onBack = { navController.popBackStack() },
+                                onPlayEpisode = { seriesId, season, episode ->
+                                    navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
+                                },
+                            )
+                        }
+                    }
+                    composable(
+                        route = TvPlayerRoutePattern,
+                        arguments = listOf(
+                            navArgument(TvSeriesIdArg) { type = NavType.StringType },
+                            navArgument(TvSeasonArg) { type = NavType.IntType; defaultValue = 1 },
+                            navArgument(TvEpisodeArg) { type = NavType.IntType; defaultValue = 1 },
+                        ),
+                    ) {
+                        TvSeriesPlayerScreen(
+                            accessToken = accessToken,
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                }
             }
-            composable(
-                route = TvCatalogWallRoutePattern,
-                arguments = listOf(
-                    navArgument(TvCatalogWallKindArg) { type = NavType.StringType },
-                    navArgument(TvCatalogWallTitleArg) {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                ),
-            ) {
-                com.chee.videos.feature.tv.TvPosterWallScreen(
-                    baseUrl = baseUrl,
-                    onBack = { navController.popBackStack() },
-                    onOpenSeries = { seriesId -> navController.navigate(buildTvSeriesRoute(seriesId)) },
-                    onOpenLongForm = { videoId, videoType ->
-                        navController.navigate(buildTvLongFormDetailRoute(videoId, videoType))
-                    },
-                )
-            }
-            composable(
-                route = TvLongFormDetailRoutePattern,
-                arguments = listOf(
-                    navArgument(TvLongFormVideoIdArg) { type = NavType.StringType },
-                    navArgument(TvLongFormVideoTypeArg) {
-                        type = NavType.StringType
-                        defaultValue = "movie"
-                    },
-                ),
-            ) {
-                TvLongFormDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onPlay = { videoId, videoType ->
-                        navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
-                    },
-                )
-            }
-            composable(
-                route = TvLongFormPlayerRoutePattern,
-                arguments = listOf(
-                    navArgument(TvLongFormVideoIdArg) { type = NavType.StringType },
-                    navArgument(TvLongFormVideoTypeArg) {
-                        type = NavType.StringType
-                        defaultValue = "movie"
-                    },
-                ),
-            ) {
-                TvLongFormPlayerScreen(
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(TvIptvRoute) {
-                TvIptvScreen(
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = TvSeriesRoutePattern,
-                arguments = listOf(navArgument(TvSeriesIdArg) { type = NavType.StringType }),
-            ) {
-                TvSeriesDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onPlayEpisode = { seriesId, season, episode ->
-                        navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
-                    },
-                )
-            }
-            composable(
-                route = TvPlayerRoutePattern,
-                arguments = listOf(
-                    navArgument(TvSeriesIdArg) { type = NavType.StringType },
-                    navArgument(TvSeasonArg) { type = NavType.IntType; defaultValue = 1 },
-                    navArgument(TvEpisodeArg) { type = NavType.IntType; defaultValue = 1 },
-                ),
-            ) {
-                TvSeriesPlayerScreen(
-                    accessToken = accessToken,
-                    onBack = { navController.popBackStack() },
-                )
-            }
+        }
         }
 
         if (showRootExitPrompt) {
