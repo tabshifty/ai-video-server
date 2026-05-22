@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 01:36 +0800
+- 进度：继续修复“首页短视频点击全屏后仍不像长视频真正全屏播放”。根因确认：此前只把播放器覆盖层提升为 Dialog，但首页短视频仍处于 `HomeScreen` 的头部内容 tab 与 `VideoHomeApp` 根 `Scaffold` 底部 tabbar 之间，外层壳没有进入全屏状态，所以视觉上仍残留头部和底部导航。新增红灯结构测试锁定 `VideoHomeApp` / `HomeScreen` 必须感知 `isShortFullscreen`；实现为 `ShortFeedScreen` 将全屏状态回传给 `HomeScreen` 和 `VideoHomeApp`，全屏期间隐藏首页头部 tab 与根底部 tabbar，退出/离开时回传 `false`。同时删除此前误加的 `DONE.md`，该任务待用户重新验收后再标记完成。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`、`android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-short-overlay-fullscreen-button/DONE.md`
+- 验证：红灯 `cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.core.ui.ShortOverlayFullscreenSpecTest` 先失败于 `short fullscreen state must hide the app shell chrome`；实现后同一命令通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过；`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过。
+
 ## 2026-05-23 01:23 +0800
 - 进度：沉淀 `tasks/` 完成标记约定。以后批量执行 `tasks/` 时，已包含 `DONE.md` 的任务目录默认视为完成并跳过；用户明确要求重开或复查时才重新处理。按用户确认测试完成的语义，为 `tasks/2026-05-23-short-overlay-fullscreen-button/` 新增 `DONE.md`，记录完成时间、关联提交和验证摘要。
 - 影响文件：`AGENTS.md`、`CONTEXT.md`、`tasks/2026-05-23-short-overlay-fullscreen-button/DONE.md`、`plan.md`

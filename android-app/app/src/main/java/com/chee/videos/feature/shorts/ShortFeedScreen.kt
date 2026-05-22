@@ -123,6 +123,7 @@ fun ShortFeedScreen(
     accessToken: String,
     onOpenDiscover: (mode: String, value: String, title: String) -> Unit,
     onOpenImageCollectionViewer: (String) -> Unit,
+    onFullscreenChange: (Boolean) -> Unit = {},
     viewModel: ShortFeedViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -222,6 +223,13 @@ fun ShortFeedScreen(
                 var scrubTargetMs by remember(currentVideoId) { mutableStateOf(0L) }
                 var progressBarSettled by remember(currentVideoId) { mutableStateOf(false) }
                 var isFullscreen by rememberSaveable { mutableStateOf(false) }
+
+                LaunchedEffect(isFullscreen) {
+                    onFullscreenChange(isFullscreen)
+                }
+                DisposableEffect(Unit) {
+                    onDispose { onFullscreenChange(false) }
+                }
 
                 LaunchedEffect(pagerState.currentPage, currentVideoId) {
                     if (!currentVideoId.isNullOrBlank()) {

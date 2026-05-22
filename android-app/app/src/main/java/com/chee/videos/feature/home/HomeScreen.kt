@@ -46,9 +46,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,10 +84,24 @@ fun HomeScreen(
     onOpenTvContinueWatching: (String, Int, Int) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
     onOpenImageCollectionViewer: (String) -> Unit,
+    onShortFullscreenChange: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var isShortFullscreen by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(isShortFullscreen) {
+        onShortFullscreenChange(isShortFullscreen)
+    }
+    LaunchedEffect(selectedTab) {
+        if (tabs[selectedTab].type != "short" && isShortFullscreen) {
+            isShortFullscreen = false
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { onShortFullscreenChange(false) }
+    }
 
     LaunchedEffect(selectedTab) {
         val tab = tabs[selectedTab]
@@ -100,10 +116,12 @@ fun HomeScreen(
             .background(AppChrome.PageGradient)
             .statusBarsPadding(),
     ) {
-        HomeHeader(
-            selectedTab = selectedTab,
-            onSelectTab = { selectedTab = it },
-        )
+        if (!isShortFullscreen) {
+            HomeHeader(
+                selectedTab = selectedTab,
+                onSelectTab = { selectedTab = it },
+            )
+        }
 
         Box(modifier = Modifier.fillMaxSize()) {
             when (tabs[selectedTab].type) {
@@ -113,6 +131,7 @@ fun HomeScreen(
                         accessToken = accessToken,
                         onOpenDiscover = onOpenShortDiscover,
                         onOpenImageCollectionViewer = onOpenImageCollectionViewer,
+                        onFullscreenChange = { isShortFullscreen = it },
                     )
                 }
 

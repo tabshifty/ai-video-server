@@ -54,6 +54,16 @@ class ShortOverlayFullscreenSpecTest {
         assertTrue("短视频全屏 Dialog 必须关闭 decorFitsSystemWindows 才能铺满系统栏区域", source.contains("decorFitsSystemWindows = false"))
     }
 
+    @Test
+    fun `short fullscreen state must hide the app shell chrome`() {
+        val appSource = Path.of("src/main/java/com/chee/videos/VideoHomeApp.kt").readText()
+        val homeSource = Path.of("src/main/java/com/chee/videos/feature/home/HomeScreen.kt").readText()
+
+        assertTrue("应用壳必须感知短视频全屏状态，才能隐藏底部 tabbar", appSource.contains("isShortFullscreen"))
+        assertTrue("首页必须感知短视频全屏状态，才能隐藏头部导航", homeSource.contains("isShortFullscreen"))
+        assertTrue("首页头部必须在短视频全屏时隐藏", homeSource.contains("if (!isShortFullscreen)"))
+    }
+
     private fun assertSourceUsesFullscreenHost(path: String) {
         val source = Path.of(path).readText()
         assertTrue("$path 必须导入 ShortOverlayFullscreenHost", source.contains("ShortOverlayFullscreenHost"))

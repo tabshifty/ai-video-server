@@ -32,6 +32,7 @@
 
 ## 手机端短视频播放术语
 - `短视频全屏播放`：手机端短视频浮层中通过右侧「全屏播放」按钮触发的横屏长视频风格播放体验。进入后强制横屏、隐藏系统栏、复用同一个 `ExoPlayer` 和 `LongFormVideoPlayer` 控制条，并临时强制 `REPEAT_MODE_ONE`，屏蔽 VerticalPager 上下滑和播完自动切下一条；退出后恢复系统栏、方向和用户原 `ShortPlaybackMode` 对应的 repeatMode，继续停留在原短视频浮层。作用域仅限手机端短视频搜索、短视频发现、主页短视频信息流和 UnifiedPlayer 短视频分支；TV 端与长视频详情既有全屏路径不套用。
+- `首页短视频全屏壳层同步`：主页短视频信息流位于 `HomeScreen` 头部 tab 和 `VideoHomeApp` 根 `Scaffold` 底部 tabbar 之间，短视频播放器内部的覆盖层或 Dialog 不能单独保证“像长视频一样全屏”。进入主页短视频全屏时，`ShortFeedScreen` 必须把 `isFullscreen` 状态回传给 `HomeScreen` 和 `VideoHomeApp`，由首页隐藏头部内容 tab、由根壳隐藏底部导航；退出或离开首页时必须回传 `false`，避免底部导航残留隐藏。
 
 ## TV 首页术语
 - `18+`：面向 TV 端显示的成人内容入口。代码、接口参数和存储内部仍使用 `av`，TV 界面文案不得显示为 `AV`。

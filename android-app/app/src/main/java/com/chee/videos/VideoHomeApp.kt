@@ -165,6 +165,7 @@ private fun AuthenticatedNav(
     val showBottomBar = rootNavigationTabs.any { it.route == currentRoute }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var isShortFullscreen by rememberSaveable { mutableStateOf(false) }
     val scannerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents?.trim().orEmpty()
         when {
@@ -185,7 +186,7 @@ private fun AuthenticatedNav(
             SnackbarHost(hostState = snackbarHostState)
         },
         bottomBar = {
-            if (showBottomBar) {
+            if (showBottomBar && !isShortFullscreen) {
                 Surface(
                     color = AppChrome.Surface,
                     contentColor = AppChrome.TextPrimary,
@@ -288,6 +289,7 @@ private fun AuthenticatedNav(
                         onOpenImageCollectionViewer = { route ->
                             navController.navigate(route)
                         },
+                        onShortFullscreenChange = { isShortFullscreen = it },
                     )
                 }
             }
