@@ -85,14 +85,14 @@ class ConnectionViewModel @Inject constructor(
 
     fun useEndpoint(baseUrl: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(connecting = true, message = "正在应用地址...", messageIsError = false) }
-            runCatching {
-                serverRepository.activateEndpoint(baseUrl)
-            }.onSuccess {
-                _uiState.update { it.copy(connecting = false, message = "已连接：${UrlBuilder.normalizeBaseUrl(baseUrl)}", messageIsError = false) }
-            }.onFailure { err ->
-                _uiState.update { it.copy(connecting = false, message = "应用地址失败：${err.message}", messageIsError = true) }
+            _uiState.update { it.copy(connecting = true, message = "正在连接服务器...", messageIsError = false) }
+            val ok = serverRepository.testEndpoint(baseUrl)
+            if (!ok) {
+                _uiState.update { it.copy(connecting = false, message = "连接失败，请确认服务器地址和运行状态", messageIsError = true) }
+                return@launch
             }
+            serverRepository.activateEndpoint(baseUrl)
+            _uiState.update { it.copy(connecting = false, message = "已连接：${UrlBuilder.normalizeBaseUrl(baseUrl)}", messageIsError = false) }
         }
     }
 

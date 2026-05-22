@@ -82,7 +82,8 @@ class TvPairingViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         loading = false,
-                        errorMessage = err.message ?: "创建配对会话失败",
+                        errorMessage = err.message?.takeIf { it.isNotBlank() }
+                            ?: "创建配对会话失败 (${err.javaClass.simpleName})",
                     )
                 }
             }

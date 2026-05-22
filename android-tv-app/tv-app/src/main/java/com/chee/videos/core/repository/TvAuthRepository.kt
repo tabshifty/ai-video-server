@@ -12,6 +12,7 @@ import com.chee.videos.core.network.ApiService
 import com.chee.videos.core.util.UrlBuilder
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 
 @Singleton
 class TvAuthRepository @Inject constructor(
@@ -27,7 +28,7 @@ class TvAuthRepository @Inject constructor(
         if (normalizedDeviceId.isBlank() || normalizedDeviceName.isBlank()) {
             return Result.failure(AppException("缺少 TV 设备信息"))
         }
-        return runCatching {
+        return try {
             val resp = api.createTvAuthSession(
                 url = UrlBuilder.tvAuthSessions(baseUrl),
                 body = TvAuthSessionCreateRequest(
@@ -35,7 +36,11 @@ class TvAuthRepository @Inject constructor(
                     deviceName = normalizedDeviceName,
                 ),
             )
-            requireEnvelope(resp)
+            Result.success(requireEnvelope(resp))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
