@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-22 22:30 +0800
+- 进度：修复一级首页左侧菜单焦点无法跳回内容区 bug（版本 0.1.55 → 0.1.56，versionCode 56→57）。根因：`TvHomeSideMenuButton` 的 `.focusProperties { right = contentFocusRequester }` 把 D-pad RIGHT 硬指向 `featuredFocusRequester`，该 requester 绑定在 `LazyColumn` 内 `TvFeaturedHero` item 上；用户向下滚动后 hero item 被虚拟化移出组合树、requester 变为 uninitialized；此时从菜单按 RIGHT → ISE → `dispatchKeyEvent` ANR 兜底吞掉返回 `false` → 无焦点移动 → 表现为”无法从菜单跳回内容区，需要点击菜单按钮”。修法：删除 `focusProperties { right = contentFocusRequester }` 块及 `contentFocusRequester` 参数在 `TvHomeSideMenuButton` / `TvHomeSideMenu` / 两处调用点的级联，同步删除孤立 `import focusProperties`；改由 Compose 空间焦点遍历自动找右侧最近可聚焦节点，内容 `LazyColumn` 横铺剩余宽度、不受虚拟化影响，空间遍历总能命中当前可见内容项。
+- 影响文件：`TvCatalogScreen.kt`（删除 `focusProperties` 块 + 参数 + import）、`build.gradle.kts`（版本号）、`plan.md`。
+- 验证：`testDebugUnitTest` BUILD SUCCESSFUL 25s 全绿。
+
 ## 2026-05-22 22:00 +0800
 - 进度：C 批视觉/交互打磨（C1-C4），版本 0.1.54 → 0.1.55（versionCode 55→56）。C1：海报墙卡片标题 Box 补 `heightIn(min=74.dp)` + `contentAlignment=TopStart`，同行 1 行/2 行标题卡片底边对齐。C2：状态屏图标 28→36dp、加载圈 24→32dp、操作按钮 icon 18→20dp + 纵向 padding 10→12dp，TV 10-foot 可读性提升。C3：电视剧详情”主演：”文本补 `maxLines=1, overflow=Ellipsis`，防超长演员列表换行破坏布局。C4：播放器居中反馈 icon 显式 `size(22.dp)`，反馈文本补 `maxLines=1, overflow=Ellipsis`，防长文案跳变。
 - 影响文件：`TvPosterWallScreen.kt`（import heightIn + 标题 Box 约束）、`TvStateFeedback.kt`（图标/圆圈/按钮尺寸）、`TvSeriesDetailScreen.kt`（主演行溢出保护）、`LongFormVideoPlayer.kt`（中心反馈 icon+文本约束）、`build.gradle.kts`（版本号）。

@@ -46,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -148,7 +147,6 @@ fun TvCatalogScreen(
             TvHomeSideMenu(
                 selectedMenu = uiState.selectedMenu,
                 menuFocusRequester = menuFocusRequester,
-                contentFocusRequester = featuredFocusRequester,
                 onSelect = viewModel::selectMenu,
                 onOpenIptv = onOpenIptv,
             )
@@ -161,7 +159,6 @@ fun TvCatalogScreen(
         TvHomeSideMenu(
             selectedMenu = uiState.selectedMenu,
             menuFocusRequester = menuFocusRequester,
-            contentFocusRequester = featuredFocusRequester,
             onSelect = viewModel::selectMenu,
             onOpenIptv = onOpenIptv,
         )
@@ -417,7 +414,6 @@ private fun TvCatalogSearchBar(
 private fun TvHomeSideMenu(
     selectedMenu: TvHomeMenuItem,
     menuFocusRequester: FocusRequester,
-    contentFocusRequester: FocusRequester,
     onSelect: (TvHomeMenuItem) -> Unit,
     onOpenIptv: () -> Unit,
 ) {
@@ -436,7 +432,6 @@ private fun TvHomeSideMenu(
                 selected = item == selectedMenu,
                 icon = tvHomeMenuIcon(item),
                 modifier = if (index == 0) Modifier.focusRequester(menuFocusRequester) else Modifier,
-                contentFocusRequester = contentFocusRequester,
                 onClick = {
                     if (item == TvHomeMenuItem.Iptv) {
                         onOpenIptv()
@@ -455,7 +450,6 @@ private fun TvHomeSideMenuButton(
     selected: Boolean,
     icon: ImageVector,
     modifier: Modifier = Modifier,
-    contentFocusRequester: FocusRequester,
     onClick: () -> Unit,
 ) {
     val background = if (selected) AppChrome.Accent.copy(alpha = 0.92f) else AppChrome.Surface.copy(alpha = 0.72f)
@@ -465,7 +459,6 @@ private fun TvHomeSideMenuButton(
         modifier = modifier
             .width(56.dp)
             .height(48.dp)
-            .focusProperties { right = contentFocusRequester }
             .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.06f)
             .clickable(onClick = onClick),
     ) {
