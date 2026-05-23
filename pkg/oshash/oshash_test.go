@@ -3,7 +3,6 @@ package oshash
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -25,7 +24,7 @@ func TestComputeReturnsDeterministicHex(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sample.bin")
-	if err := os.WriteFile(path, []byte(strings.Repeat("B", ChunkSize*4)), 0o644); err != nil {
+	if err := os.WriteFile(path, bytesOf('B', ChunkSize*4), 0o644); err != nil {
 		t.Fatalf("write temp file: %v", err)
 	}
 
@@ -43,4 +42,31 @@ func TestComputeReturnsDeterministicHex(t *testing.T) {
 	if len(first) != 16 {
 		t.Fatalf("expected 16 hex chars, got %q", first)
 	}
+}
+
+func TestComputeMatchesPythonOshashGoldenFixture(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture_256k_0x42.bin")
+	if err := os.WriteFile(path, bytesOf(0x42, 256*1024), 0o644); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+
+	got, err := Compute(path)
+	if err != nil {
+		t.Fatalf("Compute() error = %v", err)
+	}
+	const want = "9090909090948000"
+	if got != want {
+		t.Fatalf("Compute() = %q, want Python oshash golden value %q", got, want)
+	}
+}
+
+func bytesOf(value byte, n int) []byte {
+	data := make([]byte, n)
+	for i := range data {
+		data[i] = value
+	}
+	return data
 }

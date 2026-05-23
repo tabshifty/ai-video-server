@@ -297,6 +297,8 @@ func (a *API) AdminAVScrapeConfirm(c *gin.Context) {
 		response.Error(c, 3, err.Error())
 		return
 	}
+	// shouldEnqueueAdminScrapeConfirmTranscode intentionally reads the pre-confirm
+	// status; ConfirmAV turns av_scrape_pending into processing before this point.
 	if shouldEnqueueAdminScrapeConfirmTranscode(video) {
 		if a.enqueuer == nil {
 			response.Error(c, 5, "queue not configured")
@@ -402,6 +404,8 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 		response.Error(c, 4, "only movie, episode or av supports scrape confirm")
 		return
 	}
+	// shouldEnqueueAdminScrapeConfirmTranscode intentionally reads the pre-confirm
+	// status; ConfirmAV turns av_scrape_pending into processing before this point.
 	if shouldEnqueueAdminScrapeConfirmTranscode(video) {
 		if a.enqueuer == nil {
 			response.Error(c, 5, "queue not configured")

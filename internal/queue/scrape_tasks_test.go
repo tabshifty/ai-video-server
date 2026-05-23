@@ -325,7 +325,7 @@ func TestAutoScrapeAVUsesTitleToSelectSite(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case strings.HasPrefix(r.URL.Path, "/scenes") && r.URL.Query().Get("q") != "":
+		case strings.HasPrefix(r.URL.Path, "/scenes") && r.URL.Query().Get("parse") != "":
 			atomic.AddInt32(&searchHits, 1)
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"data":[{"slug":"brazzers-office-affair","title":"Brazzers Office Affair"}]}`))

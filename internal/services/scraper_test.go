@@ -2803,7 +2803,7 @@ func TestPreviewAVFallsBackToThePornDBWhenConfigured(t *testing.T) {
 			_, _ = w.Write([]byte(`<html><body></body></html>`))
 		case r.URL.Path == "/cn/vl_searchbyid.php":
 			_, _ = w.Write([]byte(`<html><body></body></html>`))
-		case r.URL.Path == "/scenes" && strings.Contains(strings.ToUpper(r.URL.Query().Get("q")), "ABW") && strings.Contains(strings.ToUpper(r.URL.Query().Get("q")), "123"):
+		case r.URL.Path == "/scenes" && strings.Contains(strings.ToUpper(r.URL.Query().Get("parse")), "ABW") && strings.Contains(strings.ToUpper(r.URL.Query().Get("parse")), "123"):
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"data":[{"slug":"abw-123-scene"}]}`))
 		case r.URL.Path == "/scenes/abw-123-scene":

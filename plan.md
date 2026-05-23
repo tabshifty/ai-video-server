@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 19:28 +0800
+- 进度：完成 `tasks/2026-05-23-western-av-oshash-confirm-gate/feedback.md` 的必修收口：ThePornDB 两位年份日期补 `20`、`/scenes` 恢复 `parse=` 且 `/movies` 保持 `q=`、补 oshash 256KiB `0x42` 黄金值测试；同时补 ConfirmAV 前置状态注释、OUMEI_NAME 来源注释、migration down 回滚提示，并将“含 DONE 的 task 不按 feedback 返工”沉淀到 `CONTEXT.md`。未纳入 `.codex/skills/av-scraper-optimization` 删除、`.claude/`、OpenSpec skill、`CLAUDE.md`、`package-lock.json`、两个 task `feedback.md` 等既有无关工作区变更。
+- 影响文件：`CONTEXT.md`、`internal/handlers/admin_scrape.go`、`internal/queue/scrape_tasks_test.go`、`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_theporndb_test.go`、`internal/services/scraper_test.go`、`migrations/0021_western_av_oshash_gate.down.sql`、`pkg/oshash/oshash_test.go`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestThePornDBSearchKeywordsExpandsSupportedDateFormats|TestThePornDBSearchURLUsesEndpointSpecificQueryParameter' -count=1` 通过；`go test ./pkg/oshash -run 'TestComputeMatchesPythonOshashGoldenFixture|TestComputeReturnsDeterministicHex|TestComputeReturnsErrFileTooSmall' -count=1` 通过；`go test ./pkg/oshash ./internal/services ./internal/queue ./internal/handlers -run 'ThePornDB|OSHash|AVScrape|ConfirmAV|SkipScrape' -count=1` 通过；`go test ./... -count=1` 通过；`go vet ./...` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md internal pkg migrations` 无输出。
+
+## 2026-05-23 19:07 +0800
+- 进度：开始按当前未完成 task 的 feedback 修复 `tasks/2026-05-23-western-av-oshash-confirm-gate`；用户确认含 `DONE.md` 的 task 视为已完成，不再按其 feedback 返工，因此跳过 `tasks/2026-05-23-tv-series-autoplay-next-episode/feedback.md`。先补 ThePornDB 日期 / 查询参数与 oshash 黄金值的定向回归测试，再做最小实现，并把 DONE 跳过 feedback 的约定沉淀到 `CONTEXT.md`。
+- 影响文件：`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/*_test.go`、`pkg/oshash/oshash_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 定向测试、`go test ./...`、`go vet ./...`、乱码扫描。
+
 ## 2026-05-23 16:50 +0800
 - 进度：已提交 `tasks/2026-05-23-western-av-oshash-confirm-gate` 的实现收口，关联提交 `ac7766f2`（`完成欧美 AV 刮削确认门控`）。按任务 DONE 标准，本轮不创建 `DONE.md`；需用户完成 B/C 手动验收后再标记完成。
 - 影响文件：`plan.md`

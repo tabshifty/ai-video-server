@@ -1749,6 +1749,9 @@ func thePornDBSearchKeywords(filePath string) ([]string, string, string) {
 		series := thePornDBLongName(strings.NewReplacer("-", "", ".", "").Replace(strings.ToLower(matches[1])))
 		date := strings.ReplaceAll(matches[2], ".", "-")
 		date = strings.ReplaceAll(date, "_", "-")
+		if len(date) == len("20-05-12") {
+			date = "20" + date
+		}
 		title := strings.TrimSpace(strings.Replace(fileName, fullNumber, "", 1))
 		title = regexp.MustCompile(`[-_&.]`).ReplaceAllString(title, " ")
 		titleParts := thePornDBMeaningfulParts(title, series)
@@ -1776,7 +1779,11 @@ func thePornDBSearchKeywords(filePath string) ([]string, string, string) {
 
 func thePornDBSearchURL(baseURL, category, keyword string) string {
 	values := url.Values{}
-	values.Set("q", keyword)
+	if category == "movies" {
+		values.Set("q", keyword)
+	} else {
+		values.Set("parse", keyword)
+	}
 	values.Set("per_page", "100")
 	return strings.TrimRight(baseURL, "/") + "/" + category + "?" + values.Encode()
 }
@@ -2023,6 +2030,7 @@ func thePornDBSimilarity(a string, b string) float64 {
 	return 1 - float64(distance)/maxLen
 }
 
+// 来源：references/mdcx/mdcx/manual.py:OUMEI_NAME，最后同步日期 2026-05-23。
 var thePornDBLongNameMap = map[string]string{
 	"wgp":              "WhenGirlsPlay",
 	"18og":             "18OnlyGirls",
