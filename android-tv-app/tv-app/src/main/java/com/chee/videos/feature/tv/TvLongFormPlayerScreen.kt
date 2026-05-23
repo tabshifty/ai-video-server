@@ -148,6 +148,9 @@ fun TvLongFormPlayerScreen(
     var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
     var preparedSubtitleTrackId by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
     var resumedFromHistoryVideoId by remember(detail.id, uiState.accessToken) { mutableStateOf("") }
+    var resumePromptLastPositionMs by remember(detail.id, uiState.accessToken) { mutableStateOf(0L) }
+    var resumePromptRemainingMs by remember(detail.id, uiState.accessToken) { mutableStateOf(0L) }
+    var resumePromptDismissed by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
     var selectedSubtitleTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
     var storedAudioTrackId by remember(detail.id) { mutableStateOf<String?>(null) }
     var selectedAudioTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
@@ -234,6 +237,11 @@ fun TvLongFormPlayerScreen(
             }
             if (!updateDecision.preservePosition && detail.id.isNotBlank()) {
                 resumedFromHistoryVideoId = detail.id
+                if (shouldTriggerResumePrompt(initialResumePositionMs)) {
+                    resumePromptLastPositionMs = initialResumePositionMs
+                    resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
+                    resumePromptDismissed = false
+                }
             }
             preparedUrl = playUrl
             preparedSubtitleTrackId = selectedSubtitleTrackId
@@ -275,6 +283,38 @@ fun TvLongFormPlayerScreen(
         while (true) {
             delay(TvPeriodicHistoryReportIntervalMillis)
             reportTvLongFormHistory(viewModel, detail.id, exoPlayer)
+        }
+    }
+
+    LaunchedEffect(playerErrorMessage) {
+        if (playerErrorMessage != null) {
+            resumePromptDismissed = true
+        }
+    }
+
+    val resumePromptGuardInput = ResumePromptGuardInput(
+        hasResumeSeekTriggered = resumedFromHistoryVideoId == detail.id && resumePromptLastPositionMs > 0L,
+        promptPermanentlyDismissed = resumePromptDismissed,
+        isPlayerError = playerErrorMessage != null,
+        isBackConfirmVisible = showBackConfirmPrompt,
+        isEpisodeSelectorVisible = false,
+        isEndOverlayVisible = false,
+        isAutoplayPromptVisible = false,
+        isPausedByUser = playbackSession.isPausedByUser,
+        remainingMs = resumePromptRemainingMs,
+    )
+    val shouldTickResumePromptCountdown = shouldTickResumePromptCountdown(resumePromptGuardInput)
+    val shouldShowResumePromptCard = shouldShowResumePromptCard(resumePromptGuardInput)
+
+    LaunchedEffect(detail.id, shouldTickResumePromptCountdown, resumePromptDismissed) {
+        if (resumePromptDismissed) return@LaunchedEffect
+        while (resumePromptRemainingMs > 0L) {
+            delay(50)
+            if (!shouldTickResumePromptCountdown || resumePromptDismissed) break
+            resumePromptRemainingMs = (resumePromptRemainingMs - 50L).coerceAtLeast(0L)
+        }
+        if (resumePromptRemainingMs <= 0L && resumePromptLastPositionMs > 0L) {
+            resumePromptDismissed = true
         }
     }
 
@@ -357,6 +397,22 @@ fun TvLongFormPlayerScreen(
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                 onRequestExitPlayback = ::handlePlaybackBack,
                 onExitPlayback = onBack,
+            )
+            TvResumePromptCard(
+                lastPositionMs = resumePromptLastPositionMs,
+                visible = shouldShowResumePromptCard,
+                remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
+                onContinue = { resumePromptDismissed = true },
+                onStartFromBeginning = {
+                    exoPlayer.seekTo(0L)
+                    resumePromptDismissed = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(
+                        start = TvResumePromptTokens.HorizontalPaddingDp,
+                        bottom = TvResumePromptTokens.BottomPaddingDp,
+                    ),
             )
             if (!playerErrorMessage.isNullOrBlank()) {
                 Surface(

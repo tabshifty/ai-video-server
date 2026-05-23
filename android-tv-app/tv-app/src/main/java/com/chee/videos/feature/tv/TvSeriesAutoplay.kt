@@ -1,5 +1,7 @@
 package com.chee.videos.feature.tv
 
+import androidx.compose.ui.unit.dp
+
 data class TvNextEpisodeRef(
     val seasonNumber: Int,
     val episodeNumber: Int,
@@ -18,6 +20,11 @@ object TvSeriesAutoplaySetting {
 }
 
 const val TvAutoplayCountdownSeconds: Int = 10
+
+object TvAutoplayPromptTokens {
+    val HorizontalPaddingDp = 48.dp
+    val BottomPaddingDp = 156.dp
+}
 
 data class AutoplayPromptGuardInput(
     val isPlaying: Boolean,

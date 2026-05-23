@@ -167,6 +167,9 @@ fun TvSeriesPlayerScreen(
     var screenDurationMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
     var resumedFromHistoryVideoId by remember { mutableStateOf("") }
+    var resumePromptLastPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
+    var resumePromptRemainingMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
+    var resumePromptDismissed by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var lastAutoplaySwitchedVideoId by remember { mutableStateOf("") }
 
     val nextEpisodeRef = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
@@ -202,6 +205,20 @@ fun TvSeriesPlayerScreen(
         hasStartedPlayback = nextSession.hasStartedPlayback
         isPausedByUser = nextSession.isPausedByUser
     }
+
+    val resumePromptGuardInput = ResumePromptGuardInput(
+        hasResumeSeekTriggered = resumedFromHistoryVideoId == uiState.currentVideoId && resumePromptLastPositionMs > 0L,
+        promptPermanentlyDismissed = resumePromptDismissed,
+        isPlayerError = playerErrorMessage != null,
+        isBackConfirmVisible = showBackConfirmPrompt,
+        isEpisodeSelectorVisible = uiState.selectorVisible,
+        isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
+        isAutoplayPromptVisible = shouldShowPromptCard,
+        isPausedByUser = playbackSession.isPausedByUser,
+        remainingMs = resumePromptRemainingMs,
+    )
+    val shouldTickResumePromptCountdown = shouldTickResumePromptCountdown(resumePromptGuardInput)
+    val shouldShowResumePromptCard = shouldShowResumePromptCard(resumePromptGuardInput)
 
     fun advanceFromAutoplay() {
         val state = latestUiState
@@ -254,6 +271,9 @@ fun TvSeriesPlayerScreen(
             reportTvSeriesHistory(viewModel, lastHistoryVideoId, exoPlayer)
         }
         lastHistoryVideoId = uiState.currentVideoId
+        resumePromptLastPositionMs = 0L
+        resumePromptRemainingMs = 0L
+        resumePromptDismissed = false
     }
 
     LaunchedEffect(uiState.currentSourceUrl, canPlay, selectedSubtitleTrackId, currentEpisode?.subtitleTracks) {
@@ -304,6 +324,11 @@ fun TvSeriesPlayerScreen(
             }
             if (!updateDecision.preservePosition && uiState.currentVideoId.isNotBlank()) {
                 resumedFromHistoryVideoId = uiState.currentVideoId
+                if (shouldTriggerResumePrompt(initialResumePositionMs)) {
+                    resumePromptLastPositionMs = initialResumePositionMs
+                    resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
+                    resumePromptDismissed = false
+                }
             }
             preparedUrl = uiState.currentSourceUrl
             preparedSubtitleTrackId = effectiveSubtitleTrackId
@@ -393,6 +418,29 @@ fun TvSeriesPlayerScreen(
             remainingMs <= 0L
         ) {
             advanceFromAutoplay()
+        }
+    }
+
+    LaunchedEffect(playerErrorMessage, uiState.selectorVisible, uiState.pendingEndOverlayKind, shouldShowPromptCard) {
+        if (
+            playerErrorMessage != null ||
+            uiState.selectorVisible ||
+            uiState.pendingEndOverlayKind != null ||
+            shouldShowPromptCard
+        ) {
+            resumePromptDismissed = true
+        }
+    }
+
+    LaunchedEffect(uiState.currentVideoId, shouldTickResumePromptCountdown, resumePromptDismissed) {
+        if (resumePromptDismissed) return@LaunchedEffect
+        while (resumePromptRemainingMs > 0L) {
+            delay(50)
+            if (!shouldTickResumePromptCountdown || resumePromptDismissed) break
+            resumePromptRemainingMs = (resumePromptRemainingMs - 50L).coerceAtLeast(0L)
+        }
+        if (resumePromptRemainingMs <= 0L && resumePromptLastPositionMs > 0L) {
+            resumePromptDismissed = true
         }
     }
 
@@ -496,9 +544,28 @@ fun TvSeriesPlayerScreen(
                         onCancel = viewModel::cancelAutoplayForCurrentEpisode,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 48.dp, bottom = 156.dp),
+                            .padding(
+                                end = TvAutoplayPromptTokens.HorizontalPaddingDp,
+                                bottom = TvAutoplayPromptTokens.BottomPaddingDp,
+                            ),
                     )
                 }
+                TvResumePromptCard(
+                    lastPositionMs = resumePromptLastPositionMs,
+                    visible = shouldShowResumePromptCard,
+                    remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
+                    onContinue = { resumePromptDismissed = true },
+                    onStartFromBeginning = {
+                        exoPlayer.seekTo(0L)
+                        resumePromptDismissed = true
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(
+                            start = TvResumePromptTokens.HorizontalPaddingDp,
+                            bottom = TvResumePromptTokens.BottomPaddingDp,
+                        ),
+                )
                 TvSeriesEndOverlay(
                     kind = uiState.pendingEndOverlayKind,
                     onPlayNext = viewModel::nextEpisode,

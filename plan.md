@@ -2,6 +2,66 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 22:04 +0800
+- 进度：完成 `tasks/2026-05-23-tv-resume-from-history-prompt/` 实现阶段自动化 review。新增任务文档、续播提示实现、测试、TV 版本号与进度记录将纳入本次提交；未创建 `DONE.md`，因为 H1-H18 真实 TV 手测需用户验收通过后再标记完成。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md tasks/2026-05-23-tv-resume-from-history-prompt android-tv-app/tv-app/src/main/java android-tv-app/tv-app/src/test/java android-tv-app/tv-app/build.gradle.kts` 无输出；H1-H18 手测待用户在 TV 设备执行。
+
+## 2026-05-23 22:00 +0800
+- 进度：完成 TV 续播提示卡核心实现：新增续播提示纯函数与 UI 卡片，接入电影 / `18+` 与电视剧播放器；历史 seek 且达到 10 秒门槛时显示 5 秒左下角提示，暂停和退出确认冻结倒计时，错误 / 选集 / 连播互斥时永久关闭；补 `TvResumePromptTest` 与 `TvResumePromptCardSpecTest` 并完成红绿验证。`CONTEXT.md` 的 6 条续播术语已在前置审查阶段追加，本轮不重复写入。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvResumePrompt.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvResumePromptCard.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesAutoplay.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvResumePromptTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvResumePromptCardSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`
+- 验证：定向红灯为 `TvResumePrompt*` API 未实现导致编译失败；实现后 `cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvResumePromptTest' --tests 'com.chee.videos.feature.tv.TvResumePromptCardSpecTest'` 通过；待执行全量 TV 单测、Debug 构建与乱码扫描。
+
+## 2026-05-23 21:54 +0800
+- 进度：开始实现 `tasks/2026-05-23-tv-resume-from-history-prompt/`。按 PRD/Implement/Review 顺序执行，先补 `TvResumePromptTest` 与 `TvResumePromptCardSpecTest` 红灯，再接入 TV 电影 / `18+` / 电视剧播放器续播提示卡，最后更新 TV 版本号并跑 review 要求验证。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/`
+- 验证：待执行定向红灯、`cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew :tv-app:assembleDebug`、乱码扫描。
+
+## 2026-05-23 21:49 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，修正 `review.md` 源文 audit 第 3 条的文件定位：`Alignment.BottomStart` 的断言应落在两个 player 文件的调用点，而不是 `TvResumePromptCard.kt`。此处仅做文档口径收紧，未改实现。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：已对照 `implement.md` 的 audit 列表；待后续统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:49 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，确认提交策略拆分为“grill 审查文档独立提交 + 后续实现阶段代码独立提交”；review 的 Done definition 改为要求实现改动集中在一个 commit，不再要求任务定义修订和实现混在同一提交。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/implement.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:41 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，确认本任务保持续播专用位置 token，不抽共享播放器提示卡 token、不改连播卡；同时把 `LeftPaddingDp` 收紧命名为 `HorizontalPaddingDp`，表达边缘水平安全距离而非只能用于左侧。已同步 `implement.md` 与 `review.md`。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/implement.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:33 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，确认倒计时状态机与 UI 可见性分离：新增 `shouldTickResumePromptCountdown` 作为 tick 条件，`shouldShowResumePromptCard` 只管渲染，避免 remainingMs 归零时漏设永久 dismiss。已同步 `implement.md` 与 `review.md`。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/implement.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:27 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，确认 `CONTEXT.md` 只沉淀去实现细节的 glossary，不照搬 PRD 中带函数名、尺寸和 API 约束的术语表。已同步 `prd.md`、`review.md`，并在 `CONTEXT.md` 追加 `续播提醒`、`续播提示卡`、`续播倒计时`、`续播提示卡触发节流`、`续播提示卡永久 dismiss`、`续播从头播放语义` 六条术语。
+- 影响文件：`CONTEXT.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/prd.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:20 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，确认续播卡是非阻塞提示：焦点从「继续观看」移到「从头播放」不冻结倒计时；倒计时归零前未按 OK 即默认继续观看并 dismiss。已同步 `prd.md`、`implement.md`、`review.md`。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/prd.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/implement.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:14 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，确认续播倒计时只在续播卡可见且可操作时消耗；暂停和退出确认这类临时隐藏都冻结剩余时间。已同步 `prd.md`、`implement.md`、`review.md`，并要求倒计时 `LaunchedEffect` 依赖可见态而非只看暂停状态。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/prd.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/implement.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:08 +0800
+- 进度：继续 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，确认本任务不改 `LongFormVideoPlayer` 公共 API；字幕/音轨夜台面板不进入续播卡状态机，“选择面板”收紧为电视剧选集面板。已同步 `prd.md`、`implement.md`、`review.md`，并把 guard 字段改名为 `isEpisodeSelectorVisible` 以避免泛化误读。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/prd.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/implement.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/review.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
+## 2026-05-23 21:04 +0800
+- 进度：进入 `$grill-with-docs` 审查 `tasks/2026-05-23-tv-resume-from-history-prompt/`，先解决续播卡与 `TV 播放器退出确认` 的语义冲突：BACK/退出确认只临时隐藏续播卡，不触发永久 dismiss；若确认提示消失且倒计时仍有剩余，续播卡恢复显示。已同步 `prd.md` 与 `implement.md`。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/prd.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/implement.md`、`plan.md`
+- 验证：待继续审查后统一执行 Markdown 乱码扫描与 diff 检查。
+
 ## 2026-05-23 20:57 +0800
 - 进度：根据用户确认，将 `tasks/2026-05-23-western-av-oshash-confirm-gate/` 标记为已完成。新增 `DONE.md` 记录完成时间、关联提交与验证摘要；后续批量处理 tasks 时默认跳过该任务目录，除非用户明确要求重开或复查。
 - 影响文件：`tasks/2026-05-23-western-av-oshash-confirm-gate/DONE.md`、`plan.md`
