@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 20:57 +0800
+- 进度：根据用户确认，将 `tasks/2026-05-23-western-av-oshash-confirm-gate/` 标记为已完成。新增 `DONE.md` 记录完成时间、关联提交与验证摘要；后续批量处理 tasks 时默认跳过该任务目录，除非用户明确要求重开或复查。
+- 影响文件：`tasks/2026-05-23-western-av-oshash-confirm-gate/DONE.md`、`plan.md`
+- 验证：待执行 Markdown 乱码扫描与 diff 检查；本次仅为任务状态文档标记，不需要重新构建。
+
 ## 2026-05-23 19:28 +0800
 - 进度：完成 `tasks/2026-05-23-western-av-oshash-confirm-gate/feedback.md` 的必修收口：ThePornDB 两位年份日期补 `20`、`/scenes` 恢复 `parse=` 且 `/movies` 保持 `q=`、补 oshash 256KiB `0x42` 黄金值测试；同时补 ConfirmAV 前置状态注释、OUMEI_NAME 来源注释、migration down 回滚提示，并将“含 DONE 的 task 不按 feedback 返工”沉淀到 `CONTEXT.md`。未纳入 `.codex/skills/av-scraper-optimization` 删除、`.claude/`、OpenSpec skill、`CLAUDE.md`、`package-lock.json`、两个 task `feedback.md` 等既有无关工作区变更。
 - 影响文件：`CONTEXT.md`、`internal/handlers/admin_scrape.go`、`internal/queue/scrape_tasks_test.go`、`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_theporndb_test.go`、`internal/services/scraper_test.go`、`migrations/0021_western_av_oshash_gate.down.sql`、`pkg/oshash/oshash_test.go`、`plan.md`
