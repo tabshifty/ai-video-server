@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 22:45 +0800
+- 进度：根据用户“完成当前任务”的确认，将 `tasks/2026-05-23-tv-resume-from-history-prompt/` 标记为已完成。新增 `DONE.md` 记录完成日期、最终关联提交 `f8a8652c` 与验证摘要；本轮仅做任务归档完成标记，不改 TV 运行时代码。
+- 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/DONE.md`、`plan.md`
+- 验证：`rg -n $'\uFFFD' plan.md tasks/2026-05-23-tv-resume-from-history-prompt/DONE.md` 无输出；`git diff --check -- plan.md tasks/2026-05-23-tv-resume-from-history-prompt/DONE.md` 通过；文档完成标记不需要重新构建。
+
 ## 2026-05-23 22:30 +0800
 - 进度：完成 `tasks/2026-05-23-tv-resume-from-history-prompt/` 的 code-review 反馈优化。重点修复 6 项：
   1. `LongFormVideoPlayer` 新增 `onTrackSheetVisibilityChanged: (Boolean) -> Unit` 单一回调（合并 subtitle/audio sheet 可见性），父屏维护 `isTrackSheetVisible` state，纳入续播卡守卫 + 永久 dismiss LaunchedEffect——修复 H16（字幕/音轨夜台玻璃面板无信号给父屏导致续播卡可与之同屏的真实 bug）。
