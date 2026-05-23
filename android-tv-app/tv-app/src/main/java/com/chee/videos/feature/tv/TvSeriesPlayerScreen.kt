@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -170,6 +171,7 @@ fun TvSeriesPlayerScreen(
     var resumePromptLastPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var resumePromptRemainingMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var resumePromptDismissed by remember(uiState.currentVideoId) { mutableStateOf(false) }
+    var isTrackSheetVisible by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var lastAutoplaySwitchedVideoId by remember { mutableStateOf("") }
 
     val nextEpisodeRef = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
@@ -178,7 +180,7 @@ fun TvSeriesPlayerScreen(
     val hasNextEpisode = nextEpisodeRef != null
     val remainingMs = (screenDurationMs - screenPositionMs).coerceAtLeast(0L)
     val remainingSeconds = autoplayCountdownTickRemaining(remainingMs)
-    val shouldShowPromptCard = shouldShowAutoplayPromptCard(
+    val shouldShowAutoplayPromptCard = shouldShowAutoplayPromptCard(
         AutoplayPromptGuardInput(
             isPlaying = isPlayerActuallyPlaying,
             autoplayEnabled = uiState.autoplayEnabled,
@@ -212,8 +214,9 @@ fun TvSeriesPlayerScreen(
         isPlayerError = playerErrorMessage != null,
         isBackConfirmVisible = showBackConfirmPrompt,
         isEpisodeSelectorVisible = uiState.selectorVisible,
+        isTrackSheetVisible = isTrackSheetVisible,
         isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
-        isAutoplayPromptVisible = shouldShowPromptCard,
+        isAutoplayPromptVisible = shouldShowAutoplayPromptCard,
         isPausedByUser = playbackSession.isPausedByUser,
         remainingMs = resumePromptRemainingMs,
     )
@@ -421,23 +424,38 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    LaunchedEffect(playerErrorMessage, uiState.selectorVisible, uiState.pendingEndOverlayKind, shouldShowPromptCard) {
+    LaunchedEffect(
+        playerErrorMessage,
+        showBackConfirmPrompt,
+        uiState.selectorVisible,
+        isTrackSheetVisible,
+        uiState.pendingEndOverlayKind,
+        shouldShowAutoplayPromptCard,
+    ) {
         if (
             playerErrorMessage != null ||
+            showBackConfirmPrompt ||
             uiState.selectorVisible ||
+            isTrackSheetVisible ||
             uiState.pendingEndOverlayKind != null ||
-            shouldShowPromptCard
+            shouldShowAutoplayPromptCard
         ) {
             resumePromptDismissed = true
         }
     }
 
     LaunchedEffect(uiState.currentVideoId, shouldTickResumePromptCountdown, resumePromptDismissed) {
-        if (resumePromptDismissed) return@LaunchedEffect
+        if (resumePromptDismissed || !shouldTickResumePromptCountdown) return@LaunchedEffect
+        val startNanos = withFrameNanos { it }
+        val initialRemainingMs = resumePromptRemainingMs
         while (resumePromptRemainingMs > 0L) {
-            delay(50)
-            if (!shouldTickResumePromptCountdown || resumePromptDismissed) break
-            resumePromptRemainingMs = (resumePromptRemainingMs - 50L).coerceAtLeast(0L)
+            val nowNanos = withFrameNanos { it }
+            val elapsedMs = (nowNanos - startNanos) / 1_000_000L
+            val next = (initialRemainingMs - elapsedMs).coerceAtLeast(0L)
+            if (next != resumePromptRemainingMs) {
+                resumePromptRemainingMs = next
+            }
+            if (next <= 0L) break
         }
         if (resumePromptRemainingMs <= 0L && resumePromptLastPositionMs > 0L) {
             resumePromptDismissed = true
@@ -534,11 +552,12 @@ fun TvSeriesPlayerScreen(
                     onNextEpisode = if (hasNextEpisode) viewModel::nextEpisode else null,
                     onRequestExitPlayback = ::handlePlaybackBack,
                     onExitPlayback = onBack,
+                    onTrackSheetVisibilityChanged = { isTrackSheetVisible = it },
                 )
                 nextEpisodeRef?.let { next ->
                     TvAutoplayPromptCard(
                         nextEpisodeRef = next,
-                        visible = shouldShowPromptCard,
+                        visible = shouldShowAutoplayPromptCard,
                         remainingSeconds = remainingSeconds,
                         onPlayNow = ::advanceFromAutoplay,
                         onCancel = viewModel::cancelAutoplayForCurrentEpisode,

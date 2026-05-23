@@ -16,6 +16,7 @@ class TvResumePromptTest {
         assertFalse(shouldShowResumePromptCard(allowed.copy(isPlayerError = true)))
         assertFalse(shouldShowResumePromptCard(allowed.copy(isBackConfirmVisible = true)))
         assertFalse(shouldShowResumePromptCard(allowed.copy(isEpisodeSelectorVisible = true)))
+        assertFalse(shouldShowResumePromptCard(allowed.copy(isTrackSheetVisible = true)))
         assertFalse(shouldShowResumePromptCard(allowed.copy(isEndOverlayVisible = true)))
         assertFalse(shouldShowResumePromptCard(allowed.copy(isAutoplayPromptVisible = true)))
         assertFalse(shouldShowResumePromptCard(allowed.copy(isPausedByUser = true)))
@@ -34,6 +35,7 @@ class TvResumePromptTest {
         assertFalse(shouldTickResumePromptCountdown(allowed.copy(isPlayerError = true)))
         assertFalse(shouldTickResumePromptCountdown(allowed.copy(isBackConfirmVisible = true)))
         assertFalse(shouldTickResumePromptCountdown(allowed.copy(isEpisodeSelectorVisible = true)))
+        assertFalse(shouldTickResumePromptCountdown(allowed.copy(isTrackSheetVisible = true)))
         assertFalse(shouldTickResumePromptCountdown(allowed.copy(isEndOverlayVisible = true)))
         assertFalse(shouldTickResumePromptCountdown(allowed.copy(isAutoplayPromptVisible = true)))
         assertFalse(shouldTickResumePromptCountdown(allowed.copy(isPausedByUser = true)))
@@ -79,6 +81,7 @@ private fun resumePromptGuardInput(): ResumePromptGuardInput = ResumePromptGuard
     isPlayerError = false,
     isBackConfirmVisible = false,
     isEpisodeSelectorVisible = false,
+    isTrackSheetVisible = false,
     isEndOverlayVisible = false,
     isAutoplayPromptVisible = false,
     isPausedByUser = false,

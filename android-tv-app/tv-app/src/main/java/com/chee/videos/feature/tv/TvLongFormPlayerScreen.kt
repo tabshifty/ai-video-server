@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -151,6 +152,7 @@ fun TvLongFormPlayerScreen(
     var resumePromptLastPositionMs by remember(detail.id, uiState.accessToken) { mutableStateOf(0L) }
     var resumePromptRemainingMs by remember(detail.id, uiState.accessToken) { mutableStateOf(0L) }
     var resumePromptDismissed by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
+    var isTrackSheetVisible by remember(detail.id) { mutableStateOf(false) }
     var selectedSubtitleTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
     var storedAudioTrackId by remember(detail.id) { mutableStateOf<String?>(null) }
     var selectedAudioTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
@@ -286,8 +288,8 @@ fun TvLongFormPlayerScreen(
         }
     }
 
-    LaunchedEffect(playerErrorMessage) {
-        if (playerErrorMessage != null) {
+    LaunchedEffect(playerErrorMessage, showBackConfirmPrompt, isTrackSheetVisible) {
+        if (playerErrorMessage != null || showBackConfirmPrompt || isTrackSheetVisible) {
             resumePromptDismissed = true
         }
     }
@@ -298,6 +300,7 @@ fun TvLongFormPlayerScreen(
         isPlayerError = playerErrorMessage != null,
         isBackConfirmVisible = showBackConfirmPrompt,
         isEpisodeSelectorVisible = false,
+        isTrackSheetVisible = isTrackSheetVisible,
         isEndOverlayVisible = false,
         isAutoplayPromptVisible = false,
         isPausedByUser = playbackSession.isPausedByUser,
@@ -307,11 +310,17 @@ fun TvLongFormPlayerScreen(
     val shouldShowResumePromptCard = shouldShowResumePromptCard(resumePromptGuardInput)
 
     LaunchedEffect(detail.id, shouldTickResumePromptCountdown, resumePromptDismissed) {
-        if (resumePromptDismissed) return@LaunchedEffect
+        if (resumePromptDismissed || !shouldTickResumePromptCountdown) return@LaunchedEffect
+        val startNanos = withFrameNanos { it }
+        val initialRemainingMs = resumePromptRemainingMs
         while (resumePromptRemainingMs > 0L) {
-            delay(50)
-            if (!shouldTickResumePromptCountdown || resumePromptDismissed) break
-            resumePromptRemainingMs = (resumePromptRemainingMs - 50L).coerceAtLeast(0L)
+            val nowNanos = withFrameNanos { it }
+            val elapsedMs = (nowNanos - startNanos) / 1_000_000L
+            val next = (initialRemainingMs - elapsedMs).coerceAtLeast(0L)
+            if (next != resumePromptRemainingMs) {
+                resumePromptRemainingMs = next
+            }
+            if (next <= 0L) break
         }
         if (resumePromptRemainingMs <= 0L && resumePromptLastPositionMs > 0L) {
             resumePromptDismissed = true
@@ -397,6 +406,7 @@ fun TvLongFormPlayerScreen(
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                 onRequestExitPlayback = ::handlePlaybackBack,
                 onExitPlayback = onBack,
+                onTrackSheetVisibilityChanged = { isTrackSheetVisible = it },
             )
             TvResumePromptCard(
                 lastPositionMs = resumePromptLastPositionMs,

@@ -2,6 +2,17 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 22:30 +0800
+- 进度：完成 `tasks/2026-05-23-tv-resume-from-history-prompt/` 的 code-review 反馈优化。重点修复 6 项：
+  1. `LongFormVideoPlayer` 新增 `onTrackSheetVisibilityChanged: (Boolean) -> Unit` 单一回调（合并 subtitle/audio sheet 可见性），父屏维护 `isTrackSheetVisible` state，纳入续播卡守卫 + 永久 dismiss LaunchedEffect——修复 H16（字幕/音轨夜台玻璃面板无信号给父屏导致续播卡可与之同屏的真实 bug）。
+  2. PRD Q7 / 实现 / CONTEXT.md 关于 BACK 退出确认的三方语义统一到「永久 dismiss」：两个 player 的永久 dismiss LaunchedEffect 新增 `showBackConfirmPrompt` key；同步改 PRD H15、CONTEXT.md「续播提示卡永久 dismiss」条目。
+  3. 倒计时驱动从 `delay(50) × N` 改为 `withFrameNanos` 推导剩余时间，只在显示秒数变化时写 state——消除主循环抖动累积与 ~100 次冗余 recompose。
+  4. `TvSeriesPlayerScreen` 内 `shouldShowPromptCard` 重命名为 `shouldShowAutoplayPromptCard`，与同包纯函数同名、不再与 `shouldShowResumePromptCard` 形似。
+  5. `TvResumePromptCard.kt` 的 `LaunchedTvInitialFocus` 去掉多余的 `lastPositionMs` key。
+  6. 版本号 `versionCode 63 → 64`、`versionName 0.1.62 → 0.1.63`；测试断言（`TvResumePromptTest` + `TvResumePromptCardSpecTest`）同步扩 `isTrackSheetVisible` 真值表 / `withFrameNanos` audit / `showBackConfirmPrompt` audit / 新 `LaunchedTvInitialFocus(visible)` 单 key 形态。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/{TvResumePrompt.kt,TvResumePromptCard.kt,TvLongFormPlayerScreen.kt,TvSeriesPlayerScreen.kt}`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/{TvResumePromptTest.kt,TvResumePromptCardSpecTest.kt}`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`tasks/2026-05-23-tv-resume-from-history-prompt/prd.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew :tv-app:assembleDebug` 通过；H15 / H16 / H16b / H17 真实 TV 手测仍待用户在设备执行。
+
 ## 2026-05-23 22:04 +0800
 - 进度：完成 `tasks/2026-05-23-tv-resume-from-history-prompt/` 实现阶段自动化 review。新增任务文档、续播提示实现、测试、TV 版本号与进度记录将纳入本次提交；未创建 `DONE.md`，因为 H1-H18 真实 TV 手测需用户验收通过后再标记完成。
 - 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

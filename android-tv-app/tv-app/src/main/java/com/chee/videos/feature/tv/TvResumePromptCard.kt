@@ -38,7 +38,7 @@ fun TvResumePromptCard(
 ) {
     val continueFocusRequester = remember { FocusRequester() }
 
-    LaunchedTvInitialFocus(visible, lastPositionMs) {
+    LaunchedTvInitialFocus(visible) {
         if (visible) {
             continueFocusRequester.tryRequestFocus()
         }

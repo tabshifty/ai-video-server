@@ -20,6 +20,10 @@ class TvResumePromptCardSpecTest {
             assertTrue(source.contains("shouldTriggerResumePrompt("))
             assertTrue(source.contains("shouldShowResumePromptCard("))
             assertTrue(source.contains("LaunchedEffect") && source.contains("shouldTickResumePromptCountdown"))
+            assertTrue(source.contains("isTrackSheetVisible = isTrackSheetVisible"))
+            assertTrue(source.contains("onTrackSheetVisibilityChanged = { isTrackSheetVisible = it }"))
+            assertTrue(source.contains("showBackConfirmPrompt"))
+            assertTrue(source.contains("withFrameNanos"))
         }
         assertTrue(longForm.contains("resumedFromHistoryVideoId == detail.id"))
         assertTrue(series.contains("resumedFromHistoryVideoId == uiState.currentVideoId"))
@@ -29,7 +33,7 @@ class TvResumePromptCardSpecTest {
     fun `resume prompt card uses tv focus shape and motion tokens`() {
         val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvResumePromptCard.kt").readText()
 
-        assertTrue(source.contains("LaunchedTvInitialFocus("))
+        assertTrue(source.contains("LaunchedTvInitialFocus(visible)"))
         assertTrue(source.contains(".tryRequestFocus()"))
         assertTrue(source.contains("AppChrome.SurfaceShape"))
         assertTrue(source.contains("AppChrome.ChipShape"))
@@ -38,6 +42,7 @@ class TvResumePromptCardSpecTest {
         assertTrue(source.contains("TvMotionTokens.EasingStandard"))
         assertFalse(source.contains("RoundedCornerShape("))
         assertFalse(source.contains("tween("))
+        assertFalse(source.contains("LaunchedTvInitialFocus(visible, lastPositionMs)"))
     }
 
     @Test

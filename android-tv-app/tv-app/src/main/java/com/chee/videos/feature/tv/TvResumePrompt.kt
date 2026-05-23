@@ -18,6 +18,7 @@ data class ResumePromptGuardInput(
     val isPlayerError: Boolean,
     val isBackConfirmVisible: Boolean,
     val isEpisodeSelectorVisible: Boolean,
+    val isTrackSheetVisible: Boolean,
     val isEndOverlayVisible: Boolean,
     val isAutoplayPromptVisible: Boolean,
     val isPausedByUser: Boolean,
@@ -33,6 +34,7 @@ fun shouldTickResumePromptCountdown(input: ResumePromptGuardInput): Boolean =
         !input.isPlayerError &&
         !input.isBackConfirmVisible &&
         !input.isEpisodeSelectorVisible &&
+        !input.isTrackSheetVisible &&
         !input.isEndOverlayVisible &&
         !input.isAutoplayPromptVisible &&
         !input.isPausedByUser

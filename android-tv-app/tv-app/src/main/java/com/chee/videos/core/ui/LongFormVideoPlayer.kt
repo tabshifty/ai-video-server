@@ -100,6 +100,7 @@ fun LongFormVideoPlayer(
     onNextEpisode: (() -> Unit)? = null,
     onRequestExitPlayback: (() -> Unit)? = null,
     onExitPlayback: (() -> Unit)? = null,
+    onTrackSheetVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val rootFocusRequester = remember { FocusRequester() }
@@ -129,6 +130,10 @@ fun LongFormVideoPlayer(
     var centerFeedbackIcon by remember { mutableStateOf(Icons.Filled.PlayArrow) }
     var subtitleSheetVisible by remember { mutableStateOf(false) }
     var audioTrackSheetVisible by remember { mutableStateOf(false) }
+    val isTrackSheetVisible = subtitleSheetVisible || audioTrackSheetVisible
+    LaunchedEffect(isTrackSheetVisible) {
+        onTrackSheetVisibilityChanged(isTrackSheetVisible)
+    }
     var audioTracks by remember { mutableStateOf(emptyList<LongFormAudioTrack>()) }
     var hasShownControlsOnce by remember { mutableStateOf(false) }
     var pendingRootFocusRequest by remember { mutableStateOf(false) }
