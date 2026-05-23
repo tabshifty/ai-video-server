@@ -50,13 +50,20 @@ func NewVideoRepository(pool *pgxpool.Pool) *VideoRepository {
 
 func (r *VideoRepository) CreateVideo(ctx context.Context, v models.Video) error {
 	_, err := r.pool.Exec(ctx, `
-INSERT INTO videos (id, user_id, tmdb_id, title, description, type, status, original_path, metadata, image_collection_id)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-`, v.ID, v.UserID, v.TMDBID, v.Title, v.Description, v.Type, v.Status, v.OriginalPath, v.Metadata, v.ImageCollectionID)
+INSERT INTO videos (id, user_id, tmdb_id, title, description, type, status, original_path, os_hash, metadata, image_collection_id)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+`, v.ID, v.UserID, v.TMDBID, v.Title, v.Description, v.Type, v.Status, v.OriginalPath, nullStringToAny(v.OSHash), v.Metadata, v.ImageCollectionID)
 	if err != nil {
 		return fmt.Errorf("insert video: %w", err)
 	}
 	return nil
+}
+
+func nullStringToAny(value string) any {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return strings.TrimSpace(value)
 }
 
 func (r *VideoRepository) AddTags(ctx context.Context, videoID uuid.UUID, tags []string) error {
@@ -470,12 +477,7 @@ func (r *VideoRepository) UpdateVideoStatus(ctx context.Context, videoID uuid.UU
 }
 
 func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error) {
-	var v models.Video
-	var durationSeconds sql.NullInt32
-	var width sql.NullInt32
-	var height sql.NullInt32
-	var imageCollectionID string
-	err := r.pool.QueryRow(ctx, `
+	row := r.pool.QueryRow(ctx, `
 SELECT
   id,
   user_id,
@@ -491,20 +493,15 @@ SELECT
   COALESCE(original_path, ''),
   COALESCE(transcoded_path, ''),
   COALESCE(thumbnail_path, ''),
+  COALESCE(os_hash, ''),
   COALESCE(metadata, '{}'::jsonb),
   created_at,
   updated_at
-FROM videos WHERE id=$1`, videoID).Scan(
-		&v.ID, &v.UserID, &v.TMDBID, &imageCollectionID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
-		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
-	)
+FROM videos WHERE id=$1`, videoID)
+	v, err := scanVideoRecord(row)
 	if err != nil {
 		return models.Video{}, fmt.Errorf("get video by id: %w", err)
 	}
-	v.DurationSeconds = nullInt32ToInt(durationSeconds)
-	v.Width = nullInt32ToInt(width)
-	v.Height = nullInt32ToInt(height)
-	v.ImageCollectionID = parseNullableUUIDText(imageCollectionID)
 	return v, nil
 }
 
@@ -531,12 +528,7 @@ WHERE status IN ('uploaded','scraping','tv_pending','processing','failed') AND o
 }
 
 func (r *VideoRepository) GetVideoByOriginalPath(ctx context.Context, originalPath string) (models.Video, error) {
-	var v models.Video
-	var durationSeconds sql.NullInt32
-	var width sql.NullInt32
-	var height sql.NullInt32
-	var imageCollectionID string
-	err := r.pool.QueryRow(ctx, `
+	row := r.pool.QueryRow(ctx, `
 SELECT
   id,
   user_id,
@@ -552,20 +544,94 @@ SELECT
   COALESCE(original_path, ''),
   COALESCE(transcoded_path, ''),
   COALESCE(thumbnail_path, ''),
+  COALESCE(os_hash, ''),
   COALESCE(metadata, '{}'::jsonb),
   created_at,
   updated_at
-FROM videos WHERE original_path=$1`, originalPath).Scan(
-		&v.ID, &v.UserID, &v.TMDBID, &imageCollectionID, &v.Title, &v.Description, &v.Type, &v.Status, &durationSeconds, &width, &height,
-		&v.OriginalPath, &v.TranscodedPath, &v.ThumbnailPath, &v.Metadata, &v.CreatedAt, &v.UpdatedAt,
-	)
+FROM videos WHERE original_path=$1`, originalPath)
+	v, err := scanVideoRecord(row)
 	if err != nil {
 		return models.Video{}, fmt.Errorf("get video by original path: %w", err)
+	}
+	return v, nil
+}
+
+type videoOSHashQueryer interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func (r *VideoRepository) UpdateVideoOSHash(ctx context.Context, videoID uuid.UUID, hash string) error {
+	return updateVideoOSHash(ctx, r.pool, videoID, hash)
+}
+
+func updateVideoOSHash(ctx context.Context, db execer, videoID uuid.UUID, hash string) error {
+	var value any
+	if trimmed := strings.TrimSpace(hash); trimmed != "" {
+		value = trimmed
+	}
+	_, err := db.Exec(ctx, `
+UPDATE videos
+SET os_hash = $2,
+    updated_at = NOW()
+WHERE id = $1`, videoID, value)
+	if err != nil {
+		return fmt.Errorf("update video os hash: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) GetVideoOSHash(ctx context.Context, videoID uuid.UUID) (string, error) {
+	return getVideoOSHash(ctx, r.pool, videoID)
+}
+
+func getVideoOSHash(ctx context.Context, db videoOSHashQueryer, videoID uuid.UUID) (string, error) {
+	var osHash sql.NullString
+	if err := db.QueryRow(ctx, `
+SELECT os_hash
+FROM videos
+WHERE id = $1`, videoID).Scan(&osHash); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("get video os hash: %w", err)
+	}
+	return strings.TrimSpace(osHash.String), nil
+}
+
+func scanVideoRecord(rows rowScanner) (models.Video, error) {
+	var v models.Video
+	var durationSeconds sql.NullInt32
+	var width sql.NullInt32
+	var height sql.NullInt32
+	var imageCollectionID string
+	var osHash sql.NullString
+	if err := rows.Scan(
+		&v.ID,
+		&v.UserID,
+		&v.TMDBID,
+		&imageCollectionID,
+		&v.Title,
+		&v.Description,
+		&v.Type,
+		&v.Status,
+		&durationSeconds,
+		&width,
+		&height,
+		&v.OriginalPath,
+		&v.TranscodedPath,
+		&v.ThumbnailPath,
+		&osHash,
+		&v.Metadata,
+		&v.CreatedAt,
+		&v.UpdatedAt,
+	); err != nil {
+		return models.Video{}, err
 	}
 	v.DurationSeconds = nullInt32ToInt(durationSeconds)
 	v.Width = nullInt32ToInt(width)
 	v.Height = nullInt32ToInt(height)
 	v.ImageCollectionID = parseNullableUUIDText(imageCollectionID)
+	v.OSHash = strings.TrimSpace(osHash.String)
 	return v, nil
 }
 

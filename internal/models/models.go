@@ -20,6 +20,7 @@ type Video struct {
 	Width             int
 	Height            int
 	OriginalPath      string
+	OSHash            string
 	TranscodedPath    string
 	ThumbnailPath     string
 	Metadata          []byte

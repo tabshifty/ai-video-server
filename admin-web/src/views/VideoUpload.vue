@@ -36,12 +36,19 @@ const form = reactive({
   tags: [],
   actors: [],
   collections: [],
-  imageCollectionID: ''
+  imageCollectionID: '',
+  siteCategory: 'japanese'
 })
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const isMovieType = computed(() => form.type === 'movie')
 const isShortType = computed(() => form.type === 'short')
+const isAVType = computed(() => form.type === 'av')
+const avSiteCategoryOptions = [
+  { value: 'japanese', label: '日本' },
+  { value: 'western', label: '欧美' },
+  { value: 'fc2', label: 'FC2' }
+]
 const selectedFiles = computed(() =>
   uploadFileList.value
     .map((item) => item.raw)
@@ -72,6 +79,9 @@ watch(
   (nextType) => {
     if (nextType !== 'short' && form.collections.length > 0) {
       form.collections = []
+    }
+    if (nextType === 'av' && !form.siteCategory) {
+      form.siteCategory = 'japanese'
     }
     if (nextType !== 'movie' || uploadFileList.value.length <= 1) return
     uploadFileList.value = [uploadFileList.value[0]]
@@ -270,7 +280,8 @@ async function uploadOneFile(targetFile, sharedPayload) {
       actor_ids: sharedPayload.actorIDs,
       actor_names: sharedPayload.actorNames,
       image_collection_id: sharedPayload.imageCollectionID,
-      collection_ids: sharedPayload.collectionIDs
+      collection_ids: sharedPayload.collectionIDs,
+      site_category: sharedPayload.siteCategory
     })
     activeSessionID = initResp.upload_session_id
     sessionId.value = activeSessionID
@@ -335,7 +346,8 @@ async function submit() {
     actorIDs,
     actorNames,
     collectionIDs: isShortType.value ? normalizeCollectionSelection(form.collections) : [],
-    imageCollectionID: resolveImageCollectionID(form.imageCollectionID)
+    imageCollectionID: resolveImageCollectionID(form.imageCollectionID),
+    siteCategory: isAVType.value ? (form.siteCategory || 'japanese') : ''
   }
 
   for (let index = 0; index < queue.length; index += 1) {
@@ -494,6 +506,13 @@ onMounted(() => {
               <el-option label="剧集分集" value="episode" />
               <el-option label="AV" value="av" />
             </el-select>
+          </el-form-item>
+          <el-form-item v-if="isAVType" label="AV 地区分类">
+            <el-radio-group v-model="form.siteCategory">
+              <el-radio-button v-for="item in avSiteCategoryOptions" :key="item.value" :label="item.value">
+                {{ item.label }}
+              </el-radio-button>
+            </el-radio-group>
           </el-form-item>
           <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
           <el-form-item label="描述"><el-input v-model="form.description" type="textarea" rows="3" /></el-form-item>

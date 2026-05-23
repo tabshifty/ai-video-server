@@ -25,6 +25,8 @@
 - `刮削确认门控`：[[欧美 AV]] 上传后必须经过的"自动刮削 → 等管理员确认 → 允许 transcode"工作流。自动刮削跑完无论命中或全 miss，视频都落 `av_scrape_pending` 状态（与 `tv_pending` 对称的 AV 版本），候选列表写入 `videos.metadata.scrape_preview`；transcode 入队被状态机硬拒绝，只有 [[刮削确认]] 或 [[弃刮]] 之后视频转入 `processing`、transcode 才能启动。该门控不适用于 `日本` / `FC2` AV，也不适用于 movie / episode / short。
 - `刮削确认`：管理员在 admin 端对 `av_scrape_pending` 视频从候选列表挑选一个候选并提交，写入 metadata 同时自动入队 transcode 的动作。复用现有 `PUT /admin/scrape/confirm` 端点；`ConfirmAV` 内部按入参视频的当前 `status` 决定是否入队 transcode——`av_scrape_pending` 时入队（专属于门控路径），其它状态（例如对已 `ready` 视频的"手动刮削"重新确认）不入队，保持现有手动刮削语义不变。`刮削确认` 与 `手动刮削` 共享候选来源，但不共享状态语义：前者处理待确认视频，后者处理已就绪视频。
 - `弃刮`：管理员明确放弃为 `av_scrape_pending` 视频补全元数据的逃生通道，用于 ThePornDB 真的无候选可选的极端情况。走独立端点 `PUT /admin/scrape/skip`，记录 `metadata.scrape_skipped=true` / `scrape_skip_reason` / `scrape_skipped_at` 三字段后转入 `processing` 并入队 transcode。弃刮后视频可播但元数据空，管理员后续仍可通过"手动刮削"再补刮，不被 `scrape_skipped=true` block。**不允许自动弃刮**——零候选时仍然停在 `av_scrape_pending` 等人决定。
+- `欧美 AV 转码入队强制标记`：`av_scrape_pending` 经 [[刮削确认]] 或 [[弃刮]] 后会先把视频状态转为 `processing`，再入队转码；普通重复转码防抖逻辑会跳过 `processing` 视频，因此该路径的 `TranscodePayload` 必须带 `force=true`，表示这是门控放行后的首次转码而不是重复任务。其它上传 / 重转码路径不得随意设置 `force`，避免绕过重复任务保护。
+- `ThePornDB JSON 响应读取`：ThePornDB 错误响应可以限读短 body 用于错误消息，但 2xx 成功响应必须完整 decode JSON，不能用 512B 之类的 `LimitReader` 读取后再 `json.Unmarshal`；detail 响应包含海报、演员、标签时很容易超过 512B，截断会表现为 `unexpected end of JSON input`，进而让 ThePornDB 候选被错误丢弃并暴露其它站点的 fallback 错误。
 
 ## 演员刮削术语
 - `影视演员信息刮削`：电影和电视剧刮削过程中，基于 TMDB credits 得到的演员进一步补齐演员资料并绑定到视频；本语义不覆盖 AV 演员刮削。

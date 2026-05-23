@@ -48,6 +48,7 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 	hash := strings.TrimSpace(c.PostForm("hash"))
+	siteCategory := strings.TrimSpace(c.PostForm("site_category"))
 	if !isSHA256Hex(hash) {
 		bad(c, "invalid hash")
 		return
@@ -103,7 +104,7 @@ func (a *API) Upload(c *gin.Context) {
 		return
 	}
 
-	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, actorIDs, actorNames, collectionIDs, imageCollectionID, hash, a.maxVideoSize)
+	result, err := a.uploadSvc.SaveUpload(c.Request.Context(), userID, file, title, desc, typ, tags, actorIDs, actorNames, collectionIDs, imageCollectionID, siteCategory, hash, a.maxVideoSize)
 	if err != nil {
 		a.logger.Error("upload failed", "error", err)
 		switch {

@@ -11,7 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 
+	"video-server/internal/models"
 	"video-server/internal/services"
+	"video-server/pkg/oshash"
 )
 
 type scrapeFailureDecision struct {
@@ -185,6 +187,7 @@ func (p *Processor) handleScrape(ctx context.Context, task *asynq.Task, expected
 		p.logger.Info("skip scrape task on finalized video", "video_id", videoID, "status", video.Status)
 		return nil
 	}
+	westernAVUpload := expectedType == "av" && queueAVSiteCategory(video) == "western"
 
 	var scrapeErr error
 	if expectedType == "movie" {
@@ -195,6 +198,9 @@ func (p *Processor) handleScrape(ctx context.Context, task *asynq.Task, expected
 		_, scrapeErr = p.scrape.ScrapeEpisodeUpload(ctx, videoID, payload.FilePath, payload.Filename)
 	}
 	if scrapeErr != nil {
+		if westernAVUpload {
+			return scrapeErr
+		}
 		decision := buildScrapeFailureDecision(expectedType, scrapeErr)
 		_ = p.repo.MergeVideoMetadata(ctx, videoID, decision.metadata)
 		_ = p.repo.UpdateVideoStatus(ctx, videoID, decision.status)
@@ -203,6 +209,10 @@ func (p *Processor) handleScrape(ctx context.Context, task *asynq.Task, expected
 			return nil
 		}
 		p.logger.Error("scrape failed, continue to transcode", "video_id", videoID, "error", scrapeErr)
+	}
+	if westernAVUpload {
+		p.logger.Info("western av scrape pending, skip transcode enqueue", "video_id", videoID)
+		return nil
 	}
 
 	if err := p.enqueuer.EnqueueTranscode(TranscodePayload{
@@ -267,7 +277,30 @@ func (p *Processor) autoScrapeEpisode(ctx context.Context, videoID uuid.UUID, ti
 }
 
 func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title, filePath string) error {
-	result, err := p.scrape.PreviewAVSearch(ctx, title, services.AVPreviewOptions{})
+	video := models.Video{ID: videoID}
+	if p.repo != nil {
+		var err error
+		video, err = p.repo.GetVideoByID(ctx, videoID)
+		if err != nil {
+			return err
+		}
+	}
+	siteCategory := queueAVSiteCategory(video)
+	osHash := strings.TrimSpace(video.OSHash)
+	if siteCategory == "western" && osHash == "" && strings.TrimSpace(video.OriginalPath) != "" {
+		if h, err := oshash.Compute(video.OriginalPath); err == nil {
+			osHash = h
+			if p.repo != nil {
+				_ = p.repo.UpdateVideoOSHash(ctx, videoID, h)
+			}
+		} else if p.logger != nil {
+			p.logger.Warn("retag oshash compute failed", "video_id", videoID, "error", err)
+		}
+	}
+	result, err := p.scrape.PreviewAVSearch(ctx, title, services.AVPreviewOptions{
+		SiteCategory: siteCategory,
+		OSHash:       osHash,
+	})
 	if err != nil {
 		return err
 	}
@@ -307,6 +340,27 @@ func (p *Processor) autoScrapeAV(ctx context.Context, videoID uuid.UUID, title, 
 		return fmt.Errorf("invalid av external_id from first candidate")
 	}
 	return p.scrape.ConfirmAV(ctx, input)
+}
+
+func queueAVSiteCategory(video models.Video) string {
+	var metadata map[string]any
+	if len(video.Metadata) > 0 {
+		_ = json.Unmarshal(video.Metadata, &metadata)
+	}
+	raw, _ := metadata["site_category"].(string)
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "western":
+		return "western"
+	case "fc2":
+		return "fc2"
+	case "japanese", "default", "jp":
+		return "japanese"
+	default:
+		if strings.TrimSpace(video.OSHash) != "" {
+			return "western"
+		}
+		return ""
+	}
 }
 
 func anyString(v any) string {

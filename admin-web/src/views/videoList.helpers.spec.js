@@ -19,6 +19,10 @@ describe('videoList helpers', () => {
       label: '待绑定',
       tagType: 'warning'
     })
+    expect(getVideoStatusMeta('av_scrape_pending')).toEqual({
+      label: '欧美 AV 待确认',
+      tagType: 'warning'
+    })
   })
 
   it('returns only editable manual status options', () => {
@@ -26,6 +30,7 @@ describe('videoList helpers', () => {
       { value: 'uploaded', label: '已上传' },
       { value: 'scraping', label: '刮削中' },
       { value: 'tv_pending', label: '待绑定' },
+      { value: 'av_scrape_pending', label: '欧美 AV 待确认' },
       { value: 'ready', label: '可播放' },
       { value: 'failed', label: '失败' }
     ])

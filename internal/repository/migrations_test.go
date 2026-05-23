@@ -33,6 +33,22 @@ func TestIPTVPlaylistMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+iptv_playlists`)
 }
 
+func TestWesternAVOshashMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0021_western_av_oshash_gate.up.sql")
+	down := readMigrationForTest(t, "0021_western_av_oshash_gate.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+videos\s+add\s+column\s+os_hash\s+char\(16\)`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_videos_os_hash`)
+	assertSQLPattern(t, up, `(?is)check\s*\(\s*status\s+in\s*\(`)
+	assertSQLPattern(t, up, `(?is)'av_scrape_pending'`)
+
+	assertSQLPattern(t, down, `(?is)update\s+videos\s+set\s+status\s*=\s*'uploaded'\s+where\s+status\s*=\s*'av_scrape_pending'`)
+	assertSQLPattern(t, down, `(?is)drop\s+index\s+if\s+exists\s+idx_videos_os_hash`)
+	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+drop\s+column\s+if\s+exists\s+os_hash`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

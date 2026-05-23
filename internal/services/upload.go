@@ -17,6 +17,7 @@ import (
 	"video-server/internal/hashutil"
 	"video-server/internal/models"
 	"video-server/internal/repository"
+	"video-server/pkg/oshash"
 )
 
 var (
@@ -43,6 +44,7 @@ type UploadResult struct {
 	InputPath     string
 	OutputDir     string
 	TargetFormat  string
+	OSHash        string
 }
 
 type LocalUploadInput struct {
@@ -58,6 +60,7 @@ type LocalUploadInput struct {
 	ActorNames        []string
 	CollectionIDs     []uuid.UUID
 	ImageCollectionID *uuid.UUID
+	SiteCategory      string
 	Hash              string
 }
 
@@ -83,6 +86,10 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 	if !strings.EqualFold(strings.TrimSpace(in.Hash), serverHash) {
 		return UploadResult{}, ErrHashMismatch
 	}
+	siteCategory := normalizeAVSiteCategory(in.SiteCategory)
+	if in.Type == "av" && siteCategory == "" {
+		siteCategory = avSiteCategoryJapanese
+	}
 
 	if existingID, exists, err := s.repo.FindVideoByHash(ctx, serverHash, info.Size()); err != nil {
 		return UploadResult{}, err
@@ -99,6 +106,7 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 			Status:        existingVideo.Status,
 			AlreadyExists: true,
 			Enqueue:       false,
+			OSHash:        existingVideo.OSHash,
 		}, nil
 	}
 	rawImageCollectionIDs := make([]uuid.UUID, 0, 1)
@@ -110,16 +118,29 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		return UploadResult{}, err
 	}
 
-	metaRaw, err := json.Marshal(map[string]any{
+	videoID := uuid.New()
+	osHash := ""
+	if in.Type == "av" && siteCategory == avSiteCategoryWestern {
+		if h, err := oshash.Compute(in.FilePath); err == nil {
+			osHash = h
+		} else {
+			s.logger.Warn("oshash compute failed", "video_id", videoID, "error", err)
+		}
+	}
+
+	meta := map[string]any{
 		"original_filename": in.Filename,
 		"source_hash":       serverHash,
 		"source_size":       info.Size(),
-	})
+	}
+	if in.Type == "av" {
+		meta["site_category"] = siteCategory
+	}
+	metaRaw, err := json.Marshal(meta)
 	if err != nil {
 		return UploadResult{}, fmt.Errorf("marshal upload metadata: %w", err)
 	}
 
-	videoID := uuid.New()
 	finalTitle := strings.TrimSpace(in.Title)
 	if finalTitle == "" {
 		name := strings.TrimSpace(in.Filename)
@@ -143,6 +164,7 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		Type:              in.Type,
 		Status:            status,
 		OriginalPath:      in.FilePath,
+		OSHash:            osHash,
 		Metadata:          metaRaw,
 		ImageCollectionID: resolvedImageCollectionID,
 	}
@@ -181,6 +203,7 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 				Status:        existingVideo.Status,
 				AlreadyExists: true,
 				Enqueue:       false,
+				OSHash:        existingVideo.OSHash,
 			}, nil
 		}
 		_ = s.repo.DeleteVideoByID(ctx, videoID)
@@ -195,10 +218,11 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		InputPath:     in.FilePath,
 		OutputDir:     filepath.Join(s.storage, "videos"),
 		TargetFormat:  "mp4",
+		OSHash:        osHash,
 	}, nil
 }
 
-func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, collectionIDs []uuid.UUID, imageCollectionID *uuid.UUID, clientHash string, maxVideoSize int64) (UploadResult, error) {
+func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, collectionIDs []uuid.UUID, imageCollectionID *uuid.UUID, siteCategory, clientHash string, maxVideoSize int64) (UploadResult, error) {
 	if fileHeader == nil {
 		return UploadResult{}, ErrInvalidUpload
 	}
@@ -258,6 +282,7 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 		ActorNames:        actorNames,
 		CollectionIDs:     collectionIDs,
 		ImageCollectionID: imageCollectionID,
+		SiteCategory:      siteCategory,
 		Hash:              clientHash,
 	}, maxVideoSize)
 	if err != nil {

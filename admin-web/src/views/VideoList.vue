@@ -19,6 +19,7 @@ import {
   getAdminVideos,
   rescanAdminVideoSubtitles,
   retranscodeVideo,
+  scrapeSkip,
   updateAdminVideo,
   updateAdminVideoSubtitle,
   uploadAdminVideoSubtitle
@@ -27,6 +28,8 @@ import {
   buildAVManualScrapeRoute,
   buildMovieManualScrapeRoute,
   canManuallyEditVideoStatus,
+  avMatchSourceLabel,
+  extractAVScrapePendingState,
   extractTvPendingDiagnostics,
   getManualVideoStatusOptions,
   getManualVideoStatusValue,
@@ -178,6 +181,18 @@ function statusTagType(status) {
   return getVideoStatusMeta(status).tagType
 }
 
+function extractErrorMessage(error, fallback) {
+  const responseMsg = error?.response?.data?.msg
+  if (typeof responseMsg === 'string' && responseMsg.trim() !== '') {
+    return responseMsg.trim()
+  }
+  const message = error?.message
+  if (typeof message === 'string' && message.trim() !== '') {
+    return message.trim()
+  }
+  return fallback
+}
+
 function detailStatusOptions(status = detail.value?.status) {
   if (canManuallyEditVideoStatus(status)) {
     return manualStatusOptions
@@ -187,6 +202,10 @@ function detailStatusOptions(status = detail.value?.status) {
 
 function tvPendingDiagnostics(video = detail.value) {
   return extractTvPendingDiagnostics(video?.metadata)
+}
+
+function avScrapePendingState(video = detail.value) {
+  return extractAVScrapePendingState(video?.metadata)
 }
 
 function openTvPendingScrapeConfirm() {
@@ -224,6 +243,32 @@ function openAVManualScrape() {
   }
   detailVisible.value = false
   router.push(buildAVManualScrapeRoute(detail.value))
+}
+
+async function skipAVScrape() {
+  if (!detail.value?.id) {
+    return
+  }
+  try {
+    const { value } = await ElMessageBox.prompt('请输入弃刮原因', '弃刮欧美 AV', {
+      confirmButtonText: '弃刮并开始转码',
+      cancelButtonText: '取消',
+      inputValue: 'ThePornDB 无可靠候选',
+      inputValidator: (text) => String(text || '').trim() !== '' || '请填写原因'
+    })
+    await scrapeSkip({
+      video_id: detail.value.id,
+      reason: String(value || '').trim()
+    })
+    ElMessage.success('已弃刮，转码任务已入队')
+    detailVisible.value = false
+    await load()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    ElMessage.error(extractErrorMessage(error, '弃刮失败'))
+  }
 }
 
 function openMovieManualScrape() {
@@ -708,6 +753,7 @@ onBeforeUnmount(() => {
               <el-option label="已上传" value="uploaded" />
               <el-option label="刮削中" value="scraping" />
               <el-option label="待绑定" value="tv_pending" />
+              <el-option label="欧美 AV 待确认" value="av_scrape_pending" />
               <el-option label="处理中" value="processing" />
               <el-option label="可播放" value="ready" />
               <el-option label="失败" value="failed" />
@@ -853,6 +899,49 @@ onBeforeUnmount(() => {
                 <span class="tv-pending-candidate__meta">TMDB {{ candidate.tmdb_id || '-' }} / {{ candidate.release_date || '-' }}</span>
               </div>
             </div>
+          </div>
+        </el-form-item>
+        <el-form-item v-if="detail.type === 'av' && detail.status === 'av_scrape_pending'" label="待确认">
+          <div class="tv-pending-panel">
+            <el-alert
+              type="warning"
+              :closable="false"
+              title="欧美 AV 已完成自动刮削，确认候选或弃刮后才会开始转码。"
+            />
+            <div class="tv-pending-actions">
+              <el-button type="primary" plain @click="openAVManualScrape">去确认候选</el-button>
+              <el-button type="danger" plain @click="skipAVScrape">弃刮并转码</el-button>
+            </div>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="候选数量">
+                {{ avScrapePendingState().candidates.length }}
+              </el-descriptions-item>
+              <el-descriptions-item label="hash">
+                {{ avScrapePendingState().attempt.os_hash || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="错误信息">
+                {{ avScrapePendingState().attempt.error || '-' }}
+              </el-descriptions-item>
+            </el-descriptions>
+            <div v-if="avScrapePendingState().candidates.length > 0" class="tv-pending-candidates">
+              <div class="tv-pending-candidates__title">自动候选</div>
+              <div
+                v-for="(candidate, index) in avScrapePendingState().candidates"
+                :key="`${candidate.external_id || candidate.title}-${index}`"
+                class="tv-pending-candidate"
+              >
+                <span>{{ candidate.title || '-' }}</span>
+                <span class="tv-pending-candidate__meta">
+                  {{ avMatchSourceLabel(candidate.match_source || candidate.metadata?.match_source) }} / {{ candidate.scrape_source || '-' }}
+                </span>
+              </div>
+            </div>
+            <el-alert
+              v-else
+              type="info"
+              :closable="false"
+              title="自动刮削未命中候选，请手动输入关键字重试或弃刮。"
+            />
           </div>
         </el-form-item>
         <el-form-item label="状态">

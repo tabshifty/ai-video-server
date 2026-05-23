@@ -337,10 +337,34 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 	raw := make([]avScrapeCandidate, 0, rawLimit)
 	var firstErr error
 
+	if plan.SiteCategory == avSiteCategoryWestern {
+		hashCandidates, err := s.collectThePornDBHashCandidate(ctx, plan.OSHash)
+		if err != nil {
+			run.addError(err)
+			if firstErr == nil || isPreferredAVScrapeError(err, firstErr) {
+				firstErr = err
+			}
+		}
+		for _, hit := range hashCandidates {
+			if len(raw) >= rawLimit {
+				break
+			}
+			key := avCandidateIdentityKey(hit)
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			raw = append(raw, hit)
+		}
+	}
+
 	for _, crawler := range crawlers {
 		run.setSource(crawler.Name())
 		crawlerQueries := queries
-		if crawler.Name() == "theporndb" && strings.TrimSpace(plan.FilePath) != "" {
+		if crawler.Name() == "theporndb" && strings.TrimSpace(plan.FilePath) != "" && strings.ContainsAny(strings.TrimSpace(plan.FilePath), `/\`) {
 			crawlerQueries = []string{strings.TrimSpace(plan.FilePath)}
 		}
 		if crawler.Name() == "theporndb" && strings.TrimSpace(plan.DetailURL) != "" {
@@ -426,6 +450,7 @@ func (s *ScraperService) searchAVCandidatesWithTrace(ctx context.Context, keywor
 			final = append([]avScrapeCandidate{merged}, final...)
 		}
 	}
+	final = moveAVHashCandidateToFront(final)
 
 	if len(final) > limit {
 		final = final[:limit]
@@ -2950,4 +2975,25 @@ func prioritizeAVCandidatesByCode(candidates []avScrapeCandidate, code string) [
 		return scoreI > scoreJ
 	})
 	return base
+}
+
+func moveAVHashCandidateToFront(candidates []avScrapeCandidate) []avScrapeCandidate {
+	if len(candidates) <= 1 {
+		return candidates
+	}
+	hashIndex := -1
+	for i, candidate := range candidates {
+		if strings.EqualFold(strings.TrimSpace(asString(candidate.Raw["match_source"])), "oshash") {
+			hashIndex = i
+			break
+		}
+	}
+	if hashIndex <= 0 {
+		return candidates
+	}
+	out := make([]avScrapeCandidate, 0, len(candidates))
+	out = append(out, candidates[hashIndex])
+	out = append(out, candidates[:hashIndex]...)
+	out = append(out, candidates[hashIndex+1:]...)
+	return out
 }

@@ -42,6 +42,7 @@ func (a *API) UploadInit(c *gin.Context) {
 		ActorIDs          []string `json:"actor_ids"`
 		ActorNames        []string `json:"actor_names"`
 		ImageCollectionID string   `json:"image_collection_id"`
+		SiteCategory      string   `json:"site_category"`
 		CollectionIDs     []string `json:"collection_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -110,6 +111,7 @@ func (a *API) UploadInit(c *gin.Context) {
 		normalizedActorIDs,
 		normalizedActorNames,
 		imageCollectionIDRaw,
+		req.SiteCategory,
 		normalizedCollectionIDs,
 	)
 	if err != nil {
@@ -211,6 +213,7 @@ func (a *API) UploadComplete(c *gin.Context) {
 		ActorNames:        normalizeActorNames(session.ActorNames),
 		CollectionIDs:     collectionIDs,
 		ImageCollectionID: imageCollectionID,
+		SiteCategory:      session.SiteCategory,
 		Hash:              session.Hash,
 	}, a.maxVideoSize)
 	if err != nil {

@@ -524,12 +524,13 @@ func (s *ScraperService) PreviewAVSearch(ctx context.Context, title string, opts
 
 func (s *ScraperService) buildAVPreviewCacheKey(keyword string, plan avSearchPlan) string {
 	return fmt.Sprintf(
-		"av|%s|%s|%s|%s|%s",
+		"av|%s|%s|%s|%s|%s|%s",
 		normalizeCacheKey(keyword),
 		normalizeCacheKey(plan.SiteCategory),
 		normalizeCacheKey(strings.Join(plan.Sources, ",")),
 		normalizeCacheKey(plan.FilePath),
 		normalizeCacheKey(plan.DetailURL),
+		normalizeCacheKey(plan.OSHash),
 	)
 }
 
@@ -744,9 +745,14 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 		thumbFilePath = strings.TrimSpace(posterAssets.CroppedPath)
 	}
 
+	siteCategory := normalizeAVSiteCategory(asString(in.Metadata["site_category"]))
+	if siteCategory == "" {
+		siteCategory = avSiteCategoryFromVideo(video, title)
+	}
+
 	meta := map[string]any{
 		"scrape_source":             scrapeSource,
-		"site_category":             chooseStr(normalizeAVSiteCategory(asString(in.Metadata["site_category"])), detectAVSiteCategory(title)),
+		"site_category":             siteCategory,
 		"external_id":               candidate.ExternalID,
 		"av_code":                   candidate.Code,
 		"actors":                    candidate.Actors,
@@ -778,6 +784,9 @@ func (s *ScraperService) ConfirmAV(ctx context.Context, in ConfirmScrapeInput) e
 	targetStatus := strings.TrimSpace(in.Status)
 	if targetStatus == "" {
 		targetStatus = "uploaded"
+	}
+	if video.Status == "av_scrape_pending" || targetStatus == "av_scrape_pending" {
+		targetStatus = "processing"
 	}
 	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, localized.titleZH, localized.descriptionZH, thumbPath, meta, targetStatus); err != nil {
 		return err
@@ -1334,11 +1343,21 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		return ScrapeResult{}, fmt.Errorf("invalid av filename")
 	}
 
+	video, err := s.repo.GetVideoByID(ctx, videoID)
+	if err != nil {
+		return ScrapeResult{}, err
+	}
+	siteCategory := avSiteCategoryFromVideo(video, keyword)
 	plan, err := s.resolveAVSearchPlan(ctx, keyword, AVPreviewOptions{
-		FilePath: filePath,
+		SiteCategory: siteCategory,
+		FilePath:     filePath,
+		OSHash:       video.OSHash,
 	})
 	if err != nil {
 		return ScrapeResult{}, err
+	}
+	if plan.SiteCategory == avSiteCategoryWestern {
+		return s.scrapeAVWesternUpload(ctx, video, keyword, plan)
 	}
 	candidates, trace, err := s.searchAVCandidatesWithTrace(ctx, keyword, 6, plan)
 	if err != nil {
@@ -1348,11 +1367,6 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 		return ScrapeResult{}, fmt.Errorf("no av result for %q", keyword)
 	}
 	candidate := candidates[0]
-	video, err := s.repo.GetVideoByID(ctx, videoID)
-	if err != nil {
-		return ScrapeResult{}, err
-	}
-
 	posterSource := avPosterSourceFromCandidate(candidate)
 	posterQuality := candidatePosterQuality(candidate)
 	thumbURL := chooseStr(candidate.ThumbURL, asString(candidate.Raw["thumb_url"]))
@@ -1432,6 +1446,131 @@ func (s *ScraperService) ScrapeAVUpload(ctx context.Context, videoID uuid.UUID, 
 	}
 	s.syncAVActors(ctx, videoID, candidate.Actors)
 	return scrape, nil
+}
+
+func (s *ScraperService) scrapeAVWesternUpload(ctx context.Context, video models.Video, keyword string, plan avSearchPlan) (ScrapeResult, error) {
+	candidates, trace, scrapeErr := s.searchAVCandidatesWithTrace(ctx, keyword, 6, plan)
+	if trace == nil {
+		trace = map[string]any{}
+	}
+	trace["site_category"] = avSiteCategoryWestern
+	trace["hash_used"] = strings.TrimSpace(plan.OSHash) != ""
+	if strings.TrimSpace(plan.OSHash) != "" {
+		trace["os_hash"] = strings.TrimSpace(plan.OSHash)
+	}
+	if scrapeErr != nil {
+		trace["error"] = scrapeErr.Error()
+	}
+
+	preview := make([]map[string]any, 0, len(candidates))
+	for _, candidate := range candidates {
+		preview = append(preview, avScrapePreviewCandidateMap(candidate, plan, trace))
+	}
+
+	meta := metadataMapFromRaw(video.Metadata)
+	meta["site_category"] = avSiteCategoryWestern
+	meta["scrape_preview"] = preview
+	meta["scrape_attempt"] = trace
+
+	title := strings.TrimSpace(video.Title)
+	if title == "" {
+		title = keyword
+	}
+	description := strings.TrimSpace(video.Description)
+	if err := s.repo.UpdateVideoScrapeResult(ctx, video.ID, nil, title, description, video.ThumbnailPath, meta, "av_scrape_pending"); err != nil {
+		return ScrapeResult{}, err
+	}
+	return ScrapeResult{
+		TMDBID:        0,
+		Title:         title,
+		Description:   description,
+		ThumbnailPath: video.ThumbnailPath,
+		Metadata:      meta,
+	}, nil
+}
+
+func avScrapePreviewCandidateMap(candidate avScrapeCandidate, plan avSearchPlan, trace map[string]any) map[string]any {
+	scrapeSource := normalizeAVSourceName(candidate.Source)
+	if scrapeSource == "" {
+		scrapeSource = plan.RecommendedSource
+	}
+	matchSource := avCandidateMatchSource(candidate)
+	metadata := cloneMetadataMap(candidate.Raw)
+	metadata["site_category"] = plan.SiteCategory
+	metadata["scrape_source"] = scrapeSource
+	metadata["match_source"] = matchSource
+	if trace != nil {
+		metadata["scrape_trace"] = trace
+	}
+	return map[string]any{
+		"external_id":     candidate.ExternalID,
+		"av_code":         candidate.Code,
+		"title":           candidate.Title,
+		"original_title":  candidate.Title,
+		"overview":        candidate.Overview,
+		"poster_url":      candidate.PosterURL,
+		"thumb_url":       candidate.ThumbURL,
+		"release_date":    candidate.ReleaseDate,
+		"actors":          candidate.Actors,
+		"detail_url":      candidate.DetailURL,
+		"metadata":        metadata,
+		"media_type_hint": "av",
+		"scrape_source":   scrapeSource,
+		"site_category":   plan.SiteCategory,
+		"match_source":    matchSource,
+	}
+}
+
+func avCandidateMatchSource(candidate avScrapeCandidate) string {
+	if candidate.Raw != nil {
+		if raw := strings.TrimSpace(asString(candidate.Raw["match_source"])); raw != "" {
+			return raw
+		}
+	}
+	if normalizeAVSourceName(candidate.Source) == "theporndb" {
+		detailPath := strings.ToLower(strings.TrimSpace(candidate.DetailURL))
+		switch {
+		case strings.Contains(detailPath, "/movies/"):
+			return "keyword:movies"
+		case strings.Contains(detailPath, "/scenes/"):
+			return "keyword:scenes"
+		}
+	}
+	source := normalizeAVSourceName(candidate.Source)
+	if source == "" {
+		source = "unknown"
+	}
+	return "keyword:" + source
+}
+
+func metadataMapFromRaw(raw []byte) map[string]any {
+	out := map[string]any{}
+	if len(raw) == 0 {
+		return out
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return out
+	}
+	for key, value := range parsed {
+		out[key] = value
+	}
+	return out
+}
+
+func avSiteCategoryFromVideo(video models.Video, fallbackTitle string) string {
+	meta := metadataMapFromRaw(video.Metadata)
+	if category := normalizeAVSiteCategory(asString(meta["site_category"])); category != "" {
+		return category
+	}
+	if strings.TrimSpace(video.OSHash) != "" {
+		return avSiteCategoryWestern
+	}
+	category := detectAVSiteCategory(fallbackTitle)
+	if category == "" {
+		return avSiteCategoryJapanese
+	}
+	return category
 }
 
 func (s *ScraperService) syncMovieActors(ctx context.Context, videoID uuid.UUID, movieTMDBID int) {

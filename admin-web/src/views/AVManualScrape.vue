@@ -6,6 +6,7 @@ import Layout from '../components/Layout.vue'
 import {
   avScrapeConfirm,
   avScrapePreview,
+  getAdminVideoDetail,
   getAVScrapeConfig,
   updateAVScrapeConfig
 } from '../api/admin'
@@ -69,6 +70,7 @@ const prettyMetadata = computed(() => JSON.stringify(selectedCandidate.value?.me
 onMounted(async () => {
   applyAVManualScrapeRouteQuery(form, edit, route.query)
   await loadConfig()
+  await loadPendingPreviewFromVideo()
 })
 
 function extractErrorMessage(error, fallback) {
@@ -100,6 +102,32 @@ function resolvePoster(urlOrPath) {
     return value
   }
   return value
+}
+
+async function loadPendingPreviewFromVideo() {
+  if (!form.video_id) {
+    return
+  }
+  try {
+    const video = await getAdminVideoDetail(form.video_id)
+    const metadata = video?.metadata && typeof video.metadata === 'object' ? video.metadata : {}
+    if (video?.status !== 'av_scrape_pending' || !Array.isArray(metadata.scrape_preview)) {
+      return
+    }
+    if (!form.title) {
+      form.title = video.title || ''
+    }
+    if (!form.site_category && typeof metadata.site_category === 'string') {
+      form.site_category = metadata.site_category
+    }
+    candidates.value = metadata.scrape_preview
+    if (candidates.value.length > 0) {
+      selectedIndex.value = 0
+      syncEditFromCandidate(candidates.value[0])
+    }
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '加载待确认候选失败'))
+  }
 }
 
 async function loadConfig() {
@@ -137,6 +165,21 @@ function syncEditFromCandidate(item) {
   edit.poster_url = item?.poster_url || ''
   edit.release_date = item?.release_date || ''
   edit.metadata = item?.metadata || {}
+}
+
+function candidateMatchSource(item) {
+  return item?.match_source || item?.metadata?.match_source || ''
+}
+
+function matchSourceLabel(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  const map = {
+    oshash: 'hash 命中',
+    'keyword:scenes': '场景关键字',
+    'keyword:movies': '影片关键字',
+    manual_retry: '手动重搜'
+  }
+  return map[normalized] || (normalized || '-')
 }
 
 function chooseCandidate(item, index) {
@@ -314,6 +357,13 @@ async function doSave() {
                   <div class="candidate-meta">
                     <span>站点：{{ toText(item.scrape_source) }}</span>
                     <span>日期：{{ toText(item.release_date) }}</span>
+                    <el-tag
+                      v-if="candidateMatchSource(item)"
+                      size="small"
+                      :type="candidateMatchSource(item) === 'oshash' ? 'success' : 'info'"
+                    >
+                      {{ matchSourceLabel(candidateMatchSource(item)) }}
+                    </el-tag>
                   </div>
                   <div class="candidate-overview">{{ toText(item.overview) }}</div>
                 </div>

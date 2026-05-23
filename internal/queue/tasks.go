@@ -33,6 +33,7 @@ type TranscodePayload struct {
 	InputPath    string `json:"input_path"`
 	OutputDir    string `json:"output_dir"`
 	TargetFormat string `json:"target_format"`
+	Force        bool   `json:"force,omitempty"`
 }
 
 // Enqueuer wraps asynq client operations.
@@ -121,7 +122,7 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	if err != nil {
 		return err
 	}
-	if video.Status == "ready" || video.Status == "processing" {
+	if video.Status == "ready" || (video.Status == "processing" && !payload.Force) {
 		p.logger.Info("skip duplicate transcode task", "video_id", videoID, "status", video.Status)
 		return nil
 	}

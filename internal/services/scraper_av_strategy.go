@@ -23,6 +23,7 @@ type AVPreviewOptions struct {
 	SiteSource   string
 	FilePath     string
 	DetailURL    string
+	OSHash       string
 }
 
 type AVPreviewResult struct {
@@ -45,6 +46,7 @@ type avSearchPlan struct {
 	Config            AVScraperSiteConfig
 	FilePath          string
 	DetailURL         string
+	OSHash            string
 }
 
 const (
@@ -229,7 +231,11 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 	cfg := s.loadAVScraperSiteConfig(ctx)
 	category := normalizeAVSiteCategory(opts.SiteCategory)
 	if category == "" {
-		category = detectAVSiteCategory(title)
+		if strings.TrimSpace(opts.OSHash) != "" {
+			category = avSiteCategoryWestern
+		} else {
+			category = detectAVSiteCategory(title)
+		}
 	}
 
 	explicitSource := normalizeAVSourceName(opts.SiteSource)
@@ -245,6 +251,7 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 			Config:            cfg,
 			FilePath:          strings.TrimSpace(opts.FilePath),
 			DetailURL:         strings.TrimSpace(opts.DetailURL),
+			OSHash:            strings.TrimSpace(opts.OSHash),
 		}, nil
 	}
 
@@ -281,6 +288,7 @@ func (s *ScraperService) resolveAVSearchPlan(ctx context.Context, title string, 
 		Config:            cfg,
 		FilePath:          strings.TrimSpace(opts.FilePath),
 		DetailURL:         strings.TrimSpace(opts.DetailURL),
+		OSHash:            strings.TrimSpace(opts.OSHash),
 	}, nil
 }
 

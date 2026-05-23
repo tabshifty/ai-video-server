@@ -79,6 +79,7 @@ export const getSystemLogs = (params) => request.get('/admin/system/logs', { par
 
 export const scrapePreview = (payload) => request.post('/admin/scrape/preview', payload)
 export const scrapeConfirm = (payload) => request.put('/admin/scrape/confirm', payload)
+export const scrapeSkip = (payload) => request.put('/admin/scrape/skip', payload)
 export const getAVScrapeConfig = () => request.get('/admin/av-scrape/config')
 export const updateAVScrapeConfig = (payload) => request.put('/admin/av-scrape/config', payload)
 export const avScrapePreview = (payload) => request.post('/admin/av-scrape/preview', payload)

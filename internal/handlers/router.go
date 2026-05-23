@@ -197,6 +197,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/system/logs", a.AdminSystemLogs)
 			admin.POST("/scrape/preview", a.AdminScrapePreview)
 			admin.PUT("/scrape/confirm", a.AdminScrapeConfirm)
+			admin.PUT("/scrape/skip", a.AdminScrapeSkip)
 			admin.GET("/av-scrape/config", a.AdminAVScrapeConfig)
 			admin.PUT("/av-scrape/config", a.AdminAVScrapeConfig)
 			admin.POST("/av-scrape/preview", a.AdminAVScrapePreview)

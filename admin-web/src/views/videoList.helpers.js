@@ -4,6 +4,7 @@ export function getVideoStatusMeta(status) {
     uploaded: { label: '已上传', tagType: 'info' },
     scraping: { label: '刮削中', tagType: 'info' },
     tv_pending: { label: '待绑定', tagType: 'warning' },
+    av_scrape_pending: { label: '欧美 AV 待确认', tagType: 'warning' },
     processing: { label: '处理中', tagType: 'info' },
     ready: { label: '可播放', tagType: 'success' },
     failed: { label: '失败', tagType: 'danger' }
@@ -11,7 +12,7 @@ export function getVideoStatusMeta(status) {
   return map[normalized] || { label: normalized || '-', tagType: 'info' }
 }
 
-const manualVideoStatusValues = ['uploaded', 'scraping', 'tv_pending', 'ready', 'failed']
+const manualVideoStatusValues = ['uploaded', 'scraping', 'tv_pending', 'av_scrape_pending', 'ready', 'failed']
 
 export function getManualVideoStatusOptions() {
   return manualVideoStatusValues.map((status) => ({
@@ -85,6 +86,27 @@ export function extractTvPendingDiagnostics(metadata) {
     candidateCount: toPositiveInt(source.candidate_count),
     candidatePreview: Array.isArray(source.candidate_preview) ? source.candidate_preview : []
   }
+}
+
+export function extractAVScrapePendingState(metadata) {
+  const source = metadata && typeof metadata === 'object' ? metadata : {}
+  return {
+    candidates: Array.isArray(source.scrape_preview) ? source.scrape_preview : [],
+    attempt: source.scrape_attempt && typeof source.scrape_attempt === 'object' ? source.scrape_attempt : {},
+    skipped: source.scrape_skipped === true,
+    skipReason: toText(source.scrape_skip_reason)
+  }
+}
+
+export function avMatchSourceLabel(value) {
+  const normalized = toText(value).toLowerCase()
+  const map = {
+    oshash: 'hash 命中',
+    'keyword:scenes': '场景关键字',
+    'keyword:movies': '影片关键字',
+    manual_retry: '手动重搜'
+  }
+  return map[normalized] || (normalized || '-')
 }
 
 export function tvPendingStageLabel(stage) {

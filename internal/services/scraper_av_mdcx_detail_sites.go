@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/net/html"
 )
@@ -43,16 +44,17 @@ type thePornDBAVCrawler struct {
 var (
 	dmmNumberPartsPattern = regexp.MustCompile(`(?i)(\d*[a-z]+)-?(\d+)`)
 	dmmDetailURLPattern   = regexp.MustCompile(`(?is)detailUrl\\":\\"(.*?)\\"`)
-	datedNumberPattern    = regexp.MustCompile(`(?i)(([A-Z0-9.-]{2,})[-_. ]2?0?(\d{2}[-.]\d{2}[-.]\d{2}))`)
+	datedNumberPattern    = regexp.MustCompile(`(?i)(?:\[)?([A-Z0-9.-]{2,})(?:\])?[-_. ]+((?:2?0?\d{2}[.-]\d{2}[.-]\d{2})|(?:\d{4}[.-]\d{2}[.-]\d{2}))`)
 )
 
 const (
-	dmmCategoryFanzaTV = "fanza_tv"
-	dmmCategoryDMMTV   = "dmm_tv"
-	dmmCategoryDigital = "digital"
-	dmmCategoryMono    = "mono"
-	dmmCategoryRental  = "rental"
-	dmmCategoryOther   = "other"
+	dmmCategoryFanzaTV     = "fanza_tv"
+	dmmCategoryDMMTV       = "dmm_tv"
+	dmmCategoryDigital     = "digital"
+	dmmCategoryMono        = "mono"
+	dmmCategoryRental      = "rental"
+	dmmCategoryOther       = "other"
+	thePornDBMinSimilarity = 0.4
 )
 
 func newDMMAVCrawler(svc *ScraperService) avCrawler       { return &dmmAVCrawler{svc: svc} }
@@ -583,7 +585,7 @@ func (c *thePornDBAVCrawler) SearchCandidates(ctx context.Context, run *avScrape
 				run.addSearchURL(searchURL)
 			}
 			var response thePornDBSearchListResponse
-			if err := c.svc.fetchAVJSON(ctx, searchURL, map[string]string{
+			if err := c.svc.fetchThePornDBJSON(ctx, searchURL, map[string]string{
 				"Authorization": "Bearer " + c.svc.avThePornDBAPIToken,
 				"Accept":        "application/json",
 			}, &response); err != nil {
@@ -600,6 +602,10 @@ func (c *thePornDBAVCrawler) SearchCandidates(ctx context.Context, run *avScrape
 			if candidate.Title == "" {
 				continue
 			}
+			if candidate.Raw == nil {
+				candidate.Raw = map[string]any{}
+			}
+			candidate.Raw["match_source"] = "keyword:" + category
 			return []avScrapeCandidate{candidate}, nil
 		}
 	}
@@ -619,7 +625,7 @@ func (c *thePornDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrape
 		run.addDetailURL(detailURL)
 	}
 	var payload thePornDBItemResponse
-	if err := c.svc.fetchAVJSON(ctx, detailURL, map[string]string{
+	if err := c.svc.fetchThePornDBJSON(ctx, detailURL, map[string]string{
 		"Authorization": "Bearer " + c.svc.avThePornDBAPIToken,
 		"Accept":        "application/json",
 	}, &payload); err != nil {
@@ -638,6 +644,32 @@ func (c *thePornDBAVCrawler) FetchByDetailURL(ctx context.Context, run *avScrape
 	candidate.Raw["detail_url"] = detailURL
 	candidate.Raw["external_id"] = candidate.ExternalID
 	return candidate, nil
+}
+
+func (s *ScraperService) collectThePornDBHashCandidate(ctx context.Context, osHash string) ([]avScrapeCandidate, error) {
+	osHash = strings.TrimSpace(osHash)
+	if osHash == "" || strings.TrimSpace(s.avThePornDBAPIToken) == "" {
+		return nil, nil
+	}
+	base := strings.TrimRight(s.avSiteBaseURL("theporndb", "https://api.theporndb.net"), "/")
+	endpoint := fmt.Sprintf("%s/scenes/hash/%s", base, osHash)
+	var payload thePornDBItemResponse
+	if err := s.fetchThePornDBJSON(ctx, endpoint, map[string]string{
+		"Authorization": "Bearer " + s.avThePornDBAPIToken,
+		"Accept":        "application/json",
+	}, &payload); err != nil {
+		return nil, nil
+	}
+	if strings.TrimSpace(payload.Data.Slug) == "" {
+		return nil, nil
+	}
+	candidate := thePornDBMetadataFromItem(payload.Data, "scenes")
+	candidate.Source = "theporndb"
+	if candidate.Raw == nil {
+		candidate.Raw = map[string]any{}
+	}
+	candidate.Raw["match_source"] = "oshash"
+	return []avScrapeCandidate{candidate}, nil
 }
 
 func normalizeThePornDBDetailURL(rawURL string, fallbackBase ...string) (string, error) {
@@ -869,6 +901,68 @@ func (s *ScraperService) fetchAVJSON(ctx context.Context, endpoint string, extra
 		return fmt.Errorf("解析 AV JSON 响应失败: %w", err)
 	}
 	return nil
+}
+
+func (s *ScraperService) fetchThePornDBJSON(ctx context.Context, endpoint string, extraHeaders map[string]string, out any) error {
+	backoffs := []time.Duration{200 * time.Millisecond, 400 * time.Millisecond, 800 * time.Millisecond}
+	var lastErr error
+	for attempt := 0; attempt <= len(backoffs); attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return fmt.Errorf("创建 ThePornDB JSON 请求失败: %w", err)
+		}
+		if strings.TrimSpace(s.avUserAgent) != "" {
+			req.Header.Set("User-Agent", s.avUserAgent)
+		}
+		for key, value := range extraHeaders {
+			if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+				continue
+			}
+			req.Header.Set(key, value)
+		}
+		client := s.avHTTPClient
+		if client == nil {
+			client = s.httpClient
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("ThePornDB JSON 请求失败: %w", err)
+		} else {
+			if resp.StatusCode == http.StatusUnauthorized {
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+				_ = resp.Body.Close()
+				return fmt.Errorf("ThePornDB JSON 请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+			}
+			if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+				_ = resp.Body.Close()
+				lastErr = fmt.Errorf("ThePornDB JSON 请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+			} else if resp.StatusCode >= 400 {
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+				_ = resp.Body.Close()
+				return fmt.Errorf("ThePornDB JSON 请求失败，状态码=%d，响应=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+			} else {
+				if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+					_ = resp.Body.Close()
+					return fmt.Errorf("解析 ThePornDB JSON 响应失败: %w", err)
+				}
+				_ = resp.Body.Close()
+				return nil
+			}
+		}
+		if attempt >= len(backoffs) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoffs[attempt]):
+		}
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("ThePornDB JSON 请求失败")
+	}
+	return lastErr
 }
 
 func (s *ScraperService) postAVJSON(ctx context.Context, endpoint string, body any, extraHeaders map[string]string, out any) error {
@@ -1650,10 +1744,10 @@ func thePornDBSearchKeywords(filePath string) ([]string, string, string) {
 	fileName = strings.TrimSuffix(fileName, path.Ext(fileName))
 
 	matches := datedNumberPattern.FindStringSubmatch(value)
-	if len(matches) == 4 {
-		fullNumber := matches[1]
-		series := thePornDBLongName(strings.NewReplacer("-", "", ".", "").Replace(strings.ToLower(matches[2])))
-		date := "20" + strings.ReplaceAll(matches[3], ".", "-")
+	if len(matches) == 3 {
+		fullNumber := matches[0]
+		series := thePornDBLongName(strings.NewReplacer("-", "", ".", "").Replace(strings.ToLower(matches[1])))
+		date := strings.ReplaceAll(matches[2], ".", "-")
 		date = strings.ReplaceAll(date, "_", "-")
 		title := strings.TrimSpace(strings.Replace(fileName, fullNumber, "", 1))
 		title = regexp.MustCompile(`[-_&.]`).ReplaceAllString(title, " ")
@@ -1682,7 +1776,7 @@ func thePornDBSearchKeywords(filePath string) ([]string, string, string) {
 
 func thePornDBSearchURL(baseURL, category, keyword string) string {
 	values := url.Values{}
-	values.Set("parse", keyword)
+	values.Set("q", keyword)
 	values.Set("per_page", "100")
 	return strings.TrimRight(baseURL, "/") + "/" + category + "?" + values.Encode()
 }
@@ -1692,12 +1786,13 @@ func thePornDBBestMatchURL(items []thePornDBItem, filePath, series, date, catego
 		return ""
 	}
 	fileName := strings.ToLower(path.Base(strings.ReplaceAll(filePath, "\\", "/")))
+	targetCode := normalizeAVCodeForCompare(extractAVCode(filePath))
 	dateSuffix := regexp.MustCompile(`[\.-_]\d{2}\.\d{2}\.\d{2}(.+)`).FindStringSubmatch(fileName)
 	if len(dateSuffix) > 1 {
 		fileName = dateSuffix[1]
 	}
 	actorNumber := len(strings.Split(strings.ReplaceAll(fileName, ".and.", "&"), "&"))
-	fileSpace := thePornDBCleanWords(filePath)
+	fileSpace := thePornDBCleanWords(fileName)
 	fileNoSpace := strings.ReplaceAll(fileSpace, " ", "")
 
 	type candidate struct {
@@ -1710,6 +1805,14 @@ func thePornDBBestMatchURL(items []thePornDBItem, filePath, series, date, catego
 		detailURL := thePornDBItemDetailURL(item, category, baseURL)
 		if detailURL == "" {
 			continue
+		}
+		if targetCode != "" {
+			if itemCode := normalizeAVCodeForCompare(extractAVCode(item.Slug)); itemCode != "" && (itemCode == targetCode || strings.Contains(itemCode, targetCode) || strings.Contains(targetCode, itemCode)) {
+				return detailURL
+			}
+			if itemCode := normalizeAVCodeForCompare(extractAVCode(detailURL)); itemCode != "" && (itemCode == targetCode || strings.Contains(itemCode, targetCode) || strings.Contains(targetCode, itemCode)) {
+				return detailURL
+			}
 		}
 		itemSeries := strings.ToLower(item.Site.ShortName)
 		itemURL := strings.ReplaceAll(strings.ToLower(item.Site.URL), "-", "")
@@ -1741,6 +1844,9 @@ func thePornDBBestMatchURL(items []thePornDBItem, filePath, series, date, catego
 	for _, candidates := range [][]candidate{dateMatches, titleMatches, actorMatches} {
 		if len(candidates) > 0 {
 			sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].score > candidates[j].score })
+			if candidates[0].score < thePornDBMinSimilarity {
+				return ""
+			}
 			return candidates[0].url
 		}
 	}
@@ -1917,14 +2023,306 @@ func thePornDBSimilarity(a string, b string) float64 {
 	return 1 - float64(distance)/maxLen
 }
 
+var thePornDBLongNameMap = map[string]string{
+	"wgp":              "WhenGirlsPlay",
+	"18og":             "18OnlyGirls",
+	"18yo":             "18YearsOld",
+	"1kf":              "1000Facials",
+	"21ea":             "21EroticAnal",
+	"21fa":             "21FootArt",
+	"21n":              "21Naturals",
+	"2cst":             "2ChicksSameTime",
+	"a1o1":             "Asian1on1",
+	"aa":               "AmateurAllure",
+	"ad":               "AmericanDaydreams",
+	"add":              "ManualAddActors",
+	"agm":              "AllGirlMassage",
+	"am":               "AssMasterpiece",
+	"analb":            "AnalBeauty",
+	"baebz":            "Baeb",
+	"bblib":            "BigButtsLikeItBig",
+	"bcasting":         "BangCasting",
+	"bconfessions":     "BangConfessions",
+	"bglamkore":        "BangGlamkore",
+	"bgonzo":           "BangGonzo",
+	"brealteens":       "BangRealTeens",
+	"bcb":              "BigCockBully",
+	"bch":              "BigCockHero",
+	"bdpov":            "BadDaddyPOV",
+	"bex":              "BrazzersExxtra",
+	"bgb":              "BabyGotBoobs",
+	"bgbs":             "BoundGangbangs",
+	"bin":              "BigNaturals",
+	"bjf":              "BlowjobFridays",
+	"bp":               "ButtPlays",
+	"btas":             "BigTitsatSchool",
+	"btaw":             "BigTitsatWork",
+	"btc":              "BigTitCreampie",
+	"btis":             "BigTitsinSports",
+	"btiu":             "BigTitsinUniform",
+	"btlbd":            "BigTitsLikeBigDicks",
+	"btra":             "BigTitsRoundAsses",
+	"burna":            "BurningAngel",
+	"bwb":              "BigWetButts",
+	"cfnm":             "ClothedFemaleNudeMale",
+	"clip":             "LegalPorno",
+	"cps":              "CherryPimps",
+	"cuf":              "CumFiesta",
+	"cws":              "CzechWifeSwap",
+	"da":               "DoctorAdventures",
+	"dbm":              "DontBreakMe",
+	"dc":               "DorcelVision",
+	"ddfb":             "DDFBusty",
+	"ddfvr":            "DDFNetworkVR",
+	"dm":               "DirtyMasseur",
+	"dnj":              "DaneJones",
+	"dpg":              "DigitalPlayground",
+	"dwc":              "DirtyWivesClub",
+	"dwp":              "DayWithAPornstar",
+	"dsw":              "DaughterSwap",
+	"esp":              "EuroSexParties",
+	"ete":              "EuroTeenErotica",
+	"ext":              "ExxxtraSmall",
+	"fams":             "FamilyStrokes",
+	"faq":              "FirstAnalQuest",
+	"fds":              "FakeDrivingSchool",
+	"fft":              "FemaleFakeTaxi",
+	"fhd":              "FantasyHD",
+	"fhl":              "FakeHostel",
+	"fho":              "FakehubOriginals",
+	"fka":              "FakeAgent",
+	"fm":               "FuckingMachines",
+	"fms":              "FantasyMassage",
+	"frs":              "FitnessRooms",
+	"ft":               "FastTimes",
+	"ftx":              "FakeTaxi",
+	"gft":              "GrandpasFuckTeens",
+	"gbcp":             "GangbangCreampie",
+	"gta":              "GirlsTryAnal",
+	"gw":               "GirlsWay",
+	"h1o1":             "Housewife1on1",
+	"ham":              "HotAndMean",
+	"hart":             "Hegre",
+	"hcm":              "HotCrazyMess",
+	"hegre-art":        "Hegre",
+	"hoh":              "HandsOnHardcore",
+	"hotab":            "HouseofTaboo",
+	"ht":               "Hogtied",
+	"ihaw":             "IHaveAWife",
+	"iktg":             "IKnowThatGirl",
+	"il":               "ImmoralLive",
+	"kha":              "KarupsHA",
+	"kow":              "KarupsOW",
+	"kpc":              "KarupsPC",
+	"la":               "LatinAdultery",
+	"lcd":              "LittleCaprice-Dreams",
+	"littlecaprice":    "LittleCaprice-Dreams",
+	"lhf":              "LoveHerFeet",
+	"lsb":              "Lesbea",
+	"lst":              "LatinaSexTapes",
+	"lta":              "LetsTryAnal",
+	"maj":              "ManoJob",
+	"mbb":              "MommyBlowsBest",
+	"mbt":              "MomsBangTeens",
+	"mc":               "MassageCreep",
+	"mcu":              "MonsterCurves",
+	"mdhf":             "MyDaughtersHotFriend",
+	"mdhg":             "MyDadsHotGirlfriend",
+	"mfa":              "ManuelFerrara",
+	"mfhg":             "MyFriendsHotGirl",
+	"mfhm":             "MyFriendsHotMom",
+	"mfl":              "Mofos",
+	"mfp":              "MyFamilyPies",
+	"mfst":             "MyFirstSexTeacher",
+	"mgbf":             "MyGirlfriendsBustyFriend",
+	"mgb":              "MommyGotBoobs",
+	"mic":              "MomsInControl",
+	"mj":               "ManoJob",
+	"mlib":             "MildsLikeItBig",
+	"mlt":              "MomsLickTeens",
+	"mmgs":             "MommysGirl",
+	"mnm":              "MyNaughtyMassage",
+	"mom":              "MomXXX",
+	"mpov":             "MrPOV",
+	"mrs":              "MassageRooms",
+	"mshf":             "MySistersHotFriend",
+	"mts":              "MomsTeachSex",
+	"mvft":             "MyVeryFirstTime",
+	"mwhf":             "MyWifesHotFriend",
+	"naf":              "NeighborAffair",
+	"nam":              "NaughtyAmerica",
+	"na":               "NaughtyAthletics",
+	"naughtyamericavr": "NaughtyAmerica",
+	"nb":               "NaughtyBookworms",
+	"news":             "NewSensations",
+	"nf":               "NubileFilms",
+	"no":               "NaughtyOffice",
+	"nrg":              "NaughtyRichGirls",
+	"nubilef":          "NubileFilms",
+	"num":              "NuruMassage",
+	"nw":               "NaughtyWeddings",
+	"obj":              "OnlyBlowjob",
+	"otb":              "OnlyTeenBlowjobs",
+	"pav":              "PixAndVideo",
+	"pba":              "PublicAgent",
+	"pf":               "PornFidelity",
+	"phd":              "PassionHD",
+	"plib":             "PornstarsLikeitBig",
+	"pop":              "PervsOnPatrol",
+	"ppu":              "PublicPickups",
+	"prdi":             "PrettyDirty",
+	"ps":               "PropertySex",
+	"pud":              "PublicDisgrace",
+	"reg":              "RealExGirlfriends",
+	"rkp":              "RKPrime",
+	"rws":              "RealWifeStories",
+	"saf":              "ShesAFreak",
+	"sart":             "SexArt",
+	"sbj":              "StreetBlowjobs",
+	"sislove":          "SisLovesMe",
+	"smb":              "ShareMyBF",
+	"ssc":              "StepSiblingsCaught",
+	"ssn":              "ShesNew",
+	"sts":              "StrandedTeens",
+	"swsn":             "SwallowSalon",
+	"tdp":              "TeensDoPorn",
+	"tds":              "TheDickSuckers",
+	"ted":              "Throated",
+	"tf":               "TeenFidelity",
+	"tgs":              "ThisGirlSucks",
+	"these":            "TheStripperExperience",
+	"tla":              "TeensLoveAnal",
+	"tlc":              "TeensLoveCream",
+	"tle":              "TheLifeErotic",
+	"tlhc":             "TeensLoveHugeCocks",
+	"tlib":             "TeensLikeItBig",
+	"tlm":              "TeensLoveMoney",
+	"togc":             "TonightsGirlfriendClassic",
+	"tog":              "TonightsGirlfriend",
+	"tspa":             "TrickySpa",
+	"tss":              "ThatSitcomShow",
+	"tuf":              "TheUpperFloor",
+	"wa":               "WhippedAss",
+	"wfbg":             "WeFuckBlackGirls",
+	"wkp":              "Wicked",
+	"wlt":              "WeLiveTogether",
+	"woc":              "WildOnCam",
+	"wov":              "WivesOnVacation",
+	"wowg":             "WowGirls",
+	"wy":               "WebYoung",
+	"zzs":              "ZZseries",
+	"ztod":             "ZeroTolerance",
+	"itc":              "InTheCrack",
+	"abbw":             "AbbyWinters",
+	"abme":             "AbuseMe",
+	"ana":              "AnalAngels",
+	"atke":             "ATKExotics",
+	"atkg":             "ATKGalleria",
+	"atkgfs":           "ATKGirlfriends",
+	"atkh":             "ATKHairy",
+	"aktp":             "ATKPetites",
+	"btp":              "BadTeensPunished",
+	"brealmilfs":       "Bang.RealMilfs",
+	"byngr":            "bang.YNGR",
+	"ba":               "Beauty-Angels",
+	"bgfs":             "BlackGFS",
+	"bna":              "BrandNew",
+	"bam":              "BruceAndMorgan",
+	"bcast":            "BrutalCastings",
+	"bd":               "BrutalDildos",
+	"bpu":              "BrutalPickups",
+	"clubseventeen":    "ClubSweethearts",
+	"cfnmt":            "CFNMTeens",
+	"cfnms":            "FNMSecret",
+	"cza":              "CzhecAmateurs",
+	"czbb":             "CzechBangBus",
+	"czb":              "CzechBitch",
+	"cc":               "CzechCasting",
+	"czc":              "CzechCouples",
+	"czestro":          "CzechEstrogenolit",
+	"czf":              "CzechFantasy",
+	"czgb":             "CzechGangBang",
+	"cgfs":             "CzechGFS",
+	"czharem":          "CzechHarem",
+	"czm":              "CzechMassage",
+	"czo":              "CzechOrgasm",
+	"czps":             "CzechPawnShop",
+	"css":              "CzechStreets",
+	"cztaxi":           "CzechTaxi",
+	"czt":              "CzechTwins",
+	"dlla":             "DadysLilAngel",
+	"dts":              "DeepThroatSirens",
+	"deb":              "DeviceBondage",
+	"doan":             "DiaryOfANanny",
+	"dpf":              "DPFanatics",
+	"ds":               "DungeonSex",
+	"ffr":              "FacialsForever",
+	"ff":               "FilthyFamily",
+	"fbbg":             "FirstBGG",
+	"fab":              "FuckedAndBound",
+	"fum":              "FuckingMachines",
+	"fs":               "FuckStudies",
+	"tfcp":             "FullyClothedPissing",
+	"gfr":              "GFRevenge",
+	"gdp":              "GirlsDoPorn",
+	"hletee":           "HelplessTeens",
+	"hotb":             "HouseOfTaboo",
+	"Infr":             "InfernalRestraints",
+	"inh":              "InnocentHigh",
+	"jlmf":             "JessieLoadsMonsterFacials",
+	"university":       "KinkUniversity",
+	"lang":             "LANewGirl",
+	"mmp":              "MMPNetwork",
+	"mot":              "MoneyTalks",
+	"mbc":              "MyBabysittersClub",
+	"mdm":              "MyDirtyMaid",
+	"nvg":              "NetVideoGirls",
+	"nubp":             "Nubiles-Porn",
+	"oo":               "Only-Opaques",
+	"os":               "Only-Secretaries",
+	"oss":              "OnlySilAndSatin",
+	"psus":             "PascalsSubSluts",
+	"pbf":              "PetiteBallerinasFucked",
+	"phdp":             "PetiteHDPoorn",
+	"psp":              "PorsntarsPunishment",
+	"pc":               "PrincessCum",
+	"pdmqfo":           "QuestForOrgasm",
+	"rtb":              "RealTimeBondage",
+	"rab":              "RoundAndBrown",
+	"sr":               "SadisticRope",
+	"sas":              "SexAndSubmission",
+	"sed":              "SexualDisgrace",
+	"seb":              "SexuallyBroken",
+	"sislov":           "SisLovesMe",
+	"tslw":             "SlimeWave",
+	"steps":            "StepSiblings",
+	"stre":             "StrictRestraint",
+	"t18":              "Taboo18",
+	"tft":              "TeacherFucksTeens",
+	"tmf":              "TeachMeFisting",
+	"tsma":             "TeenSexMania",
+	"tsm":              "TeenSexMovs",
+	"ttw":              "TeensInTheWoods",
+	"tgw":              "ThaiGirlsWild",
+	"taob":             "TheArtOfBlowJob",
+	"trwo":             "TheRealWorkout",
+	"tto":              "TheTrainingOfO",
+	"tg":               "TopGrl",
+	"tt":               "TryTeens",
+	"th":               "TwistysHard",
+	"vp":               "VIPissy",
+	"wrh":              "WeAreHairy",
+	"wpa":              "WhippedAss",
+	"yt":               "YoungThroats",
+	"zb":               "ZoliBoy",
+}
+
 func thePornDBLongName(shortName string) string {
-	names := map[string]string{
-		"clubseventeen": "clubsweethearts",
+	key := strings.ToLower(strings.TrimSpace(shortName))
+	if longName, ok := thePornDBLongNameMap[key]; ok {
+		return strings.NewReplacer("-", "", ".", "").Replace(strings.ToLower(longName))
 	}
-	if value, ok := names[shortName]; ok {
-		return strings.ReplaceAll(strings.ReplaceAll(value, "-", ""), ".", "")
-	}
-	return shortName
+	return key
 }
 
 func thePornDBUniqueStrings(values []string) []string {

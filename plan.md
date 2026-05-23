@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 16:49 +0800
+- 进度：完成 `tasks/2026-05-23-western-av-oshash-confirm-gate` 的实现收口：欧美 AV 上传自动刮削落 `av_scrape_pending` 并写入 `scrape_preview` / `scrape_attempt`，确认或弃刮后通过 `force=true` 转码入队；ThePornDB 成功响应改为完整 JSON decode，修复 detail body 被 512B 截断导致候选丢失；admin-web 增加 `欧美 AV 待确认` 状态、待确认面板、弃刮入口和 `hash 命中` 徽章，AV 手动刮削能直接加载待确认候选。
+- 影响文件：`internal/services/scraper.go`、`internal/services/scraper_av_framework.go`、`internal/services/scraper_av_mdcx_detail_sites.go`、`internal/services/scraper_av_strategy.go`、`internal/queue/scrape_tasks.go`、`internal/queue/tasks.go`、`internal/handlers/admin_scrape.go`、`internal/handlers/router.go`、`admin-web/src/api/admin.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/oshash ./internal/repository ./internal/services ./internal/queue ./internal/handlers -count=1` 通过；`go test ./...` 通过；`go vet ./...` 通过；`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size warning）。
+
+## 2026-05-23 15:53 +0800
+- 进度：开始落实 `tasks/2026-05-23-western-av-oshash-confirm-gate` 的实现阶段，先补数据层与上传透传：修复 `GetVideoOSHash` 接口编译问题、增加 `0021` 迁移、落 `pkg/oshash`、把 `site_category` 和 `os_hash` 从上传链路透传到落库。
+- 影响文件：`migrations/0021_western_av_oshash_gate.up.sql`、`migrations/0021_western_av_oshash_gate.down.sql`、`pkg/oshash/oshash.go`、`pkg/oshash/oshash_test.go`、`internal/models/models.go`、`internal/repository/video_repository.go`、`internal/services/upload.go`、`internal/services/chunk_upload.go`、`internal/handlers/upload.go`、`internal/handlers/upload_chunk.go`、`admin-web/src/views/VideoUpload.vue`、`plan.md`
+- 验证：待执行 `go test ./internal/repository -run 'OSHash|Video' -v`、`go test ./pkg/oshash -v`、`go test ./internal/services -run 'SaveUpload|SaveUploadedFile|OSHash' -v`
+
 ## 2026-05-23 15:35 +0800
 - 进度：按 task 审查结果收紧 `tasks/2026-05-23-western-av-oshash-confirm-gate` 的第三个口径：删除固定“5 秒内”的验收写法，改成自动刮削任务完成后的状态型验收；同步修正 `prd.md` / `review.md`。
 - 影响文件：`tasks/2026-05-23-western-av-oshash-confirm-gate/prd.md`、`tasks/2026-05-23-western-av-oshash-confirm-gate/review.md`、`plan.md`

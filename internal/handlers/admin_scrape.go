@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -181,6 +182,7 @@ func (a *API) AdminAVScrapePreview(c *gin.Context) {
 		DetailURL    string `json:"detail_url"`
 		BypassCache  *bool  `json:"bypass_cache"`
 	}
+	osHash := ""
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
 		return
@@ -196,6 +198,10 @@ func (a *API) AdminAVScrapePreview(c *gin.Context) {
 		if err != nil {
 			response.Error(c, 2, err.Error())
 			return
+		}
+		osHash = video.OSHash
+		if strings.TrimSpace(req.SiteCategory) == "" {
+			req.SiteCategory = avSiteCategoryFromAdminVideo(video)
 		}
 		if strings.TrimSpace(req.Title) == "" {
 			req.Title = strings.TrimSpace(video.Title)
@@ -219,6 +225,7 @@ func (a *API) AdminAVScrapePreview(c *gin.Context) {
 		SiteSource:   req.SiteSource,
 		FilePath:     req.FilePath,
 		DetailURL:    req.DetailURL,
+		OSHash:       osHash,
 	})
 	if err != nil {
 		response.Error(c, 3, err.Error())
@@ -289,6 +296,23 @@ func (a *API) AdminAVScrapeConfirm(c *gin.Context) {
 	}); err != nil {
 		response.Error(c, 3, err.Error())
 		return
+	}
+	if shouldEnqueueAdminScrapeConfirmTranscode(video) {
+		if a.enqueuer == nil {
+			response.Error(c, 5, "queue not configured")
+			return
+		}
+		payload := queue.TranscodePayload{
+			VideoID:      videoID.String(),
+			InputPath:    video.OriginalPath,
+			OutputDir:    filepath.Join(a.storageRoot, "videos"),
+			TargetFormat: "mp4",
+			Force:        true,
+		}
+		if err := a.enqueuer.EnqueueTranscode(payload); err != nil {
+			response.Error(c, 5, err.Error())
+			return
+		}
 	}
 	ok(c, gin.H{
 		"saved":    true,
@@ -388,6 +412,7 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 			InputPath:    video.OriginalPath,
 			OutputDir:    filepath.Join(a.storageRoot, "videos"),
 			TargetFormat: "mp4",
+			Force:        video.Type == "av" && video.Status == "av_scrape_pending",
 		}
 		if err := a.enqueuer.EnqueueTranscode(payload); err != nil {
 			response.Error(c, 5, err.Error())
@@ -403,9 +428,98 @@ func (a *API) AdminScrapeConfirm(c *gin.Context) {
 
 func shouldEnqueueAdminScrapeConfirmTranscode(video models.Video) bool {
 	if video.Type == "av" {
-		return false
+		return video.Status == "av_scrape_pending" && strings.TrimSpace(video.OriginalPath) != ""
 	}
 	return strings.TrimSpace(video.OriginalPath) != "" && video.Status != "ready" && video.Status != "processing"
+}
+
+func (a *API) AdminScrapeSkip(c *gin.Context) {
+	var req struct {
+		VideoID string `json:"video_id"`
+		Reason  string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	videoID, okID := parseUUID(req.VideoID)
+	if !okID {
+		bad(c, "invalid video_id")
+		return
+	}
+	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
+	if err != nil {
+		response.Error(c, 2, err.Error())
+		return
+	}
+	if video.Type != "av" {
+		bad(c, "video type must be av")
+		return
+	}
+	if video.Status != "av_scrape_pending" {
+		bad(c, "video status must be av_scrape_pending")
+		return
+	}
+	if strings.TrimSpace(video.OriginalPath) == "" {
+		response.Error(c, 3, "original path is empty")
+		return
+	}
+	if a.enqueuer == nil {
+		response.Error(c, 4, "queue not configured")
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "管理员弃刮"
+	}
+	if err := a.repo.MergeVideoMetadata(c.Request.Context(), videoID, map[string]any{
+		"scrape_skipped":     true,
+		"scrape_skip_reason": reason,
+		"scrape_skipped_at":  time.Now().UTC().Format(time.RFC3339),
+	}); err != nil {
+		response.Error(c, 5, err.Error())
+		return
+	}
+	if err := a.repo.UpdateVideoStatus(c.Request.Context(), videoID, "processing"); err != nil {
+		response.Error(c, 5, err.Error())
+		return
+	}
+	payload := queue.TranscodePayload{
+		VideoID:      videoID.String(),
+		InputPath:    video.OriginalPath,
+		OutputDir:    filepath.Join(a.storageRoot, "videos"),
+		TargetFormat: "mp4",
+		Force:        true,
+	}
+	if err := a.enqueuer.EnqueueTranscode(payload); err != nil {
+		response.Error(c, 6, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"skipped":  true,
+		"video_id": videoID,
+	})
+}
+
+func avSiteCategoryFromAdminVideo(video models.Video) string {
+	var metadata map[string]any
+	if len(video.Metadata) > 0 {
+		_ = json.Unmarshal(video.Metadata, &metadata)
+	}
+	raw, _ := metadata["site_category"].(string)
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "western":
+		return "western"
+	case "fc2":
+		return "fc2"
+	case "japanese", "default", "jp":
+		return "japanese"
+	default:
+		if strings.TrimSpace(video.OSHash) != "" {
+			return "western"
+		}
+		return ""
+	}
 }
 
 func normalizeTVPreviewRequest(typ, title string, seasonNumber, episodeNumber int) (string, int, int) {

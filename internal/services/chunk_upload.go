@@ -36,6 +36,7 @@ type ChunkSession struct {
 	ActorNames        []string       `json:"actor_names"`
 	ImageCollectionID string         `json:"image_collection_id"`
 	CollectionIDs     []string       `json:"collection_ids"`
+	SiteCategory      string         `json:"site_category"`
 	Uploaded          map[int]bool   `json:"uploaded"`
 	CreatedAt         time.Time      `json:"created_at"`
 	LastUpdated       time.Time      `json:"last_updated"`
@@ -49,7 +50,7 @@ func NewChunkUploadService(uploadTempDir string) *ChunkUploadService {
 	}
 }
 
-func (s *ChunkUploadService) Init(ctx context.Context, userID uuid.UUID, filename string, fileSize, chunkSize int64, totalChunks int, hash, typ, title, description string, tags []string, actorIDs, actorNames []string, imageCollectionID string, collectionIDs []string) (ChunkSession, error) {
+func (s *ChunkUploadService) Init(ctx context.Context, userID uuid.UUID, filename string, fileSize, chunkSize int64, totalChunks int, hash, typ, title, description string, tags []string, actorIDs, actorNames []string, imageCollectionID, siteCategory string, collectionIDs []string) (ChunkSession, error) {
 	_ = ctx
 	if chunkSize <= 0 || totalChunks <= 0 {
 		return ChunkSession{}, fmt.Errorf("invalid chunk size or total chunks")
@@ -70,6 +71,7 @@ func (s *ChunkUploadService) Init(ctx context.Context, userID uuid.UUID, filenam
 		ActorNames:        actorNames,
 		ImageCollectionID: strings.TrimSpace(imageCollectionID),
 		CollectionIDs:     collectionIDs,
+		SiteCategory:      strings.TrimSpace(siteCategory),
 		Uploaded:          map[int]bool{},
 		CreatedAt:         time.Now().UTC(),
 		LastUpdated:       time.Now().UTC(),
