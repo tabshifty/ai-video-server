@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 15:35 +0800
+- 进度：按 task 审查结果收紧 `tasks/2026-05-23-western-av-oshash-confirm-gate` 的第三个口径：删除固定“5 秒内”的验收写法，改成自动刮削任务完成后的状态型验收；同步修正 `prd.md` / `review.md`。
+- 影响文件：`tasks/2026-05-23-western-av-oshash-confirm-gate/prd.md`、`tasks/2026-05-23-western-av-oshash-confirm-gate/review.md`、`plan.md`
+- 验证：文档改动，三处口径已收紧
+
+## 2026-05-23 15:32 +0800
+- 进度：按 task 审查结果进一步收紧 `tasks/2026-05-23-western-av-oshash-confirm-gate` 的第二个口径：`av_scrape_pending` 的确认/弃刮门控与 `ready` 视频的手动重刮拆成两条不同流程，候选可复用但状态语义不复用；同步把 `CONTEXT.md`、`implement.md` 对齐。
+- 影响文件：`CONTEXT.md`、`tasks/2026-05-23-western-av-oshash-confirm-gate/implement.md`、`plan.md`
+- 验证：文档改动，待继续审查第三个口径
+
+## 2026-05-23 15:29 +0800
+- 进度：按 task 审查结果收紧 `tasks/2026-05-23-western-av-oshash-confirm-gate` 的第一个口径：`AV 地区分类` 允许空值，后端默认按 `japanese` 处理，不再写成“必填但又默认日本”的双重语义；同步把 `CONTEXT.md`、`prd.md`、`implement.md` 里的表述对齐。
+- 影响文件：`CONTEXT.md`、`tasks/2026-05-23-western-av-oshash-confirm-gate/prd.md`、`tasks/2026-05-23-western-av-oshash-confirm-gate/implement.md`、`plan.md`
+- 验证：文档改动，待继续审查其余两处口径
+
 ## 2026-05-23 14:04 +0800
 - 进度：按用户确认补写 `tasks/2026-05-23-tv-series-autoplay-next-episode/DONE.md` 完成标记，任务进入已完成状态。
 - 影响文件：`tasks/2026-05-23-tv-series-autoplay-next-episode/DONE.md`、`plan.md`

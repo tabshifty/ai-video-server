@@ -19,6 +19,13 @@
 - `电影重新刮削`：管理员对已有电影再次执行手动刮削预览和确认；预览候选必须来自实时 TMDB 查询，不复用已有视频 metadata 或短期预览缓存。
 - `bypass_cache`：管理端手动刮削预览请求中的显式重抓标记；电影手动查询默认使用该标记绕过缓存。
 
+## AV 上传分类术语
+- `AV 地区分类`：上传 AV 视频时由管理员在上传表单显式选择的地区归属，三档为 `日本` / `欧美` / `FC2`，对应内部 `site_category` ∈ {`japanese`, `western`, `fc2`}；默认 `日本`，表单或接口可不显式传值，后端按 `japanese` 兜底。该值在 `videos.metadata.site_category` 落库，是用户事实而非启发式推断，优先级高于 `detectAVSiteCategory` 的文件名启发式（启发式仅作为 retag 或历史数据缺失时的兜底）。**该分类存在的核心理由是为 [[欧美 AV]] 专属的 `oshash` 计算与 [[刮削确认门控]] 提供门控依据**——非欧美档（`日本` / `FC2`）不计算 oshash、不进入门控；脱离了"oshash + 门控只对欧美"这条规则，该分类不应被独立扩展用途，避免后续维护者把它当成通用的内容地区标签滥用。
+- `欧美 AV`：`AV 地区分类` 等于 `欧美` / `site_category=western` 的 AV 视频。本品类专享 `oshash` 上传时计算（落 `videos.os_hash`，一次计算多路复用）与 ThePornDB hash 优先路径，且专享 [[刮削确认门控]]（即"管理员手动确认后才允许压缩"）；`日本` / `FC2` 不在范围内，保持现有上传 → 自动刮削 → 自动 transcode 的行为不变。**`videos.os_hash` 是文件指纹不是刮削结果**——上传时算一次永久有效（即使 transcode 后原文件仍保留可重算一致），同时被上传后自动刮削、admin 手动刮削、retag 重刮三条路径共享读取；retag 从 `日本` / `FC2` 改为 `欧美` 时若 hash 为空、原文件仍在，应补算一次。
+- `刮削确认门控`：[[欧美 AV]] 上传后必须经过的"自动刮削 → 等管理员确认 → 允许 transcode"工作流。自动刮削跑完无论命中或全 miss，视频都落 `av_scrape_pending` 状态（与 `tv_pending` 对称的 AV 版本），候选列表写入 `videos.metadata.scrape_preview`；transcode 入队被状态机硬拒绝，只有 [[刮削确认]] 或 [[弃刮]] 之后视频转入 `processing`、transcode 才能启动。该门控不适用于 `日本` / `FC2` AV，也不适用于 movie / episode / short。
+- `刮削确认`：管理员在 admin 端对 `av_scrape_pending` 视频从候选列表挑选一个候选并提交，写入 metadata 同时自动入队 transcode 的动作。复用现有 `PUT /admin/scrape/confirm` 端点；`ConfirmAV` 内部按入参视频的当前 `status` 决定是否入队 transcode——`av_scrape_pending` 时入队（专属于门控路径），其它状态（例如对已 `ready` 视频的"手动刮削"重新确认）不入队，保持现有手动刮削语义不变。`刮削确认` 与 `手动刮削` 共享候选来源，但不共享状态语义：前者处理待确认视频，后者处理已就绪视频。
+- `弃刮`：管理员明确放弃为 `av_scrape_pending` 视频补全元数据的逃生通道，用于 ThePornDB 真的无候选可选的极端情况。走独立端点 `PUT /admin/scrape/skip`，记录 `metadata.scrape_skipped=true` / `scrape_skip_reason` / `scrape_skipped_at` 三字段后转入 `processing` 并入队 transcode。弃刮后视频可播但元数据空，管理员后续仍可通过"手动刮削"再补刮，不被 `scrape_skipped=true` block。**不允许自动弃刮**——零候选时仍然停在 `av_scrape_pending` 等人决定。
+
 ## 演员刮削术语
 - `影视演员信息刮削`：电影和电视剧刮削过程中，基于 TMDB credits 得到的演员进一步补齐演员资料并绑定到视频；本语义不覆盖 AV 演员刮削。
 - `影视演员资料`：来自 TMDB person 的演员姓名、别名、性别、国家/地区、生日、简介、TMDB person id 与本地头像；不包含角色名。
