@@ -183,12 +183,13 @@ fun TvSeriesPlayerScreen(
             isPlayerError = playerErrorMessage != null,
             isSelectorVisible = uiState.selectorVisible,
             isBackConfirmVisible = showBackConfirmPrompt,
+            isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
             isLoading = uiState.loading,
             isCanceledForCurrentEpisode = uiState.autoplayCanceledForCurrentEpisode,
             remainingMs = remainingMs,
             durationMs = screenDurationMs,
         ),
-    ) && uiState.pendingEndOverlayKind == null
+    )
 
     val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
         LongFormPlaybackSession(
@@ -210,11 +211,15 @@ fun TvSeriesPlayerScreen(
         }
         lastAutoplaySwitchedVideoId = videoId
         reportTvSeriesHistory(viewModel, videoId, exoPlayer, completedOverride = true)
+        lastHistoryVideoId = videoId
         viewModel.advanceToNextEpisodeFromAutoplay()
     }
 
     fun handlePlaybackEnded() {
         val state = latestUiState
+        if (!shouldHandlePlaybackEnded(state.currentVideoId, lastAutoplaySwitchedVideoId)) {
+            return
+        }
         val hasNext = state.hasNextPlayableEpisode()
         when {
             state.autoplayEnabled && !state.autoplayCanceledForCurrentEpisode && hasNext -> advanceFromAutoplay()

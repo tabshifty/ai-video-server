@@ -26,6 +26,7 @@ data class AutoplayPromptGuardInput(
     val isPlayerError: Boolean,
     val isSelectorVisible: Boolean,
     val isBackConfirmVisible: Boolean,
+    val isEndOverlayVisible: Boolean,
     val isLoading: Boolean,
     val isCanceledForCurrentEpisode: Boolean,
     val remainingMs: Long,
@@ -79,10 +80,21 @@ fun shouldShowAutoplayPromptCard(input: AutoplayPromptGuardInput): Boolean {
     if (input.isPlayerError) return false
     if (input.isSelectorVisible) return false
     if (input.isBackConfirmVisible) return false
+    if (input.isEndOverlayVisible) return false
     if (input.isLoading) return false
     if (input.isCanceledForCurrentEpisode) return false
     if (input.durationMs <= 0L) return false
     return input.remainingMs in 1L..10_000L
+}
+
+fun shouldHandlePlaybackEnded(
+    currentVideoId: String,
+    lastAutoplaySwitchedVideoId: String,
+): Boolean {
+    val current = currentVideoId.trim()
+    val lastAutoplay = lastAutoplaySwitchedVideoId.trim()
+    if (current.isBlank() || lastAutoplay.isBlank()) return true
+    return current == lastAutoplay
 }
 
 fun autoplayCountdownTickRemaining(

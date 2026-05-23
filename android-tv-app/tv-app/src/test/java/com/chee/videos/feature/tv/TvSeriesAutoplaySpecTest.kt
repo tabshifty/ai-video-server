@@ -111,16 +111,26 @@ class TvSeriesAutoplaySpecTest {
             isBackConfirmVisible = false,
             isLoading = false,
             isCanceledForCurrentEpisode = false,
+            isEndOverlayVisible = false,
             remainingMs = 5_000L,
             durationMs = 120_000L,
         )
 
         val blockedBySelector = allowed.copy(isSelectorVisible = true)
         val blockedByCancel = allowed.copy(isCanceledForCurrentEpisode = true)
+        val blockedByEndOverlay = allowed.copy(isEndOverlayVisible = true)
 
         assertTrue(shouldShowAutoplayPromptCard(allowed))
         assertFalse(shouldShowAutoplayPromptCard(blockedBySelector))
         assertFalse(shouldShowAutoplayPromptCard(blockedByCancel))
+        assertFalse(shouldShowAutoplayPromptCard(blockedByEndOverlay))
+    }
+
+    @Test
+    fun shouldHandlePlaybackEnded_ignoresResidualAutoplayEndedEvents() {
+        assertTrue(shouldHandlePlaybackEnded("video-1", ""))
+        assertFalse(shouldHandlePlaybackEnded("video-2", "video-1"))
+        assertTrue(shouldHandlePlaybackEnded("video-1", "video-1"))
     }
 }
 
