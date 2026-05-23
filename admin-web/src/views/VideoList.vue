@@ -38,6 +38,7 @@ import {
   getVideoThumbnailURL,
   teardownPreviewPlayer,
   shouldShowVideoThumbnail,
+  subtitleUploadAccept,
   tvPendingStageLabel
 } from './videoList.helpers'
 
@@ -1206,7 +1207,7 @@ onBeforeUnmount(() => {
                 v-model:file-list="subtitleUploadFileList"
                 :auto-upload="false"
                 :limit="1"
-                accept=".srt,.vtt"
+                :accept="subtitleUploadAccept"
               >
                 <el-button size="small">选择字幕文件</el-button>
               </el-upload>

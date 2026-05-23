@@ -228,6 +228,48 @@ func TestResolveProbeFieldsWithProbeErrorUsesDefaults(t *testing.T) {
 	}
 }
 
+func TestSubtitleUploadPlanForFilenameSupportsAssAndSsaAsWebVTT(t *testing.T) {
+	tests := []struct {
+		filename       string
+		uploadedFormat string
+		storedFormat   string
+		storedMIME     string
+		needsWebVTT    bool
+	}{
+		{filename: "movie.zh.srt", uploadedFormat: "srt", storedFormat: "srt", storedMIME: "application/x-subrip", needsWebVTT: false},
+		{filename: "movie.zh.vtt", uploadedFormat: "vtt", storedFormat: "vtt", storedMIME: "text/vtt", needsWebVTT: false},
+		{filename: "movie.zh.ass", uploadedFormat: "ass", storedFormat: "vtt", storedMIME: "text/vtt", needsWebVTT: true},
+		{filename: "movie.zh.ssa", uploadedFormat: "ssa", storedFormat: "vtt", storedMIME: "text/vtt", needsWebVTT: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			plan, err := subtitleUploadPlanForFilename(tt.filename)
+			if err != nil {
+				t.Fatalf("subtitleUploadPlanForFilename() error = %v", err)
+			}
+			if plan.UploadedFormat != tt.uploadedFormat {
+				t.Fatalf("UploadedFormat = %s, want %s", plan.UploadedFormat, tt.uploadedFormat)
+			}
+			if plan.StoredFormat != tt.storedFormat {
+				t.Fatalf("StoredFormat = %s, want %s", plan.StoredFormat, tt.storedFormat)
+			}
+			if plan.StoredMIMEType != tt.storedMIME {
+				t.Fatalf("StoredMIMEType = %s, want %s", plan.StoredMIMEType, tt.storedMIME)
+			}
+			if plan.NeedsWebVTT != tt.needsWebVTT {
+				t.Fatalf("NeedsWebVTT = %v, want %v", plan.NeedsWebVTT, tt.needsWebVTT)
+			}
+		})
+	}
+}
+
+func TestSubtitleUploadPlanForFilenameRejectsUnsupportedFormats(t *testing.T) {
+	if _, err := subtitleUploadPlanForFilename("subtitle.txt"); err == nil {
+		t.Fatalf("expected unsupported subtitle format error")
+	}
+}
+
 func TestResolveProbeFieldsWithValidProbeParsesValues(t *testing.T) {
 	plan := transcodePlan{
 		Mode:              transcodeModeBitrate,

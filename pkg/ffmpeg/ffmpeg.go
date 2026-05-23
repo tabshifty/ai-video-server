@@ -429,6 +429,29 @@ func ExtractSubtitleToWebVTT(ctx context.Context, inputPath string, streamIndex 
 	return nil
 }
 
+func buildConvertSubtitleToWebVTTArgs(inputPath, outputPath string) []string {
+	return []string{
+		"-y",
+		"-i", inputPath,
+		"-vn",
+		"-an",
+		"-c:s", "webvtt",
+		"-f", "webvtt",
+		outputPath,
+	}
+}
+
+func ConvertSubtitleToWebVTT(ctx context.Context, inputPath, outputPath string) error {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return fmt.Errorf("create subtitle output dir: %w", err)
+	}
+	cmd := exec.CommandContext(ctx, "ffmpeg", buildConvertSubtitleToWebVTTArgs(inputPath, outputPath)...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("ffmpeg convert subtitle failed: %w, output=%s", err, string(out))
+	}
+	return nil
+}
+
 func parseBitrateKbps(streamBitrate, formatBitrate string) int {
 	bitsPerSecond := parseBitrateBits(streamBitrate)
 	if bitsPerSecond <= 0 {

@@ -12,6 +12,8 @@ export function getVideoStatusMeta(status) {
   return map[normalized] || { label: normalized || '-', tagType: 'info' }
 }
 
+export const subtitleUploadAccept = '.srt,.vtt,.ass,.ssa'
+
 const manualVideoStatusValues = ['uploaded', 'scraping', 'tv_pending', 'av_scrape_pending', 'ready', 'failed']
 
 export function getManualVideoStatusOptions() {

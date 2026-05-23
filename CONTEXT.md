@@ -5,6 +5,9 @@
 - 技术沉淀只记录会影响后续实现和维护的内容，不记录临时进度、命令流水账或一次性调试过程。
 - `tasks 任务三段执行流`：当用户要求“完成 tasks 里的任务”或等价表述时，必须把 `tasks/<任务名>/prd.md`、`implement.md`、`review.md` 视为同一任务的三个阶段，并严格按 PRD → Implement → Review 顺序推进。PRD 阶段用于锁定用户故事、作用域、验收标准和非目标；Implement 阶段用于按既定方案实施，若方案与代码现状冲突须回到 PRD 校准并写入 `plan.md`；Review 阶段用于按评审脚本和验收清单验证，不允许只完成实现后跳过 review 直接宣称任务完成。已包含 `DONE.md` 的任务目录视为已完成，后续批量处理 tasks 时默认跳过；即使该目录后来出现 `feedback.md`，也只作为归档材料，不再触发返工；只有用户明确要求重开或复查该任务时才重新进入三段流程。用户完成验收后，应在对应任务目录新增 `DONE.md`，记录完成日期、关联提交和验证摘要。
 
+## 字幕处理约定
+- `外挂 ASS/SSA 字幕上传策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；其中 `.ass/.ssa` 不直接暴露给 App 播放端，而是在服务端保存为临时源文件后用 ffmpeg 转成 WebVTT，数据库 `video_subtitles.format` 与 `mime_type` 记录最终可播放形态 `vtt` / `text/vtt`，`metadata.original_format` 记录原始格式。手机端和 TV 端继续复用既有 WebVTT 字幕播放链路；ASS 的复杂样式、字体、描边、特效、卡拉 OK 与精确定位允许在转换中降级或丢失，本策略只承诺文本字幕可播放。
+
 ## Git 忽略规则约定
 - 根级 `.gitignore` 中用于本地资料或发布产物的目录规则必须按意图锚定：仅忽略根目录时使用 `/references/`、`/release/`，避免误伤 `.codex/skills/*/references/`、`.agents/skills/*/references/` 等需要版本管理的技能参考文档。
 - Python 字节码、工具缓存、Android `build/` 与 `release/` 打包输出、Gradle/IDE 本地目录和系统 `.DS_Store` 都属于本地生成物，不应提交；若已进入索引，应使用 `git rm --cached` 从版本库移除，保留本地文件即可。

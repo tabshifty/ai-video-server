@@ -51,6 +51,18 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	assertArgAbsent(t, args, "-spatial_aq")
 }
 
+func TestBuildConvertSubtitleToWebVTTArgs(t *testing.T) {
+	args := buildConvertSubtitleToWebVTTArgs("/tmp/in.ass", "/tmp/out.vtt")
+
+	assertArgPair(t, args, "-i", "/tmp/in.ass")
+	assertArgPair(t, args, "-c:s", "webvtt")
+	assertArgPair(t, args, "-f", "webvtt")
+	if args[len(args)-1] != "/tmp/out.vtt" {
+		t.Fatalf("expected output path last, got args=%v", args)
+	}
+	assertArgAbsent(t, args, "-map")
+}
+
 func TestParseBitrateKbps(t *testing.T) {
 	tests := []struct {
 		name          string

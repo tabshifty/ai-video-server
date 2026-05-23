@@ -19,6 +19,13 @@ import (
 
 const maxSubtitleUploadSize = 8 * 1024 * 1024
 
+type subtitleUploadPlan struct {
+	UploadedFormat string
+	StoredFormat   string
+	StoredMIMEType string
+	NeedsWebVTT    bool
+}
+
 type SubtitleService struct {
 	repo        *repository.VideoRepository
 	storageRoot string
@@ -45,7 +52,7 @@ func (s *SubtitleService) SaveUploadedSubtitle(
 	if fileHeader.Size > maxSubtitleUploadSize {
 		return models.VideoSubtitle{}, fmt.Errorf("subtitle file too large")
 	}
-	format, mimeType, err := subtitleFileFormat(fileHeader.Filename)
+	plan, err := subtitleUploadPlanForFilename(fileHeader.Filename)
 	if err != nil {
 		return models.VideoSubtitle{}, err
 	}
@@ -55,7 +62,11 @@ func (s *SubtitleService) SaveUploadedSubtitle(
 		return models.VideoSubtitle{}, fmt.Errorf("create subtitle dir: %w", err)
 	}
 	subtitleID := uuid.New()
-	targetPath := filepath.Join(dir, subtitleID.String()+"."+format)
+	targetPath := filepath.Join(dir, subtitleID.String()+"."+plan.StoredFormat)
+	uploadPath := targetPath
+	if plan.NeedsWebVTT {
+		uploadPath = filepath.Join(dir, subtitleID.String()+".source."+plan.UploadedFormat)
+	}
 
 	src, err := fileHeader.Open()
 	if err != nil {
@@ -63,18 +74,26 @@ func (s *SubtitleService) SaveUploadedSubtitle(
 	}
 	defer src.Close()
 
-	dst, err := os.Create(targetPath)
+	dst, err := os.Create(uploadPath)
 	if err != nil {
 		return models.VideoSubtitle{}, fmt.Errorf("create subtitle file: %w", err)
 	}
 	if _, err := dst.ReadFrom(src); err != nil {
 		dst.Close()
-		_ = os.Remove(targetPath)
+		_ = os.Remove(uploadPath)
 		return models.VideoSubtitle{}, fmt.Errorf("save subtitle file: %w", err)
 	}
 	if err := dst.Close(); err != nil {
-		_ = os.Remove(targetPath)
+		_ = os.Remove(uploadPath)
 		return models.VideoSubtitle{}, fmt.Errorf("close subtitle file: %w", err)
+	}
+	if plan.NeedsWebVTT {
+		if err := ffmpeg.ConvertSubtitleToWebVTT(ctx, uploadPath, targetPath); err != nil {
+			_ = os.Remove(uploadPath)
+			_ = os.Remove(targetPath)
+			return models.VideoSubtitle{}, err
+		}
+		_ = os.Remove(uploadPath)
 	}
 
 	info, err := os.Stat(targetPath)
@@ -91,6 +110,7 @@ func (s *SubtitleService) SaveUploadedSubtitle(
 
 	meta, err := json.Marshal(map[string]any{
 		"original_filename": strings.TrimSpace(fileHeader.Filename),
+		"original_format":   plan.UploadedFormat,
 	})
 	if err != nil {
 		_ = os.Remove(targetPath)
@@ -103,8 +123,8 @@ func (s *SubtitleService) SaveUploadedSubtitle(
 		Status:       "ready",
 		LanguageCode: normalizeSubtitleLanguageCode(languageCode),
 		Label:        strings.TrimSpace(label),
-		Format:       format,
-		MIMEType:     mimeType,
+		Format:       plan.StoredFormat,
+		MIMEType:     plan.StoredMIMEType,
 		StoredPath:   targetPath,
 		FileSize:     info.Size(),
 		IsDefault:    shouldDefault,
@@ -228,14 +248,26 @@ func normalizeSubtitleLanguageCode(raw string) string {
 	return strings.ReplaceAll(value, "_", "-")
 }
 
-func subtitleFileFormat(filename string) (string, string, error) {
+func subtitleUploadPlanForFilename(filename string) (subtitleUploadPlan, error) {
 	ext := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(filepath.Ext(filename))), ".")
 	switch ext {
 	case "srt":
-		return "srt", "application/x-subrip", nil
+		return subtitleUploadPlan{UploadedFormat: "srt", StoredFormat: "srt", StoredMIMEType: "application/x-subrip"}, nil
 	case "vtt":
-		return "vtt", "text/vtt", nil
+		return subtitleUploadPlan{UploadedFormat: "vtt", StoredFormat: "vtt", StoredMIMEType: "text/vtt"}, nil
+	case "ass":
+		return subtitleUploadPlan{UploadedFormat: "ass", StoredFormat: "vtt", StoredMIMEType: "text/vtt", NeedsWebVTT: true}, nil
+	case "ssa":
+		return subtitleUploadPlan{UploadedFormat: "ssa", StoredFormat: "vtt", StoredMIMEType: "text/vtt", NeedsWebVTT: true}, nil
 	default:
-		return "", "", fmt.Errorf("unsupported subtitle format: %s", ext)
+		return subtitleUploadPlan{}, fmt.Errorf("unsupported subtitle format: %s", ext)
 	}
+}
+
+func subtitleFileFormat(filename string) (string, string, error) {
+	plan, err := subtitleUploadPlanForFilename(filename)
+	if err != nil {
+		return "", "", err
+	}
+	return plan.StoredFormat, plan.StoredMIMEType, nil
 }

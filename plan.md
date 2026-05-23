@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-23 23:45 +0800
+- 进度：完成 ASS/SSA 外挂字幕上传支持：后端上传计划新增 `.ass/.ssa`，上传后先落临时源文件再通过 ffmpeg 转成 WebVTT，最终轨道仍以 `vtt` / `text/vtt` 暴露给手机端和 TV 端；metadata 记录 `original_filename` 与 `original_format`。管理端字幕上传选择器改用 `subtitleUploadAccept`，允许 `.srt,.vtt,.ass,.ssa`。已在 `CONTEXT.md` 沉淀“外挂 ASS/SSA 字幕上传策略”。未纳入未跟踪的 `tasks/2026-05-23-admin-*` 目录。
+- 影响文件：`internal/services/subtitle.go`、`internal/services/transcode_test.go`、`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：红灯 `go test ./pkg/ffmpeg -run TestBuildConvertSubtitleToWebVTTArgs -count=1` 先失败于 `undefined: buildConvertSubtitleToWebVTTArgs`；实现后 `go test ./pkg/ffmpeg -run 'TestBuildConvertSubtitleToWebVTTArgs|TestParseSubtitleProbeOutput' -count=1` 通过，`go test ./internal/services -run 'TestSubtitleUploadPlanForFilename' -count=1` 通过，`cd admin-web && npm test -- videoList.helpers.spec.js` 通过；收口验证 `go test ./pkg/ffmpeg ./internal/services ./internal/handlers ./internal/repository -run 'Subtitle|VideoSubtitle|BuildConvertSubtitle|ParseSubtitle|Transcode' -count=1` 通过，`cd admin-web && npm test` 通过，`cd admin-web && npm run build` 通过（仅既有 chunk size warning），`go test ./... -count=1` 通过，`go vet ./...` 通过；待执行 diff/乱码检查。
+
+## 2026-05-23 23:38 +0800
+- 进度：开始实现 ASS/SSA 外挂字幕上传支持。方案：后端允许 `.ass/.ssa` 上传后统一转换为 WebVTT 存储与播放，保留原始文件名 / 原始格式到 metadata；管理端上传选择器增加 `.ass,.ssa`；客户端继续消费既有 VTT 字幕轨，不改 Android / TV 播放器。当前工作区存在未跟踪 `tasks/2026-05-23-admin-*` 目录，视为无关用户工作，本次不纳入。
+- 影响文件：`internal/services/subtitle.go`、`pkg/ffmpeg/ffmpeg.go`、相关 Go 测试、`admin-web/src/views/VideoList.vue`、相关前端测试、`CONTEXT.md`、`plan.md`
+- 验证：待执行红灯测试、Go 定向测试、admin-web 定向测试、必要构建、乱码扫描。
+
 ## 2026-05-23 22:45 +0800
 - 进度：根据用户“完成当前任务”的确认，将 `tasks/2026-05-23-tv-resume-from-history-prompt/` 标记为已完成。新增 `DONE.md` 记录完成日期、最终关联提交 `f8a8652c` 与验证摘要；本轮仅做任务归档完成标记，不改 TV 运行时代码。
 - 影响文件：`tasks/2026-05-23-tv-resume-from-history-prompt/DONE.md`、`plan.md`

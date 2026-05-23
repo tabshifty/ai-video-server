@@ -10,6 +10,7 @@ import {
   getVideoThumbnailPlaceholder,
   getVideoThumbnailURL,
   shouldShowVideoThumbnail,
+  subtitleUploadAccept,
   teardownPreviewPlayer
 } from './videoList.helpers'
 
@@ -181,5 +182,9 @@ describe('videoList helpers', () => {
   it('returns a placeholder label for the thumbnail cell', () => {
     expect(getVideoThumbnailPlaceholder({ id: 'video-1', status: 'ready' })).toBe('暂无封面')
     expect(getVideoThumbnailPlaceholder({ id: 'video-1', status: 'processing' })).toBe('未就绪')
+  })
+
+  it('allows ASS and SSA subtitle uploads alongside SRT and VTT', () => {
+    expect(subtitleUploadAccept.split(',')).toEqual(['.srt', '.vtt', '.ass', '.ssa'])
   })
 })
