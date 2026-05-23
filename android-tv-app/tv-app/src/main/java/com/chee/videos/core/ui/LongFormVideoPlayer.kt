@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
@@ -808,7 +809,7 @@ fun LongFormVideoPlayer(
                             }
                             onNextEpisode?.let { nextEpisode ->
                                 CompactPlayerControlButton(
-                                    icon = Icons.Filled.FastForward,
+                                    icon = Icons.Filled.SkipNext,
                                     contentDescription = "下一集",
                                     tvMode = true,
                                     onClick = {

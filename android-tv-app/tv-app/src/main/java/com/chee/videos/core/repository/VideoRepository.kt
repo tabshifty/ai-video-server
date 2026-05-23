@@ -325,6 +325,13 @@ class VideoRepository @Inject constructor(
         store.saveTvSeekStepSeconds(seconds)
     }
 
+    suspend fun readTvSeriesAutoplayEnabled(): Boolean? =
+        store.readTvSeriesAutoplayEnabled()
+
+    suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) {
+        store.saveTvSeriesAutoplayEnabled(enabled)
+    }
+
     fun preferredLongFormPlaybackProfile(): PlaybackProfile =
         playbackProfileResolver.preferredLongFormProfile()
 

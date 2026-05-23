@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -169,6 +170,8 @@ fun TvCatalogScreen(
                 onRepair = onRepair,
                 onLogout = onLogout,
                 onSwitchServer = onSwitchServer,
+                seriesAutoplayEnabled = uiState.seriesAutoplayEnabled,
+                onSetSeriesAutoplayEnabled = viewModel::setSeriesAutoplayEnabled,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 22.dp, vertical = 18.dp),
@@ -486,6 +489,8 @@ private fun TvHomeSideMenuButton(
 private fun TvHomeSettingsPanel(
     tvSeekStepSeconds: Int,
     onSelectTvSeekStepSeconds: (Int) -> Unit,
+    seriesAutoplayEnabled: Boolean,
+    onSetSeriesAutoplayEnabled: (Boolean) -> Unit,
     onRepair: () -> Unit,
     onLogout: () -> Unit,
     onSwitchServer: () -> Unit,
@@ -528,6 +533,50 @@ private fun TvHomeSettingsPanel(
             selectedSeconds = tvSeekStepSeconds,
             onSelectSeconds = onSelectTvSeekStepSeconds,
         )
+        TvSeriesAutoplaySettingRow(
+            enabled = seriesAutoplayEnabled,
+            onSetEnabled = onSetSeriesAutoplayEnabled,
+        )
+    }
+}
+
+@Composable
+private fun TvSeriesAutoplaySettingRow(
+    enabled: Boolean,
+    onSetEnabled: (Boolean) -> Unit,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.SurfaceShape,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
+            .clickable { onSetEnabled(!enabled) },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "自动连播下一集",
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "仅电视剧播放页生效",
+                    color = AppChrome.TextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onSetEnabled,
+            )
+        }
     }
 }
 

@@ -26,6 +26,7 @@ class FakeTvRepository(
     private val homeError: Throwable? = null,
     private val detailError: Throwable? = null,
     private var tvSeekStepSeconds: Int = 10,
+    private var tvSeriesAutoplayEnabled: Boolean? = null,
     subtitlePreferences: Map<String, String> = emptyMap(),
     audioPreferences: Map<String, String> = emptyMap(),
 ) : TvRepository {
@@ -113,6 +114,12 @@ class FakeTvRepository(
     override suspend fun saveTvSeekStepSeconds(seconds: Int) {
         tvSeekStepSeconds = seconds
     }
+
+    override suspend fun readTvSeriesAutoplayEnabled(): Boolean? = tvSeriesAutoplayEnabled
+
+    override suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) {
+        tvSeriesAutoplayEnabled = enabled
+    }
 }
 
 data class TvHistoryReport(
@@ -187,6 +194,10 @@ class DelayedSourceTvRepository(
     override suspend fun readTvSeekStepSeconds(): Int = 10
 
     override suspend fun saveTvSeekStepSeconds(seconds: Int) = Unit
+
+    override suspend fun readTvSeriesAutoplayEnabled(): Boolean? = null
+
+    override suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) = Unit
 
     fun completeSourceUrl(videoId: String, url: String = "https://example.com/$videoId.m3u8") {
         pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.complete(url)

@@ -85,13 +85,13 @@ const val TvAutoplayCountdownSeconds: Int = 10
  * 任一为 true 即不显示。
  */
 data class AutoplayPromptGuardInput(
+    val isPlaying: Boolean,
     val autoplayEnabled: Boolean,
     val hasNextEpisode: Boolean,
     val isPlayerError: Boolean,
     val isSelectorVisible: Boolean,
     val isBackConfirmVisible: Boolean,
     val isLoading: Boolean,
-    val hasTriggeredForCurrentEpisode: Boolean,
     val isCanceledForCurrentEpisode: Boolean,
     val remainingMs: Long,
     val durationMs: Long,
@@ -116,7 +116,6 @@ data class TvSeriesPlayerUiState(
     // ... 既有字段 ...
     val autoplayEnabled: Boolean = TvSeriesAutoplaySetting.DEFAULT_ENABLED,
     val autoplayCanceledForCurrentEpisode: Boolean = false,
-    val hasTriggeredAutoplayPromptForCurrentEpisode: Boolean = false,
     val pendingEndOverlayKind: TvEndOverlayKind? = null,  // null / CURRENT_FINISHED / SERIES_FINISHED
 )
 
@@ -138,7 +137,6 @@ class TvSeriesPlayerViewModel ... {
         updateSelectedEpisode(next.seasonNumber, next.episodeNumber)
         _uiState.update {
             it.copy(
-                hasTriggeredAutoplayPromptForCurrentEpisode = false,
                 autoplayCanceledForCurrentEpisode = false,
                 pendingEndOverlayKind = null,
             )
@@ -147,10 +145,6 @@ class TvSeriesPlayerViewModel ... {
 
     fun cancelAutoplayForCurrentEpisode() {
         _uiState.update { it.copy(autoplayCanceledForCurrentEpisode = true) }
-    }
-
-    fun markAutoplayPromptTriggered() {
-        _uiState.update { it.copy(hasTriggeredAutoplayPromptForCurrentEpisode = true) }
     }
 
     fun resolveEndOverlayKind(): TvEndOverlayKind {
@@ -217,35 +211,29 @@ val hasNextEpisode = remember(uiState.series, uiState.selectedSeasonNumber, uiSt
 val shouldShowPromptCard = remember(
     uiState.autoplayEnabled,
     hasNextEpisode,
+    isPlayerActuallyPlaying,
     playerErrorMessage,
     uiState.selectorVisible,
     showBackConfirmPrompt,
     uiState.loading,
-    uiState.hasTriggeredAutoplayPromptForCurrentEpisode,
     uiState.autoplayCanceledForCurrentEpisode,
     screenPositionMs,
     screenDurationMs,
 ) {
     shouldShowAutoplayPromptCard(
         AutoplayPromptGuardInput(
+            isPlaying = isPlayerActuallyPlaying,
             autoplayEnabled = uiState.autoplayEnabled,
             hasNextEpisode = hasNextEpisode,
             isPlayerError = playerErrorMessage != null,
             isSelectorVisible = uiState.selectorVisible,
             isBackConfirmVisible = showBackConfirmPrompt,
             isLoading = uiState.loading,
-            hasTriggeredForCurrentEpisode = uiState.hasTriggeredAutoplayPromptForCurrentEpisode,
             isCanceledForCurrentEpisode = uiState.autoplayCanceledForCurrentEpisode,
             remainingMs = (screenDurationMs - screenPositionMs).coerceAtLeast(0L),
             durationMs = screenDurationMs,
         )
     )
-}
-
-LaunchedEffect(shouldShowPromptCard) {
-    if (shouldShowPromptCard && !uiState.hasTriggeredAutoplayPromptForCurrentEpisode) {
-        viewModel.markAutoplayPromptTriggered()
-    }
 }
 
 val remainingSeconds = autoplayCountdownTickRemaining(
@@ -422,10 +410,10 @@ fun TvSeriesEndOverlay(
 5. **改 `TvRepository.kt`**：interface + impl 添加同名方法。
 
 6. **改 `TvSeriesPlayerViewModel.kt`**：
-   - uiState 加四个字段（`autoplayEnabled` / `autoplayCanceledForCurrentEpisode` / `hasTriggeredAutoplayPromptForCurrentEpisode` / `pendingEndOverlayKind`）
+   - uiState 加三个字段（`autoplayEnabled` / `autoplayCanceledForCurrentEpisode` / `pendingEndOverlayKind`）
    - `load()` 顺带读 autoplay
    - 替换 `nextEpisode()` 实现
-   - 加 `cancelAutoplayForCurrentEpisode` / `markAutoplayPromptTriggered` / `resolveEndOverlayKind` / `showEndOverlay` / `dismissEndOverlay` / `setAutoplayEnabled`
+   - 加 `cancelAutoplayForCurrentEpisode` / `resolveEndOverlayKind` / `showEndOverlay` / `dismissEndOverlay` / `setAutoplayEnabled`
 
 7. **改 `TvSeriesPlayerScreen.kt`**：
    - 加 250ms 轮询计算 `screenPositionMs` / `screenDurationMs`
@@ -468,7 +456,7 @@ fun TvSeriesEndOverlay(
 | # | 风险 | 应对 |
 |---|---|---|
 | R1 | 250ms 轮询和现有 `LongFormVideoPlayer` 内部轮询并存 → 双重 setState 引起额外重组 | 派生 `screenPositionMs` 只在 Screen 层用，不传给 LongFormVideoPlayer；`TvAutoplayPromptCard` 不再自带独立计时器，重组开销可接受 |
-| R2 | `STATE_ENDED` 与"倒计时归零自动切"重复触发 → 切两次 | `advanceToNextEpisodeFromAutoplay()` 切集后立即 `_uiState.update { copy(hasTriggeredAutoplayPromptForCurrentEpisode = false, ...) }`；新集尚未到 T-10 时 STATE_ENDED 不会触发；重入保护额外加 `lastSwitchedFromVideoId` 防御性 guard |
+| R2 | `STATE_ENDED` 与"倒计时归零自动切"重复触发 → 切两次 | `advanceToNextEpisodeFromAutoplay()` 切集后复位取消状态并清空覆盖层；新集尚未到 T-10 时 STATE_ENDED 不会触发；重入保护额外加 `lastSwitchedFromVideoId` 防御性 guard |
 | R3 | 倒计时归零调用自动切后，旧 STATE_ENDED 还会 fire 一次 | 在 `handlePlaybackEnded()` 内加判断：如果 `current.currentVideoId` 和切换前的 ID 不一致即视为已经切走，return 不处理 |
 | R4 | 用户在控制条「下一集」按钮上按 OK 时，会和右下角抢焦点的提示卡冲突 | 提示卡仅在**第一次出现**抢焦点；用户手动操作过控制条后焦点已转移，不再抢回 |
 | R5 | 提示卡的倒计时和 player 的实际播放进度脱钩（player 卡顿 / buffering 让 remainingMs 不再线性下降） | 倒计时直接由 player 的 `position` / `duration` 推导；只显示整秒，不引入 wall-clock 第二时钟；暂停时位置不变自然冻结 |

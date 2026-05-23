@@ -90,7 +90,7 @@ class TvCatalogViewModelTest {
 
     @Test
     fun settingsStateLoadsAndSavesTvSeekStepSeconds() = runTest {
-        val repository = FakeTvRepository(tvSeekStepSeconds = 15)
+        val repository = FakeTvRepository(tvSeekStepSeconds = 15, tvSeriesAutoplayEnabled = false)
         val viewModel = TvCatalogViewModel(repository = repository)
 
         viewModel.awaitIdle()
@@ -98,12 +98,16 @@ class TvCatalogViewModelTest {
         viewModel.awaitIdle()
 
         assertEquals(15, viewModel.uiState.value.tvSeekStepSeconds)
+        assertFalse(viewModel.uiState.value.seriesAutoplayEnabled)
 
         viewModel.selectTvSeekStepSeconds(30)
+        viewModel.setSeriesAutoplayEnabled(true)
         viewModel.awaitIdle()
 
         assertEquals(30, viewModel.uiState.value.tvSeekStepSeconds)
+        assertTrue(viewModel.uiState.value.seriesAutoplayEnabled)
         assertEquals(30, repository.readTvSeekStepSeconds())
+        assertEquals(true, repository.readTvSeriesAutoplayEnabled())
     }
 
     @Test

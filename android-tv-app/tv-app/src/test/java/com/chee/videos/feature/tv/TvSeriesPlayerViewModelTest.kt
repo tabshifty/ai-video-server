@@ -326,6 +326,44 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun nextEpisode_skipsUnplayableEpisodesAndCrossesSeasonBoundary() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(id = "e1", number = 1, title = "第1集", videoId = "video-1", videoStatus = "ready"),
+                                tvEpisode(id = "e2", number = 2, title = "第2集"),
+                            ),
+                        ),
+                        TvSeasonDto(
+                            id = "s2",
+                            seasonNumber = 2,
+                            title = "第二季",
+                            episodes = listOf(
+                                tvEpisode(id = "e3", number = 1, title = "第1集", videoId = "video-3", videoStatus = "ready"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        viewModel.nextEpisode()
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.selectedSeasonNumber)
+        assertEquals(1, state.selectedEpisodeNumber)
+        assertEquals("video-3", state.currentVideoId)
+    }
+
+    @Test
     fun unboundEpisode_cannotPlay() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(

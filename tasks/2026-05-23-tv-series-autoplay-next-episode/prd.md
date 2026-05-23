@@ -173,7 +173,7 @@
   - case 5: 跳过中间 `playable=false` 集
   - case 6: 当前集所在季在 `series.seasons` 列表中不是按 `number` 升序排列 → 链路按 `number` 升序找下一季（防御性）
 - `TvSeriesAutoplaySetting.parse(raw: Boolean?): Boolean` —— `null` → `true`；`true` → `true`；`false` → `false`
-- `shouldShowAutoplayPromptCard(state: TvSeriesPlayerUiState, isPlaying, hasNextEpisode, hasTriggeredOnce, otherSheetsVisible): Boolean` —— 状态守卫合并判定
+- `shouldShowAutoplayPromptCard(state: TvSeriesPlayerUiState, isPlaying, hasNextEpisode, otherSheetsVisible): Boolean` —— 状态守卫合并判定；不依赖额外“已触发”布尔状态，提示卡在同一 T-10 窗口内只要重新回到可见条件就应再次出现
 - `autoplayCountdownTickRemaining(startSeconds, isPaused, elapsedMillis): Int` —— 倒计时数字递减纯函数
 
 ### 8.2 源文审计（必须）

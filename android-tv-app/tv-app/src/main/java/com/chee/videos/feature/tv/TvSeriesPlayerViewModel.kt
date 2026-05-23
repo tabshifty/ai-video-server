@@ -23,6 +23,10 @@ data class TvSeriesPlayerUiState(
     val selectedAudioTrackId: String? = null,
     val playbackSpeed: Float = 1f,
     val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
+    val autoplayEnabled: Boolean = TvSeriesAutoplaySetting.DEFAULT_ENABLED,
+    val autoplayCanceledForCurrentEpisode: Boolean = false,
+    val pendingEndOverlayKind: TvEndOverlayKind? = null,
+    val startCurrentEpisodeFromBeginning: Boolean = false,
     val selectorVisible: Boolean = false,
     val currentVideoId: String = "",
     val currentSourceUrl: String = "",
@@ -79,10 +83,48 @@ class TvSeriesPlayerViewModel @Inject constructor(
 
     fun nextEpisode() {
         val state = _uiState.value
-        val season = selectedSeason(state) ?: return
-        val currentIndex = season.episodes.indexOfFirst { it.number == state.selectedEpisodeNumber }
-        val next = season.episodes.getOrNull(currentIndex + 1) ?: return
-        updateSelectedEpisode(season.number, next.number)
+        val series = state.series ?: return
+        val next = resolveNextPlayableEpisode(
+            series = series,
+            currentSeasonNumber = state.selectedSeasonNumber,
+            currentEpisodeNumber = state.selectedEpisodeNumber,
+        ) ?: return
+        updateSelectedEpisode(next.seasonNumber, next.episodeNumber, startFromBeginning = true)
+    }
+
+    fun advanceToNextEpisodeFromAutoplay() {
+        nextEpisode()
+    }
+
+    fun cancelAutoplayForCurrentEpisode() {
+        _uiState.update { state ->
+            state.copy(autoplayCanceledForCurrentEpisode = true)
+        }
+    }
+
+    fun showEndOverlay(kind: TvEndOverlayKind) {
+        _uiState.update { state -> state.copy(pendingEndOverlayKind = kind) }
+    }
+
+    fun dismissEndOverlay() {
+        _uiState.update { state -> state.copy(pendingEndOverlayKind = null) }
+    }
+
+    fun resolveEndOverlayKind(): TvEndOverlayKind =
+        if (_uiState.value.hasNextPlayableEpisode()) {
+            TvEndOverlayKind.CURRENT_FINISHED
+        } else {
+            TvEndOverlayKind.SERIES_FINISHED
+        }
+
+    fun nextEpisodeRef(): TvNextEpisodeRef? {
+        val state = _uiState.value
+        val series = state.series ?: return null
+        return resolveNextPlayableEpisode(
+            series = series,
+            currentSeasonNumber = state.selectedSeasonNumber,
+            currentEpisodeNumber = state.selectedEpisodeNumber,
+        )
     }
 
     fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
@@ -121,6 +163,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
             _uiState.update { it.copy(loading = true, errorMessage = null) }
             val baseUrl = repository.readActiveBaseUrl().orEmpty()
             val tvSeekStepSeconds = TvPlaybackSeekStepSetting.normalize(repository.readTvSeekStepSeconds())
+            val autoplayEnabled = TvSeriesAutoplaySetting.parse(repository.readTvSeriesAutoplayEnabled())
             repository.fetchSeriesDetail(seriesId)
                 .onSuccess { dto ->
                     val series = tvSeriesDetailToUiModel(dto)
@@ -145,6 +188,10 @@ class TvSeriesPlayerViewModel @Inject constructor(
                         selectedEpisodeNumber = resolvedEpisode?.number ?: 1,
                         playbackSpeed = 1f,
                         tvSeekStepSeconds = tvSeekStepSeconds,
+                        autoplayEnabled = autoplayEnabled,
+                        autoplayCanceledForCurrentEpisode = false,
+                        pendingEndOverlayKind = null,
+                        startCurrentEpisodeFromBeginning = false,
                         selectorVisible = false,
                         errorMessage = null,
                     )
@@ -155,13 +202,19 @@ class TvSeriesPlayerViewModel @Inject constructor(
                         loading = false,
                         baseUrl = baseUrl,
                         tvSeekStepSeconds = tvSeekStepSeconds,
+                        autoplayEnabled = autoplayEnabled,
+                        startCurrentEpisodeFromBeginning = false,
                         errorMessage = error.message ?: "电视剧播放页加载失败",
                     )
                 }
         }
     }
 
-    private fun updateSelectedEpisode(seasonNumber: Int, episodeNumber: Int) {
+    private fun updateSelectedEpisode(
+        seasonNumber: Int,
+        episodeNumber: Int,
+        startFromBeginning: Boolean = false,
+    ) {
         val currentState = _uiState.value
         if (currentState.selectedSeasonNumber == seasonNumber && currentState.selectedEpisodeNumber == episodeNumber) {
             return
@@ -170,6 +223,9 @@ class TvSeriesPlayerViewModel @Inject constructor(
             it.copy(
                 selectedSeasonNumber = seasonNumber,
                 selectedEpisodeNumber = episodeNumber,
+                autoplayCanceledForCurrentEpisode = false,
+                pendingEndOverlayKind = null,
+                startCurrentEpisodeFromBeginning = startFromBeginning,
             )
         }
         updatePlaybackTarget()
@@ -231,4 +287,13 @@ internal fun selectedSeason(state: TvSeriesPlayerUiState): TvSeasonUiModel? {
 internal fun selectedEpisode(state: TvSeriesPlayerUiState): TvEpisodeUiModel? {
     val season = selectedSeason(state) ?: return null
     return season.episodes.firstOrNull { it.number == state.selectedEpisodeNumber }
+}
+
+internal fun TvSeriesPlayerUiState.hasNextPlayableEpisode(): Boolean {
+    val currentSeries = series ?: return false
+    return resolveNextPlayableEpisode(
+        series = currentSeries,
+        currentSeasonNumber = selectedSeasonNumber,
+        currentEpisodeNumber = selectedEpisodeNumber,
+    ) != null
 }

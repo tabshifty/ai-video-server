@@ -30,6 +30,8 @@ interface TvRepository {
     suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?)
     suspend fun readTvSeekStepSeconds(): Int
     suspend fun saveTvSeekStepSeconds(seconds: Int)
+    suspend fun readTvSeriesAutoplayEnabled(): Boolean?
+    suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean)
 }
 
 @Singleton
@@ -86,5 +88,12 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun saveTvSeekStepSeconds(seconds: Int) {
         videoRepository.saveTvSeekStepSeconds(seconds)
+    }
+
+    override suspend fun readTvSeriesAutoplayEnabled(): Boolean? =
+        videoRepository.readTvSeriesAutoplayEnabled()
+
+    override suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) {
+        videoRepository.saveTvSeriesAutoplayEnabled(enabled)
     }
 }

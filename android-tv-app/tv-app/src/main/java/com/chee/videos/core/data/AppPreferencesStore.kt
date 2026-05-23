@@ -2,6 +2,7 @@ package com.chee.videos.core.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.chee.videos.core.model.ServerEndpoint
@@ -34,6 +35,7 @@ class AppPreferencesStore @Inject constructor(
         val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_preferences")
         val tvAudioPreferences = stringPreferencesKey("tv_audio_preferences")
         val tvSeekStepSeconds = stringPreferencesKey("tv_seek_step_seconds")
+        val tvSeriesAutoplayEnabled = booleanPreferencesKey("tv_series_autoplay_enabled")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -66,6 +68,10 @@ class AppPreferencesStore @Inject constructor(
 
     val tvSeekStepSecondsFlow: Flow<Int> = dataStore.data.map { prefs ->
         normalizeTvSeekStepSeconds(prefs[Keys.tvSeekStepSeconds]?.toIntOrNull())
+    }
+
+    val tvSeriesAutoplayEnabledFlow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.tvSeriesAutoplayEnabled] ?: true
     }
 
     val endpointsFlow: Flow<List<ServerEndpoint>> = dataStore.data.map { prefs ->
@@ -129,6 +135,15 @@ class AppPreferencesStore @Inject constructor(
     suspend fun saveTvSeekStepSeconds(seconds: Int) {
         dataStore.edit { prefs ->
             prefs[Keys.tvSeekStepSeconds] = normalizeTvSeekStepSeconds(seconds).toString()
+        }
+    }
+
+    suspend fun readTvSeriesAutoplayEnabled(): Boolean? =
+        dataStore.data.first()[Keys.tvSeriesAutoplayEnabled]
+
+    suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.tvSeriesAutoplayEnabled] = enabled
         }
     }
 

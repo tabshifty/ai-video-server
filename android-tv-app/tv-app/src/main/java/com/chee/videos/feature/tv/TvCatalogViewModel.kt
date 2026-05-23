@@ -30,6 +30,7 @@ data class TvCatalogUiState(
     val av: List<TvHomeShelfItemUiModel> = emptyList(),
     val searchResults: List<TvSearchResultUiModel> = emptyList(),
     val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
+    val seriesAutoplayEnabled: Boolean = TvSeriesAutoplaySetting.DEFAULT_ENABLED,
     val errorMessage: String? = null,
 )
 
@@ -73,6 +74,13 @@ class TvCatalogViewModel @Inject constructor(
         _uiState.update { it.copy(tvSeekStepSeconds = normalized) }
         viewModelScope.launch {
             repository.saveTvSeekStepSeconds(normalized)
+        }
+    }
+
+    fun setSeriesAutoplayEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(seriesAutoplayEnabled = enabled) }
+        viewModelScope.launch {
+            repository.saveTvSeriesAutoplayEnabled(enabled)
         }
     }
 
@@ -189,7 +197,13 @@ class TvCatalogViewModel @Inject constructor(
     private fun loadTvPlaybackSettings() {
         viewModelScope.launch {
             val stepSeconds = TvPlaybackSeekStepSetting.normalize(repository.readTvSeekStepSeconds())
-            _uiState.update { it.copy(tvSeekStepSeconds = stepSeconds) }
+            val autoplayEnabled = TvSeriesAutoplaySetting.parse(repository.readTvSeriesAutoplayEnabled())
+            _uiState.update {
+                it.copy(
+                    tvSeekStepSeconds = stepSeconds,
+                    seriesAutoplayEnabled = autoplayEnabled,
+                )
+            }
         }
     }
 }

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.Player
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -152,6 +153,7 @@ fun TvSeriesPlayerScreen(
         }
     }
     val exoPlayer = remember(accessToken) { ExoPlayer.Builder(context).build() }
+    val latestUiState by rememberUpdatedState(uiState)
     val latestCurrentVideoId by rememberUpdatedState(uiState.currentVideoId)
     var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
@@ -161,8 +163,32 @@ fun TvSeriesPlayerScreen(
     var selectedAudioTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var playerErrorMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    var screenPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
+    var screenDurationMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
     var resumedFromHistoryVideoId by remember { mutableStateOf("") }
+    var lastAutoplaySwitchedVideoId by remember { mutableStateOf("") }
+
+    val nextEpisodeRef = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
+        uiState.nextEpisodeRef()
+    }
+    val hasNextEpisode = nextEpisodeRef != null
+    val remainingMs = (screenDurationMs - screenPositionMs).coerceAtLeast(0L)
+    val remainingSeconds = autoplayCountdownTickRemaining(remainingMs)
+    val shouldShowPromptCard = shouldShowAutoplayPromptCard(
+        AutoplayPromptGuardInput(
+            isPlaying = isPlayerActuallyPlaying,
+            autoplayEnabled = uiState.autoplayEnabled,
+            hasNextEpisode = hasNextEpisode,
+            isPlayerError = playerErrorMessage != null,
+            isSelectorVisible = uiState.selectorVisible,
+            isBackConfirmVisible = showBackConfirmPrompt,
+            isLoading = uiState.loading,
+            isCanceledForCurrentEpisode = uiState.autoplayCanceledForCurrentEpisode,
+            remainingMs = remainingMs,
+            durationMs = screenDurationMs,
+        ),
+    ) && uiState.pendingEndOverlayKind == null
 
     val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
         LongFormPlaybackSession(
@@ -174,6 +200,33 @@ fun TvSeriesPlayerScreen(
     fun updatePlaybackSession(nextSession: LongFormPlaybackSession) {
         hasStartedPlayback = nextSession.hasStartedPlayback
         isPausedByUser = nextSession.isPausedByUser
+    }
+
+    fun advanceFromAutoplay() {
+        val state = latestUiState
+        val videoId = state.currentVideoId
+        if (videoId.isBlank() || lastAutoplaySwitchedVideoId == videoId || !state.hasNextPlayableEpisode()) {
+            return
+        }
+        lastAutoplaySwitchedVideoId = videoId
+        reportTvSeriesHistory(viewModel, videoId, exoPlayer, completedOverride = true)
+        viewModel.advanceToNextEpisodeFromAutoplay()
+    }
+
+    fun handlePlaybackEnded() {
+        val state = latestUiState
+        val hasNext = state.hasNextPlayableEpisode()
+        when {
+            state.autoplayEnabled && !state.autoplayCanceledForCurrentEpisode && hasNext -> advanceFromAutoplay()
+            hasNext -> {
+                reportTvSeriesHistory(viewModel, state.currentVideoId, exoPlayer, completedOverride = true)
+                viewModel.showEndOverlay(TvEndOverlayKind.CURRENT_FINISHED)
+            }
+            else -> {
+                reportTvSeriesHistory(viewModel, state.currentVideoId, exoPlayer, completedOverride = true)
+                viewModel.showEndOverlay(TvEndOverlayKind.SERIES_FINISHED)
+            }
+        }
     }
 
     DisposableEffect(activity) {
@@ -217,7 +270,11 @@ fun TvSeriesPlayerScreen(
         }
         if (updateDecision.shouldReplaceSource) {
             playerErrorMessage = null
-            val initialResumePositionMs = if (!updateDecision.preservePosition && resumedFromHistoryVideoId != uiState.currentVideoId) {
+            val initialResumePositionMs = if (
+                !updateDecision.preservePosition &&
+                !uiState.startCurrentEpisodeFromBeginning &&
+                resumedFromHistoryVideoId != uiState.currentVideoId
+            ) {
                 currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
             } else {
                 0L
@@ -297,10 +354,53 @@ fun TvSeriesPlayerScreen(
         }
     }
 
+    LaunchedEffect(uiState.currentVideoId, canPlay) {
+        while (canPlay) {
+            screenPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+            screenDurationMs = exoPlayer.duration.coerceAtLeast(0L)
+            delay(250L)
+        }
+    }
+
+    LaunchedEffect(
+        uiState.currentVideoId,
+        uiState.autoplayEnabled,
+        uiState.autoplayCanceledForCurrentEpisode,
+        hasNextEpisode,
+        isPlayerActuallyPlaying,
+        screenDurationMs,
+        remainingMs,
+        playerErrorMessage,
+        showBackConfirmPrompt,
+        uiState.selectorVisible,
+        uiState.pendingEndOverlayKind,
+    ) {
+        if (
+            uiState.autoplayEnabled &&
+            !uiState.autoplayCanceledForCurrentEpisode &&
+            hasNextEpisode &&
+            isPlayerActuallyPlaying &&
+            playerErrorMessage == null &&
+            !showBackConfirmPrompt &&
+            !uiState.selectorVisible &&
+            uiState.pendingEndOverlayKind == null &&
+            screenDurationMs > 0L &&
+            remainingMs <= 0L
+        ) {
+            advanceFromAutoplay()
+        }
+    }
+
     DisposableEffect(exoPlayer) {
-        val listener = object : androidx.media3.common.Player.Listener {
+        val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 isPlayerActuallyPlaying = isPlaying
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    handlePlaybackEnded()
+                }
             }
 
             override fun onRenderedFirstFrame() {
@@ -378,9 +478,27 @@ fun TvSeriesPlayerScreen(
                     tvMode = true,
                     tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                     onOpenEpisodeSelector = { viewModel.setSelectorVisible(true) },
-                    onNextEpisode = viewModel::nextEpisode,
+                    onNextEpisode = if (hasNextEpisode) viewModel::nextEpisode else null,
                     onRequestExitPlayback = ::handlePlaybackBack,
                     onExitPlayback = onBack,
+                )
+                nextEpisodeRef?.let { next ->
+                    TvAutoplayPromptCard(
+                        nextEpisodeRef = next,
+                        visible = shouldShowPromptCard,
+                        remainingSeconds = remainingSeconds,
+                        onPlayNow = ::advanceFromAutoplay,
+                        onCancel = viewModel::cancelAutoplayForCurrentEpisode,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 48.dp, bottom = 156.dp),
+                    )
+                }
+                TvSeriesEndOverlay(
+                    kind = uiState.pendingEndOverlayKind,
+                    onPlayNext = viewModel::nextEpisode,
+                    onBackToDetail = onBack,
+                    modifier = Modifier.fillMaxSize(),
                 )
                 TvPlayerErrorBanner(
                     message = playerErrorMessage,
@@ -534,12 +652,22 @@ private fun reportTvSeriesHistory(
     viewModel: TvSeriesPlayerViewModel,
     videoId: String,
     player: ExoPlayer,
+    completedOverride: Boolean? = null,
 ) {
     val snapshot = tvPlaybackHistorySnapshot(
         positionMs = player.currentPosition,
         durationMs = player.duration,
     )
-    viewModel.reportHistory(videoId, snapshot.watchSeconds, snapshot.completed)
+    viewModel.reportHistory(videoId, snapshot.watchSeconds, completedOverride ?: snapshot.completed)
+}
+
+private fun TvSeriesPlayerUiState.nextEpisodeRef(): TvNextEpisodeRef? {
+    val currentSeries = series ?: return null
+    return resolveNextPlayableEpisode(
+        series = currentSeries,
+        currentSeasonNumber = selectedSeasonNumber,
+        currentEpisodeNumber = selectedEpisodeNumber,
+    )
 }
 
 private fun resolveTvSubtitleSelectionOnTrackLoad(
