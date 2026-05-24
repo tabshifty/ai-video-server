@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-24 14:30 +0800
+- 进度：完成 `tasks/2026-05-23-admin-medium-views` Phase 3 的视觉归档收尾，4 个中等视图已补齐新的 after 截图，其中 `ImageCollectionManage` 额外补了 drawer 打开形态。当前截图目录共 9 张，均为 1440x1080。
+- 影响文件：`admin-web/src/views/ImageCollectionManage.vue`、`admin-web/src/views/ScrapePreview.vue`、`admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/TvSeriesManage.vue`、`admin-web/src/router/index.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`tasks/2026-05-23-admin-medium-views/screenshots/*`、`plan.md`
+- 验证：`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src tasks/2026-05-23-admin-medium-views` 未发现乱码。
+
+## 2026-05-24 12:20 +0800
+- 进度：开始执行 `tasks/2026-05-23-admin-medium-views` Phase 3（中等视图重排）。当前先按 PRD / Implement 对齐 4 个页面的壳子重排、ImageCollectionManage 的上传 drawer 试点、4 条路由的 `hideShellPageHeader`、`themeTokens.spec.js` 的 10 文件 audit、`CONTEXT.md` 的 2 条术语补充，以及 9 张截图归档。
+- 影响文件：`admin-web/src/views/ImageCollectionManage.vue`、`admin-web/src/views/ScrapePreview.vue`、`admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/TvSeriesManage.vue`、`admin-web/src/router/index.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`tasks/2026-05-23-admin-medium-views/screenshots/*`、`plan.md`
+- 验证：待执行定向重排、`cd admin-web && npm test`、`cd admin-web && npm run build`、截图归档、乱码扫描与 diff 检查。
+
 ## 2026-05-24 11:55 +0800
 - 进度：根据 `tasks/2026-05-23-admin-simple-views/feedback.md` 补修 Phase 2 反馈项：TaskMonitor 状态筛选与后端契约对齐、UserManage 改为后台原子建用户接口、Dashboard ECharts 实例重挂载修复，并收口 shell 顶栏与视图页头的双标题问题。
 - 影响文件：`internal/handlers/admin.go`、`internal/repository/admin_repository.go`、`internal/handlers/router.go`、`admin-web/src/api/admin.js`、`admin-web/src/views/UserManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/Dashboard.vue`、`admin-web/src/components/Layout.vue`、`admin-web/src/router/index.js`、`plan.md`

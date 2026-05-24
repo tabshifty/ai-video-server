@@ -1,8 +1,14 @@
+
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
+import EmptyState from '../components/base/EmptyState.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import {
   avScrapeConfirm,
   avScrapePreview,
@@ -239,74 +245,17 @@ async function doSave() {
 
 <template>
   <Layout>
-    <div class="page page-shell">
-      <section class="section-head">
-        <div>
-          <h1 class="page-title">AV 手动刮削</h1>
-          <p class="page-subtitle">每次都按当前标题与站点策略在线重抓，保存后直接覆盖标题、简介、海报与 metadata，不触发重新转码。</p>
-        </div>
-      </section>
+    <div class="page-shell page-shell--medium">
+      <PageHeader title="AV 手动刮削" />
 
-      <section>
-        <el-card class="soft-card content-card" v-loading="configLoading">
-          <template #header>
-            <div class="panel-head">
-              <div class="panel-title">AV 刮削配置</div>
-              <p>自动刮削与手动刮削共用这份站点策略和海报裁剪设置。</p>
-            </div>
-          </template>
-          <el-form label-width="140px">
-            <el-form-item label="启用站点">
-              <el-select v-model="configForm.enabled_sites" multiple filterable clearable placeholder="选择可参与 AV 刮削的站点" style="width: 100%">
-                <el-option v-for="site in AV_SITE_OPTIONS" :key="site" :label="site" :value="site" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="FC2 默认顺序">
-              <el-input v-model="configForm.fc2_order" placeholder="如：fc2, fc2club, fc2hub" />
-            </el-form-item>
-            <el-form-item label="欧美默认顺序">
-              <el-input v-model="configForm.western_order" placeholder="如：theporndb, javdb" />
-            </el-form-item>
-            <el-form-item label="日系默认顺序">
-              <el-input v-model="configForm.japanese_order" placeholder="如：javdb, javbus, javlibrary" />
-            </el-form-item>
-            <el-form-item label="海报裁剪">
-              <el-switch v-model="configForm.poster_crop_enabled" active-text="启用裁剪" inactive-text="仅保留原图" />
-            </el-form-item>
-            <el-form-item label="裁剪模式">
-              <el-select
-                v-model="configForm.poster_crop_mode"
-                :disabled="!configForm.poster_crop_enabled"
-                placeholder="选择海报裁剪锚点"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="mode in AV_POSTER_CROP_MODE_OPTIONS"
-                  :key="mode"
-                  :label="mode"
-                  :value="mode"
-                />
-              </el-select>
-            </el-form-item>
-          </el-form>
-          <el-button type="primary" :loading="configSaving" @click="saveConfig">保存 AV 配置</el-button>
-        </el-card>
-      </section>
-
-      <section>
-        <el-card class="soft-card content-card">
-          <template #header>
-            <div class="panel-head">
-              <div class="panel-title">手动预览</div>
-              <p>默认不走缓存，会先按标题自动推荐站点，也可以手动切换站点后重新预览。</p>
-            </div>
-          </template>
-          <el-form inline class="filter-form av-filter-form">
+      <Toolbar>
+        <template #filters>
+          <el-form inline class="av-filter-form">
             <el-form-item label="视频 ID">
-              <el-input v-model="form.video_id" style="width: 320px" :disabled="previewLoading || saveLoading" />
+              <el-input v-model="form.video_id" style="width: 300px" :disabled="previewLoading || saveLoading" />
             </el-form-item>
             <el-form-item label="标题">
-              <el-input v-model="form.title" style="width: 320px" :disabled="previewLoading || saveLoading" />
+              <el-input v-model="form.title" style="width: 260px" :disabled="previewLoading || saveLoading" />
             </el-form-item>
             <el-form-item label="站点分类">
               <el-select v-model="form.site_category" clearable placeholder="按标题自动判断" style="width: 180px">
@@ -325,88 +274,131 @@ async function doSave() {
             <el-form-item label="绕过缓存">
               <el-switch v-model="form.bypass_cache" active-text="始终重抓" inactive-text="允许缓存" />
             </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="previewLoading" @click="doPreview">查询预览</el-button>
-            </el-form-item>
           </el-form>
+        </template>
+        <template #actions>
+          <el-button type="primary" :icon="Search" :loading="previewLoading" @click="doPreview">查询预览</el-button>
+        </template>
+      </Toolbar>
 
-          <div class="source-summary">
-            <el-tag size="small" type="danger">自动推荐：{{ toText(recommendedSource) }}</el-tag>
-            <el-tag size="small">实际使用：{{ toText(usedSource) }}</el-tag>
-            <el-tag size="small" type="info">当前分类：{{ toText(form.site_category || '自动') }}</el-tag>
+      <SectionCard>
+        <template #title>AV 刮削配置</template>
+        <template #description>自动刮削与手动刮削共用这份站点策略和海报裁剪设置。</template>
+        <el-form v-loading="configLoading" label-width="140px">
+          <el-form-item label="启用站点">
+            <el-select v-model="configForm.enabled_sites" multiple filterable clearable placeholder="选择可参与 AV 刮削的站点" style="width: 100%">
+              <el-option v-for="site in AV_SITE_OPTIONS" :key="site" :label="site" :value="site" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="FC2 默认顺序">
+            <el-input v-model="configForm.fc2_order" placeholder="如：fc2, fc2club, fc2hub" />
+          </el-form-item>
+          <el-form-item label="欧美默认顺序">
+            <el-input v-model="configForm.western_order" placeholder="如：theporndb, javdb" />
+          </el-form-item>
+          <el-form-item label="日系默认顺序">
+            <el-input v-model="configForm.japanese_order" placeholder="如：javdb, javbus, javlibrary" />
+          </el-form-item>
+          <el-form-item label="海报裁剪">
+            <el-switch v-model="configForm.poster_crop_enabled" active-text="启用裁剪" inactive-text="仅保留原图" />
+          </el-form-item>
+          <el-form-item label="裁剪模式">
+            <el-select
+              v-model="configForm.poster_crop_mode"
+              :disabled="!configForm.poster_crop_enabled"
+              placeholder="选择海报裁剪锚点"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="mode in AV_POSTER_CROP_MODE_OPTIONS"
+                :key="mode"
+                :label="mode"
+                :value="mode"
+              />
+            </el-select>
+          </el-form-item>
+        </el-form>
+        <Toolbar dense>
+          <template #actions>
+            <el-button type="primary" :loading="configSaving" @click="saveConfig">保存 AV 配置</el-button>
+          </template>
+        </Toolbar>
+      </SectionCard>
+
+      <div class="result-grid">
+        <SectionCard>
+          <template #title>候选列表</template>
+          <template #description>默认不走缓存，会先按标题自动推荐站点，也可以手动切换站点后重新预览。</template>
+          <div v-loading="previewLoading" class="candidate-list-shell">
+            <EmptyState
+              v-if="!candidates.length"
+              title="暂无候选数据"
+              description="先查询预览，再从候选中选择一个结果。"
+            />
+            <div v-else class="candidate-list">
+              <div
+                v-for="(item, index) in candidates"
+                :key="item.external_id || String(index)"
+                class="candidate-item"
+                :class="{ active: index === selectedIndex }"
+                @click="chooseCandidate(item, index)"
+              >
+                <div class="candidate-title">{{ toText(item.title) }}</div>
+                <div class="candidate-subtitle">{{ toText(item.av_code) }}</div>
+                <div class="candidate-meta">
+                  <span>站点：{{ toText(item.scrape_source) }}</span>
+                  <span>日期：{{ toText(item.release_date) }}</span>
+                  <el-tag
+                    v-if="candidateMatchSource(item)"
+                    size="small"
+                    :type="candidateMatchSource(item) === 'oshash' ? 'success' : 'info'"
+                  >
+                    {{ matchSourceLabel(candidateMatchSource(item)) }}
+                  </el-tag>
+                </div>
+                <div class="candidate-overview">{{ toText(item.overview) }}</div>
+              </div>
+            </div>
           </div>
-        </el-card>
-      </section>
+        </SectionCard>
 
-      <section>
-        <el-row :gutter="12" class="result-row">
-          <el-col :xs="24" :lg="10">
-            <el-card class="soft-card content-card" v-loading="previewLoading">
-              <template #header>候选列表</template>
-              <el-empty v-if="!candidates.length" description="暂无候选数据" />
-              <div v-else class="candidate-list">
-                <div
-                  v-for="(item, index) in candidates"
-                  :key="item.external_id || `${index}`"
-                  class="candidate-item"
-                  :class="{ active: index === selectedIndex }"
-                  @click="chooseCandidate(item, index)"
-                >
-                  <div class="candidate-title">{{ toText(item.title) }}</div>
-                  <div class="candidate-subtitle">{{ toText(item.av_code) }}</div>
-                  <div class="candidate-meta">
-                    <span>站点：{{ toText(item.scrape_source) }}</span>
-                    <span>日期：{{ toText(item.release_date) }}</span>
-                    <el-tag
-                      v-if="candidateMatchSource(item)"
-                      size="small"
-                      :type="candidateMatchSource(item) === 'oshash' ? 'success' : 'info'"
-                    >
-                      {{ matchSourceLabel(candidateMatchSource(item)) }}
-                    </el-tag>
-                  </div>
-                  <div class="candidate-overview">{{ toText(item.overview) }}</div>
+        <SectionCard>
+          <template #title>候选详情</template>
+          <template #description>检查海报、番号与原始 metadata 再决定是否写入视频。</template>
+          <EmptyState
+            v-if="!selectedCandidate"
+            title="请先选择候选数据"
+            description="从左侧候选列表选择一个结果后，这里会显示完整详情。"
+          />
+          <div v-else class="detail-wrap">
+            <div class="detail-head">
+              <img
+                v-if="resolvePoster(selectedCandidate.poster_url)"
+                :src="resolvePoster(selectedCandidate.poster_url)"
+                :alt="'海报：' + toText(selectedCandidate.title, '未命名')"
+                class="poster"
+              />
+              <div class="detail-head-info">
+                <h3>{{ toText(selectedCandidate.title) }}</h3>
+                <p class="origin-name">站点：{{ toText(selectedCandidate.scrape_source) }}</p>
+                <div class="tag-line">
+                  <el-tag size="small">{{ toText(selectedCandidate.external_id) }}</el-tag>
+                  <el-tag size="small" type="warning">番号：{{ toText(selectedCandidate.av_code) }}</el-tag>
                 </div>
               </div>
-            </el-card>
-          </el-col>
+            </div>
+            <p class="detail-overview">{{ toText(selectedCandidate.overview) }}</p>
+            <el-collapse>
+              <el-collapse-item title="查看原始 metadata JSON" name="metadata-json">
+                <pre class="json-box">{{ prettyMetadata }}</pre>
+              </el-collapse-item>
+            </el-collapse>
+          </div>
+        </SectionCard>
 
-          <el-col :xs="24" :lg="14">
-            <el-card class="soft-card content-card">
-              <template #header>候选详情</template>
-              <el-empty v-if="!selectedCandidate" description="请先查询并选择候选数据" />
-              <div v-else class="detail-wrap">
-                <div class="detail-head">
-                  <img
-                    v-if="resolvePoster(selectedCandidate.poster_url)"
-                    :src="resolvePoster(selectedCandidate.poster_url)"
-                    :alt="`海报：${toText(selectedCandidate.title, '未命名')}`"
-                    class="poster"
-                  />
-                  <div class="detail-head-info">
-                    <h3>{{ toText(selectedCandidate.title) }}</h3>
-                    <p class="origin-name">站点：{{ toText(selectedCandidate.scrape_source) }}</p>
-                    <div class="tag-line">
-                      <el-tag size="small">{{ toText(selectedCandidate.external_id) }}</el-tag>
-                      <el-tag size="small" type="warning">番号：{{ toText(selectedCandidate.av_code) }}</el-tag>
-                    </div>
-                  </div>
-                </div>
-                <p class="detail-overview">{{ toText(selectedCandidate.overview) }}</p>
-                <el-collapse>
-                  <el-collapse-item title="查看原始 metadata JSON" name="metadata-json">
-                    <pre class="json-box">{{ prettyMetadata }}</pre>
-                  </el-collapse-item>
-                </el-collapse>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </section>
-
-      <section>
-        <el-card class="soft-card content-card">
-          <template #header>覆盖保存</template>
+        <SectionCard>
+          <template #title>覆盖保存</template>
+          <template #description>把确认后的 metadata 写入当前视频。</template>
           <el-form label-width="90px">
             <el-form-item label="AVID"><el-input v-model="edit.external_id" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
@@ -414,50 +406,48 @@ async function doSave() {
             <el-form-item label="海报 URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="发布日期"><el-input v-model="edit.release_date" :disabled="saveLoading" /></el-form-item>
           </el-form>
-          <el-button type="primary" :loading="saveLoading" @click="doSave">保存到 AV</el-button>
-        </el-card>
-      </section>
+          <Toolbar dense>
+            <template #actions>
+              <el-button type="primary" :loading="saveLoading" @click="doSave">保存到 AV</el-button>
+            </template>
+          </Toolbar>
+        </SectionCard>
+      </div>
     </div>
   </Layout>
 </template>
 
 <style scoped>
-.panel-head p {
-  margin: 4px 0 0;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.panel-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #7f1d1d;
+.page-shell--medium {
+  display: grid;
+  gap: var(--space-5);
 }
 
 .av-filter-form {
-  width: 100%;
-}
-
-.source-summary {
-  margin-top: 14px;
-  display: flex;
-  gap: 10px;
+  display: inline-flex;
   flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-.result-row {
-  margin-top: 0;
+.result-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.candidate-list-shell {
+  min-height: 12rem;
 }
 
 .candidate-list {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .candidate-item {
-  padding: 14px 16px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 18px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  background: var(--bg-surface);
   cursor: pointer;
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
@@ -465,14 +455,14 @@ async function doSave() {
 .candidate-item:hover,
 .candidate-item.active {
   transform: translateY(-1px);
-  border-color: rgba(225, 29, 72, 0.4);
-  box-shadow: 0 16px 32px rgba(127, 29, 29, 0.08);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-xs);
 }
 
 .candidate-title {
   font-size: 15px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .candidate-subtitle,
@@ -480,12 +470,12 @@ async function doSave() {
 .candidate-overview,
 .origin-name,
 .detail-overview {
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .candidate-meta {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   margin-top: 8px;
   font-size: 12px;
   flex-wrap: wrap;
@@ -499,12 +489,12 @@ async function doSave() {
 
 .detail-wrap {
   display: grid;
-  gap: 16px;
+  gap: var(--space-3);
 }
 
 .detail-head {
   display: flex;
-  gap: 16px;
+  gap: var(--space-3);
   align-items: flex-start;
 }
 
@@ -513,29 +503,36 @@ async function doSave() {
   max-width: 40vw;
   aspect-ratio: 2 / 3;
   object-fit: cover;
-  border-radius: 18px;
-  background: #e2e8f0;
+  border-radius: var(--radius-lg);
+  background: var(--line-soft);
 }
 
 .detail-head-info h3 {
   margin: 0;
-  font-size: 24px;
-  color: #0f172a;
+  color: var(--text-primary);
+}
+
+.origin-name {
+  margin: 6px 0;
 }
 
 .tag-line {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  margin-top: 12px;
+}
+
+.detail-overview {
+  margin: 0;
+  line-height: 1.7;
 }
 
 .json-box {
   margin: 0;
   padding: 16px;
-  background: #0f172a;
-  color: #e2e8f0;
-  border-radius: 16px;
+  background: var(--bg-inverse);
+  color: var(--text-on-inverse, #e2e8f0);
+  border-radius: var(--radius-md);
   font-size: 12px;
   line-height: 1.6;
   overflow: auto;

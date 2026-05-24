@@ -1,6 +1,11 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Search } from '@element-plus/icons-vue'
+import EmptyState from '../components/base/EmptyState.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import { useRoute } from 'vue-router'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
@@ -317,53 +322,58 @@ onMounted(async () => {
 
 <template>
   <Layout>
-    <div class="tv-manage-page">
-      <aside class="tv-manage-sidebar">
-        <div class="panel-card">
-          <div class="panel-header">
-            <div>
-              <h3>电视剧列表</h3>
-              <p>按系列维度管理季与分集</p>
-            </div>
-            <el-button type="primary" @click="openCreateSeries">新建系列</el-button>
-          </div>
+    <div class="page-shell page-shell--medium tv-manage-shell">
+      <PageHeader title="电视剧管理" />
 
-          <div class="filter-grid">
-            <el-input v-model="query.q" placeholder="搜索系列标题" clearable @keyup.enter="loadList" />
-            <el-select v-model="query.active" placeholder="启用状态" clearable>
-              <el-option label="仅启用" value="1" />
-              <el-option label="仅停用" value="0" />
-            </el-select>
-            <el-select v-model="query.has_playable" placeholder="可播分集" clearable>
-              <el-option label="有可播分集" value="1" />
-              <el-option label="无可播分集" value="0" />
-            </el-select>
-            <div class="filter-actions">
-              <el-button type="primary" @click="query.page = 1; loadList()">筛选</el-button>
-              <el-button @click="query.q = ''; query.active = ''; query.has_playable = ''; query.page = 1; loadList()">重置</el-button>
-            </div>
-          </div>
+      <Toolbar>
+        <template #filters>
+          <el-input v-model="query.q" class="tv-search" placeholder="搜索系列标题" clearable @keyup.enter="query.page = 1; loadList()" />
+          <el-select v-model="query.active" class="tv-filter" placeholder="启用状态" clearable>
+            <el-option label="仅启用" value="1" />
+            <el-option label="仅停用" value="0" />
+          </el-select>
+          <el-select v-model="query.has_playable" class="tv-filter" placeholder="可播分集" clearable>
+            <el-option label="有可播分集" value="1" />
+            <el-option label="无可播分集" value="0" />
+          </el-select>
+          <el-button @click="query.q = ''; query.active = ''; query.has_playable = ''; query.page = 1; loadList()">重置</el-button>
+        </template>
+        <template #actions>
+          <el-button type="primary" :icon="Plus" @click="openCreateSeries">新建系列</el-button>
+          <el-button :icon="Search" @click="query.page = 1; loadList()">筛选</el-button>
+        </template>
+      </Toolbar>
 
-          <el-scrollbar v-loading="loadingList" height="calc(100vh - 320px)">
-            <div
-              v-for="item in list"
-              :key="item.id"
-              class="series-card"
-              :class="{ 'is-active': String(item.id) === selectedSeriesId }"
-              @click="selectSeries(item.id)"
-            >
-              <div class="series-card__title">{{ item.title }}</div>
-              <div class="series-card__meta">
-                <span>{{ item.total_seasons || 0 }} 季</span>
-                <span>{{ item.total_episodes || 0 }} 集</span>
-                <span>{{ item.playable_episodes || 0 }} 集可播</span>
+      <div class="tv-manage-grid">
+        <SectionCard class="tv-series-list-card">
+          <template #title>电视剧列表</template>
+          <template #description>按系列维度管理季与分集。</template>
+          <div v-loading="loadingList" class="series-list-shell">
+            <EmptyState
+              v-if="!list.length && !loadingList"
+              title="暂无电视剧"
+              description="先创建一个系列，再维护季与分集。"
+            />
+            <div v-else class="series-list">
+              <div
+                v-for="item in list"
+                :key="item.id"
+                class="series-card"
+                :class="{ 'is-active': String(item.id) === selectedSeriesId }"
+                @click="selectSeries(item.id)"
+              >
+                <div class="series-card__title">{{ item.title }}</div>
+                <div class="series-card__meta">
+                  <span>{{ item.total_seasons || 0 }} 季</span>
+                  <span>{{ item.total_episodes || 0 }} 集</span>
+                  <span>{{ item.playable_episodes || 0 }} 集可播</span>
+                </div>
+                <div class="series-card__status">
+                  <el-tag :type="item.active ? 'success' : 'info'">{{ item.active ? '启用' : '停用' }}</el-tag>
+                </div>
               </div>
-              <div class="series-card__status">
-                <el-tag :type="item.active ? 'success' : 'info'">{{ item.active ? '启用' : '停用' }}</el-tag>
-              </div>
             </div>
-          </el-scrollbar>
-
+          </div>
           <div class="pager-wrap">
             <AdminTablePagination
               v-model:current-page="query.page"
@@ -373,75 +383,70 @@ onMounted(async () => {
               @current-change="loadList"
             />
           </div>
-        </div>
-      </aside>
+        </SectionCard>
 
-      <section class="tv-manage-editor">
-        <div class="panel-card panel-card--editor" v-loading="loadingDetail">
-          <div class="panel-header">
-            <div>
-              <h3>{{ detail.id ? '系列详情' : '新建电视剧系列' }}</h3>
-              <p>系列、季、集三级编辑，分集可绑定已有 `type=episode` 视频</p>
+        <SectionCard class="tv-series-editor-card" v-loading="loadingDetail">
+          <template #title>{{ detail.id ? '系列详情' : '新建电视剧系列' }}</template>
+          <template #description>系列、季、集三级编辑，分集可绑定已有 type=episode 视频。</template>
+
+          <SectionCard>
+            <template #title>系列基础</template>
+            <div class="editor-grid">
+              <el-form label-position="top">
+                <el-form-item label="系列标题">
+                  <el-input v-model="detail.title" placeholder="例如：雾城档案" />
+                </el-form-item>
+                <el-form-item label="简介">
+                  <el-input v-model="detail.overview" type="textarea" :rows="4" />
+                </el-form-item>
+                <el-form-item label="海报 URL / 路径">
+                  <el-input v-model="detail.poster_url" />
+                </el-form-item>
+                <el-form-item label="横图 URL / 路径">
+                  <el-input v-model="detail.backdrop_url" />
+                </el-form-item>
+              </el-form>
+
+              <el-form label-position="top">
+                <el-form-item label="首播日期">
+                  <el-input v-model="detail.first_air_date" placeholder="YYYY-MM-DD" />
+                </el-form-item>
+                <el-form-item label="启用状态">
+                  <el-switch v-model="detail.active" active-text="启用" inactive-text="停用" />
+                </el-form-item>
+                <el-descriptions :column="1" border class="series-stats">
+                  <el-descriptions-item label="总季数">{{ detail.total_seasons || 0 }}</el-descriptions-item>
+                  <el-descriptions-item label="总集数">{{ detail.total_episodes || 0 }}</el-descriptions-item>
+                  <el-descriptions-item label="可播分集">{{ detail.playable_episodes || 0 }}</el-descriptions-item>
+                </el-descriptions>
+              </el-form>
             </div>
-            <div class="editor-actions">
-              <el-button type="primary" :loading="savingKey === 'series'" @click="saveSeries">保存系列</el-button>
-              <el-button v-if="detail.id" type="danger" plain @click="removeSeries">删除系列</el-button>
-            </div>
-          </div>
-
-          <div class="editor-grid">
-            <el-form label-position="top">
-              <el-form-item label="系列标题">
-                <el-input v-model="detail.title" placeholder="例如：雾城档案" />
-              </el-form-item>
-              <el-form-item label="简介">
-                <el-input v-model="detail.overview" type="textarea" :rows="4" />
-              </el-form-item>
-              <el-form-item label="海报 URL / 路径">
-                <el-input v-model="detail.poster_url" />
-              </el-form-item>
-              <el-form-item label="横图 URL / 路径">
-                <el-input v-model="detail.backdrop_url" />
-              </el-form-item>
-            </el-form>
-
-            <el-form label-position="top">
-              <el-form-item label="首播日期">
-                <el-input v-model="detail.first_air_date" placeholder="YYYY-MM-DD" />
-              </el-form-item>
-              <el-form-item label="启用状态">
-                <el-switch v-model="detail.active" active-text="启用" inactive-text="停用" />
-              </el-form-item>
-              <el-descriptions :column="1" border class="series-stats">
-                <el-descriptions-item label="总季数">{{ detail.total_seasons || 0 }}</el-descriptions-item>
-                <el-descriptions-item label="总集数">{{ detail.total_episodes || 0 }}</el-descriptions-item>
-                <el-descriptions-item label="可播分集">{{ detail.playable_episodes || 0 }}</el-descriptions-item>
-              </el-descriptions>
-            </el-form>
-          </div>
-
-          <div class="season-toolbar">
-            <div>
-              <h4>季度与分集</h4>
-              <p>优先在这里完成电视剧结构维护，通用视频页只做底层视频排查</p>
-            </div>
-            <el-button type="primary" plain @click="addSeason">新增季度</el-button>
-          </div>
-
-          <el-collapse v-model="activeSeasons">
-            <el-collapse-item
-              v-for="season in detail.seasons"
-              :key="season.id || season._temp_key"
-              :name="season.id || season._temp_key"
-            >
-              <template #title>
-                <div class="season-title-row">
-                  <span>第 {{ season.season_number }} 季</span>
-                  <span class="season-title-row__meta">{{ season.title || '未命名季度' }}</span>
-                </div>
+            <Toolbar dense>
+              <template #actions>
+                <el-button type="primary" :loading="savingKey === 'series'" @click="saveSeries">保存系列</el-button>
+                <el-button v-if="detail.id" type="danger" plain @click="removeSeries">删除系列</el-button>
               </template>
+            </Toolbar>
+          </SectionCard>
 
-              <div class="season-card">
+          <SectionCard>
+            <template #title>季度与分集</template>
+            <template #description>优先在这里完成电视剧结构维护，通用视频页只做底层视频排查。</template>
+            <div class="season-toolbar">
+              <el-button type="primary" plain @click="addSeason">新增季度</el-button>
+            </div>
+
+            <EmptyState
+              v-if="!detail.seasons.length"
+              title="暂无季度"
+              description="保存系列后可以继续创建季度与分集。"
+            />
+
+            <div v-else class="season-stack">
+              <SectionCard v-for="season in detail.seasons" :key="season.id || season._temp_key">
+                <template #title>第 {{ season.season_number }} 季</template>
+                <template #description>{{ season.title || '未命名季度' }}</template>
+
                 <div class="season-form-grid">
                   <el-form label-position="top">
                     <el-form-item label="季序号">
@@ -463,181 +468,150 @@ onMounted(async () => {
                     </el-form-item>
                   </el-form>
                 </div>
+
                 <div class="season-actions">
-                  <el-button :loading="savingKey === `season-${season.id || season._temp_key}`" type="primary" @click="saveSeason(season)">保存季度</el-button>
+                  <el-button :loading="savingKey === 'season-' + (season.id || season._temp_key)" type="primary" @click="saveSeason(season)">保存季度</el-button>
                   <el-button plain @click="addEpisode(season)">新增分集</el-button>
                   <el-button type="danger" plain @click="removeSeason(season)">删除季度</el-button>
                 </div>
 
-                <div v-for="episode in season.episodes" :key="episode.id || episode._temp_key" class="episode-card">
-                  <div class="episode-card__header">
-                    <h5>第 {{ episode.episode_number }} 集</h5>
-                    <el-tag :type="episode.playable ? 'success' : 'info'">
-                      {{ episode.playable ? '可播放' : '待绑定 / 未就绪' }}
-                    </el-tag>
-                  </div>
+                <div class="episode-stack">
+                  <SectionCard v-for="episode in season.episodes" :key="episode.id || episode._temp_key">
+                    <template #title>第 {{ episode.episode_number }} 集</template>
+                    <template #description>
+                      <el-tag :type="episode.playable ? 'success' : 'info'">{{ episode.playable ? '可播放' : '待绑定 / 未就绪' }}</el-tag>
+                    </template>
 
-                  <div class="episode-form-grid">
-                    <el-form label-position="top">
-                      <el-form-item label="集序号">
-                        <el-input v-model="episode.episode_number" />
-                      </el-form-item>
-                      <el-form-item label="标题">
-                        <el-input v-model="episode.title" />
-                      </el-form-item>
-                      <el-form-item label="简介">
-                        <el-input v-model="episode.overview" type="textarea" :rows="3" />
-                      </el-form-item>
-                    </el-form>
+                    <div class="episode-form-grid">
+                      <el-form label-position="top">
+                        <el-form-item label="集序号">
+                          <el-input v-model="episode.episode_number" />
+                        </el-form-item>
+                        <el-form-item label="标题">
+                          <el-input v-model="episode.title" />
+                        </el-form-item>
+                        <el-form-item label="简介">
+                          <el-input v-model="episode.overview" type="textarea" :rows="3" />
+                        </el-form-item>
+                      </el-form>
 
-                    <el-form label-position="top">
-                      <el-form-item label="时长（秒）">
-                        <el-input v-model="episode.runtime" />
-                      </el-form-item>
-                      <el-form-item label="播出日期">
-                        <el-input v-model="episode.air_date" placeholder="YYYY-MM-DD" />
-                      </el-form-item>
-                      <el-form-item label="剧照 URL / 路径">
-                        <el-input v-model="episode.still_url" />
-                      </el-form-item>
-                    </el-form>
+                      <el-form label-position="top">
+                        <el-form-item label="时长（秒）">
+                          <el-input v-model="episode.runtime" />
+                        </el-form-item>
+                        <el-form-item label="播出日期">
+                          <el-input v-model="episode.air_date" placeholder="YYYY-MM-DD" />
+                        </el-form-item>
+                        <el-form-item label="剧照 URL / 路径">
+                          <el-input v-model="episode.still_url" />
+                        </el-form-item>
+                      </el-form>
 
-                    <el-form label-position="top">
-                      <el-form-item label="绑定视频">
-                        <el-select
-                          v-model="episode.video_id"
-                          filterable
-                          remote
-                          clearable
-                          reserve-keyword
-                          placeholder="搜索已有剧集视频"
-                          :remote-method="searchEpisodeVideos"
-                          :loading="loadingVideoOptions"
-                        >
-                          <el-option
-                            v-for="option in episodeVideoOptions"
-                            :key="option.value"
-                            :label="option.label"
-                            :value="option.value"
-                          />
-                        </el-select>
-                      </el-form-item>
-                      <div class="episode-binding-tip">
-                        当前绑定：{{ episode.video_title || '未绑定' }}
-                        <span v-if="episode.video_status">（{{ episode.video_status }}）</span>
-                      </div>
-                    </el-form>
-                  </div>
+                      <el-form label-position="top">
+                        <el-form-item label="绑定视频">
+                          <el-select
+                            v-model="episode.video_id"
+                            filterable
+                            remote
+                            clearable
+                            reserve-keyword
+                            placeholder="搜索已有剧集视频"
+                            :remote-method="searchEpisodeVideos"
+                            :loading="loadingVideoOptions"
+                          >
+                            <el-option
+                              v-for="option in episodeVideoOptions"
+                              :key="option.value"
+                              :label="option.label"
+                              :value="option.value"
+                            />
+                          </el-select>
+                        </el-form-item>
+                        <div class="episode-binding-tip">
+                          当前绑定：{{ episode.video_title || '未绑定' }}
+                          <span v-if="episode.video_status">（{{ episode.video_status }}）</span>
+                        </div>
+                      </el-form>
+                    </div>
 
-                  <div class="episode-actions">
-                    <el-button :loading="savingKey === `episode-${episode.id || episode._temp_key}`" type="primary" @click="saveEpisode(season, episode)">保存分集</el-button>
-                    <el-button type="danger" plain @click="removeEpisode(season, episode)">删除分集</el-button>
-                  </div>
+                    <Toolbar dense>
+                      <template #actions>
+                        <el-button :loading="savingKey === 'episode-' + (episode.id || episode._temp_key)" type="primary" @click="saveEpisode(season, episode)">保存分集</el-button>
+                        <el-button type="danger" plain @click="removeEpisode(season, episode)">删除分集</el-button>
+                      </template>
+                    </Toolbar>
+                  </SectionCard>
                 </div>
-              </div>
-            </el-collapse-item>
-          </el-collapse>
-        </div>
-      </section>
+              </SectionCard>
+            </div>
+          </SectionCard>
+        </SectionCard>
+      </div>
     </div>
   </Layout>
 </template>
 
 <style scoped>
-.tv-manage-page {
+.page-shell--medium {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.tv-manage-shell {
+  min-width: 0;
+}
+
+.tv-manage-grid {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
-  gap: 18px;
+  gap: var(--space-4);
+  align-items: start;
 }
 
-.panel-card {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 24px;
-  padding: 18px;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+.tv-search {
+  width: min(18rem, 100%);
 }
 
-.panel-card--editor {
-  min-height: calc(100vh - 180px);
+.tv-filter {
+  width: 10rem;
 }
 
-.panel-header,
-.season-toolbar,
-.season-actions,
-.episode-actions,
-.filter-actions,
-.editor-actions,
-.season-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.series-list-shell {
+  min-height: 20rem;
 }
 
-.panel-header h3,
-.season-toolbar h4,
-.episode-card__header h5 {
-  margin: 0;
-}
-
-.panel-header p,
-.season-toolbar p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.filter-grid,
-.editor-grid,
-.season-form-grid,
-.episode-form-grid {
+.series-list {
   display: grid;
-  gap: 14px;
-}
-
-.filter-grid,
-.editor-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 18px;
-}
-
-.season-form-grid,
-.episode-form-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.episode-form-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
 }
 
 .series-card {
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
-  padding: 14px;
-  margin-bottom: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
   cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  background: var(--bg-surface);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .series-card:hover,
 .series-card.is-active {
   transform: translateY(-1px);
-  border-color: rgba(225, 29, 72, 0.34);
-  box-shadow: 0 14px 28px rgba(225, 29, 72, 0.1);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-xs);
 }
 
 .series-card__title {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .series-card__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 8px;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -646,67 +620,63 @@ onMounted(async () => {
 }
 
 .pager-wrap {
-  margin-top: 16px;
+  margin-top: var(--space-4);
   display: flex;
   justify-content: center;
 }
 
+.editor-grid,
+.season-form-grid,
+.episode-form-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.editor-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.season-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.episode-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .series-stats {
-  margin-top: 12px;
+  margin-top: var(--space-3);
 }
 
 .season-toolbar {
-  margin: 20px 0 14px;
+  margin-bottom: var(--space-3);
 }
 
-.season-card,
-.episode-card {
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
-  padding: 16px;
-  background: rgba(248, 250, 252, 0.8);
+.season-stack,
+.episode-stack {
+  display: grid;
+  gap: var(--space-3);
 }
 
-.episode-card {
-  margin-top: 14px;
-}
-
-.episode-card__header {
+.season-actions {
+  margin-top: var(--space-3);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
-.season-actions,
-.episode-actions {
-  margin-top: 10px;
-}
-
-.season-title-row {
-  width: 100%;
-  padding-right: 14px;
-}
-
-.season-title-row__meta,
 .episode-binding-tip {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 @media (max-width: 1280px) {
-  .tv-manage-page {
+  .tv-manage-grid {
     grid-template-columns: 1fr;
-  }
-
-  .panel-card--editor {
-    min-height: auto;
   }
 }
 
 @media (max-width: 960px) {
-  .filter-grid,
   .editor-grid,
   .season-form-grid,
   .episode-form-grid {

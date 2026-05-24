@@ -12,6 +12,8 @@
 - `admin Modern Minimal`：管理端视觉方向为浅色优先、低饱和 slate 中性色、冷蓝主色与克制阴影；后台工具界面优先信息密度、可扫描性和重复操作效率，不采用营销式大色块或装饰性 hero。
 - `admin 设计 token`：管理端全局颜色、字体、字号、间距、圆角、阴影、动效、断点和 shell 尺寸统一由 `admin-web/src/assets/theme.css` 的 CSS 变量表达；业务视图和基础组件应引用 token，不直接扩散临时色值或字体。
 - `Element Plus 三层架构`：L1 为 `theme.css` 中的 `--el-*` token 覆盖，L2 为 `element-overrides.css` 的低特异性 `:where()` 全局覆写，L3 为 `components/base/` 中的共享 wrapper 组件；三层各司其职，避免跨层写重复样式。
+- `admin 编辑入口 Drawer`：管理端需要编辑或创建主数据时，优先使用右侧 drawer 承载表单而不是居中 dialog；drawer 适合保留列表上下文，宽度默认 560px，窄屏自动全屏，底部操作区固定在视口内。
+- `admin 路由 hideShellPageHeader 标记`：当某个 admin 路由自身已经渲染 PageHeader 时，对应 route 必须显式设置 `meta.hideShellPageHeader = true`，避免 Layout 顶栏与页面标题重复显示。
 - `admin 侧栏分组导航`：管理端主导航按 `仪表盘`、`媒体库`、`录入处理`、`服务`、`系统` 五组呈现；菜单源由命令面板 helper 统一维护，侧栏、移动 drawer 和命令面板共享同一组路由语义。
 - `admin 侧栏折叠偏好`：桌面端侧栏支持 240px 展开与 60px 折叠，用户手动折叠状态持久化到 `localStorage` 的 `admin-sidebar-collapsed`；窄屏 drawer 与 1280px 以下自动折叠不改变该持久偏好。
 - `admin 命令面板`：管理端通过 `Cmd/Ctrl+K` 或顶栏触发的 nav-only 快速跳转面板，支持中文、拼音首字母、别名和路径匹配；它只负责页面导航，不承载业务动作。

@@ -1,8 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Search } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import EmptyState from '../components/base/EmptyState.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import {
   createAdminImageCollection,
   deleteAdminImageCollection,
@@ -16,8 +21,8 @@ import { buildImageCollectionPayload, IMAGE_COLLECTION_PREVIEW_PARAMS, revokePre
 const loading = ref(false)
 const list = ref([])
 const total = ref(0)
-const dialogVisible = ref(false)
-const saving = ref(false)
+const editDrawerVisible = ref(false)
+const editDrawerSaving = ref(false)
 const editingID = ref('')
 const imageDrawerVisible = ref(false)
 const imageDrawerLoading = ref(false)
@@ -28,6 +33,7 @@ const imageDrawerApplyingCoverID = ref('')
 const imageDrawerPreviewURLs = ref({})
 const imageDrawerPreviewErrors = ref({})
 const imageDrawerCoverPreviewURL = ref('')
+const viewportWidth = ref(readViewportWidth())
 
 const query = reactive({
   page: 1,
@@ -42,6 +48,15 @@ const imageDrawerQuery = reactive({
 })
 
 const form = reactive(createEmptyForm())
+const editDrawerSnapshot = ref(createEmptyForm())
+const editDrawerDirty = computed(() => (
+  form.name !== editDrawerSnapshot.value.name
+  || form.description !== editDrawerSnapshot.value.description
+  || form.cover_url !== editDrawerSnapshot.value.cover_url
+  || form.sort_order !== editDrawerSnapshot.value.sort_order
+  || form.active !== editDrawerSnapshot.value.active
+))
+const editDrawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '560px'))
 const activeDrawerCoverSrc = computed(() => {
   const collection = imageDrawerCollection.value
   if (!collection) return ''
@@ -60,6 +75,17 @@ function createEmptyForm() {
     sort_order: 0,
     active: true
   }
+}
+
+function readViewportWidth() {
+  if (typeof window === 'undefined') {
+    return 1440
+  }
+  return window.innerWidth
+}
+
+function updateViewportWidth() {
+  viewportWidth.value = readViewportWidth()
 }
 
 function extractErrorMessage(error, fallback) {
@@ -90,6 +116,17 @@ function buildListParams() {
 
 function resetForm() {
   Object.assign(form, createEmptyForm())
+  editDrawerSnapshot.value = createEmptyForm()
+}
+
+function captureFormSnapshot() {
+  editDrawerSnapshot.value = {
+    name: form.name,
+    description: form.description,
+    cover_url: form.cover_url,
+    sort_order: form.sort_order,
+    active: form.active
+  }
 }
 
 async function load() {
@@ -106,7 +143,8 @@ async function load() {
 function openCreate() {
   editingID.value = ''
   resetForm()
-  dialogVisible.value = true
+  captureFormSnapshot()
+  editDrawerVisible.value = true
 }
 
 function openEdit(row) {
@@ -119,7 +157,54 @@ function openEdit(row) {
     sort_order: typeof row.sort_order === 'number' ? row.sort_order : 0,
     active: !!row.active
   })
-  dialogVisible.value = true
+  captureFormSnapshot()
+  editDrawerVisible.value = true
+}
+
+async function confirmEditDrawerClose() {
+  if (!editDrawerDirty.value) {
+    return true
+  }
+  try {
+    await ElMessageBox.confirm(
+      '未保存的修改将会丢失，确认关闭吗？',
+      '确认关闭',
+      {
+        type: 'warning',
+        confirmButtonText: '确认丢弃',
+        cancelButtonText: '继续编辑'
+      }
+    )
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
+async function requestEditDrawerClose() {
+  if (await confirmEditDrawerClose()) {
+    editDrawerVisible.value = false
+  }
+}
+
+function handleEditDrawerBeforeClose(done) {
+  if (!editDrawerDirty.value) {
+    done()
+    return
+  }
+  ElMessageBox.confirm(
+    '未保存的修改将会丢失，确认关闭吗？',
+    '确认关闭',
+    {
+      type: 'warning',
+      confirmButtonText: '确认丢弃',
+      cancelButtonText: '继续编辑'
+    }
+  )
+    .then(() => {
+      done()
+    })
+    .catch(() => {})
 }
 
 async function save() {
@@ -127,7 +212,7 @@ async function save() {
     ElMessage.warning('请输入图片合集名称')
     return
   }
-  saving.value = true
+  editDrawerSaving.value = true
   try {
     const payload = buildImageCollectionPayload(form)
     if (editingID.value) {
@@ -141,12 +226,12 @@ async function save() {
       await createAdminImageCollection(payload)
       ElMessage.success('图片合集已创建')
     }
-    dialogVisible.value = false
+    editDrawerVisible.value = false
     await load()
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '保存图片合集失败'))
   } finally {
-    saving.value = false
+    editDrawerSaving.value = false
   }
 }
 
@@ -334,116 +419,141 @@ function onImageDrawerClosed() {
   imageDrawerLoading.value = false
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  updateViewportWidth()
+  window.addEventListener('resize', updateViewportWidth)
+})
 
 onBeforeUnmount(() => {
   clearImageDrawerPreviews()
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateViewportWidth)
+  }
 })
 </script>
 
 <template>
   <Layout>
-    <div class="page page-shell">
-      <section class="section-head">
-        <div>
-          <h1 class="page-title">图片合集管理</h1>
-          <p class="page-subtitle">维护图片合集并统一管理图片归档关系</p>
+    <div class="page-shell page-shell--medium">
+      <PageHeader title="图片合集" />
+
+      <Toolbar>
+        <template #filters>
+          <el-input v-model="query.q" class="collection-search" placeholder="按图片合集名称搜索" clearable @keyup.enter="load" />
+          <el-select v-model="query.active" class="collection-status" clearable placeholder="状态筛选">
+            <el-option label="全部状态" value="" />
+            <el-option label="仅启用" value="1" />
+            <el-option label="仅停用" value="0" />
+          </el-select>
+          <el-button :icon="Search" @click="load">查询</el-button>
+        </template>
+        <template #actions>
+          <el-button type="primary" :icon="Plus" @click="openCreate">创建合集</el-button>
+        </template>
+      </Toolbar>
+
+      <SectionCard>
+        <template #title>合集列表</template>
+        <template #description>维护图片合集并统一管理图片归档关系。</template>
+
+        <el-table v-if="list.length" v-loading="loading" :data="list" border>
+          <el-table-column prop="name" label="图片合集名称" min-width="180" />
+          <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
+          <el-table-column label="封面" min-width="240">
+            <template #default="{ row }">
+              <div class="cover-cell">
+                <el-tag v-if="row.cover_image_id" type="success" size="small">已绑定图片封面</el-tag>
+                <span class="cover-text">{{ row.cover_url || '-' }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="sort_order" label="排序" width="90" />
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="updated_at" label="更新时间" width="180" />
+          <el-table-column label="操作" width="260">
+            <template #default="{ row }">
+              <el-button size="small" type="primary" plain @click="openImageDrawer(row)">查看图片</el-button>
+              <el-button size="small" @click="openEdit(row)">编辑</el-button>
+              <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <EmptyState
+          v-else-if="!loading"
+          title="暂无图片合集"
+          description="先创建一个图片合集，再为图片建立归档关系。"
+        >
+          <template #action>
+            <el-button type="primary" :icon="Plus" @click="openCreate">创建合集</el-button>
+          </template>
+        </EmptyState>
+
+        <div class="collection-footer">
+          <AdminTablePagination
+            v-model:current-page="query.page"
+            v-model:page-size="query.page_size"
+            layout="total, prev, pager, next"
+            :total="total"
+            @current-change="load"
+          />
         </div>
-      </section>
-
-      <section>
-        <el-card class="soft-card content-card table-panel">
-          <div class="toolbar-row">
-            <el-form inline class="filter-form">
-              <el-form-item>
-                <el-input v-model="query.q" placeholder="按图片合集名称搜索" clearable @keyup.enter="load" />
-              </el-form-item>
-              <el-form-item>
-                <el-select v-model="query.active" style="width: 150px" clearable placeholder="状态筛选">
-                  <el-option label="全部状态" value="" />
-                  <el-option label="仅启用" value="1" />
-                  <el-option label="仅停用" value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="load">查询</el-button>
-              </el-form-item>
-            </el-form>
-            <el-button type="success" @click="openCreate">新增图片合集</el-button>
-          </div>
-
-          <div class="table-wrap">
-            <el-table :data="list" border v-loading="loading">
-              <el-table-column prop="name" label="图片合集名称" min-width="180" />
-              <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
-              <el-table-column label="封面" min-width="240">
-                <template #default="{ row }">
-                  <div class="cover-cell">
-                    <el-tag v-if="row.cover_image_id" type="success" size="small">已绑定图片封面</el-tag>
-                    <span class="cover-text">{{ row.cover_url || '-' }}</span>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column prop="sort_order" label="排序" width="90" />
-              <el-table-column label="状态" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="updated_at" label="更新时间" width="180" />
-              <el-table-column label="操作" width="260">
-                <template #default="{ row }">
-                  <el-button size="small" type="primary" plain @click="openImageDrawer(row)">查看图片</el-button>
-                  <el-button size="small" @click="openEdit(row)">编辑</el-button>
-                  <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-
-          <div class="action-row">
-            <AdminTablePagination
-              v-model:current-page="query.page"
-              v-model:page-size="query.page_size"
-              layout="total, prev, pager, next"
-              :total="total"
-              @current-change="load"
-            />
-          </div>
-        </el-card>
-      </section>
+      </SectionCard>
     </div>
 
-    <el-dialog
-      v-model="dialogVisible"
-      class="crud-dialog"
-      :title="editingID ? '编辑图片合集' : '新增图片合集'"
-      width="min(94vw, 680px)"
+    <el-drawer
+      v-model="editDrawerVisible"
+      :before-close="handleEditDrawerBeforeClose"
+      :size="editDrawerSize"
+      destroy-on-close
+      direction="rtl"
+      :title="editingID ? '编辑图片合集' : '创建图片合集'"
+      class="collection-edit-drawer"
     >
-      <el-form label-width="110px" class="dialog-form">
-        <el-form-item label="图片合集名称">
-          <el-input v-model="form.name" placeholder="请输入图片合集名称" />
-        </el-form-item>
-        <el-form-item label="图片合集简介">
-          <el-input v-model="form.description" type="textarea" :rows="3" placeholder="可选，简介用于后台识别" />
-        </el-form-item>
-        <el-form-item label="封面地址">
-          <el-input v-model="form.cover_url" placeholder="https://..." />
-          <div class="form-tip">未选择封面图片时，回退使用这里的封面地址。</div>
-        </el-form-item>
-        <el-form-item label="排序值">
-          <el-input-number v-model="form.sort_order" :step="1" :precision="0" style="width: 200px" />
-        </el-form-item>
-        <el-form-item label="启用状态">
-          <el-switch v-model="form.active" active-text="启用" inactive-text="停用" />
-        </el-form-item>
+      <el-form label-width="110px" class="collection-edit-form">
+        <SectionCard>
+          <template #title>基础信息</template>
+          <el-form-item label="图片合集名称">
+            <el-input v-model="form.name" placeholder="请输入图片合集名称" />
+          </el-form-item>
+          <el-form-item label="图片合集简介">
+            <el-input v-model="form.description" type="textarea" :rows="3" placeholder="可选，简介用于后台识别" />
+          </el-form-item>
+        </SectionCard>
+
+        <SectionCard>
+          <template #title>封面兜底</template>
+          <el-form-item label="封面地址">
+            <el-input v-model="form.cover_url" placeholder="https://..." />
+          </el-form-item>
+          <p class="form-tip">未选择封面图片时，回退使用这里的封面地址。</p>
+        </SectionCard>
+
+        <SectionCard>
+          <template #title>发布设置</template>
+          <el-form-item label="排序值">
+            <el-input-number v-model="form.sort_order" :step="1" :precision="0" style="width: 200px" />
+          </el-form-item>
+          <el-form-item label="启用状态">
+            <el-switch v-model="form.active" active-text="启用" inactive-text="停用" />
+          </el-form-item>
+        </SectionCard>
       </el-form>
 
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
-      </template>
-    </el-dialog>
+      <div class="collection-edit-drawer__footer">
+        <Toolbar dense>
+          <template #actions>
+            <el-button @click="requestEditDrawerClose">取消</el-button>
+            <el-button type="primary" :loading="editDrawerSaving" @click="save">保存</el-button>
+          </template>
+        </Toolbar>
+      </div>
+    </el-drawer>
 
     <el-drawer
       v-model="imageDrawerVisible"
@@ -514,13 +624,46 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.dialog-form {
-  padding-right: 8px;
+.page-shell--medium {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.collection-search {
+  width: min(24rem, 100%);
+}
+
+.collection-status {
+  width: 10rem;
+}
+
+.collection-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-4);
+}
+
+.collection-edit-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.collection-edit-drawer :deep(.el-drawer__body) {
+  display: grid;
+  gap: var(--space-4);
+  padding-bottom: 0;
+}
+
+.collection-edit-drawer__footer {
+  position: sticky;
+  bottom: 0;
+  padding-top: var(--space-3);
+  background: linear-gradient(180deg, transparent, var(--bg-canvas) 28%);
 }
 
 .form-tip {
   margin-top: 6px;
-  color: var(--el-text-color-secondary);
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -532,7 +675,7 @@ onBeforeUnmount(() => {
 }
 
 .cover-text {
-  color: var(--el-text-color-secondary);
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
   word-break: break-all;
