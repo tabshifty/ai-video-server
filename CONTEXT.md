@@ -17,6 +17,11 @@
 - `admin 侧栏分组导航`：管理端主导航按 `仪表盘`、`媒体库`、`录入处理`、`服务`、`系统` 五组呈现；菜单源由命令面板 helper 统一维护，侧栏、移动 drawer 和命令面板共享同一组路由语义。
 - `admin 侧栏折叠偏好`：桌面端侧栏支持 240px 展开与 60px 折叠，用户手动折叠状态持久化到 `localStorage` 的 `admin-sidebar-collapsed`；窄屏 drawer 与 1280px 以下自动折叠不改变该持久偏好。
 - `admin 命令面板`：管理端通过 `Cmd/Ctrl+K` 或顶栏触发的 nav-only 快速跳转面板，支持中文、拼音首字母、别名和路径匹配；它只负责页面导航，不承载业务动作。
+- `admin 表格列设置`：VideoList 顶部「列设置」按钮用于勾选显示/隐藏列；偏好写入 `localStorage` key `admin-videolist-columns`，窗口 < 1280px 自动隐藏次要列但仍保留用户配置，不删列、不改列宽。
+- `admin 视图模式切换`：ImageManage 顶部「视图切换」开关在网格/列表间切换；默认网格，偏好写入 `localStorage` key `admin-imagemanage-view`，切换不重置分页与筛选。
+- `admin 上传向导三步`：VideoUpload 拆成选文件、基础信息、关联与上传三步；step 切换用共享父级状态和 `v-show` 保留字段、进度与历史，类型字段驱动 AV 地区分类和短视频所属合集的条件显示。
+- `admin 批量操作浮条`：管理端表格或网格选中 ≥ 1 项时显示 `BulkActionBar`，包含已选数量和批量删除/改状态等主操作；选中状态只属于当前会话，不写入持久化存储。
+- `admin 筛选条折叠`：复杂列表页将长筛选表单折叠为「已生效筛选 chip 行」加「更多筛选」drawer；常用搜索保持可见，长尾筛选按需展开，避免筛选区挤占主表格空间。
 
 ## Git 忽略规则约定
 - 根级 `.gitignore` 中用于本地资料或发布产物的目录规则必须按意图锚定：仅忽略根目录时使用 `/references/`、`/release/`，避免误伤 `.codex/skills/*/references/`、`.agents/skills/*/references/` 等需要版本管理的技能参考文档。

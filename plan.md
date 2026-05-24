@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-24 21:30 +0800
+- 进度：完成 `tasks/2026-05-23-admin-three-pillars` Phase 4 实现与 review 自动化：ImageManage 接入 PageHeader / Toolbar / 视图切换 / 双 drawer / BulkActionBar / EmptyState 并清零旧玫红；VideoList 接入 chip 筛选、更多筛选 drawer、列设置 localStorage、编辑 drawer、BulkActionBar；VideoUpload 拆为三步 Wizard 与 3 个 step 子组件；3 条路由补 `hideShellPageHeader`，CONTEXT 新增 5 条 admin 术语，截图目录归档 11 张 1440x1080 PNG。未创建 `DONE.md`，待用户验收后按流程补完成标记。
+- 影响文件：`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/VideoUpload/*`、`admin-web/src/views/videoUpload.wizard.helpers.*`、`admin-web/src/router/index.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`tasks/2026-05-23-admin-three-pillars/*`、`plan.md`
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js src/views/videoUpload.wizard.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size warning）；`cd admin-web && npm test` 通过（13 files / 95 tests）；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src tasks/2026-05-23-admin-three-pillars` 无输出；截图目录 11 张 PNG 均为 1440x1080。
+
+## 2026-05-24 21:09 +0800
+- 进度：开始执行 `tasks/2026-05-23-admin-three-pillars` Phase 4（三巨头 IA 改造）。前置 Phase 1-3 已有 `DONE.md`，本阶段按 PRD / Implement / Review 推进：先扩 audit 与 wizard helper 红灯，再改 ImageManage / VideoList / VideoUpload、补路由 meta、CONTEXT.md 术语、截图归档与验证。
+- 影响文件：`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/VideoUpload/*`、`admin-web/src/views/videoUpload.wizard.helpers.js`、`admin-web/src/views/videoUpload.wizard.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`tasks/2026-05-23-admin-three-pillars/screenshots/*`、`plan.md`
+- 验证：待执行红灯测试、`cd admin-web && npm test`、`cd admin-web && npm run build`、截图归档、乱码扫描与 diff 检查。
+
 ## 2026-05-24 14:30 +0800
 - 进度：完成 `tasks/2026-05-23-admin-medium-views` Phase 3 的视觉归档收尾，4 个中等视图已补齐新的 after 截图，其中 `ImageCollectionManage` 额外补了 drawer 打开形态。当前截图目录共 9 张，均为 1440x1080。
 - 影响文件：`admin-web/src/views/ImageCollectionManage.vue`、`admin-web/src/views/ScrapePreview.vue`、`admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/TvSeriesManage.vue`、`admin-web/src/router/index.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`tasks/2026-05-23-admin-medium-views/screenshots/*`、`plan.md`

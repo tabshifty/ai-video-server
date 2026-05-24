@@ -1,8 +1,14 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Edit, Grid, List, Search, SwitchButton, Upload } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import BulkActionBar from '../components/base/BulkActionBar.vue'
+import EmptyState from '../components/base/EmptyState.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import {
   checkAdminImageUpload,
   deleteAdminImage,
@@ -19,6 +25,12 @@ import { sha256File } from '../utils/hash'
 const loading = ref(false)
 const list = ref([])
 const total = ref(0)
+const IMAGEMANAGE_VIEW_KEY = 'admin-imagemanage-view'
+const tableRef = ref(null)
+const selectedImageRows = ref([])
+const filterDrawerVisible = ref(false)
+const viewportWidth = ref(readViewportWidth())
+const viewMode = ref(readStoredImageView())
 
 const query = reactive({
   page: 1,
@@ -40,10 +52,12 @@ const uploadForm = reactive({
   collection_ids: []
 })
 const uploadSummary = ref(null)
+const uploadDrawerSnapshot = ref('')
 
 const detailVisible = ref(false)
 const detail = ref(null)
 const saving = ref(false)
+const detailDrawerSnapshot = ref('')
 
 const actorOptions = ref([])
 const loadingActors = ref(false)
@@ -65,6 +79,99 @@ const preview = reactive({
 const readyCount = computed(() => list.value.filter((item) => item.status === 'ready').length)
 const failedCount = computed(() => list.value.filter((item) => item.status === 'failed').length)
 const inactiveCount = computed(() => list.value.filter((item) => !item.active).length)
+const drawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '560px'))
+const uploadDrawerDirty = computed(() => uploadDrawerSnapshot.value !== serializeUploadDrawerState())
+const detailDrawerDirty = computed(() => detailDrawerSnapshot.value !== serializeDetailDrawerState())
+const activeFilterChips = computed(() => {
+  const chips = []
+  if (query.q) chips.push({ key: 'q', label: '搜索', value: query.q })
+  if (query.status) chips.push({ key: 'status', label: '状态', value: statusLabel(query.status) })
+  if (query.active !== '') chips.push({ key: 'active', label: '启用', value: query.active === '1' ? '仅启用' : '仅停用' })
+  if (query.actor_id) chips.push({ key: 'actor_id', label: '演员', value: optionLabel(actorOptions.value, query.actor_id) })
+  if (query.collection_id) chips.push({ key: 'collection_id', label: '图片合集', value: optionLabel(imageCollectionOptions.value, query.collection_id) })
+  return chips
+})
+const bulkActions = computed(() => [
+  { label: '批量启用', icon: SwitchButton, type: 'primary', onClick: () => bulkToggleActive(true) },
+  { label: '批量停用', icon: SwitchButton, type: 'warning', onClick: () => bulkToggleActive(false) },
+  { label: '批量删除', icon: Delete, type: 'danger', onClick: doBulkDelete }
+])
+
+function readViewportWidth() {
+  if (typeof window === 'undefined') return 1440
+  return window.innerWidth
+}
+
+function updateViewportWidth() {
+  viewportWidth.value = readViewportWidth()
+}
+
+function readStoredImageView() {
+  if (typeof window === 'undefined') return 'grid'
+  try {
+    return window.localStorage.getItem(IMAGEMANAGE_VIEW_KEY) === 'list' ? 'list' : 'grid'
+  } catch (_) {
+    return 'grid'
+  }
+}
+
+function setViewMode(mode) {
+  viewMode.value = mode === 'list' ? 'list' : 'grid'
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(IMAGEMANAGE_VIEW_KEY, viewMode.value)
+  } catch (_) {
+    // localStorage 不可用时仅保留本会话视图模式。
+  }
+}
+
+function optionLabel(options, value) {
+  return options.find((item) => item.value === value)?.label || value
+}
+
+function serializeUploadDrawerState() {
+  return JSON.stringify({
+    files: uploadFileList.value.map((item) => item.name || item.raw?.name || ''),
+    description: uploadForm.description || '',
+    actor_tokens: [...(uploadForm.actor_tokens || [])].sort(),
+    collection_ids: [...(uploadForm.collection_ids || [])].sort()
+  })
+}
+
+function captureUploadDrawerSnapshot() {
+  uploadDrawerSnapshot.value = serializeUploadDrawerState()
+}
+
+function serializeDetailDrawerState() {
+  if (!detail.value) return ''
+  return JSON.stringify({
+    id: detail.value.id || '',
+    title: detail.value.title || '',
+    description: detail.value.description || '',
+    active: !!detail.value.active,
+    actor_tokens: [...(detail.value.actor_tokens || [])].sort(),
+    collection_ids: [...(detail.value.collection_ids || [])].sort(),
+    metadata_text: detail.value.metadata_text || ''
+  })
+}
+
+function captureDetailDrawerSnapshot() {
+  detailDrawerSnapshot.value = serializeDetailDrawerState()
+}
+
+async function confirmDrawerClose(isDirty) {
+  if (!isDirty) return true
+  try {
+    await ElMessageBox.confirm('未保存的修改将会丢失，确认关闭吗？', '确认关闭', {
+      type: 'warning',
+      confirmButtonText: '确认丢弃',
+      cancelButtonText: '继续编辑'
+    })
+    return true
+  } catch (_) {
+    return false
+  }
+}
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
@@ -184,6 +291,7 @@ async function load() {
     const data = await getAdminImages(buildListParams())
     list.value = data.items || []
     total.value = data.total_count || 0
+    clearImageSelection()
   } finally {
     loading.value = false
   }
@@ -236,6 +344,7 @@ function resetUploadForm() {
 function openUploadDialog() {
   uploadDialogVisible.value = true
   uploadSummary.value = null
+  captureUploadDrawerSnapshot()
 }
 
 function onUploadDialogClosed() {
@@ -243,6 +352,26 @@ function onUploadDialogClosed() {
   uploadRef.value?.clearFiles()
   uploadFileList.value = []
   resetUploadForm()
+  uploadSummary.value = null
+  captureUploadDrawerSnapshot()
+}
+
+async function requestUploadDrawerClose() {
+  if (uploading.value) return
+  if (await confirmDrawerClose(uploadDrawerDirty.value)) {
+    captureUploadDrawerSnapshot()
+    uploadDialogVisible.value = false
+  }
+}
+
+function handleUploadDrawerBeforeClose(done) {
+  if (uploading.value) return
+  confirmDrawerClose(uploadDrawerDirty.value).then((confirmed) => {
+    if (confirmed) {
+      captureUploadDrawerSnapshot()
+      done()
+    }
+  })
 }
 
 function handleUploadExceed() {
@@ -346,6 +475,7 @@ async function submitUpload() {
     ElMessage.success(`上传完成：成功 ${success}，失败 ${failed}`)
     uploadRef.value?.clearFiles()
     uploadFileList.value = []
+    captureUploadDrawerSnapshot()
     await load()
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '批量上传图片失败'))
@@ -368,6 +498,7 @@ async function showDetail(row) {
   mergeActorOptions(data.actors || [])
   mergeCollectionOptions(data.collections || [])
   detailVisible.value = true
+  captureDetailDrawerSnapshot()
   await Promise.all([searchActors(''), searchImageCollections('')])
   await loadPreview()
 }
@@ -411,6 +542,7 @@ async function saveDetail() {
   try {
     await updateAdminImage(detail.value.id, payload)
     ElMessage.success('图片信息已更新')
+    captureDetailDrawerSnapshot()
     detailVisible.value = false
     await load()
   } catch (error) {
@@ -420,10 +552,101 @@ async function saveDetail() {
   }
 }
 
+async function requestDetailDrawerClose() {
+  if (await confirmDrawerClose(detailDrawerDirty.value)) {
+    captureDetailDrawerSnapshot()
+    detailVisible.value = false
+  }
+}
+
+function handleDetailDrawerBeforeClose(done) {
+  confirmDrawerClose(detailDrawerDirty.value).then((confirmed) => {
+    if (confirmed) {
+      captureDetailDrawerSnapshot()
+      done()
+    }
+  })
+}
+
 async function toggleActive(row) {
   await updateAdminImage(row.id, { active: !row.active })
   ElMessage.success(!row.active ? '图片已启用' : '图片已停用')
   await load()
+}
+
+function onImageSelectionChange(rows) {
+  selectedImageRows.value = Array.isArray(rows) ? rows : []
+}
+
+function toggleGridSelection(row, checked) {
+  const next = selectedImageRows.value.filter((item) => item.id !== row.id)
+  if (checked) {
+    next.push(row)
+  }
+  selectedImageRows.value = next
+}
+
+function isGridSelected(row) {
+  return selectedImageRows.value.some((item) => item.id === row.id)
+}
+
+function clearImageSelection() {
+  selectedImageRows.value = []
+  tableRef.value?.clearSelection?.()
+}
+
+async function bulkToggleActive(active) {
+  const targets = [...selectedImageRows.value]
+  if (targets.length === 0) return
+  try {
+    await ElMessageBox.confirm(`确认将已选 ${targets.length} 张图片批量${active ? '启用' : '停用'}？`, '批量改状态', {
+      type: 'warning'
+    })
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    throw error
+  }
+  await Promise.all(targets.map((item) => updateAdminImage(item.id, { active })))
+  ElMessage.success(`已批量${active ? '启用' : '停用'} ${targets.length} 张图片`)
+  await load()
+}
+
+async function doBulkDelete() {
+  const targets = [...selectedImageRows.value]
+  if (targets.length === 0) return
+  try {
+    await ElMessageBox.confirm(`确认删除已选 ${targets.length} 张图片？`, '批量删除图片', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消'
+    })
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    throw error
+  }
+  await Promise.all(targets.map((item) => deleteAdminImage(item.id)))
+  ElMessage.success(`已删除 ${targets.length} 张图片`)
+  await load()
+}
+
+function removeFilter(key) {
+  if (key === 'active') {
+    query.active = ''
+  } else {
+    query[key] = ''
+  }
+  query.page = 1
+  load()
+}
+
+function resetFilters() {
+  query.q = ''
+  query.status = ''
+  query.active = ''
+  query.actor_id = ''
+  query.collection_id = ''
+  query.page = 1
+  load()
 }
 
 async function doDelete(row) {
@@ -506,13 +729,16 @@ function clearPreview() {
 function onDetailClosed() {
   clearPreview()
   detail.value = null
+  captureDetailDrawerSnapshot()
 }
 
 onMounted(async () => {
+  window.addEventListener('resize', updateViewportWidth)
   await Promise.all([load(), searchActors(''), searchImageCollections('')])
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateViewportWidth)
   clearPreview()
 })
 </script>
@@ -520,14 +746,13 @@ onBeforeUnmount(() => {
 <template>
   <Layout>
     <div class="page image-page page-shell">
-      <section class="section-head">
-        <div>
-          <h1 class="page-title">图片管理</h1>
-          <p class="page-subtitle">支持批量上传、演员关联、图片合集归档和图片缩放查看</p>
-        </div>
-      </section>
+      <PageHeader title="图片管理">
+        <template #actions>
+          <el-button :icon="Upload" type="primary" @click="openUploadDialog">上传图片</el-button>
+        </template>
+      </PageHeader>
 
-      <section class="page-section">
+      <SectionCard dense>
         <div class="stats-strip">
           <div class="stat-pill">
             <div class="stat-label">总图片数</div>
@@ -546,80 +771,86 @@ onBeforeUnmount(() => {
             <div class="stat-value">{{ inactiveCount }}</div>
           </div>
         </div>
-      </section>
+      </SectionCard>
 
-      <section>
-        <el-card class="soft-card content-card table-panel list-card">
-          <template #header>
-            <div class="card-header-row">
-              <div>
-                <div class="card-title">图片列表</div>
-                <div class="card-subtitle">支持按状态、演员、图片合集进行组合筛选</div>
-              </div>
-            </div>
+      <Toolbar>
+        <template #filters>
+          <el-input
+            v-model="query.q"
+            class="quick-search"
+            placeholder="搜索图片"
+            clearable
+            :prefix-icon="Search"
+            @keyup.enter="load"
+            @clear="load"
+          />
+          <el-tag v-for="chip in activeFilterChips" :key="chip.key" closable @close="removeFilter(chip.key)">
+            {{ chip.label }}：{{ chip.value }}
+          </el-tag>
+          <el-button plain @click="filterDrawerVisible = true">更多筛选</el-button>
+        </template>
+        <template #actions>
+          <el-radio-group :model-value="viewMode" @update:model-value="setViewMode">
+            <el-radio-button value="grid">
+              <el-icon><Grid /></el-icon>
+              网格
+            </el-radio-button>
+            <el-radio-button value="list">
+              <el-icon><List /></el-icon>
+              列表
+            </el-radio-button>
+          </el-radio-group>
+        </template>
+      </Toolbar>
+
+      <SectionCard v-loading="loading">
+        <template #title>图片资产</template>
+        <template #actions>
+          <el-button :disabled="selectedImageRows.length === 0" @click="clearImageSelection">取消选择</el-button>
+        </template>
+
+        <EmptyState v-if="!loading && list.length === 0" title="暂无图片">
+          <template #action>
+            <el-button type="primary" :icon="Upload" @click="openUploadDialog">上传图片</el-button>
           </template>
-          <div class="toolbar-row">
-            <el-form inline class="filter-form image-filter-form">
-              <el-form-item>
-                <el-input v-model="query.q" placeholder="按标题或描述搜索" clearable @keyup.enter="load" />
-              </el-form-item>
-              <el-form-item>
-                <el-select v-model="query.status" placeholder="状态筛选" clearable style="width: 120px">
-                  <el-option label="可用" value="ready" />
-                  <el-option label="失败" value="failed" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-select v-model="query.active" placeholder="启用状态" clearable style="width: 120px">
-                  <el-option label="全部状态" value="" />
-                  <el-option label="仅启用" value="1" />
-                  <el-option label="仅停用" value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-select
-                  v-model="query.actor_id"
-                  filterable
-                  remote
-                  clearable
-                  reserve-keyword
-                  placeholder="按演员筛选"
-                  style="width: 180px"
-                  :remote-method="searchActors"
-                  :loading="loadingActors"
-                >
-                  <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-select
-                  v-model="query.collection_id"
-                  filterable
-                  remote
-                  clearable
-                  reserve-keyword
-                  placeholder="按图片合集筛选"
-                  style="width: 190px"
-                  :remote-method="searchImageCollections"
-                  :loading="loadingCollections"
-                >
-                  <el-option
-                    v-for="collection in imageCollectionOptions"
-                    :key="collection.value"
-                    :label="collection.label"
-                    :value="collection.value"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="load">查询</el-button>
-              </el-form-item>
-            </el-form>
-            <el-button type="success" @click="openUploadDialog">新增图片</el-button>
+        </EmptyState>
+
+        <div v-else>
+          <div v-if="viewMode === 'grid'" class="image-grid">
+            <article
+              v-for="item in list"
+              :key="item.id"
+              class="image-grid-card"
+              :class="{ 'is-selected': isGridSelected(item) }"
+            >
+              <el-checkbox
+                class="image-grid-card__select"
+                :model-value="isGridSelected(item)"
+                @update:model-value="(checked) => toggleGridSelection(item, checked)"
+              />
+              <div class="image-grid-card__preview">
+                <img v-if="item.view_url || item.url || item.thumbnail_url" :src="item.view_url || item.url || item.thumbnail_url" alt="" />
+                <span v-else>{{ item.title || '图片' }}</span>
+              </div>
+              <div class="image-grid-card__body">
+                <strong>{{ item.title || item.id }}</strong>
+                <span>{{ item.width || 0 }} x {{ item.height || 0 }} · {{ formatFileSize(item.file_size) }}</span>
+              </div>
+              <div class="image-grid-card__meta">
+                <el-tag :type="statusTagType(item.status)" size="small">{{ statusLabel(item.status) }}</el-tag>
+                <el-tag :type="item.active ? 'success' : 'info'" size="small">{{ item.active ? '启用' : '停用' }}</el-tag>
+              </div>
+              <div class="image-grid-card__actions">
+                <el-button :icon="Edit" circle @click="showDetail(item)" />
+                <el-button :icon="SwitchButton" circle @click="toggleActive(item)" />
+                <el-button :icon="Delete" circle type="danger" @click="doDelete(item)" />
+              </div>
+            </article>
           </div>
 
-          <div class="table-wrap">
-            <el-table :data="list" border v-loading="loading">
+          <div v-else class="table-wrap">
+            <el-table ref="tableRef" :data="list" border @selection-change="onImageSelectionChange">
+              <el-table-column type="selection" width="52" />
               <el-table-column prop="title" label="标题" min-width="220" />
               <el-table-column prop="status" label="状态" width="100">
                 <template #default="{ row }">
@@ -650,31 +881,35 @@ onBeforeUnmount(() => {
               </el-table-column>
             </el-table>
           </div>
+        </div>
 
-          <div class="action-row">
-            <AdminTablePagination
-              v-model:current-page="query.page"
-              v-model:page-size="query.page_size"
-              layout="total, prev, pager, next"
-              :total="total"
-              @current-change="load"
-            />
-          </div>
-        </el-card>
-      </section>
+        <div class="action-row">
+          <AdminTablePagination
+            v-model:current-page="query.page"
+            v-model:page-size="query.page_size"
+            layout="total, prev, pager, next"
+            :total="total"
+            @current-change="load"
+          />
+        </div>
+      </SectionCard>
+
+      <BulkActionBar :count="selectedImageRows.length" :actions="bulkActions" />
     </div>
 
-    <el-dialog
+    <el-drawer
       v-model="uploadDialogVisible"
-      class="crud-dialog"
       title="新增图片"
-      width="min(96vw, 920px)"
+      direction="rtl"
+      :size="drawerSize"
       :close-on-click-modal="!uploading"
       :close-on-press-escape="!uploading"
+      :before-close="handleUploadDrawerBeforeClose"
       @closed="onUploadDialogClosed"
     >
-      <el-form label-width="100px" class="upload-form">
-        <el-form-item label="批量选图">
+      <div class="drawer-body">
+        <SectionCard dense>
+          <template #title>批量选图</template>
           <el-upload
             ref="uploadRef"
             v-model:file-list="uploadFileList"
@@ -692,57 +927,63 @@ onBeforeUnmount(() => {
               </div>
             </template>
           </el-upload>
-        </el-form-item>
-        <el-form-item label="默认演员">
-          <el-select
-            v-model="uploadForm.actor_tokens"
-            multiple
-            filterable
-            remote
-            reserve-keyword
-            allow-create
-            default-first-option
-            clearable
-            :remote-method="searchActors"
-            :loading="loadingActors"
-            placeholder="可搜索演员，也可输入新演员姓名"
-            style="width: 100%"
-          >
-            <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="默认合集">
-          <el-select
-            v-model="uploadForm.collection_ids"
-            multiple
-            filterable
-            remote
-            reserve-keyword
-            clearable
-            collapse-tags
-            collapse-tags-tooltip
-            :remote-method="searchImageCollections"
-            :loading="loadingCollections"
-            placeholder="可选，可多选"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="collection in imageCollectionOptions"
-              :key="collection.value"
-              :label="collection.label"
-              :value="collection.value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="默认备注">
-          <el-input
-            v-model="uploadForm.description"
-            type="textarea"
-            :rows="2"
-            placeholder="可选，批量上传时会作为所有图片的描述"
-          />
-        </el-form-item>
-      </el-form>
+        </SectionCard>
+
+        <SectionCard dense collapsible>
+          <template #title>默认关联</template>
+          <el-form label-width="88px" class="upload-form">
+            <el-form-item label="默认演员">
+              <el-select
+                v-model="uploadForm.actor_tokens"
+                multiple
+                filterable
+                remote
+                reserve-keyword
+                allow-create
+                default-first-option
+                clearable
+                :remote-method="searchActors"
+                :loading="loadingActors"
+                placeholder="可搜索演员，也可输入新演员姓名"
+                style="width: 100%"
+              >
+                <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="默认合集">
+              <el-select
+                v-model="uploadForm.collection_ids"
+                multiple
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                collapse-tags
+                collapse-tags-tooltip
+                :remote-method="searchImageCollections"
+                :loading="loadingCollections"
+                placeholder="可选，可多选"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="collection in imageCollectionOptions"
+                  :key="collection.value"
+                  :label="collection.label"
+                  :value="collection.value"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="默认备注">
+              <el-input
+                v-model="uploadForm.description"
+                type="textarea"
+                :rows="2"
+                placeholder="可选，批量上传时会作为所有图片的描述"
+              />
+            </el-form-item>
+          </el-form>
+        </SectionCard>
+      </div>
 
       <div v-if="uploadSummary" class="upload-summary">
         <el-alert
@@ -764,22 +1005,24 @@ onBeforeUnmount(() => {
       </div>
 
       <template #footer>
-        <el-button :disabled="uploading" @click="uploadDialogVisible = false">取消</el-button>
+        <el-button :disabled="uploading" @click="requestUploadDrawerClose">取消</el-button>
         <el-button :disabled="uploading" @click="resetUploadForm">清空默认参数</el-button>
         <el-button type="primary" :loading="uploading" @click="submitUpload">开始上传</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
 
-    <el-dialog
+    <el-drawer
       v-model="detailVisible"
-      class="crud-dialog"
       title="图片详情"
-      width="min(96vw, 980px)"
+      direction="rtl"
+      :size="drawerSize"
+      :before-close="handleDetailDrawerBeforeClose"
       @closed="onDetailClosed"
     >
-      <div v-if="detail" class="detail-grid">
-        <el-card class="detail-card" shadow="never">
-          <el-form label-width="100px">
+      <div v-if="detail" class="drawer-body">
+        <SectionCard dense>
+          <template #title>基础信息</template>
+          <el-form label-width="88px">
             <el-form-item label="标题">
               <el-input v-model="detail.title" />
             </el-form-item>
@@ -834,10 +1077,10 @@ onBeforeUnmount(() => {
               <el-input v-model="detail.metadata_text" type="textarea" :rows="8" />
             </el-form-item>
           </el-form>
-        </el-card>
+        </SectionCard>
 
-        <el-card class="detail-card" shadow="never">
-          <template #header>图片查看（支持缩放接口）</template>
+        <SectionCard dense collapsible>
+          <template #title>图片查看</template>
           <div class="preview-controls">
             <el-input-number v-model="preview.w" :min="0" :step="50" controls-position="right" placeholder="宽" />
             <el-input-number v-model="preview.h" :min="0" :step="50" controls-position="right" placeholder="高" />
@@ -870,25 +1113,84 @@ onBeforeUnmount(() => {
             <span>存储格式：{{ detail.stored_mime || '-' }}</span>
             <span>文件大小：{{ formatFileSize(detail.file_size) }}</span>
           </div>
-        </el-card>
+        </SectionCard>
       </div>
 
       <template #footer>
-        <el-button @click="detailVisible = false">取消</el-button>
+        <el-button @click="requestDetailDrawerClose">取消</el-button>
         <el-button type="primary" :loading="saving" @click="saveDetail">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
+
+    <el-drawer v-model="filterDrawerVisible" title="更多筛选" direction="rtl" :size="drawerSize">
+      <el-form label-width="88px">
+        <el-form-item label="搜索">
+          <el-input v-model="query.q" placeholder="按标题或描述搜索" clearable />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="query.status" placeholder="状态筛选" clearable style="width: 100%">
+            <el-option label="可用" value="ready" />
+            <el-option label="失败" value="failed" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="启用状态">
+          <el-select v-model="query.active" placeholder="启用状态" clearable style="width: 100%">
+            <el-option label="全部状态" value="" />
+            <el-option label="仅启用" value="1" />
+            <el-option label="仅停用" value="0" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="演员">
+          <el-select
+            v-model="query.actor_id"
+            filterable
+            remote
+            clearable
+            reserve-keyword
+            placeholder="按演员筛选"
+            style="width: 100%"
+            :remote-method="searchActors"
+            :loading="loadingActors"
+          >
+            <el-option v-for="actor in actorOptions" :key="actor.value" :label="actor.label" :value="actor.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="图片合集">
+          <el-select
+            v-model="query.collection_id"
+            filterable
+            remote
+            clearable
+            reserve-keyword
+            placeholder="按图片合集筛选"
+            style="width: 100%"
+            :remote-method="searchImageCollections"
+            :loading="loadingCollections"
+          >
+            <el-option
+              v-for="collection in imageCollectionOptions"
+              :key="collection.value"
+              :label="collection.label"
+              :value="collection.value"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetFilters">重置</el-button>
+        <el-button type="primary" @click="filterDrawerVisible = false; query.page = 1; load()">应用筛选</el-button>
+      </template>
+    </el-drawer>
   </Layout>
 </template>
 
 <style scoped>
 .image-page {
-  gap: 16px;
+  gap: var(--space-4);
 }
 
-.image-filter-form {
-  flex: 1 1 auto;
-  min-width: 320px;
+.quick-search {
+  width: 240px;
 }
 
 .stats-strip {
@@ -898,104 +1200,160 @@ onBeforeUnmount(() => {
 }
 
 .stat-pill {
-  border-radius: 14px;
-  border: 1px solid rgba(190, 24, 93, 0.16);
-  background:
-    radial-gradient(circle at 12% 18%, rgba(251, 113, 133, 0.16), rgba(251, 113, 133, 0) 50%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.92), rgba(255, 241, 242, 0.75));
-  padding: 12px 14px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-muted);
 }
 
 .stat-label {
-  font-size: 12px;
-  color: #9f1239;
-  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
 }
 
 .stat-value {
-  margin-top: 6px;
-  font-size: 24px;
+  margin-top: var(--space-2);
+  color: var(--primary-strong);
+  font-size: var(--text-display);
   line-height: 1;
-  color: #881337;
-  font-family: 'Fira Code', monospace;
-}
-
-.list-card {
-  overflow: hidden;
-}
-
-.card-header-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 12px;
-}
-
-.card-title {
-  font-size: 18px;
   font-weight: 700;
-  color: #7f1d1d;
 }
 
-.card-subtitle {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #6b7280;
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
 }
 
+.image-grid-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  transition:
+    border-color var(--motion-duration-base) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+.image-grid-card.is-selected,
+.image-grid-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+
+.image-grid-card__select {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 2;
+}
+
+.image-grid-card__preview {
+  display: grid;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
+  color: var(--text-muted);
+  font-size: var(--text-small);
+}
+
+.image-grid-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-grid-card__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.image-grid-card__body strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-grid-card__body span,
+.preview-placeholder,
+.preview-meta {
+  color: var(--text-muted);
+}
+
+.image-grid-card__meta,
+.image-grid-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.image-grid-card__actions {
+  opacity: 0;
+  transition: opacity var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+.image-grid-card:hover .image-grid-card__actions,
+.image-grid-card.is-selected .image-grid-card__actions {
+  opacity: 1;
+}
+
+.drawer-body,
 .upload-form {
   width: 100%;
 }
 
+.drawer-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .upload-summary {
-  margin-top: 14px;
+  margin-top: var(--space-3);
   display: grid;
-  gap: 10px;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 12px;
-}
-
-.detail-card {
-  border-radius: 12px;
-  border: 1px solid rgba(136, 19, 55, 0.12);
+  gap: var(--space-3);
 }
 
 .preview-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-3);
 }
 
 .zoom-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .zoom-label {
   width: 50px;
   text-align: right;
-  font-family: 'Fira Code', monospace;
-  color: #7f1d1d;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .preview-canvas {
   min-height: 340px;
   max-height: 440px;
-  border: 1px dashed rgba(136, 19, 55, 0.2);
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(255, 241, 242, 0.8), rgba(248, 250, 252, 0.9));
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-muted);
   overflow: auto;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .preview-image {
@@ -1005,26 +1363,17 @@ onBeforeUnmount(() => {
   transition: transform 160ms ease;
 }
 
-.preview-placeholder {
-  color: #6b7280;
-}
-
 .preview-meta {
-  margin-top: 10px;
+  margin-top: var(--space-3);
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  color: #4b5563;
-  font-size: 12px;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
 }
 
 @media (max-width: 1200px) {
   .stats-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .detail-grid {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1033,13 +1382,8 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .card-header-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .image-filter-form {
-    min-width: 100%;
+  .quick-search {
+    width: 100%;
   }
 }
 </style>

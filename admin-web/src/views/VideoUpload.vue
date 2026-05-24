@@ -1,16 +1,21 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
-import UploadProgress from '../components/UploadProgress.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
 import { getAdminActors, getAdminCollections, getAdminImageCollections, getAdminPopularVideoTags, getAdminVideoTags } from '../api/admin'
 import { sha256File } from '../utils/hash'
 import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
+import { canAdvanceStep, getNextStep, getPrevStep } from './videoUpload.wizard.helpers'
+import StepBasic from './VideoUpload/StepBasic.vue'
+import StepFile from './VideoUpload/StepFile.vue'
+import StepRelate from './VideoUpload/StepRelate.vue'
 
 const uploadFileList = ref([])
-const uploadRef = ref(null)
+const stepFileRef = ref(null)
+const activeStep = ref(0)
 const progress = ref(0)
 const hashProgress = ref(0)
 const uploading = ref(false)
@@ -73,6 +78,11 @@ const batchProgress = computed(() => {
   const currentProgress = uploading.value && !cancelRequested.value ? progress.value / 100 : 0
   return Math.min(100, Math.round(((completedCount.value + currentProgress) / totalFiles.value) * 100))
 })
+const wizardForm = computed(() => ({
+  files: selectedFiles.value,
+  type: form.type
+}))
+const canGoNext = computed(() => canAdvanceStep(activeStep.value, wizardForm.value))
 
 watch(
   () => form.type,
@@ -88,6 +98,22 @@ watch(
     ElMessage.warning('电影仅支持单文件上传，已保留第1个文件')
   }
 )
+
+function nextStep() {
+  if (!canGoNext.value) {
+    if (activeStep.value === 0) {
+      ElMessage.warning('请先选择文件')
+    } else if (activeStep.value === 1) {
+      ElMessage.warning('请选择上传类型')
+    }
+    return
+  }
+  activeStep.value = getNextStep(activeStep.value)
+}
+
+function prevStep() {
+  activeStep.value = getPrevStep(activeStep.value)
+}
 
 function getFileKey(raw) {
   return `${raw.name}__${raw.size}__${raw.lastModified}`
@@ -114,7 +140,7 @@ function onFileChange(_file, fileList) {
 
 function clearSelectedFiles() {
   if (uploading.value) return
-  uploadRef.value?.clearFiles()
+  stepFileRef.value?.clearFiles?.()
   uploadFileList.value = []
 }
 
@@ -464,256 +490,94 @@ onMounted(() => {
 <template>
   <Layout>
     <div class="page-shell upload-page">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title">上传中心</h1>
-          <p class="page-subtitle">支持分片上传、秒传检测与上传取消</p>
-        </div>
-      </div>
+      <PageHeader title="上传中心" />
 
-      <section class="content-card upload-form-panel">
-        <div class="section-head">
-          <div class="section-head__main">
-            <h2 class="section-head__title">上传表单</h2>
-            <p class="section-head__desc">配置视频元信息并选择待上传文件</p>
-          </div>
-        </div>
-        <el-form label-width="100px">
-          <el-form-item label="视频文件">
-            <el-upload
-              ref="uploadRef"
-              v-model:file-list="uploadFileList"
-              drag
-              :auto-upload="false"
-              :on-change="onFileChange"
-              :multiple="!isMovieType"
-              :limit="isMovieType ? 1 : 999"
-              class="upload-drop"
-            >
-              <el-icon><UploadFilled /></el-icon>
-              <div>拖拽文件到此，或点击选择文件</div>
-            </el-upload>
-            <div class="upload-tip">
-              <span v-if="isMovieType">电影仅支持单文件上传</span>
-              <span v-else>当前类型支持批量上传，可一次选择多个文件</span>
-              <span>已选择 {{ selectedFiles.length }} 个文件</span>
-            </div>
-          </el-form-item>
-          <el-form-item label="类型">
-            <el-select v-model="form.type" style="width: 220px">
-              <el-option label="短视频" value="short" />
-              <el-option label="电影" value="movie" />
-              <el-option label="剧集分集" value="episode" />
-              <el-option label="AV" value="av" />
-            </el-select>
-          </el-form-item>
-          <el-form-item v-if="isAVType" label="AV 地区分类">
-            <el-radio-group v-model="form.siteCategory">
-              <el-radio-button v-for="item in avSiteCategoryOptions" :key="item.value" :label="item.value">
-                {{ item.label }}
-              </el-radio-button>
-            </el-radio-group>
-          </el-form-item>
-          <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
-          <el-form-item label="描述"><el-input v-model="form.description" type="textarea" rows="3" /></el-form-item>
-          <el-form-item label="视频标签">
-            <el-select
-              v-model="form.tags"
-              multiple
-              filterable
-              remote
-              reserve-keyword
-              :remote-method="loadTagSuggestions"
-              allow-create
-              default-first-option
-              clearable
-              placeholder="可选择或输入标签"
-              style="width: 100%"
-              :loading="loadingTags"
-            >
-              <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="图片图集">
-            <el-select
-              v-model="form.imageCollectionID"
-              filterable
-              remote
-              reserve-keyword
-              clearable
-              :remote-method="loadImageCollectionSuggestions"
-              :loading="loadingImageCollections"
-              placeholder="可选，仅可关联一个图片图集"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="collection in imageCollectionOptions"
-                :key="collection.value"
-                :label="collection.label"
-                :value="collection.value"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item v-if="isShortType" label="所属合集">
-            <el-select
-              v-model="form.collections"
-              multiple
-              filterable
-              remote
-              reserve-keyword
-              clearable
-              collapse-tags
-              collapse-tags-tooltip
-              :remote-method="loadCollectionSuggestions"
-              :loading="loadingCollections"
-              placeholder="可选，可多选"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="collection in collectionOptions"
-                :key="collection.value"
-                :label="collection.label"
-                :value="collection.value"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="关联演员">
-            <el-select
-              v-model="form.actors"
-              multiple
-              filterable
-              remote
-              reserve-keyword
-              allow-create
-              default-first-option
-              clearable
-              :remote-method="searchActors"
-              :loading="loadingActors"
-              placeholder="可搜索演员，也可直接输入新演员姓名"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="actor in actorOptions"
-                :key="actor.value"
-                :label="actor.label"
-                :value="actor.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-form>
-        <div class="toolbar-row toolbar-row--start upload-actions">
-          <el-button type="primary" :loading="uploading" :disabled="selectedFiles.length === 0" @click="submit">开始上传</el-button>
-          <el-button v-if="uploading" type="danger" @click="cancelUpload">取消上传</el-button>
-          <el-button :disabled="!canClearSelectedFiles" @click="clearSelectedFiles">清空已选文件</el-button>
-          <el-button :disabled="!canClearRecords" @click="clearUploadRecords">清空上传记录</el-button>
-        </div>
-      </section>
+      <el-steps :active="activeStep" finish-status="success" class="upload-steps">
+        <el-step title="选文件" />
+        <el-step title="基础信息" />
+        <el-step title="关联与上传" />
+      </el-steps>
 
-      <section class="content-card progress-panel">
-        <div class="section-head">
-          <div class="section-head__main">
-            <h2 class="section-head__title">进度区</h2>
-            <p class="section-head__desc">展示当前文件上传状态与整批任务完成度</p>
-          </div>
-        </div>
-        <UploadProgress
-          :percentage="progress"
-          :status-text="`当前文件：${currentFileName || '-'} ｜ 哈希计算 ${hashProgress}%`"
-        />
-        <div class="batch-progress">
-          <div class="batch-summary">
-            批次进度：{{ completedCount }}/{{ totalFiles || selectedFiles.length }}，成功 {{ successCount }}，失败 {{ failedCount }}，取消 {{ cancelledCount }}
-          </div>
-          <el-progress :percentage="batchProgress" />
-        </div>
-      </section>
+      <StepFile
+        v-show="activeStep === 0"
+        ref="stepFileRef"
+        v-model:file-list="uploadFileList"
+        :is-movie-type="isMovieType"
+        :selected-count="selectedFiles.length"
+        @file-change="onFileChange"
+      />
 
-      <section class="table-panel upload-result-panel">
-        <div class="section-head">
-          <div class="section-head__main">
-            <h2 class="section-head__title">结果区</h2>
-            <p class="section-head__desc">记录本次批量上传的每个文件结果</p>
-          </div>
-        </div>
-        <div v-if="uploadResults.length" class="table-wrap upload-result">
-          <el-table :data="uploadResults" size="small" border>
-            <el-table-column prop="name" label="文件名" min-width="280" show-overflow-tooltip />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'warning'">
-                  {{ row.status === 'success' ? '成功' : row.status === 'failed' ? '失败' : '已取消' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="message" label="信息" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="videoId" label="视频ID" min-width="260" show-overflow-tooltip />
-          </el-table>
-        </div>
-        <div v-else class="upload-result-empty">暂无上传记录，开始上传后将在这里展示结果。</div>
-      </section>
+      <StepBasic
+        v-show="activeStep === 1"
+        :form="form"
+        :is-av-type="isAVType"
+        :av-site-category-options="avSiteCategoryOptions"
+      />
+
+      <StepRelate
+        v-show="activeStep === 2"
+        :form="form"
+        :is-short-type="isShortType"
+        :tag-options="tagOptions"
+        :loading-tags="loadingTags"
+        :collection-options="collectionOptions"
+        :loading-collections="loadingCollections"
+        :image-collection-options="imageCollectionOptions"
+        :loading-image-collections="loadingImageCollections"
+        :actor-options="actorOptions"
+        :loading-actors="loadingActors"
+        :selected-count="selectedFiles.length"
+        :uploading="uploading"
+        :can-clear-selected-files="canClearSelectedFiles"
+        :can-clear-records="canClearRecords"
+        :progress="progress"
+        :hash-progress="hashProgress"
+        :current-file-name="currentFileName"
+        :completed-count="completedCount"
+        :total-files="totalFiles"
+        :success-count="successCount"
+        :failed-count="failedCount"
+        :cancelled-count="cancelledCount"
+        :batch-progress="batchProgress"
+        :upload-results="uploadResults"
+        @load-tags="loadTagSuggestions"
+        @load-collections="loadCollectionSuggestions"
+        @load-image-collections="loadImageCollectionSuggestions"
+        @search-actors="searchActors"
+        @submit="submit"
+        @cancel-upload="cancelUpload"
+        @clear-selected-files="clearSelectedFiles"
+        @clear-upload-records="clearUploadRecords"
+      />
+
+      <Toolbar class="wizard-footer">
+        <template #actions>
+          <el-button :disabled="activeStep === 0 || uploading" @click="prevStep">上一步</el-button>
+          <el-button v-if="activeStep < 2" type="primary" :disabled="!canGoNext" @click="nextStep">下一步</el-button>
+          <el-button v-else type="primary" :loading="uploading" :disabled="selectedFiles.length === 0" @click="submit">开始上传</el-button>
+        </template>
+      </Toolbar>
     </div>
   </Layout>
 </template>
 
 <style scoped>
 .upload-page {
-  padding-bottom: 4px;
+  padding-bottom: var(--space-1);
 }
 
-.upload-form-panel,
-.progress-panel,
-.upload-result-panel {
-  display: grid;
-  gap: 12px;
+.upload-steps {
+  padding: var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
 }
 
-.upload-drop :deep(.el-upload-dragger) {
-  border-radius: 14px;
-  background: linear-gradient(160deg, #fff1f2 0%, #fff 100%);
-}
-
-.upload-tip {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.upload-actions {
-  padding-left: 100px;
-}
-
-.batch-progress {
-  display: grid;
-  gap: 8px;
-}
-
-.batch-summary {
-  color: #374151;
-  font-size: 13px;
-}
-
-.upload-result-empty {
-  padding: 18px 14px;
-  border-radius: 12px;
-  border: 1px dashed var(--line-strong);
-  color: var(--text-muted);
-  font-size: 13px;
-  background: var(--bg-surface-muted);
-}
-
-@media (max-width: 768px) {
-  .upload-tip {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .upload-actions {
-    padding-left: 0;
-  }
+.wizard-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  padding: var(--space-3) 0 0;
+  background: var(--bg-canvas);
 }
 </style>

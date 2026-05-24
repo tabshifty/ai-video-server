@@ -1,10 +1,15 @@
 ﻿<script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
+import { Delete, MagicStick, MoreFilled, Setting, Search } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import BulkActionBar from '../components/base/BulkActionBar.vue'
+import EmptyState from '../components/base/EmptyState.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import {
   batchDeleteAdminVideos,
   captureAdminVideoThumbnail,
@@ -44,9 +49,13 @@ import {
 
 const list = ref([])
 const total = ref(0)
+const listLoading = ref(false)
 const tableRef = ref(null)
 const detail = ref(null)
 const detailVisible = ref(false)
+const detailSnapshot = ref('')
+const filterDrawerVisible = ref(false)
+const viewportWidth = ref(readViewportWidth())
 const previewPlayerRef = ref(null)
 const playURL = ref('')
 const playExpiresAt = ref(0)
@@ -74,12 +83,123 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const router = useRouter()
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
+const COLUMN_VISIBILITY_KEY = 'admin-videolist-columns'
+const ALL_COLUMNS = [
+  { key: 'title', label: '标题' },
+  { key: 'thumbnail', label: '封面' },
+  { key: 'type', label: '类型' },
+  { key: 'status', label: '状态' },
+  { key: 'upload_user', label: '上传用户', secondary: true },
+  { key: 'created_at', label: '上传时间', secondary: true },
+  { key: 'operations', label: '操作', required: true }
+]
+const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'upload_user', 'created_at', 'operations']
+const columnVisibility = ref(readStoredColumns())
 const retagTypeOptions = [
   { value: 'movie', label: '电影' },
   { value: 'episode', label: '剧集分集' },
   { value: 'av', label: 'AV' }
 ]
 const manualStatusOptions = getManualVideoStatusOptions()
+const detailDrawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '560px'))
+const isNarrowViewport = computed(() => viewportWidth.value < 1280)
+const activeFilterChips = computed(() => {
+  const chips = []
+  if (query.q) chips.push({ key: 'q', label: '搜索', value: query.q })
+  if (query.type) chips.push({ key: 'type', label: '类型', value: typeLabel(query.type) })
+  if (query.status) chips.push({ key: 'status', label: '状态', value: statusLabel(query.status) })
+  return chips
+})
+const bulkActions = computed(() => [
+  { label: '批量删除', icon: Delete, type: 'danger', onClick: doBatchDelete },
+  { label: '取消选择', icon: MoreFilled, type: 'primary', onClick: clearSelection }
+])
+const detailDirty = computed(() => detailSnapshot.value !== serializeDetailState())
+
+function readViewportWidth() {
+  if (typeof window === 'undefined') return 1440
+  return window.innerWidth
+}
+
+function updateViewportWidth() {
+  viewportWidth.value = readViewportWidth()
+}
+
+function readStoredColumns() {
+  if (typeof window === 'undefined') return [...DEFAULT_VISIBLE_COLUMNS]
+  try {
+    const raw = window.localStorage.getItem(COLUMN_VISIBILITY_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_COLUMNS]
+    return parsed.filter((key) => ALL_COLUMNS.some((column) => column.key === key))
+  } catch (_) {
+    return [...DEFAULT_VISIBLE_COLUMNS]
+  }
+}
+
+function persistColumns() {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility.value))
+  } catch (_) {
+    // localStorage 不可用时仅保留本会话列设置。
+  }
+}
+
+function onColumnVisibilityChange(next) {
+  const required = ALL_COLUMNS.filter((item) => item.required).map((item) => item.key)
+  columnVisibility.value = Array.from(new Set([...(next || []), ...required]))
+  persistColumns()
+}
+
+function isColumnVisible(key) {
+  if (!columnVisibility.value.includes(key)) return false
+  if (!isNarrowViewport.value) return true
+  const column = ALL_COLUMNS.find((item) => item.key === key)
+  return !column?.secondary
+}
+
+function removeFilter(key) {
+  query[key] = ''
+  query.page = 1
+  load()
+}
+
+function serializeDetailState() {
+  if (!detail.value) return ''
+  return JSON.stringify({
+    id: detail.value.id || '',
+    title: detail.value.title || '',
+    description: detail.value.description || '',
+    thumbnail_path: detail.value.thumbnail_path || '',
+    tags: [...(detail.value.tags || [])].sort(),
+    actor_tokens: [...(detail.value.actor_tokens || [])].sort(),
+    collection_ids: [...(detail.value.collection_ids || [])].sort(),
+    image_collection_id: detail.value.image_collection_id || '',
+    status: detail.value.status || '',
+    target_type: detail.value.target_type || '',
+    season_number: detail.value.season_number || 0,
+    episode_number: detail.value.episode_number || 0
+  })
+}
+
+function captureDetailSnapshot() {
+  detailSnapshot.value = serializeDetailState()
+}
+
+async function confirmDetailClose() {
+  if (!detailDirty.value) return true
+  try {
+    await ElMessageBox.confirm('未保存的修改将会丢失，确认关闭吗？', '确认关闭', {
+      type: 'warning',
+      confirmButtonText: '确认丢弃',
+      cancelButtonText: '继续编辑'
+    })
+    return true
+  } catch (_) {
+    return false
+  }
+}
 
 function statusLabel(status) {
   return getVideoStatusMeta(status).label
@@ -281,10 +401,15 @@ function openMovieManualScrape() {
 }
 
 async function load() {
-  const data = await getAdminVideos(query)
-  list.value = data.items || []
-  total.value = data.total_count || 0
-  clearSelection()
+  listLoading.value = true
+  try {
+    const data = await getAdminVideos(query)
+    list.value = data.items || []
+    total.value = data.total_count || 0
+    clearSelection()
+  } finally {
+    listLoading.value = false
+  }
 }
 
 function applyFilters() {
@@ -385,6 +510,7 @@ async function showDetail(row) {
   if (detail.value.image_collection) {
     mergeImageCollectionOptions([detail.value.image_collection])
   }
+  captureDetailSnapshot()
   detailVisible.value = true
   await Promise.all([
     searchActors(''),
@@ -442,6 +568,23 @@ function handleDetailClose() {
 
 function handleDetailClosed() {
   resetDetailState()
+  captureDetailSnapshot()
+}
+
+async function requestDetailClose() {
+  if (await confirmDetailClose()) {
+    captureDetailSnapshot()
+    detailVisible.value = false
+  }
+}
+
+function handleDetailBeforeClose(done) {
+  confirmDetailClose().then((confirmed) => {
+    if (confirmed) {
+      captureDetailSnapshot()
+      done()
+    }
+  })
 }
 
 async function captureCurrentFrameThumbnail() {
@@ -600,6 +743,7 @@ async function saveDetail() {
   }
   await updateAdminVideo(detail.value.id, payload)
   ElMessage.success(enqueueAutoScrape ? '保存成功，已加入自动刮削队列' : '保存成功')
+  captureDetailSnapshot()
   detailVisible.value = false
   await load()
 }
@@ -712,8 +856,12 @@ async function removeSubtitle(row) {
   await loadSubtitles(detail.value.id)
 }
 
-onMounted(load)
+onMounted(() => {
+  window.addEventListener('resize', updateViewportWidth)
+  load()
+})
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateViewportWidth)
   handleDetailClose()
   resetDetailState()
 })
@@ -722,75 +870,54 @@ onBeforeUnmount(() => {
 <template>
   <Layout>
     <div class="page-shell video-list-page">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title">视频管理</h1>
-          <p class="page-subtitle">筛选、查看、重转码与元数据编辑</p>
-        </div>
-      </div>
+      <PageHeader title="视频管理" />
 
-      <section class="content-card filter-panel">
-        <div class="section-head">
-          <div class="section-head__main">
-            <h2 class="section-head__title">筛选区</h2>
-            <p class="section-head__desc">按标题、类型与状态定位目标视频</p>
-          </div>
-        </div>
+      <Toolbar>
+        <template #filters>
+          <el-input
+            v-model="query.q"
+            class="quick-search"
+            placeholder="标题/标签搜索"
+            clearable
+            :prefix-icon="Search"
+            @keyup.enter="applyFilters"
+            @clear="applyFilters"
+          />
+          <el-tag v-for="chip in activeFilterChips" :key="chip.key" closable @close="removeFilter(chip.key)">
+            {{ chip.label }}：{{ chip.value }}
+          </el-tag>
+          <el-button plain @click="filterDrawerVisible = true">更多筛选</el-button>
+        </template>
+        <template #actions>
+          <el-popover trigger="click" :width="240">
+            <template #reference>
+              <el-button :icon="Setting">列设置</el-button>
+            </template>
+            <el-checkbox-group :model-value="columnVisibility" class="column-settings" @update:model-value="onColumnVisibilityChange">
+              <el-checkbox
+                v-for="column in ALL_COLUMNS"
+                :key="column.key"
+                :value="column.key"
+                :disabled="column.required"
+              >
+                {{ column.label }}
+              </el-checkbox>
+            </el-checkbox-group>
+          </el-popover>
+        </template>
+      </Toolbar>
 
-        <el-form class="filter-form" @submit.prevent>
-          <el-form-item>
-            <el-input v-model="query.q" placeholder="标题/标签搜索" clearable />
-          </el-form-item>
-          <el-form-item>
-            <el-select v-model="query.type" placeholder="类型" clearable style="width: 160px">
-              <el-option label="短视频" value="short" />
-              <el-option label="电影" value="movie" />
-              <el-option label="剧集分集" value="episode" />
-              <el-option label="AV" value="av" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-select v-model="query.status" placeholder="状态" clearable style="width: 160px">
-              <el-option label="已上传" value="uploaded" />
-              <el-option label="刮削中" value="scraping" />
-              <el-option label="待绑定" value="tv_pending" />
-              <el-option label="欧美 AV 待确认" value="av_scrape_pending" />
-              <el-option label="处理中" value="processing" />
-              <el-option label="可播放" value="ready" />
-              <el-option label="失败" value="failed" />
-            </el-select>
-          </el-form-item>
-          <div class="toolbar-row toolbar-row--start filter-actions">
-            <el-button type="primary" @click="applyFilters">查询</el-button>
-            <el-button @click="resetFilters">重置</el-button>
-          </div>
-        </el-form>
-      </section>
-
-      <section class="table-panel result-panel">
-        <div class="section-head">
-          <div class="section-head__main">
-            <h2 class="section-head__title">结果区</h2>
-            <p class="section-head__desc">当前共 {{ total }} 条视频记录</p>
-          </div>
-          <div class="section-head__actions">
-            <el-button
-              type="danger"
-              plain
-              :disabled="selectedRows.length === 0"
-              :loading="deletingBatch"
-              @click="doBatchDelete"
-            >
-              批量删除
-            </el-button>
-          </div>
-        </div>
-
-        <div class="table-wrap">
+      <SectionCard v-loading="listLoading">
+        <template #title>视频列表</template>
+        <template #actions>
+          <span class="result-total">共 {{ total }} 条</span>
+        </template>
+        <EmptyState v-if="!listLoading && list.length === 0" title="暂无视频" />
+        <div v-if="list.length > 0" class="table-wrap">
           <el-table ref="tableRef" :data="list" border @selection-change="onSelectionChange">
             <el-table-column type="selection" width="52" />
-            <el-table-column prop="title" label="标题" min-width="220" />
-            <el-table-column label="封面" width="120">
+            <el-table-column v-if="isColumnVisible('title')" prop="title" label="标题" min-width="220" />
+            <el-table-column v-if="isColumnVisible('thumbnail')" label="封面" width="120">
               <template #default="{ row }">
                 <div class="video-cover-cell">
                   <el-image
@@ -812,21 +939,21 @@ onBeforeUnmount(() => {
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="type" label="类型" width="110">
+            <el-table-column v-if="isColumnVisible('type')" prop="type" label="类型" width="110">
               <template #default="{ row }">
                 {{ typeLabel(row.type) }}
               </template>
             </el-table-column>
-            <el-table-column prop="status" label="状态" width="120">
+            <el-table-column v-if="isColumnVisible('status')" prop="status" label="状态" width="120">
               <template #default="{ row }">
                 <el-tag :type="statusTagType(row.status)">
                   {{ statusLabel(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="upload_user" label="上传用户" width="140" />
-            <el-table-column prop="created_at" label="上传时间" width="180" />
-            <el-table-column label="操作" width="300">
+            <el-table-column v-if="isColumnVisible('upload_user')" prop="upload_user" label="上传用户" width="140" />
+            <el-table-column v-if="isColumnVisible('created_at')" prop="created_at" label="上传时间" width="180" />
+            <el-table-column v-if="isColumnVisible('operations')" label="操作" width="300">
               <template #default="{ row }">
                 <el-button size="small" @click="showDetail(row)">详情</el-button>
                 <el-button size="small" @click="doRetranscode(row)">重转码</el-button>
@@ -845,19 +972,24 @@ onBeforeUnmount(() => {
             @current-change="load"
           />
         </div>
-      </section>
+      </SectionCard>
+
+      <BulkActionBar :count="selectedRows.length" :actions="bulkActions" />
     </div>
 
-    <el-dialog
+    <el-drawer
       v-model="detailVisible"
       title="视频详情"
-      width="760px"
-      destroy-on-close
+      direction="rtl"
+      :size="detailDrawerSize"
+      :before-close="handleDetailBeforeClose"
       @close="handleDetailClose"
       @closed="handleDetailClosed"
     >
-      <el-form v-if="detail" label-width="90px">
-        <el-form-item v-if="detail.type === 'episode' && detail.status === 'tv_pending'" label="待处理">
+      <el-form v-if="detail" label-width="90px" class="detail-drawer-form">
+        <SectionCard dense>
+          <template #title>基础信息</template>
+          <el-form-item v-if="detail.type === 'episode' && detail.status === 'tv_pending'" label="待处理">
           <div class="tv-pending-panel">
             <el-alert
               type="warning"
@@ -1040,7 +1172,7 @@ onBeforeUnmount(() => {
             title="保存后将自动清空短视频合集，并在后台按标题自动刮削（默认选第一个候选）。"
           />
         </el-form-item>
-        <el-form-item v-if="detail.type === 'short' && !isRetaggingShortVideo(detail)" label="所属合集">
+          <el-form-item v-if="detail.type === 'short' && !isRetaggingShortVideo(detail)" label="所属合集">
           <el-select
             v-model="detail.collection_ids"
             multiple
@@ -1063,8 +1195,11 @@ onBeforeUnmount(() => {
             />
           </el-select>
         </el-form-item>
+        </SectionCard>
 
-        <el-form-item label="播放预览">
+        <SectionCard dense collapsible :default-expanded="false">
+          <template #title>播放预览</template>
+          <el-form-item label="播放预览">
           <div class="play-preview">
             <div class="play-actions">
               <el-button
@@ -1134,8 +1269,11 @@ onBeforeUnmount(() => {
             />
           </div>
         </el-form-item>
+        </SectionCard>
 
-        <el-form-item v-if="supportsSubtitleManage(detail.type)" label="字幕管理">
+        <SectionCard v-if="supportsSubtitleManage(detail.type)" dense collapsible :default-expanded="false">
+          <template #title>字幕管理</template>
+          <el-form-item v-if="supportsSubtitleManage(detail.type)" label="字幕管理">
           <div class="subtitle-panel">
             <div class="subtitle-panel__actions">
               <el-button
@@ -1226,56 +1364,82 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </el-form-item>
+        </SectionCard>
       </el-form>
 
       <template #footer>
-        <el-button @click="detailVisible = false">取消</el-button>
+        <el-button @click="requestDetailClose">取消</el-button>
         <el-button type="primary" @click="saveDetail">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
+
+    <el-drawer v-model="filterDrawerVisible" title="更多筛选" direction="rtl" :size="detailDrawerSize">
+      <el-form label-width="88px">
+        <el-form-item label="搜索">
+          <el-input v-model="query.q" placeholder="标题/标签搜索" clearable />
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="query.type" placeholder="类型" clearable style="width: 100%">
+            <el-option label="短视频" value="short" />
+            <el-option label="电影" value="movie" />
+            <el-option label="剧集分集" value="episode" />
+            <el-option label="AV" value="av" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="query.status" placeholder="状态" clearable style="width: 100%">
+            <el-option label="已上传" value="uploaded" />
+            <el-option label="刮削中" value="scraping" />
+            <el-option label="待绑定" value="tv_pending" />
+            <el-option label="欧美 AV 待确认" value="av_scrape_pending" />
+            <el-option label="处理中" value="processing" />
+            <el-option label="可播放" value="ready" />
+            <el-option label="失败" value="failed" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetFilters">重置</el-button>
+        <el-button type="primary" @click="filterDrawerVisible = false; applyFilters()">应用筛选</el-button>
+      </template>
+    </el-drawer>
   </Layout>
 </template>
 
 <style scoped>
 .video-list-page {
-  padding-bottom: 4px;
+  padding-bottom: var(--space-1);
 }
 
-.filter-panel,
-.result-panel {
+.quick-search {
+  width: 240px;
+}
+
+.column-settings {
   display: grid;
-  gap: 12px;
+  gap: var(--space-2);
 }
 
-.filter-form {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
+.result-total {
+  color: var(--text-muted);
+  font-size: var(--text-small);
 }
 
-.filter-form .el-form-item {
-  margin: 0;
-}
-
-.filter-actions {
-  margin-left: auto;
-}
-
-.result-panel :deep(.el-button + .el-button) {
-  margin-left: 8px;
+.detail-drawer-form {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .status-field {
   width: 100%;
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .status-field__hint {
   color: var(--el-color-warning);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: var(--text-caption);
+  line-height: var(--leading-small);
 }
 
 .play-preview {
@@ -1293,10 +1457,10 @@ onBeforeUnmount(() => {
 .video-cover-image {
   width: 96px;
   height: 54px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--line-soft);
-  background: var(--surface-muted);
+  background: var(--bg-surface-muted);
   cursor: zoom-in;
 }
 
@@ -1310,12 +1474,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
-  border-radius: 8px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
   border: 1px dashed var(--line-soft);
-  background: var(--surface-muted);
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  background: var(--bg-surface-muted);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
   line-height: 1.2;
   text-align: center;
 }
@@ -1327,96 +1491,96 @@ onBeforeUnmount(() => {
 .tv-pending-panel {
   width: 100%;
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .tv-pending-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .tv-pending-candidates {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .tv-pending-candidates__title {
-  color: var(--el-text-color-regular);
-  font-size: 13px;
+  color: var(--text-secondary);
+  font-size: var(--text-small);
 }
 
 .tv-pending-candidate {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   background: rgba(245, 158, 11, 0.12);
-  color: var(--el-text-color-primary);
+  color: var(--text-primary);
 }
 
 .tv-pending-candidate__meta {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
 }
 
 .episode-fields {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .episode-divider {
-  color: #6b7280;
-  font-size: 13px;
+  color: var(--text-muted);
+  font-size: var(--text-small);
 }
 
 .play-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .play-expire {
-  color: #6b7280;
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
 }
 
 .preview-player {
   width: 100%;
   max-height: 360px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line-soft);
-  background: #000;
+  background: var(--slate-950);
 }
 
 .subtitle-panel {
   width: 100%;
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .subtitle-panel__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .subtitle-upload {
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 12px;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line-soft);
-  background: var(--surface-muted);
+  background: var(--bg-surface-muted);
 }
 
 @media (max-width: 992px) {
-  .filter-actions {
+  .quick-search {
     width: 100%;
-    margin-left: 0;
   }
 }
 </style>
