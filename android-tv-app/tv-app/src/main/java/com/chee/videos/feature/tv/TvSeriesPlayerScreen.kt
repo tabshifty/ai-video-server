@@ -525,7 +525,7 @@ fun TvSeriesPlayerScreen(
         if (canPlay) {
             Box(modifier = Modifier.fillMaxSize()) {
                 LongFormVideoPlayer(
-                    title = currentEpisode?.title ?: series.title,
+                    title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
                     player = exoPlayer,
                     isFullscreen = true,
                     onBack = onBack,
@@ -548,6 +548,10 @@ fun TvSeriesPlayerScreen(
                     showStatusBarPadding = false,
                     tvMode = true,
                     tvSeekStepSeconds = uiState.tvSeekStepSeconds,
+                    seriesTitleForOverlay = series.title,
+                    seasonNumber = uiState.selectedSeasonNumber,
+                    episodeNumber = uiState.selectedEpisodeNumber,
+                    episodeTitle = currentEpisode?.title,
                     onOpenEpisodeSelector = { viewModel.setSelectorVisible(true) },
                     onNextEpisode = if (hasNextEpisode) viewModel::nextEpisode else null,
                     onRequestExitPlayback = ::handlePlaybackBack,

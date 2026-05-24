@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-24 23:20 +0800
+- 进度：完成 `tasks/2026-05-24-tv-long-form-operation-ui-on-remote` 核心实现：新增 TV 遥控键路由纯函数、左上信息层组件与数据构造；`LongFormVideoPlayer` 的 TV 模式改为首次亮 UI 但焦点停根、DOWN 进入 controls、LEFT/RIGHT seek 并重置计时、controls 内左右走 focusProperties 首尾环绕、Slider 不可聚焦、BACK 可见时优先收 UI；电视剧播放器传入剧名/季集/单集标题，左上主行显示剧名。同步 TV 版本号升到 `0.1.66`，`CONTEXT.md` 追加 TV 操作 UI 术语。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/{LongFormVideoPlayer,TvLongFormRemoteKeyRouting,TvLongFormTitleOverlay}.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、TV 单测与 androidTest、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-24-tv-long-form-operation-ui-on-remote/DONE.md`
+- 验证：新增测试红灯曾因 `TvRemoteKeyAction` / `buildTvLongFormTitleOverlayData` 未实现失败；实现后 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.ui.TvLongFormRemoteKeyRoutingTest' --tests 'com.chee.videos.core.ui.TvLongFormTitleOverlayDataTest' --tests 'com.chee.videos.core.ui.TvLongFormControlsAutoHideTest' --tests 'com.chee.videos.core.ui.TvLongFormTitleOverlaySpecTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerTransportKeyTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:connectedDebugAndroidTest` 已编译并打包 androidTest，但本机无连接设备，失败于 `DeviceException: No connected devices!`；`git diff --check` 通过；乱码扫描无输出。无关工作区改动 `.env.example`、`internal/config/config.go` 未纳入本任务。
+
+## 2026-05-24 22:40 +0800
+- 进度：开始执行 `tasks/2026-05-24-tv-long-form-operation-ui-on-remote`。按 PRD → Implement → Review 推进 TV 长视频播放器遥控器互动操作 UI：先补纯函数与源文审计红灯测试，再接入 `LongFormVideoPlayer` 的 TV 模式键路由、左上信息层、controls 焦点入口/环绕、BACK 优先收 UI，并同步 TV 调用方、版本号、`CONTEXT.md` 与任务完成标记。当前仅 `tasks/2026-05-24-tv-long-form-operation-ui-on-remote/` 为未完成任务目录。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvLongFormRemoteKeyRouting.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvLongFormTitleOverlay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`、任务目录。
+- 验证：待执行红灯测试、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、diff/乱码扫描；`connectedDebugAndroidTest` 视本机设备可用性执行。
+
 ## 2026-05-24 22:12 +0800
 - 进度：根据 `$grill-with-docs` 决议，取消 VideoUpload 三段式上传向导，回到保留新设计系统外壳的单屏上传表单；文件选择、基础信息、关联信息、上传控制、进度与结果都在同一画面内。同步删除不再使用的 step 子组件与 wizard helper/spec，并将 `CONTEXT.md` 术语从 `admin 上传向导三步` 改为 `admin 上传单屏表单`。按用户要求，本轮不改 Phase 4 任务 PRD / implement / review 历史文档与截图，修改完成后补 `DONE.md`。
 - 影响文件：`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/VideoUpload/*`、`admin-web/src/views/videoUpload.wizard.helpers.*`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-admin-three-pillars/DONE.md`

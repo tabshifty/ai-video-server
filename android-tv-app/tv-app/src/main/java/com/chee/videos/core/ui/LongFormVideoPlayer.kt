@@ -55,7 +55,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,6 +98,10 @@ fun LongFormVideoPlayer(
     onSelectAudioTrack: (String?) -> Unit = {},
     tvMode: Boolean = false,
     tvSeekStepSeconds: Int = 10,
+    seriesTitleForOverlay: String? = null,
+    seasonNumber: Int? = null,
+    episodeNumber: Int? = null,
+    episodeTitle: String? = null,
     onOpenEpisodeSelector: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null,
     onRequestExitPlayback: (() -> Unit)? = null,
@@ -105,6 +111,15 @@ fun LongFormVideoPlayer(
     val scope = rememberCoroutineScope()
     val rootFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
+    val rewindFocusRequester = remember { FocusRequester() }
+    val forwardFocusRequester = remember { FocusRequester() }
+    val episodeSelectorFocusRequester = remember { FocusRequester() }
+    val nextEpisodeFocusRequester = remember { FocusRequester() }
+    val subtitleFocusRequester = remember { FocusRequester() }
+    val audioTrackFocusRequester = remember { FocusRequester() }
+    val backDetailFocusRequester = remember { FocusRequester() }
+    val exitPlaybackFocusRequester = remember { FocusRequester() }
+    val fullscreenFocusRequester = remember { FocusRequester() }
 
     var controlsVisible by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
@@ -138,6 +153,7 @@ fun LongFormVideoPlayer(
     var hasShownControlsOnce by remember { mutableStateOf(false) }
     var pendingRootFocusRequest by remember { mutableStateOf(false) }
     var pendingPlayPauseFocusRequest by remember { mutableStateOf(false) }
+    var focusInControls by remember { mutableStateOf(false) }
 
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
     var hideSeekPreviewJob by remember { mutableStateOf<Job?>(null) }
@@ -153,11 +169,17 @@ fun LongFormVideoPlayer(
         return player.duration.coerceAtLeast(0L)
     }
 
+    fun requestRootFocusWhenReady() {
+        pendingRootFocusRequest = true
+    }
+
     fun scheduleAutoHideControls() {
         hideControlsJob?.cancel()
         hideControlsJob = scope.launch {
             delay(5000)
             controlsVisible = false
+            focusInControls = false
+            requestRootFocusWhenReady()
         }
     }
 
@@ -167,14 +189,6 @@ fun LongFormVideoPlayer(
             pendingPlayPauseFocusRequest = true
         }
         scheduleAutoHideControls()
-    }
-
-    fun requestRootFocusWhenReady() {
-        pendingRootFocusRequest = true
-    }
-
-    fun requestPlayPauseFocusWhenReady() {
-        pendingPlayPauseFocusRequest = true
     }
 
     fun showTransientFeedback(
@@ -289,49 +303,48 @@ fun LongFormVideoPlayer(
         }
     }
 
-    fun handleTvTransportKey(nativeKeyCode: Int, repeatCount: Int): Boolean {
-        if (controlsVisible) {
-            return when (nativeKeyCode) {
-                AndroidKeyEvent.KEYCODE_MENU -> {
-                    if (tvMode) {
-                        subtitleSheetVisible = true
-                        showControlsTemporarily()
-                        true
-                    } else {
-                        false
-                    }
-                }
-
-                else -> false
-            }
-        }
-
-        return when (val action = resolveTvHiddenTransportKeyAction(nativeKeyCode, repeatCount, tvSeekStepSeconds)) {
-            is TvHiddenTransportKeyAction.Seek -> {
+    fun handleTvRemoteKeyAction(action: TvRemoteKeyAction): Boolean {
+        return when (action) {
+            is TvRemoteKeyAction.Seek -> {
                 performDebouncedStepSeek(
                     deltaMs = action.deltaMs,
                     showControls = false,
                 )
+                controlsVisible = true
+                scheduleAutoHideControls()
                 true
             }
 
-            TvHiddenTransportKeyAction.TogglePlayPause -> {
+            TvRemoteKeyAction.EnterFocus -> {
+                showControlsTemporarily(requestPlayPauseFocus = true)
+                true
+            }
+
+            TvRemoteKeyAction.ExitFocus -> {
+                requestRootFocusWhenReady()
+                focusInControls = false
+                true
+            }
+
+            TvRemoteKeyAction.TogglePlayPause -> {
                 togglePlaybackWithFeedback(showControls = false)
                 true
             }
 
-            TvHiddenTransportKeyAction.ShowControlsAndFocusPlayPause -> {
-                showControlsTemporarily(requestPlayPauseFocus = true)
+            TvRemoteKeyAction.DismissUi -> {
+                controlsVisible = false
+                focusInControls = false
+                hideControlsJob?.cancel()
+                requestRootFocusWhenReady()
                 true
             }
 
-            TvHiddenTransportKeyAction.OpenSubtitleSheet -> {
-                subtitleSheetVisible = true
-                showControlsTemporarily(requestPlayPauseFocus = true)
-                true
+            TvRemoteKeyAction.PassThrough -> {
+                if (focusInControls) {
+                    scheduleAutoHideControls()
+                }
+                false
             }
-
-            null -> false
         }
     }
 
@@ -384,6 +397,7 @@ fun LongFormVideoPlayer(
     LaunchedEffect(tvMode) {
         if (tvMode) {
             controlsVisible = true
+            requestRootFocusWhenReady()
             scheduleAutoHideControls()
         }
     }
@@ -394,10 +408,9 @@ fun LongFormVideoPlayer(
         }
         if (controlsVisible) {
             hasShownControlsOnce = true
-            pendingRootFocusRequest = false
-            requestPlayPauseFocusWhenReady()
         } else if (hasShownControlsOnce) {
             pendingPlayPauseFocusRequest = false
+            focusInControls = false
             requestRootFocusWhenReady()
         }
     }
@@ -466,6 +479,59 @@ fun LongFormVideoPlayer(
     } else {
         0f
     }
+    val tvControlFocusRequesters = buildList {
+        add(playPauseFocusRequester)
+        if (tvMode) {
+            add(rewindFocusRequester)
+        }
+        if (tvMode) {
+            add(forwardFocusRequester)
+        }
+        if (tvMode && onOpenEpisodeSelector != null) {
+            add(episodeSelectorFocusRequester)
+        }
+        if (tvMode && onNextEpisode != null) {
+            add(nextEpisodeFocusRequester)
+        }
+        add(subtitleFocusRequester)
+        if (tvMode) {
+            add(audioTrackFocusRequester)
+            add(backDetailFocusRequester)
+        }
+        if (tvMode && onExitPlayback != null) {
+            add(exitPlaybackFocusRequester)
+        }
+        if (!tvMode) {
+            add(fullscreenFocusRequester)
+        }
+    }
+    fun controlFocusModifier(focusRequester: FocusRequester): Modifier {
+        val base = Modifier.onFocusChanged { focusState ->
+            if (focusState.isFocused) {
+                focusInControls = true
+            }
+        }
+        if (!tvMode) {
+            return base
+        }
+        val index = tvControlFocusRequesters.indexOf(focusRequester)
+        if (index < 0 || tvControlFocusRequesters.isEmpty()) {
+            return base
+        }
+        val leftRequester = tvControlFocusRequesters[(index - 1 + tvControlFocusRequesters.size) % tvControlFocusRequesters.size]
+        val rightRequester = tvControlFocusRequesters[(index + 1) % tvControlFocusRequesters.size]
+        return base.focusProperties {
+            left = leftRequester
+            right = rightRequester
+        }
+    }
+    val titleOverlayData = buildTvLongFormTitleOverlayData(
+        primaryFallback = title,
+        seriesTitle = seriesTitleForOverlay,
+        seasonNumber = seasonNumber,
+        episodeNumber = episodeNumber,
+        episodeTitle = episodeTitle,
+    )
 
     Box(
         modifier = modifier
@@ -477,9 +543,15 @@ fun LongFormVideoPlayer(
                 if (!tvMode || event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
                     return@onPreviewKeyEvent false
                 }
-                handleTvTransportKey(
-                    nativeKeyCode = event.nativeKeyEvent.keyCode,
+                val action = resolveTvRemoteKeyAction(
+                    visible = controlsVisible,
+                    focusInControls = focusInControls,
+                    keyCode = event.nativeKeyEvent.keyCode,
                     repeatCount = event.nativeKeyEvent.repeatCount,
+                    seekStepSec = tvSeekStepSeconds,
+                ) ?: return@onPreviewKeyEvent false
+                handleTvRemoteKeyAction(
+                    action = action,
                 )
             }
             .onSizeChanged {
@@ -667,51 +739,60 @@ fun LongFormVideoPlayer(
             }
         }
 
-        AnimatedVisibility(
-            visible = controlsVisible,
-            enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
-            exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
-            modifier = Modifier.align(Alignment.TopCenter),
-        ) {
-            val topPaddingModifier = if (showStatusBarPadding) {
-                Modifier.statusBarsPadding()
-            } else {
-                Modifier
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(topPaddingModifier)
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+        if (tvMode) {
+            TvLongFormTitleOverlay(
+                data = titleOverlayData,
+                visible = controlsVisible,
+                showStatusBarPadding = showStatusBarPadding,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+        } else {
+            AnimatedVisibility(
+                visible = controlsVisible,
+                enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                modifier = Modifier.align(Alignment.TopCenter),
             ) {
-                Surface(
-                    color = Color(0x8C0D1016),
-                    shape = AppChrome.SurfaceShape,
-                    modifier = Modifier.fillMaxWidth(),
+                val topPaddingModifier = if (showStatusBarPadding) {
+                    Modifier.statusBarsPadding()
+                } else {
+                    Modifier
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(topPaddingModifier)
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Surface(
+                        color = Color(0x8C0D1016),
+                        shape = AppChrome.SurfaceShape,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        CompactPlayerControlButton(
-                            icon = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
-                            tvMode = tvMode,
-                            onClick = {
-                                showControlsTemporarily()
-                                onBack()
-                            },
-                        )
-                        Text(
-                            text = title,
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            CompactPlayerControlButton(
+                                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回",
+                                tvMode = tvMode,
+                                onClick = {
+                                    showControlsTemporarily()
+                                    onBack()
+                                },
+                            )
+                            Text(
+                                text = title,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
             }
@@ -743,6 +824,7 @@ fun LongFormVideoPlayer(
                             contentDescription = if (isPlaying) "暂停" else "播放",
                             tvMode = tvMode,
                             focusRequester = playPauseFocusRequester,
+                            modifier = controlFocusModifier(playPauseFocusRequester),
                             onClick = { togglePlaybackWithFeedback() },
                         )
                         if (tvMode) {
@@ -750,6 +832,8 @@ fun LongFormVideoPlayer(
                                 icon = Icons.Filled.FastForward,
                                 contentDescription = "快退 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
                                 tvMode = true,
+                                focusRequester = rewindFocusRequester,
+                                modifier = controlFocusModifier(rewindFocusRequester),
                                 onClick = { performDebouncedStepSeek(-tvSeekStepMs) },
                                 reverseMirror = true,
                             )
@@ -783,7 +867,9 @@ fun LongFormVideoPlayer(
                                 activeTrackColor = Color.White.copy(alpha = 0.92f),
                                 inactiveTrackColor = Color.White.copy(alpha = 0.22f),
                             ),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusProperties { canFocus = false },
                         )
                         Text(
                             text = if (actualDurationMs > 0) {
@@ -799,6 +885,8 @@ fun LongFormVideoPlayer(
                                 icon = Icons.Filled.FastForward,
                                 contentDescription = "快进 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
                                 tvMode = true,
+                                focusRequester = forwardFocusRequester,
+                                modifier = controlFocusModifier(forwardFocusRequester),
                                 onClick = { performDebouncedStepSeek(tvSeekStepMs) },
                             )
                             onOpenEpisodeSelector?.let { openSelector ->
@@ -806,6 +894,8 @@ fun LongFormVideoPlayer(
                                     icon = Icons.Filled.Tv,
                                     contentDescription = "选集",
                                     tvMode = true,
+                                    focusRequester = episodeSelectorFocusRequester,
+                                    modifier = controlFocusModifier(episodeSelectorFocusRequester),
                                     onClick = {
                                         openSelector()
                                         showControlsTemporarily()
@@ -817,6 +907,8 @@ fun LongFormVideoPlayer(
                                     icon = Icons.Filled.SkipNext,
                                     contentDescription = "下一集",
                                     tvMode = true,
+                                    focusRequester = nextEpisodeFocusRequester,
+                                    modifier = controlFocusModifier(nextEpisodeFocusRequester),
                                     onClick = {
                                         nextEpisode()
                                         showControlsTemporarily()
@@ -828,6 +920,8 @@ fun LongFormVideoPlayer(
                             icon = Icons.Filled.Subtitles,
                             contentDescription = "字幕",
                             tvMode = tvMode,
+                            focusRequester = subtitleFocusRequester,
+                            modifier = controlFocusModifier(subtitleFocusRequester),
                             onClick = {
                                 subtitleSheetVisible = true
                                 showControlsTemporarily()
@@ -838,6 +932,8 @@ fun LongFormVideoPlayer(
                                 icon = Icons.Filled.GraphicEq,
                                 contentDescription = "音轨",
                                 tvMode = true,
+                                focusRequester = audioTrackFocusRequester,
+                                modifier = controlFocusModifier(audioTrackFocusRequester),
                                 onClick = {
                                     audioTrackSheetVisible = true
                                     showControlsTemporarily()
@@ -845,9 +941,11 @@ fun LongFormVideoPlayer(
                             )
                             CompactPlayerControlButton(
                                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回详情",
-                            tvMode = true,
-                            onClick = {
+                                contentDescription = "返回详情",
+                                tvMode = true,
+                                focusRequester = backDetailFocusRequester,
+                                modifier = controlFocusModifier(backDetailFocusRequester),
+                                onClick = {
                                     onRequestExitPlayback?.invoke() ?: onBack()
                                     showControlsTemporarily()
                                 },
@@ -857,6 +955,8 @@ fun LongFormVideoPlayer(
                                     icon = Icons.Filled.FullscreenExit,
                                     contentDescription = "退出播放",
                                     tvMode = true,
+                                    focusRequester = exitPlaybackFocusRequester,
+                                    modifier = controlFocusModifier(exitPlaybackFocusRequester),
                                     onClick = {
                                         onRequestExitPlayback?.invoke() ?: exitPlayback()
                                         showControlsTemporarily()
@@ -867,6 +967,8 @@ fun LongFormVideoPlayer(
                             CompactPlayerControlButton(
                                 icon = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                                 contentDescription = if (isFullscreen) "退出全屏" else "全屏",
+                                focusRequester = fullscreenFocusRequester,
+                                modifier = controlFocusModifier(fullscreenFocusRequester),
                                 onClick = {
                                     onToggleFullscreen()
                                     showControlsTemporarily()
@@ -907,13 +1009,6 @@ fun LongFormVideoPlayer(
     }
 }
 
-internal sealed interface TvHiddenTransportKeyAction {
-    data class Seek(val deltaMs: Long) : TvHiddenTransportKeyAction
-    data object TogglePlayPause : TvHiddenTransportKeyAction
-    data object ShowControlsAndFocusPlayPause : TvHiddenTransportKeyAction
-    data object OpenSubtitleSheet : TvHiddenTransportKeyAction
-}
-
 internal const val TvStepSeekDebounceMillis = 300L
 
 internal data class TvPendingStepSeekUpdate(
@@ -940,40 +1035,6 @@ internal fun resolveTvPendingStepSeek(
         accumulatedDeltaMs = target - anchor,
         shouldCommitImmediately = false,
     )
-}
-
-internal fun resolveTvHiddenTransportKeyAction(
-    nativeKeyCode: Int,
-    repeatCount: Int,
-    seekStepSeconds: Int = 10,
-): TvHiddenTransportKeyAction? {
-    val stepMs = normalizeTvSeekStepSeconds(seekStepSeconds) * 1_000L
-    val repeatedStepMs = stepMs * 3
-    return when (nativeKeyCode) {
-        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-        AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
-        AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
-        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-        AndroidKeyEvent.KEYCODE_ENTER,
-        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-        -> TvHiddenTransportKeyAction.TogglePlayPause
-
-        AndroidKeyEvent.KEYCODE_DPAD_LEFT,
-        AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
-        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) -repeatedStepMs else -stepMs)
-
-        AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
-        AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-        -> TvHiddenTransportKeyAction.Seek(if (repeatCount > 0) repeatedStepMs else stepMs)
-
-        AndroidKeyEvent.KEYCODE_DPAD_UP,
-        AndroidKeyEvent.KEYCODE_DPAD_DOWN,
-        -> TvHiddenTransportKeyAction.ShowControlsAndFocusPlayPause
-
-        AndroidKeyEvent.KEYCODE_MENU -> TvHiddenTransportKeyAction.OpenSubtitleSheet
-
-        else -> null
-    }
 }
 
 internal fun normalizeTvSeekStepSeconds(seconds: Int): Int {
