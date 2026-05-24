@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 
 	"video-server/internal/middleware"
 	"video-server/internal/models"
@@ -729,6 +730,57 @@ func (a *API) AdminUpdateUserRole(c *gin.Context) {
 	ok(c, gin.H{"updated": true})
 }
 
+func (a *API) AdminCreateUser(c *gin.Context) {
+	var req struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Role     string `json:"role"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	req.Role = strings.ToLower(strings.TrimSpace(req.Role))
+	if req.Username == "" || req.Email == "" || len(req.Password) < 6 {
+		bad(c, "username/email required and password length must be >= 6")
+		return
+	}
+	if req.Role == "" {
+		req.Role = "user"
+	}
+	if req.Role != "user" && req.Role != "admin" {
+		bad(c, "role must be user or admin")
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		response.Error(c, 1000, "failed to hash password")
+		return
+	}
+
+	user := models.User{
+		ID:           uuid.New(),
+		Username:     req.Username,
+		Email:        req.Email,
+		PasswordHash: string(hash),
+		Role:         req.Role,
+	}
+	if err := a.repo.CreateUser(c.Request.Context(), user); err != nil {
+		if repository.IsUniqueViolation(err) {
+			response.Error(c, 1001, "username or email already exists")
+			return
+		}
+		response.Error(c, 1002, err.Error())
+		return
+	}
+
+	ok(c, gin.H{"user_id": user.ID})
+}
+
 func (a *API) AdminTasks(c *gin.Context) {
 	const (
 		staleTaskStartedThreshold  = 15 * time.Minute
@@ -750,9 +802,10 @@ func (a *API) AdminTasks(c *gin.Context) {
 		a.logger.Info("healed stale running transcode jobs", "count", healed)
 	}
 
+	status := strings.TrimSpace(c.Query("status"))
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 20)
-	items, total, err := a.repo.AdminListTranscodingTasks(c.Request.Context(), page, pageSize)
+	items, total, err := a.repo.AdminListTranscodingTasks(c.Request.Context(), status, page, pageSize)
 	if err != nil {
 		response.Error(c, 1018, err.Error())
 		return

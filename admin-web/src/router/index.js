@@ -19,20 +19,20 @@ import TaskMonitor from '../views/TaskMonitor.vue'
 const routes = [
   { path: '/login', component: Login, meta: { public: true } },
   { path: '/', redirect: '/dashboard' },
-  { path: '/dashboard', component: Dashboard },
+  { path: '/dashboard', component: Dashboard, meta: { hideShellPageHeader: true } },
   { path: '/videos', component: VideoList },
   { path: '/tv-series', component: TvSeriesManage },
-  { path: '/iptv', component: IPTVManage },
+  { path: '/iptv', component: IPTVManage, meta: { hideShellPageHeader: true } },
   { path: '/upload', component: VideoUpload },
   { path: '/scrape', component: ScrapePreview },
   { path: '/av-scrape', component: AVManualScrape },
-  { path: '/actors', component: ActorManage },
-  { path: '/collections', component: CollectionManage },
+  { path: '/actors', component: ActorManage, meta: { hideShellPageHeader: true } },
+  { path: '/collections', component: CollectionManage, meta: { hideShellPageHeader: true } },
   { path: '/images', component: ImageManage },
   { path: '/image-collections', component: ImageCollectionManage },
-  { path: '/users', component: UserManage },
-  { path: '/settings', component: SystemSettings },
-  { path: '/tasks', component: TaskMonitor }
+  { path: '/users', component: UserManage, meta: { hideShellPageHeader: true } },
+  { path: '/settings', component: SystemSettings, meta: { hideShellPageHeader: true } },
+  { path: '/tasks', component: TaskMonitor, meta: { hideShellPageHeader: true } }
 ]
 
 const router = createRouter({

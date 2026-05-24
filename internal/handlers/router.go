@@ -172,6 +172,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.DELETE("/tv/episodes/:id", a.AdminDeleteTVEpisode)
 			admin.POST("/videos/:id/retranscode", a.AdminRetranscodeVideo)
 			admin.GET("/users", a.AdminUsers)
+			admin.POST("/users", a.AdminCreateUser)
 			admin.PUT("/users/:id/role", a.AdminUpdateUserRole)
 			admin.GET("/actors", a.AdminActors)
 			admin.POST("/actors", a.AdminCreateActor)

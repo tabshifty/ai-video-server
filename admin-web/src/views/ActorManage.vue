@@ -86,6 +86,19 @@ function sourceLabel(source) {
   return source || '-'
 }
 
+function normalizeGenderValue(value) {
+  if (value === '男' || value === 'male') {
+    return 'male'
+  }
+  if (value === '女' || value === 'female') {
+    return 'female'
+  }
+  if (value === '未知' || value === 'unknown') {
+    return 'unknown'
+  }
+  return value || ''
+}
+
 function buildListParams() {
   const params = {
     page: query.page,
@@ -135,7 +148,7 @@ function openEdit(row) {
   Object.assign(form, {
     name: row.name || '',
     aliases: Array.isArray(row.aliases) ? [...row.aliases] : [],
-    gender: row.gender || '',
+    gender: normalizeGenderValue(row.gender),
     country: row.country || '',
     birth_date: row.birth_date || '',
     avatar_url: row.avatar_url || '',
@@ -195,7 +208,7 @@ function applyCandidate(item) {
   const aliases = Array.isArray(item?.aliases) ? item.aliases : []
   form.name = item?.name?.trim() || form.name
   form.aliases = normalizeAliases([...(form.aliases || []), ...aliases])
-  form.gender = item?.gender || form.gender
+  form.gender = normalizeGenderValue(item?.gender) || form.gender
   form.country = item?.country || form.country
   form.birth_date = item?.birth_date || form.birth_date
   form.avatar_url = item?.avatar_url || form.avatar_url
@@ -279,6 +292,7 @@ async function save() {
 }
 
 async function toggleActive(row) {
+  const nextActive = !row.active
   const payload = {
     name: row.name || '',
     aliases: Array.isArray(row.aliases) ? row.aliases : [],
@@ -289,13 +303,13 @@ async function toggleActive(row) {
     source: row.source || 'manual',
     external_id: row.external_id || '',
     notes: row.notes || '',
-    active: !row.active
+    active: nextActive
   }
 
   try {
     await updateAdminActor(row.id, payload)
-    row.active = !row.active
-    ElMessage.success(row.active ? '演员已启用' : '演员已停用')
+    await load()
+    ElMessage.success(nextActive ? '演员已启用' : '演员已停用')
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '切换演员状态失败'))
   }

@@ -177,17 +177,7 @@ onMounted(loadPlaylist)
         </template>
         <template #actions>
           <el-button :icon="Refresh" :loading="refreshLoading" @click="refreshPlaylist">远程拉取</el-button>
-          <el-upload
-            v-model:file-list="uploadFiles"
-            :auto-upload="false"
-            :limit="1"
-            accept=".m3u,.m3u8"
-            :on-change="onUploadChange"
-            :on-remove="onUploadRemove"
-            :show-file-list="false"
-          >
-            <el-button type="primary" :icon="UploadFilled">上传 M3U</el-button>
-          </el-upload>
+          <el-button type="primary" :icon="UploadFilled" :loading="uploadLoading" @click="uploadPlaylist">上传 M3U</el-button>
         </template>
       </Toolbar>
 

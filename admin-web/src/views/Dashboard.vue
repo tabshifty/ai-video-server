@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { Refresh } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
@@ -65,7 +65,18 @@ function withAlpha(color, alpha) {
 }
 
 function renderChart() {
-  if (!chartRef.value) return
+  const chartDom = chartRef.value
+  if (!chartDom) {
+    if (chart) {
+      chart.dispose()
+      chart = null
+    }
+    return
+  }
+  if (chart && chart.getDom && chart.getDom() !== chartDom) {
+    chart.dispose()
+    chart = null
+  }
   if (!trendPoints.value.length) {
     if (chart) {
       chart.clear()
@@ -136,6 +147,11 @@ function handleResize() {
 }
 
 onMounted(load)
+
+watch([chartRef, trendPoints], async () => {
+  await nextTick()
+  renderChart()
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)

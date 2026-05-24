@@ -386,12 +386,21 @@ func (r *VideoRepository) AdminUpdateUserRole(ctx context.Context, userID uuid.U
 	return nil
 }
 
-func (r *VideoRepository) AdminListTranscodingTasks(ctx context.Context, page, pageSize int) ([]models.AdminTaskListItem, int, error) {
-	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM transcoding_jobs`).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("count tasks: %w", err)
+func buildAdminListTranscodingTasksSQL(status string, page, pageSize int) (string, []any, string, []any) {
+	where := []string{"1=1"}
+	args := make([]any, 0, 3)
+	next := func(v any) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
 	}
-	rows, err := r.pool.Query(ctx, `
+
+	if s := strings.TrimSpace(strings.ToLower(status)); s != "" {
+		where = append(where, "status = "+next(s))
+	}
+
+	baseWhere := strings.Join(where, " AND ")
+	countSQL := "SELECT COUNT(*) FROM transcoding_jobs WHERE " + baseWhere
+	listSQL := fmt.Sprintf(`
 SELECT
   id,
   video_id,
@@ -407,9 +416,21 @@ SELECT
   progress_percent,
   progress_updated_at
 FROM transcoding_jobs
+WHERE %s
 ORDER BY id DESC
-LIMIT $1 OFFSET $2
-`, pageSize, (page-1)*pageSize)
+LIMIT $%d OFFSET $%d
+`, baseWhere, len(args)+1, len(args)+2)
+	listArgs := append(append(make([]any, 0, len(args)+2), args...), pageSize, (page-1)*pageSize)
+	return countSQL, args, listSQL, listArgs
+}
+
+func (r *VideoRepository) AdminListTranscodingTasks(ctx context.Context, status string, page, pageSize int) ([]models.AdminTaskListItem, int, error) {
+	countSQL, countArgs, listSQL, listArgs := buildAdminListTranscodingTasksSQL(status, page, pageSize)
+	var total int
+	if err := r.pool.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count tasks: %w", err)
+	}
+	rows, err := r.pool.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list tasks: %w", err)
 	}

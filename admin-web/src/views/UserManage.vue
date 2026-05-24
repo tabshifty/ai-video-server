@@ -7,7 +7,7 @@ import PageHeader from '../components/base/PageHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import { getAdminUsers, registerAdminUser, updateUserRole } from '../api/admin'
+import { createAdminUser, getAdminUsers, updateUserRole } from '../api/admin'
 
 const list = ref([])
 const total = ref(0)
@@ -89,14 +89,12 @@ async function saveUser() {
   }
   saving.value = true
   try {
-    const result = await registerAdminUser({
+    await createAdminUser({
       username: form.username.trim(),
       email: form.email.trim(),
-      password: form.password
+      password: form.password,
+      role: form.role
     })
-    if (form.role && form.role !== 'user' && result?.user_id) {
-      await updateUserRole(result.user_id, { role: form.role })
-    }
     dialogVisible.value = false
     ElMessage.success('用户已创建')
     await load()
@@ -116,7 +114,7 @@ onMounted(load)
       <PageHeader title="用户管理" subtitle="管理用户角色与权限">
         <template #actions>
           <el-button :loading="loading" @click="load">刷新</el-button>
-          <el-button type="primary" @click="openCreateDialog">新增用户</el-button>
+          <el-button type="primary" @click="openCreateDialog">添加用户</el-button>
         </template>
       </PageHeader>
 
@@ -135,10 +133,10 @@ onMounted(load)
         <EmptyState
           v-if="!hasUsers"
           title="暂无用户"
-          description="点击“新增用户”创建第一个账号"
+          description="点击“添加用户”创建第一个账号"
         >
           <template #action>
-            <el-button type="primary" @click="openCreateDialog">新增用户</el-button>
+            <el-button type="primary" @click="openCreateDialog">添加用户</el-button>
           </template>
         </EmptyState>
         <template v-else>
@@ -177,7 +175,7 @@ onMounted(load)
     <el-dialog
       v-model="dialogVisible"
       class="crud-dialog"
-      title="新增用户"
+      title="添加用户"
       width="min(94vw, 560px)"
     >
       <el-form label-width="88px" class="dialog-form">

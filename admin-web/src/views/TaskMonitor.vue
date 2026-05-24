@@ -15,13 +15,20 @@ const total = ref(0)
 const loading = ref(false)
 const query = reactive({ page: 1, page_size: 20, status: '' })
 let timer = null
+let loadSeq = 0
 
 const queuedCount = computed(() => list.value.filter((item) => item.status === 'pending').length)
 const runningCount = computed(() => list.value.filter((item) => item.status === 'running').length)
+const successCount = computed(() => list.value.filter((item) => item.status === 'success').length)
 const failedCount = computed(() => list.value.filter((item) => item.status === 'failed').length)
-const hasTasks = computed(() => list.value.length > 0)
+const hasTasks = computed(() => total.value > 0)
+const successRate = computed(() => {
+  if (total.value <= 0) return '0.0'
+  return ((successCount.value / total.value) * 100).toFixed(1)
+})
 
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   try {
     const params = {
@@ -32,12 +39,20 @@ async function load() {
       params.status = query.status
     }
     const data = await getAdminTasks(params)
+    if (seq !== loadSeq) {
+      return
+    }
     list.value = data.items || []
     total.value = data.total_count || 0
   } catch (error) {
+    if (seq !== loadSeq) {
+      return
+    }
     ElMessage.error(error?.message || '加载任务失败')
   } finally {
-    loading.value = false
+    if (seq === loadSeq) {
+      loading.value = false
+    }
   }
 }
 
@@ -120,6 +135,7 @@ function statusLabel(status) {
   if (!status) return '全部'
   if (status === 'pending') return '排队'
   if (status === 'running') return '处理中'
+  if (status === 'success') return '已完成'
   if (status === 'failed') return '失败'
   return status
 }
@@ -153,6 +169,8 @@ onUnmounted(() => {
           </el-button-group>
         </template>
         <template #actions>
+          <el-tag effect="plain">总量：{{ total }}</el-tag>
+          <el-tag effect="plain">成功率：{{ successRate }}%</el-tag>
           <el-tag effect="plain">自动刷新：5 秒</el-tag>
         </template>
       </Toolbar>
@@ -160,6 +178,7 @@ onUnmounted(() => {
       <section class="metric-grid">
         <StatCard label="队列" :value="queuedCount" />
         <StatCard label="处理中" :value="runningCount" />
+        <StatCard label="已完成" :value="successCount" />
         <StatCard label="失败" :value="failedCount" />
       </section>
 

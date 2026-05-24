@@ -63,6 +63,7 @@ const profile = ref({
 const navGroups = adminShellNavGroups
 const matchedNavItem = computed(() => findAdminNavItemByPath(route.path))
 const pageTitle = computed(() => matchedNavItem.value?.title || route.meta?.title || '管理后台')
+const showShellPageHeader = computed(() => !route.meta?.hideShellPageHeader)
 const isDrawerMode = computed(() => viewportWidth.value < DRAWER_BREAKPOINT)
 const isAutoCollapsed = computed(() => viewportWidth.value < COLLAPSE_BREAKPOINT)
 const isSidebarCollapsed = computed(() => !isDrawerMode.value && (userCollapsed.value || isAutoCollapsed.value))
@@ -264,7 +265,7 @@ onUnmounted(() => {
       <header class="shell-header">
         <div class="shell-header__left">
           <el-button class="mobile-nav-btn" text :icon="Menu" aria-label="打开导航菜单" @click="openMobileNav" />
-          <PageHeader class="shell-page-header" :title="pageTitle" />
+          <PageHeader v-if="showShellPageHeader" class="shell-page-header" :title="pageTitle" />
         </div>
         <button class="command-trigger" type="button" @click="openCommandPalette">
           <el-icon><Search /></el-icon>
