@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-24 10:31 +0800
+- 进度：完成 `tasks/2026-05-23-admin-shell-redesign` Phase 1 的实现、定向测试、全量 `npm test`、`npm run build`、截图归档与乱码扫描。admin-web 已切换到新的浅色设计 token、Element Plus 覆写、分组侧栏、命令面板、profile chip、独立登录页与共享基础组件；同时把 `Dashboard` / `IPTVManage` / `TaskMonitor` 的 `--font-code` 收口到 `--font-mono`，并在 `CONTEXT.md` 追加「admin 设计系统术语」。
+- 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/base/*`、`admin-web/src/views/Login.vue`、`admin-web/src/views/Dashboard.vue`、`admin-web/src/views/IPTVManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/main.js`、`admin-web/index.html`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-admin-shell-redesign/screenshots/*`
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js src/components/Layout.spec.js src/components/base/commandPalette.helpers.spec.js` 通过；`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size warning）；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src admin-web/index.html tasks/2026-05-23-admin-shell-redesign` 未发现乱码；截图已归档为 `before-*.png` / `after-*.png`。
+
+## 2026-05-24 10:04 +0800
+- 进度：开始执行 `tasks/2026-05-23-admin-shell-redesign` 的 Phase 1：重做 admin-web 设计系统、外壳与登录页，并补齐命令面板与 7 个共享 wrapper 的基础设施。当前工作区只有该任务目录是相关未跟踪内容，其余 `tasks/2026-05-23-admin-*` 目录先视为并行任务。
+- 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/base/*`、`admin-web/src/views/Login.vue`、`admin-web/src/main.js`、`admin-web/index.html`、`CONTEXT.md`、`plan.md`
+- 验证：待执行红灯测试、`npm test`、`npm run build`、截图/手测与乱码扫描。
+
 ## 2026-05-24 09:53 +0800
 - 进度：完成 TV 首页货架文案收口：三类内容页的货架标题下不再显示“最近更新”，各区块的“查看更多”卡也不再展示数量副文案；首页货架语义收束为「最近播放 / 最近更新」两类，`TvCatalogScreen` 仅保留纯标题呈现。TV 端版本递增到 `versionCode = 66`、`versionName = "0.1.65"`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

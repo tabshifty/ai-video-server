@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
 }
 
 .metric-card__value {
-  font-family: var(--font-code);
+  font-family: var(--font-mono);
   font-size: 30px;
   line-height: 1.1;
   font-weight: 600;

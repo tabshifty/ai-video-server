@@ -1,0 +1,114 @@
+:where(.el-button) {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: background var(--motion-duration-base) var(--motion-easing-standard),
+    border-color var(--motion-duration-base) var(--motion-easing-standard),
+    color var(--motion-duration-base) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+:where(.el-button--primary) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+:where(.el-button--primary:hover) {
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
+}
+
+:where(.el-button:focus-visible) {
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+:where(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner) {
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 1px var(--line-soft) inset;
+  transition: box-shadow var(--motion-duration-base) var(--motion-easing-standard),
+    background var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+:where(.el-input__wrapper.is-focus, .el-select__wrapper.is-focused, .el-textarea__inner:focus) {
+  box-shadow: 0 0 0 1px var(--primary) inset, 0 0 0 3px var(--primary-ring);
+}
+
+:where(.el-card) {
+  border-color: var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+
+:where(.el-dialog) {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+:where(.el-dialog__header) {
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+:where(.el-dialog__body) {
+  padding: var(--space-5) var(--space-6);
+}
+
+:where(.el-dialog__footer) {
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--line-soft);
+}
+
+:where(.el-drawer__header) {
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+:where(.el-drawer__body) {
+  padding: var(--space-5) var(--space-6);
+}
+
+:where(.el-table) {
+  --el-table-border-color: var(--line-soft);
+  --el-table-header-bg-color: var(--bg-surface-muted);
+  --el-table-row-hover-bg-color: var(--bg-surface-muted);
+  font-size: var(--text-small);
+}
+
+:where(.el-table th.el-table__cell) {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+:where(.el-table .cell) {
+  line-height: var(--leading-small);
+}
+
+:where(.el-tag) {
+  height: auto;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+:where(.el-pagination .btn-prev, .el-pagination .btn-next, .el-pager li) {
+  min-width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+
+:where(.el-message, .el-notification) {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+:where(.el-dropdown-menu, .el-popper) {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+:where(.el-form-item__label) {
+  color: var(--text-secondary);
+  font-weight: 500;
+}

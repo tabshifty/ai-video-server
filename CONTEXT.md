@@ -8,6 +8,14 @@
 ## 字幕处理约定
 - `外挂 ASS/SSA 字幕上传策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；其中 `.ass/.ssa` 不直接暴露给 App 播放端，而是在服务端保存为临时源文件后用 ffmpeg 转成 WebVTT，数据库 `video_subtitles.format` 与 `mime_type` 记录最终可播放形态 `vtt` / `text/vtt`，`metadata.original_format` 记录原始格式。手机端和 TV 端继续复用既有 WebVTT 字幕播放链路；ASS 的复杂样式、字体、描边、特效、卡拉 OK 与精确定位允许在转换中降级或丢失，本策略只承诺文本字幕可播放。
 
+## admin 设计系统术语
+- `admin Modern Minimal`：管理端视觉方向为浅色优先、低饱和 slate 中性色、冷蓝主色与克制阴影；后台工具界面优先信息密度、可扫描性和重复操作效率，不采用营销式大色块或装饰性 hero。
+- `admin 设计 token`：管理端全局颜色、字体、字号、间距、圆角、阴影、动效、断点和 shell 尺寸统一由 `admin-web/src/assets/theme.css` 的 CSS 变量表达；业务视图和基础组件应引用 token，不直接扩散临时色值或字体。
+- `Element Plus 三层架构`：L1 为 `theme.css` 中的 `--el-*` token 覆盖，L2 为 `element-overrides.css` 的低特异性 `:where()` 全局覆写，L3 为 `components/base/` 中的共享 wrapper 组件；三层各司其职，避免跨层写重复样式。
+- `admin 侧栏分组导航`：管理端主导航按 `仪表盘`、`媒体库`、`录入处理`、`服务`、`系统` 五组呈现；菜单源由命令面板 helper 统一维护，侧栏、移动 drawer 和命令面板共享同一组路由语义。
+- `admin 侧栏折叠偏好`：桌面端侧栏支持 240px 展开与 60px 折叠，用户手动折叠状态持久化到 `localStorage` 的 `admin-sidebar-collapsed`；窄屏 drawer 与 1280px 以下自动折叠不改变该持久偏好。
+- `admin 命令面板`：管理端通过 `Cmd/Ctrl+K` 或顶栏触发的 nav-only 快速跳转面板，支持中文、拼音首字母、别名和路径匹配；它只负责页面导航，不承载业务动作。
+
 ## Git 忽略规则约定
 - 根级 `.gitignore` 中用于本地资料或发布产物的目录规则必须按意图锚定：仅忽略根目录时使用 `/references/`、`/release/`，避免误伤 `.codex/skills/*/references/`、`.agents/skills/*/references/` 等需要版本管理的技能参考文档。
 - Python 字节码、工具缓存、Android `build/` 与 `release/` 打包输出、Gradle/IDE 本地目录和系统 `.DS_Store` 都属于本地生成物，不应提交；若已进入索引，应使用 `git rm --cached` 从版本库移除，保留本地文件即可。

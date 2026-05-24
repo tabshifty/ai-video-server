@@ -1,63 +1,137 @@
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  DataAnalysis,
-  Film,
-  UploadFilled,
-  MagicStick,
   Avatar,
-  PictureFilled,
+  DataAnalysis,
+  Expand,
   Files,
-  Monitor,
-  User,
+  Film,
+  Fold,
   List,
+  MagicStick,
+  Menu,
+  Monitor,
+  PictureFilled,
+  Search,
   Setting,
   SwitchButton,
-  Menu
+  UploadFilled,
+  User
 } from '@element-plus/icons-vue'
+import { profileApi } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
+import CommandPalette from './base/CommandPalette.vue'
+import PageHeader from './base/PageHeader.vue'
+import {
+  adminShellNavGroups,
+  findAdminNavItemByPath,
+  openCommandPalette
+} from './base/commandPalette.helpers'
+
+const SIDEBAR_COLLAPSE_KEY = 'admin-sidebar-collapsed'
+const DRAWER_BREAKPOINT = 1024
+const COLLAPSE_BREAKPOINT = 1280
+
+const iconMap = {
+  Avatar,
+  DataAnalysis,
+  Files,
+  Film,
+  List,
+  MagicStick,
+  Monitor,
+  PictureFilled,
+  Setting,
+  UploadFilled,
+  User
+}
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-
-const navItems = [
-  { path: '/dashboard', label: '仪表盘', title: '系统仪表盘', subtitle: '管理员工作台', icon: DataAnalysis },
-  { path: '/videos', label: '视频管理', title: '视频管理', subtitle: '管理员工作台', icon: Film },
-  { path: '/tv-series', label: '电视剧管理', title: '电视剧管理', subtitle: '管理员工作台', icon: Files },
-  { path: '/iptv', label: 'IPTV 管理', title: 'IPTV 管理', subtitle: '管理员工作台', icon: Monitor },
-  { path: '/upload', label: '上传视频', title: '上传中心', subtitle: '管理员工作台', icon: UploadFilled },
-  { path: '/scrape', label: '通用刮削', title: '通用刮削', subtitle: '管理员工作台', icon: MagicStick },
-  { path: '/av-scrape', label: 'AV 手动刮削', title: 'AV 手动刮削', subtitle: '管理员工作台', icon: MagicStick },
-  { path: '/actors', label: '演员管理', title: '演员管理', subtitle: '管理员工作台', icon: Avatar },
-  { path: '/collections', label: '合集管理', title: '合集管理', subtitle: '管理员工作台', icon: List },
-  { path: '/images', label: '图片管理', title: '图片管理', subtitle: '管理员工作台', icon: PictureFilled },
-  { path: '/image-collections', label: '图片合集', title: '图片合集', subtitle: '管理员工作台', icon: Files },
-  { path: '/users', label: '用户管理', title: '用户管理', subtitle: '管理员工作台', icon: User },
-  { path: '/tasks', label: '任务监控', title: '任务监控', subtitle: '管理员工作台', icon: List },
-  { path: '/settings', label: '系统设置', title: '系统设置', subtitle: '管理员工作台', icon: Setting }
-]
-
 const mobileNavVisible = ref(false)
 const shellContentRef = ref(null)
 const mainContentRef = ref(null)
+const userCollapsed = ref(readStoredCollapsed())
+const viewportWidth = ref(readViewportWidth())
+const profile = ref({
+  username: '',
+  role: auth.role || 'admin'
+})
 
-const sortedNavItems = [...navItems].sort((a, b) => b.path.length - a.path.length)
+const navGroups = adminShellNavGroups
+const matchedNavItem = computed(() => findAdminNavItemByPath(route.path))
+const pageTitle = computed(() => matchedNavItem.value?.title || route.meta?.title || '管理后台')
+const isDrawerMode = computed(() => viewportWidth.value < DRAWER_BREAKPOINT)
+const isAutoCollapsed = computed(() => viewportWidth.value < COLLAPSE_BREAKPOINT)
+const isSidebarCollapsed = computed(() => !isDrawerMode.value && (userCollapsed.value || isAutoCollapsed.value))
+const profileName = computed(() => profile.value.username || 'Admin')
+const profileRole = computed(() => profile.value.role || auth.role || 'admin')
+const profileInitial = computed(() => profileName.value.trim().slice(0, 1).toUpperCase() || 'A')
 
-function findMatchedNavItem(path) {
-  return sortedNavItems.find((item) => path === item.path || path.startsWith(`${item.path}/`))
+function readStoredCollapsed() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1'
 }
 
-const matchedNavItem = computed(() => findMatchedNavItem(route.path))
-const active = computed(() => matchedNavItem.value?.path || route.path)
-const pageMeta = computed(
-  () =>
-    matchedNavItem.value || {
-      title: route.meta?.title || '管理后台',
-      subtitle: '管理员工作台'
+function readViewportWidth() {
+  if (typeof window === 'undefined') return 1440
+  return window.innerWidth
+}
+
+function resolveIcon(iconName) {
+  return iconMap[iconName] || List
+}
+
+function isActive(item) {
+  return matchedNavItem.value?.path === item.path
+}
+
+function updateViewportWidth() {
+  viewportWidth.value = readViewportWidth()
+}
+
+function toggleSidebar() {
+  userCollapsed.value = !userCollapsed.value
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, userCollapsed.value ? '1' : '0')
+  }
+}
+
+function closeMobileNav() {
+  mobileNavVisible.value = false
+}
+
+function openMobileNav() {
+  mobileNavVisible.value = true
+}
+
+function onSkipLinkClick() {
+  shellContentRef.value?.scrollTo({ top: 0, behavior: 'auto' })
+  mainContentRef.value?.focus({ preventScroll: true })
+}
+
+async function loadProfile() {
+  try {
+    const data = await profileApi()
+    profile.value = {
+      username: data?.username || '',
+      role: data?.role || auth.role || 'admin'
     }
-)
+  } catch (_) {
+    profile.value = {
+      username: '',
+      role: auth.role || 'admin'
+    }
+  }
+}
+
+async function onLogout() {
+  await auth.logout()
+  mobileNavVisible.value = false
+  router.push('/login')
+}
 
 watch(
   () => route.fullPath,
@@ -66,83 +140,96 @@ watch(
   }
 )
 
-const restoreOverflow = { html: '', body: '' }
-watch(mobileNavVisible, (visible) => {
-  if (typeof window === 'undefined') {
-    return
-  }
-  const html = document.documentElement
-  const body = document.body
-  if (visible) {
-    restoreOverflow.html = html.style.overflow
-    restoreOverflow.body = body.style.overflow
-    html.style.overflow = 'hidden'
-    body.style.overflow = 'hidden'
-  } else {
-    html.style.overflow = restoreOverflow.html
-    body.style.overflow = restoreOverflow.body
-  }
+onMounted(() => {
+  updateViewportWidth()
+  loadProfile()
+  window.addEventListener('resize', updateViewportWidth)
 })
 
 onUnmounted(() => {
-  if (typeof window === 'undefined') {
-    return
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateViewportWidth)
   }
-  document.documentElement.style.overflow = restoreOverflow.html
-  document.body.style.overflow = restoreOverflow.body
 })
-
-function openMobileNav() {
-  mobileNavVisible.value = true
-}
-
-function onMobileNavSelect() {
-  mobileNavVisible.value = false
-}
-
-function onSkipLinkClick() {
-  shellContentRef.value?.scrollTo({ top: 0, behavior: 'auto' })
-  mainContentRef.value?.focus({ preventScroll: true })
-}
-
-async function onLogout() {
-  await auth.logout()
-  mobileNavVisible.value = false
-  router.push('/login')
-}
 </script>
 
 <template>
-  <div class="admin-shell" :class="{ 'is-mobile-nav-open': mobileNavVisible }">
+  <div
+    class="admin-shell"
+    :class="{
+      'is-collapsed': isSidebarCollapsed,
+      'is-drawer': isDrawerMode,
+      'is-mobile-nav-open': mobileNavVisible
+    }"
+  >
     <a class="skip-link" href="#main-content" @click.prevent="onSkipLinkClick">跳转到主要内容</a>
 
-    <aside class="shell-aside" aria-label="主导航">
+    <aside class="shell-aside" aria-label="分组导航">
       <div class="brand-block">
-        <div class="brand-badge">AV</div>
-        <div>
-          <div class="brand-title">视频管理后台</div>
-          <div class="brand-subtitle">本地视频服务</div>
+        <div class="brand-mark">VS</div>
+        <div class="brand-copy">
+          <strong>视频管理后台</strong>
+          <span>Video Server</span>
         </div>
+        <el-button class="collapse-button" text :aria-label="isSidebarCollapsed ? '展开侧栏' : '折叠侧栏'" @click="toggleSidebar">
+          <el-icon><component :is="isSidebarCollapsed ? Expand : Fold" /></el-icon>
+        </el-button>
       </div>
 
-      <el-menu :default-active="active" router class="nav-menu">
-        <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
-          <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.label }}</span>
-        </el-menu-item>
-      </el-menu>
+      <nav class="nav-groups" aria-label="分组导航">
+        <section v-for="group in navGroups" :key="group.key" class="nav-group" :aria-label="`${group.label}分组`">
+          <div class="nav-group__label">{{ group.label }}</div>
+          <el-tooltip
+            v-for="item in group.items"
+            :key="item.path"
+            :content="item.label"
+            :disabled="!isSidebarCollapsed"
+            placement="right"
+          >
+            <RouterLink
+              class="nav-link"
+              :class="{ 'is-active': isActive(item) }"
+              :to="item.path"
+              @click="closeMobileNav"
+            >
+              <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+              <span class="nav-link__label">{{ item.label }}</span>
+            </RouterLink>
+          </el-tooltip>
+        </section>
+      </nav>
+
+      <el-popover placement="top-start" trigger="click" popper-class="admin-profile-popper" :width="220">
+        <template #reference>
+          <button class="profile-chip" type="button">
+            <span class="profile-chip__avatar">{{ profileInitial }}</span>
+            <span class="profile-chip__copy">
+              <strong>{{ profileName }}</strong>
+              <em>{{ profileRole }}</em>
+            </span>
+          </button>
+        </template>
+        <div class="profile-panel">
+          <div class="profile-panel__name">{{ profileName }}</div>
+          <div class="profile-panel__role">admin</div>
+          <el-button class="profile-panel__logout" type="danger" text :icon="SwitchButton" @click="onLogout">
+            退出登录
+          </el-button>
+        </div>
+      </el-popover>
     </aside>
 
     <section ref="shellContentRef" class="shell-content">
       <header class="shell-header">
-        <div class="shell-header-left">
+        <div class="shell-header__left">
           <el-button class="mobile-nav-btn" text :icon="Menu" aria-label="打开导航菜单" @click="openMobileNav" />
-          <div>
-            <div class="shell-header-title">{{ pageMeta.title }}</div>
-            <div class="shell-header-subtitle">{{ pageMeta.subtitle }}</div>
-          </div>
+          <PageHeader class="shell-page-header" :title="pageTitle" />
         </div>
-        <el-button plain type="danger" :icon="SwitchButton" @click="onLogout">退出登录</el-button>
+        <button class="command-trigger" type="button" @click="openCommandPalette">
+          <el-icon><Search /></el-icon>
+          <span>快速跳转</span>
+          <kbd>⌘K</kbd>
+        </button>
       </header>
 
       <main id="main-content" ref="mainContentRef" class="shell-main" tabindex="-1">
@@ -150,49 +237,71 @@ async function onLogout() {
       </main>
     </section>
 
-    <el-drawer v-model="mobileNavVisible" direction="ltr" size="260px" :with-header="false" class="mobile-nav-drawer">
-      <div class="brand-block brand-block--drawer">
-        <div class="brand-badge">AV</div>
+    <el-drawer
+      v-model="mobileNavVisible"
+      direction="ltr"
+      size="calc(var(--admin-sidebar-width) + var(--space-8) + var(--space-2))"
+      :with-header="false"
+      class="mobile-nav-drawer"
+    >
+      <div class="drawer-brand">
+        <div class="brand-mark">VS</div>
         <div>
-          <div class="brand-title">视频管理后台</div>
-          <div class="brand-subtitle">本地视频服务</div>
+          <strong>视频管理后台</strong>
+          <span>分组导航</span>
         </div>
       </div>
-
-      <el-menu :default-active="active" router class="nav-menu nav-menu--drawer" @select="onMobileNavSelect">
-        <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
-          <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.label }}</span>
-        </el-menu-item>
-      </el-menu>
+      <nav class="drawer-nav" aria-label="移动端分组导航">
+        <section v-for="group in navGroups" :key="group.key" class="drawer-nav__group">
+          <div class="drawer-nav__label">{{ group.label }}</div>
+          <RouterLink
+            v-for="item in group.items"
+            :key="item.path"
+            class="drawer-nav__link"
+            :class="{ 'is-active': isActive(item) }"
+            :to="item.path"
+            @click="closeMobileNav"
+          >
+            <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+            <span>{{ item.label }}</span>
+          </RouterLink>
+        </section>
+      </nav>
     </el-drawer>
+
+    <CommandPalette />
   </div>
 </template>
 
 <style scoped>
 .admin-shell {
-  --shell-bg: #f8fafc;
-  --shell-title: #7f1d1d;
-  --shell-subtitle: #6b7280;
-  --shell-border: rgba(136, 19, 55, 0.12);
+  --shell-current-sidebar-width: var(--admin-sidebar-width);
   min-height: 100vh;
   min-height: 100dvh;
-  height: 100dvh;
-  background: #f8fafc;
+  background: var(--bg-canvas);
+}
+
+.admin-shell.is-collapsed {
+  --shell-current-sidebar-width: var(--admin-sidebar-collapsed-width);
+}
+
+.admin-shell.is-drawer {
+  --shell-current-sidebar-width: 0;
 }
 
 .skip-link {
   position: fixed;
-  top: 10px;
-  left: 10px;
+  top: var(--space-3);
+  left: var(--space-3);
   z-index: 2000;
-  padding: 8px 12px;
-  border-radius: 8px;
-  color: #7f1d1d;
-  background: #fff;
-  border: 1px solid rgba(127, 29, 29, 0.28);
-  transform: translateY(-160%);
-  transition: transform 0.2s ease;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(calc(-1 * var(--space-12)));
+  transition: transform var(--motion-duration-base) var(--motion-easing-standard);
 }
 
 .skip-link:focus {
@@ -201,178 +310,341 @@ async function onLogout() {
 
 .shell-aside {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 240px;
-  min-height: 100vh;
-  min-height: 100dvh;
-  height: 100dvh;
-  overflow-y: auto;
-  background: linear-gradient(180deg, #881337 0%, #be123c 45%, #1e3a8a 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  inset: 0 auto 0 0;
+  z-index: 60;
+  display: grid;
+  width: var(--shell-current-sidebar-width);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-right: 1px solid var(--line-soft);
+  background: var(--bg-sidebar);
+  transition: width var(--motion-duration-slow) var(--motion-easing-standard);
 }
 
-.shell-content {
-  margin-left: 240px;
-  min-height: 100vh;
-  min-height: 100dvh;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.admin-shell.is-mobile-nav-open .shell-content {
-  overflow: hidden;
+.admin-shell.is-drawer .shell-aside {
+  display: none;
 }
 
 .brand-block {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 10px;
-  padding: 20px 16px 14px;
-  color: #fff;
+  gap: var(--space-3);
+  padding: var(--space-4);
 }
 
-.brand-block--drawer {
-  background: linear-gradient(180deg, #881337 0%, #be123c 45%, #1e3a8a 100%);
-}
-
-.brand-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+.brand-mark {
   display: grid;
+  width: calc(var(--space-8) + var(--space-2));
+  height: calc(var(--space-8) + var(--space-2));
+  flex: 0 0 auto;
   place-items: center;
-  font-size: 14px;
-  font-family: 'Fira Code', monospace;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
+  color: var(--primary);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.42);
 }
 
-.brand-title {
-  font-weight: 700;
-  letter-spacing: 0.2px;
+.brand-copy,
+.profile-chip__copy {
+  display: grid;
+  min-width: 0;
 }
 
-.brand-subtitle {
-  margin-top: 2px;
-  font-size: 12px;
-  opacity: 0.88;
+.brand-copy strong,
+.profile-chip__copy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.nav-menu {
-  background: transparent;
-  border-right: none;
+.brand-copy span,
+.profile-chip__copy em {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-style: normal;
+  line-height: var(--leading-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-:deep(.nav-menu.el-menu .el-menu-item) {
-  margin: 4px 10px;
-  border-radius: 10px;
-  color: rgba(255, 255, 255, 0.8);
+.collapse-button {
+  margin-left: auto;
 }
 
-:deep(.nav-menu.el-menu .el-menu-item:hover) {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+.admin-shell.is-collapsed .brand-copy,
+.admin-shell.is-collapsed .collapse-button,
+.admin-shell.is-collapsed .nav-group__label,
+.admin-shell.is-collapsed .nav-link__label,
+.admin-shell.is-collapsed .profile-chip__copy {
+  display: none;
 }
 
-:deep(.nav-menu.el-menu .el-menu-item.is-active) {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.24);
+.nav-groups {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-2) var(--space-4);
+}
+
+.nav-group {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+.nav-group__label {
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: var(--leading-caption);
+  text-transform: uppercase;
+}
+
+.nav-link,
+.drawer-nav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.nav-link {
+  justify-content: flex-start;
+  min-height: calc(var(--space-8) + var(--space-2));
+  padding: 0 var(--space-3);
+}
+
+.admin-shell.is-collapsed .nav-link {
+  justify-content: center;
+  padding: 0;
+}
+
+.nav-link:hover,
+.drawer-nav__link:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.nav-link.is-active,
+.drawer-nav__link.is-active {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.profile-chip {
+  display: flex;
+  width: calc(100% - var(--space-4));
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+}
+
+.profile-chip__avatar {
+  display: grid;
+  width: var(--space-8);
+  height: var(--space-8);
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--bg-surface);
+  background: var(--primary);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.admin-shell.is-collapsed .profile-chip {
+  justify-content: center;
+  width: auto;
+  padding: var(--space-2) 0;
+}
+
+.shell-content {
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin-left: var(--shell-current-sidebar-width);
+  transition: margin-left var(--motion-duration-slow) var(--motion-easing-standard);
 }
 
 .shell-header {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 50;
   display: flex;
+  min-height: var(--admin-header-height);
   align-items: center;
   justify-content: space-between;
-  min-height: 64px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--shell-border);
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(8px);
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  backdrop-filter: blur(var(--space-3));
 }
 
-.shell-header-left {
+.shell-header__left {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
+}
+
+.shell-page-header {
+  min-width: 0;
 }
 
 .mobile-nav-btn {
   display: none;
-  font-size: 18px;
 }
 
-.shell-header-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--shell-title);
+.command-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
 }
 
-.shell-header-subtitle {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--shell-subtitle);
+.command-trigger kbd {
+  padding: calc(var(--space-1) / 2) var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--bg-surface-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
 }
 
 .shell-main {
-  flex: 1;
-  padding: 18px;
-  scroll-margin-top: 76px;
+  min-width: 0;
+  padding: var(--space-6);
 }
 
 .shell-main:focus-visible {
-  outline: 2px solid var(--shell-title);
-  outline-offset: 2px;
+  outline: calc(var(--space-1) / 2) solid var(--primary);
+  outline-offset: calc(var(--space-1) / 2);
 }
 
-.nav-menu--drawer {
-  padding-top: 12px;
-  border-right: none;
+.drawer-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--line-soft);
 }
 
-:deep(.nav-menu--drawer.el-menu .el-menu-item) {
-  color: #374151;
+.drawer-brand strong,
+.drawer-brand span {
+  display: block;
 }
 
-:deep(.nav-menu--drawer.el-menu .el-menu-item:hover) {
-  color: #111827;
-  background: #f3f4f6;
+.drawer-brand strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
-:deep(.nav-menu--drawer.el-menu .el-menu-item.is-active) {
-  color: #7f1d1d;
-  background: rgba(136, 19, 55, 0.12);
+.drawer-brand span {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.drawer-nav {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.drawer-nav__group {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.drawer-nav__label {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.drawer-nav__link {
+  min-height: calc(var(--space-8) + var(--space-2));
+  padding: 0 var(--space-3);
+}
+
+:global(.admin-profile-popper) {
+  padding: var(--space-2);
+}
+
+:global(.admin-profile-popper .profile-panel) {
+  display: grid;
+  gap: var(--space-2);
+}
+
+:global(.admin-profile-popper .profile-panel__name) {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+:global(.admin-profile-popper .profile-panel__role) {
+  display: inline-flex;
+  width: fit-content;
+  padding: calc(var(--space-1) / 2) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-size: var(--text-caption);
+}
+
+:global(.admin-profile-popper .profile-panel__logout) {
+  justify-content: flex-start;
 }
 
 :deep(.mobile-nav-drawer .el-drawer__body) {
   padding: 0;
 }
 
-@media (max-width: 992px) {
-  .shell-aside {
-    display: none;
-  }
-
-  .shell-content {
-    margin-left: 0;
-  }
-
-  .shell-header {
-    padding: 0 14px;
-  }
-
+@media (max-width: 63.9375rem) {
   .mobile-nav-btn {
     display: inline-flex;
   }
 
+  .shell-header {
+    padding: 0 var(--space-4);
+  }
+
   .shell-main {
-    padding: 14px;
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 48rem) {
+  .command-trigger span {
+    display: none;
   }
 }
 </style>

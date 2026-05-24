@@ -283,7 +283,7 @@ onMounted(loadPlaylist)
 
 .stat-value {
   margin-top: 6px;
-  font-family: var(--font-code);
+  font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 600;
   color: #7f1d1d;
