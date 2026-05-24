@@ -105,6 +105,7 @@
 
   --font-main: var(--font-sans);
   --bg-subtle: var(--bg-surface-muted);
+  --surface-muted: var(--bg-surface-muted);
   --text-main: var(--text-primary);
   --nav-bg: var(--bg-sidebar);
   --nav-surface: var(--bg-surface);

@@ -72,7 +72,13 @@ const profileInitial = computed(() => profileName.value.trim().slice(0, 1).toUpp
 
 function readStoredCollapsed() {
   if (typeof window === 'undefined') return false
-  return window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1'
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1'
+  } catch (_) {
+    // Safari Private Mode / 企业策略禁用 storage 时 localStorage 抛 SecurityError；
+    // 静默返回默认展开形态，避免 Layout 在 setup 阶段抛出导致整页白屏
+    return false
+  }
 }
 
 function readViewportWidth() {
@@ -94,8 +100,12 @@ function updateViewportWidth() {
 
 function toggleSidebar() {
   userCollapsed.value = !userCollapsed.value
-  if (typeof window !== 'undefined') {
+  if (typeof window === 'undefined') return
+  try {
     window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, userCollapsed.value ? '1' : '0')
+  } catch (_) {
+    // 隐私模式 / 配额溢出时 setItem 抛 SecurityError 或 QuotaExceededError；
+    // 本次会话内偏好仍生效，仅放弃持久化，不影响点击交互
   }
 }
 
@@ -119,10 +129,14 @@ async function loadProfile() {
       username: data?.username || '',
       role: data?.role || auth.role || 'admin'
     }
-  } catch (_) {
+  } catch (error) {
+    // 401 已由 axios 拦截器 handleAuthExpired 跳转登录页；这里只为其它错误（500 / 网络 / CORS）兜底
     profile.value = {
       username: '',
       role: auth.role || 'admin'
+    }
+    if (error?.response?.status !== 401) {
+      console.warn('[Layout] loadProfile failed:', error)
     }
   }
 }
@@ -140,15 +154,41 @@ watch(
   }
 )
 
+// mobile drawer 打开时锁 body / html 滚动，避免触摸事件穿透到 main 区域；
+// 离开本组件时无条件恢复，防止任何分支跳出未恢复
+const restoreOverflow = { html: '', body: '' }
+watch(mobileNavVisible, (visible) => {
+  if (typeof document === 'undefined') return
+  const html = document.documentElement
+  const body = document.body
+  if (visible) {
+    restoreOverflow.html = html.style.overflow
+    restoreOverflow.body = body.style.overflow
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+  } else {
+    html.style.overflow = restoreOverflow.html
+    body.style.overflow = restoreOverflow.body
+  }
+})
+
 onMounted(() => {
   updateViewportWidth()
   loadProfile()
   window.addEventListener('resize', updateViewportWidth)
+  // 部分 Android 浏览器横竖屏切换只发 orientationchange 不同步触发 resize，
+  // 不监听会让 drawer 阈值（< 1024px）在转屏后滞留旧值
+  window.addEventListener('orientationchange', updateViewportWidth)
 })
 
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateViewportWidth)
+    window.removeEventListener('orientationchange', updateViewportWidth)
+  }
+  if (typeof document !== 'undefined') {
+    document.documentElement.style.overflow = restoreOverflow.html
+    document.body.style.overflow = restoreOverflow.body
   }
 })
 </script>
@@ -190,6 +230,7 @@ onUnmounted(() => {
               class="nav-link"
               :class="{ 'is-active': isActive(item) }"
               :to="item.path"
+              :aria-current="isActive(item) ? 'page' : undefined"
               @click="closeMobileNav"
             >
               <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>

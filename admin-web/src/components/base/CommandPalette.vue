@@ -12,6 +12,16 @@ const visible = ref(false)
 const query = ref('')
 const activeIndex = ref(0)
 const inputRef = ref(null)
+const panelRef = ref(null)
+let previouslyFocusedElement = null
+
+function isTypingInEditableTarget(target) {
+  if (!target || target.nodeType !== 1) return false
+  if (target.isContentEditable) return true
+  const tag = target.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+  return false
+}
 
 const results = computed(() => searchMenuItems(query.value))
 
@@ -20,6 +30,10 @@ watch(results, () => {
 })
 
 function open() {
+  if (visible.value) return
+  if (typeof document !== 'undefined') {
+    previouslyFocusedElement = document.activeElement
+  }
   visible.value = true
   query.value = ''
   activeIndex.value = 0
@@ -28,6 +42,18 @@ function open() {
 
 function close() {
   visible.value = false
+  // 关闭时把焦点还给打开 palette 前的可聚焦节点，避免焦点丢到 body 上
+  nextTick(() => {
+    const target = previouslyFocusedElement
+    previouslyFocusedElement = null
+    if (target && typeof target.focus === 'function') {
+      try {
+        target.focus({ preventScroll: true })
+      } catch (_) {
+        // 节点已卸载等情况忽略
+      }
+    }
+  })
 }
 
 function move(delta) {
@@ -42,11 +68,6 @@ function select(item = results.value[activeIndex.value]) {
 }
 
 function onPanelKeydown(event) {
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    close()
-    return
-  }
   if (event.key === 'ArrowDown') {
     event.preventDefault()
     move(1)
@@ -57,17 +78,43 @@ function onPanelKeydown(event) {
     move(-1)
     return
   }
-  if (event.key === 'Enter') {
+  if (event.key === 'Enter' && !event.isComposing) {
     event.preventDefault()
     select()
+    return
+  }
+  if (event.key === 'Tab') {
+    // focus trap：Tab / Shift+Tab 在 panel 内部循环，不允许逃逸到底层页面
+    const focusables = panelRef.value?.querySelectorAll(
+      'input, button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (!focusables || focusables.length === 0) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null
+    if (event.shiftKey && activeEl === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && activeEl === last) {
+      event.preventDefault()
+      first.focus()
+    }
   }
 }
 
 function onGlobalKeydown(event) {
-  if (event.code === 'KeyK' && (event.metaKey || event.ctrlKey)) {
+  // Esc 关 palette 提到 document 级，保证 backdrop 焦点 / 任意子节点焦点状态下都能关闭
+  if (event.key === 'Escape' && visible.value) {
     event.preventDefault()
-    open()
+    close()
+    return
   }
+  if (event.code !== 'KeyK' || !(event.metaKey || event.ctrlKey)) return
+  // 用户在 input / textarea / contenteditable 内打字时不抢键；IME 拼音输入过程中也不抢键
+  if (event.isComposing || event.repeat) return
+  if (isTypingInEditableTarget(event.target)) return
+  event.preventDefault()
+  open()
 }
 
 onMounted(() => {
@@ -86,7 +133,7 @@ onUnmounted(() => {
     <transition name="command-palette">
       <div v-if="visible" class="command-palette" role="dialog" aria-modal="true" aria-label="命令面板">
         <button class="command-palette__backdrop" type="button" aria-label="关闭命令面板" @click="close" />
-        <section class="command-palette__panel" @keydown="onPanelKeydown">
+        <section ref="panelRef" class="command-palette__panel" @keydown="onPanelKeydown">
           <label class="command-palette__search">
             <el-icon><Search /></el-icon>
             <input
