@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -550,32 +551,44 @@ private fun TvSeriesAutoplaySettingRow(
         shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .fillMaxWidth()
-            .height(68.dp)
+            .heightIn(min = 68.dp)
             .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
             .clickable { onSetEnabled(!enabled) },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
                     text = "自动连播下一集",
                     color = AppChrome.TextPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = "仅电视剧播放页生效",
                     color = AppChrome.TextMuted,
                     style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Switch(
-                checked = enabled,
-                onCheckedChange = onSetEnabled,
-            )
+            Box(
+                modifier = Modifier.width(64.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onSetEnabled,
+                )
+            }
         }
     }
 }

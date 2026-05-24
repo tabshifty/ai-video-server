@@ -144,4 +144,32 @@ class TvHomeNavigationTest {
         assertTrue(settingsSource.contains("播放设置"))
         assertTrue(settingsSource.contains("快进/快退步长"))
     }
+
+    @Test
+    fun seriesAutoplaySettingRowProtectsSwitchFromTextCompression() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt")
+
+        assertTrue("TV 首页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        val rowSource = source.substringAfter("private fun TvSeriesAutoplaySettingRow(")
+            .substringBefore("@Composable\nprivate fun TvSeekStepSettingRow(")
+
+        assertTrue(
+            "电视剧自动连播设置行的文案区必须使用 weight(1f) 弹性收缩，避免挤压右侧 Switch",
+            rowSource.contains(".weight(1f)"),
+        )
+        assertTrue(
+            "电视剧自动连播设置行标题必须限制单行并省略，避免长文本挤压 Switch",
+            rowSource.contains("maxLines = 1") && rowSource.contains("overflow = TextOverflow.Ellipsis"),
+        )
+        assertTrue(
+            "电视剧自动连播设置行右侧 Switch 必须固定占位，避免被左侧文案压缩",
+            rowSource.contains("Modifier.width(64.dp)"),
+        )
+        assertFalse(
+            "电视剧自动连播设置行不应固定 68dp 高度，系统字号放大时应允许最小高度向上生长",
+            rowSource.contains(".height(68.dp)"),
+        )
+    }
 }
