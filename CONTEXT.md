@@ -13,6 +13,7 @@
 - `admin 设计 token`：管理端全局颜色、字体、字号、间距、圆角、阴影、动效、断点和 shell 尺寸统一由 `admin-web/src/assets/theme.css` 的 CSS 变量表达；业务视图和基础组件应引用 token，不直接扩散临时色值或字体。
 - `Element Plus 三层架构`：L1 为 `theme.css` 中的 `--el-*` token 覆盖，L2 为 `element-overrides.css` 的低特异性 `:where()` 全局覆写，L3 为 `components/base/` 中的共享 wrapper 组件；三层各司其职，避免跨层写重复样式。
 - `admin 编辑入口 Drawer`：管理端需要编辑或创建主数据时，优先使用右侧 drawer 承载表单而不是居中 dialog；drawer 适合保留列表上下文，宽度默认 560px，窄屏自动全屏，底部操作区固定在视口内。
+- `admin 编辑入口 Drawer dirty snapshot`：drawer 的 dirty 守卫必须覆盖当前 drawer 内所有可见可编辑状态，不只覆盖主表单字段；字幕、演员、合集、图片关联、上传队列等子状态若能在 drawer 内改变，也必须纳入 snapshot 或维护独立 dirty 标志。dialog 改 drawer 时要保留原有 `destroy-on-close` 或等价清理语义，避免关闭后异步请求回写旧数据。
 - `admin 路由 hideShellPageHeader 标记`：当某个 admin 路由自身已经渲染 PageHeader 时，对应 route 必须显式设置 `meta.hideShellPageHeader = true`，避免 Layout 顶栏与页面标题重复显示。
 - `admin 侧栏分组导航`：管理端主导航按 `仪表盘`、`媒体库`、`录入处理`、`服务`、`系统` 五组呈现；菜单源由命令面板 helper 统一维护，侧栏、移动 drawer 和命令面板共享同一组路由语义。
 - `admin 侧栏折叠偏好`：桌面端侧栏支持 240px 展开与 60px 折叠，用户手动折叠状态持久化到 `localStorage` 的 `admin-sidebar-collapsed`；窄屏 drawer 与 1280px 以下自动折叠不改变该持久偏好。
@@ -21,6 +22,7 @@
 - `admin 视图模式切换`：ImageManage 顶部「视图切换」开关在网格/列表间切换；默认网格，偏好写入 `localStorage` key `admin-imagemanage-view`，切换不重置分页与筛选。
 - `admin 上传向导三步`：VideoUpload 拆成选文件、基础信息、关联与上传三步；step 切换用共享父级状态和 `v-show` 保留字段、进度与历史，类型字段驱动 AV 地区分类和短视频所属合集的条件显示。
 - `admin 批量操作浮条`：管理端表格或网格选中 ≥ 1 项时显示 `BulkActionBar`，包含已选数量和批量删除/改状态等主操作；选中状态只属于当前会话，不写入持久化存储。
+- `admin 批量操作上下文切换`：任何会改变用户可见选择上下文的操作（视图模式切换、分页刷新、筛选刷新、列表 reload）必须清空或同步 BulkActionBar 选中状态，避免用户看不到勾选项却仍能执行批量删除/改状态。
 - `admin 筛选条折叠`：复杂列表页将长筛选表单折叠为「已生效筛选 chip 行」加「更多筛选」drawer；常用搜索保持可见，长尾筛选按需展开，避免筛选区挤占主表格空间。
 
 ## Git 忽略规则约定

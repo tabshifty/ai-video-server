@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '../components/Layout.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
@@ -33,6 +33,8 @@ const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
 const tagOptions = ref([])
 const loadingTags = ref(false)
+const previousType = ref('short')
+const revertingType = ref(false)
 
 const form = reactive({
   type: 'short',
@@ -86,16 +88,40 @@ const canGoNext = computed(() => canAdvanceStep(activeStep.value, wizardForm.val
 
 watch(
   () => form.type,
-  (nextType) => {
+  async (nextType, prevType) => {
+    if (revertingType.value) {
+      previousType.value = nextType
+      revertingType.value = false
+      return
+    }
     if (nextType !== 'short' && form.collections.length > 0) {
       form.collections = []
     }
     if (nextType === 'av' && !form.siteCategory) {
       form.siteCategory = 'japanese'
     }
-    if (nextType !== 'movie' || uploadFileList.value.length <= 1) return
-    uploadFileList.value = [uploadFileList.value[0]]
-    ElMessage.warning('电影仅支持单文件上传，已保留第1个文件')
+    if (nextType !== 'movie' || uploadFileList.value.length <= 1) {
+      previousType.value = nextType
+      return
+    }
+    const droppedCount = uploadFileList.value.length - 1
+    try {
+      await ElMessageBox.confirm(
+        `电影仅支持单文件上传。确认切换为电影并丢弃其余 ${droppedCount} 个文件吗？`,
+        '确认丢弃文件',
+        {
+          type: 'warning',
+          confirmButtonText: '确认丢弃',
+          cancelButtonText: '继续保留'
+        }
+      )
+      uploadFileList.value = [uploadFileList.value[0]]
+      previousType.value = nextType
+      ElMessage.warning('已保留第1个文件')
+    } catch (_) {
+      revertingType.value = true
+      form.type = prevType || previousType.value || 'short'
+    }
   }
 )
 

@@ -28,6 +28,7 @@ const total = ref(0)
 const IMAGEMANAGE_VIEW_KEY = 'admin-imagemanage-view'
 const tableRef = ref(null)
 const selectedImageRows = ref([])
+const bulkOperating = ref(false)
 const filterDrawerVisible = ref(false)
 const viewportWidth = ref(readViewportWidth())
 const viewMode = ref(readStoredImageView())
@@ -86,15 +87,15 @@ const activeFilterChips = computed(() => {
   const chips = []
   if (query.q) chips.push({ key: 'q', label: '搜索', value: query.q })
   if (query.status) chips.push({ key: 'status', label: '状态', value: statusLabel(query.status) })
-  if (query.active !== '') chips.push({ key: 'active', label: '启用', value: query.active === '1' ? '仅启用' : '仅停用' })
+  if (query.active === '0') chips.push({ key: 'active', label: '启用', value: '仅停用' })
   if (query.actor_id) chips.push({ key: 'actor_id', label: '演员', value: optionLabel(actorOptions.value, query.actor_id) })
   if (query.collection_id) chips.push({ key: 'collection_id', label: '图片合集', value: optionLabel(imageCollectionOptions.value, query.collection_id) })
   return chips
 })
 const bulkActions = computed(() => [
-  { label: '批量启用', icon: SwitchButton, type: 'primary', onClick: () => bulkToggleActive(true) },
-  { label: '批量停用', icon: SwitchButton, type: 'warning', onClick: () => bulkToggleActive(false) },
-  { label: '批量删除', icon: Delete, type: 'danger', onClick: doBulkDelete }
+  { label: '批量启用', icon: SwitchButton, type: 'primary', loading: bulkOperating.value, disabled: bulkOperating.value, onClick: () => bulkToggleActive(true) },
+  { label: '批量停用', icon: SwitchButton, type: 'warning', loading: bulkOperating.value, disabled: bulkOperating.value, onClick: () => bulkToggleActive(false) },
+  { label: '批量删除', icon: Delete, type: 'danger', loading: bulkOperating.value, disabled: bulkOperating.value, onClick: doBulkDelete }
 ])
 
 function readViewportWidth() {
@@ -117,6 +118,7 @@ function readStoredImageView() {
 
 function setViewMode(mode) {
   viewMode.value = mode === 'list' ? 'list' : 'grid'
+  clearImageSelection()
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(IMAGEMANAGE_VIEW_KEY, viewMode.value)
@@ -597,7 +599,7 @@ function clearImageSelection() {
 
 async function bulkToggleActive(active) {
   const targets = [...selectedImageRows.value]
-  if (targets.length === 0) return
+  if (targets.length === 0 || bulkOperating.value) return
   try {
     await ElMessageBox.confirm(`确认将已选 ${targets.length} 张图片批量${active ? '启用' : '停用'}？`, '批量改状态', {
       type: 'warning'
@@ -606,14 +608,26 @@ async function bulkToggleActive(active) {
     if (error === 'cancel' || error === 'close') return
     throw error
   }
-  await Promise.all(targets.map((item) => updateAdminImage(item.id, { active })))
-  ElMessage.success(`已批量${active ? '启用' : '停用'} ${targets.length} 张图片`)
-  await load()
+  bulkOperating.value = true
+  try {
+    const results = await Promise.allSettled(targets.map((item) => updateAdminImage(item.id, { active })))
+    const ok = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - ok
+    if (failed > 0) {
+      ElMessage.warning(`批量${active ? '启用' : '停用'}完成：成功 ${ok}，失败 ${failed}`)
+    } else {
+      ElMessage.success(`已批量${active ? '启用' : '停用'} ${ok} 张图片`)
+    }
+    clearImageSelection()
+    await load()
+  } finally {
+    bulkOperating.value = false
+  }
 }
 
 async function doBulkDelete() {
   const targets = [...selectedImageRows.value]
-  if (targets.length === 0) return
+  if (targets.length === 0 || bulkOperating.value) return
   try {
     await ElMessageBox.confirm(`确认删除已选 ${targets.length} 张图片？`, '批量删除图片', {
       type: 'warning',
@@ -624,14 +638,26 @@ async function doBulkDelete() {
     if (error === 'cancel' || error === 'close') return
     throw error
   }
-  await Promise.all(targets.map((item) => deleteAdminImage(item.id)))
-  ElMessage.success(`已删除 ${targets.length} 张图片`)
-  await load()
+  bulkOperating.value = true
+  try {
+    const results = await Promise.allSettled(targets.map((item) => deleteAdminImage(item.id)))
+    const ok = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - ok
+    if (failed > 0) {
+      ElMessage.warning(`批量删除完成：成功 ${ok}，失败 ${failed}`)
+    } else {
+      ElMessage.success(`已删除 ${ok} 张图片`)
+    }
+    clearImageSelection()
+    await load()
+  } finally {
+    bulkOperating.value = false
+  }
 }
 
 function removeFilter(key) {
   if (key === 'active') {
-    query.active = ''
+    query.active = '1'
   } else {
     query[key] = ''
   }
@@ -642,7 +668,7 @@ function removeFilter(key) {
 function resetFilters() {
   query.q = ''
   query.status = ''
-  query.active = ''
+  query.active = '1'
   query.actor_id = ''
   query.collection_id = ''
   query.page = 1

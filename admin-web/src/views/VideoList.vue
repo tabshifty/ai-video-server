@@ -74,6 +74,7 @@ const subtitleUploadFileList = ref([])
 const subtitleUploading = ref(false)
 const deletingBatch = ref(false)
 const selectedRows = ref([])
+const detailRequestToken = ref(0)
 const subtitleForm = reactive({
   language_code: '',
   label: '',
@@ -105,14 +106,13 @@ const detailDrawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '
 const isNarrowViewport = computed(() => viewportWidth.value < 1280)
 const activeFilterChips = computed(() => {
   const chips = []
-  if (query.q) chips.push({ key: 'q', label: '搜索', value: query.q })
   if (query.type) chips.push({ key: 'type', label: '类型', value: typeLabel(query.type) })
   if (query.status) chips.push({ key: 'status', label: '状态', value: statusLabel(query.status) })
   return chips
 })
 const bulkActions = computed(() => [
-  { label: '批量删除', icon: Delete, type: 'danger', onClick: doBatchDelete },
-  { label: '取消选择', icon: MoreFilled, type: 'primary', onClick: clearSelection }
+  { label: '批量删除', icon: Delete, type: 'danger', loading: deletingBatch.value, disabled: deletingBatch.value, onClick: doBatchDelete },
+  { label: '取消选择', icon: MoreFilled, type: 'primary', disabled: deletingBatch.value, onClick: clearSelection }
 ])
 const detailDirty = computed(() => detailSnapshot.value !== serializeDetailState())
 
@@ -127,11 +127,13 @@ function updateViewportWidth() {
 
 function readStoredColumns() {
   if (typeof window === 'undefined') return [...DEFAULT_VISIBLE_COLUMNS]
+  const required = ALL_COLUMNS.filter((item) => item.required).map((item) => item.key)
   try {
     const raw = window.localStorage.getItem(COLUMN_VISIBILITY_KEY)
     const parsed = raw ? JSON.parse(raw) : null
     if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_COLUMNS]
-    return parsed.filter((key) => ALL_COLUMNS.some((column) => column.key === key))
+    const known = parsed.filter((key) => ALL_COLUMNS.some((column) => column.key === key))
+    return Array.from(new Set([...known, ...required]))
   } catch (_) {
     return [...DEFAULT_VISIBLE_COLUMNS]
   }
@@ -179,7 +181,8 @@ function serializeDetailState() {
     status: detail.value.status || '',
     target_type: detail.value.target_type || '',
     season_number: detail.value.season_number || 0,
-    episode_number: detail.value.episode_number || 0
+    episode_number: detail.value.episode_number || 0,
+    subtitles: subtitleItems.value.map((item) => `${item.id || ''}:${item.language_code || ''}:${item.label || ''}:${item.is_default ? '1' : '0'}`).sort()
   })
 }
 
@@ -495,9 +498,15 @@ async function searchImageCollections(keyword = '') {
 }
 
 async function showDetail(row) {
+  const requestToken = detailRequestToken.value + 1
+  detailRequestToken.value = requestToken
   handleDetailClose()
   resetDetailState()
-  detail.value = await getAdminVideoDetail(row.id)
+  const data = await getAdminVideoDetail(row.id)
+  if (detailRequestToken.value !== requestToken) {
+    return
+  }
+  detail.value = data
   detail.value.actor_tokens = (detail.value.actors || []).map((actor) => actor.id)
   detail.value.collection_ids = (detail.value.collections || []).map((collection) => collection.id)
   detail.value.image_collection_id = detail.value.image_collection?.id || ''
@@ -516,14 +525,17 @@ async function showDetail(row) {
     searchActors(''),
     searchCollections(''),
     searchImageCollections(''),
-    supportsSubtitleManage(detail.value?.type) ? loadSubtitles(detail.value.id) : Promise.resolve()
+    supportsSubtitleManage(detail.value?.type) ? loadSubtitles(detail.value.id, requestToken) : Promise.resolve()
   ])
+  if (detailRequestToken.value !== requestToken || detail.value?.id !== row.id) {
+    return
+  }
   if (detail.value?.status === 'ready') {
-    await refreshPlayURL()
+    await refreshPlayURL(requestToken)
   }
 }
 
-async function refreshPlayURL() {
+async function refreshPlayURL(expectedToken = detailRequestToken.value) {
   if (!detail.value?.id) {
     return
   }
@@ -535,7 +547,7 @@ async function refreshPlayURL() {
   loadingPlayURL.value = true
   try {
     const data = await getAdminVideoPlayURL(videoID)
-    if (!detailVisible.value || detail.value?.id !== videoID) {
+    if (!detailVisible.value || detailRequestToken.value !== expectedToken || detail.value?.id !== videoID) {
       return
     }
     playURL.value = data.signed_url || ''
@@ -554,6 +566,7 @@ function resetSubtitleState() {
 }
 
 function resetDetailState() {
+  detailRequestToken.value += 1
   detail.value = null
   playURL.value = ''
   playExpiresAt.value = 0
@@ -561,6 +574,7 @@ function resetDetailState() {
 }
 
 function handleDetailClose() {
+  detailRequestToken.value += 1
   teardownPreviewPlayer(previewPlayerRef.value)
   playURL.value = ''
   playExpiresAt.value = 0
@@ -748,7 +762,7 @@ async function saveDetail() {
   await load()
 }
 
-async function loadSubtitles(videoID = detail.value?.id) {
+async function loadSubtitles(videoID = detail.value?.id, expectedToken = detailRequestToken.value) {
   if (!videoID || !supportsSubtitleManage(detail.value?.type)) {
     subtitleItems.value = []
     return
@@ -756,9 +770,14 @@ async function loadSubtitles(videoID = detail.value?.id) {
   subtitleLoading.value = true
   try {
     const data = await getAdminVideoSubtitles(videoID)
+    if (!detailVisible.value || detailRequestToken.value !== expectedToken || detail.value?.id !== videoID) {
+      return
+    }
     subtitleItems.value = data.items || []
   } finally {
-    subtitleLoading.value = false
+    if (detailRequestToken.value === expectedToken) {
+      subtitleLoading.value = false
+    }
   }
 }
 
@@ -982,6 +1001,7 @@ onBeforeUnmount(() => {
       title="视频详情"
       direction="rtl"
       :size="detailDrawerSize"
+      destroy-on-close
       :before-close="handleDetailBeforeClose"
       @close="handleDetailClose"
       @closed="handleDetailClosed"

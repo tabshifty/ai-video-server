@@ -106,7 +106,6 @@ defineEmits([
   'load-collections',
   'load-image-collections',
   'search-actors',
-  'submit',
   'cancel-upload',
   'clear-selected-files',
   'clear-upload-records'
@@ -204,7 +203,6 @@ defineEmits([
         </el-form-item>
       </el-form>
       <div class="upload-actions">
-        <el-button type="primary" :loading="uploading" :disabled="selectedCount === 0" @click="$emit('submit')">开始上传</el-button>
         <el-button v-if="uploading" type="danger" @click="$emit('cancel-upload')">取消上传</el-button>
         <el-button :disabled="!canClearSelectedFiles" @click="$emit('clear-selected-files')">清空已选文件</el-button>
         <el-button :disabled="!canClearRecords" @click="$emit('clear-upload-records')">清空上传记录</el-button>

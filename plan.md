@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-24 22:00 +0800
+- 进度：完成 `tasks/2026-05-23-admin-three-pillars/feedback.md` follow-up 修复：VideoList required 列迁移、批量删除 loading、drawer destroy-on-close、异步 token 防旧请求回写、字幕列表纳入 dirty；ImageManage 批量启停/删除改为 allSettled 并总是刷新/清选、默认 active chip 语义修正、视图切换清空选中；VideoUpload 切 movie 前确认丢弃多余文件，StepRelate 移除重复「开始上传」。同步扩展 BulkActionBar action 的 loading/disabled 支持，并在 CONTEXT 沉淀 drawer snapshot 与批量操作上下文切换契约。
+- 影响文件：`admin-web/src/components/base/BulkActionBar.vue`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/VideoUpload/StepRelate.vue`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-admin-three-pillars/feedback.md`
+- 验证：`cd admin-web && npm run build` 通过（仅 Vite chunk size warning）；`cd admin-web && npm test -- src/assets/themeTokens.spec.js src/views/videoUpload.wizard.helpers.spec.js` 通过；`cd admin-web && npm test` 通过（13 files / 95 tests）；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src tasks/2026-05-23-admin-three-pillars` 无输出。
+
+## 2026-05-24 21:55 +0800
+- 进度：开始处理 `tasks/2026-05-23-admin-three-pillars/feedback.md`。反馈覆盖 Phase 4 follow-up：VideoList 列设置 required 迁移、BulkActionBar loading/disabled、drawer destroy/竞态/字幕 dirty；ImageManage 批量操作 allSettled 与视图切换清选；VideoUpload movie 类型切换丢文件确认、去掉重复开始上传按钮；同步必要 CONTEXT 与验证。
+- 影响文件：`admin-web/src/components/base/BulkActionBar.vue`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/VideoUpload/*`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-admin-three-pillars/feedback.md`
+- 验证：待执行 `cd admin-web && npm test -- src/assets/themeTokens.spec.js src/views/videoUpload.wizard.helpers.spec.js`、`cd admin-web && npm test`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-05-24 21:30 +0800
 - 进度：完成 `tasks/2026-05-23-admin-three-pillars` Phase 4 实现与 review 自动化：ImageManage 接入 PageHeader / Toolbar / 视图切换 / 双 drawer / BulkActionBar / EmptyState 并清零旧玫红；VideoList 接入 chip 筛选、更多筛选 drawer、列设置 localStorage、编辑 drawer、BulkActionBar；VideoUpload 拆为三步 Wizard 与 3 个 step 子组件；3 条路由补 `hideShellPageHeader`，CONTEXT 新增 5 条 admin 术语，截图目录归档 11 张 1440x1080 PNG。未创建 `DONE.md`，待用户验收后按流程补完成标记。
 - 影响文件：`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/VideoUpload/*`、`admin-web/src/views/videoUpload.wizard.helpers.*`、`admin-web/src/router/index.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`tasks/2026-05-23-admin-three-pillars/*`、`plan.md`

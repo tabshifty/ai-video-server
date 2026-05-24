@@ -21,6 +21,8 @@ defineProps({
           :key="action.label"
           :type="action.type || 'primary'"
           :icon="action.icon"
+          :loading="action.loading === true"
+          :disabled="action.disabled === true"
           @click="action.onClick"
         >
           {{ action.label }}
