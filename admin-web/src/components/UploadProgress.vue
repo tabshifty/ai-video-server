@@ -24,14 +24,14 @@ defineProps({
 .progress-head {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 6px;
-  color: #7f1d1d;
+  margin-bottom: var(--space-1);
+  color: var(--primary);
   font-weight: 600;
 }
 
 .progress-note {
-  margin-top: 6px;
-  color: #6b7280;
-  font-size: 13px;
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-small);
 }
 </style>

@@ -3,6 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import Toolbar from '../components/base/Toolbar.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import StatCard from '../components/base/StatCard.vue'
+import EmptyState from '../components/base/EmptyState.vue'
 import {
   getAdminIPTVPlaylist,
   refreshAdminIPTVPlaylist,
@@ -32,6 +37,7 @@ const groupCount = computed(() => {
   return new Set(channels.value.map((item) => item.group).filter(Boolean)).size
 })
 const updatedAtText = computed(() => formatDateTime(playlist.value.updated_at))
+const hasChannels = computed(() => channels.value.length > 0)
 
 function createEmptyPlaylist() {
   return {
@@ -158,77 +164,89 @@ onMounted(loadPlaylist)
 
 <template>
   <Layout>
-    <div class="page page-shell">
-      <section class="section-head">
-        <div>
-          <h1 class="page-title">IPTV 管理</h1>
-          <p class="page-subtitle">维护 M3U 播放列表来源并预览频道解析结果</p>
-        </div>
-        <div class="section-head__actions">
-          <el-button :icon="Refresh" :loading="loading" @click="loadPlaylist">重新加载</el-button>
-        </div>
+    <div class="page-shell iptv-page">
+      <PageHeader title="IPTV 管理" subtitle="维护 M3U 播放列表来源并预览频道解析结果">
+        <template #actions>
+          <el-button :icon="Refresh" :loading="loading" @click="loadPlaylist">刷新</el-button>
+        </template>
+      </PageHeader>
+
+      <Toolbar>
+        <template #filters>
+          <el-tag effect="plain">最后更新时间：{{ updatedAtText }}</el-tag>
+        </template>
+        <template #actions>
+          <el-button :icon="Refresh" :loading="refreshLoading" @click="refreshPlaylist">远程拉取</el-button>
+          <el-upload
+            v-model:file-list="uploadFiles"
+            :auto-upload="false"
+            :limit="1"
+            accept=".m3u,.m3u8"
+            :on-change="onUploadChange"
+            :on-remove="onUploadRemove"
+            :show-file-list="false"
+          >
+            <el-button type="primary" :icon="UploadFilled">上传 M3U</el-button>
+          </el-upload>
+        </template>
+      </Toolbar>
+
+      <section class="stat-grid">
+        <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" />
       </section>
 
-      <section class="stats-grid">
-        <div v-for="item in stats" :key="item.label" class="stat-card">
-          <div class="stat-label">{{ item.label }}</div>
-          <div class="stat-value">{{ item.value }}</div>
-        </div>
-      </section>
-
-      <section class="ops-grid">
-        <el-card class="soft-card content-card">
-          <template #header>
-            <div class="card-title">上传 M3U 文件</div>
-          </template>
-          <div class="upload-panel">
-            <el-upload
-              v-model:file-list="uploadFiles"
-              drag
-              :auto-upload="false"
-              :limit="1"
-              accept=".m3u,.m3u8"
-              :on-change="onUploadChange"
-              :on-remove="onUploadRemove"
-            >
-              <el-icon class="upload-icon"><UploadFilled /></el-icon>
-              <div class="el-upload__text">拖拽文件到此处，或点击选择</div>
-              <template #tip>
-                <div class="el-upload__tip">支持 .m3u / .m3u8，上传后会替换当前播放列表。</div>
-              </template>
-            </el-upload>
-            <el-button type="primary" :loading="uploadLoading" @click="uploadPlaylist">上传并替换</el-button>
-          </div>
-        </el-card>
-
-        <el-card class="soft-card content-card">
-          <template #header>
-            <div class="card-title">远程 M3U URL</div>
-          </template>
-          <el-form label-position="top">
-            <el-form-item label="播放列表地址">
-              <el-input v-model="sourceUrl" clearable placeholder="请输入远程 M3U / M3U8 URL" />
-            </el-form-item>
-            <div class="source-actions">
-              <el-button type="primary" :loading="saveSourceLoading" @click="saveSourceUrl">保存 URL</el-button>
-              <el-button :icon="Refresh" :loading="refreshLoading" @click="refreshPlaylist">手动刷新</el-button>
+      <SectionCard>
+        <template #title>播放列表来源</template>
+        <template #description>上传本地文件或更新远程 M3U URL</template>
+        <div class="source-grid">
+          <article class="source-panel">
+            <div class="source-panel__title">本地 M3U 文件</div>
+            <p class="source-panel__desc">选择 .m3u / .m3u8 文件后点击上传并替换。</p>
+            <div class="source-panel__actions">
+              <el-upload
+                v-model:file-list="uploadFiles"
+                drag
+                :auto-upload="false"
+                :limit="1"
+                accept=".m3u,.m3u8"
+                :on-change="onUploadChange"
+                :on-remove="onUploadRemove"
+              >
+                <el-icon class="upload-icon"><UploadFilled /></el-icon>
+                <div class="el-upload__text">拖拽文件到此处，或点击选择</div>
+                <template #tip>
+                  <div class="el-upload__tip">支持 .m3u / .m3u8，上传后会替换当前播放列表。</div>
+                </template>
+              </el-upload>
+              <el-button type="primary" :loading="uploadLoading" @click="uploadPlaylist">上传并替换</el-button>
             </div>
-          </el-form>
-          <div class="status-line">最后更新时间：{{ updatedAtText }}</div>
-        </el-card>
-      </section>
+          </article>
 
-      <section>
-        <el-card class="soft-card table-card">
-          <template #header>
-            <div class="table-head">
-              <div>
-                <div class="card-title">频道预览</div>
-                <p>展示当前播放列表解析出的频道信息</p>
+          <article class="source-panel">
+            <div class="source-panel__title">远程 M3U URL</div>
+            <p class="source-panel__desc">保存后可手动拉取最新频道列表。</p>
+            <el-form label-position="top">
+              <el-form-item label="播放列表地址">
+                <el-input v-model="sourceUrl" clearable placeholder="请输入远程 M3U / M3U8 URL" />
+              </el-form-item>
+              <div class="source-panel__actions">
+                <el-button type="primary" :loading="saveSourceLoading" @click="saveSourceUrl">保存 URL</el-button>
+                <el-button :loading="refreshLoading" @click="refreshPlaylist">手动刷新</el-button>
               </div>
-              <el-tag type="info" effect="plain">{{ channels.length }} 个频道</el-tag>
-            </div>
-          </template>
+            </el-form>
+          </article>
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <template #title>频道预览</template>
+        <template #description>展示当前播放列表解析出的频道信息</template>
+        <EmptyState
+          v-if="!hasChannels"
+          title="暂无频道"
+          description="上传 M3U 文件或填入远程地址后刷新"
+        />
+        <div v-else class="table-wrap">
           <el-table v-loading="loading" :data="channels" border stripe class="channel-table" empty-text="暂无频道数据">
             <el-table-column prop="name" label="频道名" min-width="180" show-overflow-tooltip />
             <el-table-column prop="group" label="分组" min-width="130" show-overflow-tooltip>
@@ -254,86 +272,62 @@ onMounted(loadPlaylist)
               <template #default="{ row }">{{ row.tvg_id || '暂无' }}</template>
             </el-table-column>
           </el-table>
-        </el-card>
-      </section>
+        </div>
+      </SectionCard>
     </div>
   </Layout>
 </template>
 
 <style scoped>
-.card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #7f1d1d;
+.iptv-page {
+  display: grid;
+  gap: var(--space-4);
 }
 
-.stat-card {
-  min-width: 0;
-  padding: 16px;
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.source-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
-  background: #fff;
-  box-shadow: var(--shadow-soft);
+  background: var(--bg-surface-muted);
 }
 
-.stat-label {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.stat-value {
-  margin-top: 6px;
-  font-family: var(--font-mono);
-  font-size: 28px;
+.source-panel__title {
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
   font-weight: 600;
-  color: #7f1d1d;
 }
 
-.ops-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+.source-panel__desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
 }
 
-.upload-panel {
-  display: grid;
-  gap: 12px;
-}
-
-.upload-icon {
-  color: #7f1d1d;
-}
-
-.source-actions {
+.source-panel__actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
-.status-line {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line-soft);
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.table-card {
-  padding: 0;
-}
-
-.table-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.table-head p {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--text-muted);
+.upload-icon {
+  color: var(--primary);
 }
 
 .channel-table {
@@ -348,18 +342,20 @@ onMounted(loadPlaylist)
 
 .logo-empty {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-caption);
 }
 
-@media (max-width: 900px) {
-  .ops-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 75rem) {
+  .stat-grid,
+  .source-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 700px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 46rem) {
+  .stat-grid,
+  .source-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

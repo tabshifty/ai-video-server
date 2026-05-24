@@ -43,6 +43,7 @@ export const updateAdminIPTVSource = (payload) => request.put('/admin/iptv/playl
 export const refreshAdminIPTVPlaylist = () => request.post('/admin/iptv/playlist/refresh')
 
 export const getAdminUsers = (params) => request.get('/admin/users', { params })
+export const registerAdminUser = (payload) => request.post('/auth/register', payload)
 export const updateUserRole = (id, payload) => request.put(`/admin/users/${id}/role`, payload)
 export const getAdminActors = (params) => request.get('/admin/actors', { params })
 export const createAdminActor = (payload) => request.post('/admin/actors', payload)

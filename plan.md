@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-24 11:46 +0800
+- 进度：完成 `tasks/2026-05-23-admin-simple-views` Phase 2 的实现与截图归档，7 个简单视图已按 Phase 1 设计系统重排，`themeTokens.spec.js` 扩展的视图层 audit 通过，14 张 before/after 截图已写入任务目录。当前先保留任务文档本身与实现代码、截图及计划记录，待用户确认验收后再按仓库流程补 `DONE.md`。
+- 影响文件：`admin-web/src/views/Dashboard.vue`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/UserManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/IPTVManage.vue`、`admin-web/src/views/CollectionManage.vue`、`admin-web/src/views/ActorManage.vue`、`admin-web/src/components/UploadProgress.vue`、`admin-web/src/api/admin.js`、`admin-web/src/assets/themeTokens.spec.js`、`tasks/2026-05-23-admin-simple-views/screenshots/*`、`plan.md`
+- 验证：`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size warning）；`git diff --check` 通过；`rg -n $'\uFFFD' admin-web/src admin-web/src/assets/themeTokens.spec.js tasks/2026-05-23-admin-simple-views/screenshots plan.md` 未发现乱码；`tasks/2026-05-23-admin-simple-views/screenshots/` 已包含 14 张 PNG，统一 1440x1080。
+
+## 2026-05-24 10:38 +0800
+- 进度：开始执行 `tasks/2026-05-23-admin-simple-views` Phase 2，目标是把 7 个简单视图按 Phase 1 设计系统重排，并清零视图层 scoped CSS 里的玫红 hex。当前已确认 Phase 1 外壳已完成且 `DONE.md` 已存在；本阶段只处理 Dashboard / SystemSettings / UserManage / TaskMonitor / IPTVManage / CollectionManage / ActorManage / UploadProgress 及其 audit 测试。
+- 影响文件：`admin-web/src/views/Dashboard.vue`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/UserManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/IPTVManage.vue`、`admin-web/src/views/CollectionManage.vue`、`admin-web/src/views/ActorManage.vue`、`admin-web/src/components/UploadProgress.vue`、`admin-web/src/assets/themeTokens.spec.js`、`plan.md`、`tasks/2026-05-23-admin-simple-views/screenshots/*`
+- 验证：待执行红灯测试、`npm test`、`npm run build`、截图归档、乱码扫描与提交前 diff 检查。
+
 ## 2026-05-24 10:31 +0800
 - 进度：完成 `tasks/2026-05-23-admin-shell-redesign` Phase 1 的实现、定向测试、全量 `npm test`、`npm run build`、截图归档与乱码扫描。admin-web 已切换到新的浅色设计 token、Element Plus 覆写、分组侧栏、命令面板、profile chip、独立登录页与共享基础组件；同时把 `Dashboard` / `IPTVManage` / `TaskMonitor` 的 `--font-code` 收口到 `--font-mono`，并在 `CONTEXT.md` 追加「admin 设计系统术语」。
 - 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/base/*`、`admin-web/src/views/Login.vue`、`admin-web/src/views/Dashboard.vue`、`admin-web/src/views/IPTVManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/main.js`、`admin-web/index.html`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-23-admin-shell-redesign/screenshots/*`

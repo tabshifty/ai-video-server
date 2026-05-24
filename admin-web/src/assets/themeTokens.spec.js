@@ -2,6 +2,18 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
+const phase2AuditFiles = [
+  '../views/Dashboard.vue',
+  '../views/SystemSettings.vue',
+  '../views/UserManage.vue',
+  '../views/TaskMonitor.vue',
+  '../views/IPTVManage.vue',
+  '../views/CollectionManage.vue',
+  '../views/ActorManage.vue',
+  '../components/UploadProgress.vue'
+]
+const roseHexPatterns = [/#881337/i, /#be123c/i, /#7f1d1d/i]
+const dashboardLegacyPatterns = [/#2563eb/i, /#eff6ff/i, /#64748b/i, /#e2e8f0/i, /#cad8f5/i, /#e11d48/i, /#fda4af/i]
 
 describe('theme tokens', () => {
   it('exports the core admin design tokens', () => {
@@ -27,5 +39,19 @@ describe('theme tokens', () => {
     expect(css).not.toContain('Fira Code')
     expect(css).not.toContain('Fira Sans')
     expect(css).not.toContain('--font-code')
+  })
+})
+
+describe('phase 2 views hex audit', () => {
+  phase2AuditFiles.forEach((relativePath) => {
+    it(`${relativePath} 不含旧玫红 hex`, () => {
+      const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
+      const patterns = relativePath.includes('Dashboard.vue')
+        ? [...roseHexPatterns, ...dashboardLegacyPatterns]
+        : roseHexPatterns
+      patterns.forEach((pattern) => {
+        expect(source).not.toMatch(pattern)
+      })
+    })
   })
 })

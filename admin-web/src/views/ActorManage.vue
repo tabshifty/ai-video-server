@@ -1,9 +1,18 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
-import { createAdminActor, getAdminActors, scrapeAdminActorPreview, updateAdminActor } from '../api/admin'
+import PageHeader from '../components/base/PageHeader.vue'
+import Toolbar from '../components/base/Toolbar.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import EmptyState from '../components/base/EmptyState.vue'
+import {
+  createAdminActor,
+  getAdminActors,
+  scrapeAdminActorPreview,
+  updateAdminActor
+} from '../api/admin'
 
 const loading = ref(false)
 const list = ref([])
@@ -23,6 +32,8 @@ const editingID = ref('')
 const scrapeSource = ref('tmdb')
 const scrapeCandidates = ref([])
 const form = reactive(createEmptyForm())
+
+const hasActors = computed(() => list.value.length > 0)
 
 function createEmptyForm() {
   return {
@@ -95,6 +106,8 @@ async function load() {
     const data = await getAdminActors(buildListParams())
     list.value = data.items || []
     total.value = data.total_count || 0
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '加载演员列表失败'))
   } finally {
     loading.value = false
   }
@@ -278,9 +291,18 @@ async function toggleActive(row) {
     notes: row.notes || '',
     active: !row.active
   }
-  await updateAdminActor(row.id, payload)
-  ElMessage.success(payload.active ? '演员已启用' : '演员已停用')
-  await load()
+
+  try {
+    await updateAdminActor(row.id, payload)
+    row.active = !row.active
+    ElMessage.success(row.active ? '演员已启用' : '演员已停用')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '切换演员状态失败'))
+  }
+}
+
+function buildStatusLabel(row) {
+  return row.active ? '启用' : '停用'
 }
 
 onMounted(load)
@@ -288,61 +310,65 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page page-shell">
-      <section class="section-head">
-        <div>
-          <h1 class="page-title">演员管理</h1>
-          <p class="page-subtitle">支持演员录入、启停用与别名维护</p>
-        </div>
-      </section>
+    <div class="page-shell actor-page">
+      <PageHeader title="演员管理" subtitle="管理演员资料、头像与来源信息">
+        <template #actions>
+          <el-button :loading="loading" @click="load">刷新</el-button>
+          <el-button type="primary" @click="openCreate">创建演员</el-button>
+        </template>
+      </PageHeader>
 
-      <section>
-        <el-card class="soft-card content-card table-panel">
-          <div class="toolbar-row">
-            <el-form inline class="filter-form actor-filter-form">
-              <el-form-item>
-                <el-input v-model="query.q" placeholder="按姓名或别名搜索" clearable @keyup.enter="load" />
-              </el-form-item>
-              <el-form-item>
-                <el-select v-model="query.active" style="width: 150px" clearable placeholder="状态筛选">
-                  <el-option label="全部状态" value="" />
-                  <el-option label="仅启用" value="1" />
-                  <el-option label="仅停用" value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="load">查询</el-button>
-              </el-form-item>
-            </el-form>
-            <el-button type="success" @click="openCreate">新增演员</el-button>
-          </div>
+      <Toolbar>
+        <template #filters>
+          <el-input v-model="query.q" class="toolbar-search" placeholder="按演员姓名搜索" clearable @keyup.enter="load" />
+          <el-select v-model="query.active" class="toolbar-select" clearable placeholder="状态筛选">
+            <el-option label="全部状态" value="" />
+            <el-option label="仅启用" value="1" />
+            <el-option label="仅停用" value="0" />
+          </el-select>
+        </template>
+        <template #actions>
+          <el-button :loading="loading" @click="load">查询</el-button>
+          <el-button type="primary" @click="openCreate">创建演员</el-button>
+        </template>
+      </Toolbar>
 
+      <SectionCard>
+        <template #title>演员列表</template>
+        <template #description>支持演员资料的新增、编辑、停用与刮削回填</template>
+        <EmptyState
+          v-if="!hasActors"
+          title="暂无演员"
+          description="点击“创建演员”添加第一位演员"
+        >
+          <template #action>
+            <el-button type="primary" @click="openCreate">创建演员</el-button>
+          </template>
+        </EmptyState>
+        <template v-else>
           <div class="table-wrap">
-            <el-table :data="list" border v-loading="loading">
-              <el-table-column prop="name" label="姓名" min-width="180" />
-              <el-table-column label="别名" min-width="220">
+            <el-table v-loading="loading" :data="list" border>
+              <el-table-column prop="name" label="演员姓名" min-width="160" />
+              <el-table-column prop="aliases" label="别名" min-width="220">
                 <template #default="{ row }">
-                  <div class="alias-list">
-                    <el-tag v-for="alias in row.aliases || []" :key="alias" size="small">{{ alias }}</el-tag>
-                    <span v-if="!row.aliases || row.aliases.length === 0" class="muted">无</span>
-                  </div>
+                  {{ Array.isArray(row.aliases) && row.aliases.length > 0 ? row.aliases.join(' / ') : '暂无' }}
                 </template>
               </el-table-column>
               <el-table-column prop="gender" label="性别" width="100" />
-              <el-table-column prop="country" label="国家/地区" width="120" />
-              <el-table-column prop="source" label="来源" width="130" />
-              <el-table-column label="状态" width="100">
+              <el-table-column prop="country" label="国家/地区" width="130" />
+              <el-table-column prop="source" label="来源" width="110">
+                <template #default="{ row }">{{ sourceLabel(row.source) }}</template>
+              </el-table-column>
+              <el-table-column prop="active" label="状态" width="100">
                 <template #default="{ row }">
-                  <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
+                  <el-tag :type="row.active ? 'success' : 'info'">{{ buildStatusLabel(row) }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column prop="updated_at" label="更新时间" width="180" />
               <el-table-column label="操作" width="220">
                 <template #default="{ row }">
                   <el-button size="small" @click="openEdit(row)">编辑</el-button>
-                  <el-button size="small" :type="row.active ? 'warning' : 'success'" @click="toggleActive(row)">
-                    {{ row.active ? '停用' : '启用' }}
-                  </el-button>
+                  <el-button size="small" @click="toggleActive(row)">{{ row.active ? '停用' : '启用' }}</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -357,102 +383,90 @@ onMounted(load)
               @current-change="load"
             />
           </div>
-        </el-card>
-      </section>
+        </template>
+      </SectionCard>
     </div>
 
     <el-dialog
       v-model="dialogVisible"
       class="crud-dialog"
-      :title="editingID ? '编辑演员' : '新增演员'"
-      width="min(94vw, 760px)"
+      :title="editingID ? '编辑演员' : '创建演员'"
+      width="min(94vw, 860px)"
     >
-      <el-form label-width="96px" class="dialog-form">
-        <el-form-item label="姓名">
-          <el-input v-model="form.name" placeholder="请输入演员姓名" />
-        </el-form-item>
-        <el-form-item label="姓名刮削">
-          <div class="scrape-row">
-            <el-select v-model="scrapeSource" style="width: 150px">
-              <el-option label="TMDB" value="tmdb" />
-              <el-option label="JavDB" value="javdb" />
+      <div class="dialog-body">
+        <el-form label-width="100px" class="dialog-form">
+          <el-form-item label="演员姓名">
+            <el-input v-model="form.name" placeholder="请输入演员姓名" />
+          </el-form-item>
+          <el-form-item label="别名">
+            <el-select
+              v-model="form.aliases"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="输入后回车"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="性别">
+            <el-select v-model="form.gender" clearable style="width: 100%">
+              <el-option label="男" value="male" />
+              <el-option label="女" value="female" />
+              <el-option label="未知" value="unknown" />
             </el-select>
-            <el-button type="primary" :loading="scraping" @click="scrapeByName">按姓名刮削</el-button>
-          </div>
-        </el-form-item>
+          </el-form-item>
+          <el-form-item label="国家/地区">
+            <el-input v-model="form.country" placeholder="例如：日本 / 中国 / 美国" />
+          </el-form-item>
+          <el-form-item label="生日">
+            <el-date-picker v-model="form.birth_date" type="date" value-format="YYYY-MM-DD" placeholder="选择生日" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="头像地址">
+            <el-input v-model="form.avatar_url" placeholder="https://..." />
+          </el-form-item>
+          <el-form-item label="外部来源">
+            <el-input v-model="form.external_id" placeholder="可选的 TMDB / JavDB ID" />
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="form.notes" type="textarea" :rows="3" placeholder="可选备注" />
+          </el-form-item>
+          <el-form-item label="启用状态">
+            <el-switch v-model="form.active" active-text="启用" inactive-text="停用" />
+          </el-form-item>
+        </el-form>
 
-        <el-form-item label="刮削候选">
-          <div class="candidate-panel" v-loading="scraping">
-            <el-empty v-if="!scrapeCandidates.length" description="暂无候选数据" />
-            <div v-else class="candidate-list">
-              <div v-for="item in scrapeCandidates" :key="`${item.source}-${item.external_id}-${item.name}`" class="candidate-item">
-                <img v-if="item.avatar_url" :src="item.avatar_url" class="candidate-avatar" />
-                <div class="candidate-main">
-                  <div class="candidate-title">{{ item.name || '-' }}</div>
-                  <div class="candidate-meta">
-                    <span>来源：{{ sourceLabel(item.source) }}</span>
-                    <span>外部ID：{{ item.external_id || '-' }}</span>
-                  </div>
-                  <div v-if="item.aliases?.length" class="candidate-aliases">别名：{{ item.aliases.join(' / ') }}</div>
-                </div>
-                <el-button size="small" type="success" @click="applyCandidate(item)">使用该候选</el-button>
-              </div>
+        <SectionCard>
+          <template #title>刮削预览</template>
+          <template #description>可先查询候选并回填到当前表单</template>
+          <div class="scrape-panel">
+            <div class="scrape-panel__head">
+              <el-select v-model="scrapeSource" style="width: 140px">
+                <el-option label="TMDB" value="tmdb" />
+                <el-option label="JavDB" value="javdb" />
+              </el-select>
+              <el-button :loading="scraping" @click="scrapeByName">查询候选</el-button>
+            </div>
+            <EmptyState
+              v-if="scrapeCandidates.length === 0"
+              title="暂无候选"
+              description="输入演员姓名后可查询刮削候选"
+            />
+            <div v-else class="scrape-grid">
+              <button
+                v-for="item in scrapeCandidates"
+                :key="`${item.source || 'unknown'}-${item.external_id || item.name}`"
+                type="button"
+                class="scrape-card"
+                @click="applyCandidate(item)"
+              >
+                <strong>{{ item.name }}</strong>
+                <span>{{ sourceLabel(item.source) }}</span>
+              </button>
             </div>
           </div>
-        </el-form-item>
-
-        <el-form-item label="别名">
-          <el-select
-            v-model="form.aliases"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            clearable
-            placeholder="可输入多个别名"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="性别">
-          <el-select v-model="form.gender" placeholder="请选择性别" clearable style="width: 180px">
-            <el-option label="未知" value="" />
-            <el-option label="男" value="男" />
-            <el-option label="女" value="女" />
-            <el-option label="其他" value="其他" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="国家/地区">
-          <el-input v-model="form.country" placeholder="例如：中国、日本" />
-        </el-form-item>
-        <el-form-item label="出生日期">
-          <el-date-picker
-            v-model="form.birth_date"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="选择日期"
-            style="width: 220px"
-          />
-        </el-form-item>
-        <el-form-item label="头像地址">
-          <el-input v-model="form.avatar_url" placeholder="https://..." />
-        </el-form-item>
-        <el-form-item label="来源">
-          <el-select v-model="form.source" style="width: 220px">
-            <el-option label="手动录入" value="manual" />
-            <el-option label="TMDB 刮削" value="scrape_tmdb" />
-            <el-option label="AV 刮削" value="scrape_av" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="外部ID">
-          <el-input v-model="form.external_id" placeholder="站点演员ID（可选）" />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="form.notes" type="textarea" :rows="3" placeholder="补充信息（可选）" />
-        </el-form-item>
-        <el-form-item label="启用状态">
-          <el-switch v-model="form.active" active-text="启用" inactive-text="停用" />
-        </el-form-item>
-      </el-form>
+        </SectionCard>
+      </div>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -463,83 +477,72 @@ onMounted(load)
 </template>
 
 <style scoped>
-.actor-filter-form {
-  flex: 1;
-  min-width: 260px;
+.actor-page {
+  display: grid;
+  gap: var(--space-4);
 }
 
-.dialog-form {
-  padding-right: 8px;
+.toolbar-search {
+  width: min(20rem, 100%);
 }
 
-.alias-list {
+.toolbar-select {
+  width: 9.5rem;
+}
+
+.dialog-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: var(--space-4);
+}
+
+.scrape-panel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.scrape-panel__head {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
-.muted {
-  color: #9ca3af;
+.scrape-grid {
+  display: grid;
+  gap: var(--space-2);
 }
 
-.scrape-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.scrape-card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  text-align: left;
+  cursor: pointer;
 }
 
-.candidate-panel {
-  width: 100%;
-  min-height: 120px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px;
+.scrape-card strong {
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
 }
 
-.candidate-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.scrape-card span {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
 }
 
-.candidate-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 8px;
+.action-row {
+  padding-top: var(--space-2);
 }
 
-.candidate-avatar {
-  width: 52px;
-  height: 70px;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid #e5e7eb;
-}
-
-.candidate-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.candidate-title {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.candidate-meta {
-  display: flex;
-  gap: 12px;
-  margin-top: 4px;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.candidate-aliases {
-  margin-top: 4px;
-  color: #4b5563;
-  font-size: 12px;
+@media (max-width: 64rem) {
+  .dialog-body {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

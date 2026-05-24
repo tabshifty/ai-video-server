@@ -1,9 +1,18 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
-import { createAdminCollection, deleteAdminCollection, getAdminCollections, updateAdminCollection } from '../api/admin'
+import PageHeader from '../components/base/PageHeader.vue'
+import Toolbar from '../components/base/Toolbar.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import EmptyState from '../components/base/EmptyState.vue'
+import {
+  createAdminCollection,
+  deleteAdminCollection,
+  getAdminCollections,
+  updateAdminCollection
+} from '../api/admin'
 
 const loading = ref(false)
 const list = ref([])
@@ -20,6 +29,8 @@ const query = reactive({
 })
 
 const form = reactive(createEmptyForm())
+
+const hasCollections = computed(() => list.value.length > 0)
 
 function createEmptyForm() {
   return {
@@ -83,6 +94,8 @@ async function load() {
     const data = await getAdminCollections(buildListParams())
     list.value = data.items || []
     total.value = data.total_count || 0
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '加载合集列表失败'))
   } finally {
     loading.value = false
   }
@@ -133,15 +146,11 @@ async function save() {
 async function doDelete(row) {
   const title = row?.name || '该合集'
   try {
-    await ElMessageBox.confirm(
-      `确认删除「${title}」？删除后仅解除关联，不会删除视频。`,
-      '删除合集',
-      {
-        type: 'warning',
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消'
-      }
-    )
+    await ElMessageBox.confirm(`确认删除「${title}」？删除后仅解除关联，不会删除视频。`, '删除合集', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消'
+    })
   } catch (error) {
     if (error === 'cancel' || error === 'close') {
       return
@@ -165,37 +174,44 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page page-shell">
-      <section class="section-head">
-        <div>
-          <h1 class="page-title">合集管理</h1>
-          <p class="page-subtitle">支持短视频合集的新增、编辑、停用与删除</p>
-        </div>
-      </section>
+    <div class="page-shell collection-page">
+      <PageHeader title="合集管理" subtitle="支持短视频合集的新增、编辑、停用与删除">
+        <template #actions>
+          <el-button :loading="loading" @click="load">刷新</el-button>
+          <el-button type="primary" @click="openCreate">新增合集</el-button>
+        </template>
+      </PageHeader>
 
-      <section>
-        <el-card class="soft-card content-card table-panel">
-          <div class="toolbar-row">
-            <el-form inline class="filter-form">
-              <el-form-item>
-                <el-input v-model="query.q" placeholder="按合集名称搜索" clearable @keyup.enter="load" />
-              </el-form-item>
-              <el-form-item>
-                <el-select v-model="query.active" style="width: 150px" clearable placeholder="状态筛选">
-                  <el-option label="全部状态" value="" />
-                  <el-option label="仅启用" value="1" />
-                  <el-option label="仅停用" value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="load">查询</el-button>
-              </el-form-item>
-            </el-form>
-            <el-button type="success" @click="openCreate">新增合集</el-button>
-          </div>
+      <Toolbar>
+        <template #filters>
+          <el-input v-model="query.q" class="toolbar-search" placeholder="按合集名称搜索" clearable @keyup.enter="load" />
+          <el-select v-model="query.active" class="toolbar-select" clearable placeholder="状态筛选">
+            <el-option label="全部状态" value="" />
+            <el-option label="仅启用" value="1" />
+            <el-option label="仅停用" value="0" />
+          </el-select>
+        </template>
+        <template #actions>
+          <el-button :loading="loading" @click="load">查询</el-button>
+          <el-button type="primary" @click="openCreate">新增合集</el-button>
+        </template>
+      </Toolbar>
 
+      <SectionCard>
+        <template #title>合集列表</template>
+        <template #description>支持短视频合集的新增、编辑、停用与删除</template>
+        <EmptyState
+          v-if="!hasCollections"
+          title="暂无合集"
+          description="点击“新增合集”创建第一个合集"
+        >
+          <template #action>
+            <el-button type="primary" @click="openCreate">新增合集</el-button>
+          </template>
+        </EmptyState>
+        <template v-else>
           <div class="table-wrap">
-            <el-table :data="list" border v-loading="loading">
+            <el-table v-loading="loading" :data="list" border>
               <el-table-column prop="name" label="合集名称" min-width="180" />
               <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
               <el-table-column prop="cover_url" label="封面地址" min-width="240" show-overflow-tooltip />
@@ -224,8 +240,8 @@ onMounted(load)
               @current-change="load"
             />
           </div>
-        </el-card>
-      </section>
+        </template>
+      </SectionCard>
     </div>
 
     <el-dialog
@@ -261,7 +277,20 @@ onMounted(load)
 </template>
 
 <style scoped>
-.dialog-form {
-  padding-right: 8px;
+.collection-page {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.toolbar-search {
+  width: min(20rem, 100%);
+}
+
+.toolbar-select {
+  width: 9.5rem;
+}
+
+.action-row {
+  padding-top: var(--space-2);
 }
 </style>

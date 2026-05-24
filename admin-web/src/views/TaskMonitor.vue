@@ -1,22 +1,44 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import PageHeader from '../components/base/PageHeader.vue'
+import Toolbar from '../components/base/Toolbar.vue'
+import StatCard from '../components/base/StatCard.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import EmptyState from '../components/base/EmptyState.vue'
 import { getAdminTasks } from '../api/admin'
 
 const list = ref([])
 const total = ref(0)
-const query = reactive({ page: 1, page_size: 20 })
+const loading = ref(false)
+const query = reactive({ page: 1, page_size: 20, status: '' })
 let timer = null
 
+const queuedCount = computed(() => list.value.filter((item) => item.status === 'pending').length)
 const runningCount = computed(() => list.value.filter((item) => item.status === 'running').length)
-const successCount = computed(() => list.value.filter((item) => item.status === 'success').length)
 const failedCount = computed(() => list.value.filter((item) => item.status === 'failed').length)
+const hasTasks = computed(() => list.value.length > 0)
 
 async function load() {
-  const data = await getAdminTasks(query)
-  list.value = data.items || []
-  total.value = data.total_count || 0
+  loading.value = true
+  try {
+    const params = {
+      page: query.page,
+      page_size: query.page_size
+    }
+    if (query.status) {
+      params.status = query.status
+    }
+    const data = await getAdminTasks(params)
+    list.value = data.items || []
+    total.value = data.total_count || 0
+  } catch (error) {
+    ElMessage.error(error?.message || '加载任务失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 function toNumber(value) {
@@ -52,10 +74,10 @@ function resolveProgress(row) {
 
 function formatDuration(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '--'
-  const total = Math.floor(seconds)
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
+  const totalSeconds = Math.floor(seconds)
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
   if (h > 0) {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
@@ -88,6 +110,20 @@ function progressStatus(row) {
   return ''
 }
 
+function setStatus(status) {
+  query.status = status
+  query.page = 1
+  load()
+}
+
+function statusLabel(status) {
+  if (!status) return '全部'
+  if (status === 'pending') return '排队'
+  if (status === 'running') return '处理中'
+  if (status === 'failed') return '失败'
+  return status
+}
+
 onMounted(async () => {
   await load()
   timer = setInterval(load, 5000)
@@ -101,121 +137,107 @@ onUnmounted(() => {
 <template>
   <Layout>
     <div class="page-shell task-monitor-page">
-      <div class="page-header">
-        <div>
-          <h1 class="page-title">任务监控</h1>
-          <p class="page-subtitle">每 5 秒自动刷新转码任务状态</p>
-        </div>
-      </div>
+      <PageHeader title="任务监控" subtitle="每 5 秒自动刷新转码任务状态">
+        <template #actions>
+          <el-button :loading="loading" @click="load">立即刷新</el-button>
+        </template>
+      </PageHeader>
 
-      <section class="page-section">
-        <div class="section-head">
-          <div class="section-head__main">
-            <h2 class="section-head__title">任务概览</h2>
-            <p class="section-head__desc">展示当前分页内运行态、成功态与失败态分布</p>
-          </div>
-        </div>
-        <div class="stats-grid">
-          <article class="content-card monitor-stat">
-            <div class="monitor-stat__label">任务总量</div>
-            <div class="monitor-stat__value">{{ total }}</div>
-          </article>
-          <article class="content-card monitor-stat">
-            <div class="monitor-stat__label">运行中</div>
-            <div class="monitor-stat__value">{{ runningCount }}</div>
-          </article>
-          <article class="content-card monitor-stat">
-            <div class="monitor-stat__label">已完成</div>
-            <div class="monitor-stat__value">{{ successCount }}</div>
-          </article>
-          <article class="content-card monitor-stat monitor-stat--danger">
-            <div class="monitor-stat__label">失败</div>
-            <div class="monitor-stat__value">{{ failedCount }}</div>
-          </article>
-        </div>
+      <Toolbar>
+        <template #filters>
+          <el-button-group class="status-group">
+            <el-button :type="query.status === '' ? 'primary' : ''" @click="setStatus('')">全部</el-button>
+            <el-button :type="query.status === 'pending' ? 'primary' : ''" @click="setStatus('pending')">排队</el-button>
+            <el-button :type="query.status === 'running' ? 'primary' : ''" @click="setStatus('running')">处理中</el-button>
+            <el-button :type="query.status === 'failed' ? 'primary' : ''" @click="setStatus('failed')">失败</el-button>
+          </el-button-group>
+        </template>
+        <template #actions>
+          <el-tag effect="plain">自动刷新：5 秒</el-tag>
+        </template>
+      </Toolbar>
+
+      <section class="metric-grid">
+        <StatCard label="队列" :value="queuedCount" />
+        <StatCard label="处理中" :value="runningCount" />
+        <StatCard label="失败" :value="failedCount" />
       </section>
 
-      <section class="table-panel monitor-table">
-        <div class="section-head">
-          <div class="section-head__main">
-            <h2 class="section-head__title">任务列表</h2>
-            <p class="section-head__desc">每 5 秒自动刷新，也可手动立即刷新</p>
+      <SectionCard>
+        <template #title>任务列表</template>
+        <template #description>每 5 秒自动刷新，也可手动立即刷新</template>
+        <EmptyState
+          v-if="!hasTasks"
+          title="暂无任务"
+          description="当前筛选条件下没有任务"
+        >
+          <template #action>
+            <el-button :loading="loading" @click="load">立即刷新</el-button>
+          </template>
+        </EmptyState>
+        <template v-else>
+          <div class="table-wrap">
+            <el-table v-loading="loading" :data="list" border>
+              <el-table-column prop="id" label="任务ID" width="90" />
+              <el-table-column prop="video_id" label="视频ID" min-width="220" />
+              <el-table-column prop="status" label="状态" width="120">
+                <template #default="{ row }">{{ statusLabel(row.status) }}</template>
+              </el-table-column>
+              <el-table-column label="进度" min-width="220">
+                <template #default="{ row }">
+                  <el-progress :stroke-width="14" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="剩余时间" width="120">
+                <template #default="{ row }">
+                  {{ formatRemaining(row) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="已耗时" width="120">
+                <template #default="{ row }">
+                  {{ formatElapsed(row) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="retry_count" label="重试" width="80" />
+              <el-table-column prop="error" label="错误信息" min-width="280" />
+              <el-table-column prop="started_at" label="开始时间" width="180" />
+              <el-table-column prop="progress_updated_at" label="进度更新时间" width="180" />
+            </el-table>
           </div>
-          <div class="section-head__actions">
-            <el-tag type="info" effect="plain">自动刷新：5 秒</el-tag>
-            <el-button @click="load">立即刷新</el-button>
+          <div class="toolbar-row toolbar-row--end">
+            <AdminTablePagination
+              v-model:current-page="query.page"
+              v-model:page-size="query.page_size"
+              layout="total, prev, pager, next"
+              :total="total"
+              @current-change="load"
+            />
           </div>
-        </div>
-
-        <div class="table-wrap">
-          <el-table :data="list" border>
-            <el-table-column prop="id" label="任务ID" width="90" />
-            <el-table-column prop="video_id" label="视频ID" min-width="220" />
-            <el-table-column prop="status" label="状态" width="120" />
-            <el-table-column label="进度" min-width="220">
-              <template #default="{ row }">
-                <el-progress :stroke-width="14" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="剩余时间" width="120">
-              <template #default="{ row }">
-                {{ formatRemaining(row) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="已耗时" width="120">
-              <template #default="{ row }">
-                {{ formatElapsed(row) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="retry_count" label="重试" width="80" />
-            <el-table-column prop="error" label="错误信息" min-width="280" />
-            <el-table-column prop="started_at" label="开始时间" width="180" />
-            <el-table-column prop="progress_updated_at" label="进度更新时间" width="180" />
-          </el-table>
-        </div>
-        <div class="toolbar-row toolbar-row--end">
-          <AdminTablePagination
-            v-model:current-page="query.page"
-            v-model:page-size="query.page_size"
-            layout="total, prev, pager, next"
-            :total="total"
-            @current-change="load"
-          />
-        </div>
-      </section>
+        </template>
+      </SectionCard>
     </div>
   </Layout>
 </template>
 
 <style scoped>
 .task-monitor-page {
-  padding-bottom: 4px;
-}
-
-.monitor-stat {
   display: grid;
-  gap: 8px;
-  min-height: 108px;
+  gap: var(--space-4);
 }
 
-.monitor-stat__label {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.monitor-stat__value {
-  font-family: var(--font-mono);
-  font-size: 30px;
-  line-height: 1.1;
-  font-weight: 600;
-}
-
-.monitor-stat--danger .monitor-stat__value {
-  color: var(--danger);
-}
-
-.monitor-table {
+.metric-grid {
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.status-group {
+  display: inline-flex;
+}
+
+@media (max-width: 48rem) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
