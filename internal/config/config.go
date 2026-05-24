@@ -83,7 +83,7 @@ func Load() (Config, error) {
 		EnableSwagger:              getBoolEnv("ENABLE_SWAGGER", false),
 		TMDBTimeout:                time.Duration(getIntEnv("TMDB_TIMEOUT_SECONDS", 10)) * time.Second,
 		AVScraperTimeout:           time.Duration(getIntEnv("AV_SCRAPER_TIMEOUT_SECONDS", 10)) * time.Second,
-		AccessTokenTTL:             time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 24)) * time.Hour,
+		AccessTokenTTL:             time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 87600)) * time.Hour,
 		RefreshTokenTTL:            time.Duration(getIntEnv("REFRESH_TOKEN_TTL_HOURS", 168)) * time.Hour,
 		TranslationAPIURL:          strings.TrimSuffix(strings.TrimSpace(os.Getenv("TRANSLATION_API_URL")), "/"),
 		TranslationAPIKey:          os.Getenv("TRANSLATION_API_KEY"),
