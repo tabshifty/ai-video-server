@@ -172,4 +172,26 @@ class TvHomeNavigationTest {
             rowSource.contains(".height(68.dp)"),
         )
     }
+
+    @Test
+    fun homeShelvesDoNotShowSubtitleCopyUnderTheTitle() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt")
+
+        assertTrue("TV 首页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        val shelfSource = source.substringAfter("private fun TvHomeShelf(")
+            .substringBefore("@Composable\nprivate fun TvPosterMoreCard(")
+        val moreCardSource = source.substringAfter("private fun TvPosterMoreCard(")
+            .substringBefore("@Composable\nprivate fun TvHomeShelfCard(")
+
+        assertFalse(
+            "货架标题下不应再显示副文案，避免把最近更新/最近播放的语义再解释一遍",
+            shelfSource.contains("text = subtitle") || shelfSource.contains("subtitle = \"最近更新\""),
+        )
+        assertFalse(
+            "查看更多卡片不应再显示数量副文案，避免标题下出现多余说明",
+            moreCardSource.contains("text = subtitle") || moreCardSource.contains("subtitle = \"共 "),
+        )
+    }
 }

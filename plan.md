@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-24 09:53 +0800
+- 进度：完成 TV 首页货架文案收口：三类内容页的货架标题下不再显示“最近更新”，各区块的“查看更多”卡也不再展示数量副文案；首页货架语义收束为「最近播放 / 最近更新」两类，`TvCatalogScreen` 仅保留纯标题呈现。TV 端版本递增到 `versionCode = 66`、`versionName = "0.1.65"`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvHomeNavigationTest.homeShelvesDoNotShowSubtitleCopyUnderTheTitle'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md android-tv-app/tv-app/src/main/java android-tv-app/tv-app/src/test/java android-tv-app/tv-app/build.gradle.kts` 未发现乱码。未纳入未跟踪 `tasks/2026-05-23-admin-*` 目录。
+
+## 2026-05-24 09:46 +0800
+- 进度：开始收紧 TV 首页货架文案。当前首页三类内容页仍在 `电视剧 / 电影 / 18+` 货架标题下显示“最近更新”，且 `查看更多` 卡还显示“共 x 项”；根据确认后的边界，本次只保留两类货架语义（最近播放 / 最近更新），去掉货架标题下所有说明文案与统计文案，不改首页分类模型与内容排序。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：待执行红灯测试、TV 单测、TV 构建、乱码扫描。
+
 ## 2026-05-24 09:29 +0800
 - 进度：完成 TV 设置页「电视剧自动连播」抗挤压修复：设置行改为最小高度，左侧文案区弹性收缩并单行省略，右侧 Switch 固定 64dp 操作占位；补充静态回归测试锁定该布局契约。TV 端版本递增到 `versionCode = 65`、`versionName = "0.1.64"`，并在 `CONTEXT.md` 沉淀 `TV 设置行抗挤压布局`。未纳入未跟踪 `tasks/2026-05-23-admin-*` 目录。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

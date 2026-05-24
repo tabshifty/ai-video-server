@@ -315,7 +315,6 @@ fun TvCatalogScreen(
                 item(key = "tv-series-shelf") {
                     TvHomeShelf(
                         title = "电视剧",
-                        subtitle = "最近更新",
                         wallKind = "tv",
                         baseUrl = uiState.baseUrl,
                         items = uiState.tvSeries,
@@ -330,7 +329,6 @@ fun TvCatalogScreen(
                 item(key = "movies-shelf") {
                     TvHomeShelf(
                         title = "电影",
-                        subtitle = "最近更新",
                         wallKind = "movie",
                         baseUrl = uiState.baseUrl,
                         items = uiState.movies,
@@ -345,7 +343,6 @@ fun TvCatalogScreen(
                 item(key = "av-shelf") {
                     TvHomeShelf(
                         title = "18+",
-                        subtitle = "最近更新",
                         wallKind = "av",
                         baseUrl = uiState.baseUrl,
                         items = uiState.av,
@@ -1203,7 +1200,6 @@ private fun TvCatalogSection(
                 item(key = "${section.title}-more") {
                     TvPosterMoreCard(
                         label = "查看更多",
-                        subtitle = "共 ${section.items.size} 项",
                         onClick = { onOpenCatalogWall(resolveTvSectionWallKind(section.title), section.title) },
                     )
                 }
@@ -1266,7 +1262,6 @@ private fun TvSeriesPosterCard(
 @Composable
 private fun TvHomeShelf(
     title: String,
-    subtitle: String,
     wallKind: String,
     baseUrl: String,
     items: List<TvHomeShelfItemUiModel>,
@@ -1281,11 +1276,6 @@ private fun TvHomeShelf(
             color = AppChrome.TextPrimary,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = subtitle,
-            color = AppChrome.TextMuted,
-            style = MaterialTheme.typography.bodySmall,
         )
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(TvCatalogFocusLayoutSpec.shelfItemSpacingDp.dp),
@@ -1312,7 +1302,6 @@ private fun TvHomeShelf(
                 item(key = "$wallKind-more") {
                     TvPosterMoreCard(
                         label = "查看更多",
-                        subtitle = "共 ${items.size} 项",
                         onClick = { onOpenCatalogWall(wallKind, title) },
                     )
                 }
@@ -1324,7 +1313,6 @@ private fun TvHomeShelf(
 @Composable
 private fun TvPosterMoreCard(
     label: String,
-    subtitle: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -1373,11 +1361,6 @@ private fun TvPosterMoreCard(
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = subtitle,
-                    color = AppChrome.TextSecondary,
-                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
