@@ -2,18 +2,26 @@
 import { ref } from 'vue'
 import { ArrowDown, ArrowRight } from '@element-plus/icons-vue'
 
-defineProps({
+const props = defineProps({
   collapsible: {
+    type: Boolean,
+    default: false
+  },
+  defaultExpanded: {
+    type: Boolean,
+    default: true
+  },
+  dense: {
     type: Boolean,
     default: false
   }
 })
 
-const expanded = ref(true)
+const expanded = ref(props.defaultExpanded)
 </script>
 
 <template>
-  <section class="section-card">
+  <section class="section-card" :class="{ 'is-dense': dense }">
     <header class="section-card__header">
       <button v-if="collapsible" class="section-card__toggle" type="button" @click="expanded = !expanded">
         <el-icon>
@@ -40,6 +48,7 @@ const expanded = ref(true)
 
 <style scoped>
 .section-card {
+  position: relative;
   display: grid;
   gap: var(--space-4);
   padding: var(--space-4);
@@ -47,6 +56,19 @@ const expanded = ref(true)
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
   box-shadow: var(--shadow-xs);
+}
+
+.section-card.is-dense {
+  gap: var(--space-3);
+  padding: var(--space-3);
+  box-shadow: none;
+}
+
+.section-card.is-dense .section-card__title {
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .section-card__header {

@@ -12,7 +12,9 @@ const VIEW_HEX_AUDIT_TARGETS = [
   '../views/ActorManage.vue',
   '../components/UploadProgress.vue',
   '../views/ScrapePreview.vue',
-  '../views/AVManualScrape.vue'
+  '../views/AVManualScrape.vue',
+  '../views/TvSeriesManage.vue',
+  '../views/ImageCollectionManage.vue'
 ]
 const roseHexPatterns = [/#881337/i, /#be123c/i, /#7f1d1d/i]
 const dashboardLegacyPatterns = [/#2563eb/i, /#eff6ff/i, /#64748b/i, /#e2e8f0/i, /#cad8f5/i, /#e11d48/i, /#fda4af/i]

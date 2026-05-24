@@ -53,6 +53,7 @@ const editDrawerDirty = computed(() => (
   form.name !== editDrawerSnapshot.value.name
   || form.description !== editDrawerSnapshot.value.description
   || form.cover_url !== editDrawerSnapshot.value.cover_url
+  || (form.cover_image_id ?? null) !== (editDrawerSnapshot.value.cover_image_id ?? null)
   || form.sort_order !== editDrawerSnapshot.value.sort_order
   || form.active !== editDrawerSnapshot.value.active
 ))
@@ -124,6 +125,7 @@ function captureFormSnapshot() {
     name: form.name,
     description: form.description,
     cover_url: form.cover_url,
+    cover_image_id: form.cover_image_id ?? null,
     sort_order: form.sort_order,
     active: form.active
   }
@@ -183,6 +185,8 @@ async function confirmEditDrawerClose() {
 
 async function requestEditDrawerClose() {
   if (await confirmEditDrawerClose()) {
+    // 先把 snapshot 对齐到 form，避免 v-model flip 后 el-drawer before-close 再次弹同款确认
+    captureFormSnapshot()
     editDrawerVisible.value = false
   }
 }
@@ -226,6 +230,8 @@ async function save() {
       await createAdminImageCollection(payload)
       ElMessage.success('图片合集已创建')
     }
+    // 保存成功后 snapshot 对齐 form，避免随后 visible flip 触发 before-close 的「未保存」假弹
+    captureFormSnapshot()
     editDrawerVisible.value = false
     await load()
   } catch (error) {
@@ -453,11 +459,11 @@ onBeforeUnmount(() => {
         </template>
       </Toolbar>
 
-      <SectionCard>
+      <SectionCard v-loading="loading">
         <template #title>合集列表</template>
         <template #description>维护图片合集并统一管理图片归档关系。</template>
 
-        <el-table v-if="list.length" v-loading="loading" :data="list" border>
+        <el-table v-if="list.length" :data="list" border>
           <el-table-column prop="name" label="图片合集名称" min-width="180" />
           <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
           <el-table-column label="封面" min-width="240">

@@ -39,7 +39,6 @@ const selectedSeriesId = ref('')
 const detail = ref(createEmptySeriesDetail())
 const episodeVideoOptions = ref([])
 const loadingVideoOptions = ref(false)
-const activeSeasons = ref([])
 const route = useRoute()
 
 const query = reactive({
@@ -165,7 +164,6 @@ async function selectSeries(id) {
         }))
       }))
     }
-    activeSeasons.value = detail.value.seasons.map((season) => season.id)
     syncBoundVideoOptions()
   } finally {
     loadingDetail.value = false
@@ -175,7 +173,6 @@ async function selectSeries(id) {
 function openCreateSeries() {
   selectedSeriesId.value = ''
   detail.value = createEmptySeriesDetail()
-  activeSeasons.value = []
 }
 
 async function saveSeries() {
@@ -214,7 +211,6 @@ async function removeSeries() {
 
 function addSeason() {
   detail.value.seasons.unshift(createNewSeasonDraft())
-  activeSeasons.value = detail.value.seasons.map((season) => season.id || season._temp_key)
 }
 
 async function saveSeason(season) {
@@ -348,7 +344,7 @@ onMounted(async () => {
         <SectionCard class="tv-series-list-card">
           <template #title>电视剧列表</template>
           <template #description>按系列维度管理季与分集。</template>
-          <div v-loading="loadingList" class="series-list-shell">
+          <el-scrollbar v-loading="loadingList" class="series-list-shell">
             <EmptyState
               v-if="!list.length && !loadingList"
               title="暂无电视剧"
@@ -373,7 +369,7 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-          </div>
+          </el-scrollbar>
           <div class="pager-wrap">
             <AdminTablePagination
               v-model:current-page="query.page"
@@ -443,7 +439,13 @@ onMounted(async () => {
             />
 
             <div v-else class="season-stack">
-              <SectionCard v-for="season in detail.seasons" :key="season.id || season._temp_key">
+              <SectionCard
+                v-for="(season, seasonIndex) in detail.seasons"
+                :key="season.id || season._temp_key"
+                collapsible
+                :default-expanded="seasonIndex === 0"
+                dense
+              >
                 <template #title>第 {{ season.season_number }} 季</template>
                 <template #description>{{ season.title || '未命名季度' }}</template>
 
@@ -476,7 +478,13 @@ onMounted(async () => {
                 </div>
 
                 <div class="episode-stack">
-                  <SectionCard v-for="episode in season.episodes" :key="episode.id || episode._temp_key">
+                  <SectionCard
+                    v-for="episode in season.episodes"
+                    :key="episode.id || episode._temp_key"
+                    collapsible
+                    :default-expanded="false"
+                    dense
+                  >
                     <template #title>第 {{ episode.episode_number }} 集</template>
                     <template #description>
                       <el-tag :type="episode.playable ? 'success' : 'info'">{{ episode.playable ? '可播放' : '待绑定 / 未就绪' }}</el-tag>
@@ -578,6 +586,11 @@ onMounted(async () => {
 
 .series-list-shell {
   min-height: 20rem;
+  max-height: calc(100vh - 24rem);
+}
+
+.series-list-shell :deep(.el-scrollbar__wrap) {
+  padding-right: var(--space-1);
 }
 
 .series-list {

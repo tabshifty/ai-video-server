@@ -252,10 +252,10 @@ async function doSave() {
         <template #filters>
           <el-form inline class="av-filter-form">
             <el-form-item label="视频 ID">
-              <el-input v-model="form.video_id" style="width: 300px" :disabled="previewLoading || saveLoading" />
+              <el-input v-model="form.video_id" style="width: 300px" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
             </el-form-item>
             <el-form-item label="标题">
-              <el-input v-model="form.title" style="width: 260px" :disabled="previewLoading || saveLoading" />
+              <el-input v-model="form.title" style="width: 260px" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
             </el-form-item>
             <el-form-item label="站点分类">
               <el-select v-model="form.site_category" clearable placeholder="按标题自动判断" style="width: 180px">
@@ -280,6 +280,12 @@ async function doSave() {
           <el-button type="primary" :icon="Search" :loading="previewLoading" @click="doPreview">查询预览</el-button>
         </template>
       </Toolbar>
+
+      <div v-if="recommendedSource || usedSource" class="source-summary" role="status">
+        <el-tag size="small" type="danger">自动推荐：{{ toText(recommendedSource) }}</el-tag>
+        <el-tag size="small">实际使用：{{ toText(usedSource) }}</el-tag>
+        <el-tag size="small" type="info">当前分类：{{ toText(form.site_category || '自动') }}</el-tag>
+      </div>
 
       <SectionCard>
         <template #title>AV 刮削配置</template>
@@ -432,6 +438,16 @@ async function doSave() {
 .result-grid {
   display: grid;
   gap: var(--space-4);
+}
+
+.source-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
 }
 
 .candidate-list-shell {

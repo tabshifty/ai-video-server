@@ -295,10 +295,10 @@ async function doSave() {
         <template #filters>
           <el-form inline class="scrape-filter-form">
             <el-form-item label="视频ID">
-              <el-input v-model="form.video_id" style="width: 300px" :disabled="previewLoading || saveLoading" />
+              <el-input v-model="form.video_id" style="width: 300px" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
             </el-form-item>
             <el-form-item label="标题">
-              <el-input v-model="form.title" :disabled="previewLoading || saveLoading" />
+              <el-input v-model="form.title" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
             </el-form-item>
             <el-form-item label="年份">
               <el-input-number
