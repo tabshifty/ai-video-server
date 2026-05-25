@@ -180,8 +180,6 @@ class SubtitleSelectionTest {
         val decision = resolveLongFormPlayerUpdate(
             preparedUrl = "https://example.com/video.mp4",
             nextUrl = "",
-            preparedSubtitleTrackId = null,
-            nextSubtitleTrackId = null,
         )
 
         assertTrue(decision.shouldClear)
@@ -190,17 +188,16 @@ class SubtitleSelectionTest {
     }
 
     @Test
-    fun resolveLongFormPlayerUpdate_replacesAndPreservesPositionForSubtitleOnlyChange() {
+    fun resolveLongFormPlayerUpdate_doesNotReloadOnSubtitleOnlyChange() {
+        // 字幕切换不再走 setMedia 重 load —— subtitle 改走 addSlave 路径。
         val decision = resolveLongFormPlayerUpdate(
             preparedUrl = "https://example.com/video.mp4",
             nextUrl = "https://example.com/video.mp4",
-            preparedSubtitleTrackId = null,
-            nextSubtitleTrackId = "sub-1",
         )
 
         assertFalse(decision.shouldClear)
-        assertTrue(decision.shouldReplaceSource)
-        assertTrue(decision.preservePosition)
+        assertFalse(decision.shouldReplaceSource)
+        assertFalse(decision.preservePosition)
     }
 
     @Test
@@ -208,12 +205,34 @@ class SubtitleSelectionTest {
         val decision = resolveLongFormPlayerUpdate(
             preparedUrl = "https://example.com/video.mp4",
             nextUrl = "https://example.com/video.mp4",
-            preparedSubtitleTrackId = "sub-1",
-            nextSubtitleTrackId = "sub-1",
         )
 
         assertFalse(decision.shouldClear)
         assertFalse(decision.shouldReplaceSource)
+        assertFalse(decision.preservePosition)
+    }
+
+    @Test
+    fun resolveLongFormPlayerUpdate_replacesWhenSourceChanges() {
+        val decision = resolveLongFormPlayerUpdate(
+            preparedUrl = "https://example.com/v1.mp4",
+            nextUrl = "https://example.com/v2.mp4",
+        )
+
+        assertFalse(decision.shouldClear)
+        assertTrue(decision.shouldReplaceSource)
+        assertFalse(decision.preservePosition)
+    }
+
+    @Test
+    fun resolveLongFormPlayerUpdate_replacesWhenStartingFresh() {
+        val decision = resolveLongFormPlayerUpdate(
+            preparedUrl = null,
+            nextUrl = "https://example.com/v1.mp4",
+        )
+
+        assertFalse(decision.shouldClear)
+        assertTrue(decision.shouldReplaceSource)
         assertFalse(decision.preservePosition)
     }
 
