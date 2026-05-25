@@ -38,8 +38,14 @@ class TvLongFormVlcSpecTest {
         val source = Path.of("build.gradle.kts").readText()
 
         assertFalse(source.contains("media3-"))
-        assertTrue(source.contains("versionCode = 68"))
-        assertTrue(source.contains("versionName = \"0.1.68\""))
+        // versionCode/versionName 在 LibVLC 迁移之后会继续随后续任务向上累加，这里只断言不回退到迁移前
+        val versionCode = Regex("""versionCode\s*=\s*(\d+)""").find(source)?.groupValues?.get(1)?.toInt()
+        assertTrue("versionCode should be ≥ 68 since LibVLC migration baseline", (versionCode ?: 0) >= 68)
+        assertTrue(
+            "versionName should follow 0.1.x semver since LibVLC migration baseline",
+            Regex("""versionName\s*=\s*"0\.1\.(\d+)"""").find(source)?.groupValues?.get(1)?.toIntOrNull()
+                ?.let { it >= 68 } == true,
+        )
     }
 
     @Test
