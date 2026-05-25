@@ -1456,3 +1456,8 @@
 - 进度：按 `tasks/2026-05-25-tv-long-form-libvlc-migration/review.md` 重新完成自动化准入审计。确认后端字幕测试、TV 单测、TV Debug 构建、androidTest 编译、Media3 残留扫描、版本号、CONTEXT 术语、ADR 与 admin 字幕上传文案扫描均已闭合；DataStore 持久化只写 `tv_subtitle_language_preferences` / `tv_audio_language_preferences`，并在读写时清除旧 `tv_subtitle_preferences` / `tv_audio_preferences`，运行时仍保留当前 media 临时 track id 用于 UI 选中和 LibVLC `setAudioTrack`。
 - 影响文件：`plan.md`
 - 验证：`go test ./internal/services -run TestSubtitle -count=1` 通过；`go test ./pkg/ffmpeg -run 'Test.*Subtitle|TestBuildExtractSubtitleToAssArgs' -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon --init-script /tmp/force-maven-central.gradle :tv-app:testDebugUnitTest :tv-app:assembleDebug :tv-app:assembleDebugAndroidTest` 通过；`rg -n 'media3-' android-tv-app/tv-app/build.gradle.kts` 无输出；`rg -n 'androidx\.media3|ExoPlayer|PlayerView|MediaItem|CaptionStyleCompat|Player\.Listener|PlaybackParameters' android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt` 无输出；`git diff --check` 通过；乱码扫描无输出。剩余未闭合项仍是 review.md §1 真机/模拟器手测场景与用户验收确认，未创建 `DONE.md`。
+
+## 2026-05-25 19:01 +0800
+- 进度：用户确认 `tasks/2026-05-25-tv-long-form-libvlc-migration` 实测通过，按仓库规则补充 `DONE.md` 完成标记。完成标记记录相关提交、自动化验证、模拟器 instrumentation、review.md §1 手测确认与交付范围。
+- 影响文件：`tasks/2026-05-25-tv-long-form-libvlc-migration/DONE.md`、`plan.md`
+- 验证：待执行 `git diff --check`、`rg -n $'\uFFFD' tasks/2026-05-25-tv-long-form-libvlc-migration/DONE.md plan.md` 与工作区范围检查后提交。
