@@ -1,13 +1,14 @@
 package com.chee.videos.core.ui
 
-import android.net.Uri
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.MimeTypes
 import com.chee.videos.core.model.SubtitleTrackDto
+import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.player.TvLongFormVlcMediaSpec
+import com.chee.videos.core.player.buildLongFormMedia
+import com.chee.videos.core.player.normalizeLongFormLanguageCode
 import com.chee.videos.core.util.UrlBuilder
 import java.net.URI
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.MediaPlayer
 
 internal data class LongFormPlayerUpdateDecision(
     val shouldClear: Boolean,
@@ -87,43 +88,6 @@ fun resolveSelectedSubtitleTrack(tracks: List<SubtitleTrackDto>, selectedTrackId
     return tracks.firstOrNull { it.id == normalizedId && it.available && it.url.isNotBlank() }
 }
 
-fun buildLongFormMediaItem(
-    sourceUrl: String,
-    mediaId: String,
-    title: String,
-    baseUrl: String,
-    selectedSubtitleTrack: SubtitleTrackDto?,
-): MediaItem {
-    val subtitleConfigurations = buildList {
-        val track = selectedSubtitleTrack ?: return@buildList
-        val resolvedUrl = resolvePlaybackAssetUrl(baseUrl, track.url) ?: return@buildList
-        val builder = MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolvedUrl))
-            .setRoleFlags(C.ROLE_FLAG_SUBTITLE)
-            .setSelectionFlags(resolveSubtitleSelectionFlags(track))
-        val mimeType = resolveSubtitleMimeType(track)
-        if (mimeType.isNotBlank()) {
-            builder.setMimeType(mimeType)
-        }
-        if (track.languageCode.isNotBlank()) {
-            builder.setLanguage(track.languageCode)
-        }
-        if (track.label.isNotBlank()) {
-            builder.setLabel(track.label)
-        }
-        add(builder.build())
-    }
-    return MediaItem.Builder()
-        .setUri(sourceUrl)
-        .setMediaId(mediaId)
-        .setMediaMetadata(
-            MediaMetadata.Builder()
-                .setTitle(title)
-                .build(),
-        )
-        .setSubtitleConfigurations(subtitleConfigurations)
-        .build()
-}
-
 fun subtitleTrackDisplayLabel(track: SubtitleTrackDto): String {
     val label = track.label.trim().ifBlank { track.languageLabel.trim() }.ifBlank { track.languageCode.trim() }
     if (label.isNotBlank()) {
@@ -132,11 +96,83 @@ fun subtitleTrackDisplayLabel(track: SubtitleTrackDto): String {
     return if (track.sourceType == "embedded") "内嵌字幕" else "外挂字幕"
 }
 
-private fun resolveSubtitleSelectionFlags(track: SubtitleTrackDto): Int {
-    if (!track.available || track.url.isBlank()) {
-        return 0
+fun applyLongFormMediaSource(
+    libVLC: LibVLC,
+    mediaPlayer: MediaPlayer,
+    sourceUrl: String,
+    baseUrl: String,
+    selectedSubtitleTrack: SubtitleTrackDto?,
+) {
+    val subtitleUrl = selectedSubtitleTrack
+        ?.takeIf { it.available && it.url.isNotBlank() }
+        ?.let { resolvePlaybackAssetUrl(baseUrl, it.url) }
+    val media = buildLongFormMedia(
+        libVLC = libVLC,
+        spec = TvLongFormVlcMediaSpec(
+            sourceUrl = sourceUrl,
+            subtitleUrl = subtitleUrl,
+        ),
+    )
+    mediaPlayer.media = media
+    media.release()
+}
+
+fun resolveSelectedSubtitleTrackByLanguage(
+    tracks: List<SubtitleTrackDto>,
+    preferredLanguage: String?,
+): SubtitleTrackDto? {
+    return resolveSelectedSubtitleTrackByPreference(
+        tracks = tracks,
+        preference = TvTrackPreference(language = preferredLanguage.orEmpty()),
+    )
+}
+
+fun resolveSelectedSubtitleTrackByPreference(
+    tracks: List<SubtitleTrackDto>,
+    preference: TvTrackPreference?,
+): SubtitleTrackDto? {
+    val safePreference = preference ?: return null
+    val normalizedPreference = normalizeLongFormLanguageCode(safePreference.language)
+    if (normalizedPreference.isBlank()) {
+        return null
     }
-    return C.SELECTION_FLAG_DEFAULT
+    val typePreference = safePreference.type.trim().lowercase()
+    val languageMatches = tracks.filter { track ->
+        val language = normalizeLongFormLanguageCode(track.languageCode)
+        track.available &&
+            (
+                language == normalizedPreference ||
+                    language.startsWith("$normalizedPreference-") ||
+                    normalizedPreference.startsWith("$language-")
+                )
+    }
+    if (languageMatches.isEmpty()) {
+        return null
+    }
+    if (typePreference.isNotBlank()) {
+        languageMatches.firstOrNull { subtitlePreferenceType(it) == typePreference }?.let { return it }
+    }
+    return languageMatches.first()
+}
+
+fun buildSubtitleTrackPreference(track: SubtitleTrackDto?): TvTrackPreference? {
+    val safeTrack = track ?: return null
+    val language = normalizeLongFormLanguageCode(safeTrack.languageCode)
+    val type = subtitlePreferenceType(safeTrack)
+    val preference = TvTrackPreference(language = language, type = type)
+    return preference.takeUnless { it.isBlank() }
+}
+
+private fun subtitlePreferenceType(track: SubtitleTrackDto): String {
+    val label = listOf(track.label, track.languageLabel, track.sourceType)
+        .joinToString(" ")
+        .lowercase()
+    return when {
+        "forced" in label || "强制" in label -> "forced"
+        "commentary" in label || "comment" in label || "解说" in label || "评论" in label -> "commentary"
+        track.isDefault -> "default"
+        else -> ""
+    }
 }
 
 private fun resolvePlaybackAssetUrl(baseUrl: String, rawUrl: String): String? {
@@ -156,16 +192,4 @@ private fun resolvePlaybackAssetUrl(baseUrl: String, rawUrl: String): String? {
         return null
     }
     return if (path.startsWith('/')) "$normalized$path" else "$normalized/$path"
-}
-
-private fun resolveSubtitleMimeType(track: SubtitleTrackDto): String {
-    val raw = track.mimeType.trim()
-    if (raw.isNotBlank()) {
-        return raw
-    }
-    return when (track.format.trim().lowercase()) {
-        "srt" -> MimeTypes.APPLICATION_SUBRIP
-        "vtt", "webvtt" -> MimeTypes.TEXT_VTT
-        else -> ""
-    }
 }

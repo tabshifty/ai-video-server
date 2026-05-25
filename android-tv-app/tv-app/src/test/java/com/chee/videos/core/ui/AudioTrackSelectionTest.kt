@@ -1,5 +1,6 @@
 package com.chee.videos.core.ui
 
+import com.chee.videos.core.model.TvTrackPreference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -123,5 +124,65 @@ class AudioTrackSelectionTest {
 
         assertTrue(items[0].selected)
         assertFalse(items[1].selected)
+    }
+
+    @Test
+    fun inferLongFormTrackLanguageCode_recognizesCommonTrackNames() {
+        assertEquals("ja", inferLongFormTrackLanguageCode("Japanese Commentary"))
+        assertEquals("en", inferLongFormTrackLanguageCode("English 5.1"))
+        assertEquals("zh", inferLongFormTrackLanguageCode("国语 默认"))
+    }
+
+    @Test
+    fun resolveAudioSelectionOnTrackLoad_matchesStoredLanguageAndType() {
+        val selection = resolveAudioSelectionOnTrackLoad(
+            currentSelection = null,
+            storedPreference = TvTrackPreference(language = "jpn", type = "commentary"),
+            tracks = listOf(
+                LongFormAudioTrack(
+                    id = "audio-7-english",
+                    vlcTrackId = 7,
+                    label = "English",
+                    detail = "",
+                    groupIndex = 0,
+                    trackIndex = 0,
+                    selected = false,
+                    languageCode = "en",
+                    preferenceType = "",
+                ),
+                LongFormAudioTrack(
+                    id = "audio-12-japanese-commentary",
+                    vlcTrackId = 12,
+                    label = "Japanese Commentary",
+                    detail = "",
+                    groupIndex = 0,
+                    trackIndex = 1,
+                    selected = false,
+                    languageCode = "ja",
+                    preferenceType = "commentary",
+                ),
+            ),
+        )
+
+        assertEquals("audio-12-japanese-commentary", selection)
+    }
+
+    @Test
+    fun buildAudioTrackPreference_usesLanguageAndTypeNotRuntimeTrackId() {
+        val preference = buildAudioTrackPreference(
+            LongFormAudioTrack(
+                id = "audio-12-japanese-commentary",
+                vlcTrackId = 12,
+                label = "Japanese Commentary",
+                detail = "",
+                groupIndex = 0,
+                trackIndex = 1,
+                selected = false,
+                languageCode = "jpn",
+                preferenceType = "commentary",
+            ),
+        )
+
+        assertEquals(TvTrackPreference(language = "ja", type = "commentary"), preference)
     }
 }

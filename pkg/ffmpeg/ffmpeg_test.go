@@ -63,6 +63,19 @@ func TestBuildConvertSubtitleToWebVTTArgs(t *testing.T) {
 	assertArgAbsent(t, args, "-map")
 }
 
+func TestBuildExtractSubtitleToAssArgs(t *testing.T) {
+	args := buildExtractSubtitleToAssArgs("/tmp/in.mkv", 3, "/tmp/out.ass")
+
+	assertArgPair(t, args, "-i", "/tmp/in.mkv")
+	assertArgPair(t, args, "-map", "0:3")
+	assertArgPair(t, args, "-c:s", "copy")
+	if args[len(args)-1] != "/tmp/out.ass" {
+		t.Fatalf("expected output path last, got args=%v", args)
+	}
+	assertArgAbsent(t, args, "-f")
+	assertArgAbsent(t, args, "webvtt")
+}
+
 func TestParseBitrateKbps(t *testing.T) {
 	tests := []struct {
 		name          string

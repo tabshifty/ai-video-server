@@ -1,7 +1,6 @@
 package com.chee.videos.core.ui
 
 import com.chee.videos.core.model.SubtitleTrackDto
-import androidx.media3.common.C
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -237,28 +236,4 @@ class SubtitleSelectionTest {
         )
     }
 
-    @Test
-    fun resolveSubtitleSelectionFlags_marksExplicitlySelectedEmbeddedTrackAsDefault() {
-        val method = Class
-            .forName("com.chee.videos.core.ui.LongFormSubtitleSupportKt")
-            .getDeclaredMethod("resolveSubtitleSelectionFlags", SubtitleTrackDto::class.java)
-            .apply { isAccessible = true }
-
-        val selectionFlags = method.invoke(
-            null,
-            SubtitleTrackDto(
-                id = "embedded-2",
-                sourceType = "embedded",
-                languageCode = "zh-CN",
-                label = "简中（内嵌）",
-                format = "vtt",
-                url = "/api/v1/videos/video-1/subtitles/embedded-2/file",
-                mimeType = "text/vtt",
-                isDefault = false,
-                available = true,
-            ),
-        ) as Int
-
-        assertEquals(C.SELECTION_FLAG_DEFAULT, selectionFlags)
-    }
 }

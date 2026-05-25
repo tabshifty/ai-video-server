@@ -3,6 +3,9 @@ package com.chee.videos.feature.tv
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.ui.buildSubtitleTrackPreference
+import com.chee.videos.core.ui.resolveSelectedSubtitleTrackByPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +24,7 @@ data class TvSeriesPlayerUiState(
     val selectedEpisodeNumber: Int = 1,
     val selectedSubtitleTrackId: String? = null,
     val selectedAudioTrackId: String? = null,
+    val selectedAudioPreference: TvTrackPreference? = null,
     val playbackSpeed: Float = 1f,
     val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
     val autoplayEnabled: Boolean = TvSeriesAutoplaySetting.DEFAULT_ENABLED,
@@ -141,20 +145,29 @@ class TvSeriesPlayerViewModel @Inject constructor(
         if (currentVideoId.isBlank()) {
             return
         }
+        val selectedTrack = selectedEpisode(_uiState.value)
+            ?.subtitleTracks
+            ?.firstOrNull { it.id == subtitleTrackId }
+        val preference = buildSubtitleTrackPreference(selectedTrack)
         _uiState.update { it.copy(selectedSubtitleTrackId = subtitleTrackId ?: "") }
         viewModelScope.launch {
-            repository.saveTvSubtitlePreference(currentVideoId, subtitleTrackId ?: "")
+            repository.saveTvSubtitlePreference(currentVideoId, preference)
         }
     }
 
-    fun selectAudioTrack(audioTrackId: String?) {
+    fun selectAudioTrack(audioTrackId: String?, preference: TvTrackPreference?) {
         val currentVideoId = _uiState.value.currentVideoId
         if (currentVideoId.isBlank()) {
             return
         }
-        _uiState.update { it.copy(selectedAudioTrackId = audioTrackId ?: "") }
+        _uiState.update {
+            it.copy(
+                selectedAudioTrackId = audioTrackId ?: "",
+                selectedAudioPreference = preference,
+            )
+        }
         viewModelScope.launch {
-            repository.saveTvAudioPreference(currentVideoId, audioTrackId ?: "")
+            repository.saveTvAudioPreference(currentVideoId, preference)
         }
     }
 
@@ -241,6 +254,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     currentSourceUrl = "",
                     selectedSubtitleTrackId = null,
                     selectedAudioTrackId = null,
+                    selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
                 )
             }
@@ -252,13 +266,17 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 currentSourceUrl = "",
                 selectedSubtitleTrackId = null,
                 selectedAudioTrackId = null,
+                selectedAudioPreference = null,
                 canPlayCurrentEpisode = false,
             )
         }
         viewModelScope.launch {
             val sourceUrl = repository.buildSourceUrl(episode.videoId)
-            val preferredSubtitleTrackId = repository.readTvSubtitlePreference(episode.videoId)
-            val preferredAudioTrackId = repository.readTvAudioPreference(episode.videoId)
+            val preferredSubtitleTrackId = resolveSelectedSubtitleTrackByPreference(
+                tracks = episode.subtitleTracks,
+                preference = repository.readTvSubtitlePreference(episode.videoId),
+            )?.id
+            val preferredAudioPreference = repository.readTvAudioPreference(episode.videoId)
             if (requestId != playbackTargetRequestId) {
                 return@launch
             }
@@ -271,7 +289,8 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     currentVideoId = episode.videoId,
                     currentSourceUrl = sourceUrl,
                     selectedSubtitleTrackId = preferredSubtitleTrackId,
-                    selectedAudioTrackId = preferredAudioTrackId,
+                    selectedAudioTrackId = null,
+                    selectedAudioPreference = preferredAudioPreference,
                     canPlayCurrentEpisode = true,
                 )
             }

@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-25 16:41 +0800
+- 进度：开始实施 `tasks/2026-05-25-tv-long-form-libvlc-migration`。当前仅该任务未完成；已按 PRD → Implement → Review 读取任务范围。先校准代码现状：TV 工程通过 source exclude 排除短视频/通用播放器源码，长视频仍在 `LongFormVideoPlayer` / `TvLongFormPlayerScreen` / `TvSeriesPlayerScreen` 使用 Media3；后端 `subtitle.go` 仍将 ASS/SSA 转 VTT；`pkg/ffmpeg` 只有 WebVTT 抽取。接下来按 TDD 先补后端 ASS 原文策略、LibVLC 配置/源文审计红灯，再做最小迁移。
+- 影响文件：预计涉及 `internal/services/subtitle.go`、`pkg/ffmpeg/ffmpeg.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/player/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、TV/后端测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`docs/adr/0004-tv-long-form-libvlc-for-ass-rendering.md`、`plan.md`。
+- 验证：待执行红灯测试、`go test ./internal/services -run TestSubtitle`、`go test ./pkg/ffmpeg -run Test.*Subtitle`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、androidTest 编译、diff/乱码扫描；真机回归需要设备环境后记录。
+
+## 2026-05-25 16:59 +0800
+- 进度：完成 LibVLC 迁移首轮代码落地：后端 ASS/SSA 上传改为原文落 `format=ass` / `mime_type=text/x-ssa`，内嵌 ASS/SSA 抽取改用 `ffmpeg -c:s copy`；TV 长视频新增 `TvVlcLibrary` 单例、长视频 LibVLC Media 构造、TextureView Surface、by-language 选轨 helper；`LongFormVideoPlayer` / 电影播放页 / 电视剧播放页从 ExoPlayer 改为 `org.videolan.libvlc.MediaPlayer`，保留原 Compose 控制层、续播、连播、遥控器 UI 状态机；删除长视频字幕样式测试与 TV Gradle 的 Media3 依赖，TV 版本号升到 `0.1.68`。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/{model,player,ui}/**`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/{detail,tv}/**`、TV 单测/androidTest、`internal/services/subtitle.go`、`internal/services/{subtitle,transcode}_test.go`、`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`plan.md`。
+- 验证：红灯已确认：新增 Go 测试最初因 `embeddedSubtitleOutputPlanForProbe` / `buildExtractSubtitleToAssArgs` 缺失失败，TV 定向测试最初因 LibVLC helper 缺失失败；实现后 `go test ./pkg/ffmpeg -run Test.*Subtitle -count=1` 通过、`go test ./internal/services -run TestSubtitle -count=1` 通过、`cd android-tv-app && ./gradlew --no-daemon :tv-app:compileDebugKotlin` 通过。`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests ...` 当前失败在远端 Maven `com.google.guava:listenablefuture:1.0` TLS 握手，非代码编译错误；后续需在依赖可解析后重跑全量 TV 单测/build。
+
 ## 2026-05-25 16:30 +0800
 - 进度：完成 `tasks/2026-05-25-tv-long-form-libvlc-migration` 的 grill-with-docs 设计沉淀。通过 9 轮决策拷打锁定：（Q1）ASS 渲染完整支持卡拉 OK / 动态特效 / 矢量绘图；（Q2）电影/`18+`/电视剧三类一起切，IPTV 不动；（Q3）字幕走 LibVLC 自渲染（libass），不接 JNI；（Q4）不引入 Player 抽象、不留 Media3 fallback；（Q5）TextureView + 硬解默认；（Q6）SRT/VTT 接受 libass 默认外观；（Q7）后端不再 ASS→VTT 转换，只存 ASS 原文；（Q8）一次性合 + 内部 PoC 前置；（Q9）无遗漏。产出 PRD/implement/review 三件套与 ADR-0004。本任务尚未进入实施阶段——CONTEXT.md 的 6 条新术语（[[TV 长视频 LibVLC 内核]] / [[libass 自渲染字幕]] / [[TV 长视频 TextureView 硬解默认]] / [[ASS 字幕原文存储策略]] / [[字幕样式 libass 让位]] / [[LibVLC track id 不稳定]]）与 line 9 / line 170 的旧约定推翻动作均锁定到实施完成时再 sync，避免未实施先沉淀。
 - 影响文件：`tasks/2026-05-25-tv-long-form-libvlc-migration/{prd,implement,review}.md`、`docs/adr/0004-tv-long-form-libvlc-for-ass-rendering.md`、`plan.md`
@@ -1427,3 +1437,12 @@
 ---
 
 更早历史（2026-05-16 之前的所有条目，含旧 `### [YYYY-MM-DD HH:MM] Title` 格式与 `## Entry Template` 元数据段）已归档至 `plan.archive.md`，2026-05-25 拆分。
+## 2026-05-25 18:08 +0800
+- 进度：完成 `tasks/2026-05-25-tv-long-form-libvlc-migration` 的代码层收尾和验证收口。TV 长视频偏好已从 trackId 迁到 `language + type` 持久化，音轨/字幕恢复仍按当前 media 的临时 track id 运行；后端 ASS 原文落盘与内嵌抽取增加了安全清洗。`CONTEXT.md` 已同步长期约定，任务相关定向测试和全量验证已通过。
+- 影响文件：`CONTEXT.md`、`plan.md`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/{data,model,repository,ui}/**`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/{detail,tv}/**`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/{data,player,ui}/**`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/{detail,tv}/**`、`android-tv-app/tv-app/src/androidTest/java/com/chee/videos/core/ui/LongFormVideoPlayerLibVlcTest.kt`、`internal/services/subtitle.go`、`internal/services/subtitle_test.go`、`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`
+- 验证：`go test ./internal/services ./pkg/ffmpeg -count=1` 通过；`go test ./... -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon --init-script /tmp/force-maven-central.gradle :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon --init-script /tmp/force-maven-central.gradle :tv-app:assembleDebug :tv-app:assembleDebugAndroidTest` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' ...` 无输出。
+
+## 2026-05-25 17:42 +0800
+- 进度：继续收尾 `tasks/2026-05-25-tv-long-form-libvlc-migration`。补齐 review 里尚未闭合的两项：TV 长视频音轨/字幕偏好从 trackId 语义迁到 `language + type` 持久化（运行时仍按当前 media track id 选轨），并给 ASS 原文落盘/抽取增加轻量安全清洗（去除本地路径 `\fn` 覆盖、钳制 `\fad` 参数）。同步扩展 `AppPreferencesStoreTest`、`AudioTrackSelectionTest`、`LongFormSubtitleSupportLibVlcTest`、`TvSeriesPlayerViewModelTest`、`DetailViewModelTest`、`internal/services/subtitle_test.go`，并在 `CONTEXT.md` 追加长期约定。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/{data,model,repository,ui}/**`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/{detail,tv}/**`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/{data,ui}/**`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/{detail,tv}/**`、`internal/services/subtitle.go`、`internal/services/subtitle_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：后端定向测试 `go test ./internal/services -run 'TestSubtitle|TestSanitizeAss' -count=1` 通过；TV 定向测试 `cd android-tv-app && ./gradlew --no-daemon --init-script /tmp/force-maven-central.gradle :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.data.AppPreferencesStoreTest' --tests 'com.chee.videos.core.ui.AudioTrackSelectionTest' --tests 'com.chee.videos.core.ui.LongFormSubtitleSupportLibVlcTest' --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest' --tests 'com.chee.videos.feature.detail.DetailViewModelTest'` 通过；全量验证待执行。

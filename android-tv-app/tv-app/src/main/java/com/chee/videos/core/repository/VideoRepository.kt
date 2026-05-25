@@ -16,6 +16,7 @@ import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
+import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
@@ -304,18 +305,18 @@ class VideoRepository @Inject constructor(
 
     suspend fun readAccessToken(): String? = store.readAccessToken()
 
-    suspend fun readTvSubtitlePreference(videoId: String): String? =
+    suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? =
         store.readTvSubtitlePreference(videoId)
 
-    suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
-        store.saveTvSubtitlePreference(videoId, subtitleTrackId)
+    suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
+        store.saveTvSubtitlePreference(videoId, preference)
     }
 
-    suspend fun readTvAudioPreference(videoId: String): String? =
+    suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? =
         store.readTvAudioPreference(videoId)
 
-    suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
-        store.saveTvAudioPreference(videoId, audioTrackId)
+    suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
+        store.saveTvAudioPreference(videoId, preference)
     }
 
     suspend fun readTvSeekStepSeconds(): Int =

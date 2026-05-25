@@ -1,7 +1,5 @@
 package com.chee.videos.core.model
 
-import androidx.media3.common.Player
-
 enum class ShortPlaybackMode(val rawValue: String) {
     LOOP_ONE("loop_one"),
     AUTO_NEXT("auto_next");
@@ -15,7 +13,7 @@ enum class ShortPlaybackMode(val rawValue: String) {
 
 fun ShortPlaybackMode.toPlayerRepeatMode(): Int {
     return when (this) {
-        ShortPlaybackMode.LOOP_ONE -> Player.REPEAT_MODE_ONE
-        ShortPlaybackMode.AUTO_NEXT -> Player.REPEAT_MODE_OFF
+        ShortPlaybackMode.LOOP_ONE -> 1
+        ShortPlaybackMode.AUTO_NEXT -> 0
     }
 }

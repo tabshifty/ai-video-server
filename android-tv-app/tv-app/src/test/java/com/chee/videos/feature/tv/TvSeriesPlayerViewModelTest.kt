@@ -1,8 +1,10 @@
 package com.chee.videos.feature.tv
 
 import androidx.lifecycle.SavedStateHandle
+import com.chee.videos.core.model.SubtitleTrackDto
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.TvSeasonDto
+import com.chee.videos.core.model.TvTrackPreference
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -151,7 +153,7 @@ class TvSeriesPlayerViewModelTest {
     fun init_restoresSavedSubtitleSelectionForCurrentVideo() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
-                subtitlePreferences = mapOf("video-1" to "subtitle-zh"),
+                subtitlePreferences = mapOf("video-1" to TvTrackPreference(language = "zh-CN", type = "default")),
                 detailPayload = tvSeriesDetail(
                     seasons = listOf(
                         TvSeasonDto(
@@ -165,6 +167,16 @@ class TvSeriesPlayerViewModelTest {
                                     title = "第1集",
                                     videoId = "video-1",
                                     videoStatus = "ready",
+                                    subtitleTracks = listOf(
+                                        SubtitleTrackDto(
+                                            id = "subtitle-zh",
+                                            languageCode = "zh-CN",
+                                            format = "ass",
+                                            url = "/subtitles/subtitle-zh/file",
+                                            isDefault = true,
+                                            available = true,
+                                        ),
+                                    ),
                                 ),
                             ),
                         ),
@@ -182,7 +194,7 @@ class TvSeriesPlayerViewModelTest {
     fun init_restoresSavedAudioSelectionForCurrentVideo() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
-                audioPreferences = mapOf("video-1" to "audio-zh-51"),
+                audioPreferences = mapOf("video-1" to TvTrackPreference(language = "zh", type = "default")),
                 detailPayload = tvSeriesDetail(
                     seasons = listOf(
                         TvSeasonDto(
@@ -206,7 +218,8 @@ class TvSeriesPlayerViewModelTest {
         )
         viewModel.awaitIdle()
 
-        assertEquals("audio-zh-51", viewModel.uiState.value.selectedAudioTrackId)
+        assertEquals(null, viewModel.uiState.value.selectedAudioTrackId)
+        assertEquals(TvTrackPreference(language = "zh", type = "default"), viewModel.uiState.value.selectedAudioPreference)
     }
 
     @Test
@@ -237,11 +250,12 @@ class TvSeriesPlayerViewModelTest {
         )
         viewModel.awaitIdle()
 
-        viewModel.selectAudioTrack("audio-zh-51")
+        val preference = TvTrackPreference(language = "zh", type = "default")
+        viewModel.selectAudioTrack("audio-zh-51", preference)
         advanceUntilIdle()
 
         assertEquals("audio-zh-51", viewModel.uiState.value.selectedAudioTrackId)
-        assertEquals("audio-zh-51", repository.readTvAudioPreference("video-1"))
+        assertEquals(preference, repository.readTvAudioPreference("video-1"))
     }
 
     @Test

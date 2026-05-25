@@ -11,6 +11,7 @@ val tvMainSourceExcludes = listOf(
     "com/chee/videos/feature/auth/**",
     "com/chee/videos/feature/home/**",
     "com/chee/videos/feature/mine/**",
+    "com/chee/videos/feature/detail/DetailScreen.kt",
     "com/chee/videos/feature/player/**",
     "com/chee/videos/feature/shorts/**",
     "com/chee/videos/feature/shortdiscover/**",
@@ -38,7 +39,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 68
-        versionName = "0.1.67"
+        versionName = "0.1.68"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -158,9 +159,6 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.google.zxing:core:3.5.3")
 
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
     implementation("org.videolan.android:libvlc-all:3.6.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

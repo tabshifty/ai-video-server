@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
 import com.chee.videos.feature.tv.decodeTvRouteArg
@@ -109,15 +110,27 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    suspend fun readTvAudioPreference(videoId: String): String? =
-        videoRepository.readTvAudioPreference(videoId)
+    suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? =
+        videoRepository.readTvSubtitlePreference(videoId)
 
-    fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
+    fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
         if (videoId.isBlank()) {
             return
         }
         viewModelScope.launch {
-            videoRepository.saveTvAudioPreference(videoId, audioTrackId)
+            videoRepository.saveTvSubtitlePreference(videoId, preference)
+        }
+    }
+
+    suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? =
+        videoRepository.readTvAudioPreference(videoId)
+
+    fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
+        if (videoId.isBlank()) {
+            return
+        }
+        viewModelScope.launch {
+            videoRepository.saveTvAudioPreference(videoId, preference)
         }
     }
 

@@ -12,6 +12,7 @@ import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.LoginPayload
 import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
+import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.SessionTokens
@@ -73,17 +74,18 @@ class DetailViewModelTest {
     }
 
     @Test
-    fun tvAudioPreference_readsAndSavesThroughRepository() = runTest {
+    fun tvAudioPreference_readsAndSavesLanguagePreferenceThroughRepository() = runTest {
         val api = FakeDetailApiService()
         val viewModel = buildDetailViewModel(api, backgroundScope)
 
         assertEquals(null, viewModel.readTvAudioPreference("video-1"))
 
-        viewModel.saveTvAudioPreference("video-1", "audio-zh-51")
+        val preference = TvTrackPreference(language = "zh", type = "default")
+        viewModel.saveTvAudioPreference("video-1", preference)
         mainDispatcherRule.scheduler.runCurrent()
         advanceUntilIdle()
 
-        assertEquals("audio-zh-51", viewModel.readTvAudioPreference("video-1"))
+        assertEquals(preference, viewModel.readTvAudioPreference("video-1"))
     }
 
     private suspend fun buildDetailViewModel(

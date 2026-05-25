@@ -429,6 +429,29 @@ func ExtractSubtitleToWebVTT(ctx context.Context, inputPath string, streamIndex 
 	return nil
 }
 
+func buildExtractSubtitleToAssArgs(inputPath string, streamIndex int, outputPath string) []string {
+	return []string{
+		"-y",
+		"-i", inputPath,
+		"-map", fmt.Sprintf("0:%d", streamIndex),
+		"-vn",
+		"-an",
+		"-c:s", "copy",
+		outputPath,
+	}
+}
+
+func ExtractSubtitleToAss(ctx context.Context, inputPath string, streamIndex int, outputPath string) error {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return fmt.Errorf("create subtitle output dir: %w", err)
+	}
+	cmd := exec.CommandContext(ctx, "ffmpeg", buildExtractSubtitleToAssArgs(inputPath, streamIndex, outputPath)...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("ffmpeg extract ass subtitle failed: %w, output=%s", err, string(out))
+	}
+	return nil
+}
+
 func buildConvertSubtitleToWebVTTArgs(inputPath, outputPath string) []string {
 	return []string{
 		"-y",

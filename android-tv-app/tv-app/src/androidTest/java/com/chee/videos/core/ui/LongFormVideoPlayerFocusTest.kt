@@ -10,13 +10,15 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.chee.videos.core.player.TvVlcLibrary
+import com.chee.videos.core.player.newLongFormMediaPlayer
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.videolan.libvlc.MediaPlayer
 
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
@@ -24,11 +26,11 @@ class LongFormVideoPlayerFocusTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-    private lateinit var player: ExoPlayer
+    private lateinit var player: MediaPlayer
 
     @Before
     fun setUp() {
-        player = ExoPlayer.Builder(composeRule.activity).build()
+        player = newLongFormMediaPlayer(TvVlcLibrary.shared(composeRule.activity))
     }
 
     @After

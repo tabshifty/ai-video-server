@@ -106,7 +106,7 @@ class LongFormVideoPlayerTransportKeyTest {
 
         assertTrue(debouncedSeekSource.contains("updateSeekPreview("))
         assertTrue(debouncedSeekSource.contains("delay(TvStepSeekDebounceMillis)"))
-        assertTrue(debouncedSeekSource.contains("player.seekTo(pending.targetPositionMs)"))
+        assertTrue(debouncedSeekSource.contains("player.time = pending.targetPositionMs"))
     }
 
     @Test

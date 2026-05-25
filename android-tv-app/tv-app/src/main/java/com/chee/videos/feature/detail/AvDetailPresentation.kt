@@ -1,6 +1,7 @@
 package com.chee.videos.feature.detail
 
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.util.UrlBuilder
 import java.util.Locale
 
 internal data class AvDetailHeroModel(
@@ -17,6 +18,18 @@ internal data class AvDetailActorModel(
     val avatarUrl: String?,
     val hasAvatar: Boolean,
 )
+
+internal data class AvDetailMediaLayoutSpec(
+    val aspectRatio: Float,
+    val applyStatusBarPadding: Boolean,
+)
+
+internal fun buildAvDetailMediaLayoutSpec(): AvDetailMediaLayoutSpec {
+    return AvDetailMediaLayoutSpec(
+        aspectRatio = 16f / 9f,
+        applyStatusBarPadding = true,
+    )
+}
 
 internal fun buildAvDetailHeroModel(detail: VideoDetailDto): AvDetailHeroModel {
     val primaryText = anyString(detail.metadata?.get("av_code"))
@@ -72,6 +85,21 @@ internal fun buildAvDetailActorModels(baseUrl: String, detail: VideoDetailDto): 
                 hasAvatar = false,
             )
         }
+}
+
+internal fun resolveResourceUrl(baseUrl: String, raw: String?): String? {
+    val path = raw?.trim().orEmpty()
+    if (path.isBlank()) {
+        return null
+    }
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path
+    }
+    val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
+    if (normalizedBase.isBlank()) {
+        return null
+    }
+    return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
 }
 
 private fun anyString(value: Any?): String? {

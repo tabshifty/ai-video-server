@@ -8,6 +8,8 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -18,12 +20,25 @@ import (
 )
 
 const maxSubtitleUploadSize = 8 * 1024 * 1024
+const maxAssFadeMillis = 60_000
+
+var (
+	assFontOverrideRe = regexp.MustCompile(`\\fn([^\\{}\r\n]*)`)
+	assFadOverrideRe  = regexp.MustCompile(`\\fad\(\s*([-+]?\d+)\s*,\s*([-+]?\d+)\s*\)`)
+)
 
 type subtitleUploadPlan struct {
 	UploadedFormat string
 	StoredFormat   string
 	StoredMIMEType string
 	NeedsWebVTT    bool
+}
+
+type embeddedSubtitleOutputPlan struct {
+	Extension       string
+	StoredFormat    string
+	MIMEType        string
+	ConvertToWebVTT bool
 }
 
 type SubtitleService struct {
@@ -94,6 +109,11 @@ func (s *SubtitleService) SaveUploadedSubtitle(
 			return models.VideoSubtitle{}, err
 		}
 		_ = os.Remove(uploadPath)
+	} else if plan.StoredFormat == "ass" {
+		if err := sanitizeAssSubtitleFile(targetPath); err != nil {
+			_ = os.Remove(targetPath)
+			return models.VideoSubtitle{}, err
+		}
 	}
 
 	info, err := os.Stat(targetPath)
@@ -193,9 +213,19 @@ func (s *SubtitleService) extractEmbeddedSubtitle(
 		return models.VideoSubtitle{}, false, fmt.Errorf("create embedded subtitle dir: %w", err)
 	}
 	subtitleID := uuid.New()
-	outputPath := filepath.Join(outputDir, fmt.Sprintf("%s-%d.vtt", subtitleID.String(), probe.Index))
-	if err := ffmpeg.ExtractSubtitleToWebVTT(ctx, inputPath, probe.Index, outputPath); err != nil {
+	plan := embeddedSubtitleOutputPlanForProbe(probe)
+	outputPath := filepath.Join(outputDir, fmt.Sprintf("%s-%d.%s", subtitleID.String(), probe.Index, plan.Extension))
+	if plan.ConvertToWebVTT {
+		if err := ffmpeg.ExtractSubtitleToWebVTT(ctx, inputPath, probe.Index, outputPath); err != nil {
+			return models.VideoSubtitle{}, false, err
+		}
+	} else if err := ffmpeg.ExtractSubtitleToAss(ctx, inputPath, probe.Index, outputPath); err != nil {
 		return models.VideoSubtitle{}, false, err
+	} else if plan.StoredFormat == "ass" {
+		if err := sanitizeAssSubtitleFile(outputPath); err != nil {
+			_ = os.Remove(outputPath)
+			return models.VideoSubtitle{}, false, err
+		}
 	}
 	info, err := os.Stat(outputPath)
 	if err != nil {
@@ -225,8 +255,8 @@ func (s *SubtitleService) extractEmbeddedSubtitle(
 		Status:       "ready",
 		LanguageCode: normalizeSubtitleLanguageCode(probe.Language),
 		Label:        label,
-		Format:       "vtt",
-		MIMEType:     "text/vtt",
+		Format:       plan.StoredFormat,
+		MIMEType:     plan.MIMEType,
 		StoredPath:   outputPath,
 		FileSize:     info.Size(),
 		IsDefault:    probe.IsDefault,
@@ -256,11 +286,30 @@ func subtitleUploadPlanForFilename(filename string) (subtitleUploadPlan, error) 
 	case "vtt":
 		return subtitleUploadPlan{UploadedFormat: "vtt", StoredFormat: "vtt", StoredMIMEType: "text/vtt"}, nil
 	case "ass":
-		return subtitleUploadPlan{UploadedFormat: "ass", StoredFormat: "vtt", StoredMIMEType: "text/vtt", NeedsWebVTT: true}, nil
+		return subtitleUploadPlan{UploadedFormat: "ass", StoredFormat: "ass", StoredMIMEType: "text/x-ssa", NeedsWebVTT: false}, nil
 	case "ssa":
-		return subtitleUploadPlan{UploadedFormat: "ssa", StoredFormat: "vtt", StoredMIMEType: "text/vtt", NeedsWebVTT: true}, nil
+		return subtitleUploadPlan{UploadedFormat: "ssa", StoredFormat: "ass", StoredMIMEType: "text/x-ssa", NeedsWebVTT: false}, nil
 	default:
 		return subtitleUploadPlan{}, fmt.Errorf("unsupported subtitle format: %s", ext)
+	}
+}
+
+func embeddedSubtitleOutputPlanForProbe(probe ffmpeg.SubtitleProbe) embeddedSubtitleOutputPlan {
+	switch strings.ToLower(strings.TrimSpace(probe.Codec)) {
+	case "ass", "ssa":
+		return embeddedSubtitleOutputPlan{
+			Extension:       "ass",
+			StoredFormat:    "ass",
+			MIMEType:        "text/x-ssa",
+			ConvertToWebVTT: false,
+		}
+	default:
+		return embeddedSubtitleOutputPlan{
+			Extension:       "vtt",
+			StoredFormat:    "vtt",
+			MIMEType:        "text/vtt",
+			ConvertToWebVTT: true,
+		}
 	}
 }
 
@@ -270,4 +319,52 @@ func subtitleFileFormat(filename string) (string, string, error) {
 		return "", "", err
 	}
 	return plan.StoredFormat, plan.StoredMIMEType, nil
+}
+
+func sanitizeAssSubtitleFile(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read ass subtitle: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(sanitizeAssContent(string(raw))), 0o644); err != nil {
+		return fmt.Errorf("write sanitized ass subtitle: %w", err)
+	}
+	return nil
+}
+
+func sanitizeAssContent(raw string) string {
+	out := assFontOverrideRe.ReplaceAllStringFunc(raw, func(tag string) string {
+		fontName := strings.TrimSpace(strings.TrimPrefix(tag, `\fn`))
+		if fontName == "" {
+			return tag
+		}
+		if isUnsafeAssFontName(fontName) {
+			return ""
+		}
+		return `\fn` + fontName
+	})
+	out = assFadOverrideRe.ReplaceAllStringFunc(out, func(tag string) string {
+		matches := assFadOverrideRe.FindStringSubmatch(tag)
+		if len(matches) != 3 {
+			return tag
+		}
+		return fmt.Sprintf(`\fad(%d,%d)`, clampAssMillis(matches[1]), clampAssMillis(matches[2]))
+	})
+	return out
+}
+
+func isUnsafeAssFontName(raw string) bool {
+	value := strings.Trim(strings.TrimSpace(raw), `"'`)
+	return strings.Contains(value, "..") || strings.ContainsAny(value, `/\:`)
+}
+
+func clampAssMillis(raw string) int {
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || value < 0 {
+		return 0
+	}
+	if value > maxAssFadeMillis {
+		return maxAssFadeMillis
+	}
+	return value
 }

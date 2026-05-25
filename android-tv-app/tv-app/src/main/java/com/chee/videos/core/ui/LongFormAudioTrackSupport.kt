@@ -1,19 +1,23 @@
 package com.chee.videos.core.ui
 
-import androidx.media3.common.C
-import androidx.media3.common.Format
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.TrackSelectionParameters
-import androidx.media3.common.Tracks
+import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.player.TvLongFormLanguagePreference
+import com.chee.videos.core.player.TvLongFormVlcTrack
+import com.chee.videos.core.player.normalizeLongFormLanguageCode
+import com.chee.videos.core.player.resolveLongFormTrackByLanguage
 import java.util.Locale
+import org.videolan.libvlc.MediaPlayer
 
 data class LongFormAudioTrack(
     val id: String,
+    val vlcTrackId: Int = -1,
     val label: String,
     val detail: String,
     val groupIndex: Int,
     val trackIndex: Int,
     val selected: Boolean,
+    val languageCode: String = "",
+    val preferenceType: String = "",
 )
 
 internal data class AudioTrackPickerItem(
@@ -23,30 +27,56 @@ internal data class AudioTrackPickerItem(
     val selected: Boolean,
 )
 
-fun buildLongFormAudioTracks(tracks: Tracks): List<LongFormAudioTrack> {
-    return buildList {
-        tracks.groups.forEachIndexed { groupIndex, group ->
-            if (group.type != C.TRACK_TYPE_AUDIO) {
-                return@forEachIndexed
-            }
-            for (trackIndex in 0 until group.length) {
-                if (!group.isTrackSupported(trackIndex, true)) {
-                    continue
-                }
-                val format = group.getTrackFormat(trackIndex)
-                add(
-                    LongFormAudioTrack(
-                        id = buildAudioTrackId(groupIndex, trackIndex, format),
-                        label = audioTrackDisplayTitle(format, size + 1),
-                        detail = audioTrackDisplayDetail(format),
-                        groupIndex = groupIndex,
-                        trackIndex = trackIndex,
-                        selected = group.isTrackSelected(trackIndex),
-                    ),
-                )
-            }
-        }
+fun buildLongFormAudioTracksFromVlc(
+    tracks: Array<MediaPlayer.TrackDescription>?,
+    selectedTrackId: Int,
+): List<LongFormAudioTrack> {
+    if (tracks == null) {
+        return emptyList()
     }
+    return tracks
+        .filter { it.id >= 0 }
+        .mapIndexed { index, track ->
+            val name = track.name?.trim().orEmpty()
+            val language = inferLongFormTrackLanguageCode(name)
+            LongFormAudioTrack(
+                id = buildAudioTrackId(track.id, name, index),
+                vlcTrackId = track.id,
+                label = name.ifBlank { "音轨 ${index + 1}" },
+                detail = "",
+                groupIndex = 0,
+                trackIndex = index,
+                selected = track.id == selectedTrackId,
+                languageCode = language,
+                preferenceType = inferLongFormTrackPreferenceType(name),
+            )
+        }
+}
+
+fun buildLongFormSpuTracksFromVlc(
+    tracks: Array<MediaPlayer.TrackDescription>?,
+    selectedTrackId: Int,
+): List<LongFormAudioTrack> {
+    if (tracks == null) {
+        return emptyList()
+    }
+    return tracks
+        .filter { it.id >= 0 }
+        .mapIndexed { index, track ->
+            val name = track.name?.trim().orEmpty()
+            val language = inferLongFormTrackLanguageCode(name)
+            LongFormAudioTrack(
+                id = buildAudioTrackId(track.id, name, index),
+                vlcTrackId = track.id,
+                label = name.ifBlank { "字幕 ${index + 1}" },
+                detail = "",
+                groupIndex = 0,
+                trackIndex = index,
+                selected = track.id == selectedTrackId,
+                languageCode = language,
+                preferenceType = inferLongFormTrackPreferenceType(name),
+            )
+        }
 }
 
 internal fun buildAudioTrackPickerItems(
@@ -92,59 +122,85 @@ fun resolveAudioSelectionOnTrackLoad(
     return normalizedSelection.takeIf { selected -> tracks.any { it.id == selected } }
 }
 
-fun buildAudioTrackSelectionParameters(
-    currentParameters: TrackSelectionParameters,
-    currentTracks: Tracks,
-    audioTracks: List<LongFormAudioTrack>,
-    selectedAudioTrackId: String?,
-): TrackSelectionParameters {
-    val builder = currentParameters
-        .buildUpon()
-        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-    val normalizedSelection = selectedAudioTrackId?.trim().orEmpty()
-    if (normalizedSelection.isBlank()) {
-        return builder.build()
+fun resolveAudioSelectionOnTrackLoad(
+    currentSelection: String?,
+    storedPreference: TvTrackPreference?,
+    tracks: List<LongFormAudioTrack>,
+): String? {
+    val normalizedSelection = currentSelection?.trim().orEmpty()
+    if (normalizedSelection.isNotBlank() && tracks.any { it.id == normalizedSelection }) {
+        return normalizedSelection
     }
-    val selected = audioTracks.firstOrNull { it.id == normalizedSelection } ?: return builder.build()
-    val group = currentTracks.groups.getOrNull(selected.groupIndex) ?: return builder.build()
-    builder.setOverrideForType(
-        TrackSelectionOverride(
-            group.mediaTrackGroup,
-            selected.trackIndex,
+    val preference = storedPreference?.takeUnless { it.isBlank() } ?: return null
+    val match = resolveLongFormTrackByLanguage(
+        tracks = tracks.map {
+            TvLongFormVlcTrack(
+                id = it.vlcTrackId,
+                name = it.label,
+                language = it.languageCode,
+                type = it.preferenceType,
+                selected = it.selected,
+            )
+        },
+        preference = TvLongFormLanguagePreference(
+            language = preference.language,
+            type = preference.type,
         ),
-    )
-    return builder.build()
+    ) ?: return null
+    return tracks.firstOrNull { it.vlcTrackId == match.id }?.id
 }
 
-private fun buildAudioTrackId(groupIndex: Int, trackIndex: Int, format: Format): String {
+fun buildAudioTrackPreference(track: LongFormAudioTrack?): TvTrackPreference? {
+    val safeTrack = track ?: return null
+    val preference = TvTrackPreference(
+        language = normalizeLongFormLanguageCode(safeTrack.languageCode),
+        type = safeTrack.preferenceType.trim().lowercase(Locale.ROOT),
+    )
+    return preference.takeUnless { it.isBlank() }
+}
+
+internal fun inferLongFormTrackLanguageCode(name: String): String {
+    val normalized = name.lowercase(Locale.ROOT)
+    return when {
+        Regex("""\b(jpn|jp|ja)\b""").containsMatchIn(normalized) ||
+            "japanese" in normalized || "日本語" in normalized || "日语" in normalized || "日文" in normalized -> "ja"
+        Regex("""\b(eng|en)\b""").containsMatchIn(normalized) ||
+            "english" in normalized || "英语" in normalized || "英文" in normalized -> "en"
+        Regex("""\b(zho|chi|cmn|zh)\b""").containsMatchIn(normalized) ||
+            "chinese" in normalized || "mandarin" in normalized || "中文" in normalized ||
+            "国语" in normalized || "普通话" in normalized || "简中" in normalized || "繁中" in normalized -> "zh"
+        Regex("""\b(yue|cant|cantonese)\b""").containsMatchIn(normalized) ||
+            "粤语" in normalized || "粤文" in normalized -> "yue"
+        Regex("""\b(kor|ko)\b""").containsMatchIn(normalized) ||
+            "korean" in normalized || "韩语" in normalized || "韩文" in normalized -> "ko"
+        else -> normalizeLongFormLanguageCode(name)
+            .takeIf { it.matches(Regex("""[a-z]{2,8}(-[a-z0-9]{2,8})?""")) }
+            ?: ""
+    }
+}
+
+internal fun inferLongFormTrackPreferenceType(name: String): String {
+    val normalized = name.lowercase(Locale.ROOT)
+    return when {
+        "forced" in normalized || "强制" in normalized -> "forced"
+        "commentary" in normalized || "comment" in normalized || "解说" in normalized || "评论" in normalized -> "commentary"
+        "default" in normalized || "默认" in normalized -> "default"
+        else -> ""
+    }
+}
+
+private fun buildAudioTrackId(trackId: Int, name: String, index: Int): String {
     val rawParts = listOf(
         "audio",
-        groupIndex.toString(),
-        trackIndex.toString(),
-        format.id.orEmpty(),
-        format.language.orEmpty(),
-        format.channelCount.takeIf { it > 0 }?.toString().orEmpty(),
+        trackId.toString(),
+        name,
     )
     return rawParts
         .filter { it.isNotBlank() }
         .joinToString("-")
         .replace(Regex("[^A-Za-z0-9_-]+"), "-")
         .trim('-')
-        .ifBlank { "audio-$groupIndex-$trackIndex" }
-}
-
-private fun audioTrackDisplayTitle(format: Format, fallbackIndex: Int): String {
-    return format.label?.trim()
-        ?.takeIf { it.isNotBlank() }
-        ?: languageDisplayName(format.language)
-        ?: "音轨 $fallbackIndex"
-}
-
-private fun audioTrackDisplayDetail(format: Format): String {
-    return listOf(audioChannelLabel(format.channelCount), audioCodecLabel(format.sampleMimeType))
-        .filter { it.isNotBlank() }
-        .joinToString(" ")
+        .ifBlank { "audio-$index" }
 }
 
 private fun languageDisplayName(language: String?): String? {

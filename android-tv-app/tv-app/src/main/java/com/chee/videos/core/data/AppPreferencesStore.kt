@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.SessionTokens
+import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.util.UrlBuilder
 import com.google.gson.Gson
@@ -32,8 +33,10 @@ class AppPreferencesStore @Inject constructor(
         val shortDiscoverFitMode = stringPreferencesKey("short_discover_fit_mode")
         val unifiedShortFitMode = stringPreferencesKey("unified_short_fit_mode")
         val shortPlaybackMode = stringPreferencesKey("short_playback_mode")
-        val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_preferences")
-        val tvAudioPreferences = stringPreferencesKey("tv_audio_preferences")
+        val legacyTvSubtitleTrackPreferences = stringPreferencesKey("tv_subtitle_preferences")
+        val legacyTvAudioTrackPreferences = stringPreferencesKey("tv_audio_preferences")
+        val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_language_preferences")
+        val tvAudioPreferences = stringPreferencesKey("tv_audio_language_preferences")
         val tvSeekStepSeconds = stringPreferencesKey("tv_seek_step_seconds")
         val tvSeriesAutoplayEnabled = booleanPreferencesKey("tv_series_autoplay_enabled")
     }
@@ -147,32 +150,36 @@ class AppPreferencesStore @Inject constructor(
         }
     }
 
-    suspend fun readTvSubtitlePreference(videoId: String): String? {
+    suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? {
         val key = videoId.trim()
         if (key.isBlank()) {
             return null
         }
+        clearLegacyTvTrackPreferences()
         return dataStore.data.first()[Keys.tvSubtitlePreferences]
-            ?.let(::decodeStringMap)
+            ?.let(::decodeTrackPreferenceMap)
             ?.get(key)
     }
 
-    suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
-        saveStringMapPreference(Keys.tvSubtitlePreferences, videoId, subtitleTrackId)
+    suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
+        clearLegacyTvTrackPreferences()
+        saveTrackPreference(Keys.tvSubtitlePreferences, videoId, preference)
     }
 
-    suspend fun readTvAudioPreference(videoId: String): String? {
+    suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? {
         val key = videoId.trim()
         if (key.isBlank()) {
             return null
         }
+        clearLegacyTvTrackPreferences()
         return dataStore.data.first()[Keys.tvAudioPreferences]
-            ?.let(::decodeStringMap)
+            ?.let(::decodeTrackPreferenceMap)
             ?.get(key)
     }
 
-    suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
-        saveStringMapPreference(Keys.tvAudioPreferences, videoId, audioTrackId)
+    suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
+        clearLegacyTvTrackPreferences()
+        saveTrackPreference(Keys.tvAudioPreferences, videoId, preference)
     }
 
     suspend fun setActiveBaseUrl(baseUrl: String) {
@@ -235,35 +242,40 @@ class AppPreferencesStore @Inject constructor(
         }
     }
 
-    private fun decodeStringMap(raw: String): Map<String, String> {
+    private fun decodeTrackPreferenceMap(raw: String): Map<String, TvTrackPreference> {
         if (raw.isBlank()) {
             return emptyMap()
         }
         return try {
-            val type = object : TypeToken<Map<String, String>>() {}.type
-            gson.fromJson<Map<String, String>>(raw, type)
-                ?.filterKeys { it.isNotBlank() }
+            val type = object : TypeToken<Map<String, TvTrackPreference>>() {}.type
+            gson.fromJson<Map<String, TvTrackPreference>>(raw, type)
+                ?.mapNotNull { (key, preference) ->
+                    val normalized = normalizeTvTrackPreference(preference)
+                    if (key.isBlank() || normalized == null) null else key to normalized
+                }
+                ?.toMap()
                 ?: emptyMap()
         } catch (_: Exception) {
             emptyMap()
         }
     }
 
-    private suspend fun saveStringMapPreference(
+    private suspend fun saveTrackPreference(
         prefsKey: Preferences.Key<String>,
         videoId: String,
-        value: String?,
+        preference: TvTrackPreference?,
     ) {
         val key = videoId.trim()
         if (key.isBlank()) {
             return
         }
+        val normalizedPreference = preference?.let(::normalizeTvTrackPreference)
         dataStore.edit { prefs ->
-            val current = decodeStringMap(prefs[prefsKey].orEmpty()).toMutableMap()
-            if (value == null) {
+            val current = decodeTrackPreferenceMap(prefs[prefsKey].orEmpty()).toMutableMap()
+            if (normalizedPreference == null) {
                 current.remove(key)
             } else {
-                current[key] = value
+                current[key] = normalizedPreference
             }
             if (current.isEmpty()) {
                 prefs.remove(prefsKey)
@@ -271,6 +283,21 @@ class AppPreferencesStore @Inject constructor(
                 prefs[prefsKey] = gson.toJson(current)
             }
         }
+    }
+
+    private suspend fun clearLegacyTvTrackPreferences() {
+        dataStore.edit { prefs ->
+            prefs.remove(Keys.legacyTvSubtitleTrackPreferences)
+            prefs.remove(Keys.legacyTvAudioTrackPreferences)
+        }
+    }
+
+    private fun normalizeTvTrackPreference(preference: TvTrackPreference): TvTrackPreference? {
+        val normalized = TvTrackPreference(
+            language = preference.language.trim(),
+            type = preference.type.trim().lowercase(),
+        )
+        return normalized.takeUnless { it.isBlank() }
     }
 
     private fun normalizeTvSeekStepSeconds(seconds: Int?): Int {

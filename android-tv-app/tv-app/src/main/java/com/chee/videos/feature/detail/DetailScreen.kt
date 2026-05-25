@@ -719,18 +719,6 @@ private fun AvDetailPage(
     }
 }
 
-private data class AvDetailMediaLayoutSpec(
-    val aspectRatio: Float,
-    val applyStatusBarPadding: Boolean,
-)
-
-private fun buildAvDetailMediaLayoutSpec(): AvDetailMediaLayoutSpec {
-    return AvDetailMediaLayoutSpec(
-        aspectRatio = 16f / 9f,
-        applyStatusBarPadding = true,
-    )
-}
-
 @Composable
 private fun VideoPlayerSurface(
     exoPlayer: ExoPlayer,

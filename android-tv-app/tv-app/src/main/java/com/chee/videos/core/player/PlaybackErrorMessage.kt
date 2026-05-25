@@ -1,8 +1,6 @@
 package com.chee.videos.core.player
 
-import androidx.media3.common.PlaybackException
-
-fun friendlyLongFormPlaybackErrorMessage(error: PlaybackException?): String {
+fun friendlyLongFormPlaybackErrorMessage(error: Throwable?): String {
     val raw = buildString {
         append(error?.message.orEmpty())
         val cause = error?.cause

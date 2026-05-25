@@ -2,7 +2,6 @@ package com.chee.videos.core.ui
 
 import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
-import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -45,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,19 +62,15 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.PlaybackParameters
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.CaptionStyleCompat
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.chee.videos.core.model.SubtitleTrackDto
+import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.player.VlcLongFormSurface
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import org.videolan.libvlc.MediaPlayer
 
 private const val LongFormVideoPlayerLogTag = "LongFormVideoPlayer"
 
@@ -82,7 +78,7 @@ private const val LongFormVideoPlayerLogTag = "LongFormVideoPlayer"
 @Composable
 fun LongFormVideoPlayer(
     title: String,
-    player: ExoPlayer,
+    player: MediaPlayer,
     isFullscreen: Boolean,
     onBack: () -> Unit,
     onTogglePlayPause: () -> Unit,
@@ -95,7 +91,8 @@ fun LongFormVideoPlayer(
     selectedSubtitleTrackId: String? = null,
     onSelectSubtitleTrack: (String?) -> Unit = {},
     selectedAudioTrackId: String? = null,
-    onSelectAudioTrack: (String?) -> Unit = {},
+    selectedAudioPreference: TvTrackPreference? = null,
+    onSelectAudioTrack: (String?, TvTrackPreference?) -> Unit = { _, _ -> },
     tvMode: Boolean = false,
     tvSeekStepSeconds: Int = 10,
     seriesTitleForOverlay: String? = null,
@@ -107,6 +104,7 @@ fun LongFormVideoPlayer(
     onRequestExitPlayback: (() -> Unit)? = null,
     onExitPlayback: (() -> Unit)? = null,
     onTrackSheetVisibilityChanged: (Boolean) -> Unit = {},
+    onVlcEvent: (MediaPlayer.Event) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val rootFocusRequester = remember { FocusRequester() }
@@ -123,8 +121,8 @@ fun LongFormVideoPlayer(
 
     var controlsVisible by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
-    var durationMs by remember { mutableStateOf(player.duration.coerceAtLeast(0L)) }
-    var positionMs by remember { mutableStateOf(player.currentPosition.coerceAtLeast(0L)) }
+    var durationMs by remember { mutableStateOf(player.length.coerceAtLeast(0L)) }
+    var positionMs by remember { mutableStateOf(player.time.coerceAtLeast(0L)) }
     var isScrubbing by remember { mutableStateOf(false) }
     var scrubPositionMs by remember { mutableStateOf(0L) }
     var viewWidthPx by remember { mutableStateOf(1f) }
@@ -154,6 +152,7 @@ fun LongFormVideoPlayer(
     var pendingRootFocusRequest by remember { mutableStateOf(false) }
     var pendingPlayPauseFocusRequest by remember { mutableStateOf(false) }
     var focusInControls by remember { mutableStateOf(false) }
+    val latestOnVlcEvent by rememberUpdatedState(onVlcEvent)
 
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
     var hideSeekPreviewJob by remember { mutableStateOf<Job?>(null) }
@@ -166,7 +165,7 @@ fun LongFormVideoPlayer(
         if (fromState > 0) {
             return fromState
         }
-        return player.duration.coerceAtLeast(0L)
+        return player.length.coerceAtLeast(0L)
     }
 
     fun requestRootFocusWhenReady() {
@@ -220,11 +219,11 @@ fun LongFormVideoPlayer(
 
     fun performStepSeek(deltaMs: Long, showControls: Boolean = true) {
         val duration = effectiveDurationMs()
-        val current = player.currentPosition.coerceAtLeast(0L)
+        val current = player.time.coerceAtLeast(0L)
         val target = (current + deltaMs).coerceAtLeast(0L).let { next ->
             if (duration > 0L) next.coerceAtMost(duration) else next
         }
-        player.seekTo(target)
+        player.time = target
         positionMs = target
         val delta = target - current
         val direction = if (delta >= 0) "快进" else "快退"
@@ -275,7 +274,7 @@ fun LongFormVideoPlayer(
         val duration = effectiveDurationMs()
         val pending = resolveTvPendingStepSeek(
             previous = pendingStepSeek,
-            currentPositionMs = player.currentPosition.coerceAtLeast(0L),
+            currentPositionMs = player.time.coerceAtLeast(0L),
             durationMs = duration,
             deltaMs = deltaMs,
         )
@@ -290,7 +289,7 @@ fun LongFormVideoPlayer(
         commitStepSeekJob?.cancel()
         commitStepSeekJob = scope.launch {
             delay(TvStepSeekDebounceMillis)
-            player.seekTo(pending.targetPositionMs)
+            player.time = pending.targetPositionMs
             positionMs = pending.targetPositionMs
             pendingStepSeek = null
             hideSeekPreviewJob = scope.launch {
@@ -351,31 +350,35 @@ fun LongFormVideoPlayer(
     }
 
     DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(isPlayingValue: Boolean) {
-                isPlaying = isPlayingValue
-            }
-
-            override fun onEvents(playerObj: Player, events: Player.Events) {
-                val duration = playerObj.duration.coerceAtLeast(0L)
-                if (duration > 0) {
-                    durationMs = duration
+        val listener = object : MediaPlayer.EventListener {
+            override fun onEvent(event: MediaPlayer.Event) {
+                latestOnVlcEvent(event)
+                when (event.type) {
+                    MediaPlayer.Event.Playing -> isPlaying = true
+                    MediaPlayer.Event.Paused,
+                    MediaPlayer.Event.Stopped,
+                    MediaPlayer.Event.EndReached
+                    -> isPlaying = false
+                    MediaPlayer.Event.TimeChanged -> if (!isScrubbing && !draggingSeek) {
+                        positionMs = player.time.coerceAtLeast(0L)
+                    }
+                    MediaPlayer.Event.LengthChanged -> {
+                        val duration = player.length.coerceAtLeast(0L)
+                        if (duration > 0) durationMs = duration
+                    }
                 }
-                if (!isScrubbing && !draggingSeek) {
-                    positionMs = playerObj.currentPosition.coerceAtLeast(0L)
-                }
-                audioTracks = buildLongFormAudioTracks(playerObj.currentTracks)
+                audioTracks = buildLongFormAudioTracksFromVlc(player.audioTracks, player.audioTrack)
             }
         }
-        player.addListener(listener)
+        player.setEventListener(listener)
         isPlaying = player.isPlaying
-        durationMs = player.duration.coerceAtLeast(0L)
-        positionMs = player.currentPosition.coerceAtLeast(0L)
-        audioTracks = buildLongFormAudioTracks(player.currentTracks)
+        durationMs = player.length.coerceAtLeast(0L)
+        positionMs = player.time.coerceAtLeast(0L)
+        audioTracks = buildLongFormAudioTracksFromVlc(player.audioTracks, player.audioTrack)
         onDispose {
-            player.removeListener(listener)
+            player.setEventListener(null)
             if (longPressBoosting) {
-                player.playbackParameters = PlaybackParameters(1f)
+                player.setRate(1f)
             }
             hideControlsJob?.cancel()
             hideSeekPreviewJob?.cancel()
@@ -386,9 +389,9 @@ fun LongFormVideoPlayer(
     LaunchedEffect(player, isScrubbing, draggingSeek) {
         while (true) {
             if (!isScrubbing && !draggingSeek) {
-                positionMs = player.currentPosition.coerceAtLeast(0L)
+                positionMs = player.time.coerceAtLeast(0L)
             }
-            val duration = player.duration.coerceAtLeast(0L)
+            val duration = player.length.coerceAtLeast(0L)
             if (duration > 0) {
                 durationMs = duration
             }
@@ -439,29 +442,27 @@ fun LongFormVideoPlayer(
         }
     }
 
-    LaunchedEffect(player, audioTracks, selectedAudioTrackId) {
+    LaunchedEffect(player, audioTracks, selectedAudioTrackId, selectedAudioPreference) {
         if (audioTracks.isEmpty()) {
             return@LaunchedEffect
         }
         val resolvedSelection = resolveAudioSelectionOnTrackLoad(
-            storedSelection = selectedAudioTrackId,
+            currentSelection = selectedAudioTrackId,
+            storedPreference = selectedAudioPreference,
             tracks = audioTracks,
         )
         if (selectedAudioTrackId?.isNotBlank() == true && resolvedSelection == null) {
-            onSelectAudioTrack(null)
+            onSelectAudioTrack(null, null)
         }
         Log.d(
             LongFormVideoPlayerLogTag,
-            "applyAudioSelection selectedAudioTrackId=$selectedAudioTrackId resolved=$resolvedSelection " +
+            "applyAudioSelection selectedAudioTrackId=$selectedAudioTrackId selectedAudioPreference=$selectedAudioPreference " +
+                "resolved=$resolvedSelection " +
                 "tracks=${audioTracks.joinToString { "${it.id}:${it.label}/${it.detail}:selected=${it.selected}" }}",
         )
-        player.trackSelectionParameters = buildAudioTrackSelectionParameters(
-            currentParameters = player.trackSelectionParameters,
-            currentTracks = player.currentTracks,
-            audioTracks = audioTracks,
-            selectedAudioTrackId = resolvedSelection,
-        )
-        val selectedAfterApply = buildLongFormAudioTracks(player.currentTracks)
+        val selected = audioTracks.firstOrNull { it.id == resolvedSelection }
+        player.audioTrack = selected?.vlcTrackId ?: -1
+        val selectedAfterApply = buildLongFormAudioTracksFromVlc(player.audioTracks, player.audioTrack)
             .filter { it.selected }
             .joinToString { it.id }
         Log.d(
@@ -586,7 +587,7 @@ fun LongFormVideoPlayer(
                             delay(350)
                             longPressBoosting = true
                             ignoreTapAfterLongPress = true
-                            player.playbackParameters = PlaybackParameters(2f)
+                            player.setRate(2f)
                             showTransientFeedback(
                                 icon = Icons.Filled.FastForward,
                                 text = "2.0x 倍速",
@@ -596,7 +597,7 @@ fun LongFormVideoPlayer(
                         tryAwaitRelease()
                         boostJob.cancel()
                         if (longPressBoosting) {
-                            player.playbackParameters = PlaybackParameters(1f)
+                            player.setRate(1f)
                             longPressBoosting = false
                         }
                     },
@@ -607,7 +608,7 @@ fun LongFormVideoPlayer(
                     onDragStart = {
                         draggingSeek = true
                         dragDistancePx = 0f
-                        dragStartPositionMs = player.currentPosition.coerceAtLeast(0L)
+                        dragStartPositionMs = player.time.coerceAtLeast(0L)
                         dragTargetPositionMs = dragStartPositionMs
                         showSeekPreview = true
                         showControlsTemporarily()
@@ -641,7 +642,7 @@ fun LongFormVideoPlayer(
                     },
                     onDragEnd = {
                         draggingSeek = false
-                        player.seekTo(dragTargetPositionMs)
+                        player.time = dragTargetPositionMs
                         positionMs = dragTargetPositionMs
                         hideSeekPreviewJob?.cancel()
                         hideSeekPreviewJob = scope.launch {
@@ -661,21 +662,8 @@ fun LongFormVideoPlayer(
                 )
             },
     ) {
-        AndroidView(
-            factory = { context ->
-                PlayerView(context).apply {
-                    useController = false
-                    setShutterBackgroundColor(AndroidColor.BLACK)
-                    setKeepContentOnPlayerReset(true)
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    this.player = player
-                    applyLongFormSubtitleStyle()
-                }
-            },
-            update = { view ->
-                view.player = player
-                view.applyLongFormSubtitleStyle()
-            },
+        VlcLongFormSurface(
+            mediaPlayer = player,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -858,7 +846,7 @@ fun LongFormVideoPlayer(
                             },
                             onValueChangeFinished = {
                                 if (isScrubbing) {
-                                    player.seekTo(scrubPositionMs)
+                                    player.time = scrubPositionMs
                                     positionMs = scrubPositionMs
                                 }
                                 isScrubbing = false
@@ -1004,7 +992,10 @@ fun LongFormVideoPlayer(
             TvAudioTrackPickerDialog(
                 audioTracks = audioTracks,
                 selectedAudioTrackId = selectedAudioTrackId,
-                onSelectAudioTrack = onSelectAudioTrack,
+                onSelectAudioTrack = { trackId ->
+                    val preference = buildAudioTrackPreference(audioTracks.firstOrNull { it.id == trackId })
+                    onSelectAudioTrack(trackId, preference)
+                },
                 onDismissRequest = { audioTrackSheetVisible = false },
             )
         }
@@ -1092,22 +1083,4 @@ private fun formatPlaybackTime(ms: Long): String {
     } else {
         String.format("%02d:%02d", minutes, seconds)
     }
-}
-
-private fun PlayerView.applyLongFormSubtitleStyle() {
-    val subtitleView = getSubtitleView() ?: return
-    subtitleView.setStyle(buildLongFormSubtitleStyle())
-    subtitleView.setApplyEmbeddedStyles(true)
-    subtitleView.setApplyEmbeddedFontSizes(true)
-}
-
-private fun buildLongFormSubtitleStyle(): CaptionStyleCompat {
-    return CaptionStyleCompat(
-        0xFFFFFFFF.toInt(),
-        0x00000000,
-        0x00000000,
-        CaptionStyleCompat.EDGE_TYPE_OUTLINE,
-        0xB3000000.toInt(),
-        null,
-    )
 }

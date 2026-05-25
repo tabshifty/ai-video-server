@@ -228,7 +228,7 @@ func TestResolveProbeFieldsWithProbeErrorUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestSubtitleUploadPlanForFilenameSupportsAssAndSsaAsWebVTT(t *testing.T) {
+func TestSubtitleUploadPlanForFilenameKeepsAssAndSsaSource(t *testing.T) {
 	tests := []struct {
 		filename       string
 		uploadedFormat string
@@ -238,8 +238,8 @@ func TestSubtitleUploadPlanForFilenameSupportsAssAndSsaAsWebVTT(t *testing.T) {
 	}{
 		{filename: "movie.zh.srt", uploadedFormat: "srt", storedFormat: "srt", storedMIME: "application/x-subrip", needsWebVTT: false},
 		{filename: "movie.zh.vtt", uploadedFormat: "vtt", storedFormat: "vtt", storedMIME: "text/vtt", needsWebVTT: false},
-		{filename: "movie.zh.ass", uploadedFormat: "ass", storedFormat: "vtt", storedMIME: "text/vtt", needsWebVTT: true},
-		{filename: "movie.zh.ssa", uploadedFormat: "ssa", storedFormat: "vtt", storedMIME: "text/vtt", needsWebVTT: true},
+		{filename: "movie.zh.ass", uploadedFormat: "ass", storedFormat: "ass", storedMIME: "text/x-ssa", needsWebVTT: false},
+		{filename: "movie.zh.ssa", uploadedFormat: "ssa", storedFormat: "ass", storedMIME: "text/x-ssa", needsWebVTT: false},
 	}
 
 	for _, tt := range tests {

@@ -6,7 +6,10 @@
 - `tasks 任务三段执行流`：当用户要求“完成 tasks 里的任务”或等价表述时，必须把 `tasks/<任务名>/prd.md`、`implement.md`、`review.md` 视为同一任务的三个阶段，并严格按 PRD → Implement → Review 顺序推进。PRD 阶段用于锁定用户故事、作用域、验收标准和非目标；Implement 阶段用于按既定方案实施，若方案与代码现状冲突须回到 PRD 校准并写入 `plan.md`；Review 阶段用于按评审脚本和验收清单验证，不允许只完成实现后跳过 review 直接宣称任务完成。已包含 `DONE.md` 的任务目录视为已完成，后续批量处理 tasks 时默认跳过；即使该目录后来出现 `feedback.md`，也只作为归档材料，不再触发返工；只有用户明确要求重开或复查该任务时才重新进入三段流程。用户完成验收后，应在对应任务目录新增 `DONE.md`，记录完成日期、关联提交和验证摘要。
 
 ## 字幕处理约定
-- `外挂 ASS/SSA 字幕上传策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；其中 `.ass/.ssa` 不直接暴露给 App 播放端，而是在服务端保存为临时源文件后用 ffmpeg 转成 WebVTT，数据库 `video_subtitles.format` 与 `mime_type` 记录最终可播放形态 `vtt` / `text/vtt`，`metadata.original_format` 记录原始格式。手机端和 TV 端继续复用既有 WebVTT 字幕播放链路；ASS 的复杂样式、字体、描边、特效、卡拉 OK 与精确定位允许在转换中降级或丢失，本策略只承诺文本字幕可播放。
+- `ASS 字幕原文存储策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；`.ass/.ssa` 不再强转 WebVTT，而是以 ASS 原文落库，数据库记录 `video_subtitles.format=ass` / `mime_type=text/x-ssa`，`metadata.original_format` 继续记录原始扩展名。视频内嵌字幕抽取时，`ass`/`ssa` codec 用 ffmpeg `-c:s copy` 保留原文；`mov_text`、`subrip`、`webvtt` 等无 ASS Style 段的格式继续转 VTT。历史已生成的 VTT 字幕不反向迁移；用户需要 ASS 特效时重新上传或重新抽取。
+- `ASS 字幕安全清洗`：上传或抽取后的 ASS 原文在落盘前必须做轻量安全清洗，至少去掉指向本地路径/绝对路径的 `\fn` 覆盖，并把 `\fad` 参数钳制到安全上限，避免 libass 历史 CVE 类问题扩大到本项目。这里的清洗只作用于原文字幕内容，不改动视频转码链路。
+- `libass 自渲染字幕`：TV 长视频 LibVLC 内核的字幕渲染路径。所有外挂与内嵌字幕通过 LibVLC media slave 注入或自动加载，由 LibVLC 内置 libass 直接画到视频 Surface 上；ASS 的 `[V4+ Styles]`、卡拉 OK、动态特效、矢量绘图和字体回退按文件意图渲染。客户端不再用 `CaptionStyleCompat` / `SubtitleView` 统一控制长视频字幕外观；SRT/VTT 接受 libass 默认外观。
+- `字幕样式 libass 让位`：TV 长视频从 Media3 切到 LibVLC 后，字幕外观控制权从 Compose/Media3 让位给 libass。删除 `applyLongFormSubtitleStyle()` 这类统一描边逻辑是有意行为，后续不要再给 SRT/VTT 注入默认 ASS Style，除非新任务明确要求重新设计字幕偏好。
 
 ## admin 设计系统术语
 - `admin Modern Minimal`：管理端视觉方向为浅色优先、低饱和 slate 中性色、冷蓝主色与克制阴影；后台工具界面优先信息密度、可扫描性和重复操作效率，不采用营销式大色块或装饰性 hero。
@@ -71,6 +74,10 @@
 - `最近播放`：当前类型下用户已有播放进度的内容；电视剧保留季/集信息，电影和 `18+` 指向长视频本体。
 - `TV 首页货架纯标题`：TV 首页的货架标题只保留「最近播放」与「最近更新」两类语义，不在标题下追加说明文案或数量文案；单独入口可以保留为纯动作标题，但不再用副文案补充解释。
 - `服务器自动嗅探`：TV 端连接服务器页对局域网服务的扫描过程；扫描状态属于表单内的辅助反馈，应使用小型行内 loading，不使用占据视觉中心的大型加载态。
+- `TV 长视频 LibVLC 内核`：TV 长视频播放器（电影 / `18+` / 电视剧共用的 `LongFormVideoPlayer.kt`）的播放引擎，从 Media3 ExoPlayer 切到 `org.videolan.libvlc.MediaPlayer`。视频解码、字幕渲染、音轨切换均走 LibVLC；与 [[IPTV LibVLC 路径]] 共用同一个 `libvlc-all` 依赖和 `TvVlcLibrary` 单例，但长视频与 IPTV 配置不共用 helper。
+- `TV 长视频 TextureView 硬解默认`：TV 长视频 LibVLC 内核的视频输出走 `VLCVideoLayout` + TextureView，解码偏好开启 `Media.setHWDecoderEnabled(true, true)`。这与 IPTV 的“TextureView + 软解优先”不同：长视频源由后端转码链控制 codec 边界，适合默认硬解；IPTV 第三方直播源不套用该策略。
+- `LibVLC track id 不稳定`：LibVLC `MediaPlayer.getAudioTracks()` / `getSpuTracks()` 返回的 track id 在 Media 重新加载后不保证稳定，禁止把它当作长期协议或服务端字段。客户端如需跨集恢复音轨/字幕偏好，应优先保存 language code + 偏好类型并在新 media 加载后按名称/语言匹配；运行时菜单内的临时 id 只用于当前 media。
+- `TV 轨道偏好持久化`：TV 长视频播放页的音轨/字幕偏好在 DataStore 中以 `language + type` 形态保存，而不是保存 LibVLC 当前 media 的临时 track id。`LongFormVideoPlayer` 的运行时选择仍然需要 track id，但 id 只在当前 media 内有效；跨集、重载或切换来源时只读取持久化偏好并重新映射。
 
 ## TV 首页结构
 - 一级首页使用左侧窄菜单和右侧内容区。
@@ -165,9 +172,8 @@
 - 后端负责保存和解析 M3U，Admin Web 负责上传文件、保存远程 URL、手动刷新和预览解析结果；TV App 只获取解析后的频道清单。
 - TV App 播放 IPTV 时直接连接 M3U 中的原始频道 URL；后端不代理、不转码、不隐藏源地址。
 - 远程 M3U URL 只在后台手动刷新时拉取，本期不做定时刷新和 EPG 节目单。
-- TV App 播放 M3U8/HLS 频道必须打包 Media3 HLS 扩展模块；仅引入 `media3-exoplayer` 时，`DefaultMediaSourceFactory` 会在运行时找不到 `HlsMediaSource.Factory` 并导致 IPTV 播放页崩溃。
-- Media3 `PlayerView` 的 `texture_view` 只能排除部分 Compose/Surface 渲染黑屏；如果 IPTV 日志中音频解码器已初始化但没有视频解码器初始化，且出现多个 `VideoCapabilities` 不支持提示，应按直播源视频编码兼容性处理。
-- TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并关闭硬解优先走软解；其他长视频播放器继续使用 Media3。IPTV 源常见 MPEG2、特殊 H.264 profile、Dolby Vision 或设备厂商解码缺口，不能只依赖 Android TV 设备硬解能力。
+- TV App 播放 M3U8/HLS 频道走 LibVLC IPTV 路径，不再依赖 Media3 HLS 扩展。M3U8 频道兼容性问题应优先从 LibVLC event、vout、视频轨和频道源响应排查。
+- TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并关闭硬解优先走软解。TV 长视频也使用 LibVLC，但配置分轨：长视频走 [[TV 长视频 LibVLC 内核]] 与 [[TV 长视频 TextureView 硬解默认]]，IPTV 继续保持软解优先和直播诊断路径，不共用长视频硬解 helper。
 - IPTV 播放无画面排查必须保留播放事件诊断：至少记录 LibVLC event、vout 数、视频轨/音频轨数量和当前视频轨 codec/分辨率。若 `videoTracks=0` 或无 `Vout`，优先检查 M3U 频道 URL、源站多码率/分片返回和是否需要后端转码；若有视频轨和 `Vout` 但仍黑屏，优先检查输出视图/系统合成层。
 - IPTV 频道清单不应包含音频专用源。明显音频源包括 `group-title=Audio/音频`、频道名包含 `音频` 或 `audio only`、URL 路径包含 `/audio/`、`_audio/`，以及 `.mp3/.aac/.m4a/.flac/.wav/.ogg/.opus` 等音频文件。后端解析时应跳过，TV 端也要过滤旧数据，避免默认播放只有声音没有画面的条目。
 - TV App IPTV 顶部频道信息不是常驻条：进入播放页和切换频道后仅显示 3 秒临时提示，频道列表打开、加载中、无可播放频道、状态错误或播放错误时必须隐藏。临时提示仍使用后端返回的 `logo_url`（M3U `tvg-logo`）展示台标，`logo_url` 为空或图片加载失败时使用 TV 图标回退，不新增占位资源。

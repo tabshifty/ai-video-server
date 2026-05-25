@@ -11,6 +11,8 @@ import com.chee.videos.core.model.TvSearchResultDto
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
+import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.model.SubtitleTrackDto
 import kotlinx.coroutines.CompletableDeferred
 
 typealias MainDispatcherRule = com.chee.videos.core.testing.MainDispatcherRule
@@ -27,8 +29,8 @@ class FakeTvRepository(
     private val detailError: Throwable? = null,
     private var tvSeekStepSeconds: Int = 10,
     private var tvSeriesAutoplayEnabled: Boolean? = null,
-    subtitlePreferences: Map<String, String> = emptyMap(),
-    audioPreferences: Map<String, String> = emptyMap(),
+    subtitlePreferences: Map<String, TvTrackPreference> = emptyMap(),
+    audioPreferences: Map<String, TvTrackPreference> = emptyMap(),
 ) : TvRepository {
     private val storedSubtitlePreferences = subtitlePreferences.toMutableMap()
     private val storedAudioPreferences = audioPreferences.toMutableMap()
@@ -89,23 +91,23 @@ class FakeTvRepository(
         historyReports += TvHistoryReport(videoId, watchSeconds, completed)
     }
 
-    override suspend fun readTvSubtitlePreference(videoId: String): String? = storedSubtitlePreferences[videoId]
+    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = storedSubtitlePreferences[videoId]
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
-        if (subtitleTrackId == null) {
+    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
+        if (preference == null) {
             storedSubtitlePreferences.remove(videoId)
         } else {
-            storedSubtitlePreferences[videoId] = subtitleTrackId
+            storedSubtitlePreferences[videoId] = preference
         }
     }
 
-    override suspend fun readTvAudioPreference(videoId: String): String? = storedAudioPreferences[videoId]
+    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = storedAudioPreferences[videoId]
 
-    override suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) {
-        if (audioTrackId == null) {
+    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
+        if (preference == null) {
             storedAudioPreferences.remove(videoId)
         } else {
-            storedAudioPreferences[videoId] = audioTrackId
+            storedAudioPreferences[videoId] = preference
         }
     }
 
@@ -183,13 +185,13 @@ class DelayedSourceTvRepository(
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
 
-    override suspend fun readTvSubtitlePreference(videoId: String): String? = null
+    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = null
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) = Unit
+    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) = Unit
 
-    override suspend fun readTvAudioPreference(videoId: String): String? = null
+    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = null
 
-    override suspend fun saveTvAudioPreference(videoId: String, audioTrackId: String?) = Unit
+    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) = Unit
 
     override suspend fun readTvSeekStepSeconds(): Int = 10
 
@@ -237,6 +239,7 @@ fun tvEpisode(
     videoStatus: String = "",
     watchSeconds: Int = 0,
     lastWatchedAt: String? = null,
+    subtitleTracks: List<SubtitleTrackDto> = emptyList(),
 ): TvEpisodeDto = TvEpisodeDto(
     id = id,
     episodeNumber = number,
@@ -246,6 +249,7 @@ fun tvEpisode(
     watchSeconds = watchSeconds,
     lastWatchedAt = lastWatchedAt,
     playable = videoId.isNotBlank() && videoStatus == "ready",
+    subtitleTracks = subtitleTracks,
 )
 
 suspend fun TvCatalogViewModel.awaitIdle() = Unit
