@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-25 13:46 +0800
+- 进度：完成管理端视频管理列表详情按钮无反应修复。根因是 `showDetail()` 创建 `detailRequestToken` 后又调用会递增 token 的清理函数，导致详情接口返回后被判定为过期并丢弃；`refreshPlayURL()` 也会在当前详情上下文内失效 token。修复为新增 token helper，清理函数支持 `invalidateToken` 参数，打开详情和刷新播放链接时清理旧预览/URL 但不取消当前请求；字幕加载也改用统一 stale 判断。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm test -- src/views/videoList.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）；`git diff --check` 通过；`rg -n $'\uFFFD' plan.md admin-web/src/views/VideoList.vue admin-web/src/views/videoList.helpers.js admin-web/src/views/videoList.helpers.spec.js` 无输出。
+
+## 2026-05-25 13:40 +0800
+- 进度：开始排查管理端视频管理列表“详情”按钮点击无反应。初步定位到 `VideoList.vue` 的详情请求 token 链路：`showDetail()` 设置 `detailRequestToken` 后立即调用会再次递增 token 的 `handleDetailClose()` / `resetDetailState()`，导致 `getAdminVideoDetail()` 返回后被当作过期请求丢弃；`refreshPlayURL()` 内也存在调用 `handleDetailClose()` 让 expectedToken 失效的同类问题。计划先补 token 纯函数红灯测试，再做最小修复并跑 admin 定向测试与 build。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm test -- src/views/videoList.helpers.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。当前工作区无其他未提交改动。
+
 ## 2026-05-24 23:20 +0800
 - 进度：完成 `tasks/2026-05-24-tv-long-form-operation-ui-on-remote` 核心实现：新增 TV 遥控键路由纯函数、左上信息层组件与数据构造；`LongFormVideoPlayer` 的 TV 模式改为首次亮 UI 但焦点停根、DOWN 进入 controls、LEFT/RIGHT seek 并重置计时、controls 内左右走 focusProperties 首尾环绕、Slider 不可聚焦、BACK 可见时优先收 UI；电视剧播放器传入剧名/季集/单集标题，左上主行显示剧名。同步 TV 版本号升到 `0.1.66`，`CONTEXT.md` 追加 TV 操作 UI 术语。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/{LongFormVideoPlayer,TvLongFormRemoteKeyRouting,TvLongFormTitleOverlay}.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、TV 单测与 androidTest、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`、`tasks/2026-05-24-tv-long-form-operation-ui-on-remote/DONE.md`

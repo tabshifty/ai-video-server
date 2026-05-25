@@ -150,6 +150,14 @@ export function teardownPreviewPlayer(player) {
   } catch (_) {}
 }
 
+export function nextDetailRequestToken(currentToken) {
+  return Number(currentToken || 0) + 1
+}
+
+export function isStaleDetailRequest(currentToken, expectedToken) {
+  return Number(currentToken || 0) !== Number(expectedToken || 0)
+}
+
 function toText(value) {
   if (typeof value === 'string') {
     const trimmed = value.trim()

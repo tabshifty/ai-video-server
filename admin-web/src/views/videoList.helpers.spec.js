@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   buildAVManualScrapeRoute,
   buildMovieManualScrapeRoute,
@@ -8,6 +9,8 @@ import {
   getManualVideoStatusValue,
   getVideoStatusMeta,
   getVideoThumbnailPlaceholder,
+  isStaleDetailRequest,
+  nextDetailRequestToken,
   getVideoThumbnailURL,
   shouldShowVideoThumbnail,
   subtitleUploadAccept,
@@ -91,6 +94,30 @@ describe('videoList helpers', () => {
   it('ignores null players and partial player objects', () => {
     expect(() => teardownPreviewPlayer(null)).not.toThrow()
     expect(() => teardownPreviewPlayer({ src: 'blob:1' })).not.toThrow()
+  })
+
+  it('keeps detail request token stable for the active detail request', () => {
+    const requestToken = nextDetailRequestToken(4)
+
+    expect(requestToken).toBe(5)
+    expect(isStaleDetailRequest(5, requestToken)).toBe(false)
+    expect(isStaleDetailRequest(6, requestToken)).toBe(true)
+  })
+
+  it('does not invalidate the active detail request while opening the drawer', () => {
+    const source = readFileSync(new URL('./VideoList.vue', import.meta.url), 'utf8')
+    const showDetailBlock = source
+      .split('async function showDetail(row)')[1]
+      .split('async function refreshPlayURL')[0]
+    const refreshPlayURLBlock = source
+      .split('async function refreshPlayURL')[1]
+      .split('function resetSubtitleState')[0]
+
+    expect(showDetailBlock).toContain('nextDetailRequestToken(')
+    expect(showDetailBlock).toContain('handleDetailClose({ invalidateToken: false })')
+    expect(showDetailBlock).toContain('resetDetailState({ invalidateToken: false })')
+    expect(showDetailBlock).toContain('isStaleDetailRequest(detailRequestToken.value, requestToken)')
+    expect(refreshPlayURLBlock).toContain('handleDetailClose({ invalidateToken: false })')
   })
 
   it('builds the AV manual scrape route from video detail metadata', () => {

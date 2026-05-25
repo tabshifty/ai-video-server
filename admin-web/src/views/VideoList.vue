@@ -41,6 +41,8 @@ import {
   getVideoStatusMeta,
   getVideoThumbnailPlaceholder,
   getVideoThumbnailURL,
+  isStaleDetailRequest,
+  nextDetailRequestToken,
   teardownPreviewPlayer,
   shouldShowVideoThumbnail,
   subtitleUploadAccept,
@@ -498,12 +500,12 @@ async function searchImageCollections(keyword = '') {
 }
 
 async function showDetail(row) {
-  const requestToken = detailRequestToken.value + 1
+  const requestToken = nextDetailRequestToken(detailRequestToken.value)
   detailRequestToken.value = requestToken
-  handleDetailClose()
-  resetDetailState()
+  handleDetailClose({ invalidateToken: false })
+  resetDetailState({ invalidateToken: false })
   const data = await getAdminVideoDetail(row.id)
-  if (detailRequestToken.value !== requestToken) {
+  if (isStaleDetailRequest(detailRequestToken.value, requestToken)) {
     return
   }
   detail.value = data
@@ -527,7 +529,7 @@ async function showDetail(row) {
     searchImageCollections(''),
     supportsSubtitleManage(detail.value?.type) ? loadSubtitles(detail.value.id, requestToken) : Promise.resolve()
   ])
-  if (detailRequestToken.value !== requestToken || detail.value?.id !== row.id) {
+  if (isStaleDetailRequest(detailRequestToken.value, requestToken) || detail.value?.id !== row.id) {
     return
   }
   if (detail.value?.status === 'ready') {
@@ -540,14 +542,14 @@ async function refreshPlayURL(expectedToken = detailRequestToken.value) {
     return
   }
   const videoID = detail.value.id
-  handleDetailClose()
+  handleDetailClose({ invalidateToken: false })
   if (detail.value.status !== 'ready') {
     return
   }
   loadingPlayURL.value = true
   try {
     const data = await getAdminVideoPlayURL(videoID)
-    if (!detailVisible.value || detailRequestToken.value !== expectedToken || detail.value?.id !== videoID) {
+    if (!detailVisible.value || isStaleDetailRequest(detailRequestToken.value, expectedToken) || detail.value?.id !== videoID) {
       return
     }
     playURL.value = data.signed_url || ''
@@ -565,16 +567,20 @@ function resetSubtitleState() {
   subtitleUploadFileList.value = []
 }
 
-function resetDetailState() {
-  detailRequestToken.value += 1
+function resetDetailState({ invalidateToken = true } = {}) {
+  if (invalidateToken) {
+    detailRequestToken.value = nextDetailRequestToken(detailRequestToken.value)
+  }
   detail.value = null
   playURL.value = ''
   playExpiresAt.value = 0
   resetSubtitleState()
 }
 
-function handleDetailClose() {
-  detailRequestToken.value += 1
+function handleDetailClose({ invalidateToken = true } = {}) {
+  if (invalidateToken) {
+    detailRequestToken.value = nextDetailRequestToken(detailRequestToken.value)
+  }
   teardownPreviewPlayer(previewPlayerRef.value)
   playURL.value = ''
   playExpiresAt.value = 0
@@ -770,12 +776,12 @@ async function loadSubtitles(videoID = detail.value?.id, expectedToken = detailR
   subtitleLoading.value = true
   try {
     const data = await getAdminVideoSubtitles(videoID)
-    if (!detailVisible.value || detailRequestToken.value !== expectedToken || detail.value?.id !== videoID) {
+    if (!detailVisible.value || isStaleDetailRequest(detailRequestToken.value, expectedToken) || detail.value?.id !== videoID) {
       return
     }
     subtitleItems.value = data.items || []
   } finally {
-    if (detailRequestToken.value === expectedToken) {
+    if (!isStaleDetailRequest(detailRequestToken.value, expectedToken)) {
       subtitleLoading.value = false
     }
   }
