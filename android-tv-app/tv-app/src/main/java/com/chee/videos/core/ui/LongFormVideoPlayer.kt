@@ -311,6 +311,8 @@ fun LongFormVideoPlayer(
                     showControls = false,
                 )
                 controlsVisible = true
+                focusInControls = false
+                requestRootFocusWhenReady()
                 scheduleAutoHideControls()
                 true
             }
@@ -537,8 +539,8 @@ fun LongFormVideoPlayer(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .focusable()
             .focusRequester(rootFocusRequester)
+            .focusable()
             .onPreviewKeyEvent { event ->
                 if (!tvMode || event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
                     return@onPreviewKeyEvent false

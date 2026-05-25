@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-25 16:10 +0800
+- 进度：修复 `tasks/2026-05-24-tv-long-form-operation-ui-on-remote` 真机回归发现的两个故障：5 秒 UI 自动隐藏后遥控器失效 30 秒；一次 ←/→ 唤起 UI 后无法继续 seek。根因为 `LongFormVideoPlayer` 根 Box 的 `Modifier.focusRequester(rootFocusRequester)` 错排在 `Modifier.focusable()` 之后，导致 `tryRequestFocus()` 静默失败、焦点无人锚定，按钮 Compose 兜底获焦后 `focusInControls` 被卡 true 走焦点环绕。修复：交换两个 modifier 顺序回到项目惯例（与 `TvIptvScreen` / `TvPosterWallScreen` 一致），并在 `handleTvRemoteKeyAction` 的 Seek 分支追加 `focusInControls = false` + `requestRootFocusWhenReady()` 作为按钮入场抢焦的防御兜底。补两条源文审计红灯（modifier 顺序、Seek 分支兜底），TV 版本号升到 `0.1.67`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvLongFormTitleOverlaySpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`、`tasks/2026-05-24-tv-long-form-operation-ui-on-remote/feedback.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.ui.TvLongFormTitleOverlaySpecTest'` 先红（modifier 顺序 + Seek 兜底断言失败）后绿；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 全量通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；真机/模拟器手测待后续在有设备环境下回归。
+
 ## 2026-05-25 13:46 +0800
 - 进度：完成管理端视频管理列表详情按钮无反应修复。根因是 `showDetail()` 创建 `detailRequestToken` 后又调用会递增 token 的清理函数，导致详情接口返回后被判定为过期并丢弃；`refreshPlayURL()` 也会在当前详情上下文内失效 token。修复为新增 token helper，清理函数支持 `invalidateToken` 参数，打开详情和刷新播放链接时清理旧预览/URL 但不取消当前请求；字幕加载也改用统一 stale 判断。
 - 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`plan.md`

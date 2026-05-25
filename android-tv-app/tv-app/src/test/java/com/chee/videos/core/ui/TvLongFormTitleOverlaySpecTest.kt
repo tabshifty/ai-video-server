@@ -68,6 +68,43 @@ class TvLongFormTitleOverlaySpecTest {
         assertTrue(call.contains("episodeTitle = currentEpisode?.title"))
     }
 
+    @Test
+    fun rootBoxBindsFocusRequesterBeforeFocusable() {
+        val source = readSource("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
+        val rootBoxModifierChain = source
+            .substringAfter("Box(\n        modifier = modifier")
+            .substringBefore(".onPreviewKeyEvent")
+
+        val focusRequesterIdx = rootBoxModifierChain.indexOf(".focusRequester(rootFocusRequester)")
+        val focusableIdx = rootBoxModifierChain.indexOf(".focusable()")
+
+        assertTrue(
+            "根 Box 必须挂 Modifier.focusRequester(rootFocusRequester)",
+            focusRequesterIdx >= 0,
+        )
+        assertTrue(
+            "根 Box 必须挂 Modifier.focusable()",
+            focusableIdx >= 0,
+        )
+        assertTrue(
+            "Modifier.focusRequester(rootFocusRequester) 必须排在 Modifier.focusable() 之前；反向顺序会让 tryRequestFocus() 无法绑定到根 focusable 节点，导致 5 秒自动隐藏后焦点丢失、遥控器失效",
+            focusRequesterIdx < focusableIdx,
+        )
+    }
+
+    @Test
+    fun seekBranchReanchorsFocusToRootAfterShowingControls() {
+        val source = readSource("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
+        val seekBranch = source
+            .substringAfter("is TvRemoteKeyAction.Seek ->")
+            .substringBefore("TvRemoteKeyAction.EnterFocus ->")
+
+        assertTrue(
+            "Seek 分支必须显式 requestRootFocusWhenReady()，防御按钮入场抢焦",
+            seekBranch.contains("requestRootFocusWhenReady()"),
+        )
+    }
+
     private fun readSource(relative: String): String {
         val path = Path.of(relative)
         assertTrue("$relative 必须存在", path.exists())
