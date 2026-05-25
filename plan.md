@@ -1461,3 +1461,8 @@
 - 进度：用户确认 `tasks/2026-05-25-tv-long-form-libvlc-migration` 实测通过，按仓库规则补充 `DONE.md` 完成标记。完成标记记录相关提交、自动化验证、模拟器 instrumentation、review.md §1 手测确认与交付范围。
 - 影响文件：`tasks/2026-05-25-tv-long-form-libvlc-migration/DONE.md`、`plan.md`
 - 验证：待执行 `git diff --check`、`rg -n $'\uFFFD' tasks/2026-05-25-tv-long-form-libvlc-migration/DONE.md plan.md` 与工作区范围检查后提交。
+
+## 2026-05-25 20:30 +0800
+- 进度：grill-with-docs 收尾后产出 `tasks/2026-05-25-tv-long-form-focus-guarding/` 与 `tasks/2026-05-25-tv-long-form-track-preference-recovery/` 两个独立任务的 prd.md / implement.md / review.md 三件套，分别覆盖：①续播卡 dispose 触发的 [[TV 长视频焦点真空]] 与 controls auto-hide / picker dismiss / back confirm / playerError 等同源场景的修复方向 A'（续播卡内嵌 + overlay 跃迁观察 + root 自我兜底）；②音轨/字幕偏好不记的 F1/F2/F3（VLC `Playing` gate + type-only preference fallback + audio LaunchedEffect 状态回灌）。
+- 影响文件：`tasks/2026-05-25-tv-long-form-focus-guarding/prd.md|implement.md|review.md`、`tasks/2026-05-25-tv-long-form-track-preference-recovery/prd.md|implement.md|review.md`、`plan.md`
+- 验证：grill 阶段无 Gradle/测试任务，纯文档；待真正实施时按各自 review.md §0 准入条件执行。
