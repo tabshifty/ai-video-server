@@ -491,7 +491,12 @@ fun LongFormVideoPlayer(
                 "tracks=${audioTracks.joinToString { "${it.id}:${it.label}/${it.detail}:selected=${it.selected}" }}",
         )
         val selected = audioTracks.firstOrNull { it.id == resolvedSelection }
-        player.audioTrack = selected?.vlcTrackId ?: -1
+        if (selected != null) {
+            // 只在我们解析出明确的目标轨时才覆盖 LibVLC 的当前选择。
+            // LibVLC 3.x 把 audioTrack = -1 解释为"禁用音频"，不是"自动"，
+            // 所以首次进入（无 preference + 无 selection）必须保留 LibVLC 自己挑的默认轨。
+            player.audioTrack = selected.vlcTrackId
+        }
         val selectedAfterApply = buildLongFormAudioTracksFromVlc(player.audioTracks, player.audioTrack)
             .filter { it.selected }
             .joinToString { it.id }
@@ -592,6 +597,12 @@ fun LongFormVideoPlayer(
             }
             .onPreviewKeyEvent { event ->
                 if (!tvMode || event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
+                    return@onPreviewKeyEvent false
+                }
+                // 任何 overlay（续播卡 / 字幕音轨 picker / 返回二次确认 / 错误浮层）可见时，
+                // player 路由不消费按键，让 key event 流向 overlay 自身的 clickable / focusable
+                // 处理——否则续播卡的"继续观看"按钮按 CENTER 会被 player 拦下来切播放暂停。
+                if (currentFocusGuardInput.anyOverlayVisible()) {
                     return@onPreviewKeyEvent false
                 }
                 val action = resolveTvRemoteKeyAction(

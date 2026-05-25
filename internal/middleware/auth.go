@@ -19,13 +19,23 @@ const (
 )
 
 // AuthMiddleware validates access token and stores identity in request context.
+//
+// Token sources in priority order:
+//  1. `Authorization: Bearer <token>` header (standard).
+//  2. `?access_token=<token>` query (fallback for clients that cannot set
+//     custom headers — currently TV LibVLC video stream URLs, whose HTTP
+//     module bypasses OkHttp interceptor).
 func AuthMiddleware(secret string, redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := bearerToken(c.GetHeader("Authorization"))
 		if err != nil {
-			response.Error(c, 401, "missing or invalid authorization header")
-			c.Abort()
-			return
+			queryToken := strings.TrimSpace(c.Query("access_token"))
+			if queryToken == "" {
+				response.Error(c, 401, "missing or invalid authorization header")
+				c.Abort()
+				return
+			}
+			token = queryToken
 		}
 
 		claims, err := utils.ParseAndValidateToken(secret, token, utils.TokenTypeAccess)

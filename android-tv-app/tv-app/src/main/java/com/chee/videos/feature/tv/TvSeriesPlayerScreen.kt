@@ -53,6 +53,7 @@ import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.appendAccessTokenQuery
 import com.chee.videos.core.ui.applyLongFormMediaSource
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolvePlaybackAssetUrl
@@ -306,6 +307,7 @@ fun TvSeriesPlayerScreen(
                 libVLC = libVLC,
                 mediaPlayer = mediaPlayer,
                 sourceUrl = uiState.currentSourceUrl,
+                accessToken = accessToken,
             )
             mediaPlayer.play()
             if (initialResumePositionMs > 0L) {
@@ -326,13 +328,14 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    LaunchedEffect(isVlcPlaying, selectedSubtitleTrackId, currentEpisode?.subtitleTracks, uiState.baseUrl) {
+    LaunchedEffect(isVlcPlaying, selectedSubtitleTrackId, currentEpisode?.subtitleTracks, uiState.baseUrl, accessToken) {
         if (!isVlcPlaying) return@LaunchedEffect
         val effectiveSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId)
         val track = resolveSelectedSubtitleTrack(currentEpisode?.subtitleTracks.orEmpty(), effectiveSubtitleTrackId)
         val subtitleUrl = track
             ?.takeIf { it.available && it.url.isNotBlank() }
             ?.let { resolvePlaybackAssetUrl(uiState.baseUrl, it.url) }
+            ?.let { appendAccessTokenQuery(it, accessToken) }
         if (subtitleUrl.isNullOrBlank()) {
             appliedSubtitleSlaveUrl = null
             return@LaunchedEffect
@@ -340,7 +343,9 @@ fun TvSeriesPlayerScreen(
         if (subtitleUrl == appliedSubtitleSlaveUrl) {
             return@LaunchedEffect
         }
-        mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, subtitleUrl, true)
+        // 走 Uri 重载：LibVLC 的 String 重载会把 "http://..." 当文件路径，规范化成 "/http:/..." 然后报
+        // "No such file or directory"。Uri 重载经 VLCUtil.locationFromUri 转成正确的 MRL。
+        mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, android.net.Uri.parse(subtitleUrl), true)
         appliedSubtitleSlaveUrl = subtitleUrl
     }
 

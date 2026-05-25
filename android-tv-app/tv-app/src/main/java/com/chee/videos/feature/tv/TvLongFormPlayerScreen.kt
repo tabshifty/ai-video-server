@@ -41,7 +41,9 @@ import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.appendAccessTokenQuery
 import com.chee.videos.core.ui.applyLongFormMediaSource
+import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
 import com.chee.videos.core.ui.buildSubtitleTrackPreference
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolvePlaybackAssetUrl
@@ -200,7 +202,7 @@ fun TvLongFormPlayerScreen(
             currentSelection = selectedSubtitleTrackId,
             tracks = detail.subtitleTracks,
             hasStartedPlayback = hasStartedPlayback,
-        )
+        ) ?: resolveInitialSubtitleTrackId(detail.subtitleTracks)
     }
 
     LaunchedEffect(playUrl, playbackSession.hasStartedPlayback) {
@@ -224,6 +226,7 @@ fun TvLongFormPlayerScreen(
                 libVLC = libVLC,
                 mediaPlayer = mediaPlayer,
                 sourceUrl = playUrl,
+                accessToken = uiState.accessToken,
             )
             mediaPlayer.play()
             if (initialResumePositionMs > 0L) {
@@ -245,12 +248,13 @@ fun TvLongFormPlayerScreen(
         }
     }
 
-    LaunchedEffect(isVlcPlaying, selectedSubtitleTrackId, detail.subtitleTracks, uiState.baseUrl) {
+    LaunchedEffect(isVlcPlaying, selectedSubtitleTrackId, detail.subtitleTracks, uiState.baseUrl, uiState.accessToken) {
         if (!isVlcPlaying) return@LaunchedEffect
         val track = resolveSelectedSubtitleTrack(detail.subtitleTracks, selectedSubtitleTrackId)
         val subtitleUrl = track
             ?.takeIf { it.available && it.url.isNotBlank() }
             ?.let { resolvePlaybackAssetUrl(uiState.baseUrl, it.url) }
+            ?.let { appendAccessTokenQuery(it, uiState.accessToken) }
         if (subtitleUrl.isNullOrBlank()) {
             appliedSubtitleSlaveUrl = null
             return@LaunchedEffect
@@ -258,7 +262,9 @@ fun TvLongFormPlayerScreen(
         if (subtitleUrl == appliedSubtitleSlaveUrl) {
             return@LaunchedEffect
         }
-        mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, subtitleUrl, true)
+        // 走 Uri 重载：LibVLC 的 String 重载会把 "http://..." 当文件路径，规范化成 "/http:/..." 然后报
+        // "No such file or directory"。Uri 重载经 VLCUtil.locationFromUri 转成正确的 MRL。
+        mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, android.net.Uri.parse(subtitleUrl), true)
         appliedSubtitleSlaveUrl = subtitleUrl
     }
 

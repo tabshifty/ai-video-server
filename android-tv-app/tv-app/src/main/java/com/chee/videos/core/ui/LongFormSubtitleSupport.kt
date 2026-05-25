@@ -89,18 +89,37 @@ fun subtitleTrackDisplayLabel(track: SubtitleTrackDto): String {
  * 仅 setMedia，不在 setMedia 时绑定字幕。字幕通过 [[VLC Playing gate]] 之后由
  * `mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, url, true)` 注入，避免 LibVLC 在播放器
  * 未真正进入 Playing 状态时丢弃 setAudioTrack / addSlave 调用。
+ *
+ * LibVLC 的 HTTP 模块不经过 OkHttp interceptor，因此 Authorization Bearer header 不会被自动注入。
+ * 当 [accessToken] 非空时，把它以 `?access_token=` query 形式附加到 [sourceUrl] 上，服务端
+ * AuthMiddleware 在 Authorization header 缺失时会从 query 读取 token。
  */
 fun applyLongFormMediaSource(
     libVLC: LibVLC,
     mediaPlayer: MediaPlayer,
     sourceUrl: String,
+    accessToken: String? = null,
 ) {
+    val authenticatedSourceUrl = appendAccessTokenQuery(sourceUrl, accessToken)
     val media = buildLongFormMedia(
         libVLC = libVLC,
-        spec = TvLongFormVlcMediaSpec(sourceUrl = sourceUrl),
+        spec = TvLongFormVlcMediaSpec(sourceUrl = authenticatedSourceUrl),
     )
     mediaPlayer.media = media
     media.release()
+}
+
+/**
+ * 给 LibVLC 的播放 URL 附加 `access_token` query 参数。
+ * 已经包含 `access_token=` 时不重复加。token 空白时直接返回原 URL。
+ */
+internal fun appendAccessTokenQuery(url: String, accessToken: String?): String {
+    val token = accessToken?.trim().orEmpty()
+    if (token.isEmpty()) return url
+    if (url.contains("access_token=")) return url
+    val encoded = java.net.URLEncoder.encode(token, "UTF-8")
+    val separator = if (url.contains("?")) "&" else "?"
+    return "$url$separator" + "access_token=$encoded"
 }
 
 fun resolveSelectedSubtitleTrackByLanguage(
