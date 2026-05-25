@@ -93,7 +93,7 @@ fun LongFormVideoPlayer(
     onSelectSubtitleTrack: (String?) -> Unit = {},
     selectedAudioTrackId: String? = null,
     selectedAudioPreference: TvTrackPreference? = null,
-    onSelectAudioTrack: (trackId: String?, preference: TvTrackPreference?, isUserAction: Boolean) -> Unit = { _, _, _ -> },
+    onSelectAudioTrack: (String?, TvTrackPreference?) -> Unit = { _, _ -> },
     tvMode: Boolean = false,
     tvSeekStepSeconds: Int = 10,
     seriesTitleForOverlay: String? = null,
@@ -126,7 +126,6 @@ fun LongFormVideoPlayer(
 
     var controlsVisible by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
-    var isVlcPlaying by remember { mutableStateOf(player.isPlaying) }
     var durationMs by remember { mutableStateOf(player.length.coerceAtLeast(0L)) }
     var positionMs by remember { mutableStateOf(player.time.coerceAtLeast(0L)) }
     var isScrubbing by remember { mutableStateOf(false) }
@@ -360,17 +359,11 @@ fun LongFormVideoPlayer(
             override fun onEvent(event: MediaPlayer.Event) {
                 latestOnVlcEvent(event)
                 when (event.type) {
-                    MediaPlayer.Event.Playing -> {
-                        isPlaying = true
-                        isVlcPlaying = true
-                    }
-                    MediaPlayer.Event.Paused -> isPlaying = false
+                    MediaPlayer.Event.Playing -> isPlaying = true
+                    MediaPlayer.Event.Paused,
                     MediaPlayer.Event.Stopped,
-                    MediaPlayer.Event.EndReached,
-                    MediaPlayer.Event.EncounteredError -> {
-                        isPlaying = false
-                        isVlcPlaying = false
-                    }
+                    MediaPlayer.Event.EndReached
+                    -> isPlaying = false
                     MediaPlayer.Event.TimeChanged -> if (!isScrubbing && !draggingSeek) {
                         positionMs = player.time.coerceAtLeast(0L)
                     }
@@ -470,8 +463,8 @@ fun LongFormVideoPlayer(
         }
     }
 
-    LaunchedEffect(player, audioTracks, selectedAudioTrackId, selectedAudioPreference, isVlcPlaying) {
-        if (!isVlcPlaying || audioTracks.isEmpty()) {
+    LaunchedEffect(player, audioTracks, selectedAudioTrackId, selectedAudioPreference) {
+        if (audioTracks.isEmpty()) {
             return@LaunchedEffect
         }
         val resolvedSelection = resolveAudioSelectionOnTrackLoad(
@@ -480,9 +473,7 @@ fun LongFormVideoPlayer(
             tracks = audioTracks,
         )
         if (selectedAudioTrackId?.isNotBlank() == true && resolvedSelection == null) {
-            // 已有选择已经失效（track id 在新 media 不存在且 preference 也匹配不到）→ 清掉本地状态，
-            // isUserAction=false 让父级不要写 DataStore（这不是用户的主动操作）。
-            onSelectAudioTrack(null, null, false)
+            onSelectAudioTrack(null, null)
         }
         Log.d(
             LongFormVideoPlayerLogTag,
@@ -499,15 +490,6 @@ fun LongFormVideoPlayer(
             LongFormVideoPlayerLogTag,
             "audioSelectionApplied override=$resolvedSelection selectedAfterApply=$selectedAfterApply",
         )
-
-        // F3：resolvedSelection 是父级当前未感知到的新选择（由 preference 推导而来），
-        // 通过 isUserAction=false 回灌给父级，picker 的 selectedAudioTrackId 不再撒谎。
-        if (resolvedSelection != null &&
-            resolvedSelection != selectedAudioTrackId?.takeIf { it.isNotBlank() }
-        ) {
-            val preferenceForResolved = selected?.let(::buildAudioTrackPreference)
-            onSelectAudioTrack(resolvedSelection, preferenceForResolved, false)
-        }
     }
 
     val actualDurationMs = effectiveDurationMs()
@@ -1042,8 +1024,7 @@ fun LongFormVideoPlayer(
                 selectedAudioTrackId = selectedAudioTrackId,
                 onSelectAudioTrack = { trackId ->
                     val preference = buildAudioTrackPreference(audioTracks.firstOrNull { it.id == trackId })
-                    // 用户主动从 picker 选轨：isUserAction=true，父级 save DataStore
-                    onSelectAudioTrack(trackId, preference, true)
+                    onSelectAudioTrack(trackId, preference)
                 },
                 onDismissRequest = { audioTrackSheetVisible = false },
             )

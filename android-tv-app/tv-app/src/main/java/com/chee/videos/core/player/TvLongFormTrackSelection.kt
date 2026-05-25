@@ -34,19 +34,10 @@ internal fun resolveLongFormTrackByLanguage(
     preference: TvLongFormLanguagePreference,
 ): TvLongFormVlcTrack? {
     val language = normalizeLongFormLanguageCode(preference.language)
-    val type = preference.type?.trim()?.lowercase(Locale.ROOT).orEmpty()
-
     if (language.isBlank()) {
-        // type-only fallback：language 缺失但 type 不空时按 type 在全表里找第一条同 type 的 track。
-        // 修复 [[Type-only preference fallback]]：之前直接 return null 会让"isDefault 但无 language"
-        // 的偏好永远 resolve 不回任何 track。
-        if (type.isBlank()) {
-            return null
-        }
-        tracks.firstOrNull { it.type?.trim()?.lowercase(Locale.ROOT) == type }?.let { return it }
-        return tracks.firstOrNull { it.name.lowercase(Locale.ROOT).contains(type) }
+        return null
     }
-
+    val type = preference.type?.trim()?.lowercase(Locale.ROOT).orEmpty()
     val languageMatches = tracks.filter { track ->
         val trackLanguage = normalizeLongFormLanguageCode(track.language)
         trackLanguage == language ||

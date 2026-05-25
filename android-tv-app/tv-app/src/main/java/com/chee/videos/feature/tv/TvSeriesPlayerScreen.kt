@@ -55,13 +55,11 @@ import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.applyLongFormMediaSource
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
-import com.chee.videos.core.ui.resolvePlaybackAssetUrl
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.MediaPlayer
-import org.videolan.libvlc.interfaces.IMedia
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,8 +152,7 @@ fun TvSeriesPlayerScreen(
     var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var preparedUrl by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
-    var appliedSubtitleSlaveUrl by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
-    var isVlcPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
+    var preparedSubtitleTrackId by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var selectedSubtitleTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var selectedAudioTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
@@ -275,10 +272,13 @@ fun TvSeriesPlayerScreen(
         resumePromptDismissed = false
     }
 
-    LaunchedEffect(uiState.currentSourceUrl, canPlay) {
+    LaunchedEffect(uiState.currentSourceUrl, canPlay, selectedSubtitleTrackId, currentEpisode?.subtitleTracks) {
+        val effectiveSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId)
         val updateDecision = resolveLongFormPlayerUpdate(
             preparedUrl = preparedUrl,
             nextUrl = uiState.currentSourceUrl,
+            preparedSubtitleTrackId = preparedSubtitleTrackId,
+            nextSubtitleTrackId = effectiveSubtitleTrackId,
         )
         if (!canPlay) {
                 mediaPlayer.pause()
@@ -286,13 +286,13 @@ fun TvSeriesPlayerScreen(
                     mediaPlayer.stop()
                 }
             preparedUrl = null
-            appliedSubtitleSlaveUrl = null
-            isVlcPlaying = false
+            preparedSubtitleTrackId = null
             return@LaunchedEffect
         }
         if (updateDecision.shouldReplaceSource) {
             playerErrorMessage = null
             val initialResumePositionMs = if (
+                !updateDecision.preservePosition &&
                 !uiState.startCurrentEpisodeFromBeginning &&
                 resumedFromHistoryVideoId != uiState.currentVideoId
             ) {
@@ -300,19 +300,24 @@ fun TvSeriesPlayerScreen(
             } else {
                 0L
             }
-            appliedSubtitleSlaveUrl = null
-            isVlcPlaying = false
+            val restorePositionMs = if (updateDecision.preservePosition) {
+                mediaPlayer.time.coerceAtLeast(0L)
+            } else {
+                initialResumePositionMs
+            }
             applyLongFormMediaSource(
                 libVLC = libVLC,
                 mediaPlayer = mediaPlayer,
                 sourceUrl = uiState.currentSourceUrl,
+                baseUrl = uiState.baseUrl,
+                selectedSubtitleTrack = resolveSelectedSubtitleTrack(currentEpisode?.subtitleTracks.orEmpty(), effectiveSubtitleTrackId),
             )
             mediaPlayer.play()
-            if (initialResumePositionMs > 0L) {
+            if (restorePositionMs > 0L) {
                 delay(250L)
-                mediaPlayer.time = initialResumePositionMs
+                mediaPlayer.time = restorePositionMs
             }
-            if (uiState.currentVideoId.isNotBlank()) {
+            if (!updateDecision.preservePosition && uiState.currentVideoId.isNotBlank()) {
                 resumedFromHistoryVideoId = uiState.currentVideoId
                 if (shouldTriggerResumePrompt(initialResumePositionMs)) {
                     resumePromptLastPositionMs = initialResumePositionMs
@@ -321,27 +326,10 @@ fun TvSeriesPlayerScreen(
                 }
             }
             preparedUrl = uiState.currentSourceUrl
+            preparedSubtitleTrackId = effectiveSubtitleTrackId
             hasStartedPlayback = true
             isPausedByUser = false
         }
-    }
-
-    LaunchedEffect(isVlcPlaying, selectedSubtitleTrackId, currentEpisode?.subtitleTracks, uiState.baseUrl) {
-        if (!isVlcPlaying) return@LaunchedEffect
-        val effectiveSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId)
-        val track = resolveSelectedSubtitleTrack(currentEpisode?.subtitleTracks.orEmpty(), effectiveSubtitleTrackId)
-        val subtitleUrl = track
-            ?.takeIf { it.available && it.url.isNotBlank() }
-            ?.let { resolvePlaybackAssetUrl(uiState.baseUrl, it.url) }
-        if (subtitleUrl.isNullOrBlank()) {
-            appliedSubtitleSlaveUrl = null
-            return@LaunchedEffect
-        }
-        if (subtitleUrl == appliedSubtitleSlaveUrl) {
-            return@LaunchedEffect
-        }
-        mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, subtitleUrl, true)
-        appliedSubtitleSlaveUrl = subtitleUrl
     }
 
     LaunchedEffect(uiState.currentVideoId, uiState.selectedSubtitleTrackId, currentEpisode?.subtitleTracks, hasStartedPlayback) {
@@ -522,11 +510,9 @@ fun TvSeriesPlayerScreen(
                     },
                     selectedAudioTrackId = selectedAudioTrackId,
                     selectedAudioPreference = uiState.selectedAudioPreference,
-                    onSelectAudioTrack = { trackId, preference, isUserAction ->
+                    onSelectAudioTrack = { trackId, preference ->
                         selectedAudioTrackId = trackId ?: ""
-                        if (isUserAction) {
-                            viewModel.selectAudioTrack(trackId, preference)
-                        }
+                        viewModel.selectAudioTrack(trackId, preference)
                     },
                     showStatusBarPadding = false,
                     tvMode = true,
@@ -545,24 +531,17 @@ fun TvSeriesPlayerScreen(
                             MediaPlayer.Event.Playing -> {
                                 isPlayerActuallyPlaying = true
                                 playerErrorMessage = null
-                                isVlcPlaying = true
                             }
-                            MediaPlayer.Event.Paused -> {
-                                isPlayerActuallyPlaying = false
-                            }
-                            MediaPlayer.Event.Stopped -> {
-                                isPlayerActuallyPlaying = false
-                                isVlcPlaying = false
-                            }
+                            MediaPlayer.Event.Paused,
+                            MediaPlayer.Event.Stopped
+                            -> isPlayerActuallyPlaying = false
                             MediaPlayer.Event.EndReached -> {
                                 isPlayerActuallyPlaying = false
-                                isVlcPlaying = false
                                 handlePlaybackEnded()
                             }
                             MediaPlayer.Event.EncounteredError -> {
                                 playerErrorMessage = friendlyLongFormPlaybackErrorMessage(null)
                                 isPlayerActuallyPlaying = false
-                                isVlcPlaying = false
                             }
                         }
                     },

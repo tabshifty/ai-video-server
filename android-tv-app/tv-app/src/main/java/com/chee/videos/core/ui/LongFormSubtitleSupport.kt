@@ -37,14 +37,11 @@ fun resolveSubtitleSelectionOnTrackLoad(
     return resolveInitialSubtitleTrackId(tracks)
 }
 
-/**
- * 字幕切换不再触发 setMedia（之前会带 preservePosition reload）。subtitle 改走
- * `mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, ...)` 路径，由 [[VLC Playing gate]] 控制时机。
- * 本函数仅负责 source URL 的 setMedia 决策。
- */
 internal fun resolveLongFormPlayerUpdate(
     preparedUrl: String?,
     nextUrl: String?,
+    preparedSubtitleTrackId: String?,
+    nextSubtitleTrackId: String?,
 ): LongFormPlayerUpdateDecision {
     val normalizedPreparedUrl = preparedUrl?.trim().orEmpty()
     val normalizedNextUrl = nextUrl?.trim().orEmpty()
@@ -55,11 +52,25 @@ internal fun resolveLongFormPlayerUpdate(
             preservePosition = false,
         )
     }
-    if (normalizedPreparedUrl.isBlank() || normalizedPreparedUrl != normalizedNextUrl) {
+    if (normalizedPreparedUrl.isBlank()) {
         return LongFormPlayerUpdateDecision(
             shouldClear = false,
             shouldReplaceSource = true,
             preservePosition = false,
+        )
+    }
+    if (normalizedPreparedUrl != normalizedNextUrl) {
+        return LongFormPlayerUpdateDecision(
+            shouldClear = false,
+            shouldReplaceSource = true,
+            preservePosition = false,
+        )
+    }
+    if (preparedSubtitleTrackId != nextSubtitleTrackId) {
+        return LongFormPlayerUpdateDecision(
+            shouldClear = false,
+            shouldReplaceSource = true,
+            preservePosition = true,
         )
     }
     return LongFormPlayerUpdateDecision(
@@ -85,19 +96,22 @@ fun subtitleTrackDisplayLabel(track: SubtitleTrackDto): String {
     return if (track.sourceType == "embedded") "内嵌字幕" else "外挂字幕"
 }
 
-/**
- * 仅 setMedia，不在 setMedia 时绑定字幕。字幕通过 [[VLC Playing gate]] 之后由
- * `mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, url, true)` 注入，避免 LibVLC 在播放器
- * 未真正进入 Playing 状态时丢弃 setAudioTrack / addSlave 调用。
- */
 fun applyLongFormMediaSource(
     libVLC: LibVLC,
     mediaPlayer: MediaPlayer,
     sourceUrl: String,
+    baseUrl: String,
+    selectedSubtitleTrack: SubtitleTrackDto?,
 ) {
+    val subtitleUrl = selectedSubtitleTrack
+        ?.takeIf { it.available && it.url.isNotBlank() }
+        ?.let { resolvePlaybackAssetUrl(baseUrl, it.url) }
     val media = buildLongFormMedia(
         libVLC = libVLC,
-        spec = TvLongFormVlcMediaSpec(sourceUrl = sourceUrl),
+        spec = TvLongFormVlcMediaSpec(
+            sourceUrl = sourceUrl,
+            subtitleUrl = subtitleUrl,
+        ),
     )
     mediaPlayer.media = media
     media.release()
@@ -119,17 +133,10 @@ fun resolveSelectedSubtitleTrackByPreference(
 ): SubtitleTrackDto? {
     val safePreference = preference ?: return null
     val normalizedPreference = normalizeLongFormLanguageCode(safePreference.language)
-    val typePreference = safePreference.type.trim().lowercase()
-
     if (normalizedPreference.isBlank()) {
-        // type-only fallback：language 缺失但 type 不空时按 type 直接匹配。
-        // 修复 [[Type-only preference fallback]]：之前直接 return null 会让 isDefault 字幕的偏好永远丢。
-        if (typePreference.isBlank()) {
-            return null
-        }
-        return tracks.firstOrNull { it.available && subtitlePreferenceType(it) == typePreference }
+        return null
     }
-
+    val typePreference = safePreference.type.trim().lowercase()
     val languageMatches = tracks.filter { track ->
         val language = normalizeLongFormLanguageCode(track.languageCode)
         track.available &&
@@ -168,7 +175,7 @@ private fun subtitlePreferenceType(track: SubtitleTrackDto): String {
     }
 }
 
-internal fun resolvePlaybackAssetUrl(baseUrl: String, rawUrl: String): String? {
+private fun resolvePlaybackAssetUrl(baseUrl: String, rawUrl: String): String? {
     val path = rawUrl.trim()
     if (path.isBlank()) {
         return null
