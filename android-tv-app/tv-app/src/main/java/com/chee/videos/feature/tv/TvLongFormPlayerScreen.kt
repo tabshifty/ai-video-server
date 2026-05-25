@@ -44,6 +44,7 @@ import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.applyLongFormMediaSource
 import com.chee.videos.core.ui.buildSubtitleTrackPreference
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
+import com.chee.videos.core.ui.resolvePlaybackAssetUrl
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrackByPreference
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
@@ -51,6 +52,7 @@ import com.chee.videos.feature.detail.DetailViewModel
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.interfaces.IMedia
 
 @Composable
 fun TvLongFormPlayerScreen(
@@ -144,7 +146,8 @@ fun TvLongFormPlayerScreen(
     var hasStartedPlayback by rememberSaveable(detail.id) { mutableStateOf(true) }
     var isPausedByUser by rememberSaveable(detail.id) { mutableStateOf(false) }
     var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
-    var preparedSubtitleTrackId by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+    var appliedSubtitleSlaveUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+    var isVlcPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
     var resumedFromHistoryVideoId by remember(detail.id, uiState.accessToken) { mutableStateOf("") }
     var resumePromptLastPositionMs by remember(detail.id, uiState.accessToken) { mutableStateOf(0L) }
     var resumePromptRemainingMs by remember(detail.id, uiState.accessToken) { mutableStateOf(0L) }
@@ -200,41 +203,34 @@ fun TvLongFormPlayerScreen(
         )
     }
 
-    LaunchedEffect(playUrl, selectedSubtitleTrackId, playbackSession.hasStartedPlayback) {
+    LaunchedEffect(playUrl, playbackSession.hasStartedPlayback) {
         val updateDecision = resolveLongFormPlayerUpdate(
             preparedUrl = preparedUrl,
             nextUrl = playUrl,
-            preparedSubtitleTrackId = preparedSubtitleTrackId,
-            nextSubtitleTrackId = selectedSubtitleTrackId,
         )
         if (!playbackSession.hasStartedPlayback || playUrl.isNullOrBlank()) {
             return@LaunchedEffect
         }
         if (updateDecision.shouldReplaceSource) {
             playerErrorMessage = null
-            val initialResumePositionMs = if (!updateDecision.preservePosition && resumedFromHistoryVideoId != detail.id) {
+            val initialResumePositionMs = if (resumedFromHistoryVideoId != detail.id) {
                 detail.userState.watchSeconds.coerceAtLeast(0).times(1000L)
             } else {
                 0L
             }
-            val restorePositionMs = if (updateDecision.preservePosition) {
-                mediaPlayer.time.coerceAtLeast(0L)
-            } else {
-                initialResumePositionMs
-            }
+            appliedSubtitleSlaveUrl = null
+            isVlcPlaying = false
             applyLongFormMediaSource(
                 libVLC = libVLC,
                 mediaPlayer = mediaPlayer,
                 sourceUrl = playUrl,
-                baseUrl = uiState.baseUrl,
-                selectedSubtitleTrack = resolveSelectedSubtitleTrack(detail.subtitleTracks, selectedSubtitleTrackId),
             )
             mediaPlayer.play()
-            if (restorePositionMs > 0L) {
+            if (initialResumePositionMs > 0L) {
                 delay(250L)
-                mediaPlayer.time = restorePositionMs
+                mediaPlayer.time = initialResumePositionMs
             }
-            if (!updateDecision.preservePosition && detail.id.isNotBlank()) {
+            if (detail.id.isNotBlank()) {
                 resumedFromHistoryVideoId = detail.id
                 if (shouldTriggerResumePrompt(initialResumePositionMs)) {
                     resumePromptLastPositionMs = initialResumePositionMs
@@ -243,11 +239,27 @@ fun TvLongFormPlayerScreen(
                 }
             }
             preparedUrl = playUrl
-            preparedSubtitleTrackId = selectedSubtitleTrackId
         }
         if (!playbackSession.isPausedByUser) {
             mediaPlayer.play()
         }
+    }
+
+    LaunchedEffect(isVlcPlaying, selectedSubtitleTrackId, detail.subtitleTracks, uiState.baseUrl) {
+        if (!isVlcPlaying) return@LaunchedEffect
+        val track = resolveSelectedSubtitleTrack(detail.subtitleTracks, selectedSubtitleTrackId)
+        val subtitleUrl = track
+            ?.takeIf { it.available && it.url.isNotBlank() }
+            ?.let { resolvePlaybackAssetUrl(uiState.baseUrl, it.url) }
+        if (subtitleUrl.isNullOrBlank()) {
+            appliedSubtitleSlaveUrl = null
+            return@LaunchedEffect
+        }
+        if (subtitleUrl == appliedSubtitleSlaveUrl) {
+            return@LaunchedEffect
+        }
+        mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, subtitleUrl, true)
+        appliedSubtitleSlaveUrl = subtitleUrl
     }
 
     LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, playUrl) {
@@ -383,10 +395,12 @@ fun TvLongFormPlayerScreen(
                 },
                 selectedAudioTrackId = selectedAudioTrackId,
                 selectedAudioPreference = storedAudioPreference,
-                onSelectAudioTrack = { trackId, preference ->
+                onSelectAudioTrack = { trackId, preference, isUserAction ->
                     selectedAudioTrackId = trackId ?: ""
                     storedAudioPreference = preference
-                    viewModel.saveTvAudioPreference(detail.id, preference)
+                    if (isUserAction) {
+                        viewModel.saveTvAudioPreference(detail.id, preference)
+                    }
                 },
                 tvMode = true,
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
@@ -398,14 +412,20 @@ fun TvLongFormPlayerScreen(
                         MediaPlayer.Event.Playing -> {
                             isPlayerActuallyPlaying = true
                             playerErrorMessage = null
+                            isVlcPlaying = true
                         }
-                        MediaPlayer.Event.Paused,
+                        MediaPlayer.Event.Paused -> {
+                            isPlayerActuallyPlaying = false
+                        }
                         MediaPlayer.Event.Stopped,
-                        MediaPlayer.Event.EndReached
-                        -> isPlayerActuallyPlaying = false
+                        MediaPlayer.Event.EndReached -> {
+                            isPlayerActuallyPlaying = false
+                            isVlcPlaying = false
+                        }
                         MediaPlayer.Event.EncounteredError -> {
                             playerErrorMessage = friendlyLongFormPlaybackErrorMessage(null)
                             isPlayerActuallyPlaying = false
+                            isVlcPlaying = false
                         }
                     }
                 },
