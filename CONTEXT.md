@@ -78,9 +78,6 @@
 - `TV 长视频 TextureView 硬解默认`：TV 长视频 LibVLC 内核的视频输出走 `VLCVideoLayout` + TextureView，解码偏好开启 `Media.setHWDecoderEnabled(true, true)`。这与 IPTV 的“TextureView + 软解优先”不同：长视频源由后端转码链控制 codec 边界，适合默认硬解；IPTV 第三方直播源不套用该策略。
 - `LibVLC track id 不稳定`：LibVLC `MediaPlayer.getAudioTracks()` / `getSpuTracks()` 返回的 track id 在 Media 重新加载后不保证稳定，禁止把它当作长期协议或服务端字段。客户端如需跨集恢复音轨/字幕偏好，应优先保存 language code + 偏好类型并在新 media 加载后按名称/语言匹配；运行时菜单内的临时 id 只用于当前 media。
 - `TV 轨道偏好持久化`：TV 长视频播放页的音轨/字幕偏好在 DataStore 中以 `language + type` 形态保存，而不是保存 LibVLC 当前 media 的临时 track id。`LongFormVideoPlayer` 的运行时选择仍然需要 track id，但 id 只在当前 media 内有效；跨集、重载或切换来源时只读取持久化偏好并重新映射。
-- `TV 长视频焦点真空`：TV 长视频播放器在 [[续播提示卡]] / 字幕 picker / 音轨 picker / 返回二次确认提示等叠加层关闭后留下的 Compose 焦点状态：没有任何 focusable 持焦，导致 `LongFormVideoPlayer` 根 Box 的 `onPreviewKeyEvent` 收不到 DPAD_DOWN / CENTER / DPAD_UP 事件，只有 ←/→ 还能借方向性 focus search 偶尔触发。是 LibVLC 迁移之后由兄弟节点叠加层（续播卡）和 Dialog 类 picker 跨 window 焦点回收缺失放大的副作用。
-- `LongFormVideoPlayer focus 兜底`：`LongFormVideoPlayer` 内部用于消除 [[TV 长视频焦点真空]] 的双层机制：①一个聚合 `LaunchedEffect` 监听 `controlsVisible` / `subtitleSheetVisible` / `audioTrackSheetVisible` / `resumePromptVisible` / `backConfirmPromptVisible` / `playerErrorVisible` 六个可见性，任一 true→false 跃迁且没有其他 overlay 仍在显示时显式 `rootFocusRequester.tryRequestFocus()`；②根 Box 的 `onFocusChanged`，当 root 自身丢焦点又无 overlay / 无 controls 焦点时也调用 `requestRootFocusWhenReady()`。两道关共同覆盖 LaunchedEffect 不感知的 Dialog dismiss 等场景。聚合判定纯函数在 `LongFormPlayerFocusGuard.kt`。
-- `续播提示卡内嵌位置`：续播提示卡（`TvResumePromptCard`）必须作为 `LongFormVideoPlayer` 内部子节点渲染，通过 `resumePromptSlot: @Composable BoxScope.() -> Unit` 槽位接入。卡片 dispose 时 Compose 焦点自然回收到 ancestor（player 根 Box）而不是清空成 null。不允许把 `TvResumePromptCard` 作为 `LongFormVideoPlayer` 的兄弟节点平铺在 `TvLongFormPlayerScreen` / `TvSeriesPlayerScreen` 的外层 Box 里，否则 [[TV 长视频焦点真空]] 会再次出现。
 
 ## TV 首页结构
 - 一级首页使用左侧窄菜单和右侧内容区。
