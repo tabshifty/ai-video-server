@@ -545,6 +545,27 @@ fun TvSeriesPlayerScreen(
                             }
                         }
                     },
+                    resumePromptVisible = shouldShowResumePromptCard,
+                    resumePromptSlot = {
+                        TvResumePromptCard(
+                            lastPositionMs = resumePromptLastPositionMs,
+                            visible = shouldShowResumePromptCard,
+                            remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
+                            onContinue = { resumePromptDismissed = true },
+                            onStartFromBeginning = {
+                                mediaPlayer.time = 0L
+                                resumePromptDismissed = true
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(
+                                    start = TvResumePromptTokens.HorizontalPaddingDp,
+                                    bottom = TvResumePromptTokens.BottomPaddingDp,
+                                ),
+                        )
+                    },
+                    backConfirmPromptVisible = showBackConfirmPrompt,
+                    playerErrorVisible = playerErrorMessage != null,
                 )
                 nextEpisodeRef?.let { next ->
                     TvAutoplayPromptCard(
@@ -561,22 +582,6 @@ fun TvSeriesPlayerScreen(
                             ),
                     )
                 }
-                TvResumePromptCard(
-                    lastPositionMs = resumePromptLastPositionMs,
-                    visible = shouldShowResumePromptCard,
-                    remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
-                    onContinue = { resumePromptDismissed = true },
-                    onStartFromBeginning = {
-                        mediaPlayer.time = 0L
-                        resumePromptDismissed = true
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(
-                            start = TvResumePromptTokens.HorizontalPaddingDp,
-                            bottom = TvResumePromptTokens.BottomPaddingDp,
-                        ),
-                )
                 TvSeriesEndOverlay(
                     kind = uiState.pendingEndOverlayKind,
                     onPlayNext = viewModel::nextEpisode,

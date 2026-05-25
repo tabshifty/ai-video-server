@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -105,6 +106,10 @@ fun LongFormVideoPlayer(
     onExitPlayback: (() -> Unit)? = null,
     onTrackSheetVisibilityChanged: (Boolean) -> Unit = {},
     onVlcEvent: (MediaPlayer.Event) -> Unit = {},
+    resumePromptVisible: Boolean = false,
+    resumePromptSlot: (@Composable BoxScope.() -> Unit)? = null,
+    backConfirmPromptVisible: Boolean = false,
+    playerErrorVisible: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val rootFocusRequester = remember { FocusRequester() }
@@ -420,6 +425,22 @@ fun LongFormVideoPlayer(
         }
     }
 
+    val currentFocusGuardInput = PlayerFocusGuardInput(
+        controlsVisible = controlsVisible,
+        subtitleSheetVisible = subtitleSheetVisible,
+        audioTrackSheetVisible = audioTrackSheetVisible,
+        resumePromptVisible = resumePromptVisible,
+        backConfirmPromptVisible = backConfirmPromptVisible,
+        playerErrorVisible = playerErrorVisible,
+    )
+    var previousFocusGuardInput by remember { mutableStateOf(currentFocusGuardInput) }
+    LaunchedEffect(currentFocusGuardInput) {
+        if (tvMode && shouldReclaimRootFocus(previousFocusGuardInput, currentFocusGuardInput)) {
+            requestRootFocusWhenReady()
+        }
+        previousFocusGuardInput = currentFocusGuardInput
+    }
+
     LaunchedTvInitialFocus(tvMode, pendingRootFocusRequest) {
         if (!tvMode || !pendingRootFocusRequest) {
             return@LaunchedTvInitialFocus
@@ -542,6 +563,15 @@ fun LongFormVideoPlayer(
             .background(Color.Black)
             .focusRequester(rootFocusRequester)
             .focusable()
+            .onFocusChanged { focusState ->
+                if (tvMode &&
+                    !focusState.hasFocus &&
+                    !currentFocusGuardInput.anyOverlayVisible() &&
+                    !focusInControls
+                ) {
+                    requestRootFocusWhenReady()
+                }
+            }
             .onPreviewKeyEvent { event ->
                 if (!tvMode || event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
                     return@onPreviewKeyEvent false
@@ -999,6 +1029,8 @@ fun LongFormVideoPlayer(
                 onDismissRequest = { audioTrackSheetVisible = false },
             )
         }
+
+        resumePromptSlot?.invoke(this)
     }
 }
 

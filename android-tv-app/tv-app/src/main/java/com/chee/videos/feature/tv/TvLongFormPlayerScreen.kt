@@ -409,22 +409,27 @@ fun TvLongFormPlayerScreen(
                         }
                     }
                 },
-            )
-            TvResumePromptCard(
-                lastPositionMs = resumePromptLastPositionMs,
-                visible = shouldShowResumePromptCard,
-                remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
-                onContinue = { resumePromptDismissed = true },
-                onStartFromBeginning = {
-                    mediaPlayer.time = 0L
-                    resumePromptDismissed = true
+                resumePromptVisible = shouldShowResumePromptCard,
+                resumePromptSlot = {
+                    TvResumePromptCard(
+                        lastPositionMs = resumePromptLastPositionMs,
+                        visible = shouldShowResumePromptCard,
+                        remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
+                        onContinue = { resumePromptDismissed = true },
+                        onStartFromBeginning = {
+                            mediaPlayer.time = 0L
+                            resumePromptDismissed = true
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(
+                                start = TvResumePromptTokens.HorizontalPaddingDp,
+                                bottom = TvResumePromptTokens.BottomPaddingDp,
+                            ),
+                    )
                 },
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(
-                        start = TvResumePromptTokens.HorizontalPaddingDp,
-                        bottom = TvResumePromptTokens.BottomPaddingDp,
-                    ),
+                backConfirmPromptVisible = showBackConfirmPrompt,
+                playerErrorVisible = !playerErrorMessage.isNullOrBlank(),
             )
             if (!playerErrorMessage.isNullOrBlank()) {
                 Surface(
