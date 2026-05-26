@@ -28,6 +28,10 @@ __pycache__/
 admin-web/node_modules/
 admin-web/dist/
 
+# 根目录无 package.json，禁止误生成的 lock 文件入库
+/package-lock.json
+/node_modules/
+
 # Android development
 android-app/.gradle/
 android-app/.gradle-local/
