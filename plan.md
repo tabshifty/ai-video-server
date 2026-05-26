@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-26 12:30 +0800
+- 进度：生成 `tasks/2026-05-26-admin-web-dist-path-env/` 三件套（prd / implement / review），承接 [[家用部署机]] ADR-0005 / docs/家用部署机.md 中点名的代码前置条件——`internal/handlers/router.go:221` 的 admin-web dist 路径从硬编码相对路径改为读 `ADMIN_WEB_DIST_PATH` 环境变量，默认值保持现状以不破坏 dev-up.sh 体验。本任务**未实施**，待用户触发"完成 tasks"或等价指令时按 PRD → Implement → Review 三段流推进。
+- 影响文件：`tasks/2026-05-26-admin-web-dist-path-env/{prd,implement,review}.md`、`plan.md`
+- 验证：本轮仅文档沉淀，无代码改动；任务的红灯/绿灯/手测在实施阶段执行。
+
 ## 2026-05-26 12:15 +0800
 - 进度：完成 [[家用部署机]] 的 grill-with-docs 设计沉淀，把"另一台机器写代码 → push → 本机 hook 自动重启服务"这一想法拆成 8 轮独立决策并全部锁定：（Q1）家庭日常在线使用，N≈2–5；（Q2）a-1 自托管 bare repo on LAN，GitHub 降级为 mirror；（Q3a/b/c）launchd 作 supervisor + 硬切重启 + 数据层独立生命周期；（Q4a/b/c/d）部署机本地 build + path 分桶 + fail-open；（Q5a/b/c/d）migrate-apply 抽脚本 + 前向兼容契约 + 手动 rollback + 保留 3 个二进制；（Q6a/b/c）worker 硬切不 drain + 接受 in-flight 上传/转码损失 + 统一日志 `~/Library/Logs/ai-video-server/`；（Q7a/b/c）绝对路径契约 + `/Volumes/large` 外挂盘 + flock 串行 push；（Q8）纯文档 + 两个 helper 脚本 + 两份 ADR。本轮**只产出设计与脚手架**，不实际启用部署机；`internal/handlers/router.go` 对 `ADMIN_WEB_DIST_PATH` 环境变量的支持是后续独立 task，启动前必须完成。
 - 影响文件：`CONTEXT.md`（新增"部署术语"区块共 7 条术语 + "Git 忽略规则约定"无变化）、`docs/adr/0005-home-deployment-architecture.md`、`docs/adr/0006-migration-forward-compatibility.md`、`docs/家用部署机.md`、`scripts/migrate-apply.sh`（dev-up.sh 和部署 hook 共用的迁移执行器，行为与 dev-up.sh apply_migrations 等价）、`scripts/rollback.sh`（手动 rollback 工具）、`plan.md`。
