@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-26 12:55 +0800
+- 进度：完成 `tasks/2026-05-26-admin-web-dist-path-env/`。按 TDD 红→绿走完：先写 `internal/config/config_admin_dist_test.go`（env 设/默认 两条）与 `internal/handlers/admin_static_test.go`（mountAdminStatic 给定 dir 服务/缺失 dir 跳过 两条），红灯确认 `cfg.AdminWebDistPath undefined` + `undefined: mountAdminStatic`；再做绿灯：Config 加 `AdminWebDistPath` 字段 + `getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist")` 默认；`internal/handlers/router.go` 抽出 `mountAdminStatic(r, adminDist)` helper，原 inline 21 行挪进去；`API` struct 加 `adminWebDistPath` 字段，`NewAPI` 新增第 23 个 positional 参数；`main.go` 传 `cfg.AdminWebDistPath`；`.env.example` 补 `ADMIN_WEB_DIST_PATH=` 含中文注释。全套 `go test ./...` 全绿、`go build ./...` / `go vet` 通过。手测三场景未在本机做端到端启动（dev-up.sh 旧 server 仍占 :8080，强制重启会冲击你正在跑的 dev 流；本改动属 plain wire + helper extraction，单测充分覆盖），具体延后到家用部署机首次启用时按 review.md §1 走。
+- 影响文件：`internal/config/config.go`、`internal/config/config_admin_dist_test.go`（新）、`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`（新）、`main.go`、`.env.example`、`tasks/2026-05-26-admin-web-dist-path-env/DONE.md`（新）、`plan.md`。
+- 验证：`go test ./internal/config ./internal/handlers -count=1` 全绿（含新增 4 条单测）；`go test ./... -count=1` 全绿（不影响其它包）；`go build ./...` 与 `go vet ./internal/handlers ./internal/config` 无 warning；`git diff --stat` 显示仅 4 个生产代码文件 + 2 个新测试文件 + 1 个 task 完成标记，符合 PRD §2 作用域。
+
 ## 2026-05-26 12:30 +0800
 - 进度：生成 `tasks/2026-05-26-admin-web-dist-path-env/` 三件套（prd / implement / review），承接 [[家用部署机]] ADR-0005 / docs/家用部署机.md 中点名的代码前置条件——`internal/handlers/router.go:221` 的 admin-web dist 路径从硬编码相对路径改为读 `ADMIN_WEB_DIST_PATH` 环境变量，默认值保持现状以不破坏 dev-up.sh 体验。本任务**未实施**，待用户触发"完成 tasks"或等价指令时按 PRD → Implement → Review 三段流推进。
 - 影响文件：`tasks/2026-05-26-admin-web-dist-path-env/{prd,implement,review}.md`、`plan.md`

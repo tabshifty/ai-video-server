@@ -43,39 +43,41 @@ type API struct {
 	accessTTL      time.Duration
 	refreshTTL     time.Duration
 	maxVideoSize   int64
-	storageRoot    string
-	uploadTempDir  string
-	serverLogPath  string
-	enableSwagger  bool
+	storageRoot      string
+	uploadTempDir    string
+	serverLogPath    string
+	adminWebDistPath string
+	enableSwagger    bool
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath string, enableSwagger bool) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, enqueuer *queue.Enqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool) *API {
 	return &API{
-		repo:           repo,
-		uploadSvc:      uploadSvc,
-		chunkUpload:    chunkUpload,
-		recSvc:         recSvc,
-		scrapeSvc:      scrapeSvc,
-		appSvc:         appSvc,
-		imageSvc:       imageSvc,
-		subtitleSvc:    subtitleSvc,
-		iptvSvc:        services.NewIPTVService(repo, nil),
-		enqueuer:       enqueuer,
-		logger:         logger,
-		redis:          redisClient,
-		redisAddr:      redisAddr,
-		redisPassword:  redisPassword,
-		asynqQueue:     asynqQueue,
-		jwtSecret:      jwtSecret,
-		playSignSecret: playSignSecret,
-		playSignTTL:    10 * time.Minute,
-		accessTTL:      accessTTL,
-		refreshTTL:     refreshTTL,
-		maxVideoSize:   maxVideoSize,
-		storageRoot:    storageRoot,
-		uploadTempDir:  uploadTempDir,
-		serverLogPath:  serverLogPath,
-		enableSwagger:  enableSwagger,
+		repo:             repo,
+		uploadSvc:        uploadSvc,
+		chunkUpload:      chunkUpload,
+		recSvc:           recSvc,
+		scrapeSvc:        scrapeSvc,
+		appSvc:           appSvc,
+		imageSvc:         imageSvc,
+		subtitleSvc:      subtitleSvc,
+		iptvSvc:          services.NewIPTVService(repo, nil),
+		enqueuer:         enqueuer,
+		logger:           logger,
+		redis:            redisClient,
+		redisAddr:        redisAddr,
+		redisPassword:    redisPassword,
+		asynqQueue:       asynqQueue,
+		jwtSecret:        jwtSecret,
+		playSignSecret:   playSignSecret,
+		playSignTTL:      10 * time.Minute,
+		accessTTL:        accessTTL,
+		refreshTTL:       refreshTTL,
+		maxVideoSize:     maxVideoSize,
+		storageRoot:      storageRoot,
+		uploadTempDir:    uploadTempDir,
+		serverLogPath:    serverLogPath,
+		adminWebDistPath: adminWebDistPath,
+		enableSwagger:    enableSwagger,
 	}
 }
 
@@ -218,27 +220,37 @@ func (a *API) Register(r *gin.Engine) {
 	})
 
 	// Serve built admin frontend from Go server at /admin.
-	adminDist := filepath.Join("admin-web", "dist")
-	if st, err := os.Stat(adminDist); err == nil && st.IsDir() {
-		r.Static("/admin/assets", filepath.Join(adminDist, "assets"))
-		serveAdminIndex := func(c *gin.Context) {
-			c.File(filepath.Join(adminDist, "index.html"))
-		}
-		r.GET("/admin", serveAdminIndex)
-		r.GET("/admin/", serveAdminIndex)
-		r.NoRoute(func(c *gin.Context) {
-			reqPath := strings.TrimSpace(c.Request.URL.Path)
-			if strings.HasPrefix(reqPath, "/admin/assets/") {
-				c.String(http.StatusNotFound, "404 page not found")
-				return
-			}
-			if strings.HasPrefix(reqPath, "/admin/") {
-				serveAdminIndex(c)
-				return
-			}
-			c.String(http.StatusNotFound, "404 page not found")
-		})
+	mountAdminStatic(r, a.adminWebDistPath)
+}
+
+// mountAdminStatic mounts /admin and /admin/assets when adminDist points to a real directory.
+// Path is taken as-is (caller decides absolute vs relative) per [[家用部署机绝对路径契约]].
+func mountAdminStatic(r *gin.Engine, adminDist string) {
+	if adminDist == "" {
+		return
 	}
+	st, err := os.Stat(adminDist)
+	if err != nil || !st.IsDir() {
+		return
+	}
+	r.Static("/admin/assets", filepath.Join(adminDist, "assets"))
+	serveAdminIndex := func(c *gin.Context) {
+		c.File(filepath.Join(adminDist, "index.html"))
+	}
+	r.GET("/admin", serveAdminIndex)
+	r.GET("/admin/", serveAdminIndex)
+	r.NoRoute(func(c *gin.Context) {
+		reqPath := strings.TrimSpace(c.Request.URL.Path)
+		if strings.HasPrefix(reqPath, "/admin/assets/") {
+			c.String(http.StatusNotFound, "404 page not found")
+			return
+		}
+		if strings.HasPrefix(reqPath, "/admin/") {
+			serveAdminIndex(c)
+			return
+		}
+		c.String(http.StatusNotFound, "404 page not found")
+	})
 }
 
 func parsePage(raw string, fallback int) int {

@@ -169,6 +169,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 		cfg.StorageRoot,
 		cfg.UploadTempDir,
 		cfg.ServerLogPath,
+		cfg.AdminWebDistPath,
 		cfg.EnableSwagger,
 	)
 	api.Register(r)

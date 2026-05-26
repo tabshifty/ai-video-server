@@ -20,6 +20,7 @@ type Config struct {
 	PlayURLSignSecret          string
 	StorageRoot                string
 	PosterStoragePath          string
+	AdminWebDistPath           string
 	UploadTempDir              string
 	TMDBAPIKey                 string
 	TMDBBaseURL                string
@@ -62,6 +63,7 @@ func Load() (Config, error) {
 		PlayURLSignSecret:          os.Getenv("PLAY_URL_SIGN_SECRET"),
 		StorageRoot:                getEnv("STORAGE_ROOT", "./storage"),
 		PosterStoragePath:          getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
+		AdminWebDistPath:           getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist"),
 		UploadTempDir:              getEnv("UPLOAD_TEMP_DIR", "./tmp/uploads"),
 		TMDBAPIKey:                 os.Getenv("TMDB_API_KEY"),
 		TMDBBaseURL:                getEnv("TMDB_BASE_URL", "https://api.themoviedb.org/3"),
