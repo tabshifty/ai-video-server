@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-26 17:30 +0800
+- 进度：[[家用部署机]] 把 Docker Desktop 替换为 OrbStack，省 RAM 与磁盘开销。整体路径走的不是 "orb docker migrate" 自动迁移（被 Docker Desktop 内部一条 stale container ID `3d8f9aa3bf19` 卡住，`docker ps -a` 见但 `inspect/rm` 都 No such container —— Docker Desktop metadata 损坏），改走 **pg_dump → 备份 → restore** 兜底路径：(1) 先 `pg_dump video_server` 备份到 `/Volumes/large/ai-video-server/backup/video_server-20260526-171346.sql.gz`（33 MB），(2) 停 launchd + docker compose down + 退 Docker Desktop，(3) brew install --cask orbstack 起 OrbStack，(4) 用 `docker save postgres:15` 从 Docker Desktop 拷镜像到 /tmp 再 `docker load` 到 OrbStack（绕开 Docker Hub `EOF` 网络问题），(5) `docker run` 起新 video_server_postgres 容器绑 ai-video-server_pg_data named volume，(6) gunzip + psql restore，(7) launchctl bootstrap server + worker。最终验证：`SELECT count(*) FROM videos` = 154 968（与备份一致），/healthz / /admin/ / /api/v1/tv/home 全 200。中间一次 pkill com.docker.backend 时把 OrbStack 也踢断，导致 volume / image / container 全失，靠提前的 pg_dump + 之前 save 的 /tmp/postgres15.tar 完整回滚回来——双保险机制证明本次迁移的"备份先行"原则不是过度谨慎。
+- 影响文件：本机系统级改动（不进 repo）：Docker Desktop 容器 + image 已退、OrbStack 接管，`docker context use orbstack` 永久切换，Docker Desktop GUI app 与 root-owned 数据待用户自行 sudo 清理（约 4.5 GB 磁盘）。`plan.md`。
+- 验证：`launchctl print gui/501/com.aivideo.{server,worker}` 都 state=running；`curl /healthz` / `curl /api/v1/tv/home` / `curl /admin/` 全 200；`docker exec video_server_postgres psql ... SELECT count(*) FROM videos` = 154968；`vm_stat` 显示 Free+Inactive+Compressed ≈ 7.7 GiB（迁移前 6.6 GiB），净腾出 ~1 GiB 内存余量（OrbStack 还在 warm-up，稳态会再降 200~400 MB）。pg_dump 备份保留在 `/Volumes/large/.../backup/` 作为长期 escape hatch。
+
 ## 2026-05-26 15:00 +0800
 - 进度：docs/家用部署机.md 新增第三节"开发机一次性配置"，覆盖 ssh-keygen / ssh-copy-id / ssh 验证 / `git remote add deploy` / 首次 push / 之后日常 6 步；原"7. 开发机加 remote 并推第一次"已并入新章节并改名"7. 部署机最后开服"，只保留 launchd bootstrap 与 /healthz 验证。整体章节序号重排：开发机配置占据 §三，原 §三日常运维 → §四，原 §四故障速查 → §五，原 §五弃用与清理 → §六。
 - 影响文件：`docs/家用部署机.md`、`plan.md`
