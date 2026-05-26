@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-26 15:00 +0800
+- 进度：docs/家用部署机.md 新增第三节"开发机一次性配置"，覆盖 ssh-keygen / ssh-copy-id / ssh 验证 / `git remote add deploy` / 首次 push / 之后日常 6 步；原"7. 开发机加 remote 并推第一次"已并入新章节并改名"7. 部署机最后开服"，只保留 launchd bootstrap 与 /healthz 验证。整体章节序号重排：开发机配置占据 §三，原 §三日常运维 → §四，原 §四故障速查 → §五，原 §五弃用与清理 → §六。
+- 影响文件：`docs/家用部署机.md`、`plan.md`
+- 验证：grep `^## ` 章节序号连贯一、二、三、四、五、六，无重复；新章节示例命令均与之前实际部署得出的踩坑保持一致（ssh-copy-id 走 LAN IP；远端路径 `/Users/chee/deploy/ai-video-server/repo.git` 绝对；hook 输出格式与已落 `b11dcc3eeb8` 真实 push 时回流到 stderr 的样式一致）。
+
 ## 2026-05-26 14:05 +0800
 - 进度：[[家用部署机]] 在 `CheedeMac-mini.local` 完成实际启用。状态：launchd 看管的 server (pid 25394) + worker (pid 25406) 跑在 :8080，`/healthz` 200、`/admin/` 服务 admin SPA、LAN 192.168.1.24:8080 可达。dev-up.sh 已 dev-down，野生 brew redis 加密码 + bind 0.0.0.0 LAN 可达（440 keys 数据保留），现有 Postgres docker 容器 LAN 可达（21 migrations / 154 968 videos 数据保留）。bare repo + work tree + binaries/ + current/ + .env 全部就绪；post-receive hook 落盘并 dry-run 通过（mkdir 原子锁、分桶分支、GitHub mirror push、launchctl kickstart、/healthz 探活、3-binary 保留）。**家用部署机正式接管家庭客户端流量**。本轮还顺带从真实部署里挖出 3 条踩坑，**同步更新到 docs/家用部署机.md**：(1) macOS 没有 `flock`，hook 改用 `mkdir` 原子锁；(2) `.env` 文件首字节 UTF-8 BOM 会让 godotenv 把首行变量解析为 `﻿APP_MODE` 导致全局 env 装载失败，dev-up.sh 不走 godotenv 所以历史一直没暴露；(3) zsh 把 `$USER:staff` 当 history substitution（`:s/t/aff` 模式），写 newsyslog 配置必须用 `${USER}:staff`。
 - 影响文件：`docs/家用部署机.md`（剥 BOM 警告 + SSH 启用步骤 + flock → mkdir 锁 + ${USER} 大括号警告 + 分桶 case 扩 .agents/.codex/references/.run + migrate-apply.sh 传 POSTGRES_CONTAINER + mv 改普通 -f）、`plan.md`；部署机文件系统改动（不进 repo）：`~/deploy/ai-video-server/{repo.git,work,binaries,current,.env}`、`~/Library/LaunchAgents/com.aivideo.{server,worker}.plist`、`~/Library/Logs/ai-video-server/{server,worker,deploy}.log`、`/opt/homebrew/etc/redis.conf`（bind 0.0.0.0 + requirepass）。
