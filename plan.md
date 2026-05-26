@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-26 12:15 +0800
+- 进度：完成 [[家用部署机]] 的 grill-with-docs 设计沉淀，把"另一台机器写代码 → push → 本机 hook 自动重启服务"这一想法拆成 8 轮独立决策并全部锁定：（Q1）家庭日常在线使用，N≈2–5；（Q2）a-1 自托管 bare repo on LAN，GitHub 降级为 mirror；（Q3a/b/c）launchd 作 supervisor + 硬切重启 + 数据层独立生命周期；（Q4a/b/c/d）部署机本地 build + path 分桶 + fail-open；（Q5a/b/c/d）migrate-apply 抽脚本 + 前向兼容契约 + 手动 rollback + 保留 3 个二进制；（Q6a/b/c）worker 硬切不 drain + 接受 in-flight 上传/转码损失 + 统一日志 `~/Library/Logs/ai-video-server/`；（Q7a/b/c）绝对路径契约 + `/Volumes/large` 外挂盘 + flock 串行 push；（Q8）纯文档 + 两个 helper 脚本 + 两份 ADR。本轮**只产出设计与脚手架**，不实际启用部署机；`internal/handlers/router.go` 对 `ADMIN_WEB_DIST_PATH` 环境变量的支持是后续独立 task，启动前必须完成。
+- 影响文件：`CONTEXT.md`（新增"部署术语"区块共 7 条术语 + "Git 忽略规则约定"无变化）、`docs/adr/0005-home-deployment-architecture.md`、`docs/adr/0006-migration-forward-compatibility.md`、`docs/家用部署机.md`、`scripts/migrate-apply.sh`（dev-up.sh 和部署 hook 共用的迁移执行器，行为与 dev-up.sh apply_migrations 等价）、`scripts/rollback.sh`（手动 rollback 工具）、`plan.md`。
+- 验证：本轮仅文档与脚本沉淀，无代码运行验证；`scripts/migrate-apply.sh` 与 `scripts/rollback.sh` 走 `chmod +x` 后等待真实部署机环境联调。**家用部署机尚未启用**——开发机此次 push 仍只到 GitHub（保持现有 origin master 链路），bare repo / launchd / newsyslog / /Volumes/large 等基础设施都未架设。
+
+## 2026-05-26 10:55 +0800
+- 进度：使用 `git filter-repo --invert-paths` 把历史中误提交的 `android-app/.gradle-local/`（12 823 文件 / 617 MB）与 `android-tv-app/tv-app/build/`（6 184 文件 / 122 MB）整体擦除。两组路径均由"首次提交"与"数分钟后的清理 commit"配对引入（507f34b1 + ef98bb72 / 782798c6 + e0175d60），git 保留 blob 历史导致 push pack 一直膨胀到 742.79 MiB；重写后 pack 降至 9.73 MiB（缩减 98.7%）。force-push 前用 patch-id 对比确认远端独有的 47 个 commit 内容已全部存在于本地（hash 不同但 patch 一致，是历史 rebase 留下的孤儿），无工作丢失。`.worktrees/` 下 6 个 feature 分支与 2 个 detached worktree 在重写后均仍是新 master 的祖先。同步移除根目录误生成的空壳 `package-lock.json`，并在 `.gitignore` 增加 `/package-lock.json` 与 `/node_modules/`（带前导斜杠仅锚定根，不影响 `admin-web/`）。
+- 影响文件：所有 commit hash 重写（git filter-repo）；`.gitignore`（+3 行）；删除根目录 `package-lock.json`；本地 backup 分支 `backup/pre-filter-repo` 已被 filter-repo 一并重写，原始未重写历史只在 GitHub 的旧 `origin/master = 1898accd`（force-push 时被覆盖）以及 reflog 清空前的窗口。`plan.md`。
+- 验证：`git ls-files | grep -E '(\.gradle-local|tv-app/build)'` 为空；`git count-objects -vH` 显示 `size-pack: 9.73 MiB`（重写前 742.79 MiB）；`git log --all --diff-filter=AM --name-only --format= | grep -E "^(android-app/\.gradle-local|android-tv-app/tv-app/build)/"` 无残留；force-push 后 `git log --oneline -1` 本地与 `origin/master` 同步在 `eb047a3`。所有其它本地 clone / worktree 需要 `git fetch && git reset --hard origin/master` 才能跟上。
+
 ## 2026-05-25 16:41 +0800
 - 进度：开始实施 `tasks/2026-05-25-tv-long-form-libvlc-migration`。当前仅该任务未完成；已按 PRD → Implement → Review 读取任务范围。先校准代码现状：TV 工程通过 source exclude 排除短视频/通用播放器源码，长视频仍在 `LongFormVideoPlayer` / `TvLongFormPlayerScreen` / `TvSeriesPlayerScreen` 使用 Media3；后端 `subtitle.go` 仍将 ASS/SSA 转 VTT；`pkg/ffmpeg` 只有 WebVTT 抽取。接下来按 TDD 先补后端 ASS 原文策略、LibVLC 配置/源文审计红灯，再做最小迁移。
 - 影响文件：预计涉及 `internal/services/subtitle.go`、`pkg/ffmpeg/ffmpeg.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/player/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、TV/后端测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`docs/adr/0004-tv-long-form-libvlc-for-ass-rendering.md`、`plan.md`。

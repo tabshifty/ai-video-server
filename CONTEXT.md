@@ -5,6 +5,17 @@
 - 技术沉淀只记录会影响后续实现和维护的内容，不记录临时进度、命令流水账或一次性调试过程。
 - `tasks 任务三段执行流`：当用户要求“完成 tasks 里的任务”或等价表述时，必须把 `tasks/<任务名>/prd.md`、`implement.md`、`review.md` 视为同一任务的三个阶段，并严格按 PRD → Implement → Review 顺序推进。PRD 阶段用于锁定用户故事、作用域、验收标准和非目标；Implement 阶段用于按既定方案实施，若方案与代码现状冲突须回到 PRD 校准并写入 `plan.md`；Review 阶段用于按评审脚本和验收清单验证，不允许只完成实现后跳过 review 直接宣称任务完成。已包含 `DONE.md` 的任务目录视为已完成，后续批量处理 tasks 时默认跳过；即使该目录后来出现 `feedback.md`，也只作为归档材料，不再触发返工；只有用户明确要求重开或复查该任务时才重新进入三段流程。用户完成验收后，应在对应任务目录新增 `DONE.md`，记录完成日期、关联提交和验证摘要。
 
+## 部署术语
+- `家用部署机`：项目长期在线、供家庭成员通过 Android TV / phone 客户端日常使用的那台机器；它不是开发机的别名，开发动作发生在另一台机器并通过 git 推送到家用部署机。家用部署机的目标是"低中断长期在线"，可用性诉求高于开发便利。
+- `dev 模式（dev-up.sh）`：本仓库唯一的 dev orchestrator，跑 vite dev server with HMR、`.run/` pidfile、前台进程；它只服务开发，不应被偷换成 [[家用部署机]] 的生产入口。家用部署模式必须用独立的 supervisor 与构建产物，不复用 dev-up.sh 的进程模型。
+- `家用部署机硬切重启`：家用部署机的 Go server / worker 走 kill-then-start 的硬切重启策略，可接受 1~3 秒的 HTTP 中断窗口；不引入 socket activation 或蓝绿反代来追零中断。新功能或新接口不得假设客户端在重启窗口仍能拿到响应；TV/手机客户端如需在重启瞬间保持播放，由客户端侧自行重试，而不是由部署机做无缝切换。
+- `家用部署机数据层独立生命周期`：Postgres、Redis、翻译服务（llama-server 或外部端点）属于数据/支撑层，其生命周期由 supervisor（launchd / docker restart policy）独立管理，不跟随代码 push 重启。push 后的 hook 只重启 Go server + Go worker、只替换 admin-web dist；数据库迁移在 Go server 启动前同步执行（沿用现有 `schema_migrations` 幂等表，不靠重启 Postgres 触发）。
+- `家用部署机 push 分桶`：post-receive 用 `git diff --name-only oldsha newsha` 拿改动文件列表，按 path prefix 分桶决定动作。命中 `main.go` / `cmd/**` / `internal/**` / `pkg/**` / `go.mod` / `go.sum` / `migrations/**` 触发 Go server + worker 重建并 [[家用部署机硬切重启]]；命中 `admin-web/**`（不含 `admin-web/dist/`）触发前端 `npm run build` 但不重启 Go；其它路径（`android-app/**`、`android-tv-app/**`、`docs/**`、`tasks/**`、`plan.md`、`CONTEXT.md` 等）一律跳过，hook 直接退出 0。新增顶层目录时必须显式归桶，未归桶等同于"跳过"。
+- `家用部署机 fail-open 构建契约`：post-receive 阶段 git ref 已经原子写入，构建/重启失败不再回滚 ref，也不阻塞 push 协议。go build / npm build 失败时旧进程**保持运行**，hook 把错误日志（构建输出 + diff 摘要）回流到 push 端 stderr，开发机推完立即在终端看见。**不允许把构建步骤前置到 pre-receive** 来追"失败拒绝 push"，那会破坏 push 体验且与本契约语义冲突。
+- `migration 前向兼容契约`：从本约定生效之日起，新增 migration 必须保证"上一版本的二进制仍能在新 schema 上正常跑"，目的是支撑 [[家用部署机]] 的手动 rollback 路径（schema 已迁、回滚到旧 binary 不应崩）。允许：加表、加可空或带 DEFAULT 的列、加索引、加枚举值；受限：删列必须先在代码中停止使用、下次部署再删，改类型用 `ALTER` + 数据迁移；禁止：rename 列/表，对已有数据加 NOT NULL 且不带 default。Review 阶段需对照本规则核对每个新 migration；存量 21 个迁移不回溯审计，仅约束新增。
+- `家用部署机重启可恢复边界`：[[家用部署机硬切重启]] 不做 drain，正在跑的任务全部 kill。Asynq 任务（transcode / 刮削 / 字幕等）依靠 `MaxRetry` 自动重派，**重派从零开始、不带 checkpoint**，被 kill 的 ffmpeg 半成品当作过期产物；这是可接受损失。chunked upload 临时分片、运行时内存里的转码进度、未 ack 的 SSE/WS 连接在重启时**全部丢失**，由客户端重传/重连兜底；这些"不可恢复"被显式纳入家用部署模式的契约，不再为追零损失改造现有上传/转码链路；如果以后引入"上传断点续传"或"转码 checkpoint" 是独立 feature，需推翻本条契约。
+- `家用部署机绝对路径契约`：[[家用部署机]] 的工作目录会随 push 切换（symlink swap），任何"基于 CWD 解析的相对路径"都不能用来定位运行期资产。`STORAGE_ROOT`、海报/poster 等媒体路径、admin-web dist 路径在部署模式下必须传绝对路径；其中 `STORAGE_ROOT=/Volumes/large/ai-video-server/storage` 是家用部署机固定位置（外挂大容量盘），admin-web dist 走新增的 `ADMIN_WEB_DIST_PATH` 环境变量。dev 模式仍可继续用相对路径默认值，不影响开发体验。新增任何"运行时需要读/写"的目录配置时，必须同时支持绝对路径并在部署文档中显式给出值。
+
 ## 字幕处理约定
 - `ASS 字幕原文存储策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；`.ass/.ssa` 不再强转 WebVTT，而是以 ASS 原文落库，数据库记录 `video_subtitles.format=ass` / `mime_type=text/x-ssa`，`metadata.original_format` 继续记录原始扩展名。视频内嵌字幕抽取时，`ass`/`ssa` codec 用 ffmpeg `-c:s copy` 保留原文；`mov_text`、`subrip`、`webvtt` 等无 ASS Style 段的格式继续转 VTT。历史已生成的 VTT 字幕不反向迁移；用户需要 ASS 特效时重新上传或重新抽取。
 - `ASS 字幕安全清洗`：上传或抽取后的 ASS 原文在落盘前必须做轻量安全清洗，至少去掉指向本地路径/绝对路径的 `\fn` 覆盖，并把 `\fad` 参数钳制到安全上限，避免 libass 历史 CVE 类问题扩大到本项目。这里的清洗只作用于原文字幕内容，不改动视频转码链路。
