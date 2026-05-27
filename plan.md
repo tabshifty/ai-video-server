@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-28 05:02 +0800
+- 进度：完成 TV App IPTV 硬解默认改造。移除 IPTV LibVLC 初始化参数 `--avcodec-hw=none`，频道 Media 改为 `setHWDecoderEnabled(true, true)`；补源文回归测试禁止回到关闭硬解；TV 版本号升至 `0.1.72` / `versionCode=72`；`CONTEXT.md` 中 IPTV 旧“软解优先”约定改为“TextureView + 硬解默认”，保留直播诊断路径。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`rg -n "avcodec-hw=none|setHWDecoderEnabled\\(false|setHWDecoderEnabled\\(true, true\\)|versionCode =|versionName =|软解优先|关闭硬解" ...` 确认 IPTV 已改为硬解默认且版本已更新；`rg -n $'\uFFFD' ...` 无乱码；`./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvIptvPlayerViewLayoutTest` 未通过环境前置，当前命令行 Java 为 1.8，AGP 8.5.2 需要 Java 11+。
+
+## 2026-05-28 04:50 +0800
+- 进度：开始修改 TV App IPTV 播放硬解策略。现状确认：IPTV LibVLC 初始化含 `--avcodec-hw=none`，每个频道 Media 调 `setHWDecoderEnabled(false, false)`；这与用户新要求“IPTV 播放也要使用硬解”冲突，也与 `CONTEXT.md` 现有“IPTV 软解优先”约定冲突。下一步先补源文回归测试锁定 IPTV 硬解默认，再改实现、TV 版本号、`CONTEXT.md` 和验证记录。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 TV 端定向单测与乱码检查。
+
 ## 2026-05-26 17:30 +0800
 - 进度：[[家用部署机]] 把 Docker Desktop 替换为 OrbStack，省 RAM 与磁盘开销。整体路径走的不是 "orb docker migrate" 自动迁移（被 Docker Desktop 内部一条 stale container ID `3d8f9aa3bf19` 卡住，`docker ps -a` 见但 `inspect/rm` 都 No such container —— Docker Desktop metadata 损坏），改走 **pg_dump → 备份 → restore** 兜底路径：(1) 先 `pg_dump video_server` 备份到 `/Volumes/large/ai-video-server/backup/video_server-20260526-171346.sql.gz`（33 MB），(2) 停 launchd + docker compose down + 退 Docker Desktop，(3) brew install --cask orbstack 起 OrbStack，(4) 用 `docker save postgres:15` 从 Docker Desktop 拷镜像到 /tmp 再 `docker load` 到 OrbStack（绕开 Docker Hub `EOF` 网络问题），(5) `docker run` 起新 video_server_postgres 容器绑 ai-video-server_pg_data named volume，(6) gunzip + psql restore，(7) launchctl bootstrap server + worker。最终验证：`SELECT count(*) FROM videos` = 154 968（与备份一致），/healthz / /admin/ / /api/v1/tv/home 全 200。中间一次 pkill com.docker.backend 时把 OrbStack 也踢断，导致 volume / image / container 全失，靠提前的 pg_dump + 之前 save 的 /tmp/postgres15.tar 完整回滚回来——双保险机制证明本次迁移的"备份先行"原则不是过度谨慎。
 - 影响文件：本机系统级改动（不进 repo）：Docker Desktop 容器 + image 已退、OrbStack 接管，`docker context use orbstack` 永久切换，Docker Desktop GUI app 与 root-owned 数据待用户自行 sudo 清理（约 4.5 GB 磁盘）。`plan.md`。

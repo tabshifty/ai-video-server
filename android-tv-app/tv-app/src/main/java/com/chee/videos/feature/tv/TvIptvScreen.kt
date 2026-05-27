@@ -98,7 +98,6 @@ fun TvIptvScreen(
                     "--network-caching=1500",
                     "--clock-jitter=0",
                     "--clock-synchro=0",
-                    "--avcodec-hw=none",
                 ),
             ),
         )
@@ -201,7 +200,7 @@ fun TvIptvScreen(
         playerErrorMessage = null
         vlcPlayer.stop()
         val media = Media(libVlc, Uri.parse(channel.url)).apply {
-            setHWDecoderEnabled(false, false)
+            setHWDecoderEnabled(true, true)
             addOption(":network-caching=1500")
             addOption(":clock-jitter=0")
             addOption(":clock-synchro=0")

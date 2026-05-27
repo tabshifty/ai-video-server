@@ -86,7 +86,7 @@
 - `TV 首页货架纯标题`：TV 首页的货架标题只保留「最近播放」与「最近更新」两类语义，不在标题下追加说明文案或数量文案；单独入口可以保留为纯动作标题，但不再用副文案补充解释。
 - `服务器自动嗅探`：TV 端连接服务器页对局域网服务的扫描过程；扫描状态属于表单内的辅助反馈，应使用小型行内 loading，不使用占据视觉中心的大型加载态。
 - `TV 长视频 LibVLC 内核`：TV 长视频播放器（电影 / `18+` / 电视剧共用的 `LongFormVideoPlayer.kt`）的播放引擎，从 Media3 ExoPlayer 切到 `org.videolan.libvlc.MediaPlayer`。视频解码、字幕渲染、音轨切换均走 LibVLC；与 [[IPTV LibVLC 路径]] 共用同一个 `libvlc-all` 依赖和 `TvVlcLibrary` 单例，但长视频与 IPTV 配置不共用 helper。
-- `TV 长视频 TextureView 硬解默认`：TV 长视频 LibVLC 内核的视频输出走 `VLCVideoLayout` + TextureView，解码偏好开启 `Media.setHWDecoderEnabled(true, true)`。这与 IPTV 的“TextureView + 软解优先”不同：长视频源由后端转码链控制 codec 边界，适合默认硬解；IPTV 第三方直播源不套用该策略。
+- `TV 长视频 TextureView 硬解默认`：TV 长视频 LibVLC 内核的视频输出走 `VLCVideoLayout` + TextureView，解码偏好开启 `Media.setHWDecoderEnabled(true, true)`。这与 IPTV 的“TextureView + 硬解默认”同向：长视频源由后端转码链控制 codec 边界，适合默认硬解；IPTV 第三方直播源现在也默认开启硬解，若后续出现兼容性问题再单独回退。
 - `LibVLC track id 不稳定`：LibVLC `MediaPlayer.getAudioTracks()` / `getSpuTracks()` 返回的 track id 在 Media 重新加载后不保证稳定，禁止把它当作长期协议或服务端字段。客户端如需跨集恢复音轨/字幕偏好，应优先保存 language code + 偏好类型并在新 media 加载后按名称/语言匹配；运行时菜单内的临时 id 只用于当前 media。
 - `TV 轨道偏好持久化`：TV 长视频播放页的音轨/字幕偏好在 DataStore 中以 `language + type` 形态保存，而不是保存 LibVLC 当前 media 的临时 track id。`LongFormVideoPlayer` 的运行时选择仍然需要 track id，但 id 只在当前 media 内有效；跨集、重载或切换来源时只读取持久化偏好并重新映射。
 - `TV 长视频焦点真空`：TV 长视频播放器在 [[续播提示卡]] / 字幕 picker / 音轨 picker / 返回二次确认提示等叠加层关闭后留下的 Compose 焦点状态：没有任何 focusable 持焦，导致 `LongFormVideoPlayer` 根 Box 的 `onPreviewKeyEvent` 收不到 DPAD_DOWN / CENTER / DPAD_UP 事件，只有 ←/→ 还能借方向性 focus search 偶尔触发。是 LibVLC 迁移之后由兄弟节点叠加层（续播卡）和 Dialog 类 picker 跨 window 焦点回收缺失放大的副作用。
@@ -194,7 +194,7 @@
 - TV App 播放 IPTV 时直接连接 M3U 中的原始频道 URL；后端不代理、不转码、不隐藏源地址。
 - 远程 M3U URL 只在后台手动刷新时拉取，本期不做定时刷新和 EPG 节目单。
 - TV App 播放 M3U8/HLS 频道走 LibVLC IPTV 路径，不再依赖 Media3 HLS 扩展。M3U8 频道兼容性问题应优先从 LibVLC event、vout、视频轨和频道源响应排查。
-- TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并关闭硬解优先走软解。TV 长视频也使用 LibVLC，但配置分轨：长视频走 [[TV 长视频 LibVLC 内核]] 与 [[TV 长视频 TextureView 硬解默认]]，IPTV 继续保持软解优先和直播诊断路径，不共用长视频硬解 helper。
+- TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并默认开启硬解。TV 长视频也使用 LibVLC，但配置分轨：长视频走 [[TV 长视频 LibVLC 内核]] 与 [[TV 长视频 TextureView 硬解默认]]；IPTV 现在也与长视频一致使用硬解默认，但仍保留独立的直播诊断路径和独立参数，不共用长视频 helper。
 - IPTV 播放无画面排查必须保留播放事件诊断：至少记录 LibVLC event、vout 数、视频轨/音频轨数量和当前视频轨 codec/分辨率。若 `videoTracks=0` 或无 `Vout`，优先检查 M3U 频道 URL、源站多码率/分片返回和是否需要后端转码；若有视频轨和 `Vout` 但仍黑屏，优先检查输出视图/系统合成层。
 - IPTV 频道清单不应包含音频专用源。明显音频源包括 `group-title=Audio/音频`、频道名包含 `音频` 或 `audio only`、URL 路径包含 `/audio/`、`_audio/`，以及 `.mp3/.aac/.m4a/.flac/.wav/.ogg/.opus` 等音频文件。后端解析时应跳过，TV 端也要过滤旧数据，避免默认播放只有声音没有画面的条目。
 - TV App IPTV 顶部频道信息不是常驻条：进入播放页和切换频道后仅显示 3 秒临时提示，频道列表打开、加载中、无可播放频道、状态错误或播放错误时必须隐藏。临时提示仍使用后端返回的 `logo_url`（M3U `tvg-logo`）展示台标，`logo_url` 为空或图片加载失败时使用 TV 图标回退，不新增占位资源。

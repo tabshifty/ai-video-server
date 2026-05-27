@@ -43,6 +43,10 @@ class TvIptvPlayerViewLayoutTest {
             "IPTV 播放页必须记录 LibVLC 当前视频轨数量",
             source.contains("videoTracks=${'$'}{vlcPlayer.videoTracksCount}"),
         )
+        assertTrue(
+            "IPTV 播放页必须默认开启硬解，和长视频保持一致",
+            source.contains("--avcodec-hw=none").not() && source.contains("setHWDecoderEnabled(true, true)"),
+        )
     }
 
     @Test
