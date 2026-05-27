@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-28 05:20 +0800
+- 进度：完成远程支撑层开发模式代码与文档更新。`dev-up.sh` 支持 `DEV_DATA_MODE=remote` 跳过本地 Postgres/Redis 与 migration，并在外部 `TRANSLATION_API_URL` 下检查 `/v1/models` 后复用远程翻译服务；`dev-down.sh` 会读取 env 或 `.run/dev-data-mode`，远程模式只停本机进程、不停本地数据容器；`migrate-apply.sh` 对非本机 DSN 默认拒绝，必须 `ALLOW_REMOTE_MIGRATIONS=1` 才能手动执行。`docs/run.md` 与 `docs/家用部署机.md` 已写明远程翻译需要部署机暴露 LAN 端点或 SSH tunnel；`CONTEXT.md` 已沉淀 [[远程支撑层开发模式]]。本机 `.env.remote-local` 已改为指向部署机翻译端点但不纳入提交。
+- 影响文件：`scripts/dev-up.sh`、`scripts/dev-down.sh`、`scripts/migrate-apply.sh`、`docs/run.md`、`docs/家用部署机.md`、`.gitignore`、`CONTEXT.md`、`plan.md`；本机未提交文件 `.env.remote-local`
+- 验证：`bash -n scripts/dev-up.sh scripts/dev-down.sh scripts/migrate-apply.sh` 通过；远程 migration 防呆按预期拒绝 `192.168.1.24`；本地 DSN 不触发远程防呆但因本机无 `psql` 停在 psql 前置；`ENV_FILE=.env.remote-local bash scripts/dev-up.sh --frontend off` 确认远程 Postgres/Redis 可达、跳过本地 DB/migration，并在远程翻译 `http://192.168.1.24:8000/v1/models` 不可达处明确失败；`git diff --check` 通过；`rg -n $'\uFFFD' ...` 无输出。
+
+## 2026-05-28 05:20 +0800
+- 进度：用户要求把翻译服务也纳入远程开发链路。当前代码已经支持外部 `TRANSLATION_API_URL`，本次补齐的是远程 env 与文档：` .env.remote-local` 将翻译端点切到部署机，`docs/run.md` 说明远程翻译 URL / 可达性前提，`CONTEXT.md` 把术语从“远程数据层”扩展到“远程支撑层”并明确翻译服务也是该模式的一部分。若部署机翻译服务仍只绑定 loopback，则需要先在部署机侧暴露端口或走隧道，仓库不会替你隐藏这个现实约束。
+- 影响文件：`.env.remote-local`、`docs/run.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行乱码检查、文档 diff 复查与（如可能）远程翻译 URL 可达性确认。
+
+## 2026-05-28 05:14 +0800
+- 进度：开始落地远程数据层开发模式。目标是 `ENV_FILE=.env.remote-local bash scripts/dev-up.sh` 启动本机 Go server / worker / admin 前端，但通过 `DEV_DATA_MODE=remote` 直连家用部署机 Postgres / Redis；该模式默认不启动本地 docker 数据层、不自动执行 migration。数据库改动流程按已确认策略执行：先在本地 Docker DB 验证 migration，提交后由家用部署机部署流程执行；必须手动改远程库时用 `ALLOW_REMOTE_MIGRATIONS=1` 显式放行并打印警告。
+- 影响文件：`scripts/dev-up.sh`、`scripts/dev-down.sh`、`scripts/migrate-apply.sh`、`docs/run.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 shell 语法检查、远程模式防呆验证、乱码检查与 `git diff --check`。
+
 ## 2026-05-28 05:10 +0800
 - 进度：完成 `.codex/skills/repo-dev-workflow` 更新。技能新增 `CONTEXT.md` 沉淀边界、Android Java 17 前置、家用部署机/部署脚本入口、脏 `plan.md` 精确暂存、App 版本号、migration 前向兼容、tasks 三段流、TV LibVLC/IPTV 定向验证和提交后复查等仓库近期实践约束。`agents/openai.yaml` 描述仍匹配，无需改动。
 - 影响文件：`.codex/skills/repo-dev-workflow/SKILL.md`、`plan.md`

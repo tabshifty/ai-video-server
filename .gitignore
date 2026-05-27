@@ -1,6 +1,7 @@
 .env
 *.env.local
 *.local
+.env.*-local
 .run/
 .DS_Store
 **/.DS_Store

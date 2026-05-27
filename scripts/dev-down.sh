@@ -3,19 +3,64 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
+ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env}"
+DEV_DATA_MODE="${DEV_DATA_MODE:-}"
 
 log() {
   printf '[dev-down] %s\n' "$*"
 }
 
-if docker compose version >/dev/null 2>&1; then
-  COMPOSE_CMD=(docker compose)
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE_CMD=(docker-compose)
-else
-  printf 'docker compose is required\n' >&2
-  exit 1
-fi
+trim_spaces() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+load_env_file() {
+  local file="$1"
+  local line line_no key value
+  [[ -f "$file" ]] || return 0
+  line_no=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    ((line_no += 1))
+    line="${line%$'\r'}"
+    if [[ $line_no -eq 1 ]]; then
+      line="${line#$'\xEF\xBB\xBF'}"
+    fi
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+
+    line="$(trim_spaces "$line")"
+    if [[ ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      continue
+    fi
+
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="$(trim_spaces "$key")"
+    value="$(trim_spaces "$value")"
+
+    if [[ ${#value} -ge 2 && "${value:0:1}" == "\"" && "${value: -1}" == "\"" ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ ${#value} -ge 2 && "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+
+    export "$key=$value"
+  done <"$file"
+}
+
+setup_compose_cmd() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+  else
+    printf 'docker compose is required for DEV_DATA_MODE=local\n' >&2
+    exit 1
+  fi
+}
 
 pid_is_alive() {
   local pid="$1"
@@ -151,11 +196,30 @@ stop_by_pattern() {
 stop_by_port() {
   local name="$1"
   local port="$2"
+  [[ -n "$port" ]] || return 0
   local pid
   while IFS= read -r pid; do
     [[ "$pid" =~ ^[0-9]+$ ]] || continue
     stop_pid_tree "$pid" "$name"
   done < <(lsof -t -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u)
+}
+
+parse_listen_port() {
+  local addr="$1"
+  local default_port="$2"
+  if [[ -z "$addr" ]]; then
+    printf '%s' "$default_port"
+    return 0
+  fi
+  if [[ "$addr" =~ :([0-9]+)$ ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  if [[ "$addr" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$addr"
+    return 0
+  fi
+  printf '%s' "$default_port"
 }
 
 stop_worker_from_log() {
@@ -170,6 +234,18 @@ stop_worker_from_log() {
 
 cd "$ROOT_DIR"
 mkdir -p "$RUN_DIR"
+load_env_file "$ENV_FILE"
+if [[ -z "$DEV_DATA_MODE" && -f "$RUN_DIR/dev-data-mode" ]]; then
+  DEV_DATA_MODE="$(tr -d '[:space:]' <"$RUN_DIR/dev-data-mode")"
+fi
+DEV_DATA_MODE="${DEV_DATA_MODE:-local}"
+if [[ "$DEV_DATA_MODE" != "local" && "$DEV_DATA_MODE" != "remote" ]]; then
+  printf 'invalid DEV_DATA_MODE: %s (expected: local|remote)\n' "$DEV_DATA_MODE" >&2
+  exit 1
+fi
+log "data mode: $DEV_DATA_MODE"
+SERVER_PORT="$(parse_listen_port "${HTTP_ADDR:-}" "8080")"
+FRONTEND_PORT="5173"
 
 stop_by_pid_file "$RUN_DIR/server.pid" "server"
 stop_by_pid_file "$RUN_DIR/worker.pid" "worker"
@@ -179,11 +255,16 @@ stop_by_pid_file "$RUN_DIR/frontend.pid" "frontend"
 stop_by_pattern "server" "main -mode server"
 stop_by_pattern "worker" "main -mode worker"
 stop_by_pattern "frontend" "$ROOT_DIR/admin-web"
-stop_by_port "server" "8080"
+stop_by_port "server" "$SERVER_PORT"
 stop_worker_from_log
-stop_by_port "frontend" "5173"
+stop_by_port "frontend" "$FRONTEND_PORT"
 
-log "stopping postgres and redis"
-"${COMPOSE_CMD[@]}" stop postgres redis >/dev/null || true
+if [[ "$DEV_DATA_MODE" == "remote" ]]; then
+  log "remote data mode, skip stopping postgres and redis"
+else
+  setup_compose_cmd
+  log "stopping postgres and redis"
+  "${COMPOSE_CMD[@]}" stop postgres redis >/dev/null || true
+fi
 
 log "done"

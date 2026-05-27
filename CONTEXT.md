@@ -10,6 +10,7 @@
 - `dev 模式（dev-up.sh）`：本仓库唯一的 dev orchestrator，跑 vite dev server with HMR、`.run/` pidfile、前台进程；它只服务开发，不应被偷换成 [[家用部署机]] 的生产入口。家用部署模式必须用独立的 supervisor 与构建产物，不复用 dev-up.sh 的进程模型。
 - `家用部署机硬切重启`：家用部署机的 Go server / worker 走 kill-then-start 的硬切重启策略，可接受 1~3 秒的 HTTP 中断窗口；不引入 socket activation 或蓝绿反代来追零中断。新功能或新接口不得假设客户端在重启窗口仍能拿到响应；TV/手机客户端如需在重启瞬间保持播放，由客户端侧自行重试，而不是由部署机做无缝切换。
 - `家用部署机数据层独立生命周期`：Postgres、Redis、翻译服务（llama-server 或外部端点）属于数据/支撑层，其生命周期由 supervisor（launchd / docker restart policy）独立管理，不跟随代码 push 重启。push 后的 hook 只重启 Go server + Go worker、只替换 admin-web dist；数据库迁移在 Go server 启动前同步执行（沿用现有 `schema_migrations` 幂等表，不靠重启 Postgres 触发）。
+- `远程支撑层开发模式`：开发机本地运行 Go server、Go worker 与 admin 前端，但 Postgres / Redis / 翻译服务直连 [[家用部署机]] 支撑层的开发方式。该模式用于复现家庭真实数据问题，不是 schema 试验环境；默认不启动本地数据容器、不自动执行 migration，也不启动本地翻译服务。开发遇到数据库改动时，必须先在本地 Docker DB 验证 migration，再提交代码，由 [[家用部署机]] 部署流程迁移远程库；只有紧急人工修复远程库时才允许显式放行远程 migration。翻译服务若在部署机只监听 loopback，开发机必须先通过部署机配置或隧道取得可访问的 OpenAI-compatible `/v1` 端点，不能假设 `127.0.0.1:8000` 在开发机上等同于部署机。
 - `家用部署机 push 分桶`：post-receive 用 `git diff --name-only oldsha newsha` 拿改动文件列表，按 path prefix 分桶决定动作。命中 `main.go` / `cmd/**` / `internal/**` / `pkg/**` / `go.mod` / `go.sum` / `migrations/**` 触发 Go server + worker 重建并 [[家用部署机硬切重启]]；命中 `admin-web/**`（不含 `admin-web/dist/`）触发前端 `npm run build` 但不重启 Go；其它路径（`android-app/**`、`android-tv-app/**`、`docs/**`、`tasks/**`、`plan.md`、`CONTEXT.md` 等）一律跳过，hook 直接退出 0。新增顶层目录时必须显式归桶，未归桶等同于"跳过"。
 - `家用部署机 fail-open 构建契约`：post-receive 阶段 git ref 已经原子写入，构建/重启失败不再回滚 ref，也不阻塞 push 协议。go build / npm build 失败时旧进程**保持运行**，hook 把错误日志（构建输出 + diff 摘要）回流到 push 端 stderr，开发机推完立即在终端看见。**不允许把构建步骤前置到 pre-receive** 来追"失败拒绝 push"，那会破坏 push 体验且与本契约语义冲突。
 - `migration 前向兼容契约`：从本约定生效之日起，新增 migration 必须保证"上一版本的二进制仍能在新 schema 上正常跑"，目的是支撑 [[家用部署机]] 的手动 rollback 路径（schema 已迁、回滚到旧 binary 不应崩）。允许：加表、加可空或带 DEFAULT 的列、加索引、加枚举值；受限：删列必须先在代码中停止使用、下次部署再删，改类型用 `ALTER` + 数据迁移；禁止：rename 列/表，对已有数据加 NOT NULL 且不带 default。Review 阶段需对照本规则核对每个新 migration；存量 21 个迁移不回溯审计，仅约束新增。
@@ -41,6 +42,7 @@
 
 ## Git 忽略规则约定
 - 根级 `.gitignore` 中用于本地资料或发布产物的目录规则必须按意图锚定：仅忽略根目录时使用 `/references/`、`/release/`，避免误伤 `.codex/skills/*/references/`、`.agents/skills/*/references/` 等需要版本管理的技能参考文档。
+- `.env.remote-local` 这类 `*.local` 语义但文件名不以 `.local` 结尾的本机远程开发配置必须被 `.gitignore` 精确忽略，避免把部署机 IP、远程 DSN、token 或本机路径纳入版本库；文档只记录键名和示例占位，不提交真实本机值。
 - Python 字节码、工具缓存、Android `build/` 与 `release/` 打包输出、Gradle/IDE 本地目录和系统 `.DS_Store` 都属于本地生成物，不应提交；若已进入索引，应使用 `git rm --cached` 从版本库移除，保留本地文件即可。
 
 ## 管理端手动刮削术语

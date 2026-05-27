@@ -8,6 +8,8 @@ ENV_EXAMPLE="$ROOT_DIR/.env.example"
 FRONTEND_MODE="dev"
 FRONTEND_DIR="$ROOT_DIR/admin-web"
 STARTED_PID_FILES=()
+DEV_DATA_MODE="${DEV_DATA_MODE:-}"
+DEV_TRANSLATION_MODE="${DEV_TRANSLATION_MODE:-}"
 
 print_usage() {
   cat <<'EOF'
@@ -17,6 +19,12 @@ Options:
   --frontend dev    Start frontend with Vite dev server (default)
   --frontend build  Build frontend assets only
   --frontend off    Skip frontend
+
+Environment:
+  DEV_DATA_MODE=local   Start local docker postgres/redis and apply migrations (default)
+  DEV_DATA_MODE=remote  Use POSTGRES_DSN/REDIS_ADDR from ENV_FILE, skip local DB and migrations
+  DEV_TRANSLATION_MODE=auto  Start local translation service when TRANSLATION_API_URL is local (default)
+  DEV_TRANSLATION_MODE=off   Disable backend translation and skip local translation service
   -h, --help        Show this help
 EOF
 }
@@ -59,22 +67,24 @@ require_cmd() {
   fi
 }
 
-if docker compose version >/dev/null 2>&1; then
-  COMPOSE_CMD=(docker compose)
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE_CMD=(docker-compose)
-else
-  printf 'docker compose is required\n' >&2
-  exit 1
-fi
-
 require_cmd go
-require_cmd docker
 require_cmd python3
 require_cmd curl
 if [[ "$FRONTEND_MODE" != "off" ]]; then
   require_cmd npm
 fi
+
+setup_compose_cmd() {
+  require_cmd docker
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+  else
+    printf 'docker compose is required for DEV_DATA_MODE=local\n' >&2
+    exit 1
+  fi
+}
 
 cd "$ROOT_DIR"
 mkdir -p "$RUN_DIR"
@@ -126,6 +136,17 @@ load_env_file() {
 }
 
 load_env_file "$ENV_FILE"
+DEV_DATA_MODE="${DEV_DATA_MODE:-local}"
+if [[ "$DEV_DATA_MODE" != "local" && "$DEV_DATA_MODE" != "remote" ]]; then
+  printf 'invalid DEV_DATA_MODE: %s (expected: local|remote)\n' "$DEV_DATA_MODE" >&2
+  exit 1
+fi
+DEV_TRANSLATION_MODE="${DEV_TRANSLATION_MODE:-auto}"
+if [[ "$DEV_TRANSLATION_MODE" != "auto" && "$DEV_TRANSLATION_MODE" != "off" ]]; then
+  printf 'invalid DEV_TRANSLATION_MODE: %s (expected: auto|off)\n' "$DEV_TRANSLATION_MODE" >&2
+  exit 1
+fi
+printf '%s\n' "$DEV_DATA_MODE" >"$RUN_DIR/dev-data-mode"
 TRANSLATION_API_URL="${TRANSLATION_API_URL:-http://127.0.0.1:8000/v1}"
 TRANSLATION_MODEL="${TRANSLATION_MODEL:-HY-MT1.5-1.8B}"
 TRANSLATION_SERVER_BIN="${TRANSLATION_SERVER_BIN:-/tmp/llama.cpp-hunyuan/build/bin/llama-server}"
@@ -133,6 +154,8 @@ TRANSLATION_MODEL_PATH="${TRANSLATION_MODEL_PATH:-$HOME/Library/Caches/llama.cpp
 export TRANSLATION_API_URL TRANSLATION_MODEL TRANSLATION_SERVER_BIN TRANSLATION_MODEL_PATH
 export ENV_FILE
 log "using env file: $ENV_FILE"
+log "data mode: $DEV_DATA_MODE"
+log "translation mode: $DEV_TRANSLATION_MODE"
 
 list_compose_images() {
   "${COMPOSE_CMD[@]}" config --images 2>/dev/null | awk 'NF{print $1}' | sort -u
@@ -422,6 +445,87 @@ SQL
   done
 }
 
+parse_pg_endpoint() {
+  python3 - "$POSTGRES_DSN" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+dsn = sys.argv[1]
+parsed = urlparse(dsn)
+host = parsed.hostname or ""
+port = parsed.port or 5432
+if not host:
+    raise SystemExit("POSTGRES_DSN host is empty")
+print(f"{host}\t{port}")
+PY
+}
+
+parse_host_port() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+
+value = sys.argv[1]
+default_port = int(sys.argv[2])
+if not value:
+    raise SystemExit("address is empty")
+host = value
+port = default_port
+if value.startswith("[") and "]" in value:
+    host, rest = value[1:].split("]", 1)
+    if rest.startswith(":"):
+        port = int(rest[1:])
+elif ":" in value:
+    head, tail = value.rsplit(":", 1)
+    if tail.isdigit():
+        host = head
+        port = int(tail)
+if not host:
+    raise SystemExit("address host is empty")
+print(f"{host}\t{port}")
+PY
+}
+
+check_tcp_endpoint() {
+  local name="$1"
+  local host="$2"
+  local port="$3"
+  require_cmd nc
+  log "checking $name: $host:$port"
+  if ! nc -z -w 3 "$host" "$port" >/dev/null 2>&1; then
+    printf '%s is not reachable: %s:%s\n' "$name" "$host" "$port" >&2
+    return 1
+  fi
+}
+
+check_http_endpoint() {
+  local name="$1"
+  local url="$2"
+  require_cmd curl
+  log "checking $name: $url"
+  if ! curl -fsS --max-time 5 "$url" >/dev/null 2>&1; then
+    printf '%s is not reachable: %s\n' "$name" "$url" >&2
+    return 1
+  fi
+}
+
+ensure_remote_data_services() {
+  if [[ -z "${POSTGRES_DSN:-}" ]]; then
+    printf 'POSTGRES_DSN is required for DEV_DATA_MODE=remote\n' >&2
+    return 1
+  fi
+  if [[ -z "${REDIS_ADDR:-}" ]]; then
+    printf 'REDIS_ADDR is required for DEV_DATA_MODE=remote\n' >&2
+    return 1
+  fi
+
+  local pg_host pg_port redis_host redis_port
+  IFS=$'\t' read -r pg_host pg_port < <(parse_pg_endpoint)
+  IFS=$'\t' read -r redis_host redis_port < <(parse_host_port "$REDIS_ADDR" "6379")
+  check_tcp_endpoint "remote postgres" "$pg_host" "$pg_port"
+  check_tcp_endpoint "remote redis" "$redis_host" "$redis_port"
+  log "remote data services are reachable; migrations are skipped by default"
+}
+
 hash_file_sha256() {
   local file="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -485,7 +589,14 @@ resolve_translation_server_bin() {
 }
 
 ensure_translation_service() {
+  if [[ "$DEV_TRANSLATION_MODE" == "off" ]]; then
+    export TRANSLATION_API_URL=""
+    log "translation is disabled for this dev session"
+    return 0
+  fi
+
   if [[ "$TRANSLATION_API_URL" != "http://127.0.0.1:8000/v1" && "$TRANSLATION_API_URL" != "http://localhost:8000/v1" ]]; then
+    check_http_endpoint "external translation api" "$TRANSLATION_API_URL/models"
     log "translation api url is external, skip local translation server: $TRANSLATION_API_URL"
     return 0
   fi
@@ -550,25 +661,31 @@ cleanup_on_error() {
 
 trap cleanup_on_error EXIT
 
-log "ensuring docker images are available"
-ensure_compose_images_ready
+if [[ "$DEV_DATA_MODE" == "remote" ]]; then
+  ensure_remote_data_services
+else
+  setup_compose_cmd
 
-log "starting postgres and redis"
-compose_up_db_services
+  log "ensuring docker images are available"
+  ensure_compose_images_ready
 
-POSTGRES_CID="$("${COMPOSE_CMD[@]}" ps -q postgres)"
-if [[ -z "$POSTGRES_CID" ]]; then
-  printf 'failed to resolve postgres container id\n' >&2
-  exit 1
+  log "starting postgres and redis"
+  compose_up_db_services
+
+  POSTGRES_CID="$("${COMPOSE_CMD[@]}" ps -q postgres)"
+  if [[ -z "$POSTGRES_CID" ]]; then
+    printf 'failed to resolve postgres container id\n' >&2
+    exit 1
+  fi
+
+  log "waiting for postgres"
+  if ! wait_postgres "$POSTGRES_CID"; then
+    printf 'postgres is not ready\n' >&2
+    exit 1
+  fi
+
+  apply_migrations "$POSTGRES_CID"
 fi
-
-log "waiting for postgres"
-if ! wait_postgres "$POSTGRES_CID"; then
-  printf 'postgres is not ready\n' >&2
-  exit 1
-fi
-
-apply_migrations "$POSTGRES_CID"
 
 build_backend_binary
 
