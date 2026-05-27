@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-28 05:10 +0800
+- 进度：完成 `.codex/skills/repo-dev-workflow` 更新。技能新增 `CONTEXT.md` 沉淀边界、Android Java 17 前置、家用部署机/部署脚本入口、脏 `plan.md` 精确暂存、App 版本号、migration 前向兼容、tasks 三段流、TV LibVLC/IPTV 定向验证和提交后复查等仓库近期实践约束。`agents/openai.yaml` 描述仍匹配，无需改动。
+- 影响文件：`.codex/skills/repo-dev-workflow/SKILL.md`、`plan.md`
+- 验证：`python3 /Users/cuiqi/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/repo-dev-workflow` 通过；`rg -n $'\uFFFD' .codex/skills/repo-dev-workflow/SKILL.md .codex/skills/repo-dev-workflow/agents/openai.yaml plan.md` 无输出；`git diff --check -- .codex/skills/repo-dev-workflow/SKILL.md .codex/skills/repo-dev-workflow/agents/openai.yaml plan.md` 通过。
+
+## 2026-05-28 05:04 +0800
+- 进度：开始更新 `.codex/skills/repo-dev-workflow`，把近期 `CONTEXT.md`、`plan.md` 与代码实践沉淀成仓库执行流程。重点补齐：任务三段流、家用部署机与 migration 前向兼容、Android Java 17/Gradle 前置、TV LibVLC/IPTV 专项验证、admin/Go/Android 验证选择，以及已有脏工作区下的精确暂存提交策略。
+- 影响文件：`.codex/skills/repo-dev-workflow/SKILL.md`、必要时 `.codex/skills/repo-dev-workflow/agents/openai.yaml`、`plan.md`
+- 验证：待执行 skill 静态校验、乱码检查与 git diff 复查。
+
 ## 2026-05-28 05:16 +0800
 - 进度：为 Android TV 项目安装并固定 Java 17 开发环境。已下载 Temurin 17.0.19（arm64）到 `~/.jdks/jdk-17.0.19+10`，并写入 `~/.gradle/gradle.properties` 的 `org.gradle.java.home`，让 Gradle wrapper 不再依赖系统自带 Java 8。后续 Android 构建与单测应以该 JDK 为准。
 - 影响文件：`/Users/cuiqi/.jdks/jdk-17.0.19+10`、`/Users/cuiqi/.gradle/gradle.properties`、`plan.md`
