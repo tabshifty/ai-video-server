@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-28 05:16 +0800
+- 进度：为 Android TV 项目安装并固定 Java 17 开发环境。已下载 Temurin 17.0.19（arm64）到 `~/.jdks/jdk-17.0.19+10`，并写入 `~/.gradle/gradle.properties` 的 `org.gradle.java.home`，让 Gradle wrapper 不再依赖系统自带 Java 8。后续 Android 构建与单测应以该 JDK 为准。
+- 影响文件：`/Users/cuiqi/.jdks/jdk-17.0.19+10`、`/Users/cuiqi/.gradle/gradle.properties`、`plan.md`
+- 验证：`/Users/cuiqi/.jdks/jdk-17.0.19+10/Contents/Home/bin/java -version` 通过；`./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvIptvPlayerViewLayoutTest` 已从 Java 8 阻塞切换为 Android 依赖解析阻塞。
+
 ## 2026-05-28 05:02 +0800
 - 进度：完成 TV App IPTV 硬解默认改造。移除 IPTV LibVLC 初始化参数 `--avcodec-hw=none`，频道 Media 改为 `setHWDecoderEnabled(true, true)`；补源文回归测试禁止回到关闭硬解；TV 版本号升至 `0.1.72` / `versionCode=72`；`CONTEXT.md` 中 IPTV 旧“软解优先”约定改为“TextureView + 硬解默认”，保留直播诊断路径。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
@@ -11,6 +16,31 @@
 - 进度：开始修改 TV App IPTV 播放硬解策略。现状确认：IPTV LibVLC 初始化含 `--avcodec-hw=none`，每个频道 Media 调 `setHWDecoderEnabled(false, false)`；这与用户新要求“IPTV 播放也要使用硬解”冲突，也与 `CONTEXT.md` 现有“IPTV 软解优先”约定冲突。下一步先补源文回归测试锁定 IPTV 硬解默认，再改实现、TV 版本号、`CONTEXT.md` 和验证记录。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
 - 验证：待执行 TV 端定向单测与乱码检查。
+
+## 2026-05-26 20:05 +0800
+- 进度：用户要求安装 Go 以便本地后端连接远程 Postgres/Redis 调试；当前 `go.mod` 声明 `go 1.22`，本机 `Darwin arm64`，`go` 与 Homebrew 均不可用。下一步通过官方 Go tarball 安装到用户目录，避免依赖 sudo/Homebrew。
+- 影响文件：`plan.md`；开发机本地 `~/sdk/go1.22.x` 与 shell PATH 配置。
+- 验证：待执行 `go version`、`go env GOPATH`、`go test ./...` 或至少 `go test ./internal/config -count=1`。
+
+## 2026-05-26 19:32 +0800
+- 进度：用户确认允许按部署指南在开发机生成 SSH 公私钥；下一步按 `docs/家用部署机.md` 执行 `ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519`，随后验证本机是否已携带该身份，并继续评估免密登录是否还受 `authorized_keys` 缺失阻塞。
+- 影响文件：`plan.md`；开发机本地 `~/.ssh/id_ed25519`、`~/.ssh/id_ed25519.pub`
+- 验证：待执行 `ls -la ~/.ssh`、`ssh-keygen -lf ~/.ssh/id_ed25519.pub`、`ssh -o BatchMode=yes chee@192.168.1.24 'true'`。
+
+## 2026-05-26 19:34 +0800
+- 进度：已在开发机生成新的 `ed25519` 密钥对，公钥指纹为 `SHA256:fn0mPxj7+7WHXYrawG/AJ+tm8ULJNKe7BvCEukt0lxw`。再次尝试 `ssh -o BatchMode=yes -o PreferredAuthentications=publickey chee@192.168.1.24 ...` 仍被拒绝，说明阻塞点已收敛为部署机 `chee` 用户的 `~/.ssh/authorized_keys` 尚未包含这把新公钥。
+- 影响文件：`plan.md`；开发机本地 `~/.ssh/id_ed25519`、`~/.ssh/id_ed25519.pub`
+- 验证：`ssh-keygen -lf ~/.ssh/id_ed25519.pub` 返回上述指纹；`ssh -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=5 chee@192.168.1.24 'hostname && date'` 失败，报 `Permission denied (publickey,password,keyboard-interactive)`。
+
+## 2026-05-26 19:27 +0800
+- 进度：开始按 `docs/家用部署机.md` 验证开发机到家用部署机的推送链路；先核对 SSH/`deploy` remote/目标主机状态，再执行一次最小化 `git push deploy master` 推送测试。
+- 影响文件：`plan.md`
+- 验证：待执行 `git remote -v`、`ssh chee@<部署机> 'hostname && date'`、`git push deploy master`、远端 `deploy.log` / `curl /healthz` 核对。
+
+## 2026-05-26 19:30 +0800
+- 进度：完成链路前置核对。结果：远端 `192.168.1.24:22` 可达，已将 host key 写入本机 `~/.ssh/known_hosts`，并按文档把本地 Git `deploy` remote 配置为 `chee@192.168.1.24:/Users/chee/deploy/ai-video-server/repo.git`。阻塞点确认在 SSH 认证层：本机 `~/.ssh/` 只有 `known_hosts`，没有 `id_ed25519`/`id_rsa` 等私钥，`ssh-add -l` 返回 `The agent has no identities.`，`ssh -o BatchMode=yes chee@192.168.1.24 'true'` 返回 `Permission denied (publickey,password,keyboard-interactive)`，因此本轮无法实际触发 `git push deploy master`。
+- 影响文件：`plan.md`
+- 验证：`ssh-keyscan -H -T 5 192.168.1.24 CheedeMac-mini.local >> ~/.ssh/known_hosts` 成功；`git remote get-url deploy` 返回 `chee@192.168.1.24:/Users/chee/deploy/ai-video-server/repo.git`；`ssh -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=5 chee@192.168.1.24 'true'` 失败，错误如上。
 
 ## 2026-05-26 17:30 +0800
 - 进度：[[家用部署机]] 把 Docker Desktop 替换为 OrbStack，省 RAM 与磁盘开销。整体路径走的不是 "orb docker migrate" 自动迁移（被 Docker Desktop 内部一条 stale container ID `3d8f9aa3bf19` 卡住，`docker ps -a` 见但 `inspect/rm` 都 No such container —— Docker Desktop metadata 损坏），改走 **pg_dump → 备份 → restore** 兜底路径：(1) 先 `pg_dump video_server` 备份到 `/Volumes/large/ai-video-server/backup/video_server-20260526-171346.sql.gz`（33 MB），(2) 停 launchd + docker compose down + 退 Docker Desktop，(3) brew install --cask orbstack 起 OrbStack，(4) 用 `docker save postgres:15` 从 Docker Desktop 拷镜像到 /tmp 再 `docker load` 到 OrbStack（绕开 Docker Hub `EOF` 网络问题），(5) `docker run` 起新 video_server_postgres 容器绑 ai-video-server_pg_data named volume，(6) gunzip + psql restore，(7) launchctl bootstrap server + worker。最终验证：`SELECT count(*) FROM videos` = 154 968（与备份一致），/healthz / /admin/ / /api/v1/tv/home 全 200。中间一次 pkill com.docker.backend 时把 OrbStack 也踢断，导致 volume / image / container 全失，靠提前的 pg_dump + 之前 save 的 /tmp/postgres15.tar 完整回滚回来——双保险机制证明本次迁移的"备份先行"原则不是过度谨慎。
