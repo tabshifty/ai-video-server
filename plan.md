@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-28 23:11 +0800
+- 进度：完成部署机验证。已将修复提交 `5d30069` 推送到 `deploy master`，post-receive 触发 `admin-web` 构建并替换 `/Users/chee/deploy/ai-video-server/current/admin-web-dist`；Go server 未重启。部署过程中 GitHub mirror push 卡住，已终止该 best-effort 子进程，hook 按预期继续执行并完成前端更新。
+- 影响文件：`plan.md`
+- 验证：`curl http://192.168.1.24:8080/admin` 返回 200，HTML 引用新资源 `/admin/assets/index-eWUl6XQ3.js`，`Last-Modified: Thu, 28 May 2026 15:10:07 GMT`；线上 JS 已确认包含 `/admin/` router history base；部署日志显示 `frontend updated` 与 `deploy ... done`。
+
 ## 2026-05-28 23:06 +0800
 - 进度：完成管理端 `/admin` 空白页修复。新增 `resolveRouterHistoryBase` 纯函数与回归测试，`admin-web/src/router/index.js` 改为用 Vite `BASE_URL` 初始化 `createWebHistory`，保证生产 `/admin/` base 与后端静态挂载一致；`CONTEXT.md` 已补充 `admin SPA 基路径契约`。部署机当前线上 JS 已确认仍是无参 history，待提交后 push deploy 更新。
 - 影响文件：`admin-web/src/router/index.js`、`admin-web/src/router/historyBase.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
