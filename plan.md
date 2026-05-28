@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-28 23:06 +0800
+- 进度：完成管理端 `/admin` 空白页修复。新增 `resolveRouterHistoryBase` 纯函数与回归测试，`admin-web/src/router/index.js` 改为用 Vite `BASE_URL` 初始化 `createWebHistory`，保证生产 `/admin/` base 与后端静态挂载一致；`CONTEXT.md` 已补充 `admin SPA 基路径契约`。部署机当前线上 JS 已确认仍是无参 history，待提交后 push deploy 更新。
+- 影响文件：`admin-web/src/router/index.js`、`admin-web/src/router/historyBase.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`npm run test -- src/router/index.spec.js src/router/transition.spec.js` 通过；`npm run build` 通过；`git diff --check -- admin-web/src/router/index.js admin-web/src/router/historyBase.js admin-web/src/router/index.spec.js CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' ...` 无输出。
+
+## 2026-05-28 23:02 +0800
+- 进度：开始排查 `http://192.168.1.24:8080/admin` 空白页。当前确认管理端生产构建 `base=/admin/`，后端静态挂载 `/admin` 与 `/admin/assets`；前端 Vue Router 仍使用默认根路径 `createWebHistory()`，访问 `/admin` 时会被当作应用内路径导致无匹配页面。下一步补路由基路径回归测试并改为读取 Vite `BASE_URL`。
+- 影响文件：预计涉及 `admin-web/src/router/index.js`、管理端路由测试、`plan.md`
+- 验证：待执行管理端定向测试与 `npm run build`。
+
 ## 2026-05-28 05:20 +0800
 - 进度：完成远程支撑层开发模式代码与文档更新。`dev-up.sh` 支持 `DEV_DATA_MODE=remote` 跳过本地 Postgres/Redis 与 migration，并在外部 `TRANSLATION_API_URL` 下检查 `/v1/models` 后复用远程翻译服务；`dev-down.sh` 会读取 env 或 `.run/dev-data-mode`，远程模式只停本机进程、不停本地数据容器；`migrate-apply.sh` 对非本机 DSN 默认拒绝，必须 `ALLOW_REMOTE_MIGRATIONS=1` 才能手动执行。`docs/run.md` 与 `docs/家用部署机.md` 已写明远程翻译需要部署机暴露 LAN 端点或 SSH tunnel；`CONTEXT.md` 已沉淀 [[远程支撑层开发模式]]。本机 `.env.remote-local` 已改为指向部署机翻译端点但不纳入提交。
 - 影响文件：`scripts/dev-up.sh`、`scripts/dev-down.sh`、`scripts/migrate-apply.sh`、`docs/run.md`、`docs/家用部署机.md`、`.gitignore`、`CONTEXT.md`、`plan.md`；本机未提交文件 `.env.remote-local`

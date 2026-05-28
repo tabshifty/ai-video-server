@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { resolveRouterHistoryBase } from './historyBase'
 import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
 import VideoList from '../views/VideoList.vue'
@@ -36,7 +37,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(resolveRouterHistoryBase(import.meta.env.BASE_URL)),
   routes
 })
 

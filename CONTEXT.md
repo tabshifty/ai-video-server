@@ -24,6 +24,7 @@
 - `字幕样式 libass 让位`：TV 长视频从 Media3 切到 LibVLC 后，字幕外观控制权从 Compose/Media3 让位给 libass。删除 `applyLongFormSubtitleStyle()` 这类统一描边逻辑是有意行为，后续不要再给 SRT/VTT 注入默认 ASS Style，除非新任务明确要求重新设计字幕偏好。
 
 ## admin 设计系统术语
+- `admin SPA 基路径契约`：管理端生产构建固定挂载在 Go server 的 `/admin` 前缀下，Vite `base`、后端静态资源路径和 Vue Router history base 必须保持一致。`admin-web/vite.config.js` 生产 `base` 为 `/admin/` 时，`admin-web/src/router/index.js` 必须用 `createWebHistory(import.meta.env.BASE_URL)` 或等价封装，不能退回无参 `createWebHistory()`；否则访问 `http://<host>:8080/admin` 时浏览器能拿到 HTML/JS，但 Router 会把 `/admin` 当作应用内路由导致 `<router-view>` 无匹配，表现为空白页。
 - `admin Modern Minimal`：管理端视觉方向为浅色优先、低饱和 slate 中性色、冷蓝主色与克制阴影；后台工具界面优先信息密度、可扫描性和重复操作效率，不采用营销式大色块或装饰性 hero。
 - `admin 设计 token`：管理端全局颜色、字体、字号、间距、圆角、阴影、动效、断点和 shell 尺寸统一由 `admin-web/src/assets/theme.css` 的 CSS 变量表达；业务视图和基础组件应引用 token，不直接扩散临时色值或字体。
 - `Element Plus 三层架构`：L1 为 `theme.css` 中的 `--el-*` token 覆盖，L2 为 `element-overrides.css` 的低特异性 `:where()` 全局覆写，L3 为 `components/base/` 中的共享 wrapper 组件；三层各司其职，避免跨层写重复样式。
