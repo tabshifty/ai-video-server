@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-31 01:13 +0800
+- 进度：完成电视剧播放器交互 bug 修正。`LongFormVideoPlayer` 的电视剧分支改为底部单容器双页：`controls 页` 与 `选集页` 通过纵向 slide 切换，不再同时堆成双层；电视剧首屏恢复为按 DPad DOWN 唤出 controls；controls 聚焦时 LEFT/RIGHT 只切焦点，不做 seek。选集轨集卡改为“第一集”“第二集”等中文序数，左右切集时移除集卡淡入淡出和整段明显滚动，只在目标集快出边界时做最短必要跟随；连续快进/快退时进度显示改为跟随 pending seek 目标，避免进度条抖动。TV 版本升级到 `0.1.76 (76)`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/{LongFormVideoPlayer,TvEpisodeRailPolicy}.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvEpisodeRailPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesEpisodeRailSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；未纳入用户既有改动 `admin-web/.env.development`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.core.ui.TvEpisodeRailPolicyTest' --tests 'com.chee.videos.feature.tv.TvSeriesEpisodeRailSpecTest' --tests 'com.chee.videos.core.ui.TvLongFormRemoteKeyRoutingTest' --tests 'com.chee.videos.core.ui.TvLongFormControlsAutoHideTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerTransportKeyTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；待执行 `git diff --check` 与乱码扫描后提交。
+
+## 2026-05-31 01:13 +0800
+- 进度：开始修正电视剧播放器交互 bug。已重新通过 grill-with-docs 锁定四点：`controls 页` 与 `选集页` 改为单容器双页纵向 slide，而不是双层同时展开；焦点位于 controls 时 DPad LEFT/RIGHT 只切焦点，不承担 seek；选集卡文案改为“第一集”“第二集”等中文序数；左右切集时不再给单个集卡叠加明显过渡，只在目标集快出边界时做最短必要的跟随滚动。下一步修改 `LongFormVideoPlayer`、选集轨策略与源文/纯逻辑测试，并同步更新 TV 版本与 `CONTEXT.md`。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/{LongFormVideoPlayer,TvEpisodeRailPolicy}.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行电视剧播放器相关定向单测与 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`，以及 `git diff --check`、乱码扫描。
+
 ## 2026-05-30 23:55 +0800
 - 进度：完成电视剧播放器 UI 重构收尾。`LongFormVideoPlayer` 新增 `SeriesEpisodeRail` 变体、`播放器根 → controls → 选集轨` 三层焦点路由、只读进度条与横向选集轨；`TvSeriesPlayerScreen` 移除旧 `ModalBottomSheet` 选集，改为当前季分集卡片内嵌轨道并通过标题气泡跟随焦点；补充选集轨策略 / 遥控路由 / 源文审计测试，并修正 `TvScrollableBottomPaddingTest` 使其不再把沉浸式播放器页当滚动页。TV 版本升级到 `0.1.75 (75)`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/{LongFormVideoPlayer,TvLongFormRemoteKeyRouting,TvEpisodeRailPolicy}.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/{TvLongFormRemoteKeyRoutingTest,TvLongFormControlsAutoHideTest,TvEpisodeRailPolicyTest}.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/{TvSeriesEpisodeRailSpecTest,TvScrollableBottomPaddingTest}.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；未纳入用户既有改动 `admin-web/.env.development`

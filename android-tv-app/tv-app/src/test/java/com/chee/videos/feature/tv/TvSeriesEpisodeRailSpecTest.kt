@@ -28,21 +28,29 @@ class TvSeriesEpisodeRailSpecTest {
         assertTrue(source.contains("enum class TvLongFormControlsVariant"))
         assertTrue(source.contains("SeriesEpisodeRail"))
         assertTrue(source.contains("TvEpisodeRail("))
+        assertTrue(source.contains("TvSeriesControlsPage("))
         assertTrue(source.contains("TvPlaybackProgressBar("))
         assertTrue(source.contains("episodeRailVisible"))
         assertTrue(source.contains("EnterEpisodeRail"))
         assertTrue(source.contains("ExitEpisodeRail"))
         assertTrue(source.contains("tvControlsVariant == TvLongFormControlsVariant.Default"))
+        assertTrue(source.contains("AnimatedContent("))
+        assertTrue(source.contains("slideInVertically("))
+        assertTrue(source.contains("slideOutVertically("))
     }
 
     @Test
     fun episodeRailTooltipTracksFocusAndCurrentEpisodeSelectionHasNoSideEffect() {
         val source = readSource("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
+        val episodeRailSource = source.substringAfter("private fun TvEpisodeRail(").substringBefore("@Composable\nprivate fun CompactPlayerControlButton(")
 
-        assertTrue(source.contains("visible = focused"))
-        assertTrue(source.contains("text = item.title"))
+        assertTrue(episodeRailSource.contains("if (focused)"))
+        assertTrue(episodeRailSource.contains("text = item.title"))
         assertTrue(source.contains("hideAllTvUi()"))
         assertTrue(source.contains("if (item.id != currentEpisodeRailItemId)"))
+        assertTrue(episodeRailSource.contains("text = formatTvEpisodeRailLabel(item.number)"))
+        assertTrue(episodeRailSource.contains("listState.scrollToItem(nextFirstVisibleItemIndex)"))
+        assertFalse(episodeRailSource.contains("animateScrollToItem"))
     }
 
     private fun readSource(relative: String): String {
