@@ -28,7 +28,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -93,7 +95,7 @@ enum class TvLongFormControlsVariant {
     SeriesEpisodeRail,
 }
 
-private enum class TvControlFocusTarget {
+internal enum class TvControlFocusTarget {
     PlayPause,
     Rewind,
     Forward,
@@ -106,9 +108,35 @@ private enum class TvControlFocusTarget {
     Fullscreen,
 }
 
+internal enum class TvControlFocusDirection {
+    Left,
+    Right,
+}
+
+internal fun resolveTvControlHorizontalFocusTarget(
+    current: TvControlFocusTarget,
+    direction: TvControlFocusDirection,
+    targets: List<TvControlFocusTarget>,
+): TvControlFocusTarget? {
+    val index = targets.indexOf(current)
+    if (index < 0 || targets.isEmpty()) {
+        return null
+    }
+    return when (direction) {
+        TvControlFocusDirection.Left -> targets[(index - 1 + targets.size) % targets.size]
+        TvControlFocusDirection.Right -> targets[(index + 1) % targets.size]
+    }
+}
+
 private enum class TvSeriesBottomPanelPage(val depth: Int) {
     Controls(0),
     EpisodeRail(1),
+}
+
+private object TvEpisodeRailLayoutTokens {
+    const val ItemSlotWidthDp: Int = 120
+    const val TooltipHeightDp: Int = 44
+    const val TooltipMaxWidthDp: Int = 220
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -698,9 +726,24 @@ fun LongFormVideoPlayer(
         }
     }
     fun controlFocusModifier(target: TvControlFocusTarget): Modifier {
+        fun requestHorizontalControlFocus(direction: TvControlFocusDirection): Boolean {
+            val nextTarget = resolveTvControlHorizontalFocusTarget(
+                current = target,
+                direction = direction,
+                targets = tvControlFocusTargets,
+            ) ?: return false
+            val moved = resolveControlFocusRequester(nextTarget).tryRequestFocus()
+            if (moved) {
+                playerFocusLayer = TvPlayerFocusLayer.Controls
+                lastFocusedControlTarget = nextTarget
+                scheduleAutoHideControls()
+            }
+            return moved
+        }
+
         val base = Modifier
             .onFocusChanged { focusState ->
-                if (focusState.isFocused) {
+                if (focusState.isFocused || focusState.hasFocus) {
                     playerFocusLayer = TvPlayerFocusLayer.Controls
                     lastFocusedControlTarget = target
                 }
@@ -710,9 +753,15 @@ fun LongFormVideoPlayer(
                     return@onPreviewKeyEvent false
                 }
                 if (tvControlsVariant != TvLongFormControlsVariant.SeriesEpisodeRail || episodeRailItems.isEmpty()) {
-                    return@onPreviewKeyEvent false
+                    return@onPreviewKeyEvent when (event.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> requestHorizontalControlFocus(TvControlFocusDirection.Left)
+                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> requestHorizontalControlFocus(TvControlFocusDirection.Right)
+                        else -> false
+                    }
                 }
                 when (event.nativeKeyEvent.keyCode) {
+                    AndroidKeyEvent.KEYCODE_DPAD_LEFT -> requestHorizontalControlFocus(TvControlFocusDirection.Left)
+                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> requestHorizontalControlFocus(TvControlFocusDirection.Right)
                     AndroidKeyEvent.KEYCODE_DPAD_DOWN -> handleTvRemoteKeyAction(TvRemoteKeyAction.EnterEpisodeRail)
                     else -> false
                 }
@@ -720,12 +769,19 @@ fun LongFormVideoPlayer(
         if (!tvMode) {
             return base
         }
-        val index = tvControlFocusTargets.indexOf(target)
-        if (index < 0 || tvControlFocusTargets.isEmpty()) {
+        if (tvControlFocusTargets.indexOf(target) < 0 || tvControlFocusTargets.isEmpty()) {
             return base
         }
-        val leftTarget = tvControlFocusTargets[(index - 1 + tvControlFocusTargets.size) % tvControlFocusTargets.size]
-        val rightTarget = tvControlFocusTargets[(index + 1) % tvControlFocusTargets.size]
+        val leftTarget = resolveTvControlHorizontalFocusTarget(
+            current = target,
+            direction = TvControlFocusDirection.Left,
+            targets = tvControlFocusTargets,
+        ) ?: return base
+        val rightTarget = resolveTvControlHorizontalFocusTarget(
+            current = target,
+            direction = TvControlFocusDirection.Right,
+            targets = tvControlFocusTargets,
+        ) ?: return base
         return base.focusProperties {
             left = resolveControlFocusRequester(leftTarget)
             right = resolveControlFocusRequester(rightTarget)
@@ -1477,26 +1533,34 @@ private fun TvEpisodeRail(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.width(TvEpisodeRailLayoutTokens.ItemSlotWidthDp.dp),
             ) {
                 Box(
-                    modifier = Modifier.height(44.dp),
+                    modifier = Modifier
+                        .width(TvEpisodeRailLayoutTokens.ItemSlotWidthDp.dp)
+                        .height(TvEpisodeRailLayoutTokens.TooltipHeightDp.dp),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     if (focused) {
-                        Surface(
-                            color = Color(0xE8141820),
-                            shape = AppChrome.SurfaceShape,
+                        Box(
+                            modifier = Modifier.wrapContentWidth(Alignment.CenterHorizontally, unbounded = true),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                text = item.title,
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                                    .widthIn(max = 220.dp),
-                            )
+                            Surface(
+                                color = Color(0xE8141820),
+                                shape = AppChrome.SurfaceShape,
+                            ) {
+                                Text(
+                                    text = item.title,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        .widthIn(max = TvEpisodeRailLayoutTokens.TooltipMaxWidthDp.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -1514,6 +1578,7 @@ private fun TvEpisodeRail(
                     },
                     shape = AppChrome.ChipShape,
                     modifier = Modifier
+                        .width(TvEpisodeRailLayoutTokens.ItemSlotWidthDp.dp)
                         .then(if (current) Modifier.focusRequester(currentEpisodeFocusRequester) else Modifier)
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
@@ -1532,6 +1597,8 @@ private fun TvEpisodeRail(
                         },
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (current) FontWeight.Bold else FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
                 }

@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-31 02:28 +0800
+- 进度：完成电视剧播放器选集 gap 与 controls 左右焦点返修验证。确认选集 gap 的根因是焦点标题气泡参与 `LazyRow` item 横向测量，本轮已改为固定槽位 + 气泡覆盖；controls 左右键在持焦控件层消费并请求相邻按钮，根播放器继续只负责根层 seek。收尾只准备提交本任务文件，保留用户既有改动 `admin-web/.env.development` 不纳入。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/LongFormVideoPlayerControlsFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesEpisodeRailSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvSeriesEpisodeRailSpecTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerControlsFocusPolicyTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvSeriesEpisodeRailSpecTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerControlsFocusPolicyTest' --tests 'com.chee.videos.core.ui.TvLongFormRemoteKeyRoutingTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerTransportKeyTest' --tests 'com.chee.videos.core.ui.TvLongFormControlsAutoHideTest' --tests 'com.chee.videos.core.ui.TvEpisodeRailPolicyTest' --tests 'com.chee.videos.core.ui.TvLongFormTitleOverlaySpecTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`git diff --check -- CONTEXT.md plan.md android-tv-app/tv-app/build.gradle.kts android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/LongFormVideoPlayerControlsFocusPolicyTest.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesEpisodeRailSpecTest.kt` 通过；乱码扫描无输出。
+
+## 2026-05-31 02:25 +0800
+- 进度：完成电视剧播放器返修实现。`LongFormVideoPlayer` 将选集轨集卡改为固定槽位，标题气泡改为不参与横向测量的覆盖信息，避免焦点切换时在左右集卡之间撑出 gap；controls 持焦按钮新增本地 LEFT/RIGHT 焦点请求，仍保留 `focusProperties` 首尾环绕链，避免左右键回落为播放器根层 seek。新增焦点链纯逻辑测试与源文回归，TV 版本升级到 `0.1.78 (78)`，`CONTEXT.md` 补充“选集轨固定槽位”和“controls 持焦横向导航”。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/LongFormVideoPlayerControlsFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesEpisodeRailSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvSeriesEpisodeRailSpecTest' --tests 'com.chee.videos.core.ui.LongFormVideoPlayerControlsFocusPolicyTest'` 通过；待执行电视剧播放器相关定向单测、TV 全量单测、`git diff --check`、乱码扫描。
+
+## 2026-05-31 02:16 +0800
+- 进度：开始返修电视剧播放器交互问题。现有 `CONTEXT.md` 已定义 [[选集轨双态高亮]]、[[controls 左右键切焦点]] 与 [[controls 焦点环绕]]，用户反馈实际仍出现选集切换放大/位移、controls 聚焦后 LEFT/RIGHT 未稳定切焦点。本轮先补回归测试锁住“集卡固定槽位 + 静态高亮”和“controls 持焦控件本地处理左右切焦点”，再做最小实现，避免只改源文断言。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行电视剧播放器相关定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`git diff --check`、乱码扫描。
+
 ## 2026-05-31 01:50 +0800
 - 进度：完成电视剧播放器“中间切换多按一次下键”修复。`LongFormVideoPlayer` 在电视剧 controls 持焦层增加本地 `DPad DOWN` 兜底，确保第二次 DOWN 直接进入选集轨；保留 controls/选集轨焦点请求重试，选集卡继续只用静态高亮无 glow。同步更新源文审计、TV 版本到 `0.1.77 (77)`，并在 `CONTEXT.md` 追加“播放器内纵向切页无空按”约束。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvLongFormTitleOverlaySpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesEpisodeRailSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；未纳入用户既有改动 `admin-web/.env.development`

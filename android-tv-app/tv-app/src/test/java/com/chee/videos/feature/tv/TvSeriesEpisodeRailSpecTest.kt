@@ -70,6 +70,25 @@ class TvSeriesEpisodeRailSpecTest {
         assertFalse(episodeRailSource.contains("tvFocusableGlow("))
         assertTrue(episodeRailSource.contains(".focusable(enabled = item.playable)"))
         assertTrue(episodeRailSource.contains("BorderStroke("))
+        assertTrue(episodeRailSource.contains("TvEpisodeRailLayoutTokens.ItemSlotWidthDp.dp"))
+        assertTrue(episodeRailSource.contains("wrapContentWidth(Alignment.CenterHorizontally, unbounded = true)"))
+        assertFalse(episodeRailSource.contains("focusedScale"))
+        assertFalse(episodeRailSource.contains("graphicsLayer"))
+    }
+
+    @Test
+    fun controlsHandleHorizontalFocusLocallyWhenFocused() {
+        val source = readSource("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
+        val controlsModifierSource = source
+            .substringAfter("fun controlFocusModifier(target: TvControlFocusTarget): Modifier {")
+            .substringBefore("val titleOverlayData =")
+
+        assertTrue(controlsModifierSource.contains("AndroidKeyEvent.KEYCODE_DPAD_LEFT"))
+        assertTrue(controlsModifierSource.contains("AndroidKeyEvent.KEYCODE_DPAD_RIGHT"))
+        assertTrue(controlsModifierSource.contains("resolveTvControlHorizontalFocusTarget("))
+        assertTrue(controlsModifierSource.contains("requestHorizontalControlFocus("))
+        assertTrue(controlsModifierSource.contains("scheduleAutoHideControls()"))
+        assertTrue(controlsModifierSource.contains("focusState.isFocused || focusState.hasFocus"))
     }
 
     private fun readSource(relative: String): String {
