@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -582,22 +583,30 @@ fun LongFormVideoPlayer(
         if (!tvMode || !controlsVisible || target == null) {
             return@LaunchedTvInitialFocus
         }
-        try {
-            resolveControlFocusRequester(target).tryRequestFocus()
-        } finally {
-            pendingControlFocusTarget = null
+        for (attempt in 0 until 4) {
+            if (resolveControlFocusRequester(target).tryRequestFocus()) {
+                break
+            }
+            if (attempt < 3) {
+                delay(16)
+            }
         }
+        pendingControlFocusTarget = null
     }
 
     LaunchedTvInitialFocus(tvMode, episodeRailVisible, episodeRailOpenNonce, pendingEpisodeRailFocusRequest) {
         if (!tvMode || !episodeRailVisible || !pendingEpisodeRailFocusRequest) {
             return@LaunchedTvInitialFocus
         }
-        try {
-            currentEpisodeRailFocusRequester.tryRequestFocus()
-        } finally {
-            pendingEpisodeRailFocusRequest = false
+        for (attempt in 0 until 4) {
+            if (currentEpisodeRailFocusRequester.tryRequestFocus()) {
+                break
+            }
+            if (attempt < 3) {
+                delay(16)
+            }
         }
+        pendingEpisodeRailFocusRequest = false
     }
 
     LaunchedEffect(player, audioTracks, selectedAudioTrackId, selectedAudioPreference, isVlcPlaying) {
@@ -689,12 +698,25 @@ fun LongFormVideoPlayer(
         }
     }
     fun controlFocusModifier(target: TvControlFocusTarget): Modifier {
-        val base = Modifier.onFocusChanged { focusState ->
-            if (focusState.isFocused) {
-                playerFocusLayer = TvPlayerFocusLayer.Controls
-                lastFocusedControlTarget = target
+        val base = Modifier
+            .onFocusChanged { focusState ->
+                if (focusState.isFocused) {
+                    playerFocusLayer = TvPlayerFocusLayer.Controls
+                    lastFocusedControlTarget = target
+                }
             }
-        }
+            .onPreviewKeyEvent { event ->
+                if (!tvMode || event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
+                    return@onPreviewKeyEvent false
+                }
+                if (tvControlsVariant != TvLongFormControlsVariant.SeriesEpisodeRail || episodeRailItems.isEmpty()) {
+                    return@onPreviewKeyEvent false
+                }
+                when (event.nativeKeyEvent.keyCode) {
+                    AndroidKeyEvent.KEYCODE_DPAD_DOWN -> handleTvRemoteKeyAction(TvRemoteKeyAction.EnterEpisodeRail)
+                    else -> false
+                }
+            }
         if (!tvMode) {
             return base
         }
@@ -1480,9 +1502,15 @@ private fun TvEpisodeRail(
                 }
                 Surface(
                     color = when {
+                        focused -> AppChrome.SurfaceMuted.copy(alpha = 0.98f)
                         current -> AppChrome.SurfaceStrong.copy(alpha = 0.96f)
                         item.playable -> AppChrome.SurfaceElevated.copy(alpha = 0.92f)
                         else -> AppChrome.Surface.copy(alpha = 0.66f)
+                    },
+                    border = when {
+                        focused -> BorderStroke(1.dp, AppChrome.TextSecondary.copy(alpha = 0.72f))
+                        current -> BorderStroke(1.dp, AppChrome.Divider.copy(alpha = 0.88f))
+                        else -> null
                     },
                     shape = AppChrome.ChipShape,
                     modifier = Modifier
@@ -1493,7 +1521,7 @@ private fun TvEpisodeRail(
                             }
                         }
                         .focusProperties { canFocus = item.playable }
-                        .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.08f)
+                        .focusable(enabled = item.playable)
                         .clickable(enabled = item.playable) { onSelectEpisode(item) },
                 ) {
                     Text(

@@ -37,6 +37,8 @@ class TvSeriesEpisodeRailSpecTest {
         assertTrue(source.contains("AnimatedContent("))
         assertTrue(source.contains("slideInVertically("))
         assertTrue(source.contains("slideOutVertically("))
+        assertTrue(source.contains("for (attempt in 0 until 4)"))
+        assertTrue(source.contains("currentEpisodeRailFocusRequester.tryRequestFocus()"))
     }
 
     @Test
@@ -51,6 +53,23 @@ class TvSeriesEpisodeRailSpecTest {
         assertTrue(episodeRailSource.contains("text = formatTvEpisodeRailLabel(item.number)"))
         assertTrue(episodeRailSource.contains("listState.scrollToItem(nextFirstVisibleItemIndex)"))
         assertFalse(episodeRailSource.contains("animateScrollToItem"))
+    }
+
+    @Test
+    fun episodeRailUsesStaticHighlightWithoutGlowAndControlsDownEntersRailLocally() {
+        val source = readSource("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
+        val controlsModifierSource = source
+            .substringAfter("fun controlFocusModifier(target: TvControlFocusTarget): Modifier {")
+            .substringBefore("val titleOverlayData =")
+        val episodeRailSource = source
+            .substringAfter("private fun TvEpisodeRail(")
+            .substringBefore("@Composable\nprivate fun CompactPlayerControlButton(")
+
+        assertTrue(controlsModifierSource.contains("AndroidKeyEvent.KEYCODE_DPAD_DOWN"))
+        assertTrue(controlsModifierSource.contains("handleTvRemoteKeyAction(TvRemoteKeyAction.EnterEpisodeRail)"))
+        assertFalse(episodeRailSource.contains("tvFocusableGlow("))
+        assertTrue(episodeRailSource.contains(".focusable(enabled = item.playable)"))
+        assertTrue(episodeRailSource.contains("BorderStroke("))
     }
 
     private fun readSource(relative: String): String {

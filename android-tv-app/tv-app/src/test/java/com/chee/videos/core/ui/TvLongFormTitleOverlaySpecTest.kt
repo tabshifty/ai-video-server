@@ -38,7 +38,12 @@ class TvLongFormTitleOverlaySpecTest {
     @Test
     fun longFormPlayerRoutesTvKeysThroughSingleHelperAndRemovesOldHiddenTransportRouter() {
         val source = readSource("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
-        val keyHandler = source.substringAfter(".onPreviewKeyEvent").substringBefore(".onSizeChanged")
+        val rootBoxModifierChain = source
+            .substringAfter("Box(\n        modifier = modifier")
+            .substringBefore(".onSizeChanged")
+        val keyHandler = rootBoxModifierChain
+            .substringAfter(".onPreviewKeyEvent")
+            .substringBefore(".onSizeChanged")
 
         assertTrue(source.contains("resolveTvRemoteKeyAction("))
         assertFalse(source.contains("resolveTvHiddenTransportKeyAction"))
