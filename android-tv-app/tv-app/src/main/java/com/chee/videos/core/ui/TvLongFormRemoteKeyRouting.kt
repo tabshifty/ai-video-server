@@ -7,9 +7,17 @@ internal sealed interface TvRemoteKeyAction {
     data class Seek(val deltaMs: Long) : TvRemoteKeyAction
     data object EnterFocus : TvRemoteKeyAction
     data object ExitFocus : TvRemoteKeyAction
+    data object EnterEpisodeRail : TvRemoteKeyAction
+    data object ExitEpisodeRail : TvRemoteKeyAction
     data object TogglePlayPause : TvRemoteKeyAction
     data object DismissUi : TvRemoteKeyAction
     data object PassThrough : TvRemoteKeyAction
+}
+
+internal enum class TvPlayerFocusLayer {
+    Root,
+    Controls,
+    EpisodeRail,
 }
 
 @Immutable
@@ -20,7 +28,8 @@ internal data class TvLongFormTitleOverlayData(
 
 internal fun resolveTvRemoteKeyAction(
     visible: Boolean,
-    focusInControls: Boolean,
+    focusLayer: TvPlayerFocusLayer,
+    episodeRailEnabled: Boolean,
     keyCode: Int,
     repeatCount: Int,
     seekStepSec: Int,
@@ -31,24 +40,26 @@ internal fun resolveTvRemoteKeyAction(
         AndroidKeyEvent.KEYCODE_DPAD_LEFT,
         AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
         -> when {
-            visible && focusInControls -> TvRemoteKeyAction.PassThrough
+            focusLayer != TvPlayerFocusLayer.Root -> TvRemoteKeyAction.PassThrough
             else -> TvRemoteKeyAction.Seek(-seekDelta)
         }
 
         AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
         AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
         -> when {
-            visible && focusInControls -> TvRemoteKeyAction.PassThrough
+            focusLayer != TvPlayerFocusLayer.Root -> TvRemoteKeyAction.PassThrough
             else -> TvRemoteKeyAction.Seek(seekDelta)
         }
 
         AndroidKeyEvent.KEYCODE_DPAD_DOWN -> when {
-            focusInControls -> null
-            else -> TvRemoteKeyAction.EnterFocus
+            focusLayer == TvPlayerFocusLayer.Root -> TvRemoteKeyAction.EnterFocus
+            focusLayer == TvPlayerFocusLayer.Controls && episodeRailEnabled -> TvRemoteKeyAction.EnterEpisodeRail
+            else -> null
         }
 
         AndroidKeyEvent.KEYCODE_DPAD_UP -> when {
-            focusInControls -> TvRemoteKeyAction.ExitFocus
+            focusLayer == TvPlayerFocusLayer.EpisodeRail -> TvRemoteKeyAction.ExitEpisodeRail
+            focusLayer == TvPlayerFocusLayer.Controls -> TvRemoteKeyAction.ExitFocus
             else -> null
         }
 
@@ -59,7 +70,7 @@ internal fun resolveTvRemoteKeyAction(
         AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
         AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
         -> when {
-            focusInControls -> TvRemoteKeyAction.PassThrough
+            focusLayer != TvPlayerFocusLayer.Root -> TvRemoteKeyAction.PassThrough
             else -> TvRemoteKeyAction.TogglePlayPause
         }
 
@@ -82,6 +93,8 @@ internal fun shouldResetAutoHideTimer(action: TvRemoteKeyAction): Boolean {
         -> true
 
         TvRemoteKeyAction.ExitFocus,
+        TvRemoteKeyAction.EnterEpisodeRail,
+        TvRemoteKeyAction.ExitEpisodeRail,
         TvRemoteKeyAction.DismissUi,
         TvRemoteKeyAction.PassThrough,
         -> false

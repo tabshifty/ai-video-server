@@ -21,12 +21,16 @@ class TvScrollableBottomPaddingTest {
             pattern = "bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp",
         )
         assertSourceContains(
-            path = "src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt",
-            pattern = "bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp",
-        )
-        assertSourceContains(
             path = "src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt",
             pattern = "bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp",
+        )
+    }
+
+    @Test
+    fun `immersive tv player page does not reuse scroll bottom safe padding`() {
+        assertSourceNotContains(
+            path = "src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt",
+            pattern = "TvLayoutSpec.scrollBottomSafePaddingDp",
         )
     }
 
@@ -34,5 +38,11 @@ class TvScrollableBottomPaddingTest {
         val sourcePath = Path.of(path)
         assertTrue("$path 必须存在", sourcePath.exists())
         assertTrue("$path 必须使用统一 TV 滚动内容底部安全留白", sourcePath.readText().contains(pattern))
+    }
+
+    private fun assertSourceNotContains(path: String, pattern: String) {
+        val sourcePath = Path.of(path)
+        assertTrue("$path 必须存在", sourcePath.exists())
+        assertTrue("$path 不应使用滚动页底部安全留白", !sourcePath.readText().contains(pattern))
     }
 }

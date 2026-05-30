@@ -7,15 +7,19 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,6 +38,9 @@ import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -46,6 +53,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +63,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -74,6 +82,24 @@ import kotlin.math.abs
 import org.videolan.libvlc.MediaPlayer
 
 private const val LongFormVideoPlayerLogTag = "LongFormVideoPlayer"
+
+enum class TvLongFormControlsVariant {
+    Default,
+    SeriesEpisodeRail,
+}
+
+private enum class TvControlFocusTarget {
+    PlayPause,
+    Rewind,
+    Forward,
+    EpisodeSelector,
+    NextEpisode,
+    Subtitle,
+    AudioTrack,
+    BackDetail,
+    ExitPlayback,
+    Fullscreen,
+}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -96,10 +122,15 @@ fun LongFormVideoPlayer(
     onSelectAudioTrack: (trackId: String?, preference: TvTrackPreference?, isUserAction: Boolean) -> Unit = { _, _, _ -> },
     tvMode: Boolean = false,
     tvSeekStepSeconds: Int = 10,
+    tvControlsVariant: TvLongFormControlsVariant = TvLongFormControlsVariant.Default,
     seriesTitleForOverlay: String? = null,
     seasonNumber: Int? = null,
     episodeNumber: Int? = null,
     episodeTitle: String? = null,
+    episodeRailItems: List<TvEpisodeRailItem> = emptyList(),
+    currentEpisodeRailItemId: String? = null,
+    onSelectEpisodeRailItem: ((TvEpisodeRailItem) -> Unit)? = null,
+    onEpisodeRailVisibilityChanged: (Boolean) -> Unit = {},
     onOpenEpisodeSelector: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null,
     onRequestExitPlayback: (() -> Unit)? = null,
@@ -123,8 +154,12 @@ fun LongFormVideoPlayer(
     val backDetailFocusRequester = remember { FocusRequester() }
     val exitPlaybackFocusRequester = remember { FocusRequester() }
     val fullscreenFocusRequester = remember { FocusRequester() }
+    val currentEpisodeRailFocusRequester = remember { FocusRequester() }
 
     var controlsVisible by remember { mutableStateOf(false) }
+    var episodeRailVisible by rememberSaveable(currentEpisodeRailItemId, tvControlsVariant) { mutableStateOf(false) }
+    var episodeRailOpenNonce by remember(currentEpisodeRailItemId, tvControlsVariant) { mutableStateOf(0) }
+    var focusedEpisodeRailItemId by rememberSaveable(currentEpisodeRailItemId) { mutableStateOf(currentEpisodeRailItemId.orEmpty()) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var isVlcPlaying by remember { mutableStateOf(player.isPlaying) }
     var durationMs by remember { mutableStateOf(player.length.coerceAtLeast(0L)) }
@@ -153,11 +188,16 @@ fun LongFormVideoPlayer(
     LaunchedEffect(isTrackSheetVisible) {
         onTrackSheetVisibilityChanged(isTrackSheetVisible)
     }
+    LaunchedEffect(episodeRailVisible) {
+        onEpisodeRailVisibilityChanged(episodeRailVisible)
+    }
     var audioTracks by remember { mutableStateOf(emptyList<LongFormAudioTrack>()) }
     var hasShownControlsOnce by remember { mutableStateOf(false) }
     var pendingRootFocusRequest by remember { mutableStateOf(false) }
-    var pendingPlayPauseFocusRequest by remember { mutableStateOf(false) }
-    var focusInControls by remember { mutableStateOf(false) }
+    var pendingControlFocusTarget by remember { mutableStateOf<TvControlFocusTarget?>(null) }
+    var pendingEpisodeRailFocusRequest by remember { mutableStateOf(false) }
+    var playerFocusLayer by remember { mutableStateOf(TvPlayerFocusLayer.Root) }
+    var lastFocusedControlTarget by remember { mutableStateOf(TvControlFocusTarget.PlayPause) }
     val latestOnVlcEvent by rememberUpdatedState(onVlcEvent)
 
     var hideControlsJob by remember { mutableStateOf<Job?>(null) }
@@ -178,22 +218,43 @@ fun LongFormVideoPlayer(
         pendingRootFocusRequest = true
     }
 
+    fun hideEpisodeRail() {
+        episodeRailVisible = false
+        pendingEpisodeRailFocusRequest = false
+    }
+
+    fun requestControlFocusWhenReady(target: TvControlFocusTarget) {
+        pendingControlFocusTarget = target
+    }
+
     fun scheduleAutoHideControls() {
         hideControlsJob?.cancel()
+        if (episodeRailVisible) {
+            return
+        }
         hideControlsJob = scope.launch {
             delay(5000)
             controlsVisible = false
-            focusInControls = false
+            hideEpisodeRail()
+            playerFocusLayer = TvPlayerFocusLayer.Root
             requestRootFocusWhenReady()
         }
     }
 
-    fun showControlsTemporarily(requestPlayPauseFocus: Boolean = false) {
+    fun showControlsTemporarily(requestControlFocus: TvControlFocusTarget? = null) {
         controlsVisible = true
-        if (requestPlayPauseFocus) {
-            pendingPlayPauseFocusRequest = true
+        if (requestControlFocus != null) {
+            requestControlFocusWhenReady(requestControlFocus)
         }
         scheduleAutoHideControls()
+    }
+
+    fun hideAllTvUi() {
+        controlsVisible = false
+        hideEpisodeRail()
+        playerFocusLayer = TvPlayerFocusLayer.Root
+        hideControlsJob?.cancel()
+        requestRootFocusWhenReady()
     }
 
     fun showTransientFeedback(
@@ -316,20 +377,46 @@ fun LongFormVideoPlayer(
                     showControls = false,
                 )
                 controlsVisible = true
-                focusInControls = false
+                hideEpisodeRail()
+                playerFocusLayer = TvPlayerFocusLayer.Root
                 requestRootFocusWhenReady()
                 scheduleAutoHideControls()
                 true
             }
 
             TvRemoteKeyAction.EnterFocus -> {
-                showControlsTemporarily(requestPlayPauseFocus = true)
+                hideEpisodeRail()
+                playerFocusLayer = TvPlayerFocusLayer.Controls
+                showControlsTemporarily(requestControlFocus = TvControlFocusTarget.PlayPause)
                 true
             }
 
             TvRemoteKeyAction.ExitFocus -> {
+                hideEpisodeRail()
+                playerFocusLayer = TvPlayerFocusLayer.Root
                 requestRootFocusWhenReady()
-                focusInControls = false
+                true
+            }
+
+            TvRemoteKeyAction.EnterEpisodeRail -> {
+                if (tvControlsVariant != TvLongFormControlsVariant.SeriesEpisodeRail || episodeRailItems.isEmpty()) {
+                    return false
+                }
+                controlsVisible = true
+                episodeRailVisible = true
+                episodeRailOpenNonce += 1
+                focusedEpisodeRailItemId = currentEpisodeRailItemId.orEmpty()
+                pendingEpisodeRailFocusRequest = true
+                playerFocusLayer = TvPlayerFocusLayer.EpisodeRail
+                hideControlsJob?.cancel()
+                true
+            }
+
+            TvRemoteKeyAction.ExitEpisodeRail -> {
+                hideEpisodeRail()
+                playerFocusLayer = TvPlayerFocusLayer.Controls
+                requestControlFocusWhenReady(lastFocusedControlTarget)
+                scheduleAutoHideControls()
                 true
             }
 
@@ -339,15 +426,12 @@ fun LongFormVideoPlayer(
             }
 
             TvRemoteKeyAction.DismissUi -> {
-                controlsVisible = false
-                focusInControls = false
-                hideControlsJob?.cancel()
-                requestRootFocusWhenReady()
+                hideAllTvUi()
                 true
             }
 
             TvRemoteKeyAction.PassThrough -> {
-                if (focusInControls) {
+                if (playerFocusLayer == TvPlayerFocusLayer.Controls && !episodeRailVisible) {
                     scheduleAutoHideControls()
                 }
                 false
@@ -426,8 +510,9 @@ fun LongFormVideoPlayer(
         if (controlsVisible) {
             hasShownControlsOnce = true
         } else if (hasShownControlsOnce) {
-            pendingPlayPauseFocusRequest = false
-            focusInControls = false
+            pendingControlFocusTarget = null
+            hideEpisodeRail()
+            playerFocusLayer = TvPlayerFocusLayer.Root
             requestRootFocusWhenReady()
         }
     }
@@ -443,6 +528,10 @@ fun LongFormVideoPlayer(
     var previousFocusGuardInput by remember { mutableStateOf(currentFocusGuardInput) }
     LaunchedEffect(currentFocusGuardInput) {
         if (tvMode && shouldReclaimRootFocus(previousFocusGuardInput, currentFocusGuardInput)) {
+            if (episodeRailVisible) {
+                previousFocusGuardInput = currentFocusGuardInput
+                return@LaunchedEffect
+            }
             requestRootFocusWhenReady()
         }
         previousFocusGuardInput = currentFocusGuardInput
@@ -459,14 +548,41 @@ fun LongFormVideoPlayer(
         }
     }
 
-    LaunchedTvInitialFocus(tvMode, controlsVisible, pendingPlayPauseFocusRequest) {
-        if (!tvMode || !controlsVisible || !pendingPlayPauseFocusRequest) {
+    fun resolveControlFocusRequester(target: TvControlFocusTarget): FocusRequester {
+        return when (target) {
+            TvControlFocusTarget.PlayPause -> playPauseFocusRequester
+            TvControlFocusTarget.Rewind -> rewindFocusRequester
+            TvControlFocusTarget.Forward -> forwardFocusRequester
+            TvControlFocusTarget.EpisodeSelector -> episodeSelectorFocusRequester
+            TvControlFocusTarget.NextEpisode -> nextEpisodeFocusRequester
+            TvControlFocusTarget.Subtitle -> subtitleFocusRequester
+            TvControlFocusTarget.AudioTrack -> audioTrackFocusRequester
+            TvControlFocusTarget.BackDetail -> backDetailFocusRequester
+            TvControlFocusTarget.ExitPlayback -> exitPlaybackFocusRequester
+            TvControlFocusTarget.Fullscreen -> fullscreenFocusRequester
+        }
+    }
+
+    LaunchedTvInitialFocus(tvMode, controlsVisible, pendingControlFocusTarget) {
+        val target = pendingControlFocusTarget
+        if (!tvMode || !controlsVisible || target == null) {
             return@LaunchedTvInitialFocus
         }
         try {
-            playPauseFocusRequester.tryRequestFocus()
+            resolveControlFocusRequester(target).tryRequestFocus()
         } finally {
-            pendingPlayPauseFocusRequest = false
+            pendingControlFocusTarget = null
+        }
+    }
+
+    LaunchedTvInitialFocus(tvMode, episodeRailVisible, episodeRailOpenNonce, pendingEpisodeRailFocusRequest) {
+        if (!tvMode || !episodeRailVisible || !pendingEpisodeRailFocusRequest) {
+            return@LaunchedTvInitialFocus
+        }
+        try {
+            currentEpisodeRailFocusRequester.tryRequestFocus()
+        } finally {
+            pendingEpisodeRailFocusRequest = false
         }
     }
 
@@ -526,50 +642,51 @@ fun LongFormVideoPlayer(
     } else {
         0f
     }
-    val tvControlFocusRequesters = buildList {
-        add(playPauseFocusRequester)
+    val tvControlFocusTargets = buildList {
+        add(TvControlFocusTarget.PlayPause)
+        if (tvMode && tvControlsVariant == TvLongFormControlsVariant.Default) {
+            add(TvControlFocusTarget.Rewind)
+            add(TvControlFocusTarget.Forward)
+        }
+        if (tvMode && tvControlsVariant == TvLongFormControlsVariant.Default && onOpenEpisodeSelector != null) {
+            add(TvControlFocusTarget.EpisodeSelector)
+        }
+        if (tvMode && tvControlsVariant == TvLongFormControlsVariant.Default && onNextEpisode != null) {
+            add(TvControlFocusTarget.NextEpisode)
+        }
+        add(TvControlFocusTarget.Subtitle)
         if (tvMode) {
-            add(rewindFocusRequester)
+            add(TvControlFocusTarget.AudioTrack)
         }
-        if (tvMode) {
-            add(forwardFocusRequester)
-        }
-        if (tvMode && onOpenEpisodeSelector != null) {
-            add(episodeSelectorFocusRequester)
-        }
-        if (tvMode && onNextEpisode != null) {
-            add(nextEpisodeFocusRequester)
-        }
-        add(subtitleFocusRequester)
-        if (tvMode) {
-            add(audioTrackFocusRequester)
-            add(backDetailFocusRequester)
-        }
-        if (tvMode && onExitPlayback != null) {
-            add(exitPlaybackFocusRequester)
+        if (tvMode && tvControlsVariant == TvLongFormControlsVariant.Default) {
+            add(TvControlFocusTarget.BackDetail)
+            if (onExitPlayback != null) {
+                add(TvControlFocusTarget.ExitPlayback)
+            }
         }
         if (!tvMode) {
-            add(fullscreenFocusRequester)
+            add(TvControlFocusTarget.Fullscreen)
         }
     }
-    fun controlFocusModifier(focusRequester: FocusRequester): Modifier {
+    fun controlFocusModifier(target: TvControlFocusTarget): Modifier {
         val base = Modifier.onFocusChanged { focusState ->
             if (focusState.isFocused) {
-                focusInControls = true
+                playerFocusLayer = TvPlayerFocusLayer.Controls
+                lastFocusedControlTarget = target
             }
         }
         if (!tvMode) {
             return base
         }
-        val index = tvControlFocusRequesters.indexOf(focusRequester)
-        if (index < 0 || tvControlFocusRequesters.isEmpty()) {
+        val index = tvControlFocusTargets.indexOf(target)
+        if (index < 0 || tvControlFocusTargets.isEmpty()) {
             return base
         }
-        val leftRequester = tvControlFocusRequesters[(index - 1 + tvControlFocusRequesters.size) % tvControlFocusRequesters.size]
-        val rightRequester = tvControlFocusRequesters[(index + 1) % tvControlFocusRequesters.size]
+        val leftTarget = tvControlFocusTargets[(index - 1 + tvControlFocusTargets.size) % tvControlFocusTargets.size]
+        val rightTarget = tvControlFocusTargets[(index + 1) % tvControlFocusTargets.size]
         return base.focusProperties {
-            left = leftRequester
-            right = rightRequester
+            left = resolveControlFocusRequester(leftTarget)
+            right = resolveControlFocusRequester(rightTarget)
         }
     }
     val titleOverlayData = buildTvLongFormTitleOverlayData(
@@ -587,10 +704,14 @@ fun LongFormVideoPlayer(
             .focusRequester(rootFocusRequester)
             .focusable()
             .onFocusChanged { focusState ->
+                if (tvMode && focusState.isFocused) {
+                    playerFocusLayer = TvPlayerFocusLayer.Root
+                }
                 if (tvMode &&
                     !focusState.hasFocus &&
                     !currentFocusGuardInput.anyOverlayVisible() &&
-                    !focusInControls
+                    playerFocusLayer == TvPlayerFocusLayer.Root &&
+                    !episodeRailVisible
                 ) {
                     requestRootFocusWhenReady()
                 }
@@ -607,7 +728,8 @@ fun LongFormVideoPlayer(
                 }
                 val action = resolveTvRemoteKeyAction(
                     visible = controlsVisible,
-                    focusInControls = focusInControls,
+                    focusLayer = playerFocusLayer,
+                    episodeRailEnabled = tvControlsVariant == TvLongFormControlsVariant.SeriesEpisodeRail && episodeRailItems.isNotEmpty(),
                     keyCode = event.nativeKeyEvent.keyCode,
                     repeatCount = event.nativeKeyEvent.repeatCount,
                     seekStepSec = tvSeekStepSeconds,
@@ -853,6 +975,7 @@ fun LongFormVideoPlayer(
             exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
+            val isSeriesEpisodeRailVariant = tvMode && tvControlsVariant == TvLongFormControlsVariant.SeriesEpisodeRail
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -863,166 +986,201 @@ fun LongFormVideoPlayer(
                     shape = AppChrome.SurfaceShape,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isSeriesEpisodeRailVariant && episodeRailVisible) 10.dp else 0.dp),
                     ) {
-                        CompactPlayerControlButton(
-                            icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (isPlaying) "暂停" else "播放",
-                            tvMode = tvMode,
-                            focusRequester = playPauseFocusRequester,
-                            modifier = controlFocusModifier(playPauseFocusRequester),
-                            onClick = { togglePlaybackWithFeedback() },
-                        )
-                        if (tvMode) {
-                            CompactPlayerControlButton(
-                                icon = Icons.Filled.FastForward,
-                                contentDescription = "快退 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
-                                tvMode = true,
-                                focusRequester = rewindFocusRequester,
-                                modifier = controlFocusModifier(rewindFocusRequester),
-                                onClick = { performDebouncedStepSeek(-tvSeekStepMs) },
-                                reverseMirror = true,
+                        if (isSeriesEpisodeRailVariant && episodeRailVisible) {
+                            TvEpisodeRail(
+                                items = episodeRailItems,
+                                currentEpisodeId = currentEpisodeRailItemId,
+                                focusedEpisodeId = focusedEpisodeRailItemId,
+                                openNonce = episodeRailOpenNonce,
+                                currentEpisodeFocusRequester = currentEpisodeRailFocusRequester,
+                                onFocusedEpisodeChanged = { episodeId ->
+                                    focusedEpisodeRailItemId = episodeId
+                                    playerFocusLayer = TvPlayerFocusLayer.EpisodeRail
+                                },
+                                onSelectEpisode = { item ->
+                                    hideAllTvUi()
+                                    if (item.id != currentEpisodeRailItemId) {
+                                        onSelectEpisodeRailItem?.invoke(item)
+                                    }
+                                },
                             )
                         }
-                        Text(
-                            text = formatPlaybackTime(displayPositionMs),
-                            color = Color.White.copy(alpha = 0.86f),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                        Slider(
-                            value = progressValue,
-                            onValueChange = { value ->
-                                val duration = effectiveDurationMs()
-                                if (duration <= 0) {
-                                    return@Slider
-                                }
-                                isScrubbing = true
-                                scrubPositionMs = (duration * value).toLong().coerceIn(0L, duration)
-                                showControlsTemporarily()
-                            },
-                            onValueChangeFinished = {
-                                if (isScrubbing) {
-                                    player.time = scrubPositionMs
-                                    positionMs = scrubPositionMs
-                                }
-                                isScrubbing = false
-                                scheduleAutoHideControls()
-                            },
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = Color.White.copy(alpha = 0.92f),
-                                inactiveTrackColor = Color.White.copy(alpha = 0.22f),
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusProperties { canFocus = false },
-                        )
-                        Text(
-                            text = if (actualDurationMs > 0) {
-                                formatPlaybackTime(actualDurationMs)
+                        Row(
+                            modifier = Modifier.padding(top = if (isSeriesEpisodeRailVariant) 2.dp else 0.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            CompactPlayerControlButton(
+                                icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isPlaying) "暂停" else "播放",
+                                tvMode = tvMode,
+                                focusRequester = playPauseFocusRequester,
+                                modifier = controlFocusModifier(TvControlFocusTarget.PlayPause),
+                                onClick = { togglePlaybackWithFeedback() },
+                            )
+                            if (tvMode && tvControlsVariant == TvLongFormControlsVariant.Default) {
+                                CompactPlayerControlButton(
+                                    icon = Icons.Filled.FastForward,
+                                    contentDescription = "快退 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
+                                    tvMode = true,
+                                    focusRequester = rewindFocusRequester,
+                                    modifier = controlFocusModifier(TvControlFocusTarget.Rewind),
+                                    onClick = { performDebouncedStepSeek(-tvSeekStepMs) },
+                                    reverseMirror = true,
+                                )
+                            }
+                            Text(
+                                text = formatPlaybackTime(displayPositionMs),
+                                color = Color.White.copy(alpha = 0.86f),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                            if (isSeriesEpisodeRailVariant) {
+                                TvPlaybackProgressBar(
+                                    progressValue = progressValue,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .focusProperties { canFocus = false },
+                                )
                             } else {
-                                "--:--"
-                            },
-                            color = Color.White.copy(alpha = 0.68f),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                        if (tvMode) {
-                            CompactPlayerControlButton(
-                                icon = Icons.Filled.FastForward,
-                                contentDescription = "快进 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
-                                tvMode = true,
-                                focusRequester = forwardFocusRequester,
-                                modifier = controlFocusModifier(forwardFocusRequester),
-                                onClick = { performDebouncedStepSeek(tvSeekStepMs) },
+                                Slider(
+                                    value = progressValue,
+                                    onValueChange = { value ->
+                                        val duration = effectiveDurationMs()
+                                        if (duration <= 0) {
+                                            return@Slider
+                                        }
+                                        isScrubbing = true
+                                        scrubPositionMs = (duration * value).toLong().coerceIn(0L, duration)
+                                        showControlsTemporarily()
+                                    },
+                                    onValueChangeFinished = {
+                                        if (isScrubbing) {
+                                            player.time = scrubPositionMs
+                                            positionMs = scrubPositionMs
+                                        }
+                                        isScrubbing = false
+                                        scheduleAutoHideControls()
+                                    },
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.White,
+                                        activeTrackColor = Color.White.copy(alpha = 0.92f),
+                                        inactiveTrackColor = Color.White.copy(alpha = 0.22f),
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .focusProperties { canFocus = false },
+                                )
+                            }
+                            Text(
+                                text = if (actualDurationMs > 0) {
+                                    formatPlaybackTime(actualDurationMs)
+                                } else {
+                                    "--:--"
+                                },
+                                color = Color.White.copy(alpha = 0.68f),
+                                style = MaterialTheme.typography.labelSmall,
                             )
-                            onOpenEpisodeSelector?.let { openSelector ->
+                            if (tvMode && tvControlsVariant == TvLongFormControlsVariant.Default) {
                                 CompactPlayerControlButton(
-                                    icon = Icons.Filled.Tv,
-                                    contentDescription = "选集",
+                                    icon = Icons.Filled.FastForward,
+                                    contentDescription = "快进 ${normalizeTvSeekStepSeconds(tvSeekStepSeconds)} 秒",
                                     tvMode = true,
-                                    focusRequester = episodeSelectorFocusRequester,
-                                    modifier = controlFocusModifier(episodeSelectorFocusRequester),
+                                    focusRequester = forwardFocusRequester,
+                                    modifier = controlFocusModifier(TvControlFocusTarget.Forward),
+                                    onClick = { performDebouncedStepSeek(tvSeekStepMs) },
+                                )
+                                onOpenEpisodeSelector?.let { openSelector ->
+                                    CompactPlayerControlButton(
+                                        icon = Icons.Filled.Tv,
+                                        contentDescription = "选集",
+                                        tvMode = true,
+                                        focusRequester = episodeSelectorFocusRequester,
+                                        modifier = controlFocusModifier(TvControlFocusTarget.EpisodeSelector),
+                                        onClick = {
+                                            openSelector()
+                                            showControlsTemporarily()
+                                        },
+                                    )
+                                }
+                                onNextEpisode?.let { nextEpisode ->
+                                    CompactPlayerControlButton(
+                                        icon = Icons.Filled.SkipNext,
+                                        contentDescription = "下一集",
+                                        tvMode = true,
+                                        focusRequester = nextEpisodeFocusRequester,
+                                        modifier = controlFocusModifier(TvControlFocusTarget.NextEpisode),
+                                        onClick = {
+                                            nextEpisode()
+                                            showControlsTemporarily()
+                                        },
+                                    )
+                                }
+                            }
+                            CompactPlayerControlButton(
+                                icon = Icons.Filled.Subtitles,
+                                contentDescription = "字幕",
+                                tvMode = tvMode,
+                                focusRequester = subtitleFocusRequester,
+                                modifier = controlFocusModifier(TvControlFocusTarget.Subtitle),
+                                onClick = {
+                                    subtitleSheetVisible = true
+                                    showControlsTemporarily()
+                                },
+                            )
+                            if (tvMode) {
+                                CompactPlayerControlButton(
+                                    icon = Icons.Filled.GraphicEq,
+                                    contentDescription = "音轨",
+                                    tvMode = true,
+                                    focusRequester = audioTrackFocusRequester,
+                                    modifier = controlFocusModifier(TvControlFocusTarget.AudioTrack),
                                     onClick = {
-                                        openSelector()
+                                        audioTrackSheetVisible = true
+                                        showControlsTemporarily()
+                                    },
+                                )
+                                if (tvControlsVariant == TvLongFormControlsVariant.Default) {
+                                    CompactPlayerControlButton(
+                                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "返回详情",
+                                        tvMode = true,
+                                        focusRequester = backDetailFocusRequester,
+                                        modifier = controlFocusModifier(TvControlFocusTarget.BackDetail),
+                                        onClick = {
+                                            onRequestExitPlayback?.invoke() ?: onBack()
+                                            showControlsTemporarily()
+                                        },
+                                    )
+                                    onExitPlayback?.let { exitPlayback ->
+                                        CompactPlayerControlButton(
+                                            icon = Icons.Filled.FullscreenExit,
+                                            contentDescription = "退出播放",
+                                            tvMode = true,
+                                            focusRequester = exitPlaybackFocusRequester,
+                                            modifier = controlFocusModifier(TvControlFocusTarget.ExitPlayback),
+                                            onClick = {
+                                                onRequestExitPlayback?.invoke() ?: exitPlayback()
+                                                showControlsTemporarily()
+                                            },
+                                        )
+                                    }
+                                }
+                            } else {
+                                CompactPlayerControlButton(
+                                    icon = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                                    contentDescription = if (isFullscreen) "退出全屏" else "全屏",
+                                    focusRequester = fullscreenFocusRequester,
+                                    modifier = controlFocusModifier(TvControlFocusTarget.Fullscreen),
+                                    onClick = {
+                                        onToggleFullscreen()
                                         showControlsTemporarily()
                                     },
                                 )
                             }
-                            onNextEpisode?.let { nextEpisode ->
-                                CompactPlayerControlButton(
-                                    icon = Icons.Filled.SkipNext,
-                                    contentDescription = "下一集",
-                                    tvMode = true,
-                                    focusRequester = nextEpisodeFocusRequester,
-                                    modifier = controlFocusModifier(nextEpisodeFocusRequester),
-                                    onClick = {
-                                        nextEpisode()
-                                        showControlsTemporarily()
-                                    },
-                                )
-                            }
-                        }
-                        CompactPlayerControlButton(
-                            icon = Icons.Filled.Subtitles,
-                            contentDescription = "字幕",
-                            tvMode = tvMode,
-                            focusRequester = subtitleFocusRequester,
-                            modifier = controlFocusModifier(subtitleFocusRequester),
-                            onClick = {
-                                subtitleSheetVisible = true
-                                showControlsTemporarily()
-                            },
-                        )
-                        if (tvMode) {
-                            CompactPlayerControlButton(
-                                icon = Icons.Filled.GraphicEq,
-                                contentDescription = "音轨",
-                                tvMode = true,
-                                focusRequester = audioTrackFocusRequester,
-                                modifier = controlFocusModifier(audioTrackFocusRequester),
-                                onClick = {
-                                    audioTrackSheetVisible = true
-                                    showControlsTemporarily()
-                                },
-                            )
-                            CompactPlayerControlButton(
-                                icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回详情",
-                                tvMode = true,
-                                focusRequester = backDetailFocusRequester,
-                                modifier = controlFocusModifier(backDetailFocusRequester),
-                                onClick = {
-                                    onRequestExitPlayback?.invoke() ?: onBack()
-                                    showControlsTemporarily()
-                                },
-                            )
-                            onExitPlayback?.let { exitPlayback ->
-                                CompactPlayerControlButton(
-                                    icon = Icons.Filled.FullscreenExit,
-                                    contentDescription = "退出播放",
-                                    tvMode = true,
-                                    focusRequester = exitPlaybackFocusRequester,
-                                    modifier = controlFocusModifier(exitPlaybackFocusRequester),
-                                    onClick = {
-                                        onRequestExitPlayback?.invoke() ?: exitPlayback()
-                                        showControlsTemporarily()
-                                    },
-                                )
-                            }
-                        } else {
-                            CompactPlayerControlButton(
-                                icon = if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                                contentDescription = if (isFullscreen) "退出全屏" else "全屏",
-                                focusRequester = fullscreenFocusRequester,
-                                modifier = controlFocusModifier(fullscreenFocusRequester),
-                                onClick = {
-                                    onToggleFullscreen()
-                                    showControlsTemporarily()
-                                },
-                            )
                         }
                     }
                 }
@@ -1096,6 +1254,126 @@ internal fun normalizeTvSeekStepSeconds(seconds: Int): Int {
     return when (seconds) {
         5, 10, 15, 20, 30 -> seconds
         else -> 10
+    }
+}
+
+@Composable
+private fun TvPlaybackProgressBar(
+    progressValue: Float,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(6.dp)
+            .background(Color.White.copy(alpha = 0.18f), shape = AppChrome.PillShape),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progressValue.coerceIn(0f, 1f))
+                .height(6.dp)
+                .background(Color.White.copy(alpha = 0.92f), shape = AppChrome.PillShape),
+        )
+    }
+}
+
+@Composable
+private fun TvEpisodeRail(
+    items: List<TvEpisodeRailItem>,
+    currentEpisodeId: String?,
+    focusedEpisodeId: String?,
+    openNonce: Int,
+    currentEpisodeFocusRequester: FocusRequester,
+    onFocusedEpisodeChanged: (String) -> Unit,
+    onSelectEpisode: (TvEpisodeRailItem) -> Unit,
+) {
+    if (items.isEmpty()) {
+        return
+    }
+    val initialFirstVisibleItemIndex = remember(items, currentEpisodeId, openNonce) {
+        resolveEpisodeRailInitialFirstVisibleItemIndex(items, currentEpisodeId)
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialFirstVisibleItemIndex)
+    var skipInitialFocusScroll by remember(openNonce) { mutableStateOf(true) }
+
+    LaunchedEffect(items, focusedEpisodeId, openNonce) {
+        if (skipInitialFocusScroll) {
+            skipInitialFocusScroll = false
+            return@LaunchedEffect
+        }
+        val targetIndex = resolveEpisodeRailInitialFirstVisibleItemIndex(items, focusedEpisodeId)
+        listState.animateScrollToItem(targetIndex)
+    }
+
+    LazyRow(
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        items(items, key = { item -> item.id }) { item ->
+            val focused = item.id == focusedEpisodeId
+            val current = item.id == currentEpisodeId
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    modifier = Modifier.height(44.dp),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = focused,
+                        enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                        exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    ) {
+                        Surface(
+                            color = Color(0xE8141820),
+                            shape = AppChrome.SurfaceShape,
+                        ) {
+                            Text(
+                                text = item.title,
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .widthIn(max = 220.dp),
+                            )
+                        }
+                    }
+                }
+                Surface(
+                    color = when {
+                        current -> AppChrome.SurfaceStrong.copy(alpha = 0.96f)
+                        item.playable -> AppChrome.SurfaceElevated.copy(alpha = 0.92f)
+                        else -> AppChrome.Surface.copy(alpha = 0.66f)
+                    },
+                    shape = AppChrome.ChipShape,
+                    modifier = Modifier
+                        .then(if (current) Modifier.focusRequester(currentEpisodeFocusRequester) else Modifier)
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                onFocusedEpisodeChanged(item.id)
+                            }
+                        }
+                        .focusProperties { canFocus = item.playable }
+                        .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.08f)
+                        .clickable(enabled = item.playable) { onSelectEpisode(item) },
+                ) {
+                    Text(
+                        text = item.number.toString(),
+                        color = when {
+                            item.playable -> AppChrome.TextPrimary
+                            else -> AppChrome.TextSubtle
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (current) FontWeight.Bold else FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                    )
+                }
+            }
+        }
     }
 }
 

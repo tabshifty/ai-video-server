@@ -15,6 +15,8 @@ class TvLongFormControlsAutoHideTest {
     @Test
     fun nonInteractiveOrDelegatedActionsDoNotResetAutoHideTimer() {
         assertFalse(shouldResetAutoHideTimer(TvRemoteKeyAction.ExitFocus))
+        assertFalse(shouldResetAutoHideTimer(TvRemoteKeyAction.EnterEpisodeRail))
+        assertFalse(shouldResetAutoHideTimer(TvRemoteKeyAction.ExitEpisodeRail))
         assertFalse(shouldResetAutoHideTimer(TvRemoteKeyAction.DismissUi))
         assertFalse(shouldResetAutoHideTimer(TvRemoteKeyAction.PassThrough))
     }

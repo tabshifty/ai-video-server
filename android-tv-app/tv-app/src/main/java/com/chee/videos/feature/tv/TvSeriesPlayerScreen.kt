@@ -4,19 +4,10 @@ import android.app.Activity
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,8 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -50,8 +39,9 @@ import com.chee.videos.core.player.newLongFormMediaPlayer
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormVideoPlayer
+import com.chee.videos.core.ui.TvEpisodeRailItem
 import com.chee.videos.core.ui.TvErrorState
-import com.chee.videos.core.ui.TvLayoutSpec
+import com.chee.videos.core.ui.TvLongFormControlsVariant
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.appendAccessTokenQuery
 import com.chee.videos.core.ui.applyLongFormMediaSource
@@ -64,7 +54,6 @@ import kotlinx.coroutines.delay
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TvSeriesPlayerScreen(
     accessToken: String,
@@ -173,6 +162,17 @@ fun TvSeriesPlayerScreen(
 
     val nextEpisodeRef = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
         uiState.nextEpisodeRef()
+    }
+    val episodeRailItems = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
+        selectedSeason(uiState)?.episodes.orEmpty().map { episode ->
+            TvEpisodeRailItem(
+                id = episode.id,
+                number = episode.number,
+                title = episode.title,
+                playable = episode.playable,
+                current = episode.number == uiState.selectedEpisodeNumber,
+            )
+        }
     }
     val hasNextEpisode = nextEpisodeRef != null
     val remainingMs = (screenDurationMs - screenPositionMs).coerceAtLeast(0L)
@@ -536,14 +536,22 @@ fun TvSeriesPlayerScreen(
                     showStatusBarPadding = false,
                     tvMode = true,
                     tvSeekStepSeconds = uiState.tvSeekStepSeconds,
+                    tvControlsVariant = TvLongFormControlsVariant.SeriesEpisodeRail,
                     seriesTitleForOverlay = series.title,
                     seasonNumber = uiState.selectedSeasonNumber,
                     episodeNumber = uiState.selectedEpisodeNumber,
                     episodeTitle = currentEpisode?.title,
-                    onOpenEpisodeSelector = { viewModel.setSelectorVisible(true) },
-                    onNextEpisode = if (hasNextEpisode) viewModel::nextEpisode else null,
-                    onRequestExitPlayback = ::handlePlaybackBack,
-                    onExitPlayback = onBack,
+                    episodeRailItems = episodeRailItems,
+                    currentEpisodeRailItemId = currentEpisode?.id,
+                    onSelectEpisodeRailItem = { selectedItem ->
+                        val episodeNumber = selectedSeason(uiState)?.episodes
+                            ?.firstOrNull { it.id == selectedItem.id }
+                            ?.number
+                        if (episodeNumber != null) {
+                            viewModel.selectEpisode(episodeNumber)
+                        }
+                    },
+                    onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible,
                     onTrackSheetVisibilityChanged = { isTrackSheetVisible = it },
                     onVlcEvent = { event ->
                         when (event.type) {
@@ -642,93 +650,6 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    if (uiState.selectorVisible) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.setSelectorVisible(false) },
-            containerColor = AppChrome.Surface,
-            contentColor = AppChrome.TextPrimary,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = "选集播放",
-                    color = AppChrome.TextPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    items(selectedSeason(uiState)?.episodes.orEmpty(), key = { episode -> episode.id }) { episode ->
-                        val selected = episode.number == uiState.selectedEpisodeNumber
-                        Surface(
-                            color = if (selected) AppChrome.AccentSoft else AppChrome.SurfaceElevated,
-                            shape = AppChrome.SurfaceShape,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            RowItem(
-                                title = "E${episode.number} ${episode.title}",
-                                subtitle = if (episode.playable) episode.durationLabel else "待绑定 / 未就绪",
-                                selected = selected,
-                                onClick = {
-                                    viewModel.selectEpisode(episode.number)
-                                    viewModel.setSelectorVisible(false)
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RowItem(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = title,
-                color = if (selected) AppChrome.TextPrimary else AppChrome.TextSecondary,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = subtitle,
-                color = AppChrome.TextMuted,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
 }
 
 @Composable
