@@ -199,6 +199,7 @@
 - 远程 M3U URL 只在后台手动刷新时拉取，本期不做定时刷新和 EPG 节目单。
 - TV App 播放 M3U8/HLS 频道走 LibVLC IPTV 路径，不再依赖 Media3 HLS 扩展。M3U8 频道兼容性问题应优先从 LibVLC event、vout、视频轨和频道源响应排查。
 - TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并默认开启硬解。TV 长视频也使用 LibVLC，但配置分轨：长视频走 [[TV 长视频 LibVLC 内核]] 与 [[TV 长视频 TextureView 硬解默认]]；IPTV 现在也与长视频一致使用硬解默认，但仍保留独立的直播诊断路径和独立参数，不共用长视频 helper。
+- IPTV 播放页退出时不应在主线程同步 `stop()` 直播流或释放 `LibVLC` 库实例；退出契约是“先离开页面，再由播放器 release 与视图 detach 做轻量清理”，避免直播源 stop 阻塞返回动画或导航栈切换。
 - IPTV 播放无画面排查必须保留播放事件诊断：至少记录 LibVLC event、vout 数、视频轨/音频轨数量和当前视频轨 codec/分辨率。若 `videoTracks=0` 或无 `Vout`，优先检查 M3U 频道 URL、源站多码率/分片返回和是否需要后端转码；若有视频轨和 `Vout` 但仍黑屏，优先检查输出视图/系统合成层。
 - IPTV 频道清单不应包含音频专用源。明显音频源包括 `group-title=Audio/音频`、频道名包含 `音频` 或 `audio only`、URL 路径包含 `/audio/`、`_audio/`，以及 `.mp3/.aac/.m4a/.flac/.wav/.ogg/.opus` 等音频文件。后端解析时应跳过，TV 端也要过滤旧数据，避免默认播放只有声音没有画面的条目。
 - TV App IPTV 顶部频道信息不是常驻条：进入播放页和切换频道后仅显示 3 秒临时提示，频道列表打开、加载中、无可播放频道、状态错误或播放错误时必须隐藏。临时提示仍使用后端返回的 `logo_url`（M3U `tvg-logo`）展示台标，`logo_url` 为空或图片加载失败时使用 TV 图标回退，不新增占位资源。

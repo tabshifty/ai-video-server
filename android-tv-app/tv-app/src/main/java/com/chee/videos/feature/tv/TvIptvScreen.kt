@@ -70,9 +70,7 @@ import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
-import java.util.ArrayList
 import kotlinx.coroutines.delay
-import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
@@ -90,12 +88,7 @@ fun TvIptvScreen(
     val activity = context as? Activity
     val rootFocusRequester = remember { FocusRequester() }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
-    val libVlc = remember {
-        LibVLC(
-            context.applicationContext,
-            ArrayList(buildIptvLibVlcArgs()),
-        )
-    }
+    val libVlc = remember { TvIptvVlcLibrary.shared(context) }
     val vlcPlayer = remember(libVlc) { MediaPlayer(libVlc) }
     var channelListVisible by remember { mutableStateOf(false) }
     var focusedChannelIndex by remember { mutableIntStateOf(0) }
@@ -164,10 +157,7 @@ fun TvIptvScreen(
         vlcPlayer.setEventListener(listener)
         onDispose {
             vlcPlayer.setEventListener(null)
-            vlcPlayer.stop()
-            vlcPlayer.detachViews()
             vlcPlayer.release()
-            libVlc.release()
         }
     }
 
@@ -274,6 +264,12 @@ fun TvIptvScreen(
             },
             modifier = Modifier.fillMaxSize(),
         )
+        DisposableEffect(vlcPlayer) {
+            val currentPlayer = vlcPlayer
+            onDispose {
+                currentPlayer.detachViews()
+            }
+        }
 
         if (
             shouldShowIptvChannelHint(

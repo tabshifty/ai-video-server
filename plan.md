@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-30 09:38 +0800
+- 进度：完成 TV App 退出 IPTV 播放卡住修复。IPTV `LibVLC` 改为独立单例复用，退出页面时不再在 `onDispose` 主线程同步 `stop()` 直播流或释放库实例，只保留 `MediaPlayer.release()`；`detachViews()` 改为独立 `DisposableEffect` 处理，和长视频 LibVLC 生命周期保持同类模式。同步补充 IPTV 配置/源文测试约束，TV 版本升级到 `0.1.74 (74)`，`CONTEXT.md` 追加 IPTV 退出清理契约。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvPlaybackConfig.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlaybackConfigTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；未纳入用户既有改动 `admin-web/.env.development`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvIptvPlaybackConfigTest' --tests 'com.chee.videos.feature.tv.TvIptvPlayerViewLayoutTest' --tests 'com.chee.videos.feature.tv.TvIptvNavigationPolicyTest' --tests 'com.chee.videos.feature.tv.TvIptvViewModelTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`git diff --check -- ...` 通过；乱码扫描无输出。
+
+## 2026-05-30 09:34 +0800
+- 进度：继续修复 TV App 退出 IPTV 播放时卡住。代码复查确认 IPTV 退出路径会在 `DisposableEffect.onDispose` 主线程同步执行 `vlcPlayer.stop()`、`detachViews()`、`release()`、`libVlc.release()`，而返回动作本身直接 `popBackStack()`；这与长视频 LibVLC 仅 `release()`、视图层单独 `detachViews()` 的模式不一致，属于高风险阻塞点。下一步改为 IPTV LibVLC 实例复用、退出不显式 `stop()`、视图解绑独立处理，并补源文测试锁死该释放契约。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptv*.kt`、TV IPTV 源文测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 IPTV 定向单测、TV 全量单测、`git diff --check` 与乱码扫描。
+
 ## 2026-05-30 09:27 +0800
 - 进度：完成 TV App IPTV 卡顿优化首轮落地。新增 IPTV 专属 LibVLC 播放配置 helper，将直播缓存从 `1500ms` 提升到 `4000ms`，移除 `clock-jitter=0` / `clock-synchro=0` 低延迟参数，统一收口到 helper 以防后续散落魔法数字；同步补充 IPTV 配置单测与源文约束测试，TV 版本升级到 `0.1.73 (73)`，`CONTEXT.md` 追加 [[IPTV 流畅优先]] 术语。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvPlaybackConfig.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlaybackConfigTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；未纳入用户既有改动 `admin-web/.env.development`

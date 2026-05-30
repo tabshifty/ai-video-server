@@ -36,6 +36,10 @@ class TvIptvPlayerViewLayoutTest {
             source.contains("attachViews(this, null, false, true)"),
         )
         assertTrue(
+            "IPTV LibVLC 实例必须通过独立单例复用，避免退出页面时反复释放库实例导致卡顿",
+            source.contains("TvIptvVlcLibrary.shared(context)"),
+        )
+        assertTrue(
             "IPTV 播放页必须记录 LibVLC 事件和视频输出数量，方便区分无视频轨和输出层黑屏",
             source.contains("Log.i(IPTV_LOG_TAG"),
         )
@@ -48,12 +52,21 @@ class TvIptvPlayerViewLayoutTest {
             source.contains("--avcodec-hw=none").not() && source.contains("setHWDecoderEnabled(true, true)"),
         )
         assertTrue(
-            "IPTV 播放页必须通过独立 helper 注入 LibVLC 直播缓存参数，避免散落魔法数字",
-            source.contains("buildIptvLibVlcArgs()") && source.contains("buildIptvMediaOptions().forEach(::addOption)"),
+            "IPTV 播放页必须通过独立 helper 注入 media 级直播缓存参数，避免散落魔法数字",
+            source.contains("buildIptvMediaOptions().forEach(::addOption)"),
         )
         assertTrue(
             "IPTV 播放页不应强制使用低延迟时钟参数，避免牺牲直播抗抖动能力",
             !source.contains("clock-jitter=0") && !source.contains("clock-synchro=0"),
+        )
+        assertTrue(
+            "IPTV 退出页面不应在 onDispose 中同步 stop 流媒体，避免返回时主线程卡住",
+            !source.contains("vlcPlayer.stop()\n            vlcPlayer.detachViews()\n            vlcPlayer.release()") &&
+                !source.contains("libVlc.release()"),
+        )
+        assertTrue(
+            "IPTV 视图解绑应独立于播放器 release，保持退出路径轻量",
+            source.contains("currentPlayer.detachViews()"),
         )
     }
 

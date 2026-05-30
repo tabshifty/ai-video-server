@@ -24,5 +24,13 @@ class TvIptvPlaybackConfigTest {
         assertFalse(allOptions.any { it.contains("clock-jitter=0") })
         assertFalse(allOptions.any { it.contains("clock-synchro=0") })
     }
-}
 
+    @Test
+    fun iptvPlaybackConfigUsesDedicatedSharedLibVlcLibrary() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvPlaybackConfig.kt").toFile().readText()
+
+        assertTrue(source.contains("object TvIptvVlcLibrary"))
+        assertTrue(source.contains("fun shared(context: Context): LibVLC"))
+        assertTrue(source.contains("buildIptvLibVlcArgs()"))
+    }
+}
