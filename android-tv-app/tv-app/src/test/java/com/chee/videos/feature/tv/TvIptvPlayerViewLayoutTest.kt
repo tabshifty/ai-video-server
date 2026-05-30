@@ -47,6 +47,14 @@ class TvIptvPlayerViewLayoutTest {
             "IPTV 播放页必须默认开启硬解，和长视频保持一致",
             source.contains("--avcodec-hw=none").not() && source.contains("setHWDecoderEnabled(true, true)"),
         )
+        assertTrue(
+            "IPTV 播放页必须通过独立 helper 注入 LibVLC 直播缓存参数，避免散落魔法数字",
+            source.contains("buildIptvLibVlcArgs()") && source.contains("buildIptvMediaOptions().forEach(::addOption)"),
+        )
+        assertTrue(
+            "IPTV 播放页不应强制使用低延迟时钟参数，避免牺牲直播抗抖动能力",
+            !source.contains("clock-jitter=0") && !source.contains("clock-synchro=0"),
+        )
     }
 
     @Test

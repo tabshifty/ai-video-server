@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-30 09:27 +0800
+- 进度：完成 TV App IPTV 卡顿优化首轮落地。新增 IPTV 专属 LibVLC 播放配置 helper，将直播缓存从 `1500ms` 提升到 `4000ms`，移除 `clock-jitter=0` / `clock-synchro=0` 低延迟参数，统一收口到 helper 以防后续散落魔法数字；同步补充 IPTV 配置单测与源文约束测试，TV 版本升级到 `0.1.73 (73)`，`CONTEXT.md` 追加 [[IPTV 流畅优先]] 术语。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvPlaybackConfig.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlaybackConfigTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvPlayerViewLayoutTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；未纳入用户既有改动 `admin-web/.env.development`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvIptvPlaybackConfigTest' --tests 'com.chee.videos.feature.tv.TvIptvPlayerViewLayoutTest' --tests 'com.chee.videos.feature.tv.TvIptvNavigationPolicyTest' --tests 'com.chee.videos.feature.tv.TvIptvViewModelTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`git diff --check -- ...` 通过；乱码扫描无输出。
+
+## 2026-05-30 09:25 +0800
+- 进度：开始检查并优化 TV App IPTV 播放卡顿。已确认用户接受“流畅优先”，即允许直播延迟增加以减少播放中缓冲/顿挫；当前代码 IPTV LibVLC 使用 `network-caching=1500` 且强制 `clock-jitter=0` / `clock-synchro=0`，偏低延迟而非抗抖动。下一步抽出 IPTV 播放配置、补单测、提高直播缓存并移除低延迟时钟参数。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt`、IPTV 配置 helper、TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 TV IPTV 定向单测、TV 全量单测或构建、`git diff --check` 与乱码扫描。
+
 ## 2026-05-28 23:11 +0800
 - 进度：完成部署机验证。已将修复提交 `5d30069` 推送到 `deploy master`，post-receive 触发 `admin-web` 构建并替换 `/Users/chee/deploy/ai-video-server/current/admin-web-dist`；Go server 未重启。部署过程中 GitHub mirror push 卡住，已终止该 best-effort 子进程，hook 按预期继续执行并完成前端更新。
 - 影响文件：`plan.md`
