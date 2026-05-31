@@ -13,10 +13,6 @@ class TvScrollableBottomPaddingTest {
         assertTrue(TvLayoutSpec.scrollBottomSafePaddingDp >= 56f)
 
         assertSourceContains(
-            path = "src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt",
-            pattern = "bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp",
-        )
-        assertSourceContains(
             path = "src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt",
             pattern = "bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp",
         )
@@ -30,6 +26,10 @@ class TvScrollableBottomPaddingTest {
     fun `immersive tv player page does not reuse scroll bottom safe padding`() {
         assertSourceNotContains(
             path = "src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt",
+            pattern = "TvLayoutSpec.scrollBottomSafePaddingDp",
+        )
+        assertSourceNotContains(
+            path = "src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt",
             pattern = "TvLayoutSpec.scrollBottomSafePaddingDp",
         )
     }

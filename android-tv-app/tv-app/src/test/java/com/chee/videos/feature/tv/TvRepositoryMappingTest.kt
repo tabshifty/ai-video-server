@@ -77,6 +77,7 @@ class TvRepositoryMappingTest {
                                 videoStatus = "",
                                 runtime = 45,
                                 watchSeconds = 93,
+                                stillUrl = "/still/e1.jpg",
                             ),
                         ),
                     ),
@@ -88,6 +89,7 @@ class TvRepositoryMappingTest {
         assertEquals(1, uiModel.seasons.size)
         assertFalse(uiModel.seasons.first().episodes.first().playable)
         assertEquals(93, uiModel.seasons.first().episodes.first().watchSeconds)
+        assertEquals("/still/e1.jpg", uiModel.seasons.first().episodes.first().stillUrl)
     }
 
     @Test

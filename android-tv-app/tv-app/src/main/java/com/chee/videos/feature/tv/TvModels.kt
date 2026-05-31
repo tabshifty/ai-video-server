@@ -14,6 +14,7 @@ data class TvEpisodeUiModel(
     val videoId: String = "",
     val videoStatus: String = "",
     val playable: Boolean = false,
+    val stillUrl: String? = null,
     val subtitleTracks: List<SubtitleTrackDto> = emptyList(),
 )
 
