@@ -45,6 +45,10 @@ func TVSeriesBackdropURL(seriesID int64) string {
 	return fmt.Sprintf("/api/v1/tv/series/%d/backdrop", seriesID)
 }
 
+func TVEpisodeStillURL(seriesID int64, seasonNumber, episodeNumber int) string {
+	return fmt.Sprintf("/api/v1/tv/series/%d/seasons/%d/episodes/%d/still", seriesID, seasonNumber, episodeNumber)
+}
+
 func VideoSubtitleURL(videoID, subtitleID uuid.UUID) string {
 	return fmt.Sprintf("/api/v1/videos/%s/subtitles/%s/file", videoID.String(), subtitleID.String())
 }

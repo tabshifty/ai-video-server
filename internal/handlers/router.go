@@ -22,27 +22,27 @@ import (
 
 // API bundles all HTTP handlers.
 type API struct {
-	repo           *repository.VideoRepository
-	uploadSvc      *services.UploadService
-	chunkUpload    *services.ChunkUploadService
-	recSvc         *services.RecommendService
-	scrapeSvc      *services.ScraperService
-	appSvc         *services.AppService
-	imageSvc       *services.ImageService
-	subtitleSvc    *services.SubtitleService
-	iptvSvc        iptvService
-	enqueuer       *queue.Enqueuer
-	logger         *slog.Logger
-	redis          *redis.Client
-	redisAddr      string
-	redisPassword  string
-	asynqQueue     string
-	jwtSecret      string
-	playSignSecret string
-	playSignTTL    time.Duration
-	accessTTL      time.Duration
-	refreshTTL     time.Duration
-	maxVideoSize   int64
+	repo             *repository.VideoRepository
+	uploadSvc        *services.UploadService
+	chunkUpload      *services.ChunkUploadService
+	recSvc           *services.RecommendService
+	scrapeSvc        *services.ScraperService
+	appSvc           *services.AppService
+	imageSvc         *services.ImageService
+	subtitleSvc      *services.SubtitleService
+	iptvSvc          iptvService
+	enqueuer         *queue.Enqueuer
+	logger           *slog.Logger
+	redis            *redis.Client
+	redisAddr        string
+	redisPassword    string
+	asynqQueue       string
+	jwtSecret        string
+	playSignSecret   string
+	playSignTTL      time.Duration
+	accessTTL        time.Duration
+	refreshTTL       time.Duration
+	maxVideoSize     int64
 	storageRoot      string
 	uploadTempDir    string
 	serverLogPath    string
@@ -114,6 +114,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/tv/iptv/channels", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVIPTVChannels)
 		v1.GET("/tv/series/:id/poster", a.TVSeriesPoster)
 		v1.GET("/tv/series/:id/backdrop", a.TVSeriesBackdrop)
+		v1.GET("/tv/series/:id/seasons/:season/episodes/:episode/still", a.TVEpisodeStill)
 		v1.GET("/image-collections", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppImageCollections)
 		v1.GET("/image-collections/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppImageCollectionDetail)
 		v1.GET("/images/:id/view", a.AppImageView)

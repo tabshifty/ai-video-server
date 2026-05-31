@@ -66,3 +66,11 @@ func TestTVSeriesBackdropURL(t *testing.T) {
 		t.Fatalf("unexpected tv backdrop url: got=%s want=%s", got, want)
 	}
 }
+
+func TestTVEpisodeStillURL(t *testing.T) {
+	got := TVEpisodeStillURL(42, 1, 2)
+	want := "/api/v1/tv/series/42/seasons/1/episodes/2/still"
+	if got != want {
+		t.Fatalf("unexpected tv episode still url: got=%s want=%s", got, want)
+	}
+}

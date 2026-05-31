@@ -202,6 +202,7 @@ func TestScrapeEpisodeUploadDownloadsSeriesArtworkLocally(t *testing.T) {
 	for _, target := range []string{
 		filepath.Join(storageRoot, "tv", "series", "1", "poster.jpg"),
 		filepath.Join(storageRoot, "tv", "series", "1", "backdrop.jpg"),
+		filepath.Join(storageRoot, "tv", "series", "1", "episodes", "s01e02.jpg"),
 	} {
 		if _, statErr := os.Stat(target); statErr != nil {
 			t.Fatalf("expected series artwork downloaded to %s, stat err=%v", target, statErr)

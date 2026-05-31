@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-05-31 15:44 +0800
+- 进度：完成 TV 电视剧详情页返修收尾验证。TV 全量单测首次因新增 `RoundedCornerShape(6.dp)` 违反 TV 圆角白名单失败，已改为复用 `AppChrome.ChipShape` 并重跑通过。准备只暂存本任务文件，继续保留用户既有改动 `admin-web/.env.development` 不纳入提交。
+- 影响文件：同 15:43 记录；提交范围不包含 `admin-web/.env.development`
+- 验证：`go test ./internal/utils ./internal/repository ./internal/handlers ./internal/services -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`git diff --check -- ...` 通过；乱码扫描无输出。
+
+## 2026-05-31 15:43 +0800
+- 进度：完成 TV 电视剧详情页返修实现。详情主体继续保持无全局侧栏/顶部导航，左侧重做参考图式居中大标题、胶囊元信息、金色评分与「播放第 X 集 / 我的片单」操作；右侧分集列表改为更高的横向剧照卡、金色选中边框与圆形播放按钮。后端新增 TV 分集 still 本地访问路由，详情接口返回本地 still 路由，刮削同步分集时下载到 `storage/tv/series/<id>/episodes/sXXeYY.jpg`。TV 版本升级到 `0.1.80 (80)`，`CONTEXT.md` 追加详情主体还原边界与分集剧照本地化约定。
+- 影响文件：`internal/utils/video_url.go`、`internal/utils/video_url_test.go`、`internal/repository/tv_repository.go`、`internal/repository/tv_episode_still_url_test.go`、`internal/handlers/tv_artwork.go`、`internal/handlers/router.go`、`internal/services/scraper.go`、`internal/services/scraper_episode_sync_test.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest' --tests 'com.chee.videos.feature.tv.TvRepositoryMappingTest'` 通过；`go test ./internal/utils ./internal/repository ./internal/services -run 'TestTVEpisodeStillURL|TestResolveTVEpisodeStillURL|TestScrapeEpisodeUploadDownloadsSeriesArtworkLocally' -count=1` 首次因 sandbox 禁止 `httptest` 监听本地端口失败，提权重跑通过；待执行后端受影响包全量、TV 全量单测、`git diff --check`、乱码扫描与提交。
+
+## 2026-05-31 15:20 +0800
+- 进度：开始返修 TV 电视剧详情页还原度。用户确认仍只做详情主体、不做全局侧栏/顶部导航，并要求抛弃之前字体和布局的保守约束，按参考图更精准还原；同时希望每集海报下载到本地。代码现状确认：后端 `episodes.still_path` 已落库并同步 TMDB still，但 TV 详情接口目前直接返回原始 `still_path`，没有本地访问路由；同步逻辑只下载 series poster/backdrop，未下载每集 still 到本地。下一步补后端分集 still 本地路由/下载测试，再重做 TV 详情页标题、元信息、按钮和右侧剧集卡比例。
+- 影响文件：预计涉及 `internal/services/scraper.go`、`internal/repository/tv_repository.go`、`internal/handlers/tv_artwork.go`、`internal/handlers/router.go`、`internal/utils/video_url.go`、后端相关测试、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、TV 源文测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：红灯阶段 TV 源文测试 `TvSeriesDetailActionSpecTest` 因缺少 `TvSeriesTitleBlock` 失败；后端定向测试首次因 sandbox 无法写 Go build cache 被拦，待提权重跑确认红灯；待执行后端分集 still 路由/工具定向测试、TV 电视剧详情定向单测、Go/TV 受影响全量验证、`git diff --check`、乱码扫描。
+
 ## 2026-05-31 13:23 +0800
 - 进度：完成电视剧详情页主体沉浸式改造。`TvSeriesDetailScreen` 改为全屏背景 + 左侧剧集信息/演员区 + 右侧剧集列表，保留共享返回图标与播放/季/集焦点视觉；`TvEpisodeUiModel` 透传 `stillUrl` 供右侧分集卡显示缩略图；TV 版本升级到 `0.1.79 (79)`，`CONTEXT.md` 补充电视剧沉浸式详情主体、shared poster 目标与安全区域边界。范围仍不包含全局侧栏/顶部导航。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRepositoryMappingTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvScrollableBottomPaddingTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`

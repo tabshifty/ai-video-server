@@ -349,6 +349,7 @@ ORDER BY season_number ASC
 SELECT
   e.id,
   e.season_id,
+  se.season_number,
   e.episode_number,
   COALESCE(e.title, ''),
   COALESCE(e.overview, ''),
@@ -376,11 +377,13 @@ ORDER BY se.season_number ASC, e.episode_number ASC
 	for episodeRows.Next() {
 		var episode models.TvEpisodeDto
 		var seasonID int64
+		var seasonNumber int
 		var airDate sql.NullTime
 		var lastWatchedAt sql.NullTime
 		if err := episodeRows.Scan(
 			&episode.ID,
 			&seasonID,
+			&seasonNumber,
 			&episode.EpisodeNumber,
 			&episode.Title,
 			&episode.Overview,
@@ -396,6 +399,7 @@ ORDER BY se.season_number ASC, e.episode_number ASC
 			episodeRows.Close()
 			return models.TvSeriesDetailDto{}, fmt.Errorf("scan tv episode: %w", err)
 		}
+		episode.StillURL = resolveTVEpisodeStillURL(detail.ID, seasonNumber, episode.EpisodeNumber, episode.StillURL)
 		episode.AirDate = formatNullDate(airDate)
 		if lastWatchedAt.Valid {
 			episode.LastWatchedAt = lastWatchedAt.Time.Format(time.RFC3339)
@@ -464,6 +468,22 @@ WHERE id = $1
 	return posterPath, backdropPath, nil
 }
 
+func (r *VideoRepository) GetTVEpisodeStillPath(ctx context.Context, seriesID int64, seasonNumber, episodeNumber int) (string, error) {
+	var stillPath string
+	err := r.pool.QueryRow(ctx, `
+SELECT COALESCE(e.still_path, '')
+FROM episodes e
+JOIN seasons se ON se.id = e.season_id
+WHERE se.series_id = $1
+  AND se.season_number = $2
+  AND e.episode_number = $3
+`, seriesID, seasonNumber, episodeNumber).Scan(&stillPath)
+	if err != nil {
+		return "", fmt.Errorf("get tv episode still: %w", err)
+	}
+	return stillPath, nil
+}
+
 func resolveTVSeriesPosterURL(seriesID int64, raw string) string {
 	if strings.TrimSpace(raw) == "" {
 		return ""
@@ -476,6 +496,13 @@ func resolveTVSeriesBackdropURL(seriesID int64, raw string) string {
 		return ""
 	}
 	return utils.TVSeriesBackdropURL(seriesID)
+}
+
+func resolveTVEpisodeStillURL(seriesID int64, seasonNumber, episodeNumber int, raw string) string {
+	if strings.TrimSpace(raw) == "" || seriesID <= 0 || seasonNumber <= 0 || episodeNumber <= 0 {
+		return ""
+	}
+	return utils.TVEpisodeStillURL(seriesID, seasonNumber, episodeNumber)
 }
 
 func (r *VideoRepository) ListAdminTVSeries(ctx context.Context, filter AdminTVSeriesFilter) ([]models.AdminTvSeriesListItem, int, error) {

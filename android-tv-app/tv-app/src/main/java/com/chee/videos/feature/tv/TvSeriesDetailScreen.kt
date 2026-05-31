@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,9 +66,10 @@ private object TvSeriesDetailTokens {
     val PrimaryActionShape = RoundedCornerShape(8.dp)
     val SeasonChipShape = RoundedCornerShape(8.dp)
     val QualityBadgeShape = RoundedCornerShape(8.dp)
-    const val EpisodePaneWidthDp = 548
-    const val EpisodeThumbWidthDp = 150
-    const val EpisodeCardHeightDp = 106
+    val MetaChipShape = AppChrome.ChipShape
+    const val EpisodePaneWidthDp = 620
+    const val EpisodeThumbWidthDp = 216
+    const val EpisodeCardHeightDp = 136
 }
 
 @Composable
@@ -154,8 +157,8 @@ fun TvSeriesDetailScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(start = 92.dp, top = 104.dp, end = 52.dp, bottom = 54.dp),
-            horizontalArrangement = Arrangement.spacedBy(44.dp),
+                .padding(start = 92.dp, top = 96.dp, end = 48.dp, bottom = 50.dp),
+            horizontalArrangement = Arrangement.spacedBy(50.dp),
             verticalAlignment = Alignment.Top,
         ) {
             TvSeriesHeroPane(
@@ -294,24 +297,10 @@ private fun TvSeriesHeroPane(
     onPlay: () -> Unit,
 ) {
     Column(
-        modifier = modifier.padding(top = 68.dp),
+        modifier = modifier.padding(top = 48.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Text(
-            text = "电视剧",
-            color = AppChrome.AccentWarm,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = series.title,
-            color = Color.White,
-            fontSize = 56.sp,
-            lineHeight = 62.sp,
-            fontWeight = FontWeight.Black,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        TvSeriesTitleBlock(title = series.title)
         TvSeriesMetaRow(series = series)
         TvSeriesRatingRow(series = series)
         Text(
@@ -321,29 +310,52 @@ private fun TvSeriesHeroPane(
             lineHeight = 28.sp,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(620.dp),
+            modifier = Modifier.width(640.dp),
         )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TvSeriesPrimaryActionButton(
-                text = buildTvSeriesPlayButtonLabel(currentEpisode),
-                enabled = currentEpisode?.playable == true,
-                modifier = Modifier.focusRequester(playFocusRequester),
-                onClick = onPlay,
-            )
-            TvSeriesEpisodeStatusPill(
-                text = buildTvSeriesSelectedEpisodeStatus(
-                    seasonNumber = selectedSeasonNumber,
-                    episode = currentEpisode,
-                ),
-            )
-        }
+        TvSeriesReferenceActionRow(
+            primaryText = buildTvSeriesPlayButtonLabel(currentEpisode),
+            enabled = currentEpisode?.playable == true,
+            seasonNumber = selectedSeasonNumber,
+            episode = currentEpisode,
+            playFocusRequester = playFocusRequester,
+            onPlay = onPlay,
+        )
         if (series.cast.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             TvSeriesCastRow(cast = series.cast)
         }
+    }
+}
+
+@Composable
+private fun TvSeriesTitleBlock(title: String) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(650.dp),
+    ) {
+        Text(
+            text = "剧 集",
+            color = Color.White.copy(alpha = 0.88f),
+            fontSize = 30.sp,
+            lineHeight = 36.sp,
+            letterSpacing = 14.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = formatTvSeriesReferenceTitle(title),
+            color = Color.White,
+            fontSize = 76.sp,
+            lineHeight = 86.sp,
+            letterSpacing = 9.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -351,49 +363,108 @@ private fun TvSeriesHeroPane(
 private fun TvSeriesMetaRow(series: TvSeriesUiModel) {
     val items = remember(series) { buildTvSeriesDetailMetaItems(series) }
     Row(
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         items.forEachIndexed { index, item ->
-            Text(
+            TvSeriesMetaChip(
                 text = item,
-                color = Color(0xD6E8EDF6),
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                emphasized = index == 0,
             )
-            if (index < items.lastIndex) {
-                Text(
-                    text = "·",
-                    color = Color(0x99E8EDF6),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            }
         }
+    }
+}
+
+@Composable
+private fun TvSeriesMetaChip(
+    text: String,
+    emphasized: Boolean,
+) {
+    Surface(
+        color = if (emphasized) Color(0x29E9BE62) else Color(0x26000000),
+        shape = TvSeriesDetailTokens.MetaChipShape,
+        border = BorderStroke(
+            1.dp,
+            if (emphasized) AppChrome.AccentWarm.copy(alpha = 0.48f) else Color.White.copy(alpha = 0.12f),
+        ),
+    ) {
+        Text(
+            text = text,
+            color = if (emphasized) Color(0xFFFFE1A0) else Color(0xD6E8EDF6),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 
 @Composable
 private fun TvSeriesRatingRow(series: TvSeriesUiModel) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             repeat(5) { index ->
                 Icon(
                     imageVector = Icons.Filled.Star,
                     contentDescription = null,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(25.dp),
                     tint = AppChrome.AccentWarm.copy(alpha = if (index < 4) 1f else 0.48f),
                 )
             }
         }
+        Surface(
+            color = Color(0x28E9BE62),
+            shape = TvSeriesDetailTokens.MetaChipShape,
+            border = BorderStroke(1.dp, AppChrome.AccentWarm.copy(alpha = 0.44f)),
+        ) {
+            Text(
+                text = buildTvSeriesAvailabilityText(series),
+                color = Color(0xFFFFD783),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvSeriesReferenceActionRow(
+    primaryText: String,
+    enabled: Boolean,
+    seasonNumber: Int,
+    episode: TvEpisodeUiModel?,
+    playFocusRequester: FocusRequester,
+    onPlay: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(30.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TvSeriesPrimaryActionButton(
+                text = primaryText,
+                enabled = enabled,
+                modifier = Modifier.focusRequester(playFocusRequester),
+                onClick = onPlay,
+            )
+            TvSeriesSecondaryActionButton(text = "我的片单")
+        }
         Text(
-            text = buildTvSeriesAvailabilityText(series),
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            text = buildTvSeriesSelectedEpisodeStatus(
+                seasonNumber = seasonNumber,
+                episode = episode,
+            ),
+            color = Color(0xA9D5DCE8),
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -406,10 +477,11 @@ private fun TvSeriesPrimaryActionButton(
     onClick: () -> Unit,
 ) {
     Surface(
-        color = if (enabled) Color(0xFFE9BE62) else Color(0xFF2A2F36),
+        color = if (enabled) Color(0xFFEFC463) else Color(0xFF2A2F36),
         shape = TvSeriesDetailTokens.PrimaryActionShape,
-        shadowElevation = if (enabled) 10.dp else 0.dp,
+        shadowElevation = if (enabled) 14.dp else 0.dp,
         modifier = modifier
+            .width(306.dp)
             .tvFocusableGlow(
                 enabled = enabled,
                 shape = TvSeriesDetailTokens.PrimaryActionShape,
@@ -418,9 +490,9 @@ private fun TvSeriesPrimaryActionButton(
             .clickable(enabled = enabled, onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 17.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Box(
                 modifier = Modifier
@@ -441,26 +513,43 @@ private fun TvSeriesPrimaryActionButton(
                 color = if (enabled) Color(0xFF070A0D) else Color(0xFFBAC2CE),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
 
 @Composable
-private fun TvSeriesEpisodeStatusPill(text: String) {
+private fun TvSeriesSecondaryActionButton(text: String) {
     Surface(
         color = Color(0x2C141820),
         shape = TvSeriesDetailTokens.PrimaryActionShape,
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+        modifier = Modifier
+            .width(178.dp)
+            .tvFocusableGlow(shape = TvSeriesDetailTokens.PrimaryActionShape, focusedScale = 1.04f)
+            .clickable(onClick = {}),
     ) {
-        Text(
-            text = text,
-            color = Color(0xE6F7FAFF),
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 19.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size(24.dp),
+            )
+            Text(
+                text = text,
+                color = Color.White.copy(alpha = 0.92f),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -532,8 +621,8 @@ private fun TvSeriesEpisodePane(
     onPlayEpisode: (TvEpisodeUiModel) -> Unit,
 ) {
     Column(
-        modifier = modifier.padding(top = 42.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        modifier = modifier.padding(top = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -543,8 +632,10 @@ private fun TvSeriesEpisodePane(
             Text(
                 text = "剧集",
                 color = AppChrome.AccentWarm,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 32.sp,
+                lineHeight = 38.sp,
+                letterSpacing = 3.sp,
+                fontWeight = FontWeight.Black,
             )
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -564,6 +655,7 @@ private fun TvSeriesEpisodePane(
             text = season?.title?.ifBlank { "第 $selectedSeasonNumber 季" } ?: "暂无季信息",
             color = Color(0xBFE8EDF6),
             style = MaterialTheme.typography.titleSmall,
+            letterSpacing = 1.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -575,7 +667,7 @@ private fun TvSeriesEpisodePane(
 
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 10.dp),
         ) {
             items(episodes, key = { it.id }) { episode ->
@@ -597,7 +689,7 @@ private fun TvSeriesSeasonChip(
     onClick: () -> Unit,
 ) {
     Surface(
-        color = if (selected) Color(0x34E9BE62) else Color(0x22000000),
+        color = if (selected) Color(0x42E9BE62) else Color(0x22000000),
         shape = TvSeriesDetailTokens.SeasonChipShape,
         border = BorderStroke(
             1.dp,
@@ -612,7 +704,7 @@ private fun TvSeriesSeasonChip(
             color = if (selected) Color.White else Color(0xBEDFE6F0),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -630,10 +722,10 @@ private fun TvSeriesEpisodeCard(
         resolveTvResourceUrl(baseUrl, episode.stillUrl)
     }
     Surface(
-        color = if (selected) Color(0x421C1B16) else Color(0x8810161F),
+        color = if (selected) Color(0x4DE9BE62) else Color(0x8A10161F),
         shape = TvSeriesDetailTokens.EpisodeCardShape,
         border = BorderStroke(
-            width = if (selected) 1.5.dp else 1.dp,
+            width = if (selected) 2.dp else 1.dp,
             color = if (selected) AppChrome.AccentWarm else Color.White.copy(alpha = 0.12f),
         ),
         modifier = Modifier
@@ -653,24 +745,25 @@ private fun TvSeriesEpisodeCard(
                 episode = episode,
                 stillUrl = stillUrl,
                 selected = selected,
+                playable = episode.playable,
             )
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "${episode.number}. ${episode.title.ifBlank { "第 ${episode.number} 集" }}",
+                    text = "第 ${episode.number} 集  ${episode.title.ifBlank { "未命名" }}",
                     color = if (episode.playable) Color.White else Color(0x8FE8EDF6),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Black,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = episode.durationLabel,
-                    color = Color(0xBBC7CFDA),
+                    color = if (selected) Color(0xFFFFE2A0) else Color(0xBBC7CFDA),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -685,12 +778,14 @@ private fun TvSeriesEpisodeCard(
             }
             Box(
                 modifier = Modifier
-                    .padding(end = 16.dp)
-                    .size(44.dp)
+                    .padding(end = 18.dp)
+                    .size(46.dp)
                     .clip(CircleShape)
                     .background(
-                        if (episode.playable) {
-                            Color(0x24E9BE62)
+                        if (selected && episode.playable) {
+                            AppChrome.AccentWarm
+                        } else if (episode.playable) {
+                            Color(0x26E9BE62)
                         } else {
                             Color(0x1FFFFFFF)
                         },
@@ -700,7 +795,11 @@ private fun TvSeriesEpisodeCard(
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = null,
-                    tint = if (episode.playable) Color(0xFFE9BE62) else Color(0x80FFFFFF),
+                    tint = when {
+                        selected && episode.playable -> Color(0xFF080A0D)
+                        episode.playable -> Color(0xFFE9BE62)
+                        else -> Color(0x80FFFFFF)
+                    },
                     modifier = Modifier.size(28.dp),
                 )
             }
@@ -713,6 +812,7 @@ private fun TvSeriesEpisodeStill(
     episode: TvEpisodeUiModel,
     stillUrl: String?,
     selected: Boolean,
+    playable: Boolean,
 ) {
     Box(
         modifier = Modifier
@@ -746,6 +846,36 @@ private fun TvSeriesEpisodeStill(
                 fontWeight = FontWeight.SemiBold,
             )
         }
+        Surface(
+            color = if (selected && playable) AppChrome.AccentWarm else Color(0x7A05070A),
+            shape = CircleShape,
+            border = BorderStroke(
+                1.dp,
+                if (selected) AppChrome.AccentWarm else Color.White.copy(alpha = 0.18f),
+            ),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 14.dp, bottom = 12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(start = 8.dp, top = 5.dp, end = 10.dp, bottom = 5.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = if (selected && playable) Color(0xFF080A0D) else Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = episode.number.toString().padStart(2, '0'),
+                    color = if (selected && playable) Color(0xFF080A0D) else Color.White.copy(alpha = 0.88f),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        }
     }
 }
 
@@ -768,9 +898,14 @@ private fun TvSeriesEmptyEpisodes() {
 
 private fun buildTvSeriesDetailMetaItems(series: TvSeriesUiModel): List<String> {
     val items = mutableListOf<String>()
-    series.subtitle.trim().takeIf { it.isNotBlank() }?.let(items::add)
+    series.subtitle
+        .split("·")
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .take(3)
+        .forEach(items::add)
     if (series.tags.isNotEmpty()) {
-        items += series.tags.take(2).joinToString("、")
+        items += series.tags.take(2)
     }
     items += if (series.playableEpisodes > 0) {
         "${series.playableEpisodes} 集可播"
@@ -778,6 +913,17 @@ private fun buildTvSeriesDetailMetaItems(series: TvSeriesUiModel): List<String> 
         "待绑定视频"
     }
     return items
+}
+
+private fun formatTvSeriesReferenceTitle(title: String): String {
+    val normalized = title.trim()
+    if (normalized.isBlank()) {
+        return "未 命 名 剧 集"
+    }
+    val withoutExtraSpaces = normalized.replace(Regex("\\s+"), " ")
+    return withoutExtraSpaces.map { char ->
+        if (char == ' ') "   " else char.toString()
+    }.joinToString(" ")
 }
 
 private fun buildTvSeriesAvailabilityText(series: TvSeriesUiModel): String {

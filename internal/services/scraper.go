@@ -1175,6 +1175,7 @@ func (s *ScraperService) syncTVSeriesAndBindEpisode(ctx context.Context, videoID
 			); err != nil {
 				return syncedEpisodeResult{}, err
 			}
+			_ = s.downloadTVEpisodeStill(ctx, asString(epRaw["still_path"]), seriesID, seasonNumber, episodeNumber)
 			if bindVideo {
 				result.seasonRaw = seasonRaw
 				result.episodeRaw = epRaw
@@ -2364,7 +2365,10 @@ func (s *ScraperService) downloadTVSeriesArtwork(ctx context.Context, relativePa
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("create tv artwork dir: %w", err)
 	}
-	outputPath := filepath.Join(outputDir, kind+".jpg")
+	outputPath := filepath.Join(outputDir, filepath.FromSlash(kind+".jpg"))
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return fmt.Errorf("create tv artwork nested dir: %w", err)
+	}
 	f, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("create tv artwork file: %w", err)
@@ -2374,6 +2378,14 @@ func (s *ScraperService) downloadTVSeriesArtwork(ctx context.Context, relativePa
 		return fmt.Errorf("write tv artwork file: %w", err)
 	}
 	return nil
+}
+
+func (s *ScraperService) downloadTVEpisodeStill(ctx context.Context, relativePath string, seriesID int64, seasonNumber, episodeNumber int) error {
+	if seasonNumber <= 0 || episodeNumber <= 0 {
+		return nil
+	}
+	kind := fmt.Sprintf("episodes/s%02de%02d", seasonNumber, episodeNumber)
+	return s.downloadTVSeriesArtwork(ctx, relativePath, seriesID, kind)
 }
 
 func extractGenres(v any) []string {
