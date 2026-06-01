@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 19:44 +0800
+- 进度：完成 30 秒超时修复部署。`70d0572` 先部署后，因 5 个候选详情补全在部署机代理下仍耗时约 37 秒，继续以 `1b6d00d` 将补全上限降到 3；部署机 `current/video-server` 已指向 `video-server-1b6d00d096.bin`，手动只重启 server 为 pid 78477，worker pid 76490 与 ffmpeg pid 76553/76554 保持运行，未丢失当前转码进度。实测 `POST /api/v1/admin/scrape/preview`，payload `{"type":"tv","title":"The Lead","year":0}` 返回 HTTP 200、20 个候选、耗时约 1.86 秒。临时跳过 worker kickstart 的部署 hook 已恢复。
+- 影响文件：`plan.md`；代码提交为 `70d0572`、`1b6d00d`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：部署机 `/healthz` 通过；`The Lead` 电视剧预览接口实测通过；部署机 hook 推 GitHub mirror 失败为非阻塞，需从本机补推 `origin/master`。
+
 ## 2026-06-01 19:41 +0800
 - 进度：部署 `70d0572` 后实测 `The Lead` 电视剧预览返回 20 个候选但仍耗时约 37 秒，虽然前端已不会再被 axios 30 秒超时截断，但首轮后端响应仍偏慢。进一步将电影/电视剧预览详情补全上限从 5 个候选收敛到 3 个候选，减少 TMDB 详情/兜底请求数量；确认刮削仍在确认阶段重新拉详情，不依赖预览阶段完整 metadata。
 - 影响文件：`internal/services/scraper.go`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
