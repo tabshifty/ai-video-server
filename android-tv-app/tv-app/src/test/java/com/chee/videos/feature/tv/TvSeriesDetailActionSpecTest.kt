@@ -3,6 +3,7 @@ package com.chee.videos.feature.tv
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,7 +21,9 @@ class TvSeriesDetailActionSpecTest {
         assertFalse("电视剧详情页不应导入默认 Material TextButton", source.contains("import androidx.compose.material3.TextButton"))
         assertFalse("电视剧详情页不应使用默认 Material IconButton", source.contains("IconButton("))
         assertFalse("电视剧详情页不应使用默认 Material TextButton", source.contains("TextButton("))
-        assertTrue("电视剧详情页播放、季选择和集选择仍应使用共享焦点视觉", source.contains(".tvFocusableGlow("))
+        assertTrue("电视剧详情页播放、季选择和集选择必须保留遥控焦点状态", source.contains("onFocusChanged"))
+        assertTrue("电视剧详情页参考图焦点应使用暖金色，而不是旧版青蓝 glow", source.contains("ReferenceGold"))
+        assertFalse("电视剧详情页参考图还原不应继续套用旧版共享青蓝焦点 glow", source.contains(".tvFocusableGlow("))
     }
 
     @Test
@@ -41,8 +44,23 @@ class TvSeriesDetailActionSpecTest {
         assertTrue("右侧标题文案必须是中文“剧集”", source.contains("\"剧集\""))
         assertTrue("主按钮文案必须使用中文播放集数", source.contains("播放第"))
         assertTrue("电视剧详情页大标题应使用正字距拉开以贴近参考图", source.contains("letterSpacing"))
+        assertTrue("左侧信息区必须有独立宽度，避免被右侧剧集面板吞掉", source.contains("HeroInfoWidthDp"))
+        assertTrue("右侧剧集面板宽度必须按 TV density 收窄，给左侧信息留出空间", source.contains("const val EpisodePaneWidthDp = 430"))
+        assertTrue("左侧信息区必须使用参考图式小顶标 + 大标题拆分", source.contains("splitTvSeriesReferenceTitle("))
+        assertTrue("左侧信息区必须包含参考图式 18+ 年龄角标", source.contains("TvSeriesAgeBadge("))
+        assertTrue("左侧评分区必须包含参考图式 IMDb 角标", source.contains("\"IMDb\""))
+        assertFalse("左侧信息区不能继续使用会溢出 TV 逻辑宽度的 560dp 固定宽度", source.contains("width(560.dp)"))
+        assertFalse("本次不还原左侧竖向导航栏", source.contains("TvSeriesReferenceSideRail("))
+        assertFalse("本次不还原顶部导航栏", source.contains("TvSeriesReferenceTopNav("))
         assertFalse("电视剧详情页不应继续保留旧版剧情简介独立区块", source.contains("key = \"tags\""))
         assertFalse("电视剧详情页不应继续保留旧版季选择独立区块", source.contains("key = \"seasons\""))
         assertFalse("电视剧详情页不应继续保留旧版选集网格独立区块", source.contains("key = \"episodes\""))
+    }
+
+    @Test
+    fun `series detail title formatting keeps chinese title horizontal`() {
+        assertEquals("主角", formatTvSeriesReferenceTitle("主角", stretched = false))
+        assertEquals("剧集", formatTvSeriesReferenceTitle("剧集", stretched = false))
+        assertEquals("T H E", formatTvSeriesReferenceTitle("THE", stretched = true))
     }
 }

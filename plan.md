@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 22:22 +0800
+- 进度：按远程 TV 截图继续修正电视剧详情页参考图还原。确认 1920x1080 / density 320 设备下 Compose 逻辑宽度为 960dp，之前把参考图像素级宽度当 dp 导致右侧剧集面板吞掉左侧信息区；已改为参考图专用主体布局，左侧信息区固定宽度、中文标题保持横排、右侧剧集面板按 TV density 收窄，并移除旧版共享青蓝 `tvFocusableGlow`，改用暖金边框与暗玻璃焦点态。已安装到远程设备 `192.168.1.8:5555` 并截图确认左侧电视剧信息完整显示。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`adb install -r .../tv-app-armeabi-v7a-debug.apk` 成功；截图 `/tmp/tv-detail-reference-focus.png` 确认左侧信息未被吞、焦点视觉不再是旧青蓝 glow。无关 `admin-web/.env.development` 不纳入本次提交。
+
+## 2026-06-01 21:27 +0800
+- 进度：根据用户澄清调整还原范围：不还原参考图左侧竖向导航栏和顶部全局导航，只针对电视剧详情主体继续 1:1 对齐，优先修正左侧信息区。已撤掉导航还原代码，把左侧信息区改为参考图式“小顶标 + 超大字距标题、点分元信息 + 18+、星级 + 分数 + IMDb、播放/我的片单双按钮、演员行”；右侧剧集列表同步收窄为参考图式卡片比例与季选择下拉外观。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest` 通过；ADB 已连接 `192.168.1.8:5555`，待安装后截图对比。
+
+## 2026-06-01 21:13 +0800
+- 进度：开始继续按参考图还原 TV 电视剧详情页。已确认目标页面为 `android-tv-app` 的 `TvSeriesDetailScreen`，本次以参考图为主导，允许覆盖此前 TV 排版/圆角等视觉 token 约束，但保留中文界面、遥控器可聚焦、TV 端版本递增和验证要求。下一步对齐参考图的 3 区结构：左侧导航栏 + 顶部横向导航、左侧大标题/元信息/评分/主按钮/演员、右侧剧集列表。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、对应源文测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行 TV 端相关单测与构建。
+
 ## 2026-06-01 19:44 +0800
 - 进度：完成 30 秒超时修复部署。`70d0572` 先部署后，因 5 个候选详情补全在部署机代理下仍耗时约 37 秒，继续以 `1b6d00d` 将补全上限降到 3；部署机 `current/video-server` 已指向 `video-server-1b6d00d096.bin`，手动只重启 server 为 pid 78477，worker pid 76490 与 ffmpeg pid 76553/76554 保持运行，未丢失当前转码进度。实测 `POST /api/v1/admin/scrape/preview`，payload `{"type":"tv","title":"The Lead","year":0}` 返回 HTTP 200、20 个候选、耗时约 1.86 秒。临时跳过 worker kickstart 的部署 hook 已恢复。
 - 影响文件：`plan.md`；代码提交为 `70d0572`、`1b6d00d`；不纳入用户既有改动 `admin-web/.env.development`
