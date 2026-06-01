@@ -52,7 +52,13 @@ func (a *API) VideoThumbnail(c *gin.Context) {
 	if !ok {
 		return
 	}
-	c.File(thumbPath)
+	file, info, err := openLocalImageFile(c.Request.Context(), thumbPath)
+	if err != nil {
+		writeLocalImageOpenError(c, err, "thumbnail not found", "thumbnail temporarily unavailable")
+		return
+	}
+	defer file.Close()
+	serveOpenedLocalImage(c, thumbPath, file, info)
 }
 
 func (a *API) VideoSourceSigned(c *gin.Context) {
@@ -182,14 +188,6 @@ func (a *API) resolveThumbnailSource(c *gin.Context, videoID uuid.UUID) (string,
 	thumbPath = chooseVideoThumbnailVariantPath(video.Type, video.Metadata, c.Query("variant"), thumbPath)
 	if thumbPath == "" {
 		c.JSON(http.StatusNotFound, gin.H{"msg": "thumbnail not found"})
-		return "", false
-	}
-	if _, statErr := os.Stat(thumbPath); statErr != nil {
-		if errors.Is(statErr, os.ErrNotExist) {
-			c.JSON(http.StatusNotFound, gin.H{"msg": "thumbnail not found"})
-			return "", false
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "read thumbnail failed"})
 		return "", false
 	}
 	return thumbPath, true

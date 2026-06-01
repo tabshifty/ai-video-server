@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -87,24 +86,63 @@ func (a *API) serveTVSeriesArtwork(c *gin.Context, kind string) {
 
 func (a *API) serveTVArtworkPath(c *gin.Context, rawPath, localPath, notFoundMessage string) {
 	rawPath = strings.TrimSpace(rawPath)
-	if stat, statErr := os.Stat(localPath); statErr == nil && !stat.IsDir() {
-		c.File(localPath)
-		return
-	}
-	if stat, statErr := os.Stat(rawPath); statErr == nil && !stat.IsDir() {
-		c.File(rawPath)
-		return
+	localPath = strings.TrimSpace(localPath)
+	if localPath != "" {
+		served, err := tryServeLocalArtworkPath(c, localPath)
+		if served {
+			return
+		}
+		if err != nil && !isLocalImageNotFound(err) && !canRedirectTVArtwork(rawPath) && rawPath == localPath {
+			writeLocalImageOpenError(c, err, notFoundMessage, "tv artwork temporarily unavailable")
+			return
+		}
 	}
 	if strings.HasPrefix(rawPath, "http://") || strings.HasPrefix(rawPath, "https://") {
 		c.Redirect(http.StatusTemporaryRedirect, rawPath)
 		return
 	}
-	if strings.HasPrefix(rawPath, "/") {
+	if strings.HasPrefix(rawPath, "/") && !looksLikeLocalFilesystemPath(rawPath) {
 		c.Redirect(http.StatusTemporaryRedirect, "https://image.tmdb.org/t/p/original"+rawPath)
 		return
 	}
+	if rawPath != "" && rawPath != localPath {
+		served, err := tryServeLocalArtworkPath(c, rawPath)
+		if served {
+			return
+		}
+		if err != nil && !isLocalImageNotFound(err) {
+			writeLocalImageOpenError(c, err, notFoundMessage, "tv artwork temporarily unavailable")
+			return
+		}
+	}
 
 	c.JSON(http.StatusNotFound, gin.H{"msg": notFoundMessage})
+}
+
+func tryServeLocalArtworkPath(c *gin.Context, path string) (bool, error) {
+	file, info, err := openLocalImageFile(c.Request.Context(), path)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+	serveOpenedLocalImage(c, path, file, info)
+	return true, nil
+}
+
+func canRedirectTVArtwork(path string) bool {
+	path = strings.TrimSpace(path)
+	return strings.HasPrefix(path, "http://") ||
+		strings.HasPrefix(path, "https://") ||
+		(strings.HasPrefix(path, "/") && !looksLikeLocalFilesystemPath(path))
+}
+
+func looksLikeLocalFilesystemPath(path string) bool {
+	normalized := strings.ReplaceAll(strings.TrimSpace(path), "\\", "/")
+	return strings.HasPrefix(normalized, "/Volumes/") ||
+		strings.HasPrefix(normalized, "/Users/") ||
+		strings.HasPrefix(normalized, "/private/") ||
+		strings.HasPrefix(normalized, "/tmp/") ||
+		strings.HasPrefix(normalized, "/var/")
 }
 
 func tvEpisodeStillLocalPath(storageRoot string, seriesID int64, seasonNumber, episodeNumber int) string {

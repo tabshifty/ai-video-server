@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 13:31 +0800
+- 进度：完成图片接口外盘休眠兜底。新增本地图片打开 helper，统一为缩略图/TV 海报/TV 分集剧照使用 2 秒打开超时与 8 个并发槽；超时或槽位耗尽时返回 503 + `Retry-After`，TV 图片若有 TMDB/远端原始地址则优先回退重定向。旧 `/api/v1/videos/:id/thumbnail` 不再在解析阶段做无界 `os.Stat`，而是复用已打开的文件响应，避免 `c.File` 再次阻塞。`CONTEXT.md` 追加 [[家用部署机外盘休眠契约]]；12:39 的 admin 跳转假设保留为排查记录，本轮未修改管理端，当前直接 blocker 已收敛为外盘休眠导致图片接口 pending。
+- 影响文件：`internal/handlers/local_image_file.go`、`internal/handlers/local_image_file_test.go`、`internal/handlers/video_source.go`、`internal/handlers/tv_artwork.go`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`go test ./internal/handlers -count=1` 通过；`go test ./internal/... -count=1` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md internal/handlers/local_image_file.go internal/handlers/local_image_file_test.go internal/handlers/video_source.go internal/handlers/tv_artwork.go` 无输出。
+
+## 2026-06-01 13:20 +0800
+- 进度：校正管理端视频管理页 pending 的根因。最近提交 `d8eb937` 未修改旧的 `/api/v1/videos/:id/thumbnail` 处理函数，但新增 TV 分集剧照本地路由并让 TV 详情页批量请求分集图片；部署机外部媒体盘 `/Volumes/large` 会休眠，图片接口里无超时的 `os.Stat` / `c.File` 会在外盘唤醒期间阻塞，旧视频封面接口和新增 TV 剧照接口都存在同类风险。下一步为图片类本地文件响应增加超时与并发上限，外盘休眠时快速返回而不是浏览器一直 pending。
+- 影响文件：预计涉及 `internal/handlers/local_image_file.go`（新）、`internal/handlers/video_source.go`、`internal/handlers/tv_artwork.go`、后端单测、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行 `go test ./internal/handlers -count=1`、`git diff --check`、乱码扫描。
+
+## 2026-06-01 12:39 +0800
+- 进度：开始排查管理端视频管理页打不开。部署机 `/healthz`、`/admin`、管理端 JS/CSS 均可访问；根路径 `/` 返回 404 属于现有路由行为。日志显示 `/api/v1/admin/videos` 在部署后仍有 200 记录，TV 详情页提交未修改 `AdminVideos`、`AdminListVideos` 或管理端构建产物。进一步发现管理端 axios 认证失效处理直接 `location.replace('/login?...')`，生产 `/admin` 基路径下会跳到后端根路径 `/login` 并 404，表现为视频列表请求后“网站打不开”。下一步修正认证失效跳转基路径并补单测。
+- 影响文件：预计涉及 `admin-web/src/api/request.js`、管理端 API 请求测试、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行管理端定向单测、`npm run build`、`git diff --check`、乱码扫描，并推送部署机。
+
 ## 2026-05-31 15:44 +0800
 - 进度：完成 TV 电视剧详情页返修收尾验证。TV 全量单测首次因新增 `RoundedCornerShape(6.dp)` 违反 TV 圆角白名单失败，已改为复用 `AppChrome.ChipShape` 并重跑通过。准备只暂存本任务文件，继续保留用户既有改动 `admin-web/.env.development` 不纳入提交。
 - 影响文件：同 15:43 记录；提交范围不包含 `admin-web/.env.development`
