@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 17:13 +0800
+- 进度：完成图片和视频资源无法访问的根因校准。使用管理员 token 验证：管理端详情与 play-url 均 200，视频 `/source` Range 请求 15 秒无字节返回；封面接口 503。部署机 shell 直接读取同一 `/Volumes/large/.../thumb.jpg` 和 `video-hevc.mp4` 正常，手动启动同一二进制到 18081 也能 200 返回封面；但 launchd 版 server 采样显示线程卡在 `open`，TCC 日志显示当前 hash 二进制请求 `kTCCServiceSystemPolicyAllFiles` 被拒。结论：资源路径和文件都正常，问题是 launchd 启动的当前二进制缺少 macOS TCC 媒体访问权限。已临时 `bootout` launchd server，并用 SSH/Terminal 权限启动同一二进制守住 8080，验证 `/healthz` 200、封面 200、视频 Range 206；后续需做稳定签名或系统授权的长期修复。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；部署机临时状态：`com.aivideo.server` launchd job 已 bootout，手动 server pid 74522 正在提供 :8080，worker launchd 未变；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`curl /healthz` 返回 200；`curl /api/v1/videos/2bb55884-3647-4c4a-81f8-c6ba6f78534f/thumbnail` 返回 200 image/jpeg；带 token 的 `curl -r 0-0 /api/v1/videos/2bb55884-3647-4c4a-81f8-c6ba6f78534f/source` 返回 206 video/mp4；`curl /api/v1/admin/videos?...` 返回 200。
+
 ## 2026-06-01 13:31 +0800
 - 进度：完成图片接口外盘休眠兜底。新增本地图片打开 helper，统一为缩略图/TV 海报/TV 分集剧照使用 2 秒打开超时与 8 个并发槽；超时或槽位耗尽时返回 503 + `Retry-After`，TV 图片若有 TMDB/远端原始地址则优先回退重定向。旧 `/api/v1/videos/:id/thumbnail` 不再在解析阶段做无界 `os.Stat`，而是复用已打开的文件响应，避免 `c.File` 再次阻塞。`CONTEXT.md` 追加 [[家用部署机外盘休眠契约]]；12:39 的 admin 跳转假设保留为排查记录，本轮未修改管理端，当前直接 blocker 已收敛为外盘休眠导致图片接口 pending。
 - 影响文件：`internal/handlers/local_image_file.go`、`internal/handlers/local_image_file_test.go`、`internal/handlers/video_source.go`、`internal/handlers/tv_artwork.go`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
