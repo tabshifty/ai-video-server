@@ -18,6 +18,7 @@
 - `家用部署机绝对路径契约`：[[家用部署机]] 的工作目录会随 push 切换（symlink swap），任何"基于 CWD 解析的相对路径"都不能用来定位运行期资产。`STORAGE_ROOT`、海报/poster 等媒体路径、admin-web dist 路径在部署模式下必须传绝对路径；其中 `STORAGE_ROOT=/Volumes/large/ai-video-server/storage` 是家用部署机固定位置（外挂大容量盘），admin-web dist 走新增的 `ADMIN_WEB_DIST_PATH` 环境变量。dev 模式仍可继续用相对路径默认值，不影响开发体验。新增任何"运行时需要读/写"的目录配置时，必须同时支持绝对路径并在部署文档中显式给出值。
 - `家用部署机外盘休眠契约`：[[家用部署机]] 的媒体盘挂载在 `/Volumes/large`，该外部磁盘可能休眠；服务端访问封面、海报、分集剧照等图片文件时，`os.Stat` / `os.Open` / `c.File` 都可能在内核层阻塞数秒甚至更久。图片类 HTTP 接口必须使用带超时和并发上限的本地文件打开策略，外盘未及时响应时返回 503 或回退远端图片，避免浏览器图片请求长期 pending 并拖垮管理端列表页。视频播放大文件可按播放体验另行设计重试策略，但不能把图片接口的无界阻塞当作可接受行为。
 - `家用部署机媒体访问权限契约`：[[家用部署机]] 由 launchd 启动的 Go server / worker 必须具备 macOS TCC 对 `/Volumes/large` 的媒体访问权限。若 Terminal 或 SSH 手动进程能读同一路径，但 launchd 进程访问图片/视频仍在 `open` 上卡住，或 worker 在输出目录创建、源文件探测前卡住，优先排查 TCC 的 `SystemPolicyAllFiles` / `SystemPolicyRemovableVolumes` 授权，而不是误判为数据库路径错误或外盘未挂载。由于部署流程会生成带 commit hash 的新二进制，若二进制只做 ad-hoc 签名，TCC 授权可能随新 cdhash 失效；长期方案必须保证 launchd 运行身份和二进制代码身份的授权稳定。
+- `家用部署机出站代理契约`：[[家用部署机]] 的 Go server / worker 访问 TMDB、JavDB、ThePornDB 等外部刮削服务时，不自动继承 macOS 系统网络代理设置；生产进程必须在启动环境中显式配置 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` 与 `NO_PROXY`。若浏览器或 `curl -x` 通过本机代理可访问外部 API，但 Go 日志出现 TLS handshake timeout、i/o timeout 或异常解析地址，优先检查进程环境里的代理变量，而不是先改刮削逻辑。
 - `转码任务进度`：管理端语境里的“压缩进度”统一指后台 worker 已确认源视频时长后持续持久化的转码任务进度，不是前端本地估算。worker 若在外盘输出目录创建、源文件探测或 ffmpeg 启动前阻塞，进度应被视为“尚未进入转码阶段”，不能把 0% 直接归因于前端进度条损坏。
 
 ## 字幕处理约定

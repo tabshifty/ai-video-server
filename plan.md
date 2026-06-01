@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 19:22 +0800
+- 进度：完成 TMDB TLS 超时的部署机临时恢复。已在部署机 `.env` 增加显式 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY` 与 `NO_PROXY`，并重启手动 server 为 pid 77089；`/healthz` 正常。通过管理端 `POST /api/v1/admin/scrape/preview` 验证 `The Lead` 电视剧预览返回 20 个候选，不再报 TLS handshake timeout。当前 worker pid 76490 正在转码 job 6158/6159，已发送 `TSTP` 停止接新任务但保留当前 ffmpeg；后台脚本 `/tmp/restart-worker-after-transcode.sh` 会等待两个 ffmpeg 完成后重启 worker，使新 worker 读取代理环境。
+- 影响文件：`CONTEXT.md`、`plan.md`；部署机临时状态：server pid 77089 已带代理环境运行，worker pid 76490 仍在完成当前转码且停止接新任务，等待脚本 pid 77239 负责后续自动重启；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`curl -x http://127.0.0.1:15732 https://api.themoviedb.org/3/configuration` 约 0.7 秒返回 401；`GET /healthz` 返回 200；管理端 TV 预览 `The Lead` 返回 `code=0`、候选数 20；数据库 job 6158/6159 进度约 22.7% 且继续增长。
+
+## 2026-06-01 19:22 +0800
+- 进度：开始排查 TMDB `TLS handshake timeout`。日志显示 5 月 26/28/29 已有 TMDB API 直连异常，部署机当前 DNS 将 `api.themoviedb.org` 解析到 `44.0.0.15`，直连 TLS 超时；本机 macOS 系统代理为 `127.0.0.1:15732`，但 Go 进程没有 `HTTP_PROXY/HTTPS_PROXY` 环境变量，不会自动继承系统代理。已验证显式代理访问 TMDB API 可在约 0.7 秒返回 401（测试未带 API key，证明 TLS 通路可用）。
+- 影响文件：预计涉及 `CONTEXT.md`、`plan.md`；部署机运行态涉及 `.env` 代理变量与手动 server/worker 重启安排；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行部署机 `.env` 代理配置、server 重启、管理端 TMDB 预览接口验证、worker 当前转码完成后的代理重启验证、`git diff --check` 与乱码扫描。
+
 ## 2026-06-01 19:06 +0800
 - 进度：完成压缩进度 0% 的部署机恢复。已 `bootout` launchd 版 worker，保留手动 server；将卡住的 job 6156/6157 标记为 failed，并把对应视频恢复到 `uploaded` 后通过管理端重转码接口重新入队。手动 worker pid 76490 已启动，ffmpeg 子进程开始转码两集，新 job 6158/6159 已写入源时长、已处理秒数和百分比，管理端任务接口返回进度 0.68% 后继续增长到 1.18%。结论：worker 也缺少或失去 launchd 外盘媒体访问权限，导致卡在输出目录创建阶段，进度并未进入可更新状态。
 - 影响文件：`CONTEXT.md`、`plan.md`；部署机临时状态：`com.aivideo.worker` launchd job 已 bootout，手动 worker pid 76490 正在处理队列；不纳入用户既有改动 `admin-web/.env.development`
