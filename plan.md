@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 19:06 +0800
+- 进度：完成压缩进度 0% 的部署机恢复。已 `bootout` launchd 版 worker，保留手动 server；将卡住的 job 6156/6157 标记为 failed，并把对应视频恢复到 `uploaded` 后通过管理端重转码接口重新入队。手动 worker pid 76490 已启动，ffmpeg 子进程开始转码两集，新 job 6158/6159 已写入源时长、已处理秒数和百分比，管理端任务接口返回进度 0.68% 后继续增长到 1.18%。结论：worker 也缺少或失去 launchd 外盘媒体访问权限，导致卡在输出目录创建阶段，进度并未进入可更新状态。
+- 影响文件：`CONTEXT.md`、`plan.md`；部署机临时状态：`com.aivideo.worker` launchd job 已 bootout，手动 worker pid 76490 正在处理队列；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`ps` 显示 worker pid 76490 与两个 ffmpeg 子进程；数据库 `transcoding_jobs` job 6158/6159 从 `progress_percent=0.36` 增至 `1.18`；`GET /api/v1/admin/tasks?page=1&page_size=4` 返回 running job 6158/6159 的 `progress_percent=0.68`。
+
+## 2026-06-01 19:03 +0800
+- 进度：开始排查视频压缩进度一直为 0%。已确认管理端任务页展示的是后台转码任务持久化进度；部署机最新两个转码 job 已进入 `running`，但源时长、已处理秒数与进度均为空。worker 仍由 launchd 启动，进程采样显示没有 ffmpeg/ffprobe 子进程，线程卡在 `/Volumes/large` 输出目录创建，初步结论是 worker 与上一轮 server 同类，缺少或失去外盘媒体访问权限。下一步停止 launchd worker、用 SSH/Terminal 权限手动启动 worker，并对已卡住任务做最小人工恢复。
+- 影响文件：预计涉及 `CONTEXT.md`、`plan.md`；部署机运行态只调整 worker；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行部署机 worker 重启验证、数据库转码进度验证、任务接口验证、`git diff --check` 与乱码扫描。
+
 ## 2026-06-01 17:13 +0800
 - 进度：完成图片和视频资源无法访问的根因校准。使用管理员 token 验证：管理端详情与 play-url 均 200，视频 `/source` Range 请求 15 秒无字节返回；封面接口 503。部署机 shell 直接读取同一 `/Volumes/large/.../thumb.jpg` 和 `video-hevc.mp4` 正常，手动启动同一二进制到 18081 也能 200 返回封面；但 launchd 版 server 采样显示线程卡在 `open`，TCC 日志显示当前 hash 二进制请求 `kTCCServiceSystemPolicyAllFiles` 被拒。结论：资源路径和文件都正常，问题是 launchd 启动的当前二进制缺少 macOS TCC 媒体访问权限。已临时 `bootout` launchd server，并用 SSH/Terminal 权限启动同一二进制守住 8080，验证 `/healthz` 200、封面 200、视频 Range 206；后续需做稳定签名或系统授权的长期修复。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；部署机临时状态：`com.aivideo.server` launchd job 已 bootout，手动 server pid 74522 正在提供 :8080，worker launchd 未变；不纳入用户既有改动 `admin-web/.env.development`
