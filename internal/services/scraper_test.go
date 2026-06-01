@@ -560,6 +560,63 @@ func TestPreviewTVUsesChineseLanguageAndFallback(t *testing.T) {
 	}
 }
 
+func TestPreviewTVLimitsDetailRequests(t *testing.T) {
+	detailCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/search/tv":
+			results := make([]map[string]any, 0, tmdbPreviewDetailLimit+3)
+			for i := 1; i <= tmdbPreviewDetailLimit+3; i++ {
+				results = append(results, map[string]any{
+					"id":             9000 + i,
+					"name":           "搜索候选 " + strconv.Itoa(i),
+					"original_name":  "Search Candidate " + strconv.Itoa(i),
+					"overview":       "搜索简介",
+					"first_air_date": "2026-01-01",
+					"poster_path":    "/search.jpg",
+				})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
+		case strings.HasPrefix(r.URL.Path, "/tv/"):
+			detailCalls++
+			idText := strings.TrimPrefix(r.URL.Path, "/tv/")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":             9000,
+				"name":           "详情候选 " + idText,
+				"original_name":  "Detail Candidate " + idText,
+				"overview":       "详情简介",
+				"first_air_date": "2026-01-01",
+				"genres": []map[string]any{
+					{"id": 18, "name": "剧情"},
+				},
+				"poster_path": "/detail.jpg",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	svc := NewScraperService(nil, "demo-key", server.URL, "", "", 2*time.Second)
+	got, err := svc.PreviewTV(context.Background(), "The Lead", 0)
+	if err != nil {
+		t.Fatalf("PreviewTV returned error: %v", err)
+	}
+	if len(got) != tmdbPreviewDetailLimit+3 {
+		t.Fatalf("expected all search candidates, got=%d", len(got))
+	}
+	if detailCalls != tmdbPreviewDetailLimit {
+		t.Fatalf("expected detail calls capped at %d, got=%d", tmdbPreviewDetailLimit, detailCalls)
+	}
+	if got[0]["title"] != "详情候选 9001" {
+		t.Fatalf("expected first candidate enriched from detail, got=%v", got[0]["title"])
+	}
+	if got[tmdbPreviewDetailLimit]["title"] != "搜索候选 6" {
+		t.Fatalf("expected candidates after cap to use search row, got=%v", got[tmdbPreviewDetailLimit]["title"])
+	}
+}
+
 func TestExtractCastNames(t *testing.T) {
 	raw := map[string]any{
 		"cast": []any{

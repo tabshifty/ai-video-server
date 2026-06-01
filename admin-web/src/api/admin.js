@@ -79,7 +79,7 @@ export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
 export const systemCleanup = (payload) => request.post('/admin/system/cleanup', payload)
 export const getSystemLogs = (params) => request.get('/admin/system/logs', { params })
 
-export const scrapePreview = (payload) => request.post('/admin/scrape/preview', payload)
+export const scrapePreview = (payload) => request.post('/admin/scrape/preview', payload, { timeout: 0 })
 export const scrapeConfirm = (payload) => request.put('/admin/scrape/confirm', payload)
 export const scrapeSkip = (payload) => request.put('/admin/scrape/skip', payload)
 export const getAVScrapeConfig = () => request.get('/admin/av-scrape/config')

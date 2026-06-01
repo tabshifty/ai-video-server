@@ -30,6 +30,7 @@ import {
   getAdminTvSeriesDetail,
   getAdminVideoSubtitles,
   rescanAdminVideoSubtitles,
+  scrapePreview,
   updateAdminVideoSubtitle,
   updateAdminTvEpisode,
   updateAdminTvSeason,
@@ -51,6 +52,23 @@ describe('uploadAdminImages', () => {
 
     expect(post).toHaveBeenCalledWith('/admin/images/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0
+    })
+  })
+})
+
+describe('scrape preview apis', () => {
+  beforeEach(() => {
+    post.mockReset()
+    post.mockResolvedValue({ ok: true })
+  })
+
+  it('disables request timeout for external scrape preview', async () => {
+    const payload = { type: 'tv', title: 'The Lead' }
+
+    await scrapePreview(payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/scrape/preview', payload, {
       timeout: 0
     })
   })

@@ -232,6 +232,7 @@ type ConfirmScrapeInput struct {
 
 const tmdbLangChinese = "zh-CN"
 const tmdbCastLimit = 20
+const tmdbPreviewDetailLimit = 5
 const avPreviewLimitDefault = 10
 
 const (
@@ -336,6 +337,7 @@ func (s *ScraperService) PreviewMovieWithOptions(ctx context.Context, title stri
 	}
 	rows, _ := raw["results"].([]any)
 	out := make([]map[string]any, 0, len(rows))
+	detailCandidates := 0
 	for _, row := range rows {
 		item, ok := row.(map[string]any)
 		if !ok {
@@ -345,13 +347,18 @@ func (s *ScraperService) PreviewMovieWithOptions(ctx context.Context, title stri
 		if id <= 0 {
 			continue
 		}
-		detail, dErr := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", id), nil, tmdbLangChinese)
-		if dErr != nil {
-			detail = item
-		} else if needsLocalizedFallback(detail, "movie") {
-			fallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", id), nil, "")
-			if fErr == nil {
-				detail = mergeLocalizedDetail(detail, fallback, "movie")
+		detail := item
+		if detailCandidates < tmdbPreviewDetailLimit {
+			detailCandidates++
+			fetched, dErr := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", id), nil, tmdbLangChinese)
+			if dErr == nil {
+				detail = fetched
+				if needsLocalizedFallback(detail, "movie") {
+					fallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/movie/%d", id), nil, "")
+					if fErr == nil {
+						detail = mergeLocalizedDetail(detail, fallback, "movie")
+					}
+				}
 			}
 		}
 		out = append(out, map[string]any{
@@ -391,6 +398,7 @@ func (s *ScraperService) PreviewTV(ctx context.Context, title string, year int) 
 	}
 	rows, _ := raw["results"].([]any)
 	out := make([]map[string]any, 0, len(rows))
+	detailCandidates := 0
 	for _, row := range rows {
 		item, ok := row.(map[string]any)
 		if !ok {
@@ -400,13 +408,18 @@ func (s *ScraperService) PreviewTV(ctx context.Context, title string, year int) 
 		if id <= 0 {
 			continue
 		}
-		detail, dErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", id), nil, tmdbLangChinese)
-		if dErr != nil {
-			detail = item
-		} else if needsLocalizedFallback(detail, "tv") {
-			fallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", id), nil, "")
-			if fErr == nil {
-				detail = mergeLocalizedDetail(detail, fallback, "tv")
+		detail := item
+		if detailCandidates < tmdbPreviewDetailLimit {
+			detailCandidates++
+			fetched, dErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", id), nil, tmdbLangChinese)
+			if dErr == nil {
+				detail = fetched
+				if needsLocalizedFallback(detail, "tv") {
+					fallback, fErr := s.getTMDBJSON(ctx, fmt.Sprintf("/tv/%d", id), nil, "")
+					if fErr == nil {
+						detail = mergeLocalizedDetail(detail, fallback, "tv")
+					}
+				}
 			}
 		}
 		firstYear := 0

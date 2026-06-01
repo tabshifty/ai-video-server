@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 19:36 +0800
+- 进度：完成刮削预览 30 秒超时修复并准备安全部署。后端将电影/电视剧预览详情补全限制为靠前 5 个 TMDB 候选，靠后候选直接使用搜索结果字段；前端 `scrapePreview` 对外部刮削请求关闭 axios 30 秒通用超时。部署机当前仍有转码任务 6158/6159 在约 40% 运行，默认 hook 会硬重启 worker，因此本次部署需只重启 server，保留现有 worker/ffmpeg，待转码完成后 worker 再切到新二进制。
+- 影响文件：`internal/services/scraper.go`、`internal/services/scraper_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：`go test ./internal/services -run 'TestPreviewTVUsesChineseLanguageAndFallback|TestPreviewTVLimitsDetailRequests|TestPreviewMovieBypassCacheFetchesFreshCandidates' -count=1` 通过；`go test ./internal/services -count=1` 通过；`go test ./... -count=1` 通过；`cd admin-web && npm test -- src/api/admin.spec.js` 通过；`cd admin-web && npm run build` 通过；`git diff --check` 与乱码扫描通过。
+
+## 2026-06-01 19:27 +0800
+- 进度：开始修复管理端刮削预览 `timeout of 30000ms exceeded`。已确认全局 axios 超时为 30 秒，而部署机 `The Lead` TV 预览在代理恢复后仍耗时约 76 秒，根因是后端对 TMDB 搜索返回的 20 个候选逐个串行拉详情/兜底详情。下一步同时收敛后端候选详情补全数量，并让管理端刮削预览请求不使用 30 秒通用超时。
+- 影响文件：预计涉及 `internal/services/scraper.go`、`internal/services/scraper_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行后端 scraper 定向测试、admin-web API 单测、`git diff --check` 与乱码扫描。
+
 ## 2026-06-01 19:22 +0800
 - 进度：完成 TMDB TLS 超时的部署机临时恢复。已在部署机 `.env` 增加显式 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY` 与 `NO_PROXY`，并重启手动 server 为 pid 77089；`/healthz` 正常。通过管理端 `POST /api/v1/admin/scrape/preview` 验证 `The Lead` 电视剧预览返回 20 个候选，不再报 TLS handshake timeout。当前 worker pid 76490 正在转码 job 6158/6159，已发送 `TSTP` 停止接新任务但保留当前 ffmpeg；后台脚本 `/tmp/restart-worker-after-transcode.sh` 会等待两个 ffmpeg 完成后重启 worker，使新 worker 读取代理环境。
 - 影响文件：`CONTEXT.md`、`plan.md`；部署机临时状态：server pid 77089 已带代理环境运行，worker pid 76490 仍在完成当前转码且停止接新任务，等待脚本 pid 77239 负责后续自动重启；不纳入用户既有改动 `admin-web/.env.development`
