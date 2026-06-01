@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-01 19:41 +0800
+- 进度：部署 `70d0572` 后实测 `The Lead` 电视剧预览返回 20 个候选但仍耗时约 37 秒，虽然前端已不会再被 axios 30 秒超时截断，但首轮后端响应仍偏慢。进一步将电影/电视剧预览详情补全上限从 5 个候选收敛到 3 个候选，减少 TMDB 详情/兜底请求数量；确认刮削仍在确认阶段重新拉详情，不依赖预览阶段完整 metadata。
+- 影响文件：`internal/services/scraper.go`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`
+- 验证：待执行 scraper 定向测试、部署机安全推送与 `The Lead` 预览接口实测。
+
 ## 2026-06-01 19:36 +0800
 - 进度：完成刮削预览 30 秒超时修复并准备安全部署。后端将电影/电视剧预览详情补全限制为靠前 5 个 TMDB 候选，靠后候选直接使用搜索结果字段；前端 `scrapePreview` 对外部刮削请求关闭 axios 30 秒通用超时。部署机当前仍有转码任务 6158/6159 在约 40% 运行，默认 hook 会硬重启 worker，因此本次部署需只重启 server，保留现有 worker/ffmpeg，待转码完成后 worker 再切到新二进制。
 - 影响文件：`internal/services/scraper.go`、`internal/services/scraper_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`；不纳入用户既有改动 `admin-web/.env.development`

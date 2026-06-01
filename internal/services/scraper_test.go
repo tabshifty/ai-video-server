@@ -612,7 +612,8 @@ func TestPreviewTVLimitsDetailRequests(t *testing.T) {
 	if got[0]["title"] != "详情候选 9001" {
 		t.Fatalf("expected first candidate enriched from detail, got=%v", got[0]["title"])
 	}
-	if got[tmdbPreviewDetailLimit]["title"] != "搜索候选 6" {
+	expectedAfterCapTitle := "搜索候选 " + strconv.Itoa(tmdbPreviewDetailLimit+1)
+	if got[tmdbPreviewDetailLimit]["title"] != expectedAfterCapTitle {
 		t.Fatalf("expected candidates after cap to use search row, got=%v", got[tmdbPreviewDetailLimit]["title"])
 	}
 }

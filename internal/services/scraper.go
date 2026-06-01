@@ -232,7 +232,7 @@ type ConfirmScrapeInput struct {
 
 const tmdbLangChinese = "zh-CN"
 const tmdbCastLimit = 20
-const tmdbPreviewDetailLimit = 5
+const tmdbPreviewDetailLimit = 3
 const avPreviewLimitDefault = 10
 
 const (
