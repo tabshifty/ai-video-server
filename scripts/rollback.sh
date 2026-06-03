@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # 家用部署机手动 rollback：切 binary symlink + 重启 launchd 服务。
+# 如果 .env 里配置了 CODESIGN_IDENTITY，会在切换前对目标二进制重新签名，
+# 让 rollback 也继续走同一份稳定代码身份。
 # 不自动跑 migration down —— 依赖 ADR-0006 [[migration 前向兼容契约]]，
 # 即旧 binary 必须能在当前（更新过）schema 上跑。
 #
@@ -19,6 +21,7 @@ BIN_DIR="$DEPLOY_ROOT/binaries"
 CURRENT="$DEPLOY_ROOT/current"
 WORK="$DEPLOY_ROOT/work"
 LOG="$HOME/Library/Logs/ai-video-server/deploy.log"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log() { printf '[%s] [rollback] %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG"; }
 
@@ -29,6 +32,13 @@ fi
 
 TARGET_SHA="$1"
 TARGET_SHORT="${TARGET_SHA:0:10}"
+
+if [[ -f "$DEPLOY_ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$DEPLOY_ROOT/.env"
+  set +a
+fi
 
 # 找到目标二进制
 BIN_FILE=$(ls "$BIN_DIR"/video-server-"${TARGET_SHORT}"*.bin 2>/dev/null | head -1 || true)
@@ -41,6 +51,8 @@ if [[ -z "$BIN_FILE" ]]; then
 fi
 
 log "rollback to $BIN_FILE"
+log "==> codesign target binary"
+"$SCRIPT_DIR/sign-launchd-binary.sh" "$BIN_FILE"
 
 # 切 symlink（macOS mach-O 不允许覆写运行中的二进制，所以走 symlink swap）
 ln -sfn "$BIN_FILE" "$CURRENT/video-server.new"

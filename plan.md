@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 01:20 +0800
+- 进度：完成 launchd 二进制稳定签名链路落地。新增 `scripts/sign-launchd-binary.sh`，`scripts/rollback.sh` 现在会在切 symlink 前先按同一 `CODESIGN_IDENTITY` 重签目标二进制；`docs/家用部署机.md` 的 post-receive hook 也改成 build → codesign → migrate → restart，`CONTEXT.md` / ADR-0005 / ADR-0007 补齐稳定签名契约。
+- 影响文件：`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`docs/家用部署机.md`、`CONTEXT.md`、`docs/adr/0005-home-deployment-architecture.md`、`docs/adr/0007-launchd-binary-stable-signature.md`、`plan.md`
+- 验证：`bash -n scripts/sign-launchd-binary.sh scripts/rollback.sh scripts/migrate-apply.sh` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' plan.md CONTEXT.md docs/家用部署机.md docs/adr/0005-home-deployment-architecture.md docs/adr/0007-launchd-binary-stable-signature.md scripts/sign-launchd-binary.sh scripts/rollback.sh` 无输出。
+
+## 2026-06-04 01:17 +0800
+- 进度：按推荐把 launchd 二进制从 ad-hoc 改成稳定签名链路，目标是让 TCC 对 `/Volumes/large` 的外盘授权不再跟随每次 push 的 cdhash 漂移。准备新增 `scripts/sign-launchd-binary.sh`，让 post-receive hook 与 `scripts/rollback.sh` 都在切 symlink 之前先 codesign 同一份二进制。
+- 影响文件：`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`docs/家用部署机.md`、`CONTEXT.md`、`docs/adr/0007-launchd-binary-stable-signature.md`、`plan.md`
+- 验证：待执行 `bash -n`、`git diff --check`、乱码扫描。
+
 ## 2026-06-01 22:22 +0800
 - 进度：按远程 TV 截图继续修正电视剧详情页参考图还原。确认 1920x1080 / density 320 设备下 Compose 逻辑宽度为 960dp，之前把参考图像素级宽度当 dp 导致右侧剧集面板吞掉左侧信息区；已改为参考图专用主体布局，左侧信息区固定宽度、中文标题保持横排、右侧剧集面板按 TV density 收窄，并移除旧版共享青蓝 `tvFocusableGlow`，改用暖金边框与暗玻璃焦点态。已安装到远程设备 `192.168.1.8:5555` 并截图确认左侧电视剧信息完整显示。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
