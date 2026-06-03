@@ -1,6 +1,11 @@
 package ffmpeg
 
-import "testing"
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestPreferredHardwareHevcEncoder(t *testing.T) {
 	if got := preferredHardwareHevcEncoder(); got != "hevc_videotoolbox" {
@@ -61,6 +66,66 @@ func TestBuildConvertSubtitleToWebVTTArgs(t *testing.T) {
 		t.Fatalf("expected output path last, got args=%v", args)
 	}
 	assertArgAbsent(t, args, "-map")
+}
+
+func TestConvertToWebPFallsBackWhenFFmpegMissing(t *testing.T) {
+	root := t.TempDir()
+	inputPath := filepath.Join(root, "input.jpg")
+	outputPath := filepath.Join(root, "output.webp")
+	if err := os.WriteFile(inputPath, []byte("jpeg"), 0o644); err != nil {
+		t.Fatalf("write input file: %v", err)
+	}
+
+	binDir := filepath.Join(root, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("create bin dir: %v", err)
+	}
+	cwebpPath := filepath.Join(binDir, "cwebp")
+	if err := os.WriteFile(cwebpPath, []byte(`#!/bin/sh
+set -eu
+input=""
+output=""
+expect_output=0
+skip_next=0
+for arg in "$@"; do
+	if [ "$skip_next" -eq 1 ]; then
+		skip_next=0
+		continue
+	fi
+	case "$arg" in
+		-o)
+			expect_output=1
+			;;
+		-q)
+			skip_next=1
+			;;
+		-*)
+			;;
+		*)
+			if [ "$expect_output" -eq 1 ]; then
+				output="$arg"
+				expect_output=0
+			else
+				input="$arg"
+			fi
+			;;
+	esac
+done
+: "${input:?missing input}"
+: "${output:?missing output}"
+: > "$output"
+`), 0o755); err != nil {
+		t.Fatalf("write cwebp shim: %v", err)
+	}
+
+	t.Setenv("PATH", binDir)
+
+	if err := ConvertToWebP(context.Background(), inputPath, outputPath, 82); err != nil {
+		t.Fatalf("ConvertToWebP() error = %v", err)
+	}
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("output file missing: %v", err)
+	}
 }
 
 func TestBuildExtractSubtitleToAssArgs(t *testing.T) {

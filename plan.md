@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 01:35 +0800
+- 进度：完成图片上传 `ffmpeg` PATH 缺失回退修复收口。最终实现只改 `pkg/ffmpeg.ConvertToWebP` 的缺失二进制分支，让图片上传在 launchd / 受限 PATH 环境里也能改走 `cwebp`，两者都不可用时仍返回 `ErrWebPEncodingUnavailable` 走保留原图兜底。`CONTEXT.md` 已同步“ffmpeg 不在 PATH 也算 WebP 编码链路不可用”的长期契约。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg -run TestConvertToWebPFallsBackWhenFFmpegMissing -count=1` 通过；`go test ./pkg/ffmpeg ./internal/services -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check -- CONTEXT.md plan.md pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go` 无输出；工作区既有改动 `admin-web/.env.development` 未纳入本次修复。
+
+## 2026-06-04 01:34 +0800
+- 进度：修复图片上传在 launchd / 受限 PATH 环境下找不到 `ffmpeg` 可执行文件时的回退链路。`pkg/ffmpeg/ConvertToWebP` 现在把 `exec.ErrNotFound` 视为 WebP 编码能力不可用，直接降级到 `cwebp`；若 `cwebp` 也不可用，仍返回 `ErrWebPEncodingUnavailable` 让图片上传保留原始 JPEG/PNG。`CONTEXT.md` 补充了“ffmpeg 不在 PATH 中”也属于图片上传 WebP 编码不可用契约。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg -run TestConvertToWebPFallsBackWhenFFmpegMissing -count=1` 通过；`git diff --check -- pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go` 通过；待执行全量相关包验证、乱码扫描和提交。
+
 ## 2026-06-04 01:20 +0800
 - 进度：完成 launchd 二进制稳定签名链路落地。新增 `scripts/sign-launchd-binary.sh`，`scripts/rollback.sh` 现在会在切 symlink 前先按同一 `CODESIGN_IDENTITY` 重签目标二进制；`docs/家用部署机.md` 的 post-receive hook 也改成 build → codesign → migrate → restart，`CONTEXT.md` / ADR-0005 / ADR-0007 补齐稳定签名契约。
 - 影响文件：`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`docs/家用部署机.md`、`CONTEXT.md`、`docs/adr/0005-home-deployment-architecture.md`、`docs/adr/0007-launchd-binary-stable-signature.md`、`plan.md`

@@ -509,6 +509,19 @@ func ConvertToWebP(ctx context.Context, inputPath, outputPath string, quality in
 	)
 	if out, err := runFFmpegCombinedOutput(ctx, primaryArgs...); err != nil {
 		primaryOutput := string(out)
+		if errors.Is(err, exec.ErrNotFound) {
+			cwebpOut, cwebpErr := runCWebPEncode(ctx, inputPath, outputPath, quality)
+			if cwebpErr != nil {
+				return fmt.Errorf(
+					"%w: ffmpeg convert webp failed: %v, output=%s, cwebp_output=%s",
+					ErrWebPEncodingUnavailable,
+					err,
+					primaryOutput,
+					string(cwebpOut),
+				)
+			}
+			return nil
+		}
 		if !isEncoderUnavailableOutput(primaryOutput, "libwebp") {
 			return fmt.Errorf("ffmpeg convert webp failed: %w, output=%s", err, primaryOutput)
 		}
