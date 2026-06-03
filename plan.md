@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 01:36 +0800
+- 进度：已将图片上传 `ffmpeg` 缺失降级修复推送到部署机远端 `deploy`，部署机 hook 完成 `go build`、迁移和重启探活，`/healthz` 返回 OK。当前线上接收到的提交为 `0408391`。
+- 影响文件：本次推送对应提交 `0408391`（文件同上条记录）
+- 验证：远端 hook 日志显示 `go build` 成功、`apply migrations` 成功、`/healthz OK — deploy succeeded`；部署机侧 `launchctl kickstart` 输出服务名不存在，但不影响最终健康检查结果。
+
 ## 2026-06-04 01:35 +0800
 - 进度：完成图片上传 `ffmpeg` PATH 缺失回退修复收口。最终实现只改 `pkg/ffmpeg.ConvertToWebP` 的缺失二进制分支，让图片上传在 launchd / 受限 PATH 环境里也能改走 `cwebp`，两者都不可用时仍返回 `ErrWebPEncodingUnavailable` 走保留原图兜底。`CONTEXT.md` 已同步“ffmpeg 不在 PATH 也算 WebP 编码链路不可用”的长期契约。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`
