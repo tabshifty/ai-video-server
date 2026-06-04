@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 14:38 +0800
+- 进度：已将本次文档方案作为 commit `5cc2bed` 推送到 `deploy master`。远端 hook 完成 `go build`、`apply migrations`、`launchctl kickstart`，最终回执 `/healthz OK — deploy succeeded`。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 未纳入
+- 验证：`git push deploy master` 通过；远端输出确认 `HEAD is now at 5cc2bed 记录服务器权限收口方案`
+
 ## 2026-06-04 14:37 +0800
 - 进度：完成本次文档补充的收尾校验。`CONTEXT.md` 与 `docs/家用部署机.md` 的“服务器-only 权限收口”说明已落盘，`plan.md` 顶部也已记录本次决策与范围。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 未纳入
