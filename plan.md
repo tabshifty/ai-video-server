@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 11:08 +0800
+- 进度：已将部署机实际 `~/deploy/ai-video-server/repo.git/hooks/post-receive` 的前端 dist 更新块同步为增量保留 assets 版本，避免仓库文档已更新但运行中的 hook 仍整目录删除旧 hash 资源。远端 hook 保持可执行权限。
+- 影响文件：`plan.md`；远端运维文件 `~/deploy/ai-video-server/repo.git/hooks/post-receive` 已手动对齐
+- 验证：远端 `bash -n ~/deploy/ai-video-server/repo.git/hooks/post-receive` 通过；`grep -n "rsync\\|admin-web-dist\\|frontend updated" ~/deploy/ai-video-server/repo.git/hooks/post-receive` 确认包含增量同步块。
+
 ## 2026-06-04 11:06 +0800
 - 进度：完成管理端入口 HEAD 探测修复。`/admin` 与 `/admin/` 现在同时支持 GET/HEAD 并返回同一套 `no-store` 入口响应，避免部署后 `curl -I` 或缓存探测误报 404。
 - 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`plan.md`
