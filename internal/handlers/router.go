@@ -262,7 +262,9 @@ func mountAdminStatic(r *gin.Engine, adminDist string) {
 		c.File(filepath.Join(adminDist, "index.html"))
 	}
 	r.GET("/admin", serveAdminIndex)
+	r.HEAD("/admin", serveAdminIndex)
 	r.GET("/admin/", serveAdminIndex)
+	r.HEAD("/admin/", serveAdminIndex)
 	r.NoRoute(func(c *gin.Context) {
 		reqPath := strings.TrimSpace(c.Request.URL.Path)
 		if strings.HasPrefix(reqPath, "/admin/assets/") {

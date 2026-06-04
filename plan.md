@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 11:06 +0800
+- 进度：完成管理端入口 HEAD 探测修复。`/admin` 与 `/admin/` 现在同时支持 GET/HEAD 并返回同一套 `no-store` 入口响应，避免部署后 `curl -I` 或缓存探测误报 404。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestMountAdminStatic' -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check -- internal/handlers/router.go internal/handlers/admin_static_test.go plan.md` 通过；`rg -n $'\uFFFD' internal/handlers/router.go internal/handlers/admin_static_test.go plan.md` 无输出。
+
+## 2026-06-04 11:05 +0800
+- 进度：部署后用 `curl -I` 发现 `/admin` 的 HEAD 探测返回 404；已补回归测试确认红灯。浏览器 GET 不受影响，但 HEAD 误判会影响运维探测与缓存校验。
+- 影响文件：`internal/handlers/admin_static_test.go`、`plan.md`
+- 验证：红灯 `go test ./internal/handlers -run 'TestMountAdminStaticServesIndexFromGivenDir' -count=1` 失败于 `HEAD /admin = 404, want 200`。
+
 ## 2026-06-04 11:02 +0800
 - 进度：完成“更新后无法上传”的静态资源断链修复与收口。结论：线上 09:07 只更新了 admin-web dist，10:42 日志出现旧 hash CSS 404，说明打开中的旧页面在前端发布后可能缺旧资源；本次修复让入口 HTML 不缓存、存在的 hash asset 长缓存、缺失旧 asset 不长缓存，并要求部署 hook 保留一段旧 hash asset。无关工作区改动 `admin-web/.env.development` 未纳入。
 - 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`

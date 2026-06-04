@@ -39,6 +39,16 @@ func TestMountAdminStaticServesIndexFromGivenDir(t *testing.T) {
 		t.Fatalf("index Cache-Control = %q, want %q", got, adminIndexCacheControl)
 	}
 
+	req = httptest.NewRequest(http.MethodHead, "/admin", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("HEAD /admin = %d, want 200", w.Code)
+	}
+	if got := w.Header().Get("Cache-Control"); got != adminIndexCacheControl {
+		t.Fatalf("HEAD /admin Cache-Control = %q, want %q", got, adminIndexCacheControl)
+	}
+
 	req = httptest.NewRequest(http.MethodGet, "/admin/assets/app.css", nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
