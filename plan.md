@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 17:10 +0800
+- 进度：已将固定执行路径授权方案提交 `a77c95d` 推送到 `deploy master`。远端 hook 确认 `HEAD is now at a77c95d 记录固定执行路径授权方案`，本次仅文档和计划变更，未触发 Go 重建或前端构建。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 不纳入
+- 验证：`git push deploy master` 通过；远端输出 `RESTART_GO=0 REBUILD_FRONTEND=0`
+
 ## 2026-06-04 17:08 +0800
 - 进度：完成“固定真实执行路径避免重复 TCC 授权弹窗”的方案记录。`CONTEXT.md` 新增 [[家用部署机固定执行路径契约]]，`docs/家用部署机.md` 在服务器-only 权限收口方案下补充：稳定签名后仍反复弹窗时，下一档应让 launchd 永远执行固定真实文件，sha binary 只保留为回滚备份。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 不纳入
