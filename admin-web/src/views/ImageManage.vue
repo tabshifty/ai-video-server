@@ -478,7 +478,13 @@ async function submitUpload() {
     uploadRef.value?.clearFiles()
     uploadFileList.value = []
     captureUploadDrawerSnapshot()
-    await load()
+    uploading.value = false
+    try {
+      await load()
+    } catch (error) {
+      ElMessage.warning(extractErrorMessage(error, '上传完成，但刷新图片列表失败'))
+    }
+    return
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '批量上传图片失败'))
   } finally {

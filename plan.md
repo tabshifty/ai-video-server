@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 09:06 +0800
+- 进度：修正图片管理页上传按钮长时间 loading 的状态绑定。`admin-web/src/views/ImageManage.vue` 里 `uploading` 现在只覆盖真正的上传请求，上传结果落地并清空文件后立即置回 `false`，后续 `await load()` 只刷新列表，不再把“开始上传”按钮绑在列表刷新上。
+- 影响文件：`admin-web/src/views/ImageManage.vue`、`plan.md`
+- 验证：`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）；`git diff --check -- admin-web/src/views/ImageManage.vue` 通过。
+
 ## 2026-06-04 01:36 +0800
 - 进度：已将图片上传 `ffmpeg` 缺失降级修复推送到部署机远端 `deploy`，部署机 hook 完成 `go build`、迁移和重启探活，`/healthz` 返回 OK。当前线上接收到的提交为 `0408391`。
 - 影响文件：本次推送对应提交 `0408391`（文件同上条记录）
