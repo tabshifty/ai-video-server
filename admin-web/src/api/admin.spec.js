@@ -24,6 +24,8 @@ import {
   deleteAdminTvEpisode,
   deleteAdminTvSeason,
   deleteAdminTvSeries,
+  deleteAdminImage,
+  deleteAdminVideo,
   deleteAdminVideoSubtitle,
   getAdminVideoTags,
   getAdminTvSeries,
@@ -145,9 +147,15 @@ describe('tv series apis', () => {
     await deleteAdminTvSeason(22)
     await deleteAdminTvEpisode(33)
 
-    expect(remove).toHaveBeenCalledWith('/admin/tv/series/12')
-    expect(remove).toHaveBeenCalledWith('/admin/tv/seasons/22')
-    expect(remove).toHaveBeenCalledWith('/admin/tv/episodes/33')
+    expect(remove).toHaveBeenCalledWith('/admin/tv/series/12', {
+      timeout: 0
+    })
+    expect(remove).toHaveBeenCalledWith('/admin/tv/seasons/22', {
+      timeout: 0
+    })
+    expect(remove).toHaveBeenCalledWith('/admin/tv/episodes/33', {
+      timeout: 0
+    })
   })
 })
 
@@ -185,13 +193,16 @@ describe('video subtitle apis', () => {
     await deleteAdminVideoSubtitle('video-1', 'subtitle-1')
 
     expect(put).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1', payload)
-    expect(remove).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1')
+    expect(remove).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1', {
+      timeout: 0
+    })
   })
 })
 
 describe('video delete apis', () => {
   beforeEach(() => {
     post.mockReset()
+    remove.mockReset()
   })
 
   it('requests batch delete for selected video ids', async () => {
@@ -199,6 +210,24 @@ describe('video delete apis', () => {
 
     await batchDeleteAdminVideos(payload)
 
-    expect(post).toHaveBeenCalledWith('/admin/videos/batch-delete', payload)
+    expect(post).toHaveBeenCalledWith('/admin/videos/batch-delete', payload, {
+      timeout: 0
+    })
+  })
+
+  it('disables timeout for destructive delete requests', async () => {
+    await deleteAdminVideo('video-1')
+    await deleteAdminImage('image-1')
+    await deleteAdminVideoSubtitle('video-1', 'subtitle-1')
+
+    expect(remove).toHaveBeenCalledWith('/admin/videos/video-1', {
+      timeout: 0
+    })
+    expect(remove).toHaveBeenCalledWith('/admin/images/image-1', {
+      timeout: 0
+    })
+    expect(remove).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1', {
+      timeout: 0
+    })
   })
 })

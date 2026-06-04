@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 10:06 +0800
+- 进度：完成管理端 destructive API 的无超时调整，并把部署机上确认到的 TCC 事实补进仓库上下文。`admin-web/src/api/admin.js` 里视频/图片/字幕/合集/TV 相关删除请求和批量删除请求统一显式 `timeout: 0`；`admin-web/src/api/admin.spec.js` 已回归这些调用；`CONTEXT.md` 新增 `TCC` 取证契约，记录 launchd binary 仍可能在 `tccd` 下被拒。
+- 影响文件：`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src/api/admin.js admin-web/src/api/admin.spec.js` 无输出。
+
+## 2026-06-04 10:03 +0800
+- 进度：先把管理端删除型请求的客户端超时放开，避免外盘慢 I/O 直接在前端变成 30 秒 timeout。`admin-web/src/api/admin.js` 里 `deleteAdminVideo`、`deleteAdminImage`、`deleteAdminVideoSubtitle`、`deleteAdminCollection`、`deleteAdminImageCollection` 与 `batchDeleteAdminVideos` 统一改为 `timeout: 0`，`admin-web/src/api/admin.spec.js` 补了回归测试。
+- 影响文件：`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm test`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描；远端 TCC 证据待同步到 `CONTEXT.md`。
+
 ## 2026-06-04 09:06 +0800
 - 进度：修正图片管理页上传按钮长时间 loading 的状态绑定。`admin-web/src/views/ImageManage.vue` 里 `uploading` 现在只覆盖真正的上传请求，上传结果落地并清空文件后立即置回 `false`，后续 `await load()` 只刷新列表，不再把“开始上传”按钮绑在列表刷新上。
 - 影响文件：`admin-web/src/views/ImageManage.vue`、`plan.md`

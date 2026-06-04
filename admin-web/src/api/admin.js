@@ -15,24 +15,41 @@ export const rescanAdminVideoSubtitles = (id) => request.post(`/admin/videos/${i
 export const updateAdminVideoSubtitle = (id, subtitleId, payload) =>
   request.put(`/admin/videos/${id}/subtitles/${subtitleId}`, payload)
 export const deleteAdminVideoSubtitle = (id, subtitleId) =>
-  request.delete(`/admin/videos/${id}/subtitles/${subtitleId}`)
+  request.delete(`/admin/videos/${id}/subtitles/${subtitleId}`, {
+    timeout: 0
+  })
 export const getAdminVideoPlayURL = (id) => request.get(`/admin/videos/${id}/play-url`)
 export const captureAdminVideoThumbnail = (id, payload) => request.post(`/admin/videos/${id}/thumbnail/capture`, payload)
 export const updateAdminVideo = (id, payload) => request.put(`/admin/videos/${id}`, payload)
-export const deleteAdminVideo = (id) => request.delete(`/admin/videos/${id}`)
-export const batchDeleteAdminVideos = (payload) => request.post('/admin/videos/batch-delete', payload)
+export const deleteAdminVideo = (id) =>
+  request.delete(`/admin/videos/${id}`, {
+    timeout: 0
+  })
+export const batchDeleteAdminVideos = (payload) =>
+  request.post('/admin/videos/batch-delete', payload, {
+    timeout: 0
+  })
 export const retranscodeVideo = (id) => request.post(`/admin/videos/${id}/retranscode`)
 export const getAdminTvSeries = (params) => request.get('/admin/tv/series', { params })
 export const getAdminTvSeriesDetail = (id) => request.get(`/admin/tv/series/${id}`)
 export const createAdminTvSeries = (payload) => request.post('/admin/tv/series', payload)
 export const updateAdminTvSeries = (id, payload) => request.put(`/admin/tv/series/${id}`, payload)
-export const deleteAdminTvSeries = (id) => request.delete(`/admin/tv/series/${id}`)
+export const deleteAdminTvSeries = (id) =>
+  request.delete(`/admin/tv/series/${id}`, {
+    timeout: 0
+  })
 export const createAdminTvSeason = (seriesId, payload) => request.post(`/admin/tv/series/${seriesId}/seasons`, payload)
 export const updateAdminTvSeason = (id, payload) => request.put(`/admin/tv/seasons/${id}`, payload)
-export const deleteAdminTvSeason = (id) => request.delete(`/admin/tv/seasons/${id}`)
+export const deleteAdminTvSeason = (id) =>
+  request.delete(`/admin/tv/seasons/${id}`, {
+    timeout: 0
+  })
 export const createAdminTvEpisode = (seasonId, payload) => request.post(`/admin/tv/seasons/${seasonId}/episodes`, payload)
 export const updateAdminTvEpisode = (id, payload) => request.put(`/admin/tv/episodes/${id}`, payload)
-export const deleteAdminTvEpisode = (id) => request.delete(`/admin/tv/episodes/${id}`)
+export const deleteAdminTvEpisode = (id) =>
+  request.delete(`/admin/tv/episodes/${id}`, {
+    timeout: 0
+  })
 export const getAdminIPTVPlaylist = () => request.get('/admin/iptv/playlist')
 export const uploadAdminIPTVPlaylist = (formData) =>
   request.post('/admin/iptv/playlist/upload', formData, {
@@ -53,7 +70,10 @@ export const updateAdminActor = (id, payload) => request.put(`/admin/actors/${id
 export const getAdminCollections = (params) => request.get('/admin/collections', { params })
 export const createAdminCollection = (payload) => request.post('/admin/collections', payload)
 export const updateAdminCollection = (id, payload) => request.put(`/admin/collections/${id}`, payload)
-export const deleteAdminCollection = (id) => request.delete(`/admin/collections/${id}`)
+export const deleteAdminCollection = (id) =>
+  request.delete(`/admin/collections/${id}`, {
+    timeout: 0
+  })
 export const uploadAdminImages = (formData) =>
   request.post('/admin/images/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -63,7 +83,10 @@ export const checkAdminImageUpload = (payload) => request.post('/admin/images/ch
 export const getAdminImages = (params) => request.get('/admin/images', { params })
 export const getAdminImageDetail = (id) => request.get(`/admin/images/${id}`)
 export const updateAdminImage = (id, payload) => request.put(`/admin/images/${id}`, payload)
-export const deleteAdminImage = (id) => request.delete(`/admin/images/${id}`)
+export const deleteAdminImage = (id) =>
+  request.delete(`/admin/images/${id}`, {
+    timeout: 0
+  })
 export const getAdminImageViewBlob = (id, params) =>
   request.get(`/admin/images/${id}/view`, {
     params,
@@ -72,7 +95,10 @@ export const getAdminImageViewBlob = (id, params) =>
 export const getAdminImageCollections = (params) => request.get('/admin/image-collections', { params })
 export const createAdminImageCollection = (payload) => request.post('/admin/image-collections', payload)
 export const updateAdminImageCollection = (id, payload) => request.put(`/admin/image-collections/${id}`, payload)
-export const deleteAdminImageCollection = (id) => request.delete(`/admin/image-collections/${id}`)
+export const deleteAdminImageCollection = (id) =>
+  request.delete(`/admin/image-collections/${id}`, {
+    timeout: 0
+  })
 
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
 
