@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 家用部署机手动 rollback：切 binary symlink + 重启 launchd 服务。
+# 家用部署机手动 rollback：把历史二进制复制回稳定运行入口 + 重启 launchd 服务。
 # 如果 .env 里配置了 CODESIGN_IDENTITY（以及可选的 CODESIGN_KEYCHAIN），
 # 会在切换前对目标二进制重新签名，让 rollback 也继续走同一份稳定代码身份。
 # 不自动跑 migration down —— 依赖 ADR-0006 [[migration 前向兼容契约]]，
@@ -54,8 +54,9 @@ log "rollback to $BIN_FILE"
 log "==> codesign target binary"
 "$SCRIPT_DIR/sign-launchd-binary.sh" "$BIN_FILE"
 
-# 切 symlink（macOS mach-O 不允许覆写运行中的二进制，所以走 symlink swap）
-ln -sfn "$BIN_FILE" "$CURRENT/video-server.new"
+# 稳定运行入口：launchd 永远只看 current/video-server。
+cp "$BIN_FILE" "$CURRENT/video-server.new"
+chmod 755 "$CURRENT/video-server.new"
 mv -f "$CURRENT/video-server.new" "$CURRENT/video-server"
 
 # 同步 work 树到目标 sha（便于后续 push 基于此点做反向 patch）

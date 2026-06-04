@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 20:20 +0800
+- 进度：把 [[家用部署机]] 的运行入口从版本化二进制直接参与运行收口到固定真实路径 `current/video-server`；`docs/家用部署机.md`、`scripts/rollback.sh` 与 `CONTEXT.md` 已同步更新为固定执行路径语义，`binaries/video-server-<sha>.bin` 只保留作回滚备份，不再作为 launchd 直接目标。部署机 `post-receive` hook 也已从 symlink swap 改为复制到稳定入口再重启，避免后续 push 又把运行主体挂回旧 bin。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`scripts/rollback.sh`、`plan.md`
+- 验证：`bash -n scripts/rollback.sh`、`git diff --check` 通过；后续 push 仍需复跑部署链路确认。
+
 ## 2026-06-04 17:10 +0800
 - 进度：已将固定执行路径授权方案提交 `a77c95d` 推送到 `deploy master`。远端 hook 确认 `HEAD is now at a77c95d 记录固定执行路径授权方案`，本次仅文档和计划变更，未触发 Go 重建或前端构建。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 不纳入
@@ -386,7 +391,6 @@
 - 进度：完成链路前置核对。结果：远端 `192.168.1.24:22` 可达，已将 host key 写入本机 `~/.ssh/known_hosts`，并按文档把本地 Git `deploy` remote 配置为 `chee@192.168.1.24:/Users/chee/deploy/ai-video-server/repo.git`。阻塞点确认在 SSH 认证层：本机 `~/.ssh/` 只有 `known_hosts`，没有 `id_ed25519`/`id_rsa` 等私钥，`ssh-add -l` 返回 `The agent has no identities.`，`ssh -o BatchMode=yes chee@192.168.1.24 'true'` 返回 `Permission denied (publickey,password,keyboard-interactive)`，因此本轮无法实际触发 `git push deploy master`。
 - 影响文件：`plan.md`
 - 验证：`ssh-keyscan -H -T 5 192.168.1.24 CheedeMac-mini.local >> ~/.ssh/known_hosts` 成功；`git remote get-url deploy` 返回 `chee@192.168.1.24:/Users/chee/deploy/ai-video-server/repo.git`；`ssh -o BatchMode=yes -o PreferredAuthentications=publickey -o ConnectTimeout=5 chee@192.168.1.24 'true'` 失败，错误如上。
-
 ## 2026-05-26 17:30 +0800
 - 进度：[[家用部署机]] 把 Docker Desktop 替换为 OrbStack，省 RAM 与磁盘开销。整体路径走的不是 "orb docker migrate" 自动迁移（被 Docker Desktop 内部一条 stale container ID `3d8f9aa3bf19` 卡住，`docker ps -a` 见但 `inspect/rm` 都 No such container —— Docker Desktop metadata 损坏），改走 **pg_dump → 备份 → restore** 兜底路径：(1) 先 `pg_dump video_server` 备份到 `/Volumes/large/ai-video-server/backup/video_server-20260526-171346.sql.gz`（33 MB），(2) 停 launchd + docker compose down + 退 Docker Desktop，(3) brew install --cask orbstack 起 OrbStack，(4) 用 `docker save postgres:15` 从 Docker Desktop 拷镜像到 /tmp 再 `docker load` 到 OrbStack（绕开 Docker Hub `EOF` 网络问题），(5) `docker run` 起新 video_server_postgres 容器绑 ai-video-server_pg_data named volume，(6) gunzip + psql restore，(7) launchctl bootstrap server + worker。最终验证：`SELECT count(*) FROM videos` = 154 968（与备份一致），/healthz / /admin/ / /api/v1/tv/home 全 200。中间一次 pkill com.docker.backend 时把 OrbStack 也踢断，导致 volume / image / container 全失，靠提前的 pg_dump + 之前 save 的 /tmp/postgres15.tar 完整回滚回来——双保险机制证明本次迁移的"备份先行"原则不是过度谨慎。
 - 影响文件：本机系统级改动（不进 repo）：Docker Desktop 容器 + image 已退、OrbStack 接管，`docker context use orbstack` 永久切换，Docker Desktop GUI app 与 root-owned 数据待用户自行 sudo 清理（约 4.5 GB 磁盘）。`plan.md`。
