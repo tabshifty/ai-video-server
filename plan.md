@@ -2,6 +2,26 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 11:02 +0800
+- 进度：完成“更新后无法上传”的静态资源断链修复与收口。结论：线上 09:07 只更新了 admin-web dist，10:42 日志出现旧 hash CSS 404，说明打开中的旧页面在前端发布后可能缺旧资源；本次修复让入口 HTML 不缓存、存在的 hash asset 长缓存、缺失旧 asset 不长缓存，并要求部署 hook 保留一段旧 hash asset。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestMountAdminStatic' -count=1` 通过；`go test ./internal/handlers -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check -- CONTEXT.md plan.md docs/家用部署机.md internal/handlers/router.go internal/handlers/admin_static_test.go` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md docs/家用部署机.md internal/handlers/router.go internal/handlers/admin_static_test.go` 无输出。
+
+## 2026-06-04 10:58 +0800
+- 进度：完成管理端静态资源发布窗口修复。`mountAdminStatic` 改为 `/admin` HTML 返回 `no-store`、存在的 hashed asset 返回长期缓存、缺失旧 asset 返回 404 且不长缓存；部署文档的 frontend hook 从整目录删除替换改为先增量同步 assets、再同步入口文件，并保留 7 天旧 hash asset；`CONTEXT.md` 新增 `admin 静态资源发布窗口` 术语。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestMountAdminStatic' -count=1` 通过；待执行更大范围验证、diff 检查和乱码扫描。
+
+## 2026-06-04 10:58 +0800
+- 进度：已补管理端静态资源缓存回归测试并确认红灯。`TestMountAdminStaticServesIndexFromGivenDir` 现在要求 `/admin/` 返回 `Cache-Control: no-store`、存在的 `/admin/assets/*` 返回长缓存；`TestMountAdminStaticMissingAssetIsNotLongCached` 要求缺失旧 hash asset 404 且不长缓存。当前失败于 `adminIndexCacheControl` / `adminAssetCacheControl` / `adminMissingAssetCacheControl` 未实现。
+- 影响文件：`internal/handlers/admin_static_test.go`、`plan.md`
+- 验证：红灯 `go test ./internal/handlers -run 'TestMountAdminStatic' -count=1` 失败于上述未定义常量。
+
+## 2026-06-04 10:58 +0800
+- 进度：开始排查“更新后无法上传”。已确认部署机 `/healthz` 正常，当前 Go 二进制仍为 `0408391`，09:07 只更新过 admin-web 前端 dist；10:42 server log 出现旧 hashed CSS `/admin/assets/index-C0V8twHW.css` 404，且图片上传流程只打到 `/api/v1/admin/images/check`，未继续进入 `/api/v1/admin/images/upload`。计划修正管理端静态资源缓存与部署 hook 的 dist 替换方式，避免前端更新后打开中的旧页面断链。
+- 影响文件：预计涉及 `internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：已跑基线 `go test ./internal/handlers -run 'TestMountAdminStatic' -count=1` 通过；待执行定向测试、Go 相关测试、Markdown/乱码检查。
+
 ## 2026-06-04 10:27 +0800
 - 进度：完成稳定签名 helper 的 keychain/identity 预检收口，并补完相关文档说明；当前仓库层面已把“必须是 Apple-issued identity + 本地一次性 trust 授权”的要求写清楚。`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md` 已对齐。
 - 影响文件：`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`

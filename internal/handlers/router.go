@@ -224,6 +224,12 @@ func (a *API) Register(r *gin.Engine) {
 	mountAdminStatic(r, a.adminWebDistPath)
 }
 
+const (
+	adminIndexCacheControl        = "no-store"
+	adminAssetCacheControl        = "public, max-age=31536000, immutable"
+	adminMissingAssetCacheControl = "no-store"
+)
+
 // mountAdminStatic mounts /admin and /admin/assets when adminDist points to a real directory.
 // Path is taken as-is (caller decides absolute vs relative) per [[家用部署机绝对路径契约]].
 func mountAdminStatic(r *gin.Engine, adminDist string) {
@@ -234,8 +240,25 @@ func mountAdminStatic(r *gin.Engine, adminDist string) {
 	if err != nil || !st.IsDir() {
 		return
 	}
-	r.Static("/admin/assets", filepath.Join(adminDist, "assets"))
+	assetsDir := filepath.Join(adminDist, "assets")
+	serveAdminAsset := func(c *gin.Context) {
+		assetPath, ok := resolveAdminAssetPath(assetsDir, c.Param("filepath"))
+		if !ok {
+			serveMissingAdminAsset(c)
+			return
+		}
+		st, err := os.Stat(assetPath)
+		if err != nil || st.IsDir() {
+			serveMissingAdminAsset(c)
+			return
+		}
+		c.Header("Cache-Control", adminAssetCacheControl)
+		c.File(assetPath)
+	}
+	r.GET("/admin/assets/*filepath", serveAdminAsset)
+	r.HEAD("/admin/assets/*filepath", serveAdminAsset)
 	serveAdminIndex := func(c *gin.Context) {
+		c.Header("Cache-Control", adminIndexCacheControl)
 		c.File(filepath.Join(adminDist, "index.html"))
 	}
 	r.GET("/admin", serveAdminIndex)
@@ -243,7 +266,7 @@ func mountAdminStatic(r *gin.Engine, adminDist string) {
 	r.NoRoute(func(c *gin.Context) {
 		reqPath := strings.TrimSpace(c.Request.URL.Path)
 		if strings.HasPrefix(reqPath, "/admin/assets/") {
-			c.String(http.StatusNotFound, "404 page not found")
+			serveMissingAdminAsset(c)
 			return
 		}
 		if strings.HasPrefix(reqPath, "/admin/") {
@@ -252,6 +275,35 @@ func mountAdminStatic(r *gin.Engine, adminDist string) {
 		}
 		c.String(http.StatusNotFound, "404 page not found")
 	})
+}
+
+func serveMissingAdminAsset(c *gin.Context) {
+	c.Header("Cache-Control", adminMissingAssetCacheControl)
+	c.String(http.StatusNotFound, "404 page not found")
+}
+
+func resolveAdminAssetPath(baseDir, rawPath string) (string, bool) {
+	rel := strings.TrimPrefix(strings.TrimSpace(rawPath), "/")
+	if rel == "" {
+		return "", false
+	}
+	rel = filepath.Clean(rel)
+	if rel == "." || filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", false
+	}
+	target := filepath.Join(baseDir, rel)
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", false
+	}
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return "", false
+	}
+	if absTarget != absBase && !strings.HasPrefix(absTarget, absBase+string(os.PathSeparator)) {
+		return "", false
+	}
+	return target, true
 }
 
 func parsePage(raw string, fallback int) int {

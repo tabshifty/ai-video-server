@@ -32,6 +32,7 @@
 
 ## admin 设计系统术语
 - `admin SPA 基路径契约`：管理端生产构建固定挂载在 Go server 的 `/admin` 前缀下，Vite `base`、后端静态资源路径和 Vue Router history base 必须保持一致。`admin-web/vite.config.js` 生产 `base` 为 `/admin/` 时，`admin-web/src/router/index.js` 必须用 `createWebHistory(import.meta.env.BASE_URL)` 或等价封装，不能退回无参 `createWebHistory()`；否则访问 `http://<host>:8080/admin` 时浏览器能拿到 HTML/JS，但 Router 会把 `/admin` 当作应用内路由导致 `<router-view>` 无匹配，表现为空白页。
+- `admin 静态资源发布窗口`：管理端前端发布后，已经打开的旧页面和刚刷新的新页面会在短时间内并存；发布策略必须允许两者继续获取各自引用的静态资源。入口 HTML 应始终倾向重新校验，带 hash 的静态资源可以按内容地址长期缓存；不能把旧页面引用的 hash 资源立即视为无效访问。
 - `admin Modern Minimal`：管理端视觉方向为浅色优先、低饱和 slate 中性色、冷蓝主色与克制阴影；后台工具界面优先信息密度、可扫描性和重复操作效率，不采用营销式大色块或装饰性 hero。
 - `admin 设计 token`：管理端全局颜色、字体、字号、间距、圆角、阴影、动效、断点和 shell 尺寸统一由 `admin-web/src/assets/theme.css` 的 CSS 变量表达；业务视图和基础组件应引用 token，不直接扩散临时色值或字体。
 - `Element Plus 三层架构`：L1 为 `theme.css` 中的 `--el-*` token 覆盖，L2 为 `element-overrides.css` 的低特异性 `:where()` 全局覆写，L3 为 `components/base/` 中的共享 wrapper 组件；三层各司其职，避免跨层写重复样式。
