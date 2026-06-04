@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 14:37 +0800
+- 进度：完成本次文档补充的收尾校验。`CONTEXT.md` 与 `docs/家用部署机.md` 的“服务器-only 权限收口”说明已落盘，`plan.md` 顶部也已记录本次决策与范围。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 未纳入
+- 验证：`git diff --check -- CONTEXT.md 'docs/家用部署机.md' plan.md` 通过；`rg -n $'\uFFFD' CONTEXT.md 'docs/家用部署机.md' plan.md` 无输出
+
+## 2026-06-04 14:37 +0800
+- 进度：把“服务器-only 权限收口方案”补进仓库长期文档。`CONTEXT.md` 新增 `服务器-only 权限收口` 术语，`docs/家用部署机.md` 增补只做服务器时的三档处理顺序：能迁就迁、不能迁再授、不要找 SSH 绕过，用来明确部署机只承担服务器角色时如何处理 `/Volumes/large` 相关 TCC 约束。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 未纳入
+- 验证：待执行 `git diff --check -- CONTEXT.md 'docs/家用部署机.md' plan.md` 与乱码扫描
+
 ## 2026-06-04 12:45 +0800
 - 进度：完成全媒体外盘访问收口。视频源、视频字幕、演员头像、图片视图、视频抓帧与图片上传后的外盘探测都改成限时打开/限时 ffmpeg 处理；`CONTEXT.md` 也同步补了“媒体资源限时打开”和“媒体生成限时”的长期约定。无关工作区改动 `admin-web/.env.development` 未纳入。
 - 影响文件：`CONTEXT.md`、`plan.md`、`internal/handlers/local_image_file.go`、`internal/handlers/admin_image.go`、`internal/handlers/app_image_collection.go`、`internal/handlers/video_source.go`、`internal/handlers/video_subtitle.go`、`internal/handlers/actor_avatar.go`、`internal/handlers/admin_video_thumbnail.go`、`internal/services/image.go`、`internal/handlers/local_image_file_test.go`
