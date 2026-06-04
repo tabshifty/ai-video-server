@@ -22,6 +22,7 @@
 - `家用部署机外盘休眠契约`：[[家用部署机]] 的媒体盘挂载在 `/Volumes/large`，该外部磁盘可能休眠；服务端访问封面、海报、分集剧照等图片文件时，`os.Stat` / `os.Open` / `c.File` 都可能在内核层阻塞数秒甚至更久。图片类 HTTP 接口必须使用带超时和并发上限的本地文件打开策略，外盘未及时响应时返回 503 或回退远端图片，避免浏览器图片请求长期 pending 并拖垮管理端列表页。视频播放大文件可按播放体验另行设计重试策略，但不能把图片接口的无界阻塞当作可接受行为。
 - `家用部署机媒体访问权限契约`：[[家用部署机]] 由 launchd 启动的 Go server / worker 必须具备 macOS TCC 对 `/Volumes/large` 的媒体访问权限。若 Terminal 或 SSH 手动进程能读同一路径，但 launchd 进程访问图片/视频仍在 `open` 上卡住，或 worker 在输出目录创建、源文件探测前卡住，优先排查 TCC 的 `SystemPolicyAllFiles` / `SystemPolicyRemovableVolumes` 授权，而不是误判为数据库路径错误或外盘未挂载。TCC 授权需要和 [[家用部署机稳定签名契约]] 配套，否则 ad-hoc binary 每次 push 都可能换 cdhash，权限记忆会漂移。
 - `家用部署机出站代理契约`：[[家用部署机]] 的 Go server / worker 访问 TMDB、JavDB、ThePornDB 等外部刮削服务时，不自动继承 macOS 系统网络代理设置；生产进程必须在启动环境中显式配置 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` 与 `NO_PROXY`。若浏览器或 `curl -x` 通过本机代理可访问外部 API，但 Go 日志出现 TLS handshake timeout、i/o timeout 或异常解析地址，优先检查进程环境里的代理变量，而不是先改刮削逻辑。
+- `admin 上传暂存目录`：管理端图片上传在正式落库前使用的 multipart 暂存目录。这个目录应留在部署机本机磁盘或相对路径工作目录下，不能放在 `/Volumes/large` 这类可能休眠的外盘上；否则上传请求可能在 `open` / `create` 阶段长时间 pending，前端按钮会一直处于 loading。
 - `转码任务进度`：管理端语境里的“压缩进度”统一指后台 worker 已确认源视频时长后持续持久化的转码任务进度，不是前端本地估算。worker 若在外盘输出目录创建、源文件探测或 ffmpeg 启动前阻塞，进度应被视为“尚未进入转码阶段”，不能把 0% 直接归因于前端进度条损坏。
 
 ## 字幕处理约定

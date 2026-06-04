@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 12:17 +0800
+- 进度：继续排查图片上传 pending。通过采样确认 server 现场有线程阻塞在 `open`，同时部署机当前 `UPLOAD_TEMP_DIR` 曾被配置到 `/Volumes/large/videos/tmp/uploads`；已把该值改回 `./tmp/uploads` 并重启 server。已同步 `CONTEXT.md` 和 `docs/家用部署机.md`，明确上传暂存目录必须留在本机磁盘，不能放在外盘上。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；远端部署配置 `~/deploy/ai-video-server/.env`
+- 验证：远端 `.env` 中 `UPLOAD_TEMP_DIR=./tmp/uploads` 已生效；`launchctl kickstart` 后 `/healthz` 正常，server 重新启动；待用户重试图片上传确认 pending 是否消失。
+
 ## 2026-06-04 11:08 +0800
 - 进度：已将部署机实际 `~/deploy/ai-video-server/repo.git/hooks/post-receive` 的前端 dist 更新块同步为增量保留 assets 版本，避免仓库文档已更新但运行中的 hook 仍整目录删除旧 hash 资源。远端 hook 保持可执行权限。
 - 影响文件：`plan.md`；远端运维文件 `~/deploy/ai-video-server/repo.git/hooks/post-receive` 已手动对齐
