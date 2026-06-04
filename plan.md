@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 17:08 +0800
+- 进度：完成“固定真实执行路径避免重复 TCC 授权弹窗”的方案记录。`CONTEXT.md` 新增 [[家用部署机固定执行路径契约]]，`docs/家用部署机.md` 在服务器-only 权限收口方案下补充：稳定签名后仍反复弹窗时，下一档应让 launchd 永远执行固定真实文件，sha binary 只保留为回滚备份。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 不纳入
+- 验证：`git diff --check -- CONTEXT.md 'docs/家用部署机.md' plan.md` 通过；`rg -n $'\uFFFD' CONTEXT.md 'docs/家用部署机.md' plan.md` 无输出
+
+## 2026-06-04 17:08 +0800
+- 进度：开始记录“避免每次部署都手动点外盘授权”的长期方案。方案边界是文档沉淀，不直接改 hook：若稳定签名后仍每次弹 TCC 授权，下一步把 launchd 执行入口收紧为固定真实二进制路径，而不是每次指向新的 sha binary。
+- 影响文件：预计涉及 `CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 不纳入
+- 验证：待执行 Markdown diff 检查与乱码扫描，随后提交并推送 `deploy master`
+
 ## 2026-06-04 14:38 +0800
 - 进度：已将本次文档方案作为 commit `5cc2bed` 推送到 `deploy master`。远端 hook 完成 `go build`、`apply migrations`、`launchctl kickstart`，最终回执 `/healthz OK — deploy succeeded`。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；无关工作区改动 `admin-web/.env.development` 未纳入
