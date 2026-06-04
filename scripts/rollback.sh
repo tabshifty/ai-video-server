@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 家用部署机手动 rollback：切 binary symlink + 重启 launchd 服务。
-# 如果 .env 里配置了 CODESIGN_IDENTITY，会在切换前对目标二进制重新签名，
-# 让 rollback 也继续走同一份稳定代码身份。
+# 如果 .env 里配置了 CODESIGN_IDENTITY（以及可选的 CODESIGN_KEYCHAIN），
+# 会在切换前对目标二进制重新签名，让 rollback 也继续走同一份稳定代码身份。
 # 不自动跑 migration down —— 依赖 ADR-0006 [[migration 前向兼容契约]]，
 # 即旧 binary 必须能在当前（更新过）schema 上跑。
 #

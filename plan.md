@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 10:27 +0800
+- 进度：完成稳定签名 helper 的 keychain/identity 预检收口，并补完相关文档说明；当前仓库层面已把“必须是 Apple-issued identity + 本地一次性 trust 授权”的要求写清楚。`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md` 已对齐。
+- 影响文件：`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：`bash -n scripts/sign-launchd-binary.sh scripts/rollback.sh scripts/migrate-apply.sh` 通过；`git diff --check -- .env.example CONTEXT.md docs/家用部署机.md plan.md scripts/sign-launchd-binary.sh scripts/rollback.sh` 通过；`rg -n $'\uFFFD' .env.example CONTEXT.md docs/家用部署机.md plan.md scripts/sign-launchd-binary.sh scripts/rollback.sh` 无输出。
+
+## 2026-06-04 10:25 +0800
+- 进度：补强 launchd 稳定签名入口的 keychain 支持与 identity 预检，并把“必须是 Apple-issued identity + 本地一次性 trust 授权”写回仓库上下文。`scripts/sign-launchd-binary.sh` 现在支持可选 `CODESIGN_KEYCHAIN` / `CODESIGN_KEYCHAIN_PASSWORD`，签名前会先解锁 keychain 并验证 `security find-identity -v -p codesigning` 里真的存在目标 identity；`docs/家用部署机.md`、`.env.example` 和 `CONTEXT.md` 同步补充了签名身份落地约束。
+- 影响文件：`scripts/sign-launchd-binary.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `bash -n scripts/sign-launchd-binary.sh scripts/rollback.sh scripts/migrate-apply.sh`、`git diff --check`、乱码扫描。
+
 ## 2026-06-04 10:06 +0800
 - 进度：完成管理端 destructive API 的无超时调整，并把部署机上确认到的 TCC 事实补进仓库上下文。`admin-web/src/api/admin.js` 里视频/图片/字幕/合集/TV 相关删除请求和批量删除请求统一显式 `timeout: 0`；`admin-web/src/api/admin.spec.js` 已回归这些调用；`CONTEXT.md` 新增 `TCC` 取证契约，记录 launchd binary 仍可能在 `tccd` 下被拒。
 - 影响文件：`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
