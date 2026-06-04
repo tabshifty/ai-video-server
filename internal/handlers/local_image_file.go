@@ -124,7 +124,7 @@ func serveOpenedLocalImage(c *gin.Context, path string, file *os.File, info os.F
 		c.Header("Content-Length", strconv.FormatInt(info.Size(), 10))
 		modTime = info.ModTime()
 	}
-	if mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(path))); mimeType != "" {
+	if mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(path))); mimeType != "" && strings.TrimSpace(c.Writer.Header().Get("Content-Type")) == "" {
 		c.Header("Content-Type", mimeType)
 	}
 	c.Header("Cache-Control", "public, max-age=86400")

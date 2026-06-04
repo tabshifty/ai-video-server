@@ -1,11 +1,8 @@
 package handlers
 
 import (
-	"mime"
 	"net/http"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -31,42 +28,71 @@ func (a *API) ActorAvatar(c *gin.Context) {
 		return
 	}
 
-	if localPath, ok := resolveLocalActorAvatarPath(a.storageRoot, actorID); ok {
-		if stat, statErr := os.Stat(localPath); statErr == nil {
-			c.Header("Content-Length", strconv.FormatInt(stat.Size(), 10))
+	for _, localPath := range localActorAvatarPaths(a.storageRoot, actorID) {
+		file, info, err := openLocalImageFile(c.Request.Context(), localPath)
+		if err != nil {
+			if isLocalImageNotFound(err) {
+				continue
+			}
+			writeLocalImageOpenError(c, err, "actor avatar not found", "actor avatar temporarily unavailable")
+			return
 		}
-		if mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(localPath))); mimeType != "" {
+		defer file.Close()
+		if mimeType := strings.TrimSpace(fileTypeFromPath(localPath)); mimeType != "" {
 			c.Header("Content-Type", mimeType)
 		}
 		c.Header("Cache-Control", "public, max-age=86400")
-		c.File(localPath)
+		serveOpenedLocalImage(c, localPath, file, info)
 		return
 	}
 
 	raw := strings.TrimSpace(actor.AvatarURL)
-	if stat, statErr := os.Stat(raw); statErr == nil && !stat.IsDir() {
-		c.File(raw)
-		return
-	}
 	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
 		c.Redirect(http.StatusTemporaryRedirect, raw)
+		return
+	}
+	if raw != "" {
+		file, info, err := openLocalImageFile(c.Request.Context(), raw)
+		if err != nil {
+			if isLocalImageNotFound(err) {
+				c.JSON(http.StatusNotFound, gin.H{"msg": "actor avatar not found"})
+				return
+			}
+			writeLocalImageOpenError(c, err, "actor avatar not found", "actor avatar temporarily unavailable")
+			return
+		}
+		defer file.Close()
+		serveOpenedLocalImage(c, raw, file, info)
 		return
 	}
 	c.JSON(http.StatusNotFound, gin.H{"msg": "actor avatar not found"})
 }
 
-func resolveLocalActorAvatarPath(storageRoot string, actorID uuid.UUID) (string, bool) {
+func localActorAvatarPaths(storageRoot string, actorID uuid.UUID) []string {
 	if actorID == uuid.Nil {
-		return "", false
+		return nil
 	}
-	matches, err := filepath.Glob(filepath.Join(storageRoot, "actors", actorID.String(), "avatar.*"))
-	if err != nil || len(matches) == 0 {
-		return "", false
+	dir := filepath.Join(storageRoot, "actors", actorID.String())
+	return []string{
+		filepath.Join(dir, "avatar.jpg"),
+		filepath.Join(dir, "avatar.png"),
+		filepath.Join(dir, "avatar.webp"),
+		filepath.Join(dir, "avatar.gif"),
 	}
-	for _, match := range matches {
-		if stat, statErr := os.Stat(match); statErr == nil && !stat.IsDir() {
-			return match, true
-		}
+}
+
+func fileTypeFromPath(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
+	default:
+		return ""
 	}
-	return "", false
 }

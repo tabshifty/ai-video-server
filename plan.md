@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 12:45 +0800
+- 进度：完成全媒体外盘访问收口。视频源、视频字幕、演员头像、图片视图、视频抓帧与图片上传后的外盘探测都改成限时打开/限时 ffmpeg 处理；`CONTEXT.md` 也同步补了“媒体资源限时打开”和“媒体生成限时”的长期约定。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`CONTEXT.md`、`plan.md`、`internal/handlers/local_image_file.go`、`internal/handlers/admin_image.go`、`internal/handlers/app_image_collection.go`、`internal/handlers/video_source.go`、`internal/handlers/video_subtitle.go`、`internal/handlers/actor_avatar.go`、`internal/handlers/admin_video_thumbnail.go`、`internal/services/image.go`、`internal/handlers/local_image_file_test.go`
+- 验证：`go test ./internal/handlers ./internal/services -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check -- CONTEXT.md plan.md internal/handlers/local_image_file.go internal/handlers/admin_image.go internal/handlers/app_image_collection.go internal/handlers/local_image_file_test.go internal/handlers/video_source.go internal/handlers/video_subtitle.go internal/handlers/actor_avatar.go internal/handlers/admin_video_thumbnail.go internal/services/image.go` 通过；乱码扫描无输出。
+
+## 2026-06-04 12:44 +0800
+- 进度：把“外盘访问卡住”的修复范围从图片预览扩大到所有媒体路径。`admin/images/:id/view`、`images/:id/view`、`videos/:id/source`、`videos/:id/subtitle`、`actors/:id/avatar`、视频抓帧以及图片上传后的外盘探测/生成都改成限时打开或限时 ffmpeg 处理，避免 launchd 进程对 `/Volumes/large` 失去授权后把请求挂成 pending；同步把媒体访问/TCC 约定写回 `CONTEXT.md`。
+- 影响文件：`internal/handlers/local_image_file.go`、`internal/handlers/admin_image.go`、`internal/handlers/app_image_collection.go`、`internal/handlers/video_source.go`、`internal/handlers/video_subtitle.go`、`internal/handlers/actor_avatar.go`、`internal/handlers/admin_video_thumbnail.go`、`internal/services/image.go`、`internal/handlers/local_image_file_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestOpenLocalImageFileWith|TestTryServeLocalImagePath' -count=1` 通过；`go test ./internal/handlers ./internal/services -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check` 通过；乱码扫描待执行。
+
 ## 2026-06-04 12:29 +0800
 - 进度：完成图片预览链路收口。`AdminImageView` 与 `AppImageView` 现在统一走 `openLocalImageFile` / `serveOpenedLocalImage`，不再直接 `c.File` 读外盘路径；新增 `tryServeLocalImagePath` 复用本地文件限时打开逻辑，并补了 helper 回归测试，避免预览 blob 请求在外盘或 TCC 异常时长期 pending。
 - 影响文件：`internal/handlers/local_image_file.go`、`internal/handlers/admin_image.go`、`internal/handlers/app_image_collection.go`、`internal/handlers/local_image_file_test.go`、`CONTEXT.md`、`plan.md`

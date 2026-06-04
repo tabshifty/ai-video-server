@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -57,10 +59,12 @@ func (a *API) AdminCaptureVideoThumbnail(c *gin.Context) {
 		response.Error(c, 1062, "video source not found")
 		return
 	}
-	if _, err := os.Stat(sourcePath); err != nil {
+	file, _, err := openLocalImageFile(c.Request.Context(), sourcePath)
+	if err != nil {
 		response.Error(c, 1063, fmt.Sprintf("video source missing: %v", err))
 		return
 	}
+	_ = file.Close()
 
 	captureAt := req.TimeSeconds
 	if video.DurationSeconds > 0 {
@@ -87,7 +91,9 @@ func (a *API) AdminCaptureVideoThumbnail(c *gin.Context) {
 	defer func() {
 		_ = os.Remove(tempPath)
 	}()
-	if err := ffmpeg.ThumbnailAt(c.Request.Context(), sourcePath, tempPath, captureAt); err != nil {
+	thumbCtx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Minute)
+	defer cancel()
+	if err := ffmpeg.ThumbnailAt(thumbCtx, sourcePath, tempPath, captureAt); err != nil {
 		response.Error(c, 1065, err.Error())
 		return
 	}

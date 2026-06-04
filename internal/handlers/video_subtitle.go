@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -48,16 +46,10 @@ func (a *API) VideoSubtitleFile(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"msg": "subtitle not found"})
 		return
 	}
-	if _, err := os.Stat(subtitle.StoredPath); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			c.JSON(http.StatusNotFound, gin.H{"msg": "subtitle file not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "read subtitle file failed"})
-		return
-	}
 	if subtitle.MIMEType != "" {
 		c.Header("Content-Type", subtitle.MIMEType)
 	}
-	c.File(subtitle.StoredPath)
+	if !tryServeLocalImagePath(c, subtitle.StoredPath, "subtitle file not found", "read subtitle file failed") {
+		return
+	}
 }

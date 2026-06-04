@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -38,7 +37,9 @@ func (a *API) VideoSource(c *gin.Context) {
 	if !ok {
 		return
 	}
-	c.File(sourcePath)
+	if !tryServeLocalImagePath(c, sourcePath, "video source not found", "video source temporarily unavailable") {
+		return
+	}
 }
 
 func (a *API) VideoThumbnail(c *gin.Context) {
@@ -91,7 +92,9 @@ func (a *API) VideoSourceSigned(c *gin.Context) {
 	if !ok {
 		return
 	}
-	c.File(sourcePath)
+	if !tryServeLocalImagePath(c, sourcePath, "video source not found", "video source temporarily unavailable") {
+		return
+	}
 }
 
 func (a *API) resolvePlayableSource(c *gin.Context, videoID uuid.UUID) (string, bool) {
@@ -115,14 +118,6 @@ func (a *API) resolvePlayableSource(c *gin.Context, videoID uuid.UUID) (string, 
 	}
 	if sourcePath == "" {
 		c.JSON(http.StatusNotFound, gin.H{"msg": "video source not found"})
-		return "", false
-	}
-	if _, statErr := os.Stat(sourcePath); statErr != nil {
-		if errors.Is(statErr, os.ErrNotExist) {
-			c.JSON(http.StatusNotFound, gin.H{"msg": "video source not found"})
-			return "", false
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "read video source failed"})
 		return "", false
 	}
 	return sourcePath, true

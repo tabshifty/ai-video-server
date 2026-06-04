@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
@@ -46,6 +47,15 @@ type imageRepository interface {
 }
 
 var convertImageToWebP = ffmpeg.ConvertToWebP
+
+const imageFileOpenTimeout = 2 * time.Second
+const imageProcessTimeout = 2 * time.Minute
+
+type openImageResult struct {
+	file *os.File
+	info os.FileInfo
+	err  error
+}
 
 type SaveImageInput struct {
 	UserID        uuid.UUID
@@ -179,8 +189,15 @@ func (s *ImageService) saveFromLocalPath(ctx context.Context, in SaveImageInput,
 	sourceDeleted := false
 
 	if !strings.HasSuffix(strings.ToLower(originalMIME), "gif") {
+		originalFile, _, err := openImageFileWithTimeout(ctx, originalPath, imageFileOpenTimeout)
+		if err != nil {
+			return SaveImageResult{}, fmt.Errorf("open original image file: %w", err)
+		}
+		_ = originalFile.Close()
 		storedPath = filepath.Join(storedDir, imageID.String()+".webp")
-		if err := convertImageToWebP(ctx, originalPath, storedPath, 82); err != nil {
+		processCtx, cancel := context.WithTimeout(ctx, imageProcessTimeout)
+		defer cancel()
+		if err := convertImageToWebP(processCtx, originalPath, storedPath, 82); err != nil {
 			_ = os.Remove(storedPath)
 			if !errors.Is(err, ffmpeg.ErrWebPEncodingUnavailable) {
 				return SaveImageResult{}, fmt.Errorf("convert image to webp: %w", err)
@@ -200,14 +217,18 @@ func (s *ImageService) saveFromLocalPath(ctx context.Context, in SaveImageInput,
 		}
 	}
 
-	probe, err := ffmpeg.Probe(ctx, storedPath)
+	storedFile, storedInfo, err := openImageFileWithTimeout(ctx, storedPath, imageFileOpenTimeout)
+	if err != nil {
+		return SaveImageResult{}, fmt.Errorf("open stored image file: %w", err)
+	}
+	_ = storedFile.Close()
+
+	probeCtx, cancel := context.WithTimeout(ctx, imageProcessTimeout)
+	probe, err := ffmpeg.Probe(probeCtx, storedPath)
+	cancel()
 	if err != nil {
 		probe.Width = 0
 		probe.Height = 0
-	}
-	storedInfo, err := os.Stat(storedPath)
-	if err != nil {
-		return SaveImageResult{}, fmt.Errorf("stat stored image file: %w", err)
 	}
 
 	title := strings.TrimSpace(in.Title)
@@ -325,23 +346,34 @@ func (s *ImageService) resolveViewPathFromImage(ctx context.Context, img models.
 
 	key := fmt.Sprintf("w%d_h%d_fit%s_q%d_%s", width, height, fit, quality, format)
 	if p, m, _, _, exists, err := s.repo.GetImageVariantByKey(ctx, img.ID, key); err == nil && exists {
-		if _, statErr := os.Stat(p); statErr == nil {
+		if file, _, openErr := openImageFileWithTimeout(ctx, p, imageFileOpenTimeout); openErr == nil {
+			_ = file.Close()
 			if strings.TrimSpace(m) != "" {
 				mime = m
 			}
 			return p, mime, nil
+		} else if !errors.Is(openErr, os.ErrNotExist) {
+			return "", "", fmt.Errorf("open image variant: %w", openErr)
 		}
 	}
+
+	baseFile, _, err := openImageFileWithTimeout(ctx, basePath, imageFileOpenTimeout)
+	if err != nil {
+		return "", "", fmt.Errorf("open image source: %w", err)
+	}
+	_ = baseFile.Close()
 
 	variantDir := filepath.Join(s.storage, "images", "variants", img.ID.String())
 	if err := os.MkdirAll(variantDir, 0o755); err != nil {
 		return "", "", fmt.Errorf("create image variant dir: %w", err)
 	}
 	variantPath := filepath.Join(variantDir, key+"."+format)
-	if err := ffmpeg.ResizeImage(ctx, basePath, variantPath, width, height, fit, format, quality); err != nil {
+	processCtx, cancel := context.WithTimeout(ctx, imageProcessTimeout)
+	defer cancel()
+	if err := ffmpeg.ResizeImage(processCtx, basePath, variantPath, width, height, fit, format, quality); err != nil {
 		return "", "", err
 	}
-	probe, probeErr := ffmpeg.Probe(ctx, variantPath)
+	probe, probeErr := ffmpeg.Probe(processCtx, variantPath)
 	w, h := width, height
 	if probeErr == nil {
 		if probe.Width > 0 {
@@ -355,6 +387,62 @@ func (s *ImageService) resolveViewPathFromImage(ctx context.Context, img models.
 		return "", "", err
 	}
 	return variantPath, mime, nil
+}
+
+func openImageFileWithTimeout(ctx context.Context, path string, timeout time.Duration) (*os.File, os.FileInfo, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, nil, os.ErrNotExist
+	}
+	if timeout <= 0 {
+		timeout = imageFileOpenTimeout
+	}
+
+	openCtx, cancel := context.WithCancel(ctx)
+	resultCh := make(chan openImageResult, 1)
+	go func() {
+		file, err := os.Open(path)
+		if err != nil {
+			sendOpenImageResult(openCtx, resultCh, openImageResult{err: err})
+			return
+		}
+		info, err := file.Stat()
+		if err != nil {
+			_ = file.Close()
+			sendOpenImageResult(openCtx, resultCh, openImageResult{err: err})
+			return
+		}
+		sendOpenImageResult(openCtx, resultCh, openImageResult{file: file, info: info})
+	}()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	defer cancel()
+
+	select {
+	case result := <-resultCh:
+		if result.err != nil {
+			return nil, nil, result.err
+		}
+		return result.file, result.info, nil
+	case <-timer.C:
+		return nil, nil, context.DeadlineExceeded
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	}
+}
+
+func sendOpenImageResult(ctx context.Context, resultCh chan<- openImageResult, result openImageResult) {
+	select {
+	case resultCh <- result:
+	case <-ctx.Done():
+		if result.file != nil {
+			_ = result.file.Close()
+		}
+	}
 }
 
 func isAllowedImageMIME(mime string) bool {
