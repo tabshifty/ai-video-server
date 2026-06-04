@@ -131,6 +131,17 @@ func serveOpenedLocalImage(c *gin.Context, path string, file *os.File, info os.F
 	http.ServeContent(c.Writer, c.Request, filepath.Base(path), modTime, file)
 }
 
+func tryServeLocalImagePath(c *gin.Context, path, notFoundMessage, unavailableMessage string) bool {
+	file, info, err := openLocalImageFile(c.Request.Context(), path)
+	if err != nil {
+		writeLocalImageOpenError(c, err, notFoundMessage, unavailableMessage)
+		return false
+	}
+	defer file.Close()
+	serveOpenedLocalImage(c, path, file, info)
+	return true
+}
+
 func writeLocalImageOpenError(c *gin.Context, err error, notFoundMessage, unavailableMessage string) {
 	switch {
 	case isLocalImageNotFound(err):

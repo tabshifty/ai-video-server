@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-04 12:29 +0800
+- 进度：完成图片预览链路收口。`AdminImageView` 与 `AppImageView` 现在统一走 `openLocalImageFile` / `serveOpenedLocalImage`，不再直接 `c.File` 读外盘路径；新增 `tryServeLocalImagePath` 复用本地文件限时打开逻辑，并补了 helper 回归测试，避免预览 blob 请求在外盘或 TCC 异常时长期 pending。
+- 影响文件：`internal/handlers/local_image_file.go`、`internal/handlers/admin_image.go`、`internal/handlers/app_image_collection.go`、`internal/handlers/local_image_file_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestOpenLocalImageFileWith|TestTryServeLocalImagePath' -count=1` 通过；`go test ./internal/handlers -count=1` 通过；`git diff --check -- CONTEXT.md plan.md internal/handlers/local_image_file.go internal/handlers/admin_image.go internal/handlers/app_image_collection.go internal/handlers/local_image_file_test.go` 通过；乱码扫描无输出。
+
+## 2026-06-04 12:27 +0800
+- 进度：继续处理图片预览长期 pending。已确认 `admin-web` 的图片管理页会直接请求 `/admin/images/:id/view` 取 blob，而后端该路由与 `AppImageView` 仍在用 `c.File` 直读存储文件；计划把这两条视图链路改成和剧照/缩略图一致的限时打开再返回，避免外盘或 TCC 问题把页面卡成 loading。
+- 影响文件：预计涉及 `internal/handlers/local_image_file.go`、`internal/handlers/admin_image.go`、`internal/handlers/app_image_collection.go`、`internal/handlers/*_test.go`、`plan.md`
+- 验证：待执行定向单测、`go test ./internal/handlers -run 'Test.*Image.*View|TestOpenLocalImageFileWith' -count=1`、`git diff --check`、乱码扫描。
+
 ## 2026-06-04 12:17 +0800
 - 进度：继续排查图片上传 pending。通过采样确认 server 现场有线程阻塞在 `open`，同时部署机当前 `UPLOAD_TEMP_DIR` 曾被配置到 `/Volumes/large/videos/tmp/uploads`；已把该值改回 `./tmp/uploads` 并重启 server。已同步 `CONTEXT.md` 和 `docs/家用部署机.md`，明确上传暂存目录必须留在本机磁盘，不能放在外盘上。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；远端部署配置 `~/deploy/ai-video-server/.env`

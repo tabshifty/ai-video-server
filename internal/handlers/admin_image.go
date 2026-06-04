@@ -429,14 +429,12 @@ func (a *API) AdminImageView(c *gin.Context) {
 		return
 	}
 
-	if stat, statErr := os.Stat(imagePath); statErr == nil {
-		c.Header("Content-Length", strconv.FormatInt(stat.Size(), 10))
-	}
 	if mime != "" {
 		c.Header("Content-Type", mime)
 	}
-	c.Header("Cache-Control", "public, max-age=86400")
-	c.File(imagePath)
+	if !tryServeLocalImagePath(c, imagePath, "图片不存在", "图片暂时不可用") {
+		return
+	}
 }
 
 func parseOptionalBool(raw string) (*bool, error) {
