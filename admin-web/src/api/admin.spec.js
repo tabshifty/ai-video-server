@@ -27,12 +27,15 @@ import {
   deleteAdminImage,
   deleteAdminVideo,
   deleteAdminVideoSubtitle,
+  deleteLatestOrphanFileScan,
   getAdminVideoTags,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
   getAdminVideoSubtitles,
+  getLatestOrphanFileScan,
   rescanAdminVideoSubtitles,
   scrapePreview,
+  startOrphanFileScan,
   updateAdminVideoSubtitle,
   updateAdminTvEpisode,
   updateAdminTvSeason,
@@ -71,6 +74,29 @@ describe('scrape preview apis', () => {
     await scrapePreview(payload)
 
     expect(post).toHaveBeenCalledWith('/admin/scrape/preview', payload, {
+      timeout: 0
+    })
+  })
+})
+
+describe('orphan file scan apis', () => {
+  beforeEach(() => {
+    post.mockReset()
+    get.mockReset()
+    remove.mockReset()
+    post.mockResolvedValue({ ok: true })
+    get.mockResolvedValue({ ok: true })
+    remove.mockResolvedValue({ ok: true })
+  })
+
+  it('starts, loads and deletes orphan file scans', async () => {
+    await startOrphanFileScan()
+    await getLatestOrphanFileScan()
+    await deleteLatestOrphanFileScan()
+
+    expect(post).toHaveBeenCalledWith('/admin/system/orphan-files/scan')
+    expect(get).toHaveBeenCalledWith('/admin/system/orphan-files/latest')
+    expect(remove).toHaveBeenCalledWith('/admin/system/orphan-files/latest', {
       timeout: 0
     })
   })

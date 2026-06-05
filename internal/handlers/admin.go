@@ -818,6 +818,105 @@ func (a *API) AdminTasks(c *gin.Context) {
 	})
 }
 
+func (a *API) AdminStartOrphanFileScan(c *gin.Context) {
+	if a.orphanFileScanRepo == nil {
+		response.Error(c, 1068, "数据库未配置")
+		return
+	}
+	if a.enqueuer == nil {
+		response.Error(c, 1068, "队列未配置")
+		return
+	}
+
+	prev, err := a.orphanFileScanRepo.BeginOrphanFileScan(c.Request.Context())
+	if err != nil {
+		if errors.Is(err, repository.ErrOrphanFileScanRunning) {
+			response.Error(c, 1068, "已有孤儿文件扫描任务正在进行")
+			return
+		}
+		response.Error(c, 1068, err.Error())
+		return
+	}
+
+	if err := a.enqueuer.EnqueueOrphanFileScan(); err != nil {
+		if restoreErr := a.orphanFileScanRepo.RestoreOrphanFileScan(c.Request.Context(), prev); restoreErr != nil {
+			a.logger.Warn("restore orphan file scan after enqueue failure failed", "error", restoreErr)
+		}
+		response.Error(c, 1069, err.Error())
+		return
+	}
+
+	ok(c, gin.H{
+		"status": "pending",
+	})
+}
+
+func (a *API) AdminLatestOrphanFileScan(c *gin.Context) {
+	if a.orphanFileScanRepo == nil {
+		response.Error(c, 1069, "数据库未配置")
+		return
+	}
+	scan, err := a.orphanFileScanRepo.GetOrphanFileScan(c.Request.Context())
+	if err != nil {
+		response.Error(c, 1069, err.Error())
+		return
+	}
+	ok(c, scan)
+}
+
+func (a *API) AdminDeleteLatestOrphanFileScan(c *gin.Context) {
+	if a.orphanFileScanRepo == nil {
+		response.Error(c, 1070, "数据库未配置")
+		return
+	}
+	scan, err := a.orphanFileScanRepo.GetOrphanFileScan(c.Request.Context())
+	if err != nil {
+		response.Error(c, 1070, err.Error())
+		return
+	}
+	if scan.Status == "deleted" {
+		ok(c, scan)
+		return
+	}
+	if scan.Status != "completed" {
+		response.Error(c, 1070, "请先完成扫描后再删除")
+		return
+	}
+
+	deletedCount, deleteErr := deleteOrphanFileScanItems(scan.Items)
+	if deleteErr != nil {
+		response.Error(c, 1070, deleteErr.Error())
+		return
+	}
+	if err := a.orphanFileScanRepo.MarkOrphanFileScanDeleted(c.Request.Context(), deletedCount); err != nil {
+		response.Error(c, 1070, err.Error())
+		return
+	}
+
+	scan.Status = "deleted"
+	scan.DeletedFiles = deletedCount
+	ok(c, scan)
+}
+
+func deleteOrphanFileScanItems(items []models.AdminOrphanFileScanItem) (int64, error) {
+	var deletedCount int64
+	for _, item := range items {
+		path := strings.TrimSpace(item.FilePath)
+		if path == "" {
+			continue
+		}
+		if err := os.Remove(path); err != nil {
+			if os.IsNotExist(err) {
+				deletedCount++
+				continue
+			}
+			return deletedCount, fmt.Errorf("删除孤儿文件失败: %s: %w", path, err)
+		}
+		deletedCount++
+	}
+	return deletedCount, nil
+}
+
 func (a *API) AdminSystemCleanup(c *gin.Context) {
 	var req struct {
 		OlderThanHours int `json:"older_than_hours"`

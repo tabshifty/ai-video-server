@@ -25,6 +25,7 @@ const (
 	TypeScrapeTV       = "video:scrape:tv"
 	TypeScrapeAV       = "video:scrape:av"
 	TypeScrapeRetag    = "video:scrape:retag"
+	TypeOrphanFileScan = "system:orphan-files:scan"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -93,11 +94,12 @@ type Processor struct {
 	subtitle *services.SubtitleService
 	enqueuer *Enqueuer
 	logger   *slog.Logger
+	storageRoot string
 	uploadGC bool
 }
 
-func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, logger *slog.Logger) *Processor {
-	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, logger: logger, uploadGC: true}
+func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, logger *slog.Logger, storageRoot string) *Processor {
+	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, logger: logger, storageRoot: storageRoot, uploadGC: true}
 }
 
 func (p *Processor) Register(mux *asynq.ServeMux) {
@@ -106,6 +108,7 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeTV, p.HandleScrapeTV)
 	mux.HandleFunc(TypeScrapeAV, p.HandleScrapeAV)
 	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
+	mux.HandleFunc(TypeOrphanFileScan, p.HandleOrphanFileScan)
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

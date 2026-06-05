@@ -214,7 +214,7 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	configureAVScraper(scrapeSvc, cfg)
 	configureContentTranslation(scrapeSvc, cfg)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
-	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger)
+	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger, cfg.StorageRoot)
 	processor.Register(mux)
 
 	srv := asynq.NewServer(

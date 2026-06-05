@@ -2,10 +2,24 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-05 10:55 +0800
+- 进度：管理端孤儿文件扫描前后端接入已完成并通过验证。系统页现已支持异步扫描、轮询最新状态、完成后自动弹出全量删除确认，以及删除后保留扫描快照；后端迁移、仓库、队列、handler 与 API 单测已补齐。无关工作区改动 `admin-web/.env.development` 仍未纳入。
+- 影响文件：`CONTEXT.md`、`plan.md`、`internal/handlers/admin.go`、`internal/handlers/router.go`、`internal/handlers/admin_orphan_file_scan_test.go`、`internal/repository/migrations_test.go`、`internal/repository/orphan_file_scan_repository_test.go`、`internal/queue/orphan_file_scan_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`
+- 验证：`go test ./internal/... -count=1` 通过；`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过；`git diff --check` 通过；乱码扫描无输出
+
+## 2026-06-05 10:51 +0800
+- 进度：完成管理端孤儿文件扫描的前后端接入补齐。后端把孤儿文件扫描单独挂到系统页可用的仓库/队列接口上，补了迁移与纯逻辑测试；管理端系统设置页新增“开始扫描 -> 自动轮询最新状态 -> 扫完自动确认全量删除”的交互，并把删除操作收口为全量删除，不再走逐项勾选。无关工作区改动 `admin-web/.env.development` 仍不纳入。
+- 影响文件：`CONTEXT.md`、`plan.md`、`internal/handlers/admin.go`、`internal/handlers/router.go`、`internal/handlers/admin_orphan_file_scan_test.go`、`internal/repository/migrations_test.go`、`internal/repository/orphan_file_scan_repository_test.go`、`internal/queue/orphan_file_scan_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`
+- 验证：待执行 `go test ./internal/... -count=1`、`cd admin-web && npm test`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描
+
 ## 2026-06-04 20:20 +0800
 - 进度：把 [[家用部署机]] 的运行入口从版本化二进制直接参与运行收口到固定真实路径 `current/video-server`；`docs/家用部署机.md`、`scripts/rollback.sh` 与 `CONTEXT.md` 已同步更新为固定执行路径语义，`binaries/video-server-<sha>.bin` 只保留作回滚备份，不再作为 launchd 直接目标。部署机 `post-receive` hook 也已从 symlink swap 改为复制到稳定入口再重启，避免后续 push 又把运行主体挂回旧 bin。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`scripts/rollback.sh`、`plan.md`
 - 验证：`bash -n scripts/rollback.sh`、`git diff --check` 通过；后续 push 仍需复跑部署链路确认。
+## 2026-06-05 09:59 +0800
+- 进度：开始实现管理端孤儿文件扫描功能。已确认范围为 `STORAGE_ROOT` 下已知业务子树，数据库列与 `metadata` 里的本地路径统一算引用；扫描走异步任务，结果只保留最新一份，扫描完成后自动弹出全量删除确认，删除后不清空空目录。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `CONTEXT.md`、`plan.md`、`internal/queue/*`、`internal/repository/*`、`internal/models/*`、`internal/handlers/*`、`migrations/*`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`
+- 验证：待执行定向单测、`cd admin-web && npm test`、`cd admin-web && npm run build`、`go test ./internal/... -count=1`、`git diff --check`、乱码扫描
 
 ## 2026-06-04 17:10 +0800
 - 进度：已将固定执行路径授权方案提交 `a77c95d` 推送到 `deploy master`。远端 hook 确认 `HEAD is now at a77c95d 记录固定执行路径授权方案`，本次仅文档和计划变更，未触发 Go 重建或前端构建。

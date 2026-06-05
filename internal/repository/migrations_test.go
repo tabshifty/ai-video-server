@@ -49,6 +49,22 @@ func TestWesternAVOshashMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+drop\s+column\s+if\s+exists\s+os_hash`)
 }
 
+func TestOrphanFileScanMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0022_orphan_file_scan.up.sql")
+	down := readMigrationForTest(t, "0022_orphan_file_scan.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+orphan_file_scans`)
+	assertSQLPattern(t, up, `(?is)check\s*\(\s*id\s*=\s*1\s*\)`)
+	assertSQLPattern(t, up, `(?is)status\s+varchar\(20\)\s+not\s+null\s+default\s+'idle'`)
+	assertSQLPattern(t, up, `(?is)'pending'.*'running'.*'completed'.*'failed'.*'deleted'`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+orphan_file_scan_items`)
+	assertSQLPattern(t, up, `(?is)scan_id\s+bigint\s+not\s+null\s+references\s+orphan_file_scans\(id\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+orphan_file_scan_items`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+orphan_file_scans`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

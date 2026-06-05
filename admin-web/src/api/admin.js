@@ -102,6 +102,13 @@ export const deleteAdminImageCollection = (id) =>
 
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
 
+export const startOrphanFileScan = () => request.post('/admin/system/orphan-files/scan')
+export const getLatestOrphanFileScan = () => request.get('/admin/system/orphan-files/latest')
+export const deleteLatestOrphanFileScan = () =>
+  request.delete('/admin/system/orphan-files/latest', {
+    timeout: 0
+  })
+
 export const systemCleanup = (payload) => request.post('/admin/system/cleanup', payload)
 export const getSystemLogs = (params) => request.get('/admin/system/logs', { params })
 
