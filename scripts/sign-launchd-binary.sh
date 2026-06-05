@@ -11,12 +11,78 @@ EOF
 fi
 
 BIN_PATH="$1"
+CODESIGN_ENV_FILE="${CODESIGN_ENV_FILE:-}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
+CODESIGN_IDENTIFIER="${CODESIGN_IDENTIFIER:-com.chee.videos.server}"
 CODESIGN_KEYCHAIN="${CODESIGN_KEYCHAIN:-}"
 CODESIGN_KEYCHAIN_PASSWORD="${CODESIGN_KEYCHAIN_PASSWORD:-}"
+CODESIGN_KEYCHAIN_PASSWORD_FILE="${CODESIGN_KEYCHAIN_PASSWORD_FILE:-}"
+
+strip_env_quotes() {
+  local value="$1"
+  if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "$value"
+}
+
+expand_home_path() {
+  local value="$1"
+  case "$value" in
+    '$HOME'/*)
+      value="$HOME/${value#'$HOME'/}"
+      ;;
+    '${HOME}'/*)
+      value="$HOME/${value#'${HOME}'/}"
+      ;;
+    '~'/*)
+      value="$HOME/${value#'~'/}"
+      ;;
+  esac
+  printf '%s' "$value"
+}
+
+load_codesign_env_file() {
+  local env_file="$1"
+  local line key value
+  if [[ ! -f "$env_file" ]]; then
+    printf '找不到 CODESIGN_ENV_FILE 指向的环境文件: %s\n' "$env_file" >&2
+    exit 1
+  fi
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "$line" || "${line:0:1}" == "#" ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    value="$(strip_env_quotes "$value")"
+    case "$key" in
+      CODESIGN_IDENTITY)
+        [[ -n "$value" && -z "$CODESIGN_IDENTITY" ]] && CODESIGN_IDENTITY="$value"
+        ;;
+      CODESIGN_IDENTIFIER)
+        [[ -n "$value" && "$CODESIGN_IDENTIFIER" == "com.chee.videos.server" ]] && CODESIGN_IDENTIFIER="$value"
+        ;;
+      CODESIGN_KEYCHAIN)
+        [[ -n "$value" && -z "$CODESIGN_KEYCHAIN" ]] && CODESIGN_KEYCHAIN="$(expand_home_path "$value")"
+        ;;
+      CODESIGN_KEYCHAIN_PASSWORD)
+        [[ -n "$value" && -z "$CODESIGN_KEYCHAIN_PASSWORD" ]] && CODESIGN_KEYCHAIN_PASSWORD="$value"
+        ;;
+      CODESIGN_KEYCHAIN_PASSWORD_FILE)
+        [[ -n "$value" && -z "$CODESIGN_KEYCHAIN_PASSWORD_FILE" ]] && CODESIGN_KEYCHAIN_PASSWORD_FILE="$(expand_home_path "$value")"
+        ;;
+    esac
+  done < "$env_file"
+}
+
+if [[ -n "$CODESIGN_ENV_FILE" ]]; then
+  load_codesign_env_file "$CODESIGN_ENV_FILE"
+fi
 
 if [[ -z "$CODESIGN_IDENTITY" ]]; then
-  printf '缺少 CODESIGN_IDENTITY；请在部署机 .env 里配置稳定签名身份\n' >&2
+  printf '缺少 CODESIGN_IDENTITY；请在部署机 .env 里配置稳定签名身份，或设置 CODESIGN_ENV_FILE\n' >&2
   exit 1
 fi
 if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
@@ -30,6 +96,19 @@ fi
 if [[ ! -f "$BIN_PATH" ]]; then
   printf '找不到二进制: %s\n' "$BIN_PATH" >&2
   exit 1
+fi
+if [[ -z "$CODESIGN_IDENTIFIER" ]]; then
+  printf 'CODESIGN_IDENTIFIER 不能为空；请使用稳定 bundle identifier\n' >&2
+  exit 1
+fi
+if [[ -n "$CODESIGN_KEYCHAIN_PASSWORD_FILE" ]]; then
+  if [[ ! -f "$CODESIGN_KEYCHAIN_PASSWORD_FILE" ]]; then
+    printf '找不到 CODESIGN_KEYCHAIN_PASSWORD_FILE 指向的密码文件: %s\n' "$CODESIGN_KEYCHAIN_PASSWORD_FILE" >&2
+    exit 1
+  fi
+  if [[ -z "$CODESIGN_KEYCHAIN_PASSWORD" ]]; then
+    CODESIGN_KEYCHAIN_PASSWORD="$(<"$CODESIGN_KEYCHAIN_PASSWORD_FILE")"
+  fi
 fi
 
 if [[ -n "$CODESIGN_KEYCHAIN" ]]; then
@@ -60,8 +139,8 @@ else
 fi
 
 if [[ -n "$CODESIGN_KEYCHAIN" ]]; then
-  codesign --force --sign "$CODESIGN_IDENTITY" --keychain "$CODESIGN_KEYCHAIN" --timestamp=none "$BIN_PATH"
+  codesign --force --sign "$CODESIGN_IDENTITY" --identifier "$CODESIGN_IDENTIFIER" --keychain "$CODESIGN_KEYCHAIN" --timestamp=none "$BIN_PATH"
 else
-  codesign --force --sign "$CODESIGN_IDENTITY" --timestamp=none "$BIN_PATH"
+  codesign --force --sign "$CODESIGN_IDENTITY" --identifier "$CODESIGN_IDENTIFIER" --timestamp=none "$BIN_PATH"
 fi
 codesign --verify --strict --verbose=2 "$BIN_PATH"

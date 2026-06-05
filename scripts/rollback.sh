@@ -33,13 +33,6 @@ fi
 TARGET_SHA="$1"
 TARGET_SHORT="${TARGET_SHA:0:10}"
 
-if [[ -f "$DEPLOY_ROOT/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "$DEPLOY_ROOT/.env"
-  set +a
-fi
-
 # 找到目标二进制
 BIN_FILE=$(ls "$BIN_DIR"/video-server-"${TARGET_SHORT}"*.bin 2>/dev/null | head -1 || true)
 if [[ -z "$BIN_FILE" ]]; then
@@ -52,7 +45,7 @@ fi
 
 log "rollback to $BIN_FILE"
 log "==> codesign target binary"
-"$SCRIPT_DIR/sign-launchd-binary.sh" "$BIN_FILE"
+CODESIGN_ENV_FILE="$DEPLOY_ROOT/.env" "$SCRIPT_DIR/sign-launchd-binary.sh" "$BIN_FILE"
 
 # 稳定运行入口：launchd 永远只看 current/video-server。
 cp "$BIN_FILE" "$CURRENT/video-server.new"

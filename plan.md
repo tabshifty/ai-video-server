@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-05 23:58 +0800
+- 进度：完成部署机稳定签名落地。部署机已导入 `Apple Development: 813745172@qq.com (CWLBNV4944)`，补齐 Apple WWDR G3 / Apple Root 证书链，`current/video-server` 已重签为固定 `Identifier=com.chee.videos.server`、`TeamIdentifier=96X2YQJC5G`，server / worker 均已重启且 `/healthz` 正常。实际 `post-receive` hook 已对齐为 Go build 后执行 `CODESIGN_ENV_FILE="$DEPLOY_ROOT/.env" scripts/sign-launchd-binary.sh`，不再 `source` 整个业务 `.env`，避免复杂密钥破坏 shell 解析。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`.env.example`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；部署机运维文件 `~/deploy/ai-video-server/.env`、`repo.git/hooks/post-receive`、`work/scripts/*` 已同步
+- 验证：`bash -n scripts/sign-launchd-binary.sh scripts/rollback.sh scripts/migrate-apply.sh` 通过；`git diff --check` 通过；乱码扫描无输出；部署机 `codesign -dv --verbose=4 current/video-server` 显示 `Authority=Apple Development...`、`Identifier=com.chee.videos.server`、`TeamIdentifier=96X2YQJC5G`；server / worker `launchctl` 均 running；`curl http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`
+
+## 2026-06-05 23:44 +0800
+- 进度：继续收口部署机外盘 TCC 重复授权问题。已确认部署机导入的 `Apple Development` 证书在补齐 Apple WWDR G3 与 Apple Root 链路后可用于 `codesign`，并开始把签名链路固化为稳定代码身份：`scripts/sign-launchd-binary.sh` 新增固定 `CODESIGN_IDENTIFIER`，支持 `CODESIGN_KEYCHAIN_PASSWORD_FILE` 读取专用 keychain 密码，避免版本化二进制文件名或明文密码继续影响部署。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：`scripts/sign-launchd-binary.sh`、`.env.example`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；部署机运维文件待同步
+- 验证：待执行 `bash -n scripts/sign-launchd-binary.sh scripts/rollback.sh`、部署机脚本签名测试、远端 hook 语法检查、重签后 `/healthz`
+
 ## 2026-06-05 10:55 +0800
 - 进度：管理端孤儿文件扫描前后端接入已完成并通过验证。系统页现已支持异步扫描、轮询最新状态、完成后自动弹出全量删除确认，以及删除后保留扫描快照；后端迁移、仓库、队列、handler 与 API 单测已补齐。无关工作区改动 `admin-web/.env.development` 仍未纳入。
 - 影响文件：`CONTEXT.md`、`plan.md`、`internal/handlers/admin.go`、`internal/handlers/router.go`、`internal/handlers/admin_orphan_file_scan_test.go`、`internal/repository/migrations_test.go`、`internal/repository/orphan_file_scan_repository_test.go`、`internal/queue/orphan_file_scan_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`
