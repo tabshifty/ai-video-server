@@ -312,7 +312,8 @@ private fun TvSeriesHeroPane(
             color = Color(0xDDE7ECF5),
             fontSize = 13.sp,
             lineHeight = 18.sp,
-            maxLines = 2,
+            minLines = 4,
+            maxLines = 4,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(TvSeriesDetailTokens.HeroInfoWidthDp.dp),
         )
@@ -332,6 +333,18 @@ private fun TvSeriesHeroPane(
 @Composable
 private fun TvSeriesTitleBlock(title: String) {
     val titleParts = remember(title) { splitTvSeriesReferenceTitle(title) }
+    val displayTitle = remember(titleParts) {
+        if (titleParts.stretched) {
+            formatTvSeriesReferenceTitle(
+                listOf(titleParts.eyebrow, titleParts.main)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" "),
+                stretched = true,
+            )
+        } else {
+            formatTvSeriesReferenceTitle(titleParts.main, stretched = false)
+        }
+    }
     val mainFontSize = when {
         titleParts.stretched -> 44.sp
         titleParts.main.length <= 2 -> 46.sp
@@ -345,23 +358,11 @@ private fun TvSeriesTitleBlock(title: String) {
         else -> 42.sp
     }
     Column(
-        verticalArrangement = Arrangement.spacedBy(if (titleParts.stretched) 0.dp else 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.Start,
         modifier = Modifier.width(TvSeriesDetailTokens.HeroInfoWidthDp.dp),
     ) {
         Text(
-            text = formatTvSeriesReferenceTitle(titleParts.eyebrow, titleParts.stretched),
-            color = Color.White.copy(alpha = 0.88f),
-            fontSize = if (titleParts.stretched) 16.sp else 14.sp,
-            lineHeight = 19.sp,
-            letterSpacing = if (titleParts.stretched) 6.sp else 1.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = formatTvSeriesReferenceTitle(titleParts.main, titleParts.stretched),
+            text = displayTitle,
             color = Color.White,
             fontSize = mainFontSize,
             lineHeight = mainLineHeight,
@@ -369,7 +370,7 @@ private fun TvSeriesTitleBlock(title: String) {
             fontWeight = FontWeight.Black,
             maxLines = if (titleParts.stretched) 2 else 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
+            textAlign = TextAlign.Start,
         )
     }
 }
@@ -399,25 +400,6 @@ private fun TvSeriesMetaRow(series: TvSeriesUiModel) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        TvSeriesAgeBadge()
-    }
-}
-
-@Composable
-private fun TvSeriesAgeBadge() {
-    Surface(
-        color = Color.Transparent,
-        shape = TvSeriesDetailTokens.MetaChipShape,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-    ) {
-        Text(
-            text = "18+",
-            color = Color.White.copy(alpha = 0.78f),
-            fontSize = 10.sp,
-            lineHeight = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-        )
     }
 }
 
