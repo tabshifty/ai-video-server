@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-06 12:07 +0800
+- 进度：完成 TV 电视剧详情页参考图主体优化并按最新反馈去掉左侧/顶部导航栏。详情页现在保留全屏背景、独立返回按钮、小字号左侧信息区、暖金播放/焦点视觉、右侧剧照分集列表；TV 端版本号已升至 `0.1.82`。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；`adb -s 192.168.1.8:5555 install -r android-tv-app/tv-app/build/outputs/apk/debug/tv-app-armeabi-v7a-debug.apk` 成功；实机截图 `/tmp/tv-after-load.png` 确认左侧/顶部导航栏已去掉，主体小字号与右侧分集列表正常；`git diff --check` 通过；乱码扫描无输出。
+
+## 2026-06-06 12:01 +0800
+- 进度：根据用户最新反馈调整范围：去掉电视剧详情页左侧竖向导航栏和顶部英文导航栏；保留已完成的小字号左侧详情信息、暖金焦点、右侧分集剧照列表与全屏背景参考图风格。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：待重跑 TV 端定向单测、`:tv-app:assembleDebug`、ADB 实机截图、`git diff --check`、乱码扫描。
+
+## 2026-06-06 11:46 +0800
+- 进度：开始继续优化 TV App 电视剧详情页参考图还原。按用户最新要求，本次抛弃旧版“只还原主体、不还原导航”的约束，把左侧竖向 rail、顶部英文导航、左侧小字号标题信息和右侧分集列表作为同一张参考图处理；导航层仅做视觉与焦点锚点，不扩展真实全局路由。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 TV 端定向单测、`:tv-app:assembleDebug`、ADB 安装与 `192.168.1.8` 实机截图、`git diff --check`、乱码扫描。
+
 ## 2026-06-05 23:58 +0800
 - 进度：完成部署机稳定签名落地。部署机已导入 `Apple Development: 813745172@qq.com (CWLBNV4944)`，补齐 Apple WWDR G3 / Apple Root 证书链，`current/video-server` 已重签为固定 `Identifier=com.chee.videos.server`、`TeamIdentifier=96X2YQJC5G`，server / worker 均已重启且 `/healthz` 正常。实际 `post-receive` hook 已对齐为 Go build 后执行 `CODESIGN_ENV_FILE="$DEPLOY_ROOT/.env" scripts/sign-launchd-binary.sh`，不再 `source` 整个业务 `.env`，避免复杂密钥破坏 shell 解析。无关工作区改动 `admin-web/.env.development` 不纳入。
 - 影响文件：`scripts/sign-launchd-binary.sh`、`scripts/rollback.sh`、`.env.example`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；部署机运维文件 `~/deploy/ai-video-server/.env`、`repo.git/hooks/post-receive`、`work/scripts/*` 已同步
