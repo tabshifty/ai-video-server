@@ -5,6 +5,7 @@ const css = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
 const VIEW_HEX_AUDIT_TARGETS = [
   '../views/Dashboard.vue',
   '../views/SystemSettings.vue',
+  '../views/Toolbox.vue',
   '../views/UserManage.vue',
   '../views/TaskMonitor.vue',
   '../views/IPTVManage.vue',

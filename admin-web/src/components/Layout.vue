@@ -16,6 +16,7 @@ import {
   Search,
   Setting,
   SwitchButton,
+  Tools,
   UploadFilled,
   User
 } from '@element-plus/icons-vue'
@@ -43,6 +44,7 @@ const iconMap = {
   Monitor,
   PictureFilled,
   Setting,
+  Tools,
   UploadFilled,
   User
 }

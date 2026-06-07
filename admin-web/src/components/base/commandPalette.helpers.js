@@ -42,6 +42,13 @@ export const adminShellNavGroups = [
     ]
   },
   {
+    key: 'tools',
+    label: '工具箱',
+    items: [
+      { path: '/toolbox', label: '工具箱', title: '工具箱', icon: 'Tools', alias: 'toolbox tools ed2k gjx' }
+    ]
+  },
+  {
     key: 'system',
     label: '系统',
     items: [
@@ -89,6 +96,9 @@ const PINYIN_INITIAL = {
   史: 's',
   日: 'r',
   志: 'z',
+  工: 'g',
+  具: 'j',
+  箱: 'x',
   削: 'x',
   手: 's',
   动: 'd',

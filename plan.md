@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-07 14:44 +0800
+- 进度：完成管理端工具箱菜单迁移的最终校验，准备提交。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolbox.helpers.js`、`admin-web/src/views/toolbox.helpers.spec.js`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅保留现有 chunk size warning）；`git diff --check` 通过；乱码扫描无输出。
+
+## 2026-06-07 14:43 +0800
+- 进度：完成管理端“工具箱”独立菜单与页面。ED2K 链接生成器已从系统设置页迁入工具箱，系统设置页只保留临时文件清理、孤儿文件扫描和日志查看等系统运维能力；命令面板支持通过“工具箱”、`gjx`、`ed2k` 搜索入口。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolbox.helpers.js`、`admin-web/src/views/toolbox.helpers.spec.js`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅保留现有 chunk size warning）；待执行最终 `git diff --check` 与乱码扫描。
+
+## 2026-06-07 14:36 +0800
+- 进度：开始把管理端小功能收口到独立“工具箱”菜单。按最新要求新增工具箱页面与导航入口，把 ED2K 链接生成器从系统设置页迁出；系统设置页回归系统运维功能。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolbox.helpers.js`、`admin-web/src/views/toolbox.helpers.spec.js`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm test`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-07 14:00 +0800
 - 进度：完成管理端 ED2K 链接生成器。系统设置页新增多行输入框，逐行生成可点击 ED2K 链接，非法非空行会计数提示，链接点击后在当前页面会话内显示“已点击”；解析逻辑已沉到 helper 并补单测，`CONTEXT.md` 已记录该工具不提交后端、不持久化 ED2K 内容。无关工作区改动 `admin-web/.env.development` 未纳入。
 - 影响文件：`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`、`CONTEXT.md`、`plan.md`
