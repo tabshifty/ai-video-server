@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-07 14:00 +0800
+- 进度：完成管理端 ED2K 链接生成器。系统设置页新增多行输入框，逐行生成可点击 ED2K 链接，非法非空行会计数提示，链接点击后在当前页面会话内显示“已点击”；解析逻辑已沉到 helper 并补单测，`CONTEXT.md` 已记录该工具不提交后端、不持久化 ED2K 内容。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅保留现有 chunk size warning）；`git diff --check` 通过；乱码扫描无输出。
+
+## 2026-06-07 13:50 +0800
+- 进度：开始实现管理端 ED2K 链接生成器。建议放在系统设置页作为本地工具：多行输入逐行解析 `ed2k://` 文本，生成多行可点击链接，点击后在当前页面会话中标记为已点击；不新增后端接口、不持久化 ED2K 内容。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm test`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-06 12:22 +0800
 - 进度：完成 TV 电视剧详情页精修。标题区改为左对齐单行/双行剧名，不再渲染标题上方“剧集”；元信息行去掉 `18+` 年龄角标；剧情摘要固定至少四行；TV 端版本号升至 `0.1.83`。无关工作区改动 `admin-web/.env.development` 未纳入。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
