@@ -2,6 +2,81 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-08 21:02 +0800
+- 进度：完成杜比视界安全播放第一阶段实现。后端在新视频转码流程中对原始源和最终播放文件做只读播放兼容探测，写入 `videos.metadata.playback_compat`，探测失败不让转码任务失败；TV App 根据 metadata 放行历史视频、阻断探测失败/结构不完整视频、阻断原始源为 Dolby Vision 但当前压缩输出非 Dolby Vision 的风险播放，并让剧集默认选集/自动连播跳过兼容阻断分集。未实现 Media3/DV 专用系统播放分支，未保留原始视频，未改变后端转码压缩参数。TV 端版本号升至 `0.1.84`。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`internal/models/app.go`、`internal/repository/tv_repository.go`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/model/ApiModels.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesAutoplay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、TV 端相关测试、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg ./internal/services ./internal/queue ./internal/repository -run 'TestParsePlaybackCompatibility|TestBuildPlaybackCompatibility|TestBuildTranscodeTaskOptions|TestResolveTranscodePersistence|TestResolveTVEpisodeStillURL' -count=1` 通过；`go test ./pkg/ffmpeg ./internal/... -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests 'com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest' --tests 'com.chee.videos.feature.tv.TvSeriesAutoplaySpecTest' --tests 'com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest' --tests 'com.chee.videos.feature.tv.TvRepositoryMappingTest'` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；乱码扫描无输出。
+
+## 2026-06-08 20:29 +0800
+- 进度：开始实现杜比视界安全播放第一阶段。范围锁定为：后端在新视频转码流程中做只读播放兼容探测并写入 `metadata.playback_compat`；TV App 根据 metadata 对新视频探测失败、原始 DV 风险但输出非 DV 的情况阻断提示。暂不实现 Media3/DV 专用系统播放分支，不保留原始视频，不改变后端转码压缩策略。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `pkg/ffmpeg/*`、`internal/services/transcode*`、`internal/queue/tasks*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/player/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、TV 端测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行后端定向测试、TV 端定向测试、`go test ./internal/... ./pkg/ffmpeg` 或相关范围、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-06-08 20:27 +0800
+- 进度：确认 `metadata.playback_compat` 的版本化判定规则：字段不存在表示历史视频或旧数据，TV App 放行；`version=1,status=ok` 时按探测结果决策；`version=1,status=probe_failed` 或结构不完整时按新视频探测失败/不完整处理，TV App 阻断并提示兼容性未确认。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端 metadata schema、TV 端解析 helper 和决策单测。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 20:24 +0800
+- 进度：确认新视频播放兼容探测失败时的故障边界：不让转码任务整体失败，后台写入失败信息或日志；TV App 对这类新视频阻断自动播放并提示“该视频播放兼容性未确认，当前 TV 端暂不自动播放”。历史视频缺少 `playback_compat` 仍默认放行。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端探测失败 metadata、TV 端新旧视频缺字段判断和提示文案。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 20:21 +0800
+- 进度：确认原始源为 Dolby Vision 风险、但最终实际可播放文件不是可原生 Dolby Vision 源时，TV App 不依赖设备 Dolby Vision 能力兜底，也不继续播放可能异色的转码输出；改为阻断并提示“该视频来源为杜比视界，当前压缩结果可能无法安全播放”。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端 `playback_compat` 中 source/output 探测结果与 TV 端播放决策。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 20:14 +0800
+- 进度：确认存储空间优先级高于 Dolby Vision 原生播放能力：不允许为了 DV 播放长期保留原始上传文件，现有转码成功后删除 `original_path` 的存储策略保持不变。后续 TV App 能力判断只能针对当前实际可访问的播放源，不能假设已删除原始 DV 源仍可走系统播放器。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端只读探测 metadata 和 TV 端播放决策，不涉及保留原始视频副本。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 20:06 +0800
+- 进度：确认播放兼容探测结果写入 `videos.metadata.playback_compat`，不新增数据库列。该字段记录源文件/播放文件的 codec、profile、HDR/Dolby Vision 风险和探测版本，供 TV App 播放入口决策使用。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端 metadata merge、TV 端 metadata 解析和播放分流测试。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 20:04 +0800
+- 进度：确认 Dolby Vision 专用系统播放链路失败后不自动回退 LibVLC。失败页仅提供重试或返回，避免回到已知可能异色的链路。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及 TV 端 DV 播放分支错误处理和测试。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 19:59 +0800
+- 进度：确认允许 Dolby Vision 风险源使用专用系统播放器/Media3 播放分支。普通 TV 长视频继续保持 LibVLC；只有 metadata 标记为 Dolby Vision 风险且设备平台声明支持对应能力时，才进入系统解码/HDR 输出链路，避免把本次改造扩大成全量播放器迁移。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及 TV 端 Media3 依赖恢复为 DV 专用、设备能力检测、播放入口分流测试和版本号。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 19:55 +0800
+- 进度：修正杜比视界安全播放的决策顺序：检测到 Dolby Vision 风险源后，TV App 必须先判断设备平台和实际播放链路是否支持对应 profile / HDR 能力；能安全播放则原生播放，不能确认安全时才回退兼容源或阻断提示。不能把“片源是 Dolby Vision”直接等同于“禁止播放”。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及 TV 端设备能力检测 helper、播放入口决策测试。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 TV 端测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-08 19:53 +0800
+- 进度：确认播放兼容源探测优先级：新视频以原始上传源作为 Dolby Vision 风险判断主依据，最终播放文件仅作辅助；因当前 worker 转码成功后会删除 `original_path`，后续实现必须在删除原始上传文件前完成只读探测并持久化 metadata。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及 worker 转码完成前的只读 probe、metadata merge、TV 端播放判断。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、`git diff --check`、乱码扫描。
+
+## 2026-06-08 19:51 +0800
+- 进度：确认播放兼容探测的存量边界：只自动探测新上传或新转码完成的视频；历史视频已确认没有 Dolby Vision 风险，不做全库回扫。TV App 后续遇到缺少探测字段的历史视频时必须按既有路径播放，不能默认阻断。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端新视频探测写 metadata、TV 端 metadata 缺字段默认放行。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、`git diff --check`、乱码扫描。
+
+## 2026-06-08 19:50 +0800
+- 进度：确认播放兼容探测结果需要持久化到视频 metadata。TV App 后续只读 API 返回的 metadata 来决定播放、回退或阻断，不在每次打开详情页时实时触发 ffprobe，避免外盘休眠、TCC 或探测耗时影响播放入口。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端 metadata 写入/读取、TV 端播放兼容判断。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、`git diff --check`、乱码扫描。
+
+## 2026-06-08 19:45 +0800
+- 进度：继续校准 TV App 杜比视界安全播放方案。已确认允许后端做只读探测：可通过 ffprobe 或已落库 metadata 判断 Dolby Vision/HDR 风险和兼容源可用性，但不得生成新视频、不得改变后端转码压缩参数、不得隐式触发重新压缩。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端只读探测字段和 TV 端播放阻断逻辑。
+- 验证：探索阶段暂未执行；后续实现后按受影响模块执行 Go/TV 端测试、`git diff --check`、乱码扫描。
+
+## 2026-06-08 19:43 +0800
+- 进度：开始梳理 TV App 杜比视界异色兼容方案。已确认目标从“保证原生点亮杜比视界”收窄为“杜比视界安全播放”：优先不异色；同时确认本次不得改变后端转码压缩策略、码率/CRF、编码器或输出产物规则。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `CONTEXT.md`、`plan.md`；若进入实现，可能涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/core/player/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、TV 端测试与版本号。
+- 验证：待继续确认方案后决定；若实现 TV 端改动，执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
 ## 2026-06-07 14:44 +0800
 - 进度：完成管理端工具箱菜单迁移的最终校验，准备提交。无关工作区改动 `admin-web/.env.development` 不纳入。
 - 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolbox.helpers.js`、`admin-web/src/views/toolbox.helpers.spec.js`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/systemSettings.helpers.js`、`admin-web/src/views/systemSettings.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`plan.md`

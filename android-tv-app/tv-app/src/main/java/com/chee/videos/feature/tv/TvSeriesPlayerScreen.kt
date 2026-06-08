@@ -136,7 +136,8 @@ fun TvSeriesPlayerScreen(
     }
 
     val currentEpisode = selectedEpisode(uiState)
-    val canPlay = uiState.canPlayCurrentEpisode && uiState.currentSourceUrl.isNotBlank()
+    val playerBlockMessage = uiState.playbackBlockedMessage
+    val canPlay = uiState.canPlayCurrentEpisode && uiState.currentSourceUrl.isNotBlank() && playerBlockMessage == null
     val libVLC = remember { TvVlcLibrary.shared(context) }
     val mediaPlayer = remember(accessToken) { newLongFormMediaPlayer(libVLC) }
     val latestUiState by rememberUpdatedState(uiState)
@@ -638,7 +639,7 @@ fun TvSeriesPlayerScreen(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                EmptyTvPlayerState()
+                EmptyTvPlayerState(message = playerBlockMessage)
                 if (showBackConfirmPrompt) {
                     TvPlayerBackConfirmPrompt(
                         modifier = Modifier
@@ -675,9 +676,9 @@ private fun TvPlayerErrorBanner(
 }
 
 @Composable
-private fun EmptyTvPlayerState() {
+private fun EmptyTvPlayerState(message: String?) {
     Text(
-        text = "当前分集暂无可播放视频",
+        text = message ?: "当前分集暂无可播放视频",
         color = AppChrome.TextSecondary,
         style = MaterialTheme.typography.bodyLarge,
     )

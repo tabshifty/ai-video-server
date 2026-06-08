@@ -360,7 +360,8 @@ SELECT
   COALESCE(v.title, ''),
   COALESCE(v.status, ''),
   COALESCE(a.watch_seconds, 0),
-  a.updated_at
+  a.updated_at,
+  COALESCE(v.metadata, '{}'::jsonb)
 FROM episodes e
 LEFT JOIN videos v ON v.id = e.video_id
 LEFT JOIN user_video_actions a
@@ -395,6 +396,7 @@ ORDER BY se.season_number ASC, e.episode_number ASC
 			&episode.VideoStatus,
 			&episode.WatchSeconds,
 			&lastWatchedAt,
+			&episode.Metadata,
 		); err != nil {
 			episodeRows.Close()
 			return models.TvSeriesDetailDto{}, fmt.Errorf("scan tv episode: %w", err)

@@ -35,6 +35,23 @@
 - `libass 自渲染字幕`：TV 长视频 LibVLC 内核的字幕渲染路径。所有外挂与内嵌字幕通过 LibVLC media slave 注入或自动加载，由 LibVLC 内置 libass 直接画到视频 Surface 上；ASS 的 `[V4+ Styles]`、卡拉 OK、动态特效、矢量绘图和字体回退按文件意图渲染。客户端不再用 `CaptionStyleCompat` / `SubtitleView` 统一控制长视频字幕外观；SRT/VTT 接受 libass 默认外观。
 - `字幕样式 libass 让位`：TV 长视频从 Media3 切到 LibVLC 后，字幕外观控制权从 Compose/Media3 让位给 libass。删除 `applyLongFormSubtitleStyle()` 这类统一描边逻辑是有意行为，后续不要再给 SRT/VTT 注入默认 ASS Style，除非新任务明确要求重新设计字幕偏好。
 
+## TV 播放兼容术语
+- `杜比视界安全播放`：TV App 面对 Dolby Vision 风险源时以“不异色”为首要目标；设备和播放链路明确支持对应 Dolby Vision profile 时可以原生播放，否则必须回退到普通 SDR/兼容播放路径或给出明确提示。本策略不承诺所有 Dolby Vision 文件都点亮电视的 Dolby Vision 标识。
+- `媒体存储空间优先`：本项目在视频处理和播放兼容策略上以预留更多存储空间为第一要义；不能为了 Dolby Vision 原生播放、兼容回退或调试便利长期保留额外大体积视频副本。任何会增加持久视频副本的方案都必须默认排除，除非后续任务明确重新权衡存储策略。
+- `杜比视界设备能力门控`：TV App 检测到 Dolby Vision 风险源后，必须先判断当前设备平台和实际播放链路是否支持当前实际可播放源所需的 Dolby Vision profile / HDR 显示能力；只有设备或播放链路不支持、或无法确认安全播放时，才进入兼容源回退或阻断提示。不能把“片源是 Dolby Vision”直接等同于“禁止播放”，也不能假设已删除的原始源仍可被系统播放器使用。
+- `杜比视界专用系统播放链路`：普通 TV 长视频继续使用现有 LibVLC 长视频播放器；只有被 metadata 标记为 Dolby Vision 风险源、且设备平台声明支持对应能力时，才允许进入专用的系统播放器/Media3 播放分支，以复用 Android 系统解码与 HDR/Dolby Vision 输出链路。该分支不得演变成全量长视频播放器迁移。
+- `杜比视界播放失败不回退 LibVLC`：Dolby Vision 风险源进入专用系统播放链路后，如果播放失败，不自动回退到 LibVLC；失败页只提供重试或返回。LibVLC 是已知可能异色的链路，自动回退会违反 [[杜比视界安全播放]] 的“不异色优先”目标。
+- `杜比视界转码输出阻断`：如果原始上传源被探测为 Dolby Vision 风险源，但最终实际可播放文件已经不是可原生 Dolby Vision 的源，TV App 不应依赖设备 Dolby Vision 能力兜底，也不应继续播放可能异色的转码输出；应提示“该视频来源为杜比视界，当前压缩结果可能无法安全播放”并提供返回或重试入口。
+- `后端转码压缩不变约束`：杜比视界安全播放改造不得改变现有服务端转码压缩策略、码率/CRF、编码器或输出产物规则；若某个视频只有会异色的源文件且没有可用兼容播放源，TV App 只能检测、避让或提示，不能通过本次改造隐式触发重新压缩来修复色彩。
+- `杜比视界原始文件不保留约束`：即使新视频原始源被探测为 Dolby Vision 风险源，后端也不能为了 Dolby Vision 原生播放而保留原始上传文件；现有转码成功后删除 `original_path` 的存储策略保持不变。TV App 的原生 Dolby Vision 播放能力只对当前仍可访问的播放源有效。
+- `杜比视界只读探测`：为实现 [[杜比视界安全播放]]，后端可以对已有媒体文件执行只读探测（例如读取 ffprobe 结果或已落库 metadata），用于判断 Dolby Vision/HDR 风险和可用兼容源；该探测不得生成新视频、不得改变转码参数、不得隐式触发重新压缩。
+- `播放兼容探测结果持久化`：杜比视界/HDR 风险和兼容源可用性这类播放兼容探测结果应持久化到视频 metadata，而不是 TV App 每次打开详情页都触发实时 ffprobe。TV App 读取 API 返回的 metadata 决定播放、回退或阻断，避免详情页受外盘休眠、TCC 或探测耗时影响。
+- `播放兼容 metadata 结构`：播放兼容探测结果写入 `videos.metadata.playback_compat`，不新增数据库列。该结构用于记录源文件/播放文件的 codec、profile、HDR/Dolby Vision 风险和探测版本；它是播放策略输入，不作为核心查询字段。`playback_compat` 不存在表示历史视频或旧数据，TV App 按既有路径放行；`version=1` 且 `status=ok` 表示按探测结果决策；`version=1` 且 `status=probe_failed` 或结构不完整表示新视频探测失败/不完整，TV App 应阻断并提示兼容性未确认。
+- `播放兼容探测存量边界`：杜比视界只读探测只自动作用于新上传或新转码完成的视频；历史视频已人工确认没有 Dolby Vision 风险，不做全库回扫。TV App 遇到缺少播放兼容探测结果的历史视频时应按既有路径播放，不能默认当作 Dolby Vision 风险源阻断。
+- `播放兼容探测失败边界`：新视频的播放兼容探测失败或结果不完整时，不应让转码任务整体失败；后台应把失败信息写入 `playback_compat` 或日志。但 TV App 对这类新视频不能自动播放，应提示“该视频播放兼容性未确认，当前 TV 端暂不自动播放”。历史视频缺少 `playback_compat` 仍按 [[播放兼容探测存量边界]] 放行。
+- `播放兼容源探测优先级`：新视频的 Dolby Vision 风险判断以原始上传源为主，最终播放文件只作为辅助信息；因为当前转码流程会在成功后删除 `original_path`，实现时必须在删除原始上传文件前完成只读探测并把结果写入 metadata。
+- `杜比视界阻断提示`：当 TV App 判断当前视频疑似 Dolby Vision 风险源，当前设备或播放链路不支持或无法确认安全播放，且没有可靠的普通兼容播放源时，不应继续自动展示可能异色的画面；播放页应提示“该视频可能为杜比视界，当前设备或播放链路不支持安全播放”，并提供返回或重试入口。
+
 ## admin 设计系统术语
 - `admin SPA 基路径契约`：管理端生产构建固定挂载在 Go server 的 `/admin` 前缀下，Vite `base`、后端静态资源路径和 Vue Router history base 必须保持一致。`admin-web/vite.config.js` 生产 `base` 为 `/admin/` 时，`admin-web/src/router/index.js` 必须用 `createWebHistory(import.meta.env.BASE_URL)` 或等价封装，不能退回无参 `createWebHistory()`；否则访问 `http://<host>:8080/admin` 时浏览器能拿到 HTML/JS，但 Router 会把 `/admin` 当作应用内路由导致 `<router-view>` 无匹配，表现为空白页。
 - `admin 静态资源发布窗口`：管理端前端发布后，已经打开的旧页面和刚刷新的新页面会在短时间内并存；发布策略必须允许两者继续获取各自引用的静态资源。入口 HTML 应始终倾向重新校验，带 hash 的静态资源可以按内容地址长期缓存；不能把旧页面引用的 hash 资源立即视为无效访问。

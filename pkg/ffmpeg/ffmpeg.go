@@ -30,6 +30,23 @@ type VideoProbe struct {
 	AudioTrackCount int     `json:"audio_track_count"`
 }
 
+// PlaybackCompatibilityProbe holds playback compatibility attributes from ffprobe.
+type PlaybackCompatibilityProbe struct {
+	VideoStreamFound    bool
+	Codec               string
+	Profile             string
+	CodecTag            string
+	PixelFormat         string
+	ColorTransfer       string
+	ColorPrimaries      string
+	ColorSpace          string
+	DolbyVision         bool
+	DolbyVisionProfile  int
+	DolbyVisionLevel    int
+	DolbyVisionCompatID int
+	HDR                 bool
+}
+
 type SubtitleProbe struct {
 	Index     int
 	Codec     string
@@ -360,6 +377,151 @@ func parseProbeOutput(raw []byte) (VideoProbe, error) {
 		probe.BitrateKbps = parseBitrateKbps("", payload.Format.BitRate)
 	}
 	return probe, nil
+}
+
+// ProbePlaybackCompatibility reads video playback compatibility metadata via ffprobe.
+func ProbePlaybackCompatibility(ctx context.Context, inputPath string) (PlaybackCompatibilityProbe, error) {
+	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error",
+		"-show_entries", "stream=codec_type,codec_name,codec_tag_string,profile,pix_fmt,color_transfer,color_primaries,color_space:stream_side_data=side_data_type,dv_profile,dv_level,dv_bl_signal_compatibility_id",
+		"-of", "json",
+		inputPath,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return PlaybackCompatibilityProbe{}, fmt.Errorf("ffprobe playback compatibility failed: %w", err)
+	}
+	return parsePlaybackCompatibilityProbeOutput(out)
+}
+
+func parsePlaybackCompatibilityProbeOutput(raw []byte) (PlaybackCompatibilityProbe, error) {
+	type sideDataPayload struct {
+		SideDataType              string          `json:"side_data_type"`
+		DolbyVisionProfile        json.RawMessage `json:"dv_profile"`
+		DolbyVisionLevel          json.RawMessage `json:"dv_level"`
+		DolbyVisionSignalCompatID json.RawMessage `json:"dv_bl_signal_compatibility_id"`
+	}
+	var payload struct {
+		Streams []struct {
+			CodecType      string            `json:"codec_type"`
+			CodecName      string            `json:"codec_name"`
+			CodecTagString string            `json:"codec_tag_string"`
+			Profile        string            `json:"profile"`
+			PixelFormat    string            `json:"pix_fmt"`
+			ColorTransfer  string            `json:"color_transfer"`
+			ColorPrimaries string            `json:"color_primaries"`
+			ColorSpace     string            `json:"color_space"`
+			SideDataList   []sideDataPayload `json:"side_data_list"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return PlaybackCompatibilityProbe{}, fmt.Errorf("unmarshal playback compatibility probe output: %w", err)
+	}
+	for _, stream := range payload.Streams {
+		if strings.TrimSpace(stream.CodecType) != "video" {
+			continue
+		}
+		probe := PlaybackCompatibilityProbe{
+			VideoStreamFound: true,
+			Codec:            strings.TrimSpace(stream.CodecName),
+			Profile:          strings.TrimSpace(stream.Profile),
+			CodecTag:         strings.TrimSpace(stream.CodecTagString),
+			PixelFormat:      strings.TrimSpace(stream.PixelFormat),
+			ColorTransfer:    strings.TrimSpace(stream.ColorTransfer),
+			ColorPrimaries:   strings.TrimSpace(stream.ColorPrimaries),
+			ColorSpace:       strings.TrimSpace(stream.ColorSpace),
+		}
+		for _, sideData := range stream.SideDataList {
+			probe.DolbyVisionProfile = firstPositiveInt(
+				probe.DolbyVisionProfile,
+				parsePositiveIntJSON(sideData.DolbyVisionProfile),
+			)
+			probe.DolbyVisionLevel = firstPositiveInt(
+				probe.DolbyVisionLevel,
+				parsePositiveIntJSON(sideData.DolbyVisionLevel),
+			)
+			probe.DolbyVisionCompatID = firstPositiveInt(
+				probe.DolbyVisionCompatID,
+				parsePositiveIntJSON(sideData.DolbyVisionSignalCompatID),
+			)
+			if strings.Contains(strings.ToLower(sideData.SideDataType), "dovi") ||
+				strings.Contains(strings.ToLower(sideData.SideDataType), "dolby vision") {
+				probe.DolbyVision = true
+			}
+		}
+		probe.DolbyVision = probe.DolbyVision || isDolbyVisionVideo(probe)
+		probe.HDR = isHDRVideo(probe)
+		return probe, nil
+	}
+	return PlaybackCompatibilityProbe{}, nil
+}
+
+func isDolbyVisionVideo(probe PlaybackCompatibilityProbe) bool {
+	if probe.DolbyVisionProfile > 0 {
+		return true
+	}
+	joined := strings.ToLower(strings.Join([]string{
+		probe.Codec,
+		probe.Profile,
+		probe.CodecTag,
+	}, " "))
+	return strings.Contains(joined, "dolby vision") ||
+		strings.Contains(joined, "dovi") ||
+		strings.Contains(joined, "dvhe") ||
+		strings.Contains(joined, "dvh1") ||
+		strings.Contains(joined, "dvav") ||
+		strings.Contains(joined, "dva1")
+}
+
+func isHDRVideo(probe PlaybackCompatibilityProbe) bool {
+	joined := strings.ToLower(strings.Join([]string{
+		probe.ColorTransfer,
+		probe.ColorPrimaries,
+		probe.ColorSpace,
+		probe.PixelFormat,
+	}, " "))
+	return strings.Contains(joined, "smpte2084") ||
+		strings.Contains(joined, "arib-std-b67") ||
+		strings.Contains(joined, "bt2020") ||
+		strings.Contains(joined, "yuv420p10") ||
+		strings.Contains(joined, "p010")
+}
+
+func firstPositiveInt(values ...int) int {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func parsePositiveIntJSON(raw json.RawMessage) int {
+	value := strings.TrimSpace(string(raw))
+	if value == "" || value == "null" {
+		return 0
+	}
+	var number int
+	if err := json.Unmarshal(raw, &number); err == nil {
+		return firstPositiveInt(number)
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return parsePositiveInt(text)
+	}
+	return 0
+}
+
+func parsePositiveInt(raw string) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return 0
+	}
+	return value
 }
 
 func ProbeSubtitles(ctx context.Context, inputPath string) ([]SubtitleProbe, error) {

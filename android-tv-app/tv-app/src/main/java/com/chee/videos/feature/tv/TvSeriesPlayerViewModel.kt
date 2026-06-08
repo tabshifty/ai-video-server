@@ -35,6 +35,7 @@ data class TvSeriesPlayerUiState(
     val currentVideoId: String = "",
     val currentSourceUrl: String = "",
     val canPlayCurrentEpisode: Boolean = false,
+    val playbackBlockedMessage: String? = null,
     val errorMessage: String? = null,
 )
 
@@ -191,7 +192,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     val resolvedSeason = series.seasons.firstOrNull { it.number == preferredSelection?.seasonNumber }
                         ?: series.seasons.firstOrNull()
                     val resolvedEpisode = resolvedSeason?.episodes?.firstOrNull { it.number == preferredSelection?.episodeNumber }
-                        ?: resolvedSeason?.episodes?.firstOrNull { it.playable }
+                        ?: resolvedSeason?.episodes?.firstOrNull { isTvEpisodePlayableForPlayback(it) }
                         ?: resolvedSeason?.episodes?.firstOrNull()
                     _uiState.value = TvSeriesPlayerUiState(
                         loading = false,
@@ -256,6 +257,22 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     selectedAudioTrackId = null,
                     selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
+                    playbackBlockedMessage = null,
+                )
+            }
+            return
+        }
+        val playbackDecision = resolveTvPlaybackCompatibilityDecision(episode.metadata)
+        if (!playbackDecision.allowed) {
+            _uiState.update {
+                it.copy(
+                    currentVideoId = episode.videoId,
+                    currentSourceUrl = "",
+                    selectedSubtitleTrackId = null,
+                    selectedAudioTrackId = null,
+                    selectedAudioPreference = null,
+                    canPlayCurrentEpisode = false,
+                    playbackBlockedMessage = playbackDecision.blockMessage,
                 )
             }
             return
@@ -268,6 +285,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 selectedAudioTrackId = null,
                 selectedAudioPreference = null,
                 canPlayCurrentEpisode = false,
+                playbackBlockedMessage = null,
             )
         }
         viewModelScope.launch {
@@ -292,6 +310,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     selectedAudioTrackId = null,
                     selectedAudioPreference = preferredAudioPreference,
                     canPlayCurrentEpisode = true,
+                    playbackBlockedMessage = null,
                 )
             }
         }

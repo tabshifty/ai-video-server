@@ -88,14 +88,14 @@ func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Opti
 
 // Processor handles task registration and processing logic.
 type Processor struct {
-	repo     *repository.VideoRepository
-	trans    *services.TranscodeService
-	scrape   *services.ScraperService
-	subtitle *services.SubtitleService
-	enqueuer *Enqueuer
-	logger   *slog.Logger
+	repo        *repository.VideoRepository
+	trans       *services.TranscodeService
+	scrape      *services.ScraperService
+	subtitle    *services.SubtitleService
+	enqueuer    *Enqueuer
+	logger      *slog.Logger
 	storageRoot string
-	uploadGC bool
+	uploadGC    bool
 }
 
 func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, logger *slog.Logger, storageRoot string) *Processor {
@@ -136,6 +136,11 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	}
 	if inputPath == "" {
 		return fmt.Errorf("empty input path for video %s", videoID)
+	}
+
+	sourcePlaybackProbe, sourcePlaybackProbeErr := services.ProbePlaybackCompatibility(ctx, inputPath)
+	if sourcePlaybackProbeErr != nil {
+		p.logger.Warn("source playback compatibility probe failed", "video_id", videoID, "input_path", inputPath, "error", sourcePlaybackProbeErr)
 	}
 
 	jobID, err := p.repo.InsertTranscodingJob(ctx, videoID, video.UserID, "running")
@@ -188,6 +193,16 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	}
 
 	thumbPath, metadata := resolveTranscodePersistence(video, result)
+	outputPlaybackProbe, outputPlaybackProbeErr := services.ProbePlaybackCompatibility(ctx, result.TranscodedPath)
+	if outputPlaybackProbeErr != nil {
+		p.logger.Warn("output playback compatibility probe failed", "video_id", videoID, "output_path", result.TranscodedPath, "error", outputPlaybackProbeErr)
+	}
+	metadata[services.PlaybackCompatibilityMetadataKey] = services.BuildPlaybackCompatibilityMetadata(
+		sourcePlaybackProbe,
+		sourcePlaybackProbeErr,
+		outputPlaybackProbe,
+		outputPlaybackProbeErr,
+	)
 	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, thumbPath, result.Duration, result.Width, result.Height, metadata); err != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
 		return err

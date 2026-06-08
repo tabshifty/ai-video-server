@@ -93,6 +93,41 @@ class TvRepositoryMappingTest {
     }
 
     @Test
+    fun mapSeriesDetail_preservesEpisodePlaybackCompatibilityMetadata() {
+        val metadata = mapOf(
+            "playback_compat" to mapOf(
+                "version" to 1,
+                "status" to "probe_failed",
+            ),
+        )
+        val uiModel = tvSeriesDetailToUiModel(
+            TvSeriesDetailDto(
+                id = "series-1",
+                title = "雾城档案",
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            TvEpisodeDto(
+                                id = "e1",
+                                episodeNumber = 1,
+                                title = "第1集",
+                                videoId = "video-1",
+                                videoStatus = "ready",
+                                metadata = metadata,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(metadata, uiModel.seasons.first().episodes.first().metadata)
+    }
+
+    @Test
     fun mapSeriesDetail_handlesNullArrayFields() {
         val dto = Gson().fromJson(
             """

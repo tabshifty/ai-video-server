@@ -272,6 +272,7 @@ type TvEpisodeDto struct {
 	LastWatchedAt   string          `json:"last_watched_at"`
 	Playable        bool            `json:"playable"`
 	SubtitleTracks  []SubtitleTrack `json:"subtitle_tracks"`
+	Metadata        json.RawMessage `json:"metadata"`
 }
 
 type SubtitleTrack struct {

@@ -252,6 +252,7 @@ data class TvEpisodeDto(
     @SerializedName("last_watched_at") val lastWatchedAt: String? = null,
     @SerializedName("playable") val playable: Boolean = false,
     @SerializedName("subtitle_tracks") val subtitleTracks: List<SubtitleTrackDto> = emptyList(),
+    @SerializedName("metadata") val metadata: Map<String, Any?>? = emptyMap(),
 )
 
 data class HistoryItemDto(

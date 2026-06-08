@@ -141,7 +141,10 @@ fun TvLongFormPlayerScreen(
         detail = detail,
         preferredPlaybackProfile = uiState.preferredPlaybackProfile,
     )
-    val canPlay = !playUrl.isNullOrBlank()
+    val playbackCompatibilityDecision = resolveTvPlaybackCompatibilityDecision(detail.metadata)
+    val playerBlockMessage = playbackCompatibilityDecision.blockMessage
+    val playableUrl = playUrl?.takeIf { playbackCompatibilityDecision.allowed }
+    val canPlay = !playableUrl.isNullOrBlank()
     val libVLC = remember { TvVlcLibrary.shared(context) }
     val mediaPlayer = remember(uiState.accessToken) { newLongFormMediaPlayer(libVLC) }
     val latestDetailId by rememberUpdatedState(detail.id)
@@ -205,12 +208,19 @@ fun TvLongFormPlayerScreen(
         ) ?: resolveInitialSubtitleTrackId(detail.subtitleTracks)
     }
 
-    LaunchedEffect(playUrl, playbackSession.hasStartedPlayback) {
+    LaunchedEffect(playableUrl, playbackSession.hasStartedPlayback) {
         val updateDecision = resolveLongFormPlayerUpdate(
             preparedUrl = preparedUrl,
-            nextUrl = playUrl,
+            nextUrl = playableUrl,
         )
-        if (!playbackSession.hasStartedPlayback || playUrl.isNullOrBlank()) {
+        if (!playbackSession.hasStartedPlayback || playableUrl.isNullOrBlank()) {
+            mediaPlayer.pause()
+            if (updateDecision.shouldClear) {
+                mediaPlayer.stop()
+            }
+            preparedUrl = null
+            appliedSubtitleSlaveUrl = null
+            isVlcPlaying = false
             return@LaunchedEffect
         }
         if (updateDecision.shouldReplaceSource) {
@@ -225,7 +235,7 @@ fun TvLongFormPlayerScreen(
             applyLongFormMediaSource(
                 libVLC = libVLC,
                 mediaPlayer = mediaPlayer,
-                sourceUrl = playUrl,
+                sourceUrl = playableUrl,
                 accessToken = uiState.accessToken,
             )
             mediaPlayer.play()
@@ -241,7 +251,7 @@ fun TvLongFormPlayerScreen(
                     resumePromptDismissed = false
                 }
             }
-            preparedUrl = playUrl
+            preparedUrl = playableUrl
         }
         if (!playbackSession.isPausedByUser) {
             mediaPlayer.play()
@@ -268,8 +278,8 @@ fun TvLongFormPlayerScreen(
         appliedSubtitleSlaveUrl = subtitleUrl
     }
 
-    LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, playUrl) {
-        if (!playbackSession.hasStartedPlayback || playUrl.isNullOrBlank()) {
+    LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, playableUrl) {
+        if (!playbackSession.hasStartedPlayback || playableUrl.isNullOrBlank()) {
             mediaPlayer.pause()
             return@LaunchedEffect
         }
@@ -340,7 +350,7 @@ fun TvLongFormPlayerScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, mediaPlayer, playbackSession.hasStartedPlayback, playbackSession.isPausedByUser) {
+    DisposableEffect(lifecycleOwner, mediaPlayer, playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
@@ -349,7 +359,7 @@ fun TvLongFormPlayerScreen(
                 }
 
                 Lifecycle.Event.ON_RESUME -> {
-                    if (playbackSession.shouldResumeOnLifecycle()) {
+                    if (playbackSession.shouldResumeOnLifecycle() && canPlay) {
                         mediaPlayer.play()
                     }
                 }
@@ -482,7 +492,7 @@ fun TvLongFormPlayerScreen(
             }
         } else {
             Text(
-                text = "暂无可播放视频",
+                text = playerBlockMessage ?: "暂无可播放视频",
                 color = AppChrome.TextSecondary,
                 modifier = Modifier.align(Alignment.Center),
             )

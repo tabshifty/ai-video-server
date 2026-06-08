@@ -114,7 +114,7 @@ fun autoplayCountdownTickRemaining(
 }
 
 private fun isPlayableEpisode(episode: TvEpisodeUiModel): Boolean =
-    episode.playable && episode.videoId.isNotBlank()
+    isTvEpisodePlayableForPlayback(episode)
 
 private fun TvEpisodeUiModel.toNextEpisodeRef(seasonNumber: Int): TvNextEpisodeRef =
     TvNextEpisodeRef(

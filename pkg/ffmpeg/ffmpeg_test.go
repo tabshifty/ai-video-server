@@ -184,6 +184,95 @@ func TestParseBitrateKbps(t *testing.T) {
 	}
 }
 
+func TestParsePlaybackCompatibilityProbeOutputDetectsDolbyVisionSideData(t *testing.T) {
+	raw := []byte(`{
+		"streams": [
+			{"codec_type": "audio", "codec_name": "aac"},
+			{
+				"codec_type": "video",
+				"codec_name": "hevc",
+				"codec_tag_string": "dvh1",
+				"profile": "Main 10",
+				"pix_fmt": "yuv420p10le",
+				"color_transfer": "smpte2084",
+				"color_primaries": "bt2020",
+				"color_space": "bt2020nc",
+				"side_data_list": [
+					{
+						"side_data_type": "DOVI configuration record",
+						"dv_profile": "8",
+						"dv_level": 6,
+						"dv_bl_signal_compatibility_id": "1"
+					}
+				]
+			}
+		]
+	}`)
+
+	probe, err := parsePlaybackCompatibilityProbeOutput(raw)
+	if err != nil {
+		t.Fatalf("parsePlaybackCompatibilityProbeOutput() error = %v", err)
+	}
+	if !probe.VideoStreamFound {
+		t.Fatalf("expected video stream")
+	}
+	if !probe.DolbyVision {
+		t.Fatalf("expected Dolby Vision detection")
+	}
+	if probe.DolbyVisionProfile != 8 || probe.DolbyVisionLevel != 6 || probe.DolbyVisionCompatID != 1 {
+		t.Fatalf("unexpected Dolby Vision fields: profile=%d level=%d compat=%d", probe.DolbyVisionProfile, probe.DolbyVisionLevel, probe.DolbyVisionCompatID)
+	}
+	if !probe.HDR {
+		t.Fatalf("expected HDR detection")
+	}
+}
+
+func TestParsePlaybackCompatibilityProbeOutputDoesNotTreatPlainHDRAsDolbyVision(t *testing.T) {
+	raw := []byte(`{
+		"streams": [
+			{
+				"codec_type": "video",
+				"codec_name": "hevc",
+				"codec_tag_string": "hvc1",
+				"profile": "Main 10",
+				"pix_fmt": "p010le",
+				"color_transfer": "arib-std-b67",
+				"color_primaries": "bt2020",
+				"color_space": "bt2020nc"
+			}
+		]
+	}`)
+
+	probe, err := parsePlaybackCompatibilityProbeOutput(raw)
+	if err != nil {
+		t.Fatalf("parsePlaybackCompatibilityProbeOutput() error = %v", err)
+	}
+	if !probe.VideoStreamFound {
+		t.Fatalf("expected video stream")
+	}
+	if probe.DolbyVision {
+		t.Fatalf("did not expect Dolby Vision detection")
+	}
+	if !probe.HDR {
+		t.Fatalf("expected HDR detection")
+	}
+}
+
+func TestParsePlaybackCompatibilityProbeOutputWithoutVideoStream(t *testing.T) {
+	raw := []byte(`{"streams":[{"codec_type":"audio","codec_name":"aac"}]}`)
+
+	probe, err := parsePlaybackCompatibilityProbeOutput(raw)
+	if err != nil {
+		t.Fatalf("parsePlaybackCompatibilityProbeOutput() error = %v", err)
+	}
+	if probe.VideoStreamFound {
+		t.Fatalf("did not expect video stream")
+	}
+	if probe.DolbyVision || probe.HDR {
+		t.Fatalf("did not expect playback risk flags, got=%#v", probe)
+	}
+}
+
 func assertArgPair(t *testing.T, args []string, key, value string) {
 	t.Helper()
 	for idx := 0; idx < len(args)-1; idx++ {

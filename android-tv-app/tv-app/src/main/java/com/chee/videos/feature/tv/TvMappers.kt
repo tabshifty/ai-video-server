@@ -110,6 +110,7 @@ internal fun tvEpisodeToUiModel(dto: TvEpisodeDto): TvEpisodeUiModel =
         playable = dto.playable || (dto.videoId.isNotBlank() && dto.videoStatus == "ready"),
         stillUrl = dto.stillUrl,
         subtitleTracks = coerceListOrEmpty(dto.subtitleTracks),
+        metadata = dto.metadata,
     )
 
 internal fun tvSeriesDetailToUiModel(dto: TvSeriesDetailDto): TvSeriesUiModel {
@@ -146,8 +147,10 @@ internal fun tvSeriesDetailToUiModel(dto: TvSeriesDetailDto): TvSeriesUiModel {
 }
 
 internal fun findPreferredEpisodeNumber(season: TvSeasonUiModel): Int {
-    return season.episodes.maxWithOrNull(tvEpisodePreferenceComparator)?.number
-        ?: season.episodes.firstOrNull { it.playable }?.number
+    return season.episodes
+        .filter(::isTvEpisodePlayableForPlayback)
+        .maxWithOrNull(tvEpisodePreferenceComparator)
+        ?.number
         ?: season.episodes.firstOrNull()?.number
         ?: 1
 }
@@ -167,9 +170,9 @@ internal fun findPreferredSeriesSelection(series: TvSeriesUiModel): TvPreferredE
                 ) to episode
             }
         }
+        .filter { isTvEpisodePlayableForPlayback(it.second) }
         .maxWithOrNull(compareBy<Pair<TvPreferredEpisodeSelection, TvEpisodeUiModel>> { preferredEpisodeTimestamp(it.second) }
-            .thenBy { it.second.watchSeconds }
-            .thenBy { if (it.second.playable) 1 else 0 })
+            .thenBy { it.second.watchSeconds })
         ?.first
         ?: series.seasons.firstOrNull()?.let { season ->
             TvPreferredEpisodeSelection(season.number, findPreferredEpisodeNumber(season))
@@ -178,7 +181,6 @@ internal fun findPreferredSeriesSelection(series: TvSeriesUiModel): TvPreferredE
 
 private val tvEpisodePreferenceComparator = compareBy<TvEpisodeUiModel> { preferredEpisodeTimestamp(it) }
     .thenBy { it.watchSeconds }
-    .thenBy { if (it.playable) 1 else 0 }
 
 private fun preferredEpisodeTimestamp(episode: TvEpisodeUiModel): Long =
     parseEpisodeTimestamp(episode.lastWatchedAt)

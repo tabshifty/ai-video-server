@@ -310,6 +310,52 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_withoutRouteEpisode_skipsPlaybackCompatibilityBlockedEpisode() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(
+                                    id = "e1",
+                                    number = 1,
+                                    title = "第1集",
+                                    videoId = "video-1",
+                                    videoStatus = "ready",
+                                    watchSeconds = 120,
+                                    lastWatchedAt = "2026-04-26T09:30:00Z",
+                                    metadata = probeFailedPlaybackCompatibilityMetadata(),
+                                ),
+                                tvEpisode(
+                                    id = "e2",
+                                    number = 2,
+                                    title = "第2集",
+                                    videoId = "video-2",
+                                    videoStatus = "ready",
+                                    watchSeconds = 30,
+                                    lastWatchedAt = "2026-04-25T08:00:00Z",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.selectedSeasonNumber)
+        assertEquals(2, state.selectedEpisodeNumber)
+        assertEquals("video-2", state.currentVideoId)
+        assertTrue(state.canPlayCurrentEpisode)
+    }
+
+    @Test
     fun nextEpisode_skipsToFollowingEpisodeAndUpdatesVideoId() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
@@ -378,6 +424,43 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun nextEpisode_skipsPlaybackCompatibilityBlockedEpisodes() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(id = "e1", number = 1, title = "第1集", videoId = "video-1", videoStatus = "ready"),
+                                tvEpisode(
+                                    id = "e2",
+                                    number = 2,
+                                    title = "第2集",
+                                    videoId = "video-2",
+                                    videoStatus = "ready",
+                                    metadata = probeFailedPlaybackCompatibilityMetadata(),
+                                ),
+                                tvEpisode(id = "e3", number = 3, title = "第3集", videoId = "video-3", videoStatus = "ready"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        viewModel.nextEpisode()
+
+        val state = viewModel.uiState.value
+        assertEquals(3, state.selectedEpisodeNumber)
+        assertEquals("video-3", state.currentVideoId)
+    }
+
+    @Test
     fun unboundEpisode_cannotPlay() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
@@ -401,6 +484,43 @@ class TvSeriesPlayerViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.canPlayCurrentEpisode)
         assertEquals("", state.currentVideoId)
+    }
+
+    @Test
+    fun playbackCompatibilityBlockedEpisode_doesNotBuildSourceUrl() = runTest {
+        val repository = FakeTvRepository(
+            detailPayload = tvSeriesDetail(
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisode(
+                                id = "e1",
+                                number = 1,
+                                title = "第1集",
+                                videoId = "video-1",
+                                videoStatus = "ready",
+                                metadata = probeFailedPlaybackCompatibilityMetadata(),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("video-1", state.currentVideoId)
+        assertEquals("", state.currentSourceUrl)
+        assertFalse(state.canPlayCurrentEpisode)
+        assertEquals("该视频播放兼容性未确认，当前 TV 端暂不自动播放", state.playbackBlockedMessage)
+        assertTrue(repository.sourceUrlRequests.isEmpty())
     }
 
     @Test
@@ -512,3 +632,11 @@ class TvSeriesPlayerViewModelTest {
         assertTrue(repository.historyReports.isEmpty())
     }
 }
+
+private fun probeFailedPlaybackCompatibilityMetadata(): Map<String, Any?> =
+    mapOf(
+        "playback_compat" to mapOf(
+            "version" to 1,
+            "status" to "probe_failed",
+        ),
+    )

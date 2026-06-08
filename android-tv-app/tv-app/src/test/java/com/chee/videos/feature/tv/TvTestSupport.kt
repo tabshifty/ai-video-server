@@ -39,6 +39,7 @@ class FakeTvRepository(
     val searchRequests = mutableListOf<TvSearchRequest>()
     val posterWallRequests = mutableListOf<TvPosterWallRequest>()
     val detailRequests = mutableListOf<String>()
+    val sourceUrlRequests = mutableListOf<String>()
 
     override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
@@ -85,7 +86,10 @@ class FakeTvRepository(
 
     override suspend fun readActiveBaseUrl(): String = baseUrl
 
-    override suspend fun buildSourceUrl(videoId: String): String = "https://example.com/$videoId.m3u8"
+    override suspend fun buildSourceUrl(videoId: String): String {
+        sourceUrlRequests += videoId
+        return "https://example.com/$videoId.m3u8"
+    }
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
         historyReports += TvHistoryReport(videoId, watchSeconds, completed)
@@ -240,6 +244,7 @@ fun tvEpisode(
     watchSeconds: Int = 0,
     lastWatchedAt: String? = null,
     subtitleTracks: List<SubtitleTrackDto> = emptyList(),
+    metadata: Map<String, Any?>? = emptyMap(),
 ): TvEpisodeDto = TvEpisodeDto(
     id = id,
     episodeNumber = number,
@@ -250,6 +255,7 @@ fun tvEpisode(
     lastWatchedAt = lastWatchedAt,
     playable = videoId.isNotBlank() && videoStatus == "ready",
     subtitleTracks = subtitleTracks,
+    metadata = metadata,
 )
 
 suspend fun TvCatalogViewModel.awaitIdle() = Unit

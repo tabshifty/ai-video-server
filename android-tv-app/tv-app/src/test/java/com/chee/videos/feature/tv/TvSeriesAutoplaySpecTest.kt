@@ -85,6 +85,41 @@ class TvSeriesAutoplaySpecTest {
     }
 
     @Test
+    fun resolveNextPlayableEpisode_skipsPlaybackCompatibilityBlockedEpisodes() {
+        val series = tvSeriesDetailToUiModel(
+            TvSeriesDetailDto(
+                id = "series-1",
+                title = "雾城档案",
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisodeDto(id = "s1e1", number = 1, title = "第1集", playable = true, videoId = "video-s1e1"),
+                            tvEpisodeDto(
+                                id = "s1e2",
+                                number = 2,
+                                title = "第2集",
+                                playable = true,
+                                videoId = "video-s1e2",
+                                metadata = probeFailedPlaybackCompatibilityMetadata(),
+                            ),
+                            tvEpisodeDto(id = "s1e3", number = 3, title = "第3集", playable = true, videoId = "video-s1e3"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val next = resolveNextPlayableEpisode(series, currentSeasonNumber = 1, currentEpisodeNumber = 1)
+
+        assertEquals(1, next?.seasonNumber)
+        assertEquals(3, next?.episodeNumber)
+        assertEquals("第3集", next?.title)
+    }
+
+    @Test
     fun autoplayCountdownTickRemaining_usesWholeSecondsFromRemainingMillis() {
         assertEquals(10, autoplayCountdownTickRemaining(10_000L))
         assertEquals(10, autoplayCountdownTickRemaining(9_999L))
@@ -140,10 +175,20 @@ private fun tvEpisodeDto(
     title: String,
     playable: Boolean,
     videoId: String = "",
+    metadata: Map<String, Any?>? = emptyMap(),
 ): TvEpisodeDto = TvEpisodeDto(
     id = id,
     episodeNumber = number,
     title = title,
     playable = playable,
     videoId = videoId,
+    metadata = metadata,
 )
+
+private fun probeFailedPlaybackCompatibilityMetadata(): Map<String, Any?> =
+    mapOf(
+        "playback_compat" to mapOf(
+            "version" to 1,
+            "status" to "probe_failed",
+        ),
+    )

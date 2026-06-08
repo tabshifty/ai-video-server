@@ -16,6 +16,7 @@ data class TvEpisodeUiModel(
     val playable: Boolean = false,
     val stillUrl: String? = null,
     val subtitleTracks: List<SubtitleTrackDto> = emptyList(),
+    val metadata: Map<String, Any?>? = emptyMap(),
 )
 
 data class TvSeasonUiModel(
