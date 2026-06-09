@@ -17,6 +17,7 @@ import ImageCollectionManage from '../views/ImageCollectionManage.vue'
 import SystemSettings from '../views/SystemSettings.vue'
 import TaskMonitor from '../views/TaskMonitor.vue'
 import Toolbox from '../views/Toolbox.vue'
+import ToolboxEd2k from '../views/ToolboxEd2k.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { public: true } },
@@ -34,6 +35,7 @@ const routes = [
   { path: '/image-collections', component: ImageCollectionManage, meta: { hideShellPageHeader: true } },
   { path: '/users', component: UserManage, meta: { hideShellPageHeader: true } },
   { path: '/toolbox', component: Toolbox, meta: { hideShellPageHeader: true } },
+  { path: '/toolbox/ed2k', component: ToolboxEd2k },
   { path: '/settings', component: SystemSettings, meta: { hideShellPageHeader: true } },
   { path: '/tasks', component: TaskMonitor, meta: { hideShellPageHeader: true } }
 ]

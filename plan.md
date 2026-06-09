@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-09 15:25 +0800
+- 进度：完成管理端工具箱菜单合集与 ED2K 无 shell 新标签页实现。`/toolbox` 现在只展示工具菜单入口，ED2K 入口用 `router.resolve('/toolbox/ed2k').href` 生成带 SPA 基路径的链接并通过 `target="_blank"` 新标签页打开；新增 `/toolbox/ed2k` 管理员受限路由，页面不包后台 Layout，保留“返回工具箱”、ED2K 多行解析、非法行计数和本页会话“已点击”标记。命令面板 `ed2k` 搜索仍命中 `/toolbox`。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/router/index.js`、`CONTEXT.md`、`plan.md`
+- 验证：红灯 `cd admin-web && npm test -- src/views/toolboxPage.spec.js src/components/base/commandPalette.helpers.spec.js` 先失败于缺少 `ToolboxEd2k.vue`；实现后 `cd admin-web && npm test -- src/views/toolboxPage.spec.js src/views/toolbox.helpers.spec.js src/components/base/commandPalette.helpers.spec.js` 通过；`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size warning）；`git diff --check` 通过；乱码扫描无输出。
+
+## 2026-06-09 15:19 +0800
+- 进度：开始实现管理端工具箱菜单合集与 ED2K 无 shell 新标签页。范围锁定为：`/toolbox` 改为工具入口页，ED2K 入口通过新浏览器标签页打开 `/toolbox/ed2k`；`/toolbox/ed2k` 不包后台 Layout，但继续走管理员路由守卫；命令面板 `ed2k` 仍进入 `/toolbox`。
+- 影响文件：预计涉及 `admin-web/src/views/Toolbox.vue`、新增 ED2K 工具页、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、新增工具箱页面源文测试、`CONTEXT.md`、`plan.md`。
+- 验证：待先补红灯测试，再执行管理端定向测试、`cd admin-web && npm test`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
+## 2026-06-09 14:42 +0800
+- 进度：继续校准管理端工具箱信息架构。已确认 `/toolbox` 应作为带后台 shell 的菜单合集，不直接承载 ED2K 表单；ED2K 功能从工具箱菜单按钮以新浏览器标签页打开，目标页为无 shell 的单一工具工作区，但仍走管理员登录与权限校验。命令面板搜索 `ed2k` 仍按推荐进入 `/toolbox`，不绕过工具箱直达功能页。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及 `admin-web/src/views/Toolbox.vue`、新增 ED2K 工具页、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.*`、相关单测。
+- 验证：探索阶段暂未执行；后续实现后按管理端范围执行 `cd admin-web && npm test`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-08 21:02 +0800
 - 进度：完成杜比视界安全播放第一阶段实现。后端在新视频转码流程中对原始源和最终播放文件做只读播放兼容探测，写入 `videos.metadata.playback_compat`，探测失败不让转码任务失败；TV App 根据 metadata 放行历史视频、阻断探测失败/结构不完整视频、阻断原始源为 Dolby Vision 但当前压缩输出非 Dolby Vision 的风险播放，并让剧集默认选集/自动连播跳过兼容阻断分集。未实现 Media3/DV 专用系统播放分支，未保留原始视频，未改变后端转码压缩参数。TV 端版本号升至 `0.1.84`。无关工作区改动 `admin-web/.env.development` 不纳入。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`internal/models/app.go`、`internal/repository/tv_repository.go`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/model/ApiModels.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvMappers.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvModels.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesAutoplay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、TV 端相关测试、`CONTEXT.md`、`plan.md`
