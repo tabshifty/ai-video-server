@@ -28,6 +28,7 @@
 - `家用部署机出站代理契约`：[[家用部署机]] 的 Go server / worker 访问 TMDB、JavDB、ThePornDB 等外部刮削服务时，不自动继承 macOS 系统网络代理设置；生产进程必须在启动环境中显式配置 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` 与 `NO_PROXY`。若浏览器或 `curl -x` 通过本机代理可访问外部 API，但 Go 日志出现 TLS handshake timeout、i/o timeout 或异常解析地址，优先检查进程环境里的代理变量，而不是先改刮削逻辑。
 - `admin 上传暂存目录`：管理端图片上传在正式落库前使用的 multipart 暂存目录。这个目录应留在部署机本机磁盘或相对路径工作目录下，不能放在 `/Volumes/large` 这类可能休眠的外盘上；否则上传请求可能在 `open` / `create` 阶段长时间 pending，前端按钮会一直处于 loading。
 - `转码任务进度`：管理端语境里的“压缩进度”统一指后台 worker 已确认源视频时长后持续持久化的转码任务进度，不是前端本地估算。worker 若在外盘输出目录创建、源文件探测或 ffmpeg 启动前阻塞，进度应被视为“尚未进入转码阶段”，不能把 0% 直接归因于前端进度条损坏。
+- `转码音轨映射策略`：服务端压缩输出只映射首个可选音频流并统一转 AAC，不把输入里的所有音频流都带进输出。iPhone MOV 可能同时包含 AAC 主音轨和 `apac` 空间音频/未知音轨；若使用 `-map 0:a?` 会要求 ffmpeg 解码所有音频流，遇到未知音轨时整次转码失败。当前约定用 `-map 0:a:0?` 保留主音轨，额外音轨不进入压缩输出。
 
 ## 字幕处理约定
 - `ASS 字幕原文存储策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；`.ass/.ssa` 不再强转 WebVTT，而是以 ASS 原文落库，数据库记录 `video_subtitles.format=ass` / `mime_type=text/x-ssa`，`metadata.original_format` 继续记录原始扩展名。视频内嵌字幕抽取时，`ass`/`ssa` codec 用 ffmpeg `-c:s copy` 保留原文；`mov_text`、`subrip`、`webvtt` 等无 ASS Style 段的格式继续转 VTT。历史已生成的 VTT 字幕不反向迁移；用户需要 ASS 特效时重新上传或重新抽取。

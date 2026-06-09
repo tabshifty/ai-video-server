@@ -29,9 +29,10 @@ func TestBuildTranscodeVideoArgsForHevcPrimary(t *testing.T) {
 	assertArgPair(t, args, "-spatial_aq", "1")
 	assertArgPair(t, args, "-crf", "23")
 	assertArgPair(t, args, "-map", "0:v:0")
-	assertArgPair(t, args, "-map", "0:a?")
+	assertArgPair(t, args, "-map", "0:a:0?")
 	assertArgPair(t, args, "-c:a", "aac")
 	assertArgPair(t, args, "-b:a", "128k")
+	assertArgPairAbsent(t, args, "-map", "0:a?")
 	assertArgAbsent(t, args, "-ac")
 	assertArgAbsent(t, args, "-preset")
 	assertArgAbsent(t, args, "-x265-params")
@@ -47,9 +48,10 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	assertArgPair(t, args, "-maxrate", "8400k")
 	assertArgPair(t, args, "-bufsize", "16800k")
 	assertArgPair(t, args, "-map", "0:v:0")
-	assertArgPair(t, args, "-map", "0:a?")
+	assertArgPair(t, args, "-map", "0:a:0?")
 	assertArgPair(t, args, "-c:a", "aac")
 	assertArgPair(t, args, "-b:a", "128k")
+	assertArgPairAbsent(t, args, "-map", "0:a?")
 	assertArgAbsent(t, args, "-ac")
 	assertArgAbsent(t, args, "-preset")
 	assertArgAbsent(t, args, "-x265-params")
@@ -281,6 +283,15 @@ func assertArgPair(t *testing.T, args []string, key, value string) {
 		}
 	}
 	t.Fatalf("expected args to contain %s %s, got=%v", key, value, args)
+}
+
+func assertArgPairAbsent(t *testing.T, args []string, key, value string) {
+	t.Helper()
+	for idx := 0; idx < len(args)-1; idx++ {
+		if args[idx] == key && args[idx+1] == value {
+			t.Fatalf("expected args not to contain %s %s, got=%v", key, value, args)
+		}
+	}
 }
 
 func assertArgAbsent(t *testing.T, args []string, key string) {

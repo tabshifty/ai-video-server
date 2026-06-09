@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-09 22:55 +0800
+- 进度：完成 iPhone MOV 多音轨转码失败修复。`buildTranscodeVideoArgs` 的音频映射从全部音频流 `0:a?` 收窄为首个可选音频流 `0:a:0?`，保留 AAC 主音轨并跳过 `apac` 等 ffmpeg 无法解码的额外音轨；HEVC primary 与 AVC compat 两个输出 profile 的参数测试已同步覆盖。`CONTEXT.md` 已沉淀转码音轨映射策略。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：红灯 `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgs' -count=1` 先失败于仍生成 `-map 0:a?`；实现后 `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgs' -count=1` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -run 'TestBuildTranscodeVideoArgs|TestBuildTranscodeProgress|TestParseProgressValueToSeconds|TestBuildTranscodePlan|TestResolveTranscodePersistence' -count=1` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check -- CONTEXT.md plan.md pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go` 通过；乱码扫描无输出。
+
+## 2026-06-09 22:52 +0800
+- 进度：开始修复 iPhone MOV 转码压缩因未知 `apac` 音频流失败的问题。报错显示当前 ffmpeg 参数映射了全部音频流，导致可用 AAC 主音轨之外的空间音频/未知音轨也被要求解码。本次范围锁定为后端转码参数生成：保留首个可选音频流，避免不可解码的额外音轨拖垮整次压缩；不改变视频编码器、码率/CRF、杜比视界安全播放策略或长期保留原文件策略。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：待先补红灯测试，再执行 `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgs' -count=1`、必要 Go 定向测试、`git diff --check`、乱码扫描。
+
 ## 2026-06-09 18:23 +0800
 - 进度：完成管理端图像生成工作台第一阶段实现。工具箱新增“图像生成工作台”新标签页入口；新增 `/toolbox/image-workbench` 无 shell 管理员页面，提供三栏工作台、参考图上传/拖拽/粘贴、常用参数、同步生成、IndexedDB 本地历史、结果下载/复用为参考图/导入媒体库；后端新增管理员受限图像生成状态与同步代理接口，支持 OpenAI-compatible Images generate/edit、脱敏配置状态、资源限制、data URL 结果归一和轻量导入元数据；`.env.example` 增加图像生成配置键。无关工作区改动 `admin-web/.env.development` 未纳入。
 - 影响文件：`.env.example`、`CONTEXT.md`、`plan.md`、`main.go`、`internal/config/config.go`、`internal/config/config_test.go`、`internal/handlers/router.go`、`internal/handlers/admin_image_generation.go`、`internal/handlers/admin_image_generation_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.db.js`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`admin-web/src/views/toolboxPage.spec.js`

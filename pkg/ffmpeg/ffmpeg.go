@@ -96,7 +96,7 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		"-y",
 		"-i", inputPath,
 		"-map", "0:v:0",
-		"-map", "0:a?",
+		"-map", "0:a:0?",
 		"-c:v", encoder,
 		"-pix_fmt", "yuv420p",
 		"-allow_sw", "0",
