@@ -94,6 +94,9 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 	}
 	args := []string{
 		"-y",
+		"-max_error_rate", "1.0",
+		"-fflags", "+discardcorrupt",
+		"-err_detect", "ignore_err",
 		"-i", inputPath,
 		"-map", "0:v:0",
 		"-map", "0:a:0?",

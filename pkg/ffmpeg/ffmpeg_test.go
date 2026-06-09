@@ -23,6 +23,9 @@ func TestBuildTranscodeVideoArgsForHevcPrimary(t *testing.T) {
 	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileHEVCPrimary, TranscodeOptions{CRF: "23", SpatialAQ: true})
 
 	assertArgPair(t, args, "-c:v", "hevc_videotoolbox")
+	assertArgPair(t, args, "-max_error_rate", "1.0")
+	assertArgPair(t, args, "-fflags", "+discardcorrupt")
+	assertArgPair(t, args, "-err_detect", "ignore_err")
 	assertArgPair(t, args, "-pix_fmt", "yuv420p")
 	assertArgPair(t, args, "-tag:v", "hvc1")
 	assertArgPair(t, args, "-allow_sw", "0")
@@ -42,6 +45,9 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileAVCCompat, TranscodeOptions{VideoBitrateKbps: 4200})
 
 	assertArgPair(t, args, "-c:v", "h264_videotoolbox")
+	assertArgPair(t, args, "-max_error_rate", "1.0")
+	assertArgPair(t, args, "-fflags", "+discardcorrupt")
+	assertArgPair(t, args, "-err_detect", "ignore_err")
 	assertArgPair(t, args, "-pix_fmt", "yuv420p")
 	assertArgPair(t, args, "-allow_sw", "0")
 	assertArgPair(t, args, "-b:v", "4200k")

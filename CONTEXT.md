@@ -29,6 +29,7 @@
 - `admin 上传暂存目录`：管理端图片上传在正式落库前使用的 multipart 暂存目录。这个目录应留在部署机本机磁盘或相对路径工作目录下，不能放在 `/Volumes/large` 这类可能休眠的外盘上；否则上传请求可能在 `open` / `create` 阶段长时间 pending，前端按钮会一直处于 loading。
 - `转码任务进度`：管理端语境里的“压缩进度”统一指后台 worker 已确认源视频时长后持续持久化的转码任务进度，不是前端本地估算。worker 若在外盘输出目录创建、源文件探测或 ffmpeg 启动前阻塞，进度应被视为“尚未进入转码阶段”，不能把 0% 直接归因于前端进度条损坏。
 - `转码音轨映射策略`：服务端压缩输出只映射首个可选音频流并统一转 AAC，不把输入里的所有音频流都带进输出。iPhone MOV 可能同时包含 AAC 主音轨和 `apac` 空间音频/未知音轨；若使用 `-map 0:a?` 会要求 ffmpeg 解码所有音频流，遇到未知音轨时整次转码失败。当前约定用 `-map 0:a:0?` 保留主音轨，额外音轨不进入压缩输出。
+- `转码坏包容忍策略`：服务端压缩面对源 MP4/MOV 内部局部损坏的 H.264/AAC packet 时，应尽量丢弃坏包并产出可播放文件，而不是因为少量 `Invalid NAL unit size`、AAC `Invalid data found when processing input` 等可恢复解码错误让整次任务失败。转码命令固定使用 `-fflags +discardcorrupt`、`-err_detect ignore_err` 与 `-max_error_rate 1.0`：前两者作用于输入坏包/解码错误，后者避免 FFmpeg 8 在已有输出可用时仅因错误率阈值返回非 0。该策略不承诺修复严重损坏文件；若关键 moov/mdat 或主要帧数据无法解码，任务仍应失败并暴露错误。
 
 ## 字幕处理约定
 - `ASS 字幕原文存储策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；`.ass/.ssa` 不再强转 WebVTT，而是以 ASS 原文落库，数据库记录 `video_subtitles.format=ass` / `mime_type=text/x-ssa`，`metadata.original_format` 继续记录原始扩展名。视频内嵌字幕抽取时，`ass`/`ssa` codec 用 ffmpeg `-c:s copy` 保留原文；`mov_text`、`subrip`、`webvtt` 等无 ASS Style 段的格式继续转 VTT。历史已生成的 VTT 字幕不反向迁移；用户需要 ASS 特效时重新上传或重新抽取。

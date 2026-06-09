@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-09 23:24 +0800
+- 进度：完成转码坏包容忍修复收尾验证。确认本次只影响 ffmpeg 转码参数、参数测试和长期文档；不纳入无关工作区改动 `admin-web/.env.development`。本机未安装 ffmpeg，已在部署机用 `/opt/homebrew/bin/ffmpeg` 确认 FFmpeg 8.1 支持并接受 `-max_error_rate 1.0`、`-fflags +discardcorrupt`、`-err_detect ignore_err` 参数。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：`go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgs' -count=1` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -run 'TestBuildTranscodeVideoArgs|TestBuildTranscodeProgress|TestParseProgressValueToSeconds|TestBuildTranscodePlan|TestResolveTranscodePersistence|TestDecideVideoBitrate|TestChooseTranscodeOutputProfile' -count=1` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`go test ./... -count=1` 通过；`go vet ./...` 通过；`git diff --check -- CONTEXT.md plan.md pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go` 通过；乱码扫描无输出。
+
+## 2026-06-09 23:21 +0800
+- 进度：完成转码坏包容忍参数实现。`buildTranscodeVideoArgs` 现在在输入文件前加入 `-max_error_rate 1.0`、`-fflags +discardcorrupt`、`-err_detect ignore_err`，用于跳过局部损坏 packet 并忽略可恢复解码错误；HEVC primary 与 AVC compat 参数测试同步锁定这些选项。`CONTEXT.md` 已追加转码坏包容忍策略。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：红灯阶段 `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgs' -count=1` 因缺少 `-max_error_rate 1.0` 失败；实现后同命令通过。待执行相关 Go 定向测试、全量 Go 验证、`git diff --check`、乱码扫描。
+
+## 2026-06-09 23:17 +0800
+- 进度：开始修复转码压缩遇到源 MP4 内部坏 H.264/AAC packet 时失败的问题。报错中的 `Invalid NAL unit size`、AAC `Invalid data found when processing input` 表明这是源文件局部损坏/坏包场景，而不是上一轮的未知额外音轨。范围锁定为后端转码参数：丢弃损坏包、忽略可恢复解码错误，并允许 FFmpeg 在可生成输出时不要因错误率阈值非 0 退出；不改变编码器、码率/CRF、音轨选择、输出路径或重试模型。部署机 FFmpeg 8.1 已确认支持 `-max_error_rate`、`-fflags +discardcorrupt` 与 `-err_detect ignore_err`。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：待先补红灯测试，再执行 `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgs' -count=1`、相关 Go 定向测试、必要全量 Go 验证、`git diff --check`、乱码扫描；本机未安装 ffmpeg，实际转码参数运行只在部署机用 FFmpeg 8.1 做参数存在性检查。
+
 ## 2026-06-09 22:55 +0800
 - 进度：完成 iPhone MOV 多音轨转码失败修复。`buildTranscodeVideoArgs` 的音频映射从全部音频流 `0:a?` 收窄为首个可选音频流 `0:a:0?`，保留 AAC 主音轨并跳过 `apac` 等 ffmpeg 无法解码的额外音轨；HEVC primary 与 AVC compat 两个输出 profile 的参数测试已同步覆盖。`CONTEXT.md` 已沉淀转码音轨映射策略。无关工作区改动 `admin-web/.env.development` 未纳入。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
