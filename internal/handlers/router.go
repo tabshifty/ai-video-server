@@ -40,64 +40,66 @@ type orphanFileScanRepository interface {
 
 // API bundles all HTTP handlers.
 type API struct {
-	repo               *repository.VideoRepository
-	orphanFileScanRepo orphanFileScanRepository
-	uploadSvc          *services.UploadService
-	chunkUpload        *services.ChunkUploadService
-	recSvc             *services.RecommendService
-	scrapeSvc          *services.ScraperService
-	appSvc             *services.AppService
-	imageSvc           *services.ImageService
-	subtitleSvc        *services.SubtitleService
-	iptvSvc            iptvService
-	enqueuer           taskEnqueuer
-	logger             *slog.Logger
-	redis              *redis.Client
-	redisAddr          string
-	redisPassword      string
-	asynqQueue         string
-	jwtSecret          string
-	playSignSecret     string
-	playSignTTL        time.Duration
-	accessTTL          time.Duration
-	refreshTTL         time.Duration
-	maxVideoSize       int64
-	storageRoot        string
-	uploadTempDir      string
-	serverLogPath      string
-	adminWebDistPath   string
-	enableSwagger      bool
+	repo                  *repository.VideoRepository
+	orphanFileScanRepo    orphanFileScanRepository
+	uploadSvc             *services.UploadService
+	chunkUpload           *services.ChunkUploadService
+	recSvc                *services.RecommendService
+	scrapeSvc             *services.ScraperService
+	appSvc                *services.AppService
+	imageSvc              *services.ImageService
+	subtitleSvc           *services.SubtitleService
+	iptvSvc               iptvService
+	enqueuer              taskEnqueuer
+	logger                *slog.Logger
+	redis                 *redis.Client
+	redisAddr             string
+	redisPassword         string
+	asynqQueue            string
+	jwtSecret             string
+	playSignSecret        string
+	playSignTTL           time.Duration
+	accessTTL             time.Duration
+	refreshTTL            time.Duration
+	maxVideoSize          int64
+	storageRoot           string
+	uploadTempDir         string
+	serverLogPath         string
+	adminWebDistPath      string
+	enableSwagger         bool
+	imageGenerationConfig ImageGenerationConfig
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig) *API {
 	return &API{
-		repo:               repo,
-		orphanFileScanRepo: repo,
-		uploadSvc:          uploadSvc,
-		chunkUpload:        chunkUpload,
-		recSvc:             recSvc,
-		scrapeSvc:          scrapeSvc,
-		appSvc:             appSvc,
-		imageSvc:           imageSvc,
-		subtitleSvc:        subtitleSvc,
-		iptvSvc:            services.NewIPTVService(repo, nil),
-		enqueuer:           enqueuer,
-		logger:             logger,
-		redis:              redisClient,
-		redisAddr:          redisAddr,
-		redisPassword:      redisPassword,
-		asynqQueue:         asynqQueue,
-		jwtSecret:          jwtSecret,
-		playSignSecret:     playSignSecret,
-		playSignTTL:        10 * time.Minute,
-		accessTTL:          accessTTL,
-		refreshTTL:         refreshTTL,
-		maxVideoSize:       maxVideoSize,
-		storageRoot:        storageRoot,
-		uploadTempDir:      uploadTempDir,
-		serverLogPath:      serverLogPath,
-		adminWebDistPath:   adminWebDistPath,
-		enableSwagger:      enableSwagger,
+		repo:                  repo,
+		orphanFileScanRepo:    repo,
+		uploadSvc:             uploadSvc,
+		chunkUpload:           chunkUpload,
+		recSvc:                recSvc,
+		scrapeSvc:             scrapeSvc,
+		appSvc:                appSvc,
+		imageSvc:              imageSvc,
+		subtitleSvc:           subtitleSvc,
+		iptvSvc:               services.NewIPTVService(repo, nil),
+		enqueuer:              enqueuer,
+		logger:                logger,
+		redis:                 redisClient,
+		redisAddr:             redisAddr,
+		redisPassword:         redisPassword,
+		asynqQueue:            asynqQueue,
+		jwtSecret:             jwtSecret,
+		playSignSecret:        playSignSecret,
+		playSignTTL:           10 * time.Minute,
+		accessTTL:             accessTTL,
+		refreshTTL:            refreshTTL,
+		maxVideoSize:          maxVideoSize,
+		storageRoot:           storageRoot,
+		uploadTempDir:         uploadTempDir,
+		serverLogPath:         serverLogPath,
+		adminWebDistPath:      adminWebDistPath,
+		enableSwagger:         enableSwagger,
+		imageGenerationConfig: imageGenerationConfig,
 	}
 }
 
@@ -212,6 +214,8 @@ func (a *API) Register(r *gin.Engine) {
 			admin.PUT("/images/:id", a.AdminUpdateImage)
 			admin.DELETE("/images/:id", a.AdminDeleteImage)
 			admin.GET("/images/:id/view", a.AdminImageView)
+			admin.GET("/image-generation/status", a.AdminImageGenerationStatus)
+			admin.POST("/image-generation/generate", a.AdminImageGenerate)
 			admin.GET("/image-collections", a.AdminImageCollections)
 			admin.POST("/image-collections", a.AdminCreateImageCollection)
 			admin.PUT("/image-collections/:id", a.AdminUpdateImageCollection)

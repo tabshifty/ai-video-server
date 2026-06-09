@@ -48,6 +48,10 @@ type Config struct {
 	TranslationAPIKey          string
 	TranslationModel           string
 	TranslationTimeout         time.Duration
+	ImageGenerationAPIURL      string
+	ImageGenerationAPIKey      string
+	ImageGenerationModel       string
+	ImageGenerationTimeout     time.Duration
 }
 
 // Load returns validated application config from environment.
@@ -91,6 +95,10 @@ func Load() (Config, error) {
 		TranslationAPIKey:          os.Getenv("TRANSLATION_API_KEY"),
 		TranslationModel:           getEnv("TRANSLATION_MODEL", "HY-MT1.5-1.8B"),
 		TranslationTimeout:         time.Duration(getIntEnv("TRANSLATION_TIMEOUT_SECONDS", 15)) * time.Second,
+		ImageGenerationAPIURL:      strings.TrimSuffix(strings.TrimSpace(os.Getenv("IMAGE_GENERATION_API_URL")), "/"),
+		ImageGenerationAPIKey:      os.Getenv("IMAGE_GENERATION_API_KEY"),
+		ImageGenerationModel:       getEnv("IMAGE_GENERATION_MODEL", "gpt-image-1.5"),
+		ImageGenerationTimeout:     time.Duration(getIntEnv("IMAGE_GENERATION_TIMEOUT_SECONDS", 180)) * time.Second,
 	}
 
 	if cfg.PostgresDSN == "" {

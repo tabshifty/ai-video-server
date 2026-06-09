@@ -2,6 +2,91 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-09 18:23 +0800
+- 进度：完成管理端图像生成工作台第一阶段实现。工具箱新增“图像生成工作台”新标签页入口；新增 `/toolbox/image-workbench` 无 shell 管理员页面，提供三栏工作台、参考图上传/拖拽/粘贴、常用参数、同步生成、IndexedDB 本地历史、结果下载/复用为参考图/导入媒体库；后端新增管理员受限图像生成状态与同步代理接口，支持 OpenAI-compatible Images generate/edit、脱敏配置状态、资源限制、data URL 结果归一和轻量导入元数据；`.env.example` 增加图像生成配置键。无关工作区改动 `admin-web/.env.development` 未纳入。
+- 影响文件：`.env.example`、`CONTEXT.md`、`plan.md`、`main.go`、`internal/config/config.go`、`internal/config/config_test.go`、`internal/handlers/router.go`、`internal/handlers/admin_image_generation.go`、`internal/handlers/admin_image_generation_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.db.js`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`admin-web/src/views/toolboxPage.spec.js`
+- 验证：`go test ./internal/config ./internal/handlers -run 'TestLoadIncludesImageGenerationConfig|TestRegisterIncludesAdminImageGenerationRoutes|TestAdminImageGenerationStatusIsRedacted|TestNormalizeAdminImageGenerationRequestRejectsTooManyImages|TestAdminImageGenerate' -count=1` 通过；`go test ./internal/... -count=1` 通过；`cd admin-web && npm test` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size warning）；`git diff --check` 通过；乱码扫描无输出。
+
+## 2026-06-09 18:22 +0800
+- 进度：实现中按官方 GPT Image 接口校正后端代理细节：默认模型改为 `gpt-image-1.5`；官方 `gpt-image-*` 模型不发送 `response_format`，非 GPT Image 兼容模型才请求 `b64_json`；参考图编辑 multipart 文件字段使用 `image`。前端仍统一接收后端归一后的 data URL 结果。
+- 影响文件：`internal/config/config.go`、`.env.example`、`internal/handlers/admin_image_generation.go`、`internal/handlers/admin_image_generation_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待复跑后端定向测试、管理端测试/构建与 `git diff --check`。
+
+## 2026-06-09 17:59 +0800
+- 进度：开始实现管理端图像生成工作台第一阶段。范围锁定为：工具箱新增图像工作台新标签页入口；新增无 shell 图像工作台页面；后端新增管理员受限同步图像生成代理、脱敏配置状态、资源限制和 data URL 结果归一；前端新增 IndexedDB 本地创作历史、参考图上传/粘贴/拖拽、常用参数面板、结果预览/下载/复用为参考图/导入媒体库。无关工作区改动 `admin-web/.env.development` 不纳入。
+- 影响文件：预计涉及 `internal/config/config.go`、`main.go`、`internal/handlers/router.go`、新增后端图像生成代理 handler/test、`.env.example`、`admin-web/src/api/admin.js`、`admin-web/src/router/index.js`、`admin-web/src/views/Toolbox.vue`、新增图像工作台页面/helper/db/test、`CONTEXT.md`、`plan.md`。
+- 验证：待补定向测试后执行后端定向测试、管理端定向测试、`cd admin-web && npm test`、`cd admin-web && npm run build`、必要的 Go 测试、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:57 +0800
+- 进度：确认管理端图像生成代理第一阶段对前端统一返回 base64 data URL 图片结果。后端调用上游时优先请求 `b64_json`；若上游只返回临时图片 URL，后端负责下载并转换为 data URL 后返回。前端历史、预览、下载和导入媒体库均基于 data URL；响应可携带每张图的 `mime`、可探测的宽高和可选 `revised_prompt`。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端上游响应解析、URL 下载转换、图片 MIME/尺寸探测、前端结果归一和测试。
+- 验证：探索阶段暂未执行；后续实现后按后端与管理端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:55 +0800
+- 进度：确认管理端图像生成工作台第一阶段采用三栏工作台布局：左侧输入与参数，中央当前结果预览和操作，右侧本地历史画廊；移动端折叠为上下结构。无 shell 页面顶部只保留工具名、配置状态、返回工具箱、打开媒体库等必要操作；历史区默认展示最近任务缩略图，点击加载详情；中央结果支持下载、复用为参考图、导入媒体库。
+- 影响文件：`plan.md`；后续若实现，预计涉及 `ToolboxImageWorkbench.vue` 页面结构、响应式 CSS、历史画廊、结果操作区和前端页面测试。
+- 验证：探索阶段暂未执行；后续实现后按管理端范围执行测试、构建、截图/视觉检查、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:46 +0800
+- 进度：确认管理端图像生成同步代理的资源边界：后端做硬限制，前端做同口径预校验；单次最多 `n=4`、参考图最多 4 张、单张参考图最多 10 MiB、请求体总量最多 40 MiB、生成请求默认超时 180 秒、输入图片仅允许 `image/png`、`image/jpeg`、`image/webp`。超过限制直接返回业务错误，不转发上游。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端请求校验/超时、前端文件校验、错误文案和相关前后端测试。
+- 验证：探索阶段暂未执行；后续实现后按后端与管理端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:29 +0800
+- 进度：确认管理端图像生成第一阶段使用同步后端代理：前端发起生成请求，后端在请求超时内直接调用上游 Images API 并返回图片结果；前端负责把任务状态、参考图和结果写入 IndexedDB。本阶段不引入 Asynq、后端任务表、后端生成历史、断点恢复、后台继续生成、跨浏览器同步或后端历史查询。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及同步代理接口、请求超时/大小限制、前端运行态任务记录、本地失败恢复和测试。
+- 验证：探索阶段暂未执行；后续实现后按后端与管理端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:27 +0800
+- 进度：确认管理端图像生成代理需要提供脱敏配置状态接口，前端只接收 `enabled`、模型名、`base_url_configured`、`api_key_configured` 等状态，不返回真实 API Key 或完整上游地址；工作台打开时先查状态，未配置时禁用生成按钮并提示后端未配置图像生成服务；生成失败时前端展示可读错误摘要和请求时间/请求 ID，完整上游错误留在后端日志。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端配置状态接口、代理错误归一、日志字段、前端状态提示和失败态测试。
+- 验证：探索阶段暂未执行；后续实现后按后端与管理端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:26 +0800
+- 进度：确认第一阶段“基础编辑生成”的产品语义为“参考图编辑”：有参考图时走参考图 + 提示词的整图编辑/变体生成，无参考图时走文本生图；不提供可视化蒙版、局部涂抹或局部区域承诺，UI 文案避免称为“局部编辑”或“蒙版编辑”。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及工作台模式判定、参考图上传/复用、Images API generate/edit 请求分流、UI 文案和测试。
+- 验证：探索阶段暂未执行；后续实现后按管理端与必要后端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:21 +0800
+- 进度：确认管理端图像生成工作台第一阶段参数面板只暴露常用创作参数：提示词、参考图、尺寸、质量、输出格式、生成张数；默认值为 `size=auto`、`quality=auto`、`output_format=png`、`n=1`。`output_compression` 仅在选择 `jpeg/webp` 时作为折叠高级项出现；`moderation` 固定 `auto` 不暴露；透明背景、提示词防改写、种子和自定义供应商参数暂缓。
+- 影响文件：`plan.md`；后续若实现，预计涉及工作台表单状态、参数校验、生成请求 DTO、前端偏好持久化与单测。
+- 验证：探索阶段暂未执行；后续实现后按管理端与必要后端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 17:03 +0800
+- 进度：确认管理端图像创作历史使用 IndexedDB 持久化任务记录、原图和缩略图，参考项目的 `tasks/images/thumbnails` 拆分可作为实现参照；localStorage 只用于工作台轻量偏好，不承载图片 data URL 或大体积任务历史。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及管理端 IndexedDB helper、任务/图片/缩略图存储、历史画廊加载与清理、相关前端单测。
+- 验证：探索阶段暂未执行；后续实现后按管理端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 16:56 +0800
+- 进度：确认“导入媒体库”复用现有后端图片资产生命周期，并在导入成功后仅补写轻量创作来源元数据：来源、提示词、模型、尺寸、质量、输出格式、生成时间、本地任务 ID 等；不写入参考图 data URL、完整上游响应、API Key 或上游地址，避免把浏览器本地创作历史膨胀成后端创作档案。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及工作台导入逻辑、`uploadAdminImages` 复用、图片资产 metadata 补写、导入后的图片管理可追溯性测试。
+- 验证：探索阶段暂未执行；后续实现后按管理端与必要后端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 16:39 +0800
+- 进度：确认管理端图像生成代理第一阶段只支持 OpenAI-compatible Images API，用于文本生图与基础编辑生成；`model`、`base_url`、`api_key` 等上游配置放在 Go 后端环境配置中。暂不支持 Responses API、流式返回、Agent 模式或多供应商协议分支。
+- 影响文件：`plan.md`；后续若实现，预计涉及后端配置项、管理员受限代理接口、前端图像工作台 API 封装、配置状态提示和相关测试。
+- 验证：探索阶段暂未执行；后续实现后按后端与管理端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 16:37 +0800
+- 进度：确认管理端图像生成工作台第一阶段按“完整工作台主干”推进：包含文本生图、参考图上传/粘贴/拖拽、基础编辑生成、本地历史画廊、结果预览/下载/复用为参考图、显式导入媒体库、后端管理员代理与配置状态提示；暂缓可视化蒙版编辑器、Agent 模式、多/自定义供应商、流式局部图像、收藏/ZIP/复杂筛选等扩展能力。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及管理端工具箱入口、无 shell 图像工作台、前端本地历史存储、后端图像生成代理、媒体库导入衔接、相关前后端测试。
+- 验证：探索阶段暂未执行；后续实现后按实际影响范围执行管理端测试/构建、必要的 Go 后端测试、`git diff --check`、乱码扫描。
+
+## 2026-06-09 16:33 +0800
+- 进度：确认管理端图像生成工作台的历史与资产边界：生成任务、参考图、中间图和结果图默认存浏览器本地创作历史，不自动进入后端图片库；只有管理员显式执行“导入媒体库”后，选定结果才成为后端图片资产并进入图片管理/图片合集/孤儿文件扫描等生命周期。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及前端 IndexedDB/本地历史、导入媒体库 API 复用或新增、工作台与图片管理的边界测试。
+- 验证：探索阶段暂未执行；后续实现后按实际影响范围执行管理端测试/构建、必要的 Go 后端测试、`git diff --check`、乱码扫描。
+
+## 2026-06-09 16:32 +0800
+- 进度：确认管理端图像生成工作台的密钥与上游访问边界：真实 API Key 与上游地址放在 Go 后端环境配置中，前端通过管理员受限代理接口调用，不在浏览器保存或展示真实密钥，不直接复刻参考项目的纯前端 API Key 配置方式。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及后端配置、管理员受限图像生成代理接口、管理端图像工作台 API 封装与状态提示。
+- 验证：探索阶段暂未执行；后续实现后按后端与管理端范围执行测试、构建、`git diff --check`、乱码扫描。
+
+## 2026-06-09 16:24 +0800
+- 进度：开始校准管理端工具箱新增“图像生成工作台”方案。已确认参考项目为 `references/gpt_image_playground`，其定位是完整图像工作台而非最小文本生图；用户确认本次目标按完整图像工作台方向推进。已在 `CONTEXT.md` 记录 `admin 图像生成工作台` 概念，并明确它不同于媒体库图片资产管理页面。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续若实现，预计涉及管理端工具箱入口、无 shell 图像生成页、前端本地状态/存储、可能的后端代理或配置接口、相关测试与部署文档。
+- 验证：探索阶段暂未执行；后续实现后按实际影响范围执行管理端测试/构建、必要的 Go 后端测试、`git diff --check`、乱码扫描。
+
 ## 2026-06-09 15:25 +0800
 - 进度：完成管理端工具箱菜单合集与 ED2K 无 shell 新标签页实现。`/toolbox` 现在只展示工具菜单入口，ED2K 入口用 `router.resolve('/toolbox/ed2k').href` 生成带 SPA 基路径的链接并通过 `target="_blank"` 新标签页打开；新增 `/toolbox/ed2k` 管理员受限路由，页面不包后台 Layout，保留“返回工具箱”、ED2K 多行解析、非法行计数和本页会话“已点击”标记。命令面板 `ed2k` 搜索仍命中 `/toolbox`。无关工作区改动 `admin-web/.env.development` 未纳入。
 - 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/router/index.js`、`CONTEXT.md`、`plan.md`

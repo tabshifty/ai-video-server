@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Link, TopRight } from '@element-plus/icons-vue'
+import { Link, Picture, TopRight } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -9,6 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 const router = useRouter()
 
 const ed2kToolHref = computed(() => router.resolve('/toolbox/ed2k').href)
+const imageWorkbenchHref = computed(() => router.resolve('/toolbox/image-workbench').href)
 </script>
 
 <template>
@@ -28,6 +29,19 @@ const ed2kToolHref = computed(() => router.resolve('/toolbox/ed2k').href)
             <span class="tool-menu-item__content">
               <strong>ED2K 链接生成器</strong>
               <span>把多行 ED2K 文本转换为可点击链接。</span>
+            </span>
+            <span class="tool-menu-item__meta">
+              <el-icon><TopRight /></el-icon>
+              <span>新标签页打开</span>
+            </span>
+          </a>
+          <a class="tool-menu-item" :href="imageWorkbenchHref" target="_blank" rel="noopener noreferrer">
+            <span class="tool-menu-item__icon">
+              <el-icon><Picture /></el-icon>
+            </span>
+            <span class="tool-menu-item__content">
+              <strong>图像生成工作台</strong>
+              <span>基于提示词和参考图生成、编辑、保存创作结果。</span>
             </span>
             <span class="tool-menu-item__meta">
               <el-icon><TopRight /></el-icon>

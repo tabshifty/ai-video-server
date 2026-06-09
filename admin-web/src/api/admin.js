@@ -99,6 +99,11 @@ export const deleteAdminImageCollection = (id) =>
   request.delete(`/admin/image-collections/${id}`, {
     timeout: 0
   })
+export const getAdminImageGenerationStatus = () => request.get('/admin/image-generation/status')
+export const generateAdminImage = (payload) =>
+  request.post('/admin/image-generation/generate', payload, {
+    timeout: 0
+  })
 
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
 

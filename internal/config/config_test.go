@@ -144,3 +144,30 @@ func TestLoadIncludesTranslationConfig(t *testing.T) {
 		t.Fatalf("unexpected TranslationTimeout: %s", cfg.TranslationTimeout)
 	}
 }
+
+func TestLoadIncludesImageGenerationConfig(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
+	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("IMAGE_GENERATION_API_URL", "https://image-api.example/v1/")
+	t.Setenv("IMAGE_GENERATION_API_KEY", "image-token")
+	t.Setenv("IMAGE_GENERATION_MODEL", "gpt-image-test")
+	t.Setenv("IMAGE_GENERATION_TIMEOUT_SECONDS", "181")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ImageGenerationAPIURL != "https://image-api.example/v1" {
+		t.Fatalf("unexpected ImageGenerationAPIURL: %s", cfg.ImageGenerationAPIURL)
+	}
+	if cfg.ImageGenerationAPIKey != "image-token" {
+		t.Fatalf("unexpected ImageGenerationAPIKey: %s", cfg.ImageGenerationAPIKey)
+	}
+	if cfg.ImageGenerationModel != "gpt-image-test" {
+		t.Fatalf("unexpected ImageGenerationModel: %s", cfg.ImageGenerationModel)
+	}
+	if cfg.ImageGenerationTimeout != 181*time.Second {
+		t.Fatalf("unexpected ImageGenerationTimeout: %s", cfg.ImageGenerationTimeout)
+	}
+}

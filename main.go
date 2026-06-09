@@ -171,6 +171,12 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 		cfg.ServerLogPath,
 		cfg.AdminWebDistPath,
 		cfg.EnableSwagger,
+		handlers.ImageGenerationConfig{
+			APIURL:  cfg.ImageGenerationAPIURL,
+			APIKey:  cfg.ImageGenerationAPIKey,
+			Model:   cfg.ImageGenerationModel,
+			Timeout: cfg.ImageGenerationTimeout,
+		},
 	)
 	api.Register(r)
 

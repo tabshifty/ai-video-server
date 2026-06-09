@@ -31,6 +31,8 @@ import {
   getAdminVideoTags,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
+  generateAdminImage,
+  getAdminImageGenerationStatus,
   getAdminVideoSubtitles,
   getLatestOrphanFileScan,
   rescanAdminVideoSubtitles,
@@ -57,6 +59,27 @@ describe('uploadAdminImages', () => {
 
     expect(post).toHaveBeenCalledWith('/admin/images/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0
+    })
+  })
+})
+
+describe('image generation apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    get.mockResolvedValue({ ok: true })
+    post.mockResolvedValue({ ok: true })
+  })
+
+  it('loads redacted image generation status and disables timeout for generation', async () => {
+    const payload = { prompt: '生成海报', n: 1 }
+
+    await getAdminImageGenerationStatus()
+    await generateAdminImage(payload)
+
+    expect(get).toHaveBeenCalledWith('/admin/image-generation/status')
+    expect(post).toHaveBeenCalledWith('/admin/image-generation/generate', payload, {
       timeout: 0
     })
   })
