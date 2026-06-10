@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-10 11:06 +0800
+- 进度：确认管理端图像生成下一阶段的保留期语义，并将其收敛为 `admin 图像生成结果保留期`。规则是：任务记录与轻量元数据长期保留；未导入媒体库的临时结果图按统一 TTL 清理，例如 30 天；已导入媒体库的正式图片资产不受该 TTL 影响。本次只纳入 `CONTEXT.md` 与 `plan.md`，不纳入既有 `admin-web/.env.development` 工作区改动。
+- 影响文件：`CONTEXT.md`、`plan.md`。
+- 验证：`git diff --check -- CONTEXT.md plan.md` 通过；乱码扫描无输出。
+
 ## 2026-06-10 11:01 +0800
 - 进度：确认管理端图像生成下一阶段的取消语义，并将其收敛为 `admin 图像生成任务取消`。规则是：只有 `queued` 和 `running` 可取消并进入 `canceled`；`succeeded` 与 `failed` 终态不可再取消。取消后保留任务元数据与取消原因，但不承诺保留未完成中间结果图。本次只纳入 `CONTEXT.md` 与 `plan.md`，不纳入既有 `admin-web/.env.development` 工作区改动。
 - 影响文件：`CONTEXT.md`、`plan.md`。

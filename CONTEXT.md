@@ -88,6 +88,7 @@
 - `admin 图像生成任务状态模型`：[[admin 图像生成任务化]] 与 [[admin 服务端图像创作历史]] 只使用 `queued`、`running`、`succeeded`、`failed`、`canceled` 五种稳定任务状态。上游供应商的细分过程状态、重试细节或传输细节不直接暴露为系统主状态，只能折叠进日志、错误摘要或调试信息。
 - `admin 图像生成任务重试`：[[admin 图像生成任务化]] 的重试不会改写旧任务，而是创建一个新的生成任务并保留它与上一次任务的重试关联。旧任务保持原始终态，新的任务独立经历 `queued`、`running`、`succeeded`、`failed` 或 `canceled`，这样 [[admin 服务端图像创作历史]] 保持不可变并可追溯。
 - `admin 图像生成任务取消`：[[admin 图像生成任务化]] 只允许在 `queued` 或 `running` 时取消并进入 `canceled`；一旦任务已经进入 `succeeded` 或 `failed`，就不能再取消。取消后的任务保留任务元数据和取消原因，但不承诺保留未完成的中间结果图。
+- `admin 图像生成结果保留期`：[[admin 服务端图像创作历史]] 的任务记录与轻量元数据长期保留；未导入媒体库的临时结果图按统一 TTL 清理，例如 30 天；已通过 [[admin 图像导入媒体库]] 成为正式图片资产的结果图脱离该 TTL，不受临时清理策略影响。
 
 ## Git 忽略规则约定
 - 根级 `.gitignore` 中用于本地资料或发布产物的目录规则必须按意图锚定：仅忽略根目录时使用 `/references/`、`/release/`，避免误伤 `.codex/skills/*/references/`、`.agents/skills/*/references/` 等需要版本管理的技能参考文档。
