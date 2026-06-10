@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-10 09:09 +0800
+- 进度：完成管理端生图默认模型切换到 `gpt-image-2` 的实现收尾。`internal/config.Load` 的环境默认值、示例环境变量与 `CONTEXT.md` 已统一到新默认；`internal/handlers/admin_image_generation_test.go` 的显式模型样例也同步为 `gpt-image-2`，避免测试文案继续暗示旧默认。
+- 影响文件：`internal/config/config.go`、`internal/config/config_test.go`、`internal/handlers/admin_image_generation_test.go`、`.env.example`、`CONTEXT.md`、`plan.md`。
+- 验证：`go test ./internal/config ./internal/handlers -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check -- .env.example CONTEXT.md internal/config/config.go internal/config/config_test.go internal/handlers/admin_image_generation_test.go plan.md` 通过；乱码扫描无输出。
+
+## 2026-06-10 09:07 +0800
+- 进度：将管理端生图默认模型统一调整为 `gpt-image-2`。`internal/config.Load` 的环境变量默认值已从 `gpt-image-1.5` 切换为 `gpt-image-2`，`internal/handlers/admin_image_generation.go` 的运行时兜底继续保持 `gpt-image-2`，并同步更新 `.env.example`、`CONTEXT.md` 与相关测试。
+- 影响文件：`internal/config/config.go`、`internal/config/config_test.go`、`internal/handlers/admin_image_generation_test.go`、`.env.example`、`CONTEXT.md`、`plan.md`。
+- 验证：待执行 `go test ./internal/config ./internal/handlers -count=1`、必要的全量 Go 验证、`git diff --check` 与乱码扫描。
+
 ## 2026-06-09 23:24 +0800
 - 进度：完成转码坏包容忍修复收尾验证。确认本次只影响 ffmpeg 转码参数、参数测试和长期文档；不纳入无关工作区改动 `admin-web/.env.development`。本机未安装 ffmpeg，已在部署机用 `/opt/homebrew/bin/ffmpeg` 确认 FFmpeg 8.1 支持并接受 `-max_error_rate 1.0`、`-fflags +discardcorrupt`、`-err_detect ignore_err` 参数。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。

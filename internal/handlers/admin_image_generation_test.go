@@ -112,7 +112,7 @@ func TestAdminImageGenerateCallsGenerationEndpointAndReturnsDataURL(t *testing.T
 	api := &API{imageGenerationConfig: ImageGenerationConfig{
 		APIURL:  upstream.URL,
 		APIKey:  "image-token",
-		Model:   "gpt-image-1.5",
+		Model:   "gpt-image-2",
 		Timeout: 2 * time.Second,
 	}}
 

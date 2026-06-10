@@ -97,7 +97,7 @@ func Load() (Config, error) {
 		TranslationTimeout:         time.Duration(getIntEnv("TRANSLATION_TIMEOUT_SECONDS", 15)) * time.Second,
 		ImageGenerationAPIURL:      strings.TrimSuffix(strings.TrimSpace(os.Getenv("IMAGE_GENERATION_API_URL")), "/"),
 		ImageGenerationAPIKey:      os.Getenv("IMAGE_GENERATION_API_KEY"),
-		ImageGenerationModel:       getEnv("IMAGE_GENERATION_MODEL", "gpt-image-1.5"),
+		ImageGenerationModel:       getEnv("IMAGE_GENERATION_MODEL", "gpt-image-2"),
 		ImageGenerationTimeout:     time.Duration(getIntEnv("IMAGE_GENERATION_TIMEOUT_SECONDS", 180)) * time.Second,
 	}
 

@@ -171,3 +171,17 @@ func TestLoadIncludesImageGenerationConfig(t *testing.T) {
 		t.Fatalf("unexpected ImageGenerationTimeout: %s", cfg.ImageGenerationTimeout)
 	}
 }
+
+func TestLoadDefaultsImageGenerationModel(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
+	t.Setenv("JWT_SECRET", "secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ImageGenerationModel != "gpt-image-2" {
+		t.Fatalf("unexpected default ImageGenerationModel: %s", cfg.ImageGenerationModel)
+	}
+}
