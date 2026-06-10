@@ -51,4 +51,13 @@ describe('toolbox pages', () => {
     expect(imageWorkbenchRoute).not.toContain('public: true')
     expect(imageWorkbenchRoute).not.toContain('hideShellPageHeader')
   })
+
+  it('surfaces failed workbench generation reasons in local history and the selected-task empty state', () => {
+    expect(imageWorkbench).toContain('WarningFilled')
+    expect(imageWorkbench).toContain('selectedTaskError')
+    expect(imageWorkbench).toContain('task.error')
+    expect(imageWorkbench).toContain('生成失败')
+    expect(imageWorkbench).toContain('未返回错误原因')
+    expect(imageWorkbench).toContain('selectTask(fresh)')
+  })
 })

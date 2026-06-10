@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Back, Download, FolderOpened, Picture, Plus, Refresh, Upload } from '@element-plus/icons-vue'
+import { Back, Download, FolderOpened, Picture, Plus, Refresh, Upload, WarningFilled } from '@element-plus/icons-vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -49,6 +49,10 @@ const tasks = ref([])
 const selectedTask = ref(null)
 const currentResults = ref([])
 const dropActive = ref(false)
+const selectedTaskError = computed(() => {
+  if (selectedTask.value?.status !== 'error') return ''
+  return selectedTask.value.error?.trim() || '未返回错误原因'
+})
 
 const canGenerate = computed(() => status.value.enabled && !generating.value && prompt.value.trim() !== '')
 const hasReferences = computed(() => references.value.length > 0)
@@ -244,6 +248,8 @@ async function generateImage() {
     })
     await putWorkbenchTask(failedTask)
     await loadHistory()
+    const fresh = tasks.value.find((item) => item.id === failedTask.id) || failedTask
+    await selectTask(fresh)
     ElMessage.error(failedTask.error)
   } finally {
     generating.value = false
@@ -441,7 +447,13 @@ function formatDimensions(item) {
               <el-button :icon="Refresh" :loading="status.loading" @click="loadStatus">刷新配置</el-button>
             </template>
 
-            <EmptyState v-if="!currentResults.length" title="暂无结果" description="生成图片后会在这里预览和操作。" />
+            <EmptyState
+              v-if="selectedTaskError"
+              :icon="WarningFilled"
+              title="生成失败"
+              :description="selectedTaskError"
+            />
+            <EmptyState v-else-if="!currentResults.length" title="暂无结果" description="生成图片后会在这里预览和操作。" />
             <div v-else class="result-grid">
               <article v-for="(item, index) in currentResults" :key="item.id" class="result-card">
                 <img :src="item.dataUrl" :alt="'生成结果 ' + (index + 1)" />
@@ -483,6 +495,7 @@ function formatDimensions(item) {
                 <span class="history-item__copy">
                   <strong>{{ task.prompt || '未命名任务' }}</strong>
                   <small>{{ formatDate(task.createdAt) }}</small>
+                  <small v-if="task.status === 'error' && task.error" class="history-item__error">{{ task.error }}</small>
                 </span>
                 <el-tag v-if="task.status === 'error'" size="small" type="danger">失败</el-tag>
               </button>
@@ -720,7 +733,17 @@ function formatDimensions(item) {
 }
 
 .history-item__copy {
+  display: grid;
+  gap: var(--space-1);
   min-width: 0;
+}
+
+.history-item__error {
+  overflow: hidden;
+  color: var(--danger);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  word-break: break-word;
 }
 
 @media (max-width: 72rem) {
