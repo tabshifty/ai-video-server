@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-10 10:29 +0800
+- 进度：确认管理端图像生成工作台可以进入下一阶段，并将下一阶段术语收敛为“admin 图像生成任务化”和“admin 服务端图像创作历史”。下一阶段方向锁定为服务端任务化、服务端生成历史、可恢复与跨浏览器查看；暂不优先扩展蒙版编辑、Agent 或多供应商协议。本次只纳入 `CONTEXT.md` 与 `plan.md`，不纳入既有 `admin-web/.env.development` 工作区改动。
+- 影响文件：`CONTEXT.md`、`plan.md`。
+- 验证：`git diff --check -- CONTEXT.md plan.md` 通过；乱码扫描无输出。
+
 ## 2026-06-10 09:29 +0800
 - 进度：完成图像工作台失败态可见性修复收尾。失败任务在本地历史中会保留并展示错误原因，选中失败任务后预览区直接显示失败空态；本次只纳入 `admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md` 与 `plan.md`，未纳入既有 `admin-web/.env.development` 工作区改动。
 - 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`。
