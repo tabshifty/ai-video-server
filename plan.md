@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-10 10:36 +0800
+- 进度：确认管理端图像生成下一阶段的稳定任务状态模型为 `queued / running / succeeded / failed / canceled`，并将其收敛为 `admin 图像生成任务状态模型`。约束是：供应商细状态、重试细节和传输细节不升级为系统主状态，只保留在日志或错误摘要里。本次只纳入 `CONTEXT.md` 与 `plan.md`，不纳入既有 `admin-web/.env.development` 工作区改动。
+- 影响文件：`CONTEXT.md`、`plan.md`。
+- 验证：`git diff --check -- CONTEXT.md plan.md` 通过；乱码扫描无输出。
+
 ## 2026-06-10 10:29 +0800
 - 进度：确认管理端图像生成工作台可以进入下一阶段，并将下一阶段术语收敛为“admin 图像生成任务化”和“admin 服务端图像创作历史”。下一阶段方向锁定为服务端任务化、服务端生成历史、可恢复与跨浏览器查看；暂不优先扩展蒙版编辑、Agent 或多供应商协议。本次只纳入 `CONTEXT.md` 与 `plan.md`，不纳入既有 `admin-web/.env.development` 工作区改动。
 - 影响文件：`CONTEXT.md`、`plan.md`。
