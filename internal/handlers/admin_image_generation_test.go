@@ -72,13 +72,28 @@ func TestAdminImageGenerationStatusIsRedacted(t *testing.T) {
 }
 
 func TestNormalizeAdminImageGenerationRequestRejectsTooManyImages(t *testing.T) {
-	_, _, err := normalizeAdminImageGenerationRequest(adminImageGenerationRequest{
+	_, _, _, err := normalizeAdminImageGenerationRequest(adminImageGenerationRequest{
 		Prompt:       "生成海报",
 		OutputFormat: "png",
 		N:            imageGenerationMaxImages + 1,
 	})
 	if err == nil || !strings.Contains(err.Error(), "单次最多生成") {
 		t.Fatalf("expected max images error, got %v", err)
+	}
+}
+
+func TestNormalizeAdminImageGenerationRequestRejectsMaskWithoutReferences(t *testing.T) {
+	_, _, _, err := normalizeAdminImageGenerationRequest(adminImageGenerationRequest{
+		Prompt: "局部修改",
+		Mask: &adminImageGenerationMaskInput{
+			Name:        "mask.png",
+			MIME:        "image/png",
+			DataURL:     "data:image/png;base64," + base64.StdEncoding.EncodeToString(testPNGBytes(t)),
+			TargetIndex: 0,
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "局部蒙版至少需要一张参考图") {
+		t.Fatalf("expected mask-without-reference error, got %v", err)
 	}
 }
 
@@ -174,6 +189,56 @@ func TestAdminImageGenerateCallsEditEndpointForReferenceImages(t *testing.T) {
 	}
 }
 
+func TestAdminImageGenerateCallsEditEndpointWithMaskAndReordersTargetFirst(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	firstPNG := testPNGBytes(t)
+	secondPNG := testPNGBytesAlt(t)
+	maskPNG := testPNGBytesMask(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/images/edits" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if err := r.ParseMultipartForm(20 * 1024 * 1024); err != nil {
+			t.Fatalf("parse multipart: %v", err)
+		}
+		files := r.MultipartForm.File["image"]
+		if len(files) != 2 {
+			t.Fatalf("expected two reference images, got %d", len(files))
+		}
+		if files[0].Filename != "target.png" {
+			t.Fatalf("expected mask target to be reordered first, got %q", files[0].Filename)
+		}
+		maskFiles := r.MultipartForm.File["mask"]
+		if len(maskFiles) != 1 || maskFiles[0].Filename != "mask.png" {
+			t.Fatalf("expected one mask file, got %#v", maskFiles)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + base64.StdEncoding.EncodeToString(firstPNG) + `"}]}`))
+	}))
+	defer upstream.Close()
+
+	ref1 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(firstPNG)
+	ref2 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(secondPNG)
+	mask := "data:image/png;base64," + base64.StdEncoding.EncodeToString(maskPNG)
+	payload := `{"prompt":"局部改图","output_format":"png","reference_images":[{"name":"other.png","mime":"image/png","data_url":"` + ref1 + `"},{"name":"target.png","mime":"image/png","data_url":"` + ref2 + `"}],"mask":{"name":"mask.png","mime":"image/png","data_url":"` + mask + `","target_index":1}}`
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/image-generation/generate", bytes.NewBufferString(payload))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	api := &API{imageGenerationConfig: ImageGenerationConfig{
+		APIURL:  upstream.URL,
+		APIKey:  "image-token",
+		Model:   "gpt-image-test",
+		Timeout: 2 * time.Second,
+	}}
+
+	api.AdminImageGenerate(ctx)
+
+	if !strings.Contains(rec.Body.String(), `"code":0`) {
+		t.Fatalf("unexpected response: %s", rec.Body.String())
+	}
+}
+
 func TestAdminImageGenerateRequestsB64JSONForCompatibleModel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	inputPNG := testPNGBytes(t)
@@ -216,6 +281,30 @@ func testPNGBytes(t *testing.T) []byte {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
 		t.Fatalf("encode png: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func testPNGBytesAlt(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	img.Set(0, 0, color.RGBA{G: 255, A: 255})
+	img.Set(1, 0, color.RGBA{R: 255, G: 255, A: 255})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func testPNGBytesMask(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 1))
+	img.Set(0, 0, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+	img.Set(1, 0, color.NRGBA{R: 255, G: 255, B: 255, A: 0})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode mask png: %v", err)
 	}
 	return buf.Bytes()
 }

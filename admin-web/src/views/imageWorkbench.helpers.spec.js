@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   IMAGE_WORKBENCH_LIMITS,
   buildImageGenerationPayload,
+  createImageWorkbenchTask,
   normalizeImageWorkbenchParams,
   validateReferenceImageFiles
 } from './imageWorkbench.helpers'
@@ -43,8 +44,8 @@ describe('image workbench helpers', () => {
     expect(validateReferenceImageFiles(tooMany).message).toContain('参考图最多')
   })
 
-  it('builds backend payload without leaking local-only fields', () => {
-    const payload = buildImageGenerationPayload(
+  it('builds backend payload without leaking local-only fields', async () => {
+    const payload = await buildImageGenerationPayload(
       '  生成海报  ',
       { output_format: 'webp', output_compression: 76, n: 2 },
       [{ id: 'local-1', name: 'ref.png', mime: 'image/png', dataUrl: 'data:image/png;base64,abc' }]
@@ -60,5 +61,44 @@ describe('image workbench helpers', () => {
       reference_images: [{ name: 'ref.png', mime: 'image/png', data_url: 'data:image/png;base64,abc' }]
     })
     expect(payload.reference_images[0]).not.toHaveProperty('id')
+  })
+
+  it('builds mask payload against the original reference slot', async () => {
+    const payload = await buildImageGenerationPayload(
+      '编辑这张图',
+      { output_format: 'png', n: 1 },
+      [
+        { id: 'ref-a', name: 'first.jpg', mime: 'image/jpeg', dataUrl: 'data:image/png;base64,aaa' },
+        { id: 'ref-b', name: 'second.png', mime: 'image/png', dataUrl: 'data:image/png;base64,bbb' }
+      ],
+      { targetImageId: 'ref-b', maskDataUrl: 'data:image/png;base64,mask' }
+    )
+
+    expect(payload.mask).toEqual({
+      name: 'mask.png',
+      mime: 'image/png',
+      data_url: 'data:image/png;base64,mask',
+      target_index: 1
+    })
+    expect(payload.reference_images).toHaveLength(2)
+    expect(payload.reference_images[1]).toMatchObject({
+      name: 'second.png',
+      mime: 'image/png',
+      data_url: 'data:image/png;base64,bbb'
+    })
+  })
+
+  it('stores optional structured snapshots in local task records', () => {
+    const task = createImageWorkbenchTask({
+      prompt: '继续改图',
+      params: { n: 1 },
+      referenceImageIds: ['ref-a'],
+      referenceSnapshots: [{ image_id: 'ref-a', source_kind: 'browser_input', slot_index: 0 }],
+      outputImageIds: ['out-a'],
+      mask: { image_id: 'mask-a', target_reference_index: 0 }
+    })
+
+    expect(task.referenceSnapshots).toEqual([{ image_id: 'ref-a', source_kind: 'browser_input', slot_index: 0 }])
+    expect(task.mask).toEqual({ image_id: 'mask-a', target_reference_index: 0 })
   })
 })

@@ -69,12 +69,20 @@ type adminImageGenerationRequest struct {
 	OutputCompression *int                            `json:"output_compression"`
 	N                 int                             `json:"n"`
 	ReferenceImages   []adminImageGenerationInputFile `json:"reference_images"`
+	Mask              *adminImageGenerationMaskInput  `json:"mask"`
 }
 
 type adminImageGenerationInputFile struct {
 	Name    string `json:"name"`
 	MIME    string `json:"mime"`
 	DataURL string `json:"data_url"`
+}
+
+type adminImageGenerationMaskInput struct {
+	Name        string `json:"name"`
+	MIME        string `json:"mime"`
+	DataURL     string `json:"data_url"`
+	TargetIndex int    `json:"target_index"`
 }
 
 type adminImageGenerationResult struct {
@@ -127,7 +135,7 @@ func (a *API) AdminImageGenerate(c *gin.Context) {
 		response.Error(c, 2402, "图像生成请求体过大或格式无效")
 		return
 	}
-	normalizedReq, references, err := normalizeAdminImageGenerationRequest(req)
+	normalizedReq, references, mask, err := normalizeAdminImageGenerationRequest(req)
 	if err != nil {
 		response.Error(c, 2402, err.Error())
 		return
@@ -136,7 +144,7 @@ func (a *API) AdminImageGenerate(c *gin.Context) {
 	startedAt := time.Now()
 	ctx, cancel := context.WithTimeout(c.Request.Context(), cfg.Timeout)
 	defer cancel()
-	results, err := callImageGenerationUpstream(ctx, cfg, normalizedReq, references)
+	results, err := callImageGenerationUpstream(ctx, cfg, normalizedReq, references, mask)
 	if err != nil {
 		requestID := fmt.Sprintf("img-%d", startedAt.UnixNano())
 		if a.logger != nil {
@@ -153,10 +161,10 @@ func (a *API) AdminImageGenerate(c *gin.Context) {
 	})
 }
 
-func normalizeAdminImageGenerationRequest(req adminImageGenerationRequest) (adminImageGenerationRequest, []decodedImageGenerationFile, error) {
+func normalizeAdminImageGenerationRequest(req adminImageGenerationRequest) (adminImageGenerationRequest, []decodedImageGenerationFile, *normalizedImageGenerationMask, error) {
 	req.Prompt = strings.TrimSpace(req.Prompt)
 	if req.Prompt == "" {
-		return req, nil, errors.New("提示词不能为空")
+		return req, nil, nil, errors.New("提示词不能为空")
 	}
 	req.Size = normalizeImageGenerationChoice(req.Size, "auto", map[string]struct{}{
 		"auto": {}, "1024x1024": {}, "1024x1536": {}, "1536x1024": {},
@@ -171,10 +179,10 @@ func normalizeAdminImageGenerationRequest(req adminImageGenerationRequest) (admi
 		req.N = 1
 	}
 	if req.N > imageGenerationMaxImages {
-		return req, nil, fmt.Errorf("单次最多生成 %d 张图片", imageGenerationMaxImages)
+		return req, nil, nil, fmt.Errorf("单次最多生成 %d 张图片", imageGenerationMaxImages)
 	}
 	if len(req.ReferenceImages) > imageGenerationMaxReferenceImages {
-		return req, nil, fmt.Errorf("参考图最多 %d 张", imageGenerationMaxReferenceImages)
+		return req, nil, nil, fmt.Errorf("参考图最多 %d 张", imageGenerationMaxReferenceImages)
 	}
 
 	references := make([]decodedImageGenerationFile, 0, len(req.ReferenceImages))
@@ -182,18 +190,58 @@ func normalizeAdminImageGenerationRequest(req adminImageGenerationRequest) (admi
 	for i, item := range req.ReferenceImages {
 		decoded, err := decodeImageGenerationReference(item, i)
 		if err != nil {
-			return req, nil, err
+			return req, nil, nil, err
 		}
 		if len(decoded.Data) > imageGenerationMaxReferenceBytes {
-			return req, nil, fmt.Errorf("单张参考图最多 10 MiB")
+			return req, nil, nil, fmt.Errorf("单张参考图最多 10 MiB")
 		}
 		totalBytes += len(decoded.Data)
 		if totalBytes > imageGenerationMaxPayloadBytes {
-			return req, nil, fmt.Errorf("参考图总大小最多 40 MiB")
+			return req, nil, nil, fmt.Errorf("参考图总大小最多 40 MiB")
 		}
 		references = append(references, decoded)
 	}
-	return req, references, nil
+	if req.OutputFormat == "png" {
+		req.OutputCompression = nil
+	}
+
+	var mask *normalizedImageGenerationMask
+	if req.Mask != nil {
+		if len(references) == 0 {
+			return req, nil, nil, errors.New("局部蒙版至少需要一张参考图")
+		}
+		if req.Mask.TargetIndex < 0 || req.Mask.TargetIndex >= len(references) {
+			return req, nil, nil, errors.New("蒙版目标参考图不存在")
+		}
+		if references[req.Mask.TargetIndex].MIME != "image/png" {
+			return req, nil, nil, errors.New("局部蒙版的目标参考图必须为 PNG")
+		}
+		decodedMask, err := decodeImageGenerationMask(*req.Mask)
+		if err != nil {
+			return req, nil, nil, err
+		}
+		if len(decodedMask.Data) > imageGenerationMaxReferenceBytes {
+			return req, nil, nil, fmt.Errorf("局部蒙版最多 10 MiB")
+		}
+		totalBytes += len(decodedMask.Data)
+		if totalBytes > imageGenerationMaxPayloadBytes {
+			return req, nil, nil, fmt.Errorf("参考图与蒙版总大小最多 40 MiB")
+		}
+		targetWidth, targetHeight := probeImageGenerationDimensions(references[req.Mask.TargetIndex].Data)
+		maskWidth, maskHeight := probeImageGenerationDimensions(decodedMask.Data)
+		if targetWidth <= 0 || targetHeight <= 0 || maskWidth <= 0 || maskHeight <= 0 {
+			return req, nil, nil, errors.New("无法解析局部蒙版或目标参考图尺寸")
+		}
+		if targetWidth != maskWidth || targetHeight != maskHeight {
+			return req, nil, nil, errors.New("局部蒙版尺寸与目标参考图不一致")
+		}
+		mask = &normalizedImageGenerationMask{
+			File:        decodedMask,
+			TargetIndex: req.Mask.TargetIndex,
+		}
+	}
+
+	return req, references, mask, nil
 }
 
 func normalizeImageGenerationChoice(value, fallback string, allowed map[string]struct{}) string {
@@ -208,6 +256,11 @@ type decodedImageGenerationFile struct {
 	Name string
 	MIME string
 	Data []byte
+}
+
+type normalizedImageGenerationMask struct {
+	File        decodedImageGenerationFile
+	TargetIndex int
 }
 
 func decodeImageGenerationReference(item adminImageGenerationInputFile, index int) (decodedImageGenerationFile, error) {
@@ -243,9 +296,42 @@ func decodeImageGenerationReference(item adminImageGenerationInputFile, index in
 	return decodedImageGenerationFile{Name: name, MIME: mime, Data: data}, nil
 }
 
-func callImageGenerationUpstream(ctx context.Context, cfg ImageGenerationConfig, req adminImageGenerationRequest, references []decodedImageGenerationFile) ([]adminImageGenerationResult, error) {
+func decodeImageGenerationMask(mask adminImageGenerationMaskInput) (decodedImageGenerationFile, error) {
+	mime := strings.ToLower(strings.TrimSpace(mask.MIME))
+	dataURL := strings.TrimSpace(mask.DataURL)
+	if dataURL == "" {
+		return decodedImageGenerationFile{}, errors.New("局部蒙版不能为空")
+	}
+	if strings.HasPrefix(dataURL, "data:") {
+		parsedMIME, payload, ok := strings.Cut(strings.TrimPrefix(dataURL, "data:"), ",")
+		if !ok {
+			return decodedImageGenerationFile{}, errors.New("局部蒙版 data URL 无效")
+		}
+		if semi := strings.Index(parsedMIME, ";"); semi >= 0 {
+			parsedMIME = parsedMIME[:semi]
+		}
+		if mime == "" {
+			mime = strings.ToLower(strings.TrimSpace(parsedMIME))
+		}
+		dataURL = payload
+	}
+	if mime != "image/png" {
+		return decodedImageGenerationFile{}, errors.New("局部蒙版文件必须为 PNG")
+	}
+	data, err := base64.StdEncoding.DecodeString(dataURL)
+	if err != nil {
+		return decodedImageGenerationFile{}, errors.New("局部蒙版 data URL 无效")
+	}
+	name := strings.TrimSpace(mask.Name)
+	if name == "" {
+		name = "mask.png"
+	}
+	return decodedImageGenerationFile{Name: name, MIME: mime, Data: data}, nil
+}
+
+func callImageGenerationUpstream(ctx context.Context, cfg ImageGenerationConfig, req adminImageGenerationRequest, references []decodedImageGenerationFile, mask *normalizedImageGenerationMask) ([]adminImageGenerationResult, error) {
 	if len(references) > 0 {
-		return callImageGenerationEdit(ctx, cfg, req, references)
+		return callImageGenerationEdit(ctx, cfg, req, references, mask)
 	}
 	return callImageGenerationCreate(ctx, cfg, req)
 }
@@ -278,7 +364,7 @@ func callImageGenerationCreate(ctx context.Context, cfg ImageGenerationConfig, r
 	return doImageGenerationRequest(httpReq, cfg, req.OutputFormat)
 }
 
-func callImageGenerationEdit(ctx context.Context, cfg ImageGenerationConfig, req adminImageGenerationRequest, references []decodedImageGenerationFile) ([]adminImageGenerationResult, error) {
+func callImageGenerationEdit(ctx context.Context, cfg ImageGenerationConfig, req adminImageGenerationRequest, references []decodedImageGenerationFile, mask *normalizedImageGenerationMask) ([]adminImageGenerationResult, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	fields := map[string]string{
@@ -301,7 +387,11 @@ func callImageGenerationEdit(ctx context.Context, cfg ImageGenerationConfig, req
 			return nil, err
 		}
 	}
-	for _, reference := range references {
+	executionReferences := references
+	if mask != nil {
+		executionReferences = reorderImageGenerationReferencesForMask(references, mask.TargetIndex)
+	}
+	for _, reference := range executionReferences {
 		header := make(textproto.MIMEHeader)
 		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="image"; filename="%s"`, escapeMultipartFilename(reference.Name)))
 		header.Set("Content-Type", reference.MIME)
@@ -310,6 +400,18 @@ func callImageGenerationEdit(ctx context.Context, cfg ImageGenerationConfig, req
 			return nil, err
 		}
 		if _, err := part.Write(reference.Data); err != nil {
+			return nil, err
+		}
+	}
+	if mask != nil {
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="mask"; filename="%s"`, escapeMultipartFilename(mask.File.Name)))
+		header.Set("Content-Type", mask.File.MIME)
+		part, err := writer.CreatePart(header)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := part.Write(mask.File.Data); err != nil {
 			return nil, err
 		}
 	}
@@ -323,6 +425,17 @@ func callImageGenerationEdit(ctx context.Context, cfg ImageGenerationConfig, req
 	}
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 	return doImageGenerationRequest(httpReq, cfg, req.OutputFormat)
+}
+
+func reorderImageGenerationReferencesForMask(references []decodedImageGenerationFile, targetIndex int) []decodedImageGenerationFile {
+	if targetIndex <= 0 || targetIndex >= len(references) {
+		return append([]decodedImageGenerationFile(nil), references...)
+	}
+	reordered := append([]decodedImageGenerationFile(nil), references...)
+	target := reordered[targetIndex]
+	copy(reordered[1:targetIndex+1], reordered[0:targetIndex])
+	reordered[0] = target
+	return reordered
 }
 
 func shouldRequestImageGenerationB64JSON(model string) bool {

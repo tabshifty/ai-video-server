@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Download, FolderOpened, Picture, Plus, Refresh, Upload, WarningFilled } from '@element-plus/icons-vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
+import ImageWorkbenchMaskEditor from './ImageWorkbenchMaskEditor.vue'
 import {
   generateAdminImage,
   getAdminImageDetail,
@@ -15,10 +16,12 @@ import {
 } from '../api/admin'
 import {
   buildImageGenerationPayload,
+  createWorkbenchMaskPreview,
   createImageWorkbenchTask,
   dataUrlToFile,
   extensionForImageMime,
   readWorkbenchPreferences,
+  validateWorkbenchMask,
   validateReferenceImageFiles,
   writeWorkbenchPreferences
 } from './imageWorkbench.helpers'
@@ -35,6 +38,9 @@ const fileInputRef = ref(null)
 const prompt = ref('')
 const params = reactive(readWorkbenchPreferences())
 const references = ref([])
+const maskDraft = ref(null)
+const maskEditorVisible = ref(false)
+const maskEditorTargetId = ref('')
 const status = ref({
   loading: false,
   enabled: false,
@@ -52,6 +58,21 @@ const dropActive = ref(false)
 const selectedTaskError = computed(() => {
   if (selectedTask.value?.status !== 'error') return ''
   return selectedTask.value.error?.trim() || '未返回错误原因'
+})
+const maskEditorTarget = computed(() => references.value.find((item) => item.id === maskEditorTargetId.value) || null)
+const selectedMaskTarget = computed(() => references.value.find((item) => item.id === maskDraft.value?.targetImageId) || null)
+const hasMask = computed(() => Boolean(maskDraft.value?.maskDataUrl && selectedMaskTarget.value))
+const activeInputMode = computed(() => {
+  if (hasMask.value) return '局部蒙版编辑'
+  return hasReferences.value ? '参考图编辑' : '文本生图'
+})
+const maskEditorInitialMaskDataUrl = computed(() => {
+  if (maskDraft.value?.targetImageId !== maskEditorTargetId.value) return ''
+  return maskDraft.value?.maskDataUrl || ''
+})
+const maskSummary = computed(() => {
+  if (!hasMask.value || !selectedMaskTarget.value) return ''
+  return `当前正在编辑「${selectedMaskTarget.value.name || '目标参考图'}」的局部区域`
 })
 
 const canGenerate = computed(() => status.value.enabled && !generating.value && prompt.value.trim() !== '')
@@ -173,37 +194,181 @@ async function handlePaste(event) {
 }
 
 async function addReferenceFiles(files) {
-  const incoming = Array.from(files || [])
+  const descriptors = Array.from(files || []).map((file) => ({
+    file,
+    name: file.name,
+    mime: file.type,
+    size: file.size,
+    sourceKind: 'browser_input'
+  }))
+  await appendReferenceItems(descriptors)
+}
+
+async function appendReferenceItems(items) {
+  const incoming = Array.from(items || [])
   if (!incoming.length) return
-  const merged = [...references.value.map((item) => item.file).filter(Boolean), ...incoming]
+  const merged = [...references.value.map((item) => item.file).filter(Boolean), ...incoming.map((item) => item.file).filter(Boolean)]
   const validation = validateReferenceImageFiles(merged)
   if (!validation.ok) {
     ElMessage.warning(validation.message)
     return
   }
-  const items = []
-  for (const file of incoming) {
-    const dataUrl = await readFileAsDataUrl(file)
-    const id = await storeWorkbenchImage(dataUrl, 'reference', file.name)
-    items.push({ id, file, name: file.name, mime: file.type, size: file.size, dataUrl })
+  const nextItems = []
+  for (const incomingItem of incoming) {
+    const file = incomingItem.file
+    const dataUrl = incomingItem.dataUrl || (file ? await readFileAsDataUrl(file) : '')
+    const id = await storeWorkbenchImage(dataUrl, 'reference', incomingItem.name || file?.name || 'reference-image')
+    nextItems.push({
+      id,
+      file,
+      name: incomingItem.name || file?.name || 'reference-image',
+      mime: incomingItem.mime || file?.type || 'image/png',
+      size: incomingItem.size ?? file?.size ?? 0,
+      dataUrl,
+      sourceKind: incomingItem.sourceKind || 'browser_input',
+      sourceTaskId: incomingItem.sourceTaskId || '',
+      sourceResultId: incomingItem.sourceResultId || ''
+    })
   }
-  references.value = [...references.value, ...items]
+  references.value = [...references.value, ...nextItems]
+}
+
+function clearMaskDraftIfTargetRemoved(id) {
+  if (maskDraft.value?.targetImageId === id) {
+    maskDraft.value = null
+  }
+  if (maskEditorTargetId.value === id) {
+    maskEditorTargetId.value = ''
+    maskEditorVisible.value = false
+  }
 }
 
 function removeReference(id) {
+  clearMaskDraftIfTargetRemoved(id)
   references.value = references.value.filter((item) => item.id !== id)
 }
 
 function clearReferences() {
   references.value = []
+  maskDraft.value = null
+  maskEditorTargetId.value = ''
+  maskEditorVisible.value = false
 }
 
-async function generateImage() {
+function isMaskTarget(id) {
+  return maskDraft.value?.targetImageId === id
+}
+
+function getReferencePreview(item) {
+  if (isMaskTarget(item.id) && maskDraft.value?.previewDataUrl) {
+    return maskDraft.value.previewDataUrl
+  }
+  return item.dataUrl
+}
+
+function openMaskEditor(id) {
+  const target = references.value.find((item) => item.id === id)
+  if (!target) return
+  maskEditorTargetId.value = id
+  maskEditorVisible.value = true
+}
+
+async function handleMaskSaved(maskDataUrl) {
+  if (!maskEditorTarget.value?.dataUrl) {
+    ElMessage.error('遮罩目标参考图已不存在，请重新选择')
+    return
+  }
+  try {
+    const previewDataUrl = await createWorkbenchMaskPreview(maskEditorTarget.value.dataUrl, maskDataUrl)
+    maskDraft.value = {
+      targetImageId: maskEditorTarget.value.id,
+      maskDataUrl,
+      previewDataUrl
+    }
+    maskEditorVisible.value = false
+    ElMessage.success('已保存局部蒙版')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '保存蒙版失败'))
+  }
+}
+
+function removeMask() {
+  if (!maskDraft.value) return
+  maskDraft.value = null
+  ElMessage.success('已移除蒙版')
+}
+
+function buildReferenceSnapshots() {
+  return references.value.map((item, index) => ({
+    image_id: item.id,
+    name: item.name,
+    mime: item.mime,
+    slot_index: index,
+    source_kind: item.sourceKind || 'browser_input',
+    source_task_id: item.sourceTaskId || '',
+    source_result_id: item.sourceResultId || ''
+  }))
+}
+
+function buildMaskTaskSnapshot(maskImageId) {
+  if (!maskImageId || !maskDraft.value?.targetImageId) return null
+  const targetIndex = references.value.findIndex((item) => item.id === maskDraft.value?.targetImageId)
+  if (targetIndex < 0) return null
+  return {
+    image_id: maskImageId,
+    mime: 'image/png',
+    target_reference_index: targetIndex
+  }
+}
+
+async function normalizeMaskDraft(allowFullMask = false) {
+  if (!maskDraft.value?.targetImageId || !maskDraft.value?.maskDataUrl) {
+    return null
+  }
+  const target = references.value.find((item) => item.id === maskDraft.value.targetImageId)
+  if (!target?.dataUrl) {
+    maskDraft.value = null
+    throw new Error('遮罩目标参考图已不存在，请重新选择')
+  }
+  const coverage = await validateWorkbenchMask(maskDraft.value.maskDataUrl, target.dataUrl)
+  if (coverage === 'empty') {
+    throw new Error('请先涂抹需要编辑的区域')
+  }
+  if (coverage === 'full' && !allowFullMask) {
+    await ElMessageBox.confirm(
+      '当前遮罩覆盖了整张目标参考图，提交后可能会重绘全部内容。是否继续？',
+      '确认编辑整张图片？',
+      {
+        confirmButtonText: '继续提交',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  }
+  return maskDraft.value
+}
+
+async function generateImage(options = {}) {
   if (!canGenerate.value) return
+  let activeMask = null
+  try {
+    activeMask = await normalizeMaskDraft(Boolean(options.allowFullMask))
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    if (error?.message === 'cancel' || error?.message === 'close') return
+    ElMessage.error(extractErrorMessage(error, '校验蒙版失败'))
+    return
+  }
   generating.value = true
   const startedAt = Date.now()
   try {
-    const payload = buildImageGenerationPayload(prompt.value, params, references.value)
+    const payload = await buildImageGenerationPayload(prompt.value, params, references.value, activeMask)
+    let storedMaskImageId = ''
+    if (activeMask?.maskDataUrl) {
+      storedMaskImageId = await storeWorkbenchImage(activeMask.maskDataUrl, 'mask', 'workbench-mask.png')
+    }
+    const referenceSnapshots = buildReferenceSnapshots()
+    const taskMask = buildMaskTaskSnapshot(storedMaskImageId)
     const response = await generateAdminImage(payload)
     const resultItems = response?.items || []
     const outputImageIds = []
@@ -223,8 +388,10 @@ async function generateImage() {
       prompt: prompt.value,
       params,
       referenceImageIds: references.value.map((item) => item.id),
+      referenceSnapshots,
       outputImageIds,
       results: storedResults,
+      mask: taskMask,
       status: 'done',
       startedAt,
       finishedAt: Date.now()
@@ -239,8 +406,10 @@ async function generateImage() {
       prompt: prompt.value,
       params,
       referenceImageIds: references.value.map((item) => item.id),
+      referenceSnapshots: buildReferenceSnapshots(),
       outputImageIds: [],
       results: [],
+      mask: activeMask?.maskDataUrl ? buildMaskTaskSnapshot(await storeWorkbenchImage(activeMask.maskDataUrl, 'mask', 'workbench-mask.png')) : null,
       status: 'error',
       error: extractErrorMessage(error, '图像生成失败'),
       startedAt,
@@ -268,7 +437,16 @@ function downloadResult(result, index) {
 
 async function reuseAsReference(result) {
   const file = dataUrlToFile(result.dataUrl, 'generated-reference.png', result.mime)
-  await addReferenceFiles([file])
+  await appendReferenceItems([{
+    file,
+    name: file.name,
+    mime: file.type,
+    size: file.size,
+    dataUrl: result.dataUrl,
+    sourceKind: 'previous_result',
+    sourceTaskId: selectedTask.value?.id || '',
+    sourceResultId: result.id || ''
+  }])
   ElMessage.success('已复用为参考图')
 }
 
@@ -359,7 +537,7 @@ function formatDimensions(item) {
         <aside class="workbench-panel workbench-panel--input">
           <SectionCard>
             <template #title>输入</template>
-            <template #description>{{ hasReferences ? '参考图编辑' : '文本生图' }}</template>
+            <template #description>{{ activeInputMode }}</template>
 
             <div class="input-stack">
               <el-input
@@ -382,14 +560,35 @@ function formatDimensions(item) {
                 <span>支持拖拽、粘贴、上传 PNG/JPEG/WebP</span>
               </div>
 
+              <div v-if="hasMask" class="mask-summary">
+                <div>
+                  <strong>局部蒙版已启用</strong>
+                  <p>{{ maskSummary }}</p>
+                </div>
+                <div class="mask-summary__actions">
+                  <el-button size="small" @click="openMaskEditor(maskDraft?.targetImageId)">继续编辑</el-button>
+                  <el-button size="small" text @click="removeMask">移除蒙版</el-button>
+                </div>
+              </div>
+
               <div v-if="references.length" class="reference-list">
                 <article v-for="item in references" :key="item.id" class="reference-card">
-                  <img :src="item.dataUrl" :alt="item.name" />
-                  <div>
+                  <img :src="getReferencePreview(item)" :alt="item.name" />
+                  <div class="reference-card__copy">
                     <strong>{{ item.name }}</strong>
                     <span>{{ item.mime }}</span>
+                    <div class="reference-card__tags">
+                      <el-tag v-if="isMaskTarget(item.id)" size="small" type="primary">蒙版目标</el-tag>
+                      <el-tag v-if="item.sourceKind === 'previous_result'" size="small" effect="plain">前序结果</el-tag>
+                    </div>
                   </div>
-                  <el-button size="small" text @click="removeReference(item.id)">移除</el-button>
+                  <div class="reference-card__actions">
+                    <el-button size="small" @click="openMaskEditor(item.id)">
+                      {{ isMaskTarget(item.id) ? '编辑蒙版' : '添加蒙版' }}
+                    </el-button>
+                    <el-button v-if="isMaskTarget(item.id)" size="small" text @click="removeMask">移除蒙版</el-button>
+                    <el-button size="small" text @click="removeReference(item.id)">移除参考图</el-button>
+                  </div>
                 </article>
                 <el-button size="small" @click="clearReferences">清空参考图</el-button>
               </div>
@@ -504,6 +703,13 @@ function formatDimensions(item) {
         </aside>
       </div>
     </div>
+    <ImageWorkbenchMaskEditor
+      v-model="maskEditorVisible"
+      :image-data-url="maskEditorTarget?.dataUrl || ''"
+      :image-name="maskEditorTarget?.name || ''"
+      :initial-mask-data-url="maskEditorInitialMaskDataUrl"
+      @save="handleMaskSaved"
+    />
   </main>
 </template>
 
@@ -581,10 +787,39 @@ function formatDimensions(item) {
   gap: var(--space-2);
 }
 
+.mask-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line-soft));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-surface));
+}
+
+.mask-summary strong,
+.mask-summary p {
+  margin: 0;
+}
+
+.mask-summary p {
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.mask-summary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 .reference-card {
   display: grid;
   grid-template-columns: 4rem minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: var(--space-2);
   min-width: 0;
   padding: var(--space-2);
@@ -606,6 +841,12 @@ function formatDimensions(item) {
   border-radius: var(--radius-sm);
 }
 
+.reference-card__copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
 .reference-card strong,
 .history-item strong {
   display: block;
@@ -623,6 +864,17 @@ function formatDimensions(item) {
   color: var(--text-muted);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
+}
+
+.reference-card__tags,
+.reference-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reference-card__actions {
+  justify-content: flex-end;
 }
 
 .param-grid {
@@ -761,6 +1013,15 @@ function formatDimensions(item) {
     padding: var(--space-4);
   }
 
+  .mask-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mask-summary__actions {
+    justify-content: flex-start;
+  }
+
   .param-grid {
     grid-template-columns: 1fr;
   }
@@ -770,6 +1031,7 @@ function formatDimensions(item) {
     grid-template-columns: 3.5rem minmax(0, 1fr);
   }
 
+  .reference-card__actions,
   .reference-card .el-button,
   .history-item .el-tag {
     grid-column: 2;
