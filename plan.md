@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-12 09:05 +0800
+- 进度：开始清理未接入的旧任务化生图残留。已确认当前主链路采用“同步生成 + 浏览器本地历史”，本轮仅删除未跟踪的服务端任务化草稿与对应迁移文件，避免后续被误当成正式方案或被全量 migration 误执行。
+- 影响文件：`internal/services/image_generation.go`、`migrations/0023_image_generation_tasks.up.sql`、`migrations/0023_image_generation_tasks.down.sql`、`plan.md`
+- 验证：待执行 `git status --short`
+
+## 2026-06-12 09:07 +0800
+- 进度：完成未接入的旧任务化生图残留清理。当前工作区仅保留 `plan.md` 账本更新与用户已有的 `admin-web/.env.development` 本地环境改动，已避免未跟踪 `0023` migration 被后续流程误执行。
+- 影响文件：`plan.md`
+- 验证：`git status --short` 确认仅剩 `plan.md` 与未纳入的 `admin-web/.env.development`
+
 ## 2026-06-12 00:39 +0800
 - 进度：完成 admin 图像工作台“参考图局部蒙版编辑”主链路。前端新增本地蒙版编辑弹窗、蒙版目标预览、前序结果复用来源标记与最小本地快照字段；后端 `/admin/image-generation/generate` 新增 `mask` 入参、目标槽位校验、尺寸校验以及执行层首图重排后再向上游 `/images/edits` 提交蒙版。
 - 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/ImageWorkbenchMaskEditor.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`internal/handlers/admin_image_generation.go`、`internal/handlers/admin_image_generation_test.go`、`CONTEXT.md`、`plan.md`
