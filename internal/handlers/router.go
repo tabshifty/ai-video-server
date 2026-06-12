@@ -49,6 +49,7 @@ type API struct {
 	appSvc                *services.AppService
 	imageSvc              *services.ImageService
 	subtitleSvc           *services.SubtitleService
+	tvAPKSvc              tvAPKService
 	iptvSvc               iptvService
 	enqueuer              taskEnqueuer
 	logger                *slog.Logger
@@ -81,6 +82,7 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		appSvc:                appSvc,
 		imageSvc:              imageSvc,
 		subtitleSvc:           subtitleSvc,
+		tvAPKSvc:              services.NewTVAPKService(repo, uploadTempDir, storageRoot),
 		iptvSvc:               services.NewIPTVService(repo, nil),
 		enqueuer:              enqueuer,
 		logger:                logger,
@@ -161,6 +163,8 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/user/uploaded-videos", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadedVideos)
 		v1.GET("/user/liked-videos", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.LikedVideos)
 		v1.GET("/user/favorited-videos", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.FavoritedVideos)
+		v1.GET("/tv-app/releases", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVAppFamilyReleases)
+		v1.GET("/tv-app/releases/:id/download/:abi", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVAppDownloadAPK)
 
 		admin := v1.Group("/admin", middleware.AuthMiddleware(a.jwtSecret, a.redis), middleware.AdminRequired())
 		{
@@ -170,6 +174,15 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/iptv/playlist/upload", a.AdminIPTVUploadPlaylist)
 			admin.PUT("/iptv/playlist/source", a.AdminIPTVSaveSource)
 			admin.POST("/iptv/playlist/refresh", a.AdminIPTVRefreshPlaylist)
+			admin.GET("/tv-app/releases", a.AdminTVAppReleases)
+			admin.GET("/tv-app/releases/:id", a.AdminTVAppReleaseDetail)
+			admin.POST("/tv-app/releases/upload", a.AdminUploadTVAppAPK)
+			admin.PUT("/tv-app/releases/:id", a.AdminUpdateTVAppRelease)
+			admin.POST("/tv-app/releases/:id/publish", a.AdminPublishTVAppRelease)
+			admin.POST("/tv-app/releases/:id/offline", a.AdminOfflineTVAppRelease)
+			admin.POST("/tv-app/releases/:id/restore", a.AdminRestoreTVAppRelease)
+			admin.DELETE("/tv-app/releases/:id", a.AdminDeleteTVAppReleaseDraft)
+			admin.GET("/tv-app/releases/:id/download/:abi", a.AdminDownloadTVAppAPK)
 			admin.GET("/videos", a.AdminVideos)
 			admin.GET("/video-tags", a.AdminVideoTags)
 			admin.GET("/video-tags/popular", a.AdminPopularVideoTags)

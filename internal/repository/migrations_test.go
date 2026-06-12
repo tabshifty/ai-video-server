@@ -65,6 +65,25 @@ func TestOrphanFileScanMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+orphan_file_scans`)
 }
 
+func TestTVApkDistributionMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0023_tv_apk_distribution.up.sql")
+	down := readMigrationForTest(t, "0023_tv_apk_distribution.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+tv_app_releases`)
+	assertSQLPattern(t, up, `(?is)publish_status\s+varchar\(32\)\s+not\s+null\s+default\s+'draft'`)
+	assertSQLPattern(t, up, `(?is)'draft'.*'published_complete'.*'published_missing_abi'.*'offline'`)
+	assertSQLPattern(t, up, `(?is)unique\s*\(\s*package_name\s*,\s*version_code\s*\)`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+tv_app_release_apks`)
+	assertSQLPattern(t, up, `(?is)references\s+tv_app_releases\(id\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, up, `(?is)abi\s+in\s+\('armeabi-v7a',\s*'arm64-v8a'\)`)
+	assertSQLPattern(t, up, `(?is)unique\s*\(\s*release_id\s*,\s*abi\s*\)`)
+
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+tv_app_release_apks`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+tv_app_releases`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

@@ -6,7 +6,10 @@ import (
 	"io"
 	"strings"
 
+	"mime/multipart"
+
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"video-server/internal/models"
 	"video-server/internal/response"
@@ -18,6 +21,19 @@ type iptvService interface {
 	Upload(context.Context, string, io.Reader) (models.IPTVPlaylistStatus, error)
 	SaveSourceURL(context.Context, string) (models.IPTVPlaylistStatus, error)
 	Refresh(context.Context) (models.IPTVPlaylistStatus, error)
+}
+
+type tvAPKService interface {
+	AdminList(context.Context, models.AdminTvAppReleaseFilter) ([]models.AdminTvAppReleaseListItem, int, error)
+	AdminDetail(context.Context, int64) (models.AdminTvAppReleaseDetail, error)
+	UploadAPK(context.Context, *multipart.FileHeader, *uuid.UUID, string, bool) (models.TVAppReleaseRecord, models.TVAppReleaseABIInfo, error)
+	UpdateRelease(context.Context, int64, models.AdminTvAppReleaseUpdateInput) (models.TVAppReleaseRecord, error)
+	Publish(context.Context, int64, models.AdminTvAppReleasePublishInput) (models.TVAppReleaseRecord, error)
+	Offline(context.Context, int64) (models.TVAppReleaseRecord, error)
+	Restore(context.Context, int64) (models.TVAppReleaseRecord, error)
+	DeleteDraft(context.Context, int64) error
+	FamilyReleases(context.Context) ([]models.TVAppFamilyRelease, error)
+	FindReleaseAPK(context.Context, int64, string) (models.TVAppReleaseABIInfo, error)
 }
 
 func (a *API) AdminIPTVPlaylist(c *gin.Context) {

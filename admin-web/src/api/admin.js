@@ -58,6 +58,22 @@ export const uploadAdminIPTVPlaylist = (formData) =>
   })
 export const updateAdminIPTVSource = (payload) => request.put('/admin/iptv/playlist/source', payload)
 export const refreshAdminIPTVPlaylist = () => request.post('/admin/iptv/playlist/refresh')
+export const getAdminTVAppReleases = (params) => request.get('/admin/tv-app/releases', { params })
+export const getAdminTVAppReleaseDetail = (id) => request.get(`/admin/tv-app/releases/${id}`)
+export const uploadAdminTVAppAPK = (formData) =>
+  request.post('/admin/tv-app/releases/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0
+  })
+export const updateAdminTVAppRelease = (id, payload) => request.put(`/admin/tv-app/releases/${id}`, payload)
+export const publishAdminTVAppRelease = (id, payload) => request.post(`/admin/tv-app/releases/${id}/publish`, payload)
+export const offlineAdminTVAppRelease = (id) => request.post(`/admin/tv-app/releases/${id}/offline`)
+export const restoreAdminTVAppRelease = (id) => request.post(`/admin/tv-app/releases/${id}/restore`)
+export const deleteAdminTVAppReleaseDraft = (id) =>
+  request.delete(`/admin/tv-app/releases/${id}`, {
+    timeout: 0
+  })
+export const downloadAdminTVAppReleaseURL = (id, abi) => `/api/v1/admin/tv-app/releases/${id}/download/${abi}`
 
 export const getAdminUsers = (params) => request.get('/admin/users', { params })
 export const createAdminUser = (payload) => request.post('/admin/users', payload)

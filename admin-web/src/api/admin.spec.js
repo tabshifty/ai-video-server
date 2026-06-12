@@ -21,6 +21,7 @@ import {
   createAdminTvEpisode,
   createAdminTvSeason,
   createAdminTvSeries,
+  deleteAdminTVAppReleaseDraft,
   deleteAdminTvEpisode,
   deleteAdminTvSeason,
   deleteAdminTvSeries,
@@ -33,15 +34,22 @@ import {
   getAdminTvSeriesDetail,
   generateAdminImage,
   getAdminImageGenerationStatus,
+  getAdminTVAppReleaseDetail,
+  getAdminTVAppReleases,
   getAdminVideoSubtitles,
   getLatestOrphanFileScan,
+  offlineAdminTVAppRelease,
+  publishAdminTVAppRelease,
   rescanAdminVideoSubtitles,
+  restoreAdminTVAppRelease,
   scrapePreview,
   startOrphanFileScan,
+  updateAdminTVAppRelease,
   updateAdminVideoSubtitle,
   updateAdminTvEpisode,
   updateAdminTvSeason,
   updateAdminTvSeries,
+  uploadAdminTVAppAPK,
   uploadAdminVideoSubtitle,
   uploadAdminImages
 } from './admin'
@@ -203,6 +211,54 @@ describe('tv series apis', () => {
       timeout: 0
     })
     expect(remove).toHaveBeenCalledWith('/admin/tv/episodes/33', {
+      timeout: 0
+    })
+  })
+})
+
+describe('tv app release apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    put.mockReset()
+    remove.mockReset()
+  })
+
+  it('requests tv app release list and detail', async () => {
+    await getAdminTVAppReleases({ q: '84', status: 'draft' })
+    await getAdminTVAppReleaseDetail(12)
+
+    expect(get).toHaveBeenCalledWith('/admin/tv-app/releases', {
+      params: { q: '84', status: 'draft' }
+    })
+    expect(get).toHaveBeenCalledWith('/admin/tv-app/releases/12')
+  })
+
+  it('uploads tv apk with multipart and timeout disabled', async () => {
+    const formData = new FormData()
+
+    await uploadAdminTVAppAPK(formData)
+
+    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0
+    })
+  })
+
+  it('updates publish lifecycle for tv app release', async () => {
+    const payload = { release_notes: '修复 IPTV 闪退', remarks: '推荐升级' }
+
+    await updateAdminTVAppRelease(12, payload)
+    await publishAdminTVAppRelease(12, payload)
+    await offlineAdminTVAppRelease(12)
+    await restoreAdminTVAppRelease(12)
+    await deleteAdminTVAppReleaseDraft(12)
+
+    expect(put).toHaveBeenCalledWith('/admin/tv-app/releases/12', payload)
+    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/publish', payload)
+    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/offline')
+    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/restore')
+    expect(remove).toHaveBeenCalledWith('/admin/tv-app/releases/12', {
       timeout: 0
     })
   })

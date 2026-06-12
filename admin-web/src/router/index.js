@@ -6,6 +6,7 @@ import Dashboard from '../views/Dashboard.vue'
 import VideoList from '../views/VideoList.vue'
 import VideoUpload from '../views/VideoUpload.vue'
 import TvSeriesManage from '../views/TvSeriesManage.vue'
+import TvAppManage from '../views/TvAppManage.vue'
 import IPTVManage from '../views/IPTVManage.vue'
 import ScrapePreview from '../views/ScrapePreview.vue'
 import AVManualScrape from '../views/AVManualScrape.vue'
@@ -26,6 +27,7 @@ const routes = [
   { path: '/dashboard', component: Dashboard, meta: { hideShellPageHeader: true } },
   { path: '/videos', component: VideoList, meta: { hideShellPageHeader: true } },
   { path: '/tv-series', component: TvSeriesManage, meta: { hideShellPageHeader: true } },
+  { path: '/tv-app', component: TvAppManage, meta: { hideShellPageHeader: true } },
   { path: '/iptv', component: IPTVManage, meta: { hideShellPageHeader: true } },
   { path: '/upload', component: VideoUpload, meta: { hideShellPageHeader: true } },
   { path: '/scrape', component: ScrapePreview, meta: { hideShellPageHeader: true } },

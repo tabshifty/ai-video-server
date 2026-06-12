@@ -352,3 +352,62 @@ type AdminTvEpisodeInput struct {
 	StillURL      string `json:"still_url"`
 	VideoID       string `json:"video_id"`
 }
+
+type AdminTvAppReleaseFilter struct {
+	Page             int
+	PageSize         int
+	Keyword          string
+	Status           string
+	ABICompleteness  string
+	CurrentPublished bool
+}
+
+type AdminTvAppReleaseABIItem struct {
+	ID            int64           `json:"id"`
+	ReleaseID     int64           `json:"release_id"`
+	ABI           string          `json:"abi"`
+	FileName      string          `json:"file_name"`
+	StoredPath    string          `json:"stored_path"`
+	FileSize      int64           `json:"file_size"`
+	MIMEType      string          `json:"mime_type"`
+	SHA256        string          `json:"sha256"`
+	IsDebuggable  bool            `json:"is_debuggable"`
+	UploadedAt    time.Time       `json:"uploaded_at"`
+	ReplacedAt    *time.Time      `json:"replaced_at,omitempty"`
+	UploadUserID  *uuid.UUID      `json:"upload_user_id,omitempty"`
+	UploadUser    string          `json:"upload_user"`
+	Metadata      json.RawMessage `json:"metadata"`
+}
+
+type AdminTvAppReleaseListItem struct {
+	ID                   int64                      `json:"id"`
+	PackageName          string                     `json:"package_name"`
+	VersionCode          int64                      `json:"version_code"`
+	VersionName          string                     `json:"version_name"`
+	ReleaseNotes         string                     `json:"release_notes"`
+	Remarks              string                     `json:"remarks"`
+	PublishStatus        string                     `json:"publish_status"`
+	PublishedAt          *time.Time                 `json:"published_at,omitempty"`
+	LastStatusChangedAt  time.Time                  `json:"last_status_changed_at"`
+	OriginalUploadedAt   time.Time                  `json:"original_uploaded_at"`
+	CreatedAt            time.Time                  `json:"created_at"`
+	UpdatedAt            time.Time                  `json:"updated_at"`
+	LatestRecommended    bool                       `json:"latest_recommended"`
+	VisibleToFamily      bool                       `json:"visible_to_family"`
+	MissingABIs          []string                   `json:"missing_abis"`
+	UploadedABIs         []string                   `json:"uploaded_abis"`
+	ABIComplete          bool                       `json:"abi_complete"`
+	ABIItems             []AdminTvAppReleaseABIItem `json:"abi_items"`
+}
+
+type AdminTvAppReleaseDetail = AdminTvAppReleaseListItem
+
+type AdminTvAppReleaseUpdateInput struct {
+	ReleaseNotes string `json:"release_notes"`
+	Remarks      string `json:"remarks"`
+}
+
+type AdminTvAppReleasePublishInput struct {
+	ReleaseNotes string `json:"release_notes"`
+	Remarks      string `json:"remarks"`
+}
