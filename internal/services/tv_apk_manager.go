@@ -23,7 +23,7 @@ type tvAPKRepository interface {
 	OfflineTVAppRelease(context.Context, int64) (models.TVAppReleaseRecord, error)
 	RestoreTVAppRelease(context.Context, int64) (models.TVAppReleaseRecord, error)
 	DeleteTVAppDraftRelease(context.Context, int64) error
-	ListTVAppFamilyReleases(context.Context, int) ([]models.TVAppFamilyRelease, error)
+	ListTVAppFamilyReleases(context.Context, string, int) ([]models.TVAppFamilyRelease, error)
 	GetTVAppReleaseAPKByABI(context.Context, int64, string) (models.TVAppReleaseABIInfo, error)
 }
 
@@ -65,6 +65,7 @@ func (s *TVAPKService) AdminDetailForRecord(ctx context.Context, release models.
 func (s *TVAPKService) UploadAPK(
 	ctx context.Context,
 	fileHeader *multipart.FileHeader,
+	clientType string,
 	userID *uuid.UUID,
 	username string,
 	replaceExisting bool,
@@ -105,8 +106,12 @@ func (s *TVAPKService) UploadAPK(
 		_ = os.Remove(tempPath)
 		return models.TVAppReleaseRecord{}, models.TVAppReleaseABIInfo{}, err
 	}
+	if normalized := models.NormalizeAppClientType(clientType); normalized != "" && normalized != meta.ClientType {
+		_ = os.Remove(tempPath)
+		return models.TVAppReleaseRecord{}, models.TVAppReleaseABIInfo{}, models.NewTVAPKDomainError(models.TVAPKErrorClientTypeMismatch, "所选客户端类型与上传 APK 不匹配")
+	}
 
-	targetDir := filepath.Join(s.storage, "tv-app", fmt.Sprintf("%d", meta.VersionCode))
+	targetDir := filepath.Join(s.storage, "app-apks", models.AppClientTypeSlug(meta.ClientType), fmt.Sprintf("%d", meta.VersionCode))
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		_ = os.Remove(tempPath)
 		return models.TVAppReleaseRecord{}, models.TVAppReleaseABIInfo{}, fmt.Errorf("create tv apk target dir: %w", err)
@@ -145,12 +150,15 @@ func (s *TVAPKService) DeleteDraft(ctx context.Context, releaseID int64) error {
 	return s.repo.DeleteTVAppDraftRelease(ctx, releaseID)
 }
 
-func (s *TVAPKService) FamilyReleases(ctx context.Context) ([]models.TVAppFamilyRelease, error) {
-	return s.repo.ListTVAppFamilyReleases(ctx, 3)
+func (s *TVAPKService) FamilyReleases(ctx context.Context, clientType string) ([]models.TVAppFamilyRelease, error) {
+	return s.repo.ListTVAppFamilyReleases(ctx, clientType, 3)
 }
 
 func (s *TVAPKService) FindReleaseAPK(ctx context.Context, releaseID int64, abi string) (models.TVAppReleaseABIInfo, error) {
-	return s.repo.GetTVAppReleaseAPKByABI(ctx, releaseID, models.TVNormalizeABI(abi))
+	if normalized := models.TVNormalizeABI(abi); normalized != "" {
+		return s.repo.GetTVAppReleaseAPKByABI(ctx, releaseID, normalized)
+	}
+	return s.repo.GetTVAppReleaseAPKByABI(ctx, releaseID, models.NormalizeReleaseArtifactSlot(models.AppClientTypeAndroidPhone, abi))
 }
 
 func buildStoredTVAPKFileName(meta models.TVAppAPKParsedMetadata) string {
@@ -159,7 +167,11 @@ func buildStoredTVAPKFileName(meta models.TVAppAPKParsedMetadata) string {
 	if versionName == "" {
 		versionName = "unknown"
 	}
-	return fmt.Sprintf("tv-app-v%d-%s-%s.apk", meta.VersionCode, versionName, meta.ABI)
+	prefix := models.AppClientTypeSlug(meta.ClientType)
+	if prefix == "" {
+		prefix = "android-app"
+	}
+	return fmt.Sprintf("%s-v%d-%s-%s.apk", prefix, meta.VersionCode, versionName, meta.ABI)
 }
 
 func moveTVAPKFile(src, dst string) error {

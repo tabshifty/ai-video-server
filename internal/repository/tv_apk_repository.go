@@ -20,8 +20,14 @@ type tvRowScanner interface {
 }
 
 func (r *VideoRepository) AdminListTVAppReleases(ctx context.Context, f models.AdminTvAppReleaseFilter) ([]models.AdminTvAppReleaseListItem, int, error) {
-	where := []string{"1=1"}
+	clientType := models.NormalizeAppClientType(f.ClientType)
+	if clientType == "" {
+		clientType = models.AppClientTypeAndroidTV
+	}
+
+	where := []string{"r.client_type = $1"}
 	args := make([]any, 0, 10)
+	args = append(args, clientType)
 	next := func(v any) string {
 		args = append(args, v)
 		return fmt.Sprintf("$%d", len(args))
@@ -38,11 +44,11 @@ func (r *VideoRepository) AdminListTVAppReleases(ctx context.Context, f models.A
 	}
 	switch strings.TrimSpace(f.ABICompleteness) {
 	case "complete":
-		where = append(where, "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) >= 2")
+		where = append(where, buildReleaseCompletenessSQL(clientType, "complete"))
 	case "missing":
-		where = append(where, "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) BETWEEN 1 AND 1")
+		where = append(where, buildReleaseCompletenessSQL(clientType, "missing"))
 	case "empty":
-		where = append(where, "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) = 0")
+		where = append(where, buildReleaseCompletenessSQL(clientType, "empty"))
 	}
 	if f.CurrentPublished {
 		where = append(where, "r.publish_status IN ('published_complete', 'published_missing_abi')")
@@ -59,6 +65,7 @@ func (r *VideoRepository) AdminListTVAppReleases(ctx context.Context, f models.A
 	listSQL := `
 SELECT
   r.id,
+  r.client_type,
   r.package_name,
   r.version_code,
   r.version_name,
@@ -110,6 +117,7 @@ func (r *VideoRepository) GetAdminTVAppReleaseDetail(ctx context.Context, releas
 	row := r.pool.QueryRow(ctx, `
 SELECT
   id,
+  client_type,
   package_name,
   version_code,
   version_name,
@@ -149,7 +157,7 @@ func (r *VideoRepository) CreateOrUpdateTVAppDraftReleaseWithABI(
 	}
 	defer tx.Rollback(ctx)
 
-	release, err := upsertTVAppReleaseRecord(ctx, tx, meta.PackageName, meta.VersionCode, meta.VersionName)
+	release, err := upsertTVAppReleaseRecord(ctx, tx, meta.ClientType, meta.PackageName, meta.VersionCode, meta.VersionName)
 	if err != nil {
 		return models.TVAppReleaseRecord{}, models.TVAppReleaseABIInfo{}, err
 	}
@@ -206,7 +214,7 @@ func (r *VideoRepository) PublishTVAppRelease(ctx context.Context, releaseID int
 		return models.TVAppReleaseRecord{}, err
 	}
 	if len(release.ABIItems) == 0 {
-		return models.TVAppReleaseRecord{}, models.NewTVAPKDomainError(models.TVAPKErrorReleaseNotPublishable, "至少上传一个 ABI 安装包后才能发布")
+		return models.TVAppReleaseRecord{}, models.NewTVAPKDomainError(models.TVAPKErrorReleaseNotPublishable, "至少上传一个安装包后才能发布")
 	}
 
 	now := time.Now().UTC()
@@ -214,7 +222,7 @@ func (r *VideoRepository) PublishTVAppRelease(ctx context.Context, releaseID int
 	if publishedAt == nil {
 		publishedAt = &now
 	}
-	status := models.TVReleaseStatusForVisibility(true, collectReleaseABIStrings(release.ABIItems))
+	status := models.ReleaseStatusForVisibility(release.ClientType, true, collectReleaseABIStrings(release.ABIItems))
 	_, err = tx.Exec(ctx, `
 UPDATE tv_app_releases
 SET release_notes = $2,
@@ -228,7 +236,7 @@ WHERE id = $1
 	if err != nil {
 		return models.TVAppReleaseRecord{}, fmt.Errorf("publish tv app release: %w", err)
 	}
-	if err := recalcTVAppRecommendationsTx(ctx, tx); err != nil {
+	if err := recalcTVAppRecommendationsTx(ctx, tx, release.ClientType); err != nil {
 		return models.TVAppReleaseRecord{}, err
 	}
 	release, err = loadTVAppReleaseRecordTx(ctx, tx, releaseID)
@@ -248,6 +256,11 @@ func (r *VideoRepository) OfflineTVAppRelease(ctx context.Context, releaseID int
 	}
 	defer tx.Rollback(ctx)
 
+	release, err := loadTVAppReleaseRecordTx(ctx, tx, releaseID)
+	if err != nil {
+		return models.TVAppReleaseRecord{}, err
+	}
+
 	_, err = tx.Exec(ctx, `
 UPDATE tv_app_releases
 SET publish_status = $2,
@@ -259,10 +272,10 @@ WHERE id = $1
 	if err != nil {
 		return models.TVAppReleaseRecord{}, fmt.Errorf("offline tv app release: %w", err)
 	}
-	if err := recalcTVAppRecommendationsTx(ctx, tx); err != nil {
+	if err := recalcTVAppRecommendationsTx(ctx, tx, release.ClientType); err != nil {
 		return models.TVAppReleaseRecord{}, err
 	}
-	release, err := loadTVAppReleaseRecordTx(ctx, tx, releaseID)
+	release, err = loadTVAppReleaseRecordTx(ctx, tx, releaseID)
 	if err != nil {
 		return models.TVAppReleaseRecord{}, err
 	}
@@ -284,9 +297,9 @@ func (r *VideoRepository) RestoreTVAppRelease(ctx context.Context, releaseID int
 		return models.TVAppReleaseRecord{}, err
 	}
 	if len(release.ABIItems) == 0 {
-		return models.TVAppReleaseRecord{}, models.NewTVAPKDomainError(models.TVAPKErrorReleaseNotPublishable, "没有可下载 ABI 的记录不能恢复发布")
+		return models.TVAppReleaseRecord{}, models.NewTVAPKDomainError(models.TVAPKErrorReleaseNotPublishable, "没有可下载安装包的记录不能恢复发布")
 	}
-	status := models.TVReleaseStatusForVisibility(true, collectReleaseABIStrings(release.ABIItems))
+	status := models.ReleaseStatusForVisibility(release.ClientType, true, collectReleaseABIStrings(release.ABIItems))
 	_, err = tx.Exec(ctx, `
 UPDATE tv_app_releases
 SET publish_status = $2,
@@ -297,7 +310,7 @@ WHERE id = $1
 	if err != nil {
 		return models.TVAppReleaseRecord{}, fmt.Errorf("restore tv app release: %w", err)
 	}
-	if err := recalcTVAppRecommendationsTx(ctx, tx); err != nil {
+	if err := recalcTVAppRecommendationsTx(ctx, tx, release.ClientType); err != nil {
 		return models.TVAppReleaseRecord{}, err
 	}
 	release, err = loadTVAppReleaseRecordTx(ctx, tx, releaseID)
@@ -328,6 +341,7 @@ func (r *VideoRepository) GetTVAppReleaseRecord(ctx context.Context, releaseID i
 	row := r.pool.QueryRow(ctx, `
 SELECT
   id,
+  client_type,
   package_name,
   version_code,
   version_name,
@@ -353,13 +367,18 @@ WHERE id = $1
 	return releases[0], nil
 }
 
-func (r *VideoRepository) ListTVAppFamilyReleases(ctx context.Context, limit int) ([]models.TVAppFamilyRelease, error) {
+func (r *VideoRepository) ListTVAppFamilyReleases(ctx context.Context, clientType string, limit int) ([]models.TVAppFamilyRelease, error) {
+	clientType = models.NormalizeAppClientType(clientType)
+	if clientType == "" {
+		clientType = models.AppClientTypeAndroidTV
+	}
 	if limit <= 0 {
 		limit = 3
 	}
 	rows, err := r.pool.Query(ctx, `
 SELECT
   id,
+  client_type,
   package_name,
   version_code,
   version_name,
@@ -367,10 +386,11 @@ SELECT
   published_at,
   latest_recommended
 FROM tv_app_releases
-WHERE publish_status IN ('published_complete', 'published_missing_abi')
+WHERE client_type = $1
+  AND publish_status IN ('published_complete', 'published_missing_abi')
 ORDER BY version_code DESC, created_at DESC
-LIMIT $1
-`, limit)
+LIMIT $2
+`, clientType, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list family tv app releases: %w", err)
 	}
@@ -382,6 +402,7 @@ LIMIT $1
 		var publishedAt sql.NullTime
 		if err := rows.Scan(
 			&release.ID,
+			&release.ClientType,
 			&release.PackageName,
 			&release.VersionCode,
 			&release.VersionName,
@@ -423,14 +444,15 @@ LIMIT $1
 		}
 		out = append(out, models.TVAppFamilyRelease{
 			ID:                release.ID,
+			ClientType:        release.ClientType,
 			PackageName:       release.PackageName,
 			VersionCode:       release.VersionCode,
 			VersionName:       release.VersionName,
 			ReleaseNotes:      release.ReleaseNotes,
 			PublishedAt:       release.PublishedAt,
 			LatestRecommended: release.LatestRecommended,
-			UploadedABIs:      models.TVUploadedABIs(collectReleaseABIStrings(release.ABIItems)),
-			MissingABIs:       models.TVMissingABIs(collectReleaseABIStrings(release.ABIItems)),
+			UploadedABIs:      familyReleaseUploadedArtifacts(release),
+			MissingABIs:       familyReleaseMissingArtifacts(release),
 			ABIItems:          abiItems,
 		})
 	}
@@ -469,6 +491,7 @@ func scanTVAppReleaseRecord(row tvRowScanner) (models.TVAppReleaseRecord, error)
 	)
 	if err := row.Scan(
 		&release.ID,
+		&release.ClientType,
 		&release.PackageName,
 		&release.VersionCode,
 		&release.VersionName,
@@ -541,10 +564,10 @@ func buildAdminTVAppReleaseListItem(release models.TVAppReleaseRecord) models.Ad
 			Metadata:     item.Metadata,
 		})
 	}
-	uploaded := models.TVUploadedABIs(collectReleaseABIStrings(release.ABIItems))
-	missing := models.TVMissingABIs(uploaded)
+	missing := adminReleaseMissingArtifacts(release)
 	return models.AdminTvAppReleaseListItem{
 		ID:                  release.ID,
+		ClientType:          release.ClientType,
 		PackageName:         release.PackageName,
 		VersionCode:         release.VersionCode,
 		VersionName:         release.VersionName,
@@ -559,8 +582,8 @@ func buildAdminTVAppReleaseListItem(release models.TVAppReleaseRecord) models.Ad
 		LatestRecommended:   release.LatestRecommended,
 		VisibleToFamily:     models.TVReleaseVisibleToFamily(release.PublishStatus),
 		MissingABIs:         missing,
-		UploadedABIs:        uploaded,
-		ABIComplete:         len(missing) == 0,
+		UploadedABIs:        adminReleaseUploadedArtifacts(release),
+		ABIComplete:         adminReleaseComplete(release),
 		ABIItems:            abiItems,
 	}
 }
@@ -617,14 +640,11 @@ ORDER BY a.release_id DESC, a.abi ASC, a.uploaded_at DESC
 	return rows.Err()
 }
 
-func upsertTVAppReleaseRecord(ctx context.Context, tx pgx.Tx, packageName string, versionCode int64, versionName string) (models.TVAppReleaseRecord, error) {
+func upsertTVAppReleaseRecord(ctx context.Context, tx pgx.Tx, clientType, packageName string, versionCode int64, versionName string) (models.TVAppReleaseRecord, error) {
 	row := tx.QueryRow(ctx, `
-INSERT INTO tv_app_releases (package_name, version_code, version_name)
-VALUES ($1, $2, $3)
-ON CONFLICT (package_name, version_code)
-DO UPDATE SET version_name = EXCLUDED.version_name, updated_at = NOW()
-RETURNING
+SELECT
   id,
+  client_type,
   package_name,
   version_code,
   version_name,
@@ -636,12 +656,43 @@ RETURNING
   created_at,
   updated_at,
   latest_recommended
-`, packageName, versionCode, versionName)
+FROM tv_app_releases
+WHERE package_name = $1 AND version_code = $2
+FOR UPDATE
+`, packageName, versionCode)
 	release, err := scanTVAppReleaseRecord(row)
-	if err != nil {
+	if err == nil {
+		if release.ClientType != clientType {
+			return models.TVAppReleaseRecord{}, models.NewTVAPKDomainError(models.TVAPKErrorClientTypeMismatch, "安装包客户端类型与现有发布记录不匹配")
+		}
+		if strings.TrimSpace(release.VersionName) != strings.TrimSpace(versionName) {
+			return models.TVAppReleaseRecord{}, models.NewTVAPKDomainError(models.TVAPKErrorVersionNameConflict, "同一客户端轨内相同 versionCode 的 versionName 必须一致")
+		}
+		return release, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) && !IsNotFound(err) {
 		return models.TVAppReleaseRecord{}, err
 	}
-	return release, nil
+
+	row = tx.QueryRow(ctx, `
+INSERT INTO tv_app_releases (client_type, package_name, version_code, version_name)
+VALUES ($1, $2, $3, $4)
+RETURNING
+  id,
+  client_type,
+  package_name,
+  version_code,
+  version_name,
+  COALESCE(release_notes, ''),
+  COALESCE(remarks, ''),
+  publish_status,
+  published_at,
+  last_status_changed_at,
+  created_at,
+  updated_at,
+  latest_recommended
+`, clientType, packageName, versionCode, versionName)
+	return scanTVAppReleaseRecord(row)
 }
 
 func getTVAppReleaseABIByABI(ctx context.Context, tx pgx.Tx, releaseID int64, abi string) (models.TVAppReleaseABIInfo, bool, error) {
@@ -687,6 +738,7 @@ func saveTVAppReleaseABI(
 	username string,
 ) (models.TVAppReleaseABIInfo, error) {
 	metadataRaw, err := json.Marshal(map[string]any{
+		"client_type":   meta.ClientType,
 		"package_name":  meta.PackageName,
 		"version_code":  meta.VersionCode,
 		"version_name":  meta.VersionName,
@@ -786,7 +838,7 @@ RETURNING
 	visible := models.TVReleaseVisibleToFamily(release.PublishStatus)
 	if visible {
 		release.ABIItems = append(release.ABIItems, item)
-		status := models.TVReleaseStatusForVisibility(true, collectReleaseABIStrings(release.ABIItems))
+		status := models.ReleaseStatusForVisibility(release.ClientType, true, collectReleaseABIStrings(release.ABIItems))
 		if _, err := tx.Exec(ctx, `
 UPDATE tv_app_releases
 SET publish_status = $2,
@@ -804,6 +856,7 @@ func loadTVAppReleaseRecordTx(ctx context.Context, tx pgx.Tx, releaseID int64) (
 	row := tx.QueryRow(ctx, `
 SELECT
   id,
+  client_type,
   package_name,
   version_code,
   version_name,
@@ -860,8 +913,8 @@ ORDER BY a.abi ASC, a.uploaded_at DESC
 	return release, nil
 }
 
-func recalcTVAppRecommendationsTx(ctx context.Context, tx pgx.Tx) error {
-	if _, err := tx.Exec(ctx, `UPDATE tv_app_releases SET latest_recommended = FALSE WHERE latest_recommended = TRUE`); err != nil {
+func recalcTVAppRecommendationsTx(ctx context.Context, tx pgx.Tx, clientType string) error {
+	if _, err := tx.Exec(ctx, `UPDATE tv_app_releases SET latest_recommended = FALSE WHERE client_type = $1 AND latest_recommended = TRUE`, clientType); err != nil {
 		return fmt.Errorf("reset tv app recommendations: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
@@ -870,14 +923,64 @@ SET latest_recommended = TRUE
 WHERE id = (
   SELECT id
   FROM tv_app_releases
-  WHERE publish_status IN ('published_complete', 'published_missing_abi')
+  WHERE client_type = $1
+    AND publish_status IN ('published_complete', 'published_missing_abi')
   ORDER BY version_code DESC, created_at DESC
   LIMIT 1
 )
-`); err != nil {
+`, clientType); err != nil {
 		return fmt.Errorf("recalculate tv app recommendation: %w", err)
 	}
 	return nil
+}
+
+func buildReleaseCompletenessSQL(clientType, mode string) string {
+	if models.NormalizeAppClientType(clientType) == models.AppClientTypeAndroidPhone {
+		switch mode {
+		case "complete":
+			return "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) >= 1"
+		case "missing":
+			return "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) = 0"
+		case "empty":
+			return "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) = 0"
+		}
+	}
+	switch mode {
+	case "complete":
+		return "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) >= 2"
+	case "missing":
+		return "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) BETWEEN 1 AND 1"
+	case "empty":
+		return "(SELECT COUNT(*) FROM tv_app_release_apks a WHERE a.release_id = r.id) = 0"
+	default:
+		return "1=1"
+	}
+}
+
+func adminReleaseUploadedArtifacts(release models.TVAppReleaseRecord) []string {
+	if !models.AppClientTypeSupportsABI(release.ClientType) {
+		return nil
+	}
+	return models.TVUploadedABIs(collectReleaseABIStrings(release.ABIItems))
+}
+
+func adminReleaseMissingArtifacts(release models.TVAppReleaseRecord) []string {
+	if !models.AppClientTypeSupportsABI(release.ClientType) {
+		return nil
+	}
+	return models.TVMissingABIs(adminReleaseUploadedArtifacts(release))
+}
+
+func adminReleaseComplete(release models.TVAppReleaseRecord) bool {
+	return models.ReleaseArtifactComplete(release.ClientType, collectReleaseABIStrings(release.ABIItems))
+}
+
+func familyReleaseUploadedArtifacts(release models.TVAppReleaseRecord) []string {
+	return adminReleaseUploadedArtifacts(release)
+}
+
+func familyReleaseMissingArtifacts(release models.TVAppReleaseRecord) []string {
+	return adminReleaseMissingArtifacts(release)
 }
 
 func collectReleaseABIStrings(items []models.TVAppReleaseABIInfo) []string {

@@ -165,6 +165,8 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/user/favorited-videos", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.FavoritedVideos)
 		v1.GET("/tv-app/releases", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVAppFamilyReleases)
 		v1.GET("/tv-app/releases/:id/download/:abi", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVAppDownloadAPK)
+		v1.GET("/app/releases", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVAppFamilyReleases)
+		v1.GET("/app/releases/:id/download/:abi", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.TVAppDownloadAPK)
 
 		admin := v1.Group("/admin", middleware.AuthMiddleware(a.jwtSecret, a.redis), middleware.AdminRequired())
 		{

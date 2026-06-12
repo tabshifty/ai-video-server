@@ -2,6 +2,26 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-12 20:46 +0800
+- 进度：手机端与 TV 端安装包分轨已落地。后端在保留 `tv_app_releases` / `tv_app_release_apks` 表名的前提下新增 `client_type`、手机端单包固定槽位 `single`、轨内 `versionCode` 唯一且 `versionName` 冲突拒绝；家庭页新增 `/downloads/android-tv` 与 `/downloads/android-phone`，并保留 `/tv-app` 兼容入口；Admin Web 已提升为同一页内切换手机端 / TV 端的统一安装包管理工具。
+- 影响文件：`migrations/0024_app_apk_distribution_client_type.*`、`internal/models/tv_apk.go`、`internal/models/admin.go`、`internal/services/tv_apk.go`、`internal/services/tv_apk_manager.go`、`internal/repository/tv_apk_repository.go`、`internal/repository/migrations_test.go`、`internal/handlers/router.go`、`internal/handlers/tv_apk.go`、`internal/handlers/tv_app_family_page.go`、`internal/handlers/tv_app_family_page_test.go`、`internal/handlers/iptv.go`、`internal/handlers/iptv_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/TvAppManage.vue`、`admin-web/src/components/base/commandPalette.helpers.js`、`CONTEXT.md`、`plan.md`
+- 验证：`env GOCACHE=/private/tmp/go-build-cache-tvapk go test ./internal/services ./internal/repository ./internal/handlers -count=1` 通过；`cd admin-web && npm run test -- --run src/api/admin.spec.js` 通过；`cd admin-web && npm run build` 通过。提交时继续排除用户已有 `admin-web/.env.development`，并保留尚未提交的文档 ADR 工作区改动按本任务一并纳入。
+
+## 2026-06-12 20:14 +0800
+- 进度：开始实现“安装包按客户端类型分轨”。本轮先落后端与 schema：保留现有 `tv_app_releases` / `tv_app_release_apks` 表名，在不 rename 的前提下补 `client_type`、手机端单包承载槽位、包名强校验与轨内规则，再接家庭下载页和管理端切换。
+- 影响文件：`migrations/0024_*`、`internal/models/tv_apk.go`、`internal/services/tv_apk*.go`、`internal/repository/tv_apk_repository.go`、`internal/handlers/tv_apk.go`、`internal/handlers/router.go`、`internal/handlers/tv_app_family_page.go`、`admin-web/src/*`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 定向测试、`admin-web` 单测与构建；保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-12 19:53 +0800
+- 进度：开始 grill-with-docs 收敛“手机端的 app 也做一下管理”。已确认新需求不是手机端业务功能管理，而是 Android 手机端 APK 分发管理；并已收敛出若干上位术语：手机端与 TV 端共用同一套发布记录/安装包产物模型但按 `android_phone` / `android_tv` 分轨，手机端首期是单包发布记录、家庭轻量页与 TV 分开、管理端工具同页切客户端类型、家庭下载路由按客户端类型规范化命名。下一步继续逐项钉死手机端与 TV 端共享到什么程度，以及哪些地方必须分叉。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新；未执行构建或测试。
+
+## 2026-06-12 20:07 +0800
+- 进度：手机端 APK 分发管理的上位设计已收敛完成，并补充 ADR。当前已确认：手机端与 TV 端共用一套安装包分发模型并按 `client_type` 分轨；手机端首期是单包发布记录、家庭轻量页独立、管理端同页切客户端类型、`client_type` 与 `packageName` 强绑定、轨内 `versionCode` 唯一、手机端已发布替换前也必须先下线。已新增 ADR `0009-unified-app-apk-distribution-by-client-type.md` 固化这些不可逆取舍。下一步可以直接转入实现。
+- 影响文件：`CONTEXT.md`、`docs/adr/0009-unified-app-apk-distribution-by-client-type.md`、`plan.md`
+- 验证：待执行文档乱码检查与 `git diff --check`。
+
 ## 2026-06-12 18:46 +0800
 - 进度：开始补齐 TV 安装包家庭轻量页闭环。已确认当前仓库没有普通用户 Web 壳，因此本轮改动限定在 Go 侧：新增独立 `/tv-app` 轻量页，内置最小登录、现有 token 续期、最近三版展示与 ABI 直下能力，不扩展 `admin-web`。
 - 影响文件：`internal/handlers/router.go`、`internal/handlers/tv_app_family_page.go`、`internal/handlers/tv_app_family_page_test.go`、`CONTEXT.md`、`plan.md`

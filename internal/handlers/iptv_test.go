@@ -47,6 +47,8 @@ func TestRegisterIncludesIPTVRoutes(t *testing.T) {
 		"GET /api/v1/admin/tv-app/releases/:id/download/:abi",
 		"GET /api/v1/tv-app/releases",
 		"GET /api/v1/tv-app/releases/:id/download/:abi",
+		"GET /api/v1/app/releases",
+		"GET /api/v1/app/releases/:id/download/:abi",
 	} {
 		if _, ok := routes[want]; !ok {
 			t.Fatalf("expected route %s to be registered", want)

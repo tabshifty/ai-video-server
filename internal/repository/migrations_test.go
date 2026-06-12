@@ -84,6 +84,24 @@ func TestTVApkDistributionMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+tv_app_releases`)
 }
 
+func TestAppAPKClientTypeMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0024_app_apk_distribution_client_type.up.sql")
+	down := readMigrationForTest(t, "0024_app_apk_distribution_client_type.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+tv_app_releases\s+add\s+column\s+if\s+not\s+exists\s+client_type`)
+	assertSQLPattern(t, up, `(?is)client_type\s+in\s+\('android_tv',\s*'android_phone'\)`)
+	assertSQLPattern(t, up, `(?is)package_name\s*=\s*'com\.chee\.videos\.tv'`)
+	assertSQLPattern(t, up, `(?is)package_name\s*=\s*'com\.chee\.videos'`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_tv_app_releases_client_type_version_code`)
+	assertSQLPattern(t, up, `(?is)abi\s+in\s+\('armeabi-v7a',\s*'arm64-v8a',\s*'single'\)`)
+
+	assertSQLPattern(t, down, `(?is)delete\s+from\s+tv_app_releases\s+where\s+client_type\s*=\s*'android_phone'`)
+	assertSQLPattern(t, down, `(?is)drop\s+index\s+if\s+exists\s+idx_tv_app_releases_client_type_publish_status`)
+	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+client_type`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

@@ -1,17 +1,21 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"video-server/internal/models"
 )
 
-const tvAppFamilyPageHTML = `<!doctype html>
+const tvAppFamilyPageHTMLTemplate = `<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TV 安装包下载</title>
+  <title>%APP_TITLE%</title>
   <style>
     :root {
       color-scheme: light;
@@ -464,8 +468,8 @@ const tvAppFamilyPageHTML = `<!doctype html>
       <div class="hero-top">
         <div>
           <span class="eyebrow">TV App Distribution</span>
-          <h1>TV 安装包下载</h1>
-          <p>登录后可查看最近三版 TV 安装包，按设备 ABI 直接下载。推荐版本会自动指向当前家庭可见范围里最高的版本号。</p>
+          <h1>%APP_TITLE%</h1>
+          <p>登录后可查看最近三版 %APP_SHORT_LABEL% 安装包，按设备 ABI 直接下载。推荐版本会自动指向当前家庭可见范围里最高的版本号。</p>
         </div>
         <span class="status-chip" id="session-chip" data-state="idle">未登录</span>
       </div>
@@ -506,7 +510,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
             <p>点击 ABI 按钮后会立即开始下载，不额外弹确认框。若某个版本缺少 ABI，会直接在卡片中标出。</p>
           </div>
         </div>
-        <div id="releases-empty" class="empty">登录后将显示最近三版 TV 安装包。</div>
+        <div id="releases-empty" class="empty">登录后将显示最近三版 %APP_SHORT_LABEL% 安装包。</div>
         <div id="releases-list" class="releases visually-hidden"></div>
       </section>
     </div>
@@ -672,7 +676,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
           throw new Error('请先登录');
         }
         try {
-          return await requestJSON('/api/v1/tv-app/releases', {
+          return await requestJSON(APP_RELEASES_API_PATH, {
             headers: { Authorization: 'Bearer ' + accessToken }
           });
         } catch (error) {
@@ -681,7 +685,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
           }
         }
         accessToken = await refreshAccessToken();
-        return requestJSON('/api/v1/tv-app/releases', {
+        return requestJSON(APP_RELEASES_API_PATH, {
           headers: { Authorization: 'Bearer ' + accessToken }
         });
       }
@@ -728,7 +732,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
       }
 
       function buildDownloadURL(releaseID, abi, accessToken) {
-        return '/api/v1/tv-app/releases/' + encodeURIComponent(releaseID) + '/download/' + encodeURIComponent(abi) + '?access_token=' + encodeURIComponent(accessToken);
+        return APP_DOWNLOAD_API_PREFIX + encodeURIComponent(releaseID) + '/download/' + encodeURIComponent(abi) + '?access_token=' + encodeURIComponent(accessToken);
       }
 
       function buildBadges(item) {
@@ -761,7 +765,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
           return '<div class="empty">当前版本还没有可下载的 APK 文件。</div>';
         }
         return '<div class="download-list">' + item.abi_items.map(function (abi) {
-          const href = '/api/v1/tv-app/releases/' + encodeURIComponent(item.id) + '/download/' + encodeURIComponent(abi.abi);
+          const href = APP_DOWNLOAD_API_PREFIX + encodeURIComponent(item.id) + '/download/' + encodeURIComponent(abi.abi);
           return [
             '<article class="download-item">',
             '<div>',
@@ -781,7 +785,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
           releasesList.classList.add('visually-hidden');
           releasesList.innerHTML = '';
           releasesEmpty.classList.remove('visually-hidden');
-          releasesEmpty.textContent = '当前暂无可下载 TV 安装包。请等待管理员发布后再试。';
+          releasesEmpty.textContent = '当前暂无可下载 %APP_SHORT_LABEL% 安装包。请等待管理员发布后再试。';
           return;
         }
         releasesEmpty.classList.add('visually-hidden');
@@ -812,7 +816,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
       function applyLoggedInUI() {
         loginPanel.classList.add('visually-hidden');
         setSessionState('ready', '已登录');
-        setTopHint('当前展示最近三版 TV 安装包。点击 ABI 按钮会直接开始下载。');
+        setTopHint('当前展示最近三版 %APP_SHORT_LABEL% 安装包。点击 ABI 按钮会直接开始下载。');
       }
 
       function applyLoggedOutUI() {
@@ -822,7 +826,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
         releasesList.classList.add('visually-hidden');
         releasesList.innerHTML = '';
         releasesEmpty.classList.remove('visually-hidden');
-        releasesEmpty.textContent = '登录后将显示最近三版 TV 安装包。';
+        releasesEmpty.textContent = '登录后将显示最近三版 %APP_SHORT_LABEL% 安装包。';
       }
 
       async function loadReleases() {
@@ -835,7 +839,7 @@ const tvAppFamilyPageHTML = `<!doctype html>
           renderReleases(data.items || []);
           setSessionState('ready', '已登录');
         } catch (error) {
-          const message = error && error.message ? error.message : '读取 TV 安装包列表失败';
+          const message = error && error.message ? error.message : '读取 %APP_SHORT_LABEL% 安装包列表失败';
           if (message.indexOf('登录') >= 0 || message.indexOf('token') >= 0 || message.indexOf('authorization') >= 0) {
             clearTokens();
             applyLoggedOutUI();
@@ -918,13 +922,77 @@ const tvAppFamilyPageHTML = `<!doctype html>
 </html>
 `
 
-func mountTVAppFamilyPage(r *gin.Engine) {
-	serve := func(c *gin.Context) {
-		c.Header("Cache-Control", "no-store")
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(tvAppFamilyPageHTML))
+type appFamilyPageConfig struct {
+	ClientType        string
+	Title             string
+	ShortLabel        string
+	SupportsABI       bool
+	ReleasesAPIPath   string
+	DownloadAPIPrefix string
+}
+
+func renderAppFamilyPageHTML(config appFamilyPageConfig) string {
+	replacer := strings.NewReplacer(
+		"%APP_TITLE%", config.Title,
+		"%APP_SHORT_LABEL%", config.ShortLabel,
+		"APP_RELEASES_API_PATH", fmt.Sprintf("%q", config.ReleasesAPIPath),
+		"APP_DOWNLOAD_API_PREFIX", fmt.Sprintf("%q", config.DownloadAPIPrefix),
+	)
+	html := replacer.Replace(tvAppFamilyPageHTMLTemplate)
+	if config.SupportsABI {
+		return html
 	}
-	r.GET("/tv-app", serve)
-	r.HEAD("/tv-app", serve)
-	r.GET("/tv-app/", serve)
-	r.HEAD("/tv-app/", serve)
+	html = strings.ReplaceAll(html, "按设备 ABI 直接下载。", "直接下载安装。")
+	html = strings.ReplaceAll(html, "点击 ABI 按钮后会立即开始下载，不额外弹确认框。若某个版本缺少 ABI，会直接在卡片中标出。", "点击下载按钮后会立即开始下载，不额外弹确认框。")
+	html = strings.ReplaceAll(html, "if (Array.isArray(item.missing_abis) && item.missing_abis.length === 0) {\n          parts.push('<span class=\"badge badge-complete\">ABI 已齐全</span>');\n        } else if (Array.isArray(item.missing_abis) && item.missing_abis.length > 0) {\n          parts.push('<span class=\"badge badge-missing\">缺少 ABI</span>');\n        }\n        if (Array.isArray(item.uploaded_abis) && item.uploaded_abis.length > 0) {\n          parts.push('<span class=\"badge\">已上传：' + escapeHTML(item.uploaded_abis.join(' / ')) + '</span>');\n        }", "")
+	html = strings.ReplaceAll(html, "function buildMissing(item) {\n        if (!Array.isArray(item.missing_abis) || item.missing_abis.length === 0) {\n          return '';\n        }\n        return '<div><div class=\"meta-label\">仍缺少的 ABI</div><div class=\"missing-list\">' + item.missing_abis.map(function (abi) {\n          return '<span class=\"missing-pill\">' + escapeHTML(abi) + '</span>';\n        }).join('') + '</div></div>';\n      }", "function buildMissing(item) {\n        return '';\n      }")
+	html = strings.ReplaceAll(html, "<h4>' + escapeHTML(abi.abi) + '</h4>", "<h4>安装包</h4>")
+	html = strings.ReplaceAll(html, "'<a class=\"download-link\" href=\"' + href + '\" data-download-release-id=\"' + escapeHTML(item.id) + '\" data-download-abi=\"' + escapeHTML(abi.abi) + '\">下载 ' + escapeHTML(abi.abi) + '</a>',", "'<a class=\"download-link\" href=\"' + href + '\" data-download-release-id=\"' + escapeHTML(item.id) + '\" data-download-abi=\"' + escapeHTML(abi.abi) + '\">下载 APK</a>',")
+	html = strings.ReplaceAll(html, "'<div class=\"meta-box\"><div class=\"meta-label\">已上传 ABI</div><div class=\"meta-value\">' + escapeHTML((item.uploaded_abis || []).join(' / ') || '暂无') + '</div></div>',", "")
+	return html
+}
+
+func appFamilyPageConfigForClientType(clientType string) appFamilyPageConfig {
+	normalized := models.NormalizeAppClientType(clientType)
+	if normalized == "" {
+		normalized = models.AppClientTypeAndroidTV
+	}
+	shortLabel := models.AppClientTypeShortLabel(normalized)
+	if shortLabel == "" {
+		shortLabel = "客户端"
+	}
+	return appFamilyPageConfig{
+		ClientType:        normalized,
+		Title:             shortLabel + "安装包下载",
+		ShortLabel:        shortLabel,
+		SupportsABI:       models.AppClientTypeSupportsABI(normalized),
+		ReleasesAPIPath:   "/api/v1/app/releases?client_type=" + normalized,
+		DownloadAPIPrefix: "/api/v1/app/releases/",
+	}
+}
+
+func mountTVAppFamilyPage(r *gin.Engine) {
+	serve := func(config appFamilyPageConfig) gin.HandlerFunc {
+		body := []byte(renderAppFamilyPageHTML(config))
+		return func(c *gin.Context) {
+			c.Header("Cache-Control", "no-store")
+			c.Data(http.StatusOK, "text/html; charset=utf-8", body)
+		}
+	}
+
+	tvConfig := appFamilyPageConfigForClientType(models.AppClientTypeAndroidTV)
+	phoneConfig := appFamilyPageConfigForClientType(models.AppClientTypeAndroidPhone)
+
+	r.GET("/tv-app", serve(tvConfig))
+	r.HEAD("/tv-app", serve(tvConfig))
+	r.GET("/tv-app/", serve(tvConfig))
+	r.HEAD("/tv-app/", serve(tvConfig))
+	r.GET("/downloads/android-tv", serve(tvConfig))
+	r.HEAD("/downloads/android-tv", serve(tvConfig))
+	r.GET("/downloads/android-tv/", serve(tvConfig))
+	r.HEAD("/downloads/android-tv/", serve(tvConfig))
+	r.GET("/downloads/android-phone", serve(phoneConfig))
+	r.HEAD("/downloads/android-phone", serve(phoneConfig))
+	r.GET("/downloads/android-phone/", serve(phoneConfig))
+	r.HEAD("/downloads/android-phone/", serve(phoneConfig))
 }

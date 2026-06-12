@@ -60,20 +60,37 @@ export const updateAdminIPTVSource = (payload) => request.put('/admin/iptv/playl
 export const refreshAdminIPTVPlaylist = () => request.post('/admin/iptv/playlist/refresh')
 export const getAdminTVAppReleases = (params) => request.get('/admin/tv-app/releases', { params })
 export const getAdminTVAppReleaseDetail = (id) => request.get(`/admin/tv-app/releases/${id}`)
-export const uploadAdminTVAppAPK = (formData) =>
+export const uploadAdminTVAppAPK = (formData, clientType) =>
   request.post('/admin/tv-app/releases/upload', formData, {
+    params: clientType ? { client_type: clientType } : undefined,
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 0
   })
-export const updateAdminTVAppRelease = (id, payload) => request.put(`/admin/tv-app/releases/${id}`, payload)
-export const publishAdminTVAppRelease = (id, payload) => request.post(`/admin/tv-app/releases/${id}/publish`, payload)
-export const offlineAdminTVAppRelease = (id) => request.post(`/admin/tv-app/releases/${id}/offline`)
-export const restoreAdminTVAppRelease = (id) => request.post(`/admin/tv-app/releases/${id}/restore`)
-export const deleteAdminTVAppReleaseDraft = (id) =>
+export const updateAdminTVAppRelease = (id, payload, clientType) =>
+  request.put(`/admin/tv-app/releases/${id}`, payload, {
+    params: clientType ? { client_type: clientType } : undefined
+  })
+export const publishAdminTVAppRelease = (id, payload, clientType) =>
+  request.post(`/admin/tv-app/releases/${id}/publish`, payload, {
+    params: clientType ? { client_type: clientType } : undefined
+  })
+export const offlineAdminTVAppRelease = (id, clientType) =>
+  request.post(`/admin/tv-app/releases/${id}/offline`, null, {
+    params: clientType ? { client_type: clientType } : undefined
+  })
+export const restoreAdminTVAppRelease = (id, clientType) =>
+  request.post(`/admin/tv-app/releases/${id}/restore`, null, {
+    params: clientType ? { client_type: clientType } : undefined
+  })
+export const deleteAdminTVAppReleaseDraft = (id, clientType) =>
   request.delete(`/admin/tv-app/releases/${id}`, {
+    params: clientType ? { client_type: clientType } : undefined,
     timeout: 0
   })
-export const downloadAdminTVAppReleaseURL = (id, abi) => `/api/v1/admin/tv-app/releases/${id}/download/${abi}`
+export const downloadAdminTVAppReleaseURL = (id, abi, clientType) => {
+  const suffix = clientType ? `?client_type=${encodeURIComponent(clientType)}` : ''
+  return `/api/v1/admin/tv-app/releases/${id}/download/${abi}${suffix}`
+}
 
 export const getAdminUsers = (params) => request.get('/admin/users', { params })
 export const createAdminUser = (payload) => request.post('/admin/users', payload)

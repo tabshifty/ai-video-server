@@ -20,6 +20,32 @@ import {
   uploadAdminTVAppAPK
 } from '../api/admin'
 
+const CLIENTS = {
+  android_tv: {
+    label: 'TV 端',
+    shortLabel: 'TV',
+    packageName: 'com.chee.videos.tv',
+    supportsAbi: true,
+    uploadTip: '仅接收 Release APK，自动按 ABI 建档或补包。',
+    emptyTitle: '暂无 TV 发布记录',
+    emptyDesc: '先上传一个 APK 创建首条记录。',
+    pageTitle: '安装包管理',
+    pageSubtitle: '同一套分发模型，按客户端类型分轨管理手机端与 TV 端安装包。'
+  },
+  android_phone: {
+    label: '手机端',
+    shortLabel: '手机',
+    packageName: 'com.chee.videos',
+    supportsAbi: false,
+    uploadTip: '仅接收 Release APK，上传首个 APK 会自动建档。',
+    emptyTitle: '暂无手机端发布记录',
+    emptyDesc: '先上传一个 APK 创建首条记录。',
+    pageTitle: '安装包管理',
+    pageSubtitle: '同一套分发模型，按客户端类型分轨管理手机端与 TV 端安装包。'
+  }
+}
+
+const clientType = ref('android_tv')
 const loading = ref(false)
 const uploadLoading = ref(false)
 const savingId = ref(0)
@@ -40,10 +66,14 @@ const data = reactive({
   page_size: 20
 })
 
+const clientMeta = computed(() => CLIENTS[clientType.value] || CLIENTS.android_tv)
 const visibleCount = computed(() => data.items.filter((item) => item.visible_to_family).length)
-const missingCount = computed(() => data.items.filter((item) => !item.abi_complete).length)
 const draftCount = computed(() => data.items.filter((item) => item.publish_status === 'draft').length)
 const latestItem = computed(() => data.items.find((item) => item.latest_recommended) || null)
+const missingCount = computed(() => {
+  if (clientMeta.value.supportsAbi) return data.items.filter((item) => !item.abi_complete).length
+  return data.items.filter((item) => item.publish_status === 'draft').length
+})
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
@@ -73,14 +103,25 @@ function formatBytes(bytes) {
 }
 
 function statusText(status) {
-  if (status === 'draft') return '草稿'
-  if (status === 'published_complete') return '已发布-完整'
-  if (status === 'published_missing_abi') return '已发布-缺少 ABI'
-  if (status === 'offline') return '已下线'
+  if (clientMeta.value.supportsAbi) {
+    if (status === 'draft') return '草稿'
+    if (status === 'published_complete') return '已发布-完整'
+    if (status === 'published_missing_abi') return '已发布-缺少 ABI'
+    if (status === 'offline') return '已下线'
+  } else {
+    if (status === 'draft') return '草稿'
+    if (status === 'published_complete') return '已发布'
+    if (status === 'offline') return '已下线'
+  }
   return status || '--'
 }
 
 function statusTagType(status) {
+  if (!clientMeta.value.supportsAbi) {
+    if (status === 'published_complete') return 'success'
+    if (status === 'offline') return 'info'
+    return ''
+  }
   if (status === 'published_complete') return 'success'
   if (status === 'published_missing_abi') return 'warning'
   if (status === 'offline') return 'info'
@@ -88,6 +129,9 @@ function statusTagType(status) {
 }
 
 function abiLine(item) {
+  if (!clientMeta.value.supportsAbi) {
+    return item.abi_items?.length ? '已上传 APK' : '暂无 APK'
+  }
   const uploaded = Array.isArray(item.uploaded_abis) ? item.uploaded_abis.join(' / ') : ''
   const missing = Array.isArray(item.missing_abis) ? item.missing_abis.join(' / ') : ''
   if (uploaded && missing) return `已上传：${uploaded}；缺失：${missing}`
@@ -116,17 +160,35 @@ async function load() {
     const params = {
       page: query.page,
       page_size: query.page_size,
-      current_published: query.current_published ? 1 : 0
+      current_published: query.current_published ? 1 : 0,
+      client_type: clientType.value
     }
     if (query.q.trim()) params.q = query.q.trim()
     if (query.status) params.status = query.status
-    if (query.abi_completeness) params.abi_completeness = query.abi_completeness
+    if (query.abi_completeness && clientMeta.value.supportsAbi) params.abi_completeness = query.abi_completeness
     applyResult(await getAdminTVAppReleases(params))
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '加载 TV 安装包列表失败'))
+    ElMessage.error(extractErrorMessage(error, '加载安装包列表失败'))
   } finally {
     loading.value = false
   }
+}
+
+function resetQuery() {
+  query.page = 1
+  query.q = ''
+  query.status = ''
+  query.abi_completeness = ''
+  query.current_published = true
+}
+
+function changeClientType(nextType) {
+  if (!CLIENTS[nextType]) return
+  if (clientType.value === nextType) return
+  clientType.value = nextType
+  resetQuery()
+  uploadFiles.value = []
+  load()
 }
 
 function onUploadChange(file, files) {
@@ -157,7 +219,7 @@ async function uploadAPK(replaceExisting = false) {
   if (replaceExisting) formData.append('replace_existing', 'true')
   uploadLoading.value = true
   try {
-    await uploadAdminTVAppAPK(formData)
+    await uploadAdminTVAppAPK(formData, clientType.value)
     uploadFiles.value = []
     ElMessage.success(replaceExisting ? 'APK 已替换' : 'APK 已上传')
     await load()
@@ -174,7 +236,7 @@ async function saveNotes(item) {
     await updateAdminTVAppRelease(item.id, {
       release_notes: item.draft.release_notes,
       remarks: item.draft.remarks
-    })
+    }, clientType.value)
     ElMessage.success('版本说明已保存')
     await load()
   } catch (error) {
@@ -191,13 +253,13 @@ async function runDangerAction(item, action) {
       await publishAdminTVAppRelease(item.id, {
         release_notes: item.draft.release_notes,
         remarks: item.draft.remarks
-      })
+      }, clientType.value)
     } else if (action === 'offline') {
-      await offlineAdminTVAppRelease(item.id)
+      await offlineAdminTVAppRelease(item.id, clientType.value)
     } else if (action === 'restore') {
-      await restoreAdminTVAppRelease(item.id)
+      await restoreAdminTVAppRelease(item.id, clientType.value)
     } else if (action === 'delete') {
-      await deleteAdminTVAppReleaseDraft(item.id)
+      await deleteAdminTVAppReleaseDraft(item.id, clientType.value)
     }
     ElMessage.success('操作已完成')
     await load()
@@ -233,7 +295,7 @@ async function confirmAction(item, action) {
 }
 
 function downloadHref(item, abi) {
-  return downloadAdminTVAppReleaseURL(item.id, abi)
+  return downloadAdminTVAppReleaseURL(item.id, abi, clientType.value)
 }
 
 onMounted(load)
@@ -241,8 +303,8 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page-shell tv-app-page">
-      <PageHeader title="TV 安装包管理" subtitle="维护最近三版 TV APK、发布状态与 ABI 下载入口">
+    <div class="page-shell app-package-page">
+      <PageHeader :title="clientMeta.pageTitle" :subtitle="clientMeta.pageSubtitle">
         <template #actions>
           <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
         </template>
@@ -250,14 +312,19 @@ onMounted(load)
 
       <Toolbar>
         <template #filters>
-          <el-input v-model="query.q" clearable placeholder="搜索版本号 / versionName / 时间" style="width: 240px" @keyup.enter="load" />
+          <el-segmented :model-value="clientType" :options="[
+            { label: 'TV 端', value: 'android_tv' },
+            { label: '手机端', value: 'android_phone' }
+          ]" @update:modelValue="changeClientType" />
+          <el-input v-model="query.q" clearable :placeholder="clientMeta.supportsAbi ? '搜索版本号 / versionName / 时间' : '搜索版本号 / versionName / 时间'" style="width: 240px" @keyup.enter="load" />
           <el-select v-model="query.status" clearable placeholder="状态" style="width: 180px" @change="load">
             <el-option label="草稿" value="draft" />
-            <el-option label="已发布-完整" value="published_complete" />
-            <el-option label="已发布-缺少 ABI" value="published_missing_abi" />
+            <el-option v-if="clientMeta.supportsAbi" label="已发布-完整" value="published_complete" />
+            <el-option v-if="clientMeta.supportsAbi" label="已发布-缺少 ABI" value="published_missing_abi" />
+            <el-option v-else label="已发布" value="published_complete" />
             <el-option label="已下线" value="offline" />
           </el-select>
-          <el-select v-model="query.abi_completeness" clearable placeholder="ABI 完整性" style="width: 180px" @change="load">
+          <el-select v-if="clientMeta.supportsAbi" v-model="query.abi_completeness" clearable placeholder="ABI 完整性" style="width: 180px" @change="load">
             <el-option label="完整" value="complete" />
             <el-option label="缺少 ABI" value="missing" />
             <el-option label="空记录" value="empty" />
@@ -270,15 +337,15 @@ onMounted(load)
       </Toolbar>
 
       <section class="stat-grid">
-        <StatCard label="当前可见记录" :value="visibleCount" />
-        <StatCard label="缺少 ABI" :value="missingCount" />
+        <StatCard :label="clientMeta.supportsAbi ? '当前可见记录' : '当前可见记录'" :value="visibleCount" />
+        <StatCard :label="clientMeta.supportsAbi ? '缺少 ABI' : '草稿'" :value="missingCount" />
         <StatCard label="草稿" :value="draftCount" />
         <StatCard label="推荐版本" :value="latestItem ? `${latestItem.version_name} (${latestItem.version_code})` : '暂无'" />
       </section>
 
       <SectionCard>
         <template #title>上传 APK</template>
-        <template #description>首期仅接收 `com.chee.videos.tv` 的 Release APK，自动按 ABI 建档或补包。</template>
+        <template #description>{{ clientMeta.packageName }} · {{ clientMeta.uploadTip }}</template>
         <div class="upload-panel">
           <el-upload
             v-model:file-list="uploadFiles"
@@ -292,7 +359,10 @@ onMounted(load)
             <el-icon class="upload-icon"><UploadFilled /></el-icon>
             <div class="el-upload__text">拖拽 APK 到此处，或点击选择</div>
             <template #tip>
-              <div class="el-upload__tip">同 ABI 已存在时，服务端会拒绝静默覆盖；若需要替换，请在下线后选择“替换上传”。</div>
+              <div class="el-upload__tip">
+                <template v-if="clientMeta.supportsAbi">同 ABI 已存在时，服务端会拒绝静默覆盖；若需要替换，请在下线后选择“替换上传”。</template>
+                <template v-else>同版本已存在时，服务端会拒绝静默覆盖；若需要替换，请在下线后选择“替换上传”。</template>
+              </div>
             </template>
           </el-upload>
           <div class="upload-actions">
@@ -304,8 +374,8 @@ onMounted(load)
 
       <SectionCard>
         <template #title>发布记录</template>
-        <template #description>默认先看当前家庭可见记录，支持按状态、版本和 ABI 完整性叠加筛选。</template>
-        <EmptyState v-if="!data.total_count" title="暂无 TV 发布记录" description="先上传一个 APK 创建首条记录。" />
+        <template #description>{{ clientMeta.supportsAbi ? '默认先看当前家庭可见记录，支持按状态、版本和 ABI 完整性叠加筛选。' : '默认先看当前家庭可见记录，支持按状态和版本筛选。' }}</template>
+        <EmptyState v-if="!data.total_count" :title="clientMeta.emptyTitle" :description="clientMeta.emptyDesc" />
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="data.items" border row-key="id">
@@ -321,11 +391,11 @@ onMounted(load)
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="ABI 状态" min-width="280">
+              <el-table-column label="安装包状态" min-width="280">
                 <template #default="{ row }">
                   <el-tag :type="statusTagType(row.publish_status)" effect="plain">{{ statusText(row.publish_status) }}</el-tag>
                   <div class="abi-line">{{ abiLine(row) }}</div>
-                  <div class="abi-size">
+                  <div v-if="clientMeta.supportsAbi" class="abi-size">
                     <span v-for="abi in row.abi_items" :key="abi.id">{{ abi.abi }} {{ formatBytes(abi.file_size) }}</span>
                   </div>
                 </template>
@@ -368,7 +438,7 @@ onMounted(load)
                       rel="noopener noreferrer"
                     >
                       <el-icon><Download /></el-icon>
-                      下载 {{ abi.abi }}
+                      {{ clientMeta.supportsAbi ? `下载 ${abi.abi}` : '下载 APK' }}
                     </a>
                   </div>
                   <span v-else>暂无可下载 APK</span>
@@ -434,7 +504,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.tv-app-page {
+.app-package-page {
   display: grid;
   gap: var(--space-4);
 }

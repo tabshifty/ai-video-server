@@ -29,28 +29,63 @@ func NewTVAPKDomainError(code, message string) error {
 	return models.NewTVAPKDomainError(code, message)
 }
 
-func TVReleaseMissingABIs(items []models.AdminTvAppReleaseABIItem) []string {
+func ReleaseUploadedArtifacts(clientType string, items []models.AdminTvAppReleaseABIItem) []string {
 	uploaded := make([]string, 0, len(items))
 	for _, item := range items {
 		uploaded = append(uploaded, item.ABI)
 	}
-	return models.TVMissingABIs(uploaded)
+	switch models.NormalizeAppClientType(clientType) {
+	case models.AppClientTypeAndroidPhone:
+		out := make([]string, 0, 1)
+		for _, item := range uploaded {
+			if normalized := models.NormalizeReleaseArtifactSlot(clientType, item); normalized != "" {
+				out = append(out, normalized)
+			}
+		}
+		return out
+	default:
+		return models.TVUploadedABIs(uploaded)
+	}
+}
+
+func ReleaseMissingArtifacts(clientType string, items []models.AdminTvAppReleaseABIItem) []string {
+	switch models.NormalizeAppClientType(clientType) {
+	case models.AppClientTypeAndroidPhone:
+		if ReleaseArtifactComplete(clientType, items) {
+			return nil
+		}
+		return []string{models.AppAPKSlotSingle}
+	default:
+		uploaded := make([]string, 0, len(items))
+		for _, item := range items {
+			uploaded = append(uploaded, item.ABI)
+		}
+		return models.TVMissingABIs(uploaded)
+	}
+}
+
+func ReleaseArtifactComplete(clientType string, items []models.AdminTvAppReleaseABIItem) bool {
+	return models.ReleaseArtifactComplete(clientType, ReleaseUploadedArtifacts(clientType, items))
+}
+
+func NormalizeReleaseStatus(clientType string, visible bool, items []models.AdminTvAppReleaseABIItem) string {
+	return models.ReleaseStatusForVisibility(clientType, visible, ReleaseUploadedArtifacts(clientType, items))
+}
+
+func TVReleaseMissingABIs(items []models.AdminTvAppReleaseABIItem) []string {
+	return ReleaseMissingArtifacts(models.AppClientTypeAndroidTV, items)
 }
 
 func TVReleaseUploadedABIs(items []models.AdminTvAppReleaseABIItem) []string {
-	uploaded := make([]string, 0, len(items))
-	for _, item := range items {
-		uploaded = append(uploaded, item.ABI)
-	}
-	return models.TVUploadedABIs(uploaded)
+	return ReleaseUploadedArtifacts(models.AppClientTypeAndroidTV, items)
 }
 
 func TVReleaseABIComplete(items []models.AdminTvAppReleaseABIItem) bool {
-	return len(TVReleaseMissingABIs(items)) == 0
+	return ReleaseArtifactComplete(models.AppClientTypeAndroidTV, items)
 }
 
 func NormalizeTVReleaseStatus(visible bool, items []models.AdminTvAppReleaseABIItem) string {
-	return models.TVReleaseStatusForVisibility(visible, TVReleaseUploadedABIs(items))
+	return NormalizeReleaseStatus(models.AppClientTypeAndroidTV, visible, items)
 }
 
 func ParseTVAPKMetadata(apkPath string, fileName string) (models.TVAppAPKParsedMetadata, error) {
@@ -68,12 +103,17 @@ func ParseTVAPKMetadata(apkPath string, fileName string) (models.TVAppAPKParsedM
 	}
 	defer reader.Close()
 
-	abi, err := detectABIFromAPK(&reader.Reader)
+	manifest, err := parseBinaryManifest(&reader.Reader)
 	if err != nil {
 		return models.TVAppAPKParsedMetadata{}, err
 	}
 
-	manifest, err := parseBinaryManifest(&reader.Reader)
+	clientType := models.DetectAppClientTypeByPackageName(strings.TrimSpace(manifest.PackageName))
+	if clientType == "" {
+		return models.TVAppAPKParsedMetadata{}, NewTVAPKDomainError(TVAPKErrorInvalidPackage, "仅允许上传 com.chee.videos.tv 或 com.chee.videos 安装包")
+	}
+
+	abi, err := detectReleaseArtifactSlot(&reader.Reader, clientType)
 	if err != nil {
 		return models.TVAppAPKParsedMetadata{}, err
 	}
@@ -89,6 +129,7 @@ func ParseTVAPKMetadata(apkPath string, fileName string) (models.TVAppAPKParsedM
 	}
 
 	meta := models.TVAppAPKParsedMetadata{
+		ClientType:   clientType,
 		PackageName:  strings.TrimSpace(manifest.PackageName),
 		VersionCode:  manifest.VersionCode,
 		VersionName:  strings.TrimSpace(manifest.VersionName),
@@ -102,8 +143,8 @@ func ParseTVAPKMetadata(apkPath string, fileName string) (models.TVAppAPKParsedM
 		ParsedAt:     time.Now().UTC(),
 	}
 
-	if meta.PackageName != models.TVAppPackageName {
-		return models.TVAppAPKParsedMetadata{}, NewTVAPKDomainError(TVAPKErrorInvalidPackage, "仅允许上传 com.chee.videos.tv 安装包")
+	if expectedPackage := models.AppPackageNameForClientType(meta.ClientType); expectedPackage == "" || meta.PackageName != expectedPackage {
+		return models.TVAppAPKParsedMetadata{}, NewTVAPKDomainError(TVAPKErrorInvalidPackage, "安装包包名与客户端类型不匹配")
 	}
 	if meta.VersionCode <= 0 || strings.TrimSpace(meta.VersionName) == "" {
 		return models.TVAppAPKParsedMetadata{}, NewTVAPKDomainError(TVAPKErrorInvalidVersion, "无法从 APK 解析出有效版本号")
@@ -112,6 +153,13 @@ func ParseTVAPKMetadata(apkPath string, fileName string) (models.TVAppAPKParsedM
 		return models.TVAppAPKParsedMetadata{}, NewTVAPKDomainError(TVAPKErrorDebugAPKRejected, "仅允许上传 Release APK")
 	}
 	return meta, nil
+}
+
+func detectReleaseArtifactSlot(reader *zip.Reader, clientType string) (string, error) {
+	if !models.AppClientTypeSupportsABI(clientType) {
+		return models.AppAPKSlotSingle, nil
+	}
+	return detectABIFromAPK(reader)
 }
 
 func detectABIFromAPK(reader *zip.Reader) (string, error) {

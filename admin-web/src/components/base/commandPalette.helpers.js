@@ -18,7 +18,7 @@ export const adminShellNavGroups = [
     items: [
       { path: '/videos', label: '视频管理', title: '视频管理', icon: 'Film', alias: 'video videos sj spgl' },
       { path: '/tv-series', label: '电视剧管理', title: '电视剧管理', icon: 'Files', alias: 'tv series dsj' },
-      { path: '/tv-app', label: 'TV 安装包', title: 'TV 安装包管理', icon: 'Monitor', alias: 'tv app apk tvapk dzb' },
+      { path: '/tv-app', label: '安装包管理', title: '安装包管理', icon: 'Monitor', alias: 'tv app phone app apk tvapk dzb azb' },
       { path: '/actors', label: '演员管理', title: '演员管理', icon: 'Avatar', alias: 'actor actors yy' },
       { path: '/collections', label: '合集管理', title: '合集管理', icon: 'List', alias: 'collection collections hj' },
       { path: '/images', label: '图片管理', title: '图片管理', icon: 'PictureFilled', alias: 'image images tp' },

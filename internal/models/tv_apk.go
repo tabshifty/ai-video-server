@@ -10,7 +10,11 @@ import (
 )
 
 const (
+	AppClientTypeAndroidTV    = "android_tv"
+	AppClientTypeAndroidPhone = "android_phone"
+
 	TVAppPackageName = "com.chee.videos.tv"
+	AppPackageName   = "com.chee.videos"
 
 	TVReleaseStatusDraft             = "draft"
 	TVReleaseStatusPublishedComplete = "published_complete"
@@ -19,6 +23,8 @@ const (
 
 	TVABIArmV7 = "armeabi-v7a"
 	TVABIArm64 = "arm64-v8a"
+
+	AppAPKSlotSingle = "single"
 )
 
 var TVSupportedABIs = []string{TVABIArm64, TVABIArmV7}
@@ -41,6 +47,8 @@ const (
 	TVAPKErrorABIAlreadyExists      = "abi_already_exists"
 	TVAPKErrorReplaceNeedsOffline   = "replace_requires_offline"
 	TVAPKErrorReleaseNotPublishable = "release_not_publishable"
+	TVAPKErrorClientTypeMismatch    = "client_type_mismatch"
+	TVAPKErrorVersionNameConflict   = "version_name_conflict"
 )
 
 func NewTVAPKDomainError(code, message string) error {
@@ -48,6 +56,7 @@ func NewTVAPKDomainError(code, message string) error {
 }
 
 type TVAppAPKParsedMetadata struct {
+	ClientType   string          `json:"client_type"`
 	PackageName  string          `json:"package_name"`
 	VersionCode  int64           `json:"version_code"`
 	VersionName  string          `json:"version_name"`
@@ -80,6 +89,7 @@ type TVAppReleaseABIInfo struct {
 
 type TVAppReleaseRecord struct {
 	ID                  int64
+	ClientType          string
 	PackageName         string
 	VersionCode         int64
 	VersionName         string
@@ -104,6 +114,7 @@ type TVAppFamilyReleaseABI struct {
 
 type TVAppFamilyRelease struct {
 	ID                int64                   `json:"id"`
+	ClientType        string                  `json:"client_type"`
 	PackageName       string                  `json:"package_name"`
 	VersionCode       int64                   `json:"version_code"`
 	VersionName       string                  `json:"version_name"`
@@ -122,6 +133,104 @@ func TVNormalizeABI(raw string) string {
 		return value
 	default:
 		return ""
+	}
+}
+
+func NormalizeAppClientType(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	value = strings.ReplaceAll(value, "-", "_")
+	switch value {
+	case AppClientTypeAndroidTV, AppClientTypeAndroidPhone:
+		return value
+	default:
+		return ""
+	}
+}
+
+func AppClientTypeSlug(clientType string) string {
+	normalized := NormalizeAppClientType(clientType)
+	if normalized == "" {
+		return ""
+	}
+	return strings.ReplaceAll(normalized, "_", "-")
+}
+
+func AppClientTypeDisplayName(clientType string) string {
+	switch NormalizeAppClientType(clientType) {
+	case AppClientTypeAndroidPhone:
+		return "Android 手机"
+	case AppClientTypeAndroidTV:
+		return "Android TV"
+	default:
+		return ""
+	}
+}
+
+func AppClientTypeShortLabel(clientType string) string {
+	switch NormalizeAppClientType(clientType) {
+	case AppClientTypeAndroidPhone:
+		return "手机端"
+	case AppClientTypeAndroidTV:
+		return "TV 端"
+	default:
+		return ""
+	}
+}
+
+func AppPackageNameForClientType(clientType string) string {
+	switch NormalizeAppClientType(clientType) {
+	case AppClientTypeAndroidPhone:
+		return AppPackageName
+	case AppClientTypeAndroidTV:
+		return TVAppPackageName
+	default:
+		return ""
+	}
+}
+
+func DetectAppClientTypeByPackageName(packageName string) string {
+	switch strings.TrimSpace(packageName) {
+	case AppPackageName:
+		return AppClientTypeAndroidPhone
+	case TVAppPackageName:
+		return AppClientTypeAndroidTV
+	default:
+		return ""
+	}
+}
+
+func AppClientTypeSupportsABI(clientType string) bool {
+	return NormalizeAppClientType(clientType) == AppClientTypeAndroidTV
+}
+
+func NormalizeReleaseArtifactSlot(clientType, raw string) string {
+	switch NormalizeAppClientType(clientType) {
+	case AppClientTypeAndroidPhone:
+		value := strings.TrimSpace(raw)
+		if value == "" || strings.EqualFold(value, AppAPKSlotSingle) {
+			return AppAPKSlotSingle
+		}
+		return ""
+	case AppClientTypeAndroidTV:
+		return TVNormalizeABI(raw)
+	default:
+		return ""
+	}
+}
+
+func ReleaseArtifactComplete(clientType string, uploaded []string) bool {
+	switch NormalizeAppClientType(clientType) {
+	case AppClientTypeAndroidPhone:
+		for _, item := range uploaded {
+			if NormalizeReleaseArtifactSlot(clientType, item) != "" {
+				return true
+			}
+		}
+		return false
+	case AppClientTypeAndroidTV:
+		return len(TVMissingABIs(TVUploadedABIs(uploaded))) == 0
+	default:
+		return false
 	}
 }
 
@@ -180,4 +289,47 @@ func TVReleaseStatusForVisibility(visible bool, uploaded []string) string {
 		return TVReleaseStatusPublishedComplete
 	}
 	return TVReleaseStatusPublishedMissing
+}
+
+func ReleaseStatusForVisibility(clientType string, visible bool, uploaded []string) string {
+	if !visible {
+		return TVReleaseStatusOffline
+	}
+	switch NormalizeAppClientType(clientType) {
+	case AppClientTypeAndroidPhone:
+		return TVReleaseStatusPublishedComplete
+	case AppClientTypeAndroidTV:
+		return TVReleaseStatusForVisibility(true, uploaded)
+	default:
+		return TVReleaseStatusOffline
+	}
+}
+
+func ReleaseVisibilityLabel(clientType, status string) string {
+	switch NormalizeAppClientType(clientType) {
+	case AppClientTypeAndroidPhone:
+		switch strings.TrimSpace(status) {
+		case TVReleaseStatusPublishedComplete:
+			return "已发布"
+		case TVReleaseStatusDraft:
+			return "草稿"
+		case TVReleaseStatusOffline:
+			return "已下线"
+		default:
+			return strings.TrimSpace(status)
+		}
+	default:
+		switch strings.TrimSpace(status) {
+		case TVReleaseStatusPublishedComplete:
+			return "已发布-完整"
+		case TVReleaseStatusPublishedMissing:
+			return "已发布-缺少 ABI"
+		case TVReleaseStatusDraft:
+			return "草稿"
+		case TVReleaseStatusOffline:
+			return "已下线"
+		default:
+			return strings.TrimSpace(status)
+		}
+	}
 }

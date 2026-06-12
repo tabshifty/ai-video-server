@@ -21,9 +21,11 @@ import (
 func (a *API) AdminTVAppReleases(c *gin.Context) {
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 20)
+	clientType := models.NormalizeAppClientType(c.DefaultQuery("client_type", models.AppClientTypeAndroidTV))
 	items, total, err := a.tvAPKSvc.AdminList(c.Request.Context(), models.AdminTvAppReleaseFilter{
 		Page:             page,
 		PageSize:         pageSize,
+		ClientType:       clientType,
 		Keyword:          c.Query("q"),
 		Status:           strings.TrimSpace(c.Query("status")),
 		ABICompleteness:  strings.TrimSpace(c.Query("abi_completeness")),
@@ -65,6 +67,7 @@ func (a *API) AdminUploadTVAppAPK(c *gin.Context) {
 		bad(c, "请上传 file 字段")
 		return
 	}
+	clientType := models.NormalizeAppClientType(c.DefaultQuery("client_type", models.AppClientTypeAndroidTV))
 	userID, _ := middleware.UserIDFromContext(c)
 	username := "admin"
 	if userID != uuid.Nil {
@@ -77,7 +80,7 @@ func (a *API) AdminUploadTVAppAPK(c *gin.Context) {
 	if userID != uuid.Nil {
 		uploadUserID = &userID
 	}
-	release, abiInfo, err := a.tvAPKSvc.UploadAPK(c.Request.Context(), file, uploadUserID, username, replaceExisting)
+	release, abiInfo, err := a.tvAPKSvc.UploadAPK(c.Request.Context(), file, clientType, uploadUserID, username, replaceExisting)
 	if err != nil {
 		writeTVAPKError(c, 2403, err)
 		return
@@ -209,7 +212,8 @@ func (a *API) AdminDeleteTVAppReleaseDraft(c *gin.Context) {
 }
 
 func (a *API) TVAppFamilyReleases(c *gin.Context) {
-	items, err := a.tvAPKSvc.FamilyReleases(c.Request.Context())
+	clientType := models.NormalizeAppClientType(c.DefaultQuery("client_type", models.AppClientTypeAndroidTV))
+	items, err := a.tvAPKSvc.FamilyReleases(c.Request.Context(), clientType)
 	if err != nil {
 		writeTVAPKError(c, 2409, err)
 		return

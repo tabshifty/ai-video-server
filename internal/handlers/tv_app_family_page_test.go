@@ -26,6 +26,10 @@ func TestRegisterIncludesTVAppFamilyPageRoute(t *testing.T) {
 		"HEAD /tv-app",
 		"GET /tv-app/",
 		"HEAD /tv-app/",
+		"GET /downloads/android-tv",
+		"HEAD /downloads/android-tv",
+		"GET /downloads/android-phone",
+		"HEAD /downloads/android-phone",
 	} {
 		if _, ok := routes[want]; !ok {
 			t.Fatalf("expected route %s to be registered", want)
@@ -50,10 +54,10 @@ func TestMountTVAppFamilyPageServesStandaloneHTML(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		"<title>TV 安装包下载</title>",
+		"<title>TV 端安装包下载</title>",
 		`/api/v1/auth/login`,
 		`/api/v1/auth/refresh`,
-		`/api/v1/tv-app/releases`,
+		`/api/v1/app/releases?client_type=android_tv`,
 		`data-download-release-id="`,
 		`buildDownloadURL(link.dataset.downloadReleaseId, link.dataset.downloadAbi, accessToken)`,
 		"登录后查看下载列表",
@@ -82,5 +86,32 @@ func TestMountTVAppFamilyPageSupportsHead(t *testing.T) {
 	}
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("Cache-Control = %q, want no-store", got)
+	}
+}
+
+func TestMountPhoneAppFamilyPageServesStandaloneHTML(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	mountTVAppFamilyPage(router)
+
+	req := httptest.NewRequest(http.MethodGet, "/downloads/android-phone", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /downloads/android-phone = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"<title>手机端安装包下载</title>",
+		`/api/v1/app/releases?client_type=android_phone`,
+		"下载 APK",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected body to contain %q", want)
+		}
+	}
+	if strings.Contains(body, "ABI 已齐全") || strings.Contains(body, "已上传 ABI") {
+		t.Fatalf("phone family page should not expose ABI-specific wording, got body %q", body)
 	}
 }

@@ -225,11 +225,11 @@ describe('tv app release apis', () => {
   })
 
   it('requests tv app release list and detail', async () => {
-    await getAdminTVAppReleases({ q: '84', status: 'draft' })
+    await getAdminTVAppReleases({ q: '84', status: 'draft', client_type: 'android_tv' })
     await getAdminTVAppReleaseDetail(12)
 
     expect(get).toHaveBeenCalledWith('/admin/tv-app/releases', {
-      params: { q: '84', status: 'draft' }
+      params: { q: '84', status: 'draft', client_type: 'android_tv' }
     })
     expect(get).toHaveBeenCalledWith('/admin/tv-app/releases/12')
   })
@@ -237,9 +237,10 @@ describe('tv app release apis', () => {
   it('uploads tv apk with multipart and timeout disabled', async () => {
     const formData = new FormData()
 
-    await uploadAdminTVAppAPK(formData)
+    await uploadAdminTVAppAPK(formData, 'android_phone')
 
     expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/upload', formData, {
+      params: { client_type: 'android_phone' },
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0
     })
@@ -248,17 +249,26 @@ describe('tv app release apis', () => {
   it('updates publish lifecycle for tv app release', async () => {
     const payload = { release_notes: '修复 IPTV 闪退', remarks: '推荐升级' }
 
-    await updateAdminTVAppRelease(12, payload)
-    await publishAdminTVAppRelease(12, payload)
-    await offlineAdminTVAppRelease(12)
-    await restoreAdminTVAppRelease(12)
-    await deleteAdminTVAppReleaseDraft(12)
+    await updateAdminTVAppRelease(12, payload, 'android_tv')
+    await publishAdminTVAppRelease(12, payload, 'android_tv')
+    await offlineAdminTVAppRelease(12, 'android_tv')
+    await restoreAdminTVAppRelease(12, 'android_tv')
+    await deleteAdminTVAppReleaseDraft(12, 'android_tv')
 
-    expect(put).toHaveBeenCalledWith('/admin/tv-app/releases/12', payload)
-    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/publish', payload)
-    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/offline')
-    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/restore')
+    expect(put).toHaveBeenCalledWith('/admin/tv-app/releases/12', payload, {
+      params: { client_type: 'android_tv' }
+    })
+    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/publish', payload, {
+      params: { client_type: 'android_tv' }
+    })
+    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/offline', null, {
+      params: { client_type: 'android_tv' }
+    })
+    expect(post).toHaveBeenCalledWith('/admin/tv-app/releases/12/restore', null, {
+      params: { client_type: 'android_tv' }
+    })
     expect(remove).toHaveBeenCalledWith('/admin/tv-app/releases/12', {
+      params: { client_type: 'android_tv' },
       timeout: 0
     })
   })
