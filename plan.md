@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-12 18:46 +0800
+- 进度：开始补齐 TV 安装包家庭轻量页闭环。已确认当前仓库没有普通用户 Web 壳，因此本轮改动限定在 Go 侧：新增独立 `/tv-app` 轻量页，内置最小登录、现有 token 续期、最近三版展示与 ABI 直下能力，不扩展 `admin-web`。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/tv_app_family_page.go`、`internal/handlers/tv_app_family_page_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 family 页定向 handler 测试与 `go test ./internal/handlers ./internal/services ./internal/repository -count=1`。
+
+## 2026-06-12 18:58 +0800
+- 进度：家庭轻量页与定向测试已落地。`internal/handlers` 定向测试通过；组合 Go 测试首次在沙箱内失败，原因是仓库现有 `admin_image_generation_test.go` 通过 `httptest.NewServer` 绑定本地端口而被当前受限环境拒绝，已按原命令申请提权重跑，不视为本次改动回归。
+- 影响文件：`internal/handlers/tv_app_family_page.go`、`internal/handlers/tv_app_family_page_test.go`、`internal/handlers/router.go`、`CONTEXT.md`、`plan.md`
+- 验证：`env GOCACHE=/private/tmp/go-build-cache-tvapk go test ./internal/handlers -run 'TestRegisterIncludesTVAppFamilyPageRoute|TestMountTVAppFamilyPage' -count=1` 通过；组合测试提权执行中。
+
+## 2026-06-12 19:05 +0800
+- 进度：家庭轻量页交付完成。Go 侧新增 `/tv-app` 独立页面，带最小登录、refresh token 续期、最近三版展示与 ABI 直下；下载前会先检查 access token 是否临近过期，必要时自动刷新，避免页面停留过久后直接 401。已同步补 family 页路由/页面测试与长期沉淀。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/tv_app_family_page.go`、`internal/handlers/tv_app_family_page_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`env GOCACHE=/private/tmp/go-build-cache-tvapk go test ./internal/handlers -run 'TestRegisterIncludesTVAppFamilyPageRoute|TestMountTVAppFamilyPage' -count=1` 通过；`env GOCACHE=/private/tmp/go-build-cache-tvapk go test ./internal/handlers ./internal/services ./internal/repository -count=1` 通过（提权，因现有测试需本地绑定 `httptest` 端口）；`rg -n $'\uFFFD' plan.md CONTEXT.md internal/handlers/tv_app_family_page.go internal/handlers/tv_app_family_page_test.go internal/handlers/router.go` 无命中。提交时仅纳入本任务文件，保留用户已有 `admin-web/.env.development` 未提交。
+
 ## 2026-06-12 18:39 +0800
 - 进度：已打通 TV APK 二进制 manifest 解析与后端主链路：新增 APK 元数据解析单测，补齐 TV 安装包 repository / service / Gin API，管理端已接入 TV 安装包页面、路由和 API 封装。当前进入收尾验证与记录阶段。
 - 影响文件：`internal/services/tv_apk.go`、`internal/services/tv_apk_test.go`、`internal/services/tv_apk_manager.go`、`internal/repository/tv_apk_repository.go`、`internal/handlers/tv_apk.go`、`internal/handlers/router.go`、`internal/handlers/iptv.go`、`internal/handlers/iptv_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/views/TvAppManage.vue`、`plan.md`

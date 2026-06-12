@@ -260,6 +260,8 @@ func (a *API) Register(r *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
+	mountTVAppFamilyPage(r)
+
 	// Serve built admin frontend from Go server at /admin.
 	mountAdminStatic(r, a.adminWebDistPath)
 }
