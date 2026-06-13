@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 18:11 +0800
+- 进度：完成历史恢复参考图大小校验补强。新增 data URL 字节估算，历史快照恢复出的本地冻结图会带回 size；继续追加上传/粘贴/图库参考图时，校验会同时统计已有恢复图和新图，避免 `File` 为空导致总大小上限失效。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm run test -- imageWorkbench.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过，仅有 Vite chunk size warning。待执行乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-13 18:10 +0800
+- 进度：继续补强历史恢复参考图的大小校验一致性。审计发现历史恢复出来的冻结参考图没有 `File` 对象，后续继续追加参考图时总大小校验可能只统计新图；下一步补 data URL 字节估算，恢复历史输入时保留 size，并让追加参考图的校验覆盖已有冻结图。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- imageWorkbench.helpers.spec.js`、`cd admin-web && npm run build`、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-13 18:08 +0800
 - 进度：完成图库资产来源跳转闭环。工作台当前参考图和历史输入快照里的 `library_asset` 来源现在提供“查看来源”，跳转 `/images?image_id=<source_image_id>`；图片管理页消费 `image_id` query 后尝试打开详情，并在成功或失败后清理 query。来源读取失败时工作台仍保留冻结标题与来源图片 ID 摘要。`CONTEXT.md` 已新增 `admin 图库资产来源跳转 query 契约`。
 - 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/ImageManage.vue`、`CONTEXT.md`、`plan.md`

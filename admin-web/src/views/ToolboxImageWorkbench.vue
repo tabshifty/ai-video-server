@@ -525,7 +525,15 @@ async function addReferenceFiles(files) {
 async function appendReferenceItems(items) {
   const incoming = Array.from(items || [])
   if (!incoming.length) return []
-  const merged = [...references.value.map((item) => item.file).filter(Boolean), ...incoming.map((item) => item.file).filter(Boolean)]
+  const existingForValidation = references.value.map((item) => ({
+    type: item.mime,
+    size: Number(item.size || 0)
+  }))
+  const incomingForValidation = incoming.map((item) => item.file || {
+    type: item.mime,
+    size: Number(item.size || 0)
+  })
+  const merged = [...existingForValidation, ...incomingForValidation]
   const validation = validateReferenceImageFiles(merged)
   if (!validation.ok) {
     ElMessage.warning(validation.message)

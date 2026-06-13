@@ -58,6 +58,13 @@ export function formatWorkbenchFileSize(size) {
   return `${(value / 1024 / 1024).toFixed(1)} MiB`
 }
 
+export function estimateDataUrlBytes(dataUrl) {
+  const payload = String(dataUrl || '').split(',')[1] || ''
+  if (!payload) return 0
+  const padding = payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor((payload.length * 3) / 4) - padding)
+}
+
 export function validateReferenceImageFiles(files, limits = IMAGE_WORKBENCH_LIMITS) {
   const list = Array.from(files || [])
   if (list.length > limits.maxReferenceImages) {
@@ -254,7 +261,7 @@ export function hydrateReferenceImageFromSnapshot(snapshot = {}, image = {}) {
     file: null,
     name: snapshot.name || image.name || 'reference-image',
     mime: image.mime || snapshot.mime || 'image/png',
-    size: Number(image.size || 0),
+    size: Number(image.size || 0) || estimateDataUrlBytes(image.dataUrl),
     dataUrl: image.dataUrl || '',
     sourceKind,
     sourceTaskId: snapshot.source_task_id || '',

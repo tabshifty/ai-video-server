@@ -4,6 +4,7 @@ import {
   buildImageGenerationPayload,
   buildReferenceImageSnapshots,
   createImageWorkbenchTask,
+  estimateDataUrlBytes,
   hydrateReferenceImageFromSnapshot,
   normalizeImageWorkbenchParams,
   validateReferenceImageFiles
@@ -44,6 +45,12 @@ describe('image workbench helpers', () => {
       new File(['x'], `ref-${index}.png`, { type: 'image/png' })
     )
     expect(validateReferenceImageFiles(tooMany).message).toContain('参考图最多')
+  })
+
+  it('estimates data URL payload bytes for restored local images', () => {
+    expect(estimateDataUrlBytes('data:image/png;base64,eA==')).toBe(1)
+    expect(estimateDataUrlBytes('data:image/png;base64,YWJj')).toBe(3)
+    expect(estimateDataUrlBytes('bad')).toBe(0)
   })
 
   it('builds backend payload without leaking local-only fields', async () => {
@@ -140,8 +147,7 @@ describe('image workbench helpers', () => {
       {
         id: 'local-copy',
         dataUrl: 'data:image/png;base64,frozen',
-        mime: 'image/png',
-        size: 123
+        mime: 'image/png'
       }
     )
 
@@ -150,7 +156,7 @@ describe('image workbench helpers', () => {
       file: null,
       name: 'frozen-title.png',
       mime: 'image/png',
-      size: 123,
+      size: 4,
       dataUrl: 'data:image/png;base64,frozen',
       sourceKind: 'library_asset',
       sourceTaskId: '',
