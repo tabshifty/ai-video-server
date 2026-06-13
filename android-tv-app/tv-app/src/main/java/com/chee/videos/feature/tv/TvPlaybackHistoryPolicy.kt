@@ -19,6 +19,19 @@ fun tvPlaybackHistorySnapshot(
     )
 }
 
+internal fun resolveTvMedia3ResumePositionMs(
+    historyPositionMs: Long,
+    currentSnapshotPositionMs: Long,
+    hasCurrentPlaybackSnapshot: Boolean,
+): Long {
+    val safeHistoryPositionMs = historyPositionMs.coerceAtLeast(0L)
+    val safeCurrentSnapshotPositionMs = currentSnapshotPositionMs.coerceAtLeast(0L)
+    if (hasCurrentPlaybackSnapshot && safeCurrentSnapshotPositionMs > 0L) {
+        return safeCurrentSnapshotPositionMs
+    }
+    return safeHistoryPositionMs
+}
+
 fun shouldStartPeriodicHistoryReport(
     videoId: String,
     canPlay: Boolean,

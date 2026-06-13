@@ -563,11 +563,11 @@ fun TvLongFormPlayerScreen(
                 accessToken = uiState.accessToken,
                 retryKey = routeRetryNonce,
                 shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
-                initialPositionMs = if (resumedFromHistoryVideoId != detail.id) {
-                    detail.userState.watchSeconds.coerceAtLeast(0).times(1000L)
-                } else {
-                    0L
-                },
+                initialPositionMs = resolveTvMedia3ResumePositionMs(
+                    historyPositionMs = detail.userState.watchSeconds.coerceAtLeast(0).times(1000L),
+                    currentSnapshotPositionMs = latestMedia3Snapshot.positionMs,
+                    hasCurrentPlaybackSnapshot = resumedFromHistoryVideoId == detail.id,
+                ),
                 modifier = Modifier.fillMaxSize(),
                 onPlayingChanged = { playing ->
                     isPlayerActuallyPlaying = playing

@@ -757,11 +757,15 @@ fun TvSeriesPlayerScreen(
                 accessToken = accessToken,
                 retryKey = routeRetryNonce,
                 shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
-                initialPositionMs = if (!uiState.startCurrentEpisodeFromBeginning && resumedFromHistoryVideoId != uiState.currentVideoId) {
-                    currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
-                } else {
-                    0L
-                },
+                initialPositionMs = resolveTvMedia3ResumePositionMs(
+                    historyPositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
+                        currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
+                    } else {
+                        0L
+                    },
+                    currentSnapshotPositionMs = latestMedia3Snapshot.positionMs,
+                    hasCurrentPlaybackSnapshot = resumedFromHistoryVideoId == uiState.currentVideoId,
+                ),
                 modifier = Modifier.fillMaxSize(),
                 onPlayingChanged = { playing ->
                     isPlayerActuallyPlaying = playing

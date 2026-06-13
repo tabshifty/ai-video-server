@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 01:45 +0800
+- 进度：继续收敛 TV 端 DV 专用链路的失败重试语义。确认 Media3 专用链路重试不应丢失当前播放快照，新的起播位置优先采用当前播放器已采集的进度，再回退到历史记录；这样可以在失败后保留现场进度，切集或显式从头播放才重置。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlaybackHistoryPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackHistoryPolicyTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPlaybackHistoryPolicyTest --tests com.chee.videos.feature.tv.TvDolbyVisionDiagnosticsTest --tests com.chee.videos.feature.tv.DolbyVisionDisplayCapabilityTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check`、乱码检查。
+
 ## 2026-06-14 01:26 +0800
 - 进度：TV 端 DV 播放诊断最小闭环完成并验证通过。诊断入口继续限定在 DV 相关阻断页和专用 Media3 播放失败页，错误卡片改为单入口替换式诊断卡片；同时把 TV 端版本号抬到 `0.1.88` / `88`，确保功能变更和版本管理同步。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnostics.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnosticsTest.kt`、`CONTEXT.md`、`plan.md`

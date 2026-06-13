@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TvPlaybackHistoryPolicyTest {
-
     @Test
     fun watchSnapshot_convertsPositionAndDetectsCompletionNearEnd() {
         val snapshot = tvPlaybackHistorySnapshot(positionMs = 117_900L, durationMs = 120_000L)
@@ -21,6 +20,28 @@ class TvPlaybackHistoryPolicyTest {
 
         assertEquals(116, snapshot.watchSeconds)
         assertFalse(snapshot.completed)
+    }
+
+    @Test
+    fun retryResumePrefersCurrentMedia3SnapshotWhenAvailable() {
+        val resumePositionMs = resolveTvMedia3ResumePositionMs(
+            historyPositionMs = 48_000L,
+            currentSnapshotPositionMs = 91_000L,
+            hasCurrentPlaybackSnapshot = true,
+        )
+
+        assertEquals(91_000L, resumePositionMs)
+    }
+
+    @Test
+    fun retryResumeFallsBackToHistoryWhenNoCurrentSnapshotExists() {
+        val resumePositionMs = resolveTvMedia3ResumePositionMs(
+            historyPositionMs = 48_000L,
+            currentSnapshotPositionMs = 91_000L,
+            hasCurrentPlaybackSnapshot = false,
+        )
+
+        assertEquals(48_000L, resumePositionMs)
     }
 
     @Test
