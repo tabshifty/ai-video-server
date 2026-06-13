@@ -837,6 +837,17 @@ fun TvSeriesPlayerScreen(
                         .padding(bottom = 72.dp),
                 )
             }
+        } else if (uiState.playbackPreparing) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                TvPageLoadingState(message = "正在准备当前分集")
+                if (showBackConfirmPrompt) {
+                    TvPlayerBackConfirmPrompt(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 48.dp),
+                    )
+                }
+            }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 if (showDolbyVisionDiagnostics) {

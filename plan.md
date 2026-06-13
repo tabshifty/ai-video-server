@@ -2,6 +2,26 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 02:57 +0800
+- 进度：完成电视剧播放源准备态修复收尾，准备提交。本次只纳入 TV 端播放准备态代码、测试、版本号、`CONTEXT.md` 术语和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保留未提交。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerPreparingStateSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest --tests com.chee.videos.feature.tv.TvSeriesPlayerPreparingStateSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check -- CONTEXT.md plan.md android-tv-app/tv-app/build.gradle.kts android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerPreparingStateSpecTest.kt` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md android-tv-app/tv-app/build.gradle.kts android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerPreparingStateSpecTest.kt` 无命中。
+
+## 2026-06-14 02:56 +0800
+- 进度：补齐电视剧播放源准备态的首次进入覆盖。除切换分集外，首次进入电视剧播放器时如果初始分集的播放源仍在构建，也应停留在准备态而不是闪进“当前分集暂无可播放视频”。`TvSeriesPlayerViewModelTest` 新增初始加载延迟场景，确保准备态在首入与切集两条路径都成立。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`plan.md`
+- 验证：待重新执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest --tests com.chee.videos.feature.tv.TvSeriesPlayerPreparingStateSpecTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。
+
+## 2026-06-14 02:50 +0800
+- 进度：完成电视剧播放源准备态代码落地。`TvSeriesPlayerViewModel` 在可播放分集异步构建播放源时置 `playbackPreparing=true`，但在源 URL 就绪前不暴露可播放 target，避免历史上报误归到新分集；兼容阻断和未绑定分集保持非准备态。`TvSeriesPlayerScreen` 对准备态显示“正在准备当前分集”，不再落到“暂不能播放”错误页。TV 端版本同步提升到 `0.1.90`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerPreparingStateSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：先补红灯测试后，`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest` 已通过；待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-14 02:45 +0800
+- 进度：开始修复电视剧播放页在可播放分集准备播放源期间短暂闪现“当前不可播放 / 当前分集暂无可播放视频”的问题。已确认根因是分集播放源 URL 异步构建期间 UI 状态被临时清空，屏幕误走不可播放错误态；本次收口为新增明确的播放源准备态，并在准备期间显示加载态。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerPreparingStateSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行定向红灯测试 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest`，实现后执行 TV 端单测、assemble、`git diff --check` 与乱码检查。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-14 02:13 +0800
 - 进度：完成两个 TV 长视频任务的现有代码收口标记。`tasks/2026-05-25-tv-long-form-focus-guarding/DONE.md` 记录原实现提交、恢复提交、当前主线基线、自动化验证与未重跑 R1~R10 人工手测脚本的边界；`tasks/2026-05-25-tv-long-form-track-preference-recovery/DONE.md` 同步记录原实现提交、恢复提交、当前主线基线、自动化验证与未重跑 A1~A7 人工手测脚本的边界。
 - 影响文件：`tasks/2026-05-25-tv-long-form-focus-guarding/DONE.md`、`tasks/2026-05-25-tv-long-form-track-preference-recovery/DONE.md`、`plan.md`

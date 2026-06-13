@@ -35,6 +35,7 @@ data class TvSeriesPlayerUiState(
     val currentVideoId: String = "",
     val currentSourceUrl: String = "",
     val canPlayCurrentEpisode: Boolean = false,
+    val playbackPreparing: Boolean = false,
     val playbackBlockedMessage: String? = null,
     val errorMessage: String? = null,
 )
@@ -257,6 +258,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     selectedAudioTrackId = null,
                     selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
+                    playbackPreparing = false,
                     playbackBlockedMessage = null,
                 )
             }
@@ -272,6 +274,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     selectedAudioTrackId = null,
                     selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
+                    playbackPreparing = false,
                     playbackBlockedMessage = candidateDecision.blockMessage,
                 )
             }
@@ -285,6 +288,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 selectedAudioTrackId = null,
                 selectedAudioPreference = null,
                 canPlayCurrentEpisode = false,
+                playbackPreparing = true,
                 playbackBlockedMessage = null,
             )
         }
@@ -310,6 +314,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     selectedAudioTrackId = null,
                     selectedAudioPreference = preferredAudioPreference,
                     canPlayCurrentEpisode = true,
+                    playbackPreparing = false,
                     playbackBlockedMessage = null,
                 )
             }

@@ -356,6 +356,48 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_marksPlaybackPreparingUntilInitialSourceReady() = runTest {
+        val repository = DelayedSourceTvRepository(
+            detailPayload = tvSeriesDetail(
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisode(id = "e1", number = 1, title = "第1集", videoId = "video-1", videoStatus = "ready"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+
+        advanceUntilIdle()
+
+        val preparingState = viewModel.uiState.value
+        assertEquals(1, preparingState.selectedSeasonNumber)
+        assertEquals(1, preparingState.selectedEpisodeNumber)
+        assertEquals("", preparingState.currentVideoId)
+        assertEquals("", preparingState.currentSourceUrl)
+        assertFalse(preparingState.canPlayCurrentEpisode)
+        assertTrue(preparingState.playbackPreparing)
+        assertEquals(null, preparingState.playbackBlockedMessage)
+
+        repository.completeSourceUrl("video-1")
+        advanceUntilIdle()
+
+        val readyState = viewModel.uiState.value
+        assertEquals("video-1", readyState.currentVideoId)
+        assertEquals("https://example.com/video-1.m3u8", readyState.currentSourceUrl)
+        assertTrue(readyState.canPlayCurrentEpisode)
+        assertFalse(readyState.playbackPreparing)
+    }
+
+    @Test
     fun nextEpisode_skipsToFollowingEpisodeAndUpdatesVideoId() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
@@ -483,6 +525,7 @@ class TvSeriesPlayerViewModelTest {
 
         val state = viewModel.uiState.value
         assertFalse(state.canPlayCurrentEpisode)
+        assertFalse(state.playbackPreparing)
         assertEquals("", state.currentVideoId)
     }
 
@@ -519,6 +562,7 @@ class TvSeriesPlayerViewModelTest {
         assertEquals("video-1", state.currentVideoId)
         assertEquals("", state.currentSourceUrl)
         assertFalse(state.canPlayCurrentEpisode)
+        assertFalse(state.playbackPreparing)
         assertEquals("播放兼容信息不完整，暂不能确认安全播放", state.playbackBlockedMessage)
         assertTrue(repository.sourceUrlRequests.isEmpty())
     }
@@ -559,6 +603,7 @@ class TvSeriesPlayerViewModelTest {
         assertEquals("video-1", state.currentVideoId)
         assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
         assertTrue(state.canPlayCurrentEpisode)
+        assertFalse(state.playbackPreparing)
         assertEquals(null, state.playbackBlockedMessage)
         assertEquals(listOf("video-1"), repository.sourceUrlRequests)
     }
@@ -599,12 +644,13 @@ class TvSeriesPlayerViewModelTest {
         assertEquals("video-1", state.currentVideoId)
         assertEquals("", state.currentSourceUrl)
         assertFalse(state.canPlayCurrentEpisode)
+        assertFalse(state.playbackPreparing)
         assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", state.playbackBlockedMessage)
         assertTrue(repository.sourceUrlRequests.isEmpty())
     }
 
     @Test
-    fun selectEpisode_clearsPreviousPlaybackTargetUntilNewSourceReady() = runTest {
+    fun selectEpisode_marksPlaybackPreparingUntilNewSourceReady() = runTest {
         val repository = DelayedSourceTvRepository(
             detailPayload = tvSeriesDetail(
                 seasons = listOf(
@@ -637,6 +683,17 @@ class TvSeriesPlayerViewModelTest {
         assertEquals("", state.currentVideoId)
         assertEquals("", state.currentSourceUrl)
         assertFalse(state.canPlayCurrentEpisode)
+        assertTrue(state.playbackPreparing)
+        assertEquals(null, state.playbackBlockedMessage)
+
+        repository.completeSourceUrl("video-2")
+        advanceUntilIdle()
+
+        val readyState = viewModel.uiState.value
+        assertEquals("video-2", readyState.currentVideoId)
+        assertEquals("https://example.com/video-2.m3u8", readyState.currentSourceUrl)
+        assertTrue(readyState.canPlayCurrentEpisode)
+        assertFalse(readyState.playbackPreparing)
     }
 
     @Test
