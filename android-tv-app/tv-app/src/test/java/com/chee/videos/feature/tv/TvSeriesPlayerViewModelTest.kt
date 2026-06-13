@@ -519,7 +519,7 @@ class TvSeriesPlayerViewModelTest {
         assertEquals("video-1", state.currentVideoId)
         assertEquals("", state.currentSourceUrl)
         assertFalse(state.canPlayCurrentEpisode)
-        assertEquals("该视频播放兼容性未确认，当前 TV 端暂不自动播放", state.playbackBlockedMessage)
+        assertEquals("播放兼容信息不完整，暂不能确认安全播放", state.playbackBlockedMessage)
         assertTrue(repository.sourceUrlRequests.isEmpty())
     }
 

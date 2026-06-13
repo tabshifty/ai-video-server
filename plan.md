@@ -2,6 +2,131 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 11:24 +0800
+- 进度：TV Dolby Vision 播放兼容策略实现完成并进入提交准备。已确认本轮只落地现有 `playback_compat` 决策、老数据普通放行、信息不完整阻断提示和重试入口；未实现设备/HDR 能力探测、专用系统播放器/Media3 分支或播放页补探测。提交范围将精确排除用户已有 `admin-web/.env.development`。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvStateFeedbackUsageTest.kt`、`docs/adr/0010-dolby-vision-tv-playback-compatibility.md`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`rg -n $'\uFFFD' ...` 无命中；`git diff --check -- ...` 通过。
+
+## 2026-06-13 11:23 +0800
+- 进度：TV Dolby Vision 播放兼容策略已落地到 TV 端。`PlaybackCompatibilityPolicy` 现在将 `playback_compat.version < 1` 作为老数据普通放行、`version > 1` 与探测失败/字段不足作为“播放兼容信息不完整”阻断；长视频与剧集播放阻断态改用 `TvErrorState`，提供“重试”以重新拉取详情并重判；TV 端版本号升至 `0.1.85`。`CONTEXT.md` 已追加 `TV playback_compat v0 历史兼容`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvStateFeedbackUsageTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest --tests com.chee.videos.feature.tv.TvStateFeedbackUsageTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest` 通过；待补跑 TV 端相关组合/全量单测、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:18 +0800
+- 进度：开始把已收敛的 TV Dolby Vision 播放兼容策略转入实现。范围限定为 TV 端现有 `playback_compat` 决策 helper、单测、TV 版本号与文档记录；本轮不实现设备/HDR 能力探测、不接系统播放器/Media3 专用链路、不在播放页触发补探测。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待先补定向单测并运行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest`，再视改动运行 TV 端相关验证。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:14 +0800
+- 进度：grill-with-docs 已确认这套 TV Dolby Vision 播放兼容策略需要 ADR 沉淀。已新增 `docs/adr/0010-dolby-vision-tv-playback-compatibility.md`，记录“不异色优先”、老数据普通放行例外、专用链路资格、播放页不补探测与不提供强行播放旁路等关键取舍。
+- 影响文件：`docs/adr/0010-dolby-vision-tv-playback-compatibility.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md docs/adr/0010-dolby-vision-tv-playback-compatibility.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:11 +0800
+- 进度：grill-with-docs 继续收敛 `播放兼容信息不完整` 失败态里的“重试”语义。已确认该“重试”只重新拉取详情 metadata 并重新执行本地播放决策，不触发服务端补探测、实时 ffprobe、重新转码或 metadata 修复。`CONTEXT.md` 已追加 `播放兼容信息不完整重试`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:08 +0800
+- 进度：grill-with-docs 继续收敛 `播放兼容信息不完整` 的播放入口处理。已确认已存在的 `playback_compat` metadata 不能支撑播放安全判断时，TV 端首轮只提示“播放兼容信息不完整，暂不能确认安全播放”这类失败态，并提供返回/重试；播放页内不触发补探测、实时 ffprobe 或后台修复任务，补探测后续应放到后端任务或管理端修复入口。`CONTEXT.md` 已追加 `播放兼容信息不完整提示`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:05 +0800
+- 进度：grill-with-docs 继续收窄 `老数据普通播放放行` 的适用范围。已确认老数据放行只适用于 `playback_compat` 整体缺失或协议版本过旧的存量视频；如果 metadata 已存在但标记探测失败、source/output DV 判定缺失或关键字段不足，不再适用老数据放行，而应按“播放兼容信息不完整”处理。`CONTEXT.md` 已同步收紧 `DV metadata 不完整不进专用链路` 与 `老数据普通播放放行`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:03 +0800
+- 进度：grill-with-docs 修正 `playback_compat` metadata 不完整时的处理边界。用户明确要求“老数据直接放行”，已收敛为：`playback_compat` 缺失或过旧的存量视频可以继续按既有 `LibVLC` 普通播放链路放行，但这不是 Dolby Vision 安全播放，也不能进入专用系统播放链路；一旦 metadata 已明确标记 DV 风险源，仍按 DV 阻断或专用链路规则处理。`CONTEXT.md` 已将 `DV metadata 不完整不推断放行` 修正为 `DV metadata 不完整不进专用链路`，并新增 `老数据普通播放放行`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:54 +0800
+- 进度：grill-with-docs 继续收敛 `playback_compat` metadata 的可信度边界。已确认 metadata 缺失、版本过旧、探测失败，或没有分别给出 source/output 的 Dolby Vision 判定时，TV App 首轮一律按“不能确认 DV 专用链路播放源资格”处理，不根据文件名、视频类型或历史经验猜测可安全放行。`CONTEXT.md` 已追加 `DV metadata 不完整不推断放行` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:52 +0800
+- 进度：grill-with-docs 继续收敛 `杜比视界专用系统播放链路` 的播放源资格。已确认专用系统播放链路只能使用当前仍可访问、且 metadata 表明播放源自身仍是 Dolby Vision 的媒体文件；已转码成非 DV 的输出文件和已删除/不可访问的原始上传文件都不能进入安全放行。`CONTEXT.md` 已追加 `DV 专用链路播放源资格` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:51 +0800
+- 进度：grill-with-docs 继续收敛 `DV 安全放行` 的承载链路。已确认当设备显示能力和当前播放链路都明确支持对应 Dolby Vision 风险源时，首轮也只允许进入 `杜比视界专用系统播放链路`，不让现有 TV 长视频 `LibVLC` 普通链路承担 DV 安全播放；`CONTEXT.md` 已追加 `DV 支持放行只进专用链路` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:45 +0800
+- 进度：grill-with-docs 继续收敛 `明确不支持` 场景下的重试边界。已确认当 DV 风险源被明确判定为当前设备/链路不支持安全播放时，“重试”仍只适用于本地显示模式、外接链路或相关系统状态发生变化后的幂等重判，不承诺修复。`CONTEXT.md` 已扩展 `DV 重试依赖本地状态变化`，让它同时覆盖能力未知和明确不支持两种阻断原因。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:41 +0800
+- 进度：grill-with-docs 继续收敛 `明确不支持` 的失败态。已确认如果设备能力或播放链路能力被明确判定为不支持安全播放 Dolby Vision 风险源，首轮仍沿用阻断页语义，只把原因文案改为“当前设备不支持安全播放”一类解释；交互入口继续限制为“返回”和“重试”，不提供旁路播放。`CONTEXT.md` 已追加 `DV 不支持阻断不提供强行播放` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:37 +0800
+- 进度：grill-with-docs 继续收敛 `重试` 的适用前提。已确认 Dolby Vision 风险阻断页上的“重试”只有在本地能力判断依赖的状态刚发生变化时才有意义；如果显示模式、外接链路或相关系统状态没有变化，重复点击本质上只是幂等重判。`CONTEXT.md` 已追加 `DV 重试依赖本地状态变化` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:33 +0800
+- 进度：grill-with-docs 继续收敛 `重试` 的语义。已确认 Dolby Vision 风险阻断页里的“重试”首轮只表示重新执行一次本地能力判断并重走同一套播放决策，不切换播放器分支、不改写服务端 metadata，也不触发服务端修复；`CONTEXT.md` 已追加 `DV 重试属于幂等重判` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:32 +0800
+- 进度：grill-with-docs 继续收敛 `未知阻断` 的交互边界。已确认 Dolby Vision 风险源因能力未知而被阻断时，首轮失败态只提供“返回”和“重试”这类非放行入口，不提供“继续播放/忽略风险播放”旁路；`CONTEXT.md` 已追加 `DV 未知阻断不提供强行播放` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:30 +0800
+- 进度：grill-with-docs 继续收敛 `DV 能力未知` 的失败路径。已确认一旦视频已被判定为 `Dolby Vision 风险源`，而设备/HDR 能力探测结果又是 `未知`，则不允许退回当前 `LibVLC` 普通链路尝试播放；`CONTEXT.md` 已收紧 `DV 能力未知不进入安全放行分支` 术语，使其与“不异色优先”目标一致。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 10:28 +0800
+- 进度：grill-with-docs 继续收敛“退回普通非 DV 播放链路”的语义。已确认这里的“普通链路”首轮只指当前已存在的 TV 长视频 `LibVLC` 链路，不自动切到新的系统播放器 / `Media3` 分支；`CONTEXT.md` 已追加 `普通非 DV 播放链路` 术语，避免与未来 `杜比视界专用系统播放链路` 混淆。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 09:48 +0800
+- 进度：grill-with-docs 继续收敛 DV 能力探测的失败路径。已确认 `未知` 结果只是不允许进入 `DV 安全放行分支`，但不等于一刀切阻断所有播放；系统仍可退回普通非 DV 播放链路。`CONTEXT.md` 已追加 `DV 能力未知不进入安全放行分支` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 09:40 +0800
+- 进度：grill-with-docs 继续收敛 `设备/HDR 能力探测` 的首轮范围。已确认首轮只覆盖 `Dolby Vision`，不把 `HDR10 / HDR10+ / HLG` 一并纳入；`CONTEXT.md` 已追加 `DV 能力探测首轮仅覆盖 Dolby Vision` 术语，避免能力矩阵和提示文案在首轮过度膨胀。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 09:33 +0800
+- 进度：grill-with-docs 继续收敛 `设备/HDR 能力探测` 的语义。已确认这里的“能力”以“显示能力 ∩ 当前实际播放链路能力”为准，不接受只看电视面板的简化定义；`CONTEXT.md` 已追加 `设备/HDR 能力以显示能力与播放链路能力交集为准` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 09:28 +0800
+- 进度：grill-with-docs 继续收敛 DV 第二阶段的进入顺序。已确认如果后续要把现状从“DV 风险探测与阻断可行”推进到“有条件放行”，第一优先级先补 `设备/HDR 能力探测`，不先做 `专用系统播放分支`；`CONTEXT.md` 已追加 `设备/HDR 能力探测先于 DV 放行分支` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 09:24 +0800
+- 进度：grill-with-docs 继续收敛当前 DV 主链路的“可行性”定义。已确认本轮只把现状收口为 `DV 风险探测与阻断可行`：后端 `playback_compat` 探测与落库、TV 端读取 metadata 并保守阻断已打通；不把现状扩写成“DV 安全放行可行”，因为设备 HDR 能力探测和长视频专用系统播放分支仍未落地。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 09:17 +0800
+- 进度：grill-with-docs 继续收敛 `DV→SDR` 风险边界。已确认当前保留的 `杜比视界转码输出阻断` 只属于 TV 端安全播放策略，不升级成全客户端统一阻断；`CONTEXT.md` 已追加 `DV→SDR 风险阻断限于 TV 端` 术语，明确手机端和其它客户端是否跟进需要后续单独决策。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 09:14 +0800
+- 进度：grill-with-docs 收敛 “DV 视频压成 SDR 会不会有问题” 的产品语义，确认继续保留现有 `杜比视界转码输出阻断` 立场，不把 `DV→SDR` 自动视为可信播放源；同时在 `CONTEXT.md` 追加 `DV→SDR 兼容输出非默认可信播放源` 术语，明确只有后续显式定义独立色调映射方案与验收标准时，才有资格重新讨论放行。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新；待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
 ## 2026-06-12 20:46 +0800
 - 进度：手机端与 TV 端安装包分轨已落地。后端在保留 `tv_app_releases` / `tv_app_release_apks` 表名的前提下新增 `client_type`、手机端单包固定槽位 `single`、轨内 `versionCode` 唯一且 `versionName` 冲突拒绝；家庭页新增 `/downloads/android-tv` 与 `/downloads/android-phone`，并保留 `/tv-app` 兼容入口；Admin Web 已提升为同一页内切换手机端 / TV 端的统一安装包管理工具。
 - 影响文件：`migrations/0024_app_apk_distribution_client_type.*`、`internal/models/tv_apk.go`、`internal/models/admin.go`、`internal/services/tv_apk.go`、`internal/services/tv_apk_manager.go`、`internal/repository/tv_apk_repository.go`、`internal/repository/migrations_test.go`、`internal/handlers/router.go`、`internal/handlers/tv_apk.go`、`internal/handlers/tv_app_family_page.go`、`internal/handlers/tv_app_family_page_test.go`、`internal/handlers/iptv.go`、`internal/handlers/iptv_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/TvAppManage.vue`、`admin-web/src/components/base/commandPalette.helpers.js`、`CONTEXT.md`、`plan.md`

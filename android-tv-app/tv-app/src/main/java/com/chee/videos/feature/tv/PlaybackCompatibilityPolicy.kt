@@ -6,7 +6,7 @@ internal data class TvPlaybackCompatibilityDecision(
 )
 
 private const val PlaybackCompatibilityKey = "playback_compat"
-private const val ProbeUnconfirmedMessage = "该视频播放兼容性未确认，当前 TV 端暂不自动播放"
+private const val PlaybackCompatibilityIncompleteMessage = "播放兼容信息不完整，暂不能确认安全播放"
 private const val DolbyVisionTranscodeOutputMessage = "该视频来源为杜比视界，当前压缩结果可能无法安全播放"
 private const val DolbyVisionUnsupportedMessage = "该视频可能为杜比视界，当前设备或播放链路不支持安全播放"
 
@@ -14,16 +14,19 @@ internal fun resolveTvPlaybackCompatibilityDecision(
     metadata: Map<String, Any?>?,
 ): TvPlaybackCompatibilityDecision {
     val compatibility = metadata?.get(PlaybackCompatibilityKey) ?: return TvPlaybackCompatibilityDecision(allowed = true)
-    val block = compatibility as? Map<*, *> ?: return blockProbeUnconfirmed()
-    val version = numberValue(block["version"])?.toInt() ?: return blockProbeUnconfirmed()
+    val block = compatibility as? Map<*, *> ?: return blockPlaybackCompatibilityIncomplete()
+    val version = numberValue(block["version"])?.toInt() ?: return blockPlaybackCompatibilityIncomplete()
+    if (version < 1) {
+        return TvPlaybackCompatibilityDecision(allowed = true)
+    }
     val status = stringValue(block["status"]).orEmpty()
     if (version != 1 || status != "ok") {
-        return blockProbeUnconfirmed()
+        return blockPlaybackCompatibilityIncomplete()
     }
-    val source = block["source"] as? Map<*, *> ?: return blockProbeUnconfirmed()
-    val output = block["output"] as? Map<*, *> ?: return blockProbeUnconfirmed()
-    val sourceDolbyVision = optionalBooleanValue(source["dolby_vision"]) ?: return blockProbeUnconfirmed()
-    val outputDolbyVision = optionalBooleanValue(output["dolby_vision"]) ?: return blockProbeUnconfirmed()
+    val source = block["source"] as? Map<*, *> ?: return blockPlaybackCompatibilityIncomplete()
+    val output = block["output"] as? Map<*, *> ?: return blockPlaybackCompatibilityIncomplete()
+    val sourceDolbyVision = optionalBooleanValue(source["dolby_vision"]) ?: return blockPlaybackCompatibilityIncomplete()
+    val outputDolbyVision = optionalBooleanValue(output["dolby_vision"]) ?: return blockPlaybackCompatibilityIncomplete()
     if (outputDolbyVision) {
         return TvPlaybackCompatibilityDecision(
             allowed = false,
@@ -44,10 +47,10 @@ internal fun isTvEpisodePlayableForPlayback(episode: TvEpisodeUiModel): Boolean 
         episode.videoId.isNotBlank() &&
         resolveTvPlaybackCompatibilityDecision(episode.metadata).allowed
 
-private fun blockProbeUnconfirmed(): TvPlaybackCompatibilityDecision =
+private fun blockPlaybackCompatibilityIncomplete(): TvPlaybackCompatibilityDecision =
     TvPlaybackCompatibilityDecision(
         allowed = false,
-        blockMessage = ProbeUnconfirmedMessage,
+        blockMessage = PlaybackCompatibilityIncompleteMessage,
     )
 
 private fun stringValue(value: Any?): String? =

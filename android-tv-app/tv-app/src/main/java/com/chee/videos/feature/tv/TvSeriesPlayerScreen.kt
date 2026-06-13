@@ -639,7 +639,11 @@ fun TvSeriesPlayerScreen(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                EmptyTvPlayerState(message = playerBlockMessage)
+                TvErrorState(
+                    title = "暂不能播放",
+                    message = playerBlockMessage ?: "当前分集暂无可播放视频",
+                    onAction = viewModel::retry,
+                )
                 if (showBackConfirmPrompt) {
                     TvPlayerBackConfirmPrompt(
                         modifier = Modifier
@@ -673,15 +677,6 @@ private fun TvPlayerErrorBanner(
             style = MaterialTheme.typography.bodySmall,
         )
     }
-}
-
-@Composable
-private fun EmptyTvPlayerState(message: String?) {
-    Text(
-        text = message ?: "当前分集暂无可播放视频",
-        color = AppChrome.TextSecondary,
-        style = MaterialTheme.typography.bodyLarge,
-    )
 }
 
 private fun reportTvSeriesHistory(

@@ -491,10 +491,10 @@ fun TvLongFormPlayerScreen(
                 )
             }
         } else {
-            Text(
-                text = playerBlockMessage ?: "暂无可播放视频",
-                color = AppChrome.TextSecondary,
-                modifier = Modifier.align(Alignment.Center),
+            TvErrorState(
+                title = "暂不能播放",
+                message = playerBlockMessage ?: "暂无可播放视频",
+                onAction = viewModel::load,
             )
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(

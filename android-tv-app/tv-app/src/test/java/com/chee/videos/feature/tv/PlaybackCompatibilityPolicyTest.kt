@@ -15,6 +15,38 @@ class PlaybackCompatibilityPolicyTest {
     }
 
     @Test
+    fun oldPlaybackCompatibilityVersion_allowsHistoricalVideosOnNormalPath() {
+        val decision = resolveTvPlaybackCompatibilityDecision(
+            mapOf(
+                "playback_compat" to mapOf(
+                    "version" to 0,
+                    "status" to "ok",
+                ),
+            ),
+        )
+
+        assertTrue(decision.allowed)
+        assertEquals(null, decision.blockMessage)
+    }
+
+    @Test
+    fun futurePlaybackCompatibilityVersion_blocksAsIncomplete() {
+        val decision = resolveTvPlaybackCompatibilityDecision(
+            mapOf(
+                "playback_compat" to mapOf(
+                    "version" to 2,
+                    "status" to "ok",
+                    "source" to mapOf("dolby_vision" to false),
+                    "output" to mapOf("dolby_vision" to false),
+                ),
+            ),
+        )
+
+        assertFalse(decision.allowed)
+        assertEquals("播放兼容信息不完整，暂不能确认安全播放", decision.blockMessage)
+    }
+
+    @Test
     fun probeFailed_blocksPlayback() {
         val decision = resolveTvPlaybackCompatibilityDecision(
             mapOf(
@@ -26,7 +58,7 @@ class PlaybackCompatibilityPolicyTest {
         )
 
         assertFalse(decision.allowed)
-        assertEquals("该视频播放兼容性未确认，当前 TV 端暂不自动播放", decision.blockMessage)
+        assertEquals("播放兼容信息不完整，暂不能确认安全播放", decision.blockMessage)
     }
 
     @Test
@@ -41,7 +73,7 @@ class PlaybackCompatibilityPolicyTest {
         )
 
         assertFalse(decision.allowed)
-        assertEquals("该视频播放兼容性未确认，当前 TV 端暂不自动播放", decision.blockMessage)
+        assertEquals("播放兼容信息不完整，暂不能确认安全播放", decision.blockMessage)
     }
 
     @Test
