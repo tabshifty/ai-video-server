@@ -34,10 +34,12 @@ class TvLongFormVlcSpecTest {
     }
 
     @Test
-    fun tvBuildFile_removesMedia3Dependencies() {
+    fun tvBuildFile_keepsLibVlcAndAllowsDvDedicatedMedia3Dependencies() {
         val source = Path.of("build.gradle.kts").readText()
 
-        assertFalse(source.contains("media3-"))
+        assertTrue(source.contains("org.videolan.android:libvlc-all"))
+        assertTrue(source.contains("androidx.media3:media3-exoplayer"))
+        assertTrue(source.contains("androidx.media3:media3-ui"))
         // versionCode/versionName 在 LibVLC 迁移之后会继续随后续任务向上累加，这里只断言不回退到迁移前
         val versionCode = Regex("""versionCode\s*=\s*(\d+)""").find(source)?.groupValues?.get(1)?.toInt()
         assertTrue("versionCode should be ≥ 68 since LibVLC migration baseline", (versionCode ?: 0) >= 68)
@@ -49,15 +51,17 @@ class TvLongFormVlcSpecTest {
     }
 
     @Test
-    fun tvLongFormScreens_useLibVlcMediaPlayer() {
+    fun tvLongFormScreens_keepMedia3BehindDolbyVisionDedicatedComponent() {
         val longForm = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
         val series = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
+        val media3 = Path.of("src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt").readText()
 
         listOf(longForm, series).forEach { source ->
-            assertFalse(source.contains("ExoPlayer"))
-            assertFalse(source.contains("DefaultHttpDataSource"))
-            assertFalse(source.contains("DefaultMediaSourceFactory"))
+            assertFalse(source.contains("import androidx.media3."))
+            assertTrue(source.contains("TvDolbyVisionMedia3Player("))
             assertTrue(source.contains("MediaPlayer"))
         }
+        assertTrue(media3.contains("import androidx.media3.exoplayer.ExoPlayer"))
+        assertTrue(media3.contains("PlayerView"))
     }
 }

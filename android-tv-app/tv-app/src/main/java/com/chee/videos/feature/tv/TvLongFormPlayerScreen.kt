@@ -141,13 +141,29 @@ fun TvLongFormPlayerScreen(
         detail = detail,
         preferredPlaybackProfile = uiState.preferredPlaybackProfile,
     )
-    val playbackCompatibilityDecision = resolveTvPlaybackCompatibilityDecision(detail.metadata)
-    val playerBlockMessage = playbackCompatibilityDecision.blockMessage
-    val playableUrl = playUrl?.takeIf { playbackCompatibilityDecision.allowed }
-    val canPlay = !playableUrl.isNullOrBlank()
+    var routeRetryNonce by remember(detail.id) { mutableStateOf(0) }
+    val displayCapability = remember(context, detail.id, routeRetryNonce) {
+        evaluateDolbyVisionDisplayCapability(AndroidDisplayHdrCapabilityReader(context))
+    }
+    val playbackRoute = remember(detail.metadata, displayCapability, playUrl) {
+        resolveTvPlaybackRoute(
+            metadata = detail.metadata,
+            displayCapability = displayCapability,
+            playbackUrl = playUrl,
+            media3Available = true,
+        )
+    }
+    val playerBlockMessage = playbackRoute.blockMessage
+    val playableUrl = playUrl?.takeIf { playbackRoute.kind != TvPlaybackRouteKind.BLOCKED }
+    val isVlcRoute = playbackRoute.kind == TvPlaybackRouteKind.VLC && !playableUrl.isNullOrBlank()
+    val isMedia3Route = playbackRoute.kind == TvPlaybackRouteKind.MEDIA3_DOLBY_VISION && !playableUrl.isNullOrBlank()
+    val canPlay = isVlcRoute || isMedia3Route
+    val canPlayVlc = isVlcRoute
     val libVLC = remember { TvVlcLibrary.shared(context) }
     val mediaPlayer = remember(uiState.accessToken) { newLongFormMediaPlayer(libVLC) }
     val latestDetailId by rememberUpdatedState(detail.id)
+    var media3Snapshot by remember(detail.id) { mutableStateOf(TvMedia3PlaybackSnapshot(positionMs = 0L, durationMs = 0L)) }
+    val latestMedia3Snapshot by rememberUpdatedState(media3Snapshot)
     var hasStartedPlayback by rememberSaveable(detail.id) { mutableStateOf(true) }
     var isPausedByUser by rememberSaveable(detail.id) { mutableStateOf(false) }
     var preparedUrl by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
@@ -208,12 +224,12 @@ fun TvLongFormPlayerScreen(
         ) ?: resolveInitialSubtitleTrackId(detail.subtitleTracks)
     }
 
-    LaunchedEffect(playableUrl, playbackSession.hasStartedPlayback) {
+    LaunchedEffect(playableUrl, canPlayVlc, playbackSession.hasStartedPlayback) {
         val updateDecision = resolveLongFormPlayerUpdate(
             preparedUrl = preparedUrl,
-            nextUrl = playableUrl,
+            nextUrl = playableUrl.takeIf { canPlayVlc },
         )
-        if (!playbackSession.hasStartedPlayback || playableUrl.isNullOrBlank()) {
+        if (!canPlayVlc || !playbackSession.hasStartedPlayback || playableUrl.isNullOrBlank()) {
             mediaPlayer.pause()
             if (updateDecision.shouldClear) {
                 mediaPlayer.stop()
@@ -278,8 +294,8 @@ fun TvLongFormPlayerScreen(
         appliedSubtitleSlaveUrl = subtitleUrl
     }
 
-    LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, playableUrl) {
-        if (!playbackSession.hasStartedPlayback || playableUrl.isNullOrBlank()) {
+    LaunchedEffect(playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, playableUrl, canPlayVlc) {
+        if (!canPlayVlc || !playbackSession.hasStartedPlayback || playableUrl.isNullOrBlank()) {
             mediaPlayer.pause()
             return@LaunchedEffect
         }
@@ -292,13 +308,13 @@ fun TvLongFormPlayerScreen(
 
     LaunchedEffect(
         detail.id,
-        canPlay,
+        canPlayVlc,
         playbackSession.hasStartedPlayback,
         playbackSession.isPausedByUser,
     ) {
         if (!shouldStartPeriodicHistoryReport(
                 videoId = detail.id,
-                canPlay = canPlay,
+                canPlay = canPlayVlc,
                 hasStartedPlayback = playbackSession.hasStartedPlayback,
                 isPausedByUser = playbackSession.isPausedByUser,
             )
@@ -308,6 +324,27 @@ fun TvLongFormPlayerScreen(
         while (true) {
             delay(TvPeriodicHistoryReportIntervalMillis)
             reportTvLongFormHistory(viewModel, detail.id, mediaPlayer)
+        }
+    }
+
+    LaunchedEffect(
+        detail.id,
+        isMedia3Route,
+        playbackSession.hasStartedPlayback,
+        playbackSession.isPausedByUser,
+    ) {
+        if (!shouldStartPeriodicHistoryReport(
+                videoId = detail.id,
+                canPlay = isMedia3Route,
+                hasStartedPlayback = playbackSession.hasStartedPlayback,
+                isPausedByUser = playbackSession.isPausedByUser,
+            )
+        ) {
+            return@LaunchedEffect
+        }
+        while (true) {
+            delay(TvPeriodicHistoryReportIntervalMillis)
+            reportTvLongFormMedia3History(viewModel, detail.id, latestMedia3Snapshot)
         }
     }
 
@@ -350,7 +387,7 @@ fun TvLongFormPlayerScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, mediaPlayer, playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlay) {
+    DisposableEffect(lifecycleOwner, mediaPlayer, playbackSession.hasStartedPlayback, playbackSession.isPausedByUser, canPlayVlc) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
@@ -359,7 +396,7 @@ fun TvLongFormPlayerScreen(
                 }
 
                 Lifecycle.Event.ON_RESUME -> {
-                    if (playbackSession.shouldResumeOnLifecycle() && canPlay) {
+                    if (playbackSession.shouldResumeOnLifecycle() && canPlayVlc) {
                         mediaPlayer.play()
                     }
                 }
@@ -380,6 +417,14 @@ fun TvLongFormPlayerScreen(
         }
     }
 
+    DisposableEffect(isMedia3Route, latestDetailId) {
+        onDispose {
+            if (isMedia3Route) {
+                reportTvLongFormMedia3History(viewModel, latestDetailId, latestMedia3Snapshot)
+            }
+        }
+    }
+
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     Box(
@@ -387,7 +432,7 @@ fun TvLongFormPlayerScreen(
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        if (canPlay) {
+        if (isVlcRoute) {
             LongFormVideoPlayer(
                 title = detail.title,
                 player = mediaPlayer,
@@ -490,11 +535,70 @@ fun TvLongFormPlayerScreen(
                         .padding(bottom = 72.dp),
                 )
             }
+        } else if (isMedia3Route && playableUrl != null) {
+            TvDolbyVisionMedia3Player(
+                sourceUrl = playableUrl,
+                mediaId = detail.id,
+                title = detail.title,
+                accessToken = uiState.accessToken,
+                retryKey = routeRetryNonce,
+                shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
+                initialPositionMs = if (resumedFromHistoryVideoId != detail.id) {
+                    detail.userState.watchSeconds.coerceAtLeast(0).times(1000L)
+                } else {
+                    0L
+                },
+                modifier = Modifier.fillMaxSize(),
+                onPlayingChanged = { playing ->
+                    isPlayerActuallyPlaying = playing
+                    if (playing) {
+                        playerErrorMessage = null
+                        if (detail.id.isNotBlank() && resumedFromHistoryVideoId != detail.id) {
+                            val resumePositionMs = detail.userState.watchSeconds.coerceAtLeast(0).times(1000L)
+                            resumedFromHistoryVideoId = detail.id
+                            if (shouldTriggerResumePrompt(resumePositionMs)) {
+                                resumePromptLastPositionMs = resumePositionMs
+                                resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
+                                resumePromptDismissed = false
+                            }
+                        }
+                    }
+                },
+                onError = { message ->
+                    playerErrorMessage = message
+                    isPlayerActuallyPlaying = false
+                    updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
+                },
+                onSnapshotChanged = { snapshot ->
+                    media3Snapshot = snapshot
+                },
+            )
+            if (!playerErrorMessage.isNullOrBlank()) {
+                TvErrorState(
+                    title = "暂不能播放",
+                    message = playerErrorMessage.orEmpty(),
+                    onAction = {
+                        playerErrorMessage = null
+                        routeRetryNonce += 1
+                        updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                    },
+                )
+            }
+            if (showBackConfirmPrompt) {
+                TvPlayerBackConfirmPrompt(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 72.dp),
+                )
+            }
         } else {
             TvErrorState(
                 title = "暂不能播放",
                 message = playerBlockMessage ?: "暂无可播放视频",
-                onAction = viewModel::load,
+                onAction = {
+                    routeRetryNonce += 1
+                    viewModel.load()
+                },
             )
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
@@ -515,6 +619,18 @@ private fun reportTvLongFormHistory(
     val snapshot = tvPlaybackHistorySnapshot(
         positionMs = player.time,
         durationMs = player.length,
+    )
+    viewModel.reportHistory(videoId, snapshot.watchSeconds, snapshot.completed)
+}
+
+private fun reportTvLongFormMedia3History(
+    viewModel: DetailViewModel,
+    videoId: String,
+    playerSnapshot: TvMedia3PlaybackSnapshot,
+) {
+    val snapshot = tvPlaybackHistorySnapshot(
+        positionMs = playerSnapshot.positionMs,
+        durationMs = playerSnapshot.durationMs,
     )
     viewModel.reportHistory(videoId, snapshot.watchSeconds, snapshot.completed)
 }

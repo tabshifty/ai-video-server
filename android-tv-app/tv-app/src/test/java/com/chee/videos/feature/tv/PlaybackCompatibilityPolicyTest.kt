@@ -148,4 +148,52 @@ class PlaybackCompatibilityPolicyTest {
 
         assertFalse(isTvEpisodePlayableForPlayback(episode))
     }
+
+    @Test
+    fun episodePlayablePolicyKeepsOutputDolbyVisionAsPlaybackCandidate() {
+        val episode = TvEpisodeUiModel(
+            id = "e1",
+            number = 1,
+            title = "第1集",
+            durationLabel = "45 分钟",
+            summary = "剧情",
+            videoId = "video-1",
+            videoStatus = "ready",
+            playable = true,
+            metadata = mapOf(
+                "playback_compat" to mapOf(
+                    "version" to 1,
+                    "status" to "ok",
+                    "source" to mapOf("dolby_vision" to true),
+                    "output" to mapOf("dolby_vision" to true),
+                ),
+            ),
+        )
+
+        assertTrue(isTvEpisodePlayableForPlayback(episode))
+    }
+
+    @Test
+    fun episodePlayablePolicyExcludesDolbyVisionTranscodedOutput() {
+        val episode = TvEpisodeUiModel(
+            id = "e1",
+            number = 1,
+            title = "第1集",
+            durationLabel = "45 分钟",
+            summary = "剧情",
+            videoId = "video-1",
+            videoStatus = "ready",
+            playable = true,
+            metadata = mapOf(
+                "playback_compat" to mapOf(
+                    "version" to 1,
+                    "status" to "ok",
+                    "source" to mapOf("dolby_vision" to true),
+                    "output" to mapOf("dolby_vision" to false),
+                ),
+            ),
+        )
+
+        assertFalse(isTvEpisodePlayableForPlayback(episode))
+    }
 }

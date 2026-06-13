@@ -2,6 +2,66 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 17:19 +0800
+- 进度：DV 专用 Media3/ExoPlayer 播放链路本轮实现完成。单个长视频和电视剧分集现在统一通过播放链路选择器在 LibVLC、Media3 DV 专用链路和阻断之间决策；output 仍为 DV 且显示能力支持、播放 URL 有效时进入专用 Media3 分支，source DV 但 output 非 DV、显示能力未知/不支持、metadata 不完整仍阻断。剧集分集按当前分集独立构建 URL 与重判，Media3 失败重试会重新评估并重建 ExoPlayer，不回退 LibVLC；观看历史继续沿用现有接口。已更新 TV 端版本到 `0.1.87`，并调整 LibVLC 守卫测试为允许 DV 专用 Media3 例外。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/player/TvLongFormVlcSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:compileDebugKotlin` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过。待执行乱码检查与 `git diff --check` 后提交；`admin-web/.env.development` 和生图参考图相关记录不纳入本次 DV 提交。
+
+## 2026-06-13 15:58 +0800
+- 进度：开始实现 DV 专用 Media3/ExoPlayer 播放链路。已先补纯逻辑 route selector 红灯测试，随后实现 `resolveTvPlaybackRoute` 并保持旧 `resolveTvPlaybackCompatibilityDecision` 行为兼容；修正剧集“可选集”候选语义，使 output 仍为 DV 的分集不会在选集层被排除，探测失败和 DV 转码输出仍不作为候选。TV 端版本号递增至 `0.1.87`，并为 TV 工程加入 Media3 依赖，准备接入最小播放组件。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过。待继续接入 Media3 UI、单片/剧集播放页并跑全量验证。保留用户已有 `admin-web/.env.development` 与生图相关文档记录不纳入本任务提交。
+
+## 2026-06-13 15:49 +0800
+- 进度：继续收敛 DV 专用链路实现顺序。已确认实现前应先补纯逻辑“播放链路选择器”测试，把非 DV/老数据走 LibVLC、source DV + output 非 DV 阻断、output DV + 三条件成立走 Media3/ExoPlayer、显示不支持/未知阻断、metadata 不完整/探测失败/未来版本阻断等组合锁住；单个长视频和电视剧分集复用同一选择语义，再接 Compose/Media3 UI。`CONTEXT.md` 已追加 `DV 播放链路选择器`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:47 +0800
+- 进度：继续收敛 DV 专用链路是否需要用户开关。已确认首轮不提供启用/关闭杜比视界实验播放开关；播放入口由系统按安全门控自动选择 LibVLC、Media3/ExoPlayer 专用链路或阻断，用户不能通过开关绕过安全策略。`CONTEXT.md` 已追加 `DV 专用链路无用户开关`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:46 +0800
+- 进度：继续收敛 DV 专用链路的字幕/音轨体验边界。已确认外挂字幕、多音轨选择、倍速、画面比例等体验能力缺失不作为首轮专用链路阻断条件，也不在播放前额外弹确认；Media3 能自动处理的轨道按系统默认行为使用，未实现控制入口应隐藏或禁用。`CONTEXT.md` 已追加 `DV 专用链路字幕音轨首轮非阻断`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:45 +0800
+- 进度：继续收敛 DV 专用链路的观看历史语义。已确认 Media3/ExoPlayer 专用分支只替换客户端播放器实现，不改变长视频或分集的历史接口、完成判定口径和 UI 历史展示；不新增 DV 专用历史字段，客户端内部可用播放器进度快照适配 LibVLC 与 Media3。`CONTEXT.md` 已追加 `DV 专用链路不改变观看历史语义`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:43 +0800
+- 进度：继续收敛 DV 专用链路重试语义。已确认播放前阻断页和 Media3/ExoPlayer 播放失败页的“重试”都只重新评估 `playback_compat`、本地显示能力和专用链路可用性；Media3 失败后可释放并重建专用播放器再尝试同一链路，但不回退 LibVLC、不改 metadata、不触发重新转码或 ffprobe。`CONTEXT.md` 已更新 `DV 重试属于幂等重判`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:40 +0800
+- 进度：继续收敛 DV 专用链路阻断文案。已确认首轮面向用户只做有限分层：显示链路明确不支持、显示链路能力未知、source 为 DV 但 output 非 DV、专用 Media3/ExoPlayer 链路不可用或播放 URL 无效；不直接暴露 Android API 原因码。`CONTEXT.md` 已追加 `DV 专用链路阻断文案分层`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:39 +0800
+- 进度：继续收敛 DV 专用链路进入条件。已确认首轮进入 Media3/ExoPlayer 专用分支必须同时满足：当前默认显示声明支持 DV、`playback_compat` 表明当前实际播放 output 仍是 DV、专用分支可初始化且播放 URL 有效；缺任一项都不尝试播放，source 为 DV 但 output 非 DV 仍走转码输出风险阻断。`CONTEXT.md` 已追加 `DV 专用链路首轮三条件门控`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:37 +0800
+- 进度：继续收敛 DV 专用 Media3/ExoPlayer 分支的首轮功能范围。已确认首轮只做最小播放闭环：播放/暂停、返回、失败页、重试、基础进度上报、剧集切集时重新判定；不追齐 LibVLC 的字幕选择、音轨选择、倍速、画面比例或复杂 overlay。`CONTEXT.md` 已追加 `DV 专用链路首轮最小播放闭环`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:33 +0800
+- 进度：继续收敛 DV 专用链路首轮覆盖范围。用户要求专用 Media3/ExoPlayer 分支首轮不仅覆盖单个长视频，也覆盖电视剧分集；已同步约束为按当前分集独立读取播放源、`playback_compat` 和能力结果，不跨集沿用专用链路资格。`CONTEXT.md` 已追加 `DV 专用链路覆盖长视频与分集`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 15:30 +0800
+- 进度：继续 grill DV 视频下一阶段开发。已确认下一阶段从显示能力检测推进到“专用系统播放链路的最小可验证接入”，不把现有 LibVLC 直接升级为 DV 放行链路；同时确认“专用系统播放链路”收口为 TV App 内部 Media3/ExoPlayer 专用分支，不使用外部播放器 Intent。`CONTEXT.md` 已收紧对应术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
 ## 2026-06-13 14:32 +0800
 - 进度：DV 本地能力模块本轮已完成并验证通过。最终纳入变更的文件仅包含 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapability.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapabilityTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；用户已有 `admin-web/.env.development` 未纳入本次提交。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapability.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapabilityTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

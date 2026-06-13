@@ -262,8 +262,8 @@ class TvSeriesPlayerViewModel @Inject constructor(
             }
             return
         }
-        val playbackDecision = resolveTvPlaybackCompatibilityDecision(episode.metadata)
-        if (!playbackDecision.allowed) {
+        val candidateDecision = resolveTvPlaybackCandidateDecision(episode.metadata)
+        if (!candidateDecision.allowed) {
             _uiState.update {
                 it.copy(
                     currentVideoId = episode.videoId,
@@ -272,7 +272,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     selectedAudioTrackId = null,
                     selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
-                    playbackBlockedMessage = playbackDecision.blockMessage,
+                    playbackBlockedMessage = candidateDecision.blockMessage,
                 )
             }
             return

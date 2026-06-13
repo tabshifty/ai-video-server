@@ -524,6 +524,86 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun outputDolbyVisionEpisode_buildsSourceUrlForDedicatedRouteDecision() = runTest {
+        val repository = FakeTvRepository(
+            detailPayload = tvSeriesDetail(
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisode(
+                                id = "e1",
+                                number = 1,
+                                title = "第1集",
+                                videoId = "video-1",
+                                videoStatus = "ready",
+                                metadata = playbackCompatibilityMetadata(
+                                    sourceDolbyVision = true,
+                                    outputDolbyVision = true,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("video-1", state.currentVideoId)
+        assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
+        assertTrue(state.canPlayCurrentEpisode)
+        assertEquals(null, state.playbackBlockedMessage)
+        assertEquals(listOf("video-1"), repository.sourceUrlRequests)
+    }
+
+    @Test
+    fun dolbyVisionTranscodedOutput_doesNotBuildSourceUrl() = runTest {
+        val repository = FakeTvRepository(
+            detailPayload = tvSeriesDetail(
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisode(
+                                id = "e1",
+                                number = 1,
+                                title = "第1集",
+                                videoId = "video-1",
+                                videoStatus = "ready",
+                                metadata = playbackCompatibilityMetadata(
+                                    sourceDolbyVision = true,
+                                    outputDolbyVision = false,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("video-1", state.currentVideoId)
+        assertEquals("", state.currentSourceUrl)
+        assertFalse(state.canPlayCurrentEpisode)
+        assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", state.playbackBlockedMessage)
+        assertTrue(repository.sourceUrlRequests.isEmpty())
+    }
+
+    @Test
     fun selectEpisode_clearsPreviousPlaybackTargetUntilNewSourceReady() = runTest {
         val repository = DelayedSourceTvRepository(
             detailPayload = tvSeriesDetail(
@@ -638,5 +718,18 @@ private fun probeFailedPlaybackCompatibilityMetadata(): Map<String, Any?> =
         "playback_compat" to mapOf(
             "version" to 1,
             "status" to "probe_failed",
+        ),
+    )
+
+private fun playbackCompatibilityMetadata(
+    sourceDolbyVision: Boolean,
+    outputDolbyVision: Boolean,
+): Map<String, Any?> =
+    mapOf(
+        "playback_compat" to mapOf(
+            "version" to 1,
+            "status" to "ok",
+            "source" to mapOf("dolby_vision" to sourceDolbyVision),
+            "output" to mapOf("dolby_vision" to outputDolbyVision),
         ),
     )
