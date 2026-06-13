@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 18:22 +0800
+- 进度：继续收敛图库资产参考图可选范围。已确认图库选图入口除 `status=ready`、`active=true` 外，还必须限制 `stored_mime` 为 `image/png`、`image/jpeg` 或 `image/webp`，避免 GIF/BMP/TIFF 等图片管理可存在但生图参考图不支持的资产进入工作台。`CONTEXT.md` 已收紧 `admin 图库资产参考图可选范围`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：`rg -n $'\uFFFD' CONTEXT.md plan.md` 无命中；`git diff --check -- CONTEXT.md plan.md` 通过。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-13 18:11 +0800
 - 进度：完成历史恢复参考图大小校验补强。新增 data URL 字节估算，历史快照恢复出的本地冻结图会带回 size；继续追加上传/粘贴/图库参考图时，校验会同时统计已有恢复图和新图，避免 `File` 为空导致总大小上限失效。
 - 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`plan.md`
