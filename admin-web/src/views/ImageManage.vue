@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Edit, Grid, List, Search, SwitchButton, Upload } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
@@ -22,6 +23,8 @@ import {
 } from '../api/admin'
 import { sha256File } from '../utils/hash'
 
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const list = ref([])
 const total = ref(0)
@@ -511,6 +514,20 @@ async function showDetail(row) {
   await loadPreview()
 }
 
+async function openDetailFromRouteQuery() {
+  const imageID = String(route.query.image_id || '').trim()
+  if (!imageID) return
+  try {
+    await showDetail({ id: imageID })
+  } catch (error) {
+    ElMessage.warning(extractErrorMessage(error, '来源图片当前不可用，仅保留历史来源摘要'))
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.image_id
+    router.replace({ path: route.path, query: nextQuery }).catch(() => {})
+  }
+}
+
 function parseMetadata(text) {
   const raw = String(text || '').trim()
   if (!raw) return {}
@@ -767,6 +784,7 @@ function onDetailClosed() {
 onMounted(async () => {
   window.addEventListener('resize', updateViewportWidth)
   await Promise.all([load(), searchActors(''), searchImageCollections('')])
+  await openDetailFromRouteQuery()
 })
 
 onBeforeUnmount(() => {

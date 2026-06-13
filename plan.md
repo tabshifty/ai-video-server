@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 18:08 +0800
+- 进度：完成图库资产来源跳转闭环。工作台当前参考图和历史输入快照里的 `library_asset` 来源现在提供“查看来源”，跳转 `/images?image_id=<source_image_id>`；图片管理页消费 `image_id` query 后尝试打开详情，并在成功或失败后清理 query。来源读取失败时工作台仍保留冻结标题与来源图片 ID 摘要。`CONTEXT.md` 已新增 `admin 图库资产来源跳转 query 契约`。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/ImageManage.vue`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run build` 通过，仅有 Vite chunk size warning。待执行乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-13 18:06 +0800
+- 进度：继续补齐图库资产来源跳转保留失效态。审计发现历史详情已展示图库来源标题和 ID，但缺少可用的来源跳转入口；图片管理页也未识别 `image_id` query 自动打开详情。下一步补工作台“查看来源”入口和图片管理页按 `image_id` 打开详情，来源缺失时仍保留只读摘要与失效提示。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/ImageManage.vue`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run build`、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-13 18:04 +0800
+- 进度：继续收敛图库资产原尺寸处理图超限时的处理。已确认图库资产加入工作台后仍沿用普通参考图大小限制，单张最多 10 MiB、总量最多 40 MiB；原尺寸处理图超限时拒绝加入并展示原因，不自动压缩、缩放或改格式绕过限制。`CONTEXT.md` 已新增 `admin 图库资产冻结沿用参考图大小限制`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与当前 admin-web 实现改动不纳入本次文档确认。
+
 ## 2026-06-13 18:04 +0800
 - 进度：完成历史输入快照展示与继续改稿恢复闭环。选中本地历史时会读取 `referenceSnapshots` 对应的本地 IndexedDB 冻结图片，展示参考图来源类型、图库来源标题与来源图片 ID；“继续改稿”恢复提示词、参数和本地冻结参考图，不重新读取图库资产。若历史参考图本地文件缺失，会显示缺失位并阻止直接恢复，避免把失效输入送往生成接口。
 - 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`CONTEXT.md`、`plan.md`

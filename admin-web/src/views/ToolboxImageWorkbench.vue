@@ -892,6 +892,19 @@ function referenceSourceSummary(item) {
   return ''
 }
 
+function openReferenceSource(item) {
+  if (item?.sourceKind !== 'library_asset') return
+  if (!item.sourceImageId) {
+    ElMessage.warning('该图库来源缺少图片 ID，只能保留历史摘要')
+    return
+  }
+  const href = router.resolve({
+    path: '/images',
+    query: { image_id: item.sourceImageId }
+  }).href
+  window.open(href, '_blank', 'noopener,noreferrer')
+}
+
 function formatLibraryItemMeta(item) {
   const dimensions = item?.width && item?.height ? `${item.width} x ${item.height}` : '尺寸未知'
   return `${dimensions} · ${formatWorkbenchFileSize(item?.file_size)}`
@@ -964,6 +977,7 @@ function formatLibraryItemMeta(item) {
                       <el-tag size="small" effect="plain">{{ sourceKindLabel(item) }}</el-tag>
                     </div>
                     <small v-if="referenceSourceSummary(item)" class="reference-card__source">{{ referenceSourceSummary(item) }}</small>
+                    <el-button v-if="item.sourceKind === 'library_asset'" size="small" link @click="openReferenceSource(item)">查看来源</el-button>
                   </div>
                   <div class="reference-card__actions">
                     <el-button size="small" @click="openMaskEditor(item.id)">
@@ -1054,6 +1068,7 @@ function formatLibraryItemMeta(item) {
                     <strong>{{ item.name }}</strong>
                     <small>{{ sourceKindLabel(item) }}</small>
                     <small v-if="referenceSourceSummary(item)">{{ referenceSourceSummary(item) }}</small>
+                    <el-button v-if="item.sourceKind === 'library_asset'" size="small" link @click="openReferenceSource(item)">查看来源</el-button>
                   </span>
                 </article>
               </div>
