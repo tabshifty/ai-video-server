@@ -67,6 +67,7 @@ fun TvLongFormPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showBackConfirmPrompt by remember { mutableStateOf(false) }
+    var showDolbyVisionDiagnostics by remember { mutableStateOf(false) }
 
     fun handlePlaybackBack() {
         val now = SystemClock.uptimeMillis()
@@ -84,7 +85,10 @@ fun TvLongFormPlayerScreen(
         }
     }
 
-    BackHandler(onBack = ::handlePlaybackBack)
+    BackHandler(enabled = showDolbyVisionDiagnostics) {
+        showDolbyVisionDiagnostics = false
+    }
+    BackHandler(enabled = !showDolbyVisionDiagnostics, onBack = ::handlePlaybackBack)
 
     LaunchedEffect(showBackConfirmPrompt, backPromptAtMillis) {
         val promptAt = backPromptAtMillis
@@ -136,6 +140,10 @@ fun TvLongFormPlayerScreen(
         return
     }
 
+    LaunchedEffect(detail.id) {
+        showDolbyVisionDiagnostics = false
+    }
+
     val playUrl = resolveTvLongFormPlayUrl(
         baseUrl = uiState.baseUrl,
         detail = detail,
@@ -152,6 +160,9 @@ fun TvLongFormPlayerScreen(
             playbackUrl = playUrl,
             media3Available = true,
         )
+    }
+    val showDolbyVisionDiagnosticsButton = remember(detail.metadata, playbackRoute) {
+        isTvDolbyVisionDiagnosticsAvailable(playbackRoute)
     }
     val playerBlockMessage = playbackRoute.blockMessage
     val playableUrl = playUrl?.takeIf { playbackRoute.kind != TvPlaybackRouteKind.BLOCKED }
@@ -180,6 +191,15 @@ fun TvLongFormPlayerScreen(
     var selectedAudioTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
     var playerErrorMessage by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+    val playbackDiagnosticMessage = remember(playbackRoute, displayCapability, playUrl, playerErrorMessage) {
+        buildTvDolbyVisionDiagnosticMessage(
+            route = playbackRoute,
+            displayCapability = displayCapability,
+            playbackUrl = playUrl,
+            media3Available = true,
+            failureMessage = playerErrorMessage,
+        )
+    }
 
     val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
         LongFormPlaybackSession(
@@ -574,15 +594,36 @@ fun TvLongFormPlayerScreen(
                 },
             )
             if (!playerErrorMessage.isNullOrBlank()) {
-                TvErrorState(
-                    title = "暂不能播放",
-                    message = playerErrorMessage.orEmpty(),
-                    onAction = {
-                        playerErrorMessage = null
-                        routeRetryNonce += 1
-                        updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
-                    },
-                )
+                if (showDolbyVisionDiagnostics) {
+                    TvErrorState(
+                        title = "诊断信息",
+                        message = playbackDiagnosticMessage,
+                        onAction = {
+                            showDolbyVisionDiagnostics = false
+                            playerErrorMessage = null
+                            routeRetryNonce += 1
+                            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                        },
+                    )
+                } else {
+                    TvErrorState(
+                        title = "暂不能播放",
+                        message = playerErrorMessage.orEmpty(),
+                        onAction = {
+                            playerErrorMessage = null
+                            routeRetryNonce += 1
+                            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                        },
+                        secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                        onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
+                            {
+                                showDolbyVisionDiagnostics = true
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
@@ -592,14 +633,34 @@ fun TvLongFormPlayerScreen(
                 )
             }
         } else {
-            TvErrorState(
-                title = "暂不能播放",
-                message = playerBlockMessage ?: "暂无可播放视频",
-                onAction = {
-                    routeRetryNonce += 1
-                    viewModel.load()
-                },
-            )
+            if (showDolbyVisionDiagnostics) {
+                TvErrorState(
+                    title = "诊断信息",
+                    message = playbackDiagnosticMessage,
+                    onAction = {
+                        showDolbyVisionDiagnostics = false
+                        routeRetryNonce += 1
+                        viewModel.load()
+                    },
+                )
+            } else {
+                TvErrorState(
+                    title = "暂不能播放",
+                    message = playerBlockMessage ?: "暂无可播放视频",
+                    onAction = {
+                        routeRetryNonce += 1
+                        viewModel.load()
+                    },
+                    secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                    onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
+                        {
+                            showDolbyVisionDiagnostics = true
+                        }
+                    } else {
+                        null
+                    },
+                )
+            }
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
                     modifier = Modifier

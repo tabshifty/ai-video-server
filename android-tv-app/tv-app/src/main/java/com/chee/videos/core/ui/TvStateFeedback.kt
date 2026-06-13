@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Warning
@@ -85,7 +86,12 @@ fun TvEmptyState(
         TvStatePanel {
             TvStateIcon(Icons.Filled.Tv)
             TvStateTexts(title = title, message = message)
-            TvStateAction(actionLabel = actionLabel, onAction = onAction)
+            TvStateActions(
+                actionLabel = actionLabel,
+                onAction = onAction,
+                secondaryActionLabel = null,
+                onSecondaryAction = null,
+            )
         }
     }
 }
@@ -96,13 +102,20 @@ fun TvErrorState(
     message: String,
     actionLabel: String = "重试",
     onAction: () -> Unit,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     TvStateContainer(modifier = modifier) {
         TvStatePanel {
             TvStateIcon(Icons.Filled.Warning, tint = AppChrome.Error)
             TvStateTexts(title = title, message = message)
-            TvStateAction(actionLabel = actionLabel, onAction = onAction)
+            TvStateActions(
+                actionLabel = actionLabel,
+                onAction = onAction,
+                secondaryActionLabel = secondaryActionLabel,
+                onSecondaryAction = onSecondaryAction,
+            )
         }
     }
 }
@@ -166,24 +179,55 @@ private fun TvStateTexts(title: String, message: String) {
 }
 
 @Composable
-private fun TvStateAction(actionLabel: String?, onAction: (() -> Unit)?) {
+private fun TvStateActions(
+    actionLabel: String?,
+    onAction: (() -> Unit)?,
+    secondaryActionLabel: String?,
+    onSecondaryAction: (() -> Unit)?,
+) {
     if (actionLabel == null || onAction == null) {
         return
     }
+    val hasSecondaryAction = secondaryActionLabel != null && onSecondaryAction != null
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        TvStateActionButton(
+            text = actionLabel,
+            onClick = onAction,
+            icon = Icons.Filled.Refresh,
+        )
+        if (hasSecondaryAction) {
+            val secondaryAction = onSecondaryAction
+            if (secondaryAction != null) {
+                TvStateActionButton(
+                    text = secondaryActionLabel.orEmpty(),
+                    onClick = secondaryAction,
+                    icon = Icons.Filled.Info,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvStateActionButton(
+    text: String,
+    onClick: () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+) {
     Surface(
         color = Color(0x2239D7E8),
         shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.04f)
-            .clickable(onClick = onAction),
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Filled.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-            Text(text = actionLabel, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Text(text = text, color = Color.White, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

@@ -2,6 +2,51 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 01:26 +0800
+- 进度：TV 端 DV 播放诊断最小闭环完成并验证通过。诊断入口继续限定在 DV 相关阻断页和专用 Media3 播放失败页，错误卡片改为单入口替换式诊断卡片；同时把 TV 端版本号抬到 `0.1.88` / `88`，确保功能变更和版本管理同步。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnostics.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnosticsTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon --stop` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvDolbyVisionDiagnosticsTest --tests com.chee.videos.feature.tv.DolbyVisionDisplayCapabilityTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check -- CONTEXT.md plan.md android-tv-app/tv-app/build.gradle.kts android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnostics.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnosticsTest.kt` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md android-tv-app/tv-app/build.gradle.kts android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnostics.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvDolbyVisionDiagnosticsTest.kt` 无命中。保留用户已有 `admin-web/.env.development` 不纳入本次提交。
+
+## 2026-06-14 00:38 +0800
+- 进度：确认 `DV 诊断返回依赖系统返回`。诊断卡片不单独提供“返回原错误页”按钮，返回前一层只依赖系统返回键或遥控返回，避免额外焦点目标。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛最终字段边界后执行文档乱码检查和 `git diff --check`。
+
+## 2026-06-14 00:27 +0800
+- 进度：确认 `DV 诊断正式构建保留`。正式发布构建也保留诊断入口，但只在 DV 相关阻断页或专用播放失败页可见，不依赖 debug 开关。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛入口样式后执行文档乱码检查和 `git diff --check`。
+
+## 2026-06-13 19:00 +0800
+- 进度：确认 `DV 诊断单入口单视图`。诊断不做“摘要 / 详情”切换或可展开层级，用户只通过一个显式入口进入同一张简短诊断卡片，减少交互复杂度。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛是否需要任何额外 debug-only 条件后执行文档乱码检查和 `git diff --check`。
+
+## 2026-06-13 19:00 +0800
+- 进度：确认 `DV 诊断核心卡片`。首轮只呈现一张简短卡片，核心信息收敛到“当前路径 / 当前原因 / 是否有播放源或专用链路可用”，失败页最多补一条简短错误摘要，不做折叠、分组、跳转或多卡片布局。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛最终实现入口与交互后执行文档乱码检查和 `git diff --check`。
+
+## 2026-06-13 19:00 +0800
+- 进度：收紧 DV 诊断复杂度。已确认首轮只保留最少必要字段和最短操作链路，不做分层钻取、树状展开或多页面诊断流程；目标是一眼看出阻断/专用链路/失败原因。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛最小字段集合后执行文档乱码检查和 `git diff --check`。
+
+## 2026-06-13 19:00 +0800
+- 进度：确认 `DV 播放诊断展示形态`。首轮不新开独立页面，复用 TV 现有错误态主面板风格，以二级动作进入同一错误上下文内的诊断视图或弹层，便于保留焦点和返回行为。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛诊断面板布局和字段后执行文档乱码检查和 `git diff --check`。
+
+## 2026-06-13 19:00 +0800
+- 进度：确认 `DV 播放诊断入口` 边界。首轮只在播放阻断页和专用 Media3/ExoPlayer 播放失败页通过显式入口查看；正常播放页不常驻展示；诊断信息不泄漏 access token 或完整播放 URL，也不提供强行播放或切换链路能力。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛诊断字段与实现范围后执行文档乱码检查和 `git diff --check`。
+
+## 2026-06-13 19:00 +0800
+- 进度：继续 DV 视频开发前的 grill-with-docs 校准。已确认下一阶段优先补 `DV 播放诊断信息`，先提升真机排障能力，不先追齐字幕、音轨、倍速等 LibVLC 体验能力。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待继续收敛诊断信息入口、展示范围与敏感信息边界后执行文档乱码检查和 `git diff --check`。
+
 ## 2026-06-13 18:38 +0800
 - 进度：完成图库资产参考图格式过滤收尾检查，准备提交。确认只纳入本轮后端过滤、工作台请求参数、API 单测和计划记录；用户已有 `admin-web/.env.development` 仍保持未纳入。
 - 影响文件：`internal/models/admin.go`、`internal/handlers/admin_image.go`、`internal/repository/image_repository.go`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/api/admin.spec.js`、`plan.md`

@@ -66,6 +66,7 @@ fun TvSeriesPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showBackConfirmPrompt by remember { mutableStateOf(false) }
+    var showDolbyVisionDiagnostics by remember { mutableStateOf(false) }
 
     fun handlePlaybackBack() {
         val now = SystemClock.uptimeMillis()
@@ -83,7 +84,10 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    BackHandler(onBack = ::handlePlaybackBack)
+    BackHandler(enabled = showDolbyVisionDiagnostics) {
+        showDolbyVisionDiagnostics = false
+    }
+    BackHandler(enabled = !showDolbyVisionDiagnostics, onBack = ::handlePlaybackBack)
 
     LaunchedEffect(showBackConfirmPrompt, backPromptAtMillis) {
         val promptAt = backPromptAtMillis
@@ -135,6 +139,10 @@ fun TvSeriesPlayerScreen(
         return
     }
 
+    LaunchedEffect(uiState.currentVideoId) {
+        showDolbyVisionDiagnostics = false
+    }
+
     val currentEpisode = selectedEpisode(uiState)
     var routeRetryNonce by remember(uiState.currentVideoId) { mutableStateOf(0) }
     val displayCapability = remember(context, uiState.currentVideoId, routeRetryNonce) {
@@ -151,6 +159,9 @@ fun TvSeriesPlayerScreen(
                 media3Available = true,
             )
         }
+    }
+    val showDolbyVisionDiagnosticsButton = remember(currentEpisode?.metadata, playbackRoute) {
+        isTvDolbyVisionDiagnosticsAvailable(playbackRoute)
     }
     val playerBlockMessage = playbackRoute.blockMessage
     val isVlcRoute = uiState.canPlayCurrentEpisode &&
@@ -175,6 +186,15 @@ fun TvSeriesPlayerScreen(
     var selectedAudioTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var playerErrorMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    val playbackDiagnosticMessage = remember(playbackRoute, displayCapability, uiState.currentSourceUrl, playerErrorMessage) {
+        buildTvDolbyVisionDiagnosticMessage(
+            route = playbackRoute,
+            displayCapability = displayCapability,
+            playbackUrl = uiState.currentSourceUrl,
+            media3Available = true,
+            failureMessage = playerErrorMessage,
+        )
+    }
     var screenPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var screenDurationMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
@@ -775,15 +795,36 @@ fun TvSeriesPlayerScreen(
                 },
             )
             if (!playerErrorMessage.isNullOrBlank()) {
-                TvErrorState(
-                    title = "暂不能播放",
-                    message = playerErrorMessage.orEmpty(),
-                    onAction = {
-                        playerErrorMessage = null
-                        routeRetryNonce += 1
-                        updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
-                    },
-                )
+                if (showDolbyVisionDiagnostics) {
+                    TvErrorState(
+                        title = "诊断信息",
+                        message = playbackDiagnosticMessage,
+                        onAction = {
+                            showDolbyVisionDiagnostics = false
+                            playerErrorMessage = null
+                            routeRetryNonce += 1
+                            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                        },
+                    )
+                } else {
+                    TvErrorState(
+                        title = "暂不能播放",
+                        message = playerErrorMessage.orEmpty(),
+                        onAction = {
+                            playerErrorMessage = null
+                            routeRetryNonce += 1
+                            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                        },
+                        secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                        onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
+                            {
+                                showDolbyVisionDiagnostics = true
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(
@@ -794,14 +835,34 @@ fun TvSeriesPlayerScreen(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                TvErrorState(
-                    title = "暂不能播放",
-                    message = playerBlockMessage ?: "当前分集暂无可播放视频",
-                    onAction = {
-                        routeRetryNonce += 1
-                        viewModel.retry()
-                    },
-                )
+                if (showDolbyVisionDiagnostics) {
+                    TvErrorState(
+                        title = "诊断信息",
+                        message = playbackDiagnosticMessage,
+                        onAction = {
+                            showDolbyVisionDiagnostics = false
+                            routeRetryNonce += 1
+                            viewModel.retry()
+                        },
+                    )
+                } else {
+                    TvErrorState(
+                        title = "暂不能播放",
+                        message = playerBlockMessage ?: "当前分集暂无可播放视频",
+                        onAction = {
+                            routeRetryNonce += 1
+                            viewModel.retry()
+                        },
+                        secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                        onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
+                            {
+                                showDolbyVisionDiagnostics = true
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                }
                 if (showBackConfirmPrompt) {
                     TvPlayerBackConfirmPrompt(
                         modifier = Modifier
