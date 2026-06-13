@@ -2,15 +2,80 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 17:57 +0800
+- 进度：完成本轮收尾检查，准备提交工作台图库资产参考图功能。确认生成 payload 不泄漏 `source_image_id` 等本地来源字段，图库抽屉 object URL 在关闭和请求失效时释放，重复图库资产按来源图片 ID 跳过；用户已有 `admin-web/.env.development` 保留未提交，不纳入本次提交。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- imageWorkbench.helpers.spec.js admin.spec.js` 通过；`cd admin-web && npm run build` 通过，仅有 Vite chunk size warning；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src/views/ToolboxImageWorkbench.vue admin-web/src/views/imageWorkbench.helpers.js admin-web/src/views/imageWorkbench.helpers.spec.js admin-web/src/api/admin.spec.js` 无命中；`git diff --check -- CONTEXT.md plan.md admin-web/src/views/ToolboxImageWorkbench.vue admin-web/src/views/imageWorkbench.helpers.js admin-web/src/views/imageWorkbench.helpers.spec.js admin-web/src/api/admin.spec.js` 通过。
+
+## 2026-06-13 17:55 +0800
+- 进度：完成工作台内置图库资产参考图首轮实现。已新增本地参考图快照 helper，`library_asset` 来源元数据进入 IndexedDB 任务快照但不进入生成 payload；工作台输入区新增“从图库选择”抽屉，按 `status=ready`、`active=1`、搜索词和图片合集筛选图库资产，支持网格多选和剩余槽位限制；加入时通过 `/admin/images/:id/view` 拉取 blob，转为本地 data URL 后立即冻结到参考图槽位，失败项按单张提示且不回滚成功项。`CONTEXT.md` 已新增 `admin 图库资产冻结读取契约`。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- imageWorkbench.helpers.spec.js admin.spec.js` 通过；`cd admin-web && npm run build` 通过，仅有 Vite chunk size warning。待执行乱码检查与 `git diff --check`。
+
+## 2026-06-13 17:45 +0800
+- 进度：开始落地工作台内置图库资产参考图功能。实现范围收口为：新增本地参考图快照 helper，确保 `library_asset` 来源元数据只进入本地历史；工作台内置图库抽屉复用图片管理搜索、图片合集筛选和网格多选；加入参考图时立即拉取图片 blob 并冻结成本地 IndexedDB 输入快照。生成接口继续只接收既有 `reference_images` data URL，不接收图库资产 ID。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- imageWorkbench.helpers.spec.js`、`cd admin-web && npm run build`、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-13 17:45 +0800
+- 进度：继续收敛图库资产参考图格式处理。已确认图库资产作为普通参考图时保留当前处理图的原 MIME 与字节形态，PNG/JPEG/WebP 都可直接加入；只有当它被选为局部蒙版目标时，才沿用现有蒙版目标 PNG 提交契约。`CONTEXT.md` 已新增 `admin 图库资产参考图格式保留`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
+## 2026-06-13 17:44 +0800
+- 进度：补齐图库资产参考图的可选范围、标题快照与重复选择规则。已确认只允许 `status=ready` 且 `active=true` 的图片资产作为新参考图；来源标题按加入工作台时冻结，不随来源资产重命名改写；同一来源图片资产 ID 已在当前草稿里时再次选择应跳过并提示。`CONTEXT.md` 已新增 `admin 图库资产参考图可选范围`、`admin 图库资产来源标题冻结` 与 `admin 图库资产参考图重复选择跳过`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
+## 2026-06-13 17:42 +0800
+- 进度：继续收敛多选图库资产加入参考图的失败处理。已确认批量选择后按单张尽力冻结，成功项立即进入参考图槽位，失败项逐项展示原因，不回滚已成功加入的参考图。`CONTEXT.md` 已新增 `admin 图库资产批量加入部分成功`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
+## 2026-06-13 17:39 +0800
+- 进度：继续收敛图库资产参考图的选择入口。已确认图库选图应内置在图像生成工作台里，复用图片管理的搜索、合集筛选和网格多选能力；现有“打开媒体库”只作为浏览跳转，不承担跨标签页选图回填。`CONTEXT.md` 已新增 `admin 工作台内置图库选图入口`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
+## 2026-06-13 17:37 +0800
+- 进度：继续收敛图库资产来源失效态和继续改稿行为。已确认来源跳转失效时历史详情仍保留来源图片 ID、冻结标题等只读摘要，不重新打开来源图片本体；同时补记此前确认的“继续改稿应恢复历史里已冻结的图库资产参考图快照，不重新从图库读取最新内容”。`CONTEXT.md` 已新增 `admin 图库资产来源失效只读摘要` 与 `admin 继续改稿恢复图库参考图快照`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
 ## 2026-06-13 17:19 +0800
 - 进度：DV 专用 Media3/ExoPlayer 播放链路本轮实现完成。单个长视频和电视剧分集现在统一通过播放链路选择器在 LibVLC、Media3 DV 专用链路和阻断之间决策；output 仍为 DV 且显示能力支持、播放 URL 有效时进入专用 Media3 分支，source DV 但 output 非 DV、显示能力未知/不支持、metadata 不完整仍阻断。剧集分集按当前分集独立构建 URL 与重判，Media3 失败重试会重新评估并重建 ExoPlayer，不回退 LibVLC；观看历史继续沿用现有接口。已更新 TV 端版本到 `0.1.87`，并调整 LibVLC 守卫测试为允许 DV 专用 Media3 例外。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/player/TvLongFormVlcSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:compileDebugKotlin` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过。待执行乱码检查与 `git diff --check` 后提交；`admin-web/.env.development` 和生图参考图相关记录不纳入本次 DV 提交。
 
+## 2026-06-13 17:03 +0800
+- 进度：继续收敛图库资产参考图进入工作台的冻结时机。已确认图库资产加入工作台时就应拉取并复制成当前创作的本地输入快照，生成提交继续沿用现有参考图数据提交语义，不扩展为传图库资产 ID 让后端生成时再解析。`CONTEXT.md` 已新增 `admin 图库资产参考图加入即冻结`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
+## 2026-06-13 17:24 +0800
+- 进度：继续收敛图库资产来源跳转的保留策略。已确认来源跳转在资产重命名、删除或停用时不应静默消失，而应保留为明确失效态入口或提示，避免历史详情把来源关系直接抹掉。`CONTEXT.md` 已新增 `admin 图库资产来源跳转保留失效态`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
 ## 2026-06-13 15:58 +0800
 - 进度：开始实现 DV 专用 Media3/ExoPlayer 播放链路。已先补纯逻辑 route selector 红灯测试，随后实现 `resolveTvPlaybackRoute` 并保持旧 `resolveTvPlaybackCompatibilityDecision` 行为兼容；修正剧集“可选集”候选语义，使 output 仍为 DV 的分集不会在选集层被排除，探测失败和 DV 转码输出仍不作为候选。TV 端版本号递增至 `0.1.87`，并为 TV 工程加入 Media3 依赖，准备接入最小播放组件。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过。待继续接入 Media3 UI、单片/剧集播放页并跑全量验证。保留用户已有 `admin-web/.env.development` 与生图相关文档记录不纳入本任务提交。
+
+## 2026-06-13 15:57 +0800
+- 进度：按用户要求为当前任务创建独立分支 `admin-image-library-reference`。继续收敛图库资产参考图的生命周期：已确认图库资产进入生图工作台后要复制成当前创作自己的本地输入快照，并保留来源图片资产 ID、当前标题等轻量来源信息；后续来源资产重命名或删除不应破坏本地历史查看和继续改稿，只影响来源跳转与摘要状态。`CONTEXT.md` 已新增 `admin 图库资产参考图输入快照`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留既有未提交改动 `admin-web/.env.development`、TV 端策略文件和 TV 测试文件不纳入本轮处理。
+
+## 2026-06-13 16:31 +0800
+- 进度：继续收敛图库资产参考图的数量边界。已确认允许一次多选多张图库资产做参考图，但不新增独立额度；浏览器上传/粘贴、前序结果与图库资产三类来源共享现有 4 张参考图总上限。`CONTEXT.md` 已新增 `admin 参考图槽位总上限`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与 TV 端未完成改动不纳入本轮处理。
+
+## 2026-06-13 15:52 +0800
+- 进度：grill-with-docs 开始收敛“生图允许使用服务器里已有的图库做参考图”。已确认这里的“服务器图库”特指后台图片管理里的正式图片资产，而不是任意服务器文件路径、孤儿文件或浏览器本地历史结果；`CONTEXT.md` 已将参考图来源从旧的 `browser_input` / `previous_result` 两类修正为 `browser_input` / `previous_result` / `library_asset` 三类，并新增 `admin 图库资产参考图`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。
 
 ## 2026-06-13 15:49 +0800
 - 进度：继续收敛 DV 专用链路实现顺序。已确认实现前应先补纯逻辑“播放链路选择器”测试，把非 DV/老数据走 LibVLC、source DV + output 非 DV 阻断、output DV + 三条件成立走 Media3/ExoPlayer、显示不支持/未知阻断、metadata 不完整/探测失败/未来版本阻断等组合锁住；单个长视频和电视剧分集复用同一选择语义，再接 Compose/Media3 UI。`CONTEXT.md` 已追加 `DV 播放链路选择器`。

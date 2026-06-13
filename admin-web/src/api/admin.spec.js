@@ -33,7 +33,10 @@ import {
   getAdminTvSeries,
   getAdminTvSeriesDetail,
   generateAdminImage,
+  getAdminImageCollections,
   getAdminImageGenerationStatus,
+  getAdminImageViewBlob,
+  getAdminImages,
   getAdminTVAppReleaseDetail,
   getAdminTVAppReleases,
   getAdminVideoSubtitles,
@@ -89,6 +92,30 @@ describe('image generation apis', () => {
     expect(get).toHaveBeenCalledWith('/admin/image-generation/status')
     expect(post).toHaveBeenCalledWith('/admin/image-generation/generate', payload, {
       timeout: 0
+    })
+  })
+})
+
+describe('admin image library apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    get.mockResolvedValue({ ok: true })
+  })
+
+  it('loads image assets, collections and view blobs for workbench references', async () => {
+    await getAdminImages({ q: '封面', status: 'ready', active: 1 })
+    await getAdminImageCollections({ active: 1 })
+    await getAdminImageViewBlob('image-1', { w: 360, h: 270, fit: 'cover', q: 78 })
+
+    expect(get).toHaveBeenCalledWith('/admin/images', {
+      params: { q: '封面', status: 'ready', active: 1 }
+    })
+    expect(get).toHaveBeenCalledWith('/admin/image-collections', {
+      params: { active: 1 }
+    })
+    expect(get).toHaveBeenCalledWith('/admin/images/image-1/view', {
+      params: { w: 360, h: 270, fit: 'cover', q: 78 },
+      responseType: 'blob'
     })
   })
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   IMAGE_WORKBENCH_LIMITS,
   buildImageGenerationPayload,
+  buildReferenceImageSnapshots,
   createImageWorkbenchTask,
   normalizeImageWorkbenchParams,
   validateReferenceImageFiles
@@ -48,7 +49,15 @@ describe('image workbench helpers', () => {
     const payload = await buildImageGenerationPayload(
       '  生成海报  ',
       { output_format: 'webp', output_compression: 76, n: 2 },
-      [{ id: 'local-1', name: 'ref.png', mime: 'image/png', dataUrl: 'data:image/png;base64,abc' }]
+      [{
+        id: 'local-1',
+        name: 'ref.png',
+        mime: 'image/png',
+        dataUrl: 'data:image/png;base64,abc',
+        sourceKind: 'library_asset',
+        sourceImageId: 'asset-1',
+        sourceTitle: '图库原图'
+      }]
     )
 
     expect(payload).toMatchObject({
@@ -61,6 +70,56 @@ describe('image workbench helpers', () => {
       reference_images: [{ name: 'ref.png', mime: 'image/png', data_url: 'data:image/png;base64,abc' }]
     })
     expect(payload.reference_images[0]).not.toHaveProperty('id')
+    expect(payload.reference_images[0]).not.toHaveProperty('source_image_id')
+    expect(payload.reference_images[0]).not.toHaveProperty('sourceTitle')
+  })
+
+  it('stores library asset metadata only in local reference snapshots', () => {
+    expect(buildReferenceImageSnapshots([
+      {
+        id: 'local-asset-copy',
+        name: 'frozen.png',
+        mime: 'image/png',
+        sourceKind: 'library_asset',
+        sourceImageId: 'asset-1',
+        sourceTitle: '原始图库标题',
+        sourceStatus: 'ready',
+        sourceActive: true,
+        sourceViewUrl: '/api/v1/admin/images/asset-1/view',
+        sourceFrozenAt: 1781343900000
+      },
+      {
+        id: 'local-upload',
+        name: 'upload.webp',
+        mime: 'image/webp',
+        sourceKind: 'browser_input'
+      }
+    ])).toEqual([
+      {
+        image_id: 'local-asset-copy',
+        name: 'frozen.png',
+        mime: 'image/png',
+        slot_index: 0,
+        source_kind: 'library_asset',
+        source_task_id: '',
+        source_result_id: '',
+        source_image_id: 'asset-1',
+        source_title: '原始图库标题',
+        source_status: 'ready',
+        source_active: true,
+        source_view_url: '/api/v1/admin/images/asset-1/view',
+        source_frozen_at: 1781343900000
+      },
+      {
+        image_id: 'local-upload',
+        name: 'upload.webp',
+        mime: 'image/webp',
+        slot_index: 1,
+        source_kind: 'browser_input',
+        source_task_id: '',
+        source_result_id: ''
+      }
+    ])
   })
 
   it('builds mask payload against the original reference slot', async () => {

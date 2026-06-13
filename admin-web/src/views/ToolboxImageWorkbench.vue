@@ -2,24 +2,30 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Back, Download, FolderOpened, Picture, Plus, Refresh, Upload, WarningFilled } from '@element-plus/icons-vue'
+import { Back, Download, FolderOpened, Picture, Plus, Refresh, Search, Upload, WarningFilled } from '@element-plus/icons-vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import ImageWorkbenchMaskEditor from './ImageWorkbenchMaskEditor.vue'
 import {
   generateAdminImage,
+  getAdminImageCollections,
   getAdminImageDetail,
   getAdminImageGenerationStatus,
+  getAdminImageViewBlob,
+  getAdminImages,
   updateAdminImage,
   uploadAdminImages
 } from '../api/admin'
 import {
+  IMAGE_WORKBENCH_LIMITS,
   buildImageGenerationPayload,
+  buildReferenceImageSnapshots,
   createWorkbenchMaskPreview,
   createImageWorkbenchTask,
   dataUrlToFile,
   extensionForImageMime,
+  formatWorkbenchFileSize,
   readWorkbenchPreferences,
   validateWorkbenchMask,
   validateReferenceImageFiles,
@@ -32,6 +38,13 @@ import {
   putWorkbenchTask,
   storeWorkbenchImage
 } from './imageWorkbench.db'
+
+const LIBRARY_REFERENCE_PREVIEW_PARAMS = {
+  w: 360,
+  h: 270,
+  fit: 'cover',
+  q: 78
+}
 
 const router = useRouter()
 const fileInputRef = ref(null)
@@ -55,6 +68,23 @@ const tasks = ref([])
 const selectedTask = ref(null)
 const currentResults = ref([])
 const dropActive = ref(false)
+const libraryPickerVisible = ref(false)
+const libraryLoading = ref(false)
+const libraryAdding = ref(false)
+const libraryItems = ref([])
+const libraryTotal = ref(0)
+const librarySelectedItems = ref([])
+const libraryPreviewUrls = ref({})
+const libraryPreviewErrors = ref({})
+const libraryRequestSeq = ref(0)
+const libraryCollectionOptions = ref([])
+const libraryCollectionsLoading = ref(false)
+const libraryQuery = reactive({
+  page: 1,
+  page_size: 12,
+  q: '',
+  collection_id: ''
+})
 const selectedTaskError = computed(() => {
   if (selectedTask.value?.status !== 'error') return ''
   return selectedTask.value.error?.trim() || '未返回错误原因'
@@ -77,6 +107,7 @@ const maskSummary = computed(() => {
 
 const canGenerate = computed(() => status.value.enabled && !generating.value && prompt.value.trim() !== '')
 const hasReferences = computed(() => references.value.length > 0)
+const remainingReferenceSlots = computed(() => Math.max(0, IMAGE_WORKBENCH_LIMITS.maxReferenceImages - references.value.length))
 const statusType = computed(() => {
   if (status.value.loading) return 'info'
   return status.value.enabled ? 'success' : 'warning'
@@ -113,6 +144,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('paste', handlePaste)
+  clearLibraryPreviewUrls()
 })
 
 function returnToToolbox() {
@@ -122,6 +154,253 @@ function returnToToolbox() {
 function openMediaLibrary() {
   const href = router.resolve('/images').href
   window.open(href, '_blank', 'noopener,noreferrer')
+}
+
+async function openLibraryPicker() {
+  if (remainingReferenceSlots.value <= 0) {
+    ElMessage.warning(`参考图最多 ${IMAGE_WORKBENCH_LIMITS.maxReferenceImages} 张`)
+    return
+  }
+  libraryPickerVisible.value = true
+  await Promise.all([
+    loadLibraryImages(),
+    searchLibraryCollections('')
+  ])
+}
+
+function buildLibraryImageParams() {
+  const params = {
+    page: libraryQuery.page,
+    page_size: libraryQuery.page_size,
+    q: libraryQuery.q,
+    status: 'ready',
+    active: 1
+  }
+  if (libraryQuery.collection_id) {
+    params.collection_id = libraryQuery.collection_id
+  }
+  return params
+}
+
+async function loadLibraryImages() {
+  const requestSeq = libraryRequestSeq.value + 1
+  libraryRequestSeq.value = requestSeq
+  libraryLoading.value = true
+  try {
+    const data = await getAdminImages(buildLibraryImageParams())
+    if (libraryRequestSeq.value !== requestSeq) return
+    libraryItems.value = data.items || []
+    libraryTotal.value = Number(data.total_count || 0)
+    syncLibrarySelectionWithCurrentReferences()
+    await loadLibraryPreviewUrls(libraryItems.value, requestSeq)
+  } catch (error) {
+    if (libraryRequestSeq.value === requestSeq) {
+      libraryItems.value = []
+      libraryTotal.value = 0
+      clearLibraryPreviewUrls()
+      ElMessage.error(extractErrorMessage(error, '读取图库资产失败'))
+    }
+  } finally {
+    if (libraryRequestSeq.value === requestSeq) {
+      libraryLoading.value = false
+    }
+  }
+}
+
+async function searchLibraryCollections(keyword = '') {
+  libraryCollectionsLoading.value = true
+  try {
+    const data = await getAdminImageCollections({
+      q: keyword,
+      active: 1,
+      page: 1,
+      page_size: 50
+    })
+    const optionMap = new Map(libraryCollectionOptions.value.map((item) => [item.value, item]))
+    for (const item of data.items || []) {
+      if (!item?.id) continue
+      optionMap.set(item.id, { value: item.id, label: item.name || item.id })
+    }
+    libraryCollectionOptions.value = Array.from(optionMap.values())
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '读取图片合集失败'))
+  } finally {
+    libraryCollectionsLoading.value = false
+  }
+}
+
+function applyLibrarySearch() {
+  libraryQuery.page = 1
+  void loadLibraryImages()
+}
+
+function resetLibraryFilters() {
+  libraryQuery.q = ''
+  libraryQuery.collection_id = ''
+  libraryQuery.page = 1
+  void loadLibraryImages()
+}
+
+function onLibraryPickerClosed() {
+  libraryRequestSeq.value += 1
+  clearLibraryPreviewUrls()
+  libraryItems.value = []
+  libraryTotal.value = 0
+  librarySelectedItems.value = []
+  libraryLoading.value = false
+  libraryAdding.value = false
+}
+
+function clearLibraryPreviewUrls() {
+  for (const url of Object.values(libraryPreviewUrls.value)) {
+    if (url) URL.revokeObjectURL(url)
+  }
+  libraryPreviewUrls.value = {}
+  libraryPreviewErrors.value = {}
+}
+
+async function readLibraryImageBlob(blob, fallback) {
+  if (!blob?.type?.includes('application/json')) {
+    return blob
+  }
+  const text = await blob.text()
+  let payload = null
+  try {
+    payload = JSON.parse(text)
+  } catch (_) {
+    payload = null
+  }
+  throw new Error(payload?.msg || fallback)
+}
+
+async function loadLibraryPreviewUrls(items, requestSeq) {
+  clearLibraryPreviewUrls()
+  if (!items.length) return
+  const nextUrls = {}
+  const nextErrors = {}
+  await Promise.all(
+    items.map(async (item) => {
+      if (libraryDisplayUrl(item)) return
+      try {
+        const blob = await getAdminImageViewBlob(item.id, LIBRARY_REFERENCE_PREVIEW_PARAMS)
+        const imageBlob = await readLibraryImageBlob(blob, '加载图库缩略图失败')
+        nextUrls[item.id] = URL.createObjectURL(imageBlob)
+      } catch (error) {
+        nextErrors[item.id] = extractErrorMessage(error, '加载图库缩略图失败')
+      }
+    })
+  )
+  if (libraryRequestSeq.value !== requestSeq) {
+    for (const url of Object.values(nextUrls)) {
+      if (url) URL.revokeObjectURL(url)
+    }
+    return
+  }
+  libraryPreviewUrls.value = nextUrls
+  libraryPreviewErrors.value = nextErrors
+}
+
+function libraryDisplayUrl(item) {
+  return item?.view_url || item?.url || item?.thumbnail_url || libraryPreviewUrls.value[item?.id] || ''
+}
+
+function isLibraryItemSelected(item) {
+  return librarySelectedItems.value.some((selected) => selected.id === item.id)
+}
+
+function isLibraryItemAlreadyReferenced(item) {
+  return references.value.some((reference) => reference.sourceKind === 'library_asset' && reference.sourceImageId === item.id)
+}
+
+function syncLibrarySelectionWithCurrentReferences() {
+  librarySelectedItems.value = librarySelectedItems.value.filter((item) => !isLibraryItemAlreadyReferenced(item))
+}
+
+function toggleLibrarySelection(item, checked) {
+  if (!item?.id) return
+  if (isLibraryItemAlreadyReferenced(item)) {
+    ElMessage.info('该图库资产已在参考图中')
+    librarySelectedItems.value = librarySelectedItems.value.filter((selected) => selected.id !== item.id)
+    return
+  }
+  const next = librarySelectedItems.value.filter((selected) => selected.id !== item.id)
+  if (checked) {
+    if (next.length >= remainingReferenceSlots.value) {
+      ElMessage.warning(`还可以选择 ${remainingReferenceSlots.value} 张图库参考图`)
+      return
+    }
+    next.push(item)
+  }
+  librarySelectedItems.value = next
+}
+
+function clearLibrarySelection() {
+  librarySelectedItems.value = []
+}
+
+async function addSelectedLibraryReferences() {
+  const selected = librarySelectedItems.value.filter((item) => !isLibraryItemAlreadyReferenced(item))
+  if (!selected.length) {
+    ElMessage.warning('请先选择图库图片')
+    return
+  }
+  const targets = selected.slice(0, remainingReferenceSlots.value)
+  if (targets.length < selected.length) {
+    ElMessage.warning(`参考图最多 ${IMAGE_WORKBENCH_LIMITS.maxReferenceImages} 张，已按剩余槽位加入`)
+  }
+  if (!targets.length) {
+    ElMessage.warning(`参考图最多 ${IMAGE_WORKBENCH_LIMITS.maxReferenceImages} 张`)
+    return
+  }
+
+  libraryAdding.value = true
+  const descriptors = []
+  const failed = []
+  const frozenAt = Date.now()
+  for (const item of targets) {
+    try {
+      const blob = await getAdminImageViewBlob(item.id)
+      const imageBlob = await readLibraryImageBlob(blob, '读取图库图片失败')
+      const dataUrl = await blobToDataUrl(imageBlob)
+      const mime = imageBlob.type || item.stored_mime || 'image/png'
+      const name = libraryReferenceFilename(item, mime)
+      descriptors.push({
+        file: new File([imageBlob], name, { type: mime }),
+        name,
+        mime,
+        size: imageBlob.size || item.file_size || 0,
+        dataUrl,
+        sourceKind: 'library_asset',
+        sourceImageId: item.id,
+        sourceTitle: item.title || item.id,
+        sourceStatus: item.status || '',
+        sourceActive: item.active,
+        sourceViewUrl: item.view_url || item.url || `/api/v1/admin/images/${encodeURIComponent(item.id)}/view`,
+        sourceFrozenAt: frozenAt
+      })
+    } catch (error) {
+      failed.push(`${item.title || item.id}：${extractErrorMessage(error, '读取失败')}`)
+    }
+  }
+
+  try {
+    const added = await appendReferenceItems(descriptors)
+    if (added.length > 0) {
+      librarySelectedItems.value = librarySelectedItems.value.filter(
+        (item) => !added.some((reference) => reference.sourceImageId === item.id)
+      )
+      syncLibrarySelectionWithCurrentReferences()
+      ElMessage.success(`已加入 ${added.length} 张图库参考图`)
+    }
+    if (failed.length > 0) {
+      ElMessage.warning(`部分图库图片加入失败：${failed.join('；')}`)
+    }
+    if (added.length > 0 && failed.length === 0) {
+      libraryPickerVisible.value = false
+    }
+  } finally {
+    libraryAdding.value = false
+  }
 }
 
 async function loadStatus() {
@@ -206,12 +485,12 @@ async function addReferenceFiles(files) {
 
 async function appendReferenceItems(items) {
   const incoming = Array.from(items || [])
-  if (!incoming.length) return
+  if (!incoming.length) return []
   const merged = [...references.value.map((item) => item.file).filter(Boolean), ...incoming.map((item) => item.file).filter(Boolean)]
   const validation = validateReferenceImageFiles(merged)
   if (!validation.ok) {
     ElMessage.warning(validation.message)
-    return
+    return []
   }
   const nextItems = []
   for (const incomingItem of incoming) {
@@ -227,10 +506,17 @@ async function appendReferenceItems(items) {
       dataUrl,
       sourceKind: incomingItem.sourceKind || 'browser_input',
       sourceTaskId: incomingItem.sourceTaskId || '',
-      sourceResultId: incomingItem.sourceResultId || ''
+      sourceResultId: incomingItem.sourceResultId || '',
+      sourceImageId: incomingItem.sourceImageId || '',
+      sourceTitle: incomingItem.sourceTitle || '',
+      sourceStatus: incomingItem.sourceStatus || '',
+      sourceActive: incomingItem.sourceActive,
+      sourceViewUrl: incomingItem.sourceViewUrl || '',
+      sourceFrozenAt: incomingItem.sourceFrozenAt || null
     })
   }
   references.value = [...references.value, ...nextItems]
+  return nextItems
 }
 
 function clearMaskDraftIfTargetRemoved(id) {
@@ -299,15 +585,7 @@ function removeMask() {
 }
 
 function buildReferenceSnapshots() {
-  return references.value.map((item, index) => ({
-    image_id: item.id,
-    name: item.name,
-    mime: item.mime,
-    slot_index: index,
-    source_kind: item.sourceKind || 'browser_input',
-    source_task_id: item.sourceTaskId || '',
-    source_result_id: item.sourceResultId || ''
-  }))
+  return buildReferenceImageSnapshots(references.value)
 }
 
 function buildMaskTaskSnapshot(maskImageId) {
@@ -437,7 +715,7 @@ function downloadResult(result, index) {
 
 async function reuseAsReference(result) {
   const file = dataUrlToFile(result.dataUrl, 'generated-reference.png', result.mime)
-  await appendReferenceItems([{
+  const added = await appendReferenceItems([{
     file,
     name: file.name,
     mime: file.type,
@@ -447,7 +725,9 @@ async function reuseAsReference(result) {
     sourceTaskId: selectedTask.value?.id || '',
     sourceResultId: result.id || ''
   }])
-  ElMessage.success('已复用为参考图')
+  if (added.length > 0) {
+    ElMessage.success('已复用为参考图')
+  }
 }
 
 async function importToMediaLibrary(result, index) {
@@ -502,6 +782,15 @@ function readFileAsDataUrl(file) {
   })
 }
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error || new Error('读取图库图片失败'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
   if (typeof responseMsg === 'string' && responseMsg.trim()) return responseMsg.trim()
@@ -517,6 +806,37 @@ function formatDate(value) {
 function formatDimensions(item) {
   if (!item?.width || !item?.height) return item?.mime || '图片'
   return `${item.width} x ${item.height}`
+}
+
+function libraryReferenceFilename(item, mime) {
+  const title = sanitizeFilename(item?.title || item?.id || 'library-reference')
+  return `${title}.${extensionForImageMime(mime)}`
+}
+
+function sanitizeFilename(value) {
+  const normalized = String(value || '').trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-')
+  return normalized || 'library-reference'
+}
+
+function sourceKindLabel(item) {
+  if (item?.sourceKind === 'library_asset') return '图库资产'
+  if (item?.sourceKind === 'previous_result') return '前序结果'
+  return '浏览器输入'
+}
+
+function referenceSourceSummary(item) {
+  if (item?.sourceKind === 'library_asset') {
+    return `来源：${item.sourceTitle || item.sourceImageId || '图库资产'}`
+  }
+  if (item?.sourceKind === 'previous_result') {
+    return '来源：前序生成结果'
+  }
+  return ''
+}
+
+function formatLibraryItemMeta(item) {
+  const dimensions = item?.width && item?.height ? `${item.width} x ${item.height}` : '尺寸未知'
+  return `${dimensions} · ${formatWorkbenchFileSize(item?.file_size)}`
 }
 </script>
 
@@ -556,8 +876,12 @@ function formatDimensions(item) {
                 @drop.prevent="handleDrop"
               >
                 <input ref="fileInputRef" class="reference-drop__input" type="file" accept="image/png,image/jpeg,image/webp" multiple @change="handleFileInput" />
-                <el-button :icon="Upload" @click="triggerFilePicker">添加参考图</el-button>
-                <span>支持拖拽、粘贴、上传 PNG/JPEG/WebP</span>
+                <div class="reference-drop__actions">
+                  <el-button :icon="Upload" @click="triggerFilePicker">上传参考图</el-button>
+                  <el-button :icon="FolderOpened" :disabled="remainingReferenceSlots <= 0" @click="openLibraryPicker">从图库选择</el-button>
+                </div>
+                <span>支持拖拽、粘贴、上传 PNG/JPEG/WebP；还可添加 {{ remainingReferenceSlots }} 张</span>
+                <small>图库资产加入后会立即冻结为本地参考图快照</small>
               </div>
 
               <div v-if="hasMask" class="mask-summary">
@@ -579,8 +903,9 @@ function formatDimensions(item) {
                     <span>{{ item.mime }}</span>
                     <div class="reference-card__tags">
                       <el-tag v-if="isMaskTarget(item.id)" size="small" type="primary">蒙版目标</el-tag>
-                      <el-tag v-if="item.sourceKind === 'previous_result'" size="small" effect="plain">前序结果</el-tag>
+                      <el-tag size="small" effect="plain">{{ sourceKindLabel(item) }}</el-tag>
                     </div>
+                    <small v-if="referenceSourceSummary(item)" class="reference-card__source">{{ referenceSourceSummary(item) }}</small>
                   </div>
                   <div class="reference-card__actions">
                     <el-button size="small" @click="openMaskEditor(item.id)">
@@ -703,6 +1028,116 @@ function formatDimensions(item) {
         </aside>
       </div>
     </div>
+    <el-drawer
+      v-model="libraryPickerVisible"
+      title="选择图库参考图"
+      direction="rtl"
+      size="min(100%, 760px)"
+      :close-on-click-modal="!libraryAdding"
+      :close-on-press-escape="!libraryAdding"
+      @closed="onLibraryPickerClosed"
+    >
+      <div class="library-picker">
+        <SectionCard dense>
+          <template #title>图库筛选</template>
+          <div class="library-picker__filters">
+            <el-input
+              v-model="libraryQuery.q"
+              placeholder="搜索图片标题或描述"
+              clearable
+              :prefix-icon="Search"
+              @keyup.enter="applyLibrarySearch"
+              @clear="applyLibrarySearch"
+            />
+            <el-select
+              v-model="libraryQuery.collection_id"
+              filterable
+              remote
+              clearable
+              reserve-keyword
+              placeholder="按图片合集筛选"
+              :remote-method="searchLibraryCollections"
+              :loading="libraryCollectionsLoading"
+              @change="applyLibrarySearch"
+              @clear="applyLibrarySearch"
+            >
+              <el-option
+                v-for="collection in libraryCollectionOptions"
+                :key="collection.value"
+                :label="collection.label"
+                :value="collection.value"
+              />
+            </el-select>
+            <el-button type="primary" :loading="libraryLoading" @click="applyLibrarySearch">搜索</el-button>
+            <el-button @click="resetLibraryFilters">重置</el-button>
+          </div>
+        </SectionCard>
+
+        <SectionCard v-loading="libraryLoading" dense>
+          <template #title>可用图片资产</template>
+          <template #description>仅展示可用且启用的图库资产</template>
+          <template #actions>
+            <el-button :disabled="librarySelectedItems.length === 0 || libraryAdding" @click="clearLibrarySelection">取消选择</el-button>
+          </template>
+
+          <EmptyState v-if="!libraryLoading && libraryItems.length === 0" title="暂无可选图片" description="换个关键词或图片合集再试。" />
+          <div v-else class="library-grid">
+            <article
+              v-for="item in libraryItems"
+              :key="item.id"
+              class="library-card"
+              :class="{ 'is-selected': isLibraryItemSelected(item), 'is-disabled': isLibraryItemAlreadyReferenced(item) }"
+            >
+              <el-checkbox
+                class="library-card__select"
+                :model-value="isLibraryItemSelected(item)"
+                :disabled="isLibraryItemAlreadyReferenced(item)"
+                @update:model-value="(checked) => toggleLibrarySelection(item, checked)"
+              />
+              <div class="library-card__preview">
+                <img v-if="libraryDisplayUrl(item)" :src="libraryDisplayUrl(item)" :alt="item.title || item.id" />
+                <span v-else>{{ libraryPreviewErrors[item.id] || item.title || '图片' }}</span>
+              </div>
+              <div class="library-card__body">
+                <strong>{{ item.title || item.id }}</strong>
+                <span>{{ formatLibraryItemMeta(item) }}</span>
+              </div>
+              <div class="library-card__meta">
+                <el-tag size="small" type="success">可用</el-tag>
+                <el-tag v-if="isLibraryItemAlreadyReferenced(item)" size="small" type="info">已在参考图中</el-tag>
+              </div>
+            </article>
+          </div>
+
+          <div class="library-picker__pager">
+            <el-pagination
+              v-model:current-page="libraryQuery.page"
+              v-model:page-size="libraryQuery.page_size"
+              layout="total, prev, pager, next"
+              :total="libraryTotal"
+              @current-change="loadLibraryImages"
+            />
+          </div>
+        </SectionCard>
+      </div>
+
+      <template #footer>
+        <div class="library-picker__footer">
+          <span>已选 {{ librarySelectedItems.length }} 张，还可加入 {{ remainingReferenceSlots }} 张</span>
+          <div>
+            <el-button :disabled="libraryAdding" @click="libraryPickerVisible = false">关闭</el-button>
+            <el-button
+              type="primary"
+              :loading="libraryAdding"
+              :disabled="librarySelectedItems.length === 0 || remainingReferenceSlots <= 0"
+              @click="addSelectedLibraryReferences"
+            >
+              添加为参考图
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-drawer>
     <ImageWorkbenchMaskEditor
       v-model="maskEditorVisible"
       :image-data-url="maskEditorTarget?.dataUrl || ''"
@@ -782,6 +1217,19 @@ function formatDimensions(item) {
   display: none;
 }
 
+.reference-drop__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.reference-drop small {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
 .reference-list {
   display: grid;
   gap: var(--space-2);
@@ -859,6 +1307,7 @@ function formatDimensions(item) {
 }
 
 .reference-card span,
+.reference-card__source,
 .history-item small,
 .result-card__meta span {
   color: var(--text-muted);
@@ -998,6 +1447,123 @@ function formatDimensions(item) {
   word-break: break-word;
 }
 
+.library-picker {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.library-picker__filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.library-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  transition:
+    border-color var(--motion-duration-base) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-base) var(--motion-easing-standard),
+    opacity var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+.library-card.is-selected,
+.library-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.library-card.is-disabled {
+  opacity: 0.62;
+}
+
+.library-card__select {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 2;
+}
+
+.library-card__preview {
+  display: grid;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-muted);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+.library-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.library-card__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.library-card__body strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-card__body span {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.library-card__meta,
+.library-picker__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.library-picker__pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+
+.library-picker__footer {
+  justify-content: space-between;
+  width: 100%;
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.library-picker__footer > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 @media (max-width: 72rem) {
   .workbench-grid {
     grid-template-columns: 1fr;
@@ -1024,6 +1590,15 @@ function formatDimensions(item) {
 
   .param-grid {
     grid-template-columns: 1fr;
+  }
+
+  .library-picker__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .library-picker__footer {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .reference-card,

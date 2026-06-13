@@ -224,6 +224,29 @@ export function createImageWorkbenchTask({ prompt, params, referenceImageIds, re
   }
 }
 
+export function buildReferenceImageSnapshots(referenceImages = []) {
+  return (referenceImages || []).map((item, index) => {
+    const snapshot = {
+      image_id: item.id,
+      name: item.name,
+      mime: item.mime,
+      slot_index: index,
+      source_kind: item.sourceKind || 'browser_input',
+      source_task_id: item.sourceTaskId || '',
+      source_result_id: item.sourceResultId || ''
+    }
+    if (snapshot.source_kind === 'library_asset') {
+      snapshot.source_image_id = item.sourceImageId || ''
+      snapshot.source_title = item.sourceTitle || ''
+      snapshot.source_status = item.sourceStatus || ''
+      snapshot.source_active = item.sourceActive === undefined ? null : Boolean(item.sourceActive)
+      snapshot.source_view_url = item.sourceViewUrl || ''
+      snapshot.source_frozen_at = item.sourceFrozenAt || null
+    }
+    return snapshot
+  })
+}
+
 export async function buildImageGenerationPayload(prompt, params, referenceImages, maskDraft = null) {
   const normalized = normalizeImageWorkbenchParams(params)
   const payloadReferences = (referenceImages || []).map((item, index) => ({
