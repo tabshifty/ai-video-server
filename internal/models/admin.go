@@ -260,6 +260,7 @@ type AdminImageFilter struct {
 	Keyword      string
 	Status       string
 	Active       *bool
+	StoredMIMEs  []string
 	ActorID      *uuid.UUID
 	CollectionID *uuid.UUID
 }

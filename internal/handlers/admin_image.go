@@ -175,6 +175,7 @@ func (a *API) AdminImages(c *gin.Context) {
 		bad(c, "active 参数只能是 1 或 0")
 		return
 	}
+	storedMIMEs := parseCSVStrings(c.Query("stored_mime"))
 
 	var actorID *uuid.UUID
 	if raw := strings.TrimSpace(c.Query("actor_id")); raw != "" {
@@ -202,6 +203,7 @@ func (a *API) AdminImages(c *gin.Context) {
 		Keyword:      c.Query("q"),
 		Status:       c.Query("status"),
 		Active:       active,
+		StoredMIMEs:  storedMIMEs,
 		ActorID:      actorID,
 		CollectionID: collectionID,
 	})
@@ -216,6 +218,24 @@ func (a *API) AdminImages(c *gin.Context) {
 		"page":        page,
 		"page_size":   pageSize,
 	})
+}
+
+func parseCSVStrings(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		value := strings.ToLower(strings.TrimSpace(part))
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func (a *API) AdminImageDetail(c *gin.Context) {

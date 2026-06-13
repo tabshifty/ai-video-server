@@ -200,6 +200,19 @@ func (r *VideoRepository) AdminListImages(ctx context.Context, f models.AdminIma
 	if f.Active != nil {
 		where = append(where, "i.active="+next(*f.Active))
 	}
+	if len(f.StoredMIMEs) > 0 {
+		mimeArgs := make([]string, 0, len(f.StoredMIMEs))
+		for _, mime := range f.StoredMIMEs {
+			normalized := strings.TrimSpace(strings.ToLower(mime))
+			if normalized == "" {
+				continue
+			}
+			mimeArgs = append(mimeArgs, next(normalized))
+		}
+		if len(mimeArgs) > 0 {
+			where = append(where, "LOWER(COALESCE(i.stored_mime,'')) IN ("+strings.Join(mimeArgs, ",")+")")
+		}
+	}
 	if f.ActorID != nil {
 		where = append(where, "EXISTS (SELECT 1 FROM image_actors ia WHERE ia.image_id=i.id AND ia.actor_id="+next(*f.ActorID)+")")
 	}

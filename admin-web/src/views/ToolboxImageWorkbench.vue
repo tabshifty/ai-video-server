@@ -47,6 +47,7 @@ const LIBRARY_REFERENCE_PREVIEW_PARAMS = {
   fit: 'cover',
   q: 78
 }
+const LIBRARY_REFERENCE_ALLOWED_MIMES = 'image/png,image/jpeg,image/webp'
 
 const router = useRouter()
 const fileInputRef = ref(null)
@@ -179,7 +180,8 @@ function buildLibraryImageParams() {
     page_size: libraryQuery.page_size,
     q: libraryQuery.q,
     status: 'ready',
-    active: 1
+    active: 1,
+    stored_mime: LIBRARY_REFERENCE_ALLOWED_MIMES
   }
   if (libraryQuery.collection_id) {
     params.collection_id = libraryQuery.collection_id

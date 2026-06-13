@@ -103,12 +103,12 @@ describe('admin image library apis', () => {
   })
 
   it('loads image assets, collections and view blobs for workbench references', async () => {
-    await getAdminImages({ q: '封面', status: 'ready', active: 1 })
+    await getAdminImages({ q: '封面', status: 'ready', active: 1, stored_mime: 'image/png,image/jpeg,image/webp' })
     await getAdminImageCollections({ active: 1 })
     await getAdminImageViewBlob('image-1', { w: 360, h: 270, fit: 'cover', q: 78 })
 
     expect(get).toHaveBeenCalledWith('/admin/images', {
-      params: { q: '封面', status: 'ready', active: 1 }
+      params: { q: '封面', status: 'ready', active: 1, stored_mime: 'image/png,image/jpeg,image/webp' }
     })
     expect(get).toHaveBeenCalledWith('/admin/image-collections', {
       params: { active: 1 }

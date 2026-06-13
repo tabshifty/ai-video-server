@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 18:38 +0800
+- 进度：完成图库资产参考图格式过滤收尾检查，准备提交。确认只纳入本轮后端过滤、工作台请求参数、API 单测和计划记录；用户已有 `admin-web/.env.development` 仍保持未纳入。
+- 影响文件：`internal/models/admin.go`、`internal/handlers/admin_image.go`、`internal/repository/image_repository.go`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/api/admin.spec.js`、`plan.md`
+- 验证：`rg -n $'\uFFFD' CONTEXT.md plan.md internal/models/admin.go internal/handlers/admin_image.go internal/repository/image_repository.go admin-web/src/views/ToolboxImageWorkbench.vue admin-web/src/api/admin.spec.js` 无命中；`git diff --check -- CONTEXT.md plan.md internal/models/admin.go internal/handlers/admin_image.go internal/repository/image_repository.go admin-web/src/views/ToolboxImageWorkbench.vue admin-web/src/api/admin.spec.js` 通过。
+
+## 2026-06-13 18:35 +0800
+- 进度：完成图库资产参考图格式过滤代码落地。后端 `/admin/images` 支持逗号分隔的 `stored_mime` 查询过滤，列表分页和总数直接按处理图 MIME 收口；图像生成工作台图库入口固定请求 `image/png,image/jpeg,image/webp`，与 `CONTEXT.md` 中 `admin 图库资产参考图可选范围` 保持一致。
+- 影响文件：`internal/models/admin.go`、`internal/handlers/admin_image.go`、`internal/repository/image_repository.go`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/api/admin.spec.js`、`plan.md`
+- 验证：`go test ./internal/...` 通过；`cd admin-web && npm run test -- admin.spec.js` 通过；`cd admin-web && npm run build` 通过，仅有既有 Vite chunk size warning。待执行乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-13 18:27 +0800
+- 进度：开始把图库资产参考图 `stored_mime` 可选范围落地到代码。方案采用后端 `/admin/images` 查询参数过滤，而不是前端分页后本地剔除；前端工作台图库请求传 `image/png,image/jpeg,image/webp`，后端列表总数和分页直接反映可选资产集合。
+- 影响文件：`internal/models/admin.go`、`internal/handlers/admin_image.go`、`internal/repository/image_repository.go`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/api/admin.spec.js`、`plan.md`
+- 验证：待执行 `go test ./internal/...`、`cd admin-web && npm run test -- admin.spec.js`、`cd admin-web && npm run build`、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-13 18:22 +0800
 - 进度：继续收敛图库资产参考图可选范围。已确认图库选图入口除 `status=ready`、`active=true` 外，还必须限制 `stored_mime` 为 `image/png`、`image/jpeg` 或 `image/webp`，避免 GIF/BMP/TIFF 等图片管理可存在但生图参考图不支持的资产进入工作台。`CONTEXT.md` 已收紧 `admin 图库资产参考图可选范围`。
 - 影响文件：`CONTEXT.md`、`plan.md`
