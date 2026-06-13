@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 18:04 +0800
+- 进度：完成历史输入快照展示与继续改稿恢复闭环。选中本地历史时会读取 `referenceSnapshots` 对应的本地 IndexedDB 冻结图片，展示参考图来源类型、图库来源标题与来源图片 ID；“继续改稿”恢复提示词、参数和本地冻结参考图，不重新读取图库资产。若历史参考图本地文件缺失，会显示缺失位并阻止直接恢复，避免把失效输入送往生成接口。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- imageWorkbench.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过，仅有 Vite chunk size warning；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src/views/ToolboxImageWorkbench.vue admin-web/src/views/imageWorkbench.helpers.js admin-web/src/views/imageWorkbench.helpers.spec.js` 无命中；`git diff --check -- CONTEXT.md plan.md admin-web/src/views/ToolboxImageWorkbench.vue admin-web/src/views/imageWorkbench.helpers.js admin-web/src/views/imageWorkbench.helpers.spec.js` 通过。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-13 18:00 +0800
+- 进度：继续收敛图库资产参考图冻结时读取的图片规格。已确认加入工作台时应读取原尺寸处理图，调用图片查看接口不带 `w` / `h` / `fit` / `q` 缩放参数，避免把低分辨率 UI 预览变体冻结为生图参考输入。`CONTEXT.md` 已新增 `admin 图库资产原尺寸冻结`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 与 `git diff --check -- CONTEXT.md plan.md`。保留用户已有 `admin-web/.env.development` 与当前 admin-web 实现改动不纳入本次文档确认。
+
+## 2026-06-13 17:59 +0800
+- 进度：继续实现工作台图库资产参考图闭环审计发现的缺口。当前已完成“从图库选择并冻结为参考图”，但历史详情还没有展示输入快照，也没有“继续改稿”把历史中的已冻结图库资产参考图恢复回工作台输入区。下一步补本地历史参考图快照恢复 helper、历史输入快照 UI 和继续改稿入口，确保 `library_asset` 历史恢复不重新读取图库资产。
+- 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- imageWorkbench.helpers.spec.js`、`cd admin-web && npm run build`、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-13 17:57 +0800
 - 进度：完成本轮收尾检查，准备提交工作台图库资产参考图功能。确认生成 payload 不泄漏 `source_image_id` 等本地来源字段，图库抽屉 object URL 在关闭和请求失效时释放，重复图库资产按来源图片 ID 跳过；用户已有 `admin-web/.env.development` 保留未提交，不纳入本次提交。
 - 影响文件：`admin-web/src/views/ToolboxImageWorkbench.vue`、`admin-web/src/views/imageWorkbench.helpers.js`、`admin-web/src/views/imageWorkbench.helpers.spec.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`

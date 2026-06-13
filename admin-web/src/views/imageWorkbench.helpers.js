@@ -247,6 +247,30 @@ export function buildReferenceImageSnapshots(referenceImages = []) {
   })
 }
 
+export function hydrateReferenceImageFromSnapshot(snapshot = {}, image = {}) {
+  const sourceKind = snapshot.source_kind || 'browser_input'
+  const item = {
+    id: snapshot.image_id || image.id || '',
+    file: null,
+    name: snapshot.name || image.name || 'reference-image',
+    mime: image.mime || snapshot.mime || 'image/png',
+    size: Number(image.size || 0),
+    dataUrl: image.dataUrl || '',
+    sourceKind,
+    sourceTaskId: snapshot.source_task_id || '',
+    sourceResultId: snapshot.source_result_id || ''
+  }
+  if (sourceKind === 'library_asset') {
+    item.sourceImageId = snapshot.source_image_id || ''
+    item.sourceTitle = snapshot.source_title || ''
+    item.sourceStatus = snapshot.source_status || ''
+    item.sourceActive = snapshot.source_active === null || snapshot.source_active === undefined ? undefined : Boolean(snapshot.source_active)
+    item.sourceViewUrl = snapshot.source_view_url || ''
+    item.sourceFrozenAt = snapshot.source_frozen_at || null
+  }
+  return item
+}
+
 export async function buildImageGenerationPayload(prompt, params, referenceImages, maskDraft = null) {
   const normalized = normalizeImageWorkbenchParams(params)
   const payloadReferences = (referenceImages || []).map((item, index) => ({

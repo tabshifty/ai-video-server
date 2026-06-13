@@ -26,6 +26,8 @@ import {
   dataUrlToFile,
   extensionForImageMime,
   formatWorkbenchFileSize,
+  hydrateReferenceImageFromSnapshot,
+  normalizeImageWorkbenchParams,
   readWorkbenchPreferences,
   validateWorkbenchMask,
   validateReferenceImageFiles,
@@ -67,6 +69,8 @@ const importingIds = ref(new Set())
 const tasks = ref([])
 const selectedTask = ref(null)
 const currentResults = ref([])
+const currentTaskReferences = ref([])
+const currentTaskReferenceError = ref('')
 const dropActive = ref(false)
 const libraryPickerVisible = ref(false)
 const libraryLoading = ref(false)
@@ -89,6 +93,7 @@ const selectedTaskError = computed(() => {
   if (selectedTask.value?.status !== 'error') return ''
   return selectedTask.value.error?.trim() || '未返回错误原因'
 })
+const canContinueSelectedTask = computed(() => Boolean(selectedTask.value && !currentTaskReferenceError.value))
 const maskEditorTarget = computed(() => references.value.find((item) => item.id === maskEditorTargetId.value) || null)
 const selectedMaskTarget = computed(() => references.value.find((item) => item.id === maskDraft.value?.targetImageId) || null)
 const hasMask = computed(() => Boolean(maskDraft.value?.maskDataUrl && selectedMaskTarget.value))
@@ -436,16 +441,50 @@ async function hydrateTasks(items) {
 
 async function selectTask(task) {
   selectedTask.value = task
-  currentResults.value = await Promise.all(
-    (task.outputImageIds || []).map(async (id, index) => {
-      const image = await getWorkbenchImage(id)
+  currentResults.value = []
+  currentTaskReferences.value = []
+  currentTaskReferenceError.value = ''
+  const [results, taskReferences] = await Promise.all([
+    Promise.all(
+      (task.outputImageIds || []).map(async (id, index) => {
+        const image = await getWorkbenchImage(id)
+        return {
+          id,
+          dataUrl: image?.dataUrl || '',
+          mime: image?.mime || task.results?.[index]?.mime || 'image/png',
+          width: image?.width || task.results?.[index]?.width || 0,
+          height: image?.height || task.results?.[index]?.height || 0,
+          revisedPrompt: task.results?.[index]?.revised_prompt || task.results?.[index]?.revisedPrompt || ''
+        }
+      })
+    ),
+    hydrateTaskReferenceSnapshots(task)
+  ])
+  if (selectedTask.value?.id !== task.id) return
+  currentResults.value = results
+  currentTaskReferences.value = taskReferences
+  currentTaskReferenceError.value = taskReferences.some((item) => item.missing)
+    ? '部分历史参考图的本地冻结文件已丢失，不能直接继续改稿'
+    : ''
+}
+
+async function hydrateTaskReferenceSnapshots(task) {
+  const snapshots = task?.referenceSnapshots?.length
+    ? [...task.referenceSnapshots].sort((a, b) => Number(a.slot_index || 0) - Number(b.slot_index || 0))
+    : (task?.referenceImageIds || []).map((id, index) => ({ image_id: id, slot_index: index, source_kind: 'browser_input' }))
+
+  return Promise.all(
+    snapshots.map(async (snapshot) => {
+      const image = snapshot.image_id ? await getWorkbenchImage(snapshot.image_id) : null
+      if (!image?.dataUrl) {
+        return {
+          ...hydrateReferenceImageFromSnapshot(snapshot, { id: snapshot.image_id || '' }),
+          missing: true
+        }
+      }
       return {
-        id,
-        dataUrl: image?.dataUrl || '',
-        mime: image?.mime || task.results?.[index]?.mime || 'image/png',
-        width: image?.width || task.results?.[index]?.width || 0,
-        height: image?.height || task.results?.[index]?.height || 0,
-        revisedPrompt: task.results?.[index]?.revised_prompt || task.results?.[index]?.revisedPrompt || ''
+        ...hydrateReferenceImageFromSnapshot(snapshot, image),
+        missing: false
       }
     })
   )
@@ -539,6 +578,24 @@ function clearReferences() {
   maskDraft.value = null
   maskEditorTargetId.value = ''
   maskEditorVisible.value = false
+}
+
+async function continueSelectedTaskDraft() {
+  if (!selectedTask.value) return
+  if (currentTaskReferenceError.value) {
+    ElMessage.warning(currentTaskReferenceError.value)
+    return
+  }
+  prompt.value = selectedTask.value.prompt || ''
+  Object.assign(params, normalizeImageWorkbenchParams(selectedTask.value.params || {}))
+  references.value = currentTaskReferences.value.map((item) => ({
+    ...item,
+    file: null
+  }))
+  maskDraft.value = null
+  maskEditorTargetId.value = ''
+  maskEditorVisible.value = false
+  ElMessage.success('已从历史恢复输入快照')
 }
 
 function isMaskTarget(id) {
@@ -826,7 +883,8 @@ function sourceKindLabel(item) {
 
 function referenceSourceSummary(item) {
   if (item?.sourceKind === 'library_asset') {
-    return `来源：${item.sourceTitle || item.sourceImageId || '图库资产'}`
+    const title = item.sourceTitle || '图库资产'
+    return item.sourceImageId ? `来源：${title} · ID ${item.sourceImageId}` : `来源：${title}`
   }
   if (item?.sourceKind === 'previous_result') {
     return '来源：前序生成结果'
@@ -968,8 +1026,39 @@ function formatLibraryItemMeta(item) {
           <SectionCard>
             <template #title>当前结果</template>
             <template #actions>
+              <el-button :disabled="!canContinueSelectedTask" @click="continueSelectedTaskDraft">继续改稿</el-button>
               <el-button :icon="Refresh" :loading="status.loading" @click="loadStatus">刷新配置</el-button>
             </template>
+
+            <div v-if="selectedTask" class="task-input-summary">
+              <div>
+                <strong>历史输入</strong>
+                <span>{{ selectedTask.params?.size || 'auto' }} · {{ selectedTask.params?.quality || 'auto' }} · {{ selectedTask.params?.output_format || 'png' }}</span>
+              </div>
+              <el-alert
+                v-if="currentTaskReferenceError"
+                type="warning"
+                :title="currentTaskReferenceError"
+                :closable="false"
+              />
+              <div v-if="currentTaskReferences.length" class="task-reference-strip">
+                <article
+                  v-for="item in currentTaskReferences"
+                  :key="item.id || item.name"
+                  class="task-reference-chip"
+                  :class="{ 'is-missing': item.missing }"
+                >
+                  <img v-if="!item.missing && item.dataUrl" :src="item.dataUrl" :alt="item.name" />
+                  <span v-else class="task-reference-chip__missing">缺失</span>
+                  <span class="task-reference-chip__copy">
+                    <strong>{{ item.name }}</strong>
+                    <small>{{ sourceKindLabel(item) }}</small>
+                    <small v-if="referenceSourceSummary(item)">{{ referenceSourceSummary(item) }}</small>
+                  </span>
+                </article>
+              </div>
+              <p v-else class="task-input-summary__empty">该历史没有参考图，可按原提示词继续文本生图。</p>
+            </div>
 
             <EmptyState
               v-if="selectedTaskError"
@@ -1354,6 +1443,91 @@ function formatLibraryItemMeta(item) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: var(--space-4);
+}
+
+.task-input-summary {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
+}
+
+.task-input-summary > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.task-input-summary span,
+.task-input-summary__empty {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.task-input-summary__empty {
+  margin: 0;
+}
+
+.task-reference-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-2);
+}
+
+.task-reference-chip {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.task-reference-chip.is-missing {
+  border-style: dashed;
+}
+
+.task-reference-chip img,
+.task-reference-chip__missing {
+  width: 3.5rem;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+}
+
+.task-reference-chip img {
+  object-fit: cover;
+}
+
+.task-reference-chip__missing {
+  display: grid;
+  place-items: center;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-surface-muted));
+  font-size: var(--text-caption);
+}
+
+.task-reference-chip__copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.task-reference-chip__copy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .result-card {

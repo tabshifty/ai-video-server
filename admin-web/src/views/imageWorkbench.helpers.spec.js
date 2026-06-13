@@ -4,6 +4,7 @@ import {
   buildImageGenerationPayload,
   buildReferenceImageSnapshots,
   createImageWorkbenchTask,
+  hydrateReferenceImageFromSnapshot,
   normalizeImageWorkbenchParams,
   validateReferenceImageFiles
 } from './imageWorkbench.helpers'
@@ -120,6 +121,47 @@ describe('image workbench helpers', () => {
         source_result_id: ''
       }
     ])
+  })
+
+  it('hydrates frozen library asset snapshots without refetching source assets', () => {
+    const reference = hydrateReferenceImageFromSnapshot(
+      {
+        image_id: 'local-copy',
+        name: 'frozen-title.png',
+        mime: 'image/png',
+        source_kind: 'library_asset',
+        source_image_id: 'asset-1',
+        source_title: '加入时标题',
+        source_status: 'ready',
+        source_active: true,
+        source_view_url: '/api/v1/admin/images/asset-1/view',
+        source_frozen_at: 1781343900000
+      },
+      {
+        id: 'local-copy',
+        dataUrl: 'data:image/png;base64,frozen',
+        mime: 'image/png',
+        size: 123
+      }
+    )
+
+    expect(reference).toEqual({
+      id: 'local-copy',
+      file: null,
+      name: 'frozen-title.png',
+      mime: 'image/png',
+      size: 123,
+      dataUrl: 'data:image/png;base64,frozen',
+      sourceKind: 'library_asset',
+      sourceTaskId: '',
+      sourceResultId: '',
+      sourceImageId: 'asset-1',
+      sourceTitle: '加入时标题',
+      sourceStatus: 'ready',
+      sourceActive: true,
+      sourceViewUrl: '/api/v1/admin/images/asset-1/view',
+      sourceFrozenAt: 1781343900000
+    })
   })
 
   it('builds mask payload against the original reference slot', async () => {
