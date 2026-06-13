@@ -44,6 +44,19 @@
 - `设备/HDR 能力探测先于 DV 放行分支`：如果后续要把当前的 DV 风险阻断升级成“有条件放行”，第一优先级是先补齐设备显示能力和实际播放链路能力探测，而不是先接专用系统播放器分支。没有能力探测前，任何 DV 放行分支都缺少可靠前置判断。
 - `设备/HDR 能力以显示能力与播放链路能力交集为准`：这里的“设备/HDR 能力”不是只看电视面板是否支持 Dolby Vision / HDR，也不是只看播放器库名义能力，而是以“当前显示能力”和“当前实际播放链路能力”的交集为准。只要其中任一侧不支持或无法确认安全输出，就不能把当前链路视为可安全放行。
 - `DV 能力探测首轮仅覆盖 Dolby Vision`：如果后续进入设备能力探测阶段，首轮范围只覆盖 Dolby Vision，不把 HDR10、HDR10+、HLG 一并纳入。这样可以让能力矩阵、测试样本和提示文案继续围绕当前最核心的 DV 风险闭环，而不是在首轮就扩成通用 HDR 兼容框架。
+- `DV 本地能力模块先于播放接入`：DV 继续开发的下一阶段先落 TV 端纯本地能力模块，只输出 Dolby Vision 支持状态（支持 / 不支持 / 未知）和原因；该模块首轮不接入播放放行、不切换播放器、不改变现有 [[播放兼容信息不完整提示]] 或阻断策略。这样先把能力读取和可测试边界做实，再决定是否进入 [[杜比视界专用系统播放链路]]。
+- `DV 本地能力模块首轮不外显`：DV 本地能力模块首轮只落代码和单测，不在播放器 UI 暴露能力结果，不写入服务端，不做本地持久化日志。能力结果的用户提示、日志展示或播放决策接入，应等到后续与播放链路能力合并设计时再做。
+- `DV 本地能力模块归属 TV feature`：DV 本地能力模块首轮归属 `android-tv-app` 的 TV feature 包，与现有播放兼容策略同域维护；不放进 `core/ui`、`core/player` 或跨端共享层。只有后续出现明确复用需求时，才重新讨论抽取边界。
+- `DV 本地能力模块纯单测覆盖`：DV 本地能力模块首轮测试应覆盖纯逻辑组合：包含 `DOLBY_VISION` 为支持、空 HDR 类型列表为不支持、只有 `HDR10/HLG` 为不支持、无 Display 为未知、无 HdrCapabilities 为未知、API 异常为未知、重复或乱序 HDR 类型会归一化；这些测试不需要 instrumentation。
+- `DV 本地能力模块仅看当前默认显示`：DV 本地能力模块首轮只读取当前默认显示侧的能力，不把多显示器或外接显示切换纳入第一阶段判断；它给出的只是当前播放落点是否具备 DV 安全播放前提，不是全局设备结论。
+- `DV 本地能力模块播放准备时评估`：DV 本地能力模块首轮只在播放准备时评估一次；如果用户触发重试，则显式重新评估。该模块不做后台轮询、不常驻监听显示状态变化，也不主动驱动播放状态切换。
+- `DV 显示能力不推断 profile`：DV 本地能力模块首轮只输出显示侧是否声明支持 Dolby Vision，不尝试推断具体 Dolby Vision profile 级支持。Android 显示能力信号只能作为粗粒度前置条件，不能单独证明某个 profile 5/7/8 文件一定可安全输出；profile 级判断后续应由播放链路能力和媒体 metadata 再补。
+- `DV 显示能力三态映射`：DV 本地能力模块读取当前默认显示的 HDR 能力时，明确包含 Android `HDR_TYPE_DOLBY_VISION` 才输出“支持”；明确拿到 HDR 类型列表但不包含 Dolby Vision 才输出“不支持”；拿不到 Display、拿不到 HdrCapabilities、API 异常或结果不可解释时输出“未知”。探测失败不能被折叠成“不支持”。
+- `DV 显示能力读取可注入`：TV 端实现 DV 本地能力模块时，应把 Android framework 读取封装在可注入的 `DisplayHdrCapabilityReader` 一类边界内；生产实现读取当前默认 Display 的 `HdrCapabilities.supportedHdrTypes`，单测只覆盖纯 Kotlin 三态映射逻辑，不依赖真实 Android Display。
+- `DV 默认显示读取契约`：`DisplayHdrCapabilityReader` 的生产实现应优先通过 `Context.getSystemService(DisplayManager::class.java)` 读取 `Display.DEFAULT_DISPLAY`，再取该 Display 的 `HdrCapabilities.supportedHdrTypes`；拿不到默认 Display 时返回未知原因 `no_display`。该读取不依赖 Activity 或 Compose window，避免播放器 UI 直接触碰 Android 显示 API。
+- `DV HDR 类型列表归一化`：`supportedHdrTypes` 进入结果对象前应做去重和顺序归一化，避免同一设备在不同 Android 版本上因列表顺序抖动而影响日志、测试或缓存比较；结果对象保留归一化后的列表作为摘要即可，不需要暴露原始顺序。
+- `DV 本地能力结果不退化为 Boolean`：DV 本地能力模块的结果对象至少包含状态（支持 / 不支持 / 未知）、原因码和归一化 HDR 类型名摘要；不能只返回 Boolean，也不保留 Android HDR 类型 int 原值作为长期诊断语义。首轮原因码固定为闭集 enum，应能区分 `dolby_vision_present`、`dolby_vision_missing`、`no_display`、`no_hdr_capabilities`、`api_error` 等诊断场景；新增原因必须改 enum 和测试，不允许自由字符串临时扩展。
+- `DV HDR 附加字段仅诊断`：`HdrCapabilities` 里的亮度字段、色域或其它 HDR 元数据，首轮只作为诊断摘要保留，不参与“支持 / 不支持 / 未知”的状态判定。首轮判定只看是否声明 `HDR_TYPE_DOLBY_VISION`，避免把没有验收样本的亮度阈值或色彩规则提前固化进能力模块。
 - `DV 能力未知不进入安全放行分支`：如果 Dolby Vision 设备能力或当前播放链路能力探测结果为未知，不能把这次播放视为“已确认可安全放行”的 DV 播放。对于已经被判定为 Dolby Vision 风险源的视频，未知结果也不允许退回 [[普通非 DV 播放链路]]；应继续停留在阻断/提示语义，而不是把它交给已知可能异色的链路兜底。
 - `DV 未知阻断不提供强行播放`：如果 Dolby Vision 风险源因为设备能力或播放链路能力结果未知而被阻断，首轮失败态只提供“返回”和“重试”这类非放行入口，不提供“仍然继续播放”“忽略风险播放”之类的旁路按钮。这样“未知不放行”既是策略约束，也是交互约束。
 - `DV 不支持阻断不提供强行播放`：如果 Dolby Vision 风险源的设备能力或播放链路能力被明确判定为不支持安全播放，首轮仍沿用阻断页语义，只把原因文案改为“当前设备不支持安全播放”一类解释；交互入口继续限制为“返回”和“重试”，不提供旁路播放。

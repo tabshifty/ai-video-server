@@ -2,6 +2,91 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-13 14:32 +0800
+- 进度：DV 本地能力模块本轮已完成并验证通过。最终纳入变更的文件仅包含 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapability.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapabilityTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；用户已有 `admin-web/.env.development` 未纳入本次提交。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapability.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapabilityTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.DolbyVisionDisplayCapabilityTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapability.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapabilityTest.kt android-tv-app/tv-app/build.gradle.kts` 无命中；`git diff --check -- CONTEXT.md plan.md android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapability.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapabilityTest.kt android-tv-app/tv-app/build.gradle.kts` 通过。
+
+## 2026-06-13 14:26 +0800
+- 进度：DV 本地能力模块已进入实现阶段。新增 `DolbyVisionDisplayCapability` 纯本地模块和对应单测，封装当前默认 Display 的 HDR capability 读取，并把 `supportedHdrTypes` 映射为支持 / 不支持 / 未知三态、闭集原因码和归一化 HDR 类型名摘要；首轮仍未接入播放决策、UI、服务端写入或本地持久化。TV 端版本号递增至 `0.1.86`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapability.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/DolbyVisionDisplayCapabilityTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：红灯 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.DolbyVisionDisplayCapabilityTest` 曾因 `DisplayHdrCapabilityReader` 未实现失败；实现后同一命令通过。待继续执行 TV 全量单测、assembleDebug、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 14:24 +0800
+- 进度：DV 本地能力模块 grill 收敛完成，准备转入实现。已确认即使首轮不外显，也属于 TV App 功能能力新增，必须按仓库规则递增 TV 端 `versionCode/versionName`。实现范围：TV feature 包内新增可注入显示能力 reader、三态结果对象、闭集原因码、HDR 类型名摘要归一化和纯单测；不接 UI、不写服务端、不持久化日志、不参与播放放行。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/*`、`CONTEXT.md`、`plan.md`
+- 验证：已执行 `rg -n $'\uFFFD' CONTEXT.md plan.md` 无命中、`git diff --check -- CONTEXT.md plan.md` 通过；实现后待跑 TV 定向单测、TV 全量 unit test、assembleDebug、乱码检查与 `git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 14:22 +0800
+- 进度：继续收敛 DV 本地能力模块的首轮测试范围。已确认单测至少覆盖：包含 `DOLBY_VISION` 为支持、空 HDR 类型列表为不支持、只有 `HDR10/HLG` 为不支持、无 Display 为未知、无 HdrCapabilities 为未知、API 异常为未知、重复或乱序 HDR 类型会归一化；这些测试使用纯 Kotlin fake，不需要 instrumentation。`CONTEXT.md` 已追加 `DV 本地能力模块纯单测覆盖`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 14:20 +0800
+- 进度：继续收敛 DV 本地能力模块的实现归属。已确认首轮放在 `android-tv-app` 的 TV feature 包内，与现有 `PlaybackCompatibilityPolicy` 同域维护；不放入 `core/ui`、`core/player` 或跨端共享层，除非后续出现明确复用需求。`CONTEXT.md` 已追加 `DV 本地能力模块归属 TV feature`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 14:18 +0800
+- 进度：继续收敛 DV 本地能力模块的首轮交付边界。已确认首轮只落代码和单测，不在播放器 UI 暴露能力结果，不写入服务端，也不做本地持久化日志；能力结果的用户提示、日志展示或播放决策接入，等后续与播放链路能力合并设计时再做。`CONTEXT.md` 已追加 `DV 本地能力模块首轮不外显`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 14:16 +0800
+- 进度：继续收敛 DV 本地能力模块的 HDR 类型摘要格式。已确认 `supportedHdrTypes` 诊断摘要只保留归一化后的 Android HDR 类型名列表，例如 `DOLBY_VISION`、`HDR10`、`HLG`，不保留 int 原值；其它 HDR 类型只作为诊断摘要出现，不参与首轮 DV 状态判定。`CONTEXT.md` 已同步收紧 `DV 本地能力结果不退化为 Boolean`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 14:14 +0800
+- 进度：继续收敛 DV 本地能力模块的 HDR 类型列表边界。已确认成功拿到 `supportedHdrTypes` 但列表为空时，属于明确能力结果，应判为 `不支持/dolby_vision_missing`，而不是 `未知`；同时已按推荐将 `supportedHdrTypes` 进入结果对象前去重和顺序归一化，保留归一化摘要，不暴露原始顺序。`CONTEXT.md` 已追加 `DV HDR 类型列表归一化`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 14:00 +0800
+- 进度：继续收敛 DV 本地能力模块的默认 Display 读取方式。已确认生产实现优先通过 `Context.getSystemService(DisplayManager::class.java)` 读取 `Display.DEFAULT_DISPLAY`，再取该 Display 的 `HdrCapabilities.supportedHdrTypes`；拿不到默认 Display 时返回未知原因 `no_display`，不依赖 Activity 或 Compose window。`CONTEXT.md` 已追加 `DV 默认显示读取契约`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 13:56 +0800
+- 进度：继续收敛 DV 本地能力模块的附加 HDR 字段边界。已确认 `HdrCapabilities` 里的亮度字段、色域或其它 HDR 元数据首轮只作为诊断摘要保留，不参与“支持 / 不支持 / 未知”的状态判定；首轮判定只看是否声明 `HDR_TYPE_DOLBY_VISION`。`CONTEXT.md` 已追加 `DV HDR 附加字段仅诊断`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 13:51 +0800
+- 进度：继续收敛 DV 本地能力模块的原因码稳定性。已确认首轮原因码固定为闭集 enum，新增原因必须改 enum 和测试，不允许自由字符串临时扩展；`CONTEXT.md` 已把该约束并入 `DV 本地能力结果不退化为 Boolean`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 13:47 +0800
+- 进度：继续收敛 DV 本地能力模块的结果结构。已确认结果对象至少包含状态（支持 / 不支持 / 未知）、原因码和原始 `supportedHdrTypes` 摘要，不能退化为 Boolean；首轮原因码需能区分 `dolby_vision_present`、`dolby_vision_missing`、`no_display`、`no_hdr_capabilities`、`api_error` 等诊断场景。`CONTEXT.md` 已追加 `DV 本地能力结果不退化为 Boolean`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 13:40 +0800
+- 进度：继续收敛 DV 本地能力模块的实现边界。已确认 Android framework 读取应封装在可注入的 `DisplayHdrCapabilityReader` 一类边界内；生产实现读取当前默认 Display 的 `HdrCapabilities.supportedHdrTypes`，单测只覆盖纯 Kotlin 三态映射逻辑，不依赖真实 Android Display。`CONTEXT.md` 已追加 `DV 显示能力读取可注入`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:58 +0800
+- 进度：继续收敛 DV 本地能力模块的显示能力三态映射。已确认当前默认显示的 HDR 类型明确包含 `HDR_TYPE_DOLBY_VISION` 才输出“支持”；明确拿到列表但不包含 Dolby Vision 才输出“不支持”；拿不到 Display、HdrCapabilities、API 异常或结果不可解释时输出“未知”，探测失败不能折叠成“不支持”。`CONTEXT.md` 已追加 `DV 显示能力三态映射`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:53 +0800
+- 进度：继续收敛 DV 本地能力模块的能力精度。已确认首轮只输出显示侧是否声明支持 Dolby Vision，不尝试推断具体 Dolby Vision profile 级支持；Android 显示能力信号只作为粗粒度前置条件，profile 级判断后续由播放链路能力和媒体 metadata 再补。`CONTEXT.md` 已追加 `DV 显示能力不推断 profile`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:51 +0800
+- 进度：继续收敛 DV 本地能力模块的评估时机。已确认首轮只在播放准备时评估一次，并由用户触发重试时显式重新评估；不做后台轮询、不常驻监听显示状态变化，也不主动驱动播放状态切换。`CONTEXT.md` 已追加 `DV 本地能力模块播放准备时评估`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
+## 2026-06-13 11:44 +0800
+- 进度：继续收敛 DV 本地能力模块的输入边界。已确认首轮只读取当前默认显示侧能力，不把多显示器或外接显示切换纳入第一阶段判断；它输出的是当前播放落点是否具备 DV 安全播放前提，而不是全局设备结论。`CONTEXT.md` 已追加 `DV 本地能力模块仅看当前默认显示`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行本轮 `rg -n $'\uFFFD' CONTEXT.md plan.md`、`git diff --check`。保留用户已有 `admin-web/.env.development` 不纳入提交。
+
 ## 2026-06-13 11:24 +0800
 - 进度：TV Dolby Vision 播放兼容策略实现完成并进入提交准备。已确认本轮只落地现有 `playback_compat` 决策、老数据普通放行、信息不完整阻断提示和重试入口；未实现设备/HDR 能力探测、专用系统播放器/Media3 分支或播放页补探测。提交范围将精确排除用户已有 `admin-web/.env.development`。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvStateFeedbackUsageTest.kt`、`docs/adr/0010-dolby-vision-tv-playback-compatibility.md`、`CONTEXT.md`、`plan.md`
