@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 02:13 +0800
+- 进度：完成两个 TV 长视频任务的现有代码收口标记。`tasks/2026-05-25-tv-long-form-focus-guarding/DONE.md` 记录原实现提交、恢复提交、当前主线基线、自动化验证与未重跑 R1~R10 人工手测脚本的边界；`tasks/2026-05-25-tv-long-form-track-preference-recovery/DONE.md` 同步记录原实现提交、恢复提交、当前主线基线、自动化验证与未重跑 A1~A7 人工手测脚本的边界。
+- 影响文件：`tasks/2026-05-25-tv-long-form-focus-guarding/DONE.md`、`tasks/2026-05-25-tv-long-form-track-preference-recovery/DONE.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug :tv-app:assembleDebugAndroidTest` 通过；静态核对 `TvResumePromptCard(` 只出现在定义和两个 `resumePromptSlot` 调用内，`addSlave(IMedia.Slave.Type.Subtitle` 同时覆盖长视频与电视剧播放入口，`LongFormVideoPlayer.kt` 的 `onSelectAudioTrack` 同时存在 `false` 自动回灌与 `true` 用户选择路径；待执行最终 `git diff --check` 与乱码检查后提交。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-14 02:10 +0800
+- 进度：开始按现有代码收口 `tasks/2026-05-25-tv-long-form-focus-guarding` 与 `tasks/2026-05-25-tv-long-form-track-preference-recovery` 两个 TV 长视频任务。当前 TV 端版本已推进到 `0.1.89`，本次不回填旧 review 中的 `0.1.69/0.1.70` 历史版本断言，只按现有代码执行自动化准入、补充 `DONE.md` 完成标记并提交任务收口文档。
+- 影响文件：`tasks/2026-05-25-tv-long-form-focus-guarding/DONE.md`、`tasks/2026-05-25-tv-long-form-track-preference-recovery/DONE.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug :tv-app:assembleDebugAndroidTest`、任务 review 静态检查、`git diff --check` 与乱码检查。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-14 01:45 +0800
 - 进度：继续收敛 TV 端 DV 专用链路的失败重试语义。确认 Media3 专用链路重试不应丢失当前播放快照，新的起播位置优先采用当前播放器已采集的进度，再回退到历史记录；这样可以在失败后保留现场进度，切集或显式从头播放才重置。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlaybackHistoryPolicy.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackHistoryPolicyTest.kt`、`CONTEXT.md`、`plan.md`
