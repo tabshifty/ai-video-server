@@ -304,6 +304,7 @@
 - `TV 参考图换代三批迁移`：TV App 视觉换代按三批推进：先改全局 token 与共享组件，再改内容页面，最后改播放器 UI 与连接/状态类功能页；每批独立验证和提交，避免一次性大范围换皮难以回滚。
 - `TV 参考图测试语义`：TV 视觉测试应跟随 [[TV 参考图视觉基线]] 重写，断言暖金焦点、暗玻璃、紧凑字号和可访问性护栏；旧蓝青焦点色、`tvFocusableGlow` 旧语义和 10-foot 字号地板不再作为准入断言。
 - `TV 参考图导航结构`：TV App 主导航采用参考图式左侧竖向 rail 承载一级入口；不引入顶部横向导航，避免与左侧 rail 形成重复焦点路径。
+- `TV 开屏页图片`：TV App 冷启动时展示在系统窗口预览层的品牌图片。它只覆盖 Compose 首帧前的启动空白，不是业务页面、不设置固定等待时长，也不改变连接、配对或首页路由。
 - `TV 参考图全局 token 第一批`：TV App 全局 `AppChrome` token 的当前基线是参考图暖金 `Accent = #E8B85B` / `AccentStrong = #EFC463`、暗玻璃 surface、8dp `SurfaceShape` / `ChipShape` 和 999dp `PillShape`。`TvFocusGlowColor` 保留旧 API 名称以减少调用点震荡，但语义和值已经改为 `AppChrome.Accent` 暖金，不再表示蓝青 glow。`AppDarkColors.onPrimary` / `onSecondary` 必须使用深色画布，避免暖金按钮上出现低对比白字。
 - `TV 参考图内容页第二批`：TV 首页目录、海报墙和长视频详情页已经纳入 [[TV 参考图视觉基线]] 的内容页批次：占位海报、hero fallback、续播横幅、标题条和详情页 scrim 应使用 `AppChrome` 暖金/暗玻璃 token 或同页 reference brush，不再保留旧紫蓝/冷蓝占位色；任何 `AppChrome.Accent` 金色背景上的图标和文字必须使用 `AppChrome.Canvas` 深色前景。该批次只覆盖内容页视觉，不改变播放器 UI、连接/配对、加载/错误/空态、播放内核、路由或遥控器焦点结构。
 - `TV 参考图播放器与功能页第三批`：播放器 UI、字幕/音轨选择器、返回确认、续播/连播提示卡、连接服务器页、配对页以及共享加载/错误/空态属于 [[TV 参考图视觉基线]] 的第三批覆盖范围；这些界面应使用 `AppChrome` 暖金/暗玻璃 token，不再直接写旧冷色半透明 surface 或 `Color.White` 前景。播放器第三批只改变颜色、前景、surface 和进度条视觉，不改变播放内核、遥控器按键路由、焦点层级、播放历史上报或连接/配对业务流程。

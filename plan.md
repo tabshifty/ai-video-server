@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 20:04 +0800
+- 进度：完成 TV App 开屏页图片接入。用户提供图片已作为 `drawable-nodpi/tv_splash_image.png` 引入，`Theme.VideoHome.Starting` 通过窗口背景展示开屏页，`TvMainActivity.onCreate` 在 `super.onCreate` 前切回 `Theme.VideoHome`，避免开屏背景影响后续 Compose 页面；TV 端版本提升到 `0.1.98 / 98`。`CONTEXT.md` 同步记录“TV 开屏页图片”只覆盖 Compose 首帧前空白，不新增固定等待页。本次只纳入 TV splash 相关资源/代码/测试、TV 版本号、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`android-tv-app/tv-app/src/main/AndroidManifest.xml`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvMainActivity.kt`、`android-tv-app/tv-app/src/main/res/values/themes.xml`、`android-tv-app/tv-app/src/main/res/drawable/tv_splash_background.xml`、`android-tv-app/tv-app/src/main/res/drawable-nodpi/tv_splash_image.png`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvSplashScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.tv.TvSplashScreenSpecTest --tests com.chee.videos.feature.tv.TvApkPackagingConfigTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check -- ...` 通过；乱码扫描无命中。
+
+## 2026-06-14 19:59 +0800
+- 进度：开始将用户提供图片设置为 TV App 开屏页图片。代码现状显示 TV App 只有空的 `Theme.VideoHome`，manifest 直接挂到 `TvMainActivity`，没有独立启动页主题或 splash 资源；本次计划用 Activity starting theme 的窗口背景展示图片，进入 `TvMainActivity` 后切回正常主题，不新增等待页、不改变登录/连接流程。图片源为 `/Users/cuiqi/Downloads/image-workbench-1 (1).png`，尺寸 1672x941，作为 `drawable-nodpi` 资源引入。TV 端版本需从 `0.1.97 / 97` 递增到 `0.1.98 / 98`。用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`android-tv-app/tv-app/src/main/AndroidManifest.xml`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvMainActivity.kt`、`android-tv-app/tv-app/src/main/res/values/themes.xml`、TV splash 资源、TV 测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 TV splash 源文测试、TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-14 18:43 +0800
 - 进度：完成 ED2K 链接生成器点击状态调整。未点击链接不再显示“未点击”或任何状态标签；点击链接后在本页会话内显示“已点击”，并用固定状态列降低标签出现时的文本跳动。`CONTEXT.md` 同步改回“点击后仅本页会话标记已点击”。本次只纳入 ED2K 工具页、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`

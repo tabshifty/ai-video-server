@@ -11,11 +11,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.chee.videos.tv.R
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class TvMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_VideoHome)
         super.onCreate(savedInstanceState)
         installMainLooperHoverExitGuard()
         enableEdgeToEdge(

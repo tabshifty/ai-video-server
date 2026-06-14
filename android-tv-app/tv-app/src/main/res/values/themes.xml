@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.VideoHome" parent="Theme.Material3.DayNight" />
+
+    <style name="Theme.VideoHome.Starting" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/tv_splash_background</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
 </resources>
