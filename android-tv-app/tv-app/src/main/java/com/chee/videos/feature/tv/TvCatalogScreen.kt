@@ -80,6 +80,28 @@ import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.tv.TvAccountMenuAction
 
 private val tvCatalogPosterFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
+private val TvCatalogHeroFallbackBrush = Brush.horizontalGradient(
+    colors = listOf(Color(0xFF20180E), AppChrome.CanvasRaised, AppChrome.Canvas),
+)
+private val TvCatalogHeroScrimBrush = Brush.horizontalGradient(
+    colors = listOf(
+        AppChrome.Canvas.copy(alpha = 0.93f),
+        AppChrome.CanvasRaised.copy(alpha = 0.78f),
+        AppChrome.Canvas.copy(alpha = 0.52f),
+    ),
+)
+private val TvCatalogWideFallbackBrush = Brush.horizontalGradient(
+    colors = listOf(AppChrome.SurfaceStrong, AppChrome.CanvasRaised, AppChrome.Canvas),
+)
+private val TvCatalogWideScrimBrush = Brush.horizontalGradient(
+    colors = listOf(AppChrome.CanvasRaised.copy(alpha = 0.88f), AppChrome.Canvas.copy(alpha = 0.94f)),
+)
+private val TvCatalogMoreCardBrush = Brush.verticalGradient(
+    colors = listOf(AppChrome.SurfaceStrong, AppChrome.CanvasRaised),
+)
+private val TvCatalogMoreCardScrimBrush = Brush.verticalGradient(
+    colors = listOf(Color.Transparent, AppChrome.Canvas.copy(alpha = 0.70f)),
+)
 
 internal object TvCatalogFocusLayoutSpec {
     const val shelfHorizontalPaddingDp: Float = 8f
@@ -422,7 +444,7 @@ private fun TvHomeSideMenu(
         modifier = Modifier
             .width(72.dp)
             .fillMaxSize()
-            .background(Color(0xE6080B12))
+            .background(AppChrome.Canvas.copy(alpha = 0.90f))
             .padding(horizontal = 8.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -454,6 +476,7 @@ private fun TvHomeSideMenuButton(
     onClick: () -> Unit,
 ) {
     val background = if (selected) AppChrome.Accent.copy(alpha = 0.92f) else AppChrome.Surface.copy(alpha = 0.72f)
+    val contentColor = if (selected) AppChrome.Canvas else AppChrome.TextPrimary
     Surface(
         color = background,
         shape = AppChrome.ChipShape,
@@ -467,7 +490,7 @@ private fun TvHomeSideMenuButton(
             if (item == TvHomeMenuItem.Adult) {
                 Text(
                     text = "18+",
-                    color = Color.White,
+                    color = contentColor,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                 )
@@ -475,7 +498,7 @@ private fun TvHomeSideMenuButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = item.label,
-                    tint = Color.White,
+                    tint = contentColor,
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -638,7 +661,7 @@ private fun TvSeekStepSettingRow(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             text = TvPlaybackSeekStepSetting.labelFor(seconds),
-                            color = Color.White,
+                            color = if (selected) AppChrome.Canvas else AppChrome.TextPrimary,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                         )
@@ -885,9 +908,7 @@ private fun TvFeaturedHero(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF211527), Color(0xFF0B101A)),
-                            ),
+                            TvCatalogHeroFallbackBrush,
                         ),
                 )
             }
@@ -895,9 +916,7 @@ private fun TvFeaturedHero(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(Color(0xE80B0F17), Color(0xC4111520), Color(0xAA111827)),
-                        ),
+                        TvCatalogHeroScrimBrush,
                     ),
             )
             Row(
@@ -924,7 +943,7 @@ private fun TvFeaturedHero(
                     )
                     Text(
                         text = data.title,
-                        color = Color.White,
+                        color = AppChrome.TextPrimary,
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
@@ -993,7 +1012,7 @@ private fun TvFeaturedPoster(
         Icon(
             imageVector = Icons.Filled.Tv,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.84f),
+            tint = AppChrome.TextMuted,
             modifier = Modifier.size(46.dp),
         )
     }
@@ -1018,8 +1037,8 @@ private fun TvHeroActionButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = Color.White)
-            Text(text = text, color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Icon(icon, contentDescription = null, tint = AppChrome.Canvas)
+            Text(text = text, color = AppChrome.Canvas, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -1030,7 +1049,7 @@ private fun TvHeroSecondaryActionButton(
     onClick: () -> Unit,
 ) {
     Surface(
-        color = Color(0x33070B13),
+        color = AppChrome.Surface.copy(alpha = 0.82f),
         shape = AppChrome.PillShape,
         modifier = Modifier
             .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.05f)
@@ -1076,9 +1095,7 @@ private fun TvContinueWatchingBanner(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF1A2031), Color(0xFF111827)),
-                            ),
+                            TvCatalogWideFallbackBrush,
                         ),
                 )
             }
@@ -1086,9 +1103,7 @@ private fun TvContinueWatchingBanner(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(Color(0xE61A2031), Color(0xF0111827)),
-                        ),
+                        TvCatalogWideScrimBrush,
                     ),
             )
             Column(
@@ -1137,10 +1152,10 @@ private fun TvContinueWatchingBanner(
                             Icon(
                                 imageVector = Icons.Filled.PlayArrow,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = AppChrome.Canvas,
                                 modifier = Modifier.size(14.dp),
                             )
-                            Text("继续播放", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                            Text("继续播放", color = AppChrome.Canvas, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                     Text(
@@ -1329,18 +1344,14 @@ private fun TvPosterMoreCard(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color(0xFF23314A), Color(0xFF0B0F18)),
-                    ),
+                    TvCatalogMoreCardBrush,
                 ),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color(0x00000000), Color(0x7A0A0F16)),
-                        ),
+                        TvCatalogMoreCardScrimBrush,
                     ),
             )
             Column(
@@ -1353,12 +1364,12 @@ private fun TvPosterMoreCard(
                 Icon(
                     imageVector = Icons.Filled.Tv,
                     contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.9f),
+                    tint = AppChrome.TextPrimary,
                     modifier = Modifier.size(38.dp),
                 )
                 Text(
                     text = label,
-                    color = Color.White,
+                    color = AppChrome.TextPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -1458,7 +1469,7 @@ private fun TvPosterArtwork(
         Icon(
             imageVector = Icons.Filled.Tv,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.82f),
+            tint = AppChrome.TextMuted,
             modifier = Modifier.size(iconSize),
         )
     }
@@ -1466,11 +1477,11 @@ private fun TvPosterArtwork(
 
 private fun tvPosterBrush(seed: Int): Brush {
     return when (seed % 5) {
-        0 -> Brush.verticalGradient(listOf(Color(0xFF2D1A48), Color(0xFF0B1220)))
-        1 -> Brush.verticalGradient(listOf(Color(0xFF3C1D2E), Color(0xFF111827)))
-        2 -> Brush.verticalGradient(listOf(Color(0xFF1F3A56), Color(0xFF111827)))
-        3 -> Brush.verticalGradient(listOf(Color(0xFF3D3420), Color(0xFF121826)))
-        else -> Brush.verticalGradient(listOf(Color(0xFF1C3D36), Color(0xFF101820)))
+        0 -> Brush.verticalGradient(listOf(Color(0xFF3A2D1A), AppChrome.CanvasRaised))
+        1 -> Brush.verticalGradient(listOf(Color(0xFF352411), AppChrome.Canvas))
+        2 -> Brush.verticalGradient(listOf(Color(0xFF30291E), AppChrome.CanvasRaised))
+        3 -> Brush.verticalGradient(listOf(Color(0xFF3D3420), AppChrome.Canvas))
+        else -> Brush.verticalGradient(listOf(Color(0xFF2B241A), AppChrome.CanvasRaised))
     }
 }
 

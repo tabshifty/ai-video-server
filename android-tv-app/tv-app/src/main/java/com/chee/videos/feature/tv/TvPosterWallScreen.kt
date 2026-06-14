@@ -63,7 +63,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 private val tvPosterWallFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
 private val TvPosterWallCardShape = AppChrome.SurfaceShape
-private val TvPosterWallTitleBackground = Color(0xE80A0E15)
+private val TvPosterWallTitleBackground = AppChrome.Surface.copy(alpha = 0.90f)
+private val TvPosterWallPlaceholderBrush = Brush.verticalGradient(
+    colors = listOf(AppChrome.SurfaceStrong, AppChrome.Canvas),
+)
 
 internal object TvPosterWallFocusLayoutSpec {
     const val gridHorizontalPaddingDp: Float = 24f
@@ -335,11 +338,7 @@ private fun TvPosterWallCard(
                             Modifier
                         },
                     )
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color(0xFF20142D), Color(0xFF0C1018)),
-                        ),
-                    ),
+                    .background(TvPosterWallPlaceholderBrush),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!cardContent.showPosterPlaceholder) {
@@ -379,7 +378,7 @@ private fun TvPosterWallCard(
             ) {
                 Text(
                     text = cardContent.title,
-                    color = Color.White,
+                    color = AppChrome.TextPrimary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,

@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 11:31 +0800
+- 进度：完成 TV 参考图视觉换代第二批内容页验证，准备提交。本次只纳入 TV 首页目录、海报墙、长视频详情页、内容页参考图风格测试、TV 版本号、`CONTEXT.md` 长期约定和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`CONTEXT.md`、`plan.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvContentReferenceStyleSpecTest.kt`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvContentReferenceStyleSpecTest --tests com.chee.videos.feature.tv.TvCatalogFocusLayoutSpecTest --tests com.chee.videos.feature.tv.TvPosterWallFocusLayoutSpecTest --tests com.chee.videos.feature.tv.TvLongFormDetailActionSpecTest --tests com.chee.videos.feature.tv.TvLongFormDetailGlassPanelSpecTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；乱码检查无命中。
+
+## 2026-06-14 11:29 +0800
+- 进度：开始落地 TV 参考图视觉换代第二批内容页。范围限定为 TV 首页目录、海报墙、长视频详情页，以及对电视剧详情页既有参考图实现做回归核对；本批只替换内容页旧冷色/紫蓝占位、金色按钮内容色和暗玻璃背景，不改变播放器、连接/配对、加载/错误/空态行为，也不改路由、播放内核或遥控器焦点结构。用户已有 `admin-web/.env.development` 保持未提交且不纳入本轮。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt`、相关 TV 内容页测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：先补内容页参考图风格源文测试，再执行定向 TV 单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。
+
+## 2026-06-14 11:29 +0800
+- 进度：完成第二批内容页参考图视觉替换。TV 首页目录、海报墙和长视频详情页移除旧紫蓝/冷蓝占位色；金色按钮、左侧 rail 选中项和续播 chip 改用 `AppChrome.Canvas` 深色前景；内容页占位、scrim、标题条和详情页返回/次操作统一走暖金暗玻璃 token 或本页 reference brush。新增 `TvContentReferenceStyleSpecTest` 锁住内容页不再回退旧冷色与白字金底。TV 端版本提升到 `0.1.95`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvContentReferenceStyleSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvContentReferenceStyleSpecTest` 通过；待执行内容页定向测试、TV 全量单测、assemble、`git diff --check` 与乱码检查。
+
 ## 2026-06-14 11:28 +0800
 - 进度：补跑 TV 全量单测时发现 `TvSeriesPlayerViewModelTest` 里仍保留 source DV / output 非 DV 阻断的旧断言；按现有 `DV→SDR 统一兼容路线` 和 `TvPlaybackRoutePolicyTest` 语义，改为期望构建普通 VLC 播放源。业务代码未改，仅修正过期测试断言。
 - 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`plan.md`

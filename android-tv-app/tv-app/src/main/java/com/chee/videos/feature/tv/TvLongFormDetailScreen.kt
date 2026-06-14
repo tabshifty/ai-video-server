@@ -32,7 +32,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +49,19 @@ import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.feature.detail.DetailViewModel
+
+private val TvLongFormBackdropScrimBrush = Brush.verticalGradient(
+    colors = listOf(
+        AppChrome.Canvas.copy(alpha = 0.40f),
+        AppChrome.Canvas.copy(alpha = 0.72f),
+        AppChrome.Canvas.copy(alpha = 0.92f),
+    ),
+)
+private val TvLongFormBackdropFallbackBrush = Brush.horizontalGradient(
+    colors = listOf(AppChrome.SurfaceStrong, AppChrome.Canvas),
+)
+private val TvLongFormActorFallbackColor = AppChrome.SurfaceStrong
+private val TvLongFormSecondaryActionColor = AppChrome.Surface.copy(alpha = 0.78f)
 
 @Composable
 fun TvLongFormDetailScreen(
@@ -115,15 +127,7 @@ fun TvLongFormDetailScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0x6610151F),
-                                    Color(0x3310151F),
-                                    Color(0xDD070A10),
-                                ),
-                            ),
-                    ),
+                        .background(TvLongFormBackdropScrimBrush),
                 )
 
                 TvIconActionButton(
@@ -136,8 +140,8 @@ fun TvLongFormDetailScreen(
                         .padding(start = 28.dp, top = 28.dp),
                     size = 52.dp,
                     iconSize = 24.dp,
-                    containerColor = Color(0x66080B11),
-                    contentColor = Color.White,
+                    containerColor = AppChrome.Surface.copy(alpha = 0.78f),
+                    contentColor = AppChrome.TextPrimary,
                     focusedScale = 1.08f,
                 )
 
@@ -223,7 +227,7 @@ private fun TvLongFormDetailBackground(hero: TvLongFormDetailHeroUiModel) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xAA05070C)),
+                        .background(AppChrome.Canvas.copy(alpha = 0.66f)),
                 )
             }
         }
@@ -232,11 +236,7 @@ private fun TvLongFormDetailBackground(hero: TvLongFormDetailHeroUiModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.horizontalGradient(
-                    colors = listOf(Color(0xFF23131F), Color(0xFF090C12)),
-                ),
-            ),
+            .background(TvLongFormBackdropFallbackBrush),
     )
 }
 
@@ -268,7 +268,7 @@ private fun TvLongFormActorAvatar(actor: TvLongFormDetailActorUiModel) {
             modifier = Modifier
                 .size(58.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF253044)),
+                .background(TvLongFormActorFallbackColor),
             contentAlignment = Alignment.Center,
         ) {
             if (actor.hasAvatar) {
@@ -312,15 +312,16 @@ private fun TvDetailPrimaryActionButton(
             .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.06f)
             .clickable(enabled = enabled, onClick = onClick),
     ) {
+        val primaryContentColor = if (enabled) AppChrome.Canvas else AppChrome.TextMuted
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White)
+            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = primaryContentColor)
             Text(
                 text = text,
-                color = Color.White,
+                color = primaryContentColor,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -334,7 +335,7 @@ private fun TvDetailSecondaryActionButton(
     onClick: () -> Unit,
 ) {
     Surface(
-        color = Color(0x33090C13),
+        color = TvLongFormSecondaryActionColor,
         shape = AppChrome.PillShape,
         modifier = Modifier
             .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.05f)
