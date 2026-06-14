@@ -24,6 +24,23 @@ class TvSeriesDetailActionSpecTest {
         assertTrue("电视剧详情页播放、季选择和集选择必须保留遥控焦点状态", source.contains("onFocusChanged"))
         assertTrue("电视剧详情页参考图焦点应使用暖金色，而不是旧版青蓝 glow", source.contains("ReferenceGold"))
         assertFalse("电视剧详情页参考图还原不应继续套用旧版共享青蓝焦点 glow", source.contains(".tvFocusableGlow("))
+        assertFalse("电视剧详情页右侧剧集卡片不应把 selected 和 focused 叠加成高亮", source.contains("selected || focused"))
+        assertTrue("电视剧详情页右侧剧集卡片应以聚焦态而不是选中态决定金色边框", source.contains("val highlighted = focused"))
+        assertTrue("电视剧详情页主播放按钮应在聚焦时才显示金色背景", source.contains("focused && enabled -> Color(0xFFEFC463)"))
+    }
+
+    @Test
+    fun `series detail reference gold is focus only`() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt")
+        assertTrue("电视剧详情页必须存在", sourcePath.exists())
+
+        val source = sourcePath.readText()
+        assertFalse("右侧剧集卡片金色高亮只能跟随焦点，不能把 selected 当作高亮", source.contains("selected || focused"))
+        assertFalse("主播放按钮不能在可播放但未聚焦时就显示金色背景", source.contains("color = if (enabled) Color(0xFFEFC463)"))
+        assertFalse("右侧剧集面板调用点不应再传入已废弃的选集视觉参数", source.contains("selectedEpisodeNumber = uiState.selectedEpisodeNumber,"))
+        assertTrue("右侧剧集卡片视觉高亮必须直接由 focused 派生", source.contains("val highlighted = focused"))
+        assertTrue("主播放按钮聚焦时才显示参考图金色背景", source.contains("focused && enabled -> Color(0xFFEFC463)"))
+        assertTrue("主播放按钮未聚焦时应保持暗色 idle 背景", source.contains("enabled -> TvSeriesDetailTokens.PrimaryActionIdle"))
     }
 
     @Test

@@ -75,6 +75,8 @@ private object TvSeriesDetailTokens {
     val ReferenceGold = Color(0xFFE8B85B)
     val ReferenceGlass = Color(0x7810161F)
     val ReferenceGlassFocused = Color(0x98241C11)
+    val PrimaryActionIdle = Color(0x31141820)
+    val PrimaryActionDisabled = Color(0xFF2A2F36)
 }
 
 @Composable
@@ -187,7 +189,6 @@ fun TvSeriesDetailScreen(
                 episodes = episodes,
                 baseUrl = uiState.baseUrl,
                 selectedSeasonNumber = uiState.selectedSeasonNumber,
-                selectedEpisodeNumber = uiState.selectedEpisodeNumber,
                 modifier = Modifier
                     .width(TvSeriesDetailTokens.EpisodePaneWidthDp.dp)
                     .fillMaxHeight(),
@@ -473,12 +474,23 @@ private fun TvSeriesPrimaryActionButton(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val containerColor = when {
+        focused && enabled -> Color(0xFFEFC463)
+        enabled -> TvSeriesDetailTokens.PrimaryActionIdle
+        else -> TvSeriesDetailTokens.PrimaryActionDisabled
+    }
+    val contentColor = if (focused && enabled) Color(0xFF070A0D) else Color.White.copy(alpha = 0.92f)
     Surface(
-        color = if (enabled) Color(0xFFEFC463) else Color(0xFF2A2F36),
+        color = containerColor,
         shape = TvSeriesDetailTokens.PrimaryActionShape,
         border = BorderStroke(
-            width = if (focused) 2.dp else 0.dp,
-            color = if (focused) Color.White.copy(alpha = 0.86f) else Color.Transparent,
+            width = if (focused) 2.dp else 1.dp,
+            color = when {
+                focused && enabled -> Color.White.copy(alpha = 0.86f)
+                focused -> Color.White.copy(alpha = 0.36f)
+                enabled -> Color.White.copy(alpha = 0.16f)
+                else -> Color.Transparent
+            },
         ),
         shadowElevation = if (focused && enabled) 18.dp else if (enabled) 8.dp else 0.dp,
         modifier = modifier
@@ -510,7 +522,7 @@ private fun TvSeriesPrimaryActionButton(
             }
             Text(
                 text = text,
-                color = if (enabled) Color(0xFF070A0D) else Color(0xFFBAC2CE),
+                color = if (enabled) contentColor else Color(0xFFBAC2CE),
                 fontSize = 13.sp,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight.Black,
@@ -628,7 +640,6 @@ private fun TvSeriesEpisodePane(
     episodes: List<TvEpisodeUiModel>,
     baseUrl: String,
     selectedSeasonNumber: Int,
-    selectedEpisodeNumber: Int,
     modifier: Modifier = Modifier,
     onSelectSeason: (Int) -> Unit,
     onPlayEpisode: (TvEpisodeUiModel) -> Unit,
@@ -672,7 +683,6 @@ private fun TvSeriesEpisodePane(
                 TvSeriesEpisodeCard(
                     episode = episode,
                     baseUrl = baseUrl,
-                    selected = episode.number == selectedEpisodeNumber,
                     onClick = { onPlayEpisode(episode) },
                 )
             }
@@ -723,14 +733,13 @@ private fun TvSeriesSeasonSelector(
 private fun TvSeriesEpisodeCard(
     episode: TvEpisodeUiModel,
     baseUrl: String,
-    selected: Boolean,
     onClick: () -> Unit,
 ) {
     val stillUrl = remember(baseUrl, episode.stillUrl) {
         resolveTvResourceUrl(baseUrl, episode.stillUrl)
     }
     var focused by remember { mutableStateOf(false) }
-    val highlighted = selected || focused
+    val highlighted = focused
     Surface(
         color = if (highlighted) TvSeriesDetailTokens.ReferenceGlassFocused else TvSeriesDetailTokens.ReferenceGlass,
         shape = TvSeriesDetailTokens.EpisodeCardShape,
@@ -751,7 +760,6 @@ private fun TvSeriesEpisodeCard(
             TvSeriesEpisodeStill(
                 episode = episode,
                 stillUrl = stillUrl,
-                selected = selected,
             )
             Column(
                 modifier = Modifier
@@ -770,7 +778,7 @@ private fun TvSeriesEpisodeCard(
                 )
                 Text(
                     text = episode.durationLabel,
-                    color = if (selected) Color(0xFFFFE2A0) else Color(0xBBC7CFDA),
+                    color = if (highlighted) Color(0xFFFFE2A0) else Color(0xBBC7CFDA),
                     fontSize = 12.sp,
                     lineHeight = 15.sp,
                     maxLines = 1,
@@ -794,7 +802,7 @@ private fun TvSeriesEpisodeCard(
                         if (highlighted && episode.playable) {
                             TvSeriesDetailTokens.ReferenceGold
                         } else if (episode.playable) {
-                            Color(0x26E9BE62)
+                            Color(0x25272E38)
                         } else {
                             Color(0x1FFFFFFF)
                         },
@@ -805,8 +813,8 @@ private fun TvSeriesEpisodeCard(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = null,
                     tint = when {
-                        selected && episode.playable -> Color(0xFF080A0D)
-                        episode.playable -> TvSeriesDetailTokens.ReferenceGold
+                        highlighted && episode.playable -> Color(0xFF080A0D)
+                        episode.playable -> Color.White.copy(alpha = 0.56f)
                         else -> Color(0x80FFFFFF)
                     },
                     modifier = Modifier.size(21.dp),
@@ -820,7 +828,6 @@ private fun TvSeriesEpisodeCard(
 private fun TvSeriesEpisodeStill(
     episode: TvEpisodeUiModel,
     stillUrl: String?,
-    selected: Boolean,
 ) {
     Box(
         modifier = Modifier
@@ -849,7 +856,7 @@ private fun TvSeriesEpisodeStill(
         if (stillUrl.isNullOrBlank()) {
             Text(
                 text = "第 ${episode.number} 集",
-                color = Color.White.copy(alpha = if (selected) 0.92f else 0.72f),
+                color = Color.White.copy(alpha = 0.72f),
                 fontSize = 10.sp,
                 lineHeight = 12.sp,
                 fontWeight = FontWeight.SemiBold,

@@ -2,6 +2,31 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 09:20 +0800
+- 进度：完成 TV 电视剧详情页焦点态收尾并准备提交。本次只纳入电视剧详情页 UI、源文回归测试、TV 版本号、`CONTEXT.md` 术语和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保持未提交。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt android-tv-app/tv-app/build.gradle.kts` 无命中。
+
+## 2026-06-14 09:18 +0800
+- 进度：继续收紧电视剧详情页焦点语言。右侧剧集卡片的未聚焦播放圆钮从偏绿底调整为中性深灰底，图标降低到更接近参考图的灰白态；聚焦时仍保持金色圆钮与深色图标。其余“焦点与选中分离”的规则不变。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`plan.md`
+- 验证：待重新执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。
+
+## 2026-06-14 09:06 +0800
+- 进度：开始收口 TV 电视剧详情页参考图焦点态。按用户确认，右侧剧集卡片和主播放按钮的金色边框/金色背景只在遥控器聚焦时出现；当前分集离焦后不保留选中视觉。TV 端版本需同步递增。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：先补焦点态源文回归测试，再执行定向 TV 单测、必要构建、`git diff --check` 与乱码检查。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-14 09:14 +0800
+- 进度：电视剧详情页焦点态改造已完成到代码与文档层。右侧剧集卡片取消 `selected` 视觉高亮，只在当前焦点时显示暖金边框与高亮播放圆钮；主播放按钮未聚焦时回落为暗色 idle 背景，聚焦时才切换到金色。同步收口 TV 版本号到 `0.1.93`，并在 `CONTEXT.md` 增加“焦点与选中分离”术语。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。
+
+## 2026-06-14 09:06 +0800
+- 进度：开始修正 TV 电视剧详情页右侧剧集卡片与主播放按钮的焦点态，按参考图收口为“只在真正聚焦时显示金色边框 / 金色背景”，未聚焦时不保留选中态高亮。计划同步补源文测试、更新 TV 版本号、追加 `CONTEXT.md` 术语并执行 TV 构建验证。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行电视剧详情页源文测试、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。
+
 ## 2026-06-14 08:51 +0800
 - 进度：按用户确认删除旧 DV 数据后的策略，收口 TV 端对 source DV / output 非 DV 的阻断路线。后端继续保留 DV→SDR 可信兼容输出与 metadata 标记，但 TV 端现在只关心 output 是否仍为 Dolby Vision：只要当前实际 output 非 Dolby Vision，就走普通 LibVLC 链路；output 仍为 Dolby Vision 时继续走原专用链路与显示能力门控。TV 端版本提升到 `0.1.92`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
