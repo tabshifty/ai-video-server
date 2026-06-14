@@ -30,13 +30,15 @@ describe('toolbox pages', () => {
     expect(ed2kTool).not.toMatch(/<Layout[>\s]/)
   })
 
-  it('does not track or display clicked state in the ED2K generated links', () => {
-    expect(ed2kTool).not.toContain('ed2kClickedLinks')
-    expect(ed2kTool).not.toContain('markEd2kLinkClicked')
-    expect(ed2kTool).not.toContain('isEd2kLinkClicked')
-    expect(ed2kTool).not.toContain('is-clicked')
-    expect(ed2kTool).not.toContain('已点击')
+  it('only displays clicked state after an ED2K link is clicked', () => {
+    expect(ed2kTool).toContain('ed2kClickedLinks')
+    expect(ed2kTool).toContain('markEd2kLinkClicked')
+    expect(ed2kTool).toContain('isEd2kLinkClicked')
+    expect(ed2kTool).toContain('@click="markEd2kLinkClicked(link)"')
+    expect(ed2kTool).toContain('v-if="isEd2kLinkClicked(link)"')
+    expect(ed2kTool).toContain('已点击')
     expect(ed2kTool).not.toContain('未点击')
+    expect(ed2kTool).toContain('ed2k-link__status')
   })
 
   it('registers the ED2K tool page as an authenticated route without shell header metadata', () => {

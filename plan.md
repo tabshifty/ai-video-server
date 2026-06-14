@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 18:43 +0800
+- 进度：完成 ED2K 链接生成器点击状态调整。未点击链接不再显示“未点击”或任何状态标签；点击链接后在本页会话内显示“已点击”，并用固定状态列降低标签出现时的文本跳动。`CONTEXT.md` 同步改回“点击后仅本页会话标记已点击”。本次只纳入 ED2K 工具页、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/toolboxPage.spec.js src/views/toolbox.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check -- CONTEXT.md plan.md admin-web/src/views/ToolboxEd2k.vue admin-web/src/views/toolboxPage.spec.js` 通过；乱码扫描无命中。
+
+## 2026-06-14 18:42 +0800
+- 进度：开始按用户补充要求调整 ED2K 链接生成器点击状态。上一轮把点击状态完全移除，与“点击后显示已点击状态”的新语义冲突；本次收口为未点击时不显示状态标签，点击后稳定显示“已点击”，并避免标签出现导致链接文本跳动。用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行管理端定向 vitest、`npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-14 18:24 +0800
 - 进度：完成管理端 ED2K 链接生成器点击状态移除。页面不再维护 `ed2kClickedLinks`，链接点击后不会切换“已点击/未点击”标签或灰化样式；`CONTEXT.md` 同步收口为“不追踪或展示链接点击状态”。本次只纳入 ED2K 工具页、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`

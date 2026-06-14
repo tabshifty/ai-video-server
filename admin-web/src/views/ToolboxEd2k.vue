@@ -9,14 +9,24 @@ import { parseEd2kLinks } from './toolbox.helpers'
 
 const router = useRouter()
 const ed2kInput = ref('')
+const ed2kClickedLinks = ref(new Set())
 
 const ed2kParseResult = computed(() => parseEd2kLinks(ed2kInput.value))
 const ed2kLinks = computed(() => ed2kParseResult.value.links)
 const ed2kInvalidCount = computed(() => ed2kParseResult.value.invalidCount)
 const ed2kHasInput = computed(() => ed2kInput.value.trim() !== '')
 
+function isEd2kLinkClicked(link) {
+  return ed2kClickedLinks.value.has(link.href)
+}
+
+function markEd2kLinkClicked(link) {
+  ed2kClickedLinks.value = new Set([...ed2kClickedLinks.value, link.href])
+}
+
 function clearEd2kInput() {
   ed2kInput.value = ''
+  ed2kClickedLinks.value = new Set()
 }
 
 function returnToToolbox() {
@@ -66,9 +76,13 @@ function returnToToolbox() {
               :key="link.id"
               class="ed2k-link"
               :href="link.href"
+              @click="markEd2kLinkClicked(link)"
             >
               <span class="ed2k-link__line tabular-num">{{ link.lineNumber }}</span>
               <span class="ed2k-link__text">{{ link.label }}</span>
+              <span class="ed2k-link__status">
+                <el-tag v-if="isEd2kLinkClicked(link)" size="small" type="info" effect="plain">已点击</el-tag>
+              </span>
             </a>
           </div>
         </div>
@@ -123,7 +137,7 @@ function returnToToolbox() {
 
 .ed2k-link {
   display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr);
+  grid-template-columns: 3rem minmax(0, 1fr) 4.5rem;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
@@ -156,6 +170,12 @@ function returnToToolbox() {
   line-height: var(--leading-small);
 }
 
+.ed2k-link__status {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 4.5rem;
+}
+
 @media (max-width: 48rem) {
   .tool-workspace__inner {
     padding: var(--space-4);
@@ -163,6 +183,12 @@ function returnToToolbox() {
 
   .ed2k-link {
     grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+
+  .ed2k-link__status {
+    grid-column: 2;
+    justify-content: flex-start;
+    min-width: 0;
   }
 }
 </style>
