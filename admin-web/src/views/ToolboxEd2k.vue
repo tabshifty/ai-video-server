@@ -9,24 +9,14 @@ import { parseEd2kLinks } from './toolbox.helpers'
 
 const router = useRouter()
 const ed2kInput = ref('')
-const ed2kClickedLinks = ref(new Set())
 
 const ed2kParseResult = computed(() => parseEd2kLinks(ed2kInput.value))
 const ed2kLinks = computed(() => ed2kParseResult.value.links)
 const ed2kInvalidCount = computed(() => ed2kParseResult.value.invalidCount)
 const ed2kHasInput = computed(() => ed2kInput.value.trim() !== '')
 
-function isEd2kLinkClicked(link) {
-  return ed2kClickedLinks.value.has(link.href)
-}
-
-function markEd2kLinkClicked(link) {
-  ed2kClickedLinks.value = new Set([...ed2kClickedLinks.value, link.href])
-}
-
 function clearEd2kInput() {
   ed2kInput.value = ''
-  ed2kClickedLinks.value = new Set()
 }
 
 function returnToToolbox() {
@@ -41,7 +31,7 @@ function returnToToolbox() {
         <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
       </div>
 
-      <PageHeader title="ED2K 链接生成器" subtitle="把多行 ED2K 文本转换为可点击链接，点击后在本页标记状态。" />
+      <PageHeader title="ED2K 链接生成器" subtitle="把多行 ED2K 文本转换为可点击链接。" />
 
       <SectionCard>
         <template #title>链接文本</template>
@@ -75,14 +65,10 @@ function returnToToolbox() {
               v-for="link in ed2kLinks"
               :key="link.id"
               class="ed2k-link"
-              :class="{ 'is-clicked': isEd2kLinkClicked(link) }"
               :href="link.href"
-              @click="markEd2kLinkClicked(link)"
             >
               <span class="ed2k-link__line tabular-num">{{ link.lineNumber }}</span>
               <span class="ed2k-link__text">{{ link.label }}</span>
-              <el-tag v-if="isEd2kLinkClicked(link)" size="small" type="info" effect="plain">已点击</el-tag>
-              <el-tag v-else size="small" type="success" effect="plain">未点击</el-tag>
             </a>
           </div>
         </div>
@@ -137,7 +123,7 @@ function returnToToolbox() {
 
 .ed2k-link {
   display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  grid-template-columns: 3rem minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
@@ -151,11 +137,6 @@ function returnToToolbox() {
 .ed2k-link:hover {
   border-color: var(--primary);
   color: var(--primary);
-  background: var(--bg-surface);
-}
-
-.ed2k-link.is-clicked {
-  color: var(--text-muted);
   background: var(--bg-surface);
 }
 
@@ -182,11 +163,6 @@ function returnToToolbox() {
 
   .ed2k-link {
     grid-template-columns: 2.5rem minmax(0, 1fr);
-  }
-
-  .ed2k-link .el-tag {
-    grid-column: 2;
-    justify-self: start;
   }
 }
 </style>

@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 18:24 +0800
+- 进度：完成管理端 ED2K 链接生成器点击状态移除。页面不再维护 `ed2kClickedLinks`，链接点击后不会切换“已点击/未点击”标签或灰化样式；`CONTEXT.md` 同步收口为“不追踪或展示链接点击状态”。本次只纳入 ED2K 工具页、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/toolboxPage.spec.js src/views/toolbox.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check -- CONTEXT.md plan.md admin-web/src/views/ToolboxEd2k.vue admin-web/src/views/toolboxPage.spec.js` 通过；乱码扫描无命中。
+
+## 2026-06-14 18:23 +0800
+- 进度：开始移除管理端 ED2K 链接生成器的点击状态反馈。代码现状显示页面用 `ed2kClickedLinks` 在点击链接后切换“已点击/未点击”标签和灰化样式；本次范围收口为移除点击状态追踪与状态文案，保留 ED2K 解析、清空和跳转行为。用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行管理端定向 vitest、`npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-14 14:33 +0800
 - 进度：完成 DV→SDR 方案回退验证，准备提交并部署。本次回退后代码层已无 `dv_sdr_compat`、`video-dv-sdr.mp4`、`trusted_tone_map`、`trusted_compat_output` 等 SDR 可信输出路径；TV 端 source Dolby Vision + output 非 Dolby Vision 恢复阻断。用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
