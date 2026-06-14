@@ -2,6 +2,26 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 11:28 +0800
+- 进度：补跑 TV 全量单测时发现 `TvSeriesPlayerViewModelTest` 里仍保留 source DV / output 非 DV 阻断的旧断言；按现有 `DV→SDR 统一兼容路线` 和 `TvPlaybackRoutePolicyTest` 语义，改为期望构建普通 VLC 播放源。业务代码未改，仅修正过期测试断言。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；待重新执行 `git diff --check` 与乱码检查。
+
+## 2026-06-14 11:18 +0800
+- 进度：完成 TV 参考图视觉换代第一批收尾验证，准备提交。本次只纳入 TV 全局 token、共享 UI 组件、音轨/字幕选择器暖金化、对应测试、TV 版本号、`CONTEXT.md` 长期约定和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`CONTEXT.md`、`plan.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/AppChrome.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvTypography.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvIconAction.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`、相关 `core/ui` 测试
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.core.ui.TvFocusSpecTest --tests com.chee.videos.core.ui.TvTypographySpecTest --tests com.chee.videos.core.ui.TvColorContrastTest --tests com.chee.videos.core.ui.TvStateFeedbackSpecTest --tests com.chee.videos.core.ui.TvIconActionSpecTest --tests com.chee.videos.core.ui.TvShapeAuditTest --tests com.chee.videos.core.ui.TvTrackPickerGlassPanelTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 与乱码检查待最终执行。
+
+## 2026-06-14 11:08 +0800
+- 进度：完成 TV 参考图视觉换代第一批落地。`AppChrome` 切到暖金、暗玻璃、8dp 通用圆角和暖金按钮内容色；`TvFocus` 的 glow 语义切到暖金且保留 spring/触觉行为；`TvTypography` 改为参考图紧凑字号角色；共享图标按钮、状态页和音轨/字幕选择器同步去除旧蓝青风格。TV 端版本提升到 `0.1.94`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/AppChrome.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvTypography.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvIconAction.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`、相关测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.core.ui.TvFocusSpecTest --tests com.chee.videos.core.ui.TvTypographySpecTest --tests com.chee.videos.core.ui.TvColorContrastTest --tests com.chee.videos.core.ui.TvStateFeedbackSpecTest --tests com.chee.videos.core.ui.TvIconActionSpecTest --tests com.chee.videos.core.ui.TvShapeAuditTest --tests com.chee.videos.core.ui.TvTrackPickerGlassPanelTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；待执行 `git diff --check` 与乱码检查。
+
+## 2026-06-14 10:46 +0800
+- 进度：开始落地 TV 参考图视觉换代第一批代码。范围限定为全局 token 与共享组件：`AppChrome`、`TvFocus`、`TvTypography`、`TvIconActionButton`、`TvStateFeedback` 及对应源文/纯逻辑测试；同步 TV 端版本到下一 patch。用户已有 `admin-web/.env.development` 保持未提交且不纳入本轮。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/AppChrome.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvTypography.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvIconAction.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、相关测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行共享 UI 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。
+
 ## 2026-06-14 10:39 +0800
 - 进度：确认 TV 参考图导航结构。整体换代后主导航采用参考图式左侧竖向 rail 承载一级入口，不引入顶部横向导航，避免两套导航在 TV 遥控器焦点路径上重复。
 - 影响文件：`CONTEXT.md`、`plan.md`

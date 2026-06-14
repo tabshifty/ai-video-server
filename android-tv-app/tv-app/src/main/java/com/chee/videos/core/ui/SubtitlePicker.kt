@@ -282,7 +282,7 @@ private fun NightGlassTrackPickerPanel(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    // 夜台玻璃：深色半透明基底、冷色高光边缘和低饱和焦点光感。
+    // 夜台玻璃：深色半透明基底、暖金高光边缘和低饱和焦点光感。
     val panelInteractionSource = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
@@ -293,7 +293,7 @@ private fun NightGlassTrackPickerPanel(
                 brush = Brush.linearGradient(
                     listOf(
                         Color(0x66FFFFFF),
-                        Color(0x6625D9F2),
+                        Color(0x66E8B85B),
                         Color(0x1AFFFFFF),
                     ),
                 ),
@@ -302,9 +302,9 @@ private fun NightGlassTrackPickerPanel(
             .background(
                 brush = Brush.linearGradient(
                     listOf(
-                        Color(0xE60A0E16),
-                        Color(0xCC111B2A),
-                        Color(0xE6070A10),
+                        Color(0xE610161F),
+                        Color(0xCC241C11),
+                        Color(0xE6040508),
                     ),
                 ),
                 shape = AppChrome.SurfaceShape,
@@ -331,8 +331,8 @@ private fun SubtitleOptionRow(
     val rowShape = AppChrome.SurfaceShape
     var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
     val rowColor = when {
-        focused && tvMode -> Color(0x2E39D7E8)
-        selected && tvMode -> Color(0x2439D7E8)
+        focused && tvMode -> Color(0x3DE8B85B)
+        selected && tvMode -> Color(0x2EE8B85B)
         selected -> Color(0x26FFFFFF)
         tvMode -> Color(0x1AFFFFFF)
         else -> Color(0x12000000)
@@ -425,8 +425,8 @@ private fun TrackPickerSelectionRail(
     focused: Boolean,
 ) {
     val color = when {
-        selected -> Color(0xFF39D7E8)
-        focused -> Color(0x8039D7E8)
+        selected -> AppChrome.Accent
+        focused -> AppChrome.Accent.copy(alpha = 0.52f)
         else -> Color.Transparent
     }
     Box(

@@ -18,5 +18,9 @@ class TvStateFeedbackSpecTest {
         assertTrue(source.contains("fun TvEmptyState("))
         assertTrue(source.contains("fun TvErrorState("))
         assertTrue(source.contains("tvFocusableGlow"))
+        assertTrue("状态页加载指示应使用参考图暖金 accent", source.contains("color = AppChrome.Accent"))
+        assertTrue("状态页面板应使用暗玻璃 elevated surface", source.contains("color = AppChrome.SurfaceElevated"))
+        assertTrue("状态页操作按钮应使用暖金柔和底色", source.contains("color = AppChrome.AccentSoft"))
+        assertTrue("状态页不应残留旧蓝青操作底色", !source.contains("0x2239D7E8"))
     }
 }

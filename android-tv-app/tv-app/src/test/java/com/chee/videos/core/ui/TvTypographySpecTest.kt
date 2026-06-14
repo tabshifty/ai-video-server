@@ -1,71 +1,78 @@
 package com.chee.videos.core.ui
 
 import androidx.compose.ui.unit.sp
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TvTypographySpecTest {
     @Test
-    fun `headline large meets 10-foot main title floor of 34sp`() {
+    fun `typography follows compact reference image hierarchy`() {
         assertTrue(
-            "10-foot 主标题地板 34sp",
-            TvTypography.headlineLarge.fontSize.value >= 34f,
+            "参考图主标题 token 应保持 30sp 紧凑基线",
+            TvTypographyTokens.HeroTitleSp == 30,
         )
         assertTrue(
-            "TvTypographyTokens.MainTitleSp 必须 ≥ 34",
-            TvTypographyTokens.MainTitleSp >= 34,
-        )
-    }
-
-    @Test
-    fun `title small meets 10-foot subtitle floor of 22sp`() {
-        assertTrue(
-            "海报卡标题（titleSmall）必须 ≥ 22sp",
-            TvTypography.titleSmall.fontSize.value >= TvTypographyTokens.SubtitleFloorSp.toFloat(),
+            "headlineLarge 应等于参考图主标题 token",
+            TvTypography.headlineLarge.fontSize.value == TvTypographyTokens.HeroTitleSp.toFloat(),
         )
         assertTrue(
-            "TvTypographyTokens.SubtitleFloorSp 必须 ≥ 22",
-            TvTypographyTokens.SubtitleFloorSp >= 22,
+            "titleSmall 应落在参考图卡片标题尺寸，不再保留 22sp 字号地板",
+            TvTypography.titleSmall.fontSize.value == 15f,
+        )
+        assertTrue(
+            "bodyMedium 应落在参考图正文尺寸，不再保留 18sp 字号地板",
+            TvTypography.bodyMedium.fontSize.value == 13f,
         )
     }
 
     @Test
-    fun `title medium does not drop below subtitle floor`() {
+    fun `typography token names describe reference roles instead of 10-foot floors`() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvTypography.kt").toFile().readText()
+
         assertTrue(
-            "section / 卡片标题（titleMedium）必须 ≥ 22sp",
-            TvTypography.titleMedium.fontSize.value >= 22f,
+            "TvTypographyTokens 应暴露 HeroTitleSp",
+            source.contains("HeroTitleSp"),
+        )
+        assertTrue(
+            "TvTypographyTokens 应暴露 SectionTitleSp",
+            source.contains("SectionTitleSp"),
+        )
+        assertFalse(
+            "参考图换代后不再暴露 MainTitleSp 这类 10-foot 地板 token",
+            source.contains("MainTitleSp"),
+        )
+        assertFalse(
+            "参考图换代后不再暴露 SubtitleFloorSp 这类 10-foot 地板 token",
+            source.contains("SubtitleFloorSp"),
+        )
+        assertFalse(
+            "参考图换代后不再暴露 HelperFloorSp 这类 10-foot 地板 token",
+            source.contains("HelperFloorSp"),
         )
     }
 
     @Test
-    fun `body and label roles meet 10-foot helper floor of 18sp`() {
+    fun `body and label roles stay compact but readable`() {
         assertTrue(
-            "bodyMedium 必须 ≥ HelperFloorSp",
-            TvTypography.bodyMedium.fontSize.value >= TvTypographyTokens.HelperFloorSp.toFloat(),
+            "bodyLarge 应等于参考图正文 token",
+            TvTypography.bodyLarge.fontSize.value == TvTypographyTokens.BodySp.toFloat(),
         )
         assertTrue(
-            "bodySmall 必须 ≥ 18sp",
-            TvTypography.bodySmall.fontSize.value >= 18f,
+            "bodySmall 应等于参考图辅助文字 token",
+            TvTypography.bodySmall.fontSize.value == TvTypographyTokens.HelperSp.toFloat(),
         )
         assertTrue(
-            "labelLarge 必须 ≥ 18sp",
-            TvTypography.labelLarge.fontSize.value >= 18f,
+            "labelSmall 应等于参考图角标 token",
+            TvTypography.labelSmall.fontSize.value == TvTypographyTokens.CaptionSp.toFloat(),
         )
         assertTrue(
-            "labelMedium 必须 ≥ 18sp",
-            TvTypography.labelMedium.fontSize.value >= 18f,
+            "紧凑基线下 labelSmall 仍不应小于 11sp",
+            TvTypography.labelSmall.fontSize.value >= 11f,
         )
         assertTrue(
-            "labelSmall 必须 ≥ TightHelperSp",
-            TvTypography.labelSmall.fontSize.value >= TvTypographyTokens.TightHelperSp.toFloat(),
-        )
-        assertTrue(
-            "TvTypographyTokens.HelperFloorSp 必须 ≥ 18",
-            TvTypographyTokens.HelperFloorSp >= 18,
-        )
-        assertTrue(
-            "TvTypographyTokens.TightHelperSp 必须 ≥ 18",
-            TvTypographyTokens.TightHelperSp >= 18,
+            "正文基线不应大于 14sp，避免回退到旧 TV 大字号风格",
+            TvTypographyTokens.BodySp <= 14,
         )
     }
 
@@ -110,8 +117,32 @@ class TvTypographySpecTest {
         )
         for ((name, style) in roles) {
             assertTrue(
-                "$name lineHeight 必须 ≥ fontSize，避免 10-foot 行距塌陷",
+                "$name lineHeight 必须 ≥ fontSize，避免紧凑排版行距塌陷",
                 style.lineHeight.value >= style.fontSize.value,
+            )
+        }
+    }
+
+    @Test
+    fun `letter spacing stays neutral for reference typography`() {
+        val roles = listOf(
+            "headlineLarge" to TvTypography.headlineLarge,
+            "headlineMedium" to TvTypography.headlineMedium,
+            "headlineSmall" to TvTypography.headlineSmall,
+            "titleLarge" to TvTypography.titleLarge,
+            "titleMedium" to TvTypography.titleMedium,
+            "titleSmall" to TvTypography.titleSmall,
+            "bodyLarge" to TvTypography.bodyLarge,
+            "bodyMedium" to TvTypography.bodyMedium,
+            "bodySmall" to TvTypography.bodySmall,
+            "labelLarge" to TvTypography.labelLarge,
+            "labelMedium" to TvTypography.labelMedium,
+            "labelSmall" to TvTypography.labelSmall,
+        )
+        for ((name, style) in roles) {
+            assertTrue(
+                "$name letterSpacing 必须为 0sp，避免旧 Material 默认 tracking 破坏参考图字面",
+                style.letterSpacing.value == 0f,
             )
         }
     }
@@ -123,7 +154,7 @@ class TvTypographySpecTest {
         ).toFile().readText()
 
         assertTrue(
-            "TvShellApp 必须显式向 MaterialTheme 注入 TvTypography，否则全量调用点继承 Material3 默认 sp，无法满足 10-foot",
+            "TvShellApp 必须显式向 MaterialTheme 注入 TvTypography，否则全量调用点无法继承参考图紧凑字号",
             source.contains("typography = TvTypography"),
         )
         assertTrue(
@@ -133,23 +164,26 @@ class TvTypographySpecTest {
     }
 
     @Test
-    fun `tv typography tokens stay in sync with floor constants`() {
-        // 主标题地板必须等于 headlineLarge 实际配置，避免 token 与实例脱节
+    fun `tv typography tokens stay in sync with compact role constants`() {
         assertTrue(
-            "MainTitleSp 必须等于 headlineLarge.fontSize",
-            TvTypographyTokens.MainTitleSp.toFloat() == TvTypography.headlineLarge.fontSize.value,
+            "HeroTitleSp 必须等于 headlineLarge.fontSize",
+            TvTypographyTokens.HeroTitleSp.toFloat() == TvTypography.headlineLarge.fontSize.value,
         )
         assertTrue(
-            "SubtitleFloorSp 必须等于 titleSmall.fontSize",
-            TvTypographyTokens.SubtitleFloorSp.toFloat() == TvTypography.titleSmall.fontSize.value,
+            "SectionTitleSp 必须等于 titleLarge.fontSize",
+            TvTypographyTokens.SectionTitleSp.toFloat() == TvTypography.titleLarge.fontSize.value,
+        )
+        assertTrue(
+            "HelperSp 必须等于 bodySmall.fontSize",
+            TvTypographyTokens.HelperSp.toFloat() == TvTypography.bodySmall.fontSize.value,
         )
     }
 
     @Test
     fun `tv typography tokens expose sp helpers for downstream consumers`() {
         assertTrue(
-            "MainTitleSp 应转 sp",
-            TvTypographyTokens.MainTitleSp.sp.value >= 34f,
+            "HeroTitleSp 应转 sp",
+            TvTypographyTokens.HeroTitleSp.sp.value == 30f,
         )
     }
 }

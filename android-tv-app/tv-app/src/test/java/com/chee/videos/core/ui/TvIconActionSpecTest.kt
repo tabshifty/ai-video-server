@@ -16,6 +16,8 @@ class TvIconActionSpecTest {
         val source = sourcePath.readText()
         assertTrue("共享图标操作组件应命名为 TvIconActionButton", source.contains("fun TvIconActionButton("))
         assertTrue("TV 图标操作必须使用共享焦点视觉", source.contains(".tvFocusableGlow("))
+        assertTrue("TV 图标操作默认容器应使用暗玻璃 surface", source.contains("containerColor: Color = AppChrome.Surface.copy(alpha = 0.62f)"))
+        assertTrue("TV 图标操作默认图标色应使用参考图主文字色", source.contains("contentColor: Color = AppChrome.TextPrimary"))
         assertFalse("TV 图标操作组件内部不应使用默认 Material IconButton 作为主要焦点控件", source.contains("IconButton("))
     }
 

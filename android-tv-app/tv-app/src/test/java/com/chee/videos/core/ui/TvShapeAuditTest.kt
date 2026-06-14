@@ -18,7 +18,7 @@ class TvShapeAuditTest {
         .resolve("com/chee/videos/core/ui/AppChrome.kt")
 
     private val symmetricRoundedRegex = Regex("""RoundedCornerShape\(\s*(\d+)\.dp\s*\)""")
-    private val allowedRadii = setOf(8, 16, 999)
+    private val allowedRadii = setOf(8, 999)
     private val excludedPathPrefixes = listOf(
         "com/chee/videos/MainActivity.kt",
         "com/chee/videos/VideoHomeApp.kt",
@@ -59,7 +59,7 @@ class TvShapeAuditTest {
         if (offenders.isNotEmpty()) {
             fail(
                 "以下位置出现未列入白名单的对称圆角字面量。" +
-                    "白名单：8dp(ChipShape) / 16dp(SurfaceShape) / 999dp(PillShape)；" +
+                    "白名单：8dp(SurfaceShape/ChipShape) / 999dp(PillShape)；" +
                     "其余请统一走 AppChrome.SurfaceShape：\n" +
                     offenders.joinToString("\n"),
             )
@@ -71,6 +71,7 @@ class TvShapeAuditTest {
         assertTrue("AppChrome.kt 必须存在", Files.isRegularFile(appChromePath))
         val source = appChromePath.readText()
         assertTrue("AppChrome 必须暴露 RadiusDp 通用圆角 token", source.contains("RadiusDp"))
+        assertTrue("AppChrome 通用圆角必须切到参考图 8dp", AppChrome.RadiusDp.value == 8f)
         assertTrue("AppChrome 必须暴露 SurfaceShape 通用形状 token", source.contains("SurfaceShape"))
         assertTrue("AppChrome 必须暴露 ChipShape 小 chip 形状 token", source.contains("ChipShape"))
         assertTrue("AppChrome 必须保留 PillShape 胶囊形 token", source.contains("PillShape"))

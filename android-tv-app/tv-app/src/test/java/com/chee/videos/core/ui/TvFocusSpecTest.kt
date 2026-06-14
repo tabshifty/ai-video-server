@@ -18,13 +18,15 @@ class TvFocusSpecTest {
     }
 
     @Test
-    fun `global tv focus glow uses cyan glow instead of hard pink border`() {
+    fun `global tv focus glow uses reference gold instead of old cyan or pink border`() {
         val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
 
         assertTrue("TV 焦点语言不应再使用旧的粉红硬描边", !source.contains("0xFFFF5A7A"))
-        assertTrue("TV 焦点语言应定义蓝青焦点色", source.contains("TvFocusGlowColor"))
+        assertTrue("TV 焦点语言不应再定义旧蓝青焦点色", !source.contains("0xFF39D7E8"))
+        assertTrue("TV 焦点语言应复用 AppChrome.Accent 暖金色", source.contains("TvFocusGlowColor = AppChrome.Accent"))
         assertTrue("TV 焦点语言应使用柔和背景提亮", source.contains(".background("))
         assertTrue("TV 焦点语言不应依赖 border 作为默认焦点反馈", !source.contains(".border("))
+        assertTrue("TvFocusGlowColor 实际值必须等于全局暖金 accent", TvFocusGlowColor == AppChrome.Accent)
     }
 
     @Test
@@ -229,12 +231,12 @@ class TvFocusSpecTest {
     @Test
     fun `inner glow alpha target lives in viewable but non-occluding range`() {
         assertTrue(
-            "内层 glow alpha 目标值应 ≥ 0.5，保证 10-foot 视距下焦点提亮可见",
-            TvFocusMotionTokens.InnerGlowAlphaTarget >= 0.5f,
+            "参考图内层 glow alpha 目标值应 ≥ 0.35，保证焦点提亮可见",
+            TvFocusMotionTokens.InnerGlowAlphaTarget >= 0.35f,
         )
         assertTrue(
-            "内层 glow alpha 目标值应 ≤ 0.75，避免遮挡海报图色彩",
-            TvFocusMotionTokens.InnerGlowAlphaTarget <= 0.75f,
+            "参考图内层 glow alpha 目标值应 ≤ 0.5，避免把暗玻璃卡片染成整块金色",
+            TvFocusMotionTokens.InnerGlowAlphaTarget <= 0.5f,
         )
     }
 
@@ -264,11 +266,11 @@ class TvFocusSpecTest {
             shadowOccurrences >= 2,
         )
         assertTrue(
-            "外层 halo 必须 tint 到蓝青色：ambientColor = TvFocusGlowColor",
+            "外层 halo 必须 tint 到暖金色：ambientColor = TvFocusGlowColor",
             source.contains("ambientColor = TvFocusGlowColor"),
         )
         assertTrue(
-            "外层 halo 必须 tint 到蓝青色：spotColor = TvFocusGlowColor",
+            "外层 halo 必须 tint 到暖金色：spotColor = TvFocusGlowColor",
             source.contains("spotColor = TvFocusGlowColor"),
         )
         assertTrue(
@@ -290,8 +292,12 @@ class TvFocusSpecTest {
             !source.contains("shadowElevation = 28f"),
         )
         assertTrue(
-            "旧的 alpha-写死字面量 Color(0x2639D7E8) 应被移除，改走 InnerGlowAlphaTarget * surfaceAlpha",
+            "旧蓝青 alpha 写死字面量 Color(0x2639D7E8) 应被移除，改走 InnerGlowAlphaTarget * surfaceAlpha",
             !source.contains("Color(0x2639D7E8)"),
+        )
+        assertTrue(
+            "旧蓝青焦点色 Color(0xFF39D7E8) 应被移除",
+            !source.contains("Color(0xFF39D7E8)"),
         )
     }
 

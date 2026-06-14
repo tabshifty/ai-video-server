@@ -18,6 +18,23 @@ class TvColorContrastTest {
     @Test
     fun `text muted stays above 7 to 1 on every dark surface token`() {
         val muted = AppChrome.TextMuted
+        assertTextMeetsContrastOnEveryDarkSurface("TextPrimary", AppChrome.TextPrimary, 7.0)
+        assertTextMeetsContrastOnEveryDarkSurface("TextSecondary", AppChrome.TextSecondary, 7.0)
+        assertTextMeetsContrastOnEveryDarkSurface("TextMuted", muted, 7.0)
+    }
+
+    @Test
+    fun `reference gold accents stay warm and readable with dark foreground`() {
+        assertTrue("AppChrome.Accent 必须切到参考图暖金色", AppChrome.Accent == Color(0xFFE8B85B))
+        assertTrue("AppChrome.AccentStrong 必须保持暖金高亮", AppChrome.AccentStrong == Color(0xFFEFC463))
+        assertTrue(
+            "暖金主按钮上的深色文字必须满足 7.0:1，对比度 ${wcagContrastRatio(AppChrome.Canvas, AppChrome.Accent)}",
+            wcagContrastRatio(AppChrome.Canvas, AppChrome.Accent) >= 7.0,
+        )
+    }
+
+    @Test
+    fun `reference glass surfaces stay dark enough for compact text`() {
         val surfaces = listOf(
             "Surface" to AppChrome.Surface,
             "SurfaceElevated" to AppChrome.SurfaceElevated,
@@ -27,10 +44,32 @@ class TvColorContrastTest {
             "Canvas" to AppChrome.Canvas,
         )
         for ((name, surface) in surfaces) {
-            val contrast = wcagContrastRatio(muted, surface)
+            val contrast = wcagContrastRatio(AppChrome.TextPrimary, surface)
             assertTrue(
-                "TextMuted on $name 必须 ≥ 7.0:1，实测 $contrast",
+                "TextPrimary on $name 必须 ≥ 7.0:1，实测 $contrast",
                 contrast >= 7.0,
+            )
+        }
+    }
+
+    private fun assertTextMeetsContrastOnEveryDarkSurface(
+        label: String,
+        foreground: Color,
+        minimumContrast: Double,
+    ) {
+        val surfaces = listOf(
+            "Surface" to AppChrome.Surface,
+            "SurfaceElevated" to AppChrome.SurfaceElevated,
+            "SurfaceMuted" to AppChrome.SurfaceMuted,
+            "SurfaceStrong" to AppChrome.SurfaceStrong,
+            "CanvasRaised" to AppChrome.CanvasRaised,
+            "Canvas" to AppChrome.Canvas,
+        )
+        for ((name, surface) in surfaces) {
+            val contrast = wcagContrastRatio(foreground, surface)
+            assertTrue(
+                "$label on $name 必须 ≥ $minimumContrast:1，实测 $contrast",
+                contrast >= minimumContrast,
             )
         }
     }

@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -29,7 +28,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-val TvFocusGlowColor = Color(0xFF39D7E8)
+val TvFocusGlowColor = AppChrome.Accent
 
 object TvFocusSafeSpec {
     const val posterCardWidthDp: Float = 146f
@@ -56,7 +55,7 @@ object TvFocusMotionTokens {
     const val PressDampingRatio: Float = 0.7f
     const val PressStiffness: Float = 720f
 
-    const val InnerGlowAlphaTarget: Float = 0.6f
+    const val InnerGlowAlphaTarget: Float = 0.42f
     val OuterHaloElevationDp: Dp = 12.dp
 }
 

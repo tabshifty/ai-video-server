@@ -37,7 +37,7 @@ fun TvPageLoadingState(
         TvStatePanel {
             CircularProgressIndicator(
                 modifier = Modifier.size(32.dp),
-                color = TvFocusGlowColor,
+                color = AppChrome.Accent,
                 strokeWidth = 2.5.dp,
             )
             Text(
@@ -62,7 +62,7 @@ fun TvInlineLoadingState(
     ) {
         CircularProgressIndicator(
             modifier = Modifier.size(18.dp),
-            color = TvFocusGlowColor,
+            color = AppChrome.Accent,
             strokeWidth = 2.dp,
         )
         Text(
@@ -136,7 +136,7 @@ private fun TvStateContainer(
 @Composable
 private fun TvStatePanel(content: @Composable ColumnScope.() -> Unit) {
     Surface(
-        color = Color(0xD610131A),
+        color = AppChrome.SurfaceElevated,
         shape = AppChrome.SurfaceShape,
     ) {
         Column(
@@ -215,7 +215,7 @@ private fun TvStateActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
     Surface(
-        color = Color(0x2239D7E8),
+        color = AppChrome.AccentSoft,
         shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.04f)
@@ -226,8 +226,8 @@ private fun TvStateActionButton(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-            Text(text = text, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+            Icon(icon, contentDescription = null, tint = AppChrome.TextPrimary, modifier = Modifier.size(20.dp))
+            Text(text = text, color = AppChrome.TextPrimary, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

@@ -10,26 +10,26 @@ import androidx.compose.ui.unit.dp
 
 object AppChrome {
     val Canvas = Color(0xFF040508)
-    val CanvasRaised = Color(0xFF090B11)
-    val Surface = Color(0xFF10141B)
-    val SurfaceElevated = Color(0xFF161B24)
-    val SurfaceMuted = Color(0xFF1C2330)
-    val SurfaceStrong = Color(0xFF20293A)
-    val Divider = Color(0x1FFFFFFF)
-    val Accent = Color(0xFFE11D48)
-    val AccentSoft = Color(0x40E11D48)
-    val AccentStrong = Color(0xFFFF5A7A)
-    val AccentWarm = Color(0xFFD4A647)
-    val TextPrimary = Color(0xFFF8FAFC)
-    val TextSecondary = Color(0xFFCCD3DF)
+    val CanvasRaised = Color(0xFF080A0D)
+    val Surface = Color(0x7810161F)
+    val SurfaceElevated = Color(0x98241C11)
+    val SurfaceMuted = Color(0xAA141820)
+    val SurfaceStrong = Color(0xFF30291E)
+    val Divider = Color(0x33E8B85B)
+    val Accent = Color(0xFFE8B85B)
+    val AccentSoft = Color(0x40E8B85B)
+    val AccentStrong = Color(0xFFEFC463)
+    val AccentWarm = Color(0xFFD6A64F)
+    val TextPrimary = Color(0xFFF7F1E6)
+    val TextSecondary = Color(0xFFD7DCE5)
     val TextMuted = Color(0xFFB0BAC8)
-    val TextSubtle = Color(0xFF6F7B90)
-    val Error = Color(0xFFFF7B8D)
+    val TextSubtle = Color(0xFF8D96A4)
+    val Error = Color(0xFFFF8A7A)
 
     val PageGradient: Brush
         get() = Brush.verticalGradient(
             colors = listOf(
-                Color(0xFF111522),
+                Color(0xFF10161F),
                 CanvasRaised,
                 Canvas,
             ),
@@ -38,13 +38,13 @@ object AppChrome {
     val HeroGradient: Brush
         get() = Brush.verticalGradient(
             colors = listOf(
-                Color(0xFF181D2A),
-                Color(0xFF0B0E15),
+                Color(0xFF20180E),
+                Color(0xFF0A0D12),
                 Canvas,
             ),
         )
 
-    val RadiusDp: Dp = 16.dp
+    val RadiusDp: Dp = 8.dp
     val SurfaceShape: Shape = RoundedCornerShape(RadiusDp)
     val ChipRadiusDp: Dp = 8.dp
     val ChipShape: Shape = RoundedCornerShape(ChipRadiusDp)
@@ -58,8 +58,8 @@ val AppDarkColors = darkColorScheme(
     background = AppChrome.Canvas,
     surface = AppChrome.Surface,
     surfaceVariant = AppChrome.SurfaceElevated,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
+    onPrimary = AppChrome.Canvas,
+    onSecondary = AppChrome.Canvas,
     onTertiary = AppChrome.Canvas,
     onBackground = AppChrome.TextPrimary,
     onSurface = AppChrome.TextPrimary,

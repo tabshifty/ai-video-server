@@ -25,8 +25,8 @@ fun TvIconActionButton(
     size: Dp = 42.dp,
     iconSize: Dp = 24.dp,
     shape: Shape = CircleShape,
-    containerColor: Color = Color(0x24000000),
-    contentColor: Color = Color.White,
+    containerColor: Color = AppChrome.Surface.copy(alpha = 0.62f),
+    contentColor: Color = AppChrome.TextPrimary,
     focusedScale: Float = 1.1f,
 ) {
     Surface(
