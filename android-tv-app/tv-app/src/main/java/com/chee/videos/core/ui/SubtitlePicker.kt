@@ -100,6 +100,22 @@ private data class TrackPickerDialogItem(
     val selected: Boolean,
 )
 
+private val TrackPickerScrim = AppChrome.Canvas.copy(alpha = 0.72f)
+private val TrackPickerPanelBorderBrush = Brush.linearGradient(
+    listOf(
+        AppChrome.TextPrimary.copy(alpha = 0.40f),
+        AppChrome.Accent.copy(alpha = 0.40f),
+        AppChrome.TextPrimary.copy(alpha = 0.10f),
+    ),
+)
+private val TrackPickerPanelBrush = Brush.linearGradient(
+    listOf(
+        AppChrome.Surface.copy(alpha = 0.90f),
+        AppChrome.SurfaceElevated.copy(alpha = 0.82f),
+        AppChrome.Canvas.copy(alpha = 0.90f),
+    ),
+)
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun LongFormSubtitleBottomSheet(
@@ -225,7 +241,7 @@ private fun LongFormTrackPickerDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x99000000))
+                .background(TrackPickerScrim)
                 .clickable(
                     indication = null,
                     interactionSource = scrimInteractionSource,
@@ -246,7 +262,7 @@ private fun LongFormTrackPickerDialog(
                     ) {
                         Text(
                             text = title,
-                            color = Color.White,
+                            color = AppChrome.TextPrimary,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -290,23 +306,11 @@ private fun NightGlassTrackPickerPanel(
             .widthIn(min = 520.dp, max = 640.dp)
             .border(
                 width = 1.dp,
-                brush = Brush.linearGradient(
-                    listOf(
-                        Color(0x66FFFFFF),
-                        Color(0x66E8B85B),
-                        Color(0x1AFFFFFF),
-                    ),
-                ),
+                brush = TrackPickerPanelBorderBrush,
                 shape = AppChrome.SurfaceShape,
             )
             .background(
-                brush = Brush.linearGradient(
-                    listOf(
-                        Color(0xE610161F),
-                        Color(0xCC241C11),
-                        Color(0xE6040508),
-                    ),
-                ),
+                brush = TrackPickerPanelBrush,
                 shape = AppChrome.SurfaceShape,
             )
             .clickable(
@@ -331,11 +335,11 @@ private fun SubtitleOptionRow(
     val rowShape = AppChrome.SurfaceShape
     var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
     val rowColor = when {
-        focused && tvMode -> Color(0x3DE8B85B)
-        selected && tvMode -> Color(0x2EE8B85B)
-        selected -> Color(0x26FFFFFF)
-        tvMode -> Color(0x1AFFFFFF)
-        else -> Color(0x12000000)
+        focused && tvMode -> AppChrome.Accent.copy(alpha = 0.24f)
+        selected && tvMode -> AppChrome.Accent.copy(alpha = 0.18f)
+        selected -> AppChrome.TextPrimary.copy(alpha = 0.15f)
+        tvMode -> AppChrome.TextPrimary.copy(alpha = 0.10f)
+        else -> AppChrome.Canvas.copy(alpha = 0.07f)
     }
     val interactionSource = remember { MutableInteractionSource() }
     val rowModifier = if (focusRequester != null) {
@@ -381,7 +385,7 @@ private fun SubtitleOptionRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = label,
-                    color = Color.White,
+                    color = AppChrome.TextPrimary,
                     style = if (tvMode) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -389,7 +393,7 @@ private fun SubtitleOptionRow(
                 if (supportingText.isNotBlank()) {
                     Text(
                         text = supportingText,
-                        color = Color.White.copy(alpha = 0.62f),
+                        color = AppChrome.TextMuted,
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -405,12 +409,12 @@ private fun SubtitleOptionRow(
                         Icon(
                             imageVector = Icons.Filled.Check,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = AppChrome.TextPrimary,
                         )
                     }
                     Text(
                         text = "已选中",
-                        color = Color.White.copy(alpha = if (tvMode) 0.92f else 0.72f),
+                        color = if (tvMode) AppChrome.TextPrimary else AppChrome.TextMuted,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }

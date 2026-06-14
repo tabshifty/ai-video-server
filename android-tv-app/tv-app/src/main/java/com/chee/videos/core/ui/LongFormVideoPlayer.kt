@@ -89,6 +89,11 @@ import kotlin.math.abs
 import org.videolan.libvlc.MediaPlayer
 
 private const val LongFormVideoPlayerLogTag = "LongFormVideoPlayer"
+private val PlayerGlassSurface = AppChrome.Surface.copy(alpha = 0.90f)
+private val PlayerGlassSurfaceStrong = AppChrome.SurfaceMuted.copy(alpha = 0.92f)
+private val PlayerSubtleSurface = AppChrome.Surface.copy(alpha = 0.72f)
+private val PlayerProgressTrack = AppChrome.TextMuted.copy(alpha = 0.24f)
+private val PlayerProgressActiveTrack = AppChrome.Accent.copy(alpha = 0.96f)
 
 enum class TvLongFormControlsVariant {
     Default,
@@ -962,12 +967,12 @@ fun LongFormVideoPlayer(
             modifier = Modifier.align(Alignment.Center),
         ) {
             Surface(
-                color = Color(0xD610131A),
+                color = PlayerGlassSurfaceStrong,
                 shape = AppChrome.SurfaceShape,
             ) {
                 Text(
                     text = seekPreviewText,
-                    color = Color.White,
+                    color = AppChrome.TextPrimary,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier
                         .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -983,7 +988,7 @@ fun LongFormVideoPlayer(
             modifier = Modifier.align(Alignment.Center),
         ) {
             Surface(
-                color = Color(0xCC0D1016),
+                color = PlayerGlassSurface,
                 shape = AppChrome.SurfaceShape,
             ) {
                 Row(
@@ -994,12 +999,12 @@ fun LongFormVideoPlayer(
                     Icon(
                         imageVector = centerFeedbackIcon,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = AppChrome.TextPrimary,
                         modifier = Modifier.size(22.dp),
                     )
                     Text(
                         text = centerFeedbackText,
-                        color = Color.White,
+                        color = AppChrome.TextPrimary,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1034,7 +1039,7 @@ fun LongFormVideoPlayer(
                         .padding(horizontal = 12.dp, vertical = 12.dp),
                 ) {
                     Surface(
-                        color = Color(0x8C0D1016),
+                        color = PlayerSubtleSurface,
                         shape = AppChrome.SurfaceShape,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -1054,7 +1059,7 @@ fun LongFormVideoPlayer(
                             )
                             Text(
                                 text = title,
-                                color = Color.White,
+                                color = AppChrome.TextPrimary,
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -1080,7 +1085,7 @@ fun LongFormVideoPlayer(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
             ) {
                 Surface(
-                    color = Color(0x910D1016),
+                    color = PlayerGlassSurface,
                     shape = AppChrome.SurfaceShape,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -1186,7 +1191,7 @@ fun LongFormVideoPlayer(
                             }
                             Text(
                                 text = formatPlaybackTime(displayPositionMs),
-                                color = Color.White.copy(alpha = 0.86f),
+                                color = AppChrome.TextSecondary,
                                 style = MaterialTheme.typography.labelSmall,
                             )
                             Slider(
@@ -1209,9 +1214,9 @@ fun LongFormVideoPlayer(
                                     scheduleAutoHideControls()
                                 },
                                 colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = Color.White.copy(alpha = 0.92f),
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.22f),
+                                    thumbColor = AppChrome.Accent,
+                                    activeTrackColor = PlayerProgressActiveTrack,
+                                    inactiveTrackColor = PlayerProgressTrack,
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
@@ -1223,7 +1228,7 @@ fun LongFormVideoPlayer(
                                 } else {
                                     "--:--"
                                 },
-                                color = Color.White.copy(alpha = 0.68f),
+                                color = AppChrome.TextMuted,
                                 style = MaterialTheme.typography.labelSmall,
                             )
                             if (tvMode && tvControlsVariant == TvLongFormControlsVariant.Default) {
@@ -1407,13 +1412,13 @@ private fun TvPlaybackProgressBar(
     Box(
         modifier = modifier
             .height(6.dp)
-            .background(Color.White.copy(alpha = 0.18f), shape = AppChrome.PillShape),
+            .background(PlayerProgressTrack, shape = AppChrome.PillShape),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(progressValue.coerceIn(0f, 1f))
                 .height(6.dp)
-                .background(Color.White.copy(alpha = 0.92f), shape = AppChrome.PillShape),
+                .background(PlayerProgressActiveTrack, shape = AppChrome.PillShape),
         )
     }
 }
@@ -1448,7 +1453,7 @@ private fun TvSeriesControlsPage(
         )
         Text(
             text = formatPlaybackTime(displayPositionMs),
-            color = Color.White.copy(alpha = 0.86f),
+            color = AppChrome.TextSecondary,
             style = MaterialTheme.typography.labelSmall,
         )
         TvPlaybackProgressBar(
@@ -1463,7 +1468,7 @@ private fun TvSeriesControlsPage(
             } else {
                 "--:--"
             },
-            color = Color.White.copy(alpha = 0.68f),
+            color = AppChrome.TextMuted,
             style = MaterialTheme.typography.labelSmall,
         )
         CompactPlayerControlButton(
@@ -1547,12 +1552,12 @@ private fun TvEpisodeRail(
                             contentAlignment = Alignment.Center,
                         ) {
                             Surface(
-                                color = Color(0xE8141820),
+                                color = PlayerGlassSurfaceStrong,
                                 shape = AppChrome.SurfaceShape,
                             ) {
                                 Text(
                                     text = item.title,
-                                    color = Color.White,
+                                    color = AppChrome.TextPrimary,
                                     style = MaterialTheme.typography.labelMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -1634,8 +1639,8 @@ private fun CompactPlayerControlButton(
         },
         size = if (tvMode) 42.dp else 34.dp,
         iconSize = if (tvMode) 24.dp else 20.dp,
-        containerColor = Color(0x24000000),
-        contentColor = Color.White,
+        containerColor = PlayerSubtleSurface,
+        contentColor = AppChrome.TextPrimary,
         focusedScale = if (tvMode) 1.12f else 1.04f,
     )
 }

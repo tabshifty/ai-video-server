@@ -196,9 +196,14 @@ private fun ConnectionActionButton(
             .tvFocusableGlow(enabled = enabled, shape = AppChrome.PillShape, focusedScale = 1.04f)
             .clickable(enabled = enabled, onClick = onClick),
     ) {
+        val contentColor = when {
+            !enabled -> AppChrome.TextMuted
+            primary -> AppChrome.Canvas
+            else -> AppChrome.TextPrimary
+        }
         Text(
             text = text,
-            color = if (enabled) AppChrome.TextPrimary else AppChrome.TextMuted,
+            color = contentColor,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),

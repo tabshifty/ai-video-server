@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 11:36 +0800
+- 进度：开始落地 TV 参考图视觉换代第三批。范围限定为播放器 UI 与连接/状态功能页：长视频/电视剧播放器共用控件、字幕/音轨选择浮层、返回确认、续播/连播提示卡、TV 连接服务器页、配对页以及共享加载/错误/空态；本批只替换旧蓝青/冷色/白字金底等视觉残留，不改变播放内核、遥控器按键路由、播放历史上报、服务器连接流程或页面导航结构。用户已有 `admin-web/.env.development` 保持未提交且不纳入本轮。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlayerBackConfirm.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvResumePromptCard.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvAutoplayPromptCard.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvPairingScreen.kt`、相关测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：先补第三批参考图源文测试，再执行播放器/连接/状态定向 TV 单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码检查。
+
+## 2026-06-14 11:40 +0800
+- 进度：完成第三批播放器与功能页参考图视觉替换。`LongFormVideoPlayer` 的 seek/center feedback、顶栏、底部控制条、进度条、电视剧选集 rail tooltip 和图标按钮改用暖金暗玻璃 token；字幕/音轨夜台玻璃浮层去除旧白色/冷色硬编码，改由 `AppChrome` 驱动；返回确认、连接页和配对页金色主操作同步改为深色前景。新增 `TvPlayerFunctionReferenceStyleSpecTest` 锁住第三批不回退旧冷色与白色前景。TV 端版本提升到 `0.1.96`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlayerBackConfirm.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvPairingScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvTrackPickerGlassPanelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlayerFunctionReferenceStyleSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPlayerFunctionReferenceStyleSpecTest --tests com.chee.videos.core.ui.TvTrackPickerGlassPanelTest` 通过；待执行播放器/连接/状态定向测试、TV 全量单测、assemble、`git diff --check` 与乱码检查。
+
 ## 2026-06-14 11:31 +0800
 - 进度：完成 TV 参考图视觉换代第二批内容页验证，准备提交。本次只纳入 TV 首页目录、海报墙、长视频详情页、内容页参考图风格测试、TV 版本号、`CONTEXT.md` 长期约定和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`CONTEXT.md`、`plan.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvContentReferenceStyleSpecTest.kt`

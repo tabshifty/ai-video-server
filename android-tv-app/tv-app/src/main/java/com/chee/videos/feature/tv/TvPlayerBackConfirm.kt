@@ -6,7 +6,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.chee.videos.core.ui.AppChrome
 
@@ -37,13 +36,13 @@ internal fun TvPlayerBackConfirmPrompt(
 ) {
     Surface(
         modifier = modifier,
-        color = Color(0xCC121212),
+        color = AppChrome.SurfaceMuted.copy(alpha = 0.92f),
         shape = AppChrome.SurfaceShape,
     ) {
         Text(
             text = "再按一次返回",
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            color = Color.White,
+            color = AppChrome.TextPrimary,
             style = MaterialTheme.typography.bodySmall,
         )
     }

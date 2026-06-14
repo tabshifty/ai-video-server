@@ -233,9 +233,10 @@ private fun TvPairingActionButton(
             .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
+        val contentColor = if (primary) AppChrome.Canvas else AppChrome.TextPrimary
         Text(
             text = text,
-            color = AppChrome.TextPrimary,
+            color = contentColor,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
