@@ -77,7 +77,7 @@ class PlaybackCompatibilityPolicyTest {
     }
 
     @Test
-    fun sourceDolbyVisionButOutputIsNotDolbyVision_blocksTranscodedOutput() {
+    fun sourceDolbyVisionButOutputIsNotDolbyVision_allowsPlayback() {
         val decision = resolveTvPlaybackCompatibilityDecision(
             mapOf(
                 "playback_compat" to mapOf(
@@ -86,20 +86,6 @@ class PlaybackCompatibilityPolicyTest {
                     "source" to mapOf("dolby_vision" to true),
                     "output" to mapOf("dolby_vision" to false),
                 ),
-            ),
-        )
-
-        assertFalse(decision.allowed)
-        assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", decision.blockMessage)
-    }
-
-    @Test
-    fun sourceDolbyVisionTrustedToneMappedSdrOutput_allowsPlayback() {
-        val decision = resolveTvPlaybackCompatibilityDecision(
-            playbackCompat(
-                sourceDolbyVision = true,
-                outputDolbyVision = false,
-                trustedToneMappedSdr = true,
             ),
         )
 
@@ -188,7 +174,7 @@ class PlaybackCompatibilityPolicyTest {
     }
 
     @Test
-    fun episodePlayablePolicyExcludesDolbyVisionTranscodedOutput() {
+    fun episodePlayablePolicyKeepsDolbyVisionSdrOutputAsCandidate() {
         val episode = TvEpisodeUiModel(
             id = "e1",
             number = 1,
@@ -208,45 +194,6 @@ class PlaybackCompatibilityPolicyTest {
             ),
         )
 
-        assertFalse(isTvEpisodePlayableForPlayback(episode))
-    }
-
-    @Test
-    fun episodePlayablePolicyKeepsTrustedToneMappedSdrOutputAsCandidate() {
-        val episode = TvEpisodeUiModel(
-            id = "e1",
-            number = 1,
-            title = "第1集",
-            durationLabel = "45 分钟",
-            summary = "剧情",
-            videoId = "video-1",
-            videoStatus = "ready",
-            playable = true,
-            metadata = playbackCompat(
-                sourceDolbyVision = true,
-                outputDolbyVision = false,
-                trustedToneMappedSdr = true,
-            ),
-        )
-
         assertTrue(isTvEpisodePlayableForPlayback(episode))
     }
 }
-
-private fun playbackCompat(
-    sourceDolbyVision: Boolean,
-    outputDolbyVision: Boolean,
-    trustedToneMappedSdr: Boolean = false,
-): Map<String, Any?> =
-    mapOf(
-        "playback_compat" to buildMap<String, Any?> {
-            put("version", 1)
-            put("status", "ok")
-            put("source", mapOf("dolby_vision" to sourceDolbyVision))
-            put("output", mapOf("dolby_vision" to outputDolbyVision))
-            if (trustedToneMappedSdr) {
-                put("trusted_compat_output", "dv_sdr_bt709")
-                put("tone_mapped_sdr", true)
-            }
-        },
-    )

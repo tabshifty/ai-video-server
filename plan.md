@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 08:51 +0800
+- 进度：按用户确认删除旧 DV 数据后的策略，收口 TV 端对 source DV / output 非 DV 的阻断路线。后端继续保留 DV→SDR 可信兼容输出与 metadata 标记，但 TV 端现在只关心 output 是否仍为 Dolby Vision：只要当前实际 output 非 Dolby Vision，就走普通 LibVLC 链路；output 仍为 Dolby Vision 时继续走原专用链路与显示能力门控。TV 端版本提升到 `0.1.92`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 TV 播放兼容策略定向测试、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check` 与乱码检查。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-14 08:40 +0800
 - 进度：完成 DV-only 可信 SDR 兼容输出的收尾验证。后端 DV tone-map 转码、可信兼容 metadata、TV 端播放放行与版本号更新都已通过定向/全量验证；本次只纳入相关 Go、TV、`CONTEXT.md` 和 `plan.md` 文件，未处理用户已有的 `admin-web/.env.development`。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
