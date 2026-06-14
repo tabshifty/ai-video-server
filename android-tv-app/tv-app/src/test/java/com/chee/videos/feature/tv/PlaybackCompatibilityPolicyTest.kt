@@ -77,7 +77,7 @@ class PlaybackCompatibilityPolicyTest {
     }
 
     @Test
-    fun sourceDolbyVisionButOutputIsNotDolbyVision_allowsPlayback() {
+    fun sourceDolbyVisionButOutputIsNotDolbyVision_blocksTranscodedOutput() {
         val decision = resolveTvPlaybackCompatibilityDecision(
             mapOf(
                 "playback_compat" to mapOf(
@@ -89,8 +89,8 @@ class PlaybackCompatibilityPolicyTest {
             ),
         )
 
-        assertTrue(decision.allowed)
-        assertEquals(null, decision.blockMessage)
+        assertFalse(decision.allowed)
+        assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", decision.blockMessage)
     }
 
     @Test
@@ -174,7 +174,7 @@ class PlaybackCompatibilityPolicyTest {
     }
 
     @Test
-    fun episodePlayablePolicyKeepsDolbyVisionSdrOutputAsCandidate() {
+    fun episodePlayablePolicyExcludesDolbyVisionTranscodedOutput() {
         val episode = TvEpisodeUiModel(
             id = "e1",
             number = 1,
@@ -194,6 +194,6 @@ class PlaybackCompatibilityPolicyTest {
             ),
         )
 
-        assertTrue(isTvEpisodePlayableForPlayback(episode))
+        assertFalse(isTvEpisodePlayableForPlayback(episode))
     }
 }

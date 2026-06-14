@@ -93,13 +93,8 @@
 - `DV 专用链路不改变观看历史语义`：[[杜比视界专用系统播放链路]] 只是 TV 端播放实现分支，不改变长视频或电视剧分集的观看历史业务语义。首轮继续沿用现有观看历史接口、完成判定口径和 UI 历史展示，不新增 DV 专用历史字段；客户端内部可以抽象播放器进度快照来同时适配 LibVLC 和 Media3/ExoPlayer，但服务端不感知播放器分支。
 - `杜比视界播放失败不回退 LibVLC`：Dolby Vision 风险源进入专用系统播放链路后，如果播放失败，不自动回退到 LibVLC；失败页只提供重试或返回。LibVLC 是已知可能异色的链路，自动回退会违反 [[杜比视界安全播放]] 的“不异色优先”目标。
 - `杜比视界转码输出阻断`：如果原始上传源被探测为 Dolby Vision 风险源，但最终实际可播放文件已经不是可原生 Dolby Vision 的源，TV App 不应依赖设备 Dolby Vision 能力兜底，也不应继续播放可能异色的转码输出；应提示“该视频来源为杜比视界，当前压缩结果可能无法安全播放”并提供返回或重试入口。
-- `DV→SDR 兼容输出非默认可信播放源`：把 Dolby Vision 源压成 SDR 输出，不会因为“已经变成 SDR”就自动升级为可信播放源。除非后续任务显式定义独立的色调映射方案与验收标准，否则它仍属于 [[杜比视界转码输出阻断]] 的风险范围。
-- `DV→SDR 可信兼容输出`：当且仅当后端对 Dolby Vision 源执行显式 tone-map 到 SDR BT.709，并把该输出写入 `playback_compat` 的可信标记后，TV App 才能把这份兼容输出当作普通 LibVLC 可播放源处理。这个可信标记的语义是“可安全降级到 SDR”，不是“重新恢复成原生 Dolby Vision”。
-- `DV→SDR 可信兼容输出滤镜依赖`：`dv_sdr_compat` 路径把 `zscale` + `tonemap` 视为可信 SDR 色调映射链路的必要条件；如果当前 ffmpeg 构建缺少这类滤镜能力，该路径必须直接失败，不得静默降级成普通 AVC/HEVC 输出来掩盖已经丢失的色彩语义。
-- `DV→SDR 输入色彩兜底`：Dolby Vision 源文件可能只暴露 DOVI side data 和 `color_range`，不一定在容器/码流 metadata 中显式给出 `color_primaries`、`color_transfer`、`color_space`。`dv_sdr_compat` 不能把这些缺失字段交给 `zscale` 猜测；缺失时按当前可信兼容路径的 Dolby Vision profile 5 风险源前提显式兜底为 BT.2020 / SMPTE 2084 / BT.2020 non-constant luminance / full range，再进入 tone-map。
-- `DV→SDR 线性浮点中间格式`：`dv_sdr_compat` 的 tone-map 链路必须先用 `zscale` 把输入显式转换到线性传递并输出 `gbrpf32le` 中间格式，再执行 `tonemap`，最后再转换到 SDR BT.709 / TV range / `yuv420p`。只给 `zscale` 补 `primariesin`、`transferin`、`matrixin`、`rangein` 但不进入线性浮点中间格式，仍可能在 FFmpeg/libzimg 中报 `no path between colorspaces`。
-- `DV→SDR 统一兼容路线`：当历史 DV 数据会被删除，且后端新 DV 视频统一走 [[DV→SDR 可信兼容输出]] 后，TV App 不再需要保留 source DV / output 非 DV 的阻断路线；只要当前实际 output 不是 Dolby Vision，就按普通 LibVLC 链路播放。TV 端仍保留 output 仍为 Dolby Vision 时的专用链路与能力门控。
-- `DV→SDR 风险阻断限于 TV 端`：当前对 [[DV→SDR 兼容输出非默认可信播放源]] 的风险判定，只进入 TV 端安全播放策略，不自动升级成手机端或其它客户端的统一阻断规则。跨客户端是否统一，需要后续单独权衡播放器能力、提示文案和验收口径。
+- `DV→SDR 可信输出撤回`：后端不再为 Dolby Vision 源生成 `video-dv-sdr.mp4`、`dv_sdr_compat` 或 `trusted_tone_map=dv_sdr_bt709` 这类可信 SDR 兼容产物；已验证普通 `zscale + tonemap` 路线可能得到可转码但异色的结果。后续任何 DV→SDR 方案都必须作为新任务重新定义色彩链路、样片验收和播放策略，不得复用已撤回的可信标记。
+- `DV→SDR 风险阻断限于 TV 端`：当前对 [[杜比视界转码输出阻断]] 的风险判定只进入 TV 端安全播放策略，不自动升级成手机端或其它客户端的统一阻断规则。跨客户端是否统一，需要后续单独权衡播放器能力、提示文案和验收口径。
 - `后端转码压缩不变约束`：杜比视界安全播放改造不得改变现有服务端转码压缩策略、码率/CRF、编码器或输出产物规则；若某个视频只有会异色的源文件且没有可用兼容播放源，TV App 只能检测、避让或提示，不能通过本次改造隐式触发重新压缩来修复色彩。
 - `杜比视界原始文件不保留约束`：即使新视频原始源被探测为 Dolby Vision 风险源，后端也不能为了 Dolby Vision 原生播放而保留原始上传文件；现有转码成功后删除 `original_path` 的存储策略保持不变。TV App 的原生 Dolby Vision 播放能力只对当前仍可访问的播放源有效。
 - `杜比视界只读探测`：为实现 [[杜比视界安全播放]]，后端可以对已有媒体文件执行只读探测（例如读取 ffprobe 结果或已落库 metadata），用于判断 Dolby Vision/HDR 风险和可用兼容源；该探测不得生成新视频、不得改变转码参数、不得隐式触发重新压缩。

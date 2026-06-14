@@ -42,9 +42,6 @@ const (
 
 	transcodeProfileHEVCLongform = "hevc_longform"
 	transcodeProfileAVCCompat    = "avc_compat"
-	transcodeProfileDVSdrCompat  = "dv_sdr_compat"
-
-	trustedToneMapDVSdr = "dv_sdr_bt709"
 
 	resolutionTier4K    = "4k"
 	resolutionTier1080  = "1080"
@@ -68,13 +65,6 @@ type transcodeOutputProfile struct {
 	TranscodeProfile string
 	FFmpegProfile    ffmpeg.TranscodeProfile
 	SpatialAQ        bool
-	TrustedToneMap   string
-	CompatOutput     bool
-}
-
-type TranscodeProcessOptions struct {
-	SourcePlaybackProbe   ffmpeg.PlaybackCompatibilityProbe
-	SourcePlaybackProbeOK bool
 }
 
 func NewTranscodeService(storageRoot string) *TranscodeService {
@@ -82,16 +72,12 @@ func NewTranscodeService(storageRoot string) *TranscodeService {
 }
 
 func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, inputPath, typ string, progressHandler func(TranscodeProgress)) (TranscodeResult, error) {
-	return s.ProcessWithOptions(ctx, videoID, inputPath, typ, TranscodeProcessOptions{}, progressHandler)
-}
-
-func (s *TranscodeService) ProcessWithOptions(ctx context.Context, videoID uuid.UUID, inputPath, typ string, options TranscodeProcessOptions, progressHandler func(TranscodeProgress)) (TranscodeResult, error) {
 	outputDir := filepath.Join(s.storageRoot, "videos", videoID.String())
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return TranscodeResult{}, fmt.Errorf("create output dir: %w", err)
 	}
 
-	outputProfile := chooseTranscodeOutputProfile(outputDir, typ, options)
+	outputProfile := chooseTranscodeOutputProfile(outputDir, typ)
 	outputPath := outputProfile.Path
 	thumbPath := filepath.Join(outputDir, "thumb.jpg")
 	sourcePath := inputPath
@@ -115,7 +101,6 @@ func (s *TranscodeService) ProcessWithOptions(ctx context.Context, videoID uuid.
 	inputProbe, inputProbeErr := ffmpeg.Probe(ctx, sourcePath)
 	sourceDurationSeconds := probeDurationSeconds(inputProbe.Duration)
 	plan := buildTranscodePlan(inputProbe, inputProbeErr, typ)
-	plan.TranscodeProfile = outputProfile.TranscodeProfile
 	if progressHandler != nil && sourceDurationSeconds > 0 {
 		progressHandler(TranscodeProgress{
 			SourceDurationSeconds: sourceDurationSeconds,
@@ -125,11 +110,10 @@ func (s *TranscodeService) ProcessWithOptions(ctx context.Context, videoID uuid.
 		})
 	}
 	transcodeOptions := ffmpeg.TranscodeOptions{
-		CRF:                 plan.CRF,
-		VideoBitrateKbps:    plan.TargetBitrateKbps,
-		SourceDuration:      sourceDurationSeconds,
-		SpatialAQ:           outputProfile.SpatialAQ,
-		SourcePlaybackProbe: options.SourcePlaybackProbe,
+		CRF:              plan.CRF,
+		VideoBitrateKbps: plan.TargetBitrateKbps,
+		SourceDuration:   sourceDurationSeconds,
+		SpatialAQ:        outputProfile.SpatialAQ,
 		ProgressHandler: func(progress ffmpeg.TranscodeProgress) {
 			if progressHandler == nil {
 				return
@@ -236,15 +220,6 @@ func buildPlaybackMetadata(output transcodeOutputProfile) map[string]any {
 		"playback_path":  output.Path,
 		"playback_codec": output.PlaybackCodec,
 	}
-	if output.CompatOutput {
-		metadata["compat_transcoded_path"] = output.Path
-	}
-	if output.TrustedToneMap != "" {
-		metadata["trusted_tone_map"] = output.TrustedToneMap
-		metadata["tone_map_source"] = "dolby_vision"
-		metadata["tone_map_target"] = "sdr_bt709"
-		metadata["tone_mapped_sdr"] = true
-	}
 	return metadata
 }
 
@@ -332,18 +307,7 @@ func chooseCRF(videoType string) string {
 	}
 }
 
-func chooseTranscodeOutputProfile(outputDir, videoType string, options TranscodeProcessOptions) transcodeOutputProfile {
-	if shouldUseDVSdrCompatOutput(options) {
-		return transcodeOutputProfile{
-			Path:             filepath.Join(outputDir, "video-dv-sdr.mp4"),
-			PlaybackCodec:    "h264",
-			TranscodeProfile: transcodeProfileDVSdrCompat,
-			FFmpegProfile:    ffmpeg.TranscodeProfileDVSdrCompat,
-			SpatialAQ:        false,
-			TrustedToneMap:   trustedToneMapDVSdr,
-			CompatOutput:     true,
-		}
-	}
+func chooseTranscodeOutputProfile(outputDir, videoType string) transcodeOutputProfile {
 	if isLongformVideoType(videoType) {
 		return transcodeOutputProfile{
 			Path:             filepath.Join(outputDir, "video-hevc.mp4"),
@@ -360,12 +324,6 @@ func chooseTranscodeOutputProfile(outputDir, videoType string, options Transcode
 		FFmpegProfile:    ffmpeg.TranscodeProfileAVCCompat,
 		SpatialAQ:        false,
 	}
-}
-
-func shouldUseDVSdrCompatOutput(options TranscodeProcessOptions) bool {
-	return options.SourcePlaybackProbeOK &&
-		options.SourcePlaybackProbe.VideoStreamFound &&
-		options.SourcePlaybackProbe.DolbyVision
 }
 
 func chooseTranscodeProfileName(videoType string) string {

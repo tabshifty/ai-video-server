@@ -386,50 +386,6 @@ func TestBuildPlaybackMetadataUsesSingleAVCOutput(t *testing.T) {
 	}
 }
 
-func TestBuildPlaybackMetadataMarksTrustedDVSdrCompatOutput(t *testing.T) {
-	metadata := buildPlaybackMetadata(
-		transcodeOutputProfile{
-			Path:             "/tmp/video-dv-sdr.mp4",
-			PlaybackCodec:    "h264",
-			TranscodeProfile: transcodeProfileDVSdrCompat,
-			TrustedToneMap:   trustedToneMapDVSdr,
-			CompatOutput:     true,
-		},
-	)
-
-	if metadata["playback_codec"] != "h264" {
-		t.Fatalf("expected playback_codec h264, got %v", metadata["playback_codec"])
-	}
-	if metadata["playback_path"] != "/tmp/video-dv-sdr.mp4" {
-		t.Fatalf("expected playback_path /tmp/video-dv-sdr.mp4, got %v", metadata["playback_path"])
-	}
-	if metadata["compat_transcoded_path"] != "/tmp/video-dv-sdr.mp4" {
-		t.Fatalf("expected compat_transcoded_path, got %v", metadata["compat_transcoded_path"])
-	}
-	if metadata["trusted_tone_map"] != trustedToneMapDVSdr {
-		t.Fatalf("expected trusted_tone_map %s, got %v", trustedToneMapDVSdr, metadata["trusted_tone_map"])
-	}
-	if metadata["tone_map_source"] != "dolby_vision" || metadata["tone_map_target"] != "sdr_bt709" {
-		t.Fatalf("expected tone map source/target metadata, got=%#v", metadata)
-	}
-}
-
-func TestTranscodePlanCanUseDVSdrCompatProfileMetadata(t *testing.T) {
-	plan := buildTranscodePlan(ffmpeg.VideoProbe{
-		Width:       3840,
-		Height:      2160,
-		BitrateKbps: 16000,
-	}, nil, "episode")
-	outputProfile := transcodeOutputProfile{TranscodeProfile: transcodeProfileDVSdrCompat}
-	plan.TranscodeProfile = outputProfile.TranscodeProfile
-
-	_, _, _, metadata := resolveProbeFields(ffmpeg.VideoProbe{}, nil, plan)
-
-	if metadata["transcode_profile"] != transcodeProfileDVSdrCompat {
-		t.Fatalf("expected transcode_profile dv sdr compat, got %v", metadata["transcode_profile"])
-	}
-}
-
 func TestChooseTranscodeOutputProfileUsesHEVCForLongform(t *testing.T) {
 	outputDir := filepath.Join("/tmp", "videos", "abc")
 	tests := []struct {
@@ -442,7 +398,7 @@ func TestChooseTranscodeOutputProfileUsesHEVCForLongform(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			profile := chooseTranscodeOutputProfile(outputDir, tt.videoType, TranscodeProcessOptions{})
+			profile := chooseTranscodeOutputProfile(outputDir, tt.videoType)
 
 			if profile.Path != filepath.Join(outputDir, "video-hevc.mp4") {
 				t.Fatalf("expected hevc output path, got=%s", profile.Path)
@@ -463,59 +419,6 @@ func TestChooseTranscodeOutputProfileUsesHEVCForLongform(t *testing.T) {
 	}
 }
 
-func TestChooseTranscodeOutputProfileUsesTrustedDVSdrForDolbyVisionSource(t *testing.T) {
-	outputDir := filepath.Join("/tmp", "videos", "abc")
-	profile := chooseTranscodeOutputProfile(
-		outputDir,
-		"episode",
-		TranscodeProcessOptions{
-			SourcePlaybackProbe:   ffmpeg.PlaybackCompatibilityProbe{VideoStreamFound: true, DolbyVision: true},
-			SourcePlaybackProbeOK: true,
-		},
-	)
-
-	if profile.Path != filepath.Join(outputDir, "video-dv-sdr.mp4") {
-		t.Fatalf("expected dv sdr output path, got=%s", profile.Path)
-	}
-	if profile.PlaybackCodec != "h264" {
-		t.Fatalf("expected playback codec h264, got=%s", profile.PlaybackCodec)
-	}
-	if profile.FFmpegProfile != ffmpeg.TranscodeProfileDVSdrCompat {
-		t.Fatalf("expected ffmpeg dv sdr profile, got=%s", profile.FFmpegProfile)
-	}
-	if profile.SpatialAQ {
-		t.Fatalf("did not expect spatial aq for dv sdr output")
-	}
-	if profile.TranscodeProfile != transcodeProfileDVSdrCompat {
-		t.Fatalf("expected dv sdr metadata profile, got=%s", profile.TranscodeProfile)
-	}
-	if profile.TrustedToneMap != trustedToneMapDVSdr || !profile.CompatOutput {
-		t.Fatalf("expected trusted compat tone map output, got=%#v", profile)
-	}
-}
-
-func TestChooseTranscodeOutputProfileDoesNotUseDVSdrWhenSourceProbeFailed(t *testing.T) {
-	outputDir := filepath.Join("/tmp", "videos", "abc")
-	profile := chooseTranscodeOutputProfile(
-		outputDir,
-		"episode",
-		TranscodeProcessOptions{
-			SourcePlaybackProbe:   ffmpeg.PlaybackCompatibilityProbe{VideoStreamFound: true, DolbyVision: true},
-			SourcePlaybackProbeOK: false,
-		},
-	)
-
-	if profile.Path != filepath.Join(outputDir, "video-hevc.mp4") {
-		t.Fatalf("expected hevc output path when source probe is not trusted, got=%s", profile.Path)
-	}
-	if profile.FFmpegProfile != ffmpeg.TranscodeProfileHEVCPrimary {
-		t.Fatalf("expected hevc profile when source probe is not trusted, got=%s", profile.FFmpegProfile)
-	}
-	if profile.TrustedToneMap != "" || profile.CompatOutput {
-		t.Fatalf("did not expect trusted tone map metadata, got=%#v", profile)
-	}
-}
-
 func TestChooseTranscodeOutputProfileKeepsAVCForOtherTypes(t *testing.T) {
 	outputDir := filepath.Join("/tmp", "videos", "abc")
 	tests := []struct {
@@ -529,7 +432,7 @@ func TestChooseTranscodeOutputProfileKeepsAVCForOtherTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			profile := chooseTranscodeOutputProfile(outputDir, tt.videoType, TranscodeProcessOptions{})
+			profile := chooseTranscodeOutputProfile(outputDir, tt.videoType)
 
 			if profile.Path != filepath.Join(outputDir, "video-avc.mp4") {
 				t.Fatalf("expected avc output path, got=%s", profile.Path)

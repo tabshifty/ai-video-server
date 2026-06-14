@@ -36,7 +36,7 @@ class TvPlaybackRoutePolicyTest {
     }
 
     @Test
-    fun sourceDolbyVisionButOutputIsNotDolbyVision_usesVlcRoute() {
+    fun sourceDolbyVisionButOutputIsNotDolbyVision_blocksTranscodedOutput() {
         val route = resolveTvPlaybackRoute(
             metadata = playbackCompat(sourceDolbyVision = true, outputDolbyVision = false),
             displayCapability = supportedDisplayCapability(),
@@ -44,8 +44,8 @@ class TvPlaybackRoutePolicyTest {
             media3Available = true,
         )
 
-        assertEquals(TvPlaybackRouteKind.VLC, route.kind)
-        assertEquals(null, route.blockMessage)
+        assertEquals(TvPlaybackRouteKind.BLOCKED, route.kind)
+        assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", route.blockMessage)
     }
 
     @Test

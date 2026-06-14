@@ -185,17 +185,7 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 		lastProgressUpdated = now
 	}
 
-	result, transcodeErr := p.trans.ProcessWithOptions(
-		ctx,
-		video.ID,
-		inputPath,
-		video.Type,
-		services.TranscodeProcessOptions{
-			SourcePlaybackProbe:   sourcePlaybackProbe,
-			SourcePlaybackProbeOK: sourcePlaybackProbeErr == nil,
-		},
-		progressHandler,
-	)
+	result, transcodeErr := p.trans.Process(ctx, video.ID, inputPath, video.Type, progressHandler)
 	if transcodeErr != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, transcodeErr.Error())
 		p.logger.Error("transcode failed", "video_id", videoID, "error", transcodeErr)
@@ -212,7 +202,6 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 		sourcePlaybackProbeErr,
 		outputPlaybackProbe,
 		outputPlaybackProbeErr,
-		metadata,
 	)
 	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, thumbPath, result.Duration, result.Width, result.Height, metadata); err != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())

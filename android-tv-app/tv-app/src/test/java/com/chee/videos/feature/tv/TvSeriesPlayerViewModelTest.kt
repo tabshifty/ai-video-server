@@ -609,7 +609,7 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
-    fun dolbyVisionTranscodedOutput_buildsSourceUrlForVlcRoute() = runTest {
+    fun dolbyVisionTranscodedOutput_blocksWithoutSourceUrl() = runTest {
         val repository = FakeTvRepository(
             detailPayload = tvSeriesDetail(
                 seasons = listOf(
@@ -642,11 +642,11 @@ class TvSeriesPlayerViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals("video-1", state.currentVideoId)
-        assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
-        assertTrue(state.canPlayCurrentEpisode)
+        assertEquals("", state.currentSourceUrl)
+        assertFalse(state.canPlayCurrentEpisode)
         assertFalse(state.playbackPreparing)
-        assertEquals(null, state.playbackBlockedMessage)
-        assertEquals(listOf("video-1"), repository.sourceUrlRequests)
+        assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", state.playbackBlockedMessage)
+        assertEquals(emptyList<String>(), repository.sourceUrlRequests)
     }
 
     @Test

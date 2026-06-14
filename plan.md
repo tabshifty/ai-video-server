@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 14:33 +0800
+- 进度：完成 DV→SDR 方案回退验证，准备提交并部署。本次回退后代码层已无 `dv_sdr_compat`、`video-dv-sdr.mp4`、`trusted_tone_map`、`trusted_compat_output` 等 SDR 可信输出路径；TV 端 source Dolby Vision + output 非 Dolby Vision 恢复阻断。用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg ./internal/services ./internal/queue -run 'TestBuildTranscode|TestParsePlayback|TestBuildPlaybackCompatibility|TestChooseTranscodeOutputProfile|TestBuildPlaybackMetadata|TestTranscodePlan' -count=1 -v` 通过；`go test ./... -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；代码层 SDR 标记扫描无命中；待执行最终 `git diff --check`、乱码扫描和提交。
+
+## 2026-06-14 14:29 +0800
+- 进度：按用户最新要求回退所有 DV→SDR 方案代码。后端移除 `dv_sdr_compat` / `video-dv-sdr.mp4` / `trusted_tone_map=dv_sdr_bt709` 可信 SDR 输出路径，转码任务不再把源播放探测传入转码器；`playback_compat` 不再识别可信 SDR 标记。TV 端恢复 source Dolby Vision + output 非 Dolby Vision 的阻断语义，避免播放已知可能异色的转码输出；TV 版本提升到 `0.1.97 / 97`。`CONTEXT.md` 和部署文档同步记录“DV→SDR 可信输出撤回”。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
+- 验证：待执行 Go 转码/兼容定向测试、TV 播放兼容定向单测、`git diff --check` 与乱码扫描。
+
+## 2026-06-14 14:18 +0800
+- 进度：开始排查 DV 源片重转码后仍异色的问题。当前已知转码任务本身成功、输出 metadata 为 `dv_sdr_compat` / `dv_sdr_bt709`，但用户实播仍颜色异常；下一步先确认播放链路是否取到了 `video-dv-sdr.mp4`，再验证现有 `zscale + tonemap` 链路对 Dolby Vision profile 5 是否存在先天色彩解释错误。
+- 影响文件：`plan.md`，后续可能涉及 `pkg/ffmpeg/ffmpeg.go`、`internal/services/transcode.go`、`CONTEXT.md`
+- 验证：待执行远端 API/数据库核对、源片小样本滤镜验证、定向 Go 测试。
+
 ## 2026-06-14 14:12 +0800
 - 进度：完成失败 DV 源片的真实重转码验证。重新入队视频 `d967fccb-f20b-4d7d-a82b-03c94f3a26d9` 后，远端 asynq job `8672` 已从 `running` 正常结束为 `success`；视频状态转为 `ready`，输出落在 `/Volumes/large/videos/videos/d967fccb-f20b-4d7d-a82b-03c94f3a26d9/video-dv-sdr.mp4`。本次只追加部署验证账本，用户已有 `admin-web/.env.development` 仍保持未提交且不纳入。
 - 影响文件：`plan.md`
