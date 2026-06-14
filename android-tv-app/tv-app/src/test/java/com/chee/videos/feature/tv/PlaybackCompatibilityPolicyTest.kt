@@ -94,6 +94,20 @@ class PlaybackCompatibilityPolicyTest {
     }
 
     @Test
+    fun sourceDolbyVisionTrustedToneMappedSdrOutput_allowsPlayback() {
+        val decision = resolveTvPlaybackCompatibilityDecision(
+            playbackCompat(
+                sourceDolbyVision = true,
+                outputDolbyVision = false,
+                trustedToneMappedSdr = true,
+            ),
+        )
+
+        assertTrue(decision.allowed)
+        assertEquals(null, decision.blockMessage)
+    }
+
+    @Test
     fun outputDolbyVision_blocksUntilDedicatedSystemPlaybackExists() {
         val decision = resolveTvPlaybackCompatibilityDecision(
             mapOf(
@@ -196,4 +210,43 @@ class PlaybackCompatibilityPolicyTest {
 
         assertFalse(isTvEpisodePlayableForPlayback(episode))
     }
+
+    @Test
+    fun episodePlayablePolicyKeepsTrustedToneMappedSdrOutputAsCandidate() {
+        val episode = TvEpisodeUiModel(
+            id = "e1",
+            number = 1,
+            title = "第1集",
+            durationLabel = "45 分钟",
+            summary = "剧情",
+            videoId = "video-1",
+            videoStatus = "ready",
+            playable = true,
+            metadata = playbackCompat(
+                sourceDolbyVision = true,
+                outputDolbyVision = false,
+                trustedToneMappedSdr = true,
+            ),
+        )
+
+        assertTrue(isTvEpisodePlayableForPlayback(episode))
+    }
 }
+
+private fun playbackCompat(
+    sourceDolbyVision: Boolean,
+    outputDolbyVision: Boolean,
+    trustedToneMappedSdr: Boolean = false,
+): Map<String, Any?> =
+    mapOf(
+        "playback_compat" to buildMap<String, Any?> {
+            put("version", 1)
+            put("status", "ok")
+            put("source", mapOf("dolby_vision" to sourceDolbyVision))
+            put("output", mapOf("dolby_vision" to outputDolbyVision))
+            if (trustedToneMappedSdr) {
+                put("trusted_compat_output", "dv_sdr_bt709")
+                put("tone_mapped_sdr", true)
+            }
+        },
+    )

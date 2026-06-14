@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -62,6 +63,30 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	assertArgAbsent(t, args, "-preset")
 	assertArgAbsent(t, args, "-x265-params")
 	assertArgAbsent(t, args, "-spatial_aq")
+}
+
+func TestBuildTranscodeVideoArgsForDVSdrCompat(t *testing.T) {
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileDVSdrCompat, TranscodeOptions{VideoBitrateKbps: 5000})
+
+	assertArgPair(t, args, "-c:v", "h264_videotoolbox")
+	assertArgPair(t, args, "-pix_fmt", "yuv420p")
+	assertArgPair(t, args, "-allow_sw", "0")
+	assertArgPair(t, args, "-b:v", "5000k")
+	assertArgPair(t, args, "-maxrate", "10000k")
+	assertArgPair(t, args, "-bufsize", "20000k")
+	assertArgPair(t, args, "-color_primaries", "bt709")
+	assertArgPair(t, args, "-color_trc", "bt709")
+	assertArgPair(t, args, "-colorspace", "bt709")
+	filter := argValue(t, args, "-vf")
+	assertContainsAll(t, filter, "zscale", "tonemap=tonemap=hable", "bt709", "format=yuv420p")
+	assertArgPair(t, args, "-map", "0:v:0")
+	assertArgPair(t, args, "-map", "0:a:0?")
+	assertArgPair(t, args, "-c:a", "aac")
+	assertArgPair(t, args, "-b:a", "128k")
+	assertArgPairAbsent(t, args, "-tag:v", "hvc1")
+	assertArgAbsent(t, args, "-spatial_aq")
+	assertArgAbsent(t, args, "-preset")
+	assertArgAbsent(t, args, "-x265-params")
 }
 
 func TestBuildConvertSubtitleToWebVTTArgs(t *testing.T) {
@@ -305,6 +330,26 @@ func assertArgAbsent(t *testing.T, args []string, key string) {
 	for _, arg := range args {
 		if arg == key {
 			t.Fatalf("expected args not to contain %s, got=%v", key, args)
+		}
+	}
+}
+
+func argValue(t *testing.T, args []string, key string) string {
+	t.Helper()
+	for idx := 0; idx < len(args)-1; idx++ {
+		if args[idx] == key {
+			return args[idx+1]
+		}
+	}
+	t.Fatalf("expected args to contain %s, got=%v", key, args)
+	return ""
+}
+
+func assertContainsAll(t *testing.T, value string, wants ...string) {
+	t.Helper()
+	for _, want := range wants {
+		if !strings.Contains(value, want) {
+			t.Fatalf("expected %q to contain %q", value, want)
 		}
 	}
 }

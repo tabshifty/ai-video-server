@@ -48,6 +48,60 @@ func TestBuildPlaybackCompatibilityMetadataOK(t *testing.T) {
 	}
 }
 
+func TestBuildPlaybackCompatibilityMetadataMarksTrustedDVSdrOutput(t *testing.T) {
+	t.Parallel()
+
+	metadata := BuildPlaybackCompatibilityMetadata(
+		ffmpeg.PlaybackCompatibilityProbe{
+			VideoStreamFound: true,
+			DolbyVision:      true,
+		},
+		nil,
+		ffmpeg.PlaybackCompatibilityProbe{
+			VideoStreamFound: true,
+			DolbyVision:      false,
+		},
+		nil,
+		map[string]any{
+			"trusted_tone_map": trustedToneMapDVSdr,
+			"tone_mapped_sdr":  true,
+			"tone_map_source":  "dolby_vision",
+			"tone_map_target":  "sdr_bt709",
+		},
+	)
+
+	if metadata["trusted_compat_output"] != trustedToneMapDVSdr {
+		t.Fatalf("expected trusted compat output marker, got %v", metadata["trusted_compat_output"])
+	}
+	if metadata["tone_mapped_sdr"] != true {
+		t.Fatalf("expected tone_mapped_sdr true, got %v", metadata["tone_mapped_sdr"])
+	}
+}
+
+func TestBuildPlaybackCompatibilityMetadataDoesNotTrustDVSdrWithoutTranscodeMarker(t *testing.T) {
+	t.Parallel()
+
+	metadata := BuildPlaybackCompatibilityMetadata(
+		ffmpeg.PlaybackCompatibilityProbe{
+			VideoStreamFound: true,
+			DolbyVision:      true,
+		},
+		nil,
+		ffmpeg.PlaybackCompatibilityProbe{
+			VideoStreamFound: true,
+			DolbyVision:      false,
+		},
+		nil,
+		map[string]any{
+			"tone_mapped_sdr": true,
+		},
+	)
+
+	if _, ok := metadata["trusted_compat_output"]; ok {
+		t.Fatalf("did not expect trusted compat output without complete marker, got %#v", metadata)
+	}
+}
+
 func TestBuildPlaybackCompatibilityMetadataProbeFailed(t *testing.T) {
 	t.Parallel()
 

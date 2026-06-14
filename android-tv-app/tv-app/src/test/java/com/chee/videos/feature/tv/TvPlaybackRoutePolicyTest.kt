@@ -49,6 +49,23 @@ class TvPlaybackRoutePolicyTest {
     }
 
     @Test
+    fun sourceDolbyVisionTrustedToneMappedSdrOutput_usesVlcRoute() {
+        val route = resolveTvPlaybackRoute(
+            metadata = playbackCompat(
+                sourceDolbyVision = true,
+                outputDolbyVision = false,
+                trustedToneMappedSdr = true,
+            ),
+            displayCapability = unsupportedDisplayCapability(),
+            playbackUrl = "https://example.test/video.mp4",
+            media3Available = false,
+        )
+
+        assertEquals(TvPlaybackRouteKind.VLC, route.kind)
+        assertEquals(null, route.blockMessage)
+    }
+
+    @Test
     fun outputDolbyVisionWithSupportedDisplayAndMedia3_usesMedia3DedicatedRoute() {
         val route = resolveTvPlaybackRoute(
             metadata = playbackCompat(sourceDolbyVision = true, outputDolbyVision = true),
@@ -155,14 +172,19 @@ class TvPlaybackRoutePolicyTest {
 private fun playbackCompat(
     sourceDolbyVision: Boolean,
     outputDolbyVision: Boolean,
+    trustedToneMappedSdr: Boolean = false,
 ): Map<String, Any?> =
     mapOf(
-        "playback_compat" to mapOf(
-            "version" to 1,
-            "status" to "ok",
-            "source" to mapOf("dolby_vision" to sourceDolbyVision),
-            "output" to mapOf("dolby_vision" to outputDolbyVision),
-        ),
+        "playback_compat" to buildMap<String, Any?> {
+            put("version", 1)
+            put("status", "ok")
+            put("source", mapOf("dolby_vision" to sourceDolbyVision))
+            put("output", mapOf("dolby_vision" to outputDolbyVision))
+            if (trustedToneMappedSdr) {
+                put("trusted_compat_output", "dv_sdr_bt709")
+                put("tone_mapped_sdr", true)
+            }
+        },
     )
 
 private fun supportedDisplayCapability(): DolbyVisionDisplayCapability =

@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 08:40 +0800
+- 进度：完成 DV-only 可信 SDR 兼容输出的收尾验证。后端 DV tone-map 转码、可信兼容 metadata、TV 端播放放行与版本号更新都已通过定向/全量验证；本次只纳入相关 Go、TV、`CONTEXT.md` 和 `plan.md` 文件，未处理用户已有的 `admin-web/.env.development`。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；待执行 `git diff --check`、乱码检查与最终提交。
+
+## 2026-06-14 08:38 +0800
+- 进度：完成仅针对 DV 视频的可信 SDR 兼容输出实现与 TV 端收口。后端新增 `dv_sdr_compat` 转码档位，source probe 确认为 Dolby Vision 且转码结果带显式 tone-map 标记时，输出走 H.264 VideoToolbox + SDR tone-map，兼容源路径复用同一份成品；`playback_compat` 写入可信兼容标记后，TV 端仅在该标记存在时允许 source DV / output 非 DV 走普通 LibVLC 链路。TV 端版本同步提升到 `0.1.91`。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPlaybackRoutePolicyTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.PlaybackCompatibilityPolicyTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过；待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check`、乱码检查与最终提交。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
+## 2026-06-14 08:19 +0800
+- 进度：开始实现仅针对 DV 视频的 tone-map SDR 兼容转码。方案收口为：普通视频保持现有输出；source playback probe 确认为 Dolby Vision 时，服务端转码改走 H.264 VideoToolbox 硬编 + SDR tone-map 输出，并写入可信兼容标记；TV 端只在该标记存在时允许 source DV / output 非 DV 走普通播放链路。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`internal/queue/tasks.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、相关测试、`CONTEXT.md`、`plan.md`
+- 验证：待补红灯测试后执行 `go test ./pkg/ffmpeg ./internal/services ./internal/queue`、TV 播放兼容策略定向测试、必要的 TV 单测/构建、`git diff --check` 与乱码检查。保留用户已有 `admin-web/.env.development` 不纳入本轮提交。
+
 ## 2026-06-14 02:57 +0800
 - 进度：完成电视剧播放源准备态修复收尾，准备提交。本次只纳入 TV 端播放准备态代码、测试、版本号、`CONTEXT.md` 术语和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保留未提交。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerPreparingStateSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

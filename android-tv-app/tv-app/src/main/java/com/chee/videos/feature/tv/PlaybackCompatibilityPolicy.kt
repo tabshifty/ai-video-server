@@ -22,6 +22,7 @@ internal enum class TvPlaybackRouteKind {
 }
 
 private const val PlaybackCompatibilityKey = "playback_compat"
+private const val TrustedToneMappedSdrOutput = "dv_sdr_bt709"
 private const val PlaybackCompatibilityIncompleteMessage = "播放兼容信息不完整，暂不能确认安全播放"
 private const val DolbyVisionTranscodeOutputMessage = "该视频来源为杜比视界，当前压缩结果可能无法安全播放"
 private const val DolbyVisionUnsupportedMessage = "该视频可能为杜比视界，当前设备或播放链路不支持安全播放"
@@ -49,7 +50,7 @@ internal fun resolveTvPlaybackCandidateDecision(
             blockMessage = PlaybackCompatibilityIncompleteMessage,
         )
         is PlaybackCompatibilityPayload.Ok -> {
-            if (compatibility.sourceDolbyVision && !compatibility.outputDolbyVision) {
+            if (compatibility.hasUnsafeDolbyVisionTranscodeOutput()) {
                 TvPlaybackCandidateDecision(
                     allowed = false,
                     blockMessage = DolbyVisionTranscodeOutputMessage,
@@ -88,7 +89,7 @@ private fun resolveCompatibilityDecision(
             blockMessage = DolbyVisionUnsupportedMessage,
         )
     }
-    if (compatibility.sourceDolbyVision) {
+    if (compatibility.hasUnsafeDolbyVisionTranscodeOutput()) {
         return TvPlaybackCompatibilityDecision(
             allowed = false,
             blockMessage = DolbyVisionTranscodeOutputMessage,
@@ -104,7 +105,7 @@ private fun resolvePlaybackRoute(
     media3Available: Boolean,
 ): TvPlaybackRoute {
     if (!compatibility.outputDolbyVision) {
-        return if (compatibility.sourceDolbyVision) {
+        return if (compatibility.hasUnsafeDolbyVisionTranscodeOutput()) {
             blockPlaybackRoute(DolbyVisionTranscodeOutputMessage)
         } else {
             TvPlaybackRoute(kind = TvPlaybackRouteKind.VLC)
@@ -151,8 +152,12 @@ private sealed class PlaybackCompatibilityPayload {
     data class Ok(
         val sourceDolbyVision: Boolean,
         val outputDolbyVision: Boolean,
+        val trustedToneMappedSdr: Boolean,
     ) : PlaybackCompatibilityPayload()
 }
+
+private fun PlaybackCompatibilityPayload.Ok.hasUnsafeDolbyVisionTranscodeOutput(): Boolean =
+    sourceDolbyVision && !outputDolbyVision && !trustedToneMappedSdr
 
 private fun parsePlaybackCompatibility(metadata: Map<String, Any?>?): PlaybackCompatibilityPayload {
     val compatibility = metadata?.get(PlaybackCompatibilityKey) ?: return PlaybackCompatibilityPayload.Historical
@@ -171,9 +176,12 @@ private fun parsePlaybackCompatibility(metadata: Map<String, Any?>?): PlaybackCo
         ?: return PlaybackCompatibilityPayload.Incomplete
     val outputDolbyVision = optionalBooleanValue(output["dolby_vision"])
         ?: return PlaybackCompatibilityPayload.Incomplete
+    val trustedToneMappedSdr = stringValue(block["trusted_compat_output"]) == TrustedToneMappedSdrOutput &&
+        optionalBooleanValue(block["tone_mapped_sdr"]) == true
     return PlaybackCompatibilityPayload.Ok(
         sourceDolbyVision = sourceDolbyVision,
         outputDolbyVision = outputDolbyVision,
+        trustedToneMappedSdr = trustedToneMappedSdr,
     )
 }
 

@@ -26,6 +26,7 @@ func BuildPlaybackCompatibilityMetadata(
 	sourceErr error,
 	output ffmpeg.PlaybackCompatibilityProbe,
 	outputErr error,
+	transcodeMetadata ...map[string]any,
 ) map[string]any {
 	metadata := map[string]any{
 		"version":            playbackCompatibilityVersion,
@@ -37,6 +38,10 @@ func BuildPlaybackCompatibilityMetadata(
 		"output_probe_ok":    outputErr == nil && output.VideoStreamFound,
 		"source_video_found": source.VideoStreamFound,
 		"output_video_found": output.VideoStreamFound,
+	}
+	if isTrustedDVSdrOutput(source, sourceErr, output, outputErr, transcodeMetadata...) {
+		metadata["trusted_compat_output"] = trustedToneMapDVSdr
+		metadata["tone_mapped_sdr"] = true
 	}
 	if sourceErr != nil {
 		metadata["status"] = playbackCompatibilityStatusProbeFailed
@@ -55,6 +60,43 @@ func BuildPlaybackCompatibilityMetadata(
 	return metadata
 }
 
+func isTrustedDVSdrOutput(
+	source ffmpeg.PlaybackCompatibilityProbe,
+	sourceErr error,
+	output ffmpeg.PlaybackCompatibilityProbe,
+	outputErr error,
+	transcodeMetadata ...map[string]any,
+) bool {
+	if sourceErr != nil || outputErr != nil {
+		return false
+	}
+	if !source.VideoStreamFound || !output.VideoStreamFound {
+		return false
+	}
+	if !source.DolbyVision || output.DolbyVision {
+		return false
+	}
+	for _, metadata := range transcodeMetadata {
+		if metadata == nil {
+			continue
+		}
+		if stringFromMetadata(metadata["trusted_tone_map"]) != trustedToneMapDVSdr {
+			continue
+		}
+		if boolFromMetadata(metadata["tone_mapped_sdr"]) != true {
+			continue
+		}
+		if stringFromMetadata(metadata["tone_map_source"]) != "dolby_vision" {
+			continue
+		}
+		if stringFromMetadata(metadata["tone_map_target"]) != "sdr_bt709" {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func playbackProbeMetadata(probe ffmpeg.PlaybackCompatibilityProbe) map[string]any {
 	return map[string]any{
 		"video_stream_found":     probe.VideoStreamFound,
@@ -70,5 +112,23 @@ func playbackProbeMetadata(probe ffmpeg.PlaybackCompatibilityProbe) map[string]a
 		"dolby_vision_level":     probe.DolbyVisionLevel,
 		"dolby_vision_compat_id": probe.DolbyVisionCompatID,
 		"hdr":                    probe.HDR,
+	}
+}
+
+func stringFromMetadata(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	default:
+		return ""
+	}
+}
+
+func boolFromMetadata(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return v
+	default:
+		return false
 	}
 }

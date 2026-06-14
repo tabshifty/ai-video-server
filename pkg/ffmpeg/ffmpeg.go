@@ -69,6 +69,7 @@ type TranscodeProfile string
 const (
 	TranscodeProfileHEVCPrimary TranscodeProfile = "hevc_primary"
 	TranscodeProfileAVCCompat   TranscodeProfile = "avc_compat"
+	TranscodeProfileDVSdrCompat TranscodeProfile = "dv_sdr_compat"
 )
 
 // TranscodeProgress represents ffmpeg realtime progress.
@@ -86,7 +87,7 @@ func preferredHardwareAvcEncoder() string { return "h264_videotoolbox" }
 func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProfile, options TranscodeOptions) []string {
 	encoder := preferredHardwareHevcEncoder()
 	switch profile {
-	case TranscodeProfileAVCCompat:
+	case TranscodeProfileAVCCompat, TranscodeProfileDVSdrCompat:
 		encoder = preferredHardwareAvcEncoder()
 	case TranscodeProfileHEVCPrimary:
 	default:
@@ -110,6 +111,13 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		if options.SpatialAQ {
 			args = append(args, "-spatial_aq", "1")
 		}
+	case TranscodeProfileDVSdrCompat:
+		args = append(args,
+			"-vf", "zscale=t=linear:npl=100,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p",
+			"-color_primaries", "bt709",
+			"-color_trc", "bt709",
+			"-colorspace", "bt709",
+		)
 	}
 	if options.VideoBitrateKbps > 0 {
 		bitrate := strconv.Itoa(options.VideoBitrateKbps) + "k"
@@ -162,7 +170,7 @@ func TranscodeVideo(ctx context.Context, inputPath, outputPath string, profile T
 	if waitErr != nil {
 		output := stderr.String()
 		encoder := preferredHardwareHevcEncoder()
-		if profile == TranscodeProfileAVCCompat {
+		if profile == TranscodeProfileAVCCompat || profile == TranscodeProfileDVSdrCompat {
 			encoder = preferredHardwareAvcEncoder()
 		}
 		if isEncoderUnavailableOutput(output, encoder) {
