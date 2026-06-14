@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 14:12 +0800
+- 进度：完成失败 DV 源片的真实重转码验证。重新入队视频 `d967fccb-f20b-4d7d-a82b-03c94f3a26d9` 后，远端 asynq job `8672` 已从 `running` 正常结束为 `success`；视频状态转为 `ready`，输出落在 `/Volumes/large/videos/videos/d967fccb-f20b-4d7d-a82b-03c94f3a26d9/video-dv-sdr.mp4`。本次只追加部署验证账本，用户已有 `admin-web/.env.development` 仍保持未提交且不纳入。
+- 影响文件：`plan.md`
+- 验证：worker 进度轮询显示 `8672|success|2796|2796|0|100.00`；数据库查询返回 `ready|.../video-dv-sdr.mp4|dv_sdr_compat|dv_sdr_bt709|h264|h264`；远端 `ffprobe` 确认输出为 `h264`、`yuv420p`、`bt709`、`tv` range；远端 `ls -lh` 确认 `video-dv-sdr.mp4` 约 `2.7G` 且 `thumb.jpg` 已生成。
+
 ## 2026-06-14 13:22 +0800
 - 进度：完成 DV→SDR 转码滤镜修复的本地验证，准备提交并推送部署。本次只纳入后端 Go 转码/探测代码、对应测试、`CONTEXT.md` 长期约定和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`CONTEXT.md`、`plan.md`
