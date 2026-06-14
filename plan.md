@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 12:35 +0800
+- 进度：完成家用部署机 `ffmpeg-full` 安装与运行环境切换。远端已安装 `ffmpeg-full 8.1.1`，验证编译参数包含 `--enable-libzimg`，滤镜列表包含 `zscale` 与 `tonemap`，并链接 `libzimg`。已备份远端 `~/Library/LaunchAgents/com.aivideo.{server,worker}.plist` 到 `.bak-20260614123228`，将 server / worker 的 launchd PATH 调整为 `/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin` 后重新 bootstrap；server pid `29201`、worker pid `29203` 已运行。安装过程中 Homebrew cleanup 曾移除 Node 并破坏普通 ffmpeg 旧依赖，已恢复：`node v26.3.0` / `npm 11.16.0` 可用，普通 `ffmpeg 8.1.1` 可执行但仍不含 `zscale`，本项目通过 PATH 使用 `ffmpeg-full`。失败的 DV 转码任务在旧环境下已重试耗尽，需要后续重新入队/重转码才会使用新 ffmpeg。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；远端运维文件 `~/Library/LaunchAgents/com.aivideo.{server,worker}.plist` 已手动更新
+- 验证：远端 `ffmpeg -hide_banner -filters` 在新 PATH 下返回 `zscale` 与 `tonemap`；`otool -L /opt/homebrew/opt/ffmpeg-full/bin/ffmpeg` 显示 `libzimg`；`launchctl print gui/501/com.aivideo.{server,worker}` 显示新 PATH 且 state=running；`curl http://127.0.0.1:8080/healthz`、`curl http://192.168.1.24:8080/healthz`、`curl http://127.0.0.1:8080/admin/` 均返回成功。
+
+## 2026-06-14 12:17 +0800
+- 进度：开始排查家用部署机 DV→SDR 转码失败。已确认 `deploy` remote 指向 `chee@192.168.1.24`，远端 worker 由 launchd 运行，PATH 包含 `/opt/homebrew/bin`，实际使用 `/opt/homebrew/bin/ffmpeg`。部署机当前 ffmpeg 8.1 滤镜列表只有 `tonemap`，没有 `zscale`，二进制未链接 `zimg`；Homebrew core 的普通 `ffmpeg` 公式没有 `zimg` 依赖，单独 `brew install zimg` 不会让现有 ffmpeg 获得 `zscale`。部署机可用的 `ffmpeg-full` 公式包含 `zimg`，但为 keg-only，需要安装后显式让 worker PATH 优先使用 `/opt/homebrew/opt/ffmpeg-full/bin` 或等价方式。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：远端 `launchctl print gui/501/com.aivideo.worker` 确认 worker 环境；远端 `/opt/homebrew/bin/ffmpeg -hide_banner -filters` 未发现 `zscale`；远端 `brew info ffmpeg-full` 显示依赖包含 `zimg`。
+
 ## 2026-06-14 11:36 +0800
 - 进度：开始落地 TV 参考图视觉换代第三批。范围限定为播放器 UI 与连接/状态功能页：长视频/电视剧播放器共用控件、字幕/音轨选择浮层、返回确认、续播/连播提示卡、TV 连接服务器页、配对页以及共享加载/错误/空态；本批只替换旧蓝青/冷色/白字金底等视觉残留，不改变播放内核、遥控器按键路由、播放历史上报、服务器连接流程或页面导航结构。用户已有 `admin-web/.env.development` 保持未提交且不纳入本轮。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/SubtitlePicker.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPlayerBackConfirm.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvResumePromptCard.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvAutoplayPromptCard.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvPairingScreen.kt`、相关测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
