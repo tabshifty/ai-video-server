@@ -57,7 +57,7 @@ const query = reactive({
   q: '',
   status: '',
   abi_completeness: '',
-  current_published: true
+  current_published: false
 })
 const data = reactive({
   items: [],
@@ -179,7 +179,7 @@ function resetQuery() {
   query.q = ''
   query.status = ''
   query.abi_completeness = ''
-  query.current_published = true
+  query.current_published = false
 }
 
 function changeClientType(nextType) {
@@ -221,6 +221,7 @@ async function uploadAPK(replaceExisting = false) {
   try {
     await uploadAdminTVAppAPK(formData, clientType.value)
     uploadFiles.value = []
+    query.page = 1
     ElMessage.success(replaceExisting ? 'APK 已替换' : 'APK 已上传')
     await load()
   } catch (error) {
@@ -329,7 +330,7 @@ onMounted(load)
             <el-option label="缺少 ABI" value="missing" />
             <el-option label="空记录" value="empty" />
           </el-select>
-          <el-switch v-model="query.current_published" active-text="默认只看家庭可见" inactive-text="查看全部" @change="load" />
+          <el-switch v-model="query.current_published" active-text="只看家庭可见" inactive-text="查看全部" @change="load" />
         </template>
         <template #actions>
           <el-button type="primary" :icon="UploadFilled" :loading="uploadLoading" @click="uploadAPK(false)">上传 APK</el-button>
@@ -374,7 +375,7 @@ onMounted(load)
 
       <SectionCard>
         <template #title>发布记录</template>
-        <template #description>{{ clientMeta.supportsAbi ? '默认先看当前家庭可见记录，支持按状态、版本和 ABI 完整性叠加筛选。' : '默认先看当前家庭可见记录，支持按状态和版本筛选。' }}</template>
+        <template #description>{{ clientMeta.supportsAbi ? '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态、版本和 ABI 完整性叠加筛选。' : '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态和版本筛选。' }}</template>
         <EmptyState v-if="!data.total_count" :title="clientMeta.emptyTitle" :description="clientMeta.emptyDesc" />
         <template v-else>
           <div class="table-wrap">

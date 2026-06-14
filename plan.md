@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 20:19 +0800
+- 进度：完成 TV App 安装包管理页默认筛选修复。页面初始化和切客户端重置筛选时都默认查看全部发布记录，开关文案改为“只看家庭可见 / 查看全部”；上传成功后回到第一页再刷新，避免仍停在其它分页导致新草稿不易发现。`CONTEXT.md` 同步把长期约定改为“TV 管理端默认查看全部记录”。本次只纳入管理端页面、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`admin-web/src/views/TvAppManage.vue`、`admin-web/src/views/tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/tvAppManagePage.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check -- admin-web/src/views/TvAppManage.vue admin-web/src/views/tvAppManagePage.spec.js CONTEXT.md plan.md` 通过；乱码扫描无命中。
+
+## 2026-06-14 20:17 +0800
+- 进度：按用户补充要求修正方案：不是上传成功后临时切换“家庭可见”筛选，而是安装包管理页默认就不勾选“只看家庭可见”，打开页面、切客户端重置筛选后都应查看全部记录；上传成功后只回到第一页并刷新，不改动当前筛选开关语义。
+- 影响文件：`admin-web/src/views/TvAppManage.vue`、`admin-web/src/views/tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行更新后的管理端定向 Vitest、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
+## 2026-06-14 20:15 +0800
+- 进度：开始修复 TV App Release APK 上传成功后管理端看不到记录的问题。当前代码默认启用“只看家庭可见”，上传接口建档后的新记录仍是草稿，`uploadAPK()` 成功后直接刷新列表会继续被 `current_published=1` 过滤；本次计划在上传成功后自动切到“查看全部”并回到第一页，让刚上传的草稿记录可见。用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`admin-web/src/views/TvAppManage.vue`、管理端页面源文测试、`CONTEXT.md`、`plan.md`
+- 验证：待执行管理端定向 Vitest、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-14 20:04 +0800
 - 进度：完成 TV App 开屏页图片接入。用户提供图片已作为 `drawable-nodpi/tv_splash_image.png` 引入，`Theme.VideoHome.Starting` 通过窗口背景展示开屏页，`TvMainActivity.onCreate` 在 `super.onCreate` 前切回 `Theme.VideoHome`，避免开屏背景影响后续 Compose 页面；TV 端版本提升到 `0.1.98 / 98`。`CONTEXT.md` 同步记录“TV 开屏页图片”只覆盖 Compose 首帧前空白，不新增固定等待页。本次只纳入 TV splash 相关资源/代码/测试、TV 版本号、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`android-tv-app/tv-app/src/main/AndroidManifest.xml`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvMainActivity.kt`、`android-tv-app/tv-app/src/main/res/values/themes.xml`、`android-tv-app/tv-app/src/main/res/drawable/tv_splash_background.xml`、`android-tv-app/tv-app/src/main/res/drawable-nodpi/tv_splash_image.png`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvSplashScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
