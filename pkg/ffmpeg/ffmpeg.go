@@ -37,6 +37,7 @@ type PlaybackCompatibilityProbe struct {
 	Profile             string
 	CodecTag            string
 	PixelFormat         string
+	ColorRange          string
 	ColorTransfer       string
 	ColorPrimaries      string
 	ColorSpace          string
@@ -57,11 +58,12 @@ type SubtitleProbe struct {
 
 // TranscodeOptions controls H.265 transcoding behavior.
 type TranscodeOptions struct {
-	CRF              string
-	VideoBitrateKbps int
-	SourceDuration   int
-	SpatialAQ        bool
-	ProgressHandler  func(TranscodeProgress)
+	CRF                 string
+	VideoBitrateKbps    int
+	SourceDuration      int
+	SpatialAQ           bool
+	SourcePlaybackProbe PlaybackCompatibilityProbe
+	ProgressHandler     func(TranscodeProgress)
 }
 
 type TranscodeProfile string
@@ -70,6 +72,13 @@ const (
 	TranscodeProfileHEVCPrimary TranscodeProfile = "hevc_primary"
 	TranscodeProfileAVCCompat   TranscodeProfile = "avc_compat"
 	TranscodeProfileDVSdrCompat TranscodeProfile = "dv_sdr_compat"
+)
+
+const (
+	defaultDVSdrInputPrimaries = "bt2020"
+	defaultDVSdrInputTransfer  = "smpte2084"
+	defaultDVSdrInputMatrix    = "bt2020nc"
+	defaultDVSdrInputRange     = "pc"
 )
 
 // TranscodeProgress represents ffmpeg realtime progress.
@@ -113,7 +122,7 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		}
 	case TranscodeProfileDVSdrCompat:
 		args = append(args,
-			"-vf", "zscale=t=linear:npl=100,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:p=bt709:r=tv,format=yuv420p",
+			"-vf", buildDVSdrCompatFilter(options.SourcePlaybackProbe),
 			"-color_primaries", "bt709",
 			"-color_trc", "bt709",
 			"-colorspace", "bt709",
@@ -142,6 +151,57 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		outputPath,
 	)
 	return args
+}
+
+func buildDVSdrCompatFilter(probe PlaybackCompatibilityProbe) string {
+	primariesIn := zscaleInputPrimaries(probe.ColorPrimaries)
+	transferIn := zscaleInputTransfer(probe.ColorTransfer)
+	matrixIn := zscaleInputMatrix(probe.ColorSpace)
+	rangeIn := zscaleInputRange(probe.ColorRange)
+	return fmt.Sprintf(
+		"zscale=primariesin=%s:transferin=%s:matrixin=%s:rangein=%s:primaries=%s:transfer=linear:matrix=%s:range=%s,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=primaries=bt709:transfer=bt709:matrix=bt709:range=tv,format=yuv420p",
+		primariesIn,
+		transferIn,
+		matrixIn,
+		rangeIn,
+		primariesIn,
+		matrixIn,
+		rangeIn,
+	)
+}
+
+func zscaleInputPrimaries(value string) string {
+	return colorValueOrDefault(value, defaultDVSdrInputPrimaries)
+}
+
+func zscaleInputTransfer(value string) string {
+	return colorValueOrDefault(value, defaultDVSdrInputTransfer)
+}
+
+func zscaleInputMatrix(value string) string {
+	return colorValueOrDefault(value, defaultDVSdrInputMatrix)
+}
+
+func zscaleInputRange(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "unknown", "unspecified":
+		return defaultDVSdrInputRange
+	case "full":
+		return "pc"
+	case "limited":
+		return "tv"
+	default:
+		return strings.TrimSpace(value)
+	}
+}
+
+func colorValueOrDefault(value, fallback string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "unknown", "unspecified":
+		return fallback
+	default:
+		return strings.TrimSpace(value)
+	}
 }
 
 func TranscodeVideo(ctx context.Context, inputPath, outputPath string, profile TranscodeProfile, options TranscodeOptions) error {
@@ -394,7 +454,7 @@ func parseProbeOutput(raw []byte) (VideoProbe, error) {
 func ProbePlaybackCompatibility(ctx context.Context, inputPath string) (PlaybackCompatibilityProbe, error) {
 	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
-		"-show_entries", "stream=codec_type,codec_name,codec_tag_string,profile,pix_fmt,color_transfer,color_primaries,color_space:stream_side_data=side_data_type,dv_profile,dv_level,dv_bl_signal_compatibility_id",
+		"-show_entries", "stream=codec_type,codec_name,codec_tag_string,profile,pix_fmt,color_range,color_transfer,color_primaries,color_space:stream_side_data=side_data_type,dv_profile,dv_level,dv_bl_signal_compatibility_id",
 		"-of", "json",
 		inputPath,
 	)
@@ -419,6 +479,7 @@ func parsePlaybackCompatibilityProbeOutput(raw []byte) (PlaybackCompatibilityPro
 			CodecTagString string            `json:"codec_tag_string"`
 			Profile        string            `json:"profile"`
 			PixelFormat    string            `json:"pix_fmt"`
+			ColorRange     string            `json:"color_range"`
 			ColorTransfer  string            `json:"color_transfer"`
 			ColorPrimaries string            `json:"color_primaries"`
 			ColorSpace     string            `json:"color_space"`
@@ -438,6 +499,7 @@ func parsePlaybackCompatibilityProbeOutput(raw []byte) (PlaybackCompatibilityPro
 			Profile:          strings.TrimSpace(stream.Profile),
 			CodecTag:         strings.TrimSpace(stream.CodecTagString),
 			PixelFormat:      strings.TrimSpace(stream.PixelFormat),
+			ColorRange:       strings.TrimSpace(stream.ColorRange),
 			ColorTransfer:    strings.TrimSpace(stream.ColorTransfer),
 			ColorPrimaries:   strings.TrimSpace(stream.ColorPrimaries),
 			ColorSpace:       strings.TrimSpace(stream.ColorSpace),

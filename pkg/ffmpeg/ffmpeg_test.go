@@ -66,7 +66,15 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 }
 
 func TestBuildTranscodeVideoArgsForDVSdrCompat(t *testing.T) {
-	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileDVSdrCompat, TranscodeOptions{VideoBitrateKbps: 5000})
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileDVSdrCompat, TranscodeOptions{
+		VideoBitrateKbps: 5000,
+		SourcePlaybackProbe: PlaybackCompatibilityProbe{
+			ColorRange:     "pc",
+			ColorTransfer:  "smpte2084",
+			ColorPrimaries: "bt2020",
+			ColorSpace:     "bt2020nc",
+		},
+	})
 
 	assertArgPair(t, args, "-c:v", "h264_videotoolbox")
 	assertArgPair(t, args, "-pix_fmt", "yuv420p")
@@ -78,7 +86,7 @@ func TestBuildTranscodeVideoArgsForDVSdrCompat(t *testing.T) {
 	assertArgPair(t, args, "-color_trc", "bt709")
 	assertArgPair(t, args, "-colorspace", "bt709")
 	filter := argValue(t, args, "-vf")
-	assertContainsAll(t, filter, "zscale", "tonemap=tonemap=hable", "bt709", "format=yuv420p")
+	assertContainsAll(t, filter, "primariesin=bt2020", "transferin=smpte2084", "matrixin=bt2020nc", "rangein=pc", "format=gbrpf32le", "tonemap=tonemap=hable", "primaries=bt709", "transfer=bt709", "matrix=bt709", "range=tv", "format=yuv420p")
 	assertArgPair(t, args, "-map", "0:v:0")
 	assertArgPair(t, args, "-map", "0:a:0?")
 	assertArgPair(t, args, "-c:a", "aac")
@@ -87,6 +95,13 @@ func TestBuildTranscodeVideoArgsForDVSdrCompat(t *testing.T) {
 	assertArgAbsent(t, args, "-spatial_aq")
 	assertArgAbsent(t, args, "-preset")
 	assertArgAbsent(t, args, "-x265-params")
+}
+
+func TestBuildTranscodeVideoArgsForDVSdrCompatFallsBackToKnownDefaults(t *testing.T) {
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileDVSdrCompat, TranscodeOptions{})
+
+	filter := argValue(t, args, "-vf")
+	assertContainsAll(t, filter, "primariesin=bt2020", "transferin=smpte2084", "matrixin=bt2020nc", "rangein=pc")
 }
 
 func TestBuildConvertSubtitleToWebVTTArgs(t *testing.T) {
@@ -227,6 +242,7 @@ func TestParsePlaybackCompatibilityProbeOutputDetectsDolbyVisionSideData(t *test
 				"codec_tag_string": "dvh1",
 				"profile": "Main 10",
 				"pix_fmt": "yuv420p10le",
+				"color_range": "pc",
 				"color_transfer": "smpte2084",
 				"color_primaries": "bt2020",
 				"color_space": "bt2020nc",
@@ -255,6 +271,9 @@ func TestParsePlaybackCompatibilityProbeOutputDetectsDolbyVisionSideData(t *test
 	if probe.DolbyVisionProfile != 8 || probe.DolbyVisionLevel != 6 || probe.DolbyVisionCompatID != 1 {
 		t.Fatalf("unexpected Dolby Vision fields: profile=%d level=%d compat=%d", probe.DolbyVisionProfile, probe.DolbyVisionLevel, probe.DolbyVisionCompatID)
 	}
+	if probe.ColorRange != "pc" {
+		t.Fatalf("expected color range pc, got %q", probe.ColorRange)
+	}
 	if !probe.HDR {
 		t.Fatalf("expected HDR detection")
 	}
@@ -269,6 +288,7 @@ func TestParsePlaybackCompatibilityProbeOutputDoesNotTreatPlainHDRAsDolbyVision(
 				"codec_tag_string": "hvc1",
 				"profile": "Main 10",
 				"pix_fmt": "p010le",
+				"color_range": "pc",
 				"color_transfer": "arib-std-b67",
 				"color_primaries": "bt2020",
 				"color_space": "bt2020nc"
@@ -285,6 +305,9 @@ func TestParsePlaybackCompatibilityProbeOutputDoesNotTreatPlainHDRAsDolbyVision(
 	}
 	if probe.DolbyVision {
 		t.Fatalf("did not expect Dolby Vision detection")
+	}
+	if probe.ColorRange != "pc" {
+		t.Fatalf("expected color range pc, got %q", probe.ColorRange)
 	}
 	if !probe.HDR {
 		t.Fatalf("expected HDR detection")

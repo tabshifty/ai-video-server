@@ -15,6 +15,7 @@ func TestBuildPlaybackCompatibilityMetadataOK(t *testing.T) {
 			VideoStreamFound:   true,
 			Codec:              "hevc",
 			CodecTag:           "dvh1",
+			ColorRange:         "pc",
 			DolbyVision:        true,
 			DolbyVisionProfile: 8,
 			HDR:                true,
@@ -41,6 +42,9 @@ func TestBuildPlaybackCompatibilityMetadataOK(t *testing.T) {
 	source := metadata["source"].(map[string]any)
 	if source["dolby_vision"] != true || source["dolby_vision_profile"] != 8 {
 		t.Fatalf("unexpected source metadata: %#v", source)
+	}
+	if source["color_range"] != "pc" {
+		t.Fatalf("expected source color_range pc, got %v", source["color_range"])
 	}
 	output := metadata["output"].(map[string]any)
 	if output["dolby_vision"] != false || output["codec_tag"] != "hvc1" {

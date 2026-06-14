@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 13:22 +0800
+- 进度：完成 DV→SDR 转码滤镜修复的本地验证，准备提交并推送部署。本次只纳入后端 Go 转码/探测代码、对应测试、`CONTEXT.md` 长期约定和 `plan.md` 记录；用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/playback_compat.go`、`internal/services/playback_compat_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`go test ./... -count=1` 通过；待执行最终 `git diff --check`、乱码检查、提交与 `git push deploy master`。
+
+## 2026-06-14 13:13 +0800
+- 进度：继续修复家用部署机 DV→SDR 转码失败。部署机 `ffmpeg-full 8.1.1` 已具备 `zscale`，但失败源片的 ffprobe 只暴露 DOVI side data 与 `color_range=pc`，缺少 `color_primaries/color_transfer/color_space`，原滤镜链让 `zscale` 猜输入色彩并报 `code 3074: no path between colorspaces`。已将 `dv_sdr_compat` 滤镜改为显式输入 BT.2020 / SMPTE 2084 / BT.2020nc / full range，先转线性 `gbrpf32le` 中间格式再 `tonemap`，最后输出 SDR BT.709；播放兼容探测同步读取并落库 `color_range`。部署机上已用失败源片跑首帧验证，新滤镜链可正常输出 `yuv420p(tv, bt709)`。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/playback_compat.go`、`CONTEXT.md`、`plan.md`
+- 验证：远端 `ffprobe` 确认失败源片仅有 `pix_fmt=yuv420p10le`、`color_range=pc` 与 DOVI side data；远端 `ffmpeg ... -vf "zscale=primariesin=bt2020:transferin=smpte2084:matrixin=bt2020nc:rangein=pc:primaries=bt2020:transfer=linear:matrix=bt2020nc:range=pc,format=gbrpf32le,tonemap=tonemap=hable:desat=0,zscale=primaries=bt709:transfer=bt709:matrix=bt709:range=tv,format=yuv420p" -frames:v 1 -f null -` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；待执行 `git diff --check`、乱码检查并提交部署。
+
 ## 2026-06-14 12:35 +0800
 - 进度：完成家用部署机 `ffmpeg-full` 安装与运行环境切换。远端已安装 `ffmpeg-full 8.1.1`，验证编译参数包含 `--enable-libzimg`，滤镜列表包含 `zscale` 与 `tonemap`，并链接 `libzimg`。已备份远端 `~/Library/LaunchAgents/com.aivideo.{server,worker}.plist` 到 `.bak-20260614123228`，将 server / worker 的 launchd PATH 调整为 `/opt/homebrew/opt/ffmpeg-full/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin` 后重新 bootstrap；server pid `29201`、worker pid `29203` 已运行。安装过程中 Homebrew cleanup 曾移除 Node 并破坏普通 ffmpeg 旧依赖，已恢复：`node v26.3.0` / `npm 11.16.0` 可用，普通 `ffmpeg 8.1.1` 可执行但仍不含 `zscale`，本项目通过 PATH 使用 `ffmpeg-full`。失败的 DV 转码任务在旧环境下已重试耗尽，需要后续重新入队/重转码才会使用新 ffmpeg。
 - 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`；远端运维文件 `~/Library/LaunchAgents/com.aivideo.{server,worker}.plist` 已手动更新

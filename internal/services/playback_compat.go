@@ -104,6 +104,7 @@ func playbackProbeMetadata(probe ffmpeg.PlaybackCompatibilityProbe) map[string]a
 		"profile":                probe.Profile,
 		"codec_tag":              probe.CodecTag,
 		"pixel_format":           probe.PixelFormat,
+		"color_range":            probe.ColorRange,
 		"color_transfer":         probe.ColorTransfer,
 		"color_primaries":        probe.ColorPrimaries,
 		"color_space":            probe.ColorSpace,

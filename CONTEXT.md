@@ -96,6 +96,8 @@
 - `DV→SDR 兼容输出非默认可信播放源`：把 Dolby Vision 源压成 SDR 输出，不会因为“已经变成 SDR”就自动升级为可信播放源。除非后续任务显式定义独立的色调映射方案与验收标准，否则它仍属于 [[杜比视界转码输出阻断]] 的风险范围。
 - `DV→SDR 可信兼容输出`：当且仅当后端对 Dolby Vision 源执行显式 tone-map 到 SDR BT.709，并把该输出写入 `playback_compat` 的可信标记后，TV App 才能把这份兼容输出当作普通 LibVLC 可播放源处理。这个可信标记的语义是“可安全降级到 SDR”，不是“重新恢复成原生 Dolby Vision”。
 - `DV→SDR 可信兼容输出滤镜依赖`：`dv_sdr_compat` 路径把 `zscale` + `tonemap` 视为可信 SDR 色调映射链路的必要条件；如果当前 ffmpeg 构建缺少这类滤镜能力，该路径必须直接失败，不得静默降级成普通 AVC/HEVC 输出来掩盖已经丢失的色彩语义。
+- `DV→SDR 输入色彩兜底`：Dolby Vision 源文件可能只暴露 DOVI side data 和 `color_range`，不一定在容器/码流 metadata 中显式给出 `color_primaries`、`color_transfer`、`color_space`。`dv_sdr_compat` 不能把这些缺失字段交给 `zscale` 猜测；缺失时按当前可信兼容路径的 Dolby Vision profile 5 风险源前提显式兜底为 BT.2020 / SMPTE 2084 / BT.2020 non-constant luminance / full range，再进入 tone-map。
+- `DV→SDR 线性浮点中间格式`：`dv_sdr_compat` 的 tone-map 链路必须先用 `zscale` 把输入显式转换到线性传递并输出 `gbrpf32le` 中间格式，再执行 `tonemap`，最后再转换到 SDR BT.709 / TV range / `yuv420p`。只给 `zscale` 补 `primariesin`、`transferin`、`matrixin`、`rangein` 但不进入线性浮点中间格式，仍可能在 FFmpeg/libzimg 中报 `no path between colorspaces`。
 - `DV→SDR 统一兼容路线`：当历史 DV 数据会被删除，且后端新 DV 视频统一走 [[DV→SDR 可信兼容输出]] 后，TV App 不再需要保留 source DV / output 非 DV 的阻断路线；只要当前实际 output 不是 Dolby Vision，就按普通 LibVLC 链路播放。TV 端仍保留 output 仍为 Dolby Vision 时的专用链路与能力门控。
 - `DV→SDR 风险阻断限于 TV 端`：当前对 [[DV→SDR 兼容输出非默认可信播放源]] 的风险判定，只进入 TV 端安全播放策略，不自动升级成手机端或其它客户端的统一阻断规则。跨客户端是否统一，需要后续单独权衡播放器能力、提示文案和验收口径。
 - `后端转码压缩不变约束`：杜比视界安全播放改造不得改变现有服务端转码压缩策略、码率/CRF、编码器或输出产物规则；若某个视频只有会异色的源文件且没有可用兼容播放源，TV App 只能检测、避让或提示，不能通过本次改造隐式触发重新压缩来修复色彩。

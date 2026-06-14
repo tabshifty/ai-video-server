@@ -125,10 +125,11 @@ func (s *TranscodeService) ProcessWithOptions(ctx context.Context, videoID uuid.
 		})
 	}
 	transcodeOptions := ffmpeg.TranscodeOptions{
-		CRF:              plan.CRF,
-		VideoBitrateKbps: plan.TargetBitrateKbps,
-		SourceDuration:   sourceDurationSeconds,
-		SpatialAQ:        outputProfile.SpatialAQ,
+		CRF:                 plan.CRF,
+		VideoBitrateKbps:    plan.TargetBitrateKbps,
+		SourceDuration:      sourceDurationSeconds,
+		SpatialAQ:           outputProfile.SpatialAQ,
+		SourcePlaybackProbe: options.SourcePlaybackProbe,
 		ProgressHandler: func(progress ffmpeg.TranscodeProgress) {
 			if progressHandler == nil {
 				return
