@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 21:39 +0800
+- 进度：完成任务监控页 loading 卡死修复。`TaskMonitor.vue` 的自动刷新改为不重入：上一轮 `/admin/tasks` 仍在请求时，5 秒轮询直接跳过，不再堆积并发请求；页面首轮仍会正常加载，手动刷新保持可用。`CONTEXT.md` 增加“任务监控轮询不重入”长期约定。部署机当前确认有 2 个 `ffmpeg` 转码任务正在运行，server / worker 均为 running，和本次前端修复无冲突。本次只纳入任务监控页、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/taskMonitorPage.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check -- admin-web/src/views/TaskMonitor.vue admin-web/src/views/taskMonitorPage.spec.js CONTEXT.md plan.md` 通过；乱码扫描无命中；`ssh chee@192.168.1.24 'curl -sS -m 8 http://127.0.0.1:8080/healthz'` 返回 200。
+
+## 2026-06-14 21:37 +0800
+- 进度：开始排查任务监控页一直 loading。部署机当前确认有 2 个 `ffmpeg` 压缩任务正在运行，server / worker 均为 running；页面代码存在 5 秒自动刷新重入风险：上一轮 `/admin/tasks` 未完成时新一轮 `load()` 会推进 `loadSeq`，旧请求 finally 因序号不匹配不清理 `loading`，请求持续重叠时页面会一直停在 loading。本次计划限制自动轮询不重入，并保留手动刷新可主动发起。
+- 影响文件：`admin-web/src/views/TaskMonitor.vue`、任务监控页面源文测试、`CONTEXT.md`、`plan.md`
+- 验证：待执行管理端定向 Vitest、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-14 20:19 +0800
 - 进度：完成 TV App 安装包管理页默认筛选修复。页面初始化和切客户端重置筛选时都默认查看全部发布记录，开关文案改为“只看家庭可见 / 查看全部”；上传成功后回到第一页再刷新，避免仍停在其它分页导致新草稿不易发现。`CONTEXT.md` 同步把长期约定改为“TV 管理端默认查看全部记录”。本次只纳入管理端页面、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`admin-web/src/views/TvAppManage.vue`、`admin-web/src/views/tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`

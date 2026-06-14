@@ -27,7 +27,11 @@ const successRate = computed(() => {
   return ((successCount.value / total.value) * 100).toFixed(1)
 })
 
-async function load() {
+async function load(options = {}) {
+  const { skipIfLoading = false } = options
+  if (skipIfLoading && loading.value) {
+    return
+  }
   const seq = ++loadSeq
   loading.value = true
   try {
@@ -142,7 +146,7 @@ function statusLabel(status) {
 
 onMounted(async () => {
   await load()
-  timer = setInterval(load, 5000)
+  timer = setInterval(() => load({ skipIfLoading: true }), 5000)
 })
 
 onUnmounted(() => {
