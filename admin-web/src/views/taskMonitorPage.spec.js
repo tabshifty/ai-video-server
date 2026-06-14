@@ -11,4 +11,13 @@ describe('task monitor page', () => {
     expect(loadBlock).toContain('return')
     expect(taskMonitor).toContain('setInterval(() => load({ skipIfLoading: true }), 5000)')
   })
+
+  it('shows the video title alongside task and video identifiers', () => {
+    expect(taskMonitor).toContain('prop="video_title"')
+    expect(taskMonitor).toContain('label="任务"')
+    expect(taskMonitor).toContain('任务 ID：')
+    expect(taskMonitor).toContain('视频 ID：')
+    expect(taskMonitor).toContain('taskTitle(row)')
+    expect(taskMonitor).toContain('video_title')
+  })
 })

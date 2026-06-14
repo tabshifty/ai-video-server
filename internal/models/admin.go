@@ -132,6 +132,7 @@ type AdminUserListItem struct {
 type AdminTaskListItem struct {
 	ID                    int64      `json:"id"`
 	VideoID               *uuid.UUID `json:"video_id"`
+	VideoTitle            string     `json:"video_title"`
 	UserID                *uuid.UUID `json:"user_id"`
 	Status                string     `json:"status"`
 	RetryCount            int        `json:"retry_count"`

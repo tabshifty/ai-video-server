@@ -395,29 +395,31 @@ func buildAdminListTranscodingTasksSQL(status string, page, pageSize int) (strin
 	}
 
 	if s := strings.TrimSpace(strings.ToLower(status)); s != "" {
-		where = append(where, "status = "+next(s))
+		where = append(where, "t.status = "+next(s))
 	}
 
 	baseWhere := strings.Join(where, " AND ")
-	countSQL := "SELECT COUNT(*) FROM transcoding_jobs WHERE " + baseWhere
+	countSQL := "SELECT COUNT(*) FROM transcoding_jobs t WHERE " + baseWhere
 	listSQL := fmt.Sprintf(`
 SELECT
-  id,
-  video_id,
-  user_id,
-  status,
-  retry_count,
-  COALESCE(error_message, ''),
-  started_at,
-  finished_at,
-  source_duration_seconds,
-  processed_seconds,
-  remaining_seconds,
-  progress_percent,
-  progress_updated_at
-FROM transcoding_jobs
+  t.id,
+  t.video_id,
+  COALESCE(v.title, '') AS video_title,
+  t.user_id,
+  t.status,
+  t.retry_count,
+  COALESCE(t.error_message, ''),
+  t.started_at,
+  t.finished_at,
+  t.source_duration_seconds,
+  t.processed_seconds,
+  t.remaining_seconds,
+  t.progress_percent,
+  t.progress_updated_at
+FROM transcoding_jobs t
+LEFT JOIN videos v ON v.id = t.video_id
 WHERE %s
-ORDER BY id DESC
+ORDER BY t.id DESC
 LIMIT $%d OFFSET $%d
 `, baseWhere, len(args)+1, len(args)+2)
 	listArgs := append(append(make([]any, 0, len(args)+2), args...), pageSize, (page-1)*pageSize)
@@ -447,6 +449,7 @@ func (r *VideoRepository) AdminListTranscodingTasks(ctx context.Context, status 
 		if err := rows.Scan(
 			&item.ID,
 			&item.VideoID,
+			&item.VideoTitle,
 			&item.UserID,
 			&item.Status,
 			&item.RetryCount,

@@ -144,6 +144,11 @@ function statusLabel(status) {
   return status
 }
 
+function taskTitle(row) {
+  const title = String(row.video_title || '').trim()
+  return title || '未命名视频'
+}
+
 onMounted(async () => {
   await load()
   timer = setInterval(() => load({ skipIfLoading: true }), 5000)
@@ -201,8 +206,15 @@ onUnmounted(() => {
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="id" label="任务ID" width="90" />
-              <el-table-column prop="video_id" label="视频ID" min-width="220" />
+              <el-table-column prop="video_title" label="任务" min-width="280">
+                <template #default="{ row }">
+                  <div class="task-cell">
+                    <strong>{{ taskTitle(row) }}</strong>
+                    <span>任务 ID：{{ row.id }}</span>
+                    <span>视频 ID：{{ row.video_id || '--' }}</span>
+                  </div>
+                </template>
+              </el-table-column>
               <el-table-column prop="status" label="状态" width="120">
                 <template #default="{ row }">{{ statusLabel(row.status) }}</template>
               </el-table-column>
@@ -256,6 +268,26 @@ onUnmounted(() => {
 
 .status-group {
   display: inline-flex;
+}
+
+.task-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.task-cell strong {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-cell span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 48rem) {

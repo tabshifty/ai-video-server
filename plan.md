@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-14 22:16 +0800
+- 进度：完成任务监控页视频标题展示。`/admin/tasks` 列表查询通过 `transcoding_jobs -> videos` 左连接返回 `video_title`，避免任务因视频记录缺失被过滤；管理端任务表主列改为“任务”，主行显示视频标题，下面保留任务 ID 与视频 ID。`CONTEXT.md` 记录“任务监控视频标题”语义。本次只纳入任务监控相关后端模型/仓储、前端页面/测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
+- 影响文件：`internal/models/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/repository -run TestBuildAdminListTranscodingTasksSQL -count=1` 通过；`go test ./internal/repository -count=1` 通过；`cd admin-web && npm run test -- src/views/taskMonitorPage.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check -- ...` 通过；乱码扫描无命中。
+
+## 2026-06-14 22:13 +0800
+- 进度：开始为任务监控页补充视频标题。经 `$grill-with-docs` 校准，“文件标题”采用视频实体的 `videos.title`，不是从 `original_path` 推导的原始文件名；任务监控表格应优先显示视频标题，同时保留 `video_id` 便于排障。当前后端 `AdminTaskListItem` 和 SQL 只返回任务 ID / video_id 等任务字段，前端也只显示视频 ID。
+- 影响文件：`internal/models/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 仓储定向测试、管理端定向 Vitest、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-14 21:39 +0800
 - 进度：完成任务监控页 loading 卡死修复。`TaskMonitor.vue` 的自动刷新改为不重入：上一轮 `/admin/tasks` 仍在请求时，5 秒轮询直接跳过，不再堆积并发请求；页面首轮仍会正常加载，手动刷新保持可用。`CONTEXT.md` 增加“任务监控轮询不重入”长期约定。部署机当前确认有 2 个 `ffmpeg` 转码任务正在运行，server / worker 均为 running，和本次前端修复无冲突。本次只纳入任务监控页、页面源文测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`

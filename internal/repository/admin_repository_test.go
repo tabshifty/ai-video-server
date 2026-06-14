@@ -10,7 +10,7 @@ func TestBuildAdminListTranscodingTasksSQLWithoutStatus(t *testing.T) {
 
 	countSQL, countArgs, listSQL, listArgs := buildAdminListTranscodingTasksSQL("", 1, 20)
 
-	for _, want := range []string{"from transcoding_jobs where 1=1", "select count(*)"} {
+	for _, want := range []string{"from transcoding_jobs t where 1=1", "select count(*)"} {
 		if !strings.Contains(strings.ToLower(countSQL), want) {
 			t.Fatalf("count sql missing %q: %s", want, countSQL)
 		}
@@ -20,6 +20,9 @@ func TestBuildAdminListTranscodingTasksSQLWithoutStatus(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(listSQL), "limit $1 offset $2") {
 		t.Fatalf("list sql should use limit/offset placeholders 1/2: %s", listSQL)
+	}
+	if !strings.Contains(strings.ToLower(listSQL), "left join videos") || !strings.Contains(strings.ToLower(listSQL), "video_title") {
+		t.Fatalf("list sql should include video title for task identification: %s", listSQL)
 	}
 	if len(listArgs) != 2 || listArgs[0] != 20 || listArgs[1] != 0 {
 		t.Fatalf("unexpected list args: %#v", listArgs)
@@ -31,13 +34,13 @@ func TestBuildAdminListTranscodingTasksSQLWithStatus(t *testing.T) {
 
 	countSQL, countArgs, listSQL, listArgs := buildAdminListTranscodingTasksSQL("FAILED", 3, 15)
 
-	if !strings.Contains(strings.ToLower(countSQL), "status = $1") {
+	if !strings.Contains(strings.ToLower(countSQL), "t.status = $1") {
 		t.Fatalf("count sql should filter by status: %s", countSQL)
 	}
 	if len(countArgs) != 1 || countArgs[0] != "failed" {
 		t.Fatalf("unexpected count args: %#v", countArgs)
 	}
-	if !strings.Contains(strings.ToLower(listSQL), "where 1=1 and status = $1") {
+	if !strings.Contains(strings.ToLower(listSQL), "where 1=1 and t.status = $1") {
 		t.Fatalf("list sql should keep status placeholder stable: %s", listSQL)
 	}
 	if !strings.Contains(strings.ToLower(listSQL), "limit $2 offset $3") {
