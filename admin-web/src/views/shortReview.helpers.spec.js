@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildShortReviewQuery,
@@ -105,5 +106,14 @@ describe('short review helpers', () => {
     expect(readStoredShortReviewSound(brokenStorage)).toBe(false)
     expect(() => writeStoredShortReviewPosition('video-1', brokenStorage)).not.toThrow()
     expect(() => writeStoredShortReviewSound(true, brokenStorage)).not.toThrow()
+  })
+
+  it('keeps the review page locked to the viewport and lets only the queue scroll', () => {
+    const source = readFileSync(new URL('./ShortReview.vue', import.meta.url), 'utf8')
+    expect(source).toContain('overflow: hidden;')
+    expect(source).toContain('height: calc(100dvh - var(--admin-header-height) - var(--space-12));')
+    expect(source).toContain('max-height: none;')
+    expect(source).toContain('min-height: 0;')
+    expect(source).toContain('overflow: auto;')
   })
 })

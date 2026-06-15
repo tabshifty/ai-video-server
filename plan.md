@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 18:47 +0800
+- 进度：完成短视频审核页单屏布局修复。`ShortReview.vue` 现在把页面高度锁定到 admin shell 可用视口内，工作台和左右面板使用 `minmax(0, 1fr)` 收缩；待审队列只在面板内部滚动，播放器去掉固定最小高度，随右侧面板可用高度缩放。`CONTEXT.md` 已补充短视频审核页单屏工作台约定，源码测试锁定页面不靠浏览器纵向滚动承载审核流。
+- 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`npm run test -- src/views/shortReview.helpers.spec.js` 通过；`npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check -- admin-web/src/views/ShortReview.vue admin-web/src/views/shortReview.helpers.spec.js CONTEXT.md plan.md` 通过；乱码扫描无命中。
+
+## 2026-06-15 18:42 +0800
+- 进度：开始收口短视频审核页单屏布局。通过 `$grill-with-docs` 对照现有 `admin 短视频清理审核` 语义，确认本次不改审核流程，只修布局：浏览器窗口不应出现纵向滚动，待审队列在左侧面板内部滚动；右侧视频区域最大高度不得超过审核页可用高度，避免播放器硬撑页面。
+- 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：已补红灯测试 `npm run test -- src/views/shortReview.helpers.spec.js`，当前失败点为页面尚未固定到 shell 可用高度；待执行修复后定向测试、`npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-15 18:34 +0800
 - 进度：完成推送到家用部署机。已将本地 `master` 从部署机远端 `6d3619f` 推进到 `f3f67de`；远端 hook 完成 `admin-web` 构建、Go build、codesign、migration 与 server / worker `launchctl kickstart`，最终 `/healthz OK`。GitHub mirror push 在部署机 hook 内失败但标记为 non-fatal，不影响本次部署。
 - 影响文件：`plan.md`

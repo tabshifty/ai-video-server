@@ -590,7 +590,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .short-review-page {
+  height: calc(100dvh - var(--admin-header-height) - var(--space-12));
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  align-content: stretch;
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .short-review-toolbar {
@@ -613,7 +618,7 @@ onBeforeUnmount(() => {
 
 .review-workbench {
   display: grid;
-  min-height: min(760px, calc(100vh - 190px));
+  min-height: 0;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: var(--space-4);
 }
@@ -621,6 +626,7 @@ onBeforeUnmount(() => {
 .review-queue,
 .review-player-panel {
   min-width: 0;
+  min-height: 0;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
@@ -759,16 +765,19 @@ onBeforeUnmount(() => {
 .player-stage {
   position: relative;
   display: grid;
-  min-height: 480px;
+  min-height: 0;
   place-items: center;
   padding: var(--space-4);
   background: #020617;
+  overflow: hidden;
 }
 
 .review-video {
-  width: min(100%, 460px);
-  height: min(100%, calc(100vh - 310px));
-  min-height: 420px;
+  width: auto;
+  max-width: min(100%, 460px);
+  height: 100%;
+  max-height: none;
+  min-height: 0;
   border-radius: var(--radius-md);
   background: #000000;
   object-fit: contain;
@@ -851,14 +860,17 @@ onBeforeUnmount(() => {
   .review-workbench {
     min-height: 0;
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(140px, 30%) minmax(0, 1fr);
+    overflow: hidden;
   }
 
   .review-queue {
-    max-height: 300px;
+    max-height: none;
   }
 
   .review-detail {
     flex-direction: column;
+    gap: var(--space-3);
   }
 
   .review-detail__controls {
@@ -867,7 +879,7 @@ onBeforeUnmount(() => {
   }
 
   .review-video {
-    height: min(70vh, 620px);
+    height: 100%;
   }
 }
 
@@ -883,13 +895,14 @@ onBeforeUnmount(() => {
   }
 
   .player-stage {
-    min-height: 420px;
+    min-height: 0;
     padding: var(--space-3);
   }
 
   .review-video {
     width: 100%;
-    min-height: 360px;
+    height: auto;
+    aspect-ratio: 9 / 16;
   }
 
   .review-detail__controls .el-button {
