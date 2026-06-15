@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 16:44 +0800
+- 进度：完成管理端侧栏收起后无法再展开的修复。折叠态现在保留可见、可点击的展开按钮，不再把唯一 toggle 隐藏；同时补了 Layout 源文回归测试和 `CONTEXT.md` 长期约定，避免后续样式回退。
+- 影响文件：`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/components/Layout.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-15 16:40 +0800
+- 进度：开始修复管理端侧栏收起后无法再展开的问题。已确认折叠态样式把唯一的 `.collapse-button` 直接隐藏，接下来改为折叠态保留可见展开入口，并补充布局回归测试与 `CONTEXT.md` 长期约定。
+- 影响文件：`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/components/Layout.spec.js`、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-15 16:22 +0800
 - 进度：完成管理端短视频审核页首版落地。新增 `ShortReview.vue`，接入 `/short-review` 路由和媒体库侧栏/命令面板入口；页面固定查询 `short + ready`，支持关键词搜索、恢复上次审核位置、平板优先队列 + 播放器布局、自动播放默认静音、`保留并下一条`、`删除并下一条` 二次确认、当前页末尾自动加载后续页和末尾空状态。新增 `shortReview.helpers` 锁定位置恢复、固定查询、翻页推进和声音会话偏好；补充命令面板与路由源文测试。
 - 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.js`、`admin-web/src/views/shortReview.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`plan.md`

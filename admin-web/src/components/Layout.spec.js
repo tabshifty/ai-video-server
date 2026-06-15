@@ -19,6 +19,14 @@ describe('Layout shell', () => {
     expect(layout).toMatch(/profile/i)
   })
 
+  it('keeps a visible expand affordance in the collapsed sidebar', () => {
+    expect(layout).toContain('.admin-shell.is-collapsed .brand-block {')
+    expect(layout).toContain('flex-direction: column;')
+    expect(layout).toContain('.admin-shell.is-collapsed .collapse-button {')
+    expect(layout).toContain('display: inline-flex;')
+    expect(layout).toContain('width: var(--space-8);')
+  })
+
   it('removes the legacy rose gradient and admin subtitle copy', () => {
     expect(layout).not.toContain('#881337')
     expect(layout).not.toContain('#7f1d1d')

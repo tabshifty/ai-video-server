@@ -422,14 +422,39 @@ onUnmounted(() => {
 
 .collapse-button {
   margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.admin-shell.is-collapsed .brand-block {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 var(--space-2);
 }
 
 .admin-shell.is-collapsed .brand-copy,
-.admin-shell.is-collapsed .collapse-button,
 .admin-shell.is-collapsed .nav-group__label,
 .admin-shell.is-collapsed .nav-link__label,
 .admin-shell.is-collapsed .profile-chip__copy {
   display: none;
+}
+
+.admin-shell.is-collapsed .collapse-button {
+  display: inline-flex;
+  width: var(--space-8);
+  height: var(--space-8);
+  margin-left: 0;
+  padding: 0;
+  justify-content: center;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.admin-shell.is-collapsed .collapse-button:hover {
+  color: var(--text-primary);
 }
 
 .nav-groups {

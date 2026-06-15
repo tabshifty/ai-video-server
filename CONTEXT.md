@@ -124,7 +124,7 @@
 - `admin 编辑入口 Drawer dirty snapshot`：drawer 的 dirty 守卫必须覆盖当前 drawer 内所有可见可编辑状态，不只覆盖主表单字段；字幕、演员、合集、图片关联、上传队列等子状态若能在 drawer 内改变，也必须纳入 snapshot 或维护独立 dirty 标志。dialog 改 drawer 时要保留原有 `destroy-on-close` 或等价清理语义，避免关闭后异步请求回写旧数据。
 - `admin 路由 hideShellPageHeader 标记`：当某个 admin 路由自身已经渲染 PageHeader 时，对应 route 必须显式设置 `meta.hideShellPageHeader = true`，避免 Layout 顶栏与页面标题重复显示。
 - `admin 侧栏分组导航`：管理端主导航按 `仪表盘`、`媒体库`、`录入处理`、`服务`、`系统` 五组呈现；菜单源由命令面板 helper 统一维护，侧栏、移动 drawer 和命令面板共享同一组路由语义。
-- `admin 侧栏折叠偏好`：桌面端侧栏支持 240px 展开与 60px 折叠，用户手动折叠状态持久化到 `localStorage` 的 `admin-sidebar-collapsed`；窄屏 drawer 与 1280px 以下自动折叠不改变该持久偏好。
+- `admin 侧栏折叠偏好`：桌面端侧栏支持 240px 展开与 60px 折叠，用户手动折叠状态持久化到 `localStorage` 的 `admin-sidebar-collapsed`；窄屏 drawer 与 1280px 以下自动折叠不改变该持久偏好，且折叠态必须始终保留可见、可点击的展开入口，不能把唯一切换按钮隐藏掉。
 - `admin 命令面板`：管理端通过 `Cmd/Ctrl+K` 或顶栏触发的 nav-only 快速跳转面板，支持中文、拼音首字母、别名和路径匹配；它只负责页面导航，不承载业务动作。
 - `admin 表格列设置`：VideoList 顶部「列设置」按钮用于勾选显示/隐藏列；偏好写入 `localStorage` key `admin-videolist-columns`，窗口 < 1280px 自动隐藏次要列但仍保留用户配置，不删列、不改列宽。
 - `admin 视图模式切换`：ImageManage 顶部「视图切换」开关在网格/列表间切换；默认网格，偏好写入 `localStorage` key `admin-imagemanage-view`，切换不重置分页与筛选。
