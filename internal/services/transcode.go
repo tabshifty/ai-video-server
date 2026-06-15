@@ -82,7 +82,7 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	thumbPath := filepath.Join(outputDir, "thumb.jpg")
 	sourcePath := inputPath
 	cleanupSourceCopy := func() {}
-	if isSameFilePath(inputPath, outputPath) {
+	if IsSameFilePath(inputPath, outputPath) {
 		sourcePath = buildTranscodeOutputTempPath(filepath.Join(outputDir, "source-copy.mp4"))
 		if err := ffmpeg.CopyFile(sourcePath, inputPath); err != nil {
 			return TranscodeResult{}, fmt.Errorf("copy stable transcode input: %w", err)
@@ -93,7 +93,7 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 	}
 	defer cleanupSourceCopy()
 	transcodeOutputPath := outputPath
-	useTempOutput := isSameFilePath(inputPath, outputPath)
+	useTempOutput := IsSameFilePath(inputPath, outputPath)
 	if useTempOutput {
 		transcodeOutputPath = buildTranscodeOutputTempPath(outputPath)
 	}
@@ -353,7 +353,7 @@ func normalizeVideoType(videoType string) string {
 	return strings.ToLower(strings.TrimSpace(videoType))
 }
 
-func isSameFilePath(a, b string) bool {
+func IsSameFilePath(a, b string) bool {
 	a = strings.TrimSpace(a)
 	b = strings.TrimSpace(b)
 	if a == "" || b == "" {

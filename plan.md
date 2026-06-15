@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 14:49 +0800
+- 进度：开始按最新 code review 收口 DV 保留实现的后续问题。范围收口为：1）DV 原始文件保留失败不再让整个转码任务失败，而是降级为 warn 并继续完成普通转码；2）管理端重转码拆分“DV 禁止重转码”和“无可用源文件”的错误码；3）收口 `sameFilePath` / `isSameFilePath` 重复实现。`dv_source` 文件存在性检查维持现状，不额外加前置 `stat`。
+- 影响文件：`internal/queue/tasks.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/handlers/admin.go`、必要的定向测试、`plan.md`
+- 验证：待执行 `go test ./internal/queue ./internal/handlers ./internal/services -run 'Test(IsSameFilePath|SelectRetranscodeInputPath|BuildTranscode|Transcode|HandleTranscode)' -count=1`、`git diff --check` 与乱码扫描。
+
+## 2026-06-15 14:50 +0800
+- 进度：完成 DV 保留实现的 review 修正。DV 原始文件保留失败现已降级为 warn log，转码任务会继续按普通输出成功完成且不写 `source_playback_path`；管理端重转码把“DV 禁止重转码”保留在错误码 `1012`，把“无可用源文件”改为 `1071`；`internal/queue/tasks.go` 已复用 `internal/services/transcode.go` 的 `IsSameFilePath`，去掉本地重复实现。本次只纳入这 4 个 Go 文件和 `plan.md`。
+- 影响文件：`internal/queue/tasks.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`internal/handlers/admin.go`、`plan.md`
+- 验证：`go test ./internal/queue ./internal/handlers ./internal/services -run 'Test(IsSameFilePath|SelectRetranscodeInputPath|BuildTranscode|Transcode)' -count=1` 通过；`git diff --check` 通过；乱码扫描无命中。
+
 ## 2026-06-15 14:04 +0800
 - 进度：开始按最新 DV 决策（提交 `b9ea97f` / ADR `0011-dolby-vision-episode-original-file-preservation`）补代码实现。范围收口为：1）后端转码时对 `episode + Dolby Vision source` 保留原始文件并写入 `playback_compat.source_playback_path`；2）视频源接口支持 `profile=dv_source`；3）管理端禁止对持有 DV 原始文件的视频重转码并在删除/孤儿文件扫描时精确处理保留源文件；4）TV 端在 DV 场景切换到 `dv_source` 专用播放路由。TV 端功能改动需同步升级版本号。
 - 影响文件：`internal/queue/tasks.go`、`internal/services/playback_compat.go`、`internal/handlers/video_source.go`、`internal/handlers/admin.go`、`internal/repository/orphan_file_scan_repository.go`、相关 Go 测试、`android-tv-app/tv-app/**`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`

@@ -458,13 +458,13 @@ func TestIsSameFilePath(t *testing.T) {
 	same := filepath.Join(filepath.Dir(base), ".", "video.mp4")
 	other := filepath.Join(filepath.Dir(base), "video-2.mp4")
 
-	if !isSameFilePath(base, same) {
+	if !IsSameFilePath(base, same) {
 		t.Fatalf("expected same file path")
 	}
-	if isSameFilePath(base, other) {
+	if IsSameFilePath(base, other) {
 		t.Fatalf("expected different file path")
 	}
-	if isSameFilePath("", base) {
+	if IsSameFilePath("", base) {
 		t.Fatalf("expected empty path as different")
 	}
 }

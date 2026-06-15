@@ -207,8 +207,8 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	)
 	preservedSourcePath, preserveErr := p.preserveEpisodeDolbyVisionSource(video, inputPath, sourcePlaybackProbe, sourcePlaybackProbeErr)
 	if preserveErr != nil {
-		p.finalizeTranscodeFailure(ctx, videoID, jobID, preserveErr.Error())
-		return preserveErr
+		p.logger.Warn("preserve dv source failed, fallback to regular transcode output", "video_id", videoID, "input_path", inputPath, "error", preserveErr)
+		preservedSourcePath = ""
 	}
 	if preservedSourcePath != "" {
 		metadata = services.MergePlaybackCompatibilityMetadata(metadata, map[string]any{
@@ -257,7 +257,7 @@ func (p *Processor) preserveEpisodeDolbyVisionSource(
 		return "", fmt.Errorf("preserve dv source: source extension missing")
 	}
 	targetPath := filepath.Join(p.storageRoot, "videos", video.ID.String(), "source-dv"+ext)
-	if sameFilePath(inputPath, targetPath) {
+	if services.IsSameFilePath(inputPath, targetPath) {
 		return targetPath, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
@@ -393,20 +393,6 @@ func stringFromAny(value any) string {
 
 func shouldPreserveEpisodeDolbyVisionSource(videoType string, sourceProbe ffmpegpkg.PlaybackCompatibilityProbe, sourceProbeErr error) bool {
 	return strings.EqualFold(strings.TrimSpace(videoType), "episode") && sourceProbeErr == nil && sourceProbe.VideoStreamFound && sourceProbe.DolbyVision
-}
-
-func sameFilePath(a, b string) bool {
-	a = strings.TrimSpace(a)
-	b = strings.TrimSpace(b)
-	if a == "" || b == "" {
-		return false
-	}
-	aAbs, aErr := filepath.Abs(filepath.Clean(a))
-	bAbs, bErr := filepath.Abs(filepath.Clean(b))
-	if aErr != nil || bErr != nil {
-		return filepath.Clean(a) == filepath.Clean(b)
-	}
-	return aAbs == bAbs
 }
 
 func moveFilePreservingSource(srcPath, dstPath string) error {

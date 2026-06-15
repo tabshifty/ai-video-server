@@ -584,7 +584,7 @@ func (a *API) AdminRetranscodeVideo(c *gin.Context) {
 	}
 	inputPath, inputSource := selectRetranscodeInputPath(video)
 	if inputPath == "" {
-		response.Error(c, 1012, "未找到可用于重转码的源文件（原始文件与转码文件均不存在）")
+		response.Error(c, 1071, "未找到可用于重转码的源文件（原始文件与转码文件均不存在）")
 		return
 	}
 	if err := a.repo.UpdateVideoStatus(c.Request.Context(), videoID, "uploaded"); err != nil {
