@@ -112,6 +112,7 @@ These are enforced project-wide and apply even for one-line tweaks:
 - **Every accepted change must land in a git commit** — do not leave work in the working tree.
 - **Don't modify `.codex/skills/*`** unless the task is explicitly about skill authoring.
 - **Module-level `AGENTS.md` overrides parent scope** for files under that directory (e.g. `admin-web/AGENTS.md`).
+- **复杂任务默认走两段式**：先通过 `grill-with-docs` 把需求和边界收口，再用多个子代理并行产出多个方案，由主代理选最优方案并拆成任务后再编码；代码完成后必须再让子代理独立评审，修复问题并复审，直到没有阻塞问题才可宣布完成。
 
 ## TV App Visual & Focus Language
 

@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 17:08 +0800
+- 进度：完成仓库工作流约束补充。`AGENTS.md` 与 `CLAUDE.md` 已新增“`grill-with-docs` 收口后先多子代理出多方案、主代理择优拆任务再编码；代码完成后再走子代理 review 到无阻塞问题为止”的约束；`plan.md` 也已记录本次变更。
+- 影响文件：`AGENTS.md`、`CLAUDE.md`、`plan.md`
+- 验证：`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-15 17:05 +0800
+- 进度：补充仓库工作流约束。复杂任务现在要求先经 `grill-with-docs` 收口，再由多个子代理并行产出多个方案、主代理择优并拆任务后编码；代码完成后还要走子代理 review，修复问题并复审到无阻塞问题为止。
+- 影响文件：`AGENTS.md`、`CLAUDE.md`、`plan.md`
+- 验证：待执行 `git diff --check` 与乱码扫描。
+
 ## 2026-06-15 16:44 +0800
 - 进度：完成管理端侧栏收起后无法再展开的修复。折叠态现在保留可见、可点击的展开按钮，不再把唯一 toggle 隐藏；同时补了 Layout 源文回归测试和 `CONTEXT.md` 长期约定，避免后续样式回退。
 - 影响文件：`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`

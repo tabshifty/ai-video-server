@@ -34,6 +34,7 @@
   3. `review.md`：最后按评审/验收脚本逐项验证，不能跳过 review 阶段直接宣称完成。
   - After the user confirms a task has passed their testing, mark that task complete by adding `tasks/<任务名>/DONE.md` with completion date, related commit, and verification summary, then commit that marker.
   - If a task directory lacks one of these files, record the gap in `plan.md` and proceed only when the missing step is unnecessary or can be reconstructed from local context.
+- 复杂任务默认走两段式：先通过 `grill-with-docs` 把需求和边界收口，再用多个子代理并行产出多个方案，由主代理选最优方案并拆成任务后再编码；代码完成后必须再让子代理独立评审，修复问题并复审，直到没有阻塞问题才可宣布完成。
 - `plan.md` is mandatory and append-only for progress tracking:
   - Every new plan must be appended as an incremental entry.
   - Every implementation update must append what changed (not overwrite old entries).
