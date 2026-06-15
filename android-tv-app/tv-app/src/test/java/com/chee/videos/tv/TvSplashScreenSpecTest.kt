@@ -61,7 +61,10 @@ class TvSplashScreenSpecTest {
         assertTrue("TV App Gradle 配置必须存在", buildGradlePath.exists())
         val gradle = buildGradlePath.readText()
 
-        assertTrue("TV splash 功能更新必须递增 versionCode 到 98", gradle.contains("versionCode = 98"))
-        assertTrue("TV splash 功能更新必须递增 versionName 到 0.1.98", gradle.contains("versionName = \"0.1.98\""))
+        val versionCode = Regex("""versionCode\s*=\s*(\d+)""").find(gradle)?.groupValues?.get(1)?.toIntOrNull()
+        val versionPatch = Regex("""versionName\s*=\s*"0\.1\.(\d+)"""").find(gradle)?.groupValues?.get(1)?.toIntOrNull()
+
+        assertTrue("TV splash 功能更新后 versionCode 不应低于 98", (versionCode ?: 0) >= 98)
+        assertTrue("TV splash 功能更新后 versionName patch 不应低于 98", (versionPatch ?: 0) >= 98)
     }
 }

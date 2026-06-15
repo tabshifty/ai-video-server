@@ -28,10 +28,25 @@ import androidx.media3.ui.PlayerView
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import kotlinx.coroutines.delay
 
+internal const val TvDolbyVisionMedia3StartupTimeoutMillis = 15_000L
+internal const val TvDolbyVisionMedia3StartupTimeoutMessage = "杜比视界专用播放链路启动超时，请重试"
+
 internal data class TvMedia3PlaybackSnapshot(
     val positionMs: Long,
     val durationMs: Long,
 )
+
+internal fun shouldReportTvDolbyVisionMedia3StartupTimeout(
+    preparedSourceKey: String,
+    shouldPlay: Boolean,
+    playbackState: Int,
+    isPlaying: Boolean,
+): Boolean =
+    preparedSourceKey.isNotBlank() &&
+        shouldPlay &&
+        !isPlaying &&
+        playbackState != Player.STATE_READY &&
+        playbackState != Player.STATE_ENDED
 
 @Composable
 internal fun TvDolbyVisionMedia3Player(
@@ -64,15 +79,19 @@ internal fun TvDolbyVisionMedia3Player(
     val player = remember(accessToken, retryKey) { ExoPlayer.Builder(context).build() }
     var preparedSourceKey by remember { mutableStateOf("") }
     var resumeAppliedSourceKey by remember { mutableStateOf("") }
+    var playbackState by remember { mutableStateOf(Player.STATE_IDLE) }
+    var isMedia3Playing by remember { mutableStateOf(false) }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                latestOnPlayingChanged(isPlaying)
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isMedia3Playing = playing
+                latestOnPlayingChanged(playing)
             }
 
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
+            override fun onPlaybackStateChanged(nextPlaybackState: Int) {
+                playbackState = nextPlaybackState
+                if (nextPlaybackState == Player.STATE_ENDED) {
                     latestOnPlayingChanged(false)
                     latestOnEnded()
                 }
@@ -99,6 +118,8 @@ internal fun TvDolbyVisionMedia3Player(
             player.clearMediaItems()
             preparedSourceKey = ""
             resumeAppliedSourceKey = ""
+            playbackState = Player.STATE_IDLE
+            isMedia3Playing = false
             return@LaunchedEffect
         }
         if (preparedSourceKey != sourceKey) {
@@ -114,6 +135,8 @@ internal fun TvDolbyVisionMedia3Player(
             val mediaSource = DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
             player.setMediaSource(mediaSource, true)
             player.prepare()
+            playbackState = Player.STATE_IDLE
+            isMedia3Playing = false
             preparedSourceKey = sourceKey
             resumeAppliedSourceKey = ""
         }
@@ -137,6 +160,18 @@ internal fun TvDolbyVisionMedia3Player(
             player.play()
         } else {
             player.pause()
+        }
+    }
+
+    LaunchedEffect(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing, retryKey) {
+        if (!shouldReportTvDolbyVisionMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
+            return@LaunchedEffect
+        }
+        delay(TvDolbyVisionMedia3StartupTimeoutMillis)
+        if (shouldReportTvDolbyVisionMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
+            player.pause()
+            latestOnPlayingChanged(false)
+            latestOnError(TvDolbyVisionMedia3StartupTimeoutMessage)
         }
     }
 

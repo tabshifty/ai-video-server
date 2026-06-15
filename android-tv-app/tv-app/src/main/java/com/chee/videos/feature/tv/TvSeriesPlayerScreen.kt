@@ -354,10 +354,10 @@ fun TvSeriesPlayerScreen(
             nextUrl = uiState.currentSourceUrl.takeIf { isVlcRoute },
         )
         if (!isVlcRoute) {
-                mediaPlayer.pause()
-                if (updateDecision.shouldClear) {
-                    mediaPlayer.stop()
-                }
+            mediaPlayer.pause()
+            if (updateDecision.shouldClear) {
+                mediaPlayer.stop()
+            }
             preparedUrl = null
             appliedSubtitleSlaveUrl = null
             isVlcPlaying = false
@@ -397,6 +397,21 @@ fun TvSeriesPlayerScreen(
             preparedUrl = uiState.currentSourceUrl
             hasStartedPlayback = true
             isPausedByUser = false
+        }
+    }
+
+    var media3AutoStartedSourceUrl by remember(uiState.currentVideoId) { mutableStateOf("") }
+    LaunchedEffect(uiState.currentSourceUrl, isMedia3Route) {
+        if (
+            shouldAutoStartTvDolbyVisionMedia3Playback(
+                currentSourceUrl = uiState.currentSourceUrl,
+                isMedia3Route = isMedia3Route,
+                autoStartedSourceUrl = media3AutoStartedSourceUrl,
+            )
+        ) {
+            playerErrorMessage = null
+            media3AutoStartedSourceUrl = uiState.currentSourceUrl
+            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
         }
     }
 
@@ -972,3 +987,12 @@ private fun resolveTvSubtitleSelectionOnTrackLoad(
 
 private fun normalizeTvSubtitleSelection(selection: String?): String? =
     selection?.trim()?.takeIf { it.isNotBlank() }
+
+internal fun shouldAutoStartTvDolbyVisionMedia3Playback(
+    currentSourceUrl: String,
+    isMedia3Route: Boolean,
+    autoStartedSourceUrl: String,
+): Boolean =
+    isMedia3Route &&
+        currentSourceUrl.isNotBlank() &&
+        autoStartedSourceUrl != currentSourceUrl

@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 20:15 +0800
+- 进度：完成 TV App DV 源播放卡住修复。排查确认部署机 `source-dv.mkv` 存在、读盘正常，TV 已请求 `profile=dv_source` 且服务端返回 200/206；卡住主因是电视剧分集 DV Media3 route 准备好播放源后没有像 LibVLC route 一样自动进入播放会话，导致专用播放器只 prepare 不 play。现在分集 DV Media3 源准备完成会自动置为 started 并播放；Media3 专用播放器新增 15 秒启动/缓冲超时，卡住时进入专用播放失败页并允许重试，不回退 LibVLC。TV 版本升至 `0.1.100 / 100`，`CONTEXT.md` 已补充启动边界。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3PlayerTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvSplashScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvDolbyVisionMedia3PlayerTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest --tests com.chee.videos.core.player.TvLongFormVlcSpecTest --tests com.chee.videos.tv.TvSplashScreenSpecTest` 通过；`git diff --check`、乱码扫描待执行。
+
+## 2026-06-15 20:09 +0800
+- 进度：开始排查 TV App 播放 DV 源文件卡住。部署机日志确认 TV 端已请求 `/api/v1/videos/d5a89f74-2cdb-48e3-9246-189c3ba0c596/source?profile=dv_source`，服务端返回 200/206，`source-dv.mkv` 文件存在且本地读盘正常；当前风险集中在 TV 端 Media3/ExoPlayer 专用链路可能长期停在启动/缓冲状态但 UI 没有失败兜底。本次先补 DV 专用播放器启动超时与失败页，保持“不回退 LibVLC”的安全约束。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 TV 端定向单测、必要的 `:tv-app:testDebugUnitTest`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-15 19:52 +0800
 - 进度：完成 DV 剧集直拷贝修复。`episode + Dolby Vision` 的转码任务现在会跳过 ffmpeg 压缩，直接把源文件迁移/复制到 `storageRoot/videos/<uuid>/source-dv.<ext>`，并把该路径同时写入 `videos.transcoded_path` 和 `playback_compat.source_playback_path`；任务完成时直接落 ready 状态，缩略图与播放兼容 metadata 仍照常生成。补了 queue 层单测，覆盖 direct copy 输出、DV 判定和“源文件已移动后重试复用稳定目标路径”的幂等恢复。
 - 影响文件：`internal/queue/tasks.go`、`internal/queue/tasks_test.go`、`CONTEXT.md`、`plan.md`
