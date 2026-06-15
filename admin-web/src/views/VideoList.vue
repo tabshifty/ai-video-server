@@ -126,6 +126,7 @@ const retagTypeOptions = [
 const manualStatusOptions = getManualVideoStatusOptions()
 const detailDrawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '560px'))
 const isNarrowViewport = computed(() => viewportWidth.value < 1280)
+const batchActionBusy = computed(() => deletingBatch.value || updatingBatch.value)
 const canBatchEditCollections = computed(() => selectedRows.value.length > 0 && selectedRows.value.every((row) => normalizeVideoType(row.type) === 'short'))
 const activeFilterChips = computed(() => {
   const chips = []
@@ -134,9 +135,9 @@ const activeFilterChips = computed(() => {
   return chips
 })
 const bulkActions = computed(() => [
-  { label: '批量编辑', icon: EditPen, type: 'primary', loading: updatingBatch.value, disabled: updatingBatch.value, onClick: openBatchEditDrawer },
-  { label: '批量删除', icon: Delete, type: 'danger', loading: deletingBatch.value, disabled: deletingBatch.value, onClick: doBatchDelete },
-  { label: '取消选择', icon: MoreFilled, type: 'primary', disabled: deletingBatch.value, onClick: clearSelection }
+  { label: '批量编辑', icon: EditPen, type: 'primary', loading: updatingBatch.value, disabled: batchActionBusy.value, onClick: openBatchEditDrawer },
+  { label: '批量删除', icon: Delete, type: 'danger', loading: deletingBatch.value, disabled: batchActionBusy.value, onClick: doBatchDelete },
+  { label: '取消选择', icon: MoreFilled, type: 'primary', disabled: batchActionBusy.value, onClick: clearSelection }
 ])
 const detailDirty = computed(() => detailSnapshot.value !== serializeDetailState())
 
@@ -802,7 +803,7 @@ async function reloadAfterDeletion(deletedCount = 0) {
 
 async function doBatchDelete() {
   const videoIDs = selectedVideoIDs()
-  if (videoIDs.length === 0 || deletingBatch.value) {
+  if (videoIDs.length === 0 || deletingBatch.value || updatingBatch.value) {
     return
   }
   await ElMessageBox.confirm(`确认批量删除已勾选的 ${videoIDs.length} 条视频？此操作不可恢复。`, '警告', {
@@ -864,7 +865,7 @@ function onSelectionSelectAll(selection) {
 }
 
 async function openBatchEditDrawer() {
-  if (selectedRows.value.length === 0 || updatingBatch.value) {
+  if (selectedRows.value.length === 0 || batchActionBusy.value) {
     return
   }
   resetBatchEditForm()
@@ -874,10 +875,20 @@ async function openBatchEditDrawer() {
   }
   captureBatchEditSnapshot()
   batchEditVisible.value = true
-  await Promise.all([
+  const preloadResults = await Promise.allSettled([
     searchCollections(''),
     searchImageCollections('')
   ])
+  const failedTargets = []
+  if (preloadResults[0]?.status === 'rejected') {
+    failedTargets.push('合集')
+  }
+  if (preloadResults[1]?.status === 'rejected') {
+    failedTargets.push('图片图集')
+  }
+  if (failedTargets.length > 0) {
+    ElMessage.warning(`${failedTargets.join('、')}选项加载失败，可稍后重试`)
+  }
 }
 
 async function requestBatchEditClose() {
@@ -896,7 +907,7 @@ function handleBatchEditBeforeClose(done) {
 
 async function saveBatchEdit() {
   const videoIDs = selectedVideoIDs()
-  if (videoIDs.length === 0 || updatingBatch.value) {
+  if (videoIDs.length === 0 || updatingBatch.value || deletingBatch.value) {
     return
   }
   const payload = { video_ids: videoIDs }

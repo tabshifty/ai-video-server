@@ -137,3 +137,45 @@ func TestAdminBatchUpdateVideosRejectsInvalidTagsMode(t *testing.T) {
 		t.Fatalf("expected code=1, got=%d body=%s", resp.Code, rec.Body.String())
 	}
 }
+
+func TestAdminBatchUpdateVideosRejectsEmptyPatch(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	api := &API{}
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPut, "/api/v1/admin/videos/batch-update", bytes.NewBufferString(`{"video_ids":["11111111-1111-1111-1111-111111111111"]}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	api.AdminBatchUpdateVideos(ctx)
+
+	var resp apiEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.Code != 1 {
+		t.Fatalf("expected code=1, got=%d body=%s", resp.Code, rec.Body.String())
+	}
+}
+
+func TestAdminBatchUpdateVideosRejectsInvalidImageCollectionID(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	api := &API{}
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPut, "/api/v1/admin/videos/batch-update", bytes.NewBufferString(`{"video_ids":["11111111-1111-1111-1111-111111111111"],"update_image_collection_id":true,"image_collection_id":"bad-id"}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	api.AdminBatchUpdateVideos(ctx)
+
+	var resp apiEnvelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.Code != 1 {
+		t.Fatalf("expected code=1, got=%d body=%s", resp.Code, rec.Body.String())
+	}
+}

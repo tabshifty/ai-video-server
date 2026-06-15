@@ -215,10 +215,19 @@ describe('videoList helpers', () => {
     expect(subtitleUploadAccept.split(',')).toEqual(['.srt', '.vtt', '.ass', '.ssa'])
   })
 
-  it('keeps current page shift selection scope wording in source', () => {
+  it('keeps current page shift selection logic scoped to visible rows', () => {
     const source = readFileSync(new URL('./VideoList.vue', import.meta.url), 'utf8')
-    expect(source).toContain('Shift')
-    expect(source).toContain('当前页')
-    expect(source).toContain('批量编辑')
+    expect(source).toContain('function onRowSelectionSelect(selection, row)')
+    expect(source).toContain('if (shiftKeyPressed.value && selectionAnchorIndex.value >= 0 && currentIndex >= 0)')
+    expect(source).toContain('applySelectionByIDs(Array.from(selectedSet), selectionAnchorIndex.value)')
+    expect(source).toContain('clearSelection()')
+  })
+
+  it('keeps batch actions mutually exclusive and drawer preload guarded', () => {
+    const source = readFileSync(new URL('./VideoList.vue', import.meta.url), 'utf8')
+    expect(source).toContain('const batchActionBusy = computed(() => deletingBatch.value || updatingBatch.value)')
+    expect(source).toContain("if (selectedRows.value.length === 0 || batchActionBusy.value)")
+    expect(source).toContain('const preloadResults = await Promise.allSettled([')
+    expect(source).toContain("ElMessage.warning(`${failedTargets.join('、')}选项加载失败，可稍后重试`)")
   })
 })

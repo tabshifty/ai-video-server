@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 11:18 +0800
+- 进度：开始修复批量编辑 code review 发现的问题。范围收口为三项：1）批量编辑与批量删除互斥，避免并发操作同一选择集；2）批量编辑抽屉打开时为合集/图片图集远程加载补错误兜底，避免未处理 Promise；3）把脆弱的文案断言测试改成关键行为/源码结构断言，并补后端批量标签与批量校验的定向测试。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.spec.js`、`internal/handlers/admin_batch_delete_test.go`、`internal/repository/admin_repository_batch_test.go`、`plan.md`
+- 验证：待执行 `go test ./internal/repository ./internal/handlers -run 'Test(AdminBatch|MergeAdmin|NormalizeAdmin)' -count=1`、`cd admin-web && npm run test -- src/views/videoList.helpers.spec.js`、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
+## 2026-06-15 11:24 +0800
+- 进度：完成批量编辑 review 修复。`VideoList` 的批量编辑/批量删除现在共享互斥门控，避免同一选择集并发提交；批量编辑抽屉首次打开时改为 `Promise.allSettled` 预加载合集与图片图集，并在失败时给出可恢复提示；前端测试改为锁定 Shift 区间选择和互斥/预加载结构，后端测试补了空 patch、非法图片图集 ID 和标签空输入等边界。本次只纳入 review 修复相关前端页面/测试与 `plan.md`。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.spec.js`、`internal/handlers/admin_batch_delete_test.go`、`internal/repository/admin_repository_batch_test.go`、`plan.md`
+- 验证：`go test ./internal/repository ./internal/handlers -run 'Test(AdminBatch|MergeAdmin|NormalizeAdmin)' -count=1` 通过；`cd admin-web && npm run test -- src/views/videoList.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
 ## 2026-06-15 10:46 +0800
 - 进度：完成管理端视频批量编辑收尾。后端新增 `PUT /api/v1/admin/videos/batch-update`，支持对当前页已选视频统一覆盖标题、图片图集、所属合集和标签；标签支持 `replace` / `append` / `remove`，合集继续限制为短视频。前端 `VideoList` 已接入批量编辑抽屉、当前页 `Shift` 区间选择、批量 API 调用与部分成功提示。`CONTEXT.md` 已补充长期约定。本次只纳入管理端批量编辑相关前后端文件、`CONTEXT.md` 与 `plan.md`，用户既有无关改动保持不纳入。
 - 影响文件：`internal/handlers/admin.go`、`internal/handlers/router.go`、`internal/handlers/admin_batch_delete_test.go`、`internal/models/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_batch_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.spec.js`、`CONTEXT.md`、`plan.md`
