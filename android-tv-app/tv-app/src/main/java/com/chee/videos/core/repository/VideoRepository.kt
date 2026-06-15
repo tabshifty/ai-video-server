@@ -336,9 +336,11 @@ class VideoRepository @Inject constructor(
     fun preferredLongFormPlaybackProfile(): PlaybackProfile =
         playbackProfileResolver.preferredLongFormProfile()
 
-    suspend fun buildSourceUrl(videoId: String): String {
+    suspend fun buildSourceUrl(videoId: String, profile: String? = null): String {
         val baseUrl = store.readActiveBaseUrl().orEmpty()
-        return UrlBuilder.source(baseUrl, videoId, preferredLongFormPlaybackProfile().wireValue)
+        val playbackProfile = profile?.trim().takeUnless { it.isNullOrBlank() }
+            ?: preferredLongFormPlaybackProfile().wireValue
+        return UrlBuilder.source(baseUrl, videoId, playbackProfile)
     }
 
     private suspend fun <T> callWithAuth(

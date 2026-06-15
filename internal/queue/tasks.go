@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"video-server/internal/models"
 	"video-server/internal/repository"
 	"video-server/internal/services"
+	ffmpegpkg "video-server/pkg/ffmpeg"
 )
 
 const (
@@ -203,24 +205,68 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 		outputPlaybackProbe,
 		outputPlaybackProbeErr,
 	)
+	preservedSourcePath, preserveErr := p.preserveEpisodeDolbyVisionSource(video, inputPath, sourcePlaybackProbe, sourcePlaybackProbeErr)
+	if preserveErr != nil {
+		p.finalizeTranscodeFailure(ctx, videoID, jobID, preserveErr.Error())
+		return preserveErr
+	}
+	if preservedSourcePath != "" {
+		metadata = services.MergePlaybackCompatibilityMetadata(metadata, map[string]any{
+			"source_playback_path": preservedSourcePath,
+		})
+	}
 	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, thumbPath, result.Duration, result.Width, result.Height, metadata); err != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
 		return err
 	}
 	if p.subtitle != nil {
-		if _, err := p.subtitle.SyncEmbeddedSubtitles(ctx, videoID, inputPath); err != nil {
-			p.logger.Warn("sync embedded subtitles failed", "video_id", videoID, "input_path", inputPath, "error", err)
+		subtitleInputPath := inputPath
+		if preservedSourcePath != "" {
+			subtitleInputPath = preservedSourcePath
+		}
+		if _, err := p.subtitle.SyncEmbeddedSubtitles(ctx, videoID, subtitleInputPath); err != nil {
+			p.logger.Warn("sync embedded subtitles failed", "video_id", videoID, "input_path", subtitleInputPath, "error", err)
 		}
 	}
 	if err := p.repo.FinishTranscodingJob(ctx, jobID, "success", ""); err != nil {
 		return err
 	}
-	if p.uploadGC {
+	if p.uploadGC && !shouldPreserveEpisodeDolbyVisionSource(video.Type, sourcePlaybackProbe, sourcePlaybackProbeErr) {
 		_ = os.Remove(video.OriginalPath)
 	}
 
 	p.logger.Info("transcode completed", "video_id", videoID, "output", result.TranscodedPath)
 	return nil
+}
+
+func (p *Processor) preserveEpisodeDolbyVisionSource(
+	video models.Video,
+	inputPath string,
+	sourceProbe ffmpegpkg.PlaybackCompatibilityProbe,
+	sourceProbeErr error,
+) (string, error) {
+	if !shouldPreserveEpisodeDolbyVisionSource(video.Type, sourceProbe, sourceProbeErr) {
+		return "", nil
+	}
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return "", fmt.Errorf("preserve dv source: empty input path")
+	}
+	ext := strings.TrimSpace(filepath.Ext(inputPath))
+	if ext == "" {
+		return "", fmt.Errorf("preserve dv source: source extension missing")
+	}
+	targetPath := filepath.Join(p.storageRoot, "videos", video.ID.String(), "source-dv"+ext)
+	if sameFilePath(inputPath, targetPath) {
+		return targetPath, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		return "", fmt.Errorf("preserve dv source: create target dir: %w", err)
+	}
+	if err := moveFilePreservingSource(inputPath, targetPath); err != nil {
+		return "", fmt.Errorf("preserve dv source: move source file: %w", err)
+	}
+	return targetPath, nil
 }
 
 func intPtr(v int) *int {
@@ -343,6 +389,38 @@ func stringFromAny(value any) string {
 	default:
 		return ""
 	}
+}
+
+func shouldPreserveEpisodeDolbyVisionSource(videoType string, sourceProbe ffmpegpkg.PlaybackCompatibilityProbe, sourceProbeErr error) bool {
+	return strings.EqualFold(strings.TrimSpace(videoType), "episode") && sourceProbeErr == nil && sourceProbe.VideoStreamFound && sourceProbe.DolbyVision
+}
+
+func sameFilePath(a, b string) bool {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a == "" || b == "" {
+		return false
+	}
+	aAbs, aErr := filepath.Abs(filepath.Clean(a))
+	bAbs, bErr := filepath.Abs(filepath.Clean(b))
+	if aErr != nil || bErr != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return aAbs == bAbs
+}
+
+func moveFilePreservingSource(srcPath, dstPath string) error {
+	if err := os.Rename(srcPath, dstPath); err == nil {
+		return nil
+	}
+	if err := ffmpegpkg.CopyFile(dstPath, srcPath); err != nil {
+		return err
+	}
+	if err := os.Remove(srcPath); err != nil {
+		_ = os.Remove(dstPath)
+		return err
+	}
+	return nil
 }
 
 func (p *Processor) finalizeTranscodeFailure(ctx context.Context, videoID uuid.UUID, jobID int64, reason string) {

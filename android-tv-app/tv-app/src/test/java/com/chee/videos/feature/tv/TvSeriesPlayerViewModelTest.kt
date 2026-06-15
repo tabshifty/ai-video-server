@@ -605,7 +605,7 @@ class TvSeriesPlayerViewModelTest {
         assertTrue(state.canPlayCurrentEpisode)
         assertFalse(state.playbackPreparing)
         assertEquals(null, state.playbackBlockedMessage)
-        assertEquals(listOf("video-1"), repository.sourceUrlRequests)
+        assertEquals(listOf(TvSourceUrlRequest("video-1", null)), repository.sourceUrlRequests)
     }
 
     @Test
@@ -646,7 +646,51 @@ class TvSeriesPlayerViewModelTest {
         assertFalse(state.canPlayCurrentEpisode)
         assertFalse(state.playbackPreparing)
         assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", state.playbackBlockedMessage)
-        assertEquals(emptyList<String>(), repository.sourceUrlRequests)
+        assertEquals(emptyList<TvSourceUrlRequest>(), repository.sourceUrlRequests)
+    }
+
+    @Test
+    fun dolbyVisionEpisodeWithPreservedSource_buildsDvSourceUrl() = runTest {
+        val repository = FakeTvRepository(
+            detailPayload = tvSeriesDetail(
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisode(
+                                id = "e1",
+                                number = 1,
+                                title = "第1集",
+                                videoId = "video-1",
+                                videoStatus = "ready",
+                                metadata = mapOf(
+                                    "playback_compat" to mapOf(
+                                        "version" to 1,
+                                        "status" to "ok",
+                                        "source_playback_path" to "/storage/videos/e1/source-dv.mkv",
+                                        "source" to mapOf("dolby_vision" to true),
+                                        "output" to mapOf("dolby_vision" to false),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+        viewModel.awaitIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("video-1", state.currentVideoId)
+        assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
+        assertTrue(state.canPlayCurrentEpisode)
+        assertEquals(listOf(TvSourceUrlRequest("video-1", "dv_source")), repository.sourceUrlRequests)
     }
 
     @Test

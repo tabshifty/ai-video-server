@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 
 	"video-server/pkg/ffmpeg"
 )
@@ -53,6 +55,58 @@ func BuildPlaybackCompatibilityMetadata(
 		metadata["output_probe_error"] = "output video stream not found"
 	}
 	return metadata
+}
+
+func DecodePlaybackCompatibilityMetadata(raw []byte) map[string]any {
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil || payload == nil {
+		return map[string]any{}
+	}
+	block, _ := payload[PlaybackCompatibilityMetadataKey].(map[string]any)
+	if block == nil {
+		return map[string]any{}
+	}
+	return block
+}
+
+func SourcePlaybackPathFromMetadata(raw []byte) string {
+	return sourcePlaybackPathFromBlock(DecodePlaybackCompatibilityMetadata(raw))
+}
+
+func MergePlaybackCompatibilityMetadata(metadata map[string]any, patch map[string]any) map[string]any {
+	merged := cloneAnyMap(metadata)
+	if len(patch) == 0 {
+		return merged
+	}
+	current, _ := merged[PlaybackCompatibilityMetadataKey].(map[string]any)
+	current = cloneAnyMap(current)
+	for key, value := range patch {
+		current[key] = value
+	}
+	merged[PlaybackCompatibilityMetadataKey] = current
+	return merged
+}
+
+func sourcePlaybackPathFromBlock(block map[string]any) string {
+	if block == nil {
+		return ""
+	}
+	value, _ := block["source_playback_path"].(string)
+	return strings.TrimSpace(value)
+}
+
+func cloneAnyMap(in map[string]any) map[string]any {
+	if in == nil {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 func playbackProbeMetadata(probe ffmpeg.PlaybackCompatibilityProbe) map[string]any {

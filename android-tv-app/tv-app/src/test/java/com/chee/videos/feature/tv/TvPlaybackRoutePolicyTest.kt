@@ -49,6 +49,24 @@ class TvPlaybackRoutePolicyTest {
     }
 
     @Test
+    fun sourceDolbyVisionEpisodeWithPreservedSource_usesMedia3DedicatedRoute() {
+        val route = resolveTvPlaybackRoute(
+            metadata = playbackCompat(
+                sourceDolbyVision = true,
+                outputDolbyVision = false,
+                sourcePlaybackPath = "/storage/videos/e1/source-dv.mkv",
+            ),
+            displayCapability = supportedDisplayCapability(),
+            playbackUrl = "https://example.test/video-1/source?profile=dv_source",
+            media3Available = true,
+        )
+
+        assertEquals(TvPlaybackRouteKind.MEDIA3_DOLBY_VISION, route.kind)
+        assertEquals("dv_source", route.playbackProfile)
+        assertEquals(null, route.blockMessage)
+    }
+
+    @Test
     fun outputDolbyVisionWithSupportedDisplayAndMedia3_usesMedia3DedicatedRoute() {
         val route = resolveTvPlaybackRoute(
             metadata = playbackCompat(sourceDolbyVision = true, outputDolbyVision = true),
@@ -155,11 +173,13 @@ class TvPlaybackRoutePolicyTest {
 private fun playbackCompat(
     sourceDolbyVision: Boolean,
     outputDolbyVision: Boolean,
+    sourcePlaybackPath: String? = null,
 ): Map<String, Any?> =
     mapOf(
         "playback_compat" to mapOf(
             "version" to 1,
             "status" to "ok",
+            "source_playback_path" to sourcePlaybackPath,
             "source" to mapOf("dolby_vision" to sourceDolbyVision),
             "output" to mapOf("dolby_vision" to outputDolbyVision),
         ),

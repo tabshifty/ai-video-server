@@ -12,6 +12,7 @@ internal data class TvPlaybackCandidateDecision(
 
 internal data class TvPlaybackRoute(
     val kind: TvPlaybackRouteKind,
+    val playbackProfile: String? = null,
     val blockMessage: String? = null,
 )
 
@@ -50,10 +51,14 @@ internal fun resolveTvPlaybackCandidateDecision(
         )
         is PlaybackCompatibilityPayload.Ok -> {
             if (compatibility.sourceDolbyVision && !compatibility.outputDolbyVision) {
-                TvPlaybackCandidateDecision(
-                    allowed = false,
-                    blockMessage = DolbyVisionTranscodeOutputMessage,
-                )
+                if (!compatibility.sourcePlaybackPath.isNullOrBlank()) {
+                    TvPlaybackCandidateDecision(allowed = true)
+                } else {
+                    TvPlaybackCandidateDecision(
+                        allowed = false,
+                        blockMessage = DolbyVisionTranscodeOutputMessage,
+                    )
+                }
             } else {
                 TvPlaybackCandidateDecision(allowed = true)
             }
@@ -105,12 +110,35 @@ private fun resolvePlaybackRoute(
 ): TvPlaybackRoute {
     if (!compatibility.outputDolbyVision) {
         return if (compatibility.sourceDolbyVision) {
-            blockPlaybackRoute(DolbyVisionTranscodeOutputMessage)
+            if (!compatibility.sourcePlaybackPath.isNullOrBlank()) {
+                resolveDedicatedDolbyVisionRoute(
+                    displayCapability = displayCapability,
+                    playbackUrl = playbackUrl,
+                    media3Available = media3Available,
+                    playbackProfile = "dv_source",
+                )
+            } else {
+                blockPlaybackRoute(DolbyVisionTranscodeOutputMessage)
+            }
         } else {
             TvPlaybackRoute(kind = TvPlaybackRouteKind.VLC)
         }
     }
 
+    return resolveDedicatedDolbyVisionRoute(
+        displayCapability = displayCapability,
+        playbackUrl = playbackUrl,
+        media3Available = media3Available,
+        playbackProfile = null,
+    )
+}
+
+private fun resolveDedicatedDolbyVisionRoute(
+    displayCapability: DolbyVisionDisplayCapability,
+    playbackUrl: String?,
+    media3Available: Boolean,
+    playbackProfile: String?,
+): TvPlaybackRoute {
     when (displayCapability.status) {
         DolbyVisionDisplayCapabilityStatus.SUPPORTED -> Unit
         DolbyVisionDisplayCapabilityStatus.UNSUPPORTED -> {
@@ -124,13 +152,31 @@ private fun resolvePlaybackRoute(
     if (!media3Available || playbackUrl.isNullOrBlank()) {
         return blockPlaybackRoute(DolbyVisionDedicatedRouteUnavailableMessage)
     }
-    return TvPlaybackRoute(kind = TvPlaybackRouteKind.MEDIA3_DOLBY_VISION)
+    return TvPlaybackRoute(
+        kind = TvPlaybackRouteKind.MEDIA3_DOLBY_VISION,
+        playbackProfile = playbackProfile,
+    )
 }
 
 internal fun isTvEpisodePlayableForPlayback(episode: TvEpisodeUiModel): Boolean =
     episode.playable &&
         episode.videoId.isNotBlank() &&
         isPlaybackCompatibilityCandidate(episode.metadata)
+
+internal fun resolveTvPlaybackSourceProfile(
+    metadata: Map<String, Any?>?,
+): String? {
+    return when (val compatibility = parsePlaybackCompatibility(metadata)) {
+        is PlaybackCompatibilityPayload.Ok -> {
+            if (compatibility.sourceDolbyVision && !compatibility.outputDolbyVision && !compatibility.sourcePlaybackPath.isNullOrBlank()) {
+                "dv_source"
+            } else {
+                null
+            }
+        }
+        else -> null
+    }
+}
 
 private fun blockPlaybackCompatibilityIncomplete(): TvPlaybackCompatibilityDecision =
     TvPlaybackCompatibilityDecision(
@@ -151,6 +197,7 @@ private sealed class PlaybackCompatibilityPayload {
     data class Ok(
         val sourceDolbyVision: Boolean,
         val outputDolbyVision: Boolean,
+        val sourcePlaybackPath: String?,
     ) : PlaybackCompatibilityPayload()
 }
 
@@ -171,9 +218,11 @@ private fun parsePlaybackCompatibility(metadata: Map<String, Any?>?): PlaybackCo
         ?: return PlaybackCompatibilityPayload.Incomplete
     val outputDolbyVision = optionalBooleanValue(output["dolby_vision"])
         ?: return PlaybackCompatibilityPayload.Incomplete
+    val sourcePlaybackPath = stringValue(block["source_playback_path"])
     return PlaybackCompatibilityPayload.Ok(
         sourceDolbyVision = sourceDolbyVision,
         outputDolbyVision = outputDolbyVision,
+        sourcePlaybackPath = sourcePlaybackPath,
     )
 }
 

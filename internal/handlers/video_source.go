@@ -14,6 +14,7 @@ import (
 	"video-server/internal/middleware"
 	"video-server/internal/models"
 	"video-server/internal/repository"
+	"video-server/internal/services"
 	"video-server/internal/utils"
 )
 
@@ -133,6 +134,8 @@ func resolveProfiledPlayableSource(video models.Video, requestedProfile string) 
 			return path, nil
 		}
 		return strings.TrimSpace(video.TranscodedPath), nil
+	case "dv_source":
+		return services.SourcePlaybackPathFromMetadata(video.Metadata), nil
 	default:
 		return "", errInvalidPlaybackProfile
 	}

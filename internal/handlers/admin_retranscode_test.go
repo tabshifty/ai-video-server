@@ -60,3 +60,22 @@ func TestSelectRetranscodeInputPath_NoFile(t *testing.T) {
 		t.Fatalf("expected empty input and source, got input=%s source=%s", input, source)
 	}
 }
+
+func TestSelectRetranscodeInputPath_IgnoresDolbyVisionPreservedSource(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	transcodedPath := filepath.Join(dir, "video-transcoded.mp4")
+	if err := os.WriteFile(transcodedPath, []byte("transcoded"), 0o644); err != nil {
+		t.Fatalf("write transcoded: %v", err)
+	}
+
+	input, source := selectRetranscodeInputPath(models.Video{
+		OriginalPath:   filepath.Join(dir, "missing-original.mp4"),
+		TranscodedPath: transcodedPath,
+		Metadata:       []byte(`{"playback_compat":{"source_playback_path":"/storage/videos/demo/source-dv.mkv"}}`),
+	})
+	if input != transcodedPath || source != "transcoded" {
+		t.Fatalf("expected transcoded fallback selected, got input=%s source=%s", input, source)
+	}
+}

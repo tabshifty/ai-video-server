@@ -81,3 +81,30 @@ func TestCollectLocalStoragePathsRecursesNestedJSONValues(t *testing.T) {
 		t.Fatalf("expected HTTP URL to be skipped, got %v", found)
 	}
 }
+
+func TestCollectLocalStoragePathsIncludesPlaybackCompatSourcePlaybackPath(t *testing.T) {
+	t.Parallel()
+
+	var found []string
+	add := func(value string) {
+		if normalized := normalizePotentialStoragePath(value); normalized != "" {
+			found = append(found, normalized)
+		}
+	}
+
+	payload := map[string]any{
+		"playback_compat": map[string]any{
+			"version":              1,
+			"status":               "ok",
+			"source_playback_path": "/storage/videos/episode-1/source-dv.mkv",
+			"source":               map[string]any{"dolby_vision": true},
+			"output":               map[string]any{"dolby_vision": false},
+		},
+	}
+
+	collectLocalStoragePaths(payload, add)
+
+	if !slices.Contains(found, "/storage/videos/episode-1/source-dv.mkv") {
+		t.Fatalf("expected collected paths to contain source_playback_path, got %v", found)
+	}
+}

@@ -144,21 +144,29 @@ fun TvLongFormPlayerScreen(
         showDolbyVisionDiagnostics = false
     }
 
-    val playUrl = resolveTvLongFormPlayUrl(
-        baseUrl = uiState.baseUrl,
-        detail = detail,
-        preferredPlaybackProfile = uiState.preferredPlaybackProfile,
-    )
     var routeRetryNonce by remember(detail.id) { mutableStateOf(0) }
     val displayCapability = remember(context, detail.id, routeRetryNonce) {
         evaluateDolbyVisionDisplayCapability(AndroidDisplayHdrCapabilityReader(context))
     }
-    val playbackRoute = remember(detail.metadata, displayCapability, playUrl) {
+    val playbackRoute = remember(detail.metadata, displayCapability, uiState.baseUrl, uiState.preferredPlaybackProfile) {
         resolveTvPlaybackRoute(
             metadata = detail.metadata,
             displayCapability = displayCapability,
-            playbackUrl = playUrl,
+            playbackUrl = resolveTvLongFormPlayUrl(
+                baseUrl = uiState.baseUrl,
+                detail = detail,
+                preferredPlaybackProfile = uiState.preferredPlaybackProfile,
+                overridePlaybackProfile = null,
+            ),
             media3Available = true,
+        )
+    }
+    val playUrl = remember(uiState.baseUrl, detail, uiState.preferredPlaybackProfile, playbackRoute.playbackProfile) {
+        resolveTvLongFormPlayUrl(
+            baseUrl = uiState.baseUrl,
+            detail = detail,
+            preferredPlaybackProfile = uiState.preferredPlaybackProfile,
+            overridePlaybackProfile = playbackRoute.playbackProfile,
         )
     }
     val showDolbyVisionDiagnosticsButton = remember(detail.metadata, playbackRoute) {

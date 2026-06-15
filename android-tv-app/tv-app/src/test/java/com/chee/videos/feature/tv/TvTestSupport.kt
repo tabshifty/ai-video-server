@@ -39,7 +39,7 @@ class FakeTvRepository(
     val searchRequests = mutableListOf<TvSearchRequest>()
     val posterWallRequests = mutableListOf<TvPosterWallRequest>()
     val detailRequests = mutableListOf<String>()
-    val sourceUrlRequests = mutableListOf<String>()
+    val sourceUrlRequests = mutableListOf<TvSourceUrlRequest>()
 
     override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
@@ -86,8 +86,8 @@ class FakeTvRepository(
 
     override suspend fun readActiveBaseUrl(): String = baseUrl
 
-    override suspend fun buildSourceUrl(videoId: String): String {
-        sourceUrlRequests += videoId
+    override suspend fun buildSourceUrl(videoId: String, profile: String?): String {
+        sourceUrlRequests += TvSourceUrlRequest(videoId = videoId, profile = profile)
         return "https://example.com/$videoId.m3u8"
     }
 
@@ -155,6 +155,11 @@ data class TvPosterWallRequest(
     val sortOrder: String,
 )
 
+data class TvSourceUrlRequest(
+    val videoId: String,
+    val profile: String?,
+)
+
 class DelayedSourceTvRepository(
     private val baseUrl: String = "https://example.com",
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
@@ -184,7 +189,7 @@ class DelayedSourceTvRepository(
 
     override suspend fun readActiveBaseUrl(): String = baseUrl
 
-    override suspend fun buildSourceUrl(videoId: String): String =
+    override suspend fun buildSourceUrl(videoId: String, profile: String?): String =
         pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.await()
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit

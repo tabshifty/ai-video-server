@@ -94,6 +94,24 @@ class PlaybackCompatibilityPolicyTest {
     }
 
     @Test
+    fun sourceDolbyVisionEpisodeWithPreservedSource_stillBlocksGenericSafePlaybackDecision() {
+        val decision = resolveTvPlaybackCompatibilityDecision(
+            mapOf(
+                "playback_compat" to mapOf(
+                    "version" to 1,
+                    "status" to "ok",
+                    "source_playback_path" to "/storage/videos/e1/source-dv.mkv",
+                    "source" to mapOf("dolby_vision" to true),
+                    "output" to mapOf("dolby_vision" to false),
+                ),
+            ),
+        )
+
+        assertFalse(decision.allowed)
+        assertEquals("该视频来源为杜比视界，当前压缩结果可能无法安全播放", decision.blockMessage)
+    }
+
+    @Test
     fun outputDolbyVision_blocksUntilDedicatedSystemPlaybackExists() {
         val decision = resolveTvPlaybackCompatibilityDecision(
             mapOf(
@@ -195,5 +213,31 @@ class PlaybackCompatibilityPolicyTest {
         )
 
         assertFalse(isTvEpisodePlayableForPlayback(episode))
+    }
+
+    @Test
+    fun episodePlayablePolicyAllowsDolbyVisionEpisodeWhenPreservedSourceExists() {
+        val episode = TvEpisodeUiModel(
+            id = "e1",
+            number = 1,
+            title = "第1集",
+            durationLabel = "45 分钟",
+            summary = "剧情",
+            videoId = "video-1",
+            videoStatus = "ready",
+            playable = true,
+            metadata = mapOf(
+                "playback_compat" to mapOf(
+                    "version" to 1,
+                    "status" to "ok",
+                    "source_playback_path" to "/storage/videos/e1/source-dv.mkv",
+                    "source" to mapOf("dolby_vision" to true),
+                    "output" to mapOf("dolby_vision" to false),
+                ),
+            ),
+        )
+
+        assertTrue(isTvEpisodePlayableForPlayback(episode))
+        assertEquals("dv_source", resolveTvPlaybackSourceProfile(episode.metadata))
     }
 }

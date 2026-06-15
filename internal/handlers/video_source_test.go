@@ -50,6 +50,21 @@ func TestResolveProfiledPlayableSource_UsesPrimaryPathWhenCompatMissing(t *testi
 	}
 }
 
+func TestResolveProfiledPlayableSource_UsesDolbyVisionSourcePathWhenRequested(t *testing.T) {
+	video := models.Video{
+		TranscodedPath: "/tmp/video-avc.mp4",
+		Metadata:       []byte(`{"playback_compat":{"version":1,"status":"ok","source_playback_path":"/tmp/source-dv.mkv"}}`),
+	}
+
+	path, err := resolveProfiledPlayableSource(video, "dv_source")
+	if err != nil {
+		t.Fatalf("resolveProfiledPlayableSource() error = %v", err)
+	}
+	if path != "/tmp/source-dv.mkv" {
+		t.Fatalf("expected dv source path, got %s", path)
+	}
+}
+
 func TestResolveProfiledPlayableSource_RejectsUnknownProfile(t *testing.T) {
 	video := models.Video{
 		TranscodedPath: "/tmp/video-avc.mp4",

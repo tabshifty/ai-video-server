@@ -570,6 +570,11 @@ func normalizePotentialStoragePath(raw string) string {
 func collectLocalStoragePaths(value any, add func(string)) {
 	switch v := value.(type) {
 	case map[string]any:
+		if isPlaybackCompatibilityObject(v) {
+			if path, _ := v["source_playback_path"].(string); strings.TrimSpace(path) != "" {
+				add(path)
+			}
+		}
 		for _, child := range v {
 			collectLocalStoragePaths(child, add)
 		}
@@ -580,6 +585,18 @@ func collectLocalStoragePaths(value any, add func(string)) {
 	case string:
 		add(v)
 	}
+}
+
+func isPlaybackCompatibilityObject(value map[string]any) bool {
+	if value == nil {
+		return false
+	}
+	_, hasVersion := value["version"]
+	_, hasStatus := value["status"]
+	_, hasSource := value["source"]
+	_, hasOutput := value["output"]
+	_, hasSourcePlaybackPath := value["source_playback_path"]
+	return hasSourcePlaybackPath || (hasVersion && hasStatus && (hasSource || hasOutput))
 }
 
 func timePtrOrNil(v *time.Time) any {

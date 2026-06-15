@@ -71,3 +71,40 @@ func TestBuildPlaybackCompatibilityMetadataProbeFailed(t *testing.T) {
 		t.Fatalf("expected output video missing error, got %v", metadata["output_probe_error"])
 	}
 }
+
+func TestSourcePlaybackPathFromMetadata(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{"playback_compat":{"version":1,"status":"ok","source_playback_path":" /storage/videos/v1/source-dv.mkv "}}`)
+
+	if got := SourcePlaybackPathFromMetadata(raw); got != "/storage/videos/v1/source-dv.mkv" {
+		t.Fatalf("expected source playback path, got %q", got)
+	}
+}
+
+func TestMergePlaybackCompatibilityMetadata(t *testing.T) {
+	t.Parallel()
+
+	metadata := map[string]any{
+		"title": "demo",
+		PlaybackCompatibilityMetadataKey: map[string]any{
+			"version": 1,
+			"status":  "ok",
+		},
+	}
+
+	merged := MergePlaybackCompatibilityMetadata(metadata, map[string]any{
+		"source_playback_path": "/storage/videos/v1/source-dv.mkv",
+	})
+
+	block, _ := merged[PlaybackCompatibilityMetadataKey].(map[string]any)
+	if block == nil {
+		t.Fatalf("expected playback compat block, got %#v", merged)
+	}
+	if block["source_playback_path"] != "/storage/videos/v1/source-dv.mkv" {
+		t.Fatalf("expected source_playback_path merged, got %#v", block)
+	}
+	if merged["title"] != "demo" {
+		t.Fatalf("expected unrelated metadata preserved, got %#v", merged)
+	}
+}

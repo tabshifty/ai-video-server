@@ -23,7 +23,7 @@ interface TvRepository {
     suspend fun fetchIptvChannels(): Result<TvIptvPayload>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
     suspend fun readActiveBaseUrl(): String?
-    suspend fun buildSourceUrl(videoId: String): String
+    suspend fun buildSourceUrl(videoId: String, profile: String? = null): String
     suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean)
     suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference?
     suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?)
@@ -63,8 +63,8 @@ class NetworkTvRepository @Inject constructor(
     override suspend fun readActiveBaseUrl(): String? =
         videoRepository.readActiveBaseUrl()
 
-    override suspend fun buildSourceUrl(videoId: String): String =
-        videoRepository.buildSourceUrl(videoId)
+    override suspend fun buildSourceUrl(videoId: String, profile: String?): String =
+        videoRepository.buildSourceUrl(videoId, profile)
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
         videoRepository.reportHistory(videoId, watchSeconds, completed)

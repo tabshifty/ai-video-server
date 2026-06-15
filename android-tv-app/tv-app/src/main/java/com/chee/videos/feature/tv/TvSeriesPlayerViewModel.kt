@@ -293,7 +293,10 @@ class TvSeriesPlayerViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            val sourceUrl = repository.buildSourceUrl(episode.videoId)
+            val sourceUrl = repository.buildSourceUrl(
+                episode.videoId,
+                resolveTvPlaybackSourceProfile(episode.metadata),
+            )
             val preferredSubtitleTrackId = resolveSelectedSubtitleTrackByPreference(
                 tracks = episode.subtitleTracks,
                 preference = repository.readTvSubtitlePreference(episode.videoId),

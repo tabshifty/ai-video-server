@@ -25,6 +25,7 @@ import (
 	"video-server/internal/queue"
 	"video-server/internal/repository"
 	"video-server/internal/response"
+	"video-server/internal/services"
 	"video-server/internal/utils"
 )
 
@@ -557,6 +558,7 @@ func (a *API) deleteVideoResources(ctx context.Context, videoID uuid.UUID) error
 	_ = os.Remove(video.OriginalPath)
 	_ = os.Remove(video.TranscodedPath)
 	_ = os.Remove(video.ThumbnailPath)
+	_ = os.Remove(services.SourcePlaybackPathFromMetadata(video.Metadata))
 	for _, subtitle := range subtitles {
 		if strings.TrimSpace(subtitle.StoredPath) != "" {
 			_ = os.Remove(subtitle.StoredPath)
@@ -574,6 +576,10 @@ func (a *API) AdminRetranscodeVideo(c *gin.Context) {
 	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
 	if err != nil {
 		response.Error(c, 1011, err.Error())
+		return
+	}
+	if services.SourcePlaybackPathFromMetadata(video.Metadata) != "" {
+		response.Error(c, 1012, "当前视频保留了杜比视界原始播放源，禁止重转码")
 		return
 	}
 	inputPath, inputSource := selectRetranscodeInputPath(video)

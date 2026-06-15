@@ -240,17 +240,19 @@ internal fun resolveTvLongFormPlayUrl(
     baseUrl: String,
     detail: VideoDetailDto,
     preferredPlaybackProfile: String,
+    overridePlaybackProfile: String? = null,
 ): String? {
+    val playbackProfile = overridePlaybackProfile?.trim().takeUnless { it.isNullOrBlank() } ?: preferredPlaybackProfile
     val raw = detail.playUrl?.trim().orEmpty()
     if (raw.isNotBlank()) {
         val resolved = resolveTvResourceUrl(baseUrl, raw) ?: return null
-        return appendTvPlaybackProfileQuery(resolved, preferredPlaybackProfile)
+        return appendTvPlaybackProfileQuery(resolved, playbackProfile)
     }
     val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
     if (normalizedBase.isBlank()) {
         return null
     }
-    return UrlBuilder.source(normalizedBase, detail.id, preferredPlaybackProfile)
+    return UrlBuilder.source(normalizedBase, detail.id, playbackProfile)
 }
 
 internal fun resolveTvResourceUrl(baseUrl: String, rawUrl: String?): String? {

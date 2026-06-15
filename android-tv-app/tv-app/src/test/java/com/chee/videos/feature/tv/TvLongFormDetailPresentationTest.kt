@@ -124,6 +124,22 @@ class TvLongFormDetailPresentationTest {
     }
 
     @Test
+    fun `dv source override rewrites long form play url profile`() {
+        val url = resolveTvLongFormPlayUrl(
+            baseUrl = "https://media.example.com",
+            detail = VideoDetailDto(
+                id = "episode-1",
+                title = "第1集",
+                playUrl = "/api/v1/videos/episode-1/source",
+            ),
+            preferredPlaybackProfile = "compat",
+            overridePlaybackProfile = "dv_source",
+        )
+
+        assertEquals("https://media.example.com/api/v1/videos/episode-1/source?profile=dv_source", url)
+    }
+
+    @Test
     fun `builds actor row with avatar and placeholder capped at five`() {
         val hero = buildTvLongFormDetailHero(
             baseUrl = "https://media.example.com",
