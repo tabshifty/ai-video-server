@@ -214,4 +214,11 @@ describe('videoList helpers', () => {
   it('allows ASS and SSA subtitle uploads alongside SRT and VTT', () => {
     expect(subtitleUploadAccept.split(',')).toEqual(['.srt', '.vtt', '.ass', '.ssa'])
   })
+
+  it('keeps current page shift selection scope wording in source', () => {
+    const source = readFileSync(new URL('./VideoList.vue', import.meta.url), 'utf8')
+    expect(source).toContain('Shift')
+    expect(source).toContain('当前页')
+    expect(source).toContain('批量编辑')
+  })
 })

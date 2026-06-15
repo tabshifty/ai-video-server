@@ -4,14 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/models"
 )
+
+type AdminVideoTagsMode string
+
+const (
+	AdminVideoTagsModeReplace AdminVideoTagsMode = "replace"
+	AdminVideoTagsModeAppend  AdminVideoTagsMode = "append"
+	AdminVideoTagsModeRemove  AdminVideoTagsMode = "remove"
+)
+
+var ErrAdminVideoTagsModeInvalid = errors.New("invalid admin video tags mode")
 
 func (r *VideoRepository) CountVideosByType(ctx context.Context) (shorts, movies, episodes, avs int64, err error) {
 	err = r.pool.QueryRow(ctx, `
@@ -292,6 +304,220 @@ func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUI
 		}
 	}
 	return nil
+}
+
+func (r *VideoRepository) AdminBatchUpdateVideo(ctx context.Context, videoID uuid.UUID, patch models.AdminBatchVideoPatch) error {
+	video, err := r.GetVideoByID(ctx, videoID)
+	if err != nil {
+		return fmt.Errorf("get video for admin batch update: %w", err)
+	}
+
+	title := video.Title
+	if patch.UpdateTitle {
+		title = patch.Title
+	}
+
+	updateCollections := patch.UpdateCollectionIDs
+	collectionIDs := dedupeCollectionIDs(patch.CollectionIDs)
+	nextType := strings.ToLower(strings.TrimSpace(video.Type))
+	if updateCollections && nextType != "short" {
+		return ErrCollectionsOnlyForShort
+	}
+	if updateCollections {
+		collectionIDs, err = r.ResolveCollectionIDs(ctx, collectionIDs)
+		if err != nil {
+			return err
+		}
+	}
+
+	if patch.UpdateImageCollectionID {
+		rawIDs := make([]uuid.UUID, 0, 1)
+		if patch.ImageCollectionID != nil {
+			rawIDs = append(rawIDs, *patch.ImageCollectionID)
+		}
+		resolvedImageCollectionID, resolveErr := r.ResolveVideoImageCollectionID(ctx, rawIDs)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		patch.ImageCollectionID = resolvedImageCollectionID
+	}
+
+	tags, err := r.resolveAdminBatchVideoTags(ctx, videoID, patch)
+	if err != nil {
+		return err
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx admin batch update video: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if patch.UpdateTitle {
+		if _, err := tx.Exec(ctx, `
+UPDATE videos
+SET title=$2, updated_at=NOW()
+WHERE id=$1
+`, videoID, title); err != nil {
+			return fmt.Errorf("admin batch update title: %w", err)
+		}
+	}
+
+	if patch.UpdateTags {
+		if err := replaceVideoTagsTx(ctx, tx, videoID, tags); err != nil {
+			return err
+		}
+	}
+
+	if patch.UpdateImageCollectionID {
+		if _, err := tx.Exec(ctx, `
+UPDATE videos
+SET image_collection_id=$2, updated_at=NOW()
+WHERE id=$1
+`, videoID, patch.ImageCollectionID); err != nil {
+			return fmt.Errorf("admin batch update image collection: %w", err)
+		}
+	}
+
+	if updateCollections {
+		if err := replaceVideoCollectionsTx(ctx, tx, videoID, collectionIDs); err != nil {
+			return err
+		}
+	}
+
+	if patch.UpdateTitle || patch.UpdateTags || patch.UpdateCollectionIDs || patch.UpdateImageCollectionID {
+		if _, err := tx.Exec(ctx, `UPDATE videos SET updated_at=NOW() WHERE id=$1`, videoID); err != nil {
+			return fmt.Errorf("touch admin batch update video: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit admin batch update video: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) resolveAdminBatchVideoTags(ctx context.Context, videoID uuid.UUID, patch models.AdminBatchVideoPatch) ([]string, error) {
+	if !patch.UpdateTags {
+		return nil, nil
+	}
+	mode := AdminVideoTagsMode(patch.TagsMode)
+	switch mode {
+	case AdminVideoTagsModeReplace:
+		return normalizeAdminVideoTags(patch.Tags), nil
+	case AdminVideoTagsModeAppend, AdminVideoTagsModeRemove:
+		currentTags, err := r.listVideoTags(ctx, videoID)
+		if err != nil {
+			return nil, err
+		}
+		return mergeAdminVideoTags(currentTags, patch.Tags, mode)
+	default:
+		return nil, ErrAdminVideoTagsModeInvalid
+	}
+}
+
+func (r *VideoRepository) listVideoTags(ctx context.Context, videoID uuid.UUID) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `SELECT tag FROM video_tags WHERE video_id=$1 ORDER BY tag`, videoID)
+	if err != nil {
+		return nil, fmt.Errorf("admin video tags: %w", err)
+	}
+	defer rows.Close()
+
+	tags := make([]string, 0, 8)
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return nil, fmt.Errorf("scan admin tag: %w", err)
+		}
+		tags = append(tags, tag)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return tags, nil
+}
+
+func replaceVideoTagsTx(ctx context.Context, tx pgx.Tx, videoID uuid.UUID, tags []string) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM video_tags WHERE video_id=$1`, videoID); err != nil {
+		return fmt.Errorf("clear tags: %w", err)
+	}
+	for _, t := range normalizeAdminVideoTags(tags) {
+		if _, err := tx.Exec(ctx, `INSERT INTO video_tags(video_id, tag, weight) VALUES ($1,$2,1.0)`, videoID, t); err != nil {
+			return fmt.Errorf("insert admin tag: %w", err)
+		}
+	}
+	return nil
+}
+
+func replaceVideoCollectionsTx(ctx context.Context, tx pgx.Tx, videoID uuid.UUID, collectionIDs []uuid.UUID) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM video_collections WHERE video_id=$1`, videoID); err != nil {
+		return fmt.Errorf("clear video collections: %w", err)
+	}
+	for _, collectionID := range collectionIDs {
+		if _, err := tx.Exec(ctx, `INSERT INTO video_collections(video_id, collection_id) VALUES ($1,$2)`, videoID, collectionID); err != nil {
+			return fmt.Errorf("insert video collection: %w", err)
+		}
+	}
+	return nil
+}
+
+func mergeAdminVideoTags(current, incoming []string, mode AdminVideoTagsMode) ([]string, error) {
+	existing := normalizeAdminVideoTags(current)
+	target := normalizeAdminVideoTags(incoming)
+	switch mode {
+	case AdminVideoTagsModeAppend:
+		out := append([]string{}, existing...)
+		seen := map[string]struct{}{}
+		for _, item := range out {
+			seen[item] = struct{}{}
+		}
+		for _, item := range target {
+			if _, ok := seen[item]; ok {
+				continue
+			}
+			seen[item] = struct{}{}
+			out = append(out, item)
+		}
+		return out, nil
+	case AdminVideoTagsModeRemove:
+		if len(target) == 0 {
+			return existing, nil
+		}
+		removeSet := map[string]struct{}{}
+		for _, item := range target {
+			removeSet[item] = struct{}{}
+		}
+		out := make([]string, 0, len(existing))
+		for _, item := range existing {
+			if _, ok := removeSet[item]; ok {
+				continue
+			}
+			out = append(out, item)
+		}
+		return out, nil
+	default:
+		return nil, ErrAdminVideoTagsModeInvalid
+	}
+}
+
+func normalizeAdminVideoTags(raw []string) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	seen := map[string]struct{}{}
+	for _, item := range raw {
+		tag := strings.TrimSpace(strings.ToLower(item))
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
 }
 
 func (r *VideoRepository) AdminUpdateVideoStatus(ctx context.Context, videoID uuid.UUID, status string) error {

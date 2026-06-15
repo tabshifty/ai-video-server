@@ -1,7 +1,7 @@
 ﻿<script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, MagicStick, MoreFilled, Setting, Search } from '@element-plus/icons-vue'
+import { Delete, EditPen, MagicStick, MoreFilled, Setting, Search } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
@@ -15,6 +15,7 @@ import {
   captureAdminVideoThumbnail,
   deleteAdminVideoSubtitle,
   deleteAdminVideo,
+  batchUpdateAdminVideos,
   getAdminActors,
   getAdminCollections,
   getAdminImageCollections,
@@ -75,12 +76,31 @@ const subtitleUploadRef = ref(null)
 const subtitleUploadFileList = ref([])
 const subtitleUploading = ref(false)
 const deletingBatch = ref(false)
+const updatingBatch = ref(false)
 const selectedRows = ref([])
+const selectionAnchorIndex = ref(-1)
+const selectionSyncing = ref(false)
+const shiftKeyPressed = ref(false)
+const batchEditVisible = ref(false)
+const batchEditSnapshot = ref('')
+const batchEditDrawerSize = computed(() => detailDrawerSize.value)
+const batchEditDirty = computed(() => batchEditSnapshot.value !== serializeBatchEditState())
 const detailRequestToken = ref(0)
 const subtitleForm = reactive({
   language_code: '',
   label: '',
   is_default: false
+})
+const batchEditForm = reactive({
+  title_enabled: false,
+  title: '',
+  image_collection_enabled: false,
+  image_collection_id: '',
+  collection_enabled: false,
+  collection_ids: [],
+  tags_enabled: false,
+  tags_mode: 'replace',
+  tags: []
 })
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const router = useRouter()
@@ -106,6 +126,7 @@ const retagTypeOptions = [
 const manualStatusOptions = getManualVideoStatusOptions()
 const detailDrawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '560px'))
 const isNarrowViewport = computed(() => viewportWidth.value < 1280)
+const canBatchEditCollections = computed(() => selectedRows.value.length > 0 && selectedRows.value.every((row) => normalizeVideoType(row.type) === 'short'))
 const activeFilterChips = computed(() => {
   const chips = []
   if (query.type) chips.push({ key: 'type', label: '类型', value: typeLabel(query.type) })
@@ -113,6 +134,7 @@ const activeFilterChips = computed(() => {
   return chips
 })
 const bulkActions = computed(() => [
+  { label: '批量编辑', icon: EditPen, type: 'primary', loading: updatingBatch.value, disabled: updatingBatch.value, onClick: openBatchEditDrawer },
   { label: '批量删除', icon: Delete, type: 'danger', loading: deletingBatch.value, disabled: deletingBatch.value, onClick: doBatchDelete },
   { label: '取消选择', icon: MoreFilled, type: 'primary', disabled: deletingBatch.value, onClick: clearSelection }
 ])
@@ -192,6 +214,55 @@ function captureDetailSnapshot() {
   detailSnapshot.value = serializeDetailState()
 }
 
+function resetBatchEditForm() {
+  batchEditForm.title_enabled = false
+  batchEditForm.title = ''
+  batchEditForm.image_collection_enabled = false
+  batchEditForm.image_collection_id = ''
+  batchEditForm.collection_enabled = false
+  batchEditForm.collection_ids = []
+  batchEditForm.tags_enabled = false
+  batchEditForm.tags_mode = 'replace'
+  batchEditForm.tags = []
+}
+
+function serializeBatchEditState() {
+  return JSON.stringify({
+    title_enabled: batchEditForm.title_enabled,
+    title: batchEditForm.title || '',
+    image_collection_enabled: batchEditForm.image_collection_enabled,
+    image_collection_id: batchEditForm.image_collection_id || '',
+    collection_enabled: batchEditForm.collection_enabled,
+    collection_ids: [...(batchEditForm.collection_ids || [])].sort(),
+    tags_enabled: batchEditForm.tags_enabled,
+    tags_mode: batchEditForm.tags_mode || 'replace',
+    tags: [...(batchEditForm.tags || [])].sort()
+  })
+}
+
+function captureBatchEditSnapshot() {
+  batchEditSnapshot.value = serializeBatchEditState()
+}
+
+async function confirmBatchEditClose() {
+  if (!batchEditDirty.value) return true
+  try {
+    await ElMessageBox.confirm('未保存的批量修改将会丢失，确认关闭吗？', '确认关闭', {
+      type: 'warning',
+      confirmButtonText: '确认丢弃',
+      cancelButtonText: '继续编辑'
+    })
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
+function handleBatchEditClosed() {
+  resetBatchEditForm()
+  captureBatchEditSnapshot()
+}
+
 async function confirmDetailClose() {
   if (!detailDirty.value) return true
   try {
@@ -218,6 +289,31 @@ function typeLabel(type) {
     av: 'AV'
   }
   return map[type] || type || '-'
+}
+
+function selectedVideoIDSet() {
+  return new Set(selectedVideoIDs())
+}
+
+function findRowIndexByID(videoID) {
+  return list.value.findIndex((item) => String(item?.id || '') === String(videoID || ''))
+}
+
+function applySelectionByIDs(videoIDs, anchorIndex = -1) {
+  const selectedSet = new Set((videoIDs || []).map((item) => String(item || '').trim()).filter((item) => item !== ''))
+  selectionSyncing.value = true
+  selectedRows.value = list.value.filter((item) => selectedSet.has(String(item?.id || '')))
+  selectionAnchorIndex.value = anchorIndex
+  nextTick(() => {
+    tableRef.value?.clearSelection?.()
+    for (const row of list.value) {
+      const rowID = String(row?.id || '')
+      if (rowID && selectedSet.has(rowID)) {
+        tableRef.value?.toggleRowSelection?.(row, true)
+      }
+    }
+    selectionSyncing.value = false
+  })
 }
 
 function normalizeVideoType(type) {
@@ -317,6 +413,14 @@ function extractErrorMessage(error, fallback) {
     return message.trim()
   }
   return fallback
+}
+
+function updateShiftKeyState(event) {
+  shiftKeyPressed.value = !!event?.shiftKey
+}
+
+function updateShiftKeyFromBlur() {
+  shiftKeyPressed.value = false
 }
 
 function detailStatusOptions(status = detail.value?.status) {
@@ -652,11 +756,19 @@ async function doDelete(row) {
 }
 
 function onSelectionChange(rows) {
+  if (selectionSyncing.value) {
+    selectedRows.value = Array.isArray(rows) ? rows : []
+    return
+  }
   selectedRows.value = Array.isArray(rows) ? rows : []
+  if (selectedRows.value.length === 0) {
+    selectionAnchorIndex.value = -1
+  }
 }
 
 function clearSelection() {
   selectedRows.value = []
+  selectionAnchorIndex.value = -1
   tableRef.value?.clearSelection?.()
 }
 
@@ -711,6 +823,135 @@ async function doBatchDelete() {
     ElMessage.error(error?.message || '批量删除失败')
   } finally {
     deletingBatch.value = false
+  }
+}
+
+function onRowSelectionSelect(selection, row) {
+  const rowID = String(row?.id || '').trim()
+  if (!rowID) {
+    return
+  }
+  const currentIndex = findRowIndexByID(rowID)
+  const isSelected = Array.isArray(selection) && selection.some((item) => String(item?.id || '') === rowID)
+  // 仅在当前页可见顺序内做 Shift 区间选择。
+  if (shiftKeyPressed.value && selectionAnchorIndex.value >= 0 && currentIndex >= 0) {
+    const start = Math.min(selectionAnchorIndex.value, currentIndex)
+    const end = Math.max(selectionAnchorIndex.value, currentIndex)
+    const selectedSet = selectedVideoIDSet()
+    for (let index = start; index <= end; index += 1) {
+      const targetID = String(list.value[index]?.id || '').trim()
+      if (!targetID) continue
+      if (isSelected) {
+        selectedSet.add(targetID)
+      } else {
+        selectedSet.delete(targetID)
+      }
+    }
+    applySelectionByIDs(Array.from(selectedSet), selectionAnchorIndex.value)
+    return
+  }
+  selectionAnchorIndex.value = currentIndex
+}
+
+function onSelectionSelectAll(selection) {
+  if (Array.isArray(selection) && selection.length > 0) {
+    selectionAnchorIndex.value = 0
+    selectedRows.value = selection
+    return
+  }
+  selectionAnchorIndex.value = -1
+  selectedRows.value = []
+}
+
+async function openBatchEditDrawer() {
+  if (selectedRows.value.length === 0 || updatingBatch.value) {
+    return
+  }
+  resetBatchEditForm()
+  if (!canBatchEditCollections.value) {
+    batchEditForm.collection_enabled = false
+    batchEditForm.collection_ids = []
+  }
+  captureBatchEditSnapshot()
+  batchEditVisible.value = true
+  await Promise.all([
+    searchCollections(''),
+    searchImageCollections('')
+  ])
+}
+
+async function requestBatchEditClose() {
+  if (await confirmBatchEditClose()) {
+    batchEditVisible.value = false
+  }
+}
+
+function handleBatchEditBeforeClose(done) {
+  confirmBatchEditClose().then((confirmed) => {
+    if (confirmed) {
+      done()
+    }
+  })
+}
+
+async function saveBatchEdit() {
+  const videoIDs = selectedVideoIDs()
+  if (videoIDs.length === 0 || updatingBatch.value) {
+    return
+  }
+  const payload = { video_ids: videoIDs }
+  let changedFieldCount = 0
+
+  if (batchEditForm.title_enabled) {
+    payload.update_title = true
+    payload.title = batchEditForm.title
+    changedFieldCount += 1
+  }
+  if (batchEditForm.image_collection_enabled) {
+    payload.update_image_collection_id = true
+    payload.image_collection_id = String(batchEditForm.image_collection_id || '').trim()
+    changedFieldCount += 1
+  }
+  if (batchEditForm.collection_enabled) {
+    if (!canBatchEditCollections.value) {
+      ElMessage.warning('只有短视频支持批量修改所属合集')
+      return
+    }
+    payload.update_collection_ids = true
+    payload.collection_ids = normalizeCollectionSelection(batchEditForm.collection_ids)
+    changedFieldCount += 1
+  }
+  if (batchEditForm.tags_enabled) {
+    payload.update_tags = true
+    payload.tags_mode = batchEditForm.tags_mode || 'replace'
+    payload.tags = batchEditForm.tags || []
+    changedFieldCount += 1
+  }
+
+  if (changedFieldCount === 0) {
+    ElMessage.warning('请至少勾选一个要批量修改的字段')
+    return
+  }
+
+  updatingBatch.value = true
+  try {
+    const data = await batchUpdateAdminVideos(payload)
+    const successCount = Number(data?.success_count || 0)
+    const failureCount = Number(data?.failure_count || 0)
+    if (failureCount > 0) {
+      const failures = Array.isArray(data?.results) ? data.results.filter((item) => !item?.updated) : []
+      const summary = failures.slice(0, 3).map((item) => item?.message || item?.video_id || '未知错误').join('；')
+      ElMessage.warning(`批量修改完成，成功 ${successCount} 条，失败 ${failureCount} 条${summary ? `：${summary}` : ''}`)
+    } else {
+      ElMessage.success(`已批量更新 ${successCount} 条视频`)
+    }
+    captureBatchEditSnapshot()
+    batchEditVisible.value = false
+    await load()
+  } catch (error) {
+    ElMessage.error(error?.message || '批量修改失败')
+  } finally {
+    updatingBatch.value = false
   }
 }
 
@@ -883,12 +1124,19 @@ async function removeSubtitle(row) {
 
 onMounted(() => {
   window.addEventListener('resize', updateViewportWidth)
+  window.addEventListener('keydown', updateShiftKeyState)
+  window.addEventListener('keyup', updateShiftKeyState)
+  window.addEventListener('blur', updateShiftKeyFromBlur)
   load()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateViewportWidth)
+  window.removeEventListener('keydown', updateShiftKeyState)
+  window.removeEventListener('keyup', updateShiftKeyState)
+  window.removeEventListener('blur', updateShiftKeyFromBlur)
   handleDetailClose()
   resetDetailState()
+  batchEditVisible.value = false
 })
 </script>
 
@@ -939,7 +1187,15 @@ onBeforeUnmount(() => {
         </template>
         <EmptyState v-if="!listLoading && list.length === 0" title="暂无视频" />
         <div v-if="list.length > 0" class="table-wrap">
-          <el-table ref="tableRef" :data="list" border @selection-change="onSelectionChange">
+          <el-table
+            ref="tableRef"
+            :data="list"
+            row-key="id"
+            border
+            @selection-change="onSelectionChange"
+            @select="onRowSelectionSelect"
+            @select-all="onSelectionSelectAll"
+          >
             <el-table-column type="selection" width="52" />
             <el-table-column v-if="isColumnVisible('title')" prop="title" label="标题" min-width="220" />
             <el-table-column v-if="isColumnVisible('thumbnail')" label="封面" width="120">
@@ -1001,6 +1257,116 @@ onBeforeUnmount(() => {
 
       <BulkActionBar :count="selectedRows.length" :actions="bulkActions" />
     </div>
+
+    <el-drawer
+      v-model="batchEditVisible"
+      title="批量编辑"
+      direction="rtl"
+      :size="batchEditDrawerSize"
+      destroy-on-close
+      :close-on-click-modal="!updatingBatch"
+      :close-on-press-escape="!updatingBatch"
+      :before-close="handleBatchEditBeforeClose"
+      @closed="handleBatchEditClosed"
+    >
+      <el-form label-width="108px" class="detail-drawer-form">
+        <SectionCard dense>
+          <template #title>应用范围</template>
+          <el-form-item label="已选视频">
+            <el-tag type="info">共 {{ selectedRows.length }} 项</el-tag>
+          </el-form-item>
+        </SectionCard>
+
+        <SectionCard dense>
+          <template #title>批量字段</template>
+          <el-form-item>
+            <el-checkbox v-model="batchEditForm.title_enabled">标题</el-checkbox>
+            <el-input v-model="batchEditForm.title" :disabled="!batchEditForm.title_enabled" placeholder="统一覆盖为同一个标题" />
+          </el-form-item>
+          <el-form-item>
+            <el-checkbox v-model="batchEditForm.image_collection_enabled">图片图集</el-checkbox>
+            <el-select
+              v-model="batchEditForm.image_collection_id"
+              :disabled="!batchEditForm.image_collection_enabled"
+              filterable
+              remote
+              reserve-keyword
+              clearable
+              :remote-method="searchImageCollections"
+              :loading="loadingImageCollections"
+              placeholder="统一覆盖为同一个图片图集"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="collection in imageCollectionOptions"
+                :key="collection.value"
+                :label="collection.label"
+                :value="collection.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-checkbox v-model="batchEditForm.collection_enabled" :disabled="!canBatchEditCollections">所属合集</el-checkbox>
+            <el-select
+              v-model="batchEditForm.collection_ids"
+              :disabled="!batchEditForm.collection_enabled || !canBatchEditCollections"
+              multiple
+              filterable
+              remote
+              reserve-keyword
+              clearable
+              collapse-tags
+              collapse-tags-tooltip
+              :remote-method="searchCollections"
+              :loading="loadingCollections"
+              placeholder="统一覆盖为同一个合集组合"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="collection in collectionOptions"
+                :key="collection.value"
+                :label="collection.label"
+                :value="collection.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-alert
+            v-if="!canBatchEditCollections"
+            type="info"
+            :closable="false"
+            title="当前选择包含非短视频，所属合集只对短视频可用。"
+          />
+          <el-form-item>
+            <el-checkbox v-model="batchEditForm.tags_enabled">标签</el-checkbox>
+            <div class="batch-tags-mode">
+              <el-radio-group v-model="batchEditForm.tags_mode" :disabled="!batchEditForm.tags_enabled">
+                <el-radio-button label="replace">统一覆盖</el-radio-button>
+                <el-radio-button label="append">追加</el-radio-button>
+                <el-radio-button label="remove">移除</el-radio-button>
+              </el-radio-group>
+              <el-select
+                v-model="batchEditForm.tags"
+                :disabled="!batchEditForm.tags_enabled"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="输入或选择标签"
+                style="width: 100%"
+              />
+            </div>
+          </el-form-item>
+        </SectionCard>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="requestBatchEditClose">取消</el-button>
+        <el-button type="primary" :loading="updatingBatch" @click="saveBatchEdit">保存批量修改</el-button>
+      </template>
+    </el-drawer>
 
     <el-drawer
       v-model="detailVisible"

@@ -121,6 +121,18 @@ type AdminVideoFilter struct {
 	EndTime   *time.Time
 }
 
+type AdminBatchVideoPatch struct {
+	UpdateTitle             bool
+	Title                   string
+	UpdateCollectionIDs     bool
+	CollectionIDs           []uuid.UUID
+	UpdateImageCollectionID bool
+	ImageCollectionID       *uuid.UUID
+	UpdateTags              bool
+	Tags                    []string
+	TagsMode                string
+}
+
 type AdminUserListItem struct {
 	ID        uuid.UUID `json:"id"`
 	Username  string    `json:"username"`

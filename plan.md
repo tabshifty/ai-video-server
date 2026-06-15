@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 10:46 +0800
+- 进度：完成管理端视频批量编辑收尾。后端新增 `PUT /api/v1/admin/videos/batch-update`，支持对当前页已选视频统一覆盖标题、图片图集、所属合集和标签；标签支持 `replace` / `append` / `remove`，合集继续限制为短视频。前端 `VideoList` 已接入批量编辑抽屉、当前页 `Shift` 区间选择、批量 API 调用与部分成功提示。`CONTEXT.md` 已补充长期约定。本次只纳入管理端批量编辑相关前后端文件、`CONTEXT.md` 与 `plan.md`，用户既有无关改动保持不纳入。
+- 影响文件：`internal/handlers/admin.go`、`internal/handlers/router.go`、`internal/handlers/admin_batch_delete_test.go`、`internal/models/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_batch_test.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/repository ./internal/handlers -count=1` 通过；`cd admin-web && npm run test -- src/api/admin.spec.js src/views/videoList.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-15 09:50 +0800
+- 进度：开始实现管理端视频管理批量编辑。需求范围锁定为当前页可见行的 Shift 区间选择，以及对当前已选视频批量统一覆盖标题、图片图集、所属合集和标签；合集仍仅适用于短视频，混选或非短视频时前端禁用该字段，后端继续兜底校验。实现计划为：先补 `plan.md` 记录，再新增管理端视频批量更新接口与定向测试，随后接入 VideoList 批量编辑抽屉、Shift 选择和 API 调用，最后更新 `CONTEXT.md` 并执行管理端/Go 定向验证与构建。用户既有 `CONTEXT.md` 修改继续保留并在其上追加，本次不纳入 `admin-web/.env.development`。
+- 影响文件：`internal/handlers/admin.go`、`internal/handlers/router.go`、`internal/handlers/admin_batch_delete_test.go`、`internal/repository/admin_repository.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `go test ./internal/handlers ./internal/repository -count=1` 的定向用例、`cd admin-web && npm run test -- src/api/admin.spec.js src/views/videoList.helpers.spec.js`、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-14 22:16 +0800
 - 进度：完成任务监控页视频标题展示。`/admin/tasks` 列表查询通过 `transcoding_jobs -> videos` 左连接返回 `video_title`，避免任务因视频记录缺失被过滤；管理端任务表主列改为“任务”，主行显示视频标题，下面保留任务 ID 与视频 ID。`CONTEXT.md` 记录“任务监控视频标题”语义。本次只纳入任务监控相关后端模型/仓储、前端页面/测试、`CONTEXT.md` 与 `plan.md`，用户已有 `admin-web/.env.development` 保持未提交且不纳入。
 - 影响文件：`internal/models/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`

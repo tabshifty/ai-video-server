@@ -25,6 +25,9 @@ export const deleteAdminVideo = (id) =>
   request.delete(`/admin/videos/${id}`, {
     timeout: 0
   })
+export const batchUpdateAdminVideos = (payload) => request.put('/admin/videos/batch-update', payload, {
+  timeout: 0
+})
 export const batchDeleteAdminVideos = (payload) =>
   request.post('/admin/videos/batch-delete', payload, {
     timeout: 0

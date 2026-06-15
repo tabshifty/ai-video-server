@@ -18,6 +18,7 @@ vi.mock('./request', () => ({
 
 import {
   batchDeleteAdminVideos,
+  batchUpdateAdminVideos,
   createAdminTvEpisode,
   createAdminTvSeason,
   createAdminTvSeries,
@@ -369,6 +370,27 @@ describe('video delete apis', () => {
       timeout: 0
     })
     expect(remove).toHaveBeenCalledWith('/admin/videos/video-1/subtitles/subtitle-1', {
+      timeout: 0
+    })
+  })
+})
+
+describe('video batch update apis', () => {
+  beforeEach(() => {
+    put.mockReset()
+    put.mockResolvedValue({ ok: true })
+  })
+
+  it('requests batch update for selected video ids', async () => {
+    const payload = {
+      video_ids: ['video-1', 'video-2'],
+      update_title: true,
+      title: '统一标题'
+    }
+
+    await batchUpdateAdminVideos(payload)
+
+    expect(put).toHaveBeenCalledWith('/admin/videos/batch-update', payload, {
       timeout: 0
     })
   })

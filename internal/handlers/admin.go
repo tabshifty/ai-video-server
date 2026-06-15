@@ -366,6 +366,95 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 	})
 }
 
+func (a *API) AdminBatchUpdateVideos(c *gin.Context) {
+	var req struct {
+		VideoIDs                []string `json:"video_ids"`
+		Title                   string   `json:"title"`
+		UpdateTitle             bool     `json:"update_title"`
+		CollectionIDs           []string `json:"collection_ids"`
+		UpdateCollectionIDs     bool     `json:"update_collection_ids"`
+		ImageCollectionID       string   `json:"image_collection_id"`
+		UpdateImageCollectionID bool     `json:"update_image_collection_id"`
+		Tags                    []string `json:"tags"`
+		UpdateTags              bool     `json:"update_tags"`
+		TagsMode                string   `json:"tags_mode"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	videoIDs, err := parseUUIDStrings(req.VideoIDs)
+	if err != nil {
+		bad(c, "invalid video_ids")
+		return
+	}
+	if len(videoIDs) == 0 {
+		bad(c, "video_ids is required")
+		return
+	}
+
+	patch := models.AdminBatchVideoPatch{
+		UpdateTitle:             req.UpdateTitle,
+		Title:                   req.Title,
+		UpdateCollectionIDs:     req.UpdateCollectionIDs,
+		UpdateImageCollectionID: req.UpdateImageCollectionID,
+		UpdateTags:              req.UpdateTags,
+		Tags:                    req.Tags,
+		TagsMode:                strings.ToLower(strings.TrimSpace(req.TagsMode)),
+	}
+	if req.UpdateCollectionIDs {
+		patch.CollectionIDs, err = parseUUIDStrings(req.CollectionIDs)
+		if err != nil {
+			bad(c, "合集ID格式错误")
+			return
+		}
+	}
+	if req.UpdateImageCollectionID {
+		rawID := strings.TrimSpace(req.ImageCollectionID)
+		if rawID != "" {
+			parsedID, parseErr := uuid.Parse(rawID)
+			if parseErr != nil {
+				bad(c, "图片图集ID格式错误")
+				return
+			}
+			patch.ImageCollectionID = &parsedID
+		}
+	}
+	if patch.UpdateTags && patch.TagsMode == "" {
+		patch.TagsMode = "replace"
+	}
+	if !patch.UpdateTitle && !patch.UpdateCollectionIDs && !patch.UpdateImageCollectionID && !patch.UpdateTags {
+		bad(c, "至少选择一个要修改的字段")
+		return
+	}
+	if patch.UpdateTags && patch.TagsMode != "replace" && patch.TagsMode != "append" && patch.TagsMode != "remove" {
+		bad(c, "tags_mode must be one of: replace, append, remove")
+		return
+	}
+
+	result := adminBatchUpdateResult{
+		RequestedCount: len(videoIDs),
+		Results:        make([]adminBatchUpdateResultItem, 0, len(videoIDs)),
+	}
+	for _, videoID := range videoIDs {
+		item := adminBatchUpdateResultItem{VideoID: videoID}
+		if err := a.repo.AdminBatchUpdateVideo(c.Request.Context(), videoID, patch); err != nil {
+			item.Message = err.Error()
+			if errors.Is(err, repository.ErrCollectionsOnlyForShort) {
+				item.Message = "仅短视频支持合集"
+			} else if errors.Is(err, repository.ErrAdminVideoTagsModeInvalid) {
+				item.Message = "无效的标签修改模式"
+			}
+			result.FailureCount++
+		} else {
+			item.Updated = true
+			result.SuccessCount++
+		}
+		result.Results = append(result.Results, item)
+	}
+	ok(c, result)
+}
+
 func (a *API) AdminDeleteVideo(c *gin.Context) {
 	videoID, okID := parseUUID(c.Param("id"))
 	if !okID {
@@ -418,6 +507,19 @@ type adminBatchDeleteResult struct {
 type adminBatchDeleteResultItem struct {
 	VideoID uuid.UUID `json:"video_id"`
 	Deleted bool      `json:"deleted"`
+	Message string    `json:"message"`
+}
+
+type adminBatchUpdateResult struct {
+	RequestedCount int                          `json:"requested_count"`
+	SuccessCount   int                          `json:"success_count"`
+	FailureCount   int                          `json:"failure_count"`
+	Results        []adminBatchUpdateResultItem `json:"results"`
+}
+
+type adminBatchUpdateResultItem struct {
+	VideoID uuid.UUID `json:"video_id"`
+	Updated bool      `json:"updated"`
 	Message string    `json:"message"`
 }
 
