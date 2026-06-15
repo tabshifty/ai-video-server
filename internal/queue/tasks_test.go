@@ -1,7 +1,11 @@
 package queue
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -10,6 +14,7 @@ import (
 
 	"video-server/internal/models"
 	"video-server/internal/services"
+	ffmpegpkg "video-server/pkg/ffmpeg"
 )
 
 func TestBuildTranscodeTaskOptionsIncludesExplicitTimeout(t *testing.T) {
@@ -189,6 +194,196 @@ func TestResolveTranscodePersistenceDoesNotMergeNonAVMetadata(t *testing.T) {
 				t.Fatalf("expected transcode metadata, got=%v", metadata["codec"])
 			}
 		})
+	}
+}
+
+func TestBuildDolbyVisionDirectCopyResultUsesSourceAsPlayableOutput(t *testing.T) {
+	t.Parallel()
+
+	sourcePath := "/storage/videos/video-1/source-dv.mkv"
+	sourceProbe := ffmpegpkg.PlaybackCompatibilityProbe{
+		VideoStreamFound:   true,
+		Codec:              "hevc",
+		DolbyVision:        true,
+		DolbyVisionProfile: 8,
+	}
+	var thumbnailInput string
+	var thumbnailOutput string
+
+	result, err := buildDolbyVisionDirectCopyResult(
+		context.Background(),
+		sourcePath,
+		sourceProbe,
+		func(ctx context.Context, path string) (ffmpegpkg.VideoProbe, error) {
+			if path != sourcePath {
+				t.Fatalf("probe path=%s want=%s", path, sourcePath)
+			}
+			return ffmpegpkg.VideoProbe{
+				Duration: 95.4,
+				Width:    3840,
+				Height:   2160,
+				Codec:    "hevc",
+			}, nil
+		},
+		func(ctx context.Context, inputPath, outputPath string) error {
+			thumbnailInput = inputPath
+			thumbnailOutput = outputPath
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("buildDolbyVisionDirectCopyResult() error = %v", err)
+	}
+
+	if result.TranscodedPath != sourcePath {
+		t.Fatalf("expected direct copy source as transcoded path, got=%s want=%s", result.TranscodedPath, sourcePath)
+	}
+	if result.ThumbnailPath != "/storage/videos/video-1/thumb.jpg" {
+		t.Fatalf("unexpected thumbnail path: %s", result.ThumbnailPath)
+	}
+	if thumbnailInput != sourcePath || thumbnailOutput != result.ThumbnailPath {
+		t.Fatalf("thumbnail input/output = %s/%s, want %s/%s", thumbnailInput, thumbnailOutput, sourcePath, result.ThumbnailPath)
+	}
+	if result.Duration != 95 || result.Width != 3840 || result.Height != 2160 {
+		t.Fatalf("unexpected media dimensions: duration=%d width=%d height=%d", result.Duration, result.Width, result.Height)
+	}
+	if result.Metadata["transcode_mode"] != "direct_copy" {
+		t.Fatalf("expected direct_copy mode, got=%v", result.Metadata["transcode_mode"])
+	}
+	if result.Metadata["transcode_profile"] != "dv_source_copy" {
+		t.Fatalf("expected dv_source_copy profile, got=%v", result.Metadata["transcode_profile"])
+	}
+	if result.Metadata["playback_path"] != sourcePath {
+		t.Fatalf("expected playback_path=%s, got=%v", sourcePath, result.Metadata["playback_path"])
+	}
+	if result.Metadata["playback_codec"] != "hevc" {
+		t.Fatalf("expected playback_codec=hevc, got=%v", result.Metadata["playback_codec"])
+	}
+
+	playbackCompat, ok := result.Metadata[services.PlaybackCompatibilityMetadataKey].(map[string]any)
+	if !ok {
+		t.Fatalf("expected playback_compat map, got %#v", result.Metadata[services.PlaybackCompatibilityMetadataKey])
+	}
+	if playbackCompat["source_playback_path"] != sourcePath {
+		t.Fatalf("expected source_playback_path=%s, got=%v", sourcePath, playbackCompat["source_playback_path"])
+	}
+	if playbackCompat["dolby_vision_risk"] != true {
+		t.Fatalf("expected dolby_vision_risk=true, got=%v", playbackCompat["dolby_vision_risk"])
+	}
+	sourceBlock, ok := playbackCompat["source"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected source playback block, got %#v", playbackCompat["source"])
+	}
+	outputBlock, ok := playbackCompat["output"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected output playback block, got %#v", playbackCompat["output"])
+	}
+	if sourceBlock["dolby_vision"] != true || outputBlock["dolby_vision"] != true {
+		t.Fatalf("expected source and output to both be Dolby Vision, source=%v output=%v", sourceBlock["dolby_vision"], outputBlock["dolby_vision"])
+	}
+}
+
+func TestShouldPreserveEpisodeDolbyVisionSource(t *testing.T) {
+	t.Parallel()
+
+	dolbyVisionProbe := ffmpegpkg.PlaybackCompatibilityProbe{
+		VideoStreamFound: true,
+		DolbyVision:      true,
+	}
+	probeErr := errors.New("probe failed")
+	tests := []struct {
+		name      string
+		videoType string
+		probe     ffmpegpkg.PlaybackCompatibilityProbe
+		probeErr  error
+		want      bool
+	}{
+		{
+			name:      "episode dolby vision",
+			videoType: " Episode ",
+			probe:     dolbyVisionProbe,
+			want:      true,
+		},
+		{
+			name:      "movie dolby vision",
+			videoType: "movie",
+			probe:     dolbyVisionProbe,
+			want:      false,
+		},
+		{
+			name:      "probe error",
+			videoType: "episode",
+			probe:     dolbyVisionProbe,
+			probeErr:  probeErr,
+			want:      false,
+		},
+		{
+			name:      "no video stream",
+			videoType: "episode",
+			probe: ffmpegpkg.PlaybackCompatibilityProbe{
+				DolbyVision: true,
+			},
+			want: false,
+		},
+		{
+			name:      "not dolby vision",
+			videoType: "episode",
+			probe: ffmpegpkg.PlaybackCompatibilityProbe{
+				VideoStreamFound: true,
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := shouldPreserveEpisodeDolbyVisionSource(tt.videoType, tt.probe, tt.probeErr)
+			if got != tt.want {
+				t.Fatalf("shouldPreserveEpisodeDolbyVisionSource()=%v want=%v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPreserveEpisodeDolbyVisionSourceReusesExistingTargetWhenInputWasMoved(t *testing.T) {
+	t.Parallel()
+
+	storageRoot := t.TempDir()
+	videoID := uuid.New()
+	video := models.Video{
+		ID:   videoID,
+		Type: "episode",
+	}
+	inputPath := filepath.Join(t.TempDir(), "upload.mkv")
+	targetPath := filepath.Join(storageRoot, "videos", videoID.String(), "source-dv.mkv")
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		t.Fatalf("mkdir target dir: %v", err)
+	}
+	if err := os.WriteFile(targetPath, []byte("dv-source"), 0o644); err != nil {
+		t.Fatalf("write target source: %v", err)
+	}
+	processor := &Processor{storageRoot: storageRoot}
+	probe := ffmpegpkg.PlaybackCompatibilityProbe{
+		VideoStreamFound: true,
+		DolbyVision:      true,
+	}
+
+	got, err := processor.preserveEpisodeDolbyVisionSource(video, inputPath, probe, nil)
+	if err != nil {
+		t.Fatalf("preserveEpisodeDolbyVisionSource() error = %v", err)
+	}
+	if got != targetPath {
+		t.Fatalf("preserved path=%s want=%s", got, targetPath)
+	}
+	raw, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("read target source: %v", err)
+	}
+	if string(raw) != "dv-source" {
+		t.Fatalf("target source content changed: %q", raw)
 	}
 }
 

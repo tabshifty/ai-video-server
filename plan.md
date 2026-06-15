@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 19:52 +0800
+- 进度：完成 DV 剧集直拷贝修复。`episode + Dolby Vision` 的转码任务现在会跳过 ffmpeg 压缩，直接把源文件迁移/复制到 `storageRoot/videos/<uuid>/source-dv.<ext>`，并把该路径同时写入 `videos.transcoded_path` 和 `playback_compat.source_playback_path`；任务完成时直接落 ready 状态，缩略图与播放兼容 metadata 仍照常生成。补了 queue 层单测，覆盖 direct copy 输出、DV 判定和“源文件已移动后重试复用稳定目标路径”的幂等恢复。
+- 影响文件：`internal/queue/tasks.go`、`internal/queue/tasks_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/queue -count=1` 通过；`go test ./internal/services -run 'Test(BuildPlaybackCompatibilityMetadata|SourcePlaybackPathFromMetadata|MergePlaybackCompatibilityMetadata|BuildTranscode|ResolveProbe|Transcode|IsSameFilePath)' -count=1` 通过；`go test ./internal/handlers ./internal/repository -run 'Test(ResolveProfiledPlayableSource|SelectRetranscodeInputPath|CollectLocalStoragePaths)' -count=1` 通过；`git diff --check` 通过；乱码扫描待执行。
+
+## 2026-06-15 19:37 +0800
+- 进度：开始修复 DV 剧集进入压缩程序的问题。最新要求收口为：只要转码任务源探测确认为 Dolby Vision，且视频类型为 `episode`，worker 应直接把源文件迁移/复制到 `source-dv.<ext>` 作为播放源并完成任务，不再启动 ffmpeg 压缩输出；同时写入 `playback_compat.source_playback_path`，保持 TV 端走 DV 源文件链路。范围锁定后端 queue/transcode 路径、相关单测、`CONTEXT.md` 与 `plan.md`。
+- 影响文件：`internal/queue/tasks.go`、`internal/queue/tasks_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待先补红灯测试，再执行 `go test ./internal/queue -run 'TestHandleTranscode|TestShouldPreserveEpisodeDolbyVisionSource' -count=1`、相关 Go 定向测试、`go test ./internal/queue ./internal/services -count=1`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-15 18:47 +0800
 - 进度：完成短视频审核页单屏布局修复。`ShortReview.vue` 现在把页面高度锁定到 admin shell 可用视口内，工作台和左右面板使用 `minmax(0, 1fr)` 收缩；待审队列只在面板内部滚动，播放器去掉固定最小高度，随右侧面板可用高度缩放。`CONTEXT.md` 已补充短视频审核页单屏工作台约定，源码测试锁定页面不靠浏览器纵向滚动承载审核流。
 - 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.spec.js`、`CONTEXT.md`、`plan.md`

@@ -187,6 +187,38 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 		lastProgressUpdated = now
 	}
 
+	if shouldPreserveEpisodeDolbyVisionSource(video.Type, sourcePlaybackProbe, sourcePlaybackProbeErr) {
+		result, directCopyErr := p.processEpisodeDolbyVisionDirectCopy(ctx, video, inputPath, sourcePlaybackProbe)
+		if directCopyErr != nil {
+			p.finalizeTranscodeFailure(ctx, videoID, jobID, directCopyErr.Error())
+			p.logger.Error("dv direct copy failed", "video_id", videoID, "error", directCopyErr)
+			return directCopyErr
+		}
+		if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, result.ThumbnailPath, result.Duration, result.Width, result.Height, result.Metadata); err != nil {
+			p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
+			return err
+		}
+		if p.subtitle != nil {
+			if _, err := p.subtitle.SyncEmbeddedSubtitles(ctx, videoID, result.TranscodedPath); err != nil {
+				p.logger.Warn("sync embedded subtitles failed", "video_id", videoID, "input_path", result.TranscodedPath, "error", err)
+			}
+		}
+		if result.Duration > 0 {
+			sourceDuration := intPtr(result.Duration)
+			processed := intPtr(result.Duration)
+			remaining := intPtr(0)
+			progressPercent := 100.0
+			if err := p.repo.UpdateTranscodingJobProgress(ctx, jobID, sourceDuration, processed, remaining, &progressPercent); err != nil {
+				p.logger.Warn("update dv direct copy progress failed", "video_id", videoID, "job_id", jobID, "error", err)
+			}
+		}
+		if err := p.repo.FinishTranscodingJob(ctx, jobID, "success", ""); err != nil {
+			return err
+		}
+		p.logger.Info("dv direct copy completed", "video_id", videoID, "output", result.TranscodedPath)
+		return nil
+	}
+
 	result, transcodeErr := p.trans.Process(ctx, video.ID, inputPath, video.Type, progressHandler)
 	if transcodeErr != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, transcodeErr.Error())
@@ -239,6 +271,85 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	return nil
 }
 
+func (p *Processor) processEpisodeDolbyVisionDirectCopy(
+	ctx context.Context,
+	video models.Video,
+	inputPath string,
+	sourceProbe ffmpegpkg.PlaybackCompatibilityProbe,
+) (services.TranscodeResult, error) {
+	sourcePath, err := p.preserveEpisodeDolbyVisionSource(video, inputPath, sourceProbe, nil)
+	if err != nil {
+		return services.TranscodeResult{}, err
+	}
+	if strings.TrimSpace(sourcePath) == "" {
+		return services.TranscodeResult{}, fmt.Errorf("dv direct copy: source path not preserved")
+	}
+	return buildDolbyVisionDirectCopyResult(ctx, sourcePath, sourceProbe, ffmpegpkg.Probe, ffmpegpkg.Thumbnail)
+}
+
+type videoProbeFunc func(context.Context, string) (ffmpegpkg.VideoProbe, error)
+type thumbnailFunc func(context.Context, string, string) error
+
+func buildDolbyVisionDirectCopyResult(
+	ctx context.Context,
+	sourcePath string,
+	sourceProbe ffmpegpkg.PlaybackCompatibilityProbe,
+	probe videoProbeFunc,
+	thumbnail thumbnailFunc,
+) (services.TranscodeResult, error) {
+	sourcePath = strings.TrimSpace(sourcePath)
+	if sourcePath == "" {
+		return services.TranscodeResult{}, fmt.Errorf("dv direct copy: empty source path")
+	}
+	thumbPath := filepath.Join(filepath.Dir(sourcePath), "thumb.jpg")
+	if err := thumbnail(ctx, sourcePath, thumbPath); err != nil {
+		return services.TranscodeResult{}, fmt.Errorf("create dv direct copy thumbnail: %w", err)
+	}
+
+	videoProbe, probeErr := probe(ctx, sourcePath)
+	duration := 0
+	width := 0
+	height := 0
+	metadata := map[string]any{
+		"codec":             firstNonEmptyString(strings.TrimSpace(videoProbe.Codec), strings.TrimSpace(sourceProbe.Codec), "unknown"),
+		"transcode_mode":    "direct_copy",
+		"transcode_profile": "dv_source_copy",
+		"playback_path":     sourcePath,
+		"playback_codec":    firstNonEmptyString(strings.TrimSpace(sourceProbe.Codec), strings.TrimSpace(videoProbe.Codec), "source"),
+	}
+	if probeErr != nil {
+		metadata["probe_error"] = probeErr.Error()
+	} else {
+		if videoProbe.Duration > 0 {
+			duration = int(math.Round(videoProbe.Duration))
+		}
+		if videoProbe.Width > 0 {
+			width = videoProbe.Width
+		}
+		if videoProbe.Height > 0 {
+			height = videoProbe.Height
+		}
+	}
+	metadata[services.PlaybackCompatibilityMetadataKey] = services.BuildPlaybackCompatibilityMetadata(
+		sourceProbe,
+		nil,
+		sourceProbe,
+		nil,
+	)
+	metadata = services.MergePlaybackCompatibilityMetadata(metadata, map[string]any{
+		"source_playback_path": sourcePath,
+	})
+
+	return services.TranscodeResult{
+		TranscodedPath: sourcePath,
+		ThumbnailPath:  thumbPath,
+		Duration:       duration,
+		Width:          width,
+		Height:         height,
+		Metadata:       metadata,
+	}, nil
+}
+
 func (p *Processor) preserveEpisodeDolbyVisionSource(
 	video models.Video,
 	inputPath string,
@@ -252,13 +363,18 @@ func (p *Processor) preserveEpisodeDolbyVisionSource(
 	if inputPath == "" {
 		return "", fmt.Errorf("preserve dv source: empty input path")
 	}
-	ext := strings.TrimSpace(filepath.Ext(inputPath))
-	if ext == "" {
-		return "", fmt.Errorf("preserve dv source: source extension missing")
+	targetPath, err := p.episodeDolbyVisionSourceTargetPath(video, inputPath)
+	if err != nil {
+		return "", err
 	}
-	targetPath := filepath.Join(p.storageRoot, "videos", video.ID.String(), "source-dv"+ext)
 	if services.IsSameFilePath(inputPath, targetPath) {
 		return targetPath, nil
+	}
+	if _, err := os.Stat(inputPath); err != nil && os.IsNotExist(err) {
+		info, targetErr := os.Stat(targetPath)
+		if targetErr == nil && !info.IsDir() {
+			return targetPath, nil
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return "", fmt.Errorf("preserve dv source: create target dir: %w", err)
@@ -267,6 +383,18 @@ func (p *Processor) preserveEpisodeDolbyVisionSource(
 		return "", fmt.Errorf("preserve dv source: move source file: %w", err)
 	}
 	return targetPath, nil
+}
+
+func (p *Processor) episodeDolbyVisionSourceTargetPath(video models.Video, inputPath string) (string, error) {
+	inputPath = strings.TrimSpace(inputPath)
+	if inputPath == "" {
+		return "", fmt.Errorf("preserve dv source: empty input path")
+	}
+	ext := strings.TrimSpace(filepath.Ext(inputPath))
+	if ext == "" {
+		return "", fmt.Errorf("preserve dv source: source extension missing")
+	}
+	return filepath.Join(p.storageRoot, "videos", video.ID.String(), "source-dv"+ext), nil
 }
 
 func intPtr(v int) *int {
