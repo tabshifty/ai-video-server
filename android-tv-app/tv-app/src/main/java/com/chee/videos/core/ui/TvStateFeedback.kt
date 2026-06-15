@@ -104,6 +104,8 @@ fun TvErrorState(
     onAction: () -> Unit,
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
+    tertiaryActionLabel: String? = null,
+    onTertiaryAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     TvStateContainer(modifier = modifier) {
@@ -115,6 +117,8 @@ fun TvErrorState(
                 onAction = onAction,
                 secondaryActionLabel = secondaryActionLabel,
                 onSecondaryAction = onSecondaryAction,
+                tertiaryActionLabel = tertiaryActionLabel,
+                onTertiaryAction = onTertiaryAction,
             )
         }
     }
@@ -184,11 +188,14 @@ private fun TvStateActions(
     onAction: (() -> Unit)?,
     secondaryActionLabel: String?,
     onSecondaryAction: (() -> Unit)?,
+    tertiaryActionLabel: String? = null,
+    onTertiaryAction: (() -> Unit)? = null,
 ) {
     if (actionLabel == null || onAction == null) {
         return
     }
     val hasSecondaryAction = secondaryActionLabel != null && onSecondaryAction != null
+    val hasTertiaryAction = tertiaryActionLabel != null && onTertiaryAction != null
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         TvStateActionButton(
             text = actionLabel,
@@ -202,6 +209,16 @@ private fun TvStateActions(
                     text = secondaryActionLabel.orEmpty(),
                     onClick = secondaryAction,
                     icon = Icons.Filled.Info,
+                )
+            }
+        }
+        if (hasTertiaryAction) {
+            val tertiaryAction = onTertiaryAction
+            if (tertiaryAction != null) {
+                TvStateActionButton(
+                    text = tertiaryActionLabel.orEmpty(),
+                    onClick = tertiaryAction,
+                    icon = Icons.Filled.Tv,
                 )
             }
         }

@@ -2,6 +2,31 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 21:50 +0800
+- 进度：完成 TV 电视剧 DV/非 DV 混合播放控制层收尾审查，确认本次只纳入 TV 播放控制层、Media3 seek 适配、混合切集进度语义、DV 失败态选集入口、版本号、ADR 与长期上下文沉淀。当前子代理工具要求用户显式授权委派，未新增独立 review 子代理；已改为本地抽查关键 diff 与测试覆盖后提交。
+- 影响文件：`CONTEXT.md`、`docs/adr/0012-tv-series-shared-controls-for-mixed-playback-engines.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、相关 TV 单测、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesMixedPlaybackControlsSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md docs/adr android-tv-app/tv-app/src/main/java android-tv-app/tv-app/src/test/java android-tv-app/tv-app/build.gradle.kts` 无命中。真机仍需回归非 DV->DV、DV->非 DV、连播切换、DV 失败页“选集”和实际电视 DV/HDR 退出黑屏边界。
+
+## 2026-06-15 21:38 +0800
+- 进度：完成 TV 电视剧混合播放控制层首轮实现。新增 `TvSeriesCorePlaybackOverlay`，DV Media3 分支现在叠加电视剧核心控制层，支持播放/暂停、遥控左右 seek、进度显示、续播卡、选集轨、连播提示和结束覆盖层；字幕/音轨入口在 Media3 分支隐藏。Media3 播放器增加受控 seek 请求入口；切集前主动上报当前集历史，且上一集历史保存按上一集 route 选择 LibVLC time 或 Media3 snapshot，避免 LibVLC<->Media3 切换污染进度。DV 播放失败页新增“选集”动作，只允许切到其它分集，不提供回退 LibVLC 强行播放。TV 版本升至 `0.1.101 / 101`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesMixedPlaybackControlsSpecTest.kt`、相关源码规格测试、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；乱码扫描无命中。待独立 review 返回后修复问题并提交。
+
+## 2026-06-15 21:13 +0800
+- 进度：开始落地 TV 电视剧 DV/非 DV 混合播放控制层。实现策略：先新增电视剧专用共享控制层，只覆盖核心播放、seek、进度、标题覆盖、选集轨和挂载点；LibVLC 分支继续使用原视频面与字幕/音轨能力，Media3 分支复用同一控制层但隐藏字幕/音轨入口；同页内按分集 route 切换 LibVLC / Media3，切换前沿用当前历史上报逻辑。单片长视频默认控制变体暂不重构。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、预计新增 TV 核心控制层文件、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`docs/adr/0012-tv-series-shared-controls-for-mixed-playback-engines.md`、`plan.md`
+- 验证：待补策略测试后执行 TV 定向单测、必要的 `:tv-app:testDebugUnitTest` / `:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
+## 2026-06-15 20:41 +0800
+- 进度：继续收口 TV 端 DV 播放体验边界。已确认：DV 专用链路本阶段补齐核心播放与剧集互动 UI，包含播放/暂停、快进快退、进度反馈、返回二次确认、续播提示、选集轨和连播提示；字幕/音轨切换放到下一阶段。退出闪烁验收改为消除 App 可控闪烁（白闪、上一帧抖动、底图抢显、桌面露出、二次闪回），电视/系统因 Dolby Vision/HDR 模式切换产生的一次短黑属于显示链路边界。混合剧集允许在同一播放器会话内按分集切换 LibVLC / Media3，切换进度沿用既有连播/手动选集规则；DV 当前分集失败不退出剧集会话，也不允许回退 LibVLC 强行播放。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 阶段只做文档沉淀，暂不运行构建或单测。
+
+## 2026-06-15 20:28 +0800
+- 进度：开始通过 `$grill-with-docs` 收口 TV 端 DV 播放体验问题。已核对 `CONTEXT.md` 与 ADR：普通长视频主链路是 LibVLC，DV 安全放行只进专用 Media3/ExoPlayer 链路；代码也确认剧集在 `isVlcRoute` 时使用完整 `LongFormVideoPlayer` 控制层，在 `isMedia3Route` 时只渲染 `TvDolbyVisionMedia3Player`，因此“DV 退出闪一下”“DV 缺少原 LibVLC 互动 UI”“混合剧集切集时内核切换”都应归入同一个播放会话/播放链路切换策略问题，而不是各自独立修补。下一步逐项确认：是否把 TV 播放器互动层抽成可覆盖 Media3 的共享控制层，以及混合剧集切换时的状态迁移边界。
+- 影响文件：`plan.md`；已阅读 `CONTEXT.md`、`docs/adr/0010-dolby-vision-tv-playback-compatibility.md`、`docs/adr/0004-tv-long-form-libvlc-for-ass-rendering.md`、`docs/adr/0011-dolby-vision-episode-original-file-preservation.md`、TV 播放页相关代码。
+- 验证：grill 阶段只做代码/文档核对，暂不运行构建或单测。
+
 ## 2026-06-15 20:15 +0800
 - 进度：完成 TV App DV 源播放卡住修复。排查确认部署机 `source-dv.mkv` 存在、读盘正常，TV 已请求 `profile=dv_source` 且服务端返回 200/206；卡住主因是电视剧分集 DV Media3 route 准备好播放源后没有像 LibVLC route 一样自动进入播放会话，导致专用播放器只 prepare 不 play。现在分集 DV Media3 源准备完成会自动置为 started 并播放；Media3 专用播放器新增 15 秒启动/缓冲超时，卡住时进入专用播放失败页并允许重试，不回退 LibVLC。TV 版本升至 `0.1.100 / 100`，`CONTEXT.md` 已补充启动边界。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3PlayerTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvSplashScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

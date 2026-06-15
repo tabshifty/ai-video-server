@@ -57,6 +57,8 @@ internal fun TvDolbyVisionMedia3Player(
     retryKey: Int,
     shouldPlay: Boolean,
     initialPositionMs: Long,
+    seekPositionMs: Long? = null,
+    seekRequestKey: Int = 0,
     modifier: Modifier = Modifier,
     onPlayingChanged: (Boolean) -> Unit = {},
     onError: (String) -> Unit = {},
@@ -149,6 +151,15 @@ internal fun TvDolbyVisionMedia3Player(
         delay(250L)
         player.seekTo(initialPositionMs)
         resumeAppliedSourceKey = preparedSourceKey
+    }
+
+    LaunchedEffect(player, preparedSourceKey, seekPositionMs, seekRequestKey) {
+        val target = seekPositionMs ?: return@LaunchedEffect
+        if (preparedSourceKey.isBlank() || seekRequestKey <= 0) {
+            return@LaunchedEffect
+        }
+        player.seekTo(target.coerceAtLeast(0L))
+        latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
     }
 
     LaunchedEffect(player, preparedSourceKey, shouldPlay) {

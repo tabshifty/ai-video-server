@@ -44,7 +44,7 @@ class TvSeriesEpisodeRailSpecTest {
     @Test
     fun episodeRailTooltipTracksFocusAndCurrentEpisodeSelectionHasNoSideEffect() {
         val source = readSource("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
-        val episodeRailSource = source.substringAfter("private fun TvEpisodeRail(").substringBefore("@Composable\nprivate fun CompactPlayerControlButton(")
+        val episodeRailSource = source.substringAfter("fun TvEpisodeRail(").substringBefore("@Composable\ninternal fun CompactPlayerControlButton(")
 
         assertTrue(episodeRailSource.contains("if (focused)"))
         assertTrue(episodeRailSource.contains("text = item.title"))
@@ -62,8 +62,8 @@ class TvSeriesEpisodeRailSpecTest {
             .substringAfter("fun controlFocusModifier(target: TvControlFocusTarget): Modifier {")
             .substringBefore("val titleOverlayData =")
         val episodeRailSource = source
-            .substringAfter("private fun TvEpisodeRail(")
-            .substringBefore("@Composable\nprivate fun CompactPlayerControlButton(")
+            .substringAfter("fun TvEpisodeRail(")
+            .substringBefore("@Composable\ninternal fun CompactPlayerControlButton(")
 
         assertTrue(controlsModifierSource.contains("AndroidKeyEvent.KEYCODE_DPAD_DOWN"))
         assertTrue(controlsModifierSource.contains("handleTvRemoteKeyAction(TvRemoteKeyAction.EnterEpisodeRail)"))

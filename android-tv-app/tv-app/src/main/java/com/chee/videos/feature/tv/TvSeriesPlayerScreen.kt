@@ -43,6 +43,7 @@ import com.chee.videos.core.ui.TvEpisodeRailItem
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvLongFormControlsVariant
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.TvSeriesCorePlaybackOverlay
 import com.chee.videos.core.ui.appendAccessTokenQuery
 import com.chee.videos.core.ui.applyLongFormMediaSource
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
@@ -175,7 +176,8 @@ fun TvSeriesPlayerScreen(
     val mediaPlayer = remember(accessToken) { newLongFormMediaPlayer(libVLC) }
     val latestUiState by rememberUpdatedState(uiState)
     val latestCurrentVideoId by rememberUpdatedState(uiState.currentVideoId)
-    var media3Snapshot by remember(uiState.currentVideoId) { mutableStateOf(TvMedia3PlaybackSnapshot(positionMs = 0L, durationMs = 0L)) }
+    val latestIsMedia3Route by rememberUpdatedState(isMedia3Route)
+    var media3Snapshot by remember { mutableStateOf(TvMedia3PlaybackSnapshot(positionMs = 0L, durationMs = 0L)) }
     val latestMedia3Snapshot by rememberUpdatedState(media3Snapshot)
     var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
@@ -195,15 +197,17 @@ fun TvSeriesPlayerScreen(
             failureMessage = playerErrorMessage,
         )
     }
-    var screenPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
-    var screenDurationMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
+    var screenPositionMs by remember { mutableStateOf(0L) }
+    var screenDurationMs by remember { mutableStateOf(0L) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
+    var lastHistoryUsesMedia3Snapshot by remember { mutableStateOf(false) }
     var resumedFromHistoryVideoId by remember { mutableStateOf("") }
     var resumePromptLastPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var resumePromptRemainingMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var resumePromptDismissed by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var isTrackSheetVisible by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var lastAutoplaySwitchedVideoId by remember { mutableStateOf("") }
+    var openEpisodeRailRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
 
     val nextEpisodeRef = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
         uiState.nextEpisodeRef()
@@ -264,6 +268,37 @@ fun TvSeriesPlayerScreen(
     )
     val shouldTickResumePromptCountdown = shouldTickResumePromptCountdown(resumePromptGuardInput)
     val shouldShowResumePromptCard = shouldShowResumePromptCard(resumePromptGuardInput)
+    var media3SeekPositionMs by remember(uiState.currentVideoId) { mutableStateOf<Long?>(null) }
+    var media3SeekRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
+
+    fun reportCurrentEpisodeHistory(completedOverride: Boolean? = null) {
+        val videoId = latestUiState.currentVideoId
+        if (videoId.isBlank()) {
+            return
+        }
+        reportTvSeriesHistory(
+            viewModel = viewModel,
+            videoId = videoId,
+            mediaPlayer = mediaPlayer,
+            media3Snapshot = latestMedia3Snapshot,
+            useMedia3Snapshot = shouldUseMedia3SnapshotForTvSeriesHistory(
+                currentVideoId = uiState.currentVideoId,
+                targetVideoId = videoId,
+                currentRouteIsMedia3 = isMedia3Route,
+                lastHistoryVideoId = lastHistoryVideoId,
+                lastHistoryUsesMedia3Snapshot = lastHistoryUsesMedia3Snapshot,
+            ),
+            completedOverride = completedOverride,
+        )
+        if (lastHistoryVideoId == videoId) {
+            lastHistoryVideoId = ""
+        }
+    }
+
+    fun selectEpisodeFromPlayer(episodeNumber: Int) {
+        reportCurrentEpisodeHistory()
+        viewModel.selectEpisode(episodeNumber)
+    }
 
     fun advanceFromAutoplay() {
         val state = latestUiState
@@ -272,15 +307,7 @@ fun TvSeriesPlayerScreen(
             return
         }
         lastAutoplaySwitchedVideoId = videoId
-        reportTvSeriesHistory(
-            viewModel = viewModel,
-            videoId = videoId,
-            mediaPlayer = mediaPlayer,
-            media3Snapshot = latestMedia3Snapshot,
-            useMedia3Snapshot = isMedia3Route,
-            completedOverride = true,
-        )
-        lastHistoryVideoId = videoId
+        reportCurrentEpisodeHistory(completedOverride = true)
         viewModel.advanceToNextEpisodeFromAutoplay()
     }
 
@@ -293,25 +320,11 @@ fun TvSeriesPlayerScreen(
         when {
             state.autoplayEnabled && !state.autoplayCanceledForCurrentEpisode && hasNext -> advanceFromAutoplay()
             hasNext -> {
-                reportTvSeriesHistory(
-                    viewModel = viewModel,
-                    videoId = state.currentVideoId,
-                    mediaPlayer = mediaPlayer,
-                    media3Snapshot = latestMedia3Snapshot,
-                    useMedia3Snapshot = isMedia3Route,
-                    completedOverride = true,
-                )
+                reportCurrentEpisodeHistory(completedOverride = true)
                 viewModel.showEndOverlay(TvEndOverlayKind.CURRENT_FINISHED)
             }
             else -> {
-                reportTvSeriesHistory(
-                    viewModel = viewModel,
-                    videoId = state.currentVideoId,
-                    mediaPlayer = mediaPlayer,
-                    media3Snapshot = latestMedia3Snapshot,
-                    useMedia3Snapshot = isMedia3Route,
-                    completedOverride = true,
-                )
+                reportCurrentEpisodeHistory(completedOverride = true)
                 viewModel.showEndOverlay(TvEndOverlayKind.SERIES_FINISHED)
             }
         }
@@ -339,10 +352,14 @@ fun TvSeriesPlayerScreen(
                 videoId = lastHistoryVideoId,
                 mediaPlayer = mediaPlayer,
                 media3Snapshot = latestMedia3Snapshot,
-                useMedia3Snapshot = isMedia3Route,
+                useMedia3Snapshot = lastHistoryUsesMedia3Snapshot,
             )
         }
         lastHistoryVideoId = uiState.currentVideoId
+        lastHistoryUsesMedia3Snapshot = isMedia3Route
+        media3Snapshot = TvMedia3PlaybackSnapshot(positionMs = 0L, durationMs = 0L)
+        screenPositionMs = 0L
+        screenDurationMs = 0L
         resumePromptLastPositionMs = 0L
         resumePromptRemainingMs = 0L
         resumePromptDismissed = false
@@ -600,7 +617,7 @@ fun TvSeriesPlayerScreen(
                         videoId = latestCurrentVideoId,
                         mediaPlayer = mediaPlayer,
                         media3Snapshot = latestMedia3Snapshot,
-                        useMedia3Snapshot = isMedia3Route,
+                        useMedia3Snapshot = latestIsMedia3Route,
                     )
                     mediaPlayer.pause()
                 }
@@ -620,10 +637,12 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    DisposableEffect(isMedia3Route, latestCurrentVideoId) {
+    DisposableEffect(isMedia3Route, uiState.currentVideoId) {
+        val ownedVideoId = uiState.currentVideoId
+        val ownedIsMedia3Route = isMedia3Route
         onDispose {
-            if (isMedia3Route) {
-                reportTvSeriesMedia3History(viewModel, latestCurrentVideoId, latestMedia3Snapshot)
+            if (ownedIsMedia3Route) {
+                reportTvSeriesMedia3History(viewModel, ownedVideoId, latestMedia3Snapshot)
             }
         }
     }
@@ -676,7 +695,7 @@ fun TvSeriesPlayerScreen(
                             ?.firstOrNull { it.id == selectedItem.id }
                             ?.number
                         if (episodeNumber != null) {
-                            viewModel.selectEpisode(episodeNumber)
+                            selectEpisodeFromPlayer(episodeNumber)
                         }
                     },
                     onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible,
@@ -765,92 +784,181 @@ fun TvSeriesPlayerScreen(
                 }
             }
         } else if (isMedia3Route) {
-            TvDolbyVisionMedia3Player(
-                sourceUrl = uiState.currentSourceUrl,
-                mediaId = uiState.currentVideoId,
-                title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
-                accessToken = accessToken,
-                retryKey = routeRetryNonce,
-                shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
-                initialPositionMs = resolveTvMedia3ResumePositionMs(
-                    historyPositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
-                        currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
-                    } else {
-                        0L
-                    },
-                    currentSnapshotPositionMs = latestMedia3Snapshot.positionMs,
-                    hasCurrentPlaybackSnapshot = resumedFromHistoryVideoId == uiState.currentVideoId,
-                ),
-                modifier = Modifier.fillMaxSize(),
-                onPlayingChanged = { playing ->
-                    isPlayerActuallyPlaying = playing
-                    if (playing) {
-                        playerErrorMessage = null
-                        val resumePositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                TvDolbyVisionMedia3Player(
+                    sourceUrl = uiState.currentSourceUrl,
+                    mediaId = uiState.currentVideoId,
+                    title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
+                    accessToken = accessToken,
+                    retryKey = routeRetryNonce,
+                    shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
+                    initialPositionMs = resolveTvMedia3ResumePositionMs(
+                        historyPositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
                             currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
                         } else {
                             0L
-                        }
-                        if (uiState.currentVideoId.isNotBlank() && resumedFromHistoryVideoId != uiState.currentVideoId) {
-                            resumedFromHistoryVideoId = uiState.currentVideoId
-                            if (shouldTriggerResumePrompt(resumePositionMs)) {
-                                resumePromptLastPositionMs = resumePositionMs
-                                resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
-                                resumePromptDismissed = false
+                        },
+                        currentSnapshotPositionMs = latestMedia3Snapshot.positionMs,
+                        hasCurrentPlaybackSnapshot = resumedFromHistoryVideoId == uiState.currentVideoId,
+                    ),
+                    seekPositionMs = media3SeekPositionMs,
+                    seekRequestKey = media3SeekRequestKey,
+                    modifier = Modifier.fillMaxSize(),
+                    onPlayingChanged = { playing ->
+                        isPlayerActuallyPlaying = playing
+                        if (playing) {
+                            playerErrorMessage = null
+                            val resumePositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
+                                currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
+                            } else {
+                                0L
+                            }
+                            if (uiState.currentVideoId.isNotBlank() && resumedFromHistoryVideoId != uiState.currentVideoId) {
+                                resumedFromHistoryVideoId = uiState.currentVideoId
+                                if (shouldTriggerResumePrompt(resumePositionMs)) {
+                                    resumePromptLastPositionMs = resumePositionMs
+                                    resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
+                                    resumePromptDismissed = false
+                                }
                             }
                         }
-                    }
-                },
-                onError = { message ->
-                    playerErrorMessage = message
-                    isPlayerActuallyPlaying = false
-                    updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
-                },
-                onEnded = ::handlePlaybackEnded,
-                onSnapshotChanged = { snapshot ->
-                    media3Snapshot = snapshot
-                    screenPositionMs = snapshot.positionMs
-                    screenDurationMs = snapshot.durationMs
-                },
-            )
-            if (!playerErrorMessage.isNullOrBlank()) {
-                if (showDolbyVisionDiagnostics) {
-                    TvErrorState(
-                        title = "诊断信息",
-                        message = playbackDiagnosticMessage,
-                        onAction = {
-                            showDolbyVisionDiagnostics = false
-                            playerErrorMessage = null
-                            routeRetryNonce += 1
-                            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
-                        },
-                    )
-                } else {
-                    TvErrorState(
-                        title = "暂不能播放",
-                        message = playerErrorMessage.orEmpty(),
-                        onAction = {
-                            playerErrorMessage = null
-                            routeRetryNonce += 1
-                            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
-                        },
-                        secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
-                        onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
-                            {
-                                showDolbyVisionDiagnostics = true
-                            }
-                        } else {
-                            null
-                        },
+                    },
+                    onError = { message ->
+                        playerErrorMessage = message
+                        isPlayerActuallyPlaying = false
+                        updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
+                    },
+                    onEnded = ::handlePlaybackEnded,
+                    onSnapshotChanged = { snapshot ->
+                        media3Snapshot = snapshot
+                        screenPositionMs = snapshot.positionMs
+                        screenDurationMs = snapshot.durationMs
+                    },
+                )
+                TvSeriesCorePlaybackOverlay(
+                    title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
+                    isPlaying = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser && isPlayerActuallyPlaying,
+                    positionMs = screenPositionMs,
+                    durationMs = screenDurationMs,
+                    tvSeekStepSeconds = uiState.tvSeekStepSeconds,
+                    seriesTitleForOverlay = series.title,
+                    seasonNumber = uiState.selectedSeasonNumber,
+                    episodeNumber = uiState.selectedEpisodeNumber,
+                    episodeTitle = currentEpisode?.title,
+                    episodeRailItems = episodeRailItems,
+                    currentEpisodeRailItemId = currentEpisode?.id,
+                    onTogglePlayPause = {
+                        updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
+                    },
+                    onSeekTo = { targetMs ->
+                        media3SeekPositionMs = targetMs
+                        media3SeekRequestKey += 1
+                    },
+                    showTrackActions = false,
+                    onSelectEpisodeRailItem = { selectedItem ->
+                        val episodeNumber = selectedSeason(uiState)?.episodes
+                            ?.firstOrNull { it.id == selectedItem.id }
+                            ?.number
+                        if (episodeNumber != null) {
+                            selectEpisodeFromPlayer(episodeNumber)
+                        }
+                    },
+                    onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible,
+                    resumePromptVisible = shouldShowResumePromptCard,
+                    resumePromptSlot = {
+                        TvResumePromptCard(
+                            lastPositionMs = resumePromptLastPositionMs,
+                            visible = shouldShowResumePromptCard,
+                            remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
+                            onContinue = { resumePromptDismissed = true },
+                            onStartFromBeginning = {
+                                media3SeekPositionMs = 0L
+                                media3SeekRequestKey += 1
+                                resumePromptDismissed = true
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(
+                                    start = TvResumePromptTokens.HorizontalPaddingDp,
+                                    bottom = TvResumePromptTokens.BottomPaddingDp,
+                                ),
+                        )
+                    },
+                    backConfirmPromptVisible = showBackConfirmPrompt,
+                    playerErrorVisible = playerErrorMessage != null,
+                    openEpisodeRailRequestKey = openEpisodeRailRequestKey,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                nextEpisodeRef?.let { next ->
+                    TvAutoplayPromptCard(
+                        nextEpisodeRef = next,
+                        visible = shouldShowAutoplayPromptCard,
+                        remainingSeconds = remainingSeconds,
+                        onPlayNow = ::advanceFromAutoplay,
+                        onCancel = viewModel::cancelAutoplayForCurrentEpisode,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(
+                                end = TvAutoplayPromptTokens.HorizontalPaddingDp,
+                                bottom = TvAutoplayPromptTokens.BottomPaddingDp,
+                            ),
                     )
                 }
-            }
-            if (showBackConfirmPrompt) {
-                TvPlayerBackConfirmPrompt(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 72.dp),
+                TvSeriesEndOverlay(
+                    kind = uiState.pendingEndOverlayKind,
+                    onPlayNext = viewModel::nextEpisode,
+                    onBackToDetail = onBack,
+                    modifier = Modifier.fillMaxSize(),
                 )
+                if (!playerErrorMessage.isNullOrBlank()) {
+                    if (showDolbyVisionDiagnostics) {
+                        TvErrorState(
+                            title = "诊断信息",
+                            message = playbackDiagnosticMessage,
+                            onAction = {
+                                showDolbyVisionDiagnostics = false
+                                playerErrorMessage = null
+                                routeRetryNonce += 1
+                                updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                            },
+                        )
+                    } else {
+                        TvErrorState(
+                            title = "暂不能播放",
+                            message = playerErrorMessage.orEmpty(),
+                            onAction = {
+                                playerErrorMessage = null
+                                routeRetryNonce += 1
+                                updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                            },
+                            secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                            onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
+                                {
+                                    showDolbyVisionDiagnostics = true
+                                }
+                            } else {
+                                null
+                            },
+                            tertiaryActionLabel = if (episodeRailItems.isNotEmpty()) "选集" else null,
+                            onTertiaryAction = if (episodeRailItems.isNotEmpty()) {
+                                {
+                                    showDolbyVisionDiagnostics = false
+                                    playerErrorMessage = null
+                                    openEpisodeRailRequestKey += 1
+                                }
+                            } else {
+                                null
+                            },
+                        )
+                    }
+                }
+                if (showBackConfirmPrompt) {
+                    TvPlayerBackConfirmPrompt(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 72.dp),
+                    )
+                }
             }
         } else if (uiState.playbackPreparing) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -954,6 +1062,19 @@ private fun reportTvSeriesMedia3History(
     )
     viewModel.reportHistory(videoId, snapshot.watchSeconds, snapshot.completed)
 }
+
+internal fun shouldUseMedia3SnapshotForTvSeriesHistory(
+    currentVideoId: String,
+    targetVideoId: String,
+    currentRouteIsMedia3: Boolean,
+    lastHistoryVideoId: String,
+    lastHistoryUsesMedia3Snapshot: Boolean,
+): Boolean =
+    when (targetVideoId) {
+        currentVideoId -> currentRouteIsMedia3
+        lastHistoryVideoId -> lastHistoryUsesMedia3Snapshot
+        else -> currentRouteIsMedia3
+    }
 
 private fun TvSeriesPlayerUiState.nextEpisodeRef(): TvNextEpisodeRef? {
     val currentSeries = series ?: return null

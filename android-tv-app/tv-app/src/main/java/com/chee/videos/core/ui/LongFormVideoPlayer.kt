@@ -89,11 +89,11 @@ import kotlin.math.abs
 import org.videolan.libvlc.MediaPlayer
 
 private const val LongFormVideoPlayerLogTag = "LongFormVideoPlayer"
-private val PlayerGlassSurface = AppChrome.Surface.copy(alpha = 0.90f)
-private val PlayerGlassSurfaceStrong = AppChrome.SurfaceMuted.copy(alpha = 0.92f)
+internal val PlayerGlassSurface = AppChrome.Surface.copy(alpha = 0.90f)
+internal val PlayerGlassSurfaceStrong = AppChrome.SurfaceMuted.copy(alpha = 0.92f)
 private val PlayerSubtleSurface = AppChrome.Surface.copy(alpha = 0.72f)
-private val PlayerProgressTrack = AppChrome.TextMuted.copy(alpha = 0.24f)
-private val PlayerProgressActiveTrack = AppChrome.Accent.copy(alpha = 0.96f)
+internal val PlayerProgressTrack = AppChrome.TextMuted.copy(alpha = 0.24f)
+internal val PlayerProgressActiveTrack = AppChrome.Accent.copy(alpha = 0.96f)
 
 enum class TvLongFormControlsVariant {
     Default,
@@ -133,7 +133,7 @@ internal fun resolveTvControlHorizontalFocusTarget(
     }
 }
 
-private enum class TvSeriesBottomPanelPage(val depth: Int) {
+internal enum class TvSeriesBottomPanelPage(val depth: Int) {
     Controls(0),
     EpisodeRail(1),
 }
@@ -1405,7 +1405,7 @@ internal fun normalizeTvSeekStepSeconds(seconds: Int): Int {
 }
 
 @Composable
-private fun TvPlaybackProgressBar(
+internal fun TvPlaybackProgressBar(
     progressValue: Float,
     modifier: Modifier = Modifier,
 ) {
@@ -1424,7 +1424,7 @@ private fun TvPlaybackProgressBar(
 }
 
 @Composable
-private fun TvSeriesControlsPage(
+internal fun TvSeriesControlsPage(
     isPlaying: Boolean,
     displayPositionMs: Long,
     actualDurationMs: Long,
@@ -1434,6 +1434,7 @@ private fun TvSeriesControlsPage(
     subtitleFocusRequester: FocusRequester,
     audioTrackFocusRequester: FocusRequester,
     controlFocusModifier: (TvControlFocusTarget) -> Modifier,
+    showTrackActions: Boolean = true,
     onTogglePlayPause: () -> Unit,
     onOpenSubtitle: () -> Unit,
     onOpenAudioTrack: () -> Unit,
@@ -1471,27 +1472,29 @@ private fun TvSeriesControlsPage(
             color = AppChrome.TextMuted,
             style = MaterialTheme.typography.labelSmall,
         )
-        CompactPlayerControlButton(
-            icon = Icons.Filled.Subtitles,
-            contentDescription = "字幕",
-            tvMode = tvMode,
-            focusRequester = subtitleFocusRequester,
-            modifier = controlFocusModifier(TvControlFocusTarget.Subtitle),
-            onClick = onOpenSubtitle,
-        )
-        CompactPlayerControlButton(
-            icon = Icons.Filled.GraphicEq,
-            contentDescription = "音轨",
-            tvMode = true,
-            focusRequester = audioTrackFocusRequester,
-            modifier = controlFocusModifier(TvControlFocusTarget.AudioTrack),
-            onClick = onOpenAudioTrack,
-        )
+        if (showTrackActions) {
+            CompactPlayerControlButton(
+                icon = Icons.Filled.Subtitles,
+                contentDescription = "字幕",
+                tvMode = tvMode,
+                focusRequester = subtitleFocusRequester,
+                modifier = controlFocusModifier(TvControlFocusTarget.Subtitle),
+                onClick = onOpenSubtitle,
+            )
+            CompactPlayerControlButton(
+                icon = Icons.Filled.GraphicEq,
+                contentDescription = "音轨",
+                tvMode = true,
+                focusRequester = audioTrackFocusRequester,
+                modifier = controlFocusModifier(TvControlFocusTarget.AudioTrack),
+                onClick = onOpenAudioTrack,
+            )
+        }
     }
 }
 
 @Composable
-private fun TvEpisodeRail(
+internal fun TvEpisodeRail(
     items: List<TvEpisodeRailItem>,
     currentEpisodeId: String?,
     focusedEpisodeId: String?,
@@ -1613,7 +1616,7 @@ private fun TvEpisodeRail(
 }
 
 @Composable
-private fun CompactPlayerControlButton(
+internal fun CompactPlayerControlButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
@@ -1645,7 +1648,7 @@ private fun CompactPlayerControlButton(
     )
 }
 
-private fun formatPlaybackTime(ms: Long): String {
+internal fun formatPlaybackTime(ms: Long): String {
     if (ms <= 0) {
         return "00:00"
     }

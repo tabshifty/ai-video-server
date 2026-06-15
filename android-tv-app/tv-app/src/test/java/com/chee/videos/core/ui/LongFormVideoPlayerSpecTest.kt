@@ -124,7 +124,7 @@ class LongFormVideoPlayerSpecTest {
 
     @Test
     fun `screens no longer place resume prompt as sibling fallback path`() {
-        // 兜底校验：两个 screen 整体里 "TvResumePromptCard(" 最多只出现一次（就是 slot 块里的那个）
+        // 兜底校验：单片 screen 只有一个 slot；电视剧 screen 有 LibVLC / Media3 两个分支，但都必须在 slot 中。
         val longFormCount = Regex("TvResumePromptCard\\(").findAll(longFormPlayerScreenSource).count()
         val seriesCount = Regex("TvResumePromptCard\\(").findAll(seriesPlayerScreenSource).count()
         assertTrue(
@@ -132,8 +132,12 @@ class LongFormVideoPlayerSpecTest {
             longFormCount <= 1,
         )
         assertTrue(
-            "TvSeriesPlayerScreen 中 TvResumePromptCard 调用应仅在 slot 中出现一次，当前 $seriesCount",
-            seriesCount <= 1,
+            "TvSeriesPlayerScreen 中 TvResumePromptCard 调用应仅出现在 LibVLC / Media3 两个 resumePromptSlot 中，当前 $seriesCount",
+            seriesCount <= 2,
+        )
+        assertTrue(
+            "TvSeriesPlayerScreen 的 Media3 分支也必须通过 resumePromptSlot 内嵌续播卡",
+            seriesPlayerScreenSource.substringAfter("TvSeriesCorePlaybackOverlay(").contains("resumePromptSlot ="),
         )
     }
 
