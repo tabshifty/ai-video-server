@@ -4,6 +4,7 @@ import { resolveRouterHistoryBase } from './historyBase'
 import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
 import VideoList from '../views/VideoList.vue'
+import ShortReview from '../views/ShortReview.vue'
 import VideoUpload from '../views/VideoUpload.vue'
 import TvSeriesManage from '../views/TvSeriesManage.vue'
 import TvAppManage from '../views/TvAppManage.vue'
@@ -26,6 +27,7 @@ const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', component: Dashboard, meta: { hideShellPageHeader: true } },
   { path: '/videos', component: VideoList, meta: { hideShellPageHeader: true } },
+  { path: '/short-review', component: ShortReview, meta: { hideShellPageHeader: true } },
   { path: '/tv-series', component: TvSeriesManage, meta: { hideShellPageHeader: true } },
   { path: '/tv-app', component: TvAppManage, meta: { hideShellPageHeader: true } },
   { path: '/iptv', component: IPTVManage, meta: { hideShellPageHeader: true } },

@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 16:22 +0800
+- 进度：完成管理端短视频审核页首版落地。新增 `ShortReview.vue`，接入 `/short-review` 路由和媒体库侧栏/命令面板入口；页面固定查询 `short + ready`，支持关键词搜索、恢复上次审核位置、平板优先队列 + 播放器布局、自动播放默认静音、`保留并下一条`、`删除并下一条` 二次确认、当前页末尾自动加载后续页和末尾空状态。新增 `shortReview.helpers` 锁定位置恢复、固定查询、翻页推进和声音会话偏好；补充命令面板与路由源文测试。
+- 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.js`、`admin-web/src/views/shortReview.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/shortReview.helpers.spec.js src/components/base/commandPalette.helpers.spec.js src/router/index.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-15 15:59 +0800
+- 进度：开始落地管理端短视频审核页。实现范围：新增 `/short-review` 管理端页面与媒体库侧栏入口；复用现有 `/admin/videos?type=short&status=ready`、`/admin/videos/:id/play-url` 和删除接口；实现平板优先的左侧待审队列 + 右侧播放器布局；支持恢复上次审核视频、`保留并下一条`、`删除并下一条` 二次确认、当前页末尾自动加载下一页、无更多时显示末尾空状态；首版仅关键词搜索，不提供编辑能力。先补纯逻辑测试，再实现页面、路由和导航。
+- 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.js`、`admin-web/src/views/shortReview.helpers.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/shortReview.helpers.spec.js src/components/base/commandPalette.helpers.spec.js`、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-15 15:38 +0800
 - 进度：通过 `$grill-with-docs` 校准管理端短视频审核页需求。已确认待审集合为 `ready` 短视频并按上传时间倒序；页面优先平板布局，采用左侧待审队列 + 右侧大播放器；重新进入优先恢复上次正在审核的视频；`保留并下一条` 只推进审核位置、不写“已审核”状态；`删除并下一条` 走现有视频删除语义且必须二次确认；走到当前已加载列表末尾时自动加载下一页，确认没有更多待审短视频时才显示末尾空状态；播放器自动播放、默认静音、声音状态仅保留当前审核会话；首版只提供关键词搜索；入口放在媒体库分组，命名“短视频审核”，路由 `/short-review`；后端复用现有 `/admin/videos`、播放链接和删除接口；审核页不承载编辑能力。
 - 影响文件：`CONTEXT.md`、`plan.md`

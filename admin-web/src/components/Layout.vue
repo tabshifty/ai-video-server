@@ -18,7 +18,8 @@ import {
   SwitchButton,
   Tools,
   UploadFilled,
-  User
+  User,
+  VideoCamera
 } from '@element-plus/icons-vue'
 import { profileApi } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
@@ -46,7 +47,8 @@ const iconMap = {
   Setting,
   Tools,
   UploadFilled,
-  User
+  User,
+  VideoCamera
 }
 
 const route = useRoute()
