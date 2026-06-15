@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-15 18:34 +0800
+- 进度：完成推送到家用部署机。已将本地 `master` 从部署机远端 `6d3619f` 推进到 `f3f67de`；远端 hook 完成 `admin-web` 构建、Go build、codesign、migration 与 server / worker `launchctl kickstart`，最终 `/healthz OK`。GitHub mirror push 在部署机 hook 内失败但标记为 non-fatal，不影响本次部署。
+- 影响文件：`plan.md`
+- 验证：`git push deploy master` 通过；`git ls-remote deploy refs/heads/master` 返回 `f3f67de9dd205f9e77f61bb9efff369aab8c96d4`；部署机 `curl http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`。
+
 ## 2026-06-15 17:08 +0800
 - 进度：完成仓库工作流约束补充。`AGENTS.md` 与 `CLAUDE.md` 已新增“`grill-with-docs` 收口后先多子代理出多方案、主代理择优拆任务再编码；代码完成后再走子代理 review 到无阻塞问题为止”的约束；`plan.md` 也已记录本次变更。
 - 影响文件：`AGENTS.md`、`CLAUDE.md`、`plan.md`
