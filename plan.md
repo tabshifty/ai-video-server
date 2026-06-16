@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 12:12 +0800
+- 进度：补充后端回归验证并完成收尾检查。`internal/repository` 与 `internal/models` 的定向测试已通过，确认电视剧详情 `cast` 实体化后仓库层和模型层仍可正常编译/运行。
+- 影响文件：`plan.md`
+- 验证：`go test ./internal/repository ./internal/models -count=1` 通过。
+
+## 2026-06-16 12:10 +0800
+- 进度：完成 TV 电视剧详情演员头像改造的收口与验证。演员区保持横向滚动，仅展示头像和姓名，不提供点击跳转；头像优先走服务端下发的本地可访问路由，缺失或加载失败时回落首字。顺手补齐 `TvTestSupport` 的演员 DTO 导入，并把演员区“只浏览不点击”写入 `CONTEXT.md`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-16 11:26 +0800
+- 进度：开始通过 `$grill-with-docs` 收口 TV 电视剧详情演员头像改造。已确认当前服务端 `TvSeriesDetailDto.cast` 只返回演员姓名，TV 端因此只能渲染圆形首字占位；本次方向调整为详情接口返回演员实体（含本地头像路由），TV 端加载头像，缺失时保留首字兜底。
+- 影响文件：`internal/models/app.go`、`internal/repository/tv_repository.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/model/ApiModels.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待完成需求收口后补后端/TV 定向测试，再执行相关 Go/TV 验证、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 11:11 +0800
 - 进度：完成电视剧刮削幂等与 TMDB 演员复用优化。已实现同一电视剧整剧 poster/backdrop 和分集 still 的本地存在跳过下载，新增 TMDB 演员按 `source + external_id` 复用已完整资料的查询；回归测试覆盖连续刮削同一剧不同分集和已有完整 TMDB 演员再次绑定视频两条路径。
 - 影响文件：`internal/services/scraper.go`、`internal/repository/actor_repository.go`、`internal/services/scraper_episode_sync_test.go`、`internal/services/scraper_test.go`、`internal/queue/scrape_tasks_test.go`、`CONTEXT.md`、`plan.md`

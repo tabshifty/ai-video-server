@@ -10,7 +10,11 @@ object TvMockData {
             updateText = "更新至 S2·E6",
             description = "一座港口城市接连发生离奇案件，法医、刑警与记者三线交织，逐步揭开二十年前失踪案的真相。",
             tags = listOf("高能反转", "多线叙事", "口碑榜 Top3"),
-            cast = listOf("林舟", "周岚", "谢言"),
+            cast = listOf(
+                tvCast("actor-1", "林舟", "http://localhost/api/v1/actors/actor-1/avatar"),
+                tvCast("actor-2", "周岚"),
+                tvCast("actor-3", "谢言"),
+            ),
             seasonCount = 2,
             episodesPerSeason = 8,
             posterSeed = 1,
@@ -23,7 +27,11 @@ object TvMockData {
             updateText = "全 24 集",
             description = "年轻导演与纪录片团队在冬季北境追拍真实故事，在行业压力和理想之间寻找平衡。",
             tags = listOf("群像成长", "摄影质感", "年度热议"),
-            cast = listOf("宋青", "陆临", "沈雾"),
+            cast = listOf(
+                tvCast("actor-4", "宋青", "http://localhost/api/v1/actors/actor-4/avatar"),
+                tvCast("actor-5", "陆临"),
+                tvCast("actor-6", "沈雾"),
+            ),
             seasonCount = 1,
             episodesPerSeason = 24,
             posterSeed = 2,
@@ -36,7 +44,11 @@ object TvMockData {
             updateText = "更新至 S1·E10",
             description = "人类首个深空殖民站失联，救援队在残骸与日志中拼凑真相，逐步发现更大的系统性阴谋。",
             tags = listOf("宇宙探索", "硬核设定", "视觉大片"),
-            cast = listOf("陈牧", "伊娜", "塔伦"),
+            cast = listOf(
+                tvCast("actor-7", "陈牧", "http://localhost/api/v1/actors/actor-7/avatar"),
+                tvCast("actor-8", "伊娜"),
+                tvCast("actor-9", "塔伦"),
+            ),
             seasonCount = 1,
             episodesPerSeason = 12,
             posterSeed = 3,
@@ -49,7 +61,11 @@ object TvMockData {
             updateText = "全 16 集",
             description = "三代人回到故乡重建旧宅，隐藏多年的家族秘密在一次山洪后被逐层揭开。",
             tags = listOf("情感细腻", "治愈向", "高分剧情"),
-            cast = listOf("夏清", "徐南", "贺川"),
+            cast = listOf(
+                tvCast("actor-10", "夏清", "http://localhost/api/v1/actors/actor-10/avatar"),
+                tvCast("actor-11", "徐南"),
+                tvCast("actor-12", "贺川"),
+            ),
             seasonCount = 1,
             episodesPerSeason = 16,
             posterSeed = 4,
@@ -62,7 +78,11 @@ object TvMockData {
             updateText = "更新至 S3·E4",
             description = "情报组织“夜网”在全球城市间展开隐秘交锋，一名双面特工被迫在忠诚与生存间做选择。",
             tags = listOf("高密度动作", "快节奏", "追剧首选"),
-            cast = listOf("顾骁", "安洁", "井上遥"),
+            cast = listOf(
+                tvCast("actor-13", "顾骁", "http://localhost/api/v1/actors/actor-13/avatar"),
+                tvCast("actor-14", "安洁"),
+                tvCast("actor-15", "井上遥"),
+            ),
             seasonCount = 3,
             episodesPerSeason = 10,
             posterSeed = 5,
@@ -118,7 +138,7 @@ private fun tvSeries(
     updateText: String,
     description: String,
     tags: List<String>,
-    cast: List<String>,
+    cast: List<TvSeriesCastUiModel>,
     seasonCount: Int,
     episodesPerSeason: Int,
     posterSeed: Int,
@@ -157,6 +177,13 @@ private fun tvSeries(
         posterSeed = posterSeed,
     )
 }
+
+private fun tvCast(id: String, name: String, avatarUrl: String? = null): TvSeriesCastUiModel =
+    TvSeriesCastUiModel(
+        id = id,
+        name = name,
+        avatarUrl = avatarUrl,
+    )
 
 private fun episodeTitle(index: Int): String {
     return when (index % 6) {

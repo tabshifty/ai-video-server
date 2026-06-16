@@ -300,7 +300,7 @@ LIMIT 12
 	tagRows.Close()
 
 	castRows, err := r.pool.Query(ctx, `
-SELECT DISTINCT a.name
+SELECT DISTINCT a.id, a.name, COALESCE(a.avatar_url,'')
 FROM actors a
 JOIN video_actors va ON va.actor_id = a.id
 JOIN episodes e ON e.video_id = va.video_id
@@ -313,12 +313,12 @@ LIMIT 12
 		return models.TvSeriesDetailDto{}, fmt.Errorf("query tv cast: %w", err)
 	}
 	for castRows.Next() {
-		var name string
-		if err := castRows.Scan(&name); err != nil {
+		var actor models.VideoActor
+		if err := castRows.Scan(&actor.ID, &actor.Name, &actor.AvatarURL); err != nil {
 			castRows.Close()
 			return models.TvSeriesDetailDto{}, fmt.Errorf("scan tv cast: %w", err)
 		}
-		detail.Cast = append(detail.Cast, name)
+		detail.Cast = append(detail.Cast, actor)
 	}
 	castRows.Close()
 

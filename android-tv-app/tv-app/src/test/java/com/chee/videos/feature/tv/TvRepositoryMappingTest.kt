@@ -4,6 +4,7 @@ import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
+import com.chee.videos.core.model.VideoActorDto
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,6 +64,10 @@ class TvRepositoryMappingTest {
                 id = "series-1",
                 title = "雾城档案",
                 overview = "调查悬案",
+                cast = listOf(
+                    VideoActorDto(id = "actor-1", name = "林舟", avatarUrl = "/api/v1/actors/actor-1/avatar"),
+                    VideoActorDto(id = "actor-2", name = "周岚"),
+                ),
                 seasons = listOf(
                     TvSeasonDto(
                         id = "s1",
@@ -87,6 +92,9 @@ class TvRepositoryMappingTest {
 
         assertEquals("雾城档案", uiModel.title)
         assertEquals(1, uiModel.seasons.size)
+        assertEquals(2, uiModel.cast.size)
+        assertEquals("林舟", uiModel.cast.first().name)
+        assertEquals("/api/v1/actors/actor-1/avatar", uiModel.cast.first().avatarUrl)
         assertFalse(uiModel.seasons.first().episodes.first().playable)
         assertEquals(93, uiModel.seasons.first().episodes.first().watchSeconds)
         assertEquals("/still/e1.jpg", uiModel.seasons.first().episodes.first().stillUrl)
@@ -148,5 +156,30 @@ class TvRepositoryMappingTest {
         assertTrue(uiModel.tags.isEmpty())
         assertTrue(uiModel.cast.isEmpty())
         assertTrue(uiModel.seasons.isEmpty())
+    }
+
+    @Test
+    fun mapSeriesDetail_acceptsActorObjectsFromJson() {
+        val dto = Gson().fromJson(
+            """
+            {
+              "id": "series-1",
+              "title": "雾城档案",
+              "cast": [
+                {"id": "actor-1", "name": "林舟", "avatar_url": "/api/v1/actors/actor-1/avatar"},
+                {"id": "actor-2", "name": "周岚"}
+              ],
+              "seasons": []
+            }
+            """.trimIndent(),
+            TvSeriesDetailDto::class.java,
+        )
+
+        val uiModel = tvSeriesDetailToUiModel(dto)
+
+        assertEquals(2, uiModel.cast.size)
+        assertEquals("actor-1", uiModel.cast[0].id)
+        assertEquals("/api/v1/actors/actor-1/avatar", uiModel.cast[0].avatarUrl)
+        assertEquals("周岚", uiModel.cast[1].name)
     }
 }

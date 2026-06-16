@@ -222,7 +222,7 @@ data class TvSeriesDetailDto(
     @SerializedName("total_episodes") val totalEpisodes: Int = 0,
     @SerializedName("playable_episodes") val playableEpisodes: Int = 0,
     @SerializedName("tags") val tags: List<String> = emptyList(),
-    @SerializedName("cast") val cast: List<String> = emptyList(),
+    @SerializedName("cast") val cast: List<VideoActorDto> = emptyList(),
     @SerializedName("seasons") val seasons: List<TvSeasonDto> = emptyList(),
 )
 

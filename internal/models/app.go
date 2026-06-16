@@ -242,7 +242,7 @@ type TvSeriesDetailDto struct {
 	TotalEpisodes    int           `json:"total_episodes"`
 	PlayableEpisodes int           `json:"playable_episodes"`
 	Tags             []string      `json:"tags"`
-	Cast             []string      `json:"cast"`
+	Cast             []VideoActor  `json:"cast"`
 	Seasons          []TvSeasonDto `json:"seasons"`
 }
 

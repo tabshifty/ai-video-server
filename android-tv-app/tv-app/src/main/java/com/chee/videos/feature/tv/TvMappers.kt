@@ -8,6 +8,7 @@ import com.chee.videos.core.model.TvSectionDto
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
+import com.chee.videos.core.model.VideoActorDto
 
 @Suppress("UNCHECKED_CAST")
 internal fun <T> coerceListOrEmpty(value: Any?): List<T> = value as? List<T> ?: emptyList()
@@ -136,7 +137,17 @@ internal fun tvSeriesDetailToUiModel(dto: TvSeriesDetailDto): TvSeriesUiModel {
         updateText = if (dto.playableEpisodes > 0) "${dto.playableEpisodes} 集可播" else "待绑定视频",
         description = dto.overview.orEmpty().ifBlank { "暂无简介" },
         tags = coerceListOrEmpty<String>(dto.tags),
-        cast = coerceListOrEmpty<String>(dto.cast),
+        cast = coerceListOrEmpty<VideoActorDto>(dto.cast).mapNotNull { actor ->
+            val name = actor.name.trim()
+            if (name.isBlank()) {
+                return@mapNotNull null
+            }
+            TvSeriesCastUiModel(
+                id = actor.id,
+                name = name,
+                avatarUrl = actor.avatarUrl?.trim()?.takeIf { it.isNotBlank() },
+            )
+        },
         seasons = seasons,
         posterSeed = dto.title.hashCode(),
         posterUrl = dto.posterUrl,

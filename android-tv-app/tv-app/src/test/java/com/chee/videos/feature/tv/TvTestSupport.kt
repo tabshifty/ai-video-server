@@ -11,6 +11,7 @@ import com.chee.videos.core.model.TvSearchResultDto
 import com.chee.videos.core.model.TvSeasonDto
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
+import com.chee.videos.core.model.VideoActorDto
 import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.model.SubtitleTrackDto
 import kotlinx.coroutines.CompletableDeferred
@@ -231,13 +232,14 @@ fun tvSeriesDetail(
     id: String = "series-1",
     title: String = "雾城档案",
     seasons: List<TvSeasonDto> = emptyList(),
+    cast: List<VideoActorDto> = emptyList(),
 ): TvSeriesDetailDto = TvSeriesDetailDto(
     id = id,
     title = title,
     overview = "调查悬案",
     seasons = seasons,
     tags = emptyList(),
-    cast = emptyList(),
+    cast = cast,
 )
 
 fun tvEpisode(

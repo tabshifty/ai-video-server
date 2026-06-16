@@ -54,6 +54,11 @@ class TvSeriesDetailActionSpecTest {
         assertTrue("电视剧详情页标题必须独立成参考图式大标题块", source.contains("TvSeriesTitleBlock("))
         assertTrue("电视剧详情页主体应拆成右侧剧集面板", source.contains("TvSeriesEpisodePane("))
         assertTrue("电视剧详情页应保留演员区", source.contains("TvSeriesCastRow("))
+        assertTrue("电视剧详情页演员区应改为横向滚动", source.contains("LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp))"))
+        assertTrue("电视剧详情页演员卡应可展示头像", source.contains("SubcomposeAsyncImage("))
+        assertTrue("电视剧详情页演员头像缺失时必须保留首字兜底", source.contains("TvSeriesCastAvatarFallback("))
+        assertFalse("电视剧详情页演员区不应提供点击行为", castSection(source).contains(".clickable("))
+        assertFalse("电视剧详情页演员区不应提供点击行为", castSection(source).contains("onClick ="))
         assertTrue("电视剧详情页右侧剧集应使用横向缩略图卡片", source.contains("TvSeriesEpisodeCard("))
         assertTrue("电视剧详情页操作区应接近参考图的主按钮 + 次按钮组合", source.contains("TvSeriesReferenceActionRow("))
         assertTrue("电视剧详情页应提供参考图中的次操作“我的片单”", source.contains("我的片单"))
@@ -75,6 +80,7 @@ class TvSeriesDetailActionSpecTest {
         assertTrue("左侧评分区必须包含参考图式 IMDb 角标", source.contains("\"IMDb\""))
         assertTrue("参考图还原必须降低标题字号，不再沿用旧大字号布局", source.contains("titleParts.stretched -> 44.sp"))
         assertTrue("参考图还原必须降低右侧分集卡高度", source.contains("const val EpisodeCardHeightDp = 84"))
+        assertTrue("电视剧详情页头像条应使用 baseUrl 拼接本地头像路由", source.contains("resolveTvResourceUrl(baseUrl, actor.avatarUrl)"))
         assertFalse("左侧信息区不能继续使用会溢出 TV 逻辑宽度的 560dp 固定宽度", source.contains("width(560.dp)"))
         assertFalse("本次不保留左侧竖向导航栏", source.contains("TvSeriesReferenceSideRail("))
         assertFalse("本次不保留顶部导航栏", source.contains("TvSeriesReferenceTopNav("))
@@ -88,5 +94,15 @@ class TvSeriesDetailActionSpecTest {
         assertEquals("主角", formatTvSeriesReferenceTitle("主角", stretched = false))
         assertEquals("剧集", formatTvSeriesReferenceTitle("剧集", stretched = false))
         assertEquals("T H E", formatTvSeriesReferenceTitle("THE", stretched = true))
+    }
+
+    private fun castSection(source: String): String {
+        val startMarker = "private fun TvSeriesCastRow("
+        val endMarker = "@Composable\nprivate fun TvSeriesEpisodePane("
+        val start = source.indexOf(startMarker)
+        assertTrue("电视剧详情页必须存在演员区实现", start >= 0)
+        val end = source.indexOf(endMarker, start)
+        assertTrue("电视剧详情页必须存在后续剧集区实现", end > start)
+        return source.substring(start, end)
     }
 }

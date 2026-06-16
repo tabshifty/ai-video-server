@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvErrorState
@@ -171,6 +173,7 @@ fun TvSeriesDetailScreen(
             TvSeriesHeroPane(
                 series = series,
                 currentEpisode = currentEpisode,
+                baseUrl = uiState.baseUrl,
                 playFocusRequester = playFocusRequester,
                 modifier = Modifier
                     .weight(1f)
@@ -297,6 +300,7 @@ private fun TvSeriesQualityBadge(modifier: Modifier = Modifier) {
 private fun TvSeriesHeroPane(
     series: TvSeriesUiModel,
     currentEpisode: TvEpisodeUiModel?,
+    baseUrl: String,
     playFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
     onPlay: () -> Unit,
@@ -326,7 +330,7 @@ private fun TvSeriesHeroPane(
         )
         if (series.cast.isNotEmpty()) {
             Spacer(modifier = Modifier.height(2.dp))
-            TvSeriesCastRow(cast = series.cast)
+            TvSeriesCastRow(baseUrl = baseUrl, cast = series.cast)
         }
     }
 }
@@ -575,7 +579,7 @@ private fun TvSeriesSecondaryActionButton(text: String) {
 }
 
 @Composable
-private fun TvSeriesCastRow(cast: List<String>) {
+private fun TvSeriesCastRow(baseUrl: String, cast: List<TvSeriesCastUiModel>) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = "演员",
@@ -584,38 +588,50 @@ private fun TvSeriesCastRow(cast: List<String>) {
             lineHeight = 15.sp,
             fontWeight = FontWeight.Normal,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            cast.take(4).forEachIndexed { index, name ->
-                TvSeriesCastItem(index = index, name = name)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(cast.take(6), key = { it.id.ifBlank { it.name } }) { actor ->
+                TvSeriesCastItem(baseUrl = baseUrl, actor = actor)
             }
         }
     }
 }
 
 @Composable
-private fun TvSeriesCastItem(index: Int, name: String) {
+private fun TvSeriesCastItem(baseUrl: String, actor: TvSeriesCastUiModel) {
     Column(
-        modifier = Modifier.width(66.dp),
+        modifier = Modifier.width(74.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(46.dp)
                 .clip(CircleShape)
-                .background(tvCastAvatarBrush(index)),
+                .background(tvCastAvatarBrush(actor.id.hashCode())),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = name.take(1).ifBlank { "演" },
-                color = Color.White,
-                fontSize = 17.sp,
-                lineHeight = 21.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            val avatarUrl = remember(baseUrl, actor.avatarUrl) {
+                resolveTvResourceUrl(baseUrl, actor.avatarUrl)
+            }
+            if (!avatarUrl.isNullOrBlank()) {
+                SubcomposeAsyncImage(
+                    model = avatarUrl,
+                    contentDescription = actor.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    loading = {
+                        TvSeriesCastAvatarFallback(actor.name)
+                    },
+                    error = {
+                        TvSeriesCastAvatarFallback(actor.name)
+                    },
+                )
+            } else {
+                TvSeriesCastAvatarFallback(actor.name)
+            }
         }
         Text(
-            text = name,
+            text = actor.name,
             color = Color(0xFFECD38F),
             fontSize = 10.sp,
             lineHeight = 12.sp,
@@ -631,6 +647,17 @@ private fun TvSeriesCastItem(index: Int, name: String) {
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+@Composable
+private fun TvSeriesCastAvatarFallback(name: String) {
+    Text(
+        text = name.take(1).ifBlank { "演" },
+        color = Color.White,
+        fontSize = 17.sp,
+        lineHeight = 21.sp,
+        fontWeight = FontWeight.Bold,
+    )
 }
 
 @Composable

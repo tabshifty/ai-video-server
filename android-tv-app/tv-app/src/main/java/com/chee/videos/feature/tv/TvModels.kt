@@ -35,13 +35,19 @@ data class TvSeriesUiModel(
     val updateText: String,
     val description: String,
     val tags: List<String>,
-    val cast: List<String>,
+    val cast: List<TvSeriesCastUiModel>,
     val seasons: List<TvSeasonUiModel>,
     val posterSeed: Int,
     val posterUrl: String? = null,
     val backdropUrl: String? = null,
     val playableEpisodes: Int = 0,
     val totalEpisodes: Int = 0,
+)
+
+data class TvSeriesCastUiModel(
+    val id: String,
+    val name: String,
+    val avatarUrl: String? = null,
 )
 
 data class TvCatalogSectionUiModel(
