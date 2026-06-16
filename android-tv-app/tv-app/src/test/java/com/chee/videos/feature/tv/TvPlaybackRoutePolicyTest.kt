@@ -15,6 +15,7 @@ class TvPlaybackRoutePolicyTest {
         )
 
         assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
+        assertEquals(TvPlaybackOutputSurface.TEXTURE_VIEW, route.outputSurface)
         assertEquals(null, route.blockMessage)
     }
 
@@ -33,6 +34,7 @@ class TvPlaybackRoutePolicyTest {
         )
 
         assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
+        assertEquals(TvPlaybackOutputSurface.TEXTURE_VIEW, route.outputSurface)
         assertEquals(null, route.blockMessage)
     }
 
@@ -64,6 +66,7 @@ class TvPlaybackRoutePolicyTest {
 
         assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
         assertEquals("dv_source", route.playbackProfile)
+        assertEquals(TvPlaybackOutputSurface.SURFACE_VIEW, route.outputSurface)
         assertEquals(null, route.blockMessage)
     }
 
@@ -77,6 +80,7 @@ class TvPlaybackRoutePolicyTest {
         )
 
         assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
+        assertEquals(TvPlaybackOutputSurface.SURFACE_VIEW, route.outputSurface)
         assertEquals(null, route.blockMessage)
     }
 

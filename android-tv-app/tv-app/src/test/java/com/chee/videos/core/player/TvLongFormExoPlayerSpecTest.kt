@@ -56,19 +56,41 @@ class TvLongFormExoPlayerSpecTest {
     }
 
     @Test
-    fun tvLongFormMedia3PlayerUsesTextureViewWithoutLegacyPlayerChoice() {
+    fun tvLongFormMedia3PlayerChoosesOutputSurfaceWithoutLegacyPlayerChoice() {
         val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").readText()
-        val layout = Path.of("src/main/res/layout/tv_long_form_media3_player_view.xml").readText()
+        val textureLayout = Path.of("src/main/res/layout/tv_long_form_media3_player_view.xml").readText()
+        val surfaceLayout = Path.of("src/main/res/layout/tv_long_form_media3_surface_player_view.xml").readText()
 
         assertTrue(player.contains("R.layout.tv_long_form_media3_player_view"))
-        assertTrue(layout.contains("androidx.media3.ui.PlayerView"))
-        assertTrue(layout.contains("app:surface_type=\"texture_view\""))
-        assertTrue(layout.contains("app:keep_content_on_player_reset=\"true\""))
-        assertTrue(layout.contains("app:shutter_background_color=\"@android:color/transparent\""))
+        assertTrue(player.contains("R.layout.tv_long_form_media3_surface_player_view"))
+        assertTrue(player.contains("outputSurface: TvPlaybackOutputSurface"))
+        assertTrue(textureLayout.contains("androidx.media3.ui.PlayerView"))
+        assertTrue(textureLayout.contains("app:surface_type=\"texture_view\""))
+        assertTrue(surfaceLayout.contains("androidx.media3.ui.PlayerView"))
+        assertTrue(surfaceLayout.contains("app:surface_type=\"surface_view\""))
+        assertTrue(surfaceLayout.contains("app:keep_content_on_player_reset=\"true\""))
+        assertTrue(surfaceLayout.contains("app:shutter_background_color=\"@android:color/transparent\""))
         assertFalse(player.contains("PlayerView(it).apply"))
         assertFalse(player.contains("setShutterBackgroundColor(android.graphics.Color.BLACK)"))
         assertFalse(player.contains("isVlcRoute"))
         assertFalse(player.contains("TvVlcLibrary"))
+    }
+
+    @Test
+    fun tvLongFormPlayerPassesExitBackdropIntoMedia3SurfacePlayer() {
+        val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").readText()
+        val longForm = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
+        val series = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
+
+        assertTrue(player.contains("exitBackdropUrl: String? = null"))
+        assertTrue(player.contains("outputSurface == TvPlaybackOutputSurface.SURFACE_VIEW && !exitBackdropUrl.isNullOrBlank()"))
+        assertTrue(player.contains("AsyncImage("))
+        assertTrue(longForm.contains("exitBackdropUrl = detailHero.backdropUrl ?: detailHero.posterUrl"))
+        assertTrue(series.contains("exitBackdropUrl = exitBackdropUrl"))
+        assertTrue(longForm.contains("outputSurface = playbackRoute.outputSurface"))
+        assertTrue(series.contains("outputSurface = playbackRoute.outputSurface"))
+        assertFalse(longForm.contains("TextureView"))
+        assertFalse(series.contains("TextureView"))
     }
 
     @Test

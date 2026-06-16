@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 23:03 +0800
+- 进度：完成 TV 长视频 DV 异色与退出闪黑联合修复。`TvPlaybackRoute` 增加输出层语义：普通长视频使用 TextureView，DV source/output 使用 SurfaceView 保持系统 HDR/DV 直出；`TvLongFormMedia3Player` 在 SurfaceView 模式内部铺当前详情/剧集海报背板，避免 SurfaceView 销毁瞬间露黑。没有恢复长视频 LibVLC，也没有新增播放器内核选择。TV 版本递增到 `0.1.109` / `versionCode=109`。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`TvLongFormMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、相关 layout/测试、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest --tests com.chee.videos.core.player.TvLongFormExoPlayerSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' android-tv-app CONTEXT.md plan.md` 无命中。
+
+## 2026-06-16 23:02 +0800
+- 进度：修正 DV/HDR 异色回归方案边界。DV 风险源继续使用 ExoPlayer，但输出层强制 `surface_view` 保持系统 HDR/DV 直出；普通 SDR 才使用 `texture_view` 缓解退出闪黑。为避免 DV SurfaceView 销毁瞬间露出黑底，`TvLongFormMedia3Player` 在 SurfaceView 模式下内部铺当前详情/剧集海报背板承接退出，不使用黑色遮罩或人为延迟。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`TvLongFormMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、相关 layout/测试、`CONTEXT.md`、`plan.md`
+- 验证：待重新执行 TV 定向单测、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
+## 2026-06-16 22:55 +0800
+- 进度：开始修复 TV 长视频 TextureView 输出导致 DV/HDR 异色回归。结论：长视频仍只有统一 ExoPlayer 内核，不恢复 LibVLC；但 DV 风险源不能使用 TextureView 输出层，必须回到 SurfaceView 以保留系统 HDR/DV 直出色彩，普通 SDR 长视频才使用 TextureView 缓解退出闪黑。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、播放路由/测试、TV 版本文件、`CONTEXT.md`、`plan.md`
+- 验证：待补定向测试并执行 TV 定向单测、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 22:50 +0800
 - 进度：完成 TV 长视频退出播放闪黑修复。长视频 ExoPlayer 不再使用 `PlayerView` 默认 `SurfaceView`，改为专用 `tv_long_form_media3_player_view.xml` 固定 `surface_type="texture_view"`、透明 shutter 并保持 reset 内容；这是输出层合成策略调整，不新增 LibVLC/ExoPlayer 选择，也不恢复长视频 LibVLC 分支。TV 版本递增到 `0.1.108` / `versionCode=108`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`android-tv-app/tv-app/src/main/res/layout/tv_long_form_media3_player_view.xml`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/player/TvLongFormExoPlayerSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

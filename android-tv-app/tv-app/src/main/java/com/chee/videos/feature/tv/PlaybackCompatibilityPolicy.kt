@@ -13,12 +13,18 @@ internal data class TvPlaybackCandidateDecision(
 internal data class TvPlaybackRoute(
     val kind: TvPlaybackRouteKind,
     val playbackProfile: String? = null,
+    val outputSurface: TvPlaybackOutputSurface = TvPlaybackOutputSurface.TEXTURE_VIEW,
     val blockMessage: String? = null,
 )
 
 internal enum class TvPlaybackRouteKind {
     EXOPLAYER,
     BLOCKED,
+}
+
+internal enum class TvPlaybackOutputSurface {
+    TEXTURE_VIEW,
+    SURFACE_VIEW,
 }
 
 private const val PlaybackCompatibilityKey = "playback_compat"
@@ -119,6 +125,7 @@ private fun resolvePlaybackRoute(
                     playbackUrl = playbackUrl,
                     media3Available = media3Available,
                     playbackProfile = "dv_source",
+                    outputSurface = TvPlaybackOutputSurface.SURFACE_VIEW,
                 )
             } else {
                 blockPlaybackRoute(DolbyVisionTranscodeOutputMessage)
@@ -137,6 +144,7 @@ private fun resolvePlaybackRoute(
         playbackUrl = playbackUrl,
         media3Available = media3Available,
         playbackProfile = null,
+        outputSurface = TvPlaybackOutputSurface.SURFACE_VIEW,
     )
 }
 
@@ -145,6 +153,7 @@ private fun resolveDolbyVisionGatedExoPlayerRoute(
     playbackUrl: String?,
     media3Available: Boolean,
     playbackProfile: String?,
+    outputSurface: TvPlaybackOutputSurface,
 ): TvPlaybackRoute {
     when (displayCapability.status) {
         DolbyVisionDisplayCapabilityStatus.SUPPORTED -> Unit
@@ -160,6 +169,7 @@ private fun resolveDolbyVisionGatedExoPlayerRoute(
         playbackUrl = playbackUrl,
         media3Available = media3Available,
         playbackProfile = playbackProfile,
+        outputSurface = outputSurface,
     )
 }
 
@@ -167,6 +177,7 @@ private fun resolveUnifiedExoPlayerRoute(
     playbackUrl: String?,
     media3Available: Boolean,
     playbackProfile: String?,
+    outputSurface: TvPlaybackOutputSurface = TvPlaybackOutputSurface.TEXTURE_VIEW,
 ): TvPlaybackRoute {
     if (!media3Available || playbackUrl.isNullOrBlank()) {
         return blockPlaybackRoute(LongFormExoPlayerRouteUnavailableMessage)
@@ -174,6 +185,7 @@ private fun resolveUnifiedExoPlayerRoute(
     return TvPlaybackRoute(
         kind = TvPlaybackRouteKind.EXOPLAYER,
         playbackProfile = playbackProfile,
+        outputSurface = outputSurface,
     )
 }
 
