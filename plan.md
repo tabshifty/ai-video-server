@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 14:52 +0800
+- 进度：完成系统日志空态修复收尾。确认本次只纳入系统日志接口、回归测试、长期语义沉淀和计划记录；无关工作区变更不存在。
+- 影响文件：`internal/handlers/admin.go`、`internal/handlers/admin_system_logs_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers -run TestAdminSystemLogs -count=1` 通过；`go test ./internal/handlers -count=1` 通过；`git diff --check -- internal/handlers/admin.go internal/handlers/admin_system_logs_test.go CONTEXT.md plan.md` 通过；乱码扫描无命中。
+
+## 2026-06-16 14:49 +0800
+- 进度：完成系统日志空态修复。`/admin/system/logs` 在 `server.log` 尚未生成时返回空日志列表；下载模式返回 200 空文本文件；路径存在但无法读取时仍保留原错误分支。补充 handler 回归测试覆盖刷新和下载两种空态，并把长期约定写入 `CONTEXT.md`。
+- 影响文件：`internal/handlers/admin.go`、`internal/handlers/admin_system_logs_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers -run TestAdminSystemLogs -count=1` 通过；待执行 `git diff --check` 与乱码扫描后提交。
+
+## 2026-06-16 14:44 +0800
+- 进度：开始修复系统日志刷新在 `./.run/server.log` 尚未生成时报错的问题。范围收口为后端 `/admin/system/logs` 接口：日志文件缺失应返回空日志空态，不应让管理端刷新失败；其它日志读取错误仍按错误返回。
+- 影响文件：`internal/handlers/admin.go`、预计新增后端日志接口测试、`CONTEXT.md`、`plan.md`
+- 验证：待补红灯测试后执行 `go test ./internal/handlers -run TestAdminSystemLogs -count=1`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 14:29 +0800
 - 进度：完成孤儿文件扫描迁到工具箱。新增 `/toolbox/orphan-files` 无 shell 工具页并复用既有 `/admin/system/orphan-files/*` API；工具箱新增“孤儿文件扫描”新标签页入口；系统设置页移除扫描状态加载、轮询和自动删除确认，仅保留临时文件清理与系统日志；命令面板搜索孤儿文件相关关键词仍只定位 `/toolbox`。
 - 影响文件：`admin-web/src/views/ToolboxOrphanFiles.vue`、`admin-web/src/views/toolboxOrphanFiles.helpers.js`、`admin-web/src/views/toolboxOrphanFiles.helpers.spec.js`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`plan.md`

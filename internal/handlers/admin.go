@@ -1060,6 +1060,16 @@ func (a *API) AdminSystemCleanup(c *gin.Context) {
 func (a *API) AdminSystemLogs(c *gin.Context) {
 	file, err := os.Open(a.serverLogPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			if c.Query("download") == "1" {
+				c.Header("Content-Disposition", "attachment; filename=server.log")
+				c.Header("Content-Type", "text/plain; charset=utf-8")
+				c.Status(http.StatusOK)
+				return
+			}
+			ok(c, gin.H{"lines": []string{}, "line_count": 0})
+			return
+		}
 		response.Error(c, 1020, err.Error())
 		return
 	}
