@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 15:52 +0800
+- 进度：完成部署机系统日志路径落地。已推送 `2c69da3` 到 `deploy master`；远端 hook 按分桶跳过 Go/frontend 构建。随后在部署机 `~/deploy/ai-video-server/.env` 写入 `SERVER_LOG_PATH=/Users/chee/Library/Logs/ai-video-server/server.log`，重启 `com.aivideo.server`，确认 `/healthz` 正常，系统日志接口返回真实日志行。
+- 影响文件：`plan.md`；部署机运行态配置 `~/deploy/ai-video-server/.env`
+- 验证：`git push deploy master` 通过；远端 `launchctl kickstart -k gui/$(id -u)/com.aivideo.server` 后 `curl http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`；使用 60 秒临时 admin token 请求 `/api/v1/admin/system/logs?lines=5` 返回 `code=0`、`line_count=5`。
+
 ## 2026-06-16 15:39 +0800
 - 进度：开始补齐部署机系统日志路径契约。已定位根因：服务端默认 `SERVER_LOG_PATH=./.run/server.log` 只适合 dev 模式，而家用部署机 launchd 实际写入 `~/Library/Logs/ai-video-server/server.log`；部署 `.env` 若不显式设置 `SERVER_LOG_PATH`，管理端系统日志接口会读错路径并返回空态。
 - 影响文件：`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
