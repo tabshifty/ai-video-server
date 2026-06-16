@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -245,6 +247,10 @@ private fun TvAuthenticatedNav(
                                 defaultValue = "movie"
                             },
                         ),
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None },
                     ) {
                         TvLongFormPlayerScreen(
                             onBack = { navController.popBackStack() },
@@ -275,6 +281,10 @@ private fun TvAuthenticatedNav(
                             navArgument(TvSeasonArg) { type = NavType.IntType; defaultValue = 1 },
                             navArgument(TvEpisodeArg) { type = NavType.IntType; defaultValue = 1 },
                         ),
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None },
                     ) {
                         TvSeriesPlayerScreen(
                             accessToken = accessToken,

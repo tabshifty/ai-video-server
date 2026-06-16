@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 23:23 +0800
+- 进度：完成 TV 长视频 DV 退出后延迟闪黑修复。`TvShellApp` 对单片长视频播放器路由和电视剧分集播放器路由禁用 NavHost 目的页 enter/exit/pop 过渡，避免播放器 SurfaceView/ExoPlayer 在详情页背后延迟释放；保留 DV/HDR 使用 SurfaceView，普通 SDR 使用 TextureView 的输出层策略。TV 版本递增到 `0.1.110` / `versionCode=110`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvLongFormPlayerNavigationSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.tv.TvLongFormPlayerNavigationSpecTest --tests com.chee.videos.core.player.TvLongFormExoPlayerSpecTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' android-tv-app CONTEXT.md plan.md` 无命中。
+
+## 2026-06-16 23:17 +0800
+- 进度：开始修复 TV 长视频 DV 播放退出到详情页后延迟 1-2 秒闪黑的问题。根据现象判断，黑闪发生在详情页已经显示之后，更像长视频播放器目的页被 NavHost 过渡保留、随后 SurfaceView/ExoPlayer 释放触发的延迟显示链路切换；本次不再尝试透明黑幕或背景遮罩，也不把 DV 改回会异色的 TextureView，而是收口长视频播放器路由的导航退出时序。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`、TV 播放相关单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待补源码级回归测试并执行 TV 定向单测、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 23:03 +0800
 - 进度：完成 TV 长视频 DV 异色与退出闪黑联合修复。`TvPlaybackRoute` 增加输出层语义：普通长视频使用 TextureView，DV source/output 使用 SurfaceView 保持系统 HDR/DV 直出；`TvLongFormMedia3Player` 在 SurfaceView 模式内部铺当前详情/剧集海报背板，避免 SurfaceView 销毁瞬间露黑。没有恢复长视频 LibVLC，也没有新增播放器内核选择。TV 版本递增到 `0.1.109` / `versionCode=109`。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/PlaybackCompatibilityPolicy.kt`、`TvLongFormMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、相关 layout/测试、`CONTEXT.md`、`plan.md`
