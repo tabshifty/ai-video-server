@@ -41,6 +41,19 @@ class TvMedia3TrackSupportTest {
     }
 
     @Test
+    fun media3TrackLoadDoesNotOverwriteStoredAudioPreferenceWithRuntimeDefault() {
+        val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt").toFile().readText()
+
+        assertTrue(player.contains("onAudioTracksChanged: (List<LongFormAudioTrack>) -> Unit"))
+        assertFalse(
+            "轨道加载时不能把 Media3 默认选中音轨回写为父层选择，否则会覆盖按语言/类型恢复出的用户偏好",
+            player.contains("onSelectedAudioTrackChanged") ||
+                player.contains("latestOnSelectedAudioTrackChanged") ||
+                player.contains("firstOrNull { it.selected }"),
+        )
+    }
+
+    @Test
     fun textAndAudioTrackTypesStayDistinct() {
         assertEquals(1, C.TRACK_TYPE_AUDIO)
         assertEquals(3, C.TRACK_TYPE_TEXT)

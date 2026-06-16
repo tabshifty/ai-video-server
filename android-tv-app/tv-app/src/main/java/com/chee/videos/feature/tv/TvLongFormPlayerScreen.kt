@@ -656,11 +656,6 @@ fun TvLongFormPlayerScreen(
                         selectedAudioTrackId = resolvedSelection ?: ""
                     }
                 },
-                onSelectedAudioTrackChanged = { runtimeTrackId ->
-                    if (runtimeTrackId != null && runtimeTrackId != selectedAudioTrackId) {
-                        selectedAudioTrackId = runtimeTrackId
-                    }
-                },
             )
             TvSeriesCorePlaybackOverlay(
                 title = detail.title,

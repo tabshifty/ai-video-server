@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 09:34 +0800
+- 进度：完成 DV Media3 音轨偏好覆盖问题修复。已补红灯测试锁定 `onTracksChanged` 不得把 Media3 默认选中音轨回写成父层选择；实现上删除 `onSelectedAudioTrackChanged` runtime 回调，轨道加载只上报可选音轨列表，父层继续按 current selection / stored preference 决定目标并通过 Media3 override 应用。TV 版本升至 `0.1.103 / 103`，`CONTEXT.md` 补充“Media3 默认音轨不等于用户选择”约定。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvMedia3TrackSupportTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvMedia3TrackSupportTest` 先红后绿；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-16 09:30 +0800
+- 进度：开始修复 DV Media3 音轨偏好恢复被默认轨覆盖的问题。Review 发现 `onTracksChanged` 中先按保存偏好解析目标音轨，随后又把 Media3 当前默认选中的 runtime track id 回写给父层，可能把用户保存的中文/解说等偏好覆盖成底层默认轨。本次收口为：Media3 轨道加载时只上报可选音轨列表，由父层按 current selection / stored preference 决定目标；不再把底层默认选中轨道当作用户选择回灌。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待补回归测试后执行 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、必要的 `:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 09:17 +0800
 - 进度：完成 TV 端 DV 专用链路第二阶段实现。Media3 播放器现在预加载服务端外挂字幕并用 `TrackSelectionParameters` 切换字幕/音轨，不重建播放源；单片和剧集 DV 分支都接入字幕/音轨 picker、语义偏好恢复和播放控制层入口。主动返回详情时先显示 App 层黑色遮罩并短延迟导航，遮住 Media3 surface 销毁和详情页重绘之间的可控闪动；TV 版本升至 `0.1.102 / 102`。本次只纳入 TV DV 第二阶段源码、测试、版本号、`CONTEXT.md` 和 `plan.md`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`TvMedia3TrackSupport.kt`、`TvMedia3TrackPickerLayer.kt`、`TvDolbyVisionExitToDetailCover.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

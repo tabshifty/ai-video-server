@@ -70,7 +70,6 @@ internal fun TvDolbyVisionMedia3Player(
     onEnded: () -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
     onAudioTracksChanged: (List<LongFormAudioTrack>) -> Unit = {},
-    onSelectedAudioTrackChanged: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -79,7 +78,6 @@ internal fun TvDolbyVisionMedia3Player(
     val latestOnEnded by rememberUpdatedState(onEnded)
     val latestOnSnapshotChanged by rememberUpdatedState(onSnapshotChanged)
     val latestOnAudioTracksChanged by rememberUpdatedState(onAudioTracksChanged)
-    val latestOnSelectedAudioTrackChanged by rememberUpdatedState(onSelectedAudioTrackChanged)
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
             if (accessToken.isNotBlank()) {
@@ -111,9 +109,7 @@ internal fun TvDolbyVisionMedia3Player(
 
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 trackSelectionRevision += 1
-                val audioTracks = buildTvMedia3AudioTracks(tracks)
-                latestOnAudioTracksChanged(audioTracks)
-                latestOnSelectedAudioTrackChanged(audioTracks.firstOrNull { it.selected }?.id)
+                latestOnAudioTracksChanged(buildTvMedia3AudioTracks(tracks))
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -125,7 +121,6 @@ internal fun TvDolbyVisionMedia3Player(
         onDispose {
             player.removeListener(listener)
             latestOnAudioTracksChanged(emptyList())
-            latestOnSelectedAudioTrackChanged(null)
             latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
             latestOnPlayingChanged(false)
             player.release()
@@ -146,7 +141,6 @@ internal fun TvDolbyVisionMedia3Player(
             isMedia3Playing = false
             trackSelectionRevision += 1
             latestOnAudioTracksChanged(emptyList())
-            latestOnSelectedAudioTrackChanged(null)
             return@LaunchedEffect
         }
         if (preparedSourceKey != sourceKey) {
@@ -167,7 +161,6 @@ internal fun TvDolbyVisionMedia3Player(
             isMedia3Playing = false
             trackSelectionRevision += 1
             latestOnAudioTracksChanged(emptyList())
-            latestOnSelectedAudioTrackChanged(null)
             preparedSourceKey = sourceKey
             resumeAppliedSourceKey = ""
         }

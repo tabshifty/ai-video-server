@@ -882,11 +882,6 @@ fun TvSeriesPlayerScreen(
                             selectedAudioTrackId = resolvedSelection ?: ""
                         }
                     },
-                    onSelectedAudioTrackChanged = { runtimeTrackId ->
-                        if (runtimeTrackId != null && runtimeTrackId != selectedAudioTrackId) {
-                            selectedAudioTrackId = runtimeTrackId
-                        }
-                    },
                 )
                 TvSeriesCorePlaybackOverlay(
                     title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
