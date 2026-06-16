@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 19:39 +0800
+- 进度：完成 TV 电视剧详情页演员头像负 hash 越界修复与收尾。`tvCastAvatarBrush` 现在通过 `tvCastAvatarPaletteIndex()` 使用 `Math.floorMod` 计算调色板索引，新增 `TvSeriesCastAvatarPaletteTest` 覆盖负 hash、`Int.MIN_VALUE` 与空调色板边界；TV 版本已递增到 `0.1.105` / `versionCode=105`，`CONTEXT.md` 已沉淀头像调色板索引契约。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesCastAvatarPaletteTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesCastAvatarPaletteTest --tests com.chee.videos.feature.tv.TvSeriesDetailActionSpecTest` 通过；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-16 19:26 +0800
+- 进度：完成 TV 电视剧详情页演员头像负 hash 越界核心修复。`tvCastAvatarBrush` 改为通过 `tvCastAvatarPaletteIndex()` 使用 `Math.floorMod` 解析调色板索引，新增 `TvSeriesCastAvatarPaletteTest` 覆盖 `-4`、`Int.MIN_VALUE` 和边界种子；TV 版本递增到 `0.1.105` / `versionCode=105`，`CONTEXT.md` 沉淀头像调色板索引不得直接 `%` 取模。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesCastAvatarPaletteTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesCastAvatarPaletteTest`、`git diff --check` 与乱码扫描。
+
+## 2026-06-16 19:26 +0800
+- 进度：开始修复 TV 电视剧详情页演员头像兜底渐变在负 hash 下闪退的问题。崩溃点为 `TvSeriesDetailScreen.kt` 中 `tvCastAvatarBrush(actor.id.hashCode())` 直接用 `%` 对调色板取模，Java/Kotlin 对负数取模会得到负余数，导致 `colors[-4]` 越界。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、新增 TV 端定向测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待补负 hash 回归测试后执行 TV 端定向单测、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 17:33 +0800
 - 进度：完成推送到家用部署机。本地 `master` 已从部署机远端 `2c69da3` 推进到 `d4fe1f7`；远端 hook 判定 `RESTART_GO=0 REBUILD_FRONTEND=1`，执行 `npm ci && npm run build` 后更新 `current/admin-web-dist`，未重启 Go server / worker。GitHub mirror push 在远端 hook 内失败但标记为 non-fatal，不影响部署机更新。
 - 影响文件：`plan.md`

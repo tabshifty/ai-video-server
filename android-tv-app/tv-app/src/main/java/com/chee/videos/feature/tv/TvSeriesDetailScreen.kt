@@ -1014,15 +1014,21 @@ private fun tvBackdropBrush(seed: Int): Brush {
     }
 }
 
-private fun tvCastAvatarBrush(index: Int): Brush {
-    val colors = listOf(
-        Color(0xFF6D4B24) to Color(0xFF20150B),
-        Color(0xFF314958) to Color(0xFF0D151C),
-        Color(0xFF4A344D) to Color(0xFF17101B),
-        Color(0xFF4C4230) to Color(0xFF15120D),
-        Color(0xFF2E4A3B) to Color(0xFF0D1711),
-    )
-    val pair = colors[index % colors.size]
+private val tvCastAvatarPalette = listOf(
+    Color(0xFF6D4B24) to Color(0xFF20150B),
+    Color(0xFF314958) to Color(0xFF0D151C),
+    Color(0xFF4A344D) to Color(0xFF17101B),
+    Color(0xFF4C4230) to Color(0xFF15120D),
+    Color(0xFF2E4A3B) to Color(0xFF0D1711),
+)
+
+internal fun tvCastAvatarPaletteIndex(seed: Int, paletteSize: Int = tvCastAvatarPalette.size): Int {
+    require(paletteSize > 0) { "paletteSize must be positive" }
+    return Math.floorMod(seed, paletteSize)
+}
+
+private fun tvCastAvatarBrush(seed: Int): Brush {
+    val pair = tvCastAvatarPalette[tvCastAvatarPaletteIndex(seed)]
     return Brush.verticalGradient(listOf(pair.first, pair.second))
 }
 
