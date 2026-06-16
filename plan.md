@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 15:39 +0800
+- 进度：开始补齐部署机系统日志路径契约。已定位根因：服务端默认 `SERVER_LOG_PATH=./.run/server.log` 只适合 dev 模式，而家用部署机 launchd 实际写入 `~/Library/Logs/ai-video-server/server.log`；部署 `.env` 若不显式设置 `SERVER_LOG_PATH`，管理端系统日志接口会读错路径并返回空态。
+- 影响文件：`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行文档/配置 diff 检查、乱码扫描；部署后需确认部署机 `.env` 生效并重启 server。
+
 ## 2026-06-16 14:52 +0800
 - 进度：完成系统日志空态修复收尾。确认本次只纳入系统日志接口、回归测试、长期语义沉淀和计划记录；无关工作区变更不存在。
 - 影响文件：`internal/handlers/admin.go`、`internal/handlers/admin_system_logs_test.go`、`CONTEXT.md`、`plan.md`
