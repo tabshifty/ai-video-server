@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 11:11 +0800
+- 进度：完成电视剧刮削幂等与 TMDB 演员复用优化。已实现同一电视剧整剧 poster/backdrop 和分集 still 的本地存在跳过下载，新增 TMDB 演员按 `source + external_id` 复用已完整资料的查询；回归测试覆盖连续刮削同一剧不同分集和已有完整 TMDB 演员再次绑定视频两条路径。
+- 影响文件：`internal/services/scraper.go`、`internal/repository/actor_repository.go`、`internal/services/scraper_episode_sync_test.go`、`internal/services/scraper_test.go`、`internal/queue/scrape_tasks_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestScrapeEpisodeUploadSkipsExistingSeriesArtworkOnNextEpisode|TestSyncMovieActorsDoesNotOverrideExistingAvatarOrNotes' -count=1` 通过；`go test ./internal/services -run 'TestScrapeEpisodeUpload|TestSyncMovieActors' -count=1` 通过；`go test ./internal/repository -run TestBuildUpsertScrapedActorProfileSQL -count=1` 通过；`go test ./internal/repository -count=1` 通过；`go test ./internal/queue -run 'TestAutoScrapeAVMarksReadyOnSuccess|TestAutoScrapeAVStoresLocalizedFieldsAndMarksReady' -count=1` 通过；`git diff --check` 通过；乱码扫描无命中。`go test ./internal/services -count=1` 仍存在既有失败 `TestParseTVAPKMetadataParsesReleaseAPK`（`version_code` 期望 80、实际 99），与本次刮削优化无关。
+
+## 2026-06-16 11:04 +0800
+- 进度：完成刮削策略代码定位，准备补充重复图片下载与重复 TMDB 演员详情请求的回归测试；方案为电视剧集图片按本地文件幂等跳过，TMDB 演员按 `source + external_id` 查到完整资料后直接复用。
+- 影响文件：`internal/services/scraper.go`、`internal/services/scraper_episode_sync_test.go`、`internal/services/scraper_test.go`、`internal/repository/actor_repository.go`、`internal/queue/scrape_tasks_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行定向 Go 测试、`go test ./internal/services -count=1`、`git diff --check` 与乱码检查。
+
+## 2026-06-16 11:00 +0800
+- 进度：开始优化电视剧剧集刮削的重复下载/重复演员刮削问题。范围收口为：同一 TMDB 剧重复刮削不同分集时，已落盘的整剧 poster/backdrop 和分集 still 不再重复下载；TMDB 演员同步优先复用已有完整演员资料，避免已有头像/资料的演员每集重复请求详情或重复下载头像；保持 series/season/episode/actor 现有 upsert 语义不引入 migration。
+- 影响文件：`internal/services/scraper.go`、`internal/services/scraper_episode_sync_test.go`、`internal/services/scraper_test.go`、`internal/repository/actor_repository.go`、`CONTEXT.md`、`plan.md`
+- 验证：待补红灯测试后执行 `go test ./internal/services -run 'TestScrapeEpisodeUpload|TestSyncTMDBCastActors' -count=1`、`go test ./internal/repository -run TestBuildUpsertScrapedActorProfileSQL -count=1`、`go test ./internal/services -count=1`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 10:07 +0800
 - 进度：完成管理端短视频审核页分页与播放器尺寸调整。左侧待审队列改为当前页分页列表，复用 `AdminTablePagination` 支持页码输入跳转，并显示“第 X / Y 页 · 共 N 条”；`保留并下一条` / `删除并下一条` 在页末自动进入下一页第一条，删除后刷新当前页避免 offset 分页补位视频被跳过。右侧播放器增加 9:16 手机竖屏预览框，限制在页面可用高度内，视频本身保持 contain 不裁切。`CONTEXT.md` 已更新长期术语和分页/播放器约定。
 - 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.js`、`admin-web/src/views/shortReview.helpers.spec.js`、`CONTEXT.md`、`plan.md`

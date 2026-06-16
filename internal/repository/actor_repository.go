@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -245,6 +246,30 @@ LIMIT 1
 		return models.AdminActor{}, fmt.Errorf("get actor by id: %w", err)
 	}
 	return out, nil
+}
+
+func (r *VideoRepository) FindActorBySourceExternalID(ctx context.Context, source, externalID string) (models.AdminActor, bool, error) {
+	source = strings.ToLower(strings.TrimSpace(source))
+	externalID = strings.TrimSpace(externalID)
+	if source == "" || externalID == "" {
+		return models.AdminActor{}, false, nil
+	}
+	row := r.pool.QueryRow(ctx, `
+SELECT
+  id, name, aliases, COALESCE(gender,''), COALESCE(country,''), COALESCE(to_char(birth_date, 'YYYY-MM-DD'), ''),
+  COALESCE(avatar_url,''), COALESCE(source,''), COALESCE(external_id,''), COALESCE(notes,''), active, created_at, updated_at
+FROM actors
+WHERE source=$1 AND external_id=$2
+LIMIT 1
+`, source, externalID)
+	out, err := scanAdminActor(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.AdminActor{}, false, nil
+		}
+		return models.AdminActor{}, false, fmt.Errorf("find actor by source external id: %w", err)
+	}
+	return out, true, nil
 }
 
 func (r *VideoRepository) GetAppActorDetail(ctx context.Context, actorID uuid.UUID) (models.ActorDetail, error) {

@@ -174,6 +174,14 @@ func (f *fakeScraperRepo) UpdateActorAvatar(_ context.Context, actorID uuid.UUID
 	return nil
 }
 
+func (f *fakeScraperRepo) FindActorBySourceExternalID(_ context.Context, source, externalID string) (models.AdminActor, bool, error) {
+	if f.actorProfiles == nil {
+		return models.AdminActor{}, false, nil
+	}
+	actor, ok := f.actorProfiles[strings.ToLower(strings.TrimSpace(source))+"|"+strings.TrimSpace(externalID)]
+	return actor, ok, nil
+}
+
 func (f *fakeScraperRepo) UpsertScrapedActorProfile(_ context.Context, input models.AdminActorInput) (models.AdminActor, error) {
 	actorID := uuid.Nil
 	if f.actorProfiles != nil {
@@ -1905,13 +1913,14 @@ func TestSyncMovieActorsUpsertsFullTMDBProfilesAndLocalAvatarsWithoutLimit(t *te
 func TestSyncMovieActorsDoesNotOverrideExistingAvatarOrNotes(t *testing.T) {
 	videoID := uuid.New()
 	actorID := uuid.New()
+	personCalls := 0
 	repo := &fakeScraperRepo{
 		actorProfiles: map[string]models.AdminActor{
 			"scrape_tmdb|901": {
 				ID:         actorID,
 				Name:       "演员甲",
 				AvatarURL:  "https://manual.example/avatar.jpg",
-				Source:     "manual",
+				Source:     "scrape_tmdb",
 				ExternalID: "901",
 				Notes:      "人工备注",
 			},
@@ -1926,6 +1935,7 @@ func TestSyncMovieActorsDoesNotOverrideExistingAvatarOrNotes(t *testing.T) {
 				"cast": []map[string]any{{"id": 901, "name": "演员甲", "profile_path": "/tmdb.jpg"}},
 			})
 		case "/person/901":
+			personCalls++
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id":           901,
 				"name":         "演员甲",
@@ -1943,15 +1953,11 @@ func TestSyncMovieActorsDoesNotOverrideExistingAvatarOrNotes(t *testing.T) {
 
 	svc.syncMovieActors(context.Background(), videoID, 99)
 
-	if len(repo.actorProfileUpserts) != 1 {
-		t.Fatalf("expected one actor profile upsert, got=%d", len(repo.actorProfileUpserts))
+	if personCalls != 0 {
+		t.Fatalf("expected existing complete tmdb actor to skip person detail request, got=%d", personCalls)
 	}
-	upsert := repo.actorProfileUpserts[0]
-	if upsert.input.AvatarURL != "https://manual.example/avatar.jpg" {
-		t.Fatalf("expected existing avatar to be preserved, got=%s", upsert.input.AvatarURL)
-	}
-	if upsert.input.Notes != "人工备注" {
-		t.Fatalf("expected existing notes to be preserved, got=%s", upsert.input.Notes)
+	if len(repo.actorProfileUpserts) != 0 {
+		t.Fatalf("expected existing complete actor to skip profile upsert, got=%d", len(repo.actorProfileUpserts))
 	}
 	if len(repo.actorAvatarUpdates) != 0 {
 		t.Fatalf("expected no avatar download/update, got=%d", len(repo.actorAvatarUpdates))

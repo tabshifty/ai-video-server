@@ -138,6 +138,10 @@ func (r *queueRetagAVTestRepo) UpdateActorAvatar(context.Context, uuid.UUID, str
 	return nil
 }
 
+func (r *queueRetagAVTestRepo) FindActorBySourceExternalID(context.Context, string, string) (models.AdminActor, bool, error) {
+	return models.AdminActor{}, false, nil
+}
+
 func (r *queueRetagAVTestRepo) UpsertScrapedActorProfile(_ context.Context, input models.AdminActorInput) (models.AdminActor, error) {
 	return models.AdminActor{
 		ID:         uuid.New(),

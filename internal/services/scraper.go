@@ -35,6 +35,7 @@ type scraperRepo interface {
 	AddVideoActors(ctx context.Context, videoID uuid.UUID, actorIDs []uuid.UUID, source string) error
 	ListVideoActors(ctx context.Context, videoID uuid.UUID) ([]models.AdminVideoActor, error)
 	UpdateActorAvatar(ctx context.Context, actorID uuid.UUID, avatarURL, source, externalID string) error
+	FindActorBySourceExternalID(ctx context.Context, source, externalID string) (models.AdminActor, bool, error)
 	UpsertScrapedActorProfile(ctx context.Context, input models.AdminActorInput) (models.AdminActor, error)
 }
 
@@ -1700,6 +1701,14 @@ func (s *ScraperService) syncTMDBCastActors(ctx context.Context, videoID uuid.UU
 }
 
 func (s *ScraperService) upsertTMDBActorProfile(ctx context.Context, member tmdbCastMember) (models.AdminActor, error) {
+	if member.TMDBID > 0 {
+		externalID := strconv.Itoa(member.TMDBID)
+		actor, exists, err := s.repo.FindActorBySourceExternalID(ctx, "scrape_tmdb", externalID)
+		if err == nil && exists && isCompleteTMDBActorProfile(actor) {
+			return actor, nil
+		}
+	}
+
 	detail := map[string]any{}
 	if member.TMDBID > 0 {
 		var err error
@@ -1737,6 +1746,12 @@ func (s *ScraperService) upsertTMDBActorProfile(ctx context.Context, member tmdb
 		return models.AdminActor{}, err
 	}
 	return actor, nil
+}
+
+func isCompleteTMDBActorProfile(actor models.AdminActor) bool {
+	return actor.ID != uuid.Nil &&
+		strings.TrimSpace(actor.AvatarURL) != "" &&
+		strings.TrimSpace(actor.Notes) != ""
 }
 
 func tmdbActorInputFromDetail(member tmdbCastMember, detail map[string]any) models.AdminActorInput {
@@ -2355,6 +2370,21 @@ func (s *ScraperService) downloadTVSeriesArtwork(ctx context.Context, relativePa
 	if relativePath == "" || seriesID <= 0 {
 		return nil
 	}
+
+	outputDir := filepath.Join(s.storageRoot, "tv", "series", strconv.FormatInt(seriesID, 10))
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("create tv artwork dir: %w", err)
+	}
+	outputPath := filepath.Join(outputDir, filepath.FromSlash(kind+".jpg"))
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return fmt.Errorf("create tv artwork nested dir: %w", err)
+	}
+	if info, err := os.Stat(outputPath); err == nil && info.Size() > 0 {
+		return nil
+	} else if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("stat tv artwork file: %w", err)
+	}
+
 	imageURL := relativePath
 	if !strings.HasPrefix(relativePath, "http://") && !strings.HasPrefix(relativePath, "https://") {
 		imageURL = "https://image.tmdb.org/t/p/original" + relativePath
@@ -2374,14 +2404,6 @@ func (s *ScraperService) downloadTVSeriesArtwork(ctx context.Context, relativePa
 		return fmt.Errorf("tv artwork status=%d body=%s", resp.StatusCode, string(body))
 	}
 
-	outputDir := filepath.Join(s.storageRoot, "tv", "series", strconv.FormatInt(seriesID, 10))
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		return fmt.Errorf("create tv artwork dir: %w", err)
-	}
-	outputPath := filepath.Join(outputDir, filepath.FromSlash(kind+".jpg"))
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return fmt.Errorf("create tv artwork nested dir: %w", err)
-	}
 	f, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("create tv artwork file: %w", err)
