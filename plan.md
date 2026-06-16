@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 17:33 +0800
+- 进度：完成推送到家用部署机。本地 `master` 已从部署机远端 `2c69da3` 推进到 `d4fe1f7`；远端 hook 判定 `RESTART_GO=0 REBUILD_FRONTEND=1`，执行 `npm ci && npm run build` 后更新 `current/admin-web-dist`，未重启 Go server / worker。GitHub mirror push 在远端 hook 内失败但标记为 non-fatal，不影响部署机更新。
+- 影响文件：`plan.md`
+- 验证：`git push deploy master` 通过；远端 hook 输出 `frontend updated` 与 `deploy ... done`；`git ls-remote deploy refs/heads/master` 返回 `d4fe1f7713f5d6ac1b5db9029ce4903bac6051ab`。
+
 ## 2026-06-16 17:32 +0800
 - 进度：开始推送管理端时间显示格式化到家用部署机。当前部署机 `deploy/master` 为 `2c69da3`，本地 `master` 最新为 `767c13b`；本次变更命中 `admin-web/**`，按 [[家用部署机 push 分桶]] 预期只触发管理端前端构建与 dist 替换，不重启 Go server / worker。
 - 影响文件：`plan.md`
