@@ -21,10 +21,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
+import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import kotlinx.coroutines.delay
 
@@ -59,11 +61,16 @@ internal fun TvDolbyVisionMedia3Player(
     initialPositionMs: Long,
     seekPositionMs: Long? = null,
     seekRequestKey: Int = 0,
+    subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
+    selectedSubtitleTrackId: String? = null,
+    selectedAudioTrackId: String? = null,
     modifier: Modifier = Modifier,
     onPlayingChanged: (Boolean) -> Unit = {},
     onError: (String) -> Unit = {},
     onEnded: () -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
+    onAudioTracksChanged: (List<LongFormAudioTrack>) -> Unit = {},
+    onSelectedAudioTrackChanged: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -71,6 +78,8 @@ internal fun TvDolbyVisionMedia3Player(
     val latestOnError by rememberUpdatedState(onError)
     val latestOnEnded by rememberUpdatedState(onEnded)
     val latestOnSnapshotChanged by rememberUpdatedState(onSnapshotChanged)
+    val latestOnAudioTracksChanged by rememberUpdatedState(onAudioTracksChanged)
+    val latestOnSelectedAudioTrackChanged by rememberUpdatedState(onSelectedAudioTrackChanged)
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
             if (accessToken.isNotBlank()) {
@@ -83,6 +92,7 @@ internal fun TvDolbyVisionMedia3Player(
     var resumeAppliedSourceKey by remember { mutableStateOf("") }
     var playbackState by remember { mutableStateOf(Player.STATE_IDLE) }
     var isMedia3Playing by remember { mutableStateOf(false) }
+    var trackSelectionRevision by remember { mutableStateOf(0) }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -99,6 +109,13 @@ internal fun TvDolbyVisionMedia3Player(
                 }
             }
 
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                trackSelectionRevision += 1
+                val audioTracks = buildTvMedia3AudioTracks(tracks)
+                latestOnAudioTracksChanged(audioTracks)
+                latestOnSelectedAudioTrackChanged(audioTracks.firstOrNull { it.selected }?.id)
+            }
+
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 latestOnPlayingChanged(false)
                 latestOnError(friendlyLongFormPlaybackErrorMessage(error))
@@ -107,14 +124,19 @@ internal fun TvDolbyVisionMedia3Player(
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
+            latestOnAudioTracksChanged(emptyList())
+            latestOnSelectedAudioTrackChanged(null)
             latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
             latestOnPlayingChanged(false)
             player.release()
         }
     }
 
-    LaunchedEffect(player, sourceUrl, mediaId, title, dataSourceFactory) {
-        val sourceKey = "$mediaId|$sourceUrl"
+    LaunchedEffect(player, sourceUrl, mediaId, title, dataSourceFactory, subtitleConfigurations) {
+        val subtitleKey = subtitleConfigurations.joinToString("|") {
+            listOf(it.id.orEmpty(), it.uri.toString(), it.mimeType.orEmpty(), it.language.orEmpty()).joinToString(",")
+        }
+        val sourceKey = "$mediaId|$sourceUrl|$subtitleKey"
         if (sourceUrl.isBlank() || mediaId.isBlank()) {
             player.pause()
             player.clearMediaItems()
@@ -122,12 +144,16 @@ internal fun TvDolbyVisionMedia3Player(
             resumeAppliedSourceKey = ""
             playbackState = Player.STATE_IDLE
             isMedia3Playing = false
+            trackSelectionRevision += 1
+            latestOnAudioTracksChanged(emptyList())
+            latestOnSelectedAudioTrackChanged(null)
             return@LaunchedEffect
         }
         if (preparedSourceKey != sourceKey) {
             val mediaItem = MediaItem.Builder()
                 .setUri(sourceUrl)
                 .setMediaId(mediaId)
+                .setSubtitleConfigurations(subtitleConfigurations)
                 .setMediaMetadata(
                     androidx.media3.common.MediaMetadata.Builder()
                         .setTitle(title)
@@ -139,6 +165,9 @@ internal fun TvDolbyVisionMedia3Player(
             player.prepare()
             playbackState = Player.STATE_IDLE
             isMedia3Playing = false
+            trackSelectionRevision += 1
+            latestOnAudioTracksChanged(emptyList())
+            latestOnSelectedAudioTrackChanged(null)
             preparedSourceKey = sourceKey
             resumeAppliedSourceKey = ""
         }
@@ -160,6 +189,34 @@ internal fun TvDolbyVisionMedia3Player(
         }
         player.seekTo(target.coerceAtLeast(0L))
         latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
+    }
+
+    LaunchedEffect(player, preparedSourceKey, trackSelectionRevision, selectedSubtitleTrackId) {
+        if (preparedSourceKey.isBlank()) {
+            return@LaunchedEffect
+        }
+        val nextParameters = resolveTvMedia3SubtitleSelectionParameters(
+            currentParameters = player.trackSelectionParameters,
+            tracks = player.currentTracks,
+            selectedSubtitleTrackId = selectedSubtitleTrackId,
+        )
+        if (nextParameters != player.trackSelectionParameters) {
+            player.trackSelectionParameters = nextParameters
+        }
+    }
+
+    LaunchedEffect(player, preparedSourceKey, trackSelectionRevision, selectedAudioTrackId) {
+        if (preparedSourceKey.isBlank()) {
+            return@LaunchedEffect
+        }
+        val nextParameters = resolveTvMedia3AudioSelectionParameters(
+            currentParameters = player.trackSelectionParameters,
+            tracks = player.currentTracks,
+            selectedAudioTrackId = selectedAudioTrackId,
+        )
+        if (nextParameters != player.trackSelectionParameters) {
+            player.trackSelectionParameters = nextParameters
+        }
     }
 
     LaunchedEffect(player, preparedSourceKey, shouldPlay) {
@@ -241,3 +298,77 @@ internal fun ExoPlayer.readTvMedia3PlaybackSnapshot(): TvMedia3PlaybackSnapshot 
         positionMs = currentPosition.coerceAtLeast(0L),
         durationMs = duration.takeIf { it > 0L } ?: 0L,
     )
+
+internal fun resolveTvMedia3SubtitleSelectionParameters(
+    currentParameters: TrackSelectionParameters,
+    tracks: androidx.media3.common.Tracks,
+    selectedSubtitleTrackId: String?,
+): TrackSelectionParameters {
+    val normalizedSelection = selectedSubtitleTrackId?.trim().orEmpty()
+    if (normalizedSelection.isBlank()) {
+        return buildTvMedia3SelectionParametersForDisabledText(currentParameters)
+    }
+    val groupAndTrack = findTvMedia3TrackById(
+        tracks = tracks,
+        type = androidx.media3.common.C.TRACK_TYPE_TEXT,
+        trackId = normalizedSelection,
+    ) ?: return currentParameters
+    return buildTvMedia3SelectionParametersForTrack(
+        currentParameters = currentParameters,
+        tracks = tracks,
+        type = androidx.media3.common.C.TRACK_TYPE_TEXT,
+        groupIndex = groupAndTrack.groupIndex,
+        trackIndex = groupAndTrack.trackIndex,
+    )
+}
+
+internal fun resolveTvMedia3AudioSelectionParameters(
+    currentParameters: TrackSelectionParameters,
+    tracks: androidx.media3.common.Tracks,
+    selectedAudioTrackId: String?,
+): TrackSelectionParameters {
+    val normalizedSelection = selectedAudioTrackId?.trim().orEmpty()
+    if (normalizedSelection.isBlank()) {
+        return buildTvMedia3SelectionParametersForAuto(currentParameters, androidx.media3.common.C.TRACK_TYPE_AUDIO)
+    }
+    val groupAndTrack = findTvMedia3TrackById(
+        tracks = tracks,
+        type = androidx.media3.common.C.TRACK_TYPE_AUDIO,
+        trackId = normalizedSelection,
+    ) ?: return currentParameters
+    return buildTvMedia3SelectionParametersForTrack(
+        currentParameters = currentParameters,
+        tracks = tracks,
+        type = androidx.media3.common.C.TRACK_TYPE_AUDIO,
+        groupIndex = groupAndTrack.groupIndex,
+        trackIndex = groupAndTrack.trackIndex,
+    )
+}
+
+private data class TvMedia3TrackPosition(
+    val groupIndex: Int,
+    val trackIndex: Int,
+)
+
+private fun findTvMedia3TrackById(
+    tracks: androidx.media3.common.Tracks,
+    type: Int,
+    trackId: String,
+): TvMedia3TrackPosition? {
+    tracks.groups
+        .filter { it.type == type }
+        .forEachIndexed { groupIndex, group ->
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                val generatedId = if (type == androidx.media3.common.C.TRACK_TYPE_AUDIO) {
+                    buildTvMedia3TrackId("audio", groupIndex, trackIndex, format)
+                } else {
+                    format.id.orEmpty()
+                }
+                if (generatedId == trackId || format.id == trackId) {
+                    return TvMedia3TrackPosition(groupIndex, trackIndex)
+                }
+            }
+        }
+    return null
+}

@@ -18,8 +18,9 @@ class TvSeriesMixedPlaybackControlsSpecTest {
             media3Branch.contains("TvSeriesCorePlaybackOverlay("),
         )
         assertTrue(
-            "DV Media3 分支本阶段必须隐藏字幕和音轨入口",
-            media3Branch.contains("showTrackActions = false"),
+            "DV Media3 第二阶段必须展示字幕和音轨入口",
+            media3Branch.contains("showTrackActions = true") &&
+                media3Branch.contains("TvMedia3TrackPickerLayer("),
         )
     }
 

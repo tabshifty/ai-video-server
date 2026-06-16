@@ -2,6 +2,46 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 09:17 +0800
+- 进度：完成 TV 端 DV 专用链路第二阶段实现。Media3 播放器现在预加载服务端外挂字幕并用 `TrackSelectionParameters` 切换字幕/音轨，不重建播放源；单片和剧集 DV 分支都接入字幕/音轨 picker、语义偏好恢复和播放控制层入口。主动返回详情时先显示 App 层黑色遮罩并短延迟导航，遮住 Media3 surface 销毁和详情页重绘之间的可控闪动；TV 版本升至 `0.1.102 / 102`。本次只纳入 TV DV 第二阶段源码、测试、版本号、`CONTEXT.md` 和 `plan.md`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`TvMedia3TrackSupport.kt`、`TvMedia3TrackPickerLayer.kt`、`TvDolbyVisionExitToDetailCover.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvMedia3TrackSupportTest --tests com.chee.videos.feature.tv.TvSeriesMixedPlaybackControlsSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；乱码扫描无命中。曾因并发 Gradle 构建触发 Kotlin 增量缓存 EOF，已 `clean` 后串行重跑通过。
+
+## 2026-06-16 09:01 +0800
+- 进度：继续收尾 TV 端 DV 专用链路第二阶段。当前编译断点是 `TvMedia3TrackPickerKind` / `TvMedia3TrackPickerLayer` 仍在剧集页面 private 作用域，单片 DV 页面无法复用；接下来抽成共享文件，并为单片与剧集 DV 返回详情入口加页面级黑场保持，避免退出瞬间露出上一帧或详情背景。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、预计新增 TV Media3 轨道弹层文件、相关 TV 单测、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:compileDebugKotlin`、TV 定向单测、全量 TV 单测、`assembleDebug`、`git diff --check` 与乱码扫描。
+
+## 2026-06-15 22:57 +0800
+- 进度：完成 DV 第二阶段偏好粒度收口。用户确认电视剧 DV 分集的字幕/音轨偏好继续沿用现有 `videoId` 粒度，不新增整部剧共享偏好；音轨偏好仍按语言/类型等语义匹配，避免依赖底层 track id。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 阶段只做文档沉淀，暂不运行构建或单测。
+
+## 2026-06-15 22:54 +0800
+- 进度：继续收口 DV 第二阶段的播放中切换连续性。用户确认外挂字幕切换也必须尽量无感，要求播放中不跳黑、不闪回、不重启播放会话，并尽量维持当前画面连续；这使得第二阶段验收从“字幕/音轨能力存在”提升到“字幕切换连续性也要对齐返回详情连续性”。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 阶段只做术语和验收边界沉淀，暂不运行构建或单测。
+
+## 2026-06-15 22:50 +0800
+- 进度：继续推进 TV 端 DV 第二阶段收口。已确认字幕选择沿用服务端外挂字幕列表、音轨来自 Media3 当前播放源枚举到的内嵌轨道，音轨偏好按语言/类型保存；同时单片和剧集两个 DV 分支都存在返回详情连续性问题，不能只按剧集场景修。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 阶段只做代码/文档核对，暂不运行构建或单测。
+
+## 2026-06-15 22:34 +0800
+- 进度：继续收口 DV 第二阶段字幕/音轨边界。用户确认本阶段字幕/音轨范围采用“外挂字幕沿用服务端列表，音轨来自 Media3 当前播放源内嵌音频轨”，不承诺 LibVLC/libass 的内嵌字幕和 ASS 特效一致性；同时要求外挂字幕播放中切换尽量无感，不接受通过重建播放源导致明显黑屏或重启播放会话。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 阶段只做术语和验收边界沉淀，暂不运行构建或单测。
+
+## 2026-06-15 22:29 +0800
+- 进度：继续收口 `DV 返回详情闪动`。已确认真机表现更像退出瞬间露出一帧视频或详情页背景，而不是单纯系统黑屏或白闪；因此下一步优先按 App 层返回过渡连续性处理，目标是不暴露上一帧、底图抢显、白闪或桌面露出。若修复后只剩电视/系统 DV/HDR 模式切换短黑，则归入显示链路边界。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 阶段只做术语和边界沉淀，暂不运行构建或单测。
+
+## 2026-06-15 22:25 +0800
+- 进度：开始通过 `$grill-with-docs` 收口 TV 端 DV 下一阶段。真机测试确认上一阶段剧集混合播放主流程通过；新问题限定为 DV 专用链路“返回详情”时仍有闪动，不是播放结束或切下一集路径。已将术语收敛为 `DV 返回详情闪动`，后续需继续判断它属于 App 层可控过渡，还是电视/系统 HDR/Dolby Vision 模式切换边界。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 阶段先做代码/文档核对与术语沉淀，暂不运行构建或单测。
+
 ## 2026-06-15 21:50 +0800
 - 进度：完成 TV 电视剧 DV/非 DV 混合播放控制层收尾审查，确认本次只纳入 TV 播放控制层、Media3 seek 适配、混合切集进度语义、DV 失败态选集入口、版本号、ADR 与长期上下文沉淀。当前子代理工具要求用户显式授权委派，未新增独立 review 子代理；已改为本地抽查关键 diff 与测试覆盖后提交。
 - 影响文件：`CONTEXT.md`、`docs/adr/0012-tv-series-shared-controls-for-mixed-playback-engines.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvStateFeedback.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、相关 TV 单测、`plan.md`

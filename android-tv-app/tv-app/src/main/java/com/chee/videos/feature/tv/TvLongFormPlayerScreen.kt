@@ -38,15 +38,19 @@ import com.chee.videos.core.player.TvVlcLibrary
 import com.chee.videos.core.player.newLongFormMediaPlayer
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.ui.LongFormVideoPlayer
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.TvSeriesCorePlaybackOverlay
 import com.chee.videos.core.ui.appendAccessTokenQuery
 import com.chee.videos.core.ui.applyLongFormMediaSource
 import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
 import com.chee.videos.core.ui.buildSubtitleTrackPreference
+import com.chee.videos.core.ui.buildAudioTrackPreference
 import com.chee.videos.core.ui.resolveLongFormPlayerUpdate
 import com.chee.videos.core.ui.resolvePlaybackAssetUrl
+import com.chee.videos.core.ui.resolveAudioSelectionOnTrackLoad
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrack
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrackByPreference
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
@@ -68,8 +72,17 @@ fun TvLongFormPlayerScreen(
     var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showBackConfirmPrompt by remember { mutableStateOf(false) }
     var showDolbyVisionDiagnostics by remember { mutableStateOf(false) }
+    var pendingDvExitToDetail by remember { mutableStateOf(false) }
 
-    fun handlePlaybackBack() {
+    fun exitToDetailWithDvCover(isMedia3DolbyVisionRoute: Boolean) {
+        if (!isMedia3DolbyVisionRoute) {
+            onBack()
+            return
+        }
+        pendingDvExitToDetail = true
+    }
+
+    fun handlePlaybackBack(isMedia3DolbyVisionRoute: Boolean) {
         val now = SystemClock.uptimeMillis()
         when (resolveTvPlayerBackAction(backPromptAtMillis, now)) {
             TvPlayerBackAction.ShowPrompt -> {
@@ -80,15 +93,10 @@ fun TvLongFormPlayerScreen(
             TvPlayerBackAction.Exit -> {
                 backPromptAtMillis = null
                 showBackConfirmPrompt = false
-                onBack()
+                exitToDetailWithDvCover(isMedia3DolbyVisionRoute)
             }
         }
     }
-
-    BackHandler(enabled = showDolbyVisionDiagnostics) {
-        showDolbyVisionDiagnostics = false
-    }
-    BackHandler(enabled = !showDolbyVisionDiagnostics, onBack = ::handlePlaybackBack)
 
     LaunchedEffect(showBackConfirmPrompt, backPromptAtMillis) {
         val promptAt = backPromptAtMillis
@@ -101,6 +109,7 @@ fun TvLongFormPlayerScreen(
     }
 
     if (uiState.loading) {
+        BackHandler { handlePlaybackBack(isMedia3DolbyVisionRoute = false) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -120,6 +129,7 @@ fun TvLongFormPlayerScreen(
 
     val detail = uiState.detail
     if (detail == null) {
+        BackHandler { handlePlaybackBack(isMedia3DolbyVisionRoute = false) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -197,8 +207,14 @@ fun TvLongFormPlayerScreen(
     var storedSubtitlePreference by remember(detail.id) { mutableStateOf<TvTrackPreference?>(null) }
     var storedAudioPreference by remember(detail.id) { mutableStateOf<TvTrackPreference?>(null) }
     var selectedAudioTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
+    var media3AudioTracks by remember(detail.id) { mutableStateOf(emptyList<LongFormAudioTrack>()) }
+    var media3TrackPickerKind by remember(detail.id) { mutableStateOf<TvMedia3TrackPickerKind?>(null) }
+    var media3SeekPositionMs by remember(detail.id) { mutableStateOf<Long?>(null) }
+    var media3SeekRequestKey by remember(detail.id) { mutableStateOf(0) }
     var isPlayerActuallyPlaying by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
     var playerErrorMessage by remember(detail.id, uiState.accessToken) { mutableStateOf<String?>(null) }
+    var screenPositionMs by remember(detail.id) { mutableStateOf(0L) }
+    var screenDurationMs by remember(detail.id) { mutableStateOf(0L) }
     val playbackDiagnosticMessage = remember(playbackRoute, displayCapability, playUrl, playerErrorMessage) {
         buildTvDolbyVisionDiagnosticMessage(
             route = playbackRoute,
@@ -213,6 +229,28 @@ fun TvLongFormPlayerScreen(
         LongFormPlaybackSession(
             hasStartedPlayback = hasStartedPlayback,
             isPausedByUser = isPausedByUser,
+        )
+    }
+
+    BackHandler(enabled = showDolbyVisionDiagnostics) {
+        showDolbyVisionDiagnostics = false
+    }
+    BackHandler(enabled = !showDolbyVisionDiagnostics) {
+        handlePlaybackBack(isMedia3DolbyVisionRoute = isMedia3Route)
+    }
+
+    LaunchedEffect(pendingDvExitToDetail) {
+        if (!pendingDvExitToDetail) {
+            return@LaunchedEffect
+        }
+        delay(TvDolbyVisionExitToDetailCoverDelayMillis)
+        onBack()
+    }
+    val media3SubtitleConfigurations = remember(detail.subtitleTracks, uiState.baseUrl, uiState.accessToken) {
+        buildTvMedia3SubtitleConfigurations(
+            tracks = detail.subtitleTracks,
+            baseUrl = uiState.baseUrl,
+            accessToken = uiState.accessToken,
         )
     }
 
@@ -493,7 +531,7 @@ fun TvLongFormPlayerScreen(
                 },
                 tvMode = true,
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
-                onRequestExitPlayback = ::handlePlaybackBack,
+                onRequestExitPlayback = { handlePlaybackBack(isMedia3DolbyVisionRoute = false) },
                 onExitPlayback = onBack,
                 onTrackSheetVisibilityChanged = { isTrackSheetVisible = it },
                 onVlcEvent = { event ->
@@ -576,6 +614,11 @@ fun TvLongFormPlayerScreen(
                     currentSnapshotPositionMs = latestMedia3Snapshot.positionMs,
                     hasCurrentPlaybackSnapshot = resumedFromHistoryVideoId == detail.id,
                 ),
+                seekPositionMs = media3SeekPositionMs,
+                seekRequestKey = media3SeekRequestKey,
+                subtitleConfigurations = media3SubtitleConfigurations,
+                selectedSubtitleTrackId = selectedSubtitleTrackId?.takeIf { it.isNotBlank() },
+                selectedAudioTrackId = selectedAudioTrackId,
                 modifier = Modifier.fillMaxSize(),
                 onPlayingChanged = { playing ->
                     isPlayerActuallyPlaying = playing
@@ -599,7 +642,77 @@ fun TvLongFormPlayerScreen(
                 },
                 onSnapshotChanged = { snapshot ->
                     media3Snapshot = snapshot
+                    screenPositionMs = snapshot.positionMs
+                    screenDurationMs = snapshot.durationMs
                 },
+                onAudioTracksChanged = { tracks ->
+                    media3AudioTracks = tracks
+                    val resolvedSelection = resolveAudioSelectionOnTrackLoad(
+                        currentSelection = selectedAudioTrackId,
+                        storedPreference = storedAudioPreference,
+                        tracks = tracks,
+                    )
+                    if (resolvedSelection != selectedAudioTrackId?.takeIf { it.isNotBlank() }) {
+                        selectedAudioTrackId = resolvedSelection ?: ""
+                    }
+                },
+                onSelectedAudioTrackChanged = { runtimeTrackId ->
+                    if (runtimeTrackId != null && runtimeTrackId != selectedAudioTrackId) {
+                        selectedAudioTrackId = runtimeTrackId
+                    }
+                },
+            )
+            TvSeriesCorePlaybackOverlay(
+                title = detail.title,
+                isPlaying = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser && isPlayerActuallyPlaying,
+                positionMs = screenPositionMs,
+                durationMs = screenDurationMs,
+                tvSeekStepSeconds = uiState.tvSeekStepSeconds,
+                seriesTitleForOverlay = null,
+                seasonNumber = null,
+                episodeNumber = null,
+                episodeTitle = null,
+                episodeRailItems = emptyList(),
+                currentEpisodeRailItemId = null,
+                onTogglePlayPause = {
+                    updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
+                },
+                onSeekTo = { targetMs ->
+                    media3SeekPositionMs = targetMs
+                    media3SeekRequestKey += 1
+                },
+                showTrackActions = true,
+                onOpenSubtitle = {
+                    media3TrackPickerKind = TvMedia3TrackPickerKind.Subtitle
+                    isTrackSheetVisible = true
+                },
+                onOpenAudioTrack = {
+                    media3TrackPickerKind = TvMedia3TrackPickerKind.Audio
+                    isTrackSheetVisible = true
+                },
+                resumePromptVisible = shouldShowResumePromptCard,
+                resumePromptSlot = {
+                    TvResumePromptCard(
+                        lastPositionMs = resumePromptLastPositionMs,
+                        visible = shouldShowResumePromptCard,
+                        remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
+                        onContinue = { resumePromptDismissed = true },
+                        onStartFromBeginning = {
+                            media3SeekPositionMs = 0L
+                            media3SeekRequestKey += 1
+                            resumePromptDismissed = true
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(
+                                start = TvResumePromptTokens.HorizontalPaddingDp,
+                                bottom = TvResumePromptTokens.BottomPaddingDp,
+                            ),
+                    )
+                },
+                backConfirmPromptVisible = showBackConfirmPrompt,
+                playerErrorVisible = !playerErrorMessage.isNullOrBlank(),
+                modifier = Modifier.fillMaxSize(),
             )
             if (!playerErrorMessage.isNullOrBlank()) {
                 if (showDolbyVisionDiagnostics) {
@@ -640,6 +753,31 @@ fun TvLongFormPlayerScreen(
                         .padding(bottom = 72.dp),
                 )
             }
+            if (isTrackSheetVisible && playerErrorMessage == null && media3TrackPickerKind != null) {
+                TvMedia3TrackPickerLayer(
+                    kind = media3TrackPickerKind,
+                    subtitleTracks = detail.subtitleTracks.filter { it.available && it.url.isNotBlank() && !it.isEmbedded },
+                    selectedSubtitleTrackId = selectedSubtitleTrackId?.takeIf { it.isNotBlank() },
+                    onSelectSubtitleTrack = { trackId ->
+                        selectedSubtitleTrackId = trackId ?: ""
+                        val preference = buildSubtitleTrackPreference(detail.subtitleTracks.firstOrNull { it.id == trackId })
+                        storedSubtitlePreference = preference
+                        viewModel.saveTvSubtitlePreference(detail.id, preference)
+                    },
+                    audioTracks = media3AudioTracks,
+                    selectedAudioTrackId = selectedAudioTrackId,
+                    onSelectAudioTrack = { trackId ->
+                        selectedAudioTrackId = trackId ?: ""
+                        val preference = buildAudioTrackPreference(media3AudioTracks.firstOrNull { it.id == trackId })
+                        storedAudioPreference = preference
+                        viewModel.saveTvAudioPreference(detail.id, preference)
+                    },
+                    onDismissRequest = {
+                        isTrackSheetVisible = false
+                        media3TrackPickerKind = null
+                    },
+                )
+            }
         } else {
             if (showDolbyVisionDiagnostics) {
                 TvErrorState(
@@ -676,6 +814,9 @@ fun TvLongFormPlayerScreen(
                         .padding(bottom = 48.dp),
                 )
             }
+        }
+        if (pendingDvExitToDetail) {
+            TvDolbyVisionExitToDetailCover()
         }
     }
 }
