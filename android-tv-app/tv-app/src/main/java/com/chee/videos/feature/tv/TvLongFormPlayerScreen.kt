@@ -152,13 +152,6 @@ fun TvLongFormPlayerScreen(
             overridePlaybackProfile = playbackRoute.playbackProfile,
         )
     }
-    val detailHero = remember(uiState.baseUrl, uiState.videoType, detail) {
-        buildTvLongFormDetailHero(
-            baseUrl = uiState.baseUrl,
-            detail = detail,
-            videoType = uiState.videoType,
-        )
-    }
     val showDolbyVisionDiagnosticsButton = remember(detail.metadata, playbackRoute) {
         isTvDolbyVisionDiagnosticsAvailable(playbackRoute)
     }
@@ -345,8 +338,6 @@ fun TvLongFormPlayerScreen(
                 seekPositionMs = media3SeekPositionMs,
                 seekRequestKey = media3SeekRequestKey,
                 outputSurface = playbackRoute.outputSurface,
-                exitBackdropUrl = detailHero.backdropUrl ?: detailHero.posterUrl,
-                exitBackdropContentDescription = detail.title,
                 subtitleConfigurations = media3SubtitleConfigurations,
                 selectedSubtitleTrackId = selectedSubtitleTrackId?.takeIf { it.isNotBlank() },
                 selectedAudioTrackId = selectedAudioTrackId,

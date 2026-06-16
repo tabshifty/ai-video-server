@@ -321,7 +321,7 @@
 - `TV 首页货架纯标题`：TV 首页的货架标题只保留「最近播放」与「最近更新」两类语义，不在标题下追加说明文案或数量文案；单独入口可以保留为纯动作标题，但不再用副文案补充解释。
 - `服务器自动嗅探`：TV 端连接服务器页对局域网服务的扫描过程；扫描状态属于表单内的辅助反馈，应使用小型行内 loading，不使用占据视觉中心的大型加载态。
 - `TV 长视频 LibVLC 内核（迁移前）`：TV 长视频播放器（电影 / `18+` / 电视剧）曾使用 `org.videolan.libvlc.MediaPlayer` 作为播放引擎，视频解码、字幕渲染、音轨切换均走 LibVLC。该内核正被 [[TV 长视频 ExoPlayer 内核]] 取代；LibVLC 后续只保留在 [[IPTV LibVLC 路径]] 等明确直播场景。
-- `TV 长视频输出层选择`：TV 长视频只有统一 ExoPlayer 内核，但 `PlayerView` 输出层必须按内容类型选择：普通 SDR 长视频优先 `texture_view`，用于避免 Compose 导航返回或 `AndroidView` 销毁时默认 `SurfaceView` 先脱离合成层并露出播放器页黑底；Dolby Vision / HDR 风险源必须使用 `surface_view`，避免 `TextureView` 破坏系统 HDR/DV 直出链路导致异色。播放器页底层应铺当前详情/剧集海报背板，作为 SurfaceView 退出瞬间的非黑色承接层；不能用全屏黑色遮罩或人为延迟作为默认返回体验。IPTV 直播仍按 [[IPTV LibVLC 路径]] 独立使用 LibVLC 输出策略。
+- `TV 长视频输出层选择`：TV 长视频只有统一 ExoPlayer 内核，但 `PlayerView` 输出层必须按内容类型选择：普通 SDR 长视频优先 `texture_view`，用于避免 Compose 导航返回或 `AndroidView` 销毁时默认 `SurfaceView` 先脱离合成层并露出播放器页黑底；Dolby Vision / HDR 风险源必须使用 `surface_view`，避免 `TextureView` 破坏系统 HDR/DV 直出链路导致异色。播放器内部必须在 `PlayerView` 后方铺纯黑背板，避免 SurfaceView 透明、未铺满或重建期间露出详情页、海报或其它页面背景；这里的黑色背板不是覆盖视频的全屏遮罩，也不允许配合人为延迟作为退出体验。IPTV 直播仍按 [[IPTV LibVLC 路径]] 独立使用 LibVLC 输出策略。
 - `LibVLC track id 不稳定（IPTV/历史）`：LibVLC `MediaPlayer.getAudioTracks()` / `getSpuTracks()` 返回的 track id 在 Media 重新加载后不保证稳定，禁止把它当作长期协议或服务端字段。该约束后续主要保留给 [[IPTV LibVLC 路径]] 或迁移前长视频排障；TV 长视频迁到 ExoPlayer 后仍沿用“不保存底层临时 track id”的偏好原则。
 - `TV 轨道偏好持久化`：TV 长视频播放页的音轨/字幕偏好在 DataStore 中以 `language + type` 等语义形态保存，而不是保存底层播放器当前 media 的临时 track id。跨集、重载或切换来源时只读取持久化偏好并按当前 ExoPlayer/Media3 轨道列表重新映射。
 - `TV 长视频焦点真空`：TV 长视频播放器在 [[续播提示卡]] / 字幕 picker / 音轨 picker / 返回二次确认提示等叠加层关闭后留下的 Compose 焦点状态：没有任何 focusable 持焦，导致播放器根 Box 的 `onPreviewKeyEvent` 收不到 DPAD_DOWN / CENTER / DPAD_UP 事件。该问题与具体播放内核无关，迁到 ExoPlayer 后仍必须由 [[TV 播放控制层]] 兜底。

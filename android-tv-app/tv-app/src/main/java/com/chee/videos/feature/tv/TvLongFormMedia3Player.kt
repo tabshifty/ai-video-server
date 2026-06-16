@@ -15,7 +15,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -28,8 +27,6 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
-import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.tv.R
@@ -75,8 +72,6 @@ internal fun TvLongFormMedia3Player(
     seekPositionMs: Long? = null,
     seekRequestKey: Int = 0,
     outputSurface: TvPlaybackOutputSurface = TvPlaybackOutputSurface.TEXTURE_VIEW,
-    exitBackdropUrl: String? = null,
-    exitBackdropContentDescription: String? = null,
     subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
     selectedSubtitleTrackId: String? = null,
     selectedAudioTrackId: String? = null,
@@ -297,20 +292,7 @@ internal fun TvLongFormMedia3Player(
     }
 
     val playerModifier = modifier.fillMaxSize()
-    val backedPlayerModifier = if (outputSurface == TvPlaybackOutputSurface.SURFACE_VIEW) {
-        playerModifier.background(AppChrome.PageGradient)
-    } else {
-        playerModifier.background(Color.Black)
-    }
-    Box(modifier = backedPlayerModifier) {
-        if (outputSurface == TvPlaybackOutputSurface.SURFACE_VIEW && !exitBackdropUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = exitBackdropUrl,
-                contentDescription = exitBackdropContentDescription,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        }
+    Box(modifier = playerModifier.background(Color.Black)) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = {

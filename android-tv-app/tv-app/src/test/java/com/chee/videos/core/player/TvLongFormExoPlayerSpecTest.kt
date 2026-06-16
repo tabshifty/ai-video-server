@@ -77,18 +77,20 @@ class TvLongFormExoPlayerSpecTest {
     }
 
     @Test
-    fun tvLongFormPlayerPassesExitBackdropIntoMedia3SurfacePlayer() {
+    fun tvLongFormPlayerUsesBlackBackingInsteadOfBackdropBehindSurfacePlayer() {
         val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").readText()
         val longForm = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
         val series = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
 
-        assertTrue(player.contains("exitBackdropUrl: String? = null"))
-        assertTrue(player.contains("outputSurface == TvPlaybackOutputSurface.SURFACE_VIEW && !exitBackdropUrl.isNullOrBlank()"))
-        assertTrue(player.contains("AsyncImage("))
-        assertTrue(longForm.contains("exitBackdropUrl = detailHero.backdropUrl ?: detailHero.posterUrl"))
-        assertTrue(series.contains("exitBackdropUrl = exitBackdropUrl"))
+        assertTrue(player.contains("playerModifier.background(Color.Black)"))
         assertTrue(longForm.contains("outputSurface = playbackRoute.outputSurface"))
         assertTrue(series.contains("outputSurface = playbackRoute.outputSurface"))
+        assertFalse(player.contains("exitBackdropUrl"))
+        assertFalse(player.contains("exitBackdropContentDescription"))
+        assertFalse(player.contains("AsyncImage("))
+        assertFalse(player.contains("AppChrome.PageGradient"))
+        assertFalse(longForm.contains("exitBackdropUrl"))
+        assertFalse(series.contains("exitBackdropUrl"))
         assertFalse(longForm.contains("TextureView"))
         assertFalse(series.contains("TextureView"))
     }

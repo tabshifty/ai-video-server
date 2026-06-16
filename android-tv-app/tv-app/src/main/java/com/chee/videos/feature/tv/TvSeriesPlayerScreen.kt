@@ -195,11 +195,6 @@ fun TvSeriesPlayerScreen(
             )
         }
     }
-    val exitBackdropUrl = remember(uiState.baseUrl, uiState.series, currentEpisode) {
-        resolveTvResourceUrl(uiState.baseUrl, currentEpisode?.stillUrl)
-            ?: resolveTvResourceUrl(uiState.baseUrl, uiState.series?.backdropUrl)
-            ?: resolveTvResourceUrl(uiState.baseUrl, uiState.series?.posterUrl)
-    }
     val hasNextEpisode = nextEpisodeRef != null
     val remainingMs = (screenDurationMs - screenPositionMs).coerceAtLeast(0L)
     val remainingSeconds = autoplayCountdownTickRemaining(remainingMs)
@@ -498,8 +493,6 @@ fun TvSeriesPlayerScreen(
                     seekPositionMs = media3SeekPositionMs,
                     seekRequestKey = media3SeekRequestKey,
                     outputSurface = playbackRoute.outputSurface,
-                    exitBackdropUrl = exitBackdropUrl,
-                    exitBackdropContentDescription = series.title.ifBlank { currentEpisode?.title.orEmpty() },
                     subtitleConfigurations = media3SubtitleConfigurations,
                     selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
                     selectedAudioTrackId = selectedAudioTrackId,
