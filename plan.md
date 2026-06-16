@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 22:50 +0800
+- 进度：完成 TV 长视频退出播放闪黑修复。长视频 ExoPlayer 不再使用 `PlayerView` 默认 `SurfaceView`，改为专用 `tv_long_form_media3_player_view.xml` 固定 `surface_type="texture_view"`、透明 shutter 并保持 reset 内容；这是输出层合成策略调整，不新增 LibVLC/ExoPlayer 选择，也不恢复长视频 LibVLC 分支。TV 版本递增到 `0.1.108` / `versionCode=108`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`android-tv-app/tv-app/src/main/res/layout/tv_long_form_media3_player_view.xml`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/player/TvLongFormExoPlayerSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.core.player.TvLongFormExoPlayerSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' android-tv-app CONTEXT.md plan.md` 无命中。
+
+## 2026-06-16 22:45 +0800
+- 进度：开始排查 TV 长视频退出播放回详情页时闪黑问题。初步怀疑是 ExoPlayer/PlayerView 在返回导航完成前释放 Surface 或显示黑色 shutter，导致播放器页黑底露出一帧；先定位返回路径、播放器释放时机和详情页承接方式，再做最小修复。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待补定向回归测试并执行 TV 定向单测、必要时 `:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 21:34 +0800
 - 进度：完成 TV App 长视频统一 ExoPlayer 迁移收尾。独立复审确认重试/player 重建 prepare 与生命周期暂停即时历史上报风险已修复，未发现阻塞或非阻塞问题；本次提交只纳入 TV 长视频播放器迁移、相关 TV 单测、TV 版本递增、`CONTEXT.md` 技术沉淀和 `plan.md` 记录。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、相关 TV 单测、`CONTEXT.md`、`plan.md`

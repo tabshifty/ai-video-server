@@ -1,5 +1,6 @@
 package com.chee.videos.feature.tv
 
+import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
+import com.chee.videos.tv.R
 import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import kotlinx.coroutines.delay
@@ -296,9 +298,10 @@ internal fun TvLongFormMedia3Player(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = {
-                PlayerView(it).apply {
-                    useController = false
-                    setShutterBackgroundColor(android.graphics.Color.BLACK)
+                (LayoutInflater.from(it).inflate(
+                    R.layout.tv_long_form_media3_player_view,
+                    null,
+                ) as PlayerView).apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT,

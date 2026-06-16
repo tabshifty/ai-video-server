@@ -56,6 +56,22 @@ class TvLongFormExoPlayerSpecTest {
     }
 
     @Test
+    fun tvLongFormMedia3PlayerUsesTextureViewWithoutLegacyPlayerChoice() {
+        val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").readText()
+        val layout = Path.of("src/main/res/layout/tv_long_form_media3_player_view.xml").readText()
+
+        assertTrue(player.contains("R.layout.tv_long_form_media3_player_view"))
+        assertTrue(layout.contains("androidx.media3.ui.PlayerView"))
+        assertTrue(layout.contains("app:surface_type=\"texture_view\""))
+        assertTrue(layout.contains("app:keep_content_on_player_reset=\"true\""))
+        assertTrue(layout.contains("app:shutter_background_color=\"@android:color/transparent\""))
+        assertFalse(player.contains("PlayerView(it).apply"))
+        assertFalse(player.contains("setShutterBackgroundColor(android.graphics.Color.BLACK)"))
+        assertFalse(player.contains("isVlcRoute"))
+        assertFalse(player.contains("TvVlcLibrary"))
+    }
+
+    @Test
     fun tvLongFormScreensNoLongerUseDvDedicatedMedia3Naming() {
         val longForm = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
         val series = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
