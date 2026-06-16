@@ -6,9 +6,9 @@ import {
   getOrphanScanStatusLabel,
   getOrphanScanStatusType,
   shouldPromptDeleteOrphanScan
-} from './systemSettings.helpers'
+} from './toolboxOrphanFiles.helpers'
 
-describe('system settings orphan scan helpers', () => {
+describe('toolbox orphan file scan helpers', () => {
   it('formats orphan scan state labels and tag types', () => {
     expect(getOrphanScanStatusLabel('completed')).toBe('已完成')
     expect(getOrphanScanStatusLabel('unknown')).toBe('未知')

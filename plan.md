@@ -2,6 +2,31 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 14:29 +0800
+- 进度：完成孤儿文件扫描迁到工具箱。新增 `/toolbox/orphan-files` 无 shell 工具页并复用既有 `/admin/system/orphan-files/*` API；工具箱新增“孤儿文件扫描”新标签页入口；系统设置页移除扫描状态加载、轮询和自动删除确认，仅保留临时文件清理与系统日志；命令面板搜索孤儿文件相关关键词仍只定位 `/toolbox`。
+- 影响文件：`admin-web/src/views/ToolboxOrphanFiles.vue`、`admin-web/src/views/toolboxOrphanFiles.helpers.js`、`admin-web/src/views/toolboxOrphanFiles.helpers.spec.js`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/toolboxOrphanFiles.helpers.spec.js src/views/toolboxPage.spec.js src/components/base/commandPalette.helpers.spec.js src/api/admin.spec.js src/assets/themeTokens.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-16 14:18 +0800
+- 进度：完成导航边界收口。命令面板和侧栏继续只导航到 `/toolbox`，搜索孤儿文件扫描相关关键词也只定位工具箱；具体 `/toolbox/orphan-files` 工具页必须从工具箱入口显式以新标签页打开。
+- 影响文件：`CONTEXT.md`、`plan.md`、后续 `admin-web/src/components/base/commandPalette.helpers.js` 与工具箱测试。
+- 验证：进入实现后补测试覆盖工具箱入口、路由注册、系统设置移除扫描 UI、命令面板别名。
+
+## 2026-06-16 14:17 +0800
+- 进度：确认孤儿文件工具页的删除确认边界。迁移后仍保留“扫描完成且存在孤儿文件时自动提示全量删除”，但触发范围仅限 `/toolbox/orphan-files` 工具页；系统设置页和其它页面不再加载扫描状态或弹危险确认。
+- 影响文件：`CONTEXT.md`、`plan.md`、后续孤儿文件工具页实现与系统设置页清理。
+- 验证：待继续确认工具箱入口搜索与导航边界后进入实现。
+
+## 2026-06-16 14:10 +0800
+- 进度：继续收口孤儿文件扫描工具箱迁移。已确认孤儿文件扫描应与 ED2K、图像生成工作台一致，做成 `/toolbox/orphan-files` 无 shell 独立工具页，从工具箱以新标签页打开；系统设置页不再承载扫描 UI。
+- 影响文件：`CONTEXT.md`、`plan.md`、后续 `admin-web/src/views/ToolboxOrphanFiles.vue`、`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/Toolbox.vue`、路由与测试。
+- 验证：待继续确认删除提示触发时机后进入前端实现和验证。
+
+## 2026-06-16 14:07 +0800
+- 进度：开始通过 `$grill-with-docs` 收口“孤儿文件扫描迁到工具箱”。已确认本次是前端入口和页面归属迁移，不改后端 `/admin/system/orphan-files/*` API、扫描队列、删除逻辑或数据表；术语同步更新为工具箱独立工具页复用既有系统接口。
+- 影响文件：`admin-web/src/views/SystemSettings.vue`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxOrphanFiles.vue`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/views/toolboxOrphanFiles.helpers.js`、相关前端测试、`CONTEXT.md`、`plan.md`
+- 验证：待需求收口后补前端定向测试，再执行 `cd admin-web && npm run test -- src/views/toolboxOrphanFiles.helpers.spec.js src/views/toolboxPage.spec.js src/components/base/commandPalette.helpers.spec.js`、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 12:12 +0800
 - 进度：补充后端回归验证并完成收尾检查。`internal/repository` 与 `internal/models` 的定向测试已通过，确认电视剧详情 `cast` 实体化后仓库层和模型层仍可正常编译/运行。
 - 影响文件：`plan.md`

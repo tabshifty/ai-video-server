@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Link, Picture, TopRight } from '@element-plus/icons-vue'
+import { Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -10,6 +10,7 @@ const router = useRouter()
 
 const ed2kToolHref = computed(() => router.resolve('/toolbox/ed2k').href)
 const imageWorkbenchHref = computed(() => router.resolve('/toolbox/image-workbench').href)
+const orphanFilesHref = computed(() => router.resolve('/toolbox/orphan-files').href)
 </script>
 
 <template>
@@ -42,6 +43,19 @@ const imageWorkbenchHref = computed(() => router.resolve('/toolbox/image-workben
             <span class="tool-menu-item__content">
               <strong>图像生成工作台</strong>
               <span>基于提示词和参考图生成、编辑、保存创作结果。</span>
+            </span>
+            <span class="tool-menu-item__meta">
+              <el-icon><TopRight /></el-icon>
+              <span>新标签页打开</span>
+            </span>
+          </a>
+          <a class="tool-menu-item" :href="orphanFilesHref" target="_blank" rel="noopener noreferrer">
+            <span class="tool-menu-item__icon">
+              <el-icon><Search /></el-icon>
+            </span>
+            <span class="tool-menu-item__content">
+              <strong>孤儿文件扫描</strong>
+              <span>盘点存储目录中的未引用持久文件，并按扫描结果统一处理。</span>
             </span>
             <span class="tool-menu-item__meta">
               <el-icon><TopRight /></el-icon>

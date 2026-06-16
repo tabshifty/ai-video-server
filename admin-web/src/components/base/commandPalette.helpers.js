@@ -47,7 +47,13 @@ export const adminShellNavGroups = [
     key: 'tools',
     label: '工具箱',
     items: [
-      { path: '/toolbox', label: '工具箱', title: '工具箱', icon: 'Tools', alias: 'toolbox tools ed2k gjx' }
+      {
+        path: '/toolbox',
+        label: '工具箱',
+        title: '工具箱',
+        icon: 'Tools',
+        alias: 'toolbox tools ed2k orphan scan orphan-files 孤儿文件扫描 gjx'
+      }
     ]
   },
   {

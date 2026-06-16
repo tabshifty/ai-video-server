@@ -21,6 +21,7 @@ import TaskMonitor from '../views/TaskMonitor.vue'
 import Toolbox from '../views/Toolbox.vue'
 import ToolboxEd2k from '../views/ToolboxEd2k.vue'
 import ToolboxImageWorkbench from '../views/ToolboxImageWorkbench.vue'
+import ToolboxOrphanFiles from '../views/ToolboxOrphanFiles.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { public: true } },
@@ -42,6 +43,7 @@ const routes = [
   { path: '/toolbox', component: Toolbox, meta: { hideShellPageHeader: true } },
   { path: '/toolbox/ed2k', component: ToolboxEd2k },
   { path: '/toolbox/image-workbench', component: ToolboxImageWorkbench },
+  { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },
   { path: '/settings', component: SystemSettings, meta: { hideShellPageHeader: true } },
   { path: '/tasks', component: TaskMonitor, meta: { hideShellPageHeader: true } }
 ]

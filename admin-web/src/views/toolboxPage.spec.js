@@ -4,19 +4,24 @@ import { describe, expect, it } from 'vitest'
 const toolbox = readFileSync(new URL('./Toolbox.vue', import.meta.url), 'utf8')
 const ed2kTool = readFileSync(new URL('./ToolboxEd2k.vue', import.meta.url), 'utf8')
 const imageWorkbench = readFileSync(new URL('./ToolboxImageWorkbench.vue', import.meta.url), 'utf8')
+const orphanFilesTool = readFileSync(new URL('./ToolboxOrphanFiles.vue', import.meta.url), 'utf8')
+const systemSettings = readFileSync(new URL('./SystemSettings.vue', import.meta.url), 'utf8')
 const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf8')
 const ed2kRoute = router.match(/\{ path: '\/toolbox\/ed2k'[^}]+\}/)?.[0] || ''
 const imageWorkbenchRoute = router.match(/\{ path: '\/toolbox\/image-workbench'[^}]+\}/)?.[0] || ''
+const orphanFilesRoute = router.match(/\{ path: '\/toolbox\/orphan-files'[^}]+\}/)?.[0] || ''
 
 describe('toolbox pages', () => {
   it('keeps the toolbox page as a shell menu of tool entry buttons', () => {
     expect(toolbox).toContain('工具箱')
     expect(toolbox).toContain('ED2K 链接生成器')
     expect(toolbox).toContain('图像生成工作台')
+    expect(toolbox).toContain('孤儿文件扫描')
     expect(toolbox).toContain('target="_blank"')
     expect(toolbox).toContain('rel="noopener noreferrer"')
     expect(toolbox).toContain('/toolbox/ed2k')
     expect(toolbox).toContain('/toolbox/image-workbench')
+    expect(toolbox).toContain('/toolbox/orphan-files')
     expect(toolbox).not.toContain('parseEd2kLinks')
     expect(toolbox).not.toContain('ed2kInput')
   })
@@ -61,6 +66,31 @@ describe('toolbox pages', () => {
     expect(imageWorkbenchRoute).toContain('ToolboxImageWorkbench')
     expect(imageWorkbenchRoute).not.toContain('public: true')
     expect(imageWorkbenchRoute).not.toContain('hideShellPageHeader')
+  })
+
+  it('moves orphan file scanning into a no-shell authenticated toolbox page', () => {
+    expect(orphanFilesTool).toContain('孤儿文件扫描')
+    expect(orphanFilesTool).toContain('返回工具箱')
+    expect(orphanFilesTool).toContain('startOrphanFileScan')
+    expect(orphanFilesTool).toContain('getLatestOrphanFileScan')
+    expect(orphanFilesTool).toContain('deleteLatestOrphanFileScan')
+    expect(orphanFilesTool).toContain('shouldPromptDeleteOrphanScan')
+    expect(orphanFilesTool).not.toContain('components/Layout.vue')
+    expect(orphanFilesTool).not.toMatch(/<Layout[>\s]/)
+    expect(orphanFilesRoute).toContain("path: '/toolbox/orphan-files'")
+    expect(orphanFilesRoute).toContain('ToolboxOrphanFiles')
+    expect(orphanFilesRoute).not.toContain('public: true')
+    expect(orphanFilesRoute).not.toContain('hideShellPageHeader')
+  })
+
+  it('removes orphan scanning from system settings after the toolbox migration', () => {
+    expect(systemSettings).toContain('系统设置')
+    expect(systemSettings).toContain('临时文件清理')
+    expect(systemSettings).toContain('系统日志')
+    expect(systemSettings).not.toContain('孤儿文件扫描')
+    expect(systemSettings).not.toContain('startOrphanFileScan')
+    expect(systemSettings).not.toContain('getLatestOrphanFileScan')
+    expect(systemSettings).not.toContain('shouldPromptDeleteOrphanScan')
   })
 
   it('surfaces failed workbench generation reasons in local history and the selected-task empty state', () => {
