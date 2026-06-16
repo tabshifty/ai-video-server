@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 17:32 +0800
+- 进度：开始推送管理端时间显示格式化到家用部署机。当前部署机 `deploy/master` 为 `2c69da3`，本地 `master` 最新为 `767c13b`；本次变更命中 `admin-web/**`，按 [[家用部署机 push 分桶]] 预期只触发管理端前端构建与 dist 替换，不重启 Go server / worker。
+- 影响文件：`plan.md`
+- 验证：待执行 `git push deploy master`，并确认远端 hook 的 admin-web build 成功。
+
 ## 2026-06-16 17:29 +0800
 - 进度：完成管理端绝对时间显示格式化收尾。独立子代理评审未发现阻塞问题；按评审建议补充数字字符串时间戳兼容和边界测试。确认本次只纳入管理端时间格式化、长期语义沉淀和计划记录。
 - 影响文件：`admin-web/src/utils/dateTime.js`、`admin-web/src/utils/dateTime.spec.js`、`admin-web/src/views/adminDateTimeDisplay.spec.js`、相关管理端时间展示页面、`CONTEXT.md`、`plan.md`
