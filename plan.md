@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 20:04 +0800
+- 进度：完成 TV 端 DV Media3 返回详情去黑场修复与收尾。确认退出确认仍保留，但确认后的动作不再进入 App 层黑色遮罩或 80ms 延迟；单片、剧集系统返回和剧集结束覆盖层“返回详情”均直接走正常返回。`CONTEXT.md` 已将旧“DV 返回详情黑场保持”标记为已撤回，并新增“DV 返回详情正常导航”约定。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvMedia3TrackSupportTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvMedia3TrackSupportTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-16 19:57 +0800
+- 进度：完成 DV Media3 返回详情去黑场的核心改动。单片与剧集播放器的退出确认不再区分 Media3 DV 分支，二次确认后直接 `onBack()`；删除 `TvDolbyVisionExitToDetailCover` 和 80ms 延迟；剧集播放结束覆盖层的“返回详情”也改为直接返回；回归测试已反向锁定不得再保留黑色遮罩/延迟。TV 版本已递增到 `0.1.106` / `versionCode=106`，`CONTEXT.md` 已撤回旧黑场保持策略。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvMedia3TrackSupportTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvMedia3TrackSupportTest`、必要的 TV 单测/编译、`git diff --check` 与乱码扫描。
+
+## 2026-06-16 19:57 +0800
+- 进度：开始修复 TV 端 DV Media3 播放器退出到详情页会主动黑一下的问题。已定位为单片和剧集播放器在二次返回确认后设置 `pendingDvExitToDetail`，显示 `TvDolbyVisionExitToDetailCover` 黑色遮罩并延迟 80ms 才执行 `onBack()`；本次目标改为正常立即返回详情页，不再主动制造黑场。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、移除 DV 退出遮罩文件、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待修改后执行 TV Media3 定向单测、必要的 TV 单测/编译、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 19:39 +0800
 - 进度：完成 TV 电视剧详情页演员头像负 hash 越界修复与收尾。`tvCastAvatarBrush` 现在通过 `tvCastAvatarPaletteIndex()` 使用 `Math.floorMod` 计算调色板索引，新增 `TvSeriesCastAvatarPaletteTest` 覆盖负 hash、`Int.MIN_VALUE` 与空调色板边界；TV 版本已递增到 `0.1.105` / `versionCode=105`，`CONTEXT.md` 已沉淀头像调色板索引契约。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesCastAvatarPaletteTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

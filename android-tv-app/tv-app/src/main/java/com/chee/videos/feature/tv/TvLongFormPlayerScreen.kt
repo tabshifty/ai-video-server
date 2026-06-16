@@ -72,17 +72,8 @@ fun TvLongFormPlayerScreen(
     var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showBackConfirmPrompt by remember { mutableStateOf(false) }
     var showDolbyVisionDiagnostics by remember { mutableStateOf(false) }
-    var pendingDvExitToDetail by remember { mutableStateOf(false) }
 
-    fun exitToDetailWithDvCover(isMedia3DolbyVisionRoute: Boolean) {
-        if (!isMedia3DolbyVisionRoute) {
-            onBack()
-            return
-        }
-        pendingDvExitToDetail = true
-    }
-
-    fun handlePlaybackBack(isMedia3DolbyVisionRoute: Boolean) {
+    fun handlePlaybackBack() {
         val now = SystemClock.uptimeMillis()
         when (resolveTvPlayerBackAction(backPromptAtMillis, now)) {
             TvPlayerBackAction.ShowPrompt -> {
@@ -93,7 +84,7 @@ fun TvLongFormPlayerScreen(
             TvPlayerBackAction.Exit -> {
                 backPromptAtMillis = null
                 showBackConfirmPrompt = false
-                exitToDetailWithDvCover(isMedia3DolbyVisionRoute)
+                onBack()
             }
         }
     }
@@ -109,7 +100,7 @@ fun TvLongFormPlayerScreen(
     }
 
     if (uiState.loading) {
-        BackHandler { handlePlaybackBack(isMedia3DolbyVisionRoute = false) }
+        BackHandler { handlePlaybackBack() }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -129,7 +120,7 @@ fun TvLongFormPlayerScreen(
 
     val detail = uiState.detail
     if (detail == null) {
-        BackHandler { handlePlaybackBack(isMedia3DolbyVisionRoute = false) }
+        BackHandler { handlePlaybackBack() }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -236,15 +227,7 @@ fun TvLongFormPlayerScreen(
         showDolbyVisionDiagnostics = false
     }
     BackHandler(enabled = !showDolbyVisionDiagnostics) {
-        handlePlaybackBack(isMedia3DolbyVisionRoute = isMedia3Route)
-    }
-
-    LaunchedEffect(pendingDvExitToDetail) {
-        if (!pendingDvExitToDetail) {
-            return@LaunchedEffect
-        }
-        delay(TvDolbyVisionExitToDetailCoverDelayMillis)
-        onBack()
+        handlePlaybackBack()
     }
     val media3SubtitleConfigurations = remember(detail.subtitleTracks, uiState.baseUrl, uiState.accessToken) {
         buildTvMedia3SubtitleConfigurations(
@@ -531,7 +514,7 @@ fun TvLongFormPlayerScreen(
                 },
                 tvMode = true,
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
-                onRequestExitPlayback = { handlePlaybackBack(isMedia3DolbyVisionRoute = false) },
+                onRequestExitPlayback = { handlePlaybackBack() },
                 onExitPlayback = onBack,
                 onTrackSheetVisibilityChanged = { isTrackSheetVisible = it },
                 onVlcEvent = { event ->
@@ -809,9 +792,6 @@ fun TvLongFormPlayerScreen(
                         .padding(bottom = 48.dp),
                 )
             }
-        }
-        if (pendingDvExitToDetail) {
-            TvDolbyVisionExitToDetailCover()
         }
     }
 }

@@ -74,18 +74,19 @@ class TvMedia3TrackSupportTest {
     }
 
     @Test
-    fun dolbyVisionExitToDetailUsesBlackCoverOnSingleAndSeriesMedia3Routes() {
-        val cover = Path.of("src/main/java/com/chee/videos/feature/tv/TvDolbyVisionExitToDetailCover.kt").toFile().readText()
+    fun dolbyVisionExitToDetailDoesNotUseBlackCoverOrDelay() {
         val single = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").toFile().readText()
         val series = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").toFile().readText()
+        val cover = Path.of("src/main/java/com/chee/videos/feature/tv/TvDolbyVisionExitToDetailCover.kt").toFile()
 
-        assertTrue(cover.contains("background(Color.Black)"))
-        assertTrue(cover.contains("TvDolbyVisionExitToDetailCoverDelayMillis"))
+        assertFalse("DV 返回详情不应再保留 App 层黑色遮罩组件", cover.exists())
         listOf(single, series).forEach { source ->
-            assertTrue(source.contains("pendingDvExitToDetail"))
-            assertTrue(source.contains("TvDolbyVisionExitToDetailCover()"))
-            assertTrue(source.contains("delay(TvDolbyVisionExitToDetailCoverDelayMillis)"))
-            assertTrue(source.contains("handlePlaybackBack(isMedia3DolbyVisionRoute = isMedia3Route)"))
+            assertTrue(source.contains("fun handlePlaybackBack()"))
+            assertTrue(source.contains("TvPlayerBackAction.Exit ->"))
+            assertFalse(source.contains("pendingDvExitToDetail"))
+            assertFalse(source.contains("TvDolbyVisionExitToDetailCover"))
+            assertFalse(source.contains("TvDolbyVisionExitToDetailCoverDelayMillis"))
+            assertFalse(source.contains("isMedia3DolbyVisionRoute"))
         }
     }
 }

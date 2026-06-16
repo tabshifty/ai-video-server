@@ -72,17 +72,8 @@ fun TvSeriesPlayerScreen(
     var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showBackConfirmPrompt by remember { mutableStateOf(false) }
     var showDolbyVisionDiagnostics by remember { mutableStateOf(false) }
-    var pendingDvExitToDetail by remember { mutableStateOf(false) }
 
-    fun exitToDetailWithDvCover(isMedia3DolbyVisionRoute: Boolean) {
-        if (!isMedia3DolbyVisionRoute) {
-            onBack()
-            return
-        }
-        pendingDvExitToDetail = true
-    }
-
-    fun handlePlaybackBack(isMedia3DolbyVisionRoute: Boolean) {
+    fun handlePlaybackBack() {
         val now = SystemClock.uptimeMillis()
         when (resolveTvPlayerBackAction(backPromptAtMillis, now)) {
             TvPlayerBackAction.ShowPrompt -> {
@@ -93,7 +84,7 @@ fun TvSeriesPlayerScreen(
             TvPlayerBackAction.Exit -> {
                 backPromptAtMillis = null
                 showBackConfirmPrompt = false
-                exitToDetailWithDvCover(isMedia3DolbyVisionRoute)
+                onBack()
             }
         }
     }
@@ -109,7 +100,7 @@ fun TvSeriesPlayerScreen(
     }
 
     if (uiState.loading) {
-        BackHandler { handlePlaybackBack(isMedia3DolbyVisionRoute = false) }
+        BackHandler { handlePlaybackBack() }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -129,7 +120,7 @@ fun TvSeriesPlayerScreen(
 
     val series = uiState.series
     if (series == null) {
-        BackHandler { handlePlaybackBack(isMedia3DolbyVisionRoute = false) }
+        BackHandler { handlePlaybackBack() }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -265,15 +256,7 @@ fun TvSeriesPlayerScreen(
         showDolbyVisionDiagnostics = false
     }
     BackHandler(enabled = !showDolbyVisionDiagnostics) {
-        handlePlaybackBack(isMedia3DolbyVisionRoute = isMedia3Route)
-    }
-
-    LaunchedEffect(pendingDvExitToDetail) {
-        if (!pendingDvExitToDetail) {
-            return@LaunchedEffect
-        }
-        delay(TvDolbyVisionExitToDetailCoverDelayMillis)
-        onBack()
+        handlePlaybackBack()
     }
 
     fun updatePlaybackSession(nextSession: LongFormPlaybackSession) {
@@ -800,7 +783,7 @@ fun TvSeriesPlayerScreen(
                 TvSeriesEndOverlay(
                     kind = uiState.pendingEndOverlayKind,
                     onPlayNext = viewModel::nextEpisode,
-                    onBackToDetail = { exitToDetailWithDvCover(isMedia3DolbyVisionRoute = false) },
+                    onBackToDetail = onBack,
                     modifier = Modifier.fillMaxSize(),
                 )
                 TvPlayerErrorBanner(
@@ -963,7 +946,7 @@ fun TvSeriesPlayerScreen(
                 TvSeriesEndOverlay(
                     kind = uiState.pendingEndOverlayKind,
                     onPlayNext = viewModel::nextEpisode,
-                    onBackToDetail = { exitToDetailWithDvCover(isMedia3DolbyVisionRoute = true) },
+                    onBackToDetail = onBack,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (!playerErrorMessage.isNullOrBlank()) {
@@ -1087,9 +1070,6 @@ fun TvSeriesPlayerScreen(
                     )
                 }
             }
-        }
-        if (pendingDvExitToDetail) {
-            TvDolbyVisionExitToDetailCover()
         }
     }
 
