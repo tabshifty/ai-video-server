@@ -2,6 +2,66 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 20:40 +0800
+- 进度：完成 TV 长视频统一迁到 ExoPlayer 的 `$grill-with-docs` 收口并准备单独提交文档决策。本次只纳入 `CONTEXT.md`、ADR 0004/0012 状态更新、新增 ADR 0013 和 `plan.md`；不开始播放器代码实现。下一步在该文档提交之后进入实现阶段，按已确认节奏先补测试约束，再迁移单片和剧集播放器。
+- 影响文件：`CONTEXT.md`、`docs/adr/0004-tv-long-form-libvlc-for-ass-rendering.md`、`docs/adr/0012-tv-series-shared-controls-for-mixed-playback-engines.md`、`docs/adr/0013-tv-long-form-exoplayer-unification.md`、`plan.md`
+- 验证：`git diff --check` 通过；`rg -n $'\\uFFFD' CONTEXT.md plan.md docs/adr` 无命中；grill 文档阶段不执行 Android 构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认为 TV 长视频统一迁到 ExoPlayer 记录 ADR。新增 `docs/adr/0013-tv-long-form-exoplayer-unification.md`，说明长视频统一 ExoPlayer、IPTV 继续 LibVLC、接受 ASS/SSA 不再 libass 保真、不做双轨灰度和不改手机端；同时将 ADR 0004 标记为被 0013 取代，将 ADR 0012 标记为混合内核前提被 0013 更新。
+- 影响文件：`docs/adr/0013-tv-long-form-exoplayer-unification.md`、`docs/adr/0004-tv-long-form-libvlc-for-ass-rendering.md`、`docs/adr/0012-tv-series-shared-controls-for-mixed-playback-engines.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 TV 长视频 ExoPlayer 迁移先固化实施任务清单，再进入编码，不在 grill 阶段直接改播放器。实施节奏收口为：先补源码级测试约束；再抽统一 TV ExoPlayer 长视频适配层；再依次迁单片播放器和剧集播放器；随后清理长视频 LibVLC helper 与旧测试但保留 IPTV LibVLC；最后执行 TV 全量单测、`assembleDebug` 和独立代码审查。
+- 影响文件：`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 TV 长视频 ExoPlayer 迁移不改手机端、不抽共享层。本次只作用于 `android-tv-app`，不复用手机端 `UnifiedPlayerScreen` 或 `DetailScreen`，也不把 TV 控制层抽到 `android-app`；未来如需跨端统一播放能力，另起共享模块设计。`CONTEXT.md` 已新增端隔离术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认迁移实施方式为一次性切换，不做 TV 长视频双轨灰度。实现完成后 TV 长视频路径只有 ExoPlayer，不加“使用旧播放器”开关，不做长视频 LibVLC 运行时回退；播放失败只提供重试、返回或诊断。若真机出现严重兼容问题，通过 git/版本回滚或后续修复处理，不在产品内长期保留双轨。`CONTEXT.md` 已新增一次性切换术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 HLS/M3U8 边界。IPTV 播放列表中的 M3U8/HLS 频道继续走 LibVLC IPTV 路径；TV 长视频播放 URL 若是普通文件/渐进流或未来出现 ExoPlayer 支持的 HLS 源，则归统一 ExoPlayer 长视频内核处理，但不复用 IPTV 的频道列表、M3U 解析、直播诊断或 LibVLC 参数。本次不新增长视频 HLS 功能，只保证迁移后播放入口不主动排斥 Media3 支持的媒体源。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 TV 长视频 ExoPlayer 迁移后的媒体鉴权方式。视频源和外挂字幕请求统一通过 ExoPlayer/Media3 HTTP data source 发送 `Authorization: Bearer <token>` header，不再向播放 URL 或字幕 URL 拼 `access_token` query；`appendAccessTokenQuery` 只保留给 LibVLC/IPTV 或历史兼容语境。现有代码中 Media3 视频源已走 header，字幕配置仍拼 query，后续实现需改成 header 路径并加测试约束。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 TV 长视频 ExoPlayer 迁移只换播放内核，不重做控制体验。现有 TV 播放控制层语义和视觉保持：返回二次确认、BACK 优先收 UI、续播、播放/暂停、seek、字幕、音轨、剧集选集轨、连播提示、错误/重试和历史上报都必须保留。实现可改造 `LongFormVideoPlayer` 或拆新 ExoPlayer 长视频组件，但用户可见遥控器行为不得因内核替换改变。`CONTEXT.md` 已补强播放控制层和内核适配术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 TV 工程迁移后继续保留 `libvlc-all`，但用途限定为 IPTV。TV 长视频不得继续依赖 `TvVlcLibrary`、`newLongFormMediaPlayer` 或长视频 LibVLC helper；长视频相关 LibVLC URL、`addSlave`、`audioTrack=-1` 等规则标记为迁移前/历史或 IPTV 排障语境。后续单测需反向约束长视频屏不再 import `org.videolan.libvlc`，IPTV 仍允许。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 TV 长视频统一迁到 ExoPlayer 后接受 ASS/SSA 字幕能力降级。外挂 SRT/VTT/ASS/SSA 仍按服务端字幕列表加载进 ExoPlayer，但 ASS/SSA 只承诺按 ExoPlayer/Media3 能力展示，不承诺 libass 级样式、特效、卡拉 OK、矢量绘图或字体回退等价；不为 ASS 特效保留长视频 LibVLC 分支。`CONTEXT.md` 已将 libass 自渲染和相关 DV 字幕阶段术语标为迁移前，并新增 ExoPlayer 字幕能力边界。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：确认 DV 安全门控在 ExoPlayer 统一迁移后继续保留。门控结果从“进入 DV 专用 Media3 分支 / 走 LibVLC / 阻断”收口为“允许进入统一 ExoPlayer 长视频内核 / 阻断”；非 DV、老数据和普通长视频走统一 ExoPlayer，DV 显示链路不支持或未知、metadata 不完整仍阻断，不提供强行播放或 LibVLC 回退。`CONTEXT.md` 已同步更新相关 DV 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建。
+
+## 2026-06-16 20:12 +0800
+- 进度：开始通过 `$grill-with-docs` 收口“TV App 除 IPTV 外播放器统一迁到 ExoPlayer”。已确认范围只覆盖 TV 端实际运行的单片长视频播放器、电视剧分集播放器和既有 DV Media3 分支；IPTV 继续保留 LibVLC；TV 工程已排除的手机端播放器、短视频和图片合集不纳入本次。
+- 影响文件：预计 `CONTEXT.md`、`plan.md`，后续实现可能涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/player/*`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`
+- 验证：收口阶段暂不执行构建；后续实现前补测试并执行 TV 定向/全量验证。
+
 ## 2026-06-16 20:04 +0800
 - 进度：完成 TV 端 DV Media3 返回详情去黑场修复与收尾。确认退出确认仍保留，但确认后的动作不再进入 App 层黑色遮罩或 80ms 延迟；单片、剧集系统返回和剧集结束覆盖层“返回详情”均直接走正常返回。`CONTEXT.md` 已将旧“DV 返回详情黑场保持”标记为已撤回，并新增“DV 返回详情正常导航”约定。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvMedia3TrackSupportTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

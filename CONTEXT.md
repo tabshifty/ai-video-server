@@ -36,8 +36,8 @@
 ## 字幕处理约定
 - `ASS 字幕原文存储策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；`.ass/.ssa` 不再强转 WebVTT，而是以 ASS 原文落库，数据库记录 `video_subtitles.format=ass` / `mime_type=text/x-ssa`，`metadata.original_format` 继续记录原始扩展名。视频内嵌字幕抽取时，`ass`/`ssa` codec 用 ffmpeg `-c:s copy` 保留原文；`mov_text`、`subrip`、`webvtt` 等无 ASS Style 段的格式继续转 VTT。历史已生成的 VTT 字幕不反向迁移；用户需要 ASS 特效时重新上传或重新抽取。
 - `ASS 字幕安全清洗`：上传或抽取后的 ASS 原文在落盘前必须做轻量安全清洗，至少去掉指向本地路径/绝对路径的 `\fn` 覆盖，并把 `\fad` 参数钳制到安全上限，避免 libass 历史 CVE 类问题扩大到本项目。这里的清洗只作用于原文字幕内容，不改动视频转码链路。
-- `libass 自渲染字幕`：TV 长视频 LibVLC 内核的字幕渲染路径。所有外挂与内嵌字幕通过 LibVLC media slave 注入或自动加载，由 LibVLC 内置 libass 直接画到视频 Surface 上；ASS 的 `[V4+ Styles]`、卡拉 OK、动态特效、矢量绘图和字体回退按文件意图渲染。客户端不再用 `CaptionStyleCompat` / `SubtitleView` 统一控制长视频字幕外观；SRT/VTT 接受 libass 默认外观。
-- `字幕样式 libass 让位`：TV 长视频从 Media3 切到 LibVLC 后，字幕外观控制权从 Compose/Media3 让位给 libass。删除 `applyLongFormSubtitleStyle()` 这类统一描边逻辑是有意行为，后续不要再给 SRT/VTT 注入默认 ASS Style，除非新任务明确要求重新设计字幕偏好。
+- `libass 自渲染字幕（迁移前）`：TV 长视频 LibVLC 内核时期，外挂与内嵌字幕通过 LibVLC media slave 注入或自动加载，由 LibVLC 内置 libass 直接画到视频 Surface 上。随着 [[TV 长视频 ExoPlayer 内核]] 迁移，该能力不再作为长视频播放体验的默认承诺；IPTV 是否涉及字幕另按 [[IPTV LibVLC 路径]] 独立判断。
+- `TV ExoPlayer ASS/SSA 降级边界`：TV 长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后，外挂 SRT/VTT/ASS/SSA 仍按服务端字幕列表进入播放器，但 ASS/SSA 只承诺按 ExoPlayer/Media3 能力展示，不承诺 libass 级样式、特效、卡拉 OK、矢量绘图或字体回退等价。若后续需要高保真 ASS，应作为独立能力重新设计，不为此保留长视频 LibVLC 分支。
 
 ## TV 播放兼容术语
 - `杜比视界安全播放`：TV App 面对 Dolby Vision 风险源时以“不异色”为首要目标；设备和播放链路明确支持对应 Dolby Vision profile 时可以原生播放，否则必须回退到普通 SDR/兼容播放路径或给出明确提示。本策略不承诺所有 Dolby Vision 文件都点亮电视的 Dolby Vision 标识。
@@ -59,17 +59,21 @@
 - `DV HDR 类型列表归一化`：`supportedHdrTypes` 进入结果对象前应做去重和顺序归一化，避免同一设备在不同 Android 版本上因列表顺序抖动而影响日志、测试或缓存比较；结果对象保留归一化后的列表作为摘要即可，不需要暴露原始顺序。
 - `DV 本地能力结果不退化为 Boolean`：DV 本地能力模块的结果对象至少包含状态（支持 / 不支持 / 未知）、原因码和归一化 HDR 类型名摘要；不能只返回 Boolean，也不保留 Android HDR 类型 int 原值作为长期诊断语义。首轮原因码固定为闭集 enum，应能区分 `dolby_vision_present`、`dolby_vision_missing`、`no_display`、`no_hdr_capabilities`、`api_error` 等诊断场景；新增原因必须改 enum 和测试，不允许自由字符串临时扩展。
 - `DV HDR 附加字段仅诊断`：`HdrCapabilities` 里的亮度字段、色域或其它 HDR 元数据，首轮只作为诊断摘要保留，不参与“支持 / 不支持 / 未知”的状态判定。首轮判定只看是否声明 `HDR_TYPE_DOLBY_VISION`，避免把没有验收样本的亮度阈值或色彩规则提前固化进能力模块。
-- `DV 能力未知不进入安全放行分支`：如果 Dolby Vision 设备能力或当前播放链路能力探测结果为未知，不能把这次播放视为“已确认可安全放行”的 DV 播放。对于已经被判定为 Dolby Vision 风险源的视频，未知结果也不允许退回 [[普通非 DV 播放链路]]；应继续停留在阻断/提示语义，而不是把它交给已知可能异色的链路兜底。
+- `DV 能力未知不进入安全放行分支`：如果 Dolby Vision 设备能力或当前播放链路能力探测结果为未知，不能把这次播放视为“已确认可安全放行”的 DV 播放。对于已经被判定为 Dolby Vision 风险源的视频，未知结果也不允许进入 [[TV 长视频 ExoPlayer 内核]] 播放；应继续停留在阻断/提示语义，而不是把它交给可能异色的链路兜底。
 - `DV 未知阻断不提供强行播放`：如果 Dolby Vision 风险源因为设备能力或播放链路能力结果未知而被阻断，首轮失败态只提供“返回”和“重试”这类非放行入口，不提供“仍然继续播放”“忽略风险播放”之类的旁路按钮。这样“未知不放行”既是策略约束，也是交互约束。
 - `DV 不支持阻断不提供强行播放`：如果 Dolby Vision 风险源的设备能力或播放链路能力被明确判定为不支持安全播放，首轮仍沿用阻断页语义，只把原因文案改为“当前设备不支持安全播放”一类解释；交互入口继续限制为“返回”和“重试”，不提供旁路播放。
-- `DV 重试属于幂等重判`：Dolby Vision 风险阻断页或专用 Media3/ExoPlayer 播放失败页上的“重试”，首轮只表示重新评估当前播放项的 `playback_compat`、本地显示能力和专用链路可用性，并重新走同一套播放决策流程。若已进入专用链路，重试可以释放并重建专用播放器后再次尝试同一专用链路；它不回退 LibVLC，不切换到其它播放器分支，不改写服务端 metadata，也不触发重新转码、实时 ffprobe 或其它服务端修复动作。
+- `DV 重试属于幂等重判`：Dolby Vision 风险阻断页或 ExoPlayer 播放失败页上的“重试”，只表示重新评估当前播放项的 `playback_compat`、本地显示能力和统一长视频播放内核可用性，并重新走同一套播放决策流程。若已进入播放内核，重试可以释放并重建播放器后再次尝试同一播放源；它不切换到 LibVLC 或其它播放器分支，不改写服务端 metadata，也不触发重新转码、实时 ffprobe 或其它服务端修复动作。
 - `DV 重试依赖本地状态变化`：Dolby Vision 风险阻断页上的“重试”只有在能力判断依赖的本地状态刚发生变化时才真正有意义，例如显示模式、外接显示链路或相关系统状态变化；无论阻断原因是能力未知还是明确不支持，如果这些前置条件没有变化，重复点击本质上只是重复得到同一结论，不应被包装成通用修复手段。
-- `普通非 DV 播放链路`：在 TV Dolby Vision 播放兼容语境里，首轮只指当前已经存在的 TV 长视频 LibVLC 播放链路，不包含任何新的系统播放器或 Media3 分支。凡是“退回普通链路”的表述，都应理解为回到现有 LibVLC 行为边界内兜底。
-- `DV 支持放行只进专用链路`：即使设备显示能力和当前目标播放链路都明确支持对应 Dolby Vision 风险源，首轮也只允许进入 [[杜比视界专用系统播放链路]]；当前 TV 长视频 LibVLC 普通链路不承担 Dolby Vision 安全播放，除非后续单独证明它也属于可安全输出的播放链路能力范围。
-- `DV 专用链路播放源资格`：[[杜比视界专用系统播放链路]] 只能使用当前仍可访问、且 metadata 表明播放源自身仍是 Dolby Vision 的媒体文件。已经被转码成非 Dolby Vision 的输出文件不具备该资格；已删除或不可访问的原始上传文件也不能被假设为可用播放源。
-- `DV 专用链路首轮三条件门控`：TV App 首轮进入 [[杜比视界专用系统播放链路]] 必须同时满足三类条件：当前默认显示侧声明支持 Dolby Vision；`playback_compat` 表明当前实际播放 output 仍是 Dolby Vision；App 内部 Media3/ExoPlayer 专用分支可初始化且当前播放 URL 有效。缺任一项都不能尝试专用播放；如果 source 是 Dolby Vision 但 output 已不是 Dolby Vision，仍按 [[杜比视界转码输出阻断]] 处理。该门控不等同于 profile 级安全证明，profile 级判断后续仍需要结合播放链路能力和媒体 metadata 继续细化。
-- `DV 播放链路选择器`：TV 端播放入口应把当前播放项解析成明确的链路选择结果，而不是在 UI 层分散判断。首轮结果只包含既有 LibVLC 普通链路、[[杜比视界专用系统播放链路]]、阻断三类；单个长视频和电视剧分集都应复用同一套选择语义。选择器负责统一处理老数据普通放行、转码输出风险阻断、metadata 不完整阻断、显示能力不支持/未知阻断，以及满足门控时进入专用链路。
-- `DV 播放诊断信息`：TV 端围绕 Dolby Vision 播放决策提供的本地排障摘要，用于解释当前播放项为什么进入 LibVLC、专用 Media3/ExoPlayer 或阻断路径。它可以包含播放链路结果、显示能力状态、`playback_compat` 摘要、播放 URL 有效性和专用 Media3 错误摘要；它不是服务端业务数据，不改变播放决策，不上传服务端，也不替代 [[杜比视界安全播放]] 的门控规则。
+- `普通非 DV 播放链路（迁移前）`：在 TV Dolby Vision 播放兼容语境里，曾指 TV 长视频 LibVLC 播放链路，不包含任何新的系统播放器或 Media3 分支。该术语正被 [[TV 长视频 ExoPlayer 内核]] 迁移取代，后续不要再把“普通链路”默认解释为 LibVLC。
+- `TV 长视频 ExoPlayer 内核`：TV 端实际运行的单片长视频播放器和电视剧分集播放器统一使用 ExoPlayer/Media3 作为播放内核；既有 DV Media3 分支并入同一长视频内核语义，不再作为独立的全量播放器目标。IPTV 直播播放器不属于本术语范围，继续按 [[IPTV LibVLC 路径]] 独立维护。
+- `TV 长视频 ExoPlayer 端隔离`：[[TV 长视频 ExoPlayer 内核]] 迁移只作用于 `android-tv-app`，不改手机端播放器，不复用手机端 `UnifiedPlayerScreen` 或 `DetailScreen`，也不在本次抽共享播放层。若未来要统一手机端与 TV 端播放能力，应单独设计共享模块和跨端验收。
+- `TV 长视频 ExoPlayer 一次性切换`：TV 长视频迁到 [[TV 长视频 ExoPlayer 内核]] 时不提供用户可见的旧播放器开关，也不保留长视频 LibVLC 运行时回退。播放失败只提供重试、返回或诊断；若真机发现严重兼容问题，通过版本回滚或后续修复处理，不在产品内长期维持双轨。
+- `TV 长视频媒体源边界`：[[TV 长视频 ExoPlayer 内核]] 面向电影、`18+` 和电视剧分集的播放 URL，可以播放普通文件流、渐进式媒体以及 ExoPlayer/Media3 支持的媒体源；这不等于引入 IPTV 直播语义。长视频即使未来出现 HLS 播放源，也不得复用 IPTV 的频道列表、M3U 解析、直播诊断或 LibVLC 参数。
+- `DV 安全放行进入统一 ExoPlayer`：设备显示能力和当前目标播放链路都明确支持对应 Dolby Vision 风险源时，TV 端只允许进入 [[TV 长视频 ExoPlayer 内核]] 播放；否则进入阻断/提示语义，不提供 LibVLC 回退或强行播放。
+- `DV 统一内核播放源资格`：Dolby Vision 风险源进入 [[TV 长视频 ExoPlayer 内核]] 时，只能使用当前仍可访问、且 metadata 表明播放源自身仍是 Dolby Vision 的媒体文件。已经被转码成非 Dolby Vision 的输出文件不具备该资格；已删除或不可访问的原始上传文件也不能被假设为可用播放源。
+- `DV 统一内核三条件门控`：TV App 允许 Dolby Vision 风险源进入 [[TV 长视频 ExoPlayer 内核]] 必须同时满足三类条件：当前默认显示侧声明支持 Dolby Vision；`playback_compat` 表明当前实际播放 output 仍是 Dolby Vision；统一 ExoPlayer 长视频内核可初始化且当前播放 URL 有效。缺任一项都不能尝试播放；如果 source 是 Dolby Vision 但 output 已不是 Dolby Vision，仍按 [[杜比视界转码输出阻断]] 处理。该门控不等同于 profile 级安全证明，profile 级判断后续仍需要结合播放链路能力和媒体 metadata 继续细化。
+- `DV 播放链路选择器`：TV 端播放入口应把当前播放项解析成明确的播放决策，而不是在 UI 层分散判断。迁移到 [[TV 长视频 ExoPlayer 内核]] 后，选择器结果收口为“允许进入统一 ExoPlayer 播放”或“阻断/提示”；单个长视频和电视剧分集都应复用同一套选择语义。
+- `DV 播放诊断信息`：TV 端围绕 Dolby Vision 播放决策提供的本地排障摘要，用于解释当前播放项为什么允许进入统一 ExoPlayer 播放或为什么被阻断。它可以包含播放决策、显示能力状态、`playback_compat` 摘要、播放 URL 有效性和 ExoPlayer 错误摘要；它不是服务端业务数据，不改变播放决策，不上传服务端，也不替代 [[杜比视界安全播放]] 的门控规则。
 - `DV 播放诊断入口`：[[DV 播放诊断信息]] 首轮只在播放阻断页和专用 Media3/ExoPlayer 播放失败页通过显式入口打开，正常播放页不常驻展示。该入口只服务本地排障，不提供继续播放、强行播放或切换链路能力；诊断内容不得暴露 access token 或完整播放 URL，只能展示 URL 是否存在等安全摘要。
 - `DV 播放诊断展示形态`：[[DV 播放诊断入口]] 首轮复用 TV 现有错误态的主面板风格，作为二级动作进入同一错误页内的诊断视图或弹层，不新开独立页面。这样可以保持播放页焦点和返回行为稳定，也方便把诊断视图和“重试/返回”放在同一故障上下文里。
 - `DV 诊断简化原则`：[[DV 播放诊断信息]] 首轮只保留最少必要字段和最短操作链路，优先让人一眼看出“为什么被阻断 / 为什么走专用链路 / 为什么失败”，不做分层钻取、树状展开或多页面诊断流程。字段能解释决策即可，不追求把所有底层能力一次性摊开。
@@ -78,8 +82,9 @@
 - `DV 专用链路重试保留当前快照`：[[杜比视界专用系统播放链路]] 首轮在专用 Media3/ExoPlayer 播放失败后重试时，优先沿用当前播放器已经拿到的进度快照继续尝试；只有切集或显式从头播放时才回到历史起点。这样重试能保留现场进度，不把失败恢复等同于重新选集。
 - `DV 专用链路启动边界`：电视剧分集进入 [[杜比视界专用系统播放链路]] 后，当前分集播放源准备完成时必须像普通 LibVLC 分支一样自动进入播放会话，不能停留在 `hasStartedPlayback=false` 导致 Media3 只 prepare 不 play。Media3/ExoPlayer 专用播放器若在已有播放源且用户期望播放的状态下长期停留在启动/缓冲、未进入 playing，应在有限时间内切到专用播放失败页并允许重试；不能无限黑屏或卡在播放器 surface 上。
 - `DV 专用链路核心互动层`：[[杜比视界专用系统播放链路]] 的播放会话应保留 TV 长视频的核心遥控体验，包括播放/暂停、快进快退、进度反馈、返回二次确认、续播提示、剧集选集轨与连播提示；字幕/音轨切换属于第二阶段增强能力，不应和核心互动层的可播放闭环互相阻断。
-- `DV 字幕音轨第二阶段能力`：DV 专用 Media3/ExoPlayer 链路的第二阶段接入外挂字幕选择与内嵌音轨选择。外挂字幕来自服务端字幕列表并随 `MediaItem` 预加载，播放中切换通过 `TrackSelectionParameters` 覆盖完成；内嵌音轨来自 Media3 当前轨道枚举，偏好按语言/类型等语义恢复。该能力不承诺 LibVLC/libass 的内嵌字幕识别或 ASS 特效一致性。
-- `DV 第二阶段字幕音轨范围`：[[DV 专用链路第二阶段]] 的字幕选择先沿用服务端下发的外挂字幕列表，音轨选择来自 Media3/ExoPlayer 对当前播放源枚举到的内嵌音频轨；本阶段不承诺追齐 LibVLC/libass 的内嵌字幕识别、ASS 特效或样式一致性。
+- `TV ExoPlayer 字幕音轨能力`：[[TV 长视频 ExoPlayer 内核]] 的字幕选择沿用服务端下发的外挂字幕列表，音轨选择来自 ExoPlayer/Media3 对当前播放源枚举到的内嵌音频轨；偏好继续按语言/类型等语义恢复。该能力不承诺追齐 LibVLC/libass 的内嵌字幕识别、ASS 特效或样式一致性。
+- `TV ExoPlayer 媒体鉴权`：TV 长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后，视频源和外挂字幕请求都应通过 ExoPlayer/Media3 的 HTTP data source 发送 `Authorization: Bearer <token>` header 鉴权，不再把 `access_token` 拼进播放 URL 或字幕 URL。服务端 query token fallback 可以继续作为历史兼容能力存在，但不作为 TV 长视频新路径依赖。
+- `DV 第二阶段字幕音轨范围（迁移前）`：曾用于描述 DV 专用 Media3/ExoPlayer 分支接入外挂字幕选择与内嵌音轨选择的阶段性术语。随着 [[TV 长视频 ExoPlayer 内核]] 统一迁移，字幕与音轨能力不再按 DV 专用分支单独命名，统一归入 [[TV ExoPlayer 字幕音轨能力]]。
 - `DV 外挂字幕无感切换`：[[DV 第二阶段字幕音轨范围]] 中的外挂字幕切换目标是不重启播放会话、不露出黑屏、不跳回起点，并尽量保留当前播放状态；不能把每次字幕切换都表现成重新打开视频。若底层播放库能力不足以完全无感，必须在实现前重新收口验收边界。
 - `DV 字幕切换连续性`：[[DV 外挂字幕无感切换]] 的体验目标是播放中切换字幕时不跳黑、不闪回、不重启播放会话，并尽量维持当前画面连续；若底层库只能做到短暂重建但能保住进度，也必须先把这部分风险说清楚再实现。
 - `DV 音轨偏好匹配`：[[DV 第二阶段字幕音轨范围]] 中的音轨选择应保存语言、类型等语义偏好，并在下一集或下次进入时按最接近的 Media3/ExoPlayer 音频轨自动匹配；不要把底层 track id 当作跨分集稳定标识。
@@ -92,8 +97,8 @@
 - `DV 返回详情连续性`：[[DV 返回详情闪动]] 的体验目标是返回详情时不暴露上一帧视频、详情页底图抢显、白闪或系统桌面露出；如果已经没有这些 App 层可控画面外露，只剩电视/系统因 Dolby Vision/HDR 模式切换产生的一次短暂黑屏，则归入 [[DV 退出显示切换边界]]。
 - `DV 返回详情黑场保持（已撤回）`：单片与剧集从 [[杜比视界专用系统播放链路]] 主动返回详情页时，曾采用 App 层全屏黑场加短延迟再导航的策略遮住 Media3 `AndroidView` 销毁与详情页重绘间隙；该策略会让用户明确感知“黑一下”，已撤回，后续不得把主动黑场遮罩作为默认返回体验。
 - `DV 返回详情正常导航`：单片与剧集从 [[杜比视界专用系统播放链路]] 主动返回详情页时，二次退出确认完成后应直接执行正常导航返回，不再设置 App 层黑色遮罩、不再人为延迟。若仍出现短暂黑屏，需先区分是电视/系统 Dolby Vision/HDR 显示模式切换还是详情页重绘性能问题；不要用主动黑场覆盖作为首选修复。
-- `TV 播放控制层`：TV 长视频播放器中承载遥控按键、播放/暂停、seek、进度反馈、返回确认、续播提示、选集轨和连播提示的交互层；它不应被定义为某个播放内核的私有 UI。
-- `TV 播放内核适配`：LibVLC 与 Media3/ExoPlayer 都应通过适配边界向 [[TV 播放控制层]] 暴露播放状态、时长、进度、播放/暂停、seek、结束和错误，不让控制层直接依赖某个内核的私有对象。字幕/音轨选择是独立能力，不纳入本阶段适配边界。
+- `TV 播放控制层`：TV 长视频播放器中承载遥控按键、播放/暂停、seek、进度反馈、返回确认、续播提示、字幕、音轨、选集轨、连播提示、错误/重试和历史上报触发的交互层；它不应被定义为某个播放内核的私有 UI。迁到 [[TV 长视频 ExoPlayer 内核]] 是播放内核替换，不是播放器交互重做。
+- `TV 播放内核适配`：播放内核必须通过适配边界向 [[TV 播放控制层]] 暴露播放状态、时长、进度、播放/暂停、seek、结束、错误和可选轨道，不让控制层直接依赖某个内核的私有对象。长视频迁到 ExoPlayer 后，验收重点是控制层语义保持，而不是重建一套新交互。
 - `电视剧核心控制层优先抽离`：[[TV 播放控制层]] 第一阶段只覆盖电视剧播放器的核心控制与选集/连播体验，不主动重构单片长视频的默认控制变体，也不抽离字幕/音轨选择能力。
 - `混合剧集播放链路切换`：同一部电视剧内允许不同分集使用不同播放链路；非 DV 分集可走 [[普通非 DV 播放链路]]，DV 分集可走 [[杜比视界专用系统播放链路]]，用户仍停留在同一个剧集播放器会话内完成选集与连播，不因切换播放链路退回详情页。
 - `混合剧集切换进度语义`：[[混合剧集播放链路切换]] 不改变既有 [[连播链路]] 的起播规则；自动连播、下一集和播放结束兜底切集从头开始，入口进入、继续观看和手动选集按目标集历史进度续播，切走前应保存当前集进度。
@@ -102,19 +107,19 @@
 - `DV 诊断替换当前卡片`：进入 [[DV 播放诊断入口]] 后，当前错误卡片直接切换成诊断卡片，不在同一错误页里并排追加第二层信息区。这样可以保持 TV 焦点、返回和操作路径稳定，避免双层错误态同时出现。
 - `DV 诊断返回依赖系统返回`：[[DV 播放诊断入口]] 首轮不提供单独的“返回原错误页”按钮，返回诊断前一层只依赖系统返回键或遥控返回。这样诊断卡片只保留一个最关键的主操作，不额外增加焦点目标。
 - `DV 诊断用户面只显示中文`：[[DV 播放诊断信息]] 首轮在用户可见界面只显示中文解释，不直接暴露内部原因码或枚举名。内部码仍可用于日志和测试，但不作为用户界面文案的一部分。
-- `DV 专用链路无用户开关`：TV App 首轮不提供“启用/关闭杜比视界实验播放”之类的用户可见开关。播放入口由系统按安全门控自动选择：非 Dolby Vision 或历史普通数据走既有 LibVLC 普通链路，满足 [[DV 专用链路首轮三条件门控]] 的 Dolby Vision output 走专用 Media3/ExoPlayer 链路，不满足则阻断；用户不能通过开关绕过“不异色优先”的安全约束。
+- `DV 安全门控无用户开关`：TV App 不提供“启用/关闭杜比视界实验播放”之类的用户可见开关。播放入口由系统按安全门控自动选择：非 Dolby Vision 或历史普通数据走 [[TV 长视频 ExoPlayer 内核]]，满足 [[DV 统一内核三条件门控]] 的 Dolby Vision output 走同一 ExoPlayer 长视频内核，不满足则阻断；用户不能通过开关绕过“不异色优先”的安全约束。
 - `DV 专用链路阻断文案分层`：TV App 首轮对 Dolby Vision 风险源的专用链路阻断文案只做有限分层，不直接暴露 Android API 原因码。显示链路明确不支持时提示“当前电视或显示链路未声明支持杜比视界，无法安全播放该视频”；显示链路能力未知时提示“无法确认当前电视或显示链路是否支持杜比视界，暂不能安全播放”；source 为 Dolby Vision 但 output 已不是 Dolby Vision 时沿用 [[杜比视界转码输出阻断]] 文案；Media3/ExoPlayer 专用分支不可用或播放 URL 无效时提示“杜比视界专用播放链路暂不可用，无法安全播放该视频”。
 - `DV metadata 不完整不进专用链路`：如果 `playback_compat` metadata 已存在但探测失败，或没有分别给出 source/output 的 Dolby Vision 判定，TV App 首轮必须按“不能确认 [[DV 专用链路播放源资格]]”处理，不根据文件名、视频类型或历史经验猜测可进入 [[杜比视界专用系统播放链路]]。
-- `老数据普通播放放行`：`playback_compat` 整体缺失或协议版本过旧的存量视频可以继续按既有 [[普通非 DV 播放链路]] 播放，这属于兼容历史数据的普通播放放行，不等同于 Dolby Vision 安全播放，也不允许进入 [[杜比视界专用系统播放链路]]。如果 metadata 已存在但标记探测失败或关键字段缺失，不再适用老数据放行，而应按播放兼容信息不完整处理；一旦 metadata 已明确标记 Dolby Vision 风险源，仍按 Dolby Vision 阻断或专用链路规则处理。
+- `老数据普通播放放行`：`playback_compat` 整体缺失或协议版本过旧的存量视频可以继续按 [[TV 长视频 ExoPlayer 内核]] 播放，这属于兼容历史数据的普通播放放行，不等同于 Dolby Vision 安全播放。如果 metadata 已存在但标记探测失败或关键字段缺失，不再适用老数据放行，而应按播放兼容信息不完整处理；一旦 metadata 已明确标记 Dolby Vision 风险源，仍按 Dolby Vision 安全门控处理。
 - `播放兼容信息不完整提示`：如果已存在的 `playback_compat` metadata 不能支撑播放安全判断，TV 播放入口首轮只提示“播放兼容信息不完整，暂不能确认安全播放”这类失败态，并提供返回/重试，不在播放页内触发补探测、实时 ffprobe 或后台修复任务。补探测属于后端任务或管理端修复入口的后续设计。
 - `播放兼容信息不完整重试`：[[播放兼容信息不完整提示]] 里的“重试”只表示重新拉取详情 metadata 并重新执行本地播放决策；它不触发服务端补探测、实时 ffprobe、重新转码或 metadata 修复。
-- `TV playback_compat v0 历史兼容`：TV 端把 `playback_compat.version < 1` 视为协议过旧的历史数据，按 [[老数据普通播放放行]] 继续走现有 LibVLC 普通链路；`version > 1` 不做乐观兼容，按 [[播放兼容信息不完整提示]] 处理，避免未来协议字段被旧客户端误判为安全。
-- `杜比视界专用系统播放链路`：普通 TV 长视频继续使用现有 LibVLC 长视频播放器；只有被 metadata 标记为 Dolby Vision 风险源、且设备平台声明支持对应能力时，才允许进入 TV App 内部专用的 Media3/ExoPlayer 播放分支，以复用 Android 系统解码与 HDR/Dolby Vision 输出链路。该链路不是跳出 App 的外部播放器 Intent，也不得演变成全量长视频播放器迁移。
-- `DV 专用链路覆盖长视频与分集`：[[杜比视界专用系统播放链路]] 首轮应同时覆盖单个长视频播放页和电视剧分集播放页。电视剧场景必须按“当前分集”独立读取播放源、`playback_compat` 和本地能力结果并重新判定；不能因为同一部剧、同一季或上一集已经进入专用链路，就把专用链路资格沿用到下一集。
+- `TV playback_compat v0 历史兼容`：TV 端把 `playback_compat.version < 1` 视为协议过旧的历史数据，按 [[老数据普通播放放行]] 继续走 [[TV 长视频 ExoPlayer 内核]]；`version > 1` 不做乐观兼容，按 [[播放兼容信息不完整提示]] 处理，避免未来协议字段被旧客户端误判为安全。
+- `杜比视界专用系统播放链路（迁移前）`：普通 TV 长视频使用 LibVLC 时，Dolby Vision 风险源满足门控后进入的 Media3/ExoPlayer 专用分支。随着 [[TV 长视频 ExoPlayer 内核]] 迁移，该术语只保留为历史兼容语境；后续应描述为统一 ExoPlayer 长视频内核下的 Dolby Vision 播放决策。
+- `DV 安全门控覆盖长视频与分集`：DV 安全门控同时覆盖单个长视频播放页和电视剧分集播放页。电视剧场景必须按“当前分集”独立读取播放源、`playback_compat` 和本地能力结果并重新判定；不能因为同一部剧、同一季或上一集已经允许播放，就把资格沿用到下一集。
 - `电视剧分集播放源准备态`：电视剧播放器中，当前分集已确定为可播放且未被兼容策略阻断，但实际播放源尚未准备完成时，应被视为播放准备中的中间态。它不同于未绑定视频、分集不可播放和播放兼容阻断，界面不能把它表达为“当前分集暂无可播放视频”。
-- `DV 专用链路首轮最小播放闭环`：[[杜比视界专用系统播放链路]] 首轮验收目标是证明 Dolby Vision 风险源在满足条件时可以通过专用 Media3/ExoPlayer 分支播放且不回退到已知风险链路。首轮必须保留播放/暂停、返回、失败页、重试、基础进度上报，以及分集切换时重新判定；不要求追齐 LibVLC 长视频链路的字幕选择、音轨选择、倍速、画面比例或复杂播放器浮层。
-- `DV 专用链路字幕音轨首轮非阻断`：如果 Dolby Vision 风险源进入 [[杜比视界专用系统播放链路]]，首轮不因外挂字幕、多音轨选择、倍速或画面比例等体验能力缺失而阻断播放，也不在播放前额外弹确认。Media3/ExoPlayer 能自动处理的内嵌轨道可按系统默认行为使用；未实现的控制入口应隐藏或禁用，后续若要追齐 LibVLC 体验应作为独立任务处理。
-- `DV 专用链路不改变观看历史语义`：[[杜比视界专用系统播放链路]] 只是 TV 端播放实现分支，不改变长视频或电视剧分集的观看历史业务语义。首轮继续沿用现有观看历史接口、完成判定口径和 UI 历史展示，不新增 DV 专用历史字段；客户端内部可以抽象播放器进度快照来同时适配 LibVLC 和 Media3/ExoPlayer，但服务端不感知播放器分支。
+- `DV 最小播放闭环`：Dolby Vision 风险源在满足安全门控时必须能通过 [[TV 长视频 ExoPlayer 内核]] 播放，且不回退到已知风险链路。播放体验必须保留播放/暂停、返回、失败页、重试、基础进度上报，以及分集切换时重新判定。
+- `DV 字幕音轨非阻断`：如果 Dolby Vision 风险源被安全门控放行，不因外挂字幕、多音轨选择、倍速或画面比例等体验能力缺失而阻断播放，也不在播放前额外弹确认。ExoPlayer 能自动处理的内嵌轨道可按系统默认行为使用；未实现的控制入口应隐藏或禁用，后续若要追齐体验应作为独立任务处理。
+- `DV 播放不改变观看历史语义`：Dolby Vision 安全门控只是 TV 端播放决策，不改变长视频或电视剧分集的观看历史业务语义。继续沿用现有观看历史接口、完成判定口径和 UI 历史展示，不新增 DV 专用历史字段；服务端不感知播放器分支。
 - `杜比视界播放失败不回退 LibVLC`：Dolby Vision 风险源进入专用系统播放链路后，如果播放失败，不自动回退到 LibVLC；失败页只提供重试或返回。LibVLC 是已知可能异色的链路，自动回退会违反 [[杜比视界安全播放]] 的“不异色优先”目标。
 - `杜比视界转码输出阻断`：如果原始上传源被探测为 Dolby Vision 风险源，但最终实际可播放文件已经不是可原生 Dolby Vision 的源，TV App 不应依赖设备 Dolby Vision 能力兜底，也不应继续播放可能异色的转码输出；应提示“该视频来源为杜比视界，当前压缩结果可能无法安全播放”并提供返回或重试入口。
 - `DV→SDR 可信输出撤回`：后端不再为 Dolby Vision 源生成 `video-dv-sdr.mp4`、`dv_sdr_compat` 或 `trusted_tone_map=dv_sdr_bt709` 这类可信 SDR 兼容产物；已验证普通 `zscale + tonemap` 路线可能得到可转码但异色的结果。后续任何 DV→SDR 方案都必须作为新任务重新定义色彩链路、样片验收和播放策略，不得复用已撤回的可信标记。
@@ -314,20 +319,20 @@
 - `最近播放`：当前类型下用户已有播放进度的内容；电视剧保留季/集信息，电影和 `18+` 指向长视频本体。
 - `TV 首页货架纯标题`：TV 首页的货架标题只保留「最近播放」与「最近更新」两类语义，不在标题下追加说明文案或数量文案；单独入口可以保留为纯动作标题，但不再用副文案补充解释。
 - `服务器自动嗅探`：TV 端连接服务器页对局域网服务的扫描过程；扫描状态属于表单内的辅助反馈，应使用小型行内 loading，不使用占据视觉中心的大型加载态。
-- `TV 长视频 LibVLC 内核`：TV 长视频播放器（电影 / `18+` / 电视剧共用的 `LongFormVideoPlayer.kt`）的播放引擎，从 Media3 ExoPlayer 切到 `org.videolan.libvlc.MediaPlayer`。视频解码、字幕渲染、音轨切换均走 LibVLC；与 [[IPTV LibVLC 路径]] 共用同一个 `libvlc-all` 依赖和 `TvVlcLibrary` 单例，但长视频与 IPTV 配置不共用 helper。
-- `TV 长视频 TextureView 硬解默认`：TV 长视频 LibVLC 内核的视频输出走 `VLCVideoLayout` + TextureView，解码偏好开启 `Media.setHWDecoderEnabled(true, true)`。这与 IPTV 的“TextureView + 硬解默认”同向：长视频源由后端转码链控制 codec 边界，适合默认硬解；IPTV 第三方直播源现在也默认开启硬解，若后续出现兼容性问题再单独回退。
-- `LibVLC track id 不稳定`：LibVLC `MediaPlayer.getAudioTracks()` / `getSpuTracks()` 返回的 track id 在 Media 重新加载后不保证稳定，禁止把它当作长期协议或服务端字段。客户端如需跨集恢复音轨/字幕偏好，应优先保存 language code + 偏好类型并在新 media 加载后按名称/语言匹配；运行时菜单内的临时 id 只用于当前 media。
-- `TV 轨道偏好持久化`：TV 长视频播放页的音轨/字幕偏好在 DataStore 中以 `language + type` 形态保存，而不是保存 LibVLC 当前 media 的临时 track id。`LongFormVideoPlayer` 的运行时选择仍然需要 track id，但 id 只在当前 media 内有效；跨集、重载或切换来源时只读取持久化偏好并重新映射。
-- `TV 长视频焦点真空`：TV 长视频播放器在 [[续播提示卡]] / 字幕 picker / 音轨 picker / 返回二次确认提示等叠加层关闭后留下的 Compose 焦点状态：没有任何 focusable 持焦，导致 `LongFormVideoPlayer` 根 Box 的 `onPreviewKeyEvent` 收不到 DPAD_DOWN / CENTER / DPAD_UP 事件，只有 ←/→ 还能借方向性 focus search 偶尔触发。是 LibVLC 迁移之后由兄弟节点叠加层（续播卡）和 Dialog 类 picker 跨 window 焦点回收缺失放大的副作用。
+- `TV 长视频 LibVLC 内核（迁移前）`：TV 长视频播放器（电影 / `18+` / 电视剧）曾使用 `org.videolan.libvlc.MediaPlayer` 作为播放引擎，视频解码、字幕渲染、音轨切换均走 LibVLC。该内核正被 [[TV 长视频 ExoPlayer 内核]] 取代；LibVLC 后续只保留在 [[IPTV LibVLC 路径]] 等明确直播场景。
+- `TV 长视频 TextureView 硬解默认（迁移前）`：TV 长视频 LibVLC 内核时期，视频输出走 `VLCVideoLayout` + TextureView，解码偏好开启 `Media.setHWDecoderEnabled(true, true)`。随着 [[TV 长视频 ExoPlayer 内核]] 迁移，该约束不再适用于长视频；IPTV 直播仍按 [[IPTV LibVLC 路径]] 独立使用 LibVLC 输出策略。
+- `LibVLC track id 不稳定（IPTV/历史）`：LibVLC `MediaPlayer.getAudioTracks()` / `getSpuTracks()` 返回的 track id 在 Media 重新加载后不保证稳定，禁止把它当作长期协议或服务端字段。该约束后续主要保留给 [[IPTV LibVLC 路径]] 或迁移前长视频排障；TV 长视频迁到 ExoPlayer 后仍沿用“不保存底层临时 track id”的偏好原则。
+- `TV 轨道偏好持久化`：TV 长视频播放页的音轨/字幕偏好在 DataStore 中以 `language + type` 等语义形态保存，而不是保存底层播放器当前 media 的临时 track id。跨集、重载或切换来源时只读取持久化偏好并按当前 ExoPlayer/Media3 轨道列表重新映射。
+- `TV 长视频焦点真空`：TV 长视频播放器在 [[续播提示卡]] / 字幕 picker / 音轨 picker / 返回二次确认提示等叠加层关闭后留下的 Compose 焦点状态：没有任何 focusable 持焦，导致播放器根 Box 的 `onPreviewKeyEvent` 收不到 DPAD_DOWN / CENTER / DPAD_UP 事件。该问题与具体播放内核无关，迁到 ExoPlayer 后仍必须由 [[TV 播放控制层]] 兜底。
 - `LongFormVideoPlayer focus 兜底`：`LongFormVideoPlayer` 内部用于消除 [[TV 长视频焦点真空]] 的双层机制：①一个聚合 `LaunchedEffect` 监听 `controlsVisible` / `subtitleSheetVisible` / `audioTrackSheetVisible` / `resumePromptVisible` / `backConfirmPromptVisible` / `playerErrorVisible` 六个可见性，任一 true→false 跃迁且没有其他 overlay 仍在显示时显式 `rootFocusRequester.tryRequestFocus()`；②根 Box 的 `onFocusChanged`，当 root 自身丢焦点又无 overlay / 无 controls 焦点时也调用 `requestRootFocusWhenReady()`。两道关共同覆盖 LaunchedEffect 不感知的 Dialog dismiss 等场景。聚合判定纯函数在 `LongFormPlayerFocusGuard.kt`。
 - `续播提示卡内嵌位置`：续播提示卡（`TvResumePromptCard`）必须作为 `LongFormVideoPlayer` 内部子节点渲染，通过 `resumePromptSlot: @Composable BoxScope.() -> Unit` 槽位接入。卡片 dispose 时 Compose 焦点自然回收到 ancestor（player 根 Box）而不是清空成 null。不允许把 `TvResumePromptCard` 作为 `LongFormVideoPlayer` 的兄弟节点平铺在 `TvLongFormPlayerScreen` / `TvSeriesPlayerScreen` 的外层 Box 里，否则 [[TV 长视频焦点真空]] 会再次出现。
-- `VLC Playing gate`：TV 长视频 LibVLC 内核为 `MediaPlayer.audioTrack = vlcTrackId` 和 `MediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, url, true)` 这类 track 切换性调用加的等待门：必须在收到 `MediaPlayer.Event.Playing` 之后执行，`MediaPlayer.Event.Stopped/EndReached/EncounteredError` 时复位。LibVLC 在媒体未真正进入 Playing 状态时会丢弃这两类调用，导致 [[TV 轨道偏好持久化]] 表面"没生效"。`LongFormVideoPlayer` 自带 `isVlcPlaying` state gate audio LaunchedEffect；`TvLongFormPlayerScreen` / `TvSeriesPlayerScreen` 各自维护独立的 `isVlcPlaying` state 决定 `addSlave` 时机；二者通过 `MediaPlayer.EventListener` / `onVlcEvent` 回调各自驱动。
+- `VLC Playing gate（迁移前）`：TV 长视频 LibVLC 内核为 `MediaPlayer.audioTrack = vlcTrackId` 和 `MediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, url, true)` 这类 track 切换性调用加的等待门。随着 [[TV 长视频 ExoPlayer 内核]] 迁移，该约束不再作为长视频实现前提；只在排查历史版本或明确 LibVLC 场景时适用。
 - `Type-only preference fallback`：TV 长视频字幕/音轨偏好恢复的兜底规则：当 DataStore 存的 `TvTrackPreference` 只有 `type`（如 "default" / "forced" / "commentary"）而 `language` 为空时，`resolveSelectedSubtitleTrackByPreference` 与 `resolveLongFormTrackByLanguage` 按 type 字段直接在 track 列表里找第一条同 type 的 track 返回，而不是直接放弃。修复 LibVLC 迁移之后 `isDefault=true` 但无 `languageCode` 的字幕/音轨永久丢失的 design hole。`buildSubtitleTrackPreference` / `buildAudioTrackPreference` 允许写入这类 type-only preference；resolve 端必须有对应解释路径。
 - `Audio LaunchedEffect 状态回灌`：`LongFormVideoPlayer` 的 audio LaunchedEffect 在 [[VLC Playing gate]] 通过且 `resolveAudioSelectionOnTrackLoad` 给出 `resolvedSelection` 时，除了 `player.audioTrack = vlcTrackId` 外还必须通过 `onSelectAudioTrack(resolvedSelection, preference, isUserAction = false)` 把 resolved track id 回灌给父级 `selectedAudioTrackId` state，使音轨 picker 不会显示成"自动选择"。`onSelectAudioTrack` 第三参数 `isUserAction: Boolean` 区分 picker 用户操作（true，触发 DataStore 写）与 LaunchedEffect 自动回灌（false，只更新 in-memory state），避免回灌→save→state change→LaunchedEffect 再 fire 的 save-loop。
-- `TV LibVLC playback URL 携带 access_token`：TV 端给 LibVLC 当 media URL 的播放 / 字幕地址（`/api/v1/videos/:id/source` 与 `/videos/:id/subtitles/:sid/file`）必须用 `appendAccessTokenQuery(url, accessToken)` 在 URL 上附加 `?access_token=<jwt>` query 参数。LibVLC 自己的 HTTP 栈走 libcurl，不经过 OkHttp interceptor、不会带 Authorization Bearer header；服务端 `AuthMiddleware` 在 header 缺失时 fallback 从 `?access_token=` query 读取 token。`applyLongFormMediaSource` 用 accessToken 参数把视频 URL 装好；subtitle 由 LaunchedEffect 在调 `mediaPlayer.addSlave` 之前同样 append。
-- `MediaPlayer.addSlave 用 Uri 重载`：调 LibVLC `MediaPlayer.addSlave(int, ..., boolean)` 注入字幕时必须用 Uri 重载（`android.net.Uri.parse(url)`），不能用 String 重载。String 重载把 `http://...` 当本地文件路径，规范化成 `/http:/...` 后报 "cannot open file (No such file or directory)" 静默失败。Uri 重载经 `VLCUtil.locationFromUri` 转成正确的 MRL。
+- `TV LibVLC playback URL 携带 access_token（迁移前）`：TV 长视频 LibVLC 内核时期，给 LibVLC 当 media URL 的播放 / 字幕地址必须用 `appendAccessTokenQuery(url, accessToken)` 在 URL 上附加 `?access_token=<jwt>` query 参数。长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后，该规则被 [[TV ExoPlayer 媒体鉴权]] 取代；若 IPTV 后续需要受权媒体 URL，再在 [[IPTV LibVLC 路径]] 下单独定义。
+- `MediaPlayer.addSlave 用 Uri 重载（迁移前）`：TV 长视频 LibVLC 内核时期，调 LibVLC `MediaPlayer.addSlave(int, ..., boolean)` 注入字幕时必须用 Uri 重载，不能用 String 重载。长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后不再使用该字幕注入路径；该规则只作为历史排障或明确 LibVLC 场景的约束。
 - `Player onPreviewKeyEvent overlay 透传`：`LongFormVideoPlayer` 根 Box 的 `onPreviewKeyEvent` 在 [[续播提示卡内嵌位置]] 之后必须首行检查 `currentFocusGuardInput.anyOverlayVisible()`，若为 true 直接 `return false`。这是 capture phase，不让出去的话 overlay（续播卡 / 字幕 picker / 音轨 picker / 返回二次确认）按 CENTER/←/→ 会被 player 路由的 toggle/seek 吃掉，overlay 按钮的 `clickable` 收不到 key event。与 [[LongFormVideoPlayer focus 兜底]] 的 onFocusChanged 是互补关系：兜底负责"无 overlay 时把焦点拉回 root"，透传负责"有 overlay 时不要从 overlay 抢键"。
-- `LibVLC audioTrack=-1 是关音频`：libvlc-android 3.x 把 `mediaPlayer.audioTrack = -1` 解释为"禁用音频输出"，不是"自动选择"。Audio LaunchedEffect 在 `resolvedSelection == null` 时不能写 `audioTrack = -1`，必须保留 LibVLC 自挑的默认轨。规则：只在 `selected != null` 时才覆盖 `player.audioTrack`。
+- `LibVLC audioTrack=-1 是关音频（IPTV/历史）`：libvlc-android 3.x 把 `mediaPlayer.audioTrack = -1` 解释为"禁用音频输出"，不是"自动选择"。长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后不再使用该规则；只在排查 IPTV 或历史 LibVLC 长视频版本时适用。
 
 ## TV 首页结构
 - 一级首页使用左侧窄菜单和右侧内容区。
@@ -468,8 +473,9 @@
 - 后端负责保存和解析 M3U，Admin Web 负责上传文件、保存远程 URL、手动刷新和预览解析结果；TV App 只获取解析后的频道清单。
 - TV App 播放 IPTV 时直接连接 M3U 中的原始频道 URL；后端不代理、不转码、不隐藏源地址。
 - 远程 M3U URL 只在后台手动刷新时拉取，本期不做定时刷新和 EPG 节目单。
-- TV App 播放 M3U8/HLS 频道走 LibVLC IPTV 路径，不再依赖 Media3 HLS 扩展。M3U8 频道兼容性问题应优先从 LibVLC event、vout、视频轨和频道源响应排查。
-- TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并默认开启硬解。TV 长视频也使用 LibVLC，但配置分轨：长视频走 [[TV 长视频 LibVLC 内核]] 与 [[TV 长视频 TextureView 硬解默认]]；IPTV 现在也与长视频一致使用硬解默认，但仍保留独立的直播诊断路径和独立参数，不共用长视频 helper。
+- `IPTV LibVLC 路径`：TV App 播放 M3U8/HLS 频道走 LibVLC IPTV 路径，不依赖 Media3 HLS 扩展。`org.videolan.android:libvlc-all` 在 TV 工程中保留，但归属限定为 IPTV 直播播放；长视频播放器不得继续依赖 `TvVlcLibrary`、`newLongFormMediaPlayer` 或长视频 LibVLC helper。
+- `长视频 HLS 与 IPTV HLS 分界`：M3U8/HLS 出现在 IPTV 播放列表中时属于直播频道，继续走 [[IPTV LibVLC 路径]]；M3U8/HLS 若作为某个长视频播放 URL 出现，则属于 [[TV 长视频媒体源边界]]，可由 [[TV 长视频 ExoPlayer 内核]] 处理。本次迁移不新增长视频 HLS 功能，只保证长视频播放入口不主动排斥 ExoPlayer 支持的媒体源。
+- TV App 的 IPTV 播放页使用 LibVLC `VLCVideoLayout` 独立播放，在 Compose `AndroidView` 中必须让 LibVLC 使用 TextureView 输出，并默认开启硬解。IPTV 保留独立的直播诊断路径和独立参数，不共用长视频 ExoPlayer helper。
 - IPTV 播放页退出时不应在主线程同步 `stop()` 直播流或释放 `LibVLC` 库实例；退出契约是“先离开页面，再由播放器 release 与视图 detach 做轻量清理”，避免直播源 stop 阻塞返回动画或导航栈切换。
 - IPTV 播放无画面排查必须保留播放事件诊断：至少记录 LibVLC event、vout 数、视频轨/音频轨数量和当前视频轨 codec/分辨率。若 `videoTracks=0` 或无 `Vout`，优先检查 M3U 频道 URL、源站多码率/分片返回和是否需要后端转码；若有视频轨和 `Vout` 但仍黑屏，优先检查输出视图/系统合成层。
 - IPTV 频道清单不应包含音频专用源。明显音频源包括 `group-title=Audio/音频`、频道名包含 `音频` 或 `audio only`、URL 路径包含 `/audio/`、`_audio/`，以及 `.mp3/.aac/.m4a/.flac/.wav/.ogg/.opus` 等音频文件。后端解析时应跳过，TV 端也要过滤旧数据，避免默认播放只有声音没有画面的条目。

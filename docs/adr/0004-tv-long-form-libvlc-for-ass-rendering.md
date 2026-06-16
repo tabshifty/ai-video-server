@@ -1,5 +1,7 @@
 # TV 长视频播放内核从 Media3 切换到 LibVLC，由 libass 自渲染 ASS 字幕
 
+> 状态：已被 `0013-tv-long-form-exoplayer-unification.md` 取代。该 ADR 记录迁移前决策背景；当前 TV 长视频目标是统一 ExoPlayer 内核，ASS/SSA 不再承诺 libass 级保真，LibVLC 仅保留给 IPTV。
+
 TV 长视频（电影 / `18+` / 电视剧共用的 `LongFormVideoPlayer.kt`）原本基于 `androidx.media3:1.4.1`（ExoPlayer + PlayerView）。Media3 内置的 `SsaParser` 只解析 ASS/SSA 的对话文本行，**完整丢弃**样式、特效、卡拉 OK、矢量绘图、字体覆盖；ExoPlayer `SubtitleView` 也无法承载 ASS 的复杂渲染能力。为支撑用户场景里的卡拉 OK 番剧、字幕组特效番、ASS 装饰场景，决定**把 TV 长视频内核换成 `org.videolan.android:libvlc-all:3.6.0`**，并让字幕渲染完全由 LibVLC 内置的 libass 接管。
 
 服务端同步取消既有的 `ASS/SSA → WebVTT` 强转链路，DB 落 `format=ass` / `mime_type=text/x-ssa` 原文存储；视频内嵌字幕抽取时 `ass`/`ssa` codec 保留原 ASS、`mov_text` 等无 Style 格式继续 VTT。这一服务端改动是本决策的对偶项——只有 TV 客户端能渲染 ASS、服务端不再多此一举降级，整个用户故事才闭环。
