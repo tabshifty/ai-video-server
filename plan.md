@@ -2,6 +2,31 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 21:34 +0800
+- 进度：完成 TV App 长视频统一 ExoPlayer 迁移收尾。独立复审确认重试/player 重建 prepare 与生命周期暂停即时历史上报风险已修复，未发现阻塞或非阻塞问题；本次提交只纳入 TV 长视频播放器迁移、相关 TV 单测、TV 版本递增、`CONTEXT.md` 技术沉淀和 `plan.md` 记录。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、相关 TV 单测、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvLongFormMedia3PlayerTest --tests com.chee.videos.core.ui.LongFormMedia3PlaybackBoundarySpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' android-tv-app CONTEXT.md plan.md docs/adr` 无命中。
+
+## 2026-06-16 21:31 +0800
+- 进度：根据独立评审修复 TV 长视频 ExoPlayer 迁移后的两个回归风险。`TvLongFormMedia3Player` 现在把已 prepare 的 source key 与当前 player 实例绑定，避免 token 刷新或重试重建 ExoPlayer 后跳过 `setMediaSource/prepare`；Media3 生命周期 `ON_PAUSE` 会把最新 snapshot 回调给单片和剧集页并立即上报历史，降低 Home/后台时续播进度丢失风险。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、相关 TV 单测、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvLongFormMedia3PlayerTest --tests com.chee.videos.core.ui.LongFormMedia3PlaybackBoundarySpecTest` 通过；待执行全量 TV 单测、assemble 与复审。
+
+## 2026-06-16 21:12 +0800
+- 进度：完成 TV Shell 长视频播放器核心迁移实现。`TvLongFormPlayerScreen` 与 `TvSeriesPlayerScreen` 已改为统一 `TvLongFormMedia3Player` + `TvSeriesCorePlaybackOverlay`，删除运行路径上的 LibVLC `MediaPlayer/addSlave/access_token query` 分支；播放路由收口为 `EXOPLAYER/BLOCKED`；Media3 字幕 URL 不再拼 token；TV 版本递增到 `0.1.107` / `versionCode=107`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`
+- 验证：定向红灯已确认；核心定向单测 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.core.player.TvLongFormExoPlayerSpecTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest --tests com.chee.videos.feature.tv.TvLongFormMedia3PlayerTest --tests com.chee.videos.feature.tv.TvMedia3TrackSupportTest --tests com.chee.videos.feature.tv.TvDolbyVisionDiagnosticsTest --tests com.chee.videos.feature.tv.TvSeriesMixedPlaybackControlsSpecTest --tests com.chee.videos.core.ui.LongFormMedia3PlaybackBoundarySpecTest` 通过；待执行 TV 全量单测和 assemble。
+
+## 2026-06-16 20:53 +0800
+- 进度：完成三个子代理只读审视结果汇总，进入红灯测试阶段。迁移实现将按 TV Shell 实际入口收口：`TvLongFormPlayerScreen`、`TvSeriesPlayerScreen` 统一走 Media3/ExoPlayer；`TvIptvScreen` 继续保留 LibVLC；非 manifest 启动入口里的旧手机式播放器不纳入本次运行路径迁移。
+- 影响文件：`plan.md`，预计随后修改 TV 播放路由、长视频播放器 screen、Media3 组件、相关 TV 单测与 TV 版本文件。
+- 验证：待先补反向源码级/策略单测并执行定向红灯。
+
+## 2026-06-16 20:44 +0800
+- 进度：开始实现 TV 长视频统一迁到 ExoPlayer。文档决策已单独提交 `8f034bf`；实现阶段按已确认节奏推进：先补红灯测试约束，再迁移单片与剧集播放器，清理长视频 LibVLC 依赖但保留 IPTV LibVLC，最后运行 TV 定向/全量验证和独立评审。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/player/*`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待补红灯测试后执行 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 20:40 +0800
 - 进度：完成 TV 长视频统一迁到 ExoPlayer 的 `$grill-with-docs` 收口并准备单独提交文档决策。本次只纳入 `CONTEXT.md`、ADR 0004/0012 状态更新、新增 ADR 0013 和 `plan.md`；不开始播放器代码实现。下一步在该文档提交之后进入实现阶段，按已确认节奏先补测试约束，再迁移单片和剧集播放器。
 - 影响文件：`CONTEXT.md`、`docs/adr/0004-tv-long-form-libvlc-for-ass-rendering.md`、`docs/adr/0012-tv-series-shared-controls-for-mixed-playback-engines.md`、`docs/adr/0013-tv-long-form-exoplayer-unification.md`、`plan.md`

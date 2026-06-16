@@ -15,10 +15,12 @@ class TvSeriesEpisodeRailSpecTest {
         assertFalse(source.contains("ModalBottomSheet("))
         assertFalse(source.contains("LazyColumn("))
         assertFalse(source.contains("text = \"选集播放\""))
-        assertTrue(source.contains("tvControlsVariant = TvLongFormControlsVariant.SeriesEpisodeRail"))
+        assertTrue(source.contains("TvSeriesCorePlaybackOverlay("))
         assertTrue(source.contains("episodeRailItems = episodeRailItems"))
         assertTrue(source.contains("currentEpisodeRailItemId = currentEpisode?.id"))
+        assertTrue(source.contains("onSelectEpisodeRailItem = { selectedItem ->"))
         assertTrue(source.contains("onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible"))
+        assertTrue(source.contains("openEpisodeRailRequestKey = openEpisodeRailRequestKey"))
     }
 
     @Test

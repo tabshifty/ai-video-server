@@ -21,7 +21,9 @@ class TvResumePromptCardSpecTest {
             assertTrue(source.contains("shouldShowResumePromptCard("))
             assertTrue(source.contains("LaunchedEffect") && source.contains("shouldTickResumePromptCountdown"))
             assertTrue(source.contains("isTrackSheetVisible = isTrackSheetVisible"))
-            assertTrue(source.contains("onTrackSheetVisibilityChanged = { isTrackSheetVisible = it }"))
+            assertTrue(source.contains("TvSeriesCorePlaybackOverlay("))
+            assertTrue(source.contains("resumePromptSlot = {"))
+            assertTrue(source.contains("TvMedia3TrackPickerLayer("))
             assertTrue(source.contains("showBackConfirmPrompt"))
             assertTrue(source.contains("withFrameNanos"))
         }

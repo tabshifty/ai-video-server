@@ -30,15 +30,15 @@ import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import kotlinx.coroutines.delay
 
-internal const val TvDolbyVisionMedia3StartupTimeoutMillis = 15_000L
-internal const val TvDolbyVisionMedia3StartupTimeoutMessage = "杜比视界专用播放链路启动超时，请重试"
+internal const val TvLongFormMedia3StartupTimeoutMillis = 15_000L
+internal const val TvLongFormMedia3StartupTimeoutMessage = "长视频 ExoPlayer 播放链路启动超时，请重试"
 
 internal data class TvMedia3PlaybackSnapshot(
     val positionMs: Long,
     val durationMs: Long,
 )
 
-internal fun shouldReportTvDolbyVisionMedia3StartupTimeout(
+internal fun shouldReportTvLongFormMedia3StartupTimeout(
     preparedSourceKey: String,
     shouldPlay: Boolean,
     playbackState: Int,
@@ -50,8 +50,16 @@ internal fun shouldReportTvDolbyVisionMedia3StartupTimeout(
         playbackState != Player.STATE_READY &&
         playbackState != Player.STATE_ENDED
 
+internal fun shouldPrepareTvLongFormMedia3Source(
+    preparedSourceKey: String,
+    currentSourceKey: String,
+    isPreparedPlayerCurrent: Boolean,
+): Boolean =
+    currentSourceKey.isNotBlank() &&
+        (!isPreparedPlayerCurrent || preparedSourceKey != currentSourceKey)
+
 @Composable
-internal fun TvDolbyVisionMedia3Player(
+internal fun TvLongFormMedia3Player(
     sourceUrl: String,
     mediaId: String,
     title: String,
@@ -69,6 +77,7 @@ internal fun TvDolbyVisionMedia3Player(
     onError: (String) -> Unit = {},
     onEnded: () -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
+    onLifecyclePauseSnapshot: (TvMedia3PlaybackSnapshot) -> Unit = {},
     onAudioTracksChanged: (List<LongFormAudioTrack>) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -77,6 +86,7 @@ internal fun TvDolbyVisionMedia3Player(
     val latestOnError by rememberUpdatedState(onError)
     val latestOnEnded by rememberUpdatedState(onEnded)
     val latestOnSnapshotChanged by rememberUpdatedState(onSnapshotChanged)
+    val latestOnLifecyclePauseSnapshot by rememberUpdatedState(onLifecyclePauseSnapshot)
     val latestOnAudioTracksChanged by rememberUpdatedState(onAudioTracksChanged)
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -86,6 +96,8 @@ internal fun TvDolbyVisionMedia3Player(
         }
     }
     val player = remember(accessToken, retryKey) { ExoPlayer.Builder(context).build() }
+    val playerSourceKey = remember(player) { Any() }
+    var preparedPlayerSourceKey by remember { mutableStateOf<Any?>(null) }
     var preparedSourceKey by remember { mutableStateOf("") }
     var resumeAppliedSourceKey by remember { mutableStateOf("") }
     var playbackState by remember { mutableStateOf(Player.STATE_IDLE) }
@@ -135,6 +147,7 @@ internal fun TvDolbyVisionMedia3Player(
         if (sourceUrl.isBlank() || mediaId.isBlank()) {
             player.pause()
             player.clearMediaItems()
+            preparedPlayerSourceKey = null
             preparedSourceKey = ""
             resumeAppliedSourceKey = ""
             playbackState = Player.STATE_IDLE
@@ -143,7 +156,13 @@ internal fun TvDolbyVisionMedia3Player(
             latestOnAudioTracksChanged(emptyList())
             return@LaunchedEffect
         }
-        if (preparedSourceKey != sourceKey) {
+        if (
+            shouldPrepareTvLongFormMedia3Source(
+                preparedSourceKey = preparedSourceKey,
+                currentSourceKey = sourceKey,
+                isPreparedPlayerCurrent = preparedPlayerSourceKey === playerSourceKey,
+            )
+        ) {
             val mediaItem = MediaItem.Builder()
                 .setUri(sourceUrl)
                 .setMediaId(mediaId)
@@ -161,6 +180,7 @@ internal fun TvDolbyVisionMedia3Player(
             isMedia3Playing = false
             trackSelectionRevision += 1
             latestOnAudioTracksChanged(emptyList())
+            preparedPlayerSourceKey = playerSourceKey
             preparedSourceKey = sourceKey
             resumeAppliedSourceKey = ""
         }
@@ -225,21 +245,28 @@ internal fun TvDolbyVisionMedia3Player(
     }
 
     LaunchedEffect(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing, retryKey) {
-        if (!shouldReportTvDolbyVisionMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
+        if (!shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
             return@LaunchedEffect
         }
-        delay(TvDolbyVisionMedia3StartupTimeoutMillis)
-        if (shouldReportTvDolbyVisionMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
+        delay(TvLongFormMedia3StartupTimeoutMillis)
+        if (shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
             player.pause()
             latestOnPlayingChanged(false)
-            latestOnError(TvDolbyVisionMedia3StartupTimeoutMessage)
+            latestOnError(TvLongFormMedia3StartupTimeoutMessage)
         }
     }
 
     DisposableEffect(lifecycleOwner, player, shouldPlay, preparedSourceKey) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> player.pause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (preparedSourceKey.isNotBlank()) {
+                        val snapshot = player.readTvMedia3PlaybackSnapshot()
+                        latestOnSnapshotChanged(snapshot)
+                        latestOnLifecyclePauseSnapshot(snapshot)
+                    }
+                    player.pause()
+                }
                 Lifecycle.Event.ON_RESUME -> {
                     if (shouldPlay && preparedSourceKey.isNotBlank()) {
                         player.play()

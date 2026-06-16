@@ -11,22 +11,17 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import com.chee.videos.core.model.SubtitleTrackDto
 import com.chee.videos.core.ui.LongFormAudioTrack
-import com.chee.videos.core.ui.appendAccessTokenQuery
 import com.chee.videos.core.ui.subtitleTrackDisplayLabel
 import java.util.Locale
 
 internal fun buildTvMedia3SubtitleConfigurations(
     tracks: List<SubtitleTrackDto>,
     baseUrl: String,
-    accessToken: String,
 ): List<MediaItem.SubtitleConfiguration> =
     tracks
         .filter { it.available && it.url.isNotBlank() && !it.isEmbedded }
         .mapNotNull { track ->
-            val uri = appendAccessTokenQuery(
-                url = resolvePlaybackAssetUrlForMedia3Track(baseUrl, track.url),
-                accessToken = accessToken,
-            )
+            val uri = resolvePlaybackAssetUrlForMedia3Track(baseUrl, track.url)
             if (uri.isBlank()) {
                 return@mapNotNull null
             }

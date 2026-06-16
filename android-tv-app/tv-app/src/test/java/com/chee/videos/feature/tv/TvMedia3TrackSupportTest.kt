@@ -26,7 +26,7 @@ class TvMedia3TrackSupportTest {
     @Test
     fun media3TrackSupportSourcePreloadsExternalSubtitlesAndUsesOverridesForSwitching() {
         val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvMedia3TrackSupport.kt").toFile().readText()
-        val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt").toFile().readText()
+        val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").toFile().readText()
 
         assertTrue(source.contains("MediaItem.SubtitleConfiguration.Builder"))
         assertTrue(player.contains(".setSubtitleConfigurations(subtitleConfigurations)"))
@@ -42,7 +42,7 @@ class TvMedia3TrackSupportTest {
 
     @Test
     fun media3TrackLoadDoesNotOverwriteStoredAudioPreferenceWithRuntimeDefault() {
-        val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt").toFile().readText()
+        val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").toFile().readText()
 
         assertTrue(player.contains("onAudioTracksChanged: (List<LongFormAudioTrack>) -> Unit"))
         assertFalse(
@@ -71,6 +71,16 @@ class TvMedia3TrackSupportTest {
         assertTrue(single.contains("TvMedia3TrackPickerLayer("))
         assertTrue(series.contains("TvMedia3TrackPickerLayer("))
         assertFalse("共享弹层不应继续私有在剧集页面里", series.contains("private fun TvMedia3TrackPickerLayer"))
+    }
+
+    @Test
+    fun media3SubtitleConfigurationsDoNotAppendAccessTokenQuery() {
+        val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvMedia3TrackSupport.kt").toFile().readText()
+
+        assertTrue(source.contains("internal fun buildTvMedia3SubtitleConfigurations("))
+        assertFalse(source.contains("accessToken: String"))
+        assertFalse(source.contains("appendAccessTokenQuery"))
+        assertFalse(source.contains("access_token"))
     }
 
     @Test

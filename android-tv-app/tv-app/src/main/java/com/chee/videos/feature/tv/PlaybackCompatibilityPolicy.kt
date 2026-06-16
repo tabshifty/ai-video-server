@@ -17,8 +17,7 @@ internal data class TvPlaybackRoute(
 )
 
 internal enum class TvPlaybackRouteKind {
-    VLC,
-    MEDIA3_DOLBY_VISION,
+    EXOPLAYER,
     BLOCKED,
 }
 
@@ -28,7 +27,7 @@ private const val DolbyVisionTranscodeOutputMessage = "该视频来源为杜比�
 private const val DolbyVisionUnsupportedMessage = "该视频可能为杜比视界，当前设备或播放链路不支持安全播放"
 private const val DolbyVisionDisplayUnsupportedMessage = "当前电视或显示链路未声明支持杜比视界，无法安全播放该视频"
 private const val DolbyVisionDisplayUnknownMessage = "无法确认当前电视或显示链路是否支持杜比视界，暂不能安全播放"
-private const val DolbyVisionDedicatedRouteUnavailableMessage = "杜比视界专用播放链路暂不可用，无法安全播放该视频"
+private const val LongFormExoPlayerRouteUnavailableMessage = "长视频 ExoPlayer 播放链路暂不可用，无法播放该视频"
 
 internal fun resolveTvPlaybackCompatibilityDecision(
     metadata: Map<String, Any?>?,
@@ -73,7 +72,11 @@ internal fun resolveTvPlaybackRoute(
     media3Available: Boolean,
 ): TvPlaybackRoute {
     return when (val compatibility = parsePlaybackCompatibility(metadata)) {
-        PlaybackCompatibilityPayload.Historical -> TvPlaybackRoute(kind = TvPlaybackRouteKind.VLC)
+        PlaybackCompatibilityPayload.Historical -> resolveUnifiedExoPlayerRoute(
+            playbackUrl = playbackUrl,
+            media3Available = media3Available,
+            playbackProfile = null,
+        )
         PlaybackCompatibilityPayload.Incomplete -> blockPlaybackRoute(PlaybackCompatibilityIncompleteMessage)
         is PlaybackCompatibilityPayload.Ok -> resolvePlaybackRoute(
             compatibility = compatibility,
@@ -111,7 +114,7 @@ private fun resolvePlaybackRoute(
     if (!compatibility.outputDolbyVision) {
         return if (compatibility.sourceDolbyVision) {
             if (!compatibility.sourcePlaybackPath.isNullOrBlank()) {
-                resolveDedicatedDolbyVisionRoute(
+                resolveDolbyVisionGatedExoPlayerRoute(
                     displayCapability = displayCapability,
                     playbackUrl = playbackUrl,
                     media3Available = media3Available,
@@ -121,11 +124,15 @@ private fun resolvePlaybackRoute(
                 blockPlaybackRoute(DolbyVisionTranscodeOutputMessage)
             }
         } else {
-            TvPlaybackRoute(kind = TvPlaybackRouteKind.VLC)
+            resolveUnifiedExoPlayerRoute(
+                playbackUrl = playbackUrl,
+                media3Available = media3Available,
+                playbackProfile = null,
+            )
         }
     }
 
-    return resolveDedicatedDolbyVisionRoute(
+    return resolveDolbyVisionGatedExoPlayerRoute(
         displayCapability = displayCapability,
         playbackUrl = playbackUrl,
         media3Available = media3Available,
@@ -133,7 +140,7 @@ private fun resolvePlaybackRoute(
     )
 }
 
-private fun resolveDedicatedDolbyVisionRoute(
+private fun resolveDolbyVisionGatedExoPlayerRoute(
     displayCapability: DolbyVisionDisplayCapability,
     playbackUrl: String?,
     media3Available: Boolean,
@@ -149,11 +156,23 @@ private fun resolveDedicatedDolbyVisionRoute(
         }
     }
 
+    return resolveUnifiedExoPlayerRoute(
+        playbackUrl = playbackUrl,
+        media3Available = media3Available,
+        playbackProfile = playbackProfile,
+    )
+}
+
+private fun resolveUnifiedExoPlayerRoute(
+    playbackUrl: String?,
+    media3Available: Boolean,
+    playbackProfile: String?,
+): TvPlaybackRoute {
     if (!media3Available || playbackUrl.isNullOrBlank()) {
-        return blockPlaybackRoute(DolbyVisionDedicatedRouteUnavailableMessage)
+        return blockPlaybackRoute(LongFormExoPlayerRouteUnavailableMessage)
     }
     return TvPlaybackRoute(
-        kind = TvPlaybackRouteKind.MEDIA3_DOLBY_VISION,
+        kind = TvPlaybackRouteKind.EXOPLAYER,
         playbackProfile = playbackProfile,
     )
 }

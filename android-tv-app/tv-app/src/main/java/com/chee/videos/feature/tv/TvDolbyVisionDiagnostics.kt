@@ -4,9 +4,8 @@ internal fun isTvDolbyVisionDiagnosticsAvailable(
     route: TvPlaybackRoute,
 ): Boolean {
     return when (route.kind) {
-        TvPlaybackRouteKind.MEDIA3_DOLBY_VISION -> true
+        TvPlaybackRouteKind.EXOPLAYER -> true
         TvPlaybackRouteKind.BLOCKED -> route.blockMessage?.contains("杜比视界") == true
-        TvPlaybackRouteKind.VLC -> false
     }
 }
 
@@ -35,8 +34,7 @@ internal fun buildTvDolbyVisionDiagnosticMessage(
 
 private fun resolveTvDolbyVisionDiagnosticPathLabel(kind: TvPlaybackRouteKind): String =
     when (kind) {
-        TvPlaybackRouteKind.VLC -> "普通播放页"
-        TvPlaybackRouteKind.MEDIA3_DOLBY_VISION -> "专用播放失败页"
+        TvPlaybackRouteKind.EXOPLAYER -> "ExoPlayer 播放失败页"
         TvPlaybackRouteKind.BLOCKED -> "播放阻断页"
     }
 
@@ -48,11 +46,10 @@ private fun resolveTvDolbyVisionDiagnosticReasonLabel(
         return route.blockMessage.trim()
     }
     if (!failureMessage.isNullOrBlank()) {
-        return "杜比视界专用播放链路发生错误"
+        return "长视频 ExoPlayer 播放链路发生错误"
     }
     return when (route.kind) {
-        TvPlaybackRouteKind.VLC -> "普通播放链路"
-        TvPlaybackRouteKind.MEDIA3_DOLBY_VISION -> "杜比视界专用播放链路"
+        TvPlaybackRouteKind.EXOPLAYER -> "长视频 ExoPlayer 播放链路"
         TvPlaybackRouteKind.BLOCKED -> "播放被阻断"
     }
 }
@@ -79,21 +76,18 @@ private fun resolveTvDolbyVisionDiagnosticRouteLabel(
     media3Available: Boolean,
 ): String {
     val routeAvailable = when (kind) {
-        TvPlaybackRouteKind.VLC -> !playbackUrl.isNullOrBlank()
-        TvPlaybackRouteKind.MEDIA3_DOLBY_VISION -> media3Available && !playbackUrl.isNullOrBlank()
+        TvPlaybackRouteKind.EXOPLAYER -> media3Available && !playbackUrl.isNullOrBlank()
         TvPlaybackRouteKind.BLOCKED -> false
     }
     return if (routeAvailable) {
         when (kind) {
-            TvPlaybackRouteKind.VLC -> "普通链路可用"
-            TvPlaybackRouteKind.MEDIA3_DOLBY_VISION -> "专用链路可用"
-            TvPlaybackRouteKind.BLOCKED -> "专用链路不可用"
+            TvPlaybackRouteKind.EXOPLAYER -> "ExoPlayer 链路可用"
+            TvPlaybackRouteKind.BLOCKED -> "ExoPlayer 链路不可用"
         }
     } else {
         when (kind) {
-            TvPlaybackRouteKind.VLC -> "普通链路不可用"
-            TvPlaybackRouteKind.MEDIA3_DOLBY_VISION -> "专用链路不可用"
-            TvPlaybackRouteKind.BLOCKED -> "专用链路不可用"
+            TvPlaybackRouteKind.EXOPLAYER -> "ExoPlayer 链路不可用"
+            TvPlaybackRouteKind.BLOCKED -> "ExoPlayer 链路不可用"
         }
     }
 }

@@ -1,11 +1,12 @@
 package com.chee.videos.feature.tv
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class TvPlaybackRoutePolicyTest {
     @Test
-    fun missingPlaybackCompatibility_usesVlcForHistoricalVideos() {
+    fun missingPlaybackCompatibility_usesUnifiedExoPlayerForHistoricalVideos() {
         val route = resolveTvPlaybackRoute(
             metadata = emptyMap(),
             displayCapability = supportedDisplayCapability(),
@@ -13,12 +14,12 @@ class TvPlaybackRoutePolicyTest {
             media3Available = true,
         )
 
-        assertEquals(TvPlaybackRouteKind.VLC, route.kind)
+        assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
         assertEquals(null, route.blockMessage)
     }
 
     @Test
-    fun oldPlaybackCompatibilityVersion_usesVlcForHistoricalVideos() {
+    fun oldPlaybackCompatibilityVersion_usesUnifiedExoPlayerForHistoricalVideos() {
         val route = resolveTvPlaybackRoute(
             metadata = mapOf(
                 "playback_compat" to mapOf(
@@ -31,7 +32,7 @@ class TvPlaybackRoutePolicyTest {
             media3Available = true,
         )
 
-        assertEquals(TvPlaybackRouteKind.VLC, route.kind)
+        assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
         assertEquals(null, route.blockMessage)
     }
 
@@ -49,7 +50,7 @@ class TvPlaybackRoutePolicyTest {
     }
 
     @Test
-    fun sourceDolbyVisionEpisodeWithPreservedSource_usesMedia3DedicatedRoute() {
+    fun sourceDolbyVisionEpisodeWithPreservedSource_usesUnifiedExoPlayerRoute() {
         val route = resolveTvPlaybackRoute(
             metadata = playbackCompat(
                 sourceDolbyVision = true,
@@ -61,13 +62,13 @@ class TvPlaybackRoutePolicyTest {
             media3Available = true,
         )
 
-        assertEquals(TvPlaybackRouteKind.MEDIA3_DOLBY_VISION, route.kind)
+        assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
         assertEquals("dv_source", route.playbackProfile)
         assertEquals(null, route.blockMessage)
     }
 
     @Test
-    fun outputDolbyVisionWithSupportedDisplayAndMedia3_usesMedia3DedicatedRoute() {
+    fun outputDolbyVisionWithSupportedDisplayAndMedia3_usesUnifiedExoPlayerRoute() {
         val route = resolveTvPlaybackRoute(
             metadata = playbackCompat(sourceDolbyVision = true, outputDolbyVision = true),
             displayCapability = supportedDisplayCapability(),
@@ -75,7 +76,7 @@ class TvPlaybackRoutePolicyTest {
             media3Available = true,
         )
 
-        assertEquals(TvPlaybackRouteKind.MEDIA3_DOLBY_VISION, route.kind)
+        assertEquals(TvPlaybackRouteKind.EXOPLAYER, route.kind)
         assertEquals(null, route.blockMessage)
     }
 
@@ -115,11 +116,11 @@ class TvPlaybackRoutePolicyTest {
         )
 
         assertEquals(TvPlaybackRouteKind.BLOCKED, route.kind)
-        assertEquals("杜比视界专用播放链路暂不可用，无法安全播放该视频", route.blockMessage)
+        assertEquals("长视频 ExoPlayer 播放链路暂不可用，无法播放该视频", route.blockMessage)
     }
 
     @Test
-    fun outputDolbyVisionWithoutPlaybackUrl_blocksDedicatedRouteUnavailable() {
+    fun outputDolbyVisionWithoutPlaybackUrl_blocksUnifiedExoPlayerUnavailable() {
         val route = resolveTvPlaybackRoute(
             metadata = playbackCompat(sourceDolbyVision = true, outputDolbyVision = true),
             displayCapability = supportedDisplayCapability(),
@@ -128,7 +129,20 @@ class TvPlaybackRoutePolicyTest {
         )
 
         assertEquals(TvPlaybackRouteKind.BLOCKED, route.kind)
-        assertEquals("杜比视界专用播放链路暂不可用，无法安全播放该视频", route.blockMessage)
+        assertEquals("长视频 ExoPlayer 播放链路暂不可用，无法播放该视频", route.blockMessage)
+    }
+
+    @Test
+    fun ordinaryNonDolbyVisionWithUnavailableMedia3_blocksUnifiedExoPlayerUnavailable() {
+        val route = resolveTvPlaybackRoute(
+            metadata = playbackCompat(sourceDolbyVision = false, outputDolbyVision = false),
+            displayCapability = supportedDisplayCapability(),
+            playbackUrl = "https://example.test/video.mp4",
+            media3Available = false,
+        )
+
+        assertEquals(TvPlaybackRouteKind.BLOCKED, route.kind)
+        assertEquals("长视频 ExoPlayer 播放链路暂不可用，无法播放该视频", route.blockMessage)
     }
 
     @Test
@@ -167,6 +181,14 @@ class TvPlaybackRoutePolicyTest {
 
         assertEquals(TvPlaybackRouteKind.BLOCKED, route.kind)
         assertEquals("播放兼容信息不完整，暂不能确认安全播放", route.blockMessage)
+    }
+
+    @Test
+    fun routeKindsNoLongerExposeLegacyVlcOrDolbyVisionDedicatedNames() {
+        val names = TvPlaybackRouteKind.values().map { it.name }
+
+        assertFalse(names.contains("VLC"))
+        assertFalse(names.contains("MEDIA3_DOLBY_VISION"))
     }
 }
 
