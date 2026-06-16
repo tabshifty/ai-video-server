@@ -10,6 +10,7 @@ import {
   readStoredShortReviewSound,
   resolveInitialReviewIndex,
   resolveNextReviewStep,
+  resolveTotalReviewPages,
   SHORT_REVIEW_POSITION_KEY,
   SHORT_REVIEW_SOUND_KEY,
   writeStoredShortReviewPosition,
@@ -42,21 +43,45 @@ describe('short review helpers', () => {
   })
 
   it('advances inside the loaded queue before loading more or ending', () => {
-    expect(resolveNextReviewStep({ currentIndex: 0, loadedCount: 2, totalCount: 5 })).toEqual({
+    expect(resolveNextReviewStep({
+      currentIndex: 0,
+      loadedCount: 2,
+      currentPage: 1,
+      pageSize: 2,
+      totalCount: 5
+    })).toEqual({
       type: 'select',
       index: 1
     })
-    expect(resolveNextReviewStep({ currentIndex: 1, loadedCount: 2, totalCount: 5 })).toEqual({
+    expect(resolveNextReviewStep({
+      currentIndex: 1,
+      loadedCount: 2,
+      currentPage: 1,
+      pageSize: 2,
+      totalCount: 5
+    })).toEqual({
       type: 'load-more'
     })
-    expect(resolveNextReviewStep({ currentIndex: 1, loadedCount: 2, totalCount: 2 })).toEqual({
+    expect(resolveNextReviewStep({
+      currentIndex: 1,
+      loadedCount: 2,
+      currentPage: 3,
+      pageSize: 2,
+      totalCount: 5
+    })).toEqual({
       type: 'end'
     })
   })
 
-  it('does not request another page while loading more or with no loaded items', () => {
-    expect(hasMoreReviewPages({ loadedCount: 2, totalCount: 5, loadingMore: true })).toBe(false)
-    expect(hasMoreReviewPages({ loadedCount: 0, totalCount: 5 })).toBe(false)
+  it('resolves total review pages and page availability from server pagination', () => {
+    expect(resolveTotalReviewPages(0, 20)).toBe(1)
+    expect(resolveTotalReviewPages(41, 20)).toBe(3)
+    expect(hasMoreReviewPages({ currentPage: 1, pageSize: 20, totalCount: 41 })).toBe(true)
+    expect(hasMoreReviewPages({ currentPage: 3, pageSize: 20, totalCount: 41 })).toBe(false)
+  })
+
+  it('does not request another page while loading more', () => {
+    expect(hasMoreReviewPages({ currentPage: 1, pageSize: 20, totalCount: 41, loadingMore: true })).toBe(false)
   })
 
   it('builds a fixed short ready query with optional keyword', () => {
@@ -115,5 +140,14 @@ describe('short review helpers', () => {
     expect(source).toContain('max-height: none;')
     expect(source).toContain('min-height: 0;')
     expect(source).toContain('overflow: auto;')
+  })
+
+  it('renders the queue as a paged list with a phone-shaped player', () => {
+    const source = readFileSync(new URL('./ShortReview.vue', import.meta.url), 'utf8')
+    expect(source).toContain('AdminTablePagination')
+    expect(source).toContain('第 {{ currentPage }} / {{ totalPages }} 页')
+    expect(source).toContain('review-queue__pagination')
+    expect(source).toContain('review-video-frame')
+    expect(source).toContain('aspect-ratio: 9 / 16;')
   })
 })

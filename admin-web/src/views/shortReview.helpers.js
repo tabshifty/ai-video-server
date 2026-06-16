@@ -42,14 +42,29 @@ export function resolveInitialReviewIndex(items, savedVideoID) {
   return (items || []).length > 0 ? 0 : -1
 }
 
-export function hasMoreReviewPages({ loadedCount, totalCount, loadingMore = false }) {
-  if (loadingMore) return false
-  const loaded = Number(loadedCount || 0)
+export function resolveTotalReviewPages(totalCount, pageSize = 20) {
   const total = Number(totalCount || 0)
-  return loaded > 0 && total > loaded
+  const size = Number(pageSize || 20)
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(size) || size <= 0) return 1
+  return Math.max(1, Math.ceil(total / size))
 }
 
-export function resolveNextReviewStep({ currentIndex, loadedCount, totalCount, loadingMore = false }) {
+export function hasMoreReviewPages({ currentPage = 1, pageSize = 20, totalCount, loadingMore = false }) {
+  if (loadingMore) return false
+  const page = Number(currentPage || 1)
+  const size = Number(pageSize || 20)
+  const total = Number(totalCount || 0)
+  return Number.isFinite(page) && Number.isFinite(size) && page > 0 && size > 0 && page * size < total
+}
+
+export function resolveNextReviewStep({
+  currentIndex,
+  loadedCount,
+  currentPage = 1,
+  pageSize = 20,
+  totalCount,
+  loadingMore = false
+}) {
   const index = Number(currentIndex)
   const loaded = Number(loadedCount || 0)
   if (!Number.isFinite(index) || index < 0) {
@@ -58,7 +73,7 @@ export function resolveNextReviewStep({ currentIndex, loadedCount, totalCount, l
   if (index + 1 < loaded) {
     return { type: 'select', index: index + 1 }
   }
-  if (hasMoreReviewPages({ loadedCount: loaded, totalCount, loadingMore })) {
+  if (hasMoreReviewPages({ currentPage, pageSize, totalCount, loadingMore })) {
     return { type: 'load-more' }
   }
   return { type: 'end' }

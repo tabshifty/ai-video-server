@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 10:07 +0800
+- 进度：完成管理端短视频审核页分页与播放器尺寸调整。左侧待审队列改为当前页分页列表，复用 `AdminTablePagination` 支持页码输入跳转，并显示“第 X / Y 页 · 共 N 条”；`保留并下一条` / `删除并下一条` 在页末自动进入下一页第一条，删除后刷新当前页避免 offset 分页补位视频被跳过。右侧播放器增加 9:16 手机竖屏预览框，限制在页面可用高度内，视频本身保持 contain 不裁切。`CONTEXT.md` 已更新长期术语和分页/播放器约定。
+- 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.js`、`admin-web/src/views/shortReview.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/shortReview.helpers.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check -- admin-web/src/views/ShortReview.vue admin-web/src/views/shortReview.helpers.js admin-web/src/views/shortReview.helpers.spec.js CONTEXT.md plan.md` 通过；乱码扫描无命中。
+
+## 2026-06-16 09:53 +0800
+- 进度：开始修改管理端短视频审核页。通过 `$grill-with-docs` 收口术语为“短视频审核页”，本次把左侧待审队列从自动追加式长列表改为当前页分页列表，显示当前页、总页数和总条数，并支持页码输入跳转；`保留并下一条` / `删除并下一条` 在当前页末尾仍自动进入下一页第一条。右侧播放器收口为手机竖屏预览尺寸，整体高度不得超过审核页可用高度。
+- 影响文件：`admin-web/src/views/ShortReview.vue`、`admin-web/src/views/shortReview.helpers.js`、`admin-web/src/views/shortReview.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/shortReview.helpers.spec.js`、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 09:34 +0800
 - 进度：完成 DV Media3 音轨偏好覆盖问题修复。已补红灯测试锁定 `onTracksChanged` 不得把 Media3 默认选中音轨回写成父层选择；实现上删除 `onSelectedAudioTrackChanged` runtime 回调，轨道加载只上报可选音轨列表，父层继续按 current selection / stored preference 决定目标并通过 Media3 override 应用。TV 版本升至 `0.1.103 / 103`，`CONTEXT.md` 补充“Media3 默认音轨不等于用户选择”约定。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvDolbyVisionMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvMedia3TrackSupportTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

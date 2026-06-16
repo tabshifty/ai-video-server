@@ -11,6 +11,7 @@ import {
   Search,
   VideoCamera
 } from '@element-plus/icons-vue'
+import AdminTablePagination from '../components/AdminTablePagination.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import {
@@ -27,6 +28,7 @@ import {
   readStoredShortReviewSound,
   resolveInitialReviewIndex,
   resolveNextReviewStep,
+  resolveTotalReviewPages,
   writeStoredShortReviewPosition,
   writeStoredShortReviewSound
 } from './shortReview.helpers'
@@ -39,13 +41,11 @@ const currentIndex = ref(-1)
 const currentDetail = ref(null)
 const playURL = ref('')
 const listLoading = ref(false)
-const loadingMore = ref(false)
 const detailLoading = ref(false)
 const playLoading = ref(false)
 const deleting = ref(false)
 const reachedEnd = ref(false)
 const page = ref(1)
-const loadedStartPage = ref(1)
 const appliedKeyword = ref('')
 const muted = ref(!readStoredShortReviewSound())
 const videoRef = ref(null)
@@ -57,13 +57,16 @@ const activeItem = computed(() => {
 })
 const loadedCount = computed(() => items.value.length)
 const hasItems = computed(() => loadedCount.value > 0)
-const canGoPrevious = computed(() => currentIndex.value > 0)
+const canGoPrevious = computed(() => currentIndex.value > 0 || page.value > 1)
+const currentPage = computed(() => page.value)
+const totalPages = computed(() => resolveTotalReviewPages(total.value, PAGE_SIZE))
 const hasMorePages = computed(() => loadedCount.value > 0 && page.value * PAGE_SIZE < total.value)
 const progressText = computed(() => {
   if (!hasItems.value || currentIndex.value < 0) return '0 / 0'
-  const absoluteIndex = (loadedStartPage.value - 1) * PAGE_SIZE + currentIndex.value + 1
+  const absoluteIndex = (page.value - 1) * PAGE_SIZE + currentIndex.value + 1
   return `${Math.min(absoluteIndex, total.value || absoluteIndex)} / ${total.value || loadedCount.value}`
 })
+const pageSummaryText = computed(() => `第 ${currentPage.value} / ${totalPages.value} 页 · 共 ${total.value} 条`)
 const activeTitle = computed(() => currentDetail.value?.title || activeItem.value?.title || '未命名短视频')
 const emptyTitle = computed(() => {
   if (appliedKeyword.value) return '没有匹配的待审短视频'
@@ -128,8 +131,7 @@ function resetPlayback() {
 }
 
 function resolveItemPage(index = currentIndex.value) {
-  const normalized = Math.max(0, Number(index || 0))
-  return loadedStartPage.value + Math.floor(normalized / PAGE_SIZE)
+  return page.value
 }
 
 function updateCurrentPosition(videoID = activeItem.value?.id, index = currentIndex.value) {
@@ -221,14 +223,14 @@ async function restoreDetachedVideo(videoID) {
   }
 }
 
-async function loadPage(targetPage, { append = false, restoreVideoID = '', allowDetachedRestore = false } = {}) {
-  const isAppend = append
-  if (isAppend) {
-    loadingMore.value = true
-  } else {
-    listLoading.value = true
-    reachedEnd.value = false
-  }
+async function loadPage(targetPage, {
+  restoreVideoID = '',
+  allowDetachedRestore = false,
+  selectFirst = false,
+  selectIndexAfterLoad = null
+} = {}) {
+  listLoading.value = true
+  reachedEnd.value = false
   try {
     const data = await getAdminVideos(buildShortReviewQuery({
       page: targetPage,
@@ -238,48 +240,37 @@ async function loadPage(targetPage, { append = false, restoreVideoID = '', allow
     const nextItems = Array.isArray(data?.items) ? data.items : []
     total.value = Number(data?.total_count || 0)
     page.value = Number(data?.page || targetPage)
-    if (isAppend) {
-      if (items.value.length === 0) {
-        loadedStartPage.value = page.value
-      }
-      const known = new Set(items.value.map((item) => String(item.id)))
-      items.value = [
-        ...items.value,
-        ...nextItems.filter((item) => !known.has(String(item.id)))
-      ]
-    } else {
-      loadedStartPage.value = page.value
-      items.value = nextItems
+    items.value = nextItems
+
+    let index = -1
+    if (Number.isInteger(selectIndexAfterLoad)) {
+      index = Math.min(Math.max(selectIndexAfterLoad, 0), items.value.length - 1)
+    } else if (selectFirst) {
+      index = resolveInitialReviewIndex(items.value, restoreVideoID)
     }
 
-    if (!isAppend) {
-      const index = resolveInitialReviewIndex(items.value, restoreVideoID)
-      if (restoreVideoID && findVideoIndexByID(items.value, restoreVideoID) < 0 && allowDetachedRestore) {
-        if (await restoreDetachedVideo(restoreVideoID)) {
-          return true
-        }
-        currentIndex.value = -1
-        currentDetail.value = null
-        resetPlayback()
-        return false
-      }
-      if (index >= 0) {
-        await selectIndex(index, { persist: true })
+    if (restoreVideoID && findVideoIndexByID(items.value, restoreVideoID) < 0 && allowDetachedRestore) {
+      if (await restoreDetachedVideo(restoreVideoID)) {
         return true
-      } else {
-        currentIndex.value = -1
-        currentDetail.value = null
-        resetPlayback()
-        return false
       }
+      currentIndex.value = -1
+      currentDetail.value = null
+      resetPlayback()
+      return false
     }
-    return true
+    if (index >= 0) {
+      await selectIndex(index, { persist: true })
+      return true
+    }
+    currentIndex.value = -1
+    currentDetail.value = null
+    resetPlayback()
+    return false
   } catch (error) {
     ElMessage.error(error?.message || '待审短视频加载失败')
     return false
   } finally {
     listLoading.value = false
-    loadingMore.value = false
   }
 }
 
@@ -288,40 +279,48 @@ async function loadInitial({ restorePosition = true } = {}) {
   page.value = restorePosition ? savedPosition.page || 1 : 1
   const restored = await loadPage(page.value, {
     restoreVideoID: savedPosition.videoID,
-    allowDetachedRestore: restorePosition
+    allowDetachedRestore: restorePosition,
+    selectFirst: true
   })
   if (!restored && restorePosition && savedPosition.videoID) {
     page.value = 1
-    await loadPage(1)
+    await loadPage(1, { selectFirst: true })
   }
 }
 
 async function loadNextPageAndSelect() {
-  if (!hasMorePages.value || loadingMore.value) {
+  if (!hasMorePages.value || listLoading.value) {
     reachedEnd.value = true
     return
   }
-  const beforeCount = items.value.length
-  await loadPage(page.value + 1, { append: true })
-  if (items.value.length > beforeCount) {
-    await selectIndex(beforeCount)
-  } else {
+  const loaded = await loadPage(page.value + 1, { selectFirst: true })
+  if (!loaded) {
     reachedEnd.value = true
   }
 }
 
-async function loadFollowingPageAfterLocalEmpty() {
+async function loadPageAfterDelete(deletedIndex, hadMorePagesBeforeDelete) {
   const currentPage = page.value
-  await loadPage(currentPage, { append: false })
-  if (items.value.length > 0) {
+  const targetPage = Math.min(currentPage, totalPages.value)
+  if (!hadMorePagesBeforeDelete && targetPage < currentPage) {
+    await loadPage(targetPage)
+    reachedEnd.value = true
     return
   }
-  if (currentPage > 1) {
-    page.value = currentPage - 1
-    await loadPage(page.value, { append: false })
-    if (items.value.length > 0) {
+  const refreshed = await loadPage(targetPage, { selectIndexAfterLoad: deletedIndex })
+  if (items.value.length > 0) {
+    if (!refreshed) await selectIndex(Math.min(deletedIndex, items.value.length - 1))
+    return
+  }
+  if (hadMorePagesBeforeDelete) {
+    const loaded = await loadPage(targetPage + 1, { selectFirst: true })
+    if (loaded) {
       return
     }
+  }
+  if (targetPage > 1) {
+    const loadedPrevious = await loadPage(targetPage - 1, { selectIndexAfterLoad: PAGE_SIZE - 1 })
+    if (loadedPrevious) return
   }
   reachedEnd.value = true
 }
@@ -331,8 +330,10 @@ async function advanceReview({ persistCurrent = true } = {}) {
   const step = resolveNextReviewStep({
     currentIndex: currentIndex.value,
     loadedCount: loadedCount.value,
+    currentPage: page.value,
+    pageSize: PAGE_SIZE,
     totalCount: total.value,
-    loadingMore: loadingMore.value
+    loadingMore: listLoading.value
   })
   if (step.type === 'select') {
     await selectIndex(step.index)
@@ -347,7 +348,17 @@ async function advanceReview({ persistCurrent = true } = {}) {
 
 async function goPrevious() {
   if (!canGoPrevious.value) return
-  await selectIndex(currentIndex.value - 1)
+  if (currentIndex.value > 0) {
+    await selectIndex(currentIndex.value - 1)
+    return
+  }
+  await loadPage(page.value - 1, { selectIndexAfterLoad: PAGE_SIZE - 1 })
+}
+
+async function handlePageChange(targetPage) {
+  const normalizedPage = Math.min(Math.max(Number(targetPage) || 1, 1), totalPages.value)
+  if (normalizedPage === page.value) return
+  await loadPage(normalizedPage, { selectFirst: true })
 }
 
 async function applySearch() {
@@ -366,12 +377,8 @@ async function refreshList() {
 }
 
 async function restartFromFirst() {
-  if (items.value.length === 0) {
-    await loadInitial()
-    return
-  }
   reachedEnd.value = false
-  await selectIndex(0)
+  await loadPage(1, { selectFirst: true })
 }
 
 function toggleSound() {
@@ -401,16 +408,23 @@ async function deleteAndNext() {
     total.value = Math.max(0, total.value - 1)
     currentDetail.value = null
     resetPlayback()
-    if (items.value.length === 0 && total.value > 0) {
+    if (hadMorePagesBeforeDelete) {
       currentIndex.value = -1
-      await loadFollowingPageAfterLocalEmpty()
+      await loadPageAfterDelete(deletedIndex, hadMorePagesBeforeDelete)
       return
     }
-    if (deletedIndex >= items.value.length && hadMorePagesBeforeDelete) {
-      await loadNextPageAndSelect()
+    if (items.value.length === 0 && total.value > 0) {
+      currentIndex.value = -1
+      await loadPageAfterDelete(deletedIndex, hadMorePagesBeforeDelete)
       return
     }
     if (items.value.length === 0) {
+      currentIndex.value = -1
+      reachedEnd.value = true
+      writeStoredShortReviewPosition({ videoID: '' })
+      return
+    }
+    if (deletedIndex >= items.value.length) {
       currentIndex.value = -1
       reachedEnd.value = true
       writeStoredShortReviewPosition({ videoID: '' })
@@ -477,40 +491,53 @@ onBeforeUnmount(() => {
             <h2>待审队列</h2>
             <p>{{ appliedKeyword ? `关键词：${appliedKeyword}` : 'ready 短视频 · 上传时间倒序' }}</p>
           </div>
-          <el-tag type="info" effect="plain">{{ loadedCount }}/{{ total }}</el-tag>
+          <el-tag type="info" effect="plain">第 {{ currentPage }} / {{ totalPages }} 页</el-tag>
         </div>
 
-        <div v-loading="listLoading" class="review-queue__list">
-          <button
-            v-for="(item, index) in items"
-            :key="item.id"
-            class="queue-item"
-            :class="{ 'is-active': index === currentIndex }"
-            type="button"
-            @click="selectIndex(index)"
-          >
-            <span class="queue-item__thumb">
-              <img
-                v-if="item.thumbnail"
-                :src="`/api/v1/videos/${item.id}/thumbnail`"
-                :alt="`${item.title || '短视频'}封面`"
-              />
-              <el-icon v-else><VideoCamera /></el-icon>
-            </span>
-            <span class="queue-item__copy">
-              <strong>{{ item.title || '未命名短视频' }}</strong>
-              <em>{{ videoMetaLine(item) }}</em>
-            </span>
-          </button>
+        <div class="review-queue__body">
+          <div v-loading="listLoading" class="review-queue__list">
+            <button
+              v-for="(item, index) in items"
+              :key="item.id"
+              class="queue-item"
+              :class="{ 'is-active': index === currentIndex }"
+              type="button"
+              @click="selectIndex(index)"
+            >
+              <span class="queue-item__thumb">
+                <img
+                  v-if="item.thumbnail"
+                  :src="`/api/v1/videos/${item.id}/thumbnail`"
+                  :alt="`${item.title || '短视频'}封面`"
+                />
+                <el-icon v-else><VideoCamera /></el-icon>
+              </span>
+              <span class="queue-item__copy">
+                <strong>{{ item.title || '未命名短视频' }}</strong>
+                <em>{{ videoMetaLine(item) }}</em>
+              </span>
+            </button>
 
-          <div v-if="loadingMore" class="review-queue__loading">正在加载下一页...</div>
-          <EmptyState
-            v-if="!listLoading && items.length === 0"
-            class="review-queue__empty"
-            :icon="VideoCamera"
-            title="暂无队列"
-            description="当前筛选下没有可审核的 ready 短视频。"
-          />
+            <EmptyState
+              v-if="!listLoading && items.length === 0"
+              class="review-queue__empty"
+              :icon="VideoCamera"
+              title="暂无队列"
+              description="当前筛选下没有可审核的 ready 短视频。"
+            />
+          </div>
+
+          <div class="review-queue__pagination">
+            <span class="review-queue__page-summary">{{ pageSummaryText }}</span>
+            <AdminTablePagination
+              :current-page="currentPage"
+              :page-size="PAGE_SIZE"
+              :total="total"
+              layout="prev, pager, next"
+              :disabled="listLoading || deleting"
+              @current-change="handlePageChange"
+            />
+          </div>
         </div>
       </aside>
 
@@ -531,17 +558,19 @@ onBeforeUnmount(() => {
 
         <template v-else>
           <section class="player-stage" v-loading="detailLoading || playLoading">
-            <video
-              ref="videoRef"
-              class="review-video"
-              :src="playURL"
-              :muted="muted"
-              playsinline
-              controls
-              autoplay
-              loop
-              preload="metadata"
-            />
+            <div class="review-video-frame">
+              <video
+                ref="videoRef"
+                class="review-video"
+                :src="playURL"
+                :muted="muted"
+                playsinline
+                controls
+                autoplay
+                loop
+                preload="metadata"
+              />
+            </div>
             <div class="player-stage__top">
               <el-tag effect="dark">短视频</el-tag>
               <span>{{ progressText }}</span>
@@ -663,6 +692,12 @@ onBeforeUnmount(() => {
   line-height: var(--leading-small);
 }
 
+.review-queue__body {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
 .review-queue__list {
   min-height: 0;
   overflow: auto;
@@ -744,15 +779,36 @@ onBeforeUnmount(() => {
   -webkit-line-clamp: 2;
 }
 
-.review-queue__loading {
-  padding: var(--space-3);
-  color: var(--text-secondary);
-  text-align: center;
-  font-size: var(--text-small);
-}
-
 .review-queue__empty {
   min-height: 280px;
+}
+
+.review-queue__pagination {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-surface);
+}
+
+.review-queue__page-summary {
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.review-queue__pagination :deep(.admin-table-pagination) {
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+.review-queue__pagination :deep(.el-pagination) {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.review-queue__pagination :deep(.admin-table-pagination__jump) {
+  width: 100%;
 }
 
 .review-player-panel {
@@ -772,16 +828,27 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-.review-video {
+.review-video-frame {
   width: auto;
-  max-width: min(100%, 460px);
+  max-width: min(100%, 430px);
+  height: min(100%, 760px);
+  max-height: calc(100% - var(--space-8));
+  aspect-ratio: 9 / 16;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  border-radius: 28px;
+  background: #0f172a;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
+
+.review-video {
+  width: 100%;
   height: 100%;
   max-height: none;
   min-height: 0;
-  border-radius: var(--radius-md);
+  border-radius: 20px;
   background: #000000;
   object-fit: contain;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
 }
 
 .player-stage__top {
@@ -899,10 +966,15 @@ onBeforeUnmount(() => {
     padding: var(--space-3);
   }
 
+  .review-video-frame {
+    max-width: 100%;
+    max-height: calc(100% - var(--space-6));
+    padding: 8px;
+    border-radius: 24px;
+  }
+
   .review-video {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 9 / 16;
+    border-radius: 16px;
   }
 
   .review-detail__controls .el-button {
