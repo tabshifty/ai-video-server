@@ -8,6 +8,7 @@ import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import Toolbar from '../components/base/Toolbar.vue'
+import { formatAdminDateTime } from '../utils/dateTime'
 import {
   createAdminImageCollection,
   deleteAdminImageCollection,
@@ -76,6 +77,10 @@ function createEmptyForm() {
     sort_order: 0,
     active: true
   }
+}
+
+function formatDateTime(value) {
+  return formatAdminDateTime(value, '--')
 }
 
 function readViewportWidth() {
@@ -480,7 +485,9 @@ onBeforeUnmount(() => {
               <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" label="更新时间" width="180" />
+          <el-table-column label="更新时间" width="180">
+            <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
+          </el-table-column>
           <el-table-column label="操作" width="260">
             <template #default="{ row }">
               <el-button size="small" type="primary" plain @click="openImageDrawer(row)">查看图片</el-button>

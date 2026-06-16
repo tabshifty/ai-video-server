@@ -49,6 +49,7 @@ import {
   subtitleUploadAccept,
   tvPendingStageLabel
 } from './videoList.helpers'
+import { formatAdminDateTime } from '../utils/dateTime'
 
 const list = ref([])
 const total = ref(0)
@@ -280,6 +281,10 @@ async function confirmDetailClose() {
 
 function statusLabel(status) {
   return getVideoStatusMeta(status).label
+}
+
+function formatDateTime(value) {
+  return formatAdminDateTime(value, '--')
 }
 
 function typeLabel(type) {
@@ -1244,7 +1249,9 @@ onBeforeUnmount(() => {
               </template>
             </el-table-column>
             <el-table-column v-if="isColumnVisible('upload_user')" prop="upload_user" label="上传用户" width="140" />
-            <el-table-column v-if="isColumnVisible('created_at')" prop="created_at" label="上传时间" width="180" />
+            <el-table-column v-if="isColumnVisible('created_at')" label="上传时间" width="180">
+              <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+            </el-table-column>
             <el-table-column v-if="isColumnVisible('operations')" label="操作" width="300">
               <template #default="{ row }">
                 <el-button size="small" @click="showDetail(row)">详情</el-button>
@@ -1645,7 +1652,7 @@ onBeforeUnmount(() => {
               >
                 设为封面（当前帧）
               </el-button>
-              <span v-if="playExpiresAt > 0" class="play-expire">有效期至：{{ new Date(playExpiresAt * 1000).toLocaleString() }}</span>
+              <span v-if="playExpiresAt > 0" class="play-expire">有效期至：{{ formatDateTime(playExpiresAt * 1000) }}</span>
             </div>
 
             <el-alert

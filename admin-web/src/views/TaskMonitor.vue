@@ -8,6 +8,7 @@ import Toolbar from '../components/base/Toolbar.vue'
 import StatCard from '../components/base/StatCard.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import { formatAdminDateTime } from '../utils/dateTime'
 import { getAdminTasks } from '../api/admin'
 
 const list = ref([])
@@ -101,6 +102,10 @@ function formatDuration(seconds) {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function formatDateTime(value) {
+  return formatAdminDateTime(value, '--')
 }
 
 function formatRemaining(row) {
@@ -235,8 +240,12 @@ onUnmounted(() => {
               </el-table-column>
               <el-table-column prop="retry_count" label="重试" width="80" />
               <el-table-column prop="error" label="错误信息" min-width="280" />
-              <el-table-column prop="started_at" label="开始时间" width="180" />
-              <el-table-column prop="progress_updated_at" label="进度更新时间" width="180" />
+              <el-table-column label="开始时间" width="180">
+                <template #default="{ row }">{{ formatDateTime(row.started_at) }}</template>
+              </el-table-column>
+              <el-table-column label="进度更新时间" width="180">
+                <template #default="{ row }">{{ formatDateTime(row.progress_updated_at) }}</template>
+              </el-table-column>
             </el-table>
           </div>
           <div class="toolbar-row toolbar-row--end">

@@ -331,7 +331,7 @@ onUnmounted(() => {
                 {{ formatOrphanScanBytes(row.size_bytes) }}
               </template>
             </el-table-column>
-            <el-table-column prop="mod_time" label="更新时间" width="180">
+            <el-table-column label="更新时间" width="180">
               <template #default="{ row }">
                 {{ formatOrphanScanTime(row.mod_time) }}
               </template>

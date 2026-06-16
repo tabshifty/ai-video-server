@@ -17,6 +17,7 @@ import {
   updateAdminImage,
   uploadAdminImages
 } from '../api/admin'
+import { formatAdminDateTime } from '../utils/dateTime'
 import {
   IMAGE_WORKBENCH_LIMITS,
   buildImageGenerationPayload,
@@ -866,8 +867,7 @@ function extractErrorMessage(error, fallback) {
 }
 
 function formatDate(value) {
-  if (!value) return '-'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+  return formatAdminDateTime(value, '-')
 }
 
 function formatDimensions(item) {

@@ -9,6 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 import StatCard from '../components/base/StatCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
+import { formatAdminDateTime } from '../utils/dateTime'
 import {
   deleteAdminTVAppReleaseDraft,
   downloadAdminTVAppReleaseURL,
@@ -83,10 +84,7 @@ function extractErrorMessage(error, fallback) {
 }
 
 function formatDateTime(value) {
-  if (!value) return '暂无'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString('zh-CN', { hour12: false })
+  return formatAdminDateTime(value, '暂无')
 }
 
 function formatBytes(bytes) {

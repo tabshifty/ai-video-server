@@ -1,3 +1,5 @@
+import { formatAdminDateTime } from '../utils/dateTime'
+
 const ORPHAN_SCAN_STATUS_LABELS = {
   idle: '未扫描',
   pending: '排队中',
@@ -16,10 +18,6 @@ const ORPHAN_SCAN_STATUS_TYPES = {
   deleted: 'info'
 }
 
-function pad2(value) {
-  return String(value).padStart(2, '0')
-}
-
 export function getOrphanScanStatusLabel(status) {
   return ORPHAN_SCAN_STATUS_LABELS[status] || '未知'
 }
@@ -29,10 +27,7 @@ export function getOrphanScanStatusType(status) {
 }
 
 export function formatOrphanScanTime(value) {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '--'
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+  return formatAdminDateTime(value, '--')
 }
 
 export function formatOrphanScanBytes(bytes) {

@@ -18,7 +18,7 @@ describe('toolbox orphan file scan helpers', () => {
 
   it('formats orphan scan bytes and time values', () => {
     const date = new Date('2026-06-05T01:02:03.000Z')
-    const wantTime = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
+    const wantTime = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
 
     expect(formatOrphanScanBytes(0)).toBe('0 B')
     expect(formatOrphanScanBytes(1536)).toBe('1.5 KB')

@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-16 17:29 +0800
+- 进度：完成管理端绝对时间显示格式化收尾。独立子代理评审未发现阻塞问题；按评审建议补充数字字符串时间戳兼容和边界测试。确认本次只纳入管理端时间格式化、长期语义沉淀和计划记录。
+- 影响文件：`admin-web/src/utils/dateTime.js`、`admin-web/src/utils/dateTime.spec.js`、`admin-web/src/views/adminDateTimeDisplay.spec.js`、相关管理端时间展示页面、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/utils/dateTime.spec.js src/views/adminDateTimeDisplay.spec.js src/views/toolboxOrphanFiles.helpers.spec.js` 通过；`cd admin-web && npm run test` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 警告）；`git diff --check` 通过；乱码扫描无命中；排除测试文件后的绝对时间 raw prop / `toLocaleString` 覆盖搜索无命中。
+
+## 2026-06-16 17:18 +0800
+- 进度：完成管理端绝对时间显示格式化实现。新增共享 `formatAdminDateTime`，将用户、视频、图片、合集、演员、任务监控、IPTV、安装包管理、孤儿文件扫描、图像生成历史等可见绝对时间统一切到 `YYYY/MM/DD HH:mm:ss`；保留业务日期和时长原格式，并补充源码级回归测试防止时间戳列 raw prop 直出。
+- 影响文件：`admin-web/src/utils/dateTime.js`、`admin-web/src/utils/dateTime.spec.js`、`admin-web/src/views/adminDateTimeDisplay.spec.js`、`admin-web/src/views/*` 时间展示相关文件、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/utils/dateTime.spec.js src/views/adminDateTimeDisplay.spec.js src/views/toolboxOrphanFiles.helpers.spec.js`、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
+## 2026-06-16 17:05 +0800
+- 进度：开始收口并实现管理端绝对时间显示格式化。已通过 `$grill-with-docs` 确认边界：`created_at`、`updated_at`、`started_at`、`published_at`、`mod_time` 等绝对时间戳统一显示为 `YYYY/MM/DD HH:mm:ss`；`YYYY-MM-DD` 业务日期、剩余时间和播放进度等时长不纳入本次格式化。
+- 影响文件：预计 `admin-web/src` 下管理端时间展示相关页面/工具、必要前端测试、`CONTEXT.md`、`plan.md`
+- 验证：待执行管理端定向测试、`cd admin-web && npm run build`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 15:52 +0800
 - 进度：完成部署机系统日志路径落地。已推送 `2c69da3` 到 `deploy master`；远端 hook 按分桶跳过 Go/frontend 构建。随后在部署机 `~/deploy/ai-video-server/.env` 写入 `SERVER_LOG_PATH=/Users/chee/Library/Logs/ai-video-server/server.log`，重启 `com.aivideo.server`，确认 `/healthz` 正常，系统日志接口返回真实日志行。
 - 影响文件：`plan.md`；部署机运行态配置 `~/deploy/ai-video-server/.env`

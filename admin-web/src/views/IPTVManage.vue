@@ -8,6 +8,7 @@ import Toolbar from '../components/base/Toolbar.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import StatCard from '../components/base/StatCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import { formatAdminDateTime } from '../utils/dateTime'
 import {
   getAdminIPTVPlaylist,
   refreshAdminIPTVPlaylist,
@@ -73,10 +74,7 @@ function applyPlaylist(data) {
 }
 
 function formatDateTime(value) {
-  if (!value) return '暂无'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString('zh-CN', { hour12: false })
+  return formatAdminDateTime(value, '暂无')
 }
 
 async function loadPlaylist() {

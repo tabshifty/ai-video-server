@@ -7,6 +7,7 @@ import PageHeader from '../components/base/PageHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import { formatAdminDateTime } from '../utils/dateTime'
 import {
   createAdminCollection,
   deleteAdminCollection,
@@ -52,6 +53,10 @@ function extractErrorMessage(error, fallback) {
     return message.trim()
   }
   return fallback
+}
+
+function formatDateTime(value) {
+  return formatAdminDateTime(value, '--')
 }
 
 function buildListParams() {
@@ -221,7 +226,9 @@ onMounted(load)
                   <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="updated_at" label="更新时间" width="180" />
+              <el-table-column label="更新时间" width="180">
+                <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
+              </el-table-column>
               <el-table-column label="操作" width="180">
                 <template #default="{ row }">
                   <el-button size="small" @click="openEdit(row)">编辑</el-button>

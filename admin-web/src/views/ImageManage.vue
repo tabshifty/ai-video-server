@@ -21,6 +21,7 @@ import {
   updateAdminImage,
   uploadAdminImages
 } from '../api/admin'
+import { formatAdminDateTime } from '../utils/dateTime'
 import { sha256File } from '../utils/hash'
 
 const route = useRoute()
@@ -211,6 +212,10 @@ function formatFileSize(size) {
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
   if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`
   return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function formatDateTime(value) {
+  return formatAdminDateTime(value, '--')
 }
 
 function splitActorSelection(values) {
@@ -919,7 +924,9 @@ onBeforeUnmount(() => {
               <el-table-column label="文件大小" width="130">
                 <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
               </el-table-column>
-              <el-table-column prop="created_at" label="上传时间" width="180" />
+              <el-table-column label="上传时间" width="180">
+                <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+              </el-table-column>
               <el-table-column label="操作" width="250">
                 <template #default="{ row }">
                   <el-button size="small" @click="showDetail(row)">详情</el-button>
