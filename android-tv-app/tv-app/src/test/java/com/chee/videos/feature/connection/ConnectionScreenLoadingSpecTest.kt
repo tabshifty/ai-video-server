@@ -30,4 +30,15 @@ class ConnectionScreenLoadingSpecTest {
         assertFalse("连接页不应继续使用默认 Material TextButton 作为主要操作", source.contains("import androidx.compose.material3.TextButton"))
         assertFalse("连接页不应继续使用默认 Material IconButton 作为主要操作", source.contains("import androidx.compose.material3.IconButton"))
     }
+
+    @Test
+    fun `endpoint rows stay stable while connecting and with long urls`() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt")
+        val source = sourcePath.toFile().readText()
+
+        assertTrue("发现服务入口连接中必须禁用，避免重复触发网络探测", source.contains("actionsEnabled = !uiState.connecting"))
+        assertTrue("EndpointList 必须把 actionsEnabled 传给使用按钮", source.contains("enabled = actionsEnabled"))
+        assertTrue("历史地址长 URL 必须限制单行", source.contains("maxLines = 1"))
+        assertTrue("历史地址长 URL 必须省略，避免挤压 TV 操作按钮", source.contains("overflow = TextOverflow.Ellipsis"))
+    }
 }

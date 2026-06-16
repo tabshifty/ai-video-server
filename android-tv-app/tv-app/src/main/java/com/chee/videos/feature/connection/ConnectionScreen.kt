@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -104,6 +105,7 @@ fun ConnectionScreen(
                             title = "发现的服务",
                             endpoints = uiState.discoveredEndpoints,
                             useLabel = "使用",
+                            actionsEnabled = !uiState.connecting,
                             onUse = { viewModel.useEndpoint(it.baseUrl) },
                             onDelete = null,
                         )
@@ -151,6 +153,7 @@ fun ConnectionScreen(
                         title = "历史地址",
                         endpoints = uiState.savedEndpoints,
                         useLabel = "连接",
+                        actionsEnabled = !uiState.connecting,
                         onUse = { viewModel.useEndpoint(it.baseUrl) },
                         onDelete = { viewModel.removeSavedEndpoint(it.baseUrl) },
                     )
@@ -216,6 +219,7 @@ private fun EndpointList(
     title: String,
     endpoints: List<ServerEndpoint>,
     useLabel: String,
+    actionsEnabled: Boolean,
     onUse: (ServerEndpoint) -> Unit,
     onDelete: ((ServerEndpoint) -> Unit)?,
 ) {
@@ -228,7 +232,13 @@ private fun EndpointList(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(endpoint.baseUrl, style = MaterialTheme.typography.bodyLarge, color = AppChrome.TextPrimary)
+                    Text(
+                        text = endpoint.baseUrl,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AppChrome.TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text(
                         text = "最近成功时间：${java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(endpoint.lastSuccessAt))}",
                         style = MaterialTheme.typography.labelSmall,
@@ -239,12 +249,14 @@ private fun EndpointList(
                     ConnectionActionButton(
                         text = useLabel,
                         primary = true,
+                        enabled = actionsEnabled,
                         onClick = { onUse(endpoint) },
                     )
                     if (onDelete != null) {
                         ConnectionActionButton(
                             text = "删除",
                             primary = false,
+                            enabled = actionsEnabled,
                             onClick = { onDelete(endpoint) },
                         )
                     }

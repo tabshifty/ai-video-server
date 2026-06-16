@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-17 00:25 +0800
+- 进度：完成 Android TV App 整体评审第一轮优化收尾。本次聚焦“功能正常、使用流畅”的首启连接链路：异常可恢复、连接不可重入、长地址不挤压操作按钮；未改播放器内核、导航结构或 TV 编译边界。提交仅纳入本次 TV 连接优化、版本递增、长期约束沉淀和计划记录。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/connection/ConnectionViewModel.kt`、`ConnectionScreen.kt`、`core/repository/ServerRepository.kt`、`core/di/TvRepositoryModule.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/connection/*`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.connection.ConnectionViewModelTest --tests com.chee.videos.feature.connection.ConnectionScreenLoadingSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' android-tv-app CONTEXT.md plan.md` 无命中。
+
+## 2026-06-17 00:23 +0800
+- 进度：完成第一轮 TV 首启连接链路优化。连接 ViewModel 通过 `ConnectionServerRepository` 接口隔离仓储，手动连接和历史地址连接均捕获探测/激活异常并恢复 `connecting=false`；连接中重复点击历史/发现地址会被忽略，连接页地址行限制单行省略，避免长 URL 挤压遥控器操作按钮。TV 版本递增到 `0.1.112` / `versionCode=112`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/connection/ConnectionViewModel.kt`、`ConnectionScreen.kt`、`core/repository/ServerRepository.kt`、`core/di/TvRepositoryModule.kt`、`android-tv-app/tv-app/build.gradle.kts`、相关连接单测、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.connection.ConnectionViewModelTest --tests com.chee.videos.feature.connection.ConnectionScreenLoadingSpecTest` 通过；待执行 TV 全量单测、assemble、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 00:13 +0800
+- 进度：开始对 Android TV App 做整体评审与优化。先按 `$grill-with-docs` 校准 TV 工程定位与现有上下文，再审查模块边界、入口路由、播放器链路、焦点/10-foot UI、测试与构建配置；优先处理代码可证明的问题，避免无目标大重构。
+- 影响文件：预计 `android-tv-app/**`、`CONTEXT.md`、`plan.md`
+- 验证：待根据实际优化范围执行 TV 定向单测、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-16 23:39 +0800
 - 进度：完成 TV 长视频播放器内部黑色背板修复。`TvLongFormMedia3Player` 不再在 SurfaceView 背后加载详情/剧集海报，也不再使用页面渐变背板；所有长视频 Media3 播放器内部统一铺纯黑背板，避免 DV/HDR SurfaceView 透明、未铺满或重建时露出后方背景。DV/HDR 仍使用 SurfaceView，普通 SDR 仍按路由使用 TextureView。TV 版本递增到 `0.1.111` / `versionCode=111`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/player/TvLongFormExoPlayerSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

@@ -3,7 +3,7 @@ package com.chee.videos.feature.connection
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.model.ServerEndpoint
-import com.chee.videos.core.repository.ServerRepository
+import com.chee.videos.core.repository.ConnectionServerRepository
 import com.chee.videos.core.util.UrlBuilder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -26,7 +26,7 @@ data class ConnectionUiState(
 
 @HiltViewModel
 class ConnectionViewModel @Inject constructor(
-    private val serverRepository: ServerRepository,
+    private val serverRepository: ConnectionServerRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConnectionUiState())
@@ -61,7 +61,7 @@ class ConnectionViewModel @Inject constructor(
                 )
             }
             runCatching {
-                serverRepository.scanLocalNetwork()
+                serverRepository.scanLocalNetwork(DefaultLanScanPorts)
             }.onSuccess { discovered ->
                 _uiState.update {
                     it.copy(
@@ -84,15 +84,29 @@ class ConnectionViewModel @Inject constructor(
     }
 
     fun useEndpoint(baseUrl: String) {
+        if (_uiState.value.connecting) {
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(connecting = true, message = "正在连接服务器...", messageIsError = false) }
-            val ok = serverRepository.testEndpoint(baseUrl)
-            if (!ok) {
-                _uiState.update { it.copy(connecting = false, message = "连接失败，请确认服务器地址和运行状态", messageIsError = true) }
-                return@launch
+            runCatching {
+                val ok = serverRepository.testEndpoint(baseUrl)
+                if (!ok) {
+                    _uiState.update { it.copy(connecting = false, message = "连接失败，请确认服务器地址和运行状态", messageIsError = true) }
+                    return@launch
+                }
+                serverRepository.activateEndpoint(baseUrl, clearTokens = false)
+            }.onSuccess {
+                _uiState.update { it.copy(connecting = false, message = "已连接：${UrlBuilder.normalizeBaseUrl(baseUrl)}", messageIsError = false) }
+            }.onFailure { err ->
+                _uiState.update {
+                    it.copy(
+                        connecting = false,
+                        message = "连接失败：${err.message ?: "请确认服务器地址和运行状态"}",
+                        messageIsError = true,
+                    )
+                }
             }
-            serverRepository.activateEndpoint(baseUrl)
-            _uiState.update { it.copy(connecting = false, message = "已连接：${UrlBuilder.normalizeBaseUrl(baseUrl)}", messageIsError = false) }
         }
     }
 
@@ -109,13 +123,24 @@ class ConnectionViewModel @Inject constructor(
         val raw = if (port.isBlank()) host else "$host:$port"
         viewModelScope.launch {
             _uiState.update { it.copy(connecting = true, message = "正在测试连接...", messageIsError = false) }
-            val ok = serverRepository.testEndpoint(raw)
-            if (!ok) {
-                _uiState.update { it.copy(connecting = false, message = "连接失败，请确认 IP/端口和服务器状态", messageIsError = true) }
-                return@launch
+            runCatching {
+                val ok = serverRepository.testEndpoint(raw)
+                if (!ok) {
+                    _uiState.update { it.copy(connecting = false, message = "连接失败，请确认 IP/端口和服务器状态", messageIsError = true) }
+                    return@launch
+                }
+                serverRepository.activateEndpoint(raw, clearTokens = false)
+            }.onSuccess {
+                _uiState.update { it.copy(connecting = false, message = "连接成功：${UrlBuilder.normalizeBaseUrl(raw)}", messageIsError = false) }
+            }.onFailure { err ->
+                _uiState.update {
+                    it.copy(
+                        connecting = false,
+                        message = "连接失败：${err.message ?: "请确认 IP/端口和服务器状态"}",
+                        messageIsError = true,
+                    )
+                }
             }
-            serverRepository.activateEndpoint(raw)
-            _uiState.update { it.copy(connecting = false, message = "连接成功：${UrlBuilder.normalizeBaseUrl(raw)}", messageIsError = false) }
         }
     }
 
@@ -123,5 +148,9 @@ class ConnectionViewModel @Inject constructor(
         viewModelScope.launch {
             serverRepository.removeEndpoint(baseUrl)
         }
+    }
+
+    private companion object {
+        val DefaultLanScanPorts = listOf(8080, 80, 3000, 5000)
     }
 }

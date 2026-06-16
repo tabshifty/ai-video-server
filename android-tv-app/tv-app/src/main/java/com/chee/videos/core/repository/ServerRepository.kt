@@ -8,23 +8,33 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 
+interface ConnectionServerRepository {
+    val endpointsFlow: Flow<List<ServerEndpoint>>
+
+    suspend fun scanLocalNetwork(ports: List<Int>): List<ServerEndpoint>
+
+    suspend fun testEndpoint(rawInput: String): Boolean
+
+    suspend fun activateEndpoint(baseUrl: String, clearTokens: Boolean)
+
+    suspend fun removeEndpoint(baseUrl: String)
+}
+
 @Singleton
 class ServerRepository @Inject constructor(
     private val scanner: LocalNetworkScanner,
     private val store: AppPreferencesStore,
-) {
-    val endpointsFlow: Flow<List<ServerEndpoint>> = store.endpointsFlow
+) : ConnectionServerRepository {
+    override val endpointsFlow: Flow<List<ServerEndpoint>> = store.endpointsFlow
     val activeBaseUrlFlow: Flow<String?> = store.activeBaseUrlFlow
 
-    suspend fun scanLocalNetwork(
-        ports: List<Int> = listOf(8080, 80, 3000, 5000),
-    ): List<ServerEndpoint> {
+    override suspend fun scanLocalNetwork(ports: List<Int>): List<ServerEndpoint> {
         val discovered = scanner.discoverCandidateBaseUrls(ports)
         val now = System.currentTimeMillis()
         return discovered.map { ServerEndpoint(baseUrl = it, lastSuccessAt = now) }
     }
 
-    suspend fun testEndpoint(rawInput: String): Boolean {
+    override suspend fun testEndpoint(rawInput: String): Boolean {
         val baseUrl = UrlBuilder.normalizeBaseUrl(rawInput)
         if (baseUrl.isBlank()) {
             return false
@@ -32,7 +42,7 @@ class ServerRepository @Inject constructor(
         return scanner.probe(baseUrl)
     }
 
-    suspend fun activateEndpoint(baseUrl: String, clearTokens: Boolean = false) {
+    override suspend fun activateEndpoint(baseUrl: String, clearTokens: Boolean) {
         val endpoint = store.upsertEndpoint(baseUrl)
         if (clearTokens) {
             store.clearTokens()
@@ -40,7 +50,7 @@ class ServerRepository @Inject constructor(
         store.setActiveBaseUrl(endpoint.baseUrl)
     }
 
-    suspend fun removeEndpoint(baseUrl: String) {
+    override suspend fun removeEndpoint(baseUrl: String) {
         store.removeEndpoint(baseUrl)
     }
 }
