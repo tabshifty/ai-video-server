@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 
 data class TvSeriesDetailUiState(
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val series: TvSeriesUiModel? = null,
     val baseUrl: String = "",
     val selectedSeasonNumber: Int = 1,
@@ -26,6 +27,7 @@ class TvSeriesDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val seriesId = decodeTvRouteArg(savedStateHandle.get<String>(TvSeriesIdArg))
+    private var requestVersion = 0
 
     private val _uiState = MutableStateFlow(TvSeriesDetailUiState())
     val uiState: StateFlow<TvSeriesDetailUiState> = _uiState.asStateFlow()
@@ -60,34 +62,71 @@ class TvSeriesDetailViewModel @Inject constructor(
     }
 
     private fun load() {
+        val versionAtRequest = nextRequestVersion()
         viewModelScope.launch {
             val baseUrl = repository.readActiveBaseUrl().orEmpty()
-            _uiState.update { it.copy(loading = true, errorMessage = null) }
+            _uiState.update {
+                val hasExistingData = it.series != null
+                it.copy(
+                    loading = !hasExistingData,
+                    refreshing = hasExistingData,
+                    baseUrl = baseUrl,
+                    errorMessage = null,
+                )
+            }
             repository.fetchSeriesDetail(seriesId)
                 .onSuccess { dto ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onSuccess
+                    }
                     val series = tvSeriesDetailToUiModel(dto)
-                    val defaultSelection = findPreferredSeriesSelection(series)
-                    val defaultSeason = series.seasons.firstOrNull { it.number == defaultSelection?.seasonNumber }
-                        ?: series.seasons.firstOrNull()
-                    _uiState.value = TvSeriesDetailUiState(
-                        loading = false,
-                        series = series,
-                        baseUrl = baseUrl,
-                        selectedSeasonNumber = defaultSeason?.number ?: 1,
-                        selectedEpisodeNumber = defaultSelection?.episodeNumber
-                            ?: defaultSeason?.let(::findPreferredEpisodeNumber)
-                            ?: 1,
-                        errorMessage = null,
-                    )
+                    _uiState.update { state ->
+                        val resolvedSelection = resolveSeriesDetailSelection(
+                            series = series,
+                            currentSeasonNumber = state.selectedSeasonNumber,
+                            currentEpisodeNumber = state.selectedEpisodeNumber,
+                            preserveCurrentSelection = state.series != null,
+                        )
+                        state.copy(
+                            loading = false,
+                            refreshing = false,
+                            series = series,
+                            baseUrl = baseUrl,
+                            selectedSeasonNumber = resolvedSelection.seasonNumber,
+                            selectedEpisodeNumber = resolvedSelection.episodeNumber,
+                            errorMessage = null,
+                        )
+                    }
                 }
                 .onFailure { error ->
-                    _uiState.value = TvSeriesDetailUiState(
-                        loading = false,
-                        baseUrl = baseUrl,
-                        errorMessage = error.message ?: "电视剧详情加载失败",
-                    )
+                    if (versionAtRequest != requestVersion) {
+                        return@onFailure
+                    }
+                    _uiState.update { state ->
+                        val hasExistingData = state.series != null
+                        if (hasExistingData) {
+                            state.copy(
+                                loading = false,
+                                refreshing = false,
+                                baseUrl = baseUrl,
+                                errorMessage = error.message ?: "电视剧详情加载失败",
+                            )
+                        } else {
+                            TvSeriesDetailUiState(
+                                loading = false,
+                                refreshing = false,
+                                baseUrl = baseUrl,
+                                errorMessage = error.message ?: "电视剧详情加载失败",
+                            )
+                        }
+                    }
                 }
         }
+    }
+
+    private fun nextRequestVersion(): Int {
+        requestVersion += 1
+        return requestVersion
     }
 }
 
@@ -99,4 +138,41 @@ internal fun selectedDetailSeason(state: TvSeriesDetailUiState): TvSeasonUiModel
 internal fun selectedDetailEpisode(state: TvSeriesDetailUiState): TvEpisodeUiModel? {
     val season = selectedDetailSeason(state) ?: return null
     return season.episodes.firstOrNull { it.number == state.selectedEpisodeNumber }
+}
+
+internal fun resolveSeriesDetailSelection(
+    series: TvSeriesUiModel,
+    currentSeasonNumber: Int,
+    currentEpisodeNumber: Int,
+    preserveCurrentSelection: Boolean,
+): TvPreferredEpisodeSelection {
+    if (!preserveCurrentSelection) {
+        return defaultSeriesDetailSelection(series)
+    }
+
+    val currentSeason = series.seasons.firstOrNull { it.number == currentSeasonNumber }
+    if (currentSeason != null) {
+        val currentEpisode = currentSeason.episodes.firstOrNull { it.number == currentEpisodeNumber }
+        if (currentEpisode != null) {
+            return TvPreferredEpisodeSelection(currentSeason.number, currentEpisode.number)
+        }
+        return TvPreferredEpisodeSelection(
+            seasonNumber = currentSeason.number,
+            episodeNumber = findPreferredEpisodeNumber(currentSeason),
+        )
+    }
+
+    return defaultSeriesDetailSelection(series)
+}
+
+private fun defaultSeriesDetailSelection(series: TvSeriesUiModel): TvPreferredEpisodeSelection {
+    val defaultSelection = findPreferredSeriesSelection(series)
+    val defaultSeason = series.seasons.firstOrNull { it.number == defaultSelection?.seasonNumber }
+        ?: series.seasons.firstOrNull()
+    return TvPreferredEpisodeSelection(
+        seasonNumber = defaultSeason?.number ?: 1,
+        episodeNumber = defaultSelection?.episodeNumber
+            ?: defaultSeason?.let(::findPreferredEpisodeNumber)
+            ?: 1,
+    )
 }

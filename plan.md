@@ -2,6 +2,51 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-17 14:33 +0800
+- 进度：完成 TV 详情页软刷新收尾验证。已修正一条既有源码结构断言的字符串匹配过宽问题，避免把新加的页内紧凑错误条误判成 Material `IconButton`；随后串行重跑 TV 全量单测与 `assembleDebug` 均通过。`git diff --check` 与乱码扫描也已通过，当前实现面仅纳入本轮详情页软刷新、测试支撑、版本递增与文档沉淀。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' CONTEXT.md plan.md android-tv-app/tv-app/src/main/java android-tv-app/tv-app/src/test/java android-tv-app/tv-app/build.gradle.kts` 无命中。
+
+## 2026-06-17 14:32 +0800
+- 进度：全量 TV 单测第一次收尾时发现一条既有源码结构断言过度依赖裸字符串：`TvSeriesDetailActionSpecTest` 把任何 `IconButton(` 与 `.tvFocusableGlow(` 子串都视为违规，导致新增的 `TvIconActionButton(` 和页内紧凑错误条焦点按钮被误报。已把断言收窄到真正要禁止的默认 Material 按钮调用与旧卡片 glow 形态，不改变本次详情页业务实现；接下来串行重跑 TV 全量单测与 assemble，避开并行 Gradle 中间产物争用。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`plan.md`
+- 验证：待串行执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 14:31 +0800
+- 进度：完成 TV 详情页软刷新实现。电视剧详情页与长视频详情页都改为“首屏无内容才走整页 loading/error，已有内容时只走页内轻量刷新/错误”；两类详情 ViewModel 新增 `refreshing` 与请求版本保护，避免旧响应覆盖新详情；电视剧详情页软刷新成功后保留当前季/集，失效时按既定链路回退；两个详情页播放按钮都改为只在首屏首次有内容时请求一次初始焦点，后续软刷新不再抢回焦点。同步补充详情页 ViewModel 定向单测、挂载点/焦点源码结构断言，并将 TV 版本递增到 `0.1.118` / `versionCode=118`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`、`TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/detail/DetailViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailViewModelTest.kt`、`TvSeriesDetailSoftRefreshSpecTest.kt`、`TvLongFormDetailSoftRefreshSpecTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/detail/DetailViewModelTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesDetailViewModelTest --tests com.chee.videos.feature.detail.DetailViewModelTest --tests com.chee.videos.feature.tv.TvSeriesDetailSoftRefreshSpecTest --tests com.chee.videos.feature.tv.TvLongFormDetailSoftRefreshSpecTest` 通过；待执行 TV 全量单测、assemble、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 14:18 +0800
+- 进度：开始落实 TV 详情页软刷新实现，范围收口为电视剧详情页与长视频详情页两条已有内容重载链路。计划先补 ViewModel 红灯测试锁定“已有内容不退回整页 loading、失败保留旧内容、旧响应不覆盖新状态、电视剧详情保留当前选季选集并按既定回退链路收口”，再最小修改状态机和页内轻量状态挂载点。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesDetailViewModel.kt`、`TvSeriesDetailScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/detail/DetailViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行详情页定向单测、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 14:06 +0800
+- 进度：继续通过 `$grill-with-docs` 收口详情页软刷新轻量状态的结构落点。已确认已有内容后的轻量刷新/失败状态挂在详情主体内部：长视频详情页放入底部 `TvDetailGlassPanel`，电视剧详情页放入左侧 hero 或右侧剧集面板，而不是页面中央整页遮罩。`TV 详情页软刷新轻量状态挂载点` 已同步沉淀，下一步继续细化电视剧详情页到底优先挂在左侧 hero 还是右侧剧集面板。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补详情页定向红灯测试与 TV 验证。
+
+## 2026-06-17 14:02 +0800
+- 进度：继续通过 `$grill-with-docs` 收口详情页软刷新状态展示形态。已确认详情页已有内容后的刷新/失败复用现有 TV 页内轻量状态语言，不新造第二套大面板状态系统；首屏无内容才继续走 `TvPageLoadingState` / `TvErrorState`。`TV 详情页软刷新复用页内轻量状态` 已同步沉淀，下一步继续确认这类轻量状态在长视频详情页和电视剧详情页中的具体落点区域。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补详情页定向红灯测试与 TV 验证。
+
+## 2026-06-17 13:59 +0800
+- 进度：继续通过 `$grill-with-docs` 收口电视剧详情页软刷新失效回退语义。已确认当当前季/集在新详情数据里失效时，回退链路按“先保当前季、再全局偏好、最后第一季首个可播集/首集”的稳定顺序执行，不允许刷新后跳到不可预测的分集。`TV 电视剧详情软刷新失效回退链路` 已同步沉淀，下一步继续确认详情页页内附加状态是复用现有状态组件，还是新造一套局部提示样式。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补详情页定向红灯测试与 TV 验证。
+
+## 2026-06-17 13:56 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 详情页软刷新焦点语义。已确认长视频详情页和电视剧详情页在已有内容完成软刷新后，不主动把焦点抢回播放按钮；播放按钮只在首屏第一次有内容时请求初始焦点，后续软刷新应优先保持用户当前焦点目标。`TV 详情页软刷新不抢主操作焦点` 已同步沉淀，下一步继续细化当电视剧详情页当前选中季/集在新数据中失效时的回退策略。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补详情页定向红灯测试与 TV 验证。
+
+## 2026-06-17 13:53 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 下一轮“运行流畅”目标，当前聚焦详情页状态机。已确认详情页下一优先级是“已有内容不硬切”的软刷新语义：长视频详情页和电视剧详情页在已有内容时，重载失败保留旧内容并只显示页内轻量错误；电视剧详情页重载成功后，若当前季/集在新数据里仍存在，则继续保持当前选择，不重新跳回默认偏好分集。已同步沉淀 `TV 详情页软刷新` 与 `TV 电视剧详情软刷新保留当前选集` 术语，下一步继续收口长视频详情页在软刷新成功时是否还要保留用户当前焦点目标。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补详情页定向红灯测试与 TV 验证。
+
 ## 2026-06-17 11:55 +0800
 - 进度：开始实现 Android TV App IPTV 软刷新状态机。本轮仅作用于现有 `reload()` 链路，不新增正常播放中的显式刷新入口；先补红灯测试锁定“已有频道时 reload 不退回整页 loading、刷新成功保留当前频道、旧刷新响应不能覆盖新状态、刷新失败不打断当前播放”，再最小修改 IPTV ViewModel 与测试支撑。
 - 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvViewModel.kt`、`TvIptvModels.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvViewModelTest.kt`、`TvIptvNavigationPolicyTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

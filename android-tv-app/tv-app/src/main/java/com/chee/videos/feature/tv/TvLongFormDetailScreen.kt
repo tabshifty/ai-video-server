@@ -17,14 +17,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -45,6 +49,7 @@ import com.chee.videos.core.ui.TvDetailGlassPanel
 import com.chee.videos.core.ui.TvDetailPanelTokens
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
+import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableGlow
@@ -71,9 +76,10 @@ fun TvLongFormDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val playFocusRequester = remember { FocusRequester() }
+    var initialFocusRequested by remember { mutableStateOf(false) }
 
     when {
-        uiState.loading -> {
+        uiState.loading && uiState.detail == null -> {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -113,8 +119,12 @@ fun TvLongFormDetailScreen(
                 preferredPlaybackProfile = uiState.preferredPlaybackProfile,
             ) != null
 
-            LaunchedTvInitialFocus(detail.id) {
-                playFocusRequester.tryRequestFocus()
+            LaunchedTvInitialFocus(detail.id, uiState.loading) {
+                if (!initialFocusRequested && !uiState.loading) {
+                    if (playFocusRequester.tryRequestFocus()) {
+                        initialFocusRequested = true
+                    }
+                }
             }
 
             Box(
@@ -188,6 +198,19 @@ fun TvLongFormDetailScreen(
                         if (hero.actors.isNotEmpty()) {
                             TvLongFormActorRow(actors = hero.actors)
                         }
+                        if (uiState.refreshing) {
+                            TvInlineLoadingState(
+                                message = "正在更新详情",
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (!uiState.errorMessage.isNullOrBlank()) {
+                            TvLongFormInlineError(
+                                message = uiState.errorMessage.orEmpty(),
+                                onAction = viewModel::load,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             TvDetailPrimaryActionButton(
                                 text = if (canPlay) hero.primaryActionLabel else "暂无片源",
@@ -205,6 +228,66 @@ fun TvLongFormDetailScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvLongFormInlineError(
+    message: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.SurfaceShape,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = AppChrome.Error,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = message,
+                color = AppChrome.TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                color = AppChrome.SurfaceStrong,
+                shape = AppChrome.PillShape,
+                modifier = Modifier
+                    .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+                    .clickable(onClick = onAction),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        tint = AppChrome.TextPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "刷新",
+                        color = AppChrome.TextPrimary,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
         }

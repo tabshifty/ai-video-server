@@ -29,8 +29,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,8 +63,10 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
+import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
+import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvSharedSeriesPoster
 
 private object TvSeriesDetailTokens {
@@ -89,8 +94,9 @@ fun TvSeriesDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val playFocusRequester = remember { FocusRequester() }
+    var initialFocusRequested by remember { mutableStateOf(false) }
 
-    if (uiState.loading) {
+    if (uiState.loading && uiState.series == null) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -123,8 +129,12 @@ fun TvSeriesDetailScreen(
     val backdropUrl = resolveTvResourceUrl(uiState.baseUrl, series.backdropUrl)
     val posterUrl = resolveTvResourceUrl(uiState.baseUrl, series.posterUrl)
 
-    LaunchedTvInitialFocus(series.id) {
-        playFocusRequester.tryRequestFocus()
+    LaunchedTvInitialFocus(series.id, uiState.loading) {
+        if (!initialFocusRequested && !uiState.loading && series.seasons.isNotEmpty()) {
+            if (playFocusRequester.tryRequestFocus()) {
+                initialFocusRequested = true
+            }
+        }
     }
 
     Box(
@@ -192,10 +202,13 @@ fun TvSeriesDetailScreen(
                 episodes = episodes,
                 baseUrl = uiState.baseUrl,
                 selectedSeasonNumber = uiState.selectedSeasonNumber,
+                refreshing = uiState.refreshing,
+                errorMessage = uiState.errorMessage,
                 modifier = Modifier
                     .width(TvSeriesDetailTokens.EpisodePaneWidthDp.dp)
                     .fillMaxHeight(),
                 onSelectSeason = viewModel::selectSeason,
+                onRetry = viewModel::retry,
                 onPlayEpisode = { episode ->
                     viewModel.selectEpisode(episode.number)
                     onPlayEpisode(series.id, uiState.selectedSeasonNumber, episode.number)
@@ -667,8 +680,11 @@ private fun TvSeriesEpisodePane(
     episodes: List<TvEpisodeUiModel>,
     baseUrl: String,
     selectedSeasonNumber: Int,
+    refreshing: Boolean,
+    errorMessage: String?,
     modifier: Modifier = Modifier,
     onSelectSeason: (Int) -> Unit,
+    onRetry: () -> Unit,
     onPlayEpisode: (TvEpisodeUiModel) -> Unit,
 ) {
     Column(
@@ -696,6 +712,20 @@ private fun TvSeriesEpisodePane(
             )
         }
 
+        if (refreshing) {
+            TvInlineLoadingState(
+                message = "正在更新剧集详情",
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (!errorMessage.isNullOrBlank()) {
+            TvSeriesInlineError(
+                message = errorMessage,
+                onAction = onRetry,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
         if (episodes.isEmpty()) {
             TvSeriesEmptyEpisodes()
             return@Column
@@ -712,6 +742,66 @@ private fun TvSeriesEpisodePane(
                     baseUrl = baseUrl,
                     onClick = { onPlayEpisode(episode) },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvSeriesInlineError(
+    message: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.SurfaceShape,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = AppChrome.Error,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = message,
+                color = AppChrome.TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                color = AppChrome.SurfaceStrong,
+                shape = AppChrome.PillShape,
+                modifier = Modifier
+                    .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+                    .clickable(onClick = onAction),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        tint = AppChrome.TextPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "刷新",
+                        color = AppChrome.TextPrimary,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
     }

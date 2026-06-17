@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 
 data class DetailUiState(
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val detail: VideoDetailDto? = null,
     val videoType: String = "",
     val baseUrl: String = "",
@@ -38,6 +39,7 @@ class DetailViewModel @Inject constructor(
 
     private val videoId: String = decodeTvRouteArg(savedStateHandle["videoId"])
     private val videoType: String = savedStateHandle.get<String>("videoType").orEmpty()
+    private var requestVersion = 0
 
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
@@ -47,13 +49,16 @@ class DetailViewModel @Inject constructor(
     }
 
     fun load() {
+        val versionAtRequest = nextRequestVersion()
         viewModelScope.launch {
             val baseUrl = videoRepository.readActiveBaseUrl().orEmpty()
             val accessToken = videoRepository.readAccessToken().orEmpty()
 
             _uiState.update {
+                val hasExistingDetail = it.detail != null
                 it.copy(
-                    loading = true,
+                    loading = !hasExistingDetail,
+                    refreshing = hasExistingDetail,
                     videoType = videoType,
                     baseUrl = baseUrl,
                     accessToken = accessToken,
@@ -73,21 +78,29 @@ class DetailViewModel @Inject constructor(
             }
             videoRepository.fetchDetail(videoId)
                 .onSuccess { detail ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onSuccess
+                    }
                     _uiState.update {
                         it.copy(
                             loading = false,
+                            refreshing = false,
                             detail = detail,
                             errorMessage = null,
                         )
                     }
                 }
                 .onFailure { err ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onFailure
+                    }
                     if (err is AuthExpiredException) {
                         authRepository.logoutLocal()
                     }
                     _uiState.update {
                         it.copy(
                             loading = false,
+                            refreshing = false,
                             errorMessage = err.message ?: "详情加载失败",
                         )
                     }
@@ -154,6 +167,11 @@ class DetailViewModel @Inject constructor(
                 _uiState.update { it.copy(errorMessage = err.message ?: "操作失败") }
             }
         }
+    }
+
+    private fun nextRequestVersion(): Int {
+        requestVersion += 1
+        return requestVersion
     }
 
 }
