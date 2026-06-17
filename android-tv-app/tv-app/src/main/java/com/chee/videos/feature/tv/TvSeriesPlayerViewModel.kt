@@ -8,6 +8,7 @@ import com.chee.videos.core.ui.buildSubtitleTrackPreference
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrackByPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -293,15 +294,26 @@ class TvSeriesPlayerViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            val sourceUrl = repository.buildSourceUrl(
-                episode.videoId,
-                resolveTvPlaybackSourceProfile(episode.metadata),
-            )
-            val preferredSubtitleTrackId = resolveSelectedSubtitleTrackByPreference(
-                tracks = episode.subtitleTracks,
-                preference = repository.readTvSubtitlePreference(episode.videoId),
-            )?.id
-            val preferredAudioPreference = repository.readTvAudioPreference(episode.videoId)
+            val sourceResult = try {
+                val sourceUrl = repository.buildSourceUrl(
+                    episode.videoId,
+                    resolveTvPlaybackSourceProfile(episode.metadata),
+                )
+                val preferredSubtitleTrackId = resolveSelectedSubtitleTrackByPreference(
+                    tracks = episode.subtitleTracks,
+                    preference = repository.readTvSubtitlePreference(episode.videoId),
+                )?.id
+                val preferredAudioPreference = repository.readTvAudioPreference(episode.videoId)
+                TvSeriesPlaybackSourceResult.Ready(
+                    sourceUrl = sourceUrl,
+                    preferredSubtitleTrackId = preferredSubtitleTrackId,
+                    preferredAudioPreference = preferredAudioPreference,
+                )
+            } catch (err: CancellationException) {
+                throw err
+            } catch (err: Exception) {
+                TvSeriesPlaybackSourceResult.Failed(err.message ?: "播放源准备失败，请重试")
+            }
             if (requestId != playbackTargetRequestId) {
                 return@launch
             }
@@ -310,19 +322,42 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 if (selected?.videoId != episode.videoId) {
                     return@update it
                 }
-                it.copy(
-                    currentVideoId = episode.videoId,
-                    currentSourceUrl = sourceUrl,
-                    selectedSubtitleTrackId = preferredSubtitleTrackId,
-                    selectedAudioTrackId = null,
-                    selectedAudioPreference = preferredAudioPreference,
-                    canPlayCurrentEpisode = true,
-                    playbackPreparing = false,
-                    playbackBlockedMessage = null,
-                )
+                when (sourceResult) {
+                    is TvSeriesPlaybackSourceResult.Ready -> it.copy(
+                        currentVideoId = episode.videoId,
+                        currentSourceUrl = sourceResult.sourceUrl,
+                        selectedSubtitleTrackId = sourceResult.preferredSubtitleTrackId,
+                        selectedAudioTrackId = null,
+                        selectedAudioPreference = sourceResult.preferredAudioPreference,
+                        canPlayCurrentEpisode = true,
+                        playbackPreparing = false,
+                        playbackBlockedMessage = null,
+                    )
+
+                    is TvSeriesPlaybackSourceResult.Failed -> it.copy(
+                        currentVideoId = episode.videoId,
+                        currentSourceUrl = "",
+                        selectedSubtitleTrackId = null,
+                        selectedAudioTrackId = null,
+                        selectedAudioPreference = null,
+                        canPlayCurrentEpisode = false,
+                        playbackPreparing = false,
+                        playbackBlockedMessage = sourceResult.message,
+                    )
+                }
             }
         }
     }
+}
+
+private sealed interface TvSeriesPlaybackSourceResult {
+    data class Ready(
+        val sourceUrl: String,
+        val preferredSubtitleTrackId: String?,
+        val preferredAudioPreference: TvTrackPreference?,
+    ) : TvSeriesPlaybackSourceResult
+
+    data class Failed(val message: String) : TvSeriesPlaybackSourceResult
 }
 
 internal fun selectedSeason(state: TvSeriesPlayerUiState): TvSeasonUiModel? {

@@ -398,6 +398,37 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_sourceUrlFailureExposesRetryableBlockedState() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                sourceUrlError = IllegalStateException("播放源不可用"),
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(id = "e1", number = 1, title = "第1集", videoId = "video-1", videoStatus = "ready"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("video-1", state.currentVideoId)
+        assertEquals("", state.currentSourceUrl)
+        assertFalse(state.canPlayCurrentEpisode)
+        assertFalse(state.playbackPreparing)
+        assertEquals("播放源不可用", state.playbackBlockedMessage)
+    }
+
+    @Test
     fun nextEpisode_skipsToFollowingEpisodeAndUpdatesVideoId() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(

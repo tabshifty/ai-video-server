@@ -28,6 +28,7 @@ class FakeTvRepository(
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
     private val homeError: Throwable? = null,
     private val detailError: Throwable? = null,
+    private val sourceUrlError: Throwable? = null,
     private var tvSeekStepSeconds: Int = 10,
     private var tvSeriesAutoplayEnabled: Boolean? = null,
     subtitlePreferences: Map<String, TvTrackPreference> = emptyMap(),
@@ -89,6 +90,7 @@ class FakeTvRepository(
 
     override suspend fun buildSourceUrl(videoId: String, profile: String?): String {
         sourceUrlRequests += TvSourceUrlRequest(videoId = videoId, profile = profile)
+        sourceUrlError?.let { throw it }
         return "https://example.com/$videoId.m3u8"
     }
 

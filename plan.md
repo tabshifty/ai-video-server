@@ -2,6 +2,21 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-17 09:07 +0800
+- 进度：完成 Android TV App 第二轮评审优化收尾。本轮聚焦电视剧播放器分集播放源准备失败恢复：源地址生成或偏好读取异常不再让播放页卡在“正在准备当前分集”，而是进入可重试的“暂不能播放”状态；保留当前分集身份，旧请求不覆盖新分集。提交仅纳入本轮电视剧播放源失败恢复、TV 版本递增、长期约束沉淀和计划记录。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest --tests com.chee.videos.feature.tv.TvSeriesPlayerPreparingStateSpecTest --tests com.chee.videos.feature.tv.TvPlaybackRoutePolicyTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' android-tv-app CONTEXT.md plan.md` 无命中。
+
+## 2026-06-17 09:06 +0800
+- 进度：完成第二轮核心修复。红灯用例确认电视剧播放器在播放源生成失败时无法进入可重试状态；现已让分集播放源准备协程捕获非取消异常，按请求序号和当前分集校验后退出 `playbackPreparing`，保留当前分集 `videoId`、清空播放 URL，并显示可重试的阻断文案。旧分集请求仍不会覆盖新分集。TV 版本递增到 `0.1.113` / `versionCode=113`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest` 通过；待执行相关定向组合、TV 全量单测、assemble、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 09:02 +0800
+- 进度：开始 Android TV App 第二轮整体评审优化。延续“功能正常、使用流畅”目标，重点检查首页目录/搜索、详情页、播放器与 IPTV 的加载失败恢复、遥控器焦点/返回路径和可见 UI 稳定性；优先处理源码能证明且可单测回归的问题。
+- 影响文件：预计 `android-tv-app/**`、`CONTEXT.md`、`plan.md`
+- 验证：待根据实际优化范围执行 TV 定向单测、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-17 00:25 +0800
 - 进度：完成 Android TV App 整体评审第一轮优化收尾。本次聚焦“功能正常、使用流畅”的首启连接链路：异常可恢复、连接不可重入、长地址不挤压操作按钮；未改播放器内核、导航结构或 TV 编译边界。提交仅纳入本次 TV 连接优化、版本递增、长期约束沉淀和计划记录。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/connection/ConnectionViewModel.kt`、`ConnectionScreen.kt`、`core/repository/ServerRepository.kt`、`core/di/TvRepositoryModule.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/connection/*`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
