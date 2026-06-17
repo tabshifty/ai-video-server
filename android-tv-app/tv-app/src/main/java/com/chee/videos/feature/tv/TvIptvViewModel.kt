@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 
 data class TvIptvUiState(
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val channels: List<TvIptvChannelUiModel> = emptyList(),
     val groups: List<TvIptvChannelGroupUiModel> = emptyList(),
     val currentChannel: TvIptvChannelUiModel? = null,
@@ -23,6 +24,7 @@ data class TvIptvUiState(
 class TvIptvViewModel @Inject constructor(
     private val repository: TvRepository,
 ) : ViewModel() {
+    private var requestVersion = 0
     private val _uiState = MutableStateFlow(TvIptvUiState())
     val uiState: StateFlow<TvIptvUiState> = _uiState.asStateFlow()
 
@@ -31,18 +33,33 @@ class TvIptvViewModel @Inject constructor(
     }
 
     fun reload() {
+        val versionAtRequest = nextRequestVersion()
         viewModelScope.launch {
-            _uiState.update { it.copy(loading = true, statusMessage = null) }
+            _uiState.update {
+                val hasExistingData = it.channels.isNotEmpty() || it.currentChannel != null
+                it.copy(
+                    loading = !hasExistingData,
+                    refreshing = hasExistingData,
+                    statusMessage = null,
+                )
+            }
             repository.fetchIptvChannels()
                 .onSuccess { payload ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onSuccess
+                    }
                     val channels = coerceListOrEmpty<TvIptvChannelDto>(payload.channels)
                         .map(::tvIptvChannelToUiModel)
                         .filter { it.id.isNotBlank() && it.name.isNotBlank() && it.url.isNotBlank() }
                         .let(::filterPlayableIptvVideoChannels)
-                    val current = resolveDefaultIptvChannel(channels)
-                    _uiState.update {
-                        it.copy(
+                    _uiState.update { state ->
+                        val current = resolveCurrentIptvChannel(
+                            channels = channels,
+                            currentChannelId = state.currentChannel?.id,
+                        )
+                        state.copy(
                             loading = false,
+                            refreshing = false,
                             channels = channels,
                             groups = groupIptvChannels(channels),
                             currentChannel = current,
@@ -51,12 +68,17 @@ class TvIptvViewModel @Inject constructor(
                     }
                 }
                 .onFailure { error ->
-                    _uiState.update {
-                        it.copy(
+                    if (versionAtRequest != requestVersion) {
+                        return@onFailure
+                    }
+                    _uiState.update { state ->
+                        val hasExistingData = state.channels.isNotEmpty() || state.currentChannel != null
+                        state.copy(
                             loading = false,
-                            channels = emptyList(),
-                            groups = emptyList(),
-                            currentChannel = null,
+                            refreshing = false,
+                            channels = if (hasExistingData) state.channels else emptyList(),
+                            groups = if (hasExistingData) state.groups else emptyList(),
+                            currentChannel = if (hasExistingData) state.currentChannel else null,
                             statusMessage = error.message ?: "IPTV 频道加载失败，请重试",
                         )
                     }
@@ -80,5 +102,10 @@ class TvIptvViewModel @Inject constructor(
             ) ?: return@update state
             state.copy(currentChannel = channel, statusMessage = null)
         }
+    }
+
+    private fun nextRequestVersion(): Int {
+        requestVersion += 1
+        return requestVersion
     }
 }

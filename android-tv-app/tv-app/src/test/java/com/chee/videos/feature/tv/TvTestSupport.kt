@@ -330,6 +330,73 @@ class DelayedCatalogTvRepository(
     }
 }
 
+class DelayedIptvTvRepository(
+    private val baseUrl: String = "https://example.com",
+) : TvRepository {
+    private val pendingIptvRequests = ArrayDeque<CompletableDeferred<Result<TvIptvPayload>>>()
+    val iptvRequestCount: Int
+        get() = pendingIptvRequests.size
+
+    override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
+        Result.success(TvHomePayload())
+
+    override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
+        Result.success(TvSearchPayload())
+
+    override suspend fun fetchCatalogWall(
+        kind: String,
+        page: Int,
+        pageSize: Int,
+        sortBy: String,
+        sortOrder: String,
+    ): Result<TvCatalogWallPayload> =
+        Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
+
+    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> {
+        val deferred = CompletableDeferred<Result<TvIptvPayload>>()
+        pendingIptvRequests.addLast(deferred)
+        return deferred.await()
+    }
+
+    override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
+        Result.success(tvSeriesDetail(id = seriesId))
+
+    override suspend fun readActiveBaseUrl(): String = baseUrl
+
+    override suspend fun buildSourceUrl(videoId: String, profile: String?): String =
+        "https://example.com/$videoId.m3u8"
+
+    override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
+
+    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = null
+
+    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) = Unit
+
+    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = null
+
+    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) = Unit
+
+    override suspend fun readTvSeekStepSeconds(): Int = 10
+
+    override suspend fun saveTvSeekStepSeconds(seconds: Int) = Unit
+
+    override suspend fun readTvSeriesAutoplayEnabled(): Boolean? = null
+
+    override suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) = Unit
+
+    fun completeIptv(payload: TvIptvPayload = TvIptvPayload()) {
+        pendingIptvRequests.removeFirst().complete(Result.success(payload))
+    }
+
+    fun completeLatestIptv(payload: TvIptvPayload = TvIptvPayload()) {
+        pendingIptvRequests.removeLast().complete(Result.success(payload))
+    }
+
+    fun completeIptvFailure(error: Throwable = IllegalStateException("IPTV 频道加载失败，请重试")) {
+        pendingIptvRequests.removeFirst().complete(Result.failure(error))
+    }
+}
+
 data class TvPosterWallRequestKey(
     val kind: String,
     val page: Int,

@@ -17,6 +17,13 @@ class TvIptvNavigationPolicyTest {
     }
 
     @Test
+    fun currentChannelResolutionPrefersExistingChannelBeforeFallingBackToDefault() {
+        assertEquals("c2", resolveCurrentIptvChannel(channels, currentChannelId = "c2")?.id)
+        assertEquals("c1", resolveCurrentIptvChannel(channels, currentChannelId = "missing")?.id)
+        assertEquals(null, resolveCurrentIptvChannel(emptyList(), currentChannelId = "c2"))
+    }
+
+    @Test
     fun audioOnlyUrlsAreNotPlayableChannels() {
         val mixed = listOf(
             TvIptvChannelUiModel(id = "audio", name = "CCTV-1 音频", url = "https://piccpndali.v.myalicdn.com/audio/cctv1_2.m3u8", group = "Audio", sortOrder = 0),

@@ -7,8 +7,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TvIptvViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -67,5 +71,121 @@ class TvIptvViewModelTest {
         assertEquals(listOf("video"), state.channels.map { it.id })
         assertEquals("video", state.currentChannel?.id)
         assertEquals(listOf("央视频道"), state.groups.map { it.group })
+    }
+
+    @Test
+    fun reload_withExistingChannelsKeepsCurrentChannelAndDoesNotReturnToPageLoading() = runTest {
+        val repository = DelayedIptvTvRepository()
+        val viewModel = TvIptvViewModel(repository = repository)
+
+        repository.completeIptv(
+            TvIptvPayload(
+                channels = listOf(
+                    TvIptvChannelDto(id = "c1", name = "新闻一台", url = "https://example.com/news.m3u8", group = "新闻", sortOrder = 10),
+                    TvIptvChannelDto(id = "c2", name = "电影一台", url = "https://example.com/movie.m3u8", group = "电影", sortOrder = 20),
+                ),
+            ),
+        )
+        advanceUntilIdle()
+        viewModel.selectChannel("c2")
+
+        viewModel.reload()
+        runCurrent()
+
+        var state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals("c2", state.currentChannel?.id)
+        assertEquals(listOf("c1", "c2"), state.channels.map { it.id })
+
+        repository.completeIptv(
+            TvIptvPayload(
+                channels = listOf(
+                    TvIptvChannelDto(id = "c1", name = "新闻一台（新）", url = "https://example.com/news-new.m3u8", group = "新闻", sortOrder = 10),
+                    TvIptvChannelDto(id = "c2", name = "电影一台（新）", url = "https://example.com/movie-new.m3u8", group = "电影", sortOrder = 20),
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals("c2", state.currentChannel?.id)
+        assertEquals("电影一台（新）", state.currentChannel?.name)
+        assertEquals("https://example.com/movie-new.m3u8", state.currentChannel?.url)
+        assertEquals(listOf("c1", "c2"), state.channels.map { it.id })
+    }
+
+    @Test
+    fun staleReloadResponse_doesNotOverrideNewerChannelListState() = runTest {
+        val repository = DelayedIptvTvRepository()
+        val viewModel = TvIptvViewModel(repository = repository)
+
+        repository.completeIptv(
+            TvIptvPayload(
+                channels = listOf(
+                    TvIptvChannelDto(id = "c1", name = "新闻一台", url = "https://example.com/news.m3u8", group = "新闻", sortOrder = 10),
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        viewModel.reload()
+        runCurrent()
+        viewModel.reload()
+        runCurrent()
+
+        repository.completeLatestIptv(
+            TvIptvPayload(
+                channels = listOf(
+                    TvIptvChannelDto(id = "c2", name = "电影一台", url = "https://example.com/movie.m3u8", group = "电影", sortOrder = 20),
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        var state = viewModel.uiState.value
+        assertEquals(listOf("c2"), state.channels.map { it.id })
+        assertEquals("c2", state.currentChannel?.id)
+
+        repository.completeIptv(
+            TvIptvPayload(
+                channels = listOf(
+                    TvIptvChannelDto(id = "stale", name = "旧频道", url = "https://example.com/stale.m3u8", group = "旧", sortOrder = 30),
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value
+        assertEquals(listOf("c2"), state.channels.map { it.id })
+        assertEquals("c2", state.currentChannel?.id)
+    }
+
+    @Test
+    fun reloadFailure_withExistingChannelsKeepsPlaybackStateAndShowsInlineMessage() = runTest {
+        val repository = DelayedIptvTvRepository()
+        val viewModel = TvIptvViewModel(repository = repository)
+
+        repository.completeIptv(
+            TvIptvPayload(
+                channels = listOf(
+                    TvIptvChannelDto(id = "c1", name = "新闻一台", url = "https://example.com/news.m3u8", group = "新闻", sortOrder = 10),
+                    TvIptvChannelDto(id = "c2", name = "电影一台", url = "https://example.com/movie.m3u8", group = "电影", sortOrder = 20),
+                ),
+            ),
+        )
+        advanceUntilIdle()
+        viewModel.selectChannel("c2")
+
+        viewModel.reload()
+        runCurrent()
+        repository.completeIptvFailure()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals(listOf("c1", "c2"), state.channels.map { it.id })
+        assertEquals("c2", state.currentChannel?.id)
+        assertEquals("IPTV 频道加载失败，请重试", state.statusMessage)
     }
 }

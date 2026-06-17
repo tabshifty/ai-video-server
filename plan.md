@@ -2,6 +2,31 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-17 11:55 +0800
+- 进度：开始实现 Android TV App IPTV 软刷新状态机。本轮仅作用于现有 `reload()` 链路，不新增正常播放中的显式刷新入口；先补红灯测试锁定“已有频道时 reload 不退回整页 loading、刷新成功保留当前频道、旧刷新响应不能覆盖新状态、刷新失败不打断当前播放”，再最小修改 IPTV ViewModel 与测试支撑。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvViewModel.kt`、`TvIptvModels.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvViewModelTest.kt`、`TvIptvNavigationPolicyTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 IPTV 定向单测、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 12:08 +0800
+- 进度：完成 IPTV 软刷新核心实现。`TvIptvViewModel.reload()` 改为区分首屏加载与已有数据软刷新：已有频道或当前播放存在时只进入 `refreshing`，不退回整页 `loading`；刷新成功优先按当前 `channelId` 续留当前频道，只有当前频道失效时才回退默认首台；刷新失败时若旧列表仍可用则保留当前播放和旧列表，仅更新错误提示；并新增请求版本保护，避免旧刷新响应覆盖新状态。同步补充 IPTV 定向单测与纯函数测试，TV 版本递增到 `0.1.117` / `versionCode=117`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvViewModel.kt`、`TvIptvModels.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvViewModelTest.kt`、`TvIptvNavigationPolicyTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvIptvViewModelTest --tests com.chee.videos.feature.tv.TvIptvNavigationPolicyTest` 通过；待执行 TV 全量单测、assemble、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 11:57 +0800
+- 进度：完成本轮 IPTV 软刷新收尾验证。TV 全量单测通过，文本检查通过；首次把 `:tv-app:testDebugUnitTest` 与 `:tv-app:assembleDebug` 并行跑时，`assembleDebug` 曾在 `:tv-app:kaptGenerateStubsDebugKotlin` 命中 `R.jar` `ClasspathEntrySnapshotTransform` `Check failed`，随后串行单独重跑 `:tv-app:assembleDebug` 已通过，判断为并行 Gradle 任务争用中间产物导致的瞬时构建问题，不是本次 IPTV 状态机回归。当前提交面仅纳入 IPTV 软刷新状态机、相关测试、版本递增与文档记录。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvIptvViewModel.kt`、`TvIptvModels.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvIptvViewModelTest.kt`、`TvIptvNavigationPolicyTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvIptvViewModelTest --tests com.chee.videos.feature.tv.TvIptvNavigationPolicyTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 串行重跑通过；`git diff --check` 通过；`rg -n $'\\uFFFD' CONTEXT.md plan.md android-tv-app/...` 无命中。
+
+## 2026-06-17 11:46 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 IPTV 刷新失败语义。已确认频道列表软刷新失败时，只要旧列表或当前播放仍可用，就保留当前播放和旧列表，仅显示轻量错误提示与重试入口；只有首屏尚无任何频道数据时才退回整页错误态。`IPTV 频道列表软刷新` 已补充失败边界，下一步继续确认是否需要请求身份来拦截旧刷新响应覆盖新状态。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补红灯测试与 TV 定向验证。
+
+## 2026-06-17 11:43 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 Android TV App 下一轮“运行流畅”目标，先锁定 IPTV 高频播放路径。已确认 IPTV 也纳入同一流畅标准；频道列表刷新收口为软刷新语义：已有播放和已有列表保持可见，刷新完成后若当前频道仍在新列表里则继续保持当前频道，不回跳默认首台。已同步沉淀 `当前播放频道` 与 `IPTV 频道列表软刷新` 语义，下一步继续细化刷新失败与重试边界。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补红灯测试与 TV 定向验证。
+
 ## 2026-06-17 11:00 +0800
 - 进度：完成 Android TV App 第五轮评审优化收尾。本轮继续以“运行流畅”为首要目标，海报墙刷新/切换排序改为软更新：已有内容保持可见，更新期间只显示网格内行内状态，失败时在网格内给出紧凑错误条并暂停自动分页，避免空白/跳页/混排；独立复审指出软更新完成后首焦点会因 `refreshing` 变化回跳首图，已改为仅在首批内容首次到达时自动聚焦一次，软刷新/软排序不再抢焦点。TV 版本递增到 `0.1.116` / `versionCode=116`，并沉淀 `TV 海报墙软更新` 约束。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallViewModel.kt`、`TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallViewModelTest.kt`、`TvPosterWallFocusLayoutSpecTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

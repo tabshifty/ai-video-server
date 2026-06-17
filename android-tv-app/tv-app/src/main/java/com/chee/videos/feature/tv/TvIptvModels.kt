@@ -50,6 +50,13 @@ fun tvIptvChannelToUiModel(dto: TvIptvChannelDto): TvIptvChannelUiModel =
 fun resolveDefaultIptvChannel(channels: List<TvIptvChannelUiModel>): TvIptvChannelUiModel? =
     channels.firstOrNull(::isPlayableIptvVideoChannel)
 
+fun resolveCurrentIptvChannel(
+    channels: List<TvIptvChannelUiModel>,
+    currentChannelId: String?,
+): TvIptvChannelUiModel? =
+    channels.firstOrNull { it.id == currentChannelId }
+        ?: resolveDefaultIptvChannel(channels)
+
 fun filterPlayableIptvVideoChannels(channels: List<TvIptvChannelUiModel>): List<TvIptvChannelUiModel> =
     channels.filter(::isPlayableIptvVideoChannel)
 
