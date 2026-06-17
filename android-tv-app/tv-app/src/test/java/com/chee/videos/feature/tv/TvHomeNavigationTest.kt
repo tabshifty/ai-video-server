@@ -6,13 +6,18 @@ import com.chee.videos.core.model.TvHomeVideoDto
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TvHomeNavigationTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -60,7 +65,9 @@ class TvHomeNavigationTest {
         viewModel.awaitIdle()
         viewModel.selectMenu(TvHomeMenuItem.Search)
         viewModel.updateQuery("午夜")
-        viewModel.awaitIdle()
+        advanceTimeBy(300)
+        runCurrent()
+        advanceUntilIdle()
 
         assertEquals(listOf("tv"), repository.homeRequests.map { it.kind })
         assertEquals(listOf("午夜"), repository.searchRequests.map { it.query })

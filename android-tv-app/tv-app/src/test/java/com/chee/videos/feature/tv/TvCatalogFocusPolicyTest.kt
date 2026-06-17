@@ -122,4 +122,29 @@ class TvCatalogFocusPolicyTest {
             source.contains("TvCatalogInitialFocusTarget.MENU -> menuFocusRequester.tryRequestFocus()"),
         )
     }
+
+    @Test
+    fun `search screen keeps inline loading instead of replacing page`() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt")
+        assertTrue("TV 首页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        val searchSource = source.substringAfter("if (uiState.selectedMenu == TvHomeMenuItem.Search)")
+            .substringBefore("LazyColumn(\n            modifier = Modifier.fillMaxSize(),")
+
+        assertTrue(
+            "搜索输入期间必须保持搜索页可见，用 searchLoading 做行内状态，避免每个字符触发全屏 TV 首页 loading",
+            searchSource.contains("searching = uiState.searchLoading") &&
+                searchSource.contains("uiState.query.isNotBlank() && uiState.searchLoading") &&
+                searchSource.contains("title = \"正在搜索\""),
+        )
+        assertTrue(
+            "搜索失败必须在搜索页内显示错误与重试，且要先于空结果判断，不能误显示成没有找到相关内容",
+            searchSource.contains("!uiState.errorMessage.isNullOrBlank()") &&
+                searchSource.contains("title = \"搜索失败\"") &&
+                searchSource.contains("onAction = viewModel::retry") &&
+                searchSource.indexOf("!uiState.errorMessage.isNullOrBlank()") <
+                searchSource.indexOf("uiState.query.isNotBlank() && uiState.searchResults.isEmpty()"),
+        )
+    }
 }

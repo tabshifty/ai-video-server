@@ -13,7 +13,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -82,7 +84,9 @@ class TvCatalogViewModelTest {
 
         viewModel.awaitIdle()
         viewModel.updateQuery("静默")
-        viewModel.awaitIdle()
+        advanceTimeBy(300)
+        runCurrent()
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals("静默", state.query)
@@ -137,7 +141,11 @@ class TvCatalogViewModelTest {
         repository.completeHome()
         advanceUntilIdle()
         viewModel.updateQuery("雾")
+        advanceTimeBy(300)
+        runCurrent()
         viewModel.updateQuery("雾城")
+        advanceTimeBy(300)
+        runCurrent()
         repository.completeSearch(
             query = "雾城",
             payload = TvSearchPayload(
@@ -163,6 +171,58 @@ class TvCatalogViewModelTest {
         assertFalse(state.loading)
         assertEquals("雾城", state.query)
         assertEquals(listOf("雾城档案"), state.searchResults.map { it.title })
+        assertEquals(listOf("雾", "雾城"), repository.searchRequests.map { it.query })
+    }
+
+    @Test
+    fun updateQuery_debouncesSearchRequestsAndKeepsSearchScreenVisible() = runTest {
+        val repository = DelayedCatalogTvRepository()
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        repository.completeHome()
+        advanceUntilIdle()
+        viewModel.updateQuery("雾")
+        runCurrent()
+
+        var state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertTrue(state.searchLoading)
+        assertEquals(TvHomeMenuItem.Search, state.selectedMenu)
+        assertEquals("雾", state.query)
+        assertTrue(repository.searchRequests.isEmpty())
+
+        viewModel.updateQuery("雾城")
+        advanceTimeBy(299)
+        runCurrent()
+        assertTrue(repository.searchRequests.isEmpty())
+
+        advanceTimeBy(1)
+        runCurrent()
+
+        state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertTrue(state.searchLoading)
+        assertEquals(listOf("雾城"), repository.searchRequests.map { it.query })
+    }
+
+    @Test
+    fun retrySearch_cancelsPendingDebouncedSearchBeforeImmediateRequest() = runTest {
+        val repository = DelayedCatalogTvRepository()
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        repository.completeHome()
+        advanceUntilIdle()
+        viewModel.updateQuery("雾城")
+        runCurrent()
+        viewModel.retry()
+        runCurrent()
+
+        assertEquals(listOf("雾城"), repository.searchRequests.map { it.query })
+
+        advanceTimeBy(300)
+        runCurrent()
+
+        assertEquals(listOf("雾城"), repository.searchRequests.map { it.query })
     }
 
     @Test
@@ -181,6 +241,8 @@ class TvCatalogViewModelTest {
         assertEquals(null, state.errorMessage)
 
         viewModel.updateQuery("雾")
+        advanceTimeBy(300)
+        runCurrent()
         viewModel.openIptv()
         repository.completeSearchFailure(query = "雾", error = IllegalStateException("旧搜索失败"))
         advanceUntilIdle()
@@ -230,7 +292,9 @@ class TvCatalogViewModelTest {
 
         viewModel.awaitIdle()
         viewModel.updateQuery("静默")
-        viewModel.awaitIdle()
+        advanceTimeBy(300)
+        runCurrent()
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals(2, state.searchResults.size)
@@ -293,7 +357,9 @@ class TvCatalogViewModelTest {
         viewModel.awaitIdle()
         viewModel.selectMenu(TvHomeMenuItem.Search)
         viewModel.updateQuery("静默")
-        viewModel.awaitIdle()
+        advanceTimeBy(300)
+        runCurrent()
+        advanceUntilIdle()
         viewModel.retry()
         viewModel.awaitIdle()
 

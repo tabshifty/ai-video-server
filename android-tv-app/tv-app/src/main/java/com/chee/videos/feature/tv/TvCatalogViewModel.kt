@@ -8,6 +8,8 @@ import com.chee.videos.core.model.TvSeriesSummaryDto
 import com.chee.videos.core.model.TvSearchResultDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +31,7 @@ data class TvCatalogUiState(
     val movies: List<TvHomeShelfItemUiModel> = emptyList(),
     val av: List<TvHomeShelfItemUiModel> = emptyList(),
     val searchResults: List<TvSearchResultUiModel> = emptyList(),
+    val searchLoading: Boolean = false,
     val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
     val seriesAutoplayEnabled: Boolean = TvSeriesAutoplaySetting.DEFAULT_ENABLED,
     val errorMessage: String? = null,
@@ -39,6 +42,7 @@ class TvCatalogViewModel @Inject constructor(
     private val repository: TvRepository,
 ) : ViewModel() {
     private var requestVersion = 0
+    private var searchJob: Job? = null
     private val _uiState = MutableStateFlow(TvCatalogUiState())
     val uiState: StateFlow<TvCatalogUiState> = _uiState.asStateFlow()
 
@@ -60,6 +64,7 @@ class TvCatalogViewModel @Inject constructor(
                         selectedMenu = TvHomeMenuItem.Search,
                         query = "",
                         searchResults = emptyList(),
+                        searchLoading = false,
                         errorMessage = null,
                     )
                 }
@@ -72,6 +77,7 @@ class TvCatalogViewModel @Inject constructor(
                         selectedMenu = TvHomeMenuItem.Settings,
                         query = "",
                         searchResults = emptyList(),
+                        searchLoading = false,
                         errorMessage = null,
                     )
                 }
@@ -90,6 +96,7 @@ class TvCatalogViewModel @Inject constructor(
                 loading = false,
                 query = "",
                 searchResults = emptyList(),
+                searchLoading = false,
                 errorMessage = null,
             )
         }
@@ -113,10 +120,19 @@ class TvCatalogViewModel @Inject constructor(
     fun updateQuery(query: String) {
         _uiState.update { it.copy(query = query, selectedMenu = TvHomeMenuItem.Search) }
         if (query.isBlank()) {
+            searchJob?.cancel()
+            searchJob = null
             invalidateCatalogRequests()
-            _uiState.update { it.copy(loading = false, searchResults = emptyList(), errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    loading = false,
+                    searchLoading = false,
+                    searchResults = emptyList(),
+                    errorMessage = null,
+                )
+            }
         } else {
-            loadSearch(query)
+            scheduleSearch(query)
         }
     }
 
@@ -144,6 +160,7 @@ class TvCatalogViewModel @Inject constructor(
                     baseUrl = baseUrl,
                     errorMessage = null,
                     searchResults = emptyList(),
+                    searchLoading = false,
                 )
             }
             repository.fetchHome(kind = normalizedKind)
@@ -168,6 +185,7 @@ class TvCatalogViewModel @Inject constructor(
                             movies = coerceListOrEmpty<TvHomeVideoDto>(payload.movies).map(::tvHomeVideoToUiModel),
                             av = coerceListOrEmpty<TvHomeVideoDto>(payload.av).map(::tvHomeVideoToUiModel),
                             searchResults = emptyList(),
+                            searchLoading = false,
                             errorMessage = null,
                         )
                     }
@@ -189,6 +207,7 @@ class TvCatalogViewModel @Inject constructor(
                             movies = emptyList(),
                             av = emptyList(),
                             searchResults = emptyList(),
+                            searchLoading = false,
                             errorMessage = error.message ?: "TV 首页加载失败",
                         )
                     }
@@ -196,8 +215,33 @@ class TvCatalogViewModel @Inject constructor(
         }
     }
 
+    private fun scheduleSearch(query: String) {
+        searchJob?.cancel()
+        val versionAtSchedule = nextCatalogRequestVersion()
+        _uiState.update {
+            it.copy(
+                loading = false,
+                searchLoading = true,
+                errorMessage = null,
+            )
+        }
+        searchJob = viewModelScope.launch {
+            delay(TvSearchInputDebounceMillis)
+            if (versionAtSchedule != requestVersion) {
+                return@launch
+            }
+            loadSearch(query, versionAtSchedule)
+        }
+    }
+
     private fun loadSearch(query: String) {
+        searchJob?.cancel()
+        searchJob = null
         val versionAtRequest = nextCatalogRequestVersion()
+        loadSearch(query, versionAtRequest)
+    }
+
+    private fun loadSearch(query: String, versionAtRequest: Int) {
         viewModelScope.launch {
             val baseUrl = repository.readActiveBaseUrl().orEmpty()
             if (versionAtRequest != requestVersion) {
@@ -205,7 +249,8 @@ class TvCatalogViewModel @Inject constructor(
             }
             _uiState.update {
                 it.copy(
-                    loading = true,
+                    loading = false,
+                    searchLoading = true,
                     baseUrl = baseUrl,
                     errorMessage = null,
                 )
@@ -218,6 +263,7 @@ class TvCatalogViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             loading = false,
+                            searchLoading = false,
                             baseUrl = baseUrl,
                             continueWatching = null,
                             searchResults = coerceListOrEmpty<TvSearchResultDto>(payload.items).map(::tvSearchResultToUiModel),
@@ -232,6 +278,7 @@ class TvCatalogViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             loading = false,
+                            searchLoading = false,
                             baseUrl = baseUrl,
                             searchResults = emptyList(),
                             errorMessage = error.message ?: "TV 搜索失败",
@@ -247,6 +294,8 @@ class TvCatalogViewModel @Inject constructor(
     }
 
     private fun invalidateCatalogRequests() {
+        searchJob?.cancel()
+        searchJob = null
         requestVersion += 1
     }
 
@@ -261,5 +310,9 @@ class TvCatalogViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private companion object {
+        const val TvSearchInputDebounceMillis = 300L
     }
 }

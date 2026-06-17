@@ -222,9 +222,26 @@ fun TvCatalogScreen(
                     )
                 }
                 item(key = "search-header") {
-                    TvSearchResultHeader(resultCount = uiState.searchResults.size)
+                    TvSearchResultHeader(resultCount = uiState.searchResults.size, searching = uiState.searchLoading)
                 }
-                if (uiState.query.isNotBlank() && uiState.searchResults.isEmpty()) {
+                if (uiState.query.isNotBlank() && uiState.searchLoading) {
+                    item(key = "search-loading") {
+                        TvEmptyState(
+                            title = "正在搜索",
+                            message = "保持当前输入，可继续补全关键词",
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                } else if (uiState.query.isNotBlank() && !uiState.errorMessage.isNullOrBlank()) {
+                    item(key = "search-error") {
+                        TvErrorState(
+                            title = "搜索失败",
+                            message = uiState.errorMessage.orEmpty(),
+                            onAction = viewModel::retry,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                } else if (uiState.query.isNotBlank() && uiState.searchResults.isEmpty()) {
                     item(key = "search-empty") {
                         TvEmptyState(
                             title = "没有找到相关内容",
@@ -764,7 +781,7 @@ private fun tvHomeMenuIcon(item: TvHomeMenuItem): ImageVector {
 }
 
 @Composable
-private fun TvSearchResultHeader(resultCount: Int) {
+private fun TvSearchResultHeader(resultCount: Int, searching: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = "搜索结果",
@@ -773,7 +790,11 @@ private fun TvSearchResultHeader(resultCount: Int) {
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = if (resultCount > 0) "共找到 $resultCount 项内容" else "没有匹配的内容",
+            text = when {
+                searching -> "正在搜索"
+                resultCount > 0 -> "共找到 $resultCount 项内容"
+                else -> "没有匹配的内容"
+            },
             color = AppChrome.TextMuted,
             style = MaterialTheme.typography.bodySmall,
         )

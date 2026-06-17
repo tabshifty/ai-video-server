@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-17 10:35 +0800
+- 进度：完成 Android TV App 第四轮评审优化收尾。本轮以“运行流畅”为首要目标，修复 TV 首页搜索输入每个字符立即远程请求、搜索页被页面级 loading 替换的问题：搜索输入改为短 debounce，等待和网络请求期间保留搜索页并显示行内搜索状态；搜索失败在搜索页内显示错误与重试，不再误显示为空结果；重试会取消待发 debounce，避免重复请求。独立复审指出的搜索失败无页内重试入口、旧搜索响应测试覆盖不足均已修复。TV 版本递增到 `0.1.115` / `versionCode=115`，并沉淀 `TV 搜索输入流畅性` 约束。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`、`TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`、`TvCatalogFocusPolicyTest.kt`、`TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：红灯阶段 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvCatalogViewModelTest` 曾因搜索立即请求/页面 loading 失败；修复后 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvCatalogViewModelTest --tests com.chee.videos.feature.tv.TvHomeNavigationTest --tests com.chee.videos.feature.tv.TvCatalogFocusPolicyTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' android-tv-app CONTEXT.md plan.md` 无命中；独立复审阻塞问题已修复。
+
+## 2026-06-17 10:16 +0800
+- 进度：开始 Android TV App 第四轮整体评审优化。本轮将“运行流畅”置于首要目标，优先审查会造成遥控输入卡顿、整页 loading 闪烁、重复网络请求或焦点抖动的路径；初步锁定 TV 首页搜索输入每个字符立即发请求并切全局 `loading=true`，会打断搜索界面并产生请求风暴，计划先补红灯测试再做最小修复。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`、`TvCatalogScreen.kt`、相关 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 TV 目录/搜索定向单测、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-17 09:38 +0800
 - 进度：完成 Android TV App 第三轮评审优化收尾。本轮聚焦 TV 首页目录/搜索旧请求覆盖：类型化首页与搜索请求均带目录请求身份，切换菜单、进入搜索/设置/IPTV、清空搜索或连续输入时会废弃旧请求，旧首页/搜索成功或失败不再覆盖当前菜单、当前查询、列表内容或错误态。独立复审指出真实 IPTV 入口绕过 `selectMenu(Iptv)`，已修为 IPTV 点击先通知 ViewModel 离开目录状态域再导航，且不把首页状态落成 IPTV 选中。TV 版本递增到 `0.1.114` / `versionCode=114`，并沉淀 `TV 首页目录请求身份` 约束。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`、`TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`、`TvHomeNavigationTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
