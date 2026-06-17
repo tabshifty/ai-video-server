@@ -125,7 +125,7 @@ fun TvSeriesPlayerScreen(
         showDolbyVisionDiagnostics = false
     }
 
-    val currentEpisode = selectedEpisode(uiState)
+    val currentEpisode = activeEpisode(uiState)
     var routeRetryNonce by remember(uiState.currentVideoId) { mutableStateOf(0) }
     val displayCapability = remember(context, uiState.currentVideoId, routeRetryNonce) {
         evaluateDolbyVisionDisplayCapability(AndroidDisplayHdrCapabilityReader(context))
@@ -181,17 +181,17 @@ fun TvSeriesPlayerScreen(
     var lastAutoplaySwitchedVideoId by remember { mutableStateOf("") }
     var openEpisodeRailRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
 
-    val nextEpisodeRef = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
+    val nextEpisodeRef = remember(uiState.series, uiState.activeSeasonNumber, uiState.activeEpisodeNumber) {
         uiState.nextEpisodeRef()
     }
-    val episodeRailItems = remember(uiState.series, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber) {
-        selectedSeason(uiState)?.episodes.orEmpty().map { episode ->
+    val episodeRailItems = remember(uiState.series, uiState.activeSeasonNumber, uiState.activeEpisodeNumber) {
+        activeSeason(uiState)?.episodes.orEmpty().map { episode ->
             TvEpisodeRailItem(
                 id = episode.id,
                 number = episode.number,
                 title = episode.title,
                 playable = episode.playable,
-                current = episode.number == uiState.selectedEpisodeNumber,
+                current = episode.number == uiState.activeEpisodeNumber,
             )
         }
     }
@@ -225,7 +225,15 @@ fun TvSeriesPlayerScreen(
         showDolbyVisionDiagnostics = false
     }
     BackHandler(enabled = !showDolbyVisionDiagnostics) {
-        handlePlaybackBack()
+        when {
+            uiState.playbackPreparing && uiState.episodeSwitchState is TvEpisodeSwitchUiState.Preparing -> {
+                viewModel.cancelEpisodeSwitch()
+            }
+            uiState.episodeSwitchState is TvEpisodeSwitchUiState.Failed -> {
+                viewModel.clearEpisodeSwitchFeedback()
+            }
+            else -> handlePlaybackBack()
+        }
     }
 
     fun updatePlaybackSession(nextSession: LongFormPlaybackSession) {
@@ -244,6 +252,7 @@ fun TvSeriesPlayerScreen(
         isAutoplayPromptVisible = shouldShowAutoplayPromptCard,
         isPausedByUser = playbackSession.isPausedByUser,
         remainingMs = resumePromptRemainingMs,
+        skipForUserInitiatedEpisodeSwitch = uiState.episodeSwitchState is TvEpisodeSwitchUiState.Succeeded,
     )
     val shouldTickResumePromptCountdown = shouldTickResumePromptCountdown(resumePromptGuardInput)
     val shouldShowResumePromptCard = shouldShowResumePromptCard(resumePromptGuardInput)
@@ -552,11 +561,12 @@ fun TvSeriesPlayerScreen(
                     durationMs = screenDurationMs,
                     tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                     seriesTitleForOverlay = series.title,
-                    seasonNumber = uiState.selectedSeasonNumber,
-                    episodeNumber = uiState.selectedEpisodeNumber,
+                    seasonNumber = uiState.activeSeasonNumber,
+                    episodeNumber = uiState.activeEpisodeNumber,
                     episodeTitle = currentEpisode?.title,
                     episodeRailItems = episodeRailItems,
                     currentEpisodeRailItemId = currentEpisode?.id,
+                    episodeSwitchState = uiState.episodeSwitchState,
                     onTogglePlayPause = {
                         updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
                     },
@@ -574,7 +584,7 @@ fun TvSeriesPlayerScreen(
                         isTrackSheetVisible = true
                     },
                     onSelectEpisodeRailItem = { selectedItem ->
-                        val episodeNumber = selectedSeason(uiState)?.episodes
+                        val episodeNumber = activeSeason(uiState)?.episodes
                             ?.firstOrNull { it.id == selectedItem.id }
                             ?.number
                         if (episodeNumber != null) {
@@ -582,6 +592,7 @@ fun TvSeriesPlayerScreen(
                         }
                     },
                     onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible,
+                    onDismissEpisodeSwitchFeedback = viewModel::clearEpisodeSwitchFeedback,
                     resumePromptVisible = shouldShowResumePromptCard,
                     resumePromptSlot = {
                         TvResumePromptCard(
@@ -700,9 +711,13 @@ fun TvSeriesPlayerScreen(
                     )
                 }
             }
-        } else if (uiState.playbackPreparing) {
+        } else if (uiState.playbackPreparing && uiState.currentSourceUrl.isBlank()) {
             Box(modifier = Modifier.fillMaxSize()) {
-                TvPageLoadingState(message = "正在准备当前分集")
+                val message = when (val switchState = uiState.episodeSwitchState) {
+                    is TvEpisodeSwitchUiState.Preparing -> "正在切到第 ${switchState.targetEpisodeNumber} 集"
+                    else -> "正在准备当前分集"
+                }
+                TvPageLoadingState(message = message)
                 if (showBackConfirmPrompt) {
                     TvPlayerBackConfirmPrompt(
                         modifier = Modifier

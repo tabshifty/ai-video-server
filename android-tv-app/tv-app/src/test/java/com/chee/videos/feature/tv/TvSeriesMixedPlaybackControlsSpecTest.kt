@@ -22,6 +22,10 @@ class TvSeriesMixedPlaybackControlsSpecTest {
             media3Branch.contains("showTrackActions = true") &&
                 media3Branch.contains("TvMedia3TrackPickerLayer("),
         )
+        assertTrue(
+            "剧集 ExoPlayer 分支必须把切集中心状态挂给核心控制层",
+            media3Branch.contains("episodeSwitchState = uiState.episodeSwitchState"),
+        )
     }
 
     @Test
@@ -39,6 +43,11 @@ class TvSeriesMixedPlaybackControlsSpecTest {
         assertFalse(
             "Media3 失败态不能提供强行播放或回退 LibVLC 入口",
             media3Branch.contains("强行播放") || media3Branch.contains("继续播放") || media3Branch.contains("LibVLC"),
+        )
+        assertTrue(
+            "准备中按 BACK 应优先取消切集，失败态按 BACK 应先关闭失败中心态",
+            source.contains("viewModel.cancelEpisodeSwitch()") &&
+                source.contains("viewModel.clearEpisodeSwitchFeedback()"),
         )
     }
 

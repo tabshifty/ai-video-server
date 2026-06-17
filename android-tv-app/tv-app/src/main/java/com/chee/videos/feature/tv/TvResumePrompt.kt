@@ -23,6 +23,7 @@ data class ResumePromptGuardInput(
     val isAutoplayPromptVisible: Boolean,
     val isPausedByUser: Boolean,
     val remainingMs: Long,
+    val skipForUserInitiatedEpisodeSwitch: Boolean = false,
 )
 
 fun shouldShowResumePromptCard(input: ResumePromptGuardInput): Boolean =
@@ -37,6 +38,7 @@ fun shouldTickResumePromptCountdown(input: ResumePromptGuardInput): Boolean =
         !input.isTrackSheetVisible &&
         !input.isEndOverlayVisible &&
         !input.isAutoplayPromptVisible &&
+        !input.skipForUserInitiatedEpisodeSwitch &&
         !input.isPausedByUser
 
 fun resumePromptCountdownTickRemaining(remainingMs: Long): Int {

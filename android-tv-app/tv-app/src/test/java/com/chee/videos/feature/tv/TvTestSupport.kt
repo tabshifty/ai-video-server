@@ -216,6 +216,10 @@ class DelayedSourceTvRepository(
     fun completeSourceUrl(videoId: String, url: String = "https://example.com/$videoId.m3u8") {
         pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.complete(url)
     }
+
+    fun failSourceUrl(videoId: String, message: String) {
+        pendingSourceUrls.getOrPut(videoId) { CompletableDeferred() }.completeExceptionally(IllegalStateException(message))
+    }
 }
 
 class DelayedCatalogTvRepository(

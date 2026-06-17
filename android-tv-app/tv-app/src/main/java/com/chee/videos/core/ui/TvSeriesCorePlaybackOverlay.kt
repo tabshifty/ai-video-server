@@ -10,17 +10,22 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -76,6 +81,8 @@ internal fun TvSeriesCorePlaybackOverlay(
     backConfirmPromptVisible: Boolean = false,
     playerErrorVisible: Boolean = false,
     openEpisodeRailRequestKey: Int = 0,
+    episodeSwitchState: com.chee.videos.feature.tv.TvEpisodeSwitchUiState? = null,
+    onDismissEpisodeSwitchFeedback: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val rootFocusRequester = remember { FocusRequester() }
@@ -94,6 +101,8 @@ internal fun TvSeriesCorePlaybackOverlay(
     var showCenterFeedback by remember { mutableStateOf(false) }
     var centerFeedbackText by remember { mutableStateOf("") }
     var centerFeedbackIcon by remember { mutableStateOf(Icons.Filled.PlayArrow) }
+    var persistentCenterFailureMessage by remember { mutableStateOf<String?>(null) }
+    var persistentCenterFailureTargetEpisodeNumber by remember { mutableStateOf<Int?>(null) }
     var hasShownControlsOnce by remember { mutableStateOf(false) }
     var pendingRootFocusRequest by remember { mutableStateOf(false) }
     var pendingControlFocusTarget by remember { mutableStateOf<TvControlFocusTarget?>(null) }
@@ -155,6 +164,8 @@ internal fun TvSeriesCorePlaybackOverlay(
         text: String,
         durationMs: Long = 900L,
     ) {
+        persistentCenterFailureMessage = null
+        persistentCenterFailureTargetEpisodeNumber = null
         centerFeedbackIcon = icon
         centerFeedbackText = text
         showCenterFeedback = true
@@ -174,6 +185,48 @@ internal fun TvSeriesCorePlaybackOverlay(
         )
         if (showControls) {
             showControlsTemporarily()
+        }
+    }
+
+    LaunchedEffect(episodeSwitchState) {
+        when (episodeSwitchState) {
+            is com.chee.videos.feature.tv.TvEpisodeSwitchUiState.Preparing -> {
+                persistentCenterFailureMessage = null
+                persistentCenterFailureTargetEpisodeNumber = null
+                showTransientFeedback(
+                    icon = Icons.Filled.PlayArrow,
+                    text = "正在切到第 ${episodeSwitchState.targetEpisodeNumber} 集",
+                    durationMs = 1_200L,
+                )
+            }
+
+            is com.chee.videos.feature.tv.TvEpisodeSwitchUiState.Succeeded -> {
+                showTransientFeedback(
+                    icon = Icons.Filled.PlayArrow,
+                    text = episodeSwitchState.message,
+                    durationMs = 900L,
+                )
+            }
+
+            is com.chee.videos.feature.tv.TvEpisodeSwitchUiState.Canceled -> {
+                showTransientFeedback(
+                    icon = Icons.Filled.Pause,
+                    text = episodeSwitchState.message,
+                    durationMs = 1_050L,
+                )
+            }
+
+            is com.chee.videos.feature.tv.TvEpisodeSwitchUiState.Failed -> {
+                hideCenterFeedbackJob?.cancel()
+                showCenterFeedback = false
+                persistentCenterFailureTargetEpisodeNumber = episodeSwitchState.targetEpisodeNumber
+                persistentCenterFailureMessage = episodeSwitchState.message
+            }
+
+            null -> {
+                persistentCenterFailureMessage = null
+                persistentCenterFailureTargetEpisodeNumber = null
+            }
         }
     }
 
@@ -558,9 +611,63 @@ internal fun TvSeriesCorePlaybackOverlay(
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                    )
+                )
+            }
+        }
+
+        if (!persistentCenterFailureMessage.isNullOrBlank()) {
+            Surface(
+                color = PlayerGlassSurfaceStrong,
+                shape = AppChrome.SurfaceShape,
+                modifier = Modifier.align(Alignment.Center),
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = AppChrome.Error,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                        Text(
+                            text = persistentCenterFailureMessage.orEmpty(),
+                            color = AppChrome.TextPrimary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Surface(
+                        color = AppChrome.AccentSoft,
+                        shape = AppChrome.ChipShape,
+                        modifier = Modifier
+                            .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.04f)
+                            .clickable(onClick = onDismissEpisodeSwitchFeedback),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = null,
+                                tint = AppChrome.TextPrimary,
+                                modifier = Modifier.padding(end = 8.dp),
+                            )
+                            Text(
+                                text = "留在当前分集",
+                                color = AppChrome.TextPrimary,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
                 }
             }
+        }
         }
 
         TvLongFormTitleOverlay(

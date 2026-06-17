@@ -381,6 +381,8 @@ class TvSeriesPlayerViewModelTest {
         val preparingState = viewModel.uiState.value
         assertEquals(1, preparingState.selectedSeasonNumber)
         assertEquals(1, preparingState.selectedEpisodeNumber)
+        assertEquals(1, preparingState.activeSeasonNumber)
+        assertEquals(1, preparingState.activeEpisodeNumber)
         assertEquals("", preparingState.currentVideoId)
         assertEquals("", preparingState.currentSourceUrl)
         assertFalse(preparingState.canPlayCurrentEpisode)
@@ -755,9 +757,10 @@ class TvSeriesPlayerViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(2, state.selectedEpisodeNumber)
-        assertEquals("", state.currentVideoId)
-        assertEquals("", state.currentSourceUrl)
-        assertFalse(state.canPlayCurrentEpisode)
+        assertEquals(1, state.activeEpisodeNumber)
+        assertEquals("video-1", state.currentVideoId)
+        assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
+        assertTrue(state.canPlayCurrentEpisode)
         assertTrue(state.playbackPreparing)
         assertEquals(null, state.playbackBlockedMessage)
 
@@ -765,10 +768,55 @@ class TvSeriesPlayerViewModelTest {
         advanceUntilIdle()
 
         val readyState = viewModel.uiState.value
+        assertEquals(2, readyState.activeEpisodeNumber)
         assertEquals("video-2", readyState.currentVideoId)
         assertEquals("https://example.com/video-2.m3u8", readyState.currentSourceUrl)
         assertTrue(readyState.canPlayCurrentEpisode)
         assertFalse(readyState.playbackPreparing)
+    }
+
+    @Test
+    fun selectEpisode_sourceFailureKeepsActiveEpisodeWhileExposingBlockedMessage() = runTest {
+        val repository = DelayedSourceTvRepository(
+            detailPayload = tvSeriesDetail(
+                seasons = listOf(
+                    TvSeasonDto(
+                        id = "s1",
+                        seasonNumber = 1,
+                        title = "第一季",
+                        episodes = listOf(
+                            tvEpisode(id = "e1", number = 1, title = "第1集", videoId = "video-1", videoStatus = "ready"),
+                            tvEpisode(id = "e2", number = 2, title = "第2集", videoId = "video-2", videoStatus = "ready"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = repository,
+            savedStateHandle = SavedStateHandle(mapOf(TvSeriesIdArg to "series-1")),
+        )
+
+        repository.completeSourceUrl("video-1")
+        advanceUntilIdle()
+        assertEquals("video-1", viewModel.uiState.value.currentVideoId)
+
+        viewModel.selectEpisode(2)
+        advanceUntilIdle()
+        repository.failSourceUrl("video-2", "第 2 集播放源准备失败，请重试")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.selectedEpisodeNumber)
+        assertEquals(1, state.activeEpisodeNumber)
+        assertEquals("video-1", state.currentVideoId)
+        assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
+        assertTrue(state.canPlayCurrentEpisode)
+        assertFalse(state.playbackPreparing)
+        assertEquals(null, state.playbackBlockedMessage)
+        val switchState = state.episodeSwitchState as TvEpisodeSwitchUiState.Failed
+        assertEquals(2, switchState.targetEpisodeNumber)
+        assertEquals("第 2 集播放源准备失败，请重试", switchState.message)
     }
 
     @Test

@@ -2,6 +2,126 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-17 17:53 +0800
+- 进度：完成本轮 TV 剧集播放器软准备收尾验证。TV 全量单测、`assembleDebug`、`git diff --check` 与乱码扫描均通过；当前提交面只包含本轮软准备状态机/中心反馈/测试支撑/版本递增以及 `CONTEXT.md`、`plan.md` 的长期沉淀，不包含无关模块改动。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvResumePrompt.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`TvSeriesPlayerPreparingStateSpecTest.kt`、`TvSeriesEpisodeRailSpecTest.kt`、`TvSeriesMixedPlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlaySpecTest.kt`、`TvLongFormTitleOverlaySpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon -Pkotlin.incremental=false :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest --tests com.chee.videos.feature.tv.TvSeriesPlayerPreparingStateSpecTest --tests com.chee.videos.feature.tv.TvSeriesEpisodeRailSpecTest --tests com.chee.videos.feature.tv.TvSeriesMixedPlaybackControlsSpecTest --tests com.chee.videos.core.ui.TvSeriesCorePlaybackOverlaySpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon -Pkotlin.incremental=false :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon -Pkotlin.incremental=false :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' CONTEXT.md plan.md android-tv-app/tv-app/src/main/java android-tv-app/tv-app/src/test/java android-tv-app/tv-app/build.gradle.kts` 无命中。
+
+## 2026-06-17 17:50 +0800
+- 进度：完成 `TV 长视频播放器软准备` 首轮实现。电视剧播放器已拆分目标分集与实际播放分集，切集 preparing/failed/success/cancel 统一降到播放器中心层；已有播放内容时切集不再清空 `currentVideoId/currentSourceUrl` 或退回整页 loading/error，失败/取消后 rail 和标题立即回到实际播放分集，`BACK` 在 preparing 时先取消目标、在失败态时先关闭失败中心态。同步让主动切集跳过续播卡，TV 版本递增到 `0.1.119` / `versionCode=119`，并补定向测试与源码结构断言。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvResumePrompt.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`TvSeriesPlayerPreparingStateSpecTest.kt`、`TvSeriesEpisodeRailSpecTest.kt`、`TvSeriesMixedPlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlaySpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：已通过 `cd android-tv-app && ./gradlew --no-daemon -Pkotlin.incremental=false :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvSeriesPlayerViewModelTest --tests com.chee.videos.feature.tv.TvSeriesPlayerPreparingStateSpecTest --tests com.chee.videos.feature.tv.TvSeriesEpisodeRailSpecTest --tests com.chee.videos.feature.tv.TvSeriesMixedPlaybackControlsSpecTest --tests com.chee.videos.core.ui.TvSeriesCorePlaybackOverlaySpecTest`；待执行 TV 全量单测、`assembleDebug`、`git diff --check` 与乱码扫描。
+
+## 2026-06-17 16:56 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 preparing 文案。已确认 soft preparing 进行中时，中心轻提示也要明确带出当前目标分集号，例如“正在切到第 N 集”；至此软准备的主交互语义已经基本收口，可转入 TV 播放器实现。下一步开始补红灯测试并落地状态拆分、中心轻提示与 `BACK` 取消链路。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:56 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 rail 与成功反馈文案。已根据最新确认修正术语：分集 rail 不再显示 preparing 目标弱态，只跟随当前实际播放分集与焦点；soft preparing 成功后的中心短反馈继续明确带出最终生效的分集号，例如“已切到第 N 集”。下一步继续细化：preparing 轻提示本身是否也需要明确写出目标分集号。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:53 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 soft preparing 期间重新打开分集 rail 的语义。已确认单纯打开 rail 不会自动取消当前准备中的目标切换，只有明确改选或按 `BACK` 才终止当前目标；这样 rail 可以承担查看和改选入口，而不会把半途中的切换无故掐断。下一步继续细化：当 rail 重新打开时，当前正在 preparing 的目标应不应在 rail 里用弱态标出来，还是只在中心区表达。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:46 +0800
+- 进度：继续通过 `$grill-with-docs` 收口旧失败态遇到新切换时的让路时机。已确认用户发起新的切集后，只要新目标进入 soft preparing，就立即清掉旧失败态并切回 preparing 轻提示，不把过期失败继续挂在屏幕上。下一步继续细化：preparing 轻提示本身在连续切集时是否需要显式带上目标分集号，还是保持更抽象的“正在切换”文案。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:44 +0800
+- 进度：继续通过 `$grill-with-docs` 收口软切换失败态在连续失败场景下的过渡方式。已确认当旧失败提示尚在屏幕上、用户再次切集且新目标也失败时，中心失败态按同一块区域原地替换内容，不做重复闪烁或退场重进，以保证体感稳定。下一步继续细化：当用户发起新的切集后，新目标仍在 preparing 期间，旧失败态是立刻清空并切回 preparing，还是保留到新结果落定再被覆盖。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:34 +0800
+- 进度：继续通过 `$grill-with-docs` 收口成功/取消提示遇到新操作时的让路规则。已确认这两类轻提示一旦遇到新的遥控输入就立即消失，把空间让给当前交互，不继续拖着旧状态占屏。下一步继续细化：失败提示在用户直接发起新的选集动作时，是保留到新结果覆盖，还是一发起新切换就立即清掉。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:22 +0800
+- 进度：继续通过 `$grill-with-docs` 收口播放器中心轻提示的停留时长。已确认成功提示最短、取消提示次短、失败提示不自动消失，三者按语义强度分层停留，避免轻确认类反馈拖慢体感，同时保证失败态不会悄悄蒸发。下一步继续细化：一旦用户继续进行遥控操作，成功/取消提示是否应立即让路消失。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:18 +0800
+- 进度：继续通过 `$grill-with-docs` 收口失败/取消目标在 rail 中的残留表达。已确认重新打开分集 rail 时，不为上一次失败或取消目标分集保留额外弱提示痕迹；这层信息只由中心轻提示短暂承接，rail 本身回归当前实际播放分集和当前焦点的操作语义。下一步继续细化：成功/失败/取消三类中心轻提示分别应停留多久，以及是否需要因用户继续操作而立即消失。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:16 +0800
+- 进度：继续通过 `$grill-with-docs` 收口失败态/取消态后重新打开分集 rail 的默认焦点。已确认 rail 重新打开时默认回到当前实际播放分集，而不是回到上一次失败或取消的目标分集，以保持当前稳定播放上下文。下一步继续细化：rail 里是否还需要为上一次失败目标保留一个弱提示痕迹，帮助用户理解刚才失败的是哪一集。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:09 +0800
+- 进度：继续通过 `$grill-with-docs` 收口取消目标切换后的提示语义。已确认用户在 soft preparing 期间按 `BACK` 取消一次待切换目标后，可以在中心区给出一条比成功提示更轻、更短的取消反馈；该提示仅在确实存在待取消目标时显示，不抢焦点、不阻断播放。下一步继续细化：用户从失败态或取消态重新打开分集 rail 时，默认焦点应落在当前实际播放分集，还是上一次失败/取消的目标分集。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:06 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 preparing 期间的 `BACK` 语义。已确认当新目标仍在 soft preparing、旧分集还在承接时，第一次 `BACK` 解释为取消当前目标切换，继续留在旧分集；只有取消后再次按 `BACK`，才进入播放器既有的返回确认/退出链路。下一步继续细化：取消目标切换后是否需要一条极短的中心提示，例如“已取消切换到第 N 集”。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 16:00 +0800
+- 进度：继续通过 `$grill-with-docs` 收口“已完成分集从头播放”的提示策略。已确认这种场景不额外追加“已从头播放”解释文案，只沿用通用的“已切换到第 N 集”短反馈，避免中心提示从确认型退化为规则说明。下一步继续细化：soft preparing 期间若用户按 `BACK`，是取消当前目标切换并回到旧分集承接态，还是仍走播放器退出确认链路。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:42 +0800
+- 进度：继续通过 `$grill-with-docs` 收口主动切集命中已完成历史的播放策略。已确认若目标分集历史已接近片尾或已判定完成，主动切过去后直接从头开始播放，不再沿用该历史进度。下一步继续细化：这种“从头开始”是否需要一个额外的短提示，还是沿用通用的“已切换到第 N 集”成功反馈即可。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:41 +0800
+- 进度：继续通过 `$grill-with-docs` 收口新目标切换成功后的续播策略。已确认主动切集场景下，如果目标分集本身存在历史进度，切换成功后直接从该分集历史进度自动续播，不再弹续播提示卡二次询问；续播提示卡只保留给首次进入播放器或其它非主动切集场景。下一步继续细化：主动切集时若目标分集历史已接近片尾或已完成，是否仍按历史进度直接续播，还是改为从头开始。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:36 +0800
+- 进度：继续通过 `$grill-with-docs` 收口新目标切换成功后的播放态。已确认 soft preparing 期间旧内容仍沿用当前播放/暂停态承接，但一旦新目标真正切换成功，就直接播放新目标，不继承“旧内容原本暂停”的状态；同时继续沿用新目标自身的历史进度与续播提示规则。下一步继续细化：既然新目标会直接播放，若它存在历史进度，是否还要保留当前的续播提示卡倒计时，还是切集场景直接从历史进度自动续播不再询问。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:34 +0800
+- 进度：继续通过 `$grill-with-docs` 收口软切换成功后的 rail 行为。已确认目标分集真正切换成功后，也继续保持当前“选完即收起 rail”的沉浸路径，不自动把 rail 留在屏幕上；成功确认只通过中心区短反馈表达。下一步继续细化新目标切换成功后，是继承切换前的播放/暂停态，还是统一自动播放。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:32 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 soft preparing 失败后的 rail 行为。已确认失败后不自动重新打开分集 rail，维持当前“选完即收起 rail”的沉浸路径；若用户要改选其它分集，通过轻错误态里的显式“选集”动作重新进入 rail。下一步继续细化目标分集切换成功后，rail 是否也继续保持收起，还是在某些连续选集场景下保留打开。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:31 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 soft preparing 失败态的返回语义。已确认中心轻错误态可见时，第一次 `BACK` 只关闭这层失败态并留在当前实际播放分集；只有错误态关闭后再次按 `BACK`，才继续走播放器原有的返回确认/退出链路。下一步继续细化 soft preparing 失败后是否要自动重新打开分集 rail，还是维持当前“选完即收起 rail”的沉浸路径。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:29 +0800
+- 进度：继续通过 `$grill-with-docs` 收口软切换成功后的反馈合并策略。已确认连续切集场景里只保留最后一次真正生效的成功短反馈，旧反馈全部取消或被覆盖，不让中心提示堆成过期日志。下一步继续细化软准备失败或成功之后，用户按 BACK 时应该回到详情页、留在播放器还是先关闭中心提示。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:27 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 soft preparing 成功后的反馈语义。已确认新目标真正切换成功后可以在播放器中心区给出极短的轻提示，用于确认“已切到第 N 集/目标视频”；该提示自动消失、不抢焦点、不阻断播放，也不再弹二次确认层。下一步继续细化快速连续切集时，成功短反馈是否要合并、覆盖或直接省略。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 15:25 +0800
+- 进度：继续通过 `$grill-with-docs` 收口播放器软准备期间的承接方式。已确认旧分集/旧视频在 soft preparing 期间沿用当前播放态：切换前若正在播放，则继续播到新目标真正切换成功；切换前若处于暂停，则保持当前帧等待切换完成，不额外做人为冻结。下一步继续细化新目标准备成功后，是立即无感切过去，还是需要一个极短的“即将切换到第 N 集”确认反馈。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
+## 2026-06-17 14:55 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV App 下一轮“运行流畅”目标，已确认后续主线聚焦 `TV 长视频播放器软准备`。同时已补充“运行流畅”覆盖整 App 的遥控输入响应、页面切换、列表滚动、焦点移动与刷新不卡顿，不只指视频播放本身。该语义进一步收口为：单片播放器与剧集播放器在已有播放内容后切换分集、重试准备播放源或重建播放链路时，不再退回整页 loading/error，而是优先保留当前承接画面、返回路径与焦点语义，只在播放器内部表达轻量 preparing/failed 状态；其中电视剧切集失败时，旧分集继续承接当前播放/暂停画面，只提示目标分集准备失败，目标分集准备成功后才真正切换；这类轻量状态统一挂在播放器中心区，复用现有中心反馈层级；failed 状态至少保留“重试切换/重试播放”主动作，电视剧可额外提供“留在当前分集”之类关闭路径；并确认剧集播放器需要拆分“目标分集”和“当前实际播放分集”两套状态，避免 rail 高亮和真实承接画面打架；当两套状态短暂不一致时，标题、当前播放文案、历史上报和续播逻辑统一跟随实际播放分集；rail 则同时显示“实际播放分集”的主态与“目标分集 preparing”的次级态；准备中的连续选集按 latest-wins 处理，旧目标请求过期。下一步继续细化软准备期间旧分集是继续播音视频，还是先冻结承接画面。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补播放器定向红灯测试、TV 全量验证与版本递增。
+
 ## 2026-06-17 14:33 +0800
 - 进度：完成 TV 详情页软刷新收尾验证。已修正一条既有源码结构断言的字符串匹配过宽问题，避免把新加的页内紧凑错误条误判成 Material `IconButton`；随后串行重跑 TV 全量单测与 `assembleDebug` 均通过。`git diff --check` 与乱码扫描也已通过，当前实现面仅纳入本轮详情页软刷新、测试支撑、版本递增与文档沉淀。
 - 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesDetailActionSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

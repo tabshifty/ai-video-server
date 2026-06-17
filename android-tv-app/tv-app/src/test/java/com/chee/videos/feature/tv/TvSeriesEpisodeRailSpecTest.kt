@@ -18,6 +18,7 @@ class TvSeriesEpisodeRailSpecTest {
         assertTrue(source.contains("TvSeriesCorePlaybackOverlay("))
         assertTrue(source.contains("episodeRailItems = episodeRailItems"))
         assertTrue(source.contains("currentEpisodeRailItemId = currentEpisode?.id"))
+        assertTrue(source.contains("current = episode.number == uiState.activeEpisodeNumber"))
         assertTrue(source.contains("onSelectEpisodeRailItem = { selectedItem ->"))
         assertTrue(source.contains("onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible"))
         assertTrue(source.contains("openEpisodeRailRequestKey = openEpisodeRailRequestKey"))
