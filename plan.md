@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-17 11:00 +0800
+- 进度：完成 Android TV App 第五轮评审优化收尾。本轮继续以“运行流畅”为首要目标，海报墙刷新/切换排序改为软更新：已有内容保持可见，更新期间只显示网格内行内状态，失败时在网格内给出紧凑错误条并暂停自动分页，避免空白/跳页/混排；独立复审指出软更新完成后首焦点会因 `refreshing` 变化回跳首图，已改为仅在首批内容首次到达时自动聚焦一次，软刷新/软排序不再抢焦点。TV 版本递增到 `0.1.116` / `versionCode=116`，并沉淀 `TV 海报墙软更新` 约束。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallViewModel.kt`、`TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallViewModelTest.kt`、`TvPosterWallFocusLayoutSpecTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPosterWallViewModelTest --tests com.chee.videos.feature.tv.TvPosterWallFocusLayoutSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\\uFFFD' CONTEXT.md plan.md android-tv-app` 无命中；独立复审阻塞问题已修复。
+
+## 2026-06-17 10:44 +0800
+- 进度：开始 Android TV App 第五轮整体评审优化。本轮继续以“运行流畅”为首要目标，优先审查 TV 高频遥控滚动路径；初步锁定海报墙刷新/排序会把已有内容切到加载语义或清空网格，容易造成焦点丢失、页面跳动和重复感知等待。计划先补红灯测试，收口为“已有内容保持可见，更新状态行内反馈，新结果回来后再替换”。
+- 影响文件：预计 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallViewModel.kt`、`TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallViewModelTest.kt`、`TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行海报墙定向单测、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-06-17 10:35 +0800
 - 进度：完成 Android TV App 第四轮评审优化收尾。本轮以“运行流畅”为首要目标，修复 TV 首页搜索输入每个字符立即远程请求、搜索页被页面级 loading 替换的问题：搜索输入改为短 debounce，等待和网络请求期间保留搜索页并显示行内搜索状态；搜索失败在搜索页内显示错误与重试，不再误显示为空结果；重试会取消待发 debounce，避免重复请求。独立复审指出的搜索失败无页内重试入口、旧搜索响应测试覆盖不足均已修复。TV 版本递增到 `0.1.115` / `versionCode=115`，并沉淀 `TV 搜索输入流畅性` 约束。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`、`TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`、`TvCatalogFocusPolicyTest.kt`、`TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

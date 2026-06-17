@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,7 +30,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,11 +91,14 @@ fun TvPosterWallScreen(
     val gridState = rememberLazyGridState()
     val firstItemFocusRequester = remember { FocusRequester() }
     val refreshFocusRequester = remember { FocusRequester() }
+    var initialFocusRequested by remember { mutableStateOf(false) }
     val wallSpec = resolveTvCatalogWallSpec(uiState.kind, uiState.title)
 
-    LaunchedTvInitialFocus(uiState.items.isNotEmpty(), uiState.page, uiState.loading, uiState.refreshing) {
-        if (uiState.items.isNotEmpty() && uiState.page == 1 && !uiState.loading && !uiState.refreshing) {
-            firstItemFocusRequester.tryRequestFocus()
+    LaunchedTvInitialFocus(uiState.items.firstOrNull()?.id, uiState.page, uiState.loading) {
+        if (!initialFocusRequested && uiState.items.isNotEmpty() && uiState.page == 1 && !uiState.loading && !uiState.refreshing) {
+            if (firstItemFocusRequester.tryRequestFocus()) {
+                initialFocusRequested = true
+            }
         }
     }
 
@@ -154,6 +160,27 @@ fun TvPosterWallScreen(
                     verticalArrangement = Arrangement.spacedBy(TvPosterWallFocusLayoutSpec.gridItemSpacingDp.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
+                    if (uiState.refreshing) {
+                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                            TvInlineLoadingState(
+                                message = "正在更新${wallSpec.title}",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                            )
+                        }
+                    }
+                    if (!uiState.errorMessage.isNullOrBlank()) {
+                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                            TvPosterWallInlineError(
+                                message = uiState.errorMessage.orEmpty(),
+                                onAction = viewModel::refresh,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                            )
+                        }
+                    }
                     itemsIndexed(
                         uiState.items,
                         key = { _, item -> item.id },
@@ -186,6 +213,66 @@ fun TvPosterWallScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvPosterWallInlineError(
+    message: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = AppChrome.SurfaceElevated,
+        shape = AppChrome.SurfaceShape,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = AppChrome.Error,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = message,
+                color = AppChrome.TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                color = AppChrome.SurfaceStrong,
+                shape = AppChrome.PillShape,
+                modifier = Modifier
+                    .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+                    .clickable(onClick = onAction),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        tint = AppChrome.TextPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "刷新",
+                        color = AppChrome.TextPrimary,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
         }

@@ -45,4 +45,45 @@ class TvPosterWallFocusLayoutSpecTest {
         assertTrue("海报墙排序应支持正序", source.contains("正序"))
         assertTrue("海报墙排序应支持倒序", source.contains("倒序"))
     }
+
+    @Test
+    fun `poster wall keeps grid visible during soft refresh`() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt")
+        val source = sourcePath.toFile().readText()
+        val gridSource = source.substringAfter("LazyVerticalGrid(")
+
+        assertTrue(
+            "海报墙已有内容刷新/排序时必须在网格内显示行内更新状态，不能替换为整页 loading",
+            gridSource.contains("if (uiState.refreshing)") &&
+                gridSource.contains("TvInlineLoadingState") &&
+                gridSource.contains("正在更新"),
+        )
+        assertTrue(
+            "海报墙行内更新状态必须先于 itemsIndexed，保证旧内容仍保留在同一个网格里",
+            gridSource.indexOf("if (uiState.refreshing)") < gridSource.indexOf("itemsIndexed("),
+        )
+        assertTrue(
+            "海报墙已有内容刷新/排序失败时必须在网格内显示紧凑错误条，不能替换为整页错误态",
+            gridSource.contains("if (!uiState.errorMessage.isNullOrBlank())") &&
+                gridSource.contains("TvPosterWallInlineError"),
+        )
+        assertTrue(
+            "海报墙行内错误必须先于 itemsIndexed，保证旧内容仍保留在同一个网格里",
+            gridSource.indexOf("if (!uiState.errorMessage.isNullOrBlank())") < gridSource.indexOf("itemsIndexed("),
+        )
+    }
+
+    @Test
+    fun `poster wall soft update does not steal focus back to first poster`() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt")
+        val source = sourcePath.toFile().readText()
+        val focusSource = source.substringAfter("var initialFocusRequested")
+            .substringBefore("LaunchedEffect(gridState")
+        val focusEffectKeys = source.substringAfter("LaunchedTvInitialFocus(")
+            .substringBefore(") {")
+
+        assertTrue("海报墙首屏焦点必须用一次性标记，软刷新/排序完成后不得再次抢回第一张海报", focusSource.contains("initialFocusRequested"))
+        assertTrue("海报墙首焦点 effect 不得把 refreshing 作为 key，否则软更新完成会重新请求首项焦点", !focusEffectKeys.contains("uiState.refreshing"))
+        assertTrue("海报墙首焦点请求成功后必须置位，避免后续软更新再次抢焦点", focusSource.contains("initialFocusRequested = true"))
+    }
 }

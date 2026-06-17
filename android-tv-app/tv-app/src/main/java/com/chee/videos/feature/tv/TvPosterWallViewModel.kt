@@ -50,10 +50,14 @@ class TvPosterWallViewModel @Inject constructor(
     )
 
     fun refresh() {
+        val state = _uiState.value
+        if (state.loading || state.refreshing) {
+            return
+        }
         requestVersion += 1
         _uiState.update {
             it.copy(
-                loading = true,
+                loading = it.items.isEmpty(),
                 loadingMore = false,
                 refreshing = it.items.isNotEmpty(),
                 errorMessage = null,
@@ -71,12 +75,11 @@ class TvPosterWallViewModel @Inject constructor(
         requestVersion += 1
         _uiState.update {
             it.copy(
-                loading = true,
+                loading = it.items.isEmpty(),
                 loadingMore = false,
                 refreshing = it.items.isNotEmpty(),
-                page = 0,
-                totalCount = 0,
-                items = emptyList(),
+                page = if (it.items.isEmpty()) 0 else it.page,
+                totalCount = if (it.items.isEmpty()) 0 else it.totalCount,
                 sortBy = normalized.sortBy,
                 sortOrder = normalized.sortOrder,
                 errorMessage = null,
@@ -87,7 +90,7 @@ class TvPosterWallViewModel @Inject constructor(
 
     fun loadMoreIfNeeded(currentIndex: Int) {
         val state = _uiState.value
-        if (state.loading || state.loadingMore || state.refreshing || state.items.isEmpty()) {
+        if (state.loading || state.loadingMore || state.refreshing || state.items.isEmpty() || !state.errorMessage.isNullOrBlank()) {
             return
         }
         if (currentIndex < state.items.size - 6) {

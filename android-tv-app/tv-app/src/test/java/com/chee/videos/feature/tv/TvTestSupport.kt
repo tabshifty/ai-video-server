@@ -223,8 +223,10 @@ class DelayedCatalogTvRepository(
 ) : TvRepository {
     private val pendingHomes = linkedMapOf<String, CompletableDeferred<Result<TvHomePayload>>>()
     private val pendingSearches = linkedMapOf<String, CompletableDeferred<Result<TvSearchPayload>>>()
+    private val pendingPosterWalls = linkedMapOf<TvPosterWallRequestKey, ArrayDeque<CompletableDeferred<Result<TvCatalogWallPayload>>>>()
     val homeRequests = mutableListOf<TvHomeRequest>()
     val searchRequests = mutableListOf<TvSearchRequest>()
+    val posterWallRequests = mutableListOf<TvPosterWallRequest>()
 
     override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
@@ -242,8 +244,19 @@ class DelayedCatalogTvRepository(
         pageSize: Int,
         sortBy: String,
         sortOrder: String,
-    ): Result<TvCatalogWallPayload> =
-        Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
+    ): Result<TvCatalogWallPayload> {
+        posterWallRequests += TvPosterWallRequest(
+            kind = kind,
+            page = page,
+            pageSize = pageSize,
+            sortBy = sortBy,
+            sortOrder = sortOrder,
+        )
+        val key = TvPosterWallRequestKey(kind = kind, page = page, sortBy = sortBy, sortOrder = sortOrder)
+        val deferred = CompletableDeferred<Result<TvCatalogWallPayload>>()
+        pendingPosterWalls.getOrPut(key) { ArrayDeque() }.addLast(deferred)
+        return deferred.await()
+    }
 
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
         Result.success(TvIptvPayload())
@@ -289,7 +302,40 @@ class DelayedCatalogTvRepository(
     fun completeSearchFailure(query: String, error: Throwable = IllegalStateException("TV 搜索失败")) {
         pendingSearches.getOrPut(query) { CompletableDeferred() }.complete(Result.failure(error))
     }
+
+    fun completePosterWall(
+        kind: String = "tv",
+        page: Int = 1,
+        sortBy: String = "added",
+        sortOrder: String = "desc",
+        payload: TvCatalogWallPayload = TvCatalogWallPayload(page = page, pageSize = 24),
+    ) {
+        val key = TvPosterWallRequestKey(kind = kind, page = page, sortBy = sortBy, sortOrder = sortOrder)
+        pendingPosterWalls.getOrPut(key) { ArrayDeque() }
+            .removeFirst()
+            .complete(Result.success(payload))
+    }
+
+    fun completePosterWallFailure(
+        kind: String = "tv",
+        page: Int = 1,
+        sortBy: String = "added",
+        sortOrder: String = "desc",
+        error: Throwable = IllegalStateException("海报墙加载失败"),
+    ) {
+        val key = TvPosterWallRequestKey(kind = kind, page = page, sortBy = sortBy, sortOrder = sortOrder)
+        pendingPosterWalls.getOrPut(key) { ArrayDeque() }
+            .removeFirst()
+            .complete(Result.failure(error))
+    }
 }
+
+data class TvPosterWallRequestKey(
+    val kind: String,
+    val page: Int,
+    val sortBy: String,
+    val sortOrder: String,
+)
 
 fun tvSeriesSummary(
     id: String = "series-1",
