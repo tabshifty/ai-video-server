@@ -128,9 +128,18 @@ class TvHomeNavigationTest {
         assertTrue("TV 首页必须存在", screenPath.exists())
 
         val source = screenPath.readText()
+        val sideMenuSource = source.substringAfter("private fun TvHomeSideMenu(")
+            .substringBefore("@Composable\nprivate fun TvHomeSideMenuButton(")
         val buttonSource = source.substringAfter("private fun TvHomeSideMenuButton(")
             .substringBefore("@Composable\nprivate fun TvHomeSettingsPanel(")
 
+        assertTrue(
+            "IPTV 菜单点击前必须通知 ViewModel 离开目录状态域，避免旧首页/搜索请求在 IPTV 页期间回写首页状态",
+            sideMenuSource.contains("if (item == TvHomeMenuItem.Iptv)") &&
+                sideMenuSource.contains("onSelect(item)") &&
+                sideMenuSource.contains("onOpenIptv()") &&
+                sideMenuSource.indexOf("onSelect(item)") < sideMenuSource.indexOf("onOpenIptv()"),
+        )
         assertTrue(
             "TV 首页侧边菜单按钮必须使用 tvFocusableGlow 提供唯一焦点目标",
             buttonSource.contains(".tvFocusableGlow("),

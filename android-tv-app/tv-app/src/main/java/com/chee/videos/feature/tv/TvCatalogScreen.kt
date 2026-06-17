@@ -457,6 +457,7 @@ private fun TvHomeSideMenu(
                 modifier = if (index == 0) Modifier.focusRequester(menuFocusRequester) else Modifier,
                 onClick = {
                     if (item == TvHomeMenuItem.Iptv) {
+                        onSelect(item)
                         onOpenIptv()
                     } else {
                         onSelect(item)

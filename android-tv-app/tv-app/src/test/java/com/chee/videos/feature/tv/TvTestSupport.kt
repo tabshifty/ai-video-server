@@ -218,6 +218,79 @@ class DelayedSourceTvRepository(
     }
 }
 
+class DelayedCatalogTvRepository(
+    private val baseUrl: String = "https://example.com",
+) : TvRepository {
+    private val pendingHomes = linkedMapOf<String, CompletableDeferred<Result<TvHomePayload>>>()
+    private val pendingSearches = linkedMapOf<String, CompletableDeferred<Result<TvSearchPayload>>>()
+    val homeRequests = mutableListOf<TvHomeRequest>()
+    val searchRequests = mutableListOf<TvSearchRequest>()
+
+    override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
+        homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
+        return pendingHomes.getOrPut(kind) { CompletableDeferred() }.await()
+    }
+
+    override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> {
+        searchRequests += TvSearchRequest(query = query, page = page, pageSize = pageSize)
+        return pendingSearches.getOrPut(query) { CompletableDeferred() }.await()
+    }
+
+    override suspend fun fetchCatalogWall(
+        kind: String,
+        page: Int,
+        pageSize: Int,
+        sortBy: String,
+        sortOrder: String,
+    ): Result<TvCatalogWallPayload> =
+        Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
+
+    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
+        Result.success(TvIptvPayload())
+
+    override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
+        Result.success(tvSeriesDetail(id = seriesId))
+
+    override suspend fun readActiveBaseUrl(): String = baseUrl
+
+    override suspend fun buildSourceUrl(videoId: String, profile: String?): String =
+        "https://example.com/$videoId.m3u8"
+
+    override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
+
+    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = null
+
+    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) = Unit
+
+    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = null
+
+    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) = Unit
+
+    override suspend fun readTvSeekStepSeconds(): Int = 10
+
+    override suspend fun saveTvSeekStepSeconds(seconds: Int) = Unit
+
+    override suspend fun readTvSeriesAutoplayEnabled(): Boolean? = null
+
+    override suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) = Unit
+
+    fun completeHome(kind: String = "tv", payload: TvHomePayload = TvHomePayload()) {
+        pendingHomes.getOrPut(kind) { CompletableDeferred() }.complete(Result.success(payload))
+    }
+
+    fun completeHomeFailure(kind: String = "tv", error: Throwable = IllegalStateException("TV 首页加载失败")) {
+        pendingHomes.getOrPut(kind) { CompletableDeferred() }.complete(Result.failure(error))
+    }
+
+    fun completeSearch(query: String, payload: TvSearchPayload = TvSearchPayload()) {
+        pendingSearches.getOrPut(query) { CompletableDeferred() }.complete(Result.success(payload))
+    }
+
+    fun completeSearchFailure(query: String, error: Throwable = IllegalStateException("TV 搜索失败")) {
+        pendingSearches.getOrPut(query) { CompletableDeferred() }.complete(Result.failure(error))
+    }
+}
+
 fun tvSeriesSummary(
     id: String = "series-1",
     title: String = "雾城档案",

@@ -38,6 +38,7 @@ data class TvCatalogUiState(
 class TvCatalogViewModel @Inject constructor(
     private val repository: TvRepository,
 ) : ViewModel() {
+    private var requestVersion = 0
     private val _uiState = MutableStateFlow(TvCatalogUiState())
     val uiState: StateFlow<TvCatalogUiState> = _uiState.asStateFlow()
 
@@ -46,13 +47,17 @@ class TvCatalogViewModel @Inject constructor(
     }
 
     fun selectMenu(menuItem: TvHomeMenuItem) {
-        _uiState.update { it.copy(selectedMenu = menuItem) }
         when {
-            menuItem.isContentKind -> loadHome(menuItem.homeKind)
+            menuItem.isContentKind -> {
+                _uiState.update { it.copy(selectedMenu = menuItem) }
+                loadHome(menuItem.homeKind)
+            }
             menuItem == TvHomeMenuItem.Search -> {
+                invalidateCatalogRequests()
                 _uiState.update {
                     it.copy(
                         loading = false,
+                        selectedMenu = TvHomeMenuItem.Search,
                         query = "",
                         searchResults = emptyList(),
                         errorMessage = null,
@@ -60,12 +65,33 @@ class TvCatalogViewModel @Inject constructor(
                 }
             }
             menuItem == TvHomeMenuItem.Settings -> {
-                _uiState.update { it.copy(loading = false, query = "", searchResults = emptyList()) }
+                invalidateCatalogRequests()
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        selectedMenu = TvHomeMenuItem.Settings,
+                        query = "",
+                        searchResults = emptyList(),
+                        errorMessage = null,
+                    )
+                }
                 loadTvPlaybackSettings()
             }
             menuItem == TvHomeMenuItem.Iptv -> {
-                _uiState.update { it.copy(loading = false, query = "", searchResults = emptyList()) }
+                openIptv()
             }
+        }
+    }
+
+    fun openIptv() {
+        invalidateCatalogRequests()
+        _uiState.update {
+            it.copy(
+                loading = false,
+                query = "",
+                searchResults = emptyList(),
+                errorMessage = null,
+            )
         }
     }
 
@@ -87,6 +113,7 @@ class TvCatalogViewModel @Inject constructor(
     fun updateQuery(query: String) {
         _uiState.update { it.copy(query = query, selectedMenu = TvHomeMenuItem.Search) }
         if (query.isBlank()) {
+            invalidateCatalogRequests()
             _uiState.update { it.copy(loading = false, searchResults = emptyList(), errorMessage = null) }
         } else {
             loadSearch(query)
@@ -103,9 +130,13 @@ class TvCatalogViewModel @Inject constructor(
     }
 
     private fun loadHome(kind: String = _uiState.value.selectedMenu.homeKind.ifBlank { "tv" }) {
+        val versionAtRequest = nextCatalogRequestVersion()
         val normalizedKind = normalizeTvHomeKind(kind)
         viewModelScope.launch {
             val baseUrl = repository.readActiveBaseUrl().orEmpty()
+            if (versionAtRequest != requestVersion) {
+                return@launch
+            }
             _uiState.update {
                 it.copy(
                     loading = true,
@@ -117,6 +148,9 @@ class TvCatalogViewModel @Inject constructor(
             }
             repository.fetchHome(kind = normalizedKind)
                 .onSuccess { payload ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onSuccess
+                    }
                     val recentUpdates = coerceListOrEmpty<TvHomeVideoDto>(payload.recentUpdates).map(::tvHomeVideoToUiModel)
                     val typedRecentWatching = coerceListOrEmpty<TvHomeVideoDto>(payload.recentWatching).map(::tvHomeVideoToUiModel)
                     val featured = payload.featured?.let(::tvHomeVideoToUiModel)
@@ -139,6 +173,9 @@ class TvCatalogViewModel @Inject constructor(
                     }
                 }
                 .onFailure { error ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onFailure
+                    }
                     _uiState.update {
                         it.copy(
                             loading = false,
@@ -160,8 +197,12 @@ class TvCatalogViewModel @Inject constructor(
     }
 
     private fun loadSearch(query: String) {
+        val versionAtRequest = nextCatalogRequestVersion()
         viewModelScope.launch {
             val baseUrl = repository.readActiveBaseUrl().orEmpty()
+            if (versionAtRequest != requestVersion) {
+                return@launch
+            }
             _uiState.update {
                 it.copy(
                     loading = true,
@@ -171,6 +212,9 @@ class TvCatalogViewModel @Inject constructor(
             }
             repository.fetchSearch(query)
                 .onSuccess { payload ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onSuccess
+                    }
                     _uiState.update {
                         it.copy(
                             loading = false,
@@ -182,6 +226,9 @@ class TvCatalogViewModel @Inject constructor(
                     }
                 }
                 .onFailure { error ->
+                    if (versionAtRequest != requestVersion) {
+                        return@onFailure
+                    }
                     _uiState.update {
                         it.copy(
                             loading = false,
@@ -192,6 +239,15 @@ class TvCatalogViewModel @Inject constructor(
                     }
                 }
         }
+    }
+
+    private fun nextCatalogRequestVersion(): Int {
+        requestVersion += 1
+        return requestVersion
+    }
+
+    private fun invalidateCatalogRequests() {
+        requestVersion += 1
     }
 
     private fun loadTvPlaybackSettings() {

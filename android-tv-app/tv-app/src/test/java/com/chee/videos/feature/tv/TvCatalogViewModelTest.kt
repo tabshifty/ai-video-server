@@ -7,13 +7,16 @@ import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSectionDto
 import com.chee.videos.core.model.TvSeriesSummaryDto
 import com.google.gson.Gson
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TvCatalogViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -86,6 +89,108 @@ class TvCatalogViewModelTest {
         assertEquals(1, state.searchResults.size)
         assertEquals("静默轨道", state.searchResults.first().title)
         assertEquals("tv", state.searchResults.first().type)
+    }
+
+    @Test
+    fun staleHomeResponse_afterMenuSwitchDoesNotOverrideCurrentMenu() = runTest {
+        val repository = DelayedCatalogTvRepository()
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        viewModel.selectMenu(TvHomeMenuItem.Movie)
+        repository.completeHome(
+            kind = "movie",
+            payload = TvHomePayload(
+                kind = "movie",
+                movies = listOf(TvHomeVideoDto(id = "movie-current", type = "movie", title = "当前电影")),
+            ),
+        )
+        advanceUntilIdle()
+
+        var state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals(TvHomeMenuItem.Movie, state.selectedMenu)
+        assertEquals("movie", state.kind)
+        assertEquals(listOf("当前电影"), state.movies.map { it.title })
+
+        repository.completeHome(
+            kind = "tv",
+            payload = TvHomePayload(
+                kind = "tv",
+                tvSeries = listOf(TvHomeVideoDto(id = "tv-stale", type = "tv", title = "旧电视剧")),
+            ),
+        )
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals(TvHomeMenuItem.Movie, state.selectedMenu)
+        assertEquals("movie", state.kind)
+        assertTrue(state.tvSeries.isEmpty())
+        assertEquals(listOf("当前电影"), state.movies.map { it.title })
+    }
+
+    @Test
+    fun staleSearchResponse_afterQueryChangeDoesNotOverrideCurrentResults() = runTest {
+        val repository = DelayedCatalogTvRepository()
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        repository.completeHome()
+        advanceUntilIdle()
+        viewModel.updateQuery("雾")
+        viewModel.updateQuery("雾城")
+        repository.completeSearch(
+            query = "雾城",
+            payload = TvSearchPayload(
+                items = listOf(tvSearchResult(id = "new", type = "tv", title = "雾城档案")),
+            ),
+        )
+        advanceUntilIdle()
+
+        var state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals("雾城", state.query)
+        assertEquals(listOf("雾城档案"), state.searchResults.map { it.title })
+
+        repository.completeSearch(
+            query = "雾",
+            payload = TvSearchPayload(
+                items = listOf(tvSearchResult(id = "old", type = "tv", title = "旧搜索")),
+            ),
+        )
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals("雾城", state.query)
+        assertEquals(listOf("雾城档案"), state.searchResults.map { it.title })
+    }
+
+    @Test
+    fun staleFailures_afterLeavingCatalogDoNotOverrideCurrentState() = runTest {
+        val repository = DelayedCatalogTvRepository()
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        viewModel.selectMenu(TvHomeMenuItem.Movie)
+        viewModel.selectMenu(TvHomeMenuItem.Settings)
+        repository.completeHomeFailure(kind = "movie", error = IllegalStateException("旧首页失败"))
+        advanceUntilIdle()
+
+        var state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals(TvHomeMenuItem.Settings, state.selectedMenu)
+        assertEquals(null, state.errorMessage)
+
+        viewModel.updateQuery("雾")
+        viewModel.openIptv()
+        repository.completeSearchFailure(query = "雾", error = IllegalStateException("旧搜索失败"))
+        advanceUntilIdle()
+
+        state = viewModel.uiState.value
+        assertFalse(state.loading)
+        assertEquals(TvHomeMenuItem.Search, state.selectedMenu)
+        assertEquals("", state.query)
+        assertTrue(state.searchResults.isEmpty())
+        assertEquals(null, state.errorMessage)
     }
 
     @Test
