@@ -2,6 +2,11 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-19 19:29 +0800
+- 进度：按用户取消要求，收口并删除 `CONTEXT.md` 中所有压缩包上传/导入沉淀，停止继续推进该方向的设计。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 `git diff --check`、`rg -n \"压缩包导入|压缩上传|zip|rar|7z\" CONTEXT.md plan.md` 确认仅保留必要历史。
+
 ## 2026-06-19 11:08 +0800
 - 进度：完成 `TV 单片长视频播放器软准备` 首轮落地。单片页已新增“首帧后中心轻态”状态机：重试时立即进入 `正在重试播放`，成功后给出 `已恢复播放`，`BACK` 可取消当前重试并显示 `已取消重试`，失败态下沉到播放器中心区并保留“重试播放 + 诊断信息”；诊断面板主动作改为 `返回`，仅回到失败轻态。Media3 单片播放器已改为复用同一 `ExoPlayer` 实例重 prepare，接入 `onRenderedFirstFrame()`，并支持通过取消 key 停掉当前 prepare 以配合 latest-wins 丢弃过期结果。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormPlayerSoftRetrySpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormPlayerSoftRetryLogicTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
@@ -4910,3 +4915,8 @@
 - 教训沉淀（写入 .claude memory）：[[Curl failing client URL first]]、[[response.Error 包装 401 为 HTTP 200]]、[[TV LibVLC 不经过 OkHttp interceptors]]、[[内核替换类 task 必须真机端到端验证]]、[[LibVLC MediaPlayer.addSlave 必须用 Uri 重载]]、[[Player 根 onPreviewKeyEvent 遇 overlay 必须 passthrough]] 共 6 条。CONTEXT.md 同步新增 5 条术语（TV LibVLC playback URL 携带 access_token / MediaPlayer.addSlave 用 Uri 重载 / Player onPreviewKeyEvent overlay 透传 / LibVLC audioTrack=-1 是关音频）。
 - 影响文件：`internal/middleware/auth.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/LongFormSubtitleSupport.kt`、`com/chee/videos/core/ui/LongFormVideoPlayer.kt`、`com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
 - 验证：`curl -is 'http://192.168.1.24:8080/.../source?profile=compat&access_token=invalid'` 返回 `{"code":401,"msg":"invalid access token"}`（fallback 路径有效）；TV 真机 0.1.71 实测视频可播 + 音频可听 + 字幕可见 + 续播卡按钮可交互。版本 `0.1.71 / 71`。
+
+## 2026-06-19 11:36 +0800
+- 进度：完成 TV 单片长视频播放器软重试语义审查并修正一处边界回退。已确认并修复 `BACK` 取消当前重试时不应把播放会话回退成未开始；现在取消只终止本次准备、清理错误并回写 `已取消重试` 轻提示，继续沿用已出现首帧后的承接播放态。同步把 TV 版本递增到 `0.1.121` / `versionCode=121`，并补了取消语义的源码断言。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormPlayerSoftRetrySpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`
+- 验证：受限于当前 sandbox，Gradle 先后卡在默认 `~/.gradle` 锁文件权限、wrapper 网络下载和 daemon 端口绑定；已改用本地缓存拷贝到 `/private/tmp/codex-gradle-home` 继续，但完整 `:tv-app:testDebugUnitTest` 仍未跑完。后续需在可绑定本地端口的环境里复跑 `cd android-tv-app && GRADLE_USER_HOME=/private/tmp/codex-gradle-home ./gradlew --no-daemon -Dkotlin.compiler.execution.strategy=in-process :tv-app:testDebugUnitTest`，再补 `assembleDebug`、`git diff --check` 和乱码扫描。
