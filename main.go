@@ -15,6 +15,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"video-server/internal/config"
 	"video-server/internal/database"
@@ -68,7 +69,7 @@ func main() {
 
 	switch mode {
 	case "server":
-		if err := runServer(cfg, repo, transSvc, logger); err != nil {
+		if err := runServer(cfg, pool, repo, transSvc, logger); err != nil {
 			logger.Error("server stopped with error", "error", err)
 			os.Exit(1)
 		}
@@ -81,6 +82,59 @@ func main() {
 		logger.Error("invalid mode", "mode", mode)
 		os.Exit(1)
 	}
+}
+
+type archiveImportQueueAdapter struct {
+	enqueuer *queue.Enqueuer
+}
+
+func (a archiveImportQueueAdapter) EnqueueTranscode(videoID, inputPath, outputDir, targetFormat string, force bool) error {
+	if a.enqueuer == nil {
+		return fmt.Errorf("queue enqueuer unavailable")
+	}
+	return a.enqueuer.EnqueueTranscode(queue.TranscodePayload{
+		VideoID:      videoID,
+		InputPath:    inputPath,
+		OutputDir:    outputDir,
+		TargetFormat: targetFormat,
+		Force:        force,
+	})
+}
+
+func (a archiveImportQueueAdapter) EnqueueScrapeMovie(videoID, filePath, filename string) error {
+	if a.enqueuer == nil {
+		return fmt.Errorf("queue enqueuer unavailable")
+	}
+	return a.enqueuer.EnqueueScrapeMovie(queue.ScrapePayload{
+		VideoID:  videoID,
+		FilePath: filePath,
+		Filename: filename,
+		Type:     "movie",
+	})
+}
+
+func (a archiveImportQueueAdapter) EnqueueScrapeTV(videoID, filePath, filename string) error {
+	if a.enqueuer == nil {
+		return fmt.Errorf("queue enqueuer unavailable")
+	}
+	return a.enqueuer.EnqueueScrapeTV(queue.ScrapePayload{
+		VideoID:  videoID,
+		FilePath: filePath,
+		Filename: filename,
+		Type:     "episode",
+	})
+}
+
+func (a archiveImportQueueAdapter) EnqueueScrapeAV(videoID, filePath, filename string) error {
+	if a.enqueuer == nil {
+		return fmt.Errorf("queue enqueuer unavailable")
+	}
+	return a.enqueuer.EnqueueScrapeAV(queue.ScrapePayload{
+		VideoID:  videoID,
+		FilePath: filePath,
+		Filename: filename,
+		Type:     "av",
+	})
 }
 
 type avScraperConfigurer interface {
@@ -121,7 +175,7 @@ func configureContentTranslation(scrapeSvc contentTranslationConfigurer, cfg con
 	scrapeSvc.ConfigureContentTranslation(buildTranslationConfig(cfg))
 }
 
-func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
+func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
 	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.TranscodeTaskTimeout)
 	defer enqueuer.Close()
 	redisClient := redis.NewClient(&redis.Options{
@@ -142,6 +196,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	appSvc := services.NewAppService(repo)
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
+	archiveImportSvc := services.NewArchiveImportService(pool, uploadSvc, imageSvc, repo, archiveImportQueueAdapter{enqueuer: enqueuer}, cfg.StorageRoot, cfg.UploadTempDir, logger)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -155,6 +210,7 @@ func runServer(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 		appSvc,
 		imageSvc,
 		subtitleSvc,
+		archiveImportSvc,
 		enqueuer,
 		logger,
 		redisClient,

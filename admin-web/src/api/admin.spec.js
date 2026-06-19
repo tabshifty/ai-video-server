@@ -30,6 +30,9 @@ import {
   deleteAdminVideo,
   deleteAdminVideoSubtitle,
   deleteLatestOrphanFileScan,
+  getAdminArchiveImportBatches,
+  getAdminArchiveImportBatchDetail,
+  getAdminArchiveImportFileDetail,
   getAdminVideoTags,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
@@ -46,14 +49,17 @@ import {
   publishAdminTVAppRelease,
   rescanAdminVideoSubtitles,
   restoreAdminTVAppRelease,
+  retryAdminArchiveImportExtract,
   scrapePreview,
   startOrphanFileScan,
   updateAdminTVAppRelease,
+  updateAdminArchiveImportFile,
   updateAdminVideoSubtitle,
   updateAdminTvEpisode,
   updateAdminTvSeason,
   updateAdminTvSeries,
   uploadAdminTVAppAPK,
+  uploadAdminArchiveImport,
   uploadAdminVideoSubtitle,
   uploadAdminImages
 } from './admin'
@@ -118,6 +124,45 @@ describe('admin image library apis', () => {
       params: { w: 360, h: 270, fit: 'cover', q: 78 },
       responseType: 'blob'
     })
+  })
+})
+
+describe('archive import apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    put.mockReset()
+    get.mockResolvedValue({ ok: true })
+    post.mockResolvedValue({ ok: true })
+    put.mockResolvedValue({ ok: true })
+  })
+
+  it('loads archive batches and file detail endpoints', async () => {
+    await getAdminArchiveImportBatches({ page: 2, page_size: 20 })
+    await getAdminArchiveImportBatchDetail('batch-1')
+    await getAdminArchiveImportFileDetail('file-1')
+
+    expect(get).toHaveBeenCalledWith('/admin/archive-import/batches', {
+      params: { page: 2, page_size: 20 }
+    })
+    expect(get).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1')
+    expect(get).toHaveBeenCalledWith('/admin/archive-import/files/file-1')
+  })
+
+  it('uploads archive imports and processes batches or files', async () => {
+    const formData = new FormData()
+    const payload = { password: 'secret' }
+
+    await uploadAdminArchiveImport(formData)
+    await updateAdminArchiveImportFile('file-1', { title: '标题' })
+    await retryAdminArchiveImportExtract('batch-1', payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0
+    })
+    expect(put).toHaveBeenCalledWith('/admin/archive-import/files/file-1', { title: '标题' })
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/retry-extract', payload)
   })
 })
 

@@ -17,6 +17,8 @@ describe('command palette helpers', () => {
     expect(searchMenuItems('ed2k').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
     expect(searchMenuItems('孤儿文件扫描').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
     expect(searchMenuItems('orphan scan').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
+    expect(searchMenuItems('压缩包导入').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
+    expect(searchMenuItems('archive import').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
   })
 
   it('keeps every item when the query is empty', () => {
@@ -43,6 +45,8 @@ describe('command palette helpers', () => {
 
   it('keeps individual toolbox tools out of direct shell navigation', () => {
     expect(adminShellNavItems.some((entry) => entry.path === '/toolbox/orphan-files')).toBe(false)
+    expect(adminShellNavItems.some((entry) => entry.path === '/toolbox/archive-import')).toBe(false)
     expect(searchMenuItems('/toolbox/orphan-files')).toHaveLength(0)
+    expect(searchMenuItems('/toolbox/archive-import')).toHaveLength(0)
   })
 })

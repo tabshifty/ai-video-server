@@ -9,6 +9,7 @@ const displayFiles = [
   './IPTVManage.vue',
   './ShortReview.vue',
   './TaskMonitor.vue',
+  './ToolboxArchiveImport.vue',
   './ToolboxImageWorkbench.vue',
   './ToolboxOrphanFiles.vue',
   './TvAppManage.vue',

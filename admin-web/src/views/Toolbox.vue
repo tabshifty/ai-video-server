@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
+import { FolderOpened, Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -9,6 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 const router = useRouter()
 
 const ed2kToolHref = computed(() => router.resolve('/toolbox/ed2k').href)
+const archiveImportHref = computed(() => router.resolve('/toolbox/archive-import').href)
 const imageWorkbenchHref = computed(() => router.resolve('/toolbox/image-workbench').href)
 const orphanFilesHref = computed(() => router.resolve('/toolbox/orphan-files').href)
 </script>
@@ -30,6 +31,19 @@ const orphanFilesHref = computed(() => router.resolve('/toolbox/orphan-files').h
             <span class="tool-menu-item__content">
               <strong>ED2K 链接生成器</strong>
               <span>把多行 ED2K 文本转换为可点击链接。</span>
+            </span>
+            <span class="tool-menu-item__meta">
+              <el-icon><TopRight /></el-icon>
+              <span>新标签页打开</span>
+            </span>
+          </a>
+          <a class="tool-menu-item" :href="archiveImportHref" target="_blank" rel="noopener noreferrer">
+            <span class="tool-menu-item__icon">
+              <el-icon><FolderOpened /></el-icon>
+            </span>
+            <span class="tool-menu-item__content">
+              <strong>压缩包导入</strong>
+              <span>管理员上传 zip、rar、7z 压缩包后解包审核并导入媒体。</span>
             </span>
             <span class="tool-menu-item__meta">
               <el-icon><TopRight /></el-icon>

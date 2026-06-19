@@ -44,6 +44,10 @@ func (r *fakeImageRepository) ReplaceImageCollectionsByIDs(context.Context, uuid
 	return nil
 }
 
+func (r *fakeImageRepository) AddImageCollectionsByIDs(context.Context, uuid.UUID, []uuid.UUID) error {
+	return nil
+}
+
 func (r *fakeImageRepository) InsertImageHash(context.Context, string, uuid.UUID, int64) error {
 	return nil
 }

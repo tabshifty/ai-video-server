@@ -302,6 +302,32 @@ func (r *VideoRepository) ReplaceImageCollectionsByIDs(ctx context.Context, imag
 	return nil
 }
 
+func (r *VideoRepository) AddImageCollectionsByIDs(ctx context.Context, imageID uuid.UUID, collectionIDs []uuid.UUID) error {
+	resolvedIDs, err := r.ResolveImageCollectionIDs(ctx, collectionIDs)
+	if err != nil {
+		return err
+	}
+	if len(resolvedIDs) == 0 {
+		return nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx add image collections: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for _, collectionID := range resolvedIDs {
+		if _, err := tx.Exec(ctx, `INSERT INTO image_collections(image_id, collection_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, imageID, collectionID); err != nil {
+			return fmt.Errorf("insert image collection: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit add image collections: %w", err)
+	}
+	return nil
+}
+
 func (r *VideoRepository) ListImageCollectionsForAdmin(ctx context.Context, imageID uuid.UUID) ([]models.AdminImageCollection, error) {
 	rows, err := r.pool.Query(ctx, `
 SELECT c.id, c.name, COALESCE(c.description,''), COALESCE(c.cover_url,''), COALESCE(c.cover_image_id::text,''), c.sort_order, c.active, c.created_at, c.updated_at

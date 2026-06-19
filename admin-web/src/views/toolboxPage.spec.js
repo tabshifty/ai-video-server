@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest'
 
 const toolbox = readFileSync(new URL('./Toolbox.vue', import.meta.url), 'utf8')
 const ed2kTool = readFileSync(new URL('./ToolboxEd2k.vue', import.meta.url), 'utf8')
+const archiveImportTool = readFileSync(new URL('./ToolboxArchiveImport.vue', import.meta.url), 'utf8')
 const imageWorkbench = readFileSync(new URL('./ToolboxImageWorkbench.vue', import.meta.url), 'utf8')
 const orphanFilesTool = readFileSync(new URL('./ToolboxOrphanFiles.vue', import.meta.url), 'utf8')
 const systemSettings = readFileSync(new URL('./SystemSettings.vue', import.meta.url), 'utf8')
 const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf8')
 const ed2kRoute = router.match(/\{ path: '\/toolbox\/ed2k'[^}]+\}/)?.[0] || ''
+const archiveImportRoute = router.match(/\{ path: '\/toolbox\/archive-import'[^}]+\}/)?.[0] || ''
 const imageWorkbenchRoute = router.match(/\{ path: '\/toolbox\/image-workbench'[^}]+\}/)?.[0] || ''
 const orphanFilesRoute = router.match(/\{ path: '\/toolbox\/orphan-files'[^}]+\}/)?.[0] || ''
 
@@ -15,11 +17,13 @@ describe('toolbox pages', () => {
   it('keeps the toolbox page as a shell menu of tool entry buttons', () => {
     expect(toolbox).toContain('工具箱')
     expect(toolbox).toContain('ED2K 链接生成器')
+    expect(toolbox).toContain('压缩包导入')
     expect(toolbox).toContain('图像生成工作台')
     expect(toolbox).toContain('孤儿文件扫描')
     expect(toolbox).toContain('target="_blank"')
     expect(toolbox).toContain('rel="noopener noreferrer"')
     expect(toolbox).toContain('/toolbox/ed2k')
+    expect(toolbox).toContain('/toolbox/archive-import')
     expect(toolbox).toContain('/toolbox/image-workbench')
     expect(toolbox).toContain('/toolbox/orphan-files')
     expect(toolbox).not.toContain('parseEd2kLinks')
@@ -51,6 +55,25 @@ describe('toolbox pages', () => {
     expect(ed2kRoute).toContain('ToolboxEd2k')
     expect(ed2kRoute).not.toContain('public: true')
     expect(ed2kRoute).not.toContain('hideShellPageHeader')
+  })
+
+  it('keeps the archive import tool page outside the admin shell while preserving upload, batch and file editing flows', () => {
+    expect(archiveImportTool).toContain('压缩包导入')
+    expect(archiveImportTool).toContain('zip、rar、7z')
+    expect(archiveImportTool).toContain('支持密码包')
+    expect(archiveImportTool).toContain('压缩包内不允许嵌套压缩包')
+    expect(archiveImportTool).toContain('上传批次')
+    expect(archiveImportTool).toContain('批次列表')
+    expect(archiveImportTool).toContain('文件详情')
+    expect(archiveImportTool).toContain('FolderOpened')
+    expect(archiveImportTool).toContain('formatFileSize(file.file_size)')
+    expect(archiveImportTool).not.toContain('file.file_size | formatFileSize')
+    expect(archiveImportTool).not.toContain('components/Layout.vue')
+    expect(archiveImportTool).not.toMatch(/<Layout[>\s]/)
+    expect(archiveImportRoute).toContain("path: '/toolbox/archive-import'")
+    expect(archiveImportRoute).toContain('ToolboxArchiveImport')
+    expect(archiveImportRoute).not.toContain('public: true')
+    expect(archiveImportRoute).not.toContain('hideShellPageHeader')
   })
 
   it('keeps the image workbench as a no-shell authenticated tool page', () => {

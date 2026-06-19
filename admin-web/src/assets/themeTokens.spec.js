@@ -6,6 +6,7 @@ const VIEW_HEX_AUDIT_TARGETS = [
   '../views/Dashboard.vue',
   '../views/SystemSettings.vue',
   '../views/Toolbox.vue',
+  '../views/ToolboxArchiveImport.vue',
   '../views/ToolboxOrphanFiles.vue',
   '../views/UserManage.vue',
   '../views/TaskMonitor.vue',

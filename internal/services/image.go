@@ -41,6 +41,7 @@ type imageRepository interface {
 	DeleteImageByIDCascade(ctx context.Context, imageID uuid.UUID) error
 	ReplaceImageActorsByInput(ctx context.Context, imageID uuid.UUID, actorIDs []uuid.UUID, actorNames []string, source string) error
 	ReplaceImageCollectionsByIDs(ctx context.Context, imageID uuid.UUID, collectionIDs []uuid.UUID) error
+	AddImageCollectionsByIDs(ctx context.Context, imageID uuid.UUID, collectionIDs []uuid.UUID) error
 	InsertImageHash(ctx context.Context, hash string, imageID uuid.UUID, fileSize int64) error
 	GetImageVariantByKey(ctx context.Context, imageID uuid.UUID, key string) (path, mime string, width, height int, exists bool, err error)
 	UpsertImageVariant(ctx context.Context, imageID uuid.UUID, key, path, mime string, width, height int) error
@@ -291,6 +292,11 @@ func (s *ImageService) saveFromLocalPath(ctx context.Context, in SaveImageInput,
 		if repository.IsUniqueViolation(err) {
 			cleanupCreated()
 			if existingID, exists, e := s.repo.FindImageByHash(ctx, hash, info.Size()); e == nil && exists {
+				if len(in.CollectionIDs) > 0 {
+					if addErr := s.repo.AddImageCollectionsByIDs(ctx, existingID, in.CollectionIDs); addErr != nil {
+						return SaveImageResult{}, addErr
+					}
+				}
 				existing, getErr := s.repo.GetImageByID(ctx, existingID)
 				if getErr != nil {
 					return SaveImageResult{}, getErr

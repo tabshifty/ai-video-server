@@ -102,6 +102,22 @@ func TestAppAPKClientTypeMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+client_type`)
 }
 
+func TestArchiveImportBatchMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0025_archive_import_batches.up.sql")
+	down := readMigrationForTest(t, "0025_archive_import_batches.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+archive_import_batches`)
+	assertSQLPattern(t, up, `(?is)archive_format\s+varchar\(10\)\s+not\s+null`)
+	assertSQLPattern(t, up, `(?is)status\s+varchar\(24\)\s+not\s+null\s+default\s+'uploaded'`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+archive_import_files`)
+	assertSQLPattern(t, up, `(?is)batch_id\s+uuid\s+not\s+null\s+references\s+archive_import_batches\(id\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, up, `(?is)unique\s*\(\s*batch_id\s*,\s*relative_path\s*\)`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+archive_import_files`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+archive_import_batches`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

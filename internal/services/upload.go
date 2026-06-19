@@ -101,6 +101,11 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		if existingVideo.Type != in.Type {
 			return UploadResult{}, ErrHashTypeConflict
 		}
+		if len(in.CollectionIDs) > 0 {
+			if err := s.repo.AddVideoCollectionsByIDsAnyType(ctx, existingID, in.CollectionIDs); err != nil {
+				return UploadResult{}, err
+			}
+		}
 		return UploadResult{
 			VideoID:       existingID,
 			Status:        existingVideo.Status,

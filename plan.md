@@ -1,3 +1,18 @@
+## 2026-06-20 00:36 +0800
+- 进度：完成压缩包导入管理端收尾。新增的无壳层工具页已可从工具箱打开，前端静态断言覆盖了新页、路由、API、命令面板和日期显示约定；`ToolboxArchiveImport.vue` 已去掉 Vue 2 filter 写法并把文件级合集输入规范化。同步在 `CONTEXT.md` 补了“压缩包去重保留现有资产”术语，避免后续误把去重理解成覆盖资产。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/views/adminDateTimeDisplay.spec.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test` 通过；`cd admin-web && npm run build` 通过（仅有 chunk size 警告）；`GOCACHE=/private/tmp/ai-video-server-gocache go test ./internal/...` 通过大部分包，但 `internal/services/tv_apk_test.go` 仍因预期版本 80 与当前 `android-tv-app/tv-app/build.gradle.kts` 的 121 / `0.1.121` 不一致而失败，属于现存偏差。
+
+## 2026-06-20 00:21 +0800
+- 进度：继续收口压缩包上传导入功能的管理端尾部工作。已修复 `ToolboxArchiveImport.vue` 的 Vue 2 过滤器写法，改为直接调用 `formatFileSize()`；同时把文件级合集输入收拢成可规范化的选择值，补了工具箱页、命令面板、路由和 API 的静态断言，并在 `CONTEXT.md` 增补“压缩包去重保留现有资产”术语，避免后续误把去重理解成覆盖资产。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/views/adminDateTimeDisplay.spec.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run build`、`cd admin-web && npm run test` 或至少相关 vitest 定向用例、`git diff --check`、乱码扫描。
+
+## 2026-06-19 21:40 +0800
+- 进度：开始落实压缩包上传导入功能。已收口需求为：仅管理员入口，支持 `zip` / `rar` / `7z`，支持密码包但不允许嵌套压缩；压缩包先形成批次与文件清单，再按文件级别走现有视频/图片去重、压缩和入库逻辑。当前正在补后端批次/文件实体迁移与管理端入口设计，并确认系统工具链可用 `bsdtar` 处理非加密 `zip/7z/rar`，加密包需要单独兜底。
+- 影响文件：`CONTEXT.md`、`plan.md`、`migrations/*`、`internal/services/*`、`internal/handlers/*`、`admin-web/src/views/*`、`admin-web/src/api/admin.js`
+- 验证：待执行迁移模式测试、后端定向单测、admin-web 构建与乱码扫描。
+
 ﻿# plan.md
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。

@@ -216,6 +216,48 @@ func (r *VideoRepository) ReplaceVideoCollectionsByIDs(ctx context.Context, vide
 	if len(collectionIDs) > 0 && normalizedType != "short" {
 		return ErrCollectionsOnlyForShort
 	}
+	return r.replaceVideoCollectionsByIDs(ctx, videoID, collectionIDs)
+}
+
+func (r *VideoRepository) ReplaceVideoCollectionsByIDsAnyType(ctx context.Context, videoID uuid.UUID, collectionIDs []uuid.UUID) error {
+	return r.replaceVideoCollectionsByIDs(ctx, videoID, collectionIDs)
+}
+
+func (r *VideoRepository) AddVideoCollectionsByIDsAnyType(ctx context.Context, videoID uuid.UUID, collectionIDs []uuid.UUID) error {
+	resolvedIDs, err := r.ResolveCollectionIDs(ctx, collectionIDs)
+	if err != nil {
+		return err
+	}
+	if len(resolvedIDs) == 0 {
+		return nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx add video collections: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for _, collectionID := range resolvedIDs {
+		if _, err := tx.Exec(ctx, `INSERT INTO video_collections(video_id, collection_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, videoID, collectionID); err != nil {
+			return fmt.Errorf("insert video collection: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit add video collections: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) AddVideoCollectionsByIDs(ctx context.Context, videoID uuid.UUID, videoType string, collectionIDs []uuid.UUID) error {
+	normalizedType := strings.ToLower(strings.TrimSpace(videoType))
+	if len(collectionIDs) > 0 && normalizedType != "short" {
+		return ErrCollectionsOnlyForShort
+	}
+	return r.AddVideoCollectionsByIDsAnyType(ctx, videoID, collectionIDs)
+}
+
+func (r *VideoRepository) replaceVideoCollectionsByIDs(ctx context.Context, videoID uuid.UUID, collectionIDs []uuid.UUID) error {
 	resolvedIDs, err := r.ResolveCollectionIDs(ctx, collectionIDs)
 	if err != nil {
 		return err
