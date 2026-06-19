@@ -67,6 +67,7 @@ internal fun TvLongFormMedia3Player(
     title: String,
     accessToken: String,
     retryKey: Int,
+    cancelPrepareRequestKey: Int = 0,
     shouldPlay: Boolean,
     initialPositionMs: Long,
     seekPositionMs: Long? = null,
@@ -77,6 +78,7 @@ internal fun TvLongFormMedia3Player(
     selectedAudioTrackId: String? = null,
     modifier: Modifier = Modifier,
     onPlayingChanged: (Boolean) -> Unit = {},
+    onRenderedFirstFrame: () -> Unit = {},
     onError: (String) -> Unit = {},
     onEnded: () -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
@@ -86,6 +88,7 @@ internal fun TvLongFormMedia3Player(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestOnPlayingChanged by rememberUpdatedState(onPlayingChanged)
+    val latestOnRenderedFirstFrame by rememberUpdatedState(onRenderedFirstFrame)
     val latestOnError by rememberUpdatedState(onError)
     val latestOnEnded by rememberUpdatedState(onEnded)
     val latestOnSnapshotChanged by rememberUpdatedState(onSnapshotChanged)
@@ -98,7 +101,7 @@ internal fun TvLongFormMedia3Player(
             }
         }
     }
-    val player = remember(accessToken, retryKey) { ExoPlayer.Builder(context).build() }
+    val player = remember(accessToken) { ExoPlayer.Builder(context).build() }
     val playerSourceKey = remember(player) { Any() }
     var preparedPlayerSourceKey by remember { mutableStateOf<Any?>(null) }
     var preparedSourceKey by remember { mutableStateOf("") }
@@ -122,6 +125,10 @@ internal fun TvLongFormMedia3Player(
                 }
             }
 
+            override fun onRenderedFirstFrame() {
+                latestOnRenderedFirstFrame()
+            }
+
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 trackSelectionRevision += 1
                 latestOnAudioTracksChanged(buildTvMedia3AudioTracks(tracks))
@@ -142,11 +149,11 @@ internal fun TvLongFormMedia3Player(
         }
     }
 
-    LaunchedEffect(player, sourceUrl, mediaId, title, dataSourceFactory, subtitleConfigurations) {
+    LaunchedEffect(player, sourceUrl, mediaId, title, dataSourceFactory, subtitleConfigurations, retryKey) {
         val subtitleKey = subtitleConfigurations.joinToString("|") {
             listOf(it.id.orEmpty(), it.uri.toString(), it.mimeType.orEmpty(), it.language.orEmpty()).joinToString(",")
         }
-        val sourceKey = "$mediaId|$sourceUrl|$subtitleKey"
+        val sourceKey = "$mediaId|$sourceUrl|$subtitleKey|retry:$retryKey"
         if (sourceUrl.isBlank() || mediaId.isBlank()) {
             player.pause()
             player.clearMediaItems()
@@ -187,6 +194,18 @@ internal fun TvLongFormMedia3Player(
             preparedSourceKey = sourceKey
             resumeAppliedSourceKey = ""
         }
+    }
+
+    LaunchedEffect(player, cancelPrepareRequestKey) {
+        if (cancelPrepareRequestKey <= 0 || preparedSourceKey.isBlank()) {
+            return@LaunchedEffect
+        }
+        latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
+        latestOnPlayingChanged(false)
+        player.pause()
+        player.stop()
+        playbackState = Player.STATE_IDLE
+        isMedia3Playing = false
     }
 
     LaunchedEffect(player, preparedSourceKey, initialPositionMs) {

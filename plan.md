@@ -2,6 +2,161 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-19 11:08 +0800
+- 进度：完成 `TV 单片长视频播放器软准备` 首轮落地。单片页已新增“首帧后中心轻态”状态机：重试时立即进入 `正在重试播放`，成功后给出 `已恢复播放`，`BACK` 可取消当前重试并显示 `已取消重试`，失败态下沉到播放器中心区并保留“重试播放 + 诊断信息”；诊断面板主动作改为 `返回`，仅回到失败轻态。Media3 单片播放器已改为复用同一 `ExoPlayer` 实例重 prepare，接入 `onRenderedFirstFrame()`，并支持通过取消 key 停掉当前 prepare 以配合 latest-wins 丢弃过期结果。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormPlayerSoftRetrySpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormPlayerSoftRetryLogicTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon -Dkotlin.compiler.execution.strategy=in-process :tv-app:compileDebugKotlin` 通过；`cd android-tv-app && ./gradlew --no-daemon -Dkotlin.compiler.execution.strategy=in-process :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvLongFormPlayerSoftRetrySpecTest --tests com.chee.videos.feature.tv.TvLongFormPlayerSoftRetryLogicTest --tests com.chee.videos.feature.tv.TvLongFormMedia3PlayerTest` 通过；`cd android-tv-app && ./gradlew --no-daemon -Dkotlin.compiler.execution.strategy=in-process :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon -Dkotlin.compiler.execution.strategy=in-process :tv-app:assembleDebug` 通过；待执行 `git diff --check` 与乱码扫描。
+
+## 2026-06-19 09:32 +0800
+- 进度：开始落实 `TV 单片长视频播放器软准备` 实现。计划先把“已出现首帧后的单片重试/取消/失败/成功/诊断”状态抽成最小 helper 和定向红灯测试，再把 Media3 单片播放器从整块 `TvErrorState` 失败流迁到播放器中心轻态，最后补 TV 端版本递增、`CONTEXT.md`/`plan.md` 完成记录与 Gradle 验证。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行单片播放器定向单测/源码断言、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-06-17 18:08 +0800
+- 进度：继续通过 `$grill-with-docs` 收口下一轮 TV 流畅性优化主线。已确认下一轮优先目标不是首页、海报墙或 IPTV，而是 `TV 单片长视频播放器软准备`：当单片播放器已经有承接画面后，重试播放源、重建播放链路或重新入播时，不再退回整页 `loading/error`，而是尽量保留当前承接画面，把 preparing/failed 降到播放器中心区表达。下一步继续细化：单片播放器进入 soft preparing 时，旧视频的承接方式是否也沿用当前播放态，还是一律人为停在当前帧等待新链路成功。
+- 影响文件：`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与 `CONTEXT.md` 长期术语沉淀。
+
+## 2026-06-17 18:12 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器承接强度。已确认 `TV 单片长视频播放器软准备` 不只是不退回整页 `loading/error`，还要求在已有承接画面后重试播放源或重建播放链路时，不为了准备过程主动清黑底或清空旧画面；只有底层播放器自己丢失 surface 时，才接受不可避免的瞬时闪断。下一步继续细化：这条是否直接沿用现有通用术语 `TV 软准备沿用当前播放态`，即“原本在播就继续播，原本暂停就停在当前帧”，还是单片场景需要更保守的一刀切暂停策略。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 00:00 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器承接播放态。已确认 `TV 单片长视频播放器软准备` 直接沿用现有通用术语 `TV 软准备沿用当前播放态`，不为单片场景额外改成统一暂停：soft preparing 期间，旧内容若原本正在播放就继续播，若原本已暂停就停在当前帧等待新链路结果。下一步继续细化：单片播放器 soft preparing 失败态可见时，`BACK` 是先关闭中心失败态留在当前视频，还是直接进入原有返回确认/退出链路。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 09:06 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器软准备失败时的返回语义。已确认单片播放器与剧集播放器保持一致：当 `TV 单片长视频播放器软准备` 的中心失败态仍在屏幕上时，第一次 `BACK` 只关闭失败态并继续留在当前旧视频承接；只有失败态关闭后再次按 `BACK`，才进入原有返回确认或退出链路。下一步继续细化：在已有 `BACK` 关闭语义的前提下，单片失败态是否还需要一个显式“继续观看/留在当前视频”动作，还是保持“重试 + 诊断信息（可选）+ BACK 关闭”即可。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 09:07 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器失败态动作最小集。已确认单片 soft preparing 失败态不额外增加“继续观看/留在当前视频”按钮，只保留“重试播放”主动作和可选“诊断信息”副动作；关闭失败态统一由 `BACK` 承担，避免中心失败态因为多一个关闭动作而变重。下一步继续细化：用户触发“重试播放”后，失败态是否应立即原地切回 preparing 轻提示，让用户立刻感知“这次重试已开始处理”。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 09:12 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器重试反馈时机。已确认单片播放器在 soft preparing 失败后，只要用户触发“重试播放”，旧失败态就应立即被当前这次重试的 preparing 轻提示顶掉，而不是拖到真正成功或再次失败时才更新。下一步继续细化：这次 preparing 轻提示是否要像剧集 soft preparing 一样带出当前重试目标的明确文案，还是保持更短的单片通用文案。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 09:22 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器 preparing 文案粒度。已确认单片播放器触发重试后的 preparing 中心轻提示保持短文案，不需要像电视剧那样带出目标编号或长解释；单片场景只需让用户明确感知“这次重试已经开始处理”。下一步继续细化：如果这次重试最终成功，中心区是否也给一条极短成功确认，还是直接无感恢复播放、不再额外提示。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 09:23 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器重试成功反馈。已确认单片播放器重试成功后，中心区同样只给一条极短确认，不展开成解释文案；它只负责告诉用户“这次重试已经生效”，不额外解释播放源、链路或容器细节。下一步继续细化：这条极短成功确认是否也保持无编号短语义，还是单片需要再明确写出“已恢复播放”之类的提示。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 09:36 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器成功确认文案。已确认单片播放器重试成功后的确认保持无编号、无目标说明的短反馈，例如“已恢复播放”这一类，不像电视剧那样带分集号；单片场景只需说明重试已生效。下一步继续细化：单片播放器 soft preparing 的“首屏例外”边界是否与剧集保持一致，即只有首次进入且当前没有任何可承接画面时，才允许继续使用整页 loading/error。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 09:38 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器首屏例外边界。已确认单片播放器与剧集保持一致：只有首次进入且当前没有任何可承接画面时，才允许继续使用整页 `loading/error`；一旦已有承接画面，后续准备失败、重试与成功确认都应下沉到播放器内部轻量状态，不再把整页状态重新抬起。下一步继续细化：在“已有承接画面”的前提下，单片播放器的失败态是否统一挂到播放器中心区，而不是沿用当前外层 `TvErrorState` 大面板。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 10:25 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器失败态挂载点。已确认在“已有承接画面”的前提下，单片播放器的 preparing/failed 反馈也统一挂到播放器中心区，而不是沿用外层 `TvErrorState` 大面板；这一步直接复用现有通用术语 `TV 长视频播放器软准备中心挂载点`，不再额外发明单片专用挂载点名词。下一步继续细化：单片播放器 soft preparing 期间如果用户按 `BACK`，是否也应先取消这次正在进行的重试，再由下一次 `BACK` 进入原有返回确认/退出链路。
+- 影响文件：`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 10:30 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器 preparing 期间的返回语义。已确认单片播放器与剧集保持同一交互方向：soft preparing 期间第一次 `BACK` 先取消当前重试并继续留在旧视频承接，只有重试已取消或已结束后再次按 `BACK`，才进入原有返回确认/退出链路。下一步继续细化：取消这次重试后，单片播放器是否也给一条比成功提示更轻、更短的中心反馈，例如“已取消重试”。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 10:39 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器取消重试反馈。已确认单片播放器在 preparing 期间被 `BACK` 取消当前重试后，也给一条比成功提示更轻、更短的中心反馈，例如“已取消重试”；该提示只在确实存在待取消重试时显示，不抢焦点、不阻断播放、停留时间短。下一步继续细化：显式打开“诊断信息”时，单片播放器是否仍允许沿用当前较重的独立诊断面板，而不强行塞进中心轻提示。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 10:44 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器诊断视图边界。已确认“诊断信息”属于用户显式打开的调试视图，不并入 soft preparing 的中心轻提示；即使单片播放器日常的 preparing/failed/success/cancel 都下沉到播放器中心区，诊断信息仍允许沿用较重的独立面板，以保证排障信息可读。下一步继续细化：如果单片播放器连续重试、连续失败，中心失败态是否也像剧集一样原地更新内容，避免重复闪烁或退场重进。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 10:56 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器连续失败反馈。已确认如果单片播放器连续触发重试且连续失败，中心失败态继续复用同一块区域原地更新，不做闪烁、退场重进或额外过渡。下一步继续细化：单片播放器里“已有承接画面”的判定口径是什么，是只要播放器曾进入过可视承接态即可，还是必须等到底层真正出现首帧/进入 ready 后才算。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 11:04 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器“已有承接画面”的判定口径。已确认这里应按保守口径处理：不能因为用户已经进入播放器页面就算“已有承接画面”，而要等到底层真正进入过一次真实可承接的视频状态后，后续失败/重试才转入 soft preparing。代码侧现状也支持继续细化这个问题：TV 单片 ExoPlayer 路径目前只有 `STATE_READY` / `isPlaying` / `snapshot`，还没有显式接入 `onRenderedFirstFrame()`，但仓库其他 ExoPlayer 页面已经在使用该信号。下一步继续细化：单片播放器是否应明确以“至少出现过一次首帧”作为软准备的进入门槛，而不是把 `STATE_READY` 单独当作已有承接画面。
+- 影响文件：`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 15:21 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器“已有承接画面”的代码信号。已确认 TV 单片 ExoPlayer 路径应明确以“至少出现过一次首帧”作为 soft preparing 的进入门槛，而不是把 `STATE_READY` 单独当作已有承接画面；仓库里其它 ExoPlayer 页面也已在用 `onRenderedFirstFrame()` 作为用户真正看到过画面的信号。下一步继续细化：如果用户已经看到过首帧、随后暂停在某一帧上，这种暂停帧是否同样视为可承接画面，允许后续失败/重试继续走 soft preparing。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 15:23 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器暂停帧承接语义。已确认只要单片播放器此前已经真正出现过首帧，随后停在暂停帧上的画面同样视为可承接画面；后续失败/重试继续走 soft preparing，不因为当前是暂停态就退回首屏整页状态。下一步继续细化：单片播放器这类“重试当前视频链路”的成功结果，是统一直接恢复播放，还是需要继承重试前的暂停态。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 15:26 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器重试成功后的播放态。已确认单片播放器的“重试播放”属于对当前视频恢复播放链路的明确继续播放意图，因此一旦这次重试真正成功，播放器统一直接恢复播放，不继承重试前的暂停态；当前单片代码里的重试动作也已经按这个方向写成 `hasStartedPlayback=true` 且 `isPausedByUser=false`。下一步继续细化：既然成功后会直接恢复播放，中心区那条极短成功确认是否仍然保留，还是只靠视频动起来本身表达“重试已生效”。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 15:27 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器重试成功后的确认方式。已确认即使单片播放器的重试成功后会直接恢复播放，中心区那条极短成功确认仍然保留；视频重新动起来能表达很多，但在刚经历过失败后，一条短促的“已恢复播放”能更明确地确认这次重试已经生效。下一步继续细化：用户显式打开“诊断信息”后再关闭它时，是否应回到原先那层失败轻态，而不是顺手自动触发一次新的重试。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-18 15:30 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器诊断面板关闭后的去向。已确认“诊断信息”只是查看当前失败排障信息的独立面板，不承担“确认重试”的语义；用户关闭它后应回到原先那层失败轻态，由用户再明确决定是否重试，关闭诊断面板本身不自动触发新的重试。下一步继续细化：既然诊断面板主动作不该顺手重试，它在单片场景里是否应改成单纯“返回”/“关闭”，而把真正的“重试播放”留在失败轻态里。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 08:54 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器诊断面板主动作。已确认诊断面板主动作应改成单纯“返回”/“关闭”，只负责退出诊断面板并回到原失败轻态，不顺手清空失败态，也不顺手触发新的重试；真正的“重试播放”动作只保留在失败轻态里。当前单片代码在 `showDolbyVisionDiagnostics` 分支的 `onAction` 仍然会清错并直接 `routeRetryNonce += 1`，后续实现需按新语义改掉。下一步继续细化：从诊断面板返回到失败轻态后，焦点应默认回到“重试播放”主动作，还是回到上一次在失败轻态里停留的动作。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 08:57 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器诊断面板返回后的焦点语义。已确认从诊断面板返回到失败轻态后，默认焦点应落回失败轻态的主动作“重试播放”，而不是停在上一次的副动作或依赖 Compose 默认焦点漂移。代码侧也暴露了这个风险：`TvErrorState` 目前只是按按钮顺序渲染，并没有显式的“返回后焦点回主动作”保障。下一步继续细化：当失败轻态本身再次被新的 preparing 顶掉、随后又失败回到失败轻态时，默认焦点是否也继续落回“重试播放”主动作。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 09:02 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器连续失败后的焦点落点。已确认当失败轻态已被新的 preparing 顶掉、随后这次重试又再次失败时，回到失败轻态后的默认焦点仍继续落回“重试播放”主动作。这样无论是首次失败、从诊断返回，还是连续重试再次失败，用户的下一步恢复入口都保持稳定一致。下一步继续细化：如果旧失败态已被新的 preparing 顶掉，用户又在 preparing 期间按 `BACK` 取消这次重试，是回到“已取消重试”轻提示即可，还是要把刚才那层旧失败态重新抬回来。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 09:06 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器取消当前重试后的回退语义。已确认如果旧失败态已经被新的 preparing 顶掉，用户又在 preparing 期间按 `BACK` 取消这次重试，界面只保留“已取消重试”的轻提示即可，不再把旧失败态重新抬回来；旧失败一旦被新重试覆盖，就应视为过期状态。下一步继续细化：单片播放器是否也需要像剧集 `latest-wins` 一样，为连续重试建立“最后一次重试生效、旧结果晚到不得回写”的明确语义。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 09:11 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器连续重试的并发语义。已确认单片播放器也需要和剧集播放器一样建立 `latest-wins`：当用户连续触发新的“重试播放”时，系统只以最后一次重试为准，旧重试对应的 preparing / failed / success 结果一旦晚到，必须失效，不得把当前状态回滚到用户已经放弃的旧重试上。下一步继续细化：这些过期的旧重试结果是否应完全静默丢弃，连“旧重试失败/成功”的过期提示都不再弹。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 09:16 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器过期重试结果的处理方式。已确认凡是已经被新的重试覆盖、或已经被用户放弃的旧重试结果，一旦晚到，必须完全静默丢弃；它们既不能回写当前状态，也不能额外弹出“旧重试成功/失败”的过期提示。下一步继续细化：用户已经按 `BACK` 取消当前重试后，如果这次已取消的重试结果随后晚到，是否也按同样规则完全静默丢弃。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 09:24 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器已取消重试的晚到结果。已确认用户一旦通过 `BACK` 明确取消当前重试，这次重试在语义上就已经结束；它后续即使晚到成功或失败结果，也必须和其它过期重试结果一样完全静默丢弃，不再对界面发声。下一步继续细化：失败轻态里的“诊断信息”副动作是否也需要像主动作“重试播放”一样，在重新打开失败轻态时始终稳定出现在同一位置，而不是因是否可诊断而让按钮布局频繁抖动。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
+## 2026-06-19 09:28 +0800
+- 进度：继续通过 `$grill-with-docs` 收口单片播放器失败轻态的动作布局稳定性。已确认只要当前设备/路由支持“诊断信息”，这个副动作就在失败轻态里稳定待在次动作位，不因失败轻态反复出现而左右跳动；这样主动作“重试播放”和副动作“诊断信息”的空间关系保持稳定，减少视觉和焦点抖动。下一步继续细化：当诊断信息本身不可用时，是否直接收成单主动作布局，而不是为了布局稳定性保留一个不可点的空占位。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行 Android 构建；待进入实现后补单片播放器定向测试、TV 全量验证、版本递增与相关长期术语沉淀。
+
 ## 2026-06-17 17:53 +0800
 - 进度：完成本轮 TV 剧集播放器软准备收尾验证。TV 全量单测、`assembleDebug`、`git diff --check` 与乱码扫描均通过；当前提交面只包含本轮软准备状态机/中心反馈/测试支撑/版本递增以及 `CONTEXT.md`、`plan.md` 的长期沉淀，不包含无关模块改动。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlay.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvResumePrompt.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvSeriesPlayerViewModelTest.kt`、`TvSeriesPlayerPreparingStateSpecTest.kt`、`TvSeriesEpisodeRailSpecTest.kt`、`TvSeriesMixedPlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/core/ui/TvSeriesCorePlaybackOverlaySpecTest.kt`、`TvLongFormTitleOverlaySpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
