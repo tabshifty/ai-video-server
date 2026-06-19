@@ -2,6 +2,16 @@
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
 
+## 2026-06-19 19:45 +0800
+- 进度：继续收尾 TV 单片长视频软重试，修正取消重试后的实际播放器副作用，从“停止当前播放器”收窄为“仅回写快照、不主动 pause/stop”，与现有取消不回退会话语义对齐；同步补强 spec 断言，防止回归到停播实现。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormPlayerSoftRetrySpecTest.kt`、`plan.md`
+- 验证：待执行 TV 定向单测和 `compileDebugKotlin`；当前离线 Gradle 已能启动，但 Android Gradle Plugin 未缓存，完整验证仍受环境限制。
+
+## 2026-06-19 19:36 +0800
+- 进度：继续推进 TV 单片长视频软重试收尾，修正诊断面板相关 spec 断言，避免把当前 `closeDiagnosticsPanel()` 返回失败态的实现误判成“仍然触发 retry”。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvLongFormPlayerSoftRetrySpecTest.kt`、`plan.md`
+- 验证：待执行 TV 定向单测和 `compileDebugKotlin`；当前受限于 Gradle wrapper 需联网下载分发包，先用工作区内 wrapper/cache 继续排障。
+
 ## 2026-06-19 19:29 +0800
 - 进度：按用户取消要求，收口并删除 `CONTEXT.md` 中所有压缩包上传/导入沉淀，停止继续推进该方向的设计。
 - 影响文件：`CONTEXT.md`、`plan.md`

@@ -261,8 +261,6 @@ fun TvLongFormPlayerScreen(
         cancelPrepareRequestKey += 1
         playerErrorMessage = null
         softRetryUiState = TvLongFormSoftRetryUiState.Canceled(preparingState.retryKey, "已取消重试")
-        hasStartedPlayback = false
-        isPausedByUser = playbackSession.isPausedByUser
     }
 
     fun dismissSoftRetryFailure() {
@@ -576,32 +574,30 @@ fun TvLongFormPlayerScreen(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
-            if (!playerErrorMessage.isNullOrBlank() && !hasRenderedFirstFrame) {
-                if (showDolbyVisionDiagnostics) {
-                    TvErrorState(
-                        title = "诊断信息",
-                        message = playbackDiagnosticMessage,
-                        onAction = {
-                            closeDiagnosticsPanel()
-                        },
-                        actionLabel = "返回",
-                    )
-                } else {
-                    TvErrorState(
-                        title = "暂不能播放",
-                        message = playerErrorMessage.orEmpty(),
-                        actionLabel = "重试播放",
-                        onAction = ::requestPlaybackRetry,
-                        secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
-                        onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
-                            {
-                                showDolbyVisionDiagnostics = true
-                            }
-                        } else {
-                            null
-                        },
-                    )
-                }
+            if (showDolbyVisionDiagnostics && !playerErrorMessage.isNullOrBlank()) {
+                TvErrorState(
+                    title = "诊断信息",
+                    message = playbackDiagnosticMessage,
+                    onAction = {
+                        closeDiagnosticsPanel()
+                    },
+                    actionLabel = "返回",
+                )
+            } else if (!playerErrorMessage.isNullOrBlank() && !hasRenderedFirstFrame) {
+                TvErrorState(
+                    title = "暂不能播放",
+                    message = playerErrorMessage.orEmpty(),
+                    actionLabel = "重试播放",
+                    onAction = ::requestPlaybackRetry,
+                    secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                    onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
+                        {
+                            showDolbyVisionDiagnostics = true
+                        }
+                    } else {
+                        null
+                    },
+                )
             }
             if (showBackConfirmPrompt) {
                 TvPlayerBackConfirmPrompt(

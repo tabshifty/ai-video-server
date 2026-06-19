@@ -201,11 +201,6 @@ internal fun TvLongFormMedia3Player(
             return@LaunchedEffect
         }
         latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
-        latestOnPlayingChanged(false)
-        player.pause()
-        player.stop()
-        playbackState = Player.STATE_IDLE
-        isMedia3Playing = false
     }
 
     LaunchedEffect(player, preparedSourceKey, initialPositionMs) {
