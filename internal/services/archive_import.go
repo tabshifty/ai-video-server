@@ -502,6 +502,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 
 	workPath, err := s.copyArchiveWorkFile(ctx, file)
 	if err != nil {
+		_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 		return models.ArchiveImportFileListItem{}, err
 	}
 	defer func() { _ = os.Remove(workPath) }()
@@ -529,6 +530,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 		}
 		hash, err := hashutil.SHA256(workPath)
 		if err != nil {
+			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 			return models.ArchiveImportFileListItem{}, fmt.Errorf("hash archive video work file: %w", err)
 		}
 		userID := uuid.Nil
@@ -625,7 +627,7 @@ func (s *ArchiveImportService) ProcessAllFiles(ctx context.Context, batchID uuid
 	}
 	var firstErr error
 	for _, item := range files {
-		if item.Status == "pending" {
+		if shouldProcessArchiveFileInBatch(item) {
 			if _, err := s.ProcessFile(ctx, item.ID); err != nil {
 				if firstErr == nil {
 					firstErr = err
@@ -641,6 +643,21 @@ func (s *ArchiveImportService) ProcessAllFiles(ctx context.Context, batchID uuid
 		s.logger.Warn("archive batch partial processing completed", "batch_id", batchID.String(), "error", firstErr)
 	}
 	return updated, nil
+}
+
+func shouldProcessArchiveFileInBatch(item models.ArchiveImportFileListItem) bool {
+	if item.EntryType != "file" {
+		return false
+	}
+	if item.MediaKind != "video" && item.MediaKind != "image" {
+		return false
+	}
+	switch item.Status {
+	case "pending", "failed", "processing":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UUID, password string) (models.ArchiveImportBatch, error) {

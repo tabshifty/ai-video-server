@@ -1,3 +1,13 @@
+## 2026-06-20 22:45 +0800
+- 进度：修复压缩包导入批量处理候选范围。`ProcessAllFiles` 不再只处理字面 `pending`，而是覆盖可入库视频/图片中仍未成功入库的 `pending`、`failed`、`processing` 项；复制工作文件、视频 hash 等早期失败也会回写为 `failed`，避免文件卡在 `processing` 后无法被批量重试。同步补充服务层候选规则测试和 `CONTEXT.md` 语义沉淀。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -run TestArchiveImportShouldProcessInBatch` 通过；`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`go test ./internal/services` 仍因既有 `tv_apk_test.go` 期望版本 80、当前 APK 元数据 121 不一致失败。
+
+## 2026-06-20 22:41 +0800
+- 进度：开始排查压缩包导入“待处理文件依旧不能批量处理”。初步定位后端批量处理只扫描 `pending`，而单文件处理失败后可能处于 `failed`，早期复制/hash 失败还可能卡在 `processing`，导致后续批量处理跳过这些仍未入库的可处理文件。计划补服务层定向测试锁定批量候选范围，再修 `ProcessAllFiles` 与早期失败状态回写。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`plan.md`
+- 验证：待执行 `go test ./internal/services -run 'TestArchiveImport'`、必要的 admin-web 定向验证、`git diff --check`、乱码扫描。
+
 ## 2026-06-20 22:32 +0800
 - 进度：完成压缩包导入交互语义落地。压缩包导入页已支持在默认视频合集、默认图片合集、视频文件合集、图片文件合集四个位置原地新建合集并自动选中；文件清单和详情改为显示中文媒体类型加格式/MIME，并展示跳过原因；批量处理逻辑未改，仍只处理视频/图片待处理项。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`
