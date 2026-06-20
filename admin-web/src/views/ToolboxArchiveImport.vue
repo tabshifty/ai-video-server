@@ -10,12 +10,17 @@ import {
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
+  getAdminCollections,
+  getAdminImageCollections,
+  getAdminPopularVideoTags,
+  getAdminVideoTags,
   processAdminArchiveImportBatch,
   processAdminArchiveImportFile,
   retryAdminArchiveImportExtract,
   updateAdminArchiveImportFile,
   uploadAdminArchiveImport
 } from '../api/admin'
+import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
 
 const router = useRouter()
 const loading = ref(false)
@@ -29,6 +34,12 @@ const selectedFile = ref(null)
 const fileDetailLoading = ref(false)
 const fileSaving = ref(false)
 const uploadRef = ref(null)
+const tagOptions = ref([])
+const loadingTags = ref(false)
+const collectionOptions = ref([])
+const loadingCollections = ref(false)
+const imageCollectionOptions = ref([])
+const loadingImageCollections = ref(false)
 
 const query = reactive({
   page: 1,
@@ -38,9 +49,9 @@ const query = reactive({
 const uploadForm = reactive({
   title: '',
   default_description: '',
-  default_tags: '',
-  default_video_collection_ids: '',
-  default_image_collection_ids: '',
+  default_tags: [],
+  default_video_collection_ids: [],
+  default_image_collection_ids: [],
   has_password: false,
   password: ''
 })
@@ -78,6 +89,29 @@ function normalizeUUIDSelection(values) {
   return normalizeSelectionValues(values).filter((value) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
   )
+}
+
+function normalizeTagSelection(values) {
+  const out = []
+  const seen = new Set()
+  for (const item of normalizeSelectionValues(values)) {
+    const value = String(item || '').trim().replace(/\s+/g, ' ').toLowerCase()
+    if (!value) continue
+    if (seen.has(value)) continue
+    seen.add(value)
+    out.push(value)
+  }
+  return out
+}
+
+function normalizeArchiveFileState(data) {
+  if (!data || typeof data !== 'object') return data
+  return {
+    ...data,
+    tags: normalizeTagSelection(data.tags),
+    video_collection_ids: normalizeUUIDSelection(data.video_collection_ids),
+    image_collection_ids: normalizeUUIDSelection(data.image_collection_ids)
+  }
 }
 
 function batchStatusLabel(status) {
@@ -148,7 +182,7 @@ async function loadBatchDetail(batchID) {
   try {
     const data = await getAdminArchiveImportBatchDetail(batchID)
     selectedBatch.value = data
-    selectedBatchFiles.value = data.files || []
+    selectedBatchFiles.value = (data.files || []).map((item) => normalizeArchiveFileState(item))
     selectedFile.value = null
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '加载批次详情失败'))
@@ -172,12 +206,17 @@ async function uploadArchive() {
   formData.append('file', input)
   if (uploadForm.title.trim()) formData.append('title', uploadForm.title.trim())
   if (uploadForm.default_description.trim()) formData.append('default_description', uploadForm.default_description.trim())
-  if (uploadForm.default_tags.trim()) formData.append('default_tags', uploadForm.default_tags.trim())
-  if (uploadForm.default_video_collection_ids.trim()) {
-    formData.append('default_video_collection_ids', uploadForm.default_video_collection_ids.trim())
+  const defaultTags = normalizeTagSelection(uploadForm.default_tags)
+  if (defaultTags.length > 0) {
+    formData.append('default_tags', JSON.stringify(defaultTags))
   }
-  if (uploadForm.default_image_collection_ids.trim()) {
-    formData.append('default_image_collection_ids', uploadForm.default_image_collection_ids.trim())
+  const defaultVideoCollectionIDs = normalizeUUIDSelection(uploadForm.default_video_collection_ids)
+  if (defaultVideoCollectionIDs.length > 0) {
+    formData.append('default_video_collection_ids', JSON.stringify(defaultVideoCollectionIDs))
+  }
+  const defaultImageCollectionIDs = normalizeUUIDSelection(uploadForm.default_image_collection_ids)
+  if (defaultImageCollectionIDs.length > 0) {
+    formData.append('default_image_collection_ids', JSON.stringify(defaultImageCollectionIDs))
   }
   formData.append('has_password', uploadForm.has_password ? '1' : '0')
   if (uploadForm.has_password && uploadForm.password.trim()) {
@@ -207,7 +246,7 @@ async function runBatchProcess() {
   processingBatch.value = true
   try {
     const data = await processAdminArchiveImportBatch(selectedBatch.value.id)
-    selectedBatchFiles.value = data.items || []
+    selectedBatchFiles.value = (data.items || []).map((item) => normalizeArchiveFileState(item))
     await refreshBatchDetail()
     ElMessage.success('已处理当前批次的待处理文件')
   } catch (error) {
@@ -242,7 +281,7 @@ async function selectFile(row) {
   processingFileID.value = row.id
   try {
     const data = await getAdminArchiveImportFileDetail(row.id)
-    selectedFile.value = data
+    selectedFile.value = normalizeArchiveFileState(data)
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '加载文件详情失败'))
   } finally {
@@ -258,13 +297,13 @@ async function saveSelectedFile() {
     const payload = {
       title: selectedFile.value.title || '',
       description: selectedFile.value.description || '',
-      tags: normalizeSelectionValues(selectedFile.value.tags),
+      tags: normalizeTagSelection(selectedFile.value.tags),
       video_type: selectedFile.value.video_type || 'short',
       video_collection_ids: normalizeUUIDSelection(selectedFile.value.video_collection_ids),
       image_collection_ids: normalizeUUIDSelection(selectedFile.value.image_collection_ids)
     }
     const data = await updateAdminArchiveImportFile(selectedFile.value.id, payload)
-    selectedFile.value = data
+    selectedFile.value = normalizeArchiveFileState(data)
     await refreshBatchDetail()
     ElMessage.success('已保存文件信息')
   } catch (error) {
@@ -279,7 +318,7 @@ async function processSelectedFile() {
   processingFileID.value = selectedFile.value.id
   try {
     const data = await processAdminArchiveImportFile(selectedFile.value.id)
-    selectedFile.value = data
+    selectedFile.value = normalizeArchiveFileState(data)
     await refreshBatchDetail()
     ElMessage.success('已处理文件')
   } catch (error) {
@@ -292,13 +331,90 @@ async function processSelectedFile() {
 function clearUploadForm() {
   uploadForm.title = ''
   uploadForm.default_description = ''
-  uploadForm.default_tags = ''
-  uploadForm.default_video_collection_ids = ''
-  uploadForm.default_image_collection_ids = ''
+  uploadForm.default_tags = []
+  uploadForm.default_video_collection_ids = []
+  uploadForm.default_image_collection_ids = []
   uploadForm.has_password = false
   uploadForm.password = ''
   uploadRef.value?.clearFiles?.()
 }
+
+async function searchTags(keyword = '') {
+  if (!keyword) {
+    const data = await getAdminPopularVideoTags({ limit: 5 })
+    const items = data.items || []
+    return items
+      .map((item) => String(item.tag || '').trim().toLowerCase())
+      .filter((tag) => tag !== '')
+  }
+
+  const data = await getAdminVideoTags({ q: keyword, limit: 12 })
+  return (data.items || [])
+    .map((item) => String(item.tag || '').trim().toLowerCase())
+    .filter((tag) => tag !== '')
+}
+
+async function searchCollections(keyword = '') {
+  const data = await getAdminCollections({
+    q: keyword,
+    active: 1,
+    page: 1,
+    page_size: 20
+  })
+  return (data.items || []).map((item) => ({
+    value: item.id,
+    label: item.name
+  }))
+}
+
+async function searchImageCollections(keyword = '') {
+  const data = await getAdminImageCollections({
+    q: keyword,
+    active: 1,
+    page: 1,
+    page_size: 20
+  })
+  return (data.items || []).map((item) => ({
+    value: item.id,
+    label: item.name
+  }))
+}
+
+const loadTagSuggestions = createRemoteSuggestionLoader({
+  fetcher: searchTags,
+  getOptions: () => tagOptions.value,
+  setOptions: (next) => {
+    tagOptions.value = next
+  },
+  setLoading: (next) => {
+    loadingTags.value = next
+  },
+  mergeOptions: mergeRemoteStringOptions
+})
+
+const loadCollectionSuggestions = createRemoteSuggestionLoader({
+  fetcher: searchCollections,
+  getOptions: () => collectionOptions.value,
+  setOptions: (next) => {
+    collectionOptions.value = next
+  },
+  setLoading: (next) => {
+    loadingCollections.value = next
+  },
+  mergeOptions: mergeRemoteValueOptions
+})
+
+const loadImageCollectionSuggestions = createRemoteSuggestionLoader({
+  fetcher: searchImageCollections,
+  getOptions: () => imageCollectionOptions.value,
+  setOptions: (next) => {
+    imageCollectionOptions.value = next
+  },
+  setLoading: (next) => {
+    loadingImageCollections.value = next
+  },
+  mergeOptions: mergeRemoteValueOptions
+})
 
 function returnToToolbox() {
   router.push('/toolbox')
@@ -306,6 +422,9 @@ function returnToToolbox() {
 
 onMounted(async () => {
   await loadBatches()
+  loadTagSuggestions('')
+  loadCollectionSuggestions('')
+  loadImageCollectionSuggestions('')
 })
 </script>
 
@@ -347,9 +466,72 @@ onMounted(async () => {
               <el-form label-width="120px" class="archive-upload-form">
                 <el-form-item label="批次标题"><el-input v-model="uploadForm.title" placeholder="可不填，默认取文件名" /></el-form-item>
                 <el-form-item label="默认说明"><el-input v-model="uploadForm.default_description" type="textarea" :rows="2" /></el-form-item>
-                <el-form-item label="默认标签"><el-input v-model="uploadForm.default_tags" placeholder="JSON 数组或逗号分隔" /></el-form-item>
-                <el-form-item label="默认视频合集"><el-input v-model="uploadForm.default_video_collection_ids" placeholder="合集 ID JSON 数组或逗号分隔" /></el-form-item>
-                <el-form-item label="默认图片合集"><el-input v-model="uploadForm.default_image_collection_ids" placeholder="合集 ID JSON 数组或逗号分隔" /></el-form-item>
+                <el-form-item label="默认标签">
+                  <el-select
+                    v-model="uploadForm.default_tags"
+                    multiple
+                    filterable
+                    remote
+                    reserve-keyword
+                    allow-create
+                    default-first-option
+                    clearable
+                    :remote-method="loadTagSuggestions"
+                    :loading="loadingTags"
+                    placeholder="可选择或输入标签"
+                    style="width: 100%"
+                  >
+                    <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="默认视频合集">
+                  <el-select
+                    v-model="uploadForm.default_video_collection_ids"
+                    multiple
+                    filterable
+                    remote
+                    reserve-keyword
+                    clearable
+                    default-first-option
+                    collapse-tags
+                    collapse-tags-tooltip
+                    :remote-method="loadCollectionSuggestions"
+                    :loading="loadingCollections"
+                    placeholder="可选，可多选"
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="collection in collectionOptions"
+                      :key="collection.value"
+                      :label="collection.label"
+                      :value="collection.value"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="默认图片合集">
+                  <el-select
+                    v-model="uploadForm.default_image_collection_ids"
+                    multiple
+                    filterable
+                    remote
+                    reserve-keyword
+                    clearable
+                    default-first-option
+                    collapse-tags
+                    collapse-tags-tooltip
+                    :remote-method="loadImageCollectionSuggestions"
+                    :loading="loadingImageCollections"
+                    placeholder="可选，可多选"
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="collection in imageCollectionOptions"
+                      :key="collection.value"
+                      :label="collection.label"
+                      :value="collection.value"
+                    />
+                  </el-select>
+                </el-form-item>
                 <el-form-item label="有密码">
                   <el-switch v-model="uploadForm.has_password" />
                 </el-form-item>
@@ -479,29 +661,70 @@ onMounted(async () => {
                     <el-form-item label="标题"><el-input v-model="selectedFile.title" /></el-form-item>
                     <el-form-item label="说明"><el-input v-model="selectedFile.description" type="textarea" :rows="3" /></el-form-item>
                     <el-form-item label="标签" v-if="selectedFile.media_kind === 'video'">
-                      <el-select v-model="selectedFile.tags" multiple filterable allow-create default-first-option style="width: 100%" />
+                      <el-select
+                        v-model="selectedFile.tags"
+                        multiple
+                        filterable
+                        remote
+                        reserve-keyword
+                        allow-create
+                        default-first-option
+                        clearable
+                        :remote-method="loadTagSuggestions"
+                        :loading="loadingTags"
+                        placeholder="可选择或输入标签"
+                        style="width: 100%"
+                      >
+                        <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+                      </el-select>
                     </el-form-item>
                     <el-form-item label="视频合集" v-if="selectedFile.media_kind === 'video'">
                       <el-select
                         v-model="selectedFile.video_collection_ids"
                         multiple
                         filterable
-                        allow-create
+                        remote
+                        reserve-keyword
                         default-first-option
+                        clearable
+                        collapse-tags
+                        collapse-tags-tooltip
                         style="width: 100%"
-                        placeholder="合集 ID，支持输入或粘贴"
-                      />
+                        placeholder="可选，可多选"
+                        :remote-method="loadCollectionSuggestions"
+                        :loading="loadingCollections"
+                      >
+                        <el-option
+                          v-for="collection in collectionOptions"
+                          :key="collection.value"
+                          :label="collection.label"
+                          :value="collection.value"
+                        />
+                      </el-select>
                     </el-form-item>
                     <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'image'">
                       <el-select
                         v-model="selectedFile.image_collection_ids"
                         multiple
                         filterable
-                        allow-create
+                        remote
+                        reserve-keyword
                         default-first-option
+                        clearable
+                        collapse-tags
+                        collapse-tags-tooltip
                         style="width: 100%"
-                        placeholder="合集 ID，支持输入或粘贴"
-                      />
+                        placeholder="可选，可多选"
+                        :remote-method="loadImageCollectionSuggestions"
+                        :loading="loadingImageCollections"
+                      >
+                        <el-option
+                          v-for="collection in imageCollectionOptions"
+                          :key="collection.value"
+                          :label="collection.label"
+                          :value="collection.value"
+                        />
+                      </el-select>
                     </el-form-item>
                     <el-form-item>
                       <div class="archive-actions">

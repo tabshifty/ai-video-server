@@ -1,3 +1,13 @@
+## 2026-06-20 15:08 +0800
+- 进度：完成压缩包导入页的字段收口。默认标签、文件级标签改成与上传中心一致的可选可输多选；默认视频/图片合集和文件级合集改成按名称选择的远程选择器，不再向管理员暴露 JSON 数组或合集 UUID；文件详情回显与批次处理后状态都做了数组规范化。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run build` 通过；`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js` 通过；待执行 `git diff --check`、乱码扫描和提交。
+
+## 2026-06-20 14:05 +0800
+- 进度：开始落实压缩包导入页的“合集/标签不再暴露 UUID/JSON”收口。已确认压缩包导入里的默认标签也应对齐管理端现有标签选择器语义，改成可选择、可输入的标签多选，而不是继续让管理员填 JSON 数组；默认合集仍沿用“选择已有合集，缺失则先新建再回填”的语义。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/videoUpload.remote.js`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/api/admin.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run build`，以及必要的定向检查/乱码扫描。
+
 ## 2026-06-20 13:40 +0800
 - 进度：修复压缩包导入页的壳层留白和自适应断点。已恢复工具页标准 `tool-workspace__inner` 宽度与 padding，桌面端双栏在 `80rem` 以下提前收成单列，移动端继续使用更紧凑的间距；页面结构与功能逻辑未变。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`
