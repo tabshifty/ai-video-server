@@ -45,6 +45,12 @@ const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
 const quickCollectionDialogVisible = ref(false)
 const quickCollectionSaving = ref(false)
+const fileSortMode = ref('original')
+
+const fileSortOptions = [
+  { label: '按原始顺序', value: 'original' },
+  { label: '按类型排序', value: 'type' }
+]
 
 const query = reactive({
   page: 1,
@@ -70,6 +76,7 @@ const quickCollectionForm = reactive({
 
 const batches = computed(() => batchList.value || [])
 const quickCollectionDialogTitle = computed(() => (quickCollectionForm.kind === 'image' ? '新建图片合集' : '新建视频合集'))
+const displayedBatchFiles = computed(() => sortArchiveFiles(selectedBatchFiles.value))
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
@@ -303,6 +310,31 @@ function fileStatusType(status) {
   if (status === 'processing') return 'warning'
   if (status === 'skipped') return 'info'
   return 'primary'
+}
+
+function sortArchiveFiles(files) {
+  const list = Array.isArray(files) ? files.map((file, index) => ({ file, index })) : []
+  if (fileSortMode.value !== 'type') {
+    return list.map((item) => item.file)
+  }
+
+  const kindOrder = {
+    video: 0,
+    image: 1,
+    archive: 2,
+    directory: 3,
+    other: 4
+  }
+
+  return list
+    .sort((left, right) => {
+      const leftKind = String(left.file?.media_kind || 'other')
+      const rightKind = String(right.file?.media_kind || 'other')
+      const kindDiff = (kindOrder[leftKind] ?? kindOrder.other) - (kindOrder[rightKind] ?? kindOrder.other)
+      if (kindDiff !== 0) return kindDiff
+      return left.index - right.index
+    })
+    .map((item) => item.file)
 }
 
 async function loadBatches() {
@@ -759,6 +791,7 @@ onMounted(async () => {
             <template #title>批次详情</template>
             <template #description>查看当前批次文件清单，逐条修正标题、标签、合集和视频类型后再处理。</template>
             <template #actions>
+              <el-segmented v-model="fileSortMode" class="archive-file-sort" :options="fileSortOptions" />
               <el-button :loading="processingBatch" @click="refreshBatchDetail">刷新详情</el-button>
               <el-button type="primary" :loading="processingBatch" @click="runBatchProcess">处理待处理文件</el-button>
               <el-button v-if="selectedBatch.status === 'needs_password'" :loading="processingBatch" @click="runRetryExtract">重试解包</el-button>
@@ -779,7 +812,7 @@ onMounted(async () => {
             <div class="archive-file-layout">
               <div class="archive-file-list">
                 <button
-                  v-for="file in selectedBatchFiles || []"
+                  v-for="file in displayedBatchFiles"
                   :key="file.id"
                   type="button"
                   class="archive-file-item"
@@ -1059,6 +1092,10 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.archive-file-sort {
+  min-width: 13rem;
 }
 
 .collection-picker {

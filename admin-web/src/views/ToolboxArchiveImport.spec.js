@@ -43,4 +43,14 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('v-if="file.reason"')
     expect(source).not.toContain('{{ file.media_kind }} · {{ formatFileSize(file.file_size) }}')
   })
+
+  it('lets the archive file list toggle between original order and type sorting', () => {
+    expect(source).toContain("const fileSortMode = ref('original')")
+    expect(source).toContain('const displayedBatchFiles = computed(() => sortArchiveFiles(selectedBatchFiles.value))')
+    expect(source).toContain('function sortArchiveFiles(files)')
+    expect(source).toContain("'按原始顺序'")
+    expect(source).toContain("'按类型排序'")
+    expect(source).toContain('<el-segmented v-model="fileSortMode"')
+    expect(source).toContain('v-for="file in displayedBatchFiles"')
+  })
 })

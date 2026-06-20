@@ -3,6 +3,11 @@
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
 - 验证：`go test ./internal/services -run TestArchiveImportShouldProcessInBatch` 通过；`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`go test ./internal/services` 仍因既有 `tv_apk_test.go` 期望版本 80、当前 APK 元数据 121 不一致失败。
 
+## 2026-06-21 01:23 +0800
+- 进度：补压缩包导入页的文件清单排序切换，前端支持原始顺序与按类型排序两种模式；按类型排序时先展示视频、图片等可入库媒体，再保留跳过项，便于先处理真正可入库的待处理文件。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-20 22:41 +0800
 - 进度：开始排查压缩包导入“待处理文件依旧不能批量处理”。初步定位后端批量处理只扫描 `pending`，而单文件处理失败后可能处于 `failed`，早期复制/hash 失败还可能卡在 `processing`，导致后续批量处理跳过这些仍未入库的可处理文件。计划补服务层定向测试锁定批量候选范围，再修 `ProcessAllFiles` 与早期失败状态回写。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`plan.md`
