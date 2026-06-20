@@ -1,3 +1,8 @@
+## 2026-06-20 13:40 +0800
+- 进度：修复压缩包导入页的壳层留白和自适应断点。已恢复工具页标准 `tool-workspace__inner` 宽度与 padding，桌面端双栏在 `80rem` 以下提前收成单列，移动端继续使用更紧凑的间距；页面结构与功能逻辑未变。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`
+- 验证：`cd admin-web && npm run build` 通过（仅保留现有 chunk size 警告）。
+
 ## 2026-06-20 13:24 +0800
 - 进度：完成压缩包导入页的纯 UI 美化。页面从原先的三段堆叠调整为“顶部说明 + 上传入口/概览 + 批次列表/批次详情”双层工作区，上传面板、批次卡片、文件列表和错误提示都做了视觉收紧；未改动任何上传、处理、刷新、保存相关逻辑。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`

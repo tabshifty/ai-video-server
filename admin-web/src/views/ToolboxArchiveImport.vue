@@ -521,10 +521,24 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.archive-import-tool {
+.tool-workspace {
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg-canvas);
+}
+
+.tool-workspace__inner {
+  display: grid;
+  width: min(100%, 80rem);
+  margin: 0 auto;
+  padding: var(--space-6);
+  gap: var(--space-5);
+}
+
+.tool-workspace__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .archive-workspace {
@@ -757,10 +771,21 @@ onMounted(async () => {
 }
 
 @media (max-width: 64rem) {
+  .tool-workspace__inner {
+    padding: var(--space-4);
+  }
+
   .archive-workspace__hero,
   .archive-workspace__grid,
   .archive-upload-grid,
   .archive-file-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 80rem) {
+  .archive-workspace__hero,
+  .archive-workspace__grid {
     grid-template-columns: 1fr;
   }
 }
