@@ -1,3 +1,8 @@
+## 2026-06-20 13:24 +0800
+- 进度：完成压缩包导入页的纯 UI 美化。页面从原先的三段堆叠调整为“顶部说明 + 上传入口/概览 + 批次列表/批次详情”双层工作区，上传面板、批次卡片、文件列表和错误提示都做了视觉收紧；未改动任何上传、处理、刷新、保存相关逻辑。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`
+- 验证：`cd admin-web && npm run build` 通过（仅保留现有 chunk size 警告）。
+
 ## 2026-06-20 00:36 +0800
 - 进度：完成压缩包导入管理端收尾。新增的无壳层工具页已可从工具箱打开，前端静态断言覆盖了新页、路由、API、命令面板和日期显示约定；`ToolboxArchiveImport.vue` 已去掉 Vue 2 filter 写法并把文件级合集输入规范化。同步在 `CONTEXT.md` 补了“压缩包去重保留现有资产”术语，避免后续误把去重理解成覆盖资产。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/views/adminDateTimeDisplay.spec.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`CONTEXT.md`、`plan.md`
