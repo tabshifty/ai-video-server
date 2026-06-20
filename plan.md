@@ -1,3 +1,13 @@
+## 2026-06-20 22:32 +0800
+- 进度：完成压缩包导入交互语义落地。压缩包导入页已支持在默认视频合集、默认图片合集、视频文件合集、图片文件合集四个位置原地新建合集并自动选中；文件清单和详情改为显示中文媒体类型加格式/MIME，并展示跳过原因；批量处理逻辑未改，仍只处理视频/图片待处理项。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-20 22:25 +0800
+- 进度：开始落地压缩包导入交互语义。计划先补 `ToolboxArchiveImport` 静态断言锁住页内新建合集、文件类型中文化与跳过原因可见，再在压缩包导入页接入已有视频合集/图片合集创建 API，最后跑 admin-web 定向测试、构建、`git diff --check` 与乱码扫描。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-20 22:21 +0800
 - 进度：通过 `$grill-with-docs` 继续收口压缩包批量处理范围。已确认“处理待处理文件”只处理可入库的视频和图片待处理项；目录、不支持项、嵌套压缩包等跳过项继续留在清单里展示类型、状态和原因，不参与批量处理。
 - 影响文件：`CONTEXT.md`、`plan.md`

@@ -23,4 +23,24 @@ describe('ToolboxArchiveImport', () => {
     expect(source).not.toContain('uploadRef.value?.files?.length')
     expect(source).not.toContain('uploadRef.value?.uploadFiles?.length')
   })
+
+  it('supports creating video or image collections in place and filling selectors back', () => {
+    expect(source).toContain('createAdminCollection')
+    expect(source).toContain('createAdminImageCollection')
+    expect(source).toContain('openCreateVideoCollection')
+    expect(source).toContain('openCreateImageCollection')
+    expect(source).toContain('saveQuickCollection')
+    expect(source).toContain('新建视频合集')
+    expect(source).toContain('新建图片合集')
+    expect(source).toContain('pushSelectedCollectionValue(target, created.id)')
+  })
+
+  it('shows localized archive file type and skipped reason in the file list', () => {
+    expect(source).toContain('formatArchiveFileType')
+    expect(source).toContain('archiveMediaKindLabel')
+    expect(source).toContain('formatArchiveReason')
+    expect(source).toContain('{{ formatArchiveFileType(file) }}')
+    expect(source).toContain('v-if="file.reason"')
+    expect(source).not.toContain('{{ file.media_kind }} · {{ formatFileSize(file.file_size) }}')
+  })
 })

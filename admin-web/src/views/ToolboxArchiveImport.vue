@@ -7,6 +7,8 @@ import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import {
+  createAdminCollection,
+  createAdminImageCollection,
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
@@ -41,6 +43,8 @@ const collectionOptions = ref([])
 const loadingCollections = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
+const quickCollectionDialogVisible = ref(false)
+const quickCollectionSaving = ref(false)
 
 const query = reactive({
   page: 1,
@@ -57,7 +61,15 @@ const uploadForm = reactive({
   password: ''
 })
 
+const quickCollectionForm = reactive({
+  kind: 'video',
+  target: '',
+  name: '',
+  description: ''
+})
+
 const batches = computed(() => batchList.value || [])
+const quickCollectionDialogTitle = computed(() => (quickCollectionForm.kind === 'image' ? '新建图片合集' : '新建视频合集'))
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
@@ -74,6 +86,44 @@ function formatFileSize(size) {
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
   if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`
   return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function archiveMediaKindLabel(kind) {
+  const map = {
+    video: '视频',
+    image: '图片',
+    archive: '压缩包',
+    directory: '目录',
+    other: '不支持'
+  }
+  return map[kind] || kind || '未知'
+}
+
+function formatArchiveFormat(file) {
+  const mime = String(file?.mime_type || '').trim()
+  if (mime) {
+    if (mime.startsWith('image/')) return mime.slice('image/'.length).toLowerCase()
+    if (mime.startsWith('video/')) return mime.slice('video/'.length).toLowerCase()
+    return mime
+  }
+  const relativePath = String(file?.relative_path || '').trim()
+  const matched = relativePath.match(/\.([^.\/\\]+)$/)
+  return matched ? matched[1].toLowerCase() : '-'
+}
+
+function formatArchiveFileType(file) {
+  return `${archiveMediaKindLabel(file?.media_kind)} · ${formatArchiveFormat(file)}`
+}
+
+function formatArchiveReason(reason) {
+  const value = String(reason || '').trim()
+  const map = {
+    directory: '目录项不入库',
+    nested_archive_not_allowed: '嵌套压缩包已跳过',
+    unsupported_file_type: '不支持的文件类型',
+    empty_path: '路径为空'
+  }
+  return map[value] || value
 }
 
 function normalizeSelectionValues(values) {
@@ -112,6 +162,97 @@ function normalizeArchiveFileState(data) {
     tags: normalizeTagSelection(data.tags),
     video_collection_ids: normalizeUUIDSelection(data.video_collection_ids),
     image_collection_ids: normalizeUUIDSelection(data.image_collection_ids)
+  }
+}
+
+function buildQuickCollectionPayload() {
+  const payload = {
+    name: quickCollectionForm.name.trim(),
+    description: quickCollectionForm.description.trim(),
+    cover_url: '',
+    sort_order: 0,
+    active: true
+  }
+  if (quickCollectionForm.kind === 'image') {
+    payload.cover_image_id = null
+  }
+  return payload
+}
+
+function pushOption(optionsRef, option) {
+  if (!option?.value) return
+  const value = String(option.value)
+  const existingIndex = optionsRef.value.findIndex((item) => String(item?.value) === value)
+  if (existingIndex >= 0) {
+    optionsRef.value.splice(existingIndex, 1, option)
+    return
+  }
+  optionsRef.value.unshift(option)
+}
+
+function pushSelectedCollectionValue(target, collectionID) {
+  if (!collectionID) return
+  if (target === 'upload-video') {
+    uploadForm.default_video_collection_ids = normalizeUUIDSelection([...uploadForm.default_video_collection_ids, collectionID])
+    return
+  }
+  if (target === 'upload-image') {
+    uploadForm.default_image_collection_ids = normalizeUUIDSelection([...uploadForm.default_image_collection_ids, collectionID])
+    return
+  }
+  if (target === 'file-video' && selectedFile.value) {
+    selectedFile.value.video_collection_ids = normalizeUUIDSelection([...(selectedFile.value.video_collection_ids || []), collectionID])
+    return
+  }
+  if (target === 'file-image' && selectedFile.value) {
+    selectedFile.value.image_collection_ids = normalizeUUIDSelection([...(selectedFile.value.image_collection_ids || []), collectionID])
+  }
+}
+
+function openQuickCollectionDialog(kind, target) {
+  quickCollectionForm.kind = kind
+  quickCollectionForm.target = target
+  quickCollectionForm.name = ''
+  quickCollectionForm.description = ''
+  quickCollectionDialogVisible.value = true
+}
+
+function openCreateVideoCollection(target) {
+  openQuickCollectionDialog('video', target)
+}
+
+function openCreateImageCollection(target) {
+  openQuickCollectionDialog('image', target)
+}
+
+async function saveQuickCollection() {
+  if (!quickCollectionForm.name.trim()) {
+    ElMessage.warning(`请输入${quickCollectionForm.kind === 'image' ? '图片合集' : '视频合集'}名称`)
+    return
+  }
+  quickCollectionSaving.value = true
+  const target = quickCollectionForm.target
+  try {
+    const payload = buildQuickCollectionPayload()
+    const created = quickCollectionForm.kind === 'image'
+      ? await createAdminImageCollection(payload)
+      : await createAdminCollection(payload)
+    const option = {
+      value: created.id,
+      label: created.name
+    }
+    if (quickCollectionForm.kind === 'image') {
+      pushOption(imageCollectionOptions, option)
+    } else {
+      pushOption(collectionOptions, option)
+    }
+    pushSelectedCollectionValue(target, created.id)
+    quickCollectionDialogVisible.value = false
+    ElMessage.success(`${quickCollectionForm.kind === 'image' ? '图片合集' : '视频合集'}已创建`)
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '创建合集失败'))
+  } finally {
+    quickCollectionSaving.value = false
   }
 }
 
@@ -494,52 +635,58 @@ onMounted(async () => {
                   </el-select>
                 </el-form-item>
                 <el-form-item label="默认视频合集">
-                  <el-select
-                    v-model="uploadForm.default_video_collection_ids"
-                    multiple
-                    filterable
-                    remote
-                    reserve-keyword
-                    clearable
-                    default-first-option
-                    collapse-tags
-                    collapse-tags-tooltip
-                    :remote-method="loadCollectionSuggestions"
-                    :loading="loadingCollections"
-                    placeholder="可选，可多选"
-                    style="width: 100%"
-                  >
-                    <el-option
-                      v-for="collection in collectionOptions"
-                      :key="collection.value"
-                      :label="collection.label"
-                      :value="collection.value"
-                    />
-                  </el-select>
+                  <div class="collection-picker">
+                    <el-select
+                      v-model="uploadForm.default_video_collection_ids"
+                      class="collection-picker__select"
+                      multiple
+                      filterable
+                      remote
+                      reserve-keyword
+                      clearable
+                      default-first-option
+                      collapse-tags
+                      collapse-tags-tooltip
+                      :remote-method="loadCollectionSuggestions"
+                      :loading="loadingCollections"
+                      placeholder="可选，可多选"
+                    >
+                      <el-option
+                        v-for="collection in collectionOptions"
+                        :key="collection.value"
+                        :label="collection.label"
+                        :value="collection.value"
+                      />
+                    </el-select>
+                    <el-button class="collection-picker__button" @click="openCreateVideoCollection('upload-video')">新建视频合集</el-button>
+                  </div>
                 </el-form-item>
                 <el-form-item label="默认图片合集">
-                  <el-select
-                    v-model="uploadForm.default_image_collection_ids"
-                    multiple
-                    filterable
-                    remote
-                    reserve-keyword
-                    clearable
-                    default-first-option
-                    collapse-tags
-                    collapse-tags-tooltip
-                    :remote-method="loadImageCollectionSuggestions"
-                    :loading="loadingImageCollections"
-                    placeholder="可选，可多选"
-                    style="width: 100%"
-                  >
-                    <el-option
-                      v-for="collection in imageCollectionOptions"
-                      :key="collection.value"
-                      :label="collection.label"
-                      :value="collection.value"
-                    />
-                  </el-select>
+                  <div class="collection-picker">
+                    <el-select
+                      v-model="uploadForm.default_image_collection_ids"
+                      class="collection-picker__select"
+                      multiple
+                      filterable
+                      remote
+                      reserve-keyword
+                      clearable
+                      default-first-option
+                      collapse-tags
+                      collapse-tags-tooltip
+                      :remote-method="loadImageCollectionSuggestions"
+                      :loading="loadingImageCollections"
+                      placeholder="可选，可多选"
+                    >
+                      <el-option
+                        v-for="collection in imageCollectionOptions"
+                        :key="collection.value"
+                        :label="collection.label"
+                        :value="collection.value"
+                      />
+                    </el-select>
+                    <el-button class="collection-picker__button" @click="openCreateImageCollection('upload-image')">新建图片合集</el-button>
+                  </div>
                 </el-form-item>
                 <el-form-item label="有密码">
                   <el-switch v-model="uploadForm.has_password" />
@@ -636,11 +783,12 @@ onMounted(async () => {
                   :key="file.id"
                   type="button"
                   class="archive-file-item"
-                  :class="{ 'is-active': selectedFile?.id === file.id }"
+                  :class="{ 'is-active': selectedFile?.id === file.id, 'has-reason': file.reason }"
                   @click="selectFile(file)"
                 >
                   <strong>{{ file.relative_path }}</strong>
-                  <span>{{ file.media_kind }} · {{ formatFileSize(file.file_size) }}</span>
+                  <span>{{ formatArchiveFileType(file) }} · {{ formatFileSize(file.file_size) }}</span>
+                  <span v-if="file.reason" class="archive-file-item__reason">{{ formatArchiveReason(file.reason) }}</span>
                   <span><el-tag size="small" effect="plain" :type="fileStatusType(file.status)">{{ fileStatusLabel(file.status) }}</el-tag></span>
                 </button>
               </div>
@@ -658,7 +806,10 @@ onMounted(async () => {
                 <div v-else class="archive-file-detail">
                   <el-form label-width="104px">
                     <el-form-item label="相对路径"><el-input :model-value="selectedFile.relative_path" disabled /></el-form-item>
-                    <el-form-item label="类型"><el-input :model-value="selectedFile.media_kind" disabled /></el-form-item>
+                    <el-form-item label="类型"><el-input :model-value="formatArchiveFileType(selectedFile)" disabled /></el-form-item>
+                    <el-form-item v-if="selectedFile.reason" label="跳过原因">
+                      <el-input :model-value="formatArchiveReason(selectedFile.reason)" disabled />
+                    </el-form-item>
                     <el-form-item label="视频类型" v-if="selectedFile.media_kind === 'video'">
                       <el-select v-model="selectedFile.video_type" style="width: 100%">
                         <el-option label="短视频" value="short" />
@@ -688,52 +839,58 @@ onMounted(async () => {
                       </el-select>
                     </el-form-item>
                     <el-form-item label="视频合集" v-if="selectedFile.media_kind === 'video'">
-                      <el-select
-                        v-model="selectedFile.video_collection_ids"
-                        multiple
-                        filterable
-                        remote
-                        reserve-keyword
-                        default-first-option
-                        clearable
-                        collapse-tags
-                        collapse-tags-tooltip
-                        style="width: 100%"
-                        placeholder="可选，可多选"
-                        :remote-method="loadCollectionSuggestions"
-                        :loading="loadingCollections"
-                      >
-                        <el-option
-                          v-for="collection in collectionOptions"
-                          :key="collection.value"
-                          :label="collection.label"
-                          :value="collection.value"
-                        />
-                      </el-select>
+                      <div class="collection-picker">
+                        <el-select
+                          v-model="selectedFile.video_collection_ids"
+                          class="collection-picker__select"
+                          multiple
+                          filterable
+                          remote
+                          reserve-keyword
+                          default-first-option
+                          clearable
+                          collapse-tags
+                          collapse-tags-tooltip
+                          placeholder="可选，可多选"
+                          :remote-method="loadCollectionSuggestions"
+                          :loading="loadingCollections"
+                        >
+                          <el-option
+                            v-for="collection in collectionOptions"
+                            :key="collection.value"
+                            :label="collection.label"
+                            :value="collection.value"
+                          />
+                        </el-select>
+                        <el-button class="collection-picker__button" @click="openCreateVideoCollection('file-video')">新建视频合集</el-button>
+                      </div>
                     </el-form-item>
                     <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'image'">
-                      <el-select
-                        v-model="selectedFile.image_collection_ids"
-                        multiple
-                        filterable
-                        remote
-                        reserve-keyword
-                        default-first-option
-                        clearable
-                        collapse-tags
-                        collapse-tags-tooltip
-                        style="width: 100%"
-                        placeholder="可选，可多选"
-                        :remote-method="loadImageCollectionSuggestions"
-                        :loading="loadingImageCollections"
-                      >
-                        <el-option
-                          v-for="collection in imageCollectionOptions"
-                          :key="collection.value"
-                          :label="collection.label"
-                          :value="collection.value"
-                        />
-                      </el-select>
+                      <div class="collection-picker">
+                        <el-select
+                          v-model="selectedFile.image_collection_ids"
+                          class="collection-picker__select"
+                          multiple
+                          filterable
+                          remote
+                          reserve-keyword
+                          default-first-option
+                          clearable
+                          collapse-tags
+                          collapse-tags-tooltip
+                          placeholder="可选，可多选"
+                          :remote-method="loadImageCollectionSuggestions"
+                          :loading="loadingImageCollections"
+                        >
+                          <el-option
+                            v-for="collection in imageCollectionOptions"
+                            :key="collection.value"
+                            :label="collection.label"
+                            :value="collection.value"
+                          />
+                        </el-select>
+                        <el-button class="collection-picker__button" @click="openCreateImageCollection('file-image')">新建图片合集</el-button>
+                      </div>
                     </el-form-item>
                     <el-form-item>
                       <div class="archive-actions">
@@ -748,6 +905,27 @@ onMounted(async () => {
           </SectionCard>
         </div>
       </div>
+
+      <el-dialog
+        v-model="quickCollectionDialogVisible"
+        :title="quickCollectionDialogTitle"
+        width="min(94vw, 560px)"
+        destroy-on-close
+      >
+        <el-form label-width="104px" class="quick-collection-form">
+          <el-form-item :label="quickCollectionForm.kind === 'image' ? '图片合集名称' : '视频合集名称'">
+            <el-input v-model="quickCollectionForm.name" placeholder="请输入合集名称" @keyup.enter="saveQuickCollection" />
+          </el-form-item>
+          <el-form-item label="合集简介">
+            <el-input v-model="quickCollectionForm.description" type="textarea" :rows="3" placeholder="可选，简介用于后台识别" />
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button @click="quickCollectionDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="quickCollectionSaving" @click="saveQuickCollection">创建并选中</el-button>
+        </template>
+      </el-dialog>
     </div>
   </main>
 </template>
@@ -883,6 +1061,22 @@ onMounted(async () => {
   gap: var(--space-2);
 }
 
+.collection-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.collection-picker__select {
+  min-width: 0;
+  width: 100%;
+}
+
+.collection-picker__button {
+  white-space: nowrap;
+}
+
 .archive-batch-list {
   display: grid;
   gap: var(--space-2);
@@ -946,6 +1140,14 @@ onMounted(async () => {
   white-space: nowrap;
   color: var(--text-secondary);
   font-size: var(--text-small);
+}
+
+.archive-file-item.has-reason {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 9rem) auto;
+}
+
+.archive-file-item__reason {
+  color: var(--text-muted);
 }
 
 .archive-batch-summary {
@@ -1038,6 +1240,10 @@ onMounted(async () => {
     row-gap: var(--space-2);
   }
 
+  .collection-picker {
+    grid-template-columns: 1fr;
+  }
+
   .archive-batch-item span:nth-child(2),
   .archive-file-item span:nth-child(2) {
     grid-column: 1;
@@ -1052,6 +1258,11 @@ onMounted(async () => {
   .archive-file-item span:last-child {
     grid-column: 2;
     justify-self: end;
+  }
+
+  .archive-file-item.has-reason .archive-file-item__reason {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 
   .archive-upload-grid__file :deep(.el-upload-dragger) {
