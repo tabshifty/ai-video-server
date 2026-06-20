@@ -3,8 +3,8 @@ package handlers
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -41,6 +41,7 @@ type archiveImportService interface {
 	ProcessFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error)
 	ProcessAllFiles(ctx context.Context, batchID uuid.UUID) ([]models.ArchiveImportFileListItem, error)
 	RetryExtract(ctx context.Context, batchID uuid.UUID, password string) (models.ArchiveImportBatch, error)
+	DeleteBatch(ctx context.Context, batchID uuid.UUID) error
 }
 
 type orphanFileScanRepository interface {
@@ -253,6 +254,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/archive-import/batches", a.AdminArchiveImportBatches)
 			admin.POST("/archive-import/upload", a.AdminUploadArchiveImport)
 			admin.GET("/archive-import/batches/:id", a.AdminArchiveImportBatchDetail)
+			admin.DELETE("/archive-import/batches/:id", a.AdminDeleteArchiveImportBatch)
 			admin.GET("/archive-import/files/:id", a.AdminArchiveImportFileDetail)
 			admin.PUT("/archive-import/files/:id", a.AdminUpdateArchiveImportFile)
 			admin.POST("/archive-import/files/:id/process", a.AdminProcessArchiveImportFile)

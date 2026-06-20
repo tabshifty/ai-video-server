@@ -30,6 +30,7 @@ var (
 	ErrArchiveUnsupportedFormat = errors.New("unsupported archive format")
 	ErrArchivePasswordRequired  = errors.New("archive password required")
 	ErrArchiveNestedArchive     = errors.New("nested archive is not allowed")
+	ErrArchiveBatchBusy         = errors.New("archive batch is processing")
 )
 
 type ArchiveImportService struct {
@@ -417,6 +418,31 @@ func (s *ArchiveImportService) GetBatchWithFiles(ctx context.Context, batchID uu
 
 func (s *ArchiveImportService) GetFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error) {
 	return s.getArchiveFile(ctx, fileID)
+}
+
+func (s *ArchiveImportService) DeleteBatch(ctx context.Context, batchID uuid.UUID) error {
+	batch, err := s.GetBatch(ctx, batchID)
+	if err != nil {
+		return err
+	}
+	if err := validateArchiveBatchDeletion(batch); err != nil {
+		return err
+	}
+
+	if _, err := s.db.Exec(ctx, `DELETE FROM archive_import_batches WHERE id=$1`, batchID); err != nil {
+		return fmt.Errorf("delete archive batch: %w", err)
+	}
+
+	cleanupPaths := archiveBatchCleanupPaths(batch)
+	for _, path := range cleanupPaths {
+		if path == "" {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove archive batch path %s: %w", path, err)
+		}
+	}
+	return nil
 }
 
 func (s *ArchiveImportService) UpdateFile(ctx context.Context, fileID uuid.UUID, in ArchiveImportFileUpdateInput) (models.ArchiveImportFileListItem, error) {
@@ -935,6 +961,33 @@ func scanArchiveEntries(extractedDir string, batch models.ArchiveImportBatch) ([
 		return nil, fmt.Errorf("scan extracted archive entries: %w", err)
 	}
 	return items, nil
+}
+
+func archiveBatchCleanupPaths(batch models.ArchiveImportBatch) []string {
+	seen := map[string]struct{}{}
+	paths := make([]string, 0, 4)
+	appendPath := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		if _, ok := seen[path]; ok {
+			return
+		}
+		seen[path] = struct{}{}
+		paths = append(paths, path)
+	}
+
+	appendPath(filepath.Dir(strings.TrimSpace(batch.OriginalPath)))
+	appendPath(strings.TrimSpace(batch.ExtractedDir))
+	return paths
+}
+
+func validateArchiveBatchDeletion(batch models.ArchiveImportBatch) error {
+	if strings.EqualFold(strings.TrimSpace(batch.Status), "processing") {
+		return ErrArchiveBatchBusy
+	}
+	return nil
 }
 
 func classifyArchiveFile(path string) (mediaKind, mimeType, videoType, reason string) {

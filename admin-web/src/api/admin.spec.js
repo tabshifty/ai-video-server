@@ -33,6 +33,7 @@ import {
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
+  deleteAdminArchiveImportBatch,
   getAdminVideoTags,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
@@ -154,11 +155,15 @@ describe('archive import apis', () => {
     const payload = { password: 'secret' }
 
     await uploadAdminArchiveImport(formData)
+    await deleteAdminArchiveImportBatch('batch-1')
     await updateAdminArchiveImportFile('file-1', { title: '标题' })
     await retryAdminArchiveImportExtract('batch-1', payload)
 
     expect(post).toHaveBeenCalledWith('/admin/archive-import/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0
+    })
+    expect(remove).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1', {
       timeout: 0
     })
     expect(put).toHaveBeenCalledWith('/admin/archive-import/files/file-1', { title: '标题' })

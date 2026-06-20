@@ -1,3 +1,13 @@
+## 2026-06-21 10:32 +0800
+- 进度：完成压缩包导入批次删除能力。后端新增批次删除接口，限制 `processing` 批次不可删；删除时只清理批次记录、文件清单、原压缩包副本与解包工作目录，不回删已入库的视频/图片实体。管理端批次列表同步新增删除按钮和二次确认文案。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/router.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestArchiveImportShouldProcessInBatch|TestValidateArchiveBatchDeletion|TestArchiveBatchCleanupPaths'` 通过；`cd admin-web && npm run test -- src/api/admin.spec.js src/views/ToolboxArchiveImport.spec.js` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-21 10:18 +0800
+- 进度：开始补压缩包导入批次删除能力。已确认当前缺口不是前端隐藏按钮，而是后端/前端都没有删除接口；本次收口删除语义为“仅允许删除非 processing 批次，删除批次记录、文件清单、原压缩包和解包工作目录，不删除已入库的视频/图片实体”。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/router.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 定向单测、`cd admin-web && npm run test -- src/api/admin.spec.js src/views/ToolboxArchiveImport.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-20 22:45 +0800
 - 进度：修复压缩包导入批量处理候选范围。`ProcessAllFiles` 不再只处理字面 `pending`，而是覆盖可入库视频/图片中仍未成功入库的 `pending`、`failed`、`processing` 项；复制工作文件、视频 hash 等早期失败也会回写为 `failed`，避免文件卡在 `processing` 后无法被批量重试。同步补充服务层候选规则测试和 `CONTEXT.md` 语义沉淀。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`

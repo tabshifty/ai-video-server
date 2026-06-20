@@ -65,4 +65,13 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('shiftKey')
     expect(source).toContain('按住 Shift 可连续选择')
   })
+
+  it('allows deleting archive batches from the batch list with confirmation', () => {
+    expect(source).toContain('deleteAdminArchiveImportBatch')
+    expect(source).toContain('function canDeleteArchiveBatch(batch)')
+    expect(source).toContain('async function removeArchiveBatch(batch)')
+    expect(source).toContain("'删除批次'")
+    expect(source).toContain('删除后会清空该批次的压缩包记录、文件清单和解包目录')
+    expect(source).toContain('archive-batch-item__delete')
+  })
 })

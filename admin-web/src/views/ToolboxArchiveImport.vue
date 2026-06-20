@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, Check, CircleCheck, Close, FolderOpened, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { Back, Check, CircleCheck, Close, Delete, FolderOpened, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -10,6 +10,7 @@ import EmptyState from '../components/base/EmptyState.vue'
 import {
   createAdminCollection,
   createAdminImageCollection,
+  deleteAdminArchiveImportBatch,
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
@@ -29,6 +30,7 @@ const router = useRouter()
 const loading = ref(false)
 const uploadLoading = ref(false)
 const processingBatch = ref(false)
+const deletingBatchID = ref('')
 const processingFileID = ref('')
 const batchList = ref([])
 const selectedBatch = ref(null)
@@ -564,6 +566,45 @@ async function runRetryExtract() {
   }
 }
 
+function canDeleteArchiveBatch(batch) {
+  return !!batch?.id && batch.status !== 'processing'
+}
+
+async function removeArchiveBatch(batch) {
+  if (!batch?.id || !canDeleteArchiveBatch(batch)) return
+  try {
+    await ElMessageBox.confirm(
+      `删除后会清空该批次的压缩包记录、文件清单和解包目录，但不会删除已经入库的视频或图片。确认删除“${batch.title || batch.original_filename}”吗？`,
+      '删除批次',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        distinguishCancelAndClose: true
+      }
+    )
+  } catch {
+    return
+  }
+
+  deletingBatchID.value = batch.id
+  try {
+    await deleteAdminArchiveImportBatch(batch.id)
+    if (selectedBatch.value?.id === batch.id) {
+      selectedBatch.value = null
+      selectedBatchFiles.value = []
+      selectedFile.value = null
+      syncArchiveFileSelection([], -1)
+    }
+    await loadBatches()
+    ElMessage.success('批次已删除')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '删除批次失败'))
+  } finally {
+    deletingBatchID.value = ''
+  }
+}
+
 async function selectFile(row) {
   if (!row?.id) return
   fileDetailLoading.value = true
@@ -934,7 +975,21 @@ onMounted(async () => {
                 <span>
                   <el-tag effect="plain" size="small" :type="batchStatusType(batch.status)">{{ batchStatusLabel(batch.status) }}</el-tag>
                 </span>
-                <span class="tabular-num">{{ batch.processed_entries }}/{{ batch.processable_entries }}</span>
+                <div class="archive-batch-item__meta">
+                  <span class="tabular-num">{{ batch.processed_entries }}/{{ batch.processable_entries }}</span>
+                  <el-button
+                    v-if="canDeleteArchiveBatch(batch)"
+                    class="archive-batch-item__delete"
+                    type="danger"
+                    text
+                    size="small"
+                    :icon="Delete"
+                    :loading="deletingBatchID === batch.id"
+                    @click.stop="removeArchiveBatch(batch)"
+                  >
+                    删除
+                  </el-button>
+                </div>
               </button>
             </div>
           </SectionCard>
@@ -1354,6 +1409,18 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.archive-batch-item__meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.archive-batch-item__delete {
+  flex: 0 0 auto;
+}
+
 .archive-file-item__selection {
   display: inline-flex;
   align-items: center;
@@ -1493,7 +1560,7 @@ onMounted(async () => {
     grid-column: 2;
   }
 
-  .archive-batch-item span:last-child,
+  .archive-batch-item__meta,
   .archive-file-item span:last-child {
     grid-column: 3;
     justify-self: end;

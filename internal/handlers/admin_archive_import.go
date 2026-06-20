@@ -125,6 +125,30 @@ func (a *API) AdminArchiveImportBatchDetail(c *gin.Context) {
 	})
 }
 
+// AdminDeleteArchiveImportBatch deletes one archive import batch and its work files.
+func (a *API) AdminDeleteArchiveImportBatch(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "archive import service unavailable")
+		return
+	}
+	batchID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid batch id")
+		return
+	}
+	if err := a.archiveImportSvc.DeleteBatch(c.Request.Context(), batchID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			response.Error(c, 404, "batch not found")
+			return
+		}
+		response.Error(c, 1077, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"id": batchID,
+	})
+}
+
 // AdminArchiveImportFileDetail returns one archive file.
 func (a *API) AdminArchiveImportFileDetail(c *gin.Context) {
 	if a.archiveImportSvc == nil {
