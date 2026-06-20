@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, FolderOpened, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { Back, Check, CircleCheck, Close, FolderOpened, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import BulkActionBar from '../components/base/BulkActionBar.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
@@ -32,6 +33,9 @@ const processingFileID = ref('')
 const batchList = ref([])
 const selectedBatch = ref(null)
 const selectedBatchFiles = ref([])
+const selectedFileIDs = ref([])
+const selectedFileIndexAnchor = ref(-1)
+const selectionSyncing = ref(false)
 const selectedFile = ref(null)
 const fileDetailLoading = ref(false)
 const fileSaving = ref(false)
@@ -77,6 +81,29 @@ const quickCollectionForm = reactive({
 const batches = computed(() => batchList.value || [])
 const quickCollectionDialogTitle = computed(() => (quickCollectionForm.kind === 'image' ? '新建图片合集' : '新建视频合集'))
 const displayedBatchFiles = computed(() => sortArchiveFiles(selectedBatchFiles.value))
+const selectedBatchFileCount = computed(() => selectedFileIDs.value.length)
+const selectedBatchFilesForProcess = computed(() => {
+  const selectedSet = new Set(selectedFileIDs.value)
+  return displayedBatchFiles.value.filter((file) => selectedSet.has(file.id))
+})
+const canBatchProcessSelectedFiles = computed(() => selectedBatchFilesForProcess.value.length > 0 && !processingBatch.value)
+const bulkActions = computed(() => [
+  {
+    label: '处理所选',
+    icon: CircleCheck,
+    type: 'primary',
+    loading: processingBatch.value,
+    disabled: !canBatchProcessSelectedFiles.value,
+    onClick: processSelectedArchiveFiles
+  },
+  {
+    label: '全不选',
+    icon: Close,
+    type: 'default',
+    disabled: selectedFileIDs.value.length === 0 || processingBatch.value,
+    onClick: clearArchiveFileSelection
+  }
+])
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
@@ -337,6 +364,90 @@ function sortArchiveFiles(files) {
     .map((item) => item.file)
 }
 
+function selectedArchiveFileSet() {
+  return new Set(selectedFileIDs.value)
+}
+
+function findArchiveFileIndex(fileID) {
+  return displayedBatchFiles.value.findIndex((item) => String(item?.id || '') === String(fileID || ''))
+}
+
+function syncArchiveFileSelection(nextIDs, anchorIndex = selectedFileIndexAnchor.value) {
+  selectionSyncing.value = true
+  selectedFileIDs.value = Array.from(
+    new Set((nextIDs || []).map((value) => String(value || '').trim()).filter(Boolean))
+  )
+  selectedFileIndexAnchor.value = anchorIndex
+  if (selectedFile.value && !selectedFileIDs.value.includes(selectedFile.value.id)) {
+    selectedFile.value = null
+  }
+  queueMicrotask(() => {
+    selectionSyncing.value = false
+  })
+}
+
+function applyArchiveFileSelection(rows, anchorIndex = selectedFileIndexAnchor.value) {
+  const nextIDs = Array.isArray(rows) ? rows.map((item) => String(item?.id || '').trim()).filter(Boolean) : []
+  syncArchiveFileSelection(nextIDs, anchorIndex)
+}
+
+function onArchiveFileSelectionChange(rows) {
+  const nextIDs = Array.isArray(rows) ? rows.map((item) => String(item?.id || '').trim()).filter(Boolean) : []
+  if (selectionSyncing.value) {
+    selectedFileIDs.value = nextIDs
+    return
+  }
+  selectedFileIDs.value = nextIDs
+  if (selectedFileIDs.value.length === 0) {
+    selectedFileIndexAnchor.value = -1
+  }
+}
+
+function onArchiveFileSelectToggle(row, event) {
+  if (!row?.id) return
+  const currentIndex = findArchiveFileIndex(row.id)
+  if (currentIndex < 0) return
+
+  const rowID = String(row.id)
+  const selectedSet = selectedArchiveFileSet()
+  const isSelected = selectedSet.has(rowID)
+
+  const shouldRangeSelect = !!event?.shiftKey && selectedFileIndexAnchor.value >= 0
+
+  if (shouldRangeSelect) {
+    const start = Math.min(selectedFileIndexAnchor.value, currentIndex)
+    const end = Math.max(selectedFileIndexAnchor.value, currentIndex)
+    for (let index = start; index <= end; index += 1) {
+      const targetID = String(displayedBatchFiles.value[index]?.id || '').trim()
+      if (!targetID) continue
+      if (isSelected) {
+        selectedSet.add(targetID)
+      } else {
+        selectedSet.delete(targetID)
+      }
+    }
+    applyArchiveFileSelection(
+      displayedBatchFiles.value.filter((item) => selectedSet.has(String(item?.id || '').trim())),
+      selectedFileIndexAnchor.value
+    )
+    return
+  }
+
+  if (isSelected) {
+    selectedSet.delete(rowID)
+  } else {
+    selectedSet.add(rowID)
+  }
+  applyArchiveFileSelection(
+    displayedBatchFiles.value.filter((item) => selectedSet.has(String(item?.id || '').trim())),
+    currentIndex
+  )
+}
+
+function clearArchiveFileSelection() {
+  syncArchiveFileSelection([], -1)
+}
+
 async function loadBatches() {
   loading.value = true
   try {
@@ -503,6 +614,47 @@ async function processSelectedFile() {
     ElMessage.error(extractErrorMessage(error, '处理文件失败'))
   } finally {
     processingFileID.value = ''
+  }
+}
+
+async function processSelectedArchiveFiles() {
+  const files = selectedBatchFilesForProcess.value
+  if (files.length === 0) {
+    ElMessage.warning('请先勾选要处理的文件')
+    return
+  }
+  processingBatch.value = true
+  try {
+    let processedCount = 0
+    let failedCount = 0
+    const remainingSelectedIDs = []
+    for (const file of files) {
+      try {
+        await processAdminArchiveImportFile(file.id)
+        processedCount += 1
+      } catch (error) {
+        failedCount += 1
+        remainingSelectedIDs.push(file.id)
+        if (file.id === selectedFile.value?.id) {
+          ElMessage.error(extractErrorMessage(error, '处理文件失败'))
+        }
+      }
+    }
+    await refreshBatchDetail()
+    syncArchiveFileSelection(remainingSelectedIDs, selectedFileIndexAnchor.value)
+    if (processedCount > 0 && failedCount > 0) {
+      ElMessage.warning(`已处理 ${processedCount} 个文件，${failedCount} 个失败`)
+      return
+    }
+    if (processedCount > 0) {
+      ElMessage.success(`已处理 ${processedCount} 个文件`)
+      return
+    }
+    ElMessage.error('批量处理失败')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '批量处理失败'))
+  } finally {
+    processingBatch.value = false
   }
 }
 
@@ -811,14 +963,35 @@ onMounted(async () => {
 
             <div class="archive-file-layout">
               <div class="archive-file-list">
+                <div class="archive-file-list__header">
+                  <el-checkbox
+                    :model-value="selectedBatchFileCount > 0 && selectedBatchFileCount === displayedBatchFiles.length"
+                    :indeterminate="selectedBatchFileCount > 0 && selectedBatchFileCount < displayedBatchFiles.length"
+                    @change="(checked) => checked ? applyArchiveFileSelection(displayedBatchFiles) : clearArchiveFileSelection()"
+                  >
+                    已选 {{ selectedBatchFileCount }} 项
+                  </el-checkbox>
+                  <span>点击文件行查看详情，点左侧选择位勾选；按住 Shift 可连续选择。</span>
+                </div>
                 <button
                   v-for="file in displayedBatchFiles"
                   :key="file.id"
                   type="button"
                   class="archive-file-item"
-                  :class="{ 'is-active': selectedFile?.id === file.id, 'has-reason': file.reason }"
+                  :class="{ 'is-active': selectedFile?.id === file.id, 'is-selected': selectedFileIDs.includes(file.id), 'has-reason': file.reason }"
                   @click="selectFile(file)"
                 >
+                  <span
+                    class="archive-file-item__selection"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="selectedFileIDs.includes(file.id) ? '取消选择文件' : '选择文件'"
+                    @click.stop="onArchiveFileSelectToggle(file, $event)"
+                    @keydown.enter.stop.prevent="onArchiveFileSelectToggle(file, $event)"
+                    @keydown.space.stop.prevent="onArchiveFileSelectToggle(file, $event)"
+                  >
+                    <el-icon v-if="selectedFileIDs.includes(file.id)"><Check /></el-icon>
+                  </span>
                   <strong>{{ file.relative_path }}</strong>
                   <span>{{ formatArchiveFileType(file) }} · {{ formatFileSize(file.file_size) }}</span>
                   <span v-if="file.reason" class="archive-file-item__reason">{{ formatArchiveReason(file.reason) }}</span>
@@ -935,6 +1108,8 @@ onMounted(async () => {
                 </div>
               </SectionCard>
             </div>
+
+            <BulkActionBar :count="selectedFileIDs.length" :actions="bulkActions" />
           </SectionCard>
         </div>
       </div>
@@ -1098,6 +1273,15 @@ onMounted(async () => {
   min-width: 13rem;
 }
 
+.archive-file-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+}
+
 .collection-picker {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1122,7 +1306,7 @@ onMounted(async () => {
 .archive-batch-item,
 .archive-file-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: var(--space-3);
   align-items: center;
   width: 100%;
@@ -1140,7 +1324,8 @@ onMounted(async () => {
 }
 
 .archive-batch-item.is-active,
-.archive-file-item.is-active {
+.archive-file-item.is-active,
+.archive-file-item.is-selected {
   border-color: var(--primary);
   background: var(--bg-surface);
   box-shadow: var(--shadow-xs);
@@ -1169,6 +1354,15 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.archive-file-item__selection {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--primary);
+}
+
 .archive-batch-item span,
 .archive-file-item span {
   min-width: 0;
@@ -1180,7 +1374,7 @@ onMounted(async () => {
 }
 
 .archive-file-item.has-reason {
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 9rem) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 9rem) auto;
 }
 
 .archive-file-item__reason {
@@ -1273,7 +1467,7 @@ onMounted(async () => {
 
   .archive-batch-item,
   .archive-file-item {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     row-gap: var(--space-2);
   }
 
@@ -1291,14 +1485,22 @@ onMounted(async () => {
     justify-self: end;
   }
 
+  .archive-file-item__selection {
+    grid-column: 1;
+  }
+
+  .archive-file-item strong {
+    grid-column: 2;
+  }
+
   .archive-batch-item span:last-child,
   .archive-file-item span:last-child {
-    grid-column: 2;
+    grid-column: 3;
     justify-self: end;
   }
 
   .archive-file-item.has-reason .archive-file-item__reason {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
     justify-self: start;
   }
 

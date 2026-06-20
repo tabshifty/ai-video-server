@@ -53,4 +53,16 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('<el-segmented v-model="fileSortMode"')
     expect(source).toContain('v-for="file in displayedBatchFiles"')
   })
+
+  it('supports selecting archive files and batch-processing the selected items', () => {
+    expect(source).toContain('const selectedFileIDs = ref([])')
+    expect(source).toContain('const bulkActions = computed(() => [')
+    expect(source).toContain("label: '处理所选'")
+    expect(source).toContain('function onArchiveFileSelectToggle(row, event)')
+    expect(source).toContain('function processSelectedArchiveFiles()')
+    expect(source).toContain('BulkActionBar')
+    expect(source).toContain('selectedBatchFileCount')
+    expect(source).toContain('shiftKey')
+    expect(source).toContain('按住 Shift 可连续选择')
+  })
 })
