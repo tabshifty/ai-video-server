@@ -34,6 +34,7 @@ const selectedFile = ref(null)
 const fileDetailLoading = ref(false)
 const fileSaving = ref(false)
 const uploadRef = ref(null)
+const uploadFiles = ref([])
 const tagOptions = ref([])
 const loadingTags = ref(false)
 const collectionOptions = ref([])
@@ -114,6 +115,14 @@ function normalizeArchiveFileState(data) {
   }
 }
 
+function onUploadChange(file, files) {
+  uploadFiles.value = Array.isArray(files) ? files.slice(-1) : []
+}
+
+function onUploadRemove(file, files) {
+  uploadFiles.value = Array.isArray(files) ? files : []
+}
+
 function batchStatusLabel(status) {
   const map = {
     uploaded: '已上传',
@@ -192,11 +201,7 @@ async function loadBatchDetail(batchID) {
 }
 
 async function uploadArchive() {
-  if (!uploadRef.value?.files?.length && !uploadRef.value?.uploadFiles?.length) {
-    ElMessage.warning('请选择一个压缩包文件')
-    return
-  }
-  const input = uploadRef.value?.uploadFiles?.[0]?.raw || uploadRef.value?.files?.[0]?.raw
+  const input = uploadFiles.value[0]?.raw
   if (!(input instanceof File)) {
     ElMessage.warning('请选择一个压缩包文件')
     return
@@ -336,6 +341,7 @@ function clearUploadForm() {
   uploadForm.default_image_collection_ids = []
   uploadForm.has_password = false
   uploadForm.password = ''
+  uploadFiles.value = []
   uploadRef.value?.clearFiles?.()
 }
 
@@ -451,11 +457,14 @@ onMounted(async () => {
               <div class="archive-upload-grid__file">
                 <el-upload
                   ref="uploadRef"
+                  v-model:file-list="uploadFiles"
                   drag
                   :auto-upload="false"
                   :limit="1"
                   :show-file-list="true"
                   accept=".zip,.rar,.7z"
+                  :on-change="onUploadChange"
+                  :on-remove="onUploadRemove"
                 >
                   <el-icon class="archive-upload-grid__icon"><UploadFilled /></el-icon>
                   <div class="archive-upload-grid__hint">拖拽或点击选择压缩包文件</div>

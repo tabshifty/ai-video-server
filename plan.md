@@ -1,3 +1,13 @@
+## 2026-06-20 20:03 +0800
+- 进度：压缩包导入页“已选压缩包却被判定为空”的问题已修复并验证。`el-upload` 现在通过显式 `file-list` 维护选中文件，上传时只读取组件自己的 `uploadFiles` 状态，不再依赖内部实例字段；静态断言已补，防止以后回退到原来的假阴性写法。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js` 通过；`cd admin-web && npm run build` 通过；`git diff --check` 通过；乱码扫描无命中。
+
+# 2026-06-20 20:00 +0800
+- 进度：修复压缩包导入页“已选中文件却提示请选择一个压缩包文件”的上传状态 bug。`el-upload` 现在显式绑定 `v-model:file-list`，选择/移除时同步维护 `uploadFiles`，提交时只读取这份显式状态，不再依赖组件实例上的内部字段；同步补了静态断言，防止以后回退到现查实例的写法。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run build`、`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/videoUpload.remote.spec.js`、`git diff --check`、乱码扫描。
+
 ## 2026-06-20 15:08 +0800
 - 进度：完成压缩包导入页的字段收口。默认标签、文件级标签改成与上传中心一致的可选可输多选；默认视频/图片合集和文件级合集改成按名称选择的远程选择器，不再向管理员暴露 JSON 数组或合集 UUID；文件详情回显与批次处理后状态都做了数组规范化。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
