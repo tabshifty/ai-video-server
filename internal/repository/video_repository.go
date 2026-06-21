@@ -476,6 +476,22 @@ func (r *VideoRepository) UpdateVideoStatus(ctx context.Context, videoID uuid.UU
 	return nil
 }
 
+func (r *VideoRepository) UpdateVideoOriginalPath(ctx context.Context, videoID uuid.UUID, originalPath string) error {
+	var value any
+	if trimmed := strings.TrimSpace(originalPath); trimmed != "" {
+		value = trimmed
+	}
+	_, err := r.pool.Exec(ctx, `
+UPDATE videos
+SET original_path = $2,
+    updated_at = NOW()
+WHERE id = $1`, videoID, value)
+	if err != nil {
+		return fmt.Errorf("update video original path: %w", err)
+	}
+	return nil
+}
+
 func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error) {
 	row := r.pool.QueryRow(ctx, `
 SELECT

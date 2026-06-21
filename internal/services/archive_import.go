@@ -563,10 +563,32 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 		if batch.UserID != nil {
 			userID = *batch.UserID
 		}
-		result, err := s.uploadSvc.SaveUploadedFile(ctx, LocalUploadInput{
+		archiveFilename := filepath.Base(file.RelativePath)
+		resultPreview, err := s.uploadSvc.PreviewUploadedFile(ctx, LocalUploadInput{
 			UserID:        userID,
 			FilePath:      workPath,
-			Filename:      filepath.Base(file.RelativePath),
+			Filename:      archiveFilename,
+			FileSize:      file.FileSize,
+			Title:         title,
+			Desc:          description,
+			Type:          videoType,
+			Tags:          tags,
+			CollectionIDs: videoCollections,
+			Hash:          hash,
+		})
+		if err != nil {
+			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
+			return models.ArchiveImportFileListItem{}, err
+		}
+		sourcePath, err := s.copyArchiveVideoSourceFile(resultPreview.VideoID, file, workPath)
+		if err != nil {
+			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
+			return models.ArchiveImportFileListItem{}, err
+		}
+		result, err := s.uploadSvc.SaveUploadedFile(ctx, LocalUploadInput{
+			UserID:        userID,
+			FilePath:      sourcePath,
+			Filename:      archiveFilename,
 			FileSize:      file.FileSize,
 			Title:         title,
 			Desc:          description,
@@ -1121,6 +1143,26 @@ func (s *ArchiveImportService) copyArchiveWorkFile(ctx context.Context, file mod
 		return "", fmt.Errorf("copy archive work file: %w", err)
 	}
 	return target, nil
+}
+
+func (s *ArchiveImportService) copyArchiveVideoSourceFile(videoID uuid.UUID, file models.ArchiveImportFileListItem, workPath string) (string, error) {
+	sourceDir := filepath.Join(s.storageRoot, "videos", videoID.String())
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		return "", fmt.Errorf("create archive video source dir: %w", err)
+	}
+	target := filepath.Join(sourceDir, archiveVideoSourceFilename(file))
+	if err := ffmpeg.CopyFile(target, workPath); err != nil {
+		return "", fmt.Errorf("copy archive video source file: %w", err)
+	}
+	return target, nil
+}
+
+func archiveVideoSourceFilename(file models.ArchiveImportFileListItem) string {
+	ext := strings.TrimSpace(filepath.Ext(strings.TrimSpace(file.RelativePath)))
+	if ext == "" {
+		ext = strings.TrimSpace(filepath.Ext(strings.TrimSpace(file.FilePath)))
+	}
+	return "source-original" + ext
 }
 
 func (s *ArchiveImportService) markArchiveFileProcessing(ctx context.Context, fileID uuid.UUID) error {

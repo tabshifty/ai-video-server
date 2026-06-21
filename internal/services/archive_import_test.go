@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"video-server/internal/models"
 )
 
@@ -111,5 +113,61 @@ func TestArchiveBatchCleanupPathsDedupes(t *testing.T) {
 	}
 	if got[0] != originalDir {
 		t.Fatalf("archiveBatchCleanupPaths()[0] = %q, want %q", got[0], originalDir)
+	}
+}
+
+func TestArchiveVideoSourceFilenameUsesStableNameAndExt(t *testing.T) {
+	t.Parallel()
+
+	file := models.ArchiveImportFileListItem{
+		ID:           uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		RelativePath: "Season 1/Show.S01E02.mkv",
+		FilePath:     "/tmp/archive-video.mov",
+	}
+
+	if got := archiveVideoSourceFilename(file); got != "source-original.mkv" {
+		t.Fatalf("archiveVideoSourceFilename() = %q", got)
+	}
+}
+
+func TestCopyArchiveVideoSourceFileUsesStablePathOutsideWorkDir(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	workPath := filepath.Join(root, "archive-imports", "batch-1", "work", "clip.mp4")
+	if err := os.MkdirAll(filepath.Dir(workPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	const body = "demo-video"
+	if err := os.WriteFile(workPath, []byte(body), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	svc := &ArchiveImportService{uploadTemp: root}
+	file := models.ArchiveImportFileListItem{
+		ID:           uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		BatchID:      uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+		RelativePath: "nested/demo clip.mp4",
+		FilePath:     workPath,
+	}
+
+	got, err := svc.copyArchiveVideoSourceFile(file.ID, file, workPath)
+	if err != nil {
+		t.Fatalf("copyArchiveVideoSourceFile() error = %v", err)
+	}
+
+	want := filepath.Join(root, "videos", file.ID.String(), "source-original.mp4")
+	if got != want {
+		t.Fatalf("copyArchiveVideoSourceFile() path = %q, want %q", got, want)
+	}
+	data, err := os.ReadFile(got)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(data) != body {
+		t.Fatalf("copied file body = %q, want %q", string(data), body)
+	}
+	if _, err := os.Stat(workPath); err != nil {
+		t.Fatalf("work file should remain for caller cleanup, stat error = %v", err)
 	}
 }

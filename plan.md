@@ -1,3 +1,13 @@
+## 2026-06-21 17:30 +0800
+- 进度：开始修复压缩包导入后视频列表误显示失败。已定位根因是压缩包导入把视频 `original_path` 写成临时 work 文件路径，而该 work 文件会在单文件处理结束时删除，导致后续异步刮削/转码读取源文件失败并把 `videos.status` 打成 `failed`。计划改为先把视频落到稳定原始文件路径再建库，并补服务层定向测试锁定该约束。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `go test ./internal/services -run 'TestArchiveImport' -count=1`、`git diff --check`、乱码扫描。
+
+## 2026-06-21 17:30 +0800
+- 进度：完成压缩包导入视频源路径修复。`ProcessFile` 现会先把视频复制到 `UPLOAD_TEMP_DIR/archive-import-videos/<batch>/<file>/原始文件名` 稳定路径，再创建/复用视频记录；不再把会被立即删除的 work 临时文件写进 `videos.original_path`。同时补了“命中已有失败视频时修正 `original_path` 并允许重新入队”的兼容逻辑，避免旧批次失败项继续卡死；新增服务层纯逻辑测试锁定稳定源文件命名、存储位置和失败旧视频可重试边界。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/services/upload.go`、`internal/repository/video_repository.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestArchiveImport|TestArchiveVideoSource' -count=1` 通过；`go test ./internal/handlers -run 'TestSelectRetranscodeInputPath' -count=1` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' internal/services/archive_import.go internal/services/archive_import_test.go internal/services/upload.go internal/repository/video_repository.go CONTEXT.md plan.md` 无命中。
+
 ## 2026-06-21 15:26 +0800
 - 进度：完成压缩包导入页的批次优先 UI 重构收尾。页面已切换为“批次列表主视图 + 上传弹窗 + 批次详情抽屉 + 批量编辑弹窗”，批次详情内文件支持勾选、Shift 连选、按类型快捷选择、批量编辑与批量处理；单文件编辑降级为仅在单选时出现的例外项精修区，不再承载处理动作。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`

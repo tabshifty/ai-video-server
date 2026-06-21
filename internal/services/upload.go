@@ -47,6 +47,12 @@ type UploadResult struct {
 	OSHash        string
 }
 
+type UploadPreview struct {
+	VideoID       uuid.UUID
+	AlreadyExists bool
+	Status        string
+}
+
 type LocalUploadInput struct {
 	UserID            uuid.UUID
 	FilePath          string
@@ -66,6 +72,44 @@ type LocalUploadInput struct {
 
 func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
 	return &UploadService{repo: repo, uploadDir: uploadDir, storage: storageRoot, logger: logger}
+}
+
+func (s *UploadService) PreviewUploadedFile(ctx context.Context, in LocalUploadInput) (UploadPreview, error) {
+	if in.Type != "short" && in.Type != "movie" && in.Type != "episode" && in.Type != "av" {
+		return UploadPreview{}, ErrInvalidType
+	}
+	info, err := os.Stat(in.FilePath)
+	if err != nil {
+		return UploadPreview{}, fmt.Errorf("stat uploaded file: %w", err)
+	}
+	serverHash, err := hashutil.SHA256(in.FilePath)
+	if err != nil {
+		return UploadPreview{}, fmt.Errorf("calculate file hash: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(in.Hash), serverHash) {
+		return UploadPreview{}, ErrHashMismatch
+	}
+	if existingID, exists, err := s.repo.FindVideoByHash(ctx, serverHash, info.Size()); err != nil {
+		return UploadPreview{}, err
+	} else if exists {
+		existingVideo, getErr := s.repo.GetVideoByID(ctx, existingID)
+		if getErr != nil {
+			return UploadPreview{}, getErr
+		}
+		if existingVideo.Type != in.Type {
+			return UploadPreview{}, ErrHashTypeConflict
+		}
+		return UploadPreview{
+			VideoID:       existingID,
+			AlreadyExists: true,
+			Status:        existingVideo.Status,
+		}, nil
+	}
+	return UploadPreview{
+		VideoID:       uuid.New(),
+		AlreadyExists: false,
+		Status:        predictedUploadStatus(in.Type),
+	}, nil
 }
 
 func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInput, maxVideoSize int64) (UploadResult, error) {
@@ -105,6 +149,12 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 			if err := s.repo.AddVideoCollectionsByIDsAnyType(ctx, existingID, in.CollectionIDs); err != nil {
 				return UploadResult{}, err
 			}
+		}
+		if shouldRefreshExistingVideoOriginalPath(existingVideo.Status) && strings.TrimSpace(existingVideo.OriginalPath) != strings.TrimSpace(in.FilePath) {
+			if err := s.repo.UpdateVideoOriginalPath(ctx, existingID, in.FilePath); err != nil {
+				return UploadResult{}, err
+			}
+			existingVideo.OriginalPath = in.FilePath
 		}
 		return UploadResult{
 			VideoID:       existingID,
@@ -154,12 +204,8 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 			finalTitle = "untitled"
 		}
 	}
-	status := "uploaded"
-	enqueueTranscode := true
-	if in.Type == "movie" || in.Type == "episode" || in.Type == "av" {
-		status = "scraping"
-		enqueueTranscode = false
-	}
+	status := predictedUploadStatus(in.Type)
+	enqueueTranscode := status == "uploaded"
 
 	v := models.Video{
 		ID:                videoID,
@@ -299,4 +345,22 @@ func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHe
 	}
 	s.logger.Info("upload saved", "video_id", result.VideoID, "path", originalPath)
 	return result, nil
+}
+
+func predictedUploadStatus(videoType string) string {
+	switch strings.TrimSpace(videoType) {
+	case "movie", "episode", "av":
+		return "scraping"
+	default:
+		return "uploaded"
+	}
+}
+
+func shouldRefreshExistingVideoOriginalPath(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "uploaded", "scraping", "tv_pending", "av_scrape_pending", "failed":
+		return true
+	default:
+		return false
+	}
 }
