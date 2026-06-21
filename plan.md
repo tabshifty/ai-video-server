@@ -1,3 +1,8 @@
+## 2026-06-21 10:46 +0800
+- 进度：修复 `internal/services` 全量测试遗留失败。`TestParseTVAPKMetadataParsesReleaseAPK` 断言 release APK 固件为 `versionCode=80 / versionName=0.1.80`，但 `android-tv-app/tv-app/release/` 下的固件已于 6-19 重建到 121 / 0.1.121，导致 `go test ./internal/services` 全包失败。本次仅同步测试断言到 121 / 0.1.121，不改解析逻辑或固件；这是测试断言随 release 固件版本走的已知耦合（已沉淀到 CONTEXT.md）。
+- 影响文件：`internal/services/tv_apk_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`GOCACHE=/private/tmp/codex-go-cache go test ./internal/services/ -count=1` 提权运行（httptest 用例需绑本地端口）结果 `ok video-server/internal/services`；`git diff --check` 通过；乱码扫描无命中。
+
 ## 2026-06-21 10:32 +0800
 - 进度：完成压缩包导入批次删除能力。后端新增批次删除接口，限制 `processing` 批次不可删；删除时只清理批次记录、文件清单、原压缩包副本与解包工作目录，不回删已入库的视频/图片实体。管理端批次列表同步新增删除按钮和二次确认文案。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/router.go`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`

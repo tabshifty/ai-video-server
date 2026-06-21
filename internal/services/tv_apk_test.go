@@ -21,13 +21,13 @@ func TestParseTVAPKMetadataParsesReleaseAPK(t *testing.T) {
 			name:        "arm64 release apk",
 			fileName:    "tv-app-arm64-v8a-release.apk",
 			wantABI:     models.TVABIArm64,
-			wantVersion: 80,
+			wantVersion: 121,
 		},
 		{
 			name:        "armeabi release apk",
 			fileName:    "tv-app-armeabi-v7a-release.apk",
 			wantABI:     models.TVABIArmV7,
-			wantVersion: 80,
+			wantVersion: 121,
 		},
 	}
 
@@ -50,8 +50,8 @@ func TestParseTVAPKMetadataParsesReleaseAPK(t *testing.T) {
 			if meta.VersionCode != tt.wantVersion {
 				t.Fatalf("version_code = %d, want %d", meta.VersionCode, tt.wantVersion)
 			}
-			if meta.VersionName != "0.1.80" {
-				t.Fatalf("version_name = %q, want 0.1.80", meta.VersionName)
+			if meta.VersionName != "0.1.121" {
+				t.Fatalf("version_name = %q, want 0.1.121", meta.VersionName)
 			}
 			if meta.IsDebuggable {
 				t.Fatal("expected release apk to be non-debuggable")
