@@ -1,3 +1,13 @@
+## 2026-06-21 15:26 +0800
+- 进度：完成压缩包导入页的批次优先 UI 重构收尾。页面已切换为“批次列表主视图 + 上传弹窗 + 批次详情抽屉 + 批量编辑弹窗”，批次详情内文件支持勾选、Shift 连选、按类型快捷选择、批量编辑与批量处理；单文件编辑降级为仅在单选时出现的例外项精修区，不再承载处理动作。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/toolboxPage.spec.js src/api/admin.spec.js` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`git diff --check` 通过；`rg -n $'\uFFFD' admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js admin-web/src/views/toolboxPage.spec.js CONTEXT.md plan.md` 无命中。
+
+## 2026-06-21 10:31 +0800
+- 进度：开始落实压缩包导入页 UI 重构。目标是把页面改成“批次优先主视图 + 上传弹窗 + 批次详情抽屉 + 批量编辑弹窗”，同时保留勾选、Shift 连选、按类型快捷选择、批量处理与例外单文件编辑。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/views/toolboxPage.spec.js src/api/admin.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-21 10:46 +0800
 - 进度：修复 `internal/services` 全量测试遗留失败。`TestParseTVAPKMetadataParsesReleaseAPK` 断言 release APK 固件为 `versionCode=80 / versionName=0.1.80`，但 `android-tv-app/tv-app/release/` 下的固件已于 6-19 重建到 121 / 0.1.121，导致 `go test ./internal/services` 全包失败。本次仅同步测试断言到 121 / 0.1.121，不改解析逻辑或固件；这是测试断言随 release 固件版本走的已知耦合（已沉淀到 CONTEXT.md）。
 - 影响文件：`internal/services/tv_apk_test.go`、`CONTEXT.md`、`plan.md`
@@ -111,6 +121,86 @@
 ﻿# plan.md
 
 本文件用于增量记录”计划与修改”，不得覆盖历史记录，只能追加。
+
+## 2026-06-21 09:41 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包导入页的信息层级。已确认该页应改为“批次优先视图”：首屏先服务已有批次处理，上传新压缩包降为次级入口并改用独立弹窗承载，不再让上传大表单长期占据主视觉区域。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 09:46 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包导入页的文件工作流。已确认文件详情改为按需打开的抽屉，不再与文件清单常驻并排；同时文件清单必须继续支持勾选、Shift 连选与批量处理，不能因为详情抽屉化而退回单文件操作。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 09:49 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包文件清单的信息主次。已确认文件清单默认应优先突出“原始相对路径 + 当前状态 + 文件类型”这组处理决策信息；文件大小、跳过原因等保留可见，但降为次级视觉层级，不再与主信息同权堆在一行。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 09:56 +0800
+- 进度：通过 `$grill-with-docs` 校正压缩包导入页的抽屉层级。已确认应改为“批次详情抽屉”，即点击批次列表项后打开承载批次概览与文件清单的抽屉；批次中的文件不再单独打开详情抽屉，但文件勾选、Shift 连选与批量处理仍保留在批次抽屉里作为主路径。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:00 +0800
+- 进度：通过 `$grill-with-docs` 继续收口批次详情抽屉内的操作范围。已确认批次详情里的文件不仅要支持勾选和批量处理，还要支持基于当前选择集做批量编辑；这意味着后续实现不能只保留单文件编辑表单，必须补出批量字段修改入口。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:03 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包批量编辑字段边界。已确认首轮批量编辑只开放说明、标签、视频类型、视频合集、图片合集，不支持批量改标题；标题继续保留为文件级确认字段，避免整批误覆盖命名。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:06 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包批量编辑的选择集约束。已确认批量编辑不接受视频和图片混合选择；若当前勾选同时包含两类媒体，批量编辑入口应禁用并提示管理员先按媒体类型拆开处理。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:10 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包批量处理的媒体边界。已确认批量处理也不接受视频和图片混合选择；若当前勾选同时包含两类媒体，入口应禁用并明确提示管理员先按媒体类型拆开处理。代码现状的所选逐个处理逻辑后续需要补这一层门禁。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:09 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包文件清单的选择辅助。已确认批次详情里的文件清单应补“全选视频”“全选图片”“清空选择”等按类型快捷选择入口，用来配合已收口的“批量编辑/批量处理禁止媒体混选”规则，避免管理员只能靠手工逐项勾选拆分选择集。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:13 +0800
+- 进度：通过 `$grill-with-docs` 继续收口批次详情抽屉内单文件编辑的职责。已确认单文件编辑只作为“例外项精修”入口存在，仅当当前恰好选中 1 个文件时才显示；多选或未选中时隐藏，让批量编辑与批量处理保持主路径地位。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:15 +0800
+- 进度：通过 `$grill-with-docs` 继续收口压缩包批量编辑的承载方式。已确认批量编辑应使用独立弹窗，而不是常驻在批次详情抽屉里或继续叠一层侧边抽屉；批次详情抽屉维持“看批次、选文件、批量处理”的主工作区定位。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:17 +0800
+- 进度：通过 `$grill-with-docs` 继续收口单文件编辑与处理动作的分工。已确认单文件编辑区只负责保存文件级元数据，不再自己承载“处理文件”按钮；处理动作统一留在批次详情抽屉主动作区，单选时再自然退化成“处理当前文件”。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:18 +0800
+- 进度：通过 `$grill-with-docs` 继续收口上传成功后的落点。已确认上传弹窗成功创建新批次后，界面应自动关闭弹窗、刷新批次列表并直接打开新批次的详情抽屉，保持“上传后立即进入处理”的连续工作流。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:23 +0800
+- 进度：通过 `$grill-with-docs` 继续收口上传后自动切换与未保存修改的冲突。已确认若当前批次详情里仍有未保存的文件级修改，系统在切到新上传批次或其它批次前必须先显式确认是否丢弃，不能为了自动直达新批次而静默丢改动。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:25 +0800
+- 进度：通过 `$grill-with-docs` 继续收口同批次内文件切换的未保存保护。已确认若当前单文件编辑区存在未保存修改，管理员切换到另一个文件前也必须先显式确认是否丢弃；现有 `selectFile()` 直接切换的实现后续需要补 dirty/snapshot 门禁。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-21 10:29 +0800
+- 进度：通过 `$grill-with-docs` 继续收口未保存确认的重复提示策略。已确认压缩包导入里的未保存修改确认不提供“本次不再提示”之类的临时放行；只要改动仍未保存，后续每次文件切换、批次切换或视图关闭都要重新确认。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：grill 收口阶段暂不执行构建；待进入实现后补 `admin-web` 定向测试、构建、`git diff --check` 与乱码扫描。
 
 ## 2026-06-19 19:45 +0800
 - 进度：继续收尾 TV 单片长视频软重试，修正取消重试后的实际播放器副作用，从“停止当前播放器”收窄为“仅回写快照、不主动 pause/stop”，与现有取消不回退会话语义对齐；同步补强 spec 断言，防止回归到停播实现。

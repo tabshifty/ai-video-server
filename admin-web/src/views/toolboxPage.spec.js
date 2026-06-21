@@ -57,15 +57,15 @@ describe('toolbox pages', () => {
     expect(ed2kRoute).not.toContain('hideShellPageHeader')
   })
 
-  it('keeps the archive import tool page outside the admin shell while preserving upload, batch and file editing flows', () => {
+  it('keeps the archive import tool page outside the admin shell while preserving batch-first archive workflows', () => {
     expect(archiveImportTool).toContain('压缩包导入')
     expect(archiveImportTool).toContain('zip、rar、7z')
     expect(archiveImportTool).toContain('支持密码包')
     expect(archiveImportTool).toContain('压缩包内不允许嵌套压缩包')
-    expect(archiveImportTool).toContain('上传批次')
     expect(archiveImportTool).toContain('批次列表')
-    expect(archiveImportTool).toContain('文件详情')
-    expect(archiveImportTool).toContain('FolderOpened')
+    expect(archiveImportTool).toContain('title="上传压缩包"')
+    expect(archiveImportTool).toContain('title="批次详情"')
+    expect(archiveImportTool).toContain('批量编辑')
     expect(archiveImportTool).toContain('formatFileSize(file.file_size)')
     expect(archiveImportTool).not.toContain('file.file_size | formatFileSize')
     expect(archiveImportTool).not.toContain('components/Layout.vue')

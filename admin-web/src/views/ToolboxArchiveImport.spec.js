@@ -39,7 +39,7 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('formatArchiveFileType')
     expect(source).toContain('archiveMediaKindLabel')
     expect(source).toContain('formatArchiveReason')
-    expect(source).toContain('{{ formatArchiveFileType(file) }}')
+    expect(source).toContain('class="archive-file-item__meta"')
     expect(source).toContain('v-if="file.reason"')
     expect(source).not.toContain('{{ file.media_kind }} · {{ formatFileSize(file.file_size) }}')
   })
@@ -54,16 +54,36 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('v-for="file in displayedBatchFiles"')
   })
 
-  it('supports selecting archive files and batch-processing the selected items', () => {
+  it('supports selecting archive files, fast type selection and batch-processing the selected items', () => {
     expect(source).toContain('const selectedFileIDs = ref([])')
     expect(source).toContain('const bulkActions = computed(() => [')
-    expect(source).toContain("label: '处理所选'")
+    expect(source).toContain('processSelectionActionLabel')
     expect(source).toContain('function onArchiveFileSelectToggle(row, event)')
     expect(source).toContain('function processSelectedArchiveFiles()')
+    expect(source).toContain("selectArchiveFilesByKind('video')")
+    expect(source).toContain("selectArchiveFilesByKind('image')")
     expect(source).toContain('BulkActionBar')
     expect(source).toContain('selectedBatchFileCount')
     expect(source).toContain('shiftKey')
-    expect(source).toContain('按住 Shift 可连续选择')
+    expect(source).toContain('左侧勾选位支持多选和 Shift 连选')
+  })
+
+  it('keeps the page batch-first by moving upload into a dialog and batch detail into a drawer', () => {
+    expect(source).toContain('uploadDialogVisible')
+    expect(source).toContain('batchDrawerVisible')
+    expect(source).toContain('title="上传压缩包"')
+    expect(source).toContain('title="批次详情"')
+    expect(source).toContain('batchEditDialogVisible')
+    expect(source).toContain('批量编辑')
+    expect(source).toContain('上传成功后会自动打开新批次详情')
+  })
+
+  it('keeps single-file editing as an exception path without a process button', () => {
+    expect(source).toContain('这里只处理例外项修正；真正的处理动作统一留在下方主动作区。')
+    expect(source).toContain('单文件精修')
+    expect(source).toContain('saveSelectedFile')
+    expect(source).not.toContain('processSelectedFile')
+    expect(source).not.toContain('处理文件</el-button>')
   })
 
   it('allows deleting archive batches from the batch list with confirmation', () => {
@@ -72,6 +92,6 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('async function removeArchiveBatch(batch)')
     expect(source).toContain("'删除批次'")
     expect(source).toContain('删除后会清空该批次的压缩包记录、文件清单和解包目录')
-    expect(source).toContain('archive-batch-item__delete')
+    expect(source).toContain('archive-batch-card__actions')
   })
 })
