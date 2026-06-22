@@ -492,6 +492,28 @@ WHERE id = $1`, videoID, value)
 	return nil
 }
 
+func (r *VideoRepository) SetVideoImageCollectionIfEmpty(ctx context.Context, videoID uuid.UUID, imageCollectionID uuid.UUID) error {
+	if imageCollectionID == uuid.Nil {
+		return nil
+	}
+	resolvedImageCollectionID, err := r.ResolveVideoImageCollectionID(ctx, []uuid.UUID{imageCollectionID})
+	if err != nil {
+		return err
+	}
+	if resolvedImageCollectionID == nil {
+		return nil
+	}
+	_, err = r.pool.Exec(ctx, `
+UPDATE videos
+SET image_collection_id=$2, updated_at=NOW()
+WHERE id=$1 AND image_collection_id IS NULL
+`, videoID, resolvedImageCollectionID)
+	if err != nil {
+		return fmt.Errorf("set video image collection if empty: %w", err)
+	}
+	return nil
+}
+
 func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error) {
 	row := r.pool.QueryRow(ctx, `
 SELECT

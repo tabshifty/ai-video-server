@@ -96,6 +96,8 @@ const batchEditForm = reactive({
   video_type: 'short',
   video_collection_enabled: false,
   video_collection_ids: [],
+  video_image_collection_enabled: false,
+  video_image_collection_id: '',
   image_collection_enabled: false,
   image_collection_ids: []
 })
@@ -141,6 +143,24 @@ const processSelectionActionLabel = computed(() => (selectedFileIDs.value.length
 const currentBatchVideoCount = computed(() => displayedBatchFiles.value.filter((file) => archiveFileProcessKind(file) === 'video').length)
 const currentBatchImageCount = computed(() => displayedBatchFiles.value.filter((file) => archiveFileProcessKind(file) === 'image').length)
 const batchDrawerSize = computed(() => (viewportWidth.value < 1080 ? '100%' : '1100px'))
+const selectedVideoImageCollectionID = computed({
+  get() {
+    if (!selectedFile.value || selectedFile.value.media_kind !== 'video') return ''
+    return String(selectedFile.value.image_collection_ids?.[0] || '')
+  },
+  set(value) {
+    if (!selectedFile.value || selectedFile.value.media_kind !== 'video') return
+    selectedFile.value.image_collection_ids = value ? [value] : []
+  }
+})
+const batchEditVideoImageCollectionID = computed({
+  get() {
+    return String(batchEditForm.video_image_collection_id || '')
+  },
+  set(value) {
+    batchEditForm.video_image_collection_id = String(value || '')
+  }
+})
 const overviewCards = computed(() => {
   const needingAction = batches.value.filter((batch) => batchNeedsAction(batch)).length
   const needPassword = batches.value.filter((batch) => batch.status === 'needs_password').length
@@ -502,10 +522,11 @@ async function onArchiveFileSelectToggle(row, event) {
   if (shouldRangeSelect) {
     const start = Math.min(selectedFileIndexAnchor.value, currentIndex)
     const end = Math.max(selectedFileIndexAnchor.value, currentIndex)
+    const shouldSelectRange = !isSelected
     for (let index = start; index <= end; index += 1) {
       const targetID = String(displayedBatchFiles.value[index]?.id || '').trim()
       if (!targetID) continue
-      if (isSelected) {
+      if (shouldSelectRange) {
         selectedSet.add(targetID)
       } else {
         selectedSet.delete(targetID)
@@ -658,6 +679,10 @@ function pushSelectedCollectionValue(target, collectionID) {
   }
   if (target === 'file-image' && selectedFile.value) {
     selectedFile.value.image_collection_ids = normalizeUUIDSelection([...(selectedFile.value.image_collection_ids || []), collectionID])
+    return
+  }
+  if (target === 'file-video-image' && selectedFile.value) {
+    selectedFile.value.image_collection_ids = normalizeUUIDSelection([collectionID]).slice(0, 1)
   }
 }
 
@@ -831,7 +856,9 @@ async function saveSelectedFile() {
       tags: normalizeTagSelection(selectedFile.value.tags),
       video_type: selectedFile.value.video_type || 'short',
       video_collection_ids: normalizeUUIDSelection(selectedFile.value.video_collection_ids),
-      image_collection_ids: normalizeUUIDSelection(selectedFile.value.image_collection_ids)
+      image_collection_ids: selectedFile.value.media_kind === 'video'
+        ? normalizeUUIDSelection([selectedVideoImageCollectionID.value])
+        : normalizeUUIDSelection(selectedFile.value.image_collection_ids)
     }
     await updateAdminArchiveImportFile(selectedFile.value.id, payload)
     await refreshBatchDetail({ skipConfirm: true })
@@ -852,6 +879,8 @@ function resetBatchEditForm() {
   batchEditForm.video_type = 'short'
   batchEditForm.video_collection_enabled = false
   batchEditForm.video_collection_ids = []
+  batchEditForm.video_image_collection_enabled = false
+  batchEditForm.video_image_collection_id = ''
   batchEditForm.image_collection_enabled = false
   batchEditForm.image_collection_ids = []
 }
@@ -866,6 +895,8 @@ function serializeBatchEditState() {
     video_type: String(batchEditForm.video_type || ''),
     video_collection_enabled: batchEditForm.video_collection_enabled,
     video_collection_ids: [...normalizeUUIDSelection(batchEditForm.video_collection_ids)].sort(),
+    video_image_collection_enabled: batchEditForm.video_image_collection_enabled,
+    video_image_collection_id: String(batchEditForm.video_image_collection_id || ''),
     image_collection_enabled: batchEditForm.image_collection_enabled,
     image_collection_ids: [...normalizeUUIDSelection(batchEditForm.image_collection_ids)].sort()
   })
@@ -916,6 +947,7 @@ async function openBatchEditDialog() {
   if (selectedMediaKind.value === 'video') {
     loadTagSuggestions('')
     loadCollectionSuggestions('')
+    loadImageCollectionSuggestions('')
   } else if (selectedMediaKind.value === 'image') {
     loadImageCollectionSuggestions('')
   }
@@ -937,11 +969,15 @@ function buildBatchEditPayloadForFile(file) {
         ? normalizeUUIDSelection(batchEditForm.video_collection_ids)
         : normalizeUUIDSelection(current.video_collection_ids))
       : normalizeUUIDSelection(current.video_collection_ids),
-    image_collection_ids: archiveFileProcessKind(file) === 'image'
-      ? (batchEditForm.image_collection_enabled
-        ? normalizeUUIDSelection(batchEditForm.image_collection_ids)
-        : normalizeUUIDSelection(current.image_collection_ids))
-      : normalizeUUIDSelection(current.image_collection_ids)
+    image_collection_ids: archiveFileProcessKind(file) === 'video'
+      ? (batchEditForm.video_image_collection_enabled
+        ? normalizeUUIDSelection([batchEditForm.video_image_collection_id])
+        : normalizeUUIDSelection(current.image_collection_ids).slice(0, 1))
+      : (archiveFileProcessKind(file) === 'image'
+          ? (batchEditForm.image_collection_enabled
+            ? normalizeUUIDSelection(batchEditForm.image_collection_ids)
+            : normalizeUUIDSelection(current.image_collection_ids))
+          : normalizeUUIDSelection(current.image_collection_ids))
   }
   return payload
 }
@@ -955,6 +991,7 @@ async function saveBatchEdit() {
   if (selectedMediaKind.value === 'video' && batchEditForm.tags_enabled) changedFieldCount += 1
   if (selectedMediaKind.value === 'video' && batchEditForm.video_type_enabled) changedFieldCount += 1
   if (selectedMediaKind.value === 'video' && batchEditForm.video_collection_enabled) changedFieldCount += 1
+  if (selectedMediaKind.value === 'video' && batchEditForm.video_image_collection_enabled) changedFieldCount += 1
   if (selectedMediaKind.value === 'image' && batchEditForm.image_collection_enabled) changedFieldCount += 1
 
   if (changedFieldCount === 0) {
@@ -1357,6 +1394,7 @@ onUnmounted(() => {
               >
                 <span
                   class="archive-file-item__selection"
+                  :class="{ 'is-selected': selectedFileIDs.includes(String(file.id)) }"
                   role="button"
                   tabindex="0"
                   :aria-label="selectedFileIDs.includes(String(file.id)) ? '取消选择文件' : '选择文件'"
@@ -1448,6 +1486,30 @@ onUnmounted(() => {
                     />
                   </el-select>
                   <el-button class="collection-picker__button" @click="openCreateVideoCollection('file-video')">新建视频合集</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'video'">
+                <div class="collection-picker">
+                  <el-select
+                    v-model="selectedVideoImageCollectionID"
+                    class="collection-picker__select"
+                    filterable
+                    remote
+                    reserve-keyword
+                    clearable
+                    default-first-option
+                    :remote-method="loadImageCollectionSuggestions"
+                    :loading="loadingImageCollections"
+                    placeholder="可选，仅可关联一个图片图集"
+                  >
+                    <el-option
+                      v-for="collection in imageCollectionOptions"
+                      :key="collection.value"
+                      :label="collection.label"
+                      :value="collection.value"
+                    />
+                  </el-select>
+                  <el-button class="collection-picker__button" @click="openCreateImageCollection('file-video-image')">新建图片合集</el-button>
                 </div>
               </el-form-item>
               <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'image'">
@@ -1697,11 +1759,33 @@ onUnmounted(() => {
                   />
                 </el-select>
               </el-form-item>
+              <el-form-item>
+                <el-checkbox v-model="batchEditForm.video_image_collection_enabled">视频关联的图片合集</el-checkbox>
+                <el-select
+                  v-model="batchEditVideoImageCollectionID"
+                  :disabled="!batchEditForm.video_image_collection_enabled"
+                  filterable
+                  remote
+                  reserve-keyword
+                  clearable
+                  placeholder="统一覆盖为同一个图片图集"
+                  style="width: 100%"
+                  :remote-method="loadImageCollectionSuggestions"
+                  :loading="loadingImageCollections"
+                >
+                  <el-option
+                    v-for="collection in imageCollectionOptions"
+                    :key="collection.value"
+                    :label="collection.label"
+                    :value="collection.value"
+                  />
+                </el-select>
+              </el-form-item>
             </template>
 
             <template v-else-if="selectedMediaKind === 'image'">
               <el-form-item>
-                <el-checkbox v-model="batchEditForm.image_collection_enabled">图片合集</el-checkbox>
+                <el-checkbox v-model="batchEditForm.image_collection_enabled">图片入库后加入的合集</el-checkbox>
                 <el-select
                   v-model="batchEditForm.image_collection_ids"
                   :disabled="!batchEditForm.image_collection_enabled"
@@ -2099,7 +2183,26 @@ onUnmounted(() => {
   justify-content: center;
   width: 1.5rem;
   height: 1.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
   color: var(--primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bg-surface) 80%, transparent);
+  transition: border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.archive-file-item__selection:hover,
+.archive-file-item__selection:focus-visible,
+.archive-file-item__selection.is-selected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface));
+}
+
+.archive-file-item__selection:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
 }
 
 .archive-file-item__copy {

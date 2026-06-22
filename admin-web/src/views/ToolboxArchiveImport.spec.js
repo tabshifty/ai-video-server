@@ -59,13 +59,25 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('const bulkActions = computed(() => [')
     expect(source).toContain('processSelectionActionLabel')
     expect(source).toContain('function onArchiveFileSelectToggle(row, event)')
+    expect(source).toContain('const shouldSelectRange = !isSelected')
+    expect(source).toContain('if (shouldSelectRange) {')
     expect(source).toContain('function processSelectedArchiveFiles()')
     expect(source).toContain("selectArchiveFilesByKind('video')")
     expect(source).toContain("selectArchiveFilesByKind('image')")
     expect(source).toContain('BulkActionBar')
     expect(source).toContain('selectedBatchFileCount')
     expect(source).toContain('shiftKey')
+    expect(source).toContain(":class=\"{ 'is-selected': selectedFileIDs.includes(String(file.id)) }\"")
+    expect(source).toContain('border: 1px solid var(--line-strong);')
     expect(source).toContain('左侧勾选位支持多选和 Shift 连选')
+  })
+
+  it('lets archive video files link to one image collection while images can join image collections', () => {
+    expect(source).toContain('selectedVideoImageCollectionID')
+    expect(source).toContain('batchEditVideoImageCollectionID')
+    expect(source).toContain('仅可关联一个图片图集')
+    expect(source).toContain('视频关联的图片合集')
+    expect(source).toContain('图片入库后加入的合集')
   })
 
   it('keeps the page batch-first by moving upload into a dialog and batch detail into a drawer', () => {

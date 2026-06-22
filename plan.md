@@ -1,3 +1,18 @@
+## 2026-06-22 11:17 +0800
+- 进度：根据独立审查修复压缩包视频图片关联边界。旧批次里因历史扫描继承批次默认图片合集的视频文件，处理时不再把该默认值误写成视频图片图集；单文件保存视频时只提交当前可见的唯一图片图集；上传哈希并发唯一冲突分支也会在已有视频缺少图片图集时补写，不再漏掉本次关联。测试同步覆盖默认继承忽略、显式视频关联保留和单视频单图片图集约束。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/services/upload.go`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestArchiveImport|TestArchiveVideoImageCollection' -count=1` 通过；`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js` 通过；`go test ./internal/repository -run 'TestNormalizeSingleImageCollectionID|TestScanVideoRecordReadsOSHash|TestGetVideoOSHash|TestUpdateVideoOSHash' -count=1` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-22 11:07 +0800
+- 进度：完成压缩包导入页回归修复。批次详情文件勾选位现在始终显示可见边框与选中态；Shift 连选改为“未选目标时加入区间、已选目标时移除区间”；视频文件支持设置唯一图片合集，批量编辑也可统一覆盖“视频关联的图片合集”，后端处理视频时把该图片合集写入视频关联，命中已有视频且原本未关联图片合集时补上但不覆盖既有关联。批次默认图片合集继续只继承到图片文件，避免上传默认值误把所有视频挂到同一图片图集。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/services/upload.go`、`internal/repository/video_repository.go`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js` 通过；`go test ./internal/services -run 'TestArchiveImport|TestArchiveVideoImageCollection' -count=1` 通过；`go test ./internal/repository -run 'TestNormalizeSingleImageCollectionID|TestScanVideoRecordReadsOSHash|TestGetVideoOSHash|TestUpdateVideoOSHash' -count=1` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`git diff --check` 通过；乱码扫描无命中。
+
+## 2026-06-22 10:52 +0800
+- 进度：开始修复压缩包导入页三个回归：批次详情文件勾选位不可见、Shift 区间多选失效、压缩包内视频无法关联图片图集。已通过 `$grill-with-docs` 收口“图片和视频关联”语义为复用现有视频图片图集关系，不新增单图直连或封面自动绑定。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js`、`cd admin-web && npm run build`、`go test ./internal/services -run 'TestArchiveImport|TestArchiveVideoImageCollection' -count=1`、`git diff --check`、乱码扫描。
+
 ## 2026-06-21 17:30 +0800
 - 进度：开始修复压缩包导入后视频列表误显示失败。已定位根因是压缩包导入把视频 `original_path` 写成临时 work 文件路径，而该 work 文件会在单文件处理结束时删除，导致后续异步刮削/转码读取源文件失败并把 `videos.status` 打成 `failed`。计划改为先把视频落到稳定原始文件路径再建库，并补服务层定向测试锁定该约束。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`

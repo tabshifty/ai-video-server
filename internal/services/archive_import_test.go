@@ -171,3 +171,87 @@ func TestCopyArchiveVideoSourceFileUsesStablePathOutsideWorkDir(t *testing.T) {
 		t.Fatalf("work file should remain for caller cleanup, stat error = %v", err)
 	}
 }
+
+func TestNormalizeArchiveVideoImageCollectionIDs(t *testing.T) {
+	t.Parallel()
+
+	id := uuid.MustParse("55555555-5555-5555-8555-555555555555")
+	got, err := normalizeArchiveVideoImageCollectionIDs([]uuid.UUID{id, id})
+	if err != nil {
+		t.Fatalf("normalizeArchiveVideoImageCollectionIDs() error = %v", err)
+	}
+	if len(got) != 1 || got[0] != id {
+		t.Fatalf("normalizeArchiveVideoImageCollectionIDs() = %#v, want single %s", got, id)
+	}
+
+	empty, err := normalizeArchiveVideoImageCollectionIDs(nil)
+	if err != nil {
+		t.Fatalf("normalizeArchiveVideoImageCollectionIDs(nil) error = %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("normalizeArchiveVideoImageCollectionIDs(nil) = %#v, want empty", empty)
+	}
+}
+
+func TestNormalizeArchiveVideoImageCollectionIDsRejectsMultiple(t *testing.T) {
+	t.Parallel()
+
+	_, err := normalizeArchiveVideoImageCollectionIDs([]uuid.UUID{
+		uuid.MustParse("66666666-6666-4666-8666-666666666666"),
+		uuid.MustParse("77777777-7777-4777-8777-777777777777"),
+	})
+	if err == nil {
+		t.Fatal("expected error for multiple image collections on one video")
+	}
+}
+
+func TestArchiveImageCollectionsForScannedFileOnlyAppliesToImages(t *testing.T) {
+	t.Parallel()
+
+	id := uuid.MustParse("88888888-8888-4888-8888-888888888888")
+	if got := archiveImageCollectionsForScannedFile("video", []uuid.UUID{id}); len(got) != 0 {
+		t.Fatalf("video default image collections = %#v, want empty", got)
+	}
+	got := archiveImageCollectionsForScannedFile("image", []uuid.UUID{id})
+	if len(got) != 1 || got[0] != id {
+		t.Fatalf("image default image collections = %#v, want %s", got, id)
+	}
+	got[0] = uuid.Nil
+	next := archiveImageCollectionsForScannedFile("image", []uuid.UUID{id})
+	if next[0] != id {
+		t.Fatal("archiveImageCollectionsForScannedFile should return a copy")
+	}
+}
+
+func TestArchiveVideoImageCollectionsForProcessingIgnoresInheritedBatchDefault(t *testing.T) {
+	t.Parallel()
+
+	defaultID := uuid.MustParse("99999999-9999-4999-8999-999999999999")
+	got, err := archiveVideoImageCollectionsForProcessing(
+		models.ArchiveImportFileListItem{MediaKind: "video", ImageCollectionIDs: []uuid.UUID{defaultID}},
+		models.ArchiveImportBatch{DefaultImageCollectionIDs: []uuid.UUID{defaultID}},
+	)
+	if err != nil {
+		t.Fatalf("archiveVideoImageCollectionsForProcessing() error = %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("inherited default image collections = %#v, want empty", got)
+	}
+}
+
+func TestArchiveVideoImageCollectionsForProcessingKeepsExplicitVideoLink(t *testing.T) {
+	t.Parallel()
+
+	defaultID := uuid.MustParse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+	explicitID := uuid.MustParse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	got, err := archiveVideoImageCollectionsForProcessing(
+		models.ArchiveImportFileListItem{MediaKind: "video", ImageCollectionIDs: []uuid.UUID{explicitID}},
+		models.ArchiveImportBatch{DefaultImageCollectionIDs: []uuid.UUID{defaultID}},
+	)
+	if err != nil {
+		t.Fatalf("archiveVideoImageCollectionsForProcessing() error = %v", err)
+	}
+	if len(got) != 1 || got[0] != explicitID {
+		t.Fatalf("explicit video image collection = %#v, want %s", got, explicitID)
+	}
+}

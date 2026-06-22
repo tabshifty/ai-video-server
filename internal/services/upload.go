@@ -150,6 +150,9 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 				return UploadResult{}, err
 			}
 		}
+		if err := s.setExistingVideoImageCollectionIfEmpty(ctx, existingID, existingVideo, in.ImageCollectionID); err != nil {
+			return UploadResult{}, err
+		}
 		if shouldRefreshExistingVideoOriginalPath(existingVideo.Status) && strings.TrimSpace(existingVideo.OriginalPath) != strings.TrimSpace(in.FilePath) {
 			if err := s.repo.UpdateVideoOriginalPath(ctx, existingID, in.FilePath); err != nil {
 				return UploadResult{}, err
@@ -249,6 +252,9 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 			if existingVideo.Type != in.Type {
 				return UploadResult{}, ErrHashTypeConflict
 			}
+			if err := s.setExistingVideoImageCollectionIfEmpty(ctx, existingID, existingVideo, in.ImageCollectionID); err != nil {
+				return UploadResult{}, err
+			}
 			return UploadResult{
 				VideoID:       existingID,
 				Status:        existingVideo.Status,
@@ -271,6 +277,13 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		TargetFormat:  "mp4",
 		OSHash:        osHash,
 	}, nil
+}
+
+func (s *UploadService) setExistingVideoImageCollectionIfEmpty(ctx context.Context, existingID uuid.UUID, existingVideo models.Video, imageCollectionID *uuid.UUID) error {
+	if imageCollectionID == nil || existingVideo.ImageCollectionID != nil {
+		return nil
+	}
+	return s.repo.SetVideoImageCollectionIfEmpty(ctx, existingID, *imageCollectionID)
 }
 
 func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, collectionIDs []uuid.UUID, imageCollectionID *uuid.UUID, siteCategory, clientHash string, maxVideoSize int64) (UploadResult, error) {

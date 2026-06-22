@@ -472,7 +472,12 @@ func (s *ArchiveImportService) UpdateFile(ctx context.Context, fileID uuid.UUID,
 	}
 
 	imageCollections := dedupeArchiveUUIDs(in.ImageCollectionIDs)
-	if file.MediaKind != "image" {
+	if file.MediaKind == "video" {
+		imageCollections, err = normalizeArchiveVideoImageCollectionIDs(imageCollections)
+		if err != nil {
+			return models.ArchiveImportFileListItem{}, err
+		}
+	} else if file.MediaKind != "image" {
 		imageCollections = nil
 	}
 
@@ -554,6 +559,15 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 		if videoType != "short" {
 			videoCollections = nil
 		}
+		imageCollectionIDs, err := archiveVideoImageCollectionsForProcessing(file, batch)
+		if err != nil {
+			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
+			return models.ArchiveImportFileListItem{}, err
+		}
+		var videoImageCollectionID *uuid.UUID
+		if len(imageCollectionIDs) == 1 {
+			videoImageCollectionID = &imageCollectionIDs[0]
+		}
 		hash, err := hashutil.SHA256(workPath)
 		if err != nil {
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
@@ -565,16 +579,17 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 		}
 		archiveFilename := filepath.Base(file.RelativePath)
 		resultPreview, err := s.uploadSvc.PreviewUploadedFile(ctx, LocalUploadInput{
-			UserID:        userID,
-			FilePath:      workPath,
-			Filename:      archiveFilename,
-			FileSize:      file.FileSize,
-			Title:         title,
-			Desc:          description,
-			Type:          videoType,
-			Tags:          tags,
-			CollectionIDs: videoCollections,
-			Hash:          hash,
+			UserID:            userID,
+			FilePath:          workPath,
+			Filename:          archiveFilename,
+			FileSize:          file.FileSize,
+			Title:             title,
+			Desc:              description,
+			Type:              videoType,
+			Tags:              tags,
+			CollectionIDs:     videoCollections,
+			ImageCollectionID: videoImageCollectionID,
+			Hash:              hash,
 		})
 		if err != nil {
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
@@ -586,16 +601,17 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			return models.ArchiveImportFileListItem{}, err
 		}
 		result, err := s.uploadSvc.SaveUploadedFile(ctx, LocalUploadInput{
-			UserID:        userID,
-			FilePath:      sourcePath,
-			Filename:      archiveFilename,
-			FileSize:      file.FileSize,
-			Title:         title,
-			Desc:          description,
-			Type:          videoType,
-			Tags:          tags,
-			CollectionIDs: videoCollections,
-			Hash:          hash,
+			UserID:            userID,
+			FilePath:          sourcePath,
+			Filename:          archiveFilename,
+			FileSize:          file.FileSize,
+			Title:             title,
+			Desc:              description,
+			Type:              videoType,
+			Tags:              tags,
+			CollectionIDs:     videoCollections,
+			ImageCollectionID: videoImageCollectionID,
+			Hash:              hash,
 		}, 0)
 		if err != nil {
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
@@ -706,6 +722,42 @@ func shouldProcessArchiveFileInBatch(item models.ArchiveImportFileListItem) bool
 	default:
 		return false
 	}
+}
+
+func normalizeArchiveVideoImageCollectionIDs(ids []uuid.UUID) ([]uuid.UUID, error) {
+	out := dedupeArchiveUUIDs(ids)
+	if len(out) > 1 {
+		return nil, fmt.Errorf("视频仅支持关联一个图片图集")
+	}
+	return out, nil
+}
+
+func archiveVideoImageCollectionsForProcessing(file models.ArchiveImportFileListItem, batch models.ArchiveImportBatch) ([]uuid.UUID, error) {
+	fileIDs := dedupeArchiveUUIDs(file.ImageCollectionIDs)
+	if len(fileIDs) == 0 {
+		return nil, nil
+	}
+	defaultIDs := dedupeArchiveUUIDs(batch.DefaultImageCollectionIDs)
+	if sameArchiveUUIDSet(fileIDs, defaultIDs) {
+		return nil, nil
+	}
+	return normalizeArchiveVideoImageCollectionIDs(fileIDs)
+}
+
+func sameArchiveUUIDSet(left, right []uuid.UUID) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[uuid.UUID]struct{}, len(left))
+	for _, id := range left {
+		seen[id] = struct{}{}
+	}
+	for _, id := range right {
+		if _, ok := seen[id]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UUID, password string) (models.ArchiveImportBatch, error) {
@@ -964,7 +1016,7 @@ func scanArchiveEntries(extractedDir string, batch models.ArchiveImportBatch) ([
 			Description:        batch.DefaultDescription,
 			Tags:               append([]string{}, batch.DefaultTags...),
 			VideoCollectionIDs: append([]uuid.UUID{}, batch.DefaultVideoCollectionIDs...),
-			ImageCollectionIDs: append([]uuid.UUID{}, batch.DefaultImageCollectionIDs...),
+			ImageCollectionIDs: archiveImageCollectionsForScannedFile(mediaKind, batch.DefaultImageCollectionIDs),
 			Metadata: map[string]any{
 				"original_filename": filepath.Base(rel),
 				"relative_path":     rel,
@@ -983,6 +1035,13 @@ func scanArchiveEntries(extractedDir string, batch models.ArchiveImportBatch) ([
 		return nil, fmt.Errorf("scan extracted archive entries: %w", err)
 	}
 	return items, nil
+}
+
+func archiveImageCollectionsForScannedFile(mediaKind string, defaultImageCollectionIDs []uuid.UUID) []uuid.UUID {
+	if strings.TrimSpace(mediaKind) != "image" {
+		return nil
+	}
+	return append([]uuid.UUID{}, defaultImageCollectionIDs...)
 }
 
 func archiveBatchCleanupPaths(batch models.ArchiveImportBatch) []string {
