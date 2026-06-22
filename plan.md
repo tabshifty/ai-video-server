@@ -1,3 +1,8 @@
+## 2026-06-22 13:45 +0800
+- 进度：开始将管理端密码管理功能推送到家用部署机。部署前先在部署机 `.env` 写入 `PASSWORD_VAULT_KEY`（不在仓库记录密钥明文），再推送 `deploy master` 触发构建、迁移与重启。
+- 影响文件：`plan.md`；部署机本地文件系统（不进仓库）：`~/deploy/ai-video-server/.env`
+- 验证：待执行 `git diff --check`、乱码扫描、提交、部署机 env 校验、`git push deploy master` 和部署后健康检查。
+
 ## 2026-06-22 12:19 +0800
 - 进度：完成密码库功能的验证收尾。后端定向测试、前端定向测试和前端构建均通过；`go test ./... -count=1` 只失败在沙盒禁止 `httptest.NewServer` 监听本地端口的既有测试，失败点是 `internal/handlers/admin_image_generation_test.go`、`internal/queue/scrape_tasks_test.go`、`internal/services/scraper_av_mdcx_sites_test.go`，与本次密码库改动无关。
 - 影响文件：`plan.md`
