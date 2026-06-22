@@ -13,9 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"video-server/internal/config"
 	"video-server/internal/database"
@@ -197,6 +197,10 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
 	archiveImportSvc := services.NewArchiveImportService(pool, uploadSvc, imageSvc, repo, archiveImportQueueAdapter{enqueuer: enqueuer}, cfg.StorageRoot, cfg.UploadTempDir, logger)
+	passwordVaultCipher, err := services.NewPasswordVaultCipher(cfg.PasswordVaultKey)
+	if err != nil {
+		return err
+	}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -233,6 +237,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 			Model:   cfg.ImageGenerationModel,
 			Timeout: cfg.ImageGenerationTimeout,
 		},
+		passwordVaultCipher,
 	)
 	api.Register(r)
 

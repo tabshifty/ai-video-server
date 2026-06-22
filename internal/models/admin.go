@@ -158,6 +158,24 @@ type AdminTaskListItem struct {
 	ProgressUpdatedAt     *time.Time `json:"progress_updated_at"`
 }
 
+type AdminPasswordVaultEntry struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Account   string    `json:"account"`
+	URL       string    `json:"url"`
+	Note      string    `json:"note"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type AdminPasswordVaultInput struct {
+	Name     string `json:"name"`
+	Account  string `json:"account"`
+	Password string `json:"password"`
+	URL      string `json:"url"`
+	Note     string `json:"note"`
+}
+
 type AdminActor struct {
 	ID         uuid.UUID `json:"id"`
 	Name       string    `json:"name"`

@@ -12,6 +12,7 @@ const displayFiles = [
   './ToolboxArchiveImport.vue',
   './ToolboxImageWorkbench.vue',
   './ToolboxOrphanFiles.vue',
+  './ToolboxPasswordVault.vue',
   './TvAppManage.vue',
   './UserManage.vue',
   './VideoList.vue',

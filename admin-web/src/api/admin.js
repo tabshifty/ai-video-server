@@ -167,6 +167,15 @@ export const deleteLatestOrphanFileScan = () =>
     timeout: 0
   })
 
+export const getAdminPasswordVaultEntries = (params) => request.get('/admin/password-vault', { params })
+export const createAdminPasswordVaultEntry = (payload) => request.post('/admin/password-vault', payload)
+export const updateAdminPasswordVaultEntry = (id, payload) => request.put(`/admin/password-vault/${id}`, payload)
+export const deleteAdminPasswordVaultEntry = (id) =>
+  request.delete(`/admin/password-vault/${id}`, {
+    timeout: 0
+  })
+export const getAdminPasswordVaultPassword = (id) => request.get(`/admin/password-vault/${id}/password`)
+
 export const systemCleanup = (payload) => request.post('/admin/system/cleanup', payload)
 export const getSystemLogs = (params) => request.get('/admin/system/logs', { params })
 

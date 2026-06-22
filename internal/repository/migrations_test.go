@@ -118,6 +118,18 @@ func TestArchiveImportBatchMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+archive_import_batches`)
 }
 
+func TestPasswordVaultEntriesMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0026_password_vault_entries.up.sql")
+	down := readMigrationForTest(t, "0026_password_vault_entries.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+password_vault_entries`)
+	assertSQLPattern(t, up, `(?is)password_ciphertext\s+text\s+not\s+null`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_password_vault_entries_updated`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+password_vault_entries`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

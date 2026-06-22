@@ -66,6 +66,7 @@ DEV_DATA_MODE=remote
 HTTP_ADDR=:18080
 POSTGRES_DSN=postgres://video:video@<部署机 IP>:5432/video_server?sslmode=disable
 REDIS_ADDR=<部署机 IP>:6379
+PASSWORD_VAULT_KEY=<与部署机一致的密码库主密钥>
 TRANSLATION_API_URL=http://<部署机 IP>:8000/v1
 ```
 

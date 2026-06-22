@@ -6,9 +6,15 @@ import (
 	"time"
 )
 
-func TestLoadIncludesAVSiteOverridesAndTokens(t *testing.T) {
+func setRequiredEnv(t *testing.T) {
+	t.Helper()
 	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
 	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("PASSWORD_VAULT_KEY", "password-vault-test-key")
+}
+
+func TestLoadIncludesAVSiteOverridesAndTokens(t *testing.T) {
+	setRequiredEnv(t)
 	t.Setenv("AV_SCRAPER_BASE_URL", "https://javdb.example")
 	t.Setenv("AV_SITE_URL_JAVBUS", "https://javbus.example")
 	t.Setenv("AV_SITE_URL_JAVLIBRARY", "https://javlibrary.example")
@@ -62,8 +68,7 @@ func TestLoadIncludesAVSiteOverridesAndTokens(t *testing.T) {
 }
 
 func TestLoadBuildsAVSiteURLsFromPrefixedEnvVars(t *testing.T) {
-	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
-	t.Setenv("JWT_SECRET", "secret")
+	setRequiredEnv(t)
 	t.Setenv("AV_SITE_URL_JAVDB", "https://javdb.example")
 	t.Setenv("AV_SITE_URL_JAVBUS", "https://javbus.example")
 	t.Setenv("AV_SITE_URL_Foo_Bar", "https://custom.example")
@@ -100,8 +105,7 @@ func TestLoadBuildsAVSiteURLsFromPrefixedEnvVars(t *testing.T) {
 }
 
 func TestLoadFallsBackToBaseURLForJavDBSiteURL(t *testing.T) {
-	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
-	t.Setenv("JWT_SECRET", "secret")
+	setRequiredEnv(t)
 	t.Setenv("AV_SCRAPER_BASE_URL", "https://javdb-fallback.example")
 	_ = os.Unsetenv("AV_SITE_URL_JAVDB")
 
@@ -119,8 +123,7 @@ func TestLoadFallsBackToBaseURLForJavDBSiteURL(t *testing.T) {
 }
 
 func TestLoadIncludesTranslationConfig(t *testing.T) {
-	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
-	t.Setenv("JWT_SECRET", "secret")
+	setRequiredEnv(t)
 	t.Setenv("TRANSLATION_API_URL", "http://127.0.0.1:9000/v1")
 	t.Setenv("TRANSLATION_API_KEY", "token-456")
 	t.Setenv("TRANSLATION_MODEL", "HY-MT1.5-1.8B")
@@ -146,8 +149,7 @@ func TestLoadIncludesTranslationConfig(t *testing.T) {
 }
 
 func TestLoadIncludesImageGenerationConfig(t *testing.T) {
-	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
-	t.Setenv("JWT_SECRET", "secret")
+	setRequiredEnv(t)
 	t.Setenv("IMAGE_GENERATION_API_URL", "https://image-api.example/v1/")
 	t.Setenv("IMAGE_GENERATION_API_KEY", "image-token")
 	t.Setenv("IMAGE_GENERATION_MODEL", "gpt-image-test")
@@ -173,8 +175,7 @@ func TestLoadIncludesImageGenerationConfig(t *testing.T) {
 }
 
 func TestLoadDefaultsImageGenerationModel(t *testing.T) {
-	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
-	t.Setenv("JWT_SECRET", "secret")
+	setRequiredEnv(t)
 
 	cfg, err := Load()
 	if err != nil {
@@ -183,5 +184,19 @@ func TestLoadDefaultsImageGenerationModel(t *testing.T) {
 
 	if cfg.ImageGenerationModel != "gpt-image-2" {
 		t.Fatalf("unexpected default ImageGenerationModel: %s", cfg.ImageGenerationModel)
+	}
+}
+
+func TestLoadRequiresPasswordVaultKey(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
+	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("PASSWORD_VAULT_KEY", "")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("expected Load to require PASSWORD_VAULT_KEY")
+	}
+	if err.Error() != "PASSWORD_VAULT_KEY is required" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

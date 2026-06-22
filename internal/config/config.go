@@ -18,6 +18,7 @@ type Config struct {
 	ServerLogPath              string
 	JWTSecret                  string
 	PlayURLSignSecret          string
+	PasswordVaultKey           string
 	StorageRoot                string
 	PosterStoragePath          string
 	AdminWebDistPath           string
@@ -65,6 +66,7 @@ func Load() (Config, error) {
 		ServerLogPath:              getEnv("SERVER_LOG_PATH", "./.run/server.log"),
 		JWTSecret:                  os.Getenv("JWT_SECRET"),
 		PlayURLSignSecret:          os.Getenv("PLAY_URL_SIGN_SECRET"),
+		PasswordVaultKey:           os.Getenv("PASSWORD_VAULT_KEY"),
 		StorageRoot:                getEnv("STORAGE_ROOT", "./storage"),
 		PosterStoragePath:          getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
 		AdminWebDistPath:           getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist"),
@@ -106,6 +108,9 @@ func Load() (Config, error) {
 	}
 	if cfg.JWTSecret == "" {
 		return Config{}, fmt.Errorf("JWT_SECRET is required")
+	}
+	if strings.TrimSpace(cfg.PasswordVaultKey) == "" {
+		return Config{}, fmt.Errorf("PASSWORD_VAULT_KEY is required")
 	}
 	if strings.TrimSpace(cfg.PlayURLSignSecret) == "" {
 		cfg.PlayURLSignSecret = cfg.JWTSecret

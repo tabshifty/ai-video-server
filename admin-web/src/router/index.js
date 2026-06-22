@@ -23,6 +23,7 @@ import ToolboxEd2k from '../views/ToolboxEd2k.vue'
 import ToolboxArchiveImport from '../views/ToolboxArchiveImport.vue'
 import ToolboxImageWorkbench from '../views/ToolboxImageWorkbench.vue'
 import ToolboxOrphanFiles from '../views/ToolboxOrphanFiles.vue'
+import ToolboxPasswordVault from '../views/ToolboxPasswordVault.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { public: true } },
@@ -46,6 +47,7 @@ const routes = [
   { path: '/toolbox/archive-import', component: ToolboxArchiveImport },
   { path: '/toolbox/image-workbench', component: ToolboxImageWorkbench },
   { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },
+  { path: '/toolbox/password-vault', component: ToolboxPasswordVault },
   { path: '/settings', component: SystemSettings, meta: { hideShellPageHeader: true } },
   { path: '/tasks', component: TaskMonitor, meta: { hideShellPageHeader: true } }
 ]

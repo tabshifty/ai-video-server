@@ -1,3 +1,58 @@
+## 2026-06-22 12:19 +0800
+- 进度：完成密码库功能的验证收尾。后端定向测试、前端定向测试和前端构建均通过；`go test ./... -count=1` 只失败在沙盒禁止 `httptest.NewServer` 监听本地端口的既有测试，失败点是 `internal/handlers/admin_image_generation_test.go`、`internal/queue/scrape_tasks_test.go`、`internal/services/scraper_av_mdcx_sites_test.go`，与本次密码库改动无关。
+- 影响文件：`plan.md`
+- 验证：`git diff --check` 通过；`rg -n $'\uFFFD' .env.example docs/run.md docs/家用部署机.md CONTEXT.md plan.md admin-web/src internal migrations` 无命中；`env GOCACHE=/private/tmp/codex-go-cache go test ./internal/config ./internal/services ./internal/repository ./internal/handlers -run 'TestLoad|TestPasswordVault|TestRegisterIncludesAdminPasswordVaultRoutes|TestPasswordVaultEntriesMigration|TestNormalizePasswordVault|TestScanPasswordVault|TestPasswordVaultCipher' -count=1` 通过；`npm run test -- src/api/admin.spec.js src/views/toolboxPage.spec.js src/components/base/commandPalette.helpers.spec.js src/views/adminDateTimeDisplay.spec.js` 通过；`npm run build` 通过；`env GOCACHE=/private/tmp/codex-go-cache go test ./... -count=1` 失败于沙盒端口限制。
+
+## 2026-06-22 12:17 +0800
+- 进度：补齐密码库功能的部署/示例文档。`PASSWORD_VAULT_KEY` 已写入 `.env.example`、`docs/run.md` 的远程开发示例和 `docs/家用部署机.md` 的部署示例，同时在 `CONTEXT.md` 补充密钥轮换风险。
+- 影响文件：`.env.example`、`docs/run.md`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `git diff --check`、乱码扫描、后端定向测试、前端构建。
+
+## 2026-06-22 11:57 +0800
+- 进度：根据用户要求收敛工具箱密码管理功能为简单 CRUD。实现不再加入乐观锁、导入导出、密码生成、分类标签或二次验证；删除为确认后的直接删除，修改按最后提交覆盖。
+- 影响文件：预计 `migrations/`、`internal/config`、`internal/models`、`internal/repository`、`internal/handlers`、`admin-web/src`、`CONTEXT.md`、`plan.md`
+- 验证：待实现后执行后端定向测试、管理端定向测试、构建、`git diff --check` 与乱码扫描。
+
+## 2026-06-22 11:51 +0800
+- 进度：继续收口工具箱密码管理功能。已确认服务端加密主密钥由必填环境变量 `PASSWORD_VAULT_KEY` 提供，不放业务设置表，也不下发前端；术语沉淀为 `admin 密码库主密钥`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
+## 2026-06-22 11:51 +0800
+- 进度：继续收口工具箱密码管理功能。已确认显示或复制密码前不做二次输入登录密码；列表接口不返回密码明文，只有单条显式显示或复制操作才产生临时明文。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
+## 2026-06-22 11:50 +0800
+- 进度：继续收口工具箱密码管理功能。已确认首期操作只覆盖新增、列表搜索、编辑、删除、复制账号、显示密码与复制密码；不纳入导入导出、密码生成器、标签或分组；搜索不覆盖密码内容。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
+## 2026-06-22 11:48 +0800
+- 进度：继续收口工具箱密码管理功能。已确认首期条目字段只含名称、账号、密码、网址与备注，不纳入标签、分组或权限层级；术语沉淀为 `admin 密码条目字段边界`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
+## 2026-06-22 11:46 +0800
+- 进度：继续收口工具箱密码管理功能。已确认密码库持久化不保存数据库明文，首期采用服务端加密存储；明文只在管理员显式查看或复制时作为临时结果出现。该取舍已新增 ADR 记录，不采用端到端加密或明文入库。
+- 影响文件：`CONTEXT.md`、`docs/adr/0014-admin-password-vault-server-side-encryption.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
+## 2026-06-22 11:45 +0800
+- 进度：继续收口工具箱密码管理功能。已确认密码库归属所有管理员共享，不做个人私有隔离；条目需要支持后端多设备同步，继续待定凭据保护与字段边界。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
+## 2026-06-22 11:44 +0800
+- 进度：继续收口工具箱密码管理功能。已确认首期需要多设备同步，密码条目以后端持久化作为同步来源，不采用纯浏览器本地 IndexedDB 方案；术语沉淀为 `admin 密码库`，强调它不是浏览器本地草稿或偏好。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
+## 2026-06-22 11:32 +0800
+- 进度：开始通过 `$grill-with-docs` 收口工具箱密码管理功能。已确认“账号和密码”指外部服务、网站或设备的登录凭据，不改现有用户登录、管理员账号或认证授权模型；术语沉淀为 `admin 密码条目`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：需求收口中，尚未进入实现。
+
 ## 2026-06-22 11:17 +0800
 - 进度：根据独立审查修复压缩包视频图片关联边界。旧批次里因历史扫描继承批次默认图片合集的视频文件，处理时不再把该默认值误写成视频图片图集；单文件保存视频时只提交当前可见的唯一图片图集；上传哈希并发唯一冲突分支也会在已有视频缺少图片图集时补写，不再漏掉本次关联。测试同步覆盖默认继承忽略、显式视频关联保留和单视频单图片图集约束。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/services/upload.go`、`plan.md`

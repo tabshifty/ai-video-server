@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { FolderOpened, Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
+import { FolderOpened, Key, Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -12,6 +12,7 @@ const ed2kToolHref = computed(() => router.resolve('/toolbox/ed2k').href)
 const archiveImportHref = computed(() => router.resolve('/toolbox/archive-import').href)
 const imageWorkbenchHref = computed(() => router.resolve('/toolbox/image-workbench').href)
 const orphanFilesHref = computed(() => router.resolve('/toolbox/orphan-files').href)
+const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault').href)
 </script>
 
 <template>
@@ -70,6 +71,19 @@ const orphanFilesHref = computed(() => router.resolve('/toolbox/orphan-files').h
             <span class="tool-menu-item__content">
               <strong>孤儿文件扫描</strong>
               <span>盘点存储目录中的未引用持久文件，并按扫描结果统一处理。</span>
+            </span>
+            <span class="tool-menu-item__meta">
+              <el-icon><TopRight /></el-icon>
+              <span>新标签页打开</span>
+            </span>
+          </a>
+          <a class="tool-menu-item" :href="passwordVaultHref" target="_blank" rel="noopener noreferrer">
+            <span class="tool-menu-item__icon">
+              <el-icon><Key /></el-icon>
+            </span>
+            <span class="tool-menu-item__content">
+              <strong>密码管理</strong>
+              <span>记录外部服务、网站和设备的账号密码。</span>
             </span>
             <span class="tool-menu-item__meta">
               <el-icon><TopRight /></el-icon>

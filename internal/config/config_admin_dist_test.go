@@ -6,8 +6,7 @@ import (
 )
 
 func TestLoadAdminWebDistPathFromEnv(t *testing.T) {
-	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
-	t.Setenv("JWT_SECRET", "secret")
+	setRequiredEnv(t)
 	t.Setenv("ADMIN_WEB_DIST_PATH", "/Volumes/large/ai-video-server/current/admin-web-dist")
 
 	cfg, err := Load()
@@ -20,8 +19,7 @@ func TestLoadAdminWebDistPathFromEnv(t *testing.T) {
 }
 
 func TestLoadAdminWebDistPathDefaultsToRelative(t *testing.T) {
-	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
-	t.Setenv("JWT_SECRET", "secret")
+	setRequiredEnv(t)
 	// 不设 ADMIN_WEB_DIST_PATH
 
 	cfg, err := Load()

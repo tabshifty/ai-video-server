@@ -52,7 +52,7 @@ export const adminShellNavGroups = [
         label: '工具箱',
         title: '工具箱',
         icon: 'Tools',
-        alias: 'toolbox tools ed2k orphan scan orphan-files 孤儿文件扫描 archive archive-import archive import zip rar 7z 压缩包导入 压缩包 gjx'
+        alias: 'toolbox tools ed2k orphan scan orphan-files 孤儿文件扫描 archive archive-import archive import zip rar 7z 压缩包导入 压缩包 password vault credentials 密码 密码库 密码管理 gjx'
       }
     ]
   },

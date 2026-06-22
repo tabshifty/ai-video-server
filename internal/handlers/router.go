@@ -83,9 +83,10 @@ type API struct {
 	adminWebDistPath      string
 	enableSwagger         bool
 	imageGenerationConfig ImageGenerationConfig
+	passwordVaultCipher   *services.PasswordVaultCipher
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
 	return &API{
 		repo:                  repo,
 		orphanFileScanRepo:    repo,
@@ -117,6 +118,7 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		adminWebDistPath:      adminWebDistPath,
 		enableSwagger:         enableSwagger,
 		imageGenerationConfig: imageGenerationConfig,
+		passwordVaultCipher:   passwordVaultCipher,
 	}
 }
 
@@ -264,6 +266,11 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/system/orphan-files/scan", a.AdminStartOrphanFileScan)
 			admin.GET("/system/orphan-files/latest", a.AdminLatestOrphanFileScan)
 			admin.DELETE("/system/orphan-files/latest", a.AdminDeleteLatestOrphanFileScan)
+			admin.GET("/password-vault", a.AdminPasswordVaultEntries)
+			admin.POST("/password-vault", a.AdminCreatePasswordVaultEntry)
+			admin.PUT("/password-vault/:id", a.AdminUpdatePasswordVaultEntry)
+			admin.DELETE("/password-vault/:id", a.AdminDeletePasswordVaultEntry)
+			admin.GET("/password-vault/:id/password", a.AdminPasswordVaultPassword)
 			admin.POST("/system/cleanup", a.AdminSystemCleanup)
 			admin.GET("/system/logs", a.AdminSystemLogs)
 			admin.POST("/scrape/preview", a.AdminScrapePreview)

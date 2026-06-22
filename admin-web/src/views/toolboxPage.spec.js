@@ -6,12 +6,14 @@ const ed2kTool = readFileSync(new URL('./ToolboxEd2k.vue', import.meta.url), 'ut
 const archiveImportTool = readFileSync(new URL('./ToolboxArchiveImport.vue', import.meta.url), 'utf8')
 const imageWorkbench = readFileSync(new URL('./ToolboxImageWorkbench.vue', import.meta.url), 'utf8')
 const orphanFilesTool = readFileSync(new URL('./ToolboxOrphanFiles.vue', import.meta.url), 'utf8')
+const passwordVaultTool = readFileSync(new URL('./ToolboxPasswordVault.vue', import.meta.url), 'utf8')
 const systemSettings = readFileSync(new URL('./SystemSettings.vue', import.meta.url), 'utf8')
 const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf8')
 const ed2kRoute = router.match(/\{ path: '\/toolbox\/ed2k'[^}]+\}/)?.[0] || ''
 const archiveImportRoute = router.match(/\{ path: '\/toolbox\/archive-import'[^}]+\}/)?.[0] || ''
 const imageWorkbenchRoute = router.match(/\{ path: '\/toolbox\/image-workbench'[^}]+\}/)?.[0] || ''
 const orphanFilesRoute = router.match(/\{ path: '\/toolbox\/orphan-files'[^}]+\}/)?.[0] || ''
+const passwordVaultRoute = router.match(/\{ path: '\/toolbox\/password-vault'[^}]+\}/)?.[0] || ''
 
 describe('toolbox pages', () => {
   it('keeps the toolbox page as a shell menu of tool entry buttons', () => {
@@ -20,12 +22,14 @@ describe('toolbox pages', () => {
     expect(toolbox).toContain('压缩包导入')
     expect(toolbox).toContain('图像生成工作台')
     expect(toolbox).toContain('孤儿文件扫描')
+    expect(toolbox).toContain('密码管理')
     expect(toolbox).toContain('target="_blank"')
     expect(toolbox).toContain('rel="noopener noreferrer"')
     expect(toolbox).toContain('/toolbox/ed2k')
     expect(toolbox).toContain('/toolbox/archive-import')
     expect(toolbox).toContain('/toolbox/image-workbench')
     expect(toolbox).toContain('/toolbox/orphan-files')
+    expect(toolbox).toContain('/toolbox/password-vault')
     expect(toolbox).not.toContain('parseEd2kLinks')
     expect(toolbox).not.toContain('ed2kInput')
   })
@@ -104,6 +108,24 @@ describe('toolbox pages', () => {
     expect(orphanFilesRoute).toContain('ToolboxOrphanFiles')
     expect(orphanFilesRoute).not.toContain('public: true')
     expect(orphanFilesRoute).not.toContain('hideShellPageHeader')
+  })
+
+  it('adds password management as a no-shell authenticated toolbox page', () => {
+    expect(passwordVaultTool).toContain('密码管理')
+    expect(passwordVaultTool).toContain('返回工具箱')
+    expect(passwordVaultTool).toContain('getAdminPasswordVaultEntries')
+    expect(passwordVaultTool).toContain('createAdminPasswordVaultEntry')
+    expect(passwordVaultTool).toContain('updateAdminPasswordVaultEntry')
+    expect(passwordVaultTool).toContain('deleteAdminPasswordVaultEntry')
+    expect(passwordVaultTool).toContain('getAdminPasswordVaultPassword')
+    expect(passwordVaultTool).toContain('显示密码')
+    expect(passwordVaultTool).toContain('复制密码')
+    expect(passwordVaultTool).not.toContain('components/Layout.vue')
+    expect(passwordVaultTool).not.toMatch(/<Layout[>\s]/)
+    expect(passwordVaultRoute).toContain("path: '/toolbox/password-vault'")
+    expect(passwordVaultRoute).toContain('ToolboxPasswordVault')
+    expect(passwordVaultRoute).not.toContain('public: true')
+    expect(passwordVaultRoute).not.toContain('hideShellPageHeader')
   })
 
   it('removes orphan scanning from system settings after the toolbox migration', () => {

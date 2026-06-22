@@ -23,6 +23,7 @@ import {
   createAdminTvSeason,
   createAdminTvSeries,
   deleteAdminTVAppReleaseDraft,
+  deleteAdminPasswordVaultEntry,
   deleteAdminTvEpisode,
   deleteAdminTvSeason,
   deleteAdminTvSeries,
@@ -33,6 +34,8 @@ import {
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
+  getAdminPasswordVaultEntries,
+  getAdminPasswordVaultPassword,
   deleteAdminArchiveImportBatch,
   getAdminVideoTags,
   getAdminTvSeries,
@@ -55,12 +58,14 @@ import {
   startOrphanFileScan,
   updateAdminTVAppRelease,
   updateAdminArchiveImportFile,
+  updateAdminPasswordVaultEntry,
   updateAdminVideoSubtitle,
   updateAdminTvEpisode,
   updateAdminTvSeason,
   updateAdminTvSeries,
   uploadAdminTVAppAPK,
   uploadAdminArchiveImport,
+  createAdminPasswordVaultEntry,
   uploadAdminVideoSubtitle,
   uploadAdminImages
 } from './admin'
@@ -124,6 +129,43 @@ describe('admin image library apis', () => {
     expect(get).toHaveBeenCalledWith('/admin/images/image-1/view', {
       params: { w: 360, h: 270, fit: 'cover', q: 78 },
       responseType: 'blob'
+    })
+  })
+})
+
+describe('admin password vault apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    put.mockReset()
+    remove.mockReset()
+    get.mockResolvedValue({ ok: true })
+    post.mockResolvedValue({ ok: true })
+    put.mockResolvedValue({ ok: true })
+    remove.mockResolvedValue({ ok: true })
+  })
+
+  it('requests password vault list and password reveal endpoints', async () => {
+    await getAdminPasswordVaultEntries({ q: 'nas', page: 1 })
+    await getAdminPasswordVaultPassword('entry-1')
+
+    expect(get).toHaveBeenCalledWith('/admin/password-vault', {
+      params: { q: 'nas', page: 1 }
+    })
+    expect(get).toHaveBeenCalledWith('/admin/password-vault/entry-1/password')
+  })
+
+  it('creates, updates and deletes password vault entries', async () => {
+    const payload = { name: 'NAS', account: 'admin', password: 'secret', url: '', note: '' }
+
+    await createAdminPasswordVaultEntry(payload)
+    await updateAdminPasswordVaultEntry('entry-1', payload)
+    await deleteAdminPasswordVaultEntry('entry-1')
+
+    expect(post).toHaveBeenCalledWith('/admin/password-vault', payload)
+    expect(put).toHaveBeenCalledWith('/admin/password-vault/entry-1', payload)
+    expect(remove).toHaveBeenCalledWith('/admin/password-vault/entry-1', {
+      timeout: 0
     })
   })
 })
