@@ -1,3 +1,18 @@
+## 2026-06-22 13:59 +0800
+- 进度：完成工具箱菜单布局收尾。管理端构建、`git diff --check` 和乱码扫描均已通过；Vite 仅保留现有 chunk size 警告。
+- 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/toolboxPage.spec.js` 通过；`cd admin-web && npm run build` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' admin-web/src/views/Toolbox.vue admin-web/src/views/toolboxPage.spec.js CONTEXT.md plan.md` 无命中。
+
+## 2026-06-22 13:57 +0800
+- 进度：完成工具箱菜单自适应布局实现。`Toolbox.vue` 已从无限 `auto-fit` 改为最多四列，并在 `80rem`、`64rem`、`48rem` 下逐级降为三列、两列、单列；`toolboxPage.spec.js` 增加静态回归断言；`CONTEXT.md` 补充工具箱菜单密度边界。此次只影响管理端 Web，不涉及 Android App 版本号。
+- 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/toolboxPage.spec.js` 通过；待执行 `cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
+## 2026-06-22 13:55 +0800
+- 进度：开始调整管理端工具箱菜单布局。已确认当前 `Toolbox.vue` 使用 `auto-fit`，宽屏可能超过四列；计划先补静态断言锁定“最多四列、自适应降列”，再改 CSS、更新上下文并跑管理端验证。
+- 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/toolboxPage.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-22 13:50 +0800
 - 进度：完成家用部署机推送。部署机 `.env` 已配置 `PASSWORD_VAULT_KEY`（未在仓库记录明文）；`git push deploy master` 已将 `fa4909e` 推送到部署机，远端 hook 完成前端构建、Go 构建、codesign、migration、launchctl kickstart，并返回 `/healthz OK`。GitHub mirror push 在部署机 hook 中失败但标记为 non-fatal，不影响家用部署机部署。
 - 影响文件：`plan.md`；部署机本地文件系统（不进仓库）：`~/deploy/ai-video-server/.env`

@@ -104,7 +104,7 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
 
 .tool-menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
@@ -176,6 +176,18 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
   color: var(--text-muted);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
+}
+
+@media (max-width: 80rem) {
+  .tool-menu-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 64rem) {
+  .tool-menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 48rem) {

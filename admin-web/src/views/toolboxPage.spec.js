@@ -34,6 +34,14 @@ describe('toolbox pages', () => {
     expect(toolbox).not.toContain('ed2kInput')
   })
 
+  it('keeps the toolbox menu responsive with at most four items per row', () => {
+    expect(toolbox).toContain('grid-template-columns: repeat(4, minmax(0, 1fr))')
+    expect(toolbox).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))')
+    expect(toolbox).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(toolbox).toContain('grid-template-columns: 1fr')
+    expect(toolbox).not.toContain('grid-template-columns: repeat(auto-fit')
+  })
+
   it('keeps the ED2K tool page outside the admin shell while preserving the tool workflow', () => {
     expect(ed2kTool).toContain('ED2K 链接生成器')
     expect(ed2kTool).toContain('parseEd2kLinks')
