@@ -1,3 +1,8 @@
+## 2026-06-22 13:50 +0800
+- 进度：完成家用部署机推送。部署机 `.env` 已配置 `PASSWORD_VAULT_KEY`（未在仓库记录明文）；`git push deploy master` 已将 `fa4909e` 推送到部署机，远端 hook 完成前端构建、Go 构建、codesign、migration、launchctl kickstart，并返回 `/healthz OK`。GitHub mirror push 在部署机 hook 中失败但标记为 non-fatal，不影响家用部署机部署。
+- 影响文件：`plan.md`；部署机本地文件系统（不进仓库）：`~/deploy/ai-video-server/.env`
+- 验证：部署机侧 `curl -fsS http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`；`launchctl print` 确认 `com.aivideo.server` 与 `com.aivideo.worker` 均为 `running`。
+
 ## 2026-06-22 13:45 +0800
 - 进度：开始将管理端密码管理功能推送到家用部署机。部署前先在部署机 `.env` 写入 `PASSWORD_VAULT_KEY`（不在仓库记录密钥明文），再推送 `deploy master` 触发构建、迁移与重启。
 - 影响文件：`plan.md`；部署机本地文件系统（不进仓库）：`~/deploy/ai-video-server/.env`
