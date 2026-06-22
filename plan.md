@@ -1,3 +1,8 @@
+## 2026-06-22 14:02 +0800
+- 进度：完成工具箱菜单最多四列改动的家用部署机推送。`git push deploy master` 已将 `da2a56f` 推送到部署机，hook 判定 `REBUILD_FRONTEND=1`、`RESTART_GO=0`，完成 `admin-web` 构建并更新前端产物；GitHub mirror push 在部署机 hook 中失败但标记为 non-fatal。
+- 影响文件：`plan.md`
+- 验证：部署机侧 `ssh chee@192.168.1.24 'curl -fsS http://127.0.0.1:8080/healthz'` 返回 `{"status":"ok"}`。
+
 ## 2026-06-22 13:59 +0800
 - 进度：完成工具箱菜单布局收尾。管理端构建、`git diff --check` 和乱码扫描均已通过；Vite 仅保留现有 chunk size 警告。
 - 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
