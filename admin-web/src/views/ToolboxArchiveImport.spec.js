@@ -80,6 +80,15 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('图片入库后加入的合集')
   })
 
+  it('uses batch title as the default video title and keeps batch title overrides available', () => {
+    expect(source).toContain('视频默认标题')
+    expect(source).toContain('可不填，默认取压缩包文件名')
+    expect(source).toContain('title_enabled')
+    expect(source).toContain('batchEditForm.title')
+    expect(source).toContain('统一覆盖为同一个标题；留空回到视频默认标题')
+    expect(source).not.toContain('批次标题')
+  })
+
   it('keeps the page batch-first by moving upload into a dialog and batch detail into a drawer', () => {
     expect(source).toContain('uploadDialogVisible')
     expect(source).toContain('batchDrawerVisible')

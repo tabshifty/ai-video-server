@@ -452,9 +452,15 @@ func (s *ArchiveImportService) UpdateFile(ctx context.Context, fileID uuid.UUID,
 	}
 
 	title := strings.TrimSpace(in.Title)
-	if title == "" {
-		title = file.Title
+	batchTitle := ""
+	if title == "" && file.MediaKind == "video" {
+		batch, err := s.GetBatch(ctx, file.BatchID)
+		if err != nil {
+			return models.ArchiveImportFileListItem{}, err
+		}
+		batchTitle = archiveVideoDefaultTitle(batch, file.RelativePath)
 	}
+	title = archiveFileTitleForUpdate(in.Title, file, batchTitle)
 	description := strings.TrimSpace(in.Description)
 	tags := normalizeArchiveTags(in.Tags)
 
@@ -538,10 +544,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 	}
 	defer func() { _ = os.Remove(workPath) }()
 
-	title := strings.TrimSpace(file.Title)
-	if title == "" {
-		title = deriveArchiveFileTitle(file.RelativePath)
-	}
+	title := archiveFileTitleForProcessing(file, batch)
 	description := strings.TrimSpace(file.Description)
 	tags := append([]string{}, file.Tags...)
 	if len(tags) == 0 {
@@ -998,10 +1001,6 @@ func scanArchiveEntries(extractedDir string, batch models.ArchiveImportBatch) ([
 				reason = "unsupported_file_type"
 			}
 		}
-		title := deriveArchiveFileTitle(rel)
-		if batch.DefaultTitlePrefix != "" {
-			title = batch.DefaultTitlePrefix + " " + title
-		}
 		item := archiveImportFileMeta{
 			RelativePath:       rel,
 			FilePath:           path,
@@ -1012,7 +1011,7 @@ func scanArchiveEntries(extractedDir string, batch models.ArchiveImportBatch) ([
 			MIMEType:           mimeType,
 			Status:             status,
 			Reason:             reason,
-			Title:              title,
+			Title:              archiveFileTitleForScannedFile(mediaKind, rel, batch),
 			Description:        batch.DefaultDescription,
 			Tags:               append([]string{}, batch.DefaultTags...),
 			VideoCollectionIDs: append([]uuid.UUID{}, batch.DefaultVideoCollectionIDs...),
@@ -1042,6 +1041,48 @@ func archiveImageCollectionsForScannedFile(mediaKind string, defaultImageCollect
 		return nil
 	}
 	return append([]uuid.UUID{}, defaultImageCollectionIDs...)
+}
+
+func archiveFileTitleForScannedFile(mediaKind, relativePath string, batch models.ArchiveImportBatch) string {
+	if strings.TrimSpace(mediaKind) == "video" {
+		return archiveVideoDefaultTitle(batch, relativePath)
+	}
+	return deriveArchiveFileTitle(relativePath)
+}
+
+func archiveFileTitleForProcessing(file models.ArchiveImportFileListItem, batch models.ArchiveImportBatch) string {
+	title := strings.TrimSpace(file.Title)
+	if title != "" {
+		return title
+	}
+	if strings.TrimSpace(file.MediaKind) == "video" {
+		return archiveVideoDefaultTitle(batch, file.RelativePath)
+	}
+	return deriveArchiveFileTitle(file.RelativePath)
+}
+
+func archiveFileTitleForUpdate(inputTitle string, file models.ArchiveImportFileListItem, batchTitle string) string {
+	title := strings.TrimSpace(inputTitle)
+	if title != "" {
+		return title
+	}
+	if strings.TrimSpace(file.MediaKind) == "video" {
+		if title = strings.TrimSpace(batchTitle); title != "" {
+			return title
+		}
+		return deriveArchiveFileTitle(file.RelativePath)
+	}
+	return file.Title
+}
+
+func archiveVideoDefaultTitle(batch models.ArchiveImportBatch, relativePath string) string {
+	if title := strings.TrimSpace(batch.DefaultTitlePrefix); title != "" {
+		return title
+	}
+	if title := strings.TrimSpace(batch.Title); title != "" {
+		return title
+	}
+	return deriveArchiveFileTitle(relativePath)
 }
 
 func archiveBatchCleanupPaths(batch models.ArchiveImportBatch) []string {

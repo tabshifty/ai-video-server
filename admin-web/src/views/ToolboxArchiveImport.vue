@@ -88,6 +88,8 @@ const quickCollectionForm = reactive({
 })
 
 const batchEditForm = reactive({
+  title_enabled: false,
+  title: '',
   description_enabled: false,
   description: '',
   tags_enabled: false,
@@ -871,6 +873,8 @@ async function saveSelectedFile() {
 }
 
 function resetBatchEditForm() {
+  batchEditForm.title_enabled = false
+  batchEditForm.title = ''
   batchEditForm.description_enabled = false
   batchEditForm.description = ''
   batchEditForm.tags_enabled = false
@@ -887,6 +891,8 @@ function resetBatchEditForm() {
 
 function serializeBatchEditState() {
   return JSON.stringify({
+    title_enabled: batchEditForm.title_enabled,
+    title: String(batchEditForm.title || ''),
     description_enabled: batchEditForm.description_enabled,
     description: String(batchEditForm.description || ''),
     tags_enabled: batchEditForm.tags_enabled,
@@ -956,7 +962,9 @@ async function openBatchEditDialog() {
 function buildBatchEditPayloadForFile(file) {
   const current = normalizeArchiveFileState(file)
   const payload = {
-    title: current.title || '',
+    title: archiveFileProcessKind(file) === 'video' && batchEditForm.title_enabled
+      ? String(batchEditForm.title || '')
+      : current.title || '',
     description: batchEditForm.description_enabled ? batchEditForm.description : (current.description || ''),
     tags: archiveFileProcessKind(file) === 'video'
       ? (batchEditForm.tags_enabled ? normalizeTagSelection(batchEditForm.tags) : normalizeTagSelection(current.tags))
@@ -987,6 +995,7 @@ async function saveBatchEdit() {
   if (targets.length <= 1 || batchEditSaving.value || !canOpenBatchEdit.value) return
 
   let changedFieldCount = 0
+  if (selectedMediaKind.value === 'video' && batchEditForm.title_enabled) changedFieldCount += 1
   if (batchEditForm.description_enabled) changedFieldCount += 1
   if (selectedMediaKind.value === 'video' && batchEditForm.tags_enabled) changedFieldCount += 1
   if (selectedMediaKind.value === 'video' && batchEditForm.video_type_enabled) changedFieldCount += 1
@@ -1583,7 +1592,7 @@ onUnmounted(() => {
           </el-upload>
 
           <el-form label-width="116px" class="archive-upload-form">
-            <el-form-item label="批次标题"><el-input v-model="uploadForm.title" placeholder="可不填，默认取文件名" /></el-form-item>
+            <el-form-item label="视频默认标题"><el-input v-model="uploadForm.title" placeholder="可不填，默认取压缩包文件名" /></el-form-item>
             <el-form-item label="默认说明"><el-input v-model="uploadForm.default_description" type="textarea" :rows="2" /></el-form-item>
             <el-form-item label="默认标签">
               <el-select
@@ -1703,6 +1712,14 @@ onUnmounted(() => {
             </el-form-item>
 
             <template v-if="selectedMediaKind === 'video'">
+              <el-form-item>
+                <el-checkbox v-model="batchEditForm.title_enabled">标题</el-checkbox>
+                <el-input
+                  v-model="batchEditForm.title"
+                  :disabled="!batchEditForm.title_enabled"
+                  placeholder="统一覆盖为同一个标题；留空回到视频默认标题"
+                />
+              </el-form-item>
               <el-form-item>
                 <el-checkbox v-model="batchEditForm.tags_enabled">标签</el-checkbox>
                 <el-select

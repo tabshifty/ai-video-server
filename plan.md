@@ -1,3 +1,13 @@
+## 2026-06-23 14:35 +0800
+- 进度：完成压缩包导入视频标题语义调整。新上传批次的视频文件默认标题直接使用视频默认标题，不再拼接压缩包内文件名；图片标题继续按文件名派生；单文件或批量编辑把视频标题清空时回到视频默认标题；管理端批量编辑视频新增标题字段用于临时标题分组；`CONTEXT.md` 已沉淀标题语义和标题分组边界。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestArchiveImport' -count=1` 通过；`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md internal/services/archive_import.go internal/services/archive_import_test.go admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js` 无命中。
+
+## 2026-06-23 14:30 +0800
+- 进度：开始调整压缩包导入视频标题语义。已通过 `$grill-with-docs` 确认：上传弹窗的批次标题改为视频默认标题；新上传批次的视频默认直接使用该标题，不再拼接文件名；图片标题继续按文件名派生；单文件标题清空回到视频默认标题；文件清单多选支持批量覆盖标题形成临时标题分组。
+- 影响文件：预计 `internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `go test ./internal/services -run 'TestArchiveImport' -count=1`、`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-06-22 14:02 +0800
 - 进度：完成工具箱菜单最多四列改动的家用部署机推送。`git push deploy master` 已将 `da2a56f` 推送到部署机，hook 判定 `REBUILD_FRONTEND=1`、`RESTART_GO=0`，完成 `admin-web` 构建并更新前端产物；GitHub mirror push 在部署机 hook 中失败但标记为 non-fatal。
 - 影响文件：`plan.md`

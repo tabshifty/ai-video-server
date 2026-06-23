@@ -172,6 +172,81 @@ func TestCopyArchiveVideoSourceFileUsesStablePathOutsideWorkDir(t *testing.T) {
 	}
 }
 
+func TestArchiveFileTitleForScannedFileUsesBatchTitleOnlyForVideos(t *testing.T) {
+	t.Parallel()
+
+	batch := models.ArchiveImportBatch{
+		Title:              "压缩包标题",
+		DefaultTitlePrefix: "视频默认标题",
+	}
+
+	if got := archiveFileTitleForScannedFile("video", "第一组/clip-01.mp4", batch); got != "视频默认标题" {
+		t.Fatalf("video title = %q, want batch title", got)
+	}
+	if got := archiveFileTitleForScannedFile("image", "第一组/cover image.jpg", batch); got != "cover image" {
+		t.Fatalf("image title = %q, want filename-derived title", got)
+	}
+}
+
+func TestArchiveFileTitleForScannedFileFallsBackToBatchTitleAndFilename(t *testing.T) {
+	t.Parallel()
+
+	if got := archiveFileTitleForScannedFile(
+		"video",
+		"clips/fallback-name.mp4",
+		models.ArchiveImportBatch{Title: "批次标题"},
+	); got != "批次标题" {
+		t.Fatalf("video title with batch title = %q, want batch title", got)
+	}
+	if got := archiveFileTitleForScannedFile("video", "clips/fallback-name.mp4", models.ArchiveImportBatch{}); got != "fallback-name" {
+		t.Fatalf("video title without batch title = %q, want filename-derived fallback", got)
+	}
+}
+
+func TestArchiveFileTitleForProcessingBlankVideoUsesBatchTitle(t *testing.T) {
+	t.Parallel()
+
+	batch := models.ArchiveImportBatch{DefaultTitlePrefix: "视频默认标题"}
+	file := models.ArchiveImportFileListItem{
+		MediaKind:    "video",
+		RelativePath: "第二组/demo.mp4",
+		Title:        "",
+	}
+	if got := archiveFileTitleForProcessing(file, batch); got != "视频默认标题" {
+		t.Fatalf("processing title = %q, want batch title", got)
+	}
+
+	file.Title = "单文件标题"
+	if got := archiveFileTitleForProcessing(file, batch); got != "单文件标题" {
+		t.Fatalf("processing explicit title = %q, want explicit title", got)
+	}
+}
+
+func TestArchiveFileTitleForUpdateBlankVideoUsesBatchTitle(t *testing.T) {
+	t.Parallel()
+
+	video := models.ArchiveImportFileListItem{
+		MediaKind:    "video",
+		RelativePath: "第三组/demo.mp4",
+		Title:        "旧单文件标题",
+	}
+	if got := archiveFileTitleForUpdate("", video, "视频默认标题"); got != "视频默认标题" {
+		t.Fatalf("blank video update title = %q, want batch title", got)
+	}
+	if got := archiveFileTitleForUpdate(" 新标题 ", video, "视频默认标题"); got != "新标题" {
+		t.Fatalf("explicit video update title = %q, want trimmed input title", got)
+	}
+
+	image := models.ArchiveImportFileListItem{
+		MediaKind:    "image",
+		RelativePath: "第三组/cover.jpg",
+		Title:        "图片原标题",
+	}
+	if got := archiveFileTitleForUpdate("", image, "视频默认标题"); got != "图片原标题" {
+		t.Fatalf("blank image update title = %q, want existing image title", got)
+	}
+}
+
 func TestNormalizeArchiveVideoImageCollectionIDs(t *testing.T) {
 	t.Parallel()
 
