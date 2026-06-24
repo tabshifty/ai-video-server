@@ -1,3 +1,13 @@
+## 2026-06-24 22:28 +0800
+- 进度：完成压缩包导入 UTF-8 落库报错修复。服务层现在会先把外部解压器 stderr 与批次/文件失败原因归一化为合法 UTF-8，再写入 `archive_import_batches.last_error` / `archive_import_files.reason`；新增纯单测锁定非法字节替换行为，并在 `CONTEXT.md` 沉淀“压缩包错误文本 UTF-8 落库”兼容约束。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestNormalizeArchive|TestSanitizeArchive' -count=1` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md internal/services/archive_import.go internal/services/archive_import_test.go` 无命中。
+
+## 2026-06-24 22:25 +0800
+- 进度：开始修复压缩包导入的 UTF-8 落库报错。已定位为解压器 stderr 或文件系统错误文本可能携带原始非 UTF-8 字节，当前会原样写入 `archive_import_batches.last_error` / `archive_import_files.reason`，触发 Postgres `SQLSTATE 22021`。计划先补服务层纯逻辑测试锁定错误文本归一化，再实现压缩包错误文本 UTF-8 清洗，并同步更新 `CONTEXT.md`。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `go test ./internal/services -run 'TestNormalizeArchive|TestSanitizeArchive' -count=1`、`git diff --check`、`rg -n $'\uFFFD' CONTEXT.md plan.md`
+
 ## 2026-06-24 17:56 +0800
 - 进度：完成 TV 短视频迁移收尾校验。当前仅准备纳入 TV 端短视频全屏播放页、首页 `短视频` action-only 入口、独立路由/仓库接口、相关单测、TV 版本号，以及 `CONTEXT.md`、`android-tv-app/AGENTS.md`、`plan.md` 的长期文档更新；未纳入其它模块改动。
 - 影响文件：`android-tv-app/AGENTS.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/*`、`CONTEXT.md`、`plan.md`

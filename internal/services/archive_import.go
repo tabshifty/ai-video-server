@@ -335,7 +335,7 @@ func (s *ArchiveImportService) UploadArchive(ctx context.Context, in ArchiveImpo
 			return models.ArchiveImportBatch{}, updateErr
 		}
 		batch.Status = status
-		batch.LastError = err.Error()
+		batch.LastError = sanitizeArchiveError(err)
 		return batch, err
 	}
 
@@ -812,7 +812,7 @@ func (s *ArchiveImportService) updateArchiveBatchStatus(ctx context.Context, bat
 UPDATE archive_import_batches
 SET status=$2, last_error=$3, updated_at=NOW()
 WHERE id=$1
-`, batchID, status, strings.TrimSpace(lastError))
+`, batchID, status, sanitizeArchiveText(lastError))
 	if err != nil {
 		return fmt.Errorf("update archive batch status: %w", err)
 	}
@@ -1265,7 +1265,7 @@ func (s *ArchiveImportService) updateArchiveFileFailure(ctx context.Context, fil
 UPDATE archive_import_files
 SET status='failed', reason=$2, processed_at=NOW(), updated_at=NOW()
 WHERE id=$1
-`, fileID, strings.TrimSpace(reason))
+`, fileID, sanitizeArchiveText(reason))
 	if err != nil {
 		return fmt.Errorf("update archive file failure: %w", err)
 	}
@@ -1340,6 +1340,17 @@ func isArchivePasswordRelatedError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "password") || strings.Contains(msg, "passphrase") || strings.Contains(msg, "encrypted")
+}
+
+func sanitizeArchiveText(value string) string {
+	return strings.TrimSpace(strings.ToValidUTF8(value, "\uFFFD"))
+}
+
+func sanitizeArchiveError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return sanitizeArchiveText(err.Error())
 }
 
 func detectArchiveFormat(filename string) (string, error) {
@@ -1458,7 +1469,7 @@ func (s *ArchiveImportService) extractWithBsdtar(ctx context.Context, archivePat
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		output := strings.TrimSpace(stderr.String())
+		output := sanitizeArchiveText(stderr.String())
 		if output != "" {
 			err = fmt.Errorf("%w: %s", err, output)
 		}
@@ -1476,7 +1487,7 @@ func (s *ArchiveImportService) extractWithUnzip(ctx context.Context, archivePath
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		output := strings.TrimSpace(stderr.String())
+		output := sanitizeArchiveText(stderr.String())
 		if output != "" {
 			err = fmt.Errorf("%w: %s", err, output)
 		}
@@ -1502,7 +1513,7 @@ func (s *ArchiveImportService) extractWithSevenZip(ctx context.Context, archiveP
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		output := strings.TrimSpace(stderr.String())
+		output := sanitizeArchiveText(stderr.String())
 		if output != "" {
 			err = fmt.Errorf("%w: %s", err, output)
 		}

@@ -1,9 +1,12 @@
 package services
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -328,6 +331,34 @@ func TestArchiveVideoImageCollectionsForProcessingKeepsExplicitVideoLink(t *test
 	}
 	if len(got) != 1 || got[0] != explicitID {
 		t.Fatalf("explicit video image collection = %#v, want %s", got, explicitID)
+	}
+}
+
+func TestSanitizeArchiveTextReplacesInvalidUTF8(t *testing.T) {
+	t.Parallel()
+
+	input := "解压失败: " + string([]byte{0xc9, 0xcf}) + " 文件"
+	got := sanitizeArchiveText(input)
+	if !utf8.ValidString(got) {
+		t.Fatalf("sanitizeArchiveText() should return valid UTF-8, got %q", got)
+	}
+	if !strings.Contains(got, "解压失败:") || !strings.Contains(got, "文件") {
+		t.Fatalf("sanitizeArchiveText() should preserve valid text, got %q", got)
+	}
+	if strings.Contains(got, string([]byte{0xc9, 0xcf})) {
+		t.Fatalf("sanitizeArchiveText() should remove raw invalid bytes, got %q", got)
+	}
+}
+
+func TestSanitizeArchiveErrorReplacesInvalidUTF8(t *testing.T) {
+	t.Parallel()
+
+	got := sanitizeArchiveError(errors.New("外部命令报错: " + string([]byte{0xc9, 0xcf})))
+	if !utf8.ValidString(got) {
+		t.Fatalf("sanitizeArchiveError() should return valid UTF-8, got %q", got)
+	}
+	if !strings.Contains(got, "外部命令报错:") {
+		t.Fatalf("sanitizeArchiveError() should preserve valid text, got %q", got)
 	}
 }
 
