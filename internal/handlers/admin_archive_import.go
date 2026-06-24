@@ -13,6 +13,18 @@ import (
 	"video-server/internal/services"
 )
 
+type adminArchiveImportGroupRequest struct {
+	Name               string   `json:"name"`
+	Note               string   `json:"note"`
+	Title              string   `json:"title"`
+	Description        string   `json:"description"`
+	Tags               []string `json:"tags"`
+	VideoType          string   `json:"video_type"`
+	VideoCollectionIDs []string `json:"video_collection_ids"`
+	ImageCollectionIDs []string `json:"image_collection_ids"`
+	FileIDs            []string `json:"file_ids"`
+}
+
 // AdminArchiveImportBatches lists archive import batches.
 func (a *API) AdminArchiveImportBatches(c *gin.Context) {
 	if a.archiveImportSvc == nil {
@@ -119,10 +131,207 @@ func (a *API) AdminArchiveImportBatchDetail(c *gin.Context) {
 		response.Error(c, 1072, err.Error())
 		return
 	}
+	groups, err := a.archiveImportSvc.ListGroups(c.Request.Context(), batchID)
+	if err != nil {
+		response.Error(c, 1072, err.Error())
+		return
+	}
 	ok(c, models.ArchiveImportBatchDetail{
 		ArchiveImportBatch: batch,
 		Files:              files,
+		Groups:             groups,
 	})
+}
+
+// AdminCreateArchiveImportGroup creates a batch group from the selected files.
+func (a *API) AdminCreateArchiveImportGroup(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "archive import service unavailable")
+		return
+	}
+	batchID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid batch id")
+		return
+	}
+	var req adminArchiveImportGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	fileIDs, err := parseUUIDStrings(req.FileIDs)
+	if err != nil {
+		bad(c, "文件ID格式错误")
+		return
+	}
+	videoCollectionIDs, err := parseUUIDStrings(req.VideoCollectionIDs)
+	if err != nil {
+		bad(c, "视频合集ID格式错误")
+		return
+	}
+	imageCollectionIDs, err := parseUUIDStrings(req.ImageCollectionIDs)
+	if err != nil {
+		bad(c, "图片合集ID格式错误")
+		return
+	}
+	group, err := a.archiveImportSvc.CreateGroup(c.Request.Context(), batchID, services.ArchiveImportGroupCreateInput{
+		Name:               req.Name,
+		Note:               req.Note,
+		FileIDs:            fileIDs,
+		Title:              req.Title,
+		Description:        req.Description,
+		Tags:               req.Tags,
+		VideoType:          req.VideoType,
+		VideoCollectionIDs: videoCollectionIDs,
+		ImageCollectionIDs: imageCollectionIDs,
+	})
+	if err != nil {
+		response.Error(c, 1072, err.Error())
+		return
+	}
+	ok(c, group)
+}
+
+// AdminUpdateArchiveImportGroup updates batch-group metadata.
+func (a *API) AdminUpdateArchiveImportGroup(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "archive import service unavailable")
+		return
+	}
+	groupID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid group id")
+		return
+	}
+	var req adminArchiveImportGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	videoCollectionIDs, err := parseUUIDStrings(req.VideoCollectionIDs)
+	if err != nil {
+		bad(c, "视频合集ID格式错误")
+		return
+	}
+	imageCollectionIDs, err := parseUUIDStrings(req.ImageCollectionIDs)
+	if err != nil {
+		bad(c, "图片合集ID格式错误")
+		return
+	}
+	group, err := a.archiveImportSvc.UpdateGroup(c.Request.Context(), groupID, services.ArchiveImportGroupUpdateInput{
+		Name:                     req.Name,
+		Note:                     req.Note,
+		UpdateTitle:              true,
+		Title:                    req.Title,
+		UpdateDescription:        true,
+		Description:              req.Description,
+		UpdateTags:               true,
+		Tags:                     req.Tags,
+		UpdateVideoType:          true,
+		VideoType:                req.VideoType,
+		UpdateVideoCollectionIDs: true,
+		VideoCollectionIDs:       videoCollectionIDs,
+		UpdateImageCollectionIDs: true,
+		ImageCollectionIDs:       imageCollectionIDs,
+	})
+	if err != nil {
+		response.Error(c, 1072, err.Error())
+		return
+	}
+	ok(c, group)
+}
+
+// AdminDeleteArchiveImportGroup deletes one archive import group.
+func (a *API) AdminDeleteArchiveImportGroup(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "archive import service unavailable")
+		return
+	}
+	groupID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid group id")
+		return
+	}
+	if err := a.archiveImportSvc.DeleteGroup(c.Request.Context(), groupID); err != nil {
+		response.Error(c, 1077, err.Error())
+		return
+	}
+	ok(c, gin.H{"id": groupID})
+}
+
+// AdminAssignArchiveImportFilesToGroup assigns selected files to one group.
+func (a *API) AdminAssignArchiveImportFilesToGroup(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "archive import service unavailable")
+		return
+	}
+	groupID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid group id")
+		return
+	}
+	var req adminArchiveImportGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	fileIDs, err := parseUUIDStrings(req.FileIDs)
+	if err != nil {
+		bad(c, "文件ID格式错误")
+		return
+	}
+	if err := a.archiveImportSvc.AssignFilesToGroup(c.Request.Context(), groupID, fileIDs); err != nil {
+		response.Error(c, 1072, err.Error())
+		return
+	}
+	ok(c, gin.H{"group_id": groupID, "file_ids": fileIDs})
+}
+
+// AdminRemoveArchiveImportFilesFromGroup moves selected files back to ungrouped.
+func (a *API) AdminRemoveArchiveImportFilesFromGroup(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "archive import service unavailable")
+		return
+	}
+	batchID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid batch id")
+		return
+	}
+	var req adminArchiveImportGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "invalid payload")
+		return
+	}
+	fileIDs, err := parseUUIDStrings(req.FileIDs)
+	if err != nil {
+		bad(c, "文件ID格式错误")
+		return
+	}
+	if err := a.archiveImportSvc.RemoveFilesFromGroup(c.Request.Context(), batchID, fileIDs); err != nil {
+		response.Error(c, 1072, err.Error())
+		return
+	}
+	ok(c, gin.H{"batch_id": batchID, "file_ids": fileIDs})
+}
+
+// AdminProcessArchiveImportGroup processes all pending files in a group.
+func (a *API) AdminProcessArchiveImportGroup(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "archive import service unavailable")
+		return
+	}
+	groupID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid group id")
+		return
+	}
+	files, err := a.archiveImportSvc.ProcessGroup(c.Request.Context(), groupID)
+	if err != nil {
+		response.Error(c, 1076, err.Error())
+		return
+	}
+	ok(c, gin.H{"files": files})
 }
 
 // AdminDeleteArchiveImportBatch deletes one archive import batch and its work files.

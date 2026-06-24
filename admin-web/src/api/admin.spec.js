@@ -37,10 +37,12 @@ import {
   getAdminPasswordVaultEntries,
   getAdminPasswordVaultPassword,
   deleteAdminArchiveImportBatch,
+  deleteAdminArchiveImportGroup,
   getAdminVideoTags,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
   generateAdminImage,
+  createAdminArchiveImportGroup,
   getAdminImageCollections,
   getAdminImageGenerationStatus,
   getAdminImageViewBlob,
@@ -51,11 +53,15 @@ import {
   getLatestOrphanFileScan,
   offlineAdminTVAppRelease,
   publishAdminTVAppRelease,
+  processAdminArchiveImportGroup,
   rescanAdminVideoSubtitles,
+  removeAdminArchiveImportGroupFiles,
   restoreAdminTVAppRelease,
   retryAdminArchiveImportExtract,
   scrapePreview,
   startOrphanFileScan,
+  assignAdminArchiveImportGroupFiles,
+  updateAdminArchiveImportGroup,
   updateAdminTVAppRelease,
   updateAdminArchiveImportFile,
   updateAdminPasswordVaultEntry,
@@ -175,9 +181,11 @@ describe('archive import apis', () => {
     get.mockReset()
     post.mockReset()
     put.mockReset()
+    remove.mockReset()
     get.mockResolvedValue({ ok: true })
     post.mockResolvedValue({ ok: true })
     put.mockResolvedValue({ ok: true })
+    remove.mockResolvedValue({ ok: true })
   })
 
   it('loads archive batches and file detail endpoints', async () => {
@@ -210,6 +218,41 @@ describe('archive import apis', () => {
     })
     expect(put).toHaveBeenCalledWith('/admin/archive-import/files/file-1', { title: '标题' })
     expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/retry-extract', payload)
+  })
+
+  it('manages archive import groups within a batch', async () => {
+    const groupPayload = {
+      name: '第一组',
+      note: '说明',
+      file_ids: ['file-1']
+    }
+    const updatePayload = {
+      name: '第一组',
+      note: '更新说明',
+      title: '组标题',
+      description: '组说明',
+      tags: ['tag-a'],
+      video_type: 'short',
+      video_collection_ids: ['collection-1'],
+      image_collection_ids: ['image-collection-1']
+    }
+    const filePayload = { file_ids: ['file-1', 'file-2'] }
+
+    await createAdminArchiveImportGroup('batch-1', groupPayload)
+    await updateAdminArchiveImportGroup('group-1', updatePayload)
+    await assignAdminArchiveImportGroupFiles('group-1', filePayload)
+    await removeAdminArchiveImportGroupFiles('batch-1', filePayload)
+    await processAdminArchiveImportGroup('group-1')
+    await deleteAdminArchiveImportGroup('group-1')
+
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/groups', groupPayload)
+    expect(put).toHaveBeenCalledWith('/admin/archive-import/groups/group-1', updatePayload)
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/groups/group-1/files', filePayload)
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/groups/remove-files', filePayload)
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/groups/group-1/process')
+    expect(remove).toHaveBeenCalledWith('/admin/archive-import/groups/group-1', {
+      timeout: 0
+    })
   })
 })
 

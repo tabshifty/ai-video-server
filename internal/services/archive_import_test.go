@@ -330,3 +330,120 @@ func TestArchiveVideoImageCollectionsForProcessingKeepsExplicitVideoLink(t *test
 		t.Fatalf("explicit video image collection = %#v, want %s", got, explicitID)
 	}
 }
+
+func TestValidateArchiveImportGroupSelection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		files []models.ArchiveImportFileListItem
+		want  string
+		err   string
+	}{
+		{
+			name: "accepts image selection",
+			files: []models.ArchiveImportFileListItem{
+				{MediaKind: "image", Status: "pending"},
+			},
+			want: "image",
+		},
+		{
+			name: "rejects mixed media kinds",
+			files: []models.ArchiveImportFileListItem{
+				{MediaKind: "video", Status: "pending"},
+				{MediaKind: "image", Status: "pending"},
+			},
+			err: "group selection cannot mix video and image files",
+		},
+		{
+			name: "rejects frozen files",
+			files: []models.ArchiveImportFileListItem{
+				{MediaKind: "video", Status: "ready"},
+			},
+			err: "processed files can no longer move between groups",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateArchiveImportGroupSelection(tt.files)
+			if tt.err != "" {
+				if err == nil || err.Error() != tt.err {
+					t.Fatalf("validateArchiveImportGroupSelection() error = %v, want %q", err, tt.err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("validateArchiveImportGroupSelection() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("validateArchiveImportGroupSelection() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestArchiveImportApplyGroupToFileHonorsOverrides(t *testing.T) {
+	t.Parallel()
+
+	videoCollectionID := uuid.MustParse("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+	groupVideoCollectionID := uuid.MustParse("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+	imageCollectionID := uuid.MustParse("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+	groupTitle := "分组标题"
+	groupDescription := "分组说明"
+	groupVideoType := "movie"
+	file := models.ArchiveImportFileListItem{
+		MediaKind:          "video",
+		RelativePath:       "demo/clip.mp4",
+		Title:              "旧标题",
+		Description:        "文件级说明",
+		Tags:               []string{"old"},
+		VideoType:          "short",
+		VideoCollectionIDs: []uuid.UUID{videoCollectionID},
+		ImageCollectionIDs: nil,
+	}
+	batch := models.ArchiveImportBatch{
+		DefaultTitlePrefix:        "批次标题",
+		DefaultDescription:        "批次说明",
+		DefaultTags:               []string{"batch-tag"},
+		DefaultVideoCollectionIDs: []uuid.UUID{videoCollectionID},
+	}
+	group := models.ArchiveImportGroup{
+		MediaKind:          "video",
+		Title:              &groupTitle,
+		Description:        &groupDescription,
+		Tags:               []string{"group-tag"},
+		VideoType:          &groupVideoType,
+		VideoCollectionIDs: []uuid.UUID{groupVideoCollectionID},
+		ImageCollectionIDs: []uuid.UUID{imageCollectionID},
+	}
+	overrides := archiveImportFieldOverrides{
+		Title:              false,
+		Description:        true,
+		Tags:               false,
+		VideoType:          false,
+		VideoCollectionIDs: true,
+		ImageCollectionIDs: false,
+	}
+
+	archiveImportApplyGroupToFile(&file, batch, &group, overrides)
+
+	if file.Title != groupTitle {
+		t.Fatalf("file.Title = %q, want %q", file.Title, groupTitle)
+	}
+	if file.Description != "文件级说明" {
+		t.Fatalf("file.Description = %q, want file-level override", file.Description)
+	}
+	if len(file.Tags) != 1 || file.Tags[0] != "group-tag" {
+		t.Fatalf("file.Tags = %#v, want group defaults", file.Tags)
+	}
+	if file.VideoType != "movie" {
+		t.Fatalf("file.VideoType = %q, want %q", file.VideoType, "movie")
+	}
+	if len(file.VideoCollectionIDs) != 1 || file.VideoCollectionIDs[0] != videoCollectionID {
+		t.Fatalf("file.VideoCollectionIDs = %#v, want file-level override", file.VideoCollectionIDs)
+	}
+	if len(file.ImageCollectionIDs) != 1 || file.ImageCollectionIDs[0] != imageCollectionID {
+		t.Fatalf("file.ImageCollectionIDs = %#v, want group default image collection", file.ImageCollectionIDs)
+	}
+}

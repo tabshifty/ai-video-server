@@ -46,7 +46,8 @@ describe('ToolboxArchiveImport', () => {
 
   it('lets the archive file list toggle between original order and type sorting', () => {
     expect(source).toContain("const fileSortMode = ref('original')")
-    expect(source).toContain('const displayedBatchFiles = computed(() => sortArchiveFiles(selectedBatchFiles.value))')
+    expect(source).toContain('const filteredBatchFiles = computed(() => filterArchiveFilesByGroup(selectedBatchFiles.value, activeGroupFilter.value))')
+    expect(source).toContain('const displayedBatchFiles = computed(() => sortArchiveFiles(filteredBatchFiles.value))')
     expect(source).toContain('function sortArchiveFiles(files)')
     expect(source).toContain("'按原始顺序'")
     expect(source).toContain("'按类型排序'")
@@ -70,6 +71,20 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain(":class=\"{ 'is-selected': selectedFileIDs.includes(String(file.id)) }\"")
     expect(source).toContain('border: 1px solid var(--line-strong);')
     expect(source).toContain('左侧勾选位支持多选和 Shift 连选')
+  })
+
+  it('adds a persistent group workspace with ungrouped cards and batch move actions', () => {
+    expect(source).toContain('const selectedBatchGroups = ref([])')
+    expect(source).toContain("const ARCHIVE_GROUP_FILTER_UNGROUPED = '__ungrouped__'")
+    expect(source).toContain('archiveGroupCards')
+    expect(source).toContain('未分组固定置顶')
+    expect(source).toContain('创建分组')
+    expect(source).toContain('加入分组')
+    expect(source).toContain('移出分组')
+    expect(source).toContain('成员')
+    expect(source).toContain('未入库')
+    expect(source).toContain('已入库')
+    expect(source).toContain("file.group_name || '未分组'")
   })
 
   it('lets archive video files link to one image collection while images can join image collections', () => {

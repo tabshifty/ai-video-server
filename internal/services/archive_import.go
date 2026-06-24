@@ -219,33 +219,10 @@ WHERE id = $1
 }
 
 func (s *ArchiveImportService) ListFiles(ctx context.Context, batchID uuid.UUID) ([]models.ArchiveImportFileListItem, error) {
-	rows, err := s.db.Query(ctx, `
-SELECT
-  id,
-  batch_id,
-  relative_path,
-  file_path,
-  entry_type,
-  media_kind,
-  video_type,
-  file_size,
-  mime_type,
-  status,
-  COALESCE(reason, ''),
-  COALESCE(title, ''),
-  COALESCE(description, ''),
-  COALESCE(tags, '[]'::jsonb),
-  COALESCE(video_collection_ids, '[]'::jsonb),
-  COALESCE(image_collection_ids, '[]'::jsonb),
-  linked_video_id,
-  linked_image_id,
-  created_at,
-  updated_at,
-  processed_at
-FROM archive_import_files
-WHERE batch_id = $1
-ORDER BY relative_path ASC
-`, batchID)
+	rows, err := s.db.Query(ctx, archiveImportFileSelectSQL(`
+WHERE f.batch_id = $1
+ORDER BY f.relative_path ASC
+`), batchID)
 	if err != nil {
 		return nil, fmt.Errorf("list archive files: %w", err)
 	}
@@ -253,36 +230,10 @@ ORDER BY relative_path ASC
 
 	items := make([]models.ArchiveImportFileListItem, 0, 64)
 	for rows.Next() {
-		var item models.ArchiveImportFileListItem
-		var tagsRaw, videoCollectionsRaw, imageCollectionsRaw []byte
-		if err := rows.Scan(
-			&item.ID,
-			&item.BatchID,
-			&item.RelativePath,
-			&item.FilePath,
-			&item.EntryType,
-			&item.MediaKind,
-			&item.VideoType,
-			&item.FileSize,
-			&item.MIMEType,
-			&item.Status,
-			&item.Reason,
-			&item.Title,
-			&item.Description,
-			&tagsRaw,
-			&videoCollectionsRaw,
-			&imageCollectionsRaw,
-			&item.LinkedVideoID,
-			&item.LinkedImageID,
-			&item.CreatedAt,
-			&item.UpdatedAt,
-			&item.ProcessedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan archive file: %w", err)
+		item, scanErr := scanArchiveImportFileRecord(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan archive file: %w", scanErr)
 		}
-		_ = json.Unmarshal(tagsRaw, &item.Tags)
-		_ = json.Unmarshal(videoCollectionsRaw, &item.VideoCollectionIDs)
-		_ = json.Unmarshal(imageCollectionsRaw, &item.ImageCollectionIDs)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -450,19 +401,47 @@ func (s *ArchiveImportService) UpdateFile(ctx context.Context, fileID uuid.UUID,
 	if err != nil {
 		return models.ArchiveImportFileListItem{}, err
 	}
+	batch, err := s.GetBatch(ctx, file.BatchID)
+	if err != nil {
+		return models.ArchiveImportFileListItem{}, err
+	}
+	var group *models.ArchiveImportGroup
+	if file.GroupID != nil {
+		groupValue, getErr := s.GetGroup(ctx, *file.GroupID)
+		if getErr != nil {
+			return models.ArchiveImportFileListItem{}, getErr
+		}
+		group = &groupValue
+	}
+	defaults := resolveArchiveImportFileDefaults(file, batch, group)
+	overrides := archiveImportFieldOverridesForFile(file, batch, group)
 
 	title := strings.TrimSpace(in.Title)
-	batchTitle := ""
-	if title == "" && file.MediaKind == "video" {
-		batch, err := s.GetBatch(ctx, file.BatchID)
-		if err != nil {
-			return models.ArchiveImportFileListItem{}, err
-		}
-		batchTitle = archiveVideoDefaultTitle(batch, file.RelativePath)
+	if title == "" || title == strings.TrimSpace(defaults.Title) {
+		file.Title = defaults.Title
+		overrides.Title = false
+	} else {
+		file.Title = title
+		overrides.Title = true
 	}
-	title = archiveFileTitleForUpdate(in.Title, file, batchTitle)
+
 	description := strings.TrimSpace(in.Description)
+	if description == strings.TrimSpace(defaults.Description) {
+		file.Description = defaults.Description
+		overrides.Description = false
+	} else {
+		file.Description = description
+		overrides.Description = true
+	}
+
 	tags := normalizeArchiveTags(in.Tags)
+	if sameArchiveStringSet(tags, defaults.Tags) {
+		file.Tags = append([]string{}, defaults.Tags...)
+		overrides.Tags = false
+	} else {
+		file.Tags = append([]string{}, tags...)
+		overrides.Tags = true
+	}
 
 	videoType := strings.ToLower(strings.TrimSpace(in.VideoType))
 	if file.MediaKind != "video" {
@@ -471,10 +450,24 @@ func (s *ArchiveImportService) UpdateFile(ctx context.Context, fileID uuid.UUID,
 	if videoType == "" {
 		videoType = "short"
 	}
+	if file.MediaKind == "video" && strings.EqualFold(videoType, defaults.VideoType) {
+		file.VideoType = defaults.VideoType
+		overrides.VideoType = false
+	} else {
+		file.VideoType = videoType
+		overrides.VideoType = file.MediaKind == "video"
+	}
 
 	videoCollections := dedupeArchiveUUIDs(in.VideoCollectionIDs)
 	if file.MediaKind != "video" {
 		videoCollections = nil
+	}
+	if sameArchiveUUIDSet(videoCollections, defaults.VideoCollectionIDs) {
+		file.VideoCollectionIDs = append([]uuid.UUID{}, defaults.VideoCollectionIDs...)
+		overrides.VideoCollectionIDs = false
+	} else {
+		file.VideoCollectionIDs = append([]uuid.UUID{}, videoCollections...)
+		overrides.VideoCollectionIDs = file.MediaKind == "video"
 	}
 
 	imageCollections := dedupeArchiveUUIDs(in.ImageCollectionIDs)
@@ -486,34 +479,24 @@ func (s *ArchiveImportService) UpdateFile(ctx context.Context, fileID uuid.UUID,
 	} else if file.MediaKind != "image" {
 		imageCollections = nil
 	}
-
-	tagsRaw, err := json.Marshal(tags)
-	if err != nil {
-		return models.ArchiveImportFileListItem{}, fmt.Errorf("marshal archive file tags: %w", err)
-	}
-	videoCollectionsRaw, err := json.Marshal(videoCollections)
-	if err != nil {
-		return models.ArchiveImportFileListItem{}, fmt.Errorf("marshal archive file video collections: %w", err)
-	}
-	imageCollectionsRaw, err := json.Marshal(imageCollections)
-	if err != nil {
-		return models.ArchiveImportFileListItem{}, fmt.Errorf("marshal archive file image collections: %w", err)
+	if sameArchiveUUIDSet(imageCollections, defaults.ImageCollectionIDs) {
+		file.ImageCollectionIDs = append([]uuid.UUID{}, defaults.ImageCollectionIDs...)
+		overrides.ImageCollectionIDs = false
+	} else {
+		file.ImageCollectionIDs = append([]uuid.UUID{}, imageCollections...)
+		overrides.ImageCollectionIDs = file.MediaKind == "video" || file.MediaKind == "image"
 	}
 
-	_, err = s.db.Exec(ctx, `
-UPDATE archive_import_files
-SET
-  title=$2,
-  description=$3,
-  tags=$4,
-  video_type=$5,
-  video_collection_ids=$6,
-  image_collection_ids=$7,
-  updated_at=NOW()
-WHERE id=$1
-`, fileID, title, description, tagsRaw, videoType, videoCollectionsRaw, imageCollectionsRaw)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
-		return models.ArchiveImportFileListItem{}, fmt.Errorf("update archive file: %w", err)
+		return models.ArchiveImportFileListItem{}, fmt.Errorf("begin archive file update tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := updateArchiveImportFileStateTx(ctx, tx, file, overrides); err != nil {
+		return models.ArchiveImportFileListItem{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return models.ArchiveImportFileListItem{}, fmt.Errorf("commit archive file update tx: %w", err)
 	}
 	return s.getArchiveFile(ctx, fileID)
 }
@@ -1336,32 +1319,7 @@ func (s *ArchiveImportService) mustArchiveFileBatchID(ctx context.Context, fileI
 }
 
 func (s *ArchiveImportService) getArchiveFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error) {
-	rows, err := s.db.Query(ctx, `
-SELECT
-  id,
-  batch_id,
-  relative_path,
-  file_path,
-  entry_type,
-  media_kind,
-  video_type,
-  file_size,
-  mime_type,
-  status,
-  COALESCE(reason, ''),
-  COALESCE(title, ''),
-  COALESCE(description, ''),
-  COALESCE(tags, '[]'::jsonb),
-  COALESCE(video_collection_ids, '[]'::jsonb),
-  COALESCE(image_collection_ids, '[]'::jsonb),
-  linked_video_id,
-  linked_image_id,
-  created_at,
-  updated_at,
-  processed_at
-FROM archive_import_files
-WHERE id = $1
-`, fileID)
+	rows, err := s.db.Query(ctx, archiveImportFileSelectSQL(`WHERE f.id = $1`), fileID)
 	if err != nil {
 		return models.ArchiveImportFileListItem{}, fmt.Errorf("query archive file: %w", err)
 	}
@@ -1369,36 +1327,10 @@ WHERE id = $1
 	if !rows.Next() {
 		return models.ArchiveImportFileListItem{}, fmt.Errorf("archive file not found")
 	}
-	var item models.ArchiveImportFileListItem
-	var tagsRaw, videoCollectionsRaw, imageCollectionsRaw []byte
-	if err := rows.Scan(
-		&item.ID,
-		&item.BatchID,
-		&item.RelativePath,
-		&item.FilePath,
-		&item.EntryType,
-		&item.MediaKind,
-		&item.VideoType,
-		&item.FileSize,
-		&item.MIMEType,
-		&item.Status,
-		&item.Reason,
-		&item.Title,
-		&item.Description,
-		&tagsRaw,
-		&videoCollectionsRaw,
-		&imageCollectionsRaw,
-		&item.LinkedVideoID,
-		&item.LinkedImageID,
-		&item.CreatedAt,
-		&item.UpdatedAt,
-		&item.ProcessedAt,
-	); err != nil {
+	item, err := scanArchiveImportFileRecord(rows)
+	if err != nil {
 		return models.ArchiveImportFileListItem{}, fmt.Errorf("scan archive file: %w", err)
 	}
-	_ = json.Unmarshal(tagsRaw, &item.Tags)
-	_ = json.Unmarshal(videoCollectionsRaw, &item.VideoCollectionIDs)
-	_ = json.Unmarshal(imageCollectionsRaw, &item.ImageCollectionIDs)
 	return item, rows.Err()
 }
 

@@ -35,9 +35,16 @@ type taskEnqueuer interface {
 type archiveImportService interface {
 	ListBatches(ctx context.Context, page, pageSize int) ([]models.ArchiveImportBatchListItem, int, error)
 	GetBatchWithFiles(ctx context.Context, batchID uuid.UUID) (models.ArchiveImportBatch, []models.ArchiveImportFileListItem, error)
+	ListGroups(ctx context.Context, batchID uuid.UUID) ([]models.ArchiveImportGroup, error)
 	GetFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error)
 	UploadArchive(ctx context.Context, in services.ArchiveImportUploadInput, fileHeader *multipart.FileHeader) (models.ArchiveImportBatch, error)
 	UpdateFile(ctx context.Context, fileID uuid.UUID, in services.ArchiveImportFileUpdateInput) (models.ArchiveImportFileListItem, error)
+	CreateGroup(ctx context.Context, batchID uuid.UUID, in services.ArchiveImportGroupCreateInput) (models.ArchiveImportGroup, error)
+	UpdateGroup(ctx context.Context, groupID uuid.UUID, in services.ArchiveImportGroupUpdateInput) (models.ArchiveImportGroup, error)
+	DeleteGroup(ctx context.Context, groupID uuid.UUID) error
+	AssignFilesToGroup(ctx context.Context, groupID uuid.UUID, fileIDs []uuid.UUID) error
+	RemoveFilesFromGroup(ctx context.Context, batchID uuid.UUID, fileIDs []uuid.UUID) error
+	ProcessGroup(ctx context.Context, groupID uuid.UUID) ([]models.ArchiveImportFileListItem, error)
 	ProcessFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error)
 	ProcessAllFiles(ctx context.Context, batchID uuid.UUID) ([]models.ArchiveImportFileListItem, error)
 	RetryExtract(ctx context.Context, batchID uuid.UUID, password string) (models.ArchiveImportBatch, error)
@@ -256,7 +263,13 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/archive-import/batches", a.AdminArchiveImportBatches)
 			admin.POST("/archive-import/upload", a.AdminUploadArchiveImport)
 			admin.GET("/archive-import/batches/:id", a.AdminArchiveImportBatchDetail)
+			admin.POST("/archive-import/batches/:id/groups", a.AdminCreateArchiveImportGroup)
+			admin.POST("/archive-import/batches/:id/groups/remove-files", a.AdminRemoveArchiveImportFilesFromGroup)
 			admin.DELETE("/archive-import/batches/:id", a.AdminDeleteArchiveImportBatch)
+			admin.PUT("/archive-import/groups/:id", a.AdminUpdateArchiveImportGroup)
+			admin.DELETE("/archive-import/groups/:id", a.AdminDeleteArchiveImportGroup)
+			admin.POST("/archive-import/groups/:id/files", a.AdminAssignArchiveImportFilesToGroup)
+			admin.POST("/archive-import/groups/:id/process", a.AdminProcessArchiveImportGroup)
 			admin.GET("/archive-import/files/:id", a.AdminArchiveImportFileDetail)
 			admin.PUT("/archive-import/files/:id", a.AdminUpdateArchiveImportFile)
 			admin.POST("/archive-import/files/:id/process", a.AdminProcessArchiveImportFile)

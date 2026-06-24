@@ -1,3 +1,65 @@
+## 2026-06-24 14:59 +0800
+- 进度：完成压缩包导入多分组主链路。后端已补齐分组模型查询、创建/编辑/删除/加入/移出/处理接口与路由；管理端批次详情新增分组工作区、未分组虚拟卡片、分组创建/编辑弹窗、加入/移出分组动作与分组直处理入口，文件行同步显示分组归属。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_groups.go`、`internal/services/archive_import_test.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/router.go`、`internal/models/models.go`、`migrations/0027_archive_import_groups.up.sql`、`migrations/0027_archive_import_groups.down.sql`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`env GOCACHE=/private/tmp/codex-go-cache go test ./internal/services ./internal/handlers -run 'TestArchiveImport|TestRegisterIncludesAdminPasswordVaultRoutes' -count=1` 通过；`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js src/api/admin.spec.js` 通过；`cd admin-web && npm run build` 通过（仅保留既有 chunk size 警告）；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md internal/handlers/admin_archive_import.go internal/handlers/router.go internal/models/models.go internal/services/archive_import.go internal/services/archive_import_groups.go internal/services/archive_import_test.go admin-web/src/api/admin.js admin-web/src/api/admin.spec.js admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js migrations/0027_archive_import_groups.up.sql migrations/0027_archive_import_groups.down.sql` 无命中。
+
+## 2026-06-24 14:40 +0800
+- 进度：继续推进压缩包导入多分组实现，已确认后端现有分组服务骨架已接上 batch detail，当前需要补齐路由/handler 接口并处理 `UpdateFile` 的编译断点，再同步管理端分组工作区。
+- 影响文件：`internal/services/archive_import.go`、`internal/handlers/router.go`、`internal/handlers/admin_archive_import.go`、`admin-web/src/api/admin.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`
+- 验证：待执行后端定向测试、前端定向测试、`npm run build`、`gofmt`、`git diff --check`、乱码扫描。
+
+## 2026-06-24 14:12 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”展示信息。已确认分组卡片至少展示成员总数、未入库数和已入库数，便于管理员快速判断该组是否还有待处理文件。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 14:09 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”迁移交互。已确认文件进组/出组的主交互基于多选后的批量动作完成，分别提供“加入分组”和“移出分组”入口，不走单文件行内复杂下拉。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 14:14 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”编辑边界。已确认真实分组允许改名与改备注；改名后仍需满足同一批次内唯一约束。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 14:10 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”显示顺序。已确认批次详情中“未分组”虚拟区块固定置顶，真实分组按创建时间倒序展示，优先暴露最新仍在整理的分组。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 14:06 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”未分组呈现。已确认批次详情中固定展示“未分组”虚拟区块，用来承载尚未加入任何分组的文件；该区块可直接处理，但不是可重命名或可删除的真实分组。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 14:02 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”命名约束。已确认同一批次内分组名必须唯一，不允许重复，避免回看、重命名和恢复处理时混淆。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 13:50 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”已入库边界。已确认 `ready` / `existing` 这类已入库文件在分组层面冻结：不再允许换组，也不再继续吃到新的分组默认值，避免让管理员误以为正式资产会被同步改写。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”空组生命周期。已确认空分组不自动删除；即使当前没有成员文件，也继续保留，只有管理员显式删除时才真正移除。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”操作层级。已确认分组应作为一级操作对象，允许管理员直接处理本组内仍未入库的成员文件，不要求每次重新勾选同一组文件。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 10:35 +0800
+- 进度：通过 `$grill-with-docs` 收口压缩包导入“多个分组”术语。已将 `CONTEXT.md` 中原先的“压缩包标题分组”改为更通用的“压缩包批次内分组”，统一指同一批次内按文件选择集拆分的多个处理组，不再把它限定成单纯标题覆盖。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”边界。已确认批次内分组不是临时前端选择态，而是需要持久化保存、刷新后可恢复的批次内实体。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”数据来源。已确认分组采用“分组默认值 + 文件级覆盖”模型：分组保存默认元数据，文件先继承，后续单文件修改视为覆盖，不再把分组理解成一次性直接回写所有文件。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”归属约束。已确认同一批次中的单个文件最多只属于一个分组，也允许未分组；不支持多分组同时归属。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”初始归属。已确认新解包文件默认保持未分组，不自动落到所谓默认分组；批次级默认值继续作为未分组文件的首层默认来源。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”媒体边界。已确认分组本身也禁止视频和图片混放；每个分组只能承载单一媒体类型。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”创建路径。已确认管理员应先在文件清单勾选文件，再基于当前选择集创建分组；不采用先建空分组再回填文件的主路径。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”身份字段。已确认分组需要显式命名，分组名必填；备注可选，仅用于管理员区分和回看。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”换组规则。已确认文件换组时采用“重算继承值、保留文件级覆盖”语义：未覆盖字段跟随新分组默认值，已覆盖字段继续保持文件级特例。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”删除语义。已确认删组只删除分组本身，组内文件全部回到未分组；文件级覆盖保留，未覆盖字段回退到批次级默认值。
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入“多个分组”后续联动边界。已确认分组默认值后改会自动更新组内未覆盖的文件记录，但不反向改写已入库的视频/图片实体；分组语义继续限定在入库前工作区。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
 ## 2026-06-23 14:35 +0800
 - 进度：完成压缩包导入视频标题语义调整。新上传批次的视频文件默认标题直接使用视频默认标题，不再拼接压缩包内文件名；图片标题继续按文件名派生；单文件或批量编辑把视频标题清空时回到视频默认标题；管理端批量编辑视频新增标题字段用于临时标题分组；`CONTEXT.md` 已沉淀标题语义和标题分组边界。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`

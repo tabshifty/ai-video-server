@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, Check, CircleCheck, Close, Delete, EditPen, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { Back, Check, CircleCheck, Close, Delete, EditPen, Plus, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
@@ -9,23 +9,32 @@ import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
 import {
+  assignAdminArchiveImportGroupFiles,
   createAdminCollection,
+  createAdminArchiveImportGroup,
   createAdminImageCollection,
   deleteAdminArchiveImportBatch,
+  deleteAdminArchiveImportGroup,
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminCollections,
   getAdminImageCollections,
   getAdminPopularVideoTags,
   getAdminVideoTags,
+  processAdminArchiveImportGroup,
   processAdminArchiveImportFile,
+  removeAdminArchiveImportGroupFiles,
   retryAdminArchiveImportExtract,
+  updateAdminArchiveImportGroup,
   updateAdminArchiveImportFile,
   uploadAdminArchiveImport
 } from '../api/admin'
 import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
 
 const PROCESSABLE_ARCHIVE_FILE_STATUSES = new Set(['pending', 'failed', 'processing'])
+const FROZEN_ARCHIVE_FILE_STATUSES = new Set(['ready', 'existing'])
+const ARCHIVE_GROUP_FILTER_ALL = '__all__'
+const ARCHIVE_GROUP_FILTER_UNGROUPED = '__ungrouped__'
 
 const router = useRouter()
 const loading = ref(false)
@@ -38,13 +47,16 @@ const batchEditSaving = ref(false)
 const batchDrawerVisible = ref(false)
 const uploadDialogVisible = ref(false)
 const batchEditDialogVisible = ref(false)
+const archiveGroupDialogVisible = ref(false)
 const quickCollectionDialogVisible = ref(false)
 const quickCollectionSaving = ref(false)
+const archiveGroupSaving = ref(false)
 const uploadRef = ref(null)
 const uploadFiles = ref([])
 const batchList = ref([])
 const selectedBatch = ref(null)
 const selectedBatchFiles = ref([])
+const selectedBatchGroups = ref([])
 const selectedFileIDs = ref([])
 const selectedFileIndexAnchor = ref(-1)
 const selectedFile = ref(null)
@@ -59,6 +71,11 @@ const loadingCollections = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
 const batchEditSnapshot = ref('')
+const archiveGroupSnapshot = ref('')
+const archiveGroupDialogMode = ref('create')
+const archiveGroupSourceFileIDs = ref([])
+const activeGroupFilter = ref(ARCHIVE_GROUP_FILTER_ALL)
+const assignGroupTargetID = ref('')
 
 const fileSortOptions = [
   { label: '按原始顺序', value: 'original' },
@@ -87,6 +104,19 @@ const quickCollectionForm = reactive({
   description: ''
 })
 
+const archiveGroupForm = reactive({
+  id: '',
+  name: '',
+  note: '',
+  media_kind: 'video',
+  title: '',
+  description: '',
+  tags: [],
+  video_type: 'short',
+  video_collection_ids: [],
+  image_collection_ids: []
+})
+
 const batchEditForm = reactive({
   title_enabled: false,
   title: '',
@@ -106,7 +136,9 @@ const batchEditForm = reactive({
 
 const batches = computed(() => batchList.value || [])
 const quickCollectionDialogTitle = computed(() => (quickCollectionForm.kind === 'image' ? '新建图片合集' : '新建视频合集'))
-const displayedBatchFiles = computed(() => sortArchiveFiles(selectedBatchFiles.value))
+const archiveRealGroups = computed(() => selectedBatchGroups.value || [])
+const filteredBatchFiles = computed(() => filterArchiveFilesByGroup(selectedBatchFiles.value, activeGroupFilter.value))
+const displayedBatchFiles = computed(() => sortArchiveFiles(filteredBatchFiles.value))
 const selectedBatchFileCount = computed(() => selectedFileIDs.value.length)
 const selectedBatchFilesForActions = computed(() => {
   const selectedSet = new Set(selectedFileIDs.value)
@@ -121,6 +153,7 @@ const selectedContainsUnsupportedKinds = computed(() =>
   selectedBatchFilesForActions.value.some((file) => archiveFileProcessKind(file) === '')
 )
 const selectedProcessableFiles = computed(() => selectedBatchFilesForActions.value.filter((file) => canProcessArchiveFile(file)))
+const selectedFrozenFiles = computed(() => selectedBatchFilesForActions.value.filter((file) => isArchiveGroupFrozenFile(file)))
 const selectedUnprocessableCount = computed(() => selectedBatchFilesForActions.value.length - selectedProcessableFiles.value.length)
 const shouldShowSingleFileEditor = computed(() => selectedFileIDs.value.length === 1)
 const selectedFileDirty = computed(() => !!selectedFile.value && serializeSelectedFileState() !== selectedFileSnapshot.value)
@@ -141,10 +174,63 @@ const canOpenBatchEdit = computed(() =>
 const batchEditTargetLabel = computed(() => (selectedMediaKind.value === 'image' ? '已选图片' : '已选视频'))
 const batchEditDialogTitle = computed(() => (selectedMediaKind.value === 'image' ? '批量编辑图片文件' : '批量编辑视频文件'))
 const batchEditDirty = computed(() => serializeBatchEditState() !== batchEditSnapshot.value)
+const archiveGroupDialogTitle = computed(() => (archiveGroupDialogMode.value === 'create' ? '创建分组' : '编辑分组'))
+const archiveGroupDirty = computed(() => serializeArchiveGroupState() !== archiveGroupSnapshot.value)
 const processSelectionActionLabel = computed(() => (selectedFileIDs.value.length === 1 ? '处理当前文件' : '处理所选'))
-const currentBatchVideoCount = computed(() => displayedBatchFiles.value.filter((file) => archiveFileProcessKind(file) === 'video').length)
-const currentBatchImageCount = computed(() => displayedBatchFiles.value.filter((file) => archiveFileProcessKind(file) === 'image').length)
+const currentBatchVideoCount = computed(() => selectedBatchFiles.value.filter((file) => archiveFileProcessKind(file) === 'video').length)
+const currentBatchImageCount = computed(() => selectedBatchFiles.value.filter((file) => archiveFileProcessKind(file) === 'image').length)
 const batchDrawerSize = computed(() => (viewportWidth.value < 1080 ? '100%' : '1100px'))
+const currentArchiveGroupScopeLabel = computed(() => {
+  if (activeGroupFilter.value === ARCHIVE_GROUP_FILTER_ALL) return '全部文件'
+  if (activeGroupFilter.value === ARCHIVE_GROUP_FILTER_UNGROUPED) return '未分组'
+  return archiveRealGroups.value.find((group) => String(group.id || '') === String(activeGroupFilter.value || ''))?.name || '全部文件'
+})
+const canCreateArchiveGroup = computed(() =>
+  selectedBatchFilesForActions.value.length > 0
+  && !hasMixedSelectedMediaKinds.value
+  && !selectedContainsUnsupportedKinds.value
+  && (selectedMediaKind.value === 'video' || selectedMediaKind.value === 'image')
+  && selectedFrozenFiles.value.length === 0
+)
+const assignTargetGroup = computed(() =>
+  archiveRealGroups.value.find((group) => String(group.id || '') === String(assignGroupTargetID.value || '')) || null
+)
+const canAssignSelectedFilesToGroup = computed(() =>
+  canCreateArchiveGroup.value
+  && !!assignTargetGroup.value
+  && String(assignTargetGroup.value?.media_kind || '') === String(selectedMediaKind.value || '')
+)
+const canRemoveSelectedFilesFromGroup = computed(() =>
+  selectedBatchFilesForActions.value.length > 0
+  && selectedFrozenFiles.value.length === 0
+)
+const archiveGroupOptions = computed(() =>
+  archiveRealGroups.value
+    .filter((group) => !selectedMediaKind.value || String(group.media_kind || '') === String(selectedMediaKind.value || ''))
+    .map((group) => ({
+      value: String(group.id || ''),
+      label: group.name
+    }))
+)
+const archiveGroupCards = computed(() => {
+  const ungroupedFiles = groupFilesForCard(ARCHIVE_GROUP_FILTER_UNGROUPED)
+  const cards = [
+    buildArchiveGroupCard({
+      id: ARCHIVE_GROUP_FILTER_UNGROUPED,
+      name: '未分组',
+      note: '',
+      media_kind: '',
+      files: ungroupedFiles
+    })
+  ]
+  for (const group of archiveRealGroups.value) {
+    cards.push(buildArchiveGroupCard(group))
+  }
+  return cards
+})
+const archiveSelectedGroupCard = computed(() =>
+  archiveGroupCards.value.find((group) => String(group.id || '') === String(activeGroupFilter.value || '')) || null
+)
 const selectedVideoImageCollectionID = computed({
   get() {
     if (!selectedFile.value || selectedFile.value.media_kind !== 'video') return ''
@@ -163,6 +249,14 @@ const batchEditVideoImageCollectionID = computed({
     batchEditForm.video_image_collection_id = String(value || '')
   }
 })
+const archiveGroupVideoImageCollectionID = computed({
+  get() {
+    return String(archiveGroupForm.image_collection_ids?.[0] || '')
+  },
+  set(value) {
+    archiveGroupForm.image_collection_ids = value ? [String(value)] : []
+  }
+})
 const overviewCards = computed(() => {
   const needingAction = batches.value.filter((batch) => batchNeedsAction(batch)).length
   const needPassword = batches.value.filter((batch) => batch.status === 'needs_password').length
@@ -176,6 +270,9 @@ const overviewCards = computed(() => {
 })
 const selectionAlert = computed(() => {
   if (selectedBatchFilesForActions.value.length === 0) return { type: '', title: '' }
+  if (selectedFrozenFiles.value.length > 0) {
+    return { type: 'warning', title: '当前选择包含已入库文件；已入库文件允许继续查看，但不能再参与分组迁移。' }
+  }
   if (hasMixedSelectedMediaKinds.value) {
     return { type: 'warning', title: '当前同时选中了视频和图片，请先按媒体类型拆开处理。' }
   }
@@ -257,6 +354,60 @@ function archiveFileProcessKind(file) {
   const kind = String(file?.media_kind || '').trim()
   if (kind === 'video' || kind === 'image') return kind
   return ''
+}
+
+function isArchiveGroupFrozenFile(file) {
+  return FROZEN_ARCHIVE_FILE_STATUSES.has(String(file?.status || '').trim())
+}
+
+function archiveGroupMediaKindLabel(kind) {
+  if (kind === 'video') return '视频分组'
+  if (kind === 'image') return '图片分组'
+  return '虚拟区块'
+}
+
+function normalizeArchiveGroupFilter(value) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return ARCHIVE_GROUP_FILTER_ALL
+  return normalized
+}
+
+function archiveFileBelongsToGroup(file, groupID) {
+  const targetGroupID = normalizeArchiveGroupFilter(groupID)
+  if (targetGroupID === ARCHIVE_GROUP_FILTER_ALL) return true
+  const fileGroupID = String(file?.group_id || '').trim()
+  if (targetGroupID === ARCHIVE_GROUP_FILTER_UNGROUPED) return fileGroupID === ''
+  return fileGroupID === targetGroupID
+}
+
+function filterArchiveFilesByGroup(files, groupID) {
+  return (Array.isArray(files) ? files : []).filter((file) => archiveFileBelongsToGroup(file, groupID))
+}
+
+function groupFilesForCard(groupID) {
+  return filterArchiveFilesByGroup(selectedBatchFiles.value, groupID)
+}
+
+function countArchiveImportedFiles(files) {
+  return files.filter((file) => isArchiveGroupFrozenFile(file)).length
+}
+
+function buildArchiveGroupCard(group) {
+  const id = String(group?.id || '')
+  const files = Array.isArray(group?.files) ? group.files : groupFilesForCard(id)
+  const importedCount = countArchiveImportedFiles(files)
+  const totalCount = files.length
+  return {
+    id,
+    name: group?.name || '未分组',
+    note: String(group?.note || ''),
+    media_kind: String(group?.media_kind || '').trim(),
+    total_count: totalCount,
+    imported_count: importedCount,
+    pending_count: Math.max(totalCount - importedCount, 0),
+    processable_count: files.filter((file) => canProcessArchiveFile(file)).length,
+    files
+  }
 }
 
 function canProcessArchiveFile(file) {
@@ -565,9 +716,30 @@ async function selectArchiveFilesByKind(kind) {
 
 function applyBatchDetailData(data, options = {}) {
   const files = (data?.files || []).map((item) => normalizeArchiveFileState(item))
+  const groups = Array.isArray(data?.groups) ? data.groups : []
+  const previousBatchID = String(selectedBatch.value?.id || '')
   selectedBatch.value = data
   selectedBatchFiles.value = files
+  selectedBatchGroups.value = groups
   retryExtractPassword.value = ''
+  if (String(data?.id || '') !== previousBatchID) {
+    activeGroupFilter.value = ARCHIVE_GROUP_FILTER_ALL
+  } else if (
+    activeGroupFilter.value !== ARCHIVE_GROUP_FILTER_ALL
+    && activeGroupFilter.value !== ARCHIVE_GROUP_FILTER_UNGROUPED
+    && !groups.some((group) => String(group.id || '') === String(activeGroupFilter.value || ''))
+  ) {
+    activeGroupFilter.value = ARCHIVE_GROUP_FILTER_ALL
+  }
+  if (
+    assignGroupTargetID.value
+    && !groups.some((group) => String(group.id || '') === String(assignGroupTargetID.value || ''))
+  ) {
+    assignGroupTargetID.value = ''
+  }
+  if (!assignGroupTargetID.value) {
+    assignGroupTargetID.value = groups[0]?.id ? String(groups[0].id) : ''
+  }
 
   let nextSelection = []
   if (Array.isArray(options.preferredSelectionIDs) && options.preferredSelectionIDs.length > 0) {
@@ -872,6 +1044,289 @@ async function saveSelectedFile() {
   }
 }
 
+function resetArchiveGroupForm() {
+  archiveGroupForm.id = ''
+  archiveGroupForm.name = ''
+  archiveGroupForm.note = ''
+  archiveGroupForm.media_kind = 'video'
+  archiveGroupForm.title = ''
+  archiveGroupForm.description = ''
+  archiveGroupForm.tags = []
+  archiveGroupForm.video_type = 'short'
+  archiveGroupForm.video_collection_ids = []
+  archiveGroupForm.image_collection_ids = []
+}
+
+function serializeArchiveGroupState() {
+  return JSON.stringify({
+    id: String(archiveGroupForm.id || ''),
+    name: String(archiveGroupForm.name || '').trim(),
+    note: String(archiveGroupForm.note || '').trim(),
+    media_kind: String(archiveGroupForm.media_kind || ''),
+    title: String(archiveGroupForm.title || ''),
+    description: String(archiveGroupForm.description || ''),
+    tags: [...normalizeTagSelection(archiveGroupForm.tags)].sort(),
+    video_type: String(archiveGroupForm.video_type || ''),
+    video_collection_ids: [...normalizeUUIDSelection(archiveGroupForm.video_collection_ids)].sort(),
+    image_collection_ids: [...normalizeUUIDSelection(archiveGroupForm.image_collection_ids)].sort()
+  })
+}
+
+function captureArchiveGroupSnapshot() {
+  archiveGroupSnapshot.value = serializeArchiveGroupState()
+}
+
+function fillArchiveGroupForm(group) {
+  resetArchiveGroupForm()
+  archiveGroupForm.id = String(group?.id || '')
+  archiveGroupForm.name = String(group?.name || '')
+  archiveGroupForm.note = String(group?.note || '')
+  archiveGroupForm.media_kind = String(group?.media_kind || 'video') || 'video'
+  archiveGroupForm.title = String(group?.title || '')
+  archiveGroupForm.description = String(group?.description || '')
+  archiveGroupForm.tags = normalizeTagSelection(group?.tags || [])
+  archiveGroupForm.video_type = String(group?.video_type || 'short') || 'short'
+  archiveGroupForm.video_collection_ids = normalizeUUIDSelection(group?.video_collection_ids || [])
+  archiveGroupForm.image_collection_ids = normalizeUUIDSelection(group?.image_collection_ids || [])
+}
+
+async function confirmArchiveGroupDialogClose() {
+  if (!archiveGroupDirty.value) return true
+  try {
+    await ElMessageBox.confirm('未保存的分组修改将会丢失，确认关闭吗？', '确认关闭', {
+      type: 'warning',
+      confirmButtonText: '确认丢弃',
+      cancelButtonText: '继续编辑'
+    })
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
+function handleArchiveGroupDialogClosed() {
+  archiveGroupSourceFileIDs.value = []
+  resetArchiveGroupForm()
+  captureArchiveGroupSnapshot()
+}
+
+async function requestArchiveGroupDialogClose() {
+  if (await confirmArchiveGroupDialogClose()) {
+    archiveGroupDialogVisible.value = false
+  }
+}
+
+function handleArchiveGroupDialogBeforeClose(done) {
+  confirmArchiveGroupDialogClose().then((confirmed) => {
+    if (confirmed) {
+      done()
+    }
+  })
+}
+
+async function setArchiveGroupFilter(groupID) {
+  const nextGroupID = normalizeArchiveGroupFilter(groupID)
+  if (nextGroupID === activeGroupFilter.value) return true
+  if (!(await confirmDiscardUnsavedFileChanges('确认切换分组'))) {
+    return false
+  }
+  activeGroupFilter.value = nextGroupID
+  syncArchiveFileSelection([], -1)
+  return true
+}
+
+async function openArchiveGroupFiles(groupID) {
+  await setArchiveGroupFilter(groupID)
+}
+
+async function openCreateArchiveGroupDialog() {
+  if (!canCreateArchiveGroup.value) return
+  archiveGroupDialogMode.value = 'create'
+  archiveGroupSourceFileIDs.value = selectedBatchFilesForActions.value.map((file) => String(file.id || '')).filter(Boolean)
+  resetArchiveGroupForm()
+  archiveGroupForm.media_kind = selectedMediaKind.value || 'video'
+  captureArchiveGroupSnapshot()
+  archiveGroupDialogVisible.value = true
+  if (archiveGroupForm.media_kind === 'video') {
+    loadTagSuggestions('')
+    loadCollectionSuggestions('')
+    loadImageCollectionSuggestions('')
+  } else {
+    loadImageCollectionSuggestions('')
+  }
+}
+
+async function openEditArchiveGroupDialog(group) {
+  if (!group?.id || group.id === ARCHIVE_GROUP_FILTER_UNGROUPED) return
+  archiveGroupDialogMode.value = 'edit'
+  archiveGroupSourceFileIDs.value = []
+  fillArchiveGroupForm(group)
+  captureArchiveGroupSnapshot()
+  archiveGroupDialogVisible.value = true
+  if (archiveGroupForm.media_kind === 'video') {
+    loadTagSuggestions('')
+    loadCollectionSuggestions('')
+    loadImageCollectionSuggestions('')
+  } else {
+    loadImageCollectionSuggestions('')
+  }
+}
+
+function buildArchiveGroupPayload() {
+  return {
+    name: String(archiveGroupForm.name || '').trim(),
+    note: String(archiveGroupForm.note || '').trim(),
+    title: archiveGroupForm.media_kind === 'video' || archiveGroupForm.media_kind === 'image'
+      ? String(archiveGroupForm.title || '')
+      : '',
+    description: String(archiveGroupForm.description || ''),
+    tags: archiveGroupForm.media_kind === 'video' ? normalizeTagSelection(archiveGroupForm.tags) : [],
+    video_type: archiveGroupForm.media_kind === 'video' ? String(archiveGroupForm.video_type || 'short') : 'short',
+    video_collection_ids: archiveGroupForm.media_kind === 'video'
+      ? normalizeUUIDSelection(archiveGroupForm.video_collection_ids)
+      : [],
+    image_collection_ids: normalizeUUIDSelection(
+      archiveGroupForm.media_kind === 'video'
+        ? archiveGroupForm.image_collection_ids.slice(0, 1)
+        : archiveGroupForm.image_collection_ids
+    )
+  }
+}
+
+async function saveArchiveGroup() {
+  if (!selectedBatch.value?.id) return
+  const payload = buildArchiveGroupPayload()
+  if (!payload.name) {
+    ElMessage.warning('请输入分组名称')
+    return
+  }
+  archiveGroupSaving.value = true
+  try {
+    let savedGroup = null
+    if (archiveGroupDialogMode.value === 'create') {
+      if (archiveGroupSourceFileIDs.value.length === 0) {
+        ElMessage.warning('请先选中文件再创建分组')
+        return
+      }
+      savedGroup = await createAdminArchiveImportGroup(selectedBatch.value.id, {
+        ...payload,
+        file_ids: archiveGroupSourceFileIDs.value
+      })
+      assignGroupTargetID.value = String(savedGroup?.id || '')
+      activeGroupFilter.value = String(savedGroup?.id || ARCHIVE_GROUP_FILTER_ALL)
+      ElMessage.success('分组已创建')
+    } else {
+      savedGroup = await updateAdminArchiveImportGroup(archiveGroupForm.id, payload)
+      ElMessage.success('分组已更新')
+    }
+    archiveGroupDialogVisible.value = false
+    await refreshBatchDetail({ skipConfirm: true })
+    if (savedGroup?.id) {
+      activeGroupFilter.value = String(savedGroup.id)
+      assignGroupTargetID.value = String(savedGroup.id)
+    }
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, archiveGroupDialogMode.value === 'create' ? '创建分组失败' : '保存分组失败'))
+  } finally {
+    archiveGroupSaving.value = false
+  }
+}
+
+async function assignSelectedFilesToGroup() {
+  if (!selectedBatch.value?.id || !canAssignSelectedFilesToGroup.value) return
+  archiveGroupSaving.value = true
+  try {
+    await assignAdminArchiveImportGroupFiles(assignGroupTargetID.value, {
+      file_ids: selectedBatchFilesForActions.value.map((file) => String(file.id || '')).filter(Boolean)
+    })
+    await refreshBatchDetail({ skipConfirm: true })
+    ElMessage.success('已加入分组')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '加入分组失败'))
+  } finally {
+    archiveGroupSaving.value = false
+  }
+}
+
+async function removeSelectedFilesFromGroup() {
+  if (!selectedBatch.value?.id || !canRemoveSelectedFilesFromGroup.value) return
+  archiveGroupSaving.value = true
+  try {
+    await removeAdminArchiveImportGroupFiles(selectedBatch.value.id, {
+      file_ids: selectedBatchFilesForActions.value.map((file) => String(file.id || '')).filter(Boolean)
+    })
+    await refreshBatchDetail({ skipConfirm: true })
+    ElMessage.success('已移出分组')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '移出分组失败'))
+  } finally {
+    archiveGroupSaving.value = false
+  }
+}
+
+async function processArchiveGroupCard(group) {
+  if (!group?.id) return
+  if (group.id === ARCHIVE_GROUP_FILTER_UNGROUPED) {
+    const fileIDs = group.files.filter((file) => canProcessArchiveFile(file)).map((file) => file.id)
+    if (fileIDs.length === 0) {
+      ElMessage.warning('当前未分组区块里没有可处理文件')
+      return
+    }
+    if (!(await setArchiveGroupFilter(ARCHIVE_GROUP_FILTER_UNGROUPED))) {
+      return
+    }
+    if (!(await requestArchiveFileSelection(fileIDs, fileIDs.length > 0 ? findArchiveFileIndex(fileIDs[0]) : -1))) {
+      return
+    }
+    await processSelectedArchiveFiles()
+    return
+  }
+  processingBatch.value = true
+  try {
+    await processAdminArchiveImportGroup(group.id)
+    await refreshBatchDetail({ skipConfirm: true })
+    ElMessage.success(`已处理分组“${group.name}”中的可处理文件`)
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '处理分组失败'))
+  } finally {
+    processingBatch.value = false
+  }
+}
+
+async function removeArchiveGroup(group) {
+  if (!group?.id || group.id === ARCHIVE_GROUP_FILTER_UNGROUPED) return
+  try {
+    await ElMessageBox.confirm(
+      `删除分组“${group.name}”后，组内文件会回到未分组，但不会删除文件记录。确认继续吗？`,
+      '删除分组',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch (_) {
+    return
+  }
+
+  archiveGroupSaving.value = true
+  try {
+    await deleteAdminArchiveImportGroup(group.id)
+    if (String(activeGroupFilter.value || '') === String(group.id || '')) {
+      activeGroupFilter.value = ARCHIVE_GROUP_FILTER_ALL
+    }
+    if (String(assignGroupTargetID.value || '') === String(group.id || '')) {
+      assignGroupTargetID.value = ''
+    }
+    await refreshBatchDetail({ skipConfirm: true })
+    ElMessage.success('分组已删除')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '删除分组失败'))
+  } finally {
+    archiveGroupSaving.value = false
+  }
+}
+
 function resetBatchEditForm() {
   batchEditForm.title_enabled = false
   batchEditForm.title = ''
@@ -1135,6 +1590,10 @@ function handleBatchDrawerClosed() {
   selectedFileIndexAnchor.value = -1
   clearSelectedFileDraft()
   retryExtractPassword.value = ''
+  selectedBatchGroups.value = []
+  activeGroupFilter.value = ARCHIVE_GROUP_FILTER_ALL
+  assignGroupTargetID.value = ''
+  archiveGroupDialogVisible.value = false
 }
 
 async function searchTags(keyword = '') {
@@ -1365,9 +1824,90 @@ onUnmounted(() => {
             </div>
           </SectionCard>
 
+          <SectionCard class="archive-group-panel">
+            <template #title>分组工作区</template>
+            <template #description>未分组固定置顶；先多选文件，再创建、加入或移出分组。</template>
+            <template #actions>
+              <div class="archive-group-panel__actions">
+                <el-button @click="openArchiveGroupFiles(ARCHIVE_GROUP_FILTER_ALL)">全部文件</el-button>
+                <el-select
+                  v-model="assignGroupTargetID"
+                  class="archive-group-panel__select"
+                  clearable
+                  filterable
+                  placeholder="选择目标分组"
+                >
+                  <el-option v-for="group in archiveGroupOptions" :key="group.value" :label="group.label" :value="group.value" />
+                </el-select>
+                <el-button type="primary" :icon="Plus" :disabled="!canCreateArchiveGroup" @click="openCreateArchiveGroupDialog">创建分组</el-button>
+                <el-button :disabled="!canAssignSelectedFilesToGroup" :loading="archiveGroupSaving" @click="assignSelectedFilesToGroup">加入分组</el-button>
+                <el-button :disabled="!canRemoveSelectedFilesFromGroup" :loading="archiveGroupSaving" @click="removeSelectedFilesFromGroup">移出分组</el-button>
+              </div>
+            </template>
+
+            <div class="archive-group-toolbar">
+              <div class="archive-group-toolbar__selection">
+                <strong>当前查看：{{ currentArchiveGroupScopeLabel }}</strong>
+                <span>未分组、真实分组和全部文件共用同一份选择集；切换区块会清空当前勾选。</span>
+              </div>
+            </div>
+
+            <div class="archive-group-grid">
+              <article
+                v-for="group in archiveGroupCards"
+                :key="group.id"
+                class="archive-group-card"
+                :class="{ 'is-active': String(activeGroupFilter || '') === String(group.id || '') }"
+              >
+                <div class="archive-group-card__head">
+                  <div class="archive-group-card__copy">
+                    <strong>{{ group.name }}</strong>
+                    <span>{{ group.id === ARCHIVE_GROUP_FILTER_UNGROUPED ? '未归入任何真实分组' : (group.note || '分组默认值由此统一继承') }}</span>
+                  </div>
+                  <el-tag size="small" effect="plain">{{ group.id === ARCHIVE_GROUP_FILTER_UNGROUPED ? '未分组' : archiveGroupMediaKindLabel(group.media_kind) }}</el-tag>
+                </div>
+
+                <div class="archive-group-card__stats">
+                  <div>
+                    <span>成员</span>
+                    <strong class="tabular-num">{{ group.total_count }}</strong>
+                  </div>
+                  <div>
+                    <span>未入库</span>
+                    <strong class="tabular-num">{{ group.pending_count }}</strong>
+                  </div>
+                  <div>
+                    <span>已入库</span>
+                    <strong class="tabular-num">{{ group.imported_count }}</strong>
+                  </div>
+                </div>
+
+                <div class="archive-group-card__footer">
+                  <span>{{ group.id === ARCHIVE_GROUP_FILTER_UNGROUPED ? '可直接处理未分组文件' : '可直接处理该组内仍未入库的文件' }}</span>
+                  <div class="archive-group-card__actions">
+                    <el-button size="small" text @click.stop="openArchiveGroupFiles(group.id)">
+                      {{ String(activeGroupFilter || '') === String(group.id || '') ? '正在查看' : '查看文件' }}
+                    </el-button>
+                    <el-button
+                      size="small"
+                      text
+                      :icon="CircleCheck"
+                      :loading="processingBatch && String(activeGroupFilter || '') === String(group.id || '')"
+                      @click.stop="processArchiveGroupCard(group)"
+                    >
+                      处理
+                    </el-button>
+                    <el-button v-if="group.id !== ARCHIVE_GROUP_FILTER_UNGROUPED" size="small" text :icon="EditPen" @click.stop="openEditArchiveGroupDialog(group)">编辑</el-button>
+                    <el-button v-if="group.id !== ARCHIVE_GROUP_FILTER_UNGROUPED" size="small" type="danger" text :icon="Delete" :loading="archiveGroupSaving" @click.stop="removeArchiveGroup(group)">删除</el-button>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </SectionCard>
+
           <SectionCard class="archive-file-panel">
             <template #title>文件清单</template>
-            <template #description>优先看路径、状态和类型，再决定是否按类型拆开勾选、批量编辑或批量处理。</template>
+            <template #description>优先看路径、状态和类型，再决定是否按类型拆开勾选、批量编辑或批量处理；当前视图为“{{ currentArchiveGroupScopeLabel }}”。</template>
             <template #actions>
               <el-segmented v-model="fileSortMode" class="archive-file-sort" :options="fileSortOptions" />
             </template>
@@ -1375,7 +1915,7 @@ onUnmounted(() => {
             <div class="archive-file-toolbar">
               <div class="archive-file-toolbar__selection">
                 <strong>已选 {{ selectedBatchFileCount }} 项</strong>
-                <span>点击文件行会切换为单选精修；左侧勾选位支持多选和 Shift 连选。</span>
+                <span>点击文件行会切换为单选精修；左侧勾选位支持多选和 Shift 连选。分组切换会清空当前勾选。</span>
               </div>
               <div class="archive-file-toolbar__actions">
                 <el-button size="small" @click="selectArchiveFilesByKind('video')">全选视频</el-button>
@@ -1417,6 +1957,7 @@ onUnmounted(() => {
                 <div class="archive-file-item__copy">
                   <strong>{{ file.relative_path }}</strong>
                   <span class="archive-file-item__meta">{{ formatArchiveFileType(file) }}</span>
+                  <span class="archive-file-item__group">分组：{{ file.group_name || '未分组' }}</span>
                   <span class="archive-file-item__submeta">{{ formatFileSize(file.file_size) }}</span>
                   <span v-if="file.reason" class="archive-file-item__reason">{{ formatArchiveReason(file.reason) }}</span>
                 </div>
@@ -1837,6 +2378,150 @@ onUnmounted(() => {
       </el-dialog>
 
       <el-dialog
+        v-model="archiveGroupDialogVisible"
+        :title="archiveGroupDialogTitle"
+        width="min(94vw, 720px)"
+        destroy-on-close
+        :before-close="handleArchiveGroupDialogBeforeClose"
+        @closed="handleArchiveGroupDialogClosed"
+      >
+        <el-form label-width="112px" class="archive-group-form">
+          <SectionCard dense>
+            <template #title>分组信息</template>
+            <el-form-item label="来源" v-if="archiveGroupDialogMode === 'create'">
+              <el-tag type="info">已选 {{ archiveGroupSourceFileIDs.length }} 个{{ archiveGroupForm.media_kind === 'image' ? '图片' : '视频' }}</el-tag>
+            </el-form-item>
+            <el-form-item label="媒体类型">
+              <el-input :model-value="archiveGroupForm.media_kind === 'image' ? '图片' : '视频'" disabled />
+            </el-form-item>
+            <el-form-item label="分组名称">
+              <el-input v-model="archiveGroupForm.name" placeholder="同一批次内不可重复" />
+            </el-form-item>
+            <el-form-item label="分组备注">
+              <el-input v-model="archiveGroupForm.note" type="textarea" :rows="2" placeholder="可选，仅用于管理员回看" />
+            </el-form-item>
+          </SectionCard>
+
+          <SectionCard dense>
+            <template #title>分组默认值</template>
+            <template #description>组内未做文件级覆盖的字段，会跟随这里的默认值。</template>
+            <el-form-item label="默认标题">
+              <el-input v-model="archiveGroupForm.title" placeholder="留空时回到批次级默认标题" />
+            </el-form-item>
+            <el-form-item label="默认说明">
+              <el-input v-model="archiveGroupForm.description" type="textarea" :rows="3" placeholder="留空时回到批次级默认说明" />
+            </el-form-item>
+
+            <template v-if="archiveGroupForm.media_kind === 'video'">
+              <el-form-item label="默认标签">
+                <el-select
+                  v-model="archiveGroupForm.tags"
+                  multiple
+                  filterable
+                  remote
+                  reserve-keyword
+                  allow-create
+                  default-first-option
+                  clearable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  :remote-method="loadTagSuggestions"
+                  :loading="loadingTags"
+                  placeholder="可选择或输入标签"
+                  style="width: 100%"
+                >
+                  <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="默认视频类型">
+                <el-select v-model="archiveGroupForm.video_type" style="width: 100%">
+                  <el-option label="短视频" value="short" />
+                  <el-option label="电影" value="movie" />
+                  <el-option label="剧集分集" value="episode" />
+                  <el-option label="AV" value="av" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="默认视频合集">
+                <el-select
+                  v-model="archiveGroupForm.video_collection_ids"
+                  multiple
+                  filterable
+                  remote
+                  reserve-keyword
+                  clearable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="可选，可多选"
+                  style="width: 100%"
+                  :remote-method="loadCollectionSuggestions"
+                  :loading="loadingCollections"
+                >
+                  <el-option
+                    v-for="collection in collectionOptions"
+                    :key="collection.value"
+                    :label="collection.label"
+                    :value="collection.value"
+                  />
+                </el-select>
+              </el-form-item>
+            </template>
+
+            <el-form-item v-if="archiveGroupForm.media_kind === 'video'" label="默认图片合集">
+              <el-select
+                v-model="archiveGroupVideoImageCollectionID"
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                placeholder="可选，仅可关联一个图片图集"
+                style="width: 100%"
+                :remote-method="loadImageCollectionSuggestions"
+                :loading="loadingImageCollections"
+              >
+                <el-option
+                  v-for="collection in imageCollectionOptions"
+                  :key="collection.value"
+                  :label="collection.label"
+                  :value="collection.value"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item v-else label="默认图片合集">
+              <el-select
+                v-model="archiveGroupForm.image_collection_ids"
+                multiple
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="可选，可多选"
+                style="width: 100%"
+                :remote-method="loadImageCollectionSuggestions"
+                :loading="loadingImageCollections"
+              >
+                <el-option
+                  v-for="collection in imageCollectionOptions"
+                  :key="collection.value"
+                  :label="collection.label"
+                  :value="collection.value"
+                />
+              </el-select>
+            </el-form-item>
+          </SectionCard>
+        </el-form>
+
+        <template #footer>
+          <el-button @click="requestArchiveGroupDialogClose">取消</el-button>
+          <el-button type="primary" :loading="archiveGroupSaving" @click="saveArchiveGroup">
+            {{ archiveGroupDialogMode === 'create' ? '创建分组' : '保存分组' }}
+          </el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog
         v-model="quickCollectionDialogVisible"
         :title="quickCollectionDialogTitle"
         width="min(94vw, 560px)"
@@ -2116,10 +2801,128 @@ onUnmounted(() => {
   align-items: start;
 }
 
+.archive-group-panel,
 .archive-file-panel,
 .archive-file-editor,
 .archive-selection-card {
   min-width: 0;
+}
+
+.archive-group-panel__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.archive-group-panel__select {
+  width: min(18rem, 100%);
+}
+
+.archive-group-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.archive-group-toolbar__selection {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.archive-group-toolbar__selection strong {
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.archive-group-toolbar__selection span {
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.archive-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-3);
+}
+
+.archive-group-card {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-muted);
+  transition: border-color var(--motion-duration-base) var(--motion-easing-standard),
+    background-color var(--motion-duration-base) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+.archive-group-card.is-active {
+  border-color: var(--primary);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.archive-group-card__head,
+.archive-group-card__footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.archive-group-card__copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.archive-group-card__copy strong {
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.archive-group-card__copy span,
+.archive-group-card__footer span {
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.archive-group-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.archive-group-card__stats div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.archive-group-card__stats span {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.archive-group-card__stats strong {
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.archive-group-card__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
 }
 
 .archive-file-sort {
@@ -2248,6 +3051,12 @@ onUnmounted(() => {
   line-height: var(--leading-small);
 }
 
+.archive-file-item__group {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
 .archive-file-item__submeta,
 .archive-file-item__reason {
   color: var(--text-muted);
@@ -2349,6 +3158,7 @@ onUnmounted(() => {
 }
 
 @media (max-width: 64rem) {
+  .archive-group-toolbar,
   .archive-file-toolbar,
   .archive-drawer__hero,
   .archive-password-card__form {
@@ -2356,6 +3166,7 @@ onUnmounted(() => {
     flex-direction: column;
   }
 
+  .archive-group-panel__actions,
   .archive-file-toolbar__actions,
   .archive-drawer__hero-actions {
     justify-content: flex-start;
@@ -2370,6 +3181,7 @@ onUnmounted(() => {
   .archive-overview-grid,
   .archive-batch-grid,
   .archive-batch-card__stats,
+  .archive-group-card__stats,
   .archive-batch-summary {
     grid-template-columns: 1fr;
   }

@@ -142,6 +142,18 @@ export const uploadAdminArchiveImport = (formData) =>
     timeout: 0
   })
 export const getAdminArchiveImportBatchDetail = (id) => request.get(`/admin/archive-import/batches/${id}`)
+export const createAdminArchiveImportGroup = (batchId, payload) =>
+  request.post(`/admin/archive-import/batches/${batchId}/groups`, payload)
+export const updateAdminArchiveImportGroup = (id, payload) => request.put(`/admin/archive-import/groups/${id}`, payload)
+export const deleteAdminArchiveImportGroup = (id) =>
+  request.delete(`/admin/archive-import/groups/${id}`, {
+    timeout: 0
+  })
+export const assignAdminArchiveImportGroupFiles = (id, payload) =>
+  request.post(`/admin/archive-import/groups/${id}/files`, payload)
+export const removeAdminArchiveImportGroupFiles = (batchId, payload) =>
+  request.post(`/admin/archive-import/batches/${batchId}/groups/remove-files`, payload)
+export const processAdminArchiveImportGroup = (id) => request.post(`/admin/archive-import/groups/${id}/process`)
 export const deleteAdminArchiveImportBatch = (id) =>
   request.delete(`/admin/archive-import/batches/${id}`, {
     timeout: 0

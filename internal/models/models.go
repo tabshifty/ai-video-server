@@ -88,50 +88,51 @@ type VideoSubtitle struct {
 }
 
 type ArchiveImportBatch struct {
-	ID                      uuid.UUID
-	UserID                  *uuid.UUID
-	Title                   string
-	OriginalFilename        string
-	ArchiveFormat           string
-	OriginalPath            string
-	ExtractedDir            string
-	Status                  string
-	LastError               string
-	TotalEntries            int
-	ProcessableEntries      int
-	ProcessedEntries        int
-	SkippedEntries          int
-	FailedEntries           int
-	DefaultTitlePrefix      string
-	DefaultDescription      string
-	DefaultTags             []string
+	ID                        uuid.UUID
+	UserID                    *uuid.UUID
+	Title                     string
+	OriginalFilename          string
+	ArchiveFormat             string
+	OriginalPath              string
+	ExtractedDir              string
+	Status                    string
+	LastError                 string
+	TotalEntries              int
+	ProcessableEntries        int
+	ProcessedEntries          int
+	SkippedEntries            int
+	FailedEntries             int
+	DefaultTitlePrefix        string
+	DefaultDescription        string
+	DefaultTags               []string
 	DefaultVideoCollectionIDs []uuid.UUID
 	DefaultImageCollectionIDs []uuid.UUID
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	CompletedAt             *time.Time
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	CompletedAt               *time.Time
 }
 
 type ArchiveImportBatchListItem struct {
-	ID                   uuid.UUID  `json:"id"`
-	Title                string     `json:"title"`
-	OriginalFilename     string     `json:"original_filename"`
-	ArchiveFormat        string     `json:"archive_format"`
-	Status               string     `json:"status"`
-	LastError            string     `json:"last_error"`
-	TotalEntries         int        `json:"total_entries"`
-	ProcessableEntries   int        `json:"processable_entries"`
-	ProcessedEntries     int        `json:"processed_entries"`
-	SkippedEntries       int        `json:"skipped_entries"`
-	FailedEntries        int        `json:"failed_entries"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
-	CompletedAt          *time.Time `json:"completed_at"`
+	ID                 uuid.UUID  `json:"id"`
+	Title              string     `json:"title"`
+	OriginalFilename   string     `json:"original_filename"`
+	ArchiveFormat      string     `json:"archive_format"`
+	Status             string     `json:"status"`
+	LastError          string     `json:"last_error"`
+	TotalEntries       int        `json:"total_entries"`
+	ProcessableEntries int        `json:"processable_entries"`
+	ProcessedEntries   int        `json:"processed_entries"`
+	SkippedEntries     int        `json:"skipped_entries"`
+	FailedEntries      int        `json:"failed_entries"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	CompletedAt        *time.Time `json:"completed_at"`
 }
 
 type ArchiveImportFile struct {
 	ID                 uuid.UUID
 	BatchID            uuid.UUID
+	GroupID            *uuid.UUID
 	RelativePath       string
 	FilePath           string
 	EntryType          string
@@ -146,6 +147,7 @@ type ArchiveImportFile struct {
 	Tags               []string
 	VideoCollectionIDs []uuid.UUID
 	ImageCollectionIDs []uuid.UUID
+	FieldOverrides     map[string]bool
 	LinkedVideoID      *uuid.UUID
 	LinkedImageID      *uuid.UUID
 	Metadata           map[string]any
@@ -155,31 +157,51 @@ type ArchiveImportFile struct {
 }
 
 type ArchiveImportFileListItem struct {
+	ID                 uuid.UUID       `json:"id"`
+	BatchID            uuid.UUID       `json:"batch_id"`
+	GroupID            *uuid.UUID      `json:"group_id"`
+	GroupName          string          `json:"group_name"`
+	RelativePath       string          `json:"relative_path"`
+	FilePath           string          `json:"file_path"`
+	EntryType          string          `json:"entry_type"`
+	MediaKind          string          `json:"media_kind"`
+	VideoType          string          `json:"video_type"`
+	FileSize           int64           `json:"file_size"`
+	MIMEType           string          `json:"mime_type"`
+	Status             string          `json:"status"`
+	Reason             string          `json:"reason"`
+	Title              string          `json:"title"`
+	Description        string          `json:"description"`
+	Tags               []string        `json:"tags"`
+	VideoCollectionIDs []uuid.UUID     `json:"video_collection_ids"`
+	ImageCollectionIDs []uuid.UUID     `json:"image_collection_ids"`
+	FieldOverrides     map[string]bool `json:"field_overrides"`
+	LinkedVideoID      *uuid.UUID      `json:"linked_video_id"`
+	LinkedImageID      *uuid.UUID      `json:"linked_image_id"`
+	Metadata           map[string]any  `json:"metadata"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+	ProcessedAt        *time.Time      `json:"processed_at"`
+}
+
+type ArchiveImportGroup struct {
 	ID                 uuid.UUID   `json:"id"`
 	BatchID            uuid.UUID   `json:"batch_id"`
-	RelativePath       string      `json:"relative_path"`
-	FilePath           string      `json:"file_path"`
-	EntryType          string      `json:"entry_type"`
+	Name               string      `json:"name"`
+	Note               string      `json:"note"`
 	MediaKind          string      `json:"media_kind"`
-	VideoType          string      `json:"video_type"`
-	FileSize           int64       `json:"file_size"`
-	MIMEType           string      `json:"mime_type"`
-	Status             string      `json:"status"`
-	Reason             string      `json:"reason"`
-	Title              string      `json:"title"`
-	Description        string      `json:"description"`
+	Title              *string     `json:"title"`
+	Description        *string     `json:"description"`
 	Tags               []string    `json:"tags"`
+	VideoType          *string     `json:"video_type"`
 	VideoCollectionIDs []uuid.UUID `json:"video_collection_ids"`
 	ImageCollectionIDs []uuid.UUID `json:"image_collection_ids"`
-	LinkedVideoID      *uuid.UUID  `json:"linked_video_id"`
-	LinkedImageID      *uuid.UUID  `json:"linked_image_id"`
-	Metadata           map[string]any `json:"metadata"`
 	CreatedAt          time.Time   `json:"created_at"`
 	UpdatedAt          time.Time   `json:"updated_at"`
-	ProcessedAt        *time.Time  `json:"processed_at"`
 }
 
 type ArchiveImportBatchDetail struct {
 	ArchiveImportBatch
-	Files []ArchiveImportFileListItem `json:"files"`
+	Files  []ArchiveImportFileListItem `json:"files"`
+	Groups []ArchiveImportGroup        `json:"groups"`
 }
