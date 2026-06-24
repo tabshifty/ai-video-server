@@ -119,7 +119,10 @@ fun TvCatalogScreen(
     onPlayLongForm: (String, String) -> Unit,
     onOpenCatalogWall: (String, String) -> Unit = { _, _ -> },
     onOpenIptv: () -> Unit = {},
+    onOpenShorts: () -> Unit = {},
     homeContentFocusRequester: FocusRequester? = null,
+    requestedMenuFocusItem: TvHomeMenuItem? = null,
+    onRequestedMenuFocusConsumed: () -> Unit = {},
     onRepair: () -> Unit = {},
     onLogout: () -> Unit = {},
     onSwitchServer: () -> Unit = {},
@@ -129,7 +132,10 @@ fun TvCatalogScreen(
     val isSearching = uiState.selectedMenu == TvHomeMenuItem.Search
     val localSearchFocusRequester = remember { FocusRequester() }
     val searchFocusRequester = homeContentFocusRequester ?: localSearchFocusRequester
-    val menuFocusRequester = remember { FocusRequester() }
+    val menuFocusRequesters = remember {
+        TvHomeMenuItem.defaults().associateWith { FocusRequester() }
+    }
+    val menuFocusRequester = menuFocusRequesters.getValue(TvHomeMenuItem.defaultSelected())
     val featuredFocusRequester = remember { FocusRequester() }
     val continueFocusRequester = remember { FocusRequester() }
     val firstSectionItemFocusRequester = remember { FocusRequester() }
@@ -152,8 +158,14 @@ fun TvCatalogScreen(
         avCount = uiState.av.size,
     )
 
-    LaunchedTvInitialFocus(uiState.loading, isSearching, initialFocusTarget) {
+    LaunchedTvInitialFocus(uiState.loading, isSearching, initialFocusTarget, requestedMenuFocusItem) {
         if (uiState.loading || isSearching) return@LaunchedTvInitialFocus
+        val requestedFocusRequester = requestedMenuFocusItem?.let(menuFocusRequesters::get)
+        if (requestedFocusRequester != null) {
+            requestedFocusRequester.tryRequestFocus()
+            onRequestedMenuFocusConsumed()
+            return@LaunchedTvInitialFocus
+        }
         when (initialFocusTarget) {
             TvCatalogInitialFocusTarget.FEATURED -> featuredFocusRequester.tryRequestFocus()
             TvCatalogInitialFocusTarget.CONTINUE_WATCHING -> continueFocusRequester.tryRequestFocus()
@@ -170,9 +182,10 @@ fun TvCatalogScreen(
         Row(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             TvHomeSideMenu(
                 selectedMenu = uiState.selectedMenu,
-                menuFocusRequester = menuFocusRequester,
+                menuFocusRequesters = menuFocusRequesters,
                 onSelect = viewModel::selectMenu,
                 onOpenIptv = onOpenIptv,
+                onOpenShorts = onOpenShorts,
             )
             TvPageLoadingState(message = "正在加载 TV 首页")
         }
@@ -182,9 +195,10 @@ fun TvCatalogScreen(
     Row(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         TvHomeSideMenu(
             selectedMenu = uiState.selectedMenu,
-            menuFocusRequester = menuFocusRequester,
+            menuFocusRequesters = menuFocusRequesters,
             onSelect = viewModel::selectMenu,
             onOpenIptv = onOpenIptv,
+            onOpenShorts = onOpenShorts,
         )
         if (uiState.selectedMenu == TvHomeMenuItem.Settings) {
             TvHomeSettingsPanel(
@@ -453,9 +467,10 @@ private fun TvCatalogSearchBar(
 @Composable
 private fun TvHomeSideMenu(
     selectedMenu: TvHomeMenuItem,
-    menuFocusRequester: FocusRequester,
+    menuFocusRequesters: Map<TvHomeMenuItem, FocusRequester>,
     onSelect: (TvHomeMenuItem) -> Unit,
     onOpenIptv: () -> Unit,
+    onOpenShorts: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -466,16 +481,19 @@ private fun TvHomeSideMenu(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        TvHomeMenuItem.defaults().forEachIndexed { index, item ->
+        TvHomeMenuItem.defaults().forEach { item ->
             TvHomeSideMenuButton(
                 item = item,
                 selected = item == selectedMenu,
                 icon = tvHomeMenuIcon(item),
-                modifier = if (index == 0) Modifier.focusRequester(menuFocusRequester) else Modifier,
+                modifier = Modifier.focusRequester(menuFocusRequesters.getValue(item)),
                 onClick = {
                     if (item == TvHomeMenuItem.Iptv) {
                         onSelect(item)
                         onOpenIptv()
+                    } else if (item == TvHomeMenuItem.Shorts) {
+                        onSelect(item)
+                        onOpenShorts()
                     } else {
                         onSelect(item)
                     }
@@ -775,6 +793,7 @@ private fun tvHomeMenuIcon(item: TvHomeMenuItem): ImageVector {
         TvHomeMenuItem.Movie -> Icons.Filled.LocalMovies
         TvHomeMenuItem.Adult -> Icons.Filled.Warning
         TvHomeMenuItem.Iptv -> Icons.Filled.Tv
+        TvHomeMenuItem.Shorts -> Icons.Filled.PlayArrow
         TvHomeMenuItem.Search -> Icons.Filled.Search
         TvHomeMenuItem.Settings -> Icons.Filled.Settings
     }

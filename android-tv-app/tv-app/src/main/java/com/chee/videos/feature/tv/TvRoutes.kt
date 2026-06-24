@@ -11,6 +11,7 @@ const val TvLongFormVideoIdArg = "videoId"
 const val TvLongFormVideoTypeArg = "videoType"
 const val TvCatalogWallKindArg = "kind"
 const val TvCatalogWallTitleArg = "title"
+const val TvShortFeedRoute = "tv/shorts"
 
 const val TvSeriesRoutePattern = "tv/series/{$TvSeriesIdArg}"
 const val TvPlayerRoutePattern = "tv/player/{$TvSeriesIdArg}?$TvSeasonArg={$TvSeasonArg}&$TvEpisodeArg={$TvEpisodeArg}"

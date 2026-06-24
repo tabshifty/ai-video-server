@@ -68,6 +68,9 @@ import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
 import com.chee.videos.feature.tv.TvSeriesDetailScreen
 import com.chee.videos.feature.tv.TvSeriesIdArg
+import com.chee.videos.feature.tv.TvShortFeedRoute
+import com.chee.videos.feature.tv.TvHomeMenuItem
+import com.chee.videos.feature.tv.TvShortFeedScreen
 import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.buildTvSeriesRoute
 import com.chee.videos.feature.tv.buildTvCatalogWallRoute
@@ -120,6 +123,7 @@ private fun TvAuthenticatedNav(
     val handleShellBack = shouldHandleTvShellBack(currentRoute)
     val handleRootExitConfirm = shouldHandleTvRootExitConfirm(currentRoute)
     val homeContentFocusRequester = remember { FocusRequester() }
+    var homeMenuFocusTarget by remember { mutableStateOf<TvHomeMenuItem?>(null) }
     val activity = LocalContext.current.findActivity()
     var rootExitPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showRootExitPrompt by remember { mutableStateOf(false) }
@@ -194,7 +198,12 @@ private fun TvAuthenticatedNav(
                             onOpenIptv = {
                                 navController.navigate(TvIptvRoute)
                             },
+                            onOpenShorts = {
+                                navController.navigate(TvShortFeedRoute)
+                            },
                             homeContentFocusRequester = homeContentFocusRequester,
+                            requestedMenuFocusItem = homeMenuFocusTarget,
+                            onRequestedMenuFocusConsumed = { homeMenuFocusTarget = null },
                             onRepair = onRepair,
                             onLogout = onLogout,
                             onSwitchServer = onSwitchServer,
@@ -259,6 +268,22 @@ private fun TvAuthenticatedNav(
                     composable(TvIptvRoute) {
                         TvIptvScreen(
                             onBack = { navController.popBackStack() },
+                        )
+                    }
+                    composable(
+                        route = TvShortFeedRoute,
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None },
+                    ) {
+                        TvShortFeedScreen(
+                            baseUrl = baseUrl,
+                            accessToken = accessToken,
+                            onBack = {
+                                homeMenuFocusTarget = TvHomeMenuItem.Shorts
+                                navController.popBackStack()
+                            },
                         )
                     }
                     composable(

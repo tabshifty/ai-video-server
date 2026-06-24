@@ -15,5 +15,6 @@
 
 ## Rules
 - TV 与手机端目录隔离，禁止通过 `sourceSets`、相对路径源码引用或 Gradle project dependency 依赖 `../android-app` 源码。
-- TV 工程仅实现长视频相关能力；不要在此工程引入短视频、图片合集、上传或手机端互动流。
+- TV 工程能力以客厅遥控场景为准独立实现；当前除长视频主链路外，也允许首页 action-only 入口进入的独立短视频纯播放页。
+- TV 端短视频必须留在 `feature/tv` 下独立维护，不要直接搬运或重新解封手机端 `feature/shorts`、`shortdiscover`、`shortsearch` 等源码。
 - 若 TV 与手机端都需要同一逻辑，默认在 TV 工程内独立维护，除非任务明确要求抽共享层。

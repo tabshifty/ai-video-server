@@ -4,6 +4,7 @@ import com.chee.videos.core.model.TvContinueWatchingDto
 import com.chee.videos.core.model.TvCatalogWallItemDto
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvEpisodeDto
+import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvSearchPayload
@@ -24,6 +25,8 @@ class FakeTvRepository(
     private val homePayloads: Map<String, TvHomePayload> = emptyMap(),
     private val searchPayload: TvSearchPayload = TvSearchPayload(),
     private val iptvPayload: TvIptvPayload = TvIptvPayload(),
+    private val shortFeedItems: List<FeedVideoDto> = emptyList(),
+    private val shortFeedPages: List<List<FeedVideoDto>> = emptyList(),
     private val posterWallPages: List<TvCatalogWallPayload> = emptyList(),
     private val detailPayload: TvSeriesDetailDto = tvSeriesDetail(),
     private val homeError: Throwable? = null,
@@ -39,9 +42,11 @@ class FakeTvRepository(
     val historyReports = mutableListOf<TvHistoryReport>()
     val homeRequests = mutableListOf<TvHomeRequest>()
     val searchRequests = mutableListOf<TvSearchRequest>()
+    val shortFeedRequests = mutableListOf<TvShortFeedRequest>()
     val posterWallRequests = mutableListOf<TvPosterWallRequest>()
     val detailRequests = mutableListOf<String>()
     val sourceUrlRequests = mutableListOf<TvSourceUrlRequest>()
+    private var shortFeedRequestIndex = 0
 
     override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
         homeRequests += TvHomeRequest(kind = kind, query = query, page = page, pageSize = pageSize)
@@ -78,6 +83,14 @@ class FakeTvRepository(
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> {
         homeError?.let { return Result.failure(it) }
         return Result.success(iptvPayload)
+    }
+
+    override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> {
+        shortFeedRequests += TvShortFeedRequest(pageSize = pageSize, excludeIds = excludeIds)
+        homeError?.let { return Result.failure(it) }
+        val response = shortFeedPages.getOrNull(shortFeedRequestIndex) ?: shortFeedItems
+        shortFeedRequestIndex += 1
+        return Result.success(response.take(pageSize))
     }
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
@@ -150,6 +163,11 @@ data class TvSearchRequest(
     val pageSize: Int,
 )
 
+data class TvShortFeedRequest(
+    val pageSize: Int,
+    val excludeIds: List<String>,
+)
+
 data class TvPosterWallRequest(
     val kind: String,
     val page: Int,
@@ -186,6 +204,9 @@ class DelayedSourceTvRepository(
 
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
         Result.success(TvIptvPayload())
+
+    override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
+        Result.success(emptyList())
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(detailPayload)
@@ -264,6 +285,9 @@ class DelayedCatalogTvRepository(
 
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
         Result.success(TvIptvPayload())
+
+    override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
+        Result.success(emptyList())
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(tvSeriesDetail(id = seriesId))
@@ -365,6 +389,9 @@ class DelayedIptvTvRepository(
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(tvSeriesDetail(id = seriesId))
 
+    override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
+        Result.success(emptyList())
+
     override suspend fun readActiveBaseUrl(): String = baseUrl
 
     override suspend fun buildSourceUrl(videoId: String, profile: String?): String =
@@ -424,6 +451,9 @@ class DelayedSeriesDetailTvRepository(
 
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
         Result.success(TvIptvPayload())
+
+    override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
+        Result.success(emptyList())
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
         detailRequests += seriesId

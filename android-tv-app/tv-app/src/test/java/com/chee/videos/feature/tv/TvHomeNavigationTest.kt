@@ -25,7 +25,7 @@ class TvHomeNavigationTest {
     @Test
     fun menuDefaultsToSeriesWithFixedOrderAndAvLabel() {
         assertEquals(
-            listOf("电视剧", "电影", "18+", "IPTV", "搜索", "设置"),
+            listOf("电视剧", "电影", "18+", "IPTV", "短视频", "搜索", "设置"),
             TvHomeMenuItem.defaults().map { it.label },
         )
         assertEquals(TvHomeMenuItem.Series, TvHomeMenuItem.defaultSelected())
@@ -33,6 +33,7 @@ class TvHomeNavigationTest {
         assertEquals("movie", TvHomeMenuItem.Movie.homeKind)
         assertEquals("av", TvHomeMenuItem.Adult.homeKind)
         assertFalse(TvHomeMenuItem.Iptv.isContentKind)
+        assertFalse(TvHomeMenuItem.Shorts.isContentKind)
     }
 
     @Test
@@ -146,6 +147,13 @@ class TvHomeNavigationTest {
                 sideMenuSource.contains("onSelect(item)") &&
                 sideMenuSource.contains("onOpenIptv()") &&
                 sideMenuSource.indexOf("onSelect(item)") < sideMenuSource.indexOf("onOpenIptv()"),
+        )
+        assertTrue(
+            "短视频菜单点击前也必须先通知 ViewModel 离开目录状态域，并在其后再导航到独立短视频页",
+            sideMenuSource.contains("else if (item == TvHomeMenuItem.Shorts)") &&
+                sideMenuSource.contains("onOpenShorts()") &&
+                sideMenuSource.indexOf("else if (item == TvHomeMenuItem.Shorts)") <
+                sideMenuSource.indexOf("onOpenShorts()"),
         )
         assertTrue(
             "TV 首页侧边菜单按钮必须使用 tvFocusableGlow 提供唯一焦点目标",

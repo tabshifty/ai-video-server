@@ -6,6 +6,11 @@ import org.junit.Test
 class TvRoutesTest {
 
     @Test
+    fun tvShortFeedRoute_isFixedFullScreenRoute() {
+        assertEquals("tv/shorts", TvShortFeedRoute)
+    }
+
+    @Test
     fun buildTvSeriesRoute_returnsExpectedRoute() {
         assertEquals("tv/series/demo", buildTvSeriesRoute("demo"))
     }

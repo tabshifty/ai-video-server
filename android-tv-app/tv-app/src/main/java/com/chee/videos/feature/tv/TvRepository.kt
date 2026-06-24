@@ -6,6 +6,7 @@ import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.repository.VideoRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,6 +22,7 @@ interface TvRepository {
         sortOrder: String = "desc",
     ): Result<TvCatalogWallPayload>
     suspend fun fetchIptvChannels(): Result<TvIptvPayload>
+    suspend fun fetchShortFeed(pageSize: Int = 20, excludeIds: List<String> = emptyList()): Result<List<FeedVideoDto>>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
     suspend fun readActiveBaseUrl(): String?
     suspend fun buildSourceUrl(videoId: String, profile: String? = null): String
@@ -56,6 +58,9 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
         videoRepository.fetchTvIptvChannels()
+
+    override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
+        videoRepository.fetchShortFeed(pageSize = pageSize, excludeIds = excludeIds)
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         videoRepository.fetchTvSeriesDetail(seriesId)

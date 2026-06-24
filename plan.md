@@ -1,3 +1,137 @@
+## 2026-06-24 17:56 +0800
+- 进度：完成 TV 短视频迁移收尾校验。当前仅准备纳入 TV 端短视频全屏播放页、首页 `短视频` action-only 入口、独立路由/仓库接口、相关单测、TV 版本号，以及 `CONTEXT.md`、`android-tv-app/AGENTS.md`、`plan.md` 的长期文档更新；未纳入其它模块改动。
+- 影响文件：`android-tv-app/AGENTS.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/*`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md android-tv-app/AGENTS.md android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv android-tv-app/tv-app/src/main/java/com/chee/videos/tv android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv android-tv-app/tv-app/src/test/java/com/chee/videos/tv` 无命中。
+
+## 2026-06-24 17:55 +0800
+- 进度：完成 TV 短视频迁移实现收尾。新增 `tv/shorts` 独立全屏短视频页与 ViewModel，首页左侧菜单在 `IPTV` 下方新增 `短视频` 入口并保持 action-only 语义；补充 `fetchShortFeed(pageSize, excludeIds)`、返回焦点与导航回退测试，同时校正 TV 模块 AGENTS 中已过时的“仅长视频”约束。
+- 影响文件：`android-tv-app/AGENTS.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvHomeNavigation.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRepository.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRoutes.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedViewModel.kt`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRoutesTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedViewModelTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvTestSupport.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvShellAppBackPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvShortFeedNavigationSpecTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：待执行最终提交与提交后状态确认。
+
+## 2026-06-24 17:13 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频入口的菜单视觉语义。已确认 `短视频` 与 `IPTV` 一样只是启动动作，不作为持久选中菜单态；返回首页后焦点回到 `短视频` 按钮，但原内容分类高亮保持不变。该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 17:12 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频末尾观感。已确认最后一条且无更多内容时，视频自然播完后停在最后一帧并视为暂停态，不回开头、不跳第一页；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 17:08 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频入口可见性。已确认左侧菜单里的 `短视频` 入口始终显示，不因当前是否有短视频而动态隐藏，空态统一交给短视频页内处理；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 17:06 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频返回焦点。已确认从短视频页 `BACK` 返回首页后，焦点稳定回到左侧 `短视频` 入口按钮，不回内容区旧焦点；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 17:01 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频 feed 语义。已确认同一次进入短视频页的会话里，后续补货尽量排除已经出现过的内容，只有服务端候选池过小时才接受重复；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:55 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频切条手感。已确认上/下键只做离散的一次一条切换，不支持长按连续切条；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:53 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频 seek 手感。已确认支持长按左右键按全局步长连续 seek，进度条在连续 seek 期间保持显示，松手后停止；若 seek 前已暂停，松手后仍保持暂停。该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:52 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频加载反馈。已确认首帧准备、切条准备和缓冲等待时保留极简 loading 指示，不带文案、不抢焦点，用于区分加载与暂停/卡住；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:48 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频中央提示边界。已确认切条成功仍不提示，但 `OK` 切换播放/暂停时保留中央短提示，用于区分“已暂停”和“卡住”；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:44 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频 seek 与暂停关系。已确认暂停后按左/右 seek 只改变位置，不自动恢复播放，`OK` 继续是唯一的播放/暂停切换开关；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:42 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频首屏异常态。已确认首屏加载失败和空态都留在短视频页内处理，不自动退回首页；失败态保留 `重试` 与 `BACK`，空态保留空提示与 `BACK`，并已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:40 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频失败态。已确认单条播放失败时不自动退首页、不自动跳下一条，而是在当前页显示极简失败态，只保留 `重试` 与 `BACK` 退出路径；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:38 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频进度反馈。已确认底部进度条不常驻显示，只在左右键快进/快退时短暂浮现后自动消失，以兼顾 seek 反馈与沉浸感；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:32 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频切条反馈。已确认按 `上/下` 切条成功后不显示任何额外成功提示，避免破坏沉浸感；切条反馈仅由画面与播放内容变化承担，该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:29 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频暂停语义。已确认暂停只作用于当前条，切到其它条目后新条目仍自动播放，不继承上一条的暂停状态；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:27 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频页面 chrome。已确认页面标题、返回按钮、顶部说明等页面级 chrome 全部移除，整页只保留视频画面与最小播放反馈，退出完全依赖遥控器 `BACK`；该边界已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:23 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频历史语义。已确认保留现有观看历史上报，但历史只用于记录，不反向驱动短视频入口恢复；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:20 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频起播语义。已确认每次从首页进入短视频页时，都从当次新拉取信息流的第一条开始，不恢复上次停留位置；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:10 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频画面策略。已确认首版固定完整显示（FIT），允许两侧留黑边，不提供画面比例切换入口，也不默认使用铺满裁切；该策略已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 16:01 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频音频策略。已确认页面进入后默认有声，不提供页内静音开关，音量完全交给电视系统控制；该策略已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 15:56 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频列表边界。已确认首尾不回绕：第一条按 `上` 无动作，最后一条且无更多内容时播完停在当前条，不回第一条也不自动退出；该边界已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 15:43 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频页面边界。已确认首版不保留手机端那套右侧操作区，点赞/收藏/详情/画面比例切换/播放模式切换等入口全部移除，只保留播放画面和最小播放反馈；该边界已同步补充到 `CONTEXT.md`。
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频末尾行为。已确认默认按 `AUTO_NEXT` 语义播完自动切下一条，且页内不再保留播放模式切换入口；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 15:40 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 TV 短视频遥控器行为。已确认左右键快进/快退直接复用 TV 端现有全局步长设置（5/10/15/20/30 秒，默认 10 秒），不为短视频单独加新设置；该语义已同步补充到 `CONTEXT.md`。
+- 进度：继续通过 `$grill-with-docs` 收口短视频页主键语义。已确认 `OK/中键` 只做播放/暂停切换，不打开额外菜单、不切去独立操作区；完整遥控口径收敛为 `上/下切条`、`左/右按全局步长快退快进`、`OK 播放暂停`、`BACK 返回首页`，并已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 15:27 +0800
+- 进度：开始通过 `$grill-with-docs` 收口“手机端短视频模式迁到 TV 端”。已确认这里的“短视频模式”指对齐手机端 `ShortFeedScreen` 的直接播放信息流，不走 `ShortDiscover` 式封面墙预览；该术语已同步补充到 `CONTEXT.md`。
+- 进度：继续通过 `$grill-with-docs` 收口 TV 入口形态。已确认入口放在 TV 首页左侧菜单 `IPTV` 下方，点击后进入无左侧菜单的独立短视频页；该入口语义已同步补充到 `CONTEXT.md`。
+- 进度：继续通过 `$grill-with-docs` 收口返回语义。已确认短视频页按 `BACK` 直接回首页，并恢复离开前的首页状态，不把 `短视频` 作为长期选中菜单态；该返回语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
 ## 2026-06-24 14:59 +0800
 - 进度：完成压缩包导入多分组主链路。后端已补齐分组模型查询、创建/编辑/删除/加入/移出/处理接口与路由；管理端批次详情新增分组工作区、未分组虚拟卡片、分组创建/编辑弹窗、加入/移出分组动作与分组直处理入口，文件行同步显示分组归属。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_groups.go`、`internal/services/archive_import_test.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/router.go`、`internal/models/models.go`、`migrations/0027_archive_import_groups.up.sql`、`migrations/0027_archive_import_groups.down.sql`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`

@@ -323,6 +323,20 @@ class TvCatalogViewModelTest {
     }
 
     @Test
+    fun selectingShortsMenuKeepsCatalogSelectionAndDoesNotRequestTypedHomeAgain() = runTest {
+        val repository = FakeTvRepository(homePayload = TvHomePayload())
+        val viewModel = TvCatalogViewModel(repository = repository)
+
+        viewModel.awaitIdle()
+        viewModel.selectMenu(TvHomeMenuItem.Shorts)
+        viewModel.awaitIdle()
+
+        assertEquals(listOf("tv"), repository.homeRequests.map { it.kind })
+        assertEquals(TvHomeMenuItem.Series, viewModel.uiState.value.selectedMenu)
+        assertTrue(viewModel.uiState.value.searchResults.isEmpty())
+    }
+
+    @Test
     fun repositoryFailure_exposesErrorState() = runTest {
         val viewModel = TvCatalogViewModel(
             repository = FakeTvRepository(homeError = IllegalStateException("加载失败")),
