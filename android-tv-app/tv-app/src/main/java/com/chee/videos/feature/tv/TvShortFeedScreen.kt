@@ -5,6 +5,7 @@ import android.graphics.Color as AndroidColor
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -50,9 +51,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.memory.MemoryCache
+import coil.request.ImageRequest
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -78,6 +84,8 @@ import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 @Composable
 fun TvShortFeedScreen(
@@ -104,6 +112,9 @@ fun TvShortFeedScreen(
             repeatMode = Player.REPEAT_MODE_OFF
         }
     }
+    val imageLoader = remember { context.imageLoader }
+    // 预加载并发上限：配合 execute（挂起）把封面预抓取并发钉在 2，外盘休眠时单条缩略图阻塞数秒也不并发打爆磁盘。
+    val thumbnailPrefetchSemaphore = remember { Semaphore(permits = 2) }
 
     var renderedVideoId by remember { mutableStateOf<String?>(null) }
     var lastHistoryVideoId by remember { mutableStateOf("") }
@@ -152,7 +163,15 @@ fun TvShortFeedScreen(
     DisposableEffect(sharedPlayer) {
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
-                renderedVideoId = sharedPlayer.currentMediaItem?.mediaId
+                // ExoPlayer 实际是 STATE_READY 先于 onRenderedFirstFrame 触发，故 READY 分支通常是
+                // 清封面的实际主触发；此回调作为冗余确认兜底。仅当首帧属于当前条目时才写，防止切条后
+                // 旧条目的迟到首帧误设 renderedVideoId（卡在 stale 值或过早摘掉新条目封面）。
+                val renderedFor = sharedPlayer.currentMediaItem?.mediaId
+                if (renderedFor != null && renderedFor == latestCurrentVideoId &&
+                    renderedVideoId != latestCurrentVideoId
+                ) {
+                    renderedVideoId = renderedFor
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -169,6 +188,16 @@ fun TvShortFeedScreen(
                         hasEndedAtCurrentVideo = false
                     } else {
                         hasEndedAtCurrentVideo = true
+                    }
+                } else if (playbackState == Player.STATE_READY) {
+                    // 主清封面触发：短视频 ProgressiveMediaSource 下 STATE_READY 意味着解码器就绪、
+                    // 首帧即将/已经渲染（实际先于 onRenderedFirstFrame）。用同款 mediaId 守卫 + 已清则跳过，
+                    // 避免封面永久冻结；BUFFERING/IDLE 不触发，避免误杀慢加载。
+                    val readyFor = sharedPlayer.currentMediaItem?.mediaId
+                    if (readyFor != null && readyFor == latestCurrentVideoId &&
+                        renderedVideoId != latestCurrentVideoId
+                    ) {
+                        renderedVideoId = readyFor
                     }
                 }
             }
@@ -247,6 +276,44 @@ fun TvShortFeedScreen(
         }
     }
 
+    // 预热封面缓存：对当前条 ±2 条窗口预热 Coil 内存/磁盘缓存，让相邻切条命中缓存瞬时显示封面。
+    // 去重：先查内存缓存命中即跳过；用 execute（挂起）+ Semaphore(2) 真正把并发抓取上限钉在 2，
+    // 外盘休眠时单条缩略图阻塞数秒也不至于并发打爆磁盘；分页补货时重叠前缀走缓存命中、仅新尾部发请求。
+    LaunchedEffect(uiState.items, uiState.currentIndex, baseUrl) {
+        val items = uiState.items
+        if (items.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val center = uiState.currentIndex
+        val start = (center - 2).coerceAtLeast(0)
+        val end = (center + 2).coerceAtMost(items.lastIndex)
+        for (idx in start..end) {
+            val item = items.getOrNull(idx) ?: continue
+            if (item.id.isBlank()) {
+                continue
+            }
+            val thumbUrl = resolveThumbnailUrl(baseUrl, item.thumbnailPath) ?: continue
+            val cacheKey = MemoryCache.Key(thumbUrl)
+            if (imageLoader.memoryCache?.get(cacheKey) != null) {
+                continue
+            }
+            thumbnailPrefetchSemaphore.withPermit {
+                // 拿到许可后二次检查：窗口内更早的请求或当前封面 AsyncImage 可能已填满缓存。
+                if (imageLoader.memoryCache?.get(cacheKey) != null) {
+                    return@withPermit
+                }
+                val request = ImageRequest.Builder(context)
+                    .data(thumbUrl)
+                    .memoryCacheKey(thumbUrl)
+                    .diskCacheKey(thumbUrl)
+                    .build()
+                // execute 挂起至抓取完成，配合 Semaphore 把并发抓取上限钉在 2（enqueue 非阻塞会让信号量形同虚设）。
+                // 抓取失败静默丢弃：封面 AsyncImage 仍会在该条成为当前条时自行重试。
+                runCatching { imageLoader.execute(request) }
+            }
+        }
+    }
+
     LaunchedEffect(uiState.items.size, uiState.currentIndex, currentVideoId, hasEndedAtCurrentVideo) {
         if (hasEndedAtCurrentVideo && currentVideoId.isNotBlank() && uiState.currentIndex < uiState.items.lastIndex) {
             hasEndedAtCurrentVideo = false
@@ -289,6 +356,14 @@ fun TvShortFeedScreen(
     val showPlaybackLoading = currentVideoId.isNotBlank() &&
         playbackErrorMessage == null &&
         (renderedVideoId != currentVideoId || playerPlaybackState == Player.STATE_BUFFERING)
+
+    val coverUrl = remember(baseUrl, currentVideoId, currentItem?.thumbnailPath) {
+        resolveThumbnailUrl(baseUrl, currentItem?.thumbnailPath)
+    }
+    val showPoster = currentVideoId.isNotBlank() &&
+        coverUrl != null &&
+        renderedVideoId != currentVideoId &&
+        playbackErrorMessage == null
 
     LaunchedTvInitialFocus(currentVideoId, playbackErrorMessage, uiState.loading, uiState.items.size) {
         if (currentVideoId.isNotBlank() && playbackErrorMessage == null && !showInitialLoading && !showEmptyState) {
@@ -453,6 +528,19 @@ fun TvShortFeedScreen(
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
+
+                AnimatedVisibility(
+                    visible = showPoster,
+                    enter = fadeIn(animationSpec = tween(150)),
+                    exit = fadeOut(animationSpec = tween(150)),
+                ) {
+                    AsyncImage(
+                        model = coverUrl,
+                        contentDescription = "${currentItem?.title.orEmpty()} 封面",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
 
                 if (showPlaybackLoading) {
                     TvShortFeedLoadingOverlay(
@@ -746,3 +834,26 @@ private fun formatTvShortPlaybackTime(ms: Long): String {
 
 private const val TvShortCenterIndicatorDurationMillis = 700L
 private const val TvShortSeekOverlayDurationMillis = 1_200L
+
+/**
+ * 把 [FeedVideoDto.thumbnailPath] 解析成可被 Coil 直接加载的绝对封面 URL。
+ *
+ * 服务端短信息流（`RandomShort` → `RecommendedVideo.ThumbnailPath`）恒为
+ * `/api/v1/videos/:id/thumbnail` 形态的服务端相对路径，前置拼接规范化 base 即得公开端点
+ * 绝对 URL（该端点无需鉴权）；已是 `http(s)://` 绝对地址则原样返回。该实现留在 `feature/tv`
+ * 包内独立维护，不复用手机端 `feature/shorts` 等源码。
+ */
+private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {
+    val path = rawPath?.trim().orEmpty()
+    if (path.isBlank()) {
+        return null
+    }
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path
+    }
+    val normalizedBase = UrlBuilder.normalizeBaseUrl(baseUrl)
+    if (normalizedBase.isBlank()) {
+        return null
+    }
+    return if (path.startsWith("/")) "$normalizedBase$path" else "$normalizedBase/$path"
+}
