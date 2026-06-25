@@ -1,3 +1,8 @@
+# 2026-06-25 22:43 +0800
+- 进度：已将 `tv-short-feed-cover-poster` 快进合并到本地 `master`，并推送到 `deploy` 远端；部署机 hook 已完成本次更新收口。
+- 影响文件：`plan.md`
+- 验证：`git merge --ff-only tv-short-feed-cover-poster` 通过；`git push deploy master` 通过，hook 输出 `RESTART_GO=0 REBUILD_FRONTEND=0` 且无失败。
+
 # 2026-06-25 22:38 +0800
 - 进度：准备将 `tv-short-feed-cover-poster` 合并到 `master`，然后推送到部署机 `deploy` 远端；当前先核对分叉关系、部署约定和工作区状态，确认不会把无关改动带进去。
 - 影响文件：`plan.md`
