@@ -1,3 +1,8 @@
+# 2026-06-25 22:38 +0800
+- 进度：准备将 `tv-short-feed-cover-poster` 合并到 `master`，然后推送到部署机 `deploy` 远端；当前先核对分叉关系、部署约定和工作区状态，确认不会把无关改动带进去。
+- 影响文件：`plan.md`
+- 验证：待执行 `git merge --ff-only tv-short-feed-cover-poster`、`git push deploy master`、`git status --short`、`git diff --stat`、乱码扫描。
+
 ## 2026-06-25 14:13 +0800
 - 进度：TV 短视频信息流切条由「黑屏 + loading」改为「视频缩略图封面占位 + 交叉淡入」。需求先经 grill-with-docs 把边界收口成 7 条决策并写入 CONTEXT.md `TV 短视频封面占位` 术语；再用三个子代理并行产出方案（最小差异 / 预加载健壮 / 首帧可靠），主代理综合为「A 骨架 + B 预加载 + C 首帧守卫」并拆 5 个任务编码。改动单文件 `TvShortFeedScreen.kt`：①新增本地 `resolveThumbnailUrl(baseUrl, rawPath)`（复刻手机端，服务端 `thumbnailPath` 恒为 `/api/v1/videos/:id/thumbnail` 公开端点路径）；②`showPoster = currentVideoId 非空 && coverUrl 非空 && renderedVideoId != currentVideoId && 无错误` 单一判定覆盖切条/重试/ON_RESUME；③封面 `AnimatedVisibility`+`tween(150)` 淡入淡出、`ContentScale.Fit` 与 `RESIZE_MODE_FIT` 几何对齐，z 序 PlayerView→封面→转圈（转圈保留叠在封面之上）；④`onRenderedFirstFrame` 与 `STATE_READY` 双信号清封面，均带 `mediaId == latestCurrentVideoId` 守卫防 stale first-frame（ExoPlayer 实际 READY 先于首帧，READY 为主触发、首帧为冗余确认）；⑤预加载 `LaunchedEffect` 对当前条 ±2 窗口预热 Coil 缓存，`memoryCache` 去重 + `execute`（挂起）+ `Semaphore(2)` 真正把并发抓取钉在 2 保护外盘休眠；首帧永不触发的极端病理情况转圈持续可见（非黑屏），用户可 BACK/切条脱困，不加超时强摘（避免与 BUFFERING 转圈判定交互、保沉浸式口径）。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/build.gradle.kts`（版本 0.1.122→0.1.123 / 122→123）、`CONTEXT.md`、`plan.md`
