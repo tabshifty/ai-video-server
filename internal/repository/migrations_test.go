@@ -130,6 +130,23 @@ func TestPasswordVaultEntriesMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+password_vault_entries`)
 }
 
+func TestArchiveImportBatchEncodingMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0028_archive_import_batch_encoding.up.sql")
+	down := readMigrationForTest(t, "0028_archive_import_batch_encoding.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+archive_import_batches\s+add\s+column\s+if\s+not\s+exists\s+encoding_mode`)
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+archive_import_batches\s+add\s+column\s+if\s+not\s+exists\s+encoding_requested_mode`)
+	assertSQLPattern(t, up, `(?is)'needs_password'.*'needs_encoding'.*'failed'`)
+	assertSQLPattern(t, up, `(?is)encoding_mode\s+in\s+\('','utf8','gbk'\)`)
+	assertSQLPattern(t, up, `(?is)encoding_requested_mode\s+in\s+\('auto','utf8','gbk'\)`)
+
+	assertSQLPattern(t, down, `(?is)update\s+archive_import_batches\s+set\s+status\s*=\s*'failed'\s+where\s+status\s*=\s*'needs_encoding'`)
+	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+encoding_requested_mode`)
+	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+encoding_mode`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

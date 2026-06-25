@@ -100,11 +100,13 @@ func (a *API) AdminUploadArchiveImport(c *gin.Context) {
 		case errors.Is(err, services.ErrArchiveUnsupportedFormat):
 			bad(c, "仅支持 zip、rar、7z")
 		case errors.Is(err, services.ErrArchivePasswordRequired):
-			response.Error(c, 1073, "压缩包需要密码")
+			response.JSON(c, 1073, "压缩包需要密码", batch)
+		case errors.Is(err, services.ErrArchiveEncodingRequired) && batch.Status == "needs_encoding":
+			response.JSON(c, 1077, "压缩包条目名编码需要确认", batch)
 		case errors.Is(err, services.ErrArchiveNestedArchive):
 			response.Error(c, 1074, "不允许压缩包嵌套")
 		default:
-			response.Error(c, 1072, err.Error())
+			response.JSON(c, 1072, err.Error(), batch)
 		}
 		return
 	}
@@ -473,7 +475,7 @@ func (a *API) AdminProcessArchiveImportBatch(c *gin.Context) {
 	})
 }
 
-// AdminRetryArchiveImportExtract retries archive extraction with a password.
+// AdminRetryArchiveImportExtract retries archive extraction with password and zip entry-name encoding.
 func (a *API) AdminRetryArchiveImportExtract(c *gin.Context) {
 	if a.archiveImportSvc == nil {
 		response.Error(c, 1071, "archive import service unavailable")
@@ -485,23 +487,34 @@ func (a *API) AdminRetryArchiveImportExtract(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Password string `json:"password"`
+		Password     string `json:"password"`
+		EncodingMode string `json:"encoding_mode"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
 		return
 	}
-	batch, err := a.archiveImportSvc.RetryExtract(c.Request.Context(), batchID, req.Password)
+	switch strings.ToLower(strings.TrimSpace(req.EncodingMode)) {
+	case "", "auto", "utf8", "gbk":
+	default:
+		bad(c, "encoding_mode 参数只能是 auto、utf8、gbk")
+		return
+	}
+	batch, err := a.archiveImportSvc.RetryExtract(c.Request.Context(), batchID, req.Password, req.EncodingMode)
 	if err != nil {
 		if errors.Is(err, services.ErrArchivePasswordRequired) {
-			response.Error(c, 1073, "压缩包需要密码")
+			response.JSON(c, 1073, "压缩包需要密码", batch)
+			return
+		}
+		if errors.Is(err, services.ErrArchiveEncodingRequired) && batch.Status == "needs_encoding" {
+			response.JSON(c, 1077, "压缩包条目名编码需要确认", batch)
 			return
 		}
 		if errors.Is(err, services.ErrArchiveNestedArchive) {
 			response.Error(c, 1074, "不允许压缩包嵌套")
 			return
 		}
-		response.Error(c, 1076, err.Error())
+		response.JSON(c, 1076, err.Error(), batch)
 		return
 	}
 	ok(c, batch)

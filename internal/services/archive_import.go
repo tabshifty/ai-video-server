@@ -15,10 +15,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
 	"video-server/internal/hashutil"
 	"video-server/internal/models"
@@ -31,6 +34,14 @@ var (
 	ErrArchivePasswordRequired  = errors.New("archive password required")
 	ErrArchiveNestedArchive     = errors.New("nested archive is not allowed")
 	ErrArchiveBatchBusy         = errors.New("archive batch is processing")
+	ErrArchiveEncodingRequired  = errors.New("archive entry encoding requires manual selection")
+	ErrArchiveEntryNameConflict = errors.New("archive entry names conflict after decoding")
+)
+
+const (
+	archiveEncodingAuto = "auto"
+	archiveEncodingUTF8 = "utf8"
+	archiveEncodingGBK  = "gbk"
 )
 
 type ArchiveImportService struct {
@@ -127,7 +138,7 @@ func (s *ArchiveImportService) ListBatches(ctx context.Context, page, pageSize i
 	}
 
 	rows, err := s.db.Query(ctx, `
-SELECT id, title, original_filename, archive_format, status, COALESCE(last_error, ''), total_entries, processable_entries, processed_entries, skipped_entries, failed_entries, created_at, updated_at, completed_at
+SELECT id, title, original_filename, archive_format, status, COALESCE(last_error, ''), COALESCE(encoding_mode, ''), COALESCE(encoding_requested_mode, 'auto'), total_entries, processable_entries, processed_entries, skipped_entries, failed_entries, created_at, updated_at, completed_at
 FROM archive_import_batches
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
@@ -140,7 +151,7 @@ LIMIT $1 OFFSET $2
 	items := make([]models.ArchiveImportBatchListItem, 0, pageSize)
 	for rows.Next() {
 		var item models.ArchiveImportBatchListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.OriginalFilename, &item.ArchiveFormat, &item.Status, &item.LastError, &item.TotalEntries, &item.ProcessableEntries, &item.ProcessedEntries, &item.SkippedEntries, &item.FailedEntries, &item.CreatedAt, &item.UpdatedAt, &item.CompletedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.OriginalFilename, &item.ArchiveFormat, &item.Status, &item.LastError, &item.EncodingMode, &item.EncodingRequestedMode, &item.TotalEntries, &item.ProcessableEntries, &item.ProcessedEntries, &item.SkippedEntries, &item.FailedEntries, &item.CreatedAt, &item.UpdatedAt, &item.CompletedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan archive batch: %w", err)
 		}
 		items = append(items, item)
@@ -165,6 +176,8 @@ SELECT
   COALESCE(extracted_dir, ''),
   COALESCE(status, ''),
   COALESCE(last_error, ''),
+  COALESCE(encoding_mode, ''),
+  COALESCE(encoding_requested_mode, 'auto'),
   COALESCE(total_entries, 0),
   COALESCE(processable_entries, 0),
   COALESCE(processed_entries, 0),
@@ -190,6 +203,8 @@ WHERE id = $1
 		&batch.ExtractedDir,
 		&batch.Status,
 		&batch.LastError,
+		&batch.EncodingMode,
+		&batch.EncodingRequestedMode,
 		&batch.TotalEntries,
 		&batch.ProcessableEntries,
 		&batch.ProcessedEntries,
@@ -315,6 +330,8 @@ func (s *ArchiveImportService) UploadArchive(ctx context.Context, in ArchiveImpo
 		ExtractedDir:              extractedDir,
 		Status:                    "uploaded",
 		LastError:                 "",
+		EncodingMode:              "",
+		EncodingRequestedMode:     archiveEncodingAuto,
 		DefaultTitlePrefix:        title,
 		DefaultDescription:        strings.TrimSpace(in.DefaultDescription),
 		DefaultTags:               normalizeArchiveTags(in.DefaultTags),
@@ -326,25 +343,28 @@ func (s *ArchiveImportService) UploadArchive(ctx context.Context, in ArchiveImpo
 		return models.ArchiveImportBatch{}, err
 	}
 
-	if err := s.extractArchive(ctx, format, originalPath, extractedDir, passwordForInput(in)); err != nil {
-		status := "failed"
-		if isArchivePasswordRelatedError(err) {
-			status = "needs_password"
-		}
-		if updateErr := s.updateArchiveBatchStatus(ctx, batchID, status, err.Error()); updateErr != nil {
+	actualEncodingMode, err := s.extractArchive(ctx, format, originalPath, extractedDir, passwordForInput(in), batch.EncodingRequestedMode)
+	if err != nil {
+		status := archiveBatchFailureStatus(batch, batch.EncodingRequestedMode, err)
+		if updateErr := s.updateArchiveBatchExtractFailure(ctx, batchID, status, err.Error(), batch.EncodingRequestedMode); updateErr != nil {
 			return models.ArchiveImportBatch{}, updateErr
 		}
-		batch.Status = status
-		batch.LastError = sanitizeArchiveError(err)
-		return batch, err
+		refreshed, getErr := s.GetBatch(ctx, batchID)
+		if getErr != nil {
+			return models.ArchiveImportBatch{}, err
+		}
+		return refreshed, err
+	}
+	if updateErr := s.updateArchiveBatchExtractSuccess(ctx, batchID, batch.EncodingRequestedMode, actualEncodingMode); updateErr != nil {
+		return models.ArchiveImportBatch{}, updateErr
 	}
 
 	if err := s.recordArchiveEntries(ctx, batchID, batch); err != nil {
-		_ = s.updateArchiveBatchStatus(ctx, batchID, "failed", err.Error())
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), batch.EncodingRequestedMode)
 		return models.ArchiveImportBatch{}, err
 	}
 	if err := s.refreshArchiveBatchStats(ctx, batchID); err != nil {
-		_ = s.updateArchiveBatchStatus(ctx, batchID, "failed", err.Error())
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), batch.EncodingRequestedMode)
 		return models.ArchiveImportBatch{}, err
 	}
 
@@ -746,7 +766,7 @@ func sameArchiveUUIDSet(left, right []uuid.UUID) bool {
 	return true
 }
 
-func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UUID, password string) (models.ArchiveImportBatch, error) {
+func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UUID, password, requestedMode string) (models.ArchiveImportBatch, error) {
 	batch, err := s.GetBatch(ctx, batchID)
 	if err != nil {
 		return models.ArchiveImportBatch{}, err
@@ -754,28 +774,34 @@ func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UU
 	if batch.OriginalPath == "" || batch.ExtractedDir == "" {
 		return models.ArchiveImportBatch{}, fmt.Errorf("batch paths missing")
 	}
+	requestedMode = archiveEncodingRequestedModeForFormat(batch.ArchiveFormat, requestedMode)
 	if err := s.clearArchiveBatchFiles(ctx, batchID); err != nil {
 		return models.ArchiveImportBatch{}, err
 	}
 	if err := os.RemoveAll(batch.ExtractedDir); err != nil && !os.IsNotExist(err) {
 		return models.ArchiveImportBatch{}, fmt.Errorf("clear archive extracted dir: %w", err)
 	}
-	if err := s.extractArchive(ctx, batch.ArchiveFormat, batch.OriginalPath, batch.ExtractedDir, strings.TrimSpace(password)); err != nil {
-		status := "failed"
-		if isArchivePasswordRelatedError(err) {
-			status = "needs_password"
-		}
-		if updateErr := s.updateArchiveBatchStatus(ctx, batchID, status, err.Error()); updateErr != nil {
+	actualEncodingMode, err := s.extractArchive(ctx, batch.ArchiveFormat, batch.OriginalPath, batch.ExtractedDir, strings.TrimSpace(password), requestedMode)
+	if err != nil {
+		status := archiveBatchFailureStatus(batch, requestedMode, err)
+		if updateErr := s.updateArchiveBatchExtractFailure(ctx, batchID, status, err.Error(), requestedMode); updateErr != nil {
 			return models.ArchiveImportBatch{}, updateErr
 		}
-		return models.ArchiveImportBatch{}, err
+		refreshed, getErr := s.GetBatch(ctx, batchID)
+		if getErr != nil {
+			return models.ArchiveImportBatch{}, err
+		}
+		return refreshed, err
+	}
+	if updateErr := s.updateArchiveBatchExtractSuccess(ctx, batchID, requestedMode, actualEncodingMode); updateErr != nil {
+		return models.ArchiveImportBatch{}, updateErr
 	}
 	if err := s.recordArchiveEntries(ctx, batchID, batch); err != nil {
-		_ = s.updateArchiveBatchStatus(ctx, batchID, "failed", err.Error())
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
 		return models.ArchiveImportBatch{}, err
 	}
 	if err := s.refreshArchiveBatchStats(ctx, batchID); err != nil {
-		_ = s.updateArchiveBatchStatus(ctx, batchID, "failed", err.Error())
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
 		return models.ArchiveImportBatch{}, err
 	}
 	return s.GetBatch(ctx, batchID)
@@ -797,10 +823,11 @@ func (s *ArchiveImportService) insertArchiveBatch(ctx context.Context, batch mod
 	_, err = s.db.Exec(ctx, `
 INSERT INTO archive_import_batches (
   id, user_id, title, original_filename, archive_format, original_path, extracted_dir, status, last_error,
-  default_title_prefix, default_description, default_tags, default_video_collection_ids, default_image_collection_ids
+  encoding_mode, encoding_requested_mode, default_title_prefix, default_description, default_tags,
+  default_video_collection_ids, default_image_collection_ids
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-`, batch.ID, batch.UserID, batch.Title, batch.OriginalFilename, batch.ArchiveFormat, batch.OriginalPath, batch.ExtractedDir, batch.Status, batch.LastError, batch.DefaultTitlePrefix, batch.DefaultDescription, defaultTagsRaw, defaultVideoCollectionsRaw, defaultImageCollectionsRaw)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+`, batch.ID, batch.UserID, batch.Title, batch.OriginalFilename, batch.ArchiveFormat, batch.OriginalPath, batch.ExtractedDir, batch.Status, batch.LastError, batch.EncodingMode, batch.EncodingRequestedMode, batch.DefaultTitlePrefix, batch.DefaultDescription, defaultTagsRaw, defaultVideoCollectionsRaw, defaultImageCollectionsRaw)
 	if err != nil {
 		return fmt.Errorf("insert archive batch: %w", err)
 	}
@@ -815,6 +842,30 @@ WHERE id=$1
 `, batchID, status, sanitizeArchiveText(lastError))
 	if err != nil {
 		return fmt.Errorf("update archive batch status: %w", err)
+	}
+	return nil
+}
+
+func (s *ArchiveImportService) updateArchiveBatchExtractSuccess(ctx context.Context, batchID uuid.UUID, requestedMode, encodingMode string) error {
+	_, err := s.db.Exec(ctx, `
+UPDATE archive_import_batches
+SET encoding_mode=$2, encoding_requested_mode=$3, last_error='', updated_at=NOW()
+WHERE id=$1
+`, batchID, normalizeArchiveEncodingModeValue(encodingMode), normalizeArchiveEncodingRequestedModeValue(requestedMode))
+	if err != nil {
+		return fmt.Errorf("update archive batch extract success: %w", err)
+	}
+	return nil
+}
+
+func (s *ArchiveImportService) updateArchiveBatchExtractFailure(ctx context.Context, batchID uuid.UUID, status, lastError, requestedMode string) error {
+	_, err := s.db.Exec(ctx, `
+UPDATE archive_import_batches
+SET status=$2, last_error=$3, encoding_requested_mode=$4, updated_at=NOW()
+WHERE id=$1
+`, batchID, status, sanitizeArchiveText(lastError), normalizeArchiveEncodingRequestedModeValue(requestedMode))
+	if err != nil {
+		return fmt.Errorf("update archive batch extract failure: %w", err)
 	}
 	return nil
 }
@@ -1353,6 +1404,53 @@ func sanitizeArchiveError(err error) string {
 	return sanitizeArchiveText(err.Error())
 }
 
+func normalizeArchiveEncodingRequestedModeValue(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case archiveEncodingUTF8:
+		return archiveEncodingUTF8
+	case archiveEncodingGBK:
+		return archiveEncodingGBK
+	default:
+		return archiveEncodingAuto
+	}
+}
+
+func normalizeArchiveEncodingModeValue(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case archiveEncodingUTF8:
+		return archiveEncodingUTF8
+	case archiveEncodingGBK:
+		return archiveEncodingGBK
+	default:
+		return ""
+	}
+}
+
+func archiveEncodingRequestedModeForFormat(format, requestedMode string) string {
+	if strings.ToLower(strings.TrimSpace(format)) != "zip" {
+		return archiveEncodingAuto
+	}
+	return normalizeArchiveEncodingRequestedModeValue(requestedMode)
+}
+
+func archiveBatchFailureStatus(batch models.ArchiveImportBatch, requestedMode string, err error) string {
+	if isArchivePasswordRelatedError(err) || errors.Is(err, ErrArchivePasswordRequired) {
+		return "needs_password"
+	}
+	if !errors.Is(err, ErrArchiveEncodingRequired) {
+		return "failed"
+	}
+	current := normalizeArchiveEncodingRequestedModeValue(requestedMode)
+	previous := normalizeArchiveEncodingRequestedModeValue(batch.EncodingRequestedMode)
+	if current == archiveEncodingAuto {
+		return "needs_encoding"
+	}
+	if previous != archiveEncodingAuto && previous != current {
+		return "failed"
+	}
+	return "needs_encoding"
+}
+
 func detectArchiveFormat(filename string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(filename)))
 	switch ext {
@@ -1367,101 +1465,212 @@ func detectArchiveFormat(filename string) (string, error) {
 	}
 }
 
-func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archivePath, extractedDir, password string) error {
+func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archivePath, extractedDir, password, requestedMode string) (string, error) {
 	if err := os.RemoveAll(extractedDir); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("clear archive extraction dir: %w", err)
+		return "", fmt.Errorf("clear archive extraction dir: %w", err)
 	}
 	if err := os.MkdirAll(extractedDir, 0o755); err != nil {
-		return fmt.Errorf("create archive extraction dir: %w", err)
+		return "", fmt.Errorf("create archive extraction dir: %w", err)
 	}
 
 	switch strings.ToLower(strings.TrimSpace(format)) {
 	case "zip":
 		if strings.TrimSpace(password) != "" {
-			return s.extractWithUnzip(ctx, archivePath, extractedDir, password)
+			return s.extractZipArchiveWithPassword(ctx, archivePath, extractedDir, password, archiveEncodingRequestedModeForFormat(format, requestedMode))
 		}
-		return extractZipArchive(archivePath, extractedDir)
+		return extractZipArchive(archivePath, extractedDir, archiveEncodingRequestedModeForFormat(format, requestedMode))
 	case "rar", "7z":
 		if strings.TrimSpace(password) != "" {
 			if err := s.extractWithSevenZip(ctx, archivePath, extractedDir, password); err == nil {
-				return nil
+				return "", nil
 			} else if !errors.Is(err, exec.ErrNotFound) {
-				return err
+				return "", err
 			}
 		}
-		return s.extractWithBsdtar(ctx, archivePath, extractedDir)
+		if err := s.extractWithBsdtar(ctx, archivePath, extractedDir); err != nil {
+			return "", err
+		}
+		return "", nil
 	default:
-		return ErrArchiveUnsupportedFormat
+		return "", ErrArchiveUnsupportedFormat
 	}
 }
 
-func extractZipArchive(archivePath, extractedDir string) error {
+type archiveZipExtractEntry struct {
+	file       *zip.File
+	targetPath string
+	isDir      bool
+}
+
+func extractZipArchive(archivePath, extractedDir, requestedMode string) (string, error) {
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
-		return fmt.Errorf("open zip archive: %w", err)
+		return "", fmt.Errorf("open zip archive: %w", err)
 	}
 	defer reader.Close()
 
-	for _, file := range reader.File {
-		if file.FileInfo().IsDir() {
-			targetDir, err := safeArchiveTargetPath(extractedDir, file.Name)
-			if err != nil {
-				return err
-			}
-			if err := os.MkdirAll(targetDir, 0o755); err != nil {
-				return fmt.Errorf("create zip dir: %w", err)
+	entries, effectiveMode, err := planZipExtractEntries(reader.File, extractedDir, requestedMode)
+	if err != nil {
+		return "", err
+	}
+
+	for _, entry := range entries {
+		if entry.isDir {
+			if err := os.MkdirAll(entry.targetPath, 0o755); err != nil {
+				return "", fmt.Errorf("create zip dir: %w", err)
 			}
 			continue
 		}
-		targetPath, err := safeArchiveTargetPath(extractedDir, file.Name)
-		if err != nil {
-			return err
+		if err := os.MkdirAll(filepath.Dir(entry.targetPath), 0o755); err != nil {
+			return "", fmt.Errorf("create zip parent dir: %w", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-			return fmt.Errorf("create zip parent dir: %w", err)
-		}
-		rc, err := file.Open()
+		rc, err := entry.file.Open()
 		if err != nil {
 			if isArchivePasswordRelatedError(err) {
-				return ErrArchivePasswordRequired
+				return "", ErrArchivePasswordRequired
 			}
-			return fmt.Errorf("open zip entry: %w", err)
+			return "", fmt.Errorf("open zip entry: %w", err)
 		}
-		out, err := os.Create(targetPath)
+		out, err := os.Create(entry.targetPath)
 		if err != nil {
 			rc.Close()
-			return fmt.Errorf("create zip entry file: %w", err)
+			return "", fmt.Errorf("create zip entry file: %w", err)
 		}
 		if _, err := io.Copy(out, rc); err != nil {
 			out.Close()
 			rc.Close()
-			return fmt.Errorf("extract zip entry: %w", err)
+			return "", fmt.Errorf("extract zip entry: %w", err)
 		}
 		if err := out.Close(); err != nil {
 			rc.Close()
-			return fmt.Errorf("close zip entry file: %w", err)
+			return "", fmt.Errorf("close zip entry file: %w", err)
 		}
 		if err := rc.Close(); err != nil {
-			return fmt.Errorf("close zip entry: %w", err)
+			return "", fmt.Errorf("close zip entry: %w", err)
 		}
 	}
-	return nil
+	if effectiveMode == "" {
+		effectiveMode = archiveEncodingUTF8
+	}
+	return normalizeArchiveEncodingModeValue(effectiveMode), nil
 }
 
-func safeArchiveTargetPath(baseDir, name string) (string, error) {
+func (s *ArchiveImportService) extractZipArchiveWithPassword(ctx context.Context, archivePath, extractedDir, password, requestedMode string) (string, error) {
+	reader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return "", fmt.Errorf("open zip archive: %w", err)
+	}
+	defer reader.Close()
+
+	entries, effectiveMode, err := planZipExtractEntries(reader.File, extractedDir, requestedMode)
+	if err != nil {
+		return "", err
+	}
+
+	for _, entry := range entries {
+		if entry.isDir {
+			if err := os.MkdirAll(entry.targetPath, 0o755); err != nil {
+				return "", fmt.Errorf("create zip dir: %w", err)
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(entry.targetPath), 0o755); err != nil {
+			return "", fmt.Errorf("create zip parent dir: %w", err)
+		}
+		if err := extractZipEntryWithUnzip(ctx, archivePath, entry.file.Name, entry.targetPath, password); err != nil {
+			return "", err
+		}
+	}
+
+	if effectiveMode == "" {
+		effectiveMode = archiveEncodingUTF8
+	}
+	return normalizeArchiveEncodingModeValue(effectiveMode), nil
+}
+
+func planZipExtractEntries(files []*zip.File, extractedDir, requestedMode string) ([]archiveZipExtractEntry, string, error) {
+	effectiveMode := ""
+	entries := make([]archiveZipExtractEntry, 0, len(files))
+	seenPaths := make(map[string]struct{}, len(files))
+	for _, file := range files {
+		decodedName, usedMode, err := decodeArchiveZipEntryName(file.Name, requestedMode)
+		if err != nil {
+			return nil, "", fmt.Errorf("decode zip entry name: %w", err)
+		}
+		targetPath, relativePath, err := safeArchiveTargetPath(extractedDir, decodedName)
+		if err != nil {
+			return nil, "", err
+		}
+		if _, ok := seenPaths[relativePath]; ok {
+			return nil, "", fmt.Errorf("%w: %s", ErrArchiveEntryNameConflict, relativePath)
+		}
+		seenPaths[relativePath] = struct{}{}
+		if usedMode == archiveEncodingGBK {
+			effectiveMode = archiveEncodingGBK
+		} else if effectiveMode == "" {
+			effectiveMode = archiveEncodingUTF8
+		}
+		entries = append(entries, archiveZipExtractEntry{
+			file:       file,
+			targetPath: targetPath,
+			isDir:      file.FileInfo().IsDir(),
+		})
+	}
+	return entries, effectiveMode, nil
+}
+
+func decodeArchiveZipEntryName(rawName, requestedMode string) (string, string, error) {
+	requestedMode = normalizeArchiveEncodingRequestedModeValue(requestedMode)
+	rawName = strings.ReplaceAll(rawName, `\`, `/`)
+	switch requestedMode {
+	case archiveEncodingUTF8:
+		if !utf8.ValidString(rawName) {
+			return "", "", ErrArchiveEncodingRequired
+		}
+		return rawName, archiveEncodingUTF8, nil
+	case archiveEncodingGBK:
+		decoded, err := decodeArchiveGBKString([]byte(rawName))
+		if err != nil {
+			return "", "", ErrArchiveEncodingRequired
+		}
+		return decoded, archiveEncodingGBK, nil
+	default:
+		if utf8.ValidString(rawName) {
+			return rawName, archiveEncodingUTF8, nil
+		}
+		decoded, err := decodeArchiveGBKString([]byte(rawName))
+		if err != nil {
+			return "", "", ErrArchiveEncodingRequired
+		}
+		return decoded, archiveEncodingGBK, nil
+	}
+}
+
+func decodeArchiveGBKString(raw []byte) (string, error) {
+	decoded, _, err := transform.String(simplifiedchinese.GBK.NewDecoder(), string(raw))
+	if err != nil {
+		return "", err
+	}
+	if !utf8.ValidString(decoded) {
+		return "", ErrArchiveEncodingRequired
+	}
+	return decoded, nil
+}
+
+func safeArchiveTargetPath(baseDir, name string) (string, string, error) {
 	cleaned := filepath.Clean(strings.TrimSpace(name))
 	if cleaned == "." || cleaned == string(filepath.Separator) || strings.HasPrefix(cleaned, "..") {
-		return "", ErrArchiveNestedArchive
+		return "", "", ErrArchiveNestedArchive
 	}
 	target := filepath.Join(baseDir, cleaned)
 	rel, err := filepath.Rel(baseDir, target)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if strings.HasPrefix(rel, "..") {
-		return "", ErrArchiveNestedArchive
+		return "", "", ErrArchiveNestedArchive
 	}
-	return target, nil
+	return target, filepath.ToSlash(rel), nil
 }
 
 func (s *ArchiveImportService) extractWithBsdtar(ctx context.Context, archivePath, extractedDir string) error {
@@ -1495,6 +1704,34 @@ func (s *ArchiveImportService) extractWithUnzip(ctx context.Context, archivePath
 			return ErrArchivePasswordRequired
 		}
 		return fmt.Errorf("extract archive with unzip: %w", err)
+	}
+	return nil
+}
+
+func extractZipEntryWithUnzip(ctx context.Context, archivePath, rawName, targetPath, password string) error {
+	out, err := os.Create(targetPath)
+	if err != nil {
+		return fmt.Errorf("create zip entry file: %w", err)
+	}
+
+	args := []string{"-p", "-qq", "-P", password, archivePath, rawName}
+	cmd := exec.CommandContext(ctx, "unzip", args...)
+	var stderr bytes.Buffer
+	cmd.Stdout = out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		_ = out.Close()
+		output := sanitizeArchiveText(stderr.String())
+		if output != "" {
+			err = fmt.Errorf("%w: %s", err, output)
+		}
+		if isArchivePasswordRelatedError(err) {
+			return ErrArchivePasswordRequired
+		}
+		return fmt.Errorf("extract zip entry with unzip: %w", err)
+	}
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("close zip entry file: %w", err)
 	}
 	return nil
 }

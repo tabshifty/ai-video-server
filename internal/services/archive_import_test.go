@@ -1,7 +1,10 @@
 package services
 
 import (
+	"archive/zip"
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +12,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
 	"video-server/internal/models"
 )
@@ -146,7 +151,7 @@ func TestCopyArchiveVideoSourceFileUsesStablePathOutsideWorkDir(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	svc := &ArchiveImportService{uploadTemp: root}
+	svc := &ArchiveImportService{storageRoot: root}
 	file := models.ArchiveImportFileListItem{
 		ID:           uuid.MustParse("33333333-3333-3333-3333-333333333333"),
 		BatchID:      uuid.MustParse("44444444-4444-4444-4444-444444444444"),
@@ -362,6 +367,242 @@ func TestSanitizeArchiveErrorReplacesInvalidUTF8(t *testing.T) {
 	}
 }
 
+func TestDecodeArchiveZipEntryNameAutoPrefersUTF8(t *testing.T) {
+	t.Parallel()
+
+	const rawName = "第一组/测试视频.mp4"
+	got, mode, err := decodeArchiveZipEntryName(rawName, archiveEncodingAuto)
+	if err != nil {
+		t.Fatalf("decodeArchiveZipEntryName() error = %v", err)
+	}
+	if got != rawName {
+		t.Fatalf("decodeArchiveZipEntryName() name = %q, want %q", got, rawName)
+	}
+	if mode != archiveEncodingUTF8 {
+		t.Fatalf("decodeArchiveZipEntryName() mode = %q, want %q", mode, archiveEncodingUTF8)
+	}
+}
+
+func TestDecodeArchiveZipEntryNameAutoFallsBackToGBK(t *testing.T) {
+	t.Parallel()
+
+	const want = "第一组/测试视频.mp4"
+	rawName := mustEncodeGBKString(t, want)
+
+	got, mode, err := decodeArchiveZipEntryName(rawName, archiveEncodingAuto)
+	if err != nil {
+		t.Fatalf("decodeArchiveZipEntryName() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("decodeArchiveZipEntryName() name = %q, want %q", got, want)
+	}
+	if mode != archiveEncodingGBK {
+		t.Fatalf("decodeArchiveZipEntryName() mode = %q, want %q", mode, archiveEncodingGBK)
+	}
+}
+
+func TestDecodeArchiveZipEntryNameExplicitUTF8RejectsGBKBytes(t *testing.T) {
+	t.Parallel()
+
+	rawName := mustEncodeGBKString(t, "第一组/测试视频.mp4")
+	if _, _, err := decodeArchiveZipEntryName(rawName, archiveEncodingUTF8); !errors.Is(err, ErrArchiveEncodingRequired) {
+		t.Fatalf("decodeArchiveZipEntryName() error = %v, want %v", err, ErrArchiveEncodingRequired)
+	}
+}
+
+func TestArchiveBatchFailureStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		batch         models.ArchiveImportBatch
+		requestedMode string
+		err           error
+		want          string
+	}{
+		{
+			name:          "password errors prefer needs password",
+			requestedMode: archiveEncodingAuto,
+			err:           ErrArchivePasswordRequired,
+			want:          "needs_password",
+		},
+		{
+			name:          "auto decode failure asks for encoding",
+			requestedMode: archiveEncodingAuto,
+			err:           ErrArchiveEncodingRequired,
+			want:          "needs_encoding",
+		},
+		{
+			name:          "first explicit decode failure still retryable",
+			batch:         models.ArchiveImportBatch{EncodingRequestedMode: archiveEncodingAuto},
+			requestedMode: archiveEncodingUTF8,
+			err:           ErrArchiveEncodingRequired,
+			want:          "needs_encoding",
+		},
+		{
+			name:          "second distinct explicit decode failure is final",
+			batch:         models.ArchiveImportBatch{EncodingRequestedMode: archiveEncodingUTF8},
+			requestedMode: archiveEncodingGBK,
+			err:           ErrArchiveEncodingRequired,
+			want:          "failed",
+		},
+		{
+			name:          "non encoding failures fail directly",
+			requestedMode: archiveEncodingAuto,
+			err:           errors.New("boom"),
+			want:          "failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := archiveBatchFailureStatus(tt.batch, tt.requestedMode, tt.err); got != tt.want {
+				t.Fatalf("archiveBatchFailureStatus() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExtractZipArchiveDecodesGBKPaths(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	archivePath := filepath.Join(root, "gbk.zip")
+	extractedDir := filepath.Join(root, "out")
+	const decodedName = "第一组/测试视频.txt"
+	if err := writeTestZipArchive(archivePath, []testZipArchiveEntry{
+		{
+			Name:    mustEncodeGBKString(t, decodedName),
+			Body:    "demo-body",
+			NonUTF8: true,
+		},
+	}); err != nil {
+		t.Fatalf("writeTestZipArchive() error = %v", err)
+	}
+
+	mode, err := extractZipArchive(archivePath, extractedDir, archiveEncodingAuto)
+	if err != nil {
+		t.Fatalf("extractZipArchive() error = %v", err)
+	}
+	if mode != archiveEncodingGBK {
+		t.Fatalf("extractZipArchive() mode = %q, want %q", mode, archiveEncodingGBK)
+	}
+	data, err := os.ReadFile(filepath.Join(extractedDir, "第一组", "测试视频.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(data) != "demo-body" {
+		t.Fatalf("ReadFile() body = %q, want %q", string(data), "demo-body")
+	}
+}
+
+func TestExtractZipArchiveRejectsDecodedPathConflicts(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	archivePath := filepath.Join(root, "conflict.zip")
+	extractedDir := filepath.Join(root, "out")
+	const decodedName = "第一组/测试视频.txt"
+	if err := writeTestZipArchive(archivePath, []testZipArchiveEntry{
+		{
+			Name: decodedName,
+			Body: "utf8-body",
+		},
+		{
+			Name:    mustEncodeGBKString(t, decodedName),
+			Body:    "gbk-body",
+			NonUTF8: true,
+		},
+	}); err != nil {
+		t.Fatalf("writeTestZipArchive() error = %v", err)
+	}
+
+	_, err := extractZipArchive(archivePath, extractedDir, archiveEncodingAuto)
+	if !errors.Is(err, ErrArchiveEntryNameConflict) {
+		t.Fatalf("extractZipArchive() error = %v, want %v", err, ErrArchiveEntryNameConflict)
+	}
+}
+
+func TestExtractZipArchiveWithPasswordUsesDecodedGBKPaths(t *testing.T) {
+	root := t.TempDir()
+	archivePath := filepath.Join(root, "password.zip")
+	extractedDir := filepath.Join(root, "out")
+	fakeBinDir := filepath.Join(root, "bin")
+	logPath := filepath.Join(root, "unzip.log")
+	const decodedName = "第一组/测试视频.txt"
+	if err := os.MkdirAll(fakeBinDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := writeTestZipArchive(archivePath, []testZipArchiveEntry{
+		{
+			Name:    mustEncodeGBKString(t, decodedName),
+			Body:    "encrypted-body",
+			NonUTF8: true,
+		},
+	}); err != nil {
+		t.Fatalf("writeTestZipArchive() error = %v", err)
+	}
+	if err := writeFakeUnzipScript(fakeBinDir, logPath, "encrypted-body"); err != nil {
+		t.Fatalf("writeFakeUnzipScript() error = %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("FAKE_UNZIP_LOG", logPath)
+
+	svc := &ArchiveImportService{}
+	mode, err := svc.extractZipArchiveWithPassword(context.Background(), archivePath, extractedDir, "secret", archiveEncodingAuto)
+	if err != nil {
+		t.Fatalf("extractZipArchiveWithPassword() error = %v", err)
+	}
+	if mode != archiveEncodingGBK {
+		t.Fatalf("extractZipArchiveWithPassword() mode = %q, want %q", mode, archiveEncodingGBK)
+	}
+
+	data, err := os.ReadFile(filepath.Join(extractedDir, "第一组", "测试视频.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(data) != "encrypted-body" {
+		t.Fatalf("extracted file body = %q, want %q", string(data), "encrypted-body")
+	}
+
+	rawHex, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("ReadFile(log) error = %v", err)
+	}
+	wantHex := fmt.Sprintf("%x", []byte(mustEncodeGBKString(t, decodedName)))
+	if strings.TrimSpace(string(rawHex)) != wantHex {
+		t.Fatalf("raw unzip entry bytes = %q, want %q", strings.TrimSpace(string(rawHex)), wantHex)
+	}
+}
+
+func TestPlanZipExtractEntriesDecodesGBKForPasswordPathPlanning(t *testing.T) {
+	t.Parallel()
+
+	const decodedName = "第一组/测试视频.txt"
+	files := []*zip.File{
+		{
+			FileHeader: zip.FileHeader{
+				Name:    mustEncodeGBKString(t, decodedName),
+				NonUTF8: true,
+			},
+		},
+	}
+
+	entries, mode, err := planZipExtractEntries(files, t.TempDir(), archiveEncodingAuto)
+	if err != nil {
+		t.Fatalf("planZipExtractEntries() error = %v", err)
+	}
+	if mode != archiveEncodingGBK {
+		t.Fatalf("planZipExtractEntries() mode = %q, want %q", mode, archiveEncodingGBK)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("planZipExtractEntries() len = %d, want 1", len(entries))
+	}
+	if !strings.HasSuffix(entries[0].targetPath, filepath.Join("第一组", "测试视频.txt")) {
+		t.Fatalf("planZipExtractEntries() targetPath = %q", entries[0].targetPath)
+	}
+}
+
 func TestValidateArchiveImportGroupSelection(t *testing.T) {
 	t.Parallel()
 
@@ -412,6 +653,70 @@ func TestValidateArchiveImportGroupSelection(t *testing.T) {
 			}
 		})
 	}
+}
+
+type testZipArchiveEntry struct {
+	Name    string
+	Body    string
+	NonUTF8 bool
+}
+
+func writeTestZipArchive(path string, entries []testZipArchiveEntry) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := zip.NewWriter(file)
+	for _, entry := range entries {
+		header := &zip.FileHeader{
+			Name:    entry.Name,
+			Method:  zip.Store,
+			NonUTF8: entry.NonUTF8,
+		}
+		w, err := writer.CreateHeader(header)
+		if err != nil {
+			_ = writer.Close()
+			return err
+		}
+		if _, err := w.Write([]byte(entry.Body)); err != nil {
+			_ = writer.Close()
+			return err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+func mustEncodeGBKString(t *testing.T, value string) string {
+	t.Helper()
+
+	encoded, _, err := transform.String(simplifiedchinese.GBK.NewEncoder(), value)
+	if err != nil {
+		t.Fatalf("transform.String() error = %v", err)
+	}
+	return encoded
+}
+
+func writeFakeUnzipScript(dir, logPath, body string) error {
+	script := fmt.Sprintf(`#!/bin/sh
+set -eu
+if [ "$1" != "-p" ] || [ "$2" != "-qq" ] || [ "$3" != "-P" ]; then
+  echo "unexpected unzip args: $*" >&2
+  exit 2
+fi
+if [ "$4" != "secret" ]; then
+  echo "unexpected password" >&2
+  exit 2
+fi
+printf '%%s' "$6" | od -An -tx1 | tr -d ' \n' > "$FAKE_UNZIP_LOG"
+printf %q
+`, body)
+	path := filepath.Join(dir, "unzip")
+	return os.WriteFile(path, []byte(script), 0o755)
 }
 
 func TestArchiveImportApplyGroupToFileHonorsOverrides(t *testing.T) {

@@ -62,6 +62,7 @@ const selectedFileIndexAnchor = ref(-1)
 const selectedFile = ref(null)
 const selectedFileSnapshot = ref('')
 const retryExtractPassword = ref('')
+const retryExtractEncodingMode = ref('auto')
 const fileSortMode = ref('original')
 const viewportWidth = ref(readViewportWidth())
 const tagOptions = ref([])
@@ -80,6 +81,12 @@ const assignGroupTargetID = ref('')
 const fileSortOptions = [
   { label: '按原始顺序', value: 'original' },
   { label: '按类型排序', value: 'type' }
+]
+
+const archiveEncodingModeOptions = [
+  { label: '自动判定', value: 'auto' },
+  { label: 'UTF-8', value: 'utf8' },
+  { label: 'GBK / CP936', value: 'gbk' }
 ]
 
 const query = reactive({
@@ -259,12 +266,12 @@ const archiveGroupVideoImageCollectionID = computed({
 })
 const overviewCards = computed(() => {
   const needingAction = batches.value.filter((batch) => batchNeedsAction(batch)).length
-  const needPassword = batches.value.filter((batch) => batch.status === 'needs_password').length
+  const needExtractRetry = batches.value.filter((batch) => batch.status === 'needs_password' || batch.status === 'needs_encoding').length
   const processing = batches.value.filter((batch) => batch.status === 'processing').length
   return [
     { label: '批次总数', value: batches.value.length, hint: '按上传时间倒序浏览' },
-    { label: '待继续处理', value: needingAction, hint: '仍有待处理、失败或待密码批次' },
-    { label: '待密码', value: needPassword, hint: '补密码后可继续解包' },
+    { label: '待继续处理', value: needingAction, hint: '仍有待处理、失败或待纠偏批次' },
+    { label: '待纠偏', value: needExtractRetry, hint: '补密码或确认编码后可继续解包' },
     { label: '处理中', value: processing, hint: '后台仍在解包或入库' }
   ]
 })
@@ -498,6 +505,7 @@ function formatBatchProgress(batch) {
 
 function batchNeedsAction(batch) {
   return batch?.status === 'needs_password'
+    || batch?.status === 'needs_encoding'
     || batch?.status === 'failed'
     || batch?.status === 'partial'
     || Number(batch?.failed_entries || 0) > 0
@@ -512,6 +520,7 @@ function batchStatusLabel(status) {
     partial: '部分完成',
     completed: '已完成',
     needs_password: '待密码',
+    needs_encoding: '待编码',
     failed: '失败'
   }
   return map[status] || status || '-'
@@ -519,10 +528,35 @@ function batchStatusLabel(status) {
 
 function batchStatusType(status) {
   if (status === 'completed') return 'success'
-  if (status === 'partial' || status === 'needs_password') return 'warning'
+  if (status === 'partial' || status === 'needs_password' || status === 'needs_encoding') return 'warning'
   if (status === 'failed') return 'danger'
   if (status === 'processing') return 'info'
   return 'primary'
+}
+
+function archiveEncodingModeLabel(mode) {
+  const map = {
+    auto: '自动判定',
+    utf8: 'UTF-8',
+    gbk: 'GBK / CP936'
+  }
+  return map[String(mode || '').trim().toLowerCase()] || '待确认'
+}
+
+function canRetryArchiveExtract(batch) {
+  return batch?.status === 'needs_password' || batch?.status === 'needs_encoding'
+}
+
+function batchSupportsEncodingRetry(batch) {
+  return String(batch?.archive_format || '').trim().toLowerCase() === 'zip'
+}
+
+function currentBatchEncodingSummary(batch) {
+  const effective = String(batch?.encoding_mode || '').trim().toLowerCase()
+  if (effective) return archiveEncodingModeLabel(effective)
+  if (batch?.status === 'needs_encoding') return '待确认'
+  if (batchSupportsEncodingRetry(batch)) return archiveEncodingModeLabel(batch?.encoding_requested_mode || 'auto')
+  return '-'
 }
 
 function fileStatusLabel(status) {
@@ -722,6 +756,9 @@ function applyBatchDetailData(data, options = {}) {
   selectedBatchFiles.value = files
   selectedBatchGroups.value = groups
   retryExtractPassword.value = ''
+  retryExtractEncodingMode.value = batchSupportsEncodingRetry(data)
+    ? String(data?.encoding_requested_mode || data?.encoding_mode || 'auto').trim().toLowerCase() || 'auto'
+    : 'auto'
   if (String(data?.id || '') !== previousBatchID) {
     activeGroupFilter.value = ARCHIVE_GROUP_FILTER_ALL
   } else if (
@@ -974,6 +1011,14 @@ async function uploadArchive() {
     }
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '上传压缩包失败'))
+    await loadBatches()
+    const recoverableBatchID = String(error?.data?.id || '').trim()
+    if (recoverableBatchID) {
+      await loadBatchDetail(recoverableBatchID, {
+        preserveSelection: false,
+        skipConfirm: true
+      })
+    }
   } finally {
     uploadLoading.value = false
   }
@@ -1550,18 +1595,25 @@ async function processSelectedArchiveFiles() {
 async function runRetryExtract() {
   if (!selectedBatch.value?.id) return
   const password = String(retryExtractPassword.value || '').trim()
-  if (!password) {
+  if (selectedBatch.value.status === 'needs_password' && !password) {
     ElMessage.warning('请输入密码后再重试')
     return
   }
+  const encodingMode = batchSupportsEncodingRetry(selectedBatch.value)
+    ? String(retryExtractEncodingMode.value || 'auto').trim().toLowerCase() || 'auto'
+    : 'auto'
   processingBatch.value = true
   try {
-    await retryAdminArchiveImportExtract(selectedBatch.value.id, { password })
+    await retryAdminArchiveImportExtract(selectedBatch.value.id, {
+      password,
+      encoding_mode: encodingMode
+    })
     retryExtractPassword.value = ''
     ElMessage.success('已重新解包')
     await refreshBatchDetail({ skipConfirm: true })
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '重试解包失败'))
+    await refreshBatchDetail({ skipConfirm: true })
   } finally {
     processingBatch.value = false
   }
@@ -1590,6 +1642,7 @@ function handleBatchDrawerClosed() {
   selectedFileIndexAnchor.value = -1
   clearSelectedFileDraft()
   retryExtractPassword.value = ''
+  retryExtractEncodingMode.value = 'auto'
   selectedBatchGroups.value = []
   activeGroupFilter.value = ARCHIVE_GROUP_FILTER_ALL
   assignGroupTargetID.value = ''
@@ -1792,12 +1845,13 @@ onUnmounted(() => {
             </div>
             <div class="archive-drawer__hero-actions">
               <el-button :loading="batchDetailLoading" @click="refreshBatchDetail">刷新详情</el-button>
-              <el-button v-if="selectedBatch.status === 'needs_password'" :loading="processingBatch" @click="runRetryExtract">重试解包</el-button>
+              <el-button v-if="canRetryArchiveExtract(selectedBatch)" :loading="processingBatch" @click="runRetryExtract">重试解包</el-button>
             </div>
           </section>
 
           <section class="archive-batch-summary">
             <div><span>状态</span><strong>{{ batchStatusLabel(selectedBatch.status) }}</strong></div>
+            <div><span>解包编码</span><strong>{{ currentBatchEncodingSummary(selectedBatch) }}</strong></div>
             <div><span>总项</span><strong class="tabular-num">{{ selectedBatch.total_entries }}</strong></div>
             <div><span>可处理</span><strong class="tabular-num">{{ selectedBatch.processable_entries }}</strong></div>
             <div><span>已处理</span><strong class="tabular-num">{{ selectedBatch.processed_entries }}</strong></div>
@@ -1815,11 +1869,34 @@ onUnmounted(() => {
             class="archive-inline-alert"
           />
 
-          <SectionCard v-if="selectedBatch.status === 'needs_password'" dense class="archive-password-card">
-            <template #title>补密码后继续解包</template>
-            <template #description>当前批次在等待管理员重新输入密码。输入正确密码后，详情会刷新到最新状态。</template>
+          <SectionCard v-if="canRetryArchiveExtract(selectedBatch)" dense class="archive-password-card">
+            <template #title>纠偏后继续解包</template>
+            <template #description>
+              {{
+                selectedBatch.status === 'needs_password'
+                  ? '当前批次在等待管理员重新输入密码；ZIP 批次也可以顺手确认条目名编码模式。'
+                  : '当前批次在等待管理员确认 ZIP 条目名编码。默认先走自动判定，必要时改用 UTF-8 或 GBK / CP936。'
+              }}
+            </template>
             <div class="archive-password-card__form">
-              <el-input v-model="retryExtractPassword" type="password" show-password placeholder="请输入压缩包密码" />
+              <el-input
+                v-model="retryExtractPassword"
+                type="password"
+                show-password
+                :placeholder="selectedBatch.status === 'needs_password' ? '请输入压缩包密码' : '如需补密码可一并填写'"
+              />
+              <el-select
+                v-if="batchSupportsEncodingRetry(selectedBatch)"
+                v-model="retryExtractEncodingMode"
+                class="archive-password-card__encoding"
+              >
+                <el-option
+                  v-for="item in archiveEncodingModeOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
               <el-button type="primary" :loading="processingBatch" @click="runRetryExtract">重试解包</el-button>
             </div>
           </SectionCard>
@@ -2796,9 +2873,13 @@ onUnmounted(() => {
 
 .archive-password-card__form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: var(--space-2);
   align-items: start;
+}
+
+.archive-password-card__encoding {
+  width: 160px;
 }
 
 .archive-group-panel,
@@ -3174,6 +3255,10 @@ onUnmounted(() => {
 
   .archive-password-card__form {
     display: grid;
+  }
+
+  .archive-password-card__encoding {
+    width: 100%;
   }
 }
 

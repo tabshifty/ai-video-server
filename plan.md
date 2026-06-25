@@ -1,3 +1,68 @@
+## 2026-06-25 14:13 +0800
+- 进度：完成 ZIP 压缩包中文条目名编码兼容收尾。回归确认服务端能按 `auto / utf8 / gbk` 正确解码并落盘，密码分支会沿用解码后的中文路径，`needs_encoding` 批次可通过重试入口补编码或补密码，管理端摘要与表单已联动到位。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/admin_archive_import_test.go`、`internal/handlers/router.go`、`internal/models/models.go`、`internal/repository/migrations_test.go`、`migrations/0028_archive_import_batch_encoding.up.sql`、`migrations/0028_archive_import_batch_encoding.down.sql`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./... -count=1` 通过；`go vet ./internal/services ./internal/handlers ./internal/repository` 通过；`cd admin-web && npm test` 166 项通过；`cd admin-web && npm run build` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md internal/services/archive_import.go internal/services/archive_import_test.go internal/handlers/admin_archive_import.go internal/handlers/admin_archive_import_test.go` 无命中。
+
+## 2026-06-25 09:35 +0800
+- 进度：完成 ZIP 压缩包条目名编码兼容实现并开始补严回归。服务层 `decodeArchiveZipEntryName` 落地 `auto / utf8 / gbk` 判码（合法 UTF-8 优先、仅非法 UTF-8 才回退 GBK），`planZipExtractEntries` 处理解码后路径冲突；`archiveBatchFailureStatus` 实现“自动失败→needs_encoding、首次显式失败仍可重试、第二次显式异种编码失败转 failed”的两段式纠偏；`RetryExtract` 合并密码与编码模式入口，`extractArchive` 返回最终采用编码并写入 `encoding_mode`；`encoding_requested_mode` 与 `encoding_mode` 仅对 `zip` 生效，`rar/7z` 维持既有外部解压器行为。管理端重试表单把密码与编码选择合并在同一张纠偏卡，`needs_encoding` 状态与批次摘要“解包编码”回显联动。当前补充中的回归测试会锁定 upload / retry-extract 的 handler 契约，避免返回体丢失批次数据。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/router.go`、`internal/models/models.go`、`internal/repository/migrations_test.go`、`migrations/0028_archive_import_batch_encoding.up.sql`、`migrations/0028_archive_import_batch_encoding.down.sql`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./...` 通过（含 `internal/services`、`internal/handlers`、`internal/repository`、`internal/queue`）；`go vet ./internal/services ./internal/handlers ./internal/repository` 无告警；`cd admin-web && npm test` 166 项通过；`cd admin-web && npm run build` 通过；`git diff --check` 通过；`rg -n $'\uFFFD'` 对改动文件无命中；迁移编号 0028 紧接 0027 正确递增。
+
+## 2026-06-24 23:19 +0800
+- 进度：开始落地 ZIP 压缩包条目名编码兼容实现。当前工作重点是修通 `archive_import` 的自动判码、`needs_encoding` 重试入口、批次编码追溯字段，以及管理端重试表单联动；先修到可编译，再补服务/前端验证。
+- 影响文件：`internal/services/archive_import.go`、`internal/handlers/admin_archive_import.go`、`internal/models/models.go`、`internal/repository/migrations_test.go`、`migrations/0028_archive_import_batch_encoding.up.sql`、`migrations/0028_archive_import_batch_encoding.down.sql`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `go test ./internal/services ./internal/handlers ./internal/repository -count=1`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
+## 2026-06-24 22:56 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包最终编码的审计边界。已确认批次一旦通过人工指定编码模式成功解包，就必须保留“最终采用的编码模式”用于回看与排障；同时核实了当前 `archive_import_batches` 既没有 `encoding_mode` 字段，也没有批次级 `metadata`，现状不足以直接承载该信息。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:52 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包重试解包入口。已确认密码与条目名编码模式属于同一个纠偏表单，一次重试同时提交 `password` 和 `encoding_mode`，避免管理员在“待密码”和“待编码”之间来回切入口；该边界已同步补入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:49 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包条目名编码模式的作用域。已确认首期显式编码模式只作用于 `zip`，`rar/7z` 维持既有外部解压器行为，不共享 `utf8 / gbk` 人工纠偏入口；该边界已同步补入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:48 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包条目名编码模式的入口边界。已确认编码模式不放上传表单，首次上传默认 `auto`；只有批次进入 `needs_encoding` 后，管理员才通过“重试解包”显式选择 `utf8` 或 `gbk` 做人工纠偏。该语义已同步补入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:46 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包编码待确认状态。已确认自动判码失败或管理员手动纠偏时应进入独立 `needs_encoding` 可重试状态，与 `needs_password` 并列而不是混入 `failed`；该语义已同步补充到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:44 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入的解包重试边界。已确认现有 `retry-extract` 不应继续只承载密码，而要扩成支持显式条目名编码模式；首期模式收口为 `auto / utf8 / gbk`，并已同步补充 `CONTEXT.md` 的 `压缩包解包编码模式` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:42 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包 ZIP 条目名的判码顺序。已确认不能把“未标 UTF-8”直接等同为 `GBK/CP936`；条目名先按合法 UTF-8 使用，仅在不是合法 UTF-8 时才回退 `GBK/CP936`，并已同步补充 `CONTEXT.md` 的 `压缩包条目名判码顺序` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:41 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入的相对路径落库边界。已确认 `relative_path` 与管理员可见文件名统一保存解码后的中文路径文本，不存原始字节串转义；该术语已补入 `CONTEXT.md`，避免后续误把路径审计做成原始编码展示。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:40 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入的中文条目名兼容边界。已确认“必须解决中文 ZIP 条目名”在术语上应具体化为兼容明确列出的常见编码，而不是泛化成“所有中文都支持”；当前兼容集收口为 `UTF-8 + GBK/CP936`，并已同步更新 `CONTEXT.md` 的 `压缩包条目名编码` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
+## 2026-06-24 22:36 +0800
+- 进度：继续通过 `$grill-with-docs` 收口压缩包导入的条目名编码边界。已确认当前问题不是“中文字符本身不支持”，而是 ZIP 条目名编码可能与 UTF-8/系统可创建路径不兼容；同时确认优先保留 `压缩包原始相对路径保留` 与 `压缩包原目录结构保留` 契约，不自动猜码、不自动改名，并已同步补充 `CONTEXT.md` 的 `压缩包条目名编码` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档更新，无需构建。
+
 ## 2026-06-24 22:28 +0800
 - 进度：完成压缩包导入 UTF-8 落库报错修复。服务层现在会先把外部解压器 stderr 与批次/文件失败原因归一化为合法 UTF-8，再写入 `archive_import_batches.last_error` / `archive_import_files.reason`；新增纯单测锁定非法字节替换行为，并在 `CONTEXT.md` 沉淀“压缩包错误文本 UTF-8 落库”兼容约束。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`

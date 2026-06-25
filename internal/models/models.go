@@ -88,45 +88,49 @@ type VideoSubtitle struct {
 }
 
 type ArchiveImportBatch struct {
-	ID                        uuid.UUID
-	UserID                    *uuid.UUID
-	Title                     string
-	OriginalFilename          string
-	ArchiveFormat             string
-	OriginalPath              string
-	ExtractedDir              string
-	Status                    string
-	LastError                 string
-	TotalEntries              int
-	ProcessableEntries        int
-	ProcessedEntries          int
-	SkippedEntries            int
-	FailedEntries             int
-	DefaultTitlePrefix        string
-	DefaultDescription        string
-	DefaultTags               []string
-	DefaultVideoCollectionIDs []uuid.UUID
-	DefaultImageCollectionIDs []uuid.UUID
-	CreatedAt                 time.Time
-	UpdatedAt                 time.Time
-	CompletedAt               *time.Time
+	ID                        uuid.UUID   `json:"id"`
+	UserID                    *uuid.UUID  `json:"user_id"`
+	Title                     string      `json:"title"`
+	OriginalFilename          string      `json:"original_filename"`
+	ArchiveFormat             string      `json:"archive_format"`
+	OriginalPath              string      `json:"original_path"`
+	ExtractedDir              string      `json:"extracted_dir"`
+	Status                    string      `json:"status"`
+	LastError                 string      `json:"last_error"`
+	EncodingMode              string      `json:"encoding_mode"`
+	EncodingRequestedMode     string      `json:"encoding_requested_mode"`
+	TotalEntries              int         `json:"total_entries"`
+	ProcessableEntries        int         `json:"processable_entries"`
+	ProcessedEntries          int         `json:"processed_entries"`
+	SkippedEntries            int         `json:"skipped_entries"`
+	FailedEntries             int         `json:"failed_entries"`
+	DefaultTitlePrefix        string      `json:"default_title_prefix"`
+	DefaultDescription        string      `json:"default_description"`
+	DefaultTags               []string    `json:"default_tags"`
+	DefaultVideoCollectionIDs []uuid.UUID `json:"default_video_collection_ids"`
+	DefaultImageCollectionIDs []uuid.UUID `json:"default_image_collection_ids"`
+	CreatedAt                 time.Time   `json:"created_at"`
+	UpdatedAt                 time.Time   `json:"updated_at"`
+	CompletedAt               *time.Time  `json:"completed_at"`
 }
 
 type ArchiveImportBatchListItem struct {
-	ID                 uuid.UUID  `json:"id"`
-	Title              string     `json:"title"`
-	OriginalFilename   string     `json:"original_filename"`
-	ArchiveFormat      string     `json:"archive_format"`
-	Status             string     `json:"status"`
-	LastError          string     `json:"last_error"`
-	TotalEntries       int        `json:"total_entries"`
-	ProcessableEntries int        `json:"processable_entries"`
-	ProcessedEntries   int        `json:"processed_entries"`
-	SkippedEntries     int        `json:"skipped_entries"`
-	FailedEntries      int        `json:"failed_entries"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
-	CompletedAt        *time.Time `json:"completed_at"`
+	ID                    uuid.UUID  `json:"id"`
+	Title                 string     `json:"title"`
+	OriginalFilename      string     `json:"original_filename"`
+	ArchiveFormat         string     `json:"archive_format"`
+	Status                string     `json:"status"`
+	LastError             string     `json:"last_error"`
+	EncodingMode          string     `json:"encoding_mode"`
+	EncodingRequestedMode string     `json:"encoding_requested_mode"`
+	TotalEntries          int        `json:"total_entries"`
+	ProcessableEntries    int        `json:"processable_entries"`
+	ProcessedEntries      int        `json:"processed_entries"`
+	SkippedEntries        int        `json:"skipped_entries"`
+	FailedEntries         int        `json:"failed_entries"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	CompletedAt           *time.Time `json:"completed_at"`
 }
 
 type ArchiveImportFile struct {

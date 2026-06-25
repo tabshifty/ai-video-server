@@ -47,7 +47,7 @@ type archiveImportService interface {
 	ProcessGroup(ctx context.Context, groupID uuid.UUID) ([]models.ArchiveImportFileListItem, error)
 	ProcessFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error)
 	ProcessAllFiles(ctx context.Context, batchID uuid.UUID) ([]models.ArchiveImportFileListItem, error)
-	RetryExtract(ctx context.Context, batchID uuid.UUID, password string) (models.ArchiveImportBatch, error)
+	RetryExtract(ctx context.Context, batchID uuid.UUID, password, requestedMode string) (models.ArchiveImportBatch, error)
 	DeleteBatch(ctx context.Context, batchID uuid.UUID) error
 }
 

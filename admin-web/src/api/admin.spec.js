@@ -202,7 +202,7 @@ describe('archive import apis', () => {
 
   it('uploads archive imports and processes batches or files', async () => {
     const formData = new FormData()
-    const payload = { password: 'secret' }
+    const payload = { password: 'secret', encoding_mode: 'auto' }
 
     await uploadAdminArchiveImport(formData)
     await deleteAdminArchiveImportBatch('batch-1')
