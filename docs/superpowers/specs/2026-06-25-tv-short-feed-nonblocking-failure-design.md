@@ -129,11 +129,15 @@ AnimatedVisibility(
 - **去全屏遮罩**：删除旧 `Color.Black.copy(alpha = 0.56f)`；提示浮于失败播放器残帧之上。
 - **图标用 `Icons.Filled.Refresh`**（已导入 `:29`，与既有重试按钮同图标，`OK` 重试语义呼应），无需新增 import。
 - **只显示"播放失败"短文案**，不显示底层异常串（TV 上 `PlaybackException` 文案不可读、不可操作、易误导；详细串仍留在 `playbackErrorMessage` 供未来日志/诊断）。
-- **与暂停提示互斥**：失败态 OK 分支不设 `showCenterIndicator`，故两提示不同时可见；即便暂停提示自动隐藏窗口内失败恰好到达，`fadeOut`/`fadeIn` 也只是 1 帧交叉淡入，非硬叠。
+- **与暂停提示互斥**：失败态 OK 分支不设 `showCenterIndicator`，故两提示不会因 OK 同时可见；此外 `onPlayerError` 在置 `playbackErrorMessage` 时同步 `showCenterIndicator = false` 并取消 `centerIndicatorHideJob`，覆盖「先暂停（700ms 自动隐藏窗口内）随后失败」的场景——失败提示干净地接管中央位，二者不叠显。
 
 ### 4.4 不改任何 `LaunchedEffect`
 
 `LaunchedEffect(currentVideoId)`（`:230-245`）已清 `playbackErrorMessage`，`LaunchedEffect(..., playbackRetryNonce)`（`:247`）已驱动重备，`onPlayerError`（`:205-210`）是播放期唯一写入者——均不改。OK 重试分支与切条清空均复用既有清空路径，B 不引入新写入点。
+
+### 4.5 `onPlayerError` 清暂停提示（互斥保障）
+
+`onPlayerError` 在置 `playbackErrorMessage` 时，同步 `showCenterIndicator = false` 并 `centerIndicatorHideJob?.cancel()`。原因：用户可能先按 OK 暂停（暂停提示 + 700ms 自动隐藏 job），随后在该窗口内发生 `PlaybackException`（如延迟网络错误、暂停态 seek 到未缓冲区）。若不清，暂停提示与失败提示两个居中 chip 会在 700ms 窗口内叠显。清掉后失败提示干净接管中央位，与 §4.3 互斥口径一致。
 
 ## 5. 边界与已确认假设
 

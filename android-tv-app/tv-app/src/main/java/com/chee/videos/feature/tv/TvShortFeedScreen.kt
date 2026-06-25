@@ -206,6 +206,10 @@ fun TvShortFeedScreen(
                 if (latestCurrentVideoId.isNotBlank()) {
                     playbackErrorMessage = error.message?.trim().takeUnless { it.isNullOrBlank() }
                         ?: "短视频播放失败，请重试"
+                    // 失败态接管中央提示：清掉可能仍在 700ms 自动隐藏窗口内的暂停指示，
+                    // 避免“暂停”与“播放失败”两个居中 chip 短暂叠显。
+                    showCenterIndicator = false
+                    centerIndicatorHideJob?.cancel()
                 }
             }
         }
@@ -421,9 +425,6 @@ fun TvShortFeedScreen(
                         if (event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
                             return@onPreviewKeyEvent false
                         }
-                        if (playbackErrorMessage != null) {
-                            return@onPreviewKeyEvent false
-                        }
                         when (event.nativeKeyEvent.keyCode) {
                             AndroidKeyEvent.KEYCODE_DPAD_UP -> {
                                 if (event.nativeKeyEvent.repeatCount > 0) {
@@ -442,6 +443,10 @@ fun TvShortFeedScreen(
                             AndroidKeyEvent.KEYCODE_DPAD_LEFT,
                             AndroidKeyEvent.KEYCODE_MEDIA_REWIND,
                             -> {
+                                if (playbackErrorMessage != null) {
+                                    // 失败态：左右静默 no-op，消费按键不触发 seek
+                                    return@onPreviewKeyEvent true
+                                }
                                 seekCurrentShortVideo(
                                     player = sharedPlayer,
                                     stepSeconds = uiState.seekStepSeconds,
@@ -463,6 +468,9 @@ fun TvShortFeedScreen(
                             AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
                             AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
                             -> {
+                                if (playbackErrorMessage != null) {
+                                    return@onPreviewKeyEvent true
+                                }
                                 seekCurrentShortVideo(
                                     player = sharedPlayer,
                                     stepSeconds = uiState.seekStepSeconds,
@@ -489,6 +497,14 @@ fun TvShortFeedScreen(
                             AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
                             -> {
                                 if (event.nativeKeyEvent.repeatCount > 0 || currentVideoId.isBlank()) {
+                                    return@onPreviewKeyEvent true
+                                }
+                                if (playbackErrorMessage != null) {
+                                    // 失败态：OK/中键重试当前条（等价于旧“重试”按钮）
+                                    playbackErrorMessage = null
+                                    renderedVideoId = null
+                                    hasEndedAtCurrentVideo = false
+                                    playbackRetryNonce += 1
                                     return@onPreviewKeyEvent true
                                 }
                                 val pausedNow = viewModel.togglePauseCurrent(currentVideoId)
@@ -602,26 +618,32 @@ fun TvShortFeedScreen(
                     )
                 }
 
-                if (!playbackErrorMessage.isNullOrBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.56f)),
+                AnimatedVisibility(
+                    visible = playbackErrorMessage != null,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.Center),
+                ) {
+                    Surface(
+                        color = AppChrome.Surface.copy(alpha = 0.82f),
+                        shape = CircleShape,
                     ) {
-                        TvShortFeedProblemState(
-                            title = "播放失败",
-                            message = playbackErrorMessage.orEmpty(),
-                            primaryActionLabel = "重试",
-                            onPrimaryAction = {
-                                playbackErrorMessage = null
-                                renderedVideoId = null
-                                hasEndedAtCurrentVideo = false
-                                playbackRetryNonce += 1
-                            },
-                            secondaryActionLabel = "返回首页",
-                            onSecondaryAction = onBack,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = null,
+                                tint = Color.White,
+                            )
+                            Text(
+                                text = "播放失败",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
             }
