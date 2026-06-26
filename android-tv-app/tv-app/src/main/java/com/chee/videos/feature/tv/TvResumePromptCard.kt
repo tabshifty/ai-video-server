@@ -22,10 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvMotionTokens
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 
 @Composable
 fun TvResumePromptCard(
@@ -98,7 +98,7 @@ private fun TvResumePromptActionButton(
         contentColor = AppChrome.TextPrimary,
         shape = AppChrome.ChipShape,
         modifier = modifier
-            .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.04f)
+            .tvFocusableScaleOnly(focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
         Text(

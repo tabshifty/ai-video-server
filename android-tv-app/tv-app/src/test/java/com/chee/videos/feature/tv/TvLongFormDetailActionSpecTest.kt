@@ -20,7 +20,7 @@ class TvLongFormDetailActionSpecTest {
         assertFalse("长视频详情页不应导入默认 Material TextButton", source.contains("import androidx.compose.material3.TextButton"))
         assertFalse("长视频详情页不应使用默认 Material IconButton", source.contains("IconButton("))
         assertFalse("长视频详情页不应使用默认 Material TextButton", source.contains("TextButton("))
-        assertTrue("长视频详情页播放和收藏仍应使用共享焦点视觉", source.contains(".tvFocusableGlow("))
+        assertTrue("长视频详情页播放和收藏仍应使用共享焦点视觉", source.contains(".tvFocusableScaleOnly("))
     }
 
     @Test

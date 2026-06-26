@@ -11,13 +11,13 @@ class TvPairingConnectionExperienceTest {
     fun pairingActionsUseSharedTvFocusAndSingleFocusableTarget() {
         val source = Path.of("src/main/java/com/chee/videos/tv/TvPairingScreen.kt").readText()
 
-        assertTrue("TV 配对页操作应接入共享 TV 焦点视觉", source.contains("tvFocusableGlow"))
+        assertTrue("TV 配对页操作应接入共享 TV 焦点视觉", source.contains("tvFocusableScaleOnly"))
         assertFalse(
-            "TV 配对页不应裸用 foundation focusable；共享 tvFocusableGlow 已经提供唯一焦点目标",
+            "TV 配对页不应裸用 foundation focusable；共享 tvFocusableScaleOnly 已经提供唯一焦点目标",
             source.contains("import androidx.compose.foundation.focusable"),
         )
         assertFalse(
-            "TV 配对页操作不能在 tvFocusableGlow 之外再叠加 .focusable()，否则遥控确认键可能落到重复焦点层",
+            "TV 配对页操作不能在 tvFocusableScaleOnly 之外再叠加 .focusable()，否则遥控确认键可能落到重复焦点层",
             source.contains(".focusable()"),
         )
     }

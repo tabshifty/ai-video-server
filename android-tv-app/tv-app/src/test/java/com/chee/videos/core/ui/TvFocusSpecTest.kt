@@ -18,18 +18,6 @@ class TvFocusSpecTest {
     }
 
     @Test
-    fun `global tv focus glow uses reference gold instead of old cyan or pink border`() {
-        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
-
-        assertTrue("TV 焦点语言不应再使用旧的粉红硬描边", !source.contains("0xFFFF5A7A"))
-        assertTrue("TV 焦点语言不应再定义旧蓝青焦点色", !source.contains("0xFF39D7E8"))
-        assertTrue("TV 焦点语言应复用 AppChrome.Accent 暖金色", source.contains("TvFocusGlowColor = AppChrome.Accent"))
-        assertTrue("TV 焦点语言应使用柔和背景提亮", source.contains(".background("))
-        assertTrue("TV 焦点语言不应依赖 border 作为默认焦点反馈", !source.contains(".border("))
-        assertTrue("TvFocusGlowColor 实际值必须等于全局暖金 accent", TvFocusGlowColor == AppChrome.Accent)
-    }
-
-    @Test
     fun `tv focus modifiers replace tween easing with spring physics`() {
         val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
 
@@ -65,12 +53,16 @@ class TvFocusSpecTest {
             source.contains("ScaleStiffness"),
         )
         assertTrue(
-            "TvFocusMotionTokens 必须暴露 SurfaceDampingRatio（光晕/提亮淡入 spring 阻尼）",
-            source.contains("SurfaceDampingRatio"),
+            "TvFocusMotionTokens 必须暴露 PressedScale（按下下沉目标）",
+            source.contains("PressedScale"),
         )
         assertTrue(
-            "TvFocusMotionTokens 必须暴露 SurfaceStiffness（光晕/提亮淡入 spring 刚度）",
-            source.contains("SurfaceStiffness"),
+            "TvFocusMotionTokens 必须暴露 PressDampingRatio（按下 spring 阻尼）",
+            source.contains("PressDampingRatio"),
+        )
+        assertTrue(
+            "TvFocusMotionTokens 必须暴露 PressStiffness（按下 spring 刚度）",
+            source.contains("PressStiffness"),
         )
     }
 
@@ -83,18 +75,6 @@ class TvFocusSpecTest {
         assertTrue(
             "TV 焦点缩放刚度应在 320-440 区间，避免动效迟滞或过快丢失分量感",
             TvFocusMotionTokens.ScaleStiffness in 320f..440f,
-        )
-    }
-
-    @Test
-    fun `surface alpha spring is critically damped and faster than scale`() {
-        assertTrue(
-            "光晕/提亮淡入阻尼应等于或大于 1，避免视觉上的 alpha 抖动",
-            TvFocusMotionTokens.SurfaceDampingRatio >= 1f,
-        )
-        assertTrue(
-            "光晕/提亮淡入刚度应高于焦点缩放刚度，让背景反馈追上 scale 起步",
-            TvFocusMotionTokens.SurfaceStiffness > TvFocusMotionTokens.ScaleStiffness,
         )
     }
 
@@ -225,97 +205,6 @@ class TvFocusSpecTest {
         assertTrue(
             "触觉 API 必须按 SDK_INT 守门到 Build.VERSION_CODES.R",
             source.contains("Build.VERSION.SDK_INT") && source.contains("Build.VERSION_CODES.R"),
-        )
-    }
-
-    @Test
-    fun `inner glow alpha target lives in viewable but non-occluding range`() {
-        assertTrue(
-            "参考图内层 glow alpha 目标值应 ≥ 0.35，保证焦点提亮可见",
-            TvFocusMotionTokens.InnerGlowAlphaTarget >= 0.35f,
-        )
-        assertTrue(
-            "参考图内层 glow alpha 目标值应 ≤ 0.5，避免把暗玻璃卡片染成整块金色",
-            TvFocusMotionTokens.InnerGlowAlphaTarget <= 0.5f,
-        )
-    }
-
-    @Test
-    fun `outer halo elevation respects poster focus safe space`() {
-        assertTrue(
-            "外层 halo elevation 应 ≥ 8dp，看得见 tinted shadow 扩散",
-            TvFocusMotionTokens.OuterHaloElevationDp.value >= 8f,
-        )
-        assertTrue(
-            "外层 halo elevation 应 ≤ 16dp，与 posterFocusSafeSpaceDp = 8 留够余量，不漏到邻卡",
-            TvFocusMotionTokens.OuterHaloElevationDp.value <= 16f,
-        )
-    }
-
-    @Test
-    fun `tv focus modifiers route outer halo through Modifier shadow with tinted colors`() {
-        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
-
-        assertTrue(
-            "外层 halo 应升级为 Modifier.shadow(...)，而非 graphicsLayer.shadowElevation 裸字面量",
-            source.contains("Modifier.shadow(") || source.contains(".shadow("),
-        )
-        val shadowOccurrences = Regex("""\.shadow\(""").findAll(source).count()
-        assertTrue(
-            "tvFocusableGlow 与 tvFocusableScaleOnly 都应使用 .shadow(...) —— 至少出现 2 次",
-            shadowOccurrences >= 2,
-        )
-        assertTrue(
-            "外层 halo 必须 tint 到暖金色：ambientColor = TvFocusGlowColor",
-            source.contains("ambientColor = TvFocusGlowColor"),
-        )
-        assertTrue(
-            "外层 halo 必须 tint 到暖金色：spotColor = TvFocusGlowColor",
-            source.contains("spotColor = TvFocusGlowColor"),
-        )
-        assertTrue(
-            "外层 halo 必须不裁剪，才能溢出 shape 形成扩散感",
-            source.contains("clip = false"),
-        )
-    }
-
-    @Test
-    fun `tv focus modifiers no longer use bare shadow elevation literals`() {
-        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
-
-        assertTrue(
-            "旧的 graphicsLayer 裸 shadowElevation = 32f 应被替换为 Modifier.shadow",
-            !source.contains("shadowElevation = 32f"),
-        )
-        assertTrue(
-            "旧的 graphicsLayer 裸 shadowElevation = 28f 应被替换为 Modifier.shadow",
-            !source.contains("shadowElevation = 28f"),
-        )
-        assertTrue(
-            "旧蓝青 alpha 写死字面量 Color(0x2639D7E8) 应被移除，改走 InnerGlowAlphaTarget * surfaceAlpha",
-            !source.contains("Color(0x2639D7E8)"),
-        )
-        assertTrue(
-            "旧蓝青焦点色 Color(0xFF39D7E8) 应被移除",
-            !source.contains("Color(0xFF39D7E8)"),
-        )
-    }
-
-    @Test
-    fun `tv focus modifiers consume both inner and outer glow tokens`() {
-        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/core/ui/TvFocus.kt").toFile().readText()
-
-        assertTrue(
-            "tvFocusableGlow 必须引用 TvFocusMotionTokens.InnerGlowAlphaTarget 决定内层 alpha",
-            source.contains("TvFocusMotionTokens.InnerGlowAlphaTarget"),
-        )
-        assertTrue(
-            "tvFocusableGlow / tvFocusableScaleOnly 必须引用 TvFocusMotionTokens.OuterHaloElevationDp 决定外层扩散",
-            source.contains("TvFocusMotionTokens.OuterHaloElevationDp"),
-        )
-        assertTrue(
-            "halo elevation 应走 animateDpAsState，与内层 surfaceAlpha 同节奏，而非 jump cut",
-            source.contains("animateDpAsState("),
         )
     }
 }

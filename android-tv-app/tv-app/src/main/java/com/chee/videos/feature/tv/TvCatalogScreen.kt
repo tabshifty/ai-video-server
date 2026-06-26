@@ -74,7 +74,6 @@ import com.chee.videos.core.ui.TvMotionTokens
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.rememberTvReduceMotionEnabled
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.tv.TvAccountMenuAction
@@ -232,7 +231,7 @@ fun TvCatalogScreen(
                         onQueryChanged = viewModel::updateQuery,
                         modifier = Modifier
                             .focusRequester(searchFocusRequester)
-                            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.01f),
+                            .tvFocusableScaleOnly(focusedScale = 1.01f),
                     )
                 }
                 item(key = "search-header") {
@@ -336,7 +335,7 @@ fun TvCatalogScreen(
                         data = continueWatching,
                         modifier = Modifier
                             .focusRequester(continueFocusRequester)
-                            .tvFocusableGlow(shape = AppChrome.SurfaceShape),
+                            .tvFocusableScaleOnly(),
                         onClick = {
                             if (continueWatching.type == "tv") {
                                 onOpenContinueWatching(
@@ -519,7 +518,7 @@ private fun TvHomeSideMenuButton(
         modifier = modifier
             .width(56.dp)
             .height(48.dp)
-            .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.06f)
+            .tvFocusableScaleOnly(focusedScale = 1.06f)
             .clickable(onClick = onClick),
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -608,7 +607,7 @@ private fun TvSeriesAutoplaySettingRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
-            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
+            .tvFocusableScaleOnly(focusedScale = 1.02f)
             .clickable { onSetEnabled(!enabled) },
     ) {
         Row(
@@ -691,7 +690,7 @@ private fun TvSeekStepSettingRow(
                     modifier = Modifier
                         .width(72.dp)
                         .height(44.dp)
-                        .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.04f)
+                        .tvFocusableScaleOnly(focusedScale = 1.04f)
                         .clickable { onSelectSeconds(seconds) },
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -719,7 +718,7 @@ private fun TvSettingsActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(62.dp)
-            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
+            .tvFocusableScaleOnly(focusedScale = 1.02f)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -756,7 +755,7 @@ private fun TvHomeAllEntry(
         modifier = Modifier
             .fillMaxWidth()
             .height(78.dp)
-            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
+            .tvFocusableScaleOnly(focusedScale = 1.02f)
             .clickable(onClick = { onOpenCatalogWall(wallKind, title) }),
     ) {
         Row(
@@ -832,7 +831,7 @@ private fun TvSearchResultCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(AppChrome.SurfaceShape)
-            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
+            .tvFocusableScaleOnly(focusedScale = 1.02f)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -1070,7 +1069,7 @@ private fun TvHeroActionButton(
         color = AppChrome.Accent,
         shape = AppChrome.PillShape,
         modifier = modifier
-            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.06f)
+            .tvFocusableScaleOnly(focusedScale = 1.06f)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -1093,7 +1092,7 @@ private fun TvHeroSecondaryActionButton(
         color = AppChrome.Surface.copy(alpha = 0.82f),
         shape = AppChrome.PillShape,
         modifier = Modifier
-            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.05f)
+            .tvFocusableScaleOnly(focusedScale = 1.05f)
             .clickable(onClick = onClick),
     ) {
         Text(
@@ -1277,7 +1276,7 @@ private fun TvSeriesPosterCard(
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 310.dp)
-            .tvFocusableScaleOnly(shape = AppChrome.SurfaceShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -1378,7 +1377,7 @@ private fun TvPosterMoreCard(
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 310.dp)
-            .tvFocusableScaleOnly(shape = AppChrome.SurfaceShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Box(
@@ -1432,7 +1431,7 @@ private fun TvHomeShelfCard(
         modifier = modifier
             .padding(tvCatalogPosterFocusSafeSpace)
             .size(width = 146.dp, height = 310.dp)
-            .tvFocusableScaleOnly(shape = AppChrome.SurfaceShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

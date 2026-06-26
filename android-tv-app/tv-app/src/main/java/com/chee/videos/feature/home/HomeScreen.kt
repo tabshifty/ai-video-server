@@ -59,9 +59,9 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.homeContentTabs
-import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.feature.shorts.ShortFeedScreen
 import com.chee.videos.feature.tv.TvCatalogScreen
@@ -508,7 +508,7 @@ private fun AvPosterCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(homeFocusSafeSpace)
-            .tvFocusableGlow(shape = AppChrome.CardShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable { onOpenDetail(item.id, item.type) },
         color = AppChrome.Surface,
         shape = AppChrome.CardShape,
@@ -705,7 +705,7 @@ private fun VideoCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(homeFocusSafeSpace)
-            .tvFocusableGlow(shape = AppChrome.CardShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable { onOpenDetail(item.id, item.type) },
         color = AppChrome.SurfaceElevated,
         shape = AppChrome.CardShape,

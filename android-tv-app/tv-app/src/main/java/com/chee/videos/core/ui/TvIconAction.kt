@@ -34,7 +34,7 @@ fun TvIconActionButton(
         shape = shape,
         modifier = modifier
             .size(size)
-            .tvFocusableGlow(shape = shape, focusedScale = focusedScale)
+            .tvFocusableScaleOnly(focusedScale = focusedScale)
             .clickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center) {

@@ -1,3 +1,18 @@
+# 2026-06-26 16:50 +0800
+- 进度：通过 `$grill-with-docs` 收口 TV app 聚焦视觉装饰精简方案并完成实现。目标为单纯减少视觉装饰（非性能 bug）。决策：A 方向——可聚焦节点焦点反馈只剩几何缩放，剥离内层暖金提亮（`.background(TvFocusGlowColor.copy(alpha=...))`）与外层暖金光晕（`.shadow(elevation, ambientColor/spotColor=TvFocusGlowColor, clip=false)`）；B 实现——删除 `tvFocusableGlow` 函数，49 处调用点全迁到 `tvFocusableScaleOnly`，签名收敛为 `(enabled, focusedScale)` 并去掉 dead `shape` 参数；彻底删除 dead token（`TvFocusGlowColor`、`TvFocusMotionTokens.SurfaceDampingRatio`/`SurfaceStiffness`/`InnerGlowAlphaTarget`/`OuterHaloElevationDp`）及相关 imports（保留 `focusable` import）。保留按下下沉 `PressedScale 0.97f` + DPad 中键 `HapticFeedbackConstants.CONFIRM` 触觉、`resolveTvFocusableScaleTarget`/`tvFocusableScaleSpring`/spring 物理/`TvFocusSafeSpec`、按重要性分档的 6 档缩放幅度（1.01/1.02/1.04/1.05/1.06/1.1）不动；4 处播放器根 Box 裸 `.focusable()` 为「整页抓焦」合法模式未动；`tvStaggerEntry` 入场动画未动。测试：`TvFocusSpecTest` 删光晕/提亮断言保留缩放/按下/触觉/safe-space/spring 断言；第 1 档 7 测试机械换名 `tvFocusableGlow`→`tvFocusableScaleOnly` 并保留禁双焦点负面断言；第 2 档「不用 glow」空判保留。版本：选 A 方案仅 bump `versionCode` 124→125 / `versionName` 0.1.124→0.1.125，不重建 release 固件、不碰 `tv_apk_test.go`（固件与 Go 断言仍停在 121，gradle 与固件脱节加深为已知接受项，见 CONTEXT.md「TV APK 解析测试与 release 固件版本耦合」）。已将 `TV 焦点反馈只缩放` 术语写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/TvFocus.kt`、`TvIconAction.kt`、`TvSeriesCorePlaybackOverlay.kt`、`TvStateFeedback.kt`、`feature/connection/ConnectionScreen.kt`、`feature/home/HomeScreen.kt`、`feature/tv/TvAutoplayPromptCard.kt`、`TvCatalogScreen.kt`、`TvLongFormDetailScreen.kt`、`TvLongFormPlayerScreen.kt`、`TvPosterWallScreen.kt`、`TvResumePromptCard.kt`、`TvSeriesDetailScreen.kt`、`TvSeriesEndOverlay.kt`、`TvShortFeedScreen.kt`、`tv/TvPairingScreen.kt`、`src/test/java/com/chee/videos/core/ui/TvFocusSpecTest.kt`、`TvIconActionSpecTest.kt`、`TvStateFeedbackSpecTest.kt`、`feature/connection/ConnectionScreenLoadingSpecTest.kt`、`feature/tv/TvHomeNavigationTest.kt`、`TvLongFormDetailActionSpecTest.kt`、`TvResumePromptCardSpecTest.kt`、`tv/TvPairingConnectionExperienceTest.kt`、`plan.md`
+- 验证：`./gradlew :tv-app:assembleDebug` BUILD SUCCESSFUL（40s，仅 2 个与本次无关的既有 warning）；`./gradlew :tv-app:testDebugUnitTest` BUILD SUCCESSFUL；`go test ./internal/services -run TestParseTVAPKMetadataParsesReleaseAPK -count=1` ok（未碰固件，预期通过）。
+
+# 2026-06-26 15:36 +0800
+- 进度：继续通过 `$grill-with-docs` 收口 ED2K 方案边界，不做实现。已补充确认“下载完成结果页首期只保留导入与删除暂存文件两类主操作”，并将 `ED2K 下载结果主操作边界` 术语写入 `CONTEXT.md`，保持 ED2K 页面只管理下载工作区，不扩展为并行入库编辑器。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
+# 2026-06-26 15:11 +0800
+- 进度：开始通过 `$grill-with-docs` 探讨“家用部署机通过 ED2K 链接长期在线下载”的能力边界，不做实现。已先确认这不是现有 `admin ED2K 链接生成器`，并把“后端下载任务 / 暂存工作区 / 下载完成后不自动入库 / 一次提交对应一个下载批次 / 外部引擎持久化下载状态、worker 只做编排同步 / 按批次目录隔离落地”的术语写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 # 2026-06-26 09:52 +0800
 - 进度：已将修复提交 `8f7651a` 推送到部署机并同步到 GitHub；部署机 hook 触发 Go 重建、签名、迁移和重启，`/healthz` 返回正常。
 - 影响文件：`plan.md`

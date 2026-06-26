@@ -58,7 +58,6 @@ import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.tvSharedSeriesPoster
 import com.chee.videos.core.ui.tvStaggerEntry
@@ -253,7 +252,7 @@ private fun TvPosterWallInlineError(
                 color = AppChrome.SurfaceStrong,
                 shape = AppChrome.PillShape,
                 modifier = Modifier
-                    .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+                    .tvFocusableScaleOnly(focusedScale = 1.04f)
                     .clickable(onClick = onAction),
             ) {
                 Row(
@@ -335,7 +334,7 @@ private fun TvPosterWallTopBar(
             shape = AppChrome.PillShape,
             modifier = Modifier
                 .focusRequester(refreshFocusRequester)
-                .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+                .tvFocusableScaleOnly(focusedScale = 1.04f)
                 .clickable(onClick = onRefresh),
         ) {
             Row(
@@ -364,7 +363,7 @@ private fun TvPosterWallSortButton(
         color = AppChrome.SurfaceElevated.copy(alpha = 0.9f),
         shape = AppChrome.PillShape,
         modifier = Modifier
-            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+            .tvFocusableScaleOnly(focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
         Text(
@@ -406,7 +405,7 @@ private fun TvPosterWallCard(
         shape = TvPosterWallCardShape,
         modifier = modifier
             .padding(tvPosterWallFocusSafeSpace)
-            .tvFocusableScaleOnly(shape = TvPosterWallCardShape, focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .tvFocusableScaleOnly(focusedScale = TvFocusSafeSpec.posterFocusedScale)
             .clickable(onClick = onClick),
     ) {
         Column(

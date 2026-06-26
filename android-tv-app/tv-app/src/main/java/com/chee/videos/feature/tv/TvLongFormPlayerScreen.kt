@@ -48,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.LongFormAudioTrack
@@ -63,7 +64,6 @@ import com.chee.videos.core.ui.resolveAudioSelectionOnTrackLoad
 import com.chee.videos.core.ui.resolveSelectedSubtitleTrackByPreference
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.feature.detail.DetailViewModel
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 import kotlinx.coroutines.delay
@@ -869,7 +869,7 @@ private fun TvLongFormFeedbackActionButton(
         color = AppChrome.AccentSoft,
         shape = AppChrome.ChipShape,
         modifier = modifier
-            .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.04f)
+            .tvFocusableScaleOnly(focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
         Row(

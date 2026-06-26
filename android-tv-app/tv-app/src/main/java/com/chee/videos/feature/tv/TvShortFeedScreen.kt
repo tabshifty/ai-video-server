@@ -76,10 +76,10 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -743,7 +743,7 @@ private fun TvShortFeedStateButton(
         color = AppChrome.AccentSoft,
         shape = AppChrome.SurfaceShape,
         modifier = modifier
-            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.04f)
+            .tvFocusableScaleOnly(focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
         Row(

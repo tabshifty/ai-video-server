@@ -39,7 +39,7 @@ class TvResumePromptCardSpecTest {
         assertTrue(source.contains(".tryRequestFocus()"))
         assertTrue(source.contains("AppChrome.SurfaceShape"))
         assertTrue(source.contains("AppChrome.ChipShape"))
-        assertTrue(source.contains("tvFocusableGlow("))
+        assertTrue(source.contains("tvFocusableScaleOnly("))
         assertTrue(source.contains("TvMotionTokens.DurationStandardMs"))
         assertTrue(source.contains("TvMotionTokens.EasingStandard"))
         assertFalse(source.contains("RoundedCornerShape("))

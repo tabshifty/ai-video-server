@@ -60,13 +60,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.core.ui.tvSharedSeriesPoster
 
 private object TvSeriesDetailTokens {
@@ -781,7 +781,7 @@ private fun TvSeriesInlineError(
                 color = AppChrome.SurfaceStrong,
                 shape = AppChrome.PillShape,
                 modifier = Modifier
-                    .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+                    .tvFocusableScaleOnly(focusedScale = 1.04f)
                     .clickable(onClick = onAction),
             ) {
                 Row(

@@ -235,7 +235,7 @@ private fun TvStateActionButton(
         color = AppChrome.AccentSoft,
         shape = AppChrome.SurfaceShape,
         modifier = Modifier
-            .tvFocusableGlow(shape = AppChrome.SurfaceShape, focusedScale = 1.04f)
+            .tvFocusableScaleOnly(focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
         Row(

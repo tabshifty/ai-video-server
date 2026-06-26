@@ -645,7 +645,7 @@ internal fun TvSeriesCorePlaybackOverlay(
                         color = AppChrome.AccentSoft,
                         shape = AppChrome.ChipShape,
                         modifier = Modifier
-                            .tvFocusableGlow(shape = AppChrome.ChipShape, focusedScale = 1.04f)
+                            .tvFocusableScaleOnly(focusedScale = 1.04f)
                             .clickable(onClick = onDismissEpisodeSwitchFeedback),
                     ) {
                         Row(

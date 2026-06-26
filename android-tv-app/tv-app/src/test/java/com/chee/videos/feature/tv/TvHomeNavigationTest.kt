@@ -156,11 +156,11 @@ class TvHomeNavigationTest {
                 sideMenuSource.indexOf("onOpenShorts()"),
         )
         assertTrue(
-            "TV 首页侧边菜单按钮必须使用 tvFocusableGlow 提供唯一焦点目标",
-            buttonSource.contains(".tvFocusableGlow("),
+            "TV 首页侧边菜单按钮必须使用 tvFocusableScaleOnly 提供唯一焦点目标",
+            buttonSource.contains(".tvFocusableScaleOnly("),
         )
         assertFalse(
-            "TV 首页侧边菜单按钮不能在 tvFocusableGlow 之后再叠加 .focusable()，否则遥控确认键会先落到重复焦点层，表现为必须按两次才触发",
+            "TV 首页侧边菜单按钮不能在 tvFocusableScaleOnly 之后再叠加 .focusable()，否则遥控确认键会先落到重复焦点层，表现为必须按两次才触发",
             buttonSource.contains(".focusable()"),
         )
 

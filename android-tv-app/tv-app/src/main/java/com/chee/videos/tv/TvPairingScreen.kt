@@ -33,9 +33,9 @@ import androidx.lifecycle.ViewModel
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.repository.TvAuthRepository
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.delay
@@ -230,7 +230,7 @@ private fun TvPairingActionButton(
         color = if (primary) AppChrome.Accent else AppChrome.SurfaceElevated.copy(alpha = 0.9f),
         shape = AppChrome.PillShape,
         modifier = modifier
-            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+            .tvFocusableScaleOnly(focusedScale = 1.04f)
             .clickable(onClick = onClick),
     ) {
         val contentColor = if (primary) AppChrome.Canvas else AppChrome.TextPrimary

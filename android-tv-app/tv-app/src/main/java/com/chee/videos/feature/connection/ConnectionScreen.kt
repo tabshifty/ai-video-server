@@ -30,8 +30,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.TvLayoutSpec
-import com.chee.videos.core.ui.tvFocusableGlow
 
 private val ConnectionScanLoadingIndicatorSize = 14.dp
 
@@ -196,7 +196,7 @@ private fun ConnectionActionButton(
         },
         shape = AppChrome.PillShape,
         modifier = modifier
-            .tvFocusableGlow(enabled = enabled, shape = AppChrome.PillShape, focusedScale = 1.04f)
+            .tvFocusableScaleOnly(enabled = enabled, focusedScale = 1.04f)
             .clickable(enabled = enabled, onClick = onClick),
     ) {
         val contentColor = when {

@@ -44,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvDetailGlassPanel
 import com.chee.videos.core.ui.TvDetailPanelTokens
@@ -52,7 +53,6 @@ import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
-import com.chee.videos.core.ui.tvFocusableGlow
 import com.chee.videos.feature.detail.DetailViewModel
 
 private val TvLongFormBackdropScrimBrush = Brush.verticalGradient(
@@ -268,7 +268,7 @@ private fun TvLongFormInlineError(
                 color = AppChrome.SurfaceStrong,
                 shape = AppChrome.PillShape,
                 modifier = Modifier
-                    .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.04f)
+                    .tvFocusableScaleOnly(focusedScale = 1.04f)
                     .clickable(onClick = onAction),
             ) {
                 Row(
@@ -392,7 +392,7 @@ private fun TvDetailPrimaryActionButton(
         color = if (enabled) AppChrome.Accent else AppChrome.SurfaceStrong,
         shape = AppChrome.PillShape,
         modifier = modifier
-            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.06f)
+            .tvFocusableScaleOnly(focusedScale = 1.06f)
             .clickable(enabled = enabled, onClick = onClick),
     ) {
         val primaryContentColor = if (enabled) AppChrome.Canvas else AppChrome.TextMuted
@@ -421,7 +421,7 @@ private fun TvDetailSecondaryActionButton(
         color = TvLongFormSecondaryActionColor,
         shape = AppChrome.PillShape,
         modifier = Modifier
-            .tvFocusableGlow(shape = AppChrome.PillShape, focusedScale = 1.05f)
+            .tvFocusableScaleOnly(focusedScale = 1.05f)
             .clickable(onClick = onClick),
     ) {
         Row(
