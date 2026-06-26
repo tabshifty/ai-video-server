@@ -211,6 +211,58 @@ func TestArchiveFileTitleForScannedFileFallsBackToBatchTitleAndFilename(t *testi
 	}
 }
 
+func TestScanArchiveEntriesAssignsShortVideoTypeToDirectories(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "nested", "sub"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "nested", "sub", "note.txt"), []byte("demo"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	items, err := scanArchiveEntries(root, models.ArchiveImportBatch{Title: "批次标题"})
+	if err != nil {
+		t.Fatalf("scanArchiveEntries() error = %v", err)
+	}
+
+	var dirItem *archiveImportFileMeta
+	for i := range items {
+		if items[i].EntryType == "directory" && items[i].RelativePath == "nested/sub" {
+			dirItem = &items[i]
+			break
+		}
+	}
+	if dirItem == nil {
+		t.Fatal("expected to find directory entry nested/sub")
+	}
+	if dirItem.VideoType != "short" {
+		t.Fatalf("directory video_type = %q, want %q", dirItem.VideoType, "short")
+	}
+}
+
+func TestArchiveImportVideoTypeOrDefault(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "blank", in: "", want: "short"},
+		{name: "spaces", in: "   ", want: "short"},
+		{name: "normalizes case", in: " MOVIE ", want: "movie"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := archiveImportVideoTypeOrDefault(tt.in); got != tt.want {
+				t.Fatalf("archiveImportVideoTypeOrDefault(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestArchiveFileTitleForProcessingBlankVideoUsesBatchTitle(t *testing.T) {
 	t.Parallel()
 

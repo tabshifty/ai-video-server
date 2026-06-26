@@ -1,3 +1,13 @@
+# 2026-06-26 09:51 +0800
+- 进度：压缩包导入目录条目 `video_type` 约束问题已修复并验证通过。目录分支现在显式写入 `short`，插入前通过 `archiveImportVideoTypeOrDefault` 兜底空值与大小写，避免 `archive_import_files` 因空字符串触发 check constraint；同时补了目录回归与纯逻辑回归。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -count=1` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md internal/services/archive_import.go internal/services/archive_import_test.go` 无命中。
+
+# 2026-06-25 22:52 +0800
+- 进度：修复压缩包导入在目录条目上落空 `video_type` 导致的数据库约束失败。已定位到 `scanArchiveEntries` 目录分支漏填字段，计划同时补插入前的防御性归一化和回归测试。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `go test ./internal/services -run 'TestScanArchiveEntries|TestArchiveFileTitleForScannedFile' -count=1`、`git diff --check`、乱码扫描。
+
 # 2026-06-25 22:43 +0800
 - 进度：已将 `tv-short-feed-cover-poster` 快进合并到本地 `master`，并推送到 `deploy` 远端；部署机 hook 已完成本次更新收口。
 - 影响文件：`plan.md`

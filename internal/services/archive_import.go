@@ -963,7 +963,7 @@ func (s *ArchiveImportService) recordArchiveEntries(ctx context.Context, batchID
 			entry.FilePath,
 			entry.EntryType,
 			entry.MediaKind,
-			entry.VideoType,
+			archiveImportVideoTypeOrDefault(entry.VideoType),
 			entry.FileSize,
 			entry.MIMEType,
 			entry.Status,
@@ -1018,6 +1018,7 @@ func scanArchiveEntries(extractedDir string, batch models.ArchiveImportBatch) ([
 				FilePath:     path,
 				EntryType:    "directory",
 				MediaKind:    "directory",
+				VideoType:    "short",
 				Status:       "skipped",
 				Reason:       "directory",
 				Title:        deriveArchiveFileTitle(rel),
@@ -1144,6 +1145,14 @@ func validateArchiveBatchDeletion(batch models.ArchiveImportBatch) error {
 		return ErrArchiveBatchBusy
 	}
 	return nil
+}
+
+func archiveImportVideoTypeOrDefault(videoType string) string {
+	value := strings.ToLower(strings.TrimSpace(videoType))
+	if value == "" {
+		return "short"
+	}
+	return value
 }
 
 func classifyArchiveFile(path string) (mediaKind, mimeType, videoType, reason string) {
