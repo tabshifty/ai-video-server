@@ -1,3 +1,8 @@
+# 2026-06-26 09:52 +0800
+- 进度：已将修复提交 `8f7651a` 推送到部署机并同步到 GitHub；部署机 hook 触发 Go 重建、签名、迁移和重启，`/healthz` 返回正常。
+- 影响文件：`plan.md`
+- 验证：`git push deploy master` 通过，hook 输出 `RESTART_GO=1 REBUILD_FRONTEND=0`、`go build`/`codesign`/`migrate`/`kickstart` 均成功，`/healthz OK`；`git push origin master` 通过。
+
 # 2026-06-26 09:51 +0800
 - 进度：压缩包导入目录条目 `video_type` 约束问题已修复并验证通过。目录分支现在显式写入 `short`，插入前通过 `archiveImportVideoTypeOrDefault` 兜底空值与大小写，避免 `archive_import_files` 因空字符串触发 check constraint；同时补了目录回归与纯逻辑回归。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`
