@@ -3,6 +3,11 @@
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest --tests "com.chee.videos.feature.tv.TvHomeNavigationTest" --tests "com.chee.videos.feature.tv.TvCatalogFocusPolicyTest"` → BUILD SUCCESSFUL；`--rerun-tasks` 强制重跑两测试类亦绿；评审 BLOCKER 已修复并复测通过。
 
+## 2026-06-27 09:51 +0800
+- 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“下载层不先判业务类型，但仍需让管理员知道下载到了什么”的展示边界，不做实现。已确认完成态任务详情的文件清单至少要展示文件名、相对路径、大小等基础识别信息；相应补强 `ED2K 下载完成详情文件清单` 术语，不再把“知道下载了什么”留到导入阶段才解决。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 ## 2026-06-27 09:41 +0800
 - 进度：按你的提醒把讨论焦点从低频取消尾巴拉回 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“下载完成后管理员是否先看文件清单再导入”的 happy path，不做实现。已确认任务详情应展示下载出的文件清单，供管理员先核对结果再发起导入；相应将 `ED2K 下载完成详情文件清单` 写入 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`
