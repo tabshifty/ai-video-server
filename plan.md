@@ -1,3 +1,13 @@
+## 2026-06-27 15:18 +0800
+- 进度：ED2K 下载工作台已从静态骨架升级为可用的本地任务面板。当前支持多行链接粘贴、自动标题、按资源哈希命中历史任务、任务列表/详情切换、状态本地流转和永久删除；`/toolbox/ed2k` 仍保持原链接生成器并存，两个入口互不抢职责。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxEd2k.spec.js src/views/ToolboxEd2kDownload.spec.js src/views/toolboxPage.spec.js` 通过；`cd admin-web && npm run build` 通过（仅有现有 bundle size warning）
+
+## 2026-06-27 15:05 +0800
+- 进度：继续完善 ED2K 下载工作台，把它从静态骨架推进成可操作的本地任务面板。现在支持多行 ED2K 链接粘贴、根据文件名自动生成标题、按资源哈希命中历史任务、任务列表与详情切换、状态本地流转和永久删除；原链接生成器继续独立保留在 `/toolbox/ed2k`，没有被合并回去。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxEd2k.spec.js src/views/ToolboxEd2kDownload.spec.js src/views/toolboxPage.spec.js` 与 `npm run build`
+
 ## 2026-06-27 14:27 +0800
 - 进度：把 ED2K 两个入口拆回并存结构。`/toolbox/ed2k` 已恢复为原来的 ED2K 链接生成器，新增 `/toolbox/ed2k-download` 作为独立下载工作台；工具箱菜单同时展示两个入口，分别用 Link 和 Download 图标区分。前端测试也拆成了链接生成器与下载工作台两个专属 spec，避免以后互相污染。
 - 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/router/index.js`、`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2k.spec.js`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`plan.md`
