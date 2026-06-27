@@ -1,14 +1,18 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, Delete, Download, RefreshRight, Search } from '@element-plus/icons-vue'
+import { Back, Delete, Download, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
-import { getEd2kLinkLabel, parseEd2kLinks } from './toolbox.helpers'
-
-const STORAGE_KEY = 'admin-ed2k-download-workbench'
+import {
+  createAdminEd2kDownloadTasks,
+  deleteAdminEd2kDownloadTask,
+  getAdminEd2kDownloadTasks,
+  retryAdminEd2kDownloadTask
+} from '../api/admin'
+import { parseEd2kLinks } from './toolbox.helpers'
 
 const router = useRouter()
 const ed2kInput = ref('')
@@ -16,6 +20,8 @@ const titleInput = ref('')
 const currentFilter = ref('all')
 const tasks = ref([])
 const selectedTaskID = ref('')
+const loadingTasks = ref(false)
+const submitting = ref(false)
 
 const statusOptions = [
   { value: 'all', label: '全部' },
@@ -52,10 +58,10 @@ const visibleTasks = computed(() => {
     const aActive = isActiveStatus(a.status) ? 0 : 1
     const bActive = isActiveStatus(b.status) ? 0 : 1
     if (aActive !== bActive) return aActive - bActive
-    return Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0)
+    return taskUpdatedAtValue(b) - taskUpdatedAtValue(a)
   })
   if (currentFilter.value === 'all') return list
-  return list.filter((task) => task.status === currentFilter.value)
+  return list.filter((task) => String(task.status || '') === currentFilter.value)
 })
 const selectedTask = computed(() => visibleTasks.value.find((task) => task.id === selectedTaskID.value) || visibleTasks.value[0] || null)
 const selectedTaskLabel = computed(() => selectedTask.value ? taskStatusLabelMap[selectedTask.value.status] || selectedTask.value.status : '暂无任务')
@@ -64,11 +70,15 @@ const selectedTaskFiles = computed(() => selectedTask.value?.files || [])
 const selectedTaskHasFiles = computed(() => selectedTaskFiles.value.length > 0)
 const selectedTaskHistory = computed(() => selectedTask.value?.history || [])
 const hasHistoryHit = computed(() => selectedTask.value?.history?.some((item) => item.kind === 'history') || false)
+const selectedTaskProgressText = computed(() => selectedTask.value?.progressText || selectedTask.value?.progress_text || '等待执行器接管')
+const selectedTaskErrorMessage = computed(() => selectedTask.value?.errorMessage || selectedTask.value?.error_message || '')
 
 watch(
-  tasks,
-  (value) => persistTasks(value),
-  { deep: true }
+  currentFilter,
+  () => {
+    void loadTasks()
+  },
+  { immediate: true }
 )
 
 watch(
@@ -85,61 +95,14 @@ watch(
   { immediate: true }
 )
 
-onMounted(() => {
-  loadTasks()
-})
-
 function isActiveStatus(status) {
   return status === 'queued' || status === 'running'
 }
 
-function safeDecodeText(value) {
-  try {
-    return decodeURIComponent(value)
-  } catch {
-    return value
-  }
-}
-
-function buildTaskHash(link) {
-  const parts = String(link || '').trim().split('|')
-  return parts[4] || parts[3] || String(link || '').trim()
-}
-
-function normalizeTaskFromLink(link, createdAt = Date.now()) {
-  const href = String(link || '').trim()
-  const title = getEd2kLinkLabel(href)
-  const hash = buildTaskHash(href)
-  const fileName = safeDecodeText(title || hash || href)
-  return {
-    id: `ed2k-task-${hash.toLowerCase()}-${createdAt}`,
-    title: fileName,
-    sourceLink: href,
-    resourceHash: hash,
-    filename: fileName,
-    declaredSize: getEd2kDeclaredSize(href),
-    status: 'queued',
-    progressText: '等待外部下载引擎开始传输',
-    reason: '',
-    createdAt,
-    updatedAt: createdAt,
-    finishedAt: null,
-    deletedAt: null,
-    files: [],
-    history: [
-      {
-        kind: 'created',
-        label: '已创建',
-        message: '任务已加入工作台'
-      }
-    ]
-  }
-}
-
-function getEd2kDeclaredSize(link) {
-  const parts = String(link || '').trim().split('|')
-  const raw = Number(parts[3] || 0)
-  return Number.isFinite(raw) ? raw : 0
+function taskUpdatedAtValue(task) {
+  const raw = task?.updatedAt || task?.updated_at || task?.createdAt || task?.created_at || 0
+  const time = new Date(raw).getTime()
+  return Number.isFinite(time) ? time : 0
 }
 
 function formatFileSize(size) {
@@ -151,84 +114,58 @@ function formatFileSize(size) {
   return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
-function persistTasks(value) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value || []))
-  } catch {
-    // localStorage 不可用时只保留当前会话。
+function normalizeTask(task) {
+  return {
+    ...task,
+    sourceLink: task.sourceLink || task.source_link || '',
+    resourceHash: task.resourceHash || task.resource_hash || '',
+    declaredSize: task.declaredSize || task.declared_size || 0,
+    title: task.title || '',
+    filename: task.filename || '',
+    status: task.status || '',
+    progressText: task.progressText || task.progress_text || '',
+    errorMessage: task.errorMessage || task.error_message || '',
+    outputDir: task.outputDir || task.output_dir || '',
+    downloadedPath: task.downloadedPath || task.downloaded_path || '',
+    retryCount: task.retryCount || task.retry_count || 0,
+    files: Array.isArray(task.files) ? task.files : [],
+    history: Array.isArray(task.history) ? task.history : [],
+    createdAt: task.createdAt || task.created_at || '',
+    updatedAt: task.updatedAt || task.updated_at || '',
+    startedAt: task.startedAt || task.started_at || null,
+    finishedAt: task.finishedAt || task.finished_at || null,
+    deletedAt: task.deletedAt || task.deleted_at || null
   }
 }
 
-function loadTasks() {
+async function loadTasks() {
+  loadingTasks.value = true
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    tasks.value = raw ? JSON.parse(raw) : seedTasks()
-  } catch {
-    tasks.value = seedTasks()
-  }
-  if (tasks.value.length === 0) {
-    tasks.value = seedTasks()
-  }
-  if (!selectedTaskID.value && tasks.value[0]) {
-    selectedTaskID.value = tasks.value[0].id
-  }
-}
-
-function seedTasks() {
-  return [
-    {
-      id: 'ed2k-task-seed-1',
-      title: 'demo_episode_01.mkv',
-      sourceLink: 'ed2k://|file|demo_episode_01.mkv|734003200|0123456789ABCDEF0123456789ABCDEF|/',
-      resourceHash: '0123456789ABCDEF0123456789ABCDEF',
-      filename: 'demo_episode_01.mkv',
-      declaredSize: 734003200,
-      status: 'running',
-      progressText: '下载中但暂无进度',
-      reason: '',
-      createdAt: Date.now() - 3600000,
-      updatedAt: Date.now() - 900000,
-      finishedAt: null,
-      deletedAt: null,
-      files: [
-        {
-          name: 'demo_episode_01.mkv',
-          path: 'Season 01/demo_episode_01.mkv',
-          size: 524288000
-        }
-      ],
-      history: [
-        { kind: 'created', label: '已创建', message: '示例任务已加入工作台' },
-        { kind: 'status', label: '下载中', message: '等待外部引擎同步状态' }
-      ]
+    const params = {
+      page: 1,
+      page_size: 100
     }
-  ]
+    if (currentFilter.value !== 'all') {
+      params.status = currentFilter.value
+    }
+    const data = await getAdminEd2kDownloadTasks(params)
+    tasks.value = (data.items || []).map((item) => normalizeTask(item))
+    if (tasks.value.length === 0) {
+      selectedTaskID.value = ''
+      return
+    }
+    if (!tasks.value.some((task) => task.id === selectedTaskID.value)) {
+      selectedTaskID.value = tasks.value[0].id
+    }
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '加载下载任务失败')
+  } finally {
+    loadingTasks.value = false
+  }
 }
 
-function findTaskByHash(hash) {
-  const normalizedHash = String(hash || '').trim().toLowerCase()
-  return tasks.value.find((task) => String(task.resourceHash || '').trim().toLowerCase() === normalizedHash) || null
-}
-
-function ensureTaskSelected(task) {
-  if (!task) return
+function selectTask(task) {
   selectedTaskID.value = task.id
-}
-
-function markTaskDeleted(task) {
-  task.status = 'deleted'
-  task.deletedAt = Date.now()
-  task.updatedAt = task.deletedAt
-  task.progressText = '任务已永久删除'
-  task.reason = ''
-  task.history = [
-    ...(task.history || []),
-    {
-      kind: 'deleted',
-      label: '已删除',
-      message: '管理员已永久删除该任务'
-    }
-  ]
 }
 
 async function submitLinks() {
@@ -238,55 +175,35 @@ async function submitLinks() {
     return
   }
 
-  const created = []
-  const reused = []
-  const rejected = []
-
-  for (const link of links) {
-    const hash = buildTaskHash(link.href)
-    const existing = findTaskByHash(hash)
-    if (existing) {
-      reused.push({ link, existing })
-      existing.updatedAt = Date.now()
-      existing.history = [
-        ...(existing.history || []),
-        {
-          kind: 'history',
-          label: '历史命中',
-          message: `已存在任务：${existing.title}`
-        }
-      ]
-      ensureTaskSelected(existing)
-      continue
-    }
-
-    const task = normalizeTaskFromLink(link.href)
-    if (titleInput.value.trim()) {
-      task.title = titleInput.value.trim()
-    }
-    task.history = [
-      ...(task.history || []),
-      {
-        kind: 'queued',
-        label: '排队中',
-        message: '任务等待下载引擎接管'
-      }
-    ]
-    tasks.value = [task, ...tasks.value]
-    created.push(task)
-    ensureTaskSelected(task)
-  }
-
-  if (created.length > 0) {
+  submitting.value = true
+  try {
+    const data = await createAdminEd2kDownloadTasks({
+      links: links.map((link) => link.href),
+      title: titleInput.value.trim()
+    })
+    const created = (data.created || []).map((item) => normalizeTask(item))
+    const reused = (data.reused || []).map((item) => normalizeTask(item))
+    const rejected = data.rejected || []
+    const focusTask = created[0] || reused[0] || null
     ed2kInput.value = ''
     titleInput.value = ''
-    ElMessage.success(`已创建 ${created.length} 条下载任务`)
-  }
-  if (reused.length > 0) {
-    ElMessage.info(`${reused.length} 条链接命中历史任务，已直接定位到现有记录`)
-  }
-  if (rejected.length > 0) {
-    ElMessage.warning(`${rejected.length} 条链接未通过校验`)
+    await loadTasks()
+    if (focusTask?.id) {
+      selectedTaskID.value = focusTask.id
+    }
+    if (created.length > 0) {
+      ElMessage.success(`已创建 ${created.length} 条下载任务`)
+    }
+    if (reused.length > 0) {
+      ElMessage.info(`${reused.length} 条链接命中历史任务，已直接定位到现有记录`)
+    }
+    if (rejected.length > 0) {
+      ElMessage.warning(`${rejected.length} 条链接未通过校验`)
+    }
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '创建下载任务失败')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -294,64 +211,30 @@ function setFilter(status) {
   currentFilter.value = status
 }
 
-function selectTask(task) {
-  selectedTaskID.value = task.id
-}
-
-function moveTaskStatus(task, status) {
-  task.status = status
-  task.updatedAt = Date.now()
-  task.progressText = status === 'running' ? '下载中但暂无进度' : status === 'completed' ? '下载完成，等待导入' : status === 'failed' ? '等待管理员处理失败原因' : '等待外部下载引擎开始传输'
-  task.reason = status === 'failed' ? '外部引擎未返回可执行结果' : ''
-  if (status === 'completed') {
-    task.files = task.files.length > 0 ? task.files : [
-      {
-        name: task.filename,
-        path: task.filename,
-        size: task.declaredSize || 0
-      }
-    ]
-    task.finishedAt = task.finishedAt || Date.now()
-  }
-  task.history = [
-    ...(task.history || []),
-    {
-      kind: 'status',
-      label: taskStatusLabelMap[status] || status,
-      message: `任务状态已切换为 ${taskStatusLabelMap[status] || status}`
-    }
-  ]
-}
-
-function resetTask(task) {
-  task.status = 'queued'
-  task.progressText = '等待外部下载引擎开始传输'
-  task.reason = ''
-  task.updatedAt = Date.now()
-  task.deletedAt = null
-  task.history = [
-    ...(task.history || []),
-    {
-      kind: 'status',
-      label: '排队中',
-      message: '任务已重置为排队中'
-    }
-  ]
-}
-
 async function deleteTask(task) {
   try {
-    await ElMessageBox.confirm(`确认永久删除「${task.title}」？删除后不会进入回收站。`, '删除下载任务', {
+    await ElMessageBox.confirm(`确认删除「${task.title}」？排队中的任务会被永久移除。`, '删除下载任务', {
       confirmButtonText: '永久删除',
       cancelButtonText: '取消',
       type: 'warning'
     })
-    markTaskDeleted(task)
-    ElMessage.success('任务已永久删除')
+    await deleteAdminEd2kDownloadTask(task.id)
+    await loadTasks()
+    ElMessage.success('任务已删除')
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error('删除任务失败')
+      ElMessage.error(error?.response?.data?.msg || error?.message || '删除任务失败')
     }
+  }
+}
+
+async function retryTask(task) {
+  try {
+    await retryAdminEd2kDownloadTask(task.id)
+    await loadTasks()
+    ElMessage.success('任务已重新排队')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '重试任务失败')
   }
 }
 
@@ -385,11 +268,11 @@ watch(
 
       <PageHeader
         title="ED2K 下载工作台"
-        subtitle="管理员在这里粘贴 ED2K 链接、按资源哈希识别历史任务，并对任务做本地管理。"
+        subtitle="管理员在这里粘贴 ED2K 链接、按资源哈希识别历史任务，并在后端工作台里管理下载任务。"
       >
         <template #actions>
           <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
-          <el-button :icon="RefreshRight" @click="loadTasks">刷新本地记录</el-button>
+          <el-button :icon="RefreshRight" :loading="loadingTasks" @click="loadTasks">刷新任务</el-button>
         </template>
       </PageHeader>
 
@@ -414,7 +297,7 @@ watch(
               v-model="titleInput"
               placeholder="任务标题（可不填，默认自动生成）"
             />
-            <el-button type="primary" :icon="Download" :disabled="!canSubmit" @click="submitLinks">创建任务</el-button>
+            <el-button type="primary" :icon="Download" :loading="submitting" :disabled="!canSubmit" @click="submitLinks">创建任务</el-button>
           </div>
           <div class="composer__meta">
             <span>有效链接：{{ linkCount }}</span>
@@ -474,8 +357,7 @@ watch(
           <template #title>任务详情</template>
           <template #description>来源标识常驻，文件清单只展示当前任务已有结果。</template>
           <template #actions>
-            <el-button :icon="RefreshRight" @click="resetTask(selectedTask)">重置</el-button>
-            <el-button :icon="Search" @click="moveTaskStatus(selectedTask, 'running')">切到下载中</el-button>
+            <el-button :icon="RefreshRight" :disabled="selectedTask.status !== 'failed'" @click="retryTask(selectedTask)">重试任务</el-button>
             <el-button :icon="Delete" type="danger" plain @click="deleteTask(selectedTask)">永久删除</el-button>
           </template>
 
@@ -504,21 +386,18 @@ watch(
               <template #description>状态提示只表达当前走到哪一步。</template>
               <div class="feedback-panel">
                 <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
-                <p>{{ selectedTask.progressText }}</p>
-                <p v-if="selectedTask.reason">{{ selectedTask.reason }}</p>
+                <p>{{ selectedTaskProgressText }}</p>
+                <p v-if="selectedTaskErrorMessage">{{ selectedTaskErrorMessage }}</p>
               </div>
             </SectionCard>
 
             <SectionCard>
               <template #title>任务操作</template>
-              <template #description>这里保留本地管理动作，后续可再接真实后端。</template>
+              <template #description>这里保留后端管理动作：重试失败任务、永久删除排队任务。</template>
 
               <div class="action-row">
-                <el-button @click="moveTaskStatus(selectedTask, 'queued')">排队</el-button>
-                <el-button @click="moveTaskStatus(selectedTask, 'running')">下载中</el-button>
-                <el-button @click="moveTaskStatus(selectedTask, 'completed')">已完成</el-button>
-                <el-button @click="moveTaskStatus(selectedTask, 'failed')">失败</el-button>
-                <el-button @click="resetTask(selectedTask)">重新排队</el-button>
+                <el-button :disabled="selectedTask.status !== 'failed'" @click="retryTask(selectedTask)">重新排队</el-button>
+                <el-button :disabled="selectedTask.status !== 'queued' && selectedTask.status !== 'running'" @click="deleteTask(selectedTask)">删除任务</el-button>
               </div>
             </SectionCard>
 

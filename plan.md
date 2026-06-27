@@ -1,3 +1,8 @@
+## 2026-06-27 16:03 +0800
+- 进度：把 ED2K 下载工作台继续往后端收口。已新增 `ed2k_download_tasks` 表、管理端任务路由、任务列表/创建/详情/重试/删除接口，以及前端 API 接入；`/toolbox/ed2k-download` 现在从 `localStorage` 切到后端数据源，删除排队任务会永久清除记录，资源哈希历史命中则只附加历史，不重建任务。
+- 影响文件：`internal/models/admin.go`、`internal/repository/ed2k_download_repository.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`internal/handlers/router.go`、`internal/repository/migrations_test.go`、`migrations/0029_ed2k_download_tasks.up.sql`、`migrations/0029_ed2k_download_tasks.down.sql`、`admin-web/src/api/admin.js`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers ./internal/repository -run 'TestRegisterIncludesEd2kDownloadRoutes|TestParseEd2kDownloadLinkAndBuildTitle|TestEd2kDownloadTasksMigration'` 通过；`cd admin-web && npm test -- --run src/views/ToolboxEd2kDownload.spec.js src/views/toolboxPage.spec.js` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）
+
 ## 2026-06-27 15:18 +0800
 - 进度：ED2K 下载工作台已从静态骨架升级为可用的本地任务面板。当前支持多行链接粘贴、自动标题、按资源哈希命中历史任务、任务列表/详情切换、状态本地流转和永久删除；`/toolbox/ed2k` 仍保持原链接生成器并存，两个入口互不抢职责。
 - 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`CONTEXT.md`、`plan.md`

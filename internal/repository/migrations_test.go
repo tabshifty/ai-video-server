@@ -130,6 +130,21 @@ func TestPasswordVaultEntriesMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+password_vault_entries`)
 }
 
+func TestEd2kDownloadTasksMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0029_ed2k_download_tasks.up.sql")
+	down := readMigrationForTest(t, "0029_ed2k_download_tasks.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+ed2k_download_tasks`)
+	assertSQLPattern(t, up, `(?is)resource_hash\s+varchar\(64\)\s+not\s+null`)
+	assertSQLPattern(t, up, `(?is)status\s+varchar\(24\)\s+not\s+null\s+default\s+'queued'`)
+	assertSQLPattern(t, up, `(?is)create\s+unique\s+index\s+if\s+not\s+exists\s+idx_ed2k_download_tasks_resource_hash_unique`)
+	assertSQLPattern(t, up, `(?is)where\s+status\s*<>\s*'deleted'`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_ed2k_download_tasks_status_updated`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+ed2k_download_tasks`)
+}
+
 func TestArchiveImportBatchEncodingMigration(t *testing.T) {
 	t.Parallel()
 
