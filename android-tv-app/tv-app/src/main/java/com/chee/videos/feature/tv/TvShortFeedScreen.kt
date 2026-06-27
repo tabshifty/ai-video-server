@@ -2,6 +2,7 @@ package com.chee.videos.feature.tv
 
 import android.app.Activity
 import android.graphics.Color as AndroidColor
+import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -130,6 +131,9 @@ fun TvShortFeedScreen(
     var seekOverlayDurationMs by remember { mutableLongStateOf(0L) }
     var seekOverlayHideJob by remember { mutableStateOf<Job?>(null) }
     var playbackRetryNonce by remember { mutableIntStateOf(0) }
+    // 双按返回确认：与长视频/电视剧播放器同款状态机（复用 resolveTvPlayerBackAction）。
+    var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
+    var showBackConfirmPrompt by remember { mutableStateOf(false) }
 
     val currentItem = uiState.items.getOrNull(uiState.currentIndex)
     val currentVideoId = currentItem?.id.orEmpty()
@@ -142,7 +146,37 @@ fun TvShortFeedScreen(
         viewModel.load()
     }
 
-    BackHandler(onBack = onBack)
+    // 顶层 BackHandler 与根 Box onPreviewKeyEvent 的 BACK/ESCAPE 分支共用同一套双按状态机，
+    // 避免单条路径仍单按即退（根 Box 有焦点时 preview 先消费 BACK，顶层 BackHandler 收不到；
+    // 失败/空态可聚焦按钮获焦时则走顶层 BackHandler）。两条路径都指向 handlePlaybackBack。
+    fun handlePlaybackBack() {
+        val now = SystemClock.uptimeMillis()
+        when (resolveTvPlayerBackAction(backPromptAtMillis, now)) {
+            TvPlayerBackAction.ShowPrompt -> {
+                backPromptAtMillis = now
+                showBackConfirmPrompt = true
+            }
+
+            TvPlayerBackAction.Exit -> {
+                backPromptAtMillis = null
+                showBackConfirmPrompt = false
+                onBack()
+            }
+        }
+    }
+
+    BackHandler(onBack = ::handlePlaybackBack)
+
+    // 提示自动消失：超窗口后清显示，仅当时间戳未变时执行，防止旧协程误清新一次提示。
+    LaunchedEffect(showBackConfirmPrompt, backPromptAtMillis) {
+        val promptAt = backPromptAtMillis
+        if (showBackConfirmPrompt && promptAt != null) {
+            delay(TvPlayerBackConfirmWindowMillis)
+            if (backPromptAtMillis == promptAt) {
+                showBackConfirmPrompt = false
+            }
+        }
+    }
 
     DisposableEffect(activity) {
         if (activity == null) {
@@ -520,7 +554,7 @@ fun TvShortFeedScreen(
                             AndroidKeyEvent.KEYCODE_BACK,
                             AndroidKeyEvent.KEYCODE_ESCAPE,
                             -> {
-                                onBack()
+                                handlePlaybackBack()
                             }
 
                             else -> return@onPreviewKeyEvent false
@@ -645,6 +679,15 @@ fun TvShortFeedScreen(
                             )
                         }
                     }
+                }
+
+                if (showBackConfirmPrompt) {
+                    TvPlayerBackConfirmPrompt(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(bottom = 48.dp),
+                    )
                 }
             }
         }

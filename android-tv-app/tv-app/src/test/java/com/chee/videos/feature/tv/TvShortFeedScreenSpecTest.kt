@@ -27,4 +27,36 @@ class TvShortFeedScreenSpecTest {
         assertFalse("短视频页不应再引入旧短视频右侧动作 rail", source.contains("ShortPlaybackModeToggleButton"))
         assertFalse("短视频页不应再复用旧短视频动作按钮组件", source.contains("ShortVideoOverlayActionButton"))
     }
+
+    @Test
+    fun shortFeedScreenBackUsesSharedDoublePressConfirm() {
+        val sourcePath = Path.of("src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt")
+        assertTrue("TV 短视频页必须存在", sourcePath.exists())
+
+        val source = sourcePath.readText()
+        assertTrue(
+            "短视频页 BACK 必须复用长视频/电视剧双按状态机 resolveTvPlayerBackAction",
+            source.contains("resolveTvPlayerBackAction"),
+        )
+        assertTrue(
+            "短视频页必须有统一的双按返回处理函数 handlePlaybackBack",
+            source.contains("fun handlePlaybackBack()"),
+        )
+        assertTrue(
+            "短视频页顶层 BackHandler 必须接入双按状态机而非直接 onBack",
+            source.contains("BackHandler(onBack = ::handlePlaybackBack)"),
+        )
+        assertTrue(
+            "短视频页 preview 的 BACK 分支必须接入双按状态机而非直接 onBack",
+            source.contains("AndroidKeyEvent.KEYCODE_BACK") && source.contains("handlePlaybackBack()"),
+        )
+        assertTrue(
+            "短视频页必须复用既有返回确认提示组件 TvPlayerBackConfirmPrompt",
+            source.contains("TvPlayerBackConfirmPrompt"),
+        )
+        assertFalse(
+            "短视频页不应新造并行双按实现（禁止出现独立 backPressTime/lastBackPress 旧式时间戳）",
+            source.contains("backPressTime") || source.contains("lastBackPress"),
+        )
+    }
 }
