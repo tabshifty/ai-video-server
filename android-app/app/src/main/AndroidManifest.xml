@@ -36,6 +36,11 @@
                 <data android:scheme="cheevideos" android:host="tv-auth" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name="com.chee.videos.feature.tvauth.PortraitCaptureActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.VideoHome" />
     </application>
 
 </manifest>

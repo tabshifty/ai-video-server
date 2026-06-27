@@ -84,6 +84,7 @@ import com.chee.videos.feature.tv.TvSeriesPlayerScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tvauth.TvAuthApprovalScreen
 import com.chee.videos.feature.tvauth.TvAuthDeepLinkParser
+import com.chee.videos.feature.tvauth.PortraitCaptureActivity
 import com.chee.videos.feature.tvauth.resolveTvAuthDeepLink
 import com.chee.videos.feature.tv.buildTvPlayerRoute
 import com.chee.videos.feature.tv.buildTvSeriesRoute
@@ -311,7 +312,9 @@ private fun AuthenticatedNav(
                                     setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                                     setPrompt("扫描 TV 登录二维码")
                                     setBeepEnabled(false)
-                                    setOrientationLocked(false)
+                                    // 用自定义竖屏 CaptureActivity 覆盖库默认的横屏 Activity；
+                                    // 方向由 Manifest 锁定，这里不再用 setOrientationLocked。
+                                    setCaptureActivity(PortraitCaptureActivity::class.java)
                                     addExtra(Intents.Scan.FORMATS, ScanOptions.QR_CODE)
                                 },
                             )
