@@ -8,6 +8,11 @@
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest --tests "com.chee.videos.feature.tv.TvHomeNavigationTest" --tests "com.chee.videos.feature.tv.TvCatalogFocusPolicyTest"` → BUILD SUCCESSFUL；`--rerun-tasks` 强制重跑两测试类亦绿；评审 BLOCKER 已修复并复测通过。
 
+## 2026-06-27 10:19 +0800
+- 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“running 阶段落盘快照是否也隐藏引擎辅助文件”的边界，不做实现。已确认进行中快照和完成态结果清单一样，都只展示对管理员有意义的交付文件，不暴露引擎内部临时/控制文件；相应补强 `ED2K running 详情可见进行中落盘快照` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 ## 2026-06-27 10:17 +0800
 - 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“running 阶段是否可见当前已落盘文件快照”的边界，不做实现。已确认任务详情可以展示进行中的落盘文件快照，但必须明确它不等同于最终结果；相应将 `ED2K running 详情可见进行中落盘快照` 写入 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`
