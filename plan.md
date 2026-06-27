@@ -1,3 +1,8 @@
+## 2026-06-27 11:26 +0800
+- 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“任务列表的文件摘要应如何兼顾轻量与可识别”的边界，不做实现。已确认单文件任务在列表中直接显示目标文件名与声明大小，多文件任务显示根目录名/主目录名配合“共 N 项”摘要；相应补强 `ED2K 任务列表文件摘要优先` 术语。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 ## 2026-06-27 11:20 +0800
 - 进度：通过 `$grill-with-docs` 收口「短视频按返回键双按确认退出」边界并落地实现。确认范围仅 TV 端（手机端无任何视频有双按模式，「像其他视频一样」指 TV 长视频/电视剧播放器）；文案「再按一次返回」+ 第二次 `onBack` 返回首页（与长视频/电视剧逐字对齐，回避「退出」在词表里退出 App vs 退页的重载）；两条返回路径（根 Box `onPreviewKeyEvent` 的 `KEYCODE_BACK`/`KEYCODE_ESCAPE` 分支 + 顶层 `BackHandler`）共用同一 `handlePlaybackBack` 状态机，复用既有 `resolveTvPlayerBackAction`/`TvPlayerBackAction`/`TvPlayerBackConfirmWindowMillis`/`TvPlayerBackConfirmPrompt`，不新造并行实现；单条失败轻提示显示时 BACK 不拦截、直接进双按（贴合既有 `TV 短视频单条失败留在当前页`「不引入先清提示再退出中间态」契约）；失败/空态可聚焦卡片「返回首页」按钮点击保持 `onBack` 不进双按。`TvShortFeedScreenSpecTest` 加 `shortFeedScreenBackUsesSharedDoublePressConfirm` 防回归（断言含 `resolveTvPlayerBackAction`/`handlePlaybackBack`、两路径接进它、复用 `TvPlayerBackConfirmPrompt`、不出现 `backPressTime`/`lastBackPress` 旧式时间戳）。版本：`versionCode` 126→127 / `versionName` 0.1.126→0.1.127。`CONTEXT.md` 改写 `TV 短视频返回语义`（单按→双按，标注与 IPTV 分叉，回链 [[TV 播放器退出确认]]）。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
