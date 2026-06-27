@@ -8,6 +8,11 @@
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest --tests "com.chee.videos.feature.tv.TvHomeNavigationTest" --tests "com.chee.videos.feature.tv.TvCatalogFocusPolicyTest"` → BUILD SUCCESSFUL；`--rerun-tasks` 强制重跑两测试类亦绿；评审 BLOCKER 已修复并复测通过。
 
+## 2026-06-27 11:17 +0800
+- 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“任务列表默认是否把进行中任务置顶”的边界，不做实现。已确认下载页是监控面而不是归档页，`queued` / `running` 应置顶并按最近状态更新时间倒序，已结束任务排在后面；相应将 `ED2K 任务列表进行中置顶` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 ## 2026-06-27 11:05 +0800
 - 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“任务列表是否只展示简洁文件摘要、完整清单留给详情”的边界，不做实现。已确认列表层只保留轻量文件摘要，多文件任务不在列表里展开完整清单；相应将 `ED2K 任务列表文件摘要优先` 写入 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`
