@@ -8,6 +8,11 @@
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest --tests "com.chee.videos.feature.tv.TvHomeNavigationTest" --tests "com.chee.videos.feature.tv.TvCatalogFocusPolicyTest"` → BUILD SUCCESSFUL；`--rerun-tasks` 强制重跑两测试类亦绿；评审 BLOCKER 已修复并复测通过。
 
+## 2026-06-27 10:36 +0800
+- 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“列表和详情里是否必须区分预期文件信息、过程快照和最终结果”这一显示语义，不做实现。已确认三类文件信息来源必须分层可辨，不能混成一个模糊文件列表；相应将 `ED2K 文件信息来源必须分层可辨` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 ## 2026-06-27 10:30 +0800
 - 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“failed 详情是否可见失败前已落盘文件残留”的边界，不做实现。已确认失败详情应允许管理员查看失败残留快照，用来判断任务在失败前走到了哪一步，但必须明确它不等同于成功结果；相应将 `ED2K failed 详情可见失败残留快照` 写入 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`
