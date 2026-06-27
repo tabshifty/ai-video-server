@@ -3,6 +3,11 @@
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest --tests "com.chee.videos.feature.tv.TvHomeNavigationTest" --tests "com.chee.videos.feature.tv.TvCatalogFocusPolicyTest"` → BUILD SUCCESSFUL；`--rerun-tasks` 强制重跑两测试类亦绿；评审 BLOCKER 已修复并复测通过。
 
+## 2026-06-27 10:11 +0800
+- 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“完成态结果文件清单是否隐藏引擎辅助文件”的边界，不做实现。已确认任务详情只展示对管理员有意义的最终交付文件，不把下载引擎的临时/控制文件混入结果清单；相应将 `ED2K 下载结果清单隐藏引擎辅助文件` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 ## 2026-06-27 10:09 +0800
 - 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“running 阶段进度展示是否只信任引擎真实进度”的边界，不做实现。已确认能拿到引擎真实进度就直接展示，拿不到就明确显示暂无进度，不做本地估算；相应将 `ED2K 下载进度只展示引擎真实进度` 写入 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`
