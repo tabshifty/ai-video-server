@@ -1,3 +1,13 @@
+## 2026-06-27 14:03 +0800
+- 进度：完成 ED2K 下载工作台前端第一刀。管理端工具菜单中的 ED2K 入口已从链接生成器切换为下载工作台，`/toolbox/ed2k` 现展示固定四段式详情骨架：来源标识、预期文件信息、状态反馈、文件区；页面可在 queued / running / failed / completed 示例状态间切换，用于验证不同状态下的区块显隐与摘要切换。新增 `ToolboxEd2k.spec.js` 覆盖骨架语义，`toolboxPage.spec.js` 也同步改写为下载工作台入口。当前仍是前端骨架，未接真实后端下载接口。
+- 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/views/ToolboxEd2k.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxEd2k.spec.js src/views/toolboxPage.spec.js` 通过；`cd admin-web && npm run build` 通过
+
+## 2026-06-27 14:01 +0800
+- 进度：开始落 ED2K 下载工作台前端骨架。已把管理端入口从“ED2K 链接生成器”切到“ED2K 下载工作台”，并在 `/toolbox/ed2k` 落出固定区块顺序的详情骨架：来源标识、预期文件信息、状态反馈、文件区；同一页面可切换 queued / running / failed / completed 示例状态，用于校验各区块显隐与摘要切换。
+- 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/views/ToolboxEd2k.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- --runInBand`（或等价 Vitest 定向）与 `npm run build`
+
 ## 2026-06-27 11:59 +0800
 - 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“任务详情各区块是否应固定顺序呈现、只按状态决定显隐”的边界，不做实现。已确认详情页应固定为来源标识 -> 预期文件信息 -> 状态反馈 -> 文件区，缺失区块直接不渲染、不留空占位；相应将 `ED2K 任务详情固定区块顺序` 写入 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`

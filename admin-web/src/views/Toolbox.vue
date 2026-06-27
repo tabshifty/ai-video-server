@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { FolderOpened, Key, Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
+import { Download, FolderOpened, Key, Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -27,11 +27,11 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
         <div class="tool-menu-grid" aria-label="工具箱菜单">
           <a class="tool-menu-item" :href="ed2kToolHref" target="_blank" rel="noopener noreferrer">
             <span class="tool-menu-item__icon">
-              <el-icon><Link /></el-icon>
+              <el-icon><Download /></el-icon>
             </span>
             <span class="tool-menu-item__content">
-              <strong>ED2K 链接生成器</strong>
-              <span>把多行 ED2K 文本转换为可点击链接。</span>
+              <strong>ED2K 下载工作台</strong>
+              <span>管理管理员贴入的 ED2K 下载任务与工作区状态。</span>
             </span>
             <span class="tool-menu-item__meta">
               <el-icon><TopRight /></el-icon>

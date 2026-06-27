@@ -18,7 +18,7 @@ const passwordVaultRoute = router.match(/\{ path: '\/toolbox\/password-vault'[^}
 describe('toolbox pages', () => {
   it('keeps the toolbox page as a shell menu of tool entry buttons', () => {
     expect(toolbox).toContain('工具箱')
-    expect(toolbox).toContain('ED2K 链接生成器')
+    expect(toolbox).toContain('ED2K 下载工作台')
     expect(toolbox).toContain('压缩包导入')
     expect(toolbox).toContain('图像生成工作台')
     expect(toolbox).toContain('孤儿文件扫描')
@@ -43,23 +43,35 @@ describe('toolbox pages', () => {
   })
 
   it('keeps the ED2K tool page outside the admin shell while preserving the tool workflow', () => {
-    expect(ed2kTool).toContain('ED2K 链接生成器')
-    expect(ed2kTool).toContain('parseEd2kLinks')
+    expect(ed2kTool).toContain('ED2K 下载工作台')
+    expect(ed2kTool).toContain('来源标识')
+    expect(ed2kTool).toContain('预期文件信息')
+    expect(ed2kTool).toContain('状态反馈')
+    expect(ed2kTool).toContain('文件区')
     expect(ed2kTool).toContain('返回工具箱')
     expect(ed2kTool).toContain('/toolbox')
     expect(ed2kTool).not.toContain('components/Layout.vue')
     expect(ed2kTool).not.toMatch(/<Layout[>\s]/)
   })
 
-  it('only displays clicked state after an ED2K link is clicked', () => {
-    expect(ed2kTool).toContain('ed2kClickedLinks')
-    expect(ed2kTool).toContain('markEd2kLinkClicked')
-    expect(ed2kTool).toContain('isEd2kLinkClicked')
-    expect(ed2kTool).toContain('@click="markEd2kLinkClicked(link)"')
-    expect(ed2kTool).toContain('v-if="isEd2kLinkClicked(link)"')
-    expect(ed2kTool).toContain('已点击')
-    expect(ed2kTool).not.toContain('未点击')
-    expect(ed2kTool).toContain('ed2k-link__status')
+  it('keeps the ED2K download workbench anchored on source metadata and fixed detail sections', () => {
+    expect(ed2kTool).toContain('source_link')
+    expect(ed2kTool).toContain('resource_hash')
+    expect(ed2kTool).toContain('expected_files')
+    expect(ed2kTool).toContain('running_files')
+    expect(ed2kTool).toContain('failed_files')
+    expect(ed2kTool).toContain('completed_files')
+    expect(ed2kTool).toContain('showExpectedFiles')
+    expect(ed2kTool).toContain('showFileSection')
+    expect(ed2kTool).toContain('fileSectionTitle')
+    expect(ed2kTool).toContain('currentStatusDescription')
+    expect(ed2kTool).toContain('file-item__main')
+    expect(ed2kTool).toContain('来源标识')
+    expect(ed2kTool).toContain('预期文件信息')
+    expect(ed2kTool).toContain('最终结果清单')
+    expect(ed2kTool).not.toContain('parseEd2kLinks')
+    expect(ed2kTool).not.toContain('ed2kClickedLinks')
+    expect(ed2kTool).not.toContain('已点击')
   })
 
   it('registers the ED2K tool page as an authenticated route without shell header metadata', () => {
