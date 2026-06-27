@@ -1,3 +1,8 @@
+## 2026-06-27 17:24 +0800
+- 进度：已提交 `502afad` `接上 ED2K 部署执行器适配层`，并推送到 `deploy/master`。远端 hook 本次命中 `RESTART_GO=1 REBUILD_FRONTEND=1`，完成 `npm ci && npm run build`、`go build`、`codesign`、migration 与 launchctl kickstart；hook 自带的 `/healthz` 首次探测报 failed，但随后复查部署机 `launchctl print` 显示 server / worker 都是 `state = running`，手工 `curl http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`，判定为启动窗口内的瞬时探活失败。另已确认远端 `~/deploy/ai-video-server/work/scripts/ed2k-amule-executor.sh` 已存在且可执行；部署机当前 `.env` 里仍未写任何 `ED2K_*` / `AMULE_*` 项，且机器上也尚无 `amuled` / `amulecmd`，所以线上代码路径已经就位，但“真下载”仍差外部 ED2K 引擎安装与运行态配置。
+- 影响文件：`plan.md`；远端运行态核对：`deploy/master`、`~/deploy/ai-video-server/work/scripts/ed2k-amule-executor.sh`、`~/Library/Logs/ai-video-server/{deploy,server}.log`
+- 验证：`git push deploy master` 通过；远端 `git --git-dir=$HOME/deploy/ai-video-server/repo.git rev-parse HEAD` = `502afadae16b8a76d7e89f044c67f117f35a9ab8`；`launchctl print gui/$(id -u)/com.aivideo.{server,worker}` 均为 running；`curl -sS --max-time 10 http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`；`grep -n "^ED2K\\|^AMULE" ~/deploy/ai-video-server/.env` 当前无输出。
+
 ## 2026-06-27 17:15 +0800
 - 进度：完成 ED2K 部署层执行器接线。worker 现在会把任务 id、资源哈希、文件名、声明大小和原始链接通过环境变量传给外部执行器；仓库新增 `scripts/ed2k-amule-executor.sh` 作为默认 aMule 适配脚本，按 `ED2K_DOWNLOAD_EXECUTABLE` 直接被 worker 调起，完成后输出项目侧 JSON 结果；`.env.example`、`docs/家用部署机.md`、`CONTEXT.md` 已同步补齐部署变量、aMule 远控前提与脚本契约。另已 SSH 实探部署机：当前只有 `/usr/bin/python3`、`/usr/bin/jq`，没有 `amuled`、`amulecmd`、Docker 或 MacPorts 安装入口，所以“仓库与发布链已接好”，但“真下载”仍差外部 ED2K 引擎本体安装。
 - 影响文件：`internal/queue/ed2k_download.go`、`internal/queue/ed2k_download_test.go`、`scripts/ed2k-amule-executor.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
