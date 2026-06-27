@@ -9,6 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 const router = useRouter()
 
 const ed2kToolHref = computed(() => router.resolve('/toolbox/ed2k').href)
+const ed2kDownloadHref = computed(() => router.resolve('/toolbox/ed2k-download').href)
 const archiveImportHref = computed(() => router.resolve('/toolbox/archive-import').href)
 const imageWorkbenchHref = computed(() => router.resolve('/toolbox/image-workbench').href)
 const orphanFilesHref = computed(() => router.resolve('/toolbox/orphan-files').href)
@@ -26,6 +27,19 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
 
         <div class="tool-menu-grid" aria-label="工具箱菜单">
           <a class="tool-menu-item" :href="ed2kToolHref" target="_blank" rel="noopener noreferrer">
+            <span class="tool-menu-item__icon">
+              <el-icon><Link /></el-icon>
+            </span>
+            <span class="tool-menu-item__content">
+              <strong>ED2K 链接生成器</strong>
+              <span>把多行 ED2K 文本转换为可点击链接。</span>
+            </span>
+            <span class="tool-menu-item__meta">
+              <el-icon><TopRight /></el-icon>
+              <span>新标签页打开</span>
+            </span>
+          </a>
+          <a class="tool-menu-item" :href="ed2kDownloadHref" target="_blank" rel="noopener noreferrer">
             <span class="tool-menu-item__icon">
               <el-icon><Download /></el-icon>
             </span>

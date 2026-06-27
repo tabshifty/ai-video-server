@@ -1,3 +1,8 @@
+## 2026-06-27 14:27 +0800
+- 进度：把 ED2K 两个入口拆回并存结构。`/toolbox/ed2k` 已恢复为原来的 ED2K 链接生成器，新增 `/toolbox/ed2k-download` 作为独立下载工作台；工具箱菜单同时展示两个入口，分别用 Link 和 Download 图标区分。前端测试也拆成了链接生成器与下载工作台两个专属 spec，避免以后互相污染。
+- 影响文件：`admin-web/src/views/Toolbox.vue`、`admin-web/src/router/index.js`、`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2k.spec.js`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`admin-web/src/views/toolboxPage.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxEd2k.spec.js src/views/ToolboxEd2kDownload.spec.js src/views/toolboxPage.spec.js` 与 `npm run build`
+
 ## 2026-06-27 14:03 +0800
 - 进度：完成 ED2K 下载工作台前端第一刀。管理端工具菜单中的 ED2K 入口已从链接生成器切换为下载工作台，`/toolbox/ed2k` 现展示固定四段式详情骨架：来源标识、预期文件信息、状态反馈、文件区；页面可在 queued / running / failed / completed 示例状态间切换，用于验证不同状态下的区块显隐与摘要切换。新增 `ToolboxEd2k.spec.js` 覆盖骨架语义，`toolboxPage.spec.js` 也同步改写为下载工作台入口。当前仍是前端骨架，未接真实后端下载接口。
 - 影响文件：`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/toolboxPage.spec.js`、`admin-web/src/views/ToolboxEd2k.spec.js`、`plan.md`
