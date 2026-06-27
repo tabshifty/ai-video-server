@@ -28,6 +28,7 @@ const (
 	TypeScrapeAV       = "video:scrape:av"
 	TypeScrapeRetag    = "video:scrape:retag"
 	TypeOrphanFileScan = "system:orphan-files:scan"
+	TypeEd2kDownload   = "download:ed2k"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -37,6 +38,11 @@ type TranscodePayload struct {
 	OutputDir    string `json:"output_dir"`
 	TargetFormat string `json:"target_format"`
 	Force        bool   `json:"force,omitempty"`
+}
+
+// Ed2kDownloadPayload carries identifiers for ED2K download processing.
+type Ed2kDownloadPayload struct {
+	TaskID string `json:"task_id"`
 }
 
 // Enqueuer wraps asynq client operations.
@@ -76,6 +82,24 @@ func (e *Enqueuer) EnqueueTranscode(payloadIn TranscodePayload) error {
 	return nil
 }
 
+func (e *Enqueuer) EnqueueEd2kDownload(payloadIn Ed2kDownloadPayload) error {
+	payload, err := json.Marshal(payloadIn)
+	if err != nil {
+		return fmt.Errorf("marshal ed2k download payload: %w", err)
+	}
+	_, err = e.client.Enqueue(
+		asynq.NewTask(TypeEd2kDownload, payload),
+		asynq.MaxRetry(3),
+		asynq.ProcessIn(2*time.Second),
+		asynq.Queue(e.queue),
+		asynq.Timeout(6*time.Hour),
+	)
+	if err != nil {
+		return fmt.Errorf("enqueue ed2k download task: %w", err)
+	}
+	return nil
+}
+
 func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Option {
 	if timeout <= 0 {
 		timeout = 6 * time.Hour
@@ -90,18 +114,19 @@ func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Opti
 
 // Processor handles task registration and processing logic.
 type Processor struct {
-	repo        *repository.VideoRepository
-	trans       *services.TranscodeService
-	scrape      *services.ScraperService
-	subtitle    *services.SubtitleService
-	enqueuer    *Enqueuer
-	logger      *slog.Logger
-	storageRoot string
-	uploadGC    bool
+	repo         *repository.VideoRepository
+	trans        *services.TranscodeService
+	scrape       *services.ScraperService
+	subtitle     *services.SubtitleService
+	enqueuer     *Enqueuer
+	ed2kExecutor Ed2kDownloadExecutor
+	logger       *slog.Logger
+	storageRoot  string
+	uploadGC     bool
 }
 
-func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, logger *slog.Logger, storageRoot string) *Processor {
-	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, logger: logger, storageRoot: storageRoot, uploadGC: true}
+func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, ed2kExecutor Ed2kDownloadExecutor, logger *slog.Logger, storageRoot string) *Processor {
+	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, ed2kExecutor: ed2kExecutor, logger: logger, storageRoot: storageRoot, uploadGC: true}
 }
 
 func (p *Processor) Register(mux *asynq.ServeMux) {
@@ -111,6 +136,7 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeAV, p.HandleScrapeAV)
 	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
 	mux.HandleFunc(TypeOrphanFileScan, p.HandleOrphanFileScan)
+	mux.HandleFunc(TypeEd2kDownload, p.HandleEd2kDownload)
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

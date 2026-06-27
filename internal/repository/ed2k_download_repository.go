@@ -215,6 +215,26 @@ RETURNING id, source_link, resource_hash, title, filename, declared_size, status
 	return item, nil
 }
 
+func (r *VideoRepository) MarkEd2kDownloadTaskRunning(ctx context.Context, id uuid.UUID, progressText string, history models.AdminEd2kDownloadTaskHistoryItem) error {
+	_, err := r.UpdateEd2kDownloadTaskStatus(ctx, id, "running", progressText, "", timePtr(time.Now()), nil, nil, "", "", nil, 0, history)
+	return err
+}
+
+func (r *VideoRepository) MarkEd2kDownloadTaskFailed(ctx context.Context, id uuid.UUID, errorMessage string, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	return r.UpdateEd2kDownloadTaskStatus(ctx, id, "failed", "下载失败", errorMessage, nil, timePtr(time.Now()), nil, "", "", nil, 0, history)
+}
+
+func (r *VideoRepository) MarkEd2kDownloadTaskCompleted(ctx context.Context, id uuid.UUID, outputDir, downloadedPath string, files []models.AdminEd2kDownloadTaskFile, progressText string, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	if strings.TrimSpace(progressText) == "" {
+		progressText = "下载已完成"
+	}
+	return r.UpdateEd2kDownloadTaskStatus(ctx, id, "completed", progressText, "", nil, timePtr(time.Now()), nil, outputDir, downloadedPath, files, 0, history)
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
+}
+
 func (r *VideoRepository) DeleteEd2kDownloadTask(ctx context.Context, id uuid.UUID) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM ed2k_download_tasks WHERE id = $1`, id)
 	if err != nil {

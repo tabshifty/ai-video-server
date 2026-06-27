@@ -174,6 +174,24 @@ func TestLoadIncludesImageGenerationConfig(t *testing.T) {
 	}
 }
 
+func TestLoadIncludesEd2kDownloadConfig(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("ED2K_DOWNLOAD_EXECUTABLE", "/usr/local/bin/amulecmd")
+	t.Setenv("ED2K_DOWNLOAD_TIMEOUT_SECONDS", "123")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ED2KDownloadExecutable != "/usr/local/bin/amulecmd" {
+		t.Fatalf("unexpected ED2KDownloadExecutable: %s", cfg.ED2KDownloadExecutable)
+	}
+	if cfg.ED2KDownloadTimeout != 123*time.Second {
+		t.Fatalf("unexpected ED2KDownloadTimeout: %s", cfg.ED2KDownloadTimeout)
+	}
+}
+
 func TestLoadDefaultsImageGenerationModel(t *testing.T) {
 	setRequiredEnv(t)
 

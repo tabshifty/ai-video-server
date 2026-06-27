@@ -30,6 +30,7 @@ type taskEnqueuer interface {
 	EnqueueScrapeAV(queue.ScrapePayload) error
 	EnqueueScrapeRetag(queue.RetagScrapePayload) error
 	EnqueueOrphanFileScan() error
+	EnqueueEd2kDownload(queue.Ed2kDownloadPayload) error
 }
 
 type archiveImportService interface {

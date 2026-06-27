@@ -53,6 +53,8 @@ type Config struct {
 	ImageGenerationAPIKey      string
 	ImageGenerationModel       string
 	ImageGenerationTimeout     time.Duration
+	ED2KDownloadExecutable     string
+	ED2KDownloadTimeout        time.Duration
 }
 
 // Load returns validated application config from environment.
@@ -101,6 +103,8 @@ func Load() (Config, error) {
 		ImageGenerationAPIKey:      os.Getenv("IMAGE_GENERATION_API_KEY"),
 		ImageGenerationModel:       getEnv("IMAGE_GENERATION_MODEL", "gpt-image-2"),
 		ImageGenerationTimeout:     time.Duration(getIntEnv("IMAGE_GENERATION_TIMEOUT_SECONDS", 180)) * time.Second,
+		ED2KDownloadExecutable:     strings.TrimSpace(os.Getenv("ED2K_DOWNLOAD_EXECUTABLE")),
+		ED2KDownloadTimeout:        time.Duration(getIntEnv("ED2K_DOWNLOAD_TIMEOUT_SECONDS", 21600)) * time.Second,
 	}
 
 	if cfg.PostgresDSN == "" {

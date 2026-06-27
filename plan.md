@@ -3,6 +3,11 @@
 - 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/tvauth/PortraitCaptureActivity.kt`、`android-app/app/src/main/AndroidManifest.xml`、`android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`、`android-app/app/build.gradle.kts`、`android-app/app/src/test/java/com/chee/videos/feature/tvauth/TvAuthScanOrientationSpecTest.kt`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-app && ./gradlew :app:assembleDebug :app:testDebugUnitTest` → `assembleDebug` 通过；新增 `TvAuthScanOrientationSpecTest` 3/3 绿（test-results XML failures=0 errors=0）。全量 `testDebugUnitTest` 有一项 `TvCatalogViewModelTest.nullListsInPayload...` 偶发 `UncaughtExceptionsBeforeTest` 失败，但单独重跑该测试类 BUILD SUCCESSFUL——属既有协程测试跨用例泄漏的 flake，与本次扫码方向改动无关（改动未触及 TV catalog 链路）。
 
+## 2026-06-27 16:34 +0800
+- 进度：继续推进 ED2K 下载执行闭环。已新增 `download:ed2k` asynq 任务类型、外部执行器配置入口、worker 状态回写骨架和任务创建后入队逻辑；当前下载不再只是落库，而是会进入 worker 由外部可执行程序接管。还未完成的是执行器输出格式和家用部署机上的实际桥接脚本。
+- 影响文件：`internal/config/config.go`、`internal/config/config_test.go`、`internal/models/admin.go`、`internal/queue/tasks.go`、`internal/queue/ed2k_download.go`、`internal/repository/ed2k_download_repository.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/router.go`、`internal/handlers/admin_orphan_file_scan_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `go test ./internal/handlers ./internal/repository ./internal/queue ./internal/config` 与 `cd admin-web && npm run build`
+
 ## 2026-06-27 16:03 +0800
 - 进度：把 ED2K 下载工作台继续往后端收口。已新增 `ed2k_download_tasks` 表、管理端任务路由、任务列表/创建/详情/重试/删除接口，以及前端 API 接入；`/toolbox/ed2k-download` 现在从 `localStorage` 切到后端数据源，删除排队任务会永久清除记录，资源哈希历史命中则只附加历史，不重建任务。
 - 影响文件：`internal/models/admin.go`、`internal/repository/ed2k_download_repository.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`internal/handlers/router.go`、`internal/repository/migrations_test.go`、`migrations/0029_ed2k_download_tasks.up.sql`、`migrations/0029_ed2k_download_tasks.down.sql`、`admin-web/src/api/admin.js`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`

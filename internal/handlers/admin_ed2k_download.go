@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/models"
+	"video-server/internal/queue"
 	"video-server/internal/response"
 )
 
@@ -136,6 +137,16 @@ func (a *API) AdminCreateEd2kDownloadTasks(c *gin.Context) {
 		item, createErr := a.repo.CreateEd2kDownloadTask(c.Request.Context(), task)
 		if createErr != nil {
 			response.Error(c, 1092, createErr.Error())
+			return
+		}
+		if a.enqueuer == nil {
+			_ = a.repo.DeleteEd2kDownloadTask(c.Request.Context(), item.ID)
+			response.Error(c, 1093, "queue not configured")
+			return
+		}
+		if err := a.enqueuer.EnqueueEd2kDownload(queue.Ed2kDownloadPayload{TaskID: item.ID.String()}); err != nil {
+			_ = a.repo.DeleteEd2kDownloadTask(c.Request.Context(), item.ID)
+			response.Error(c, 1094, err.Error())
 			return
 		}
 		created = append(created, item)

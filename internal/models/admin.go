@@ -193,6 +193,13 @@ type AdminEd2kDownloadTask struct {
 	DeletedAt      *time.Time                         `json:"deleted_at"`
 }
 
+type AdminEd2kDownloadTaskQueueMeta struct {
+	JobID         string `json:"job_id"`
+	Executor      string `json:"executor"`
+	Command       string `json:"command"`
+	ArgumentCount int    `json:"argument_count"`
+}
+
 type AdminPasswordVaultEntry struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`

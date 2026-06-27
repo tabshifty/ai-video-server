@@ -281,7 +281,14 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	configureAVScraper(scrapeSvc, cfg)
 	configureContentTranslation(scrapeSvc, cfg)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
-	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger, cfg.StorageRoot)
+	var ed2kExecutor queue.Ed2kDownloadExecutor
+	if cfg.ED2KDownloadExecutable != "" {
+		ed2kExecutor = queue.CommandEd2kDownloadExecutor{
+			Command: cfg.ED2KDownloadExecutable,
+			Timeout: cfg.ED2KDownloadTimeout,
+		}
+	}
+	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, ed2kExecutor, logger, cfg.StorageRoot)
 	processor.Register(mux)
 
 	srv := asynq.NewServer(
