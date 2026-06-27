@@ -124,6 +124,37 @@ class TvCatalogFocusPolicyTest {
     }
 
     @Test
+    fun `side menu button uses static highlight focus instead of scale`() {
+        val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt")
+        assertTrue("TV 首页必须存在", screenPath.exists())
+
+        val source = screenPath.readText()
+        val buttonSource = source.substringAfter("private fun TvHomeSideMenuButton(")
+            .substringBefore("\n@Composable")
+
+        assertTrue(
+            "TvHomeSideMenuButton 不应再用 tvFocusableScaleOnly 表达聚焦，应改用静态高亮（见 CONTEXT.md「TV 侧边菜单聚焦高亮」）",
+            !buttonSource.contains("tvFocusableScaleOnly"),
+        )
+        assertTrue(
+            "TvHomeSideMenuButton 聚焦应通过裸 .focusable() 接收遥控焦点，不与 tvFocusableScaleOnly 叠加触发双焦点",
+            buttonSource.contains(".focusable()"),
+        )
+        assertTrue(
+            "TvHomeSideMenuButton 必须用 onFocusChanged 读取焦点态以驱动静态高亮",
+            buttonSource.contains(".onFocusChanged"),
+        )
+        assertTrue(
+            "TvHomeSideMenuButton 聚焦态必须有暖金描边（BorderStroke + AccentStrong）作为静态高亮信号",
+            buttonSource.contains("BorderStroke") && buttonSource.contains("AppChrome.AccentStrong"),
+        )
+        assertTrue(
+            "TvHomeSideMenuButton 聚焦态必须把背景提亮到 SurfaceElevated，与未聚焦态拉开对比",
+            buttonSource.contains("AppChrome.SurfaceElevated"),
+        )
+    }
+
+    @Test
     fun `search screen keeps inline loading instead of replacing page`() {
         val screenPath = Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt")
         assertTrue("TV 首页必须存在", screenPath.exists())

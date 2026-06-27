@@ -5,8 +5,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,12 +45,15 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
@@ -510,15 +515,28 @@ private fun TvHomeSideMenuButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) AppChrome.Accent.copy(alpha = 0.92f) else AppChrome.Surface.copy(alpha = 0.72f)
+    var focused by remember { mutableStateOf(false) }
+    // 聚焦态：背景提亮 + 暖金描边（静态高亮，无 scale）；与选集轨双态高亮同口径。
+    // 见 CONTEXT.md「TV 侧边菜单聚焦高亮」（「只缩放」全局规则的例外）。
+    val background = when {
+        selected -> AppChrome.Accent.copy(alpha = 0.92f)
+        focused -> AppChrome.SurfaceElevated
+        else -> AppChrome.Surface.copy(alpha = 0.72f)
+    }
     val contentColor = if (selected) AppChrome.Canvas else AppChrome.TextPrimary
+    // 选中项金底上叠更亮的金边需要更粗的描边才在 10-foot 视距可辨；未选中态深底 1dp 即足够。
+    val focusBorder = if (focused) {
+        BorderStroke(if (selected) 2.dp else 1.dp, AppChrome.AccentStrong)
+    } else null
     Surface(
         color = background,
+        border = focusBorder,
         shape = AppChrome.ChipShape,
         modifier = modifier
             .width(56.dp)
             .height(48.dp)
-            .tvFocusableScaleOnly(focusedScale = 1.06f)
+            .onFocusChanged { focused = it.isFocused || it.hasFocus }
+            .focusable()
             .clickable(onClick = onClick),
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
