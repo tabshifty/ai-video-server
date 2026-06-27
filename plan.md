@@ -1,3 +1,13 @@
+## 2026-06-27 09:42 +0800
+- 进度：完成 TV 左侧菜单聚焦改静态高亮实现。按 grill 收口方案在 `TvCatalogScreen.kt` 的 `TvHomeSideMenuButton` 内联：用 `onFocusChanged` 读 `focused`，按 `focused`/`selected` 组合选 background（选中=实色金 `Accent`、聚焦未选中=`SurfaceElevated`、常态=`Surface`）与 border（聚焦=`AccentStrong` 描边，未选中 `1.dp` / 选中 `2.dp` 分档保证 10-foot 可辨），`tvFocusableScaleOnly(focusedScale = 1.06f)` 换成裸 `.focusable()`（无 scale/无按下下沉/无触觉，对齐选集轨双态高亮）；补 `BorderStroke`/`focusable`/`onFocusChanged`/`mutableStateOf`/`setValue` imports。红灯：`TvCatalogFocusPolicyTest` 加 `side menu button uses static highlight focus instead of scale` 断言（不含 `tvFocusableScaleOnly`、含 `.focusable()`/`onFocusChanged`/`BorderStroke`+`AccentStrong`/`SurfaceElevated`）。版本：`versionCode` 125→126 / `versionName` 0.1.125→0.1.126，不重建 release 固件、不碰 `tv_apk_test.go`（固件与 Go 断言仍停在 121，脱节为已知接受项）。两段式评审：两子代理并行独立评审，焦点正确性评审发现一条 BLOCKER——既有 `TvHomeNavigationTest.sideMenuButtonsUseSingleFocusableTargetSoConfirmWorksOnce` 仍锁旧模型（`assertTrue tvFocusableScaleOnly` / `assertFalse .focusable()`），与新测试矛盾致构建红；已将其两断言翻转为新模型（保留 IPTV/Shorts 顺序断言不动）。视觉评审提一条 MINOR——选中聚焦金边对金底对比偏弱，已采纳其建议把选中聚焦描边加粗到 `2.dp`。`CONTEXT.md` 新增术语 `TV 侧边菜单聚焦高亮`（点明为「只缩放」全局规则例外，回链选集轨双态高亮），并同步描边分档语义。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest --tests "com.chee.videos.feature.tv.TvHomeNavigationTest" --tests "com.chee.videos.feature.tv.TvCatalogFocusPolicyTest"` → BUILD SUCCESSFUL；`--rerun-tasks` 强制重跑两测试类亦绿；评审 BLOCKER 已修复并复测通过。
+
+## 2026-06-27 09:41 +0800
+- 进度：按你的提醒把讨论焦点从低频取消尾巴拉回 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“下载完成后管理员是否先看文件清单再导入”的 happy path，不做实现。已确认任务详情应展示下载出的文件清单，供管理员先核对结果再发起导入；相应将 `ED2K 下载完成详情文件清单` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
+
 ## 2026-06-27 09:37 +0800
 - 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“running 取消后若旧任务仍有清理失败，是否阻断同资源重提”的边界，不做实现。已确认这类旧任务的清理失败不应占住新任务重提入口；同一链接后续再次提交时仍允许按新任务创建，相应将 `ED2K running 取消清理失败不阻断新任务重提` 写入 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`
