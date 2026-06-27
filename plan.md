@@ -1,3 +1,13 @@
+## 2026-06-27 17:15 +0800
+- 进度：完成 ED2K 部署层执行器接线。worker 现在会把任务 id、资源哈希、文件名、声明大小和原始链接通过环境变量传给外部执行器；仓库新增 `scripts/ed2k-amule-executor.sh` 作为默认 aMule 适配脚本，按 `ED2K_DOWNLOAD_EXECUTABLE` 直接被 worker 调起，完成后输出项目侧 JSON 结果；`.env.example`、`docs/家用部署机.md`、`CONTEXT.md` 已同步补齐部署变量、aMule 远控前提与脚本契约。另已 SSH 实探部署机：当前只有 `/usr/bin/python3`、`/usr/bin/jq`，没有 `amuled`、`amulecmd`、Docker 或 MacPorts 安装入口，所以“仓库与发布链已接好”，但“真下载”仍差外部 ED2K 引擎本体安装。
+- 影响文件：`internal/queue/ed2k_download.go`、`internal/queue/ed2k_download_test.go`、`scripts/ed2k-amule-executor.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：`bash -n scripts/ed2k-amule-executor.sh scripts/rollback.sh scripts/sign-launchd-binary.sh scripts/migrate-apply.sh` 通过；`go test ./internal/config ./internal/queue -count=1` 通过；`go test ./... -count=1` 通过；`git diff --check -- .env.example CONTEXT.md docs/家用部署机.md plan.md scripts/ed2k-amule-executor.sh internal/queue/ed2k_download.go internal/queue/ed2k_download_test.go` 通过；`rg -n $'\uFFFD' ...` 无输出。
+
+## 2026-06-27 16:46 +0800
+- 进度：开始把 ED2K 外部执行器真正接到家用部署机发布链里。当前代码已能由 worker 调 `ED2K_DOWNLOAD_EXECUTABLE`，本轮范围收口为补齐部署侧可直接落地的执行器脚本、`.env` 配置项和 `docs/家用部署机.md` 接线步骤，避免下载工作台继续停留在“可建任务但无法真下载”的半成品状态。
+- 影响文件：`scripts/ed2k-amule-executor.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `bash -n scripts/ed2k-amule-executor.sh scripts/rollback.sh scripts/sign-launchd-binary.sh scripts/migrate-apply.sh`、`go test ./internal/config ./internal/queue -count=1`、`git diff --check`、乱码扫描。
+
 ## 2026-06-27 16:30 +0800
 - 进度：修复手机端「扫码登录 TV」进入横屏的 bug。根因：扫码走 zxing-android-embedded 4.3.0 默认 `CaptureActivity`，该库在其 Manifest 里声明 `sensorLandscape`，app 未注册自定义子类覆盖 → 扫码页被锁横屏；`VideoHomeApp.kt` 既有的 `setOrientationLocked(false)` 只抑制运行时 `setRequestedOrientation`，清不掉 Manifest 级方向锁。按 Plan A 修复：新增空子类 `PortraitCaptureActivity : CaptureActivity()`，在 app `AndroidManifest.xml` 声明并 `android:screenOrientation="portrait"`，`ScanOptions` 改调 `setCaptureActivity(PortraitCaptureActivity::class.java)`（删掉无效的 `setOrientationLocked(false)`）。TDD：先写 `TvAuthScanOrientationSpecTest`（三断言：扫码注册自定义 CaptureActivity、Manifest 声明 portrait、子类继承库基类且不调 setOrientationLocked）→ 红（三测全挂，因自定义 Activity/Manifest/调用都不存在）→ 绿。版本：`versionCode` 3→4 / `versionName` 0.1.2→0.1.3。`CONTEXT.md` 新增术语 `扫码登录 TV 方向锁定`。
 - 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/tvauth/PortraitCaptureActivity.kt`、`android-app/app/src/main/AndroidManifest.xml`、`android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`、`android-app/app/build.gradle.kts`、`android-app/app/src/test/java/com/chee/videos/feature/tvauth/TvAuthScanOrientationSpecTest.kt`、`CONTEXT.md`、`plan.md`

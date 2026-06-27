@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -51,6 +52,14 @@ func (e CommandEd2kDownloadExecutor) Run(ctx context.Context, task models.AdminE
 	args := append([]string{}, e.Args...)
 	args = append(args, task.SourceLink)
 	cmd := exec.CommandContext(runCtx, command, args...)
+	cmd.Env = append(os.Environ(),
+		"ED2K_TASK_ID="+task.ID.String(),
+		"ED2K_TASK_TITLE="+task.Title,
+		"ED2K_SOURCE_LINK="+task.SourceLink,
+		"ED2K_RESOURCE_HASH="+task.ResourceHash,
+		"ED2K_FILENAME="+task.Filename,
+		fmt.Sprintf("ED2K_DECLARED_SIZE=%d", task.DeclaredSize),
+	)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
