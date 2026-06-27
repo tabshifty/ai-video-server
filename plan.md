@@ -1,12 +1,17 @@
 ## 2026-06-27 11:20 +0800
 - 进度：通过 `$grill-with-docs` 收口「短视频按返回键双按确认退出」边界并落地实现。确认范围仅 TV 端（手机端无任何视频有双按模式，「像其他视频一样」指 TV 长视频/电视剧播放器）；文案「再按一次返回」+ 第二次 `onBack` 返回首页（与长视频/电视剧逐字对齐，回避「退出」在词表里退出 App vs 退页的重载）；两条返回路径（根 Box `onPreviewKeyEvent` 的 `KEYCODE_BACK`/`KEYCODE_ESCAPE` 分支 + 顶层 `BackHandler`）共用同一 `handlePlaybackBack` 状态机，复用既有 `resolveTvPlayerBackAction`/`TvPlayerBackAction`/`TvPlayerBackConfirmWindowMillis`/`TvPlayerBackConfirmPrompt`，不新造并行实现；单条失败轻提示显示时 BACK 不拦截、直接进双按（贴合既有 `TV 短视频单条失败留在当前页`「不引入先清提示再退出中间态」契约）；失败/空态可聚焦卡片「返回首页」按钮点击保持 `onBack` 不进双按。`TvShortFeedScreenSpecTest` 加 `shortFeedScreenBackUsesSharedDoublePressConfirm` 防回归（断言含 `resolveTvPlayerBackAction`/`handlePlaybackBack`、两路径接进它、复用 `TvPlayerBackConfirmPrompt`、不出现 `backPressTime`/`lastBackPress` 旧式时间戳）。版本：`versionCode` 126→127 / `versionName` 0.1.126→0.1.127。`CONTEXT.md` 改写 `TV 短视频返回语义`（单按→双按，标注与 IPTV 分叉，回链 [[TV 播放器退出确认]]）。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
-- 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest`（待执行）。
+- 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest` → BUILD SUCCESSFUL in 8s；`compileDebugKotlin` 编译干净，`testDebugUnitTest` 全绿（含新增 `shortFeedScreenBackUsesSharedDoublePressConfirm` 与既有 `TvShellAppBackPolicyTest`/`TvShortFeedScreenSpecTest`/`TvPlayerBackConfirmTest`）。
 
 ## 2026-06-27 09:42 +0800
 - 进度：完成 TV 左侧菜单聚焦改静态高亮实现。按 grill 收口方案在 `TvCatalogScreen.kt` 的 `TvHomeSideMenuButton` 内联：用 `onFocusChanged` 读 `focused`，按 `focused`/`selected` 组合选 background（选中=实色金 `Accent`、聚焦未选中=`SurfaceElevated`、常态=`Surface`）与 border（聚焦=`AccentStrong` 描边，未选中 `1.dp` / 选中 `2.dp` 分档保证 10-foot 可辨），`tvFocusableScaleOnly(focusedScale = 1.06f)` 换成裸 `.focusable()`（无 scale/无按下下沉/无触觉，对齐选集轨双态高亮）；补 `BorderStroke`/`focusable`/`onFocusChanged`/`mutableStateOf`/`setValue` imports。红灯：`TvCatalogFocusPolicyTest` 加 `side menu button uses static highlight focus instead of scale` 断言（不含 `tvFocusableScaleOnly`、含 `.focusable()`/`onFocusChanged`/`BorderStroke`+`AccentStrong`/`SurfaceElevated`）。版本：`versionCode` 125→126 / `versionName` 0.1.125→0.1.126，不重建 release 固件、不碰 `tv_apk_test.go`（固件与 Go 断言仍停在 121，脱节为已知接受项）。两段式评审：两子代理并行独立评审，焦点正确性评审发现一条 BLOCKER——既有 `TvHomeNavigationTest.sideMenuButtonsUseSingleFocusableTargetSoConfirmWorksOnce` 仍锁旧模型（`assertTrue tvFocusableScaleOnly` / `assertFalse .focusable()`），与新测试矛盾致构建红；已将其两断言翻转为新模型（保留 IPTV/Shorts 顺序断言不动）。视觉评审提一条 MINOR——选中聚焦金边对金底对比偏弱，已采纳其建议把选中聚焦描边加粗到 `2.dp`。`CONTEXT.md` 新增术语 `TV 侧边菜单聚焦高亮`（点明为「只缩放」全局规则例外，回链选集轨双态高亮），并同步描边分档语义。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvCatalogFocusPolicyTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvHomeNavigationTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
 - 验证：`cd android-tv-app && ./gradlew :tv-app:assembleDebug :tv-app:testDebugUnitTest --tests "com.chee.videos.feature.tv.TvHomeNavigationTest" --tests "com.chee.videos.feature.tv.TvCatalogFocusPolicyTest"` → BUILD SUCCESSFUL；`--rerun-tasks` 强制重跑两测试类亦绿；评审 BLOCKER 已修复并复测通过。
+
+## 2026-06-27 10:21 +0800
+- 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“failed 详情应优先展示哪一层失败原因”的边界，不做实现。已确认失败详情优先展示外部引擎的原始失败原因，缺省时再回退到项目侧同步、扫描或落账失败原因；相应将 `ED2K failed 原因优先展示引擎原始原因` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档探索阶段，无需构建。
 
 ## 2026-06-27 10:19 +0800
 - 进度：继续围绕 ED2K 下载一期主链路，通过 `$grill-with-docs` 收口“running 阶段落盘快照是否也隐藏引擎辅助文件”的边界，不做实现。已确认进行中快照和完成态结果清单一样，都只展示对管理员有意义的交付文件，不暴露引擎内部临时/控制文件；相应补强 `ED2K running 详情可见进行中落盘快照` 术语。
