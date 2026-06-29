@@ -3,6 +3,16 @@
 - 影响文件：`internal/queue/scrape_tasks.go`、`internal/queue/scrape_tasks_test.go`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/VideoList.vue`、`CONTEXT.md`、`plan.md`
 - 验证：`go test ./internal/queue/ -run TestBuildWesternAVScrapeFailureDecisionMarksAVScrapePending` 通过；`go test ./internal/queue/ ./internal/services/` 通过；`go build ./...` 通过；`cd admin-web && npm test -- videoList.helpers.spec` 23/23 绿；`cd admin-web && npm test`（仅回退 ED2K 既有未提交改动后）25 文件 173 测试全绿——`toolboxPage.spec` 在含 ED2K 既有改动时的全量失败经 `git stash` 二分确认是 ED2K 既有改动引入、与本次无关；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）。
 
+## 2026-06-29 10:50 +0800
+- 进度：准备把 ED2K 下载工作台“新建任务改成弹窗”的前端改动推送到部署机。当前工作区仅剩 `ToolboxEd2kDownload.vue` 与对应静态 spec 未提交；已先复跑定向测试，构建进行中，随后会精确提交这两个文件并推送 `deploy/master`。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxEd2kDownload.spec.js` 通过；待取回 `cd admin-web && npm run build` 结果。
+
+## 2026-06-29 10:50 +0800
+- 进度：ED2K 下载工作台弹窗化改动已完成推送前自检。确认仅涉及 `ToolboxEd2kDownload.vue` 与对应静态 spec；定向 Vitest、前端构建、`git diff --check` 和乱码扫描均已通过，下一步直接精确提交并推送 `deploy/master`。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxEd2kDownload.spec.js` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）；`git diff --check -- admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js plan.md` 通过；`rg -n $'\uFFFD' admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js plan.md` 无输出。
+
 ## 2026-06-28 01:07 +0800
 - 进度：开始收口 ED2K 下载工作台“新建任务改成弹窗”的最小前端改造。范围只含 `admin-web` 视图与静态 spec：移除页面内常驻提交表单，改为 `PageHeader` 主按钮打开创建弹窗；暂不扩展先前 grill 中讨论的逐行结果、草稿持久化等额外语义。
 - 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`plan.md`

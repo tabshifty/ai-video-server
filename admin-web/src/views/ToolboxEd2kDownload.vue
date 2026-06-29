@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, Delete, Download, RefreshRight } from '@element-plus/icons-vue'
+import { Back, Delete, Download, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
@@ -15,6 +15,7 @@ import {
 import { parseEd2kLinks } from './toolbox.helpers'
 
 const router = useRouter()
+const createDialogVisible = ref(false)
 const ed2kInput = ref('')
 const titleInput = ref('')
 const currentFilter = ref('all')
@@ -187,6 +188,7 @@ async function submitLinks() {
     const focusTask = created[0] || reused[0] || null
     ed2kInput.value = ''
     titleInput.value = ''
+    createDialogVisible.value = false
     await loadTasks()
     if (focusTask?.id) {
       selectedTaskID.value = focusTask.id
@@ -243,6 +245,11 @@ function clearComposer() {
   titleInput.value = ''
 }
 
+function openCreateDialog() {
+  clearComposer()
+  createDialogVisible.value = true
+}
+
 function returnToToolbox() {
   router.push('/toolbox')
 }
@@ -271,41 +278,11 @@ watch(
         subtitle="管理员在这里粘贴 ED2K 链接、按资源哈希识别历史任务，并在后端工作台里管理下载任务。"
       >
         <template #actions>
+          <el-button type="primary" :icon="Plus" @click="openCreateDialog">新建任务</el-button>
           <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
           <el-button :icon="RefreshRight" :loading="loadingTasks" @click="loadTasks">刷新任务</el-button>
         </template>
       </PageHeader>
-
-      <SectionCard>
-        <template #title>提交链接</template>
-        <template #description>允许管理员直接贴入原始 ED2K 链接；任务标题默认取链接里的文件名。</template>
-        <template #actions>
-          <el-button :disabled="!ed2kInput && !titleInput" @click="clearComposer">清空</el-button>
-        </template>
-
-        <div class="composer">
-          <el-input
-            v-model="ed2kInput"
-            type="textarea"
-            :rows="6"
-            resize="vertical"
-            placeholder="每行一个 ed2k:// 链接"
-            @change="syncTitleFromSingleLink"
-          />
-          <div class="composer__bar">
-            <el-input
-              v-model="titleInput"
-              placeholder="任务标题（可不填，默认自动生成）"
-            />
-            <el-button type="primary" :icon="Download" :loading="submitting" :disabled="!canSubmit" @click="submitLinks">创建任务</el-button>
-          </div>
-          <div class="composer__meta">
-            <span>有效链接：{{ linkCount }}</span>
-            <span v-if="invalidCount > 0">已忽略 {{ invalidCount }} 行非 ED2K 文本</span>
-            <span v-if="linkCount > 0">标题会优先使用文件名</span>
-          </div>
-        </div>
-      </SectionCard>
 
       <section class="task-workspace">
         <SectionCard class="task-list-card">
@@ -439,6 +416,38 @@ watch(
       </section>
     </div>
   </main>
+
+  <el-dialog v-model="createDialogVisible" class="crud-dialog" title="新建下载任务" width="min(94vw, 720px)" destroy-on-close>
+    <div class="composer">
+      <p class="composer__intro">允许管理员直接贴入原始 ED2K 链接；任务标题默认取链接里的文件名。</p>
+      <el-input
+        v-model="ed2kInput"
+        type="textarea"
+        :rows="8"
+        resize="vertical"
+        placeholder="每行一个 ed2k:// 链接"
+        @change="syncTitleFromSingleLink"
+      />
+      <div class="composer__bar">
+        <el-input
+          v-model="titleInput"
+          placeholder="任务标题（可不填，默认自动生成）"
+        />
+        <el-button type="primary" :icon="Download" :loading="submitting" :disabled="!canSubmit" @click="submitLinks">创建任务</el-button>
+      </div>
+      <div class="composer__meta">
+        <span>有效链接：{{ linkCount }}</span>
+        <span v-if="invalidCount > 0">已忽略 {{ invalidCount }} 行非 ED2K 文本</span>
+        <span v-if="linkCount > 0">标题会优先使用文件名</span>
+      </div>
+    </div>
+    <template #footer>
+      <div class="composer__footer">
+        <el-button :disabled="!ed2kInput && !titleInput" @click="clearComposer">清空</el-button>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -467,6 +476,13 @@ watch(
   gap: var(--space-3);
 }
 
+.composer__intro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
 .composer__bar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -481,6 +497,11 @@ watch(
   color: var(--text-secondary);
   font-size: var(--text-small);
   line-height: var(--leading-small);
+}
+
+.composer__footer {
+  display: inline-flex;
+  gap: var(--space-2);
 }
 
 .task-workspace {

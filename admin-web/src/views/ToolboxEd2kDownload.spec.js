@@ -9,6 +9,9 @@ describe('ToolboxEd2kDownload', () => {
     expect(source).toContain('任务标题默认取链接里的文件名')
     expect(source).toContain('当前资源已命中历史任务，不允许重建下载任务')
     expect(source).toContain('永久删除')
+    expect(source).toContain('新建任务')
+    expect(source).toContain('新建下载任务')
+    expect(source).toContain('createDialogVisible')
     expect(source).toContain('resourceHash')
     expect(source).toContain('titleInput')
     expect(source).toContain('getAdminEd2kDownloadTasks')
@@ -24,8 +27,7 @@ describe('ToolboxEd2kDownload', () => {
     expect(source).not.toMatch(/<Layout[>\s]/)
   })
 
-  it('keeps the workbench focused on task submission, task list, detail, and history sections', () => {
-    expect(source).toContain('提交链接')
+  it('keeps the workbench focused on dialog-based task submission, task list, detail, and history sections', () => {
     expect(source).toContain('下载任务')
     expect(source).toContain('任务详情')
     expect(source).toContain('状态反馈')
@@ -35,5 +37,7 @@ describe('ToolboxEd2kDownload', () => {
     expect(source).toContain('重试任务')
     expect(source).toContain('刷新任务')
     expect(source).toContain('后端工作台里管理下载任务')
+    expect(source).toContain('<el-dialog')
+    expect(source).not.toContain('<template #title>提交链接</template>')
   })
 })
