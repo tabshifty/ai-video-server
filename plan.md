@@ -1,3 +1,23 @@
+## 2026-06-29 13:45 +0800
+- 进度：继续完成部署机 ED2K 环境实装。已在部署机安装 MacPorts 2.12.5 与 `amule @2021.12.05_2+wxwidgets30`，配置 `com.aivideo.amuled` launchd 服务、`/Volumes/large/ai-video-server/storage/ed2k-downloads` 下载目录、`~/.aMule/amule.conf` 远控端口 `4712` 与密码 `785689`，并写入部署机 `.env` 的 `ED2K_*` / `AMULE_*` 项。排查中发现仓库执行器脚本把 `amulecmd` 的 `-p` / `-P` 参数写反，且 `status` 在当前 MacPorts aMule 组合上会超时；已修正为 `-p 4712 -P <密码>`，就绪检查改用已验证可返回的 `help`。当前远控认证链路已通过 `amulecmd -h 127.0.0.1 -p 4712 -P 785689 -c help` 验证；真实 ED2K 下载任务尚未端到端验证。
+- 影响文件：`scripts/ed2k-amule-executor.sh`、`docs/家用部署机.md`、`docs/examples/com.aivideo.amuled.plist`、`CONTEXT.md`、`plan.md`；部署机运行态：MacPorts/aMule、`~/.aMule/amule.conf`、`~/Library/LaunchAgents/com.aivideo.amuled.plist`、`~/deploy/ai-video-server/.env`、`~/deploy/ai-video-server/work/scripts/ed2k-amule-executor.sh`
+- 验证：部署机 `command -v /opt/local/bin/{amuled,amulecmd}` 可用；`launchctl print gui/$(id -u)/com.aivideo.amuled` 显示 running；`amulecmd -h 127.0.0.1 -p 4712 -P 785689 -c help` 返回命令列表；`bash -n scripts/ed2k-amule-executor.sh` 通过。
+
+## 2026-06-29 11:22 +0800
+- 进度：完成 ED2K 部署环境文档收口。`docs/家用部署机.md` 已把 ED2K 外部引擎的推荐方案收窄为 `MacPorts + aMule`，补齐了下载目录必须对齐项目侧工作区、`com.aivideo.amuled` 的固定 launchd 服务名、统一日志路径，以及从仓库模板生成 `~/Library/LaunchAgents/com.aivideo.amuled.plist` 的步骤；同时新增 `docs/examples/com.aivideo.amuled.plist` 作为部署机可复用模板。未改 Go / 前端实现。
+- 影响文件：`docs/家用部署机.md`、`docs/examples/com.aivideo.amuled.plist`、`CONTEXT.md`、`plan.md`
+- 验证：`git diff --check -- docs/家用部署机.md docs/examples/com.aivideo.amuled.plist CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' docs/家用部署机.md docs/examples/com.aivideo.amuled.plist CONTEXT.md plan.md` 无输出。
+
+## 2026-06-29 11:16 +0800
+- 进度：开始实现 ED2K 部署环境文档收口。范围限定在 `docs/家用部署机.md`、新增 aMule 的 `launchd` plist 模板，以及对应的长期术语/进度记录；不改 Go / 前端代码。目标是把刚刚 grill 确认的 `MacPorts + aMule + launchd + 固定日志路径/服务名` 从口头约定落成可复用文档资产。
+- 影响文件：`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `git diff --check -- docs/家用部署机.md CONTEXT.md plan.md`、`rg -n $'\uFFFD' docs/家用部署机.md CONTEXT.md plan.md`
+
+## 2026-06-29 11:09 +0800
+- 进度：继续通过 `$grill-with-docs` 收口“ED2K 下载工作台在部署机还缺什么环境”的部署边界，不做实现。已确认首期外部引擎固定为 `aMule`，安装来源固定走 `MacPorts`，`amuled` 必须用 `launchd` 常驻托管，且 aMule 实际下载目录必须与项目侧 `ED2K_DOWNLOAD_ROOT + ED2K_DOWNLOAD_SUBDIR` 对齐到 `/Volumes/large/ai-video-server/storage/ed2k-downloads`；相应将 `ED2K aMule 部署前提` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档变更，未运行构建/测试。
+
 ## 2026-06-29 09:55 +0800
 - 进度：修复 AV 视频刮削失败后状态一直停在「刮削中」、且日本 AV 详情没有显眼逃生入口的问题。经 grill 收口确认两件事：(1) 根因是欧美 AV 自动刮削报错时 `handleScrape` western 分支直接 `return scrapeErr` 不更新状态，加上无 asynq 失败兜底，状态永远停在上传时写入的 `scraping`；日本 AV 理论走 `buildScrapeFailureDecision` 落 `uploaded`，但 worker 被 kill / 写库失败等路径到不了状态更新代码，同样卡 `scraping`。(2) 「去 AV 手动刮削」按钮其实对日本 AV 也显示，只是藏在默认折叠的「播放预览」区里，stuck 时等于没有出口。本轮两者都做：后端修根因（仅路径1），前端加顶部显眼「去刮削」逃生按钮（B：跳手动刮削页，不做后端重跑）。TDD：先后端写 `TestBuildWesternAVScrapeFailureDecisionMarksAVScrapePending`（红：helper 未定义）→ 加 `buildWesternAVScrapeFailureDecision` 纯函数 → 接入 `handleScrape` western 分支（落 `av_scrape_pending` + `scrape_attempt.error` + 空 `scrape_preview` + 不入队 transcode + return nil）→ 绿；前端写 `shouldShowStuckScrapeAction` / `buildStuckScrapeRoute` 的 4 个 spec（红）→ 实现 helper（绿）→ `VideoList.vue` 状态区接按钮 + `openStuckScrape` 分发。`CONTEXT.md` 补 `欧美 AV 刮削报错落待确认`、`卡刮削逃生按钮` 两条术语。范围外：`HandleScrapeRetag` av 分支同缺陷不改；worker 被 kill 的路径2 不做后端兜底，靠按钮人工救。
 - 影响文件：`internal/queue/scrape_tasks.go`、`internal/queue/scrape_tasks_test.go`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/VideoList.vue`、`CONTEXT.md`、`plan.md`

@@ -99,8 +99,8 @@ mkdir -p "$OUTPUT_DIR"
 AMULE_CMD_BASE=(
   "$AMULECMD_BIN"
   -h "$AMULE_REMOTE_HOST"
-  -P "$AMULE_REMOTE_PORT"
-  -p "$AMULE_REMOTE_PASSWORD"
+  -p "$AMULE_REMOTE_PORT"
+  -P "$AMULE_REMOTE_PASSWORD"
 )
 
 run_amulecmd() {
@@ -123,7 +123,7 @@ ensure_amuled_ready() {
 wait_for_remote() {
   local attempts=0
   while (( attempts < 30 )); do
-    if run_amulecmd "status" >/dev/null 2>&1; then
+    if run_amulecmd "help" >/dev/null 2>&1; then
       return 0
     fi
     attempts=$((attempts + 1))
