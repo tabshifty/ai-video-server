@@ -14,6 +14,7 @@ DECLARED_SIZE="${ED2K_DECLARED_SIZE:-0}"
 
 AMULECMD_BIN="${AMULECMD_BIN:-amulecmd}"
 AMULED_BIN="${AMULED_BIN:-amuled}"
+ED2K_BIN="${ED2K_BIN:-ed2k}"
 AMULE_REMOTE_HOST="${AMULE_REMOTE_HOST:-127.0.0.1}"
 AMULE_REMOTE_PORT="${AMULE_REMOTE_PORT:-4712}"
 AMULE_REMOTE_PASSWORD="${AMULE_REMOTE_PASSWORD:-}"
@@ -40,6 +41,11 @@ fi
 
 if ! command -v "$AMULED_BIN" >/dev/null 2>&1; then
   printf 'amuled not found: %s\n' "$AMULED_BIN" >&2
+  exit 68
+fi
+
+if ! command -v "$ED2K_BIN" >/dev/null 2>&1; then
+  printf 'ed2k helper not found: %s\n' "$ED2K_BIN" >&2
   exit 68
 fi
 
@@ -95,6 +101,7 @@ build_output_dir() {
 
 OUTPUT_DIR="$(build_output_dir)"
 mkdir -p "$OUTPUT_DIR"
+DOWNLOAD_BASE="$ED2K_DOWNLOAD_ROOT/$ED2K_DOWNLOAD_SUBDIR"
 
 AMULE_CMD_BASE=(
   "$AMULECMD_BIN"
@@ -163,6 +170,10 @@ extract_progress_text() {
   printf '下载已完成'
 }
 
+submit_ed2k_link() {
+  "$ED2K_BIN" "$SOURCE_LINK" >/dev/null
+}
+
 collect_files_json() {
   local output_dir="$1"
   local downloaded_path="$2"
@@ -206,6 +217,10 @@ guess_downloaded_path() {
     printf '%s\n' "$OUTPUT_DIR/$FILENAME"
     return
   fi
+  if [[ -n "$FILENAME" && -f "$DOWNLOAD_BASE/$FILENAME" ]]; then
+    printf '%s\n' "$DOWNLOAD_BASE/$FILENAME"
+    return
+  fi
   local first
   first="$(find "$OUTPUT_DIR" -mindepth 1 -maxdepth 1 | head -n1 || true)"
   if [[ -n "$first" ]]; then
@@ -219,15 +234,27 @@ has_output_files() {
   find "$OUTPUT_DIR" -type f -print -quit | grep -q .
 }
 
+has_downloaded_file() {
+  if [[ -n "$FILENAME" && -f "$DOWNLOAD_BASE/$FILENAME" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+mirror_downloaded_file() {
+  if [[ -n "$FILENAME" && -f "$DOWNLOAD_BASE/$FILENAME" && ! -e "$OUTPUT_DIR/$FILENAME" ]]; then
+    ln -s "$DOWNLOAD_BASE/$FILENAME" "$OUTPUT_DIR/$FILENAME"
+  fi
+}
+
 ensure_amuled_ready
 wait_for_remote
 
-run_amulecmd "set directory \"$OUTPUT_DIR\"" >/dev/null
-run_amulecmd "add \"$SOURCE_LINK\"" >/dev/null
+submit_ed2k_link
 
 start_epoch="$(date +%s)"
 deadline=$((start_epoch + ED2K_WAIT_TIMEOUT_SECONDS))
-progress_text="等待 ED2K 引擎完成下载"
+progress_text="等待 aMule 接收 ED2K 链接"
 
 while true; do
   if (( $(date +%s) > deadline )); then
@@ -235,20 +262,18 @@ while true; do
     exit 69
   fi
 
+  if has_downloaded_file; then
+    mirror_downloaded_file
+    progress_text="下载已完成"
+    break
+  fi
+
   if has_output_files; then
     progress_text="下载已完成"
     break
   fi
 
-  listing="$(run_amulecmd "show dl" || true)"
-  entry="$(find_download_entry "$listing" || true)"
-  if [[ -n "$entry" ]]; then
-    progress_text="$(extract_progress_text "$entry")"
-    lowered_entry="$(lower "$entry")"
-    if [[ "$lowered_entry" == *"100%"* || "$lowered_entry" == *"completed"* || "$lowered_entry" == *"complete"* ]]; then
-      break
-    fi
-  fi
+  progress_text="等待 aMule 完成下载"
 
   sleep "$ED2K_POLL_INTERVAL_SECONDS"
 done

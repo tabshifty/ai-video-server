@@ -265,6 +265,7 @@
 - `ED2K 暂存工作区`：[[ED2K 后端下载任务]] 在 `STORAGE_ROOT` 下使用的下载落地区。下载完成的文件先停留在这里，等待管理员后续显式导入；首期不自动创建视频/图片资产，不自动转码，也不自动刮削。
 - `ED2K aMule 部署前提`：[[ED2K 后端下载任务]] 在 [[家用部署机]] 上首期固定以 `aMule` 作为外部下载引擎，部署前提包括：通过 `MacPorts` 提供 `amuled` 与 `amulecmd`，以 `launchd` 常驻托管 `amuled`，并让 aMule 的实际下载目录与项目侧 [[ED2K 暂存工作区]] 对齐到 `/Volumes/large/ai-video-server/storage/ed2k-downloads`。在这些前提满足之前，项目代码即使已部署，也只具备“能创建任务”而不具备“能真下载”的闭环能力。
 - `ED2K aMule 远控参数契约`：`amulecmd` 的命令行参数中 `-p` 表示 External Connections 端口，`-P` 表示密码；二者写反会让执行器在部署机上直接失败。部署连通性验证优先使用 `amulecmd ... -c help`，因为部分 aMule / MacPorts 组合下 `status`、`show dl` 在空队列或未连网阶段可能长时间不返回；`help` 能返回只证明远控认证与命令通道可用，不等同于真实下载闭环已经验证。
+- `ED2K aMule 链接提交契约`：在 [[ED2K aMule 部署前提]] 下，项目侧向 aMule 提交 `ed2k://` 链接应优先使用 aMule 自带的 `ed2k` helper，而不是 `amulecmd Add`。MacPorts aMule 上 `ed2k` helper 会把链接写入 `~/.aMule/ED2KLinks` 供 aMule 轮询接收，实测能返回 `Link successfully queued.`；而 `amulecmd Add` / `Show DL` / `Status` 在当前部署机组合上可能超时，不能作为执行器主路径。
 - `ED2K 引擎状态主导`：[[ED2K 后端下载任务]] 首期由外部 ED2K 下载引擎持久化下载进度、断点续传和完成态；项目内 worker 只负责创建任务、触发开始、轮询状态和同步结果，不把单个 Asynq handler 设计成从头阻塞到下载完成。
 - `ED2K 引擎 queued 与 running 明确区分`：如果外部 ED2K 引擎返回的是 `queued` 而不是 `running`，首期也应把二者作为不同的可见状态明确区分。`queued` 表示任务已经进入引擎但尚未开始实际传输，`running` 才表示已经在下载；既然 [[ED2K 引擎状态主导]] 已成立，项目侧就应忠实保留这层差异。
 - `ED2K queued 状态允许主动取消`：当一条任务处于引擎 `queued` 或等价排队态时，首期允许管理员主动取消。因为这时任务已经进入引擎但尚未开始实际传输，撤回成本最低，也符合下载任务管理的直觉；既然 [[ED2K 引擎 queued 与 running 明确区分]] 已成立，这一状态的可操作性也应单独定义。

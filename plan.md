@@ -1,3 +1,13 @@
+## 2026-06-29 14:10 +0800
+- 进度：完成 ED2K 执行器主路径修正并同步到部署机。脚本现在通过 `ED2K_BIN` 使用 aMule 自带 `ed2k` helper 提交链接，保留 `amulecmd help` 作为远控就绪检查，不再调用当前部署机上会超时的 `amulecmd Add` / `Show DL` / `Status`。部署机短超时实测使用用户提供链接运行脚本，已进入等待下载阶段并按 `ED2K_WAIT_TIMEOUT_SECONDS=10` 正常返回 `ed2k download timed out after 10 seconds`，说明执行器不再卡在命令提交；同时发现 aMule 日志仍显示 `0 servers in server.met found`，当前剩余阻塞是 aMule 网络/服务器列表未配置，尚未形成真实下载文件。
+- 影响文件：`scripts/ed2k-amule-executor.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`；部署机运行态：`~/deploy/ai-video-server/work/scripts/ed2k-amule-executor.sh` 已同步，`.env` 已新增 `ED2K_BIN=/opt/local/bin/ed2k`
+- 验证：`bash -n scripts/ed2k-amule-executor.sh` 通过；部署机显式环境短测执行器返回预期超时 `exit 69`；部署机检查任务目录 `/Volumes/large/ai-video-server/storage/ed2k-downloads/0492A10119DF2BC8FB751F0E3A0D5C99` 已创建但无结果文件；aMule 日志显示当前无服务器列表。
+
+## 2026-06-29 14:05 +0800
+- 进度：开始修正 ED2K 执行器主路径。部署机实测 `amulecmd help` 能验证远控，但 `Add` / `Show DL` / `Status` 会超时；`ed2k` helper 能返回 `Link successfully queued.`。本轮改为用 aMule 自带 `ed2k` helper 提交链接，避免执行器卡在 `amulecmd` 核心命令；由于 aMule 的实际下载目录是全局 `IncomingDir`，脚本会继续维护项目侧任务目录输出契约。
+- 影响文件：`scripts/ed2k-amule-executor.sh`、`.env.example`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `bash -n scripts/ed2k-amule-executor.sh`、部署机脚本 dry-run/短超时实测、`git diff --check`、乱码扫描。
+
 ## 2026-06-29 13:45 +0800
 - 进度：继续完成部署机 ED2K 环境实装。已在部署机安装 MacPorts 2.12.5 与 `amule @2021.12.05_2+wxwidgets30`，配置 `com.aivideo.amuled` launchd 服务、`/Volumes/large/ai-video-server/storage/ed2k-downloads` 下载目录、`~/.aMule/amule.conf` 远控端口 `4712` 与密码 `785689`，并写入部署机 `.env` 的 `ED2K_*` / `AMULE_*` 项。排查中发现仓库执行器脚本把 `amulecmd` 的 `-p` / `-P` 参数写反，且 `status` 在当前 MacPorts aMule 组合上会超时；已修正为 `-p 4712 -P <密码>`，就绪检查改用已验证可返回的 `help`。当前远控认证链路已通过 `amulecmd -h 127.0.0.1 -p 4712 -P 785689 -c help` 验证；真实 ED2K 下载任务尚未端到端验证。
 - 影响文件：`scripts/ed2k-amule-executor.sh`、`docs/家用部署机.md`、`docs/examples/com.aivideo.amuled.plist`、`CONTEXT.md`、`plan.md`；部署机运行态：MacPorts/aMule、`~/.aMule/amule.conf`、`~/Library/LaunchAgents/com.aivideo.amuled.plist`、`~/deploy/ai-video-server/.env`、`~/deploy/ai-video-server/work/scripts/ed2k-amule-executor.sh`
