@@ -64,6 +64,44 @@ export function buildMovieManualScrapeRoute(video) {
   }
 }
 
+// shouldShowStuckScrapeAction：详情顶部「去刮削」逃生按钮的显隐条件。
+// 仅当视频卡在 scraping（上传后自动刮削未推进：worker 被 kill / 写库失败 /
+// 欧美 AV 报错），且类型属于可手动刮削的 movie/av/episode 时显示。short 等类型不刮削，不显示。
+export function shouldShowStuckScrapeAction(status, type) {
+  if (normalizeVideoStatus(status) !== 'scraping') {
+    return false
+  }
+  const normalizedType = String(type || '').trim().toLowerCase()
+  return normalizedType === 'av' || normalizedType === 'movie' || normalizedType === 'episode'
+}
+
+// buildStuckScrapeRoute：卡在 scraping 时「去刮削」按钮跳转的目标路由，按类型复用现有手动刮削入口。
+// episode 传入 diagnostics（extractTvPendingDiagnostics 的返回）时带解析到的季集，否则只带标题。
+export function buildStuckScrapeRoute(video, diagnostics) {
+  const normalizedType = String(video?.type || '').trim().toLowerCase()
+  if (normalizedType === 'av') {
+    return buildAVManualScrapeRoute(video)
+  }
+  if (normalizedType === 'movie') {
+    return buildMovieManualScrapeRoute(video)
+  }
+  if (normalizedType === 'episode') {
+    const query = {
+      video_id: toText(video?.id),
+      type: 'tv',
+      title: (diagnostics && toText(diagnostics.parsedTitle)) || toText(video?.title)
+    }
+    if (diagnostics && toPositiveInt(diagnostics.parsedSeasonNumber) > 0) {
+      query.season_number = toPositiveInt(diagnostics.parsedSeasonNumber)
+    }
+    if (diagnostics && toPositiveInt(diagnostics.parsedEpisodeNumber) > 0) {
+      query.episode_number = toPositiveInt(diagnostics.parsedEpisodeNumber)
+    }
+    return { path: '/scrape', query }
+  }
+  return null
+}
+
 export function getVideoThumbnailURL(video) {
   const videoID = toText(video?.id)
   return videoID ? `/api/v1/videos/${videoID}/thumbnail` : ''

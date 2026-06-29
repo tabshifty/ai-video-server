@@ -1,3 +1,18 @@
+## 2026-06-29 09:55 +0800
+- 进度：修复 AV 视频刮削失败后状态一直停在「刮削中」、且日本 AV 详情没有显眼逃生入口的问题。经 grill 收口确认两件事：(1) 根因是欧美 AV 自动刮削报错时 `handleScrape` western 分支直接 `return scrapeErr` 不更新状态，加上无 asynq 失败兜底，状态永远停在上传时写入的 `scraping`；日本 AV 理论走 `buildScrapeFailureDecision` 落 `uploaded`，但 worker 被 kill / 写库失败等路径到不了状态更新代码，同样卡 `scraping`。(2) 「去 AV 手动刮削」按钮其实对日本 AV 也显示，只是藏在默认折叠的「播放预览」区里，stuck 时等于没有出口。本轮两者都做：后端修根因（仅路径1），前端加顶部显眼「去刮削」逃生按钮（B：跳手动刮削页，不做后端重跑）。TDD：先后端写 `TestBuildWesternAVScrapeFailureDecisionMarksAVScrapePending`（红：helper 未定义）→ 加 `buildWesternAVScrapeFailureDecision` 纯函数 → 接入 `handleScrape` western 分支（落 `av_scrape_pending` + `scrape_attempt.error` + 空 `scrape_preview` + 不入队 transcode + return nil）→ 绿；前端写 `shouldShowStuckScrapeAction` / `buildStuckScrapeRoute` 的 4 个 spec（红）→ 实现 helper（绿）→ `VideoList.vue` 状态区接按钮 + `openStuckScrape` 分发。`CONTEXT.md` 补 `欧美 AV 刮削报错落待确认`、`卡刮削逃生按钮` 两条术语。范围外：`HandleScrapeRetag` av 分支同缺陷不改；worker 被 kill 的路径2 不做后端兜底，靠按钮人工救。
+- 影响文件：`internal/queue/scrape_tasks.go`、`internal/queue/scrape_tasks_test.go`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/VideoList.vue`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/queue/ -run TestBuildWesternAVScrapeFailureDecisionMarksAVScrapePending` 通过；`go test ./internal/queue/ ./internal/services/` 通过；`go build ./...` 通过；`cd admin-web && npm test -- videoList.helpers.spec` 23/23 绿；`cd admin-web && npm test`（仅回退 ED2K 既有未提交改动后）25 文件 173 测试全绿——`toolboxPage.spec` 在含 ED2K 既有改动时的全量失败经 `git stash` 二分确认是 ED2K 既有改动引入、与本次无关；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）。
+
+## 2026-06-28 01:07 +0800
+- 进度：开始收口 ED2K 下载工作台“新建任务改成弹窗”的最小前端改造。范围只含 `admin-web` 视图与静态 spec：移除页面内常驻提交表单，改为 `PageHeader` 主按钮打开创建弹窗；暂不扩展先前 grill 中讨论的逐行结果、草稿持久化等额外语义。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxEd2kDownload.spec.js`、`cd admin-web && npm run build`
+
+## 2026-06-28 01:09 +0800
+- 进度：完成 ED2K 下载工作台“新建任务改成弹窗”的最小前端落地。`PageHeader` 右侧新增“新建任务”主按钮，页面内常驻“提交链接”卡片已移除，原提交表单迁入居中 `el-dialog`；现有列表、详情、提交 API 与成功后聚焦逻辑保持不变。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxEd2kDownload.spec.js` 通过；`cd admin-web && npm run build` 通过（仅有既有 chunk size warning）；`git diff --check -- admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js plan.md` 通过；`rg -n $'\uFFFD' admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js plan.md` 无输出。
+
 ## 2026-06-27 17:24 +0800
 - 进度：已提交 `502afad` `接上 ED2K 部署执行器适配层`，并推送到 `deploy/master`。远端 hook 本次命中 `RESTART_GO=1 REBUILD_FRONTEND=1`，完成 `npm ci && npm run build`、`go build`、`codesign`、migration 与 launchctl kickstart；hook 自带的 `/healthz` 首次探测报 failed，但随后复查部署机 `launchctl print` 显示 server / worker 都是 `state = running`，手工 `curl http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`，判定为启动窗口内的瞬时探活失败。另已确认远端 `~/deploy/ai-video-server/work/scripts/ed2k-amule-executor.sh` 已存在且可执行；部署机当前 `.env` 里仍未写任何 `ED2K_*` / `AMULE_*` 项，且机器上也尚无 `amuled` / `amulecmd`，所以线上代码路径已经就位，但“真下载”仍差外部 ED2K 引擎安装与运行态配置。
 - 影响文件：`plan.md`；远端运行态核对：`deploy/master`、`~/deploy/ai-video-server/work/scripts/ed2k-amule-executor.sh`、`~/Library/Logs/ai-video-server/{deploy,server}.log`

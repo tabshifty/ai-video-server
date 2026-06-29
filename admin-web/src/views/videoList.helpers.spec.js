@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import {
   buildAVManualScrapeRoute,
   buildMovieManualScrapeRoute,
+  buildStuckScrapeRoute,
   canManuallyEditVideoStatus,
   extractTvPendingDiagnostics,
   getManualVideoStatusOptions,
@@ -13,6 +14,7 @@ import {
   nextDetailRequestToken,
   getVideoThumbnailURL,
   shouldShowVideoThumbnail,
+  shouldShowStuckScrapeAction,
   subtitleUploadAccept,
   teardownPreviewPlayer
 } from './videoList.helpers'
@@ -194,6 +196,77 @@ describe('videoList helpers', () => {
         title: '无年份电影'
       }
     })
+  })
+
+  it('shows the stuck-scrape action only for scraping movie/av/episode', () => {
+    expect(shouldShowStuckScrapeAction('scraping', 'av')).toBe(true)
+    expect(shouldShowStuckScrapeAction('scraping', 'movie')).toBe(true)
+    expect(shouldShowStuckScrapeAction('scraping', 'episode')).toBe(true)
+
+    expect(shouldShowStuckScrapeAction('uploaded', 'av')).toBe(false)
+    expect(shouldShowStuckScrapeAction('ready', 'av')).toBe(false)
+    expect(shouldShowStuckScrapeAction('av_scrape_pending', 'av')).toBe(false)
+    expect(shouldShowStuckScrapeAction('scraping', 'short')).toBe(false)
+    expect(shouldShowStuckScrapeAction('scraping', '')).toBe(false)
+    expect(shouldShowStuckScrapeAction('', 'av')).toBe(false)
+  })
+
+  it('builds a stuck-scrape route per video type', () => {
+    expect(buildStuckScrapeRoute({
+      id: 'av-1',
+      type: 'av',
+      title: 'SSIS-123',
+      metadata: { external_id: 'SSIS-123' }
+    })).toEqual(buildAVManualScrapeRoute({
+      id: 'av-1',
+      type: 'av',
+      title: 'SSIS-123',
+      metadata: { external_id: 'SSIS-123' }
+    }))
+
+    expect(buildStuckScrapeRoute({
+      id: 'movie-1',
+      type: 'movie',
+      title: '盗梦空间'
+    })).toEqual(buildMovieManualScrapeRoute({
+      id: 'movie-1',
+      type: 'movie',
+      title: '盗梦空间'
+    }))
+
+    expect(buildStuckScrapeRoute({
+      id: 'ep-1',
+      type: 'episode',
+      title: '三体 S01E02'
+    })).toEqual({
+      path: '/scrape',
+      query: {
+        video_id: 'ep-1',
+        type: 'tv',
+        title: '三体 S01E02'
+      }
+    })
+  })
+
+  it('builds a stuck-scrape episode route with parsed season/episode when available', () => {
+    expect(buildStuckScrapeRoute(
+      { id: 'ep-1', type: 'episode', title: '三体' },
+      { parsedTitle: '三体', parsedSeasonNumber: 1, parsedEpisodeNumber: 2 }
+    )).toEqual({
+      path: '/scrape',
+      query: {
+        video_id: 'ep-1',
+        type: 'tv',
+        title: '三体',
+        season_number: 1,
+        episode_number: 2
+      }
+    })
+  })
+
+  it('returns null for unknown stuck-scrape video types', () => {
+    expect(buildStuckScrapeRoute({ id: 'x', type: 'short', title: 't' })).toBeNull()
+    expect(buildStuckScrapeRoute({ id: 'x', type: '', title: 't' })).toBeNull()
   })
 
   it('builds a thumbnail url only when the video has an id', () => {

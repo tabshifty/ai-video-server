@@ -46,6 +46,8 @@ import {
   nextDetailRequestToken,
   teardownPreviewPlayer,
   shouldShowVideoThumbnail,
+  shouldShowStuckScrapeAction,
+  buildStuckScrapeRoute,
   subtitleUploadAccept,
   tvPendingStageLabel
 } from './videoList.helpers'
@@ -513,6 +515,18 @@ function openMovieManualScrape() {
   }
   detailVisible.value = false
   router.push(buildMovieManualScrapeRoute(detail.value))
+}
+
+function openStuckScrape() {
+  if (!detail.value?.id) {
+    return
+  }
+  const route = buildStuckScrapeRoute(detail.value, tvPendingDiagnostics())
+  if (!route) {
+    return
+  }
+  detailVisible.value = false
+  router.push(route)
 }
 
 async function load() {
@@ -1506,6 +1520,23 @@ onBeforeUnmount(() => {
             <div v-if="!canManuallyEditVideoStatus(detail.status)" class="status-field__hint">
               处理中状态不支持手动修改
             </div>
+            <el-button
+              v-if="shouldShowStuckScrapeAction(detail.status, detail.type)"
+              type="warning"
+              plain
+              size="small"
+              class="status-field__stuck-action"
+              @click="openStuckScrape"
+            >
+              <el-icon><MagicStick /></el-icon>
+              去刮削
+            </el-button>
+            <div
+              v-if="shouldShowStuckScrapeAction(detail.status, detail.type)"
+              class="status-field__hint status-field__hint--stuck"
+            >
+              刮削未推进，可手动重新刮削推进状态。
+            </div>
           </div>
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="detail.title" /></el-form-item>
@@ -1850,6 +1881,14 @@ onBeforeUnmount(() => {
   color: var(--el-color-warning);
   font-size: var(--text-caption);
   line-height: var(--leading-small);
+}
+
+.status-field__stuck-action {
+  justify-self: start;
+}
+
+.status-field__hint--stuck {
+  color: var(--el-color-info);
 }
 
 .play-preview {

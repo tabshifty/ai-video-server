@@ -199,7 +199,11 @@ func (p *Processor) handleScrape(ctx context.Context, task *asynq.Task, expected
 	}
 	if scrapeErr != nil {
 		if westernAVUpload {
-			return scrapeErr
+			decision := buildWesternAVScrapeFailureDecision(scrapeErr)
+			_ = p.repo.MergeVideoMetadata(ctx, videoID, decision.metadata)
+			_ = p.repo.UpdateVideoStatus(ctx, videoID, decision.status)
+			p.logger.Warn("western av scrape failed, moved to pending state", "video_id", videoID, "status", decision.status, "error", scrapeErr)
+			return nil
 		}
 		decision := buildScrapeFailureDecision(expectedType, scrapeErr)
 		_ = p.repo.MergeVideoMetadata(ctx, videoID, decision.metadata)
@@ -423,6 +427,25 @@ func buildScrapeFailureDecision(expectedType string, err error) scrapeFailureDec
 		status:           "tv_pending",
 		enqueueTranscode: false,
 		metadata:         buildEpisodePendingMetadata(err),
+	}
+}
+
+// buildWesternAVScrapeFailureDecision 欧美 AV 自动刮削报错时的失败决策：状态落
+// av_scrape_pending（与"跑完全 miss 落 av_scrape_pending"对称，守住刮削确认门控），
+// 不入队转码，把报错写进 metadata.scrape_attempt.error 让详情面板复用现有待确认诊断，
+// return nil 不重试。避免欧美 AV 刮削报错后状态永远停在 uploading 时写入的 scraping。
+func buildWesternAVScrapeFailureDecision(err error) scrapeFailureDecision {
+	return scrapeFailureDecision{
+		status:           "av_scrape_pending",
+		enqueueTranscode: false,
+		metadata: map[string]any{
+			"site_category":  "western",
+			"scrape_preview": []map[string]any{},
+			"scrape_attempt": map[string]any{
+				"site_category": "western",
+				"error":         err.Error(),
+			},
+		},
 	}
 }
 

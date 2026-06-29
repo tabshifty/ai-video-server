@@ -57,6 +57,40 @@ func TestBuildScrapeFailureDecisionMarksEpisodeAsTVPending(t *testing.T) {
 	}
 }
 
+func TestBuildWesternAVScrapeFailureDecisionMarksAVScrapePending(t *testing.T) {
+	t.Parallel()
+
+	scrapeErr := errors.New("resolve av search plan failed")
+	decision := buildWesternAVScrapeFailureDecision(scrapeErr)
+
+	if decision.status != "av_scrape_pending" {
+		t.Fatalf("expected status av_scrape_pending, got=%s", decision.status)
+	}
+	if decision.enqueueTranscode {
+		t.Fatal("western av failure must not enqueue transcode (gate contract)")
+	}
+	attempt, ok := decision.metadata["scrape_attempt"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected scrape_attempt map, got=%T", decision.metadata["scrape_attempt"])
+	}
+	if attempt["error"] != scrapeErr.Error() {
+		t.Fatalf("unexpected scrape_attempt.error: %v", attempt["error"])
+	}
+	if attempt["site_category"] != "western" {
+		t.Fatalf("expected site_category western, got=%v", attempt["site_category"])
+	}
+	preview, ok := decision.metadata["scrape_preview"].([]map[string]any)
+	if !ok {
+		t.Fatalf("expected scrape_preview to be an empty slice, got=%T", decision.metadata["scrape_preview"])
+	}
+	if len(preview) != 0 {
+		t.Fatalf("expected empty scrape_preview, got=%d items", len(preview))
+	}
+	if decision.metadata["site_category"] != "western" {
+		t.Fatalf("expected top-level site_category western, got=%v", decision.metadata["site_category"])
+	}
+}
+
 func TestBuildScrapeFailureDecisionKeepsMovieFallbackBehavior(t *testing.T) {
 	t.Parallel()
 
