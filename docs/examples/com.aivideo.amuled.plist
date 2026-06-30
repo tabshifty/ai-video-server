@@ -7,7 +7,11 @@
   <string>com.aivideo.amuled</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/local/bin/amuled</string>
+    <string>/Users/__USER__/deploy/aMule.app/Contents/MacOS/amuled</string>
+    <string>-c</string>
+    <string>/Users/__USER__/.aMule</string>
+    <string>-d</string>
+    <string>-o</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/Users/__USER__</string>
