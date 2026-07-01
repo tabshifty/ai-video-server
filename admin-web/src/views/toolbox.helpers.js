@@ -134,8 +134,13 @@ export function buildPendingEd2kInput(allEntries, results) {
     .join('\n')
 }
 
-export function shouldKeepEd2kCreateDialogOpen(results) {
+export function shouldKeepEd2kCreateDialogOpen(entries, results) {
+  const activeLineNumbers = new Set((Array.isArray(entries) ? entries : []).map((entry) => entry.lineNumber))
+  if (activeLineNumbers.size === 0) {
+    return false
+  }
   return (Array.isArray(results) ? results : []).some((item) =>
+    activeLineNumbers.has(item.lineNumber) &&
     ['invalid', 'create_failed', 'enqueue_failed'].includes(item.status)
   )
 }

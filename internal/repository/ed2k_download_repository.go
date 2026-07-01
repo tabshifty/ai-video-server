@@ -229,7 +229,7 @@ UPDATE ed2k_download_tasks
 SET status = 'running',
     progress_text = $2,
     error_message = '',
-    started_at = COALESCE($3, started_at),
+    started_at = $3,
     cleaned_at = NULL,
     updated_at = NOW(),
     history = COALESCE(history, '[]'::jsonb) || $4::jsonb
@@ -421,7 +421,7 @@ RETURNING id, source_link, resource_hash, title, filename, declared_size, status
 	return item, nil
 }
 
-func (r *VideoRepository) RequeueFilesCleanedEd2kDownloadTask(ctx context.Context, id uuid.UUID, history models.AdminEd2kDownloadTaskHistoryItem, startedAt *time.Time) (models.AdminEd2kDownloadTask, error) {
+func (r *VideoRepository) RequeueFilesCleanedEd2kDownloadTask(ctx context.Context, id uuid.UUID, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
 	filesRaw, err := json.Marshal([]models.AdminEd2kDownloadTaskFile{})
 	if err != nil {
 		return models.AdminEd2kDownloadTask{}, fmt.Errorf("marshal ed2k retry files: %w", err)
@@ -435,16 +435,14 @@ UPDATE ed2k_download_tasks
 SET status = 'queued',
     progress_text = '等待执行器接管',
     error_message = '',
-    started_at = COALESCE($4, started_at),
     downloaded_path = '',
     files = $2::jsonb,
-    cleaned_at = NULL,
     retry_count = retry_count + 1,
     updated_at = NOW(),
     history = COALESCE(history, '[]'::jsonb) || $3::jsonb
 WHERE id = $1 AND status = 'files_cleaned'
 RETURNING id, source_link, resource_hash, title, filename, declared_size, status, progress_text, error_message, output_dir, downloaded_path, retry_count, files, history, created_at, updated_at, started_at, finished_at, cleaned_at, deleted_at
-`, id, filesRaw, historyRaw, startedAt)
+`, id, filesRaw, historyRaw)
 	item, scanErr := scanEd2kDownloadTask(row)
 	if scanErr != nil {
 		return models.AdminEd2kDownloadTask{}, fmt.Errorf("requeue files_cleaned ed2k download task: %w", scanErr)
@@ -485,6 +483,17 @@ func (r *VideoRepository) DeleteEd2kDownloadTask(ctx context.Context, id uuid.UU
 	tag, err := r.pool.Exec(ctx, `DELETE FROM ed2k_download_tasks WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete ed2k download task: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (r *VideoRepository) DeleteQueuedEd2kDownloadTask(ctx context.Context, id uuid.UUID) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM ed2k_download_tasks WHERE id = $1 AND status = 'queued'`, id)
+	if err != nil {
+		return fmt.Errorf("delete queued ed2k download task: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return pgx.ErrNoRows

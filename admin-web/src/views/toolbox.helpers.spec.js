@@ -66,7 +66,7 @@ describe('toolbox ed2k helpers', () => {
       '3:reused'
     ])
     expect(buildPendingEd2kInput(entries, session)).toBe(entries[1].sourceLink)
-    expect(shouldKeepEd2kCreateDialogOpen(session)).toBe(true)
+    expect(shouldKeepEd2kCreateDialogOpen(entries, session)).toBe(true)
   })
 
   it('keeps first-assigned line numbers for retried input and gives edited links new line numbers', () => {
@@ -99,6 +99,23 @@ describe('toolbox ed2k helpers', () => {
     expect(mergeEd2kDraftEntries(previousEntries, latestEntries, results)).toEqual([
       { lineNumber: 1, sourceLink: 'ed2k://|file|fixed.mkv|456|FEDCBA9876543210FEDCBA9876543210|/' }
     ])
+  })
+
+  it('does not keep the create dialog open once historical invalid results are no longer referenced by current draft lines', () => {
+    const first = parseEd2kCreateEntries(`
+      bad-link
+      ed2k://|file|ok.mkv|123|0123456789ABCDEF0123456789ABCDEF|/
+    `)
+    const retried = parseEd2kCreateEntries(`
+      ed2k://|file|fixed.mkv|456|FEDCBA9876543210FEDCBA9876543210|/
+    `, first)
+    const session = mergeEd2kCreateSession([], normalizeEd2kCreateResults([
+      { line_number: 1, source_link: 'bad-link', status: 'invalid', message: 'bad' },
+      { line_number: 2, source_link: first[1].sourceLink, status: 'created', message: 'ok' },
+      { line_number: 3, source_link: retried[0].sourceLink, status: 'created', message: 'ok' }
+    ]))
+
+    expect(shouldKeepEd2kCreateDialogOpen(retried, session)).toBe(false)
   })
 
   it('hides legacy deleted tasks from the visible task list and keeps status filtering client-side', () => {

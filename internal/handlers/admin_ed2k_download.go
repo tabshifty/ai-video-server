@@ -38,7 +38,7 @@ func timePtr(t time.Time) *time.Time {
 
 type ed2kDownloadRetryRepository interface {
 	GetEd2kDownloadTask(ctx context.Context, id uuid.UUID) (models.AdminEd2kDownloadTask, error)
-	RequeueFilesCleanedEd2kDownloadTask(ctx context.Context, id uuid.UUID, history models.AdminEd2kDownloadTaskHistoryItem, startedAt *time.Time) (models.AdminEd2kDownloadTask, error)
+	RequeueFilesCleanedEd2kDownloadTask(ctx context.Context, id uuid.UUID, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error)
 	RestoreFilesCleanedEd2kDownloadTask(ctx context.Context, id uuid.UUID, history models.AdminEd2kDownloadTaskHistoryItem, startedAt, cleanedAt *time.Time) (models.AdminEd2kDownloadTask, error)
 }
 
@@ -351,6 +351,15 @@ type ed2kDownloadCancelRepository interface {
 	MarkEd2kDownloadTaskCancelled(ctx context.Context, id uuid.UUID, progressText, errorMessage string, finishedAt, cleanedAt *time.Time, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error)
 }
 
+type ed2kQueuedDeleteRepository interface {
+	GetEd2kDownloadTask(ctx context.Context, id uuid.UUID) (models.AdminEd2kDownloadTask, error)
+	DeleteQueuedEd2kDownloadTask(ctx context.Context, id uuid.UUID) error
+	RestoreFilesCleanedEd2kDownloadTask(ctx context.Context, id uuid.UUID, history models.AdminEd2kDownloadTaskHistoryItem, startedAt, cleanedAt *time.Time) (models.AdminEd2kDownloadTask, error)
+}
+
+var errEd2kQueuedDeleteActiveJob = errors.New("queued task already started in worker")
+var errEd2kQueuedDeleteStaleState = errors.New("queued task state changed before delete")
+
 func retryEd2kDownloadTask(ctx context.Context, taskID uuid.UUID, repo ed2kDownloadRetryRepository, enqueuer ed2kDownloadRetryEnqueuer, now time.Time) (models.AdminEd2kDownloadTask, error) {
 	task, err := repo.GetEd2kDownloadTask(ctx, taskID)
 	if err != nil {
@@ -364,7 +373,7 @@ func retryEd2kDownloadTask(ctx context.Context, taskID uuid.UUID, repo ed2kDownl
 		Label:   "重新下载",
 		Message: "管理员重新下载已清理的历史任务",
 		At:      now,
-	}, timePtr(now))
+	})
 	if err != nil {
 		if isEd2kConditionalUpdateMiss(err) {
 			current, reloadErr := repo.GetEd2kDownloadTask(ctx, taskID)
@@ -429,6 +438,74 @@ func retryEd2kDownloadTask(ctx context.Context, taskID uuid.UUID, repo ed2kDownl
 
 var errEd2kDownloadRetryInvalidStatus = errors.New("only files_cleaned task can retry")
 var errEd2kDownloadCleanupRetryInvalidStatus = errors.New("only cancelled task with cleanup failure can retry cleanup")
+
+func deleteQueuedEd2kDownloadTask(ctx context.Context, task models.AdminEd2kDownloadTask, repo ed2kQueuedDeleteRepository, enqueuer interface {
+	DeleteEd2kDownloadTask(taskID string) error
+	EnqueueEd2kDownload(payload queue.Ed2kDownloadPayload) error
+}, now time.Time) (models.AdminEd2kDownloadTask, bool, error) {
+	if strings.TrimSpace(task.Status) != "queued" {
+		return models.AdminEd2kDownloadTask{}, false, fmt.Errorf("only queued task can use queued delete helper")
+	}
+	if enqueuer != nil {
+		if err := enqueuer.DeleteEd2kDownloadTask(task.ID.String()); err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "active state") {
+				return models.AdminEd2kDownloadTask{}, false, errEd2kQueuedDeleteActiveJob
+			}
+			return models.AdminEd2kDownloadTask{}, false, err
+		}
+	}
+	if task.FinishedAt != nil && task.CleanedAt != nil {
+		item, err := repo.RestoreFilesCleanedEd2kDownloadTask(ctx, task.ID, models.AdminEd2kDownloadTaskHistoryItem{
+			Kind:    "retry_rollback",
+			Label:   "重下已撤销",
+			Message: "管理员删除排队中的重下任务，已恢复到文件已清理历史记录",
+			At:      now,
+		}, task.StartedAt, task.CleanedAt)
+		if err != nil {
+			if isEd2kConditionalUpdateMiss(err) {
+				return models.AdminEd2kDownloadTask{}, false, errEd2kQueuedDeleteStaleState
+			}
+			if rollbackErr := restoreQueuedEd2kDeleteJob(ctx, repo, enqueuer, task.ID, err); rollbackErr != nil {
+				return models.AdminEd2kDownloadTask{}, false, rollbackErr
+			}
+			return models.AdminEd2kDownloadTask{}, false, err
+		}
+		return item, false, nil
+	}
+	if err := repo.DeleteQueuedEd2kDownloadTask(ctx, task.ID); err != nil {
+		if isEd2kConditionalUpdateMiss(err) {
+			return models.AdminEd2kDownloadTask{}, false, errEd2kQueuedDeleteStaleState
+		}
+		if rollbackErr := restoreQueuedEd2kDeleteJob(ctx, repo, enqueuer, task.ID, err); rollbackErr != nil {
+			return models.AdminEd2kDownloadTask{}, false, rollbackErr
+		}
+		return models.AdminEd2kDownloadTask{}, false, err
+	}
+	return models.AdminEd2kDownloadTask{}, true, nil
+}
+
+func restoreQueuedEd2kDeleteJob(ctx context.Context, repo ed2kQueuedDeleteRepository, enqueuer interface {
+	DeleteEd2kDownloadTask(taskID string) error
+	EnqueueEd2kDownload(payload queue.Ed2kDownloadPayload) error
+}, taskID uuid.UUID, originalErr error) error {
+	if enqueuer == nil {
+		return originalErr
+	}
+	current, err := repo.GetEd2kDownloadTask(ctx, taskID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return originalErr
+		}
+		return fmt.Errorf("%w; reload queued task after delete failure: %v", originalErr, err)
+	}
+	if current.Status != "queued" {
+		return originalErr
+	}
+	if err := enqueuer.EnqueueEd2kDownload(queue.Ed2kDownloadPayload{TaskID: taskID.String()}); err != nil {
+		return fmt.Errorf("%w; restore queued job after delete failure: %v", originalErr, err)
+	}
+	return originalErr
+}
 
 func cancelEd2kDownloadTask(ctx context.Context, task models.AdminEd2kDownloadTask, repo ed2kDownloadCancelRepository, paths ed2kDeletePaths, now time.Time) (models.AdminEd2kDownloadTask, error) {
 	cancelingItem := task
@@ -498,20 +575,33 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 	}
 	now := time.Now()
 	if task.Status == "queued" {
-		if err := a.repo.DeleteEd2kDownloadTask(c.Request.Context(), taskID); err != nil {
+		item, deleted, err := deleteQueuedEd2kDownloadTask(c.Request.Context(), task, a.repo, a.enqueuer, now)
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				response.Error(c, 404, "task not found")
+				return
+			}
+			if errors.Is(err, errEd2kQueuedDeleteStaleState) {
+				response.Error(c, 1099, "任务状态已变化，请刷新后重试")
+				return
+			}
+			if errors.Is(err, errEd2kQueuedDeleteActiveJob) {
+				response.Error(c, 1099, "任务已开始执行，请刷新后重试")
 				return
 			}
 			response.Error(c, 1098, err.Error())
 			return
 		}
-		ok(c, gin.H{
-			"id":      taskID,
-			"deleted": true,
-			"status":  "deleted",
-			"at":      now,
-		})
+		if deleted {
+			ok(c, gin.H{
+				"id":      taskID,
+				"deleted": true,
+				"status":  "deleted",
+				"at":      now,
+			})
+			return
+		}
+		ok(c, item)
 		return
 	}
 	if task.Status == "failed" {

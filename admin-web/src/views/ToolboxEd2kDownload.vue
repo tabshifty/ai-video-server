@@ -205,6 +205,19 @@ function selectTask(task) {
   selectedTaskID.value = task.id
 }
 
+function applyTaskSnapshot(task) {
+  if (!task?.id) {
+    return
+  }
+  const nextTask = normalizeTask(task)
+  const index = tasks.value.findIndex((item) => item.id === nextTask.id)
+  if (index >= 0) {
+    tasks.value = tasks.value.map((item, currentIndex) => currentIndex === index ? nextTask : item)
+    return
+  }
+  tasks.value = [nextTask, ...tasks.value]
+}
+
 async function focusTask(task) {
   const { filter, selectedTaskID: nextSelectedTaskID } = buildEd2kTaskFocusState(currentFilter.value, task)
   if (!nextSelectedTaskID) {
@@ -261,7 +274,7 @@ async function submitLinks() {
     if (failedCount > 0) {
       ElMessage.warning(`${failedCount} 条输入仍待修正，已保留在弹窗中`)
     }
-    if (!shouldKeepEd2kCreateDialogOpen(createSessionResults.value)) {
+    if (!shouldKeepEd2kCreateDialogOpen(createDraftEntries.value, createSessionResults.value)) {
       createDialogVisible.value = false
       createDraftEntries.value = []
       createSessionResults.value = []
@@ -294,7 +307,12 @@ async function deleteTask(task) {
       return
     }
     const updatedTask = normalizeTask(result || {})
+    applyTaskSnapshot(updatedTask)
     await focusTask(updatedTask)
+    if (task.status === 'queued' && updatedTask.status === 'files_cleaned') {
+      ElMessage.success('已撤销本次重新下载，历史任务已恢复')
+      return
+    }
     if (updatedTask.status === 'cancelled' && updatedTask.errorMessage) {
       ElMessage.warning(updatedTask.progressText || '任务已取消，仍有残留待清理')
       return
@@ -323,6 +341,7 @@ async function cleanTaskFiles(task) {
       type: 'warning'
     })
     const item = normalizeTask(await cleanAdminEd2kDownloadTaskFiles(task.id))
+    applyTaskSnapshot(item)
     await focusTask(item)
     ElMessage.success('暂存文件已清理')
   } catch (error) {
@@ -335,6 +354,7 @@ async function cleanTaskFiles(task) {
 async function retryTask(task) {
   try {
     const item = normalizeTask(await retryAdminEd2kDownloadTask(task.id))
+    applyTaskSnapshot(item)
     await focusTask(item)
     ElMessage.success('任务已重新加入下载队列')
   } catch (error) {
@@ -345,6 +365,7 @@ async function retryTask(task) {
 async function retryCleanup(task) {
   try {
     const item = normalizeTask(await retryAdminEd2kDownloadCleanup(task.id))
+    applyTaskSnapshot(item)
     await focusTask(item)
     ElMessage.success('残留清理已重试完成')
   } catch (error) {

@@ -396,6 +396,187 @@ func TestRetryEd2kDownloadTaskTreatsEnqueueErrorWithPersistedJobAsSuccess(t *tes
 	}
 }
 
+func TestDeleteQueuedEd2kDownloadTaskDeletesOrdinaryQueuedTaskAndQueueJob(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("27222222-2222-2222-2222-222222222222")
+	repo := &ed2kQueuedDeleteRepoStub{}
+	enqueuer := &ed2kQueuedDeleteEnqueuerStub{}
+
+	item, deleted, err := deleteQueuedEd2kDownloadTask(context.Background(), models.AdminEd2kDownloadTask{
+		ID:     taskID,
+		Status: "queued",
+	}, repo, enqueuer, time.Now())
+	if err != nil {
+		t.Fatalf("deleteQueuedEd2kDownloadTask() error = %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected ordinary queued task to be physically deleted")
+	}
+	if item.ID != uuid.Nil {
+		t.Fatalf("expected no restored task payload, got %#v", item)
+	}
+	if repo.deleteCalls != 1 {
+		t.Fatalf("expected one repo delete call, got %d", repo.deleteCalls)
+	}
+	if enqueuer.deletedTaskID != taskID.String() {
+		t.Fatalf("expected queue delete for %s, got %s", taskID.String(), enqueuer.deletedTaskID)
+	}
+}
+
+func TestDeleteQueuedEd2kDownloadTaskRestoresRetriedFilesCleanedHistory(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("28222222-2222-2222-2222-222222222222")
+	startedAt := timePtrNow()
+	cleanedAt := timePtrNow()
+	finishedAt := timePtrNow()
+	repo := &ed2kQueuedDeleteRepoStub{
+		restored: models.AdminEd2kDownloadTask{
+			ID:         taskID,
+			Status:     "files_cleaned",
+			StartedAt:  startedAt,
+			FinishedAt: finishedAt,
+			CleanedAt:  cleanedAt,
+		},
+	}
+	enqueuer := &ed2kQueuedDeleteEnqueuerStub{}
+
+	item, deleted, err := deleteQueuedEd2kDownloadTask(context.Background(), models.AdminEd2kDownloadTask{
+		ID:         taskID,
+		Status:     "queued",
+		StartedAt:  startedAt,
+		FinishedAt: finishedAt,
+		CleanedAt:  cleanedAt,
+	}, repo, enqueuer, time.Now())
+	if err != nil {
+		t.Fatalf("deleteQueuedEd2kDownloadTask() error = %v", err)
+	}
+	if deleted {
+		t.Fatal("expected retried files_cleaned task to be restored instead of deleted")
+	}
+	if item.Status != "files_cleaned" {
+		t.Fatalf("expected files_cleaned status, got %s", item.Status)
+	}
+	if repo.restoreCalls != 1 {
+		t.Fatalf("expected one restore call, got %d", repo.restoreCalls)
+	}
+	if repo.deleteCalls != 0 {
+		t.Fatalf("did not expect physical delete, got %d", repo.deleteCalls)
+	}
+	if enqueuer.deletedTaskID != taskID.String() {
+		t.Fatalf("expected queue delete for %s, got %s", taskID.String(), enqueuer.deletedTaskID)
+	}
+}
+
+func TestDeleteQueuedEd2kDownloadTaskReturnsStaleStateWhenRestoreMisses(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("2c222222-2222-2222-2222-222222222222")
+	startedAt := timePtrNow()
+	cleanedAt := timePtrNow()
+	repo := &ed2kQueuedDeleteRepoStub{
+		restoreErr: errors.New("restore files_cleaned ed2k download task: no rows in result set"),
+	}
+	enqueuer := &ed2kQueuedDeleteEnqueuerStub{}
+
+	_, deleted, err := deleteQueuedEd2kDownloadTask(context.Background(), models.AdminEd2kDownloadTask{
+		ID:         taskID,
+		Status:     "queued",
+		StartedAt:  startedAt,
+		FinishedAt: timePtrNow(),
+		CleanedAt:  cleanedAt,
+	}, repo, enqueuer, time.Now())
+	if !errors.Is(err, errEd2kQueuedDeleteStaleState) {
+		t.Fatalf("expected stale state error, got %v", err)
+	}
+	if deleted {
+		t.Fatal("did not expect deleted=true on stale restore")
+	}
+	if enqueuer.enqueuedTaskID != "" {
+		t.Fatalf("did not expect queue job restore on stale rollback, got %s", enqueuer.enqueuedTaskID)
+	}
+}
+
+func TestDeleteQueuedEd2kDownloadTaskRejectsWhenQueueJobAlreadyActive(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("29222222-2222-2222-2222-222222222222")
+	repo := &ed2kQueuedDeleteRepoStub{}
+	enqueuer := &ed2kQueuedDeleteEnqueuerStub{
+		deleteErr: errors.New("delete enqueued ed2k download task: asynq: cannot delete task in active state. use CancelProcessing instead."),
+	}
+
+	_, deleted, err := deleteQueuedEd2kDownloadTask(context.Background(), models.AdminEd2kDownloadTask{
+		ID:     taskID,
+		Status: "queued",
+	}, repo, enqueuer, time.Now())
+	if !errors.Is(err, errEd2kQueuedDeleteActiveJob) {
+		t.Fatalf("expected active job error, got %v", err)
+	}
+	if deleted {
+		t.Fatal("did not expect deleted=true on active job rejection")
+	}
+	if repo.deleteCalls != 0 || repo.restoreCalls != 0 {
+		t.Fatalf("did not expect repo mutation, got delete=%d restore=%d", repo.deleteCalls, repo.restoreCalls)
+	}
+}
+
+func TestDeleteQueuedEd2kDownloadTaskRequeuesJobWhenRepoDeleteFails(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("2a222222-2222-2222-2222-222222222222")
+	repo := &ed2kQueuedDeleteRepoStub{
+		deleteErr: errors.New("delete queued ed2k download task: db boom"),
+		current: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "queued",
+		},
+	}
+	enqueuer := &ed2kQueuedDeleteEnqueuerStub{}
+
+	_, deleted, err := deleteQueuedEd2kDownloadTask(context.Background(), models.AdminEd2kDownloadTask{
+		ID:     taskID,
+		Status: "queued",
+	}, repo, enqueuer, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "db boom") {
+		t.Fatalf("expected repo delete error, got %v", err)
+	}
+	if deleted {
+		t.Fatal("did not expect deleted=true when repo delete fails")
+	}
+	if enqueuer.deletedTaskID != taskID.String() {
+		t.Fatalf("expected queue delete for %s, got %s", taskID.String(), enqueuer.deletedTaskID)
+	}
+	if enqueuer.enqueuedTaskID != taskID.String() {
+		t.Fatalf("expected queue job restore for %s, got %s", taskID.String(), enqueuer.enqueuedTaskID)
+	}
+}
+
+func TestDeleteQueuedEd2kDownloadTaskReturnsStaleStateWhenQueuedDeleteMisses(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("2b222222-2222-2222-2222-222222222222")
+	repo := &ed2kQueuedDeleteRepoStub{
+		deleteErr: errors.New("delete queued ed2k download task: no rows in result set"),
+	}
+	enqueuer := &ed2kQueuedDeleteEnqueuerStub{}
+
+	_, deleted, err := deleteQueuedEd2kDownloadTask(context.Background(), models.AdminEd2kDownloadTask{
+		ID:     taskID,
+		Status: "queued",
+	}, repo, enqueuer, time.Now())
+	if !errors.Is(err, errEd2kQueuedDeleteStaleState) {
+		t.Fatalf("expected stale state error, got %v", err)
+	}
+	if deleted {
+		t.Fatal("did not expect deleted=true on stale queued delete")
+	}
+	if enqueuer.enqueuedTaskID != "" {
+		t.Fatalf("did not expect queue job restore on stale delete, got %s", enqueuer.enqueuedTaskID)
+	}
+}
+
 func TestCleanCompletedEd2kDownloadArtifactsRemovesSymlinkAndRealFile(t *testing.T) {
 	t.Parallel()
 
@@ -813,7 +994,7 @@ func (s *ed2kRetryRepoStub) UpdateEd2kDownloadTaskStatus(context.Context, uuid.U
 	return models.AdminEd2kDownloadTask{}, nil
 }
 
-func (s *ed2kRetryRepoStub) RequeueFilesCleanedEd2kDownloadTask(context.Context, uuid.UUID, models.AdminEd2kDownloadTaskHistoryItem, *time.Time) (models.AdminEd2kDownloadTask, error) {
+func (s *ed2kRetryRepoStub) RequeueFilesCleanedEd2kDownloadTask(context.Context, uuid.UUID, models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
 	s.requeueCalls++
 	if s.requeueErr != nil {
 		return models.AdminEd2kDownloadTask{}, s.requeueErr
@@ -827,6 +1008,54 @@ func (s *ed2kRetryRepoStub) RestoreFilesCleanedEd2kDownloadTask(context.Context,
 		return s.restored, nil
 	}
 	return s.task, nil
+}
+
+type ed2kQueuedDeleteRepoStub struct {
+	deleteCalls  int
+	deleteErr    error
+	restoreCalls int
+	restored     models.AdminEd2kDownloadTask
+	restoreErr   error
+	current      models.AdminEd2kDownloadTask
+	getCalls     int
+}
+
+func (s *ed2kQueuedDeleteRepoStub) GetEd2kDownloadTask(context.Context, uuid.UUID) (models.AdminEd2kDownloadTask, error) {
+	s.getCalls++
+	if s.current.ID != uuid.Nil {
+		return s.current, nil
+	}
+	return models.AdminEd2kDownloadTask{}, pgx.ErrNoRows
+}
+
+func (s *ed2kQueuedDeleteRepoStub) DeleteQueuedEd2kDownloadTask(context.Context, uuid.UUID) error {
+	s.deleteCalls++
+	return s.deleteErr
+}
+
+func (s *ed2kQueuedDeleteRepoStub) RestoreFilesCleanedEd2kDownloadTask(context.Context, uuid.UUID, models.AdminEd2kDownloadTaskHistoryItem, *time.Time, *time.Time) (models.AdminEd2kDownloadTask, error) {
+	s.restoreCalls++
+	if s.restoreErr != nil {
+		return models.AdminEd2kDownloadTask{}, s.restoreErr
+	}
+	return s.restored, nil
+}
+
+type ed2kQueuedDeleteEnqueuerStub struct {
+	deletedTaskID  string
+	deleteErr      error
+	enqueuedTaskID string
+	enqueueErr     error
+}
+
+func (s *ed2kQueuedDeleteEnqueuerStub) DeleteEd2kDownloadTask(taskID string) error {
+	s.deletedTaskID = taskID
+	return s.deleteErr
+}
+
+func (s *ed2kQueuedDeleteEnqueuerStub) EnqueueEd2kDownload(payload queue.Ed2kDownloadPayload) error {
+	s.enqueuedTaskID = payload.TaskID
+	return s.enqueueErr
 }
 
 type ed2kCleanupRepoStub struct {

@@ -166,6 +166,22 @@ func TestEd2kDownloadTaskLifecycleMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)where\s+status\s*<>\s*'deleted'`)
 }
 
+func TestMarkEd2kDownloadTaskRunningRefreshesStartedAt(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(filepath.Join(".", "ed2k_download_repository.go"))
+	if err != nil {
+		t.Fatalf("read repository source: %v", err)
+	}
+	source := string(raw)
+	if !strings.Contains(source, "started_at = $3") {
+		t.Fatal("expected running transition to refresh started_at directly")
+	}
+	if strings.Contains(source, "started_at = COALESCE($3, started_at)") {
+		t.Fatal("expected running transition not to preserve stale started_at")
+	}
+}
+
 func TestArchiveImportBatchEncodingMigration(t *testing.T) {
 	t.Parallel()
 
