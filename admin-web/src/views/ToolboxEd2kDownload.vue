@@ -506,7 +506,6 @@ watch(
 
 .task-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
@@ -523,6 +522,8 @@ watch(
 
 .task-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-2);
   width: 100%;
   padding: var(--space-3);
@@ -540,9 +541,12 @@ watch(
 .task-row__head,
 .task-row__meta {
   display: flex;
-  justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
+}
+
+.task-row__head {
+  align-items: baseline;
 }
 
 .task-row__head strong,
@@ -560,6 +564,7 @@ watch(
 
 .task-row__meta {
   align-items: center;
+  justify-content: flex-end;
   color: var(--text-secondary);
   font-size: var(--text-small);
 }
@@ -662,15 +667,18 @@ watch(
   gap: var(--space-2);
 }
 
-@media (max-width: 64rem) {
-  .task-workspace {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 48rem) {
   .tool-workspace__inner {
     padding: var(--space-4);
+  }
+
+  .task-row {
+    grid-template-columns: 1fr;
+  }
+
+  .task-row__head,
+  .task-row__meta {
+    justify-content: flex-start;
   }
 
   .composer__bar {

@@ -40,4 +40,12 @@ describe('ToolboxEd2kDownload', () => {
     expect(source).toContain('<el-dialog')
     expect(source).not.toContain('<template #title>提交链接</template>')
   })
+
+  it('keeps the task list as a full-width workspace row instead of a narrow side rail', () => {
+    expect(source).toContain('class="task-workspace"')
+    expect(source).toContain('class="task-list-card"')
+    expect(source).toMatch(/\.task-workspace\s*\{[^}]*display:\s*grid;[^}]*gap:\s*var\(--space-4\);/s)
+    expect(source).not.toMatch(/\.task-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*24rem\)/s)
+    expect(source).toMatch(/\.task-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto;/s)
+  })
 })

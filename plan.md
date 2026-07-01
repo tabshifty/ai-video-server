@@ -1,3 +1,13 @@
+## 2026-07-01 11:43 +0800
+- 进度：完成 ED2K 下载工作台列表全宽布局。页面从“左侧 24rem 列表 + 右侧详情”的双列布局改为“列表整行在上、详情整行在下”，任务行在桌面端横向展示标题/哈希与状态/大小，移动端回落为单列；同步补静态 spec 锁定列表不再回退到窄侧栏，并在 `CONTEXT.md` 追加 [[ED2K 下载工作台列表全宽]]。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxEd2kDownload.spec.js` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）；`git diff --check -- admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js CONTEXT.md plan.md` 无输出。
+
+## 2026-07-01 11:41 +0800
+- 进度：开始修正 ED2K 下载工作台布局。经 `$grill-with-docs` 对照现有页面与上下文，“列表要全宽”收口为任务列表卡片应占据工作台整行宽度，不再固定在 24rem 左栏；任务详情顺延到列表下方，避免任务标题、资源哈希和筛选区被左栏压窄。范围限定为管理端单页布局与对应静态 spec，不改后端下载语义。
+- 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxEd2kDownload.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-07-01 09:40 +0800
 - 进度：完成 server.met 定时刷新在部署机（`chee@192.168.1.24`，macOS）的运行态落地与全链路验收。部署机 `.env`（`~/deploy/ai-video-server/.env`，即 worker plist `ENV_FILE` 指向的真实文件，非 `work/.env`）四键齐全且无 BOM：`ED2K_SERVERLIST_URL=http://upd.emule-security.org/server.met`、`ED2K_SERVERLIST_REFRESH_CRON=17 1 * * *`、`ED2K_SERVERLIST_REFRESH_EXECUTABLE=/Users/chee/deploy/ai-video-server/work/scripts/ed2k-serverlist-refresh.sh`、`ED2K_SERVERLIST_REFRESH_TIMEOUT_SECONDS=600`；刷新脚本可执行位齐全（`-rwxr-xr-x`）。发现上一轮 worker（pid 61693，09:13:41 启动）启动早于写 `.env`（09:15），加载的是无 serverlist 键的旧环境，worker.log 明确记 `ed2k serverlist refresh scheduler disabled (ED2K_SERVERLIST_URL empty)` → `launchctl kickstart -k gui/501/com.aivideo.worker` 重启后 scheduler 正常启动。
 - 验证（部署机运行态，全链路真实触发）：①重启 worker 后 worker.log 出现 `ed2k serverlist refresh scheduler started cron="17 1 * * *" url=...` + asynq `Scheduler timezone is set to Local`（进程 TZ = +08:00，cron 即本地凌晨 01:17）；②临时把 cron 改 `31 9 * * *` 重启 worker，09:31:02 worker.log 出现 `ed2k serverlist refresh completed server_met_path=... server_met_bytes=1627 restarted=true executor=launchctl/com.aivideo.amuled`——完整 scheduler→handler（nil payload 解析 OK、在途检查未跳过）→executor 全链路跑通，nil-payload 修复在真实环境验证有效（无 `unexpected end of JSON input`）；③执行器实测：server.met 由 2283 字节刷新为 1627/2263 字节、魔数 `e009` 前后均正确、amuled 经 `launchctl kickstart -k` 重启（pid 61801→62220→62320）并在 ~4 秒内重连 ed2k-rust（Low ID，用户编号 194530）+ Kad（有防火墙）；④cron 改回 `17 1 * * *` 重启 worker 确认恢复，临时 `.env.bak.cron-test.*` 已清理。amuled 在 2026-06-30 修复 aMule 3.0.0 事件循环 + 本轮 GUI 授权外盘后持续在线，ED2K 服务器列表已是最新。
