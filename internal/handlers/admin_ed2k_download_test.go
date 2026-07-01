@@ -1,17 +1,16 @@
 package handlers
 
 import (
-	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"video-server/internal/models"
-	"video-server/internal/queue"
 )
 
 func TestRegisterIncludesEd2kDownloadRoutes(t *testing.T) {
@@ -30,12 +29,14 @@ func TestRegisterIncludesEd2kDownloadRoutes(t *testing.T) {
 		"GET /api/v1/admin/ed2k-download/tasks",
 		"POST /api/v1/admin/ed2k-download/tasks",
 		"GET /api/v1/admin/ed2k-download/tasks/:id",
-		"POST /api/v1/admin/ed2k-download/tasks/:id/retry",
 		"DELETE /api/v1/admin/ed2k-download/tasks/:id",
 	} {
 		if _, ok := routes[want]; !ok {
 			t.Fatalf("expected route %s to be registered", want)
 		}
+	}
+	if _, ok := routes["POST /api/v1/admin/ed2k-download/tasks/:id/retry"]; ok {
+		t.Fatal("did not expect retry route to remain registered")
 	}
 }
 
@@ -64,120 +65,140 @@ func TestParseEd2kDownloadLinkAndBuildTitle(t *testing.T) {
 	}
 }
 
-func TestRetryEd2kDownloadTaskRequeuesAfterStatusUpdate(t *testing.T) {
+func TestDeleteFailedEd2kDownloadArtifactsRemovesWorkspaceAndTempFiles(t *testing.T) {
 	t.Parallel()
 
-	taskID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	task := models.AdminEd2kDownloadTask{
-		ID:     taskID,
-		Status: "failed",
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	baseDownloadDir := filepath.Join(downloadRoot, downloadSubdir)
+	logPath := filepath.Join(rootDir, "cancel.log")
+	amulecmdPath := filepath.Join(rootDir, "amulecmd")
+	if err := os.MkdirAll(baseDownloadDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(download): %v", err)
 	}
-	repo := &ed2kRetryRepoStub{
-		task: task,
-		updated: models.AdminEd2kDownloadTask{
-			ID:           taskID,
-			Status:       "queued",
-			ProgressText: "等待执行器接管",
-			RetryCount:   1,
-		},
+	if err := os.WriteFile(amulecmdPath, []byte(strings.Join([]string{
+		"#!/usr/bin/env bash",
+		"set -euo pipefail",
+		"printf '%s\\n' \"$*\" >> \"" + logPath + "\"",
+	}, "\n")), 0o755); err != nil {
+		t.Fatalf("WriteFile(amulecmd): %v", err)
 	}
-	enq := &ed2kRetryEnqueuerStub{}
 
-	item, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enq, time.Now())
+	taskID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	hash := "ABCDEF0123456789ABCDEF0123456789"
+	outputDir := filepath.Join(baseDownloadDir, hash)
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(outputDir): %v", err)
+	}
+	outputFile := filepath.Join(outputDir, "demo.mkv")
+	if err := os.WriteFile(outputFile, []byte("demo"), 0o644); err != nil {
+		t.Fatalf("WriteFile(output): %v", err)
+	}
+
+	task := makeFailedTask(taskID, hash, outputDir, outputFile)
+	err := deleteFailedEd2kDownloadArtifacts(task, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+		amulecmdBin:    amulecmdPath,
+		remoteHost:     "127.0.0.1",
+		remotePort:     "4712",
+		remotePassword: "secret",
+	})
 	if err != nil {
-		t.Fatalf("retryEd2kDownloadTask() error = %v", err)
+		t.Fatalf("deleteFailedEd2kDownloadArtifacts() error = %v", err)
 	}
-	if item.Status != "queued" {
-		t.Fatalf("expected queued item, got %s", item.Status)
+	assertPathMissing(t, outputDir)
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("ReadFile(cancel.log): %v", err)
 	}
-	if !repo.updateCalled {
-		t.Fatal("expected status update")
-	}
-	if len(enq.payloads) != 1 {
-		t.Fatalf("expected one enqueue call, got %d", len(enq.payloads))
-	}
-	if enq.payloads[0].TaskID != taskID.String() {
-		t.Fatalf("unexpected enqueue task id: %s", enq.payloads[0].TaskID)
+	if !strings.Contains(string(raw), "cancel "+hash) {
+		t.Fatalf("expected cancel command to contain resource hash, got %q", string(raw))
 	}
 }
 
-func TestRetryEd2kDownloadTaskReturnsEnqueueError(t *testing.T) {
+func TestDeleteFailedEd2kDownloadArtifactsDoesNotDeleteOutsideConfiguredRoots(t *testing.T) {
 	t.Parallel()
 
-	taskID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	repo := &ed2kRetryRepoStub{
-		task: models.AdminEd2kDownloadTask{
-			ID:     taskID,
-			Status: "failed",
-		},
-		updated: models.AdminEd2kDownloadTask{
-			ID:     taskID,
-			Status: "queued",
-		},
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	if err := os.MkdirAll(filepath.Join(downloadRoot, downloadSubdir), 0o755); err != nil {
+		t.Fatalf("MkdirAll(download): %v", err)
 	}
-	enq := &ed2kRetryEnqueuerStub{err: errors.New("enqueue failed")}
 
-	_, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enq, time.Now())
-	if err == nil {
-		t.Fatal("expected enqueue error")
+	taskID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	hash := "ABCDEF0123456789ABCDEF0123456789"
+	outsideDir := filepath.Join(rootDir, "outside")
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(outside): %v", err)
 	}
-	if !strings.Contains(err.Error(), "enqueue failed") {
-		t.Fatalf("unexpected error: %v", err)
+	outsideFile := filepath.Join(outsideDir, "demo.mkv")
+	if err := os.WriteFile(outsideFile, []byte("demo"), 0o644); err != nil {
+		t.Fatalf("WriteFile(outside): %v", err)
 	}
-	if !repo.updateCalled {
-		t.Fatal("expected status update before enqueue")
+
+	task := makeFailedTask(taskID, hash, outsideDir, outsideFile)
+	err := deleteFailedEd2kDownloadArtifacts(task, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+	})
+	if err != nil {
+		t.Fatalf("deleteFailedEd2kDownloadArtifacts() error = %v", err)
+	}
+	if _, statErr := os.Stat(outsideFile); statErr != nil {
+		t.Fatalf("expected outside file to remain, got %v", statErr)
 	}
 }
 
-func TestRetryEd2kDownloadTaskReturnsInFlightConflict(t *testing.T) {
+func TestRemoveFailedEd2kPathIgnoresNotExist(t *testing.T) {
 	t.Parallel()
 
-	taskID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	repo := &ed2kRetryRepoStub{
-		task: models.AdminEd2kDownloadTask{
-			ID:     taskID,
-			Status: "failed",
-		},
-		updated: models.AdminEd2kDownloadTask{
-			ID:     taskID,
-			Status: "queued",
-		},
-	}
-	enq := &ed2kRetryEnqueuerStub{err: queue.ErrEd2kDownloadTaskInFlight}
-
-	_, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enq, time.Now())
-	if !errors.Is(err, queue.ErrEd2kDownloadTaskInFlight) {
-		t.Fatalf("expected in-flight conflict, got %v", err)
+	path := filepath.Join(t.TempDir(), "missing")
+	if err := removeFailedEd2kPath(path); err != nil {
+		t.Fatalf("removeFailedEd2kPath() error = %v", err)
 	}
 }
 
-type ed2kRetryRepoStub struct {
-	task         models.AdminEd2kDownloadTask
-	updated      models.AdminEd2kDownloadTask
-	updateCalled bool
-}
+func TestCancelFailedEd2kDownloadIgnoresHashNotFound(t *testing.T) {
+	t.Parallel()
 
-func (s *ed2kRetryRepoStub) GetEd2kDownloadTask(context.Context, uuid.UUID) (models.AdminEd2kDownloadTask, error) {
-	return s.task, nil
-}
-
-func (s *ed2kRetryRepoStub) UpdateEd2kDownloadTaskStatus(ctx context.Context, id uuid.UUID, status, progressText, errorMessage string, startedAt, finishedAt, deletedAt *time.Time, outputDir, downloadedPath string, files []models.AdminEd2kDownloadTaskFile, retryDelta int, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
-	s.updateCalled = true
-	if id != s.task.ID {
-		return models.AdminEd2kDownloadTask{}, errors.New("unexpected task id")
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "amulecmd")
+	if err := os.WriteFile(scriptPath, []byte(strings.Join([]string{
+		"#!/usr/bin/env bash",
+		"echo 'FileHash not found: ABCDEF0123456789ABCDEF0123456789'",
+		"exit 1",
+	}, "\n")), 0o755); err != nil {
+		t.Fatalf("WriteFile(script): %v", err)
 	}
-	if status != "queued" || progressText != "等待执行器接管" || retryDelta != 1 || history.Kind != "retry" {
-		return models.AdminEd2kDownloadTask{}, errors.New("unexpected retry update")
+
+	err := cancelFailedEd2kDownload(makeFailedTask(uuid.New(), "ABCDEF0123456789ABCDEF0123456789", "", ""), ed2kDeletePaths{
+		amulecmdBin:    scriptPath,
+		remoteHost:     "127.0.0.1",
+		remotePort:     "4712",
+		remotePassword: "secret",
+	})
+	if err != nil {
+		t.Fatalf("cancelFailedEd2kDownload() error = %v", err)
 	}
-	return s.updated, nil
 }
 
-type ed2kRetryEnqueuerStub struct {
-	payloads []queue.Ed2kDownloadPayload
-	err      error
+func makeFailedTask(taskID uuid.UUID, hash, outputDir, downloadedPath string) models.AdminEd2kDownloadTask {
+	return models.AdminEd2kDownloadTask{
+		ID:             taskID,
+		Status:         "failed",
+		ResourceHash:   hash,
+		Filename:       "demo.mkv",
+		OutputDir:      outputDir,
+		DownloadedPath: downloadedPath,
+	}
 }
 
-func (s *ed2kRetryEnqueuerStub) EnqueueEd2kDownload(payload queue.Ed2kDownloadPayload) error {
-	s.payloads = append(s.payloads, payload)
-	return s.err
+func assertPathMissing(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected %s to be removed, got err=%v", path, err)
+	}
 }

@@ -55,6 +55,12 @@ type Config struct {
 	ImageGenerationTimeout     time.Duration
 	ED2KDownloadExecutable     string
 	ED2KDownloadTimeout        time.Duration
+	ED2KDownloadRoot           string
+	ED2KDownloadSubdir         string
+	AMULECMDBin                string
+	AMULERemoteHost            string
+	AMULERemotePort            string
+	AMULERemotePassword        string
 	// ED2K 服务器列表定时刷新：URL 留空 = 功能禁用（不启动 scheduler）。
 	ED2KServerlistURL               string
 	ED2KServerlistRefreshCron       string
@@ -110,6 +116,12 @@ func Load() (Config, error) {
 		ImageGenerationTimeout:          time.Duration(getIntEnv("IMAGE_GENERATION_TIMEOUT_SECONDS", 180)) * time.Second,
 		ED2KDownloadExecutable:          strings.TrimSpace(os.Getenv("ED2K_DOWNLOAD_EXECUTABLE")),
 		ED2KDownloadTimeout:             time.Duration(getIntEnv("ED2K_DOWNLOAD_TIMEOUT_SECONDS", 21600)) * time.Second,
+		ED2KDownloadRoot:                strings.TrimSpace(os.Getenv("ED2K_DOWNLOAD_ROOT")),
+		ED2KDownloadSubdir:              strings.TrimSpace(getEnv("ED2K_DOWNLOAD_SUBDIR", "ed2k-downloads")),
+		AMULECMDBin:                     strings.TrimSpace(getEnv("AMULECMD_BIN", "amulecmd")),
+		AMULERemoteHost:                 strings.TrimSpace(getEnv("AMULE_REMOTE_HOST", "127.0.0.1")),
+		AMULERemotePort:                 strings.TrimSpace(getEnv("AMULE_REMOTE_PORT", "4712")),
+		AMULERemotePassword:             strings.TrimSpace(os.Getenv("AMULE_REMOTE_PASSWORD")),
 		ED2KServerlistURL:               strings.TrimSpace(os.Getenv("ED2K_SERVERLIST_URL")),
 		ED2KServerlistRefreshCron:       strings.TrimSpace(os.Getenv("ED2K_SERVERLIST_REFRESH_CRON")),
 		ED2KServerlistRefreshExecutable: strings.TrimSpace(os.Getenv("ED2K_SERVERLIST_REFRESH_EXECUTABLE")),

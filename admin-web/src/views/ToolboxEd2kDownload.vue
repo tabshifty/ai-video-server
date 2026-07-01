@@ -9,8 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 import {
   createAdminEd2kDownloadTasks,
   deleteAdminEd2kDownloadTask,
-  getAdminEd2kDownloadTasks,
-  retryAdminEd2kDownloadTask
+  getAdminEd2kDownloadTasks
 } from '../api/admin'
 import { parseEd2kLinks } from './toolbox.helpers'
 
@@ -215,7 +214,7 @@ function setFilter(status) {
 
 async function deleteTask(task) {
   try {
-    await ElMessageBox.confirm(`确认删除「${task.title}」？排队中的任务会被永久移除。`, '删除下载任务', {
+    await ElMessageBox.confirm(`确认删除「${task.title}」？失败任务会同时清理数据库记录和已落下的下载残留。`, '删除下载任务', {
       confirmButtonText: '永久删除',
       cancelButtonText: '取消',
       type: 'warning'
@@ -227,16 +226,6 @@ async function deleteTask(task) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error?.response?.data?.msg || error?.message || '删除任务失败')
     }
-  }
-}
-
-async function retryTask(task) {
-  try {
-    await retryAdminEd2kDownloadTask(task.id)
-    await loadTasks()
-    ElMessage.success('任务已重新排队')
-  } catch (error) {
-    ElMessage.error(error?.response?.data?.msg || error?.message || '重试任务失败')
   }
 }
 
@@ -334,7 +323,6 @@ watch(
           <template #title>任务详情</template>
           <template #description>来源标识常驻，文件清单只展示当前任务已有结果。</template>
           <template #actions>
-            <el-button :icon="RefreshRight" :disabled="selectedTask.status !== 'failed'" @click="retryTask(selectedTask)">重试任务</el-button>
             <el-button :icon="Delete" type="danger" plain @click="deleteTask(selectedTask)">永久删除</el-button>
           </template>
 
@@ -370,11 +358,10 @@ watch(
 
             <SectionCard>
               <template #title>任务操作</template>
-              <template #description>这里保留后端管理动作：重试失败任务、永久删除排队任务。</template>
+              <template #description>这里保留后端管理动作：删除排队任务，或删除失败任务并清理残留。</template>
 
               <div class="action-row">
-                <el-button :disabled="selectedTask.status !== 'failed'" @click="retryTask(selectedTask)">重新排队</el-button>
-                <el-button :disabled="selectedTask.status !== 'queued' && selectedTask.status !== 'running'" @click="deleteTask(selectedTask)">删除任务</el-button>
+                <el-button :disabled="selectedTask.status !== 'queued' && selectedTask.status !== 'failed' && selectedTask.status !== 'running'" @click="deleteTask(selectedTask)">删除任务</el-button>
               </div>
             </SectionCard>
 

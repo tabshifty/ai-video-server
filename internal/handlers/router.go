@@ -87,6 +87,12 @@ type API struct {
 	maxVideoSize          int64
 	storageRoot           string
 	uploadTempDir         string
+	ed2kDownloadRoot      string
+	ed2kDownloadSubdir    string
+	amulecmdBin           string
+	amuleRemoteHost       string
+	amuleRemotePort       string
+	amuleRemotePassword   string
 	serverLogPath         string
 	adminWebDistPath      string
 	enableSwagger         bool
@@ -94,7 +100,7 @@ type API struct {
 	passwordVaultCipher   *services.PasswordVaultCipher
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, ed2kDownloadRoot, ed2kDownloadSubdir, amulecmdBin, amuleRemoteHost, amuleRemotePort, amuleRemotePassword, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
 	return &API{
 		repo:                  repo,
 		orphanFileScanRepo:    repo,
@@ -122,6 +128,12 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		maxVideoSize:          maxVideoSize,
 		storageRoot:           storageRoot,
 		uploadTempDir:         uploadTempDir,
+		ed2kDownloadRoot:      ed2kDownloadRoot,
+		ed2kDownloadSubdir:    ed2kDownloadSubdir,
+		amulecmdBin:           amulecmdBin,
+		amuleRemoteHost:       amuleRemoteHost,
+		amuleRemotePort:       amuleRemotePort,
+		amuleRemotePassword:   amuleRemotePassword,
 		serverLogPath:         serverLogPath,
 		adminWebDistPath:      adminWebDistPath,
 		enableSwagger:         enableSwagger,
@@ -280,7 +292,6 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/ed2k-download/tasks", a.AdminEd2kDownloadTasks)
 			admin.POST("/ed2k-download/tasks", a.AdminCreateEd2kDownloadTasks)
 			admin.GET("/ed2k-download/tasks/:id", a.AdminEd2kDownloadTaskDetail)
-			admin.POST("/ed2k-download/tasks/:id/retry", a.AdminRetryEd2kDownloadTask)
 			admin.DELETE("/ed2k-download/tasks/:id", a.AdminDeleteEd2kDownloadTask)
 			admin.POST("/system/orphan-files/scan", a.AdminStartOrphanFileScan)
 			admin.GET("/system/orphan-files/latest", a.AdminLatestOrphanFileScan)

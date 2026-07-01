@@ -1,8 +1,12 @@
 package handlers
 
 import (
-	"context"
 	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"net/url"
 	"strconv"
 	"strings"
@@ -20,11 +24,6 @@ import (
 type adminEd2kDownloadCreateRequest struct {
 	Links []string `json:"links"`
 	Title string   `json:"title"`
-}
-
-type ed2kDownloadRetryRepository interface {
-	GetEd2kDownloadTask(ctx context.Context, id uuid.UUID) (models.AdminEd2kDownloadTask, error)
-	UpdateEd2kDownloadTaskStatus(ctx context.Context, id uuid.UUID, status, progressText, errorMessage string, startedAt, finishedAt, deletedAt *time.Time, outputDir, downloadedPath string, files []models.AdminEd2kDownloadTaskFile, retryDelta int, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error)
 }
 
 func normalizeEd2kDownloadTitle(title string) string {
@@ -182,76 +181,6 @@ func (a *API) AdminEd2kDownloadTaskDetail(c *gin.Context) {
 	ok(c, task)
 }
 
-func (a *API) AdminRetryEd2kDownloadTask(c *gin.Context) {
-	taskID, okID := parseUUID(c.Param("id"))
-	if !okID {
-		bad(c, "invalid task id")
-		return
-	}
-	item, err := retryEd2kDownloadTask(c.Request.Context(), taskID, a.repo, a.enqueuer, time.Now())
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			response.Error(c, 404, "task not found")
-			return
-		}
-		if errors.Is(err, errEd2kDownloadRetryInvalidStatus) {
-			response.Error(c, 1095, err.Error())
-			return
-		}
-		if errors.Is(err, queue.ErrEd2kDownloadTaskInFlight) {
-			response.Error(c, 1096, "任务已在执行中")
-			return
-		}
-		response.Error(c, 1096, err.Error())
-		return
-	}
-	ok(c, item)
-}
-
-func retryEd2kDownloadTask(ctx context.Context, taskID uuid.UUID, repo ed2kDownloadRetryRepository, enqueuer interface {
-	EnqueueEd2kDownload(queue.Ed2kDownloadPayload) error
-}, now time.Time) (models.AdminEd2kDownloadTask, error) {
-	task, err := repo.GetEd2kDownloadTask(ctx, taskID)
-	if err != nil {
-		return models.AdminEd2kDownloadTask{}, err
-	}
-	if task.Status != "failed" && task.Status != "deleted" {
-		return models.AdminEd2kDownloadTask{}, errEd2kDownloadRetryInvalidStatus
-	}
-	item, err := repo.UpdateEd2kDownloadTaskStatus(
-		ctx,
-		taskID,
-		"queued",
-		"等待执行器接管",
-		"",
-		nil,
-		nil,
-		nil,
-		task.OutputDir,
-		task.DownloadedPath,
-		task.Files,
-		1,
-		models.AdminEd2kDownloadTaskHistoryItem{
-			Kind:    "retry",
-			Label:   "重新排队",
-			Message: "管理员手动重试下载任务",
-			At:      now,
-		},
-	)
-	if err != nil {
-		return models.AdminEd2kDownloadTask{}, err
-	}
-	if enqueuer == nil {
-		return models.AdminEd2kDownloadTask{}, errors.New("queue not configured")
-	}
-	if err := enqueuer.EnqueueEd2kDownload(queue.Ed2kDownloadPayload{TaskID: taskID.String()}); err != nil {
-		return models.AdminEd2kDownloadTask{}, err
-	}
-	return item, nil
-}
-
-var errEd2kDownloadRetryInvalidStatus = errors.New("only failed or deleted task can retry")
-
 func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 	taskID, okID := parseUUID(c.Param("id"))
 	if !okID {
@@ -269,6 +198,34 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 	}
 	now := time.Now()
 	if task.Status == "queued" {
+		if err := a.repo.DeleteEd2kDownloadTask(c.Request.Context(), taskID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				response.Error(c, 404, "task not found")
+				return
+			}
+			response.Error(c, 1098, err.Error())
+			return
+		}
+		ok(c, gin.H{
+			"id":      taskID,
+			"deleted": true,
+			"status":  "deleted",
+			"at":      now,
+		})
+		return
+	}
+	if task.Status == "failed" {
+		if err := deleteFailedEd2kDownloadArtifacts(task, ed2kDeletePaths{
+			downloadRoot:   a.ed2kDownloadRoot,
+			downloadSubdir: a.ed2kDownloadSubdir,
+			amulecmdBin:    a.amulecmdBin,
+			remoteHost:     a.amuleRemoteHost,
+			remotePort:     a.amuleRemotePort,
+			remotePassword: a.amuleRemotePassword,
+		}); err != nil {
+			response.Error(c, 1098, err.Error())
+			return
+		}
 		if err := a.repo.DeleteEd2kDownloadTask(c.Request.Context(), taskID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				response.Error(c, 404, "task not found")
@@ -313,5 +270,140 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 		ok(c, item)
 		return
 	}
-	response.Error(c, 1099, "only queued or running task can delete")
+	response.Error(c, 1099, "only queued, failed or running task can delete")
+}
+
+type ed2kDeletePaths struct {
+	downloadRoot   string
+	downloadSubdir string
+	amulecmdBin    string
+	remoteHost     string
+	remotePort     string
+	remotePassword string
+}
+
+func deleteFailedEd2kDownloadArtifacts(task models.AdminEd2kDownloadTask, paths ed2kDeletePaths) error {
+	if err := cancelFailedEd2kDownload(task, paths); err != nil {
+		return err
+	}
+	candidates := collectFailedEd2kDeleteCandidates(task, paths)
+	for _, candidate := range candidates {
+		if err := removeFailedEd2kPath(candidate); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func collectFailedEd2kDeleteCandidates(task models.AdminEd2kDownloadTask, paths ed2kDeletePaths) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, 6)
+	add := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return
+		}
+		clean := filepath.Clean(path)
+		if clean == "." {
+			return
+		}
+		if _, ok := seen[clean]; ok {
+			return
+		}
+		seen[clean] = struct{}{}
+		out = append(out, clean)
+	}
+
+	baseDownloadDir := ""
+	if root := strings.TrimSpace(paths.downloadRoot); root != "" {
+		baseDownloadDir = root
+		if subdir := strings.TrimSpace(paths.downloadSubdir); subdir != "" {
+			baseDownloadDir = filepath.Join(root, subdir)
+		}
+	}
+	outputDirWithinManagedRoot := false
+	if outputDir := strings.TrimSpace(task.OutputDir); outputDir != "" {
+		if pathWithinRoot(outputDir, baseDownloadDir) {
+			outputDirWithinManagedRoot = true
+			add(outputDir)
+		}
+	}
+	if downloadedPath := strings.TrimSpace(task.DownloadedPath); downloadedPath != "" {
+		if (outputDirWithinManagedRoot && pathWithinRoot(downloadedPath, task.OutputDir)) || pathWithinRoot(downloadedPath, baseDownloadDir) {
+			add(downloadedPath)
+		}
+	}
+	if baseDownloadDir != "" {
+		add(filepath.Join(baseDownloadDir, task.ResourceHash))
+		if task.ID != uuid.Nil {
+			add(filepath.Join(baseDownloadDir, task.ID.String()))
+		}
+		if name := strings.TrimSpace(task.Filename); name != "" {
+			add(filepath.Join(baseDownloadDir, name))
+		}
+	}
+	return out
+}
+
+func cancelFailedEd2kDownload(task models.AdminEd2kDownloadTask, paths ed2kDeletePaths) error {
+	hash := strings.TrimSpace(task.ResourceHash)
+	command := strings.TrimSpace(paths.amulecmdBin)
+	if hash == "" || command == "" || strings.TrimSpace(paths.remotePassword) == "" {
+		return nil
+	}
+	cmd := exec.Command(
+		command,
+		"-h", strings.TrimSpace(paths.remoteHost),
+		"-p", strings.TrimSpace(paths.remotePort),
+		"-P", strings.TrimSpace(paths.remotePassword),
+		"-c", "cancel "+hash,
+	)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	text := strings.TrimSpace(string(output))
+	if text == "" {
+		return fmt.Errorf("取消 aMule 下载失败: %w", err)
+	}
+	lower := strings.ToLower(text)
+	if strings.Contains(lower, "filehash not found") || strings.Contains(text, "文件校验码不存在") {
+		return nil
+	}
+	return fmt.Errorf("取消 aMule 下载失败: %s", text)
+}
+
+func pathWithinRoot(path, root string) bool {
+	path = strings.TrimSpace(path)
+	root = strings.TrimSpace(root)
+	if path == "" || root == "" {
+		return false
+	}
+	cleanPath := filepath.Clean(path)
+	cleanRoot := filepath.Clean(root)
+	rel, err := filepath.Rel(cleanRoot, cleanPath)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)))
+}
+
+func removeFailedEd2kPath(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("删除下载残留失败: %s: %w", path, err)
+	}
+	if info.IsDir() {
+		if err := os.RemoveAll(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("删除下载残留目录失败: %s: %w", path, err)
+		}
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("删除下载残留文件失败: %s: %w", path, err)
+	}
+	return nil
 }

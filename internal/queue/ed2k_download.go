@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -15,6 +16,13 @@ import (
 
 	"video-server/internal/models"
 )
+
+type ed2kDownloadRepository interface {
+	GetEd2kDownloadTask(ctx context.Context, id uuid.UUID) (models.AdminEd2kDownloadTask, error)
+	MarkEd2kDownloadTaskRunning(ctx context.Context, id uuid.UUID, progressText string, history models.AdminEd2kDownloadTaskHistoryItem) error
+	MarkEd2kDownloadTaskFailed(ctx context.Context, id uuid.UUID, errorMessage string, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error)
+	MarkEd2kDownloadTaskCompleted(ctx context.Context, id uuid.UUID, outputDir, downloadedPath string, files []models.AdminEd2kDownloadTaskFile, progressText string, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error)
+}
 
 // Ed2kDownloadExecutor runs a queued ED2K download task through an external binary.
 type Ed2kDownloadExecutor interface {
@@ -82,7 +90,11 @@ func (e CommandEd2kDownloadExecutor) Run(ctx context.Context, task models.AdminE
 }
 
 func (p *Processor) HandleEd2kDownload(ctx context.Context, task *asynq.Task) error {
-	if p.repo == nil {
+	return handleEd2kDownload(ctx, task, p.repo, p.ed2kExecutor, p.logger)
+}
+
+func handleEd2kDownload(ctx context.Context, task *asynq.Task, repo ed2kDownloadRepository, executor Ed2kDownloadExecutor, logger *slog.Logger) error {
+	if repo == nil {
 		return fmt.Errorf("ed2k download processor not configured")
 	}
 	var payload Ed2kDownloadPayload
@@ -93,15 +105,15 @@ func (p *Processor) HandleEd2kDownload(ctx context.Context, task *asynq.Task) er
 	if err != nil {
 		return fmt.Errorf("invalid ed2k task id: %w", err)
 	}
-	item, err := p.repo.GetEd2kDownloadTask(ctx, taskID)
+	item, err := repo.GetEd2kDownloadTask(ctx, taskID)
 	if err != nil {
 		return err
 	}
 	if item.Status != "queued" {
-		p.logger.Info("skip ed2k download task", "task_id", taskID.String(), "status", item.Status)
+		logger.Info("skip ed2k download task", "task_id", taskID.String(), "status", item.Status)
 		return nil
 	}
-	if err := p.repo.MarkEd2kDownloadTaskRunning(ctx, taskID, "下载任务已开始执行", models.AdminEd2kDownloadTaskHistoryItem{
+	if err := repo.MarkEd2kDownloadTaskRunning(ctx, taskID, "下载任务已开始执行", models.AdminEd2kDownloadTaskHistoryItem{
 		Kind:    "running",
 		Label:   "下载中",
 		Message: "外部执行器已接管任务",
@@ -109,20 +121,20 @@ func (p *Processor) HandleEd2kDownload(ctx context.Context, task *asynq.Task) er
 	}); err != nil {
 		return err
 	}
-	if p.ed2kExecutor == nil {
+	if executor == nil {
 		return fmt.Errorf("ed2k download executor not configured")
 	}
-	result, err := p.ed2kExecutor.Run(ctx, item)
+	result, err := executor.Run(ctx, item)
 	if err != nil {
-		_, _ = p.repo.MarkEd2kDownloadTaskFailed(ctx, taskID, err.Error(), models.AdminEd2kDownloadTaskHistoryItem{
+		_, _ = repo.MarkEd2kDownloadTaskFailed(ctx, taskID, err.Error(), models.AdminEd2kDownloadTaskHistoryItem{
 			Kind:    "failed",
 			Label:   "失败",
 			Message: err.Error(),
 			At:      time.Now(),
 		})
-		return err
+		return nil
 	}
-	updated, err := p.repo.MarkEd2kDownloadTaskCompleted(ctx, taskID, result.OutputDir, result.DownloadedPath, result.Files, result.ProgressText, models.AdminEd2kDownloadTaskHistoryItem{
+	updated, err := repo.MarkEd2kDownloadTaskCompleted(ctx, taskID, result.OutputDir, result.DownloadedPath, result.Files, result.ProgressText, models.AdminEd2kDownloadTaskHistoryItem{
 		Kind:    "completed",
 		Label:   "已完成",
 		Message: "下载任务执行完成",
@@ -131,6 +143,6 @@ func (p *Processor) HandleEd2kDownload(ctx context.Context, task *asynq.Task) er
 	if err != nil {
 		return err
 	}
-	p.logger.Info("ed2k download completed", "task_id", taskID.String(), "status", updated.Status, "output_dir", result.OutputDir)
+	logger.Info("ed2k download completed", "task_id", taskID.String(), "status", updated.Status, "output_dir", result.OutputDir)
 	return nil
 }

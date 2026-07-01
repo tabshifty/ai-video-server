@@ -178,6 +178,12 @@ func TestLoadIncludesEd2kDownloadConfig(t *testing.T) {
 	setRequiredEnv(t)
 	t.Setenv("ED2K_DOWNLOAD_EXECUTABLE", "/usr/local/bin/amulecmd")
 	t.Setenv("ED2K_DOWNLOAD_TIMEOUT_SECONDS", "123")
+	t.Setenv("ED2K_DOWNLOAD_ROOT", "/data/storage")
+	t.Setenv("ED2K_DOWNLOAD_SUBDIR", "downloads")
+	t.Setenv("AMULECMD_BIN", "/usr/local/bin/amulecmd")
+	t.Setenv("AMULE_REMOTE_HOST", "127.0.0.2")
+	t.Setenv("AMULE_REMOTE_PORT", "4713")
+	t.Setenv("AMULE_REMOTE_PASSWORD", "secret-pass")
 
 	cfg, err := Load()
 	if err != nil {
@@ -189,6 +195,24 @@ func TestLoadIncludesEd2kDownloadConfig(t *testing.T) {
 	}
 	if cfg.ED2KDownloadTimeout != 123*time.Second {
 		t.Fatalf("unexpected ED2KDownloadTimeout: %s", cfg.ED2KDownloadTimeout)
+	}
+	if cfg.ED2KDownloadRoot != "/data/storage" {
+		t.Fatalf("unexpected ED2KDownloadRoot: %s", cfg.ED2KDownloadRoot)
+	}
+	if cfg.ED2KDownloadSubdir != "downloads" {
+		t.Fatalf("unexpected ED2KDownloadSubdir: %s", cfg.ED2KDownloadSubdir)
+	}
+	if cfg.AMULECMDBin != "/usr/local/bin/amulecmd" {
+		t.Fatalf("unexpected AMULECMDBin: %s", cfg.AMULECMDBin)
+	}
+	if cfg.AMULERemoteHost != "127.0.0.2" {
+		t.Fatalf("unexpected AMULERemoteHost: %s", cfg.AMULERemoteHost)
+	}
+	if cfg.AMULERemotePort != "4713" {
+		t.Fatalf("unexpected AMULERemotePort: %s", cfg.AMULERemotePort)
+	}
+	if cfg.AMULERemotePassword != "secret-pass" {
+		t.Fatalf("unexpected AMULERemotePassword: %s", cfg.AMULERemotePassword)
 	}
 }
 
