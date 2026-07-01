@@ -63,84 +63,86 @@ type orphanFileScanRepository interface {
 
 // API bundles all HTTP handlers.
 type API struct {
-	repo                  *repository.VideoRepository
-	orphanFileScanRepo    orphanFileScanRepository
-	uploadSvc             *services.UploadService
-	chunkUpload           *services.ChunkUploadService
-	recSvc                *services.RecommendService
-	scrapeSvc             *services.ScraperService
-	appSvc                *services.AppService
-	imageSvc              *services.ImageService
-	subtitleSvc           *services.SubtitleService
-	archiveImportSvc      archiveImportService
-	tvAPKSvc              tvAPKService
-	iptvSvc               iptvService
-	enqueuer              taskEnqueuer
-	logger                *slog.Logger
-	redis                 *redis.Client
-	redisAddr             string
-	redisPassword         string
-	asynqQueue            string
-	jwtSecret             string
-	playSignSecret        string
-	playSignTTL           time.Duration
-	accessTTL             time.Duration
-	refreshTTL            time.Duration
-	maxVideoSize          int64
-	storageRoot           string
-	uploadTempDir         string
-	ed2kDownloadRoot      string
-	ed2kDownloadSubdir    string
-	amulecmdBin           string
-	amuleRemoteHost       string
-	amuleRemotePort       string
-	amuleRemotePassword   string
-	serverLogPath         string
-	adminWebDistPath      string
-	enableSwagger         bool
-	imageGenerationConfig ImageGenerationConfig
-	passwordVaultCipher   *services.PasswordVaultCipher
+	repo                   *repository.VideoRepository
+	orphanFileScanRepo     orphanFileScanRepository
+	uploadSvc              *services.UploadService
+	chunkUpload            *services.ChunkUploadService
+	recSvc                 *services.RecommendService
+	scrapeSvc              *services.ScraperService
+	appSvc                 *services.AppService
+	imageSvc               *services.ImageService
+	subtitleSvc            *services.SubtitleService
+	archiveImportSvc       archiveImportService
+	tvAPKSvc               tvAPKService
+	iptvSvc                iptvService
+	enqueuer               taskEnqueuer
+	logger                 *slog.Logger
+	redis                  *redis.Client
+	redisAddr              string
+	redisPassword          string
+	asynqQueue             string
+	jwtSecret              string
+	playSignSecret         string
+	playSignTTL            time.Duration
+	accessTTL              time.Duration
+	refreshTTL             time.Duration
+	maxVideoSize           int64
+	storageRoot            string
+	uploadTempDir          string
+	ed2kDownloadExecutable string
+	ed2kDownloadRoot       string
+	ed2kDownloadSubdir     string
+	amulecmdBin            string
+	amuleRemoteHost        string
+	amuleRemotePort        string
+	amuleRemotePassword    string
+	serverLogPath          string
+	adminWebDistPath       string
+	enableSwagger          bool
+	imageGenerationConfig  ImageGenerationConfig
+	passwordVaultCipher    *services.PasswordVaultCipher
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, ed2kDownloadRoot, ed2kDownloadSubdir, amulecmdBin, amuleRemoteHost, amuleRemotePort, amuleRemotePassword, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, ed2kDownloadExecutable, ed2kDownloadRoot, ed2kDownloadSubdir, amulecmdBin, amuleRemoteHost, amuleRemotePort, amuleRemotePassword, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
 	return &API{
-		repo:                  repo,
-		orphanFileScanRepo:    repo,
-		uploadSvc:             uploadSvc,
-		chunkUpload:           chunkUpload,
-		recSvc:                recSvc,
-		scrapeSvc:             scrapeSvc,
-		appSvc:                appSvc,
-		imageSvc:              imageSvc,
-		subtitleSvc:           subtitleSvc,
-		archiveImportSvc:      archiveImportSvc,
-		tvAPKSvc:              services.NewTVAPKService(repo, uploadTempDir, storageRoot),
-		iptvSvc:               services.NewIPTVService(repo, nil),
-		enqueuer:              enqueuer,
-		logger:                logger,
-		redis:                 redisClient,
-		redisAddr:             redisAddr,
-		redisPassword:         redisPassword,
-		asynqQueue:            asynqQueue,
-		jwtSecret:             jwtSecret,
-		playSignSecret:        playSignSecret,
-		playSignTTL:           10 * time.Minute,
-		accessTTL:             accessTTL,
-		refreshTTL:            refreshTTL,
-		maxVideoSize:          maxVideoSize,
-		storageRoot:           storageRoot,
-		uploadTempDir:         uploadTempDir,
-		ed2kDownloadRoot:      ed2kDownloadRoot,
-		ed2kDownloadSubdir:    ed2kDownloadSubdir,
-		amulecmdBin:           amulecmdBin,
-		amuleRemoteHost:       amuleRemoteHost,
-		amuleRemotePort:       amuleRemotePort,
-		amuleRemotePassword:   amuleRemotePassword,
-		serverLogPath:         serverLogPath,
-		adminWebDistPath:      adminWebDistPath,
-		enableSwagger:         enableSwagger,
-		imageGenerationConfig: imageGenerationConfig,
-		passwordVaultCipher:   passwordVaultCipher,
+		repo:                   repo,
+		orphanFileScanRepo:     repo,
+		uploadSvc:              uploadSvc,
+		chunkUpload:            chunkUpload,
+		recSvc:                 recSvc,
+		scrapeSvc:              scrapeSvc,
+		appSvc:                 appSvc,
+		imageSvc:               imageSvc,
+		subtitleSvc:            subtitleSvc,
+		archiveImportSvc:       archiveImportSvc,
+		tvAPKSvc:               services.NewTVAPKService(repo, uploadTempDir, storageRoot),
+		iptvSvc:                services.NewIPTVService(repo, nil),
+		enqueuer:               enqueuer,
+		logger:                 logger,
+		redis:                  redisClient,
+		redisAddr:              redisAddr,
+		redisPassword:          redisPassword,
+		asynqQueue:             asynqQueue,
+		jwtSecret:              jwtSecret,
+		playSignSecret:         playSignSecret,
+		playSignTTL:            10 * time.Minute,
+		accessTTL:              accessTTL,
+		refreshTTL:             refreshTTL,
+		maxVideoSize:           maxVideoSize,
+		storageRoot:            storageRoot,
+		uploadTempDir:          uploadTempDir,
+		ed2kDownloadExecutable: ed2kDownloadExecutable,
+		ed2kDownloadRoot:       ed2kDownloadRoot,
+		ed2kDownloadSubdir:     ed2kDownloadSubdir,
+		amulecmdBin:            amulecmdBin,
+		amuleRemoteHost:        amuleRemoteHost,
+		amuleRemotePort:        amuleRemotePort,
+		amuleRemotePassword:    amuleRemotePassword,
+		serverLogPath:          serverLogPath,
+		adminWebDistPath:       adminWebDistPath,
+		enableSwagger:          enableSwagger,
+		imageGenerationConfig:  imageGenerationConfig,
+		passwordVaultCipher:    passwordVaultCipher,
 	}
 }
 
@@ -291,6 +293,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/archive-import/batches/:id/process", a.AdminProcessArchiveImportBatch)
 			admin.POST("/archive-import/batches/:id/retry-extract", a.AdminRetryArchiveImportExtract)
 			admin.GET("/tasks", a.AdminTasks)
+			admin.GET("/ed2k-download/status", a.AdminEd2kDownloadStatus)
 			admin.GET("/ed2k-download/tasks", a.AdminEd2kDownloadTasks)
 			admin.POST("/ed2k-download/tasks", a.AdminCreateEd2kDownloadTasks)
 			admin.GET("/ed2k-download/tasks/:id", a.AdminEd2kDownloadTaskDetail)

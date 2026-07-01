@@ -54,6 +54,12 @@ type Ed2kServerlistRefreshPayload struct{}
 
 var ErrEd2kDownloadTaskInFlight = errors.New("ed2k download task already in flight")
 
+const (
+	ed2kDownloadPollMaxRetry = 20160
+	ed2kDownloadPollDelay    = 30 * time.Second
+	ed2kDownloadTaskTimeout  = time.Minute
+)
+
 // Enqueuer wraps asynq client operations.
 type Enqueuer struct {
 	client               *asynq.Client
@@ -156,15 +162,31 @@ func wrapEd2kDownloadEnqueueError(err error) error {
 
 func buildEd2kDownloadTaskOptions(queue, taskID string) []asynq.Option {
 	opts := []asynq.Option{
-		asynq.MaxRetry(3),
+		asynq.MaxRetry(ed2kDownloadPollMaxRetry),
 		asynq.ProcessIn(2 * time.Second),
 		asynq.Queue(queue),
-		asynq.Timeout(6 * time.Hour),
+		asynq.Timeout(ed2kDownloadTaskTimeout),
 	}
 	if strings.TrimSpace(taskID) != "" {
 		opts = append(opts, asynq.TaskID(taskID))
 	}
 	return opts
+}
+
+func Ed2kDownloadRetryDelayFunc(fallback asynq.RetryDelayFunc) asynq.RetryDelayFunc {
+	if fallback == nil {
+		fallback = asynq.DefaultRetryDelayFunc
+	}
+	return func(n int, err error, task *asynq.Task) time.Duration {
+		if task != nil && task.Type() == TypeEd2kDownload && errors.Is(err, ErrEd2kDownloadStillInProgress) {
+			return ed2kDownloadPollDelay
+		}
+		return fallback(n, err, task)
+	}
+}
+
+func IsEd2kDownloadFailure(err error) bool {
+	return !errors.Is(err, ErrEd2kDownloadStillInProgress)
 }
 
 func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Option {

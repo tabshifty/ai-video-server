@@ -8,6 +8,7 @@ import {
   normalizeEd2kCreateResults,
   mergeEd2kCreateSession,
   mergeEd2kDraftEntries,
+  getEd2kCreateResultMeta,
   buildPendingEd2kInput,
   shouldKeepEd2kCreateDialogOpen
 } from './toolbox.helpers'
@@ -127,6 +128,15 @@ describe('toolbox ed2k helpers', () => {
 
     expect(filterEd2kTasks(tasks, 'all').map((item) => item.id)).toEqual(['task-1', 'task-3'])
     expect(filterEd2kTasks(tasks, 'cancelled').map((item) => item.id)).toEqual(['task-3'])
+  })
+
+  it('maps ed2k create result status codes to Chinese labels', () => {
+    expect(getEd2kCreateResultMeta('created')).toEqual({ label: '已创建', tone: 'success' })
+    expect(getEd2kCreateResultMeta('reused')).toEqual({ label: '命中历史', tone: 'info' })
+    expect(getEd2kCreateResultMeta('duplicate')).toEqual({ label: '同次重复', tone: 'warning' })
+    expect(getEd2kCreateResultMeta('invalid')).toEqual({ label: '链接无效', tone: 'danger' })
+    expect(getEd2kCreateResultMeta('create_failed')).toEqual({ label: '创建失败', tone: 'danger' })
+    expect(getEd2kCreateResultMeta('enqueue_failed')).toEqual({ label: '入队失败', tone: 'danger' })
   })
 
   it('switches filter to the target task status when the current filtered view cannot show that task', () => {

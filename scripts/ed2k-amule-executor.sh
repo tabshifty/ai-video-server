@@ -11,6 +11,7 @@ TASK_ID="${ED2K_TASK_ID:-}"
 RESOURCE_HASH="${ED2K_RESOURCE_HASH:-}"
 FILENAME="${ED2K_FILENAME:-}"
 DECLARED_SIZE="${ED2K_DECLARED_SIZE:-0}"
+EXECUTOR_MODE="${ED2K_EXECUTOR_MODE:-submit}"
 
 AMULECMD_BIN="${AMULECMD_BIN:-amulecmd}"
 AMULED_BIN="${AMULED_BIN:-amuled}"
@@ -102,6 +103,8 @@ build_output_dir() {
 OUTPUT_DIR="$(build_output_dir)"
 mkdir -p "$OUTPUT_DIR"
 DOWNLOAD_BASE="$ED2K_DOWNLOAD_ROOT/$ED2K_DOWNLOAD_SUBDIR"
+SUBMIT_MARKER="$OUTPUT_DIR/.submitted_at"
+SEEN_MARKER="$OUTPUT_DIR/.download_seen"
 
 AMULE_CMD_BASE=(
   "$AMULECMD_BIN"
@@ -174,6 +177,31 @@ submit_ed2k_link() {
   "$ED2K_BIN" "$SOURCE_LINK" >/dev/null
 }
 
+touch_submit_marker() {
+  date '+%s' > "$SUBMIT_MARKER"
+}
+
+mark_download_seen() {
+  date '+%s' > "$SEEN_MARKER"
+}
+
+emit_nonterminal_json() {
+  local status="$1"
+  local progress_text="$2"
+  /usr/bin/python3 - "$status" "$progress_text" "$AMULECMD_BIN" <<'PY'
+import json
+import sys
+
+payload = {
+    "Status": sys.argv[1],
+    "ProgressText": sys.argv[2],
+    "Executor": sys.argv[3],
+    "Files": [],
+}
+print(json.dumps(payload, ensure_ascii=False))
+PY
+}
+
 collect_files_json() {
   local output_dir="$1"
   local downloaded_path="$2"
@@ -186,17 +214,23 @@ output_dir = os.path.abspath(sys.argv[1])
 downloaded_path = os.path.abspath(sys.argv[2]) if sys.argv[2] else ""
 items = []
 
-if os.path.isfile(downloaded_path):
+ignored_names = {".submitted_at", ".download_seen"}
+
+if os.path.isfile(downloaded_path) and os.path.basename(downloaded_path) not in ignored_names:
     targets = [downloaded_path]
 elif downloaded_path and os.path.isdir(downloaded_path):
     targets = []
     for root, _, files in os.walk(downloaded_path):
         for name in files:
+            if name in ignored_names:
+                continue
             targets.append(os.path.join(root, name))
 else:
     targets = []
     for root, _, files in os.walk(output_dir):
         for name in files:
+            if name in ignored_names:
+                continue
             targets.append(os.path.join(root, name))
 
 targets = sorted({os.path.abspath(path) for path in targets if os.path.isfile(path)})
@@ -231,14 +265,41 @@ guess_downloaded_path() {
 }
 
 has_output_files() {
-  find "$OUTPUT_DIR" -type f -print -quit | grep -q .
+  find "$OUTPUT_DIR" -type f ! -name '.submitted_at' ! -name '.download_seen' -print -quit | grep -q .
 }
 
 has_downloaded_file() {
-  if [[ -n "$FILENAME" && -f "$DOWNLOAD_BASE/$FILENAME" ]]; then
-    return 0
+  if [[ -z "$FILENAME" || ! -f "$DOWNLOAD_BASE/$FILENAME" ]]; then
+    return 1
   fi
-  return 1
+  /usr/bin/python3 - "$DOWNLOAD_BASE/$FILENAME" "$DECLARED_SIZE" "$SUBMIT_MARKER" <<'PY'
+import os
+import sys
+
+path = sys.argv[1]
+try:
+    declared_size = int(sys.argv[2])
+except ValueError:
+    declared_size = 0
+marker = sys.argv[3]
+
+try:
+    stat = os.stat(path)
+except OSError:
+    sys.exit(1)
+
+if declared_size > 0 and stat.st_size != declared_size:
+    sys.exit(1)
+
+if os.path.exists(marker):
+    try:
+        if stat.st_mtime + 1 < os.stat(marker).st_mtime:
+            sys.exit(1)
+    except OSError:
+        sys.exit(1)
+
+sys.exit(0)
+PY
 }
 
 mirror_downloaded_file() {
@@ -247,51 +308,25 @@ mirror_downloaded_file() {
   fi
 }
 
-ensure_amuled_ready
-wait_for_remote
+emit_completed_json() {
+  local progress_text="下载已完成"
+  local downloaded_path
+  local files_json
+  downloaded_path="$(guess_downloaded_path)"
+  files_json="$(collect_files_json "$OUTPUT_DIR" "$downloaded_path")"
 
-submit_ed2k_link
-
-start_epoch="$(date +%s)"
-deadline=$((start_epoch + ED2K_WAIT_TIMEOUT_SECONDS))
-progress_text="等待 aMule 接收 ED2K 链接"
-
-while true; do
-  if (( $(date +%s) > deadline )); then
-    printf 'ed2k download timed out after %s seconds\n' "$ED2K_WAIT_TIMEOUT_SECONDS" >&2
-    exit 69
+  if [[ "$files_json" == "[]" ]]; then
+    printf 'ed2k executor produced no files in %s\n' "$OUTPUT_DIR" >&2
+    exit 70
   fi
 
-  if has_downloaded_file; then
-    mirror_downloaded_file
-    progress_text="下载已完成"
-    break
-  fi
-
-  if has_output_files; then
-    progress_text="下载已完成"
-    break
-  fi
-
-  progress_text="等待 aMule 完成下载"
-
-  sleep "$ED2K_POLL_INTERVAL_SECONDS"
-done
-
-downloaded_path="$(guess_downloaded_path)"
-files_json="$(collect_files_json "$OUTPUT_DIR" "$downloaded_path")"
-
-if [[ "$files_json" == "[]" ]]; then
-  printf 'ed2k executor produced no files in %s\n' "$OUTPUT_DIR" >&2
-  exit 70
-fi
-
-/usr/bin/python3 - "$OUTPUT_DIR" "$downloaded_path" "$progress_text" "$AMULECMD_BIN" "$files_json" <<'PY'
+  /usr/bin/python3 - "$OUTPUT_DIR" "$downloaded_path" "$progress_text" "$AMULECMD_BIN" "$files_json" <<'PY'
 import json
 import os
 import sys
 
 payload = {
+    "Status": "completed",
     "OutputDir": os.path.abspath(sys.argv[1]),
     "DownloadedPath": os.path.abspath(sys.argv[2]),
     "ProgressText": sys.argv[3],
@@ -300,3 +335,59 @@ payload = {
 }
 print(json.dumps(payload, ensure_ascii=False))
 PY
+}
+
+run_submit_action() {
+  ensure_amuled_ready
+  wait_for_remote
+  touch_submit_marker
+  submit_ed2k_link
+  emit_nonterminal_json "running" "已提交到 aMule，等待同步下载状态"
+}
+
+run_status_action() {
+  ensure_amuled_ready
+  if ! wait_for_remote; then
+    emit_nonterminal_json "not_found" "等待 aMule 远程控制恢复"
+    return
+  fi
+
+  local listing
+  if ! listing="$(run_amulecmd "show dl")"; then
+    emit_nonterminal_json "not_found" "等待 aMule 同步下载状态"
+    return
+  fi
+  local entry
+  entry="$(find_download_entry "$listing" || true)"
+  if [[ -n "$entry" ]]; then
+    mark_download_seen
+    emit_nonterminal_json "running" "$(extract_progress_text "$entry")"
+    return
+  fi
+
+  if has_downloaded_file; then
+    mirror_downloaded_file
+    emit_completed_json
+    return
+  fi
+
+  if has_output_files; then
+    emit_completed_json
+    return
+  fi
+
+  emit_nonterminal_json "running" "等待 aMule 同步下载状态"
+}
+
+case "$(lower "$EXECUTOR_MODE")" in
+  submit)
+    run_submit_action
+    ;;
+  status)
+    run_status_action
+    ;;
+  *)
+    printf 'unsupported ED2K_EXECUTOR_MODE: %s\n' "$EXECUTOR_MODE" >&2
+    exit 64
+    ;;
+esac

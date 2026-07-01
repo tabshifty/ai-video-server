@@ -243,6 +243,21 @@ RETURNING id
 	return nil
 }
 
+func (r *VideoRepository) UpdateEd2kDownloadTaskProgress(ctx context.Context, id uuid.UUID, progressText string) error {
+	row := r.pool.QueryRow(ctx, `
+UPDATE ed2k_download_tasks
+SET progress_text = $2,
+    updated_at = NOW()
+WHERE id = $1 AND status = 'running'
+RETURNING id
+`, id, progressText)
+	var ignored uuid.UUID
+	if scanErr := row.Scan(&ignored); scanErr != nil {
+		return fmt.Errorf("update ed2k download task progress: %w", scanErr)
+	}
+	return nil
+}
+
 func (r *VideoRepository) MarkEd2kDownloadTaskCanceling(ctx context.Context, id uuid.UUID, progressText string, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
 	historyRaw, err := json.Marshal([]models.AdminEd2kDownloadTaskHistoryItem{history})
 	if err != nil {

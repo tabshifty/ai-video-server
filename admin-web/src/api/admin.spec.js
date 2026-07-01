@@ -46,6 +46,7 @@ import {
   generateAdminImage,
   createAdminArchiveImportGroup,
   cleanAdminEd2kDownloadTaskFiles,
+  getAdminEd2kDownloadStatus,
   getAdminImageCollections,
   getAdminImageGenerationStatus,
   getAdminImageViewBlob,
@@ -279,12 +280,14 @@ describe('ed2k download apis', () => {
     }
 
     await createAdminEd2kDownloadTasks(payload)
+    await getAdminEd2kDownloadStatus()
     await retryAdminEd2kDownloadTask('task-1')
     await retryAdminEd2kDownloadCleanup('task-1')
     await cleanAdminEd2kDownloadTaskFiles('task-1')
     await deleteAdminEd2kDownloadTask('task-1')
 
     expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks', payload)
+    expect(get).toHaveBeenCalledWith('/admin/ed2k-download/status')
     expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks/task-1/retry')
     expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks/task-1/retry-cleanup')
     expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks/task-1/clean-files')

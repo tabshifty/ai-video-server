@@ -36,9 +36,48 @@ func TestBuildEd2kDownloadTaskOptionsBindsTaskID(t *testing.T) {
 
 	assertOption(t, opts, asynq.QueueOpt, "transcode")
 	assertOption(t, opts, asynq.ProcessInOpt, 2*time.Second)
-	assertOption(t, opts, asynq.TimeoutOpt, 6*time.Hour)
-	assertOption(t, opts, asynq.MaxRetryOpt, 3)
+	assertOption(t, opts, asynq.TimeoutOpt, time.Minute)
+	assertOption(t, opts, asynq.MaxRetryOpt, ed2kDownloadPollMaxRetry)
 	assertOption(t, opts, asynq.TaskIDOpt, taskID)
+}
+
+func TestEd2kDownloadRetryDelayFuncUsesPollDelayForInProgress(t *testing.T) {
+	t.Parallel()
+
+	fallbackCalled := false
+	delayFunc := Ed2kDownloadRetryDelayFunc(func(int, error, *asynq.Task) time.Duration {
+		fallbackCalled = true
+		return 7 * time.Second
+	})
+
+	delay := delayFunc(1, ErrEd2kDownloadStillInProgress, asynq.NewTask(TypeEd2kDownload, nil))
+
+	if delay != ed2kDownloadPollDelay {
+		t.Fatalf("delay=%v want=%v", delay, ed2kDownloadPollDelay)
+	}
+	if fallbackCalled {
+		t.Fatal("did not expect fallback retry delay for ed2k in-progress")
+	}
+	if IsEd2kDownloadFailure(ErrEd2kDownloadStillInProgress) {
+		t.Fatal("in-progress sentinel should not count as failure")
+	}
+}
+
+func TestEd2kDownloadRetryDelayFuncFallsBackForOtherErrors(t *testing.T) {
+	t.Parallel()
+
+	delayFunc := Ed2kDownloadRetryDelayFunc(func(int, error, *asynq.Task) time.Duration {
+		return 7 * time.Second
+	})
+
+	delay := delayFunc(1, errors.New("boom"), asynq.NewTask(TypeEd2kDownload, nil))
+
+	if delay != 7*time.Second {
+		t.Fatalf("delay=%v want=7s", delay)
+	}
+	if !IsEd2kDownloadFailure(errors.New("boom")) {
+		t.Fatal("real errors should count as failures")
+	}
 }
 
 func TestWrapEd2kDownloadEnqueueErrorMapsTaskIDConflict(t *testing.T) {

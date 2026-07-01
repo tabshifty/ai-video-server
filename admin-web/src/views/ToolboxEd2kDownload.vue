@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Back, Delete, Download, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -10,6 +10,8 @@ import {
   cleanAdminEd2kDownloadTaskFiles,
   createAdminEd2kDownloadTasks,
   deleteAdminEd2kDownloadTask,
+  getAdminEd2kDownloadStatus,
+  getAdminEd2kDownloadTask,
   getAdminEd2kDownloadTasks,
   retryAdminEd2kDownloadCleanup,
   retryAdminEd2kDownloadTask
@@ -18,6 +20,7 @@ import {
   buildEd2kTaskFocusState,
   buildPendingEd2kInput,
   filterEd2kTasks,
+  getEd2kCreateResultMeta,
   mergeEd2kCreateSession,
   mergeEd2kDraftEntries,
   normalizeEd2kCreateResults,
@@ -36,7 +39,12 @@ const tasks = ref([])
 const selectedTaskID = ref('')
 const pendingFocusTaskID = ref('')
 const loadingTasks = ref(false)
+const totalTaskCount = ref(0)
+const lastTasksLoadedAt = ref('')
+const downloadStatus = ref(null)
+const loadingDownloadStatus = ref(false)
 const submitting = ref(false)
+let pollTimer = null
 
 const statusOptions = [
   { value: 'all', label: '全部' },
@@ -75,15 +83,20 @@ const canSubmit = computed(() => pendingCreateEntries.value.length > 0)
 const linkCount = computed(() => parsedLinks.value.links.length)
 const invalidCount = computed(() => parsedLinks.value.invalidCount)
 const visibleTasks = computed(() => filterEd2kTasks(tasks.value, currentFilter.value))
-const selectedTask = computed(() => visibleTasks.value.find((task) => task.id === selectedTaskID.value) || visibleTasks.value[0] || null)
+const selectedTask = computed(() => tasks.value.find((task) => task.id === selectedTaskID.value) || null)
 const selectedTaskLabel = computed(() => selectedTask.value ? taskStatusLabelMap[selectedTask.value.status] || selectedTask.value.status : '暂无任务')
 const selectedTaskTone = computed(() => selectedTask.value ? taskStatusToneMap[selectedTask.value.status] || 'info' : 'info')
 const selectedTaskFiles = computed(() => selectedTask.value?.files || [])
 const selectedTaskHasFiles = computed(() => selectedTaskFiles.value.length > 0)
 const selectedTaskHistory = computed(() => selectedTask.value?.history || [])
+const selectedTaskLatestHistoryAt = computed(() => selectedTaskHistory.value.map((item) => item.at || item.At || '').filter(Boolean).at(-1) || '')
 const hasHistoryHit = computed(() => selectedTask.value?.history?.some((item) => item.kind === 'history') || false)
 const selectedTaskProgressText = computed(() => selectedTask.value?.progressText || selectedTask.value?.progress_text || '等待执行器接管')
 const selectedTaskErrorMessage = computed(() => selectedTask.value?.errorMessage || selectedTask.value?.error_message || '')
+const selectedTaskOutsideFilter = computed(() => {
+  if (!selectedTask.value || currentFilter.value === 'all') return false
+  return selectedTask.value.status !== currentFilter.value
+})
 const canDeleteSelectedTask = computed(() => ['queued', 'running', 'canceling', 'failed'].includes(selectedTask.value?.status || ''))
 const canCleanSelectedTaskFiles = computed(() => selectedTask.value?.status === 'completed')
 const canRetrySelectedTask = computed(() => selectedTask.value?.status === 'files_cleaned')
@@ -102,32 +115,43 @@ const selectedTaskCleanedAtLabel = computed(() => {
   return '清理完成时间'
 })
 const selectedTaskDeleteActionLabel = computed(() => buildDeleteTaskActionCopy(selectedTask.value).actionLabel)
-
-onMounted(() => {
-  void loadTasks()
+const hasActiveTasks = computed(() => tasks.value.some((task) => isActiveStatus(task.status)))
+const pollIntervalText = computed(() => hasActiveTasks.value ? '有进行中任务时每 5 秒' : '空闲时每 30 秒')
+const lastTasksLoadedAtLabel = computed(() => lastTasksLoadedAt.value ? formatDateTime(lastTasksLoadedAt.value) : '尚未刷新')
+const engineLevel = computed(() => downloadStatus.value?.engine?.level || 'unknown')
+const engineSummary = computed(() => downloadStatus.value?.engine?.summary || '正在检查下载引擎状态')
+const engineLastError = computed(() => downloadStatus.value?.engine?.last_error || '')
+const engineCheckedAtLabel = computed(() => downloadStatus.value?.engine?.checked_at ? formatDateTime(downloadStatus.value.engine.checked_at) : '尚未检查')
+const engineTone = computed(() => {
+  const level = engineLevel.value
+  if (level === 'healthy') return 'success'
+  if (level === 'degraded') return 'warning'
+  if (level === 'down' || level === 'misconfigured') return 'danger'
+  return 'info'
+})
+const engineLevelLabel = computed(() => {
+  const map = {
+    healthy: '下载引擎正常',
+    degraded: '下载引擎需关注',
+    down: '下载引擎异常',
+    misconfigured: '下载引擎未配置',
+    unknown: '下载引擎未知'
+  }
+  return map[engineLevel.value] || map.unknown
 })
 
-watch(
-  visibleTasks,
-  (value) => {
-    if (!value.length) {
-      if (!pendingFocusTaskID.value) {
-        selectedTaskID.value = ''
-      }
-      return
-    }
-    if (pendingFocusTaskID.value && value.some((task) => task.id === pendingFocusTaskID.value)) {
-      selectedTaskID.value = pendingFocusTaskID.value
-      pendingFocusTaskID.value = ''
-      return
-    }
-    if (!value.some((task) => task.id === selectedTaskID.value)) {
-      selectedTaskID.value = value[0].id
-    }
-    pendingFocusTaskID.value = ''
-  },
-  { immediate: true }
-)
+onMounted(async () => {
+  await Promise.all([loadTasks(), loadDownloadStatus()])
+  scheduleNextPoll()
+})
+
+onUnmounted(() => {
+  clearPollTimer()
+})
+
+watch([visibleTasks, tasks], () => {
+  reconcileSelectedTask()
+}, { immediate: true })
 
 function isActiveStatus(status) {
   return status === 'queued' || status === 'running' || status === 'canceling'
@@ -167,42 +191,120 @@ function normalizeTask(task) {
   }
 }
 
-async function loadTasks() {
+async function loadTasks(options = {}) {
+  if (loadingTasks.value) {
+    return
+  }
   loadingTasks.value = true
   try {
     const params = {
       page: 1,
       page_size: 100
     }
-    if (currentFilter.value !== 'all') {
-      params.status = currentFilter.value
-    }
     const data = await getAdminEd2kDownloadTasks(params)
     tasks.value = (data.items || []).map((item) => normalizeTask(item))
-    if (tasks.value.length === 0) {
-      if (!pendingFocusTaskID.value) {
-        selectedTaskID.value = ''
-      }
-      return
-    }
-    if (pendingFocusTaskID.value && tasks.value.some((task) => task.id === pendingFocusTaskID.value)) {
-      selectedTaskID.value = pendingFocusTaskID.value
-      pendingFocusTaskID.value = ''
-      return
-    }
-    if (!tasks.value.some((task) => task.id === selectedTaskID.value)) {
-      selectedTaskID.value = tasks.value[0].id
-    }
-    pendingFocusTaskID.value = ''
+    totalTaskCount.value = Number(data.total_count || data.totalCount || tasks.value.length)
+    lastTasksLoadedAt.value = new Date().toISOString()
+    reconcileSelectedTask()
   } catch (error) {
-    ElMessage.error(error?.response?.data?.msg || error?.message || '加载下载任务失败')
+    if (!options.silent) {
+      ElMessage.error(error?.response?.data?.msg || error?.message || '加载下载任务失败')
+    }
   } finally {
     loadingTasks.value = false
   }
 }
 
+async function loadSelectedTask(options = {}) {
+  const taskID = selectedTaskID.value
+  if (!taskID) {
+    return
+  }
+  try {
+    const item = normalizeTask(await getAdminEd2kDownloadTask(taskID))
+    applyTaskSnapshot(item)
+  } catch (error) {
+    if (!options.silent) {
+      ElMessage.error(error?.response?.data?.msg || error?.message || '刷新任务详情失败')
+    }
+  }
+}
+
+async function loadDownloadStatus(options = {}) {
+  if (loadingDownloadStatus.value) {
+    return
+  }
+  loadingDownloadStatus.value = true
+  try {
+    downloadStatus.value = await getAdminEd2kDownloadStatus()
+  } catch (error) {
+    if (!options.silent) {
+      ElMessage.error(error?.response?.data?.msg || error?.message || '加载下载引擎状态失败')
+    }
+  } finally {
+    loadingDownloadStatus.value = false
+  }
+}
+
+function reconcileSelectedTask() {
+  if (pendingFocusTaskID.value && tasks.value.some((task) => task.id === pendingFocusTaskID.value)) {
+    selectedTaskID.value = pendingFocusTaskID.value
+    pendingFocusTaskID.value = ''
+    return
+  }
+  if (selectedTaskID.value && tasks.value.some((task) => task.id === selectedTaskID.value)) {
+    pendingFocusTaskID.value = ''
+    return
+  }
+  if (visibleTasks.value.length > 0) {
+    selectedTaskID.value = visibleTasks.value[0].id
+    pendingFocusTaskID.value = ''
+    return
+  }
+  if (tasks.value.length > 0 && !selectedTaskID.value) {
+    selectedTaskID.value = tasks.value[0].id
+    pendingFocusTaskID.value = ''
+    return
+  }
+  if (tasks.value.length === 0) {
+    selectedTaskID.value = ''
+    pendingFocusTaskID.value = ''
+  }
+}
+
+async function refreshWorkbench(options = {}) {
+  await loadTasks(options)
+  await Promise.all([loadSelectedTask(options), loadDownloadStatus(options)])
+}
+
+async function manualRefresh() {
+  await refreshWorkbench()
+  scheduleNextPoll()
+}
+
+function clearPollTimer() {
+  if (pollTimer) {
+    window.clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+function scheduleNextPoll() {
+  clearPollTimer()
+  const delay = hasActiveTasks.value ? 5000 : 30000
+  pollTimer = window.setTimeout(async () => {
+    if (document.visibilityState === 'hidden') {
+      scheduleNextPoll()
+      return
+    }
+    await refreshWorkbench({ silent: true })
+    scheduleNextPoll()
+  }, delay)
+}
+
 function selectTask(task) {
   selectedTaskID.value = task.id
+  void loadSelectedTask({ silent: true })
 }
 
 function applyTaskSnapshot(task) {
@@ -227,12 +329,11 @@ async function focusTask(task) {
   selectedTaskID.value = nextSelectedTaskID
   if (filter !== currentFilter.value) {
     currentFilter.value = filter
-    await loadTasks()
-    return
   }
   if (!tasks.value.some((item) => item.id === nextSelectedTaskID)) {
-    await loadTasks()
+    await refreshWorkbench()
   }
+  await loadSelectedTask({ silent: true })
 }
 
 async function submitLinks() {
@@ -289,7 +390,7 @@ async function submitLinks() {
 
 function setFilter(status) {
   currentFilter.value = status
-  void loadTasks()
+  reconcileSelectedTask()
 }
 
 async function deleteTask(task) {
@@ -302,8 +403,9 @@ async function deleteTask(task) {
     })
     const result = await deleteAdminEd2kDownloadTask(task.id)
     if (result?.deleted) {
-      await loadTasks()
+      await refreshWorkbench()
       ElMessage.success('任务已删除')
+      scheduleNextPoll()
       return
     }
     const updatedTask = normalizeTask(result || {})
@@ -315,17 +417,21 @@ async function deleteTask(task) {
     }
     if (updatedTask.status === 'cancelled' && updatedTask.errorMessage) {
       ElMessage.warning(updatedTask.progressText || '任务已取消，仍有残留待清理')
+      scheduleNextPoll()
       return
     }
     if (updatedTask.status === 'cancelled') {
       ElMessage.success('任务已取消')
+      scheduleNextPoll()
       return
     }
     if (updatedTask.status === 'canceling') {
       ElMessage.warning(updatedTask.progressText || '取消失败，请重试')
+      scheduleNextPoll()
       return
     }
     ElMessage.success(actionCopy.successMessage)
+    scheduleNextPoll()
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error?.response?.data?.msg || error?.message || '删除任务失败')
@@ -344,6 +450,7 @@ async function cleanTaskFiles(task) {
     applyTaskSnapshot(item)
     await focusTask(item)
     ElMessage.success('暂存文件已清理')
+    scheduleNextPoll()
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error?.response?.data?.msg || error?.message || '删除暂存文件失败')
@@ -357,6 +464,7 @@ async function retryTask(task) {
     applyTaskSnapshot(item)
     await focusTask(item)
     ElMessage.success('任务已重新加入下载队列')
+    scheduleNextPoll()
   } catch (error) {
     ElMessage.error(error?.response?.data?.msg || error?.message || '重新下载失败')
   }
@@ -368,6 +476,7 @@ async function retryCleanup(task) {
     applyTaskSnapshot(item)
     await focusTask(item)
     ElMessage.success('残留清理已重试完成')
+    scheduleNextPoll()
   } catch (error) {
     ElMessage.error(error?.response?.data?.msg || error?.message || '重试清理失败')
   }
@@ -473,9 +582,23 @@ function buildDeleteTaskActionCopy(task) {
         <template #actions>
           <el-button type="primary" :icon="Plus" @click="openCreateDialog">新建任务</el-button>
           <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
-          <el-button :icon="RefreshRight" :loading="loadingTasks" @click="loadTasks">刷新任务</el-button>
+          <el-button :icon="RefreshRight" :loading="loadingTasks || loadingDownloadStatus" @click="manualRefresh">刷新工作台</el-button>
         </template>
       </PageHeader>
+
+      <section class="workbench-status" aria-label="ED2K 下载引擎状态">
+        <div class="workbench-status__main">
+          <el-tag :type="engineTone" effect="plain">{{ engineLevelLabel }}</el-tag>
+          <strong>{{ engineSummary }}</strong>
+          <span v-if="engineLastError">最近错误：{{ engineLastError }}</span>
+        </div>
+        <div class="workbench-status__meta">
+          <span>自动刷新：{{ pollIntervalText }}</span>
+          <span>列表更新于：{{ lastTasksLoadedAtLabel }}</span>
+          <span>引擎检查于：{{ engineCheckedAtLabel }}</span>
+          <span v-if="totalTaskCount > tasks.length">当前仅加载最近 {{ tasks.length }} / {{ totalTaskCount }} 条任务</span>
+        </div>
+      </section>
 
       <section class="task-workspace">
         <SectionCard class="task-list-card">
@@ -531,6 +654,7 @@ function buildDeleteTaskActionCopy(task) {
           </template>
 
           <div class="detail-stack">
+            <p v-if="selectedTaskOutsideFilter" class="history-hit">当前任务已从“{{ taskStatusLabelMap[currentFilter] || currentFilter }}”切换为“{{ selectedTaskLabel }}”，详情已保留。</p>
             <div class="source-block">
               <div class="source-block__row">
                 <span class="source-block__label">原始链接</span>
@@ -572,6 +696,10 @@ function buildDeleteTaskActionCopy(task) {
                 <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
                 <p>{{ selectedTaskProgressText }}</p>
                 <p v-if="selectedTaskErrorMessage">{{ selectedTaskErrorMessage }}</p>
+                <p>任务创建时间：{{ formatDateTime(selectedTask.createdAt) }}</p>
+                <p>最近更新时间：{{ formatDateTime(selectedTask.updatedAt) }}</p>
+                <p v-if="selectedTask.startedAt">开始执行时间：{{ formatDateTime(selectedTask.startedAt) }}</p>
+                <p v-if="selectedTaskLatestHistoryAt">最近事件时间：{{ formatDateTime(selectedTaskLatestHistoryAt) }}</p>
                 <p v-if="selectedTask.finishedAt && !['queued', 'running', 'canceling'].includes(selectedTask.status)">{{ selectedTaskFinishedAtLabel }}：{{ formatDateTime(selectedTask.finishedAt) }}</p>
                 <p v-if="selectedTask.cleanedAt && ['files_cleaned', 'cancelled'].includes(selectedTask.status)">{{ selectedTaskCleanedAtLabel }}：{{ formatDateTime(selectedTask.cleanedAt) }}</p>
               </div>
@@ -614,9 +742,10 @@ function buildDeleteTaskActionCopy(task) {
               <template #description>只要历史任务存在，就算已经下载过。</template>
 
               <div v-if="selectedTaskHistory.length > 0" class="history-list">
-                <article v-for="item in selectedTaskHistory" :key="`${selectedTask.id}-${item.kind}-${item.label}`" class="history-item">
+                <article v-for="(item, index) in selectedTaskHistory" :key="`${selectedTask.id}-${item.kind}-${item.label}-${item.at || item.At || index}`" class="history-item">
                   <strong>{{ item.label }}</strong>
                   <span>{{ item.message }}</span>
+                  <span>{{ formatDateTime(item.at || item.At) }}</span>
                 </article>
               </div>
               <EmptyState v-else title="暂无历史" description="该任务还没有历史记录。" />
@@ -661,8 +790,8 @@ function buildDeleteTaskActionCopy(task) {
             <strong>第 {{ item.lineNumber }} 行 · {{ item.message }}</strong>
             <span>{{ item.sourceLink }}</span>
             <div class="action-row">
-              <el-tag size="small" :type="item.status === 'created' ? 'success' : item.status === 'reused' ? 'info' : item.status === 'duplicate' ? 'warning' : 'danger'" effect="plain">
-                {{ item.status }}
+              <el-tag size="small" :type="getEd2kCreateResultMeta(item.status).tone" effect="plain">
+                {{ getEd2kCreateResultMeta(item.status).label }}
               </el-tag>
               <el-button v-if="item.task?.id" text type="primary" @click="focusTask(item.task)">定位任务</el-button>
             </div>
@@ -737,6 +866,28 @@ function buildDeleteTaskActionCopy(task) {
   display: grid;
   gap: var(--space-4);
   align-items: start;
+}
+
+.workbench-status {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.workbench-status__main,
+.workbench-status__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.workbench-status__meta {
+  color: var(--text-secondary);
+  font-size: var(--text-small);
 }
 
 .task-list-card,

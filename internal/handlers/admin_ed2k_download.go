@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -104,6 +105,109 @@ func (a *API) AdminEd2kDownloadTasks(c *gin.Context) {
 		"page":        page,
 		"page_size":   pageSize,
 	})
+}
+
+func (a *API) AdminEd2kDownloadStatus(c *gin.Context) {
+	engine := a.buildEd2kEngineStatus(c.Request.Context(), time.Now())
+	ok(c, gin.H{
+		"engine": engine,
+		"serverlist": gin.H{
+			"status":     "unknown",
+			"checked_at": nil,
+			"message":    "server.met 定时刷新结果当前仅记录在 worker 日志",
+		},
+	})
+}
+
+func (a *API) buildEd2kEngineStatus(ctx context.Context, checkedAt time.Time) gin.H {
+	required := []struct {
+		value   string
+		message string
+	}{
+		{a.ed2kDownloadExecutable, "ED2K 下载执行器未配置"},
+		{a.ed2kDownloadRoot, "ED2K 下载根目录未配置"},
+		{a.amulecmdBin, "amulecmd 未配置"},
+		{a.amuleRemoteHost, "aMule 远程控制主机未配置"},
+		{a.amuleRemotePort, "aMule 远程控制端口未配置"},
+		{a.amuleRemotePassword, "aMule 远程控制密码未配置"},
+	}
+	for _, item := range required {
+		if strings.TrimSpace(item.value) == "" {
+			return ed2kEngineStatusPayload("misconfigured", item.message, checkedAt, item.message, false, false)
+		}
+	}
+	if !isExecutableAvailable(a.ed2kDownloadExecutable) {
+		return ed2kEngineStatusPayload("misconfigured", "ED2K 下载执行器不可执行", checkedAt, "执行器脚本不可执行或不存在", false, false)
+	}
+	if !isExecutableAvailable(a.amulecmdBin) {
+		return ed2kEngineStatusPayload("misconfigured", "amulecmd 不可执行", checkedAt, "amulecmd 不可执行或不存在", false, false)
+	}
+	if stat, err := os.Stat(a.ed2kDownloadRoot); err != nil || !stat.IsDir() {
+		return ed2kEngineStatusPayload("misconfigured", "ED2K 下载根目录不可用", checkedAt, "下载根目录不存在或不是目录", false, false)
+	}
+
+	helpOutput, err := a.runAmulecmdHealthCommand(ctx, "help")
+	if err != nil {
+		return ed2kEngineStatusPayload("down", "下载引擎异常：当前只能创建任务记录，无法开始下载", checkedAt, sanitizeEd2kHealthError(err.Error(), a.amuleRemotePassword), true, false)
+	}
+	statusOutput, err := a.runAmulecmdHealthCommand(ctx, "status")
+	if err != nil {
+		return ed2kEngineStatusPayload("degraded", "下载引擎远程控制可达，但 ED2K 网络状态查询失败", checkedAt, sanitizeEd2kHealthError(err.Error(), a.amuleRemotePassword), true, true)
+	}
+	if looksEd2kDisconnected(statusOutput) {
+		return ed2kEngineStatusPayload("degraded", "下载引擎可接收任务，但当前未连接 ED2K 网络", checkedAt, "", true, true)
+	}
+	if strings.TrimSpace(helpOutput) == "" {
+		return ed2kEngineStatusPayload("degraded", "下载引擎远程控制返回为空，请检查 aMule 状态", checkedAt, "", true, true)
+	}
+	return ed2kEngineStatusPayload("healthy", "下载引擎正常：aMule 远程控制已连接，可接收新任务", checkedAt, "", true, true)
+}
+
+func (a *API) runAmulecmdHealthCommand(ctx context.Context, command string) (string, error) {
+	runCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(runCtx, a.amulecmdBin, "-h", a.amuleRemoteHost, "-p", a.amuleRemotePort, "-P", a.amuleRemotePassword, "-c", command)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if stderr.Len() > 0 {
+			return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+		}
+		return "", err
+	}
+	return stdout.String(), nil
+}
+
+func ed2kEngineStatusPayload(level, summary string, checkedAt time.Time, lastError string, configured, remoteReachable bool) gin.H {
+	return gin.H{
+		"level":            level,
+		"summary":          summary,
+		"checked_at":       checkedAt,
+		"last_error":       strings.TrimSpace(lastError),
+		"configured":       configured,
+		"remote_reachable": remoteReachable,
+	}
+}
+
+func isExecutableAvailable(path string) bool {
+	_, err := exec.LookPath(strings.TrimSpace(path))
+	return err == nil
+}
+
+func sanitizeEd2kHealthError(message, password string) string {
+	out := strings.TrimSpace(message)
+	if strings.TrimSpace(password) != "" {
+		out = strings.ReplaceAll(out, password, "[已隐藏]")
+	}
+	return out
+}
+
+func looksEd2kDisconnected(output string) bool {
+	normalized := strings.ToLower(output)
+	return strings.Contains(normalized, "ed2k: disconnected") ||
+		strings.Contains(normalized, "ed2k: not connected") ||
+		strings.Contains(normalized, "not connected to ed2k")
 }
 
 func (a *API) AdminCreateEd2kDownloadTasks(c *gin.Context) {

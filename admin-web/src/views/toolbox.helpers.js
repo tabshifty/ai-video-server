@@ -145,6 +145,19 @@ export function shouldKeepEd2kCreateDialogOpen(entries, results) {
   )
 }
 
+export function getEd2kCreateResultMeta(status) {
+  const normalized = String(status || '').trim()
+  const map = {
+    created: { label: '已创建', tone: 'success' },
+    reused: { label: '命中历史', tone: 'info' },
+    duplicate: { label: '同次重复', tone: 'warning' },
+    invalid: { label: '链接无效', tone: 'danger' },
+    create_failed: { label: '创建失败', tone: 'danger' },
+    enqueue_failed: { label: '入队失败', tone: 'danger' }
+  }
+  return map[normalized] || { label: '未知结果', tone: 'info' }
+}
+
 export function filterEd2kTasks(tasks, statusFilter) {
   const list = (Array.isArray(tasks) ? tasks : []).filter((task) => String(task?.status || '') !== 'deleted')
   if (!statusFilter || statusFilter === 'all') {

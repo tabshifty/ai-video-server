@@ -26,8 +26,8 @@ func TestCommandEd2kDownloadExecutorPassesTaskMetadataByEnv(t *testing.T) {
 	script := strings.Join([]string{
 		"#!/usr/bin/env bash",
 		"set -euo pipefail",
-		"printf '{\"task_id\":\"%s\",\"title\":\"%s\",\"resource_hash\":\"%s\",\"filename\":\"%s\",\"declared_size\":\"%s\",\"source_link\":\"%s\"}' \"$ED2K_TASK_ID\" \"$ED2K_TASK_TITLE\" \"$ED2K_RESOURCE_HASH\" \"$ED2K_FILENAME\" \"$ED2K_DECLARED_SIZE\" \"$ED2K_SOURCE_LINK\" > \"$1\"",
-		"printf '{\"OutputDir\":\"/tmp/ed2k\",\"DownloadedPath\":\"/tmp/ed2k/file.mkv\",\"ProgressText\":\"下载已完成\",\"Files\":[{\"name\":\"file.mkv\",\"path\":\"file.mkv\",\"size\":12}]}'",
+		"printf '{\"task_id\":\"%s\",\"title\":\"%s\",\"resource_hash\":\"%s\",\"filename\":\"%s\",\"declared_size\":\"%s\",\"source_link\":\"%s\",\"mode\":\"%s\"}' \"$ED2K_TASK_ID\" \"$ED2K_TASK_TITLE\" \"$ED2K_RESOURCE_HASH\" \"$ED2K_FILENAME\" \"$ED2K_DECLARED_SIZE\" \"$ED2K_SOURCE_LINK\" \"$ED2K_EXECUTOR_MODE\" > \"$1\"",
+		"printf '{\"Status\":\"completed\",\"OutputDir\":\"/tmp/ed2k\",\"DownloadedPath\":\"/tmp/ed2k/file.mkv\",\"ProgressText\":\"下载已完成\",\"Files\":[{\"name\":\"file.mkv\",\"path\":\"file.mkv\",\"size\":12}]}'",
 	}, "\n")
 	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write script: %v", err)
@@ -47,7 +47,7 @@ func TestCommandEd2kDownloadExecutorPassesTaskMetadataByEnv(t *testing.T) {
 		Args:    []string{capturePath},
 	}
 
-	result, err := executor.Run(context.Background(), task)
+	result, err := executor.Submit(context.Background(), task)
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -69,6 +69,7 @@ func TestCommandEd2kDownloadExecutorPassesTaskMetadataByEnv(t *testing.T) {
 		Filename     string `json:"filename"`
 		DeclaredSize string `json:"declared_size"`
 		SourceLink   string `json:"source_link"`
+		Mode         string `json:"mode"`
 	}
 	if err := json.Unmarshal(raw, &captured); err != nil {
 		t.Fatalf("unmarshal capture: %v", err)
@@ -91,6 +92,9 @@ func TestCommandEd2kDownloadExecutorPassesTaskMetadataByEnv(t *testing.T) {
 	if captured.SourceLink != task.SourceLink {
 		t.Fatalf("unexpected source link: %s", captured.SourceLink)
 	}
+	if captured.Mode != ed2kExecutorModeSubmit {
+		t.Fatalf("unexpected executor mode: %s", captured.Mode)
+	}
 }
 
 func TestHandleEd2kDownloadMarksFailedAndStopsAsynqRetry(t *testing.T) {
@@ -110,16 +114,19 @@ func TestHandleEd2kDownloadMarksFailedAndStopsAsynqRetry(t *testing.T) {
 			Status: "running",
 		},
 	}
-	executor := ed2kDownloadExecutorStub{err: errors.New("executor failed")}
+	executor := ed2kDownloadExecutorStub{submitErr: errors.New("executor failed")}
 	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	err := handleEd2kDownload(context.Background(), task, repo, executor, logger)
+	err := handleEd2kDownload(context.Background(), task, repo, &executor, logger)
 	if err != nil {
 		t.Fatalf("handleEd2kDownload() error = %v, want nil", err)
 	}
 	if !repo.runningCalled {
 		t.Fatal("expected task to enter running before executor failure")
+	}
+	if !executor.submitCalled {
+		t.Fatal("expected queued task to call submit")
 	}
 	if !repo.failedCalled {
 		t.Fatal("expected task to be marked failed")
@@ -139,7 +146,7 @@ func TestHandleEd2kDownloadSkipsLateResultWhenTaskLeavesRunning(t *testing.T) {
 	repo := &ed2kDownloadRepoStub{
 		task: models.AdminEd2kDownloadTask{
 			ID:           taskID,
-			Status:       "queued",
+			Status:       "running",
 			SourceLink:   "ed2k://|file|demo.mkv|123|ABCDEF1234567890|/",
 			ResourceHash: "ABCDEF1234567890",
 			Filename:     "demo.mkv",
@@ -150,7 +157,8 @@ func TestHandleEd2kDownloadSkipsLateResultWhenTaskLeavesRunning(t *testing.T) {
 		},
 	}
 	executor := ed2kDownloadExecutorStub{
-		result: Ed2kDownloadResult{
+		statusResult: Ed2kDownloadResult{
+			Status:         ed2kDownloadStatusCompleted,
 			OutputDir:      "/tmp/ed2k",
 			DownloadedPath: "/tmp/ed2k/demo.mkv",
 			ProgressText:   "下载已完成",
@@ -162,7 +170,7 @@ func TestHandleEd2kDownloadSkipsLateResultWhenTaskLeavesRunning(t *testing.T) {
 	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	if err := handleEd2kDownload(context.Background(), task, repo, executor, logger); err != nil {
+	if err := handleEd2kDownload(context.Background(), task, repo, &executor, logger); err != nil {
 		t.Fatalf("handleEd2kDownload() error = %v", err)
 	}
 	if repo.completedCalled {
@@ -180,7 +188,7 @@ func TestHandleEd2kDownloadTreatsConditionalCompleteMissAsLateResult(t *testing.
 	repo := &ed2kDownloadRepoStub{
 		task: models.AdminEd2kDownloadTask{
 			ID:           taskID,
-			Status:       "queued",
+			Status:       "running",
 			SourceLink:   "ed2k://|file|demo.mkv|123|ABCDEF1234567890|/",
 			ResourceHash: "ABCDEF1234567890",
 			Filename:     "demo.mkv",
@@ -192,7 +200,8 @@ func TestHandleEd2kDownloadTreatsConditionalCompleteMissAsLateResult(t *testing.
 		completeErr: errors.New("mark ed2k download task completed: no rows in result set"),
 	}
 	executor := ed2kDownloadExecutorStub{
-		result: Ed2kDownloadResult{
+		statusResult: Ed2kDownloadResult{
+			Status:         ed2kDownloadStatusCompleted,
 			OutputDir:      "/tmp/ed2k",
 			DownloadedPath: "/tmp/ed2k/demo.mkv",
 			ProgressText:   "下载已完成",
@@ -202,11 +211,52 @@ func TestHandleEd2kDownloadTreatsConditionalCompleteMissAsLateResult(t *testing.
 	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	if err := handleEd2kDownload(context.Background(), task, repo, executor, logger); err != nil {
+	if err := handleEd2kDownload(context.Background(), task, repo, &executor, logger); err != nil {
 		t.Fatalf("handleEd2kDownload() should swallow late-result conditional miss, got %v", err)
 	}
 	if !repo.completedCalled {
 		t.Fatal("expected completion attempt")
+	}
+}
+
+func TestHandleEd2kDownloadReturnsRetrySentinelWhileRunning(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("25555555-2222-2222-2222-222222222222")
+	repo := &ed2kDownloadRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:           taskID,
+			Status:       "running",
+			SourceLink:   "ed2k://|file|demo.mkv|123|ABCDEF1234567890|/",
+			ResourceHash: "ABCDEF1234567890",
+			Filename:     "demo.mkv",
+		},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "running",
+		},
+	}
+	executor := ed2kDownloadExecutorStub{
+		statusResult: Ed2kDownloadResult{
+			Status:       ed2kDownloadStatusRunning,
+			ProgressText: "下载进行中（12.3%）",
+		},
+	}
+	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	err := handleEd2kDownload(context.Background(), task, repo, &executor, logger)
+	if !errors.Is(err, ErrEd2kDownloadStillInProgress) {
+		t.Fatalf("handleEd2kDownload() error = %v, want in-progress sentinel", err)
+	}
+	if !repo.progressCalled {
+		t.Fatal("expected running task progress to update")
+	}
+	if repo.progressText != "下载进行中（12.3%）" {
+		t.Fatalf("unexpected progress text: %s", repo.progressText)
+	}
+	if repo.failedCalled || repo.completedCalled {
+		t.Fatal("did not expect non-terminal status to mark final state")
 	}
 }
 
@@ -228,7 +278,8 @@ func TestHandleEd2kDownloadSkipsFilesCleanedTaskUntilApiRequeuesIt(t *testing.T)
 		},
 	}
 	executor := ed2kDownloadExecutorStub{
-		result: Ed2kDownloadResult{
+		statusResult: Ed2kDownloadResult{
+			Status:         ed2kDownloadStatusCompleted,
 			OutputDir:      "/tmp/ed2k",
 			DownloadedPath: "/tmp/ed2k/demo.mkv",
 			ProgressText:   "下载已完成",
@@ -238,7 +289,7 @@ func TestHandleEd2kDownloadSkipsFilesCleanedTaskUntilApiRequeuesIt(t *testing.T)
 	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	if err := handleEd2kDownload(context.Background(), task, repo, executor, logger); err != nil {
+	if err := handleEd2kDownload(context.Background(), task, repo, &executor, logger); err != nil {
 		t.Fatalf("handleEd2kDownload() error = %v", err)
 	}
 	if repo.runningCalled {
@@ -254,8 +305,10 @@ type ed2kDownloadRepoStub struct {
 	refreshedTask   models.AdminEd2kDownloadTask
 	getCalls        int
 	runningCalled   bool
+	progressCalled  bool
 	failedCalled    bool
 	completedCalled bool
+	progressText    string
 	failedMessage   string
 	failErr         error
 	completeErr     error
@@ -271,6 +324,12 @@ func (s *ed2kDownloadRepoStub) GetEd2kDownloadTask(context.Context, uuid.UUID) (
 
 func (s *ed2kDownloadRepoStub) MarkEd2kDownloadTaskRunning(context.Context, uuid.UUID, string, models.AdminEd2kDownloadTaskHistoryItem) error {
 	s.runningCalled = true
+	return nil
+}
+
+func (s *ed2kDownloadRepoStub) UpdateEd2kDownloadTaskProgress(_ context.Context, _ uuid.UUID, progressText string) error {
+	s.progressCalled = true
+	s.progressText = progressText
 	return nil
 }
 
@@ -292,15 +351,28 @@ func (s *ed2kDownloadRepoStub) MarkEd2kDownloadTaskCompleted(context.Context, uu
 }
 
 type ed2kDownloadExecutorStub struct {
-	result Ed2kDownloadResult
-	err    error
+	submitResult Ed2kDownloadResult
+	statusResult Ed2kDownloadResult
+	submitErr    error
+	statusErr    error
+	submitCalled bool
+	statusCalled bool
 }
 
-func (s ed2kDownloadExecutorStub) Run(context.Context, models.AdminEd2kDownloadTask) (Ed2kDownloadResult, error) {
-	if s.err != nil {
-		return Ed2kDownloadResult{}, s.err
+func (s *ed2kDownloadExecutorStub) Submit(context.Context, models.AdminEd2kDownloadTask) (Ed2kDownloadResult, error) {
+	s.submitCalled = true
+	if s.submitErr != nil {
+		return Ed2kDownloadResult{}, s.submitErr
 	}
-	return s.result, nil
+	return s.submitResult, nil
+}
+
+func (s *ed2kDownloadExecutorStub) Status(context.Context, models.AdminEd2kDownloadTask) (Ed2kDownloadResult, error) {
+	s.statusCalled = true
+	if s.statusErr != nil {
+		return Ed2kDownloadResult{}, s.statusErr
+	}
+	return s.statusResult, nil
 }
 
 func mustMarshalEd2kPayload(t *testing.T, payload Ed2kDownloadPayload) []byte {

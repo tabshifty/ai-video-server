@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -31,6 +33,7 @@ func TestRegisterIncludesEd2kDownloadRoutes(t *testing.T) {
 	}
 
 	for _, want := range []string{
+		"GET /api/v1/admin/ed2k-download/status",
 		"GET /api/v1/admin/ed2k-download/tasks",
 		"POST /api/v1/admin/ed2k-download/tasks",
 		"GET /api/v1/admin/ed2k-download/tasks/:id",
@@ -67,6 +70,57 @@ func TestParseEd2kDownloadLinkAndBuildTitle(t *testing.T) {
 	}
 	if got := buildEd2kDownloadTaskTitle("  "); got != "ED2K 下载任务" {
 		t.Fatalf("unexpected default title: %s", got)
+	}
+}
+
+func TestAdminEd2kDownloadStatusIsRedacted(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	executorPath := filepath.Join(dir, "ed2k-amule-executor.sh")
+	amulecmdPath := filepath.Join(dir, "amulecmd")
+	if err := os.WriteFile(executorPath, []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile(executor): %v", err)
+	}
+	if err := os.WriteFile(amulecmdPath, []byte(strings.Join([]string{
+		"#!/usr/bin/env bash",
+		"set -euo pipefail",
+		"if [[ \"$*\" == *\"status\"* ]]; then",
+		"  echo 'eD2k: Connected to server with LowID'",
+		"else",
+		"  echo 'help ok'",
+		"fi",
+	}, "\n")), 0o755); err != nil {
+		t.Fatalf("WriteFile(amulecmd): %v", err)
+	}
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/ed2k-download/status", nil)
+	api := &API{
+		ed2kDownloadExecutable: executorPath,
+		ed2kDownloadRoot:       dir,
+		amulecmdBin:            amulecmdPath,
+		amuleRemoteHost:        "127.0.0.1",
+		amuleRemotePort:        "4712",
+		amuleRemotePassword:    "secret-pass",
+	}
+
+	api.AdminEd2kDownloadStatus(ctx)
+
+	body := rec.Body.String()
+	for _, want := range []string{
+		`"level":"healthy"`,
+		"下载引擎正常",
+		`"configured":true`,
+		`"remote_reachable":true`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected response to contain %s, got %s", want, body)
+		}
+	}
+	if strings.Contains(body, "secret-pass") {
+		t.Fatalf("status response leaked remote password: %s", body)
 	}
 }
 

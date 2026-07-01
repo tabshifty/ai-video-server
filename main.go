@@ -228,6 +228,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		cfg.MaxVideoSize,
 		cfg.StorageRoot,
 		cfg.UploadTempDir,
+		cfg.ED2KDownloadExecutable,
 		cfg.ED2KDownloadRoot,
 		cfg.ED2KDownloadSubdir,
 		cfg.AMULECMDBin,
@@ -337,6 +338,8 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 			Queues: map[string]int{
 				cfg.AsynqQueue: 10,
 			},
+			RetryDelayFunc: queue.Ed2kDownloadRetryDelayFunc(nil),
+			IsFailure:      queue.IsEd2kDownloadFailure,
 		},
 	)
 	logger.Info("worker started", "concurrency", cfg.MaxTranscodeWorkers, "queue", cfg.AsynqQueue)

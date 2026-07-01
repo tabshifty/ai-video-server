@@ -1,3 +1,23 @@
+## 2026-07-02 00:05 +0800
+- 进度：完成 ED2K 下载工作台本体补完（仍不含媒体导入）。worker 已从长阻塞执行器改为 `submit/status` 短轮询模型：`queued` 只提交到 aMule 并转 `running`，正常下载中的轮询通过 Asynq 30 秒重试继续同步进度；管理端已补下载引擎状态、自动刷新、固定选中详情和中文结果标签。`server.met` 结果仍只在日志，不新增入库。
+- 影响文件：`internal/queue/ed2k_download.go`、`internal/queue/tasks.go`、`internal/queue/ed2k_download_test.go`、`internal/queue/tasks_test.go`、`internal/repository/ed2k_download_repository.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`internal/handlers/router.go`、`main.go`、`scripts/ed2k-amule-executor.sh`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`admin-web/src/views/toolbox.helpers.js`、`admin-web/src/views/toolbox.helpers.spec.js`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
+- 验证：`go test ./internal/queue ./internal/handlers ./internal/repository -run 'Ed2k|ed2k|LifecycleMigration' -count=1` 通过；`cd admin-web && npm run test -- src/views/toolbox.helpers.spec.js src/views/ToolboxEd2kDownload.spec.js src/api/admin.spec.js` 通过；`cd admin-web && npm run build` 通过；`go build ./...` 通过；`go vet ./...` 通过；`git diff --check` 通过；乱码扫描通过。
+
+## 2026-07-02 00:11 +0800
+- 进度：独立复审中又补掉一个误判失败风险：`status` 轮询若只是一时连不上 aMule 远控，不应立刻把 `running` 任务落成 `failed`；执行器脚本已改为返回 `not_found` 非终态，让 worker 继续短轮询等待远控恢复。
+- 影响文件：`scripts/ed2k-amule-executor.sh`、`plan.md`
+- 验证：复跑 ED2K Go 定向测试、管理端 Vitest 与 `npm run build` 中。
+
+## 2026-07-01 23:37 +0800
+- 进度：继续补完 ED2K 下载工作台本体可用性。已确认上一段未完成改动仍会让 Asynq handler 长时间阻塞到下载结束，本轮改为短动作模型：`queued` 只提交给 aMule 并转 `running`，后续 `running` 通过短状态查询同步进度/完成/失败；管理端补引擎健康、自动刷新和选中详情保留，不扩展媒体导入。
+- 影响文件：预计涉及 `internal/queue/ed2k_download.go`、`internal/queue/tasks.go`、`internal/queue/*_test.go`、`internal/repository/ed2k_download_repository.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/router.go`、`scripts/ed2k-amule-executor.sh`、`admin-web/src/api/admin.js`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
+- 验证：待执行 ED2K 定向 Go 测试、管理端 Vitest/build、`go build ./...`、`go vet ./...`、`git diff --check` 与乱码扫描。
+
+## 2026-07-01 23:12 +0800
+- 进度：开始补完 ED2K 下载工作台本体可用性（不含媒体导入）。本轮目标收口为：下载 worker 不再因为单次阻塞执行器或重启导致任务永久卡 `running`；执行器脚本实际同步 aMule 的排队/下载进度与完成结果；管理端自动刷新在途任务并展示引擎健康状态；保留既有取消、清理、重下和历史去重语义不扩展成入库功能。
+- 影响文件：预计涉及 `scripts/ed2k-amule-executor.sh`、`internal/queue/ed2k_download.go`、`internal/queue/ed2k_download_test.go`、`internal/repository/ed2k_download_repository.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
+- 验证：待执行 ED2K 定向 Go 测试、ED2K 管理端 Vitest、`cd admin-web && npm run build`、`go test ./internal/handlers ./internal/queue ./internal/repository -run 'Ed2k|ed2k' -count=1`、`go build ./...`、`go vet ./...`、`git diff --check`、乱码扫描；完成后按仓库复杂任务规则做独立复审。
+
 ## 2026-07-01 20:41 +0800
 - 进度：最终独立复审通过，结论 `no findings`。这轮又补掉了三处竞态/回显问题：① queued 删除时，若删队列成功但改库失败，会在数据库仍为 `queued` 时补回 asynq job，避免留下“库里排队、队列空”的假在途；② `files_cleaned` 重下真正进入 `running` 时会刷新 `started_at` 为这次实际开跑时间，而撤销重下仍能恢复旧历史时间；③ `cleanTaskFiles` / `retryTask` / `retryCleanup` 以及“撤销重下”都会先同步本地任务快照，再聚焦目标任务，避免 `all` 视图停留旧状态。准备精确暂存并提交；提交范围只包含 ED2K 本轮相关文件和 `CONTEXT.md` 的新增 ED2K 术语，不包含 `CONTEXT.md` 里无关 TV 海报墙差异。
 - 影响文件：`CONTEXT.md`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/toolbox.helpers.js`、`admin-web/src/views/toolbox.helpers.spec.js`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`internal/repository/ed2k_download_repository.go`、`internal/repository/migrations_test.go`、`plan.md`

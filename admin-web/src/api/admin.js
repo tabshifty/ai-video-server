@@ -171,6 +171,7 @@ export const generateAdminImage = (payload) =>
   })
 
 export const getAdminEd2kDownloadTasks = (params) => request.get('/admin/ed2k-download/tasks', { params })
+export const getAdminEd2kDownloadStatus = () => request.get('/admin/ed2k-download/status')
 export const createAdminEd2kDownloadTasks = (payload) => request.post('/admin/ed2k-download/tasks', payload)
 export const getAdminEd2kDownloadTask = (id) => request.get(`/admin/ed2k-download/tasks/${id}`)
 export const retryAdminEd2kDownloadTask = (id) => request.post(`/admin/ed2k-download/tasks/${id}/retry`)
