@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strconv"
@@ -19,6 +20,11 @@ import (
 type adminEd2kDownloadCreateRequest struct {
 	Links []string `json:"links"`
 	Title string   `json:"title"`
+}
+
+type ed2kDownloadRetryRepository interface {
+	GetEd2kDownloadTask(ctx context.Context, id uuid.UUID) (models.AdminEd2kDownloadTask, error)
+	UpdateEd2kDownloadTaskStatus(ctx context.Context, id uuid.UUID, status, progressText, errorMessage string, startedAt, finishedAt, deletedAt *time.Time, outputDir, downloadedPath string, files []models.AdminEd2kDownloadTaskFile, retryDelta int, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error)
 }
 
 func normalizeEd2kDownloadTitle(title string) string {
@@ -182,21 +188,38 @@ func (a *API) AdminRetryEd2kDownloadTask(c *gin.Context) {
 		bad(c, "invalid task id")
 		return
 	}
-	task, err := a.repo.GetEd2kDownloadTask(c.Request.Context(), taskID)
+	item, err := retryEd2kDownloadTask(c.Request.Context(), taskID, a.repo, a.enqueuer, time.Now())
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			response.Error(c, 404, "task not found")
 			return
 		}
-		response.Error(c, 1094, err.Error())
+		if errors.Is(err, errEd2kDownloadRetryInvalidStatus) {
+			response.Error(c, 1095, err.Error())
+			return
+		}
+		if errors.Is(err, queue.ErrEd2kDownloadTaskInFlight) {
+			response.Error(c, 1096, "任务已在执行中")
+			return
+		}
+		response.Error(c, 1096, err.Error())
 		return
+	}
+	ok(c, item)
+}
+
+func retryEd2kDownloadTask(ctx context.Context, taskID uuid.UUID, repo ed2kDownloadRetryRepository, enqueuer interface {
+	EnqueueEd2kDownload(queue.Ed2kDownloadPayload) error
+}, now time.Time) (models.AdminEd2kDownloadTask, error) {
+	task, err := repo.GetEd2kDownloadTask(ctx, taskID)
+	if err != nil {
+		return models.AdminEd2kDownloadTask{}, err
 	}
 	if task.Status != "failed" && task.Status != "deleted" {
-		response.Error(c, 1095, "only failed or deleted task can retry")
-		return
+		return models.AdminEd2kDownloadTask{}, errEd2kDownloadRetryInvalidStatus
 	}
-	item, err := a.repo.UpdateEd2kDownloadTaskStatus(
-		c.Request.Context(),
+	item, err := repo.UpdateEd2kDownloadTaskStatus(
+		ctx,
 		taskID,
 		"queued",
 		"等待执行器接管",
@@ -212,19 +235,22 @@ func (a *API) AdminRetryEd2kDownloadTask(c *gin.Context) {
 			Kind:    "retry",
 			Label:   "重新排队",
 			Message: "管理员手动重试下载任务",
-			At:      time.Now(),
+			At:      now,
 		},
 	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			response.Error(c, 404, "task not found")
-			return
-		}
-		response.Error(c, 1096, err.Error())
-		return
+		return models.AdminEd2kDownloadTask{}, err
 	}
-	ok(c, item)
+	if enqueuer == nil {
+		return models.AdminEd2kDownloadTask{}, errors.New("queue not configured")
+	}
+	if err := enqueuer.EnqueueEd2kDownload(queue.Ed2kDownloadPayload{TaskID: taskID.String()}); err != nil {
+		return models.AdminEd2kDownloadTask{}, err
+	}
+	return item, nil
 }
+
+var errEd2kDownloadRetryInvalidStatus = errors.New("only failed or deleted task can retry")
 
 func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 	taskID, okID := parseUUID(c.Param("id"))

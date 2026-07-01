@@ -28,6 +28,31 @@ func TestBuildTranscodeTaskOptionsIncludesExplicitTimeout(t *testing.T) {
 	assertOption(t, opts, asynq.MaxRetryOpt, 3)
 }
 
+func TestBuildEd2kDownloadTaskOptionsBindsTaskID(t *testing.T) {
+	t.Parallel()
+
+	taskID := "11111111-1111-1111-1111-111111111111"
+	opts := buildEd2kDownloadTaskOptions("transcode", taskID)
+
+	assertOption(t, opts, asynq.QueueOpt, "transcode")
+	assertOption(t, opts, asynq.ProcessInOpt, 2*time.Second)
+	assertOption(t, opts, asynq.TimeoutOpt, 6*time.Hour)
+	assertOption(t, opts, asynq.MaxRetryOpt, 3)
+	assertOption(t, opts, asynq.TaskIDOpt, taskID)
+}
+
+func TestWrapEd2kDownloadEnqueueErrorMapsTaskIDConflict(t *testing.T) {
+	t.Parallel()
+
+	err := wrapEd2kDownloadEnqueueError(asynq.ErrTaskIDConflict)
+	if !errors.Is(err, ErrEd2kDownloadTaskInFlight) {
+		t.Fatalf("expected task in-flight error, got %v", err)
+	}
+	if !errors.Is(err, asynq.ErrTaskIDConflict) {
+		t.Fatalf("expected original asynq conflict error, got %v", err)
+	}
+}
+
 func assertOption(t *testing.T, opts []asynq.Option, typ asynq.OptionType, want any) {
 	t.Helper()
 	for _, opt := range opts {

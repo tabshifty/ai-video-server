@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -51,6 +52,8 @@ type Ed2kDownloadPayload struct {
 // 不随任务携带；scheduler 以空 payload 入队即可。
 type Ed2kServerlistRefreshPayload struct{}
 
+var ErrEd2kDownloadTaskInFlight = errors.New("ed2k download task already in flight")
+
 // Enqueuer wraps asynq client operations.
 type Enqueuer struct {
 	client               *asynq.Client
@@ -95,15 +98,32 @@ func (e *Enqueuer) EnqueueEd2kDownload(payloadIn Ed2kDownloadPayload) error {
 	}
 	_, err = e.client.Enqueue(
 		asynq.NewTask(TypeEd2kDownload, payload),
-		asynq.MaxRetry(3),
-		asynq.ProcessIn(2*time.Second),
-		asynq.Queue(e.queue),
-		asynq.Timeout(6*time.Hour),
+		buildEd2kDownloadTaskOptions(e.queue, payloadIn.TaskID)...,
 	)
 	if err != nil {
-		return fmt.Errorf("enqueue ed2k download task: %w", err)
+		return wrapEd2kDownloadEnqueueError(err)
 	}
 	return nil
+}
+
+func wrapEd2kDownloadEnqueueError(err error) error {
+	if errors.Is(err, asynq.ErrTaskIDConflict) {
+		return fmt.Errorf("%w: %w", ErrEd2kDownloadTaskInFlight, err)
+	}
+	return fmt.Errorf("enqueue ed2k download task: %w", err)
+}
+
+func buildEd2kDownloadTaskOptions(queue, taskID string) []asynq.Option {
+	opts := []asynq.Option{
+		asynq.MaxRetry(3),
+		asynq.ProcessIn(2 * time.Second),
+		asynq.Queue(queue),
+		asynq.Timeout(6 * time.Hour),
+	}
+	if strings.TrimSpace(taskID) != "" {
+		opts = append(opts, asynq.TaskID(taskID))
+	}
+	return opts
 }
 
 func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Option {

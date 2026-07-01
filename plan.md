@@ -1,3 +1,13 @@
+## 2026-07-01 12:04 +0800
+- 进度：完成 ED2K 下载任务生命周期底座修复。`EnqueueEd2kDownload` 现在统一走 `buildEd2kDownloadTaskOptions`，携带 `asynq.TaskID(taskID)`，并把 asynq `ErrTaskIDConflict` 包装成项目侧 `ErrEd2kDownloadTaskInFlight`；手动重试路径抽成 `retryEd2kDownloadTask`，在状态更新为 `queued` 后重新入队，TaskID 冲突时向管理端返回“任务已在执行中”。`CONTEXT.md` 已移除“当前代码缺这一步”的过时表述。
+- 影响文件：`internal/queue/tasks.go`、`internal/queue/tasks_test.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/queue -run 'TestBuildEd2kDownloadTaskOptionsBindsTaskID|TestWrapEd2kDownloadEnqueueErrorMapsTaskIDConflict'` 通过；`go test ./internal/handlers -run 'TestRetryEd2kDownloadTask'` 通过；`go test ./internal/handlers ./internal/queue` 通过；`go build ./...` 通过；`go vet ./...` 通过。
+
+## 2026-07-01 12:00 +0800
+- 进度：开始按建议补 ED2K 下载工作台生命周期底座，范围先收口为两件事：`EnqueueEd2kDownload` 用 asynq `TaskID` 与工作台 task id 一对一绑定，避免同一任务重复入队并发执行；手动重试在写回 `queued` 后必须重新入队，避免“重新排队”只是改库状态但 worker 不会再处理。暂不做逐行提交、`files_cleaned`、导入链路和真实小链接验收。
+- 影响文件：`internal/queue/tasks.go`、`internal/queue/tasks_test.go`、`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`plan.md`
+- 验证：待执行定向 Go 测试、`go test ./internal/handlers ./internal/queue`、`go build ./...`、`go vet ./...`、`git diff --check`、乱码扫描。
+
 ## 2026-07-01 11:43 +0800
 - 进度：完成 ED2K 下载工作台列表全宽布局。页面从“左侧 24rem 列表 + 右侧详情”的双列布局改为“列表整行在上、详情整行在下”，任务行在桌面端横向展示标题/哈希与状态/大小，移动端回落为单列；同步补静态 spec 锁定列表不再回退到窄侧栏，并在 `CONTEXT.md` 追加 [[ED2K 下载工作台列表全宽]]。
 - 影响文件：`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`
