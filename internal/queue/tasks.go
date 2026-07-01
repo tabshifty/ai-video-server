@@ -29,6 +29,8 @@ const (
 	TypeScrapeRetag    = "video:scrape:retag"
 	TypeOrphanFileScan = "system:orphan-files:scan"
 	TypeEd2kDownload   = "download:ed2k"
+	// TypeEd2kServerlistRefresh 是 server.met 定时刷新任务类型，由 asynq.Scheduler 按 cron 入队。
+	TypeEd2kServerlistRefresh = "ed2k:serverlist:refresh"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -44,6 +46,10 @@ type TranscodePayload struct {
 type Ed2kDownloadPayload struct {
 	TaskID string `json:"task_id"`
 }
+
+// Ed2kServerlistRefreshPayload 为空 payload：刷新参数（URL/脚本路径）走 config + 执行器，
+// 不随任务携带；scheduler 以空 payload 入队即可。
+type Ed2kServerlistRefreshPayload struct{}
 
 // Enqueuer wraps asynq client operations.
 type Enqueuer struct {
@@ -114,19 +120,20 @@ func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Opti
 
 // Processor handles task registration and processing logic.
 type Processor struct {
-	repo         *repository.VideoRepository
-	trans        *services.TranscodeService
-	scrape       *services.ScraperService
-	subtitle     *services.SubtitleService
-	enqueuer     *Enqueuer
-	ed2kExecutor Ed2kDownloadExecutor
-	logger       *slog.Logger
-	storageRoot  string
-	uploadGC     bool
+	repo               *repository.VideoRepository
+	trans              *services.TranscodeService
+	scrape             *services.ScraperService
+	subtitle           *services.SubtitleService
+	enqueuer           *Enqueuer
+	ed2kExecutor       Ed2kDownloadExecutor
+	ed2kServerlistExec Ed2kServerlistRefreshExecutor
+	logger             *slog.Logger
+	storageRoot        string
+	uploadGC           bool
 }
 
-func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, ed2kExecutor Ed2kDownloadExecutor, logger *slog.Logger, storageRoot string) *Processor {
-	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, ed2kExecutor: ed2kExecutor, logger: logger, storageRoot: storageRoot, uploadGC: true}
+func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, ed2kExecutor Ed2kDownloadExecutor, ed2kServerlistExec Ed2kServerlistRefreshExecutor, logger *slog.Logger, storageRoot string) *Processor {
+	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, ed2kExecutor: ed2kExecutor, ed2kServerlistExec: ed2kServerlistExec, logger: logger, storageRoot: storageRoot, uploadGC: true}
 }
 
 func (p *Processor) Register(mux *asynq.ServeMux) {
@@ -137,6 +144,7 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
 	mux.HandleFunc(TypeOrphanFileScan, p.HandleOrphanFileScan)
 	mux.HandleFunc(TypeEd2kDownload, p.HandleEd2kDownload)
+	mux.HandleFunc(TypeEd2kServerlistRefresh, p.HandleEd2kServerlistRefresh)
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

@@ -245,3 +245,16 @@ func (r *VideoRepository) DeleteEd2kDownloadTask(ctx context.Context, id uuid.UU
 	}
 	return nil
 }
+
+// HasActiveEd2kDownloadTasks 返回是否存在 queued/running 状态的 ED2K 下载任务。
+// 供 server.met 定时刷新任务判定在途下载：重启 amuled 会打断在途下载，故任一在途即跳过本轮刷新。
+func (r *VideoRepository) HasActiveEd2kDownloadTasks(ctx context.Context) (bool, error) {
+	var count int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM ed2k_download_tasks WHERE status IN ('queued','running')`,
+	).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("count active ed2k download tasks: %w", err)
+	}
+	return count > 0, nil
+}

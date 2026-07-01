@@ -288,11 +288,44 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 			Timeout: cfg.ED2KDownloadTimeout,
 		}
 	}
-	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, ed2kExecutor, logger, cfg.StorageRoot)
+	// server.met 刷新执行器：URL 与脚本都配置时才启用（见 [[ED2K 服务器列表刷新]]）。
+	var ed2kServerlistExec queue.Ed2kServerlistRefreshExecutor
+	if cfg.ED2KServerlistURL != "" && cfg.ED2KServerlistRefreshExecutable != "" {
+		ed2kServerlistExec = queue.CommandEd2kServerlistRefreshExecutor{
+			Command: cfg.ED2KServerlistRefreshExecutable,
+			Timeout: cfg.ED2KServerlistRefreshTimeout,
+		}
+	}
+	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, ed2kExecutor, ed2kServerlistExec, logger, cfg.StorageRoot)
 	processor.Register(mux)
 
+	redisOpt := asynq.RedisClientOpt{Addr: cfg.RedisAddr, Password: cfg.RedisPassword}
+
+	// server.met 定时刷新调度器：URL 配置时按 cron 入队刷新任务。
+	// 用 scheduler.Start()（非阻塞）+ srv.Run(mux)（阻塞、自管信号）+ defer scheduler.Shutdown()；
+	// 不能用 scheduler.Run()，它会自带信号处理与 srv.Run 抢信号。
+	if cfg.ED2KServerlistURL != "" {
+		scheduler := asynq.NewScheduler(redisOpt, &asynq.SchedulerOpts{Location: time.Local})
+		if _, err := scheduler.Register(
+			cfg.ED2KServerlistRefreshCron,
+			asynq.NewTask(queue.TypeEd2kServerlistRefresh, nil),
+			asynq.MaxRetry(0),
+			asynq.Queue(cfg.AsynqQueue),
+			asynq.Timeout(cfg.ED2KServerlistRefreshTimeout),
+		); err != nil {
+			return fmt.Errorf("register ed2k serverlist refresh cron: %w", err)
+		}
+		if err := scheduler.Start(); err != nil {
+			return fmt.Errorf("start ed2k serverlist refresh scheduler: %w", err)
+		}
+		defer scheduler.Shutdown()
+		logger.Info("ed2k serverlist refresh scheduler started", "cron", cfg.ED2KServerlistRefreshCron, "url", cfg.ED2KServerlistURL)
+	} else {
+		logger.Info("ed2k serverlist refresh scheduler disabled (ED2K_SERVERLIST_URL empty)")
+	}
+
 	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: cfg.RedisAddr, Password: cfg.RedisPassword},
+		redisOpt,
 		asynq.Config{
 			Concurrency: cfg.MaxTranscodeWorkers,
 			Queues: map[string]int{

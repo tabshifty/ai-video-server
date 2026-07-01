@@ -192,6 +192,49 @@ func TestLoadIncludesEd2kDownloadConfig(t *testing.T) {
 	}
 }
 
+func TestLoadIncludesEd2kServerlistRefreshConfig(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("ED2K_SERVERLIST_URL", "http://upd.example.org/server.met")
+	t.Setenv("ED2K_SERVERLIST_REFRESH_CRON", "30 2 * * *")
+	t.Setenv("ED2K_SERVERLIST_REFRESH_EXECUTABLE", "/usr/local/bin/ed2k-serverlist-refresh.sh")
+	t.Setenv("ED2K_SERVERLIST_REFRESH_TIMEOUT_SECONDS", "321")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ED2KServerlistURL != "http://upd.example.org/server.met" {
+		t.Fatalf("unexpected ED2KServerlistURL: %s", cfg.ED2KServerlistURL)
+	}
+	if cfg.ED2KServerlistRefreshCron != "30 2 * * *" {
+		t.Fatalf("unexpected ED2KServerlistRefreshCron: %s", cfg.ED2KServerlistRefreshCron)
+	}
+	if cfg.ED2KServerlistRefreshExecutable != "/usr/local/bin/ed2k-serverlist-refresh.sh" {
+		t.Fatalf("unexpected ED2KServerlistRefreshExecutable: %s", cfg.ED2KServerlistRefreshExecutable)
+	}
+	if cfg.ED2KServerlistRefreshTimeout != 321*time.Second {
+		t.Fatalf("unexpected ED2KServerlistRefreshTimeout: %s", cfg.ED2KServerlistRefreshTimeout)
+	}
+}
+
+func TestLoadDefaultsEd2kServerlistRefreshCronAndDisabled(t *testing.T) {
+	setRequiredEnv(t)
+	// 不设 ED2K_SERVERLIST_URL / CRON：cron 取默认，URL 为空（功能禁用语义）。
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ED2KServerlistURL != "" {
+		t.Fatalf("expected empty ED2KServerlistURL when unset, got: %s", cfg.ED2KServerlistURL)
+	}
+	if cfg.ED2KServerlistRefreshCron != "17 1 * * *" {
+		t.Fatalf("unexpected default ED2KServerlistRefreshCron: %s", cfg.ED2KServerlistRefreshCron)
+	}
+}
+
 func TestLoadDefaultsImageGenerationModel(t *testing.T) {
 	setRequiredEnv(t)
 
