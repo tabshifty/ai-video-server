@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/models"
 )
@@ -119,19 +121,38 @@ func handleEd2kDownload(ctx context.Context, task *asynq.Task, repo ed2kDownload
 		Message: "外部执行器已接管任务",
 		At:      time.Now(),
 	}); err != nil {
+		if isEd2kConditionalUpdateMiss(err) {
+			logger.Info("skip stale ed2k download start", "task_id", taskID.String())
+			return nil
+		}
 		return err
 	}
 	if executor == nil {
 		return fmt.Errorf("ed2k download executor not configured")
 	}
 	result, err := executor.Run(ctx, item)
+	current, refreshErr := repo.GetEd2kDownloadTask(ctx, taskID)
+	if refreshErr != nil {
+		return refreshErr
+	}
+	if current.Status != "running" {
+		logger.Info("skip late ed2k download result", "task_id", taskID.String(), "status", current.Status)
+		return nil
+	}
 	if err != nil {
-		_, _ = repo.MarkEd2kDownloadTaskFailed(ctx, taskID, err.Error(), models.AdminEd2kDownloadTaskHistoryItem{
+		_, markErr := repo.MarkEd2kDownloadTaskFailed(ctx, taskID, err.Error(), models.AdminEd2kDownloadTaskHistoryItem{
 			Kind:    "failed",
 			Label:   "失败",
 			Message: err.Error(),
 			At:      time.Now(),
 		})
+		if markErr != nil {
+			if isEd2kConditionalUpdateMiss(markErr) {
+				logger.Info("skip late ed2k download failure result", "task_id", taskID.String())
+				return nil
+			}
+			return markErr
+		}
 		return nil
 	}
 	updated, err := repo.MarkEd2kDownloadTaskCompleted(ctx, taskID, result.OutputDir, result.DownloadedPath, result.Files, result.ProgressText, models.AdminEd2kDownloadTaskHistoryItem{
@@ -141,8 +162,19 @@ func handleEd2kDownload(ctx context.Context, task *asynq.Task, repo ed2kDownload
 		At:      time.Now(),
 	})
 	if err != nil {
+		if isEd2kConditionalUpdateMiss(err) {
+			logger.Info("skip late ed2k download completion result", "task_id", taskID.String())
+			return nil
+		}
 		return err
 	}
 	logger.Info("ed2k download completed", "task_id", taskID.String(), "status", updated.Status, "output_dir", result.OutputDir)
 	return nil
+}
+
+func isEd2kConditionalUpdateMiss(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, pgx.ErrNoRows) || strings.Contains(err.Error(), pgx.ErrNoRows.Error())
 }

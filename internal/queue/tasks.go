@@ -58,6 +58,8 @@ var ErrEd2kDownloadTaskInFlight = errors.New("ed2k download task already in flig
 type Enqueuer struct {
 	client               *asynq.Client
 	queue                string
+	redisAddr            string
+	redisPassword        string
 	transcodeTaskTimeout time.Duration
 }
 
@@ -68,6 +70,8 @@ func NewEnqueuer(redisAddr, redisPassword, queue string, transcodeTaskTimeout ti
 	return &Enqueuer{
 		client:               asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword}),
 		queue:                queue,
+		redisAddr:            redisAddr,
+		redisPassword:        redisPassword,
 		transcodeTaskTimeout: transcodeTaskTimeout,
 	}
 }
@@ -104,6 +108,43 @@ func (e *Enqueuer) EnqueueEd2kDownload(payloadIn Ed2kDownloadPayload) error {
 		return wrapEd2kDownloadEnqueueError(err)
 	}
 	return nil
+}
+
+func (e *Enqueuer) DeleteEd2kDownloadTask(taskID string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return nil
+	}
+	inspector := e.newInspector()
+	defer func() { _ = inspector.Close() }()
+	if err := inspector.DeleteTask(e.queue, taskID); err != nil {
+		if errors.Is(err, asynq.ErrTaskNotFound) {
+			return nil
+		}
+		return fmt.Errorf("delete enqueued ed2k download task: %w", err)
+	}
+	return nil
+}
+
+func (e *Enqueuer) HasEd2kDownloadTask(taskID string) (bool, error) {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return false, nil
+	}
+	inspector := e.newInspector()
+	defer func() { _ = inspector.Close() }()
+	_, err := inspector.GetTaskInfo(e.queue, taskID)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, asynq.ErrTaskNotFound) {
+		return false, nil
+	}
+	return false, fmt.Errorf("get enqueued ed2k download task info: %w", err)
+}
+
+func (e *Enqueuer) newInspector() *asynq.Inspector {
+	return asynq.NewInspector(asynq.RedisClientOpt{Addr: e.redisAddr, Password: e.redisPassword})
 }
 
 func wrapEd2kDownloadEnqueueError(err error) error {

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Back, Delete, Download, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -7,19 +7,34 @@ import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import {
+  cleanAdminEd2kDownloadTaskFiles,
   createAdminEd2kDownloadTasks,
   deleteAdminEd2kDownloadTask,
-  getAdminEd2kDownloadTasks
+  getAdminEd2kDownloadTasks,
+  retryAdminEd2kDownloadCleanup,
+  retryAdminEd2kDownloadTask
 } from '../api/admin'
-import { parseEd2kLinks } from './toolbox.helpers'
+import {
+  buildEd2kTaskFocusState,
+  buildPendingEd2kInput,
+  filterEd2kTasks,
+  mergeEd2kCreateSession,
+  mergeEd2kDraftEntries,
+  normalizeEd2kCreateResults,
+  parseEd2kCreateEntries,
+  parseEd2kLinks,
+  shouldKeepEd2kCreateDialogOpen
+} from './toolbox.helpers'
 
 const router = useRouter()
 const createDialogVisible = ref(false)
 const ed2kInput = ref('')
-const titleInput = ref('')
+const createDraftEntries = ref([])
+const createSessionResults = ref([])
 const currentFilter = ref('all')
 const tasks = ref([])
 const selectedTaskID = ref('')
+const pendingFocusTaskID = ref('')
 const loadingTasks = ref(false)
 const submitting = ref(false)
 
@@ -27,42 +42,39 @@ const statusOptions = [
   { value: 'all', label: '全部' },
   { value: 'queued', label: '排队中' },
   { value: 'running', label: '下载中' },
+  { value: 'canceling', label: '取消中' },
+  { value: 'cancelled', label: '已取消' },
   { value: 'completed', label: '已完成' },
   { value: 'failed', label: '失败' },
-  { value: 'deleted', label: '已删除' }
+  { value: 'files_cleaned', label: '已下载但文件已清理' }
 ]
 
 const taskStatusLabelMap = {
   queued: '排队中',
   running: '下载中',
+  canceling: '取消中',
+  cancelled: '已取消',
   completed: '已完成',
   failed: '失败',
-  deleted: '已删除'
+  files_cleaned: '已下载但文件已清理'
 }
 
 const taskStatusToneMap = {
   queued: 'info',
   running: 'warning',
+  canceling: 'warning',
+  cancelled: 'info',
   completed: 'success',
   failed: 'danger',
-  deleted: 'info'
+  files_cleaned: 'success'
 }
 
 const parsedLinks = computed(() => parseEd2kLinks(ed2kInput.value))
-const canSubmit = computed(() => parsedLinks.value.links.length > 0)
+const pendingCreateEntries = computed(() => parseEd2kCreateEntries(ed2kInput.value, createDraftEntries.value))
+const canSubmit = computed(() => pendingCreateEntries.value.length > 0)
 const linkCount = computed(() => parsedLinks.value.links.length)
 const invalidCount = computed(() => parsedLinks.value.invalidCount)
-const visibleTasks = computed(() => {
-  const list = [...tasks.value]
-  list.sort((a, b) => {
-    const aActive = isActiveStatus(a.status) ? 0 : 1
-    const bActive = isActiveStatus(b.status) ? 0 : 1
-    if (aActive !== bActive) return aActive - bActive
-    return taskUpdatedAtValue(b) - taskUpdatedAtValue(a)
-  })
-  if (currentFilter.value === 'all') return list
-  return list.filter((task) => String(task.status || '') === currentFilter.value)
-})
+const visibleTasks = computed(() => filterEd2kTasks(tasks.value, currentFilter.value))
 const selectedTask = computed(() => visibleTasks.value.find((task) => task.id === selectedTaskID.value) || visibleTasks.value[0] || null)
 const selectedTaskLabel = computed(() => selectedTask.value ? taskStatusLabelMap[selectedTask.value.status] || selectedTask.value.status : '暂无任务')
 const selectedTaskTone = computed(() => selectedTask.value ? taskStatusToneMap[selectedTask.value.status] || 'info' : 'info')
@@ -72,37 +84,53 @@ const selectedTaskHistory = computed(() => selectedTask.value?.history || [])
 const hasHistoryHit = computed(() => selectedTask.value?.history?.some((item) => item.kind === 'history') || false)
 const selectedTaskProgressText = computed(() => selectedTask.value?.progressText || selectedTask.value?.progress_text || '等待执行器接管')
 const selectedTaskErrorMessage = computed(() => selectedTask.value?.errorMessage || selectedTask.value?.error_message || '')
+const canDeleteSelectedTask = computed(() => ['queued', 'running', 'canceling', 'failed'].includes(selectedTask.value?.status || ''))
+const canCleanSelectedTaskFiles = computed(() => selectedTask.value?.status === 'completed')
+const canRetrySelectedTask = computed(() => selectedTask.value?.status === 'files_cleaned')
+const canRetrySelectedCleanup = computed(() => selectedTask.value?.status === 'cancelled' && Boolean(selectedTaskErrorMessage.value) && !selectedTask.value?.cleanedAt)
+const selectedTaskFinishedAtLabel = computed(() => {
+  const status = selectedTask.value?.status || ''
+  if (status === 'completed' || status === 'files_cleaned') return '下载完成时间'
+  if (status === 'failed') return '失败时间'
+  if (status === 'cancelled') return '取消完成时间'
+  return '结束时间'
+})
+const selectedTaskCleanedAtLabel = computed(() => {
+  const status = selectedTask.value?.status || ''
+  if (status === 'files_cleaned') return '文件清理时间'
+  if (status === 'cancelled') return '残留清理完成时间'
+  return '清理完成时间'
+})
+const selectedTaskDeleteActionLabel = computed(() => buildDeleteTaskActionCopy(selectedTask.value).actionLabel)
 
-watch(
-  currentFilter,
-  () => {
-    void loadTasks()
-  },
-  { immediate: true }
-)
+onMounted(() => {
+  void loadTasks()
+})
 
 watch(
   visibleTasks,
   (value) => {
     if (!value.length) {
-      selectedTaskID.value = ''
+      if (!pendingFocusTaskID.value) {
+        selectedTaskID.value = ''
+      }
+      return
+    }
+    if (pendingFocusTaskID.value && value.some((task) => task.id === pendingFocusTaskID.value)) {
+      selectedTaskID.value = pendingFocusTaskID.value
+      pendingFocusTaskID.value = ''
       return
     }
     if (!value.some((task) => task.id === selectedTaskID.value)) {
       selectedTaskID.value = value[0].id
     }
+    pendingFocusTaskID.value = ''
   },
   { immediate: true }
 )
 
 function isActiveStatus(status) {
-  return status === 'queued' || status === 'running'
-}
-
-function taskUpdatedAtValue(task) {
-  const raw = task?.updatedAt || task?.updated_at || task?.createdAt || task?.created_at || 0
-  const time = new Date(raw).getTime()
-  return Number.isFinite(time) ? time : 0
+  return status === 'queued' || status === 'running' || status === 'canceling'
 }
 
 function formatFileSize(size) {
@@ -134,6 +162,7 @@ function normalizeTask(task) {
     updatedAt: task.updatedAt || task.updated_at || '',
     startedAt: task.startedAt || task.started_at || null,
     finishedAt: task.finishedAt || task.finished_at || null,
+    cleanedAt: task.cleanedAt || task.cleaned_at || null,
     deletedAt: task.deletedAt || task.deleted_at || null
   }
 }
@@ -151,12 +180,20 @@ async function loadTasks() {
     const data = await getAdminEd2kDownloadTasks(params)
     tasks.value = (data.items || []).map((item) => normalizeTask(item))
     if (tasks.value.length === 0) {
-      selectedTaskID.value = ''
+      if (!pendingFocusTaskID.value) {
+        selectedTaskID.value = ''
+      }
+      return
+    }
+    if (pendingFocusTaskID.value && tasks.value.some((task) => task.id === pendingFocusTaskID.value)) {
+      selectedTaskID.value = pendingFocusTaskID.value
+      pendingFocusTaskID.value = ''
       return
     }
     if (!tasks.value.some((task) => task.id === selectedTaskID.value)) {
       selectedTaskID.value = tasks.value[0].id
     }
+    pendingFocusTaskID.value = ''
   } catch (error) {
     ElMessage.error(error?.response?.data?.msg || error?.message || '加载下载任务失败')
   } finally {
@@ -168,9 +205,26 @@ function selectTask(task) {
   selectedTaskID.value = task.id
 }
 
+async function focusTask(task) {
+  const { filter, selectedTaskID: nextSelectedTaskID } = buildEd2kTaskFocusState(currentFilter.value, task)
+  if (!nextSelectedTaskID) {
+    return
+  }
+  pendingFocusTaskID.value = nextSelectedTaskID
+  selectedTaskID.value = nextSelectedTaskID
+  if (filter !== currentFilter.value) {
+    currentFilter.value = filter
+    await loadTasks()
+    return
+  }
+  if (!tasks.value.some((item) => item.id === nextSelectedTaskID)) {
+    await loadTasks()
+  }
+}
+
 async function submitLinks() {
-  const links = parsedLinks.value.links
-  if (!links.length) {
+  const entries = pendingCreateEntries.value
+  if (!entries.length) {
     ElMessage.warning('请先粘贴至少一条 ED2K 链接')
     return
   }
@@ -178,28 +232,40 @@ async function submitLinks() {
   submitting.value = true
   try {
     const data = await createAdminEd2kDownloadTasks({
-      links: links.map((link) => link.href),
-      title: titleInput.value.trim()
+      entries: entries.map((entry) => ({
+        line_number: entry.lineNumber,
+        source_link: entry.sourceLink
+      }))
     })
-    const created = (data.created || []).map((item) => normalizeTask(item))
-    const reused = (data.reused || []).map((item) => normalizeTask(item))
-    const rejected = data.rejected || []
-    const focusTask = created[0] || reused[0] || null
-    ed2kInput.value = ''
-    titleInput.value = ''
-    createDialogVisible.value = false
+    const latestResults = normalizeEd2kCreateResults(data.results || []).map((item) => ({
+      ...item,
+      task: item.task ? normalizeTask(item.task) : null
+    }))
+    createSessionResults.value = mergeEd2kCreateSession(createSessionResults.value, latestResults)
+    createDraftEntries.value = mergeEd2kDraftEntries(createDraftEntries.value, entries, createSessionResults.value)
+    ed2kInput.value = buildPendingEd2kInput(createDraftEntries.value, createSessionResults.value)
     await loadTasks()
-    if (focusTask?.id) {
-      selectedTaskID.value = focusTask.id
+    const targetTask = createSessionResults.value.find((item) => item.task?.id && ['created', 'reused', 'enqueue_failed'].includes(item.status))?.task || null
+    if (targetTask?.id) {
+      await focusTask(targetTask)
     }
-    if (created.length > 0) {
-      ElMessage.success(`已创建 ${created.length} 条下载任务`)
+    const createdCount = latestResults.filter((item) => item.status === 'created').length
+    const reusedCount = latestResults.filter((item) => item.status === 'reused').length
+    const failedCount = latestResults.filter((item) => ['invalid', 'create_failed', 'enqueue_failed'].includes(item.status)).length
+    if (createdCount > 0) {
+      ElMessage.success(`已创建 ${createdCount} 条下载任务`)
     }
-    if (reused.length > 0) {
-      ElMessage.info(`${reused.length} 条链接命中历史任务，已直接定位到现有记录`)
+    if (reusedCount > 0) {
+      ElMessage.info(`${reusedCount} 条链接命中历史任务，已直接定位到现有记录`)
     }
-    if (rejected.length > 0) {
-      ElMessage.warning(`${rejected.length} 条链接未通过校验`)
+    if (failedCount > 0) {
+      ElMessage.warning(`${failedCount} 条输入仍待修正，已保留在弹窗中`)
+    }
+    if (!shouldKeepEd2kCreateDialogOpen(createSessionResults.value)) {
+      createDialogVisible.value = false
+      createDraftEntries.value = []
+      createSessionResults.value = []
+      ed2kInput.value = ''
     }
   } catch (error) {
     ElMessage.error(error?.response?.data?.msg || error?.message || '创建下载任务失败')
@@ -210,18 +276,38 @@ async function submitLinks() {
 
 function setFilter(status) {
   currentFilter.value = status
+  void loadTasks()
 }
 
 async function deleteTask(task) {
+  const actionCopy = buildDeleteTaskActionCopy(task)
   try {
-    await ElMessageBox.confirm(`确认删除「${task.title}」？失败任务会同时清理数据库记录和已落下的下载残留。`, '删除下载任务', {
-      confirmButtonText: '永久删除',
+    await ElMessageBox.confirm(actionCopy.confirmMessage(task), actionCopy.dialogTitle, {
+      confirmButtonText: actionCopy.confirmButtonText,
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await deleteAdminEd2kDownloadTask(task.id)
-    await loadTasks()
-    ElMessage.success('任务已删除')
+    const result = await deleteAdminEd2kDownloadTask(task.id)
+    if (result?.deleted) {
+      await loadTasks()
+      ElMessage.success('任务已删除')
+      return
+    }
+    const updatedTask = normalizeTask(result || {})
+    await focusTask(updatedTask)
+    if (updatedTask.status === 'cancelled' && updatedTask.errorMessage) {
+      ElMessage.warning(updatedTask.progressText || '任务已取消，仍有残留待清理')
+      return
+    }
+    if (updatedTask.status === 'cancelled') {
+      ElMessage.success('任务已取消')
+      return
+    }
+    if (updatedTask.status === 'canceling') {
+      ElMessage.warning(updatedTask.progressText || '取消失败，请重试')
+      return
+    }
+    ElMessage.success(actionCopy.successMessage)
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error?.response?.data?.msg || error?.message || '删除任务失败')
@@ -229,9 +315,47 @@ async function deleteTask(task) {
   }
 }
 
+async function cleanTaskFiles(task) {
+  try {
+    await ElMessageBox.confirm(`确认删除「${task.title}」的暂存文件？这不会改变已下载判定。`, '删除暂存文件', {
+      confirmButtonText: '删除暂存文件',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    const item = normalizeTask(await cleanAdminEd2kDownloadTaskFiles(task.id))
+    await focusTask(item)
+    ElMessage.success('暂存文件已清理')
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(error?.response?.data?.msg || error?.message || '删除暂存文件失败')
+    }
+  }
+}
+
+async function retryTask(task) {
+  try {
+    const item = normalizeTask(await retryAdminEd2kDownloadTask(task.id))
+    await focusTask(item)
+    ElMessage.success('任务已重新加入下载队列')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '重新下载失败')
+  }
+}
+
+async function retryCleanup(task) {
+  try {
+    const item = normalizeTask(await retryAdminEd2kDownloadCleanup(task.id))
+    await focusTask(item)
+    ElMessage.success('残留清理已重试完成')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '重试清理失败')
+  }
+}
+
 function clearComposer() {
   ed2kInput.value = ''
-  titleInput.value = ''
+  createDraftEntries.value = []
+  createSessionResults.value = []
 }
 
 function openCreateDialog() {
@@ -243,16 +367,75 @@ function returnToToolbox() {
   router.push('/toolbox')
 }
 
-function syncTitleFromSingleLink() {
-  if (parsedLinks.value.links.length !== 1) return
-  if (titleInput.value.trim()) return
-  titleInput.value = parsedLinks.value.links[0]?.label || ''
+function formatDateTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
 }
 
-watch(
-  () => parsedLinks.value.links.length,
-  () => syncTitleFromSingleLink()
-)
+async function handleCreateDialogBeforeClose(done) {
+  if (!ed2kInput.value.trim() && createSessionResults.value.length === 0) {
+    done()
+    return
+  }
+  try {
+    await ElMessageBox.confirm('未保存的修改将会丢失，确认关闭？', '关闭新建任务', {
+      confirmButtonText: '丢弃并关闭',
+      cancelButtonText: '继续编辑',
+      type: 'warning'
+    })
+    clearComposer()
+    done()
+  } catch {
+    // keep dialog open
+  }
+}
+
+function buildDeleteTaskActionCopy(task) {
+  const status = task?.status || ''
+  if (status === 'running') {
+    return {
+      actionLabel: '取消任务',
+      dialogTitle: '取消下载任务',
+      confirmButtonText: '确认取消',
+      confirmMessage: (currentTask) => `确认取消「${currentTask.title}」？这会停止下载并清理已落下的临时文件，任务历史会保留为已取消。`,
+      successMessage: '任务已取消'
+    }
+  }
+  if (status === 'canceling') {
+    return {
+      actionLabel: '继续取消',
+      dialogTitle: '继续取消下载任务',
+      confirmButtonText: '继续取消',
+      confirmMessage: (currentTask) => `确认继续取消「${currentTask.title}」？系统会再次尝试停止下载并清理残留。`,
+      successMessage: '已重新尝试取消任务'
+    }
+  }
+  if (status === 'failed') {
+    return {
+      actionLabel: '删除任务',
+      dialogTitle: '删除下载任务',
+      confirmButtonText: '永久删除',
+      confirmMessage: (currentTask) => `确认删除「${currentTask.title}」？失败任务会同时清理数据库记录和已落下的下载残留。`,
+      successMessage: '任务已删除'
+    }
+  }
+  return {
+    actionLabel: '删除任务',
+    dialogTitle: '删除下载任务',
+    confirmButtonText: '永久删除',
+    confirmMessage: (currentTask) => `确认删除「${currentTask.title}」？这会永久删除当前下载任务。`,
+    successMessage: '任务已删除'
+  }
+}
 </script>
 
 <template>
@@ -323,7 +506,7 @@ watch(
           <template #title>任务详情</template>
           <template #description>来源标识常驻，文件清单只展示当前任务已有结果。</template>
           <template #actions>
-            <el-button :icon="Delete" type="danger" plain @click="deleteTask(selectedTask)">永久删除</el-button>
+            <el-button v-if="canDeleteSelectedTask" :icon="Delete" type="danger" plain @click="deleteTask(selectedTask)">{{ selectedTaskDeleteActionLabel }}</el-button>
           </template>
 
           <div class="detail-stack">
@@ -347,21 +530,41 @@ watch(
             </div>
 
             <SectionCard>
+              <template #title>预期文件信息</template>
+              <template #description>链接声明信息始终保留，用来核对这条任务原本打算下载什么。</template>
+              <div class="source-block">
+                <div class="source-block__row">
+                  <span class="source-block__label">预期文件名</span>
+                  <span class="source-block__value">{{ selectedTask.filename }}</span>
+                </div>
+                <div class="source-block__row">
+                  <span class="source-block__label">声明大小</span>
+                  <span class="source-block__value">{{ formatFileSize(selectedTask.declaredSize) }}</span>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard>
               <template #title>状态反馈</template>
               <template #description>状态提示只表达当前走到哪一步。</template>
               <div class="feedback-panel">
                 <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
                 <p>{{ selectedTaskProgressText }}</p>
                 <p v-if="selectedTaskErrorMessage">{{ selectedTaskErrorMessage }}</p>
+                <p v-if="selectedTask.finishedAt && !['queued', 'running', 'canceling'].includes(selectedTask.status)">{{ selectedTaskFinishedAtLabel }}：{{ formatDateTime(selectedTask.finishedAt) }}</p>
+                <p v-if="selectedTask.cleanedAt && ['files_cleaned', 'cancelled'].includes(selectedTask.status)">{{ selectedTaskCleanedAtLabel }}：{{ formatDateTime(selectedTask.cleanedAt) }}</p>
               </div>
             </SectionCard>
 
             <SectionCard>
               <template #title>任务操作</template>
-              <template #description>这里保留后端管理动作：删除排队任务，或删除失败任务并清理残留。</template>
+              <template #description>这里保留后端管理动作：删除排队/失败任务、取消运行中任务、继续重试取消中的任务，已完成任务可清理暂存文件，已清理历史可重新下载。</template>
 
               <div class="action-row">
-                <el-button :disabled="selectedTask.status !== 'queued' && selectedTask.status !== 'failed' && selectedTask.status !== 'running'" @click="deleteTask(selectedTask)">删除任务</el-button>
+                <el-button :disabled="!canDeleteSelectedTask" @click="deleteTask(selectedTask)">{{ selectedTaskDeleteActionLabel }}</el-button>
+                <el-button :disabled="!canCleanSelectedTaskFiles" @click="cleanTaskFiles(selectedTask)">删除暂存文件</el-button>
+                <el-button :disabled="!canRetrySelectedTask" @click="retryTask(selectedTask)">重新下载</el-button>
+                <el-button :disabled="!canRetrySelectedCleanup" @click="retryCleanup(selectedTask)">重试清理</el-button>
               </div>
             </SectionCard>
 
@@ -404,7 +607,14 @@ watch(
     </div>
   </main>
 
-  <el-dialog v-model="createDialogVisible" class="crud-dialog" title="新建下载任务" width="min(94vw, 720px)" destroy-on-close>
+  <el-dialog
+    v-model="createDialogVisible"
+    class="crud-dialog"
+    title="新建下载任务"
+    width="min(94vw, 720px)"
+    destroy-on-close
+    :before-close="handleCreateDialogBeforeClose"
+  >
     <div class="composer">
       <p class="composer__intro">允许管理员直接贴入原始 ED2K 链接；任务标题默认取链接里的文件名。</p>
       <el-input
@@ -413,25 +623,36 @@ watch(
         :rows="8"
         resize="vertical"
         placeholder="每行一个 ed2k:// 链接"
-        @change="syncTitleFromSingleLink"
       />
       <div class="composer__bar">
-        <el-input
-          v-model="titleInput"
-          placeholder="任务标题（可不填，默认自动生成）"
-        />
         <el-button type="primary" :icon="Download" :loading="submitting" :disabled="!canSubmit" @click="submitLinks">创建任务</el-button>
       </div>
       <div class="composer__meta">
         <span>有效链接：{{ linkCount }}</span>
-        <span v-if="invalidCount > 0">已忽略 {{ invalidCount }} 行非 ED2K 文本</span>
-        <span v-if="linkCount > 0">标题会优先使用文件名</span>
+        <span v-if="invalidCount > 0">检测到 {{ invalidCount }} 行非 ED2K 文件链接，提交后会在结果区逐行回显</span>
+        <span v-if="pendingCreateEntries.length > 0">任务标题会直接使用链接里的文件名</span>
       </div>
+      <SectionCard v-if="createSessionResults.length > 0">
+        <template #title>结果区</template>
+        <template #description>逐行回显本次打开期间的提交结果，已收口输入会自动从文本框移除。</template>
+        <div class="history-list" aria-label="ED2K 创建结果区">
+          <article v-for="item in createSessionResults" :key="`${item.lineNumber}:${item.sourceLink}`" class="history-item">
+            <strong>第 {{ item.lineNumber }} 行 · {{ item.message }}</strong>
+            <span>{{ item.sourceLink }}</span>
+            <div class="action-row">
+              <el-tag size="small" :type="item.status === 'created' ? 'success' : item.status === 'reused' ? 'info' : item.status === 'duplicate' ? 'warning' : 'danger'" effect="plain">
+                {{ item.status }}
+              </el-tag>
+              <el-button v-if="item.task?.id" text type="primary" @click="focusTask(item.task)">定位任务</el-button>
+            </div>
+          </article>
+        </div>
+      </SectionCard>
     </div>
     <template #footer>
       <div class="composer__footer">
-        <el-button :disabled="!ed2kInput && !titleInput" @click="clearComposer">清空</el-button>
-        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button :disabled="!ed2kInput && createSessionResults.length === 0" @click="clearComposer">清空</el-button>
+        <el-button @click="handleCreateDialogBeforeClose(() => { createDialogVisible = false })">取消</el-button>
       </div>
     </template>
   </el-dialog>

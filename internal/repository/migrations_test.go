@@ -139,10 +139,31 @@ func TestEd2kDownloadTasksMigration(t *testing.T) {
 	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+ed2k_download_tasks`)
 	assertSQLPattern(t, up, `(?is)resource_hash\s+varchar\(64\)\s+not\s+null`)
 	assertSQLPattern(t, up, `(?is)status\s+varchar\(24\)\s+not\s+null\s+default\s+'queued'`)
+	assertSQLPattern(t, up, `(?is)'queued'.*'running'.*'completed'.*'failed'.*'deleted'`)
 	assertSQLPattern(t, up, `(?is)create\s+unique\s+index\s+if\s+not\s+exists\s+idx_ed2k_download_tasks_resource_hash_unique`)
 	assertSQLPattern(t, up, `(?is)where\s+status\s*<>\s*'deleted'`)
 	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_ed2k_download_tasks_status_updated`)
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+ed2k_download_tasks`)
+}
+
+func TestEd2kDownloadTaskLifecycleMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0030_ed2k_download_task_lifecycle.up.sql")
+	down := readMigrationForTest(t, "0030_ed2k_download_task_lifecycle.down.sql")
+
+	assertSQLPattern(t, up, `(?is)drop\s+constraint\s+if\s+exists\s+ed2k_download_tasks_status_check`)
+	assertSQLPattern(t, up, `(?is)'queued'.*'running'.*'canceling'.*'cancelled'.*'completed'.*'failed'.*'files_cleaned'.*'deleted'`)
+	assertSQLPattern(t, up, `(?is)add\s+column\s+if\s+not\s+exists\s+cleaned_at\s+timestamptz`)
+	assertSQLPattern(t, up, `(?is)drop\s+index\s+if\s+exists\s+idx_ed2k_download_tasks_resource_hash_unique`)
+	assertSQLPattern(t, up, `(?is)where\s+status\s*<>\s*'deleted'\s+and\s+status\s*<>\s*'cancelled'`)
+
+	assertSQLPattern(t, down, `(?is)update\s+ed2k_download_tasks\s+set\s+status\s*=\s*'running'\s+where\s+status\s*=\s*'canceling'`)
+	assertSQLPattern(t, down, `(?is)update\s+ed2k_download_tasks\s+set\s+status\s*=\s*'deleted'\s+where\s+status\s*=\s*'cancelled'`)
+	assertSQLPattern(t, down, `(?is)update\s+ed2k_download_tasks\s+set\s+status\s*=\s*'completed'\s+where\s+status\s*=\s*'files_cleaned'`)
+	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+cleaned_at`)
+	assertSQLPattern(t, down, `(?is)'queued'.*'running'.*'completed'.*'failed'.*'deleted'`)
+	assertSQLPattern(t, down, `(?is)where\s+status\s*<>\s*'deleted'`)
 }
 
 func TestArchiveImportBatchEncodingMigration(t *testing.T) {

@@ -31,6 +31,8 @@ type taskEnqueuer interface {
 	EnqueueScrapeRetag(queue.RetagScrapePayload) error
 	EnqueueOrphanFileScan() error
 	EnqueueEd2kDownload(queue.Ed2kDownloadPayload) error
+	DeleteEd2kDownloadTask(taskID string) error
+	HasEd2kDownloadTask(taskID string) (bool, error)
 }
 
 type archiveImportService interface {
@@ -292,6 +294,9 @@ func (a *API) Register(r *gin.Engine) {
 			admin.GET("/ed2k-download/tasks", a.AdminEd2kDownloadTasks)
 			admin.POST("/ed2k-download/tasks", a.AdminCreateEd2kDownloadTasks)
 			admin.GET("/ed2k-download/tasks/:id", a.AdminEd2kDownloadTaskDetail)
+			admin.POST("/ed2k-download/tasks/:id/retry", a.AdminRetryEd2kDownloadTask)
+			admin.POST("/ed2k-download/tasks/:id/clean-files", a.AdminCleanEd2kDownloadTaskFiles)
+			admin.POST("/ed2k-download/tasks/:id/retry-cleanup", a.AdminRetryCancelledEd2kDownloadCleanup)
 			admin.DELETE("/ed2k-download/tasks/:id", a.AdminDeleteEd2kDownloadTask)
 			admin.POST("/system/orphan-files/scan", a.AdminStartOrphanFileScan)
 			admin.GET("/system/orphan-files/latest", a.AdminLatestOrphanFileScan)

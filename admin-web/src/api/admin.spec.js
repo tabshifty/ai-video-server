@@ -19,6 +19,7 @@ vi.mock('./request', () => ({
 import {
   batchDeleteAdminVideos,
   batchUpdateAdminVideos,
+  createAdminEd2kDownloadTasks,
   createAdminTvEpisode,
   createAdminTvSeason,
   createAdminTvSeries,
@@ -38,11 +39,13 @@ import {
   getAdminPasswordVaultPassword,
   deleteAdminArchiveImportBatch,
   deleteAdminArchiveImportGroup,
+  deleteAdminEd2kDownloadTask,
   getAdminVideoTags,
   getAdminTvSeries,
   getAdminTvSeriesDetail,
   generateAdminImage,
   createAdminArchiveImportGroup,
+  cleanAdminEd2kDownloadTaskFiles,
   getAdminImageCollections,
   getAdminImageGenerationStatus,
   getAdminImageViewBlob,
@@ -56,6 +59,8 @@ import {
   processAdminArchiveImportGroup,
   rescanAdminVideoSubtitles,
   removeAdminArchiveImportGroupFiles,
+  retryAdminEd2kDownloadTask,
+  retryAdminEd2kDownloadCleanup,
   restoreAdminTVAppRelease,
   retryAdminArchiveImportExtract,
   scrapePreview,
@@ -251,6 +256,39 @@ describe('archive import apis', () => {
     expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/groups/remove-files', filePayload)
     expect(post).toHaveBeenCalledWith('/admin/archive-import/groups/group-1/process')
     expect(remove).toHaveBeenCalledWith('/admin/archive-import/groups/group-1', {
+      timeout: 0
+    })
+  })
+})
+
+describe('ed2k download apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    remove.mockReset()
+    get.mockResolvedValue({ ok: true })
+    post.mockResolvedValue({ ok: true })
+    remove.mockResolvedValue({ ok: true })
+  })
+
+  it('creates tasks by entry line and exposes clean/retry/delete actions', async () => {
+    const payload = {
+      entries: [
+        { line_number: 7, source_link: 'ed2k://|file|demo.mkv|123|0123456789ABCDEF0123456789ABCDEF|/' }
+      ]
+    }
+
+    await createAdminEd2kDownloadTasks(payload)
+    await retryAdminEd2kDownloadTask('task-1')
+    await retryAdminEd2kDownloadCleanup('task-1')
+    await cleanAdminEd2kDownloadTaskFiles('task-1')
+    await deleteAdminEd2kDownloadTask('task-1')
+
+    expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks', payload)
+    expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks/task-1/retry')
+    expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks/task-1/retry-cleanup')
+    expect(post).toHaveBeenCalledWith('/admin/ed2k-download/tasks/task-1/clean-files')
+    expect(remove).toHaveBeenCalledWith('/admin/ed2k-download/tasks/task-1', {
       timeout: 0
     })
   })

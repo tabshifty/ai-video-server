@@ -105,6 +105,10 @@ func TestHandleEd2kDownloadMarksFailedAndStopsAsynqRetry(t *testing.T) {
 			ResourceHash: "ABCDEF1234567890",
 			Filename:     "demo.mkv",
 		},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "running",
+		},
 	}
 	executor := ed2kDownloadExecutorStub{err: errors.New("executor failed")}
 	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
@@ -128,15 +132,140 @@ func TestHandleEd2kDownloadMarksFailedAndStopsAsynqRetry(t *testing.T) {
 	}
 }
 
+func TestHandleEd2kDownloadSkipsLateResultWhenTaskLeavesRunning(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	repo := &ed2kDownloadRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:           taskID,
+			Status:       "queued",
+			SourceLink:   "ed2k://|file|demo.mkv|123|ABCDEF1234567890|/",
+			ResourceHash: "ABCDEF1234567890",
+			Filename:     "demo.mkv",
+		},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "canceling",
+		},
+	}
+	executor := ed2kDownloadExecutorStub{
+		result: Ed2kDownloadResult{
+			OutputDir:      "/tmp/ed2k",
+			DownloadedPath: "/tmp/ed2k/demo.mkv",
+			ProgressText:   "下载已完成",
+			Files: []models.AdminEd2kDownloadTaskFile{
+				{Name: "demo.mkv", Path: "demo.mkv", Size: 123},
+			},
+		},
+	}
+	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	if err := handleEd2kDownload(context.Background(), task, repo, executor, logger); err != nil {
+		t.Fatalf("handleEd2kDownload() error = %v", err)
+	}
+	if repo.completedCalled {
+		t.Fatal("did not expect cancelled/canceling task to be marked completed")
+	}
+	if repo.failedCalled {
+		t.Fatal("did not expect cancelled/canceling task to be marked failed")
+	}
+}
+
+func TestHandleEd2kDownloadTreatsConditionalCompleteMissAsLateResult(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("23333333-2222-2222-2222-222222222222")
+	repo := &ed2kDownloadRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:           taskID,
+			Status:       "queued",
+			SourceLink:   "ed2k://|file|demo.mkv|123|ABCDEF1234567890|/",
+			ResourceHash: "ABCDEF1234567890",
+			Filename:     "demo.mkv",
+		},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "running",
+		},
+		completeErr: errors.New("mark ed2k download task completed: no rows in result set"),
+	}
+	executor := ed2kDownloadExecutorStub{
+		result: Ed2kDownloadResult{
+			OutputDir:      "/tmp/ed2k",
+			DownloadedPath: "/tmp/ed2k/demo.mkv",
+			ProgressText:   "下载已完成",
+			Files:          []models.AdminEd2kDownloadTaskFile{{Name: "demo.mkv", Path: "demo.mkv", Size: 123}},
+		},
+	}
+	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	if err := handleEd2kDownload(context.Background(), task, repo, executor, logger); err != nil {
+		t.Fatalf("handleEd2kDownload() should swallow late-result conditional miss, got %v", err)
+	}
+	if !repo.completedCalled {
+		t.Fatal("expected completion attempt")
+	}
+}
+
+func TestHandleEd2kDownloadSkipsFilesCleanedTaskUntilApiRequeuesIt(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("24444444-2222-2222-2222-222222222222")
+	repo := &ed2kDownloadRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:           taskID,
+			Status:       "files_cleaned",
+			SourceLink:   "ed2k://|file|demo.mkv|123|ABCDEF1234567890|/",
+			ResourceHash: "ABCDEF1234567890",
+			Filename:     "demo.mkv",
+		},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "running",
+		},
+	}
+	executor := ed2kDownloadExecutorStub{
+		result: Ed2kDownloadResult{
+			OutputDir:      "/tmp/ed2k",
+			DownloadedPath: "/tmp/ed2k/demo.mkv",
+			ProgressText:   "下载已完成",
+			Files:          []models.AdminEd2kDownloadTaskFile{{Name: "demo.mkv", Path: "demo.mkv", Size: 123}},
+		},
+	}
+	task := asynq.NewTask(TypeEd2kDownload, mustMarshalEd2kPayload(t, Ed2kDownloadPayload{TaskID: taskID.String()}))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	if err := handleEd2kDownload(context.Background(), task, repo, executor, logger); err != nil {
+		t.Fatalf("handleEd2kDownload() error = %v", err)
+	}
+	if repo.runningCalled {
+		t.Fatal("did not expect files_cleaned task to enter running before api requeue")
+	}
+	if repo.completedCalled {
+		t.Fatal("did not expect files_cleaned task to complete without queued transition")
+	}
+}
+
 type ed2kDownloadRepoStub struct {
 	task            models.AdminEd2kDownloadTask
+	refreshedTask   models.AdminEd2kDownloadTask
+	getCalls        int
 	runningCalled   bool
 	failedCalled    bool
 	completedCalled bool
 	failedMessage   string
+	failErr         error
+	completeErr     error
 }
 
 func (s *ed2kDownloadRepoStub) GetEd2kDownloadTask(context.Context, uuid.UUID) (models.AdminEd2kDownloadTask, error) {
+	s.getCalls++
+	if s.getCalls > 1 && s.refreshedTask.ID != uuid.Nil {
+		return s.refreshedTask, nil
+	}
 	return s.task, nil
 }
 
@@ -148,11 +277,17 @@ func (s *ed2kDownloadRepoStub) MarkEd2kDownloadTaskRunning(context.Context, uuid
 func (s *ed2kDownloadRepoStub) MarkEd2kDownloadTaskFailed(_ context.Context, _ uuid.UUID, errorMessage string, _ models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
 	s.failedCalled = true
 	s.failedMessage = errorMessage
+	if s.failErr != nil {
+		return models.AdminEd2kDownloadTask{}, s.failErr
+	}
 	return s.task, nil
 }
 
 func (s *ed2kDownloadRepoStub) MarkEd2kDownloadTaskCompleted(context.Context, uuid.UUID, string, string, []models.AdminEd2kDownloadTaskFile, string, models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
 	s.completedCalled = true
+	if s.completeErr != nil {
+		return models.AdminEd2kDownloadTask{}, s.completeErr
+	}
 	return s.task, nil
 }
 

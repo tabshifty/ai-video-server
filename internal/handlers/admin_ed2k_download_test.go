@@ -1,16 +1,21 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/models"
+	"video-server/internal/queue"
 )
 
 func TestRegisterIncludesEd2kDownloadRoutes(t *testing.T) {
@@ -29,14 +34,14 @@ func TestRegisterIncludesEd2kDownloadRoutes(t *testing.T) {
 		"GET /api/v1/admin/ed2k-download/tasks",
 		"POST /api/v1/admin/ed2k-download/tasks",
 		"GET /api/v1/admin/ed2k-download/tasks/:id",
+		"POST /api/v1/admin/ed2k-download/tasks/:id/retry",
+		"POST /api/v1/admin/ed2k-download/tasks/:id/clean-files",
+		"POST /api/v1/admin/ed2k-download/tasks/:id/retry-cleanup",
 		"DELETE /api/v1/admin/ed2k-download/tasks/:id",
 	} {
 		if _, ok := routes[want]; !ok {
 			t.Fatalf("expected route %s to be registered", want)
 		}
-	}
-	if _, ok := routes["POST /api/v1/admin/ed2k-download/tasks/:id/retry"]; ok {
-		t.Fatal("did not expect retry route to remain registered")
 	}
 }
 
@@ -57,11 +62,11 @@ func TestParseEd2kDownloadLinkAndBuildTitle(t *testing.T) {
 	if size != 123 {
 		t.Fatalf("unexpected size: %d", size)
 	}
-	if got := buildEd2kDownloadTaskTitle("主角.mkv", "  "); got != "主角.mkv" {
+	if got := buildEd2kDownloadTaskTitle("主角.mkv"); got != "主角.mkv" {
 		t.Fatalf("unexpected fallback title: %s", got)
 	}
-	if got := buildEd2kDownloadTaskTitle("主角.mkv", "  自定义 标题  "); got != "自定义 标题" {
-		t.Fatalf("unexpected normalized title: %s", got)
+	if got := buildEd2kDownloadTaskTitle("  "); got != "ED2K 下载任务" {
+		t.Fatalf("unexpected default title: %s", got)
 	}
 }
 
@@ -185,6 +190,524 @@ func TestCancelFailedEd2kDownloadIgnoresHashNotFound(t *testing.T) {
 	}
 }
 
+func TestBuildEd2kCreateResultsCoversDuplicateInvalidReuseAndEnqueueFailure(t *testing.T) {
+	t.Parallel()
+
+	existingID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	repo := &ed2kCreateRepoStub{
+		byHash: map[string]models.AdminEd2kDownloadTask{
+			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA": {
+				ID:           existingID,
+				ResourceHash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				Status:       "completed",
+			},
+		},
+		createErrByHash: map[string]error{
+			"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC": errors.New("db create failed"),
+		},
+		createTaskIDByHash: map[string]uuid.UUID{
+			"DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD": uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+		},
+	}
+	enqueuer := &ed2kCreateEnqueuerStub{
+		errByTaskID: map[string]error{
+			"44444444-4444-4444-4444-444444444444": errors.New("enqueue boom"),
+		},
+	}
+	entries := []ed2kCreateLine{
+		{lineNumber: 7, sourceLink: "ed2k://|file|first.mkv|1|AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA|/"},
+		{lineNumber: 8, sourceLink: "bad-link"},
+		{lineNumber: 9, sourceLink: "ed2k://|file|dup.mkv|1|BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB|/"},
+		{lineNumber: 10, sourceLink: "ed2k://|file|dup.mkv|1|BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB|/"},
+		{lineNumber: 11, sourceLink: "ed2k://|file|create-fail.mkv|1|CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC|/"},
+		{lineNumber: 12, sourceLink: "ed2k://|file|enqueue-fail.mkv|1|DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD|/"},
+	}
+
+	results, err := buildEd2kCreateResults(context.Background(), repo, enqueuer, entries)
+	if err != nil {
+		t.Fatalf("buildEd2kCreateResults() error = %v", err)
+	}
+	if got := collectCreateStatuses(results); got != "7:reused,8:invalid,9:created,10:duplicate,11:create_failed,12:enqueue_failed" {
+		t.Fatalf("unexpected statuses: %s", got)
+	}
+	if repo.appendHistoryCalls != 1 {
+		t.Fatalf("expected one history append, got %d", repo.appendHistoryCalls)
+	}
+	if results[0].Task == nil || results[0].Task.ID != existingID {
+		t.Fatalf("expected reused task target, got %#v", results[0].Task)
+	}
+	if results[5].Task == nil || results[5].Task.Status != "failed" {
+		t.Fatalf("expected enqueue_failed result to carry failed task, got %#v", results[5].Task)
+	}
+}
+
+func TestRetryEd2kDownloadTaskRequeuesFilesCleanedTask(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	repo := &ed2kRetryRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "files_cleaned",
+		},
+		requeued: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "queued",
+		},
+	}
+	enqueuer := &ed2kCreateEnqueuerStub{errByTaskID: map[string]error{}}
+
+	item, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enqueuer, time.Now())
+	if err != nil {
+		t.Fatalf("retryEd2kDownloadTask() error = %v", err)
+	}
+	if item.Status != "queued" {
+		t.Fatalf("expected queued task, got %s", item.Status)
+	}
+	if repo.requeueCalls != 1 {
+		t.Fatalf("expected one requeue call, got %d", repo.requeueCalls)
+	}
+	if enqueuer.calls != 1 {
+		t.Fatalf("expected one enqueue call, got %d", enqueuer.calls)
+	}
+}
+
+func TestRetryEd2kDownloadTaskRollsBackRequeuedStateWhenEnqueueFails(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("23222222-2222-2222-2222-222222222222")
+	repo := &ed2kRetryRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:        taskID,
+			Status:    "files_cleaned",
+			StartedAt: timePtrNow(),
+			CleanedAt: timePtrNow(),
+		},
+		requeued: models.AdminEd2kDownloadTask{ID: taskID, Status: "queued"},
+	}
+	enqueuer := &ed2kCreateEnqueuerStub{errByTaskID: map[string]error{
+		taskID.String(): errors.New("enqueue boom"),
+	}}
+
+	_, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enqueuer, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "enqueue boom") {
+		t.Fatalf("expected enqueue error, got %v", err)
+	}
+	if enqueuer.calls != 1 {
+		t.Fatalf("expected one enqueue call, got %d", enqueuer.calls)
+	}
+	if repo.restoreCalls != 1 {
+		t.Fatalf("expected one restore call, got %d", repo.restoreCalls)
+	}
+}
+
+func TestRetryEd2kDownloadTaskReturnsCurrentTaskWhenWorkerAlreadyTookOver(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("24222222-2222-2222-2222-222222222222")
+	repo := &ed2kRetryRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "files_cleaned",
+		},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "running",
+		},
+		requeueErr: errors.New("requeue files_cleaned ed2k download task: no rows in result set"),
+	}
+	enqueuer := &ed2kCreateEnqueuerStub{errByTaskID: map[string]error{}}
+
+	item, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enqueuer, time.Now())
+	if err != nil {
+		t.Fatalf("retryEd2kDownloadTask() error = %v", err)
+	}
+	if item.Status != "running" {
+		t.Fatalf("expected running task, got %s", item.Status)
+	}
+	if enqueuer.inspectedTaskID != "" {
+		t.Fatalf("did not expect queue inspection for running task, got %s", enqueuer.inspectedTaskID)
+	}
+}
+
+func TestRetryEd2kDownloadTaskReturnsQueuedOnlyWhenQueueStillHasTask(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("25222222-2222-2222-2222-222222222222")
+	repo := &ed2kRetryRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "files_cleaned",
+		},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "queued",
+		},
+		requeueErr: errors.New("requeue files_cleaned ed2k download task: no rows in result set"),
+	}
+	enqueuer := &ed2kCreateEnqueuerStub{
+		errByTaskID: map[string]error{},
+		hasTaskByID: map[string]bool{taskID.String(): true},
+	}
+
+	item, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enqueuer, time.Now())
+	if err != nil {
+		t.Fatalf("retryEd2kDownloadTask() error = %v", err)
+	}
+	if item.Status != "queued" {
+		t.Fatalf("expected queued task, got %s", item.Status)
+	}
+	if enqueuer.inspectedTaskID != taskID.String() {
+		t.Fatalf("expected queue inspection for %s, got %s", taskID.String(), enqueuer.inspectedTaskID)
+	}
+}
+
+func TestRetryEd2kDownloadTaskTreatsEnqueueErrorWithPersistedJobAsSuccess(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("26222222-2222-2222-2222-222222222222")
+	repo := &ed2kRetryRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:        taskID,
+			Status:    "files_cleaned",
+			StartedAt: timePtrNow(),
+			CleanedAt: timePtrNow(),
+		},
+		requeued: models.AdminEd2kDownloadTask{ID: taskID, Status: "queued"},
+		refreshedTask: models.AdminEd2kDownloadTask{
+			ID:     taskID,
+			Status: "queued",
+		},
+	}
+	enqueuer := &ed2kCreateEnqueuerStub{
+		errByTaskID: map[string]error{taskID.String(): errors.New("transient enqueue error")},
+		hasTaskByID: map[string]bool{taskID.String(): true},
+	}
+
+	item, err := retryEd2kDownloadTask(context.Background(), taskID, repo, enqueuer, time.Now())
+	if err != nil {
+		t.Fatalf("retryEd2kDownloadTask() error = %v", err)
+	}
+	if item.Status != "queued" {
+		t.Fatalf("expected queued task, got %s", item.Status)
+	}
+	if repo.restoreCalls != 0 {
+		t.Fatalf("did not expect rollback when job already exists, got %d", repo.restoreCalls)
+	}
+}
+
+func TestCleanCompletedEd2kDownloadArtifactsRemovesSymlinkAndRealFile(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	outputDir := filepath.Join(downloadRoot, downloadSubdir, "task-1")
+	realFile := filepath.Join(downloadRoot, downloadSubdir, "done.mkv")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatalf("mkdir output: %v", err)
+	}
+	if err := os.WriteFile(realFile, []byte("demo"), 0o644); err != nil {
+		t.Fatalf("write real file: %v", err)
+	}
+	if err := os.Symlink(realFile, filepath.Join(outputDir, "done.mkv")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+
+	taskID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	task := models.AdminEd2kDownloadTask{
+		ID:         taskID,
+		Status:     "completed",
+		OutputDir:  outputDir,
+		Filename:   "done.mkv",
+		FinishedAt: timePtrNow(),
+		Files: []models.AdminEd2kDownloadTaskFile{
+			{Name: "done.mkv", Path: "done.mkv", Size: 4},
+		},
+	}
+	if err := cleanCompletedEd2kDownloadArtifacts(task, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+	}); err != nil {
+		t.Fatalf("cleanCompletedEd2kDownloadArtifacts() error = %v", err)
+	}
+	assertPathMissing(t, realFile)
+	assertPathMissing(t, outputDir)
+}
+
+func TestCleanCompletedEd2kDownloadArtifactsRejectsSymlinkedParentDirectoryEscape(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	outputDir := filepath.Join(downloadRoot, downloadSubdir, "task-escape")
+	outsideDir := filepath.Join(rootDir, "outside")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatalf("mkdir output: %v", err)
+	}
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatalf("mkdir outside: %v", err)
+	}
+	if err := os.Symlink(outsideDir, filepath.Join(outputDir, "nested")); err != nil {
+		t.Fatalf("symlink nested dir: %v", err)
+	}
+	outsideFile := filepath.Join(outsideDir, "done.mkv")
+	if err := os.WriteFile(outsideFile, []byte("demo"), 0o644); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+
+	task := models.AdminEd2kDownloadTask{
+		ID:         uuid.MustParse("34333333-3333-3333-3333-333333333333"),
+		Status:     "completed",
+		OutputDir:  outputDir,
+		Filename:   "done.mkv",
+		FinishedAt: timePtrNow(),
+		Files: []models.AdminEd2kDownloadTaskFile{
+			{Name: "done.mkv", Path: "nested/done.mkv", Size: 4},
+		},
+	}
+	err := cleanCompletedEd2kDownloadArtifacts(task, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+	})
+	if err == nil || !strings.Contains(err.Error(), "父目录越出任务目录") {
+		t.Fatalf("expected parent directory escape error, got %v", err)
+	}
+	if _, statErr := os.Stat(outsideFile); statErr != nil {
+		t.Fatalf("expected outside file to remain, got %v", statErr)
+	}
+}
+
+func TestCleanCompletedEd2kDownloadArtifactsRejectsSymlinkedTaskRootEscape(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	managedRoot := filepath.Join(downloadRoot, downloadSubdir)
+	realOutsideDir := filepath.Join(rootDir, "outside-real")
+	if err := os.MkdirAll(managedRoot, 0o755); err != nil {
+		t.Fatalf("mkdir managed root: %v", err)
+	}
+	if err := os.MkdirAll(realOutsideDir, 0o755); err != nil {
+		t.Fatalf("mkdir real outside dir: %v", err)
+	}
+	symlinkedTaskDir := filepath.Join(managedRoot, "task-link")
+	if err := os.Symlink(realOutsideDir, symlinkedTaskDir); err != nil {
+		t.Fatalf("symlink task dir: %v", err)
+	}
+	outsideFile := filepath.Join(realOutsideDir, "done.mkv")
+	if err := os.WriteFile(outsideFile, []byte("demo"), 0o644); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+
+	task := models.AdminEd2kDownloadTask{
+		ID:         uuid.MustParse("35333333-3333-3333-3333-333333333333"),
+		Status:     "completed",
+		OutputDir:  symlinkedTaskDir,
+		Filename:   "done.mkv",
+		FinishedAt: timePtrNow(),
+		Files: []models.AdminEd2kDownloadTaskFile{
+			{Name: "done.mkv", Path: "done.mkv", Size: 4},
+		},
+	}
+	err := cleanCompletedEd2kDownloadArtifacts(task, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+	})
+	if err == nil || !strings.Contains(err.Error(), "任务目录超出受管目录") {
+		t.Fatalf("expected symlinked task root escape error, got %v", err)
+	}
+	if _, statErr := os.Stat(outsideFile); statErr != nil {
+		t.Fatalf("expected outside file to remain, got %v", statErr)
+	}
+}
+
+func TestRetryCancelledEd2kDownloadCleanupSucceeds(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	outputDir := filepath.Join(downloadRoot, downloadSubdir, "task-cancelled")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatalf("mkdir output: %v", err)
+	}
+	residueFile := filepath.Join(outputDir, "part.tmp")
+	if err := os.WriteFile(residueFile, []byte("tmp"), 0o644); err != nil {
+		t.Fatalf("write residue file: %v", err)
+	}
+	taskID := uuid.MustParse("36333333-3333-3333-3333-333333333333")
+	finishedAt := timePtrNow()
+	repo := &ed2kCleanupRepoStub{
+		task: models.AdminEd2kDownloadTask{
+			ID:           taskID,
+			Status:       "cancelled",
+			ErrorMessage: "仍有残留待清理",
+			OutputDir:    outputDir,
+			FinishedAt:   finishedAt,
+		},
+		updated: models.AdminEd2kDownloadTask{
+			ID:         taskID,
+			Status:     "cancelled",
+			FinishedAt: finishedAt,
+		},
+	}
+
+	item, err := retryCancelledEd2kDownloadCleanup(context.Background(), taskID, repo, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("retryCancelledEd2kDownloadCleanup() error = %v", err)
+	}
+	if item.Status != "cancelled" {
+		t.Fatalf("expected cancelled status, got %s", item.Status)
+	}
+	if repo.updateCalls != 1 {
+		t.Fatalf("expected one update call, got %d", repo.updateCalls)
+	}
+	assertPathMissing(t, outputDir)
+}
+
+func TestCancelEd2kDownloadTaskLeavesTaskCancelingWhenEngineStopFails(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	outputDir := filepath.Join(downloadRoot, downloadSubdir, "task-running")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatalf("mkdir output: %v", err)
+	}
+	residueFile := filepath.Join(outputDir, "part.tmp")
+	if err := os.WriteFile(residueFile, []byte("tmp"), 0o644); err != nil {
+		t.Fatalf("write residue file: %v", err)
+	}
+	amulecmdPath := filepath.Join(rootDir, "amulecmd")
+	if err := os.WriteFile(amulecmdPath, []byte(strings.Join([]string{
+		"#!/usr/bin/env bash",
+		"echo 'cancel failed'",
+		"exit 1",
+	}, "\n")), 0o755); err != nil {
+		t.Fatalf("write amulecmd: %v", err)
+	}
+	taskID := uuid.MustParse("37333333-3333-3333-3333-333333333333")
+	task := models.AdminEd2kDownloadTask{
+		ID:           taskID,
+		Status:       "running",
+		ResourceHash: "ABCDEF0123456789ABCDEF0123456789",
+		OutputDir:    outputDir,
+	}
+	repo := &ed2kCancelRepoStub{
+		cancelingItem: models.AdminEd2kDownloadTask{
+			ID:           taskID,
+			Status:       "canceling",
+			ResourceHash: task.ResourceHash,
+			OutputDir:    outputDir,
+		},
+		cancellationFailedItem: models.AdminEd2kDownloadTask{
+			ID:           taskID,
+			Status:       "canceling",
+			ResourceHash: task.ResourceHash,
+			OutputDir:    outputDir,
+			ErrorMessage: "取消 aMule 下载失败: cancel failed",
+		},
+	}
+
+	item, err := cancelEd2kDownloadTask(context.Background(), task, repo, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+		amulecmdBin:    amulecmdPath,
+		remoteHost:     "127.0.0.1",
+		remotePort:     "4712",
+		remotePassword: "secret",
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("cancelEd2kDownloadTask() error = %v", err)
+	}
+	if item.Status != "canceling" {
+		t.Fatalf("expected canceling status, got %s", item.Status)
+	}
+	if repo.cancelingCalls != 1 {
+		t.Fatalf("expected one canceling transition, got %d", repo.cancelingCalls)
+	}
+	if repo.cancellationFailedCalls != 1 {
+		t.Fatalf("expected one cancellation failure transition, got %d", repo.cancellationFailedCalls)
+	}
+	if repo.cancelledCalls != 0 {
+		t.Fatalf("did not expect cancelled transition, got %d", repo.cancelledCalls)
+	}
+	if _, err := os.Stat(residueFile); err != nil {
+		t.Fatalf("expected residue file to remain after cancel failure, got %v", err)
+	}
+}
+
+func TestCancelEd2kDownloadTaskCanRetryExistingCancelingTask(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	downloadRoot := filepath.Join(rootDir, "storage")
+	downloadSubdir := "ed2k-downloads"
+	outputDir := filepath.Join(downloadRoot, downloadSubdir, "task-canceling")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatalf("mkdir output: %v", err)
+	}
+	residueFile := filepath.Join(outputDir, "part.tmp")
+	if err := os.WriteFile(residueFile, []byte("tmp"), 0o644); err != nil {
+		t.Fatalf("write residue file: %v", err)
+	}
+	amulecmdPath := filepath.Join(rootDir, "amulecmd")
+	if err := os.WriteFile(amulecmdPath, []byte(strings.Join([]string{
+		"#!/usr/bin/env bash",
+		"exit 0",
+	}, "\n")), 0o755); err != nil {
+		t.Fatalf("write amulecmd: %v", err)
+	}
+	taskID := uuid.MustParse("38333333-3333-3333-3333-333333333333")
+	task := models.AdminEd2kDownloadTask{
+		ID:           taskID,
+		Status:       "canceling",
+		ResourceHash: "ABCDEF0123456789ABCDEF0123456789",
+		OutputDir:    outputDir,
+	}
+	repo := &ed2kCancelRepoStub{
+		cancelledItem: models.AdminEd2kDownloadTask{
+			ID:         taskID,
+			Status:     "cancelled",
+			OutputDir:  outputDir,
+			FinishedAt: timePtrNow(),
+			CleanedAt:  timePtrNow(),
+		},
+	}
+
+	item, err := cancelEd2kDownloadTask(context.Background(), task, repo, ed2kDeletePaths{
+		downloadRoot:   downloadRoot,
+		downloadSubdir: downloadSubdir,
+		amulecmdBin:    amulecmdPath,
+		remoteHost:     "127.0.0.1",
+		remotePort:     "4712",
+		remotePassword: "secret",
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("cancelEd2kDownloadTask() error = %v", err)
+	}
+	if item.Status != "cancelled" {
+		t.Fatalf("expected cancelled status, got %s", item.Status)
+	}
+	if repo.cancelingCalls != 0 {
+		t.Fatalf("did not expect running->canceling transition, got %d", repo.cancelingCalls)
+	}
+	if repo.cancelledCalls != 1 {
+		t.Fatalf("expected one cancelled transition, got %d", repo.cancelledCalls)
+	}
+	if repo.lastCancelledCleanedAt == nil {
+		t.Fatal("expected cleaned_at to be recorded on successful cancel cleanup")
+	}
+	assertPathMissing(t, outputDir)
+}
+
 func makeFailedTask(taskID uuid.UUID, hash, outputDir, downloadedPath string) models.AdminEd2kDownloadTask {
 	return models.AdminEd2kDownloadTask{
 		ID:             taskID,
@@ -194,6 +717,159 @@ func makeFailedTask(taskID uuid.UUID, hash, outputDir, downloadedPath string) mo
 		OutputDir:      outputDir,
 		DownloadedPath: downloadedPath,
 	}
+}
+
+func collectCreateStatuses(results []models.AdminEd2kDownloadCreateResult) string {
+	parts := make([]string, 0, len(results))
+	for _, item := range results {
+		parts = append(parts, strconv.Itoa(item.LineNumber)+":"+item.Status)
+	}
+	return strings.Join(parts, ",")
+}
+
+func timePtrNow() *time.Time {
+	now := time.Now()
+	return &now
+}
+
+type ed2kCreateRepoStub struct {
+	byHash             map[string]models.AdminEd2kDownloadTask
+	createErrByHash    map[string]error
+	createTaskIDByHash map[string]uuid.UUID
+	appendHistoryCalls int
+}
+
+func (s *ed2kCreateRepoStub) GetEd2kDownloadTaskByHash(_ context.Context, resourceHash string) (models.AdminEd2kDownloadTask, error) {
+	if task, ok := s.byHash[resourceHash]; ok {
+		return task, nil
+	}
+	return models.AdminEd2kDownloadTask{}, pgx.ErrNoRows
+}
+
+func (s *ed2kCreateRepoStub) AppendEd2kDownloadTaskHistory(context.Context, uuid.UUID, models.AdminEd2kDownloadTaskHistoryItem) error {
+	s.appendHistoryCalls++
+	return nil
+}
+
+func (s *ed2kCreateRepoStub) CreateEd2kDownloadTask(_ context.Context, input models.AdminEd2kDownloadTask) (models.AdminEd2kDownloadTask, error) {
+	if err := s.createErrByHash[input.ResourceHash]; err != nil {
+		return models.AdminEd2kDownloadTask{}, err
+	}
+	if taskID, ok := s.createTaskIDByHash[input.ResourceHash]; ok {
+		input.ID = taskID
+	}
+	return input, nil
+}
+
+func (s *ed2kCreateRepoStub) UpdateEd2kDownloadTaskStatus(_ context.Context, id uuid.UUID, status, progressText, errorMessage string, startedAt, finishedAt, deletedAt *time.Time, outputDir, downloadedPath string, files []models.AdminEd2kDownloadTaskFile, retryDelta int, history models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	return models.AdminEd2kDownloadTask{
+		ID:             id,
+		Status:         status,
+		ProgressText:   progressText,
+		ErrorMessage:   errorMessage,
+		OutputDir:      outputDir,
+		DownloadedPath: downloadedPath,
+		Files:          files,
+	}, nil
+}
+
+type ed2kCreateEnqueuerStub struct {
+	calls           int
+	errByTaskID     map[string]error
+	hasTaskByID     map[string]bool
+	inspectedTaskID string
+}
+
+func (s *ed2kCreateEnqueuerStub) EnqueueEd2kDownload(payload queue.Ed2kDownloadPayload) error {
+	s.calls++
+	return s.errByTaskID[payload.TaskID]
+}
+
+func (s *ed2kCreateEnqueuerStub) HasEd2kDownloadTask(taskID string) (bool, error) {
+	s.inspectedTaskID = taskID
+	return s.hasTaskByID[taskID], nil
+}
+
+type ed2kRetryRepoStub struct {
+	task          models.AdminEd2kDownloadTask
+	refreshedTask models.AdminEd2kDownloadTask
+	requeued      models.AdminEd2kDownloadTask
+	restored      models.AdminEd2kDownloadTask
+	requeueCalls  int
+	requeueErr    error
+	restoreCalls  int
+	getCalls      int
+}
+
+func (s *ed2kRetryRepoStub) GetEd2kDownloadTask(context.Context, uuid.UUID) (models.AdminEd2kDownloadTask, error) {
+	s.getCalls++
+	if s.getCalls > 1 && s.refreshedTask.ID != uuid.Nil {
+		return s.refreshedTask, nil
+	}
+	return s.task, nil
+}
+
+func (s *ed2kRetryRepoStub) UpdateEd2kDownloadTaskStatus(context.Context, uuid.UUID, string, string, string, *time.Time, *time.Time, *time.Time, string, string, []models.AdminEd2kDownloadTaskFile, int, models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	return models.AdminEd2kDownloadTask{}, nil
+}
+
+func (s *ed2kRetryRepoStub) RequeueFilesCleanedEd2kDownloadTask(context.Context, uuid.UUID, models.AdminEd2kDownloadTaskHistoryItem, *time.Time) (models.AdminEd2kDownloadTask, error) {
+	s.requeueCalls++
+	if s.requeueErr != nil {
+		return models.AdminEd2kDownloadTask{}, s.requeueErr
+	}
+	return s.requeued, nil
+}
+
+func (s *ed2kRetryRepoStub) RestoreFilesCleanedEd2kDownloadTask(context.Context, uuid.UUID, models.AdminEd2kDownloadTaskHistoryItem, *time.Time, *time.Time) (models.AdminEd2kDownloadTask, error) {
+	s.restoreCalls++
+	if s.restored.ID != uuid.Nil {
+		return s.restored, nil
+	}
+	return s.task, nil
+}
+
+type ed2kCleanupRepoStub struct {
+	task        models.AdminEd2kDownloadTask
+	updated     models.AdminEd2kDownloadTask
+	updateCalls int
+}
+
+func (s *ed2kCleanupRepoStub) GetEd2kDownloadTask(context.Context, uuid.UUID) (models.AdminEd2kDownloadTask, error) {
+	return s.task, nil
+}
+
+func (s *ed2kCleanupRepoStub) MarkEd2kDownloadTaskCancelledCleanupResolved(context.Context, uuid.UUID, *time.Time, models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	s.updateCalls++
+	return s.updated, nil
+}
+
+type ed2kCancelRepoStub struct {
+	cancelingItem           models.AdminEd2kDownloadTask
+	cancellationFailedItem  models.AdminEd2kDownloadTask
+	cancelledItem           models.AdminEd2kDownloadTask
+	cancelingCalls          int
+	cancellationFailedCalls int
+	cancelledCalls          int
+	lastCancelledFinishedAt *time.Time
+	lastCancelledCleanedAt  *time.Time
+}
+
+func (s *ed2kCancelRepoStub) MarkEd2kDownloadTaskCanceling(context.Context, uuid.UUID, string, models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	s.cancelingCalls++
+	return s.cancelingItem, nil
+}
+
+func (s *ed2kCancelRepoStub) MarkEd2kDownloadTaskCancellationFailed(context.Context, uuid.UUID, string, string, models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	s.cancellationFailedCalls++
+	return s.cancellationFailedItem, nil
+}
+
+func (s *ed2kCancelRepoStub) MarkEd2kDownloadTaskCancelled(_ context.Context, _ uuid.UUID, _ string, _ string, finishedAt, cleanedAt *time.Time, _ models.AdminEd2kDownloadTaskHistoryItem) (models.AdminEd2kDownloadTask, error) {
+	s.cancelledCalls++
+	s.lastCancelledFinishedAt = finishedAt
+	s.lastCancelledCleanedAt = cleanedAt
+	return s.cancelledItem, nil
 }
 
 func assertPathMissing(t *testing.T, path string) {

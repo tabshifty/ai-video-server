@@ -190,7 +190,17 @@ type AdminEd2kDownloadTask struct {
 	UpdatedAt      time.Time                          `json:"updated_at"`
 	StartedAt      *time.Time                         `json:"started_at"`
 	FinishedAt     *time.Time                         `json:"finished_at"`
+	CleanedAt      *time.Time                         `json:"cleaned_at"`
 	DeletedAt      *time.Time                         `json:"deleted_at"`
+}
+
+type AdminEd2kDownloadCreateResult struct {
+	LineNumber   int                    `json:"line_number"`
+	SourceLink   string                 `json:"source_link"`
+	ResourceHash string                 `json:"resource_hash"`
+	Status       string                 `json:"status"`
+	Message      string                 `json:"message"`
+	Task         *AdminEd2kDownloadTask `json:"task,omitempty"`
 }
 
 type AdminEd2kDownloadTaskQueueMeta struct {
