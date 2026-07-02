@@ -1,3 +1,8 @@
+## 2026-07-02 11:13 +0800
+- 进度：继续排查两个新下载任务为何再次卡在“等待 aMule 同步下载状态”。已确认不是“没源”而是“队列被打空”：数据库里当前两条任务仍是 `running`，但部署机 `amulecmd show dl` 为空、`status` 显示 `Total sources: 0`。进一步结合 aMule 日志与任务目录时间线，根因锁定为：删除旧 `cancelled` 历史记录时，后端按 `resource_hash` 去执行 `amulecmd cancel <hash>` 和 hash 目录清理，误伤了同 hash 的新 `running` 任务，导致新任务被从 aMule 队列撤掉、任务目录标记也被删空，只剩数据库状态继续轮询。准备补守卫：删除 `cancelled` 记录时若同 hash 已有其它非取消/未删除任务，就只删旧 DB 记录，不再碰 aMule 队列和下载目录；随后手工把当前两条 `running` 任务补回队列。
+- 影响文件：预计涉及 `internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 定向测试、部署机实机回归（删除旧取消记录不再打掉新 running 任务；当前两条任务重新出现在 `show dl`）。
+
 ## 2026-07-02 11:05 +0800
 - 进度：已完成“已取消下载记录可删除”修复。后端现在允许 `cancelled` 任务走删除入口，并复用既有残留清理逻辑后物理删库；前端工作台已恢复 `cancelled` 状态的删除按钮，并把确认文案/操作说明同步到位。
 - 影响文件：`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`

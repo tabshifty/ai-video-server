@@ -714,16 +714,18 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 		return
 	}
 	if status == "failed" || status == "cancelled" {
-		if err := deleteFailedEd2kDownloadArtifacts(task, ed2kDeletePaths{
-			downloadRoot:   a.ed2kDownloadRoot,
-			downloadSubdir: a.ed2kDownloadSubdir,
-			amulecmdBin:    a.amulecmdBin,
-			remoteHost:     a.amuleRemoteHost,
-			remotePort:     a.amuleRemotePort,
-			remotePassword: a.amuleRemotePassword,
-		}); err != nil {
-			response.Error(c, 1098, err.Error())
-			return
+		if status == "failed" || !shouldSkipCancelledDeleteArtifacts(c.Request.Context(), a.repo, task) {
+			if err := deleteFailedEd2kDownloadArtifacts(task, ed2kDeletePaths{
+				downloadRoot:   a.ed2kDownloadRoot,
+				downloadSubdir: a.ed2kDownloadSubdir,
+				amulecmdBin:    a.amulecmdBin,
+				remoteHost:     a.amuleRemoteHost,
+				remotePort:     a.amuleRemotePort,
+				remotePassword: a.amuleRemotePassword,
+			}); err != nil {
+				response.Error(c, 1098, err.Error())
+				return
+			}
 		}
 		if err := a.repo.DeleteEd2kDownloadTask(c.Request.Context(), taskID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -770,6 +772,25 @@ func canDeleteEd2kDownloadTaskStatus(status string) bool {
 	default:
 		return false
 	}
+}
+
+type ed2kTaskByHashLookup interface {
+	GetEd2kDownloadTaskByHash(ctx context.Context, resourceHash string) (models.AdminEd2kDownloadTask, error)
+}
+
+func shouldSkipCancelledDeleteArtifacts(ctx context.Context, repo ed2kTaskByHashLookup, task models.AdminEd2kDownloadTask) bool {
+	if repo == nil || strings.TrimSpace(task.Status) != "cancelled" {
+		return false
+	}
+	hash := strings.TrimSpace(task.ResourceHash)
+	if hash == "" {
+		return false
+	}
+	current, err := repo.GetEd2kDownloadTaskByHash(ctx, hash)
+	if err != nil {
+		return false
+	}
+	return current.ID != uuid.Nil && current.ID != task.ID
 }
 
 func (a *API) AdminRetryCancelledEd2kDownloadCleanup(c *gin.Context) {

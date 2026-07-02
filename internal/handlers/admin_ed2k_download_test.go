@@ -472,6 +472,67 @@ func TestCanDeleteEd2kDownloadTaskStatus(t *testing.T) {
 	}
 }
 
+func TestShouldSkipCancelledDeleteArtifacts(t *testing.T) {
+	t.Parallel()
+
+	taskID := uuid.MustParse("27212121-1111-1111-1111-111111111111")
+	cases := []struct {
+		name string
+		task models.AdminEd2kDownloadTask
+		repo ed2kTaskByHashLookup
+		want bool
+	}{
+		{
+			name: "same hash has newer active task",
+			task: models.AdminEd2kDownloadTask{
+				ID:           taskID,
+				Status:       "cancelled",
+				ResourceHash: "ABCDEF0123456789ABCDEF0123456789",
+			},
+			repo: ed2kTaskByHashLookupStub{task: models.AdminEd2kDownloadTask{
+				ID:           uuid.MustParse("27212121-2222-1111-1111-111111111111"),
+				Status:       "running",
+				ResourceHash: "ABCDEF0123456789ABCDEF0123456789",
+			}},
+			want: true,
+		},
+		{
+			name: "no active sibling",
+			task: models.AdminEd2kDownloadTask{
+				ID:           taskID,
+				Status:       "cancelled",
+				ResourceHash: "ABCDEF0123456789ABCDEF0123456789",
+			},
+			repo: ed2kTaskByHashLookupStub{err: pgx.ErrNoRows},
+			want: false,
+		},
+		{
+			name: "non cancelled task never skips",
+			task: models.AdminEd2kDownloadTask{
+				ID:           taskID,
+				Status:       "failed",
+				ResourceHash: "ABCDEF0123456789ABCDEF0123456789",
+			},
+			repo: ed2kTaskByHashLookupStub{task: models.AdminEd2kDownloadTask{
+				ID:           uuid.MustParse("27212121-3333-1111-1111-111111111111"),
+				Status:       "running",
+				ResourceHash: "ABCDEF0123456789ABCDEF0123456789",
+			}},
+			want: false,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldSkipCancelledDeleteArtifacts(context.Background(), tc.repo, tc.task); got != tc.want {
+				t.Fatalf("shouldSkipCancelledDeleteArtifacts() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDeleteQueuedEd2kDownloadTaskDeletesOrdinaryQueuedTaskAndQueueJob(t *testing.T) {
 	t.Parallel()
 
@@ -1132,6 +1193,18 @@ func (s *ed2kQueuedDeleteEnqueuerStub) DeleteEd2kDownloadTask(taskID string) err
 func (s *ed2kQueuedDeleteEnqueuerStub) EnqueueEd2kDownload(payload queue.Ed2kDownloadPayload) error {
 	s.enqueuedTaskID = payload.TaskID
 	return s.enqueueErr
+}
+
+type ed2kTaskByHashLookupStub struct {
+	task models.AdminEd2kDownloadTask
+	err  error
+}
+
+func (s ed2kTaskByHashLookupStub) GetEd2kDownloadTaskByHash(context.Context, string) (models.AdminEd2kDownloadTask, error) {
+	if s.err != nil {
+		return models.AdminEd2kDownloadTask{}, s.err
+	}
+	return s.task, nil
 }
 
 type ed2kCleanupRepoStub struct {
