@@ -1,5 +1,7 @@
 package com.chee.videos.feature.tv
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,9 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -37,10 +39,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
+import com.chee.videos.core.ui.TvFocusMotionTokens
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
 import com.chee.videos.core.ui.TvEmptyState
@@ -65,16 +72,30 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 private val tvPosterWallFocusSafeSpace = TvFocusSafeSpec.posterFocusSafeSpaceDp.dp
 private val TvPosterWallCardShape = AppChrome.SurfaceShape
-private val TvPosterWallTitleBackground = AppChrome.Surface.copy(alpha = 0.90f)
 private val TvPosterWallPlaceholderBrush = Brush.verticalGradient(
     colors = listOf(AppChrome.SurfaceStrong, AppChrome.Canvas),
+)
+// D-轻：标题融进海报底部渐变遮罩。遮罩盖卡片底部约 45%，自上而下由透明渐到接近不透明，
+// 保证两行标题（尤其上行）都有足够深的底色，再叠加文字阴影兜底，替代旧的独立深色标题色块。
+private val TvPosterWallTitleScrimBrush = Brush.verticalGradient(
+    colors = listOf(
+        Color.Transparent,
+        AppChrome.Canvas.copy(alpha = 0.55f),
+        AppChrome.Canvas.copy(alpha = 0.88f),
+    ),
 )
 
 internal object TvPosterWallFocusLayoutSpec {
     const val gridHorizontalPaddingDp: Float = 24f
-    const val gridTopPaddingDp: Float = 8f
+    const val gridTopPaddingDp: Float = 26f
     const val gridBottomPaddingDp: Float = TvLayoutSpec.scrollBottomSafePaddingDp
     const val gridItemSpacingDp: Float = 16f
+    // 海报墙想要比首页/目录页更醒目的聚焦放大，但 TvFocusSafeSpec.posterFocusedScale 是首页/目录页共用的
+    // 共享 token（恒 1.04f），改它会连带改其它页面。海报墙专属的 1.08f 收口在这里，显式传给卡片。
+    const val posterWallFocusedScale: Float = 1.08f
+    // 海报墙是 [[TV 焦点反馈只缩放]] 全仓口径的允许例外：聚焦时叠加一道中性（黑色）落影抬升，
+    // 让卡片从网格里「浮」起来。仅海报墙本地内联，不抽共享修饰器、不动 tvFocusableScaleOnly。
+    const val posterWallFocusedShadowElevationDp: Float = 10f
     const val posterCardsUseFocusSafeContainer: Boolean = true
 }
 
@@ -148,7 +169,7 @@ fun TvPosterWallScreen(
             else -> {
                 LazyVerticalGrid(
                     state = gridState,
-                    columns = GridCells.Adaptive(minSize = 170.dp),
+                    columns = GridCells.Adaptive(minSize = 90.dp),
                     contentPadding = PaddingValues(
                         start = TvPosterWallFocusLayoutSpec.gridHorizontalPaddingDp.dp,
                         end = TvPosterWallFocusLayoutSpec.gridHorizontalPaddingDp.dp,
@@ -400,77 +421,102 @@ private fun TvPosterWallCard(
     onClick: () -> Unit,
 ) {
     val cardContent = buildTvPosterWallCardContent(baseUrl, item)
+    // 海报墙例外：聚焦时叠加中性（黑色）落影抬升。elevation 跟随焦点动画，非聚焦时归零。
+    var isCardFocused by remember { mutableStateOf(false) }
+    val shadowElevation by animateDpAsState(
+        targetValue = if (isCardFocused) TvPosterWallFocusLayoutSpec.posterWallFocusedShadowElevationDp.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = TvFocusMotionTokens.ScaleDampingRatio,
+            stiffness = TvFocusMotionTokens.ScaleStiffness,
+        ),
+        label = "tvPosterWallCardShadow",
+    )
     Surface(
         color = Color.Transparent,
         shape = TvPosterWallCardShape,
         modifier = modifier
             .padding(tvPosterWallFocusSafeSpace)
-            .tvFocusableScaleOnly(focusedScale = TvFocusSafeSpec.posterFocusedScale)
+            .onFocusChanged { state -> isCardFocused = state.isFocused || state.hasFocus }
+            .tvFocusableScaleOnly(focusedScale = TvPosterWallFocusLayoutSpec.posterWallFocusedScale)
+            .shadow(
+                elevation = shadowElevation,
+                shape = TvPosterWallCardShape,
+                clip = false,
+                ambientColor = Color.Black,
+                spotColor = Color.Black,
+            )
             .clickable(onClick = onClick),
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(TvPosterWallCardShape),
+                .aspectRatio(9f / 16f)
+                .clip(TvPosterWallCardShape)
+                .background(TvPosterWallPlaceholderBrush),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(9f / 16f)
-                    .then(
-                        if (item.type == "tv") {
-                            Modifier.tvSharedSeriesPoster(item.id)
-                        } else {
-                            Modifier
-                        },
+            // shared-element 只绑在海报图片节点上（与详情页 TvSeriesDetailBackdrop 的纯背景图节点对应），
+            // scrim/标题作为兄弟覆盖层，不进入 shared-element 子树，避免过渡时把标题一起「飞」进详情页。
+            val sharedModifier = if (item.type == "tv") {
+                Modifier.tvSharedSeriesPoster(item.id)
+            } else {
+                Modifier
+            }
+            if (!cardContent.showPosterPlaceholder) {
+                AsyncImage(
+                    model = cardContent.posterUrl,
+                    contentDescription = "${cardContent.title} 海报",
+                    modifier = Modifier.fillMaxSize().then(sharedModifier),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize().then(sharedModifier),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Tv,
+                        contentDescription = null,
+                        tint = AppChrome.TextMuted,
+                        modifier = Modifier.size(30.dp),
                     )
-                    .background(TvPosterWallPlaceholderBrush),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!cardContent.showPosterPlaceholder) {
-                    AsyncImage(
-                        model = cardContent.posterUrl,
-                        contentDescription = "${cardContent.title} 海报",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
+                    Text(
+                        text = "暂无海报",
+                        color = AppChrome.TextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Tv,
-                            contentDescription = null,
-                            tint = AppChrome.TextMuted,
-                            modifier = Modifier.size(30.dp),
-                        )
-                        Text(
-                            text = "暂无海报",
-                            color = AppChrome.TextMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
                 }
             }
+            // 底部渐变遮罩 + 标题压在遮罩之上，消除独立标题色块的「胶布感」。
+            // 占位卡（无海报）的「暂无海报」图标+标签由外层 Box 的 contentAlignment=Center 居中，
+            // 标题压在底部遮罩上，两者空间分离、不堆叠；占位卡同样保留标题，避免无海报时无法识别剧集。
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 74.dp)
-                    .background(TvPosterWallTitleBackground)
-                    .padding(horizontal = 10.dp, vertical = 9.dp),
-                contentAlignment = Alignment.TopStart,
-            ) {
-                Text(
-                    text = cardContent.title,
-                    color = AppChrome.TextPrimary,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+                    .fillMaxHeight(0.55f)
+                    .align(Alignment.BottomCenter)
+                    .background(TvPosterWallTitleScrimBrush),
+            )
+            Text(
+                text = cardContent.title,
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    shadow = Shadow(
+                        color = AppChrome.Canvas.copy(alpha = 0.9f),
+                        offset = Offset(0f, 1f),
+                        blurRadius = 4f,
+                    ),
+                ),
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            )
         }
     }
 }
