@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-02 17:41 +0800
+- 进度：完成转码队列失败记录排查与修复。只读查询远程支撑层发现最近多条失败记录为 `ffmpeg progress read failed: read |0: file already closed`，关联视频多已 `ready` 且进度 100%，判定为 ffmpeg 进度管道读取顺序导致的假失败，而非媒体资产不可用。修复 `TranscodeVideo` 的等待顺序：先等进度读取自然结束，再 `Wait` 回收 ffmpeg 进程，避免 `Wait` 抢先关闭 stdout pipe。同步在 `CONTEXT.md` 增加 `转码进度假失败` 排障口径。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg ./internal/services -run 'TestBuildTranscode|TestParseProgress|TestBuildPlayback|TestResolveProbe|TestChooseTranscodeOutputProfile|TestBuildTranscodeOutputTempPath' -count=1` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`go vet ./...` 通过；`git diff --check -- pkg/ffmpeg/ffmpeg.go CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' pkg/ffmpeg/ffmpeg.go CONTEXT.md plan.md` 无输出；`go test ./... -count=1` 仅 `internal/handlers TestAdminEd2kDownloadStatusIsRedacted` 失败，返回 `level":"down"` 且脚本 `signal: killed`，与本次 ffmpeg 修复无关。待提交。
+
+## 2026-07-02 17:37 +0800
+- 进度：开始排查“转码队列失败记录”。先确认适用规则、现有术语和 Go 后端队列实现；工作区已有未跟踪 `package.json`，按用户既有改动处理，不纳入本次提交。下一步定位失败记录来源、复现根因并做最小修复。
+- 影响文件：待定，预计涉及转码队列 Go 后端、`CONTEXT.md`、`plan.md`
+- 验证：待执行定向 Go 测试、`go test ./... -count=1`、`go vet ./...`、`git diff --check`、乱码扫描。
+
 ## 2026-07-02 +0800（复审修复轮）
 - 进度：子代理独立复审海报墙重设计 diff，发现 1 BLOCKER + 2 IMPORTANT + 2 MINOR，已全部修复。**BLOCKER（首屏自动聚焦首卡只缩放不抬影）**：中性落影的 `.onFocusChanged` 原放在 `.tvFocusableScaleOnly` **之后**，它观察的是其后第一个焦点目标（`.clickable` 的焦点节点）；而 `firstItemFocusRequester.requestFocus()` 解析到链上第一个可聚焦目标（`tvFocusableScaleOnly` 内部的 `.focusable()`），程序聚焦落在该祖先上不向下传播到 `.clickable`，导致首屏自动聚焦的首卡 `isCardFocused=false`、落影 elevation=0——首卡只缩放不抬影，DPad 移开再回来才正常。修复：`.onFocusChanged` 移到 `.tvFocusableScaleOnly` **之前**，借 `hasFocus` 捕获任意子树焦点（程序聚焦 + DPad 聚焦都覆盖）。**IMPORTANT（顶行聚焦落影裁切顶部栏）**：`gridTopPaddingDp=16` 只覆盖了缩放垂直溢出（12.38dp），没算中性落影（`clip=false`，10dp 软影溢出节点边界）→ 顶行聚焦卡的落影顶边被顶部栏裁。修复：`gridTopPaddingDp` 16f→24f，护栏测试改为断言 `gridTopPaddingDp >= 缩放溢出 + posterWallFocusedShadowElevationDp`（12.38+10=22.38 ≤ 24）。**IMPORTANT（占位卡丢失标题）**：原设计占位卡（无海报）只显示「暂无海报」、不显示真实标题，导致无海报的卡无法识别剧集。修复：scrim+标题对所有卡都渲染——占位卡的「暂无海报」图标+标签由外层 Box `contentAlignment=Center` 居中，真实标题压底部遮罩，两者空间分离不堆叠。**MINOR（标题上行可读性）**：原遮罩 `fillMaxHeight(0.45f)` 在 ~178dp 卡上盖底部 80dp，2 行标题上行落在遮罩 ~0.35 alpha 区偏弱。修复：遮罩提到 `fillMaxHeight(0.55f)`，上行落在更强 alpha 区。**MINOR（测试脆弱）**：shared-element 测试字符串切片仍保留（锁实现形态是 spec 测试职责，可接受）。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`（`.onFocusChanged` 前置 + `gridTopPaddingDp` 24f + 遮罩 0.55f + 占位卡渲染标题）、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallFocusLayoutSpecTest.kt`（顶行护栏含落影 elevation）、`CONTEXT.md`（契约补 `.onFocusChanged` 前置语义 + 顶行 padding 含落影 + 占位卡保留标题 + 遮罩 55%）。

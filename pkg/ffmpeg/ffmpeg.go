@@ -154,8 +154,8 @@ func TranscodeVideo(ctx context.Context, inputPath, outputPath string, profile T
 		progressErrCh <- readTranscodeProgress(stdout, options.SourceDuration, options.ProgressHandler)
 	}()
 
-	waitErr := cmd.Wait()
 	progressErr := <-progressErrCh
+	waitErr := cmd.Wait()
 	if progressErr != nil {
 		return fmt.Errorf("ffmpeg progress read failed: %w", progressErr)
 	}
