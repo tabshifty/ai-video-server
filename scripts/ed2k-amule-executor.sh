@@ -24,6 +24,9 @@ ED2K_DOWNLOAD_SUBDIR="${ED2K_DOWNLOAD_SUBDIR:-ed2k-downloads}"
 ED2K_WAIT_TIMEOUT_SECONDS="${ED2K_WAIT_TIMEOUT_SECONDS:-21600}"
 ED2K_POLL_INTERVAL_SECONDS="${ED2K_POLL_INTERVAL_SECONDS:-5}"
 ED2K_OUTPUT_DIR_MODE="${ED2K_OUTPUT_DIR_MODE:-hash}"
+ED2K_SUBMIT_CONFIRM_TIMEOUT_SECONDS="${ED2K_SUBMIT_CONFIRM_TIMEOUT_SECONDS:-12}"
+ED2K_REQUEUE_IF_UNSEEN_AFTER_SECONDS="${ED2K_REQUEUE_IF_UNSEEN_AFTER_SECONDS:-45}"
+ED2K_REQUEUE_INTERVAL_SECONDS="${ED2K_REQUEUE_INTERVAL_SECONDS:-300}"
 
 if [[ -z "$ED2K_DOWNLOAD_ROOT" ]]; then
   printf 'ED2K_DOWNLOAD_ROOT is required\n' >&2
@@ -105,6 +108,7 @@ mkdir -p "$OUTPUT_DIR"
 DOWNLOAD_BASE="$ED2K_DOWNLOAD_ROOT/$ED2K_DOWNLOAD_SUBDIR"
 SUBMIT_MARKER="$OUTPUT_DIR/.submitted_at"
 SEEN_MARKER="$OUTPUT_DIR/.download_seen"
+REQUEUE_MARKER="$OUTPUT_DIR/.requeued_at"
 
 AMULE_CMD_BASE=(
   "$AMULECMD_BIN"
@@ -121,6 +125,10 @@ run_amulecmd() {
     return 1
   fi
   printf '%s\n' "$output"
+}
+
+run_amulecmd_add() {
+  run_amulecmd "add $SOURCE_LINK"
 }
 
 ensure_amuled_ready() {
@@ -185,6 +193,78 @@ mark_download_seen() {
   date '+%s' > "$SEEN_MARKER"
 }
 
+touch_requeue_marker() {
+  date '+%s' > "$REQUEUE_MARKER"
+}
+
+read_marker_epoch() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    return 1
+  fi
+  local value
+  value="$(tr -cd '0-9' < "$path" 2>/dev/null || true)"
+  if [[ -z "$value" ]]; then
+    return 1
+  fi
+  printf '%s\n' "$value"
+}
+
+wait_for_download_entry() {
+  local timeout="$1"
+  if [[ -z "$timeout" ]] || (( timeout <= 0 )); then
+    timeout=1
+  fi
+  local deadline now listing entry
+  deadline=$(( $(date '+%s') + timeout ))
+  while :; do
+    if listing="$(run_amulecmd "show dl" 2>/dev/null)"; then
+      entry="$(find_download_entry "$listing" || true)"
+      if [[ -n "$entry" ]]; then
+        mark_download_seen
+        return 0
+      fi
+    fi
+    now="$(date '+%s')"
+    if (( now >= deadline )); then
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+should_requeue_unseen_download() {
+  if [[ -f "$SEEN_MARKER" ]]; then
+    return 1
+  fi
+  local submit_epoch now requeue_epoch
+  submit_epoch="$(read_marker_epoch "$SUBMIT_MARKER" || true)"
+  if [[ -z "$submit_epoch" ]]; then
+    return 1
+  fi
+  now="$(date '+%s')"
+  if (( now - submit_epoch < ED2K_REQUEUE_IF_UNSEEN_AFTER_SECONDS )); then
+    return 1
+  fi
+  requeue_epoch="$(read_marker_epoch "$REQUEUE_MARKER" || true)"
+  if [[ -n "$requeue_epoch" ]] && (( now - requeue_epoch < ED2K_REQUEUE_INTERVAL_SECONDS )); then
+    return 1
+  fi
+  return 0
+}
+
+ensure_download_visible_with_fallback() {
+  local confirm_timeout="$1"
+  if wait_for_download_entry "$confirm_timeout"; then
+    return 0
+  fi
+  if ! run_amulecmd_add >/dev/null; then
+    return 1
+  fi
+  touch_requeue_marker
+  wait_for_download_entry "$confirm_timeout"
+}
+
 emit_nonterminal_json() {
   local status="$1"
   local progress_text="$2"
@@ -214,7 +294,7 @@ output_dir = os.path.abspath(sys.argv[1])
 downloaded_path = os.path.abspath(sys.argv[2]) if sys.argv[2] else ""
 items = []
 
-ignored_names = {".submitted_at", ".download_seen"}
+ignored_names = {".submitted_at", ".download_seen", ".requeued_at"}
 
 if os.path.isfile(downloaded_path) and os.path.basename(downloaded_path) not in ignored_names:
     targets = [downloaded_path]
@@ -265,7 +345,7 @@ guess_downloaded_path() {
 }
 
 has_output_files() {
-  find "$OUTPUT_DIR" -type f ! -name '.submitted_at' ! -name '.download_seen' -print -quit | grep -q .
+  find "$OUTPUT_DIR" -type f ! -name '.submitted_at' ! -name '.download_seen' ! -name '.requeued_at' -print -quit | grep -q .
 }
 
 has_downloaded_file() {
@@ -342,6 +422,10 @@ run_submit_action() {
   wait_for_remote
   touch_submit_marker
   submit_ed2k_link
+  if ensure_download_visible_with_fallback "$ED2K_SUBMIT_CONFIRM_TIMEOUT_SECONDS"; then
+    emit_nonterminal_json "running" "已提交到 aMule，等待开始下载"
+    return
+  fi
   emit_nonterminal_json "running" "已提交到 aMule，等待同步下载状态"
 }
 
@@ -373,6 +457,19 @@ run_status_action() {
 
   if has_output_files; then
     emit_completed_json
+    return
+  fi
+
+  if should_requeue_unseen_download; then
+    if ensure_download_visible_with_fallback "$ED2K_SUBMIT_CONFIRM_TIMEOUT_SECONDS"; then
+      listing="$(run_amulecmd "show dl" || true)"
+      entry="$(find_download_entry "$listing" || true)"
+      if [[ -n "$entry" ]]; then
+        emit_nonterminal_json "running" "$(extract_progress_text "$entry")"
+        return
+      fi
+    fi
+    emit_nonterminal_json "running" "首次提交未出现在下载队列，已请求 aMule 重新接收链接"
     return
   fi
 
