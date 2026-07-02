@@ -1,3 +1,8 @@
+## 2026-07-02 10:32 +0800
+- 进度：部署机回归完成。`git push deploy master` 已把修复同步到部署机最新 commit `848e740`；由于这次改动只涉及外部执行器脚本/文档，hook 判定 `RESTART_GO=0`，无需重启 server/worker。历史卡死任务已被用户取消，不再作为样本；改用部署机真实 `.env` 对用户给出的 `ed2k://|file|[A06][XRW]01772.zip|65645868|0492A10119DF2BC8FB751F0E3A0D5C99|/` 做两轮 smoke test，结果都能在 `submit` 后立即返回 running，随后 `status` 能看到“已进入 aMule 下载队列，等待开始下载”，且 `amulecmd show dl` 可见对应 hash，证明“等待 aMule 同步下载状态”卡死已解除。
+- 影响文件：`plan.md`
+- 验证：部署 commit `859d7d9` 后真实脚本 smoke test 覆盖 submit/status/cancel/清理，发现并修复“无百分比误报下载已完成”；部署 commit `848e740` 后再次 smoke test 通过，`cancel 0492A10119DF2BC8FB751F0E3A0D5C99` 与测试输出目录清理都成功；本地 `git status --short` 干净。
+
 ## 2026-07-02 10:30 +0800
 - 进度：部署机真实脚本 smoke test 暴露第二个用户态问题：任务已进入 `amulecmd show dl` 队列、但首行尚无百分比时，`extract_progress_text` 会把 `running` 任务文案误写成“下载已完成”。已改为缺百分比时回写“已进入 aMule 下载队列，等待开始下载”，避免工作台把未开始传输的入队任务误报为完成。
 - 影响文件：`scripts/ed2k-amule-executor.sh`、`CONTEXT.md`、`plan.md`
