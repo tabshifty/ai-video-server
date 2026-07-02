@@ -450,6 +450,28 @@ func TestRetryEd2kDownloadTaskTreatsEnqueueErrorWithPersistedJobAsSuccess(t *tes
 	}
 }
 
+func TestCanDeleteEd2kDownloadTaskStatus(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]bool{
+		"queued":    true,
+		"running":   true,
+		"canceling": true,
+		"failed":    true,
+		"cancelled": true,
+		"completed": false,
+		"files_cleaned": false,
+		"deleted":   false,
+		"":          false,
+	}
+
+	for status, want := range cases {
+		if got := canDeleteEd2kDownloadTaskStatus(status); got != want {
+			t.Fatalf("canDeleteEd2kDownloadTaskStatus(%q) = %v, want %v", status, got, want)
+		}
+	}
+}
+
 func TestDeleteQueuedEd2kDownloadTaskDeletesOrdinaryQueuedTaskAndQueueJob(t *testing.T) {
 	t.Parallel()
 

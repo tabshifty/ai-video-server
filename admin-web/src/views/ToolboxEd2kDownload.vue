@@ -97,7 +97,7 @@ const selectedTaskOutsideFilter = computed(() => {
   if (!selectedTask.value || currentFilter.value === 'all') return false
   return selectedTask.value.status !== currentFilter.value
 })
-const canDeleteSelectedTask = computed(() => ['queued', 'running', 'canceling', 'failed'].includes(selectedTask.value?.status || ''))
+const canDeleteSelectedTask = computed(() => ['queued', 'running', 'canceling', 'cancelled', 'failed'].includes(selectedTask.value?.status || ''))
 const canCleanSelectedTaskFiles = computed(() => selectedTask.value?.status === 'completed')
 const canRetrySelectedTask = computed(() => selectedTask.value?.status === 'files_cleaned')
 const canRetrySelectedCleanup = computed(() => selectedTask.value?.status === 'cancelled' && Boolean(selectedTaskErrorMessage.value) && !selectedTask.value?.cleanedAt)
@@ -558,6 +558,15 @@ function buildDeleteTaskActionCopy(task) {
       successMessage: '任务已删除'
     }
   }
+  if (status === 'cancelled') {
+    return {
+      actionLabel: '删除任务',
+      dialogTitle: '删除已取消任务',
+      confirmButtonText: '永久删除',
+      confirmMessage: (currentTask) => `确认删除「${currentTask.title}」？已取消任务会同时清理数据库记录和残留下载文件（如果仍有）。`,
+      successMessage: '任务已删除'
+    }
+  }
   return {
     actionLabel: '删除任务',
     dialogTitle: '删除下载任务',
@@ -707,7 +716,7 @@ function buildDeleteTaskActionCopy(task) {
 
             <SectionCard>
               <template #title>任务操作</template>
-              <template #description>这里保留后端管理动作：删除排队/失败任务、取消运行中任务、继续重试取消中的任务，已完成任务可清理暂存文件，已清理历史可重新下载。</template>
+              <template #description>这里保留后端管理动作：删除排队/失败/已取消任务、取消运行中任务、继续重试取消中的任务，已完成任务可清理暂存文件，已清理历史可重新下载。</template>
 
               <div class="action-row">
                 <el-button :disabled="!canDeleteSelectedTask" @click="deleteTask(selectedTask)">{{ selectedTaskDeleteActionLabel }}</el-button>

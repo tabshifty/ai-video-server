@@ -1,3 +1,13 @@
+## 2026-07-02 11:05 +0800
+- 进度：已完成“已取消下载记录可删除”修复。后端现在允许 `cancelled` 任务走删除入口，并复用既有残留清理逻辑后物理删库；前端工作台已恢复 `cancelled` 状态的删除按钮，并把确认文案/操作说明同步到位。
+- 影响文件：`internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestCanDeleteEd2kDownloadTaskStatus|TestDeleteQueuedEd2kDownloadTask|TestRetryCancelledEd2kDownloadCleanup|TestCancelEd2kDownloadTask' -count=1` 通过；`cd admin-web && npm run test -- src/views/ToolboxEd2kDownload.spec.js` 通过；`cd admin-web && npm run build` 通过；`git diff --check -- internal/handlers/admin_ed2k_download.go internal/handlers/admin_ed2k_download_test.go admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js CONTEXT.md plan.md` 通过；乱码检查通过。待执行提交与部署同步。
+
+## 2026-07-02 10:59 +0800
+- 进度：排查“已取消下载记录不能删除”。已确认问题同时存在于前后端：后端 `AdminDeleteEd2kDownloadTask` 只允许删除 `queued/failed/running/canceling`，前端 `canDeleteSelectedTask` 也把 `cancelled` 排除。准备做最小修复：后端允许 `cancelled` 走物理删除，并复用现有残留清理逻辑；前端恢复 `cancelled` 的删除入口。
+- 影响文件：预计涉及 `internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`admin-web/src/views/ToolboxEd2kDownload.vue`、`admin-web/src/views/ToolboxEd2kDownload.spec.js`、`plan.md`
+- 验证：待执行 Go 定向测试、管理端定向测试/构建、`git diff --check`。
+
 ## 2026-07-02 10:32 +0800
 - 进度：部署机回归完成。`git push deploy master` 已把修复同步到部署机最新 commit `848e740`；由于这次改动只涉及外部执行器脚本/文档，hook 判定 `RESTART_GO=0`，无需重启 server/worker。历史卡死任务已被用户取消，不再作为样本；改用部署机真实 `.env` 对用户给出的 `ed2k://|file|[A06][XRW]01772.zip|65645868|0492A10119DF2BC8FB751F0E3A0D5C99|/` 做两轮 smoke test，结果都能在 `submit` 后立即返回 running，随后 `status` 能看到“已进入 aMule 下载队列，等待开始下载”，且 `amulecmd show dl` 可见对应 hash，证明“等待 aMule 同步下载状态”卡死已解除。
 - 影响文件：`plan.md`

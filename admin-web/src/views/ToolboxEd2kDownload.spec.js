@@ -48,6 +48,8 @@ describe('ToolboxEd2kDownload', () => {
     expect(source).toContain('重试清理')
     expect(source).toContain('取消任务')
     expect(source).toContain('继续取消')
+    expect(source).toContain("['queued', 'running', 'canceling', 'cancelled', 'failed']")
+    expect(source).toContain('删除已取消任务')
     expect(source).toContain('预期文件信息')
     expect(source).toContain('文件清理时间')
     expect(source).toContain('残留清理完成时间')

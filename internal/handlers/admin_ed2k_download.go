@@ -677,8 +677,13 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 		response.Error(c, 1097, err.Error())
 		return
 	}
+	status := strings.TrimSpace(task.Status)
+	if !canDeleteEd2kDownloadTaskStatus(status) {
+		response.Error(c, 1099, "only queued, failed, cancelled, running or canceling task can delete")
+		return
+	}
 	now := time.Now()
-	if task.Status == "queued" {
+	if status == "queued" {
 		item, deleted, err := deleteQueuedEd2kDownloadTask(c.Request.Context(), task, a.repo, a.enqueuer, now)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -708,7 +713,7 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 		ok(c, item)
 		return
 	}
-	if task.Status == "failed" {
+	if status == "failed" || status == "cancelled" {
 		if err := deleteFailedEd2kDownloadArtifacts(task, ed2kDeletePaths{
 			downloadRoot:   a.ed2kDownloadRoot,
 			downloadSubdir: a.ed2kDownloadSubdir,
@@ -736,7 +741,7 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 		})
 		return
 	}
-	if task.Status == "running" || task.Status == "canceling" {
+	if status == "running" || status == "canceling" {
 		item, err := cancelEd2kDownloadTask(c.Request.Context(), task, a.repo, ed2kDeletePaths{
 			downloadRoot:   a.ed2kDownloadRoot,
 			downloadSubdir: a.ed2kDownloadSubdir,
@@ -756,7 +761,15 @@ func (a *API) AdminDeleteEd2kDownloadTask(c *gin.Context) {
 		ok(c, item)
 		return
 	}
-	response.Error(c, 1099, "only queued, failed, running or canceling task can delete")
+}
+
+func canDeleteEd2kDownloadTaskStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "queued", "running", "canceling", "failed", "cancelled":
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *API) AdminRetryCancelledEd2kDownloadCleanup(c *gin.Context) {
