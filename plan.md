@@ -1,3 +1,8 @@
+## 2026-07-02 10:30 +0800
+- 进度：部署机真实脚本 smoke test 暴露第二个用户态问题：任务已进入 `amulecmd show dl` 队列、但首行尚无百分比时，`extract_progress_text` 会把 `running` 任务文案误写成“下载已完成”。已改为缺百分比时回写“已进入 aMule 下载队列，等待开始下载”，避免工作台把未开始传输的入队任务误报为完成。
+- 影响文件：`scripts/ed2k-amule-executor.sh`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `bash -n scripts/ed2k-amule-executor.sh`、本地 fake `amulecmd` 回归、部署机真实脚本二次 smoke test。
+
 ## 2026-07-02 10:25 +0800
 - 进度：完成本地修复验证并收口实现。`scripts/ed2k-amule-executor.sh` 现改为“`ed2k` helper 首提 + `show dl` 短窗口确认 + 不可见时 `amulecmd add` 补提 + 轮询期未见队列时节流重试”，避免任务永久卡在“等待 aMule 同步下载状态”。
 - 影响文件：`scripts/ed2k-amule-executor.sh`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`

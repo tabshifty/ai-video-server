@@ -178,7 +178,7 @@ extract_progress_text() {
     printf '下载进行中（%s）' "$progress"
     return
   fi
-  printf '下载已完成'
+  printf '已进入 aMule 下载队列，等待开始下载'
 }
 
 submit_ed2k_link() {
