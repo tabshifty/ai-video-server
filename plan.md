@@ -1,3 +1,8 @@
+## 2026-07-02 11:20 +0800
+- 进度：根因修复与现网补救完成。已部署 commit `6dadefc`，为“删除 `cancelled` 历史记录时若同 `resource_hash` 已存在其它非取消/未删除任务，则跳过 aMule `cancel <hash>` 与 hash 目录清理，只删旧 DB 记录”的守卫，避免旧取消记录误伤新 `running` 任务。随后在部署机手工把当前两条受影响任务重新 `amulecmd add` 回队列，`show dl` 已可见两条资源，数据库进度文案也在 `2026-07-02 11:20:10` 更新为“已进入 aMule 下载队列，等待开始下载”。
+- 影响文件：`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestCanDeleteEd2kDownloadTaskStatus|TestShouldSkipCancelledDeleteArtifacts|TestDeleteQueuedEd2kDownloadTask|TestRetryCancelledEd2kDownloadCleanup|TestCancelEd2kDownloadTask' -count=1` 通过；部署 hook `go build -> codesign -> migrations -> launchctl kickstart -> /healthz OK` 通过；部署机 `amulecmd show dl` 当前可见 `0492A10119DF2BC8FB751F0E3A0D5C99` 与 `D6054BA6F77FF4A9923F16D7DF9DCAC6`；`amulecmd status` 当前 `Download 0 bytes/sec / Total sources 0`，说明任务已重新入队但暂时还没有可用源，不再是“队列被打空”的卡死；本地工作区待提交仅本条 `plan.md` 记录。
+
 ## 2026-07-02 11:13 +0800
 - 进度：继续排查两个新下载任务为何再次卡在“等待 aMule 同步下载状态”。已确认不是“没源”而是“队列被打空”：数据库里当前两条任务仍是 `running`，但部署机 `amulecmd show dl` 为空、`status` 显示 `Total sources: 0`。进一步结合 aMule 日志与任务目录时间线，根因锁定为：删除旧 `cancelled` 历史记录时，后端按 `resource_hash` 去执行 `amulecmd cancel <hash>` 和 hash 目录清理，误伤了同 hash 的新 `running` 任务，导致新任务被从 aMule 队列撤掉、任务目录标记也被删空，只剩数据库状态继续轮询。准备补守卫：删除 `cancelled` 记录时若同 hash 已有其它非取消/未删除任务，就只删旧 DB 记录，不再碰 aMule 队列和下载目录；随后手工把当前两条 `running` 任务补回队列。
 - 影响文件：预计涉及 `internal/handlers/admin_ed2k_download.go`、`internal/handlers/admin_ed2k_download_test.go`、`CONTEXT.md`、`plan.md`
