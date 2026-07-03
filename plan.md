@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-03 14:47 +0800
+- 进度：完成“短视频待删除队列”大改并收口复审问题。后端在通用编辑与状态编辑中补 `SELECT FOR UPDATE` 行锁和事务内状态校验，迁移增加 `videos_pending_delete_short_check`，内部原始 `UpdateVideoStatus` 禁止绕过专用工作流直接写 `pending_delete`；管理端旧“短视频审核”已替换为“待删除短视频”列表，保留/最终删除二次确认流程不展示提名人和时间；手机端仅管理员在主短视频流右侧看到图标按钮，二次确认后加入待删除列表。独立后端复审与前端/手机端复审均无阻塞问题。
+- 影响文件：`migrations/0031_short_pending_delete.*.sql`、`internal/models/models.go`、`internal/repository/*.go`、`internal/handlers/*.go`、`admin-web/src/api/admin.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/views/VideoList.vue`、相关 admin-web spec、`android-app/app/src/main/java/com/chee/videos/...`、相关 Android 单测、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/repository -run 'TestUpdateVideoStatusRejectsPendingDeleteWorkflowBypass|TestValidateAdminVideoStatusEdit|TestAdminPendingDeleteMutationsUseRowLocks|TestShortPendingDeleteWorkflowSourceGuards|TestShortPendingDeleteMigration' -count=1` 通过；`go test ./internal/repository ./internal/handlers -count=1` 通过；`go test ./... -count=1` 通过；`go vet ./...` 通过；`cd admin-web && npm run test` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过（仅既有 AGP compileSdk warning）；`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过（仅既有 AGP compileSdk warning）；`git diff --check` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src android-app/app/src internal migrations` 无输出。待提交。
+
+## 2026-07-03 14:28 +0800
+- 进度：完成手机端改造。短视频主流 ViewModel 会读取用户资料判断 `admin`，仅管理员在主短视频页右侧动作栏看到图标按钮；点击后弹出“加入待删除列表”二次确认，成功 Toast“已加入待删除列表”并从当前窗口移除该视频、跳到下一条，失败 Toast 并保留当前视频。同步新增手机端 API、URL builder、窗口移除纯逻辑测试，并将手机端版本 `0.1.3(4)` 递增到 `0.1.4(5)`。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt`、`ShortFeedViewModel.kt`、`ShortFeedProgressState.kt`、`core/network/ApiService.kt`、`core/repository/VideoRepository.kt`、`core/util/UrlBuilder.kt`、相关 Android 单测、`android-app/app/build.gradle.kts`、`plan.md`
+- 验证：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.feature.shorts.ShortFeedActionRailVisibilityTest --tests com.chee.videos.feature.shorts.ShortFeedPagerRestoreTest` 通过（仅既有 AGP compileSdk warning 和 kapt warning）。待执行全量验证、乱码扫描和提交。
+
+## 2026-07-03 14:21 +0800
+- 进度：完成管理端改造。旧 `短视频审核` 路由/导航/页面/helper/spec 已移除，新增 `待删除短视频` 页面 `/short-pending-delete`，采用列表 + 预览 + 单条 `保留` / `最终删除` 终审流程；页面不展示提名人和提名时间。视频管理新增 `pending_delete` 状态标签和筛选，允许预览待删除视频，但禁止手动改入/改出待删除状态，短视频待删除时隐藏类型转换入口。
+- 影响文件：`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/api/admin.js`、`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/views/pendingDeleteShorts.helpers.*`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.*`、相关 spec、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/router/index.spec.js src/components/base/commandPalette.helpers.spec.js src/api/admin.spec.js src/views/videoList.helpers.spec.js src/views/pendingDeleteShorts.helpers.spec.js src/views/adminDateTimeDisplay.spec.js` 通过；`cd admin-web && npm run build` 通过（仅既有 chunk size warning）。待执行手机端和全量验证。
+
+## 2026-07-03 14:14 +0800
+- 进度：完成后端第一阶段实现。新增 `0031_short_pending_delete` migration、`pending_delete_at` 内部排序字段、短视频加入/保留待删除队列仓储方法、待删除短视频列表接口、手机/后台共用的加入待删除接口，以及后台预览 `pending_delete` 视频的签名播放放行；后台手动状态编辑已禁止改入/改出 `pending_delete`。
+- 影响文件：`migrations/0031_short_pending_delete.*.sql`、`internal/models/models.go`、`internal/repository/video_repository.go`、`internal/repository/admin_repository.go`、`internal/handlers/admin.go`、`internal/handlers/router.go`、`internal/handlers/video_source.go`、相关 Go 测试、`plan.md`
+- 验证：`go test ./internal/repository -run 'TestShortPendingDeleteMigration|TestScanVideoRecordReadsOSHash|TestValidateAdminVideoStatusEdit' -count=1` 通过；`go test ./internal/handlers -run 'TestRegister|TestAdmin|TestVideoSource' -count=1` 通过。待执行管理端、手机端和全量验证。
+
+## 2026-07-03 14:04 +0800
+- 进度：开始落地“短视频待删除队列”大改。需求已通过 grill 收口：手机端 admin 主短视频流用右侧图标将短视频加入 `pending_delete`，普通入口全局隐藏；后台旧“短视频审核”退役，新建“待删除短视频”列表 + 预览单条终审；通用视频管理保留直删和批量直删旁路，但不能手动改入/改出 `pending_delete`；`pending_delete_at` 仅作为内部排序字段，不展示提名人/提名时间。
+- 影响文件：预计涉及 `migrations/0031_*`、Go 后端 handler/repository/model/router、`admin-web` 路由/API/视图、`android-app` 短视频页/API/版本号、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 定向测试、admin-web 构建/相关测试、手机端单测/构建、`git diff --check`、乱码扫描。
+
 ## 2026-07-03 09:13 +0800
 - 进度：完成两次转码队列修复的本地复审并修复发现项。评审范围从单个 `2050b6b` 扩大到 `32055b5..HEAD`，覆盖 `3b2e42c` 进度管道假失败修复与 `2050b6b` AVC 超高尺寸修复。发现并修复两点：① `TranscodeVideo` 虽已先等进度管道再 `Wait`，但错误优先级仍可能在真实 ffmpeg 失败同时伴随进度读取错误时返回 `progress read failed`，本轮抽出 `buildTranscodeVideoError` 并改为真实 ffmpeg 退出错误优先；② `TestAdminEd2kDownloadStatusIsRedacted` 的假 `amulecmd` 使用 `/usr/bin/env bash`，全量并发下偶发 3 秒超时被 kill，本轮改成 POSIX `sh` + `case`，消除 bash 启动依赖。另补 `buildMaxDimensionScaleFilter` 表驱动测试，覆盖横屏、竖屏、方形、正常尺寸、未知尺寸和 odd max。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/handlers/admin_ed2k_download_test.go`、`CONTEXT.md`、`plan.md`

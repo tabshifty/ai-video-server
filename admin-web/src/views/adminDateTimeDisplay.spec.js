@@ -7,7 +7,7 @@ const displayFiles = [
   './ImageCollectionManage.vue',
   './ImageManage.vue',
   './IPTVManage.vue',
-  './ShortReview.vue',
+  './PendingDeleteShorts.vue',
   './TaskMonitor.vue',
   './ToolboxArchiveImport.vue',
   './ToolboxImageWorkbench.vue',

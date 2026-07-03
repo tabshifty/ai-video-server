@@ -73,6 +73,9 @@ object UrlBuilder {
     fun toggleDislike(baseUrl: String, videoId: String): String =
         "${normalizeBaseUrl(baseUrl)}/api/v1/videos/$videoId/dislike"
 
+    fun adminVideoPendingDelete(baseUrl: String, videoId: String): String =
+        "${normalizeBaseUrl(baseUrl)}/api/v1/admin/videos/$videoId/pending-delete"
+
     fun history(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/history"
 
     fun historyContinue(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/history/continue"

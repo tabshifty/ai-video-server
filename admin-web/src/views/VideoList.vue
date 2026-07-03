@@ -33,6 +33,7 @@ import {
 import {
   buildAVManualScrapeRoute,
   buildMovieManualScrapeRoute,
+  canPreviewVideoStatus,
   canManuallyEditVideoStatus,
   avMatchSourceLabel,
   extractAVScrapePendingState,
@@ -330,6 +331,12 @@ function normalizeVideoType(type) {
     .toLowerCase()
 }
 
+function normalizeVideoStatus(status) {
+  return String(status || '')
+    .trim()
+    .toLowerCase()
+}
+
 function supportsSubtitleManage(type = detail.value?.type) {
   const normalized = normalizeVideoType(type)
   return normalized === 'movie' || normalized === 'episode' || normalized === 'av'
@@ -435,7 +442,15 @@ function detailStatusOptions(status = detail.value?.status) {
   if (canManuallyEditVideoStatus(status)) {
     return manualStatusOptions
   }
-  return [{ value: 'processing', label: statusLabel('processing'), disabled: true }, ...manualStatusOptions]
+  const value = normalizeVideoStatus(status)
+  return [{ value, label: statusLabel(value), disabled: true }, ...manualStatusOptions]
+}
+
+function statusEditHint(status) {
+  if (normalizeVideoStatus(status) === 'pending_delete') {
+    return '待删除状态只能在“待删除短视频”页面保留或最终删除'
+  }
+  return '处理中状态不支持手动修改'
 }
 
 function tvPendingDiagnostics(video = detail.value) {
@@ -656,7 +671,7 @@ async function showDetail(row) {
   if (isStaleDetailRequest(detailRequestToken.value, requestToken) || detail.value?.id !== row.id) {
     return
   }
-  if (detail.value?.status === 'ready') {
+  if (canPreviewVideoStatus(detail.value?.status)) {
     await refreshPlayURL(requestToken)
   }
 }
@@ -667,7 +682,7 @@ async function refreshPlayURL(expectedToken = detailRequestToken.value) {
   }
   const videoID = detail.value.id
   handleDetailClose({ invalidateToken: false })
-  if (detail.value.status !== 'ready') {
+  if (!canPreviewVideoStatus(detail.value.status)) {
     return
   }
   loadingPlayURL.value = true
@@ -1518,7 +1533,7 @@ onBeforeUnmount(() => {
               />
             </el-select>
             <div v-if="!canManuallyEditVideoStatus(detail.status)" class="status-field__hint">
-              处理中状态不支持手动修改
+              {{ statusEditHint(detail.status) }}
             </div>
             <el-button
               v-if="shouldShowStuckScrapeAction(detail.status, detail.type)"
@@ -1592,13 +1607,13 @@ onBeforeUnmount(() => {
             />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="detail.type === 'short'" label="改为类型">
+        <el-form-item v-if="detail.type === 'short' && detail.status !== 'pending_delete'" label="改为类型">
           <el-select v-model="detail.target_type" clearable placeholder="保持短视频" style="width: 100%">
             <el-option label="保持短视频" value="" />
             <el-option v-for="item in retagTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="detail.type === 'short' && normalizeVideoType(detail.target_type) === 'episode'" label="季/集">
+        <el-form-item v-if="detail.type === 'short' && detail.status !== 'pending_delete' && normalizeVideoType(detail.target_type) === 'episode'" label="季/集">
           <div class="episode-fields">
             <el-input-number v-model="detail.season_number" :min="1" :step="1" controls-position="right" />
             <span class="episode-divider">季</span>
@@ -1606,7 +1621,7 @@ onBeforeUnmount(() => {
             <span class="episode-divider">集</span>
           </div>
         </el-form-item>
-        <el-form-item v-if="isRetaggingShortVideo(detail)" label="自动刮削">
+        <el-form-item v-if="detail.status !== 'pending_delete' && isRetaggingShortVideo(detail)" label="自动刮削">
           <el-alert
             type="info"
             :closable="false"
@@ -1668,7 +1683,7 @@ onBeforeUnmount(() => {
                 plain
                 size="small"
                 :loading="loadingPlayURL"
-                :disabled="detail.status !== 'ready'"
+                :disabled="!canPreviewVideoStatus(detail.status)"
                 @click="refreshPlayURL"
               >
                 刷新播放链接
@@ -1687,10 +1702,10 @@ onBeforeUnmount(() => {
             </div>
 
             <el-alert
-              v-if="detail.status !== 'ready'"
+              v-if="!canPreviewVideoStatus(detail.status)"
               type="warning"
               :closable="false"
-              title="当前视频未就绪，只有“可播放”状态才可预览。"
+              title="当前视频未就绪，只有“可播放”或“待删除”状态才可预览。"
             />
 
             <el-alert
@@ -1835,6 +1850,7 @@ onBeforeUnmount(() => {
             <el-option label="欧美 AV 待确认" value="av_scrape_pending" />
             <el-option label="处理中" value="processing" />
             <el-option label="可播放" value="ready" />
+            <el-option label="待删除" value="pending_delete" />
             <el-option label="失败" value="failed" />
           </el-select>
         </el-form-item>

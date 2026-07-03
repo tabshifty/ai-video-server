@@ -34,7 +34,7 @@ func (a *API) VideoSource(c *gin.Context) {
 		return
 	}
 
-	sourcePath, ok := a.resolvePlayableSource(c, videoID)
+	sourcePath, ok := a.resolvePlayableSource(c, videoID, false)
 	if !ok {
 		return
 	}
@@ -89,7 +89,7 @@ func (a *API) VideoSourceSigned(c *gin.Context) {
 		return
 	}
 
-	sourcePath, ok := a.resolvePlayableSource(c, videoID)
+	sourcePath, ok := a.resolvePlayableSource(c, videoID, true)
 	if !ok {
 		return
 	}
@@ -98,7 +98,7 @@ func (a *API) VideoSourceSigned(c *gin.Context) {
 	}
 }
 
-func (a *API) resolvePlayableSource(c *gin.Context, videoID uuid.UUID) (string, bool) {
+func (a *API) resolvePlayableSource(c *gin.Context, videoID uuid.UUID, allowPendingDelete bool) (string, bool) {
 	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
 	if err != nil {
 		if repository.IsNotFound(err) {
@@ -108,7 +108,8 @@ func (a *API) resolvePlayableSource(c *gin.Context, videoID uuid.UUID) (string, 
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "query video failed"})
 		return "", false
 	}
-	if video.Status != "ready" {
+	status := strings.ToLower(strings.TrimSpace(video.Status))
+	if status != "ready" && !(allowPendingDelete && status == "pending_delete") {
 		c.JSON(http.StatusConflict, gin.H{"msg": "video not ready"})
 		return "", false
 	}

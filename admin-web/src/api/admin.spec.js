@@ -51,10 +51,13 @@ import {
   getAdminImageGenerationStatus,
   getAdminImageViewBlob,
   getAdminImages,
+  getAdminPendingDeleteShorts,
   getAdminTVAppReleaseDetail,
   getAdminTVAppReleases,
   getAdminVideoSubtitles,
   getLatestOrphanFileScan,
+  keepAdminPendingDeleteShort,
+  markAdminShortVideoPendingDelete,
   offlineAdminTVAppRelease,
   publishAdminTVAppRelease,
   processAdminArchiveImportGroup,
@@ -348,6 +351,27 @@ describe('video tag apis', () => {
     expect(get).toHaveBeenCalledWith('/admin/video-tags', {
       params: { q: '动作', limit: 12 }
     })
+  })
+})
+
+describe('pending delete short video apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    get.mockResolvedValue({ ok: true })
+    post.mockResolvedValue({ ok: true })
+  })
+
+  it('loads queue and exposes mark/keep actions', async () => {
+    await getAdminPendingDeleteShorts({ page: 1, page_size: 20 })
+    await markAdminShortVideoPendingDelete('video-1')
+    await keepAdminPendingDeleteShort('video-1')
+
+    expect(get).toHaveBeenCalledWith('/admin/short-videos/pending-delete', {
+      params: { page: 1, page_size: 20 }
+    })
+    expect(post).toHaveBeenCalledWith('/admin/videos/video-1/pending-delete')
+    expect(post).toHaveBeenCalledWith('/admin/videos/video-1/pending-delete/keep')
   })
 })
 

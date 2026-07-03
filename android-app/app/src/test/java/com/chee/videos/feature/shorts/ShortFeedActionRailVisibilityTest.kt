@@ -23,4 +23,26 @@ class ShortFeedActionRailVisibilityTest {
             ),
         )
     }
+
+    @Test
+    fun `shows pending delete action only for admin when detail sheet is closed`() {
+        assertTrue(
+            shouldShowShortFeedPendingDeleteAction(
+                isAdmin = true,
+                detailSheetOpen = false,
+            ),
+        )
+        assertFalse(
+            shouldShowShortFeedPendingDeleteAction(
+                isAdmin = false,
+                detailSheetOpen = false,
+            ),
+        )
+        assertFalse(
+            shouldShowShortFeedPendingDeleteAction(
+                isAdmin = true,
+                detailSheetOpen = true,
+            ),
+        )
+    }
 }

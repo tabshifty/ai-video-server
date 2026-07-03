@@ -166,6 +166,26 @@ func TestEd2kDownloadTaskLifecycleMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)where\s+status\s*<>\s*'deleted'`)
 }
 
+func TestShortPendingDeleteMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0031_short_pending_delete.up.sql")
+	down := readMigrationForTest(t, "0031_short_pending_delete.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+videos\s+add\s+column\s+if\s+not\s+exists\s+pending_delete_at\s+timestamptz`)
+	assertSQLPattern(t, up, `(?is)drop\s+constraint\s+if\s+exists\s+videos_status_check`)
+	assertSQLPattern(t, up, `(?is)'uploaded'.*'scraping'.*'tv_pending'.*'av_scrape_pending'.*'processing'.*'ready'.*'pending_delete'.*'failed'`)
+	assertSQLPattern(t, up, `(?is)add\s+constraint\s+videos_pending_delete_short_check\s+check\s*\(\s*status\s*<>\s*'pending_delete'\s+or\s+type\s*=\s*'short'\s*\)`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_videos_short_pending_delete_at`)
+	assertSQLPattern(t, up, `(?is)where\s+type\s*=\s*'short'\s+and\s+status\s*=\s*'pending_delete'`)
+
+	assertSQLPattern(t, down, `(?is)drop\s+index\s+if\s+exists\s+idx_videos_short_pending_delete_at`)
+	assertSQLPattern(t, down, `(?is)update\s+videos\s+set\s+status\s*=\s*'ready'.*pending_delete_at\s*=\s*null.*where\s+status\s*=\s*'pending_delete'`)
+	assertSQLPattern(t, down, `(?is)drop\s+constraint\s+if\s+exists\s+videos_pending_delete_short_check`)
+	assertSQLPattern(t, down, `(?is)'uploaded'.*'scraping'.*'tv_pending'.*'av_scrape_pending'.*'processing'.*'ready'.*'failed'`)
+	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+drop\s+column\s+if\s+exists\s+pending_delete_at`)
+}
+
 func TestMarkEd2kDownloadTaskRunningRefreshesStartedAt(t *testing.T) {
 	t.Parallel()
 

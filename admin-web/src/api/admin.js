@@ -2,6 +2,7 @@ import request from './request'
 
 export const getAdminStats = () => request.get('/admin/stats')
 export const getAdminVideos = (params) => request.get('/admin/videos', { params })
+export const getAdminPendingDeleteShorts = (params) => request.get('/admin/short-videos/pending-delete', { params })
 export const getAdminVideoTags = (params) => request.get('/admin/video-tags', { params })
 export const getAdminPopularVideoTags = (params) => request.get('/admin/video-tags/popular', { params })
 export const getAdminVideoDetail = (id) => request.get(`/admin/videos/${id}`)
@@ -19,6 +20,8 @@ export const deleteAdminVideoSubtitle = (id, subtitleId) =>
     timeout: 0
   })
 export const getAdminVideoPlayURL = (id) => request.get(`/admin/videos/${id}/play-url`)
+export const markAdminShortVideoPendingDelete = (id) => request.post(`/admin/videos/${id}/pending-delete`)
+export const keepAdminPendingDeleteShort = (id) => request.post(`/admin/videos/${id}/pending-delete/keep`)
 export const captureAdminVideoThumbnail = (id, payload) => request.post(`/admin/videos/${id}/thumbnail/capture`, payload)
 export const updateAdminVideo = (id, payload) => request.put(`/admin/videos/${id}`, payload)
 export const deleteAdminVideo = (id) =>

@@ -7,6 +7,7 @@ export function getVideoStatusMeta(status) {
     av_scrape_pending: { label: '欧美 AV 待确认', tagType: 'warning' },
     processing: { label: '处理中', tagType: 'info' },
     ready: { label: '可播放', tagType: 'success' },
+    pending_delete: { label: '待删除', tagType: 'danger' },
     failed: { label: '失败', tagType: 'danger' }
   }
   return map[normalized] || { label: normalized || '-', tagType: 'info' }
@@ -24,7 +25,8 @@ export function getManualVideoStatusOptions() {
 }
 
 export function canManuallyEditVideoStatus(status) {
-  return normalizeVideoStatus(status) !== 'processing'
+  const normalized = normalizeVideoStatus(status)
+  return normalized !== 'processing' && normalized !== 'pending_delete'
 }
 
 export function getManualVideoStatusValue(status) {
@@ -33,6 +35,11 @@ export function getManualVideoStatusValue(status) {
     return ''
   }
   return normalized
+}
+
+export function canPreviewVideoStatus(status) {
+  const normalized = normalizeVideoStatus(status)
+  return normalized === 'ready' || normalized === 'pending_delete'
 }
 
 export function buildAVManualScrapeRoute(video) {

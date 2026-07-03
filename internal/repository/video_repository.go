@@ -469,11 +469,173 @@ WHERE id = $1`, videoID, reason)
 }
 
 func (r *VideoRepository) UpdateVideoStatus(ctx context.Context, videoID uuid.UUID, status string) error {
-	_, err := r.pool.Exec(ctx, "UPDATE videos SET status=$2, updated_at=NOW() WHERE id=$1", videoID, status)
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status == "pending_delete" {
+		return ErrAdminPendingDeleteStatusEdit
+	}
+	_, err := r.pool.Exec(ctx, "UPDATE videos SET status=$2, pending_delete_at=NULL, updated_at=NOW() WHERE id=$1", videoID, status)
 	if err != nil {
 		return fmt.Errorf("update video status: %w", err)
 	}
 	return nil
+}
+
+func (r *VideoRepository) MarkShortVideoPendingDelete(ctx context.Context, videoID uuid.UUID) (models.Video, bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return models.Video{}, false, fmt.Errorf("begin mark pending delete tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	video, err := scanVideoRecord(tx.QueryRow(ctx, `
+SELECT
+  id,
+  user_id,
+  tmdb_id,
+  COALESCE(image_collection_id::text, ''),
+  COALESCE(title, ''),
+  COALESCE(description, ''),
+  type,
+  status,
+  COALESCE(duration_seconds, 0),
+  COALESCE(width, 0),
+  COALESCE(height, 0),
+  COALESCE(original_path, ''),
+  COALESCE(transcoded_path, ''),
+  COALESCE(thumbnail_path, ''),
+  COALESCE(os_hash, ''),
+  COALESCE(metadata, '{}'::jsonb),
+  pending_delete_at,
+  created_at,
+  updated_at
+FROM videos
+WHERE id=$1
+FOR UPDATE`, videoID))
+	if err != nil {
+		return models.Video{}, false, fmt.Errorf("get video for pending delete: %w", err)
+	}
+	if strings.ToLower(strings.TrimSpace(video.Type)) != "short" {
+		return models.Video{}, false, ErrPendingDeleteOnlyForShort
+	}
+	if video.Status == "pending_delete" {
+		if err := tx.Commit(ctx); err != nil {
+			return models.Video{}, false, fmt.Errorf("commit idempotent pending delete tx: %w", err)
+		}
+		return video, true, nil
+	}
+	if video.Status != "ready" {
+		return models.Video{}, false, ErrPendingDeleteRequiresReady
+	}
+
+	updated, err := scanVideoRecord(tx.QueryRow(ctx, `
+UPDATE videos
+SET status='pending_delete',
+    pending_delete_at=NOW(),
+    updated_at=NOW()
+WHERE id=$1
+RETURNING
+  id,
+  user_id,
+  tmdb_id,
+  COALESCE(image_collection_id::text, ''),
+  COALESCE(title, ''),
+  COALESCE(description, ''),
+  type,
+  status,
+  COALESCE(duration_seconds, 0),
+  COALESCE(width, 0),
+  COALESCE(height, 0),
+  COALESCE(original_path, ''),
+  COALESCE(transcoded_path, ''),
+  COALESCE(thumbnail_path, ''),
+  COALESCE(os_hash, ''),
+  COALESCE(metadata, '{}'::jsonb),
+  pending_delete_at,
+  created_at,
+  updated_at`, videoID))
+	if err != nil {
+		return models.Video{}, false, fmt.Errorf("mark short video pending delete: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return models.Video{}, false, fmt.Errorf("commit pending delete tx: %w", err)
+	}
+	return updated, false, nil
+}
+
+func (r *VideoRepository) KeepPendingDeleteShortVideo(ctx context.Context, videoID uuid.UUID) (models.Video, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return models.Video{}, fmt.Errorf("begin keep pending delete tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	video, err := scanVideoRecord(tx.QueryRow(ctx, `
+SELECT
+  id,
+  user_id,
+  tmdb_id,
+  COALESCE(image_collection_id::text, ''),
+  COALESCE(title, ''),
+  COALESCE(description, ''),
+  type,
+  status,
+  COALESCE(duration_seconds, 0),
+  COALESCE(width, 0),
+  COALESCE(height, 0),
+  COALESCE(original_path, ''),
+  COALESCE(transcoded_path, ''),
+  COALESCE(thumbnail_path, ''),
+  COALESCE(os_hash, ''),
+  COALESCE(metadata, '{}'::jsonb),
+  pending_delete_at,
+  created_at,
+  updated_at
+FROM videos
+WHERE id=$1
+FOR UPDATE`, videoID))
+	if err != nil {
+		return models.Video{}, fmt.Errorf("get video for keep pending delete: %w", err)
+	}
+	if strings.ToLower(strings.TrimSpace(video.Type)) != "short" {
+		return models.Video{}, ErrPendingDeleteOnlyForShort
+	}
+	if video.Status != "pending_delete" {
+		return models.Video{}, ErrPendingDeleteNotPending
+	}
+
+	updated, err := scanVideoRecord(tx.QueryRow(ctx, `
+UPDATE videos
+SET status='ready',
+    pending_delete_at=NULL,
+    updated_at=NOW()
+WHERE id=$1
+RETURNING
+  id,
+  user_id,
+  tmdb_id,
+  COALESCE(image_collection_id::text, ''),
+  COALESCE(title, ''),
+  COALESCE(description, ''),
+  type,
+  status,
+  COALESCE(duration_seconds, 0),
+  COALESCE(width, 0),
+  COALESCE(height, 0),
+  COALESCE(original_path, ''),
+  COALESCE(transcoded_path, ''),
+  COALESCE(thumbnail_path, ''),
+  COALESCE(os_hash, ''),
+  COALESCE(metadata, '{}'::jsonb),
+  pending_delete_at,
+  created_at,
+  updated_at`, videoID))
+	if err != nil {
+		return models.Video{}, fmt.Errorf("keep pending delete short video: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return models.Video{}, fmt.Errorf("commit keep pending delete tx: %w", err)
+	}
+	return updated, nil
 }
 
 func (r *VideoRepository) UpdateVideoOriginalPath(ctx context.Context, videoID uuid.UUID, originalPath string) error {
@@ -533,6 +695,7 @@ SELECT
   COALESCE(thumbnail_path, ''),
   COALESCE(os_hash, ''),
   COALESCE(metadata, '{}'::jsonb),
+  pending_delete_at,
   created_at,
   updated_at
 FROM videos WHERE id=$1`, videoID)
@@ -547,7 +710,7 @@ func (r *VideoRepository) ListActiveOriginalPaths(ctx context.Context) ([]string
 	rows, err := r.pool.Query(ctx, `
 SELECT original_path
 FROM videos
-WHERE status IN ('uploaded','scraping','tv_pending','processing','failed') AND original_path IS NOT NULL AND original_path <> ''
+WHERE status IN ('uploaded','scraping','tv_pending','processing','pending_delete','failed') AND original_path IS NOT NULL AND original_path <> ''
 `)
 	if err != nil {
 		return nil, fmt.Errorf("list active original paths: %w", err)
@@ -584,6 +747,7 @@ SELECT
   COALESCE(thumbnail_path, ''),
   COALESCE(os_hash, ''),
   COALESCE(metadata, '{}'::jsonb),
+  pending_delete_at,
   created_at,
   updated_at
 FROM videos WHERE original_path=$1`, originalPath)
@@ -643,6 +807,7 @@ func scanVideoRecord(rows rowScanner) (models.Video, error) {
 	var height sql.NullInt32
 	var imageCollectionID string
 	var osHash sql.NullString
+	var pendingDeleteAt sql.NullTime
 	if err := rows.Scan(
 		&v.ID,
 		&v.UserID,
@@ -660,6 +825,7 @@ func scanVideoRecord(rows rowScanner) (models.Video, error) {
 		&v.ThumbnailPath,
 		&osHash,
 		&v.Metadata,
+		&pendingDeleteAt,
 		&v.CreatedAt,
 		&v.UpdatedAt,
 	); err != nil {
@@ -670,6 +836,9 @@ func scanVideoRecord(rows rowScanner) (models.Video, error) {
 	v.Height = nullInt32ToInt(height)
 	v.ImageCollectionID = parseNullableUUIDText(imageCollectionID)
 	v.OSHash = strings.TrimSpace(osHash.String)
+	if pendingDeleteAt.Valid {
+		v.PendingDeleteAt = &pendingDeleteAt.Time
+	}
 	return v, nil
 }
 

@@ -17,7 +17,7 @@ export const adminShellNavGroups = [
     label: '媒体库',
     items: [
       { path: '/videos', label: '视频管理', title: '视频管理', icon: 'Film', alias: 'video videos sj spgl' },
-      { path: '/short-review', label: '短视频审核', title: '短视频审核', icon: 'VideoCamera', alias: 'short review audit cleanup dssp dssh sh ql' },
+      { path: '/short-pending-delete', label: '待删除短视频', title: '待删除短视频', icon: 'Delete', alias: 'short pending delete cleanup dsc dsp dscdsp ql' },
       { path: '/tv-series', label: '电视剧管理', title: '电视剧管理', icon: 'Files', alias: 'tv series dsj' },
       { path: '/tv-app', label: '安装包管理', title: '安装包管理', icon: 'Monitor', alias: 'tv app phone app apk tvapk dzb azb' },
       { path: '/actors', label: '演员管理', title: '演员管理', icon: 'Avatar', alias: 'actor actors yy' },
@@ -80,6 +80,9 @@ const PINYIN_INITIAL = {
   视: 's',
   频: 'p',
   短: 'd',
+  待: 'd',
+  删: 's',
+  除: 'c',
   审: 's',
   核: 'h',
   管: 'g',

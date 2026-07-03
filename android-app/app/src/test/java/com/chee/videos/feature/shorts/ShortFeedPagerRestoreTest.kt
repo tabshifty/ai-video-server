@@ -2,6 +2,7 @@ package com.chee.videos.feature.shorts
 
 import com.chee.videos.core.model.FeedVideoDto
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShortFeedPagerRestoreTest {
@@ -43,6 +44,35 @@ class ShortFeedPagerRestoreTest {
         )
 
         assertEquals(2, page)
+    }
+
+    @Test
+    fun pendingDeleteRemovalSelectsNextAvailableVideo() {
+        val items = listOf(feedItem("a"), feedItem("b"), feedItem("c"))
+
+        val window = resolveShortFeedPendingDeleteWindow(
+            items = items,
+            removedVideoId = "b",
+        )
+
+        assertTrue(window.removed)
+        assertEquals(listOf("a", "c"), window.items.map { it.id })
+        assertEquals(1, window.pagerInitialPage)
+        assertEquals("c", window.pagerAnchorVideoId)
+    }
+
+    @Test
+    fun pendingDeleteRemovalFallsBackToPreviousWhenLastVideoRemoved() {
+        val items = listOf(feedItem("a"), feedItem("b"))
+
+        val window = resolveShortFeedPendingDeleteWindow(
+            items = items,
+            removedVideoId = "b",
+        )
+
+        assertEquals(listOf("a"), window.items.map { it.id })
+        assertEquals(0, window.pagerInitialPage)
+        assertEquals("a", window.pagerAnchorVideoId)
     }
 
     private fun feedItem(id: String): FeedVideoDto {

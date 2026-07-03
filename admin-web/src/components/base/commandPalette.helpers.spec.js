@@ -9,8 +9,8 @@ describe('command palette helpers', () => {
   it('matches menu items by label, path, alias and initials', () => {
     expect(searchMenuItems('上传').map((item) => item.label).slice(0, 1)).toEqual(['上传视频'])
     expect(searchMenuItems('sj').map((item) => item.label).slice(0, 1)).toEqual(['视频管理'])
-    expect(searchMenuItems('dssh').map((item) => item.label).slice(0, 1)).toEqual(['短视频审核'])
-    expect(searchMenuItems('/short-review').map((item) => item.label).slice(0, 1)).toEqual(['短视频审核'])
+    expect(searchMenuItems('dscdsp').map((item) => item.label).slice(0, 1)).toEqual(['待删除短视频'])
+    expect(searchMenuItems('/short-pending-delete').map((item) => item.label).slice(0, 1)).toEqual(['待删除短视频'])
     expect(searchMenuItems('/videos').map((item) => item.label).slice(0, 1)).toEqual(['视频管理'])
     expect(searchMenuItems('upload').map((item) => item.label).slice(0, 1)).toEqual(['上传视频'])
     expect(searchMenuItems('gjx').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
@@ -36,12 +36,12 @@ describe('command palette helpers', () => {
     })
   })
 
-  it('registers short video review under media navigation', () => {
-    const item = adminShellNavItems.find((entry) => entry.path === '/short-review')
+  it('registers pending delete shorts under media navigation', () => {
+    const item = adminShellNavItems.find((entry) => entry.path === '/short-pending-delete')
     expect(item).toMatchObject({
-      label: '短视频审核',
+      label: '待删除短视频',
       groupLabel: '媒体库',
-      icon: 'VideoCamera'
+      icon: 'Delete'
     })
   })
 

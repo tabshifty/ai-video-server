@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
@@ -24,10 +25,15 @@ data class ShortFeedUiState(
     val loading: Boolean = false,
     val loaded: Boolean = false,
     val loadingMore: Boolean = false,
-    val items: List<com.chee.videos.core.model.FeedVideoDto> = emptyList(),
+    val items: List<FeedVideoDto> = emptyList(),
     val errorMessage: String? = null,
     val loadMoreErrorMessage: String? = null,
     val detailErrorMessage: String? = null,
+    val pendingDeleteMessage: String? = null,
+    val pendingDeleteMessageSerial: Int = 0,
+    val isAdmin: Boolean = false,
+    val adminRoleLoading: Boolean = false,
+    val adminRoleLoaded: Boolean = false,
     val fitMode: VideoFitMode = VideoFitMode.FILL,
     val pausedByUserVideoIds: Set<String> = emptySet(),
     val detailSheetVideoId: String? = null,
@@ -70,6 +76,7 @@ class ShortFeedViewModel @Inject constructor(
     }
 
     fun load(force: Boolean = false) {
+        loadViewerRoleIfNeeded()
         val currentState = _uiState.value
         if ((currentState.loaded || currentState.loading) && !force) {
             return
@@ -265,6 +272,62 @@ class ShortFeedViewModel @Inject constructor(
         toggleAction(videoId) { videoRepository.toggleDislike(videoId) }
     }
 
+    fun markPendingDelete(videoId: String) {
+        val normalizedVideoId = videoId.trim()
+        val state = _uiState.value
+        if (normalizedVideoId.isBlank() || !state.isAdmin || state.actionBusyVideoIds.contains(normalizedVideoId)) {
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    actionBusyVideoIds = it.actionBusyVideoIds + normalizedVideoId,
+                    detailErrorMessage = null,
+                )
+            }
+            videoRepository.markShortVideoPendingDelete(normalizedVideoId)
+                .onSuccess {
+                    _uiState.update { latest ->
+                        val window = resolveShortFeedPendingDeleteWindow(
+                            items = latest.items,
+                            removedVideoId = normalizedVideoId,
+                        )
+                        val remainingIds = window.items.mapTo(mutableSetOf()) { it.id }
+                        latest.copy(
+                            items = window.items,
+                            detailByVideoId = latest.detailByVideoId.filterKeys { it in remainingIds },
+                            detailLoadingVideoIds = latest.detailLoadingVideoIds.filterTo(mutableSetOf()) { it in remainingIds },
+                            actionBusyVideoIds = latest.actionBusyVideoIds - normalizedVideoId,
+                            pausedByUserVideoIds = latest.pausedByUserVideoIds.filterTo(mutableSetOf()) { it in remainingIds },
+                            detailSheetVideoId = latest.detailSheetVideoId?.takeIf { it in remainingIds },
+                            pagerInitialPage = window.pagerInitialPage,
+                            pagerAnchorVideoId = window.pagerAnchorVideoId,
+                            pagerResetToken = if (window.removed) latest.pagerResetToken + 1 else latest.pagerResetToken,
+                            pendingDeleteMessage = "已加入待删除列表",
+                            pendingDeleteMessageSerial = latest.pendingDeleteMessageSerial + 1,
+                        )
+                    }
+                    if (_uiState.value.items.isEmpty()) {
+                        load(force = true)
+                    }
+                }
+                .onFailure { err ->
+                    handleAuthError(err)
+                    _uiState.update {
+                        it.copy(
+                            actionBusyVideoIds = it.actionBusyVideoIds - normalizedVideoId,
+                            pendingDeleteMessage = err.message ?: "加入待删除列表失败",
+                            pendingDeleteMessageSerial = it.pendingDeleteMessageSerial + 1,
+                        )
+                    }
+                }
+        }
+    }
+
+    fun consumePendingDeleteMessage() {
+        _uiState.update { it.copy(pendingDeleteMessage = null) }
+    }
+
     fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
         if (videoId.isBlank() || watchSeconds <= 0) {
             return
@@ -360,6 +423,36 @@ class ShortFeedViewModel @Inject constructor(
         }
     }
 
+    private fun loadViewerRoleIfNeeded() {
+        val state = _uiState.value
+        if (state.adminRoleLoaded || state.adminRoleLoading) {
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(adminRoleLoading = true) }
+            videoRepository.fetchUserProfile()
+                .onSuccess { profile ->
+                    _uiState.update {
+                        it.copy(
+                            isAdmin = profile.role.trim().equals("admin", ignoreCase = true),
+                            adminRoleLoading = false,
+                            adminRoleLoaded = true,
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    handleAuthError(err)
+                    _uiState.update {
+                        it.copy(
+                            isAdmin = false,
+                            adminRoleLoading = false,
+                            adminRoleLoaded = true,
+                        )
+                    }
+                }
+        }
+    }
+
     private fun ShortFeedUiState.toWindowSnapshot(): ShortFeedWindowSnapshot {
         return ShortFeedWindowSnapshot(
             items = items,
@@ -381,7 +474,7 @@ class ShortFeedViewModel @Inject constructor(
 }
 
 internal fun resolveShortFeedInitialPage(
-    incomingItems: List<com.chee.videos.core.model.FeedVideoDto>,
+    incomingItems: List<FeedVideoDto>,
     anchorVideoId: String?,
     fallbackPage: Int,
 ): Int {
@@ -396,4 +489,38 @@ internal fun resolveShortFeedInitialPage(
         return anchorIndex
     }
     return fallbackPage.coerceIn(0, incomingItems.lastIndex)
+}
+
+internal data class ShortFeedPendingDeleteWindow(
+    val items: List<FeedVideoDto>,
+    val pagerInitialPage: Int,
+    val pagerAnchorVideoId: String?,
+    val removed: Boolean,
+)
+
+internal fun resolveShortFeedPendingDeleteWindow(
+    items: List<FeedVideoDto>,
+    removedVideoId: String,
+): ShortFeedPendingDeleteWindow {
+    val removedIndex = items.indexOfFirst { it.id == removedVideoId }
+    if (removedIndex < 0) {
+        return ShortFeedPendingDeleteWindow(
+            items = items,
+            pagerInitialPage = 0.coerceAtMost((items.size - 1).coerceAtLeast(0)),
+            pagerAnchorVideoId = items.firstOrNull()?.id,
+            removed = false,
+        )
+    }
+    val nextItems = items.filterNot { it.id == removedVideoId }
+    val nextPage = if (nextItems.isEmpty()) {
+        0
+    } else {
+        removedIndex.coerceAtMost(nextItems.lastIndex)
+    }
+    return ShortFeedPendingDeleteWindow(
+        items = nextItems,
+        pagerInitialPage = nextPage,
+        pagerAnchorVideoId = nextItems.getOrNull(nextPage)?.id,
+        removed = true,
+    )
 }

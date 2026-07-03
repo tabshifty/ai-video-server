@@ -170,6 +170,12 @@ interface ApiService {
     ): ApiEnvelope<ActionTogglePayload>
 
     @POST
+    suspend fun markShortVideoPendingDelete(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<Map<String, Any?>>
+
+    @POST
     suspend fun recordHistory(
         @Url url: String,
         @Header("Authorization") authorization: String,

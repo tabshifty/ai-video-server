@@ -4,6 +4,7 @@ import {
   buildAVManualScrapeRoute,
   buildMovieManualScrapeRoute,
   buildStuckScrapeRoute,
+  canPreviewVideoStatus,
   canManuallyEditVideoStatus,
   extractTvPendingDiagnostics,
   getManualVideoStatusOptions,
@@ -20,7 +21,7 @@ import {
 } from './videoList.helpers'
 
 describe('videoList helpers', () => {
-  it('includes tv_pending status label and tag type', () => {
+  it('includes non-ready workflow status labels and tag types', () => {
     expect(getVideoStatusMeta('tv_pending')).toEqual({
       label: '待绑定',
       tagType: 'warning'
@@ -28,6 +29,10 @@ describe('videoList helpers', () => {
     expect(getVideoStatusMeta('av_scrape_pending')).toEqual({
       label: '欧美 AV 待确认',
       tagType: 'warning'
+    })
+    expect(getVideoStatusMeta('pending_delete')).toEqual({
+      label: '待删除',
+      tagType: 'danger'
     })
   })
 
@@ -42,14 +47,22 @@ describe('videoList helpers', () => {
     ])
   })
 
-  it('blocks manual edits for processing only', () => {
+  it('blocks manual edits for processing and pending delete', () => {
     expect(canManuallyEditVideoStatus('processing')).toBe(false)
+    expect(canManuallyEditVideoStatus('pending_delete')).toBe(false)
     expect(canManuallyEditVideoStatus('ready')).toBe(true)
   })
 
-  it('omits processing from the manual update payload value', () => {
+  it('omits locked statuses from the manual update payload value', () => {
     expect(getManualVideoStatusValue('processing')).toBe('')
+    expect(getManualVideoStatusValue('pending_delete')).toBe('')
     expect(getManualVideoStatusValue('ready')).toBe('ready')
+  })
+
+  it('allows admin preview for ready and pending delete videos only', () => {
+    expect(canPreviewVideoStatus('ready')).toBe(true)
+    expect(canPreviewVideoStatus('pending_delete')).toBe(true)
+    expect(canPreviewVideoStatus('processing')).toBe(false)
   })
 
   it('extracts tv pending diagnostics from metadata', () => {

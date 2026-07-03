@@ -3,14 +3,13 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-
 )
 
 type stubQueryRower struct {
@@ -51,6 +50,7 @@ func TestScanVideoRecordReadsOSHash(t *testing.T) {
 	userID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	tmdbID := 998877
 	now := time.Unix(1710000000, 0).UTC()
+	pendingDeleteAt := time.Unix(1710000100, 0).UTC()
 
 	got, err := scanVideoRecord(stubRowScanner{
 		values: []any{
@@ -70,6 +70,7 @@ func TestScanVideoRecordReadsOSHash(t *testing.T) {
 			"/videos/sample.jpg",
 			sql.NullString{String: "0123456789abcdef", Valid: true},
 			[]byte(`{"site_category":"western"}`),
+			sql.NullTime{Time: pendingDeleteAt, Valid: true},
 			now,
 			now,
 		},
@@ -98,6 +99,9 @@ func TestScanVideoRecordReadsOSHash(t *testing.T) {
 	}
 	if string(got.Metadata) != `{"site_category":"western"}` {
 		t.Fatalf("unexpected metadata: %s", string(got.Metadata))
+	}
+	if got.PendingDeleteAt == nil || !got.PendingDeleteAt.Equal(pendingDeleteAt) {
+		t.Fatalf("unexpected pending_delete_at: %#v", got.PendingDeleteAt)
 	}
 }
 

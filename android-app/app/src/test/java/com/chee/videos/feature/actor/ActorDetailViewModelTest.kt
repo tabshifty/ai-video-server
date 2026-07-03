@@ -243,6 +243,7 @@ private class FakeActorApiService(
     override suspend fun toggleLike(url: String, authorization: String): ApiEnvelope<ActionTogglePayload> = error("unused")
     override suspend fun toggleFavorite(url: String, authorization: String): ApiEnvelope<ActionTogglePayload> = error("unused")
     override suspend fun toggleDislike(url: String, authorization: String): ApiEnvelope<ActionTogglePayload> = error("unused")
+    override suspend fun markShortVideoPendingDelete(url: String, authorization: String): ApiEnvelope<Map<String, Any?>> = error("unused")
     override suspend fun recordHistory(url: String, authorization: String, body: RecordHistoryRequest): ApiEnvelope<Map<String, Boolean>> = error("unused")
     override suspend fun continueHistory(url: String, authorization: String, page: Int, limit: Int): ApiEnvelope<ContinueHistoryPayload> = error("unused")
     override suspend fun likedVideos(url: String, authorization: String, page: Int, pageSize: Int): ApiEnvelope<SearchPayload> = error("unused")

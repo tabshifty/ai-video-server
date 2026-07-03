@@ -121,6 +121,23 @@ func (a *API) AdminVideos(c *gin.Context) {
 	})
 }
 
+func (a *API) AdminPendingDeleteShortVideos(c *gin.Context) {
+	page := parsePage(c.Query("page"), 1)
+	pageSize := parsePageSize(c.Query("page_size"), 20)
+
+	items, total, err := a.repo.AdminListPendingDeleteShortVideos(c.Request.Context(), page, pageSize)
+	if err != nil {
+		response.Error(c, 1081, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"items":       items,
+		"total_count": total,
+		"page":        page,
+		"page_size":   pageSize,
+	})
+}
+
 func (a *API) AdminPopularVideoTags(c *gin.Context) {
 	limit := 5
 	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
@@ -213,7 +230,7 @@ func (a *API) AdminVideoPlayURL(c *gin.Context) {
 		response.Error(c, 1022, err.Error())
 		return
 	}
-	if video.Status != "ready" {
+	if !adminCanPreviewVideoStatus(video.Status) {
 		response.Error(c, 1023, "video not ready")
 		return
 	}
@@ -224,6 +241,63 @@ func (a *API) AdminVideoPlayURL(c *gin.Context) {
 		"signed_url": fmt.Sprintf("/api/v1/videos/%s/source/signed?exp=%d&sig=%s", videoID.String(), exp, sig),
 		"expires_at": exp,
 	})
+}
+
+func adminCanPreviewVideoStatus(status string) bool {
+	status = strings.ToLower(strings.TrimSpace(status))
+	return status == "ready" || status == "pending_delete"
+}
+
+func (a *API) AdminMarkShortVideoPendingDelete(c *gin.Context) {
+	videoID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid video id")
+		return
+	}
+	video, alreadyPending, err := a.repo.MarkShortVideoPendingDelete(c.Request.Context(), videoID)
+	if err != nil {
+		writePendingDeleteWorkflowError(c, err)
+		return
+	}
+	ok(c, gin.H{
+		"video_id":        video.ID,
+		"status":          video.Status,
+		"already_pending": alreadyPending,
+		"pending_delete":  true,
+	})
+}
+
+func (a *API) AdminKeepPendingDeleteShortVideo(c *gin.Context) {
+	videoID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "invalid video id")
+		return
+	}
+	video, err := a.repo.KeepPendingDeleteShortVideo(c.Request.Context(), videoID)
+	if err != nil {
+		writePendingDeleteWorkflowError(c, err)
+		return
+	}
+	ok(c, gin.H{
+		"video_id": video.ID,
+		"status":   video.Status,
+		"kept":     true,
+	})
+}
+
+func writePendingDeleteWorkflowError(c *gin.Context, err error) {
+	switch {
+	case repository.IsNotFound(err):
+		response.Error(c, 404, "video not found")
+	case errors.Is(err, repository.ErrPendingDeleteOnlyForShort):
+		bad(c, "仅短视频支持加入待删除列表")
+	case errors.Is(err, repository.ErrPendingDeleteRequiresReady):
+		bad(c, "只有已就绪短视频可以加入待删除列表")
+	case errors.Is(err, repository.ErrPendingDeleteNotPending):
+		bad(c, "短视频不在待删除列表中")
+	default:
+		response.Error(c, 1082, err.Error())
+	}
 }
 
 func (a *API) AdminUpdateVideo(c *gin.Context) {
@@ -255,6 +329,11 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 	if req.Metadata == nil {
 		req.Metadata = map[string]any{}
 	}
+	requestedStatus := strings.ToLower(strings.TrimSpace(req.Status))
+	if requestedStatus == "pending_delete" {
+		bad(c, "待删除短视频只能在待删除页保留或最终删除")
+		return
+	}
 
 	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
 	if err != nil {
@@ -263,6 +342,10 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 			return
 		}
 		response.Error(c, 1007, err.Error())
+		return
+	}
+	if requestedStatus != "" && video.Status == "pending_delete" {
+		bad(c, "待删除短视频只能在待删除页保留或最终删除")
 		return
 	}
 
@@ -324,9 +407,17 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 		updateCollections = true
 		collectionIDs = nil
 	}
-	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, targetType, actorIDs, actorNames, updateActors, collectionIDs, updateCollections, imageCollectionID, updateImageCollection); err != nil {
+	statusForAdminUpdate := req.Status
+	if typeChanged && autoScrape {
+		statusForAdminUpdate = ""
+	}
+	if err := a.repo.AdminUpdateVideo(c.Request.Context(), videoID, req.Title, req.Description, req.Thumbnail, req.Tags, req.Metadata, targetType, actorIDs, actorNames, updateActors, collectionIDs, updateCollections, imageCollectionID, updateImageCollection, statusForAdminUpdate); err != nil {
 		if errors.Is(err, repository.ErrCollectionsOnlyForShort) {
 			bad(c, "仅短视频支持合集")
+			return
+		}
+		if errors.Is(err, repository.ErrAdminPendingDeleteStatusEdit) {
+			bad(c, "待删除短视频只能在待删除页保留或最终删除")
 			return
 		}
 		response.Error(c, 1007, err.Error())
@@ -354,12 +445,6 @@ func (a *API) AdminUpdateVideo(c *gin.Context) {
 			return
 		}
 		enqueuedAutoScrape = true
-	}
-	if req.Status != "" && !enqueuedAutoScrape {
-		if err := a.repo.AdminUpdateVideoStatus(c.Request.Context(), videoID, req.Status); err != nil {
-			response.Error(c, 1008, err.Error())
-			return
-		}
 	}
 	ok(c, gin.H{
 		"updated":              true,
@@ -580,6 +665,10 @@ func (a *API) AdminRetranscodeVideo(c *gin.Context) {
 	}
 	if services.SourcePlaybackPathFromMetadata(video.Metadata) != "" {
 		response.Error(c, 1012, "当前视频保留了杜比视界原始播放源，禁止重转码")
+		return
+	}
+	if video.Status == "pending_delete" {
+		bad(c, "待删除短视频只能在待删除页保留或最终删除")
 		return
 	}
 	inputPath, inputSource := selectRetranscodeInputPath(video)

@@ -1,6 +1,7 @@
 package com.chee.videos.feature.shorts
 
 import android.graphics.Color as AndroidColor
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,6 +50,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -127,9 +131,17 @@ fun ShortFeedScreen(
     viewModel: ShortFeedViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.load()
+    }
+    LaunchedEffect(uiState.pendingDeleteMessageSerial) {
+        val message = uiState.pendingDeleteMessage
+        if (uiState.pendingDeleteMessageSerial > 0 && !message.isNullOrBlank()) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumePendingDeleteMessage()
+        }
     }
 
     when {
@@ -155,7 +167,6 @@ fun ShortFeedScreen(
         }
 
         else -> {
-            val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
             val dataSourceFactory = remember(accessToken) {
                 DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -174,7 +185,31 @@ fun ShortFeedScreen(
             var lastHistoryVideoId by remember { mutableStateOf<String?>(null) }
             var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
             val coroutineScope = rememberCoroutineScope()
+            var pendingDeleteTarget by remember { mutableStateOf<FeedVideoDto?>(null) }
             val latestCurrentVideoId by rememberUpdatedState(sharedPlayer.currentMediaItem?.mediaId)
+
+            pendingDeleteTarget?.let { target ->
+                AlertDialog(
+                    onDismissRequest = { pendingDeleteTarget = null },
+                    title = { Text("加入待删除列表") },
+                    text = { Text("确认将「${target.title.ifBlank { "未命名短视频" }}」加入待删除列表？") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.markPendingDelete(target.id)
+                                pendingDeleteTarget = null
+                            },
+                        ) {
+                            Text("加入待删除列表")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { pendingDeleteTarget = null }) {
+                            Text("取消")
+                        }
+                    },
+                )
+            }
 
             KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
@@ -395,6 +430,10 @@ fun ShortFeedScreen(
                 val showActionRail = shouldShowShortFeedActionRail(
                     detailSheetOpen = sheetOpen,
                 )
+                val showPendingDeleteAction = shouldShowShortFeedPendingDeleteAction(
+                    isAdmin = uiState.isAdmin,
+                    detailSheetOpen = sheetOpen,
+                )
 
                 Box(
                     modifier = Modifier
@@ -437,6 +476,7 @@ fun ShortFeedScreen(
                                     isFavorited = detail?.userState?.isFavorited == true,
                                     actionBusy = item.id in uiState.actionBusyVideoIds,
                                     showActionRail = showActionRail,
+                                    showPendingDeleteAction = showPendingDeleteAction,
                                     onTogglePauseByUser = { viewModel.togglePauseByUser(item.id) },
                                     onToggleLike = { viewModel.toggleLike(item.id) },
                                     onToggleFavorite = { viewModel.toggleFavorite(item.id) },
@@ -445,6 +485,7 @@ fun ShortFeedScreen(
                                     onOpenFullscreen = { isFullscreen = true },
                                     playbackMode = uiState.playbackMode,
                                     onOpenDetail = { viewModel.openDetailSheet(item.id) },
+                                    onRequestPendingDelete = { pendingDeleteTarget = item },
                                 )
                             }
                         }
@@ -567,6 +608,7 @@ private fun VerticalVideoPage(
     isFavorited: Boolean,
     actionBusy: Boolean,
     showActionRail: Boolean,
+    showPendingDeleteAction: Boolean,
     onTogglePauseByUser: () -> Boolean,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -575,6 +617,7 @@ private fun VerticalVideoPage(
     onOpenFullscreen: () -> Unit,
     playbackMode: com.chee.videos.core.model.ShortPlaybackMode,
     onOpenDetail: () -> Unit,
+    onRequestPendingDelete: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
 
@@ -716,6 +759,15 @@ private fun VerticalVideoPage(
                     onClick = onToggleFavorite,
                     contentDescription = "收藏",
                 )
+                if (showPendingDeleteAction) {
+                    ShortsActionButton(
+                        icon = Icons.Filled.Delete,
+                        active = false,
+                        enabled = !actionBusy,
+                        onClick = onRequestPendingDelete,
+                        contentDescription = "加入待删除列表",
+                    )
+                }
                 ShortsActionButton(
                     icon = Icons.Filled.AspectRatio,
                     active = false,

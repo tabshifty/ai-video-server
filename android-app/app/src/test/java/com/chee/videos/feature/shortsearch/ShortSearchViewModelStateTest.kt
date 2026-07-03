@@ -255,6 +255,11 @@ private class FakeShortSearchApiService(
         return ApiEnvelope(code = 0, data = ActionTogglePayload(action = "favorite", enabled = favoriteResults[videoId] == true))
     }
 
+    override suspend fun markShortVideoPendingDelete(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<Map<String, Any?>> = error("unused")
+
     override suspend fun refresh(url: String, authorization: String): ApiEnvelope<RefreshPayload> =
         ApiEnvelope(code = 401, msg = "expired")
 

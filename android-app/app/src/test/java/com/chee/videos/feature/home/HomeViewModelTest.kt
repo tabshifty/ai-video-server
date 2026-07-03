@@ -495,6 +495,11 @@ private class FakeHomeApiService(
         excludeIds: String?,
     ): ApiEnvelope<FeedPayload> = error("unused")
 
+    override suspend fun markShortVideoPendingDelete(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<Map<String, Any?>> = error("unused")
+
     override suspend fun shortDiscover(
         url: String,
         authorization: String,

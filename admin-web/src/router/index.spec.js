@@ -12,9 +12,9 @@ describe('resolveRouterHistoryBase', () => {
     expect(resolveRouterHistoryBase()).toBe('/')
   })
 
-  it('注册短视频审核路由并隐藏壳层重复标题', () => {
+  it('注册待删除短视频路由并隐藏壳层重复标题', () => {
     const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
-    expect(source).toContain("import ShortReview from '../views/ShortReview.vue'")
-    expect(source).toContain("{ path: '/short-review', component: ShortReview, meta: { hideShellPageHeader: true } }")
+    expect(source).toContain("import PendingDeleteShorts from '../views/PendingDeleteShorts.vue'")
+    expect(source).toContain("{ path: '/short-pending-delete', component: PendingDeleteShorts, meta: { hideShellPageHeader: true } }")
   })
 })

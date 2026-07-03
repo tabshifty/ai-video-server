@@ -227,6 +227,15 @@ class VideoRepository @Inject constructor(
         }
     }
 
+    suspend fun markShortVideoPendingDelete(videoId: String): Result<Unit> {
+        return callWithAuth { baseUrl, bearer ->
+            api.markShortVideoPendingDelete(
+                url = UrlBuilder.adminVideoPendingDelete(baseUrl, videoId),
+                authorization = bearer,
+            )
+        }.map { Unit }
+    }
+
     suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) {
         callWithAuth { baseUrl, bearer ->
             api.recordHistory(

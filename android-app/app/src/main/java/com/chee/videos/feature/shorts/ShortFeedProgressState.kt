@@ -13,3 +13,10 @@ internal fun shouldShowShortFeedActionRail(
 ): Boolean {
     return !detailSheetOpen
 }
+
+internal fun shouldShowShortFeedPendingDeleteAction(
+    isAdmin: Boolean,
+    detailSheetOpen: Boolean,
+): Boolean {
+    return isAdmin && shouldShowShortFeedActionRail(detailSheetOpen)
+}

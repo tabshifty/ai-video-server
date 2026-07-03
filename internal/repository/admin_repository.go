@@ -24,6 +24,10 @@ const (
 )
 
 var ErrAdminVideoTagsModeInvalid = errors.New("invalid admin video tags mode")
+var ErrPendingDeleteOnlyForShort = errors.New("pending delete only supports short videos")
+var ErrPendingDeleteRequiresReady = errors.New("pending delete requires ready short video")
+var ErrPendingDeleteNotPending = errors.New("short video is not pending delete")
+var ErrAdminPendingDeleteStatusEdit = errors.New("pending delete status cannot be edited manually")
 
 func (r *VideoRepository) CountVideosByType(ctx context.Context) (shorts, movies, episodes, avs int64, err error) {
 	err = r.pool.QueryRow(ctx, `
@@ -149,6 +153,36 @@ func (r *VideoRepository) AdminListVideos(ctx context.Context, f models.AdminVid
 	return items, total, rows.Err()
 }
 
+func (r *VideoRepository) AdminListPendingDeleteShortVideos(ctx context.Context, page, pageSize int) ([]models.AdminVideoListItem, int, error) {
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM videos WHERE type='short' AND status='pending_delete'`).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("admin count pending delete shorts: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx, `
+SELECT v.id, v.title, v.type, v.status, COALESCE(v.thumbnail_path,''), v.user_id, COALESCE(us.username,''), v.created_at, v.updated_at
+FROM videos v
+LEFT JOIN users us ON us.id = v.user_id
+WHERE v.type='short' AND v.status='pending_delete'
+ORDER BY v.pending_delete_at DESC NULLS LAST, v.updated_at DESC, v.created_at DESC
+LIMIT $1 OFFSET $2
+`, pageSize, (page-1)*pageSize)
+	if err != nil {
+		return nil, 0, fmt.Errorf("admin list pending delete shorts: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.AdminVideoListItem, 0, pageSize)
+	for rows.Next() {
+		var item models.AdminVideoListItem
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.Status, &item.Thumbnail, &item.UploadUserID, &item.UploadUser, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan pending delete short: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, total, rows.Err()
+}
+
 func (r *VideoRepository) AdminVideoDetail(ctx context.Context, videoID uuid.UUID) (models.AdminVideoDetail, error) {
 	var out models.AdminVideoDetail
 	var metadata []byte
@@ -231,7 +265,7 @@ WHERE id=$1
 	return out, nil
 }
 
-func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, targetType string, actorIDs []uuid.UUID, actorNames []string, updateActors bool, collectionIDs []uuid.UUID, updateCollections bool, imageCollectionID *uuid.UUID, updateImageCollection bool) error {
+func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUID, title, description, thumbnail string, tags []string, metadata map[string]any, targetType string, actorIDs []uuid.UUID, actorNames []string, updateActors bool, collectionIDs []uuid.UUID, updateCollections bool, imageCollectionID *uuid.UUID, updateImageCollection bool, requestedStatus string) error {
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("marshal admin metadata: %w", err)
@@ -247,18 +281,28 @@ func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUI
 		}
 		imageCollectionID = resolvedImageCollectionID
 	}
-	video, err := r.GetVideoByID(ctx, videoID)
-	if err != nil {
-		return fmt.Errorf("get video for admin update: %w", err)
-	}
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	video, err := lockVideoForAdminUpdate(ctx, tx, videoID)
+	if err != nil {
+		return err
+	}
 	nextType := strings.ToLower(strings.TrimSpace(targetType))
 	if nextType == "" {
 		nextType = video.Type
+	}
+	if video.Status == "pending_delete" && nextType != "short" {
+		return ErrAdminPendingDeleteStatusEdit
+	}
+	requestedStatus = strings.ToLower(strings.TrimSpace(requestedStatus))
+	if requestedStatus != "" {
+		if err := validateAdminVideoStatusEdit(video, requestedStatus); err != nil {
+			return err
+		}
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -288,6 +332,11 @@ func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUI
 	WHERE id=$1
 	`, videoID, imageCollectionID); err != nil {
 			return fmt.Errorf("update video image collection: %w", err)
+		}
+	}
+	if requestedStatus != "" {
+		if _, err := tx.Exec(ctx, `UPDATE videos SET status=$2, pending_delete_at=NULL, updated_at=NOW() WHERE id=$1`, videoID, requestedStatus); err != nil {
+			return fmt.Errorf("admin update video status: %w", err)
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -521,11 +570,51 @@ func normalizeAdminVideoTags(raw []string) []string {
 }
 
 func (r *VideoRepository) AdminUpdateVideoStatus(ctx context.Context, videoID uuid.UUID, status string) error {
-	_, err := r.pool.Exec(ctx, `UPDATE videos SET status=$2, updated_at=NOW() WHERE id=$1`, videoID, status)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
+		return fmt.Errorf("begin tx admin status update: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	video, err := lockVideoForAdminUpdate(ctx, tx, videoID)
+	if err != nil {
+		return err
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if err := validateAdminVideoStatusEdit(video, status); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE videos SET status=$2, pending_delete_at=NULL, updated_at=NOW() WHERE id=$1`, videoID, status); err != nil {
 		return fmt.Errorf("admin update video status: %w", err)
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit admin status update: %w", err)
+	}
 	return nil
+}
+
+func validateAdminVideoStatusEdit(video models.Video, status string) error {
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status == "pending_delete" {
+		return ErrAdminPendingDeleteStatusEdit
+	}
+	if video.Status == "pending_delete" {
+		return ErrAdminPendingDeleteStatusEdit
+	}
+	return nil
+}
+
+func lockVideoForAdminUpdate(ctx context.Context, tx pgx.Tx, videoID uuid.UUID) (models.Video, error) {
+	var video models.Video
+	if err := tx.QueryRow(ctx, `
+SELECT type, status
+FROM videos
+WHERE id=$1
+FOR UPDATE
+`, videoID).Scan(&video.Type, &video.Status); err != nil {
+		return models.Video{}, fmt.Errorf("lock video for admin update: %w", err)
+	}
+	return video, nil
 }
 
 func (r *VideoRepository) AdminUpdateVideoThumbnail(ctx context.Context, videoID uuid.UUID, thumbnailPath string) error {

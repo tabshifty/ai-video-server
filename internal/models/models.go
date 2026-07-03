@@ -24,6 +24,7 @@ type Video struct {
 	TranscodedPath    string
 	ThumbnailPath     string
 	Metadata          []byte
+	PendingDeleteAt   *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
