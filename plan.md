@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-03 09:02 +0800
+- 进度：完成本轮转码失败记录修复。只读查询最新失败记录后确认三类情况：① 最新一条仍是上一轮已修的 `file already closed` 进度假失败，关联视频 `ready` 且进度 100%，推断部署机 worker 仍需运行新二进制或该任务发生在部署窗口；② 同一短视频多次真实失败为 2160x4670 HEVC MOV 转 H.264 时 `h264_videotoolbox Cannot create compression session: -12903`，属于 AVC 硬编尺寸上限；③ 另有一条坏 AAC 文件在输出部分视频后音频滤镜失败，涉及“保留坏音轨/丢音轨/静音输出”的产品取舍，本轮不隐式改变。实现上给 `avc_compat` 输出加 4096 最长边上限，服务层把 ffprobe 源宽高传给 ffmpeg，超限时只等比例降采样（例如 2160x4670 → `scale=-2:4096`），普通尺寸和 HEVC 长视频不变。同步补 `AVC 硬编尺寸上限` 技术沉淀。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：先用新增测试得到红灯（`SourceWidth` / `SourceHeight` / `MaxVideoDimension` 字段不存在）；实现后 `go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoArgsForAvcCompat|TestBuildMaxDimension|TestBuildTranscodeVideoArgsForHevcPrimary' -count=1` 通过；`go test ./internal/services -run 'TestChooseTranscodeOutputProfile|TestBuildTranscodePlan|TestResolveProbeFields' -count=1` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`go vet ./...` 通过；`go test ./... -count=1` 通过；`git diff --check -- pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go internal/services/transcode.go internal/services/transcode_test.go CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go internal/services/transcode.go internal/services/transcode_test.go CONTEXT.md plan.md` 无输出。待提交。
+
+## 2026-07-03 08:55 +0800
+- 进度：继续排查转码队列失败记录。先确认工作区干净，再只读查询远程支撑层最新 `transcoding_jobs` 失败记录，重点区分上一轮已修的 `转码进度假失败` 与新的真实 ffmpeg/硬编失败。
+- 影响文件：待定，预计涉及 Go 转码链路、`CONTEXT.md`、`plan.md`
+- 验证：待执行定向 Go 测试、`go vet ./...`、`git diff --check`、乱码扫描。
+
 ## 2026-07-02 17:41 +0800
 - 进度：完成转码队列失败记录排查与修复。只读查询远程支撑层发现最近多条失败记录为 `ffmpeg progress read failed: read |0: file already closed`，关联视频多已 `ready` 且进度 100%，判定为 ffmpeg 进度管道读取顺序导致的假失败，而非媒体资产不可用。修复 `TranscodeVideo` 的等待顺序：先等进度读取自然结束，再 `Wait` 回收 ffmpeg 进程，避免 `Wait` 抢先关闭 stdout pipe。同步在 `CONTEXT.md` 增加 `转码进度假失败` 排障口径。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`CONTEXT.md`、`plan.md`

@@ -43,6 +43,8 @@ const (
 	transcodeProfileHEVCLongform = "hevc_longform"
 	transcodeProfileAVCCompat    = "avc_compat"
 
+	avcCompatMaxVideoDimension = 4096
+
 	resolutionTier4K    = "4k"
 	resolutionTier1080  = "1080"
 	resolutionTierOther = "other"
@@ -60,11 +62,12 @@ type transcodePlan struct {
 }
 
 type transcodeOutputProfile struct {
-	Path             string
-	PlaybackCodec    string
-	TranscodeProfile string
-	FFmpegProfile    ffmpeg.TranscodeProfile
-	SpatialAQ        bool
+	Path              string
+	PlaybackCodec     string
+	TranscodeProfile  string
+	FFmpegProfile     ffmpeg.TranscodeProfile
+	SpatialAQ         bool
+	MaxVideoDimension int
 }
 
 func NewTranscodeService(storageRoot string) *TranscodeService {
@@ -110,10 +113,13 @@ func (s *TranscodeService) Process(ctx context.Context, videoID uuid.UUID, input
 		})
 	}
 	transcodeOptions := ffmpeg.TranscodeOptions{
-		CRF:              plan.CRF,
-		VideoBitrateKbps: plan.TargetBitrateKbps,
-		SourceDuration:   sourceDurationSeconds,
-		SpatialAQ:        outputProfile.SpatialAQ,
+		CRF:               plan.CRF,
+		VideoBitrateKbps:  plan.TargetBitrateKbps,
+		SourceDuration:    sourceDurationSeconds,
+		SourceWidth:       inputProbe.Width,
+		SourceHeight:      inputProbe.Height,
+		MaxVideoDimension: outputProfile.MaxVideoDimension,
+		SpatialAQ:         outputProfile.SpatialAQ,
 		ProgressHandler: func(progress ffmpeg.TranscodeProgress) {
 			if progressHandler == nil {
 				return
@@ -318,11 +324,12 @@ func chooseTranscodeOutputProfile(outputDir, videoType string) transcodeOutputPr
 		}
 	}
 	return transcodeOutputProfile{
-		Path:             filepath.Join(outputDir, "video-avc.mp4"),
-		PlaybackCodec:    "h264",
-		TranscodeProfile: transcodeProfileAVCCompat,
-		FFmpegProfile:    ffmpeg.TranscodeProfileAVCCompat,
-		SpatialAQ:        false,
+		Path:              filepath.Join(outputDir, "video-avc.mp4"),
+		PlaybackCodec:     "h264",
+		TranscodeProfile:  transcodeProfileAVCCompat,
+		FFmpegProfile:     ffmpeg.TranscodeProfileAVCCompat,
+		SpatialAQ:         false,
+		MaxVideoDimension: avcCompatMaxVideoDimension,
 	}
 }
 

@@ -64,6 +64,28 @@ func TestBuildTranscodeVideoArgsForAvcCompat(t *testing.T) {
 	assertArgAbsent(t, args, "-spatial_aq")
 }
 
+func TestBuildTranscodeVideoArgsForAvcCompatDownscalesTallVideoForVideoToolbox(t *testing.T) {
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileAVCCompat, TranscodeOptions{
+		VideoBitrateKbps:  4200,
+		SourceWidth:       2160,
+		SourceHeight:      4670,
+		MaxVideoDimension: 4096,
+	})
+
+	assertArgPair(t, args, "-vf", "scale=-2:4096")
+}
+
+func TestBuildTranscodeVideoArgsForAvcCompatKeepsNormalDimensions(t *testing.T) {
+	args := buildTranscodeVideoArgs("/tmp/in.mov", "/tmp/out.mp4", TranscodeProfileAVCCompat, TranscodeOptions{
+		VideoBitrateKbps:  4200,
+		SourceWidth:       1080,
+		SourceHeight:      1920,
+		MaxVideoDimension: 4096,
+	})
+
+	assertArgAbsent(t, args, "-vf")
+}
+
 func TestBuildConvertSubtitleToWebVTTArgs(t *testing.T) {
 	args := buildConvertSubtitleToWebVTTArgs("/tmp/in.ass", "/tmp/out.vtt")
 

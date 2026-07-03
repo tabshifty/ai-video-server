@@ -412,6 +412,9 @@ func TestChooseTranscodeOutputProfileUsesHEVCForLongform(t *testing.T) {
 			if !profile.SpatialAQ {
 				t.Fatalf("expected spatial aq enabled for longform")
 			}
+			if profile.MaxVideoDimension != 0 {
+				t.Fatalf("did not expect max dimension for hevc longform, got=%d", profile.MaxVideoDimension)
+			}
 			if profile.TranscodeProfile != transcodeProfileHEVCLongform {
 				t.Fatalf("expected hevc longform metadata profile, got=%s", profile.TranscodeProfile)
 			}
@@ -445,6 +448,9 @@ func TestChooseTranscodeOutputProfileKeepsAVCForOtherTypes(t *testing.T) {
 			}
 			if profile.SpatialAQ {
 				t.Fatalf("did not expect spatial aq for non-longform")
+			}
+			if profile.MaxVideoDimension != avcCompatMaxVideoDimension {
+				t.Fatalf("expected avc max dimension %d, got=%d", avcCompatMaxVideoDimension, profile.MaxVideoDimension)
 			}
 			if profile.TranscodeProfile != transcodeProfileAVCCompat {
 				t.Fatalf("expected avc compat metadata profile, got=%s", profile.TranscodeProfile)

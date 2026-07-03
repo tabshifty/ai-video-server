@@ -55,13 +55,16 @@ type SubtitleProbe struct {
 	IsDefault bool
 }
 
-// TranscodeOptions controls H.265 transcoding behavior.
+// TranscodeOptions controls video transcoding behavior.
 type TranscodeOptions struct {
-	CRF              string
-	VideoBitrateKbps int
-	SourceDuration   int
-	SpatialAQ        bool
-	ProgressHandler  func(TranscodeProgress)
+	CRF               string
+	VideoBitrateKbps  int
+	SourceDuration    int
+	SourceWidth       int
+	SourceHeight      int
+	MaxVideoDimension int
+	SpatialAQ         bool
+	ProgressHandler   func(TranscodeProgress)
 }
 
 type TranscodeProfile string
@@ -100,10 +103,15 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		"-i", inputPath,
 		"-map", "0:v:0",
 		"-map", "0:a:0?",
+	}
+	if scaleFilter := buildMaxDimensionScaleFilter(options.SourceWidth, options.SourceHeight, options.MaxVideoDimension); scaleFilter != "" {
+		args = append(args, "-vf", scaleFilter)
+	}
+	args = append(args,
 		"-c:v", encoder,
 		"-pix_fmt", "yuv420p",
 		"-allow_sw", "0",
-	}
+	)
 	switch profile {
 	case TranscodeProfileHEVCPrimary:
 		args = append(args, "-tag:v", "hvc1")
@@ -134,6 +142,29 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		outputPath,
 	)
 	return args
+}
+
+func buildMaxDimensionScaleFilter(width, height, maxDimension int) string {
+	if width <= 0 || height <= 0 || maxDimension <= 0 {
+		return ""
+	}
+	if width <= maxDimension && height <= maxDimension {
+		return ""
+	}
+	if maxDimension%2 != 0 {
+		maxDimension--
+	}
+	if maxDimension < 2 {
+		return ""
+	}
+	switch {
+	case width > height:
+		return fmt.Sprintf("scale=%d:-2", maxDimension)
+	case height > width:
+		return fmt.Sprintf("scale=-2:%d", maxDimension)
+	default:
+		return fmt.Sprintf("scale=%d:%d", maxDimension, maxDimension)
+	}
 }
 
 func TranscodeVideo(ctx context.Context, inputPath, outputPath string, profile TranscodeProfile, options TranscodeOptions) error {
