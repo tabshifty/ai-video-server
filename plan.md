@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-03 15:41 +0800
+- 进度：完成管理端“待删除短视频”页面留白修复。页面已接回普通管理端 `Layout` 壳层，恢复侧栏、顶栏、命令面板和主内容留白；窄屏布局改为自然滚动并给队列/预览面板稳定高度，避免移动端空状态被压扁裁切。同步新增 router spec 锁定该页面必须接入普通壳层，并在 `CONTEXT.md` 沉淀 `admin 普通页面壳层` 术语。
+- 影响文件：`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：MCP 通过本机 mock API 预览 `/short-pending-delete`，桌面与移动截图确认壳层、留白和空状态正常；`cd admin-web && npm run test -- src/router/index.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 既有警告）；`git diff --check -- admin-web/src/views/PendingDeleteShorts.vue admin-web/src/router/index.spec.js CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' admin-web/src/views/PendingDeleteShorts.vue admin-web/src/router/index.spec.js CONTEXT.md plan.md` 无输出。
+
+## 2026-07-03 15:23 +0800
+- 进度：开始修复管理端“待删除短视频”页面留白问题。已通过 `grill-with-docs` 对照 `CONTEXT.md` 确认当前术语是“待删除短视频 / 短视频待删除队列”，不是已退役的“短视频审核”；改动范围收敛到该页面样式，不变更业务流程、路由或接口。
+- 影响文件：预计涉及 `admin-web/src/views/PendingDeleteShorts.vue`、`CONTEXT.md`、`plan.md`
+- 验证：待用 MCP 查看本地 dev 页面加载情况，并执行 `cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-07-03 15:09 +0800
 - 进度：完成短视频待删除队列复审修复。已将普通入口遗漏补齐：继续观看、喜欢/收藏仅返回 `ready` 视频，“我的上传”只排除 `pending_delete` 以保留上传生命周期记录；新增源文测试锁定这些过滤。管理端待删除页播放器区域已改为引用 `theme.css` 设计 token，不再扩散临时色值、圆角或阴影。`CONTEXT.md` 已把旧 `admin 短视频审核` 明确标记为退役术语，避免和新待删除队列混用。
 - 复审说明：独立 Standards/Spec 复审无阻塞问题；Spec 提醒“我的上传”不应误过滤非 ready，已修正并复测。`toolboxPage.spec.js` 的 ED2K 断言同步保留，因为 `ToolboxEd2kDownload.vue` 在本功能前已是“新建任务/创建任务”，旧断言会导致必跑 `npm run test` 失败；`AppPreferencesStoreTest.kt` 的 Main dispatcher 包装保留，因为尝试回退后 `:app:testDebugUnitTest` 出现协程未捕获异常失败，恢复后测试通过。

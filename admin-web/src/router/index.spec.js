@@ -14,7 +14,11 @@ describe('resolveRouterHistoryBase', () => {
 
   it('注册待删除短视频路由并隐藏壳层重复标题', () => {
     const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const page = readFileSync(new URL('../views/PendingDeleteShorts.vue', import.meta.url), 'utf8')
+
     expect(source).toContain("import PendingDeleteShorts from '../views/PendingDeleteShorts.vue'")
     expect(source).toContain("{ path: '/short-pending-delete', component: PendingDeleteShorts, meta: { hideShellPageHeader: true } }")
+    expect(page).toContain("import Layout from '../components/Layout.vue'")
+    expect(page).toMatch(/<Layout>\s*<div class="page-shell pending-delete-page">/)
   })
 })

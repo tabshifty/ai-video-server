@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, CircleCheck, Delete, Headset, Mute, Refresh, VideoCamera } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
+import Layout from '../components/Layout.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import {
@@ -249,132 +250,134 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="page-shell pending-delete-page">
-    <PageHeader title="待删除短视频" subtitle="逐条复核手机端加入待删除列表的短视频。">
-      <template #actions>
-        <el-button :icon="Refresh" :loading="listLoading" @click="refreshList">刷新列表</el-button>
-      </template>
-    </PageHeader>
+  <Layout>
+    <div class="page-shell pending-delete-page">
+      <PageHeader title="待删除短视频" subtitle="逐条复核手机端加入待删除列表的短视频。">
+        <template #actions>
+          <el-button :icon="Refresh" :loading="listLoading" @click="refreshList">刷新列表</el-button>
+        </template>
+      </PageHeader>
 
-    <section class="pending-delete-workbench" :class="{ 'is-empty': !hasItems }">
-      <aside class="pending-delete-queue" aria-label="待删除短视频队列">
-        <div class="pending-delete-queue__head">
-          <div>
-            <h2>待处理队列</h2>
-            <p>按队列顺序排列</p>
-          </div>
-          <span>{{ pageSummaryText }}</span>
-        </div>
-
-        <div class="pending-delete-queue__body">
-          <div v-loading="listLoading" class="pending-delete-queue__list">
-            <button
-              v-for="(item, index) in items"
-              :key="item.id"
-              class="pending-delete-item"
-              :class="{ 'is-active': index === currentIndex }"
-              type="button"
-              @click="selectIndex(index)"
-            >
-              <span class="pending-delete-item__thumb">
-                <el-icon><VideoCamera /></el-icon>
-              </span>
-              <span class="pending-delete-item__copy">
-                <strong>{{ item.title || '未命名短视频' }}</strong>
-                <em>短视频</em>
-              </span>
-            </button>
-
-            <EmptyState
-              v-if="!listLoading && items.length === 0"
-              class="pending-delete-queue__empty"
-              :icon="VideoCamera"
-              title="暂无待删除短视频"
-              description="当前队列为空。"
-            />
+      <section class="pending-delete-workbench" :class="{ 'is-empty': !hasItems }">
+        <aside class="pending-delete-queue" aria-label="待删除短视频队列">
+          <div class="pending-delete-queue__head">
+            <div>
+              <h2>待处理队列</h2>
+              <p>按队列顺序排列</p>
+            </div>
+            <span>{{ pageSummaryText }}</span>
           </div>
 
-          <div class="pending-delete-queue__pagination">
-            <AdminTablePagination
-              :current-page="page"
-              :page-size="PAGE_SIZE"
-              :total="total"
-              layout="prev, pager, next"
-              :disabled="listLoading || actionBusy"
-              @current-change="handlePageChange"
-            />
-          </div>
-        </div>
-      </aside>
+          <div class="pending-delete-queue__body">
+            <div v-loading="listLoading" class="pending-delete-queue__list">
+              <button
+                v-for="(item, index) in items"
+                :key="item.id"
+                class="pending-delete-item"
+                :class="{ 'is-active': index === currentIndex }"
+                type="button"
+                @click="selectIndex(index)"
+              >
+                <span class="pending-delete-item__thumb">
+                  <el-icon><VideoCamera /></el-icon>
+                </span>
+                <span class="pending-delete-item__copy">
+                  <strong>{{ item.title || '未命名短视频' }}</strong>
+                  <em>短视频</em>
+                </span>
+              </button>
 
-      <main class="pending-delete-player-panel" aria-label="待删除短视频播放器">
-        <EmptyState
-          v-if="!hasItems"
-          :icon="VideoCamera"
-          title="暂无待删除短视频"
-          description="处理完成后队列会停留在这里，不会跳转到其他页面。"
-        >
-          <template #action>
-            <el-button type="primary" :icon="Refresh" :loading="listLoading" @click="refreshList">刷新列表</el-button>
-          </template>
-        </EmptyState>
-
-        <template v-else>
-          <section class="pending-delete-stage" v-loading="detailLoading || playLoading">
-            <div class="pending-delete-video-frame">
-              <video
-                ref="videoRef"
-                class="pending-delete-video"
-                :src="playURL"
-                :muted="muted"
-                playsinline
-                controls
-                autoplay
-                loop
-                preload="metadata"
+              <EmptyState
+                v-if="!listLoading && items.length === 0"
+                class="pending-delete-queue__empty"
+                :icon="VideoCamera"
+                title="暂无待删除短视频"
+                description="当前队列为空。"
               />
             </div>
-            <div class="pending-delete-stage__top">
-              <span>{{ progressText }}</span>
-            </div>
-          </section>
 
-          <section class="pending-delete-detail">
-            <div class="pending-delete-detail__copy">
-              <h2>{{ activeTitle }}</h2>
-              <div class="pending-delete-detail__facts">
-                <span>时长 {{ formatShortVideoDuration(currentDetail?.duration_seconds) }}</span>
-                <span>{{ dimensionText(currentDetail) }}</span>
+            <div class="pending-delete-queue__pagination">
+              <AdminTablePagination
+                :current-page="page"
+                :page-size="PAGE_SIZE"
+                :total="total"
+                layout="prev, pager, next"
+                :disabled="listLoading || actionBusy"
+                @current-change="handlePageChange"
+              />
+            </div>
+          </div>
+        </aside>
+
+        <main class="pending-delete-player-panel" aria-label="待删除短视频播放器">
+          <EmptyState
+            v-if="!hasItems"
+            :icon="VideoCamera"
+            title="暂无待删除短视频"
+            description="处理完成后队列会停留在这里，不会跳转到其他页面。"
+          >
+            <template #action>
+              <el-button type="primary" :icon="Refresh" :loading="listLoading" @click="refreshList">刷新列表</el-button>
+            </template>
+          </EmptyState>
+
+          <template v-else>
+            <section class="pending-delete-stage" v-loading="detailLoading || playLoading">
+              <div class="pending-delete-video-frame">
+                <video
+                  ref="videoRef"
+                  class="pending-delete-video"
+                  :src="playURL"
+                  :muted="muted"
+                  playsinline
+                  controls
+                  autoplay
+                  loop
+                  preload="metadata"
+                />
               </div>
-            </div>
+              <div class="pending-delete-stage__top">
+                <span>{{ progressText }}</span>
+              </div>
+            </section>
 
-            <div class="pending-delete-detail__controls">
-              <el-button :icon="ArrowLeft" :disabled="!canGoPrevious || actionBusy" @click="goPrevious">上一条</el-button>
-              <el-button :icon="muted ? Mute : Headset" :disabled="actionBusy" @click="toggleSound">
-                {{ muted ? '开启声音' : '静音' }}
-              </el-button>
-              <el-button
-                type="primary"
-                :icon="CircleCheck"
-                :loading="actionBusy"
-                @click="keepCurrent"
-              >
-                保留
-              </el-button>
-              <el-button
-                type="danger"
-                :icon="Delete"
-                :loading="actionBusy"
-                @click="deleteCurrent"
-              >
-                最终删除
-              </el-button>
-            </div>
-          </section>
-        </template>
-      </main>
-    </section>
-  </div>
+            <section class="pending-delete-detail">
+              <div class="pending-delete-detail__copy">
+                <h2>{{ activeTitle }}</h2>
+                <div class="pending-delete-detail__facts">
+                  <span>时长 {{ formatShortVideoDuration(currentDetail?.duration_seconds) }}</span>
+                  <span>{{ dimensionText(currentDetail) }}</span>
+                </div>
+              </div>
+
+              <div class="pending-delete-detail__controls">
+                <el-button :icon="ArrowLeft" :disabled="!canGoPrevious || actionBusy" @click="goPrevious">上一条</el-button>
+                <el-button :icon="muted ? Mute : Headset" :disabled="actionBusy" @click="toggleSound">
+                  {{ muted ? '开启声音' : '静音' }}
+                </el-button>
+                <el-button
+                  type="primary"
+                  :icon="CircleCheck"
+                  :loading="actionBusy"
+                  @click="keepCurrent"
+                >
+                  保留
+                </el-button>
+                <el-button
+                  type="danger"
+                  :icon="Delete"
+                  :loading="actionBusy"
+                  @click="deleteCurrent"
+                >
+                  最终删除
+                </el-button>
+              </div>
+            </section>
+          </template>
+        </main>
+      </section>
+    </div>
+  </Layout>
 </template>
 
 <style scoped>
@@ -622,10 +625,24 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1023px) {
+  .pending-delete-page {
+    height: auto;
+    min-height: calc(100dvh - var(--admin-header-height) - var(--space-8));
+    overflow: visible;
+  }
+
   .pending-delete-workbench {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(140px, 30%) minmax(0, 1fr);
-    overflow: hidden;
+    grid-template-rows: auto minmax(420px, 1fr);
+    overflow: visible;
+  }
+
+  .pending-delete-queue {
+    max-height: min(440px, calc(100dvh - var(--admin-header-height) - var(--space-8)));
+  }
+
+  .pending-delete-player-panel {
+    min-height: 420px;
   }
 
   .pending-delete-detail {
