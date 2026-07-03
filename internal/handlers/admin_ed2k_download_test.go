@@ -84,13 +84,11 @@ func TestAdminEd2kDownloadStatusIsRedacted(t *testing.T) {
 		t.Fatalf("WriteFile(executor): %v", err)
 	}
 	if err := os.WriteFile(amulecmdPath, []byte(strings.Join([]string{
-		"#!/usr/bin/env bash",
-		"set -euo pipefail",
-		"if [[ \"$*\" == *\"status\"* ]]; then",
-		"  echo 'eD2k: Connected to server with LowID'",
-		"else",
-		"  echo 'help ok'",
-		"fi",
+		"#!/bin/sh",
+		"case \"$*\" in",
+		"  *status*) echo 'eD2k: Connected to server with LowID' ;;",
+		"  *) echo 'help ok' ;;",
+		"esac",
 	}, "\n")), 0o755); err != nil {
 		t.Fatalf("WriteFile(amulecmd): %v", err)
 	}
@@ -454,15 +452,15 @@ func TestCanDeleteEd2kDownloadTaskStatus(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]bool{
-		"queued":    true,
-		"running":   true,
-		"canceling": true,
-		"failed":    true,
-		"cancelled": true,
-		"completed": false,
+		"queued":        true,
+		"running":       true,
+		"canceling":     true,
+		"failed":        true,
+		"cancelled":     true,
+		"completed":     false,
 		"files_cleaned": false,
-		"deleted":   false,
-		"":          false,
+		"deleted":       false,
+		"":              false,
 	}
 
 	for status, want := range cases {

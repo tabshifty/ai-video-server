@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-03 09:13 +0800
+- 进度：完成两次转码队列修复的本地复审并修复发现项。评审范围从单个 `2050b6b` 扩大到 `32055b5..HEAD`，覆盖 `3b2e42c` 进度管道假失败修复与 `2050b6b` AVC 超高尺寸修复。发现并修复两点：① `TranscodeVideo` 虽已先等进度管道再 `Wait`，但错误优先级仍可能在真实 ffmpeg 失败同时伴随进度读取错误时返回 `progress read failed`，本轮抽出 `buildTranscodeVideoError` 并改为真实 ffmpeg 退出错误优先；② `TestAdminEd2kDownloadStatusIsRedacted` 的假 `amulecmd` 使用 `/usr/bin/env bash`，全量并发下偶发 3 秒超时被 kill，本轮改成 POSIX `sh` + `case`，消除 bash 启动依赖。另补 `buildMaxDimensionScaleFilter` 表驱动测试，覆盖横屏、竖屏、方形、正常尺寸、未知尺寸和 odd max。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/handlers/admin_ed2k_download_test.go`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./pkg/ffmpeg -run 'TestBuildTranscodeVideoError|TestBuildMaxDimensionScaleFilter|TestBuildTranscodeVideoArgsForAvcCompat|TestBuildTranscodeVideoArgsForHevcPrimary|TestIsEncoderUnavailableOutput' -count=1` 通过；`go test ./internal/handlers -run 'TestAdminEd2kDownloadStatusIsRedacted' -count=5` 通过；`go test ./pkg/ffmpeg ./internal/services ./internal/queue -count=1` 通过；`go test ./... -count=1` 通过；`go vet ./...` 通过；`git diff --check -- pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go internal/handlers/admin_ed2k_download_test.go CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' pkg/ffmpeg/ffmpeg.go pkg/ffmpeg/ffmpeg_test.go internal/handlers/admin_ed2k_download_test.go CONTEXT.md plan.md` 无输出。待提交。
+
+## 2026-07-03 09:06 +0800
+- 进度：开始评审上一轮 `AVC 硬编超高尺寸失败` 修复，评审范围按 `HEAD~1..HEAD`（`2050b6b 修复AVC硬编超高尺寸失败`）处理。将按 standards/spec 两条线检查是否符合仓库规则、转码语义和实际失败原因；若发现问题直接修复并复测。
+- 影响文件：待定，预计涉及 `pkg/ffmpeg`、`internal/services`、`CONTEXT.md`、`plan.md`
+- 验证：待执行评审发现项对应定向测试、`go test ./... -count=1`、`go vet ./...`、`git diff --check`、乱码扫描。
+
 ## 2026-07-03 09:02 +0800
 - 进度：完成本轮转码失败记录修复。只读查询最新失败记录后确认三类情况：① 最新一条仍是上一轮已修的 `file already closed` 进度假失败，关联视频 `ready` 且进度 100%，推断部署机 worker 仍需运行新二进制或该任务发生在部署窗口；② 同一短视频多次真实失败为 2160x4670 HEVC MOV 转 H.264 时 `h264_videotoolbox Cannot create compression session: -12903`，属于 AVC 硬编尺寸上限；③ 另有一条坏 AAC 文件在输出部分视频后音频滤镜失败，涉及“保留坏音轨/丢音轨/静音输出”的产品取舍，本轮不隐式改变。实现上给 `avc_compat` 输出加 4096 最长边上限，服务层把 ffprobe 源宽高传给 ffmpeg，超限时只等比例降采样（例如 2160x4670 → `scale=-2:4096`），普通尺寸和 HEVC 长视频不变。同步补 `AVC 硬编尺寸上限` 技术沉淀。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`internal/services/transcode.go`、`internal/services/transcode_test.go`、`CONTEXT.md`、`plan.md`

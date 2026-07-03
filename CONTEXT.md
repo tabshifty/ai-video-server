@@ -52,7 +52,7 @@
 - `压缩包分组工作区`：管理端批次详情中的分组区块按“全部文件 / 未分组 / 真实分组”三种视图切换；未分组固定置顶，真实分组按创建时间倒序展示，文件行保留 `group_name` 以便全量视图识别归属，分组卡片负责查看、处理、编辑和删除，批量动作负责创建、加入与移出。
 - `压缩包分组接口`：压缩包导入分组能力由后端独立接口承载，创建、更新、删除、加入、移出和处理分别通过 `/admin/archive-import/batches/:id/groups`、`/admin/archive-import/groups/:id`、`/admin/archive-import/groups/:id/files`、`/admin/archive-import/batches/:id/groups/remove-files`、`/admin/archive-import/groups/:id/process` 暴露；创建请求可以同时携带分组默认值与初始文件选择集。
 - `转码任务进度`：管理端语境里的“压缩进度”统一指后台 worker 已确认源视频时长后持续持久化的转码任务进度，不是前端本地估算。worker 若在外盘输出目录创建、源文件探测或 ffmpeg 启动前阻塞，进度应被视为“尚未进入转码阶段”，不能把 0% 直接归因于前端进度条损坏。
-- `转码进度假失败`：当转码任务记录显示进度已到 100%、关联视频已经 `ready`，但失败原因为进度管道读取关闭（例如 `file already closed`）时，应优先判定为任务监控噪声而非媒体资产不可用。排障时要用视频最终状态、输出文件和真实 ffmpeg stderr 共同判断，不能只看 `transcoding_jobs.error_message`。
+- `转码进度假失败`：当转码任务记录显示进度已到 100%、关联视频已经 `ready`，但失败原因为进度管道读取关闭（例如 `file already closed`）时，应优先判定为任务监控噪声而非媒体资产不可用。排障时要用视频最终状态、输出文件和真实 ffmpeg stderr 共同判断；若真实 ffmpeg 退出错误与进度读取错误同时存在，以 ffmpeg stderr 为准，不能只看 `transcoding_jobs.error_message`。
 - `任务监控轮询不重入`：管理端任务监控页的自动刷新必须在上一轮 `/admin/tasks` 请求结束后才允许发起下一轮；若请求耗时超过轮询间隔，应跳过本次自动刷新，而不是叠加并发请求。该页用请求序号避免旧响应覆盖新数据，若轮询重入会让旧请求 finally 不清理 `loading`，表现为页面长期 loading。
 - `任务监控视频标题`：管理端任务监控页用视频实体的 `title` 作为识别某个转码任务的首选名称；`video_id` 只是排障定位信息，不应是管理员判断“当前任务是哪个视频”的唯一线索。
 - `AVC 硬编尺寸上限`：短视频和 AV 等 `avc_compat` 输出走 H.264 VideoToolbox 硬编时，源视频最长边超过 4096 像素会被视为超出安全编码尺寸，应只做等比例降采样后再编码。普通尺寸视频不应被无故缩放；长视频 HEVC 输出不沿用该 AVC 上限。

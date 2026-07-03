@@ -2,8 +2,10 @@ package ffmpeg
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -84,6 +86,64 @@ func TestBuildTranscodeVideoArgsForAvcCompatKeepsNormalDimensions(t *testing.T) 
 	})
 
 	assertArgAbsent(t, args, "-vf")
+}
+
+func TestBuildMaxDimensionScaleFilter(t *testing.T) {
+	tests := []struct {
+		name         string
+		width        int
+		height       int
+		maxDimension int
+		want         string
+	}{
+		{name: "tall over max", width: 2160, height: 4670, maxDimension: 4096, want: "scale=-2:4096"},
+		{name: "wide over max", width: 4670, height: 2160, maxDimension: 4096, want: "scale=4096:-2"},
+		{name: "square over max", width: 5000, height: 5000, maxDimension: 4096, want: "scale=4096:4096"},
+		{name: "normal dimensions", width: 1080, height: 1920, maxDimension: 4096, want: ""},
+		{name: "unknown source dimensions", width: 0, height: 4670, maxDimension: 4096, want: ""},
+		{name: "odd max becomes even", width: 2160, height: 4670, maxDimension: 4095, want: "scale=-2:4094"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildMaxDimensionScaleFilter(tt.width, tt.height, tt.maxDimension)
+			if got != tt.want {
+				t.Fatalf("buildMaxDimensionScaleFilter()=%q want=%q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildTranscodeVideoErrorPrefersFFmpegFailureOverProgressReadFailure(t *testing.T) {
+	err := buildTranscodeVideoError(
+		TranscodeProfileAVCCompat,
+		errors.New("exit status 187"),
+		errors.New("read |0: file already closed"),
+		"Conversion failed!",
+	)
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "ffmpeg transcode failed") {
+		t.Fatalf("expected ffmpeg transcode failure, got %v", err)
+	}
+	if strings.Contains(err.Error(), "progress read failed") {
+		t.Fatalf("did not expect progress read failure to hide ffmpeg stderr, got %v", err)
+	}
+}
+
+func TestBuildTranscodeVideoErrorReportsProgressReadFailureWhenFFmpegSucceeded(t *testing.T) {
+	err := buildTranscodeVideoError(
+		TranscodeProfileAVCCompat,
+		nil,
+		errors.New("read |0: file already closed"),
+		"",
+	)
+
+	if err == nil || !strings.Contains(err.Error(), "ffmpeg progress read failed") {
+		t.Fatalf("expected progress read failure, got %v", err)
+	}
 }
 
 func TestBuildConvertSubtitleToWebVTTArgs(t *testing.T) {

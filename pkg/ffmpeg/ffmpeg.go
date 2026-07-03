@@ -187,19 +187,22 @@ func TranscodeVideo(ctx context.Context, inputPath, outputPath string, profile T
 
 	progressErr := <-progressErrCh
 	waitErr := cmd.Wait()
-	if progressErr != nil {
-		return fmt.Errorf("ffmpeg progress read failed: %w", progressErr)
-	}
+	return buildTranscodeVideoError(profile, waitErr, progressErr, stderr.String())
+}
+
+func buildTranscodeVideoError(profile TranscodeProfile, waitErr, progressErr error, stderr string) error {
 	if waitErr != nil {
-		output := stderr.String()
 		encoder := preferredHardwareHevcEncoder()
 		if profile == TranscodeProfileAVCCompat {
 			encoder = preferredHardwareAvcEncoder()
 		}
-		if isEncoderUnavailableOutput(output, encoder) {
+		if isEncoderUnavailableOutput(stderr, encoder) {
 			return fmt.Errorf("hardware encoder unavailable for %s: %s", profile, encoder)
 		}
-		return fmt.Errorf("ffmpeg transcode failed: %w, output=%s", waitErr, output)
+		return fmt.Errorf("ffmpeg transcode failed: %w, output=%s", waitErr, stderr)
+	}
+	if progressErr != nil {
+		return fmt.Errorf("ffmpeg progress read failed: %w", progressErr)
 	}
 	return nil
 }
