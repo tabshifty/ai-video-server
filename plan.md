@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-03 21:09 +0800
+- 进度：完成手机端安装包下载 `invalid abi` 短修。`downloadTVAppAPK` 现在同时接受 TV ABI 和手机端固定槽位 `single`；新增 handler 回归测试锁定 `/api/v1/app/releases/:id/download/single` 必须直接下发 APK 文件，同时保留未知槽位仍返回 `invalid abi`。
+- 影响文件：`internal/handlers/tv_apk.go`、`internal/handlers/tv_apk_download_test.go`、`plan.md`
+- 验证：`go test ./internal/handlers -run 'TestTVAppDownloadAPKAcceptsPhoneSingleSlot|TestTVAppDownloadAPKRejectsUnknownArtifactSlot' -count=1` 通过；`go test ./internal/handlers -count=1` 通过；`git diff --check -- internal/handlers/tv_apk.go internal/handlers/tv_apk_download_test.go plan.md` 通过；`rg -n $'\uFFFD' internal/handlers/tv_apk.go internal/handlers/tv_apk_download_test.go plan.md` 无输出。
+
+## 2026-07-03 21:03 +0800
+- 进度：开始短修手机端安装包下载 `invalid abi`。已定位到家庭下载页会为手机端产物生成 `.../download/single` 链接，但 `downloadTVAppAPK` 入口仍用 TV ABI 规则预校验，只接受 `arm64-v8a` / `armeabi-v7a`，导致手机端固定槽位 `single` 在到达 service 前就被拒绝。
+- 影响文件：预计涉及 `internal/handlers/tv_apk.go`、`internal/handlers/*test.go`、`plan.md`
+- 验证：待执行 `go test ./internal/handlers -run 'TestTVAppDownloadAPKAcceptsPhoneSingleSlot' -count=1`、`go test ./internal/handlers -count=1`、`git diff --check`、乱码扫描。
+
 ## 2026-07-03 20:18 +0800
 - 进度：完成压缩包导入大文件处理超时短修。管理端压缩包重试解包、单文件处理、分组处理和批次处理请求均显式关闭 Axios 默认 30 秒超时；API 回归测试已锁定这些长耗时动作必须 `timeout: 0`。同步在 `CONTEXT.md` 沉淀 `压缩包处理长耗时请求` 边界。
 - 影响文件：`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`

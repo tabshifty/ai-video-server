@@ -238,13 +238,16 @@ func (a *API) downloadTVAppAPK(c *gin.Context) {
 		bad(c, "invalid release id")
 		return
 	}
-	abi := models.TVNormalizeABI(c.Param("abi"))
-	if abi == "" {
+	artifact := models.TVNormalizeABI(c.Param("abi"))
+	if artifact == "" {
+		artifact = models.NormalizeReleaseArtifactSlot(models.AppClientTypeAndroidPhone, c.Param("abi"))
+	}
+	if artifact == "" {
 		bad(c, "invalid abi")
 		return
 	}
 
-	item, err := a.tvAPKSvc.FindReleaseAPK(c.Request.Context(), releaseID, abi)
+	item, err := a.tvAPKSvc.FindReleaseAPK(c.Request.Context(), releaseID, artifact)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || repository.IsNotFound(err) {
 			responseError(c, 404, "apk not found")
