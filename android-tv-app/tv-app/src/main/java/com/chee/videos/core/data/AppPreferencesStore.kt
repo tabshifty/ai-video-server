@@ -39,6 +39,7 @@ class AppPreferencesStore @Inject constructor(
         val tvAudioPreferences = stringPreferencesKey("tv_audio_language_preferences")
         val tvSeekStepSeconds = stringPreferencesKey("tv_seek_step_seconds")
         val tvSeriesAutoplayEnabled = booleanPreferencesKey("tv_series_autoplay_enabled")
+        val tvDeviceFallbackId = stringPreferencesKey("tv_device_fallback_id")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -147,6 +148,19 @@ class AppPreferencesStore @Inject constructor(
     suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.tvSeriesAutoplayEnabled] = enabled
+        }
+    }
+
+    suspend fun readTvDeviceFallbackId(): String? =
+        dataStore.data.first()[Keys.tvDeviceFallbackId]?.takeIf { it.isNotBlank() }
+
+    suspend fun saveTvDeviceFallbackId(value: String) {
+        val normalized = value.trim()
+        if (normalized.isBlank()) {
+            return
+        }
+        dataStore.edit { prefs ->
+            prefs[Keys.tvDeviceFallbackId] = normalized
         }
     }
 

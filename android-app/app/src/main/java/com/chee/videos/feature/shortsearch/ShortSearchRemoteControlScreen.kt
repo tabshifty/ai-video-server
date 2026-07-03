@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -26,6 +27,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -70,10 +74,6 @@ class ShortSearchRemoteControlViewModel @Inject constructor(
     val uiState: StateFlow<ShortSearchRemoteControlUiState> = _uiState.asStateFlow()
     private var pollingJob: Job? = null
 
-    init {
-        startPolling()
-    }
-
     fun previous() {
         runAction { videoRepository.tvRemotePrevious(sessionId) }
     }
@@ -88,6 +88,14 @@ class ShortSearchRemoteControlViewModel @Inject constructor(
 
     fun refreshNow() {
         viewModelScope.launch { refreshSession() }
+    }
+
+    fun setPollingEnabled(enabled: Boolean) {
+        if (enabled) {
+            startPolling()
+        } else {
+            stopPolling()
+        }
     }
 
     private fun runAction(block: suspend () -> Result<TvRemoteSessionDto>) {
@@ -112,6 +120,9 @@ class ShortSearchRemoteControlViewModel @Inject constructor(
     }
 
     private fun startPolling() {
+        if (pollingJob?.isActive == true) {
+            return
+        }
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
             while (true) {
@@ -122,6 +133,11 @@ class ShortSearchRemoteControlViewModel @Inject constructor(
                 delay(5_000L)
             }
         }
+    }
+
+    private fun stopPolling() {
+        pollingJob?.cancel()
+        pollingJob = null
     }
 
     private suspend fun refreshSession() {
@@ -163,6 +179,30 @@ fun ShortSearchRemoteControlScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    viewModel.setPollingEnabled(true)
+                    viewModel.refreshNow()
+                }
+
+                Lifecycle.Event.ON_STOP -> viewModel.setPollingEnabled(false)
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            viewModel.setPollingEnabled(true)
+            viewModel.refreshNow()
+        }
+        onDispose {
+            viewModel.setPollingEnabled(false)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(uiState.endedMessage) {
         val message = uiState.endedMessage ?: return@LaunchedEffect

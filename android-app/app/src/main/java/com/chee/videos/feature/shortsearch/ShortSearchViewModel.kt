@@ -84,10 +84,54 @@ internal fun buildShortSearchRemoteItems(items: List<VideoListItemDto>): List<Tv
 internal fun sortTvDevicesForSelection(items: List<TvDeviceDto>, preferredDeviceId: String?): List<TvDeviceDto> {
     val preferred = preferredDeviceId?.trim().orEmpty()
     return items.sortedWith(
-        compareByDescending<TvDeviceDto> { it.deviceId == preferred }
-            .thenByDescending { it.isOnline }
-            .thenBy { it.deviceName },
+        compareByDescending<TvDeviceDto> { it.isOnline }
+            .thenByDescending { it.deviceId == preferred }
+            .thenByDescending { it.lastSeenAt.orEmpty() }
+            .thenByDescending { it.lastAuthorizedAt.orEmpty() }
+            .thenBy { it.deviceName }
     )
+}
+
+internal fun resolveTvDeviceSelection(
+    items: List<TvDeviceDto>,
+    currentSelectedDeviceId: String?,
+    preferredDeviceId: String?,
+): String? {
+    val currentSelected = currentSelectedDeviceId?.trim().orEmpty()
+    if (currentSelected.isNotBlank() && items.any { it.deviceId == currentSelected }) {
+        return currentSelected
+    }
+    val preferred = preferredDeviceId?.trim().orEmpty()
+    val onlinePreferred = items.firstOrNull { it.deviceId == preferred && it.isOnline }?.deviceId
+    if (onlinePreferred != null) {
+        return onlinePreferred
+    }
+    val firstOnline = items.firstOrNull { it.isOnline }?.deviceId
+    if (firstOnline != null) {
+        return firstOnline
+    }
+    return items.firstOrNull { it.deviceId == preferred }?.deviceId
+        ?: items.firstOrNull()?.deviceId
+}
+
+internal fun pickTvDeviceForLaunch(items: List<TvDeviceDto>, selectedDeviceId: String): TvDeviceDto? {
+    val selected = selectedDeviceId.trim()
+    return items.firstOrNull { it.deviceId == selected }
+        ?: items.firstOrNull()
+}
+
+internal fun shouldPersistTvDevicePreference(device: TvDeviceDto?): Boolean {
+    return device?.isOnline == true
+}
+
+internal fun resolveTvDeviceRequestTarget(
+    items: List<TvDeviceDto>,
+    selectedDeviceId: String,
+): String? {
+    return pickTvDeviceForLaunch(items, selectedDeviceId)
+        ?.takeIf(::shouldPersistTvDevicePreference)
+        ?.deviceId
+        ?: pickTvDeviceForLaunch(items, selectedDeviceId)?.deviceId
 }
 
 internal fun resolveShortSearchRemoteStartIndex(items: List<VideoListItemDto>, playingVideoId: String?): Int? {
@@ -203,10 +247,11 @@ class ShortSearchViewModel @Inject constructor(
                         it.copy(
                             tvDevices = sorted,
                             castDevicesLoading = false,
-                            selectedTvDeviceId = it.selectedTvDeviceId
-                                ?.takeIf { selected -> sorted.any { device -> device.deviceId == selected } }
-                                ?: preferredDeviceId?.takeIf { selected -> sorted.any { device -> device.deviceId == selected } }
-                                ?: sorted.firstOrNull()?.deviceId,
+                            selectedTvDeviceId = resolveTvDeviceSelection(
+                                items = sorted,
+                                currentSelectedDeviceId = it.selectedTvDeviceId,
+                                preferredDeviceId = preferredDeviceId,
+                            ),
                             castErrorMessage = null,
                         )
                     }
@@ -257,12 +302,24 @@ class ShortSearchViewModel @Inject constructor(
         }
         _uiState.update { it.copy(castLaunching = true, castErrorMessage = null) }
         viewModelScope.launch {
+            val launchTarget = resolveTvDeviceRequestTarget(state.tvDevices, selectedDeviceId)
+            if (launchTarget.isNullOrBlank()) {
+                _uiState.update {
+                    it.copy(
+                        castLaunching = false,
+                        castErrorMessage = "请选择要投放的电视",
+                    )
+                }
+                return@launch
+            }
             videoRepository.createTvRemoteSession(
-                deviceId = selectedDeviceId,
+                deviceId = launchTarget,
                 items = snapshotItems,
                 currentIndex = currentIndex,
             ).onSuccess { session ->
-                videoRepository.saveLastTvRemoteDeviceId(selectedDeviceId)
+                if (shouldPersistTvDevicePreference(pickTvDeviceForLaunch(state.tvDevices, launchTarget))) {
+                    videoRepository.saveLastTvRemoteDeviceId(launchTarget)
+                }
                 _uiState.update {
                     it.copy(
                         castSheetVisible = false,

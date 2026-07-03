@@ -117,7 +117,21 @@ class ShortSearchViewModelStateTest {
             preferredDeviceId = "tv-1",
         )
 
-        assertEquals(listOf("tv-1", "tv-2"), devices.map { it.deviceId })
+        assertEquals(listOf("tv-2", "tv-1"), devices.map { it.deviceId })
+    }
+
+    @Test
+    fun resolveTvDeviceSelection_prefersOnlineDeviceOverOfflineHistory() {
+        val selected = resolveTvDeviceSelection(
+            items = listOf(
+                TvDeviceDto(deviceId = "tv-2", deviceName = "客厅电视", isOnline = true),
+                TvDeviceDto(deviceId = "tv-1", deviceName = "卧室电视", isOnline = false),
+            ),
+            currentSelectedDeviceId = null,
+            preferredDeviceId = "tv-1",
+        )
+
+        assertEquals("tv-2", selected)
     }
 
     @Test

@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +36,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -112,6 +116,9 @@ fun TvShellApp(
     }
 }
 
+internal fun isTvRemotePlaybackRoute(route: String?): Boolean =
+    route?.startsWith("tv/remote-shorts/") == true
+
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun TvAuthenticatedNav(
@@ -131,6 +138,7 @@ private fun TvAuthenticatedNav(
     val homeContentFocusRequester = remember { FocusRequester() }
     var homeMenuFocusTarget by remember { mutableStateOf<TvHomeMenuItem?>(null) }
     val activity = LocalContext.current.findActivity()
+    val lifecycleOwner = LocalLifecycleOwner.current
     var rootExitPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showRootExitPrompt by remember { mutableStateOf(false) }
 
@@ -166,14 +174,41 @@ private fun TvAuthenticatedNav(
         }
     }
 
+    DisposableEffect(lifecycleOwner, remoteCoordinatorViewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    remoteCoordinatorViewModel.setPollingEnabled(true)
+                    remoteCoordinatorViewModel.refreshNow()
+                }
+
+                Lifecycle.Event.ON_STOP -> remoteCoordinatorViewModel.setPollingEnabled(false)
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            remoteCoordinatorViewModel.setPollingEnabled(true)
+            remoteCoordinatorViewModel.refreshNow()
+        }
+        onDispose {
+            remoteCoordinatorViewModel.setPollingEnabled(false)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(remoteCoordinatorState.activeSessionId, currentRoute) {
         val activeSessionId = remoteCoordinatorState.activeSessionId ?: return@LaunchedEffect
         val targetRoute = buildTvRemotePlaybackRoute(activeSessionId)
+        val currentEntry = navBackStackEntry
         if (currentRoute == targetRoute) {
             return@LaunchedEffect
         }
         navController.navigate(targetRoute) {
             launchSingleTop = true
+            if (isTvRemotePlaybackRoute(currentRoute) && currentEntry != null) {
+                popUpTo(currentEntry.destination.id) { inclusive = true }
+            }
         }
     }
 
@@ -297,6 +332,7 @@ private fun TvAuthenticatedNav(
                     ) {
                         TvRemotePlaybackScreen(
                             accessToken = accessToken,
+                            onSessionEnded = remoteCoordinatorViewModel::dismissSession,
                             onBack = { navController.popBackStack() },
                         )
                     }

@@ -122,7 +122,12 @@ func (a *API) GetCurrentTVRemoteSessionForDevice(c *gin.Context) {
 		response.Error(c, 401, "unauthorized")
 		return
 	}
-	payload, err := a.appSvc.GetCurrentTVRemoteSessionForDevice(c.Request.Context(), userID, c.Query("device_id"))
+	payload, err := a.appSvc.GetCurrentTVRemoteSessionForDevice(
+		c.Request.Context(),
+		userID,
+		c.Query("device_id"),
+		c.Query("legacy_device_id"),
+	)
 	if err != nil {
 		if repository.IsNotFound(err) {
 			response.Error(c, 404, "tv device not found")

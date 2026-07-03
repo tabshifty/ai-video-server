@@ -17,6 +17,9 @@ class TvRemotePlaybackNavigationSpecTest {
             "popEnterTransition = { EnterTransition.None }",
             "popExitTransition = { ExitTransition.None }",
             "TvRemotePlaybackScreen(",
+            "val currentEntry = navBackStackEntry",
+            "if (isTvRemotePlaybackRoute(currentRoute) && currentEntry != null) {",
+            "popUpTo(currentEntry.destination.id) { inclusive = true }",
         ).forEach { line ->
             assertTrue("远程投放页必须包含 $line", source.contains(line))
         }

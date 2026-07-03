@@ -216,12 +216,13 @@ class VideoRepository @Inject constructor(
         }
     }
 
-    suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> {
+    suspend fun fetchCurrentTvRemoteSession(deviceId: String, legacyDeviceId: String? = null): Result<TvRemoteSessionDto?> {
         return callWithAuth { baseUrl, bearer ->
             api.getCurrentTvRemoteSessionForDevice(
                 url = UrlBuilder.tvRemoteCurrentSessionForDevice(baseUrl),
                 authorization = bearer,
                 deviceId = deviceId.trim(),
+                legacyDeviceId = legacyDeviceId?.trim()?.takeIf { it.isNotBlank() },
             )
         }.map { it.session }
     }

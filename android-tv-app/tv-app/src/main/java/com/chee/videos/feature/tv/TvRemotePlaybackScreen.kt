@@ -31,7 +31,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,6 +45,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -93,13 +95,10 @@ class TvRemotePlaybackViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val sessionId = savedStateHandle.get<String>(TvRemotePlaybackSessionIdArg).orEmpty()
+    val remoteSessionId: String get() = sessionId
     private val _uiState = MutableStateFlow(TvRemotePlaybackUiState())
     val uiState: StateFlow<TvRemotePlaybackUiState> = _uiState.asStateFlow()
     private var pollingJob: Job? = null
-
-    init {
-        startPolling()
-    }
 
     fun previous() {
         runAction { repository.tvRemotePrevious(sessionId) }
@@ -109,11 +108,22 @@ class TvRemotePlaybackViewModel @Inject constructor(
         runAction { repository.tvRemoteNext(sessionId) }
     }
 
-    suspend fun endSession() {
-        repository.endTvRemoteSession(sessionId)
+    fun refreshNow() {
+        viewModelScope.launch { refreshSession() }
+    }
+
+    fun setPollingEnabled(enabled: Boolean) {
+        if (enabled) {
+            startPolling()
+        } else {
+            stopPolling()
+        }
     }
 
     private fun startPolling() {
+        if (pollingJob?.isActive == true) {
+            return
+        }
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
             while (true) {
@@ -124,6 +134,11 @@ class TvRemotePlaybackViewModel @Inject constructor(
                 delay(5_000L)
             }
         }
+    }
+
+    private fun stopPolling() {
+        pollingJob?.cancel()
+        pollingJob = null
     }
 
     private fun runAction(block: suspend () -> Result<TvRemoteSessionDto>) {
@@ -191,12 +206,13 @@ class TvRemotePlaybackViewModel @Inject constructor(
 @Composable
 fun TvRemotePlaybackScreen(
     accessToken: String,
+    onSessionEnded: (String) -> Unit = {},
     onBack: () -> Unit,
     viewModel: TvRemotePlaybackViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
             if (accessToken.isNotBlank()) {
@@ -217,11 +233,32 @@ fun TvRemotePlaybackScreen(
     val currentItem = session?.currentItem ?: session?.items?.getOrNull(session.currentIndex)
     val currentVideoId = session?.currentVideoId ?: currentItem?.videoId.orEmpty()
 
-    BackHandler {
-        coroutineScope.launch {
-            viewModel.endSession()
-            onBack()
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    viewModel.setPollingEnabled(true)
+                    viewModel.refreshNow()
+                }
+
+                Lifecycle.Event.ON_STOP -> viewModel.setPollingEnabled(false)
+                else -> Unit
+            }
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            viewModel.setPollingEnabled(true)
+            viewModel.refreshNow()
+        }
+        onDispose {
+            viewModel.setPollingEnabled(false)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    BackHandler {
+        onSessionEnded(viewModel.remoteSessionId)
+        onBack()
     }
 
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
@@ -315,6 +352,7 @@ fun TvRemotePlaybackScreen(
 
             session.status == "ended" -> {
                 LaunchedEffect(session.sessionId, session.status) {
+                    onSessionEnded(session.sessionId)
                     onBack()
                 }
             }

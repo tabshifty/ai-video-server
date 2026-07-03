@@ -144,6 +144,7 @@ interface ApiService {
         @Url url: String,
         @Header("Authorization") authorization: String,
         @Query("device_id") deviceId: String,
+        @Query("legacy_device_id") legacyDeviceId: String? = null,
     ): ApiEnvelope<TvRemoteDeviceSessionPayload>
 
     @POST

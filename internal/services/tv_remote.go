@@ -19,7 +19,6 @@ const (
 	tvRemoteSessionStatusActive = "active"
 	tvRemoteSessionStatusEnded  = "ended"
 	tvRemoteDeviceSeenTTL       = 30 * time.Second
-	maxTVRemoteSessionItems     = 100
 )
 
 var (
@@ -133,35 +132,52 @@ func (s *AppService) StepTVRemoteSession(ctx context.Context, userID uuid.UUID, 
 	return s.UpdateTVRemoteSessionCurrentIndex(ctx, userID, sessionID, nextIndex)
 }
 
-func (s *AppService) GetCurrentTVRemoteSessionForDevice(ctx context.Context, userID uuid.UUID, deviceID string) (*models.TvRemoteSession, error) {
-	return s.GetCurrentTVRemoteSessionForDeviceAt(ctx, userID, deviceID, time.Now().UTC())
+func (s *AppService) GetCurrentTVRemoteSessionForDevice(
+	ctx context.Context,
+	userID uuid.UUID,
+	deviceID string,
+	legacyDeviceID string,
+) (*models.TvRemoteSession, error) {
+	return s.GetCurrentTVRemoteSessionForDeviceAt(ctx, userID, deviceID, legacyDeviceID, time.Now().UTC())
 }
 
 func (s *AppService) GetCurrentTVRemoteSessionForDeviceAt(
 	ctx context.Context,
 	userID uuid.UUID,
 	deviceID string,
+	legacyDeviceID string,
 	now time.Time,
 ) (*models.TvRemoteSession, error) {
 	if s.tvRemoteRepo == nil {
 		return nil, fmt.Errorf("tv remote repository is not configured")
 	}
-	normalizedDeviceID := strings.TrimSpace(deviceID)
-	if normalizedDeviceID == "" {
+	candidateIDs := buildTVRemoteDeviceCandidates(deviceID, legacyDeviceID)
+	if len(candidateIDs) == 0 {
 		return nil, fmt.Errorf("device id is required")
 	}
-	if err := s.tvRemoteRepo.TouchTVDeviceSeen(ctx, userID, normalizedDeviceID, tvRemotePlatform, now); err != nil {
-		return nil, err
-	}
-	session, err := s.tvRemoteRepo.GetActiveTVRemoteSessionForDevice(ctx, userID, normalizedDeviceID, tvRemotePlatform)
-	if err != nil {
-		if repository.IsNotFound(err) {
-			return nil, nil
+	touchedAny := false
+	for _, candidateID := range candidateIDs {
+		if err := s.tvRemoteRepo.TouchTVDeviceSeen(ctx, userID, candidateID, tvRemotePlatform, now); err != nil {
+			if repository.IsNotFound(err) {
+				continue
+			}
+			return nil, err
 		}
-		return nil, err
+		touchedAny = true
+		session, err := s.tvRemoteRepo.GetActiveTVRemoteSessionForDevice(ctx, userID, candidateID, tvRemotePlatform)
+		if err != nil {
+			if repository.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		decorated := decorateTVRemoteSession(session)
+		return &decorated, nil
 	}
-	decorated := decorateTVRemoteSession(session)
-	return &decorated, nil
+	if touchedAny {
+		return nil, nil
+	}
+	return nil, pgx.ErrNoRows
 }
 
 func (s *AppService) UpdateTVRemoteSessionCurrentIndex(
@@ -236,9 +252,6 @@ func normalizeTVRemoteSessionItems(items []models.TvRemoteSessionItem) ([]models
 	if len(normalized) == 0 {
 		return nil, ErrTVRemoteItemsRequired
 	}
-	if len(normalized) > maxTVRemoteSessionItems {
-		normalized = normalized[:maxTVRemoteSessionItems]
-	}
 	return normalized, nil
 }
 
@@ -287,4 +300,21 @@ func normalizeTVRemoteEndedReason(reason string) string {
 		return trimmed[:32]
 	}
 	return trimmed
+}
+
+func buildTVRemoteDeviceCandidates(deviceID string, legacyDeviceID string) []string {
+	seen := make(map[string]struct{}, 2)
+	items := make([]string, 0, 2)
+	for _, raw := range []string{deviceID, legacyDeviceID} {
+		normalized := strings.TrimSpace(raw)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		items = append(items, normalized)
+	}
+	return items
 }

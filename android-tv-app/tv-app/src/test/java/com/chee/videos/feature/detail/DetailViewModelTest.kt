@@ -334,6 +334,7 @@ private class FakeDetailApiService : ApiService {
         url: String,
         authorization: String,
         deviceId: String,
+        legacyDeviceId: String?,
     ): ApiEnvelope<TvRemoteDeviceSessionPayload> = error("unused")
 
     override suspend fun tvRemotePrevious(
@@ -528,6 +529,7 @@ private class DelayedDetailApiService : ApiService {
         url: String,
         authorization: String,
         deviceId: String,
+        legacyDeviceId: String?,
     ): ApiEnvelope<TvRemoteDeviceSessionPayload> = error("unused")
 
     override suspend fun tvRemotePrevious(

@@ -1,5 +1,4 @@
 package com.chee.videos.tv
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -56,6 +55,7 @@ data class TvPairingUiState(
 @HiltViewModel
 class TvPairingViewModel @Inject constructor(
     private val repository: TvAuthRepository,
+    private val deviceIdentityProvider: TvDeviceIdentityProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(TvPairingUiState())
     val uiState: StateFlow<TvPairingUiState> = _uiState.asStateFlow()
@@ -64,7 +64,7 @@ class TvPairingViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, errorMessage = null, statusMessage = null) }
             repository.createSession(
-                deviceId = buildTvDeviceId(),
+                deviceId = deviceIdentityProvider.currentDeviceId(),
                 deviceName = buildTvDeviceName(),
             ).onSuccess { payload ->
                 _uiState.update {

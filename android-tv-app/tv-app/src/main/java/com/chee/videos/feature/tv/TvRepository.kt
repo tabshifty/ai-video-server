@@ -25,7 +25,7 @@ interface TvRepository {
     suspend fun fetchIptvChannels(): Result<TvIptvPayload>
     suspend fun fetchShortFeed(pageSize: Int = 20, excludeIds: List<String> = emptyList()): Result<List<FeedVideoDto>>
     suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto>
-    suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?>
+    suspend fun fetchCurrentTvRemoteSession(deviceId: String, legacyDeviceId: String? = null): Result<TvRemoteSessionDto?>
     suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto>
     suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto>
     suspend fun endTvRemoteSession(sessionId: String, endedReason: String = "tv_back"): Result<Unit>
@@ -71,8 +71,8 @@ class NetworkTvRepository @Inject constructor(
     override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
         videoRepository.fetchTvRemoteSession(sessionId)
 
-    override suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> =
-        videoRepository.fetchCurrentTvRemoteSession(deviceId)
+    override suspend fun fetchCurrentTvRemoteSession(deviceId: String, legacyDeviceId: String?): Result<TvRemoteSessionDto?> =
+        videoRepository.fetchCurrentTvRemoteSession(deviceId, legacyDeviceId)
 
     override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
         videoRepository.tvRemotePrevious(sessionId)
