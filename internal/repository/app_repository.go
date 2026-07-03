@@ -190,6 +190,7 @@ JOIN videos v ON v.id = a.video_id
 WHERE a.user_id=$1
   AND a.action_type='view'
   AND a.watch_seconds > 0
+  AND v.status='ready'
 `, userID).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count continue watching: %w", err)
@@ -202,6 +203,7 @@ JOIN videos v ON v.id = a.video_id
 WHERE a.user_id=$1
   AND a.action_type='view'
   AND a.watch_seconds > 0
+  AND v.status='ready'
 ORDER BY a.updated_at DESC
 LIMIT $2 OFFSET $3
 `, userID, limit, offset)
@@ -486,14 +488,14 @@ LIMIT $2 OFFSET $3
 
 func (r *VideoRepository) GetUploadedVideos(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error) {
 	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM videos WHERE user_id=$1`, userID).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM videos WHERE user_id=$1 AND status<>'pending_delete'`, userID).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count uploaded videos: %w", err)
 	}
 
 	rows, err := r.pool.Query(ctx, `
 SELECT id, title, type, thumbnail_path, transcoded_path, duration_seconds, created_at, COALESCE(metadata, '{}'::jsonb)
 FROM videos
-WHERE user_id=$1
+WHERE user_id=$1 AND status<>'pending_delete'
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
 `, userID, limit, offset)
@@ -526,7 +528,8 @@ func (r *VideoRepository) GetActionVideos(ctx context.Context, userID uuid.UUID,
 	if err := r.pool.QueryRow(ctx, `
 SELECT COUNT(*)
 FROM user_video_actions a
-WHERE a.user_id=$1 AND a.action_type=$2
+JOIN videos v ON v.id = a.video_id
+WHERE a.user_id=$1 AND a.action_type=$2 AND v.status='ready'
 `, userID, action).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count action videos: %w", err)
 	}
@@ -535,7 +538,7 @@ WHERE a.user_id=$1 AND a.action_type=$2
 SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, a.updated_at, COALESCE(v.metadata, '{}'::jsonb)
 FROM user_video_actions a
 JOIN videos v ON v.id = a.video_id
-WHERE a.user_id=$1 AND a.action_type=$2
+WHERE a.user_id=$1 AND a.action_type=$2 AND v.status='ready'
 ORDER BY a.updated_at DESC
 LIMIT $3 OFFSET $4
 `, userID, action, limit, offset)

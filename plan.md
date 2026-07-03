@@ -2,6 +2,17 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-03 15:09 +0800
+- 进度：完成短视频待删除队列复审修复。已将普通入口遗漏补齐：继续观看、喜欢/收藏仅返回 `ready` 视频，“我的上传”只排除 `pending_delete` 以保留上传生命周期记录；新增源文测试锁定这些过滤。管理端待删除页播放器区域已改为引用 `theme.css` 设计 token，不再扩散临时色值、圆角或阴影。`CONTEXT.md` 已把旧 `admin 短视频审核` 明确标记为退役术语，避免和新待删除队列混用。
+- 复审说明：独立 Standards/Spec 复审无阻塞问题；Spec 提醒“我的上传”不应误过滤非 ready，已修正并复测。`toolboxPage.spec.js` 的 ED2K 断言同步保留，因为 `ToolboxEd2kDownload.vue` 在本功能前已是“新建任务/创建任务”，旧断言会导致必跑 `npm run test` 失败；`AppPreferencesStoreTest.kt` 的 Main dispatcher 包装保留，因为尝试回退后 `:app:testDebugUnitTest` 出现协程未捕获异常失败，恢复后测试通过。
+- 影响文件：`internal/repository/app_repository.go`、`internal/repository/app_repository_pending_delete_test.go`、`admin-web/src/views/PendingDeleteShorts.vue`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/repository -run 'TestAppListQueriesHidePendingDeleteVideos|TestShortPendingDelete|TestUpdateVideoStatusRejects|TestValidateAdminVideoStatusEdit' -count=1` 通过；`go test ./internal/repository ./internal/handlers -count=1` 通过；`go test ./... -count=1` 通过；`go vet ./...` 通过；`cd admin-web && npm run test` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk 大小警告）；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` 通过（仅现有 AGP/compileSdk 警告）；`git diff --check` 与乱码扫描通过。
+
+## 2026-07-03 14:55 +0800
+- 进度：开始对最新提交 `cc225f5 实现短视频待删除队列` 做复审修复，审查范围按 `HEAD~1...HEAD`。将按仓库规则、用户确认过的待删除队列需求、后端状态机并发风险、管理端替换完整性、手机端管理员入口与二次确认行为逐项核对；发现问题直接修复并复测，直到独立复审无阻塞问题。
+- 影响文件：预计涉及 `plan.md`，如发现问题可能触及 Go 后端、`admin-web`、`android-app`、`CONTEXT.md`
+- 验证：待执行独立 standards/spec 评审、必要定向测试、`go test ./... -count=1`、`go vet ./...`、`cd admin-web && npm run test && npm run build`、`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug`、`git diff --check`、乱码扫描。
+
 ## 2026-07-03 14:47 +0800
 - 进度：完成“短视频待删除队列”大改并收口复审问题。后端在通用编辑与状态编辑中补 `SELECT FOR UPDATE` 行锁和事务内状态校验，迁移增加 `videos_pending_delete_short_check`，内部原始 `UpdateVideoStatus` 禁止绕过专用工作流直接写 `pending_delete`；管理端旧“短视频审核”已替换为“待删除短视频”列表，保留/最终删除二次确认流程不展示提名人和时间；手机端仅管理员在主短视频流右侧看到图标按钮，二次确认后加入待删除列表。独立后端复审与前端/手机端复审均无阻塞问题。
 - 影响文件：`migrations/0031_short_pending_delete.*.sql`、`internal/models/models.go`、`internal/repository/*.go`、`internal/handlers/*.go`、`admin-web/src/api/admin.js`、`admin-web/src/router/index.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/views/VideoList.vue`、相关 admin-web spec、`android-app/app/src/main/java/com/chee/videos/...`、相关 Android 单测、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

@@ -539,7 +539,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   place-items: center;
   padding: var(--space-4);
-  background: #020617;
+  background: var(--slate-950);
   overflow: hidden;
 }
 
@@ -549,19 +549,19 @@ onBeforeUnmount(() => {
   height: min(100%, 760px);
   max-height: calc(100% - var(--space-8));
   aspect-ratio: 9 / 16;
-  padding: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.36);
-  border-radius: 28px;
-  background: #0f172a;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-2xl);
+  background: var(--slate-900);
+  box-shadow: var(--shadow-lg);
 }
 
 .pending-delete-video {
   width: 100%;
   height: 100%;
   min-height: 0;
-  border-radius: 20px;
-  background: #000000;
+  border-radius: var(--radius-xl);
+  background: var(--slate-950);
   object-fit: contain;
 }
 
@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
   left: var(--space-3);
   display: flex;
   justify-content: flex-end;
-  color: #f8fafc;
+  color: var(--slate-50);
   font-size: var(--text-small);
 }
 
@@ -647,12 +647,12 @@ onBeforeUnmount(() => {
   .pending-delete-video-frame {
     max-width: 100%;
     max-height: calc(100% - var(--space-6));
-    padding: 8px;
-    border-radius: 24px;
+    padding: var(--space-2);
+    border-radius: var(--radius-xl);
   }
 
   .pending-delete-video {
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
   }
 
   .pending-delete-detail__controls .el-button {
