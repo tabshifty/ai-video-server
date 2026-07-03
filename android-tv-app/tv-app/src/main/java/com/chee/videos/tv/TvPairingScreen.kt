@@ -1,6 +1,5 @@
 package com.chee.videos.tv
 
-import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,8 +64,8 @@ class TvPairingViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, errorMessage = null, statusMessage = null) }
             repository.createSession(
-                deviceId = "android-tv-${Build.DEVICE}-${Build.MODEL}".lowercase(),
-                deviceName = listOf(Build.MANUFACTURER, Build.MODEL).joinToString(" ").trim(),
+                deviceId = buildTvDeviceId(),
+                deviceName = buildTvDeviceName(),
             ).onSuccess { payload ->
                 _uiState.update {
                     it.copy(

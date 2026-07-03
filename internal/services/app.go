@@ -12,11 +12,15 @@ import (
 
 // AppService handles app-facing APIs for detail/history/interaction/search/user.
 type AppService struct {
-	repo *repository.VideoRepository
+	repo         *repository.VideoRepository
+	tvRemoteRepo tvRemoteRepository
 }
 
 func NewAppService(repo *repository.VideoRepository) *AppService {
-	return &AppService{repo: repo}
+	return &AppService{
+		repo:         repo,
+		tvRemoteRepo: repo,
+	}
 }
 
 func (s *AppService) VideoDetail(ctx context.Context, userID, videoID uuid.UUID) (models.VideoDetail, error) {

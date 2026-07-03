@@ -75,6 +75,9 @@ import com.chee.videos.feature.mine.MineScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
 import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
 import com.chee.videos.feature.shortsearch.ShortSearchScreen
+import com.chee.videos.feature.shortsearch.ShortSearchRemoteControlRoutePattern
+import com.chee.videos.feature.shortsearch.ShortSearchRemoteControlScreen
+import com.chee.videos.feature.shortsearch.buildShortSearchRemoteControlRoute
 import com.chee.videos.feature.tv.TvEpisodeArg
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
@@ -335,8 +338,20 @@ private fun AuthenticatedNav(
                         baseUrl = baseUrl,
                         accessToken = accessToken,
                         onFullscreenChange = { isShortFullscreen = it },
+                        onOpenRemoteControl = { sessionId ->
+                            navController.navigate(buildShortSearchRemoteControlRoute(sessionId))
+                        },
                     )
                 }
+            }
+
+            composable(
+                route = ShortSearchRemoteControlRoutePattern,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+            ) {
+                ShortSearchRemoteControlScreen(
+                    onBack = { navController.popBackStack() },
+                )
             }
 
             composable(

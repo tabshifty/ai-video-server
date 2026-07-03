@@ -7,6 +7,7 @@ import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvIptvPayload
+import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSearchResultDto
 import com.chee.videos.core.model.TvSeasonDto
@@ -46,6 +47,7 @@ class FakeTvRepository(
     val posterWallRequests = mutableListOf<TvPosterWallRequest>()
     val detailRequests = mutableListOf<String>()
     val sourceUrlRequests = mutableListOf<TvSourceUrlRequest>()
+    var currentRemoteSession: TvRemoteSessionDto? = null
     private var shortFeedRequestIndex = 0
 
     override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> {
@@ -92,6 +94,23 @@ class FakeTvRepository(
         shortFeedRequestIndex += 1
         return Result.success(response.take(pageSize))
     }
+
+    override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
+        currentRemoteSession?.takeIf { it.sessionId == sessionId }
+            ?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("missing tv remote session"))
+
+    override suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> =
+        Result.success(currentRemoteSession?.takeIf { it.deviceId == deviceId && it.status == "active" })
+
+    override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
+        Result.success(Unit)
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
         detailRequests += seriesId
@@ -208,6 +227,21 @@ class DelayedSourceTvRepository(
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         Result.success(emptyList())
 
+    override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> =
+        Result.success(null)
+
+    override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
+        Result.success(Unit)
+
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(detailPayload)
 
@@ -288,6 +322,21 @@ class DelayedCatalogTvRepository(
 
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         Result.success(emptyList())
+
+    override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> =
+        Result.success(null)
+
+    override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
+        Result.success(Unit)
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         Result.success(tvSeriesDetail(id = seriesId))
@@ -392,6 +441,21 @@ class DelayedIptvTvRepository(
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         Result.success(emptyList())
 
+    override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> =
+        Result.success(null)
+
+    override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
+        Result.success(Unit)
+
     override suspend fun readActiveBaseUrl(): String = baseUrl
 
     override suspend fun buildSourceUrl(videoId: String, profile: String?): String =
@@ -454,6 +518,21 @@ class DelayedSeriesDetailTvRepository(
 
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         Result.success(emptyList())
+
+    override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> =
+        Result.success(null)
+
+    override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
+        Result.success(Unit)
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
         detailRequests += seriesId

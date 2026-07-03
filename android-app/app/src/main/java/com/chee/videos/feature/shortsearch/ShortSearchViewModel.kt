@@ -6,6 +6,8 @@ import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.ShortPlaybackMode
+import com.chee.videos.core.model.TvDeviceDto
+import com.chee.videos.core.model.TvRemoteSessionItemDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
@@ -36,6 +38,13 @@ data class ShortSearchUiState(
     val detailByVideoId: Map<String, VideoDetailDto> = emptyMap(),
     val detailLoadingVideoIds: Set<String> = emptySet(),
     val actionBusyVideoIds: Set<String> = emptySet(),
+    val tvDevices: List<TvDeviceDto> = emptyList(),
+    val castSheetVisible: Boolean = false,
+    val castDevicesLoading: Boolean = false,
+    val castLaunching: Boolean = false,
+    val selectedTvDeviceId: String? = null,
+    val castErrorMessage: String? = null,
+    val pendingRemoteSessionId: String? = null,
     val errorMessage: String? = null,
 )
 
@@ -56,6 +65,38 @@ internal fun resetShortSearchForQuery(state: ShortSearchUiState, query: String):
 
 internal fun mergeShortSearchItems(existing: List<VideoListItemDto>, incoming: List<VideoListItemDto>): List<VideoListItemDto> {
     return (existing + incoming).distinctBy { it.id }
+}
+
+internal fun buildShortSearchRemoteItems(items: List<VideoListItemDto>): List<TvRemoteSessionItemDto> {
+    return items
+        .filter { it.id.isNotBlank() }
+        .map { item ->
+            TvRemoteSessionItemDto(
+                videoId = item.id,
+                title = item.title.trim(),
+                thumbnailPath = item.thumbnailPath?.trim(),
+                duration = item.duration,
+                type = item.type.trim().ifBlank { "short" },
+            )
+        }
+}
+
+internal fun sortTvDevicesForSelection(items: List<TvDeviceDto>, preferredDeviceId: String?): List<TvDeviceDto> {
+    val preferred = preferredDeviceId?.trim().orEmpty()
+    return items.sortedWith(
+        compareByDescending<TvDeviceDto> { it.deviceId == preferred }
+            .thenByDescending { it.isOnline }
+            .thenBy { it.deviceName },
+    )
+}
+
+internal fun resolveShortSearchRemoteStartIndex(items: List<VideoListItemDto>, playingVideoId: String?): Int? {
+    val target = playingVideoId?.trim().orEmpty()
+    if (target.isBlank()) {
+        return null
+    }
+    val index = items.indexOfFirst { it.id == target }
+    return index.takeIf { it >= 0 }
 }
 
 @HiltViewModel
@@ -144,6 +185,111 @@ class ShortSearchViewModel @Inject constructor(
 
     fun toggleFavorite(videoId: String) {
         toggleAction(videoId) { videoRepository.toggleFavorite(videoId) }
+    }
+
+    fun openCastSheet() {
+        val startIndex = resolveShortSearchRemoteStartIndex(_uiState.value.items, _uiState.value.playingVideoId)
+        if (startIndex == null) {
+            _uiState.update { it.copy(castErrorMessage = "当前视频未准备好，暂时无法投放") }
+            return
+        }
+        _uiState.update { it.copy(castSheetVisible = true, castDevicesLoading = true, castErrorMessage = null) }
+        viewModelScope.launch {
+            val preferredDeviceId = videoRepository.readLastTvRemoteDeviceId()
+            videoRepository.fetchTvDevices()
+                .onSuccess { devices ->
+                    val sorted = sortTvDevicesForSelection(devices, preferredDeviceId)
+                    _uiState.update {
+                        it.copy(
+                            tvDevices = sorted,
+                            castDevicesLoading = false,
+                            selectedTvDeviceId = it.selectedTvDeviceId
+                                ?.takeIf { selected -> sorted.any { device -> device.deviceId == selected } }
+                                ?: preferredDeviceId?.takeIf { selected -> sorted.any { device -> device.deviceId == selected } }
+                                ?: sorted.firstOrNull()?.deviceId,
+                            castErrorMessage = null,
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    handleAuthError(err)
+                    _uiState.update {
+                        it.copy(
+                            castDevicesLoading = false,
+                            castErrorMessage = err.message ?: "加载电视列表失败",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun dismissCastSheet() {
+        _uiState.update {
+            it.copy(
+                castSheetVisible = false,
+                castDevicesLoading = false,
+                castLaunching = false,
+                castErrorMessage = null,
+            )
+        }
+    }
+
+    fun selectTvDevice(deviceId: String) {
+        _uiState.update { it.copy(selectedTvDeviceId = deviceId.trim()) }
+    }
+
+    fun startCastFromCurrentSearch() {
+        val state = _uiState.value
+        val selectedDeviceId = state.selectedTvDeviceId?.trim().orEmpty()
+        val currentIndex = resolveShortSearchRemoteStartIndex(state.items, state.playingVideoId)
+        if (selectedDeviceId.isBlank()) {
+            _uiState.update { it.copy(castErrorMessage = "请选择要投放的电视") }
+            return
+        }
+        if (currentIndex == null) {
+            _uiState.update { it.copy(castErrorMessage = "当前视频未准备好，暂时无法投放") }
+            return
+        }
+        val snapshotItems = buildShortSearchRemoteItems(state.items)
+        if (snapshotItems.isEmpty()) {
+            _uiState.update { it.copy(castErrorMessage = "当前搜索结果为空，无法发起投放") }
+            return
+        }
+        _uiState.update { it.copy(castLaunching = true, castErrorMessage = null) }
+        viewModelScope.launch {
+            videoRepository.createTvRemoteSession(
+                deviceId = selectedDeviceId,
+                items = snapshotItems,
+                currentIndex = currentIndex,
+            ).onSuccess { session ->
+                videoRepository.saveLastTvRemoteDeviceId(selectedDeviceId)
+                _uiState.update {
+                    it.copy(
+                        castSheetVisible = false,
+                        castDevicesLoading = false,
+                        castLaunching = false,
+                        castErrorMessage = null,
+                        pendingRemoteSessionId = session.sessionId,
+                    )
+                }
+            }.onFailure { err ->
+                handleAuthError(err)
+                _uiState.update {
+                    it.copy(
+                        castLaunching = false,
+                        castErrorMessage = err.message ?: "发起投放失败",
+                    )
+                }
+            }
+        }
+    }
+
+    fun consumePendingRemoteSession() {
+        _uiState.update { it.copy(pendingRemoteSessionId = null) }
+    }
+
+    fun clearCastErrorMessage() {
+        _uiState.update { it.copy(castErrorMessage = null) }
     }
 
     private fun search(query: String, force: Boolean = false) {

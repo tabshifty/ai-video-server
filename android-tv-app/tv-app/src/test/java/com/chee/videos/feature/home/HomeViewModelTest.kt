@@ -20,6 +20,8 @@ import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvIptvPayload
+import com.chee.videos.core.model.TvRemoteDeviceSessionPayload
+import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
@@ -349,6 +351,33 @@ private class FakeHomeApiService(
     override suspend fun denyTvAuthSession(
         url: String,
         authorization: String,
+    ): ApiEnvelope<Map<String, Boolean>> = error("unused")
+
+    override suspend fun getTvRemoteSession(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun getCurrentTvRemoteSessionForDevice(
+        url: String,
+        authorization: String,
+        deviceId: String,
+    ): ApiEnvelope<TvRemoteDeviceSessionPayload> = error("unused")
+
+    override suspend fun tvRemotePrevious(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun tvRemoteNext(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun endTvRemoteSession(
+        url: String,
+        authorization: String,
+        body: Map<String, String>,
     ): ApiEnvelope<Map<String, Boolean>> = error("unused")
 
     override suspend fun imageCollections(

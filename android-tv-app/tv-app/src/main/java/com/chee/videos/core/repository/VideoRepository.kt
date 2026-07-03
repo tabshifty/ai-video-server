@@ -14,6 +14,7 @@ import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvIptvPayload
+import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvTrackPreference
@@ -204,6 +205,53 @@ class VideoRepository @Inject constructor(
                 authorization = bearer,
             )
         }
+    }
+
+    suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.getTvRemoteSession(
+                url = UrlBuilder.tvRemoteSession(baseUrl, sessionId),
+                authorization = bearer,
+            )
+        }
+    }
+
+    suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> {
+        return callWithAuth { baseUrl, bearer ->
+            api.getCurrentTvRemoteSessionForDevice(
+                url = UrlBuilder.tvRemoteCurrentSessionForDevice(baseUrl),
+                authorization = bearer,
+                deviceId = deviceId.trim(),
+            )
+        }.map { it.session }
+    }
+
+    suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvRemotePrevious(
+                url = UrlBuilder.tvRemotePrevious(baseUrl, sessionId),
+                authorization = bearer,
+            )
+        }
+    }
+
+    suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvRemoteNext(
+                url = UrlBuilder.tvRemoteNext(baseUrl, sessionId),
+                authorization = bearer,
+            )
+        }
+    }
+
+    suspend fun endTvRemoteSession(sessionId: String, endedReason: String = "tv_back"): Result<Unit> {
+        return callWithAuth { baseUrl, bearer ->
+            api.endTvRemoteSession(
+                url = UrlBuilder.tvRemoteEnd(baseUrl, sessionId),
+                authorization = bearer,
+                body = mapOf("ended_reason" to endedReason),
+            )
+        }.map { Unit }
     }
 
     suspend fun fetchImageCollections(

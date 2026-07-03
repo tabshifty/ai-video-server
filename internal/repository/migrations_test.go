@@ -186,6 +186,29 @@ func TestShortPendingDeleteMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+drop\s+column\s+if\s+exists\s+pending_delete_at`)
 }
 
+func TestTVRemoteSessionMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0032_tv_remote_sessions.up.sql")
+	down := readMigrationForTest(t, "0032_tv_remote_sessions.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+tv_devices\s+add\s+column\s+if\s+not\s+exists\s+last_seen_at\s+timestamptz`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+tv_remote_sessions`)
+	assertSQLPattern(t, up, `(?is)status\s+varchar\(16\)\s+not\s+null\s+default\s+'active'`)
+	assertSQLPattern(t, up, `(?is)items\s+jsonb\s+not\s+null\s+default\s+'\[\]'\:\:jsonb`)
+	assertSQLPattern(t, up, `(?is)current_index\s+int\s+not\s+null\s+default\s+0`)
+	assertSQLPattern(t, up, `(?is)current_video_id\s+uuid`)
+	assertSQLPattern(t, up, `(?is)'active'.*'ended'`)
+	assertSQLPattern(t, up, `(?is)jsonb_typeof\(items\)\s*=\s*'array'`)
+	assertSQLPattern(t, up, `(?is)create\s+unique\s+index\s+if\s+not\s+exists\s+idx_tv_remote_sessions_device_active_unique`)
+	assertSQLPattern(t, up, `(?is)where\s+status\s*=\s*'active'`)
+
+	assertSQLPattern(t, down, `(?is)drop\s+index\s+if\s+exists\s+idx_tv_remote_sessions_device_active_unique`)
+	assertSQLPattern(t, down, `(?is)drop\s+index\s+if\s+exists\s+idx_tv_remote_sessions_user_updated_at`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+tv_remote_sessions`)
+	assertSQLPattern(t, down, `(?is)alter\s+table\s+tv_devices\s+drop\s+column\s+if\s+exists\s+last_seen_at`)
+}
+
 func TestMarkEd2kDownloadTaskRunningRefreshesStartedAt(t *testing.T) {
 	t.Parallel()
 

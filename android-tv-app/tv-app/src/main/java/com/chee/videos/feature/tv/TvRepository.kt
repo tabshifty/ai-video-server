@@ -3,6 +3,7 @@ package com.chee.videos.feature.tv
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvIptvPayload
+import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvTrackPreference
@@ -23,6 +24,11 @@ interface TvRepository {
     ): Result<TvCatalogWallPayload>
     suspend fun fetchIptvChannels(): Result<TvIptvPayload>
     suspend fun fetchShortFeed(pageSize: Int = 20, excludeIds: List<String> = emptyList()): Result<List<FeedVideoDto>>
+    suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto>
+    suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?>
+    suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto>
+    suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto>
+    suspend fun endTvRemoteSession(sessionId: String, endedReason: String = "tv_back"): Result<Unit>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
     suspend fun readActiveBaseUrl(): String?
     suspend fun buildSourceUrl(videoId: String, profile: String? = null): String
@@ -61,6 +67,21 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         videoRepository.fetchShortFeed(pageSize = pageSize, excludeIds = excludeIds)
+
+    override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
+        videoRepository.fetchTvRemoteSession(sessionId)
+
+    override suspend fun fetchCurrentTvRemoteSession(deviceId: String): Result<TvRemoteSessionDto?> =
+        videoRepository.fetchCurrentTvRemoteSession(deviceId)
+
+    override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
+        videoRepository.tvRemotePrevious(sessionId)
+
+    override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        videoRepository.tvRemoteNext(sessionId)
+
+    override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
+        videoRepository.endTvRemoteSession(sessionId, endedReason)
 
     override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
         videoRepository.fetchTvSeriesDetail(seriesId)

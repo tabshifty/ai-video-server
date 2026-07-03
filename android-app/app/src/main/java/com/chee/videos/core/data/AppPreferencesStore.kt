@@ -32,6 +32,7 @@ class AppPreferencesStore @Inject constructor(
         val unifiedShortFitMode = stringPreferencesKey("unified_short_fit_mode")
         val shortPlaybackMode = stringPreferencesKey("short_playback_mode")
         val tvSubtitlePreferences = stringPreferencesKey("tv_subtitle_preferences")
+        val lastTvRemoteDeviceId = stringPreferencesKey("last_tv_remote_device_id")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -144,6 +145,20 @@ class AppPreferencesStore @Inject constructor(
                 prefs.remove(Keys.tvSubtitlePreferences)
             } else {
                 prefs[Keys.tvSubtitlePreferences] = gson.toJson(current)
+            }
+        }
+    }
+
+    suspend fun readLastTvRemoteDeviceId(): String? =
+        dataStore.data.first()[Keys.lastTvRemoteDeviceId]?.takeIf { it.isNotBlank() }
+
+    suspend fun saveLastTvRemoteDeviceId(deviceId: String?) {
+        val normalized = deviceId?.trim().orEmpty()
+        dataStore.edit { prefs ->
+            if (normalized.isBlank()) {
+                prefs.remove(Keys.lastTvRemoteDeviceId)
+            } else {
+                prefs[Keys.lastTvRemoteDeviceId] = normalized
             }
         }
     }

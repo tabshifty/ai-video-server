@@ -19,7 +19,10 @@ import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
+import com.chee.videos.core.model.TvDeviceListPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvRemoteCreateSessionRequest
+import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
@@ -236,6 +239,11 @@ private class FakeActorApiService(
     override suspend fun getTvAuthSession(url: String): ApiEnvelope<TvAuthSessionStatusPayload> = error("unused")
     override suspend fun approveTvAuthSession(url: String, authorization: String): ApiEnvelope<Map<String, Boolean>> = error("unused")
     override suspend fun denyTvAuthSession(url: String, authorization: String): ApiEnvelope<Map<String, Boolean>> = error("unused")
+    override suspend fun tvDevices(url: String, authorization: String): ApiEnvelope<TvDeviceListPayload> = error("unused")
+    override suspend fun createTvRemoteSession(url: String, authorization: String, body: TvRemoteCreateSessionRequest): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+    override suspend fun getTvRemoteSession(url: String, authorization: String): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+    override suspend fun tvRemotePrevious(url: String, authorization: String): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+    override suspend fun tvRemoteNext(url: String, authorization: String): ApiEnvelope<TvRemoteSessionDto> = error("unused")
     override suspend fun imageCollections(url: String, authorization: String, keyword: String?, page: Int, pageSize: Int): ApiEnvelope<ImageCollectionsPayload> = error("unused")
     override suspend fun imageCollectionDetail(url: String, authorization: String): ApiEnvelope<ImageCollectionDetailDto> = error("unused")
     override suspend fun search(url: String, authorization: String, keyword: String, type: String, page: Int, pageSize: Int): ApiEnvelope<SearchPayload> = error("unused")

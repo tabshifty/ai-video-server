@@ -18,7 +18,11 @@ import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
+import com.chee.videos.core.model.TvDeviceDto
+import com.chee.videos.core.model.TvDeviceListPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvRemoteCreateSessionRequest
+import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
@@ -87,6 +91,33 @@ class ShortSearchViewModelStateTest {
         )
 
         assertEquals(listOf("a", "b"), merged.map { it.id })
+    }
+
+    @Test
+    fun buildShortSearchRemoteItems_keepsCurrentSearchSnapshotOrder() {
+        val items = buildShortSearchRemoteItems(
+            listOf(
+                VideoListItemDto(id = "v1", title = " 第一条 ", type = "short", thumbnailPath = " /thumb1.jpg ", duration = 11),
+                VideoListItemDto(id = "v2", title = "第二条", type = "short", thumbnailPath = "/thumb2.jpg", duration = 12),
+            ),
+        )
+
+        assertEquals(listOf("v1", "v2"), items.map { it.videoId })
+        assertEquals("第一条", items.first().title)
+        assertEquals("/thumb1.jpg", items.first().thumbnailPath)
+    }
+
+    @Test
+    fun sortTvDevicesForSelection_putsPreferredDeviceFirst() {
+        val devices = sortTvDevicesForSelection(
+            items = listOf(
+                TvDeviceDto(deviceId = "tv-1", deviceName = "卧室电视", isOnline = false),
+                TvDeviceDto(deviceId = "tv-2", deviceName = "客厅电视", isOnline = true),
+            ),
+            preferredDeviceId = "tv-1",
+        )
+
+        assertEquals(listOf("tv-1", "tv-2"), devices.map { it.deviceId })
     }
 
     @Test
@@ -327,6 +358,32 @@ private class FakeShortSearchApiService(
         url: String,
         authorization: String,
     ): ApiEnvelope<Map<String, Boolean>> = error("unused")
+
+    override suspend fun tvDevices(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvDeviceListPayload> = error("unused")
+
+    override suspend fun createTvRemoteSession(
+        url: String,
+        authorization: String,
+        body: TvRemoteCreateSessionRequest,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun getTvRemoteSession(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun tvRemotePrevious(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun tvRemoteNext(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
 
     override suspend fun imageCollections(
         url: String,

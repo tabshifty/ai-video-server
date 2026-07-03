@@ -34,12 +34,17 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -102,6 +107,7 @@ fun ShortSearchScreen(
     baseUrl: String,
     accessToken: String,
     onFullscreenChange: (Boolean) -> Unit = {},
+    onOpenRemoteControl: (String) -> Unit = {},
     viewModel: ShortSearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -111,6 +117,12 @@ fun ShortSearchScreen(
     }
 
     BackHandler(enabled = uiState.playingVideoId != null) { viewModel.closePlayer() }
+
+    LaunchedEffect(uiState.pendingRemoteSessionId) {
+        val sessionId = uiState.pendingRemoteSessionId ?: return@LaunchedEffect
+        onOpenRemoteControl(sessionId)
+        viewModel.consumePendingRemoteSession()
+    }
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0B0E15)).statusBarsPadding()) {
         OutlinedTextField(
@@ -172,10 +184,24 @@ fun ShortSearchScreen(
             onEnsureDetailLoaded = viewModel::ensureDetailLoaded,
             onToggleLike = viewModel::toggleLike,
             onToggleFavorite = viewModel::toggleFavorite,
+            onOpenCastSheet = viewModel::openCastSheet,
             onClose = viewModel::closePlayer,
             onToggleFitMode = viewModel::toggleFitMode,
             onTogglePlaybackMode = viewModel::togglePlaybackMode,
             onFullscreenChange = onFullscreenChange,
+        )
+    }
+
+    if (uiState.castSheetVisible) {
+        ShortSearchCastDeviceDialog(
+            devices = uiState.tvDevices,
+            loading = uiState.castDevicesLoading,
+            launching = uiState.castLaunching,
+            selectedDeviceId = uiState.selectedTvDeviceId,
+            errorMessage = uiState.castErrorMessage,
+            onDismiss = viewModel::dismissCastSheet,
+            onSelectDevice = viewModel::selectTvDevice,
+            onConfirm = viewModel::startCastFromCurrentSearch,
         )
     }
 }
@@ -208,6 +234,7 @@ private fun ShortSearchPlayerOverlay(
     onEnsureDetailLoaded: (String) -> Unit,
     onToggleLike: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onOpenCastSheet: () -> Unit,
     onClose: () -> Unit,
     onToggleFitMode: () -> Unit,
     onTogglePlaybackMode: () -> Unit,
@@ -418,6 +445,13 @@ private fun ShortSearchPlayerOverlay(
                                 onClick = { onToggleFavorite(item.id) },
                                 contentDescription = "收藏",
                             )
+                            ShortVideoOverlayActionButton(
+                                icon = Icons.Filled.Tv,
+                                active = false,
+                                enabled = !actionBusy,
+                                onClick = onOpenCastSheet,
+                                contentDescription = "投放到电视",
+                            )
                             ShortVideoOverlayActionButton(icon = Icons.Filled.AspectRatio, active = false, enabled = true, onClick = onToggleFitMode, contentDescription = if (fitMode == VideoFitMode.FILL) "切换完整显示" else "切换铺满显示")
                             ShortPlaybackModeToggleButton(playbackMode = playbackMode, onClick = onTogglePlaybackMode)
                             ShortOverlayFullscreenButton(onClick = { isFullscreen = true })
@@ -473,6 +507,85 @@ private fun ShortSearchPlayerOverlay(
             }
         }
     }
+}
+
+@Composable
+private fun ShortSearchCastDeviceDialog(
+    devices: List<com.chee.videos.core.model.TvDeviceDto>,
+    loading: Boolean,
+    launching: Boolean,
+    selectedDeviceId: String?,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSelectDevice: (String) -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择电视") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when {
+                    loading -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(strokeWidth = 2.dp)
+                            Text("正在加载已授权电视")
+                        }
+                    }
+
+                    devices.isEmpty() -> {
+                        Text("当前账号还没有已授权的电视设备")
+                    }
+
+                    else -> {
+                        devices.forEach { device ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onSelectDevice(device.deviceId) }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                RadioButton(
+                                    selected = device.deviceId == selectedDeviceId,
+                                    onClick = { onSelectDevice(device.deviceId) },
+                                )
+                                Column {
+                                    Text(device.deviceName.ifBlank { device.deviceId })
+                                    Text(
+                                        text = if (device.isOnline) "当前可接收投放" else "当前不可接收投放",
+                                        color = if (device.isOnline) Color(0xFF2FA36B) else Color(0xFFB18828),
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(errorMessage, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !loading && !launching && selectedDeviceId != null,
+                onClick = onConfirm,
+            ) {
+                Text(if (launching) "投放中..." else "开始投放")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                enabled = !launching,
+                onClick = onDismiss,
+            ) {
+                Text("取消")
+            }
+        },
+    )
 }
 
 private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {

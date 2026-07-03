@@ -167,6 +167,52 @@ data class TvAuthSessionStatusPayload(
     @SerializedName("server_base_url") val serverBaseUrl: String? = null,
 )
 
+data class TvDeviceListPayload(
+    @SerializedName("items") val items: List<TvDeviceDto> = emptyList(),
+)
+
+data class TvDeviceDto(
+    @SerializedName("id") val id: String = "",
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("device_name") val deviceName: String,
+    @SerializedName("platform") val platform: String = "android_tv",
+    @SerializedName("last_authorized_at") val lastAuthorizedAt: String? = null,
+    @SerializedName("last_seen_at") val lastSeenAt: String? = null,
+    @SerializedName("is_online") val isOnline: Boolean = false,
+)
+
+data class TvRemoteSessionItemDto(
+    @SerializedName("video_id") val videoId: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("thumbnail_path") val thumbnailPath: String? = null,
+    @SerializedName("duration") val duration: Int = 0,
+    @SerializedName("type") val type: String = "short",
+)
+
+data class TvRemoteCreateSessionRequest(
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("items") val items: List<TvRemoteSessionItemDto> = emptyList(),
+    @SerializedName("current_index") val currentIndex: Int,
+)
+
+data class TvRemoteSessionDto(
+    @SerializedName("session_id") val sessionId: String,
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("device_name") val deviceName: String = "",
+    @SerializedName("platform") val platform: String = "android_tv",
+    @SerializedName("status") val status: String = "",
+    @SerializedName("items") val items: List<TvRemoteSessionItemDto> = emptyList(),
+    @SerializedName("current_index") val currentIndex: Int = 0,
+    @SerializedName("current_video_id") val currentVideoId: String? = null,
+    @SerializedName("current_item") val currentItem: TvRemoteSessionItemDto? = null,
+    @SerializedName("has_previous") val hasPrevious: Boolean = false,
+    @SerializedName("has_next") val hasNext: Boolean = false,
+    @SerializedName("ended_reason") val endedReason: String? = null,
+    @SerializedName("ended_at") val endedAt: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null,
+)
+
 data class TvSectionDto(
     @SerializedName("title") val title: String = "",
     @SerializedName("subtitle") val subtitle: String = "",

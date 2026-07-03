@@ -17,6 +17,8 @@ import com.chee.videos.core.model.TvAuthStatusEnvelope
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvIptvPayload
+import com.chee.videos.core.model.TvRemoteDeviceSessionPayload
+import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
@@ -129,6 +131,38 @@ interface ApiService {
     suspend fun denyTvAuthSession(
         @Url url: String,
         @Header("Authorization") authorization: String,
+    ): ApiEnvelope<Map<String, Boolean>>
+
+    @GET
+    suspend fun getTvRemoteSession(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto>
+
+    @GET
+    suspend fun getCurrentTvRemoteSessionForDevice(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("device_id") deviceId: String,
+    ): ApiEnvelope<TvRemoteDeviceSessionPayload>
+
+    @POST
+    suspend fun tvRemotePrevious(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto>
+
+    @POST
+    suspend fun tvRemoteNext(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto>
+
+    @POST
+    suspend fun endTvRemoteSession(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Body body: Map<String, String>,
     ): ApiEnvelope<Map<String, Boolean>>
 
     @GET

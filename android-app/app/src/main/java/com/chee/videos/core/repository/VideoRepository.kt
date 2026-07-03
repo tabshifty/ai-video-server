@@ -13,6 +13,10 @@ import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvDeviceDto
+import com.chee.videos.core.model.TvRemoteCreateSessionRequest
+import com.chee.videos.core.model.TvRemoteSessionDto
+import com.chee.videos.core.model.TvRemoteSessionItemDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
@@ -184,6 +188,60 @@ class VideoRepository @Inject constructor(
         }
     }
 
+    suspend fun fetchTvDevices(): Result<List<TvDeviceDto>> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvDevices(
+                url = UrlBuilder.tvDevices(baseUrl),
+                authorization = bearer,
+            )
+        }.map { it.items }
+    }
+
+    suspend fun createTvRemoteSession(
+        deviceId: String,
+        items: List<TvRemoteSessionItemDto>,
+        currentIndex: Int,
+    ): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.createTvRemoteSession(
+                url = UrlBuilder.tvRemoteSessions(baseUrl),
+                authorization = bearer,
+                body = TvRemoteCreateSessionRequest(
+                    deviceId = deviceId.trim(),
+                    items = items,
+                    currentIndex = currentIndex,
+                ),
+            )
+        }
+    }
+
+    suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.getTvRemoteSession(
+                url = UrlBuilder.tvRemoteSession(baseUrl, sessionId),
+                authorization = bearer,
+            )
+        }
+    }
+
+    suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvRemotePrevious(
+                url = UrlBuilder.tvRemotePrevious(baseUrl, sessionId),
+                authorization = bearer,
+            )
+        }
+    }
+
+    suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvRemoteNext(
+                url = UrlBuilder.tvRemoteNext(baseUrl, sessionId),
+                authorization = bearer,
+            )
+        }
+    }
+
     suspend fun fetchImageCollections(
         query: String? = null,
         page: Int = 1,
@@ -297,6 +355,13 @@ class VideoRepository @Inject constructor(
 
     suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
         store.saveTvSubtitlePreference(videoId, subtitleTrackId)
+    }
+
+    suspend fun readLastTvRemoteDeviceId(): String? =
+        store.readLastTvRemoteDeviceId()
+
+    suspend fun saveLastTvRemoteDeviceId(deviceId: String?) {
+        store.saveLastTvRemoteDeviceId(deviceId)
     }
 
     fun preferredLongFormPlaybackProfile(): PlaybackProfile =

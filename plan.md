@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-04 01:10 +0800
+- 进度：完成“手机短视频搜索投放到 TV App”首期收尾。手机端已补版本 `0.1.5(6)`，TV 端已补版本 `0.1.129(129)`；`CONTEXT.md` 追加了 `TV 短视频投放可接收态` 与 `TV 短视频投放全局协调器` 两条长期契约，收口服务端 `last_seen_at` 新鲜度门控和 TV 根壳全局唤起模型。
+- 影响文件：`android-app/app/build.gradle.kts`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `git diff --check`、`rg -n $'\uFFFD' CONTEXT.md plan.md android-app/app/src android-tv-app/tv-app/src internal migrations`、提交中文 commit。
+
+## 2026-07-04 01:04 +0800
+- 进度：完成受影响 Android 模块全量验证。TV 端远程投放页、全局协调路由与测试桩已通过完整 `:tv-app:testDebugUnitTest` 和 `:tv-app:assembleDebug`；手机端短视频搜索投放入口、设备选择、控制页和最近设备记忆已通过完整 `:app:testDebugUnitTest` 和 `:app:assembleDebug`。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/**`、`android-app/app/src/test/java/com/chee/videos/**`、`android-tv-app/tv-app/src/main/java/com/chee/videos/**`、`android-tv-app/tv-app/src/test/java/com/chee/videos/**`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` 通过。
+
+## 2026-07-04 00:56 +0800
+- 进度：处理 TV 定向红灯。`TvRemotePlaybackNavigationSpecTest` 把 `popExitTransition` 误写成 `EnterTransition.None`，与 `TvShellApp` 实现和同类路由规格不一致；已校正断言并确认 TV 远程投放路由的独立页面挂载与无动画过渡规格通过。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvRemotePlaybackNavigationSpecTest.kt`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.tv.TvShellAppBackPolicyTest --tests com.chee.videos.tv.TvRemotePlaybackNavigationSpecTest --tests com.chee.videos.feature.tv.TvShortFeedViewModelTest` 通过。
+
+## 2026-07-04 00:40 +0800
+- 进度：完成“手机短视频搜索投放到 TV App”核心实现。后端新增 `tv_remote_sessions` migration、repository/service/handler 和会话互斥更新；手机端接入远程投放 DTO/API/repository、短视频搜索浮层投放入口、设备选择和专用控制页；TV 端接入设备身份 helper、全局远程协调 ViewModel、独立投放页与根壳唤起路由，满足“App 内任意前台页被手机唤起，返回回原页”的首期目标。
+- 影响文件：`migrations/0032_tv_remote_sessions.*.sql`、`internal/handlers/tv_remote.go`、`internal/repository/tv_remote_repository.go`、`internal/services/tv_remote*.go`、`internal/models/user.go`、`internal/services/app.go`、`internal/handlers/router.go`、`android-app/app/src/main/java/com/chee/videos/**`、`android-app/app/src/test/java/com/chee/videos/**`、`android-tv-app/tv-app/src/main/java/com/chee/videos/**`、`android-tv-app/tv-app/src/test/java/com/chee/videos/**`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/repository ./internal/services ./internal/handlers -count=1` 通过；`go test ./internal/... -count=1` 通过；`go test ./... -count=1` 通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.feature.shortsearch.ShortSearchViewModelStateTest` 通过。
+
+## 2026-07-03 22:09 +0800
+- 进度：开始实现“手机短视频搜索投放到 TV App”。已按 `grill-with-docs` 收口边界，并核对代码现状：后端仅有 `tv_devices` / TV 配对链路，没有远程播放会话模型；TV 端现有 `TvShortFeedScreen` 是本地短视频信息流页，不能承载远程投放语义；手机/TV App 当前都没有可复用的实时通道，首期同步模型将沿用前台轮询。
+- 影响文件：预计涉及 `migrations/*`、`internal/models/*`、`internal/repository/*`、`internal/services/*`、`internal/handlers/*`、`android-app/app/src/main/java/com/chee/videos/**`、`android-tv-app/tv-app/src/main/java/com/chee/videos/**`、`CONTEXT.md`、`plan.md`
+- 验证：待执行后端定向 `go test`、手机端 `:app:testDebugUnitTest` / `:app:assembleDebug`、TV 端 `:tv-app:testDebugUnitTest` / `:tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
 ## 2026-07-03 21:09 +0800
 - 进度：完成手机端安装包下载 `invalid abi` 短修。`downloadTVAppAPK` 现在同时接受 TV ABI 和手机端固定槽位 `single`；新增 handler 回归测试锁定 `/api/v1/app/releases/:id/download/single` 必须直接下发 APK 文件，同时保留未知槽位仍返回 `invalid abi`。
 - 影响文件：`internal/handlers/tv_apk.go`、`internal/handlers/tv_apk_download_test.go`、`plan.md`
@@ -11,6 +36,11 @@
 - 进度：开始短修手机端安装包下载 `invalid abi`。已定位到家庭下载页会为手机端产物生成 `.../download/single` 链接，但 `downloadTVAppAPK` 入口仍用 TV ABI 规则预校验，只接受 `arm64-v8a` / `armeabi-v7a`，导致手机端固定槽位 `single` 在到达 service 前就被拒绝。
 - 影响文件：预计涉及 `internal/handlers/tv_apk.go`、`internal/handlers/*test.go`、`plan.md`
 - 验证：待执行 `go test ./internal/handlers -run 'TestTVAppDownloadAPKAcceptsPhoneSingleSlot' -count=1`、`go test ./internal/handlers -count=1`、`git diff --check`、乱码扫描。
+
+## 2026-07-03 20:51 +0800
+- 进度：开始通过 `grill-with-docs` 收口“手机端短视频可投放到 TV App”方案。已核对现状：两端已有 TV 配对登录链路与独立短视频播放器，但没有 Chromecast / DLNA / MediaRouter / 局域网设备发现协议栈；本轮先把术语收敛为“短视频远程播放会话”，明确它不是镜像投屏，而是手机端发起、TV 端自行向同一后端拉流播放的跨端会话。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：讨论性文档更新，未执行构建或测试。
 
 ## 2026-07-03 20:18 +0800
 - 进度：完成压缩包导入大文件处理超时短修。管理端压缩包重试解包、单文件处理、分组处理和批次处理请求均显式关闭 Axios 默认 30 秒超时；API 回归测试已锁定这些长耗时动作必须 `timeout: 0`。同步在 `CONTEXT.md` 沉淀 `压缩包处理长耗时请求` 边界。

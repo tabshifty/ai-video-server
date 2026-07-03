@@ -163,6 +163,17 @@ func (a *API) Register(r *gin.Engine) {
 			tvAuth.POST("/sessions/:session_id/approve", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ApproveTVAuthSession)
 			tvAuth.POST("/sessions/:session_id/deny", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.DenyTVAuthSession)
 		}
+		v1.GET("/tv-devices", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ListTVDevices)
+		tvRemote := v1.Group("/tv-remote", middleware.AuthMiddleware(a.jwtSecret, a.redis))
+		{
+			tvRemote.POST("/sessions", a.CreateTVRemoteSession)
+			tvRemote.GET("/sessions/:session_id", a.GetTVRemoteSession)
+			tvRemote.POST("/sessions/:session_id/previous", a.TVRemotePrevious)
+			tvRemote.POST("/sessions/:session_id/next", a.TVRemoteNext)
+			tvRemote.GET("/devices/current/session", a.GetCurrentTVRemoteSessionForDevice)
+			tvRemote.POST("/sessions/:session_id/current-index", a.UpdateTVRemoteSessionCurrentIndex)
+			tvRemote.POST("/sessions/:session_id/end", a.EndTVRemoteSession)
+		}
 		v1.POST("/upload/check", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadCheck)
 		v1.POST("/upload/init", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadInit)
 		v1.PUT("/upload/chunk", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadChunk)

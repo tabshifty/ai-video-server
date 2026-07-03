@@ -65,6 +65,9 @@ import com.chee.videos.feature.tv.TvCatalogWallKindArg
 import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
 import com.chee.videos.feature.tv.TvCatalogWallTitleArg
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
+import com.chee.videos.feature.tv.TvRemotePlaybackRoutePattern
+import com.chee.videos.feature.tv.TvRemotePlaybackScreen
+import com.chee.videos.feature.tv.TvRemotePlaybackSessionIdArg
 import com.chee.videos.feature.tv.TvSeasonArg
 import com.chee.videos.feature.tv.TvSeriesDetailScreen
 import com.chee.videos.feature.tv.TvSeriesIdArg
@@ -77,6 +80,7 @@ import com.chee.videos.feature.tv.buildTvCatalogWallRoute
 import com.chee.videos.feature.tv.buildTvLongFormDetailRoute
 import com.chee.videos.feature.tv.buildTvLongFormPlayerRoute
 import com.chee.videos.feature.tv.buildTvPlayerRoute
+import com.chee.videos.feature.tv.buildTvRemotePlaybackRoute
 import kotlinx.coroutines.delay
 
 @Composable
@@ -118,6 +122,8 @@ private fun TvAuthenticatedNav(
     onSwitchServer: () -> Unit,
 ) {
     val navController = rememberNavController()
+    val remoteCoordinatorViewModel: TvRemoteCoordinatorViewModel = hiltViewModel()
+    val remoteCoordinatorState by remoteCoordinatorViewModel.uiState.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val handleShellBack = shouldHandleTvShellBack(currentRoute)
@@ -157,6 +163,17 @@ private fun TvAuthenticatedNav(
             if (rootExitPromptAtMillis == promptAt) {
                 showRootExitPrompt = false
             }
+        }
+    }
+
+    LaunchedEffect(remoteCoordinatorState.activeSessionId, currentRoute) {
+        val activeSessionId = remoteCoordinatorState.activeSessionId ?: return@LaunchedEffect
+        val targetRoute = buildTvRemotePlaybackRoute(activeSessionId)
+        if (currentRoute == targetRoute) {
+            return@LaunchedEffect
+        }
+        navController.navigate(targetRoute) {
+            launchSingleTop = true
         }
     }
 
@@ -267,6 +284,19 @@ private fun TvAuthenticatedNav(
                     }
                     composable(TvIptvRoute) {
                         TvIptvScreen(
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                    composable(
+                        route = TvRemotePlaybackRoutePattern,
+                        arguments = listOf(navArgument(TvRemotePlaybackSessionIdArg) { type = NavType.StringType }),
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None },
+                    ) {
+                        TvRemotePlaybackScreen(
+                            accessToken = accessToken,
                             onBack = { navController.popBackStack() },
                         )
                     }
@@ -435,4 +465,6 @@ private fun String.isTvPlaybackRoute(): Boolean =
         startsWith("tv/player/") ||
         this == TvLongFormPlayerRoutePattern ||
         startsWith("tv/long-form-player/") ||
+        this == TvRemotePlaybackRoutePattern ||
+        startsWith("tv/remote-shorts/") ||
         this == TvIptvRoute

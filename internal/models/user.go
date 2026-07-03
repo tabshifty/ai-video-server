@@ -74,6 +74,43 @@ type TvDeviceRecord struct {
 	Platform         string     `json:"platform"`
 	UserID           *uuid.UUID `json:"user_id,omitempty"`
 	LastAuthorizedAt *time.Time `json:"last_authorized_at,omitempty"`
+	LastSeenAt       *time.Time `json:"last_seen_at,omitempty"`
+	IsOnline         bool       `json:"is_online"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+type TvRemoteSessionItem struct {
+	VideoID       uuid.UUID `json:"video_id"`
+	Title         string    `json:"title"`
+	ThumbnailPath string    `json:"thumbnail_path"`
+	Duration      int       `json:"duration"`
+	Type          string    `json:"type"`
+}
+
+type TvRemoteSession struct {
+	ID             uuid.UUID             `json:"session_id"`
+	UserID         uuid.UUID             `json:"-"`
+	DeviceID       string                `json:"device_id"`
+	DeviceName     string                `json:"device_name"`
+	Platform       string                `json:"platform"`
+	Status         string                `json:"status"`
+	Items          []TvRemoteSessionItem `json:"items"`
+	CurrentIndex   int                   `json:"current_index"`
+	CurrentVideoID *uuid.UUID            `json:"current_video_id,omitempty"`
+	CurrentItem    *TvRemoteSessionItem  `json:"current_item,omitempty"`
+	HasPrevious    bool                  `json:"has_previous"`
+	HasNext        bool                  `json:"has_next"`
+	EndedReason    string                `json:"ended_reason,omitempty"`
+	EndedAt        *time.Time            `json:"ended_at,omitempty"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
+}
+
+type TvDeviceListPayload struct {
+	Items []TvDeviceRecord `json:"items"`
+}
+
+type TvRemoteDeviceSessionPayload struct {
+	Session *TvRemoteSession `json:"session"`
 }

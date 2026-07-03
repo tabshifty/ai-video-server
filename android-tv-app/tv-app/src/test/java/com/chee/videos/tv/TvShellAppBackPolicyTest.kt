@@ -4,6 +4,7 @@ import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
 import com.chee.videos.feature.tv.TvLongFormDetailRoutePattern
 import com.chee.videos.feature.tv.TvLongFormPlayerRoutePattern
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
+import com.chee.videos.feature.tv.TvRemotePlaybackRoutePattern
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tv.TvShortFeedRoute
 import org.junit.Assert.assertEquals
@@ -28,9 +29,11 @@ class TvShellAppBackPolicyTest {
         assertFalse(shouldHandleTvShellBack("tv-home"))
         assertFalse(shouldHandleTvShellBack(TvPlayerRoutePattern))
         assertFalse(shouldHandleTvShellBack(TvLongFormPlayerRoutePattern))
+        assertFalse(shouldHandleTvShellBack(TvRemotePlaybackRoutePattern))
         assertFalse(shouldHandleTvShellBack(TvShortFeedRoute))
         assertFalse(shouldHandleTvShellBack("tv/player/series-1?season=1&episode=2"))
         assertFalse(shouldHandleTvShellBack("tv/long-form-player/movie-1?videoType=movie"))
+        assertFalse(shouldHandleTvShellBack("tv/remote-shorts/session-1"))
         assertFalse(shouldHandleTvShellBack(null))
     }
 
@@ -43,6 +46,7 @@ class TvShellAppBackPolicyTest {
         assertFalse(shouldHandleTvRootExitConfirm(TvSeriesRoutePattern))
         assertFalse(shouldHandleTvRootExitConfirm(TvPlayerRoutePattern))
         assertFalse(shouldHandleTvRootExitConfirm(TvLongFormPlayerRoutePattern))
+        assertFalse(shouldHandleTvRootExitConfirm(TvRemotePlaybackRoutePattern))
         assertFalse(shouldHandleTvRootExitConfirm(TvShortFeedRoute))
         assertFalse(shouldHandleTvRootExitConfirm(null))
     }

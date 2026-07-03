@@ -46,6 +46,23 @@ object UrlBuilder {
     fun tvAuthDeny(baseUrl: String, sessionId: String): String =
         "${tvAuthSession(baseUrl, sessionId)}/deny"
 
+    fun tvRemoteSessions(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv-remote/sessions"
+
+    fun tvRemoteSession(baseUrl: String, sessionId: String): String =
+        "${tvRemoteSessions(baseUrl)}/$sessionId"
+
+    fun tvRemoteCurrentSessionForDevice(baseUrl: String): String =
+        "${normalizeBaseUrl(baseUrl)}/api/v1/tv-remote/devices/current/session"
+
+    fun tvRemotePrevious(baseUrl: String, sessionId: String): String =
+        "${tvRemoteSession(baseUrl, sessionId)}/previous"
+
+    fun tvRemoteNext(baseUrl: String, sessionId: String): String =
+        "${tvRemoteSession(baseUrl, sessionId)}/next"
+
+    fun tvRemoteEnd(baseUrl: String, sessionId: String): String =
+        "${tvRemoteSession(baseUrl, sessionId)}/end"
+
     fun imageCollections(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/image-collections"
 
     fun imageCollectionDetail(baseUrl: String, collectionId: String): String =
