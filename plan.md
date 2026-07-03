@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-03 20:18 +0800
+- 进度：完成压缩包导入大文件处理超时短修。管理端压缩包重试解包、单文件处理、分组处理和批次处理请求均显式关闭 Axios 默认 30 秒超时；API 回归测试已锁定这些长耗时动作必须 `timeout: 0`。同步在 `CONTEXT.md` 沉淀 `压缩包处理长耗时请求` 边界。
+- 影响文件：`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/api/admin.spec.js` 通过；`cd admin-web && npm run build` 通过（仅 Vite chunk size 既有警告）；`git diff --check -- admin-web/src/api/admin.js admin-web/src/api/admin.spec.js CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' admin-web/src/api/admin.js admin-web/src/api/admin.spec.js CONTEXT.md plan.md` 无输出。
+
+## 2026-07-03 20:16 +0800
+- 进度：开始短修压缩包导入大文件处理超时问题。已定位到后端处理链路无 30 秒显式超时，但管理端公共 Axios 默认 `timeout: 30000`，压缩包处理文件、处理分组、处理批次和重试解包请求未关闭默认超时；本轮先做前端 API 层短修，不改为后台任务模型。
+- 影响文件：预计涉及 `admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/api/admin.spec.js`、`cd admin-web && npm run build`、`git diff --check`、乱码扫描。
+
 ## 2026-07-03 15:41 +0800
 - 进度：完成管理端“待删除短视频”页面留白修复。页面已接回普通管理端 `Layout` 壳层，恢复侧栏、顶栏、命令面板和主内容留白；窄屏布局改为自然滚动并给队列/预览面板稳定高度，避免移动端空状态被压扁裁切。同步新增 router spec 锁定该页面必须接入普通壳层，并在 `CONTEXT.md` 沉淀 `admin 普通页面壳层` 术语。
 - 影响文件：`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`

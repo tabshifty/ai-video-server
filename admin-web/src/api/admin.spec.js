@@ -60,6 +60,8 @@ import {
   markAdminShortVideoPendingDelete,
   offlineAdminTVAppRelease,
   publishAdminTVAppRelease,
+  processAdminArchiveImportBatch,
+  processAdminArchiveImportFile,
   processAdminArchiveImportGroup,
   rescanAdminVideoSubtitles,
   removeAdminArchiveImportGroupFiles,
@@ -216,6 +218,8 @@ describe('archive import apis', () => {
     await uploadAdminArchiveImport(formData)
     await deleteAdminArchiveImportBatch('batch-1')
     await updateAdminArchiveImportFile('file-1', { title: '标题' })
+    await processAdminArchiveImportFile('file-1')
+    await processAdminArchiveImportBatch('batch-1')
     await retryAdminArchiveImportExtract('batch-1', payload)
 
     expect(post).toHaveBeenCalledWith('/admin/archive-import/upload', formData, {
@@ -226,7 +230,15 @@ describe('archive import apis', () => {
       timeout: 0
     })
     expect(put).toHaveBeenCalledWith('/admin/archive-import/files/file-1', { title: '标题' })
-    expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/retry-extract', payload)
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/files/file-1/process', null, {
+      timeout: 0
+    })
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/process', null, {
+      timeout: 0
+    })
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/retry-extract', payload, {
+      timeout: 0
+    })
   })
 
   it('manages archive import groups within a batch', async () => {
@@ -258,7 +270,9 @@ describe('archive import apis', () => {
     expect(put).toHaveBeenCalledWith('/admin/archive-import/groups/group-1', updatePayload)
     expect(post).toHaveBeenCalledWith('/admin/archive-import/groups/group-1/files', filePayload)
     expect(post).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1/groups/remove-files', filePayload)
-    expect(post).toHaveBeenCalledWith('/admin/archive-import/groups/group-1/process')
+    expect(post).toHaveBeenCalledWith('/admin/archive-import/groups/group-1/process', null, {
+      timeout: 0
+    })
     expect(remove).toHaveBeenCalledWith('/admin/archive-import/groups/group-1', {
       timeout: 0
     })

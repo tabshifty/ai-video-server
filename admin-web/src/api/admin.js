@@ -156,17 +156,28 @@ export const assignAdminArchiveImportGroupFiles = (id, payload) =>
   request.post(`/admin/archive-import/groups/${id}/files`, payload)
 export const removeAdminArchiveImportGroupFiles = (batchId, payload) =>
   request.post(`/admin/archive-import/batches/${batchId}/groups/remove-files`, payload)
-export const processAdminArchiveImportGroup = (id) => request.post(`/admin/archive-import/groups/${id}/process`)
+export const processAdminArchiveImportGroup = (id) =>
+  request.post(`/admin/archive-import/groups/${id}/process`, null, {
+    timeout: 0
+  })
 export const deleteAdminArchiveImportBatch = (id) =>
   request.delete(`/admin/archive-import/batches/${id}`, {
     timeout: 0
   })
 export const getAdminArchiveImportFileDetail = (id) => request.get(`/admin/archive-import/files/${id}`)
 export const updateAdminArchiveImportFile = (id, payload) => request.put(`/admin/archive-import/files/${id}`, payload)
-export const processAdminArchiveImportFile = (id) => request.post(`/admin/archive-import/files/${id}/process`)
-export const processAdminArchiveImportBatch = (id) => request.post(`/admin/archive-import/batches/${id}/process`)
+export const processAdminArchiveImportFile = (id) =>
+  request.post(`/admin/archive-import/files/${id}/process`, null, {
+    timeout: 0
+  })
+export const processAdminArchiveImportBatch = (id) =>
+  request.post(`/admin/archive-import/batches/${id}/process`, null, {
+    timeout: 0
+  })
 export const retryAdminArchiveImportExtract = (id, payload) =>
-  request.post(`/admin/archive-import/batches/${id}/retry-extract`, payload)
+  request.post(`/admin/archive-import/batches/${id}/retry-extract`, payload, {
+    timeout: 0
+  })
 export const getAdminImageGenerationStatus = () => request.get('/admin/image-generation/status')
 export const generateAdminImage = (payload) =>
   request.post('/admin/image-generation/generate', payload, {
