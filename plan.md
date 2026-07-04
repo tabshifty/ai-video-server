@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-04 12:54 +0800
+- 进度：完成 TV 海报墙六列密度修正并已推送到测试电视。`TvPosterWallScreen` 已从 `GridCells.Adaptive(minSize = 90.dp)` 改为固定 `6` 列，网格间距从 `16dp` 收紧到 `8dp`；`TvPosterWallFocusLayoutSpecTest` 同步改为锁定“固定六列 + 960dp TV 逻辑宽度下的焦点安全余量”；TV 端版本升级到 `0.1.131(131)`，并在 `CONTEXT.md` 追加海报墙六列密度约束。随后已构建 `armeabi-v7a` debug 包并通过 `adb -s 192.168.1.8:5555 install -r ...` 覆盖安装到测试电视，设备侧版本核对为 `0.1.131(131)`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallFocusLayoutSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPosterWallFocusLayoutSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug` 通过；`git diff --check -- ...` 通过；`rg -n $'\uFFFD' ...` 无输出；`adb connect 192.168.1.8` 成功；`adb -s 192.168.1.8:5555 install -r android-tv-app/tv-app/build/outputs/apk/debug/tv-app-armeabi-v7a-debug.apk` 成功；`adb -s 192.168.1.8:5555 shell dumpsys package com.chee.videos.tv | rg -n "versionName|versionCode"` 显示 `0.1.131(131)`。
+
+## 2026-07-04 12:48 +0800
+- 进度：开始修正 TV 端海报墙网格密度。已核对现状：独立页面在 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`，当前用 `GridCells.Adaptive(minSize = 90.dp)`，这会在 1080p/4K TV 的逻辑 dp 宽度上一屏塞进 8 列以上，不符合当前“海报墙每行应为 6 列、卡片间距更紧”的实机诉求。计划改为固定 6 列并下调网格间距，同时同步修正规格测试、TV 版本号与 `CONTEXT.md` 沉淀。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallFocusLayoutSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvPosterWallFocusLayoutSpecTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:assembleDebug`、`git diff --check`、`rg -n $'\\uFFFD' ...`
+
 ## 2026-07-04 12:29 +0800
 - 进度：完成安装包管理二维码入口实现并验证通过。管理端安装包页已新增独立二维码卡片，按客户端切换显示 `TV 下载二维码` / `手机端下载二维码`；二维码内容固定指向对应客户端下载页，生产/同服访问沿用当前 origin，Vite 开发态则回退到 `VITE_API_PROXY_TARGET` 对应的后端 origin，避免扫到 `:5173/downloads/**` 的 404 地址。同步补了纯 helper 和页面源文测试，并引入 `qrcode` 依赖生成本地 data URL，不依赖外部二维码服务。
 - 影响文件：`admin-web/package.json`、`admin-web/package-lock.json`、`admin-web/src/views/TvAppManage.vue`、`admin-web/src/views/tvAppManage.qr.js`、`admin-web/src/views/tvAppManage.qr.spec.js`、`admin-web/src/views/tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`

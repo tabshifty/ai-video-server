@@ -13,13 +13,19 @@ class TvPosterWallFocusLayoutSpecTest {
         assertTrue(TvPosterWallFocusLayoutSpec.gridTopPaddingDp >= TvFocusSafeSpec.posterFocusSafeSpaceDp)
         assertTrue(TvPosterWallFocusLayoutSpec.gridBottomPaddingDp >= TvFocusSafeSpec.posterFocusSafeSpaceDp)
         assertTrue(TvPosterWallFocusLayoutSpec.gridBottomPaddingDp >= TvLayoutSpec.scrollBottomSafePaddingDp)
-        assertTrue(TvPosterWallFocusLayoutSpec.gridItemSpacingDp >= TvFocusSafeSpec.posterFocusSafeSpaceDp * 2)
-        // 纯 9:16 卡 + 1.08 放大 + 中性落影抬升，顶行聚焦时垂直方向既要吸收缩放溢出又要吸收落影外溢：
-        // 顶部内边距必须 ≥ 焦点垂直溢出 + 落影 elevation，否则聚焦卡的落影/圆角会被顶部栏裁切。
-        // 最坏列宽取 Adaptive(minSize=90) 单列上限（略低于 2×minSize=180dp）——窄容器单列场景下卡最宽、
-        // 垂直溢出最大；TV 宽屏实际是多列近 90dp 地板，但护栏按最坏算。
-        val worstColumnWidthDp = 179f
-        val worstCardHeightDp = worstColumnWidthDp * 16f / 9f
+        assertTrue(TvPosterWallFocusLayoutSpec.gridColumnCount == 6)
+        assertTrue(TvPosterWallFocusLayoutSpec.gridItemSpacingDp >= TvFocusSafeSpec.posterFocusSafeSpaceDp)
+        // 设计目标以 1920x1080 / density 320 的 TV 逻辑宽度 960dp 为准：
+        // 固定 6 列、左右 24dp content padding、列间 8dp，再扣掉卡片外层双侧 8dp 焦点安全带后，
+        // 顶行聚焦时顶部内边距仍需同时吸收 1.08 放大的垂直溢出和 10dp 中性落影外溢。
+        val denseTvViewportWidthDp = 960f
+        val slotWidthDp = (
+            denseTvViewportWidthDp -
+                TvPosterWallFocusLayoutSpec.gridHorizontalPaddingDp * 2 -
+                TvPosterWallFocusLayoutSpec.gridItemSpacingDp * (TvPosterWallFocusLayoutSpec.gridColumnCount - 1)
+            ) / TvPosterWallFocusLayoutSpec.gridColumnCount
+        val worstCardWidthDp = slotWidthDp - TvFocusSafeSpec.posterFocusSafeSpaceDp * 2
+        val worstCardHeightDp = worstCardWidthDp * 16f / 9f
         val scaleOverflowDp = TvFocusSafeSpec.requiredSafeSpaceDp(
             baseSizeDp = worstCardHeightDp,
             focusedScale = TvPosterWallFocusLayoutSpec.posterWallFocusedScale,
@@ -27,7 +33,7 @@ class TvPosterWallFocusLayoutSpecTest {
         )
         val requiredTopPaddingDp = scaleOverflowDp + TvPosterWallFocusLayoutSpec.posterWallFocusedShadowElevationDp
         assertTrue(
-            "海报墙顶部内边距 ${TvPosterWallFocusLayoutSpec.gridTopPaddingDp}dp 应 ≥ 顶行聚焦垂直溢出 $scaleOverflowDp dp + 落影 ${TvPosterWallFocusLayoutSpec.posterWallFocusedShadowElevationDp}dp（最坏列宽 ${worstColumnWidthDp}dp × 16/9）",
+            "海报墙顶部内边距 ${TvPosterWallFocusLayoutSpec.gridTopPaddingDp}dp 应 ≥ 顶行聚焦垂直溢出 $scaleOverflowDp dp + 落影 ${TvPosterWallFocusLayoutSpec.posterWallFocusedShadowElevationDp}dp（960dp 视口下卡宽 ${worstCardWidthDp}dp × 16/9）",
             TvPosterWallFocusLayoutSpec.gridTopPaddingDp >= requiredTopPaddingDp,
         )
     }
@@ -97,8 +103,14 @@ class TvPosterWallFocusLayoutSpecTest {
         val source = sourcePath.toFile().readText()
 
         assertTrue(
-            "海报墙网格 minSize 应降到 90dp 量级以在 4K TV 上塞进 6 列，不应保留旧的 170dp",
-            source.contains("GridCells.Adaptive(minSize = 90.dp)"),
+            "海报墙独立页必须固定 6 列，不能再靠 Adaptive(minSize) 让不同电视自行挤出 8 列",
+            TvPosterWallFocusLayoutSpec.gridColumnCount == 6 &&
+                source.contains("GridCells.Fixed(TvPosterWallFocusLayoutSpec.gridColumnCount)") &&
+                !source.contains("GridCells.Adaptive("),
+        )
+        assertTrue(
+            "海报墙列间距应收紧到 8dp，卡片外层已有 8dp 焦点安全带，不需要继续保留 16dp 大 gutter",
+            TvPosterWallFocusLayoutSpec.gridItemSpacingDp == 8f,
         )
     }
 

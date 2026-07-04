@@ -86,10 +86,12 @@ private val TvPosterWallTitleScrimBrush = Brush.verticalGradient(
 )
 
 internal object TvPosterWallFocusLayoutSpec {
+    const val gridColumnCount: Int = 6
     const val gridHorizontalPaddingDp: Float = 24f
     const val gridTopPaddingDp: Float = 26f
     const val gridBottomPaddingDp: Float = TvLayoutSpec.scrollBottomSafePaddingDp
-    const val gridItemSpacingDp: Float = 16f
+    // 卡片本身已带 8dp 焦点安全外容器，网格 gutter 维持 8dp 即可把可见卡缝收紧到约 24dp。
+    const val gridItemSpacingDp: Float = 8f
     // 海报墙想要比首页/目录页更醒目的聚焦放大，但 TvFocusSafeSpec.posterFocusedScale 是首页/目录页共用的
     // 共享 token（恒 1.04f），改它会连带改其它页面。海报墙专属的 1.08f 收口在这里，显式传给卡片。
     const val posterWallFocusedScale: Float = 1.08f
@@ -169,7 +171,7 @@ fun TvPosterWallScreen(
             else -> {
                 LazyVerticalGrid(
                     state = gridState,
-                    columns = GridCells.Adaptive(minSize = 90.dp),
+                    columns = GridCells.Fixed(TvPosterWallFocusLayoutSpec.gridColumnCount),
                     contentPadding = PaddingValues(
                         start = TvPosterWallFocusLayoutSpec.gridHorizontalPaddingDp.dp,
                         end = TvPosterWallFocusLayoutSpec.gridHorizontalPaddingDp.dp,
