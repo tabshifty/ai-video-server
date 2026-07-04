@@ -11,6 +11,9 @@ class TvRemotePlaybackControlsSpecTest {
         val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt").readText()
 
         listOf(
+            ".focusRequester(rootFocusRequester)",
+            ".focusable()",
+            "rootFocusRequester.tryRequestFocus()",
             "AndroidKeyEvent.KEYCODE_DPAD_LEFT",
             "AndroidKeyEvent.KEYCODE_DPAD_RIGHT",
             "showSeekOverlay = true",

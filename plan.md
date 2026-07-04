@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-04 14:05 +0800
+- 进度：修复 TV 远程投放页真机遥控器按键失效。根因是页面把 `onPreviewKeyEvent` 挂在根 `Box` 上，但没有像 `TvShortFeedScreen` 一样显式建立 `focusRequester + focusable + LaunchedTvInitialFocus` 焦点链，真机上按键未稳定落到 Compose 根节点，导致 `上一个/下一个`、`暂停/播放`、`快进/快退` 一起失效。已补根焦点请求与初始抢焦点，并把 `PlayerView` 设为不抢焦点；同步补源码规格测试锁定 `rootFocusRequester.tryRequestFocus()` 与根节点 `.focusable()` 挂点。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvRemotePlaybackSeekMathTest --tests com.chee.videos.feature.tv.TvRemotePlaybackControlsSpecTest --tests com.chee.videos.feature.tv.TvRemotePlaybackLifecycleSpecTest --tests com.chee.videos.tv.TvRemotePlaybackNavigationSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；`git diff --check -- android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt plan.md` 通过；`rg -n $'\uFFFD' ...` 无输出。
+
 ## 2026-07-04 13:51 +0800
 - 进度：完成 TV 远程投放页控播增强。`TvRemotePlaybackScreen` 已补本地 `左右键快退/快进`、沿用全局 seek 步长与连按加速、seek 时底部进度条反馈、`中键/播放键` 暂停播放中心提示、左上信息层与右侧三键操作区 3 秒自动隐藏、切条后自动回显、错误态保持恢复入口可见；`TvRemotePlaybackViewModel` 同步读取全局 seek 步长；TV 端版本升级到 `0.1.132(132)`。同时补了 `TvRemotePlaybackSeekMathTest` 和 `TvRemotePlaybackControlsSpecTest` 锁定 seek 计算、源码挂点与自动隐藏约束。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackSeekMathTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

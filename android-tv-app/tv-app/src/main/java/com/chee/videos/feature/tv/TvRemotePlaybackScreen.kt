@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,7 +76,9 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvMotionTokens
+import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.util.UrlBuilder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -234,6 +239,7 @@ fun TvRemotePlaybackScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
+    val rootFocusRequester = remember { FocusRequester() }
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
             if (accessToken.isNotBlank()) {
@@ -419,10 +425,18 @@ fun TvRemotePlaybackScreen(
         }
     }
 
+    LaunchedTvInitialFocus(currentVideoId, visibleErrorMessage, uiState.loading, session?.currentIndex) {
+        if (currentVideoId.isNotBlank() && visibleErrorMessage == null && !uiState.loading) {
+            rootFocusRequester.tryRequestFocus()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(AppChrome.PageGradient)
+            .focusRequester(rootFocusRequester)
+            .focusable()
             .onPreviewKeyEvent { event ->
                 if (event.nativeKeyEvent.action != AndroidKeyEvent.ACTION_DOWN) {
                     return@onPreviewKeyEvent false
@@ -491,9 +505,15 @@ fun TvRemotePlaybackScreen(
                                 useController = false
                                 setShutterBackgroundColor(AndroidColor.BLACK)
                                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                isFocusable = false
+                                isFocusableInTouchMode = false
                             }
                         },
-                        update = { view -> view.player = sharedPlayer },
+                        update = { view ->
+                            view.player = sharedPlayer
+                            view.isFocusable = false
+                            view.isFocusableInTouchMode = false
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
