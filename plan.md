@@ -2,6 +2,66 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-04 13:51 +0800
+- 进度：完成 TV 远程投放页控播增强。`TvRemotePlaybackScreen` 已补本地 `左右键快退/快进`、沿用全局 seek 步长与连按加速、seek 时底部进度条反馈、`中键/播放键` 暂停播放中心提示、左上信息层与右侧三键操作区 3 秒自动隐藏、切条后自动回显、错误态保持恢复入口可见；`TvRemotePlaybackViewModel` 同步读取全局 seek 步长；TV 端版本升级到 `0.1.132(132)`。同时补了 `TvRemotePlaybackSeekMathTest` 和 `TvRemotePlaybackControlsSpecTest` 锁定 seek 计算、源码挂点与自动隐藏约束。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackSeekMathTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvRemotePlaybackSeekMathTest --tests com.chee.videos.feature.tv.TvRemotePlaybackControlsSpecTest --tests com.chee.videos.feature.tv.TvRemotePlaybackLifecycleSpecTest --tests com.chee.videos.tv.TvRemotePlaybackNavigationSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；`git diff --check -- CONTEXT.md plan.md android-tv-app/tv-app/build.gradle.kts android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackSeekMathTest.kt` 通过；`rg -n $'\uFFFD' ...` 无输出。
+
+## 2026-07-04 13:45 +0800
+- 进度：开始实现 TV 远程投放页控播增强。已收口的边界包括：左右键本地 seek、seek 连按加速、快进快退时显示底部进度条、左上信息层 + 右侧三键操作区 3 秒自动隐藏、错误态保持恢复入口可见。下一步先补 `TvRemotePlaybackScreen` 的红灯测试（seek 计算 / 源文挂点），再改 `TvRemotePlaybackScreen`、`TvRemotePlaybackViewModel`、TV 版本号与对应文档记录。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/*`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvRemotePlayback*`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、`rg -n $'\\uFFFD' ...`
+
+## 2026-07-04 13:35 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页错误态行为。已确认当前条播放失败或不可播放时，左上信息层与右侧操作区保持可见，不继续自动隐藏，方便用户直接用会话级按钮切条恢复；对应术语已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行错误态提示层级边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:30 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页左右键连按手感。已确认远程投放页的条内 seek 沿用现有 TV 短视频页的“按键重复时放大单次 seek 增量”规则，不改成始终固定一个基础步长；对应术语已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行切条后 UI 回显边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:29 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页 seek 步长来源。已确认远程投放页的条内快进/快退直接复用 TV 现有全局 seek 步长设置，不单独定义页面级固定秒数；对应术语已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 seek 连按手感边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:28 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页操作区内容。已确认右侧常驻操作区仍只保留 `上一个 / 暂停播放 / 下一个` 这组三键，不新增显式 `快退 / 快进` 按钮；条内 seek 统一走遥控器左右键和临时进度反馈。对应术语已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 seek 步长边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:26 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页暂停态行为。已确认即使当前条处于暂停态，标题区和右侧操作区仍然遵循“交互后回显、3 秒无操作自动隐藏”的沉浸规则，不因为暂停改成常驻显示；对应术语已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行剩余布局边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:20 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页标题布局。已确认“标题放到上面”指整块信息一起上移到左上角：主标题与 `设备名 · 第 n / m 条` 副信息作为同一组顶部信息层一起显示并跟随 3 秒自动隐藏，不保留底部残留信息条。对应术语已追加到 `CONTEXT.md`。同时已核对代码现状：TV 短视频页与长视频页都复用 `readTvSeekStepSeconds()` 的全局 TV seek 步长设置，因此远程投放页后续会沿用同一套步长，不再引入额外设置项。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行剩余交互边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:17 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页反馈层级。已确认 3 秒自动隐藏只作用于常驻标题区和右侧操作区，不会一并禁掉暂停/播放中心反馈与 seek 进度反馈；用户触发本地控播时，这两类临时反馈仍可像短视频页一样短暂回显。对应契约已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行标题上移边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:09 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页自动隐藏行为。已确认 UI 不是“首进 3 秒后永久消失”，而是“首进先显示、每次遥控器交互时回显并重置计时、连续 3 秒无操作再隐藏”；对应长期交互契约已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行最后一轮显示层边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:07 +0800
+- 进度：继续通过 `grill-with-docs` 收口 TV 投放页交互。已确认遥控器键位分工采用“上下切条、左右条内 seek、中键暂停/播放”，保持现有 `上一个/下一个` 会话级控制不变，同时把快进/快退限定为当前 TV 本机播放器的本地进度调整；对应长期交互契约已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续“3 秒自动隐藏”与标题布局边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
+## 2026-07-04 13:06 +0800
+- 进度：开始通过 `grill-with-docs` 收口“TV 投屏页增加快进/快退、暂停/播放、3 秒自动隐藏、标题上移”边界。已核对现状：目标页面是 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`，当前仅支持 `上一个/下一个/暂停播放`，标题在底部、控制区常显；并已确认首条关键边界为“投放页的暂停/播放与快进/快退仅控制 TV 本机播放器，不回写手机端或服务端会话协议”，对应术语已追加到 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续交互边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
 ## 2026-07-04 12:54 +0800
 - 进度：完成 TV 海报墙六列密度修正并已推送到测试电视。`TvPosterWallScreen` 已从 `GridCells.Adaptive(minSize = 90.dp)` 改为固定 `6` 列，网格间距从 `16dp` 收紧到 `8dp`；`TvPosterWallFocusLayoutSpecTest` 同步改为锁定“固定六列 + 960dp TV 逻辑宽度下的焦点安全余量”；TV 端版本升级到 `0.1.131(131)`，并在 `CONTEXT.md` 追加海报墙六列密度约束。随后已构建 `armeabi-v7a` debug 包并通过 `adb -s 192.168.1.8:5555 install -r ...` 覆盖安装到测试电视，设备侧版本核对为 `0.1.131(131)`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvPosterWallFocusLayoutSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`

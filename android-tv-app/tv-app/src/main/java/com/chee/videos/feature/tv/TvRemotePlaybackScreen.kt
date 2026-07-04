@@ -5,6 +5,7 @@ import android.net.Uri
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -12,9 +13,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -29,8 +36,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +62,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -63,6 +73,7 @@ import coil.compose.AsyncImage
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.TvMotionTokens
 import com.chee.videos.core.util.UrlBuilder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -85,6 +96,7 @@ data class TvRemotePlaybackUiState(
     val session: TvRemoteSessionDto? = null,
     val currentSourceUrl: String = "",
     val currentPosterUrl: String = "",
+    val seekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
     val actionLoading: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -99,6 +111,14 @@ class TvRemotePlaybackViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(TvRemotePlaybackUiState())
     val uiState: StateFlow<TvRemotePlaybackUiState> = _uiState.asStateFlow()
     private var pollingJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(seekStepSeconds = TvPlaybackSeekStepSetting.normalize(repository.readTvSeekStepSeconds()))
+            }
+        }
+    }
 
     fun previous() {
         runAction { repository.tvRemotePrevious(sessionId) }
@@ -213,6 +233,7 @@ fun TvRemotePlaybackScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
             if (accessToken.isNotBlank()) {
@@ -229,9 +250,79 @@ fun TvRemotePlaybackScreen(
     var renderedVideoId by remember { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable { mutableStateOf(false) }
+    var showChrome by rememberSaveable { mutableStateOf(true) }
+    var chromeHideJob by remember { mutableStateOf<Job?>(null) }
+    var showCenterIndicator by remember { mutableStateOf(false) }
+    var centerIndicatorIsPause by remember { mutableStateOf(false) }
+    var centerIndicatorHideJob by remember { mutableStateOf<Job?>(null) }
+    var showSeekOverlay by remember { mutableStateOf(false) }
+    var seekOverlayPositionMs by remember { mutableLongStateOf(0L) }
+    var seekOverlayDurationMs by remember { mutableLongStateOf(0L) }
+    var seekOverlayHideJob by remember { mutableStateOf<Job?>(null) }
+    var playbackErrorMessage by remember { mutableStateOf<String?>(null) }
     val session = uiState.session
     val currentItem = session?.currentItem ?: session?.items?.getOrNull(session.currentIndex)
     val currentVideoId = session?.currentVideoId ?: currentItem?.videoId.orEmpty()
+    val visibleErrorMessage = uiState.errorMessage ?: playbackErrorMessage
+    val keepChromeVisible = !visibleErrorMessage.isNullOrBlank()
+
+    fun scheduleChromeAutoHide() {
+        chromeHideJob?.cancel()
+        if (keepChromeVisible) {
+            showChrome = true
+            return
+        }
+        chromeHideJob = coroutineScope.launch {
+            delay(TvRemoteChromeAutoHideDurationMillis)
+            if (uiState.errorMessage.isNullOrBlank() && playbackErrorMessage.isNullOrBlank()) {
+                showChrome = false
+            }
+        }
+    }
+
+    fun showChromeTemporarily() {
+        showChrome = true
+        scheduleChromeAutoHide()
+    }
+
+    fun togglePlaybackWithFeedback() {
+        isPausedByUser = if (sharedPlayer.isPlaying) {
+            sharedPlayer.pause()
+            true
+        } else {
+            sharedPlayer.play()
+            false
+        }
+        centerIndicatorIsPause = isPausedByUser
+        showCenterIndicator = true
+        centerIndicatorHideJob?.cancel()
+        centerIndicatorHideJob = coroutineScope.launch {
+            delay(TvRemoteCenterIndicatorDurationMillis)
+            showCenterIndicator = false
+        }
+        showChromeTemporarily()
+    }
+
+    fun applySeek(forward: Boolean, repeatCount: Int) {
+        val targetMs = calculateTvRemoteSeekTarget(
+            currentPositionMs = sharedPlayer.currentPosition.coerceAtLeast(0L),
+            durationMs = sharedPlayer.duration,
+            stepSeconds = uiState.seekStepSeconds,
+            repeatCount = repeatCount,
+            forward = forward,
+        ) ?: return
+        val durationMs = sharedPlayer.duration.takeIf { it > 0L } ?: return
+        sharedPlayer.seekTo(targetMs)
+        seekOverlayPositionMs = targetMs
+        seekOverlayDurationMs = durationMs
+        showSeekOverlay = true
+        seekOverlayHideJob?.cancel()
+        seekOverlayHideJob = coroutineScope.launch {
+            delay(TvRemoteSeekOverlayDurationMillis)
+            showSeekOverlay = false
+        }
+        showChromeTemporarily()
+    }
 
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
@@ -267,14 +358,24 @@ fun TvRemotePlaybackScreen(
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
                 renderedVideoId = sharedPlayer.currentMediaItem?.mediaId
+                playbackErrorMessage = null
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 isPlayerActuallyPlaying = isPlaying
             }
+
+            override fun onPlayerError(error: PlaybackException) {
+                playbackErrorMessage = error.message?.trim().takeUnless { it.isNullOrBlank() } ?: "播放失败"
+                showChrome = true
+                chromeHideJob?.cancel()
+            }
         }
         sharedPlayer.addListener(listener)
         onDispose {
+            chromeHideJob?.cancel()
+            centerIndicatorHideJob?.cancel()
+            seekOverlayHideJob?.cancel()
             sharedPlayer.removeListener(listener)
             sharedPlayer.release()
         }
@@ -288,6 +389,9 @@ fun TvRemotePlaybackScreen(
             return@LaunchedEffect
         }
         renderedVideoId = null
+        playbackErrorMessage = null
+        showSeekOverlay = false
+        showCenterIndicator = false
         sharedPlayer.stop()
         sharedPlayer.clearMediaItems()
         val mediaItem = MediaItem.Builder()
@@ -300,6 +404,21 @@ fun TvRemotePlaybackScreen(
         sharedPlayer.playWhenReady = !isPausedByUser
     }
 
+    LaunchedEffect(currentVideoId) {
+        if (currentVideoId.isNotBlank()) {
+            showChromeTemporarily()
+        }
+    }
+
+    LaunchedEffect(keepChromeVisible) {
+        if (keepChromeVisible) {
+            showChrome = true
+            chromeHideJob?.cancel()
+        } else if (showChrome) {
+            scheduleChromeAutoHide()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -310,6 +429,7 @@ fun TvRemotePlaybackScreen(
                 }
                 when (event.nativeKeyEvent.keyCode) {
                     AndroidKeyEvent.KEYCODE_DPAD_UP -> {
+                        showChromeTemporarily()
                         if (session?.hasPrevious == true && !uiState.actionLoading) {
                             viewModel.previous()
                         }
@@ -317,9 +437,20 @@ fun TvRemotePlaybackScreen(
                     }
 
                     AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                        showChromeTemporarily()
                         if (session?.hasNext == true && !uiState.actionLoading) {
                             viewModel.next()
                         }
+                        true
+                    }
+
+                    AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+                        applySeek(forward = false, repeatCount = event.nativeKeyEvent.repeatCount)
+                        true
+                    }
+
+                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        applySeek(forward = true, repeatCount = event.nativeKeyEvent.repeatCount)
                         true
                     }
 
@@ -327,13 +458,7 @@ fun TvRemotePlaybackScreen(
                     AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                     AndroidKeyEvent.KEYCODE_SPACE,
                     -> {
-                        isPausedByUser = if (sharedPlayer.isPlaying) {
-                            sharedPlayer.pause()
-                            true
-                        } else {
-                            sharedPlayer.play()
-                            false
-                        }
+                        togglePlaybackWithFeedback()
                         true
                     }
 
@@ -381,38 +506,64 @@ fun TvRemotePlaybackScreen(
                     )
                 }
                 Box(modifier = Modifier.fillMaxSize().background(Color(0x30000000)))
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .navigationBarsPadding()
-                        .padding(28.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                AnimatedVisibility(
+                    visible = showChrome || keepChromeVisible,
+                    enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    modifier = Modifier.align(Alignment.TopStart),
                 ) {
-                    Text(
-                        text = currentItem?.title?.ifBlank { "短视频投放" } ?: "短视频投放",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                    TvRemotePlaybackInfoOverlay(
+                        title = currentItem?.title?.ifBlank { "短视频投放" } ?: "短视频投放",
+                        subtitle = "${session.deviceName.ifBlank { session.deviceId }} · 第 ${session.currentIndex + 1} / ${session.items.size.coerceAtLeast(1)} 条",
+                        errorMessage = visibleErrorMessage,
                     )
-                    Text(
-                        text = "${session.deviceName.ifBlank { session.deviceId }} · 第 ${session.currentIndex + 1} / ${session.items.size.coerceAtLeast(1)} 条",
-                        color = Color(0xFFD2D7DF),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    if (!uiState.errorMessage.isNullOrBlank()) {
-                        Text(
-                            text = uiState.errorMessage.orEmpty(),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                }
+                AnimatedVisibility(
+                    visible = showCenterIndicator,
+                    enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    modifier = Modifier.align(Alignment.Center),
+                ) {
+                    Surface(
+                        color = AppChrome.Surface.copy(alpha = 0.82f),
+                        shape = CircleShape,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (centerIndicatorIsPause) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.White,
+                            )
+                            Text(
+                                text = if (centerIndicatorIsPause) "已暂停" else "继续播放",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
                 AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
+                    visible = showSeekOverlay && seekOverlayDurationMs > 0L,
+                    enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 24.dp),
+                ) {
+                    TvRemotePlaybackBottomProgressBar(
+                        positionMs = seekOverlayPositionMs,
+                        durationMs = seekOverlayDurationMs,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = showChrome || keepChromeVisible,
+                    enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
                     modifier = Modifier.align(Alignment.CenterEnd),
                 ) {
                     Column(
@@ -430,15 +581,7 @@ fun TvRemotePlaybackScreen(
                             icon = if (sharedPlayer.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             label = if (sharedPlayer.isPlaying) "暂停" else "播放",
                             enabled = true,
-                            onClick = {
-                                if (sharedPlayer.isPlaying) {
-                                    sharedPlayer.pause()
-                                    isPausedByUser = true
-                                } else {
-                                    sharedPlayer.play()
-                                    isPausedByUser = false
-                                }
-                            },
+                            onClick = ::togglePlaybackWithFeedback,
                         )
                         TvRemoteActionBubble(
                             icon = Icons.Filled.SkipNext,
@@ -449,6 +592,93 @@ fun TvRemotePlaybackScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TvRemotePlaybackInfoOverlay(
+    title: String,
+    subtitle: String,
+    errorMessage: String?,
+) {
+    Column(
+        modifier = Modifier
+            .statusBarsPadding()
+            .padding(start = 24.dp, top = 24.dp, end = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = title,
+            color = Color.White,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 720.dp),
+        )
+        Text(
+            text = subtitle,
+            color = Color(0xFFD2D7DF),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 720.dp),
+        )
+        if (!errorMessage.isNullOrBlank()) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 720.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvRemotePlaybackBottomProgressBar(
+    positionMs: Long,
+    durationMs: Long,
+) {
+    val progress = if (durationMs <= 0L) {
+        0f
+    } else {
+        (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Surface(
+            color = AppChrome.Surface.copy(alpha = 0.92f),
+            shape = AppChrome.SurfaceShape,
+        ) {
+            Text(
+                text = "${formatTvRemotePlaybackTime(positionMs)} / ${formatTvRemotePlaybackTime(durationMs)}",
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .widthIn(min = 320.dp, max = 560.dp)
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(CircleShape)
+                .background(AppChrome.TextPrimary.copy(alpha = 0.18f)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(AppChrome.AccentStrong, CircleShape),
+            )
         }
     }
 }
@@ -475,3 +705,41 @@ private fun TvRemoteActionBubble(
         Text(label, color = Color.White.copy(alpha = alpha), style = MaterialTheme.typography.bodySmall)
     }
 }
+
+internal fun calculateTvRemoteSeekTarget(
+    currentPositionMs: Long,
+    durationMs: Long,
+    stepSeconds: Int,
+    repeatCount: Int,
+    forward: Boolean,
+): Long? {
+    if (durationMs <= 0L) {
+        return null
+    }
+    val current = currentPositionMs.coerceAtLeast(0L)
+    val stepMs = TvPlaybackSeekStepSetting.normalize(stepSeconds) * 1_000L
+    val deltaMs = stepMs * if (repeatCount > 0) 3L else 1L
+    return if (forward) {
+        (current + deltaMs).coerceAtMost(durationMs)
+    } else {
+        (current - deltaMs).coerceAtLeast(0L)
+    }
+}
+
+private fun formatTvRemotePlaybackTime(ms: Long): String {
+    val totalSeconds = ms.coerceAtLeast(0L) / 1_000L
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
+    val seconds = totalSeconds % 60L
+    return buildString {
+        append(hours.toString().padStart(2, '0'))
+        append(':')
+        append(minutes.toString().padStart(2, '0'))
+        append(':')
+        append(seconds.toString().padStart(2, '0'))
+    }
+}
+
+private const val TvRemoteChromeAutoHideDurationMillis = 3_000L
+private const val TvRemoteCenterIndicatorDurationMillis = 700L
+private const val TvRemoteSeekOverlayDurationMillis = 1_200L
