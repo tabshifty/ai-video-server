@@ -23,6 +23,8 @@ class TvRemotePlaybackControlsSpecTest {
             ".align(Alignment.BottomCenter)",
             "TvRemotePlaybackBottomProgressBar(",
             "repository.readTvSeekStepSeconds()",
+            "contentScale = ContentScale.Fit",
+            "resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT",
         ).forEach { line ->
             assertTrue("TvRemotePlaybackScreen 必须包含 $line", source.contains(line))
         }

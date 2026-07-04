@@ -521,7 +521,7 @@ fun TvRemotePlaybackScreen(
                     AsyncImage(
                         model = uiState.currentPosterUrl,
                         contentDescription = "${currentItem?.title.orEmpty()} 封面",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-04 14:12 +0800
+- 进度：完成 TV 远程投放页 poster 承接修复。`TvRemotePlaybackScreen` 的首帧前封面已从 `ContentScale.Crop` 改为 `ContentScale.Fit`，与同页 `PlayerView` 的 `AspectRatioFrameLayout.RESIZE_MODE_FIT` 保持一致，避免投放页封面先全屏铺满、切到视频后尺寸突变。源码规格测试已同步锁定 `contentScale = ContentScale.Fit` 与 `resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT`；TV 端版本升级到 `0.1.133(133)`。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvRemotePlaybackControlsSpecTest --tests com.chee.videos.feature.tv.TvRemotePlaybackLifecycleSpecTest --tests com.chee.videos.tv.TvRemotePlaybackNavigationSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；`git diff --check -- android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt android-tv-app/tv-app/build.gradle.kts plan.md` 通过；`rg -n $'\uFFFD' ...` 无输出。
+
+## 2026-07-04 14:10 +0800
+- 进度：开始修正 TV 远程投放页首帧前 poster 承接方式。实机反馈显示投放页开始播放前的封面仍按全屏铺满，未跟随 `PlayerView.RESIZE_MODE_FIT` 的视频承接尺寸；计划把 `TvRemotePlaybackScreen` 的 poster 改为和播放器一致的 `FIT` 语义，并补源码规格测试锁定该约束，同时按仓库规则递增 TV 版本号。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`
+- 验证：待执行 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvRemotePlaybackControlsSpecTest --tests com.chee.videos.feature.tv.TvRemotePlaybackLifecycleSpecTest --tests com.chee.videos.tv.TvRemotePlaybackNavigationSpecTest`、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
 ## 2026-07-04 14:05 +0800
 - 进度：修复 TV 远程投放页真机遥控器按键失效。根因是页面把 `onPreviewKeyEvent` 挂在根 `Box` 上，但没有像 `TvShortFeedScreen` 一样显式建立 `focusRequester + focusable + LaunchedTvInitialFocus` 焦点链，真机上按键未稳定落到 Compose 根节点，导致 `上一个/下一个`、`暂停/播放`、`快进/快退` 一起失效。已补根焦点请求与初始抢焦点，并把 `PlayerView` 设为不抢焦点；同步补源码规格测试锁定 `rootFocusRequester.tryRequestFocus()` 与根节点 `.focusable()` 挂点。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`plan.md`
