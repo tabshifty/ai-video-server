@@ -2,6 +2,61 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-04 12:29 +0800
+- 进度：完成安装包管理二维码入口实现并验证通过。管理端安装包页已新增独立二维码卡片，按客户端切换显示 `TV 下载二维码` / `手机端下载二维码`；二维码内容固定指向对应客户端下载页，生产/同服访问沿用当前 origin，Vite 开发态则回退到 `VITE_API_PROXY_TARGET` 对应的后端 origin，避免扫到 `:5173/downloads/**` 的 404 地址。同步补了纯 helper 和页面源文测试，并引入 `qrcode` 依赖生成本地 data URL，不依赖外部二维码服务。
+- 影响文件：`admin-web/package.json`、`admin-web/package-lock.json`、`admin-web/src/views/TvAppManage.vue`、`admin-web/src/views/tvAppManage.qr.js`、`admin-web/src/views/tvAppManage.qr.spec.js`、`admin-web/src/views/tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/tvAppManage.qr.spec.js src/views/tvAppManagePage.spec.js` 通过；`cd admin-web && npm run build` 通过（仅现有 chunk size warning）；`git diff --check -- CONTEXT.md plan.md admin-web/package.json admin-web/package-lock.json admin-web/src/views/TvAppManage.vue admin-web/src/views/tvAppManage.qr.js admin-web/src/views/tvAppManage.qr.spec.js admin-web/src/views/tvAppManagePage.spec.js` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src/views/TvAppManage.vue admin-web/src/views/tvAppManage.qr.js admin-web/src/views/tvAppManage.qr.spec.js admin-web/src/views/tvAppManagePage.spec.js` 无输出。
+
+## 2026-07-04 12:26 +0800
+- 进度：开始实现安装包管理二维码入口。计划先补 `admin-web` 纯 helper 与页面源文测试，锁定客户端下载页路径、标题和开发态 origin 回退规则；再把二维码卡片接到 `TvAppManage.vue`；最后执行 `vitest` 定向测试、`npm run build`、`git diff --check` 与乱码扫描。
+- 影响文件：预计涉及 `admin-web/package.json`、`admin-web/package-lock.json`、`admin-web/src/views/TvAppManage.vue`、`admin-web/src/views/tvAppManagePage.spec.js`、可能新增 `admin-web/src/views/tvAppManage.qr.js` / `*.spec.js`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/tvAppManagePage.spec.js ...`、`cd admin-web && npm run build`、`git diff --check`、`rg -n $'\\uFFFD' ...`
+
+## 2026-07-04 12:24 +0800
+- 进度：继续通过 `grill-with-docs` 校正开发态二维码 origin 规则。已发现并收口一个与前述结论冲突的现状：Vite dev server 只代理 `/api/v1`，并不承载 `/downloads/**`，因此开发态若后台从 `:5173` 打开，二维码不能继续原样用前端 origin，而应回退到代理目标对应的后端 origin。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续标题中文术语精修问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 12:20 +0800
+- 进度：继续通过 `grill-with-docs` 收口二维码异常 origin 场景。已确认即使管理员后台是从 `localhost` 或 `127.0.0.1` 之类仅本机可达的地址打开，二维码也仍按当前访问 origin 原样生成，不额外拦截、替换或补提示。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续发布态空列表场景边界问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 12:17 +0800
+- 进度：继续通过 `grill-with-docs` 收口二维码 URL 来源。已确认二维码内容使用当前浏览器访问管理端时的同源 origin 来拼接客户端下载页路径，而不是依赖额外配置的固定公网/内网域名。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续异常 origin 场景边界问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 12:15 +0800
+- 进度：继续通过 `grill-with-docs` 收口二维码卡片标题。已确认卡片标题随客户端类型切换为具体命名，如 `TV 下载二维码` / `手机下载二维码`；由于卡片只保留标题和二维码，不再用泛标题。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续二维码 URL 来源边界问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 12:14 +0800
+- 进度：继续通过 `grill-with-docs` 收口二维码卡片最小文案。已确认卡片不显示按钮、完整地址或辅助说明句，只保留标题和二维码本体，维持最克制的扫码入口表达。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续标题命名边界问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 12:12 +0800
+- 进度：继续通过 `grill-with-docs` 收口二维码卡片内容边界。已确认分发入口卡片不附带“打开下载页”按钮，也不展示完整下载地址文本；二维码本身就是唯一显式入口，避免把页面又做回链接工具面板。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续最小文案边界问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 12:06 +0800
+- 进度：继续通过 `grill-with-docs` 收口安装包二维码页面层级。已确认二维码不混入上传表单或发布记录表格，而是在安装包管理页中作为独立分发入口卡片展示，位置放在统计区下方、上传区上方。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续卡片内容边界问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 12:04 +0800
+- 进度：继续通过 `grill-with-docs` 收口安装包二维码展示层。已确认二维码不是每条发布记录各自一张，而是随当前客户端类型切换、每次只展示一个固定下载页二维码，避免把“固定入口”误读成“版本级下载码”。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续布局层问答与最终实现阶段的管理端定向测试/构建验证。
+
+## 2026-07-04 11:59 +0800
+- 进度：开始通过 `grill-with-docs` 收口“安装包管理页补 TV / 手机端下载二维码”边界。已核对现状：管理端安装包工具页是 `admin-web/src/views/TvAppManage.vue`，家庭成员下载入口已存在并按客户端类型分轨到 `/downloads/android-tv` 与 `/downloads/android-phone`；本轮已先确认二维码不应直达某个具体版本或 APK，而应固定指向对应客户端下载页，避免后续发版后频繁换码。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行后续术语沉淀、展示层边界问答与最终实现阶段的管理端定向测试/构建验证。
+
 ## 2026-07-04 02:01 +0800
 - 进度：完成短视频搜索投放复审最终收口。第三轮独立复审新增打回的 4 个问题已修复：恢复误删的公开 `current-index` 接口以保持本轮改动最小；服务端当前 `device_id` 命中但无 active session 时会继续回退查询 `legacy_device_id`，避免 TV 升级后看不到老会话；TV 根壳在已处于远程投放页时收到新会话会替换当前投放页而不是继续压栈，确保 `BACK` 回原页面；手机端投放设备默认选择改为优先在线设备，避免升级后仍默认命中离线旧设备。相关 Go/Android 回归测试与文档已同步补齐。
 - 影响文件：`internal/handlers/router.go`、`internal/handlers/tv_remote.go`、`internal/handlers/recommend_test.go`、`internal/services/tv_remote.go`、`internal/services/tv_remote_test.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/tv/TvShellApp.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvRemotePlaybackNavigationSpecTest.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchViewModel.kt`、`android-app/app/src/test/java/com/chee/videos/feature/shortsearch/ShortSearchViewModelStateTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/tv/TvRemoteCoordinatorLifecycleSpecTest.kt`、`CONTEXT.md`、`plan.md`

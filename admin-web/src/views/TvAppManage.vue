@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import QRCode from 'qrcode'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Refresh, UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
@@ -10,6 +11,7 @@ import StatCard from '../components/base/StatCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
+import { buildTVAppDownloadPageURL, getTVAppDownloadQRCodeTitle } from './tvAppManage.qr'
 import {
   deleteAdminTVAppReleaseDraft,
   downloadAdminTVAppReleaseURL,
@@ -52,6 +54,7 @@ const uploadLoading = ref(false)
 const savingId = ref(0)
 const actionId = ref(0)
 const uploadFiles = ref([])
+const downloadQRCodeDataURL = ref('')
 const query = reactive({
   page: 1,
   page_size: 20,
@@ -68,6 +71,7 @@ const data = reactive({
 })
 
 const clientMeta = computed(() => CLIENTS[clientType.value] || CLIENTS.android_tv)
+const downloadQRCodeTitle = computed(() => getTVAppDownloadQRCodeTitle(clientType.value))
 const visibleCount = computed(() => data.items.filter((item) => item.visible_to_family).length)
 const draftCount = computed(() => data.items.filter((item) => item.publish_status === 'draft').length)
 const latestItem = computed(() => data.items.find((item) => item.latest_recommended) || null)
@@ -180,12 +184,27 @@ function resetQuery() {
   query.current_published = false
 }
 
+async function refreshDownloadQRCode() {
+  downloadQRCodeDataURL.value = await QRCode.toDataURL(
+    buildTVAppDownloadPageURL(clientType.value, {
+      currentOrigin: window.location.origin,
+      isDev: import.meta.env.DEV,
+      apiProxyTarget: import.meta.env.VITE_API_PROXY_TARGET
+    }),
+    {
+      margin: 1,
+      width: 220
+    }
+  )
+}
+
 function changeClientType(nextType) {
   if (!CLIENTS[nextType]) return
   if (clientType.value === nextType) return
   clientType.value = nextType
   resetQuery()
   uploadFiles.value = []
+  refreshDownloadQRCode()
   load()
 }
 
@@ -297,7 +316,10 @@ function downloadHref(item, abi) {
   return downloadAdminTVAppReleaseURL(item.id, abi, clientType.value)
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  refreshDownloadQRCode()
+})
 </script>
 
 <template>
@@ -341,6 +363,13 @@ onMounted(load)
         <StatCard label="草稿" :value="draftCount" />
         <StatCard label="推荐版本" :value="latestItem ? `${latestItem.version_name} (${latestItem.version_code})` : '暂无'" />
       </section>
+
+      <SectionCard>
+        <template #title>{{ downloadQRCodeTitle }}</template>
+        <div class="download-qr-card">
+          <img v-if="downloadQRCodeDataURL" class="download-qr-image" :src="downloadQRCodeDataURL" :alt="downloadQRCodeTitle">
+        </div>
+      </SectionCard>
 
       <SectionCard>
         <template #title>上传 APK</template>
@@ -517,6 +546,19 @@ onMounted(load)
 .upload-panel {
   display: grid;
   gap: 16px;
+}
+
+.download-qr-card {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 252px;
+}
+
+.download-qr-image {
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
 }
 
 .upload-actions {
