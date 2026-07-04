@@ -189,10 +189,19 @@ data class TvRemoteSessionItemDto(
     @SerializedName("type") val type: String = "short",
 )
 
+data class TvRemoteSearchContextRequest(
+    @SerializedName("query") val query: String,
+    @SerializedName("type") val type: String = "short",
+    @SerializedName("page") val page: Int,
+    @SerializedName("page_size") val pageSize: Int,
+    @SerializedName("total_count") val totalCount: Int,
+)
+
 data class TvRemoteCreateSessionRequest(
     @SerializedName("device_id") val deviceId: String,
     @SerializedName("items") val items: List<TvRemoteSessionItemDto> = emptyList(),
     @SerializedName("current_index") val currentIndex: Int,
+    @SerializedName("search_context") val searchContext: TvRemoteSearchContextRequest? = null,
 )
 
 data class TvRemoteSessionDto(

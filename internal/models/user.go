@@ -88,23 +88,32 @@ type TvRemoteSessionItem struct {
 	Type          string    `json:"type"`
 }
 
+type TvRemoteSearchContext struct {
+	Query      string `json:"query"`
+	Type       string `json:"type"`
+	Page       int    `json:"page"`
+	PageSize   int    `json:"page_size"`
+	TotalCount int    `json:"total_count"`
+}
+
 type TvRemoteSession struct {
-	ID             uuid.UUID             `json:"session_id"`
-	UserID         uuid.UUID             `json:"-"`
-	DeviceID       string                `json:"device_id"`
-	DeviceName     string                `json:"device_name"`
-	Platform       string                `json:"platform"`
-	Status         string                `json:"status"`
-	Items          []TvRemoteSessionItem `json:"items"`
-	CurrentIndex   int                   `json:"current_index"`
-	CurrentVideoID *uuid.UUID            `json:"current_video_id,omitempty"`
-	CurrentItem    *TvRemoteSessionItem  `json:"current_item,omitempty"`
-	HasPrevious    bool                  `json:"has_previous"`
-	HasNext        bool                  `json:"has_next"`
-	EndedReason    string                `json:"ended_reason,omitempty"`
-	EndedAt        *time.Time            `json:"ended_at,omitempty"`
-	CreatedAt      time.Time             `json:"created_at"`
-	UpdatedAt      time.Time             `json:"updated_at"`
+	ID             uuid.UUID              `json:"session_id"`
+	UserID         uuid.UUID              `json:"-"`
+	DeviceID       string                 `json:"device_id"`
+	DeviceName     string                 `json:"device_name"`
+	Platform       string                 `json:"platform"`
+	Status         string                 `json:"status"`
+	Items          []TvRemoteSessionItem  `json:"items"`
+	SearchContext  *TvRemoteSearchContext `json:"search_context,omitempty"`
+	CurrentIndex   int                    `json:"current_index"`
+	CurrentVideoID *uuid.UUID             `json:"current_video_id,omitempty"`
+	CurrentItem    *TvRemoteSessionItem   `json:"current_item,omitempty"`
+	HasPrevious    bool                   `json:"has_previous"`
+	HasNext        bool                   `json:"has_next"`
+	EndedReason    string                 `json:"ended_reason,omitempty"`
+	EndedAt        *time.Time             `json:"ended_at,omitempty"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
 }
 
 type TvDeviceListPayload struct {

@@ -7,6 +7,7 @@ import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.TvDeviceDto
+import com.chee.videos.core.model.TvRemoteSearchContextRequest
 import com.chee.videos.core.model.TvRemoteSessionItemDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoFitMode
@@ -48,6 +49,8 @@ data class ShortSearchUiState(
     val errorMessage: String? = null,
 )
 
+private const val ShortSearchRemotePageSize = 24
+
 internal fun normalizeShortSearchQuery(query: String): String = query.trim()
 
 internal fun resetShortSearchForQuery(state: ShortSearchUiState, query: String): ShortSearchUiState {
@@ -79,6 +82,25 @@ internal fun buildShortSearchRemoteItems(items: List<VideoListItemDto>): List<Tv
                 type = item.type.trim().ifBlank { "short" },
             )
         }
+}
+
+internal fun buildShortSearchRemoteSearchContext(
+    activeQuery: String,
+    page: Int,
+    totalCount: Int,
+    pageSize: Int = ShortSearchRemotePageSize,
+): TvRemoteSearchContextRequest? {
+    val query = activeQuery.trim()
+    if (query.isBlank()) {
+        return null
+    }
+    return TvRemoteSearchContextRequest(
+        query = query,
+        type = "short",
+        page = page.coerceAtLeast(1),
+        pageSize = pageSize.coerceAtLeast(1),
+        totalCount = totalCount.coerceAtLeast(0),
+    )
 }
 
 internal fun sortTvDevicesForSelection(items: List<TvDeviceDto>, preferredDeviceId: String?): List<TvDeviceDto> {
@@ -316,6 +338,11 @@ class ShortSearchViewModel @Inject constructor(
                 deviceId = launchTarget,
                 items = snapshotItems,
                 currentIndex = currentIndex,
+                searchContext = buildShortSearchRemoteSearchContext(
+                    activeQuery = state.activeQuery,
+                    page = state.page,
+                    totalCount = state.totalCount,
+                ),
             ).onSuccess { session ->
                 if (shouldPersistTvDevicePreference(pickTvDeviceForLaunch(state.tvDevices, launchTarget))) {
                     videoRepository.saveLastTvRemoteDeviceId(launchTarget)

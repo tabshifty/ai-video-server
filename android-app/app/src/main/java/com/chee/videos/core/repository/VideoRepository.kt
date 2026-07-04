@@ -15,6 +15,7 @@ import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvDeviceDto
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
+import com.chee.videos.core.model.TvRemoteSearchContextRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvRemoteSessionItemDto
 import com.chee.videos.core.model.TvSearchPayload
@@ -201,6 +202,7 @@ class VideoRepository @Inject constructor(
         deviceId: String,
         items: List<TvRemoteSessionItemDto>,
         currentIndex: Int,
+        searchContext: TvRemoteSearchContextRequest? = null,
     ): Result<TvRemoteSessionDto> {
         return callWithAuth { baseUrl, bearer ->
             api.createTvRemoteSession(
@@ -210,6 +212,7 @@ class VideoRepository @Inject constructor(
                     deviceId = deviceId.trim(),
                     items = items,
                     currentIndex = currentIndex,
+                    searchContext = searchContext,
                 ),
             )
         }

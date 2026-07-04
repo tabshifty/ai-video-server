@@ -108,6 +108,21 @@ class ShortSearchViewModelStateTest {
     }
 
     @Test
+    fun buildShortSearchRemoteSearchContext_usesCurrentSearchWindow() {
+        val context = buildShortSearchRemoteSearchContext(
+            activeQuery = "  老师  ",
+            page = 3,
+            totalCount = 77,
+        )
+
+        assertEquals("老师", context?.query)
+        assertEquals("short", context?.type)
+        assertEquals(3, context?.page)
+        assertEquals(24, context?.pageSize)
+        assertEquals(77, context?.totalCount)
+    }
+
+    @Test
     fun sortTvDevicesForSelection_putsPreferredDeviceFirst() {
         val devices = sortTvDevicesForSelection(
             items = listOf(

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -35,8 +36,9 @@ type tvRemoteRepository interface {
 	CreateOrReplaceTVRemoteSession(ctx context.Context, session models.TvRemoteSession, now time.Time) error
 	GetTVRemoteSessionByID(ctx context.Context, sessionID uuid.UUID) (models.TvRemoteSession, error)
 	GetActiveTVRemoteSessionForDevice(ctx context.Context, userID uuid.UUID, deviceID string, platform string) (models.TvRemoteSession, error)
-	UpdateTVRemoteSessionCurrentIndex(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, currentIndex int, currentVideoID uuid.UUID, now time.Time) error
+	UpdateTVRemoteSessionState(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, items []models.TvRemoteSessionItem, currentIndex int, currentVideoID uuid.UUID, searchContext *models.TvRemoteSearchContext, now time.Time) error
 	EndTVRemoteSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, endedReason string, endedAt time.Time) error
+	SearchVideos(ctx context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error)
 }
 
 func (s *AppService) ListTVDevices(ctx context.Context, userID uuid.UUID) (models.TvDeviceListPayload, error) {
@@ -57,8 +59,9 @@ func (s *AppService) StartTVRemoteSession(
 	deviceID string,
 	items []models.TvRemoteSessionItem,
 	currentIndex int,
+	searchContext *models.TvRemoteSearchContext,
 ) (models.TvRemoteSession, error) {
-	return s.StartTVRemoteSessionAt(ctx, userID, deviceID, items, currentIndex, time.Now().UTC())
+	return s.StartTVRemoteSessionAt(ctx, userID, deviceID, items, currentIndex, searchContext, time.Now().UTC())
 }
 
 func (s *AppService) StartTVRemoteSessionAt(
@@ -67,6 +70,7 @@ func (s *AppService) StartTVRemoteSessionAt(
 	deviceID string,
 	items []models.TvRemoteSessionItem,
 	currentIndex int,
+	searchContext *models.TvRemoteSearchContext,
 	now time.Time,
 ) (models.TvRemoteSession, error) {
 	if s.tvRemoteRepo == nil {
@@ -95,6 +99,7 @@ func (s *AppService) StartTVRemoteSessionAt(
 		Platform:       tvRemotePlatform,
 		Status:         tvRemoteSessionStatusActive,
 		Items:          normalizedItems,
+		SearchContext:  normalizeTVRemoteSearchContext(searchContext, len(normalizedItems)),
 		CurrentIndex:   currentIndex,
 		CurrentVideoID: &currentVideoID,
 	}
@@ -124,6 +129,12 @@ func (s *AppService) StepTVRemoteSession(ctx context.Context, userID uuid.UUID, 
 	}
 	if session.Status != tvRemoteSessionStatusActive {
 		return decorateTVRemoteSession(session), ErrTVRemoteSessionInactive
+	}
+	if delta > 0 {
+		session, err = s.ensureTVRemoteSessionHasNextItem(ctx, userID, session)
+		if err != nil {
+			return models.TvRemoteSession{}, err
+		}
 	}
 	nextIndex := stepTVRemoteSessionIndex(session.CurrentIndex, delta, len(session.Items))
 	if nextIndex == session.CurrentIndex {
@@ -200,7 +211,16 @@ func (s *AppService) UpdateTVRemoteSessionCurrentIndex(
 	if currentIndex == session.CurrentIndex && session.CurrentVideoID != nil && *session.CurrentVideoID == currentVideoID {
 		return decorateTVRemoteSession(session), nil
 	}
-	if err := s.tvRemoteRepo.UpdateTVRemoteSessionCurrentIndex(ctx, sessionID, userID, currentIndex, currentVideoID, time.Now().UTC()); err != nil {
+	if err := s.tvRemoteRepo.UpdateTVRemoteSessionState(
+		ctx,
+		sessionID,
+		userID,
+		session.Items,
+		currentIndex,
+		currentVideoID,
+		session.SearchContext,
+		time.Now().UTC(),
+	); err != nil {
 		return models.TvRemoteSession{}, err
 	}
 	updated, err := s.getTVRemoteSessionForUser(ctx, userID, sessionID)
@@ -255,10 +275,49 @@ func normalizeTVRemoteSessionItems(items []models.TvRemoteSessionItem) ([]models
 	return normalized, nil
 }
 
+func normalizeTVRemoteSearchContext(searchContext *models.TvRemoteSearchContext, loadedItemCount int) *models.TvRemoteSearchContext {
+	if searchContext == nil {
+		return nil
+	}
+	query := strings.TrimSpace(searchContext.Query)
+	if query == "" {
+		return nil
+	}
+	typ := strings.ToLower(strings.TrimSpace(searchContext.Type))
+	if typ == "" {
+		typ = "short"
+	}
+	pageSize := searchContext.PageSize
+	if pageSize <= 0 {
+		pageSize = loadedItemCount
+	}
+	if pageSize <= 0 {
+		pageSize = 24
+	}
+	page := searchContext.Page
+	if page < 1 {
+		page = 1
+		if loadedItemCount > 0 {
+			page = int(math.Ceil(float64(loadedItemCount) / float64(pageSize)))
+		}
+	}
+	totalCount := searchContext.TotalCount
+	if totalCount < loadedItemCount {
+		totalCount = loadedItemCount
+	}
+	return &models.TvRemoteSearchContext{
+		Query:      query,
+		Type:       typ,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalCount: totalCount,
+	}
+}
+
 func decorateTVRemoteSession(session models.TvRemoteSession) models.TvRemoteSession {
 	session.CurrentItem = currentTVRemoteSessionItem(session)
 	session.HasPrevious = session.CurrentIndex > 0
-	session.HasNext = session.CurrentIndex >= 0 && session.CurrentIndex < len(session.Items)-1
+	session.HasNext = (session.CurrentIndex >= 0 && session.CurrentIndex < len(session.Items)-1) || tvRemoteSessionSearchHasMore(session)
 	return session
 }
 
@@ -282,6 +341,114 @@ func stepTVRemoteSessionIndex(currentIndex int, delta int, length int) int {
 		return length - 1
 	}
 	return next
+}
+
+func tvRemoteSessionSearchHasMore(session models.TvRemoteSession) bool {
+	if session.SearchContext == nil {
+		return false
+	}
+	if session.SearchContext.TotalCount <= 0 {
+		return false
+	}
+	return len(session.Items) < session.SearchContext.TotalCount
+}
+
+func buildTVRemoteSessionItemsFromSearchResults(items []models.VideoListItem) []models.TvRemoteSessionItem {
+	next := make([]models.TvRemoteSessionItem, 0, len(items))
+	for _, item := range items {
+		if item.ID == uuid.Nil {
+			continue
+		}
+		next = append(next, models.TvRemoteSessionItem{
+			VideoID:       item.ID,
+			Title:         strings.TrimSpace(item.Title),
+			ThumbnailPath: strings.TrimSpace(item.ThumbnailPath),
+			Duration:      item.Duration,
+			Type:          strings.TrimSpace(item.Type),
+		})
+	}
+	return next
+}
+
+func mergeTVRemoteSessionItems(existing []models.TvRemoteSessionItem, incoming []models.TvRemoteSessionItem) []models.TvRemoteSessionItem {
+	merged := make([]models.TvRemoteSessionItem, 0, len(existing)+len(incoming))
+	seen := make(map[uuid.UUID]struct{}, len(existing)+len(incoming))
+	for _, item := range existing {
+		if item.VideoID == uuid.Nil {
+			continue
+		}
+		if _, ok := seen[item.VideoID]; ok {
+			continue
+		}
+		seen[item.VideoID] = struct{}{}
+		merged = append(merged, item)
+	}
+	for _, item := range incoming {
+		if item.VideoID == uuid.Nil {
+			continue
+		}
+		if _, ok := seen[item.VideoID]; ok {
+			continue
+		}
+		seen[item.VideoID] = struct{}{}
+		merged = append(merged, item)
+	}
+	return merged
+}
+
+func (s *AppService) ensureTVRemoteSessionHasNextItem(
+	ctx context.Context,
+	userID uuid.UUID,
+	session models.TvRemoteSession,
+) (models.TvRemoteSession, error) {
+	if session.CurrentIndex < len(session.Items)-1 || !tvRemoteSessionSearchHasMore(session) || session.SearchContext == nil {
+		return session, nil
+	}
+	searchContext := *session.SearchContext
+	prevLen := len(session.Items)
+	nextPage := searchContext.Page + 1
+	if nextPage < 1 {
+		nextPage = 1
+	}
+	offset := (nextPage - 1) * searchContext.PageSize
+	items, totalCount, err := s.tvRemoteRepo.SearchVideos(ctx, searchContext.Query, searchContext.Type, searchContext.PageSize, offset)
+	if err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	searchContext.Page = nextPage
+	if totalCount > 0 {
+		searchContext.TotalCount = totalCount
+	}
+	mergedItems := mergeTVRemoteSessionItems(session.Items, buildTVRemoteSessionItemsFromSearchResults(items))
+	session.Items = mergedItems
+	session.SearchContext = &searchContext
+	currentVideoID := uuid.Nil
+	if currentItem := currentTVRemoteSessionItem(session); currentItem != nil {
+		currentVideoID = currentItem.VideoID
+	}
+	if currentVideoID == uuid.Nil {
+		return session, nil
+	}
+	if err := s.tvRemoteRepo.UpdateTVRemoteSessionState(
+		ctx,
+		session.ID,
+		userID,
+		session.Items,
+		session.CurrentIndex,
+		currentVideoID,
+		session.SearchContext,
+		time.Now().UTC(),
+	); err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	if len(mergedItems) == prevLen && !tvRemoteSessionSearchHasMore(session) {
+		return decorateTVRemoteSession(session), nil
+	}
+	updated, err := s.getTVRemoteSessionForUser(ctx, userID, session.ID)
+	if err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	return updated, nil
 }
 
 func isTVDeviceReachable(lastSeenAt *time.Time, now time.Time) bool {

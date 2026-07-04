@@ -209,6 +209,21 @@ func TestTVRemoteSessionMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)alter\s+table\s+tv_devices\s+drop\s+column\s+if\s+exists\s+last_seen_at`)
 }
 
+func TestTVRemoteSessionSearchContextMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0033_tv_remote_session_search_context.up.sql")
+	down := readMigrationForTest(t, "0033_tv_remote_session_search_context.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+tv_remote_sessions\s+add\s+column\s+if\s+not\s+exists\s+search_context\s+jsonb`)
+	assertSQLPattern(t, up, `(?is)drop\s+constraint\s+if\s+exists\s+tv_remote_sessions_search_context_object_check`)
+	assertSQLPattern(t, up, `(?is)add\s+constraint\s+tv_remote_sessions_search_context_object_check`)
+	assertSQLPattern(t, up, `(?is)search_context\s+is\s+null\s+or\s+jsonb_typeof\(search_context\)\s*=\s*'object'`)
+
+	assertSQLPattern(t, down, `(?is)drop\s+constraint\s+if\s+exists\s+tv_remote_sessions_search_context_object_check`)
+	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+search_context`)
+}
+
 func TestMarkEd2kDownloadTaskRunningRefreshesStartedAt(t *testing.T) {
 	t.Parallel()
 

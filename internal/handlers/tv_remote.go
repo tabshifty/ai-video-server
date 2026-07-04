@@ -34,15 +34,16 @@ func (a *API) CreateTVRemoteSession(c *gin.Context) {
 		return
 	}
 	var req struct {
-		DeviceID     string                       `json:"device_id"`
-		Items        []models.TvRemoteSessionItem `json:"items"`
-		CurrentIndex int                          `json:"current_index"`
+		DeviceID      string                        `json:"device_id"`
+		Items         []models.TvRemoteSessionItem  `json:"items"`
+		CurrentIndex  int                           `json:"current_index"`
+		SearchContext *models.TvRemoteSearchContext `json:"search_context"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		bad(c, "invalid payload")
 		return
 	}
-	payload, err := a.appSvc.StartTVRemoteSession(c.Request.Context(), userID, strings.TrimSpace(req.DeviceID), req.Items, req.CurrentIndex)
+	payload, err := a.appSvc.StartTVRemoteSession(c.Request.Context(), userID, strings.TrimSpace(req.DeviceID), req.Items, req.CurrentIndex, req.SearchContext)
 	if err != nil {
 		switch {
 		case repository.IsNotFound(err):

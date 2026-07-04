@@ -32,7 +32,7 @@ func TestStartTVRemoteSessionRejectsOfflineDevice(t *testing.T) {
 
 	_, err := svc.StartTVRemoteSessionAt(context.Background(), userID, "living-room", []models.TvRemoteSessionItem{
 		{VideoID: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Title: "条目 1"},
-	}, 0, now)
+	}, 0, nil, now)
 	if !errors.Is(err, ErrTVRemoteDeviceOffline) {
 		t.Fatalf("expected ErrTVRemoteDeviceOffline, got=%v", err)
 	}
@@ -61,7 +61,7 @@ func TestStartTVRemoteSessionCreatesSessionWithCurrentItem(t *testing.T) {
 	session, err := svc.StartTVRemoteSessionAt(context.Background(), userID, " living-room ", []models.TvRemoteSessionItem{
 		{VideoID: videoID1, Title: " 第一条 ", ThumbnailPath: " /thumb-1.jpg ", Duration: 11, Type: "short"},
 		{VideoID: videoID2, Title: "第二条", ThumbnailPath: "/thumb-2.jpg", Duration: 12, Type: "short"},
-	}, 1, now)
+	}, 1, nil, now)
 	if err != nil {
 		t.Fatalf("StartTVRemoteSessionAt returned err=%v", err)
 	}
@@ -115,7 +115,7 @@ func TestStartTVRemoteSessionKeepsCurrentIndexBeyondHundredthItem(t *testing.T) 
 	}
 	svc := &AppService{tvRemoteRepo: repo}
 
-	session, err := svc.StartTVRemoteSessionAt(context.Background(), userID, "living-room", items, 119, now)
+	session, err := svc.StartTVRemoteSessionAt(context.Background(), userID, "living-room", items, 119, nil, now)
 	if err != nil {
 		t.Fatalf("StartTVRemoteSessionAt returned err=%v", err)
 	}
@@ -309,6 +309,91 @@ func TestStepTVRemoteSessionIndexStopsAtBoundaries(t *testing.T) {
 	}
 }
 
+func TestStepTVRemoteSessionLoadsMoreSearchResultsAtLoadedBoundary(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	videoID1 := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	videoID2 := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	videoID3 := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
+
+	repo := &fakeTVRemoteRepository{
+		session: models.TvRemoteSession{
+			ID:         sessionID,
+			UserID:     userID,
+			DeviceID:   "living-room",
+			DeviceName: "客厅电视",
+			Platform:   tvRemotePlatform,
+			Status:     tvRemoteSessionStatusActive,
+			Items: []models.TvRemoteSessionItem{
+				{VideoID: videoID1, Title: "条目 1", Type: "short"},
+				{VideoID: videoID2, Title: "条目 2", Type: "short"},
+			},
+			SearchContext: &models.TvRemoteSearchContext{
+				Query:      "老师",
+				Type:       "short",
+				Page:       1,
+				PageSize:   2,
+				TotalCount: 3,
+			},
+			CurrentIndex: 1,
+			CurrentVideoID: func() *uuid.UUID {
+				value := videoID2
+				return &value
+			}(),
+		},
+		searchItems: []models.VideoListItem{
+			{ID: videoID3, Title: "条目 3", Type: "short", ThumbnailPath: "/thumb-3.jpg", Duration: 13},
+		},
+		searchTotalCount: 3,
+	}
+	svc := &AppService{tvRemoteRepo: repo}
+
+	session, err := svc.StepTVRemoteSession(context.Background(), userID, sessionID, 1)
+	if err != nil {
+		t.Fatalf("StepTVRemoteSession returned err=%v", err)
+	}
+	if repo.searchCall == nil {
+		t.Fatal("expected search call to be issued when stepping at loaded boundary")
+	}
+	if repo.searchCall.query != "老师" || repo.searchCall.typ != "short" || repo.searchCall.limit != 2 || repo.searchCall.offset != 2 {
+		t.Fatalf("unexpected search call: %+v", *repo.searchCall)
+	}
+	if session.CurrentIndex != 2 {
+		t.Fatalf("expected current index 2 after loading more, got=%d", session.CurrentIndex)
+	}
+	if len(session.Items) != 3 {
+		t.Fatalf("expected 3 items after loading more, got=%d", len(session.Items))
+	}
+	if session.CurrentItem == nil || session.CurrentItem.VideoID != videoID3 {
+		t.Fatalf("expected current item to advance to the loaded third entry, got=%#v", session.CurrentItem)
+	}
+}
+
+func TestDecorateTVRemoteSessionMarksHasNextWhenSearchContextHasMore(t *testing.T) {
+	t.Parallel()
+
+	session := decorateTVRemoteSession(models.TvRemoteSession{
+		Items: []models.TvRemoteSessionItem{
+			{VideoID: uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Title: "条目 1", Type: "short"},
+			{VideoID: uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), Title: "条目 2", Type: "short"},
+		},
+		CurrentIndex: 1,
+		SearchContext: &models.TvRemoteSearchContext{
+			Query:      "老师",
+			Type:       "short",
+			Page:       1,
+			PageSize:   2,
+			TotalCount: 5,
+		},
+	})
+
+	if !session.HasNext {
+		t.Fatal("expected hasNext to stay true when search context still has more pages")
+	}
+}
+
 type fakeTVRemoteRepository struct {
 	device           models.TvDeviceRecord
 	session          models.TvRemoteSession
@@ -318,6 +403,16 @@ type fakeTVRemoteRepository struct {
 	devicesByID      map[string]models.TvDeviceRecord
 	sessionsByDevice map[string]models.TvRemoteSession
 	getActiveErr     error
+	searchItems      []models.VideoListItem
+	searchTotalCount int
+	searchCall       *fakeTVRemoteSearchCall
+}
+
+type fakeTVRemoteSearchCall struct {
+	query  string
+	typ    string
+	limit  int
+	offset int
 }
 
 func (r *fakeTVRemoteRepository) ListUserTVDevices(context.Context, uuid.UUID, string) ([]models.TvDeviceRecord, error) {
@@ -399,11 +494,17 @@ func (r *fakeTVRemoteRepository) GetActiveTVRemoteSessionForDevice(_ context.Con
 }
 
 func (r *fakeTVRemoteRepository) UpdateTVRemoteSessionCurrentIndex(_ context.Context, sessionID, _ uuid.UUID, currentIndex int, currentVideoID uuid.UUID, _ time.Time) error {
+	panic("UpdateTVRemoteSessionCurrentIndex should not be called")
+}
+
+func (r *fakeTVRemoteRepository) UpdateTVRemoteSessionState(_ context.Context, sessionID, _ uuid.UUID, items []models.TvRemoteSessionItem, currentIndex int, currentVideoID uuid.UUID, searchContext *models.TvRemoteSearchContext, _ time.Time) error {
 	if r.session.ID != sessionID {
 		return pgx.ErrNoRows
 	}
+	r.session.Items = append([]models.TvRemoteSessionItem(nil), items...)
 	r.session.CurrentIndex = currentIndex
 	r.session.CurrentVideoID = &currentVideoID
+	r.session.SearchContext = searchContext
 	return nil
 }
 
@@ -415,4 +516,14 @@ func (r *fakeTVRemoteRepository) EndTVRemoteSession(_ context.Context, sessionID
 	r.session.EndedReason = endedReason
 	r.session.EndedAt = &endedAt
 	return nil
+}
+
+func (r *fakeTVRemoteRepository) SearchVideos(_ context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error) {
+	r.searchCall = &fakeTVRemoteSearchCall{
+		query:  q,
+		typ:    typ,
+		limit:  limit,
+		offset: offset,
+	}
+	return append([]models.VideoListItem(nil), r.searchItems...), r.searchTotalCount, nil
 }

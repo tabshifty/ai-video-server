@@ -117,6 +117,13 @@ func (r *VideoRepository) CreateOrReplaceTVRemoteSession(ctx context.Context, se
 	if err != nil {
 		return fmt.Errorf("marshal tv remote session items: %w", err)
 	}
+	var searchContextJSON []byte
+	if session.SearchContext != nil {
+		searchContextJSON, err = json.Marshal(session.SearchContext)
+		if err != nil {
+			return fmt.Errorf("marshal tv remote session search context: %w", err)
+		}
+	}
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -151,10 +158,10 @@ WHERE device_id = $2
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO tv_remote_sessions (
-    id, user_id, device_id, platform, status, items, current_index, current_video_id, ended_reason, ended_at, created_at, updated_at
+    id, user_id, device_id, platform, status, items, search_context, current_index, current_video_id, ended_reason, ended_at, created_at, updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $11)
-`, session.ID, session.UserID, session.DeviceID, session.Platform, session.Status, itemsJSON, session.CurrentIndex, session.CurrentVideoID, session.EndedReason, session.EndedAt, now); err != nil {
+VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $12)
+`, session.ID, session.UserID, session.DeviceID, session.Platform, session.Status, itemsJSON, searchContextJSON, session.CurrentIndex, session.CurrentVideoID, session.EndedReason, session.EndedAt, now); err != nil {
 		return fmt.Errorf("insert tv remote session: %w", err)
 	}
 
@@ -171,12 +178,13 @@ SELECT
     s.user_id,
     s.device_id,
     COALESCE(d.device_name, ''),
-    s.platform,
-    s.status,
-    s.items,
-    s.current_index,
-    s.current_video_id,
-    s.ended_reason,
+	s.platform,
+	s.status,
+	s.items,
+	s.search_context,
+	s.current_index,
+	s.current_video_id,
+	s.ended_reason,
     s.ended_at,
     s.created_at,
     s.updated_at
@@ -196,12 +204,13 @@ SELECT
     s.user_id,
     s.device_id,
     COALESCE(d.device_name, ''),
-    s.platform,
-    s.status,
-    s.items,
-    s.current_index,
-    s.current_video_id,
-    s.ended_reason,
+	s.platform,
+	s.status,
+	s.items,
+	s.search_context,
+	s.current_index,
+	s.current_video_id,
+	s.ended_reason,
     s.ended_at,
     s.created_at,
     s.updated_at
@@ -218,25 +227,40 @@ LIMIT 1
 `, userID, strings.TrimSpace(deviceID), strings.TrimSpace(platform)))
 }
 
-func (r *VideoRepository) UpdateTVRemoteSessionCurrentIndex(
+func (r *VideoRepository) UpdateTVRemoteSessionState(
 	ctx context.Context,
 	sessionID uuid.UUID,
 	userID uuid.UUID,
+	items []models.TvRemoteSessionItem,
 	currentIndex int,
 	currentVideoID uuid.UUID,
+	searchContext *models.TvRemoteSearchContext,
 	now time.Time,
 ) error {
+	itemsJSON, err := json.Marshal(items)
+	if err != nil {
+		return fmt.Errorf("marshal tv remote session items: %w", err)
+	}
+	var searchContextJSON []byte
+	if searchContext != nil {
+		searchContextJSON, err = json.Marshal(searchContext)
+		if err != nil {
+			return fmt.Errorf("marshal tv remote session search context: %w", err)
+		}
+	}
 	tag, err := r.pool.Exec(ctx, `
 UPDATE tv_remote_sessions
-SET current_index = $3,
-    current_video_id = $4,
-    updated_at = $5
+SET items = $3::jsonb,
+    search_context = $4::jsonb,
+    current_index = $5,
+    current_video_id = $6,
+    updated_at = $7
 WHERE id = $1
   AND user_id = $2
   AND status = 'active'
-`, sessionID, userID, currentIndex, currentVideoID, now)
+`, sessionID, userID, itemsJSON, searchContextJSON, currentIndex, currentVideoID, now)
 	if err != nil {
-		return fmt.Errorf("update tv remote session current index: %w", err)
+		return fmt.Errorf("update tv remote session state: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return pgx.ErrNoRows
@@ -271,6 +295,7 @@ type tvRemoteSessionScanner interface {
 func scanTVRemoteSessionRow(row tvRemoteSessionScanner) (models.TvRemoteSession, error) {
 	var session models.TvRemoteSession
 	var rawItems []byte
+	var rawSearchContext []byte
 	err := row.Scan(
 		&session.ID,
 		&session.UserID,
@@ -279,6 +304,7 @@ func scanTVRemoteSessionRow(row tvRemoteSessionScanner) (models.TvRemoteSession,
 		&session.Platform,
 		&session.Status,
 		&rawItems,
+		&rawSearchContext,
 		&session.CurrentIndex,
 		&session.CurrentVideoID,
 		&session.EndedReason,
@@ -295,6 +321,13 @@ func scanTVRemoteSessionRow(row tvRemoteSessionScanner) (models.TvRemoteSession,
 	}
 	if err := json.Unmarshal(rawItems, &session.Items); err != nil {
 		return models.TvRemoteSession{}, fmt.Errorf("unmarshal tv remote session items: %w", err)
+	}
+	if len(rawSearchContext) > 0 && string(rawSearchContext) != "null" {
+		var searchContext models.TvRemoteSearchContext
+		if err := json.Unmarshal(rawSearchContext, &searchContext); err != nil {
+			return models.TvRemoteSession{}, fmt.Errorf("unmarshal tv remote session search context: %w", err)
+		}
+		session.SearchContext = &searchContext
 	}
 	return session, nil
 }

@@ -67,6 +67,25 @@
 - 影响文件：`CONTEXT.md`、`plan.md`
 - 验证：待执行最后一轮显示层边界问答，以及实现阶段的 TV 定向单测、`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug`、`git diff --check`、乱码扫描。
 
+## 2026-07-04 15:34 +0800
+- 进度：完成“短视频搜索投放不再受当前已加载页数限制”的主实现。后端为 `tv_remote_sessions` 增加可空 `search_context`，手机端发起投放时带上当前短视频搜索词/分页/总数，服务端在远程会话执行 `next` 且撞到已加载尾部时会按同一搜索条件自动补下一页并回写会话，因此手机控制页和 TV 投放页的 `hasNext` 不再受投放瞬间已加载页数限制；手机端版本升级到 `0.1.7(8)`。本次未改 TV App 源码，TV 端行为变化来自服务端会话补页。
+- 影响文件：`migrations/0033_tv_remote_session_search_context.*`、`internal/models/user.go`、`internal/repository/tv_remote_repository.go`、`internal/services/tv_remote.go`、`internal/handlers/tv_remote.go`、`internal/services/tv_remote_test.go`、`internal/repository/migrations_test.go`、`android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`、`android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchViewModel.kt`、`android-app/app/src/test/java/com/chee/videos/feature/shortsearch/ShortSearchViewModelStateTest.kt`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services ./internal/repository -run 'TestStepTVRemoteSessionLoadsMoreSearchResultsAtLoadedBoundary|TestDecorateTVRemoteSessionMarksHasNextWhenSearchContextHasMore|TestTVRemoteSessionSearchContextMigration|TestTVRemoteSessionMigration' -count=1` 通过；`go test ./internal/handlers -run TestRegisterIncludesImageCollectionRoutes -count=1` 通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.feature.shortsearch.ShortSearchViewModelStateTest` 通过；`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过；`git diff --check -- ...` 通过；`rg -n $'\uFFFD' ...` 无输出。
+
+## 2026-07-04 15:23 +0800
+- 进度：开始实现“短视频搜索投放可突破当前已加载页数、继续到最后一页”。按最小改动方案推进：后端 `tv_remote_sessions` 增加可空搜索上下文并在 `next` 撞到已加载尾部时自动补下一页；手机端发起投放时把当前搜索词/分页上下文带给后端；先补 Go/Android 定向红灯测试，再改实现、版本号和验证记录。
+- 影响文件：预计涉及 `migrations/0033_*`、`internal/models/user.go`、`internal/repository/tv_remote_repository.go`、`internal/services/tv_remote.go`、`internal/services/tv_remote_test.go`、`internal/repository/migrations_test.go`、`android-app/app/src/main/java/com/chee/videos/core/model/ApiModels.kt`、`android-app/app/src/main/java/com/chee/videos/core/repository/VideoRepository.kt`、`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchViewModel.kt`、`android-app/app/src/test/java/com/chee/videos/feature/shortsearch/ShortSearchViewModelStateTest.kt`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 定向测试、手机端定向单测、受影响模块构建/单测、`git diff --check`、乱码扫描。
+
+## 2026-07-04 15:08 +0800
+- 进度：继续通过 `grill-with-docs` 收口“短视频搜索投放不再受当前已加载页数限制”边界。已确认需要推翻既有“结果快照冻结 / 快照内切条”契约，改为“投放会话绑定发起时的短视频搜索条件与起播位置；后续可继续按同一搜索条件向后补页直到最后一页”。`CONTEXT.md` 已同步把手机控制页和 TV 投放页的切条边界从“结果快照”改写为“搜索条件冻结 + 动态补页”。
+- 进度：继续收口补页责任归属。已确认“继续向后补页直到最后一页”由服务端远程投放会话负责，而不是依赖手机端控制页持续把后续页推给会话；这样手机端离开控制页后，TV 端仍能继续沿同一搜索条件播放。`CONTEXT.md` 已追加服务端补页契约。
+- 进度：继续收口会话绑定内容。已确认服务端远程投放会话冻结的是“完整搜索参数集合”，不是只记当前关键词，避免后续补充排序、标签或筛选后再次推翻会话模型。`CONTEXT.md` 已追加完整搜索条件术语。
+- 进度：继续收口搜索结果漂移边界。已确认投放会话后续补页应保持“会话启动时确定下来的稳定顺序”，不跟随搜索结果实时前插、重排或删除而改写既有播放位置；会话语义是一段可预期的连续播放，不是实时刷新流。`CONTEXT.md` 已追加稳定顺序术语。
+- 进度：继续收口失效条目处理边界。已发现 `CONTEXT.md` 里旧有“单条失效留在会话内处理、不自动跳过”的术语与当前目标冲突，现已按最新确认改为“单条失效自动跳过并继续推进，同时向手机控制页和 TV 页反馈跳过原因”。这样“继续播放直到最后一页”不会被单条坏内容中断。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：文档变更，待继续通过 `grill-with-docs` 收口“由谁负责补页 / 会话如何绑定搜索条件 / 手机离场后的会话续播边界”，实现阶段再执行对应 Go/Android 定向测试、`git diff --check` 与乱码扫描。
+
 ## 2026-07-04 13:07 +0800
 - 进度：继续通过 `grill-with-docs` 收口 TV 投放页交互。已确认遥控器键位分工采用“上下切条、左右条内 seek、中键暂停/播放”，保持现有 `上一个/下一个` 会话级控制不变，同时把快进/快退限定为当前 TV 本机播放器的本地进度调整；对应长期交互契约已追加到 `CONTEXT.md`。
 - 影响文件：`CONTEXT.md`、`plan.md`
