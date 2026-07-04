@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-04 20:59 +0800
+- 进度：完成管理端“压缩包导入 > 批次详情”单文件精修交互改造。`ToolboxArchiveImport.vue` 已删除批次详情里的内嵌单文件表单，改为文件行右侧“编辑”按钮显式打开居中弹窗；整行点击仍只负责选中，保存成功后自动关闭弹窗并保留当前选择，关闭前统一做脏数据确认。源码规格测试同步改为锁定“行内编辑按钮 + 弹窗 + 不在弹窗内混入处理动作”；`CONTEXT.md` 已收口对应长期交互术语。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：`cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js` 通过；`cd admin-web && npm run build` 通过（仅现有 chunk size warning）；`git diff --check -- CONTEXT.md plan.md admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js` 无输出。
+
+## 2026-07-04 16:05 +0800
+- 进度：开始修正管理端“压缩包导入 > 批次详情”的单文件精修交互。已通过 `grill-with-docs` 收口为“内嵌表单改成行内‘编辑’按钮打开居中弹窗，整行点击仍只负责选中，不改视频管理页 drawer”；下一步直接改 `ToolboxArchiveImport.vue` 与对应源码规格测试，并在完成后执行 `admin-web` 定向测试、`npm run build`、`git diff --check` 与乱码扫描。
+- 影响文件：预计涉及 `admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 `cd admin-web && npm run test -- src/views/ToolboxArchiveImport.spec.js`、`cd admin-web && npm run build`、`git diff --check -- CONTEXT.md plan.md admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js`、`rg -n $'\uFFFD' CONTEXT.md plan.md admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js`
+
 ## 2026-07-04 14:12 +0800
 - 进度：完成 TV 远程投放页 poster 承接修复。`TvRemotePlaybackScreen` 的首帧前封面已从 `ContentScale.Crop` 改为 `ContentScale.Fit`，与同页 `PlayerView` 的 `AspectRatioFrameLayout.RESIZE_MODE_FIT` 保持一致，避免投放页封面先全屏铺满、切到视频后尺寸突变。源码规格测试已同步锁定 `contentScale = ContentScale.Fit` 与 `resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT`；TV 端版本升级到 `0.1.133(133)`。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`plan.md`

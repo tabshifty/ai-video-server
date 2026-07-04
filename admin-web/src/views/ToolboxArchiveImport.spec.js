@@ -114,11 +114,21 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('上传成功后会自动打开新批次详情')
   })
 
-  it('keeps single-file editing as an exception path without a process button', () => {
-    expect(source).toContain('这里只处理例外项修正；真正的处理动作统一留在下方主动作区。')
-    expect(source).toContain('单文件精修')
+  it('moves single-file editing into a row-level dialog without mixing in process actions', () => {
+    expect(source).toContain('const selectedFileDialogVisible = ref(false)')
+    expect(source).toContain('async function openArchiveFileEditor(row)')
+    expect(source).toContain('requestSelectedFileDialogClose')
+    expect(source).toContain('handleSelectedFileDialogBeforeClose')
+    expect(source).toContain('handleSelectedFileDialogClosed')
+    expect(source).toContain('v-model="selectedFileDialogVisible"')
+    expect(source).toContain('@click.stop="openArchiveFileEditor(file)"')
+    expect(source).toContain('class="archive-file-item__edit"')
+    expect(source).toContain('canEditArchiveFile(file)')
+    expect(source).toContain('直接点文件行右侧“编辑”')
+    expect(source).toContain('处理动作仍走下方主动作区')
     expect(source).toContain('saveSelectedFile')
-    expect(source).not.toContain('processSelectedFile')
+    expect(source).not.toContain('<SectionCard v-if="shouldShowSingleFileEditor"')
+    expect(source).not.toContain('单文件精修')
     expect(source).not.toContain('处理文件</el-button>')
   })
 

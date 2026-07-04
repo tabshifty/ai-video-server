@@ -45,6 +45,7 @@ const deletingBatchID = ref('')
 const fileSaving = ref(false)
 const batchEditSaving = ref(false)
 const batchDrawerVisible = ref(false)
+const selectedFileDialogVisible = ref(false)
 const uploadDialogVisible = ref(false)
 const batchEditDialogVisible = ref(false)
 const archiveGroupDialogVisible = ref(false)
@@ -162,8 +163,11 @@ const selectedContainsUnsupportedKinds = computed(() =>
 const selectedProcessableFiles = computed(() => selectedBatchFilesForActions.value.filter((file) => canProcessArchiveFile(file)))
 const selectedFrozenFiles = computed(() => selectedBatchFilesForActions.value.filter((file) => isArchiveGroupFrozenFile(file)))
 const selectedUnprocessableCount = computed(() => selectedBatchFilesForActions.value.length - selectedProcessableFiles.value.length)
-const shouldShowSingleFileEditor = computed(() => selectedFileIDs.value.length === 1)
 const selectedFileDirty = computed(() => !!selectedFile.value && serializeSelectedFileState() !== selectedFileSnapshot.value)
+const selectedFileDialogTitle = computed(() => {
+  if (selectedFile.value?.media_kind === 'image') return '编辑图片文件'
+  return '编辑视频文件'
+})
 const canProcessSelectedFiles = computed(() =>
   selectedBatchFilesForActions.value.length > 0
   && !processingBatch.value
@@ -361,6 +365,10 @@ function archiveFileProcessKind(file) {
   const kind = String(file?.media_kind || '').trim()
   if (kind === 'video' || kind === 'image') return kind
   return ''
+}
+
+function canEditArchiveFile(file) {
+  return archiveFileProcessKind(file) !== ''
 }
 
 function isArchiveGroupFrozenFile(file) {
@@ -694,6 +702,33 @@ async function requestArchiveFileSelection(nextIDs, anchorIndex = selectedFileIn
 async function onArchiveFileRowClick(row) {
   if (!row?.id) return
   await requestArchiveFileSelection([row.id], findArchiveFileIndex(row.id))
+}
+
+async function preloadSelectedFileEditor(file) {
+  const mediaKind = archiveFileProcessKind(file)
+  if (!mediaKind) return
+  const tasks = mediaKind === 'video'
+    ? [
+        { label: '标签', action: () => loadTagSuggestions('') },
+        { label: '视频合集', action: () => loadCollectionSuggestions('') },
+        { label: '图片合集', action: () => loadImageCollectionSuggestions('') }
+      ]
+    : [
+        { label: '图片合集', action: () => loadImageCollectionSuggestions('') }
+      ]
+  const results = await Promise.allSettled(tasks.map((task) => task.action()))
+  const failed = tasks.filter((_, index) => results[index]?.status === 'rejected').map((task) => task.label)
+  if (failed.length > 0) {
+    ElMessage.warning(`${failed.join('、')}选项加载失败，可稍后重试`)
+  }
+}
+
+async function openArchiveFileEditor(row) {
+  if (!row?.id || !canEditArchiveFile(row)) return
+  const selected = await requestArchiveFileSelection([row.id], findArchiveFileIndex(row.id))
+  if (!selected || !selectedFile.value) return
+  await preloadSelectedFileEditor(row)
+  selectedFileDialogVisible.value = true
 }
 
 async function onArchiveFileSelectToggle(row, event) {
@@ -1081,6 +1116,7 @@ async function saveSelectedFile() {
     }
     await updateAdminArchiveImportFile(selectedFile.value.id, payload)
     await refreshBatchDetail({ skipConfirm: true })
+    selectedFileDialogVisible.value = false
     ElMessage.success('已保存文件信息')
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '保存文件失败'))
@@ -1641,12 +1677,35 @@ function handleBatchDrawerClosed() {
   selectedFileIDs.value = []
   selectedFileIndexAnchor.value = -1
   clearSelectedFileDraft()
+  selectedFileDialogVisible.value = false
   retryExtractPassword.value = ''
   retryExtractEncodingMode.value = 'auto'
   selectedBatchGroups.value = []
   activeGroupFilter.value = ARCHIVE_GROUP_FILTER_ALL
   assignGroupTargetID.value = ''
   archiveGroupDialogVisible.value = false
+}
+
+async function confirmSelectedFileDialogClose() {
+  return confirmDiscardUnsavedFileChanges('确认关闭')
+}
+
+async function requestSelectedFileDialogClose() {
+  if (await confirmSelectedFileDialogClose()) {
+    selectedFileDialogVisible.value = false
+  }
+}
+
+function handleSelectedFileDialogBeforeClose(done) {
+  confirmSelectedFileDialogClose().then((confirmed) => {
+    if (confirmed) {
+      done()
+    }
+  })
+}
+
+function handleSelectedFileDialogClosed() {
+  syncSelectedFileFromCurrentRow()
 }
 
 async function searchTags(keyword = '') {
@@ -2010,13 +2069,16 @@ onUnmounted(() => {
             />
 
             <div class="archive-file-list">
-              <button
+              <div
                 v-for="file in displayedBatchFiles"
                 :key="file.id"
-                type="button"
                 class="archive-file-item"
                 :class="{ 'is-active': selectedFileIDs.length === 1 && selectedFileIDs[0] === String(file.id), 'is-selected': selectedFileIDs.includes(String(file.id)), 'has-reason': file.reason }"
+                role="button"
+                tabindex="0"
                 @click="onArchiveFileRowClick(file)"
+                @keydown.enter.prevent="onArchiveFileRowClick(file)"
+                @keydown.space.prevent="onArchiveFileRowClick(file)"
               >
                 <span
                   class="archive-file-item__selection"
@@ -2039,150 +2101,169 @@ onUnmounted(() => {
                   <span v-if="file.reason" class="archive-file-item__reason">{{ formatArchiveReason(file.reason) }}</span>
                 </div>
 
-                <span class="archive-file-item__status">
-                  <el-tag size="small" effect="plain" :type="fileStatusType(file.status)">{{ fileStatusLabel(file.status) }}</el-tag>
-                </span>
-              </button>
+                <div class="archive-file-item__aside">
+                  <el-button
+                    v-if="canEditArchiveFile(file)"
+                    size="small"
+                    text
+                    type="primary"
+                    class="archive-file-item__edit"
+                    @click.stop="openArchiveFileEditor(file)"
+                  >
+                    编辑
+                  </el-button>
+                  <span class="archive-file-item__status">
+                    <el-tag size="small" effect="plain" :type="fileStatusType(file.status)">{{ fileStatusLabel(file.status) }}</el-tag>
+                  </span>
+                </div>
+              </div>
             </div>
           </SectionCard>
 
-          <SectionCard v-if="shouldShowSingleFileEditor" dense class="archive-file-editor">
-            <template #title>单文件精修</template>
-            <template #description>这里只处理例外项修正；真正的处理动作统一留在下方主动作区。</template>
-
-            <div v-if="!selectedFile" class="archive-file-editor__empty">
-              <span>正在准备当前文件信息…</span>
-            </div>
-
-            <el-form v-else label-width="96px" class="archive-file-editor__form">
-              <el-form-item label="相对路径"><el-input :model-value="selectedFile.relative_path" disabled /></el-form-item>
-              <el-form-item label="文件类型"><el-input :model-value="formatArchiveFileType(selectedFile)" disabled /></el-form-item>
-              <el-form-item v-if="selectedFile.reason" label="跳过原因">
-                <el-input :model-value="formatArchiveReason(selectedFile.reason)" disabled />
-              </el-form-item>
-              <el-form-item label="视频类型" v-if="selectedFile.media_kind === 'video'">
-                <el-select v-model="selectedFile.video_type" style="width: 100%">
-                  <el-option label="短视频" value="short" />
-                  <el-option label="电影" value="movie" />
-                  <el-option label="剧集分集" value="episode" />
-                  <el-option label="AV" value="av" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="标题"><el-input v-model="selectedFile.title" /></el-form-item>
-              <el-form-item label="说明"><el-input v-model="selectedFile.description" type="textarea" :rows="3" /></el-form-item>
-              <el-form-item label="标签" v-if="selectedFile.media_kind === 'video'">
-                <el-select
-                  v-model="selectedFile.tags"
-                  multiple
-                  filterable
-                  remote
-                  reserve-keyword
-                  allow-create
-                  default-first-option
-                  clearable
-                  :remote-method="loadTagSuggestions"
-                  :loading="loadingTags"
-                  placeholder="可选择或输入标签"
-                  style="width: 100%"
-                >
-                  <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="视频合集" v-if="selectedFile.media_kind === 'video'">
-                <div class="collection-picker">
-                  <el-select
-                    v-model="selectedFile.video_collection_ids"
-                    class="collection-picker__select"
-                    multiple
-                    filterable
-                    remote
-                    reserve-keyword
-                    clearable
-                    default-first-option
-                    collapse-tags
-                    collapse-tags-tooltip
-                    :remote-method="loadCollectionSuggestions"
-                    :loading="loadingCollections"
-                    placeholder="可选，可多选"
-                  >
-                    <el-option
-                      v-for="collection in collectionOptions"
-                      :key="collection.value"
-                      :label="collection.label"
-                      :value="collection.value"
-                    />
-                  </el-select>
-                  <el-button class="collection-picker__button" @click="openCreateVideoCollection('file-video')">新建视频合集</el-button>
-                </div>
-              </el-form-item>
-              <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'video'">
-                <div class="collection-picker">
-                  <el-select
-                    v-model="selectedVideoImageCollectionID"
-                    class="collection-picker__select"
-                    filterable
-                    remote
-                    reserve-keyword
-                    clearable
-                    default-first-option
-                    :remote-method="loadImageCollectionSuggestions"
-                    :loading="loadingImageCollections"
-                    placeholder="可选，仅可关联一个图片图集"
-                  >
-                    <el-option
-                      v-for="collection in imageCollectionOptions"
-                      :key="collection.value"
-                      :label="collection.label"
-                      :value="collection.value"
-                    />
-                  </el-select>
-                  <el-button class="collection-picker__button" @click="openCreateImageCollection('file-video-image')">新建图片合集</el-button>
-                </div>
-              </el-form-item>
-              <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'image'">
-                <div class="collection-picker">
-                  <el-select
-                    v-model="selectedFile.image_collection_ids"
-                    class="collection-picker__select"
-                    multiple
-                    filterable
-                    remote
-                    reserve-keyword
-                    clearable
-                    default-first-option
-                    collapse-tags
-                    collapse-tags-tooltip
-                    :remote-method="loadImageCollectionSuggestions"
-                    :loading="loadingImageCollections"
-                    placeholder="可选，可多选"
-                  >
-                    <el-option
-                      v-for="collection in imageCollectionOptions"
-                      :key="collection.value"
-                      :label="collection.label"
-                      :value="collection.value"
-                    />
-                  </el-select>
-                  <el-button class="collection-picker__button" @click="openCreateImageCollection('file-image')">新建图片合集</el-button>
-                </div>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" :loading="fileSaving" @click="saveSelectedFile">保存文件</el-button>
-              </el-form-item>
-            </el-form>
-          </SectionCard>
-
-          <SectionCard v-else dense class="archive-selection-card">
+          <SectionCard dense class="archive-selection-card">
             <template #title>当前操作模式</template>
             <template #description>
-              <template v-if="selectedFileIDs.length === 0">先从文件清单里勾选一组同类型文件，再走批量编辑或批量处理。</template>
-              <template v-else>当前是多选模式，单文件精修已隐藏，主路径请使用下方批量动作。</template>
+              <template v-if="selectedFileIDs.length === 0">先从文件清单里勾选一组同类型文件，再走批量编辑或批量处理；需要例外修正时，直接点文件行右侧“编辑”。</template>
+              <template v-else-if="selectedFileIDs.length === 1">当前已单选 1 个文件；如需例外修正，请点该文件行右侧“编辑”，处理动作仍走下方主动作区。</template>
+              <template v-else>当前是多选模式；批量编辑和批量处理继续走下方主动作区，单文件弹窗不在这里打开。</template>
             </template>
           </SectionCard>
 
           <BulkActionBar :count="selectedFileIDs.length" :actions="bulkActions" />
         </div>
       </el-drawer>
+
+      <el-dialog
+        v-model="selectedFileDialogVisible"
+        :title="selectedFileDialogTitle"
+        width="min(94vw, 720px)"
+        destroy-on-close
+        :before-close="handleSelectedFileDialogBeforeClose"
+        @closed="handleSelectedFileDialogClosed"
+      >
+        <div v-if="!selectedFile" class="archive-file-editor__empty">
+          <span>正在准备当前文件信息…</span>
+        </div>
+
+        <el-form v-else label-width="96px" class="archive-file-editor__form">
+          <el-form-item label="相对路径"><el-input :model-value="selectedFile.relative_path" disabled /></el-form-item>
+          <el-form-item label="文件类型"><el-input :model-value="formatArchiveFileType(selectedFile)" disabled /></el-form-item>
+          <el-form-item v-if="selectedFile.reason" label="跳过原因">
+            <el-input :model-value="formatArchiveReason(selectedFile.reason)" disabled />
+          </el-form-item>
+          <el-form-item label="视频类型" v-if="selectedFile.media_kind === 'video'">
+            <el-select v-model="selectedFile.video_type" style="width: 100%">
+              <el-option label="短视频" value="short" />
+              <el-option label="电影" value="movie" />
+              <el-option label="剧集分集" value="episode" />
+              <el-option label="AV" value="av" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="标题"><el-input v-model="selectedFile.title" /></el-form-item>
+          <el-form-item label="说明"><el-input v-model="selectedFile.description" type="textarea" :rows="3" /></el-form-item>
+          <el-form-item label="标签" v-if="selectedFile.media_kind === 'video'">
+            <el-select
+              v-model="selectedFile.tags"
+              multiple
+              filterable
+              remote
+              reserve-keyword
+              allow-create
+              default-first-option
+              clearable
+              :remote-method="loadTagSuggestions"
+              :loading="loadingTags"
+              placeholder="可选择或输入标签"
+              style="width: 100%"
+            >
+              <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="视频合集" v-if="selectedFile.media_kind === 'video'">
+            <div class="collection-picker">
+              <el-select
+                v-model="selectedFile.video_collection_ids"
+                class="collection-picker__select"
+                multiple
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                default-first-option
+                collapse-tags
+                collapse-tags-tooltip
+                :remote-method="loadCollectionSuggestions"
+                :loading="loadingCollections"
+                placeholder="可选，可多选"
+              >
+                <el-option
+                  v-for="collection in collectionOptions"
+                  :key="collection.value"
+                  :label="collection.label"
+                  :value="collection.value"
+                />
+              </el-select>
+              <el-button class="collection-picker__button" @click="openCreateVideoCollection('file-video')">新建视频合集</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'video'">
+            <div class="collection-picker">
+              <el-select
+                v-model="selectedVideoImageCollectionID"
+                class="collection-picker__select"
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                default-first-option
+                :remote-method="loadImageCollectionSuggestions"
+                :loading="loadingImageCollections"
+                placeholder="可选，仅可关联一个图片图集"
+              >
+                <el-option
+                  v-for="collection in imageCollectionOptions"
+                  :key="collection.value"
+                  :label="collection.label"
+                  :value="collection.value"
+                />
+              </el-select>
+              <el-button class="collection-picker__button" @click="openCreateImageCollection('file-video-image')">新建图片合集</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'image'">
+            <div class="collection-picker">
+              <el-select
+                v-model="selectedFile.image_collection_ids"
+                class="collection-picker__select"
+                multiple
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                default-first-option
+                collapse-tags
+                collapse-tags-tooltip
+                :remote-method="loadImageCollectionSuggestions"
+                :loading="loadingImageCollections"
+                placeholder="可选，可多选"
+              >
+                <el-option
+                  v-for="collection in imageCollectionOptions"
+                  :key="collection.value"
+                  :label="collection.label"
+                  :value="collection.value"
+                />
+              </el-select>
+              <el-button class="collection-picker__button" @click="openCreateImageCollection('file-image')">新建图片合集</el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button @click="requestSelectedFileDialogClose">取消</el-button>
+          <el-button type="primary" :loading="fileSaving" @click="saveSelectedFile">保存文件</el-button>
+        </template>
+      </el-dialog>
 
       <el-dialog
         v-model="uploadDialogVisible"
@@ -2884,7 +2965,6 @@ onUnmounted(() => {
 
 .archive-group-panel,
 .archive-file-panel,
-.archive-file-editor,
 .archive-selection-card {
   min-width: 0;
 }
@@ -3143,6 +3223,27 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
+}
+
+.archive-file-item__aside {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: var(--space-2);
+}
+
+.archive-file-item__edit {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.archive-file-item:hover .archive-file-item__edit,
+.archive-file-item:focus-within .archive-file-item__edit,
+.archive-file-item.is-selected .archive-file-item__edit,
+.archive-file-item.is-active .archive-file-item__edit {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .archive-file-item__status {
