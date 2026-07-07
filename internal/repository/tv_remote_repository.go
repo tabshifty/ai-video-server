@@ -158,10 +158,10 @@ WHERE device_id = $2
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO tv_remote_sessions (
-    id, user_id, device_id, platform, status, items, search_context, current_index, current_video_id, ended_reason, ended_at, created_at, updated_at
+    id, user_id, device_id, platform, status, items, search_context, current_index, current_video_id, autoplay_next_enabled, ended_reason, ended_at, created_at, updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $12)
-`, session.ID, session.UserID, session.DeviceID, session.Platform, session.Status, itemsJSON, searchContextJSON, session.CurrentIndex, session.CurrentVideoID, session.EndedReason, session.EndedAt, now); err != nil {
+VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13, $13)
+`, session.ID, session.UserID, session.DeviceID, session.Platform, session.Status, itemsJSON, searchContextJSON, session.CurrentIndex, session.CurrentVideoID, session.AutoplayNextEnabled, session.EndedReason, session.EndedAt, now); err != nil {
 		return fmt.Errorf("insert tv remote session: %w", err)
 	}
 
@@ -184,6 +184,7 @@ SELECT
 	s.search_context,
 	s.current_index,
 	s.current_video_id,
+    s.autoplay_next_enabled,
 	s.ended_reason,
     s.ended_at,
     s.created_at,
@@ -210,6 +211,7 @@ SELECT
 	s.search_context,
 	s.current_index,
 	s.current_video_id,
+    s.autoplay_next_enabled,
 	s.ended_reason,
     s.ended_at,
     s.created_at,
@@ -268,6 +270,70 @@ WHERE id = $1
 	return nil
 }
 
+func (r *VideoRepository) UpdateTVRemoteSessionStateIfAutoplayNextEnabled(
+	ctx context.Context,
+	sessionID uuid.UUID,
+	userID uuid.UUID,
+	items []models.TvRemoteSessionItem,
+	currentIndex int,
+	currentVideoID uuid.UUID,
+	searchContext *models.TvRemoteSearchContext,
+	expectedCurrentIndex int,
+	expectedCurrentVideoID uuid.UUID,
+	now time.Time,
+) error {
+	itemsJSON, err := json.Marshal(items)
+	if err != nil {
+		return fmt.Errorf("marshal tv remote session items: %w", err)
+	}
+	var searchContextJSON []byte
+	if searchContext != nil {
+		searchContextJSON, err = json.Marshal(searchContext)
+		if err != nil {
+			return fmt.Errorf("marshal tv remote session search context: %w", err)
+		}
+	}
+	tag, err := r.pool.Exec(ctx, `
+UPDATE tv_remote_sessions
+SET items = $3::jsonb,
+    search_context = $4::jsonb,
+    current_index = $5,
+    current_video_id = $6,
+    updated_at = $9
+WHERE id = $1
+  AND user_id = $2
+  AND status = 'active'
+  AND autoplay_next_enabled = TRUE
+  AND current_index = $7
+  AND current_video_id = $8
+`, sessionID, userID, itemsJSON, searchContextJSON, currentIndex, currentVideoID, expectedCurrentIndex, expectedCurrentVideoID, now)
+	if err != nil {
+		return fmt.Errorf("auto-next tv remote session state: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (r *VideoRepository) UpdateTVRemoteSessionAutoplayNext(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, enabled bool, now time.Time) error {
+	tag, err := r.pool.Exec(ctx, `
+UPDATE tv_remote_sessions
+SET autoplay_next_enabled = $3,
+    updated_at = $4
+WHERE id = $1
+  AND user_id = $2
+  AND status = 'active'
+`, sessionID, userID, enabled, now)
+	if err != nil {
+		return fmt.Errorf("update tv remote session autoplay next: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func (r *VideoRepository) EndTVRemoteSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, endedReason string, endedAt time.Time) error {
 	tag, err := r.pool.Exec(ctx, `
 UPDATE tv_remote_sessions
@@ -307,6 +373,7 @@ func scanTVRemoteSessionRow(row tvRemoteSessionScanner) (models.TvRemoteSession,
 		&rawSearchContext,
 		&session.CurrentIndex,
 		&session.CurrentVideoID,
+		&session.AutoplayNextEnabled,
 		&session.EndedReason,
 		&session.EndedAt,
 		&session.CreatedAt,

@@ -28,6 +28,7 @@ interface TvRepository {
     suspend fun fetchCurrentTvRemoteSession(deviceId: String, legacyDeviceId: String? = null): Result<TvRemoteSessionDto?>
     suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto>
     suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto>
+    suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto>
     suspend fun endTvRemoteSession(sessionId: String, endedReason: String = "tv_back"): Result<Unit>
     suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto>
     suspend fun readActiveBaseUrl(): String?
@@ -79,6 +80,9 @@ class NetworkTvRepository @Inject constructor(
 
     override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
         videoRepository.tvRemoteNext(sessionId)
+
+    override suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> =
+        videoRepository.tvRemoteAutoNext(sessionId)
 
     override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
         videoRepository.endTvRemoteSession(sessionId, endedReason)

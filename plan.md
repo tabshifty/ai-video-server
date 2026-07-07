@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-07 18:39 +0800
+- 进度：完成独立复审后的最终收口。两轮复审指出的本地开关阻断 `/auto-next`、服务端非条件推进、自动连播补页无条件写会话状态均已修复；复审确认 `auto-next` 补页现在只在内存中合并，最终通过同一个带 `autoplay_next_enabled = TRUE` 与 expected index/video 条件的 SQL 写入，不再发现阻塞或中风险问题。
+- 影响文件：`internal/services/tv_remote.go`、`internal/repository/tv_remote_repository.go`、`internal/services/tv_remote_test.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`plan.md`
+- 验证：独立复审通过；`go test ./internal/repository -run 'TestTVRemoteSessionAutoplayNextMigration' -count=1`、`go test ./internal/services -run 'TestUpdateTVRemoteSessionAutoplayNext|TestAutoNextTVRemoteSession' -count=1`、`go test ./internal/handlers -run 'Test.*Route' -count=1` 通过；`git diff --check` 通过；乱码扫描无输出。
+
+## 2026-07-07 18:38 +0800
+- 进度：完成本轮收尾验证。手机端完整单测与 Debug 构建通过，TV 端完整单测与 Debug 构建通过；空白检查和乱码扫描通过。`go test ./... -count=1` 仍失败在既有 TV APK 元数据测试，fixture 实际解析 `version_code = 130`，测试期望 `121`，与本次远程投放自动连播改动无关；受影响的后端 repository/service/handler 定向测试已通过。
+- 影响文件：`plan.md`
+- 验证：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；`git diff --check` 通过；`rg -n $'\uFFFD' ...` 无输出；`go test ./... -count=1` 失败于 `internal/services TestParseTVAPKMetadataParsesReleaseAPK` 的既有 APK 版本期望不一致。
+
+## 2026-07-07 18:37 +0800
+- 进度：根据独立复审修复自动连播竞态：TV 端自然结束不再用 5 秒轮询到的本地开关值阻断 `/auto-next` 请求，而是始终让服务端检查最新会话开关；服务端 `auto-next` 改为专用条件更新，同时校验自动连播仍开启、当前位置 index/video 未变，避免并发关闭、显式切条或重复结束事件连续推进。补充 Gson 缺字段默认开启单测和 stale auto-next 服务层回归测试。
+- 影响文件：`internal/services/tv_remote.go`、`internal/repository/tv_remote_repository.go`、`internal/services/tv_remote_test.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackAutoplayNextTest.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvRemotePlaybackControlsSpecTest.kt`、`CONTEXT.md`、`plan.md`
+- 验证：`go test ./internal/services -run 'TestUpdateTVRemoteSessionAutoplayNext|TestAutoNextTVRemoteSession' -count=1` 通过；`go test ./internal/repository -run 'TestTVRemoteSessionAutoplayNextMigration' -count=1` 通过；`go test ./internal/handlers -run 'Test.*Route' -count=1` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvRemotePlaybackAutoplayNextTest --tests com.chee.videos.feature.tv.TvRemotePlaybackControlsSpecTest` 通过；`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过。
+
+## 2026-07-07 18:36 +0800
+- 进度：完成自动连播主实现：后端会话字段、迁移、开关接口与自然结束 `auto-next` 已接入；手机端投放控制页增加“自动播放下一条”开关并改为深色媒体遥控 UI；TV 投放页监听 `Player.STATE_ENDED`，按会话开关和去重 guard 调用服务端 `auto-next`，显式 `下一个` 保持既有路径；两端 DTO 对缺失 `autoplay_next_enabled` 按开启兼容，并已递增手机端与 TV 端版本号。
+- 影响文件：`migrations/0034_tv_remote_session_autoplay_next.*.sql`、`internal/**/tv_remote*`、`internal/models/user.go`、`android-app/app/src/main/java/com/chee/videos/**`、`android-app/app/src/test/java/com/chee/videos/**`、`android-app/app/build.gradle.kts`、`android-tv-app/tv-app/src/main/java/com/chee/videos/**`、`android-tv-app/tv-app/src/test/java/com/chee/videos/**`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 后端定向/全量测试、手机端与 TV 端定向/全量 Gradle 测试、assemble、`git diff --check` 和乱码扫描。
+
+## 2026-07-07 18:04 +0800
+- 进度：开始实现 TV 远程投放“自动播放下一条”会话级开关。已通过 `grill-with-docs` 收口语义，并启动子代理并行审视后端、手机端、TV 端实现方案；主线将先补红灯测试，再最小改动服务端会话字段/API、手机端投放控制页开关与 UI、TV 端自然播完自动推进共享会话，并同步递增手机端与 TV 端版本号。
+- 影响文件：预计涉及 `migrations/*`、`internal/models/user.go`、`internal/services/tv_remote.go`、`internal/repository/tv_remote_repository.go`、`internal/handlers/tv_remote.go`、路由注册文件、`android-app/app/src/main/java/com/chee/videos/**`、`android-tv-app/tv-app/src/main/java/com/chee/videos/**`、两端 `build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行 Go 定向测试、手机端定向单测与 `:app:testDebugUnitTest`/`:app:assembleDebug`、TV 端定向单测与 `:tv-app:testDebugUnitTest`/`:tv-app:assembleDebug`、`git diff --check`、乱码扫描。
+
 ## 2026-07-07 17:58 +0800
 - 进度：继续收口自动连播到达集合末尾的结束行为。已确认自动连播开启时，如果当前搜索集合已经到最后一条且服务端补不到更多结果，TV 停在最后一条末帧并留在投放页，手机端控制页显示已到最后一条并禁用 `下一个`；不自动退出投放页，也不循环回第一条。
 - 影响文件：`CONTEXT.md`、`plan.md`

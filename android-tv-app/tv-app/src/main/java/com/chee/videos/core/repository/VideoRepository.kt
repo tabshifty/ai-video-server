@@ -245,6 +245,15 @@ class VideoRepository @Inject constructor(
         }
     }
 
+    suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvRemoteAutoNext(
+                url = UrlBuilder.tvRemoteAutoNext(baseUrl, sessionId),
+                authorization = bearer,
+            )
+        }
+    }
+
     suspend fun endTvRemoteSession(sessionId: String, endedReason: String = "tv_back"): Result<Unit> {
         return callWithAuth { baseUrl, bearer ->
             api.endTvRemoteSession(

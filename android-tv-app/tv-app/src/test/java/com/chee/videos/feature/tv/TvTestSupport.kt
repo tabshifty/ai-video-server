@@ -109,6 +109,9 @@ class FakeTvRepository(
     override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
         Result.failure(UnsupportedOperationException("unused"))
 
+    override suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
     override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
         Result.success(Unit)
 
@@ -239,6 +242,9 @@ class DelayedSourceTvRepository(
     override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
         Result.failure(UnsupportedOperationException("unused"))
 
+    override suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
     override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
         Result.success(Unit)
 
@@ -333,6 +339,9 @@ class DelayedCatalogTvRepository(
         Result.failure(UnsupportedOperationException("unused"))
 
     override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> =
         Result.failure(UnsupportedOperationException("unused"))
 
     override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
@@ -453,6 +462,9 @@ class DelayedIptvTvRepository(
     override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
         Result.failure(UnsupportedOperationException("unused"))
 
+    override suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
     override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
         Result.success(Unit)
 
@@ -529,6 +541,9 @@ class DelayedSeriesDetailTvRepository(
         Result.failure(UnsupportedOperationException("unused"))
 
     override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
+        Result.failure(UnsupportedOperationException("unused"))
+
+    override suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> =
         Result.failure(UnsupportedOperationException("unused"))
 
     override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =

@@ -16,6 +16,7 @@ import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvDeviceListPayload
+import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
@@ -144,6 +145,13 @@ interface ApiService {
     suspend fun tvRemoteNext(
         @Url url: String,
         @Header("Authorization") authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto>
+
+    @POST
+    suspend fun tvRemoteAutoplayNext(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Body body: TvRemoteAutoplayNextRequest,
     ): ApiEnvelope<TvRemoteSessionDto>
 
     @GET

@@ -29,4 +29,17 @@ class TvRemotePlaybackControlsSpecTest {
             assertTrue("TvRemotePlaybackScreen 必须包含 $line", source.contains(line))
         }
     }
+
+    @Test
+    fun remotePlaybackScreenAutoAdvancesSharedSessionWhenCurrentItemEnds() {
+        val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt").readText()
+
+        listOf(
+            "Player.STATE_ENDED",
+            "shouldTvRemoteAutoplayNext(",
+            "viewModel.autoNext()",
+        ).forEach { line ->
+            assertTrue("TV 远程投放页自动连播必须包含 $line", source.contains(line))
+        }
+    }
 }

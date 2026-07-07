@@ -170,6 +170,8 @@ func (a *API) Register(r *gin.Engine) {
 			tvRemote.GET("/sessions/:session_id", a.GetTVRemoteSession)
 			tvRemote.POST("/sessions/:session_id/previous", a.TVRemotePrevious)
 			tvRemote.POST("/sessions/:session_id/next", a.TVRemoteNext)
+			tvRemote.POST("/sessions/:session_id/auto-next", a.TVRemoteAutoNext)
+			tvRemote.POST("/sessions/:session_id/autoplay-next", a.UpdateTVRemoteSessionAutoplayNext)
 			tvRemote.GET("/devices/current/session", a.GetCurrentTVRemoteSessionForDevice)
 			tvRemote.POST("/sessions/:session_id/current-index", a.UpdateTVRemoteSessionCurrentIndex)
 			tvRemote.POST("/sessions/:session_id/end", a.EndTVRemoteSession)

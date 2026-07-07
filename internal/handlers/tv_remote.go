@@ -91,6 +91,32 @@ func (a *API) TVRemoteNext(c *gin.Context) {
 	a.stepTVRemoteSession(c, 1)
 }
 
+func (a *API) TVRemoteAutoNext(c *gin.Context) {
+	userID, okUser := middleware.UserIDFromContext(c)
+	if !okUser {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	sessionID, okSession := parseUUID(c.Param("session_id"))
+	if !okSession {
+		bad(c, "invalid session id")
+		return
+	}
+	payload, err := a.appSvc.AutoNextTVRemoteSession(c.Request.Context(), userID, sessionID)
+	if err != nil {
+		switch {
+		case repository.IsNotFound(err):
+			response.Error(c, 404, "session not found")
+		case errors.Is(err, services.ErrTVRemoteSessionInactive):
+			response.Error(c, 2314, err.Error())
+		default:
+			response.Error(c, 2315, err.Error())
+		}
+		return
+	}
+	ok(c, payload)
+}
+
 func (a *API) stepTVRemoteSession(c *gin.Context, delta int) {
 	userID, okUser := middleware.UserIDFromContext(c)
 	if !okUser {
@@ -167,6 +193,39 @@ func (a *API) UpdateTVRemoteSessionCurrentIndex(c *gin.Context) {
 			response.Error(c, 2309, err.Error())
 		default:
 			response.Error(c, 2310, err.Error())
+		}
+		return
+	}
+	ok(c, payload)
+}
+
+func (a *API) UpdateTVRemoteSessionAutoplayNext(c *gin.Context) {
+	userID, okUser := middleware.UserIDFromContext(c)
+	if !okUser {
+		response.Error(c, 401, "unauthorized")
+		return
+	}
+	sessionID, okSession := parseUUID(c.Param("session_id"))
+	if !okSession {
+		bad(c, "invalid session id")
+		return
+	}
+	var req struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil {
+		bad(c, "invalid payload")
+		return
+	}
+	payload, err := a.appSvc.UpdateTVRemoteSessionAutoplayNext(c.Request.Context(), userID, sessionID, *req.Enabled)
+	if err != nil {
+		switch {
+		case repository.IsNotFound(err):
+			response.Error(c, 404, "session not found")
+		case errors.Is(err, services.ErrTVRemoteSessionInactive):
+			response.Error(c, 2312, err.Error())
+		default:
+			response.Error(c, 2313, err.Error())
 		}
 		return
 	}

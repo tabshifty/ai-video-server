@@ -347,6 +347,11 @@ private class FakeDetailApiService : ApiService {
         authorization: String,
     ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
 
+    override suspend fun tvRemoteAutoNext(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
     override suspend fun endTvRemoteSession(
         url: String,
         authorization: String,
@@ -538,6 +543,11 @@ private class DelayedDetailApiService : ApiService {
     ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
 
     override suspend fun tvRemoteNext(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun tvRemoteAutoNext(
         url: String,
         authorization: String,
     ): ApiEnvelope<TvRemoteSessionDto> = error("unused")

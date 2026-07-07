@@ -60,6 +60,9 @@ object UrlBuilder {
     fun tvRemoteNext(baseUrl: String, sessionId: String): String =
         "${tvRemoteSession(baseUrl, sessionId)}/next"
 
+    fun tvRemoteAutoNext(baseUrl: String, sessionId: String): String =
+        "${tvRemoteSession(baseUrl, sessionId)}/auto-next"
+
     fun tvRemoteEnd(baseUrl: String, sessionId: String): String =
         "${tvRemoteSession(baseUrl, sessionId)}/end"
 

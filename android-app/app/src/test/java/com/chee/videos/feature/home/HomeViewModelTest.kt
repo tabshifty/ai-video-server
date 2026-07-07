@@ -20,6 +20,7 @@ import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvDeviceListPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
@@ -577,6 +578,12 @@ private class FakeHomeApiService(
     override suspend fun tvRemoteNext(
         url: String,
         authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
+    override suspend fun tvRemoteAutoplayNext(
+        url: String,
+        authorization: String,
+        body: TvRemoteAutoplayNextRequest,
     ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
 
     override suspend fun imageCollections(

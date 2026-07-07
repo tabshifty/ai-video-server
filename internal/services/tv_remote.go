@@ -37,6 +37,8 @@ type tvRemoteRepository interface {
 	GetTVRemoteSessionByID(ctx context.Context, sessionID uuid.UUID) (models.TvRemoteSession, error)
 	GetActiveTVRemoteSessionForDevice(ctx context.Context, userID uuid.UUID, deviceID string, platform string) (models.TvRemoteSession, error)
 	UpdateTVRemoteSessionState(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, items []models.TvRemoteSessionItem, currentIndex int, currentVideoID uuid.UUID, searchContext *models.TvRemoteSearchContext, now time.Time) error
+	UpdateTVRemoteSessionStateIfAutoplayNextEnabled(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, items []models.TvRemoteSessionItem, currentIndex int, currentVideoID uuid.UUID, searchContext *models.TvRemoteSearchContext, expectedCurrentIndex int, expectedCurrentVideoID uuid.UUID, now time.Time) error
+	UpdateTVRemoteSessionAutoplayNext(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, enabled bool, now time.Time) error
 	EndTVRemoteSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, endedReason string, endedAt time.Time) error
 	SearchVideos(ctx context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error)
 }
@@ -93,15 +95,16 @@ func (s *AppService) StartTVRemoteSessionAt(
 	}
 	currentVideoID := normalizedItems[currentIndex].VideoID
 	session := models.TvRemoteSession{
-		ID:             uuid.New(),
-		UserID:         userID,
-		DeviceID:       normalizedDeviceID,
-		Platform:       tvRemotePlatform,
-		Status:         tvRemoteSessionStatusActive,
-		Items:          normalizedItems,
-		SearchContext:  normalizeTVRemoteSearchContext(searchContext, len(normalizedItems)),
-		CurrentIndex:   currentIndex,
-		CurrentVideoID: &currentVideoID,
+		ID:                  uuid.New(),
+		UserID:              userID,
+		DeviceID:            normalizedDeviceID,
+		Platform:            tvRemotePlatform,
+		Status:              tvRemoteSessionStatusActive,
+		Items:               normalizedItems,
+		SearchContext:       normalizeTVRemoteSearchContext(searchContext, len(normalizedItems)),
+		CurrentIndex:        currentIndex,
+		CurrentVideoID:      &currentVideoID,
+		AutoplayNextEnabled: true,
 	}
 	if err := s.tvRemoteRepo.CreateOrReplaceTVRemoteSession(ctx, session, now); err != nil {
 		return models.TvRemoteSession{}, err
@@ -222,6 +225,87 @@ func (s *AppService) UpdateTVRemoteSessionCurrentIndex(
 		time.Now().UTC(),
 	); err != nil {
 		return models.TvRemoteSession{}, err
+	}
+	updated, err := s.getTVRemoteSessionForUser(ctx, userID, sessionID)
+	if err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	return decorateTVRemoteSession(updated), nil
+}
+
+func (s *AppService) UpdateTVRemoteSessionAutoplayNext(
+	ctx context.Context,
+	userID uuid.UUID,
+	sessionID uuid.UUID,
+	enabled bool,
+) (models.TvRemoteSession, error) {
+	session, err := s.getTVRemoteSessionForUser(ctx, userID, sessionID)
+	if err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	if session.Status != tvRemoteSessionStatusActive {
+		return decorateTVRemoteSession(session), ErrTVRemoteSessionInactive
+	}
+	if session.AutoplayNextEnabled == enabled {
+		return decorateTVRemoteSession(session), nil
+	}
+	if err := s.tvRemoteRepo.UpdateTVRemoteSessionAutoplayNext(ctx, sessionID, userID, enabled, time.Now().UTC()); err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	updated, err := s.getTVRemoteSessionForUser(ctx, userID, sessionID)
+	if err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	return decorateTVRemoteSession(updated), nil
+}
+
+func (s *AppService) AutoNextTVRemoteSession(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID) (models.TvRemoteSession, error) {
+	session, err := s.getTVRemoteSessionForUser(ctx, userID, sessionID)
+	if err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	if session.Status != tvRemoteSessionStatusActive {
+		return decorateTVRemoteSession(session), ErrTVRemoteSessionInactive
+	}
+	if !session.AutoplayNextEnabled {
+		return decorateTVRemoteSession(session), nil
+	}
+	session, err = s.ensureTVRemoteSessionHasNextItemWithoutPersisting(ctx, userID, session)
+	if err != nil {
+		return models.TvRemoteSession{}, err
+	}
+	nextIndex := stepTVRemoteSessionIndex(session.CurrentIndex, 1, len(session.Items))
+	if nextIndex == session.CurrentIndex {
+		return decorateTVRemoteSession(session), nil
+	}
+	currentItem := currentTVRemoteSessionItem(session)
+	if currentItem == nil || currentItem.VideoID == uuid.Nil {
+		return decorateTVRemoteSession(session), nil
+	}
+	currentVideoID := session.Items[nextIndex].VideoID
+	if err := s.tvRemoteRepo.UpdateTVRemoteSessionStateIfAutoplayNextEnabled(
+		ctx,
+		sessionID,
+		userID,
+		session.Items,
+		nextIndex,
+		currentVideoID,
+		session.SearchContext,
+		session.CurrentIndex,
+		currentItem.VideoID,
+		time.Now().UTC(),
+	); err != nil {
+		if !repository.IsNotFound(err) {
+			return models.TvRemoteSession{}, err
+		}
+		latest, latestErr := s.getTVRemoteSessionForUser(ctx, userID, sessionID)
+		if latestErr != nil {
+			return models.TvRemoteSession{}, err
+		}
+		if latest.Status != tvRemoteSessionStatusActive {
+			return decorateTVRemoteSession(latest), ErrTVRemoteSessionInactive
+		}
+		return decorateTVRemoteSession(latest), nil
 	}
 	updated, err := s.getTVRemoteSessionForUser(ctx, userID, sessionID)
 	if err != nil {
@@ -401,6 +485,23 @@ func (s *AppService) ensureTVRemoteSessionHasNextItem(
 	userID uuid.UUID,
 	session models.TvRemoteSession,
 ) (models.TvRemoteSession, error) {
+	return s.ensureTVRemoteSessionHasNextItemWithPersisting(ctx, userID, session, true)
+}
+
+func (s *AppService) ensureTVRemoteSessionHasNextItemWithoutPersisting(
+	ctx context.Context,
+	userID uuid.UUID,
+	session models.TvRemoteSession,
+) (models.TvRemoteSession, error) {
+	return s.ensureTVRemoteSessionHasNextItemWithPersisting(ctx, userID, session, false)
+}
+
+func (s *AppService) ensureTVRemoteSessionHasNextItemWithPersisting(
+	ctx context.Context,
+	userID uuid.UUID,
+	session models.TvRemoteSession,
+	persist bool,
+) (models.TvRemoteSession, error) {
 	if session.CurrentIndex < len(session.Items)-1 || !tvRemoteSessionSearchHasMore(session) || session.SearchContext == nil {
 		return session, nil
 	}
@@ -427,6 +528,9 @@ func (s *AppService) ensureTVRemoteSessionHasNextItem(
 		currentVideoID = currentItem.VideoID
 	}
 	if currentVideoID == uuid.Nil {
+		return session, nil
+	}
+	if !persist {
 		return session, nil
 	}
 	if err := s.tvRemoteRepo.UpdateTVRemoteSessionState(

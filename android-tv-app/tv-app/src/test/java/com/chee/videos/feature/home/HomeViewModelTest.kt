@@ -375,6 +375,11 @@ private class FakeHomeApiService(
         authorization: String,
     ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
 
+    override suspend fun tvRemoteAutoNext(
+        url: String,
+        authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto> = error("unused")
+
     override suspend fun endTvRemoteSession(
         url: String,
         authorization: String,

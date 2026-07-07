@@ -160,6 +160,12 @@ interface ApiService {
     ): ApiEnvelope<TvRemoteSessionDto>
 
     @POST
+    suspend fun tvRemoteAutoNext(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+    ): ApiEnvelope<TvRemoteSessionDto>
+
+    @POST
     suspend fun endTvRemoteSession(
         @Url url: String,
         @Header("Authorization") authorization: String,

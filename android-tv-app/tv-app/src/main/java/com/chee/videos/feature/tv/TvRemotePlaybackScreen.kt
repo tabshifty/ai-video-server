@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
@@ -131,6 +132,10 @@ class TvRemotePlaybackViewModel @Inject constructor(
 
     fun next() {
         runAction { repository.tvRemoteNext(sessionId) }
+    }
+
+    fun autoNext() {
+        runAction { repository.tvRemoteAutoNext(sessionId) }
     }
 
     fun refreshNow() {
@@ -269,8 +274,14 @@ fun TvRemotePlaybackScreen(
     val session = uiState.session
     val currentItem = session?.currentItem ?: session?.items?.getOrNull(session.currentIndex)
     val currentVideoId = session?.currentVideoId ?: currentItem?.videoId.orEmpty()
+    val currentAutoplayKey = session?.let { "${it.sessionId}:${it.currentIndex}:$currentVideoId" }.orEmpty()
     val visibleErrorMessage = uiState.errorMessage ?: playbackErrorMessage
     val keepChromeVisible = !visibleErrorMessage.isNullOrBlank()
+    val latestHasNext by rememberUpdatedState(session?.hasNext == true)
+    val latestActionLoading by rememberUpdatedState(uiState.actionLoading)
+    val latestLoading by rememberUpdatedState(uiState.loading)
+    val latestCurrentAutoplayKey by rememberUpdatedState(currentAutoplayKey)
+    var lastAutoplayAdvancedKey by remember { mutableStateOf<String?>(null) }
 
     fun scheduleChromeAutoHide() {
         chromeHideJob?.cancel()
@@ -371,6 +382,23 @@ fun TvRemotePlaybackScreen(
                 isPlayerActuallyPlaying = isPlaying
             }
 
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState != Player.STATE_ENDED) {
+                    return
+                }
+                if (shouldTvRemoteAutoplayNext(
+                        hasNext = latestHasNext,
+                        actionLoading = latestActionLoading,
+                        loading = latestLoading,
+                        currentAutoplayKey = latestCurrentAutoplayKey,
+                        lastAutoplayAdvancedKey = lastAutoplayAdvancedKey,
+                    )
+                ) {
+                    lastAutoplayAdvancedKey = latestCurrentAutoplayKey
+                    viewModel.autoNext()
+                }
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 playbackErrorMessage = error.message?.trim().takeUnless { it.isNullOrBlank() } ?: "播放失败"
                 showChrome = true
@@ -394,6 +422,8 @@ fun TvRemotePlaybackScreen(
             renderedVideoId = null
             return@LaunchedEffect
         }
+        isPausedByUser = false
+        lastAutoplayAdvancedKey = null
         renderedVideoId = null
         playbackErrorMessage = null
         showSeekOverlay = false
@@ -407,7 +437,7 @@ fun TvRemotePlaybackScreen(
         val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
         sharedPlayer.setMediaSource(mediaSource, true)
         sharedPlayer.prepare()
-        sharedPlayer.playWhenReady = !isPausedByUser
+        sharedPlayer.playWhenReady = true
     }
 
     LaunchedEffect(currentVideoId) {
@@ -744,6 +774,20 @@ internal fun calculateTvRemoteSeekTarget(
     } else {
         (current - deltaMs).coerceAtLeast(0L)
     }
+}
+
+internal fun shouldTvRemoteAutoplayNext(
+    hasNext: Boolean,
+    actionLoading: Boolean,
+    loading: Boolean = false,
+    currentAutoplayKey: String = "current",
+    lastAutoplayAdvancedKey: String? = null,
+): Boolean {
+    return hasNext &&
+        !actionLoading &&
+        !loading &&
+        currentAutoplayKey.isNotBlank() &&
+        currentAutoplayKey != lastAutoplayAdvancedKey
 }
 
 private fun formatTvRemotePlaybackTime(ms: Long): String {

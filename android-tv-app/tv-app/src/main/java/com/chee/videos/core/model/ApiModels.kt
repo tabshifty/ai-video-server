@@ -212,11 +212,15 @@ data class TvRemoteSessionDto(
     @SerializedName("current_item") val currentItem: TvRemoteSessionItemDto? = null,
     @SerializedName("has_previous") val hasPrevious: Boolean = false,
     @SerializedName("has_next") val hasNext: Boolean = false,
+    @SerializedName("autoplay_next_enabled") val autoplayNextEnabled: Boolean? = null,
     @SerializedName("ended_reason") val endedReason: String? = null,
     @SerializedName("ended_at") val endedAt: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null,
-)
+) {
+    val isAutoplayNextEnabled: Boolean
+        get() = autoplayNextEnabled != false
+}
 
 data class TvRemoteDeviceSessionPayload(
     @SerializedName("session") val session: TvRemoteSessionDto? = null,

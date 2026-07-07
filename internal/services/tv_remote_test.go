@@ -86,6 +86,188 @@ func TestStartTVRemoteSessionCreatesSessionWithCurrentItem(t *testing.T) {
 	if got := session.Items[0].ThumbnailPath; got != "/thumb-1.jpg" {
 		t.Fatalf("expected trimmed thumbnail, got=%q", got)
 	}
+	if !session.AutoplayNextEnabled || repo.created == nil || !repo.created.AutoplayNextEnabled {
+		t.Fatalf("expected new sessions to enable autoplay next by default, session=%v created=%#v", session.AutoplayNextEnabled, repo.created)
+	}
+}
+
+func TestUpdateTVRemoteSessionAutoplayNext(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	videoID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+	repo := &fakeTVRemoteRepository{
+		session: models.TvRemoteSession{
+			ID:                  sessionID,
+			UserID:              userID,
+			DeviceID:            "living-room",
+			DeviceName:          "客厅电视",
+			Platform:            tvRemotePlatform,
+			Status:              tvRemoteSessionStatusActive,
+			Items:               []models.TvRemoteSessionItem{{VideoID: videoID, Title: "条目 1"}},
+			CurrentIndex:        0,
+			CurrentVideoID:      &videoID,
+			AutoplayNextEnabled: true,
+		},
+	}
+	svc := &AppService{tvRemoteRepo: repo}
+
+	session, err := svc.UpdateTVRemoteSessionAutoplayNext(context.Background(), userID, sessionID, false)
+	if err != nil {
+		t.Fatalf("UpdateTVRemoteSessionAutoplayNext returned err=%v", err)
+	}
+	if session.AutoplayNextEnabled {
+		t.Fatal("expected autoplay next to be disabled")
+	}
+	if repo.autoplayNextUpdates != 1 {
+		t.Fatalf("expected repository autoplay update once, got=%d", repo.autoplayNextUpdates)
+	}
+}
+
+func TestAutoNextTVRemoteSessionNoopsWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	videoID1 := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	videoID2 := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+	repo := &fakeTVRemoteRepository{
+		session: models.TvRemoteSession{
+			ID:                  sessionID,
+			UserID:              userID,
+			DeviceID:            "living-room",
+			DeviceName:          "客厅电视",
+			Platform:            tvRemotePlatform,
+			Status:              tvRemoteSessionStatusActive,
+			Items:               []models.TvRemoteSessionItem{{VideoID: videoID1}, {VideoID: videoID2}},
+			CurrentIndex:        0,
+			CurrentVideoID:      &videoID1,
+			AutoplayNextEnabled: false,
+		},
+	}
+	svc := &AppService{tvRemoteRepo: repo}
+
+	session, err := svc.AutoNextTVRemoteSession(context.Background(), userID, sessionID)
+	if err != nil {
+		t.Fatalf("AutoNextTVRemoteSession returned err=%v", err)
+	}
+	if session.CurrentIndex != 0 {
+		t.Fatalf("expected current index to stay 0 when autoplay is disabled, got=%d", session.CurrentIndex)
+	}
+}
+
+func TestAutoNextTVRemoteSessionStepsWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	videoID1 := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	videoID2 := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+	repo := &fakeTVRemoteRepository{
+		session: models.TvRemoteSession{
+			ID:                  sessionID,
+			UserID:              userID,
+			DeviceID:            "living-room",
+			DeviceName:          "客厅电视",
+			Platform:            tvRemotePlatform,
+			Status:              tvRemoteSessionStatusActive,
+			Items:               []models.TvRemoteSessionItem{{VideoID: videoID1}, {VideoID: videoID2}},
+			CurrentIndex:        0,
+			CurrentVideoID:      &videoID1,
+			AutoplayNextEnabled: true,
+		},
+	}
+	svc := &AppService{tvRemoteRepo: repo}
+
+	session, err := svc.AutoNextTVRemoteSession(context.Background(), userID, sessionID)
+	if err != nil {
+		t.Fatalf("AutoNextTVRemoteSession returned err=%v", err)
+	}
+	if session.CurrentIndex != 1 || session.CurrentItem == nil || session.CurrentItem.VideoID != videoID2 {
+		t.Fatalf("expected auto next to advance to second item, got=%#v", session)
+	}
+}
+
+func TestAutoNextTVRemoteSessionNoopsWhenExpectedCurrentItemChanged(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	videoID1 := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	videoID2 := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+	repo := &fakeTVRemoteRepository{
+		session: models.TvRemoteSession{
+			ID:                  sessionID,
+			UserID:              userID,
+			DeviceID:            "living-room",
+			DeviceName:          "客厅电视",
+			Platform:            tvRemotePlatform,
+			Status:              tvRemoteSessionStatusActive,
+			Items:               []models.TvRemoteSessionItem{{VideoID: videoID1}, {VideoID: videoID2}},
+			CurrentIndex:        0,
+			CurrentVideoID:      &videoID1,
+			AutoplayNextEnabled: true,
+		},
+		autoplayNextExpectedIndexOverride: intPtr(1),
+	}
+	svc := &AppService{tvRemoteRepo: repo}
+
+	session, err := svc.AutoNextTVRemoteSession(context.Background(), userID, sessionID)
+	if err != nil {
+		t.Fatalf("AutoNextTVRemoteSession returned err=%v", err)
+	}
+	if session.CurrentIndex != 0 {
+		t.Fatalf("expected stale auto-next to leave current index unchanged, got=%d", session.CurrentIndex)
+	}
+}
+
+func TestAutoNextTVRemoteSessionDoesNotPersistLoadedBoundaryBeforeConditionalAdvance(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	videoID1 := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	videoID2 := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	videoID3 := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
+
+	repo := &fakeTVRemoteRepository{
+		session: models.TvRemoteSession{
+			ID:                  sessionID,
+			UserID:              userID,
+			DeviceID:            "living-room",
+			DeviceName:          "客厅电视",
+			Platform:            tvRemotePlatform,
+			Status:              tvRemoteSessionStatusActive,
+			Items:               []models.TvRemoteSessionItem{{VideoID: videoID1}, {VideoID: videoID2}},
+			SearchContext:       &models.TvRemoteSearchContext{Query: "老师", Type: "short", Page: 1, PageSize: 2, TotalCount: 3},
+			CurrentIndex:        1,
+			CurrentVideoID:      &videoID2,
+			AutoplayNextEnabled: true,
+		},
+		searchItems:                       []models.VideoListItem{{ID: videoID3, Title: "条目 3", Type: "short"}},
+		searchTotalCount:                  3,
+		autoplayNextExpectedIndexOverride: intPtr(0),
+	}
+	svc := &AppService{tvRemoteRepo: repo}
+
+	session, err := svc.AutoNextTVRemoteSession(context.Background(), userID, sessionID)
+	if err != nil {
+		t.Fatalf("AutoNextTVRemoteSession returned err=%v", err)
+	}
+	if repo.searchCall == nil {
+		t.Fatal("expected auto-next at loaded boundary to fetch next page")
+	}
+	if repo.stateUpdates != 0 {
+		t.Fatalf("expected auto-next boundary load to avoid unconditional state update, got=%d", repo.stateUpdates)
+	}
+	if session.CurrentIndex != 1 || len(session.Items) != 2 {
+		t.Fatalf("expected stale boundary auto-next to leave stored session untouched, got index=%d len=%d", session.CurrentIndex, len(session.Items))
+	}
 }
 
 func TestStartTVRemoteSessionKeepsCurrentIndexBeyondHundredthItem(t *testing.T) {
@@ -395,17 +577,20 @@ func TestDecorateTVRemoteSessionMarksHasNextWhenSearchContextHasMore(t *testing.
 }
 
 type fakeTVRemoteRepository struct {
-	device           models.TvDeviceRecord
-	session          models.TvRemoteSession
-	created          *models.TvRemoteSession
-	touchedDeviceID  string
-	touchedDeviceIDs []string
-	devicesByID      map[string]models.TvDeviceRecord
-	sessionsByDevice map[string]models.TvRemoteSession
-	getActiveErr     error
-	searchItems      []models.VideoListItem
-	searchTotalCount int
-	searchCall       *fakeTVRemoteSearchCall
+	device                            models.TvDeviceRecord
+	session                           models.TvRemoteSession
+	created                           *models.TvRemoteSession
+	touchedDeviceID                   string
+	touchedDeviceIDs                  []string
+	devicesByID                       map[string]models.TvDeviceRecord
+	sessionsByDevice                  map[string]models.TvRemoteSession
+	getActiveErr                      error
+	searchItems                       []models.VideoListItem
+	searchTotalCount                  int
+	searchCall                        *fakeTVRemoteSearchCall
+	stateUpdates                      int
+	autoplayNextUpdates               int
+	autoplayNextExpectedIndexOverride *int
 }
 
 type fakeTVRemoteSearchCall struct {
@@ -505,6 +690,37 @@ func (r *fakeTVRemoteRepository) UpdateTVRemoteSessionState(_ context.Context, s
 	r.session.CurrentIndex = currentIndex
 	r.session.CurrentVideoID = &currentVideoID
 	r.session.SearchContext = searchContext
+	r.stateUpdates++
+	return nil
+}
+
+func (r *fakeTVRemoteRepository) UpdateTVRemoteSessionStateIfAutoplayNextEnabled(_ context.Context, sessionID, _ uuid.UUID, items []models.TvRemoteSessionItem, currentIndex int, currentVideoID uuid.UUID, searchContext *models.TvRemoteSearchContext, expectedCurrentIndex int, expectedCurrentVideoID uuid.UUID, _ time.Time) error {
+	if r.session.ID != sessionID {
+		return pgx.ErrNoRows
+	}
+	if !r.session.AutoplayNextEnabled {
+		return pgx.ErrNoRows
+	}
+	expectedIndex := expectedCurrentIndex
+	if r.autoplayNextExpectedIndexOverride != nil {
+		expectedIndex = *r.autoplayNextExpectedIndexOverride
+	}
+	if r.session.CurrentIndex != expectedIndex || r.session.CurrentVideoID == nil || *r.session.CurrentVideoID != expectedCurrentVideoID {
+		return pgx.ErrNoRows
+	}
+	r.session.Items = append([]models.TvRemoteSessionItem(nil), items...)
+	r.session.CurrentIndex = currentIndex
+	r.session.CurrentVideoID = &currentVideoID
+	r.session.SearchContext = searchContext
+	return nil
+}
+
+func (r *fakeTVRemoteRepository) UpdateTVRemoteSessionAutoplayNext(_ context.Context, sessionID, _ uuid.UUID, enabled bool, _ time.Time) error {
+	if r.session.ID != sessionID {
+		return pgx.ErrNoRows
+	}
+	r.session.AutoplayNextEnabled = enabled
+	r.autoplayNextUpdates++
 	return nil
 }
 
@@ -526,4 +742,8 @@ func (r *fakeTVRemoteRepository) SearchVideos(_ context.Context, q, typ string, 
 		offset: offset,
 	}
 	return append([]models.VideoListItem(nil), r.searchItems...), r.searchTotalCount, nil
+}
+
+func intPtr(value int) *int {
+	return &value
 }

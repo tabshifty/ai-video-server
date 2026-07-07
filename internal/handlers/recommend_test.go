@@ -53,6 +53,8 @@ func TestRegisterIncludesImageCollectionRoutes(t *testing.T) {
 		"GET /api/v1/tv-remote/sessions/:session_id",
 		"POST /api/v1/tv-remote/sessions/:session_id/previous",
 		"POST /api/v1/tv-remote/sessions/:session_id/next",
+		"POST /api/v1/tv-remote/sessions/:session_id/auto-next",
+		"POST /api/v1/tv-remote/sessions/:session_id/autoplay-next",
 		"GET /api/v1/tv-remote/devices/current/session",
 		"POST /api/v1/tv-remote/sessions/:session_id/current-index",
 		"POST /api/v1/tv-remote/sessions/:session_id/end",

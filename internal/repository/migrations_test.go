@@ -224,6 +224,16 @@ func TestTVRemoteSessionSearchContextMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+search_context`)
 }
 
+func TestTVRemoteSessionAutoplayNextMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0034_tv_remote_session_autoplay_next.up.sql")
+	down := readMigrationForTest(t, "0034_tv_remote_session_autoplay_next.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+tv_remote_sessions\s+add\s+column\s+if\s+not\s+exists\s+autoplay_next_enabled\s+boolean\s+not\s+null\s+default\s+true`)
+	assertSQLPattern(t, down, `(?is)alter\s+table\s+tv_remote_sessions\s+drop\s+column\s+if\s+exists\s+autoplay_next_enabled`)
+}
+
 func TestMarkEd2kDownloadTaskRunningRefreshesStartedAt(t *testing.T) {
 	t.Parallel()
 

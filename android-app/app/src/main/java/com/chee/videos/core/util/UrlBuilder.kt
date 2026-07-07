@@ -55,6 +55,9 @@ object UrlBuilder {
     fun tvRemoteNext(baseUrl: String, sessionId: String): String =
         "${tvRemoteSession(baseUrl, sessionId)}/next"
 
+    fun tvRemoteAutoplayNext(baseUrl: String, sessionId: String): String =
+        "${tvRemoteSession(baseUrl, sessionId)}/autoplay-next"
+
     fun imageCollections(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/image-collections"
 
     fun imageCollectionDetail(baseUrl: String, collectionId: String): String =

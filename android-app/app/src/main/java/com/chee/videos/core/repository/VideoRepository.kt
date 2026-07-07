@@ -14,6 +14,7 @@ import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvDeviceDto
+import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSearchContextRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
@@ -241,6 +242,16 @@ class VideoRepository @Inject constructor(
             api.tvRemoteNext(
                 url = UrlBuilder.tvRemoteNext(baseUrl, sessionId),
                 authorization = bearer,
+            )
+        }
+    }
+
+    suspend fun tvRemoteAutoplayNext(sessionId: String, enabled: Boolean): Result<TvRemoteSessionDto> {
+        return callWithAuth { baseUrl, bearer ->
+            api.tvRemoteAutoplayNext(
+                url = UrlBuilder.tvRemoteAutoplayNext(baseUrl, sessionId),
+                authorization = bearer,
+                body = TvRemoteAutoplayNextRequest(enabled = enabled),
             )
         }
     }
