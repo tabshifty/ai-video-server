@@ -65,6 +65,8 @@
 - `ED2K 外部执行器适配`：ED2K 下载能力首期不在本仓库内实现完整协议栈，而是通过一个可替换的外部执行器二进制来完成实际下载。Go worker 负责入队、取任务、驱动执行器并回写状态；后续若切换到 `amuled`、`amulecmd` 或其它桥接工具，只需要替换执行器实现和环境变量，不需要改动下载任务主状态机。这里 carve out 一项不属于执行器、而由 Go 侧直接处理的 fs 操作：完成后的暂存清理（见 [[ED2K 暂存清理归 Go fs 操作]]）——它只做符号链接解析与本地文件删除，不触碰 aMule 远程控制，因此不违反“Go 不散落 aMule 远控细节”的边界。
 - `ED2K aMule 执行器契约`：家用部署机当前约定的 ED2K 外部执行器是 `scripts/ed2k-amule-executor.sh` 这一层适配脚本，worker 通过 `ED2K_DOWNLOAD_EXECUTABLE` 调它，并用环境变量传入任务 id、资源哈希、文件名与声明大小；脚本再去驱动部署机上的 `amuled + amulecmd`。这样项目内只固定“脚本输入输出契约”，不把 aMule 远程控制细节散落到 Go 代码里。
 - `ED2K 外部引擎自备`：既然 [[ED2K 外部执行器适配]] 明确不在仓库里自带协议栈，部署机要想让下载工作台真正下载，就必须自行提供可运行的外部 ED2K 引擎。当前默认路径是部署官方 aMule 3.0.0 macOS dmg 的 `aMule.app` bundle（见 [[ED2K aMule 部署前提]]），并提前配置好 External Connections 密码与端口；仓库只负责调度和适配，不负责把引擎二进制打进发布产物。
+- `ED2K 家庭网络入站受限`：[[家用部署机]] 所在网络无法为 ED2K 客户端提供可从公网直达的入站端口，因此客户端只能获得 Low ID；这是网络可达性约束，不是 [[ED2K aMule 执行器契约]] 的引擎故障，在同一网络内替换 ED2K 客户端也不会自动获得 High ID。Low ID 仍可下载，但会失去部分直接互联机会，尤其可能影响双方都是 Low ID 的冷门资源。
+- `ED2K 来源不可替代`：当前待下载资源基本只提供 `ed2k://` 链接，因此替代方案必须继续承接 ED2K 协议，不能把 BT、磁力链接或直链视为等价回退。这里允许替换的是 [[ED2K 外部执行器适配]] 背后的运行位置或客户端实现，不是资源来源协议。
 
 ## 字幕处理约定
 - `ASS 字幕原文存储策略`：后台字幕上传入口允许 `.srt`、`.vtt`、`.ass`、`.ssa` 四类文件；`.ass/.ssa` 不再强转 WebVTT，而是以 ASS 原文落库，数据库记录 `video_subtitles.format=ass` / `mime_type=text/x-ssa`，`metadata.original_format` 继续记录原始扩展名。视频内嵌字幕抽取时，`ass`/`ssa` codec 用 ffmpeg `-c:s copy` 保留原文；`mov_text`、`subrip`、`webvtt` 等无 ASS Style 段的格式继续转 VTT。历史已生成的 VTT 字幕不反向迁移；用户需要 ASS 特效时重新上传或重新抽取。

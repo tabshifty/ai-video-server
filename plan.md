@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-10 19:13:55 +0800
+- 进度：完成本轮 ED2K 网络与来源约束的文档校验，确认术语、部署说明和进度记录没有空白错误或乱码替换字符。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
+- 验证：`git diff --check -- CONTEXT.md docs/家用部署机.md plan.md` 通过；乱码替换字符扫描无输出。文档变更，无需运行构建或测试。
+
+## 2026-07-10 19:13 +0800
+- 进度：继续通过 `grill-with-docs` 收口 Low ID 替代方案，确认当前资源基本只提供 ED2K 链接，将其定义为 `ED2K 来源不可替代`。后续方案必须保留 ED2K 协议，只比较公网远程引擎、可入站 VPN 或自建公网转发等运行架构，不再把 BT、磁力或直链列为等价替代。
+- 影响文件：`CONTEXT.md`、`plan.md`
+- 验证：待执行 Markdown 空白检查与乱码扫描；文档变更，无需运行构建或测试。
+
+## 2026-07-10 19:12 +0800
+- 进度：通过 `grill-with-docs` 确认家用路由网络无法为 ED2K 提供公网可达的入站端口，并将该长期约束收口为 `ED2K 家庭网络入站受限`。同时修正部署文档中“Low ID 不影响从源下载”的过强表述，明确同网更换客户端不能解决 High ID，Low ID 仍可下载但可能减少冷门资源的直接来源；替代架构仍待继续收口。
+- 影响文件：`CONTEXT.md`、`docs/家用部署机.md`、`plan.md`
+- 验证：`git diff --check -- CONTEXT.md docs/家用部署机.md` 通过；乱码替换字符扫描无输出。文档变更，无需运行构建或测试。
+
 ## 2026-07-07 18:39 +0800
 - 进度：完成独立复审后的最终收口。两轮复审指出的本地开关阻断 `/auto-next`、服务端非条件推进、自动连播补页无条件写会话状态均已修复；复审确认 `auto-next` 补页现在只在内存中合并，最终通过同一个带 `autoplay_next_enabled = TRUE` 与 expected index/video 条件的 SQL 写入，不再发现阻塞或中风险问题。
 - 影响文件：`internal/services/tv_remote.go`、`internal/repository/tv_remote_repository.go`、`internal/services/tv_remote_test.go`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvRemotePlaybackScreen.kt`、`plan.md`
