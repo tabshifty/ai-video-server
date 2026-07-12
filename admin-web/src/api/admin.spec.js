@@ -18,6 +18,7 @@ vi.mock('./request', () => ({
 
 import {
   batchDeleteAdminVideos,
+  batchUpdateAdminArchiveImportFiles,
   batchUpdateAdminVideos,
   createAdminEd2kDownloadTasks,
   createAdminTvEpisode,
@@ -209,6 +210,17 @@ describe('archive import apis', () => {
     })
     expect(get).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1')
     expect(get).toHaveBeenCalledWith('/admin/archive-import/files/file-1')
+  })
+
+  it('updates archive import files through the semantic batch endpoint', async () => {
+    const payload = {
+      targets: [{ id: 'file-1', updated_at: '2026-07-12T05:00:00Z' }],
+      title_mode: 'filename'
+    }
+
+    await batchUpdateAdminArchiveImportFiles(payload)
+
+    expect(put).toHaveBeenCalledWith('/admin/archive-import/files/batch-update', payload)
   })
 
   it('uploads archive imports and processes batches or files', async () => {
