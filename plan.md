@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-12 18:58:53 +0800
+- 进度：完成管理端文件名标题派生、替换资格、单文件草稿、批量预览/目标/payload 纯函数与新批量 API 客户端。批量本地门禁覆盖空选择、缺 ID/`updated_at`、可见跨批次、不可替换状态、空/超长标题；固定 payload 不允许 patch 覆盖 `targets/title_mode`。首轮评审发现 JS `trim`/`\s` 与 Go `unicode.IsSpace` 及尾斜杠 basename 存在差异，已改为显式 Go 空白字符集并补 U+0085、U+FEFF、尾斜杠回归。`changed=false` 依“原标题先 TrimSpace 比较、同名不制造脏状态”规格保留。复审通过，无剩余问题。
+- 影响文件：`admin-web/src/views/toolboxArchiveImport.helpers.js`、`admin-web/src/views/toolboxArchiveImport.helpers.spec.js`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`plan.md`
+- 验证：helper RED 因模块未存在失败，API RED 因函数未定义失败；一致性修复 RED 精确命中 U+0085、U+FEFF 和尾斜杠 3 个边界。GREEN `npm test -- toolboxArchiveImport.helpers.spec.js admin.spec.js` 通过（2 文件、61 测试）；子代理管理端全量 216/216 和 `npm run build` 通过，仅有旧有 Vite chunk 大小警告；`git diff --check` 通过。
+
 ## 2026-07-12 18:34:09 +0800
 - 进度：完成 `PUT /api/v1/admin/archive-import/files/batch-update` 的 Gin 请求解析、静态路由、service interface 与结构化错误映射。Handler 只接受目标 ID/时间、`title_mode` 与显式字段开关，不接受前端派生的标题/说明；非法目标、时间或合集 UUID 在调用 service 前拒绝，批量业务错误固定返回 `code=1078` 并保留 `reason/issues`。独立复审确认规格与质量均通过，无 Critical、Important 或 Minor 问题。
 - 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/admin_archive_import_test.go`、`plan.md`
