@@ -623,6 +623,95 @@ func TestApplyArchiveImportBatchPlanCallerDefersRollbackBeforeWrites(t *testing.
 	}
 }
 
+func TestBatchUpdateFilesReadsResultsInsideTransactionBeforeCommit(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("archive_import_batch_update.go")
+	if err != nil {
+		t.Fatalf("ReadFile(archive_import_batch_update.go) error = %v", err)
+	}
+	source := string(raw)
+	const signature = "func (s *ArchiveImportService) BatchUpdateFiles"
+	start := strings.Index(source, signature)
+	if start < 0 {
+		t.Fatalf("%s not found", signature)
+	}
+	body := source[start+len(signature):]
+	if end := strings.Index(body, "\nfunc "); end >= 0 {
+		body = body[:end]
+	}
+
+	applyIndex := strings.Index(body, "applyArchiveImportBatchPlanTx(ctx, tx")
+	listIndex := strings.Index(body, "listArchiveFilesByIDsTx(ctx, tx")
+	commitIndex := strings.Index(body, "tx.Commit(ctx)")
+	poolListIndex := strings.Index(body, "s.listArchiveFilesByIDs(ctx")
+	if applyIndex < 0 || listIndex < 0 || commitIndex < 0 || poolListIndex >= 0 {
+		t.Fatalf(
+			"unexpected result read calls: apply=%d tx_list=%d commit=%d pool_list=%d",
+			applyIndex,
+			listIndex,
+			commitIndex,
+			poolListIndex,
+		)
+	}
+	if !(applyIndex < listIndex && listIndex < commitIndex) {
+		t.Fatalf("unexpected result read order: apply=%d tx_list=%d commit=%d", applyIndex, listIndex, commitIndex)
+	}
+}
+
+func TestListArchiveFilesByIDsTxReturnsCompleteResultsInRelativePathOrder(t *testing.T) {
+	t.Parallel()
+
+	batchID := uuid.New()
+	firstID := uuid.New()
+	secondID := uuid.New()
+	rows := &archiveImportFileRows{files: []models.ArchiveImportFileListItem{
+		{ID: firstID, BatchID: batchID, RelativePath: "第一集.mp4", Title: "第一集"},
+		{ID: secondID, BatchID: batchID, RelativePath: "第二集.mp4", Title: "第二集"},
+	}}
+	tx := &queryFailingArchiveImportTx{rows: rows}
+
+	got, err := listArchiveFilesByIDsTx(context.Background(), tx, batchID, []uuid.UUID{firstID, secondID})
+	if err != nil {
+		t.Fatalf("listArchiveFilesByIDsTx() error = %v", err)
+	}
+	if len(got) != 2 || got[0].ID != firstID || got[1].ID != secondID {
+		t.Fatalf("files = %#v, want both query-ordered files", got)
+	}
+	if got[0].RelativePath != "第一集.mp4" || got[1].RelativePath != "第二集.mp4" {
+		t.Fatalf("relative paths = %q, %q", got[0].RelativePath, got[1].RelativePath)
+	}
+	if !strings.Contains(tx.query, "ORDER BY f.relative_path ASC") {
+		t.Fatalf("result query does not define relative path order:\n%s", tx.query)
+	}
+	if len(tx.args) != 2 || tx.args[0] != batchID {
+		t.Fatalf("query args = %#v, want batch ID and file IDs", tx.args)
+	}
+	gotIDs, ok := tx.args[1].([]uuid.UUID)
+	if !ok || !slices.Equal(gotIDs, []uuid.UUID{firstID, secondID}) {
+		t.Fatalf("query IDs = %#v", tx.args[1])
+	}
+}
+
+func TestListArchiveFilesByIDsTxRejectsIncompleteResults(t *testing.T) {
+	t.Parallel()
+
+	batchID := uuid.New()
+	firstID := uuid.New()
+	missingID := uuid.New()
+	tx := &queryFailingArchiveImportTx{rows: &archiveImportFileRows{files: []models.ArchiveImportFileListItem{
+		{ID: firstID, BatchID: batchID, RelativePath: "第一集.mp4"},
+	}}}
+
+	got, err := listArchiveFilesByIDsTx(context.Background(), tx, batchID, []uuid.UUID{firstID, missingID})
+	if err == nil {
+		t.Fatal("listArchiveFilesByIDsTx() error = nil, want incomplete result error")
+	}
+	if got != nil {
+		t.Fatalf("files = %#v, want nil on incomplete result", got)
+	}
+}
+
 func TestApplyArchiveImportBatchPlanRecomputesOnlyModifiedOverrides(t *testing.T) {
 	t.Parallel()
 
@@ -729,6 +818,64 @@ func TestApplyArchiveImportBatchPlanRecomputesOnlyModifiedOverrides(t *testing.T
 	}
 }
 
+func TestApplyArchiveImportBatchPlanKeepsEmptyOptionalOverridesDisabled(t *testing.T) {
+	t.Parallel()
+
+	defaultVideoCollectionID := uuid.New()
+	file := models.ArchiveImportFileListItem{
+		ID:                 uuid.New(),
+		MediaKind:          "video",
+		RelativePath:       "文件名标题.mp4",
+		Title:              "文件名标题",
+		Description:        "自定义描述",
+		Tags:               []string{"自定义标签"},
+		VideoType:          "movie",
+		VideoCollectionIDs: []uuid.UUID{uuid.New()},
+		ImageCollectionIDs: []uuid.UUID{uuid.New()},
+		FieldOverrides:     map[string]bool{},
+	}
+	batch := models.ArchiveImportBatch{
+		DefaultTitlePrefix:        "批次默认标题",
+		DefaultDescription:        "批次默认描述",
+		DefaultTags:               []string{"默认标签"},
+		DefaultVideoCollectionIDs: []uuid.UUID{defaultVideoCollectionID},
+	}
+	tx := &failingArchiveImportTx{}
+
+	err := applyArchiveImportBatchPlanTx(
+		context.Background(),
+		tx,
+		[]archiveImportBatchPlannedFile{{File: file}},
+		batch,
+		nil,
+		ArchiveImportBatchUpdateInput{TitleMode: ArchiveImportTitleModeFilename},
+	)
+	if err != nil {
+		t.Fatalf("applyArchiveImportBatchPlanTx() error = %v", err)
+	}
+	if tx.calls != 1 || len(tx.execArgs) != 1 {
+		t.Fatalf("exec calls = %d, args = %#v", tx.calls, tx.execArgs)
+	}
+	var got map[string]bool
+	raw, ok := tx.execArgs[0][8].([]byte)
+	if !ok {
+		t.Fatalf("field overrides arg = %#v, want JSON bytes", tx.execArgs[0][8])
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal field overrides: %v", err)
+	}
+	for _, field := range []string{
+		archiveImportOverrideTags,
+		archiveImportOverrideVideoType,
+		archiveImportOverrideVideoCollectionIDs,
+		archiveImportOverrideImageCollectionIDs,
+	} {
+		if got[field] {
+			t.Fatalf("%s override = true, want false: %#v", field, got)
+		}
+	}
+}
+
 func TestApplyArchiveImportBatchPlanStopsAfterWriteFailure(t *testing.T) {
 	t.Parallel()
 
@@ -782,11 +929,69 @@ type queryFailingArchiveImportTx struct {
 	pgx.Tx
 	query string
 	args  []any
+	rows  pgx.Rows
 	err   error
 }
 
 func (tx *queryFailingArchiveImportTx) Query(_ context.Context, query string, args ...any) (pgx.Rows, error) {
 	tx.query = query
 	tx.args = append([]any{}, args...)
-	return nil, tx.err
+	return tx.rows, tx.err
+}
+
+type archiveImportFileRows struct {
+	pgx.Rows
+	files  []models.ArchiveImportFileListItem
+	index  int
+	closed bool
+}
+
+func (rows *archiveImportFileRows) Close() {
+	rows.closed = true
+}
+
+func (rows *archiveImportFileRows) Err() error {
+	return nil
+}
+
+func (rows *archiveImportFileRows) Next() bool {
+	if rows.index >= len(rows.files) {
+		rows.Close()
+		return false
+	}
+	rows.index++
+	return true
+}
+
+func (rows *archiveImportFileRows) Scan(dest ...any) error {
+	if rows.index == 0 || rows.index > len(rows.files) || len(dest) != 25 {
+		return errors.New("unexpected archive import file scan")
+	}
+	file := rows.files[rows.index-1]
+	*(dest[0].(*uuid.UUID)) = file.ID
+	*(dest[1].(*uuid.UUID)) = file.BatchID
+	*(dest[2].(**uuid.UUID)) = file.GroupID
+	*(dest[3].(*string)) = file.GroupName
+	*(dest[4].(*string)) = file.RelativePath
+	*(dest[5].(*string)) = file.FilePath
+	*(dest[6].(*string)) = file.EntryType
+	*(dest[7].(*string)) = file.MediaKind
+	*(dest[8].(*string)) = file.VideoType
+	*(dest[9].(*int64)) = file.FileSize
+	*(dest[10].(*string)) = file.MIMEType
+	*(dest[11].(*string)) = file.Status
+	*(dest[12].(*string)) = file.Reason
+	*(dest[13].(*string)) = file.Title
+	*(dest[14].(*string)) = file.Description
+	*(dest[15].(*[]byte)) = []byte(`[]`)
+	*(dest[16].(*[]byte)) = []byte(`[]`)
+	*(dest[17].(*[]byte)) = []byte(`[]`)
+	*(dest[18].(*[]byte)) = []byte(`{}`)
+	*(dest[19].(*[]byte)) = []byte(`{}`)
+	*(dest[20].(**uuid.UUID)) = file.LinkedVideoID
+	*(dest[21].(**uuid.UUID)) = file.LinkedImageID
+	*(dest[22].(*time.Time)) = file.CreatedAt
+	*(dest[23].(*time.Time)) = file.UpdatedAt
+	*(dest[24].(**time.Time)) = file.ProcessedAt
+	return nil
 }

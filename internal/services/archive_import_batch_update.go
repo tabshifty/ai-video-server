@@ -304,10 +304,14 @@ func (s *ArchiveImportService) BatchUpdateFiles(ctx context.Context, in ArchiveI
 	if err := applyArchiveImportBatchPlanTx(ctx, tx, plans, batch, groups, in); err != nil {
 		return nil, &ArchiveImportBatchUpdateError{Reason: ArchiveImportBatchReasonUpdateFailed, Err: err}
 	}
+	items, err := listArchiveFilesByIDsTx(ctx, tx, plans[0].File.BatchID, ids)
+	if err != nil {
+		return nil, &ArchiveImportBatchUpdateError{Reason: ArchiveImportBatchReasonUpdateFailed, Err: err}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, &ArchiveImportBatchUpdateError{Reason: ArchiveImportBatchReasonUpdateFailed, Err: err}
 	}
-	return s.listArchiveFilesByIDs(ctx, plans[0].File.BatchID, ids)
+	return items, nil
 }
 
 func sortedArchiveImportBatchTargetIDs(targets []ArchiveImportBatchUpdateTarget) []uuid.UUID {
@@ -344,6 +348,34 @@ FOR UPDATE OF f
 		return nil, fmt.Errorf("iterate locked archive import files: %w", err)
 	}
 	return files, nil
+}
+
+func listArchiveFilesByIDsTx(ctx context.Context, tx pgx.Tx, batchID uuid.UUID, ids []uuid.UUID) ([]models.ArchiveImportFileListItem, error) {
+	rows, err := tx.Query(ctx, archiveImportFileSelectSQL(`
+WHERE f.batch_id = $1
+  AND f.id = ANY($2)
+ORDER BY f.relative_path ASC
+`), batchID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("list archive import files in transaction: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.ArchiveImportFileListItem, 0, len(ids))
+	for rows.Next() {
+		item, scanErr := scanArchiveImportFileRecord(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan archive import file in transaction: %w", scanErr)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate archive import files in transaction: %w", err)
+	}
+	if len(items) != len(ids) {
+		return nil, fmt.Errorf("archive import batch result incomplete: got %d files, want %d", len(items), len(ids))
+	}
+	return items, nil
 }
 
 func getArchiveImportBatchDefaultsTx(ctx context.Context, tx pgx.Tx, batchID uuid.UUID) (models.ArchiveImportBatch, error) {
@@ -438,7 +470,7 @@ func applyArchiveImportBatchPlanTx(
 		file := plan.File
 		group := archiveImportGroupPtrByID(groups, file.GroupID)
 		defaults := resolveArchiveImportFileDefaults(file, batch, group)
-		overrides := archiveImportFieldOverridesForFile(file, batch, group)
+		overrides := archiveImportFieldOverridesFromMap(file.FieldOverrides)
 		overrides.Title = strings.TrimSpace(file.Title) != strings.TrimSpace(defaults.Title)
 		overrides.Description = strings.TrimSpace(file.Description) != strings.TrimSpace(defaults.Description)
 		if in.UpdateTags {
