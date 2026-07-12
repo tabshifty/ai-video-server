@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-12 19:36:23 +0800
+- 进度：完成单文件“使用文件名”草稿、手调退出模式、单目标语义保存，以及批量 `none/uniform/filename` 三态、说明互斥、前 5 条预览、单次事务请求和错误恢复。原有统一标题/不修改继续逐文件部分成功语义，处理当前/所选未与改名动作耦合。首轮评审发现“点击前已手改标题/说明”会与服务端权威旧值不一致，以及 API 已提交但详情刷新失败仍关闭并提示完整成功两个 Important；已增加持久行文本比较门禁、五字段 snapshot 校验、刷新失败保留弹窗与明确提示，并把可选 patch 提取为纯函数测试。复审通过，无 Critical、Important 或 Minor 问题。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`admin-web/src/views/toolboxArchiveImport.helpers.js`、`admin-web/src/views/toolboxArchiveImport.helpers.spec.js`、`plan.md`
+- 验证：页面 RED 中 helper 32/32 通过，6 组新交互约束按预期失败；评审修复 RED 为 46 通过/8 失败，仅因 3 个纯函数和 4 组页面分支未实现。GREEN `npm test -- ToolboxArchiveImport.spec.js toolboxArchiveImport.helpers.spec.js admin.spec.js` 通过（83/83）；子代理管理端全量 226/226 通过；主代理复跑 `npm run build` 通过，仅有旧有 chunk 大小警告；`git diff --check` 通过。待做真实浏览器宽/窄视口验收。
+
 ## 2026-07-12 18:58:53 +0800
 - 进度：完成管理端文件名标题派生、替换资格、单文件草稿、批量预览/目标/payload 纯函数与新批量 API 客户端。批量本地门禁覆盖空选择、缺 ID/`updated_at`、可见跨批次、不可替换状态、空/超长标题；固定 payload 不允许 patch 覆盖 `targets/title_mode`。首轮评审发现 JS `trim`/`\s` 与 Go `unicode.IsSpace` 及尾斜杠 basename 存在差异，已改为显式 Go 空白字符集并补 U+0085、U+FEFF、尾斜杠回归。`changed=false` 依“原标题先 TrimSpace 比较、同名不制造脏状态”规格保留。复审通过，无剩余问题。
 - 影响文件：`admin-web/src/views/toolboxArchiveImport.helpers.js`、`admin-web/src/views/toolboxArchiveImport.helpers.spec.js`、`admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`plan.md`
