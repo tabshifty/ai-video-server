@@ -40,6 +40,27 @@ describe('archive filename title derivation', () => {
   it('uses only the filename and removes only its last extension', () => {
     expect(deriveArchiveFilenameTitle('目录名.mp4/子目录\\www.98T.la@archive.part.name.tar.mp4')).toBe('archive.part.name.tar')
   })
+
+  it('trims and collapses U+0085 like Go unicode.IsSpace', () => {
+    const nextLine = '\u0085'
+
+    expect(deriveArchiveFilenameTitle(`目录/${nextLine}www.98T.la@A${nextLine}${nextLine}B${nextLine}.mp4`)).toBe('A B')
+  })
+
+  it('preserves U+FEFF because Go unicode.IsSpace excludes it', () => {
+    const byteOrderMark = '\uFEFF'
+
+    expect(deriveArchiveFilenameTitle(`目录/${byteOrderMark}www.98T.la@A${byteOrderMark}${byteOrderMark}B${byteOrderMark}.mp4`))
+      .toBe(`${byteOrderMark}A${byteOrderMark}${byteOrderMark}B${byteOrderMark}`)
+  })
+
+  it('matches Go path.Base for trailing separators and empty roots', () => {
+    expect(deriveArchiveFilenameTitle('目录/片名.mp4/')).toBe('片名')
+    expect(deriveArchiveFilenameTitle('目录/片名.mp4///')).toBe('片名')
+    expect(deriveArchiveFilenameTitle('')).toBe('')
+    expect(deriveArchiveFilenameTitle('/')).toBe('')
+    expect(deriveArchiveFilenameTitle('///')).toBe('')
+  })
 })
 
 describe('archive filename title eligibility', () => {

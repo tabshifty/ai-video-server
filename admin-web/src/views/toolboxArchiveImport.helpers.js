@@ -1,8 +1,15 @@
 const archiveFilenameAdPattern = /www\.98T\.la@/gi
 const archiveFilenameTitleMaxCodePoints = 200
+// Mirrors Go unicode.IsSpace (Unicode White_Space), which excludes U+FEFF.
+const goWhitespaceEdgesPattern = /^[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028-\u2029\u202F\u205F\u3000]+|[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028-\u2029\u202F\u205F\u3000]+$/gu
+const goWhitespaceRunPattern = /[\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028-\u2029\u202F\u205F\u3000]+/gu
 
 function archiveFileText(value) {
   return String(value ?? '')
+}
+
+function trimGoWhitespace(value) {
+  return value.replace(goWhitespaceEdgesPattern, '')
 }
 
 function archiveFilenameIssue(file, message) {
@@ -14,12 +21,16 @@ function archiveFilenameIssue(file, message) {
 }
 
 export function deriveArchiveFilenameTitle(relativePath) {
-  const normalized = archiveFileText(relativePath).trim().replace(/\\/g, '/')
-  const filename = normalized.split('/').pop() || ''
+  const normalized = trimGoWhitespace(archiveFileText(relativePath)).replace(/\\/g, '/')
+  const pathWithoutTrailingSlashes = normalized.replace(/\/+$/, '')
+  if (!pathWithoutTrailingSlashes) return ''
+
+  const filename = pathWithoutTrailingSlashes.split('/').pop() || ''
   const dotIndex = filename.lastIndexOf('.')
   const basename = dotIndex >= 0 ? filename.slice(0, dotIndex) : filename
 
-  return basename.replace(archiveFilenameAdPattern, '').trim().replace(/\s+/g, ' ')
+  return trimGoWhitespace(basename.replace(archiveFilenameAdPattern, ''))
+    .replace(goWhitespaceRunPattern, ' ')
 }
 
 export function canReplaceArchiveFilenameTitle(file) {
@@ -52,7 +63,7 @@ export function buildArchiveFilenameTitleDraft(file) {
     }
   }
 
-  const originalTitle = currentTitle.trim()
+  const originalTitle = trimGoWhitespace(currentTitle)
   const description = originalTitle && originalTitle !== title
     ? currentDescription === '' ? originalTitle : `${originalTitle}\n${currentDescription}`
     : currentDescription
@@ -79,25 +90,25 @@ export function buildArchiveFilenameBatchPreview(files, limit = 5) {
       validItems.push({
         id: archiveFileText(file?.id),
         relative_path: archiveFileText(file?.relative_path),
-        old_title: archiveFileText(file?.title).trim(),
+        old_title: trimGoWhitespace(archiveFileText(file?.title)),
         new_title: draft.title
       })
     }
 
-    if (!archiveFileText(file?.id).trim()) {
+    if (!trimGoWhitespace(archiveFileText(file?.id))) {
       issues.push(archiveFilenameIssue(file, '文件 ID 不能为空'))
     }
-    if (!archiveFileText(file?.updated_at).trim()) {
+    if (!trimGoWhitespace(archiveFileText(file?.updated_at))) {
       issues.push(archiveFilenameIssue(file, '文件更新时间不能为空'))
     }
   }
 
   const firstVisibleBatchID = selectedFiles
-    .map((file) => archiveFileText(file?.batch_id).trim())
+    .map((file) => trimGoWhitespace(archiveFileText(file?.batch_id)))
     .find(Boolean)
   if (firstVisibleBatchID) {
     for (const file of selectedFiles) {
-      const batchID = archiveFileText(file?.batch_id).trim()
+      const batchID = trimGoWhitespace(archiveFileText(file?.batch_id))
       if (batchID && batchID !== firstVisibleBatchID) {
         issues.push(archiveFilenameIssue(file, '所选文件不属于同一批次'))
       }
