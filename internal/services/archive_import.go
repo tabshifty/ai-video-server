@@ -539,6 +539,10 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 	if err := s.markArchiveFileProcessing(ctx, fileID); err != nil {
 		return models.ArchiveImportFileListItem{}, err
 	}
+	file, err = s.getArchiveFile(ctx, fileID)
+	if err != nil {
+		return models.ArchiveImportFileListItem{}, err
+	}
 
 	workPath, err := s.copyArchiveWorkFile(ctx, file)
 	if err != nil {

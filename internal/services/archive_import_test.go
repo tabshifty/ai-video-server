@@ -282,6 +282,39 @@ func TestArchiveFileTitleForProcessingBlankVideoUsesBatchTitle(t *testing.T) {
 	}
 }
 
+func TestProcessFileReloadsMetadataAfterMarkingProcessing(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("archive_import.go")
+	if err != nil {
+		t.Fatalf("ReadFile(archive_import.go) error = %v", err)
+	}
+	source := string(raw)
+	const signature = "func (s *ArchiveImportService) ProcessFile"
+	start := strings.Index(source, signature)
+	if start < 0 {
+		t.Fatalf("%s not found", signature)
+	}
+	body := source[start+len(signature):]
+	if end := strings.Index(body, "\nfunc "); end >= 0 {
+		body = body[:end]
+	}
+
+	markIndex := strings.Index(body, "s.markArchiveFileProcessing(ctx, fileID)")
+	titleIndex := strings.Index(body, "archiveFileTitleForProcessing(file, batch)")
+	if markIndex < 0 || titleIndex < 0 || markIndex >= titleIndex {
+		t.Fatalf("unexpected ProcessFile call order: mark=%d title=%d", markIndex, titleIndex)
+	}
+	reloadOffset := strings.Index(body[markIndex:], "s.getArchiveFile(ctx, fileID)")
+	if reloadOffset < 0 {
+		t.Fatal("ProcessFile does not reload file metadata after marking processing")
+	}
+	reloadIndex := markIndex + reloadOffset
+	if reloadIndex >= titleIndex {
+		t.Fatalf("metadata reload occurs after metadata consumption: reload=%d title=%d", reloadIndex, titleIndex)
+	}
+}
+
 func TestArchiveFileTitleForUpdateBlankVideoUsesBatchTitle(t *testing.T) {
 	t.Parallel()
 
