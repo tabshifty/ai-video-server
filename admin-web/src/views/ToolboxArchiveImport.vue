@@ -31,10 +31,13 @@ import {
   uploadAdminArchiveImport
 } from '../api/admin'
 import {
+  archiveFilenameEditorMatchesPersistedText,
+  buildArchiveFilenameBatchOptionalPatch,
   buildArchiveFilenameBatchPayload,
   buildArchiveFilenameBatchPreview,
   buildArchiveFilenameTitleDraft,
-  canReplaceArchiveFilenameTitle
+  canReplaceArchiveFilenameTitle,
+  isArchiveFilenameDraftSnapshotCurrent
 } from './toolboxArchiveImport.helpers'
 import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
 
@@ -682,13 +685,20 @@ function captureSelectedFilenameDraftSnapshot() {
   selectedFilenameDraftSnapshot.value = {
     id: String(selectedFile.value.id || ''),
     updated_at: String(selectedFile.value.updated_at || ''),
-    relative_path: String(selectedFile.value.relative_path || '')
+    relative_path: String(selectedFile.value.relative_path || ''),
+    title: String(selectedFile.value.title || ''),
+    description: String(selectedFile.value.description || '')
   }
 }
 
 function applySelectedFilenameTitleDraft() {
   if (!selectedFile.value || !canReplaceArchiveFilenameTitle(selectedFile.value)) return
-  const draft = buildArchiveFilenameTitleDraft(selectedFile.value)
+  const persistedFile = findArchiveFileByID(selectedFile.value.id)
+  if (!archiveFilenameEditorMatchesPersistedText(selectedFile.value, persistedFile)) {
+    ElMessage.warning('标题或说明有未保存修改，请先保存或撤销后再使用文件名')
+    return
+  }
+  const draft = buildArchiveFilenameTitleDraft(persistedFile)
   if (!draft.ok) {
     ElMessage.error(formatArchiveFilenameIssue(draft.issue))
     return
@@ -1204,7 +1214,10 @@ async function removeArchiveBatch(batch) {
 
 async function saveSelectedFile() {
   if (!selectedFile.value?.id || selectedFileIDs.value.length !== 1) return
-  const filenameModeActive = !!selectedFilenameDraftSnapshot.value
+  const filenameModeActive = isArchiveFilenameDraftSnapshotCurrent(selectedFilenameDraftSnapshot.value, selectedFile.value)
+  if (selectedFilenameDraftSnapshot.value && !filenameModeActive) {
+    deactivateSelectedFilenameMode()
+  }
   const metadataDraft = filenameModeActive ? captureSelectedFileMetadataDraft() : null
   fileSaving.value = true
   try {
@@ -1218,7 +1231,7 @@ async function saveSelectedFile() {
         ? normalizeUUIDSelection([selectedVideoImageCollectionID.value])
         : normalizeUUIDSelection(selectedFile.value.image_collection_ids)
     }
-    if (selectedFilenameDraftSnapshot.value) {
+    if (filenameModeActive) {
       const filenamePayload = buildArchiveFilenameBatchPayload([selectedFile.value], {
         update_tags: true,
         tags: normalizeTagSelection(selectedFile.value.tags),
@@ -1233,7 +1246,11 @@ async function saveSelectedFile() {
     } else {
       await updateAdminArchiveImportFile(selectedFile.value.id, payload)
     }
-    await refreshBatchDetail({ skipConfirm: true })
+    const refreshed = await refreshBatchDetail({ skipConfirm: true })
+    if (!refreshed) {
+      ElMessage.warning('文件信息已保存，但刷新失败，请手动刷新')
+      return
+    }
     selectedFileDialogVisible.value = false
     ElMessage.success('已保存文件信息')
   } catch (error) {
@@ -1656,24 +1673,16 @@ function buildBatchEditPayloadForFile(file) {
 }
 
 function buildArchiveFilenameBatchPatch() {
-  const patch = {}
-  if (batchEditForm.tags_enabled) {
-    patch.update_tags = true
-    patch.tags = normalizeTagSelection(batchEditForm.tags)
-  }
-  if (batchEditForm.video_type_enabled) {
-    patch.update_video_type = true
-    patch.video_type = batchEditForm.video_type || 'short'
-  }
-  if (batchEditForm.video_collection_enabled) {
-    patch.update_video_collection_ids = true
-    patch.video_collection_ids = normalizeUUIDSelection(batchEditForm.video_collection_ids)
-  }
-  if (batchEditForm.video_image_collection_enabled) {
-    patch.update_image_collection_ids = true
-    patch.image_collection_ids = normalizeUUIDSelection([batchEditForm.video_image_collection_id])
-  }
-  return patch
+  return buildArchiveFilenameBatchOptionalPatch({
+    tags_enabled: batchEditForm.tags_enabled,
+    tags: normalizeTagSelection(batchEditForm.tags),
+    video_type_enabled: batchEditForm.video_type_enabled,
+    video_type: batchEditForm.video_type || 'short',
+    video_collection_enabled: batchEditForm.video_collection_enabled,
+    video_collection_ids: normalizeUUIDSelection(batchEditForm.video_collection_ids),
+    video_image_collection_enabled: batchEditForm.video_image_collection_enabled,
+    image_collection_ids: normalizeUUIDSelection([batchEditForm.video_image_collection_id])
+  })
 }
 
 async function saveArchiveFilenameBatchUpdate(targets) {
@@ -1688,10 +1697,20 @@ async function saveArchiveFilenameBatchUpdate(targets) {
   batchEditSaving.value = true
   try {
     const payload = buildArchiveFilenameBatchPayload(targets, buildArchiveFilenameBatchPatch())
-    await batchUpdateAdminArchiveImportFiles(payload)
-    await refreshBatchDetail({ skipConfirm: true })
+    const result = await batchUpdateAdminArchiveImportFiles(payload)
+    const apiUpdatedCount = result?.updated_count
+    const updatedCount = Number.isInteger(apiUpdatedCount)
+      && apiUpdatedCount >= 0
+      && apiUpdatedCount <= targets.length
+      ? apiUpdatedCount
+      : targets.length
+    const refreshed = await refreshBatchDetail({ skipConfirm: true })
+    if (!refreshed) {
+      ElMessage.warning('更新已提交，但刷新失败，请手动刷新')
+      return
+    }
     batchEditDialogVisible.value = false
-    ElMessage.success(`已更新 ${targets.length} 个视频`)
+    ElMessage.success(`已更新 ${updatedCount} 个视频`)
   } catch (error) {
     if (isArchiveFilenameTargetConflict(error)) {
       ElMessage.warning(extractErrorMessage(error, '文件状态已变化，已刷新批次详情'))
@@ -1739,7 +1758,11 @@ async function saveBatchEdit() {
         failureCount += 1
       }
     }
-    await refreshBatchDetail({ skipConfirm: true })
+    const refreshed = await refreshBatchDetail({ skipConfirm: true })
+    if (!refreshed) {
+      ElMessage.warning('更新已提交，但刷新失败，请手动刷新')
+      return
+    }
     batchEditDialogVisible.value = false
     if (failureCount > 0) {
       ElMessage.warning(`批量修改完成：成功 ${successCount} 项，失败 ${failureCount} 项`)

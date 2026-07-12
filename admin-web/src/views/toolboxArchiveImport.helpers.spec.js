@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  archiveFilenameEditorMatchesPersistedText,
+  buildArchiveFilenameBatchOptionalPatch,
   buildArchiveFilenameBatchPayload,
   buildArchiveFilenameBatchPreview,
   buildArchiveFilenameBatchTargets,
   buildArchiveFilenameTitleDraft,
   canReplaceArchiveFilenameTitle,
-  deriveArchiveFilenameTitle
+  deriveArchiveFilenameTitle,
+  isArchiveFilenameDraftSnapshotCurrent
 } from './toolboxArchiveImport.helpers'
 
 const updatedAt = '2026-07-12T05:00:00Z'
@@ -82,6 +85,48 @@ describe('archive filename title eligibility', () => {
 })
 
 describe('archive filename title drafts', () => {
+  it('requires editor title and description to match persisted text while ignoring metadata drafts', () => {
+    const persisted = pendingVideo('标题.mp4', {
+      tags: ['持久标签'],
+      video_type: 'short',
+      video_collection_ids: ['collection-1']
+    })
+    const metadataOnlyDraft = {
+      ...persisted,
+      tags: ['新标签'],
+      video_type: 'movie',
+      video_collection_ids: ['collection-2'],
+      image_collection_ids: ['image-collection-1']
+    }
+
+    expect(archiveFilenameEditorMatchesPersistedText(metadataOnlyDraft, persisted)).toBe(true)
+    expect(archiveFilenameEditorMatchesPersistedText({ ...metadataOnlyDraft, title: '手改标题' }, persisted)).toBe(false)
+    expect(archiveFilenameEditorMatchesPersistedText({ ...metadataOnlyDraft, description: '手改说明' }, persisted)).toBe(false)
+    expect(archiveFilenameEditorMatchesPersistedText(metadataOnlyDraft, null)).toBe(false)
+  })
+
+  it('validates filename snapshots against identity, source and generated text', () => {
+    const file = pendingVideo('目录/标题.mp4', {
+      title: '标题',
+      description: '旧标题\n原说明'
+    })
+    const snapshot = {
+      id: file.id,
+      updated_at: file.updated_at,
+      relative_path: file.relative_path,
+      title: file.title,
+      description: file.description
+    }
+
+    expect(isArchiveFilenameDraftSnapshotCurrent(snapshot, file)).toBe(true)
+    for (const field of ['id', 'updated_at', 'relative_path', 'title', 'description']) {
+      expect(isArchiveFilenameDraftSnapshotCurrent({ ...snapshot, [field]: `${snapshot[field]}-changed` }, file)).toBe(false)
+    }
+    const { description: _, ...incompleteSnapshot } = snapshot
+    expect(isArchiveFilenameDraftSnapshotCurrent(incompleteSnapshot, file)).toBe(false)
+    expect(isArchiveFilenameDraftSnapshotCurrent(null, file)).toBe(false)
+  })
+
   it('derives cleaned titles and preserves old titles in descriptions', () => {
     expect(buildArchiveFilenameTitleDraft(pendingVideo('目录/WWW.98t.LA@  ABC  123.mp4'))).toEqual({
       ok: true,
@@ -175,6 +220,41 @@ describe('archive filename title drafts', () => {
 })
 
 describe('archive filename batch helpers', () => {
+  it('omits disabled optional fields from filename batch patches', () => {
+    expect(buildArchiveFilenameBatchOptionalPatch({
+      tags_enabled: false,
+      tags: ['标签'],
+      video_type_enabled: false,
+      video_type: 'movie',
+      video_collection_enabled: false,
+      video_collection_ids: ['collection-1'],
+      video_image_collection_enabled: false,
+      image_collection_ids: ['image-collection-1']
+    })).toEqual({})
+  })
+
+  it('keeps enabled optional fields explicit even when normalized selections are empty', () => {
+    expect(buildArchiveFilenameBatchOptionalPatch({
+      tags_enabled: true,
+      tags: [],
+      video_type_enabled: true,
+      video_type: 'short',
+      video_collection_enabled: true,
+      video_collection_ids: [],
+      video_image_collection_enabled: true,
+      image_collection_ids: []
+    })).toEqual({
+      update_tags: true,
+      tags: [],
+      update_video_type: true,
+      video_type: 'short',
+      update_video_collection_ids: true,
+      video_collection_ids: [],
+      update_image_collection_ids: true,
+      image_collection_ids: []
+    })
+  })
+
   it('previews only the first five valid items and reports the remainder', () => {
     const files = Array.from({ length: 7 }, (_, index) => pendingVideo(`标题 ${index + 1}.mp4`, {
       id: `file-${index + 1}`,
