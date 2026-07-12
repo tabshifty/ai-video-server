@@ -42,6 +42,7 @@ type archiveImportService interface {
 	GetFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error)
 	UploadArchive(ctx context.Context, in services.ArchiveImportUploadInput, fileHeader *multipart.FileHeader) (models.ArchiveImportBatch, error)
 	UpdateFile(ctx context.Context, fileID uuid.UUID, in services.ArchiveImportFileUpdateInput) (models.ArchiveImportFileListItem, error)
+	BatchUpdateFiles(ctx context.Context, in services.ArchiveImportBatchUpdateInput) ([]models.ArchiveImportFileListItem, error)
 	CreateGroup(ctx context.Context, batchID uuid.UUID, in services.ArchiveImportGroupCreateInput) (models.ArchiveImportGroup, error)
 	UpdateGroup(ctx context.Context, groupID uuid.UUID, in services.ArchiveImportGroupUpdateInput) (models.ArchiveImportGroup, error)
 	DeleteGroup(ctx context.Context, groupID uuid.UUID) error
@@ -303,6 +304,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.DELETE("/archive-import/groups/:id", a.AdminDeleteArchiveImportGroup)
 			admin.POST("/archive-import/groups/:id/files", a.AdminAssignArchiveImportFilesToGroup)
 			admin.POST("/archive-import/groups/:id/process", a.AdminProcessArchiveImportGroup)
+			admin.PUT("/archive-import/files/batch-update", a.AdminBatchUpdateArchiveImportFiles)
 			admin.GET("/archive-import/files/:id", a.AdminArchiveImportFileDetail)
 			admin.PUT("/archive-import/files/:id", a.AdminUpdateArchiveImportFile)
 			admin.POST("/archive-import/files/:id/process", a.AdminProcessArchiveImportFile)

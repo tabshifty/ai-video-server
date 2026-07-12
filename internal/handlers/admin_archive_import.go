@@ -3,8 +3,10 @@ package handlers
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/middleware"
@@ -23,6 +25,24 @@ type adminArchiveImportGroupRequest struct {
 	VideoCollectionIDs []string `json:"video_collection_ids"`
 	ImageCollectionIDs []string `json:"image_collection_ids"`
 	FileIDs            []string `json:"file_ids"`
+}
+
+type adminArchiveImportBatchTargetRequest struct {
+	ID        string    `json:"id"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type adminArchiveImportBatchUpdateRequest struct {
+	Targets                  []adminArchiveImportBatchTargetRequest `json:"targets"`
+	TitleMode                string                                 `json:"title_mode"`
+	UpdateTags               bool                                   `json:"update_tags"`
+	Tags                     []string                               `json:"tags"`
+	UpdateVideoType          bool                                   `json:"update_video_type"`
+	VideoType                string                                 `json:"video_type"`
+	UpdateVideoCollectionIDs bool                                   `json:"update_video_collection_ids"`
+	VideoCollectionIDs       []string                               `json:"video_collection_ids"`
+	UpdateImageCollectionIDs bool                                   `json:"update_image_collection_ids"`
+	ImageCollectionIDs       []string                               `json:"image_collection_ids"`
 }
 
 // AdminArchiveImportBatches lists archive import batches.
@@ -381,6 +401,82 @@ func (a *API) AdminArchiveImportFileDetail(c *gin.Context) {
 		return
 	}
 	ok(c, file)
+}
+
+// AdminBatchUpdateArchiveImportFiles updates selected archive files atomically.
+func (a *API) AdminBatchUpdateArchiveImportFiles(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "压缩包导入服务不可用")
+		return
+	}
+
+	var req adminArchiveImportBatchUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "请求参数格式错误")
+		return
+	}
+	if len(req.Targets) == 0 {
+		bad(c, "至少选择一个压缩包文件")
+		return
+	}
+
+	targets := make([]services.ArchiveImportBatchUpdateTarget, 0, len(req.Targets))
+	for _, target := range req.Targets {
+		fileID, okID := parseUUID(target.ID)
+		if !okID || fileID == uuid.Nil {
+			bad(c, "文件ID格式错误")
+			return
+		}
+		if target.UpdatedAt.IsZero() {
+			bad(c, "文件更新时间不能为空")
+			return
+		}
+		targets = append(targets, services.ArchiveImportBatchUpdateTarget{
+			ID:        fileID,
+			UpdatedAt: target.UpdatedAt,
+		})
+	}
+
+	videoCollectionIDs, err := parseUUIDStrings(req.VideoCollectionIDs)
+	if err != nil {
+		bad(c, "视频合集ID格式错误")
+		return
+	}
+	imageCollectionIDs, err := parseUUIDStrings(req.ImageCollectionIDs)
+	if err != nil {
+		bad(c, "图片合集ID格式错误")
+		return
+	}
+
+	items, err := a.archiveImportSvc.BatchUpdateFiles(c.Request.Context(), services.ArchiveImportBatchUpdateInput{
+		Targets:                  targets,
+		TitleMode:                req.TitleMode,
+		UpdateTags:               req.UpdateTags,
+		Tags:                     req.Tags,
+		UpdateVideoType:          req.UpdateVideoType,
+		VideoType:                req.VideoType,
+		UpdateVideoCollectionIDs: req.UpdateVideoCollectionIDs,
+		VideoCollectionIDs:       videoCollectionIDs,
+		UpdateImageCollectionIDs: req.UpdateImageCollectionIDs,
+		ImageCollectionIDs:       imageCollectionIDs,
+	})
+	if err != nil {
+		var batchErr *services.ArchiveImportBatchUpdateError
+		if errors.As(err, &batchErr) {
+			response.JSON(c, 1078, "压缩包文件批量更新失败", gin.H{
+				"reason": batchErr.Reason,
+				"issues": batchErr.Issues,
+			})
+			return
+		}
+		response.Error(c, 1072, err.Error())
+		return
+	}
+
+	ok(c, gin.H{
+		"updated_count": len(items),
+		"items":         items,
+	})
 }
 
 // AdminUpdateArchiveImportFile updates batch-file metadata.
