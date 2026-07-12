@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, Check, CircleCheck, Close, Delete, EditPen, Plus, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { Back, Check, CircleCheck, Close, Delete, DocumentCopy, EditPen, Plus, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
@@ -10,6 +10,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
 import {
   assignAdminArchiveImportGroupFiles,
+  batchUpdateAdminArchiveImportFiles,
   createAdminCollection,
   createAdminArchiveImportGroup,
   createAdminImageCollection,
@@ -29,6 +30,12 @@ import {
   updateAdminArchiveImportFile,
   uploadAdminArchiveImport
 } from '../api/admin'
+import {
+  buildArchiveFilenameBatchPayload,
+  buildArchiveFilenameBatchPreview,
+  buildArchiveFilenameTitleDraft,
+  canReplaceArchiveFilenameTitle
+} from './toolboxArchiveImport.helpers'
 import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
 
 const PROCESSABLE_ARCHIVE_FILE_STATUSES = new Set(['pending', 'failed', 'processing'])
@@ -62,6 +69,7 @@ const selectedFileIDs = ref([])
 const selectedFileIndexAnchor = ref(-1)
 const selectedFile = ref(null)
 const selectedFileSnapshot = ref('')
+const selectedFilenameDraftSnapshot = ref(null)
 const retryExtractPassword = ref('')
 const retryExtractEncodingMode = ref('auto')
 const fileSortMode = ref('original')
@@ -82,6 +90,12 @@ const assignGroupTargetID = ref('')
 const fileSortOptions = [
   { label: '按原始顺序', value: 'original' },
   { label: '按类型排序', value: 'type' }
+]
+
+const batchTitleModeOptions = [
+  { label: '不修改', value: 'none' },
+  { label: '统一标题', value: 'uniform' },
+  { label: '按各自文件名替换', value: 'filename' }
 ]
 
 const archiveEncodingModeOptions = [
@@ -126,7 +140,7 @@ const archiveGroupForm = reactive({
 })
 
 const batchEditForm = reactive({
-  title_enabled: false,
+  title_mode: 'none',
   title: '',
   description_enabled: false,
   description: '',
@@ -164,6 +178,11 @@ const selectedProcessableFiles = computed(() => selectedBatchFilesForActions.val
 const selectedFrozenFiles = computed(() => selectedBatchFilesForActions.value.filter((file) => isArchiveGroupFrozenFile(file)))
 const selectedUnprocessableCount = computed(() => selectedBatchFilesForActions.value.length - selectedProcessableFiles.value.length)
 const selectedFileDirty = computed(() => !!selectedFile.value && serializeSelectedFileState() !== selectedFileSnapshot.value)
+const batchFilenamePreview = computed(() =>
+  batchEditForm.title_mode === 'filename'
+    ? buildArchiveFilenameBatchPreview(selectedBatchFilesForActions.value, 5)
+    : { ok: false, total: 0, items: [], remaining: 0, issues: [] }
+)
 const selectedFileDialogTitle = computed(() => {
   if (selectedFile.value?.media_kind === 'image') return '编辑图片文件'
   return '编辑视频文件'
@@ -335,6 +354,16 @@ function extractErrorMessage(error, fallback) {
   const message = error?.message
   if (typeof message === 'string' && message.trim() !== '') return message.trim()
   return fallback
+}
+
+function isArchiveFilenameTargetConflict(error) {
+  return error?.data?.reason === 'stale_target'
+    || error?.data?.reason === 'ineligible_target'
+}
+
+function formatArchiveFilenameIssue(issue) {
+  const path = String(issue?.relative_path || issue?.id || '当前文件')
+  return `${path}：${issue?.message || '无法按文件名替换标题'}`
 }
 
 function formatDateTime(value, fallback = '--') {
@@ -641,12 +670,85 @@ function captureSelectedFileSnapshot() {
   selectedFileSnapshot.value = serializeSelectedFileState()
 }
 
+function deactivateSelectedFilenameMode() {
+  selectedFilenameDraftSnapshot.value = null
+}
+
+function captureSelectedFilenameDraftSnapshot() {
+  if (!selectedFile.value) {
+    deactivateSelectedFilenameMode()
+    return
+  }
+  selectedFilenameDraftSnapshot.value = {
+    id: String(selectedFile.value.id || ''),
+    updated_at: String(selectedFile.value.updated_at || ''),
+    relative_path: String(selectedFile.value.relative_path || '')
+  }
+}
+
+function applySelectedFilenameTitleDraft() {
+  if (!selectedFile.value || !canReplaceArchiveFilenameTitle(selectedFile.value)) return
+  const draft = buildArchiveFilenameTitleDraft(selectedFile.value)
+  if (!draft.ok) {
+    ElMessage.error(formatArchiveFilenameIssue(draft.issue))
+    return
+  }
+  if (!draft.changed) {
+    ElMessage.info('标题已与文件名一致')
+    return
+  }
+  selectedFile.value.title = draft.title
+  selectedFile.value.description = draft.description
+  captureSelectedFilenameDraftSnapshot()
+}
+
+function captureSelectedFileMetadataDraft() {
+  if (!selectedFile.value) return null
+  return {
+    id: String(selectedFile.value.id || ''),
+    tags: [...normalizeTagSelection(selectedFile.value.tags)],
+    video_type: String(selectedFile.value.video_type || 'short'),
+    video_collection_ids: [...normalizeUUIDSelection(selectedFile.value.video_collection_ids)],
+    image_collection_ids: [...normalizeUUIDSelection(selectedFile.value.image_collection_ids)]
+  }
+}
+
+function restoreSelectedFileMetadataDraft(draft) {
+  if (!draft || !selectedFile.value || String(selectedFile.value.id || '') !== draft.id) return false
+  selectedFile.value.tags = [...draft.tags]
+  selectedFile.value.video_type = draft.video_type
+  selectedFile.value.video_collection_ids = [...draft.video_collection_ids]
+  selectedFile.value.image_collection_ids = [...draft.image_collection_ids]
+  return true
+}
+
+async function refreshSelectedFilenameDraftAfterConflict(metadataDraft) {
+  const refreshed = await refreshBatchDetail({ skipConfirm: true })
+  if (!refreshed || !restoreSelectedFileMetadataDraft(metadataDraft)) return
+
+  const draft = buildArchiveFilenameTitleDraft(selectedFile.value)
+  if (!draft.ok) {
+    deactivateSelectedFilenameMode()
+    ElMessage.warning(formatArchiveFilenameIssue(draft.issue))
+    return
+  }
+  if (!draft.changed) {
+    deactivateSelectedFilenameMode()
+    return
+  }
+  selectedFile.value.title = draft.title
+  selectedFile.value.description = draft.description
+  captureSelectedFilenameDraftSnapshot()
+}
+
 function clearSelectedFileDraft() {
+  deactivateSelectedFilenameMode()
   selectedFile.value = null
   selectedFileSnapshot.value = ''
 }
 
 function syncSelectedFileFromCurrentRow() {
+  deactivateSelectedFilenameMode()
   if (selectedFileIDs.value.length !== 1) {
     clearSelectedFileDraft()
     return
@@ -1102,6 +1204,8 @@ async function removeArchiveBatch(batch) {
 
 async function saveSelectedFile() {
   if (!selectedFile.value?.id || selectedFileIDs.value.length !== 1) return
+  const filenameModeActive = !!selectedFilenameDraftSnapshot.value
+  const metadataDraft = filenameModeActive ? captureSelectedFileMetadataDraft() : null
   fileSaving.value = true
   try {
     const payload = {
@@ -1114,11 +1218,30 @@ async function saveSelectedFile() {
         ? normalizeUUIDSelection([selectedVideoImageCollectionID.value])
         : normalizeUUIDSelection(selectedFile.value.image_collection_ids)
     }
-    await updateAdminArchiveImportFile(selectedFile.value.id, payload)
+    if (selectedFilenameDraftSnapshot.value) {
+      const filenamePayload = buildArchiveFilenameBatchPayload([selectedFile.value], {
+        update_tags: true,
+        tags: normalizeTagSelection(selectedFile.value.tags),
+        update_video_type: true,
+        video_type: selectedFile.value.video_type || 'short',
+        update_video_collection_ids: true,
+        video_collection_ids: normalizeUUIDSelection(selectedFile.value.video_collection_ids),
+        update_image_collection_ids: true,
+        image_collection_ids: normalizeUUIDSelection([selectedVideoImageCollectionID.value])
+      })
+      await batchUpdateAdminArchiveImportFiles(filenamePayload)
+    } else {
+      await updateAdminArchiveImportFile(selectedFile.value.id, payload)
+    }
     await refreshBatchDetail({ skipConfirm: true })
     selectedFileDialogVisible.value = false
     ElMessage.success('已保存文件信息')
   } catch (error) {
+    if (filenameModeActive && isArchiveFilenameTargetConflict(error)) {
+      ElMessage.warning(extractErrorMessage(error, '文件状态已变化，已刷新最新信息'))
+      await refreshSelectedFilenameDraftAfterConflict(metadataDraft)
+      return
+    }
     ElMessage.error(extractErrorMessage(error, '保存文件失败'))
   } finally {
     fileSaving.value = false
@@ -1409,7 +1532,7 @@ async function removeArchiveGroup(group) {
 }
 
 function resetBatchEditForm() {
-  batchEditForm.title_enabled = false
+  batchEditForm.title_mode = 'none'
   batchEditForm.title = ''
   batchEditForm.description_enabled = false
   batchEditForm.description = ''
@@ -1427,7 +1550,7 @@ function resetBatchEditForm() {
 
 function serializeBatchEditState() {
   return JSON.stringify({
-    title_enabled: batchEditForm.title_enabled,
+    title_mode: batchEditForm.title_mode,
     title: String(batchEditForm.title || ''),
     description_enabled: batchEditForm.description_enabled,
     description: String(batchEditForm.description || ''),
@@ -1446,6 +1569,12 @@ function serializeBatchEditState() {
 
 function captureBatchEditSnapshot() {
   batchEditSnapshot.value = serializeBatchEditState()
+}
+
+function onBatchTitleModeChange(mode) {
+  if (mode !== 'filename') return
+  batchEditForm.description_enabled = false
+  batchEditForm.description = ''
 }
 
 async function confirmBatchEditClose() {
@@ -1498,7 +1627,7 @@ async function openBatchEditDialog() {
 function buildBatchEditPayloadForFile(file) {
   const current = normalizeArchiveFileState(file)
   const payload = {
-    title: archiveFileProcessKind(file) === 'video' && batchEditForm.title_enabled
+    title: archiveFileProcessKind(file) === 'video' && batchEditForm.title_mode === 'uniform'
       ? String(batchEditForm.title || '')
       : current.title || '',
     description: batchEditForm.description_enabled ? batchEditForm.description : (current.description || ''),
@@ -1526,12 +1655,66 @@ function buildBatchEditPayloadForFile(file) {
   return payload
 }
 
+function buildArchiveFilenameBatchPatch() {
+  const patch = {}
+  if (batchEditForm.tags_enabled) {
+    patch.update_tags = true
+    patch.tags = normalizeTagSelection(batchEditForm.tags)
+  }
+  if (batchEditForm.video_type_enabled) {
+    patch.update_video_type = true
+    patch.video_type = batchEditForm.video_type || 'short'
+  }
+  if (batchEditForm.video_collection_enabled) {
+    patch.update_video_collection_ids = true
+    patch.video_collection_ids = normalizeUUIDSelection(batchEditForm.video_collection_ids)
+  }
+  if (batchEditForm.video_image_collection_enabled) {
+    patch.update_image_collection_ids = true
+    patch.image_collection_ids = normalizeUUIDSelection([batchEditForm.video_image_collection_id])
+  }
+  return patch
+}
+
+async function saveArchiveFilenameBatchUpdate(targets) {
+  if (!batchFilenamePreview.value.ok) {
+    const issue = batchFilenamePreview.value.issues[0]
+    ElMessage.error(issue
+      ? `无法保存：${formatArchiveFilenameIssue(issue)}`
+      : '所选视频无法按文件名替换标题')
+    return
+  }
+
+  batchEditSaving.value = true
+  try {
+    const payload = buildArchiveFilenameBatchPayload(targets, buildArchiveFilenameBatchPatch())
+    await batchUpdateAdminArchiveImportFiles(payload)
+    await refreshBatchDetail({ skipConfirm: true })
+    batchEditDialogVisible.value = false
+    ElMessage.success(`已更新 ${targets.length} 个视频`)
+  } catch (error) {
+    if (isArchiveFilenameTargetConflict(error)) {
+      ElMessage.warning(extractErrorMessage(error, '文件状态已变化，已刷新批次详情'))
+      await refreshBatchDetail({ skipConfirm: true })
+      return
+    }
+    ElMessage.error(extractErrorMessage(error, '按文件名批量更新失败'))
+  } finally {
+    batchEditSaving.value = false
+  }
+}
+
 async function saveBatchEdit() {
   const targets = [...selectedBatchFilesForActions.value]
   if (targets.length <= 1 || batchEditSaving.value || !canOpenBatchEdit.value) return
 
+  if (batchEditForm.title_mode === 'filename') {
+    await saveArchiveFilenameBatchUpdate(targets)
+    return
+  }
+
   let changedFieldCount = 0
-  if (selectedMediaKind.value === 'video' && batchEditForm.title_enabled) changedFieldCount += 1
+  if (selectedMediaKind.value === 'video' && batchEditForm.title_mode === 'uniform') changedFieldCount += 1
   if (batchEditForm.description_enabled) changedFieldCount += 1
   if (selectedMediaKind.value === 'video' && batchEditForm.tags_enabled) changedFieldCount += 1
   if (selectedMediaKind.value === 'video' && batchEditForm.video_type_enabled) changedFieldCount += 1
@@ -2159,8 +2342,24 @@ onUnmounted(() => {
               <el-option label="AV" value="av" />
             </el-select>
           </el-form-item>
-          <el-form-item label="标题"><el-input v-model="selectedFile.title" /></el-form-item>
-          <el-form-item label="说明"><el-input v-model="selectedFile.description" type="textarea" :rows="3" /></el-form-item>
+          <el-form-item label="标题">
+            <div class="archive-title-input">
+              <el-input v-model="selectedFile.title" @input="deactivateSelectedFilenameMode" />
+              <el-button
+                v-if="canReplaceArchiveFilenameTitle(selectedFile)"
+                :icon="DocumentCopy"
+                @click="applySelectedFilenameTitleDraft"
+              >使用文件名</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="说明">
+            <el-input
+              v-model="selectedFile.description"
+              type="textarea"
+              :rows="3"
+              @input="deactivateSelectedFilenameMode"
+            />
+          </el-form-item>
           <el-form-item label="标签" v-if="selectedFile.media_kind === 'video'">
             <el-select
               v-model="selectedFile.tags"
@@ -2399,11 +2598,61 @@ onUnmounted(() => {
 
           <SectionCard dense>
             <template #title>批量字段</template>
+            <template v-if="selectedMediaKind === 'video'">
+              <el-form-item label="标题处理">
+                <div class="archive-title-mode-control">
+                  <el-segmented
+                    v-model="batchEditForm.title_mode"
+                    class="archive-title-mode"
+                    :options="batchTitleModeOptions"
+                    @change="onBatchTitleModeChange"
+                  />
+                  <el-input
+                    v-if="batchEditForm.title_mode === 'uniform'"
+                    v-model="batchEditForm.title"
+                    placeholder="统一覆盖为同一个标题；留空回到视频默认标题"
+                  />
+
+                  <div v-if="batchEditForm.title_mode === 'filename'" class="archive-title-preview">
+                    <p class="archive-title-preview__summary">
+                      共 {{ batchFilenamePreview.total }} 个视频
+                      <span v-if="batchFilenamePreview.remaining > 0">，另有 {{ batchFilenamePreview.remaining }} 项未展示</span>
+                    </p>
+                    <ul v-if="batchFilenamePreview.items.length > 0" class="archive-title-preview__list">
+                      <li
+                        v-for="item in batchFilenamePreview.items"
+                        :key="item.id"
+                        class="archive-title-preview__row"
+                      >
+                        <div>
+                          <span>原标题</span>
+                          <strong>{{ item.old_title || '（空标题）' }}</strong>
+                        </div>
+                        <div>
+                          <span>新标题</span>
+                          <strong>{{ item.new_title }}</strong>
+                        </div>
+                      </li>
+                    </ul>
+                    <ul v-if="batchFilenamePreview.issues.length > 0" class="archive-title-preview__issues">
+                      <li v-for="issue in batchFilenamePreview.issues" :key="`${issue.id}:${issue.relative_path}:${issue.message}`">
+                        <strong>{{ issue.relative_path || issue.id || '未知文件' }}</strong>
+                        <span>{{ issue.message }}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </el-form-item>
+            </template>
+
             <el-form-item>
-              <el-checkbox v-model="batchEditForm.description_enabled">说明</el-checkbox>
+              <el-checkbox
+                v-model="batchEditForm.description_enabled"
+                :disabled="batchEditForm.title_mode === 'filename'"
+              >说明</el-checkbox>
               <el-input
                 v-model="batchEditForm.description"
-                :disabled="!batchEditForm.description_enabled"
+                :disabled="batchEditForm.title_mode === 'filename' || !batchEditForm.description_enabled"
                 type="textarea"
                 :rows="3"
                 placeholder="统一覆盖为同一份说明"
@@ -2411,14 +2660,6 @@ onUnmounted(() => {
             </el-form-item>
 
             <template v-if="selectedMediaKind === 'video'">
-              <el-form-item>
-                <el-checkbox v-model="batchEditForm.title_enabled">标题</el-checkbox>
-                <el-input
-                  v-model="batchEditForm.title"
-                  :disabled="!batchEditForm.title_enabled"
-                  placeholder="统一覆盖为同一个标题；留空回到视频默认标题"
-                />
-              </el-form-item>
               <el-form-item>
                 <el-checkbox v-model="batchEditForm.tags_enabled">标签</el-checkbox>
                 <el-select
@@ -2531,7 +2772,12 @@ onUnmounted(() => {
 
         <template #footer>
           <el-button @click="requestBatchEditClose">取消</el-button>
-          <el-button type="primary" :loading="batchEditSaving" @click="saveBatchEdit">保存批量修改</el-button>
+          <el-button
+            type="primary"
+            :loading="batchEditSaving"
+            :disabled="batchEditForm.title_mode === 'filename' && !batchFilenamePreview.ok"
+            @click="saveBatchEdit"
+          >保存批量修改</el-button>
         </template>
       </el-dialog>
 
@@ -3262,6 +3508,106 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+.archive-title-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.archive-title-mode-control {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.archive-title-mode {
+  width: 100%;
+}
+
+.archive-title-mode :deep(.el-segmented__group) {
+  width: 100%;
+}
+
+.archive-title-mode :deep(.el-segmented__item) {
+  flex: 1;
+  min-width: 0;
+}
+
+.archive-title-mode :deep(.el-segmented__item-label) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.archive-title-preview {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-soft);
+}
+
+.archive-title-preview__summary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.archive-title-preview__list,
+.archive-title-preview__issues {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.archive-title-preview__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.archive-title-preview__row div,
+.archive-title-preview__issues li {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.archive-title-preview__row span,
+.archive-title-preview__issues span {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.archive-title-preview__row strong,
+.archive-title-preview__issues strong {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.archive-title-preview__issues {
+  color: var(--danger);
+}
+
+.archive-title-preview__issues strong,
+.archive-title-preview__issues span {
+  color: inherit;
+}
+
 .archive-upload-dialog {
   display: grid;
   gap: var(--space-4);
@@ -3382,6 +3728,13 @@ onUnmounted(() => {
   }
 
   .collection-picker {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 40rem) {
+  .archive-title-input,
+  .archive-title-preview__row {
     grid-template-columns: 1fr;
   }
 }

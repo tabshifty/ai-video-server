@@ -95,13 +95,76 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('图片入库后加入的合集')
   })
 
-  it('uses batch title as the default video title and keeps batch title overrides available', () => {
+  it('uses batch title as the default video title and keeps explicit batch title modes available', () => {
     expect(source).toContain('视频默认标题')
     expect(source).toContain('可不填，默认取压缩包文件名')
-    expect(source).toContain('title_enabled')
+    expect(source).toContain("title_mode: 'none'")
     expect(source).toContain('batchEditForm.title')
     expect(source).toContain('统一覆盖为同一个标题；留空回到视频默认标题')
+    expect(source).not.toContain('title_enabled')
     expect(source).not.toContain('批次标题')
+  })
+
+  it('adds filename title drafts without coupling them to process actions', () => {
+    expect(source).toContain("{ label: '不修改', value: 'none' }")
+    expect(source).toContain("{ label: '统一标题', value: 'uniform' }")
+    expect(source).toContain("{ label: '按各自文件名替换', value: 'filename' }")
+    expect(source).toContain('DocumentCopy')
+    expect(source).toContain('canReplaceArchiveFilenameTitle(selectedFile)')
+    expect(source).toContain('applySelectedFilenameTitleDraft')
+    expect(source).toContain('使用文件名')
+    expect(source).toContain('@input="deactivateSelectedFilenameMode"')
+    expect(source).toContain('标题已与文件名一致')
+    expect(source).not.toContain('processSelectedArchiveFiles()\n  applySelectedFilenameTitleDraft')
+    expect(source).not.toContain('processAdminArchiveImportFile(file.id)\n        applySelectedFilenameTitleDraft')
+  })
+
+  it('routes an active single-file filename draft through one semantic request and preserves manual saves', () => {
+    expect(source).toContain('const selectedFilenameDraftSnapshot = ref(null)')
+    expect(source).toContain('if (selectedFilenameDraftSnapshot.value)')
+    expect(source).toContain('buildArchiveFilenameBatchPayload([selectedFile.value], {')
+    expect(source).toContain('update_tags: true')
+    expect(source).toContain('update_video_type: true')
+    expect(source).toContain('update_video_collection_ids: true')
+    expect(source).toContain('update_image_collection_ids: true')
+    expect(source).toContain('await batchUpdateAdminArchiveImportFiles(filenamePayload)')
+    expect(source).toContain('await updateAdminArchiveImportFile(selectedFile.value.id, payload)')
+    expect(source).toContain("error?.data?.reason === 'stale_target'")
+    expect(source).toContain("error?.data?.reason === 'ineligible_target'")
+  })
+
+  it('uses filename as a mutually exclusive batch title mode with a bounded issue-aware preview', () => {
+    expect(source).toContain('<el-segmented')
+    expect(source).toContain('v-model="batchEditForm.title_mode"')
+    expect(source).toContain('@change="onBatchTitleModeChange"')
+    expect(source).toContain("batchEditForm.title_mode === 'filename'")
+    expect(source).toContain(':disabled="batchEditForm.title_mode === \'filename\' || !batchEditForm.description_enabled"')
+    expect(source).toContain('buildArchiveFilenameBatchPreview(selectedBatchFilesForActions.value, 5)')
+    expect(source).toContain('batchFilenamePreview.total')
+    expect(source).toContain('batchFilenamePreview.remaining')
+    expect(source).toContain('issue.relative_path')
+    expect(source).toContain('原标题')
+    expect(source).toContain('新标题')
+  })
+
+  it('saves filename batches transactionally while leaving uniform mode on the existing loop', () => {
+    expect(source).toContain('saveArchiveFilenameBatchUpdate')
+    expect(source).toContain("if (batchEditForm.title_mode === 'filename')")
+    expect(source).toContain('await batchUpdateAdminArchiveImportFiles(payload)')
+    expect(source).toContain('for (const file of targets) {')
+    expect(source).toContain("batchEditForm.title_mode === 'uniform'")
+    expect(source).toContain('已更新 ${targets.length} 个视频')
+    expect(source).toContain(':disabled="batchEditForm.title_mode === \'filename\' && !batchFilenamePreview.ok"')
+  })
+
+  it('keeps the title mode and preview stable in the dense responsive dialog', () => {
+    expect(source).toContain('class="archive-title-mode"')
+    expect(source).toContain('class="archive-title-preview"')
+    expect(source).toContain('class="archive-title-preview__row"')
+    expect(source).toContain('class="archive-title-preview__issues"')
+    expect(source).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));')
+    expect(source).toContain('@media (max-width: 40rem)')
+    expect(source).toMatch(/@media \(max-width: 40rem\)[\s\S]*?\.archive-title-preview__row[\s\S]*?grid-template-columns: 1fr;/)
   })
 
   it('keeps the page batch-first by moving upload into a dialog and batch detail into a drawer', () => {
