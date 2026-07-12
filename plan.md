@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-12 18:11:23 +0800
+- 进度：完成服务端压缩包标题批量规划、固定 UUID 顺序行锁、同一 `pgx.Tx` 内的默认值/分组/写入/结果读取、`updated_at` 校验、`field_overrides` 维护和 `ProcessFile` 标记 processing 后快照重读。首轮评审发现空 override map 会误重算关闭字段、Commit 后查询结果无法回滚两个 Important；已分别改为从现有 map 直接恢复并仅重算开启字段、Commit 前同事务读取完整结果。复审通过，无剩余 Critical、Important 或 Minor 问题。
+- 影响文件：`internal/services/archive_import_batch_update.go`、`internal/services/archive_import_batch_update_test.go`、`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`plan.md`
+- 验证：三轮 RED 分别确认纯规划缺失、事务 helper 缺失与 processing 后仍消费旧快照；评审修复额外观察到空 override 误变为 true、Commit 前无事务结果读取的 RED。GREEN `go test ./internal/services -run 'TestPlanArchiveFilenameBatchUpdate|TestApplyArchiveImportBatchPlan|TestBatchUpdateFiles|TestProcessFileReloadsMetadataAfterMarkingProcessing|ArchiveImport' -count=1` 通过；子代理定向 `-race`、`go vet ./internal/services`、gofmt 和 `git diff --check` 通过。真实 PostgreSQL 锁行为无现成集成夹具，已使用 SQL 结构断言、扫描列核对与 pgx fake 覆盖。
+
 ## 2026-07-12 14:15:26 +0800
 - 进度：完成 Go 标题派生、原标题转存说明、替换资格与结构化错误模型。独立评审一度误将“原说明为空时不追加换行”报为缺陷；以权威规格第 3.2 节复核后撤销，最终规格符合性与代码质量均通过，无 Critical、Important 或 Minor 问题。
 - 影响文件：`internal/services/archive_import_batch_update.go`、`internal/services/archive_import_batch_update_test.go`、`plan.md`
