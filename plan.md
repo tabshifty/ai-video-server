@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-12 14:15:26 +0800
+- 进度：完成 Go 标题派生、原标题转存说明、替换资格与结构化错误模型。独立评审一度误将“原说明为空时不追加换行”报为缺陷；以权威规格第 3.2 节复核后撤销，最终规格符合性与代码质量均通过，无 Critical、Important 或 Minor 问题。
+- 影响文件：`internal/services/archive_import_batch_update.go`、`internal/services/archive_import_batch_update_test.go`、`plan.md`
+- 验证：RED 先后观察到标题派生函数未定义、描述合并/资格/错误类型未定义的编译失败；GREEN `go test ./internal/services -run 'TestDeriveArchiveFilenameTitle|TestMergeArchiveFilenameTitleDescription|TestCanReplaceArchiveFilenameTitle|TestArchiveImportBatchUpdate' -count=1` 通过；子代理补充定向 `-race`、跳过缺失 TV APK 固件的 service 包回归与 `go vet ./...` 均通过；`git diff --check` 通过。
+
 ## 2026-07-12 13:59:55 +0800
 - 进度：已在隔离工作树 `feature/archive-filename-title` 启动实施，完成依赖安装与改动前基线验证。实施以设计规格为权威：原标题去首尾空白后比较，原说明内容原样保留，不采用计划示例中额外清理说明的做法。
 - 影响文件：`plan.md`
