@@ -8,6 +8,7 @@ import {
   buildArchiveFilenameTitleDraft,
   canReplaceArchiveFilenameTitle,
   deriveArchiveFilenameTitle,
+  executeArchiveFilenameUpdate,
   isArchiveFilenameDraftSnapshotCurrent
 } from './toolboxArchiveImport.helpers'
 
@@ -356,5 +357,116 @@ describe('archive filename batch helpers', () => {
       targets,
       title_mode: 'filename'
     })
+  })
+})
+
+describe('archive filename update workflow', () => {
+  it('submits once and reports success only after authority refresh succeeds', async () => {
+    const calls = []
+    const result = { updated_count: 2 }
+
+    const outcome = await executeArchiveFilenameUpdate({
+      submit: async () => {
+        calls.push('submit')
+        return result
+      },
+      refresh: async () => {
+        calls.push('refresh')
+        return true
+      },
+      isConflict: () => false,
+      recoverConflict: async () => calls.push('recover')
+    })
+
+    expect(calls).toEqual(['submit', 'refresh'])
+    expect(outcome).toEqual({ status: 'success', data: result, error: null })
+  })
+
+  it('reports a committed refresh failure without retrying or recovering', async () => {
+    const calls = []
+    const result = { updated_count: 1 }
+
+    const outcome = await executeArchiveFilenameUpdate({
+      submit: async () => {
+        calls.push('submit')
+        return result
+      },
+      refresh: async () => {
+        calls.push('refresh')
+        return false
+      },
+      isConflict: () => false,
+      recoverConflict: async () => calls.push('recover')
+    })
+
+    expect(calls).toEqual(['submit', 'refresh'])
+    expect(outcome).toEqual({ status: 'refresh_failed', data: result, error: null })
+  })
+
+  it('treats a thrown authority refresh as a committed refresh failure', async () => {
+    const calls = []
+    const result = { updated_count: 1 }
+    const refreshFailure = new Error('refresh unavailable')
+
+    const outcome = await executeArchiveFilenameUpdate({
+      submit: async () => {
+        calls.push('submit')
+        return result
+      },
+      refresh: async () => {
+        calls.push('refresh')
+        throw refreshFailure
+      },
+      isConflict: () => {
+        calls.push('conflict-check')
+        return true
+      },
+      recoverConflict: async () => calls.push('recover')
+    })
+
+    expect(calls).toEqual(['submit', 'refresh'])
+    expect(outcome).toEqual({ status: 'refresh_failed', data: result, error: refreshFailure })
+  })
+
+  it('runs conflict recovery once without the normal success refresh', async () => {
+    const calls = []
+    const conflict = new Error('stale target')
+
+    const outcome = await executeArchiveFilenameUpdate({
+      submit: async () => {
+        calls.push('submit')
+        throw conflict
+      },
+      refresh: async () => {
+        calls.push('refresh')
+        return true
+      },
+      isConflict: (error) => error === conflict,
+      recoverConflict: async (error) => calls.push(error === conflict ? 'recover' : 'wrong-error')
+    })
+
+    expect(calls).toEqual(['submit', 'recover'])
+    expect(outcome).toEqual({ status: 'conflict', data: null, error: conflict })
+  })
+
+  it('keeps generic failures separate from refresh and conflict recovery', async () => {
+    const calls = []
+    const failure = new Error('network unavailable')
+
+    const outcome = await executeArchiveFilenameUpdate({
+      submit: async () => {
+        calls.push('submit')
+        throw failure
+      },
+      refresh: async () => {
+        calls.push('refresh')
+        return true
+      },
+      isConflict: () => false,
+      recoverConflict: async () => calls.push('recover')
+    })
+
+    expect(calls).toEqual(['submit'])
+    expect(outcome).toEqual({ status: 'error', data: null, error: failure })
   })
 })

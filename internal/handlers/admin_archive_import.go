@@ -416,7 +416,10 @@ func (a *API) AdminBatchUpdateArchiveImportFiles(c *gin.Context) {
 		return
 	}
 	if len(req.Targets) == 0 {
-		bad(c, "至少选择一个压缩包文件")
+		response.JSON(c, 1078, "压缩包文件批量更新失败", gin.H{
+			"reason": services.ArchiveImportBatchReasonInvalidSelection,
+			"issues": []services.ArchiveImportBatchUpdateIssue{},
+		})
 		return
 	}
 
@@ -437,15 +440,23 @@ func (a *API) AdminBatchUpdateArchiveImportFiles(c *gin.Context) {
 		})
 	}
 
-	videoCollectionIDs, err := parseUUIDStrings(req.VideoCollectionIDs)
-	if err != nil {
-		bad(c, "视频合集ID格式错误")
-		return
+	var videoCollectionIDs []uuid.UUID
+	if req.UpdateVideoCollectionIDs {
+		var err error
+		videoCollectionIDs, err = parseUUIDStrings(req.VideoCollectionIDs)
+		if err != nil {
+			bad(c, "视频合集ID格式错误")
+			return
+		}
 	}
-	imageCollectionIDs, err := parseUUIDStrings(req.ImageCollectionIDs)
-	if err != nil {
-		bad(c, "图片合集ID格式错误")
-		return
+	var imageCollectionIDs []uuid.UUID
+	if req.UpdateImageCollectionIDs {
+		var err error
+		imageCollectionIDs, err = parseUUIDStrings(req.ImageCollectionIDs)
+		if err != nil {
+			bad(c, "图片合集ID格式错误")
+			return
+		}
 	}
 
 	items, err := a.archiveImportSvc.BatchUpdateFiles(c.Request.Context(), services.ArchiveImportBatchUpdateInput{

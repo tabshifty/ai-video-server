@@ -150,6 +150,9 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('buildArchiveFilenameBatchPreview(selectedBatchFilesForActions.value, 5)')
     expect(source).toContain('batchFilenamePreview.total')
     expect(source).toContain('batchFilenamePreview.remaining')
+    expect(source).toContain('batchFilenameIssuePreview.items')
+    expect(source).toContain('batchFilenameIssuePreview.remaining')
+    expect(source).toContain('batchFilenamePreview.value.issues.slice(0, 5)')
     expect(source).toContain('issue.relative_path')
     expect(source).toContain('原标题')
     expect(source).toContain('新标题')
@@ -167,24 +170,28 @@ describe('ToolboxArchiveImport', () => {
   })
 
   it('keeps dialogs and drafts open when committed updates cannot refresh authority', () => {
+    expect(source).toContain('executeArchiveFilenameUpdate')
+    expect(source.match(/await executeArchiveFilenameUpdate\(\{/g)).toHaveLength(2)
+    expect(source.match(/outcome\.status === 'refresh_failed'/g)).toHaveLength(2)
+    expect(source.match(/outcome\.status === 'success'/g)).toHaveLength(2)
     expect(source).toContain('文件信息已保存，但刷新失败，请手动刷新')
     expect(source).toContain('更新已提交，但刷新失败，请手动刷新')
-    expect(source.match(/const refreshed = await refreshBatchDetail\(\{ skipConfirm: true \}\)/g)).toHaveLength(4)
-    expect(source.match(/if \(!refreshed\) \{/g)).toHaveLength(3)
     expect(source).toContain('const result = await batchUpdateAdminArchiveImportFiles(payload)')
-    expect(source).toContain('result?.updated_count')
+    expect(source).toContain('outcome.data?.updated_count')
     expect(source).toContain('Number.isInteger(apiUpdatedCount)')
     expect(source).toContain('已更新 ${updatedCount} 个视频')
   })
 
   it('keeps the title mode and preview stable in the dense responsive dialog', () => {
     expect(source).toContain('class="archive-title-mode"')
+    expect(source).toContain('<el-form-item label="标题处理" class="archive-title-mode-item">')
     expect(source).toContain('class="archive-title-preview"')
     expect(source).toContain('class="archive-title-preview__row"')
     expect(source).toContain('class="archive-title-preview__issues"')
     expect(source).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));')
     expect(source).toContain('@media (max-width: 40rem)')
     expect(source).toMatch(/@media \(max-width: 40rem\)[\s\S]*?\.archive-title-preview__row[\s\S]*?grid-template-columns: 1fr;/)
+    expect(source).toMatch(/@media \(max-width: 40rem\)[\s\S]*?\.archive-title-mode-item \{[\s\S]*?display: block;[\s\S]*?\.archive-title-mode-item :deep\(\.el-form-item__label\)[\s\S]*?width: auto !important;[\s\S]*?\.archive-title-mode-item :deep\(\.el-form-item__content\)[\s\S]*?margin-left: 0 !important;/)
   })
 
   it('keeps the page batch-first by moving upload into a dialog and batch detail into a drawer', () => {

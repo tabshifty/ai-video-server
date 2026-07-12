@@ -19,6 +19,8 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -45,14 +47,26 @@ const (
 )
 
 type ArchiveImportService struct {
-	db          *pgxpool.Pool
-	uploadSvc   *UploadService
+	db          archiveImportDB
+	uploadSvc   archiveImportUploadService
 	imageSvc    *ImageService
 	repo        *repository.VideoRepository
 	enqueuer    archiveImportEnqueuer
 	storageRoot string
 	uploadTemp  string
 	logger      *slog.Logger
+}
+
+type archiveImportDB interface {
+	Begin(context.Context) (pgx.Tx, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+type archiveImportUploadService interface {
+	PreviewUploadedFile(context.Context, LocalUploadInput) (UploadPreview, error)
+	SaveUploadedFile(context.Context, LocalUploadInput, int64) (UploadResult, error)
 }
 
 type ArchiveImportUploadInput struct {
@@ -541,6 +555,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 	}
 	file, err = s.getArchiveFile(ctx, fileID)
 	if err != nil {
+		_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 		return models.ArchiveImportFileListItem{}, err
 	}
 
@@ -552,7 +567,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 	defer func() { _ = os.Remove(workPath) }()
 
 	title := archiveFileTitleForProcessing(file, batch)
-	description := strings.TrimSpace(file.Description)
+	description := file.Description
 	tags := append([]string{}, file.Tags...)
 	if len(tags) == 0 {
 		tags = []string{}

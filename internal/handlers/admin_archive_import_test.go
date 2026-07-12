@@ -322,10 +322,6 @@ func TestAdminBatchUpdateArchiveImportFilesRejectsInvalidRequests(t *testing.T) 
 		payload string
 	}{
 		{
-			name:    "空目标",
-			payload: `{"targets":[],"title_mode":"filename"}`,
-		},
-		{
 			name:    "目标时间为零值",
 			payload: `{"targets":[{"id":"11111111-1111-4111-8111-111111111111"}],"title_mode":"filename"}`,
 		},
@@ -356,6 +352,54 @@ func TestAdminBatchUpdateArchiveImportFilesRejectsInvalidRequests(t *testing.T) 
 				t.Fatalf("expected no batch update call, got %d", stub.batchUpdateCalls)
 			}
 		})
+	}
+}
+
+func TestAdminBatchUpdateArchiveImportFilesReturnsStructuredInvalidSelectionForEmptyTargets(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	stub := &archiveImportServiceStub{}
+
+	rec := performAdminBatchUpdateArchiveImportFiles(
+		&API{archiveImportSvc: stub},
+		`{"targets":[],"title_mode":"filename"}`,
+	)
+	resp := decodeAdminArchiveImportResponse(t, rec)
+
+	if resp.Code != 1078 || resp.Msg != "压缩包文件批量更新失败" {
+		t.Fatalf("body=%s", rec.Body.String())
+	}
+	if resp.Data["reason"] != services.ArchiveImportBatchReasonInvalidSelection {
+		t.Fatalf("reason=%v body=%s", resp.Data["reason"], rec.Body.String())
+	}
+	issues, ok := resp.Data["issues"].([]any)
+	if !ok || len(issues) != 0 {
+		t.Fatalf("issues=%#v body=%s", resp.Data["issues"], rec.Body.String())
+	}
+	if stub.batchUpdateCalls != 0 {
+		t.Fatalf("expected no batch update call, got %d", stub.batchUpdateCalls)
+	}
+}
+
+func TestAdminBatchUpdateArchiveImportFilesIgnoresDisabledCollectionValues(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	stub := &archiveImportServiceStub{}
+	payload := `{
+		"targets":[{"id":"11111111-1111-4111-8111-111111111111","updated_at":"2026-07-12T05:00:00Z"}],
+		"title_mode":"filename",
+		"update_video_collection_ids":false,
+		"video_collection_ids":["not-a-uuid"],
+		"update_image_collection_ids":false,
+		"image_collection_ids":["also-not-a-uuid"]
+	}`
+
+	rec := performAdminBatchUpdateArchiveImportFiles(&API{archiveImportSvc: stub}, payload)
+	resp := decodeAdminArchiveImportResponse(t, rec)
+
+	if resp.Code != 0 || stub.batchUpdateCalls != 1 {
+		t.Fatalf("body=%s calls=%d", rec.Body.String(), stub.batchUpdateCalls)
+	}
+	if len(stub.batchUpdateInput.VideoCollectionIDs) != 0 || len(stub.batchUpdateInput.ImageCollectionIDs) != 0 {
+		t.Fatalf("disabled collection values reached service: %#v", stub.batchUpdateInput)
 	}
 }
 

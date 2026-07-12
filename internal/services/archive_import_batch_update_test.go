@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -361,6 +362,65 @@ func TestPlanArchiveFilenameBatchUpdateRejectsInvalidSelection(t *testing.T) {
 	}
 }
 
+func TestPlanArchiveFilenameBatchUpdateReportsDuplicateAndMissingTargets(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.July, 12, 5, 0, 0, 0, time.UTC)
+	duplicateID := uuid.New()
+	known := eligibleArchiveBatchUpdateFile(uuid.New(), uuid.New(), "已存在.mp4", now)
+	missingID := uuid.New()
+	tests := []struct {
+		name     string
+		files    []models.ArchiveImportFileListItem
+		in       ArchiveImportBatchUpdateInput
+		wantID   uuid.UUID
+		wantText string
+	}{
+		{
+			name: "duplicate target id",
+			in: ArchiveImportBatchUpdateInput{
+				Targets: []ArchiveImportBatchUpdateTarget{
+					{ID: duplicateID, UpdatedAt: now},
+					{ID: duplicateID, UpdatedAt: now},
+				},
+				TitleMode: ArchiveImportTitleModeFilename,
+			},
+			wantID:   duplicateID,
+			wantText: "重复",
+		},
+		{
+			name:  "missing target id",
+			files: []models.ArchiveImportFileListItem{known},
+			in: ArchiveImportBatchUpdateInput{
+				Targets: []ArchiveImportBatchUpdateTarget{
+					{ID: known.ID, UpdatedAt: now},
+					{ID: missingID, UpdatedAt: now},
+				},
+				TitleMode: ArchiveImportTitleModeFilename,
+			},
+			wantID:   missingID,
+			wantText: "不存在",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plans, err := planArchiveFilenameBatchUpdate(tt.files, tt.in)
+			if plans != nil {
+				t.Fatalf("plans = %#v, want nil", plans)
+			}
+			batchErr := requireArchiveImportBatchUpdateError(t, err, ArchiveImportBatchReasonInvalidSelection)
+			if len(batchErr.Issues) != 1 {
+				t.Fatalf("issues = %#v, want one target issue", batchErr.Issues)
+			}
+			issue := batchErr.Issues[0]
+			if issue.ID != tt.wantID || !strings.Contains(issue.Message, tt.wantText) {
+				t.Fatalf("issue = %#v, want ID %s and message containing %q", issue, tt.wantID, tt.wantText)
+			}
+		})
+	}
+}
+
 func TestPlanArchiveFilenameBatchUpdateRejectsInvalidTitleMode(t *testing.T) {
 	t.Parallel()
 
@@ -576,6 +636,257 @@ func TestApplyArchiveImportBatchPlanRejectsInvalidPatchBeforeDatabaseAccess(t *t
 			requireArchiveImportBatchUpdateError(t, err, ArchiveImportBatchReasonInvalidPatch)
 		})
 	}
+}
+
+func TestBatchUpdateFilesRejectsInvalidSelectionBeforeDatabaseAccess(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.July, 12, 5, 0, 0, 0, time.UTC)
+	firstID := uuid.New()
+	secondID := uuid.New()
+	tests := []struct {
+		name              string
+		targets           []ArchiveImportBatchUpdateTarget
+		wantIssueIDs      []uuid.UUID
+		wantIssueMessages []string
+	}{
+		{name: "empty targets"},
+		{
+			name: "duplicate targets",
+			targets: []ArchiveImportBatchUpdateTarget{
+				{ID: firstID, UpdatedAt: now},
+				{ID: firstID, UpdatedAt: now},
+			},
+			wantIssueIDs:      []uuid.UUID{firstID},
+			wantIssueMessages: []string{"文件 ID 重复"},
+		},
+		{
+			name: "multiple duplicate target groups",
+			targets: []ArchiveImportBatchUpdateTarget{
+				{ID: firstID, UpdatedAt: now},
+				{ID: secondID, UpdatedAt: now},
+				{ID: firstID, UpdatedAt: now},
+				{ID: secondID, UpdatedAt: now},
+			},
+			wantIssueIDs:      []uuid.UUID{firstID, secondID},
+			wantIssueMessages: []string{"文件 ID 重复", "文件 ID 重复"},
+		},
+		{
+			name: "multiple targets with missing fields",
+			targets: []ArchiveImportBatchUpdateTarget{
+				{ID: uuid.Nil, UpdatedAt: now},
+				{ID: secondID},
+			},
+			wantIssueIDs:      []uuid.UUID{uuid.Nil, secondID},
+			wantIssueMessages: []string{"目标 ID 和更新时间不能为空", "目标 ID 和更新时间不能为空"},
+		},
+		{
+			name: "missing timestamp followed by duplicate id",
+			targets: []ArchiveImportBatchUpdateTarget{
+				{ID: firstID},
+				{ID: firstID, UpdatedAt: now},
+			},
+			wantIssueIDs:      []uuid.UUID{firstID, firstID},
+			wantIssueMessages: []string{"目标 ID 和更新时间不能为空", "文件 ID 重复"},
+		},
+	}
+
+	service := &ArchiveImportService{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := service.BatchUpdateFiles(context.Background(), ArchiveImportBatchUpdateInput{
+				Targets:   tt.targets,
+				TitleMode: ArchiveImportTitleModeFilename,
+			})
+			if files != nil {
+				t.Fatalf("files = %#v, want nil", files)
+			}
+			batchErr := requireArchiveImportBatchUpdateError(t, err, ArchiveImportBatchReasonInvalidSelection)
+			if len(batchErr.Issues) != len(tt.wantIssueIDs) {
+				t.Fatalf("issues = %#v, want IDs %#v", batchErr.Issues, tt.wantIssueIDs)
+			}
+			for index, wantID := range tt.wantIssueIDs {
+				issue := batchErr.Issues[index]
+				if issue.ID != wantID || issue.Message != tt.wantIssueMessages[index] {
+					t.Fatalf("issue[%d] = %#v, want ID %s and message %q", index, issue, wantID, tt.wantIssueMessages[index])
+				}
+			}
+		})
+	}
+}
+
+func TestBatchUpdateFilesUsesObservableTransactionBoundary(t *testing.T) {
+	t.Parallel()
+
+	t.Run("commits after reading complete results", func(t *testing.T) {
+		service, tx, input := newArchiveImportBatchTransactionFixture(0, nil)
+
+		items, err := service.BatchUpdateFiles(context.Background(), input)
+		if err != nil {
+			t.Fatalf("BatchUpdateFiles() error = %v", err)
+		}
+		if len(items) != len(input.Targets) {
+			t.Fatalf("items = %#v, want %d results", items, len(input.Targets))
+		}
+		if tx.commitCalls != 1 {
+			t.Fatalf("Commit() calls = %d, want 1", tx.commitCalls)
+		}
+		resultIndex := slices.Index(tx.events, "query:results")
+		commitIndex := slices.Index(tx.events, "commit")
+		if resultIndex < 0 || commitIndex < 0 || resultIndex >= commitIndex {
+			t.Fatalf("transaction events = %#v, want results before commit", tx.events)
+		}
+	})
+
+	t.Run("rolls back and never commits after a write fails", func(t *testing.T) {
+		writeErr := errors.New("forced second write failure")
+		service, tx, input := newArchiveImportBatchTransactionFixture(2, writeErr)
+
+		items, err := service.BatchUpdateFiles(context.Background(), input)
+		if items != nil {
+			t.Fatalf("items = %#v, want nil", items)
+		}
+		batchErr := requireArchiveImportBatchUpdateError(t, err, ArchiveImportBatchReasonUpdateFailed)
+		if !errors.Is(batchErr, writeErr) {
+			t.Fatalf("BatchUpdateFiles() error = %v, want %v", batchErr, writeErr)
+		}
+		if tx.execCalls != 2 {
+			t.Fatalf("Exec() calls = %d, want 2", tx.execCalls)
+		}
+		if tx.commitCalls != 0 {
+			t.Fatalf("Commit() calls = %d, want 0", tx.commitCalls)
+		}
+		if tx.rollbackCalls != 1 {
+			t.Fatalf("Rollback() calls = %d, want 1", tx.rollbackCalls)
+		}
+		if slices.Contains(tx.events, "query:results") {
+			t.Fatalf("transaction events = %#v, result query must not run after write failure", tx.events)
+		}
+	})
+}
+
+func newArchiveImportBatchTransactionFixture(failAt int, failErr error) (*ArchiveImportService, *observableArchiveImportBatchTx, ArchiveImportBatchUpdateInput) {
+	batchID := uuid.MustParse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+	updatedAt := time.Date(2026, time.July, 12, 5, 0, 0, 0, time.UTC)
+	first := eligibleArchiveBatchUpdateFile(
+		uuid.MustParse("11111111-1111-4111-8111-111111111111"),
+		batchID,
+		"www.98T.la@第一集.mp4",
+		updatedAt,
+	)
+	second := eligibleArchiveBatchUpdateFile(
+		uuid.MustParse("22222222-2222-4222-8222-222222222222"),
+		batchID,
+		"www.98T.la@第二集.mp4",
+		updatedAt,
+	)
+	resultFiles := []models.ArchiveImportFileListItem{first, second}
+	resultFiles[0].Title = "第一集"
+	resultFiles[0].Description = "旧标题"
+	resultFiles[1].Title = "第二集"
+	resultFiles[1].Description = "旧标题"
+	tx := &observableArchiveImportBatchTx{
+		batchID:     batchID,
+		lockedFiles: []models.ArchiveImportFileListItem{first, second},
+		resultFiles: resultFiles,
+		failAt:      failAt,
+		failErr:     failErr,
+	}
+	db := &observableArchiveImportBatchDB{tx: tx}
+	input := archiveFilenameBatchUpdateInput(second, first)
+	return &ArchiveImportService{db: db}, tx, input
+}
+
+type observableArchiveImportBatchDB struct {
+	tx *observableArchiveImportBatchTx
+}
+
+func (db *observableArchiveImportBatchDB) Begin(context.Context) (pgx.Tx, error) {
+	db.tx.events = append(db.tx.events, "begin")
+	return db.tx, nil
+}
+
+func (db *observableArchiveImportBatchDB) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, errors.New("unexpected pool Exec call")
+}
+
+func (db *observableArchiveImportBatchDB) Query(context.Context, string, ...any) (pgx.Rows, error) {
+	return nil, errors.New("unexpected pool Query call")
+}
+
+func (db *observableArchiveImportBatchDB) QueryRow(context.Context, string, ...any) pgx.Row {
+	return archiveImportScanRow(func(...any) error {
+		return errors.New("unexpected pool QueryRow call")
+	})
+}
+
+type observableArchiveImportBatchTx struct {
+	pgx.Tx
+	batchID       uuid.UUID
+	lockedFiles   []models.ArchiveImportFileListItem
+	resultFiles   []models.ArchiveImportFileListItem
+	failAt        int
+	failErr       error
+	execCalls     int
+	commitCalls   int
+	rollbackCalls int
+	events        []string
+}
+
+func (tx *observableArchiveImportBatchTx) Query(_ context.Context, query string, _ ...any) (pgx.Rows, error) {
+	switch {
+	case strings.Contains(query, "FOR UPDATE OF f"):
+		tx.events = append(tx.events, "query:lock")
+		return &archiveImportFileRows{files: append([]models.ArchiveImportFileListItem{}, tx.lockedFiles...)}, nil
+	case strings.Contains(query, "ORDER BY f.relative_path ASC"):
+		tx.events = append(tx.events, "query:results")
+		return &archiveImportFileRows{files: append([]models.ArchiveImportFileListItem{}, tx.resultFiles...)}, nil
+	default:
+		return nil, fmt.Errorf("unexpected transaction Query: %s", query)
+	}
+}
+
+func (tx *observableArchiveImportBatchTx) QueryRow(_ context.Context, query string, _ ...any) pgx.Row {
+	if !strings.Contains(query, "FROM archive_import_batches") {
+		return archiveImportScanRow(func(...any) error {
+			return fmt.Errorf("unexpected transaction QueryRow: %s", query)
+		})
+	}
+	tx.events = append(tx.events, "queryrow:batch")
+	return archiveImportScanRow(func(dest ...any) error {
+		if len(dest) != 7 {
+			return fmt.Errorf("batch defaults Scan() destinations = %d, want 7", len(dest))
+		}
+		*(dest[0].(*uuid.UUID)) = tx.batchID
+		*(dest[1].(*string)) = "批次标题"
+		*(dest[2].(*string)) = "批次标题"
+		*(dest[3].(*string)) = ""
+		for _, index := range []int{4, 5, 6} {
+			*(dest[index].(*[]byte)) = []byte("[]")
+		}
+		return nil
+	})
+}
+
+func (tx *observableArchiveImportBatchTx) Exec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+	tx.execCalls++
+	tx.events = append(tx.events, fmt.Sprintf("exec:%d", tx.execCalls))
+	if tx.execCalls == tx.failAt {
+		return pgconn.CommandTag{}, tx.failErr
+	}
+	return pgconn.NewCommandTag("UPDATE 1"), nil
+}
+
+func (tx *observableArchiveImportBatchTx) Commit(context.Context) error {
+	tx.commitCalls++
+	tx.events = append(tx.events, "commit")
+	return nil
+}
+
+func (tx *observableArchiveImportBatchTx) Rollback(context.Context) error {
+	tx.rollbackCalls++
+	tx.events = append(tx.events, "rollback")
+	return nil
 }
 
 func TestApplyArchiveImportBatchPlanCallerDefersRollbackBeforeWrites(t *testing.T) {
@@ -818,7 +1129,7 @@ func TestApplyArchiveImportBatchPlanRecomputesOnlyModifiedOverrides(t *testing.T
 	}
 }
 
-func TestApplyArchiveImportBatchPlanKeepsEmptyOptionalOverridesDisabled(t *testing.T) {
+func TestApplyArchiveImportBatchPlanInfersLegacyEmptyOptionalOverrides(t *testing.T) {
 	t.Parallel()
 
 	defaultVideoCollectionID := uuid.New()
@@ -870,9 +1181,93 @@ func TestApplyArchiveImportBatchPlanKeepsEmptyOptionalOverridesDisabled(t *testi
 		archiveImportOverrideVideoCollectionIDs,
 		archiveImportOverrideImageCollectionIDs,
 	} {
-		if got[field] {
-			t.Fatalf("%s override = true, want false: %#v", field, got)
+		if !got[field] {
+			t.Fatalf("%s override = false, want inferred true: %#v", field, got)
 		}
+	}
+
+	updatedFile := file
+	updatedFile.FieldOverrides = got
+	groupTitle := "新分组标题"
+	groupDescription := "新分组描述"
+	groupVideoType := "episode"
+	group := models.ArchiveImportGroup{
+		Title:              &groupTitle,
+		Description:        &groupDescription,
+		Tags:               []string{"新分组标签"},
+		VideoType:          &groupVideoType,
+		VideoCollectionIDs: []uuid.UUID{uuid.New()},
+		ImageCollectionIDs: []uuid.UUID{uuid.New()},
+	}
+	archiveImportApplyGroupToFile(
+		&updatedFile,
+		batch,
+		&group,
+		archiveImportFieldOverridesForFile(updatedFile, batch, &group),
+	)
+	if !slices.Equal(updatedFile.Tags, file.Tags) || updatedFile.VideoType != file.VideoType ||
+		!slices.Equal(updatedFile.VideoCollectionIDs, file.VideoCollectionIDs) ||
+		!slices.Equal(updatedFile.ImageCollectionIDs, file.ImageCollectionIDs) {
+		t.Fatalf("later group update overwrote inferred custom fields: %#v", updatedFile)
+	}
+}
+
+func TestApplyArchiveImportBatchPlanPreservesDescriptionWhitespace(t *testing.T) {
+	t.Parallel()
+
+	const description = "旧标题\n  原说明\n\n"
+	tx := &failingArchiveImportTx{}
+	err := applyArchiveImportBatchPlanTx(
+		context.Background(),
+		tx,
+		[]archiveImportBatchPlannedFile{{File: models.ArchiveImportFileListItem{
+			ID:           uuid.New(),
+			MediaKind:    "video",
+			RelativePath: "文件名标题.mp4",
+			Title:        "文件名标题",
+			Description:  description,
+			VideoType:    "short",
+		}}},
+		models.ArchiveImportBatch{},
+		nil,
+		ArchiveImportBatchUpdateInput{TitleMode: ArchiveImportTitleModeFilename},
+	)
+	if err != nil {
+		t.Fatalf("applyArchiveImportBatchPlanTx() error = %v", err)
+	}
+	if tx.calls != 1 || len(tx.execArgs) != 1 {
+		t.Fatalf("exec calls = %d, args = %#v", tx.calls, tx.execArgs)
+	}
+	if got := tx.execArgs[0][3]; got != description {
+		t.Fatalf("description SQL arg = %q, want %q", got, description)
+	}
+}
+
+func TestUpdateArchiveImportFileStateTxPreservesDescriptionWhitespace(t *testing.T) {
+	t.Parallel()
+
+	const description = "旧标题\n  原说明\n\n"
+	tx := &failingArchiveImportTx{}
+	err := updateArchiveImportFileStateTx(
+		context.Background(),
+		tx,
+		models.ArchiveImportFileListItem{
+			ID:          uuid.New(),
+			MediaKind:   "video",
+			Title:       "文件名标题",
+			Description: description,
+			VideoType:   "short",
+		},
+		archiveImportFieldOverrides{Description: true},
+	)
+	if err != nil {
+		t.Fatalf("updateArchiveImportFileStateTx() error = %v", err)
+	}
+	if tx.calls != 1 || len(tx.execArgs) != 1 {
+		t.Fatalf("exec calls = %d, args = %#v", tx.calls, tx.execArgs)
+	}
+	if got := tx.execArgs[0][3]; got != description {
+		t.Fatalf("description SQL arg = %q, want %q", got, description)
 	}
 }
 

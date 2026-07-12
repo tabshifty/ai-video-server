@@ -37,6 +37,7 @@ import {
   buildArchiveFilenameBatchPreview,
   buildArchiveFilenameTitleDraft,
   canReplaceArchiveFilenameTitle,
+  executeArchiveFilenameUpdate,
   isArchiveFilenameDraftSnapshotCurrent
 } from './toolboxArchiveImport.helpers'
 import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
@@ -186,6 +187,10 @@ const batchFilenamePreview = computed(() =>
     ? buildArchiveFilenameBatchPreview(selectedBatchFilesForActions.value, 5)
     : { ok: false, total: 0, items: [], remaining: 0, issues: [] }
 )
+const batchFilenameIssuePreview = computed(() => ({
+  items: batchFilenamePreview.value.issues.slice(0, 5),
+  remaining: Math.max(batchFilenamePreview.value.issues.length - 5, 0)
+}))
 const selectedFileDialogTitle = computed(() => {
   if (selectedFile.value?.media_kind === 'image') return '编辑图片文件'
   return '编辑视频文件'
@@ -1242,10 +1247,32 @@ async function saveSelectedFile() {
         update_image_collection_ids: true,
         image_collection_ids: normalizeUUIDSelection([selectedVideoImageCollectionID.value])
       })
-      await batchUpdateAdminArchiveImportFiles(filenamePayload)
-    } else {
-      await updateAdminArchiveImportFile(selectedFile.value.id, payload)
+      const outcome = await executeArchiveFilenameUpdate({
+        submit: async () => {
+          await batchUpdateAdminArchiveImportFiles(filenamePayload)
+        },
+        refresh: () => refreshBatchDetail({ skipConfirm: true }),
+        isConflict: isArchiveFilenameTargetConflict,
+        recoverConflict: async (error) => {
+          ElMessage.warning(extractErrorMessage(error, '文件状态已变化，已刷新最新信息'))
+          await refreshSelectedFilenameDraftAfterConflict(metadataDraft)
+        }
+      })
+      if (outcome.status === 'success') {
+        selectedFileDialogVisible.value = false
+        ElMessage.success('已保存文件信息')
+        return
+      }
+      if (outcome.status === 'refresh_failed') {
+        ElMessage.warning('文件信息已保存，但刷新失败，请手动刷新')
+        return
+      }
+      if (outcome.status === 'conflict') return
+      ElMessage.error(extractErrorMessage(outcome.error, '保存文件失败'))
+      return
     }
+
+    await updateAdminArchiveImportFile(selectedFile.value.id, payload)
     const refreshed = await refreshBatchDetail({ skipConfirm: true })
     if (!refreshed) {
       ElMessage.warning('文件信息已保存，但刷新失败，请手动刷新')
@@ -1254,11 +1281,6 @@ async function saveSelectedFile() {
     selectedFileDialogVisible.value = false
     ElMessage.success('已保存文件信息')
   } catch (error) {
-    if (filenameModeActive && isArchiveFilenameTargetConflict(error)) {
-      ElMessage.warning(extractErrorMessage(error, '文件状态已变化，已刷新最新信息'))
-      await refreshSelectedFilenameDraftAfterConflict(metadataDraft)
-      return
-    }
     ElMessage.error(extractErrorMessage(error, '保存文件失败'))
   } finally {
     fileSaving.value = false
@@ -1697,26 +1719,36 @@ async function saveArchiveFilenameBatchUpdate(targets) {
   batchEditSaving.value = true
   try {
     const payload = buildArchiveFilenameBatchPayload(targets, buildArchiveFilenameBatchPatch())
-    const result = await batchUpdateAdminArchiveImportFiles(payload)
-    const apiUpdatedCount = result?.updated_count
-    const updatedCount = Number.isInteger(apiUpdatedCount)
-      && apiUpdatedCount >= 0
-      && apiUpdatedCount <= targets.length
-      ? apiUpdatedCount
-      : targets.length
-    const refreshed = await refreshBatchDetail({ skipConfirm: true })
-    if (!refreshed) {
+    const outcome = await executeArchiveFilenameUpdate({
+      submit: async () => {
+        const result = await batchUpdateAdminArchiveImportFiles(payload)
+        return result
+      },
+      refresh: () => refreshBatchDetail({ skipConfirm: true }),
+      isConflict: isArchiveFilenameTargetConflict,
+      recoverConflict: async (error) => {
+        ElMessage.warning(extractErrorMessage(error, '文件状态已变化，已刷新批次详情'))
+        await refreshBatchDetail({ skipConfirm: true })
+      }
+    })
+    if (outcome.status === 'refresh_failed') {
       ElMessage.warning('更新已提交，但刷新失败，请手动刷新')
       return
     }
-    batchEditDialogVisible.value = false
-    ElMessage.success(`已更新 ${updatedCount} 个视频`)
-  } catch (error) {
-    if (isArchiveFilenameTargetConflict(error)) {
-      ElMessage.warning(extractErrorMessage(error, '文件状态已变化，已刷新批次详情'))
-      await refreshBatchDetail({ skipConfirm: true })
+    if (outcome.status === 'conflict') return
+    if (outcome.status === 'success') {
+      const apiUpdatedCount = outcome.data?.updated_count
+      const updatedCount = Number.isInteger(apiUpdatedCount)
+        && apiUpdatedCount >= 0
+        && apiUpdatedCount <= targets.length
+        ? apiUpdatedCount
+        : targets.length
+      batchEditDialogVisible.value = false
+      ElMessage.success(`已更新 ${updatedCount} 个视频`)
       return
     }
+    ElMessage.error(extractErrorMessage(outcome.error, '按文件名批量更新失败'))
+  } catch (error) {
     ElMessage.error(extractErrorMessage(error, '按文件名批量更新失败'))
   } finally {
     batchEditSaving.value = false
@@ -2622,7 +2654,7 @@ onUnmounted(() => {
           <SectionCard dense>
             <template #title>批量字段</template>
             <template v-if="selectedMediaKind === 'video'">
-              <el-form-item label="标题处理">
+              <el-form-item label="标题处理" class="archive-title-mode-item">
                 <div class="archive-title-mode-control">
                   <el-segmented
                     v-model="batchEditForm.title_mode"
@@ -2657,12 +2689,15 @@ onUnmounted(() => {
                         </div>
                       </li>
                     </ul>
-                    <ul v-if="batchFilenamePreview.issues.length > 0" class="archive-title-preview__issues">
-                      <li v-for="issue in batchFilenamePreview.issues" :key="`${issue.id}:${issue.relative_path}:${issue.message}`">
+                    <ul v-if="batchFilenameIssuePreview.items.length > 0" class="archive-title-preview__issues">
+                      <li v-for="issue in batchFilenameIssuePreview.items" :key="`${issue.id}:${issue.relative_path}:${issue.message}`">
                         <strong>{{ issue.relative_path || issue.id || '未知文件' }}</strong>
                         <span>{{ issue.message }}</span>
                       </li>
                     </ul>
+                    <p v-if="batchFilenameIssuePreview.remaining > 0" class="archive-title-preview__issue-summary">
+                      另有 {{ batchFilenameIssuePreview.remaining }} 项问题未展示
+                    </p>
                   </div>
                 </div>
               </el-form-item>
@@ -3631,6 +3666,13 @@ onUnmounted(() => {
   color: inherit;
 }
 
+.archive-title-preview__issue-summary {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
 .archive-upload-dialog {
   display: grid;
   gap: var(--space-4);
@@ -3756,6 +3798,21 @@ onUnmounted(() => {
 }
 
 @media (max-width: 40rem) {
+  .archive-title-mode-item {
+    display: block;
+  }
+
+  .archive-title-mode-item :deep(.el-form-item__label) {
+    width: auto !important;
+    height: auto;
+    margin-bottom: var(--space-2);
+    justify-content: flex-start;
+  }
+
+  .archive-title-mode-item :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+  }
+
   .archive-title-input,
   .archive-title-preview__row {
     grid-template-columns: 1fr;

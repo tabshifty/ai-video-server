@@ -128,50 +128,27 @@ func planArchiveFilenameBatchUpdate(files []models.ArchiveImportFileListItem, in
 			Err:    fmt.Errorf("title_mode 仅支持 filename"),
 		}
 	}
-	if len(in.Targets) == 0 {
-		return nil, &ArchiveImportBatchUpdateError{
-			Reason: ArchiveImportBatchReasonInvalidSelection,
-			Err:    fmt.Errorf("至少选择一个文件"),
-		}
-	}
-
-	targets := make(map[uuid.UUID]ArchiveImportBatchUpdateTarget, len(in.Targets))
-	for _, target := range in.Targets {
-		if target.ID == uuid.Nil || target.UpdatedAt.IsZero() {
-			return nil, &ArchiveImportBatchUpdateError{
-				Reason: ArchiveImportBatchReasonInvalidSelection,
-				Err:    fmt.Errorf("目标 ID 和更新时间不能为空"),
-			}
-		}
-		if _, exists := targets[target.ID]; exists {
-			return nil, &ArchiveImportBatchUpdateError{
-				Reason: ArchiveImportBatchReasonInvalidSelection,
-				Err:    fmt.Errorf("文件 ID 重复"),
-			}
-		}
-		targets[target.ID] = target
+	if err := validateArchiveImportBatchUpdateTargets(in.Targets); err != nil {
+		return nil, err
 	}
 
 	byID := make(map[uuid.UUID]models.ArchiveImportFileListItem, len(files))
 	for _, file := range files {
 		byID[file.ID] = file
 	}
-	if len(byID) != len(targets) {
-		return nil, &ArchiveImportBatchUpdateError{
-			Reason: ArchiveImportBatchReasonInvalidSelection,
-			Err:    fmt.Errorf("部分文件不存在"),
+	issues := make([]ArchiveImportBatchUpdateIssue, 0)
+	for _, target := range in.Targets {
+		if _, exists := byID[target.ID]; !exists {
+			issues = append(issues, ArchiveImportBatchUpdateIssue{
+				ID:      target.ID,
+				Message: "文件不存在或已删除",
+			})
 		}
 	}
-	for id := range targets {
-		if _, exists := byID[id]; !exists {
-			return nil, &ArchiveImportBatchUpdateError{
-				Reason: ArchiveImportBatchReasonInvalidSelection,
-				Err:    fmt.Errorf("部分文件不存在"),
-			}
-		}
+	if len(issues) > 0 {
+		return nil, batchUpdateError(ArchiveImportBatchReasonInvalidSelection, issues)
 	}
 
-	issues := make([]ArchiveImportBatchUpdateIssue, 0)
 	batchID := byID[in.Targets[0].ID].BatchID
 	for _, target := range in.Targets {
 		file := byID[target.ID]
@@ -237,6 +214,46 @@ func planArchiveFilenameBatchUpdate(files []models.ArchiveImportFileListItem, in
 	return plans, nil
 }
 
+func validateArchiveImportBatchUpdateTargets(input []ArchiveImportBatchUpdateTarget) error {
+	if len(input) == 0 {
+		return &ArchiveImportBatchUpdateError{
+			Reason: ArchiveImportBatchReasonInvalidSelection,
+			Issues: []ArchiveImportBatchUpdateIssue{},
+			Err:    fmt.Errorf("至少选择一个文件"),
+		}
+	}
+
+	targets := make(map[uuid.UUID]struct{}, len(input))
+	issues := make([]ArchiveImportBatchUpdateIssue, 0)
+	for _, target := range input {
+		if target.ID == uuid.Nil || target.UpdatedAt.IsZero() {
+			issues = append(issues, ArchiveImportBatchUpdateIssue{
+				ID:      target.ID,
+				Message: "目标 ID 和更新时间不能为空",
+			})
+		}
+		if target.ID == uuid.Nil {
+			continue
+		}
+		if _, exists := targets[target.ID]; exists {
+			issues = append(issues, ArchiveImportBatchUpdateIssue{
+				ID:      target.ID,
+				Message: "文件 ID 重复",
+			})
+			continue
+		}
+		targets[target.ID] = struct{}{}
+	}
+	if len(issues) > 0 {
+		return &ArchiveImportBatchUpdateError{
+			Reason: ArchiveImportBatchReasonInvalidSelection,
+			Issues: issues,
+			Err:    fmt.Errorf("目标选择无效"),
+		}
+	}
+	return nil
+}
+
 func batchUpdateIssueForFile(file models.ArchiveImportFileListItem, message string) ArchiveImportBatchUpdateIssue {
 	return ArchiveImportBatchUpdateIssue{
 		ID:           file.ID,
@@ -262,6 +279,9 @@ func (s *ArchiveImportService) BatchUpdateFiles(ctx context.Context, in ArchiveI
 			Reason: ArchiveImportBatchReasonInvalidPatch,
 			Err:    fmt.Errorf("视频类型无效"),
 		}
+	}
+	if err := validateArchiveImportBatchUpdateTargets(in.Targets); err != nil {
+		return nil, err
 	}
 
 	var err error
@@ -470,7 +490,7 @@ func applyArchiveImportBatchPlanTx(
 		file := plan.File
 		group := archiveImportGroupPtrByID(groups, file.GroupID)
 		defaults := resolveArchiveImportFileDefaults(file, batch, group)
-		overrides := archiveImportFieldOverridesFromMap(file.FieldOverrides)
+		overrides := archiveImportFieldOverridesForFile(file, batch, group)
 		overrides.Title = strings.TrimSpace(file.Title) != strings.TrimSpace(defaults.Title)
 		overrides.Description = strings.TrimSpace(file.Description) != strings.TrimSpace(defaults.Description)
 		if in.UpdateTags {

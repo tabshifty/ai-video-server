@@ -177,3 +177,27 @@ export function buildArchiveFilenameBatchPayload(files, patch = {}) {
     title_mode: 'filename'
   }
 }
+
+export async function executeArchiveFilenameUpdate({ submit, refresh, isConflict, recoverConflict }) {
+  let data
+  try {
+    data = await submit()
+  } catch (error) {
+    if (isConflict(error)) {
+      await recoverConflict(error)
+      return { status: 'conflict', data: null, error }
+    }
+    return { status: 'error', data: null, error }
+  }
+
+  try {
+    const refreshed = await refresh()
+    return {
+      status: refreshed ? 'success' : 'refresh_failed',
+      data,
+      error: null
+    }
+  } catch (error) {
+    return { status: 'refresh_failed', data, error }
+  }
+}

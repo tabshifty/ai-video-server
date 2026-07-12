@@ -780,6 +780,10 @@ WHERE id=$1
 }
 
 func updateArchiveImportFileStateTx(ctx context.Context, tx pgx.Tx, file models.ArchiveImportFileListItem, overrides archiveImportFieldOverrides) error {
+	return updateArchiveImportFileStateWithDescriptionTx(ctx, tx, file, overrides, file.Description)
+}
+
+func updateArchiveImportFileStateWithDescriptionTx(ctx context.Context, tx pgx.Tx, file models.ArchiveImportFileListItem, overrides archiveImportFieldOverrides, description string) error {
 	tagsRaw, err := json.Marshal(normalizeArchiveTags(file.Tags))
 	if err != nil {
 		return fmt.Errorf("marshal archive file tags: %w", err)
@@ -823,7 +827,7 @@ SET
   field_overrides=$9,
   updated_at=NOW()
 WHERE id=$1
-`, file.ID, file.GroupID, strings.TrimSpace(file.Title), strings.TrimSpace(file.Description), tagsRaw, videoType, videoCollectionsRaw, imageCollectionsRaw, fieldOverridesRaw); err != nil {
+	`, file.ID, file.GroupID, strings.TrimSpace(file.Title), description, tagsRaw, videoType, videoCollectionsRaw, imageCollectionsRaw, fieldOverridesRaw); err != nil {
 		return fmt.Errorf("update archive file state: %w", err)
 	}
 	return nil
