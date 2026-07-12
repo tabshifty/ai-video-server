@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-12 18:34:09 +0800
+- 进度：完成 `PUT /api/v1/admin/archive-import/files/batch-update` 的 Gin 请求解析、静态路由、service interface 与结构化错误映射。Handler 只接受目标 ID/时间、`title_mode` 与显式字段开关，不接受前端派生的标题/说明；非法目标、时间或合集 UUID 在调用 service 前拒绝，批量业务错误固定返回 `code=1078` 并保留 `reason/issues`。独立复审确认规格与质量均通过，无 Critical、Important 或 Minor 问题。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_archive_import.go`、`internal/handlers/admin_archive_import_test.go`、`plan.md`
+- 验证：RED `go test ./internal/handlers -run TestAdminBatchUpdateArchiveImportFiles -count=1` 仅因 Handler 未定义失败；GREEN `go test ./internal/handlers -run 'TestAdminBatchUpdateArchiveImportFiles|TestAdmin.*ArchiveImport' -count=1` 与 Handler 全包测试通过；新用例定向 `-race`、`go vet ./internal/handlers`、gofmt 与 `git diff --check` 通过。扩大 race 范围命中旧有并行测试调用 `gin.SetMode` 的全局数据竞争，本任务未扩大修改范围。
+
 ## 2026-07-12 18:11:23 +0800
 - 进度：完成服务端压缩包标题批量规划、固定 UUID 顺序行锁、同一 `pgx.Tx` 内的默认值/分组/写入/结果读取、`updated_at` 校验、`field_overrides` 维护和 `ProcessFile` 标记 processing 后快照重读。首轮评审发现空 override map 会误重算关闭字段、Commit 后查询结果无法回滚两个 Important；已分别改为从现有 map 直接恢复并仅重算开启字段、Commit 前同事务读取完整结果。复审通过，无剩余 Critical、Important 或 Minor 问题。
 - 影响文件：`internal/services/archive_import_batch_update.go`、`internal/services/archive_import_batch_update_test.go`、`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`plan.md`
