@@ -2,6 +2,36 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 22:26 +0800
+- 进度：完成 Precision Ops Task 5 两项 Important 评审修复的最终验证与提交前自审。用户/内置快照在 save、update、select/apply 边界均已隔离嵌套引用，页面原地修改会正确进入自定义态且不污染源；窄屏 tab 与 action 均具 44px 点击目标，桌面 32px action 和横向滚动保持。无页面字段知识、页面接入、依赖或范围外改动。
+- 影响文件：本次精确提交仅包含 `admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`admin-web/src/components/base/SavedViewTabs.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`；原报告 `.superpowers/sdd/task-5-report.md` 只追加证据且不纳入提交。
+- 验证：Finding 1 RED 为 3 项失败/5 项通过，Finding 2 RED 为 1 项失败/13 项通过，失败原因均与 finding 一致；两个评审文件联合通过（22/22），原 Task 5 三文件联合通过（29/29），`cd admin-web && npm test` 通过（31 个测试文件，290/290），`cd admin-web && npm run build` 成功（仅既有 chunk-size warning），`git diff --check`、业务字段越界扫描及本次 6 个提交文件 U+FFFD 扫描通过。
+
+## 2026-07-15 22:23 +0800
+- 进度：完成 Task 5 评审 Finding 2 最小修复及两个评审文件联合 GREEN。`SavedViewTabs` 只在既有 `<1024px` 媒体查询内把 tab item 的 height、min-height、line-height 设为 44px；桌面 action 32px、tab 长名称省略与窄屏横向滚动规则未改。
+- 影响文件：`admin-web/src/components/base/SavedViewTabs.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 通过（14/14）；`cd admin-web && npm test -- src/components/base/useSavedViews.spec.js src/components/base/precisionOpsComponents.spec.js` 通过（2 个测试文件，22/22，输出无 warning/error）。待运行原 Task 5 三文件联合、全量测试、构建和静态门禁。
+
+## 2026-07-15 22:21 +0800
+- 进度：Task 5 评审 Finding 2 窄屏 tab 点击目标测试已确认 RED。测试只读取 `SavedViewTabs` style block 的 `<1024px` 媒体查询，并要求 `.el-tabs__item` 同时具备 44px 高度和行高；既有横向滚动、桌面 action 32px 与其它 SFC 契约继续通过。
+- 影响文件：`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 按预期失败（1 个测试文件，1 项失败、13 项通过，退出码 1）；失败输出显示媒体查询只有 action button 44px 规则，没有 tab item 规则。
+
+## 2026-07-15 22:19 +0800
+- 进度：完成 Task 5 评审 Finding 1 最小修复与定向 GREEN。composable 以 JSON round-trip 在 save、update 和 select/apply 三个边界取得独立快照所有权，既解开 Vue 嵌套代理/引用，又保持版本 1 JSON schema 的值语义；未引入 `columns` 等页面字段知识。
+- 影响文件：`admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/useSavedViews.spec.js` 通过（1 个测试文件，8/8）。下一步只增加窄屏 tab 44px 点击目标断言并确认 Finding 2 RED。
+
+## 2026-07-15 22:18 +0800
+- 进度：Task 5 评审 Finding 1 嵌套快照所有权测试已确认 RED。新增用例让 normalizer 原样保留嵌套数组/对象引用，分别在 save、update 和 select/apply 后原地修改页面；失败 diff 显示用户快照的数组/对象值随页面变化，内置源快照也被页面反向改写，证实 `activeViewId` 可能继续错误匹配。
+- 影响文件：`admin-web/src/components/base/useSavedViews.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/useSavedViews.spec.js` 按预期失败（1 个测试文件，3 项失败、5 项通过，退出码 1）；三项均失败于嵌套源快照已被污染的深相等断言，不是测试加载或语法错误。
+
+## 2026-07-15 22:16 +0800
+- 进度：启动 Precision Ops Task 5 独立评审修复。Finding 1 的根因是 `useSavedViews` 在 save/update/select 边界直接共享 normalizer 返回的嵌套引用，页面原地修改可污染用户或内置源快照；Finding 2 的根因是窄屏媒体查询只扩大 action button，未覆盖 `.el-tabs__item` 点击目标。修复保持 composable 业务无关，并沿用 JSON 可序列化保存视图 schema。
+- 影响文件：计划只修改 `admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`admin-web/src/components/base/SavedViewTabs.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`；向忽略提交的 `.superpowers/sdd/task-5-report.md` 追加证据，不接业务页面或其它模块。
+- 验证：严格分两轮 RED→GREEN；随后运行两个修复文件覆盖测试、原 Task 5 三文件联合定向、管理端全量 `npm test`、`npm run build`、`git diff --check` 与本次文件 U+FFFD 扫描。
+
 ## 2026-07-15 21:58 +0800
 - 进度：完成 Precision Ops Task 5 最终验证与提交前自审。helper、共享 composable 与 `SavedViewTabs` 的职责边界、异常回退、内置保护、重复 ID 去碰撞、确认命令和响应式尺寸均已逐项核对；无页面接入、页面业务字段、Layout/路由/API/依赖改动，无卡片背景、常驻阴影或硬编码颜色。
 - 影响文件：本次精确提交仅包含 `admin-web/src/components/base/savedView.helpers.js`、`admin-web/src/components/base/savedView.helpers.spec.js`、`admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`admin-web/src/components/base/SavedViewTabs.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-5-report.md`、构建产物或其它文件。

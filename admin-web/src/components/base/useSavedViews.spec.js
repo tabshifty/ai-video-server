@@ -5,6 +5,10 @@ import { CUSTOM_VIEW_ID } from './savedView.helpers'
 import { useSavedViews } from './useSavedViews'
 
 const normalize = (snapshot) => ({ q: String(snapshot?.q || '') })
+const normalizeNested = (snapshot) => ({
+  columns: Array.isArray(snapshot?.columns) ? snapshot.columns : [],
+  filters: snapshot?.filters && typeof snapshot.filters === 'object' ? snapshot.filters : {}
+})
 const builtInViews = [
   { id: 'builtin-all', label: '全部', builtIn: true, snapshot: normalize({}) }
 ]
@@ -123,6 +127,109 @@ describe('useSavedViews', () => {
     page.q = '不同快照'
     expect(controller.saveView('第二个')).toBe('user-123-2')
     expect(controller.userViews.value.map((item) => item.id)).toEqual(['user-123', 'user-123-2'])
+  })
+
+  it('owns nested snapshot data after saving a view', () => {
+    const page = reactive({
+      columns: ['title'],
+      filters: { state: 'failed' }
+    })
+    const controller = useSavedViews({
+      storageKey: 'nested-save-v1',
+      builtInViews: [{
+        id: 'builtin-all',
+        label: '全部',
+        builtIn: true,
+        snapshot: normalizeNested({ columns: [], filters: { state: 'all' } })
+      }],
+      normalizeSnapshot: normalizeNested,
+      getCurrentSnapshot: () => page,
+      applySnapshot: () => {},
+      storage: null,
+      now: () => 789
+    })
+
+    const id = controller.saveView('嵌套快照')
+    page.columns.push('status')
+    page.filters.state = 'ready'
+
+    expect(controller.userViews.value[0].snapshot).toEqual({
+      columns: ['title'],
+      filters: { state: 'failed' }
+    })
+    expect(controller.activeViewId.value).toBe(CUSTOM_VIEW_ID)
+    expect(id).toBe('user-789')
+  })
+
+  it('owns replacement nested snapshot data after updating a view', () => {
+    const page = reactive({
+      columns: ['title'],
+      filters: { state: 'failed' }
+    })
+    const controller = useSavedViews({
+      storageKey: 'nested-update-v1',
+      builtInViews: [{
+        id: 'builtin-all',
+        label: '全部',
+        builtIn: true,
+        snapshot: normalizeNested({ columns: [], filters: { state: 'all' } })
+      }],
+      normalizeSnapshot: normalizeNested,
+      getCurrentSnapshot: () => page,
+      applySnapshot: () => {},
+      storage: null,
+      now: () => 790
+    })
+    const id = controller.saveView('待更新')
+    page.columns = ['title', 'duration']
+    page.filters = { state: 'ready' }
+
+    expect(controller.updateView(id)).toBe(true)
+    page.columns.push('owner')
+    page.filters.state = 'all'
+
+    expect(controller.userViews.value[0].snapshot).toEqual({
+      columns: ['title', 'duration'],
+      filters: { state: 'ready' }
+    })
+    expect(controller.activeViewId.value).toBe(CUSTOM_VIEW_ID)
+  })
+
+  it('does not lend source-view nested data to the page when selecting', async () => {
+    const sourceSnapshot = {
+      columns: ['title'],
+      filters: { state: 'failed' }
+    }
+    const page = reactive({
+      columns: [],
+      filters: { state: 'all' }
+    })
+    const controller = useSavedViews({
+      storageKey: 'nested-select-v1',
+      builtInViews: [{
+        id: 'builtin-failed',
+        label: '失败',
+        builtIn: true,
+        snapshot: sourceSnapshot
+      }],
+      normalizeSnapshot: normalizeNested,
+      getCurrentSnapshot: () => page,
+      applySnapshot: (snapshot) => {
+        page.columns = snapshot.columns
+        page.filters = snapshot.filters
+      },
+      storage: null
+    })
+
+    expect(await controller.selectView('builtin-failed')).toBe(true)
+    page.columns.push('status')
+    page.filters.state = 'ready'
+
+    expect(sourceSnapshot).toEqual({
+      columns: ['title'],
+      filters: { state: 'failed' }
+    })
+    expect(controller.activeViewId.value).toBe(CUSTOM_VIEW_ID)
   })
 
   it('stays independent of page business fields and confirmation UI', () => {

@@ -173,4 +173,13 @@ describe('Precision Ops base components', () => {
     expect(savedViewStyle).not.toContain('box-shadow')
     expect(savedViewStyle).not.toMatch(/\bbackground(?:-color)?:/)
   })
+
+  it('gives every saved-view tab a 44px mobile click target', () => {
+    const mediaStart = savedViewStyle.indexOf('@media (max-width: 63.9375rem)')
+
+    expect(mediaStart).toBeGreaterThan(-1)
+    const mobileStyle = savedViewStyle.slice(mediaStart)
+    expect(mobileStyle).toMatch(/:deep\(\.el-tabs__item\)\s*\{[^}]*height:\s*44px/)
+    expect(mobileStyle).toMatch(/:deep\(\.el-tabs__item\)\s*\{[^}]*line-height:\s*44px/)
+  })
 })

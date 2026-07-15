@@ -180,6 +180,12 @@ async function requestRemove() {
     overflow-x: auto;
   }
 
+  :deep(.el-tabs__item) {
+    height: 44px;
+    min-height: 44px;
+    line-height: 44px;
+  }
+
   .saved-view-tabs__actions :deep(.el-button) {
     height: 44px;
     min-height: 44px;

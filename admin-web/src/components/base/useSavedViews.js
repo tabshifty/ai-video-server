@@ -19,6 +19,11 @@ function resolveStorage(storage) {
   }
 }
 
+function ownSnapshot(snapshot) {
+  // JSON round-trip matches the persisted schema and unwraps nested Vue proxies.
+  return JSON.parse(JSON.stringify(snapshot))
+}
+
 export function useSavedViews({
   storageKey,
   builtInViews,
@@ -82,7 +87,7 @@ export function useSavedViews({
     if (!view) return false
 
     selectedViewId.value = view.id
-    applySnapshot(normalizeSnapshot(view.snapshot))
+    applySnapshot(ownSnapshot(normalizeSnapshot(view.snapshot)))
     await refresh()
     return true
   }
@@ -94,7 +99,7 @@ export function useSavedViews({
     const view = {
       id: nextViewId(),
       label: normalizedLabel,
-      snapshot: currentSnapshot.value
+      snapshot: ownSnapshot(currentSnapshot.value)
     }
     userViews.value = upsertSavedView(userViews.value, view)
     selectedViewId.value = view.id
@@ -108,7 +113,7 @@ export function useSavedViews({
 
     userViews.value = upsertSavedView(userViews.value, {
       ...source,
-      snapshot: currentSnapshot.value
+      snapshot: ownSnapshot(currentSnapshot.value)
     })
     selectedViewId.value = id
     persist()
