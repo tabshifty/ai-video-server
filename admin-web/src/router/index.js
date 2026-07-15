@@ -29,7 +29,7 @@ import ToolboxPasswordVault from '../views/ToolboxPasswordVault.vue'
 const routes = [
   { path: '/login', component: Login, meta: { public: true } },
   { path: '/', redirect: '/dashboard' },
-  { path: '/dashboard', component: Dashboard, meta: { hideShellPageHeader: true } },
+  { path: '/dashboard', component: Dashboard },
   { path: '/videos', component: VideoList, meta: { hideShellPageHeader: true } },
   { path: '/short-pending-delete', component: PendingDeleteShorts, meta: { hideShellPageHeader: true } },
   { path: '/tv-series', component: TvSeriesManage, meta: { hideShellPageHeader: true } },

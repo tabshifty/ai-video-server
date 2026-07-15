@@ -3,11 +3,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { Refresh } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
-import StatCard from '../components/base/StatCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import MetricStrip from '../components/base/MetricStrip.vue'
 import { getAdminStats } from '../api/admin'
+import { buildDashboardMetricGroups, dashboardQuickActions } from './dashboard.helpers'
 
 const stats = ref(null)
 const loading = ref(false)
@@ -20,19 +20,7 @@ const trendPoints = computed(() => {
   return Array.isArray(points) ? points : []
 })
 
-const metricCards = computed(() => [
-  { label: '短视频', value: stats.value?.short_videos || 0 },
-  { label: '电影', value: stats.value?.movie_videos || 0 },
-  { label: '电视剧集', value: stats.value?.episode_videos || 0 },
-  { label: 'AV', value: stats.value?.av_videos || 0 },
-  { label: '总用户数', value: stats.value?.total_users || 0 },
-  { label: '今日上传', value: stats.value?.today_uploads || 0 },
-  { label: '转码队列长度', value: stats.value?.queue_length || 0 },
-  {
-    label: '磁盘剩余',
-    value: `${((stats.value?.disk_free_bytes || 0) / 1024 / 1024 / 1024).toFixed(2)} GB`
-  }
-])
+const metricGroups = computed(() => buildDashboardMetricGroups(stats.value || {}))
 
 function resolveColor(token) {
   if (typeof window === 'undefined' || !document?.documentElement) return ''
@@ -131,11 +119,11 @@ async function load() {
   loading.value = true
   errorMessage.value = ''
   try {
-    stats.value = await getAdminStats()
+    const nextStats = await getAdminStats()
+    stats.value = nextStats
     await nextTick()
     renderChart()
   } catch (error) {
-    stats.value = null
     errorMessage.value = error?.message || '加载仪表盘失败'
   } finally {
     loading.value = false
@@ -162,43 +150,49 @@ onBeforeUnmount(() => {
 
 <template>
   <Layout>
-    <div class="page-shell dashboard-page">
-      <PageHeader title="系统仪表盘">
-        <template #actions>
-          <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
+    </template>
 
-      <EmptyState
-        v-if="errorMessage"
-        title="加载失败"
-        :description="errorMessage"
-      >
-        <template #action>
-          <el-button type="primary" :icon="Refresh" :loading="loading" @click="load">重试</el-button>
-        </template>
-      </EmptyState>
+    <div class="page-shell dashboard-page" data-density="compact">
+      <el-alert v-if="errorMessage" type="error" :closable="false" :title="errorMessage">
+        <template #default><el-button link type="primary" @click="load">重试</el-button></template>
+      </el-alert>
 
-      <template v-else>
-        <section class="metric-grid">
-          <StatCard
-            v-for="item in metricCards"
-            :key="item.label"
-            :label="item.label"
-            :value="item.value"
-          />
-        </section>
+      <el-skeleton v-if="loading && !stats" :rows="7" animated />
 
-        <SectionCard>
-          <template #title>近 7 天上传趋势</template>
-          <template #description>按天统计上传数量，辅助判断高峰与队列压力</template>
-          <div v-if="trendPoints.length" ref="chartRef" class="trend-chart" />
-          <EmptyState
-            v-else
-            title="暂无趋势数据"
-            description="后端暂未返回最近 7 天上传趋势"
-          />
-        </SectionCard>
+      <template v-else-if="stats">
+        <MetricStrip :items="metricGroups.runtime" aria-label="运行摘要" />
+
+        <div class="dashboard-workspace">
+          <div class="dashboard-workspace__main">
+            <section class="dashboard-section">
+              <h2>内容库存</h2>
+              <MetricStrip :items="metricGroups.inventory" aria-label="内容库存" />
+            </section>
+
+            <SectionCard dense>
+              <template #title>近 7 天上传趋势</template>
+              <div v-if="trendPoints.length" ref="chartRef" class="trend-chart" />
+              <EmptyState
+                v-else
+                title="暂无趋势数据"
+                description="后端暂未返回最近 7 天上传趋势"
+              />
+            </SectionCard>
+          </div>
+
+          <nav class="dashboard-quick-actions" aria-label="常用入口">
+            <h2>常用入口</h2>
+            <RouterLink
+              v-for="item in dashboardQuickActions"
+              :key="item.path"
+              :to="item.path"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </nav>
+        </div>
       </template>
     </div>
   </Layout>
@@ -207,29 +201,97 @@ onBeforeUnmount(() => {
 <style scoped>
 .dashboard-page {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-4);
   padding-bottom: var(--space-1);
 }
 
-.metric-grid {
+.dashboard-workspace {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.dashboard-workspace__main,
+.dashboard-section,
+.dashboard-quick-actions {
+  min-width: 0;
+}
+
+.dashboard-workspace__main {
+  display: grid;
   gap: var(--space-4);
 }
 
+.dashboard-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dashboard-section h2,
+.dashboard-quick-actions h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+}
+
+.dashboard-quick-actions {
+  align-self: start;
+  display: grid;
+  gap: var(--space-1);
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--line-soft);
+}
+
+.dashboard-quick-actions h2 {
+  margin-bottom: var(--space-1);
+}
+
+.dashboard-quick-actions a {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--space-8);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  transition: background var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.dashboard-quick-actions a:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.dashboard-quick-actions a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .trend-chart {
-  height: 360px;
+  height: 240px;
 }
 
-@media (max-width: 75rem) {
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 63.9375rem) {
+  .dashboard-workspace {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
 
-@media (max-width: 46rem) {
-  .metric-grid {
-    grid-template-columns: 1fr;
+  .dashboard-quick-actions {
+    padding-top: var(--space-4);
+    padding-left: 0;
+    border-top: 1px solid var(--line-soft);
+    border-left: 0;
+  }
+
+  .dashboard-quick-actions a {
+    min-height: 44px;
   }
 }
 </style>

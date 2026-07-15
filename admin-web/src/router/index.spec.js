@@ -21,4 +21,12 @@ describe('resolveRouterHistoryBase', () => {
     expect(page).toContain("import Layout from '../components/Layout.vue'")
     expect(page).toMatch(/<Layout>\s*<div class="page-shell pending-delete-page">/)
   })
+
+  it('仪表盘使用壳层标题且保持原有路由目标', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const dashboardRoute = source.split('\n').find((line) => line.includes("path: '/dashboard'"))
+
+    expect(dashboardRoute).toContain("{ path: '/dashboard', component: Dashboard }")
+    expect(dashboardRoute).not.toContain('hideShellPageHeader')
+  })
 })

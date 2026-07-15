@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 22:54 +0800
+- 进度：完成 Precision Ops Task 6 最终验证与提交前自审。指标仅来自现有 stats API，快捷入口仅四个指定路由，Dashboard 不再导入/渲染 PageHeader 和 StatCard，刷新失败不清空旧 stats，ECharts render/resize/dispose 生命周期与原 API/权限/路由目标保持。新增样式无直接色值、数字 rgba、渐变、常驻阴影、非零字距或超过 8px 的普通圆角。
+- 影响文件：本次精确提交仅包含 `admin-web/src/views/dashboard.helpers.js`、`admin-web/src/views/dashboard.helpers.spec.js`、`admin-web/src/views/dashboardPage.spec.js`、`admin-web/src/views/Dashboard.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-6-report.md`、构建产物或范围外文件。
+- 验证：最终 fresh `cd admin-web && npm test -- src/views/dashboard.helpers.spec.js src/views/dashboardPage.spec.js src/router/index.spec.js src/components/Layout.spec.js` 通过（4 个文件，24/24）；`cd admin-web && npm test` 通过（33 个文件，300/300）；`cd admin-web && npm run build` 成功（2364 modules transformed，仅既有 chunk-size warning）；`git diff --check`、本任务文件 U+FFFD 扫描、新增样式禁止模式扫描和变更白名单核对通过。
+
+## 2026-07-15 22:48 +0800
+- 进度：完成 Precision Ops Task 6 最小实现与指定四文件定向 GREEN。纯 helper 将当前 stats API 字段分为运行摘要与内容库存，快捷入口严格为 upload/tasks/videos/images；Dashboard 使用壳层 header action、MetricStrip、内容库存、240px 趋势图和语义导航，保留 ECharts 生命周期并在刷新失败时继续展示旧 stats；dashboard 路由仅移除兼容 meta。
+- 影响文件：`admin-web/src/views/dashboard.helpers.js`、`admin-web/src/views/dashboard.helpers.spec.js`、`admin-web/src/views/dashboardPage.spec.js`、`admin-web/src/views/Dashboard.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：首次四文件命令为 21/24，唯一原因是页面测试的 template 提取器在嵌套 slot 首个闭合标签处过早截断，其他三组文件与页面脚本/样式已通过；修正为外层 template 边界后，`cd admin-web && npm test -- src/views/dashboard.helpers.spec.js src/views/dashboardPage.spec.js src/router/index.spec.js src/components/Layout.spec.js` 通过（4 个测试文件，24/24，退出码 0）。
+
+## 2026-07-15 22:43 +0800
+- 进度：Precision Ops Task 6 helper、Dashboard 真实 SFC 与路由契约测试已确认 RED。Dashboard SFC 可被 Vite Vue 插件正常转换；失败来自缺少纯映射模块、旧 PageHeader/StatCard 结构、未提供快捷导航/骨架/保留旧 stats/240px 布局，以及 dashboard 路由仍携带兼容 meta，不是测试语法或环境错误。
+- 影响文件：`admin-web/src/views/dashboard.helpers.spec.js`、`admin-web/src/views/dashboardPage.spec.js`、`admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/dashboard.helpers.spec.js src/views/dashboardPage.spec.js src/router/index.spec.js` 按预期失败（退出码 1；3 个测试文件失败，7 项失败、3 项通过，helper 文件因 `./dashboard.helpers` 尚不存在而收集失败）。
+
+## 2026-07-15 22:40 +0800
+- 进度：启动 Precision Ops Task 6，按 helper 数据映射、Dashboard 真实 SFC 结构与路由兼容 meta 三类契约执行 TDD。保留现有 `getAdminStats` API、权限/路由目标、ECharts render/resize/dispose 生命周期及刷新旧数据；仅使用现有 stats 字段和四个指定快捷入口。
+- 影响文件：计划只新增 `admin-web/src/views/dashboard.helpers.js`、`admin-web/src/views/dashboard.helpers.spec.js`、`admin-web/src/views/dashboardPage.spec.js`，修改 `admin-web/src/views/Dashboard.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`，并追加 `CONTEXT.md`、`plan.md`；任务报告写入不纳入提交的 `.superpowers/sdd/task-6-report.md`。
+- 验证：先写 helper/页面/路由定向测试并确认预期 RED，再做最小实现；收尾运行指定四文件定向测试、管理端全量 `npm test`、`npm run build`、`git diff --check`、U+FFFD 扫描与范围自审。
+
 ## 2026-07-15 22:26 +0800
 - 进度：完成 Precision Ops Task 5 两项 Important 评审修复的最终验证与提交前自审。用户/内置快照在 save、update、select/apply 边界均已隔离嵌套引用，页面原地修改会正确进入自定义态且不污染源；窄屏 tab 与 action 均具 44px 点击目标，桌面 32px action 和横向滚动保持。无页面字段知识、页面接入、依赖或范围外改动。
 - 影响文件：本次精确提交仅包含 `admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`admin-web/src/components/base/SavedViewTabs.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`；原报告 `.superpowers/sdd/task-5-report.md` 只追加证据且不纳入提交。
