@@ -21,9 +21,21 @@
 - 本地偏好必须带 schema 版本，解析或存储失败时回退且不能让页面白屏。
 - 每次视图切换、筛选、分页、刷新或 reload 后，批量选择继续按现有当前页契约清空或同步。
 - 保留 `VideoList.vue`、`ImageManage.vue`、`ToolboxArchiveImport.vue` 和 `ToolboxImageWorkbench.vue` 的业务脚本边界，不借样式升级拆分其请求和编辑流程。
-- 每个任务只精确暂存列出的文件；保留工作区中与本任务无关的用户改动。
-- 每个阶段在 `plan.md` 顶部追加反向时间记录；只有新增长期契约或偏好 key 时才更新 `CONTEXT.md`。
-- 管理端代码任务至少运行定向 Vitest、`npm test` 和 `npm run build`；最终阶段再完成 375/768/1024/1440px 浏览器验收。
+- 每个任务只精确暂存其生产/测试文件以及本任务新增的 `plan.md`、`CONTEXT.md` 记录；保留工作区中与本任务无关的用户改动。
+- 每个任务开始、RED、实现和验证阶段都在 `plan.md` 顶部追加反向时间记录；修改生产代码或界面行为的任务必须同时在 `CONTEXT.md` 追加一条长期有效的 Precision Ops 契约，不能写临时进度。
+- 管理端 Task 1-22 无论各任务步骤是否重复列出，都必须在提交前依次运行定向 Vitest、完整 `npm test` 和 `npm run build`；最终阶段再完成 375/768/1024/1440px 浏览器验收。
+
+## 通用任务门禁
+
+以下步骤适用于 Task 1-22，并由每个 task brief 的分派提示原文携带：
+
+1. 在 `plan.md` 记录任务范围和待执行验证。
+2. 先写定向测试并观察与缺失行为一致的 RED；把命令和关键失败写入 `plan.md`。
+3. 完成最小实现后运行任务列出的定向 Vitest。
+4. 运行 `cd admin-web && npm test`，要求所有 Vitest 通过。
+5. 运行 `cd admin-web && npm run build`，只允许既有 chunk-size 警告，不允许新增 warning/error。
+6. 运行 `git diff --check` 和 U+FFFD 扫描；修改生产代码或界面行为时，把本任务形成的长期约束追加到 `CONTEXT.md`。
+7. 在 `plan.md` 追加验证结果，精确暂存本任务文件与本任务新增的账本/技术沉淀片段，再使用任务指定的中文提交信息提交。
 
 ## 文件与职责
 
@@ -37,6 +49,7 @@
 | `admin-web/src/components/base/StatusIndicator.vue` | 状态点、文字和语义色的统一组合 |
 | `admin-web/src/components/base/SavedViewTabs.vue` | 内置视图、自定义态和用户视图操作 |
 | `admin-web/src/components/base/savedView.helpers.js` | 保存视图解析、快照比较、增删改与版本回退 |
+| `admin-web/src/components/base/useSavedViews.js` | 保存视图持久化、选中态、自定义态和快照生命周期 composable |
 | `admin-web/src/views/precisionOpsRollout.spec.js` | 25 个视图的阶段归属、页头迁移和密度静态契约 |
 | 四个样板页及其测试 | 验证概览、监控、表格集合和媒体网格四种范式 |
 | 其余 21 个视图 | 按阶段接入已验证的壳层、密度和状态模式 |
@@ -71,7 +84,7 @@ it('exports the approved Precision Ops shell and semantic tokens', () => {
   expect(css).toContain('--admin-header-height: 52px')
   expect(css).toContain('--bg-canvas: #f7f8fa')
   expect(css).toContain('--text-primary: #172033')
-  expect(css).toContain('--text-muted: #64748b')
+  expect(css).toContain('--text-muted: #607085')
   expect(css).toContain('--success-600: #047857')
   expect(css).toContain('--warning-600: #b45309')
   expect(css).toContain('--danger-600: #c81e1e')
@@ -83,6 +96,9 @@ it('scopes compact sizing instead of applying it to every form', () => {
   expect(css).toContain('[data-density="monitor"]')
   expect(css).toContain('[data-density="form"]')
   expect(overrides).toContain(':where([data-density="compact"], [data-density="monitor"])')
+  expect(overrides).toContain('min-width: 44px')
+  expect(overrides).toContain('.el-button.is-circle')
+  expect(overrides).toContain('.el-checkbox')
   expect(overrides).not.toMatch(/^:where\(\.el-button\)\s*\{[^}]*min-height:\s*32px/m)
 })
 
@@ -121,7 +137,7 @@ Expected: FAIL，旧壳层仍为 240/60/64px，且没有三个 `data-density` �
   --bg-sidebar: #f1f3f5;
   --text-primary: #172033;
   --text-secondary: #475569;
-  --text-muted: #64748b;
+  --text-muted: #607085;
   --text-on-inverse: #ffffff;
   --bg-inverse: #0f172a;
   --line-soft: #e2e8f0;
@@ -224,6 +240,17 @@ body {
   ) {
     min-height: 44px;
   }
+
+  :where([data-density]) :where(
+    .el-button.is-circle,
+    .el-checkbox,
+    .el-radio,
+    .el-pagination button,
+    .el-pager li
+  ) {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -249,7 +276,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功，0 个错误。
 
-Commit: `git add admin-web/src/assets/theme.css admin-web/src/assets/element-overrides.css admin-web/src/assets/themeTokens.spec.js admin-web/src/components/base/SectionCard.vue admin-web/src/components/base/EmptyState.vue admin-web/src/components/base/BulkActionBar.vue && git commit -m "样式：建立 Precision Ops 设计令牌"`
+Commit message: `样式：建立 Precision Ops 设计令牌`
 
 ---
 
@@ -412,7 +439,7 @@ Run: `cd admin-web && npm test -- src/components/adminShellPreferences.spec.js s
 
 Expected: PASS。
 
-Commit: `git add admin-web/src/components/adminShellPreferences.js admin-web/src/components/adminShellPreferences.spec.js admin-web/src/components/base/commandPalette.helpers.js admin-web/src/components/base/commandPalette.helpers.spec.js CONTEXT.md && git commit -m "功能：统一管理端导航与壳层偏好"`
+Commit message: `功能：统一管理端导航与壳层偏好`
 
 ---
 
@@ -580,7 +607,7 @@ Run: `cd admin-web && npm test && npm run build`
 
 Expected: 全部测试和 Vite 构建通过。
 
-Commit: `git add admin-web/src/components/Layout.vue admin-web/src/components/Layout.spec.js && git commit -m "样式：升级管理端工作区壳层"`
+Commit message: `样式：升级管理端工作区壳层`
 
 ---
 
@@ -700,7 +727,7 @@ Run: `cd admin-web && npm test -- src/components/base/precisionOpsComponents.spe
 
 Expected: PASS。
 
-Commit: `git add admin-web/src/components/base/MetricStrip.vue admin-web/src/components/base/StatusIndicator.vue admin-web/src/components/base/precisionOpsComponents.spec.js && git commit -m "组件：增加紧凑指标与状态指示"`
+Commit message: `组件：增加紧凑指标与状态指示`
 
 ---
 
@@ -709,13 +736,16 @@ Commit: `git add admin-web/src/components/base/MetricStrip.vue admin-web/src/com
 **Files:**
 - Create: `admin-web/src/components/base/savedView.helpers.js`
 - Create: `admin-web/src/components/base/savedView.helpers.spec.js`
+- Create: `admin-web/src/components/base/useSavedViews.js`
+- Create: `admin-web/src/components/base/useSavedViews.spec.js`
 - Create: `admin-web/src/components/base/SavedViewTabs.vue`
 - Modify: `admin-web/src/components/base/precisionOpsComponents.spec.js`
 
 **Interfaces:**
 - Produces: `SAVED_VIEW_SCHEMA_VERSION = 1`、`CUSTOM_VIEW_ID = 'custom'`。
 - Produces: `snapshotKey(snapshot)`、`parseSavedViewDocument(raw, normalizeSnapshot)`、`serializeSavedViews(items)`、`upsertSavedView(items, view)`、`removeSavedView(items, id)`、`createSavedViewId(now)`。
-- `SavedViewTabs`: props `items`、`activeId`、`editableSourceId`；emits `select`、`save`、`update`、`rename`、`remove`。
+- Produces: `useSavedViews(options)`，统一管理 storage 容错、用户视图、选中来源、自定义态、save/update/rename/remove 和切换后的刷新。
+- `SavedViewTabs`: props `items`、`activeId`、`editableSourceId`；在组件内完成名称 prompt 和删除 confirm 后 emits `select`、`save(label)`、`update(id)`、`rename({ id, label })`、`remove(id)`。
 
 - [ ] **Step 1: 写保存视图红灯测试**
 
@@ -826,13 +856,211 @@ export function createSavedViewId(now = Date.now()) {
 }
 ```
 
-- [ ] **Step 4: 实现 SavedViewTabs 的完整命令面**
+- [ ] **Step 4: 写 composable 红灯测试并确认失败**
 
-组件必须：用 tabs 切换视图；当前快照偏离所选视图时显示临时“自定义”；自定义态可“另存为视图”；来源为用户视图时额外显示“更新视图”；用户视图可重命名和删除；内置视图不可覆盖、重命名或删除。实现以下公开结构：
+创建 `useSavedViews.spec.js`，使用响应式页面快照和内存 storage 验证共享控制器，而不是在两个页面复制状态机：
+
+```js
+import { reactive } from 'vue'
+import { describe, expect, it, vi } from 'vitest'
+import { CUSTOM_VIEW_ID } from './savedView.helpers'
+import { useSavedViews } from './useSavedViews'
+
+const normalize = (snapshot) => ({ q: String(snapshot?.q || '') })
+const builtInViews = [
+  { id: 'builtin-all', label: '全部', builtIn: true, snapshot: normalize({}) }
+]
+
+function createStorage(raw = '') {
+  let value = raw
+  return {
+    getItem: vi.fn(() => value),
+    setItem: vi.fn((_, next) => { value = next })
+  }
+}
+
+describe('useSavedViews', () => {
+  it('owns custom state and the complete saved-view lifecycle', async () => {
+    const page = reactive({ q: '' })
+    const storage = createStorage()
+    const refresh = vi.fn()
+    const controller = useSavedViews({
+      storageKey: 'test-saved-views-v1',
+      builtInViews,
+      normalizeSnapshot: normalize,
+      getCurrentSnapshot: () => page,
+      applySnapshot: (snapshot) => { page.q = snapshot.q },
+      refresh,
+      storage,
+      now: () => 123
+    })
+
+    expect(controller.activeViewId.value).toBe('builtin-all')
+    page.q = '失败'
+    expect(controller.activeViewId.value).toBe(CUSTOM_VIEW_ID)
+    const id = controller.saveView('  失败处理  ')
+    expect(id).toBe('user-123')
+    expect(controller.activeViewId.value).toBe(id)
+    expect(controller.renameView({ id, label: '待处理' })).toBe(true)
+    page.q = ''
+    await controller.selectView(id)
+    expect(page.q).toBe('失败')
+    expect(refresh).toHaveBeenCalledTimes(1)
+    page.q = '重试'
+    expect(controller.updateView(id)).toBe(true)
+    await controller.removeView(id)
+    expect(controller.activeViewId.value).toBe('builtin-all')
+    expect(storage.setItem).toHaveBeenCalled()
+  })
+
+  it('keeps the session usable when storage is unavailable', () => {
+    const storage = {
+      getItem: () => { throw new Error('denied') },
+      setItem: () => { throw new Error('denied') }
+    }
+    const controller = useSavedViews({
+      storageKey: 'test-saved-views-v1',
+      builtInViews,
+      normalizeSnapshot: normalize,
+      getCurrentSnapshot: () => ({ q: '' }),
+      applySnapshot: () => {},
+      storage,
+      now: () => 456
+    })
+    expect(controller.saveView('会话视图')).toBe('user-456')
+    expect(controller.userViews.value).toHaveLength(1)
+  })
+})
+```
+
+Run: `cd admin-web && npm test -- src/components/base/useSavedViews.spec.js`
+
+Expected: FAIL，composable 尚不存在。
+
+- [ ] **Step 5: 实现共享 useSavedViews 控制器**
+
+创建 `useSavedViews.js`。页面必须通过 `getCurrentSnapshot` 提供可追踪快照，通过 `applySnapshot` 负责页面字段、列偏好和选择清理，通过 `refresh` 负责业务加载；composable 不知道任何页面业务字段：
+
+```js
+import { computed, ref } from 'vue'
+import {
+  CUSTOM_VIEW_ID,
+  createSavedViewId,
+  parseSavedViewDocument,
+  removeSavedView as removeSavedViewItem,
+  serializeSavedViews,
+  snapshotKey,
+  upsertSavedView
+} from './savedView.helpers'
+
+function resolveStorage(storage) {
+  if (storage !== undefined) return storage
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage
+  } catch (_) {
+    return null
+  }
+}
+
+export function useSavedViews({
+  storageKey,
+  builtInViews,
+  normalizeSnapshot,
+  getCurrentSnapshot,
+  applySnapshot,
+  refresh = () => {},
+  storage,
+  now = Date.now
+}) {
+  const targetStorage = resolveStorage(storage)
+  const defaultView = builtInViews[0] || null
+  let initialViews = []
+  try {
+    initialViews = parseSavedViewDocument(targetStorage?.getItem(storageKey), normalizeSnapshot)
+  } catch (_) {}
+
+  const userViews = ref(initialViews)
+  const selectedViewId = ref(defaultView?.id || '')
+  const availableViews = computed(() => [...builtInViews, ...userViews.value])
+  const selectedView = computed(() => availableViews.value.find((item) => item.id === selectedViewId.value) || defaultView)
+  const currentSnapshot = computed(() => normalizeSnapshot(getCurrentSnapshot()))
+  const activeViewId = computed(() => selectedView.value && snapshotKey(currentSnapshot.value) === snapshotKey(normalizeSnapshot(selectedView.value.snapshot))
+    ? selectedView.value.id
+    : CUSTOM_VIEW_ID)
+  const editableSourceId = computed(() => selectedView.value && !selectedView.value.builtIn ? selectedView.value.id : '')
+
+  function persist() {
+    try {
+      targetStorage?.setItem(storageKey, serializeSavedViews(userViews.value))
+    } catch (_) {}
+  }
+
+  async function selectView(id) {
+    const view = availableViews.value.find((item) => item.id === id)
+    if (!view) return false
+    selectedViewId.value = view.id
+    applySnapshot(normalizeSnapshot(view.snapshot))
+    await refresh()
+    return true
+  }
+
+  function saveView(label) {
+    const normalizedLabel = String(label || '').trim()
+    if (!normalizedLabel) return null
+    const view = { id: createSavedViewId(now()), label: normalizedLabel, snapshot: currentSnapshot.value }
+    userViews.value = upsertSavedView(userViews.value, view)
+    selectedViewId.value = view.id
+    persist()
+    return view.id
+  }
+
+  function updateView(id) {
+    const source = userViews.value.find((item) => item.id === id)
+    if (!source) return false
+    userViews.value = upsertSavedView(userViews.value, { ...source, snapshot: currentSnapshot.value })
+    selectedViewId.value = id
+    persist()
+    return true
+  }
+
+  function renameView({ id, label }) {
+    const source = userViews.value.find((item) => item.id === id)
+    const normalizedLabel = String(label || '').trim()
+    if (!source || !normalizedLabel) return false
+    userViews.value = upsertSavedView(userViews.value, { ...source, label: normalizedLabel })
+    persist()
+    return true
+  }
+
+  async function removeView(id) {
+    if (!userViews.value.some((item) => item.id === id) || !defaultView) return false
+    userViews.value = removeSavedViewItem(userViews.value, id)
+    persist()
+    return selectView(defaultView.id)
+  }
+
+  return {
+    userViews,
+    availableViews,
+    activeViewId,
+    editableSourceId,
+    selectView,
+    saveView,
+    updateView,
+    renameView,
+    removeView
+  }
+}
+```
+
+- [ ] **Step 6: 实现 SavedViewTabs 的完整命令面**
+
+组件必须：用 tabs 切换视图；当前快照偏离所选视图时显示临时“自定义”；自定义态可“另存为视图”；来源为用户视图时额外显示“更新视图”；用户视图可重命名和删除；内置视图不可覆盖、重命名或删除。名称输入和删除确认只能存在于此组件，页面和 composable 不得调用 `ElMessageBox`：
 
 ```vue
 <script setup>
 import { computed } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { EditPen, MoreFilled, Plus, RefreshRight, Delete } from '@element-plus/icons-vue'
 import { CUSTOM_VIEW_ID } from './savedView.helpers'
 
@@ -847,6 +1075,48 @@ const visibleItems = computed(() => props.activeId === CUSTOM_VIEW_ID
   : props.items)
 const activeItem = computed(() => props.items.find((item) => item.id === props.activeId) || null)
 const editableSource = computed(() => props.items.find((item) => item.id === props.editableSourceId && !item.builtIn) || null)
+
+function isDismissed(error) {
+  return error === 'cancel' || error === 'close'
+}
+
+async function requestSave() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入视图名称', '保存视图', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValidator: (text) => String(text || '').trim() !== '' || '请输入视图名称'
+    })
+    emit('save', String(value).trim())
+  } catch (error) {
+    if (!isDismissed(error)) throw error
+  }
+}
+
+async function requestRename() {
+  if (!activeItem.value || activeItem.value.builtIn) return
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新的视图名称', '重命名视图', {
+      inputValue: activeItem.value.label,
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValidator: (text) => String(text || '').trim() !== '' || '请输入视图名称'
+    })
+    emit('rename', { id: activeItem.value.id, label: String(value).trim() })
+  } catch (error) {
+    if (!isDismissed(error)) throw error
+  }
+}
+
+async function requestRemove() {
+  if (!activeItem.value || activeItem.value.builtIn) return
+  try {
+    await ElMessageBox.confirm('确认删除这个保存视图？', '删除视图', { type: 'warning' })
+    emit('remove', activeItem.value.id)
+  } catch (error) {
+    if (!isDismissed(error)) throw error
+  }
+}
 </script>
 
 <template>
@@ -855,7 +1125,7 @@ const editableSource = computed(() => props.items.find((item) => item.id === pro
       <el-tab-pane v-for="item in visibleItems" :key="item.id" :name="item.id" :label="item.label" />
     </el-tabs>
     <div class="saved-view-tabs__actions">
-      <el-button v-if="activeId === CUSTOM_VIEW_ID" :icon="Plus" @click="emit('save')">另存为视图</el-button>
+      <el-button v-if="activeId === CUSTOM_VIEW_ID" :icon="Plus" @click="requestSave">另存为视图</el-button>
       <el-button v-if="activeId === CUSTOM_VIEW_ID && editableSource" :icon="RefreshRight" @click="emit('update', editableSource.id)">更新视图</el-button>
       <el-dropdown v-if="activeItem && !activeItem.builtIn" trigger="click">
         <el-tooltip content="视图操作" placement="top">
@@ -863,8 +1133,8 @@ const editableSource = computed(() => props.items.find((item) => item.id === pro
         </el-tooltip>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item :icon="EditPen" @click="emit('rename', activeItem.id)">重命名</el-dropdown-item>
-            <el-dropdown-item :icon="Delete" divided @click="emit('remove', activeItem.id)">删除</el-dropdown-item>
+            <el-dropdown-item :icon="EditPen" @click="requestRename">重命名</el-dropdown-item>
+            <el-dropdown-item :icon="Delete" divided @click="requestRemove">删除</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -889,13 +1159,29 @@ CSS 使用一条下边框和 32px 操作按钮，不添加卡片背景；`<1024p
 </style>
 ```
 
-- [ ] **Step 5: 运行测试并提交**
+- [ ] **Step 7: 运行测试并提交**
 
-Run: `cd admin-web && npm test -- src/components/base/savedView.helpers.spec.js src/components/base/precisionOpsComponents.spec.js`
+在 `precisionOpsComponents.spec.js` 加入：
+
+```js
+const savedViewTabs = readFileSync(new URL('./SavedViewTabs.vue', import.meta.url), 'utf8')
+
+it('owns confirmed saved-view naming and deletion commands', () => {
+  expect(savedViewTabs).toContain("ElMessageBox.prompt('请输入视图名称'")
+  expect(savedViewTabs).toContain("ElMessageBox.prompt('请输入新的视图名称'")
+  expect(savedViewTabs).toContain("ElMessageBox.confirm('确认删除这个保存视图？'")
+  expect(savedViewTabs).toContain("emit('save', String(value).trim())")
+  expect(savedViewTabs).toContain("emit('rename', { id: activeItem.value.id, label: String(value).trim() })")
+  expect(savedViewTabs).toContain("emit('remove', activeItem.value.id)")
+  expect(savedViewTabs).not.toContain('localStorage')
+})
+```
+
+Run: `cd admin-web && npm test -- src/components/base/savedView.helpers.spec.js src/components/base/useSavedViews.spec.js src/components/base/precisionOpsComponents.spec.js`
 
 Expected: PASS。
 
-Commit: `git add admin-web/src/components/base/savedView.helpers.js admin-web/src/components/base/savedView.helpers.spec.js admin-web/src/components/base/SavedViewTabs.vue admin-web/src/components/base/precisionOpsComponents.spec.js && git commit -m "功能：增加集合保存视图基础能力"`
+Commit message: `功能：增加集合保存视图基础能力`
 
 ---
 
@@ -1093,7 +1379,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/dashboard.helpers.js admin-web/src/views/dashboard.helpers.spec.js admin-web/src/views/dashboardPage.spec.js admin-web/src/views/Dashboard.vue admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级管理端仪表盘"`
+Commit message: `样式：升级管理端仪表盘`
 
 ---
 
@@ -1119,21 +1405,27 @@ it('removes the mixed-scope success rate and labels every summary scope', () => 
   expect(taskMonitor).not.toContain('<StatCard')
   expect(taskMonitor).toContain("label: '任务总量'")
   expect(taskMonitor).toContain("scope: '全局'")
+  expect(taskMonitor).toContain("scope: query.status ? '当前筛选·全部页' : '全局'")
   expect(taskMonitor).toContain("label: '排队'")
   expect(taskMonitor).toContain("scope: '本页'")
 })
 
 it('keeps existing rows visible during background refresh', () => {
-  expect(taskMonitor).toContain('const initialLoading = computed(() => loading.value && list.value.length === 0)')
-  expect(taskMonitor).toContain('const backgroundRefreshing = computed(() => loading.value && list.value.length > 0)')
+  expect(taskMonitor).toContain('const initialLoading = computed(() => loading.value && !loaded.value)')
+  expect(taskMonitor).toContain('const backgroundRefreshing = computed(() => loading.value && loaded.value)')
+  expect(taskMonitor).toContain('if (seq === loadSeq) loaded.value = true')
   expect(taskMonitor).not.toContain('<el-table v-loading="loading"')
+  expect(taskMonitor).not.toContain('if (hadRows) ElMessage.error')
+  expect(taskMonitor).toContain("loadError.value = error?.message || '加载任务失败'")
 })
 
 it('offers all five status filters and compact task rows', () => {
   expect(taskMonitor).toContain("{ label: '已完成', value: 'success' }")
   expect(taskMonitor).toContain('data-density="monitor"')
   expect(taskMonitor).toContain(':stroke-width="6"')
-  expect(taskMonitor).toContain('show-overflow-tooltip')
+  expect(taskMonitor).toContain('class="task-error"')
+  expect(taskMonitor).toContain('tabindex="0"')
+  expect(taskMonitor).toContain(':aria-label="row.error || \'无错误\'"')
 })
 ```
 
@@ -1148,9 +1440,10 @@ Expected: FAIL，页面仍计算成功率、使用 4 张卡并用全表 loading 
 删除 `PageHeader`、`StatCard` import，新增 `../components/base/MetricStrip.vue` 和 `../components/base/StatusIndicator.vue` import。删除 `successCount` 和 `successRate`，增加：
 
 ```js
+const loaded = ref(false)
 const loadError = ref('')
-const initialLoading = computed(() => loading.value && list.value.length === 0)
-const backgroundRefreshing = computed(() => loading.value && list.value.length > 0)
+const initialLoading = computed(() => loading.value && !loaded.value)
+const backgroundRefreshing = computed(() => loading.value && loaded.value)
 const hasStatusFilter = computed(() => query.status !== '')
 const statusOptions = [
   { label: '全部', value: '' },
@@ -1160,7 +1453,7 @@ const statusOptions = [
   { label: '失败', value: 'failed' }
 ]
 const summaryMetrics = computed(() => [
-  { key: 'total', label: '任务总量', value: total.value, scope: '全局' },
+  { key: 'total', label: '任务总量', value: total.value, scope: query.status ? '当前筛选·全部页' : '全局' },
   { key: 'queued', label: '排队', value: queuedCount.value, scope: '本页', tone: 'info' },
   { key: 'running', label: '处理中', value: runningCount.value, scope: '本页', tone: 'warning' },
   { key: 'failed', label: '失败', value: failedCount.value, scope: '本页', tone: 'danger' }
@@ -1178,7 +1471,6 @@ async function load(options = {}) {
   const { skipIfLoading = false } = options
   if (skipIfLoading && loading.value) return
   const seq = ++loadSeq
-  const hadRows = list.value.length > 0
   loading.value = true
   loadError.value = ''
   try {
@@ -1190,16 +1482,17 @@ async function load(options = {}) {
     total.value = data.total_count || 0
   } catch (error) {
     if (seq !== loadSeq) return
-    const message = error?.message || '加载任务失败'
-    if (hadRows) ElMessage.error(message)
-    else loadError.value = message
+    loadError.value = error?.message || '加载任务失败'
   } finally {
-    if (seq === loadSeq) loading.value = false
+    if (seq === loadSeq) {
+      loaded.value = true
+      loading.value = false
+    }
   }
 }
 ```
 
-上述 `load` 继续使用 `loadSeq`，不会让旧请求覆盖新结果；后台失败保留已有列表，首次失败显示内容区错误。
+上述 `load` 继续使用 `loadSeq`，不会让旧请求覆盖新结果；`loaded` 只由最新请求在 finally 置为 true，因此首次成功为空后自动刷新仍保留空态而不反复切回骨架。首次和后台刷新失败都写入 `loadError`，已有列表继续在错误提示下方渲染，不能只用瞬时 toast。API 的 `total_count` 会随状态筛选变化，因此筛选时范围必须显示“当前筛选·全部页”，不能误称全局。
 
 - [ ] **Step 4: 改造模板、状态和错误单元格**
 
@@ -1254,7 +1547,13 @@ async function load(options = {}) {
           <el-table-column label="剩余时间" width="112"><template #default="{ row }">{{ formatRemaining(row) }}</template></el-table-column>
           <el-table-column label="已耗时" width="112"><template #default="{ row }">{{ formatElapsed(row) }}</template></el-table-column>
           <el-table-column prop="retry_count" label="重试" width="72" />
-          <el-table-column prop="error" label="错误" min-width="220" show-overflow-tooltip />
+          <el-table-column prop="error" label="错误" min-width="220">
+            <template #default="{ row }">
+              <el-tooltip :content="row.error || '无错误'" placement="top">
+                <span class="task-error" tabindex="0" :aria-label="row.error || '无错误'">{{ row.error || '--' }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
           <el-table-column label="开始时间" width="168"><template #default="{ row }">{{ formatDateTime(row.started_at) }}</template></el-table-column>
           <el-table-column label="进度更新时间" width="168"><template #default="{ row }">{{ formatDateTime(row.progress_updated_at) }}</template></el-table-column>
         </el-table>
@@ -1264,7 +1563,7 @@ async function load(options = {}) {
 </Layout>
 ```
 
-实施时把注释位置替换为现有完整任务、状态、进度、剩余时间、已耗时、重试、开始时间和进度更新时间列，不删除任何列。状态列使用 `StatusIndicator`；任务标题与 ID 保持两行，行高 44px；错误列单行省略并支持 hover/focus 读取完整内容。
+实施时保留现有完整任务、状态、进度、剩余时间、已耗时、重试、开始时间和进度更新时间列，不删除任何列。状态列使用 `StatusIndicator`；任务标题与 ID 保持两行，行高 44px；`.task-error` 使用 `display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap`，tooltip 提供 hover 全文，`tabindex` 与 `aria-label` 提供键盘焦点和完整可访问名称。
 
 - [ ] **Step 5: 移除路由 meta、运行测试并提交**
 
@@ -1282,7 +1581,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/TaskMonitor.vue admin-web/src/views/taskMonitorPage.spec.js admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级任务监控信息层级"`
+Commit message: `样式：升级任务监控信息层级`
 
 ---
 
@@ -1298,7 +1597,7 @@ Commit: `git add admin-web/src/views/TaskMonitor.vue admin-web/src/views/taskMon
 - Modify: `CONTEXT.md`
 
 **Interfaces:**
-- Consumes: `SavedViewTabs`、`StatusIndicator`、Task 5 保存视图 helper、Layout `header-actions`。
+- Consumes: `SavedViewTabs`、`StatusIndicator`、Task 5 `useSavedViews`、Layout `header-actions`。
 - Produces: `createVideoBuiltInViews(defaultColumns)`、`normalizeVideoViewSnapshot(snapshot, allowedColumns, defaultColumns)`。
 - Storage: `admin-videolist-saved-views-v1`，文档 `{ version: 1, items }`；继续同步现有 `admin-videolist-columns`。
 - Preserves: Shift 当前页区间选择、批量编辑/删除、1280px 次要列隐藏、560px Drawer、字幕和脏数据守卫。
@@ -1334,9 +1633,12 @@ const source = readFileSync(new URL('./VideoList.vue', import.meta.url), 'utf8')
 describe('Precision Ops video list', () => {
   it('uses saved views and the merged workspace header', () => {
     expect(source).toContain('admin-videolist-saved-views-v1')
+    expect(source).toContain('useSavedViews')
     expect(source).toContain('<SavedViewTabs')
     expect(source).toContain('<template #header-actions>')
     expect(source).not.toContain('<PageHeader')
+    expect(source).not.toContain('function persistUserViews')
+    expect(source).not.toContain("ElMessageBox.prompt('请输入视图名称'")
   })
 
   it('keeps detail visible and moves low-frequency actions into a menu', () => {
@@ -1352,6 +1654,7 @@ describe('Precision Ops video list', () => {
     expect(source).toContain('has-media-rows')
     expect(source).toContain('width: 72px')
     expect(source).toContain('height: 40px')
+    expect(source).not.toMatch(/rgba?\(\s*\d/)
   })
 })
 ```
@@ -1390,9 +1693,9 @@ export function createVideoBuiltInViews(defaultColumns) {
 }
 ```
 
-- [ ] **Step 4: 接入版本化保存视图状态**
+- [ ] **Step 4: 通过 useSavedViews 接入版本化保存视图**
 
-在 `VideoList.vue` 的列常量之后增加以下状态和完整操作；`prompt` 的输入校验为去空格后非空：
+在 `VideoList.vue` 的查询、列状态和列常量就绪后实例化共享 composable。页面只定义 storage key、内置视图、快照规范、应用快照和刷新；名称输入、删除确认、storage 解析、选中态、自定义态和 CRUD 生命周期不得在页面重复实现：
 
 ```js
 const SAVED_VIEWS_KEY = 'admin-videolist-saved-views-v1'
@@ -1400,110 +1703,42 @@ const listError = ref('')
 const hasActiveFilters = computed(() => String(query.q || '').trim() !== '' || query.type !== '' || query.status !== '')
 const allowedColumnKeys = ALL_COLUMNS.map((item) => item.key)
 const builtInViews = createVideoBuiltInViews(DEFAULT_VISIBLE_COLUMNS)
-const userViews = ref(readUserViews())
-const selectedViewID = ref('builtin-all')
-const availableViews = computed(() => [...builtInViews, ...userViews.value])
-const currentViewSnapshot = computed(() => normalizeVideoViewSnapshot({
-  q: query.q,
-  type: query.type,
-  status: query.status,
-  columns: columnVisibility.value
-}, allowedColumnKeys, DEFAULT_VISIBLE_COLUMNS))
-const selectedView = computed(() => availableViews.value.find((item) => item.id === selectedViewID.value) || builtInViews[0])
-const activeViewID = computed(() => snapshotKey(currentViewSnapshot.value) === snapshotKey(selectedView.value.snapshot)
-  ? selectedView.value.id
-  : CUSTOM_VIEW_ID)
-const editableSourceID = computed(() => selectedView.value.builtIn ? '' : selectedView.value.id)
 
-function readUserViews() {
-  if (typeof window === 'undefined') return []
-  try {
-    return parseSavedViewDocument(
-      window.localStorage.getItem(SAVED_VIEWS_KEY),
-      (snapshot) => normalizeVideoViewSnapshot(snapshot, allowedColumnKeys, DEFAULT_VISIBLE_COLUMNS)
-    )
-  } catch (_) {
-    return []
-  }
-}
-
-function persistUserViews() {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(SAVED_VIEWS_KEY, serializeSavedViews(userViews.value))
-  } catch (_) {}
-}
-
-function applySavedView(id) {
-  const view = availableViews.value.find((item) => item.id === id)
-  if (!view) return
-  selectedViewID.value = view.id
-  query.q = view.snapshot.q
-  query.type = view.snapshot.type
-  query.status = view.snapshot.status
-  query.page = 1
-  columnVisibility.value = [...view.snapshot.columns]
-  persistColumns()
-  clearSelection()
-  load()
-}
-
-function isViewDialogDismiss(error) {
-  return error === 'cancel' || error === 'close'
-}
-
-async function saveCurrentView() {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入视图名称', '保存视图', {
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputValidator: (text) => String(text || '').trim() !== '' || '请输入视图名称'
-    })
-    const view = { id: createSavedViewId(), label: String(value).trim(), snapshot: currentViewSnapshot.value }
-    userViews.value = upsertSavedView(userViews.value, view)
-    selectedViewID.value = view.id
-    persistUserViews()
-  } catch (error) {
-    if (!isViewDialogDismiss(error)) throw error
-  }
-}
-
-function updateSavedView(id) {
-  const source = userViews.value.find((item) => item.id === id)
-  if (!source) return
-  userViews.value = upsertSavedView(userViews.value, { ...source, snapshot: currentViewSnapshot.value })
-  selectedViewID.value = id
-  persistUserViews()
-}
-
-async function renameSavedView(id) {
-  const source = userViews.value.find((item) => item.id === id)
-  if (!source) return
-  try {
-    const { value } = await ElMessageBox.prompt('请输入新的视图名称', '重命名视图', {
-      inputValue: source.label,
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputValidator: (text) => String(text || '').trim() !== '' || '请输入视图名称'
-    })
-    userViews.value = upsertSavedView(userViews.value, { ...source, label: String(value).trim() })
-    persistUserViews()
-  } catch (error) {
-    if (!isViewDialogDismiss(error)) throw error
-  }
-}
-
-async function removeSavedViewByID(id) {
-  try {
-    await ElMessageBox.confirm('确认删除这个保存视图？', '删除视图', { type: 'warning' })
-    userViews.value = removeSavedView(userViews.value, id)
-    selectedViewID.value = 'builtin-all'
-    persistUserViews()
-    applySavedView('builtin-all')
-  } catch (error) {
-    if (!isViewDialogDismiss(error)) throw error
-  }
-}
+const {
+  availableViews,
+  activeViewId,
+  editableSourceId,
+  selectView,
+  saveView,
+  updateView,
+  renameView,
+  removeView
+} = useSavedViews({
+  storageKey: SAVED_VIEWS_KEY,
+  builtInViews,
+  normalizeSnapshot: (snapshot) => normalizeVideoViewSnapshot(
+    snapshot,
+    allowedColumnKeys,
+    DEFAULT_VISIBLE_COLUMNS
+  ),
+  getCurrentSnapshot: () => ({
+    q: query.q,
+    type: query.type,
+    status: query.status,
+    columns: columnVisibility.value
+  }),
+  applySnapshot: (snapshot) => {
+    const next = normalizeVideoViewSnapshot(snapshot, allowedColumnKeys, DEFAULT_VISIBLE_COLUMNS)
+    query.q = next.q
+    query.type = next.type
+    query.status = next.status
+    query.page = 1
+    columnVisibility.value = [...next.columns]
+    persistColumns()
+    clearSelection()
+  },
+  refresh: load
+})
 
 function videoStatusTone(status) {
   return getVideoStatusMeta(status).tagType || 'neutral'
@@ -1525,8 +1760,7 @@ async function load() {
 }
 ```
 
-从 Task 5 导入 `CUSTOM_VIEW_ID`、`createSavedViewId`、`parseSavedViewDocument`、`removeSavedView`、`serializeSavedViews`、`snapshotKey`、`upsertSavedView`；同时导入 `SavedViewTabs.vue` 和 `StatusIndicator.vue`，删除 `PageHeader` import。切换保存视图必须调用现有 `clearSelection()`；页码、选择和 Drawer 状态不得进入快照。
-
+从 Task 5 只导入 `useSavedViews`，同时导入 `SavedViewTabs.vue` 和 `StatusIndicator.vue`，删除 `PageHeader` import。页面不得导入保存视图 helper，不得出现 `readUserViews`、`persistUserViews`、`selectedViewID` 或保存视图专用 `ElMessageBox.prompt/confirm`。切换保存视图通过 `applySnapshot` 调用现有 `clearSelection()`；页码、选择和 Drawer 状态不得进入快照。
 - [ ] **Step 5: 重组集合工具条、加载状态和行操作**
 
 页面根容器增加 `data-density="compact"`，移除 `PageHeader`。在 Layout 头部放列设置和上传入口，在集合区依次放保存视图、搜索/筛选工具条、表格、分页和批量条：
@@ -1545,13 +1779,13 @@ async function load() {
   <div class="page-shell video-list-page" data-density="compact">
     <SavedViewTabs
       :items="availableViews"
-      :active-id="activeViewID"
-      :editable-source-id="editableSourceID"
-      @select="applySavedView"
-      @save="saveCurrentView"
-      @update="updateSavedView"
-      @rename="renameSavedView"
-      @remove="removeSavedViewByID"
+      :active-id="activeViewId"
+      :editable-source-id="editableSourceId"
+      @select="selectView"
+      @save="saveView"
+      @update="updateView"
+      @rename="renameView"
+      @remove="removeView"
     />
     <Toolbar dense>
       <template #filters>
@@ -1647,13 +1881,13 @@ async function load() {
 </Layout>
 ```
 
-CSS 固定 `.video-cover-cell` 和 `.video-cover-image` 为 `72px × 40px`，媒体行由 `.has-media-rows` 使用 52px token。详情 Drawer 保持 560px/窄屏 100%、现有脏数据确认和固定 footer；只用分组标题、预览层级和间距整理，不改保存 payload。
+CSS 固定 `.video-cover-cell` 和 `.video-cover-image` 为 `72px × 40px`，媒体行由 `.has-media-rows` 使用 52px token；现有直接数字 `rgba(...)` 状态底色改为对应语义 token 的 `color-mix(...)`。详情 Drawer 保持 560px/窄屏 100%、现有脏数据确认和固定 footer；只用分组标题、预览层级和间距整理，不改保存 payload。
 
 - [ ] **Step 6: 移除路由 meta、记录 key、验证并提交**
 
 把路由改为 `{ path: '/videos', component: VideoList }`。在 `CONTEXT.md` 的保存视图术语补充两个 key 及同步规则：`admin-videolist-saved-views-v1` 保存版本化视图，应用视图时同步 `admin-videolist-columns`；手动改列只进入“自定义”，显式更新后才覆盖快照。
 
-Run: `cd admin-web && npm test -- src/views/videoList.helpers.spec.js src/views/videoListPage.spec.js src/components/base/savedView.helpers.spec.js src/router/index.spec.js`
+Run: `cd admin-web && npm test -- src/views/videoList.helpers.spec.js src/views/videoListPage.spec.js src/components/base/savedView.helpers.spec.js src/components/base/useSavedViews.spec.js src/router/index.spec.js`
 
 Expected: PASS。
 
@@ -1661,7 +1895,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/videoList.helpers.js admin-web/src/views/videoList.helpers.spec.js admin-web/src/views/videoListPage.spec.js admin-web/src/views/VideoList.vue admin-web/src/router/index.js admin-web/src/router/index.spec.js CONTEXT.md && git commit -m "样式：升级视频资源集合页"`
+Commit message: `样式：升级视频资源集合页`
 
 ---
 
@@ -1677,7 +1911,8 @@ Commit: `git add admin-web/src/views/videoList.helpers.js admin-web/src/views/vi
 - Modify: `CONTEXT.md`
 
 **Interfaces:**
-- Produces: `createImageBuiltInViews()`、`normalizeImageViewSnapshot(snapshot)`。
+- Consumes: `SavedViewTabs`、`MetricStrip`、`StatusIndicator`、Task 5 `useSavedViews`、Layout `header-actions`。
+- Produces: `DEFAULT_IMAGE_ACTIVE = '1'`、`createImageBuiltInViews(defaultActive, defaultViewMode)`、`normalizeImageViewSnapshot(snapshot)`、`hasImageActiveFilters(snapshot)`。
 - Storage: `admin-imagemanage-saved-views-v1`；应用视图时同步既有 `admin-imagemanage-view`。
 - Preserves: 上传队列、秒传预检、批量启停/删除、详情/上传脏数据守卫、560px Drawer、路由 query 打开详情。
 
@@ -1685,16 +1920,30 @@ Commit: `git add admin-web/src/views/videoList.helpers.js admin-web/src/views/vi
 
 ```js
 import { describe, expect, it } from 'vitest'
-import { createImageBuiltInViews, normalizeImageViewSnapshot } from './imageManage.helpers'
+import {
+  DEFAULT_IMAGE_ACTIVE,
+  createImageBuiltInViews,
+  hasImageActiveFilters,
+  normalizeImageViewSnapshot
+} from './imageManage.helpers'
 
 describe('image manage view helpers', () => {
   it('builds supported built-ins and excludes page state', () => {
-    expect(createImageBuiltInViews().map((item) => [item.label, item.snapshot.status])).toEqual([
-      ['全部图片', ''], ['可用', 'ready'], ['失败', 'failed']
+    expect(createImageBuiltInViews(DEFAULT_IMAGE_ACTIVE, 'list').map((item) => [item.label, item.snapshot.status, item.snapshot.active, item.snapshot.viewMode])).toEqual([
+      ['全部图片', '', '1', 'list'],
+      ['可用', 'ready', '1', 'list'],
+      ['失败', 'failed', '1', 'list']
     ])
     expect(normalizeImageViewSnapshot({ q: 'A', status: 'ready', active: '0', actor_id: 'a', collection_id: 'c', viewMode: 'list', page: 4 })).toEqual({
       q: 'A', status: 'ready', active: '0', actor_id: 'a', collection_id: 'c', viewMode: 'list'
     })
+  })
+
+  it('treats the existing active default as baseline instead of a user filter', () => {
+    const baseline = { q: '', status: '', active: DEFAULT_IMAGE_ACTIVE, actor_id: '', collection_id: '' }
+    expect(hasImageActiveFilters(baseline)).toBe(false)
+    expect(hasImageActiveFilters({ ...baseline, active: '0' })).toBe(true)
+    expect(hasImageActiveFilters({ ...baseline, active: '' })).toBe(true)
   })
 })
 ```
@@ -1708,14 +1957,20 @@ const source = readFileSync(new URL('./ImageManage.vue', import.meta.url), 'utf8
 describe('Precision Ops image manage', () => {
   it('uses saved views, metrics and workspace actions', () => {
     expect(source).toContain('admin-imagemanage-saved-views-v1')
+    expect(source).toContain('useSavedViews')
     expect(source).toContain('<SavedViewTabs')
     expect(source).toContain('<MetricStrip')
     expect(source).toContain('<template #header-actions>')
     expect(source).not.toContain('<PageHeader')
+    expect(source).not.toContain('function persistUserViews')
+    expect(source).not.toContain("ElMessageBox.prompt('请输入视图名称'")
+    expect(source).toContain("label: '结果总数'")
+    expect(source).toContain("scope: '当前条件·全部页'")
   })
 
   it('keeps asset controls visible and preserves full images', () => {
     expect(source).toContain('aria-label="图片操作"')
+    expect(source).toContain(':aria-label="`选择图片：${item.title || item.id}`"')
     expect(source).toContain('minmax(184px, 1fr)')
     expect(source).toContain('object-fit: contain')
     expect(source).not.toMatch(/image-grid-card__actions[\s\S]{0,160}opacity:\s*0/)
@@ -1732,6 +1987,8 @@ Expected: FAIL，helper 不存在，网格仍为 220px 且操作只在 hover 后
 - [ ] **Step 3: 实现图片视图纯函数**
 
 ```js
+export const DEFAULT_IMAGE_ACTIVE = '1'
+
 export function normalizeImageViewSnapshot(snapshot) {
   return {
     q: String(snapshot?.q || ''),
@@ -1743,58 +2000,60 @@ export function normalizeImageViewSnapshot(snapshot) {
   }
 }
 
-export function createImageBuiltInViews() {
-  const snapshot = (status) => normalizeImageViewSnapshot({ status, active: '', viewMode: 'grid' })
+export function createImageBuiltInViews(defaultActive = DEFAULT_IMAGE_ACTIVE, defaultViewMode = 'grid') {
+  const snapshot = (status) => normalizeImageViewSnapshot({
+    status,
+    active: defaultActive,
+    viewMode: defaultViewMode
+  })
   return [
     { id: 'builtin-all', label: '全部图片', builtIn: true, snapshot: snapshot('') },
     { id: 'builtin-ready', label: '可用', builtIn: true, snapshot: snapshot('ready') },
     { id: 'builtin-failed', label: '失败', builtIn: true, snapshot: snapshot('failed') }
   ]
 }
+
+export function hasImageActiveFilters(snapshot) {
+  return String(snapshot?.q || '').trim() !== ''
+    || String(snapshot?.status || '') !== ''
+    || String(snapshot?.active) !== DEFAULT_IMAGE_ACTIVE
+    || String(snapshot?.actor_id || '') !== ''
+    || String(snapshot?.collection_id || '') !== ''
+}
 ```
 
-- [ ] **Step 4: 接入保存视图并同步既有网格偏好**
+- [ ] **Step 4: 通过 useSavedViews 接入保存视图并同步既有网格偏好**
 
-把 `query.active` 的初始值改为空字符串，使“全部图片”内置视图与名称一致；空字符串仍使用现有 API 的“不传 active”能力，不增加参数。加入以下完整控制器：
+保留 `query.active` 的现有初始语义，不扩大默认结果集：把查询初始值、`resetFilters` 和 `removeFilter('active')` 的 `'1'` 统一替换为 `DEFAULT_IMAGE_ACTIVE`，并以当前 `active` 和既有 `admin-imagemanage-view` 模式作为内置视图基线。页面只提供 storage key、内置视图、快照规范、应用快照和业务刷新：
 
 ```js
 const SAVED_VIEWS_KEY = 'admin-imagemanage-saved-views-v1'
-const builtInViews = createImageBuiltInViews()
-const userViews = ref(readUserViews())
-const selectedViewID = ref('builtin-all')
-const availableViews = computed(() => [...builtInViews, ...userViews.value])
-const currentViewSnapshot = computed(() => normalizeImageViewSnapshot({
-  q: query.q,
-  status: query.status,
-  active: query.active,
-  actor_id: query.actor_id,
-  collection_id: query.collection_id,
-  viewMode: viewMode.value
-}))
-const selectedView = computed(() => availableViews.value.find((item) => item.id === selectedViewID.value) || builtInViews[0])
-const activeViewID = computed(() => snapshotKey(currentViewSnapshot.value) === snapshotKey(selectedView.value.snapshot)
-  ? selectedView.value.id
-  : CUSTOM_VIEW_ID)
-const editableSourceID = computed(() => selectedView.value.builtIn ? '' : selectedView.value.id)
+const builtInViews = createImageBuiltInViews(query.active, viewMode.value)
 
-function readUserViews() {
-  if (typeof window === 'undefined') return []
-  try {
-    return parseSavedViewDocument(
-      window.localStorage.getItem(SAVED_VIEWS_KEY),
-      normalizeImageViewSnapshot
-    )
-  } catch (_) {
-    return []
-  }
-}
-
-function persistUserViews() {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(SAVED_VIEWS_KEY, serializeSavedViews(userViews.value))
-  } catch (_) {}
-}
+const {
+  availableViews,
+  activeViewId,
+  editableSourceId,
+  selectView,
+  saveView,
+  updateView,
+  renameView,
+  removeView
+} = useSavedViews({
+  storageKey: SAVED_VIEWS_KEY,
+  builtInViews,
+  normalizeSnapshot: normalizeImageViewSnapshot,
+  getCurrentSnapshot: () => ({
+    q: query.q,
+    status: query.status,
+    active: query.active,
+    actor_id: query.actor_id,
+    collection_id: query.collection_id,
+    viewMode: viewMode.value
+  }),
+  applySnapshot: applyImageViewSnapshot,
+  refresh: load
+})
 
 function applyImageViewSnapshot(snapshot) {
   const next = normalizeImageViewSnapshot(snapshot)
@@ -1807,74 +2066,9 @@ function applyImageViewSnapshot(snapshot) {
   setViewMode(next.viewMode)
   clearImageSelection()
 }
-
-function applySavedView(id) {
-  const view = availableViews.value.find((item) => item.id === id)
-  if (!view) return
-  selectedViewID.value = view.id
-  applyImageViewSnapshot(view.snapshot)
-  load()
-}
-
-function isViewDialogDismiss(error) {
-  return error === 'cancel' || error === 'close'
-}
-
-async function saveCurrentView() {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入视图名称', '保存视图', {
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputValidator: (text) => String(text || '').trim() !== '' || '请输入视图名称'
-    })
-    const view = { id: createSavedViewId(), label: String(value).trim(), snapshot: { ...currentViewSnapshot.value } }
-    userViews.value = upsertSavedView(userViews.value, view)
-    selectedViewID.value = view.id
-    persistUserViews()
-  } catch (error) {
-    if (!isViewDialogDismiss(error)) throw error
-  }
-}
-
-function updateSavedView(id) {
-  const source = userViews.value.find((item) => item.id === id)
-  if (!source) return
-  userViews.value = upsertSavedView(userViews.value, { ...source, snapshot: { ...currentViewSnapshot.value } })
-  selectedViewID.value = id
-  persistUserViews()
-}
-
-async function renameSavedView(id) {
-  const source = userViews.value.find((item) => item.id === id)
-  if (!source) return
-  try {
-    const { value } = await ElMessageBox.prompt('请输入新的视图名称', '重命名视图', {
-      inputValue: source.label,
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputValidator: (text) => String(text || '').trim() !== '' || '请输入视图名称'
-    })
-    userViews.value = upsertSavedView(userViews.value, { ...source, label: String(value).trim() })
-    persistUserViews()
-  } catch (error) {
-    if (!isViewDialogDismiss(error)) throw error
-  }
-}
-
-async function removeSavedViewByID(id) {
-  try {
-    await ElMessageBox.confirm('确认删除这个保存视图？', '删除视图', { type: 'warning' })
-    userViews.value = removeSavedView(userViews.value, id)
-    selectedViewID.value = 'builtin-all'
-    persistUserViews()
-    applySavedView('builtin-all')
-  } catch (error) {
-    if (!isViewDialogDismiss(error)) throw error
-  }
-}
 ```
 
-从 Task 5 导入 `CUSTOM_VIEW_ID`、`createSavedViewId`、`parseSavedViewDocument`、`removeSavedView`、`serializeSavedViews`、`snapshotKey`、`upsertSavedView`；导入 `SavedViewTabs.vue`、`MetricStrip.vue`、`StatusIndicator.vue`，在 Element 图标 import 中加入 `MoreFilled`，并删除 `PageHeader` import。`setViewMode` 继续写 `admin-imagemanage-view`。手动切换网格/列表只改变当前快照并使 tab 进入“自定义”；只有用户触发保存或更新时才写 `admin-imagemanage-saved-views-v1`。
+从 Task 5 只导入 `useSavedViews`；导入 `SavedViewTabs.vue`、`MetricStrip.vue`、`StatusIndicator.vue`，在 Element 图标 import 中加入 `MoreFilled`，并删除 `PageHeader` import。页面不得导入保存视图 helper，不得出现 `readUserViews`、`persistUserViews`、`selectedViewID` 或保存视图专用 `ElMessageBox.prompt/confirm`。`setViewMode` 继续写 `admin-imagemanage-view`。手动切换网格/列表只改变当前快照并使 tab 进入“自定义”；只有用户触发保存或更新时才由 composable 写 `admin-imagemanage-saved-views-v1`。
 
 - [ ] **Step 5: 重组指标、工具条、空态和资产卡操作**
 
@@ -1882,7 +2076,7 @@ async function removeSavedViewByID(id) {
 
 ```js
 const listError = ref('')
-const hasActiveFilters = computed(() => String(query.q || '').trim() !== '' || query.status !== '' || query.active !== '' || query.actor_id !== '' || query.collection_id !== '')
+const hasActiveFilters = computed(() => hasImageActiveFilters(query))
 
 async function load() {
   loading.value = true
@@ -1904,7 +2098,7 @@ async function load() {
 
 ```js
 const summaryMetrics = computed(() => [
-  { key: 'total', label: '总图片数', value: total.value, scope: '全局' },
+  { key: 'total', label: '结果总数', value: total.value, scope: '当前条件·全部页' },
   { key: 'ready', label: '可用', value: readyCount.value, scope: '本页', tone: 'success' },
   { key: 'failed', label: '失败', value: failedCount.value, scope: '本页', tone: 'danger' },
   { key: 'inactive', label: '停用', value: inactiveCount.value, scope: '本页', tone: 'warning' }
@@ -1921,13 +2115,13 @@ const summaryMetrics = computed(() => [
   <div class="page-shell image-page" data-density="compact">
     <SavedViewTabs
       :items="availableViews"
-      :active-id="activeViewID"
-      :editable-source-id="editableSourceID"
-      @select="applySavedView"
-      @save="saveCurrentView"
-      @update="updateSavedView"
-      @rename="renameSavedView"
-      @remove="removeSavedViewByID"
+      :active-id="activeViewId"
+      :editable-source-id="editableSourceId"
+      @select="selectView"
+      @save="saveView"
+      @update="updateView"
+      @rename="renameView"
+      @remove="removeView"
     />
     <MetricStrip :items="summaryMetrics" aria-label="图片摘要" />
     <Toolbar dense>
@@ -1959,7 +2153,7 @@ const summaryMetrics = computed(() => [
       </EmptyState>
       <div v-else-if="viewMode === 'grid'" class="image-grid">
         <article v-for="item in list" :key="item.id" class="image-grid-card" :class="{ 'is-selected': isGridSelected(item) }">
-          <el-checkbox class="image-grid-card__select" :model-value="isGridSelected(item)" @update:model-value="(checked) => toggleGridSelection(item, checked)" />
+          <el-checkbox class="image-grid-card__select" :aria-label="`选择图片：${item.title || item.id}`" :model-value="isGridSelected(item)" @update:model-value="(checked) => toggleGridSelection(item, checked)" />
           <div class="image-grid-card__preview">
             <img v-if="item.view_url || item.url || item.thumbnail_url" :src="item.view_url || item.url || item.thumbnail_url" :alt="item.title || '图片预览'" />
             <span v-else>{{ item.title || '图片' }}</span>
@@ -2024,7 +2218,7 @@ const summaryMetrics = computed(() => [
 
 把路由改为 `{ path: '/images', component: ImageManage }`。在 `CONTEXT.md` 记录 `admin-imagemanage-saved-views-v1` 与 `admin-imagemanage-view` 的同步关系，以及手动模式切换不静默覆盖保存视图。
 
-Run: `cd admin-web && npm test -- src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js src/components/base/savedView.helpers.spec.js src/router/index.spec.js`
+Run: `cd admin-web && npm test -- src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js src/components/base/savedView.helpers.spec.js src/components/base/useSavedViews.spec.js src/router/index.spec.js`
 
 Expected: PASS。
 
@@ -2032,7 +2226,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/imageManage.helpers.js admin-web/src/views/imageManage.helpers.spec.js admin-web/src/views/imageManagePage.spec.js admin-web/src/views/ImageManage.vue admin-web/src/router/index.js admin-web/src/router/index.spec.js CONTEXT.md && git commit -m "样式：升级图片资产集合页"`
+Commit message: `样式：升级图片资产集合页`
 
 ---
 
@@ -2053,12 +2247,22 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const readView = (name) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')
+const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf8')
 const migrated = {
   'Dashboard.vue': 'compact',
   'TaskMonitor.vue': 'monitor',
   'VideoList.vue': 'compact',
   'ImageManage.vue': 'compact'
 }
+const pendingShellViews = [
+  'AVManualScrape.vue', 'ActorManage.vue', 'CollectionManage.vue', 'IPTVManage.vue',
+  'ImageCollectionManage.vue', 'PendingDeleteShorts.vue', 'ScrapePreview.vue',
+  'SystemSettings.vue', 'Toolbox.vue', 'TvAppManage.vue', 'TvSeriesManage.vue',
+  'UserManage.vue', 'VideoUpload.vue'
+]
+const compatibilityMeta = (component) => new RegExp(
+  `component:\\s*${component},\\s*meta:\\s*\\{\\s*hideShellPageHeader:\\s*true\\s*\\}`
+)
 
 describe('Precision Ops phase one rollout', () => {
   Object.entries(migrated).forEach(([file, density]) => {
@@ -2067,6 +2271,15 @@ describe('Precision Ops phase one rollout', () => {
       expect(source).toContain('<Layout>')
       expect(source).toContain(`data-density="${density}"`)
       expect(source).not.toContain('<PageHeader')
+      expect(router).not.toMatch(compatibilityMeta(file.replace('.vue', '')))
+    })
+  })
+
+  it('keeps all 13 pending shell pages on the compatibility boundary', () => {
+    expect(pendingShellViews).toHaveLength(13)
+    pendingShellViews.forEach((file) => {
+      expect(readView(file)).toContain('<PageHeader')
+      expect(router).toMatch(compatibilityMeta(file.replace('.vue', '')))
     })
   })
 })
@@ -2103,7 +2316,7 @@ ImageManage 1440×900：至少 5×3 张图片可见，选择与更多操作常�
 
 在 `plan.md` 顶部追加第一阶段完成记录，列出上述 `npm test`、`npm run build` 和四视口结果；若任何浏览器项失败，先修复并重新执行 Step 2-3，不进入阶段二。
 
-Commit: `git add admin-web/src/views/precisionOpsRollout.spec.js plan.md && git commit -m "验证：完成 Precision Ops 第一阶段验收"`
+Commit message: `验证：完成 Precision Ops 第一阶段验收`
 
 ---
 
@@ -2271,7 +2484,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/ActorManage.vue admin-web/src/views/CollectionManage.vue admin-web/src/views/UserManage.vue admin-web/src/views/precisionOpsRollout.spec.js admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级基础资源集合页"`
+Commit message: `样式：升级基础资源集合页`
 
 ---
 
@@ -2301,8 +2514,12 @@ it('keeps media review actions explicit and keyboard reachable', () => {
   const collections = readView('ImageCollectionManage.vue')
   expect(pending).toContain('aria-label="待删除短视频队列"')
   expect(pending).toContain('刷新列表')
+  expect(pending).not.toMatch(/\.pending-delete-queue,\s*\.pending-delete-player-panel\s*\{[^}]*box-shadow:/s)
+  expect(pending).not.toMatch(/\.pending-delete-video-frame\s*\{[^}]*box-shadow:/s)
   expect(collections).toContain('创建合集')
   expect(collections).toContain('<el-drawer')
+  expect(collections).not.toMatch(/border-radius:\s*(?:14|16|18)px/)
+  expect(collections).not.toMatch(/(?:linear|radial)-gradient\(/)
 })
 ```
 
@@ -2321,10 +2538,10 @@ Expected: FAIL，两页仍有自身 `PageHeader` 且未声明紧凑密度。
   </template>
   <div class="page-shell pending-delete-page" data-density="compact">
     <p class="page-context-note">逐条复核手机端加入待删除列表的短视频。</p>
-    <section class="pending-delete-workbench" :class="{ 'is-empty': !hasItems }">
+    <section class="pending-delete-workbench" :class="{ 'is-empty': !hasItems }" aria-label="待删除短视频队列">
 ```
 
-保留现有队列和详情 DOM 顺序、键盘按钮、播放器清理、保留/最终删除函数。把副标题改成内容区单行范围说明；队列项固定紧凑高度，长标题两行省略；操作区不依赖 hover。首次加载使用稳定骨架，读取失败保留页头和重试，队列为空使用真正空态。
+保留现有队列和详情 DOM 顺序、键盘按钮、播放器清理、保留/最终删除函数。把副标题改成内容区单行范围说明；队列项固定紧凑高度，长标题两行省略；操作区不依赖 hover。移除队列、播放器面板和视频框的常驻阴影。首次加载使用稳定骨架，读取失败保留页头和重试，队列为空使用真正空态。
 
 - [ ] **Step 4: 迁移 ImageCollectionManage 壳层和媒体缩略图密度**
 
@@ -2338,7 +2555,7 @@ Expected: FAIL，两页仍有自身 `PageHeader` 且未声明紧凑密度。
 
 保留现有筛选、表格、两个 Drawer 和图片关联操作。表格使用 40px 文字行；图片选择 Drawer 内网格使用 `repeat(auto-fill, minmax(184px, 1fr))`、12px gap、4:3 稳定预览和 `object-fit: contain`。缩略图选择与详情入口始终可见，状态使用 `StatusIndicator`。读取失败、真正空态和筛选零结果使用 Task 11 状态模式。
 
-把该页现有 `color: #fff` 和 `background: #0f172a` 分别替换为 `var(--text-on-inverse)` 与 `var(--bg-inverse)`，不得在视图 CSS 留直接 hex。
+把该页现有 `color: #fff` 和 `background: #0f172a` 分别替换为 `var(--text-on-inverse)` 与 `var(--bg-inverse)`；其它直接 `rgba(...)` 改为语义 token 或 `color-mix(in srgb, <semantic-token> <percentage>, transparent)`。把 14/16/18px 局部圆角全部收敛为 `var(--radius-md)`，把装饰性 `linear-gradient` 替换为对应的 `var(--bg-canvas)`、`var(--bg-inverse)` 或 `var(--bg-surface-muted)` 单色表面。不得在视图 CSS 留直接 hex、直接数字 rgba 或装饰渐变。
 
 - [ ] **Step 5: 移除路由 meta、更新旧路由测试并提交**
 
@@ -2347,7 +2564,14 @@ Expected: FAIL，两页仍有自身 `PageHeader` 且未声明紧凑密度。
 { path: '/image-collections', component: ImageCollectionManage }
 ```
 
-把 `router/index.spec.js` 旧断言从“注册并隐藏壳层重复标题”改为断言 route 行不含 `hideShellPageHeader`，页面不含 `<PageHeader`。
+把 `router/index.spec.js` 旧断言从“注册并隐藏壳层重复标题”替换为以下精确断言：
+
+```js
+expect(routerSource).toContain("{ path: '/short-pending-delete', component: PendingDeleteShorts },")
+expect(routerSource).toContain("{ path: '/image-collections', component: ImageCollectionManage },")
+expect(pendingSource).not.toContain('<PageHeader')
+expect(collectionSource).not.toContain('<PageHeader')
+```
 
 Run: `cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/router/index.spec.js src/views/pendingDeleteShorts.helpers.spec.js src/views/imageCollectionManage.helpers.spec.js`
 
@@ -2357,7 +2581,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/PendingDeleteShorts.vue admin-web/src/views/ImageCollectionManage.vue admin-web/src/views/precisionOpsRollout.spec.js admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级媒体复核集合页"`
+Commit message: `样式：升级媒体复核集合页`
 
 ---
 
@@ -2392,7 +2616,20 @@ it('uses metric strips instead of repeated stat cards on service pages', () => {
 })
 ```
 
-在 `tvAppManagePage.spec.js` 增加工作区页头、紧凑密度和现有业务按钮仍存在的断言。
+在 `tvAppManagePage.spec.js` 增加：
+
+```js
+it('uses the compact workspace without dropping package commands', () => {
+  expect(tvAppManage).toContain('<template #header-actions>')
+  expect(tvAppManage).toContain('data-density="compact"')
+  expect(tvAppManage).not.toContain('<PageHeader')
+  expect(tvAppManage).toContain('@click="uploadAPK(false)"')
+  expect(tvAppManage).toContain("@click=\"confirmAction(row, 'publish')\"")
+  expect(tvAppManage).toContain("@click=\"confirmAction(row, 'offline')\"")
+  expect(tvAppManage).toContain("@click=\"confirmAction(row, 'delete')\"")
+  expect(tvAppManage).toContain('下载 APK')
+})
+```
 
 - [ ] **Step 2: 运行测试并确认按预期失败**
 
@@ -2450,7 +2687,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/IPTVManage.vue admin-web/src/views/TvAppManage.vue admin-web/src/views/tvAppManagePage.spec.js admin-web/src/views/precisionOpsRollout.spec.js admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级服务资源集合页"`
+Commit message: `样式：升级服务资源集合页`
 
 ---
 
@@ -2492,7 +2729,7 @@ Expected: 全部测试和生产构建通过，0 个失败。
 
 在 `plan.md` 顶部追加第二阶段验证记录，列出 7 页、自动命令和四视口结果。任何阻塞项修复并复跑后再提交。
 
-Commit: `git add admin-web/src/views/precisionOpsRollout.spec.js plan.md && git commit -m "验证：完成 Precision Ops 第二阶段验收"`
+Commit message: `验证：完成 Precision Ops 第二阶段验收`
 
 ---
 
@@ -2556,7 +2793,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/VideoUpload.vue admin-web/src/views/precisionOpsRollout.spec.js admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级视频上传工作区"`
+Commit message: `样式：升级视频上传工作区`
 
 ---
 
@@ -2638,7 +2875,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/ScrapePreview.vue admin-web/src/views/AVManualScrape.vue admin-web/src/views/precisionOpsRollout.spec.js admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级媒体刮削工作台"`
+Commit message: `样式：升级媒体刮削工作台`
 
 ---
 
@@ -2727,7 +2964,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/TvSeriesManage.vue admin-web/src/views/SystemSettings.vue admin-web/src/views/Toolbox.vue admin-web/src/views/precisionOpsRollout.spec.js admin-web/src/router/index.js admin-web/src/router/index.spec.js && git commit -m "样式：升级管理端表单与工具壳层"`
+Commit message: `样式：升级管理端表单与工具壳层`
 
 ---
 
@@ -2767,6 +3004,12 @@ Object.entries(standaloneViews).forEach(([file, density]) => {
     expect(source).not.toContain('<Layout')
   })
 })
+
+it('removes the decorative login gradient', () => {
+  const source = readView('Login.vue')
+  expect(source).not.toMatch(/(?:linear|radial)-gradient\(/)
+  expect(source).not.toMatch(/\.login-card\s*\{[^}]*box-shadow:/s)
+})
 ```
 
 - [ ] **Step 2: 运行测试并确认按预期失败**
@@ -2795,7 +3038,7 @@ Expected: FAIL，四页尚未声明任务密度。
 <main class="login-page" data-density="form">
 ```
 
-ED2K 输入/结果、孤儿扫描状态/表格和登录表单保留原结构；普通区块阴影清零、圆角不超过 8px。密码页的“密码库” `SectionCard` 额外添加 `data-density="compact"`，使搜索、表格和分页使用集合尺寸；创建/编辑和显示密码 Dialog 保持中密度和既有确认语义。
+ED2K 输入/结果、孤儿扫描状态/表格和登录表单保留原结构；普通区块阴影清零、圆角不超过 8px。Login 的装饰性 `linear-gradient` 改为 `var(--bg-canvas)`/`var(--bg-surface)` 单色层级，并移除登录面板常驻阴影。密码页的“密码库” `SectionCard` 额外添加 `data-density="compact"`，使搜索、表格和分页使用集合尺寸；创建/编辑和显示密码 Dialog 保持中密度和既有确认语义。
 
 - [ ] **Step 4: 运行测试、构建并提交**
 
@@ -2807,7 +3050,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/ToolboxEd2k.vue admin-web/src/views/ToolboxOrphanFiles.vue admin-web/src/views/ToolboxPasswordVault.vue admin-web/src/views/Login.vue admin-web/src/views/precisionOpsRollout.spec.js && git commit -m "样式：统一轻量工具与登录工作区"`
+Commit message: `样式：统一轻量工具与登录工作区`
 
 ---
 
@@ -2836,7 +3079,18 @@ it('scopes compact density to ED2K task collections', () => {
 })
 ```
 
-在现有 `ToolboxEd2kDownload.spec.js` 增加断言：创建、刷新、暂停/继续、删除和历史文案仍存在。
+在现有 `ToolboxEd2kDownload.spec.js` 增加：
+
+```js
+it('keeps the primary task commands and history', () => {
+  expect(source).toContain('@click="openCreateDialog"')
+  expect(source).toContain('@click="manualRefresh"')
+  expect(source).toContain('@click="deleteTask(selectedTask)"')
+  expect(source).toContain('@click="retryTask(selectedTask)"')
+  expect(source).toContain('@click="retryCleanup(selectedTask)"')
+  expect(source).toContain('<template #title>历史记录</template>')
+})
+```
 
 - [ ] **Step 2: 运行测试并确认按预期失败**
 
@@ -2874,7 +3128,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/ToolboxEd2kDownload.vue admin-web/src/views/ToolboxEd2kDownload.spec.js admin-web/src/views/precisionOpsRollout.spec.js && git commit -m "样式：升级 ED2K 下载工作台"`
+Commit message: `样式：升级 ED2K 下载工作台`
 
 ---
 
@@ -2903,6 +3157,7 @@ it('keeps archive business boundaries while applying collection density', () => 
   expect(source).toContain('<BulkActionBar')
   expect(source).toContain('<PageHeader')
   expect(source).not.toContain('<Layout')
+  expect(source).not.toMatch(/(?:linear|radial)-gradient\(/)
 })
 ```
 
@@ -2935,7 +3190,7 @@ Expected: FAIL，概览仍为独立卡片，批次和文件区没有显式集合
 <SectionCard class="archive-file-panel" data-density="compact">
 ```
 
-批次列表、分组网格、文件清单、详情 Drawer、批量浮条和 5 类现有 Dialog 的事件、props、函数名、请求 payload 全部保持不变。移除普通面板阴影，表格/文件行采用 40px 或 52px 媒体行；错误文本单行省略并保留 tooltip；375/768px 时 Dialog/Drawer 不溢出。
+批次列表、分组网格、文件清单、详情 Drawer、批量浮条和 5 类现有 Dialog 的事件、props、函数名、请求 payload 全部保持不变。移除普通面板阴影和装饰性 `linear-gradient`/`radial-gradient`，用 `var(--bg-canvas)`、`var(--bg-surface)`、`var(--bg-surface-muted)` 建立单色层级；表格/文件行采用 40px 或 52px 媒体行；错误文本单行省略并保留 tooltip；375/768px 时 Dialog/Drawer 不溢出。
 
 - [ ] **Step 4: 运行既有大页回归、全量测试和构建**
 
@@ -2947,7 +3202,7 @@ Run: `cd admin-web && npm test && npm run build`
 
 Expected: 全部测试和 Vite 构建通过。
 
-Commit: `git add admin-web/src/views/ToolboxArchiveImport.vue admin-web/src/views/ToolboxArchiveImport.spec.js admin-web/src/views/precisionOpsRollout.spec.js && git commit -m "样式：升级压缩包导入工作台"`
+Commit message: `样式：升级压缩包导入工作台`
 
 ---
 
@@ -2972,6 +3227,10 @@ it('keeps the mask editor component-only boundary', () => {
   const source = readView('ImageWorkbenchMaskEditor.vue')
   expect(source).toContain('data-density="form"')
   expect(source).toContain('mask-editor__toolbar')
+  expect(source).toContain("const MASK_OPAQUE_COLOR = '#ffffff'")
+  expect(source).toContain("overlayCtx.fillStyle = resolveCanvasColor('--primary')")
+  expect(source).not.toMatch(/rgba?\(\s*\d/)
+  expect(source).not.toMatch(/\.mask-editor__canvas\s*\{[^}]*box-shadow:/s)
   expect(source).not.toContain('<Layout')
   expect(source).not.toContain('<PageHeader')
 })
@@ -3008,16 +3267,20 @@ Dialog 根内容增加：
 <div class="mask-editor" data-density="form">
 ```
 
-Canvas 绘制颜色不能硬编码，在脚本中增加：
+Mask 的纯白像素是导出 PNG 的业务数据编码，不能耦合到 UI 主题；overlay 才使用界面语义色。在脚本中增加：
 
 ```js
+const MASK_OPAQUE_COLOR = '#ffffff'
+
 function resolveCanvasColor(token) {
   if (typeof window === 'undefined' || typeof document === 'undefined') return ''
   return window.getComputedStyle(document.documentElement).getPropertyValue(token).trim()
 }
 ```
 
-把 `ctx.fillStyle`/`ctx.strokeStyle` 的 `#ffffff` 改为 `resolveCanvasColor('--bg-surface')`，把 overlay 的 `#3b82f6` 改为 `resolveCanvasColor('--primary')`。调用点只在组件 mounted 且 canvas context 已建立后运行，因此不得加入第二套直接色值 fallback。
+`fillWhiteMask` 以及 brush/eraser 两个分支的 `ctx.fillStyle`/`ctx.strokeStyle` 统一使用 `MASK_OPAQUE_COLOR`；brush 的 `destination-out` 只依赖不透明 alpha，不再保留直接黑色 `rgba(...)`。把 overlay 的 `#3b82f6` 改为 `resolveCanvasColor('--primary')`。调用点只在组件 mounted 且 canvas context 已建立后运行，因此不得加入第二套界面色 fallback。
+
+棋盘背景是透明媒体识别能力，可保留两层 `linear-gradient`，但其中的直接数字 rgba 改为 `color-mix(in srgb, var(--text-primary) 4%, transparent)`；移除 `.mask-editor__canvas` 常驻 `var(--shadow-sm)`。最终 direct-color 审计只对上述精确 `MASK_OPAQUE_COLOR` 声明做域例外，其它直接 hex/数字 rgba 仍失败。
 
 工具栏用稳定 grid/flex 尺寸：图标按钮 36×36px，模式使用 segmented/radio，数值缩放使用 slider，画布容器保持明确 `min-height`、`max-width` 和 aspect constraints。`<768px` 工具栏换行但不覆盖画布；不修改 pointer 事件、mask 数据结构或 confirm/cancel emits。
 
@@ -3031,7 +3294,7 @@ Run: `cd admin-web && npm run build`
 
 Expected: Vite 构建成功。
 
-Commit: `git add admin-web/src/views/ToolboxImageWorkbench.vue admin-web/src/views/ImageWorkbenchMaskEditor.vue admin-web/src/views/imageWorkbench.helpers.spec.js admin-web/src/views/precisionOpsRollout.spec.js && git commit -m "样式：升级图像生成与遮罩工作台"`
+Commit message: `样式：升级图像生成与遮罩工作台`
 
 ---
 
@@ -3091,16 +3354,54 @@ import { describe, expect, it } from 'vitest'
 
 const directory = new URL('.', import.meta.url)
 const viewFiles = readdirSync(directory).filter((name) => name.endsWith('.vue'))
+const MASK_DATA_COLOR_DECLARATION = "const MASK_OPAQUE_COLOR = '#ffffff'"
+const functionalGradientBlocks = {
+  'ImageManage.vue': /\.image-grid-card__preview\s*\{[^{}]*\}/g,
+  'ImageWorkbenchMaskEditor.vue': /\.mask-editor__stage\s*\{[^{}]*\}/g
+}
+
+function colorAuditSource(file, source) {
+  return file === 'ImageWorkbenchMaskEditor.vue'
+    ? source.replace(MASK_DATA_COLOR_DECLARATION, '')
+    : source
+}
+
+function gradientAuditSource(file, source) {
+  const block = functionalGradientBlocks[file]
+  return block ? source.replace(block, '') : source
+}
+
+function persistentPanelShadowSelectors(source) {
+  return [...source.matchAll(/([^{}]+)\{([^{}]*box-shadow:\s*var\(--shadow-[a-z0-9-]+\)[^{}]*)\}/gi)]
+    .map((match) => match[1].trim())
+    .filter((selector) => !/:(hover|focus|focus-visible|active)\b/.test(selector))
+    .filter((selector) => !/\.(?:is-)?(?:active|selected)\b/.test(selector))
+    .filter((selector) => !/(drawer|dialog|popover|popper|tooltip|dropdown|bulk-action|floating|overlay|modal)/i.test(selector))
+}
+
+function oversizedDirectRadii(source) {
+  return [...source.matchAll(/border-radius:\s*([0-9]+(?:\.[0-9]+)?)px/g)]
+    .map((match) => Number(match[1]))
+    .filter((value) => value > 8)
+}
 
 describe('Precision Ops final audit', () => {
   viewFiles.forEach((file) => {
     const source = readFileSync(new URL(file, directory), 'utf8')
-    it(`${file} avoids negative tracking and direct view colors`, () => {
-      expect(source).not.toMatch(/letter-spacing:\s*-/)
-      expect(source).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+    it(`${file} avoids nonzero tracking and direct view colors`, () => {
+      const auditedSource = colorAuditSource(file, source)
+      expect(source).not.toMatch(/letter-spacing:\s*(?!0(?:px|rem|em)?\s*;)[^;]+;/)
+      expect(auditedSource).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+      expect(auditedSource).not.toMatch(/rgba?\(\s*\d/i)
     })
-    it(`${file} avoids persistent small panel shadows`, () => {
-      expect(source).not.toMatch(/box-shadow:\s*var\(--shadow-(xs|sm)\)/)
+    it(`${file} avoids persistent panel shadows`, () => {
+      expect(persistentPanelShadowSelectors(source)).toEqual([])
+    })
+    it(`${file} avoids oversized direct panel radii`, () => {
+      expect(oversizedDirectRadii(source)).toEqual([])
+    })
+    it(`${file} avoids decorative gradients`, () => {
+      expect(gradientAuditSource(file, source)).not.toMatch(/(?:linear|radial)-gradient\(/)
     })
   })
 
@@ -3116,7 +3417,24 @@ describe('Precision Ops final audit', () => {
 })
 ```
 
-在 `themeTokens.spec.js` 增加精确壳层、密度、字号、圆角和语义色断言；继续保留旧玫红和视图直接 hex 审计。
+在 `themeTokens.spec.js` 增加以下最终锁定；继续保留旧玫红和视图直接 hex 审计：
+
+```js
+it('locks the final Precision Ops geometry and semantic palette', () => {
+  expect(css).toContain('--admin-sidebar-width: 224px')
+  expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
+  expect(css).toContain('--admin-header-height: 52px')
+  expect(css).toContain('--text-muted: #607085')
+  expect(css).toContain('--success-600: #047857')
+  expect(css).toContain('--warning-600: #b45309')
+  expect(css).toContain('--danger-600: #c81e1e')
+  expect(css).toContain('--info-600: #0369a1')
+  expect(css).toMatch(/\[data-density="compact"\][\s\S]*--control-height:\s*32px/)
+  expect(css).toMatch(/\[data-density="monitor"\][\s\S]*--table-row-height:\s*44px/)
+  expect(css).toMatch(/\[data-density="form"\][\s\S]*--control-height:\s*36px/)
+  expect(css).toMatch(/--radius-md:\s*8px/)
+})
+```
 
 - [ ] **Step 3: 运行全量自动验证**
 
@@ -3132,9 +3450,16 @@ Run: `git diff --check`
 
 Expected: 无输出，退出码 0。
 
-Run: `rg -n $'\uFFFD' CONTEXT.md plan.md docs/superpowers admin-web/src`
+Run:
 
-Expected: 无输出，退出码 1。
+```bash
+replacement_status=0
+replacement_output="$(LC_ALL=C rg -n $'\xEF\xBF\xBD' CONTEXT.md plan.md docs/superpowers admin-web/src 2>&1)" || replacement_status=$?
+test "$replacement_status" -eq 1
+test -z "$replacement_output"
+```
+
+Expected: 两个 `test` 均通过；严格区分“无匹配”的退出码 1 与命令错误。
 
 - [ ] **Step 4: 完成 25 视图四档视口验收**
 
@@ -3157,11 +3482,18 @@ Run: `cd admin-web && npm run dev -- --host 127.0.0.1 --port 4173`
 
 - [ ] **Step 5: 对照规格逐项复核业务边界**
 
-Run: `git diff --name-only b265e2d..HEAD`
+Run:
+
+```bash
+MERGE_BASE="$(git merge-base master HEAD)"
+git diff --name-only "$MERGE_BASE"
+git ls-files --others --exclude-standard
+git status --short
+```
 
 Expected: 只出现 `admin-web/`、`CONTEXT.md`、`plan.md` 和本计划明确的测试/文档文件；不出现 Go、Android、migration、依赖锁文件或 API 契约改动。
 
-Run: `git diff b265e2d..HEAD -- admin-web/src/api admin-web/package.json admin-web/package-lock.json`
+Run: `git diff "$(git merge-base master HEAD)" -- admin-web/src/api admin-web/package.json admin-web/package-lock.json`
 
 Expected: 无输出。
 
@@ -3171,7 +3503,7 @@ Expected: 无输出。
 
 在 `plan.md` 顶部追加最终记录，写明完整测试、构建、静态检查、25 页四视口和业务边界结果。只有执行中产生规格未覆盖但长期有效的新决定时才追加 `CONTEXT.md`；不能写临时进度。
 
-Commit: `git add admin-web/src/views/precisionOpsAudit.spec.js admin-web/src/views/precisionOpsRollout.spec.js admin-web/src/assets/themeTokens.spec.js plan.md CONTEXT.md && git commit -m "验证：完成管理端 Precision Ops 全站验收"`
+Commit message: `验证：完成管理端 Precision Ops 全站验收`
 
 ---
 

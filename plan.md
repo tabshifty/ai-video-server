@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 18:20:20 +0800
+- 进度：Precision Ops 实施前门禁最终独立复审完成。ImageManage 统计口径、全视图非零字距审计、Login/MaskEditor 定向常驻阴影断言均已复审关闭；最终结论为 Critical 0、Important 0、Minor 0。下一步从 Task 1 开始按 fresh implementer → 独立规格/质量 reviewer 的子代理流程连续执行。
+- 影响文件：`docs/superpowers/specs/2026-07-15-admin-web-precision-ops-design.md`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`plan.md`。
+- 验证：22 个 Task、25 个 Vue 视图、202 个成对代码围栏和 22 条中文提交信息检查通过；占位符、旧色值、重复保存视图控制器和 U+FFFD 扫描无输出；对比度为 4.545:1；`git diff --check` 通过。精确提交本次三份文档，不纳入 `.superpowers/` 账本/brief，也不触及主工作区 Android 图片删除。
+
+## 2026-07-15 18:18:40 +0800
+- 进度：完成 Precision Ops 实施计划的独立预检与修正。除已确认的 `#607085` 对比度和共享 `useSavedViews` 边界外，进一步锁定 ImageManage 默认 `active='1'` 与真实统计口径、TaskMonitor 空列表后台刷新和筛选总数口径、保存视图确认职责、窄屏 44px 双向点击目标、直接颜色/装饰渐变/常驻阴影/大圆角审计、Mask 数据白色域例外、每任务 TDD/全量测试/构建/账本/技术沉淀门禁，以及包含未提交与未跟踪文件的最终范围检查。业务代码尚未修改。
+- 影响文件：`docs/superpowers/specs/2026-07-15-admin-web-precision-ops-design.md`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`plan.md`。
+- 验证：独立子代理最终复核无 Critical；唯一 Important“图片总数误标全局”已改为“结果总数 / 当前条件·全部页”并进入定向复审。22 个 Task 连续，25 个 Vue 视图全部覆盖，202 个 Markdown 代码围栏分别成对，22 条中文提交信息齐全；占位符、旧 `#64748B`、Task 8/9 页面级保存视图控制器和 U+FFFD 扫描无输出；`#607085` 在 `#F1F3F5` 上对比度为 4.545:1；`git diff --check` 通过。待复审关闭后精确提交本次三份文档。
+
+## 2026-07-15 17:29:06 +0800
+- 进度：完成 Precision Ops 实施前门禁修正。弱文字色由 `#64748B` 调整为在弱表面 `#F1F3F5` 上达到 WCAG AA 的 `#607085`；保存视图由共享 `useSavedViews` composable 统一负责版本解析、storage 容错、选中来源、自定义态和 save/update/rename/remove 生命周期，`SavedViewTabs` 负责名称输入与删除确认，VideoList/ImageManage 只提供各自 key、内置视图、快照规范、应用快照和刷新，避免复制两套控制器。业务代码尚未修改。
+- 影响文件：`docs/superpowers/specs/2026-07-15-admin-web-precision-ops-design.md`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`plan.md`。
+- 验证：待执行 22 个 Task 连续性、25 视图覆盖、占位符、Markdown 围栏、U+FFFD 乱码、旧颜色和重复保存视图控制器扫描，以及 `git diff --check`；通过后精确提交本次文档门禁修正，再启动 Task 1。
+
 ## 2026-07-15 16:54:12 +0800
 - 进度：用户确认 PC 管理端 `Precision Ops` 书面设计规格后，完成对应实施计划。计划按“共享基础与四个样板页 → 7 个资源集合页 → 14 个表单/编辑器/工具视图 → 全站收尾”组织为 22 个可独立测试、评审和提交的任务，明确了 token/密度、壳层偏好、合并页头、保存视图、四个样板页、25 视图推广、错误状态、响应式、无障碍、量化验收和回滚步骤；每个代码任务包含红灯测试、最小实现、定向验证、全量测试/构建和中文提交。业务代码尚未修改。
 - 影响文件：`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`plan.md`。本次提交不纳入未跟踪 `.superpowers/`，也不纳入与本任务无关的 `android-tv-app/tv-app/src/main/res/drawable-nodpi/tv_splash_image.png` 删除。
