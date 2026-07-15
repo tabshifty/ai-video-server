@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 20:57 +0800
+- 进度：完成 Precision Ops Task 4 最终验证与提交前自审。`MetricStrip` 的 label/value/scope、等宽数字、4/2/1 列固定断点、长内容换行和五档批准语义色均已核对；`StatusIndicator` 的可见 label、图标或空心点、语义色、外层可访问名称和装饰图形隐藏均已核对。无页面接入、硬编码色值、常驻阴影、TypeScript 迁移、新依赖或 token/Layout/路由/API 改动。
+- 影响文件：本次精确提交仅包含 `admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-4-report.md`、构建产物或其它文件。
+- 验证：RED 因两个目标 SFC 均不存在而确认；定向 GREEN 通过（1 个测试文件，2/2）；`cd admin-web && npm test` 通过（29 个测试文件，263/263）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本任务 5 个提交文件的 U+FFFD 码点扫描无命中。
+
+## 2026-07-15 20:54 +0800
+- 进度：完成 Precision Ops Task 4 最小实现与定向 GREEN。`MetricStrip` 按固定 4/2/1 列网格展示 label、value 与可选 scope，数值复用 `tabular-num`，长动态内容允许换行且不撑破网格，tone 只映射既有 neutral/success/warning/danger/info 语义 token；`StatusIndicator` 通过可见 label、传入图标或空心圆点和语义色共同表达状态，装饰图形隐藏于辅助技术，外层使用 label 提供可访问名称。
+- 影响文件：`admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 通过（1 个测试文件，2/2）。待追加长期组件契约并运行管理端全量测试、构建和静态检查。
+
+## 2026-07-15 20:53 +0800
+- 进度：Precision Ops Task 4 静态契约测试已确认 RED。测试文件先于生产组件创建；Vitest 收集阶段因 `MetricStrip.vue` 不存在而以退出码 1 失败，按读取顺序尚未执行第二次读取；随后单独核验 `MetricStrip.vue` 与 `StatusIndicator.vue` 均不存在，失败原因准确来自待实现组件缺失。
+- 影响文件：`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 按预期失败（1 个测试文件收集失败，0 项执行）；两个目标 SFC 的显式存在性检查均返回 `No such file or directory`。
+
+## 2026-07-15 20:52 +0800
+- 进度：启动 Precision Ops Task 4，范围仅为新增紧凑指标条 `MetricStrip`、可访问状态组件 `StatusIndicator` 及其静态契约测试；不接入页面，不修改 token、Layout、路由、API、依赖或既有组件。指标条固定采用 4 列、窄于 1024px 时 2 列、最多 36rem 时 1 列，并显式展示统计口径；状态组件同时提供文字、形状或图标及语义色，颜色不作为唯一载体。
+- 影响文件：计划只新增 `admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`，并追加 `CONTEXT.md`、`plan.md`；任务报告写入未提交的 `.superpowers/sdd/task-4-report.md`。
+- 验证：先只创建静态契约测试并运行 `cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js`，确认因两个 SFC 尚不存在而 RED；最小实现后运行同一定向测试、管理端全量测试、构建、`git diff --check` 与本任务文件 U+FFFD 扫描。
+
 ## 2026-07-15 20:40 +0800
 - 进度：完成 Precision Ops Task 3 独立评审修复的最终验证与提交前自审。生产代码只为两处桌面 RouterLink 增加权威菜单标签的动态可访问名称；Drawer、路由、偏好 helper 和其它行为未改。静态测试不再依赖全文件散落字符串，分别锁定两个 reader 的 try/catch fallback、route watch 的完整副作用、header identity/slot 独立条件，以及桌面恰好两处、Drawer 零处动态链接名称。
 - 影响文件：本次精确提交仅包含 `admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-3-report.md`、构建产物、依赖或其它文件。
