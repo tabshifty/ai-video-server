@@ -51,7 +51,7 @@ const routes = [
   { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },
   { path: '/toolbox/password-vault', component: ToolboxPasswordVault },
   { path: '/settings', component: SystemSettings, meta: { hideShellPageHeader: true } },
-  { path: '/tasks', component: TaskMonitor, meta: { hideShellPageHeader: true } }
+  { path: '/tasks', component: TaskMonitor }
 ]
 
 const router = createRouter({

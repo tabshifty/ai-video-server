@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 23:56 +0800
+- 进度：完成 Task 7 恢复审计、最终验证与提交前范围自审。既有 RED/GREEN 仅作为接手证据保留在下方原记录；本次新鲜验证确认 TaskMonitor 诚实统计、latest-wins 首次加载、非阻断后台刷新、持久错误、九列紧凑表格、五状态筛选、壳层标题操作区与 `/tasks` 路由变更符合 brief，未发现阻塞或需新增修复的问题。
+- 影响文件：本次精确提交仅包含 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-7-report.md`、`admin-web/dist`、依赖、其它页面或范围外文件。
+- 验证：brief 三文件定向通过（3 个文件，28/28）；`cd admin-web && npm test` 通过（33 个文件，309/309）；`cd admin-web && npm run build` 成功（2366 modules transformed，仅既有 chunk-size warning）；`git diff --check`、六个提交文件 U+FFFD 扫描、新增页面 CSS 禁止模式扫描和变更白名单核对通过。
+
+## 2026-07-15 23:52 +0800
+- 进度：接手恢复并审计 Task 7 现有未提交实现；逐项核对 brief、两级 AGENTS、页面/路由完整差异及顶部三条原 TDD 记录。确认页面测试真实导入 SFC，script/template/style block 提取边界有效，最新请求 finally 与 catch 不清 rows 的跨行正则均有违规样例自校验；生产实现保留九列、分页参数、`loadSeq`、5 秒 `skipIfLoading`，统计范围、首次/后台错误态、44px monitor 行高、窄屏点击目标和 CSS 禁止项均符合约定，未发现需新增修复的缺陷。
+- 影响文件：恢复审计不改生产/测试实现；仅追加 `CONTEXT.md` 的 TaskMonitor 精确刷新与范围契约，并追加 `plan.md`。原未提交范围仍为 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：新鲜运行 `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js src/router/index.spec.js src/components/base/precisionOpsComponents.spec.js` 通过（3 个文件，28/28，无 warning/error）。待运行管理端全量测试、生产构建、静态与乱码检查，并记录精确提交范围。
+
+## 2026-07-15 23:43 +0800
+- 进度：完成 Task 7 最小实现与单文件 GREEN。TaskMonitor 已改用壳层 `header-actions`、五项分段筛选、四项带范围 `MetricStrip`、文字与语义色并存的 `StatusIndicator`；新增 `loaded/loadError` 刷新状态机，最新请求才结束首次加载，首次/后台失败持久显示且不清空已有 rows、不遮罩表格。保留分页、全部九列、请求参数、`loadSeq`、5 秒 `skipIfLoading` 轮询及原格式化逻辑；`/tasks` 仅移除 `meta.hideShellPageHeader`。
+- 影响文件：`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 通过（退出码 0；1 个文件，9/9）；`cd admin-web && npm test -- src/router/index.spec.js` 通过（退出码 0；1 个文件，5/5）；两次均无 warning/error。待执行 brief 三文件定向、全量、构建与静态验证。
+
+## 2026-07-15 23:40 +0800
+- 进度：完成 Task 7 测试先行 RED。页面测试直接导入 `TaskMonitor.vue` 作为 Vite Vue 编译门禁，并将脚本、模板、样式断言限定到对应 SFC block；最新响应 `loaded` 保护与失败分支 rows 保留模式均包含可命中违规样例的最小自校验。生产页面和路由尚未修改。
+- 影响文件：`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 按预期失败（退出码 1；1 个文件，7 项失败、2 项通过；真实 SFC 编译成功，失败指向旧 `successRate`/`StatCard`/全表 loading 及缺失的诚实口径、刷新状态、五项筛选、紧凑错误单元格）；`cd admin-web && npm test -- src/router/index.spec.js` 按预期失败（退出码 1；仅新增 `/tasks` 断言失败，实际仍含 `meta.hideShellPageHeader`）。
+
+## 2026-07-15 23:34 +0800
+- 进度：启动 Precision Ops Task 7，已核对唯一 brief、适用规则、TaskMonitor 现有实现及 Task 1/3/4 基础契约；现有状态值 `pending/running/success/failed`、分页参数、`loadSeq` 旧响应保护和 5 秒 `skipIfLoading` 轮询与 brief 一致，无需补充上下文。下一步严格 TDD，先扩展页面与路由测试并取得真实 RED，再做最小实现。
+- 影响文件：计划仅修改 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`，并追加 `CONTEXT.md`、`plan.md` 本任务记录；不修改 API、依赖、其它页面或 `.superpowers` 跟踪文件。
+- 验证：待执行页面单文件 RED、Task 7 定向测试、管理端全量测试、生产构建、`git diff --check`、U+FFFD 扫描与提交范围核对。
+
 ## 2026-07-15 23:21 +0800
 - 进度：完成 Task 6 Important 评审修复的覆盖验证与提交前自审。多行 catch 自校验和真实 Dashboard 共用同一个跨行模式，未留下只适配单行格式的断言；模式反斜杠均为 U+005C，无 ESC/C0/DEL 控制字节。本次无生产代码、长期契约或依赖变更。
 - 影响文件：本次精确提交仅包含 `admin-web/src/views/dashboardPage.spec.js`、`plan.md`；原报告 `.superpowers/sdd/task-6-report.md` 追加证据但不纳入提交，`Dashboard.vue`、`CONTEXT.md`、构建产物和范围外文件均不纳入。

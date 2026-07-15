@@ -1,11 +1,10 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
-import StatCard from '../components/base/StatCard.vue'
+import MetricStrip from '../components/base/MetricStrip.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
@@ -14,19 +13,39 @@ import { getAdminTasks } from '../api/admin'
 const list = ref([])
 const total = ref(0)
 const loading = ref(false)
+const loaded = ref(false)
+const loadError = ref('')
 const query = reactive({ page: 1, page_size: 20, status: '' })
 let timer = null
 let loadSeq = 0
 
 const queuedCount = computed(() => list.value.filter((item) => item.status === 'pending').length)
 const runningCount = computed(() => list.value.filter((item) => item.status === 'running').length)
-const successCount = computed(() => list.value.filter((item) => item.status === 'success').length)
 const failedCount = computed(() => list.value.filter((item) => item.status === 'failed').length)
-const hasTasks = computed(() => total.value > 0)
-const successRate = computed(() => {
-  if (total.value <= 0) return '0.0'
-  return ((successCount.value / total.value) * 100).toFixed(1)
-})
+const initialLoading = computed(() => loading.value && !loaded.value)
+const backgroundRefreshing = computed(() => loading.value && loaded.value)
+const hasStatusFilter = computed(() => query.status !== '')
+const statusOptions = [
+  { label: '全部', value: '' },
+  { label: '排队', value: 'pending' },
+  { label: '处理中', value: 'running' },
+  { label: '已完成', value: 'success' },
+  { label: '失败', value: 'failed' }
+]
+const summaryMetrics = computed(() => [
+  { key: 'total', label: '任务总量', value: total.value, scope: query.status ? '当前筛选·全部页' : '全局' },
+  { key: 'queued', label: '排队', value: queuedCount.value, scope: '本页', tone: 'info' },
+  { key: 'running', label: '处理中', value: runningCount.value, scope: '本页', tone: 'warning' },
+  { key: 'failed', label: '失败', value: failedCount.value, scope: '本页', tone: 'danger' }
+])
+
+function taskStatusTone(status) {
+  if (status === 'success') return 'success'
+  if (status === 'failed') return 'danger'
+  if (status === 'running') return 'warning'
+  if (status === 'pending') return 'info'
+  return 'neutral'
+}
 
 async function load(options = {}) {
   const { skipIfLoading = false } = options
@@ -35,6 +54,7 @@ async function load(options = {}) {
   }
   const seq = ++loadSeq
   loading.value = true
+  loadError.value = ''
   try {
     const params = {
       page: query.page,
@@ -53,9 +73,10 @@ async function load(options = {}) {
     if (seq !== loadSeq) {
       return
     }
-    ElMessage.error(error?.message || '加载任务失败')
+    loadError.value = error?.message || '加载任务失败'
   } finally {
     if (seq === loadSeq) {
+      loaded.value = true
       loading.value = false
     }
   }
@@ -166,84 +187,93 @@ onUnmounted(() => {
 
 <template>
   <Layout>
-    <div class="page-shell task-monitor-page">
-      <PageHeader title="任务监控" subtitle="每 5 秒自动刷新转码任务状态">
-        <template #actions>
-          <el-button :loading="loading" @click="load">立即刷新</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button class="task-refresh" :loading="loading" @click="load">立即刷新</el-button>
+    </template>
 
-      <Toolbar>
+    <div class="page-shell task-monitor-page" data-density="monitor">
+      <Toolbar dense>
         <template #filters>
-          <el-button-group class="status-group">
-            <el-button :type="query.status === '' ? 'primary' : ''" @click="setStatus('')">全部</el-button>
-            <el-button :type="query.status === 'pending' ? 'primary' : ''" @click="setStatus('pending')">排队</el-button>
-            <el-button :type="query.status === 'running' ? 'primary' : ''" @click="setStatus('running')">处理中</el-button>
-            <el-button :type="query.status === 'failed' ? 'primary' : ''" @click="setStatus('failed')">失败</el-button>
-          </el-button-group>
+          <el-segmented
+            class="status-filter"
+            aria-label="任务状态筛选"
+            :model-value="query.status"
+            :options="statusOptions"
+            @update:model-value="setStatus"
+          />
         </template>
         <template #actions>
-          <el-tag effect="plain">总量：{{ total }}</el-tag>
-          <el-tag effect="plain">成功率：{{ successRate }}%</el-tag>
-          <el-tag effect="plain">自动刷新：5 秒</el-tag>
+          <StatusIndicator
+            :label="backgroundRefreshing ? '正在刷新' : '每 5 秒自动刷新'"
+            :tone="backgroundRefreshing ? 'info' : 'neutral'"
+          />
         </template>
       </Toolbar>
 
-      <section class="metric-grid">
-        <StatCard label="队列" :value="queuedCount" />
-        <StatCard label="处理中" :value="runningCount" />
-        <StatCard label="已完成" :value="successCount" />
-        <StatCard label="失败" :value="failedCount" />
-      </section>
+      <MetricStrip :items="summaryMetrics" aria-label="任务摘要" />
 
-      <SectionCard>
+      <el-alert v-if="loadError" type="error" :closable="false" :title="loadError">
+        <template #default>
+          <el-button link type="primary" @click="load">重试</el-button>
+        </template>
+      </el-alert>
+
+      <el-skeleton v-if="initialLoading" :rows="12" animated />
+
+      <SectionCard v-else-if="!loadError || list.length > 0" dense>
         <template #title>任务列表</template>
-        <template #description>每 5 秒自动刷新，也可手动立即刷新</template>
         <EmptyState
-          v-if="!hasTasks"
-          title="暂无任务"
-          description="当前筛选条件下没有任务"
+          v-if="list.length === 0"
+          :title="hasStatusFilter ? '当前筛选无结果' : '暂无任务'"
+          :description="hasStatusFilter ? '清除状态筛选后查看全部任务' : '任务创建后会显示在这里'"
         >
-          <template #action>
-            <el-button :loading="loading" @click="load">立即刷新</el-button>
+          <template v-if="hasStatusFilter" #action>
+            <el-button @click="setStatus('')">清除筛选</el-button>
           </template>
         </EmptyState>
         <template v-else>
           <div class="table-wrap">
-            <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="video_title" label="任务" min-width="280">
+            <el-table :data="list" border>
+              <el-table-column prop="video_title" label="任务" min-width="260">
                 <template #default="{ row }">
                   <div class="task-cell">
                     <strong>{{ taskTitle(row) }}</strong>
-                    <span>任务 ID：{{ row.id }}</span>
-                    <span>视频 ID：{{ row.video_id || '--' }}</span>
+                    <span>任务 ID：{{ row.id }} · 视频 ID：{{ row.video_id || '--' }}</span>
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column prop="status" label="状态" width="120">
-                <template #default="{ row }">{{ statusLabel(row.status) }}</template>
-              </el-table-column>
-              <el-table-column label="进度" min-width="220">
+              <el-table-column prop="status" label="状态" width="112">
                 <template #default="{ row }">
-                  <el-progress :stroke-width="14" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
+                  <StatusIndicator :label="statusLabel(row.status)" :tone="taskStatusTone(row.status)" />
                 </template>
               </el-table-column>
-              <el-table-column label="剩余时间" width="120">
+              <el-table-column label="进度" min-width="190">
+                <template #default="{ row }">
+                  <el-progress :stroke-width="6" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="剩余时间" width="112">
                 <template #default="{ row }">
                   {{ formatRemaining(row) }}
                 </template>
               </el-table-column>
-              <el-table-column label="已耗时" width="120">
+              <el-table-column label="已耗时" width="112">
                 <template #default="{ row }">
                   {{ formatElapsed(row) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="retry_count" label="重试" width="80" />
-              <el-table-column prop="error" label="错误信息" min-width="280" />
-              <el-table-column label="开始时间" width="180">
+              <el-table-column prop="retry_count" label="重试" width="72" />
+              <el-table-column prop="error" label="错误" min-width="220">
+                <template #default="{ row }">
+                  <el-tooltip :content="row.error || '无错误'" placement="top">
+                    <span class="task-error" tabindex="0" :aria-label="row.error || '无错误'">{{ row.error || '--' }}</span>
+                  </el-tooltip>
+                </template>
+              </el-table-column>
+              <el-table-column label="开始时间" width="168">
                 <template #default="{ row }">{{ formatDateTime(row.started_at) }}</template>
               </el-table-column>
-              <el-table-column label="进度更新时间" width="180">
+              <el-table-column label="进度更新时间" width="168">
                 <template #default="{ row }">{{ formatDateTime(row.progress_updated_at) }}</template>
               </el-table-column>
             </el-table>
@@ -269,39 +299,52 @@ onUnmounted(() => {
   gap: var(--space-4);
 }
 
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
-.status-group {
-  display: inline-flex;
-}
-
 .task-cell {
   display: grid;
-  gap: 4px;
   min-width: 0;
+  gap: var(--space-1);
 }
 
-.task-cell strong {
-  color: var(--text-primary);
+.task-cell strong,
+.task-cell span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.task-cell span {
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
+.task-cell strong {
+  color: var(--text-primary);
 }
 
-@media (max-width: 48rem) {
-  .metric-grid {
-    grid-template-columns: 1fr;
+.task-cell span {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.task-error {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-error:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 63.9375rem) {
+  .task-refresh {
+    min-height: 44px;
+  }
+
+  :deep(.el-segmented__item) {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 </style>

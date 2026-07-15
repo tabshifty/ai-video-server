@@ -29,4 +29,12 @@ describe('resolveRouterHistoryBase', () => {
     expect(dashboardRoute).toContain("{ path: '/dashboard', component: Dashboard }")
     expect(dashboardRoute).not.toContain('hideShellPageHeader')
   })
+
+  it('任务监控使用壳层标题且保持原有路由目标', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const taskRoute = source.split('\n').find((line) => line.includes("path: '/tasks'"))
+
+    expect(taskRoute).toContain("{ path: '/tasks', component: TaskMonitor }")
+    expect(taskRoute).not.toContain('hideShellPageHeader')
+  })
 })
