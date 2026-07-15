@@ -36,17 +36,11 @@ export const adminShellNavGroups = [
     ]
   },
   {
-    key: 'service',
-    label: '服务',
+    key: 'service-tools',
+    label: '服务与工具',
     items: [
       { path: '/iptv', label: 'IPTV 管理', title: 'IPTV 管理', icon: 'Monitor', alias: 'iptv live' },
-      { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' }
-    ]
-  },
-  {
-    key: 'tools',
-    label: '工具箱',
-    items: [
+      { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' },
       {
         path: '/toolbox',
         label: '工具箱',

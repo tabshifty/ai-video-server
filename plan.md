@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 19:35 +0800
+- 进度：完成 Precision Ops Task 2 最终验证与提交前自审。偏好 helper 保持纯函数且不读取浏览器存储；版本、损坏/不兼容文档、未知/重复项、最近访问最多 3 条及活动分组强制展开均有真实断言；权威导航恰为五组，三个“服务与工具”菜单项的路径、标签与 alias 能力完整保留。实现只复用一个版本文档解析器和一个有效值去重器，无过度抽象、重复状态机或无关格式化。
+- 影响文件：本次精确提交仅包含 `admin-web/src/components/adminShellPreferences.js`、`admin-web/src/components/adminShellPreferences.spec.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-2-report.md`、构建产物或其它文件。
+- 验证：定向测试通过（2 个测试文件，12/12）；`cd admin-web && npm test` 通过（28 个测试文件，247/247）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本任务 6 个提交文件的 U+FFFD 扫描无命中，偏好实现与测试的浏览器存储访问扫描无命中。
+
+## 2026-07-15 19:33 +0800
+- 进度：完成 Precision Ops Task 2 最小实现。新增无存储副作用的版本化偏好纯函数，统一过滤未知值和重复项，最近访问固定最多保留 3 条并按最新优先，活动路由所属有效分组强制展开；权威导航已固定为五组，原 IPTV 管理、任务监控、工具箱的路径、标签、图标、标题和 alias 原样归入“服务与工具”。
+- 影响文件：`admin-web/src/components/adminShellPreferences.js`、`admin-web/src/components/adminShellPreferences.spec.js`、`admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/adminShellPreferences.spec.js src/components/base/commandPalette.helpers.spec.js` 通过（2 个测试文件，12/12）。待运行管理端全量测试与构建、`git diff --check` 和本任务文件 U+FFFD 扫描。
+
+## 2026-07-15 19:32 +0800
+- 进度：Precision Ops Task 2 定向测试已确认 RED。偏好测试因 `adminShellPreferences` 模块尚不存在而无法收集；导航测试可正常执行，并因找不到 `service-tools` 分组而失败，证明现有“服务”和“工具箱”尚未合并；其余 5 项既有命令面板测试通过。
+- 影响文件：`admin-web/src/components/adminShellPreferences.spec.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/adminShellPreferences.spec.js src/components/base/commandPalette.helpers.spec.js` 按预期失败（2 个测试文件失败；偏好模块缺失，命令面板 6 项中 1 项失败、5 项通过；退出码 1）。
+
+## 2026-07-15 19:31 +0800
+- 进度：启动 Precision Ops Task 2，范围仅为壳层本地偏好纯函数与五组权威导航；合并“服务”和“工具箱”分组容器，但保留 IPTV 管理、任务监控、工具箱的原路径、标签与 alias 能力。不改 Layout、路由、API、权限、依赖或其它页面，也不在偏好函数中读取 `localStorage`。
+- 影响文件：计划创建 `admin-web/src/components/adminShellPreferences.js`、`admin-web/src/components/adminShellPreferences.spec.js`，修改 `admin-web/src/components/base/commandPalette.helpers.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`CONTEXT.md`、`plan.md`；报告 `.superpowers/sdd/task-2-report.md` 不纳入提交。
+- 验证：先补版本、损坏 JSON、未知/重复项、最近访问最多 3 条、活动分组展开及五组导航契约测试，运行 `cd admin-web && npm test -- src/components/adminShellPreferences.spec.js src/components/base/commandPalette.helpers.spec.js` 确认 RED；最小实现后运行同一定向测试、管理端全量测试与构建、`git diff --check` 和本任务文件 U+FFFD 扫描。
+
 ## 2026-07-15 19:23:03 +0800
 - 进度：完成 Task 1 第二次独立复审分页特异性修复的最终验证。生产 CSS、静态测试、实施计划与长期契约均以 `.el-pagination .btn-prev`、`.el-pagination .btn-next`、`.el-pager li` 作为窄屏分页覆盖目标；前两者与 Element Plus 默认规则特异性相同并由后加载规则获胜，泛化 `.el-pagination button` 仅保留在禁止断言和解释文本中，不再表示实际覆盖契约。
 - 影响文件：本次精确提交仅包含 `admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-1-report.md`、构建产物或依赖目录。

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  adminShellNavGroups,
   adminShellNavItems,
   matchMenuItem,
   searchMenuItems
@@ -43,6 +44,24 @@ describe('command palette helpers', () => {
       groupLabel: '媒体库',
       icon: 'Delete'
     })
+  })
+
+  it('keeps service and toolbox navigation capabilities in one authoritative group', () => {
+    const group = adminShellNavGroups.find((entry) => entry.key === 'service-tools')
+
+    expect(group).toMatchObject({ label: '服务与工具' })
+    expect(group.items.map(({ path, label, alias }) => ({ path, label, alias }))).toEqual([
+      { path: '/iptv', label: 'IPTV 管理', alias: 'iptv live' },
+      { path: '/tasks', label: '任务监控', alias: 'task tasks jobs rw' },
+      {
+        path: '/toolbox',
+        label: '工具箱',
+        alias: 'toolbox tools ed2k orphan scan orphan-files 孤儿文件扫描 archive archive-import archive import zip rar 7z 压缩包导入 压缩包 password vault credentials 密码 密码库 密码管理 gjx'
+      }
+    ])
+    expect(searchMenuItems('live')[0]).toMatchObject({ path: '/iptv', groupKey: 'service-tools' })
+    expect(searchMenuItems('jobs')[0]).toMatchObject({ path: '/tasks', groupKey: 'service-tools' })
+    expect(searchMenuItems('gjx')[0]).toMatchObject({ path: '/toolbox', groupKey: 'service-tools' })
   })
 
   it('keeps individual toolbox tools out of direct shell navigation', () => {
