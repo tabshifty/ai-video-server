@@ -307,6 +307,7 @@ onUnmounted(() => {
                 :class="{ 'is-active': isActive(item) }"
                 :to="item.path"
                 :aria-current="isActive(item) ? 'page' : undefined"
+                :aria-label="item.label"
                 @click="closeMobileNav"
               >
                 <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
@@ -351,6 +352,7 @@ onUnmounted(() => {
                 :class="{ 'is-active': isActive(item) }"
                 :to="item.path"
                 :aria-current="isActive(item) ? 'page' : undefined"
+                :aria-label="item.label"
                 @click="closeMobileNav"
               >
                 <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>

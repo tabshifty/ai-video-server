@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 20:40 +0800
+- 进度：完成 Precision Ops Task 3 独立评审修复的最终验证与提交前自审。生产代码只为两处桌面 RouterLink 增加权威菜单标签的动态可访问名称；Drawer、路由、偏好 helper 和其它行为未改。静态测试不再依赖全文件散落字符串，分别锁定两个 reader 的 try/catch fallback、route watch 的完整副作用、header identity/slot 独立条件，以及桌面恰好两处、Drawer 零处动态链接名称。
+- 影响文件：本次精确提交仅包含 `admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-3-report.md`、构建产物、依赖或其它文件。
+- 验证：定向测试通过（3 个测试文件，30/30）；`cd admin-web && npm test` 通过（28 个测试文件，261/261）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本任务 5 个提交文件的 U+FFFD 字面量扫描无命中；实施计划保持 204 个成对代码围栏。
+
+## 2026-07-15 20:37 +0800
+- 进度：完成 Precision Ops Task 3 独立评审最小修复。桌面最近访问与正式分组的两个 RouterLink 均直接绑定 `:aria-label="item.label"`，折叠 CSS 隐藏可见文字后仍保留稳定链接名称；Drawer 文字常显且未误加冗余属性。测试已改为在两个桌面 RouterLink 块内分别断言、限制全文件恰好两处并对 Drawer 做负断言，同时把 storage fallback、route watch 副作用和 workspace header 条件收紧到对应块。
+- 影响文件：`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/Layout.spec.js` 通过（11/11）。待运行三文件定向、管理端全量测试、构建和静态检查。
+
+## 2026-07-15 20:36 +0800
+- 进度：Precision Ops Task 3 可访问名称与测试加固已确认 RED。新增 helper 分别截取 storage reader 函数、`route.fullPath` watch、workspace header、桌面 nav 和 Drawer nav；storage 异常回退、watch 完整副作用及 header 两个独立条件均已在各自代码块内通过，唯一失败是两处桌面 RouterLink 都缺少 `:aria-label="item.label"`。
+- 影响文件：`admin-web/src/components/Layout.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/Layout.spec.js` 按预期失败（1 个测试文件，11 项中 1 项失败、10 项通过，退出码 1）；失败消息直接显示桌面 `nav-link` 块缺少动态可访问名称，无语法、收集或 block regex 错误。
+
+## 2026-07-15 20:33 +0800
+- 进度：开始修复 Precision Ops Task 3 独立评审问题。已核实折叠桌面侧栏通过 `display: none` 隐藏 `.nav-link__label` 后，最近访问与正式分组的两个 RouterLink 都失去可访问名称；tooltip 只提供视觉提示，不能替代链接 name。测试同时收紧到 storage reader、route watch、workspace header 和桌面/Drawer 导航各自代码块，避免全文件字符串误命中；不安装测试框架或依赖。
+- 影响文件：计划修改 `admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；追加未提交的 `.superpowers/sdd/task-3-report.md`。不改 Task 2 helper、路由、页面、API、权限或依赖。
+- 验证：先只改 `Layout.spec.js` 并运行 `cd admin-web && npm test -- src/components/Layout.spec.js`，确认两处桌面链接缺少 `:aria-label="item.label"` 而 RED；最小修复后运行三文件定向、管理端全量测试、构建、`git diff --check` 与本次文件 U+FFFD 扫描。
+
 ## 2026-07-15 20:14 +0800
 - 进度：完成 Precision Ops Task 3 最终验证与提交前自审。最近访问最多 3 条、route path 去重、当前分组强制展开、storage 异常回退、桌面/Drawer 共用状态、收起态纯图标分组按钮、52px 工作区身份区、`header-actions` 命名 slot、兼容 meta、20px/16px/12px 留白和窄屏 44px 导航目标均受契约测试或构建保护；现有命令面板、退出登录、移动导航关闭与当前路由高亮保持不变。
 - 影响文件：本次精确提交仅包含 `admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-3-report.md`、构建产物、Task 2 helper、路由、页面、API、权限或依赖。

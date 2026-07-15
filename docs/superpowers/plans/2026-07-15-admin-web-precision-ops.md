@@ -692,6 +692,22 @@ watch(
 
 在 `.nav-groups` 顶部渲染最多 3 个 `recentNavItems`；每个正式分组标题改成带 `aria-expanded` 的按钮，列表使用 `v-show="isGroupExpanded(group.key)"`。折叠侧栏只显示图标和 tooltip，不渲染分组按钮文字；Drawer 使用同一组 `navGroups` 和展开状态。CSS 固定页头高度 52px、主区桌面 padding 20px、`<1024px` 16px、`<768px` 12px，所有导航目标在窄屏至少 44px。
 
+桌面最近访问和正式分组的 RouterLink 都会在折叠态隐藏 `.nav-link__label`，因此两处必须直接用权威菜单标签提供可访问名称；tooltip 只作为视觉提示，不能替代链接 name。Drawer 的链接文字始终可见，不重复增加该属性。
+
+```vue
+<RouterLink
+  class="nav-link"
+  :class="{ 'is-active': isActive(item) }"
+  :to="item.path"
+  :aria-current="isActive(item) ? 'page' : undefined"
+  :aria-label="item.label"
+  @click="closeMobileNav"
+>
+  <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+  <span class="nav-link__label">{{ item.label }}</span>
+</RouterLink>
+```
+
 把 `.nav-group__label` 和 `.drawer-nav__label` 的 `letter-spacing: 0.08em` 都改为 `letter-spacing: 0`，与全站字距契约一致。
 
 - [ ] **Step 5: 运行壳层测试、全量测试和构建**

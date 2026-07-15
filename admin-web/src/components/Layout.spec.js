@@ -4,6 +4,16 @@ import { describe, expect, it } from 'vitest'
 const layout = readFileSync(new URL('./Layout.vue', import.meta.url), 'utf8')
 const commandPaletteHelper = readFileSync(new URL('./base/commandPalette.helpers.js', import.meta.url), 'utf8')
 
+function findBlock(source, pattern) {
+  const match = source.match(pattern)
+  expect(match).not.toBeNull()
+  return match?.[0] || ''
+}
+
+function findFunctionBlock(name) {
+  return findBlock(layout, new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm'))
+}
+
 describe('Layout shell', () => {
   it('uses grouped navigation and the command palette shell', () => {
     expect(layout).toContain('分组')
@@ -46,18 +56,48 @@ describe('Layout shell', () => {
 
   it('keeps the migration compatibility boundary', () => {
     expect(layout).toContain('const showShellPageHeader = computed(() => !route.meta?.hideShellPageHeader)')
-    expect(layout).toContain('v-if="showShellPageHeader"')
+    const shellHeader = findBlock(layout, /<header class="shell-header">[\s\S]*?<\/header>/)
+    const identity = findBlock(shellHeader, /<div v-if="showShellPageHeader" class="workspace-identity">[\s\S]*?<\/div>/)
+    const actions = findBlock(shellHeader, /<div v-if="\$slots\['header-actions'\]" class="shell-header__actions">[\s\S]*?<\/div>/)
+
+    expect(identity).not.toContain('header-actions')
+    expect(actions).not.toContain('showShellPageHeader')
   })
 
-  it('guards shell storage and updates preferences from the route path', () => {
-    expect(layout).toContain('parseRecentRoutes(window.localStorage.getItem(RECENT_ROUTES_KEY), validNavPaths)')
-    expect(layout).toContain('parseExpandedGroupKeys(window.localStorage.getItem(NAV_GROUPS_KEY), validGroupKeys)')
-    expect(layout).toContain('persistShellPreference(RECENT_ROUTES_KEY')
-    expect(layout).toContain('persistShellPreference(NAV_GROUPS_KEY')
-    expect(layout).toContain('const path = route.path')
-    expect(layout).toContain('pushRecentRoute(recentRoutePaths.value, path, validNavPaths, 3)')
-    expect(layout).toContain('ensureActiveGroup(expandedGroupKeys.value, activeGroupKey.value, validGroupKeys)')
-    expect(layout).toContain('{ immediate: true }')
+  it('guards each shell preference reader with its own fallback', () => {
+    const recentReader = findFunctionBlock('readStoredRecentRoutes')
+    const expandedReader = findFunctionBlock('readStoredExpandedGroups')
+
+    expect(recentReader).toContain('parseRecentRoutes(window.localStorage.getItem(RECENT_ROUTES_KEY), validNavPaths)')
+    expect(recentReader).toMatch(/try \{[\s\S]*?catch \(_\) \{\s*return \[\]\s*\}/)
+    expect(expandedReader).toContain('parseExpandedGroupKeys(window.localStorage.getItem(NAV_GROUPS_KEY), validGroupKeys)')
+    expect(expandedReader).toMatch(/try \{[\s\S]*?catch \(_\) \{\s*return \[\.\.\.validGroupKeys\]\s*\}/)
+  })
+
+  it('updates every shell preference inside the route watcher', () => {
+    const routeWatch = findBlock(layout, /watch\(\s*\(\) => route\.fullPath,[\s\S]*?^\)/m)
+
+    expect(routeWatch).toContain('const path = route.path')
+    expect(routeWatch).toContain('mobileNavVisible.value = false')
+    expect(routeWatch).toContain('pushRecentRoute(recentRoutePaths.value, path, validNavPaths, 3)')
+    expect(routeWatch).toContain('ensureActiveGroup(expandedGroupKeys.value, activeGroupKey.value, validGroupKeys)')
+    expect(routeWatch).toContain('persistShellPreference(RECENT_ROUTES_KEY')
+    expect(routeWatch).toContain('persistShellPreference(NAV_GROUPS_KEY')
+    expect(routeWatch.match(/persistShellPreference\(/g) || []).toHaveLength(2)
+    expect(routeWatch).toContain('{ immediate: true }')
+  })
+
+  it('names exactly the two desktop links whose text disappears when collapsed', () => {
+    const desktopNav = findBlock(layout, /<nav class="nav-groups"[\s\S]*?<\/nav>/)
+    const drawerNav = findBlock(layout, /<nav class="drawer-nav"[\s\S]*?<\/nav>/)
+    const desktopLinks = desktopNav.match(/<RouterLink\b[\s\S]*?<\/RouterLink>/g) || []
+
+    expect(desktopLinks).toHaveLength(2)
+    for (const link of desktopLinks) {
+      expect(link).toContain(':aria-label="item.label"')
+    }
+    expect(layout.match(/:aria-label="item\.label"/g) || []).toHaveLength(2)
+    expect(drawerNav).not.toContain(':aria-label="item.label"')
   })
 
   it('uses shared expanded groups and precise responsive workspace spacing', () => {
