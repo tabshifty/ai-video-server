@@ -2,6 +2,51 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 21:58 +0800
+- 进度：完成 Precision Ops Task 5 最终验证与提交前自审。helper、共享 composable 与 `SavedViewTabs` 的职责边界、异常回退、内置保护、重复 ID 去碰撞、确认命令和响应式尺寸均已逐项核对；无页面接入、页面业务字段、Layout/路由/API/依赖改动，无卡片背景、常驻阴影或硬编码颜色。
+- 影响文件：本次精确提交仅包含 `admin-web/src/components/base/savedView.helpers.js`、`admin-web/src/components/base/savedView.helpers.spec.js`、`admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`admin-web/src/components/base/SavedViewTabs.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-5-report.md`、构建产物或其它文件。
+- 验证：三轮 RED 均因对应生产模块尚不存在而按预期失败；三阶段单独 GREEN 分别通过（7/7、5/5、13/13）；联合定向通过（3 个测试文件，25/25）；`cd admin-web && npm test` 通过（31 个测试文件，286/286）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本任务 8 个提交文件 U+FFFD 扫描无命中；业务字段和确认职责越界扫描无命中。
+
+## 2026-07-15 21:56 +0800
+- 进度：完成 Precision Ops Task 5 三阶段联合定向 GREEN，并在 `CONTEXT.md` 沉淀版本 1 文档与 canonical key、共享控制器注入边界、storage fail-soft 会话策略、重复时钟 ID 去碰撞和 `SavedViewTabs` 独占确认职责。未接入业务页面，未改 Layout、路由、API 或依赖。
+- 影响文件：本任务 5 个新增生产/测试文件、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/savedView.helpers.spec.js src/components/base/useSavedViews.spec.js src/components/base/precisionOpsComponents.spec.js` 通过（3 个测试文件，25/25）。待运行管理端全量测试、生产构建、`git diff --check`、本任务文件 U+FFFD 扫描和范围自审。
+
+## 2026-07-15 21:54 +0800
+- 进度：完成 Precision Ops Task 5 第三阶段 `SavedViewTabs` 最小实现与定向 GREEN。组件独占保存/重命名 prompt 和删除 confirm，仅在确认后发出 trim 后命令；内置视图不出现覆盖、重命名或删除入口，自定义态提供临时 tab、另存为及可选用户来源更新。布局无卡片背景或阴影，以底边框分隔；桌面操作高 32px，窄于 1024px 时 tabs 可横向滚动且操作目标至少 44px，纯图标操作具中文 tooltip 与 `aria-label`，长 tab 名称省略防溢出。
+- 影响文件：`admin-web/src/components/base/SavedViewTabs.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 通过（1 个测试文件，13/13），其中直接 import 三个 SFC 完成真实 Vite Vue 转换。下一步追加长期契约并运行三文件联合定向、全量测试、构建与静态检查。
+
+## 2026-07-15 21:52 +0800
+- 进度：Precision Ops Task 5 第三阶段 `SavedViewTabs` SFC 契约测试已确认 RED。测试直接 import 目标 SFC 形成 Vite Vue 编译门禁，并把名称 prompt、删除 confirm、trim 后 emit、cancel/close 吞掉与其它异常重抛、内置保护、自定义命令、底边框、32/44px 操作尺寸、纯图标可访问名称及长 tab 防溢出分别限定到 script/template/style block；生产组件尚未创建。
+- 影响文件：`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 按预期失败（1 个测试文件收集失败，退出码 1）；原因是直接 import 的 `./SavedViewTabs.vue` 不存在，已有基础 SFC 未报告转换错误。
+
+## 2026-07-15 21:50 +0800
+- 进度：完成 Precision Ops Task 5 第二阶段共享 composable 最小实现与定向 GREEN。控制器只消费注入的 storage key、内置视图、快照 normalize/get/apply 与 refresh，不包含页面业务字段或确认 UI；storage 读写异常只关闭持久化、不破坏会话状态；连续相同时钟值通过确定性数字后缀避免覆盖旧视图。
+- 影响文件：`admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/useSavedViews.spec.js` 通过（1 个测试文件，5/5）。下一步先修改 `precisionOpsComponents.spec.js` 并确认 `SavedViewTabs.vue` 缺失导致的第三阶段 RED。
+
+## 2026-07-15 21:48 +0800
+- 进度：Precision Ops Task 5 第二阶段 composable 测试已确认 RED。测试通过响应式页面快照与注入式内存 storage 锁定自定义态、选中用户来源、save/update/rename/remove/select+refresh 全生命周期、内置视图保护、无效命令、持久化初始化、storage 读写异常会话降级及重复时钟 ID 防覆盖；生产 composable 尚未创建。
+- 影响文件：`admin-web/src/components/base/useSavedViews.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/useSavedViews.spec.js` 按预期失败（1 个测试文件收集失败，退出码 1）；原因是 `./useSavedViews` 模块不存在，已有 helper 可正常解析。
+
+## 2026-07-15 21:46 +0800
+- 进度：完成 Precision Ops Task 5 第一阶段 helper 最小实现与定向 GREEN。版本 1 文档解析按用户 ID、非空名称和首条唯一 ID 过滤记录，单条快照规范化异常局部丢弃；快照键递归规范对象键顺序，集合变换保持输入不可变，helper 不读取浏览器 storage。
+- 影响文件：`admin-web/src/components/base/savedView.helpers.js`、`admin-web/src/components/base/savedView.helpers.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/savedView.helpers.spec.js` 通过（1 个测试文件，7/7）。下一步先创建 `useSavedViews.spec.js` 并确认 composable 缺失导致的第二阶段 RED。
+
+## 2026-07-15 21:44 +0800
+- 进度：Precision Ops Task 5 第一阶段 helper 测试已确认 RED。测试先锁定 schema 常量、嵌套规范快照键、版本文档往返、损坏/不兼容/重复/非法记录回退、逐记录规范化异常隔离、不可变集合操作和 storage 独立性；生产 helper 尚未创建。
+- 影响文件：`admin-web/src/components/base/savedView.helpers.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/savedView.helpers.spec.js` 按预期失败（1 个测试文件收集失败，退出码 1）；原因是 `./savedView.helpers` 模块不存在，不是测试语法或环境错误。
+
+## 2026-07-15 21:42 +0800
+- 进度：启动 Precision Ops Task 5，按 helper、共享 `useSavedViews` composable、`SavedViewTabs` 三阶段 TDD 落地集合保存视图基础能力。纯函数只负责版本 1 文档、规范快照键、记录校验与集合变换；composable 独占 storage 容错和通用状态机；组件独占名称输入与删除确认。范围不接入 `VideoList`/`ImageManage`，不修改 Layout、路由、API 或依赖。
+- 影响文件：计划只新增 `admin-web/src/components/base/savedView.helpers.js`、`admin-web/src/components/base/savedView.helpers.spec.js`、`admin-web/src/components/base/useSavedViews.js`、`admin-web/src/components/base/useSavedViews.spec.js`、`admin-web/src/components/base/SavedViewTabs.vue`，修改 `admin-web/src/components/base/precisionOpsComponents.spec.js`，并追加 `CONTEXT.md`、`plan.md`；任务报告写入未提交的 `.superpowers/sdd/task-5-report.md`。
+- 验证：每阶段先只写测试并运行对应定向命令确认预期 RED，再实现最小能力转 GREEN；收尾运行三文件定向测试、管理端全量 `npm test`、`npm run build`、`git diff --check` 与本任务文件 U+FFFD 扫描。
+
 ## 2026-07-15 21:28 +0800
 - 进度：完成 Precision Ops Task 4 全部评审 finding 的最终验证与提交前自审。测试已从纯源码读取升级为 Vite Vue 插件直接 import 两个 SFC，并继续把模板/样式断言限定到对应 block；Metric 与 Status 的批准 tone 集合、字段 validator、非法 class neutral 回退、重复 identity 拒绝、第四列边线及长状态文案换行均有独立回归用例。实现计划 Task 4 示例已同步且保持 204 个成对代码围栏，无页面接入、新依赖或额外业务改动。
 - 影响文件：本次精确提交仅包含 `admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-4-report.md`、构建产物或其它文件。

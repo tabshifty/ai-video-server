@@ -208,6 +208,10 @@
 - `admin Dashboard 数据诚实性`：管理端仪表盘只能按现有统计接口展示内容库存、用户、今日上传、转码队列、磁盘容量与上传趋势；没有全局失败率、告警或健康度数据时不得用前端推测制造告警。新增全局健康指标必须作为独立后端契约设计，不夹带在视觉升级中。
 - `admin TaskMonitor 统计口径`：任务监控的总量来自服务端分页总数，状态分类数若由当前页任务计算，界面必须明确标注“本页”；不得再用当前页成功数除以全局总数生成成功率。自动刷新应保留当前内容并表达刷新状态，不用遮罩阻断管理员继续查看。
 - `admin 保存视图`：管理端集合页的保存视图是浏览器本地、页面内的效率偏好，只保存该页面已有的筛选值、列显示以及网格/列表模式等稳定状态；数据必须带 schema 版本，解析失败或版本不兼容时回退默认。选择视图后再手动修改任何已保存字段时进入临时“自定义”状态，不静默改写原视图；显式保存后才更新快照。保存视图不新增服务端同步、共享权限、排序能力或跨页面通用查询语义。
+- `admin 保存视图本地文档契约`：保存视图文档 schema 固定从版本 1 起步，结构为 `{ version: 1, items: [{ id, label, snapshot }] }`；用户视图 ID 必须以 `user-` 开头且后缀非空、不含空白，label trim 后必须非空，snapshot 必须先经过页面注入的 normalizer。读取损坏 JSON、不兼容版本、非数组 items、非法记录或重复 ID 时安全过滤，单条 snapshot 规范化异常不得清空同文档内其它有效记录。快照比较使用递归排序对象键的 canonical JSON key，数组顺序保持业务语义；纯 helper 不读取 storage。
+- `admin 保存视图共享控制器边界`：集合页统一通过 `useSavedViews` 注入 `storageKey`、`builtInViews`、`normalizeSnapshot`、`getCurrentSnapshot`、`applySnapshot` 与 `refresh`；composable 独占用户视图、选中来源、自定义态以及 save/update/rename/remove/select+refresh 状态机，不得知道 `q`、`status`、`columns` 等页面业务字段。页面 normalizer 决定稳定快照形状，`applySnapshot` 负责业务字段、列偏好和选择清理，`refresh` 负责加载；`VideoList`、`ImageManage` 等消费者不得复制一份页面控制器。
+- `admin 保存视图 storage 异常策略`：`useSavedViews` 是保存视图唯一的 storage 访问层；读取异常按无用户视图启动，写入或序列化异常只使持久化失效，当前会话中的响应式用户视图及后续命令继续可用。保存 ID 以 `user-${now}` 为基础，同一 storage 会话发生时间戳碰撞时追加确定性数字后缀，禁止静默覆盖旧视图。
+- `admin SavedViewTabs 确认职责`：保存名称、重命名名称与删除确认只由共享 `SavedViewTabs` 调用 `ElMessageBox`；页面和 `useSavedViews` 只接收已确认命令，不得再次 prompt/confirm。组件仅在确认成功后 emit trim 后的 label 或目标 ID，`cancel`/`close` 作为无操作吞掉，其它异常继续抛出；内置视图永远不展示覆盖、重命名或删除命令，自定义态只提供另存为及对有效用户来源的更新。
 - `admin 媒体集合操作可发现性`：视频和图片集合页必须始终提供可见、可键盘聚焦的详情入口或更多操作菜单；低频或危险动作可以收入更多菜单，但不能只在鼠标 hover 时出现。图片缩略图优先完整展示资产内容，卡片的选择、状态和操作不能覆盖关键画面或互相遮挡。
 - `admin 媒体上下文检查器`：视频与图片资产详情继续复用 560px 右侧 Drawer 作为上下文检查器，通过稳定预览、分组元数据和固定操作区提升核对效率；本轮不引入常驻分屏面板或新的选择状态机，窄屏沿用全宽 Drawer。
 - `admin 设计 token`：管理端全局颜色、字体、字号、间距、圆角、阴影、动效、断点和 shell 尺寸统一由 `admin-web/src/assets/theme.css` 的 CSS 变量表达；业务视图和基础组件应引用 token，不直接扩散临时色值或字体。

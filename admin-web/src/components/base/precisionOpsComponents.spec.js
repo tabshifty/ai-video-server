@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import MetricStrip from './MetricStrip.vue'
+import SavedViewTabs from './SavedViewTabs.vue'
 import StatusIndicator from './StatusIndicator.vue'
 
 const metricStripSource = readFileSync(new URL('./MetricStrip.vue', import.meta.url), 'utf8')
+const savedViewTabsSource = readFileSync(new URL('./SavedViewTabs.vue', import.meta.url), 'utf8')
 const statusIndicatorSource = readFileSync(new URL('./StatusIndicator.vue', import.meta.url), 'utf8')
 const semanticTones = ['neutral', 'success', 'warning', 'danger', 'info']
 
@@ -31,6 +33,9 @@ function findRule(style, selector) {
 
 const metricTemplate = extractBlock(metricStripSource, 'template')
 const metricStyle = extractBlock(metricStripSource, 'style')
+const savedViewScript = extractBlock(savedViewTabsSource, 'script')
+const savedViewTemplate = extractBlock(savedViewTabsSource, 'template')
+const savedViewStyle = extractBlock(savedViewTabsSource, 'style')
 const statusTemplate = extractBlock(statusIndicatorSource, 'template')
 const statusStyle = extractBlock(statusIndicatorSource, 'style')
 
@@ -118,5 +123,54 @@ describe('Precision Ops base components', () => {
     expect(statusStyle).not.toContain('white-space: nowrap')
     expect(labelRule).toContain('min-width: 0')
     expect(labelRule).toContain('overflow-wrap: anywhere')
+  })
+
+  it('compiles SavedViewTabs and exposes the complete shared command surface', () => {
+    expect(SavedViewTabs).toBeTruthy()
+    expect(Object.keys(SavedViewTabs.props)).toEqual(['items', 'activeId', 'editableSourceId'])
+    expect(SavedViewTabs.props.items.required).toBe(true)
+    expect(SavedViewTabs.props.activeId.required).toBe(true)
+    expect(SavedViewTabs.emits).toEqual(['select', 'save', 'update', 'rename', 'remove'])
+  })
+
+  it('owns confirmed saved-view naming and deletion commands', () => {
+    expect(savedViewScript).toContain("ElMessageBox.prompt('请输入视图名称'")
+    expect(savedViewScript).toContain("ElMessageBox.prompt('请输入新的视图名称'")
+    expect(savedViewScript).toContain("ElMessageBox.confirm('确认删除这个保存视图？'")
+    expect(savedViewScript).toContain("emit('save', String(value).trim())")
+    expect(savedViewScript).toContain("emit('rename', { id: activeItem.value.id, label: String(value).trim() })")
+    expect(savedViewScript).toContain("emit('remove', activeItem.value.id)")
+    expect(savedViewScript).toContain("return error === 'cancel' || error === 'close'")
+    expect(savedViewScript.match(/if \(!isDismissed\(error\)\) throw error/g)).toHaveLength(3)
+    expect(savedViewScript).not.toContain('localStorage')
+  })
+
+  it('shows transient custom commands while protecting built-in views', () => {
+    expect(savedViewScript).toContain("{ id: CUSTOM_VIEW_ID, label: '自定义', builtIn: true, transient: true }")
+    expect(savedViewScript).toContain('props.editableSourceId && !item.builtIn')
+    expect(savedViewScript).toContain('if (!activeItem.value || activeItem.value.builtIn) return')
+    expect(savedViewTemplate).toContain('v-if="activeId === CUSTOM_VIEW_ID"')
+    expect(savedViewTemplate).toContain('v-if="activeId === CUSTOM_VIEW_ID && editableSource"')
+    expect(savedViewTemplate).toContain("emit('update', editableSource.id)")
+    expect(savedViewTemplate).toContain('v-if="activeItem && !activeItem.builtIn"')
+  })
+
+  it('keeps saved-view commands compact, responsive and accessible without cards', () => {
+    const rootRule = findRule(savedViewStyle, '.saved-view-tabs')
+    const actionButtonRule = findRule(savedViewStyle, '.saved-view-tabs__actions :deep(.el-button)')
+    const tabItemRule = findRule(savedViewStyle, ':deep(.el-tabs__item)')
+
+    expect(savedViewTemplate).toContain('class="saved-view-tabs" aria-label="保存视图"')
+    expect(savedViewTemplate).toContain('<el-tooltip content="视图操作"')
+    expect(savedViewTemplate).toContain('aria-label="视图操作"')
+    expect(rootRule).toContain('border-bottom: 1px solid var(--line-soft)')
+    expect(rootRule).toContain('letter-spacing: 0')
+    expect(actionButtonRule).toContain('height: 32px')
+    expect(tabItemRule).toContain('overflow: hidden')
+    expect(tabItemRule).toContain('text-overflow: ellipsis')
+    expect(savedViewStyle).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.saved-view-tabs__tabs\s*\{[^}]*overflow-x:\s*auto/)
+    expect(savedViewStyle).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.saved-view-tabs__actions :deep\(\.el-button\)\s*\{[^}]*min-height:\s*44px/)
+    expect(savedViewStyle).not.toContain('box-shadow')
+    expect(savedViewStyle).not.toMatch(/\bbackground(?:-color)?:/)
   })
 })
