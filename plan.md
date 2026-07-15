@@ -2,6 +2,76 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 14:41:28 +0800
+- 进度：完成 PC 管理端 `Precision Ops` 书面设计规格与最终自检。规格已覆盖现状、官方基准、目标与非目标、壳层导航、视觉 token、按任务分级密度、共享组件、本地保存视图、四个样板页、全站四阶段推广、状态/无障碍策略、量化验收、验证和回滚；自检将 `MetricStrip` 的职责收紧为“口径明确”，允许全局与本页指标并列时必须直接标注，避免与 TaskMonitor、ImageManage 的真实统计边界冲突。提交范围只包含 `CONTEXT.md`、`plan.md` 和 `docs/superpowers/specs/2026-07-15-admin-web-precision-ops-design.md`，不纳入视觉伴侣临时目录 `.superpowers/`，业务代码未修改。
+- 影响文件：`CONTEXT.md`、`plan.md`、`docs/superpowers/specs/2026-07-15-admin-web-precision-ops-design.md`。
+- 验证：规格占位符扫描和 U+FFFD 乱码扫描无输出；25 个 `admin-web/src/views/*.vue` 与推广阶段清单双向比对无差异；`git diff --check -- CONTEXT.md plan.md docs/superpowers/specs/2026-07-15-admin-web-precision-ops-design.md` 通过；9 个官方参考链接重新核验为 HTTP 200（Primer 大页面使用 HEAD 复核）。本次仅更新文档，无需运行管理端测试或构建；提交前继续对暂存内容复跑静态检查。
+
+## 2026-07-15 14:04:15 +0800
+- 进度：用户确认 Precision Ops 设计第 4 节及完整方案。全站按“基础系统与四个样板页 → 资源集合页 → 表单/编辑器/工具页 → 响应式与无障碍收尾”四阶段推广；共享架构沿用主题 token、低特异性 Element 覆写和基础组件三层；状态策略区分首次加载、后台刷新、真正空态、筛选零结果、读取失败和危险操作；每阶段独立验证与提交，不改路由、权限、API、数据库或依赖。
+- 影响文件：`plan.md`；后续新增中文设计规格，视觉临时稿位于未提交的 `.superpowers/`。
+- 验证：用户终端明确“确认”；待写入设计规格并执行占位符、矛盾、范围、歧义、Markdown 空白和乱码自检后提交。
+
+## 2026-07-15 13:54:42 +0800
+- 进度：用户确认 Precision Ops 设计第 3B 节“视频列表与图片管理”。VideoList 使用保存视图、单行筛选条、约 72×40px 封面、52px 媒体行、显式详情和更多菜单，保留 Shift 选择、列设置、批量语义与现有 Drawer。ImageManage 使用紧凑统计条、保存视图、约 184px 最小卡宽和 12px 网格间距，1440px 目标至少 5 列，图片以 contain 完整展示，选择与更多操作不再只依赖 hover；网格/列表、筛选和 Drawer 语义不变。
+- 影响文件：`CONTEXT.md`、`plan.md`；视觉临时稿位于未提交的 `.superpowers/`。
+- 验证：浏览器连续两次记录 `approve-media-collection-pages`，与用户终端“确认”一致；待确认全站推广、共享组件、加载/错误策略、量化验收和回滚方案。
+
+## 2026-07-15 13:48:50 +0800
+- 进度：用户确认 Precision Ops 设计第 3A 节“运营概览与任务监控”。Dashboard 将 8 张同权大卡收为运行摘要与内容库存两级指标，趋势图降低高度并增加现有路由快捷入口；不伪造接口未提供的失败率或健康度。TaskMonitor 移除重复 KPI 卡和误导性成功率，明确全局总量与本页状态计数，使用 44px 任务行、6px 进度条、可查看全文的单行错误，并让后台刷新保留现有内容。
+- 影响文件：`CONTEXT.md`、`plan.md`；视觉临时稿位于未提交的 `.superpowers/`。
+- 验证：浏览器连续两次记录 `approve-ops-monitoring-pages`，与用户终端“确认”一致；待确认视频列表与图片管理两类媒体集合页。
+
+## 2026-07-15 13:43:52 +0800
+- 进度：用户确认 Precision Ops 设计第 2 节“设计 token 与按任务分级密度”。视觉基线采用冷中性画布/白色表面/深色正文/冷蓝主操作及独立成功、警告、危险状态色，字体延续 Inter 与中文系统栈，普通区块取消阴影，圆角收敛到 4/6/8px。紧凑列表使用 32px 控件、36px 表头、40px 文字行或 52px 媒体行；监控任务行 44px、进度条 6px；中密度表单使用 36px 控件和 16px 间距；窄屏点击目标不小于 44px。
+- 影响文件：`plan.md`；视觉临时稿位于未提交的 `.superpowers/`。
+- 验证：浏览器连续记录 `approve-precision-tokens`，与用户终端“确认”一致；核对现有 Dashboard 接口仅提供内容数、用户数、今日上传、队列长度、磁盘容量与上传趋势，样板设计不得伪造失败率或系统健康数据。
+
+## 2026-07-15 11:49:56 +0800
+- 进度：用户确认 Precision Ops 设计第 1 节“壳层与导航”。桌面侧栏收为 224/56px，普通页面把空置顶栏与重复页头合并成 52px 工作区栏；导航保留既有分组和路由，增加最多 3 项本地最近访问并默认展开当前分组；桌面主区边距为 20px。
+- 影响文件：`CONTEXT.md`、`plan.md`；视觉临时稿位于未提交的 `.superpowers/`。
+- 验证：浏览器连续两次记录 `approve-precision-shell`，与用户终端“确认”一致；待确认设计 token、控件尺寸与按任务分级密度。
+
+## 2026-07-15 11:43:43 +0800
+- 进度：用户在视觉对比页依次查看三套候选后，最终重复选择并在终端明确更倾向 `Precision Ops`。主方向据此收口为 Polaris/Cloudscape 式集合管理；吸收 Exception Command Center 的异常健康摘要，但仅用于仪表盘/任务监控；吸收 Media Workspace 的上下文检查器，但仅用于视频/图片资产页。
+- 影响文件：`CONTEXT.md`、`plan.md`；视觉临时稿位于未提交的 `.superpowers/`。
+- 验证：浏览器事件最后两次选择均为 `precision-ops`，与用户终端反馈一致；待分章节确认壳层导航、设计 token、样板页和分阶段验收。
+
+## 2026-07-15 11:35:00 +0800
+- 进度：三个只读子代理已并行完成 `Precision Ops`、`Exception Command Center`、`Media Workspace` 候选方案。按日常效率 35%、现有架构兼容 25%、全站推广 20%、视觉品质 10%、实施风险 10% 初评，`Precision Ops` 适合作为主方向；异常优先健康摘要与媒体上下文检查器分别适合作为受限增强，不应主导全站。
+- 影响文件：`plan.md`；子代理未修改工作区。
+- 验证：三套方案均覆盖壳层、精确 token、四个样板页、复用组件、阶段、量化验收和风险；待通过可视或文字对比向用户展示方向并取得确认。
+
+## 2026-07-15 11:16:53 +0800
+- 进度：用户确认 PC 管理端采用分阶段覆盖全站的交付节奏。第一阶段统一设计系统、壳层和基础组件，并以仪表盘、视频列表、任务监控、图片管理作为四类样板页；验收后再按页面类型推广，不一次性改动全部业务页，也不把核心四页作为永久终点。
+- 影响文件：`CONTEXT.md`、`plan.md`。
+- 验证：需求边界已完成收口；待并行产出多套设计方向并按效率、风险和全站推广成本择优。
+
+## 2026-07-15 11:12:56 +0800
+- 进度：用户确认样式升级可同时包含低风险的信息架构与交互效率调整。允许合并空置顶栏、折叠长导航分组并增加最近访问或保存视图；不改现有路由、权限、接口语义和业务流程，新增偏好优先沿用浏览器本地存储。
+- 影响文件：`CONTEXT.md`、`plan.md`。
+- 验证：设计决策记录阶段，无需运行前端构建；待确认全站升级的交付节奏。
+
+## 2026-07-15 11:06:31 +0800
+- 进度：用户确认管理端采用按任务分级密度。列表、监控和批量处理页使用紧凑密度，表单、编辑器和媒体预览使用中等密度，窄屏继续保留舒适点击尺寸；首轮不做全站固定紧凑，也不增加用户密度切换设置。
+- 影响文件：`CONTEXT.md`、`plan.md`。
+- 验证：设计决策记录阶段，无需运行前端构建；待确认是否允许样式升级同时包含低风险的信息架构与交互效率调整。
+
+## 2026-07-15 11:01:47 +0800
+- 进度：用户确认 PC 管理端第二轮样式升级以“操作效率与信息密度”为第一优先级。已将长期边界收口为延续 `admin Modern Minimal`，重点减少无效留白、提高首屏信息量、强化状态层级并缩短筛选、比较和批量操作路径；不以品牌化装饰或单纯换色为主目标。
+- 影响文件：`CONTEXT.md`、`plan.md`。
+- 验证：设计决策记录阶段，无需运行前端构建；待继续确认全站内容密度策略。
+
+## 2026-07-15 10:43:19 +0800
+- 进度：完成 PC 管理端现状与外部案例基线调研。现有界面已落实 `admin Modern Minimal`、分组侧栏、命令面板、主题 token 与基础组件，第二轮不重复换肤；1440px 真实页面暴露的主要问题是空置顶栏、仪表盘指标同权重、列表/空态纵向占用偏大和媒体库导航过长。外部基准收敛为 Stripe 的异常与快捷入口、Shopify Polaris 的保存视图/筛选/批量表格、Cloudscape 的密度设置/列表详情分屏、GitHub Primer 的表格语义、Vercel Geist 的高对比克制视觉、Grafana 的健康度分层。
+- 影响文件：`plan.md`；业务代码未修改。
+- 验证：已在 1440×1000 视口核对现有仪表盘与视频列表；已核验上述产品或设计系统官方页面；`ui-ux-pro-max` 已完成 Data-Dense Dashboard、表格批量操作、响应式、图表与 Vue 指南检索。当前待用户确认升级目标优先级。
+
+## 2026-07-15 10:34:47 +0800
+- 进度：启动 PC 管理端样式升级方案调研。本轮先审计现有 Vue 3 + Element Plus 管理端的信息架构、主题变量、基础组件与典型业务页面，再检索成熟管理端产品并并行产出多个设计方向；只输出设计方案，用户确认前不修改业务代码。
+- 影响文件：`plan.md`；后续拟新增中文设计规格。
+- 验证：待完成现状页面核对、案例来源核验、UI/UX 设计基线检索、方案对比与用户确认；纯调研阶段无需运行前端构建。
+
 ## 2026-07-12 21:10:46 +0800
 - 进度：完成提交前最终新鲜验证与范围复核。当前提交只纳入压缩包文件名标题替换的最终修复、测试和本任务账本，不包含 Android、migration、构建产物或无关工作区内容；规格与工程双重复审均无遗留问题，工程结论为 Ready to merge。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.spec.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/toolboxArchiveImport.helpers.js`、`admin-web/src/views/toolboxArchiveImport.helpers.spec.js`、`internal/handlers/admin_archive_import.go`、`internal/handlers/admin_archive_import_test.go`、`internal/services/archive_import.go`、`internal/services/archive_import_batch_update.go`、`internal/services/archive_import_batch_update_test.go`、`internal/services/archive_import_groups.go`、`internal/services/archive_import_process_test.go`、`plan.md`
