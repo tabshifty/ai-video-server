@@ -112,3 +112,65 @@
   color: var(--text-secondary);
   font-weight: 500;
 }
+
+:where([data-density="compact"], [data-density="monitor"]) :where(
+  .el-button,
+  .el-input__wrapper,
+  .el-select__wrapper,
+  .el-segmented,
+  .el-radio-button__inner
+) {
+  min-height: var(--control-height);
+}
+
+:where([data-density="compact"], [data-density="monitor"]) :where(.el-table th.el-table__cell) {
+  height: var(--table-head-height);
+  padding-block: 0;
+}
+
+:where([data-density="compact"], [data-density="monitor"]) :where(.el-table td.el-table__cell) {
+  height: var(--table-row-height);
+  padding-block: 0;
+}
+
+:where([data-density="compact"] .has-media-rows) :where(.el-table td.el-table__cell) {
+  height: var(--media-row-height);
+}
+
+:where([data-density="form"]) :where(.el-button, .el-input__wrapper, .el-select__wrapper) {
+  min-height: var(--control-height);
+}
+
+@media (max-width: 63.9375rem) {
+  :where([data-density]) :where(
+    .el-button,
+    .el-input__wrapper,
+    .el-select__wrapper,
+    .el-radio-button__inner,
+    .el-pagination button,
+    .el-pager li
+  ) {
+    min-height: 44px;
+  }
+
+  :where([data-density]) :where(
+    .el-button.is-circle,
+    .el-checkbox,
+    .el-radio,
+    .el-pagination button,
+    .el-pager li
+  ) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

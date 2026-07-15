@@ -55,7 +55,6 @@ const expanded = ref(props.defaultExpanded)
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
 }
 
 .section-card.is-dense {

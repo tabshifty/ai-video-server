@@ -204,6 +204,7 @@
 - `admin 媒体集合操作可发现性`：视频和图片集合页必须始终提供可见、可键盘聚焦的详情入口或更多操作菜单；低频或危险动作可以收入更多菜单，但不能只在鼠标 hover 时出现。图片缩略图优先完整展示资产内容，卡片的选择、状态和操作不能覆盖关键画面或互相遮挡。
 - `admin 媒体上下文检查器`：视频与图片资产详情继续复用 560px 右侧 Drawer 作为上下文检查器，通过稳定预览、分组元数据和固定操作区提升核对效率；本轮不引入常驻分屏面板或新的选择状态机，窄屏沿用全宽 Drawer。
 - `admin 设计 token`：管理端全局颜色、字体、字号、间距、圆角、阴影、动效、断点和 shell 尺寸统一由 `admin-web/src/assets/theme.css` 的 CSS 变量表达；业务视图和基础组件应引用 token，不直接扩散临时色值或字体。
+- `admin Precision Ops token 与密度契约`：Precision Ops 壳层固定通过 `--admin-sidebar-width: 224px`、`--admin-sidebar-collapsed-width: 56px`、`--admin-header-height: 52px` 取值；页面密度必须在业务容器显式声明 `data-density="compact"`、`data-density="monitor"` 或 `data-density="form"`，未声明密度的旧页面不受紧凑规则影响。`compact` 使用 32px 控件、36px 表头、40px 普通行、52px 媒体行和 12px 区块间距；`monitor` 使用 32px 控件、36px 表头、44px 行和 12px 区块间距；`form` 使用 36px 控件和 16px 区块间距。视口不宽于 `63.9375rem` 时，密度容器内的圆形按钮、复选框、单选框和分页目标必须同时保持至少 44px 宽高。
 - `Element Plus 三层架构`：L1 为 `theme.css` 中的 `--el-*` token 覆盖，L2 为 `element-overrides.css` 的低特异性 `:where()` 全局覆写，L3 为 `components/base/` 中的共享 wrapper 组件；三层各司其职，避免跨层写重复样式。
 - `admin 编辑入口 Drawer`：管理端需要编辑或创建主数据时，优先使用右侧 drawer 承载表单而不是居中 dialog；drawer 适合保留列表上下文，宽度默认 560px，窄屏自动全屏，底部操作区固定在视口内。
 - `admin 编辑入口 Drawer dirty snapshot`：drawer 的 dirty 守卫必须覆盖当前 drawer 内所有可见可编辑状态，不只覆盖主表单字段；字幕、演员、合集、图片关联、上传队列等子状态若能在 drawer 内改变，也必须纳入 snapshot 或维护独立 dirty 标志。dialog 改 drawer 时要保留原有 `destroy-on-close` 或等价清理语义，避免关闭后异步请求回写旧数据。

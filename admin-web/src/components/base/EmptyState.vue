@@ -37,7 +37,7 @@ defineProps({
   display: grid;
   place-items: center;
   gap: var(--space-2);
-  min-height: calc(var(--space-12) * 4 + var(--space-6) + var(--space-1));
+  min-height: 160px;
   padding: var(--space-8);
   color: var(--text-secondary);
   text-align: center;

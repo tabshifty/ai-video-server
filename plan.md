@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 18:35:12 +0800
+- 进度：完成 Precision Ops Task 1 最终验证与提交前自审。兼容别名均保留并继续指向新语义 token；`compact`、`monitor`、`form` 仅在显式 `data-density` 容器内生效；窄屏圆形按钮、复选框、单选框和分页目标同时具备至少 44px 宽高；普通 `SectionCard` 已取消常驻阴影，批量浮条按浮层语义保留 `var(--shadow-lg)`。`CONTEXT.md` 仅新增长期 token 与密度契约。
+- 影响文件：本次精确提交仅包含 `admin-web/src/assets/theme.css`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/components/base/SectionCard.vue`、`admin-web/src/components/base/EmptyState.vue`、`admin-web/src/components/base/BulkActionBar.vue`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/` 报告或其它无关文件。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 通过（24/24）；`cd admin-web && npm test` 通过（27 个测试文件、234/234）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本任务 8 个文件及新增行 U+FFFD 扫描无命中。全仓扫描另命中两处历史 `tasks/` 文档中的 U+FFFD 搜索命令字面量，均不在本次差异中。
+
+## 2026-07-15 18:29:04 +0800
+- 进度：完成 Precision Ops Task 1 最小实现。主题已切换到批准的语义色、字号、圆角和 224/56/52px 壳层 token；新增 `compact`、`monitor`、`form` 三类显式密度变量及低特异性 Element Plus 映射，未声明密度的页面不被全局压缩；窄屏圆形按钮、复选框、单选框和分页目标均锁定至少 44px 宽高。基础区块同步取消常驻阴影、收紧空态高度和浮条圆角，浮条 `var(--shadow-lg)` 保留。
+- 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/components/base/SectionCard.vue`、`admin-web/src/components/base/EmptyState.vue`、`admin-web/src/components/base/BulkActionBar.vue`、`CONTEXT.md`、`plan.md`。
+- 验证：差异自查确认旧兼容别名仍引用新语义 token，新增长期密度契约不含临时进度；待运行定向 GREEN、管理端全量测试与构建、静态检查。
+
+## 2026-07-15 18:27:54 +0800
+- 进度：Precision Ops Task 1 定向测试已确认 RED。新增 5 组契约均因目标行为尚不存在而失败，分别覆盖批准的壳层/语义 token、三个显式密度作用域、窄屏双向 44px 点击目标、批准字号和基础区块几何；测试本身可正常收集并执行。
+- 影响文件：`admin-web/src/assets/themeTokens.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 按预期失败（1 个测试文件，24 项中 5 项失败、19 项通过；退出码 1），关键输出包括旧 `--admin-sidebar-width: 240px`、缺少 `[data-density="compact"]`、44px 规则匹配为 `null`、旧 `--text-h2: 15px` 及 `SectionCard` 仍含 `var(--shadow-xs)`。
+
+## 2026-07-15 18:26:39 +0800
+- 进度：启动 Precision Ops Task 1，仅建立全站设计 token、显式任务密度、窄屏点击尺寸与基础区块几何；不改 API、权限、路由、数据库、依赖或业务流程。先按 TDD 补定向静态契约并观察真实红灯，再做最小生产实现。
+- 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/components/base/SectionCard.vue`、`admin-web/src/components/base/EmptyState.vue`、`admin-web/src/components/base/BulkActionBar.vue`、`CONTEXT.md`、`plan.md`。
+- 验证：待执行 `cd admin-web && npm test -- src/assets/themeTokens.spec.js` 确认 RED；实现后执行定向测试、管理端全量测试与构建、`git diff --check` 及 U+FFFD 扫描。
+
 ## 2026-07-15 18:20:20 +0800
 - 进度：Precision Ops 实施前门禁最终独立复审完成。ImageManage 统计口径、全视图非零字距审计、Login/MaskEditor 定向常驻阴影断言均已复审关闭；最终结论为 Critical 0、Important 0、Minor 0。下一步从 Task 1 开始按 fresh implementer → 独立规格/质量 reviewer 的子代理流程连续执行。
 - 影响文件：`docs/superpowers/specs/2026-07-15-admin-web-precision-ops-design.md`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`plan.md`。

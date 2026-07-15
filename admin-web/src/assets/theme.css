@@ -24,55 +24,59 @@
   --blue-900: #1e3a8a;
 
   --success-50: #ecfdf5;
-  --success-600: #059669;
+  --success-600: #047857;
   --warning-50: #fffbeb;
-  --warning-600: #d97706;
+  --warning-600: #b45309;
   --danger-50: #fef2f2;
-  --danger-600: #dc2626;
+  --danger-600: #c81e1e;
   --info-50: #f0f9ff;
-  --info-600: #0284c7;
+  --info-600: #0369a1;
 
   --primary: var(--blue-600);
   --primary-strong: var(--blue-700);
   --primary-soft: var(--blue-50);
   --primary-ring: color-mix(in srgb, var(--blue-600) 36%, transparent);
 
-  --bg-canvas: var(--slate-50);
+  --bg-canvas: #f7f8fa;
   --bg-surface: #ffffff;
-  --bg-surface-muted: var(--slate-100);
-  --bg-sidebar: var(--slate-100);
+  --bg-surface-muted: #f1f3f5;
+  --bg-sidebar: #f1f3f5;
   --bg-overlay: color-mix(in srgb, var(--slate-950) 36%, transparent);
+  --bg-inverse: #0f172a;
 
-  --text-primary: var(--slate-900);
-  --text-secondary: var(--slate-600);
-  --text-muted: var(--slate-400);
+  --text-primary: #172033;
+  --text-secondary: #475569;
+  --text-muted: #607085;
+  --text-on-inverse: #ffffff;
 
-  --line-soft: var(--slate-200);
-  --line-strong: var(--slate-300);
+  --line-soft: #e2e8f0;
+  --line-strong: #cbd5e1;
   --line-focus: var(--primary-ring);
 
   --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
 
-  --text-display: 28px;
-  --leading-display: 36px;
   --text-h1: 20px;
   --leading-h1: 28px;
-  --text-h2: 15px;
-  --leading-h2: 22px;
+  --text-h2: 14px;
+  --leading-h2: 20px;
   --text-body: 14px;
-  --leading-body: 22px;
+  --leading-body: 20px;
   --text-small: 13px;
-  --leading-small: 20px;
-  --text-caption: 11px;
+  --leading-small: 18px;
+  --text-caption: 12px;
   --leading-caption: 16px;
+  --text-kpi: 24px;
+  --leading-kpi: 30px;
+  --text-display: var(--text-kpi);
+  --leading-display: var(--leading-kpi);
 
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-2xl: 8px;
 
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -99,9 +103,9 @@
   --bp-lg: 1280px;
   --bp-xl: 1536px;
 
-  --admin-sidebar-width: 240px;
-  --admin-sidebar-collapsed-width: 60px;
-  --admin-header-height: 64px;
+  --admin-sidebar-width: 224px;
+  --admin-sidebar-collapsed-width: 56px;
+  --admin-header-height: 52px;
 
   --font-main: var(--font-sans);
   --bg-subtle: var(--bg-surface-muted);
@@ -146,6 +150,27 @@
   --el-font-family: var(--font-sans);
 }
 
+[data-density="compact"] {
+  --control-height: 32px;
+  --table-head-height: 36px;
+  --table-row-height: 40px;
+  --media-row-height: 52px;
+  --section-padding: 12px;
+}
+
+[data-density="monitor"] {
+  --control-height: 32px;
+  --table-head-height: 36px;
+  --table-row-height: 44px;
+  --media-row-height: 44px;
+  --section-padding: 12px;
+}
+
+[data-density="form"] {
+  --control-height: 36px;
+  --section-padding: 16px;
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg-canvas: var(--slate-900);
@@ -179,6 +204,7 @@ body {
   background: var(--bg-canvas);
   font-family: var(--font-sans);
   font-feature-settings: 'cv11' on, 'ss03' on;
+  letter-spacing: 0;
 }
 
 button,

@@ -43,7 +43,7 @@ defineProps({
   gap: var(--space-4);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
   box-shadow: var(--shadow-lg);
 }

@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
+const overrides = readFileSync(new URL('./element-overrides.css', import.meta.url), 'utf8')
+const sectionCard = readFileSync(new URL('../components/base/SectionCard.vue', import.meta.url), 'utf8')
+const emptyState = readFileSync(new URL('../components/base/EmptyState.vue', import.meta.url), 'utf8')
+const bulkActionBar = readFileSync(new URL('../components/base/BulkActionBar.vue', import.meta.url), 'utf8')
 const VIEW_HEX_AUDIT_TARGETS = [
   '../views/Dashboard.vue',
   '../views/SystemSettings.vue',
@@ -26,20 +30,54 @@ const roseHexPatterns = [/#881337/i, /#be123c/i, /#7f1d1d/i]
 const dashboardLegacyPatterns = [/#2563eb/i, /#eff6ff/i, /#64748b/i, /#e2e8f0/i, /#cad8f5/i, /#e11d48/i, /#fda4af/i]
 
 describe('theme tokens', () => {
-  it('exports the core admin design tokens', () => {
-    expect(css).toContain('--primary: var(--blue-600)')
-    expect(css).toContain('--text-primary: var(--slate-900)')
-    expect(css).toContain('--bg-canvas: var(--slate-50)')
-    expect(css).toContain('--bg-sidebar: var(--slate-100)')
+  it('exports the approved Precision Ops shell and semantic tokens', () => {
+    expect(css).toContain('--admin-sidebar-width: 224px')
+    expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
+    expect(css).toContain('--admin-header-height: 52px')
+    expect(css).toContain('--bg-canvas: #f7f8fa')
+    expect(css).toContain('--text-primary: #172033')
+    expect(css).toContain('--text-muted: #607085')
+    expect(css).toContain('--success-600: #047857')
+    expect(css).toContain('--warning-600: #b45309')
+    expect(css).toContain('--danger-600: #c81e1e')
+    expect(css).toContain('--info-600: #0369a1')
   })
 
-  it('exports six typography tiers', () => {
-    expect(css).toMatch(/--text-display:\s*28px/)
+  it('scopes compact sizing instead of applying it to every form', () => {
+    expect(css).toContain('[data-density="compact"]')
+    expect(css).toContain('[data-density="monitor"]')
+    expect(css).toContain('[data-density="form"]')
+    expect(overrides).toContain(':where([data-density="compact"], [data-density="monitor"])')
+    expect(overrides).toContain('min-width: 44px')
+    expect(overrides).toContain('.el-button.is-circle')
+    expect(overrides).toContain('.el-checkbox')
+    expect(overrides).not.toMatch(/^:where\(\.el-button\)\s*\{[^}]*min-height:\s*32px/m)
+  })
+
+  it('keeps narrow-screen touch targets at least 44px in both dimensions', () => {
+    const touchTargetRule = overrides.match(
+      /@media \(max-width: 63\.9375rem\) \{[\s\S]*?:where\(\[data-density\]\) :where\(\s*\.el-button\.is-circle,\s*\.el-checkbox,\s*\.el-radio,\s*\.el-pagination button,\s*\.el-pager li\s*\)\s*\{([^}]*)\}/
+    )
+
+    expect(touchTargetRule).not.toBeNull()
+    expect(touchTargetRule?.[1]).toMatch(/min-width:\s*44px/)
+    expect(touchTargetRule?.[1]).toMatch(/min-height:\s*44px/)
+  })
+
+  it('exports the approved typography scale', () => {
     expect(css).toMatch(/--text-h1:\s*20px/)
-    expect(css).toMatch(/--text-h2:\s*15px/)
+    expect(css).toMatch(/--text-h2:\s*14px/)
     expect(css).toMatch(/--text-body:\s*14px/)
     expect(css).toMatch(/--text-small:\s*13px/)
-    expect(css).toMatch(/--text-caption:\s*11px/)
+    expect(css).toMatch(/--text-caption:\s*12px/)
+    expect(css).toMatch(/--text-kpi:\s*24px/)
+  })
+
+  it('uses the approved base section geometry', () => {
+    expect(sectionCard).not.toMatch(/\.section-card\s*\{[^}]*box-shadow:/)
+    expect(emptyState).toMatch(/\.empty-state\s*\{[^}]*min-height:\s*160px/)
+    expect(bulkActionBar).toMatch(/\.bulk-action-bar\s*\{[^}]*border-radius:\s*var\(--radius-md\)/)
+    expect(bulkActionBar).toMatch(/\.bulk-action-bar\s*\{[^}]*box-shadow:\s*var\(--shadow-lg\)/)
   })
 
   it('removes the old rose palette and Fira stack', () => {
