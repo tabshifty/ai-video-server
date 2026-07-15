@@ -54,7 +54,6 @@ async function load(options = {}) {
   }
   const seq = ++loadSeq
   loading.value = true
-  loadError.value = ''
   try {
     const params = {
       page: query.page,
@@ -67,6 +66,7 @@ async function load(options = {}) {
     if (seq !== loadSeq) {
       return
     }
+    loadError.value = ''
     list.value = data.items || []
     total.value = data.total_count || 0
   } catch (error) {
@@ -158,6 +158,10 @@ function progressStatus(row) {
 function setStatus(status) {
   query.status = status
   query.page = 1
+  list.value = []
+  total.value = 0
+  loaded.value = false
+  loadError.value = ''
   load()
 }
 

@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 00:27 +0800
+- 进度：完成 Task 7 三项 Important 评审修复的最终验证与提交前自审。同查询错误只由最新成功响应清除，状态筛选切换重置旧查询展示身份并进入骨架，finally 门禁以平衡 block 同时拒绝两种未保护 fixture；原九列、请求参数、分页、5 秒轮询、loadSeq、后台 rows 保留、路由和样式契约均保持。
+- 影响文件：本次精确提交仅包含 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-7-report.md`、`admin-web/dist`、路由、依赖或其它范围外文件。
+- 验证：页面单文件通过（11/11）；Task 7 三文件定向通过（30/30）；`cd admin-web && npm test` 通过（33 个文件，311/311）；`cd admin-web && npm run build` 成功（2366 modules transformed，仅既有 chunk-size warning）；`git diff --check`、四文件 U+FFFD 与 C0/DEL 扫描、变更白名单及路由零差异核对通过。
+
+## 2026-07-16 00:20 +0800
+- 进度：完成 Task 7 三项 Important 的最小修复与单文件 GREEN。测试用平衡花括号提取 finally 与 latest guard，并要求 finally 后只剩函数闭括号、guard 外无语句，统一拒绝直接未保护和跨 guard 闭括号两种 unsafe fixture；生产页面仅将同查询清错移动到最新成功分支，并让状态筛选切换在 `load()` 前清空 list/total/旧 error、置 `loaded=false`。旧请求保护、同查询后台 rows 保留、API 参数、轮询、路由、九列和样式均未改。
+- 影响文件：`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/views/TaskMonitor.vue`、`CONTEXT.md`、`plan.md`。
+- 验证：加固测试门禁后单文件为 2 项失败、9 项通过，证明正则假阳性已独立修复且两个生产 finding 仍保持 RED；生产最小改动后 `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 通过（1 个文件，11/11，无 warning/error）。待运行 Task 7 三文件定向、管理端全量测试、构建与静态门禁。
+
+## 2026-07-16 00:17 +0800
+- 进度：Task 7 三项评审回归测试已确认 RED。真实 SFC 继续正常编译；失败分别证明旧 finally 门禁会接受 guard 外 `loaded=true` 的 exact unsafe 函数尾、同查询重试在 latest-success guard 前提前清错，以及状态筛选切换未清空旧 rows/total/loaded 身份。补充边界已收口：同一查询的错误保留到最新成功，切换筛选则连同旧 `loadError` 一并清空并显示新查询骨架。
+- 影响文件：`admin-web/src/views/taskMonitorPage.spec.js`、`plan.md`；生产页面尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 按预期失败（退出码 1；1 个文件，3 项失败、8 项通过）。三项失败均来自评审指出的既有缺陷，不是 SFC 编译、测试语法或环境错误。
+
+## 2026-07-16 00:15 +0800
+- 进度：启动 Task 7 独立评审的 3 个 Important 修复。根因已逐项复现：`load()` 在请求开始即清空错误，会让首次失败后的自动重试进入 `loaded=true/list=[]/loadError=''` 伪空态；`setStatus()` 先切换筛选身份却保留旧 rows/total，失败后会永久错标；现有 finally 正则在真实函数闭括号存在时会跨过 latest guard，错误接受 guard 外更新 `loaded` 的实现。范围仅加固 TaskMonitor 状态机及页面测试，不改 API、路由、九列、分页、轮询或样式。
+- 影响文件：计划修改 `admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/views/TaskMonitor.vue`、`CONTEXT.md`、`plan.md`，并追加不纳入提交的 `.superpowers/sdd/task-7-report.md`。
+- 验证：先只修改页面测试，为错误清除顺序、筛选身份重置和 exact unsafe finally 变体增加回归门禁，运行 `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 确认真实 RED；最小实现后运行单文件 GREEN、Task 7 三文件定向、管理端全量测试、生产构建、`git diff --check`、U+FFFD/C0/DEL 扫描与提交范围核对。
+
 ## 2026-07-15 23:56 +0800
 - 进度：完成 Task 7 恢复审计、最终验证与提交前范围自审。既有 RED/GREEN 仅作为接手证据保留在下方原记录；本次新鲜验证确认 TaskMonitor 诚实统计、latest-wins 首次加载、非阻断后台刷新、持久错误、九列紧凑表格、五状态筛选、壳层标题操作区与 `/tasks` 路由变更符合 brief，未发现阻塞或需新增修复的问题。
 - 影响文件：本次精确提交仅包含 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-7-report.md`、`admin-web/dist`、依赖、其它页面或范围外文件。

@@ -24,14 +24,53 @@ function findRule(styleSource, selector) {
   return match?.[1] || ''
 }
 
+function extractBalancedBraceBlock(sourceText, openingPattern) {
+  const opening = sourceText.match(openingPattern)
+  if (!opening || opening.index === undefined) return null
+
+  const openBraceIndex = opening.index + opening[0].lastIndexOf('{')
+  let depth = 0
+
+  for (let index = openBraceIndex; index < sourceText.length; index += 1) {
+    if (sourceText[index] === '{') depth += 1
+    if (sourceText[index] !== '}') continue
+
+    depth -= 1
+    if (depth === 0) {
+      return {
+        body: sourceText.slice(openBraceIndex + 1, index),
+        closeBraceIndex: index,
+        openingIndex: opening.index
+      }
+    }
+  }
+
+  return null
+}
+
+function latestFinallyOwnsCompletion(sourceText) {
+  const finallyBlock = extractBalancedBraceBlock(sourceText, /finally\s*\{/)
+  if (!finallyBlock) return false
+  if (!/^\s*\}\s*$/.test(sourceText.slice(finallyBlock.closeBraceIndex + 1))) return false
+
+  const guardBlock = extractBalancedBraceBlock(finallyBlock.body, /if\s*\(seq === loadSeq\)\s*\{/)
+  if (!guardBlock) return false
+
+  const outsideGuard = finallyBlock.body.slice(0, guardBlock.openingIndex)
+    + finallyBlock.body.slice(guardBlock.closeBraceIndex + 1)
+
+  return outsideGuard.trim() === ''
+    && /loaded\.value\s*=\s*true/.test(guardBlock.body)
+    && /loading\.value\s*=\s*false/.test(guardBlock.body)
+}
+
 const script = extractBlock('script')
 const template = extractBlock('template')
 const style = extractBlock('style')
 const loadBlock = script.match(/async function load\(options = \{\}\) \{[\s\S]*?\n\}(?=\n\nfunction toNumber)/)?.[0] || ''
+const setStatusBlock = script.match(/function setStatus\(status\) \{[\s\S]*?\n\}(?=\n\nfunction statusLabel)/)?.[0] || ''
 const statusOptionsBlock = script.match(/const statusOptions = \[[\s\S]*?\n\]/)?.[0] || ''
 const summaryMetricsBlock = script.match(/const summaryMetrics = computed\(\(\) => \[[\s\S]*?\n\]\)/)?.[0] || ''
-const latestLoadedInFinallyPattern = /finally\s*\{\s*if\s*\(seq === loadSeq\)\s*\{(?=[\s\S]*?loaded\.value\s*=\s*true)(?=[\s\S]*?loading\.value\s*=\s*false)[\s\S]*?\}\s*\}\s*$/
-const unguardedLoadedInFinallyPattern = /finally\s*\{\s*loaded\.value\s*=\s*true/
 const rowsResetInCatchPattern = /catch\s*\(error\)\s*\{(?:(?!\}\s*finally)[\s\S])*?list\.value\s*=\s*\[\]/
 
 describe('任务监控页', () => {
@@ -68,15 +107,26 @@ describe('任务监控页', () => {
       loaded.value = true
       loading.value = false
     }
-  }`
+  }
+}`
     const unsafeFinally = `finally {
     loaded.value = true
-    if (seq === loadSeq) loading.value = false
-  }`
+    if (seq === loadSeq) {
+      loading.value = false
+    }
+  }
+}`
+    const escapedGuardFinally = `finally {
+    if (seq === loadSeq) {
+      loading.value = false
+    }
+    loaded.value = true
+  }
+}`
 
-    expect(protectedFinally).toMatch(latestLoadedInFinallyPattern)
-    expect(unsafeFinally).toMatch(unguardedLoadedInFinallyPattern)
-    expect(unsafeFinally).not.toMatch(latestLoadedInFinallyPattern)
+    expect(latestFinallyOwnsCompletion(protectedFinally)).toBe(true)
+    expect(latestFinallyOwnsCompletion(unsafeFinally)).toBe(false)
+    expect(latestFinallyOwnsCompletion(escapedGuardFinally)).toBe(false)
   })
 
   it('只允许最新请求结束首次加载并保留原请求参数与轮询约定', () => {
@@ -87,10 +137,22 @@ describe('任务监控页', () => {
     expect(loadBlock).toContain('page_size: query.page_size')
     expect(loadBlock).toContain('if (query.status)')
     expect(loadBlock).toContain('params.status = query.status')
-    expect(loadBlock).toMatch(latestLoadedInFinallyPattern)
-    expect(loadBlock).not.toMatch(unguardedLoadedInFinallyPattern)
+    expect(latestFinallyOwnsCompletion(loadBlock)).toBe(true)
     expect(loadBlock.match(/loaded\.value\s*=\s*true/g)).toHaveLength(1)
     expect(script).toContain('setInterval(() => load({ skipIfLoading: true }), 5000)')
+  })
+
+  it('只在最新请求成功后清除持久错误', () => {
+    const requestIndex = loadBlock.indexOf('const data = await getAdminTasks(params)')
+    const staleGuard = extractBalancedBraceBlock(loadBlock.slice(requestIndex), /if\s*\(seq !== loadSeq\)\s*\{/)
+    const clearErrorIndex = loadBlock.indexOf("loadError.value = ''")
+    const rowsIndex = loadBlock.indexOf('list.value = data.items || []')
+
+    expect(requestIndex).toBeGreaterThan(-1)
+    expect(staleGuard).not.toBeNull()
+    expect(clearErrorIndex).toBeGreaterThan(requestIndex + (staleGuard?.closeBraceIndex || 0))
+    expect(clearErrorIndex).toBeLessThan(rowsIndex)
+    expect(loadBlock.match(/loadError\.value\s*=\s*''/g)).toHaveLength(1)
   })
 
   it('失败分支门禁能识别清空已有任务的违规实现', () => {
@@ -138,6 +200,24 @@ describe('任务监控页', () => {
     expect(template).toContain("hasStatusFilter ? '当前筛选无结果' : '暂无任务'")
     expect(template).toContain("hasStatusFilter ? '清除状态筛选后查看全部任务' : '任务创建后会显示在这里'")
     expect(template).toContain("@click=\"setStatus('')\"")
+  })
+
+  it('切换筛选时清空旧查询身份并重新进入首次加载', () => {
+    const setStatusBody = extractBalancedBraceBlock(setStatusBlock, /function setStatus\(status\)\s*\{/)
+    const statements = setStatusBody?.body
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    expect(statements).toEqual([
+      'query.status = status',
+      'query.page = 1',
+      'list.value = []',
+      'total.value = 0',
+      'loaded.value = false',
+      "loadError.value = ''",
+      'load()'
+    ])
   })
 
   it('保留完整任务列并用文字和语义色共同表达状态', () => {
