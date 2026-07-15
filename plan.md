@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 23:21 +0800
+- 进度：完成 Task 6 Important 评审修复的覆盖验证与提交前自审。多行 catch 自校验和真实 Dashboard 共用同一个跨行模式，未留下只适配单行格式的断言；模式反斜杠均为 U+005C，无 ESC/C0/DEL 控制字节。本次无生产代码、长期契约或依赖变更。
+- 影响文件：本次精确提交仅包含 `admin-web/src/views/dashboardPage.spec.js`、`plan.md`；原报告 `.superpowers/sdd/task-6-report.md` 追加证据但不纳入提交，`Dashboard.vue`、`CONTEXT.md`、构建产物和范围外文件均不纳入。
+- 验证：`cd admin-web && npm test -- src/views/dashboardPage.spec.js` 通过（1 个文件，7/7，无噪声）；Task 6 四文件定向通过（4 个文件，25/25）；`cd admin-web && npm test` 通过（33 个文件，301/301）；`cd admin-web && npm run build` 成功（2364 modules transformed，仅既有 chunk-size warning）；`git diff --check`、U+FFFD 扫描、C0/DEL 控制字节扫描与变更白名单核对通过。
+
+## 2026-07-15 23:18 +0800
+- 进度：完成 Task 6 Important 评审门禁最小修复与单文件 GREEN。共享 `statsResetInCatchPattern` 改为 JavaScript 正则字面量需要的单反斜杠 `[\s\S]`，多行违规 catch 样例现在可被识别，当前 Dashboard 因失败分支未清空 stats 而继续通过。生产代码和长期契约均未改。
+- 影响文件：`admin-web/src/views/dashboardPage.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/dashboardPage.spec.js` 通过（退出码 0；1 个测试文件，7/7，无 warning/error）；源码逐字节显示模式中反斜杠均为 U+005C（0x5c）且每处单个，C0/DEL 控制字节扫描无命中。
+
+## 2026-07-15 23:14 +0800
+- 进度：Task 6 Important 评审修复已确认 RED。将现有双反斜杠模式提为共享测试门禁，新增一个含换行、错误赋值和 `stats.value = null` 的多行 catch 样例；样例无法被当前模式识别，证明原断言存在假阳性。未修改 `Dashboard.vue`。
+- 影响文件：`admin-web/src/views/dashboardPage.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/dashboardPage.spec.js` 按预期失败（退出码 1；1 个测试文件，1 项失败、6 项通过）；唯一失败为“能识别多行 catch 分支中违规清空 stats”，关键输出显示 `/catch \\(error\\) \\{[\\\\s\\\\S]*?stats\\.value.../` 未匹配违规样例，其余页面契约继续通过。
+
+## 2026-07-15 23:11 +0800
+- 进度：启动 Precision Ops Task 6 独立评审 Important 修复。已用同一个多行 catch 违规样例复现：当前测试字面量 `[\\s\\S]` 返回 false，正确 `[\s\S]` 返回 true，确认现有断言无法跨行捕获 `stats.value = null`。生产 `Dashboard.vue` 行为正确且保持不变。
+- 影响文件：计划仅修改 `admin-web/src/views/dashboardPage.spec.js`、`plan.md`，并向不纳入提交的 `.superpowers/sdd/task-6-report.md` 追加评审修复证据；不修改 Dashboard 生产代码或 `CONTEXT.md`。
+- 验证：先新增多行违规 catch 自校验并运行 `cd admin-web && npm test -- src/views/dashboardPage.spec.js` 确认 RED；最小修复后运行同一文件 GREEN、Task 6 四文件定向、管理端全量测试、生产构建、`git diff --check` 与 U+FFFD 扫描。
+
 ## 2026-07-15 22:54 +0800
 - 进度：完成 Precision Ops Task 6 最终验证与提交前自审。指标仅来自现有 stats API，快捷入口仅四个指定路由，Dashboard 不再导入/渲染 PageHeader 和 StatCard，刷新失败不清空旧 stats，ECharts render/resize/dispose 生命周期与原 API/权限/路由目标保持。新增样式无直接色值、数字 rgba、渐变、常驻阴影、非零字距或超过 8px 的普通圆角。
 - 影响文件：本次精确提交仅包含 `admin-web/src/views/dashboard.helpers.js`、`admin-web/src/views/dashboard.helpers.spec.js`、`admin-web/src/views/dashboardPage.spec.js`、`admin-web/src/views/Dashboard.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-6-report.md`、构建产物或范围外文件。

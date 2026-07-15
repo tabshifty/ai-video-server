@@ -27,6 +27,7 @@ function findRule(style, selector) {
 const script = extractBlock('script')
 const template = extractBlock('template')
 const style = extractBlock('style')
+const statsResetInCatchPattern = /catch \(error\) \{[\s\S]*?stats\.value\s*=\s*null/
 
 describe('Precision Ops dashboard', () => {
   it('通过真实 SFC 编译并使用壳层标题操作区', () => {
@@ -58,10 +59,23 @@ describe('Precision Ops dashboard', () => {
     expect(template).toContain('description="后端暂未返回最近 7 天上传趋势"')
   })
 
+  it('能识别多行 catch 分支中违规清空 stats', () => {
+    const violatingLoad = `async function load() {
+  try {
+    stats.value = await getAdminStats()
+  } catch (error) {
+    errorMessage.value = error.message
+    stats.value = null
+  }
+}`
+
+    expect(violatingLoad).toMatch(statsResetInCatchPattern)
+  })
+
   it('刷新失败时保留已有 stats 并保留图表生命周期', () => {
     expect(script).toContain('const nextStats = await getAdminStats()')
     expect(script).toContain('stats.value = nextStats')
-    expect(script).not.toMatch(/catch \(error\) \{[\\s\\S]*?stats\.value\s*=\s*null/)
+    expect(script).not.toMatch(statsResetInCatchPattern)
     expect(script).toContain("window.addEventListener('resize', handleResize)")
     expect(script).toContain("window.removeEventListener('resize', handleResize)")
     expect(script).toContain('chart?.dispose()')
