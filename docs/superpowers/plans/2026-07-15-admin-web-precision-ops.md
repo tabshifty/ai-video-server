@@ -77,6 +77,36 @@
 
 ```js
 const overrides = readFileSync(new URL('./element-overrides.css', import.meta.url), 'utf8')
+const mainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf8')
+const densityTokenContracts = [
+  {
+    density: 'compact',
+    tokens: [
+      ['--control-height', '32px'],
+      ['--table-head-height', '36px'],
+      ['--table-row-height', '40px'],
+      ['--media-row-height', '52px'],
+      ['--section-padding', '12px']
+    ]
+  },
+  {
+    density: 'monitor',
+    tokens: [
+      ['--control-height', '32px'],
+      ['--table-head-height', '36px'],
+      ['--table-row-height', '44px'],
+      ['--media-row-height', '44px'],
+      ['--section-padding', '12px']
+    ]
+  },
+  {
+    density: 'form',
+    tokens: [
+      ['--control-height', '36px'],
+      ['--section-padding', '16px']
+    ]
+  }
+]
 
 it('exports the approved Precision Ops shell and semantic tokens', () => {
   expect(css).toContain('--admin-sidebar-width: 224px')
@@ -95,11 +125,47 @@ it('scopes compact sizing instead of applying it to every form', () => {
   expect(css).toContain('[data-density="compact"]')
   expect(css).toContain('[data-density="monitor"]')
   expect(css).toContain('[data-density="form"]')
-  expect(overrides).toContain(':where([data-density="compact"], [data-density="monitor"])')
   expect(overrides).toContain('min-width: 44px')
   expect(overrides).toContain('.el-button.is-circle')
   expect(overrides).toContain('.el-checkbox')
   expect(overrides).not.toMatch(/^:where\(\.el-button\)\s*\{[^}]*min-height:\s*32px/m)
+})
+
+it.each(densityTokenContracts)('exports every $density density token', ({ density, tokens }) => {
+  const densityRule = css.match(new RegExp(`\\[data-density="${density}"\\]\\s*\\{([^}]*)\\}`))
+
+  expect(densityRule).not.toBeNull()
+  tokens.forEach(([token, value]) => {
+    expect(densityRule?.[1]).toContain(`${token}: ${value}`)
+  })
+})
+
+it('keeps component specificity in density overrides', () => {
+  expect(overrides).not.toMatch(/:where\(\[data-density[^\n]*\)\s+:where\(/)
+
+  const selectors = [
+    ':where([data-density="compact"], [data-density="monitor"]) .el-select__wrapper',
+    ':where([data-density="compact"], [data-density="monitor"]) .el-table th.el-table__cell',
+    ':where([data-density="compact"], [data-density="monitor"]) .el-table td.el-table__cell',
+    ':where([data-density="compact"]) .has-media-rows .el-table td.el-table__cell',
+    ':where([data-density="form"]) .el-select__wrapper',
+    ':where([data-density]) .el-pagination button',
+    ':where([data-density]) .el-button.is-circle'
+  ]
+
+  selectors.forEach((selector) => {
+    expect(overrides).toContain(selector)
+  })
+})
+
+it('loads density overrides after Element Plus defaults and theme tokens', () => {
+  const elementPlusStyles = mainSource.indexOf("import 'element-plus/dist/index.css'")
+  const themeStyles = mainSource.indexOf("import './assets/theme.css'")
+  const densityOverrides = mainSource.indexOf("import './assets/element-overrides.css'")
+
+  expect(elementPlusStyles).toBeGreaterThan(-1)
+  expect(themeStyles).toBeGreaterThan(elementPlusStyles)
+  expect(densityOverrides).toBeGreaterThan(themeStyles)
 })
 
 it('exports the approved typography scale', () => {
@@ -196,58 +262,54 @@ body {
 }
 ```
 
-- [ ] **Step 4: 增加低特异性密度映射和窄屏点击尺寸**
+- [ ] **Step 4: 增加低特异性密度祖先和可覆盖的组件映射**
 
-把以下规则加入 `element-overrides.css`，不改变未声明密度的页面：
+把以下规则加入 `element-overrides.css`，不改变未声明密度的页面。只用 `:where()` 清零密度祖先的特异性，组件目标必须保留自身 class/tag 特异性；`element-overrides.css` 在 Element Plus CSS 后加载，因此等于或高于默认选择器的目标规则可以通过正常级联获胜，不使用 `!important`：
 
 ```css
-:where([data-density="compact"], [data-density="monitor"]) :where(
-  .el-button,
-  .el-input__wrapper,
-  .el-select__wrapper,
-  .el-segmented,
-  .el-radio-button__inner
-) {
+:where([data-density="compact"], [data-density="monitor"]) .el-button,
+:where([data-density="compact"], [data-density="monitor"]) .el-input__wrapper,
+:where([data-density="compact"], [data-density="monitor"]) .el-select__wrapper,
+:where([data-density="compact"], [data-density="monitor"]) .el-segmented,
+:where([data-density="compact"], [data-density="monitor"]) .el-radio-button__inner {
   min-height: var(--control-height);
 }
 
-:where([data-density="compact"], [data-density="monitor"]) :where(.el-table th.el-table__cell) {
+:where([data-density="compact"], [data-density="monitor"]) .el-table th.el-table__cell {
   height: var(--table-head-height);
   padding-block: 0;
 }
 
-:where([data-density="compact"], [data-density="monitor"]) :where(.el-table td.el-table__cell) {
+:where([data-density="compact"], [data-density="monitor"]) .el-table td.el-table__cell {
   height: var(--table-row-height);
   padding-block: 0;
 }
 
-:where([data-density="compact"] .has-media-rows) :where(.el-table td.el-table__cell) {
+:where([data-density="compact"]) .has-media-rows .el-table td.el-table__cell {
   height: var(--media-row-height);
 }
 
-:where([data-density="form"]) :where(.el-button, .el-input__wrapper, .el-select__wrapper) {
+:where([data-density="form"]) .el-button,
+:where([data-density="form"]) .el-input__wrapper,
+:where([data-density="form"]) .el-select__wrapper {
   min-height: var(--control-height);
 }
 
 @media (max-width: 63.9375rem) {
-  :where([data-density]) :where(
-    .el-button,
-    .el-input__wrapper,
-    .el-select__wrapper,
-    .el-radio-button__inner,
-    .el-pagination button,
-    .el-pager li
-  ) {
+  :where([data-density]) .el-button,
+  :where([data-density]) .el-input__wrapper,
+  :where([data-density]) .el-select__wrapper,
+  :where([data-density]) .el-radio-button__inner,
+  :where([data-density]) .el-pagination button,
+  :where([data-density]) .el-pager li {
     min-height: 44px;
   }
 
-  :where([data-density]) :where(
-    .el-button.is-circle,
-    .el-checkbox,
-    .el-radio,
-    .el-pagination button,
-    .el-pager li
-  ) {
+  :where([data-density]) .el-button.is-circle,
+  :where([data-density]) .el-checkbox,
+  :where([data-density]) .el-radio,
+  :where([data-density]) .el-pagination button,
+  :where([data-density]) .el-pager li {
     min-width: 44px;
     min-height: 44px;
   }

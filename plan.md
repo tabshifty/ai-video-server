@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 19:09:36 +0800
+- 进度：完成 Task 1 specificity 独立评审修复的最终验证。生产 CSS、静态测试、实施计划和长期契约现统一采用“密度祖先低特异性、目标组件保留特异性”的级联规则；双层 `:where()` 错误示例已清除，`main.js` 的 Element Plus → theme → overrides 导入顺序受到测试保护，三组密度数值均被表驱动测试逐项锁定。
+- 影响文件：本次精确提交仅包含 `admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-1-report.md`、构建产物或依赖目录。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 通过（29/29）；`cd admin-web && npm test` 通过（27 个测试文件、239/239）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本次 5 个提交文件和报告的 U+FFFD 扫描无命中；实施计划维持 202 个成对代码围栏，生产 CSS 与 Task 1 示例均无密度双层 `:where()`。
+
+## 2026-07-15 19:05:18 +0800
+- 进度：完成 Task 1 级联缺陷的最小生产修复。所有密度规则仅以 `:where([data-density...])` 降低作用域祖先特异性，`.el-select__wrapper`、`.el-table th/td.el-table__cell`、`.el-pagination button`、`.el-button.is-circle` 等目标选择器保留 class/tag 特异性；媒体行的 `.has-media-rows` 也移出 `:where()`。规则仍在 Element Plus CSS 后加载，未使用 `!important`，未声明密度的页面不受影响。
+- 影响文件：`admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 通过（1 个测试文件，29/29）。待同步实施计划错误示例与长期契约后运行全量验证。
+
+## 2026-07-15 19:00:57 +0800
+- 进度：Task 1 级联修复测试已确认 RED。测试现会拒绝密度祖先后紧跟目标 `:where()`，要求 select、table、form、pagination、circle 等关键目标保留组件特异性，并通过表驱动逐项锁定 compact 32/36/40/52/12px、monitor 32/36/44/44/12px、form 36/16px；同时锁定 `main.js` 中 Element Plus → theme → overrides 的导入顺序。
+- 影响文件：`admin-web/src/assets/themeTokens.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 按预期失败（1 个测试文件，29 项中 2 项失败、27 项通过；退出码 1）。失败分别证明现有双层 `:where()` 被拒绝，以及窄屏圆形目标无法按保留特异性的选择器匹配；密度数值与导入顺序断言已通过。
+
+## 2026-07-15 18:59:29 +0800
+- 进度：Task 1 独立评审发现密度覆写的级联缺陷。`main.js` 已按 Element Plus → `theme.css` → `element-overrides.css` 顺序加载，但现有规则同时用 `:where()` 清零密度祖先和目标组件特异性，会输给 Element Plus 的 `.el-select__wrapper`、`.el-table .el-table__cell`、`.el-pagination button` 等默认选择器；现有静态测试还错误地把双层 `:where()` 当作通过条件。修复边界为：只让密度祖先保持零特异性，组件目标保留自身 class/tag 特异性，不使用 `!important`。
+- 影响文件：计划修改 `admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/main.js` 导入顺序仅作测试读取不改动、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`、`.superpowers/sdd/task-1-report.md`；报告不纳入提交。
+- 验证：先补拒绝双层 `:where()`、关键目标特异性、样式导入顺序和三组完整密度数值的定向测试并确认 RED，再做最小 CSS 修复，最后运行定向测试、管理端全量测试与构建、`git diff --check` 和本次文件 U+FFFD 扫描。
+
 ## 2026-07-15 18:35:12 +0800
 - 进度：完成 Precision Ops Task 1 最终验证与提交前自审。兼容别名均保留并继续指向新语义 token；`compact`、`monitor`、`form` 仅在显式 `data-density` 容器内生效；窄屏圆形按钮、复选框、单选框和分页目标同时具备至少 44px 宽高；普通 `SectionCard` 已取消常驻阴影，批量浮条按浮层语义保留 `var(--shadow-lg)`。`CONTEXT.md` 仅新增长期 token 与密度契约。
 - 影响文件：本次精确提交仅包含 `admin-web/src/assets/theme.css`、`admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/components/base/SectionCard.vue`、`admin-web/src/components/base/EmptyState.vue`、`admin-web/src/components/base/BulkActionBar.vue`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/` 报告或其它无关文件。

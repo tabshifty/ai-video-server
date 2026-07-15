@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./theme.css', import.meta.url), 'utf8')
 const overrides = readFileSync(new URL('./element-overrides.css', import.meta.url), 'utf8')
+const mainSource = readFileSync(new URL('../main.js', import.meta.url), 'utf8')
 const sectionCard = readFileSync(new URL('../components/base/SectionCard.vue', import.meta.url), 'utf8')
 const emptyState = readFileSync(new URL('../components/base/EmptyState.vue', import.meta.url), 'utf8')
 const bulkActionBar = readFileSync(new URL('../components/base/BulkActionBar.vue', import.meta.url), 'utf8')
@@ -28,6 +29,35 @@ const VIEW_HEX_AUDIT_TARGETS = [
 ]
 const roseHexPatterns = [/#881337/i, /#be123c/i, /#7f1d1d/i]
 const dashboardLegacyPatterns = [/#2563eb/i, /#eff6ff/i, /#64748b/i, /#e2e8f0/i, /#cad8f5/i, /#e11d48/i, /#fda4af/i]
+const densityTokenContracts = [
+  {
+    density: 'compact',
+    tokens: [
+      ['--control-height', '32px'],
+      ['--table-head-height', '36px'],
+      ['--table-row-height', '40px'],
+      ['--media-row-height', '52px'],
+      ['--section-padding', '12px']
+    ]
+  },
+  {
+    density: 'monitor',
+    tokens: [
+      ['--control-height', '32px'],
+      ['--table-head-height', '36px'],
+      ['--table-row-height', '44px'],
+      ['--media-row-height', '44px'],
+      ['--section-padding', '12px']
+    ]
+  },
+  {
+    density: 'form',
+    tokens: [
+      ['--control-height', '36px'],
+      ['--section-padding', '16px']
+    ]
+  }
+]
 
 describe('theme tokens', () => {
   it('exports the approved Precision Ops shell and semantic tokens', () => {
@@ -47,16 +77,52 @@ describe('theme tokens', () => {
     expect(css).toContain('[data-density="compact"]')
     expect(css).toContain('[data-density="monitor"]')
     expect(css).toContain('[data-density="form"]')
-    expect(overrides).toContain(':where([data-density="compact"], [data-density="monitor"])')
     expect(overrides).toContain('min-width: 44px')
     expect(overrides).toContain('.el-button.is-circle')
     expect(overrides).toContain('.el-checkbox')
     expect(overrides).not.toMatch(/^:where\(\.el-button\)\s*\{[^}]*min-height:\s*32px/m)
   })
 
+  it.each(densityTokenContracts)('exports every $density density token', ({ density, tokens }) => {
+    const densityRule = css.match(new RegExp(`\\[data-density="${density}"\\]\\s*\\{([^}]*)\\}`))
+
+    expect(densityRule).not.toBeNull()
+    tokens.forEach(([token, value]) => {
+      expect(densityRule?.[1]).toContain(`${token}: ${value}`)
+    })
+  })
+
+  it('keeps component specificity in density overrides', () => {
+    expect(overrides).not.toMatch(/:where\(\[data-density[^\n]*\)\s+:where\(/)
+
+    const selectors = [
+      ':where([data-density="compact"], [data-density="monitor"]) .el-select__wrapper',
+      ':where([data-density="compact"], [data-density="monitor"]) .el-table th.el-table__cell',
+      ':where([data-density="compact"], [data-density="monitor"]) .el-table td.el-table__cell',
+      ':where([data-density="compact"]) .has-media-rows .el-table td.el-table__cell',
+      ':where([data-density="form"]) .el-select__wrapper',
+      ':where([data-density]) .el-pagination button',
+      ':where([data-density]) .el-button.is-circle'
+    ]
+
+    selectors.forEach((selector) => {
+      expect(overrides).toContain(selector)
+    })
+  })
+
+  it('loads density overrides after Element Plus defaults and theme tokens', () => {
+    const elementPlusStyles = mainSource.indexOf("import 'element-plus/dist/index.css'")
+    const themeStyles = mainSource.indexOf("import './assets/theme.css'")
+    const densityOverrides = mainSource.indexOf("import './assets/element-overrides.css'")
+
+    expect(elementPlusStyles).toBeGreaterThan(-1)
+    expect(themeStyles).toBeGreaterThan(elementPlusStyles)
+    expect(densityOverrides).toBeGreaterThan(themeStyles)
+  })
+
   it('keeps narrow-screen touch targets at least 44px in both dimensions', () => {
     const touchTargetRule = overrides.match(
-      /@media \(max-width: 63\.9375rem\) \{[\s\S]*?:where\(\[data-density\]\) :where\(\s*\.el-button\.is-circle,\s*\.el-checkbox,\s*\.el-radio,\s*\.el-pagination button,\s*\.el-pager li\s*\)\s*\{([^}]*)\}/
+      /@media \(max-width: 63\.9375rem\) \{[\s\S]*?:where\(\[data-density\]\) \.el-button\.is-circle,[^{]*\{([^}]*)\}/
     )
 
     expect(touchTargetRule).not.toBeNull()
