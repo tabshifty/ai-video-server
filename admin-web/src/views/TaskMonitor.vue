@@ -155,13 +155,23 @@ function progressStatus(row) {
   return ''
 }
 
-function setStatus(status) {
-  query.status = status
-  query.page = 1
+function resetQueryIdentity() {
   list.value = []
   total.value = 0
   loaded.value = false
   loadError.value = ''
+}
+
+function setStatus(status) {
+  query.status = status
+  query.page = 1
+  resetQueryIdentity()
+  load()
+}
+
+function setPage(page) {
+  query.page = page
+  resetQueryIdentity()
   load()
 }
 
@@ -284,11 +294,11 @@ onUnmounted(() => {
           </div>
           <div class="toolbar-row toolbar-row--end">
             <AdminTablePagination
-              v-model:current-page="query.page"
-              v-model:page-size="query.page_size"
+              :current-page="query.page"
+              :page-size="query.page_size"
               layout="total, prev, pager, next"
               :total="total"
-              @current-change="load"
+              @current-change="setPage"
             />
           </div>
         </template>

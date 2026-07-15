@@ -48,6 +48,32 @@ function extractBalancedBraceBlock(sourceText, openingPattern) {
   return null
 }
 
+function extractFunctionStatements(sourceText, openingPattern) {
+  const block = extractBalancedBraceBlock(sourceText, openingPattern)
+  if (!block) return null
+
+  return block.body
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function ownsQueryIdentityReset(sourceText) {
+  const resetStatements = extractFunctionStatements(sourceText, /function resetQueryIdentity\(\)\s*\{/)
+  const setPageStatements = extractFunctionStatements(sourceText, /function setPage\(page\)\s*\{/)
+
+  return JSON.stringify(resetStatements) === JSON.stringify([
+    'list.value = []',
+    'total.value = 0',
+    'loaded.value = false',
+    "loadError.value = ''"
+  ]) && JSON.stringify(setPageStatements) === JSON.stringify([
+    'query.page = page',
+    'resetQueryIdentity()',
+    'load()'
+  ])
+}
+
 function latestFinallyOwnsCompletion(sourceText) {
   const finallyBlock = extractBalancedBraceBlock(sourceText, /finally\s*\{/)
   if (!finallyBlock) return false
@@ -68,10 +94,10 @@ const script = extractBlock('script')
 const template = extractBlock('template')
 const style = extractBlock('style')
 const loadBlock = script.match(/async function load\(options = \{\}\) \{[\s\S]*?\n\}(?=\n\nfunction toNumber)/)?.[0] || ''
-const setStatusBlock = script.match(/function setStatus\(status\) \{[\s\S]*?\n\}(?=\n\nfunction statusLabel)/)?.[0] || ''
 const statusOptionsBlock = script.match(/const statusOptions = \[[\s\S]*?\n\]/)?.[0] || ''
 const summaryMetricsBlock = script.match(/const summaryMetrics = computed\(\(\) => \[[\s\S]*?\n\]\)/)?.[0] || ''
 const rowsResetInCatchPattern = /catch\s*\(error\)\s*\{(?:(?!\}\s*finally)[\s\S])*?list\.value\s*=\s*\[\]/
+const paginationTag = template.match(/<AdminTablePagination\b[\s\S]*?\/>/)?.[0] || ''
 
 describe('任务监控页', () => {
   it('通过真实 SFC 编译并使用壳层标题操作区', () => {
@@ -203,21 +229,46 @@ describe('任务监控页', () => {
   })
 
   it('切换筛选时清空旧查询身份并重新进入首次加载', () => {
-    const setStatusBody = extractBalancedBraceBlock(setStatusBlock, /function setStatus\(status\)\s*\{/)
-    const statements = setStatusBody?.body
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-
-    expect(statements).toEqual([
+    expect(extractFunctionStatements(script, /function setStatus\(status\)\s*\{/)).toEqual([
       'query.status = status',
       'query.page = 1',
-      'list.value = []',
-      'total.value = 0',
-      'loaded.value = false',
-      "loadError.value = ''",
+      'resetQueryIdentity()',
       'load()'
     ])
+  })
+
+  it('分页查询身份门禁能拒绝直接加载与错误重置顺序', () => {
+    const validFixture = `function resetQueryIdentity() {
+  list.value = []
+  total.value = 0
+  loaded.value = false
+  loadError.value = ''
+}
+
+function setPage(page) {
+  query.page = page
+  resetQueryIdentity()
+  load()
+}`
+    const directLoadFixture = `function setPage(page) {
+  query.page = page
+  load()
+}`
+    const lateResetFixture = `${validFixture.replace('resetQueryIdentity()\n  load()', 'load()\n  resetQueryIdentity()')}`
+
+    expect(ownsQueryIdentityReset(validFixture)).toBe(true)
+    expect(ownsQueryIdentityReset(directLoadFixture)).toBe(false)
+    expect(ownsQueryIdentityReset(lateResetFixture)).toBe(false)
+  })
+
+  it('分页切换使用只读参数并在请求前接管新查询身份', () => {
+    expect(paginationTag).not.toBe('')
+    expect(paginationTag).toContain(':current-page="query.page"')
+    expect(paginationTag).toContain(':page-size="query.page_size"')
+    expect(paginationTag).toContain('@current-change="setPage"')
+    expect(paginationTag).not.toContain('v-model:current-page')
+    expect(paginationTag).not.toContain('v-model:page-size')
+    expect(ownsQueryIdentityReset(script)).toBe(true)
   })
 
   it('保留完整任务列并用文字和语义色共同表达状态', () => {
@@ -232,8 +283,6 @@ describe('任务监控页', () => {
     expect(script).toContain("if (status === 'pending') return 'info'")
     expect(template).toContain(':stroke-width="6"')
     expect(template).toContain('<AdminTablePagination')
-    expect(template).toContain('v-model:current-page="query.page"')
-    expect(template).toContain('v-model:page-size="query.page_size"')
   })
 
   it('错误全文可访问且监控密度和窄屏点击目标稳定', () => {

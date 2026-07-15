@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 07:41 +0800
+- 进度：完成 Task 7 分页查询身份修复的覆盖验证与提交前自审。状态筛选和分页均在新请求前重置旧展示身份；同查询刷新仍保留 rows/error 到最新成功。分页只读 props 不消费 `update:currentPage`，仅 `current-change` 调用一次 `setPage/load`，无双请求；九列、total/layout、API 参数、5 秒轮询、loadSeq、同查询错误语义、路由和既有 UI 均保持。
+- 影响文件：本次精确提交仅包含 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-7-report.md`、`admin-web/dist`、分页组件、路由、依赖或其它文件。
+- 验证：页面单文件通过（13/13）；Task 7 三文件定向通过（32/32）；`cd admin-web && npm test` 通过（33 个文件，313/313）；`cd admin-web && npm run build` 成功（2366 modules transformed，仅既有 chunk-size warning）；`git diff --check`、四文件 U+FFFD 与 C0/DEL 扫描、变更白名单、分页绑定契约及分页组件/路由零差异核对通过。
+
+## 2026-07-16 07:40 +0800
+- 进度：完成 Task 7 分页查询身份最小实现与恢复后的单文件 GREEN。`resetQueryIdentity()` 集中清空 list、total、loaded、loadError；状态筛选与新增 `setPage(page)` 都先写查询字段，再重置展示身份并调用 `load()`。分页模板改用只读 current-page/page-size props，只有 `current-change` 调用 `setPage`；`update:currentPage` 无监听者，因此每次切页只发起一个请求。其余 Task 7 行为未改。
+- 影响文件：`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：恢复后新鲜运行 `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 通过（退出码 0；1 个文件，13/13，无 warning/error）。测试门禁的 valid、direct-load、late-reset fixtures 与真实 script 共用同一检查，真实 SFC import 和真实分页标签提取均通过。待运行 Task 7 三文件定向、管理端全量测试、生产构建及静态范围门禁。
+
+## 2026-07-16 07:33 +0800
+- 进度：Task 7 分页查询身份回归测试已确认真实 RED。测试通过平衡花括号提取真实 `resetQueryIdentity`、`setStatus`、`setPage` 函数体，以正确、直接加载和错误重置顺序三类 fixture 自校验；分页断言限定到真实 `<AdminTablePagination />` 标签。生产页面尚未修改。
+- 影响文件：`admin-web/src/views/taskMonitorPage.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 按预期失败（退出码 1；1 个文件，2 项失败、11 项通过）。失败一显示 `setStatus` 仍内联清空身份、未复用 reset helper；失败二显示分页仍为两项 `v-model` 与 `@current-change="load"`。真实 SFC 编译和三类 fixture 门禁均通过，失败不是语法或环境错误。
+
+## 2026-07-16 07:32 +0800
+- 进度：启动 Precision Ops Task 7 剩余分页查询身份 Important 修复。已核实 `AdminTablePagination` 依次发出 `update:currentPage` 与 `current-change`；现有 `v-model:current-page` 会先切换页码身份，却继续展示上一页 rows、total 与本页指标，请求失败后错标会永久保留。范围仅收口 TaskMonitor 的分页身份重置，不重做 Task 7 其它内容。
+- 影响文件：计划精确修改 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`，并追加不纳入提交的 `.superpowers/sdd/task-7-report.md`；不修改 `AdminTablePagination.vue`、路由、依赖、构建产物或其它文件。
+- 验证：先补真实 script/template 分页身份门禁并运行 `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 取得预期 RED；最小实现后运行单文件 GREEN、Task 7 三文件定向、管理端全量测试、生产构建、`git diff --check`、U+FFFD/C0/DEL 与提交范围扫描。
+
 ## 2026-07-16 00:27 +0800
 - 进度：完成 Task 7 三项 Important 评审修复的最终验证与提交前自审。同查询错误只由最新成功响应清除，状态筛选切换重置旧查询展示身份并进入骨架，finally 门禁以平衡 block 同时拒绝两种未保护 fixture；原九列、请求参数、分页、5 秒轮询、loadSeq、后台 rows 保留、路由和样式契约均保持。
 - 影响文件：本次精确提交仅包含 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-7-report.md`、`admin-web/dist`、路由、依赖或其它范围外文件。
