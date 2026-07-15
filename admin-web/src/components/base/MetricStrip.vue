@@ -1,6 +1,35 @@
+<script>
+const METRIC_TONES = new Set(['neutral', 'success', 'warning', 'danger', 'info'])
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function validateMetricItems(items) {
+  if (!Array.isArray(items)) return false
+
+  const identities = new Set()
+
+  return items.every((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    if (!isNonEmptyString(item.label)) return false
+    if (typeof item.value !== 'string' && typeof item.value !== 'number') return false
+    if (item.key !== undefined && !isNonEmptyString(item.key)) return false
+    if (item.scope !== undefined && typeof item.scope !== 'string') return false
+    if (item.tone !== undefined && !METRIC_TONES.has(item.tone)) return false
+
+    const identity = item.key || item.label
+    if (identities.has(identity)) return false
+
+    identities.add(identity)
+    return true
+  })
+}
+</script>
+
 <script setup>
 defineProps({
-  items: { type: Array, required: true },
+  items: { type: Array, required: true, validator: validateMetricItems },
   ariaLabel: { type: String, default: '指标摘要' }
 })
 </script>
@@ -11,7 +40,7 @@ defineProps({
       v-for="item in items"
       :key="item.key || item.label"
       class="metric-strip__item"
-      :class="`metric-strip__item--${item.tone || 'neutral'}`"
+      :class="`metric-strip__item--${METRIC_TONES.has(item.tone) ? item.tone : 'neutral'}`"
     >
       <div class="metric-strip__label">
         <span>{{ item.label }}</span>
@@ -37,6 +66,10 @@ defineProps({
 }
 
 .metric-strip__item:last-child {
+  border-right: 0;
+}
+
+.metric-strip__item:nth-child(4n) {
   border-right: 0;
 }
 

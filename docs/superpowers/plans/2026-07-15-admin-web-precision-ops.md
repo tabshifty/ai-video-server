@@ -732,31 +732,124 @@ Commit message: `样式：升级管理端工作区壳层`
 - Create: `admin-web/src/components/base/precisionOpsComponents.spec.js`
 
 **Interfaces:**
-- `MetricStrip.items`: `Array<{ key?: string, label: string, value: string|number, scope?: string, tone?: 'neutral'|'success'|'warning'|'danger'|'info' }>`。
-- `StatusIndicator.label`: string；`tone`: `neutral|success|warning|danger|info`；`icon`: 可选 Element Plus 图标对象。
+- `MetricStrip.items`: `Array<{ key?: string, label: string, value: string|number, scope?: string, tone?: 'neutral'|'success'|'warning'|'danger'|'info' }>`；`key || label` 在数组内必须唯一，重复 label 必须提供不同的非空 key。
+- `StatusIndicator.label`: 非空 string；`tone`: `neutral|success|warning|danger|info`；`icon`: 可选 Element Plus 图标对象。无效 tone 即使绕过 Vue validator，运行时 class 也必须回退 neutral。
 
-- [ ] **Step 1: 写组件静态契约红灯测试**
+- [ ] **Step 1: 写 SFC 编译与组件契约红灯测试**
 
 ```js
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import MetricStrip from './MetricStrip.vue'
+import StatusIndicator from './StatusIndicator.vue'
 
-const metricStrip = readFileSync(new URL('./MetricStrip.vue', import.meta.url), 'utf8')
-const statusIndicator = readFileSync(new URL('./StatusIndicator.vue', import.meta.url), 'utf8')
+const metricStripSource = readFileSync(new URL('./MetricStrip.vue', import.meta.url), 'utf8')
+const statusIndicatorSource = readFileSync(new URL('./StatusIndicator.vue', import.meta.url), 'utf8')
+const semanticTones = ['neutral', 'success', 'warning', 'danger', 'info']
+
+function extractBlock(source, tag) {
+  const match = source.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`))
+  if (!match) throw new Error(`缺少 ${tag} block`)
+  return match[1]
+}
+
+function getValidator(component, propName) {
+  const validator = component.props?.[propName]?.validator
+  expect(validator).toBeTypeOf('function')
+  return validator
+}
+
+function findRule(style, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = style.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))
+  expect(match).not.toBeNull()
+  return match?.[1] || ''
+}
+
+const metricTemplate = extractBlock(metricStripSource, 'template')
+const metricStyle = extractBlock(metricStripSource, 'style')
+const statusTemplate = extractBlock(statusIndicatorSource, 'template')
+const statusStyle = extractBlock(statusIndicatorSource, 'style')
 
 describe('Precision Ops base components', () => {
-  it('renders labeled tabular metrics without cards', () => {
-    expect(metricStrip).toContain('metric-strip')
-    expect(metricStrip).toContain('tabular-num')
-    expect(metricStrip).toContain('item.scope')
-    expect(metricStrip).not.toContain('box-shadow')
+  it('compiles both SFCs and renders labeled tabular metrics without cards', () => {
+    expect(MetricStrip).toBeTruthy()
+    expect(StatusIndicator).toBeTruthy()
+    expect(metricTemplate).toContain('class="metric-strip"')
+    expect(metricTemplate).toContain('tabular-num')
+    expect(metricTemplate).toContain('v-if="item.scope"')
+    expect(metricStyle).not.toContain('box-shadow')
   })
 
-  it('combines text, shape and semantic tone', () => {
-    expect(statusIndicator).toContain('status-indicator__dot')
-    expect(statusIndicator).toContain('{{ label }}')
-    expect(statusIndicator).toContain('aria-label')
-    expect(statusIndicator).toContain('status-indicator--danger')
+  it('validates metric item shape and semantic tone', () => {
+    const validateItems = getValidator(MetricStrip, 'items')
+    expect(validateItems([])).toBe(true)
+    expect(validateItems([
+      { key: 'all', label: '任务总数', value: 12, scope: '全局', tone: 'neutral' },
+      { label: '失败', value: '2', tone: 'danger' }
+    ])).toBe(true)
+    expect(validateItems([{ label: ' ', value: 1 }])).toBe(false)
+    expect(validateItems([{ label: '总数', value: true }])).toBe(false)
+    expect(validateItems([{ label: '总数', value: 1, scope: 24 }])).toBe(false)
+    expect(validateItems([{ label: '总数', value: 1, tone: 'critical' }])).toBe(false)
+    expect(validateItems([{ key: 1, label: '总数', value: 1 }])).toBe(false)
+  })
+
+  it('requires unique metric identities and explicit keys for duplicate labels', () => {
+    const validateItems = getValidator(MetricStrip, 'items')
+    expect(validateItems([
+      { label: '重复指标', value: 1 },
+      { label: '重复指标', value: 2 }
+    ])).toBe(false)
+    expect(validateItems([
+      { key: 'first', label: '重复指标', value: 1 },
+      { key: 'second', label: '重复指标', value: 2 }
+    ])).toBe(true)
+    expect(validateItems([
+      { key: 'same', label: '指标一', value: 1 },
+      { key: 'same', label: '指标二', value: 2 }
+    ])).toBe(false)
+  })
+
+  it('normalizes invalid metric tone classes to neutral', () => {
+    expect(metricTemplate).toContain("METRIC_TONES.has(item.tone) ? item.tone : 'neutral'")
+  })
+
+  it('closes every desktop grid row and preserves responsive overrides', () => {
+    expect(findRule(metricStyle, '.metric-strip__item:nth-child(4n)')).toContain('border-right: 0')
+    expect(metricStyle).toContain('.metric-strip__item:nth-child(2n)')
+    expect(metricStyle).toMatch(/@media \(max-width: 36rem\)[\s\S]*?\.metric-strip__item\s*\{[^}]*border-right:\s*0/)
+  })
+
+  it('requires a non-empty status label', () => {
+    const validateLabel = getValidator(StatusIndicator, 'label')
+    expect(validateLabel('运行中')).toBe(true)
+    expect(validateLabel('  ')).toBe(false)
+  })
+
+  it('validates status tone while normalizing invalid classes', () => {
+    const validateTone = getValidator(StatusIndicator, 'tone')
+    semanticTones.forEach((tone) => expect(validateTone(tone)).toBe(true))
+    expect(validateTone('critical')).toBe(false)
+    expect(statusTemplate).toContain("STATUS_TONES.has(tone) ? tone : 'neutral'")
+  })
+
+  it('combines accessible text, shape and semantic tone', () => {
+    expect(statusTemplate).toContain('status-indicator__dot')
+    expect(statusTemplate).toContain('{{ label }}')
+    expect(statusTemplate).toContain('aria-label')
+    expect(statusStyle).toContain('.status-indicator--danger')
+  })
+
+  it('wraps long visible status labels without overflowing', () => {
+    const rootRule = findRule(statusStyle, '.status-indicator')
+    const labelRule = findRule(statusStyle, '.status-indicator__label')
+    expect(statusTemplate).toContain('class="status-indicator__label"')
+    expect(rootRule).toContain('max-width: 100%')
+    expect(rootRule).toContain('min-width: 0')
+    expect(statusStyle).not.toContain('white-space: nowrap')
+    expect(labelRule).toContain('min-width: 0')
+    expect(labelRule).toContain('overflow-wrap: anywhere')
   })
 })
 ```
@@ -765,21 +858,46 @@ describe('Precision Ops base components', () => {
 
 Run: `cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js`
 
-Expected: FAIL，两个组件文件尚不存在。
+Expected: FAIL。首次创建时应因两个 SFC 不存在而收集失败；评审加固时应因新增 validator、tone 回退、边线或长文案契约尚未满足而断言失败。两种情况都必须确认不是测试语法或 Vite Vue 转换配置错误。
 
 - [ ] **Step 3: 实现 MetricStrip**
 
 ```vue
+<script>
+const METRIC_TONES = new Set(['neutral', 'success', 'warning', 'danger', 'info'])
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function validateMetricItems(items) {
+  if (!Array.isArray(items)) return false
+  const identities = new Set()
+  return items.every((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    if (!isNonEmptyString(item.label)) return false
+    if (typeof item.value !== 'string' && typeof item.value !== 'number') return false
+    if (item.key !== undefined && !isNonEmptyString(item.key)) return false
+    if (item.scope !== undefined && typeof item.scope !== 'string') return false
+    if (item.tone !== undefined && !METRIC_TONES.has(item.tone)) return false
+    const identity = item.key || item.label
+    if (identities.has(identity)) return false
+    identities.add(identity)
+    return true
+  })
+}
+</script>
+
 <script setup>
 defineProps({
-  items: { type: Array, required: true },
+  items: { type: Array, required: true, validator: validateMetricItems },
   ariaLabel: { type: String, default: '指标摘要' }
 })
 </script>
 
 <template>
   <section class="metric-strip" :aria-label="ariaLabel">
-    <div v-for="item in items" :key="item.key || item.label" class="metric-strip__item" :class="`metric-strip__item--${item.tone || 'neutral'}`">
+    <div v-for="item in items" :key="item.key || item.label" class="metric-strip__item" :class="`metric-strip__item--${METRIC_TONES.has(item.tone) ? item.tone : 'neutral'}`">
       <div class="metric-strip__label">
         <span>{{ item.label }}</span>
         <em v-if="item.scope">{{ item.scope }}</em>
@@ -793,7 +911,9 @@ defineProps({
 .metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--line-soft); background: var(--bg-surface); }
 .metric-strip__item { min-width: 0; padding: var(--space-3); border-right: 1px solid var(--line-soft); }
 .metric-strip__item:last-child { border-right: 0; }
-.metric-strip__label { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); color: var(--text-secondary); font-size: var(--text-caption); }
+.metric-strip__item:nth-child(4n) { border-right: 0; }
+.metric-strip__label { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: var(--space-2); color: var(--text-secondary); font-size: var(--text-caption); }
+.metric-strip__label span, .metric-strip__label em, .metric-strip__value { min-width: 0; overflow-wrap: anywhere; }
 .metric-strip__label em { color: var(--text-muted); font-style: normal; }
 .metric-strip__value { display: block; margin-top: var(--space-1); color: var(--text-primary); font-size: var(--text-kpi); line-height: var(--leading-kpi); font-weight: 600; }
 .metric-strip__item--success .metric-strip__value { color: var(--success-600); }
@@ -808,24 +928,37 @@ defineProps({
 - [ ] **Step 4: 实现 StatusIndicator**
 
 ```vue
+<script>
+const STATUS_TONES = new Set(['neutral', 'success', 'warning', 'danger', 'info'])
+
+function isNonEmptyStatusLabel(label) {
+  return typeof label === 'string' && label.trim().length > 0
+}
+
+function isStatusTone(tone) {
+  return STATUS_TONES.has(tone)
+}
+</script>
+
 <script setup>
 defineProps({
-  label: { type: String, required: true },
-  tone: { type: String, default: 'neutral' },
+  label: { type: String, required: true, validator: isNonEmptyStatusLabel },
+  tone: { type: String, default: 'neutral', validator: isStatusTone },
   icon: { type: [Object, Function], default: null }
 })
 </script>
 
 <template>
-  <span class="status-indicator" :class="`status-indicator--${tone}`" :aria-label="label">
-    <el-icon v-if="icon"><component :is="icon" /></el-icon>
+  <span class="status-indicator" :class="`status-indicator--${STATUS_TONES.has(tone) ? tone : 'neutral'}`" :aria-label="label">
+    <el-icon v-if="icon" aria-hidden="true"><component :is="icon" /></el-icon>
     <span v-else class="status-indicator__dot" aria-hidden="true" />
-    <span>{{ label }}</span>
+    <span class="status-indicator__label">{{ label }}</span>
   </span>
 </template>
 
 <style scoped>
-.status-indicator { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); font-size: var(--text-small); white-space: nowrap; }
+.status-indicator { display: inline-flex; max-width: 100%; min-width: 0; align-items: center; gap: var(--space-1); color: var(--text-secondary); font-size: var(--text-small); }
+.status-indicator__label { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .status-indicator__dot { width: 8px; height: 8px; flex: 0 0 auto; border: 2px solid currentColor; border-radius: 50%; }
 .status-indicator--success { color: var(--success-600); }
 .status-indicator--warning { color: var(--warning-600); }
@@ -841,6 +974,8 @@ Run: `cd admin-web && npm test -- src/components/base/precisionOpsComponents.spe
 Expected: PASS。
 
 Commit message: `组件：增加紧凑指标与状态指示`
+
+评审加固提交：`修复：强化 Precision Ops 基础组件契约`
 
 ---
 

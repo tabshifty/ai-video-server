@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 21:28 +0800
+- 进度：完成 Precision Ops Task 4 全部评审 finding 的最终验证与提交前自审。测试已从纯源码读取升级为 Vite Vue 插件直接 import 两个 SFC，并继续把模板/样式断言限定到对应 block；Metric 与 Status 的批准 tone 集合、字段 validator、非法 class neutral 回退、重复 identity 拒绝、第四列边线及长状态文案换行均有独立回归用例。实现计划 Task 4 示例已同步且保持 204 个成对代码围栏，无页面接入、新依赖或额外业务改动。
+- 影响文件：本次精确提交仅包含 `admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-4-report.md`、构建产物或其它文件。
+- 验证：评审修复 RED 通过真实 SFC 转换后按预期 7 失败/2 通过；定向 GREEN 通过（9/9）；`cd admin-web && npm test` 通过（29 个测试文件，270/270）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本次 6 个提交文件 U+FFFD 码点扫描无命中；指定范围外文件差异扫描无命中。
+
+## 2026-07-15 21:24 +0800
+- 进度：完成 Precision Ops Task 4 评审 finding 的最小实现与文档同步。两个 SFC 各自用唯一批准 tone 集合同时驱动 prop validator 与 neutral class 回退；Metric items validator 校验字段形状和 `key || label` 唯一性，重复 label 只有不同非空 key 时合法；桌面每行第四格清除右边线且保留 2/1 列覆盖。Status label/tone 增加 validator，外层允许收缩并限制父宽，可见 label 改为可断词换行。Task 4 计划示例与长期契约已同步。
+- 影响文件：`admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 通过（1 个测试文件，9/9），且测试通过 Vite Vue 插件真实转换两个 SFC。待核对计划代码围栏、运行管理端全量测试、构建和静态检查。
+
+## 2026-07-15 21:20 +0800
+- 进度：Precision Ops Task 4 评审修复测试已确认 RED。测试通过 Vite Vue 插件直接 import 两个 SFC，证明转换门禁可正常收集；9 项中 7 项按预期失败，分别显示 Metric items validator、重复 identity 拒绝、Metric tone neutral 回退、桌面每行第四格边线、Status label validator、Status tone validator/neutral 回退及长 label 换行规则尚不存在，2 项既有标记与可访问组合契约继续通过。
+- 影响文件：`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 按预期失败（1 个测试文件，7 项失败、2 项通过，退出码 1）；失败来自待修复生产契约，不是 SFC 编译、测试语法或 block 提取错误。
+
+## 2026-07-15 21:13 +0800
+- 进度：开始修复 Precision Ops Task 4 独立评审的 1 个 Important 与 4 个 Minor finding。根因分别是静态测试未直接 import SFC、两个组件 props 缺少运行时边界、tone 直接拼接任意 class、四列网格未清除每行第四格右边线，以及状态 label 被无条件 `nowrap` 强制单行。范围只加固两个共享组件及其测试，并同步 Task 4 实施计划与长期契约；不接入页面、不新增依赖、不改 token/Layout/路由/API。
+- 影响文件：计划修改 `admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；追加未提交的 `.superpowers/sdd/task-4-report.md`。
+- 验证：先只修改 `precisionOpsComponents.spec.js`，直接 import 两个 SFC 并锁定 validator、重复 identity、tone neutral 回退、桌面第四列边线和长状态 label 换行，运行定向测试确认 RED；最小修复后运行同一定向测试、管理端全量测试、构建、`git diff --check` 与本次文件 U+FFFD 扫描。
+
 ## 2026-07-15 20:57 +0800
 - 进度：完成 Precision Ops Task 4 最终验证与提交前自审。`MetricStrip` 的 label/value/scope、等宽数字、4/2/1 列固定断点、长内容换行和五档批准语义色均已核对；`StatusIndicator` 的可见 label、图标或空心点、语义色、外层可访问名称和装饰图形隐藏均已核对。无页面接入、硬编码色值、常驻阴影、TypeScript 迁移、新依赖或 token/Layout/路由/API 改动。
 - 影响文件：本次精确提交仅包含 `admin-web/src/components/base/MetricStrip.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-4-report.md`、构建产物或其它文件。
