@@ -21,6 +21,27 @@ describe('admin shell preferences', () => {
     expect(pushRecentRoute(['/unknown', '/tasks', '/tasks', '/videos'], '/dashboard', paths, 2)).toEqual(['/dashboard', '/tasks'])
   })
 
+  it('caps the recent route limit at three', () => {
+    const existing = ['/videos', '/tasks', '/toolbox']
+
+    expect(pushRecentRoute(existing, '/dashboard', paths, 4)).toEqual(['/dashboard', '/videos', '/tasks'])
+  })
+
+  it('returns no recent routes for zero or negative limits', () => {
+    const existing = ['/videos', '/tasks', '/toolbox']
+
+    expect(pushRecentRoute(existing, '/dashboard', paths, 0)).toEqual([])
+    expect(pushRecentRoute(existing, '/dashboard', paths, -1)).toEqual([])
+  })
+
+  it('truncates fractional limits and defaults non-finite limits to three', () => {
+    const existing = ['/videos', '/tasks', '/toolbox']
+
+    expect(pushRecentRoute(existing, '/dashboard', paths, 2.9)).toEqual(['/dashboard', '/videos'])
+    expect(pushRecentRoute(existing, '/dashboard', paths, Number.POSITIVE_INFINITY)).toEqual(['/dashboard', '/videos', '/tasks'])
+    expect(pushRecentRoute(existing, '/dashboard', paths, Number.NaN)).toEqual(['/dashboard', '/videos', '/tasks'])
+  })
+
   it('filters unknown and duplicate recent routes and caps parsed history at three', () => {
     const raw = JSON.stringify({
       version: SHELL_PREFERENCE_VERSION,
@@ -36,6 +57,18 @@ describe('admin shell preferences', () => {
     expect(parseRecentRoutes(null, paths)).toEqual([])
     expect(parseExpandedGroupKeys('{bad', groups)).toEqual(groups)
     expect(parseExpandedGroupKeys('{"version":2,"keys":["overview"]}', groups)).toEqual(groups)
+  })
+
+  it.each([
+    ['missing keys', '{"version":1}'],
+    ['null keys', '{"version":1,"keys":null}'],
+    ['non-array keys', '{"version":1,"keys":"overview"}']
+  ])('falls back for a semantically corrupt v1 document with %s', (_, raw) => {
+    expect(parseExpandedGroupKeys(raw, groups)).toEqual(groups)
+  })
+
+  it('preserves a valid empty expanded group list', () => {
+    expect(parseExpandedGroupKeys('{"version":1,"keys":[]}', groups)).toEqual([])
   })
 
   it('round trips versioned documents with the documented structure', () => {

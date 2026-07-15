@@ -50,12 +50,14 @@ describe('command palette helpers', () => {
     const group = adminShellNavGroups.find((entry) => entry.key === 'service-tools')
 
     expect(group).toMatchObject({ label: '服务与工具' })
-    expect(group.items.map(({ path, label, alias }) => ({ path, label, alias }))).toEqual([
-      { path: '/iptv', label: 'IPTV 管理', alias: 'iptv live' },
-      { path: '/tasks', label: '任务监控', alias: 'task tasks jobs rw' },
+    expect(group.items.map(({ path, label, title, icon, alias }) => ({ path, label, title, icon, alias }))).toEqual([
+      { path: '/iptv', label: 'IPTV 管理', title: 'IPTV 管理', icon: 'Monitor', alias: 'iptv live' },
+      { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' },
       {
         path: '/toolbox',
         label: '工具箱',
+        title: '工具箱',
+        icon: 'Tools',
         alias: 'toolbox tools ed2k orphan scan orphan-files 孤儿文件扫描 archive archive-import archive import zip rar 7z 压缩包导入 压缩包 password vault credentials 密码 密码库 密码管理 gjx'
       }
     ])

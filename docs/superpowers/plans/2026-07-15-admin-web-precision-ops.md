@@ -392,19 +392,27 @@ import {
 import { adminShellNavGroups } from './base/commandPalette.helpers'
 
 const paths = ['/dashboard', '/videos', '/tasks', '/toolbox']
-const groups = ['overview', 'media', 'service-tools', 'system']
+const groups = ['overview', 'media', 'ingest', 'service-tools', 'system']
 
 describe('admin shell preferences', () => {
   it('keeps three unique recent known routes with newest first', () => {
     expect(pushRecentRoute(['/videos', '/dashboard'], '/tasks', paths)).toEqual(['/tasks', '/videos', '/dashboard'])
     expect(pushRecentRoute(['/tasks', '/videos', '/dashboard'], '/videos', paths)).toEqual(['/videos', '/tasks', '/dashboard'])
     expect(pushRecentRoute(['/tasks'], '/unknown', paths)).toEqual(['/tasks'])
+    expect(pushRecentRoute(['/videos', '/tasks', '/toolbox'], '/dashboard', paths, 4)).toEqual(['/dashboard', '/videos', '/tasks'])
+    expect(pushRecentRoute(['/videos'], '/dashboard', paths, 0)).toEqual([])
+    expect(pushRecentRoute(['/videos', '/tasks'], '/dashboard', paths, 2.9)).toEqual(['/dashboard', '/videos'])
+    expect(pushRecentRoute(['/videos', '/tasks'], '/dashboard', paths, Number.POSITIVE_INFINITY)).toEqual(['/dashboard', '/videos', '/tasks'])
   })
 
   it('falls back safely for corrupt or incompatible documents', () => {
     expect(parseRecentRoutes('{bad', paths)).toEqual([])
     expect(parseRecentRoutes('{"version":2,"paths":["/videos"]}', paths)).toEqual([])
     expect(parseExpandedGroupKeys('{bad', groups)).toEqual(groups)
+    expect(parseExpandedGroupKeys('{"version":1}', groups)).toEqual(groups)
+    expect(parseExpandedGroupKeys('{"version":1,"keys":null}', groups)).toEqual(groups)
+    expect(parseExpandedGroupKeys('{"version":1,"keys":"overview"}', groups)).toEqual(groups)
+    expect(parseExpandedGroupKeys('{"version":1,"keys":[]}', groups)).toEqual([])
   })
 
   it('round trips versioned documents and forces the active group open', () => {
@@ -420,6 +428,12 @@ describe('admin shell preferences', () => {
       ['ingest', '录入处理'],
       ['service-tools', '服务与工具'],
       ['system', '系统']
+    ])
+    const serviceTools = adminShellNavGroups.find((group) => group.key === 'service-tools')
+    expect(serviceTools.items.map(({ path, title, icon }) => ({ path, title, icon }))).toEqual([
+      { path: '/iptv', title: 'IPTV 管理', icon: 'Monitor' },
+      { path: '/tasks', title: '任务监控', icon: 'List' },
+      { path: '/toolbox', title: '工具箱', icon: 'Tools' }
     ])
   })
 })
@@ -463,12 +477,15 @@ function knownUnique(values, validValues, limit = Number.POSITIVE_INFINITY) {
 
 export function parseRecentRoutes(raw, validPaths) {
   const document = parseDocument(raw)
-  return document ? knownUnique(document.paths, validPaths, 3) : []
+  return document && Array.isArray(document.paths) ? knownUnique(document.paths, validPaths, 3) : []
 }
 
 export function pushRecentRoute(paths, path, validPaths, limit = 3) {
-  if (!validPaths.includes(path)) return knownUnique(paths, validPaths, limit)
-  return knownUnique([path, ...(Array.isArray(paths) ? paths : [])], validPaths, limit)
+  const finiteLimit = Number.isFinite(limit) ? Math.trunc(limit) : 3
+  const normalizedLimit = Math.min(3, Math.max(0, finiteLimit))
+  if (normalizedLimit === 0) return []
+  if (!validPaths.includes(path)) return knownUnique(paths, validPaths, normalizedLimit)
+  return knownUnique([path, ...(Array.isArray(paths) ? paths : [])], validPaths, normalizedLimit)
 }
 
 export function serializeRecentRoutes(paths) {
@@ -477,7 +494,7 @@ export function serializeRecentRoutes(paths) {
 
 export function parseExpandedGroupKeys(raw, validKeys) {
   const document = parseDocument(raw)
-  return document ? knownUnique(document.keys, validKeys) : [...validKeys]
+  return document && Array.isArray(document.keys) ? knownUnique(document.keys, validKeys) : [...validKeys]
 }
 
 export function ensureActiveGroup(keys, activeKey, validKeys) {
@@ -511,7 +528,7 @@ export function serializeExpandedGroupKeys(keys) {
 }
 ```
 
-在 `CONTEXT.md` 的壳层术语中记录：最近访问 key 为 `admin-recent-routes-v1`，分组展开 key 为 `admin-nav-groups-v1`，两者文档结构均为 `{ version: 1, ... }`；旧值、损坏 JSON 或 storage 异常回退默认。
+在 `CONTEXT.md` 的壳层术语中记录：最近访问 key 为 `admin-recent-routes-v1`，分组展开 key 为 `admin-nav-groups-v1`，两者文档结构均为 `{ version: 1, ... }`；旧值、损坏 JSON、字段语义损坏或 storage 异常回退默认。合法空 `keys` 保留全部收起语义，`parseRecentRoutes` 固定截断到 3 条，`pushRecentRoute` 将调用方 limit 归一化到 0..3。
 
 - [ ] **Step 5: 运行测试并提交**
 

@@ -25,12 +25,15 @@ function knownUnique(values, validValues, limit = Number.POSITIVE_INFINITY) {
 
 export function parseRecentRoutes(raw, validPaths) {
   const document = parseDocument(raw)
-  return document ? knownUnique(document.paths, validPaths, 3) : []
+  return document && Array.isArray(document.paths) ? knownUnique(document.paths, validPaths, 3) : []
 }
 
 export function pushRecentRoute(paths, path, validPaths, limit = 3) {
-  if (!validPaths.includes(path)) return knownUnique(paths, validPaths, limit)
-  return knownUnique([path, ...(Array.isArray(paths) ? paths : [])], validPaths, limit)
+  const finiteLimit = Number.isFinite(limit) ? Math.trunc(limit) : 3
+  const normalizedLimit = Math.min(3, Math.max(0, finiteLimit))
+  if (normalizedLimit === 0) return []
+  if (!validPaths.includes(path)) return knownUnique(paths, validPaths, normalizedLimit)
+  return knownUnique([path, ...(Array.isArray(paths) ? paths : [])], validPaths, normalizedLimit)
 }
 
 export function serializeRecentRoutes(paths) {
@@ -39,7 +42,7 @@ export function serializeRecentRoutes(paths) {
 
 export function parseExpandedGroupKeys(raw, validKeys) {
   const document = parseDocument(raw)
-  return document ? knownUnique(document.keys, validKeys) : [...validKeys]
+  return document && Array.isArray(document.keys) ? knownUnique(document.keys, validKeys) : [...validKeys]
 }
 
 export function ensureActiveGroup(keys, activeKey, validKeys) {
