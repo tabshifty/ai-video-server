@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 20:14 +0800
+- 进度：完成 Precision Ops Task 3 最终验证与提交前自审。最近访问最多 3 条、route path 去重、当前分组强制展开、storage 异常回退、桌面/Drawer 共用状态、收起态纯图标分组按钮、52px 工作区身份区、`header-actions` 命名 slot、兼容 meta、20px/16px/12px 留白和窄屏 44px 导航目标均受契约测试或构建保护；现有命令面板、退出登录、移动导航关闭与当前路由高亮保持不变。
+- 影响文件：本次精确提交仅包含 `admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-3-report.md`、构建产物、Task 2 helper、路由、页面、API、权限或依赖。
+- 验证：三文件定向测试通过（3 个测试文件，28/28）；`cd admin-web && npm test` 通过（28 个测试文件，259/259）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本任务 4 个提交文件的 U+FFFD 字面量扫描无命中。
+
+## 2026-07-15 20:12 +0800
+- 进度：完成 Precision Ops Task 3 收起态可操作性自审修复。初版在折叠侧栏中移除了整个分组按钮，导致已收起分组只能先展开侧栏后恢复；现改为仅条件隐藏分组文字，保留旋转箭头按钮，并补齐动态中文 `aria-label` 与 tooltip，因此自动折叠区间仍可直接展开任一分组。
+- 影响文件：`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：新增契约先按预期 RED（1 个测试文件，9 项中 1 项失败、8 项通过），最小修复后 `cd admin-web && npm test -- src/components/Layout.spec.js` 通过（9/9）。待重跑三文件定向、全量测试、构建和静态检查。
+
+## 2026-07-15 20:07 +0800
+- 进度：完成 Precision Ops Task 3 最小实现。Layout 复用 Task 2 权威导航和版本化偏好纯函数，storage 读写全部容错；route watch 按 `route.path` 去重并保留最多 3 条最近访问、强制展开当前分组和关闭移动 Drawer。桌面与 Drawer 共用五组导航及展开状态；52px 工作区栏展示分组/页名并仅通过 `header-actions` 命名 slot 接入页面操作，兼容 meta 只隐藏壳层身份区。桌面主区与两个窄屏级别分别使用 20px、16px、12px 留白，移动导航目标至少 44px，分组字距归零，普通壳层区块不再保留常驻小阴影。
+- 影响文件：`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/Layout.spec.js` 通过（8/8）；三文件定向回归通过（3 个测试文件，27/27）。待完成差异自审、长期契约记录、管理端全量测试、构建与静态检查。
+
+## 2026-07-15 20:02 +0800
+- 进度：Precision Ops Task 3 壳层契约测试已确认 RED。现有迁移兼容 meta 用例继续通过；新增用例明确因最近访问与分组偏好 key、storage/route 同步、桌面与 Drawer 共用展开状态、`header-actions` 命名 slot 及 52px/20px/16px/12px 几何尚未实现而失败，测试可正常收集执行。
+- 影响文件：`admin-web/src/components/Layout.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/Layout.spec.js` 按预期失败（1 个测试文件，8 项中 3 项失败、5 项通过，退出码 1）；失败项均对应 Task 3 尚缺契约，不是语法、导入或测试环境错误。
+
+## 2026-07-15 19:59 +0800
+- 进度：开始 Precision Ops Task 3，仅升级管理端 Layout 壳层：接入 Task 2 的权威五组导航与偏好纯函数，增加最多 3 条最近访问、桌面与移动 Drawer 共用的分组展开状态、52px 工作区页头和 `header-actions` 命名 slot；继续保留 `route.meta.hideShellPageHeader === true` 的分阶段迁移兼容边界，不改路由、页面、API、权限、依赖或 Task 2 helper。
+- 影响文件：计划只修改 `admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`；任务报告写入未提交的 `.superpowers/sdd/task-3-report.md`。
+- 验证：先扩展 `Layout.spec.js` 并运行 `cd admin-web && npm test -- src/components/Layout.spec.js` 确认因最近访问、折叠分组和命名 slot 缺失而 RED；实现后运行三文件定向测试、管理端全量测试、构建、`git diff --check` 与本任务文件 U+FFFD 扫描。
+
 ## 2026-07-15 19:50 +0800
 - 进度：完成 Precision Ops Task 2 独立复审修复的最终验证与提交前自审。语义损坏的版本 1 分组文档与合法空 keys 已明确分流；最近访问 limit 的上限、零值、负数、小数和非有限值均有独立真实断言；三项“服务与工具”菜单的路径、标签、title、icon 与 alias 均受测试保护。修复仅在既有纯函数内增加字段类型守卫和 limit 归一化，无 storage 读取、额外 API、重复状态机或导航生产数据改动。
 - 影响文件：本次精确提交仅包含 `admin-web/src/components/adminShellPreferences.js`、`admin-web/src/components/adminShellPreferences.spec.js`、`admin-web/src/components/base/commandPalette.helpers.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-2-report.md`、构建产物或其它文件。

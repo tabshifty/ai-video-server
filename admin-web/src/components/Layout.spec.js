@@ -27,6 +27,52 @@ describe('Layout shell', () => {
     expect(layout).toContain('width: var(--space-8);')
   })
 
+  it('keeps collapsed group toggles operable without rendering their text', () => {
+    expect(layout).toContain('<span v-if="!isSidebarCollapsed">{{ group.label }}</span>')
+    expect(layout).toContain(':aria-label="`${group.label}分组')
+    expect(layout).toContain('.admin-shell.is-collapsed button.nav-group__label {')
+  })
+
+  it('renders the Precision Ops workspace header contract', () => {
+    expect(layout).toContain('admin-recent-routes-v1')
+    expect(layout).toContain('admin-nav-groups-v1')
+    expect(layout).toContain('name="header-actions"')
+    expect(layout).toContain('matchedNavItem.value?.groupLabel')
+    expect(layout).toContain('recentNavItems')
+    expect(layout).toContain('toggleGroup(group.key)')
+    expect(layout).toContain('aria-expanded')
+    expect(layout).toContain('var(--admin-header-height)')
+  })
+
+  it('keeps the migration compatibility boundary', () => {
+    expect(layout).toContain('const showShellPageHeader = computed(() => !route.meta?.hideShellPageHeader)')
+    expect(layout).toContain('v-if="showShellPageHeader"')
+  })
+
+  it('guards shell storage and updates preferences from the route path', () => {
+    expect(layout).toContain('parseRecentRoutes(window.localStorage.getItem(RECENT_ROUTES_KEY), validNavPaths)')
+    expect(layout).toContain('parseExpandedGroupKeys(window.localStorage.getItem(NAV_GROUPS_KEY), validGroupKeys)')
+    expect(layout).toContain('persistShellPreference(RECENT_ROUTES_KEY')
+    expect(layout).toContain('persistShellPreference(NAV_GROUPS_KEY')
+    expect(layout).toContain('const path = route.path')
+    expect(layout).toContain('pushRecentRoute(recentRoutePaths.value, path, validNavPaths, 3)')
+    expect(layout).toContain('ensureActiveGroup(expandedGroupKeys.value, activeGroupKey.value, validGroupKeys)')
+    expect(layout).toContain('{ immediate: true }')
+  })
+
+  it('uses shared expanded groups and precise responsive workspace spacing', () => {
+    expect(layout.match(/v-for="group in navGroups"/g) || []).toHaveLength(2)
+    expect(layout.match(/v-show="isGroupExpanded\(group.key\)"/g) || []).toHaveLength(2)
+    expect(layout).toContain('height: var(--admin-header-height);')
+    expect(layout).toContain('padding: var(--space-5);')
+    expect(layout).toContain('@media (max-width: 63.9375rem)')
+    expect(layout).toContain('padding: var(--space-4);')
+    expect(layout).toContain('@media (max-width: 47.9375rem)')
+    expect(layout).toContain('padding: var(--space-3);')
+    expect(layout).toContain('min-height: 44px;')
+    expect(layout).not.toContain('letter-spacing: 0.08em;')
+  })
+
   it('removes the legacy rose gradient and admin subtitle copy', () => {
     expect(layout).not.toContain('#881337')
     expect(layout).not.toContain('#7f1d1d')

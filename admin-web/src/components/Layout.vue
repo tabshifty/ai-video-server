@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  ArrowRight,
   Avatar,
   DataAnalysis,
   Expand,
@@ -24,16 +25,29 @@ import {
 import { profileApi } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
 import CommandPalette from './base/CommandPalette.vue'
-import PageHeader from './base/PageHeader.vue'
 import {
   adminShellNavGroups,
+  adminShellNavItems,
   findAdminNavItemByPath,
   openCommandPalette
 } from './base/commandPalette.helpers'
+import {
+  ensureActiveGroup,
+  parseExpandedGroupKeys,
+  parseRecentRoutes,
+  pushRecentRoute,
+  serializeExpandedGroupKeys,
+  serializeRecentRoutes
+} from './adminShellPreferences'
 
 const SIDEBAR_COLLAPSE_KEY = 'admin-sidebar-collapsed'
+const RECENT_ROUTES_KEY = 'admin-recent-routes-v1'
+const NAV_GROUPS_KEY = 'admin-nav-groups-v1'
 const DRAWER_BREAKPOINT = 1024
 const COLLAPSE_BREAKPOINT = 1280
+const navGroups = adminShellNavGroups
+const validNavPaths = adminShellNavItems.map((item) => item.path)
+const validGroupKeys = adminShellNavGroups.map((group) => group.key)
 
 const iconMap = {
   Avatar,
@@ -59,14 +73,20 @@ const shellContentRef = ref(null)
 const mainContentRef = ref(null)
 const userCollapsed = ref(readStoredCollapsed())
 const viewportWidth = ref(readViewportWidth())
+const recentRoutePaths = ref(readStoredRecentRoutes())
+const expandedGroupKeys = ref(readStoredExpandedGroups())
 const profile = ref({
   username: '',
   role: auth.role || 'admin'
 })
 
-const navGroups = adminShellNavGroups
 const matchedNavItem = computed(() => findAdminNavItemByPath(route.path))
+const activeGroupKey = computed(() => matchedNavItem.value?.groupKey || '')
 const pageTitle = computed(() => matchedNavItem.value?.title || route.meta?.title || '管理后台')
+const pageGroupLabel = computed(() => matchedNavItem.value?.groupLabel || '管理后台')
+const recentNavItems = computed(() => recentRoutePaths.value
+  .map((path) => findAdminNavItemByPath(path))
+  .filter(Boolean))
 const showShellPageHeader = computed(() => !route.meta?.hideShellPageHeader)
 const isDrawerMode = computed(() => viewportWidth.value < DRAWER_BREAKPOINT)
 const isAutoCollapsed = computed(() => viewportWidth.value < COLLAPSE_BREAKPOINT)
@@ -83,6 +103,33 @@ function readStoredCollapsed() {
     // Safari Private Mode / 企业策略禁用 storage 时 localStorage 抛 SecurityError；
     // 静默返回默认展开形态，避免 Layout 在 setup 阶段抛出导致整页白屏
     return false
+  }
+}
+
+function readStoredRecentRoutes() {
+  if (typeof window === 'undefined') return []
+  try {
+    return parseRecentRoutes(window.localStorage.getItem(RECENT_ROUTES_KEY), validNavPaths)
+  } catch (_) {
+    return []
+  }
+}
+
+function readStoredExpandedGroups() {
+  if (typeof window === 'undefined') return [...validGroupKeys]
+  try {
+    return parseExpandedGroupKeys(window.localStorage.getItem(NAV_GROUPS_KEY), validGroupKeys)
+  } catch (_) {
+    return [...validGroupKeys]
+  }
+}
+
+function persistShellPreference(key, value) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, value)
+  } catch (_) {
+    // storage 不可用时保留本次会话状态，不阻断壳层渲染与导航。
   }
 }
 
@@ -112,6 +159,17 @@ function toggleSidebar() {
     // 隐私模式 / 配额溢出时 setItem 抛 SecurityError 或 QuotaExceededError；
     // 本次会话内偏好仍生效，仅放弃持久化，不影响点击交互
   }
+}
+
+function isGroupExpanded(key) {
+  return expandedGroupKeys.value.includes(key)
+}
+
+function toggleGroup(key) {
+  expandedGroupKeys.value = isGroupExpanded(key)
+    ? expandedGroupKeys.value.filter((item) => item !== key)
+    : [...expandedGroupKeys.value, key]
+  persistShellPreference(NAV_GROUPS_KEY, serializeExpandedGroupKeys(expandedGroupKeys.value))
 }
 
 function closeMobileNav() {
@@ -155,8 +213,14 @@ async function onLogout() {
 watch(
   () => route.fullPath,
   () => {
+    const path = route.path
     mobileNavVisible.value = false
-  }
+    recentRoutePaths.value = pushRecentRoute(recentRoutePaths.value, path, validNavPaths, 3)
+    expandedGroupKeys.value = ensureActiveGroup(expandedGroupKeys.value, activeGroupKey.value, validGroupKeys)
+    persistShellPreference(RECENT_ROUTES_KEY, serializeRecentRoutes(recentRoutePaths.value))
+    persistShellPreference(NAV_GROUPS_KEY, serializeExpandedGroupKeys(expandedGroupKeys.value))
+  },
+  { immediate: true }
 )
 
 // mobile drawer 打开时锁 body / html 滚动，避免触摸事件穿透到 main 区域；
@@ -216,32 +280,84 @@ onUnmounted(() => {
           <strong>视频管理后台</strong>
           <span>Video Server</span>
         </div>
-        <el-button class="collapse-button" text :aria-label="isSidebarCollapsed ? '展开侧栏' : '折叠侧栏'" @click="toggleSidebar">
+        <el-button
+          class="collapse-button"
+          text
+          :aria-label="isSidebarCollapsed ? '展开侧栏' : '折叠侧栏'"
+          :title="isSidebarCollapsed ? '展开侧栏' : '折叠侧栏'"
+          @click="toggleSidebar"
+        >
           <el-icon><component :is="isSidebarCollapsed ? Expand : Fold" /></el-icon>
         </el-button>
       </div>
 
       <nav class="nav-groups" aria-label="分组导航">
+        <section v-if="recentNavItems.length" class="nav-group nav-group--recent" aria-label="最近访问">
+          <div v-if="!isSidebarCollapsed" class="nav-group__label">最近访问</div>
+          <div class="nav-group__items">
+            <el-tooltip
+              v-for="item in recentNavItems"
+              :key="item.path"
+              :content="item.label"
+              :disabled="!isSidebarCollapsed"
+              placement="right"
+            >
+              <RouterLink
+                class="nav-link"
+                :class="{ 'is-active': isActive(item) }"
+                :to="item.path"
+                :aria-current="isActive(item) ? 'page' : undefined"
+                @click="closeMobileNav"
+              >
+                <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+                <span class="nav-link__label">{{ item.label }}</span>
+              </RouterLink>
+            </el-tooltip>
+          </div>
+        </section>
+
         <section v-for="group in navGroups" :key="group.key" class="nav-group" :aria-label="`${group.label}分组`">
-          <div class="nav-group__label">{{ group.label }}</div>
           <el-tooltip
-            v-for="item in group.items"
-            :key="item.path"
-            :content="item.label"
+            :content="group.label"
             :disabled="!isSidebarCollapsed"
             placement="right"
           >
-            <RouterLink
-              class="nav-link"
-              :class="{ 'is-active': isActive(item) }"
-              :to="item.path"
-              :aria-current="isActive(item) ? 'page' : undefined"
-              @click="closeMobileNav"
+            <button
+              class="nav-group__label"
+              type="button"
+              :aria-expanded="isGroupExpanded(group.key)"
+              :aria-label="`${group.label}分组，${isGroupExpanded(group.key) ? '点击收起' : '点击展开'}`"
+              @click="toggleGroup(group.key)"
             >
-              <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
-              <span class="nav-link__label">{{ item.label }}</span>
-            </RouterLink>
+              <span v-if="!isSidebarCollapsed">{{ group.label }}</span>
+              <el-icon
+                class="nav-group__chevron"
+                :class="{ 'is-expanded': isGroupExpanded(group.key) }"
+              >
+                <ArrowRight />
+              </el-icon>
+            </button>
           </el-tooltip>
+          <div v-show="isGroupExpanded(group.key)" class="nav-group__items">
+            <el-tooltip
+              v-for="item in group.items"
+              :key="item.path"
+              :content="item.label"
+              :disabled="!isSidebarCollapsed"
+              placement="right"
+            >
+              <RouterLink
+                class="nav-link"
+                :class="{ 'is-active': isActive(item) }"
+                :to="item.path"
+                :aria-current="isActive(item) ? 'page' : undefined"
+                @click="closeMobileNav"
+              >
+                <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+                <span class="nav-link__label">{{ item.label }}</span>
+              </RouterLink>
+            </el-tooltip>
+          </div>
         </section>
       </nav>
 
@@ -268,14 +384,33 @@ onUnmounted(() => {
     <section ref="shellContentRef" class="shell-content">
       <header class="shell-header">
         <div class="shell-header__left">
-          <el-button class="mobile-nav-btn" text :icon="Menu" aria-label="打开导航菜单" @click="openMobileNav" />
-          <PageHeader v-if="showShellPageHeader" class="shell-page-header" :title="pageTitle" />
+          <el-button
+            class="mobile-nav-btn"
+            text
+            :icon="Menu"
+            aria-label="打开导航菜单"
+            title="打开导航菜单"
+            @click="openMobileNav"
+          />
+          <div v-if="showShellPageHeader" class="workspace-identity">
+            <span>{{ pageGroupLabel }}</span>
+            <h1>{{ pageTitle }}</h1>
+          </div>
         </div>
-        <button class="command-trigger" type="button" @click="openCommandPalette">
+        <button
+          class="command-trigger"
+          type="button"
+          aria-label="打开快速跳转"
+          title="打开快速跳转"
+          @click="openCommandPalette"
+        >
           <el-icon><Search /></el-icon>
           <span>快速跳转</span>
           <kbd>⌘K</kbd>
         </button>
+        <div v-if="$slots['header-actions']" class="shell-header__actions">
+          <slot name="header-actions" />
+        </div>
       </header>
 
       <main id="main-content" ref="mainContentRef" class="shell-main" tabindex="-1">
@@ -298,19 +433,53 @@ onUnmounted(() => {
         </div>
       </div>
       <nav class="drawer-nav" aria-label="移动端分组导航">
+        <section v-if="recentNavItems.length" class="drawer-nav__group drawer-nav__group--recent" aria-label="最近访问">
+          <div class="drawer-nav__label">最近访问</div>
+          <div class="drawer-nav__items">
+            <RouterLink
+              v-for="item in recentNavItems"
+              :key="item.path"
+              class="drawer-nav__link"
+              :class="{ 'is-active': isActive(item) }"
+              :to="item.path"
+              :aria-current="isActive(item) ? 'page' : undefined"
+              @click="closeMobileNav"
+            >
+              <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+              <span>{{ item.label }}</span>
+            </RouterLink>
+          </div>
+        </section>
+
         <section v-for="group in navGroups" :key="group.key" class="drawer-nav__group">
-          <div class="drawer-nav__label">{{ group.label }}</div>
-          <RouterLink
-            v-for="item in group.items"
-            :key="item.path"
-            class="drawer-nav__link"
-            :class="{ 'is-active': isActive(item) }"
-            :to="item.path"
-            @click="closeMobileNav"
+          <button
+            class="drawer-nav__label"
+            type="button"
+            :aria-expanded="isGroupExpanded(group.key)"
+            @click="toggleGroup(group.key)"
           >
-            <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
-            <span>{{ item.label }}</span>
-          </RouterLink>
+            <span>{{ group.label }}</span>
+            <el-icon
+              class="nav-group__chevron"
+              :class="{ 'is-expanded': isGroupExpanded(group.key) }"
+            >
+              <ArrowRight />
+            </el-icon>
+          </button>
+          <div v-show="isGroupExpanded(group.key)" class="drawer-nav__items">
+            <RouterLink
+              v-for="item in group.items"
+              :key="item.path"
+              class="drawer-nav__link"
+              :class="{ 'is-active': isActive(item) }"
+              :to="item.path"
+              :aria-current="isActive(item) ? 'page' : undefined"
+              @click="closeMobileNav"
+            >
+              <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+              <span>{{ item.label }}</span>
+            </RouterLink>
+          </div>
         </section>
       </nav>
     </el-drawer>
@@ -388,7 +557,6 @@ onUnmounted(() => {
   border-radius: var(--radius-xl);
   color: var(--primary);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
   font-weight: 600;
 }
 
@@ -433,7 +601,6 @@ onUnmounted(() => {
 }
 
 .admin-shell.is-collapsed .brand-copy,
-.admin-shell.is-collapsed .nav-group__label,
 .admin-shell.is-collapsed .nav-link__label,
 .admin-shell.is-collapsed .profile-chip__copy {
   display: none;
@@ -450,7 +617,6 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
 }
 
 .admin-shell.is-collapsed .collapse-button:hover {
@@ -469,14 +635,56 @@ onUnmounted(() => {
   margin-top: var(--space-3);
 }
 
-.nav-group__label {
+.nav-group__items,
+.drawer-nav__items {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.nav-group__label,
+.drawer-nav__label {
   padding: 0 var(--space-2);
   color: var(--text-muted);
   font-size: var(--text-caption);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   line-height: var(--leading-caption);
-  text-transform: uppercase;
+}
+
+button.nav-group__label,
+button.drawer-nav__label {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+button.nav-group__label {
+  min-height: var(--space-6);
+}
+
+.admin-shell.is-collapsed button.nav-group__label {
+  min-height: var(--space-8);
+  justify-content: center;
+  padding: 0;
+}
+
+button.nav-group__label:hover,
+button.drawer-nav__label:hover {
+  color: var(--text-secondary);
+}
+
+.nav-group__chevron {
+  flex: 0 0 auto;
+  transition: transform var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+.nav-group__chevron.is-expanded {
+  transform: rotate(90deg);
 }
 
 .nav-link,
@@ -527,7 +735,6 @@ onUnmounted(() => {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-xl);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
   cursor: pointer;
 }
 
@@ -562,11 +769,13 @@ onUnmounted(() => {
   top: 0;
   z-index: 50;
   display: flex;
+  height: var(--admin-header-height);
   min-height: var(--admin-header-height);
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-4);
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-5);
+  box-sizing: border-box;
   border-bottom: 1px solid var(--line-soft);
   background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
   backdrop-filter: blur(var(--space-3));
@@ -579,8 +788,35 @@ onUnmounted(() => {
   gap: var(--space-3);
 }
 
-.shell-page-header {
+.workspace-identity {
+  display: flex;
   min-width: 0;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.workspace-identity span,
+.workspace-identity h1 {
+  overflow: hidden;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-identity span {
+  flex: 0 1 auto;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.workspace-identity h1 {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  font-weight: 600;
 }
 
 .mobile-nav-btn {
@@ -589,14 +825,15 @@ onUnmounted(() => {
 
 .command-trigger {
   display: inline-flex;
+  min-height: var(--space-8);
   align-items: center;
   gap: var(--space-2);
+  margin-left: auto;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   color: var(--text-secondary);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
   cursor: pointer;
 }
 
@@ -610,9 +847,16 @@ onUnmounted(() => {
   line-height: var(--leading-caption);
 }
 
+.shell-header__actions {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
 .shell-main {
   min-width: 0;
-  padding: var(--space-6);
+  padding: var(--space-5);
 }
 
 .shell-main:focus-visible {
@@ -655,15 +899,15 @@ onUnmounted(() => {
 }
 
 .drawer-nav__label {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding: 0 var(--space-3);
+}
+
+button.drawer-nav__label,
+.drawer-nav__link {
+  min-height: 44px;
 }
 
 .drawer-nav__link {
-  min-height: calc(var(--space-8) + var(--space-2));
   padding: 0 var(--space-3);
 }
 
@@ -702,6 +946,10 @@ onUnmounted(() => {
 @media (max-width: 63.9375rem) {
   .mobile-nav-btn {
     display: inline-flex;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
   }
 
   .shell-header {
@@ -713,9 +961,32 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 48rem) {
-  .command-trigger span {
+@media (max-width: 47.9375rem) {
+  .shell-header {
+    gap: var(--space-2);
+    padding: 0 var(--space-3);
+  }
+
+  .shell-header__left {
+    gap: var(--space-2);
+  }
+
+  .workspace-identity span,
+  .command-trigger span,
+  .command-trigger kbd {
     display: none;
+  }
+
+  .command-trigger {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .shell-main {
+    padding: var(--space-3);
   }
 }
 </style>
