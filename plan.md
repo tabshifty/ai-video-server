@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-15 19:23:03 +0800
+- 进度：完成 Task 1 第二次独立复审分页特异性修复的最终验证。生产 CSS、静态测试、实施计划与长期契约均以 `.el-pagination .btn-prev`、`.el-pagination .btn-next`、`.el-pager li` 作为窄屏分页覆盖目标；前两者与 Element Plus 默认规则特异性相同并由后加载规则获胜，泛化 `.el-pagination button` 仅保留在禁止断言和解释文本中，不再表示实际覆盖契约。
+- 影响文件：本次精确提交仅包含 `admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-1-report.md`、构建产物或依赖目录。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 通过（30/30）；`cd admin-web && npm test` 通过（27 个测试文件、240/240）；`cd admin-web && npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本次 5 个提交文件和报告的 U+FFFD 扫描无命中；prev/next/pager 精确 selector 在生产 CSS 中各出现两次，实施计划维持 202 个成对代码围栏。
+
+## 2026-07-15 19:21:38 +0800
+- 进度：完成 Task 1 窄屏分页特异性的最小生产修复。高度与宽度两组规则都改用 `.el-pagination .btn-prev`、`.el-pagination .btn-next`、`.el-pager li`；prev/next 与 Element Plus 默认 0-2-0 特异性相同并由后加载规则获胜，泛化 `.el-pagination button` 已从生产密度规则移除，未使用 `!important`。
+- 影响文件：`admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 通过（1 个测试文件，30/30）。待同步实施计划与长期契约后运行全量验证。
+
+## 2026-07-15 19:20:21 +0800
+- 进度：Task 1 窄屏分页特异性测试已确认 RED。测试现要求高度与宽度两组规则都使用 `.el-pagination .btn-prev`、`.el-pagination .btn-next`、`.el-pager li` 精确目标，并禁止密度作用域下继续使用泛化 `.el-pagination button`。
+- 影响文件：`admin-web/src/assets/themeTokens.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js` 按预期失败（1 个测试文件，30 项中 2 项失败、28 项通过；退出码 1）。失败分别证明精确 prev/next selector 缺失，以及泛化 pagination button selector 仍存在；测试可正常收集执行。
+
+## 2026-07-15 19:19:28 +0800
+- 进度：Task 1 第二次独立复审发现窄屏分页 selector 仍有级联缺陷。Element Plus 默认 `.el-pagination .btn-prev/.btn-next` 特异性为 0-2-0，当前密度规则的 `.el-pagination button` 仅为 0-1-1，因此即使 overrides 后加载也无法把 prev/next 的 `min-width` 从 32px 提升到 44px；现有测试、实施计划与长期契约还错误地把泛化 button selector 固化为覆盖契约。
+- 影响文件：计划修改 `admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/assets/element-overrides.css`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`、`.superpowers/sdd/task-1-report.md`；报告不纳入提交。
+- 验证：先要求窄屏高度/宽度两组规则都精确包含 `.el-pagination .btn-prev`、`.el-pagination .btn-next`、`.el-pager li`，并拒绝密度作用域下泛化 `.el-pagination button`，确认 RED 后做最小 CSS 修复；最后运行定向测试、管理端全量测试与构建、`git diff --check` 及本次文件 U+FFFD 扫描。
+
 ## 2026-07-15 19:09:36 +0800
 - 进度：完成 Task 1 specificity 独立评审修复的最终验证。生产 CSS、静态测试、实施计划和长期契约现统一采用“密度祖先低特异性、目标组件保留特异性”的级联规则；双层 `:where()` 错误示例已清除，`main.js` 的 Element Plus → theme → overrides 导入顺序受到测试保护，三组密度数值均被表驱动测试逐项锁定。
 - 影响文件：本次精确提交仅包含 `admin-web/src/assets/element-overrides.css`、`admin-web/src/assets/themeTokens.spec.js`、`docs/superpowers/plans/2026-07-15-admin-web-precision-ops.md`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-1-report.md`、构建产物或依赖目录。

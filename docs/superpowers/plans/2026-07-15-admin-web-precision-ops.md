@@ -149,13 +149,29 @@ it('keeps component specificity in density overrides', () => {
     ':where([data-density="compact"], [data-density="monitor"]) .el-table td.el-table__cell',
     ':where([data-density="compact"]) .has-media-rows .el-table td.el-table__cell',
     ':where([data-density="form"]) .el-select__wrapper',
-    ':where([data-density]) .el-pagination button',
+    ':where([data-density]) .el-pagination .btn-prev',
+    ':where([data-density]) .el-pagination .btn-next',
+    ':where([data-density]) .el-pager li',
     ':where([data-density]) .el-button.is-circle'
   ]
 
   selectors.forEach((selector) => {
     expect(overrides).toContain(selector)
   })
+})
+
+it('matches Element Plus pagination specificity in both narrow-screen rules', () => {
+  expect(overrides).not.toContain(':where([data-density]) .el-pagination button')
+
+  const paginationRules = [...overrides.matchAll(
+    /:where\(\[data-density\]\) \.el-pagination \.btn-prev,\s*:where\(\[data-density\]\) \.el-pagination \.btn-next,\s*:where\(\[data-density\]\) \.el-pager li\s*\{([^}]*)\}/g
+  )]
+
+  expect(paginationRules).toHaveLength(2)
+  paginationRules.forEach(([, body]) => {
+    expect(body).toMatch(/min-height:\s*44px/)
+  })
+  expect(paginationRules.some(([, body]) => /min-width:\s*44px/.test(body))).toBe(true)
 })
 
 it('loads density overrides after Element Plus defaults and theme tokens', () => {
@@ -300,7 +316,8 @@ body {
   :where([data-density]) .el-input__wrapper,
   :where([data-density]) .el-select__wrapper,
   :where([data-density]) .el-radio-button__inner,
-  :where([data-density]) .el-pagination button,
+  :where([data-density]) .el-pagination .btn-prev,
+  :where([data-density]) .el-pagination .btn-next,
   :where([data-density]) .el-pager li {
     min-height: 44px;
   }
@@ -308,7 +325,8 @@ body {
   :where([data-density]) .el-button.is-circle,
   :where([data-density]) .el-checkbox,
   :where([data-density]) .el-radio,
-  :where([data-density]) .el-pagination button,
+  :where([data-density]) .el-pagination .btn-prev,
+  :where([data-density]) .el-pagination .btn-next,
   :where([data-density]) .el-pager li {
     min-width: 44px;
     min-height: 44px;
