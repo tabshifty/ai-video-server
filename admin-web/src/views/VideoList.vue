@@ -7,9 +7,11 @@ import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import PageHeader from '../components/base/PageHeader.vue'
+import SavedViewTabs from '../components/base/SavedViewTabs.vue'
 import SectionCard from '../components/base/SectionCard.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import Toolbar from '../components/base/Toolbar.vue'
+import { useSavedViews } from '../components/base/useSavedViews'
 import {
   batchDeleteAdminVideos,
   captureAdminVideoThumbnail,
@@ -35,6 +37,7 @@ import {
   buildMovieManualScrapeRoute,
   canPreviewVideoStatus,
   canManuallyEditVideoStatus,
+  createVideoBuiltInViews,
   avMatchSourceLabel,
   extractAVScrapePendingState,
   extractTvPendingDiagnostics,
@@ -45,6 +48,7 @@ import {
   getVideoThumbnailURL,
   isStaleDetailRequest,
   nextDetailRequestToken,
+  normalizeVideoViewSnapshot,
   teardownPreviewPlayer,
   shouldShowVideoThumbnail,
   shouldShowStuckScrapeAction,
@@ -57,6 +61,7 @@ import { formatAdminDateTime } from '../utils/dateTime'
 const list = ref([])
 const total = ref(0)
 const listLoading = ref(false)
+const listError = ref('')
 const tableRef = ref(null)
 const detail = ref(null)
 const detailVisible = ref(false)
@@ -110,6 +115,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const router = useRouter()
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
+const SAVED_VIEWS_KEY = 'admin-videolist-saved-views-v1'
 const COLUMN_VISIBILITY_KEY = 'admin-videolist-columns'
 const ALL_COLUMNS = [
   { key: 'title', label: '标题' },
@@ -122,6 +128,43 @@ const ALL_COLUMNS = [
 ]
 const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'upload_user', 'created_at', 'operations']
 const columnVisibility = ref(readStoredColumns())
+const allowedColumnKeys = ALL_COLUMNS.map((item) => item.key)
+const builtInViews = createVideoBuiltInViews(DEFAULT_VISIBLE_COLUMNS)
+const {
+  availableViews,
+  activeViewId,
+  editableSourceId,
+  selectView,
+  saveView,
+  updateView,
+  renameView,
+  removeView
+} = useSavedViews({
+  storageKey: SAVED_VIEWS_KEY,
+  builtInViews,
+  normalizeSnapshot: (snapshot) => normalizeVideoViewSnapshot(
+    snapshot,
+    allowedColumnKeys,
+    DEFAULT_VISIBLE_COLUMNS
+  ),
+  getCurrentSnapshot: () => ({
+    q: query.q,
+    type: query.type,
+    status: query.status,
+    columns: columnVisibility.value
+  }),
+  applySnapshot: (snapshot) => {
+    const next = normalizeVideoViewSnapshot(snapshot, allowedColumnKeys, DEFAULT_VISIBLE_COLUMNS)
+    query.q = next.q
+    query.type = next.type
+    query.status = next.status
+    query.page = 1
+    columnVisibility.value = [...next.columns]
+    persistColumns()
+    clearSelection()
+  },
+  refresh: load
+})
 const retagTypeOptions = [
   { value: 'movie', label: '电影' },
   { value: 'episode', label: '剧集分集' },
@@ -132,6 +175,7 @@ const detailDrawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '
 const isNarrowViewport = computed(() => viewportWidth.value < 1280)
 const batchActionBusy = computed(() => deletingBatch.value || updatingBatch.value)
 const canBatchEditCollections = computed(() => selectedRows.value.length > 0 && selectedRows.value.every((row) => normalizeVideoType(row.type) === 'short'))
+const hasActiveFilters = computed(() => String(query.q || '').trim() !== '' || query.type !== '' || query.status !== '')
 const activeFilterChips = computed(() => {
   const chips = []
   if (query.type) chips.push({ key: 'type', label: '类型', value: typeLabel(query.type) })
@@ -414,8 +458,8 @@ function normalizeCollectionSelection(values) {
   return out
 }
 
-function statusTagType(status) {
-  return getVideoStatusMeta(status).tagType
+function videoStatusTone(status) {
+  return getVideoStatusMeta(status).tagType || 'neutral'
 }
 
 function extractErrorMessage(error, fallback) {
@@ -546,11 +590,14 @@ function openStuckScrape() {
 
 async function load() {
   listLoading.value = true
+  listError.value = ''
   try {
     const data = await getAdminVideos(query)
     list.value = data.items || []
     total.value = data.total_count || 0
     clearSelection()
+  } catch (error) {
+    listError.value = error?.message || '加载视频列表失败'
   } finally {
     listLoading.value = false
   }
@@ -1187,10 +1234,40 @@ onBeforeUnmount(() => {
 
 <template>
   <Layout>
-    <div class="page-shell video-list-page">
-      <PageHeader title="视频管理" />
+    <template #header-actions>
+      <div class="video-header-actions">
+        <el-popover trigger="click" :width="240" popper-class="video-column-settings-popper">
+          <template #reference>
+            <el-button :icon="Setting">列设置</el-button>
+          </template>
+          <el-checkbox-group :model-value="columnVisibility" class="column-settings" @update:model-value="onColumnVisibilityChange">
+            <el-checkbox
+              v-for="column in ALL_COLUMNS"
+              :key="column.key"
+              :value="column.key"
+              :disabled="column.required"
+            >
+              {{ column.label }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-popover>
+        <el-button type="primary" @click="router.push('/upload')">上传视频</el-button>
+      </div>
+    </template>
 
-      <Toolbar>
+    <div class="page-shell video-list-page" data-density="compact">
+      <SavedViewTabs
+        :items="availableViews"
+        :active-id="activeViewId"
+        :editable-source-id="editableSourceId"
+        @select="selectView"
+        @save="saveView"
+        @update="updateView"
+        @rename="renameView"
+        @remove="removeView"
+      />
+
+      <Toolbar dense>
         <template #filters>
           <el-input
             v-model="query.q"
@@ -1206,32 +1283,29 @@ onBeforeUnmount(() => {
           </el-tag>
           <el-button plain @click="filterDrawerVisible = true">更多筛选</el-button>
         </template>
-        <template #actions>
-          <el-popover trigger="click" :width="240">
-            <template #reference>
-              <el-button :icon="Setting">列设置</el-button>
-            </template>
-            <el-checkbox-group :model-value="columnVisibility" class="column-settings" @update:model-value="onColumnVisibilityChange">
-              <el-checkbox
-                v-for="column in ALL_COLUMNS"
-                :key="column.key"
-                :value="column.key"
-                :disabled="column.required"
-              >
-                {{ column.label }}
-              </el-checkbox>
-            </el-checkbox-group>
-          </el-popover>
-        </template>
       </Toolbar>
 
-      <SectionCard v-loading="listLoading">
+      <el-alert v-if="listError" type="error" :closable="false" :title="listError">
+        <template #default><el-button link type="primary" @click="load">重试</el-button></template>
+      </el-alert>
+
+      <el-skeleton v-if="listLoading && list.length === 0" :rows="10" animated />
+
+      <SectionCard v-else-if="!listError || list.length > 0" dense>
         <template #title>视频列表</template>
         <template #actions>
           <span class="result-total">共 {{ total }} 条</span>
         </template>
-        <EmptyState v-if="!listLoading && list.length === 0" title="暂无视频" />
-        <div v-if="list.length > 0" class="table-wrap">
+        <EmptyState
+          v-if="list.length === 0"
+          :title="hasActiveFilters ? '当前筛选无结果' : '暂无视频'"
+          :description="hasActiveFilters ? '清除筛选后查看全部视频' : '上传视频后会显示在这里'"
+        >
+          <template v-if="hasActiveFilters" #action>
+            <el-button @click="resetFilters">清除筛选</el-button>
+          </template>
+        </EmptyState>
+        <div v-else class="table-wrap has-media-rows">
           <el-table
             ref="tableRef"
             :data="list"
@@ -1241,9 +1315,9 @@ onBeforeUnmount(() => {
             @select="onRowSelectionSelect"
             @select-all="onSelectionSelectAll"
           >
-            <el-table-column type="selection" width="52" />
-            <el-table-column v-if="isColumnVisible('title')" prop="title" label="标题" min-width="220" />
-            <el-table-column v-if="isColumnVisible('thumbnail')" label="封面" width="120">
+            <el-table-column type="selection" width="44" />
+            <el-table-column v-if="isColumnVisible('title')" prop="title" label="标题" min-width="220" show-overflow-tooltip />
+            <el-table-column v-if="isColumnVisible('thumbnail')" label="封面" width="96">
               <template #default="{ row }">
                 <div class="video-cover-cell">
                   <el-image
@@ -1265,27 +1339,40 @@ onBeforeUnmount(() => {
                 </div>
               </template>
             </el-table-column>
-            <el-table-column v-if="isColumnVisible('type')" prop="type" label="类型" width="110">
+            <el-table-column v-if="isColumnVisible('type')" prop="type" label="类型" width="96">
               <template #default="{ row }">
                 {{ typeLabel(row.type) }}
               </template>
             </el-table-column>
             <el-table-column v-if="isColumnVisible('status')" prop="status" label="状态" width="120">
               <template #default="{ row }">
-                <el-tag :type="statusTagType(row.status)">
-                  {{ statusLabel(row.status) }}
-                </el-tag>
+                <StatusIndicator :label="statusLabel(row.status)" :tone="videoStatusTone(row.status)" />
               </template>
             </el-table-column>
-            <el-table-column v-if="isColumnVisible('upload_user')" prop="upload_user" label="上传用户" width="140" />
-            <el-table-column v-if="isColumnVisible('created_at')" label="上传时间" width="180">
+            <el-table-column v-if="isColumnVisible('upload_user')" prop="upload_user" label="上传用户" width="128" show-overflow-tooltip />
+            <el-table-column v-if="isColumnVisible('created_at')" label="上传时间" width="168">
               <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
             </el-table-column>
-            <el-table-column v-if="isColumnVisible('operations')" label="操作" width="300">
+            <el-table-column v-if="isColumnVisible('operations')" label="操作" width="108" fixed="right">
               <template #default="{ row }">
-                <el-button size="small" @click="showDetail(row)">详情</el-button>
-                <el-button size="small" @click="doRetranscode(row)">重转码</el-button>
-                <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
+                <div class="video-row-actions">
+                  <el-button link type="primary" @click="showDetail(row)">详情</el-button>
+                  <el-dropdown
+                    trigger="click"
+                    popper-class="video-row-actions-popper"
+                    @command="(command) => command === 'retranscode' ? doRetranscode(row) : doDelete(row)"
+                  >
+                    <el-tooltip content="更多视频操作" placement="top">
+                      <el-button :icon="MoreFilled" circle aria-label="更多视频操作" />
+                    </el-tooltip>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="retranscode">重新转码</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -1868,6 +1955,23 @@ onBeforeUnmount(() => {
   padding-bottom: var(--space-1);
 }
 
+.video-header-actions,
+.video-row-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.video-header-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.video-row-actions {
+  justify-content: flex-end;
+}
+
 .quick-search {
   width: 240px;
 }
@@ -1912,16 +2016,16 @@ onBeforeUnmount(() => {
 }
 
 .video-cover-cell {
-  width: 96px;
-  min-height: 54px;
+  width: 72px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .video-cover-image {
-  width: 96px;
-  height: 54px;
+  width: 72px;
+  height: 40px;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--line-soft);
@@ -1934,8 +2038,8 @@ onBeforeUnmount(() => {
 }
 
 .video-cover-placeholder {
-  width: 96px;
-  height: 54px;
+  width: 72px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1981,7 +2085,7 @@ onBeforeUnmount(() => {
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  background: rgba(245, 158, 11, 0.12);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
   color: var(--text-primary);
 }
 
@@ -2043,7 +2147,19 @@ onBeforeUnmount(() => {
   background: var(--bg-surface-muted);
 }
 
-@media (max-width: 992px) {
+@media (max-width: 63.9375rem) {
+  .video-header-actions :deep(.el-button) {
+    min-height: 44px;
+  }
+
+  :global(.video-column-settings-popper .el-checkbox) {
+    min-height: 44px;
+  }
+
+  :global(.video-row-actions-popper .el-dropdown-menu__item) {
+    min-height: 44px;
+  }
+
   .quick-search {
     width: 100%;
   }

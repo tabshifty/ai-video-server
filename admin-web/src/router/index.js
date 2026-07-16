@@ -30,7 +30,7 @@ const routes = [
   { path: '/login', component: Login, meta: { public: true } },
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', component: Dashboard },
-  { path: '/videos', component: VideoList, meta: { hideShellPageHeader: true } },
+  { path: '/videos', component: VideoList },
   { path: '/short-pending-delete', component: PendingDeleteShorts, meta: { hideShellPageHeader: true } },
   { path: '/tv-series', component: TvSeriesManage, meta: { hideShellPageHeader: true } },
   { path: '/tv-app', component: TvAppManage, meta: { hideShellPageHeader: true } },

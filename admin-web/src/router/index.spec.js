@@ -37,4 +37,12 @@ describe('resolveRouterHistoryBase', () => {
     expect(taskRoute).toContain("{ path: '/tasks', component: TaskMonitor }")
     expect(taskRoute).not.toContain('hideShellPageHeader')
   })
+
+  it('视频资源页使用壳层标题且保持原有路由目标', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const videoRoute = source.split('\n').find((line) => line.includes("path: '/videos'"))
+
+    expect(videoRoute).toContain("{ path: '/videos', component: VideoList }")
+    expect(videoRoute).not.toContain('hideShellPageHeader')
+  })
 })

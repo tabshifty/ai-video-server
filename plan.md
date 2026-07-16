@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 08:15 +0800
+- 进度：完成 Precision Ops Task 8 最终验证与提交前自审。补充验证发现 Teleport 的列设置和行操作菜单不继承页面密度规则，新增窄屏点击目标门禁并完成单文件 RED（1 项失败/7 项通过）到 GREEN（8/8）；通过专用 popper class 将两类菜单项固定为至少 44px，无业务流程变更。
+- 影响文件：本次精确提交只包含 `admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-8-report.md`、`admin-web/dist`、共享 saved-view、API、依赖或范围外文件。
+- 验证：最终 fresh 五文件定向通过（5 个文件，56/56）；`cd admin-web && npm test` 通过（34 个文件，325/325）；`cd admin-web && npm run build` 成功（2370 modules transformed，仅既有 chunk-size warning）；`git diff --check`、八文件 U+FFFD/C0/DEL、样式禁止模式、保存视图职责边界和变更白名单检查通过。
+
+## 2026-07-16 08:09 +0800
+- 进度：完成 Precision Ops Task 8 最小实现与首次三文件 GREEN。VideoList 只向 `useSavedViews` 注入视频快照边界和现有列同步，使用壳层操作区、保存视图、紧凑媒体表格、行内错误/骨架/诚实空态及 108px 行操作菜单；删除确认、请求、选择/批量、1280px 次要列、560px Drawer、字幕、payload 和脏数据守卫保持原位。
+- 影响文件：`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/videoList.helpers.spec.js src/views/videoListPage.spec.js src/router/index.spec.js` 通过（退出码 0；3 个测试文件，40/40，无 warning/error）。待运行 brief 五文件定向、全量测试、生产构建与静态范围门禁。
+
+## 2026-07-16 08:05 +0800
+- 进度：Precision Ops Task 8 helper、VideoList 真实 SFC 与 `/videos` 路由契约已确认 RED。失败来自缺少保存视图纯函数/共享接线、旧 PageHeader、无行内错误与首次骨架、300px 三常驻行操作、旧媒体几何和路由兼容 meta；现有选择、批量操作、响应式列、Drawer、字幕与编辑 payload 保留门禁通过。
+- 影响文件：`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/videoList.helpers.spec.js src/views/videoListPage.spec.js src/router/index.spec.js` 按预期失败（退出码 1；3 个测试文件失败，40 项中 10 项失败、30 项通过）；真实 VideoList SFC 已由 Vite Vue 插件成功编译，失败不是测试语法或环境错误。
+
+## 2026-07-16 07:58 +0800
+- 进度：启动 Precision Ops Task 8，按纯快照 helper、VideoList 真实 SFC 页面契约和 `/videos` 路由 meta 三类门禁执行严格 TDD。保存视图仅接入 Task 5 共享 composable，保留现有选择、批量操作、筛选分页清理、Drawer、字幕、编辑 payload、脏数据守卫和请求流程。
+- 影响文件：计划只修改 `admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`，新增 `admin-web/src/views/videoListPage.spec.js`，并追加 `plan.md`；不修改共享 saved-view、API、依赖、其它页面或 `.superpowers` 指令文件。
+- 验证：先运行三文件命令确认 helper、页面结构与路由的真实 RED，再完成最小实现；收尾运行 brief 五文件定向、管理端全量测试、生产构建、`git diff --check`、U+FFFD/C0/DEL、样式禁止模式和变更白名单检查。
+
 ## 2026-07-16 07:41 +0800
 - 进度：完成 Task 7 分页查询身份修复的覆盖验证与提交前自审。状态筛选和分页均在新请求前重置旧展示身份；同查询刷新仍保留 rows/error 到最新成功。分页只读 props 不消费 `update:currentPage`，仅 `current-change` 调用一次 `setPage/load`，无双请求；九列、total/layout、API 参数、5 秒轮询、loadSeq、同查询错误语义、路由和既有 UI 均保持。
 - 影响文件：本次精确提交仅包含 `admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-7-report.md`、`admin-web/dist`、分页组件、路由、依赖或其它文件。

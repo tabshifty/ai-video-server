@@ -6,6 +6,7 @@ import {
   buildStuckScrapeRoute,
   canPreviewVideoStatus,
   canManuallyEditVideoStatus,
+  createVideoBuiltInViews,
   extractTvPendingDiagnostics,
   getManualVideoStatusOptions,
   getManualVideoStatusValue,
@@ -13,6 +14,7 @@ import {
   getVideoThumbnailPlaceholder,
   isStaleDetailRequest,
   nextDetailRequestToken,
+  normalizeVideoViewSnapshot,
   getVideoThumbnailURL,
   shouldShowVideoThumbnail,
   shouldShowStuckScrapeAction,
@@ -21,6 +23,64 @@ import {
 } from './videoList.helpers'
 
 describe('videoList helpers', () => {
+  it('只创建 API 已支持的内置视频视图且不共享列引用', () => {
+    const columns = ['title', 'thumbnail', 'status', 'operations']
+    const views = createVideoBuiltInViews(columns)
+
+    expect(views.map((item) => [item.id, item.label, item.snapshot.status])).toEqual([
+      ['builtin-all', '全部视频', ''],
+      ['builtin-processing', '处理中', 'processing'],
+      ['builtin-failed', '失败', 'failed']
+    ])
+    expect(views.every((item) => item.builtIn === true)).toBe(true)
+    expect(views[0].snapshot.columns).not.toBe(columns)
+    expect(views[0].snapshot.columns).not.toBe(views[1].snapshot.columns)
+
+    views[0].snapshot.columns.pop()
+    expect(columns).toEqual(['title', 'thumbnail', 'status', 'operations'])
+    expect(views[1].snapshot.columns).toEqual(columns)
+  })
+
+  it('规范视频视图快照并排除分页、选择和 Drawer 状态', () => {
+    const allowed = ['title', 'thumbnail', 'status', 'operations']
+    const defaults = ['title', 'thumbnail', 'status', 'operations']
+    const sourceColumns = ['status', 'unknown', 'status', 'title']
+
+    const snapshot = normalizeVideoViewSnapshot({
+      q: 'A',
+      type: 'movie',
+      status: 'ready',
+      page: 9,
+      selectedRows: ['video-1'],
+      detailVisible: true,
+      columns: sourceColumns
+    }, allowed, defaults)
+
+    expect(snapshot).toEqual({
+      q: 'A',
+      type: 'movie',
+      status: 'ready',
+      columns: ['status', 'title', 'operations']
+    })
+    expect(snapshot.columns).not.toBe(sourceColumns)
+    expect(snapshot).not.toHaveProperty('page')
+    expect(snapshot).not.toHaveProperty('selectedRows')
+    expect(snapshot).not.toHaveProperty('detailVisible')
+  })
+
+  it('缺省快照复制默认列并始终保留操作列', () => {
+    const allowed = ['title', 'thumbnail', 'status', 'operations']
+    const defaults = ['title', 'thumbnail', 'status', 'operations']
+    const snapshot = normalizeVideoViewSnapshot({}, allowed, defaults)
+
+    expect(snapshot).toEqual({ q: '', type: '', status: '', columns: defaults })
+    expect(snapshot.columns).not.toBe(defaults)
+    expect(normalizeVideoViewSnapshot({ columns: ['title'] }, allowed, defaults).columns).toEqual([
+      'title',
+      'operations'
+    ])
+  })
+
   it('includes non-ready workflow status labels and tag types', () => {
     expect(getVideoStatusMeta('tv_pending')).toEqual({
       label: '待绑定',

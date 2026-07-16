@@ -13,6 +13,28 @@ export function getVideoStatusMeta(status) {
   return map[normalized] || { label: normalized || '-', tagType: 'info' }
 }
 
+export function normalizeVideoViewSnapshot(snapshot, allowedColumns, defaultColumns) {
+  const allowed = new Set(allowedColumns)
+  const requested = Array.isArray(snapshot?.columns) ? snapshot.columns : defaultColumns
+  const columns = requested.filter((key, index) => allowed.has(key) && requested.indexOf(key) === index)
+  if (allowed.has('operations') && !columns.includes('operations')) columns.push('operations')
+  return {
+    q: String(snapshot?.q || ''),
+    type: String(snapshot?.type || ''),
+    status: String(snapshot?.status || ''),
+    columns: columns.length > 0 ? columns : [...defaultColumns]
+  }
+}
+
+export function createVideoBuiltInViews(defaultColumns) {
+  const snapshot = (status) => ({ q: '', type: '', status, columns: [...defaultColumns] })
+  return [
+    { id: 'builtin-all', label: '全部视频', builtIn: true, snapshot: snapshot('') },
+    { id: 'builtin-processing', label: '处理中', builtIn: true, snapshot: snapshot('processing') },
+    { id: 'builtin-failed', label: '失败', builtIn: true, snapshot: snapshot('failed') }
+  ]
+}
+
 export const subtitleUploadAccept = '.srt,.vtt,.ass,.ssa'
 
 const manualVideoStatusValues = ['uploaded', 'scraping', 'tv_pending', 'av_scrape_pending', 'ready', 'failed']
