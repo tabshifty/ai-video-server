@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 23:29 +0800
+- 进度：Task 12 图片选择 Drawer 响应式缺陷完成提交前自查与验证。浏览器根因对应的生产差异严格只有 `size="920px"` → `size="min(100vw, 920px)"`，因此 1440px 继续保持 920px、768px 最大为 100vw；编辑 Drawer 的 `:size="editDrawerSize"`、共享关闭链路、API、预览参数、数据/关联逻辑均未改。
+- 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/ImageCollectionManage.vue`、`precisionOpsRollout.spec.js` 共 4 个 tracked 文件；忽略的 `.superpowers/sdd/task-12-report.md` 在提交后追加证据，`admin-web/dist/` 不纳入提交。
+- 验证：rollout RED 为 19 项中精确 1 项失败，单行修复后同文件 19/19 GREEN；正式四文件定向 32/32；`cd admin-web && npm test` 通过（38 文件，392/392）；`npm run build` 成功（2374 modules transformed，仅既有 chunk-size warning）；`git diff --check`、4 文件白名单、UTF-8 U+FFFD、生产一行差异和 helper/API/预览参数/路由/依赖零差异检查通过。待使用固定中文提交信息 `修复：收敛图片合集抽屉宽度` 精确提交。
+
+## 2026-07-16 23:27 +0800
+- 进度：Task 12 图片选择 Drawer 响应式宽度完成最小修复并取得初步 GREEN。生产代码只把“合集关联图片”Drawer 的 `size="920px"` 改为 `size="min(100vw, 920px)"`，桌面最大宽度保持 920px、窄屏不超过视口；同页编辑 Drawer、共享 header、API、预览参数、数据与关联逻辑均未改。
+- 影响文件：修改 `admin-web/src/views/ImageCollectionManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，并计划追加忽略报告；不修改其它生产页、路由、helper、依赖、后端或 Task 13。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 通过（1 文件，19/19），同一断言完成 RED→GREEN；待执行 Task 12 四文件定向、管理端全量、生产构建和静态范围门禁。
+
+## 2026-07-16 23:25 +0800
+- 进度：Task 12 图片选择 Drawer 响应式宽度取得严格 RED；此时仅修改 rollout 测试与账本，生产 SFC 尚未修改。新增契约精确要求 `size="min(100vw, 920px)"`，验证固定 `920px` 是 768px 视口左侧越界的直接原因。
+- 影响文件：RED 阶段仅修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`；`ImageCollectionManage.vue`、`CONTEXT.md` 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 按预期退出 1（1 文件，19 项中仅两个 Drawer 宽度契约 1 项失败/其余 18 项通过），失败消息精确为模板缺少 `size="min(100vw, 920px)"`，无编译或其它契约错误。
+
+## 2026-07-16 23:24 +0800
+- 进度：Task 12 浏览器烟测发现图片选择 Drawer 在 1440px 视口以 920px 宽度正常显示，但在 768px 视口仍固定 920px，实际左边界为 -152px、内容不可完全触达。源码根因确认是“合集关联图片”Drawer 使用 `size="920px"`，同页编辑 Drawer 的窄屏全宽逻辑正常；本轮严格先补 `size="min(100vw, 920px)"` 契约取得 RED，再做单行生产修复。
+- 影响文件：计划只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/views/ImageCollectionManage.vue`、`CONTEXT.md`、`plan.md`，并追加忽略的 `.superpowers/sdd/task-12-report.md`；不修改编辑 Drawer、API、预览参数、数据/关联逻辑、路由、依赖或 Task 13。
+- 验证：待执行 rollout 真实 RED、Task 12 四文件定向 GREEN、`cd admin-web && npm test`、`npm run build`、`git diff --check`、UTF-8 U+FFFD、4 文件白名单及 helper/API/请求参数敏感范围检查；构建只接受既有 chunk-size warning。
+
 ## 2026-07-16 23:12 +0800
 - 进度：Task 12 提交前实现、自查与验证完成。零上下文差异复核确认待删除队列/播放器 DOM 顺序、分页、选择、播放清理、保留/最终删除函数未改；图片合集 API、payload、240×240/`fit: cover` 预览常量和两处调用未改；编辑 Drawer 的共享 header `close` 仍进入 `before-close`，取消仍调用 `requestEditDrawerClose`。路由只移除 `/short-pending-delete` 与 `/image-collections` 两条兼容 meta，不推进 Task 13。
 - 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`index.spec.js` 共 7 个 tracked 文件；忽略的 `.superpowers/sdd/task-12-report.md` 单独保留为实施证据，`admin-web/dist/` 不纳入提交。

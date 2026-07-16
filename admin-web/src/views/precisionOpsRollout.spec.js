@@ -222,6 +222,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(template.match(/<template #header="\{ close, titleId, titleClass \}">/g)).toHaveLength(2)
     expect(template.match(/:close="close"/g)).toHaveLength(2)
     expect(template).toContain(':before-close="handleEditDrawerBeforeClose"')
+    expect(template).toContain('size="min(100vw, 920px)"')
     expect(template).toContain('@click="requestEditDrawerClose">取消</el-button>')
     expect(template).not.toContain('@click="editDrawerVisible = false">取消</el-button>')
   })

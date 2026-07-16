@@ -614,7 +614,7 @@ onBeforeUnmount(() => {
     <el-drawer
       v-model="imageDrawerVisible"
       title="合集关联图片"
-      size="920px"
+      size="min(100vw, 920px)"
       destroy-on-close
       :show-close="false"
       @closed="onImageDrawerClosed"

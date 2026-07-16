@@ -7,6 +7,7 @@
 - `Precision Ops 媒体集合加载状态`：`PendingDeleteShorts` 与 `ImageCollectionManage` 的列表读取失败不能退化成“暂无数据”伪空态；无缓存请求进行中显示稳定骨架，失败后显示可重试错误，有缓存刷新失败继续保留并展示旧列表，只有成功读取到空集合时才显示真正空态。图片合集页的无缓存判定复用 `crudCollectionState.js`，避免各集合页重新发明加载条件。
 - `图片合集预览显示与请求解耦`：图片选择 Drawer 的缩略图容器按 4:3、`object-fit: contain` 展示，以便完整检查不同宽高比图片；这只是 CSS 显示契约，`IMAGE_COLLECTION_PREVIEW_PARAMS` 仍固定请求 240×240、`fit: cover`、质量 82，预览 API、关联与封面更新流程不得随视觉比例一起改动。
 - `图片合集 Drawer 关闭链路`：编辑与图片选择 Drawer 都使用 `AdminDrawerHeader` 提供共享纯图标关闭入口；编辑 Drawer header slot 的 `close` 必须交给 Element Plus 既有 `before-close` 链路执行脏数据确认，底部取消继续走 `requestEditDrawerClose`，不得直接翻转 `editDrawerVisible` 绕过确认。
+- `图片合集 Drawer 响应式宽度`：“合集关联图片”Drawer 在桌面端最多保持 920px 检查宽度，但任何视口都不得宽于当前可视区，模板固定使用 `size="min(100vw, 920px)"`；768px 等窄屏应完整落在视口内，不能沿用固定 `920px` 造成左侧内容不可达。编辑 Drawer 继续保留自身的 560px/窄屏全宽逻辑，不与图片选择 Drawer 合并尺寸状态。
 - `待删除短视频复核工作台边界`：`PendingDeleteShorts` 的壳层迁移只改变标题归属、加载反馈与紧凑样式；队列在播放器之前的 DOM 顺序、当前项选择、分页、播放资源清理、保留和最终删除确认语义保持不变，列表读取失败时不得清空当前缓存项或伪装成处理完成。
 
 ## 部署术语
