@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 23:12 +0800
+- 进度：Task 12 提交前实现、自查与验证完成。零上下文差异复核确认待删除队列/播放器 DOM 顺序、分页、选择、播放清理、保留/最终删除函数未改；图片合集 API、payload、240×240/`fit: cover` 预览常量和两处调用未改；编辑 Drawer 的共享 header `close` 仍进入 `before-close`，取消仍调用 `requestEditDrawerClose`。路由只移除 `/short-pending-delete` 与 `/image-collections` 两条兼容 meta，不推进 Task 13。
+- 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`index.spec.js` 共 7 个 tracked 文件；忽略的 `.superpowers/sdd/task-12-report.md` 单独保留为实施证据，`admin-web/dist/` 不纳入提交。
+- 验证：正式定向 4 文件 32/32；`cd admin-web && npm test` 通过（38 文件，392/392）；`npm run build` 成功（2374 modules transformed，仅既有 chunk-size warning）；`git diff --check`、7 文件精确白名单、UTF-8 U+FFFD、目标 CSS 禁项、helper/API/依赖零差异和路由敏感范围检查通过。待使用固定中文提交信息 `样式：升级媒体复核集合页` 精确提交。
+
+## 2026-07-16 23:08 +0800
+- 进度：Task 12 最小实现与定向 GREEN 完成。两页移除自身 `PageHeader`、接入共享 header actions 与显式 compact 密度；待删除页新增稳定骨架/错误重试且失败保留缓存队列，图片合集复用 `crudCollectionState.js` 区分无缓存加载、失败、筛选零结果与真实空态，状态改用 `StatusIndicator`，两个 Drawer 接入 `AdminDrawerHeader` 且编辑 close/取消继续经过既有脏数据链路。媒体网格只改 CSS 为 184px/12px、4:3/contain，请求常量与两处 240×240/cover 调用未改；路由只移除指定两条兼容 meta。
+- 影响文件：实现修改 `PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`router/index.js`，测试修改 `precisionOpsRollout.spec.js`、`router/index.spec.js`，并追加 `CONTEXT.md`、`plan.md`；不修改 helper、API、payload、权限、依赖、后端、数据库、Android 或 Task 13。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/router/index.spec.js src/views/pendingDeleteShorts.helpers.spec.js src/views/imageCollectionManage.helpers.spec.js` 通过（4 文件，32/32）。静态自查确认目标两页无直接 hex、数字 rgba、装饰渐变与常驻阴影，路由剩余 8 条兼容 meta 均属于待迁移页；待执行全量测试、生产构建和最终静态门禁。
+
+## 2026-07-16 23:03 +0800
+- 进度：Task 12 阶段覆盖取得严格 RED；此时只修改测试与账本，生产 SFC/路由尚未修改。rollout 失败精确命中两页缺少 compact 壳层、待删除页常驻阴影与加载错误状态、图片合集无缓存加载/媒体网格/共享 Drawer header 等 6 项缺失行为；独立路由 RED 精确命中两条旧兼容 meta。
+- 影响文件：RED 阶段仅修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.spec.js`、`plan.md`；`PendingDeleteShorts.vue`、`ImageCollectionManage.vue` 与 `router/index.js` 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/pendingDeleteShorts.helpers.spec.js src/views/imageCollectionManage.helpers.spec.js` 按预期退出 1（3 文件中 1 失败/2 通过，24 项中 6 失败/18 通过，两个 helper 文件 5/5 通过）；`npm test -- src/router/index.spec.js` 按预期退出 1（1 文件，8 项中仅媒体集合路由断言 1 项失败）。
+
+## 2026-07-16 22:57 +0800
+- 进度：开始实施 Precision Ops Task 12，按确认 brief 将 `PendingDeleteShorts` 与 `ImageCollectionManage` 迁入共享壳层并收紧媒体集合密度；严格先扩阶段/路由测试取得缺失行为 RED，再做最小实现。保持待删除队列语义、两个 Drawer 脏数据关闭链路、图片预览请求参数与全部 API/权限/业务流程不变，不推进 Task 13。
+- 影响文件：计划只修改 `admin-web/src/views/PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`index.spec.js`、`CONTEXT.md`、`plan.md`，并写入忽略的 `.superpowers/sdd/task-12-report.md`；不修改依赖、后端、数据库、Android 或其它路由目标。
+- 验证：待执行 brief 三文件 RED、四文件定向 GREEN、`cd admin-web && npm test`、`npm run build`、`git diff --check`、U+FFFD 扫描、文件白名单、敏感范围及请求参数不变检查；构建只接受既有 chunk-size warning。
+
 ## 2026-07-16 22:42 +0800
 - 进度：Task 11 修复后独立复审最终判定 Spec PASS、Task quality Approved，Critical 0、Important 0、Minor 0。复审确认无缓存首次加载与失败后重试均进入骨架，有缓存刷新继续显示旧表，空闲空列表才显示真实空态；三页页头、compact 密度、状态、Drawer、路由与业务 API 边界仍全部符合 brief。已在 SDD 忽略账本标记 Task 11 完成，下一步进入 Task 12。
 - 影响文件：本次 tracked 只追加 `plan.md`；`.superpowers/sdd/progress.md`、更新后的 Task 11 报告与 `review-dc3bf31..f721290.diff` 继续作为忽略证据。不修改生产代码、测试、`CONTEXT.md`、API、路由、依赖、Go 或 Android。

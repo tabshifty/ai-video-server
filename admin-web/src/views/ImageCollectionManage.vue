@@ -4,11 +4,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
+import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'
 import {
   createAdminImageCollection,
   deleteAdminImageCollection,
@@ -19,7 +21,9 @@ import {
 } from '../api/admin'
 import { buildImageCollectionPayload, IMAGE_COLLECTION_PREVIEW_PARAMS, revokePreviewURLs } from './imageCollectionManage.helpers'
 
-const loading = ref(false)
+const loading = ref(true)
+const loaded = ref(false)
+const loadError = ref('')
 const list = ref([])
 const total = ref(0)
 const editDrawerVisible = ref(false)
@@ -50,6 +54,11 @@ const imageDrawerQuery = reactive({
 
 const form = reactive(createEmptyForm())
 const editDrawerSnapshot = ref(createEmptyForm())
+const initialLoading = computed(() => shouldShowCrudCollectionSkeleton({
+  loading: loading.value,
+  rowCount: list.value.length
+}))
+const hasFilters = computed(() => String(query.q || '').trim() !== '' || String(query.active || '') !== '')
 const editDrawerDirty = computed(() => (
   form.name !== editDrawerSnapshot.value.name
   || form.description !== editDrawerSnapshot.value.description
@@ -137,14 +146,25 @@ function captureFormSnapshot() {
 }
 
 async function load() {
+  loadError.value = ''
   loading.value = true
   try {
     const data = await getAdminImageCollections(buildListParams())
     list.value = data.items || []
     total.value = data.total_count || 0
+  } catch (error) {
+    loadError.value = extractErrorMessage(error, '加载图片合集列表失败')
   } finally {
+    loaded.value = true
     loading.value = false
   }
+}
+
+function resetFilters() {
+  query.page = 1
+  query.q = ''
+  query.active = ''
+  load()
 }
 
 function openCreate() {
@@ -446,10 +466,12 @@ onBeforeUnmount(() => {
 
 <template>
   <Layout>
-    <div class="page-shell page-shell--medium">
-      <PageHeader title="图片合集" />
+    <template #header-actions>
+      <el-button type="primary" :icon="Plus" @click="openCreate">创建合集</el-button>
+    </template>
 
-      <Toolbar>
+    <div class="page-shell image-collection-page" data-density="compact">
+      <Toolbar dense>
         <template #filters>
           <el-input v-model="query.q" class="collection-search" placeholder="按图片合集名称搜索" clearable @keyup.enter="load" />
           <el-select v-model="query.active" class="collection-status" clearable placeholder="状态筛选">
@@ -457,65 +479,77 @@ onBeforeUnmount(() => {
             <el-option label="仅启用" value="1" />
             <el-option label="仅停用" value="0" />
           </el-select>
-          <el-button :icon="Search" @click="load">查询</el-button>
         </template>
         <template #actions>
-          <el-button type="primary" :icon="Plus" @click="openCreate">创建合集</el-button>
+          <el-tag effect="plain">共 {{ total }} 个合集</el-tag>
+          <el-button :icon="Search" :loading="loading" @click="load">查询</el-button>
+          <el-button @click="resetFilters">重置</el-button>
         </template>
       </Toolbar>
 
-      <SectionCard v-loading="loading">
+      <el-alert v-if="loadError" type="error" :closable="false" :title="loadError">
+        <template #default><el-button link type="primary" @click="load">重试</el-button></template>
+      </el-alert>
+
+      <el-skeleton v-if="initialLoading" :rows="8" animated />
+
+      <SectionCard v-else-if="!loadError || list.length > 0" dense>
         <template #title>合集列表</template>
         <template #description>维护图片合集并统一管理图片归档关系。</template>
 
-        <el-table v-if="list.length" :data="list" border>
-          <el-table-column prop="name" label="图片合集名称" min-width="180" />
-          <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
-          <el-table-column label="封面" min-width="240">
-            <template #default="{ row }">
-              <div class="cover-cell">
-                <el-tag v-if="row.cover_image_id" type="success" size="small">已绑定图片封面</el-tag>
-                <span class="cover-text">{{ row.cover_url || '-' }}</span>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="sort_order" label="排序" width="90" />
-          <el-table-column label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="更新时间" width="180">
-            <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="260">
-            <template #default="{ row }">
-              <el-button size="small" type="primary" plain @click="openImageDrawer(row)">查看图片</el-button>
-              <el-button size="small" @click="openEdit(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
         <EmptyState
-          v-else-if="!loading"
-          title="暂无图片合集"
-          description="先创建一个图片合集，再为图片建立归档关系。"
+          v-if="list.length === 0"
+          :title="hasFilters ? '当前筛选无结果' : '暂无图片合集'"
+          :description="hasFilters ? '重置筛选后查看全部图片合集' : '先创建一个图片合集，再为图片建立归档关系。'"
         >
           <template #action>
-            <el-button type="primary" :icon="Plus" @click="openCreate">创建合集</el-button>
+            <el-button v-if="hasFilters" @click="resetFilters">重置筛选</el-button>
+            <el-button v-else type="primary" :icon="Plus" @click="openCreate">创建合集</el-button>
           </template>
         </EmptyState>
 
-        <div class="collection-footer">
-          <AdminTablePagination
-            v-model:current-page="query.page"
-            v-model:page-size="query.page_size"
-            layout="total, prev, pager, next"
-            :total="total"
-            @current-change="load"
-          />
-        </div>
+        <template v-else>
+          <div class="table-wrap">
+            <el-table v-loading="loading" class="image-collection-table" :data="list" border>
+              <el-table-column prop="name" label="图片合集名称" min-width="180" />
+              <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
+              <el-table-column label="封面" min-width="240">
+                <template #default="{ row }">
+                  <div class="cover-cell">
+                    <el-tag v-if="row.cover_image_id" type="success" size="small">已绑定图片封面</el-tag>
+                    <span class="cover-text">{{ row.cover_url || '-' }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="sort_order" label="排序" width="90" />
+              <el-table-column label="状态" width="100">
+                <template #default="{ row }">
+                  <StatusIndicator :label="row.active ? '启用' : '停用'" :tone="row.active ? 'success' : 'warning'" />
+                </template>
+              </el-table-column>
+              <el-table-column label="更新时间" width="180">
+                <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="260">
+                <template #default="{ row }">
+                  <el-button size="small" type="primary" plain @click="openImageDrawer(row)">查看图片</el-button>
+                  <el-button size="small" @click="openEdit(row)">编辑</el-button>
+                  <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="collection-footer">
+            <AdminTablePagination
+              v-model:current-page="query.page"
+              v-model:page-size="query.page_size"
+              layout="total, prev, pager, next"
+              :total="total"
+              @current-change="load"
+            />
+          </div>
+        </template>
       </SectionCard>
     </div>
 
@@ -527,7 +561,16 @@ onBeforeUnmount(() => {
       direction="rtl"
       :title="editingID ? '编辑图片合集' : '创建图片合集'"
       class="collection-edit-drawer"
+      :show-close="false"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader
+          :title="editingID ? '编辑图片合集' : '创建图片合集'"
+          :title-id="titleId"
+          :title-class="titleClass"
+          :close="close"
+        />
+      </template>
       <el-form label-width="110px" class="collection-edit-form">
         <SectionCard>
           <template #title>基础信息</template>
@@ -573,8 +616,12 @@ onBeforeUnmount(() => {
       title="合集关联图片"
       size="920px"
       destroy-on-close
+      :show-close="false"
       @closed="onImageDrawerClosed"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="合集关联图片" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <div v-if="imageDrawerCollection" class="image-drawer">
         <div class="drawer-hero">
           <div class="drawer-cover-card">
@@ -637,9 +684,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.page-shell--medium {
+.image-collection-page {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .collection-search {
@@ -653,7 +700,15 @@ onBeforeUnmount(() => {
 .collection-footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.image-collection-table :deep(.el-table__row) {
+  height: 40px;
+}
+
+.image-collection-table :deep(tbody .el-table__cell) {
+  padding-block: 0;
 }
 
 .collection-edit-form {
@@ -671,7 +726,7 @@ onBeforeUnmount(() => {
   position: sticky;
   bottom: 0;
   padding-top: var(--space-3);
-  background: linear-gradient(180deg, transparent, var(--bg-canvas) 28%);
+  background: var(--bg-canvas);
 }
 
 .form-tip {
@@ -683,21 +738,25 @@ onBeforeUnmount(() => {
 
 .cover-cell {
   display: flex;
-  flex-direction: column;
+  min-width: 0;
+  align-items: center;
   gap: 8px;
 }
 
 .cover-text {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
-  word-break: break-all;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .image-drawer {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-3);
   min-height: 100%;
 }
 
@@ -708,26 +767,33 @@ onBeforeUnmount(() => {
 .drawer-cover-card {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  gap: 18px;
-  padding: 18px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(17, 24, 39, 0.96), rgba(30, 41, 59, 0.92));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-inverse);
 }
 
 .drawer-cover-media {
   aspect-ratio: 1 / 1;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--text-on-inverse) 8%, transparent);
 }
 
 .drawer-cover-image,
 .thumb-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   display: block;
+}
+
+.drawer-cover-image {
+  object-fit: cover;
+}
+
+.thumb-image {
+  object-fit: contain;
 }
 
 .drawer-cover-empty,
@@ -736,7 +802,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.72);
   text-align: center;
 }
 
@@ -744,7 +809,8 @@ onBeforeUnmount(() => {
 .thumb-placeholder {
   width: 100%;
   height: 100%;
-  background: rgba(255, 255, 255, 0.08);
+  color: color-mix(in srgb, var(--text-on-inverse) 72%, transparent);
+  background: color-mix(in srgb, var(--text-on-inverse) 8%, transparent);
 }
 
 .drawer-cover-meta {
@@ -755,18 +821,18 @@ onBeforeUnmount(() => {
 }
 
 .drawer-cover-title {
-  color: #fff;
-  font-size: 22px;
+  color: var(--text-on-inverse);
+  font-size: var(--text-h2);
   font-weight: 700;
 }
 
 .drawer-cover-desc {
-  color: rgba(255, 255, 255, 0.78);
+  color: color-mix(in srgb, var(--text-on-inverse) 78%, transparent);
   line-height: 1.7;
 }
 
 .drawer-cover-note {
-  color: rgba(255, 255, 255, 0.68);
+  color: color-mix(in srgb, var(--text-on-inverse) 68%, transparent);
   font-size: 13px;
 }
 
@@ -776,22 +842,23 @@ onBeforeUnmount(() => {
 
 .thumb-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: 12px;
 }
 
 .thumb-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  background: var(--el-bg-color);
+  background: var(--bg-surface);
 }
 
 .thumb-media {
-  aspect-ratio: 1 / 1;
-  background: #0f172a;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--bg-inverse);
 }
 
 .thumb-body {
@@ -823,10 +890,10 @@ onBeforeUnmount(() => {
 
 .drawer-empty {
   min-height: 240px;
-  border: 1px dashed var(--el-border-color);
-  border-radius: 18px;
-  color: var(--el-text-color-secondary);
-  background: var(--el-fill-color-light);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--bg-surface-muted);
 }
 
 .drawer-pagination {

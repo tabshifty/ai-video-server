@@ -5,7 +5,6 @@ import { ArrowLeft, CircleCheck, Delete, Headset, Mute, Refresh, VideoCamera } f
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import {
   deleteAdminVideo,
   getAdminPendingDeleteShorts,
@@ -29,7 +28,8 @@ const currentIndex = ref(-1)
 const currentDetail = ref(null)
 const playURL = ref('')
 const muted = ref(true)
-const listLoading = ref(false)
+const listLoading = ref(true)
+const listError = ref('')
 const detailLoading = ref(false)
 const playLoading = ref(false)
 const actionBusy = ref(false)
@@ -37,6 +37,7 @@ const videoRef = ref(null)
 const requestSeq = ref(0)
 
 const hasItems = computed(() => items.value.length > 0)
+const initialLoading = computed(() => listLoading.value && items.value.length === 0)
 const activeItem = computed(() => (currentIndex.value >= 0 ? items.value[currentIndex.value] || null : null))
 const activeTitle = computed(() => currentDetail.value?.title || activeItem.value?.title || '未命名短视频')
 const totalPages = computed(() => resolveTotalPendingDeletePages(total.value, PAGE_SIZE))
@@ -127,6 +128,7 @@ async function selectIndex(index) {
 }
 
 async function loadPage(targetPage = page.value, { selectIndexAfterLoad = 0 } = {}) {
+  listError.value = ''
   listLoading.value = true
   try {
     const data = await getAdminPendingDeleteShorts({
@@ -145,7 +147,8 @@ async function loadPage(targetPage = page.value, { selectIndexAfterLoad = 0 } = 
     await selectIndex(selectIndexAfterLoad)
     return true
   } catch (error) {
-    ElMessage.error(error?.message || '待删除短视频加载失败')
+    listError.value = error?.response?.data?.msg || error?.message || '待删除短视频加载失败'
+    ElMessage.error(listError.value)
     return false
   } finally {
     listLoading.value = false
@@ -251,15 +254,26 @@ onBeforeUnmount(() => {
 
 <template>
   <Layout>
-    <div class="page-shell pending-delete-page">
-      <PageHeader title="待删除短视频" subtitle="逐条复核手机端加入待删除列表的短视频。">
-        <template #actions>
-          <el-button :icon="Refresh" :loading="listLoading" @click="refreshList">刷新列表</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button :icon="Refresh" :loading="listLoading" @click="refreshList">刷新列表</el-button>
+    </template>
 
-      <section class="pending-delete-workbench" :class="{ 'is-empty': !hasItems }">
-        <aside class="pending-delete-queue" aria-label="待删除短视频队列">
+    <div class="page-shell pending-delete-page" data-density="compact">
+      <p class="page-context-note">逐条复核手机端加入待删除列表的短视频。</p>
+
+      <el-alert v-if="listError" type="error" :closable="false" :title="listError">
+        <template #default><el-button link type="primary" :loading="listLoading" @click="refreshList">重试</el-button></template>
+      </el-alert>
+
+      <el-skeleton v-if="initialLoading" class="pending-delete-skeleton" :rows="12" animated />
+
+      <section
+        v-else-if="!listError || hasItems"
+        class="pending-delete-workbench"
+        :class="{ 'is-empty': !hasItems }"
+        aria-label="待删除短视频队列"
+      >
+        <aside class="pending-delete-queue" aria-label="待删除短视频列表">
           <div class="pending-delete-queue__head">
             <div>
               <h2>待处理队列</h2>
@@ -382,17 +396,35 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .pending-delete-page {
+  display: flex;
   height: calc(100dvh - var(--admin-header-height) - var(--space-12));
   min-width: 0;
   min-height: 0;
+  flex-direction: column;
+  gap: var(--space-3);
   overflow: hidden;
-  align-content: stretch;
-  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.page-context-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.pending-delete-skeleton {
+  min-height: 0;
+  flex: 1;
+  padding: var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
 }
 
 .pending-delete-workbench {
   display: grid;
   min-height: 0;
+  flex: 1;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: var(--space-4);
 }
@@ -402,9 +434,8 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
 }
 
 .pending-delete-queue {
@@ -453,11 +484,12 @@ onBeforeUnmount(() => {
 .pending-delete-item {
   display: grid;
   width: 100%;
+  height: 64px;
   min-width: 0;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: var(--space-3);
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: var(--space-2);
   align-items: center;
-  padding: var(--space-2);
+  padding: 4px var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: inherit;
@@ -472,7 +504,11 @@ onBeforeUnmount(() => {
 .pending-delete-item:focus-visible {
   border-color: var(--line-strong);
   background: var(--bg-surface-muted);
-  outline: none;
+}
+
+.pending-delete-item:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: -2px;
 }
 
 .pending-delete-item.is-active {
@@ -482,7 +518,8 @@ onBeforeUnmount(() => {
 
 .pending-delete-item__thumb {
   display: grid;
-  width: 48px;
+  width: 32px;
+  height: 56px;
   aspect-ratio: 9 / 16;
   place-items: center;
   border: 1px solid var(--line-soft);
@@ -498,13 +535,14 @@ onBeforeUnmount(() => {
 }
 
 .pending-delete-item__copy strong {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--text-primary);
   font-size: var(--text-small);
   font-weight: 600;
   line-height: var(--leading-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .pending-delete-item__copy em {
@@ -554,16 +592,15 @@ onBeforeUnmount(() => {
   aspect-ratio: 9 / 16;
   padding: var(--space-2);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-md);
   background: var(--slate-900);
-  box-shadow: var(--shadow-lg);
 }
 
 .pending-delete-video {
   width: 100%;
   height: 100%;
   min-height: 0;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-md);
   background: var(--slate-950);
   object-fit: contain;
 }
@@ -665,11 +702,6 @@ onBeforeUnmount(() => {
     max-width: 100%;
     max-height: calc(100% - var(--space-6));
     padding: var(--space-2);
-    border-radius: var(--radius-xl);
-  }
-
-  .pending-delete-video {
-    border-radius: var(--radius-lg);
   }
 
   .pending-delete-detail__controls .el-button {

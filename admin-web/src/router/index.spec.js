@@ -12,14 +12,15 @@ describe('resolveRouterHistoryBase', () => {
     expect(resolveRouterHistoryBase()).toBe('/')
   })
 
-  it('注册待删除短视频路由并隐藏壳层重复标题', () => {
-    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
-    const page = readFileSync(new URL('../views/PendingDeleteShorts.vue', import.meta.url), 'utf8')
+  it('媒体集合页使用壳层标题且保持原有路由目标', () => {
+    const routerSource = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const pendingSource = readFileSync(new URL('../views/PendingDeleteShorts.vue', import.meta.url), 'utf8')
+    const collectionSource = readFileSync(new URL('../views/ImageCollectionManage.vue', import.meta.url), 'utf8')
 
-    expect(source).toContain("import PendingDeleteShorts from '../views/PendingDeleteShorts.vue'")
-    expect(source).toContain("{ path: '/short-pending-delete', component: PendingDeleteShorts, meta: { hideShellPageHeader: true } }")
-    expect(page).toContain("import Layout from '../components/Layout.vue'")
-    expect(page).toMatch(/<Layout>\s*<div class="page-shell pending-delete-page">/)
+    expect(routerSource).toContain("{ path: '/short-pending-delete', component: PendingDeleteShorts },")
+    expect(routerSource).toContain("{ path: '/image-collections', component: ImageCollectionManage },")
+    expect(pendingSource).not.toContain('<PageHeader')
+    expect(collectionSource).not.toContain('<PageHeader')
   })
 
   it('仪表盘使用壳层标题且保持原有路由目标', () => {
