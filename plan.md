@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 22:42 +0800
+- 进度：Task 11 修复后独立复审最终判定 Spec PASS、Task quality Approved，Critical 0、Important 0、Minor 0。复审确认无缓存首次加载与失败后重试均进入骨架，有缓存刷新继续显示旧表，空闲空列表才显示真实空态；三页页头、compact 密度、状态、Drawer、路由与业务 API 边界仍全部符合 brief。已在 SDD 忽略账本标记 Task 11 完成，下一步进入 Task 12。
+- 影响文件：本次 tracked 只追加 `plan.md`；`.superpowers/sdd/progress.md`、更新后的 Task 11 报告与 `review-dc3bf31..f721290.diff` 继续作为忽略证据。不修改生产代码、测试、`CONTEXT.md`、API、路由、依赖、Go 或 Android。
+- 验证：主线程在干净 HEAD `f721290` 独立重跑 `cd admin-web && npm test` 通过（38 文件，386/386），`npm run build` 成功（2374 modules transformed，仅既有 chunk-size warning）；`git diff --check`、8 文件 U+FFFD/C0/DEL、白名单和敏感范围检查通过；独立复审确认上一轮 1 项 Important 已闭合且无新增问题。
+
 ## 2026-07-16 22:27 +0800
 - 进度：Task 11 Important 的实现、长期契约、验证与提交前自审完成。共享 helper 只表达“loading 且无缓存行”，三页无缓存重试必走 skeleton、有缓存刷新仍走 SectionCard+旧表；失败错误和 rows 保留不变。零上下文审计确认三个 SFC 各自仅新增 helper import 并替换 computed，未改 API、路由、权限、依赖、payload、查询、模板或 Drawer；修复报告已更新，提交后交原复审者复审。
 - 影响文件：本次精确提交仅包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/crudCollectionState.js`、`crudCollectionState.spec.js`、`ActorManage.vue`、`CollectionManage.vue`、`UserManage.vue`、`precisionOpsRollout.spec.js` 共 8 个文件；`.superpowers/sdd/task-11-report.md` 与 `admin-web/dist/` 保持忽略，不纳入提交。
