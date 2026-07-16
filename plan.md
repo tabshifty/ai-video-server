@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 07:22 +0800
+- 进度：Task 12 最终独立复审通过，Spec compliant、Task quality Approved，Critical 0、Important 0、Minor 0。复审确认上轮 52px 队列媒体行、动态 `aria-current` + 可见图标形状和图片合集无效 `loaded` 三项均已闭合，未破坏队列业务、图片合集加载状态、Task 11 契约、Drawer 或响应式行为；已在 SDD 忽略账本标记 Task 12 完成，下一步进入 Task 13。
+- 影响文件：本次 tracked 只追加 `plan.md`；`.superpowers/sdd/progress.md`、`task-12-report.md` 与最终 `review-8a5ac97..a04e882.diff` 继续作为忽略证据。不修改生产代码、测试、`CONTEXT.md`、API、路由、依赖、Go 或 Android。
+- 验证：主线程在最终 HEAD `a04e882` 新鲜执行 Task 12 定向测试通过（4 文件，33/33）、`cd admin-web && npm test` 通过（38 文件，393/393）、`npm run build` 成功（2374 modules transformed，仅既有 chunk-size warning）；`git diff --check`、7 文件白名单、U+FFFD/C0/DEL、CSS 禁项和敏感范围检查通过。登录态浏览器 1440/1024 实测所有队列项均为 52px、当前项 ARIA/图标形状明确、内容无越界且控制台无错误；768px 图片选择 Drawer 实测完整落在 0..768 视口内。
+
 ## 2026-07-17 00:07 +0800
 - 进度：Task 12 独立复审 Important 2 / Minor 1 完成提交前自查与验证。队列项实际使用 compact `--media-row-height` 52px，44px 缩略图和两行 18px 标题在全局 border-box 下不溢出；当前项同时具备动态 `aria-current` 与 `CircleCheck`/`VideoCamera` 可见形状差异，焦点环保留。图片合集两处无效 `loaded` 已删除，Task 11 三页正契约未动。
 - 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`precisionOpsRollout.spec.js` 共 5 个 tracked 文件；忽略的 `.superpowers/sdd/task-12-report.md` 在提交后追加复审证据，`admin-web/dist/` 不纳入提交。
