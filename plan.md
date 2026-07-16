@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 00:07 +0800
+- 进度：Task 12 独立复审 Important 2 / Minor 1 完成提交前自查与验证。队列项实际使用 compact `--media-row-height` 52px，44px 缩略图和两行 18px 标题在全局 border-box 下不溢出；当前项同时具备动态 `aria-current` 与 `CircleCheck`/`VideoCamera` 可见形状差异，焦点环保留。图片合集两处无效 `loaded` 已删除，Task 11 三页正契约未动。
+- 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`precisionOpsRollout.spec.js` 共 5 个 tracked 文件；忽略的 `.superpowers/sdd/task-12-report.md` 在提交后追加复审证据，`admin-web/dist/` 不纳入提交。
+- 验证：rollout RED 精确为 3/20、修复后 20/20 GREEN；正式四文件定向 33/33；`cd admin-web && npm test` 通过（38 文件，393/393）；`npm run build` 成功（2374 modules transformed，仅既有 chunk-size warning）；`git diff --check`、5 文件白名单、UTF-8 U+FFFD、Pending 脚本零差异、旧 64/56px/副标禁用、图片合集两处死状态精确删除及 Task 11/helper/API/预览参数/路由/依赖零差异检查通过。待使用固定中文提交信息 `修复：完善媒体队列紧凑语义` 精确提交。
+
+## 2026-07-17 00:03 +0800
+- 进度：Task 12 独立复审三项完成最小修复并取得初步 GREEN。待删除队列项改用 `height: var(--media-row-height)`，以 3px 纵向内边距容纳 44px 的 9:16 缩略图和最多两行 18px 标题，移除冗余“短视频”副标；当前按钮同时绑定 `aria-current`，缩略图在当前项显示 `CircleCheck`、普通项显示 `VideoCamera`，焦点样式与选择函数未改。图片合集只删除无消费者的 `loaded` 声明/写入，shared helper 及加载、错误、缓存和空态逻辑不变。
+- 影响文件：修改 `PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，并计划追加忽略报告；不修改 Task 11 三页、API、预览参数、队列顺序/分页/选择/播放器/保留删除函数、路由、依赖或 Task 13。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 通过（1 文件，20/20），三个失败测试完成 RED→GREEN，Task 11 `crudViews` 正断言继续通过；待执行 Task 12 四文件定向、管理端全量、生产构建和静态范围门禁。
+
+## 2026-07-17 00:00 +0800
+- 进度：Task 12 独立复审三项修复取得严格 RED；此时仅修改 rollout 测试与账本，生产 SFC 尚未修改。三个失败测试分别精确命中队列按钮缺少 `aria-current + CircleCheck/VideoCamera` 形状差异、队列项仍为 64px 而非 `var(--media-row-height)`、图片合集仍包含无消费者 `loaded`；其余 17 项通过。
+- 影响文件：RED 阶段仅修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`；`PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`CONTEXT.md` 尚未修改，Task 11 三页的 `crudViews` 正断言保持原样。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 按预期退出 1（1 文件，20 项中 3 失败/17 通过），三条失败消息与复审 Important 2 / Minor 1 一一对应，无 SFC 编译或其它契约错误。
+
+## 2026-07-16 23:58 +0800
+- 进度：Task 12 独立复审判定 Spec FAIL / Needs fixes（Critical 0、Important 2、Minor 1），主线程复核三项均成立：待删除队列项固定 64px 而 compact `--media-row-height` 为 52px；当前项只有颜色边框/背景、缺少 `aria-current` 与可见非颜色形状；图片合集 `loaded` 仅声明和写入、没有运行时消费者，页面专属测试反而固化死状态。本轮严格先扩 52px、ARIA+图标形状和无 `loaded` 三项测试取得 RED，再做最小修复。
+- 影响文件：计划只修改 `admin-web/src/views/PendingDeleteShorts.vue`、`ImageCollectionManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，并追加忽略的 `.superpowers/sdd/task-12-report.md`；Task 11 的 Actor/Collection/User `loaded` 契约、API、预览参数、队列顺序/选择/业务函数、路由、依赖和 Task 13 均不修改。
+- 验证：待执行 rollout 三项真实 RED、Task 12 四文件定向 GREEN、`cd admin-web && npm test`、`npm run build`、`git diff --check`、UTF-8 U+FFFD、5 文件白名单及队列业务函数/helper/API/预览参数/路由/依赖敏感范围检查；构建只接受既有 chunk-size warning。
+
 ## 2026-07-16 23:29 +0800
 - 进度：Task 12 图片选择 Drawer 响应式缺陷完成提交前自查与验证。浏览器根因对应的生产差异严格只有 `size="920px"` → `size="min(100vw, 920px)"`，因此 1440px 继续保持 920px、768px 最大为 100vw；编辑 Drawer 的 `:size="editDrawerSize"`、共享关闭链路、API、预览参数、数据/关联逻辑均未改。
 - 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/ImageCollectionManage.vue`、`precisionOpsRollout.spec.js` 共 4 个 tracked 文件；忽略的 `.superpowers/sdd/task-12-report.md` 在提交后追加证据，`admin-web/dist/` 不纳入提交。

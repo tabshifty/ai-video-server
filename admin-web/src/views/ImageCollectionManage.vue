@@ -22,7 +22,6 @@ import {
 import { buildImageCollectionPayload, IMAGE_COLLECTION_PREVIEW_PARAMS, revokePreviewURLs } from './imageCollectionManage.helpers'
 
 const loading = ref(true)
-const loaded = ref(false)
 const loadError = ref('')
 const list = ref([])
 const total = ref(0)
@@ -155,7 +154,6 @@ async function load() {
   } catch (error) {
     loadError.value = extractErrorMessage(error, '加载图片合集列表失败')
   } finally {
-    loaded.value = true
     loading.value = false
   }
 }

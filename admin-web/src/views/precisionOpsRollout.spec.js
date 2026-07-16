@@ -144,16 +144,29 @@ describe('Precision Ops 第一阶段 rollout', () => {
 
   it('媒体复核操作保持显式并可由键盘触达', () => {
     const pending = readView('PendingDeleteShorts.vue')
+    const pendingTemplate = extractTemplate(pending)
+    const queueItem = pendingTemplate.match(/<button\s+v-for="\(item, index\) in items"[\s\S]*?<\/button>/)?.[0] || ''
     const collections = readView('ImageCollectionManage.vue')
 
     expect(pending).toContain('aria-label="待删除短视频队列"')
     expect(pending).toContain('刷新列表')
+    expect(queueItem).toMatch(
+      /:aria-current="index === currentIndex \? 'true' : undefined"[\s\S]*?<span class="pending-delete-item__thumb">[\s\S]*?<CircleCheck v-if="index === currentIndex" \/>[\s\S]*?<VideoCamera v-else \/>[\s\S]*?<\/span>/
+    )
     expect(pending).not.toMatch(/\.pending-delete-queue,\s*\.pending-delete-player-panel\s*\{[^}]*box-shadow:/s)
     expect(pending).not.toMatch(/\.pending-delete-video-frame\s*\{[^}]*box-shadow:/s)
     expect(collections).toContain('创建合集')
     expect(collections).toContain('<el-drawer')
     expect(collections).not.toMatch(/border-radius:\s*(?:14|16|18)px/)
     expect(collections).not.toMatch(/(?:linear|radial)-gradient\(/)
+  })
+
+  it('待删除队列项遵循 compact 媒体行高', () => {
+    const style = extractStyle(readView('PendingDeleteShorts.vue'))
+    const itemRule = style.match(/\.pending-delete-item\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(itemRule).toContain('height: var(--media-row-height);')
+    expect(itemRule).not.toContain('height: 64px;')
   })
 
   it('媒体集合区分读取失败、无缓存加载与真正空态', () => {
@@ -176,7 +189,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(pendingTemplate).toMatch(/<section\s+v-else-if="!listError \|\| hasItems"[\s\S]*?aria-label="待删除短视频队列"/)
 
     expect(collections).toContain("import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'")
-    expect(collections).toContain("const loaded = ref(false)")
+    expect(collections).not.toContain("const loaded = ref(false)")
     expect(collections).toContain("const loadError = ref('')")
     expect(collections).toMatch(
       /const initialLoading = computed\(\(\) => shouldShowCrudCollectionSkeleton\(\{\s*loading: loading\.value,\s*rowCount: list\.value\.length\s*\}\)\)/
@@ -185,7 +198,8 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(collectionCatch).toContain("loadError.value = extractErrorMessage(error, '加载图片合集列表失败')")
     expect(collectionCatch).not.toContain('list.value =')
     expect(collectionCatch).not.toContain('total.value =')
-    expect(collectionLoad).toMatch(/finally \{[\s\S]*loaded\.value = true[\s\S]*loading\.value = false/)
+    expect(collectionLoad).not.toContain('loaded.value = true')
+    expect(collectionLoad).toContain('loading.value = false')
     expect(collections).toContain("const hasFilters = computed(() => String(query.q || '').trim() !== '' || String(query.active || '') !== '')")
     expect(collectionTemplate.indexOf('<el-alert v-if="loadError"')).toBeLessThan(collectionTemplate.indexOf('<el-skeleton v-if="initialLoading"'))
     expect(collectionTemplate).toContain('<SectionCard v-else-if="!loadError || list.length > 0" dense>')

@@ -289,15 +289,18 @@ onBeforeUnmount(() => {
                 :key="item.id"
                 class="pending-delete-item"
                 :class="{ 'is-active': index === currentIndex }"
+                :aria-current="index === currentIndex ? 'true' : undefined"
                 type="button"
                 @click="selectIndex(index)"
               >
                 <span class="pending-delete-item__thumb">
-                  <el-icon><VideoCamera /></el-icon>
+                  <el-icon aria-hidden="true">
+                    <CircleCheck v-if="index === currentIndex" />
+                    <VideoCamera v-else />
+                  </el-icon>
                 </span>
                 <span class="pending-delete-item__copy">
                   <strong>{{ item.title || '未命名短视频' }}</strong>
-                  <em>短视频</em>
                 </span>
               </button>
 
@@ -484,12 +487,12 @@ onBeforeUnmount(() => {
 .pending-delete-item {
   display: grid;
   width: 100%;
-  height: 64px;
+  height: var(--media-row-height);
   min-width: 0;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr);
   gap: var(--space-2);
   align-items: center;
-  padding: 4px var(--space-2);
+  padding: 3px var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: inherit;
@@ -518,9 +521,9 @@ onBeforeUnmount(() => {
 
 .pending-delete-item__thumb {
   display: grid;
-  width: 32px;
-  height: 56px;
+  height: calc(var(--media-row-height) - 8px);
   aspect-ratio: 9 / 16;
+  justify-self: center;
   place-items: center;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
@@ -529,13 +532,16 @@ onBeforeUnmount(() => {
 }
 
 .pending-delete-item__copy {
-  display: grid;
+  display: flex;
   min-width: 0;
-  gap: var(--space-1);
+  min-height: 0;
+  align-items: center;
 }
 
 .pending-delete-item__copy strong {
   display: -webkit-box;
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
   font-size: var(--text-small);
@@ -543,13 +549,6 @@ onBeforeUnmount(() => {
   line-height: var(--leading-small);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-.pending-delete-item__copy em {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-style: normal;
-  line-height: var(--leading-caption);
 }
 
 .pending-delete-queue__empty {
