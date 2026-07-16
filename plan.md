@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 14:31 +0800
+- 进度：Task 10 第一阶段集成门禁已完成提交前新鲜验证。生产代码与测试在 `5e1c887` 后保持零差异；本次只提交真实管理员验收的 tracked 账本记录，真实 CDP 脚本、JSON、截图和审计报告继续作为忽略证据保留。完成提交后交由独立子代理复核 Task 10 的 Spec、代码质量和真实证据，再更新 SDD 账本。
+- 影响文件：精确提交仅 `plan.md`；`admin-web/dist/` 与 `.superpowers/sdd/task-10-real-*` 均被忽略，不纳入 Git；无关工作区改动为 0。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 通过（1 文件，6/6）；`cd admin-web && npm test` 通过（37 文件，360/360）；`cd admin-web && npm run build` 成功（2371 modules transformed，仅既有 chunk-size warning）；真实 CDP 最终 16/16、硬失败/数据前置/写请求均为 0；`git diff --check`、单文件白名单、`plan.md` U+FFFD/C0/DEL 和真实 JSON/16 截图一致性检查通过。
+
+## 2026-07-16 14:28 +0800
+- 进度：用户已在专用 Chrome profile 登录，Task 10 真实管理员只读验收最终通过，第一阶段浏览器门禁收口。四个页面在 375×812、768×1024、1024×900、1440×900 共 16/16 场景 ready；CDP 在网络层只放行 GET/HEAD/OPTIONS，写请求 0。真实读取失败、危险确认和保存视图因会改变真实网络状态、进入危险流程或修改管理员本地偏好而未主动触发，继续由自动测试与 mock 门禁覆盖。
+- 影响文件：本阶段 tracked 范围只追加 `plan.md`；`.superpowers/sdd/task-10-real-smoke.mjs`、真实 JSON、16 张截图及 Task 10 报告均由 `.superpowers/sdd/.gitignore` 排除，不修改生产代码、测试、API、路由、依赖、`CONTEXT.md` 或 Chrome profile。
+- 验证：最终真实 CDP 退出码 0，`hardFailures=[]`、`dataPrerequisites=[]`、`blockedWrites=[]`；根横向溢出、`<1024px` 小点击目标、console、runtime、API/网络失败、不可见焦点均为 0。Dashboard canvas 非空；1440 下 Task 真实 20/首屏 14、Video 真实 20/首屏 12、Image 真实 20/首屏 15；后台刷新保留 20 rows；Video/Image 零结果与恢复、更多菜单、详情 Drawer 均通过。代表桌面/375 截图已人工检查。待提交前新鲜重跑 rollout 定向、完整 `npm test`、`npm run build`、diff/U+FFFD 门禁并完成独立复核。
+
 ## 2026-07-16 11:40 +0800
 - 进度：完成 Task 10 可自动修复项、浏览器复验和提交前自审；真实管理员验收仍因仓库未提供管理员账号/密码/token 而阻塞，因此不把 Task 10 标为完成、不进入阶段二。本次修改 6 个生产 SFC 与各自 6 个测试文件；`precisionOpsRollout.spec.js` 作为第 7 个定向验证文件保持零差异。
 - 影响文件：精确提交只包含 `admin-web/src/components/Layout.vue`、`Layout.spec.js`、`AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`，Dashboard/TaskMonitor/VideoList/ImageManage 四个页面及对应 spec，`CONTEXT.md`、`plan.md`，共 14 个文件；不纳入 `.superpowers/sdd/task-10-report.md`、CDP script/results/截图、`admin-web/dist`，不修改 API、路由、依赖或其它页面。
