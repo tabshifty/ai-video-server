@@ -30,8 +30,17 @@ import {
   DEFAULT_IMAGE_ACTIVE,
   createImageBuiltInViews,
   hasImageActiveFilters,
-  normalizeImageViewSnapshot
+  normalizeImageViewSnapshot,
+  resolveImagePreviewUrl,
+  revokeImagePreviewUrls
 } from './imageManage.helpers'
+
+const IMAGE_LIST_PREVIEW_PARAMS = Object.freeze({
+  w: 480,
+  h: 270,
+  fit: 'inside',
+  q: 82
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -39,6 +48,8 @@ const loading = ref(false)
 const list = ref([])
 const total = ref(0)
 const listError = ref('')
+const listPreviewUrls = ref({})
+const listPreviewErrors = ref({})
 const IMAGEMANAGE_VIEW_KEY = 'admin-imagemanage-view'
 const SAVED_VIEWS_KEY = 'admin-imagemanage-saved-views-v1'
 const tableRef = ref(null)
@@ -48,6 +59,7 @@ const filterDrawerVisible = ref(false)
 const viewportWidth = ref(readViewportWidth())
 const viewMode = ref(readStoredImageView())
 let loadSeq = 0
+let listPreviewSeq = 0
 
 const query = reactive({
   page: 1,
@@ -345,6 +357,7 @@ function buildListParams() {
 }
 
 function resetQueryIdentity() {
+  clearListPreviews()
   list.value = []
   total.value = 0
   clearImageSelection()
@@ -414,6 +427,7 @@ async function load() {
     total.value = data.total_count || 0
     listError.value = ''
     clearImageSelection()
+    void loadListPreviews(list.value, seq)
     return true
   } catch (error) {
     if (seq !== loadSeq) {
@@ -426,6 +440,66 @@ async function load() {
       loading.value = false
     }
   }
+}
+
+function imagePreviewUrl(item) {
+  return resolveImagePreviewUrl(item, listPreviewUrls.value)
+}
+
+function clearListPreviews() {
+  listPreviewSeq += 1
+  listPreviewUrls.value = revokeImagePreviewUrls(listPreviewUrls.value)
+  listPreviewErrors.value = {}
+}
+
+async function readImagePreviewBlob(blob, fallback) {
+  if (!blob?.type?.includes('application/json')) {
+    return blob
+  }
+  const text = await blob.text()
+  let payload = null
+  try {
+    payload = JSON.parse(text)
+  } catch (_) {
+    payload = null
+  }
+  throw new Error(payload?.msg || fallback)
+}
+
+async function loadListPreviews(items, listRequestSeq) {
+  const previewRequestSeq = ++listPreviewSeq
+  listPreviewUrls.value = revokeImagePreviewUrls(listPreviewUrls.value)
+  listPreviewErrors.value = {}
+  if (!items.length) return
+
+  const nextUrls = {}
+  const nextErrors = {}
+  await Promise.all(
+    items.map(async (item) => {
+      if (!item?.id || resolveImagePreviewUrl(item)) return
+      try {
+        const blob = await getAdminImageViewBlob(item.id, IMAGE_LIST_PREVIEW_PARAMS)
+        const imageBlob = await readImagePreviewBlob(blob, '加载图片缩略图失败')
+        const ownedUrl = URL.createObjectURL(imageBlob)
+        if (listRequestSeq !== loadSeq || previewRequestSeq !== listPreviewSeq) {
+          URL.revokeObjectURL(ownedUrl)
+          return
+        }
+        nextUrls[item.id] = ownedUrl
+        listPreviewUrls.value = { ...listPreviewUrls.value, [item.id]: ownedUrl }
+      } catch (error) {
+        if (listRequestSeq !== loadSeq || previewRequestSeq !== listPreviewSeq) return
+        nextErrors[item.id] = extractErrorMessage(error, '加载图片缩略图失败')
+        listPreviewErrors.value = { ...listPreviewErrors.value, [item.id]: nextErrors[item.id] }
+      }
+    })
+  )
+
+  if (listRequestSeq !== loadSeq || previewRequestSeq !== listPreviewSeq) {
+    return
+  }
+  listPreviewUrls.value = nextUrls
+  listPreviewErrors.value = nextErrors
 }
 
 async function searchActors(keyword = '') {
@@ -935,17 +1009,8 @@ async function loadPreview() {
   preview.loading = true
   try {
     const blob = await getAdminImageViewBlob(detail.value.id, currentPreviewParams())
-    if (blob?.type?.includes('application/json')) {
-      const text = await blob.text()
-      let payload
-      try {
-        payload = JSON.parse(text)
-      } catch (_) {
-        payload = null
-      }
-      throw new Error(payload?.msg || '加载图片预览失败')
-    }
-    preview.url = URL.createObjectURL(blob)
+    const imageBlob = await readImagePreviewBlob(blob, '加载图片预览失败')
+    preview.url = URL.createObjectURL(imageBlob)
   } catch (error) {
     preview.error = extractErrorMessage(error, '加载图片预览失败')
   } finally {
@@ -975,6 +1040,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateViewportWidth)
+  clearListPreviews()
   clearPreview()
 })
 </script>
@@ -1066,10 +1132,11 @@ onBeforeUnmount(() => {
             />
             <div class="image-grid-card__preview">
               <img
-                v-if="item.view_url || item.url || item.thumbnail_url"
-                :src="item.view_url || item.url || item.thumbnail_url"
+                v-if="imagePreviewUrl(item)"
+                :src="imagePreviewUrl(item)"
                 :alt="item.title || '图片预览'"
               />
+              <span v-else-if="listPreviewErrors[item.id]">预览加载失败</span>
               <span v-else>{{ item.title || '图片' }}</span>
             </div>
             <div class="image-grid-card__body">

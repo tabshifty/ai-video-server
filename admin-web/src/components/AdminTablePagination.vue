@@ -128,6 +128,12 @@ function submitJump() {
 }
 
 @media (max-width: 63.9375rem) {
+  .admin-table-pagination {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
   .admin-table-pagination__jump :deep(.el-input__wrapper) {
     min-height: 44px;
   }

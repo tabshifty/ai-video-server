@@ -1,5 +1,20 @@
 export const DEFAULT_IMAGE_ACTIVE = '1'
 
+export function resolveImagePreviewUrl(item, ownedUrls = {}) {
+  return item?.view_url
+    || item?.url
+    || item?.thumbnail_url
+    || ownedUrls?.[item?.id]
+    || ''
+}
+
+export function revokeImagePreviewUrls(urlMap, revoke = (value) => URL.revokeObjectURL(value)) {
+  for (const value of Object.values(urlMap || {})) {
+    if (value) revoke(value)
+  }
+  return {}
+}
+
 export function normalizeImageViewSnapshot(snapshot) {
   return {
     q: String(snapshot?.q || ''),

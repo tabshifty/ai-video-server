@@ -2,6 +2,36 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 19:40 +0800
+- 进度：完成 Task 10 三项复核缺口的提交前新鲜门禁。提交范围严格限定 12 个 Task 10 文件；真实管理员与隔离状态浏览器证据继续留在忽略目录，不提交生成产物。API、路由、权限、数据库、依赖、Go 与 Android 均无改动；待提交后生成固定范围评审包并由独立子代理复审，复审未清零 Critical/Important 前不标记 Task 10 完成。
+- 影响文件：`CONTEXT.md`、`plan.md`、`admin-web/src/assets/element-overrides.css`、`themeTokens.spec.js`、`components/AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`、`views/ImageManage.vue`、`VideoList.vue`、`imageManage.helpers.js`、`imageManage.helpers.spec.js`、`imageManagePage.spec.js`、`videoListPage.spec.js`；`.superpowers/sdd/*` 与 `admin-web/dist/` 保持忽略。
+- 验证：`cd admin-web && npm test` 通过（37 个文件，369/369）；`cd admin-web && npm run build` 成功（2371 modules transformed，仅既有 chunk-size warning）；`git diff --check` 通过；12 个文件 U+FFFD、C0/DEL 扫描无命中；文件白名单与敏感范围扫描确认无 API、路由、权限、认证、依赖、Go、Android 或 migration 变更。
+
+## 2026-07-16 19:35 +0800
+- 进度：Task 10 三项独立复核缺口已完成生产修复与最终浏览器 GREEN。ImageManage 对缺少直连字段的真实列表异步读取认证 blob 并完整回收 object URL；完整键盘门禁覆盖侧栏、命令面板、保存视图、筛选、列设置、行/卡片菜单、分页与 Drawer，并在可见表面检查焦点；隔离状态 Chrome 覆盖 4 loading、4 真正空态、4 读取失败和 2 个中文危险确认。最终又修复共享移动分页 `flex-end` 负自由空间把活动页推出视口的问题，未改变分页事件或业务状态。
+- 影响文件：`admin-web/src/assets/element-overrides.css`、`themeTokens.spec.js`、`components/AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`、`views/ImageManage.vue`、`imageManage.helpers.js`、`imageManage.helpers.spec.js`、`imageManagePage.spec.js`、`views/VideoList.vue`、`videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。不修改 API、路由、权限、数据库、依赖、Go 或 Android；`.superpowers/sdd/*` 与 `admin-web/dist/` 继续只作忽略证据。
+- 验证：隔离状态 smoke 最终 14/14、14 PNG、`hardFailures=[]`、`blockedWrites=[]`、`unexpectedErrors=[]`；完整真实管理员 smoke 最终 16/16、16 PNG、键盘 18/18、`hardFailures=[]`、`dataPrerequisites=[]`、`blockedWrites=[]`，四个 Image 视口均 20/20 真实图片 loaded 且 `object-fit: contain`。移动分页 after probe 的活动 page 1 位于 `167.3..211.3px`，焦点可见，根宽保持 `375/375`。待执行提交前新鲜定向、全量测试、构建、静态门禁与独立复审。
+
+## 2026-07-16 18:25 +0800
+- 进度：Task 10 键盘与状态门禁完成逐层 RED→GREEN。CDP 先修复共享 target 焦点模拟和 keyboard-only 假失败，再通过真实路径暴露 Drawer close、dropdown item 的焦点级联问题；对应 CSS 单测先 RED 后 GREEN。隔离状态 smoke 随后发现 Video 删除确认沿用英文 `Cancel/OK`，收紧中文门禁取得仅该场景失败的 RED，再以中文“删除视频 / 取消 / 确认删除”最小修复闭合。
+- 影响文件：键盘生产增量仅 `admin-web/src/assets/element-overrides.css`、`themeTokens.spec.js`；中文确认增量仅 `views/VideoList.vue`、`videoListPage.spec.js`；状态与真实 CDP 脚本、JSON、截图和报告均在 `.superpowers/sdd/` 留证且不提交。
+- 验证：`themeTokens.spec.js` 最终 33/33；Video 页面测试 12/12；keyboard-only 最终 18/18、硬失败和写请求均为 0；Drawer probe 的 outline 为 `solid/2px/2px`，Video/Image dropdown 均聚焦真实 `li.el-dropdown-menu__item` 并可 Escape 关闭；状态中文门禁最终 14/14。
+
+## 2026-07-16 15:03 +0800
+- 进度：完成 Task 10 真实图片网格最小实现与图片定向 GREEN。图片列表仍先按既有 latest-wins 写入，随后 fire-and-forget 拉取缺少直连字段的认证 blob；直连 URL 优先，单项失败保留“预览加载失败”占位，双代次阻止旧页写回，替换、查询重置、stale 和卸载均回收 owned object URL。详情预览复用同一 JSON blob 错误解析；查询、选择、上传、编辑和危险操作流程未改。
+- 影响文件：`admin-web/src/views/ImageManage.vue`、`imageManage.helpers.js`、`imageManage.helpers.spec.js`、`imageManagePage.spec.js`、`CONTEXT.md`、`plan.md`；未修改 API、路由、依赖或其它生产页面。
+- 验证：`cd admin-web && npm test -- src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js` 通过（退出码 0；2 文件，24/24）；目标文件 `git diff --check` 通过。待执行真实键盘 CDP、隔离 state mock、Task 10 七文件定向、全量测试和构建。
+
+## 2026-07-16 15:00 +0800
+- 进度：Task 10 真实图片网格的四项回归门禁已取得严格 TDD RED。新增测试锁定直连 URL 优先、owned object URL 全回收、列表成功后 fire-and-forget 拉取缺失认证 blob、单项失败占位，以及列表请求/预览请求双代次下 stale 结果只回收不写回；生产文件尚未修改。
+- 影响文件：本阶段只修改 `admin-web/src/views/imageManage.helpers.spec.js`、`admin-web/src/views/imageManagePage.spec.js`，并保留 14:51 独立复核记录；下一步最小修改对应 helper 与 `ImageManage.vue`。
+- 验证：`cd admin-web && npm test -- src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js` 按预期失败（退出码 1；2 文件，24 项中新增 4 项失败、原有 20 项通过）。失败分别为两个 helper 尚未导出、列表 blob 预览状态/加载缺失和生命周期代次缺失，不是 SFC 编译、语法或环境错误。
+
+## 2026-07-16 14:51 +0800
+- 进度：Task 10 独立复核判定 Spec FAIL、Task quality Needs fixes（0 Critical、3 Important、0 Minor），因此撤销“第一阶段已完成”的当前状态，`9c97116` 只保留为真实主场景验收审计点，不进入 Task 11。复核确认主场景布局和主要只读交互通过，但焦点门禁漏判 Element Plus 隐藏 input 且未覆盖完整键盘路径；真实图片网格没有实际 `<img>`；首次加载、真正空态、读取失败和危险确认缺少安全浏览器状态证据。
+- 影响文件：修复计划先通过 `admin-web/src/views/imageManagePage.spec.js` 建立真实缩略图 RED，再最小修改 `ImageManage.vue`（必要时只扩展既有 `imageManage.helpers.js/spec.js`）复用 `getAdminImageViewBlob` 和 object URL 生命周期，不改 API/业务流程；忽略脚本扩展真实键盘路径与安全 state mock，最终追加 `CONTEXT.md`、`plan.md`。不修改路由、依赖、Go、Android 或其它页面生产行为。
+- 验证：待执行图片预览定向 RED/GREEN；更新后的真实四页四视口和完整键盘路径；隔离 mock 的首次加载、真正空态、读取失败和危险确认；随后新鲜运行 Task 10 七文件定向、完整 `npm test`、`npm run build`、diff/U+FFFD/范围门禁并重新独立复核。
+
 ## 2026-07-16 14:31 +0800
 - 进度：Task 10 第一阶段集成门禁已完成提交前新鲜验证。生产代码与测试在 `5e1c887` 后保持零差异；本次只提交真实管理员验收的 tracked 账本记录，真实 CDP 脚本、JSON、截图和审计报告继续作为忽略证据保留。完成提交后交由独立子代理复核 Task 10 的 Spec、代码质量和真实证据，再更新 SDD 账本。
 - 影响文件：精确提交仅 `plan.md`；`admin-web/dist/` 与 `.superpowers/sdd/task-10-real-*` 均被忽略，不纳入 Git；无关工作区改动为 0。

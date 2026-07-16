@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import * as imageManageHelpers from './imageManage.helpers'
 import {
   DEFAULT_IMAGE_ACTIVE,
   createImageBuiltInViews,
@@ -7,6 +8,41 @@ import {
 } from './imageManage.helpers'
 
 describe('图片管理视图 helper', () => {
+  it('图片预览地址优先使用服务端直连字段并回退到当前页 owned URL', () => {
+    const resolveImagePreviewUrl = imageManageHelpers.resolveImagePreviewUrl
+
+    expect(resolveImagePreviewUrl).toBeTypeOf('function')
+    expect(resolveImagePreviewUrl(
+      { id: 'image-1', view_url: '/direct/view', url: '/direct/url', thumbnail_url: '/direct/thumb' },
+      { 'image-1': 'blob:owned' }
+    )).toBe('/direct/view')
+    expect(resolveImagePreviewUrl(
+      { id: 'image-1', url: '/direct/url', thumbnail_url: '/direct/thumb' },
+      { 'image-1': 'blob:owned' }
+    )).toBe('/direct/url')
+    expect(resolveImagePreviewUrl(
+      { id: 'image-1', thumbnail_url: '/direct/thumb' },
+      { 'image-1': 'blob:owned' }
+    )).toBe('/direct/thumb')
+    expect(resolveImagePreviewUrl({ id: 'image-1' }, { 'image-1': 'blob:owned' })).toBe('blob:owned')
+    expect(resolveImagePreviewUrl({ id: 'image-2' }, { 'image-1': 'blob:owned' })).toBe('')
+  })
+
+  it('图片列表预览替换时回收全部 owned URL 并返回空映射', () => {
+    const revokeImagePreviewUrls = imageManageHelpers.revokeImagePreviewUrls
+    const revoke = vi.fn()
+
+    expect(revokeImagePreviewUrls).toBeTypeOf('function')
+    expect(revokeImagePreviewUrls({
+      first: 'blob:first',
+      second: 'blob:second',
+      empty: ''
+    }, revoke)).toEqual({})
+    expect(revoke).toHaveBeenCalledTimes(2)
+    expect(revoke).toHaveBeenCalledWith('blob:first')
+    expect(revoke).toHaveBeenCalledWith('blob:second')
+  })
+
   it('只创建受支持的内置视图并保持快照引用隔离', () => {
     const views = createImageBuiltInViews(DEFAULT_IMAGE_ACTIVE, 'list')
 

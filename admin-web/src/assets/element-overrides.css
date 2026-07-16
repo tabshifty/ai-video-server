@@ -21,6 +21,23 @@
   box-shadow: 0 0 0 3px var(--primary-ring);
 }
 
+:where(.el-segmented__item-input:focus-visible + .el-segmented__item-label) {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
+.el-drawer__close-btn:focus,
+.el-drawer__close-btn:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
+.el-dropdown-menu__item:focus,
+.el-dropdown-menu__item:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
 :where(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner) {
   border-radius: var(--radius-md);
   box-shadow: 0 0 0 1px var(--line-soft) inset;
@@ -142,6 +159,11 @@
 }
 
 @media (max-width: 63.9375rem) {
+  :where(.el-drawer__close-btn) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   :where([data-density]) .el-button,
   :where([data-density]) .el-input__wrapper,
   :where([data-density]) .el-select__wrapper,

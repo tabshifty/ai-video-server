@@ -915,7 +915,11 @@ async function captureCurrentFrameThumbnail() {
 }
 
 async function doDelete(row) {
-  await ElMessageBox.confirm(`确认删除 ${row.title} ?`, '警告')
+  await ElMessageBox.confirm(`确认删除视频「${row.title}」？`, '删除视频', {
+    type: 'warning',
+    confirmButtonText: '确认删除',
+    cancelButtonText: '取消'
+  })
   await deleteAdminVideo(row.id)
   ElMessage.success('删除成功')
   await reloadAfterDeletion(1)

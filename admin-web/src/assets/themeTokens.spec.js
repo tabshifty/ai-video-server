@@ -146,6 +146,46 @@ describe('theme tokens', () => {
     expect(touchTargetRule?.[1]).toMatch(/min-height:\s*44px/)
   })
 
+  it('keeps Element Plus segmented keyboard focus visible on its rendered label', () => {
+    const selector = ':where(.el-segmented__item-input:focus-visible + .el-segmented__item-label)'
+    const start = overrides.indexOf(selector)
+    const end = start >= 0 ? overrides.indexOf('}', start) : -1
+    const rule = start >= 0 && end > start ? overrides.slice(start, end + 1) : ''
+
+    expect(start).toBeGreaterThan(-1)
+    expect(rule).toContain('outline: 2px solid var(--line-focus)')
+    expect(rule).toContain('outline-offset: 2px')
+  })
+
+  it('keeps Drawer close controls visible for focus traps and touch-safe', () => {
+    const selector = '.el-drawer__close-btn:focus,\n.el-drawer__close-btn:focus-visible'
+    const start = overrides.indexOf(selector)
+    const end = start >= 0 ? overrides.indexOf('}', start) : -1
+    const focusRule = start >= 0 && end > start ? overrides.slice(start, end + 1) : ''
+    const mediaStart = overrides.indexOf('@media (max-width: 63.9375rem)')
+    const touchStart = overrides.indexOf(':where(.el-drawer__close-btn)', mediaStart)
+    const touchEnd = touchStart >= 0 ? overrides.indexOf('}', touchStart) : -1
+    const touchRule = touchStart >= 0 && touchEnd > touchStart ? overrides.slice(touchStart, touchEnd + 1) : ''
+
+    expect(start).toBeGreaterThan(-1)
+    expect(focusRule).toContain('outline: 2px solid var(--line-focus)')
+    expect(focusRule).toContain('outline-offset: 2px')
+    expect(touchStart).toBeGreaterThan(mediaStart)
+    expect(touchRule).toContain('min-width: 44px')
+    expect(touchRule).toContain('min-height: 44px')
+  })
+
+  it('keeps Element Plus dropdown menu items visibly focused from the roving group', () => {
+    const selector = '.el-dropdown-menu__item:focus,\n.el-dropdown-menu__item:focus-visible'
+    const start = overrides.indexOf(selector)
+    const end = start >= 0 ? overrides.indexOf('}', start) : -1
+    const rule = start >= 0 && end > start ? overrides.slice(start, end + 1) : ''
+
+    expect(start).toBeGreaterThan(-1)
+    expect(rule).toContain('outline: 2px solid var(--line-focus)')
+    expect(rule).toContain('outline-offset: 2px')
+  })
+
   it('exports the approved typography scale', () => {
     expect(css).toMatch(/--text-h1:\s*20px/)
     expect(css).toMatch(/--text-h2:\s*14px/)

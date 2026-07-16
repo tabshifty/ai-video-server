@@ -181,6 +181,8 @@ const currentSnapshotBlock = savedViewsOptions
   ? extractBalancedBraceBlock(savedViewsOptions.body, /getCurrentSnapshot:\s*\(\)\s*=>\s*\(\s*\{/)
   : null
 const loadBlock = extractBalancedBraceBlock(script, /async function load\(\)\s*\{/)
+const listPreviewBlock = extractBalancedBraceBlock(script, /async function loadListPreviews\(items, listRequestSeq\)\s*\{/)
+const clearListPreviewsBlock = extractBalancedBraceBlock(script, /function clearListPreviews\(\)\s*\{/)
 const deleteBlock = extractBalancedBraceBlock(script, /async function doDelete\(row\)\s*\{/)
 const filterDrawer = extractElement(template, /<el-drawer\b(?=[^>]*v-model="filterDrawerVisible")[^>]*>/, '</el-drawer>')
 const paginationTag = template.match(/<AdminTablePagination\b[\s\S]*?\/>/)?.[0] || ''
@@ -392,6 +394,74 @@ async function load() {
     expect(template).toContain("hasActiveFilters ? '当前筛选无结果' : '暂无图片'")
     expect(template).toContain("hasActiveFilters ? '清除筛选后查看全部图片' : '上传图片后会显示在这里'")
     expect(template).toContain('v-if="hasActiveFilters" @click="resetFilters"')
+  })
+
+  it('列表成功后非阻塞加载缺失的认证 blob 预览并保留单项失败占位', () => {
+    expect(script).toContain('const listPreviewUrls = ref({})')
+    expect(script).toContain('const listPreviewErrors = ref({})')
+    expect(script).toContain('const IMAGE_LIST_PREVIEW_PARAMS = Object.freeze({')
+    expect(listPreviewBlock).not.toBeNull()
+    expect(listPreviewBlock?.body).toContain('await Promise.all(')
+    expect(listPreviewBlock?.body).toContain('if (!item?.id || resolveImagePreviewUrl(item)) return')
+    expect(listPreviewBlock?.body).toContain('getAdminImageViewBlob(item.id, IMAGE_LIST_PREVIEW_PARAMS)')
+    expect(listPreviewBlock?.body).toContain("readImagePreviewBlob(blob, '加载图片缩略图失败')")
+    expect(listPreviewBlock?.body).toContain('const ownedUrl = URL.createObjectURL(imageBlob)')
+    expect(listPreviewBlock?.body).toContain("nextErrors[item.id] = extractErrorMessage(error, '加载图片缩略图失败')")
+
+    expect(tokensAppearInOrder(loadBlock?.body || '', [
+      'list.value = data.items || []',
+      'void loadListPreviews(list.value, seq)',
+      'return true'
+    ])).toBe(true)
+    expect(loadBlock?.body).not.toContain('await loadListPreviews(list.value, seq)')
+
+    expect(gridCard).toContain('v-if="imagePreviewUrl(item)"')
+    expect(gridCard).toContain(':src="imagePreviewUrl(item)"')
+    expect(gridCard).toContain('v-else-if="listPreviewErrors[item.id]"')
+    expect(gridCard).toContain('预览加载失败')
+    expect(findRule(style, '.image-grid-card__preview img')).toContain('object-fit: contain')
+  })
+
+  it('图片 blob 预览只接受最新列表并在替换、stale、查询重置和卸载时回收', () => {
+    const resetBlock = extractBalancedBraceBlock(script, /function resetQueryIdentity\(\)\s*\{/)
+    const unmountBlock = extractBalancedBraceBlock(script, /onBeforeUnmount\(\(\)\s*=>\s*\{/)
+
+    expect(script).toContain('let listPreviewSeq = 0')
+    expect(clearListPreviewsBlock).not.toBeNull()
+    expect(tokensAppearInOrder(clearListPreviewsBlock?.body || '', [
+      'listPreviewSeq += 1',
+      'listPreviewUrls.value = revokeImagePreviewUrls(listPreviewUrls.value)',
+      'listPreviewErrors.value = {}'
+    ])).toBe(true)
+    expect(listPreviewBlock?.body).toContain('const previewRequestSeq = ++listPreviewSeq')
+    expect(listPreviewBlock?.body).toContain('listPreviewUrls.value = revokeImagePreviewUrls(listPreviewUrls.value)')
+    expect(listPreviewBlock?.body).toContain('if (listRequestSeq !== loadSeq || previewRequestSeq !== listPreviewSeq)')
+    expect(listPreviewBlock?.body).toContain('URL.revokeObjectURL(ownedUrl)')
+    expect((listPreviewBlock?.body || '').lastIndexOf('if (listRequestSeq !== loadSeq || previewRequestSeq !== listPreviewSeq)'))
+      .toBeLessThan((listPreviewBlock?.body || '').lastIndexOf('listPreviewUrls.value = nextUrls'))
+    expect((listPreviewBlock?.body || '').lastIndexOf('listPreviewUrls.value = nextUrls'))
+      .toBeLessThan((listPreviewBlock?.body || '').lastIndexOf('listPreviewErrors.value = nextErrors'))
+    expect(resetBlock?.body).toContain('clearListPreviews()')
+    expect(unmountBlock?.body).toContain('clearListPreviews()')
+  })
+
+  it('每张认证缩略图完成后立即发布并在发布前复核双代次', () => {
+    const body = listPreviewBlock?.body || ''
+    const ownedIndex = body.indexOf('const ownedUrl = URL.createObjectURL(imageBlob)')
+    const staleIndex = body.indexOf('if (listRequestSeq !== loadSeq || previewRequestSeq !== listPreviewSeq)', ownedIndex)
+    const revokeIndex = body.indexOf('URL.revokeObjectURL(ownedUrl)', staleIndex)
+    const publishIndex = body.indexOf('nextUrls[item.id] = ownedUrl', revokeIndex)
+    const reactivePublishIndex = body.indexOf(
+      'listPreviewUrls.value = { ...listPreviewUrls.value, [item.id]: ownedUrl }',
+      publishIndex
+    )
+
+    expect(ownedIndex).toBeGreaterThan(-1)
+    expect(staleIndex).toBeGreaterThan(ownedIndex)
+    expect(revokeIndex).toBeGreaterThan(staleIndex)
+    expect(publishIndex).toBeGreaterThan(revokeIndex)
+    expect(reactivePublishIndex).toBeGreaterThan(publishIndex)
+    expect(listPreviewBlock?.body).not.toContain('nextUrls[item.id] = URL.createObjectURL(imageBlob)')
   })
 
   it('网格和列表动作共用显式白名单并安全消费异步拒绝', () => {

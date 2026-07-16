@@ -373,6 +373,10 @@ async function load() {
     expect(operationsColumn).not.toContain('@click="doDelete(row)"')
     expect(deleteBlock).not.toBeNull()
     expect(deleteBlock?.body.indexOf('ElMessageBox.confirm')).toBeGreaterThan(-1)
+    expect(deleteBlock?.body).toContain("ElMessageBox.confirm(`确认删除视频「${row.title}」？`, '删除视频', {")
+    expect(deleteBlock?.body).toContain("confirmButtonText: '确认删除'")
+    expect(deleteBlock?.body).toContain("cancelButtonText: '取消'")
+    expect(deleteBlock?.body).toContain("type: 'warning'")
     expect(deleteBlock?.body.indexOf('deleteAdminVideo(row.id)')).toBeGreaterThan(deleteBlock?.body.indexOf('ElMessageBox.confirm'))
   })
 

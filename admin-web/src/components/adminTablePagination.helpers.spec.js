@@ -26,6 +26,17 @@ describe('resolvePageJump', () => {
     expect(findRule(mobileStyle, '.admin-table-pagination__jump :deep(.el-button)')).toContain('min-height: 44px')
   })
 
+  it('在移动端让超宽分页从左侧开始并在组件内部水平滚动', () => {
+    const mediaStart = style.indexOf('@media (max-width: 63.9375rem)')
+
+    expect(mediaStart).toBeGreaterThan(-1)
+    const mobileStyle = style.slice(mediaStart)
+    const paginationRule = findRule(mobileStyle, '.admin-table-pagination')
+    expect(paginationRule).toContain('justify-content: flex-start')
+    expect(paginationRule).toContain('overflow-x: auto')
+    expect(paginationRule).toContain('overscroll-behavior-inline: contain')
+  })
+
   it('jumps to the requested page when the input is valid', () => {
     expect(
       resolvePageJump('5', {
