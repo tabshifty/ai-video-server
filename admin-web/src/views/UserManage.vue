@@ -9,6 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
 import { createAdminUser, getAdminUsers, updateUserRole } from '../api/admin'
+import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'
 
 const list = ref([])
 const total = ref(0)
@@ -21,7 +22,10 @@ const query = reactive({ page: 1, page_size: 20 })
 const roleUpdatingMap = reactive({})
 const form = reactive(createEmptyForm())
 
-const initialLoading = computed(() => loading.value && !loaded.value)
+const initialLoading = computed(() => shouldShowCrudCollectionSkeleton({
+  loading: loading.value,
+  rowCount: list.value.length
+}))
 const hasFilters = computed(() => false)
 
 function createEmptyForm() {

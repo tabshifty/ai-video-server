@@ -9,6 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import StatusIndicator from '../components/base/StatusIndicator.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
+import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'
 import {
   createAdminCollection,
   deleteAdminCollection,
@@ -34,7 +35,10 @@ const query = reactive({
 
 const form = reactive(createEmptyForm())
 
-const initialLoading = computed(() => loading.value && !loaded.value)
+const initialLoading = computed(() => shouldShowCrudCollectionSkeleton({
+  loading: loading.value,
+  rowCount: list.value.length
+}))
 const hasFilters = computed(() => String(query.q || '').trim() !== '' || String(query.active || '') !== '')
 
 function createEmptyForm() {

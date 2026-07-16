@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 22:27 +0800
+- 进度：Task 11 Important 的实现、长期契约、验证与提交前自审完成。共享 helper 只表达“loading 且无缓存行”，三页无缓存重试必走 skeleton、有缓存刷新仍走 SectionCard+旧表；失败错误和 rows 保留不变。零上下文审计确认三个 SFC 各自仅新增 helper import 并替换 computed，未改 API、路由、权限、依赖、payload、查询、模板或 Drawer；修复报告已更新，提交后交原复审者复审。
+- 影响文件：本次精确提交仅包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/crudCollectionState.js`、`crudCollectionState.spec.js`、`ActorManage.vue`、`CollectionManage.vue`、`UserManage.vue`、`precisionOpsRollout.spec.js` 共 8 个文件；`.superpowers/sdd/task-11-report.md` 与 `admin-web/dist/` 保持忽略，不纳入提交。
+- 验证：正式定向 4 文件 28/28；`cd admin-web && npm test` 通过（38 文件，386/386）；`npm run build` 成功（2374 modules transformed，仅既有 chunk-size warning）；最终 `git diff --check`、tracked 与忽略报告 U+FFFD/C0/DEL、8 文件精确白名单、敏感范围、SFC 零上下文和旧表达式禁用检查均通过。待使用中文提交信息 `修复：区分基础集合重试加载态` 精确提交。
+
+## 2026-07-16 22:23 +0800
+- 进度：Task 11 Important 完成最小修复与定向 GREEN。新增纯函数只判断 `loading && rowCount === 0`；Actor/Collection/User 的 `initialLoading` 统一传入 `loading.value` 与 `list.value.length`，保留 `loaded/loadError`、模板顺序和 rows。无缓存首次加载与失败后重试走骨架，有缓存后台刷新继续走 SectionCard 与旧表；API、查询、payload、路由和 Drawer 行为未改。
+- 影响文件：新增 `admin-web/src/views/crudCollectionState.js`、`crudCollectionState.spec.js`，修改三个目标 SFC、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`；忽略报告待更新。
+- 验证：`cd admin-web && npm test -- src/views/crudCollectionState.spec.js src/views/precisionOpsRollout.spec.js src/router/index.spec.js src/views/adminDateTimeDisplay.spec.js` 通过（4 文件，28/28）。表驱动四状态与三页真实 import/调用、旧表达式禁用、SFC 编译、路由和日期显示同时 GREEN；待执行管理端全量测试、生产构建和静态范围门禁。
+
+## 2026-07-16 22:21 +0800
+- 进度：Task 11 Important 的共享状态 helper 与三页接线契约取得严格行为 RED。测试先以缺模块失败确认新契约尚不存在；加入仅复刻旧 `loading && !loaded` 语义且尚未接线的最小 helper 后，四个表驱动案例中只有“首次失败后重试、无缓存 rows”返回 false，证明 `loaded=true` 是空态闪现的直接原因。rollout 同时锁定三页真实 import、`loading + list.length` 调用与旧表达式禁用。
+- 影响文件：RED 阶段只新增 `admin-web/src/views/crudCollectionState.js`、`crudCollectionState.spec.js`，修改 `precisionOpsRollout.spec.js` 与 `plan.md`；三个生产 SFC 尚未修改，helper 也尚未接入页面。
+- 验证：`cd admin-web && npm test -- src/views/crudCollectionState.spec.js` 行为 RED 为 1 文件、4 项中 1 失败/3 通过；正式四文件 RED `cd admin-web && npm test -- src/views/crudCollectionState.spec.js src/views/precisionOpsRollout.spec.js src/router/index.spec.js src/views/adminDateTimeDisplay.spec.js` 退出 1（4 文件中 2 失败/2 通过，28 项中 2 失败/26 通过）。失败分别命中重试状态与 Actor 首个缺失接线，路由、日期显示、真实 SFC 编译及其它 rollout 契约均通过。
+
+## 2026-07-16 22:18 +0800
+- 进度：Task 11 提交后独立复审判定 Critical 0、Important 1、Minor 0，Spec FAIL、Task quality Needs fixes。根因确认是三页 `initialLoading = loading && !loaded` 在首次失败后把 `loaded` 永久置真；重试先清空 `loadError` 时，无缓存 rows 的请求进行中会错误进入 SectionCard 并短暂暴露空态操作，违反“空列表不能在请求未完成时短暂显示暂无数据”。有旧 rows 的后台刷新继续保留并展示旧表是正确语义。
+- 影响文件：计划新增 `admin-web/src/views/crudCollectionState.js`、`crudCollectionState.spec.js`，最小修改 `ActorManage.vue`、`CollectionManage.vue`、`UserManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，并更新忽略的 `.superpowers/sdd/task-11-report.md`；不修改 API、路由、权限、依赖、payload、Drawer、Go 或 Android。
+- 验证：严格 TDD，先以表驱动纯逻辑测试锁定首次加载、失败后无缓存重试、有缓存后台刷新和空闲空列表四种状态并取得 RED，再实现共享 helper 与三页真实 SFC 接线；随后执行 Task 11 四文件定向 GREEN、管理端全量测试、生产构建、`git diff --check`、本轮文件 U+FFFD/C0/DEL、精确白名单和敏感范围检查，提交后交原复审者复审。
+
 ## 2026-07-16 21:44 +0800
 - 记录校正：21:37 条目中“任务明确禁止子代理，故本轮以当前线程自审替代独立代理评审”为实施代理误述，不构成用户要求或仓库规则。Task 11 实际由子代理实施，主线程将在提交后继续派独立子代理复审；21:37 条目的其它实现范围、测试、构建、静态门禁与提交前自审结果仍然有效。
 - 影响文件：本次 tracked 只追加 `plan.md`；忽略的 `.superpowers/sdd/task-11-report.md` 末尾同步追加事实校正。不修改 Task 11 生产代码、测试、`CONTEXT.md`、API、路由、依赖、Go 或 Android。

@@ -145,7 +145,11 @@ describe('Precision Ops 第一阶段 rollout', () => {
 
       expect(source, file).toContain("const loaded = ref(false)")
       expect(source, file).toContain("const loadError = ref('')")
-      expect(source, file).toContain('const initialLoading = computed(() => loading.value && !loaded.value)')
+      expect(source, file).toContain("import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'")
+      expect(source, file).toMatch(
+        /const initialLoading = computed\(\(\) => shouldShowCrudCollectionSkeleton\(\{\s*loading: loading\.value,\s*rowCount: list\.value\.length\s*\}\)\)/
+      )
+      expect(source, file).not.toContain('computed(() => loading.value && !loaded.value)')
       expect(load.indexOf("loadError.value = ''"), file).toBeGreaterThanOrEqual(0)
       expect(load.indexOf("loadError.value = ''"), file).toBeLessThan(load.indexOf('try {'))
       expect(load, file).toContain(`loadError.value = extractErrorMessage(error, '${error}')`)
