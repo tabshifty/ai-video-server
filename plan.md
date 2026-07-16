@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 11:05 +0800
+- 进度：完成 Task 10 rollout 自动门禁、fresh Web Interface Guidelines 静态审查、真实管理员只读前置与 mock Chrome smoke，状态为 `DONE_WITH_CONCERNS`，不是“第一阶段完成”。自动门禁无生产缺失；mock 16/16 场景与 16 张截图均执行，但 VideoList/ImageManage 四视口均有 dropdown+tooltip Vue warning，375/768 存在不足 44px 的刷新/快速跳转/视频详情目标，ImageManage 1440×900 首屏仅 10/15 张；1024 因全局契约为严格 `<1024px` 只记录 brief 清单歧义。真实 login/proxy 可达，但仓库无管理员凭据，真实四页四视口验收未执行且保持阻塞；Task 10 不标 DONE，不进入阶段二。
+- 影响文件：精确提交只包含 `admin-web/src/views/precisionOpsRollout.spec.js` 与本任务新增的 `plan.md` 记录；不修改生产页面、Layout、路由、`CONTEXT.md`、依赖或既有测试。不纳入 `.superpowers/sdd/task-10-report.md`、Web Guidelines 快照、CDP 脚本/JSON、16 张截图、Chrome profile或 `admin-web/dist`。
+- 验证：rollout 单文件 6/6；`cd admin-web && npm test` 通过（37 个文件，356/356）；`cd admin-web && npm run build` 成功（2371 modules transformed，仅既有 chunk-size warning）；`git diff --check`、两个提交文件 U+FFFD/C0/DEL 和范围扫描通过。mock 全场景根横向溢出 0、非预期网络失败 0、runtime exception 0、Dashboard canvas 四视口非空、焦点序列可达；失败项与 Web Guidelines 0 Critical、多项 Important/Minor 已写入 `.superpowers/sdd/task-10-report.md`。
+
+## 2026-07-16 10:42 +0800
+- 进度：完成 Task 10 rollout 集成门禁并取得 verification-only immediate GREEN。测试直接 import Dashboard、TaskMonitor、VideoList、ImageManage 四个真实 SFC，限定各自 template 检查 Layout、精确密度、PageHeader 移除与无兼容 meta；13 个 pending shell 页面逐文件保留 PageHeader 和单路由项精确 `hideShellPageHeader`，并锁定 4/13 长度、唯一性和集合不重叠，未发现生产兼容边界缺失。
+- 影响文件：创建 `admin-web/src/views/precisionOpsRollout.spec.js`，追加 `plan.md`；生产页面、路由、`CONTEXT.md` 和既有测试均未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 通过（退出码 0；1 个文件，6/6，无 warning/error）。待运行管理端全量、构建、静态/Web Guidelines 和浏览器验收。
+
+## 2026-07-16 10:40 +0800
+- 进度：启动 Precision Ops Task 10 第一阶段集成门禁。本任务是 verification-only immediate GREEN：现有四个样板页与 13 个兼容页无生产缺失行为，只新增 rollout 编译/结构/密度/路由边界测试，不制造虚假 RED，不修改业务页面、路由或 `CONTEXT.md`。浏览器前置已核对：系统 Google Chrome 150 可用，仓库无 Playwright/Puppeteer，Vite development proxy 指向可达的 `192.168.1.24:8080`，仓库未提供管理员账号凭据，本机 4173/8080 当前无监听；真实管理员四页验收预计因凭据缺失阻塞，后续严格与 mock smoke 分开记录。
+- 影响文件：计划只创建 `admin-web/src/views/precisionOpsRollout.spec.js` 并追加 `plan.md`；`.superpowers/sdd/task-10-report.md`、临时 CDP 脚本、截图和日志不纳入提交，不生成或提交 `dist`。
+- 验证：待运行 rollout 单文件 immediate GREEN、管理端全量测试、生产构建、`git diff --check`、U+FFFD/C0/DEL 与范围扫描；fresh curl Web Interface Guidelines 后静态审查四个样板页和 Layout；启动 4173 Vite，执行真实登录只读前置并尽力完成 mock Chrome 四页四视口 smoke。
+
 ## 2026-07-16 10:11 +0800
 - 进度：完成 Task 9 迟到独立评审的全部 Critical/Important/Minor 关闭与 amend 前最终自审。评审为 0 Critical、2 Important、1 Minor；模式选择保留、列表逐行/本页全选可访问性和详情动态中文 alt 均已修复并由三个独立门禁覆盖。表头全选/取消全选、indeterminate、逐行选择、网格/列表与 BulkActionBar 共用 selection；所有新查询 identity reset 仍清选择。
 - 影响文件：评审修复增量仅为 `admin-web/src/views/ImageManage.vue`、`admin-web/src/views/imageManagePage.spec.js`、`plan.md`，将 amend 到 Task 9 原提交；最终提交范围仍严格为 brief 7 文件和 `plan.md`。
