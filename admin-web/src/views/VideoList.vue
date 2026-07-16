@@ -1340,7 +1340,9 @@ onBeforeUnmount(() => {
       <div class="video-header-actions">
         <el-popover trigger="click" :width="240" popper-class="video-column-settings-popper">
           <template #reference>
-            <el-button :icon="Setting">列设置</el-button>
+            <el-button :icon="Setting" aria-label="列设置" title="列设置">
+              <span class="video-column-settings-label">列设置</span>
+            </el-button>
           </template>
           <el-checkbox-group :model-value="columnVisibility" class="column-settings" @update:model-value="onColumnVisibilityChange">
             <el-checkbox
@@ -1459,21 +1461,21 @@ onBeforeUnmount(() => {
               <template #default="{ row }">
                 <div class="video-row-actions">
                   <el-button link type="primary" @click="showDetail(row)">详情</el-button>
-                  <el-dropdown
-                    trigger="click"
-                    popper-class="video-row-actions-popper"
-                    @command="(command) => handleVideoRowAction(command, row)"
-                  >
-                    <el-tooltip content="更多视频操作" placement="top">
+                  <el-tooltip content="更多视频操作" placement="top">
+                    <el-dropdown
+                      trigger="click"
+                      popper-class="video-row-actions-popper"
+                      @command="(command) => handleVideoRowAction(command, row)"
+                    >
                       <el-button :icon="MoreFilled" circle aria-label="更多视频操作" />
-                    </el-tooltip>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item command="retranscode">重新转码</el-dropdown-item>
-                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="retranscode">重新转码</el-dropdown-item>
+                          <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </el-tooltip>
                 </div>
               </template>
             </el-table-column>
@@ -2260,6 +2262,11 @@ onBeforeUnmount(() => {
     min-height: 44px;
   }
 
+  .video-row-actions :deep(.el-button) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   :global(.video-column-settings-popper .el-checkbox) {
     min-height: 44px;
   }
@@ -2270,6 +2277,12 @@ onBeforeUnmount(() => {
 
   .quick-search {
     width: 100%;
+  }
+}
+
+@media (max-width: 47.9375rem) {
+  .video-column-settings-label {
+    display: none;
   }
 }
 </style>

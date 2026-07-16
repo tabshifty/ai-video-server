@@ -426,6 +426,7 @@ onUnmounted(() => {
       size="calc(var(--admin-sidebar-width) + var(--space-8) + var(--space-2))"
       :with-header="false"
       class="mobile-nav-drawer"
+      aria-label="管理端导航"
     >
       <div class="drawer-brand">
         <div class="brand-mark">VS</div>
@@ -943,6 +944,7 @@ button.drawer-nav__label,
 
 :deep(.mobile-nav-drawer .el-drawer__body) {
   padding: 0;
+  overscroll-behavior: contain;
 }
 
 @media (max-width: 63.9375rem) {
@@ -956,6 +958,16 @@ button.drawer-nav__label,
 
   .shell-header {
     padding: 0 var(--space-4);
+  }
+
+  .command-trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .shell-header__actions :deep(.el-button) {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .shell-main {

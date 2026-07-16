@@ -19,6 +19,10 @@ const trendPoints = computed(() => {
   const points = stats.value?.weekly_upload_trend
   return Array.isArray(points) ? points : []
 })
+const trendAriaLabel = computed(() => {
+  const detail = trendPoints.value.map((item) => `${item.day}：${item.count}`).join('；')
+  return detail ? `近 7 天上传趋势：${detail}` : '近 7 天上传趋势：暂无数据'
+})
 
 const metricGroups = computed(() => buildDashboardMetricGroups(stats.value || {}))
 
@@ -52,6 +56,12 @@ function withAlpha(color, alpha) {
   return normalized
 }
 
+function prefersReducedMotion() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
 function renderChart() {
   const chartDom = chartRef.value
   if (!chartDom) {
@@ -83,6 +93,7 @@ function renderChart() {
   const lineSoft = resolveColor('--line-soft')
 
   chart.setOption({
+    animation: !prefersReducedMotion(),
     grid: { left: 36, right: 18, top: 30, bottom: 24 },
     tooltip: { trigger: 'axis' },
     xAxis: {
@@ -159,7 +170,10 @@ onBeforeUnmount(() => {
         <template #default><el-button link type="primary" @click="load">重试</el-button></template>
       </el-alert>
 
-      <el-skeleton v-if="loading && !stats" :rows="7" animated />
+      <div v-if="loading && !stats" class="dashboard-loading" role="status" aria-live="polite">
+        <span class="dashboard-sr-only">正在加载仪表盘…</span>
+        <el-skeleton :rows="7" animated />
+      </div>
 
       <template v-else-if="stats">
         <MetricStrip :items="metricGroups.runtime" aria-label="运行摘要" />
@@ -173,7 +187,13 @@ onBeforeUnmount(() => {
 
             <SectionCard dense>
               <template #title>近 7 天上传趋势</template>
-              <div v-if="trendPoints.length" ref="chartRef" class="trend-chart" />
+              <div
+                v-if="trendPoints.length"
+                ref="chartRef"
+                class="trend-chart"
+                role="img"
+                :aria-label="trendAriaLabel"
+              />
               <EmptyState
                 v-else
                 title="暂无趋势数据"
@@ -203,6 +223,18 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--space-4);
   padding-bottom: var(--space-1);
+}
+
+.dashboard-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .dashboard-workspace {

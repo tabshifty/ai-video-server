@@ -126,4 +126,14 @@ function submitJump() {
 .admin-table-pagination__input {
   width: 88px;
 }
+
+@media (max-width: 63.9375rem) {
+  .admin-table-pagination__jump :deep(.el-input__wrapper) {
+    min-height: 44px;
+  }
+
+  .admin-table-pagination__jump :deep(.el-button) {
+    min-height: 44px;
+  }
+}
 </style>

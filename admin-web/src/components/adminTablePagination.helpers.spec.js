@@ -1,8 +1,31 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+import AdminTablePagination from './AdminTablePagination.vue'
 import { resolvePageJump } from './adminTablePagination.helpers'
 
+const source = readFileSync(new URL('./AdminTablePagination.vue', import.meta.url), 'utf8')
+const style = source.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] || ''
+
+function findRule(styleSource, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = styleSource.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))
+
+  expect(match).not.toBeNull()
+  return match?.[1] || ''
+}
+
 describe('resolvePageJump', () => {
+  it('通过真实 SFC 编译并在小于 1024px 时保持跳页输入和按钮至少 44px 高', () => {
+    const mediaStart = style.indexOf('@media (max-width: 63.9375rem)')
+
+    expect(AdminTablePagination).toBeTruthy()
+    expect(mediaStart).toBeGreaterThan(-1)
+    const mobileStyle = style.slice(mediaStart)
+    expect(findRule(mobileStyle, '.admin-table-pagination__jump :deep(.el-input__wrapper)')).toContain('min-height: 44px')
+    expect(findRule(mobileStyle, '.admin-table-pagination__jump :deep(.el-button)')).toContain('min-height: 44px')
+  })
+
   it('jumps to the requested page when the input is valid', () => {
     expect(
       resolvePageJump('5', {

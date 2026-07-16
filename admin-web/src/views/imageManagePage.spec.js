@@ -421,6 +421,8 @@ async function load() {
       expect(element).toContain('popper-class="image-row-actions-popper"')
       expect(element).toContain('content="图片操作"')
       expect(element).toContain('aria-label="图片操作"')
+      expect(element).toMatch(/<el-tooltip\b[^>]*content="图片操作"[^>]*>\s*<el-dropdown\b[\s\S]*?>\s*<el-button\b/)
+      expect(element).not.toMatch(/<el-dropdown\b[^>]*>\s*<el-tooltip\b/)
     }
     expect(deleteBlock?.body.indexOf('ElMessageBox.confirm')).toBeGreaterThan(-1)
     expect(deleteBlock?.body.indexOf('deleteAdminImage(row.id)')).toBeGreaterThan(deleteBlock?.body.indexOf('ElMessageBox.confirm') || -1)
@@ -435,6 +437,8 @@ async function load() {
     expect(template).toContain('prop="title" label="标题" min-width="200" show-overflow-tooltip')
     expect(template).toContain('class="table-wrap has-media-rows"')
     expect(findRule(style, '.image-grid')).toContain('grid-template-columns: repeat(auto-fill, minmax(184px, 1fr))')
+    expect(findRule(style, '.image-grid-card')).toContain('gap: var(--space-1)')
+    expect(findRule(style, '.image-grid-card__preview')).toContain('aspect-ratio: 16 / 9')
     expect(findRule(style, '.image-grid-card__preview img')).toContain('object-fit: contain')
     expect(findRule(style, '.image-grid-card__actions')).not.toMatch(/opacity:\s*0/)
   })

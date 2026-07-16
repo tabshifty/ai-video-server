@@ -356,9 +356,27 @@ onUnmounted(() => {
     min-height: 44px;
   }
 
+  .status-filter {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .status-filter :deep(.el-segmented__group) {
+    width: max-content;
+    min-width: max-content;
+  }
+
   :deep(.el-segmented__item) {
-    min-width: 44px;
+    min-width: 72px;
     min-height: 44px;
+    flex: 0 0 auto;
+  }
+
+  .status-filter :deep(.el-segmented__item-label) {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
   }
 }
 </style>

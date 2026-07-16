@@ -367,6 +367,8 @@ async function load() {
     expect(operationsColumn).toContain('aria-label="更多视频操作"')
     expect(operationsColumn).toContain('command="retranscode"')
     expect(operationsColumn).toContain('command="delete"')
+    expect(operationsColumn).toMatch(/<el-tooltip\b[^>]*content="更多视频操作"[^>]*>\s*<el-dropdown\b[\s\S]*?>\s*<el-button\b/)
+    expect(operationsColumn).not.toMatch(/<el-dropdown\b[^>]*>\s*<el-tooltip\b/)
     expect(operationsColumn).not.toContain('@click="doRetranscode(row)"')
     expect(operationsColumn).not.toContain('@click="doDelete(row)"')
     expect(deleteBlock).not.toBeNull()
@@ -427,8 +429,16 @@ async function load() {
     expect(mediaStart).toBeGreaterThan(-1)
     const mobileStyle = style.slice(mediaStart)
     expect(findRule(mobileStyle, '.video-header-actions :deep(.el-button)')).toContain('min-height: 44px')
+    expect(findRule(mobileStyle, '.video-row-actions :deep(.el-button)')).toContain('min-width: 44px')
+    expect(findRule(mobileStyle, '.video-row-actions :deep(.el-button)')).toContain('min-height: 44px')
     expect(findRule(mobileStyle, ':global(.video-column-settings-popper .el-checkbox)')).toContain('min-height: 44px')
     expect(findRule(mobileStyle, ':global(.video-row-actions-popper .el-dropdown-menu__item)')).toContain('min-height: 44px')
+
+    const narrowStart = style.indexOf('@media (max-width: 47.9375rem)')
+    expect(narrowStart).toBeGreaterThan(mediaStart)
+    const narrowStyle = style.slice(narrowStart)
+    expect(template).toMatch(/<el-button\b(?=[^>]*:icon="Setting")(?=[^>]*aria-label="列设置")(?=[^>]*title="列设置")[^>]*>\s*<span class="video-column-settings-label">列设置<\/span>/)
+    expect(findRule(narrowStyle, '.video-column-settings-label')).toContain('display: none')
   })
 
   it('保留选择、批量操作、响应式列、Drawer、字幕和编辑 payload', () => {

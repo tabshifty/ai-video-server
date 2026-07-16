@@ -59,6 +59,21 @@ describe('Precision Ops dashboard', () => {
     expect(template).toContain('description="后端暂未返回最近 7 天上传趋势"')
   })
 
+  it('为首次加载和趋势图提供动态中文读屏文本', () => {
+    expect(template).toContain('<div v-if="loading && !stats" class="dashboard-loading" role="status" aria-live="polite">')
+    expect(template).toContain('<span class="dashboard-sr-only">正在加载仪表盘…</span>')
+    expect(findRule(style, '.dashboard-sr-only')).toContain('position: absolute')
+    expect(script).toContain('const trendAriaLabel = computed(() =>')
+    expect(script).toContain('trendPoints.value.map((item) => `${item.day}：${item.count}`).join(\'；\')')
+    expect(template).toMatch(/<div\b(?=[^>]*ref="chartRef")(?=[^>]*role="img")(?=[^>]*:aria-label="trendAriaLabel")[^>]*\/>/)
+  })
+
+  it('在浏览器请求减少动态效果时关闭 ECharts 动画并安全回退', () => {
+    expect(script).toContain("typeof window.matchMedia === 'function'")
+    expect(script).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches")
+    expect(script).toContain('animation: !prefersReducedMotion()')
+  })
+
   it('能识别多行 catch 分支中违规清空 stats', () => {
     const violatingLoad = `async function load() {
   try {

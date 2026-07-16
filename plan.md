@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 11:40 +0800
+- 进度：完成 Task 10 可自动修复项、浏览器复验和提交前自审；真实管理员验收仍因仓库未提供管理员账号/密码/token 而阻塞，因此不把 Task 10 标为完成、不进入阶段二。本次修改 6 个生产 SFC 与各自 6 个测试文件；`precisionOpsRollout.spec.js` 作为第 7 个定向验证文件保持零差异。
+- 影响文件：精确提交只包含 `admin-web/src/components/Layout.vue`、`Layout.spec.js`、`AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`，Dashboard/TaskMonitor/VideoList/ImageManage 四个页面及对应 spec，`CONTEXT.md`、`plan.md`，共 14 个文件；不纳入 `.superpowers/sdd/task-10-report.md`、CDP script/results/截图、`admin-web/dist`，不修改 API、路由、依赖或其它页面。
+- 验证：七文件定向 74/74；`cd admin-web && npm test` 通过（37 个文件，360/360）；`cd admin-web && npm run build` 成功（2371 modules transformed，仅既有 chunk-size warning）；CDP mock 16/16、硬失败 0，console/runtime/network/root overflow/`<1024px` 小目标均为 0，Dashboard canvas、12 tasks、10 videos、1440 首屏 15 images、Drawer 名称、Video 标题与 Task 五标签均通过；`git diff --check`、14 文件 U+FFFD/C0/DEL、API/路由/依赖零差异及变更白名单检查通过。
+
+## 2026-07-16 11:37 +0800
+- 进度：完成 Task 10 六类自动验收阻塞的最小生产实现、七文件 GREEN 和 mock Chrome 复验。Layout/分页补严格 `<1024px` 44px 与 Drawer 名称；Dashboard 补 live status、逐点趋势替代文本和 reduced-motion；Task 分段内部横滚且标签不截断；Video/Image 菜单改为 `tooltip > dropdown > button`；Video 最窄列设置图标化且详情 44px；Image 网格改 16:9 contain 和紧凑卡间距。API、路由、查询与业务状态机未改。
+- 影响文件：目标六个生产 SFC、七个既有测试、`CONTEXT.md`、`plan.md`；CDP script/results/16 张截图与 Task 10 报告仍只在 `.superpowers/sdd/` 留证，不纳入提交。
+- 验证：七文件定向通过（7 个文件，74/74）。升级后的 CDP mock 4 页×4 视口通过（16/16，16 张截图，硬失败 0）：console warning/error、runtime exception、network failure、根横溢出和 `<1024px` 小目标均为 0；Dashboard 四视口 canvas 非空，1440 tasks 12、videos 10、images 首屏 15；375/768 Drawer 名称均为“管理端导航”，Video 标题完整，Task 五标签齐全且无截断。首轮 CDP 的 2 项仅因 scratch 错把真实标题“视频管理”写成“视频资源”，更正验收期望后生产不变即全绿。
+
+## 2026-07-16 11:27 +0800
+- 进度：Task 10 六类自动验收阻塞的真实定向 RED 已建立。七个测试文件均先保持生产不动，新增门禁直接检查真实 SFC 与最终 media/style block；所有目标 SFC 编译成功，rollout 边界继续绿色，失败来自当前缺失行为而非测试语法或环境。
+- 影响文件：本阶段只修改 `admin-web/src/components/Layout.spec.js`、`adminTablePagination.helpers.spec.js`、Dashboard/TaskMonitor/VideoList/ImageManage 四个页面 spec 和 `plan.md`，生产文件尚未修改。
+- 验证：七文件定向退出码 1；7 个文件中 6 失败、1 通过，74 项中 9 项失败、65 项通过。失败分类为 Layout Drawer 名称/共享 44px 1 项、分页移动规则 1 项、Dashboard live/趋势替代与 reduced-motion 2 项、Task 标签防截断 1 项、Video dropdown 层级及详情/图标窄屏 2 项、Image dropdown 层级与 16:9 密度 2 项；`precisionOpsRollout.spec.js` 6/6。
+
+## 2026-07-16 11:23 +0800
+- 进度：启动 Task 10 自动验收阻塞修复。范围严格限定真实 mock Chrome/Task 10 验收复现的 dropdown warning、`<1024px` 点击目标、移动文字完整性、移动导航 Drawer 名称、Dashboard 异步/趋势读屏与 reduced-motion、ImageManage 1440 首屏 15 卡密度；1024px 按桌面边界，不处理 URL 同步、Intl、表单 name 等后续建议。
+- 影响文件：计划只修改 `admin-web/src/components/Layout.vue`、`Layout.spec.js`、`AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`，Dashboard/TaskMonitor/VideoList/ImageManage 四个页面及对应页面 spec，并追加 `CONTEXT.md`、`plan.md`；`.superpowers/sdd/task-10-report.md` 与 CDP scratch 只追加证据、不纳入提交，不修改 API、路由、依赖或业务状态机。
+- 验证：先只扩展七个既有测试文件并运行定向命令确认真实 RED，再做最小生产修改；收尾运行同一定向、管理端全量测试、生产构建、diff/U+FFFD/C0/DEL/样式/范围门禁，以及现有 Vite 4173 上的 CDP mock 4 页 × 4 视口共 16 场景。真实管理员验收因凭据缺失继续如实保留 blocker。
+
 ## 2026-07-16 11:05 +0800
 - 进度：完成 Task 10 rollout 自动门禁、fresh Web Interface Guidelines 静态审查、真实管理员只读前置与 mock Chrome smoke，状态为 `DONE_WITH_CONCERNS`，不是“第一阶段完成”。自动门禁无生产缺失；mock 16/16 场景与 16 张截图均执行，但 VideoList/ImageManage 四视口均有 dropdown+tooltip Vue warning，375/768 存在不足 44px 的刷新/快速跳转/视频详情目标，ImageManage 1440×900 首屏仅 10/15 张；1024 因全局契约为严格 `<1024px` 只记录 brief 清单歧义。真实 login/proxy 可达，但仓库无管理员凭据，真实四页四视口验收未执行且保持阻塞；Task 10 不标 DONE，不进入阶段二。
 - 影响文件：精确提交只包含 `admin-web/src/views/precisionOpsRollout.spec.js` 与本任务新增的 `plan.md` 记录；不修改生产页面、Layout、路由、`CONTEXT.md`、依赖或既有测试。不纳入 `.superpowers/sdd/task-10-report.md`、Web Guidelines 快照、CDP 脚本/JSON、16 张截图、Chrome profile或 `admin-web/dist`。

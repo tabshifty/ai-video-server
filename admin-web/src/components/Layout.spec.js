@@ -14,6 +14,16 @@ function findFunctionBlock(name) {
   return findBlock(layout, new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm'))
 }
 
+function findRule(source, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = source.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))
+
+  expect(match).not.toBeNull()
+  return match?.[1] || ''
+}
+
+const style = findBlock(layout, /<style scoped>[\s\S]*?<\/style>/)
+
 describe('Layout shell', () => {
   it('uses grouped navigation and the command palette shell', () => {
     expect(layout).toContain('分组')
@@ -111,6 +121,22 @@ describe('Layout shell', () => {
     expect(layout).toContain('padding: var(--space-3);')
     expect(layout).toContain('min-height: 44px;')
     expect(layout).not.toContain('letter-spacing: 0.08em;')
+  })
+
+  it('为移动导航命名并在小于 1024px 时提供稳定命令点击目标', () => {
+    const drawer = findBlock(layout, /<el-drawer\b(?=[^>]*class="mobile-nav-drawer")[\s\S]*?<\/el-drawer>/)
+    const mediaStart = style.indexOf('@media (max-width: 63.9375rem)')
+    const narrowStart = style.indexOf('@media (max-width: 47.9375rem)', mediaStart)
+
+    expect(drawer).toContain('aria-label="管理端导航"')
+    expect(findRule(style, ':deep(.mobile-nav-drawer .el-drawer__body)')).toContain('overscroll-behavior: contain')
+    expect(mediaStart).toBeGreaterThan(-1)
+    expect(narrowStart).toBeGreaterThan(mediaStart)
+    const mobileStyle = style.slice(mediaStart, narrowStart)
+    expect(findRule(mobileStyle, '.command-trigger')).toContain('min-width: 44px')
+    expect(findRule(mobileStyle, '.command-trigger')).toContain('min-height: 44px')
+    expect(findRule(mobileStyle, '.shell-header__actions :deep(.el-button)')).toContain('min-width: 44px')
+    expect(findRule(mobileStyle, '.shell-header__actions :deep(.el-button)')).toContain('min-height: 44px')
   })
 
   it('removes the legacy rose gradient and admin subtitle copy', () => {
