@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 21:37 +0800
+- 进度：Task 11 实现、验证与提交前自审完成。三页真实 SFC 编译、PageHeader/旧 Dialog 清理、互斥状态分支、三个 Drawer 标题/slot close/footer、7/10 rollout、仅三项路由 meta 删除及 API/payload/依赖零差异均已逐项确认。任务明确禁止子代理，故本轮以当前线程自审替代独立代理评审并在忽略报告中记录该边界；无 Critical/Important/阻塞 concern。
+- 影响文件：本次精确提交仅包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/ActorManage.vue`、`CollectionManage.vue`、`UserManage.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`router/index.spec.js`；`.superpowers/sdd/task-11-report.md` 由目录 gitignore 排除，不纳入提交。API、权限、认证、依赖、数据库、Go、Android、migration 与 `.codex/skills/*` 均不修改。
+- 验证：定向正式 3 文件 24/24；`cd admin-web && npm test` 通过（37 文件，382/382）；`npm run build` 成功（2373 modules transformed，仅既有 chunk-size warning）；`git diff --check`、8 文件 U+FFFD/C0/DEL、精确白名单、API 调用行和敏感范围检查通过。提交前将对最终账本状态重新执行同一全量、构建与静态门禁，再使用中文提交信息 `样式：升级基础资源集合页` 精确提交。
+
+## 2026-07-16 21:31 +0800
+- 进度：完成 Task 11 最小生产实现与正式定向 GREEN。Actor/Collection/User 已迁移到壳层 header-actions 与 compact 工作区，补齐保留旧 rows 的行内错误、首次骨架和诚实空态；Actor/Collection 使用 StatusIndicator 并保留查询/重置/总量，User 只保留总量和原角色选择器。三个主编辑器改为 560px/窄屏全宽右侧 Drawer，统一使用 AdminDrawerHeader 的 slot close，既有 footer、API、payload 和业务 handler 未改；对应三个路由只移除兼容 meta，并在 `CONTEXT.md` 沉淀长期 CRUD 契约。
+- 影响文件：`admin-web/src/views/ActorManage.vue`、`CollectionManage.vue`、`UserManage.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`router/index.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：同一 RED 两文件复跑已通过 21/21；正式命令 `cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/router/index.spec.js src/views/adminDateTimeDisplay.spec.js` 通过（3 个文件，24/24）。待执行管理端全量测试、生产构建、静态字符/范围门禁与最终自审。
+
+## 2026-07-16 21:26 +0800
+- 进度：Task 11 rollout、路由与三页静态契约取得严格 RED。新增测试已让 ActorManage、CollectionManage、UserManage 作为真实 SFC 进入迁移集合，并锁定 compact 壳层、加载/失败/筛选空态、工具条职责、Actor/Collection 状态指示器、User 角色选择器、共享 Drawer header/关闭路径/保存 footer 及三个精确路由；生产文件尚未修改。
+- 影响文件：本阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.spec.js` 与 `plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/router/index.spec.js` 按预期退出 1（2 个文件，21 项中 8 失败/13 通过）；失败准确命中三页仍缺 compact/壳层页头/状态分支/StatusIndicator/共享 Drawer，以及 `/actors`、`/collections`、`/users` 仍带兼容 meta。三个新增真实 SFC 均成功编译，无测试语法或环境错误。
+
+## 2026-07-16 21:23 +0800
+- 进度：启动 Precision Ops Task 11，按既定简报将 ActorManage、CollectionManage、UserManage 迁移为壳层页头、紧凑集合密度与 560px/窄屏全宽 Drawer；保留三页既有 API、分页、角色更新、演员刮削、候选回填、启停和删除语义。严格执行 TDD，先扩展真实 SFC、路由、状态分支、共享 Drawer header 与业务控件静态契约，再做最小生产实现。
+- 影响文件：计划仅修改 `admin-web/src/views/ActorManage.vue`、`CollectionManage.vue`、`UserManage.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`router/index.spec.js`、`CONTEXT.md`、`plan.md`，并创建不纳入提交的 `.superpowers/sdd/task-11-report.md`；不修改 API、payload、依赖、权限、认证、Go、Android 或 `.codex/skills/*`。
+- 验证：待执行 Task 11 两文件定向 RED；实现后执行包含状态/Drawer 契约的定向 GREEN、管理端全量测试、生产构建、`git diff --check`、U+FFFD/C0/DEL、精确白名单与敏感范围检查，并逐项自审 PageHeader、路由 meta、互斥状态分支、Drawer header/footer 和业务行为保留情况。
+
 ## 2026-07-16 21:12 +0800
 - 进度：Task 10 第二轮独立复审最终判定 Spec PASS、Task quality Approved，Critical 0、Important 0、Minor 0。复审确认真实图片、状态证据、完整键盘路径、Element Plus 中文 locale、分页与 Drawer 中文提示均已闭合，Drawer dirty guard、分页事件、API 与依赖边界没有回归；已在 SDD 忽略账本将 Task 10 标记完成，下一步进入阶段二 Task 11。
 - 影响文件：本次 tracked 只追加 `plan.md`；`.superpowers/sdd/progress.md`、更新后的 Task 10 报告与 `review-9c97116..78d6c9c.diff` 继续作为忽略证据，不修改生产代码、测试、`CONTEXT.md`、API、路由、权限、依赖、Go 或 Android。

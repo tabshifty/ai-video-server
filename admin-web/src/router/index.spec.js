@@ -53,4 +53,20 @@ describe('resolveRouterHistoryBase', () => {
     expect(imageRoute).toContain("{ path: '/images', component: ImageManage }")
     expect(imageRoute).not.toContain('hideShellPageHeader')
   })
+
+  it('基础 CRUD 集合页使用壳层标题且只移除对应兼容 meta', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const routes = [
+      ["path: '/actors'", "{ path: '/actors', component: ActorManage }"],
+      ["path: '/collections'", "{ path: '/collections', component: CollectionManage }"],
+      ["path: '/users'", "{ path: '/users', component: UserManage }"]
+    ]
+
+    routes.forEach(([path, expected]) => {
+      const route = source.split('\n').find((line) => line.includes(path)) || ''
+
+      expect(route).toContain(expected)
+      expect(route).not.toContain('hideShellPageHeader')
+    })
+  })
 })

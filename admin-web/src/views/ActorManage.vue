@@ -3,10 +3,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
 import {
   createAdminActor,
@@ -16,6 +17,8 @@ import {
 } from '../api/admin'
 
 const loading = ref(false)
+const loaded = ref(false)
+const loadError = ref('')
 const list = ref([])
 const total = ref(0)
 
@@ -34,7 +37,8 @@ const scrapeSource = ref('tmdb')
 const scrapeCandidates = ref([])
 const form = reactive(createEmptyForm())
 
-const hasActors = computed(() => list.value.length > 0)
+const initialLoading = computed(() => loading.value && !loaded.value)
+const hasFilters = computed(() => String(query.q || '').trim() !== '' || String(query.active || '') !== '')
 
 function createEmptyForm() {
   return {
@@ -119,16 +123,25 @@ function buildListParams() {
 }
 
 async function load() {
+  loadError.value = ''
   loading.value = true
   try {
     const data = await getAdminActors(buildListParams())
     list.value = data.items || []
     total.value = data.total_count || 0
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '加载演员列表失败'))
+    loadError.value = extractErrorMessage(error, '加载演员列表失败')
   } finally {
+    loaded.value = true
     loading.value = false
   }
+}
+
+function resetFilters() {
+  query.page = 1
+  query.q = ''
+  query.active = ''
+  load()
 }
 
 function resetForm() {
@@ -329,13 +342,12 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page-shell actor-page">
-      <PageHeader title="演员管理" subtitle="管理演员资料、头像与来源信息">
-        <template #actions>
-          <el-button :loading="loading" @click="load">刷新</el-button>
-          <el-button type="primary" @click="openCreate">创建演员</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button :loading="loading" @click="load">刷新</el-button>
+      <el-button type="primary" @click="openCreate">创建演员</el-button>
+    </template>
+
+    <div class="page-shell actor-page" data-density="compact">
 
       <Toolbar>
         <template #filters>
@@ -347,21 +359,31 @@ onMounted(load)
           </el-select>
         </template>
         <template #actions>
+          <el-tag effect="plain">共 {{ total }} 位演员</el-tag>
           <el-button :loading="loading" @click="load">查询</el-button>
-          <el-button type="primary" @click="openCreate">创建演员</el-button>
+          <el-button @click="resetFilters">重置</el-button>
         </template>
       </Toolbar>
 
-      <SectionCard>
+      <el-alert v-if="loadError" type="error" :closable="false" :title="loadError">
+        <template #default>
+          <el-button link type="primary" @click="load">重试</el-button>
+        </template>
+      </el-alert>
+
+      <el-skeleton v-if="initialLoading" :rows="8" animated />
+
+      <SectionCard v-else-if="!loadError || list.length > 0" dense>
         <template #title>演员列表</template>
         <template #description>支持演员资料的新增、编辑、停用与刮削回填</template>
         <EmptyState
-          v-if="!hasActors"
-          title="暂无演员"
-          description="点击“创建演员”添加第一位演员"
+          v-if="list.length === 0"
+          :title="hasFilters ? '当前筛选无结果' : '暂无演员'"
+          :description="hasFilters ? '重置筛选后查看全部演员' : '点击“创建演员”添加第一位演员'"
         >
           <template #action>
-            <el-button type="primary" @click="openCreate">创建演员</el-button>
+            <el-button v-if="hasFilters" @click="resetFilters">重置筛选</el-button>
+            <el-button v-else type="primary" @click="openCreate">创建演员</el-button>
           </template>
         </EmptyState>
         <template v-else>
@@ -380,7 +402,7 @@ onMounted(load)
               </el-table-column>
               <el-table-column prop="active" label="状态" width="100">
                 <template #default="{ row }">
-                  <el-tag :type="row.active ? 'success' : 'info'">{{ buildStatusLabel(row) }}</el-tag>
+                  <StatusIndicator :label="buildStatusLabel(row)" :tone="row.active ? 'success' : 'warning'" />
                 </template>
               </el-table-column>
               <el-table-column label="更新时间" width="180">
@@ -408,12 +430,23 @@ onMounted(load)
       </SectionCard>
     </div>
 
-    <el-dialog
+    <el-drawer
       v-model="dialogVisible"
-      class="crud-dialog"
+      class="crud-drawer"
       :title="editingID ? '编辑演员' : '创建演员'"
-      width="min(94vw, 860px)"
+      direction="rtl"
+      size="min(100vw, 560px)"
+      destroy-on-close
+      :show-close="false"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader
+          :title="editingID ? '编辑演员' : '创建演员'"
+          :title-id="titleId"
+          :title-class="titleClass"
+          :close="close"
+        />
+      </template>
       <div class="dialog-body">
         <el-form label-width="100px" class="dialog-form">
           <el-form-item label="演员姓名">
@@ -493,7 +526,7 @@ onMounted(load)
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="save">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
   </Layout>
 </template>
 
@@ -513,7 +546,6 @@ onMounted(load)
 
 .dialog-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
   gap: var(--space-4);
 }
 
@@ -561,9 +593,4 @@ onMounted(load)
   padding-top: var(--space-2);
 }
 
-@media (max-width: 64rem) {
-  .dialog-body {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

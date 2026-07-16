@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
@@ -13,13 +13,16 @@ import { createAdminUser, getAdminUsers, updateUserRole } from '../api/admin'
 const list = ref([])
 const total = ref(0)
 const loading = ref(false)
+const loaded = ref(false)
+const loadError = ref('')
 const dialogVisible = ref(false)
 const saving = ref(false)
 const query = reactive({ page: 1, page_size: 20 })
 const roleUpdatingMap = reactive({})
 const form = reactive(createEmptyForm())
 
-const hasUsers = computed(() => list.value.length > 0)
+const initialLoading = computed(() => loading.value && !loaded.value)
+const hasFilters = computed(() => false)
 
 function createEmptyForm() {
   return {
@@ -47,14 +50,16 @@ function formatDateTime(value) {
 }
 
 async function load() {
+  loadError.value = ''
   loading.value = true
   try {
     const data = await getAdminUsers(query)
     list.value = data.items || []
     total.value = data.total_count || 0
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '加载用户列表失败'))
+    loadError.value = extractErrorMessage(error, '加载用户列表失败')
   } finally {
+    loaded.value = true
     loading.value = false
   }
 }
@@ -115,28 +120,32 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page-shell user-page">
-      <PageHeader title="用户管理" subtitle="管理用户角色与权限">
-        <template #actions>
-          <el-button :loading="loading" @click="load">刷新</el-button>
-          <el-button type="primary" @click="openCreateDialog">添加用户</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button :loading="loading" @click="load">刷新</el-button>
+      <el-button type="primary" @click="openCreateDialog">添加用户</el-button>
+    </template>
+
+    <div class="page-shell user-page" data-density="compact">
 
       <Toolbar>
         <template #filters>
           <el-tag effect="plain">共 {{ total }} 个账号</el-tag>
         </template>
-        <template #actions>
-          <el-button :loading="loading" @click="load">重新加载</el-button>
-        </template>
       </Toolbar>
 
-      <SectionCard>
+      <el-alert v-if="loadError" type="error" :closable="false" :title="loadError">
+        <template #default>
+          <el-button link type="primary" @click="load">重试</el-button>
+        </template>
+      </el-alert>
+
+      <el-skeleton v-if="initialLoading" :rows="8" animated />
+
+      <SectionCard v-else-if="!loadError || list.length > 0" dense>
         <template #title>账号列表</template>
         <template #description>可直接调整用户角色，变更即时生效。</template>
         <EmptyState
-          v-if="!hasUsers"
+          v-if="list.length === 0"
           title="暂无用户"
           description="点击“添加用户”创建第一个账号"
         >
@@ -179,12 +188,23 @@ onMounted(load)
       </SectionCard>
     </div>
 
-    <el-dialog
+    <el-drawer
       v-model="dialogVisible"
-      class="crud-dialog"
+      class="crud-drawer"
       title="添加用户"
-      width="min(94vw, 560px)"
+      direction="rtl"
+      size="min(100vw, 560px)"
+      destroy-on-close
+      :show-close="false"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader
+          title="添加用户"
+          :title-id="titleId"
+          :title-class="titleClass"
+          :close="close"
+        />
+      </template>
       <el-form label-width="88px" class="dialog-form">
         <el-form-item label="用户名">
           <el-input v-model="form.username" placeholder="请输入用户名" autocomplete="username" />
@@ -207,7 +227,7 @@ onMounted(load)
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="saveUser">创建</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
   </Layout>
 </template>
 

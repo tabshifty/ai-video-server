@@ -3,10 +3,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
 import {
   createAdminCollection,
@@ -16,6 +17,8 @@ import {
 } from '../api/admin'
 
 const loading = ref(false)
+const loaded = ref(false)
+const loadError = ref('')
 const list = ref([])
 const total = ref(0)
 const dialogVisible = ref(false)
@@ -31,7 +34,8 @@ const query = reactive({
 
 const form = reactive(createEmptyForm())
 
-const hasCollections = computed(() => list.value.length > 0)
+const initialLoading = computed(() => loading.value && !loaded.value)
+const hasFilters = computed(() => String(query.q || '').trim() !== '' || String(query.active || '') !== '')
 
 function createEmptyForm() {
   return {
@@ -94,16 +98,25 @@ function buildPayloadFromForm() {
 }
 
 async function load() {
+  loadError.value = ''
   loading.value = true
   try {
     const data = await getAdminCollections(buildListParams())
     list.value = data.items || []
     total.value = data.total_count || 0
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '加载合集列表失败'))
+    loadError.value = extractErrorMessage(error, '加载合集列表失败')
   } finally {
+    loaded.value = true
     loading.value = false
   }
+}
+
+function resetFilters() {
+  query.page = 1
+  query.q = ''
+  query.active = ''
+  load()
 }
 
 function openCreate() {
@@ -179,13 +192,12 @@ onMounted(load)
 
 <template>
   <Layout>
-    <div class="page-shell collection-page">
-      <PageHeader title="合集管理" subtitle="支持短视频合集的新增、编辑、停用与删除">
-        <template #actions>
-          <el-button :loading="loading" @click="load">刷新</el-button>
-          <el-button type="primary" @click="openCreate">新增合集</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button :loading="loading" @click="load">刷新</el-button>
+      <el-button type="primary" @click="openCreate">新增合集</el-button>
+    </template>
+
+    <div class="page-shell collection-page" data-density="compact">
 
       <Toolbar>
         <template #filters>
@@ -197,21 +209,31 @@ onMounted(load)
           </el-select>
         </template>
         <template #actions>
+          <el-tag effect="plain">共 {{ total }} 个合集</el-tag>
           <el-button :loading="loading" @click="load">查询</el-button>
-          <el-button type="primary" @click="openCreate">新增合集</el-button>
+          <el-button @click="resetFilters">重置</el-button>
         </template>
       </Toolbar>
 
-      <SectionCard>
+      <el-alert v-if="loadError" type="error" :closable="false" :title="loadError">
+        <template #default>
+          <el-button link type="primary" @click="load">重试</el-button>
+        </template>
+      </el-alert>
+
+      <el-skeleton v-if="initialLoading" :rows="8" animated />
+
+      <SectionCard v-else-if="!loadError || list.length > 0" dense>
         <template #title>合集列表</template>
         <template #description>支持短视频合集的新增、编辑、停用与删除</template>
         <EmptyState
-          v-if="!hasCollections"
-          title="暂无合集"
-          description="点击“新增合集”创建第一个合集"
+          v-if="list.length === 0"
+          :title="hasFilters ? '当前筛选无结果' : '暂无合集'"
+          :description="hasFilters ? '重置筛选后查看全部合集' : '点击“新增合集”创建第一个合集'"
         >
           <template #action>
-            <el-button type="primary" @click="openCreate">新增合集</el-button>
+            <el-button v-if="hasFilters" @click="resetFilters">重置筛选</el-button>
+            <el-button v-else type="primary" @click="openCreate">新增合集</el-button>
           </template>
         </EmptyState>
         <template v-else>
@@ -223,7 +245,7 @@ onMounted(load)
               <el-table-column prop="sort_order" label="排序" width="90" />
               <el-table-column label="状态" width="100">
                 <template #default="{ row }">
-                  <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '启用' : '停用' }}</el-tag>
+                  <StatusIndicator :label="row.active ? '启用' : '停用'" :tone="row.active ? 'success' : 'warning'" />
                 </template>
               </el-table-column>
               <el-table-column label="更新时间" width="180">
@@ -251,12 +273,23 @@ onMounted(load)
       </SectionCard>
     </div>
 
-    <el-dialog
+    <el-drawer
       v-model="dialogVisible"
-      class="crud-dialog"
+      class="crud-drawer"
       :title="editingID ? '编辑合集' : '新增合集'"
-      width="min(94vw, 680px)"
+      direction="rtl"
+      size="min(100vw, 560px)"
+      destroy-on-close
+      :show-close="false"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader
+          :title="editingID ? '编辑合集' : '新增合集'"
+          :title-id="titleId"
+          :title-class="titleClass"
+          :close="close"
+        />
+      </template>
       <el-form label-width="100px" class="dialog-form">
         <el-form-item label="合集名称">
           <el-input v-model="form.name" placeholder="请输入合集名称" />
@@ -279,7 +312,7 @@ onMounted(load)
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="save">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
   </Layout>
 </template>
 

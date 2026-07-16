@@ -1070,6 +1070,7 @@
 ## 管理端 Element Plus 本地化与关闭控件约定
 - `Element Plus 中文 locale 统一入口`：管理端必须在 `main.js` 通过 Element Plus 官方 `locale` API 注入 `zh-cn`，不要在业务页面复制翻译表。分页总数、上一页/下一页、对话框默认 aria 等框架文案以该全局入口为基线；共享 `AdminTablePagination` 只在自身组件根节点内为纯图标上一页/下一页同步中文 `aria-label` 与原生 `title`，禁止全局 DOM 扫描或 MutationObserver 补丁。
 - `Drawer 关闭守卫与键盘提示`：Video/Image 等带 dirty guard 的 `el-drawer` 若自定义关闭按钮，必须从 `#header="{ close, titleId, titleClass }"` 使用 Element Plus 提供的 `close` 回调，不能直接把 v-model 改为 false 绕过 `before-close`。共享纯图标关闭按钮使用中文 `aria-label` 与稳定原生 `title`；不要再用默认支持 Enter/Space trigger 的 `el-tooltip` 包裹该按钮，否则 tooltip 的 keydown `preventDefault()` 会截断原生 click，导致键盘无法关闭 Drawer。
+- `Precision Ops 基础 CRUD 集合契约`：ActorManage、CollectionManage、UserManage 已使用壳层页头承载刷新和创建主操作，并在业务容器声明 `data-density="compact"`；列表读取必须区分首次骨架、行内错误、真正空态和筛选零结果，失败时保留旧 rows，Actor/Collection 的零结果提供重置筛选，User 不为视觉迁移新增筛选或 API 参数。Actor/Collection 的只读启停状态使用 `StatusIndicator`，User 的角色选择器仍是可编辑业务控件，不能用状态指示器替换或重复展示。三页主编辑器统一使用右侧 `size="min(100vw, 560px)"` Drawer，并通过共享 `AdminDrawerHeader` 接收 Element Plus header slot 的 `close`；迁移不得改变既有 API、payload、分页、角色更新、演员刮削与候选回填、启停、删除或保存 footer 语义。
 
 ## TV C 批 · 视觉与健壮性约定
 - `LazyVerticalGrid 网格行高均齐`：`LazyVerticalGrid` 同行内卡片的文本区 Box 若无最小高度约束，标题行数不同的卡片高度不一致，行内最高卡片与最矮卡片底边落差可见。对于 9:16 海报卡等固定比例卡片，若采用 `titleSmall`（22sp/28dp lineHeight）、`maxLines=2`：2 行占 56dp，加上 `vertical=9.dp` 双向 padding 共 74dp；给标题 Box 叠 `Modifier.heightIn(min = 74.dp)` 并设 `contentAlignment = Alignment.TopStart` 即可统一行高，短标题顶对齐不居中漂浮。调整 `maxLines` 或 typography role 时 `heightIn` 最小值也须同步更新。
