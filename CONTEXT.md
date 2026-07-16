@@ -1067,6 +1067,10 @@
 - `TV 单片软重试首帧门槛`：单片长视频播放器只有在底层 `onRenderedFirstFrame()` 至少成功触发过一次后，才允许把后续重试/取消/失败/成功下沉到播放器中心轻态；首帧前的首次进入、首次失败仍保留整页 `loading/error`。
 - `TV 单片诊断面板只读返回`：单片长视频播放器的“诊断信息”面板只承担查看当前失败上下文的职责；关闭动作必须只返回上一层失败轻态，不顺手清掉失败态，也不顺手触发下一次重试。真正的“重试播放”入口只保留在失败轻态。
 
+## 管理端 Element Plus 本地化与关闭控件约定
+- `Element Plus 中文 locale 统一入口`：管理端必须在 `main.js` 通过 Element Plus 官方 `locale` API 注入 `zh-cn`，不要在业务页面复制翻译表。分页总数、上一页/下一页、对话框默认 aria 等框架文案以该全局入口为基线；共享 `AdminTablePagination` 只在自身组件根节点内为纯图标上一页/下一页同步中文 `aria-label` 与原生 `title`，禁止全局 DOM 扫描或 MutationObserver 补丁。
+- `Drawer 关闭守卫与键盘提示`：Video/Image 等带 dirty guard 的 `el-drawer` 若自定义关闭按钮，必须从 `#header="{ close, titleId, titleClass }"` 使用 Element Plus 提供的 `close` 回调，不能直接把 v-model 改为 false 绕过 `before-close`。共享纯图标关闭按钮使用中文 `aria-label` 与稳定原生 `title`；不要再用默认支持 Enter/Space trigger 的 `el-tooltip` 包裹该按钮，否则 tooltip 的 keydown `preventDefault()` 会截断原生 click，导致键盘无法关闭 Drawer。
+
 ## TV C 批 · 视觉与健壮性约定
 - `LazyVerticalGrid 网格行高均齐`：`LazyVerticalGrid` 同行内卡片的文本区 Box 若无最小高度约束，标题行数不同的卡片高度不一致，行内最高卡片与最矮卡片底边落差可见。对于 9:16 海报卡等固定比例卡片，若采用 `titleSmall`（22sp/28dp lineHeight）、`maxLines=2`：2 行占 56dp，加上 `vertical=9.dp` 双向 padding 共 74dp；给标题 Box 叠 `Modifier.heightIn(min = 74.dp)` 并设 `contentAlignment = Alignment.TopStart` 即可统一行高，短标题顶对齐不居中漂浮。调整 `maxLines` 或 typography role 时 `heightIn` 最小值也须同步更新。
 - `TV 状态屏 10-foot 图标规范`：`TvStateFeedback.kt` 内各状态组件的图标在 TV 10-foot 视距下必须满足最小可感知尺寸：`TvStateIcon` 图标 ≥ 36dp；`TvPageLoadingState` 的 `CircularProgressIndicator` ≥ 32dp；状态操作按钮（`TvStateAction`）内图标 ≥ 20dp，按钮纵向 padding ≥ 12dp（保证按钮总高度 ≥ 48dp，TV 触控目标最小值）。低于这些值即会在大屏 10-foot 视距下呈现为"轻而模糊"的状态面板。

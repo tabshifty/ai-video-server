@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUpdated, ref, watch } from 'vue'
 
 import { resolvePageJump } from './adminTablePagination.helpers'
 
@@ -28,7 +28,12 @@ const props = defineProps({
 
 const emit = defineEmits(['update:currentPage', 'update:pageSize', 'current-change', 'size-change'])
 
+const paginationRef = ref(null)
 const jumpPage = ref('1')
+const navigationHints = [
+  ['.btn-prev', '上一页'],
+  ['.btn-next', '下一页']
+]
 
 const jumpState = computed(() =>
   resolvePageJump(jumpPage.value, {
@@ -72,11 +77,27 @@ function submitJump() {
   emit('update:currentPage', result.page)
   emit('current-change', result.page)
 }
+
+function syncPaginationNavigationHints() {
+  const root = paginationRef.value?.$el
+  if (!root?.querySelector) return
+
+  navigationHints.forEach(([selector, label]) => {
+    const button = root.querySelector(selector)
+    if (!button) return
+    button.setAttribute('aria-label', label)
+    button.setAttribute('title', label)
+  })
+}
+
+onMounted(syncPaginationNavigationHints)
+onUpdated(syncPaginationNavigationHints)
 </script>
 
 <template>
   <div class="admin-table-pagination">
     <el-pagination
+      ref="paginationRef"
       :current-page="currentPage"
       :page-size="pageSize"
       :layout="layout"

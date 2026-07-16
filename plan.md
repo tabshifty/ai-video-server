@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 20:34 +0800
+- 进度：完成 Task 10 第二轮复审修复的提交前收口。代表截图已人工检查，真实 Video/Image 1440 与隔离 Video/Image 删除确认均无重叠、空白或文字遮挡；本次只提交 12 个白名单生产/测试/账本文件，忽略的 CDP 脚本、JSON、30 张截图与报告不提交。API、路由、权限、认证、数据库、依赖、Go、Android、migration 和 `.codex/skills/*` 均为零差异。
+- 影响文件：`CONTEXT.md`、`plan.md`、`admin-web/src/main.js`、`assets/themeTokens.spec.js`、`components/AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`、`components/base/AdminDrawerHeader.vue`、`precisionOpsComponents.spec.js`、`views/VideoList.vue`、`videoListPage.spec.js`、`views/ImageManage.vue`、`imageManagePage.spec.js`。
+- 验证：`git diff --check`、12 文件 U+FFFD/C0/DEL、精确白名单、敏感范围与证据一致性均通过；9444 无监听进程。自动、浏览器、全量与构建结果沿用 20:31 同一新鲜工作树证据。待精确暂存并提交中文提交信息。
+
+## 2026-07-16 20:31 +0800
+- 进度：Task 10 第二轮复审修复完成生产实现与提交前验证。管理端通过官方 API 注入 Element Plus zh-CN；共享分页仅在自身根节点同步上一页/下一页中文名称与原生提示；新增共享 Drawer header，Video/Image 各 3 个 Drawer 保留原 v-model、Teleport、`before-close`、destroy-on-close、closed/footer 等语义，并通过 slot `close` 进入原守卫。首轮自定义 header 的 `el-tooltip` 会拦截 Enter，新增单测取得 1 RED 后改用需求允许的原生 title，Drawer probe 与完整键盘门禁随即 GREEN。
+- 影响文件：`admin-web/src/main.js`、`components/AdminTablePagination.vue`、`components/base/AdminDrawerHeader.vue`、`views/VideoList.vue`、`views/ImageManage.vue`、对应 5 个测试、`CONTEXT.md`、`plan.md`；忽略证据为 `.superpowers/sdd/task-10-real-*`、`task-10-state-*` 与报告。不改 API、路由、权限、数据库、依赖、Go、Android、migration 或 `.codex/skills/*`。
+- 验证：定向 5 文件 90/90；tooltip 键盘回归测试 15/15，Drawer probe 关闭、surface/focus 与 `solid/2px/2px` 通过；真实完整 smoke 16/16、16 PNG、键盘 18/18、`hardFailures=[]`、`dataPrerequisites=[]`、`blockedWrites=[]`；隔离状态 smoke 14/14、14 PNG、硬失败/写请求/非预期错误均为 0；`cd admin-web && npm test` 37 文件 374/374；`npm run build` 成功（2373 modules transformed，仅既有 chunk-size warning）。待完成静态白名单与精确提交。
+
+## 2026-07-16 20:13 +0800
+- 进度：Task 10 本轮自动与真实浏览器门禁取得严格 RED。五个定向 Vitest 文件中新增 5 项失败、原有 85 项通过，分别命中 locale、共享分页提示、共享 Drawer header 与 Video/Image 接入；真实 keyboard CDP 有 8 条预期失败，浏览器原始 DOM 明确为 `Total 0`、`Go to previous page`、`Go to next page`、`Close this dialog` 且 title 均为空，两页保存视图证据仍只有内置 tab switch。所有失败均与复审结论一致，`blockedWrites=[]`。
+- 影响文件：RED 仅修改五个测试、`plan.md` 和忽略的 `.superpowers/sdd/task-10-real-smoke.mjs`/结果；生产文件尚未修改。
+- 验证：`cd admin-web && npm test -- src/assets/themeTokens.spec.js src/components/adminTablePagination.helpers.spec.js src/components/base/precisionOpsComponents.spec.js src/views/videoListPage.spec.js src/views/imageManagePage.spec.js` 退出码 1（5 文件，90 项中 5 失败/85 通过）；`TASK10_REAL_MODE=keyboard node .superpowers/sdd/task-10-real-smoke.mjs` 退出码 2（8 条预期失败，写请求 0）。
+
+## 2026-07-16 20:09 +0800
+- 进度：开始修复 Task 10 第二轮独立复审的 2 项 Important。根因已定位为 Element Plus 未注入官方 zh-CN locale、共享分页内部图标按钮缺少原生中文提示、Video/Image Drawer 沿用缺少中文 title 的默认关闭按钮，以及真实 CDP 保存视图路径只切换内置标签而未进入“另存为视图” prompt。严格按 RED→GREEN，先收紧自动测试与忽略的只读浏览器脚本，再做最小生产实现。
+- 影响文件：计划修改 `admin-web/src/main.js`、共享分页与测试、共享 Drawer header 与基础组件测试、`VideoList.vue`/`ImageManage.vue` 及页面测试、`CONTEXT.md`、`plan.md`；`.superpowers/sdd/task-10-real-smoke.mjs`、结果、截图和报告仅作忽略证据。明确不改 API、路由、权限、数据库、依赖、Go、Android、migration 或 `.codex/skills/*`。
+- 验证：待执行五文件定向 RED/GREEN、真实管理员 keyboard/full CDP（仅 GET/HEAD/OPTIONS，写请求 fail-closed）、完整 `npm test`、`npm run build`、`git diff --check`、乱码/控制字符、敏感范围与精确文件白名单门禁。
+
 ## 2026-07-16 19:40 +0800
 - 进度：完成 Task 10 三项复核缺口的提交前新鲜门禁。提交范围严格限定 12 个 Task 10 文件；真实管理员与隔离状态浏览器证据继续留在忽略目录，不提交生成产物。API、路由、权限、数据库、依赖、Go 与 Android 均无改动；待提交后生成固定范围评审包并由独立子代理复审，复审未清零 Critical/Important 前不标记 Task 10 完成。
 - 影响文件：`CONTEXT.md`、`plan.md`、`admin-web/src/assets/element-overrides.css`、`themeTokens.spec.js`、`components/AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`、`views/ImageManage.vue`、`VideoList.vue`、`imageManage.helpers.js`、`imageManage.helpers.spec.js`、`imageManagePage.spec.js`、`videoListPage.spec.js`；`.superpowers/sdd/*` 与 `admin-web/dist/` 保持忽略。

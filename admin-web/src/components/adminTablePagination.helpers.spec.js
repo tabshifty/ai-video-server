@@ -37,6 +37,17 @@ describe('resolvePageJump', () => {
     expect(paginationRule).toContain('overscroll-behavior-inline: contain')
   })
 
+  it('只在共享分页根节点内为上一页和下一页补齐中文名称与原生提示', () => {
+    expect(source).toContain('ref="paginationRef"')
+    expect(source).toContain("['.btn-prev', '上一页']")
+    expect(source).toContain("['.btn-next', '下一页']")
+    expect(source).toContain("button.setAttribute('aria-label', label)")
+    expect(source).toContain("button.setAttribute('title', label)")
+    expect(source).toContain('paginationRef.value?.$el')
+    expect(source).not.toContain('MutationObserver')
+    expect(source).not.toContain('document.querySelector')
+  })
+
   it('jumps to the requested page when the input is valid', () => {
     expect(
       resolvePageJump('5', {

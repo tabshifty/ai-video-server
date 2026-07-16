@@ -136,6 +136,12 @@ describe('theme tokens', () => {
     expect(densityOverrides).toBeGreaterThan(themeStyles)
   })
 
+  it('通过官方 API 为 Element Plus 注入中文 locale', () => {
+    expect(mainSource).toContain("import zhCn from 'element-plus/es/locale/lang/zh-cn'")
+    expect(mainSource).toContain('app.use(ElementPlus, { locale: zhCn })')
+    expect(mainSource).not.toMatch(/app\.use\(ElementPlus\)\s*$/m)
+  })
+
   it('keeps narrow-screen touch targets at least 44px in both dimensions', () => {
     const touchTargetRule = overrides.match(
       /@media \(max-width: 63\.9375rem\) \{[\s\S]*?:where\(\[data-density\]\) \.el-button\.is-circle,[^{]*\{([^}]*)\}/

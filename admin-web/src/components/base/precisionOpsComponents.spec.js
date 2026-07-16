@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import MetricStrip from './MetricStrip.vue'
 import SavedViewTabs from './SavedViewTabs.vue'
@@ -7,6 +7,7 @@ import StatusIndicator from './StatusIndicator.vue'
 const metricStripSource = readFileSync(new URL('./MetricStrip.vue', import.meta.url), 'utf8')
 const savedViewTabsSource = readFileSync(new URL('./SavedViewTabs.vue', import.meta.url), 'utf8')
 const statusIndicatorSource = readFileSync(new URL('./StatusIndicator.vue', import.meta.url), 'utf8')
+const drawerHeaderURL = new URL('./AdminDrawerHeader.vue', import.meta.url)
 const semanticTones = ['neutral', 'success', 'warning', 'danger', 'info']
 
 function extractBlock(source, tag) {
@@ -181,5 +182,23 @@ describe('Precision Ops base components', () => {
     const mobileStyle = savedViewStyle.slice(mediaStart)
     expect(mobileStyle).toMatch(/:deep\(\.el-tabs__item\)\s*\{[^}]*height:\s*44px/)
     expect(mobileStyle).toMatch(/:deep\(\.el-tabs__item\)\s*\{[^}]*line-height:\s*44px/)
+  })
+
+  it('共享 Drawer 标题使用 Element Plus close 回调并提供中文名称与提示', async () => {
+    expect(existsSync(drawerHeaderURL)).toBe(true)
+    if (!existsSync(drawerHeaderURL)) return
+
+    const drawerHeaderSource = readFileSync(drawerHeaderURL, 'utf8')
+    const AdminDrawerHeader = (await import('./AdminDrawerHeader.vue')).default
+
+    expect(AdminDrawerHeader).toBeTruthy()
+    expect(Object.keys(AdminDrawerHeader.props)).toEqual(['title', 'titleId', 'titleClass', 'close'])
+    expect(AdminDrawerHeader.props.close.required).toBe(true)
+    expect(drawerHeaderSource).toContain('aria-label="关闭此对话框"')
+    expect(drawerHeaderSource).toContain('title="关闭此对话框"')
+    expect(drawerHeaderSource).toContain('class="el-drawer__close-btn"')
+    expect(drawerHeaderSource).toContain('@click="close"')
+    expect(drawerHeaderSource).not.toContain('<el-tooltip')
+    expect(drawerHeaderSource).not.toContain("emit('update:modelValue'")
   })
 })

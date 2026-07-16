@@ -600,4 +600,17 @@ async function load() {
     expect(template).toContain(':before-close="handleDetailDrawerBeforeClose"')
     expect(template).toContain('<BulkActionBar :count="selectedImageRows.length" :actions="bulkActions" />')
   })
+
+  it('三个 Drawer 复用中文关闭标题且继续由原有关闭守卫控制', () => {
+    expect(script).toContain("import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'")
+    expect(template.match(/<AdminDrawerHeader\b/g)).toHaveLength(3)
+    expect(template.match(/<template #header="\{ close, titleId, titleClass \}">/g)).toHaveLength(3)
+    expect(template.match(/:show-close="false"/g)).toHaveLength(3)
+    for (const title of ['新增图片', '图片详情', '更多筛选']) {
+      expect(template).toMatch(new RegExp(`<AdminDrawerHeader\\b(?=[^>]*title="${title}")(?=[^>]*:close="close")[^>]*\\/>`))
+    }
+    expect(template).toContain(':before-close="handleUploadDrawerBeforeClose"')
+    expect(template).toContain(':before-close="handleDetailDrawerBeforeClose"')
+    expect(template).toContain('@closed="syncFilterDraftFromQuery"')
+  })
 })

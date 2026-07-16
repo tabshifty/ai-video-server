@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, MoreFilled, Search, SwitchButton, Upload } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import MetricStrip from '../components/base/MetricStrip.vue'
@@ -1254,9 +1255,13 @@ onBeforeUnmount(() => {
       :size="drawerSize"
       :close-on-click-modal="!uploading"
       :close-on-press-escape="!uploading"
+      :show-close="false"
       :before-close="handleUploadDrawerBeforeClose"
       @closed="onUploadDialogClosed"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="新增图片" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <div class="drawer-body">
         <SectionCard dense>
           <template #title>批量选图</template>
@@ -1366,9 +1371,13 @@ onBeforeUnmount(() => {
       title="图片详情"
       direction="rtl"
       :size="drawerSize"
+      :show-close="false"
       :before-close="handleDetailDrawerBeforeClose"
       @closed="onDetailClosed"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="图片详情" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <div v-if="detail" class="drawer-body">
         <SectionCard dense>
           <template #title>基础信息</template>
@@ -1477,8 +1486,12 @@ onBeforeUnmount(() => {
       title="更多筛选"
       direction="rtl"
       :size="drawerSize"
+      :show-close="false"
       @closed="syncFilterDraftFromQuery"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="更多筛选" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <el-form label-width="88px">
         <el-form-item label="搜索">
           <el-input v-model="filterDraft.q" placeholder="按标题或描述搜索" clearable />

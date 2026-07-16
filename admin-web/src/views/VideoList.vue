@@ -5,6 +5,7 @@ import { Delete, EditPen, MagicStick, MoreFilled, Setting, Search } from '@eleme
 import { useRouter } from 'vue-router'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import SavedViewTabs from '../components/base/SavedViewTabs.vue'
@@ -1508,9 +1509,13 @@ onBeforeUnmount(() => {
       destroy-on-close
       :close-on-click-modal="!updatingBatch"
       :close-on-press-escape="!updatingBatch"
+      :show-close="false"
       :before-close="handleBatchEditBeforeClose"
       @closed="handleBatchEditClosed"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="批量编辑" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <el-form label-width="108px" class="detail-drawer-form">
         <SectionCard dense>
           <template #title>应用范围</template>
@@ -1616,10 +1621,14 @@ onBeforeUnmount(() => {
       direction="rtl"
       :size="detailDrawerSize"
       destroy-on-close
+      :show-close="false"
       :before-close="handleDetailBeforeClose"
       @close="handleDetailClose"
       @closed="handleDetailClosed"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="视频详情" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <el-form v-if="detail" label-width="90px" class="detail-drawer-form">
         <SectionCard dense>
           <template #title>基础信息</template>
@@ -2029,8 +2038,12 @@ onBeforeUnmount(() => {
       title="更多筛选"
       direction="rtl"
       :size="detailDrawerSize"
+      :show-close="false"
       @closed="syncFilterDraftFromQuery"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="更多筛选" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <el-form label-width="88px">
         <el-form-item label="搜索">
           <el-input v-model="filterDraft.q" placeholder="标题/标签搜索" clearable />
