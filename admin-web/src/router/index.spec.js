@@ -45,4 +45,12 @@ describe('resolveRouterHistoryBase', () => {
     expect(videoRoute).toContain("{ path: '/videos', component: VideoList }")
     expect(videoRoute).not.toContain('hideShellPageHeader')
   })
+
+  it('图片资产页使用壳层标题且保持原有路由目标', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const imageRoute = source.split('\n').find((line) => line.includes("path: '/images'"))
+
+    expect(imageRoute).toContain("{ path: '/images', component: ImageManage }")
+    expect(imageRoute).not.toContain('hideShellPageHeader')
+  })
 })

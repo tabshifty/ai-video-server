@@ -2,14 +2,17 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Grid, List, Search, SwitchButton, Upload } from '@element-plus/icons-vue'
+import { Delete, MoreFilled, Search, SwitchButton, Upload } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import PageHeader from '../components/base/PageHeader.vue'
+import MetricStrip from '../components/base/MetricStrip.vue'
+import SavedViewTabs from '../components/base/SavedViewTabs.vue'
 import SectionCard from '../components/base/SectionCard.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import Toolbar from '../components/base/Toolbar.vue'
+import { useSavedViews } from '../components/base/useSavedViews'
 import {
   checkAdminImageUpload,
   deleteAdminImage,
@@ -23,28 +26,70 @@ import {
 } from '../api/admin'
 import { formatAdminDateTime } from '../utils/dateTime'
 import { sha256File } from '../utils/hash'
+import {
+  DEFAULT_IMAGE_ACTIVE,
+  createImageBuiltInViews,
+  hasImageActiveFilters,
+  normalizeImageViewSnapshot
+} from './imageManage.helpers'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const list = ref([])
 const total = ref(0)
+const listError = ref('')
 const IMAGEMANAGE_VIEW_KEY = 'admin-imagemanage-view'
+const SAVED_VIEWS_KEY = 'admin-imagemanage-saved-views-v1'
 const tableRef = ref(null)
 const selectedImageRows = ref([])
 const bulkOperating = ref(false)
 const filterDrawerVisible = ref(false)
 const viewportWidth = ref(readViewportWidth())
 const viewMode = ref(readStoredImageView())
+let loadSeq = 0
 
 const query = reactive({
   page: 1,
   page_size: 20,
   q: '',
   status: '',
-  active: '1',
+  active: DEFAULT_IMAGE_ACTIVE,
   actor_id: '',
   collection_id: ''
+})
+const quickSearch = ref(query.q)
+const filterDraft = reactive({
+  q: query.q,
+  status: query.status,
+  active: query.active,
+  actor_id: query.actor_id,
+  collection_id: query.collection_id
+})
+const builtInViews = createImageBuiltInViews(query.active, viewMode.value)
+const {
+  availableViews,
+  activeViewId,
+  editableSourceId,
+  selectView,
+  saveView,
+  updateView,
+  renameView,
+  removeView
+} = useSavedViews({
+  storageKey: SAVED_VIEWS_KEY,
+  builtInViews,
+  normalizeSnapshot: normalizeImageViewSnapshot,
+  getCurrentSnapshot: () => ({
+    q: query.q,
+    status: query.status,
+    active: query.active,
+    actor_id: query.actor_id,
+    collection_id: query.collection_id,
+    viewMode: viewMode.value
+  }),
+  applySnapshot: applyImageViewSnapshot,
+  refresh: refreshSavedView
 })
 
 const uploadRef = ref(null)
@@ -84,14 +129,25 @@ const preview = reactive({
 const readyCount = computed(() => list.value.filter((item) => item.status === 'ready').length)
 const failedCount = computed(() => list.value.filter((item) => item.status === 'failed').length)
 const inactiveCount = computed(() => list.value.filter((item) => !item.active).length)
+const allPageSelected = computed(() => list.value.length > 0 && list.value.every((item) => isGridSelected(item)))
+const somePageSelected = computed(() => !allPageSelected.value && list.value.some((item) => isGridSelected(item)))
 const drawerSize = computed(() => (viewportWidth.value < 1024 ? '100%' : '560px'))
 const uploadDrawerDirty = computed(() => uploadDrawerSnapshot.value !== serializeUploadDrawerState())
 const detailDrawerDirty = computed(() => detailDrawerSnapshot.value !== serializeDetailDrawerState())
+const hasActiveFilters = computed(() => hasImageActiveFilters(query))
+const summaryMetrics = computed(() => [
+  { key: 'total', label: '结果总数', value: total.value, scope: '当前条件·全部页' },
+  { key: 'ready', label: '可用', value: readyCount.value, scope: '本页', tone: 'success' },
+  { key: 'failed', label: '失败', value: failedCount.value, scope: '本页', tone: 'danger' },
+  { key: 'inactive', label: '停用', value: inactiveCount.value, scope: '本页', tone: 'warning' }
+])
 const activeFilterChips = computed(() => {
   const chips = []
   if (query.q) chips.push({ key: 'q', label: '搜索', value: query.q })
   if (query.status) chips.push({ key: 'status', label: '状态', value: statusLabel(query.status) })
-  if (query.active === '0') chips.push({ key: 'active', label: '启用', value: '仅停用' })
+  if (query.active !== DEFAULT_IMAGE_ACTIVE) {
+    chips.push({ key: 'active', label: '启用', value: query.active === '0' ? '仅停用' : '全部状态' })
+  }
   if (query.actor_id) chips.push({ key: 'actor_id', label: '演员', value: optionLabel(actorOptions.value, query.actor_id) })
   if (query.collection_id) chips.push({ key: 'collection_id', label: '图片合集', value: optionLabel(imageCollectionOptions.value, query.collection_id) })
   return chips
@@ -122,7 +178,6 @@ function readStoredImageView() {
 
 function setViewMode(mode) {
   viewMode.value = mode === 'list' ? 'list' : 'grid'
-  clearImageSelection()
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(IMAGEMANAGE_VIEW_KEY, viewMode.value)
@@ -197,12 +252,6 @@ function statusLabel(status) {
     failed: '失败'
   }
   return map[status] || status || '-'
-}
-
-function statusTagType(status) {
-  if (status === 'ready') return 'success'
-  if (status === 'failed') return 'danger'
-  return 'info'
 }
 
 function formatFileSize(size) {
@@ -281,7 +330,7 @@ function buildListParams() {
     q: query.q,
     status: query.status
   }
-  if (query.active === '1') {
+  if (query.active === DEFAULT_IMAGE_ACTIVE) {
     params.active = 1
   } else if (query.active === '0') {
     params.active = 0
@@ -295,15 +344,87 @@ function buildListParams() {
   return params
 }
 
+function resetQueryIdentity() {
+  list.value = []
+  total.value = 0
+  clearImageSelection()
+  listError.value = ''
+}
+
+function syncFilterDraftFromQuery() {
+  filterDraft.q = query.q
+  filterDraft.status = query.status
+  filterDraft.active = query.active
+  filterDraft.actor_id = query.actor_id
+  filterDraft.collection_id = query.collection_id
+}
+
+function openFilterDrawer() {
+  syncFilterDraftFromQuery()
+  filterDrawerVisible.value = true
+}
+
+function applyImageViewSnapshot(snapshot) {
+  const next = normalizeImageViewSnapshot(snapshot)
+  query.q = next.q
+  query.status = next.status
+  query.active = next.active
+  query.actor_id = next.actor_id
+  query.collection_id = next.collection_id
+  query.page = 1
+  setViewMode(next.viewMode)
+  quickSearch.value = query.q
+  syncFilterDraftFromQuery()
+  resetQueryIdentity()
+}
+
+async function refreshSavedView() {
+  const loaded = await load()
+  if (loaded === false) {
+    throw new Error(listError.value || '加载图片列表失败')
+  }
+  return loaded
+}
+
+async function selectImageView(id) {
+  try {
+    await selectView(id)
+  } catch (error) {
+    listError.value = extractErrorMessage(error, '加载图片列表失败')
+  }
+}
+
+async function removeImageView(id) {
+  try {
+    await removeView(id)
+  } catch (error) {
+    listError.value = extractErrorMessage(error, '加载图片列表失败')
+  }
+}
+
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   try {
     const data = await getAdminImages(buildListParams())
+    if (seq !== loadSeq) {
+      return null
+    }
     list.value = data.items || []
     total.value = data.total_count || 0
+    listError.value = ''
     clearImageSelection()
+    return true
+  } catch (error) {
+    if (seq !== loadSeq) {
+      return null
+    }
+    listError.value = extractErrorMessage(error, '加载图片列表失败')
+    return false
   } finally {
-    loading.value = false
+    if (seq === loadSeq) {
+      loading.value = false
+    }
   }
 }
 
@@ -613,11 +734,20 @@ function toggleGridSelection(row, checked) {
   if (checked) {
     next.push(row)
   }
-  selectedImageRows.value = next
+  onImageSelectionChange(next)
 }
 
 function isGridSelected(row) {
   return selectedImageRows.value.some((item) => item.id === row.id)
+}
+
+function toggleCurrentPageSelection(checked) {
+  const currentPageIDs = new Set(list.value.map((item) => item.id))
+  const next = selectedImageRows.value.filter((item) => !currentPageIDs.has(item.id))
+  if (checked) {
+    next.push(...list.value)
+  }
+  onImageSelectionChange(next)
 }
 
 function clearImageSelection() {
@@ -683,23 +813,56 @@ async function doBulkDelete() {
   }
 }
 
+function applyQuickSearch() {
+  query.q = quickSearch.value
+  query.page = 1
+  syncFilterDraftFromQuery()
+  resetQueryIdentity()
+  load()
+}
+
+function applyFilterDrawer() {
+  query.q = filterDraft.q
+  query.status = filterDraft.status
+  query.active = filterDraft.active
+  query.actor_id = filterDraft.actor_id
+  query.collection_id = filterDraft.collection_id
+  query.page = 1
+  quickSearch.value = query.q
+  filterDrawerVisible.value = false
+  resetQueryIdentity()
+  load()
+}
+
 function removeFilter(key) {
   if (key === 'active') {
-    query.active = '1'
+    query.active = DEFAULT_IMAGE_ACTIVE
   } else {
     query[key] = ''
   }
   query.page = 1
+  quickSearch.value = query.q
+  syncFilterDraftFromQuery()
+  resetQueryIdentity()
   load()
 }
 
 function resetFilters() {
   query.q = ''
   query.status = ''
-  query.active = '1'
+  query.active = DEFAULT_IMAGE_ACTIVE
   query.actor_id = ''
   query.collection_id = ''
   query.page = 1
+  quickSearch.value = query.q
+  syncFilterDraftFromQuery()
+  resetQueryIdentity()
+  load()
+}
+
+function setPage(page) {
+  query.page = page
+  resetQueryIdentity()
   load()
 }
 
@@ -725,6 +888,24 @@ async function doDelete(row) {
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '删除图片失败'))
   }
+}
+
+function handleImageRowAction(command, row) {
+  if (command === 'toggle') {
+    toggleActive(row).catch((error) => {
+      if (error === 'cancel' || error === 'close') return
+      ElMessage.error(extractErrorMessage(error, '更新图片状态失败'))
+    })
+    return true
+  }
+  if (command === 'delete') {
+    doDelete(row).catch((error) => {
+      if (error === 'cancel' || error === 'close') return
+      ElMessage.error(extractErrorMessage(error, '删除图片失败'))
+    })
+    return true
+  }
+  return false
 }
 
 function currentPreviewParams() {
@@ -800,153 +981,198 @@ onBeforeUnmount(() => {
 
 <template>
   <Layout>
-    <div class="page image-page page-shell">
-      <PageHeader title="图片管理">
-        <template #actions>
-          <el-button :icon="Upload" type="primary" @click="openUploadDialog">上传图片</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <div class="image-header-actions">
+        <el-button :icon="Upload" type="primary" @click="openUploadDialog">上传图片</el-button>
+      </div>
+    </template>
 
-      <SectionCard dense>
-        <div class="stats-strip">
-          <div class="stat-pill">
-            <div class="stat-label">总图片数</div>
-            <div class="stat-value">{{ total }}</div>
-          </div>
-          <div class="stat-pill">
-            <div class="stat-label">当前页可用</div>
-            <div class="stat-value">{{ readyCount }}</div>
-          </div>
-          <div class="stat-pill">
-            <div class="stat-label">当前页失败</div>
-            <div class="stat-value">{{ failedCount }}</div>
-          </div>
-          <div class="stat-pill">
-            <div class="stat-label">当前页停用</div>
-            <div class="stat-value">{{ inactiveCount }}</div>
-          </div>
-        </div>
-      </SectionCard>
+    <div class="page-shell image-page" data-density="compact">
+      <SavedViewTabs
+        :items="availableViews"
+        :active-id="activeViewId"
+        :editable-source-id="editableSourceId"
+        @select="selectImageView"
+        @save="saveView"
+        @update="updateView"
+        @rename="renameView"
+        @remove="removeImageView"
+      />
 
-      <Toolbar>
+      <MetricStrip :items="summaryMetrics" aria-label="图片摘要" />
+
+      <Toolbar dense>
         <template #filters>
           <el-input
-            v-model="query.q"
+            v-model="quickSearch"
             class="quick-search"
             placeholder="搜索图片"
             clearable
             :prefix-icon="Search"
-            @keyup.enter="load"
-            @clear="load"
+            @keyup.enter="applyQuickSearch"
+            @clear="applyQuickSearch"
           />
           <el-tag v-for="chip in activeFilterChips" :key="chip.key" closable @close="removeFilter(chip.key)">
             {{ chip.label }}：{{ chip.value }}
           </el-tag>
-          <el-button plain @click="filterDrawerVisible = true">更多筛选</el-button>
+          <el-button plain @click="openFilterDrawer">更多筛选</el-button>
         </template>
         <template #actions>
-          <el-radio-group :model-value="viewMode" @update:model-value="setViewMode">
-            <el-radio-button value="grid">
-              <el-icon><Grid /></el-icon>
-              网格
-            </el-radio-button>
-            <el-radio-button value="list">
-              <el-icon><List /></el-icon>
-              列表
-            </el-radio-button>
-          </el-radio-group>
+          <el-segmented
+            class="image-view-switch"
+            aria-label="图片视图模式"
+            :model-value="viewMode"
+            :options="[{ label: '网格', value: 'grid' }, { label: '列表', value: 'list' }]"
+            @update:model-value="setViewMode"
+          />
         </template>
       </Toolbar>
 
-      <SectionCard v-loading="loading">
+      <el-alert v-if="listError" type="error" :closable="false" :title="listError">
+        <template #default><el-button link type="primary" @click="load">重试</el-button></template>
+      </el-alert>
+
+      <el-skeleton v-if="loading && list.length === 0" :rows="12" animated />
+
+      <SectionCard v-else-if="!listError || list.length > 0" dense>
         <template #title>图片资产</template>
         <template #actions>
-          <el-button :disabled="selectedImageRows.length === 0" @click="clearImageSelection">取消选择</el-button>
+          <el-button v-if="selectedImageRows.length > 0" @click="clearImageSelection">取消选择</el-button>
         </template>
 
-        <EmptyState v-if="!loading && list.length === 0" title="暂无图片">
+        <EmptyState
+          v-if="list.length === 0"
+          :title="hasActiveFilters ? '当前筛选无结果' : '暂无图片'"
+          :description="hasActiveFilters ? '清除筛选后查看全部图片' : '上传图片后会显示在这里'"
+        >
           <template #action>
-            <el-button type="primary" :icon="Upload" @click="openUploadDialog">上传图片</el-button>
+            <el-button v-if="hasActiveFilters" @click="resetFilters">清除筛选</el-button>
+            <el-button v-else type="primary" :icon="Upload" @click="openUploadDialog">上传图片</el-button>
           </template>
         </EmptyState>
 
-        <div v-else>
-          <div v-if="viewMode === 'grid'" class="image-grid">
-            <article
-              v-for="item in list"
-              :key="item.id"
-              class="image-grid-card"
-              :class="{ 'is-selected': isGridSelected(item) }"
-            >
-              <el-checkbox
-                class="image-grid-card__select"
-                :model-value="isGridSelected(item)"
-                @update:model-value="(checked) => toggleGridSelection(item, checked)"
+        <div v-else-if="viewMode === 'grid'" class="image-grid">
+          <article
+            v-for="item in list"
+            :key="item.id"
+            class="image-grid-card"
+            :class="{ 'is-selected': isGridSelected(item) }"
+          >
+            <el-checkbox
+              class="image-grid-card__select"
+              :aria-label="`选择图片：${item.title || item.id}`"
+              :model-value="isGridSelected(item)"
+              @update:model-value="(checked) => toggleGridSelection(item, checked)"
+            />
+            <div class="image-grid-card__preview">
+              <img
+                v-if="item.view_url || item.url || item.thumbnail_url"
+                :src="item.view_url || item.url || item.thumbnail_url"
+                :alt="item.title || '图片预览'"
               />
-              <div class="image-grid-card__preview">
-                <img v-if="item.view_url || item.url || item.thumbnail_url" :src="item.view_url || item.url || item.thumbnail_url" alt="" />
-                <span v-else>{{ item.title || '图片' }}</span>
-              </div>
-              <div class="image-grid-card__body">
-                <strong>{{ item.title || item.id }}</strong>
-                <span>{{ item.width || 0 }} x {{ item.height || 0 }} · {{ formatFileSize(item.file_size) }}</span>
-              </div>
-              <div class="image-grid-card__meta">
-                <el-tag :type="statusTagType(item.status)" size="small">{{ statusLabel(item.status) }}</el-tag>
-                <el-tag :type="item.active ? 'success' : 'info'" size="small">{{ item.active ? '启用' : '停用' }}</el-tag>
-              </div>
-              <div class="image-grid-card__actions">
-                <el-button :icon="Edit" circle @click="showDetail(item)" />
-                <el-button :icon="SwitchButton" circle @click="toggleActive(item)" />
-                <el-button :icon="Delete" circle type="danger" @click="doDelete(item)" />
-              </div>
-            </article>
-          </div>
-
-          <div v-else class="table-wrap">
-            <el-table ref="tableRef" :data="list" border @selection-change="onImageSelectionChange">
-              <el-table-column type="selection" width="52" />
-              <el-table-column prop="title" label="标题" min-width="220" />
-              <el-table-column prop="status" label="状态" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+              <span v-else>{{ item.title || '图片' }}</span>
+            </div>
+            <div class="image-grid-card__body">
+              <strong>{{ item.title || item.id }}</strong>
+              <span>{{ item.width || 0 }} × {{ item.height || 0 }} · {{ formatFileSize(item.file_size) }}</span>
+            </div>
+            <div class="image-grid-card__meta">
+              <StatusIndicator :label="statusLabel(item.status)" :tone="item.status === 'failed' ? 'danger' : 'success'" />
+              <StatusIndicator :label="item.active ? '启用' : '停用'" :tone="item.active ? 'success' : 'warning'" />
+            </div>
+            <div class="image-grid-card__actions image-row-actions">
+              <el-button link type="primary" @click="showDetail(item)">详情</el-button>
+              <el-dropdown
+                trigger="click"
+                popper-class="image-row-actions-popper"
+                @command="(command) => handleImageRowAction(command, item)"
+              >
+                <el-tooltip content="图片操作" placement="top">
+                  <el-button :icon="MoreFilled" circle aria-label="图片操作" />
+                </el-tooltip>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="toggle">{{ item.active ? '停用' : '启用' }}</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                  </el-dropdown-menu>
                 </template>
-              </el-table-column>
-              <el-table-column label="启用" width="90">
-                <template #default="{ row }">
-                  <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '是' : '否' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="stored_mime" label="格式" width="110" />
-              <el-table-column label="尺寸" width="130">
-                <template #default="{ row }">{{ row.width || 0 }} x {{ row.height || 0 }}</template>
-              </el-table-column>
-              <el-table-column label="文件大小" width="130">
-                <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
-              </el-table-column>
-              <el-table-column label="上传时间" width="180">
-                <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
-              </el-table-column>
-              <el-table-column label="操作" width="250">
-                <template #default="{ row }">
-                  <el-button size="small" @click="showDetail(row)">详情</el-button>
-                  <el-button size="small" :type="row.active ? 'warning' : 'success'" @click="toggleActive(row)">
-                    {{ row.active ? '停用' : '启用' }}
-                  </el-button>
-                  <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+              </el-dropdown>
+            </div>
+          </article>
         </div>
 
-        <div class="action-row">
+        <div v-else class="table-wrap has-media-rows">
+          <el-table ref="tableRef" :data="list" row-key="id" border>
+            <el-table-column width="44">
+              <template #header>
+                <el-checkbox
+                  class="image-table-selection"
+                  aria-label="选择本页全部图片"
+                  :model-value="allPageSelected"
+                  :indeterminate="somePageSelected"
+                  @update:model-value="toggleCurrentPageSelection"
+                />
+              </template>
+              <template #default="{ row }">
+                <el-checkbox
+                  class="image-table-selection"
+                  :aria-label="`选择图片：${row.title || row.id}`"
+                  :model-value="isGridSelected(row)"
+                  @update:model-value="(checked) => toggleGridSelection(row, checked)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="status" label="状态" width="104">
+              <template #default="{ row }">
+                <StatusIndicator :label="statusLabel(row.status)" :tone="row.status === 'failed' ? 'danger' : 'success'" />
+              </template>
+            </el-table-column>
+            <el-table-column label="启用" width="88">
+              <template #default="{ row }">{{ row.active ? '是' : '否' }}</template>
+            </el-table-column>
+            <el-table-column prop="stored_mime" label="格式" width="104" />
+            <el-table-column label="尺寸" width="120">
+              <template #default="{ row }">{{ row.width || 0 }} × {{ row.height || 0 }}</template>
+            </el-table-column>
+            <el-table-column label="文件大小" width="120">
+              <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
+            </el-table-column>
+            <el-table-column label="上传时间" width="168">
+              <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="108" fixed="right">
+              <template #default="{ row }">
+                <div class="image-row-actions">
+                  <el-button link type="primary" @click="showDetail(row)">详情</el-button>
+                  <el-dropdown
+                    trigger="click"
+                    popper-class="image-row-actions-popper"
+                    @command="(command) => handleImageRowAction(command, row)"
+                  >
+                    <el-tooltip content="图片操作" placement="top">
+                      <el-button :icon="MoreFilled" circle aria-label="图片操作" />
+                    </el-tooltip>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="toggle">{{ row.active ? '停用' : '启用' }}</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="toolbar-row toolbar-row--end">
           <AdminTablePagination
-            v-model:current-page="query.page"
-            v-model:page-size="query.page_size"
+            :current-page="query.page"
+            :page-size="query.page_size"
             layout="total, prev, pager, next"
             :total="total"
-            @current-change="load"
+            @current-change="setPage"
           />
         </div>
       </SectionCard>
@@ -1159,7 +1385,7 @@ onBeforeUnmount(() => {
             <img
               v-if="preview.url"
               :src="preview.url"
-              alt="preview"
+              :alt="`图片预览：${detail.title || detail.id}`"
               class="preview-image"
               :style="{ transform: `scale(${preview.zoom / 100})` }"
             />
@@ -1179,19 +1405,25 @@ onBeforeUnmount(() => {
       </template>
     </el-drawer>
 
-    <el-drawer v-model="filterDrawerVisible" title="更多筛选" direction="rtl" :size="drawerSize">
+    <el-drawer
+      v-model="filterDrawerVisible"
+      title="更多筛选"
+      direction="rtl"
+      :size="drawerSize"
+      @closed="syncFilterDraftFromQuery"
+    >
       <el-form label-width="88px">
         <el-form-item label="搜索">
-          <el-input v-model="query.q" placeholder="按标题或描述搜索" clearable />
+          <el-input v-model="filterDraft.q" placeholder="按标题或描述搜索" clearable />
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="query.status" placeholder="状态筛选" clearable style="width: 100%">
+          <el-select v-model="filterDraft.status" placeholder="状态筛选" clearable style="width: 100%">
             <el-option label="可用" value="ready" />
             <el-option label="失败" value="failed" />
           </el-select>
         </el-form-item>
         <el-form-item label="启用状态">
-          <el-select v-model="query.active" placeholder="启用状态" clearable style="width: 100%">
+          <el-select v-model="filterDraft.active" placeholder="启用状态" clearable style="width: 100%">
             <el-option label="全部状态" value="" />
             <el-option label="仅启用" value="1" />
             <el-option label="仅停用" value="0" />
@@ -1199,7 +1431,7 @@ onBeforeUnmount(() => {
         </el-form-item>
         <el-form-item label="演员">
           <el-select
-            v-model="query.actor_id"
+            v-model="filterDraft.actor_id"
             filterable
             remote
             clearable
@@ -1214,7 +1446,7 @@ onBeforeUnmount(() => {
         </el-form-item>
         <el-form-item label="图片合集">
           <el-select
-            v-model="query.collection_id"
+            v-model="filterDraft.collection_id"
             filterable
             remote
             clearable
@@ -1235,7 +1467,7 @@ onBeforeUnmount(() => {
       </el-form>
       <template #footer>
         <el-button @click="resetFilters">重置</el-button>
-        <el-button type="primary" @click="filterDrawerVisible = false; query.page = 1; load()">应用筛选</el-button>
+        <el-button type="primary" @click="applyFilterDrawer">应用筛选</el-button>
       </template>
     </el-drawer>
   </Layout>
@@ -1244,61 +1476,55 @@ onBeforeUnmount(() => {
 <style scoped>
 .image-page {
   gap: var(--space-4);
+  padding-bottom: var(--space-1);
+}
+
+.image-header-actions,
+.image-row-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.image-header-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.image-row-actions {
+  justify-content: flex-end;
+}
+
+.image-row-actions :deep(.el-button:focus-visible) {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
 }
 
 .quick-search {
   width: 240px;
 }
 
-.stats-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.stat-pill {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface-muted);
-}
-
-.stat-label {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-}
-
-.stat-value {
-  margin-top: var(--space-2);
-  color: var(--primary-strong);
-  font-size: var(--text-display);
-  line-height: 1;
-  font-weight: 700;
-}
-
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: 12px;
 }
 
 .image-grid-card {
   position: relative;
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: 8px;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
-  transition:
-    border-color var(--motion-duration-base) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-base) var(--motion-easing-standard);
+  transition: border-color var(--motion-duration-base) var(--motion-easing-standard);
 }
 
 .image-grid-card.is-selected,
 .image-grid-card:hover {
   border-color: var(--primary);
-  box-shadow: var(--shadow-md);
 }
 
 .image-grid-card__select {
@@ -1308,13 +1534,25 @@ onBeforeUnmount(() => {
   z-index: 2;
 }
 
+.image-grid-card__select :deep(.el-checkbox__input.is-focus .el-checkbox__inner) {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
 .image-grid-card__preview {
   display: grid;
   aspect-ratio: 4 / 3;
   place-items: center;
   overflow: hidden;
   border-radius: var(--radius-md);
-  background: var(--bg-surface-muted);
+  background-color: var(--bg-surface-muted);
+  background-image:
+    linear-gradient(45deg, var(--line-soft) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--line-soft) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--line-soft) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--line-soft) 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
   color: var(--text-muted);
   font-size: var(--text-small);
 }
@@ -1322,7 +1560,7 @@ onBeforeUnmount(() => {
 .image-grid-card__preview img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .image-grid-card__body {
@@ -1354,13 +1592,13 @@ onBeforeUnmount(() => {
 }
 
 .image-grid-card__actions {
-  opacity: 0;
-  transition: opacity var(--motion-duration-base) var(--motion-easing-standard);
+  align-items: center;
+  justify-content: space-between;
+  opacity: 1;
 }
 
-.image-grid-card:hover .image-grid-card__actions,
-.image-grid-card.is-selected .image-grid-card__actions {
-  opacity: 1;
+.has-media-rows :deep(.el-table) {
+  min-width: 960px;
 }
 
 .drawer-body,
@@ -1405,7 +1643,7 @@ onBeforeUnmount(() => {
   min-height: 340px;
   max-height: 440px;
   border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface-muted);
   overflow: auto;
   display: grid;
@@ -1428,15 +1666,23 @@ onBeforeUnmount(() => {
   font-size: var(--text-caption);
 }
 
-@media (max-width: 1200px) {
-  .stats-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 63.9375rem) {
+  .image-header-actions :deep(.el-button) {
+    min-height: 44px;
   }
-}
 
-@media (max-width: 760px) {
-  .stats-strip {
-    grid-template-columns: 1fr;
+  .image-view-switch :deep(.el-segmented__item) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .image-row-actions :deep(.el-button) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  :global(.image-row-actions-popper .el-dropdown-menu__item) {
+    min-height: 44px;
   }
 
   .quick-search {

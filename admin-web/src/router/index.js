@@ -40,7 +40,7 @@ const routes = [
   { path: '/av-scrape', component: AVManualScrape, meta: { hideShellPageHeader: true } },
   { path: '/actors', component: ActorManage, meta: { hideShellPageHeader: true } },
   { path: '/collections', component: CollectionManage, meta: { hideShellPageHeader: true } },
-  { path: '/images', component: ImageManage, meta: { hideShellPageHeader: true } },
+  { path: '/images', component: ImageManage },
   { path: '/image-collections', component: ImageCollectionManage, meta: { hideShellPageHeader: true } },
   { path: '/users', component: UserManage, meta: { hideShellPageHeader: true } },
   { path: '/toolbox', component: Toolbox, meta: { hideShellPageHeader: true } },

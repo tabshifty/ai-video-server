@@ -2,6 +2,41 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 10:11 +0800
+- 进度：完成 Task 9 迟到独立评审的全部 Critical/Important/Minor 关闭与 amend 前最终自审。评审为 0 Critical、2 Important、1 Minor；模式选择保留、列表逐行/本页全选可访问性和详情动态中文 alt 均已修复并由三个独立门禁覆盖。表头全选/取消全选、indeterminate、逐行选择、网格/列表与 BulkActionBar 共用 selection；所有新查询 identity reset 仍清选择。
+- 影响文件：评审修复增量仅为 `admin-web/src/views/ImageManage.vue`、`admin-web/src/views/imageManagePage.spec.js`、`plan.md`，将 amend 到 Task 9 原提交；最终提交范围仍严格为 brief 7 文件和 `plan.md`。
+- 验证：评审修复页面 16/16；Task 9 五文件定向 42/42；`cd admin-web && npm test` 通过（36 个文件，350/350）；`cd admin-web && npm run build` 成功（2371 modules transformed，仅既有 chunk-size warning）；修复增量 `git diff --check`、U+FFFD/C0/DEL、三文件白名单、选择状态硬约束和样式禁止项扫描通过。amend 后将核对最终提交八文件与干净工作树。
+
+## 2026-07-16 10:08 +0800
+- 进度：完成 Task 9 独立评审两项 Important 和一项 Minor 的最小修复与页面 GREEN。模式切换只更新 presentation/storage/custom 态，不清 selection；列表改为显式表头与逐行 checkbox，表头保留本页全选/取消全选和 indeterminate，行使用标题或 ID 的动态中文 aria，网格/列表/BulkActionBar 共用 `selectedImageRows`。saved-view、筛选、分页 reset 与最新成功仍清选择；详情预览 alt 改为标题或 ID 的动态中文名称。
+- 影响文件：`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/imageManagePage.spec.js`、`plan.md`；完成验证后 amend 原 Task 9 提交并更新报告最终 SHA。
+- 验证：`cd admin-web && npm test -- src/views/imageManagePage.spec.js` 通过（退出码 0；16/16，无 warning/error）。待新鲜运行 Task 9 五文件定向、管理端全量测试、生产构建和最终静态门禁。
+
+## 2026-07-16 10:06 +0800
+- 进度：Task 9 迟到独立评审的两项 Important 和一项 Minor 已拆成三个互不短路的页面回归门禁并确认真实 RED。模式 valid/unsafe fixture 正常；真实页面仍在 presentation 切换时清空选择，列表仍使用无法提供行级中文名称的内建 selection 列，详情预览仍为英文泛化 alt。生产修复尚未修改。
+- 影响文件：本阶段只修改 `admin-web/src/views/imageManagePage.spec.js`、`plan.md`；随后将最小修改 `admin-web/src/views/ImageManage.vue` 并 amend 原 Task 9 提交。
+- 验证：`cd admin-web && npm test -- src/views/imageManagePage.spec.js` 按预期失败（退出码 1；16 项中 3 项失败、13 项通过）。三个独立失败分别显示 `setViewMode` 仍调用 `clearImageSelection()`、主表仍为 `type="selection"`、详情仍为 `alt="preview"`；其它 Task 9 契约继续通过。
+
+## 2026-07-16 09:58 +0800
+- 进度：完成 Precision Ops Task 9 实现、自审与最终提交前范围核对。双 storage key、默认 active 基线、六字段快照、筛选草稿、新查询身份、latest-wins、保存视图拒绝消费和危险命令白名单均由真实 SFC 与 protected/unsafe fixture 门禁覆盖；上传队列/秒传、批量、选择、Drawer 守卫、route query、zoom/fit 和保存 payload 保持。预提交只读 reviewer 长轮次中断且未产出报告，按主线程指令不再等待，提交后由主线程执行正式独立评审。
+- 影响文件：本次精确提交只包含 `admin-web/src/views/imageManage.helpers.js`、`admin-web/src/views/imageManage.helpers.spec.js`、`admin-web/src/views/imageManagePage.spec.js`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-9-report.md`、`admin-web/dist`、API、依赖、共享 saved-view/分页组件、其它页面、Android 或 Go。
+- 验证：Task 9 五文件定向通过（5 个文件，39/39）；`cd admin-web && npm test` 通过（36 个文件，347/347）；`cd admin-web && npm run build` 成功（2371 modules transformed，仅既有 chunk-size warning）；`git diff --check`、八文件 U+FFFD/C0/DEL、样式四层棋盘例外/禁止项、受控分页绑定、共享模块零差异和八文件白名单检查通过。提交前将对最终文档状态新鲜重跑全部门禁。
+
+## 2026-07-16 09:43 +0800
+- 进度：完成 Task 9 helper、ImageManage 和路由最小实现及三文件 GREEN。图片页接入共享保存视图、六字段快照和双 key 同步；筛选草稿、保存视图、移除/重置与受控分页统一 reset 新查询身份，latest-wins 保护列表/总数/错误/选择/loading，同查询失败保留旧资产；主工作区升级为紧凑指标、184px contain 网格、108px 显式白名单菜单和窄屏 44px 控件，原上传/批量/详情/预览业务保留。
+- 影响文件：`admin-web/src/views/imageManage.helpers.js`、`admin-web/src/views/imageManage.helpers.spec.js`、`admin-web/src/views/imageManagePage.spec.js`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：首次实现后三文件为 23/24，唯一失败是网格图片仍残留旧 `object-fit: cover`；最小改为 `contain` 后，`cd admin-web && npm test -- src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js src/router/index.spec.js` 通过（退出码 0；3 个文件，24/24，无 warning/error）。待完成语义自审、长期契约、五文件定向、全量测试、构建和静态范围门禁。
+
+## 2026-07-16 09:33 +0800
+- 进度：Task 9 helper、ImageManage 真实 SFC 与 `/images` 路由测试已确认真实 RED。页面门禁以 protected/unsafe fixture 自校验查询身份 reset、latest-wins 与危险命令 fail-closed，并限定真实 script/template/style；现有上传、selection、Drawer/route query、预览和 payload 保留门禁通过，生产文件尚未修改。
+- 影响文件：本阶段只创建 `admin-web/src/views/imageManage.helpers.spec.js`、`admin-web/src/views/imageManagePage.spec.js`，修改 `admin-web/src/router/index.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js src/router/index.spec.js` 按预期失败（退出码 1；3 个文件失败；已收集 20 项中 13 项失败、7 项通过，helper suite 因生产 helper 尚不存在而预期收集失败）。页面 13 项中 12 项失败、1 项保留门禁通过，失败命中保存视图、快照/查询身份、最新写权、错误态、危险命令、资产几何/可访问性与窄屏目标；路由唯一失败为 `/images` 仍带兼容 meta，不是测试语法、SFC 编译或环境错误。
+
+## 2026-07-16 09:25 +0800
+- 进度：启动 Precision Ops Task 9，按用户选择 A 以数据诚实和危险操作 fail-closed 为高层契约。范围收口为 ImageManage 保存视图、紧凑资产网格/列表、检查器与查询身份；保留默认 `active='1'`、上传队列/秒传预检、批量启停删除、选择同步、详情/上传脏数据守卫、560px Drawer、route query 详情、预览 zoom/fit、保存 payload 和现有请求流程。
+- 影响文件：计划仅创建 `admin-web/src/views/imageManage.helpers.js`、`admin-web/src/views/imageManage.helpers.spec.js`、`admin-web/src/views/imageManagePage.spec.js`，修改 `admin-web/src/views/ImageManage.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`，并追加不纳入提交的 `.superpowers/sdd/task-9-report.md`；不修改 API、依赖、共享 saved-view/分页组件、其它页面、Android 或 Go。
+- 验证：先完整审计现有业务与接口，再创建 helper/page 测试和路由断言，运行 `cd admin-web && npm test -- src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js src/router/index.spec.js` 取得真实 RED；最小实现后运行 brief 五文件定向、管理端全量测试、生产构建、`git diff --check`、U+FFFD/C0/DEL、样式与范围扫描。
+
 ## 2026-07-16 09:11 +0800
 - 进度：完成 Task 8 两项 Important 修复、自审补强和最终提交前范围核对。查询草稿/身份、latest-wins 写权、保存视图拒绝消费、受控分页与危险命令白名单均由真实 SFC 和可命中违规 fixture 门禁覆盖；提交前语义自审发现的行命令异步拒绝问题已修复并重新执行全部验证。两个已记账 Minor 按用户决定保持不动。
 - 影响文件：本次精确提交只包含 `admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-8-report.md`、`admin-web/dist`、共享 saved-view、分页组件、API、路由、依赖或其它文件。
