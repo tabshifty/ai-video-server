@@ -70,4 +70,19 @@ describe('resolveRouterHistoryBase', () => {
       expect(route).not.toContain('hideShellPageHeader')
     })
   })
+
+  it('服务资源集合页使用壳层标题且只移除对应兼容 meta', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const routes = [
+      ["path: '/iptv'", "{ path: '/iptv', component: IPTVManage }"],
+      ["path: '/tv-app'", "{ path: '/tv-app', component: TvAppManage }"]
+    ]
+
+    routes.forEach(([path, expected]) => {
+      const route = source.split('\n').find((line) => line.includes(path)) || ''
+
+      expect(route).toContain(expected)
+      expect(route).not.toContain('hideShellPageHeader')
+    })
+  })
 })

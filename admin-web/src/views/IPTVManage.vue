@@ -3,12 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
-import Toolbar from '../components/base/Toolbar.vue'
-import SectionCard from '../components/base/SectionCard.vue'
-import StatCard from '../components/base/StatCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import MetricStrip from '../components/base/MetricStrip.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
+import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'
 import {
   getAdminIPTVPlaylist,
   refreshAdminIPTVPlaylist,
@@ -16,7 +17,8 @@ import {
   uploadAdminIPTVPlaylist
 } from '../api/admin'
 
-const loading = ref(false)
+const loading = ref(true)
+const loadError = ref('')
 const uploadLoading = ref(false)
 const saveSourceLoading = ref(false)
 const refreshLoading = ref(false)
@@ -24,12 +26,6 @@ const uploadFiles = ref([])
 const sourceUrl = ref('')
 const playlist = ref(createEmptyPlaylist())
 
-const stats = computed(() => [
-  { label: '频道数', value: Number(playlist.value.channel_count || 0) },
-  { label: '跳过数', value: Number(playlist.value.skipped_count || 0) },
-  { label: '分组数', value: groupCount.value },
-  { label: '预览数', value: channels.value.length }
-])
 const channels = computed(() => (Array.isArray(playlist.value.channels) ? playlist.value.channels : []))
 const groupCount = computed(() => {
   if (Array.isArray(playlist.value.groups)) {
@@ -39,6 +35,16 @@ const groupCount = computed(() => {
 })
 const updatedAtText = computed(() => formatDateTime(playlist.value.updated_at))
 const hasChannels = computed(() => channels.value.length > 0)
+const initialLoading = computed(() => shouldShowCrudCollectionSkeleton({
+  loading: loading.value,
+  rowCount: channels.value.length
+}))
+const stats = computed(() => [
+  { key: 'channels', label: '频道数', value: Number(playlist.value.channel_count || 0), scope: '当前播放列表' },
+  { key: 'skipped', label: '跳过数', value: Number(playlist.value.skipped_count || 0), scope: '当前播放列表' },
+  { key: 'groups', label: '分组数', value: groupCount.value, scope: '当前播放列表' },
+  { key: 'preview', label: '预览数', value: channels.value.length, scope: '当前载入' }
+])
 
 function createEmptyPlaylist() {
   return {
@@ -78,11 +84,12 @@ function formatDateTime(value) {
 }
 
 async function loadPlaylist() {
+  loadError.value = ''
   loading.value = true
   try {
     applyPlaylist(await getAdminIPTVPlaylist())
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '加载 IPTV 状态失败'))
+    loadError.value = extractErrorMessage(error, '加载 IPTV 状态失败')
   } finally {
     loading.value = false
   }
@@ -162,16 +169,14 @@ onMounted(loadPlaylist)
 
 <template>
   <Layout>
-    <div class="page-shell iptv-page">
-      <PageHeader title="IPTV 管理" subtitle="维护 M3U 播放列表来源并预览频道解析结果">
-        <template #actions>
-          <el-button :icon="Refresh" :loading="loading" @click="loadPlaylist">刷新</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button :icon="Refresh" :loading="loading" @click="loadPlaylist">刷新</el-button>
+    </template>
 
-      <Toolbar>
+    <div class="page-shell iptv-page" data-density="compact">
+      <Toolbar dense>
         <template #filters>
-          <el-tag effect="plain">最后更新时间：{{ updatedAtText }}</el-tag>
+          <StatusIndicator :label="`最后更新时间：${updatedAtText}`" tone="neutral" />
         </template>
         <template #actions>
           <el-button :icon="Refresh" :loading="refreshLoading" @click="refreshPlaylist">远程拉取</el-button>
@@ -179,11 +184,11 @@ onMounted(loadPlaylist)
         </template>
       </Toolbar>
 
-      <section class="stat-grid">
-        <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" />
-      </section>
+      <el-alert v-if="loadError" type="error" :closable="false" :title="loadError">
+        <template #default><el-button link type="primary" @click="loadPlaylist">重试</el-button></template>
+      </el-alert>
 
-      <SectionCard>
+      <SectionCard dense>
         <template #title>播放列表来源</template>
         <template #description>上传本地文件或更新远程 M3U URL</template>
         <div class="source-grid">
@@ -226,42 +231,48 @@ onMounted(loadPlaylist)
         </div>
       </SectionCard>
 
-      <SectionCard>
-        <template #title>频道预览</template>
-        <template #description>展示当前播放列表解析出的频道信息</template>
-        <EmptyState
-          v-if="!hasChannels"
-          title="暂无频道"
-          description="上传 M3U 文件或填入远程地址后刷新"
-        />
-        <div v-else class="table-wrap">
-          <el-table v-loading="loading" :data="channels" border stripe class="channel-table" empty-text="暂无频道数据">
-            <el-table-column prop="name" label="频道名" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="group" label="分组" min-width="130" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.group || '未分组' }}</template>
-            </el-table-column>
-            <el-table-column label="台标" width="96" align="center">
-              <template #default="{ row }">
-                <el-image v-if="row.logo_url" class="logo-image" :src="row.logo_url" fit="contain" lazy>
-                  <template #error>
-                    <span class="logo-empty">无</span>
-                  </template>
-                </el-image>
-                <span v-else class="logo-empty">无</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="播放地址" min-width="260" show-overflow-tooltip>
-              <template #default="{ row }">
-                <el-link v-if="row.url" :href="row.url" target="_blank" type="primary">{{ row.url }}</el-link>
-                <span v-else>暂无</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="tvg_id" label="tvg-id" min-width="140" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.tvg_id || '暂无' }}</template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </SectionCard>
+      <el-skeleton v-if="initialLoading" :rows="8" animated />
+
+      <template v-else-if="!loadError || hasChannels">
+        <MetricStrip :items="stats" aria-label="IPTV 摘要" />
+
+        <SectionCard dense>
+          <template #title>频道预览</template>
+          <template #description>展示当前播放列表解析出的频道信息</template>
+          <EmptyState
+            v-if="!hasChannels"
+            title="暂无频道"
+            description="上传 M3U 文件或填入远程地址后刷新"
+          />
+          <div v-else class="table-wrap">
+            <el-table v-loading="loading" :data="channels" border stripe class="channel-table" empty-text="暂无频道数据">
+              <el-table-column prop="name" label="频道名" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="group" label="分组" min-width="130" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.group || '未分组' }}</template>
+              </el-table-column>
+              <el-table-column label="台标" width="96" align="center">
+                <template #default="{ row }">
+                  <el-image v-if="row.logo_url" class="logo-image" :src="row.logo_url" fit="contain" lazy>
+                    <template #error>
+                      <span class="logo-empty">无</span>
+                    </template>
+                  </el-image>
+                  <span v-else class="logo-empty">无</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="播放地址" min-width="260" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <el-link v-if="row.url" :href="row.url" target="_blank" type="primary">{{ row.url }}</el-link>
+                  <span v-else>暂无</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="tvg_id" label="tvg-id" min-width="140" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.tvg_id || '暂无' }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </SectionCard>
+      </template>
     </div>
   </Layout>
 </template>
@@ -269,12 +280,6 @@ onMounted(loadPlaylist)
 <style scoped>
 .iptv-page {
   display: grid;
-  gap: var(--space-4);
-}
-
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
@@ -289,7 +294,7 @@ onMounted(loadPlaylist)
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface-muted);
 }
 
@@ -322,6 +327,10 @@ onMounted(loadPlaylist)
   width: 100%;
 }
 
+.channel-table :deep(.el-table__row) {
+  height: var(--table-row-height);
+}
+
 .logo-image {
   width: 44px;
   height: 28px;
@@ -334,14 +343,12 @@ onMounted(loadPlaylist)
 }
 
 @media (max-width: 75rem) {
-  .stat-grid,
   .source-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 46rem) {
-  .stat-grid,
   .source-grid {
     grid-template-columns: 1fr;
   }

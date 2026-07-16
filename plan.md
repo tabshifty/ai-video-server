@@ -2,6 +2,41 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 07:45 +0800
+- 进度：Task 13 完成提交前最终自审与验证。PageHeader 移除后两组 `pageTitle/pageSubtitle` 四行死字段已按单项 RED→GREEN 精确删除，pre-existing `shortLabel` 保留。首次读取失败时独立来源/二维码/上传命令面继续可用，数据 gate 内不显示伪指标或伪空态；两页 compact、指标口径、状态文字、下载常驻、更多操作与业务 handler 边界均符合 brief，无阻塞 concern。
+- 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/router/index.js`、`index.spec.js`、`views/IPTVManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js` 共 8 个 tracked 文件；忽略报告 `.superpowers/sdd/task-13-report.md` 在提交后写入最终 SHA，`admin-web/dist/` 不纳入提交。
+- 验证：死字段单文件 RED 精确 1 failed / 8 passed，四行删除后 9/9 GREEN；Task 13 正式四文件定向 48/48；`cd admin-web && npm test` 通过（38 文件，405/405）；`npm run build` 成功（2372 modules transformed，仅既有 chunk-size warning）；`git diff --check`、8 文件白名单、U+FFFD/C0/DEL、CSS 禁项、API/依赖/二维码 helper 零差异、路由仅两条 meta 删除及业务 handler/payload/读取参数敏感检查全部通过。待使用固定提交信息 `样式：升级服务资源集合页` 精确提交。
+
+## 2026-07-17 07:42 +0800
+- 进度：Task 13 PageHeader 移除后的死字段清理取得严格 RED。紧凑工作区测试新增 `pageTitle/pageSubtitle` 不得残留契约，当前 TvApp 单文件测试精确 1 项失败，证明两组客户端元数据各残留两个只供旧 PageHeader 使用、现已无消费者的字段。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/tvAppManagePage.spec.js`、`plan.md`；`TvAppManage.vue` 四行字段尚未删除，pre-existing `shortLabel` 与其它客户端元数据不动。
+- 验证：`cd admin-web && npm test -- src/views/tvAppManagePage.spec.js` 按预期退出 1（1 failed / 8 passed），失败命中 `pageTitle:` 残留，无其它契约失败。
+
+## 2026-07-17 07:41 +0800
+- 进度：Task 13 首次读取失败可恢复性完成最小模板修复并取得 GREEN。IPTV 来源文件/URL 区与 TvApp 二维码/上传区移到无缓存 skeleton 和数据错误 gate 之外；MetricStrip、频道预览与发布记录仍留在 gate 内，因此首次失败可继续上传/配置或扫码，且不会把读取失败伪装成零指标/真正空态。两页脚本、handler、payload 和请求未改。
+- 影响文件：本轮只重排 `IPTVManage.vue`、`TvAppManage.vue` 模板并更新两项静态契约、`CONTEXT.md`、`plan.md`；API、依赖、二维码 helper、路由和 Task 14 不变。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js` 通过（2 文件，35/35），完成本轮精确 2 RED → 35 GREEN；待重新执行正式四文件、全量测试、生产构建和全部静态门禁，旧验证不复用作最终证据。
+
+## 2026-07-17 07:39 +0800
+- 进度：Task 13 提交前自查确认首次读取失败的可恢复性缺口，并完成补充 RED。现有顶层错误 gate 会连同 IPTV 来源文件/URL 命令面以及 TvApp 二维码/上传命令面一起隐藏；新增契约要求这些独立命令面位于无缓存 skeleton 与数据错误 gate 之外，仅 MetricStrip 和频道/发布列表受 gate 保护，且错误时仍不得显示伪空态。
+- 影响文件：本轮 RED 只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js`、`plan.md`；两页生产模板尚未重排，handler、payload、API、二维码 helper 与路由均未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js` 按预期退出 1（2 文件，各精确 1 项失败，其余 33 项通过）；失败分别证明 IPTV 来源标题和 TvApp 上传标题都位于 skeleton 之后，正是独立命令面被 gate 隐藏的缺失行为。
+
+## 2026-07-17 07:36 +0800
+- 进度：Task 13 完成最小实现并取得初步 GREEN。两页移除自身 PageHeader/StatCard，接入 Layout header-actions、compact、MetricStrip、StatusIndicator；IPTV 保留来源/频道命令并增加缓存友好的行内错误与骨架，安装包页保留客户端/筛选/二维码/上传/下载语义并把四个发布动作收进文字“更多操作”菜单。路由只移除 `/iptv` 与 `/tv-app` 的兼容 meta，rollout 精确为 11 migrated / 6 pending。
+- 影响文件：修改两页 SFC、rollout/TvApp/router 三个测试、router、`CONTEXT.md`、`plan.md`，并计划写入忽略报告；不修改 API、依赖、权限、数据库、二维码 helper、路由目标或 Task 14。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js src/router/index.spec.js` 通过（3 文件，44/44）；静态自查确认 IPTV 上传/URL 保存/远程拉取及 TvApp 客户端切换、查询参数、二维码 origin、上传后第一页、发布确认和下载 URL 调用仍在原 handler。待执行含 QR 的正式四文件定向、全量测试、生产构建及所有静态门禁。
+
+## 2026-07-17 07:32 +0800
+- 进度：Task 13 服务资源页测试取得严格 RED；此时只修改 rollout、TvApp 页面、router 三个测试与 `plan.md`，两页生产 SFC 和路由尚未修改。两文件定向测试精确 9 项失败，命中两页缺少 compact/header-actions、MetricStrip、集合错误/骨架状态、IPTV 状态指示器/紧凑区块，以及 TvApp 状态指示器/更多操作菜单；其余 26 项通过。router 定向精确 1 项失败，命中 `/iptv`、`/tv-app` 仍保留兼容 meta。
+- 影响文件：RED 阶段仅修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js`、`admin-web/src/router/index.spec.js`、`plan.md`；未修改生产 SFC、API、依赖、二维码 helper、业务 handler/payload 或 `CONTEXT.md`。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js` 按预期退出 1（2 文件，9 failed / 26 passed）；`npm test -- src/router/index.spec.js` 按预期退出 1（1 failed / 8 passed），失败均由缺失迁移行为导致，无测试语法或 SFC 编译错误。
+
+## 2026-07-17 07:28 +0800
+- 进度：开始实施 Precision Ops Task 13，迁移 IPTV 与安装包服务资源集合页。严格先扩 rollout、TvApp 页面及路由静态契约并观察缺失行为 RED，再最小接入壳层页头动作、compact 密度、MetricStrip、StatusIndicator，以及保留缓存的集合错误/骨架/真正空态；不推进 Task 14。
+- 影响文件：计划修改 `admin-web/src/views/IPTVManage.vue`、`TvAppManage.vue`、`tvAppManagePage.spec.js`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`index.spec.js`、`CONTEXT.md`、`plan.md`，并写入忽略证据 `.superpowers/sdd/task-13-report.md`；不修改 API、依赖、权限、数据库、路由目标、二维码 helper 或既有业务 handler/payload。
+- 验证：待执行 Task 13 两文件 RED、四文件定向 GREEN、`cd admin-web && npm test`、`npm run build`、`git diff --check`、UTF-8 U+FFFD/C0/DEL、文件白名单及 API/依赖/路由/业务 handler 敏感范围检查；构建只接受既有 chunk-size warning。
+
 ## 2026-07-17 07:22 +0800
 - 进度：Task 12 最终独立复审通过，Spec compliant、Task quality Approved，Critical 0、Important 0、Minor 0。复审确认上轮 52px 队列媒体行、动态 `aria-current` + 可见图标形状和图片合集无效 `loaded` 三项均已闭合，未破坏队列业务、图片合集加载状态、Task 11 契约、Drawer 或响应式行为；已在 SDD 忽略账本标记 Task 12 完成，下一步进入 Task 13。
 - 影响文件：本次 tracked 只追加 `plan.md`；`.superpowers/sdd/progress.md`、`task-12-report.md` 与最终 `review-8a5ac97..a04e882.diff` 继续作为忽略证据。不修改生产代码、测试、`CONTEXT.md`、API、路由、依赖、Go 或 Android。

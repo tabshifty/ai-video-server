@@ -2,15 +2,16 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import QRCode from 'qrcode'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Refresh, UploadFilled } from '@element-plus/icons-vue'
+import { Download, MoreFilled, Refresh, UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
-import Toolbar from '../components/base/Toolbar.vue'
-import SectionCard from '../components/base/SectionCard.vue'
-import StatCard from '../components/base/StatCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import MetricStrip from '../components/base/MetricStrip.vue'
+import SectionCard from '../components/base/SectionCard.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
+import Toolbar from '../components/base/Toolbar.vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
+import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'
 import { buildTVAppDownloadPageURL, getTVAppDownloadQRCodeTitle } from './tvAppManage.qr'
 import {
   deleteAdminTVAppReleaseDraft,
@@ -32,8 +33,6 @@ const CLIENTS = {
     uploadTip: '仅接收 Release APK，自动按 ABI 建档或补包。',
     emptyTitle: '暂无 TV 发布记录',
     emptyDesc: '先上传一个 APK 创建首条记录。',
-    pageTitle: '安装包管理',
-    pageSubtitle: '同一套分发模型，按客户端类型分轨管理手机端与 TV 端安装包。'
   },
   android_phone: {
     label: '手机端',
@@ -43,13 +42,12 @@ const CLIENTS = {
     uploadTip: '仅接收 Release APK，上传首个 APK 会自动建档。',
     emptyTitle: '暂无手机端发布记录',
     emptyDesc: '先上传一个 APK 创建首条记录。',
-    pageTitle: '安装包管理',
-    pageSubtitle: '同一套分发模型，按客户端类型分轨管理手机端与 TV 端安装包。'
   }
 }
 
 const clientType = ref('android_tv')
-const loading = ref(false)
+const loading = ref(true)
+const loadError = ref('')
 const uploadLoading = ref(false)
 const savingId = ref(0)
 const actionId = ref(0)
@@ -73,12 +71,26 @@ const data = reactive({
 const clientMeta = computed(() => CLIENTS[clientType.value] || CLIENTS.android_tv)
 const downloadQRCodeTitle = computed(() => getTVAppDownloadQRCodeTitle(clientType.value))
 const visibleCount = computed(() => data.items.filter((item) => item.visible_to_family).length)
-const draftCount = computed(() => data.items.filter((item) => item.publish_status === 'draft').length)
 const latestItem = computed(() => data.items.find((item) => item.latest_recommended) || null)
 const missingCount = computed(() => {
   if (clientMeta.value.supportsAbi) return data.items.filter((item) => !item.abi_complete).length
   return data.items.filter((item) => item.publish_status === 'draft').length
 })
+const initialLoading = computed(() => shouldShowCrudCollectionSkeleton({
+  loading: loading.value,
+  rowCount: data.items.length
+}))
+const summaryMetrics = computed(() => [
+  { key: 'total', label: '记录总数', value: data.total_count, scope: '当前筛选·全部页' },
+  { key: 'visible', label: '家庭可见', value: visibleCount.value, scope: '当前页' },
+  {
+    key: 'incomplete',
+    label: clientMeta.value.supportsAbi ? '缺少 ABI' : '草稿',
+    value: missingCount.value,
+    scope: '当前页'
+  },
+  { key: 'recommended', label: '推荐版本', value: latestItem.value ? `${latestItem.value.version_name} (${latestItem.value.version_code})` : '暂无', scope: '当前页' }
+])
 
 function extractErrorMessage(error, fallback) {
   const responseMsg = error?.response?.data?.msg
@@ -118,16 +130,16 @@ function statusText(status) {
   return status || '--'
 }
 
-function statusTagType(status) {
+function statusTone(status) {
   if (!clientMeta.value.supportsAbi) {
     if (status === 'published_complete') return 'success'
     if (status === 'offline') return 'info'
-    return ''
+    return 'neutral'
   }
   if (status === 'published_complete') return 'success'
   if (status === 'published_missing_abi') return 'warning'
   if (status === 'offline') return 'info'
-  return ''
+  return 'neutral'
 }
 
 function abiLine(item) {
@@ -157,6 +169,7 @@ function applyResult(result) {
 }
 
 async function load() {
+  loadError.value = ''
   loading.value = true
   try {
     const params = {
@@ -170,7 +183,7 @@ async function load() {
     if (query.abi_completeness && clientMeta.value.supportsAbi) params.abi_completeness = query.abi_completeness
     applyResult(await getAdminTVAppReleases(params))
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '加载安装包列表失败'))
+    loadError.value = extractErrorMessage(error, '加载安装包列表失败')
   } finally {
     loading.value = false
   }
@@ -324,14 +337,13 @@ onMounted(() => {
 
 <template>
   <Layout>
-    <div class="page-shell app-package-page">
-      <PageHeader :title="clientMeta.pageTitle" :subtitle="clientMeta.pageSubtitle">
-        <template #actions>
-          <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
-        </template>
-      </PageHeader>
+    <template #header-actions>
+      <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
+      <el-button type="primary" :icon="UploadFilled" :loading="uploadLoading" @click="uploadAPK(false)">上传 APK</el-button>
+    </template>
 
-      <Toolbar>
+    <div class="page-shell app-package-page" data-density="compact">
+      <Toolbar dense>
         <template #filters>
           <el-segmented :model-value="clientType" :options="[
             { label: 'TV 端', value: 'android_tv' },
@@ -352,26 +364,20 @@ onMounted(() => {
           </el-select>
           <el-switch v-model="query.current_published" active-text="只看家庭可见" inactive-text="查看全部" @change="load" />
         </template>
-        <template #actions>
-          <el-button type="primary" :icon="UploadFilled" :loading="uploadLoading" @click="uploadAPK(false)">上传 APK</el-button>
-        </template>
       </Toolbar>
 
-      <section class="stat-grid">
-        <StatCard :label="clientMeta.supportsAbi ? '当前可见记录' : '当前可见记录'" :value="visibleCount" />
-        <StatCard :label="clientMeta.supportsAbi ? '缺少 ABI' : '草稿'" :value="missingCount" />
-        <StatCard label="草稿" :value="draftCount" />
-        <StatCard label="推荐版本" :value="latestItem ? `${latestItem.version_name} (${latestItem.version_code})` : '暂无'" />
-      </section>
+      <el-alert v-if="loadError" type="error" :closable="false" :title="loadError">
+        <template #default><el-button link type="primary" @click="load">重试</el-button></template>
+      </el-alert>
 
-      <SectionCard>
+      <SectionCard dense>
         <template #title>{{ downloadQRCodeTitle }}</template>
         <div class="download-qr-card">
           <img v-if="downloadQRCodeDataURL" class="download-qr-image" :src="downloadQRCodeDataURL" :alt="downloadQRCodeTitle">
         </div>
       </SectionCard>
 
-      <SectionCard>
+      <SectionCard dense>
         <template #title>上传 APK</template>
         <template #description>{{ clientMeta.packageName }} · {{ clientMeta.uploadTip }}</template>
         <div class="upload-panel">
@@ -400,133 +406,134 @@ onMounted(() => {
         </div>
       </SectionCard>
 
-      <SectionCard>
-        <template #title>发布记录</template>
-        <template #description>{{ clientMeta.supportsAbi ? '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态、版本和 ABI 完整性叠加筛选。' : '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态和版本筛选。' }}</template>
-        <EmptyState v-if="!data.total_count" :title="clientMeta.emptyTitle" :description="clientMeta.emptyDesc" />
-        <template v-else>
-          <div class="table-wrap">
-            <el-table v-loading="loading" :data="data.items" border row-key="id">
-              <el-table-column label="版本" min-width="220">
-                <template #default="{ row }">
-                  <div class="version-cell">
-                    <div class="version-main">
-                      <strong>{{ row.version_name }}</strong>
-                      <span>({{ row.version_code }})</span>
-                      <el-tag v-if="row.latest_recommended" size="small" type="success">推荐</el-tag>
-                    </div>
-                    <div class="version-sub">{{ statusText(row.publish_status) }}</div>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column label="安装包状态" min-width="280">
-                <template #default="{ row }">
-                  <el-tag :type="statusTagType(row.publish_status)" effect="plain">{{ statusText(row.publish_status) }}</el-tag>
-                  <div class="abi-line">{{ abiLine(row) }}</div>
-                  <div v-if="clientMeta.supportsAbi" class="abi-size">
-                    <span v-for="abi in row.abi_items" :key="abi.id">{{ abi.abi }} {{ formatBytes(abi.file_size) }}</span>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column label="版本说明" min-width="320">
-                <template #default="{ row }">
-                  <el-input
-                    v-model="row.draft.release_notes"
-                    type="textarea"
-                    :rows="2"
-                    resize="none"
-                    placeholder="给家庭成员看的简短版本说明"
-                  />
-                  <el-input
-                    v-model="row.draft.remarks"
-                    class="remark-input"
-                    placeholder="备注（仅管理端）"
-                  />
-                  <div class="inline-actions">
-                    <el-button size="small" :loading="savingId === row.id" @click="saveNotes(row)">保存说明</el-button>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column label="时间" min-width="220">
-                <template #default="{ row }">
-                  <div>上传：{{ formatDateTime(row.original_uploaded_at) }}</div>
-                  <div>发布：{{ formatDateTime(row.published_at) }}</div>
-                  <div>状态变更：{{ formatDateTime(row.last_status_changed_at) }}</div>
-                </template>
-              </el-table-column>
-              <el-table-column label="下载" min-width="220">
-                <template #default="{ row }">
-                  <div v-if="row.abi_items?.length" class="download-list">
-                    <a
-                      v-for="abi in row.abi_items"
-                      :key="abi.id"
-                      class="download-link"
-                      :href="downloadHref(row, abi.abi)"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <el-icon><Download /></el-icon>
-                      {{ clientMeta.supportsAbi ? `下载 ${abi.abi}` : '下载 APK' }}
-                    </a>
-                  </div>
-                  <span v-else>暂无可下载 APK</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="240" fixed="right">
-                <template #default="{ row }">
-                  <div class="action-stack">
-                    <el-button
-                      v-if="row.publish_status === 'draft'"
-                      size="small"
-                      type="primary"
-                      :loading="actionId === row.id"
-                      @click="confirmAction(row, 'publish')"
-                    >
-                      发布
-                    </el-button>
-                    <el-button
-                      v-if="row.publish_status === 'published_complete' || row.publish_status === 'published_missing_abi'"
-                      size="small"
-                      :loading="actionId === row.id"
-                      @click="confirmAction(row, 'offline')"
-                    >
-                      下线
-                    </el-button>
-                    <el-button
-                      v-if="row.publish_status === 'offline'"
-                      size="small"
-                      :loading="actionId === row.id"
-                      @click="confirmAction(row, 'restore')"
-                    >
-                      恢复发布
-                    </el-button>
-                    <el-button
-                      v-if="row.publish_status === 'draft'"
-                      size="small"
-                      type="danger"
-                      :loading="actionId === row.id"
-                      @click="confirmAction(row, 'delete')"
-                    >
-                      删除草稿
-                    </el-button>
-                  </div>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+      <el-skeleton v-if="initialLoading" :rows="8" animated />
 
-          <div class="toolbar-row toolbar-row--end">
-            <AdminTablePagination
-              v-model:current-page="query.page"
-              v-model:page-size="query.page_size"
-              layout="total, prev, pager, next"
-              :total="data.total_count"
-              @current-change="load"
-              @size-change="load"
-            />
-          </div>
-        </template>
-      </SectionCard>
+      <template v-else-if="!loadError || data.items.length > 0">
+        <MetricStrip :items="summaryMetrics" aria-label="安装包摘要" />
+
+        <SectionCard dense>
+          <template #title>发布记录</template>
+          <template #description>{{ clientMeta.supportsAbi ? '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态、版本和 ABI 完整性叠加筛选。' : '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态和版本筛选。' }}</template>
+          <EmptyState v-if="data.items.length === 0" :title="clientMeta.emptyTitle" :description="clientMeta.emptyDesc" />
+          <template v-else>
+            <div class="table-wrap">
+              <el-table v-loading="loading" class="package-table" :data="data.items" border row-key="id">
+                <el-table-column label="版本" min-width="220">
+                  <template #default="{ row }">
+                    <div class="version-cell">
+                      <div class="version-main">
+                        <strong>{{ row.version_name }}</strong>
+                        <span>({{ row.version_code }})</span>
+                        <el-tag v-if="row.latest_recommended" size="small" type="success">推荐</el-tag>
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="安装包状态" min-width="280">
+                  <template #default="{ row }">
+                    <StatusIndicator :label="statusText(row.publish_status)" :tone="statusTone(row.publish_status)" />
+                    <div class="abi-line">{{ abiLine(row) }}</div>
+                    <div v-if="clientMeta.supportsAbi" class="abi-size">
+                      <span v-for="abi in row.abi_items" :key="abi.id">{{ abi.abi }} {{ formatBytes(abi.file_size) }}</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="版本说明" min-width="320">
+                  <template #default="{ row }">
+                    <el-input
+                      v-model="row.draft.release_notes"
+                      type="textarea"
+                      :rows="2"
+                      resize="none"
+                      placeholder="给家庭成员看的简短版本说明"
+                    />
+                    <el-input
+                      v-model="row.draft.remarks"
+                      class="remark-input"
+                      placeholder="备注（仅管理端）"
+                    />
+                    <div class="inline-actions">
+                      <el-button size="small" :loading="savingId === row.id" @click="saveNotes(row)">保存说明</el-button>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="时间" min-width="220">
+                  <template #default="{ row }">
+                    <div>上传：{{ formatDateTime(row.original_uploaded_at) }}</div>
+                    <div>发布：{{ formatDateTime(row.published_at) }}</div>
+                    <div>状态变更：{{ formatDateTime(row.last_status_changed_at) }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="下载" min-width="220">
+                  <template #default="{ row }">
+                    <div v-if="row.abi_items?.length" class="download-list">
+                      <a
+                        v-for="abi in row.abi_items"
+                        :key="abi.id"
+                        class="download-link"
+                        :href="downloadHref(row, abi.abi)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <el-icon><Download /></el-icon>
+                        {{ clientMeta.supportsAbi ? `下载 ${abi.abi}` : '下载 APK' }}
+                      </a>
+                    </div>
+                    <span v-else>暂无可下载 APK</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="132" fixed="right">
+                  <template #default="{ row }">
+                    <el-dropdown trigger="click">
+                      <el-button :icon="MoreFilled" size="small" :loading="actionId === row.id">更多操作</el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item
+                            v-if="row.publish_status === 'draft'"
+                            @click="confirmAction(row, 'publish')"
+                          >
+                            发布
+                          </el-dropdown-item>
+                          <el-dropdown-item
+                            v-if="row.publish_status === 'published_complete' || row.publish_status === 'published_missing_abi'"
+                            @click="confirmAction(row, 'offline')"
+                          >
+                            下线
+                          </el-dropdown-item>
+                          <el-dropdown-item
+                            v-if="row.publish_status === 'offline'"
+                            @click="confirmAction(row, 'restore')"
+                          >
+                            恢复发布
+                          </el-dropdown-item>
+                          <el-dropdown-item
+                            v-if="row.publish_status === 'draft'"
+                            divided
+                            @click="confirmAction(row, 'delete')"
+                          >
+                            删除草稿
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <div class="toolbar-row toolbar-row--end">
+              <AdminTablePagination
+                v-model:current-page="query.page"
+                v-model:page-size="query.page_size"
+                layout="total, prev, pager, next"
+                :total="data.total_count"
+                @current-change="load"
+                @size-change="load"
+              />
+            </div>
+          </template>
+        </SectionCard>
+      </template>
     </div>
   </Layout>
 </template>
@@ -537,15 +544,9 @@ onMounted(() => {
   gap: var(--space-4);
 }
 
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
 .upload-panel {
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .download-qr-card {
@@ -563,57 +564,59 @@ onMounted(() => {
 
 .upload-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .version-cell {
   display: grid;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .version-main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
-.version-sub,
 .abi-line,
 .abi-size,
 .remark-input {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .abi-size {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--text-caption);
 }
 
 .inline-actions {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
-.download-list,
-.action-stack {
+.download-list {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .download-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   color: var(--el-color-primary);
   text-decoration: none;
 }
 
-@media (max-width: 48rem) {
-  .stat-grid {
-    grid-template-columns: 1fr;
-  }
+.download-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.package-table :deep(.el-table__row) {
+  height: var(--table-row-height);
 }
 </style>

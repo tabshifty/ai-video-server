@@ -5,8 +5,10 @@ import CollectionManage from './CollectionManage.vue'
 import Dashboard from './Dashboard.vue'
 import ImageCollectionManage from './ImageCollectionManage.vue'
 import ImageManage from './ImageManage.vue'
+import IPTVManage from './IPTVManage.vue'
 import PendingDeleteShorts from './PendingDeleteShorts.vue'
 import TaskMonitor from './TaskMonitor.vue'
+import TvAppManage from './TvAppManage.vue'
 import UserManage from './UserManage.vue'
 import VideoList from './VideoList.vue'
 
@@ -21,15 +23,15 @@ const migratedViews = [
   { file: 'ImageCollectionManage.vue', component: 'ImageCollectionManage', density: 'compact', compiled: ImageCollectionManage },
   { file: 'ActorManage.vue', component: 'ActorManage', density: 'compact', compiled: ActorManage },
   { file: 'CollectionManage.vue', component: 'CollectionManage', density: 'compact', compiled: CollectionManage },
-  { file: 'UserManage.vue', component: 'UserManage', density: 'compact', compiled: UserManage }
+  { file: 'UserManage.vue', component: 'UserManage', density: 'compact', compiled: UserManage },
+  { file: 'IPTVManage.vue', component: 'IPTVManage', density: 'compact', compiled: IPTVManage },
+  { file: 'TvAppManage.vue', component: 'TvAppManage', density: 'compact', compiled: TvAppManage }
 ]
 const pendingShellViews = [
   'AVManualScrape.vue',
-  'IPTVManage.vue',
   'ScrapePreview.vue',
   'SystemSettings.vue',
   'Toolbox.vue',
-  'TvAppManage.vue',
   'TvSeriesManage.vue',
   'VideoUpload.vue'
 ]
@@ -108,11 +110,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('固定九个已迁移页面与 8 个兼容页面，且集合互不重叠', () => {
+  it('固定 11 个已迁移页面与 6 个兼容页面，且集合互不重叠', () => {
     const migratedFiles = migratedViews.map(({ file }) => file)
 
-    expect(migratedViews).toHaveLength(9)
-    expect(pendingShellViews).toHaveLength(8)
+    expect(migratedViews).toHaveLength(11)
+    expect(pendingShellViews).toHaveLength(6)
     expect(new Set(migratedFiles).size).toBe(migratedFiles.length)
     expect(new Set(pendingShellViews).size).toBe(pendingShellViews.length)
     expect(migratedFiles.filter((file) => pendingShellViews.includes(file))).toEqual([])
@@ -131,7 +133,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     })
   })
 
-  it('8 个待迁移 shell 页面保持 PageHeader 与精确兼容 meta', () => {
+  it('6 个待迁移 shell 页面保持 PageHeader 与精确兼容 meta', () => {
     pendingShellViews.forEach((file) => {
       const component = file.replace('.vue', '')
       const template = extractTemplate(readView(file))
@@ -140,6 +142,79 @@ describe('Precision Ops 第一阶段 rollout', () => {
       expect(template, file).toContain('<PageHeader')
       expect(line, component).toMatch(exactRoutePattern(component, true))
     })
+  })
+
+  it('服务资源页使用指标条替代重复统计卡', () => {
+    for (const file of ['IPTVManage.vue', 'TvAppManage.vue']) {
+      const source = readView(file)
+
+      expect(source, file).toContain('<MetricStrip')
+      expect(source, file).not.toContain('<StatCard')
+    }
+  })
+
+  it('IPTV 区分读取失败、无缓存加载与成功空态并保留缓存频道', () => {
+    const source = readView('IPTVManage.vue')
+    const template = extractTemplate(source)
+    const load = functionBlock(source, 'async function loadPlaylist()')
+    const catchBlock = load.slice(load.indexOf('} catch (error) {'), load.indexOf('} finally {'))
+    const alertIndex = template.indexOf('<el-alert v-if="loadError"')
+    const sourceIndex = template.indexOf('<template #title>播放列表来源</template>')
+    const skeletonIndex = template.indexOf('<el-skeleton v-if="initialLoading"')
+    const contentIndex = template.indexOf('<template v-else-if="!loadError || hasChannels">')
+    const dataContent = template.slice(contentIndex)
+
+    expect(source).toContain("import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'")
+    expect(source).toContain("const loading = ref(true)")
+    expect(source).toContain("const loadError = ref('')")
+    expect(source).toMatch(
+      /const initialLoading = computed\(\(\) => shouldShowCrudCollectionSkeleton\(\{\s*loading: loading\.value,\s*rowCount: channels\.value\.length\s*\}\)\)/
+    )
+    expect(load.indexOf("loadError.value = ''")).toBeGreaterThanOrEqual(0)
+    expect(load.indexOf("loadError.value = ''")).toBeLessThan(load.indexOf('try {'))
+    expect(catchBlock).toContain("loadError.value = extractErrorMessage(error, '加载 IPTV 状态失败')")
+    expect(catchBlock).not.toContain('applyPlaylist(')
+    expect(catchBlock).not.toContain('ElMessage.error')
+    expect(alertIndex).toBeGreaterThanOrEqual(0)
+    expect(sourceIndex).toBeGreaterThan(alertIndex)
+    expect(sourceIndex).toBeLessThan(skeletonIndex)
+    expect(skeletonIndex).toBeGreaterThan(alertIndex)
+    expect(contentIndex).toBeGreaterThan(skeletonIndex)
+    expect(dataContent).toContain('<MetricStrip :items="stats" aria-label="IPTV 摘要" />')
+    expect(dataContent).toContain('<template #title>频道预览</template>')
+    expect(dataContent).not.toContain('<template #title>播放列表来源</template>')
+    expect(dataContent).toContain('v-if="!hasChannels"')
+  })
+
+  it('IPTV 保留来源与频道预览命令并使用紧凑无阴影区块', () => {
+    const source = readView('IPTVManage.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const sourcePanelRule = style.match(/\.source-panel\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(source).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
+    expect(template).toContain('<template #header-actions>')
+    expect(template).toContain('<Toolbar dense>')
+    expect(template).toContain(':label="`最后更新时间：${updatedAtText}`"')
+    expect(template).toContain('@click="refreshPlaylist">远程拉取</el-button>')
+    expect(template).toContain('@click="uploadPlaylist">上传 M3U</el-button>')
+    expect(template).toContain('@click="saveSourceUrl">保存 URL</el-button>')
+    expect(template).toContain('label="播放地址" min-width="260" show-overflow-tooltip')
+    expect(template.match(/<article class="source-panel">/g)).toHaveLength(2)
+    expect(sourcePanelRule).toContain('border-radius: var(--radius-md);')
+    expect(sourcePanelRule).not.toContain('box-shadow:')
+    expect(style).toMatch(/\.channel-table\s+:deep\(\.el-table__row\)\s*\{[^}]*height:\s*var\(--table-row-height\);/s)
+  })
+
+  it('服务资源页样式只使用既有语义颜色且没有装饰性表面效果', () => {
+    for (const file of ['IPTVManage.vue', 'TvAppManage.vue']) {
+      const style = extractStyle(readView(file))
+
+      expect(style, file).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+      expect(style, file).not.toMatch(/rgba?\(\s*\d/)
+      expect(style, file).not.toMatch(/(?:linear|radial)-gradient\(/)
+      expect(style, file).not.toMatch(/border-radius:\s*(?:14|16|18)px/)
+    }
   })
 
   it('媒体复核操作保持显式并可由键盘触达', () => {

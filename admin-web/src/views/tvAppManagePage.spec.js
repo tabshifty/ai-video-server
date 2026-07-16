@@ -7,6 +7,9 @@ const queryBlock = tvAppManage.match(/const query = reactive\(\{[\s\S]*?\n\}\)/)
 const resetQueryBlock = tvAppManage.match(/function resetQuery\(\) \{[\s\S]*?\n\}/)?.[0] || ''
 const uploadAPKBlock = tvAppManage.match(/async function uploadAPK[\s\S]*?\n}\n\nasync function saveNotes/)?.[0] || ''
 const qrBlock = tvAppManage.match(/async function refreshDownloadQRCode\(\) \{[\s\S]*?\n\}/)?.[0] || ''
+const loadBlock = tvAppManage.match(/async function load\(\) \{[\s\S]*?\n\}(?=\n\nfunction resetQuery)/)?.[0] || ''
+const loadCatchBlock = loadBlock.match(/} catch \(error\) \{[\s\S]*?(?=\n  } finally \{)/)?.[0] || ''
+const template = tvAppManage.match(/<template>([\s\S]*?)<\/template>\s*\n\s*<style scoped>/)?.[1] || ''
 
 describe('TV app package management page', () => {
   it('defaults to the full release list so uploaded draft releases are visible', () => {
@@ -52,5 +55,82 @@ describe('TV app package management page', () => {
     expect(qrBlock).toContain('buildTVAppDownloadPageURL')
     expect(tvAppManage).not.toContain('download-link-address')
     expect(tvAppManage).not.toContain('打开下载页')
+  })
+
+  it('使用紧凑工作区且不丢失安装包命令', () => {
+    expect(tvAppManage).toContain('<template #header-actions>')
+    expect(tvAppManage).toContain('data-density="compact"')
+    expect(tvAppManage).not.toContain('<PageHeader')
+    expect(tvAppManage).not.toContain('pageTitle:')
+    expect(tvAppManage).not.toContain('pageSubtitle:')
+    expect(tvAppManage).toContain('@click="uploadAPK(false)"')
+    expect(tvAppManage).toContain("@click=\"confirmAction(row, 'publish')\"")
+    expect(tvAppManage).toContain("@click=\"confirmAction(row, 'offline')\"")
+    expect(tvAppManage).toContain("@click=\"confirmAction(row, 'delete')\"")
+    expect(tvAppManage).toContain('下载 APK')
+  })
+
+  it('读取失败只显示行内错误并在刷新时保留已有安装包', () => {
+    const alertIndex = template.indexOf('<el-alert v-if="loadError"')
+    const qrIndex = template.indexOf('<template #title>{{ downloadQRCodeTitle }}</template>')
+    const uploadIndex = template.indexOf('<template #title>上传 APK</template>')
+    const skeletonIndex = template.indexOf('<el-skeleton v-if="initialLoading"')
+    const contentIndex = template.indexOf('<template v-else-if="!loadError || data.items.length > 0">')
+    const dataContent = template.slice(contentIndex)
+
+    expect(tvAppManage).toContain("import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'")
+    expect(tvAppManage).toContain('const loading = ref(true)')
+    expect(tvAppManage).toContain("const loadError = ref('')")
+    expect(tvAppManage).toMatch(
+      /const initialLoading = computed\(\(\) => shouldShowCrudCollectionSkeleton\(\{\s*loading: loading\.value,\s*rowCount: data\.items\.length\s*\}\)\)/
+    )
+    expect(loadBlock.indexOf("loadError.value = ''")).toBeGreaterThanOrEqual(0)
+    expect(loadBlock.indexOf("loadError.value = ''")).toBeLessThan(loadBlock.indexOf('try {'))
+    expect(loadCatchBlock).toContain("loadError.value = extractErrorMessage(error, '加载安装包列表失败')")
+    expect(loadCatchBlock).not.toContain('applyResult(')
+    expect(loadCatchBlock).not.toContain('data.items')
+    expect(loadCatchBlock).not.toContain('data.total_count')
+    expect(loadCatchBlock).not.toContain('ElMessage.error')
+    expect(alertIndex).toBeGreaterThanOrEqual(0)
+    expect(qrIndex).toBeGreaterThan(alertIndex)
+    expect(uploadIndex).toBeGreaterThan(qrIndex)
+    expect(uploadIndex).toBeLessThan(skeletonIndex)
+    expect(skeletonIndex).toBeGreaterThan(alertIndex)
+    expect(contentIndex).toBeGreaterThan(skeletonIndex)
+    expect(dataContent).toContain('<MetricStrip :items="summaryMetrics" aria-label="安装包摘要" />')
+    expect(dataContent).toContain('<template #title>发布记录</template>')
+    expect(dataContent).not.toContain('<template #title>{{ downloadQRCodeTitle }}</template>')
+    expect(dataContent).not.toContain('<template #title>上传 APK</template>')
+    expect(dataContent).toContain('<EmptyState v-if="data.items.length === 0"')
+  })
+
+  it('摘要只展示既有事实并逐项标明当前筛选或当前页口径', () => {
+    expect(tvAppManage).toContain("import MetricStrip from '../components/base/MetricStrip.vue'")
+    expect(tvAppManage).toContain('<MetricStrip :items="summaryMetrics" aria-label="安装包摘要" />')
+    expect(tvAppManage).toContain("{ key: 'total', label: '记录总数', value: data.total_count, scope: '当前筛选·全部页' }")
+    expect(tvAppManage).toContain("{ key: 'visible', label: '家庭可见', value: visibleCount.value, scope: '当前页' }")
+    expect(tvAppManage).toContain("scope: '当前页'")
+    expect(tvAppManage).toContain("{ key: 'recommended', label: '推荐版本', value: latestItem.value ? `${latestItem.value.version_name} (${latestItem.value.version_code})` : '暂无', scope: '当前页' }")
+    expect(tvAppManage).not.toContain('健康度')
+    expect(tvAppManage).not.toContain('告警')
+  })
+
+  it('状态有文字且四项发布命令进入更多操作菜单', () => {
+    expect(tvAppManage).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
+    expect(template).toContain('<StatusIndicator :label="statusText(row.publish_status)" :tone="statusTone(row.publish_status)" />')
+    expect(template).toContain('<el-dropdown trigger="click"')
+    expect(template).toContain('更多操作')
+    expect(template).toContain("@click=\"confirmAction(row, 'publish')\"")
+    expect(template).toContain("@click=\"confirmAction(row, 'offline')\"")
+    expect(template).toContain("@click=\"confirmAction(row, 'restore')\"")
+    expect(template).toContain("@click=\"confirmAction(row, 'delete')\"")
+    expect(template).toContain(':href="downloadHref(row, abi.abi)"')
+  })
+
+  it('替换上传仍是页面文件选择器的全局命令', () => {
+    expect(template).toContain('@click="uploadAPK(false)">上传并建档</el-button>')
+    expect(template).toContain('@click="uploadAPK(true)">替换上传</el-button>')
+    expect(tvAppManage).not.toContain('uploadAPK(row')
+    expect(uploadAPKBlock).toContain("if (replaceExisting) formData.append('replace_existing', 'true')")
   })
 })
