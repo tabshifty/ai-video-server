@@ -188,9 +188,11 @@ onMounted(loadPlaylist)
         <template #default><el-button link type="primary" @click="loadPlaylist">重试</el-button></template>
       </el-alert>
 
-      <SectionCard dense>
-        <template #title>播放列表来源</template>
-        <template #description>上传本地文件或更新远程 M3U URL</template>
+      <section class="source-section" aria-labelledby="iptv-source-title">
+        <header class="source-section__header">
+          <h2 id="iptv-source-title" class="source-section__title">播放列表来源</h2>
+          <p class="source-section__description">上传本地文件或更新远程 M3U URL</p>
+        </header>
         <div class="source-grid">
           <article class="source-panel">
             <div class="source-panel__title">本地 M3U 文件</div>
@@ -229,7 +231,7 @@ onMounted(loadPlaylist)
             </el-form>
           </article>
         </div>
-      </SectionCard>
+      </section>
 
       <el-skeleton v-if="initialLoading" :rows="8" animated />
 
@@ -281,6 +283,36 @@ onMounted(loadPlaylist)
 .iptv-page {
   display: grid;
   gap: var(--space-4);
+}
+
+.source-section {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.source-section__header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.source-section__title,
+.source-section__description {
+  margin: 0;
+}
+
+.source-section__title {
+  color: var(--text-primary);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: 600;
+}
+
+.source-section__description {
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
 }
 
 .source-grid {

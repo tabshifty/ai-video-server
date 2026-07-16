@@ -159,7 +159,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     const load = functionBlock(source, 'async function loadPlaylist()')
     const catchBlock = load.slice(load.indexOf('} catch (error) {'), load.indexOf('} finally {'))
     const alertIndex = template.indexOf('<el-alert v-if="loadError"')
-    const sourceIndex = template.indexOf('<template #title>播放列表来源</template>')
+    const sourceIndex = template.indexOf('播放列表来源')
     const skeletonIndex = template.indexOf('<el-skeleton v-if="initialLoading"')
     const contentIndex = template.indexOf('<template v-else-if="!loadError || hasChannels">')
     const dataContent = template.slice(contentIndex)
@@ -190,6 +190,9 @@ describe('Precision Ops 第一阶段 rollout', () => {
     const source = readView('IPTVManage.vue')
     const template = extractTemplate(source)
     const style = extractStyle(source)
+    const sourceSection = template.match(/<section class="source-section" aria-labelledby="iptv-source-title">[\s\S]*?<\/section>/)?.[0] || ''
+    const sourceSectionRule = style.match(/\.source-section\s*\{[^}]*\}/s)?.[0] || ''
+    const sourceTitleRule = style.match(/\.source-section__title\s*\{[^}]*\}/s)?.[0] || ''
     const sourcePanelRule = style.match(/\.source-panel\s*\{[^}]*\}/s)?.[0] || ''
 
     expect(source).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
@@ -200,7 +203,13 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(template).toContain('@click="uploadPlaylist">上传 M3U</el-button>')
     expect(template).toContain('@click="saveSourceUrl">保存 URL</el-button>')
     expect(template).toContain('label="播放地址" min-width="260" show-overflow-tooltip')
-    expect(template.match(/<article class="source-panel">/g)).toHaveLength(2)
+    expect(template).not.toContain('<template #title>播放列表来源</template>')
+    expect(sourceSection).toContain('<h2 id="iptv-source-title" class="source-section__title">播放列表来源</h2>')
+    expect(sourceSection.match(/<article class="source-panel">/g)).toHaveLength(2)
+    expect(sourceSectionRule).toContain('width: 100%;')
+    expect(sourceSectionRule).not.toMatch(/(?:^|[;{]\s*)(?:border|background|box-shadow)\s*:/)
+    expect(sourceTitleRule).toContain('font-size: var(--text-h2);')
+    expect(sourceTitleRule).toContain('line-height: var(--leading-h2);')
     expect(sourcePanelRule).toContain('border-radius: var(--radius-md);')
     expect(sourcePanelRule).not.toContain('box-shadow:')
     expect(style).toMatch(/\.channel-table\s+:deep\(\.el-table__row\)\s*\{[^}]*height:\s*var\(--table-row-height\);/s)

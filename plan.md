@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 07:56 +0800
+- 进度：Task 13 IPTV 来源区嵌套卡片视觉问题完成提交前自审与验证。新语义 section 与 h2 关联正确，外层没有边框/背景/阴影，两个工具面板是唯一内层表面；最新 Web Interface Guidelines 审查未发现本次差异新增的可访问性、焦点、交互或内容层级问题，无阻塞 concern。
+- 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/IPTVManage.vue`、`precisionOpsRollout.spec.js` 共 4 个 tracked 文件；忽略报告在提交后追加最终 SHA。TvApp、API、路由、依赖、二维码 helper 与 IPTV script 不纳入也无差异。
+- 验证：rollout 完成精确 1 RED / 25 pass → 26/26 GREEN；Task 13 四文件定向 48/48；`cd admin-web && npm test` 通过（38 文件，405/405）；`npm run build` 成功（2372 modules transformed，仅既有 chunk-size warning）；`git diff --check`、4 文件白名单、U+FFFD/C0/DEL、CSS/无框外层、IPTV script/来源内部节点/频道预览零差异及 TvApp/API/路由/依赖/二维码 helper 零差异检查全部通过。待使用提交信息 `修复：移除 IPTV 嵌套卡片` 精确提交。
+
+## 2026-07-17 07:54 +0800
+- 进度：Task 13 IPTV 来源区卡片嵌套完成最小修复并取得 GREEN。外层 `SectionCard` 替换为 `section.source-section[aria-labelledby="iptv-source-title"]`，使用关联 h2 与原说明；外层只负责全宽 grid/间距和标题排版，没有 border/background/box-shadow，两个 `.source-panel` 仍是唯一并列工具表面，频道预览 SectionCard 不变。
+- 影响文件：修改 `IPTVManage.vue` 模板/CSS、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，并计划追加忽略报告；IPTV script、内部上传/URL 节点、TvApp、API、路由和依赖未改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 通过（1 文件，26/26），完成精确 1 RED → 26 GREEN；待执行 Task 13 四文件、管理端全量、生产构建和全部静态/敏感范围门禁。
+
+## 2026-07-17 07:53 +0800
+- 进度：Task 13 IPTV 来源区无嵌套卡片契约取得严格 RED；此时只修改 rollout 测试与 `plan.md`，生产模板/CSS 尚未修改。测试要求来源外壳为 `section.source-section[aria-labelledby="iptv-source-title"]`，包含关联 h2 和两个原工具面板，且外壳 CSS 无 border/background/box-shadow。
+- 影响文件：RED 阶段仅修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`；`IPTVManage.vue`、`CONTEXT.md`、TvApp、API、路由与依赖均未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 按预期退出 1（1 failed / 25 passed）；唯一失败精确命中旧 `<template #title>播放列表来源</template>` 仍存在于 SectionCard，真实 SFC 编译与其余 25 项契约均通过。
+
+## 2026-07-17 07:52 +0800
+- 进度：Task 13 主线程视觉验收发现 IPTV 来源区存在卡片嵌套：共享 `SectionCard` 自带边框、surface 背景和圆角，内部两个 `.source-panel` 又各自带边框与背景，违反“卡片内不再嵌卡片”及“两个并列无阴影 section”边界。严格先补无框语义 section 契约并观察 RED，再仅替换来源区外壳；频道 SectionCard 与所有脚本/handler/payload 保持不变。
+- 影响文件：计划修改 `admin-web/src/views/IPTVManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，并追加忽略报告 `.superpowers/sdd/task-13-report.md`；不修改 `TvAppManage.vue`、API、路由、依赖或 IPTV script。
+- 验证：待执行 rollout 精确 RED、Task 13 四文件定向、`cd admin-web && npm test`、`npm run build`、`git diff --check`、4 文件白名单、U+FFFD/C0/DEL、CSS 禁项以及 TvApp/API/路由/依赖/IPTV script 零差异敏感检查。
+
 ## 2026-07-17 07:45 +0800
 - 进度：Task 13 完成提交前最终自审与验证。PageHeader 移除后两组 `pageTitle/pageSubtitle` 四行死字段已按单项 RED→GREEN 精确删除，pre-existing `shortLabel` 保留。首次读取失败时独立来源/二维码/上传命令面继续可用，数据 gate 内不显示伪指标或伪空态；两页 compact、指标口径、状态文字、下载常驻、更多操作与业务 handler 边界均符合 brief，无阻塞 concern。
 - 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/router/index.js`、`index.spec.js`、`views/IPTVManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js` 共 8 个 tracked 文件；忽略报告 `.superpowers/sdd/task-13-report.md` 在提交后写入最终 SHA，`admin-web/dist/` 不纳入提交。
