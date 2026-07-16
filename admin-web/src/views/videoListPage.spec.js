@@ -70,12 +70,85 @@ function ownsSnapshotApplyOrder(sourceText) {
     'query.page = 1',
     'columnVisibility.value = [...next.columns]',
     'persistColumns()',
-    'clearSelection()'
+    'resetQueryIdentity()'
   ]
   const indexes = tokens.map((token) => block.body.indexOf(token))
 
   return indexes.every((index) => index >= 0)
     && indexes.every((index, position) => position === 0 || indexes[position - 1] < index)
+}
+
+function resetsBeforeLoad(sourceText, openingPattern) {
+  const block = extractBalancedBraceBlock(sourceText, openingPattern)
+  if (!block) return false
+
+  const resetIndex = block.body.indexOf('resetQueryIdentity()')
+  const loadIndex = block.body.indexOf('load()')
+  return resetIndex >= 0 && loadIndex > resetIndex
+}
+
+function latestRequestOwnsState(sourceText) {
+  const block = extractBalancedBraceBlock(sourceText, /async function load\(\)\s*\{/)
+  if (!block) return false
+  const body = block.body
+  const requestIndex = body.indexOf('const data = await getAdminVideos(query)')
+  const catchMatch = body.match(/catch\s*\(error\)\s*\{/)
+  if (!body.includes('const seq = ++loadSeq') || requestIndex < 0 || !catchMatch || catchMatch.index === undefined) return false
+
+  const successSource = body.slice(requestIndex, catchMatch.index)
+  const successGuard = extractBalancedBraceBlock(successSource, /if\s*\(seq !== loadSeq\)\s*\{/)
+  if (!successGuard || successGuard.body.trim() !== 'return null') return false
+  const successTail = successSource.slice(successGuard.closeBraceIndex + 1)
+  if (!['list.value = data.items || []', 'total.value = data.total_count || 0', "listError.value = ''", 'clearSelection()', 'return true']
+    .every((token) => successTail.includes(token))) return false
+
+  const catchBlock = extractBalancedBraceBlock(body, /catch\s*\(error\)\s*\{/)
+  const catchGuard = catchBlock
+    ? extractBalancedBraceBlock(catchBlock.body, /if\s*\(seq !== loadSeq\)\s*\{/)
+    : null
+  if (!catchBlock || !catchGuard || catchGuard.body.trim() !== 'return null') return false
+  const catchTail = catchBlock.body.slice(catchGuard.closeBraceIndex + 1)
+  if (!catchTail.includes("listError.value = error?.message || '加载视频列表失败'") || !catchTail.includes('return false')) return false
+  if (/list\.value\s*=|total\.value\s*=|clearSelection\(\)/.test(catchTail)) return false
+
+  const finallyBlock = extractBalancedBraceBlock(body, /finally\s*\{/)
+  const ownerGuard = finallyBlock
+    ? extractBalancedBraceBlock(finallyBlock.body, /if\s*\(seq === loadSeq\)\s*\{/)
+    : null
+  if (!finallyBlock || !ownerGuard || !ownerGuard.body.includes('listLoading.value = false')) return false
+  const outsideOwner = finallyBlock.body.slice(0, ownerGuard.openingIndex)
+    + finallyBlock.body.slice(ownerGuard.closeBraceIndex + 1)
+  return outsideOwner.trim() === '' && (body.match(/listLoading\.value\s*=\s*false/g) || []).length === 1
+}
+
+function handlesRowActionFailClosed(sourceText) {
+  const block = extractBalancedBraceBlock(sourceText, /function handleVideoRowAction\(command, row\)\s*\{/)
+  if (!block) return false
+
+  const retranscodeBlock = extractBalancedBraceBlock(block.body, /if\s*\(command === 'retranscode'\)\s*\{/)
+  const deleteBlock = extractBalancedBraceBlock(block.body, /if\s*\(command === 'delete'\)\s*\{/)
+  if (!retranscodeBlock || !deleteBlock) return false
+  if (!retranscodeBlock.body.includes('doRetranscode(row)') || !retranscodeBlock.body.includes('return true')) return false
+  if (!deleteBlock.body.includes('doDelete(row)') || !deleteBlock.body.includes('return true')) return false
+
+  const tail = block.body.slice(deleteBlock.closeBraceIndex + 1)
+  return tail.includes('return false')
+    && (block.body.match(/doRetranscode\(row\)/g) || []).length === 1
+    && (block.body.match(/doDelete\(row\)/g) || []).length === 1
+}
+
+function consumesRowActionRejections(sourceText) {
+  const block = extractBalancedBraceBlock(sourceText, /function handleVideoRowAction\(command, row\)\s*\{/)
+  if (!block) return false
+
+  const retranscodeBlock = extractBalancedBraceBlock(block.body, /if\s*\(command === 'retranscode'\)\s*\{/)
+  const deleteBlock = extractBalancedBraceBlock(block.body, /if\s*\(command === 'delete'\)\s*\{/)
+  return Boolean(
+    retranscodeBlock
+    && deleteBlock
+    && /doRetranscode\(row\)\.catch\(/.test(retranscodeBlock.body)
+    && /doDelete\(row\)\.catch\(/.test(deleteBlock.body)
+  )
 }
 
 function catchClearsRows(sourceText) {
@@ -92,6 +165,8 @@ const currentSnapshotBlock = savedViewsOptions
   : null
 const loadBlock = extractBalancedBraceBlock(script, /async function load\(\)\s*\{/)
 const deleteBlock = extractBalancedBraceBlock(script, /async function doDelete\(row\)\s*\{/)
+const filterDrawer = extractElement(template, /<el-drawer\b(?=[^>]*v-model="filterDrawerVisible")[^>]*>/, '</el-drawer>')
+const paginationTag = template.match(/<AdminTablePagination\b[\s\S]*?\/>/)?.[0] || ''
 const operationsColumn = extractElement(
   template,
   /<el-table-column\b(?=[^>]*isColumnVisible\('operations'\))[^>]*>/,
@@ -108,7 +183,7 @@ describe('视频资源集合页', () => {
     expect(savedViewsOptions?.body).toContain('storageKey: SAVED_VIEWS_KEY')
     expect(savedViewsOptions?.body).toContain('builtInViews')
     expect(savedViewsOptions?.body).toContain('normalizeSnapshot:')
-    expect(savedViewsOptions?.body).toContain('refresh: load')
+    expect(savedViewsOptions?.body).toContain('refresh: refreshSavedView')
     expect(script).not.toMatch(/function\s+(?:persistUserViews|readUserViews)\b/)
     expect(script).not.toContain('selectedViewID')
     expect(script).not.toContain("from '../components/base/savedView.helpers'")
@@ -125,9 +200,9 @@ describe('视频资源集合页', () => {
   query.page = 1
   columnVisibility.value = [...next.columns]
   persistColumns()
-  clearSelection()
+  resetQueryIdentity()
 }`
-    const invalidFixture = validFixture.replace('persistColumns()\n  clearSelection()', 'clearSelection()\n  persistColumns()')
+    const invalidFixture = validFixture.replace('persistColumns()\n  resetQueryIdentity()', 'resetQueryIdentity()\n  persistColumns()')
 
     expect(ownsSnapshotApplyOrder(validFixture)).toBe(true)
     expect(ownsSnapshotApplyOrder(invalidFixture)).toBe(false)
@@ -142,6 +217,104 @@ describe('视频资源集合页', () => {
     expect(currentSnapshotBlock?.body).not.toMatch(/\bpage\b|selectedRows|detailVisible|filterDrawerVisible/)
   })
 
+  it('所有新查询身份先清旧数据并通过唯一受控入口加载', () => {
+    const validFixture = `function setPage(page) {
+  query.page = page
+  resetQueryIdentity()
+  load()
+}`
+    const unsafeFixture = validFixture.replace('resetQueryIdentity()\n  load()', 'load()\n  resetQueryIdentity()')
+    const resetBlock = extractBalancedBraceBlock(script, /function resetQueryIdentity\(\)\s*\{/)
+
+    expect(resetsBeforeLoad(validFixture, /function setPage\(page\)\s*\{/)).toBe(true)
+    expect(resetsBeforeLoad(unsafeFixture, /function setPage\(page\)\s*\{/)).toBe(false)
+    expect(resetBlock).not.toBeNull()
+    expect(resetBlock?.body).toContain('list.value = []')
+    expect(resetBlock?.body).toContain('total.value = 0')
+    expect(resetBlock?.body).toContain("listError.value = ''")
+    expect(resetBlock?.body).toContain('clearSelection()')
+    expect(ownsSnapshotApplyOrder(savedViewsOptions?.body || '')).toBe(true)
+    expect(resetsBeforeLoad(script, /function applyFilters\(\)\s*\{/)).toBe(true)
+    expect(resetsBeforeLoad(script, /function applyFilterDrawer\(\)\s*\{/)).toBe(true)
+    expect(resetsBeforeLoad(script, /function removeFilter\(key\)\s*\{/)).toBe(true)
+    expect(resetsBeforeLoad(script, /function resetFilters\(\)\s*\{/)).toBe(true)
+    expect(resetsBeforeLoad(script, /function setPage\(page\)\s*\{/)).toBe(true)
+    expect(script).toContain("const quickSearch = ref(query.q)")
+    expect(script).toContain('const filterDraft = reactive({ q: query.q, type: query.type, status: query.status })')
+    expect(template).toContain('v-model="quickSearch"')
+    expect(template).toContain('@click="openFilterDrawer"')
+    expect(filterDrawer).toContain('v-model="filterDraft.q"')
+    expect(filterDrawer).toContain('v-model="filterDraft.type"')
+    expect(filterDrawer).toContain('v-model="filterDraft.status"')
+    expect(filterDrawer).toContain('@closed="syncFilterDraftFromQuery"')
+    expect(filterDrawer).toContain('@click="applyFilterDrawer"')
+    expect(filterDrawer).not.toMatch(/v-model="query\.(?:q|type|status)"/)
+    expect(paginationTag).toContain(':current-page="query.page"')
+    expect(paginationTag).toContain(':page-size="query.page_size"')
+    expect(paginationTag).toContain('@current-change="setPage"')
+    expect(paginationTag).not.toContain('v-model:current-page')
+    expect(paginationTag).not.toContain('v-model:page-size')
+  })
+
+  it('只有最新请求可以写入列表、错误、选择和加载完成状态', () => {
+    const protectedLoad = `let loadSeq = 0
+async function load() {
+  const seq = ++loadSeq
+  listLoading.value = true
+  try {
+    const data = await getAdminVideos(query)
+    if (seq !== loadSeq) {
+      return null
+    }
+    list.value = data.items || []
+    total.value = data.total_count || 0
+    listError.value = ''
+    clearSelection()
+    return true
+  } catch (error) {
+    if (seq !== loadSeq) {
+      return null
+    }
+    listError.value = error?.message || '加载视频列表失败'
+    return false
+  } finally {
+    if (seq === loadSeq) {
+      listLoading.value = false
+    }
+  }
+}`
+    const unsafeLoad = protectedLoad
+      .replace(/\s*if \(seq !== loadSeq\) \{\s*return null\s*\}/g, '')
+      .replace('if (seq === loadSeq) {\n      listLoading.value = false\n    }', 'listLoading.value = false')
+
+    expect(latestRequestOwnsState(protectedLoad)).toBe(true)
+    expect(latestRequestOwnsState(unsafeLoad)).toBe(false)
+    expect(latestRequestOwnsState(script)).toBe(true)
+    const requestIndex = loadBlock?.body.indexOf('const data = await getAdminVideos(query)') || -1
+    expect(requestIndex).toBeGreaterThan(-1)
+    expect(loadBlock?.body.slice(0, requestIndex)).not.toContain("listError.value = ''")
+    expect(catchClearsRows(loadBlock?.body || '')).toBe(false)
+  })
+
+  it('保存视图刷新失败会拒绝且页面事件安全消费 rejection', () => {
+    const refreshBlock = extractBalancedBraceBlock(script, /async function refreshSavedView\(\)\s*\{/)
+    const selectBlock = extractBalancedBraceBlock(script, /async function selectVideoView\(id\)\s*\{/)
+    const removeBlock = extractBalancedBraceBlock(script, /async function removeVideoView\(id\)\s*\{/)
+
+    expect(refreshBlock).not.toBeNull()
+    expect(refreshBlock?.body).toContain('const loaded = await load()')
+    expect(refreshBlock?.body).toContain('if (loaded === false)')
+    expect(refreshBlock?.body).toContain("throw new Error(listError.value || '加载视频列表失败')")
+    expect(selectBlock).not.toBeNull()
+    expect(selectBlock?.body).toContain('await selectView(id)')
+    expect(selectBlock?.body).toMatch(/catch \(error\) \{[\s\S]*?listError\.value/)
+    expect(removeBlock).not.toBeNull()
+    expect(removeBlock?.body).toContain('await removeView(id)')
+    expect(removeBlock?.body).toMatch(/catch \(error\) \{[\s\S]*?listError\.value/)
+    expect(template).toContain('@select="selectVideoView"')
+    expect(template).toContain('@remove="removeVideoView"')
+  })
+
   it('使用壳层操作区、保存视图和紧凑筛选工具条', () => {
     expect(script).not.toContain('PageHeader')
     expect(template).not.toContain('<PageHeader')
@@ -151,11 +324,11 @@ describe('视频资源集合页', () => {
     expect(template).toContain(':items="availableViews"')
     expect(template).toContain(':active-id="activeViewId"')
     expect(template).toContain(':editable-source-id="editableSourceId"')
-    expect(template).toContain('@select="selectView"')
+    expect(template).toContain('@select="selectVideoView"')
     expect(template).toContain('@save="saveView"')
     expect(template).toContain('@update="updateView"')
     expect(template).toContain('@rename="renameView"')
-    expect(template).toContain('@remove="removeView"')
+    expect(template).toContain('@remove="removeVideoView"')
     expect(template).toContain('<Toolbar dense>')
     expect(template).toContain('class="page-shell video-list-page" data-density="compact"')
   })
@@ -201,6 +374,32 @@ describe('视频资源集合页', () => {
     expect(deleteBlock?.body.indexOf('deleteAdminVideo(row.id)')).toBeGreaterThan(deleteBlock?.body.indexOf('ElMessageBox.confirm'))
   })
 
+  it('未知行操作命令 fail-closed 且已知命令安全消费异步拒绝', () => {
+    const protectedHandler = `function handleVideoRowAction(command, row) {
+  if (command === 'retranscode') {
+    doRetranscode(row).catch(() => {})
+    return true
+  }
+  if (command === 'delete') {
+    doDelete(row).catch(() => {})
+    return true
+  }
+  return false
+}`
+    const unsafeHandler = `function handleVideoRowAction(command, row) {
+  return command === 'retranscode' ? doRetranscode(row) : doDelete(row)
+}`
+
+    expect(handlesRowActionFailClosed(protectedHandler)).toBe(true)
+    expect(handlesRowActionFailClosed(unsafeHandler)).toBe(false)
+    expect(consumesRowActionRejections(protectedHandler)).toBe(true)
+    expect(consumesRowActionRejections(unsafeHandler)).toBe(false)
+    expect(handlesRowActionFailClosed(script)).toBe(true)
+    expect(consumesRowActionRejections(script)).toBe(true)
+    expect(operationsColumn).toContain('@command="(command) => handleVideoRowAction(command, row)"')
+    expect(operationsColumn).not.toMatch(/command === 'retranscode' \? doRetranscode\(row\) : doDelete\(row\)/)
+  })
+
   it('使用固定媒体几何、状态组件和防溢出表格', () => {
     expect(template).toContain('class="table-wrap has-media-rows"')
     expect(template).toContain('<StatusIndicator')
@@ -244,6 +443,6 @@ describe('视频资源集合页', () => {
     expect(template).toContain(':before-close="handleDetailBeforeClose"')
     expect(template).toContain('<BulkActionBar :count="selectedRows.length" :actions="bulkActions" />')
     expect(template).toContain('<AdminTablePagination')
-    expect(template).toContain('@current-change="load"')
+    expect(template).toContain('@current-change="setPage"')
   })
 })

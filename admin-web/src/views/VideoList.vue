@@ -90,6 +90,7 @@ const selectedRows = ref([])
 const selectionAnchorIndex = ref(-1)
 const selectionSyncing = ref(false)
 const shiftKeyPressed = ref(false)
+let loadSeq = 0
 const batchEditVisible = ref(false)
 const batchEditSnapshot = ref('')
 const batchEditDrawerSize = computed(() => detailDrawerSize.value)
@@ -115,6 +116,8 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const router = useRouter()
 
 const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
+const quickSearch = ref(query.q)
+const filterDraft = reactive({ q: query.q, type: query.type, status: query.status })
 const SAVED_VIEWS_KEY = 'admin-videolist-saved-views-v1'
 const COLUMN_VISIBILITY_KEY = 'admin-videolist-columns'
 const ALL_COLUMNS = [
@@ -161,9 +164,11 @@ const {
     query.page = 1
     columnVisibility.value = [...next.columns]
     persistColumns()
-    clearSelection()
+    quickSearch.value = query.q
+    syncFilterDraftFromQuery()
+    resetQueryIdentity()
   },
-  refresh: load
+  refresh: refreshSavedView
 })
 const retagTypeOptions = [
   { value: 'movie', label: '电影' },
@@ -237,6 +242,9 @@ function isColumnVisible(key) {
 function removeFilter(key) {
   query[key] = ''
   query.page = 1
+  quickSearch.value = query.q
+  syncFilterDraftFromQuery()
+  resetQueryIdentity()
   load()
 }
 
@@ -588,23 +596,90 @@ function openStuckScrape() {
   router.push(route)
 }
 
-async function load() {
-  listLoading.value = true
+function resetQueryIdentity() {
+  list.value = []
+  total.value = 0
   listError.value = ''
+  clearSelection()
+}
+
+function syncFilterDraftFromQuery() {
+  filterDraft.q = query.q
+  filterDraft.type = query.type
+  filterDraft.status = query.status
+}
+
+function openFilterDrawer() {
+  syncFilterDraftFromQuery()
+  filterDrawerVisible.value = true
+}
+
+async function refreshSavedView() {
+  const loaded = await load()
+  if (loaded === false) {
+    throw new Error(listError.value || '加载视频列表失败')
+  }
+  return loaded
+}
+
+async function selectVideoView(id) {
   try {
-    const data = await getAdminVideos(query)
-    list.value = data.items || []
-    total.value = data.total_count || 0
-    clearSelection()
+    await selectView(id)
   } catch (error) {
     listError.value = error?.message || '加载视频列表失败'
+  }
+}
+
+async function removeVideoView(id) {
+  try {
+    await removeView(id)
+  } catch (error) {
+    listError.value = error?.message || '加载视频列表失败'
+  }
+}
+
+async function load() {
+  const seq = ++loadSeq
+  listLoading.value = true
+  try {
+    const data = await getAdminVideos(query)
+    if (seq !== loadSeq) {
+      return null
+    }
+    list.value = data.items || []
+    total.value = data.total_count || 0
+    listError.value = ''
+    clearSelection()
+    return true
+  } catch (error) {
+    if (seq !== loadSeq) {
+      return null
+    }
+    listError.value = error?.message || '加载视频列表失败'
+    return false
   } finally {
-    listLoading.value = false
+    if (seq === loadSeq) {
+      listLoading.value = false
+    }
   }
 }
 
 function applyFilters() {
+  query.q = quickSearch.value
   query.page = 1
+  syncFilterDraftFromQuery()
+  resetQueryIdentity()
+  load()
+}
+
+function applyFilterDrawer() {
+  query.q = filterDraft.q
+  query.type = filterDraft.type
+  query.status = filterDraft.status
+  query.page = 1
+  quickSearch.value = query.q
+  filterDrawerVisible.value = false
+  resetQueryIdentity()
   load()
 }
 
@@ -613,6 +688,15 @@ function resetFilters() {
   query.type = ''
   query.status = ''
   query.page = 1
+  quickSearch.value = query.q
+  syncFilterDraftFromQuery()
+  resetQueryIdentity()
+  load()
+}
+
+function setPage(page) {
+  query.page = page
+  resetQueryIdentity()
   load()
 }
 
@@ -1054,6 +1138,24 @@ async function doRetranscode(row) {
   await load()
 }
 
+function handleVideoRowAction(command, row) {
+  if (command === 'retranscode') {
+    doRetranscode(row).catch((error) => {
+      if (error === 'cancel' || error === 'close') return
+      ElMessage.error(error?.message || '重新转码失败')
+    })
+    return true
+  }
+  if (command === 'delete') {
+    doDelete(row).catch((error) => {
+      if (error === 'cancel' || error === 'close') return
+      ElMessage.error(error?.message || '删除失败')
+    })
+    return true
+  }
+  return false
+}
+
 async function saveDetail() {
   if (!detail.value?.id) {
     return
@@ -1260,17 +1362,17 @@ onBeforeUnmount(() => {
         :items="availableViews"
         :active-id="activeViewId"
         :editable-source-id="editableSourceId"
-        @select="selectView"
+        @select="selectVideoView"
         @save="saveView"
         @update="updateView"
         @rename="renameView"
-        @remove="removeView"
+        @remove="removeVideoView"
       />
 
       <Toolbar dense>
         <template #filters>
           <el-input
-            v-model="query.q"
+            v-model="quickSearch"
             class="quick-search"
             placeholder="标题/标签搜索"
             clearable
@@ -1281,7 +1383,7 @@ onBeforeUnmount(() => {
           <el-tag v-for="chip in activeFilterChips" :key="chip.key" closable @close="removeFilter(chip.key)">
             {{ chip.label }}：{{ chip.value }}
           </el-tag>
-          <el-button plain @click="filterDrawerVisible = true">更多筛选</el-button>
+          <el-button plain @click="openFilterDrawer">更多筛选</el-button>
         </template>
       </Toolbar>
 
@@ -1360,7 +1462,7 @@ onBeforeUnmount(() => {
                   <el-dropdown
                     trigger="click"
                     popper-class="video-row-actions-popper"
-                    @command="(command) => command === 'retranscode' ? doRetranscode(row) : doDelete(row)"
+                    @command="(command) => handleVideoRowAction(command, row)"
                   >
                     <el-tooltip content="更多视频操作" placement="top">
                       <el-button :icon="MoreFilled" circle aria-label="更多视频操作" />
@@ -1380,11 +1482,11 @@ onBeforeUnmount(() => {
 
         <div class="toolbar-row toolbar-row--end">
           <AdminTablePagination
-            v-model:current-page="query.page"
-            v-model:page-size="query.page_size"
+            :current-page="query.page"
+            :page-size="query.page_size"
             layout="total, prev, pager, next"
             :total="total"
-            @current-change="load"
+            @current-change="setPage"
           />
         </div>
       </SectionCard>
@@ -1916,13 +2018,19 @@ onBeforeUnmount(() => {
       </template>
     </el-drawer>
 
-    <el-drawer v-model="filterDrawerVisible" title="更多筛选" direction="rtl" :size="detailDrawerSize">
+    <el-drawer
+      v-model="filterDrawerVisible"
+      title="更多筛选"
+      direction="rtl"
+      :size="detailDrawerSize"
+      @closed="syncFilterDraftFromQuery"
+    >
       <el-form label-width="88px">
         <el-form-item label="搜索">
-          <el-input v-model="query.q" placeholder="标题/标签搜索" clearable />
+          <el-input v-model="filterDraft.q" placeholder="标题/标签搜索" clearable />
         </el-form-item>
         <el-form-item label="类型">
-          <el-select v-model="query.type" placeholder="类型" clearable style="width: 100%">
+          <el-select v-model="filterDraft.type" placeholder="类型" clearable style="width: 100%">
             <el-option label="短视频" value="short" />
             <el-option label="电影" value="movie" />
             <el-option label="剧集分集" value="episode" />
@@ -1930,7 +2038,7 @@ onBeforeUnmount(() => {
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="query.status" placeholder="状态" clearable style="width: 100%">
+          <el-select v-model="filterDraft.status" placeholder="状态" clearable style="width: 100%">
             <el-option label="已上传" value="uploaded" />
             <el-option label="刮削中" value="scraping" />
             <el-option label="待绑定" value="tv_pending" />
@@ -1944,7 +2052,7 @@ onBeforeUnmount(() => {
       </el-form>
       <template #footer>
         <el-button @click="resetFilters">重置</el-button>
-        <el-button type="primary" @click="filterDrawerVisible = false; applyFilters()">应用筛选</el-button>
+        <el-button type="primary" @click="applyFilterDrawer">应用筛选</el-button>
       </template>
     </el-drawer>
   </Layout>

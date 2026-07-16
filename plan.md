@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-16 09:11 +0800
+- 进度：完成 Task 8 两项 Important 修复、自审补强和最终提交前范围核对。查询草稿/身份、latest-wins 写权、保存视图拒绝消费、受控分页与危险命令白名单均由真实 SFC 和可命中违规 fixture 门禁覆盖；提交前语义自审发现的行命令异步拒绝问题已修复并重新执行全部验证。两个已记账 Minor 按用户决定保持不动。
+- 影响文件：本次精确提交只包含 `admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-8-report.md`、`admin-web/dist`、共享 saved-view、分页组件、API、路由、依赖或其它文件。
+- 验证：最后一次生产改动后的 Task 8 五文件定向通过（5 个文件，60/60）；`cd admin-web && npm test` 通过（34 个文件，329/329）；`cd admin-web && npm run build` 成功（2370 modules transformed，仅既有 chunk-size warning）；`git diff --check`、四文件 U+FFFD 与 C0/DEL、VideoList 样式禁止模式、共享模块零差异和四文件白名单检查通过。
+
+## 2026-07-16 09:10 +0800
+- 进度：Task 8 提交前语义自审发现白名单行命令处理器返回布尔值后，重新转码/删除 Promise 不再返回给 Vue，确认取消或请求失败可能形成未处理 rejection。按 TDD 先补 protected/unsafe fixture 与真实 SFC 门禁，再在两个已知命令分支内最小 catch：取消/关闭静默消费，其它错误显示明确反馈；未知命令仍 fail-closed，删除确认顺序不变。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：新增门禁先按预期 RED（1 项失败、11 项通过，唯一失败为真实处理器未消费 Promise），生产修复后 `cd admin-web && npm test -- src/views/videoListPage.spec.js` 通过（12/12）。由于生产代码在上一轮全量证据后有改动，下一步重新运行全部覆盖验证，不复用旧结果。
+
+## 2026-07-16 09:05 +0800
+- 进度：完成 Task 8 两项 Important 的最小生产修复与页面单文件 GREEN。VideoList 将工具条搜索和 Drawer 筛选改为独立草稿，保存视图、筛选提交/移除/重置和分页统一先 reset 新查询身份再加载；`loadSeq` 保证只有最新请求可写列表、错误、选择与 loading，同查询失败保留已有状态。保存视图刷新失败由页面包装继续拒绝并在 select/remove 事件边界消费；行操作只对白名单命令分派，未知命令 fail-closed，既有删除确认保持原位。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`；共享 saved-view、分页组件、API 和其它页面未修改。
+- 验证：`cd admin-web && npm test -- src/views/videoListPage.spec.js` 通过（退出码 0；1 个文件，12/12，无 warning/error）。待运行 Task 8 五文件定向、管理端全量测试、生产构建和静态范围门禁。
+
+## 2026-07-16 09:01 +0800
+- 进度：Task 8 两项 Important 的回归门禁已完成真实 RED。新增测试以受保护/不安全 fixture 自校验查询身份 reset 顺序、latest-wins 请求写权和未知行命令 fail-closed，并直接检查真实 SFC；保存视图刷新失败确认可在页面层包装并安全消费 rejection，无需修改共享 composable。生产代码尚未修改。
+- 影响文件：本阶段只修改 `admin-web/src/views/videoListPage.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/videoListPage.spec.js` 按预期失败（退出码 1；12 项中 8 项失败、4 项通过）。protected/unsafe fixtures 均通过，8 项失败分别命中筛选草稿、查询身份 reset、受控分页、最新请求写权、保存视图 rejection 消费和未知危险命令白名单等现有生产缺口，不是测试语法、SFC 编译或环境错误。
+
+## 2026-07-16 08:55 +0800
+- 进度：启动 Task 8 两项 Important 评审修复；用户明确选择 A，当 brief 示例与数据诚实/危险操作安全冲突时以高层契约为准。修复聚焦查询身份 reset、筛选草稿边界、最新请求写权、saved-view refresh rejection 安全处理、受控分页和未知行命令 fail-closed，不处理已记账的两个 Minor。
+- 影响文件：计划只修改 `admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`，并追加不纳入提交的 `.superpowers/sdd/task-8-report.md`；不修改共享 `useSavedViews`、`AdminTablePagination`、API、依赖或其它页面。
+- 验证：先运行 `cd admin-web && npm test -- src/views/videoListPage.spec.js` 确认两个 finding 的真实 RED，再做最小实现；收尾运行 Task 8 五文件定向、管理端全量测试、生产构建、`git diff --check`、U+FFFD/C0/DEL、样式禁止模式和变更白名单检查。
+
 ## 2026-07-16 08:15 +0800
 - 进度：完成 Precision Ops Task 8 最终验证与提交前自审。补充验证发现 Teleport 的列设置和行操作菜单不继承页面密度规则，新增窄屏点击目标门禁并完成单文件 RED（1 项失败/7 项通过）到 GREEN（8/8）；通过专用 popper class 将两类菜单项固定为至少 44px，无业务流程变更。
 - 影响文件：本次精确提交只包含 `admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/VideoList.vue`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；不纳入 `.superpowers/sdd/task-8-report.md`、`admin-web/dist`、共享 saved-view、API、依赖或范围外文件。
