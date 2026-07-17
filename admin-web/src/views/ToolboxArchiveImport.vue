@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Back, Check, CircleCheck, Close, Delete, DocumentCopy, EditPen, Plus, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import MetricStrip from '../components/base/MetricStrip.vue'
@@ -2127,10 +2128,14 @@ onUnmounted(() => {
         direction="rtl"
         :size="batchDrawerSize"
         destroy-on-close
+        :show-close="false"
         :before-close="handleBatchDrawerBeforeClose"
         @closed="handleBatchDrawerClosed"
         data-density="form"
       >
+        <template #header="{ close, titleId, titleClass }">
+          <AdminDrawerHeader title="批次详情" :title-id="titleId" :title-class="titleClass" :close="close" />
+        </template>
         <div v-if="selectedBatch" class="archive-drawer">
           <section class="archive-drawer__hero">
             <div class="archive-drawer__hero-copy">

@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 17:25 +0800
+- 进度：Task 20 第二轮 review fix 完成提交前最终验证与自审。唯一批次 Drawer 现只渲染一个带稳定中文 aria-label/title 的共享关闭按钮，Element Plus slot `close` 保持原 dirty guard 与 closed 清理链路；5 个 Dialog、业务 handler/payload、页面专属 36/44px CSS、API/依赖/router 均未改。按分工未运行浏览器审计，也未访问认证、网络或真实日志。
+- 影响文件：最终只纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个 tracked 文件，并更新 git 忽略报告；不纳入 precision rollout、helpers、shared header、共享样式或其它文件。相对固定 Base 的 Task 20 总白名单仍精确为 5 个文件。
+- 验证：定向命令由 1 failed / 131 passed 转为 132/132；完整 `npm test` 为 39 文件 473/473；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、固定 Base 白名单、禁止文件/API/依赖/router 零差异、业务脚本与 overlay 归一化全部通过。
+
+## 2026-07-17 17:21 +0800
+- 进度：Task 20 第二轮 review fix 完成最小生产实现并取得定向 GREEN。唯一批次 Drawer 禁用框架默认关闭按钮，header slot 通过共享 `AdminDrawerHeader` 复用中文 aria-label/title 与原生按钮；slot 的 `close` 回调继续进入原 `before-close`/`closed` 链路，页面专属 `.el-drawer__close-btn` 36/44px CSS 与 5 个 Dialog 均未改。
+- 影响文件：已修改 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`，并待追加 git 忽略报告；未修改 shared header、业务 handler/payload、helpers、precision rollout、共享样式、API、依赖、router 或其它文件。
+- 验证：同一 Task 20 三文件命令由准确 RED（3 文件 132 tests，1 failed / 131 passed，唯一失败为缺少 shared header import）转为 GREEN（3 文件 132/132）。待完整测试、构建及最终静态/敏感差异归一化门禁。
+
+## 2026-07-17 17:16 +0800
+- 进度：开始修复 Task 20 第二轮 reviewer 的 1 个 Important：唯一批次 Drawer 迁移到仓库标准 `AdminDrawerHeader`，用 `:show-close="false"` 禁用框架默认按钮，并通过 header slot 注入共享中文 aria-label/title 关闭按钮；共享 `close` 回调继续经过原 `handleBatchDrawerBeforeClose` 与 `handleBatchDrawerClosed`，页面专属 36/44px CSS 继续命中共享按钮的 `.el-drawer__close-btn`。
+- 影响文件：计划精确修改 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个 tracked 文件，并追加 git 忽略报告；不扩展 5 个 Dialog，不修改 shared header、业务 handler/payload、helpers、API、依赖、router、共享样式或其它文件。
+- 验证：先只补真实 SFC 契约并运行 Task 20 三文件定向命令取得准确 RED；最小实现后依次运行定向 GREEN、完整测试、构建、静态/编码/Base 五文件/API/依赖/router/业务脚本/overlay 归一化。业务脚本门禁只额外移除 `MetricStrip` 与 `AdminDrawerHeader` 两条纯视觉 import；按分工不运行浏览器审计。
+
 ## 2026-07-17 17:00 +0800
 - 进度：Task 20 首轮独立 review fix 完成提交前最终验证。Important 已以 reason 桌面 compact 32px、`<1024px` 44px 最小焦点目标闭合，并用匹配 line-height 保持单行 ellipsis 与垂直对齐；Minor 已以 CSS 声明边界 helper 替换 selection/Drawer 尺寸子串断言，width/height 不再能被 min-width/min-height 误满足。未运行浏览器审计。
 - 影响文件：最终精确纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个本轮 tracked 文件，并更新 git 忽略报告；不修改 precision rollout、helpers、共享样式、API、依赖、router、业务脚本或其它文件。相对固定 Base 的 Task 20 总白名单仍精确为 5 文件。

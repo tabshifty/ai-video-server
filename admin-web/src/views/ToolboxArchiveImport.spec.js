@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(new URL('./ToolboxArchiveImport.vue', import.meta.url), 'utf8')
+const adminDrawerHeaderSource = readFileSync(new URL('../components/base/AdminDrawerHeader.vue', import.meta.url), 'utf8')
 
 function extractTemplate(sfc) {
   const opening = sfc.match(/<template[^>]*>/)
@@ -357,6 +358,36 @@ describe('ToolboxArchiveImport', () => {
       expect(closeRule, property).toMatch(cssDeclarationPattern(property, '36px'))
       expect(narrowCloseRule, property).toMatch(cssDeclarationPattern(property, '44px'))
     }
+  })
+
+  it('uses the shared labeled Drawer header without rendering the framework close button', () => {
+    const template = extractTemplate(source)
+    const drawer = template.match(/<el-drawer\b[\s\S]*?>/)?.[0] || ''
+    const drawerHeader = template.match(/<el-drawer\b[\s\S]*?>\s*<template #header="\{ close, titleId, titleClass \}">[\s\S]*?<\/template>/)?.[0] || ''
+
+    expect(source).toContain("import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'")
+    for (const contract of [
+      'v-model="batchDrawerVisible"',
+      'class="archive-batch-drawer"',
+      'title="批次详情"',
+      'direction="rtl"',
+      ':size="batchDrawerSize"',
+      'destroy-on-close',
+      ':show-close="false"',
+      ':before-close="handleBatchDrawerBeforeClose"',
+      '@closed="handleBatchDrawerClosed"',
+      'data-density="form"'
+    ]) {
+      expect(drawer, contract).toContain(contract)
+    }
+    expect(drawerHeader).toContain('<template #header="{ close, titleId, titleClass }">')
+    expect(drawerHeader).toContain('<AdminDrawerHeader title="批次详情" :title-id="titleId" :title-class="titleClass" :close="close" />')
+    expect(template.match(/<AdminDrawerHeader\b/g)).toHaveLength(1)
+    expect(template.match(/<el-dialog\b/g)).toHaveLength(5)
+    expect(adminDrawerHeaderSource).toContain('class="el-drawer__close-btn"')
+    expect(adminDrawerHeaderSource).toContain('aria-label="关闭此对话框"')
+    expect(adminDrawerHeaderSource).toContain('title="关闭此对话框"')
+    expect(adminDrawerHeaderSource).toContain('@click="close"')
   })
 
   it('keeps file sort segmented items at compact desktop height and 44px below desktop', () => {
