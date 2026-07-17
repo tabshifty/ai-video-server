@@ -2,6 +2,36 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 16:31 +0800
+- 进度：Task 20 浏览器矩阵修复完成提交前最终验证。文件选择位 32/44px、reason focus trigger + 2px 焦点、批次 Drawer 关闭按钮 36/44px、文件排序 segmented 32/44px 均由真实 SFC 契约闭合；浏览器矩阵既有四视口无溢出、MetricStrip、overlay 密度、文件/分组/BulkActionBar、零 mutation/控制台问题保持不变。未执行新的浏览器审计。
+- 影响文件：最终精确纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个 tracked 文件，并更新 git 忽略报告；未修改 `precisionOpsRollout.spec.js`、helpers、共享样式、API、依赖、router、业务脚本或其它文件。
+- 验证：最终 Task 20 定向 3 文件 131/131、完整 `npm test` 39 文件 472/472、`npm run build` 转换 2373 modules 成功且仅既有 chunk-size warning；`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、4 文件白名单、禁止文件零差异、API/依赖/router 零差异、业务脚本相对固定 Base 归一化通过。5 个 Dialog opening tag 除 density 外逐项一致，唯一 Drawer 除 density + `archive-batch-drawer` class 外逐项一致。
+
+## 2026-07-17 16:28 +0800
+- 进度：Task 20 segmented 浏览器缺口完成 RED/GREEN。真实 SFC 契约先以 1 failed / 130 passed 精确暴露桌面文件排序 item 缺少 compact 高度，随后只在 `.archive-file-sort :deep(.el-segmented__item)` 基础规则增加 `min-height: var(--control-height)`，现有 `<1024px` 规则继续覆盖为 44px；不改模板、脚本或共享样式。
+- 影响文件：仍为当前 4 个 Task 20 tracked 文件与 git 忽略报告；本次生产增量只有目标 SFC 一条 scoped CSS 声明，spec 增加一条桌面/窄屏双层契约。
+- 验证：Task 20 三文件 RED 为 1 failed / 130 passed，最小实现后 GREEN 为 3 文件 131/131。待完整测试、构建与最终差异门禁。
+
+## 2026-07-17 16:26 +0800
+- 进度：继续修复 Task 20 浏览器矩阵新增确证缺口：Drawer 文件排序的两个 `.el-segmented__item` 在 1440/1024px 实测仅 28px，未消费 compact 桌面 32px；768/375px 既有 44px 规则保持不变。先补桌面 `--control-height` 与窄屏 44px 双层真实 SFC 契约，再做最小 scoped CSS 修复。
+- 影响文件：仍严格限制为当前 `ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个 tracked 文件及 git 忽略报告；不修改业务脚本、API、helpers、`precisionOpsRollout.spec.js`、共享样式或其它文件。
+- 验证：先运行 Task 20 三文件命令取得 segmented 桌面契约准确 RED，最小实现后重跑定向 GREEN，并按本轮最终门禁执行完整测试、构建、静态/编码/差异归一化后统一提交。
+
+## 2026-07-17 15:54 +0800
+- 进度：Task 20 浏览器缺口最小实现取得定向 GREEN。文件选择位桌面五项尺寸统一消费 compact `--control-height`、窄屏五项精确 44px；reason Tooltip 使用 Element Plus 原生 focus trigger 并补 2px focus-visible；唯一批次 Drawer 新增视觉 class，以页面 scoped `:global` 精确锁定关闭按钮桌面 36px、窄屏 44px，不修改共享 overrides。
+- 影响文件：已修改目标 SFC、其 spec、`CONTEXT.md` 的 Task 20 长期交互目标契约与 `plan.md`，并待追加 git 忽略报告；未修改业务脚本、helpers、共享组件/样式、API、依赖、router、其它页面或 Task 21。
+- 验证：Task 20 三文件命令通过（3 文件，130/130）。待完整 `npm test`、`npm run build`、最终静态/编码/白名单/API/依赖/router/脚本归一化，以及允许 Drawer density + class 后其余 overlay props/events 逐字一致门禁。
+
+## 2026-07-17 15:53 +0800
+- 进度：Task 20 浏览器缺口真实 SFC 契约取得严格 RED。3 条独立测试分别锁定文件选择位桌面五项尺寸消费 `--control-height` 且窄屏五项精确 44px、reason Tooltip 的 `trigger="focus"` 与 2px focus-visible、唯一批次 Drawer class 及关闭按钮桌面 36px/窄屏 44px；生产 SFC 仍保持 `0e9f865` 状态。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`；生产 SFC、`CONTEXT.md`、helpers、API、依赖、router 与共享样式尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/ToolboxArchiveImport.spec.js src/views/toolboxArchiveImport.helpers.spec.js src/views/precisionOpsRollout.spec.js` 按预期退出 1（3 文件，130 tests，3 failed / 127 passed）；3 个失败与浏览器测量逐项对应，helpers 41/41、rollout 63/63 和其余页面/业务契约全部通过。
+
+## 2026-07-17 15:52 +0800
+- 进度：开始修复 Task 20 浏览器合成数据矩阵发现的 3 个真实 UI 缺口：文件选择位桌面消费 compact 32px 且窄屏精确提升 44px；reason Tooltip 改为键盘 focus 触发并提供 2px 可见焦点；批次 Drawer 以页面专属 class 把关闭按钮锁为桌面 36px、窄屏 44px。保留浏览器矩阵已通过的四视口无溢出、MetricStrip、Dialog/Drawer 密度、文件/分组/BulkActionBar、零 mutation/控制台问题，以及全部业务边界。
+- 影响文件：计划精确修改 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件，并更新 git 忽略的 `.superpowers/sdd/task-20-report.md`；不修改共享 `element-overrides.css`、helpers、API、依赖、router、其它页面或 Task 21。
+- 验证：先只修改真实 SFC 契约并运行 Task 20 三文件命令取得准确 RED；最小实现后运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、4 文件白名单、API/依赖/router 零差异、业务脚本归一化，以及只额外允许 Drawer density + class 的 overlay opening-tag 归一化门禁。
+
 ## 2026-07-17 15:32 +0800
 - 进度：Task 20 完成提交前最终验证与自审。概览 MetricStrip/固定说明、根与集合/Teleport 密度、无渐变单色表面、52px 最小文件行、可聚焦 reason Tooltip/ellipsis、375/768px 父子 actions 与表单收纳均闭合；5 个 Dialog + 1 个 Drawer 原 props/events、BulkActionBar、文件选择绑定以及全部上传/轮询/纠偏/分组/编辑/合集/处理/dirty/payload 脚本边界未改变。
 - 影响文件：最终精确纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件；git 忽略报告不纳入，helpers 测试只验证未修改，不修改 API、依赖、router、其它页面或 Task 21。

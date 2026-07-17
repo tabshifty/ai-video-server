@@ -2122,6 +2122,7 @@ onUnmounted(() => {
 
       <el-drawer
         v-model="batchDrawerVisible"
+        class="archive-batch-drawer"
         title="批次详情"
         direction="rtl"
         :size="batchDrawerSize"
@@ -2336,6 +2337,7 @@ onUnmounted(() => {
                   <el-tooltip
                     v-if="file.reason"
                     :content="formatArchiveReason(file.reason)"
+                    trigger="focus"
                     placement="top"
                   >
                     <span class="archive-file-item__reason" tabindex="0">{{ formatArchiveReason(file.reason) }}</span>
@@ -3058,6 +3060,13 @@ onUnmounted(() => {
   max-width: 100%;
 }
 
+:global(.archive-batch-drawer .el-drawer__close-btn) {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
 .archive-batch-panel {
   min-width: 0;
 }
@@ -3392,6 +3401,10 @@ onUnmounted(() => {
   min-width: 13rem;
 }
 
+.archive-file-sort :deep(.el-segmented__item) {
+  min-height: var(--control-height);
+}
+
 .archive-file-toolbar {
   display: flex;
   align-items: flex-start;
@@ -3467,8 +3480,11 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--control-height);
+  height: var(--control-height);
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+  flex-basis: var(--control-height);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
@@ -3538,6 +3554,11 @@ onUnmounted(() => {
   line-height: var(--leading-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.archive-file-item__reason:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
 }
 
 .archive-file-item__aside {
@@ -3797,6 +3818,14 @@ onUnmounted(() => {
     min-height: 44px;
     width: 44px;
     height: 44px;
+    flex-basis: 44px;
+  }
+
+  :global(.archive-batch-drawer .el-drawer__close-btn) {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .archive-drawer :deep(.bulk-action-bar) {

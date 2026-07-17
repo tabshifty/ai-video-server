@@ -311,6 +311,56 @@ describe('ToolboxArchiveImport', () => {
     expect(reasonRule).toContain('white-space: nowrap;')
   })
 
+  it('sizes the file selection target from compact density and raises every dimension to 44px below desktop', () => {
+    const style = extractStyle(source)
+    const selectionRule = style.match(/\.archive-file-item__selection\s*\{[^}]*\}/s)?.[0] || ''
+    const narrowSelectionRule = style.match(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-file-item__selection\s*\{[^}]*\}/s)?.[0] || ''
+
+    for (const property of ['width', 'height', 'min-width', 'min-height', 'flex-basis']) {
+      expect(selectionRule, property).toContain(`${property}: var(--control-height);`)
+      expect(narrowSelectionRule, property).toContain(`${property}: 44px;`)
+    }
+  })
+
+  it('opens the skipped reason tooltip on keyboard focus and provides a visible focus ring', () => {
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const reasonTooltip = template.match(/<el-tooltip\s+v-if="file\.reason"[\s\S]*?<\/el-tooltip>/)?.[0] || ''
+    const reasonFocusRule = style.match(/\.archive-file-item__reason:focus-visible\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(reasonTooltip).toContain(':content="formatArchiveReason(file.reason)"')
+    expect(reasonTooltip).toContain('trigger="focus"')
+    expect(reasonTooltip).toContain('<span class="archive-file-item__reason" tabindex="0">{{ formatArchiveReason(file.reason) }}</span>')
+    expect(reasonFocusRule).toContain('outline: 2px solid var(--line-focus);')
+    expect(reasonFocusRule).toContain('outline-offset: 2px;')
+  })
+
+  it('gives only the batch Drawer close button a 36px desktop and 44px narrow target', () => {
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const drawer = template.match(/<el-drawer\b[\s\S]*?>/)?.[0] || ''
+    const closeRule = style.match(/:global\(\.archive-batch-drawer \.el-drawer__close-btn\)\s*\{[^}]*\}/s)?.[0] || ''
+    const narrowCloseRule = style.match(/@media \(max-width: 63\.9375rem\)[\s\S]*?:global\(\.archive-batch-drawer \.el-drawer__close-btn\)\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(drawer).toContain('class="archive-batch-drawer"')
+    expect(drawer).toContain('v-model="batchDrawerVisible"')
+    expect(drawer).toContain('data-density="form"')
+    for (const property of ['width', 'height', 'min-width', 'min-height']) {
+      expect(closeRule, property).toContain(`${property}: 36px;`)
+      expect(narrowCloseRule, property).toContain(`${property}: 44px;`)
+    }
+  })
+
+  it('keeps file sort segmented items at compact desktop height and 44px below desktop', () => {
+    const style = extractStyle(source)
+    const desktopStyle = style.slice(0, style.indexOf('@media'))
+    const desktopItemRule = desktopStyle.match(/\.archive-file-sort :deep\(\.el-segmented__item\)\s*\{[^}]*\}/s)?.[0] || ''
+    const narrowItemRule = style.match(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-file-sort :deep\(\.el-segmented__item\)\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(desktopItemRule).toContain('min-height: var(--control-height);')
+    expect(narrowItemRule).toContain('min-height: 44px;')
+  })
+
   it('removes decorative gradients and contains dynamic content at 768px and 375px', () => {
     const style = extractStyle(source)
     const rootRule = style.match(/\.tool-workspace\s*\{[^}]*\}/s)?.[0] || ''
