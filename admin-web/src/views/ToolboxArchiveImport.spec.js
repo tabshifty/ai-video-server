@@ -3,6 +3,19 @@ import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(new URL('./ToolboxArchiveImport.vue', import.meta.url), 'utf8')
 
+function extractTemplate(sfc) {
+  const opening = sfc.match(/<template[^>]*>/)
+  const start = (opening?.index || 0) + (opening?.[0].length || 0)
+  const end = sfc.lastIndexOf('</template>')
+
+  return end > start ? sfc.slice(start, end) : ''
+}
+
+function extractStyle(sfc) {
+  const match = sfc.match(/<style scoped>([\s\S]*?)<\/style>/)
+  return match?.[1] || ''
+}
+
 describe('ToolboxArchiveImport', () => {
   it('keeps tags and collections as selector-based inputs instead of JSON or raw ID fields', () => {
     expect(source).toContain('默认标签')
@@ -229,5 +242,112 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain("'删除批次'")
     expect(source).toContain('删除后会清空该批次的压缩包记录、文件清单和解包目录')
     expect(source).toContain('archive-batch-card__actions')
+  })
+
+  it('uses a standalone form workspace and a non-card metric strip without scope hints', () => {
+    const template = extractTemplate(source)
+    const overviewBlock = source.match(/const overviewCards = computed\(\(\) => \{[\s\S]*?\n\}\)\nconst selectionAlert/)?.[0] || ''
+    const metricStrip = template.match(/<MetricStrip\b[\s\S]*?\/>/)?.[0] || ''
+
+    expect(source).toContain("import MetricStrip from '../components/base/MetricStrip.vue'")
+    expect(template.trimStart()).toMatch(/^<main class="tool-workspace archive-import-tool" data-density="form">/)
+    expect(metricStrip).toContain(':items="overviewCards"')
+    expect(metricStrip).toContain('aria-label="压缩包批次摘要"')
+    expect(metricStrip).not.toContain('scope')
+    expect(template).toContain('class="archive-overview-note"')
+    expect(template).toContain('按上传时间倒序；待继续处理包含待处理、失败或待纠偏批次；待纠偏可补密码或确认编码后继续解包；处理中表示后台仍在解包或入库。')
+    expect(template).not.toContain('archive-overview-grid')
+    expect(template).not.toContain('archive-overview-card')
+    expect(overviewBlock).toContain('const needingAction = batches.value.filter((batch) => batchNeedsAction(batch)).length')
+    expect(overviewBlock).toContain("const needExtractRetry = batches.value.filter((batch) => batch.status === 'needs_password' || batch.status === 'needs_encoding').length")
+    expect(overviewBlock).toContain("const processing = batches.value.filter((batch) => batch.status === 'processing').length")
+    expect(overviewBlock).toContain("{ key: '批次总数', label: '批次总数', value: batches.value.length }")
+    expect(overviewBlock).toContain("{ key: '待继续处理', label: '待继续处理', value: needingAction }")
+    expect(overviewBlock).toContain("{ key: '待纠偏', label: '待纠偏', value: needExtractRetry }")
+    expect(overviewBlock).toContain("{ key: '处理中', label: '处理中', value: processing }")
+    expect(overviewBlock).not.toContain('hint:')
+  })
+
+  it('keeps compact collections and all existing Teleport surfaces at form density', () => {
+    const template = extractTemplate(source)
+    const dialogs = template.match(/<el-dialog\b[\s\S]*?>/g) || []
+    const drawers = template.match(/<el-drawer\b[\s\S]*?>/g) || []
+
+    expect(template).toContain('<SectionCard class="archive-batch-panel" data-density="compact">')
+    expect(template).toContain('<SectionCard class="archive-file-panel" data-density="compact">')
+    expect(dialogs).toHaveLength(5)
+    expect(drawers).toHaveLength(1)
+    dialogs.forEach((dialog) => expect(dialog).toContain('data-density="form"'))
+    drawers.forEach((drawer) => expect(drawer).toContain('data-density="form"'))
+
+    expect(drawers[0]).toContain('v-model="batchDrawerVisible"')
+    expect(drawers[0]).toContain(':before-close="handleBatchDrawerBeforeClose"')
+    expect(drawers[0]).toContain('@closed="handleBatchDrawerClosed"')
+    expect(template).toContain('v-model="selectedFileDialogVisible"')
+    expect(template).toContain(':before-close="handleSelectedFileDialogBeforeClose"')
+    expect(template).toContain('@closed="handleSelectedFileDialogClosed"')
+    expect(template).toContain('v-model="uploadDialogVisible"')
+    expect(template).toContain('v-model="batchEditDialogVisible"')
+    expect(template).toContain(':before-close="handleBatchEditBeforeClose"')
+    expect(template).toContain('v-model="archiveGroupDialogVisible"')
+    expect(template).toContain(':before-close="handleArchiveGroupDialogBeforeClose"')
+    expect(template).toContain('v-model="quickCollectionDialogVisible"')
+    expect(template).toContain('<BulkActionBar :count="selectedFileIDs.length" :actions="bulkActions" />')
+  })
+
+  it('uses a 52px minimum media row and exposes the full skipped reason through a focusable tooltip', () => {
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const fileItemRule = style.match(/\.archive-file-item\s*\{[^}]*\}/s)?.[0] || ''
+    const reasonRule = style.match(/\.archive-file-item__reason\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(fileItemRule).toContain('min-height: var(--media-row-height);')
+    expect(fileItemRule).not.toMatch(/(?:^|[;{]\s*)height:/)
+    expect(template).toMatch(/<el-tooltip\s+v-if="file\.reason"\s+:content="formatArchiveReason\(file\.reason\)"[\s\S]*?<span class="archive-file-item__reason" tabindex="0">\{\{ formatArchiveReason\(file\.reason\) \}\}<\/span>[\s\S]*?<\/el-tooltip>/)
+    expect(reasonRule).toContain('display: block;')
+    expect(reasonRule).toContain('max-width: 100%;')
+    expect(reasonRule).toContain('overflow: hidden;')
+    expect(reasonRule).toContain('text-overflow: ellipsis;')
+    expect(reasonRule).toContain('white-space: nowrap;')
+  })
+
+  it('removes decorative gradients and contains dynamic content at 768px and 375px', () => {
+    const style = extractStyle(source)
+    const rootRule = style.match(/\.tool-workspace\s*\{[^}]*\}/s)?.[0] || ''
+    const innerRule = style.match(/\.tool-workspace__inner\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(source).not.toMatch(/(?:linear|radial)-gradient\(/)
+    expect(rootRule).toContain('min-width: 0;')
+    expect(rootRule).toContain('overflow-x: clip;')
+    expect(innerRule).toContain('min-width: 0;')
+    expect(style).toMatch(/\.archive-drawer,[\s\S]*?\.quick-collection-form\s*\{[^}]*max-width:\s*100%;/s)
+    expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-file-item__selection\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s)
+    expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-group-panel__actions,[\s\S]*?\.archive-drawer__hero-actions\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s)
+    expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-import-tool :deep\(\.page-header-shell__actions\),[\s\S]*?\.archive-file-panel :deep\(\.section-card__actions\)\s*\{[^}]*width:\s*100%;[^}]*margin-left:\s*0;[^}]*flex-wrap:\s*wrap;/s)
+    expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-batch-panel :deep\(\.section-card__header\),[\s\S]*?\.archive-file-panel :deep\(\.section-card__header\)\s*\{[^}]*flex-wrap:\s*wrap;/s)
+    expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-drawer :deep\(\.bulk-action-bar\)\s*\{[^}]*flex-direction:\s*column;[\s\S]*?\.archive-drawer :deep\(\.bulk-action-bar__actions\)\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s)
+    expect(style).toMatch(/@media \(max-width: 48rem\)[\s\S]*?\.archive-group-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/s)
+    expect(style).toMatch(/@media \(max-width: 48rem\)[\s\S]*?\.archive-file-sort\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;/s)
+    expect(style).toMatch(/@media \(max-width: 48rem\)[\s\S]*?\.archive-file-editor__form :deep\(\.el-form-item__content\),[\s\S]*?\.quick-collection-form :deep\(\.el-form-item__content\)\s*\{[^}]*margin-left:\s*0 !important;[^}]*min-width:\s*0;/s)
+  })
+
+  it('keeps the critical archive commands and dirty guards on their original handlers', () => {
+    const template = extractTemplate(source)
+
+    for (const command of [
+      '@click="uploadArchive"',
+      '@click="runRetryExtract"',
+      '@click="saveSelectedFile"',
+      '@click="saveBatchEdit"',
+      '@click="saveArchiveGroup"',
+      '@click.stop="onArchiveFileSelectToggle(file, $event)"'
+    ]) {
+      expect(template, command).toContain(command)
+    }
+    expect(source).toContain('onClick: processSelectedArchiveFiles')
+    expect(source).toContain('confirmDiscardUnsavedFileChanges')
+    expect(source).toContain('requestSelectedFileDialogClose')
+    expect(source).toContain('requestBatchEditClose')
+    expect(source).toContain('requestArchiveGroupDialogClose')
   })
 })

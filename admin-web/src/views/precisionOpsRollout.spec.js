@@ -50,6 +50,7 @@ const phaseTwoFiles = [
 ]
 const pendingShellViews = []
 const standaloneViews = {
+  'ToolboxArchiveImport.vue': 'form',
   'ToolboxEd2k.vue': 'form',
   'ToolboxEd2kDownload.vue': 'form',
   'ToolboxOrphanFiles.vue': 'form',
@@ -729,6 +730,20 @@ describe('Precision Ops 独立工具工作区', () => {
       expect(template).toContain('<PageHeader')
       expect(template).not.toContain('<Layout')
     })
+  })
+
+  it('压缩包导入保持业务边界并应用紧凑集合密度', () => {
+    const source = readView('ToolboxArchiveImport.vue')
+    const template = extractTemplate(source)
+
+    expect(source).toContain('class="archive-batch-panel" data-density="compact"')
+    expect(source).toContain('class="archive-file-panel" data-density="compact"')
+    expect(source).toContain('<MetricStrip')
+    expect(source).toContain('<BulkActionBar')
+    expect(template).toContain('<PageHeader')
+    expect(template).not.toContain('<Layout')
+    expect(source).not.toMatch(/(?:linear|radial)-gradient\(/)
+    expect(source).not.toContain('archive-overview-card')
   })
 
   it('移除登录页装饰渐变与面板常驻阴影', () => {

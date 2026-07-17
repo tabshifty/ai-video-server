@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 15:32 +0800
+- 进度：Task 20 完成提交前最终验证与自审。概览 MetricStrip/固定说明、根与集合/Teleport 密度、无渐变单色表面、52px 最小文件行、可聚焦 reason Tooltip/ellipsis、375/768px 父子 actions 与表单收纳均闭合；5 个 Dialog + 1 个 Drawer 原 props/events、BulkActionBar、文件选择绑定以及全部上传/轮询/纠偏/分组/编辑/合集/处理/dirty/payload 脚本边界未改变。
+- 影响文件：最终精确纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件；git 忽略报告不纳入，helpers 测试只验证未修改，不修改 API、依赖、router、其它页面或 Task 21。
+- 验证：最终 Task 20 定向 3 文件 127/127、管理端完整 `npm test` 39 文件 468/468、`npm run build` 转换 2373 modules 成功且仅既有 chunk-size warning；`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、5 文件白名单、API/依赖/router 零差异、scoped style 12 个语义背景/0 渐变/4 个仅交互或选择阴影/媒体行 min-height 门禁通过。归一化时移除唯一 `MetricStrip` import，并把 4 个精确 overview shape 反向映射为 Base 原行，所得 `<script setup>` 与固定 Base `621229d9dd241570229e7a78518770fa54663278` 逐字一致。
+
+## 2026-07-17 15:30 +0800
+- 进度：Task 20 窄屏自审补充闭环。自审发现 action 子项虽已换行，但 PageHeader/SectionCard actions 父层与 Drawer 内共享 `BulkActionBar` 尚无本页明确收纳契约；先补真实 SFC 断言取得 1 failed / 126 passed 的准确 RED，再以页面局部 deep 规则让页头与 SectionCard actions 全宽换行、SectionCard header 换行、BulkActionBar 纵向回落，未改模板或业务脚本。
+- 影响文件：补充周期只修改 `admin-web/src/views/ToolboxArchiveImport.spec.js`、`ToolboxArchiveImport.vue` 的 scoped CSS 与 `plan.md`；未改 API、payload、handler、Dialog/Drawer、BulkActionBar 共享组件、依赖或 router。
+- 验证：同一 Task 20 三文件命令先按预期退出 1（1 failed / 126 passed），最小 CSS 实现后通过（3 文件，127/127）。待重新执行完整 `npm test`、`npm run build` 及全部最终静态门禁，以覆盖最后改动。
+
+## 2026-07-17 15:25 +0800
+- 进度：Task 20 最小生产实现取得定向 GREEN。概览改用无 scope 的 `MetricStrip` 并保留固定说明，根工作台为 `form`，批次/文件集合为 `compact`，既有 5 个 Dialog 与 1 个 Drawer 均声明 `form`；文件行消费 `--media-row-height` 最小高度，reason 使用可聚焦 Element Plus Tooltip 保留全文，单色表面与 1024/768px 响应式规则收纳页面、Teleport 表单和操作目标。
+- 影响文件：已修改目标 SFC、两份目标 spec、`CONTEXT.md`、`plan.md`；helpers 测试只运行未修改，未修改 API、payload、handler、router、依赖、其它页面或 Task 21。
+- 验证：`cd admin-web && npm test -- src/views/ToolboxArchiveImport.spec.js src/views/toolboxArchiveImport.helpers.spec.js src/views/precisionOpsRollout.spec.js` 通过（3 文件，127/127）；SFC diff 显示脚本只含允许的 `MetricStrip` import 与四个 overview 输出 shape，所有 5 Dialog + 1 Drawer 原 props/events 均原样保留并仅增加密度。待完整 `npm test`、`npm run build` 与最终静态/敏感差异门禁。
+
+## 2026-07-17 15:22 +0800
+- 进度：Task 20 两份真实 SFC 契约取得严格 RED。新增断言锁定独立根 `form`、无 scope 的 `MetricStrip` 与固定说明、批次/文件 `compact`、5 个 Dialog + 1 个 Drawer 的 `form` 密度、无渐变/旧 overview 卡、52px 最小媒体行、可聚焦 reason Tooltip/ellipsis、768/375px 收纳以及原关键业务 handler/dirty guard；生产 SFC 仍保持固定 Base 状态。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/ToolboxArchiveImport.spec.js`、`precisionOpsRollout.spec.js`、`plan.md`；`ToolboxArchiveImport.vue`、`CONTEXT.md`、helpers 测试、API、依赖和 router 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/ToolboxArchiveImport.spec.js src/views/toolboxArchiveImport.helpers.spec.js src/views/precisionOpsRollout.spec.js` 按预期退出 1（3 文件，127 tests，6 failed / 121 passed）；4 个页面视觉契约和 2 个 rollout 根/集合契约准确失败，`toolboxArchiveImport.helpers.spec.js` 41/41 与新增关键业务边界断言全部通过，无测试语法、环境或既有业务失败。
+
+## 2026-07-17 15:18 +0800
+- 进度：开始 Task 20，将 `ToolboxArchiveImport` 升级为独立 `form` 压缩包批次工作台；概览迁移到无卡片 `MetricStrip`，批次与文件集合声明 `compact`，既有 5 个 Dialog 与 1 个 Drawer 声明 `form`，文件行补固定媒体最小行高、原因全文 Tooltip 与窄屏收纳。严格保留上传、轮询、密码/编码重试、分组、选择、编辑、合集、处理/重试、dirty guard、API、payload 与 handler，不重构业务脚本，不推进 Task 21。
+- 影响文件：计划精确修改 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件，并写入 git 忽略的 `.superpowers/sdd/task-20-report.md`；`toolboxArchiveImport.helpers.spec.js` 只验证，不修改。
+- 验证：先只补两份真实 SFC 契约并运行 `cd admin-web && npm test -- src/views/ToolboxArchiveImport.spec.js src/views/toolboxArchiveImport.helpers.spec.js src/views/precisionOpsRollout.spec.js` 取得准确 RED；最小实现后依次运行同一定向测试、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、5 文件白名单、API/依赖/router 零差异、业务脚本相对固定 Base `621229d9dd241570229e7a78518770fa54663278` 归一化及 scoped style 门禁。
+
 ## 2026-07-17 15:10 +0800
 - 进度：Task 19 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，Cannot verify 仅为 reviewer 按只读约束不重复执行验证。首轮筛选当前态语义、全宽正向契约和圆角数值门禁 3 项 finding 均由 `a1fdbd2` 闭合；ED2K 下载工作台至此完成。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-19-report.md`、浏览器审计脚本/矩阵与 4 张安全截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 20。

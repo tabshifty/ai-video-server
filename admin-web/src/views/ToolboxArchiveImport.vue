@@ -5,6 +5,7 @@ import { Back, Check, CircleCheck, Close, Delete, DocumentCopy, EditPen, Plus, R
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import MetricStrip from '../components/base/MetricStrip.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
@@ -300,10 +301,10 @@ const overviewCards = computed(() => {
   const needExtractRetry = batches.value.filter((batch) => batch.status === 'needs_password' || batch.status === 'needs_encoding').length
   const processing = batches.value.filter((batch) => batch.status === 'processing').length
   return [
-    { label: '批次总数', value: batches.value.length, hint: '按上传时间倒序浏览' },
-    { label: '待继续处理', value: needingAction, hint: '仍有待处理、失败或待纠偏批次' },
-    { label: '待纠偏', value: needExtractRetry, hint: '补密码或确认编码后可继续解包' },
-    { label: '处理中', value: processing, hint: '后台仍在解包或入库' }
+    { key: '批次总数', label: '批次总数', value: batches.value.length },
+    { key: '待继续处理', label: '待继续处理', value: needingAction },
+    { key: '待纠偏', label: '待纠偏', value: needExtractRetry },
+    { key: '处理中', label: '处理中', value: processing }
   ]
 })
 const selectionAlert = computed(() => {
@@ -2044,7 +2045,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="tool-workspace archive-import-tool">
+  <main class="tool-workspace archive-import-tool" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
         <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
@@ -2057,15 +2058,10 @@ onUnmounted(() => {
         </template>
       </PageHeader>
 
-      <section class="archive-overview-grid">
-        <article v-for="item in overviewCards" :key="item.label" class="archive-overview-card">
-          <span>{{ item.label }}</span>
-          <strong class="tabular-num">{{ item.value }}</strong>
-          <p>{{ item.hint }}</p>
-        </article>
-      </section>
+      <MetricStrip :items="overviewCards" aria-label="压缩包批次摘要" />
+      <p class="archive-overview-note">按上传时间倒序；待继续处理包含待处理、失败或待纠偏批次；待纠偏可补密码或确认编码后继续解包；处理中表示后台仍在解包或入库。</p>
 
-      <SectionCard class="archive-batch-panel">
+      <SectionCard class="archive-batch-panel" data-density="compact">
         <template #title>批次列表</template>
         <template #description>从这里继续处理已有批次。点击卡片后会打开批次详情抽屉；上传新包不再挤占主界面。</template>
 
@@ -2132,6 +2128,7 @@ onUnmounted(() => {
         destroy-on-close
         :before-close="handleBatchDrawerBeforeClose"
         @closed="handleBatchDrawerClosed"
+        data-density="form"
       >
         <div v-if="selectedBatch" class="archive-drawer">
           <section class="archive-drawer__hero">
@@ -2279,7 +2276,7 @@ onUnmounted(() => {
             </div>
           </SectionCard>
 
-          <SectionCard class="archive-file-panel">
+          <SectionCard class="archive-file-panel" data-density="compact">
             <template #title>文件清单</template>
             <template #description>优先看路径、状态和类型，再决定是否按类型拆开勾选、批量编辑或批量处理；当前视图为“{{ currentArchiveGroupScopeLabel }}”。</template>
             <template #actions>
@@ -2336,7 +2333,13 @@ onUnmounted(() => {
                   <span class="archive-file-item__meta">{{ formatArchiveFileType(file) }}</span>
                   <span class="archive-file-item__group">分组：{{ file.group_name || '未分组' }}</span>
                   <span class="archive-file-item__submeta">{{ formatFileSize(file.file_size) }}</span>
-                  <span v-if="file.reason" class="archive-file-item__reason">{{ formatArchiveReason(file.reason) }}</span>
+                  <el-tooltip
+                    v-if="file.reason"
+                    :content="formatArchiveReason(file.reason)"
+                    placement="top"
+                  >
+                    <span class="archive-file-item__reason" tabindex="0">{{ formatArchiveReason(file.reason) }}</span>
+                  </el-tooltip>
                 </div>
 
                 <div class="archive-file-item__aside">
@@ -2378,6 +2381,7 @@ onUnmounted(() => {
         destroy-on-close
         :before-close="handleSelectedFileDialogBeforeClose"
         @closed="handleSelectedFileDialogClosed"
+        data-density="form"
       >
         <div v-if="!selectedFile" class="archive-file-editor__empty">
           <span>正在准备当前文件信息…</span>
@@ -2524,6 +2528,7 @@ onUnmounted(() => {
         title="上传压缩包"
         width="min(94vw, 760px)"
         destroy-on-close
+        data-density="form"
       >
         <div class="archive-upload-dialog">
           <p class="archive-upload-dialog__lead">支持密码包；上传成功后会自动打开新批次详情。压缩包内不允许嵌套压缩包。</p>
@@ -2642,6 +2647,7 @@ onUnmounted(() => {
         destroy-on-close
         :before-close="handleBatchEditBeforeClose"
         @closed="handleBatchEditClosed"
+        data-density="form"
       >
         <el-form label-width="112px" class="archive-batch-edit-form">
           <SectionCard dense>
@@ -2846,6 +2852,7 @@ onUnmounted(() => {
         destroy-on-close
         :before-close="handleArchiveGroupDialogBeforeClose"
         @closed="handleArchiveGroupDialogClosed"
+        data-density="form"
       >
         <el-form label-width="112px" class="archive-group-form">
           <SectionCard dense>
@@ -2988,6 +2995,7 @@ onUnmounted(() => {
         :title="quickCollectionDialogTitle"
         width="min(94vw, 560px)"
         destroy-on-close
+        data-density="form"
       >
         <el-form label-width="104px" class="quick-collection-form">
           <el-form-item :label="quickCollectionForm.kind === 'image' ? '图片合集名称' : '视频合集名称'">
@@ -3009,15 +3017,16 @@ onUnmounted(() => {
 
 <style scoped>
 .tool-workspace {
+  min-width: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--primary) 10%, transparent) 0, transparent 32%),
-    linear-gradient(180deg, var(--bg-canvas) 0%, color-mix(in srgb, var(--bg-canvas) 92%, var(--bg-surface)) 100%);
+  overflow-x: clip;
+  background: var(--bg-canvas);
 }
 
 .tool-workspace__inner {
   display: grid;
+  min-width: 0;
   width: min(100%, 84rem);
   margin: 0 auto;
   padding: var(--space-6);
@@ -3030,40 +3039,23 @@ onUnmounted(() => {
   justify-content: flex-start;
 }
 
-.archive-overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.archive-overview-card {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-surface-muted) 100%);
-  box-shadow: var(--shadow-xs);
-}
-
-.archive-overview-card span {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  line-height: var(--leading-caption);
-}
-
-.archive-overview-card strong {
-  color: var(--text-primary);
-  font-size: var(--text-h1);
-  line-height: var(--leading-h1);
-  font-weight: 600;
-}
-
-.archive-overview-card p {
+.archive-overview-note {
   margin: 0;
   color: var(--text-secondary);
   font-size: var(--text-small);
   line-height: var(--leading-small);
+  overflow-wrap: anywhere;
+}
+
+.archive-drawer,
+.archive-file-editor__form,
+.archive-upload-dialog,
+.archive-upload-form,
+.archive-batch-edit-form,
+.archive-group-form,
+.quick-collection-form {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .archive-batch-panel {
@@ -3186,7 +3178,7 @@ onUnmounted(() => {
   padding: var(--space-4);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, var(--bg-surface)) 0%, var(--bg-surface) 70%);
+  background: var(--bg-surface-muted);
 }
 
 .archive-drawer__hero-copy {
@@ -3198,6 +3190,7 @@ onUnmounted(() => {
 .archive-drawer__hero-copy h2,
 .archive-drawer__hero-copy p {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .archive-drawer__hero-copy h2 {
@@ -3250,6 +3243,7 @@ onUnmounted(() => {
 .archive-batch-summary strong {
   min-width: 0;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .archive-inline-alert {
@@ -3293,6 +3287,7 @@ onUnmounted(() => {
 
 .archive-group-toolbar__selection {
   display: grid;
+  min-width: 0;
   gap: var(--space-1);
 }
 
@@ -3306,6 +3301,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   font-size: var(--text-small);
   line-height: var(--leading-small);
+  overflow-wrap: anywhere;
 }
 
 .archive-group-grid {
@@ -3351,6 +3347,7 @@ onUnmounted(() => {
   color: var(--text-primary);
   font-size: var(--text-body);
   line-height: var(--leading-body);
+  overflow-wrap: anywhere;
 }
 
 .archive-group-card__copy span,
@@ -3358,6 +3355,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   font-size: var(--text-small);
   line-height: var(--leading-small);
+  overflow-wrap: anywhere;
 }
 
 .archive-group-card__stats {
@@ -3403,6 +3401,7 @@ onUnmounted(() => {
 
 .archive-file-toolbar__selection {
   display: grid;
+  min-width: 0;
   gap: var(--space-1);
 }
 
@@ -3416,6 +3415,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   font-size: var(--text-small);
   line-height: var(--leading-small);
+  overflow-wrap: anywhere;
 }
 
 .archive-file-toolbar__actions {
@@ -3436,6 +3436,7 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--space-3);
   width: 100%;
+  min-height: var(--media-row-height);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
@@ -3522,15 +3523,27 @@ onUnmounted(() => {
   line-height: var(--leading-caption);
 }
 
-.archive-file-item__submeta,
-.archive-file-item__reason {
+.archive-file-item__submeta {
   color: var(--text-muted);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
 }
 
+.archive-file-item__reason {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .archive-file-item__aside {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-self: end;
   gap: var(--space-2);
@@ -3694,7 +3707,7 @@ onUnmounted(() => {
   min-height: 13rem;
   border: 1px dashed var(--line-strong);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-surface-muted) 100%);
+  background: var(--bg-surface-muted);
 }
 
 .archive-upload-dialog__icon {
@@ -3744,13 +3757,25 @@ onUnmounted(() => {
   .tool-workspace__inner {
     padding: var(--space-4);
   }
-
-  .archive-overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
-@media (max-width: 64rem) {
+@media (max-width: 63.9375rem) {
+  .archive-import-tool :deep(.page-header-shell__actions),
+  .archive-batch-panel :deep(.section-card__actions),
+  .archive-group-panel :deep(.section-card__actions),
+  .archive-file-panel :deep(.section-card__actions) {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .archive-batch-panel :deep(.section-card__header),
+  .archive-group-panel :deep(.section-card__header),
+  .archive-file-panel :deep(.section-card__header) {
+    flex-wrap: wrap;
+  }
+
   .archive-group-toolbar,
   .archive-file-toolbar,
   .archive-drawer__hero,
@@ -3762,7 +3787,30 @@ onUnmounted(() => {
   .archive-group-panel__actions,
   .archive-file-toolbar__actions,
   .archive-drawer__hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
     justify-content: flex-start;
+  }
+
+  .archive-file-item__selection {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .archive-drawer :deep(.bulk-action-bar) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .archive-drawer :deep(.bulk-action-bar__actions) {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .archive-file-sort :deep(.el-segmented__item) {
+    min-height: 44px;
   }
 
   .archive-password-card__form {
@@ -3775,25 +3823,63 @@ onUnmounted(() => {
 }
 
 @media (max-width: 48rem) {
-  .archive-overview-grid,
   .archive-batch-grid,
   .archive-batch-card__stats,
   .archive-group-card__stats,
   .archive-batch-summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .archive-group-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .archive-file-sort {
+    min-width: 0;
+    width: 100%;
   }
 
   .archive-file-item {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .archive-file-item__status {
+  .archive-file-item__aside {
     grid-column: 2;
     justify-self: start;
+    flex-wrap: wrap;
   }
 
   .collection-picker {
     grid-template-columns: 1fr;
+  }
+
+  .archive-file-editor__form :deep(.el-form-item),
+  .archive-upload-form :deep(.el-form-item),
+  .archive-batch-edit-form :deep(.el-form-item),
+  .archive-group-form :deep(.el-form-item),
+  .quick-collection-form :deep(.el-form-item) {
+    display: block;
+  }
+
+  .archive-file-editor__form :deep(.el-form-item__label),
+  .archive-upload-form :deep(.el-form-item__label),
+  .archive-batch-edit-form :deep(.el-form-item__label),
+  .archive-group-form :deep(.el-form-item__label),
+  .quick-collection-form :deep(.el-form-item__label) {
+    width: auto !important;
+    height: auto;
+    margin-bottom: var(--space-2);
+    justify-content: flex-start;
+  }
+
+  .archive-file-editor__form :deep(.el-form-item__content),
+  .archive-upload-form :deep(.el-form-item__content),
+  .archive-batch-edit-form :deep(.el-form-item__content),
+  .archive-group-form :deep(.el-form-item__content),
+  .quick-collection-form :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+    min-width: 0;
+    width: 100%;
   }
 }
 
