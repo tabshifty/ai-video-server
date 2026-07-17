@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 13:39 +0800
+- 进度：Task 18 完成提交前最终验证与自审，不推进 Task 19。四页独立 PageHeader/无 Layout、根 `form`、密码列表 `compact`/Dialog `form`、Login 单色无阴影、三个中文可访问名称、窄屏收纳/44px 链接目标与焦点契约完整；四个 `<script setup>` 相对固定 Base 逐字一致，ED2K 解析、孤儿扫描/删除、密码 CRUD/显示复制及登录鉴权模型和 handler 均未改。详细证据已写入 git 忽略的 `.superpowers/sdd/task-18-report.md`，按分工不执行浏览器验收。
+- 影响文件：最终只纳入 `admin-web/src/views/ToolboxEd2k.vue`、`ToolboxOrphanFiles.vue`、`ToolboxPasswordVault.vue`、`Login.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 7 个 tracked 文件；不纳入忽略报告，不修改 API、依赖、router、认证细节、其它页面/测试或 Task 19。
+- 验证：brief 四文件定向 65/65；管理端完整 `npm test` 为 39 文件 452/452；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、7 文件白名单、无直接颜色/渐变/超 8px 圆角/常驻阴影、U+FFFD/C0/DEL、API/依赖/router 零差异及四页业务脚本归一化零差异门禁均通过。
+
+## 2026-07-17 13:34 +0800
+- 进度：Task 18 完成最小生产实现并取得三文件定向 GREEN。四页根工作区声明 `form` 且继续保留自身 PageHeader/无 Layout；密码库列表回落 `compact`、两个 Dialog 显式保持 `form`；Login 改为 canvas/surface 单色层级并移除常驻阴影；三个无可见标签输入补中文 aria-label；独立页补横向收缩、窄屏操作收纳/密码链接 44px 和原生链接焦点。四个生产脚本未改。
+- 影响文件：生产只修改四个目标 SFC 的模板属性与 scoped CSS，保留 RED 阶段 `precisionOpsRollout.spec.js`，并追加 `CONTEXT.md`、`plan.md` 和 git 忽略报告；未修改 API、依赖、router、模型、handler、payload 或确认链路。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/ToolboxEd2k.spec.js src/views/toolboxOrphanFiles.helpers.spec.js` 通过（3 文件，62/62）；待 brief 四文件定向、完整 `npm test`、`npm run build` 及最终静态/敏感差异门禁。
+
+## 2026-07-17 13:32 +0800
+- 进度：Task 18 真实 SFC 契约取得严格 RED；四页业务 SFC 仍保持固定 Base 状态。新增契约锁定四个独立 PageHeader 工作区的 `form` 密度与无 Layout 边界、Login 去装饰渐变/常驻阴影、密码库列表 `compact`/两个 Dialog `form`、ED2K 文本域/密码库搜索/只读密码的中文可访问名称，以及窄屏横向收纳、44px 链接目标和原生链接可见焦点。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js` 与 `plan.md`，并新增 git 忽略的 `.superpowers/sdd/task-18-report.md`；四个生产 SFC、`CONTEXT.md`、API、依赖和 router 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/ToolboxEd2k.spec.js src/views/toolboxOrphanFiles.helpers.spec.js` 按预期退出 1（3 文件，1 failed / 2 passed；62 tests，9 failed / 53 passed）。9 个失败测试精确对应缺失行为，两份既有业务测试共 4/4 通过，无语法或环境错误。
+
+## 2026-07-17 13:27 +0800
+- 进度：开始 Task 18，只把 ED2K、孤儿文件、密码库与登录四个独立页面统一到 `form` 中密度工作区，并为密码库列表增加 `compact` 内层密度；四页继续保留自身 PageHeader、独立路由边界和全部既有业务脚本，不引入 Layout，不推进 Task 19。
+- 影响文件：计划精确修改 `admin-web/src/views/ToolboxEd2k.vue`、`ToolboxOrphanFiles.vue`、`ToolboxPasswordVault.vue`、`Login.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 7 个 tracked 文件，并写入 git 忽略的 `.superpowers/sdd/task-18-report.md`；不修改 API、依赖、router、认证细节、其它测试或页面。
+- 验证：先补真实 SFC 契约并运行 `cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/ToolboxEd2k.spec.js src/views/toolboxOrphanFiles.helpers.spec.js` 取得严格 RED；最小实现后运行 brief 四文件定向、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、7 文件白名单、API/依赖/router 零差异及四页业务脚本相对固定 Base `f14bdb31500654f464a67dc48bdbd276366ef8b6` 归一化零差异门禁。
+
 ## 2026-07-17 13:24 +0800
 - 进度：Task 17 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，Cannot verify 为无。首轮 4 个 Important 已由 `b12cd4b` 闭合；最终三页 × 1440/1024/768/375px 浏览器矩阵为 PASS、0 failure，电视剧系列 7 行均具备原生按钮与 pressed 语义，三个筛选名称和两处动态长文本计算样式完整。合成 Settings smoke 又闭合非空日志、独立滚动和失败保留旧日志运行态。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-17-report.md`、浏览器/Settings smoke 脚本、矩阵和 12 张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 18。

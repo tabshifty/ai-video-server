@@ -35,7 +35,7 @@ function returnToToolbox() {
 </script>
 
 <template>
-  <main class="tool-workspace">
+  <main class="tool-workspace" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
         <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
@@ -57,6 +57,7 @@ function returnToToolbox() {
             :rows="8"
             resize="vertical"
             placeholder="每行一个 ed2k:// 链接"
+            aria-label="ED2K 链接文本"
             class="ed2k-tool__input"
           />
           <div class="ed2k-tool__summary">
@@ -95,6 +96,8 @@ function returnToToolbox() {
 .tool-workspace {
   min-height: 100vh;
   min-height: 100dvh;
+  min-width: 0;
+  overflow-x: clip;
   background: var(--bg-canvas);
 }
 
@@ -152,6 +155,11 @@ function returnToToolbox() {
   border-color: var(--primary);
   color: var(--primary);
   background: var(--bg-surface);
+}
+
+.ed2k-link:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
 }
 
 .ed2k-link__line {

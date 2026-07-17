@@ -217,7 +217,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="tool-workspace orphan-tool">
+  <main class="tool-workspace orphan-tool" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
         <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
@@ -347,6 +347,8 @@ onUnmounted(() => {
 .tool-workspace {
   min-height: 100vh;
   min-height: 100dvh;
+  min-width: 0;
+  overflow-x: clip;
   background: var(--bg-canvas);
 }
 
@@ -422,6 +424,18 @@ onUnmounted(() => {
 
 .scan-table-wrap {
   min-width: 0;
+}
+
+@media (max-width: 63.9375rem) {
+  .orphan-tool :deep(.section-card__header) {
+    flex-wrap: wrap;
+  }
+
+  .orphan-tool :deep(.section-card__actions) {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 64rem) {

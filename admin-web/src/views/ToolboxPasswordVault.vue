@@ -248,7 +248,7 @@ onMounted(loadEntries)
 </script>
 
 <template>
-  <main class="tool-workspace password-vault-tool">
+  <main class="tool-workspace password-vault-tool" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
         <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
@@ -256,7 +256,7 @@ onMounted(loadEntries)
 
       <PageHeader title="密码管理" subtitle="记录外部服务、网站和设备的账号密码。" />
 
-      <SectionCard>
+      <SectionCard data-density="compact">
         <template #title>密码库</template>
         <template #description>支持新增、修改、删除、显示密码和复制账号密码。</template>
 
@@ -268,6 +268,7 @@ onMounted(loadEntries)
               clearable
               :prefix-icon="Search"
               placeholder="搜索名称、账号、网址、备注"
+              aria-label="密码库搜索"
               @clear="clearSearch"
               @keyup.enter="applySearch"
             />
@@ -341,7 +342,7 @@ onMounted(loadEntries)
       </SectionCard>
     </div>
 
-    <el-dialog v-model="dialogVisible" class="crud-dialog" :title="dialogTitle" width="min(94vw, 560px)">
+    <el-dialog v-model="dialogVisible" class="crud-dialog" :title="dialogTitle" width="min(94vw, 560px)" data-density="form">
       <el-form label-width="88px" class="dialog-form">
         <el-form-item label="名称">
           <el-input v-model="form.name" placeholder="例如：家庭路由器" autocomplete="off" />
@@ -366,8 +367,8 @@ onMounted(loadEntries)
       </template>
     </el-dialog>
 
-    <el-dialog v-model="passwordDialogVisible" class="crud-dialog" :title="passwordDialogTitle" width="min(94vw, 520px)">
-      <el-input :model-value="passwordValue" readonly autocomplete="off" />
+    <el-dialog v-model="passwordDialogVisible" class="crud-dialog" :title="passwordDialogTitle" width="min(94vw, 520px)" data-density="form">
+      <el-input :model-value="passwordValue" readonly autocomplete="off" aria-label="密码内容" />
       <template #footer>
         <el-button @click="passwordDialogVisible = false">关闭</el-button>
         <el-button type="primary" :icon="CopyDocument" @click="copyText(passwordValue, '密码已复制')">复制密码</el-button>
@@ -380,6 +381,8 @@ onMounted(loadEntries)
 .tool-workspace {
   min-height: 100vh;
   min-height: 100dvh;
+  min-width: 0;
+  overflow-x: clip;
   background: var(--bg-canvas);
 }
 
@@ -402,6 +405,8 @@ onMounted(loadEntries)
 }
 
 .password-vault-tool__url {
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   color: var(--primary);
   text-overflow: ellipsis;
@@ -411,6 +416,11 @@ onMounted(loadEntries)
 
 .password-vault-tool__url:hover {
   text-decoration: underline;
+}
+
+.password-vault-tool__url:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
 }
 
 .password-vault-tool__actions {
@@ -425,6 +435,14 @@ onMounted(loadEntries)
 
 .password-vault-tool__pagination {
   padding-top: var(--space-3);
+}
+
+@media (max-width: 63.9375rem) {
+  .password-vault-tool__url {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
 }
 
 @media (max-width: 48rem) {

@@ -3,6 +3,7 @@
 ## 技术沉淀约定
 - 每次功能更新必须补充本文件，沉淀长期有效的术语、架构决策、接口约定、兼容策略、踩坑经验或后续维护注意事项。
 - 技术沉淀只记录会影响后续实现和维护的内容，不记录临时进度、命令流水账或一次性调试过程。
+- `Precision Ops 独立轻量工作区边界`：`/toolbox/ed2k`、`/toolbox/orphan-files`、`/toolbox/password-vault` 与 `/login` 是不渲染 Layout 的独立页面，继续使用自身 PageHeader，并在根工作区声明 `form` 中密度；不得因全站壳层迁移把它们并回后台 Layout 或改写返回工具箱、登录鉴权、ED2K 解析、孤儿扫描/删除及密码 CRUD/显示复制链路。密码库列表 SectionCard 显式回落到 `compact`，创建/编辑与显示密码 Dialog 保持 `form`；登录页只用 `--bg-canvas`/`--bg-surface` 单色分层且不保留面板常驻阴影。无可见 label 的 ED2K 文本域、密码库搜索与只读密码必须提供中文可访问名称；窄于 `64rem` 时原生链接与操作目标保持至少 44px、焦点可见，动态文本和宽表只能在自身容器收敛，不能撑出页面横向滚动。
 - `Precision Ops 表单壳层归属`：`/tv-series`、`/settings`、`/toolbox` 统一由 Layout 提供唯一页面标题，页面根工作区使用 `form` 密度，不再保留自身 PageHeader 或 `hideShellPageHeader` 兼容 meta。电视剧管理的“新建系列”和“筛选”属于壳层页头动作，筛选 Toolbar 只保留搜索、启用状态、可播分集和重置；左侧系列列表在 form 工作区内显式回落到 `compact` 密度。系列启用 switch 需用页面局部规则在桌面消费 36px 控件高度，窄于 `64rem` 时提升到 44px，不能假设共享 form override 会覆盖 switch。
 - `电视剧三级编辑嵌套边界`：电视剧列表与系列编辑器是左右两个顶层 SectionCard；系列基础、季度与分集不得继续用 SectionCard 套 SectionCard。右侧内部使用带关联标题的无框 `section` 与 `fieldset/legend` 字段组，标题分隔线表达层级；壳层迁移不得重排系列、季、集字段，也不得改写保存、删除、新增、绑定或加载状态的既有数据流。
 - `电视剧列表键盘与长文本边界`：系列列表中的每一项必须使用 `button[type="button"]`，继续调用既有选择 handler，并以 `aria-pressed` 同步暴露当前选中状态；focus-visible 焦点环应收在可滚动列表项内部，避免被外层裁剪。系列标题、启用状态和可播分集筛选都必须有独立中文可访问名称，不能只依赖 placeholder；动态系列标题与分集绑定视频文本只在各自精确容器设置 `min-width: 0` 和 `overflow-wrap: anywhere`，不得用全局 overflow 隐藏真实内容。

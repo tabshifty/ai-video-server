@@ -49,6 +49,12 @@ const phaseTwoFiles = [
   'TvAppManage.vue'
 ]
 const pendingShellViews = []
+const standaloneViews = {
+  'ToolboxEd2k.vue': 'form',
+  'ToolboxOrphanFiles.vue': 'form',
+  'ToolboxPasswordVault.vue': 'form',
+  'Login.vue': 'form'
+}
 
 const crudViews = [
   {
@@ -688,6 +694,77 @@ describe('Precision Ops 第一阶段 rollout', () => {
       expect(header, file).toContain(':close="close"')
       expect(template, file).toContain(`:loading="saving" @click="${saveHandler}"`)
     })
+  })
+})
+
+describe('Precision Ops 独立工具工作区', () => {
+  Object.entries(standaloneViews).forEach(([file, density]) => {
+    it(`${file} 保持独立标题工作区`, () => {
+      const source = readView(file)
+
+      expect(source).toContain(`data-density="${density}"`)
+      expect(source).toContain('<PageHeader')
+      expect(source).not.toContain('<Layout')
+    })
+  })
+
+  it('移除登录页装饰渐变与面板常驻阴影', () => {
+    const source = readView('Login.vue')
+
+    expect(source).not.toMatch(/(?:linear|radial)-gradient\(/)
+    expect(source).not.toMatch(/\.login-card\s*\{[^}]*box-shadow:/s)
+  })
+
+  it('密码库列表使用紧凑密度且两个对话框保持表单密度', () => {
+    const template = extractTemplate(readView('ToolboxPasswordVault.vue'))
+    const dialogs = template.match(/<el-dialog\b[\s\S]*?>/g) || []
+
+    expect(template).toMatch(/<SectionCard\s+data-density="compact">/)
+    expect(dialogs).toHaveLength(2)
+    dialogs.forEach((dialog) => expect(dialog).toContain('data-density="form"'))
+  })
+
+  it('独立工具无可见标签的主要输入提供中文可访问名称', () => {
+    const ed2k = readView('ToolboxEd2k.vue')
+    const passwordVault = readView('ToolboxPasswordVault.vue')
+
+    expect.soft(ed2k).toContain('aria-label="ED2K 链接文本"')
+    expect.soft(passwordVault).toContain('aria-label="密码库搜索"')
+    expect.soft(passwordVault).toContain('aria-label="密码内容"')
+  })
+
+  it('独立工作区限制页面横向溢出并收纳窄屏操作', () => {
+    const workspaceFiles = ['ToolboxEd2k.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue']
+
+    workspaceFiles.forEach((file) => {
+      const style = extractStyle(readView(file))
+      const rootRule = style.match(/\.tool-workspace\s*\{[^}]*\}/s)?.[0] || ''
+
+      expect.soft(rootRule, file).toContain('min-width: 0;')
+      expect.soft(rootRule, file).toContain('overflow-x: clip;')
+    })
+
+    const loginStyle = extractStyle(readView('Login.vue'))
+    const loginRootRule = loginStyle.match(/\.login-page\s*\{[^}]*\}/s)?.[0] || ''
+    const orphanStyle = extractStyle(readView('ToolboxOrphanFiles.vue'))
+    const passwordStyle = extractStyle(readView('ToolboxPasswordVault.vue'))
+
+    expect.soft(loginRootRule).toContain('min-width: 0;')
+    expect.soft(loginRootRule).toContain('overflow-x: clip;')
+    expect.soft(orphanStyle).toMatch(
+      /@media \(max-width: 63\.9375rem\)[\s\S]*?\.orphan-tool :deep\(\.section-card__actions\)\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s
+    )
+    expect.soft(passwordStyle).toMatch(
+      /@media \(max-width: 63\.9375rem\)[\s\S]*?\.password-vault-tool__url\s*\{[^}]*min-height:\s*44px;/s
+    )
+  })
+
+  it('独立工作区原生链接提供可见键盘焦点', () => {
+    const ed2kStyle = extractStyle(readView('ToolboxEd2k.vue'))
+    const passwordStyle = extractStyle(readView('ToolboxPasswordVault.vue'))
+
+    expect.soft(ed2kStyle).toMatch(/\.ed2k-link:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--line-focus\);/s)
+    expect.soft(passwordStyle).toMatch(/\.password-vault-tool__url:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--line-focus\);/s)
   })
 })
 

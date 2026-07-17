@@ -30,7 +30,7 @@ async function submit() {
 </script>
 
 <template>
-  <main class="login-page">
+  <main class="login-page" data-density="form">
     <section class="login-card" aria-label="管理员登录">
       <div class="login-brand">
         <div class="login-brand__mark">VS</div>
@@ -59,13 +59,13 @@ async function submit() {
 .login-page {
   min-height: 100vh;
   min-height: 100dvh;
+  min-width: 0;
   display: grid;
   align-items: center;
   justify-content: center;
+  overflow-x: clip;
   padding: var(--space-6);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--blue-50) 72%, transparent), transparent 48%),
-    var(--bg-canvas);
+  background: var(--bg-canvas);
 }
 
 .login-card {
@@ -76,7 +76,6 @@ async function submit() {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-xl);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-lg);
 }
 
 .login-brand {
