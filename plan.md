@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 17:34 +0800
+- 进度：Task 20 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。首轮 reason 焦点目标 32/44px 与尺寸断言边界、第二轮 Drawer 单一共享关闭入口与中文提示均已闭合；reviewer 的 Cannot verify 仅为按只读约束不重复执行主代理验证。压缩包导入工作台至此完成。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-20-report.md`、浏览器审计脚本与 8 张安全截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 21。
+- 验证：主线程在 `6a4b28a` 上新鲜运行管理端全量 39 文件 473/473、Vite 2373 modules 构建成功且仅既有 chunk-size warning；四视口本地合成数据矩阵 4/4 PASS，reason 目标为 32/32/44/44px，每视口仅 1 个中文 aria-label/title 的可见 Drawer 关闭按钮，0 横向溢出、0 mutation、0 控制台问题。5 文件白名单、API/依赖/router 零差异、`git diff --check` 与 UTF-8/U+FFFD/C0/DEL 门禁通过。
+
 ## 2026-07-17 17:25 +0800
 - 进度：Task 20 第二轮 review fix 完成提交前最终验证与自审。唯一批次 Drawer 现只渲染一个带稳定中文 aria-label/title 的共享关闭按钮，Element Plus slot `close` 保持原 dirty guard 与 closed 清理链路；5 个 Dialog、业务 handler/payload、页面专属 36/44px CSS、API/依赖/router 均未改。按分工未运行浏览器审计，也未访问认证、网络或真实日志。
 - 影响文件：最终只纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个 tracked 文件，并更新 git 忽略报告；不纳入 precision rollout、helpers、shared header、共享样式或其它文件。相对固定 Base 的 Task 20 总白名单仍精确为 5 个文件。
