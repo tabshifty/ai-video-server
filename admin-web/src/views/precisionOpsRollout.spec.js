@@ -51,6 +51,7 @@ const phaseTwoFiles = [
 const pendingShellViews = []
 const standaloneViews = {
   'ToolboxEd2k.vue': 'form',
+  'ToolboxEd2kDownload.vue': 'form',
   'ToolboxOrphanFiles.vue': 'form',
   'ToolboxPasswordVault.vue': 'form',
   'Login.vue': 'form'
@@ -746,17 +747,40 @@ describe('Precision Ops 独立工具工作区', () => {
     dialogs.forEach((dialog) => expect(dialog).toContain('data-density="form"'))
   })
 
+  it('ED2K 下载任务保持独立表单工作台与紧凑全宽列表', () => {
+    const source = readView('ToolboxEd2kDownload.vue')
+    const template = extractTemplate(source)
+    const rootMain = rootMainStartTag(source)
+    const style = extractStyle(source)
+    const listIndex = template.indexOf('<SectionCard class="task-list-card" data-density="compact">')
+    const detailIndex = template.indexOf('<SectionCard v-if="selectedTask">')
+
+    expect.soft(rootMain).toContain('class="tool-workspace"')
+    expect.soft(rootMain).toContain('data-density="form"')
+    expect.soft(template).toContain('<PageHeader')
+    expect.soft(template).not.toContain('<Layout')
+    expect(source).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
+    expect(template).toContain('<StatusIndicator')
+    expect(listIndex).toBeGreaterThanOrEqual(0)
+    expect(detailIndex).toBeGreaterThan(listIndex)
+    expect(template.match(/<SectionCard\b/g)).toHaveLength(3)
+    expect(style).toMatch(/\.task-workspace\s*\{[^}]*display:\s*grid;[^}]*gap:\s*var\(--space-4\);/s)
+    expect(style).not.toMatch(/\.task-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*24rem\)/s)
+  })
+
   it('独立工具无可见标签的主要输入提供中文可访问名称', () => {
     const ed2k = readView('ToolboxEd2k.vue')
+    const download = readView('ToolboxEd2kDownload.vue')
     const passwordVault = readView('ToolboxPasswordVault.vue')
 
     expect.soft(ed2k).toContain('aria-label="ED2K 链接文本"')
+    expect.soft(download).toContain('aria-label="ED2K 下载链接"')
     expect.soft(passwordVault).toContain('aria-label="密码库搜索"')
     expect.soft(passwordVault).toContain('aria-label="密码内容"')
   })
 
   it('独立工作区限制页面横向溢出并收纳窄屏操作', () => {
-    const workspaceFiles = ['ToolboxEd2k.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue']
+    const workspaceFiles = ['ToolboxEd2k.vue', 'ToolboxEd2kDownload.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue']
 
     workspaceFiles.forEach((file) => {
       const style = extractStyle(readView(file))
@@ -768,11 +792,18 @@ describe('Precision Ops 独立工具工作区', () => {
 
     const loginStyle = extractStyle(readView('Login.vue'))
     const loginRootRule = loginStyle.match(/\.login-page\s*\{[^}]*\}/s)?.[0] || ''
+    const downloadStyle = extractStyle(readView('ToolboxEd2kDownload.vue'))
     const orphanStyle = extractStyle(readView('ToolboxOrphanFiles.vue'))
     const passwordStyle = extractStyle(readView('ToolboxPasswordVault.vue'))
 
     expect.soft(loginRootRule).toContain('min-width: 0;')
     expect.soft(loginRootRule).toContain('overflow-x: clip;')
+    expect.soft(downloadStyle).toMatch(
+      /@media \(max-width: 63\.9375rem\)[\s\S]*?\.tool-workspace :deep\(\.el-button\),\s*\.crud-dialog :deep\(\.el-button\)\s*\{[^}]*min-height:\s*44px;/s
+    )
+    expect.soft(downloadStyle).toMatch(
+      /@media \(max-width: 63\.9375rem\)[\s\S]*?\.tool-workspace :deep\(\.page-header-shell__actions\),\s*\.task-list-card :deep\(\.section-card__actions\)\s*\{[^}]*flex-wrap:\s*wrap;/s
+    )
     expect.soft(orphanStyle).toMatch(
       /@media \(max-width: 63\.9375rem\)[\s\S]*?\.orphan-tool :deep\(\.section-card__actions\)\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s
     )

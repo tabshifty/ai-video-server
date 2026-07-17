@@ -6,6 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import {
   cleanAdminEd2kDownloadTaskFiles,
   createAdminEd2kDownloadTasks,
@@ -578,7 +579,7 @@ function buildDeleteTaskActionCopy(task) {
 </script>
 
 <template>
-  <main class="tool-workspace">
+  <main class="tool-workspace" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
         <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
@@ -590,14 +591,14 @@ function buildDeleteTaskActionCopy(task) {
       >
         <template #actions>
           <el-button type="primary" :icon="Plus" @click="openCreateDialog">新建任务</el-button>
-          <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
+          <StatusIndicator :label="selectedTaskLabel" :tone="selectedTaskTone" />
           <el-button :icon="RefreshRight" :loading="loadingTasks || loadingDownloadStatus" @click="manualRefresh">刷新工作台</el-button>
         </template>
       </PageHeader>
 
       <section class="workbench-status" aria-label="ED2K 下载引擎状态">
         <div class="workbench-status__main">
-          <el-tag :type="engineTone" effect="plain">{{ engineLevelLabel }}</el-tag>
+          <StatusIndicator :label="engineLevelLabel" :tone="engineTone" />
           <strong>{{ engineSummary }}</strong>
           <span v-if="engineLastError">最近错误：{{ engineLastError }}</span>
         </div>
@@ -610,9 +611,9 @@ function buildDeleteTaskActionCopy(task) {
       </section>
 
       <section class="task-workspace">
-        <SectionCard class="task-list-card">
+        <SectionCard class="task-list-card" data-density="compact">
           <template #title>下载任务</template>
-          <template #description>历史任务存在就直接命中，不再允许重复创建同一资源。</template>
+          <template #description>历史任务存在就直接命中，不再允许重复创建同一资源；列表按最近状态变更排序，选择任务后在详情区查看完整信息。</template>
           <template #actions>
             <div class="status-filters">
               <el-button
@@ -633,6 +634,7 @@ function buildDeleteTaskActionCopy(task) {
               class="task-row"
               :class="{ 'is-active': selectedTask && selectedTask.id === task.id }"
               type="button"
+              :aria-pressed="selectedTask?.id === task.id"
               @click="selectTask(task)"
             >
               <span class="task-row__head">
@@ -640,9 +642,10 @@ function buildDeleteTaskActionCopy(task) {
                 <span class="task-row__sub">{{ task.resourceHash }}</span>
               </span>
               <span class="task-row__meta">
-                <el-tag size="small" :type="taskStatusToneMap[task.status] || 'info'" effect="plain">
-                  {{ taskStatusLabelMap[task.status] || task.status }}
-                </el-tag>
+                <StatusIndicator
+                  :label="taskStatusLabelMap[task.status] || task.status"
+                  :tone="taskStatusToneMap[task.status] || 'info'"
+                />
                 <span>{{ formatFileSize(task.declaredSize) }}</span>
               </span>
             </button>
@@ -683,9 +686,11 @@ function buildDeleteTaskActionCopy(task) {
               </div>
             </div>
 
-            <SectionCard>
-              <template #title>预期文件信息</template>
-              <template #description>链接声明信息始终保留，用来核对这条任务原本打算下载什么。</template>
+            <section class="detail-section" aria-labelledby="expected-file-title">
+              <div class="detail-section__header">
+                <h3 id="expected-file-title" class="detail-section__title">预期文件信息</h3>
+                <p class="detail-section__description">链接声明信息始终保留，用来核对这条任务原本打算下载什么。</p>
+              </div>
               <div class="source-block">
                 <div class="source-block__row">
                   <span class="source-block__label">预期文件名</span>
@@ -696,13 +701,15 @@ function buildDeleteTaskActionCopy(task) {
                   <span class="source-block__value">{{ formatFileSize(selectedTask.declaredSize) }}</span>
                 </div>
               </div>
-            </SectionCard>
+            </section>
 
-            <SectionCard>
-              <template #title>状态反馈</template>
-              <template #description>状态提示只表达当前走到哪一步。</template>
+            <section class="detail-section" aria-labelledby="status-feedback-title">
+              <div class="detail-section__header">
+                <h3 id="status-feedback-title" class="detail-section__title">状态反馈</h3>
+                <p class="detail-section__description">状态提示只表达当前走到哪一步。</p>
+              </div>
               <div class="feedback-panel">
-                <el-tag :type="selectedTaskTone" effect="plain">{{ selectedTaskLabel }}</el-tag>
+                <StatusIndicator :label="selectedTaskLabel" :tone="selectedTaskTone" />
                 <p>{{ selectedTaskProgressText }}</p>
                 <p v-if="selectedTaskErrorMessage">{{ selectedTaskErrorMessage }}</p>
                 <p>任务创建时间：{{ formatDateTime(selectedTask.createdAt) }}</p>
@@ -712,11 +719,13 @@ function buildDeleteTaskActionCopy(task) {
                 <p v-if="selectedTask.finishedAt && !['queued', 'running', 'canceling'].includes(selectedTask.status)">{{ selectedTaskFinishedAtLabel }}：{{ formatDateTime(selectedTask.finishedAt) }}</p>
                 <p v-if="selectedTask.cleanedAt && ['files_cleaned', 'cancelled'].includes(selectedTask.status)">{{ selectedTaskCleanedAtLabel }}：{{ formatDateTime(selectedTask.cleanedAt) }}</p>
               </div>
-            </SectionCard>
+            </section>
 
-            <SectionCard>
-              <template #title>任务操作</template>
-              <template #description>这里保留后端管理动作：删除排队/失败/已取消任务、取消运行中任务、继续重试取消中的任务，已完成任务可清理暂存文件，已清理历史可重新下载。</template>
+            <section class="detail-section" aria-labelledby="task-actions-title">
+              <div class="detail-section__header">
+                <h3 id="task-actions-title" class="detail-section__title">任务操作</h3>
+                <p class="detail-section__description">这里保留后端管理动作：删除排队/失败/已取消任务、取消运行中任务、继续重试取消中的任务，已完成任务可清理暂存文件，已清理历史可重新下载。</p>
+              </div>
 
               <div class="action-row">
                 <el-button :disabled="!canDeleteSelectedTask" @click="deleteTask(selectedTask)">{{ selectedTaskDeleteActionLabel }}</el-button>
@@ -724,11 +733,13 @@ function buildDeleteTaskActionCopy(task) {
                 <el-button :disabled="!canRetrySelectedTask" @click="retryTask(selectedTask)">重新下载</el-button>
                 <el-button :disabled="!canRetrySelectedCleanup" @click="retryCleanup(selectedTask)">重试清理</el-button>
               </div>
-            </SectionCard>
+            </section>
 
-            <SectionCard>
-              <template #title>文件区</template>
-              <template #description>完成后显示最终文件，失败或进行中只显示已有快照。</template>
+            <section class="detail-section file-section" data-density="compact" aria-labelledby="task-files-title">
+              <div class="detail-section__header">
+                <h3 id="task-files-title" class="detail-section__title">文件区</h3>
+                <p class="detail-section__description">完成后显示最终文件，失败或进行中只显示已有快照。</p>
+              </div>
 
               <div v-if="selectedTaskHasFiles" class="file-list" aria-label="任务文件区">
                 <article v-for="file in selectedTaskFiles" :key="file.path" class="file-item">
@@ -744,11 +755,13 @@ function buildDeleteTaskActionCopy(task) {
                 title="暂无文件"
                 description="当前任务还没有可展示的落盘文件。"
               />
-            </SectionCard>
+            </section>
 
-            <SectionCard>
-              <template #title>历史记录</template>
-              <template #description>只要历史任务存在，就算已经下载过。</template>
+            <section class="detail-section" aria-labelledby="task-history-title">
+              <div class="detail-section__header">
+                <h3 id="task-history-title" class="detail-section__title">历史记录</h3>
+                <p class="detail-section__description">只要历史任务存在，就算已经下载过。</p>
+              </div>
 
               <div v-if="selectedTaskHistory.length > 0" class="history-list">
                 <article v-for="(item, index) in selectedTaskHistory" :key="`${selectedTask.id}-${item.kind}-${item.label}-${item.at || item.At || index}`" class="history-item">
@@ -759,7 +772,7 @@ function buildDeleteTaskActionCopy(task) {
               </div>
               <EmptyState v-else title="暂无历史" description="该任务还没有历史记录。" />
               <p v-if="hasHistoryHit" class="history-hit">当前资源已命中历史任务，不允许重建下载任务。</p>
-            </SectionCard>
+            </section>
           </div>
         </SectionCard>
       </section>
@@ -769,6 +782,7 @@ function buildDeleteTaskActionCopy(task) {
   <el-dialog
     v-model="createDialogVisible"
     class="crud-dialog"
+    data-density="form"
     title="新建下载任务"
     width="min(94vw, 720px)"
     destroy-on-close
@@ -781,6 +795,7 @@ function buildDeleteTaskActionCopy(task) {
         type="textarea"
         :rows="8"
         resize="vertical"
+        aria-label="ED2K 下载链接"
         placeholder="每行一个 ed2k:// 链接"
       />
       <div class="composer__bar">
@@ -799,9 +814,10 @@ function buildDeleteTaskActionCopy(task) {
             <strong>第 {{ item.lineNumber }} 行 · {{ item.message }}</strong>
             <span>{{ item.sourceLink }}</span>
             <div class="action-row">
-              <el-tag size="small" :type="getEd2kCreateResultMeta(item.status).tone" effect="plain">
-                {{ getEd2kCreateResultMeta(item.status).label }}
-              </el-tag>
+              <StatusIndicator
+                :label="getEd2kCreateResultMeta(item.status).label"
+                :tone="getEd2kCreateResultMeta(item.status).tone"
+              />
               <el-button v-if="item.task?.id" text type="primary" @click="focusTask(item.task)">定位任务</el-button>
             </div>
           </article>
@@ -821,12 +837,15 @@ function buildDeleteTaskActionCopy(task) {
 .tool-workspace {
   min-height: 100vh;
   min-height: 100dvh;
+  min-width: 0;
+  overflow-x: clip;
   background: var(--bg-canvas);
 }
 
 .tool-workspace__inner {
   display: grid;
   width: min(100%, 80rem);
+  min-width: 0;
   margin: 0 auto;
   padding: var(--space-6);
   gap: var(--space-5);
@@ -915,11 +934,15 @@ function buildDeleteTaskActionCopy(task) {
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-3);
+  height: var(--media-row-height);
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
   background: var(--bg-surface-muted);
+  color: var(--text-primary);
+  font: inherit;
   text-align: left;
+  cursor: pointer;
 }
 
 .task-row.is-active {
@@ -927,15 +950,25 @@ function buildDeleteTaskActionCopy(task) {
   background: var(--bg-surface);
 }
 
+.task-row:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: -2px;
+}
+
 .task-row__head,
 .task-row__meta {
-  display: flex;
   gap: var(--space-2);
   min-width: 0;
 }
 
 .task-row__head {
-  align-items: baseline;
+  display: grid;
+  gap: 0;
+  align-content: center;
+}
+
+.task-row__meta {
+  display: flex;
 }
 
 .task-row__head strong,
@@ -944,6 +977,7 @@ function buildDeleteTaskActionCopy(task) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: var(--leading-small);
 }
 
 .task-row__sub {
@@ -961,6 +995,37 @@ function buildDeleteTaskActionCopy(task) {
 .detail-stack {
   display: grid;
   gap: var(--space-4);
+}
+
+.detail-section {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.detail-section__header {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.detail-section__title,
+.detail-section__description {
+  margin: 0;
+}
+
+.detail-section__title {
+  color: var(--text-primary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  font-weight: 600;
+}
+
+.detail-section__description {
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
 }
 
 .source-block,
@@ -1013,10 +1078,13 @@ function buildDeleteTaskActionCopy(task) {
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface-muted);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.file-item:last-child,
+.history-item:last-child {
+  border-bottom: 0;
 }
 
 .file-item__main {
@@ -1038,14 +1106,15 @@ function buildDeleteTaskActionCopy(task) {
 
 .history-item {
   display: grid;
+  min-width: 0;
   gap: var(--space-1);
-  padding: var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface-muted);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .history-item span {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text-secondary);
   font-size: var(--text-small);
 }
@@ -1056,18 +1125,50 @@ function buildDeleteTaskActionCopy(task) {
   gap: var(--space-2);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 63.9375rem) {
   .tool-workspace__inner {
     padding: var(--space-4);
   }
 
-  .task-row {
-    grid-template-columns: 1fr;
+  .tool-workspace :deep(.page-header-shell) {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  .task-row__head,
-  .task-row__meta {
-    justify-content: flex-start;
+  .tool-workspace :deep(.page-header-shell__actions),
+  .task-list-card :deep(.section-card__actions) {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .tool-workspace :deep(.section-card__header) {
+    flex-wrap: wrap;
+  }
+
+  .tool-workspace :deep(.section-card__actions) {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .status-filters {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .tool-workspace :deep(.el-button),
+  .crud-dialog :deep(.el-button) {
+    min-height: 44px;
+  }
+
+  .crud-dialog :deep(.el-textarea__inner) {
+    min-height: 44px;
+  }
+
+  .composer__footer {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .composer__bar {

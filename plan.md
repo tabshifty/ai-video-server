@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 14:29 +0800
+- 进度：Task 19 完成提交前最终验证与自审。自审发现 52px 任务行的两行文本在原纵向 padding 下少 2px，补测试取得 1 failed / 7 passed 的准确 RED，再以 `space-1` 纵向 padding 和统一 small line-height 闭合 GREEN；其余根/密度、全宽顺序、状态指示、无嵌套、Dialog、窄屏、业务命令与长期契约均无阻塞问题。
+- 影响文件：最终只纳入 `admin-web/src/views/ToolboxEd2kDownload.vue`、`ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件；git 忽略报告不纳入，不修改 API、依赖、router、其它页面、Android 或后端，不推进 Task 20。
+- 验证：最终 Task 19 定向 69/69、管理端完整 `npm test` 39 文件 460/460、`npm run build` 转换 2373 modules 成功且仅既有 chunk-size warning；`git diff --check`、5 文件白名单、U+FFFD/C0/DEL、语义样式、无 Layout、3 个 SectionCard、API/依赖/router 零差异及脚本归一化门禁均通过。按 brief 不执行浏览器验收。
+
+## 2026-07-17 14:22 +0800
+- 进度：Task 19 最小生产实现取得定向 GREEN。独立根与新建 Dialog 分别声明 `form`，任务列表声明 `compact` 并保持在全宽详情之前；既有状态位置复用 `StatusIndicator`，原生任务按钮补选中/focus/固定媒体行，详情五个内部卡片改为带标题分隔线的无框语义 section，窄屏动作统一收纳到 44px。任务列表说明继续保留原“历史任务存在就直接命中”业务文案。
+- 影响文件：已修改目标 SFC、两份目标 spec、`CONTEXT.md`、`plan.md`，并新增 git 忽略报告；未修改 API、依赖、router、其它页面或后端。
+- 验证：Task 19 定向测试通过（2 文件，69/69）；去除唯一新增 `StatusIndicator` import 后 `<script setup>` 相对固定 Base 逐字一致，API、依赖、router 零差异。待完整 `npm test`、`npm run build` 与最终静态/敏感门禁。
+
+## 2026-07-17 14:18 +0800
+- 进度：Task 19 真实 SFC 契约取得严格 RED；两份既有下载业务/API 测试继续通过，新增测试精确提取 PageHeader、任务工作区、详情卡、原生任务按钮和新建 Dialog，锁定独立根 `form`、列表 `compact`、语义状态、选中/focus/固定行高、无卡片嵌套、中文 textarea 名称和窄屏收纳。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js` 与 `plan.md`；生产 SFC、`CONTEXT.md`、API、依赖和 router 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/ToolboxEd2kDownload.spec.js src/views/precisionOpsRollout.spec.js` 按预期退出 1（2 文件，69 tests，10 failed / 59 passed）；失败全部对应目标页面尚缺契约，无测试语法、环境或既有业务断言错误。
+
+## 2026-07-17 14:12 +0800
+- 进度：开始 Task 19，把 `ToolboxEd2kDownload` 升级为独立 `form` 下载工作台；任务列表继续位于详情之前并占用全宽，集合显式使用 `compact`，详情内部改为无框语义区块，同时保留全部下载业务、确认链路、轮询、筛选与原生任务选择 handler，不推进 Task 20。
+- 影响文件：计划精确修改 `admin-web/src/views/ToolboxEd2kDownload.vue`、`ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件，并写入 git 忽略的 `.superpowers/sdd/task-19-report.md`；不修改 API、依赖、router、其它页面或后端。
+- 验证：先补真实 SFC 契约并运行 `cd admin-web && npm test -- src/views/ToolboxEd2kDownload.spec.js src/views/precisionOpsRollout.spec.js` 取得准确 RED；最小实现后依次运行同一定向测试、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、5 文件白名单、API/依赖/router 零差异及 `<script setup>` 相对固定 Base `ccb722ab4c32e4ff3e5b1f9ee91523fc80215e3a` 归一化零差异门禁。
+
 ## 2026-07-17 14:06 +0800
 - 进度：Task 18 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，Cannot verify 为无。首轮唯一 Important 已由 `8170c21` 的合成 SFC/root main 精确契约闭合；四个独立页面 × 1440/1024/768/375px 浏览器矩阵为 PASS、0 failure，独立 PageHeader/无 Layout、form/compact 密度、登录单色无阴影、ED2K 链接焦点、孤儿指标响应式和密码页紧凑边界均符合要求。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-18-report.md`、浏览器审计脚本/矩阵与 8 张安全截图；孤儿扫描和密码库使用本地空数据履约且不截图，登录截图前清空并隐藏临时 DOM 字段。不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 19。
