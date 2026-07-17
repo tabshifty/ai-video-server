@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 08:29 +0800
+- 进度：Task 13 安装包查询身份与末页空态修复完成提交前自审和新鲜验证。实际请求参数与 identity 同源，异身份 raw cache 不可见，success/catch/finally 均受最新序号+身份双门禁；当前身份的指标、表格、分页及总数驱动空态闭合，未改 API、路由、二维码、IPTV 或业务 action。正式独立复审由主线程在提交后基于固定 review package 执行，本工作树中间态不替代该门禁。
+- 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/TvAppManage.vue`、`tvAppManagePage.spec.js`、`tvAppManage.requestState.js`、`tvAppManage.requestState.spec.js` 共 6 个文件；忽略报告 `.superpowers/sdd/task-13-report.md` 在提交后回填 SHA，`admin-web/dist/` 不纳入提交。
+- 验证：Task 13 原四文件加 helper 定向通过（5 文件，55/55）；`cd admin-web && npm test` 通过（39 文件，412/412）；`npm run build` 成功（2373 modules transformed，仅既有 chunk-size warning）；`git diff --check`、6 文件白名单、U+FFFD/C0/DEL 及 API/依赖/路由/二维码/IPTV 零差异检查全部通过，TvApp diff 仅涉及请求状态、当前缓存投影与对应模板绑定。待使用提交信息 `修复：隔离安装包查询缓存` 精确提交。
+
+## 2026-07-17 08:26 +0800
+- 进度：Task 13 两个 Important 完成最小实现并取得初步 GREEN。新增纯逻辑 helper，以实际发送的 7 项参数口径生成请求身份、按 active/cached identity 投影缓存，并用序号+身份双门禁拒绝迟到成功、失败和 finally 写状态；页面指标、骨架、表格与分页只消费当前身份投影，真正空态改由当前查询总数判断，`total_count > 0 && items=[]` 继续保留空表和分页。搜索输入本身不切换 active identity，只有 `load()` 建立新身份。
+- 影响文件：修改 `TvAppManage.vue`、`tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`，新增 `tvAppManage.requestState.js`、`tvAppManage.requestState.spec.js`；不修改 API、依赖、路由、二维码 helper、IPTV 或业务 action/确认流程。
+- 验证：helper 与页面测试初步通过（2 文件，16/16）；待执行 Task 13 正式四文件加 helper 定向、管理端全量、生产构建、独立复审和全部静态/敏感范围门禁，初步 GREEN 不复用作最终证据。
+
+## 2026-07-17 08:22 +0800
+- 进度：Task 13 安装包查询身份与末页空态修复取得严格行为 RED。页面测试 11 项中 4 项失败，分别命中 raw rows 骨架/gate、缺少请求身份与迟到响应门禁、`items.length` 错误空态及 raw total 指标；helper wished-for API 先确认缺模块，再以错误返回值骨架运行出 5/5 行为失败，覆盖实际 7 参数身份、同/异身份缓存、总数非零空页和序号+身份判断。
+- 影响文件：RED 阶段修改 `tvAppManagePage.spec.js`，新增 `tvAppManage.requestState.spec.js` 与仅返回错误值的最小 helper 骨架，追加 `plan.md`；`TvAppManage.vue`、`CONTEXT.md`、API、业务 action、IPTV、路由、依赖和二维码 helper 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/tvAppManagePage.spec.js` 按预期退出 1（4 failed / 7 passed）；helper 初次运行因 wished-for 模块缺失退出 1，补编译骨架后 `npm test -- src/views/tvAppManage.requestState.spec.js` 按预期退出 1（5/5 failed），所有失败均来自缺失行为而非错误断言。
+
+## 2026-07-17 08:19 +0800
+- 进度：开始闭合 Task 13 独立复审 2 个 Important。代码路径确认安装包 raw `data` 没有查询身份，`load()` 也没有请求序号：切换客户端/筛选/分页后旧行仍按当前 `clientType` 暴露下载与发布命令，迟到响应可覆盖新状态；同时 `items.length === 0` 把“当前页无行但总数非零”误判为全局空态并隐藏分页。严格先写行为 RED，再用最小请求 params/key、缓存身份和序号门禁修复，不推进 Task 14。
+- 影响文件：计划修改 `admin-web/src/views/TvAppManage.vue`、`tvAppManagePage.spec.js`，新增小型 `tvAppManage.requestState.js` 及其测试，并追加 `CONTEXT.md`、`plan.md`、忽略报告；不修改 API、依赖、路由、二维码 helper、IPTV 或业务 action/确认流程。
+- 验证：待执行两缺陷精确 RED、helper/page GREEN、Task 13 四文件与 helper 定向、`cd admin-web && npm test`、`npm run build`、`git diff --check`、本波次文件白名单、U+FFFD/C0/DEL 及 API/依赖/路由/二维码/IPTV/业务 action 敏感检查。
+
 ## 2026-07-17 07:56 +0800
 - 进度：Task 13 IPTV 来源区嵌套卡片视觉问题完成提交前自审与验证。新语义 section 与 h2 关联正确，外层没有边框/背景/阴影，两个工具面板是唯一内层表面；最新 Web Interface Guidelines 审查未发现本次差异新增的可访问性、焦点、交互或内容层级问题，无阻塞 concern。
 - 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/IPTVManage.vue`、`precisionOpsRollout.spec.js` 共 4 个 tracked 文件；忽略报告在提交后追加最终 SHA。TvApp、API、路由、依赖、二维码 helper 与 IPTV script 不纳入也无差异。

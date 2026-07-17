@@ -9,6 +9,7 @@ const uploadAPKBlock = tvAppManage.match(/async function uploadAPK[\s\S]*?\n}\n\
 const qrBlock = tvAppManage.match(/async function refreshDownloadQRCode\(\) \{[\s\S]*?\n\}/)?.[0] || ''
 const loadBlock = tvAppManage.match(/async function load\(\) \{[\s\S]*?\n\}(?=\n\nfunction resetQuery)/)?.[0] || ''
 const loadCatchBlock = loadBlock.match(/} catch \(error\) \{[\s\S]*?(?=\n  } finally \{)/)?.[0] || ''
+const loadFinallyBlock = loadBlock.match(/} finally \{[\s\S]*?(?=\n  \}\n\})/)?.[0] || ''
 const template = tvAppManage.match(/<template>([\s\S]*?)<\/template>\s*\n\s*<style scoped>/)?.[1] || ''
 
 describe('TV app package management page', () => {
@@ -75,14 +76,14 @@ describe('TV app package management page', () => {
     const qrIndex = template.indexOf('<template #title>{{ downloadQRCodeTitle }}</template>')
     const uploadIndex = template.indexOf('<template #title>上传 APK</template>')
     const skeletonIndex = template.indexOf('<el-skeleton v-if="initialLoading"')
-    const contentIndex = template.indexOf('<template v-else-if="!loadError || data.items.length > 0">')
+    const contentIndex = template.indexOf('<template v-else-if="!loadError || hasCurrentResult">')
     const dataContent = template.slice(contentIndex)
 
     expect(tvAppManage).toContain("import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'")
     expect(tvAppManage).toContain('const loading = ref(true)')
     expect(tvAppManage).toContain("const loadError = ref('')")
     expect(tvAppManage).toMatch(
-      /const initialLoading = computed\(\(\) => shouldShowCrudCollectionSkeleton\(\{\s*loading: loading\.value,\s*rowCount: data\.items\.length\s*\}\)\)/
+      /const initialLoading = computed\(\(\) => shouldShowCrudCollectionSkeleton\(\{\s*loading: loading\.value,\s*rowCount: currentItems\.value\.length\s*\}\)\)/
     )
     expect(loadBlock.indexOf("loadError.value = ''")).toBeGreaterThanOrEqual(0)
     expect(loadBlock.indexOf("loadError.value = ''")).toBeLessThan(loadBlock.indexOf('try {'))
@@ -101,13 +102,61 @@ describe('TV app package management page', () => {
     expect(dataContent).toContain('<template #title>发布记录</template>')
     expect(dataContent).not.toContain('<template #title>{{ downloadQRCodeTitle }}</template>')
     expect(dataContent).not.toContain('<template #title>上传 APK</template>')
-    expect(dataContent).toContain('<EmptyState v-if="data.items.length === 0"')
+    expect(dataContent).toContain('<EmptyState v-if="currentTotalCount === 0"')
+  })
+
+  it('只渲染当前请求身份的缓存并拒绝迟到响应改写状态', () => {
+    const requestIndex = loadBlock.indexOf('const request = buildTVAppReleaseRequest({')
+    const activeIndex = loadBlock.indexOf('activeRequestKey.value = request.key')
+    const fetchIndex = loadBlock.indexOf('const result = await getAdminTVAppReleases(request.params)')
+    const successGuardIndex = loadBlock.indexOf('if (!isCurrentTVAppReleaseRequest(token, latestRequest)) return', fetchIndex)
+    const applyIndex = loadBlock.indexOf('applyResult(result)')
+    const cacheIndex = loadBlock.indexOf('cachedRequestKey.value = request.key')
+
+    expect(tvAppManage).toContain("from './tvAppManage.requestState'")
+    expect(tvAppManage).toContain('let loadSequence = 0')
+    expect(tvAppManage).toContain("const activeRequestKey = ref('')")
+    expect(tvAppManage).toContain('const cachedRequestKey = ref(null)')
+    expect(tvAppManage).toContain('const currentCollection = computed(() => selectTVAppReleaseCache({')
+    expect(tvAppManage).toContain('activeRequestKey: activeRequestKey.value')
+    expect(tvAppManage).toContain('cachedRequestKey: cachedRequestKey.value')
+    expect(tvAppManage).toContain('const hasCurrentResult = computed(() => currentCollection.value.hasCurrentResult)')
+    expect(tvAppManage).toContain('const currentItems = computed(() => currentCollection.value.items)')
+    expect(tvAppManage).toContain('const currentTotalCount = computed(() => currentCollection.value.totalCount)')
+    expect(template).toContain(':data="currentItems"')
+    expect(template).not.toContain(':data="data.items"')
+
+    expect(requestIndex).toBeGreaterThanOrEqual(0)
+    expect(activeIndex).toBeGreaterThan(requestIndex)
+    expect(fetchIndex).toBeGreaterThan(activeIndex)
+    expect(successGuardIndex).toBeGreaterThan(fetchIndex)
+    expect(applyIndex).toBeGreaterThan(successGuardIndex)
+    expect(cacheIndex).toBeGreaterThan(applyIndex)
+    expect(loadCatchBlock).toContain('if (!isCurrentTVAppReleaseRequest(token, latestRequest)) return')
+    expect(loadCatchBlock.indexOf('if (!isCurrentTVAppReleaseRequest(token, latestRequest)) return')).toBeLessThan(
+      loadCatchBlock.indexOf("loadError.value = extractErrorMessage(error, '加载安装包列表失败')")
+    )
+    expect(loadFinallyBlock).toContain('if (isCurrentTVAppReleaseRequest(token, latestRequest))')
+    expect(loadFinallyBlock.indexOf('if (isCurrentTVAppReleaseRequest(token, latestRequest))')).toBeLessThan(
+      loadFinallyBlock.indexOf('loading.value = false')
+    )
+  })
+
+  it('按当前查询总数判断真正空态并保留非零总数的分页入口', () => {
+    const releaseSection = template.slice(template.indexOf('<template #title>发布记录</template>'))
+
+    expect(releaseSection).toContain('<EmptyState v-if="currentTotalCount === 0"')
+    expect(releaseSection).toContain('<template v-else>')
+    expect(releaseSection).toContain(':data="currentItems"')
+    expect(releaseSection).toContain(':total="currentTotalCount"')
+    expect(releaseSection).not.toContain('v-if="data.items.length === 0"')
+    expect(releaseSection).not.toContain('v-if="!data.total_count"')
   })
 
   it('摘要只展示既有事实并逐项标明当前筛选或当前页口径', () => {
     expect(tvAppManage).toContain("import MetricStrip from '../components/base/MetricStrip.vue'")
     expect(tvAppManage).toContain('<MetricStrip :items="summaryMetrics" aria-label="安装包摘要" />')
-    expect(tvAppManage).toContain("{ key: 'total', label: '记录总数', value: data.total_count, scope: '当前筛选·全部页' }")
+    expect(tvAppManage).toContain("{ key: 'total', label: '记录总数', value: currentTotalCount.value, scope: '当前筛选·全部页' }")
     expect(tvAppManage).toContain("{ key: 'visible', label: '家庭可见', value: visibleCount.value, scope: '当前页' }")
     expect(tvAppManage).toContain("scope: '当前页'")
     expect(tvAppManage).toContain("{ key: 'recommended', label: '推荐版本', value: latestItem.value ? `${latestItem.value.version_name} (${latestItem.value.version_code})` : '暂无', scope: '当前页' }")

@@ -14,6 +14,11 @@ import { formatAdminDateTime } from '../utils/dateTime'
 import { shouldShowCrudCollectionSkeleton } from './crudCollectionState'
 import { buildTVAppDownloadPageURL, getTVAppDownloadQRCodeTitle } from './tvAppManage.qr'
 import {
+  buildTVAppReleaseRequest,
+  isCurrentTVAppReleaseRequest,
+  selectTVAppReleaseCache
+} from './tvAppManage.requestState'
+import {
   deleteAdminTVAppReleaseDraft,
   downloadAdminTVAppReleaseURL,
   getAdminTVAppReleases,
@@ -53,6 +58,10 @@ const savingId = ref(0)
 const actionId = ref(0)
 const uploadFiles = ref([])
 const downloadQRCodeDataURL = ref('')
+const activeRequestKey = ref('')
+const cachedRequestKey = ref(null)
+let loadSequence = 0
+let latestRequest = { sequence: 0, key: '' }
 const query = reactive({
   page: 1,
   page_size: 20,
@@ -70,18 +79,27 @@ const data = reactive({
 
 const clientMeta = computed(() => CLIENTS[clientType.value] || CLIENTS.android_tv)
 const downloadQRCodeTitle = computed(() => getTVAppDownloadQRCodeTitle(clientType.value))
-const visibleCount = computed(() => data.items.filter((item) => item.visible_to_family).length)
-const latestItem = computed(() => data.items.find((item) => item.latest_recommended) || null)
+const currentCollection = computed(() => selectTVAppReleaseCache({
+  activeRequestKey: activeRequestKey.value,
+  cachedRequestKey: cachedRequestKey.value,
+  items: data.items,
+  totalCount: data.total_count
+}))
+const hasCurrentResult = computed(() => currentCollection.value.hasCurrentResult)
+const currentItems = computed(() => currentCollection.value.items)
+const currentTotalCount = computed(() => currentCollection.value.totalCount)
+const visibleCount = computed(() => currentItems.value.filter((item) => item.visible_to_family).length)
+const latestItem = computed(() => currentItems.value.find((item) => item.latest_recommended) || null)
 const missingCount = computed(() => {
-  if (clientMeta.value.supportsAbi) return data.items.filter((item) => !item.abi_complete).length
-  return data.items.filter((item) => item.publish_status === 'draft').length
+  if (clientMeta.value.supportsAbi) return currentItems.value.filter((item) => !item.abi_complete).length
+  return currentItems.value.filter((item) => item.publish_status === 'draft').length
 })
 const initialLoading = computed(() => shouldShowCrudCollectionSkeleton({
   loading: loading.value,
-  rowCount: data.items.length
+  rowCount: currentItems.value.length
 }))
 const summaryMetrics = computed(() => [
-  { key: 'total', label: '记录总数', value: data.total_count, scope: '当前筛选·全部页' },
+  { key: 'total', label: '记录总数', value: currentTotalCount.value, scope: '当前筛选·全部页' },
   { key: 'visible', label: '家庭可见', value: visibleCount.value, scope: '当前页' },
   {
     key: 'incomplete',
@@ -169,23 +187,28 @@ function applyResult(result) {
 }
 
 async function load() {
+  const request = buildTVAppReleaseRequest({
+    query,
+    clientType: clientType.value,
+    supportsAbi: clientMeta.value.supportsAbi
+  })
+  const token = { sequence: ++loadSequence, key: request.key }
+  latestRequest = token
+  activeRequestKey.value = request.key
   loadError.value = ''
   loading.value = true
   try {
-    const params = {
-      page: query.page,
-      page_size: query.page_size,
-      current_published: query.current_published ? 1 : 0,
-      client_type: clientType.value
-    }
-    if (query.q.trim()) params.q = query.q.trim()
-    if (query.status) params.status = query.status
-    if (query.abi_completeness && clientMeta.value.supportsAbi) params.abi_completeness = query.abi_completeness
-    applyResult(await getAdminTVAppReleases(params))
+    const result = await getAdminTVAppReleases(request.params)
+    if (!isCurrentTVAppReleaseRequest(token, latestRequest)) return
+    applyResult(result)
+    cachedRequestKey.value = request.key
   } catch (error) {
+    if (!isCurrentTVAppReleaseRequest(token, latestRequest)) return
     loadError.value = extractErrorMessage(error, '加载安装包列表失败')
   } finally {
-    loading.value = false
+    if (isCurrentTVAppReleaseRequest(token, latestRequest)) {
+      loading.value = false
+    }
   }
 }
 
@@ -408,16 +431,16 @@ onMounted(() => {
 
       <el-skeleton v-if="initialLoading" :rows="8" animated />
 
-      <template v-else-if="!loadError || data.items.length > 0">
+      <template v-else-if="!loadError || hasCurrentResult">
         <MetricStrip :items="summaryMetrics" aria-label="安装包摘要" />
 
         <SectionCard dense>
           <template #title>发布记录</template>
           <template #description>{{ clientMeta.supportsAbi ? '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态、版本和 ABI 完整性叠加筛选。' : '默认查看全部记录，可切换为只看当前家庭可见记录，并支持按状态和版本筛选。' }}</template>
-          <EmptyState v-if="data.items.length === 0" :title="clientMeta.emptyTitle" :description="clientMeta.emptyDesc" />
+          <EmptyState v-if="currentTotalCount === 0" :title="clientMeta.emptyTitle" :description="clientMeta.emptyDesc" />
           <template v-else>
             <div class="table-wrap">
-              <el-table v-loading="loading" class="package-table" :data="data.items" border row-key="id">
+              <el-table v-loading="loading" class="package-table" :data="currentItems" border row-key="id">
                 <el-table-column label="版本" min-width="220">
                   <template #default="{ row }">
                     <div class="version-cell">
@@ -526,7 +549,7 @@ onMounted(() => {
                 v-model:current-page="query.page"
                 v-model:page-size="query.page_size"
                 layout="total, prev, pager, next"
-                :total="data.total_count"
+                :total="currentTotalCount"
                 @current-change="load"
                 @size-change="load"
               />
