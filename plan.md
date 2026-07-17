@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 19:51 +0800
+- 进度：Task 21 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。正式 reviewer 的 radio 44px 与测试精度 finding、浏览器发现的共享折叠按钮/关闭提示/Mask footer、以及第二次浏览器定位的 Teleport selector 与 Drawer 桌面尺寸均已闭合；图像生成与遮罩工作台至此完成。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-21-report.md`、安全浏览器脚本、矩阵 JSON 与 12 张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 22。
+- 验证：主线程在 `2b8647b` 上新鲜运行管理端全量 39 文件 483/483、Vite 2373 modules 构建成功且仅既有 chunk-size warning；四视口本地合成数据矩阵 4/4 PASS，结果/图库列数、184px 轨道、SectionCard 36/44px、Drawer 36/44px、Mask radio/清空按钮 36/44px、单一中文关闭入口、canvas 非空与 footer 视口内均通过。合成 IDB 初始为空且已清理，API 9 次均为本地 GET、0 mutation、0 控制台问题；固定 Base 八文件、API/依赖/router 零差异、`git diff --check`、UTF-8/U+FFFD/C0/DEL 与颜色门禁通过。
+
 ## 2026-07-17 19:30 +0800
 - 进度：Task 21 第二小波完成提交前最终验证与自审。Drawer 专属全局关闭目标契约和 Mask Teleport 全局视口约束均闭合；本波次两份业务脚本相对上一提交逐字一致，固定 Base 归一化后无业务差异，Drawer/Dialog opening props/events、Mask 五个 pointer 绑定、capture/release 与 emit 均保持。按分工不执行浏览器复验，由主代理在新提交上复测四视口。
 - 影响文件：本提交只纳入 `admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`plan.md` 共 5 个 tracked 文件，并更新 git 忽略报告；固定 Base 总差异仍精确为既定 8 文件，不修改 `SectionCard.vue`、共享组件 spec、`CONTEXT.md`、API、依赖、router 或其它文件。
