@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 14:06 +0800
+- 进度：Task 18 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，Cannot verify 为无。首轮唯一 Important 已由 `8170c21` 的合成 SFC/root main 精确契约闭合；四个独立页面 × 1440/1024/768/375px 浏览器矩阵为 PASS、0 failure，独立 PageHeader/无 Layout、form/compact 密度、登录单色无阴影、ED2K 链接焦点、孤儿指标响应式和密码页紧凑边界均符合要求。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-18-report.md`、浏览器审计脚本/矩阵与 8 张安全截图；孤儿扫描和密码库使用本地空数据履约且不截图，登录截图前清空并隐藏临时 DOM 字段。不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 19。
+- 验证：主线程在 `8170c21` 上新鲜运行 Task 18 定向 66/66、管理端全量 39 文件 453/453、Vite 2373 modules 构建成功且仅既有 chunk-size warning；16/16 视口均为 0 document overflow、0 小控件、0 mutation、0 应用控制台问题，孤儿指标列为 4/2/1/1、密码 compact 卡始终为 1、ED2K 合成链接四视口均有 2px 可见焦点。`git diff --check`、U+FFFD/C0/DEL、API/依赖/router、四页业务脚本及干净工作区门禁通过。
+
 ## 2026-07-17 14:01 +0800
 - 进度：Task 18 第一轮 review fix 完成最终验证与自审。合成 SFC 明确证明内部 Dialog density 不能冒充根 main density；实际四页只从 template 顶层 main start tag 校验 `form`，PageHeader/无 Layout 仍限定在 template。未修改或回退任何生产文件，不推进 Task 19。
 - 影响文件：最终只纳入 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md` 两个 tracked 文件，并更新 git 忽略报告；`CONTEXT.md`、四个生产 SFC、其它生产代码/API、依赖、router 均不纳入且相对 `cb849bc` 零差异。
