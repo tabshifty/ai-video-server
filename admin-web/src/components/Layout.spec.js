@@ -10,8 +10,8 @@ function findBlock(source, pattern) {
   return match?.[0] || ''
 }
 
-function findFunctionBlock(name) {
-  return findBlock(layout, new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm'))
+function findFunctionBlock(name, source = layout) {
+  return findBlock(source, new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm'))
 }
 
 function findRule(source, selector) {
@@ -34,9 +34,22 @@ describe('Layout shell', () => {
     expect(layout).toMatch(/CommandPalette|command-palette/i)
   })
 
-  it('persists the sidebar collapse preference and profile chip', () => {
+  it('把壳层偏好写入及容错限定在持久化函数内', () => {
+    const persistBlock = findFunctionBlock('persistShellPreference')
+    const unsafeFixture = `function persistShellPreference(key, value) {
+  if (typeof window === 'undefined') return
+}
+function unrelatedWrite(key, value) {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch (_) {}
+}`
+
     expect(layout).toContain('admin-sidebar-collapsed')
     expect(layout).toMatch(/profile/i)
+    expect(persistBlock).toContain('window.localStorage.setItem(key, value)')
+    expect(persistBlock).toMatch(/try \{[\s\S]*?window\.localStorage\.setItem\(key, value\)[\s\S]*?\} catch \(_\) \{/)
+    expect(findFunctionBlock('persistShellPreference', unsafeFixture)).not.toContain('window.localStorage.setItem')
   })
 
   it('keeps a visible expand affordance in the collapsed sidebar', () => {
@@ -110,16 +123,44 @@ describe('Layout shell', () => {
     expect(drawerNav).not.toContain(':aria-label="item.label"')
   })
 
+  it('只把四个新增导航装饰图标隐藏于辅助技术', () => {
+    const desktopRecent = findBlock(layout, /<section v-if="recentNavItems\.length" class="nav-group nav-group--recent"[\s\S]*?<\/section>/)
+    const desktopGroupButton = findBlock(layout, /<button\s+class="nav-group__label"[\s\S]*?<\/button>/)
+    const mobileRecent = findBlock(layout, /<section v-if="recentNavItems\.length" class="drawer-nav__group drawer-nav__group--recent"[\s\S]*?<\/section>/)
+    const mobileGroupButton = findBlock(layout, /<button\s+class="drawer-nav__label"[\s\S]*?<\/button>/)
+    const decorativeIcons = [
+      findBlock(desktopRecent, /<el-icon\b[^>]*>\s*<component :is="resolveIcon\(item\.icon\)" \/>\s*<\/el-icon>/),
+      findBlock(desktopGroupButton, /<el-icon\b(?=[^>]*class="nav-group__chevron")[^>]*>[\s\S]*?<ArrowRight \/>[\s\S]*?<\/el-icon>/),
+      findBlock(mobileRecent, /<el-icon\b[^>]*>\s*<component :is="resolveIcon\(item\.icon\)" \/>\s*<\/el-icon>/),
+      findBlock(mobileGroupButton, /<el-icon\b(?=[^>]*class="nav-group__chevron")[^>]*>[\s\S]*?<ArrowRight \/>[\s\S]*?<\/el-icon>/)
+    ]
+
+    expect(decorativeIcons).toHaveLength(4)
+    for (const icon of decorativeIcons) {
+      expect(icon).toContain('aria-hidden="true"')
+    }
+  })
+
   it('uses shared expanded groups and precise responsive workspace spacing', () => {
+    const mediaStart = style.indexOf('@media (max-width: 63.9375rem)')
+    const narrowStart = style.indexOf('@media (max-width: 47.9375rem)', mediaStart)
+    const baseStyle = style.slice(0, mediaStart)
+    const mediaStyle = style.slice(mediaStart, narrowStart)
+    const narrowStyle = style.slice(narrowStart)
+
     expect(layout.match(/v-for="group in navGroups"/g) || []).toHaveLength(2)
     expect(layout.match(/v-show="isGroupExpanded\(group.key\)"/g) || []).toHaveLength(2)
-    expect(layout).toContain('height: var(--admin-header-height);')
-    expect(layout).toContain('padding: var(--space-5);')
-    expect(layout).toContain('@media (max-width: 63.9375rem)')
-    expect(layout).toContain('padding: var(--space-4);')
-    expect(layout).toContain('@media (max-width: 47.9375rem)')
-    expect(layout).toContain('padding: var(--space-3);')
-    expect(layout).toContain('min-height: 44px;')
+    expect(mediaStart).toBeGreaterThan(-1)
+    expect(narrowStart).toBeGreaterThan(mediaStart)
+    expect(findRule(baseStyle, '.shell-header')).toContain('height: var(--admin-header-height)')
+    expect(findRule(baseStyle, '.shell-header')).toContain('padding: 0 var(--space-5)')
+    expect(findRule(baseStyle, '.shell-main')).toContain('padding: var(--space-5)')
+    expect(findRule(mediaStyle, '.shell-header')).toContain('padding: 0 var(--space-4)')
+    expect(findRule(mediaStyle, '.command-trigger')).toContain('min-height: 44px')
+    expect(findRule(mediaStyle, '.shell-main')).toContain('padding: var(--space-4)')
+    expect(findRule(narrowStyle, '.shell-header')).toContain('padding: 0 var(--space-3)')
+    expect(findRule(narrowStyle, '.command-trigger')).toContain('height: 44px')
+    expect(findRule(narrowStyle, '.shell-main')).toContain('padding: var(--space-3)')
     expect(layout).not.toContain('letter-spacing: 0.08em;')
   })
 

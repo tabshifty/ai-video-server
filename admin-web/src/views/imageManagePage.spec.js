@@ -64,6 +64,20 @@ function tokensAppearInOrder(sourceText, tokens) {
     && indexes.every((index, position) => position === 0 || indexes[position - 1] < index)
 }
 
+function handlesUploadRefreshResult(sourceText) {
+  const block = extractBalancedBraceBlock(sourceText, /async function submitUpload\(\)\s*\{/)
+  if (!block) return false
+
+  const loadIndex = block.body.indexOf('const loaded = await load()')
+  const failureBlock = extractBalancedBraceBlock(block.body, /if\s*\(loaded === false\)\s*\{/)
+  return Boolean(
+    loadIndex >= 0
+    && failureBlock
+    && failureBlock.openingIndex > loadIndex
+    && failureBlock.body.includes("ElMessage.warning('上传完成，但刷新图片列表失败')")
+  )
+}
+
 function ownsSnapshotApplyOrder(sourceText) {
   const block = extractBalancedBraceBlock(sourceText, /function applyImageViewSnapshot\(snapshot\)\s*\{/)
   if (!block) return false
@@ -346,6 +360,28 @@ async function load() {
     expect(removeBlock?.body).toMatch(/catch \(error\) \{[\s\S]*?listError\.value/)
     expect(template).toContain('@select="selectImageView"')
     expect(template).toContain('@remove="removeImageView"')
+  })
+
+  it('上传完成后只把最新列表刷新失败反馈为 warning', () => {
+    const validFixture = `async function submitUpload() {
+  const loaded = await load()
+  if (loaded === false) {
+    ElMessage.warning('上传完成，但刷新图片列表失败')
+  }
+}`
+    const staleFixture = validFixture.replace('loaded === false', 'loaded === null')
+    const catchOnlyFixture = `async function submitUpload() {
+  try {
+    await load()
+  } catch (error) {
+    ElMessage.warning('上传完成，但刷新图片列表失败')
+  }
+}`
+
+    expect(handlesUploadRefreshResult(validFixture)).toBe(true)
+    expect(handlesUploadRefreshResult(staleFixture)).toBe(false)
+    expect(handlesUploadRefreshResult(catchOnlyFixture)).toBe(false)
+    expect(handlesUploadRefreshResult(script)).toBe(true)
   })
 
   it('按固定顺序使用壳层操作区、保存视图、指标和紧凑工作区', () => {

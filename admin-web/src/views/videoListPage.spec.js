@@ -58,24 +58,104 @@ function findRule(styleSource, selector) {
   return match?.[1] || ''
 }
 
+function maskCommentsAndStrings(sourceText) {
+  let masked = ''
+  let state = 'code'
+
+  for (let index = 0; index < sourceText.length; index += 1) {
+    const char = sourceText[index]
+    const next = sourceText[index + 1]
+    if (state === 'code') {
+      if (char === '/' && next === '/') {
+        masked += '  '
+        state = 'line-comment'
+        index += 1
+      } else if (char === '/' && next === '*') {
+        masked += '  '
+        state = 'block-comment'
+        index += 1
+      } else if (char === "'" || char === '"' || char === '`') {
+        masked += ' '
+        state = char
+      } else {
+        masked += char
+      }
+      continue
+    }
+
+    if (state === 'line-comment') {
+      masked += char === '\n' ? '\n' : ' '
+      if (char === '\n') state = 'code'
+      continue
+    }
+    if (state === 'block-comment') {
+      if (char === '*' && next === '/') {
+        masked += '  '
+        state = 'code'
+        index += 1
+      } else {
+        masked += char === '\n' ? '\n' : ' '
+      }
+      continue
+    }
+    if (char === '\\') {
+      masked += next === '\n' ? ' \n' : '  '
+      index += 1
+    } else if (char === state) {
+      masked += ' '
+      state = 'code'
+    } else {
+      masked += char === '\n' ? '\n' : ' '
+    }
+  }
+
+  return masked
+}
+
+function topLevelExecutableLines(sourceText) {
+  const statements = []
+  let depth = 0
+  let offset = 0
+
+  for (const line of sourceText.split('\n')) {
+    const text = line.trim()
+    if (depth === 0 && text && text !== '}') {
+      statements.push({ text, index: offset + line.indexOf(text) })
+    }
+    for (const char of line) {
+      if (char === '{') depth += 1
+      if (char === '}') depth -= 1
+    }
+    offset += line.length + 1
+  }
+
+  return statements
+}
+
 function ownsSnapshotApplyOrder(sourceText) {
-  const block = extractBalancedBraceBlock(sourceText, /applySnapshot:\s*\(snapshot\)\s*=>\s*\{/)
+  const block = extractBalancedBraceBlock(
+    maskCommentsAndStrings(sourceText),
+    /applySnapshot:\s*\(snapshot\)\s*=>\s*\{/
+  )
   if (!block) return false
 
-  const tokens = [
-    'const next = normalizeVideoViewSnapshot(',
-    'query.q = next.q',
-    'query.type = next.type',
-    'query.status = next.status',
-    'query.page = 1',
-    'columnVisibility.value = [...next.columns]',
-    'persistColumns()',
-    'resetQueryIdentity()'
+  const patterns = [
+    /^const next = normalizeVideoViewSnapshot\([^\n]+\);?$/,
+    /^query\.q = next\.q;?$/,
+    /^query\.type = next\.type;?$/,
+    /^query\.status = next\.status;?$/,
+    /^query\.page = 1;?$/,
+    /^columnVisibility\.value = \[\.\.\.next\.columns\];?$/,
+    /^persistColumns\(\);?$/,
+    /^resetQueryIdentity\(\);?$/
   ]
-  const indexes = tokens.map((token) => block.body.indexOf(token))
+  const statements = topLevelExecutableLines(block.body)
+  const indexes = patterns.map((pattern) => statements.findIndex(({ text }) => pattern.test(text)))
+  if (!indexes.every((index) => index >= 0)) return false
+  if (!indexes.every((index, position) => position === 0 || indexes[position - 1] < index)) return false
 
-  return indexes.every((index) => index >= 0)
-    && indexes.every((index, position) => position === 0 || indexes[position - 1] < index)
+  const lastRequiredStatement = statements[indexes[indexes.length - 1]]
+  return !/\breturn\b/.test(block.body.slice(0, lastRequiredStatement.index))
 }
 
 function resetsBeforeLoad(sourceText, openingPattern) {
@@ -167,6 +247,9 @@ const loadBlock = extractBalancedBraceBlock(script, /async function load\(\)\s*\
 const deleteBlock = extractBalancedBraceBlock(script, /async function doDelete\(row\)\s*\{/)
 const filterDrawer = extractElement(template, /<el-drawer\b(?=[^>]*v-model="filterDrawerVisible")[^>]*>/, '</el-drawer>')
 const paginationTag = template.match(/<AdminTablePagination\b[\s\S]*?\/>/)?.[0] || ''
+const headerActions = template.match(
+  /<template #header-actions>[\s\S]*?(?=\s*<div class="page-shell video-list-page")/
+)?.[0] || ''
 const operationsColumn = extractElement(
   template,
   /<el-table-column\b(?=[^>]*isColumnVisible\('operations'\))[^>]*>/,
@@ -203,9 +286,37 @@ describe('视频资源集合页', () => {
   resetQueryIdentity()
 }`
     const invalidFixture = validFixture.replace('persistColumns()\n  resetQueryIdentity()', 'resetQueryIdentity()\n  persistColumns()')
+    const stringFixture = `applySnapshot: (snapshot) => {
+  const ignored = \`
+  const next = normalizeVideoViewSnapshot(snapshot)
+  query.q = next.q
+  query.type = next.type
+  query.status = next.status
+  query.page = 1
+  columnVisibility.value = [...next.columns]
+  persistColumns()
+  resetQueryIdentity()
+  \`
+}`
+    const commentFixture = validFixture.replace(/\n  (?=\S)/g, '\n  // ')
+    const earlyReturnFixture = validFixture.replace(
+      '  const next = normalizeVideoViewSnapshot(snapshot)',
+      '  return\n  const next = normalizeVideoViewSnapshot(snapshot)'
+    )
+    const unreachableFixture = validFixture
+      .replace('  const next = normalizeVideoViewSnapshot(snapshot)', '  if (false) {\n    const next = normalizeVideoViewSnapshot(snapshot)')
+      .replace('  resetQueryIdentity()\n}', '    resetQueryIdentity()\n  }\n}')
 
     expect(ownsSnapshotApplyOrder(validFixture)).toBe(true)
     expect(ownsSnapshotApplyOrder(invalidFixture)).toBe(false)
+    for (const [name, fixture] of Object.entries({
+      stringFixture,
+      commentFixture,
+      earlyReturnFixture,
+      unreachableFixture
+    })) {
+      expect(ownsSnapshotApplyOrder(fixture), name).toBe(false)
+    }
     expect(ownsSnapshotApplyOrder(savedViewsOptions?.body || '')).toBe(true)
     expect(currentSnapshotBlock).not.toBeNull()
     expect(currentSnapshotBlock?.body.match(/^\s*(q|type|status|columns):/gm)?.map((line) => line.trim().split(':')[0])).toEqual([
@@ -319,7 +430,15 @@ async function load() {
     expect(script).not.toContain('PageHeader')
     expect(template).not.toContain('<PageHeader')
     expect(template).toContain('<template #header-actions>')
-    expect(template).toContain("router.push('/upload')")
+    const uploadLink = extractElement(
+      headerActions,
+      /<RouterLink\b(?=[^>]*\bcustom\b)(?=[^>]*\bto="\/upload")[^>]*>/,
+      '</RouterLink>'
+    )
+    expect(uploadLink).not.toBe('')
+    expect(uploadLink).toContain('v-slot="{ href, navigate }"')
+    expect(uploadLink).toMatch(/<el-button\b(?=[^>]*\btag="a")(?=[^>]*\btype="primary")(?=[^>]*:href="href")(?=[^>]*@click="navigate")[^>]*>上传视频<\/el-button>/)
+    expect(headerActions).not.toContain("router.push('/upload')")
     expect(template).toContain('<SavedViewTabs')
     expect(template).toContain(':items="availableViews"')
     expect(template).toContain(':active-id="activeViewId"')

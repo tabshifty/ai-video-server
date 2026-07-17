@@ -310,7 +310,7 @@ onUnmounted(() => {
                 :aria-label="item.label"
                 @click="closeMobileNav"
               >
-                <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+                <el-icon aria-hidden="true"><component :is="resolveIcon(item.icon)" /></el-icon>
                 <span class="nav-link__label">{{ item.label }}</span>
               </RouterLink>
             </el-tooltip>
@@ -332,6 +332,7 @@ onUnmounted(() => {
             >
               <span v-if="!isSidebarCollapsed">{{ group.label }}</span>
               <el-icon
+                aria-hidden="true"
                 class="nav-group__chevron"
                 :class="{ 'is-expanded': isGroupExpanded(group.key) }"
               >
@@ -448,7 +449,7 @@ onUnmounted(() => {
               :aria-current="isActive(item) ? 'page' : undefined"
               @click="closeMobileNav"
             >
-              <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+              <el-icon aria-hidden="true"><component :is="resolveIcon(item.icon)" /></el-icon>
               <span>{{ item.label }}</span>
             </RouterLink>
           </div>
@@ -463,6 +464,7 @@ onUnmounted(() => {
           >
             <span>{{ group.label }}</span>
             <el-icon
+              aria-hidden="true"
               class="nav-group__chevron"
               :class="{ 'is-expanded': isGroupExpanded(group.key) }"
             >

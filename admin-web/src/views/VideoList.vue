@@ -1360,7 +1360,9 @@ onBeforeUnmount(() => {
             </el-checkbox>
           </el-checkbox-group>
         </el-popover>
-        <el-button type="primary" @click="router.push('/upload')">上传视频</el-button>
+        <RouterLink v-slot="{ href, navigate }" to="/upload" custom>
+          <el-button tag="a" type="primary" :href="href" @click="navigate">上传视频</el-button>
+        </RouterLink>
       </div>
     </template>
 

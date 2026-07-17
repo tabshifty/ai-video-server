@@ -684,7 +684,10 @@ async function submitUpload() {
     captureUploadDrawerSnapshot()
     uploading.value = false
     try {
-      await load()
+      const loaded = await load()
+      if (loaded === false) {
+        ElMessage.warning('上传完成，但刷新图片列表失败')
+      }
     } catch (error) {
       ElMessage.warning(extractErrorMessage(error, '上传完成，但刷新图片列表失败'))
     }

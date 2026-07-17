@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 21:07 +0800
+- 进度：Task 22 Web 规范修复完成提交前全量验证与自审。审计的 1 Important / 2 Minor 均由生产最小差异闭合；Task 3 的三段响应式 rule、storage 函数块边界与 Task 8 的 snapshot 四类反例均由定向测试锁定，未放宽断言。按简报不运行浏览器，最终 DOM、辅助技术树和四视口由指定代理在最终 HEAD 验收。
+- 影响文件：最终 tracked 差异精确为 `admin-web/src/views/VideoList.vue`、`videoListPage.spec.js`、`ImageManage.vue`、`imageManagePage.spec.js`、`admin-web/src/components/Layout.vue`、`Layout.spec.js`、`CONTEXT.md`、`plan.md` 八个白名单文件；完整报告为 git 忽略的 `.superpowers/sdd/task-22-guideline-fix-report.md`。无关工作区变更不存在，API、依赖、router、payload 与其它业务流程未纳入。
+- 验证：定向 3 files 47/47；完整 `npm test` 40 files 635/635；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、严格 UTF-8/U+FFFD、固定基线八文件白名单、HEAD/merge-base、API/依赖/router、payload 与三份生产 Vue 精确范围门禁全部通过；待精确提交 `修复：闭合 Precision Ops Web 规范问题`。
+
+## 2026-07-17 21:04 +0800
+- 进度：Task 22 Web 规范最小修复与测试 helper 加固取得定向 GREEN。上传视频入口改为 `RouterLink custom` 提供 `href/navigate`、`el-button tag="a"` 保留主按钮外观；图片上传完成刷新显式区分 `false` 与 `null`；Layout 只隐藏四个指定装饰图标。snapshot helper 仅做轻量字符串/注释遮罩与顶层精确语句检查，四类 unsafe fixture 均被拒绝，不引入 parser。
+- 影响文件：当前改动严格位于八文件 tracked 白名单，并向 `CONTEXT.md` 沉淀真实链接、列表刷新三态与装饰图标长期契约；未修改 API、权限、router 目标、依赖、payload、Go、Android、数据库或其它业务流程。
+- 验证：逐文件 `videoListPage.spec.js` 13/13、`imageManagePage.spec.js` 21/21、`Layout.spec.js` 13/13；指定组合命令通过（3 files，47/47）。待运行管理端完整测试、生产构建、diff/编码/固定基线范围与 API/依赖/router 门禁。
+
+## 2026-07-17 21:01 +0800
+- 进度：Task 22 Web 规范三文件定向测试取得正式 RED。首轮 5 failed / 42 passed 额外暴露一条测试误把 `47.9375rem` 内已继承的 command trigger 最小高度要求为重复声明；按现有 CSS 级联与规格校准为检查该 rule 自有 `height` 后重跑，正式 RED 只保留四个真实缺口。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/imageManagePage.spec.js`、`admin-web/src/components/Layout.spec.js` 与 `plan.md`；三份生产 SFC、`CONTEXT.md`、API、依赖、router、payload 和其它业务流程尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageManagePage.spec.js src/components/Layout.spec.js` 退出 1（3 files，47 tests，4 failed / 43 passed）。失败精确为 snapshot 字符串反例被旧 helper 假判通过、上传视频入口不是 `/upload` 真实链接、上传成功后未消费 `load() === false`、四个指定装饰图标缺少 `aria-hidden="true"`；响应式三段 rule 与 `persistShellPreference` 函数块收紧断言均已通过。
+
+## 2026-07-17 20:55 +0800
+- 进度：开始闭合 Task 22 Web 规范审计的 1 个 Important、2 个 Minor 与 Task 3/Task 8 测试精度延后项。先收紧三份既有 SFC 定向测试，锁定上传入口真实链接语义、图片上传完成刷新对 `false`/`null` 的分支、四个装饰图标的辅助技术隐藏，并用反例约束 snapshot 顶层执行顺序、响应式 rule 定位和 storage 函数块边界；取得真实 RED 后再做最小实现。
+- 影响文件：tracked 白名单严格为 `admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/imageManagePage.spec.js`、`admin-web/src/components/Layout.vue`、`admin-web/src/components/Layout.spec.js`、`CONTEXT.md`、`plan.md`；报告写入 git 忽略的 `.superpowers/sdd/task-22-guideline-fix-report.md`。不修改 API、权限、router 目标、依赖、payload、Go、Android、数据库或其它业务流程，不运行浏览器、认证态、网络或真实数据。
+- 验证：先运行 `cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageManagePage.spec.js src/components/Layout.spec.js` 记录失败数和精确原因；最小修复后运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD、固定基线八文件白名单与 API/依赖/router 零差异门禁。
+
 ## 2026-07-17 20:27 +0800
 - 进度：Task 22 自动化审计与自审加固完成提交前验证。25 个视图按 17 个 shell、7 个独立页、1 个 MaskEditor 唯一归属；router 无 `hideShellPageHeader`；全站颜色/字距/阴影/圆角/渐变、图库动作常显与最终 token 由静态测试锁定，45 项 helper 正反例闭合绕过。加固后独立复审结论 Approved / Ready，0 Critical / 0 Important / 0 Minor。浏览器登录态与 375/768/1024/1440px Step 4 明确 deferred，由控制器使用本地合成数据执行，本记录不声称四视口通过。
 - 影响文件：最终 tracked 范围精确为 `admin-web/src/views/precisionOpsAudit.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`plan.md`；git 忽略报告为 `.superpowers/sdd/task-22-report.md`。没有新长期决定，`CONTEXT.md` 不修改；无生产 SFC、API、权限、router 目标、依赖、数据库、Go、Android 或业务流程改动。
