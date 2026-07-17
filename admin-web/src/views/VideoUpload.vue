@@ -525,13 +525,13 @@ onMounted(() => {
           </el-form-item>
           <el-form-item v-if="isAVType" label="AV 地区分类">
             <el-radio-group v-model="form.siteCategory">
-              <el-radio-button v-for="item in avSiteCategoryOptions" :key="item.value" :label="item.value">
+              <el-radio-button v-for="item in avSiteCategoryOptions" :key="item.value" :value="item.value">
                 {{ item.label }}
               </el-radio-button>
             </el-radio-group>
           </el-form-item>
           <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
-          <el-form-item label="描述"><el-input v-model="form.description" type="textarea" rows="3" /></el-form-item>
+          <el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="3" /></el-form-item>
         </el-form>
       </SectionCard>
 

@@ -470,7 +470,7 @@ async function doSave() {
             style="margin-bottom: 16px"
           />
           <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
-          <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" rows="3" :disabled="saveLoading" /></el-form-item>
+          <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" :rows="3" :disabled="saveLoading" /></el-form-item>
           <el-form-item label="海报URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>
           <el-form-item v-if="form.type === 'movie'" label="横向背景"><el-input v-model="edit.backdrop_url" :disabled="saveLoading" /></el-form-item>
           <el-form-item label="发布日期"><el-input v-model="edit.release_date" :disabled="saveLoading" /></el-form-item>

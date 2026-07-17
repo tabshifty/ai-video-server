@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 00:44 +0800
+- 进度：Task 22 产品运行时整洁完成提交前实现与自审。静态契约覆盖字体域名及远程字体 `@import`/preconnect、全视图字符串数字 `rows`、全视图 RadioButton 旧值属性，并在 GREEN 重构中把远程连接断言收窄到字体域名，避免误拦合法非字体 preconnect；生产差异保持 11 处目标字体/属性机械替换。
+- 影响文件：最终 tracked 范围精确为 brief 允许的 `admin-web/src/views/precisionOpsAudit.spec.js`、`admin-web/src/assets/theme.css`、`admin-web/index.html`、四份目标 Vue、`CONTEXT.md`、`plan.md` 共 9 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-product-hygiene-report.md`。API、权限、router、依赖、lockfile、payload、Go、Android、数据库、业务脚本与浏览器审计器均不纳入。
+- 验证：定向 150/150；完整 `npm test` 40 files 638/638；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、固定基线九文件白名单、package/lockfile/API/router 零差异、全视图目标属性扫描与 9/9 文件严格 UTF-8/U+FFFD 门禁均已通过；最终提交前将从当前状态新鲜重跑完整验证。
+
+## 2026-07-18 00:38 +0800
+- 进度：Task 22 产品运行时整洁完成最小生产替换并取得定向 GREEN。移除 CSS Google Fonts `@import` 与 HTML 两个字体 preconnect，字体栈保留中文/系统 fallback；四个 `el-input` 数字 `rows` 改为 Vue 绑定，四个 RadioButton 值属性改为 `value`/`:value`，未改变模型值、文案、顺序、结构或业务逻辑。
+- 影响文件：当前 tracked 差异精确位于 brief 允许的 9 个文件；`CONTEXT.md` 已追加远程字体禁用、数值 prop 绑定与 RadioButton value 三条长期契约，测试只增加全站静态契约。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsAudit.spec.js` 通过（1 file，150/150）；差异审阅确认生产修改均为目标属性与字体来源替换。待运行完整 `npm test`、生产 build 与最终范围/编码门禁。
+
+## 2026-07-18 00:37 +0800
+- 进度：Task 22 产品运行时整洁静态契约取得真实 RED。新增 3 项全站契约均准确命中既有问题，原有 Precision Ops 审计保持全绿；失败清单逐文件列出 4 个字符串数字 `rows` 与 4 个旧 RadioButton `label` 值属性，字体断言命中 Google Fonts、preconnect 和 Inter 首选字体。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsAudit.spec.js` 与 `plan.md`；生产 CSS、HTML、四份目标 Vue、`CONTEXT.md` 和其它业务文件尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsAudit.spec.js` 按预期退出 1（1 file，150 tests，3 failed / 147 passed）；失败只来自新增字体、数字 prop 与 RadioButton value 契约，无语法、路径、环境或既有审计失败。
+
+## 2026-07-18 00:34 +0800
+- 进度：开始 Task 22 产品运行时整洁修复。先在既有全站静态审计中锁定公共远程字体引用、系统字体 fallback、`el-input` 数字 `rows` 的 Vue 绑定和 Element Plus RadioButton `value` 契约；取得只命中现有违规的真实 RED 后，再做属性与字体来源的最小替换。
+- 影响文件：计划只修改 `admin-web/src/views/precisionOpsAudit.spec.js`、`admin-web/src/assets/theme.css`、`admin-web/index.html`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/ScrapePreview.vue`、`admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/VideoList.vue`、`CONTEXT.md`、`plan.md`，并写入 git 忽略的 `.superpowers/sdd/task-22-product-hygiene-report.md`；不修改审计器、API、权限、router、依赖、payload、Go、Android、数据库或业务流程。
+- 验证：先运行 `cd admin-web && npm test -- src/views/precisionOpsAudit.spec.js` 记录准确 RED；最小修复后运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、严格 U+FFFD、固定基线白名单与 API/依赖/router 零差异门禁。
+
 ## 2026-07-17 21:07 +0800
 - 进度：Task 22 Web 规范修复完成提交前全量验证与自审。审计的 1 Important / 2 Minor 均由生产最小差异闭合；Task 3 的三段响应式 rule、storage 函数块边界与 Task 8 的 snapshot 四类反例均由定向测试锁定，未放宽断言。按简报不运行浏览器，最终 DOM、辅助技术树和四视口由指定代理在最终 HEAD 验收。
 - 影响文件：最终 tracked 差异精确为 `admin-web/src/views/VideoList.vue`、`videoListPage.spec.js`、`ImageManage.vue`、`imageManagePage.spec.js`、`admin-web/src/components/Layout.vue`、`Layout.spec.js`、`CONTEXT.md`、`plan.md` 八个白名单文件；完整报告为 git 忽略的 `.superpowers/sdd/task-22-guideline-fix-report.md`。无关工作区变更不存在，API、依赖、router、payload 与其它业务流程未纳入。

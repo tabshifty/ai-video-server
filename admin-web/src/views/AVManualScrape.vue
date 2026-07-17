@@ -421,7 +421,7 @@ async function doSave() {
           <el-form label-width="90px">
             <el-form-item label="AVID"><el-input v-model="edit.external_id" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="标题"><el-input v-model="edit.title" :disabled="saveLoading" /></el-form-item>
-            <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" rows="3" :disabled="saveLoading" /></el-form-item>
+            <el-form-item label="简介"><el-input v-model="edit.overview" type="textarea" :rows="3" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="海报 URL"><el-input v-model="edit.poster_url" :disabled="saveLoading" /></el-form-item>
             <el-form-item label="发布日期"><el-input v-model="edit.release_date" :disabled="saveLoading" /></el-form-item>
           </el-form>

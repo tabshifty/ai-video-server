@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 const directory = new URL('.', import.meta.url)
 const viewFiles = readdirSync(directory).filter((name) => name.endsWith('.vue'))
+const themeSource = readFileSync(new URL('../assets/theme.css', directory), 'utf8')
+const indexSource = readFileSync(new URL('../../index.html', directory), 'utf8')
 const MASK_DATA_COLOR_DECLARATION = "const MASK_OPAQUE_COLOR = '#ffffff'"
 const ZERO_LETTER_SPACING_PATTERN = /^[+-]?(?:0+(?:\.0*)?|\.0+)(?:px|rem|em)?$/i
+const REMOTE_FONT_DOMAIN_PATTERN = /fonts\.(?:googleapis|gstatic)\.com/i
 const DIRECT_VIEW_COLOR_PATTERNS = [
   /#(?:[0-9a-f]{3,8})\b/i,
   /rgba?\(\s*[+-]?(?:\d|\.\d)/i,
@@ -52,6 +55,19 @@ function directViewColorDeclarations(source) {
 
 function decorativeGradientDeclarations(source) {
   return source.match(DECORATIVE_GRADIENT_PATTERN) || []
+}
+
+function openingTags(source, elementName) {
+  return source.match(new RegExp(`<${elementName}\\b[^>]*>`, 'gi')) || []
+}
+
+function viewTagViolations(elementName, predicate) {
+  return viewFiles.flatMap((file) => {
+    const source = readFileSync(new URL(file, directory), 'utf8')
+    return openingTags(source, elementName)
+      .filter(predicate)
+      .map((tag) => `${file}: ${tag.replace(/\\s+/g, ' ')}`)
+  })
 }
 
 function cssAuditSource(source) {
@@ -123,6 +139,39 @@ function oversizedDirectRadii(source) {
       })
     })
 }
+
+describe('Product runtime hygiene contracts', () => {
+  it('uses local Chinese and system font fallbacks without remote font loading', () => {
+    const runtimeSources = `${themeSource}\n${indexSource}`
+    const fontSans = themeSource.match(/--font-sans:\s*([^;]+);/i)?.[1].trim()
+    const remoteFontImports = (themeSource.match(/@import[^;]*;/gi) || [])
+      .filter((declaration) => REMOTE_FONT_DOMAIN_PATTERN.test(declaration))
+    const remoteFontPreconnects = openingTags(indexSource, 'link')
+      .filter((tag) => /(?:^|\s)rel=['"]preconnect['"]/i.test(tag))
+      .filter((tag) => REMOTE_FONT_DOMAIN_PATTERN.test(tag))
+
+    expect(runtimeSources).not.toMatch(REMOTE_FONT_DOMAIN_PATTERN)
+    expect(remoteFontImports).toEqual([])
+    expect(remoteFontPreconnects).toEqual([])
+    expect(fontSans).toBe("'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif")
+  })
+
+  it('binds numeric el-input rows as numbers in every view', () => {
+    const violations = viewTagViolations('el-input', (tag) => (
+      /(?:^|\s)rows\s*=\s*(['"])\d+\1/i.test(tag)
+    ))
+
+    expect(violations).toEqual([])
+  })
+
+  it('uses value for every el-radio-button option value', () => {
+    const violations = viewTagViolations('el-radio-button', (tag) => (
+      /(?:^|\s):?label\s*=/i.test(tag)
+    ))
+
+    expect(violations).toEqual([])
+  })
+})
 
 describe('Precision Ops final audit', () => {
   viewFiles.forEach((file) => {

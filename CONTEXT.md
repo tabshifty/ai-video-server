@@ -1129,3 +1129,8 @@
 - `遮罩编辑器交互边界`：`ImageWorkbenchMaskEditor` 继续是 component-only Dialog，不引入 Layout 或 PageHeader；Dialog 自身声明 `form` 以覆盖 Teleport footer。模式使用 radio segmented，笔刷大小使用 slider，清空使用桌面 36px、1024px 以下 44px 的中文命名图标按钮；768px 以下工具栏在正常文档流换行，不能覆盖画布。视觉迁移不得改变 mask Canvas 尺寸与数据结构、brush/eraser composite、pointer 坐标/capture/release 或 `update:modelValue`/`save` emits。
 - `共享 SectionCard 折叠按钮契约`：`SectionCard` 的折叠按钮必须随 expanded 状态提供“收起区块/展开区块”动态 `aria-label` 与原生 `title`，并同步 `aria-expanded`；箭头图标是装饰信息，必须 `aria-hidden`。桌面 width/height/min-width/min-height 消费当前密度的 `--control-height`，1024px 以下四项统一提升到 44px；不得改变 `defaultExpanded`、点击反转或 `v-show` slot 语义。
 - `媒体工作台 Overlay 关闭与视口约束`：图像工作台图库 Drawer 禁用框架默认 close，只通过标准 `AdminDrawerHeader` 接收 header slot 的 `close/titleId/titleClass`，保留原 v-model、size、modal/escape guards 与 closed 清理。Mask Dialog 同样禁用默认 close，但使用页面内唯一 `.el-dialog__headerbtn`，中文 aria/title 均为“关闭此对话框”并调用 slot `close`；Dialog 根本身以 `max-height: 92vh` + flex column 限制在 `top=4vh` 的视口范围内，body 使用 `min-height: 0`、`overflow: auto`、`overscroll-behavior: contain`，header/footer 不随内容滚出。禁止用 `.mask-editor :deep(.el-dialog)` 这类把同一根误当后代的死选择器修宽高。
+
+## 管理端运行时依赖与组件属性约定
+- `关键样式本地字体契约`：管理端关键样式不得依赖 Google Fonts 等公共远程字体服务；全局无衬线字体栈优先使用已有中文字体与系统字体 fallback，页面加载不能通过 CSS `@import` 或 HTML preconnect 建立公共字体外链。
+- `Vue 数值 prop 绑定契约`：Vue 模板向组件传递数值 prop 时必须使用 `:` 绑定保证运行时类型为 Number；例如 Element Plus `el-input` 的 `rows` 应写成 `:rows="3"`，不能写成字符串属性 `rows="3"`。
+- `RadioButton 选项值契约`：Element Plus `el-radio-button` 必须使用 `value`/`:value` 表达选项值，显示文案继续由默认 slot 承载；不得继续用已弃用的 `label`/`:label` 兼任选项值。

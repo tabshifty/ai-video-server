@@ -1589,9 +1589,9 @@ onBeforeUnmount(() => {
             <el-checkbox v-model="batchEditForm.tags_enabled">标签</el-checkbox>
             <div class="batch-tags-mode">
               <el-radio-group v-model="batchEditForm.tags_mode" :disabled="!batchEditForm.tags_enabled">
-                <el-radio-button label="replace">统一覆盖</el-radio-button>
-                <el-radio-button label="append">追加</el-radio-button>
-                <el-radio-button label="remove">移除</el-radio-button>
+                <el-radio-button value="replace">统一覆盖</el-radio-button>
+                <el-radio-button value="append">追加</el-radio-button>
+                <el-radio-button value="remove">移除</el-radio-button>
               </el-radio-group>
               <el-select
                 v-model="batchEditForm.tags"
@@ -1761,7 +1761,7 @@ onBeforeUnmount(() => {
           </div>
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="detail.title" /></el-form-item>
-        <el-form-item label="描述"><el-input v-model="detail.description" type="textarea" rows="4" /></el-form-item>
+        <el-form-item label="描述"><el-input v-model="detail.description" type="textarea" :rows="4" /></el-form-item>
         <el-form-item label="封面"><el-input v-model="detail.thumbnail_path" /></el-form-item>
         <el-form-item label="标签">
           <el-select
