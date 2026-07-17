@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 15:10 +0800
+- 进度：Task 19 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，Cannot verify 仅为 reviewer 按只读约束不重复执行验证。首轮筛选当前态语义、全宽正向契约和圆角数值门禁 3 项 finding 均由 `a1fdbd2` 闭合；ED2K 下载工作台至此完成。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-19-report.md`、浏览器审计脚本/矩阵与 4 张安全截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 20。
+- 验证：主线程在 `a1fdbd2` 上新鲜运行 Task 19 定向 70/70、管理端全量 39 文件 461/461、Vite 2373 modules 构建成功且仅既有 chunk-size warning；四视口本地合成数据矩阵 4/4 PASS，均为 0 横向溢出、52px 任务行、1 个 active/7 个 inactive 筛选、1 个当前 Check、0 mutation、0 应用控制台问题。`git diff --check`、U+FFFD、API/依赖/router、业务脚本归一化及干净工作区门禁通过。
+
 ## 2026-07-17 14:59 +0800
 - 进度：Task 19 首轮 reviewer 的 3 项 finding 已完成最终验证与自审。自审进一步发现圆角 helper 初版只取每条声明的第一个值，以 `8px 9.25px / 4px` 合成样式取得 1 failed / 8 passed 的独立 RED，改为逐声明枚举全部 px 值后 9/9 GREEN；筛选当前态、单列全宽与圆角门禁均无剩余阻塞问题。
 - 影响文件：最终精确纳入 `admin-web/src/views/ToolboxEd2kDownload.vue`、`ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件；git 忽略报告不纳入，不修改 API、payload、handler、router、依赖、其它页面或 Task 20。
