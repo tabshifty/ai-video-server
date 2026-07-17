@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 08:39 +0800
+- 进度：Precision Ops Task 13 最终独立复审通过。第一轮复审发现安装包查询身份错配和非零总数空页 2 个 Important，已由 `b26f25b` 以实际请求 identity、latest-wins 序号门禁、当前缓存投影和总数驱动空态闭合；第二轮基于完整固定差异包判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。第一轮无法从 Task 13 diff 独立确认的共享 Layout 契约已由既有 Layout/theme 测试和本轮 1440/1024/768px 浏览器实测补证：桌面/收起侧栏、52px 页头、20px 主区边距、窄屏导航与 44px 点击目标契约存在，三档页面横向溢出均为 0。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-13-report.md`；不修改生产代码、测试、API、依赖、路由、二维码 helper、IPTV 或 Task 14。
+- 验证：主线程在最终生产提交 `b26f25b` 上新鲜运行 Task 13 五文件定向 55/55、管理端全量 39 文件 412/412、Vite 2373 modules 构建成功且仅既有 chunk-size warning；修复波次 `git diff --check`、6 文件白名单、U+FFFD/C0/DEL 和 API/依赖/路由/二维码/IPTV 零差异门禁通过。IPTV 最终浏览器复测确认 4 项指标、2 个来源面板、外层四边框 0px、透明背景、无阴影，1440/1024/768px 无页面或按钮溢出；正式复审无遗留 finding，可进入 Task 14。
+
 ## 2026-07-17 08:29 +0800
 - 进度：Task 13 安装包查询身份与末页空态修复完成提交前自审和新鲜验证。实际请求参数与 identity 同源，异身份 raw cache 不可见，success/catch/finally 均受最新序号+身份双门禁；当前身份的指标、表格、分页及总数驱动空态闭合，未改 API、路由、二维码、IPTV 或业务 action。正式独立复审由主线程在提交后基于固定 review package 执行，本工作树中间态不替代该门禁。
 - 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/TvAppManage.vue`、`tvAppManagePage.spec.js`、`tvAppManage.requestState.js`、`tvAppManage.requestState.spec.js` 共 6 个文件；忽略报告 `.superpowers/sdd/task-13-report.md` 在提交后回填 SHA，`admin-web/dist/` 不纳入提交。
