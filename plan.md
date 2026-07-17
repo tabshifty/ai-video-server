@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 10:50 +0800
+- 进度：Precision Ops Task 14 最终独立复审通过。第一轮复审发现四视口交互证据缺口与 User/TvApp 极端长行假阳性 2 个 Important，已由 `bd1852d` 以 required 强门禁、四档安全交互全量执行、具名 N/A/直接提交 concern 分类及局部文本收敛闭合；第二轮基于完整两提交差异包和更新矩阵判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。直接提交动作因禁止业务数据变更而明确记为非 required `NOT_RUN_DIRECT_MUTATION`，外部扩展错误与仅有 code 的 `PerformanceIssue` 在认证详情禁读边界下作为非阻塞环境 concern 保留。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-14-report.md`；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 15。
+- 验证：主线程在最终生产提交 `bd1852d` 上新鲜运行长文本定向 44/44、管理端全量 39 文件 421/421、Vite 2373 modules 构建成功且仅既有 chunk-size warning；修复波次 6 文件白名单、`git diff --check`、U+FFFD/C0/DEL、审计脚本语法及敏感范围零差异门禁通过。最终机器矩阵 28/28、required 76/76、四档各 19/19，零 `SKIPPED`/mutation request/application error/warning；User 最大 45/60px、TvApp 157/200px，document overflow 全 0，读取失败、临时 target 关闭和认证数据禁读标记均通过，可进入 Task 15。
+
 ## 2026-07-17 10:34 +0800
 - 进度：Task 14 独立复审修复波次完成提交前最终自审与新鲜验证，不推进 Task 15。两项 Important 已闭合：四视口矩阵的 PASS 现在严格依赖全部适用安全交互 required PASS，User/TvApp 长文本具有独立收敛与非空行高门限；完整 diff 自审同步校正了 `CONTEXT.md` 中旧“版本/ABI 安全换行”表述，避免与新单行契约冲突。
 - 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/UserManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js` 共 6 个 tracked 文件；git 忽略的 Task 14 审计脚本、矩阵、28 张截图与报告不提交，提交后只回填报告 SHA。API、角色/发布事件、权限、路由、依赖、Android、后端和 Task 15 均无差异。
