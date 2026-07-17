@@ -2,6 +2,41 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 20:27 +0800
+- 进度：Task 22 自动化审计与自审加固完成提交前验证。25 个视图按 17 个 shell、7 个独立页、1 个 MaskEditor 唯一归属；router 无 `hideShellPageHeader`；全站颜色/字距/阴影/圆角/渐变、图库动作常显与最终 token 由静态测试锁定，45 项 helper 正反例闭合绕过。加固后独立复审结论 Approved / Ready，0 Critical / 0 Important / 0 Minor。浏览器登录态与 375/768/1024/1440px Step 4 明确 deferred，由控制器使用本地合成数据执行，本记录不声称四视口通过。
+- 影响文件：最终 tracked 范围精确为 `admin-web/src/views/precisionOpsAudit.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`plan.md`；git 忽略报告为 `.superpowers/sdd/task-22-report.md`。没有新长期决定，`CONTEXT.md` 不修改；无生产 SFC、API、权限、router 目标、依赖、数据库、Go、Android 或业务流程改动。
+- 验证：定向 3 文件 251/251；管理端完整 `npm test` 40 文件 633/633；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、严格 U+FFFD、merge-base 允许范围、固定基线四文件白名单、API/依赖/router 零差异均通过；Dashboard/TaskMonitor 数据口径、saved view 边界、VideoList/ImageManage 批量与 dirty guard、25 页路由目标和权限因生产零差异且既有测试通过而保持。
+
+## 2026-07-17 20:23 +0800
+- 进度：Task 22 自审加固取得定向 GREEN。最小 helper 只提取 style rule/declaration，逐 selector 分支判断常驻阴影与动作基础可见性；圆角按 CSS 绝对单位换算并拒绝未知相对单位绕过；颜色覆盖 HSL/OKLCH/color，渐变大小写不敏感并覆盖 conic，字距只接受带允许单位的数值零。首轮实现剩余 2 个失败均为 JS `resolveColor` 名称后缀误报，以 CSS 函数词边界闭合，不修改生产文件。
+- 影响文件：实现增量仍只在 `admin-web/src/views/precisionOpsAudit.spec.js`、`plan.md` 与 git 忽略报告；tracked 总范围保持三份目标测试和 `plan.md`。
+- 验证：同一三文件定向命令由 22 failed / 229 passed 转为 251/251；现有 25 页静态审计与 45 项 helper 正反例全部通过，无 warning/error。待加固后独立复审、完整测试、构建及最终门禁。
+
+## 2026-07-17 20:21 +0800
+- 进度：Task 22 自审加固取得真实 helper RED。先把现有内联 matcher 原样提取为可测试 helper，再加入 45 项正反例；失败只命中新要求的绕过形式，既有 25 页 final audit、17/7/1 rollout 与主题锁定全部保持通过，没有暴露需要扩大 tracked 范围的生产违规。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsAudit.spec.js` 与 `plan.md`，报告待补；其它两份目标测试、生产 SFC、router、API、依赖和 `CONTEXT.md` 未改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsAudit.spec.js src/views/precisionOpsRollout.spec.js src/assets/themeTokens.spec.js` 退出 1（3 文件，251 tests，22 failed / 229 passed）。失败精确为字距数值零 4、HSL/HSLA/OKLCH/color 4、直接/分组阴影 3、rem/em/pt/vw 圆角 4、大小写/conic gradient 3、动作变量 opacity/visibility/display/hover-only 4；无语法或环境错误。
+
+## 2026-07-17 20:19 +0800
+- 进度：开始闭合 Task 22 自审静态审计绕过。按控制器最新要求，在不修改生产 SFC 的前提下增加表驱动正反例，覆盖直接/分组 selector 阴影、rem 与其它单位直接大圆角、HSL/OKLCH/color 颜色、大小写与 conic gradient、图库动作 visibility/display/变量 opacity/hover-only，以及字距数值零与非零；先保持现有 matcher 行为取得真实 RED，再最小收紧 helper。
+- 影响文件：仍只修改 `admin-web/src/views/precisionOpsAudit.spec.js`、既有两份 brief 测试、`plan.md` 与 git 忽略报告；不修改 25 个生产视图、router、API、依赖、权限或业务流程。
+- 验证：先运行三文件定向命令记录新增表驱动 RED；helper GREEN 后重新执行定向、完整 `npm test`、`npm run build`、`git diff --check`、严格编码与范围/API/依赖/router 门禁。若收紧审计暴露现有 SFC 真违规且需扩大 tracked 范围，立即停止并报告。
+
+## 2026-07-17 20:03 +0800
+- 进度：Task 22 自动化审计取得定向 GREEN。新增 25 视图逐文件静态审计与 17/7/1 唯一归属，锁定普通业务 router 无兼容 meta、图库动作常显、壳层零字距和最终几何/语义色/密度 token；唯一测试解析误报已用不放宽非零检测的最小正则修正闭合，未修改任何生产文件。
+- 影响文件：当前仍只修改三份 brief 指定测试与 `plan.md`；`CONTEXT.md` 无新长期决定，不追加。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsAudit.spec.js src/views/precisionOpsRollout.spec.js src/assets/themeTokens.spec.js` 通过（3 文件，206/206），无 warning/error；待完整测试、构建和最终静态/范围门禁。
+
+## 2026-07-17 20:02 +0800
+- 进度：Task 22 三份自动化审计首次真实运行暴露计划示例测试缺陷。25 个视图的颜色/阴影/圆角/渐变与唯一边界、router meta、主题 token 均通过，生产本身已合规；唯一失败为壳层字距审计把 `letter-spacing: 0;` 误判为非零。Task 22 属 verification-only，没有制造行为 RED；最小复现确认 brief 正则中的 `\s*` 可回溯并把空格留给负向前瞻，修正模式在合法零值上无匹配、在 `0.02em` 上仍准确匹配，因此只修正测试解析，不修改 `Layout.vue`。
+- 影响文件：RED 阶段只新增/修改 `admin-web/src/views/precisionOpsAudit.spec.js`、`precisionOpsRollout.spec.js`、`admin-web/src/assets/themeTokens.spec.js` 与 `plan.md`；未修改生产文件、`CONTEXT.md`、API、依赖或 router。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsAudit.spec.js src/views/precisionOpsRollout.spec.js src/assets/themeTokens.spec.js` 退出 1（3 文件，206 tests，1 failed / 205 passed）；失败位于 `precisionOpsAudit.spec.js` 壳层字距断言，无语法、环境或生产合规失败。
+
+## 2026-07-17 20:00 +0800
+- 进度：开始 Task 22 自动化审计，补齐 25 个 Vue 视图的唯一边界归属、普通业务路由兼容 meta 清除、全站直接颜色/字距/常驻阴影/直接大圆角/装饰渐变与图库动作常显审计，并锁定最终壳层几何、语义色和三档密度 token；先真实运行新增审计并记录任何失败的实际原因，再只在 brief 范围内做必要修正，不制造行为 RED。浏览器登录态与 375/768/1024/1440px 验收明确 deferred，由控制器后续以本地合成数据执行。
+- 影响文件：计划只修改 `admin-web/src/views/precisionOpsAudit.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/assets/themeTokens.spec.js`、`plan.md`，并写入 git 忽略的 `.superpowers/sdd/task-22-report.md`；只有形成新长期约定时才修改 `CONTEXT.md`，不修改 API、权限、router 目标、依赖、Go、Android、数据库或业务流程。
+- 验证：先运行 `cd admin-web && npm test -- src/views/precisionOpsAudit.spec.js src/views/precisionOpsRollout.spec.js src/assets/themeTokens.spec.js` 记录准确 RED；最小修正后运行同一定向 GREEN，再依次执行完整 `npm test`、`npm run build`、`git diff --check`、严格 U+FFFD、Task 22 范围/API/依赖/router 与业务边界静态门禁；不执行 brief Step 4。
+
 ## 2026-07-17 19:51 +0800
 - 进度：Task 21 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。正式 reviewer 的 radio 44px 与测试精度 finding、浏览器发现的共享折叠按钮/关闭提示/Mask footer、以及第二次浏览器定位的 Teleport selector 与 Drawer 桌面尺寸均已闭合；图像生成与遮罩工作台至此完成。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-21-report.md`、安全浏览器脚本、矩阵 JSON 与 12 张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 22。

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import ActorManage from './ActorManage.vue'
 import AVManualScrape from './AVManualScrape.vue'
@@ -58,6 +58,17 @@ const standaloneViews = {
   'ToolboxPasswordVault.vue': 'form',
   'Login.vue': 'form'
 }
+const shellViews = [
+  'AVManualScrape.vue', 'ActorManage.vue', 'CollectionManage.vue', 'Dashboard.vue',
+  'IPTVManage.vue', 'ImageCollectionManage.vue', 'ImageManage.vue', 'PendingDeleteShorts.vue',
+  'ScrapePreview.vue', 'SystemSettings.vue', 'TaskMonitor.vue', 'Toolbox.vue',
+  'TvAppManage.vue', 'TvSeriesManage.vue', 'UserManage.vue', 'VideoList.vue', 'VideoUpload.vue'
+]
+const standalonePageViews = [
+  'Login.vue', 'ToolboxArchiveImport.vue', 'ToolboxEd2k.vue', 'ToolboxEd2kDownload.vue',
+  'ToolboxImageWorkbench.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue'
+]
+const componentViews = ['ImageWorkbenchMaskEditor.vue']
 
 const crudViews = [
   {
@@ -155,6 +166,18 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
+  it('assigns all 25 Vue views to exactly one boundary', () => {
+    const actual = readdirSync(new URL('.', import.meta.url)).filter((name) => name.endsWith('.vue')).sort()
+    const assigned = [...shellViews, ...standalonePageViews, ...componentViews].sort()
+    expect(actual).toEqual(assigned)
+    expect(assigned).toHaveLength(25)
+  })
+
+  it('fully removes the ordinary-page compatibility meta', () => {
+    const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf8')
+    expect(router).not.toContain('hideShellPageHeader')
+  })
+
   it('固定 17 个已迁移页面与 0 个兼容页面，且集合互不重叠', () => {
     const migratedFiles = migratedViews.map(({ file }) => file)
 

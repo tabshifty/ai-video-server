@@ -60,6 +60,21 @@ const densityTokenContracts = [
 ]
 
 describe('theme tokens', () => {
+  it('locks the final Precision Ops geometry and semantic palette', () => {
+    expect(css).toContain('--admin-sidebar-width: 224px')
+    expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
+    expect(css).toContain('--admin-header-height: 52px')
+    expect(css).toContain('--text-muted: #607085')
+    expect(css).toContain('--success-600: #047857')
+    expect(css).toContain('--warning-600: #b45309')
+    expect(css).toContain('--danger-600: #c81e1e')
+    expect(css).toContain('--info-600: #0369a1')
+    expect(css).toMatch(/\[data-density="compact"\][\s\S]*--control-height:\s*32px/)
+    expect(css).toMatch(/\[data-density="monitor"\][\s\S]*--table-row-height:\s*44px/)
+    expect(css).toMatch(/\[data-density="form"\][\s\S]*--control-height:\s*36px/)
+    expect(css).toMatch(/--radius-md:\s*8px/)
+  })
+
   it('exports the approved Precision Ops shell and semantic tokens', () => {
     expect(css).toContain('--admin-sidebar-width: 224px')
     expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
