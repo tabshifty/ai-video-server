@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 13:16 +0800
+- 进度：Task 17 第一轮 review fix 完成提交前最终验证与自审，4 个 Important 均由真实 SFC 契约覆盖并闭合，不推进 Task 18。系列项具备原生按钮键盘行为、准确选中语义和可见焦点；三个筛选控件有明确名称；系列标题与绑定视频文本的长词只在自身容器换行。完整证据已追加到 git 忽略的 `.superpowers/sdd/task-17-report.md`。
+- 影响文件：最终只纳入 `admin-web/src/views/TvSeriesManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件；不纳入忽略报告或主线程浏览器审计脚本，不修改 API、依赖、路由、业务脚本模型/handler、共享主题、其它页面或 Task 18。
+- 验证：review 覆盖 RED 为 4 failed / 49 passed，覆盖 GREEN 53/53；Task 17 原四文件定向 77/77；管理端完整 `npm test` 为 39 文件 443/443 且告警筛选无新增输出；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、4 文件白名单、U+FFFD/C0/DEL、API/依赖/router 零差异及 TV 业务脚本零差异门禁均通过。
+
+## 2026-07-17 13:14 +0800
+- 进度：Task 17 第一轮 review fix 完成最小生产修复并取得覆盖 GREEN。系列项改为原生 button，保留 `selectSeries(item.id)`，以 `aria-pressed` 同步选中态并使用裁剪容器内可见的 focus ring；三个筛选控件补中文 aria-label；系列标题和绑定视频文本仅在自身容器允许长词换行。按钮内部同步改为合法 span 内容，业务脚本、列表密度和选择行为未改。
+- 影响文件：生产只修改 `admin-web/src/views/TvSeriesManage.vue` 的模板与 scoped CSS，保留 RED 阶段 `precisionOpsRollout.spec.js`，并追加 `CONTEXT.md`、`plan.md`；未修改 API、依赖、路由、脚本模型/handler、共享主题或其它页面。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvSeriesManage.helpers.spec.js` 通过（2 文件，53/53）；待 Task 17 原四文件定向、完整测试、生产构建和最终静态/敏感差异门禁。
+
+## 2026-07-17 13:13 +0800
+- 进度：Task 17 第一轮 review fix 的四组真实 SFC 契约取得严格 RED，分别锁定系列项原生 button/type/aria-pressed/原 click handler、三个筛选 aria-label、按钮宽度/字体/对齐重置与 focus-visible，以及系列标题/绑定视频文本的局部长词边界；尚未修改生产 SFC。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js` 与 `plan.md`，并追加 git 忽略报告；`TvSeriesManage.vue`、`CONTEXT.md`、API、依赖、路由、业务脚本模型/handler 均未改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvSeriesManage.helpers.spec.js` 按预期退出 1（2 文件，4 failed / 49 passed）。四个失败测试精确对应按钮语义、筛选名称、焦点/按钮重置和两处长文本策略；原 `selectSeries(item.id)` handler 保留断言通过，无语法或环境错误。
+
+## 2026-07-17 13:12 +0800
+- 进度：开始 Task 17 第一轮 review fix，只闭合电视剧系列列表的键盘/选中语义、三个筛选控件可访问名称和两处动态长文本边界，不推进 Task 18。已对照当前 SFC 与仓库原生列表按钮模式验证 4 个 Important：系列项缺原生按钮/aria/focus，筛选仅有 placeholder，系列标题与绑定视频文本缺自身换行边界。
+- 影响文件：计划只修改 `admin-web/src/views/TvSeriesManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件，并追加 git 忽略的 `.superpowers/sdd/task-17-report.md`；不修改 API、依赖、路由、业务脚本模型/handler、其它页面或 Task 18。
+- 验证：先在真实 SFC rollout 契约中锁定 button/type/aria-pressed/click handler、三个 aria-label、focus-visible、按钮重置和两处长文本策略并取得严格 RED，再运行两文件 GREEN、Task 17 原四文件定向、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、4 文件白名单及 API/依赖/router/脚本敏感差异门禁。
+
 ## 2026-07-17 12:54 +0800
 - 进度：Task 17 完成提交前最终验证与自审，不推进 Task 18。三页真实 SFC、17 migrated / 0 pending、form density、TV 页头唯一动作/compact 左栏/无嵌套 SectionCard、Settings 区块错误与旧日志滚动、Toolbox 无外层卡/六个精确独立链接契约完整；详细证据已写入 git 忽略的 `.superpowers/sdd/task-17-report.md`，按分工不执行浏览器验收。
 - 影响文件：最终只纳入 `admin-web/src/views/TvSeriesManage.vue`、`SystemSettings.vue`、`Toolbox.vue`、`precisionOpsRollout.spec.js`、`toolboxPage.spec.js`、`admin-web/src/router/index.js`、`index.spec.js`、`CONTEXT.md`、`plan.md` 共 9 个 tracked 文件；不纳入忽略报告，不修改 API、依赖、权限、共享主题、其它页面/路由、Android、后端或 Task 18。

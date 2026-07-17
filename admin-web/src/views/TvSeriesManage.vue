@@ -326,12 +326,12 @@ onMounted(async () => {
 
       <Toolbar>
         <template #filters>
-          <el-input v-model="query.q" class="tv-search" placeholder="搜索系列标题" clearable @keyup.enter="query.page = 1; loadList()" />
-          <el-select v-model="query.active" class="tv-filter" placeholder="启用状态" clearable>
+          <el-input v-model="query.q" class="tv-search" aria-label="系列标题筛选" placeholder="搜索系列标题" clearable @keyup.enter="query.page = 1; loadList()" />
+          <el-select v-model="query.active" class="tv-filter" aria-label="启用状态筛选" placeholder="启用状态" clearable>
             <el-option label="仅启用" value="1" />
             <el-option label="仅停用" value="0" />
           </el-select>
-          <el-select v-model="query.has_playable" class="tv-filter" placeholder="可播分集" clearable>
+          <el-select v-model="query.has_playable" class="tv-filter" aria-label="可播分集筛选" placeholder="可播分集" clearable>
             <el-option label="有可播分集" value="1" />
             <el-option label="无可播分集" value="0" />
           </el-select>
@@ -350,23 +350,25 @@ onMounted(async () => {
               description="先创建一个系列，再维护季与分集。"
             />
             <div v-else class="series-list">
-              <div
+              <button
                 v-for="item in list"
                 :key="item.id"
                 class="series-card"
                 :class="{ 'is-active': String(item.id) === selectedSeriesId }"
+                :aria-pressed="String(item.id) === selectedSeriesId"
+                type="button"
                 @click="selectSeries(item.id)"
               >
-                <div class="series-card__title">{{ item.title }}</div>
-                <div class="series-card__meta">
+                <span class="series-card__title">{{ item.title }}</span>
+                <span class="series-card__meta">
                   <span>{{ item.total_seasons || 0 }} 季</span>
                   <span>{{ item.total_episodes || 0 }} 集</span>
                   <span>{{ item.playable_episodes || 0 }} 集可播</span>
-                </div>
-                <div class="series-card__status">
+                </span>
+                <span class="series-card__status">
                   <el-tag :type="item.active ? 'success' : 'info'">{{ item.active ? '启用' : '停用' }}</el-tag>
-                </div>
-              </div>
+                </span>
+              </button>
             </div>
           </el-scrollbar>
           <div class="pager-wrap">
@@ -605,11 +607,18 @@ onMounted(async () => {
 }
 
 .series-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   cursor: pointer;
+  appearance: none;
+  color: inherit;
   background: var(--bg-surface);
+  font: inherit;
+  text-align: left;
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
@@ -620,7 +629,15 @@ onMounted(async () => {
   box-shadow: var(--shadow-xs);
 }
 
+.series-card:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: -2px;
+}
+
 .series-card__title {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -635,6 +652,7 @@ onMounted(async () => {
 }
 
 .series-card__status {
+  display: block;
   margin-top: 10px;
 }
 
@@ -753,6 +771,8 @@ onMounted(async () => {
 }
 
 .episode-binding-tip {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: 12px;
 }

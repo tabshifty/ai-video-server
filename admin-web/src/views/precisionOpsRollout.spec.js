@@ -221,6 +221,50 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect.soft(style).toMatch(/@media \(max-width: 63\.9375rem\)\s*\{[\s\S]*?\.tv-manage-shell :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*44px;/s)
   })
 
+  it('电视剧系列项使用原生按钮保留选择动作与准确选中语义', () => {
+    const template = extractTemplate(readView('TvSeriesManage.vue'))
+    const seriesItem = template.match(/<(?:button|div)\s+v-for="item in list"[\s\S]*?@click="selectSeries\(item\.id\)"[\s\S]*?>/)?.[0] || ''
+
+    expect.soft(seriesItem).toMatch(/^<button\b/)
+    expect.soft(seriesItem).toContain('type="button"')
+    expect.soft(seriesItem).toContain(':aria-pressed="String(item.id) === selectedSeriesId"')
+    expect.soft(seriesItem).toContain('@click="selectSeries(item.id)"')
+  })
+
+  it('电视剧筛选控件提供与用途对应的中文可访问名称', () => {
+    const toolbar = toolbarBlock(extractTemplate(readView('TvSeriesManage.vue')))
+    const titleFilter = toolbar.match(/<el-input\b[^>]*v-model="query\.q"[^>]*\/>/)?.[0] || ''
+    const activeFilter = toolbar.match(/<el-select\b[^>]*v-model="query\.active"[^>]*>/)?.[0] || ''
+    const playableFilter = toolbar.match(/<el-select\b[^>]*v-model="query\.has_playable"[^>]*>/)?.[0] || ''
+
+    expect.soft(titleFilter).toContain('aria-label="系列标题筛选"')
+    expect.soft(activeFilter).toContain('aria-label="启用状态筛选"')
+    expect.soft(playableFilter).toContain('aria-label="可播分集筛选"')
+  })
+
+  it('电视剧系列按钮重置原生外观并提供可见键盘焦点', () => {
+    const style = extractStyle(readView('TvSeriesManage.vue'))
+    const buttonRule = style.match(/\.series-card\s*\{[^}]*\}/s)?.[0] || ''
+    const focusRule = style.match(/\.series-card:focus-visible\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect.soft(buttonRule).toContain('width: 100%;')
+    expect.soft(buttonRule).toContain('font: inherit;')
+    expect.soft(buttonRule).toContain('text-align: left;')
+    expect.soft(focusRule).toContain('outline: 2px solid var(--line-focus);')
+    expect.soft(focusRule).toContain('outline-offset: -2px;')
+  })
+
+  it('电视剧系列标题与绑定视频文本在自身容器内安全换行', () => {
+    const style = extractStyle(readView('TvSeriesManage.vue'))
+    const titleRule = style.match(/\.series-card__title\s*\{[^}]*\}/s)?.[0] || ''
+    const bindingRule = style.match(/\.episode-binding-tip\s*\{[^}]*\}/s)?.[0] || ''
+
+    for (const rule of [titleRule, bindingRule]) {
+      expect.soft(rule).toContain('min-width: 0;')
+      expect.soft(rule).toContain('overflow-wrap: anywhere;')
+    }
+  })
+
   it('系统设置使用无阴影表单区块并在清理与日志区分别保留可恢复错误', () => {
     const source = readView('SystemSettings.vue')
     const template = extractTemplate(source)
