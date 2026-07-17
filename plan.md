@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 12:32 +0800
+- 进度：Task 16 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，且 Cannot verify 为无。首轮浏览器唯一阻塞已由 `5f0a329` 闭合；最终两页 × 1440/1024/768/375px 为 `PASS_WITH_CONCERNS`、0 failure。真实环境无候选的验证缺口又由 CDP Fetch 本地履约 smoke 闭合：两页 2 候选的初始、Enter、Space、点击 aria-pressed 轨迹全部通过，AV“已选中”始终唯一且跟随当前项，两个拦截 POST 未到后端、临时 target 已关闭。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-16-report.md`、浏览器/候选 smoke 脚本、矩阵、JSON 和 8 张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 17。
+- 验证：主线程在最新提交 `5f0a329` 上新鲜运行 Task 16 定向 64/64、管理端全量 39 文件 431/431、Vite 2373 modules 构建成功且仅既有 chunk-size warning；8/8 视口中通用筛选 5/2/1/1、AV 筛选 5/2/1/1、AV 结果 2/2/1/1，控件最小高度 36/36/44/44px，document/filter overflow 与 mutation request 均为 0。候选 smoke 状态 PASS；`git diff --check`、总体 7 文件/修复 4 文件白名单、U+FFFD/C0/DEL、API/依赖零差异、两页业务脚本归一化零差异及修复提交模板零差异门禁通过。两页各 1 条固定 Base 已存在的 `rows` warning 经复审判为非 finding，可进入 Task 17。
+
 ## 2026-07-17 12:12 +0800
 - 进度：Task 16 AV switch 阻塞完成最小 CSS GREEN 与提交前最终验证，不推进 Task 17。页面局部 switch 默认跟随 `var(--control-height)` 保持桌面 36px，窄于 `64rem` 时提升到 44px；同时覆盖“绕过缓存”和“海报裁剪”，未修改共享主题、模板、脚本、switch v-model 或业务数据流。完整修复证据已追加到 git 忽略的 `.superpowers/sdd/task-16-report.md`，按分工不执行浏览器验收。
 - 影响文件：最终精确纳入 `admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件；去除长期文档后的修复白名单为 SFC/spec/plan 3 文件。API、依赖、router、共享主题、其它页面、AV 脚本与模板均无差异，不处理既有 `rows="3"` warning。
