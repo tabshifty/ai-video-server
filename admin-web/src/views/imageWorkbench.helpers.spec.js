@@ -13,6 +13,39 @@ import {
 
 const readView = (file) => readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
 
+function extractSfcBlock(source, tag) {
+  const opening = source.match(new RegExp(`<${tag}[^>]*>`))
+  const start = (opening?.index || 0) + (opening?.[0].length || 0)
+  const end = source.lastIndexOf(`</${tag}>`)
+
+  expect(opening).not.toBeNull()
+  expect(end).toBeGreaterThan(start)
+  return source.slice(start, end)
+}
+
+function extractBraceBlock(source, marker) {
+  const start = source.indexOf(marker)
+  const openingBrace = source.indexOf('{', start)
+
+  expect(start, marker).toBeGreaterThanOrEqual(0)
+  expect(openingBrace, marker).toBeGreaterThan(start)
+  let depth = 0
+  for (let index = openingBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') depth -= 1
+    if (depth === 0) return source.slice(start, index + 1)
+  }
+  throw new Error(`未找到完整代码块：${marker}`)
+}
+
+function findStyleRule(style, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = style.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))
+
+  expect(match, selector).not.toBeNull()
+  return match?.[1] || ''
+}
+
 describe('image workbench helpers', () => {
   it('normalizes common generation params', () => {
     expect(
@@ -216,6 +249,9 @@ describe('image workbench helpers', () => {
 describe('image workbench Precision Ops contracts', () => {
   it('keeps the mask editor component-only boundary and separates data colors from UI colors', () => {
     const source = readView('ImageWorkbenchMaskEditor.vue')
+    const script = extractSfcBlock(source, 'script')
+    const drawPreview = extractBraceBlock(script, 'function drawPreview()')
+    const resolveCanvasColor = extractBraceBlock(script, 'function resolveCanvasColor(token)')
     const sourceWithoutMaskDataColor = source.replace("const MASK_OPAQUE_COLOR = '#ffffff'", '')
 
     expect(source).toContain('data-density="form"')
@@ -224,8 +260,11 @@ describe('image workbench Precision Ops contracts', () => {
     expect(source).toContain('mask-editor__toolbar')
     expect(source).toContain("const MASK_OPAQUE_COLOR = '#ffffff'")
     expect(source.match(/= MASK_OPAQUE_COLOR/g)).toHaveLength(5)
-    expect(source).toContain("function resolveCanvasColor(token) {\n  if (typeof window === 'undefined' || typeof document === 'undefined') return ''\n  return window.getComputedStyle(document.documentElement).getPropertyValue(token).trim()\n}")
-    expect(source).toContain("overlayCtx.fillStyle = resolveCanvasColor('--primary')")
+    expect(resolveCanvasColor).toContain("if (typeof window === 'undefined' || typeof document === 'undefined') return ''")
+    expect(resolveCanvasColor).toContain('return window.getComputedStyle(document.documentElement).getPropertyValue(token).trim()')
+    expect(resolveCanvasColor).not.toMatch(/getPropertyValue\(token\).*?(?:\|\||\?\?|fallback)/i)
+    expect(drawPreview.match(/^\s*overlayCtx\.fillStyle = resolveCanvasColor\('--primary'\)\s*$/gm)).toHaveLength(1)
+    expect(drawPreview).not.toMatch(/overlayCtx\.fillStyle\s*=.*(?:\|\||\?\?|fallback)/i)
     expect(source).toContain('color-mix(in srgb, var(--text-primary) 4%, transparent)')
     expect(source.match(/linear-gradient\(/g)).toHaveLength(2)
     expect(sourceWithoutMaskDataColor).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
@@ -237,6 +276,9 @@ describe('image workbench Precision Ops contracts', () => {
 
   it('uses fixed-format mask controls without changing pointer or save contracts', () => {
     const source = readView('ImageWorkbenchMaskEditor.vue')
+    const style = extractSfcBlock(source, 'style')
+    const mobileStyle = extractBraceBlock(style, '@media (max-width: 63.9375rem)')
+    const mobileModeRule = findStyleRule(mobileStyle, '.mask-editor__mode :deep(.el-radio-button__inner)')
 
     expect(source).toContain('<el-radio-group v-model="tool"')
     expect(source).toContain('<el-slider v-model="brushSize"')
@@ -261,18 +303,78 @@ describe('image workbench Precision Ops contracts', () => {
     expect(source).toContain('x: ((event.clientX - rect.left) / rect.width) * canvas.width')
     expect(source).toContain('y: ((event.clientY - rect.top) / rect.height) * canvas.height')
     expect(source).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.mask-editor__icon-button\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/s)
+    expect(mobileModeRule).toContain('min-height: 44px;')
     expect(source).toContain("emit('save', maskCanvas.toDataURL('image/png'))")
+  })
+
+  it('keeps the mask dialog close control named and its footer inside the viewport', () => {
+    const source = readView('ImageWorkbenchMaskEditor.vue')
+    const template = extractSfcBlock(source, 'template')
+    const style = extractSfcBlock(source, 'style')
+    const dialogOpening = template.match(/<el-dialog\b[\s\S]*?>/)?.[0] || ''
+    const header = template.match(/<template #header="\{ close, titleId, titleClass \}">[\s\S]*?<\/template>/)?.[0] || ''
+    const rootRule = findStyleRule(style, '.mask-editor')
+    const bodyRule = findStyleRule(style, '.mask-editor :deep(.el-dialog__body)')
+
+    expect(source).toMatch(/import \{(?=[^}]*\bClose\b)(?=[^}]*\bDelete\b)[^}]*\} from '@element-plus\/icons-vue'/)
+    expect(dialogOpening).toContain('v-model="visible"')
+    expect(dialogOpening).toContain('width="min(96vw, 1080px)"')
+    expect(dialogOpening).toContain(':show-close="false"')
+    expect(dialogOpening).toContain(':close-on-click-modal="false"')
+    expect(header).toContain(':id="titleId"')
+    expect(header).toContain(':class="titleClass"')
+    expect(header).toContain('class="el-dialog__headerbtn"')
+    expect(header).toContain('aria-label="关闭此对话框"')
+    expect(header).toContain('title="关闭此对话框"')
+    expect(header).toContain('@click="close"')
+    expect(header).toContain('aria-hidden="true"')
+    expect(header).toContain('<Close />')
+    expect(template.match(/class="el-dialog__headerbtn"/g)).toHaveLength(1)
+    expect(rootRule).toContain('max-height: 92vh;')
+    expect(rootRule).toContain('display: flex;')
+    expect(rootRule).toContain('flex-direction: column;')
+    expect(bodyRule).toContain('min-height: 0;')
+    expect(bodyRule).toContain('overflow: auto;')
+    expect(bodyRule).toContain('overscroll-behavior: contain;')
+    expect(style).not.toContain('.mask-editor :deep(.el-dialog)')
+  })
+
+  it('uses the shared single close entry for the library drawer', () => {
+    const source = readView('ToolboxImageWorkbench.vue')
+    const template = extractSfcBlock(source, 'template')
+    const drawer = template.match(/<el-drawer\b[\s\S]*?<\/el-drawer>/)?.[0] || ''
+    const drawerOpening = drawer.match(/<el-drawer\b[\s\S]*?>/)?.[0] || ''
+    const header = drawer.match(/<template #header="\{ close, titleId, titleClass \}">[\s\S]*?<\/template>/)?.[0] || ''
+
+    expect(source).toContain("import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'")
+    expect(drawerOpening).toContain('v-model="libraryPickerVisible"')
+    expect(drawerOpening).toContain('title="选择图库参考图"')
+    expect(drawerOpening).toContain('size="min(100%, 760px)"')
+    expect(drawerOpening).toContain(':show-close="false"')
+    expect(drawerOpening).toContain(':close-on-click-modal="!libraryAdding"')
+    expect(drawerOpening).toContain(':close-on-press-escape="!libraryAdding"')
+    expect(drawerOpening).toContain('@closed="onLibraryPickerClosed"')
+    expect(header).toContain('<AdminDrawerHeader')
+    expect(header).toContain('title="选择图库参考图"')
+    expect(header).toContain(':title-id="titleId"')
+    expect(header).toContain(':title-class="titleClass"')
+    expect(header).toContain(':close="close"')
+    expect(template.match(/<AdminDrawerHeader\b/g)).toHaveLength(1)
   })
 
   it('uses stable compact media-grid geometry in the image workbench', () => {
     const source = readView('ToolboxImageWorkbench.vue')
     const resultGridRule = source.match(/\.result-grid\s*\{[^}]*\}/s)?.[0] || ''
     const libraryGridRule = source.match(/\.library-grid\s*\{[^}]*\}/s)?.[0] || ''
+    const template = extractSfcBlock(source, 'template')
+    const inputOpening = template.match(/<aside class="workbench-panel workbench-panel--input"[^>]*>/)?.[0] || ''
 
     expect(source).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
     expect(source).toContain('<StatusIndicator :label="statusLabel" :tone="statusType" />')
     expect(source).toContain('<section class="workbench-panel workbench-panel--preview" data-density="compact">')
     expect(source).toContain('<div class="library-picker" data-density="compact">')
+    expect(source.match(/data-density="compact"/g)).toHaveLength(2)
+    expect(inputOpening).not.toContain('data-density')
     for (const rule of [resultGridRule, libraryGridRule]) {
       expect(rule).toContain('grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));')
       expect(rule).toContain('gap: 12px;')

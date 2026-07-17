@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Delete } from '@element-plus/icons-vue'
+import { Close, Delete } from '@element-plus/icons-vue'
 
 const MASK_OPAQUE_COLOR = '#ffffff'
 
@@ -249,8 +249,21 @@ function saveMask() {
     append-to-body
     destroy-on-close
     data-density="form"
+    :show-close="false"
     :close-on-click-modal="false"
   >
+    <template #header="{ close, titleId, titleClass }">
+      <span :id="titleId" :class="titleClass" role="heading" aria-level="2">编辑局部蒙版</span>
+      <button
+        type="button"
+        class="el-dialog__headerbtn"
+        aria-label="关闭此对话框"
+        title="关闭此对话框"
+        @click="close"
+      >
+        <el-icon class="el-dialog__close" aria-hidden="true"><Close /></el-icon>
+      </button>
+    </template>
     <div class="mask-editor__layout">
       <div class="mask-editor__toolbar">
         <div class="mask-editor__toolbar-group mask-editor__toolbar-group--identity">
@@ -299,6 +312,25 @@ function saveMask() {
 </template>
 
 <style scoped>
+.mask-editor {
+  display: flex;
+  max-height: 92vh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mask-editor :deep(.el-dialog__header),
+.mask-editor :deep(.el-dialog__footer) {
+  flex: 0 0 auto;
+}
+
+.mask-editor :deep(.el-dialog__body) {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 .mask-editor__layout {
   display: grid;
   gap: var(--space-4);
@@ -386,6 +418,10 @@ function saveMask() {
 }
 
 @media (max-width: 63.9375rem) {
+  .mask-editor__mode :deep(.el-radio-button__inner) {
+    min-height: 44px;
+  }
+
   .mask-editor__icon-button {
     width: 44px;
     height: 44px;

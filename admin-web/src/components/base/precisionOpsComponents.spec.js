@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import MetricStrip from './MetricStrip.vue'
+import SectionCard from './SectionCard.vue'
 import SavedViewTabs from './SavedViewTabs.vue'
 import StatusIndicator from './StatusIndicator.vue'
 
 const metricStripSource = readFileSync(new URL('./MetricStrip.vue', import.meta.url), 'utf8')
+const sectionCardSource = readFileSync(new URL('./SectionCard.vue', import.meta.url), 'utf8')
 const savedViewTabsSource = readFileSync(new URL('./SavedViewTabs.vue', import.meta.url), 'utf8')
 const statusIndicatorSource = readFileSync(new URL('./StatusIndicator.vue', import.meta.url), 'utf8')
 const drawerHeaderURL = new URL('./AdminDrawerHeader.vue', import.meta.url)
@@ -32,8 +34,26 @@ function findRule(style, selector) {
   return match?.[1] || ''
 }
 
+function extractBraceBlock(source, marker) {
+  const start = source.indexOf(marker)
+  const openingBrace = source.indexOf('{', start)
+
+  expect(start, marker).toBeGreaterThanOrEqual(0)
+  expect(openingBrace, marker).toBeGreaterThan(start)
+  let depth = 0
+  for (let index = openingBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') depth -= 1
+    if (depth === 0) return source.slice(start, index + 1)
+  }
+  throw new Error(`未找到完整代码块：${marker}`)
+}
+
 const metricTemplate = extractBlock(metricStripSource, 'template')
 const metricStyle = extractBlock(metricStripSource, 'style')
+const sectionCardScript = extractBlock(sectionCardSource, 'script')
+const sectionCardTemplate = extractBlock(sectionCardSource, 'template')
+const sectionCardStyle = extractBlock(sectionCardSource, 'style')
 const savedViewScript = extractBlock(savedViewTabsSource, 'script')
 const savedViewTemplate = extractBlock(savedViewTabsSource, 'template')
 const savedViewStyle = extractBlock(savedViewTabsSource, 'style')
@@ -200,5 +220,30 @@ describe('Precision Ops base components', () => {
     expect(drawerHeaderSource).toContain('@click="close"')
     expect(drawerHeaderSource).not.toContain('<el-tooltip')
     expect(drawerHeaderSource).not.toContain("emit('update:modelValue'")
+  })
+
+  it('共享折叠区块按钮公开当前状态的中文名称且保留原折叠语义', () => {
+    const toggle = sectionCardTemplate.match(/<button\b(?=[^>]*class="section-card__toggle")[\s\S]*?>/)?.[0] || ''
+
+    expect(SectionCard).toBeTruthy()
+    expect(sectionCardScript).toContain('const expanded = ref(props.defaultExpanded)')
+    expect(SectionCard.props.defaultExpanded.default).toBe(true)
+    expect(toggle).toContain(':aria-label="expanded ? \'收起区块\' : \'展开区块\'"')
+    expect(toggle).toContain(':title="expanded ? \'收起区块\' : \'展开区块\'"')
+    expect(toggle).toContain(':aria-expanded="expanded"')
+    expect(toggle).toContain('@click="expanded = !expanded"')
+    expect(sectionCardTemplate).toContain('<el-icon aria-hidden="true">')
+    expect(sectionCardTemplate).toContain('<div v-show="expanded" class="section-card__body">')
+  })
+
+  it('共享折叠区块按钮消费桌面密度并在窄屏提升为 44px', () => {
+    const desktopRule = findRule(sectionCardStyle, '.section-card__toggle')
+    const mobileStyle = extractBraceBlock(sectionCardStyle, '@media (max-width: 63.9375rem)')
+    const mobileRule = findRule(mobileStyle, '.section-card__toggle')
+
+    for (const property of ['width', 'height', 'min-width', 'min-height']) {
+      expect(desktopRule).toContain(`${property}: var(--control-height)`)
+      expect(mobileRule).toContain(`${property}: 44px`)
+    }
   })
 })

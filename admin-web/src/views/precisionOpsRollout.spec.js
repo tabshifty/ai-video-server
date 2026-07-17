@@ -749,6 +749,10 @@ describe('Precision Ops 独立工具工作区', () => {
 
   it('遮罩编辑器保持组件边界与表单密度', () => {
     const source = readView('ImageWorkbenchMaskEditor.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const dialog = template.match(/<el-dialog\b[\s\S]*?>/)?.[0] || ''
+    const rootRule = style.match(/\.mask-editor\s*\{[^}]*\}/s)?.[0] || ''
 
     expect(source).toContain('data-density="form"')
     expect(source).toContain('mask-editor__toolbar')
@@ -756,16 +760,34 @@ describe('Precision Ops 独立工具工作区', () => {
     expect(source).toContain("overlayCtx.fillStyle = resolveCanvasColor('--primary')")
     expect(source).not.toMatch(/rgba?\(\s*\d/)
     expect(source).not.toMatch(/\.mask-editor__canvas\s*\{[^}]*box-shadow:/s)
+    expect(dialog).toContain(':show-close="false"')
+    expect(template.match(/class="el-dialog__headerbtn"/g)).toHaveLength(1)
+    expect(template).toContain('aria-label="关闭此对话框"')
+    expect(template).toContain('title="关闭此对话框"')
+    expect(rootRule).toContain('display: flex;')
+    expect(rootRule).toContain('max-height: 92vh;')
+    expect(rootRule).toContain('flex-direction: column;')
+    expect(style).toMatch(/\.mask-editor :deep\(\.el-dialog__body\)\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*auto;[^}]*overscroll-behavior:\s*contain;/s)
     expect(source).not.toContain('<Layout')
     expect(source).not.toContain('<PageHeader')
   })
 
   it('图像工作台使用稳定媒体网格且保留独立页头', () => {
     const source = readView('ToolboxImageWorkbench.vue')
+    const template = extractTemplate(source)
+    const inputOpening = template.match(/<aside class="workbench-panel workbench-panel--input"[^>]*>/)?.[0] || ''
+    const drawer = template.match(/<el-drawer\b[\s\S]*?<\/el-drawer>/)?.[0] || ''
 
     expect(source).toContain('minmax(184px, 1fr)')
     expect(source).toContain('object-fit: contain')
     expect(source).toContain('<PageHeader')
+    expect(source.match(/data-density="compact"/g)).toHaveLength(2)
+    expect(inputOpening).not.toContain('data-density')
+    expect(source).toContain("import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'")
+    expect(drawer).toContain(':show-close="false"')
+    expect(drawer).toContain('<template #header="{ close, titleId, titleClass }">')
+    expect(drawer).toContain('<AdminDrawerHeader title="选择图库参考图" :title-id="titleId" :title-class="titleClass" :close="close" />')
+    expect(template.match(/<AdminDrawerHeader\b/g)).toHaveLength(1)
   })
 
   it('移除登录页装饰渐变与面板常驻阴影', () => {

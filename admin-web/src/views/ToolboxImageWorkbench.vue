@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Download, FolderOpened, Picture, Plus, Refresh, Search, Upload, WarningFilled } from '@element-plus/icons-vue'
+import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
@@ -1149,10 +1150,14 @@ function formatLibraryItemMeta(item) {
       direction="rtl"
       size="min(100%, 760px)"
       data-density="form"
+      :show-close="false"
       :close-on-click-modal="!libraryAdding"
       :close-on-press-escape="!libraryAdding"
       @closed="onLibraryPickerClosed"
     >
+      <template #header="{ close, titleId, titleClass }">
+        <AdminDrawerHeader title="选择图库参考图" :title-id="titleId" :title-class="titleClass" :close="close" />
+      </template>
       <div class="library-picker" data-density="compact">
         <SectionCard dense>
           <template #title>图库筛选</template>

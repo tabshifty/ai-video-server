@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 19:07 +0800
+- 进度：Task 21 正式 review 与安全浏览器矩阵合并修复完成提交前验证。7 个目标 RED 已全部闭合，overlay 语义色赋值精确锚定且无颜色 fallback，compact 仅存在于结果区与 Teleport 图库区；共享折叠按钮、两个唯一关闭入口、radio 44px 和 Mask 视口内 footer/body 滚动契约均由真实 SFC 测试覆盖。按分工不运行浏览器，交由主代理复验四视口。
+- 影响文件：固定任务 Base `7a952b7d7f0dd99311a57a703fef6dc27cc7594b` 下最终精确纳入 `CONTEXT.md`、`plan.md`、`admin-web/src/components/base/SectionCard.vue`、`precisionOpsComponents.spec.js`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js` 共 8 个 tracked 文件，并更新 git 忽略报告；不修改其它文件。
+- 验证：扩展定向 3 文件 97/97；管理端完整 `npm test` 39 文件 483/483；`npm run build` 转换 2373 modules 成功且仅既有 chunk-size warning。`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、固定 Base 八文件白名单、API/依赖/router 零差异、direct-color/gradient/shadow、Toolbox/Mask/SectionCard 业务脚本/handler/pointer/emit 与 Drawer/Dialog opening props/events 归一化门禁全部通过。
+
+## 2026-07-17 19:03 +0800
+- 进度：Task 21 合并 fix wave 最小实现取得定向 GREEN。共享 `SectionCard` 保留原 expanded/default/slot 语义，只为折叠按钮增加动态“收起区块/展开区块” aria/title、`aria-expanded`、装饰图标隐藏和 36/44px 尺寸；图库 Drawer 使用唯一 `AdminDrawerHeader`；Mask Dialog 使用唯一 inline close，并以同根 92vh flex column + body 滚动把 footer 留在视口内，radio 在 `<1024px` 明确 44px。
+- 影响文件：已修改三份目标生产 SFC、三份目标 spec、`plan.md`、`CONTEXT.md` 与 git 忽略报告；不修改共享主题、API、依赖、router、IndexedDB、生成/图库/导入业务、Canvas/pointer/emits 或 overlay 原 guards/events。
+- 验证：同一扩展定向命令由准确 RED（3 文件 97 tests，7 failed / 90 passed）转为 GREEN（3 文件 97/97）。实现后首轮 96/97 的唯一失败是 rollout 测试错误限定 CSS 声明顺序，改为提取同一 rule 逐项断言后全绿，生产 CSS 未为测试重排；待完整测试、构建与最终静态/差异门禁。
+
+## 2026-07-17 18:59 +0800
+- 进度：Task 21 合并 fix wave 三份真实 SFC/共享组件契约取得严格 RED。测试分别提取函数、真实 opening tag/header slot、CSS media 块与共享折叠按钮，锁定 radio 窄屏 44px、Mask 单一中文关闭入口和视口内 body 滚动、图库 Drawer 唯一共享关闭入口、`SectionCard` 动态展开状态名称与 36/44px；overlay 完整赋值/无 fallback 与 compact 仅结果+图库两区的正负契约在 RED 阶段已通过。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`admin-web/src/components/base/precisionOpsComponents.spec.js` 与 `plan.md`，并更新 git 忽略报告；三份生产 SFC、`CONTEXT.md`、API、依赖和 router 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/imageWorkbench.helpers.spec.js src/views/precisionOpsRollout.spec.js src/components/base/precisionOpsComponents.spec.js` 退出 1（3 文件，97 tests，7 failed / 90 passed）；首轮曾以 8 failed 暴露测试把 brief 必需 SSR guard 的 `||` 误判为颜色 fallback，收窄到颜色返回路径后固定为上述 7 个目标生产缺口，无语法、环境或既有业务失败。
+
+## 2026-07-17 18:51 +0800
+- 进度：开始 Task 21 正式 review 与安全浏览器矩阵合并修复。精确闭合 Mask radio 在 768/375px 被局部 form 规则回压到 36px、共享 `SectionCard` 折叠按钮 28px 且无动态中文名称、图库 Drawer 与 Mask Dialog 默认关闭按钮缺稳定 title，以及 Mask footer 超出窄屏视口四类缺口；同步收紧 overlay 无 fallback 与 compact 仅落结果/图库两区的静态契约，不自行运行浏览器。
+- 影响文件：在固定任务 Base `7a952b7d7f0dd99311a57a703fef6dc27cc7594b` 的原 6 文件基础上，允许新增修改 `admin-web/src/components/base/SectionCard.vue` 与 `precisionOpsComponents.spec.js`，最终 tracked 白名单为 8 文件；更新 git 忽略的 `.superpowers/sdd/task-21-report.md`，不修改 API、依赖、router、业务数据流、共享主题或其它文件。
+- 验证：先只修改 `imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`precisionOpsComponents.spec.js` 并运行 `cd admin-web && npm test -- src/views/imageWorkbench.helpers.spec.js src/views/precisionOpsRollout.spec.js src/components/base/precisionOpsComponents.spec.js` 取得准确 RED；最小实现后依次运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、固定 Base 八文件白名单、API/依赖/router 零差异、业务脚本/handler/pointer/emit 与 overlay props/events 归一化门禁，提交建议为 `修复：补齐媒体工作台窄屏交互`。
+
 ## 2026-07-17 18:10 +0800
 - 进度：Task 21 完成提交前最终验证与独立复审。自审以两个精确 RED 移除图库持续阴影并让 36/44px 图标轨道自适应；首轮 reviewer 的 1 个 Important 以 Element Plus 2.13.6 源码确认 Dialog attrs 与 `.el-dialog` 同根，随后用 `width="min(96vw, 1080px)"` 直接闭合窄屏宽度并删除无效后代选择器。复审结论 Ready，0 Critical / 0 Important / 0 Minor。
 - 影响文件：最终只纳入 `admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个 tracked 文件，并更新 git 忽略报告；不修改 API、依赖、router、helpers 生产代码、其它页面、Android 或后端。

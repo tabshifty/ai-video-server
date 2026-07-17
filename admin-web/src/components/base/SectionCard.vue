@@ -23,8 +23,16 @@ const expanded = ref(props.defaultExpanded)
 <template>
   <section class="section-card" :class="{ 'is-dense': dense }">
     <header class="section-card__header">
-      <button v-if="collapsible" class="section-card__toggle" type="button" @click="expanded = !expanded">
-        <el-icon>
+      <button
+        v-if="collapsible"
+        class="section-card__toggle"
+        type="button"
+        :aria-label="expanded ? '收起区块' : '展开区块'"
+        :title="expanded ? '收起区块' : '展开区块'"
+        :aria-expanded="expanded"
+        @click="expanded = !expanded"
+      >
+        <el-icon aria-hidden="true">
           <component :is="expanded ? ArrowDown : ArrowRight" />
         </el-icon>
       </button>
@@ -108,9 +116,12 @@ const expanded = ref(props.defaultExpanded)
 
 .section-card__toggle {
   display: inline-grid;
-  width: calc(var(--space-6) + var(--space-1));
-  height: calc(var(--space-6) + var(--space-1));
+  width: var(--control-height);
+  height: var(--control-height);
+  min-width: var(--control-height);
+  min-height: var(--control-height);
   place-items: center;
+  padding: 0;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
@@ -120,5 +131,14 @@ const expanded = ref(props.defaultExpanded)
 
 .section-card__body {
   min-width: 0;
+}
+
+@media (max-width: 63.9375rem) {
+  .section-card__toggle {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 </style>
