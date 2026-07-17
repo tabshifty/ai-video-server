@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 14:01 +0800
+- 进度：Task 18 第一轮 review fix 完成最终验证与自审。合成 SFC 明确证明内部 Dialog density 不能冒充根 main density；实际四页只从 template 顶层 main start tag 校验 `form`，PageHeader/无 Layout 仍限定在 template。未修改或回退任何生产文件，不推进 Task 19。
+- 影响文件：最终只纳入 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md` 两个 tracked 文件，并更新 git 忽略报告；`CONTEXT.md`、四个生产 SFC、其它生产代码/API、依赖、router 均不纳入且相对 `cb849bc` 零差异。
+- 验证：覆盖 GREEN 59/59；Task 18 四文件定向 66/66；管理端完整 `npm test` 为 39 文件 453/453；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、U+FFFD/C0/DEL、2 文件白名单及生产/CONTEXT/API/依赖/router 零差异门禁均通过。
+
+## 2026-07-17 14:00 +0800
+- 进度：Task 18 第一轮 review fix 完成最小测试 helper 并取得覆盖 GREEN。`rootMainStartTag` 复用 `extractTemplate`，只从去除前导空白后的 template 开头匹配顶层 `<main ...>` start tag；四页 density 只检查该标签，PageHeader/无 Layout 只检查 template，内部 Dialog 不再能掩盖根密度回归。
+- 影响文件：只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md` 和 git 忽略报告；四个生产 SFC、`CONTEXT.md`、API、依赖、router 均未改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 通过（1 文件，59/59）；待 Task 18 四文件定向、完整 `npm test`、`npm run build` 与最终静态/敏感差异门禁。
+
+## 2026-07-17 13:59 +0800
+- 进度：Task 18 第一轮 review fix 的最小合成 SFC 取得严格 RED。fixture 的根 `<main>` 无 density、内部 `<el-dialog>` 带 `data-density="form"`，测试调用尚不存在的 `rootMainStartTag`；四个生产 SFC 和原四页断言未改。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md` 与 git 忽略报告；未修改生产、`CONTEXT.md`、API、依赖或 router。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 按预期退出 1（1 文件，59 tests，1 failed / 58 passed）；唯一失败为 `ReferenceError: rootMainStartTag is not defined`，准确证明 helper 尚缺失，无其它回归或环境错误。
+
+## 2026-07-17 13:57 +0800
+- 进度：开始 Task 18 第一轮 review fix，只修复独立工作区密度契约扫描整份 SFC、可能被密码页内部 Dialog `form` 属性误通过的问题；不修改或回退四个生产 SFC，不推进 Task 19。
+- 影响文件：只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md` 两个 tracked 文件，并追加 git 忽略的 `.superpowers/sdd/task-18-report.md`；不修改 `CONTEXT.md`、生产页面、API、依赖或 router。
+- 验证：先以“根 main 无密度、内部 Dialog 有 form 密度”的最小合成 SFC 调用尚不存在的精确 helper，运行 `cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js` 取得 helper 缺失 RED；最小实现后运行同命令 GREEN、Task 18 四文件定向、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、2 文件白名单及生产/API/依赖/router 相对 `cb849bc` 零差异门禁。
+
 ## 2026-07-17 13:39 +0800
 - 进度：Task 18 完成提交前最终验证与自审，不推进 Task 19。四页独立 PageHeader/无 Layout、根 `form`、密码列表 `compact`/Dialog `form`、Login 单色无阴影、三个中文可访问名称、窄屏收纳/44px 链接目标与焦点契约完整；四个 `<script setup>` 相对固定 Base 逐字一致，ED2K 解析、孤儿扫描/删除、密码 CRUD/显示复制及登录鉴权模型和 handler 均未改。详细证据已写入 git 忽略的 `.superpowers/sdd/task-18-report.md`，按分工不执行浏览器验收。
 - 影响文件：最终只纳入 `admin-web/src/views/ToolboxEd2k.vue`、`ToolboxOrphanFiles.vue`、`ToolboxPasswordVault.vue`、`Login.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 7 个 tracked 文件；不纳入忽略报告，不修改 API、依赖、router、认证细节、其它页面/测试或 Task 19。

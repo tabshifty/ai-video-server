@@ -91,6 +91,14 @@ function extractTemplate(source) {
   return source.slice(start, end)
 }
 
+function rootMainStartTag(source) {
+  const template = extractTemplate(source).trimStart()
+  const match = template.match(/^<main\b[^>]*>/)
+
+  expect(match).not.toBeNull()
+  return match?.[0] || ''
+}
+
 function extractStyle(source) {
   const match = source.match(/<style scoped>([\s\S]*?)<\/style>/)
 
@@ -698,13 +706,27 @@ describe('Precision Ops 第一阶段 rollout', () => {
 })
 
 describe('Precision Ops 独立工具工作区', () => {
+  it('只读取 template 顶层 main 的开始标签', () => {
+    const fixture = `
+      <template>
+        <main class="fixture-root">
+          <el-dialog data-density="form" />
+        </main>
+      </template>
+    `
+
+    expect(rootMainStartTag(fixture)).not.toContain('data-density')
+  })
+
   Object.entries(standaloneViews).forEach(([file, density]) => {
     it(`${file} 保持独立标题工作区`, () => {
       const source = readView(file)
+      const template = extractTemplate(source)
+      const rootMain = rootMainStartTag(source)
 
-      expect(source).toContain(`data-density="${density}"`)
-      expect(source).toContain('<PageHeader')
-      expect(source).not.toContain('<Layout')
+      expect(rootMain).toContain(`data-density="${density}"`)
+      expect(template).toContain('<PageHeader')
+      expect(template).not.toContain('<Layout')
     })
   })
 
