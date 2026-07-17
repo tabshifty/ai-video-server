@@ -471,8 +471,8 @@ onBeforeUnmount(() => {
     <div class="page-shell image-collection-page" data-density="compact">
       <Toolbar dense>
         <template #filters>
-          <el-input v-model="query.q" class="collection-search" placeholder="按图片合集名称搜索" clearable @keyup.enter="load" />
-          <el-select v-model="query.active" class="collection-status" clearable placeholder="状态筛选">
+          <el-input v-model="query.q" class="collection-search" aria-label="图片合集名称筛选" placeholder="按图片合集名称搜索" clearable @keyup.enter="load" />
+          <el-select v-model="query.active" class="collection-status" aria-label="图片合集状态筛选" clearable placeholder="状态筛选">
             <el-option label="全部状态" value="" />
             <el-option label="仅启用" value="1" />
             <el-option label="仅停用" value="0" />
@@ -509,7 +509,7 @@ onBeforeUnmount(() => {
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" class="image-collection-table" :data="list" border>
-              <el-table-column prop="name" label="图片合集名称" min-width="180" />
+              <el-table-column prop="name" label="图片合集名称" min-width="180" show-overflow-tooltip />
               <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
               <el-table-column label="封面" min-width="240">
                 <template #default="{ row }">

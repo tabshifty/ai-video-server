@@ -205,8 +205,8 @@ onMounted(load)
 
       <Toolbar>
         <template #filters>
-          <el-input v-model="query.q" class="toolbar-search" placeholder="按合集名称搜索" clearable @keyup.enter="load" />
-          <el-select v-model="query.active" class="toolbar-select" clearable placeholder="状态筛选">
+          <el-input v-model="query.q" class="toolbar-search" aria-label="合集名称筛选" placeholder="按合集名称搜索" clearable @keyup.enter="load" />
+          <el-select v-model="query.active" class="toolbar-select" aria-label="合集状态筛选" clearable placeholder="状态筛选">
             <el-option label="全部状态" value="" />
             <el-option label="仅启用" value="1" />
             <el-option label="仅停用" value="0" />
@@ -243,7 +243,7 @@ onMounted(load)
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="name" label="合集名称" min-width="180" />
+              <el-table-column prop="name" label="合集名称" min-width="180" show-overflow-tooltip />
               <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
               <el-table-column prop="cover_url" label="封面地址" min-width="240" show-overflow-tooltip />
               <el-table-column prop="sort_order" label="排序" width="90" />

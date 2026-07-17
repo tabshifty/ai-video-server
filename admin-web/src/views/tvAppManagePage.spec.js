@@ -10,6 +10,7 @@ const qrBlock = tvAppManage.match(/async function refreshDownloadQRCode\(\) \{[\
 const loadBlock = tvAppManage.match(/async function load\(\) \{[\s\S]*?\n\}(?=\n\nfunction resetQuery)/)?.[0] || ''
 const loadCatchBlock = loadBlock.match(/} catch \(error\) \{[\s\S]*?(?=\n  } finally \{)/)?.[0] || ''
 const loadFinallyBlock = loadBlock.match(/} finally \{[\s\S]*?(?=\n  \}\n\})/)?.[0] || ''
+const confirmActionBlock = tvAppManage.match(/async function confirmAction[\s\S]*?\n\}(?=\n\nfunction downloadHref)/)?.[0] || ''
 const template = tvAppManage.match(/<template>([\s\S]*?)<\/template>\s*\n\s*<style scoped>/)?.[1] || ''
 
 describe('TV app package management page', () => {
@@ -174,6 +175,19 @@ describe('TV app package management page', () => {
     expect(template).toContain("@click=\"confirmAction(row, 'restore')\"")
     expect(template).toContain("@click=\"confirmAction(row, 'delete')\"")
     expect(template).toContain(':href="downloadHref(row, abi.abi)"')
+  })
+
+  it('危险确认取消或关闭时终止动作且不产生未处理拒绝', () => {
+    const confirmIndex = confirmActionBlock.indexOf('await ElMessageBox.confirm(')
+    const catchIndex = confirmActionBlock.indexOf('} catch (error) {')
+    const cancelIndex = confirmActionBlock.indexOf("if (error === 'cancel' || error === 'close')")
+    const actionIndex = confirmActionBlock.lastIndexOf('await runDangerAction(item, action)')
+
+    expect(confirmIndex).toBeGreaterThanOrEqual(0)
+    expect(catchIndex).toBeGreaterThan(confirmIndex)
+    expect(cancelIndex).toBeGreaterThan(catchIndex)
+    expect(confirmActionBlock).toContain("ElMessage.error('操作确认失败，请重试')")
+    expect(actionIndex).toBeGreaterThan(cancelIndex)
   })
 
   it('替换上传仍是页面文件选择器的全局命令', () => {

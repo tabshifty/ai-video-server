@@ -169,6 +169,7 @@ onMounted(load)
                 <template #default="{ row }">
                   <el-select
                     :model-value="row.role"
+                    :aria-label="`调整用户 ${row.username || row.id} 的角色`"
                     :disabled="isRoleUpdating(row.id)"
                     @change="(value) => onRoleChange(row, value)"
                   >

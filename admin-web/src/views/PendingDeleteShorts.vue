@@ -629,11 +629,15 @@ onBeforeUnmount(() => {
 }
 
 .pending-delete-detail__copy h2 {
+  display: -webkit-box;
   margin: 0;
+  overflow: hidden;
   color: var(--text-primary);
   font-size: var(--text-h1);
   line-height: var(--leading-h1);
   font-weight: 600;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .pending-delete-detail__facts {

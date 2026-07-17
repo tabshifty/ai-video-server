@@ -336,15 +336,21 @@ async function confirmAction(item, action) {
     await runDangerAction(item, action)
     return
   }
-  await ElMessageBox.confirm(
-    `确认${actionText} ${item.version_name} (${item.version_code}) 吗？`,
-    `${actionText}确认`,
-    {
-      type: action === 'delete' ? 'warning' : 'info',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消'
-    }
-  )
+  try {
+    await ElMessageBox.confirm(
+      `确认${actionText} ${item.version_name} (${item.version_code}) 吗？`,
+      `${actionText}确认`,
+      {
+        type: action === 'delete' ? 'warning' : 'info',
+        confirmButtonText: '确认',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error('操作确认失败，请重试')
+    return
+  }
   await runDangerAction(item, action)
 }
 
@@ -372,20 +378,20 @@ onMounted(() => {
             { label: 'TV 端', value: 'android_tv' },
             { label: '手机端', value: 'android_phone' }
           ]" @update:modelValue="changeClientType" />
-          <el-input v-model="query.q" clearable :placeholder="clientMeta.supportsAbi ? '搜索版本号 / versionName / 时间' : '搜索版本号 / versionName / 时间'" style="width: 240px" @keyup.enter="load" />
-          <el-select v-model="query.status" clearable placeholder="状态" style="width: 180px" @change="load">
+          <el-input v-model="query.q" aria-label="安装包版本筛选" clearable :placeholder="clientMeta.supportsAbi ? '搜索版本号 / versionName / 时间' : '搜索版本号 / versionName / 时间'" style="width: 240px" @keyup.enter="load" />
+          <el-select v-model="query.status" aria-label="安装包状态筛选" clearable placeholder="状态" style="width: 180px" @change="load">
             <el-option label="草稿" value="draft" />
             <el-option v-if="clientMeta.supportsAbi" label="已发布-完整" value="published_complete" />
             <el-option v-if="clientMeta.supportsAbi" label="已发布-缺少 ABI" value="published_missing_abi" />
             <el-option v-else label="已发布" value="published_complete" />
             <el-option label="已下线" value="offline" />
           </el-select>
-          <el-select v-if="clientMeta.supportsAbi" v-model="query.abi_completeness" clearable placeholder="ABI 完整性" style="width: 180px" @change="load">
+          <el-select v-if="clientMeta.supportsAbi" v-model="query.abi_completeness" aria-label="ABI 完整性筛选" clearable placeholder="ABI 完整性" style="width: 180px" @change="load">
             <el-option label="完整" value="complete" />
             <el-option label="缺少 ABI" value="missing" />
             <el-option label="空记录" value="empty" />
           </el-select>
-          <el-switch v-model="query.current_published" active-text="只看家庭可见" inactive-text="查看全部" @change="load" />
+          <el-switch v-model="query.current_published" aria-label="家庭可见筛选" active-text="只看家庭可见" inactive-text="查看全部" @change="load" />
         </template>
       </Toolbar>
 
@@ -396,7 +402,7 @@ onMounted(() => {
       <SectionCard dense>
         <template #title>{{ downloadQRCodeTitle }}</template>
         <div class="download-qr-card">
-          <img v-if="downloadQRCodeDataURL" class="download-qr-image" :src="downloadQRCodeDataURL" :alt="downloadQRCodeTitle">
+          <img v-if="downloadQRCodeDataURL" class="download-qr-image" :src="downloadQRCodeDataURL" :alt="downloadQRCodeTitle" width="220" height="220">
         </div>
       </SectionCard>
 
@@ -465,6 +471,7 @@ onMounted(() => {
                   <template #default="{ row }">
                     <el-input
                       v-model="row.draft.release_notes"
+                      :aria-label="`${row.version_name} 版本说明`"
                       type="textarea"
                       :rows="2"
                       resize="none"
@@ -472,6 +479,7 @@ onMounted(() => {
                     />
                     <el-input
                       v-model="row.draft.remarks"
+                      :aria-label="`${row.version_name} 管理端备注`"
                       class="remark-input"
                       placeholder="备注（仅管理端）"
                     />

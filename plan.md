@@ -2,6 +2,41 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 09:25 +0800
+- 进度：Precision Ops Task 14 第二阶段集成门禁完成提交前最终验证，不推进 Task 15。阶段二 7 页完整清单保持 `migratedViews` 对象数组权威结构；浏览器发现并按严格 RED → 最小修复 → GREEN 闭合 TV 危险确认取消未处理拒绝、共享 Drawer 滚动链、阶段二输入/图片可访问名称与尺寸、极端资源名称 compact 收敛 4 类阻塞。最终无未修复产品阻塞；Actor 启停和 User 角色变更因现有直接提交且禁止业务流程变更而未触发，作为明确 concern 保留。
+- 影响文件：最终精确提交 `CONTEXT.md`、`plan.md`、`admin-web/src/assets/element-overrides.css`、`themeTokens.spec.js`、`components/AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`、`views/PendingDeleteShorts.vue`、`ActorManage.vue`、`CollectionManage.vue`、`ImageCollectionManage.vue`、`UserManage.vue`、`IPTVManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js` 共 15 个 tracked 文件；git 忽略报告、矩阵与 28 张截图不提交。未修改 API、权限、数据库、依赖、路由、Android、后端或 Task 15。
+- 验证：阶段二 rollout 定向 30/30；TV 确认 12/12；Drawer 主题 35/35；可访问性/分页 38/38；管理端全量 39 文件 419/419；Vite 2373 modules 构建成功且仅既有 chunk-size warning。最终 CDP 7 页 × 4 视口为 28/28 PASS，读取失败保留筛选与 20 行缓存 PASS，应用控制台 0 error / 0 warning；36 条浏览器扩展 blob XHR error 与 103 条 `PerformanceIssue` code 单列。15 文件白名单、`git diff --check`、whitespace、U+FFFD、C0/DEL、重点 Web 指南反模式与 API/路由/依赖/Android/后端零差异门禁均通过，待使用提交信息 `验证：完成 Precision Ops 第二阶段验收` 精确提交。
+
+## 2026-07-17 09:16 +0800
+- 进度：Task 14 最终截图自审发现“无越界”仍未覆盖 compact 扫描密度：极端演员/合集/图片合集名称会把单行撑到数百像素高，待删除详情标题在 375px 连续占满屏幕。完成精确 RED 与最小收敛实现，三个名称列只增加 overflow tooltip，待删除详情标题沿用队列标题的两行截断；不改变数据、动作或表格滚动边界。
+- 影响文件：修改 `ActorManage.vue`、`CollectionManage.vue`、`ImageCollectionManage.vue`、`PendingDeleteShorts.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，更新忽略报告/截图；其余 Task 14 修复保持不变。
+- 验证：`npm test -- src/views/precisionOpsRollout.spec.js` 按预期退出 1（1 failed / 29 passed），首个失败为演员名称列缺少 `show-overflow-tooltip`，准确命中长内容未收敛。待定向 GREEN、浏览器行高/截图复证、最终全量与构建及 28 项矩阵重跑。
+
+## 2026-07-17 09:06 +0800
+- 进度：Task 14 按最新 Web Interface Guidelines 与 brief 点名项确认阶段二输入可访问名称和动态图片契约缺口，并完成属性级最小实现。为三个资源筛选页、安装包筛选/行内说明、用户行角色选择与共享跳页输入补中文 aria-label；IPTV 台标补动态 alt，安装包二维码补原生 220×220 属性。未改变 v-model、请求参数、事件、API、权限、路由或业务流程。
+- 影响文件：修改 `ActorManage.vue`、`CollectionManage.vue`、`ImageCollectionManage.vue`、`UserManage.vue`、`IPTVManage.vue`、`TvAppManage.vue`、`AdminTablePagination.vue` 及 `precisionOpsRollout.spec.js`、`adminTablePagination.helpers.spec.js`、`CONTEXT.md`、`plan.md`；更新忽略报告。
+- 验证：实现前定向 RED 为 2 文件 3 failed / 35 passed，分别命中共享跳页输入、阶段二筛选/行内编辑名称和动态图片契约。待两文件 GREEN、浏览器渲染后可访问名称/alt/尺寸复证、全量自动门禁和最终 28 项矩阵。
+
+## 2026-07-17 09:03 +0800
+- 进度：Task 14 校准 CDP 原生 Enter 序列后确认共享 Drawer body 未隔离滚动链：演员创建 Drawer 正常打开为 560×900，但 computed `overscrollBehaviorX/Y` 均为 `auto`。完成共享主题 RED 与最小样式实现，只在既有 `.el-drawer__body` 规则加入 `overscroll-behavior: contain`，同时覆盖阶段二 CRUD 编辑/详情 Drawer，不改页面模板与业务状态。
+- 影响文件：修改 `admin-web/src/assets/themeTokens.spec.js`、`admin-web/src/assets/element-overrides.css`、`CONTEXT.md`、`plan.md`，并更新忽略报告/探针；保留 TV 确认取消修复与 Task 14 清单契约。
+- 验证：校准探针以 `rawKeyDown → char → keyUp` 真实打开 Drawer；`npm test -- src/assets/themeTokens.spec.js` 按预期退出 1（1 failed / 34 passed），失败精确命中共享规则缺少 `overscroll-behavior: contain`。待主题定向 GREEN、浏览器 computed style 复证和全部门禁重跑。
+
+## 2026-07-17 08:59 +0800
+- 进度：Task 14 的 TV 安装包危险确认取消缺陷取得严格 RED 并完成最小实现。新增页面契约要求确认 await 后必须捕获 `cancel` / `close`、非取消异常给出恢复提示，且原业务 action 仍只能位于确认成功之后；生产修复沿用合集与待删除页既有模式，不改变 API、权限、路由、确认文案或发布流程。
+- 影响文件：RED 修改 `admin-web/src/views/tvAppManagePage.spec.js`；最小实现修改 `admin-web/src/views/TvAppManage.vue`，并在 `CONTEXT.md` 追加管理端危险确认取消的长期契约；保留 Task 14 原 `precisionOpsRollout.spec.js`、`plan.md` 与忽略报告/矩阵产物。
+- 验证：`npm test -- src/views/tvAppManagePage.spec.js` 按预期退出 1（1 failed / 11 passed），失败为 `confirmAction()` 的 catch 索引 `-1`，准确命中缺失取消边界。待定向 GREEN、完整自动门禁及 28 项浏览器复跑。
+
+## 2026-07-17 08:57 +0800
+- 进度：Task 14 清单与自动门禁初步 GREEN 后完成首轮 7 页 × 4 视口浏览器矩阵。28/28 组合均跑完且临时 CDP 标签页正常关闭，页面横向溢出全部为 0、工作区页头主操作全部存在、Tab/Shift+Tab 可见焦点与长内容收敛全部通过；初版 18 PASS / 10 FAIL 中，375px 分页按钮与多数 Drawer/确认框失败已识别为审计脚本裁剪/键盘事件误判，保持未验证并等待校准重跑。唯一有独立双视口证据的阻塞缺陷是 TV 安装包危险确认按 `Escape` 取消时产生 Vue 未处理事件与 `Uncaught (in promise)`。
+- 影响文件：已修改 `precisionOpsRollout.spec.js`、`plan.md`，并生成忽略报告/矩阵/截图；下一步将为 `TvAppManage.vue` 的确认取消边界先补 `tvAppManagePage.spec.js` RED，再最小修复并追加 `CONTEXT.md` 长期约定，不处理 Actor 启停、User 角色变更等未定性旧问题。
+- 验证：清单定向 27/27；管理端全量 39 文件 413/413；Vite 2373 modules 构建成功且仅既有 chunk-size warning。TV 取消缺陷在 375/1440px 均复现；待 RED、GREEN、全量自动复跑及 CDP 恢复后的 28 项最终矩阵。
+
+## 2026-07-17 08:43 +0800
+- 进度：开始 Precision Ops Task 14 第二阶段集成门禁，仅验收 `PendingDeleteShorts.vue`、`ActorManage.vue`、`CollectionManage.vue`、`ImageCollectionManage.vue`、`UserManage.vue`、`IPTVManage.vue`、`TvAppManage.vue` 及其既有路由，不推进 Task 15。先锁定 `migratedViews` 对象数组中的阶段二 7 页清单，再执行定向测试、管理端全量测试与构建，以及 375/768/1024/1440px 已登录浏览器安全验收；危险操作只打开确认并取消，编辑器与 Drawer 不保存数据。
+- 影响文件：计划仅修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`，并生成 git 忽略的 `.superpowers/sdd/task-14-report.md`、浏览器矩阵和必要截图；若发现真实阻塞缺陷，先记录复现与根因，再严格按 RED → 最小修复 → 完整复跑扩展范围。
+- 验证：待执行 `npm test -- src/views/precisionOpsRollout.spec.js`、`cd admin-web && npm test`、`npm run build`、四视口七页面浏览器矩阵、键盘/焦点/Drawer/危险确认安全交互、控制台 error/issue、`git diff --check`、U+FFFD/C0/DEL 与文件白名单检查。
+
 ## 2026-07-17 08:39 +0800
 - 进度：Precision Ops Task 13 最终独立复审通过。第一轮复审发现安装包查询身份错配和非零总数空页 2 个 Important，已由 `b26f25b` 以实际请求 identity、latest-wins 序号门禁、当前缓存投影和总数驱动空态闭合；第二轮基于完整固定差异包判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。第一轮无法从 Task 13 diff 独立确认的共享 Layout 契约已由既有 Layout/theme 测试和本轮 1440/1024/768px 浏览器实测补证：桌面/收起侧栏、52px 页头、20px 主区边距、窄屏导航与 44px 点击目标契约存在，三档页面横向溢出均为 0。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-13-report.md`；不修改生产代码、测试、API、依赖、路由、二维码 helper、IPTV 或 Task 14。

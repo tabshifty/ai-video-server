@@ -355,8 +355,8 @@ onMounted(load)
 
       <Toolbar>
         <template #filters>
-          <el-input v-model="query.q" class="toolbar-search" placeholder="按演员姓名搜索" clearable @keyup.enter="load" />
-          <el-select v-model="query.active" class="toolbar-select" clearable placeholder="状态筛选">
+          <el-input v-model="query.q" class="toolbar-search" aria-label="演员姓名筛选" placeholder="按演员姓名搜索" clearable @keyup.enter="load" />
+          <el-select v-model="query.active" class="toolbar-select" aria-label="演员状态筛选" clearable placeholder="状态筛选">
             <el-option label="全部状态" value="" />
             <el-option label="仅启用" value="1" />
             <el-option label="仅停用" value="0" />
@@ -393,7 +393,7 @@ onMounted(load)
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="name" label="演员姓名" min-width="160" />
+              <el-table-column prop="name" label="演员姓名" min-width="160" show-overflow-tooltip />
               <el-table-column prop="aliases" label="别名" min-width="220">
                 <template #default="{ row }">
                   {{ Array.isArray(row.aliases) && row.aliases.length > 0 ? row.aliases.join(' / ') : '暂无' }}

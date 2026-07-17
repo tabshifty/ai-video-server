@@ -112,6 +112,7 @@ onUpdated(syncPaginationNavigationHints)
       <el-input
         v-model="jumpPage"
         class="admin-table-pagination__input"
+        aria-label="跳转页码"
         inputmode="numeric"
         :disabled="jumpDisabled"
         @keyup.enter="submitJump"

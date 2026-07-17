@@ -27,6 +27,15 @@ const migratedViews = [
   { file: 'IPTVManage.vue', component: 'IPTVManage', density: 'compact', compiled: IPTVManage },
   { file: 'TvAppManage.vue', component: 'TvAppManage', density: 'compact', compiled: TvAppManage }
 ]
+const phaseTwoFiles = [
+  'PendingDeleteShorts.vue',
+  'ActorManage.vue',
+  'CollectionManage.vue',
+  'ImageCollectionManage.vue',
+  'UserManage.vue',
+  'IPTVManage.vue',
+  'TvAppManage.vue'
+]
 const pendingShellViews = [
   'AVManualScrape.vue',
   'ScrapePreview.vue',
@@ -430,5 +439,60 @@ describe('Precision Ops 第一阶段 rollout', () => {
       expect(header, file).toContain(':close="close"')
       expect(template, file).toContain(`:loading="saving" @click="${saveHandler}"`)
     })
+  })
+})
+
+describe('Precision Ops 第二阶段集成门禁', () => {
+  it('锁定阶段二 7 个资源页完整清单并使用紧凑密度', () => {
+    expect(phaseTwoFiles).toHaveLength(7)
+    expect(new Set(phaseTwoFiles).size).toBe(phaseTwoFiles.length)
+    expect(
+      phaseTwoFiles.every((file) =>
+        migratedViews.some(({ file: migratedFile, density }) => migratedFile === file && density === 'compact')
+      )
+    ).toBe(true)
+  })
+
+  it('阶段二筛选与行内编辑控件提供可访问名称', () => {
+    const actor = readView('ActorManage.vue')
+    const collection = readView('CollectionManage.vue')
+    const imageCollection = readView('ImageCollectionManage.vue')
+    const user = readView('UserManage.vue')
+    const tvApp = readView('TvAppManage.vue')
+
+    expect(actor).toContain('aria-label="演员姓名筛选"')
+    expect(actor).toContain('aria-label="演员状态筛选"')
+    expect(collection).toContain('aria-label="合集名称筛选"')
+    expect(collection).toContain('aria-label="合集状态筛选"')
+    expect(imageCollection).toContain('aria-label="图片合集名称筛选"')
+    expect(imageCollection).toContain('aria-label="图片合集状态筛选"')
+    expect(user).toContain(':aria-label="`调整用户 ${row.username || row.id} 的角色`"')
+    expect(tvApp).toContain('aria-label="安装包版本筛选"')
+    expect(tvApp).toContain('aria-label="安装包状态筛选"')
+    expect(tvApp).toContain('aria-label="ABI 完整性筛选"')
+    expect(tvApp).toContain('aria-label="家庭可见筛选"')
+    expect(tvApp).toContain(':aria-label="`${row.version_name} 版本说明`"')
+    expect(tvApp).toContain(':aria-label="`${row.version_name} 管理端备注`"')
+  })
+
+  it('阶段二动态图片提供替代文本与稳定尺寸', () => {
+    const iptv = readView('IPTVManage.vue')
+    const iptvStyle = extractStyle(iptv)
+    const tvApp = readView('TvAppManage.vue')
+
+    expect(iptv).toContain(':alt="`${row.name || \'未命名频道\'}台标`"')
+    expect(iptvStyle).toMatch(/\.logo-image\s*\{[^}]*width:\s*44px;[^}]*height:\s*28px;/s)
+    expect(tvApp).toContain(':alt="downloadQRCodeTitle" width="220" height="220"')
+  })
+
+  it('阶段二资源名称与待删除详情标题保持紧凑收敛', () => {
+    const pendingStyle = extractStyle(readView('PendingDeleteShorts.vue'))
+
+    expect(readView('ActorManage.vue')).toContain('prop="name" label="演员姓名" min-width="160" show-overflow-tooltip')
+    expect(readView('CollectionManage.vue')).toContain('prop="name" label="合集名称" min-width="180" show-overflow-tooltip')
+    expect(readView('ImageCollectionManage.vue')).toContain('prop="name" label="图片合集名称" min-width="180" show-overflow-tooltip')
+    expect(pendingStyle).toMatch(
+      /\.pending-delete-detail__copy h2\s*\{[^}]*display:\s*-webkit-box;[^}]*overflow:\s*hidden;[^}]*-webkit-box-orient:\s*vertical;[^}]*-webkit-line-clamp:\s*2;/s
+    )
   })
 })

@@ -48,6 +48,10 @@ describe('resolvePageJump', () => {
     expect(source).not.toContain('document.querySelector')
   })
 
+  it('为共享跳页输入提供可访问名称', () => {
+    expect(source).toContain('aria-label="跳转页码"')
+  })
+
   it('jumps to the requested page when the input is valid', () => {
     expect(
       resolvePageJump('5', {

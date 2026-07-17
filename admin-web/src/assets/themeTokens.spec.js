@@ -181,6 +181,16 @@ describe('theme tokens', () => {
     expect(touchRule).toContain('min-height: 44px')
   })
 
+  it('contains scroll chaining inside every Drawer body', () => {
+    const selector = ':where(.el-drawer__body)'
+    const start = overrides.indexOf(selector)
+    const end = start >= 0 ? overrides.indexOf('}', start) : -1
+    const rule = start >= 0 && end > start ? overrides.slice(start, end + 1) : ''
+
+    expect(start).toBeGreaterThan(-1)
+    expect(rule).toContain('overscroll-behavior: contain')
+  })
+
   it('keeps Element Plus dropdown menu items visibly focused from the roving group', () => {
     const selector = '.el-dropdown-menu__item:focus,\n.el-dropdown-menu__item:focus-visible'
     const start = overrides.indexOf(selector)
