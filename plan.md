@@ -2,6 +2,31 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 12:54 +0800
+- 进度：Task 17 完成提交前最终验证与自审，不推进 Task 18。三页真实 SFC、17 migrated / 0 pending、form density、TV 页头唯一动作/compact 左栏/无嵌套 SectionCard、Settings 区块错误与旧日志滚动、Toolbox 无外层卡/六个精确独立链接契约完整；详细证据已写入 git 忽略的 `.superpowers/sdd/task-17-report.md`，按分工不执行浏览器验收。
+- 影响文件：最终只纳入 `admin-web/src/views/TvSeriesManage.vue`、`SystemSettings.vue`、`Toolbox.vue`、`precisionOpsRollout.spec.js`、`toolboxPage.spec.js`、`admin-web/src/router/index.js`、`index.spec.js`、`CONTEXT.md`、`plan.md` 共 9 个 tracked 文件；不纳入忽略报告，不修改 API、依赖、权限、共享主题、其它页面/路由、Android、后端或 Task 18。
+- 验证：Task 17 四文件定向 73/73；管理端完整 `npm test` 为 39 文件 439/439 且告警扫描无 warning；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、9 文件白名单、U+FFFD/C0/DEL、API/依赖零差异、router 仅三条兼容 meta 差异、TV/Toolbox 脚本仅删 import 及 SystemSettings 最小区块错误状态门禁均通过。
+
+## 2026-07-17 12:50 +0800
+- 进度：Task 17 提交前密度审计发现电视剧“启用状态” switch 不在共享 form 控件选择器内；沿用既有页面局部模式，桌面消费 36px `--control-height`，窄于 `64rem` 时提升为 44px，未修改 switch v-model、文案或业务脚本。同时移除替换折叠卡后不再使用的 `seasonIndex` 模板别名。
+- 影响文件：只追加 `admin-web/src/views/precisionOpsRollout.spec.js` 的两条 switch 高度契约、`TvSeriesManage.vue` 的局部 CSS、`CONTEXT.md` 与 `plan.md`；不修改共享主题、模板字段/动作、API、依赖、路由或其它页面。
+- 验证：两文件先按预期 RED（1 failed / 48 passed，两条 soft assertion 精确命中桌面与窄屏规则缺失），最小 CSS 后 GREEN（2 文件，49/49）；待从最终代码重跑 Task 17 四文件定向、完整测试和构建。
+
+## 2026-07-17 12:45 +0800
+- 进度：Task 17 完成最小生产迁移并取得定向 GREEN。三页删除自身 PageHeader、接入 form density，电视剧唯一“新建系列/筛选”移入 Layout 页头，左栏回落 compact，右侧只保留两个顶层 SectionCard，系列基础/季/集改为无框语义 section/fieldset 与标题分隔线；系统清理和日志各自增加可关闭、重试清除的区块错误，旧日志失败时继续保留；工具箱移除外层装饰卡，六个 8px 入口仍精确指向独立标签页；三条路由只删除兼容 meta。
+- 影响文件：生产修改 `admin-web/src/views/TvSeriesManage.vue`、`SystemSettings.vue`、`Toolbox.vue`、`admin-web/src/router/index.js`，保留 RED 阶段三份 spec，并追加 `CONTEXT.md`、`plan.md`；未修改 API、依赖、权限、共享主题、其它页面/路由或独立工具业务边界。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvSeriesManage.helpers.spec.js src/views/toolboxPage.spec.js src/router/index.spec.js` 通过（4 文件，73/73）；待完整 `npm test`、`npm run build` 与最终静态/敏感差异门禁。
+
+## 2026-07-17 12:41 +0800
+- 进度：Task 17 三页壳层与路由契约取得严格 RED。rollout 使用真实 `TvSeriesManage`、`SystemSettings`、`Toolbox` SFC import，将权威清单更新为 17 migrated / 0 pending，并锁定 form density、无 PageHeader、电视剧页头动作与 Toolbar 去重、compact 左栏、无嵌套 SectionCard、系统设置区块错误/日志滚动、工具箱无外层卡和六个精确独立链接；router 使用三条整行相等断言。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`toolboxPage.spec.js`、`admin-web/src/router/index.spec.js` 与 `plan.md`；尚未修改三页生产 SFC、生产路由、`CONTEXT.md`、API、依赖、权限、共享主题或其它页面/路由。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvSeriesManage.helpers.spec.js src/views/toolboxPage.spec.js src/router/index.spec.js` 按预期退出 1（4 文件，7 failed / 66 passed）：rollout 6 项精确命中三页通用迁移和三页专属结构缺口，router 1 项精确命中三条路由仍带兼容 meta；其余两份视图测试通过，无语法或环境错误。
+
+## 2026-07-17 12:36 +0800
+- 进度：开始 Precision Ops Task 17“TvSeriesManage、SystemSettings 与 Toolbox 壳层页”，只迁移 `/tv-series`、`/settings`、`/toolbox` 的表单密度、壳层页头、无框字段组/区块和独立工具入口，不推进 Task 18。严格保留系列/季/集的全部模型与业务动作、系统清理/日志动作及六个工具的独立标签页路由；不读取或输出认证、存储、请求头、请求体、响应体等敏感详情。
+- 影响文件：计划只修改 `admin-web/src/views/TvSeriesManage.vue`、`SystemSettings.vue`、`Toolbox.vue`、`precisionOpsRollout.spec.js`、`toolboxPage.spec.js`、`admin-web/src/router/index.js`、`index.spec.js`、`CONTEXT.md`、`plan.md` 共 9 个 tracked 文件；证据写入 git 忽略的 `.superpowers/sdd/task-17-report.md`。不修改 API、依赖、权限、共享主题、其它页面/路由或独立工具边界。
+- 验证：待执行三份视图测试和 router 测试的严格 RED，再做最小生产实现并运行同组定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、9 文件白名单及 API/依赖/其它路由/三页脚本敏感差异门禁；按分工不执行浏览器验收。
+
 ## 2026-07-17 12:32 +0800
 - 进度：Task 16 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，且 Cannot verify 为无。首轮浏览器唯一阻塞已由 `5f0a329` 闭合；最终两页 × 1440/1024/768/375px 为 `PASS_WITH_CONCERNS`、0 failure。真实环境无候选的验证缺口又由 CDP Fetch 本地履约 smoke 闭合：两页 2 候选的初始、Enter、Space、点击 aria-pressed 轨迹全部通过，AV“已选中”始终唯一且跟随当前项，两个拦截 POST 未到后端、临时 target 已关闭。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-16-report.md`、浏览器/候选 smoke 脚本、矩阵、JSON 和 8 张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 17。

@@ -9,8 +9,11 @@ import ImageManage from './ImageManage.vue'
 import IPTVManage from './IPTVManage.vue'
 import PendingDeleteShorts from './PendingDeleteShorts.vue'
 import ScrapePreview from './ScrapePreview.vue'
+import SystemSettings from './SystemSettings.vue'
 import TaskMonitor from './TaskMonitor.vue'
+import Toolbox from './Toolbox.vue'
 import TvAppManage from './TvAppManage.vue'
+import TvSeriesManage from './TvSeriesManage.vue'
 import UserManage from './UserManage.vue'
 import VideoList from './VideoList.vue'
 import VideoUpload from './VideoUpload.vue'
@@ -31,7 +34,10 @@ const migratedViews = [
   { file: 'TvAppManage.vue', component: 'TvAppManage', density: 'compact', compiled: TvAppManage },
   { file: 'VideoUpload.vue', component: 'VideoUpload', density: 'form', compiled: VideoUpload },
   { file: 'ScrapePreview.vue', component: 'ScrapePreview', density: 'form', compiled: ScrapePreview },
-  { file: 'AVManualScrape.vue', component: 'AVManualScrape', density: 'form', compiled: AVManualScrape }
+  { file: 'AVManualScrape.vue', component: 'AVManualScrape', density: 'form', compiled: AVManualScrape },
+  { file: 'TvSeriesManage.vue', component: 'TvSeriesManage', density: 'form', compiled: TvSeriesManage },
+  { file: 'SystemSettings.vue', component: 'SystemSettings', density: 'form', compiled: SystemSettings },
+  { file: 'Toolbox.vue', component: 'Toolbox', density: 'form', compiled: Toolbox }
 ]
 const phaseTwoFiles = [
   'PendingDeleteShorts.vue',
@@ -42,11 +48,7 @@ const phaseTwoFiles = [
   'IPTVManage.vue',
   'TvAppManage.vue'
 ]
-const pendingShellViews = [
-  'SystemSettings.vue',
-  'Toolbox.vue',
-  'TvSeriesManage.vue'
-]
+const pendingShellViews = []
 
 const crudViews = [
   {
@@ -136,11 +138,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('固定 14 个已迁移页面与 3 个兼容页面，且集合互不重叠', () => {
+  it('固定 17 个已迁移页面与 0 个兼容页面，且集合互不重叠', () => {
     const migratedFiles = migratedViews.map(({ file }) => file)
 
-    expect(migratedViews).toHaveLength(14)
-    expect(pendingShellViews).toHaveLength(3)
+    expect(migratedViews).toHaveLength(17)
+    expect(pendingShellViews).toHaveLength(0)
     expect(new Set(migratedFiles).size).toBe(migratedFiles.length)
     expect(new Set(pendingShellViews).size).toBe(pendingShellViews.length)
     expect(migratedFiles.filter((file) => pendingShellViews.includes(file))).toEqual([])
@@ -159,15 +161,107 @@ describe('Precision Ops 第一阶段 rollout', () => {
     })
   })
 
-  it('3 个待迁移 shell 页面保持 PageHeader 与精确兼容 meta', () => {
-    pendingShellViews.forEach((file) => {
-      const component = file.replace('.vue', '')
-      const template = extractTemplate(readView(file))
-      const line = routeLine(component)
+  it('不存在仍依赖 PageHeader 兼容 meta 的待迁移 shell 页面', () => {
+    expect(pendingShellViews).toEqual([])
+  })
 
-      expect(template, file).toContain('<PageHeader')
-      expect(line, component).toMatch(exactRoutePattern(component, true))
-    })
+  it('电视剧管理把唯一主动作合并到页头并保持紧凑列表与原编辑命令', () => {
+    const source = readView('TvSeriesManage.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const headerActions = headerActionsBlock(template)
+    const toolbar = toolbarBlock(template)
+    const models = [
+      'detail.title',
+      'detail.overview',
+      'detail.poster_url',
+      'detail.backdrop_url',
+      'detail.first_air_date',
+      'detail.active',
+      'season.season_number',
+      'season.title',
+      'season.air_date',
+      'season.overview',
+      'season.poster_url',
+      'episode.episode_number',
+      'episode.title',
+      'episode.overview',
+      'episode.runtime',
+      'episode.air_date',
+      'episode.still_url',
+      'episode.video_id'
+    ]
+
+    expect.soft(template).toContain('class="page-shell page-shell--medium tv-manage-shell" data-density="form"')
+    expect.soft(template).not.toContain('<PageHeader')
+    expect(headerActions).toContain(':icon="Plus" @click="openCreateSeries">新建系列</el-button>')
+    expect(headerActions).toContain(':icon="Search" @click="query.page = 1; loadList()">筛选</el-button>')
+    expect(template.match(/@click="openCreateSeries">新建系列<\/el-button>/g)).toHaveLength(1)
+    expect(template.match(/>筛选<\/el-button>/g)).toHaveLength(1)
+    expect(toolbar).toContain('v-model="query.q"')
+    expect(toolbar).toContain('v-model="query.active"')
+    expect(toolbar).toContain('v-model="query.has_playable"')
+    expect(toolbar).toContain('>重置</el-button>')
+    expect(toolbar).not.toContain('新建系列')
+    expect(toolbar).not.toContain('>筛选</el-button>')
+    expect(template).toMatch(/<SectionCard class="tv-series-list-card" data-density="compact">/)
+    expect(template.match(/<SectionCard\b/g)).toHaveLength(2)
+    expect(template).toContain('<section class="editor-section" aria-labelledby="series-basics-title">')
+    expect(template).toContain('<section class="editor-section" aria-labelledby="season-episode-title">')
+    expect(template).toMatch(/<fieldset\b[^>]*class="field-group season-field-group"/)
+    expect(template).toMatch(/<fieldset\b[^>]*class="field-group episode-field-group"/)
+    expect(template).toContain('<legend class="field-group__legend">')
+    models.forEach((model) => expect(template, model).toContain(`v-model="${model}"`))
+    for (const handler of ['saveSeries', 'removeSeries', 'addSeason', 'saveSeason(season)', 'addEpisode(season)', 'removeSeason(season)', 'saveEpisode(season, episode)', 'removeEpisode(season, episode)']) {
+      expect(template, handler).toContain(`@click="${handler}"`)
+    }
+    expect(style).toMatch(/\.field-group\s*\{[^}]*border:\s*0;[^}]*box-shadow:\s*none;/s)
+    expect(style).toMatch(/\.field-group__legend\s*\{[^}]*border-bottom:\s*1px solid var\(--line-soft\);/s)
+    expect.soft(style).toMatch(/\.tv-manage-shell :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*var\(--control-height\);/s)
+    expect.soft(style).toMatch(/@media \(max-width: 63\.9375rem\)\s*\{[\s\S]*?\.tv-manage-shell :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*44px;/s)
+  })
+
+  it('系统设置使用无阴影表单区块并在清理与日志区分别保留可恢复错误', () => {
+    const source = readView('SystemSettings.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const loadLogs = functionBlock(source, 'async function loadLogs()')
+    const runCleanup = functionBlock(source, 'async function runCleanup()')
+
+    expect.soft(template).toContain('class="page-shell settings-page" data-density="form"')
+    expect.soft(template).toContain('<p class="page-context-note">执行临时文件清理并查看最近系统日志。</p>')
+    expect.soft(template).not.toContain('<PageHeader')
+    expect(template.match(/<SectionCard\b/g)).toHaveLength(2)
+    expect(source).toContain("const logsError = ref('')")
+    expect(source).toContain("const cleanupError = ref('')")
+    expect(loadLogs.indexOf("logsError.value = ''")).toBeLessThan(loadLogs.indexOf('try {'))
+    expect(runCleanup.indexOf("cleanupError.value = ''")).toBeLessThan(runCleanup.indexOf('try {'))
+    expect(loadLogs).toMatch(/catch \(error\) \{[\s\S]*logsError\.value = extractErrorMessage\(error,/)
+    expect(runCleanup).toMatch(/catch \(error\) \{[\s\S]*cleanupError\.value = extractErrorMessage\(error,/)
+    expect(template).toMatch(/<el-alert\s+v-if="cleanupError"[\s\S]*?:title="cleanupError"[\s\S]*?closable[\s\S]*?@close="cleanupError = ''"/)
+    expect(template).toMatch(/<el-alert\s+v-if="logsError"[\s\S]*?:title="logsError"[\s\S]*?closable[\s\S]*?@close="logsError = ''"/)
+    expect(template).toContain('v-if="!hasLogs && !logsError"')
+    expect(template).toContain('<el-scrollbar v-else-if="hasLogs" max-height="60vh" class="log-box">')
+    expect(style).toMatch(/\.settings-page :deep\(\.section-card\)\s*\{[^}]*border-radius:\s*var\(--radius-md\);[^}]*box-shadow:\s*none;/s)
+    expect(style).toMatch(/\.log-box\s*\{[^}]*overflow:\s*hidden;/s)
+    expect(style).toMatch(/\.log-text\s*\{[^}]*font-family:\s*var\(--font-mono\);/s)
+  })
+
+  it('工具箱移除外层装饰卡并保留六个 8px 独立工具入口', () => {
+    const source = readView('Toolbox.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+
+    expect.soft(template).toContain('class="page-shell toolbox-page" data-density="form"')
+    expect.soft(template).toContain('<p class="page-context-note">工具会在独立标签页打开，并保持当前管理端上下文。</p>')
+    expect.soft(template).not.toContain('<PageHeader')
+    expect(template).not.toContain('<SectionCard')
+    expect(template.match(/<a class="tool-menu-item"/g)).toHaveLength(6)
+    expect(template.match(/target="_blank"/g)).toHaveLength(6)
+    expect(template.match(/rel="noopener noreferrer"/g)).toHaveLength(6)
+    expect(template.match(/<span>新标签页打开<\/span>/g)).toHaveLength(6)
+    expect(style).toMatch(/\.tool-menu-item\s*\{[^}]*min-height:\s*44px;[^}]*border-radius:\s*8px;[^}]*box-shadow:\s*none;/s)
+    expect(style).toMatch(/\.toolbox-page\s*\{[^}]*min-width:\s*0;[^}]*overflow-x:\s*clip;/s)
   })
 
   it('两页刮削工作台把唯一查询动作合并到壳层页头', () => {

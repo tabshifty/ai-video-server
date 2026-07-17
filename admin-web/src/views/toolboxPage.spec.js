@@ -25,8 +25,10 @@ describe('toolbox pages', () => {
     expect(toolbox).toContain('图像生成工作台')
     expect(toolbox).toContain('孤儿文件扫描')
     expect(toolbox).toContain('密码管理')
-    expect(toolbox).toContain('target="_blank"')
-    expect(toolbox).toContain('rel="noopener noreferrer"')
+    expect(toolbox.match(/<a class="tool-menu-item"/g)).toHaveLength(6)
+    expect(toolbox.match(/target="_blank"/g)).toHaveLength(6)
+    expect(toolbox.match(/rel="noopener noreferrer"/g)).toHaveLength(6)
+    expect(toolbox.match(/新标签页打开/g)).toHaveLength(6)
     expect(toolbox).toContain('/toolbox/ed2k')
     expect(toolbox).toContain('/toolbox/ed2k-download')
     expect(toolbox).toContain('/toolbox/archive-import')
@@ -35,6 +37,22 @@ describe('toolbox pages', () => {
     expect(toolbox).toContain('/toolbox/password-vault')
     expect(toolbox).toContain('Download')
     expect(toolbox).toContain('Link')
+  })
+
+  it('keeps every toolbox destination resolved to its exact standalone route', () => {
+    const destinations = [
+      ['ed2kToolHref', '/toolbox/ed2k'],
+      ['ed2kDownloadHref', '/toolbox/ed2k-download'],
+      ['archiveImportHref', '/toolbox/archive-import'],
+      ['imageWorkbenchHref', '/toolbox/image-workbench'],
+      ['orphanFilesHref', '/toolbox/orphan-files'],
+      ['passwordVaultHref', '/toolbox/password-vault']
+    ]
+
+    destinations.forEach(([href, path]) => {
+      expect(toolbox).toContain(`const ${href} = computed(() => router.resolve('${path}').href)`)
+      expect(toolbox).toContain(`:href="${href}" target="_blank" rel="noopener noreferrer"`)
+    })
   })
 
   it('keeps the toolbox menu responsive with at most four items per row', () => {
@@ -151,7 +169,8 @@ describe('toolbox pages', () => {
   })
 
   it('removes orphan scanning from system settings after the toolbox migration', () => {
-    expect(systemSettings).toContain('系统设置')
+    expect(systemSettings).toContain('<Layout>')
+    expect(systemSettings).not.toContain('<PageHeader')
     expect(systemSettings).toContain('临时文件清理')
     expect(systemSettings).toContain('系统日志')
     expect(systemSettings).not.toContain('孤儿文件扫描')

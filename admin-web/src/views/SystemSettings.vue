@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import { getSystemLogs, systemCleanup } from '../api/admin'
@@ -11,6 +10,8 @@ import { getSystemLogs, systemCleanup } from '../api/admin'
 const logs = ref([])
 const loading = ref(false)
 const cleanupLoading = ref(false)
+const logsError = ref('')
+const cleanupError = ref('')
 
 const hasLogs = computed(() => logs.value.length > 0)
 
@@ -28,11 +29,13 @@ function extractErrorMessage(error, fallback) {
 
 async function loadLogs() {
   loading.value = true
+  logsError.value = ''
   try {
     const data = await getSystemLogs({ lines: 300 })
     logs.value = data.lines || []
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '加载系统日志失败'))
+    logsError.value = extractErrorMessage(error, '加载系统日志失败')
+    ElMessage.error(logsError.value)
   } finally {
     loading.value = false
   }
@@ -40,11 +43,13 @@ async function loadLogs() {
 
 async function runCleanup() {
   cleanupLoading.value = true
+  cleanupError.value = ''
   try {
     await systemCleanup({ older_than_hours: 24 })
     ElMessage.success('清理任务已执行')
   } catch (error) {
-    ElMessage.error(extractErrorMessage(error, '执行清理任务失败'))
+    cleanupError.value = extractErrorMessage(error, '执行清理任务失败')
+    ElMessage.error(cleanupError.value)
   } finally {
     cleanupLoading.value = false
   }
@@ -53,8 +58,8 @@ async function runCleanup() {
 
 <template>
   <Layout>
-    <div class="page-shell settings-page">
-      <PageHeader title="系统设置" subtitle="执行临时文件清理和日志查看" />
+    <div class="page-shell settings-page" data-density="form">
+      <p class="page-context-note">执行临时文件清理并查看最近系统日志。</p>
 
       <SectionCard>
         <template #title>临时文件清理</template>
@@ -62,6 +67,15 @@ async function runCleanup() {
         <template #actions>
           <el-button type="warning" :loading="cleanupLoading" @click="runCleanup">执行清理</el-button>
         </template>
+        <el-alert
+          v-if="cleanupError"
+          class="section-feedback"
+          :title="cleanupError"
+          type="error"
+          show-icon
+          closable
+          @close="cleanupError = ''"
+        />
         <p class="section-note">清理仅作用于上传暂存目录，不会删除业务库中的媒体资源。</p>
       </SectionCard>
 
@@ -74,8 +88,17 @@ async function runCleanup() {
             <span>刷新日志</span>
           </el-button>
         </template>
+        <el-alert
+          v-if="logsError"
+          class="section-feedback"
+          :title="logsError"
+          type="error"
+          show-icon
+          closable
+          @close="logsError = ''"
+        />
         <EmptyState
-          v-if="!hasLogs"
+          v-if="!hasLogs && !logsError"
           title="暂无日志"
           description="点击刷新日志按钮拉取最近日志"
         >
@@ -83,7 +106,7 @@ async function runCleanup() {
             <el-button :loading="loading" @click="loadLogs">刷新</el-button>
           </template>
         </EmptyState>
-        <el-scrollbar v-else max-height="60vh" class="log-box">
+        <el-scrollbar v-else-if="hasLogs" max-height="60vh" class="log-box">
           <pre class="log-text">{{ logs.join('\n') }}</pre>
         </el-scrollbar>
       </SectionCard>
@@ -94,7 +117,18 @@ async function runCleanup() {
 <style scoped>
 .settings-page {
   display: grid;
-  gap: var(--space-6);
+  min-width: 0;
+  gap: var(--space-5);
+  overflow-x: clip;
+}
+
+.settings-page :deep(.section-card) {
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.section-feedback {
+  margin-bottom: var(--space-3);
 }
 
 .section-note {
@@ -105,8 +139,9 @@ async function runCleanup() {
 }
 
 .log-box {
+  overflow: hidden;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--slate-950);
 }
 

@@ -3,7 +3,6 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import { useRoute } from 'vue-router'
@@ -318,8 +317,12 @@ onMounted(async () => {
 
 <template>
   <Layout>
-    <div class="page-shell page-shell--medium tv-manage-shell">
-      <PageHeader title="电视剧管理" />
+    <template #header-actions>
+      <el-button type="primary" :icon="Plus" @click="openCreateSeries">新建系列</el-button>
+      <el-button :icon="Search" @click="query.page = 1; loadList()">筛选</el-button>
+    </template>
+
+    <div class="page-shell page-shell--medium tv-manage-shell" data-density="form">
 
       <Toolbar>
         <template #filters>
@@ -334,14 +337,10 @@ onMounted(async () => {
           </el-select>
           <el-button @click="query.q = ''; query.active = ''; query.has_playable = ''; query.page = 1; loadList()">重置</el-button>
         </template>
-        <template #actions>
-          <el-button type="primary" :icon="Plus" @click="openCreateSeries">新建系列</el-button>
-          <el-button :icon="Search" @click="query.page = 1; loadList()">筛选</el-button>
-        </template>
       </Toolbar>
 
       <div class="tv-manage-grid">
-        <SectionCard class="tv-series-list-card">
+        <SectionCard class="tv-series-list-card" data-density="compact">
           <template #title>电视剧列表</template>
           <template #description>按系列维度管理季与分集。</template>
           <el-scrollbar v-loading="loadingList" class="series-list-shell">
@@ -385,8 +384,10 @@ onMounted(async () => {
           <template #title>{{ detail.id ? '系列详情' : '新建电视剧系列' }}</template>
           <template #description>系列、季、集三级编辑，分集可绑定已有 type=episode 视频。</template>
 
-          <SectionCard>
-            <template #title>系列基础</template>
+          <section class="editor-section" aria-labelledby="series-basics-title">
+            <header class="editor-section__header">
+              <h2 id="series-basics-title" class="editor-section__title">系列基础</h2>
+            </header>
             <div class="editor-grid">
               <el-form label-position="top">
                 <el-form-item label="系列标题">
@@ -423,11 +424,13 @@ onMounted(async () => {
                 <el-button v-if="detail.id" type="danger" plain @click="removeSeries">删除系列</el-button>
               </template>
             </Toolbar>
-          </SectionCard>
+          </section>
 
-          <SectionCard>
-            <template #title>季度与分集</template>
-            <template #description>优先在这里完成电视剧结构维护，通用视频页只做底层视频排查。</template>
+          <section class="editor-section" aria-labelledby="season-episode-title">
+            <header class="editor-section__header">
+              <h2 id="season-episode-title" class="editor-section__title">季度与分集</h2>
+              <p class="editor-section__description">优先在这里完成电视剧结构维护，通用视频页只做底层视频排查。</p>
+            </header>
             <div class="season-toolbar">
               <el-button type="primary" plain @click="addSeason">新增季度</el-button>
             </div>
@@ -439,15 +442,15 @@ onMounted(async () => {
             />
 
             <div v-else class="season-stack">
-              <SectionCard
-                v-for="(season, seasonIndex) in detail.seasons"
+              <fieldset
+                v-for="season in detail.seasons"
                 :key="season.id || season._temp_key"
-                collapsible
-                :default-expanded="seasonIndex === 0"
-                dense
+                class="field-group season-field-group"
               >
-                <template #title>第 {{ season.season_number }} 季</template>
-                <template #description>{{ season.title || '未命名季度' }}</template>
+                <legend class="field-group__legend">
+                  <span>第 {{ season.season_number }} 季</span>
+                  <span class="field-group__description">{{ season.title || '未命名季度' }}</span>
+                </legend>
 
                 <div class="season-form-grid">
                   <el-form label-position="top">
@@ -478,17 +481,15 @@ onMounted(async () => {
                 </div>
 
                 <div class="episode-stack">
-                  <SectionCard
+                  <fieldset
                     v-for="episode in season.episodes"
                     :key="episode.id || episode._temp_key"
-                    collapsible
-                    :default-expanded="false"
-                    dense
+                    class="field-group episode-field-group"
                   >
-                    <template #title>第 {{ episode.episode_number }} 集</template>
-                    <template #description>
+                    <legend class="field-group__legend">
+                      <span>第 {{ episode.episode_number }} 集</span>
                       <el-tag :type="episode.playable ? 'success' : 'info'">{{ episode.playable ? '可播放' : '待绑定 / 未就绪' }}</el-tag>
-                    </template>
+                    </legend>
 
                     <div class="episode-form-grid">
                       <el-form label-position="top">
@@ -548,11 +549,11 @@ onMounted(async () => {
                         <el-button type="danger" plain @click="removeEpisode(season, episode)">删除分集</el-button>
                       </template>
                     </Toolbar>
-                  </SectionCard>
+                  </fieldset>
                 </div>
-              </SectionCard>
+              </fieldset>
             </div>
-          </SectionCard>
+          </section>
         </SectionCard>
       </div>
     </div>
@@ -567,6 +568,11 @@ onMounted(async () => {
 
 .tv-manage-shell {
   min-width: 0;
+  overflow-x: clip;
+}
+
+.tv-manage-shell :deep(.el-switch) {
+  min-height: var(--control-height);
 }
 
 .tv-manage-grid {
@@ -668,7 +674,75 @@ onMounted(async () => {
 .season-stack,
 .episode-stack {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-5);
+}
+
+.editor-section {
+  min-width: 0;
+}
+
+.editor-section + .editor-section {
+  margin-top: var(--space-6);
+}
+
+.editor-section__header {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.editor-section__title,
+.editor-section__description {
+  margin: 0;
+}
+
+.editor-section__title {
+  color: var(--text-primary);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: 600;
+}
+
+.editor-section__description {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.field-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.field-group__legend {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text-primary);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  font-weight: 600;
+}
+
+.field-group__description {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.episode-stack {
+  margin-top: var(--space-5);
 }
 
 .season-actions {
@@ -689,11 +763,22 @@ onMounted(async () => {
   }
 }
 
+@media (max-width: 63.9375rem) {
+  .tv-manage-shell :deep(.el-switch) {
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 960px) {
   .editor-grid,
   .season-form-grid,
   .episode-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .field-group__legend {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

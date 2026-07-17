@@ -3,8 +3,6 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Download, FolderOpened, Key, Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
-import SectionCard from '../components/base/SectionCard.vue'
 
 const router = useRouter()
 
@@ -18,14 +16,10 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
 
 <template>
   <Layout>
-    <div class="page-shell toolbox-page">
-      <PageHeader title="工具箱" subtitle="打开独立标签页使用后台小工具" />
+    <div class="page-shell toolbox-page" data-density="form">
+      <p class="page-context-note">工具会在独立标签页打开，并保持当前管理端上下文。</p>
 
-      <SectionCard>
-        <template #title>工具菜单</template>
-        <template #description>点击工具入口后会在新的浏览器标签页打开具体功能。</template>
-
-        <div class="tool-menu-grid" aria-label="工具箱菜单">
+      <div class="tool-menu-grid" aria-label="工具箱菜单">
           <a class="tool-menu-item" :href="ed2kToolHref" target="_blank" rel="noopener noreferrer">
             <span class="tool-menu-item__icon">
               <el-icon><Link /></el-icon>
@@ -104,8 +98,7 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
               <span>新标签页打开</span>
             </span>
           </a>
-        </div>
-      </SectionCard>
+      </div>
     </div>
   </Layout>
 </template>
@@ -113,7 +106,9 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
 <style scoped>
 .toolbox-page {
   display: grid;
-  gap: var(--space-6);
+  min-width: 0;
+  gap: var(--space-4);
+  overflow-x: clip;
 }
 
 .tool-menu-grid {
@@ -128,9 +123,11 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
   align-items: start;
   gap: var(--space-3);
   min-width: 0;
+  min-height: 44px;
   padding: var(--space-4);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
+  box-shadow: none;
   color: var(--text-primary);
   background: var(--bg-surface-muted);
   text-decoration: none;
@@ -177,6 +174,7 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
 }
 
 .tool-menu-item__content span {
+  overflow-wrap: anywhere;
   color: var(--text-secondary);
   font-size: var(--text-small);
   line-height: var(--leading-small);

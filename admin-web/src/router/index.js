@@ -32,7 +32,7 @@ const routes = [
   { path: '/dashboard', component: Dashboard },
   { path: '/videos', component: VideoList },
   { path: '/short-pending-delete', component: PendingDeleteShorts },
-  { path: '/tv-series', component: TvSeriesManage, meta: { hideShellPageHeader: true } },
+  { path: '/tv-series', component: TvSeriesManage },
   { path: '/tv-app', component: TvAppManage },
   { path: '/iptv', component: IPTVManage },
   { path: '/upload', component: VideoUpload },
@@ -43,14 +43,14 @@ const routes = [
   { path: '/images', component: ImageManage },
   { path: '/image-collections', component: ImageCollectionManage },
   { path: '/users', component: UserManage },
-  { path: '/toolbox', component: Toolbox, meta: { hideShellPageHeader: true } },
+  { path: '/toolbox', component: Toolbox },
   { path: '/toolbox/ed2k', component: ToolboxEd2k },
   { path: '/toolbox/ed2k-download', component: ToolboxEd2kDownload },
   { path: '/toolbox/archive-import', component: ToolboxArchiveImport },
   { path: '/toolbox/image-workbench', component: ToolboxImageWorkbench },
   { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },
   { path: '/toolbox/password-vault', component: ToolboxPasswordVault },
-  { path: '/settings', component: SystemSettings, meta: { hideShellPageHeader: true } },
+  { path: '/settings', component: SystemSettings },
   { path: '/tasks', component: TaskMonitor }
 ]
 

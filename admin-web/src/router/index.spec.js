@@ -70,6 +70,22 @@ describe('resolveRouterHistoryBase', () => {
     })
   })
 
+  it('电视剧、工具箱与系统设置使用壳层标题且只移除对应兼容 meta', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const routes = [
+      ["path: '/tv-series'", "{ path: '/tv-series', component: TvSeriesManage },"],
+      ["path: '/toolbox'", "{ path: '/toolbox', component: Toolbox },"],
+      ["path: '/settings'", "{ path: '/settings', component: SystemSettings },"]
+    ]
+
+    routes.forEach(([path, expected]) => {
+      const route = source.split('\n').find((line) => line.includes(path)) || ''
+
+      expect(route.trim()).toBe(expected)
+      expect(route).not.toContain('hideShellPageHeader')
+    })
+  })
+
   it('图片资产页使用壳层标题且保持原有路由目标', () => {
     const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
     const imageRoute = source.split('\n').find((line) => line.includes("path: '/images'"))
