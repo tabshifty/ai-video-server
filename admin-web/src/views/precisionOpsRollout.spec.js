@@ -495,4 +495,11 @@ describe('Precision Ops 第二阶段集成门禁', () => {
       /\.pending-delete-detail__copy h2\s*\{[^}]*display:\s*-webkit-box;[^}]*overflow:\s*hidden;[^}]*-webkit-box-orient:\s*vertical;[^}]*-webkit-line-clamp:\s*2;/s
     )
   })
+
+  it('用户身份字段使用表格溢出提示保持 compact 行高', () => {
+    const user = readView('UserManage.vue')
+
+    expect(user).toContain('prop="username" label="用户名" min-width="160" show-overflow-tooltip')
+    expect(user).toContain('prop="email" label="邮箱" min-width="220" show-overflow-tooltip')
+  })
 })

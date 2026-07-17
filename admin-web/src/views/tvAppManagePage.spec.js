@@ -12,6 +12,7 @@ const loadCatchBlock = loadBlock.match(/} catch \(error\) \{[\s\S]*?(?=\n  } fin
 const loadFinallyBlock = loadBlock.match(/} finally \{[\s\S]*?(?=\n  \}\n\})/)?.[0] || ''
 const confirmActionBlock = tvAppManage.match(/async function confirmAction[\s\S]*?\n\}(?=\n\nfunction downloadHref)/)?.[0] || ''
 const template = tvAppManage.match(/<template>([\s\S]*?)<\/template>\s*\n\s*<style scoped>/)?.[1] || ''
+const style = tvAppManage.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] || ''
 
 describe('TV app package management page', () => {
   it('defaults to the full release list so uploaded draft releases are visible', () => {
@@ -175,6 +176,34 @@ describe('TV app package management page', () => {
     expect(template).toContain("@click=\"confirmAction(row, 'restore')\"")
     expect(template).toContain("@click=\"confirmAction(row, 'delete')\"")
     expect(template).toContain(':href="downloadHref(row, abi.abi)"')
+  })
+
+  it('长版本与 ABI 文本独立收敛且保留完整值提示', () => {
+    const compactTextRule = style.match(/\.compact-text\s*\{[^}]*\}/s)?.[0] || ''
+    const tableRowRule = style.match(/\.package-table\s+:deep\(\.el-table__row\)\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(template).toContain('<el-tooltip :content="row.version_name || \'--\'" placement="top">')
+    expect(template).toMatch(
+      /class="compact-text version-name"\s+tabindex="0"\s+:aria-label="`版本名称：\$\{row\.version_name \|\| '--'\}`"/
+    )
+    expect(template).toContain('<el-tooltip :content="`版本号：${row.version_code ?? \'--\'}`" placement="top">')
+    expect(template).toMatch(
+      /class="compact-text version-code"\s+tabindex="0"\s+:aria-label="`版本号：\$\{row\.version_code \?\? '--'\}`"/
+    )
+    expect(template).toContain('<el-tag v-if="row.latest_recommended" size="small" type="success">推荐</el-tag>')
+    expect(template).toContain('<el-tooltip :content="abiLine(row)" placement="top">')
+    expect(template).toMatch(
+      /class="abi-line compact-text"\s+tabindex="0"\s+:aria-label="`ABI 概览：\$\{abiLine\(row\)\}`"/
+    )
+    expect(template).toContain(':content="`${abi.abi} ${formatBytes(abi.file_size)}`"')
+    expect(template).toMatch(
+      /class="abi-entry compact-text"\s+tabindex="0"\s+:aria-label="`ABI 文件：\$\{abi\.abi\}，大小 \$\{formatBytes\(abi\.file_size\)\}`"/
+    )
+    expect(compactTextRule).toContain('min-width: 0;')
+    expect(compactTextRule).toContain('overflow: hidden;')
+    expect(compactTextRule).toContain('text-overflow: ellipsis;')
+    expect(compactTextRule).toContain('white-space: nowrap;')
+    expect(tableRowRule).not.toContain('overflow: hidden;')
   })
 
   it('危险确认取消或关闭时终止动作且不产生未处理拒绝', () => {

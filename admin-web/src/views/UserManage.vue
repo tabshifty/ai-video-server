@@ -160,8 +160,8 @@ onMounted(load)
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="username" label="用户名" min-width="160" />
-              <el-table-column prop="email" label="邮箱" min-width="220" />
+              <el-table-column prop="username" label="用户名" min-width="160" show-overflow-tooltip />
+              <el-table-column prop="email" label="邮箱" min-width="220" show-overflow-tooltip />
               <el-table-column label="注册时间" width="180">
                 <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
               </el-table-column>

@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 10:34 +0800
+- 进度：Task 14 独立复审修复波次完成提交前最终自审与新鲜验证，不推进 Task 15。两项 Important 已闭合：四视口矩阵的 PASS 现在严格依赖全部适用安全交互 required PASS，User/TvApp 长文本具有独立收敛与非空行高门限；完整 diff 自审同步校正了 `CONTEXT.md` 中旧“版本/ABI 安全换行”表述，避免与新单行契约冲突。
+- 影响文件：本次精确提交只包含 `CONTEXT.md`、`plan.md`、`admin-web/src/views/UserManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js` 共 6 个 tracked 文件；git 忽略的 Task 14 审计脚本、矩阵、28 张截图与报告不提交，提交后只回填报告 SHA。API、角色/发布事件、权限、路由、依赖、Android、后端和 Task 15 均无差异。
+- 验证：严格 RED 为 2 failed / 42 passed，定向 GREEN 44/44；`cd admin-web && npm test` 通过（39 文件，421/421）；`npm run build` 成功（2373 modules transformed，仅既有 chunk-size warning）。全新 CDP 28/28 PASS、required 76/76、四档各 19/19，User 45/60px、TvApp 157/200px，零 `SKIPPED`/mutation request/application error/warning，读取失败 PASS，临时 target 已关闭且未访问认证数据；57 条扩展错误与 182 个 `PerformanceIssue` 单列。`git diff --check`、6 文件白名单、U+FFFD/C0/DEL、审计脚本语法/矩阵结构、UI 反模式及 API/路由/依赖/Android/后端零差异门禁通过，待使用 `修复：补齐第二阶段交互与长文本门禁` 精确提交。
+
+## 2026-07-17 10:30 +0800
+- 进度：Task 14 两项 Important 完成最小修复与全新浏览器复跑，不推进 Task 15。User 用户名/邮箱改为列级 overflow tooltip；TvApp 只为版本名、版本号、ABI 概览和 ABI 条目增加独立可聚焦 tooltip 与单行省略，不裁剪 textarea、备注、时间、下载或更多操作。忽略的 CDP 脚本移除代表视口和可放行 `SKIPPED`，四视口均执行安全流程，required 全 PASS 才允许矩阵 PASS；直接提交动作与具名 N/A 独立统计。
+- 影响文件：tracked 修改 `UserManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`；同步更新忽略的 Task 14 审计脚本、矩阵、28 张截图与报告。未修改 API、角色/发布事件、权限、路由、依赖、Android、后端或 Task 15。
+- 验证：长文本契约先 RED（2 文件，2 failed / 42 passed）后 GREEN（2 文件，44/44）；当前生产构建 2373 modules 成功且仅既有 chunk-size warning。CDP 从 0 重跑 7 页 × 4 视口为 28/28 PASS，每档 19 个 required PASS、合计 76/76；筛选 16/16、可用分页 12/12、Drawer 32/32、危险确认 16/16，零 `SKIPPED`、零 mutation request，12 个直接提交动作单列。User 极端行高最大 45px（上限 60），TvApp 最大 157px（正常基线最高 157、上限 200），document overflow 均为 0；读取失败保留筛选值和 20 行缓存 PASS，应用控制台 0 error / 0 warning，57 条扩展错误与 182 个 `PerformanceIssue` 单列，临时 target 已关闭且未访问认证数据。待更新报告并执行最终全量/静态门禁。
+
+## 2026-07-17 10:17 +0800
+- 进度：Task 14 复审长文本修复取得严格 RED；此时只修改 `precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js` 与 `plan.md`，尚未修改 User/TvApp 生产 SFC。新增契约分别要求 User 用户名/邮箱列使用 Element Plus overflow tooltip，以及 TvApp 版本名、版本号、ABI 概览和 ABI 条目各自保留完整值提示、键盘可达标签与单行收敛类，且禁止通过整行 `overflow: hidden` 裁剪表单或命令。
+- 影响文件：RED 阶段仅修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/views/tvAppManagePage.spec.js`、`plan.md`；`UserManage.vue`、`TvAppManage.vue`、API、角色/发布事件和 Task 15 均未修改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js` 按预期退出 1（2 文件，2 failed / 42 passed）；两个失败分别精确命中 User 列级 tooltip 缺失与 TvApp 版本 tooltip/收敛节点缺失，无语法或环境错误。
+
+## 2026-07-17 10:14 +0800
+- 进度：Precision Ops Task 14 独立复审 verdict 为 `Needs fixes`（0 Critical / 2 Important / 0 Minor），本波次只修复四视口安全交互门禁缺失与 User/TvApp 极端长文本假阳性，不推进 Task 15。已核对根因：浏览器脚本硬编码仅在 375/1440 执行交互且允许 required `SKIPPED` 进入 PASS；User 用户名/邮箱为裸文本列，TvApp 版本与 ABI 文本无限换行，同时审计未设置行高阈值。
+- 影响文件：计划修改 `admin-web/src/views/UserManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`；同步修改 git 忽略的 `.superpowers/sdd/task-14-browser-audit.mjs`、矩阵、截图与 `task-14-report.md`。不修改 API、角色事件、发布流程、权限、路由、依赖、Android、后端或 Task 15。
+- 验证：待严格执行长文本契约 RED → 最小实现 → 定向 GREEN；从 0 重跑 7 页 × 4 视口矩阵，要求所有适用且安全的筛选/分页/Drawer/危险确认流程在四视口逐项 PASS，直接提交动作独立标为 `NOT_RUN_DIRECT_MUTATION`，User/TvApp 极端行高低于明确门限且 document overflow 为 0；最后执行管理端全量、生产构建、`git diff --check`、乱码/控制字符、文件白名单与跨模块零差异门禁。
+
 ## 2026-07-17 09:25 +0800
 - 进度：Precision Ops Task 14 第二阶段集成门禁完成提交前最终验证，不推进 Task 15。阶段二 7 页完整清单保持 `migratedViews` 对象数组权威结构；浏览器发现并按严格 RED → 最小修复 → GREEN 闭合 TV 危险确认取消未处理拒绝、共享 Drawer 滚动链、阶段二输入/图片可访问名称与尺寸、极端资源名称 compact 收敛 4 类阻塞。最终无未修复产品阻塞；Actor 启停和 User 角色变更因现有直接提交且禁止业务流程变更而未触发，作为明确 concern 保留。
 - 影响文件：最终精确提交 `CONTEXT.md`、`plan.md`、`admin-web/src/assets/element-overrides.css`、`themeTokens.spec.js`、`components/AdminTablePagination.vue`、`adminTablePagination.helpers.spec.js`、`views/PendingDeleteShorts.vue`、`ActorManage.vue`、`CollectionManage.vue`、`ImageCollectionManage.vue`、`UserManage.vue`、`IPTVManage.vue`、`TvAppManage.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js` 共 15 个 tracked 文件；git 忽略报告、矩阵与 28 张截图不提交。未修改 API、权限、数据库、依赖、路由、Android、后端或 Task 15。

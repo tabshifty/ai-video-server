@@ -451,9 +451,27 @@ onMounted(() => {
                   <template #default="{ row }">
                     <div class="version-cell">
                       <div class="version-main">
-                        <strong>{{ row.version_name }}</strong>
-                        <span>({{ row.version_code }})</span>
-                        <el-tag v-if="row.latest_recommended" size="small" type="success">推荐</el-tag>
+                        <el-tooltip :content="row.version_name || '--'" placement="top">
+                          <strong
+                            class="compact-text version-name"
+                            tabindex="0"
+                            :aria-label="`版本名称：${row.version_name || '--'}`"
+                          >
+                            {{ row.version_name }}
+                          </strong>
+                        </el-tooltip>
+                        <div class="version-meta">
+                          <el-tooltip :content="`版本号：${row.version_code ?? '--'}`" placement="top">
+                            <span
+                              class="compact-text version-code"
+                              tabindex="0"
+                              :aria-label="`版本号：${row.version_code ?? '--'}`"
+                            >
+                              ({{ row.version_code }})
+                            </span>
+                          </el-tooltip>
+                          <el-tag v-if="row.latest_recommended" size="small" type="success">推荐</el-tag>
+                        </div>
                       </div>
                     </div>
                   </template>
@@ -461,9 +479,30 @@ onMounted(() => {
                 <el-table-column label="安装包状态" min-width="280">
                   <template #default="{ row }">
                     <StatusIndicator :label="statusText(row.publish_status)" :tone="statusTone(row.publish_status)" />
-                    <div class="abi-line">{{ abiLine(row) }}</div>
+                    <el-tooltip :content="abiLine(row)" placement="top">
+                      <div
+                        class="abi-line compact-text"
+                        tabindex="0"
+                        :aria-label="`ABI 概览：${abiLine(row)}`"
+                      >
+                        {{ abiLine(row) }}
+                      </div>
+                    </el-tooltip>
                     <div v-if="clientMeta.supportsAbi" class="abi-size">
-                      <span v-for="abi in row.abi_items" :key="abi.id">{{ abi.abi }} {{ formatBytes(abi.file_size) }}</span>
+                      <el-tooltip
+                        v-for="abi in row.abi_items"
+                        :key="abi.id"
+                        :content="`${abi.abi} ${formatBytes(abi.file_size)}`"
+                        placement="top"
+                      >
+                        <span
+                          class="abi-entry compact-text"
+                          tabindex="0"
+                          :aria-label="`ABI 文件：${abi.abi}，大小 ${formatBytes(abi.file_size)}`"
+                        >
+                          {{ abi.abi }} {{ formatBytes(abi.file_size) }}
+                        </span>
+                      </el-tooltip>
                     </div>
                   </template>
                 </el-table-column>
@@ -605,10 +644,33 @@ onMounted(() => {
 }
 
 .version-main {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.version-meta {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.version-code {
+  flex: 1 1 auto;
+}
+
+.version-meta :deep(.el-tag) {
+  flex: 0 0 auto;
+}
+
+.compact-text {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .abi-line,
@@ -620,6 +682,7 @@ onMounted(() => {
 .abi-size {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
   color: var(--el-text-color-secondary);
   font-size: var(--text-caption);
 }
