@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 11:32 +0800
+- 进度：Task 15 首轮独立复审的唯一 Important 已闭合。页面局部桌面媒体规则使条件性 AV 地区单选在 `64rem` 及以上命中 `form` 的 36px 控件高度，并以媒体范围隔离保证窄于 `64rem` 的共享 44px 规则继续生效；未修改共享主题、AV 逻辑、请求、payload 或 reviewer 明确认定非本任务 finding 的既有 `rows="3"`。本修复波次按指令未做浏览器验收，不推进 Task 16。
+- 影响文件：最终精确提交 `admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件；完整 fix report 追加到 git 忽略的 `.superpowers/sdd/task-15-report.md`。API、依赖、路由、共享主题、上传页脚本与模板均无差异。
+- 验证：两文件初始及桌面范围收紧后的 RED 均为 1 failed / 36 passed，唯一失败精确命中缺失 radio inner 密度规则；最小修复后两文件 GREEN 37/37，Task 15 原三文件定向 47/47，管理端完整 `npm test` 为 39 文件 424/424，`npm run build` 成功转换 2373 modules（仅既有 chunk-size warning）。`git diff --check`、4 文件白名单、U+FFFD/C0/DEL、API/依赖/路由/共享主题零差异及 VideoUpload 脚本/模板敏感差异门禁均通过。
+
+## 2026-07-17 11:30 +0800
+- 进度：Task 15 AV 单选桌面密度完成最小修复并取得两文件 GREEN。上传页只在 `min-width: 64rem` 为 `.el-radio-button__inner` 设置 `min-height: var(--control-height)`，桌面与 form density 同为 36px；1024px 以下继续由既有全局媒体查询提供 44px，未扩共享主题或修改 AV 业务流程。
+- 影响文件：生产只修改 `admin-web/src/views/VideoUpload.vue` 的局部 scoped CSS；保留 RED 阶段的 `admin-web/src/views/precisionOpsRollout.spec.js` 与 `plan.md`。`CONTEXT.md` 长期约束待补，API、请求、payload、路由与依赖均未改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/videoUpload.remote.spec.js` 通过（2 文件，37/37）；待 Task 15 原三文件定向、管理端完整测试、生产构建和最终静态/敏感差异门禁。
+
+## 2026-07-17 11:29 +0800
+- 进度：Task 15 AV 单选桌面密度契约取得严格 RED。最小断言精确要求上传页局部 `.el-radio-button__inner` 使用 `var(--control-height)`；同时确认 scoped 页面选择器优先级高于共享窄屏规则，因此将契约限定在 `min-width: 64rem`，避免局部 36px 覆盖 1024px 以下既有 44px。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js` 与 `plan.md`；尚未修改 `VideoUpload.vue`、`CONTEXT.md`、共享主题、AV 逻辑、请求或 payload。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/videoUpload.remote.spec.js` 按预期退出 1（2 文件，1 failed / 36 passed）；唯一失败为上传工作区样式缺少 radio inner 桌面密度规则，远程建议加载 4/4 与其它 rollout 契约均通过。
+
+## 2026-07-17 11:28 +0800
+- 进度：Task 15 首轮独立复审为 Needs fixes（0 Critical / 1 Important / 0 Minor）。已确认 AV 地区条件单选的 `.el-radio-button__inner` 未被桌面 `form` density 覆盖，会回落到 Element Plus 默认约 30px；现有 1024px 以下全局 44px 规则正确且保持不动。先补页面局部静态契约取得严格 RED，再做单一 CSS 修复；reviewer 点名的既有 `rows="3"` warning 不属于本任务，不处理且不推进 Task 16。
+- 影响文件：计划只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/views/VideoUpload.vue`、`CONTEXT.md`、`plan.md`，并追加 git 忽略的 `.superpowers/sdd/task-15-report.md`；不修改共享主题、AV 类型逻辑、请求、payload、API、依赖或路由。
+- 验证：待执行两文件精确 RED、最小 CSS GREEN、Task 15 三文件定向、管理端完整测试、生产构建、`git diff --check`、U+FFFD/C0/DEL、4 文件白名单及 API/依赖/路由/VideoUpload 业务脚本敏感差异门禁；按指令不做浏览器验收。
+
 ## 2026-07-17 11:07 +0800
 - 进度：Task 15 独立收尾复审完成并取得最终 GREEN，无需追加生产修正。逐项确认 `/upload` 使用 Layout 壳层标题与 `form` 中密度作用域，五个 SectionCard 保持原顺序、16px 内边距和 14px 标题；页面只有一个“开始上传”入口，结果宽表、长文本 tooltip、44px 上传目标/按钮及 768px 以下单列表单契约完整。按本轮明确边界未执行浏览器验收，不推进 Task 16。
 - 影响文件：最终精确提交 `admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个 tracked 文件；详细报告写入 git 忽略的 `.superpowers/sdd/task-15-report.md`。API、payload、依赖、其它路由、Android 与后端均无差异。

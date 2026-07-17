@@ -738,6 +738,12 @@ onMounted(() => {
   background: var(--bg-surface-muted);
 }
 
+@media (min-width: 64rem) {
+  .upload-page :deep(.el-radio-button__inner) {
+    min-height: var(--control-height);
+  }
+}
+
 @media (max-width: 768px) {
   .upload-page :deep(.el-form-item) {
     display: grid;

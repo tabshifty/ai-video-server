@@ -175,6 +175,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(template).toMatch(/prop="videoId"[^>]*show-overflow-tooltip/)
     expect(style).toMatch(/\.upload-actions :deep\(\.el-button\)\s*\{[^}]*min-height:\s*44px/s)
     expect(style).toMatch(/\.upload-drop :deep\(\.el-upload-dragger\)\s*\{[^}]*min-height:\s*44px/s)
+    expect(style).toMatch(/@media \(min-width: 64rem\)\s*\{\s*\.upload-page :deep\(\.el-radio-button__inner\)\s*\{[^}]*min-height:\s*var\(--control-height\)/s)
     expect(style).toMatch(/@media \(max-width: 768px\)[\s\S]*\.upload-page :deep\(\.el-form-item\)\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/)
   })
 
