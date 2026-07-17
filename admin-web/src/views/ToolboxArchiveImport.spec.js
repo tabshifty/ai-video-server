@@ -16,6 +16,11 @@ function extractStyle(sfc) {
   return match?.[1] || ''
 }
 
+function cssDeclarationPattern(property, value) {
+  const escapeRegExp = (input) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(?:^|[;{])\\s*${escapeRegExp(property)}\\s*:\\s*${escapeRegExp(value)}\\s*;`)
+}
+
 describe('ToolboxArchiveImport', () => {
   it('keeps tags and collections as selector-based inputs instead of JSON or raw ID fields', () => {
     expect(source).toContain('默认标签')
@@ -300,6 +305,7 @@ describe('ToolboxArchiveImport', () => {
     const style = extractStyle(source)
     const fileItemRule = style.match(/\.archive-file-item\s*\{[^}]*\}/s)?.[0] || ''
     const reasonRule = style.match(/\.archive-file-item__reason\s*\{[^}]*\}/s)?.[0] || ''
+    const narrowReasonRule = style.match(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-file-item__reason\s*\{[^}]*\}/s)?.[0] || ''
 
     expect(fileItemRule).toContain('min-height: var(--media-row-height);')
     expect(fileItemRule).not.toMatch(/(?:^|[;{]\s*)height:/)
@@ -309,6 +315,8 @@ describe('ToolboxArchiveImport', () => {
     expect(reasonRule).toContain('overflow: hidden;')
     expect(reasonRule).toContain('text-overflow: ellipsis;')
     expect(reasonRule).toContain('white-space: nowrap;')
+    expect(reasonRule).toMatch(cssDeclarationPattern('min-height', 'var(--control-height)'))
+    expect(narrowReasonRule).toMatch(cssDeclarationPattern('min-height', '44px'))
   })
 
   it('sizes the file selection target from compact density and raises every dimension to 44px below desktop', () => {
@@ -317,8 +325,8 @@ describe('ToolboxArchiveImport', () => {
     const narrowSelectionRule = style.match(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-file-item__selection\s*\{[^}]*\}/s)?.[0] || ''
 
     for (const property of ['width', 'height', 'min-width', 'min-height', 'flex-basis']) {
-      expect(selectionRule, property).toContain(`${property}: var(--control-height);`)
-      expect(narrowSelectionRule, property).toContain(`${property}: 44px;`)
+      expect(selectionRule, property).toMatch(cssDeclarationPattern(property, 'var(--control-height)'))
+      expect(narrowSelectionRule, property).toMatch(cssDeclarationPattern(property, '44px'))
     }
   })
 
@@ -346,8 +354,8 @@ describe('ToolboxArchiveImport', () => {
     expect(drawer).toContain('v-model="batchDrawerVisible"')
     expect(drawer).toContain('data-density="form"')
     for (const property of ['width', 'height', 'min-width', 'min-height']) {
-      expect(closeRule, property).toContain(`${property}: 36px;`)
-      expect(narrowCloseRule, property).toContain(`${property}: 44px;`)
+      expect(closeRule, property).toMatch(cssDeclarationPattern(property, '36px'))
+      expect(narrowCloseRule, property).toMatch(cssDeclarationPattern(property, '44px'))
     }
   })
 

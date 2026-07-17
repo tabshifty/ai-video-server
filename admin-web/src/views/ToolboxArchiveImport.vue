@@ -3548,10 +3548,11 @@ onUnmounted(() => {
 .archive-file-item__reason {
   display: block;
   max-width: 100%;
+  min-height: var(--control-height);
   overflow: hidden;
   color: var(--text-muted);
   font-size: var(--text-caption);
-  line-height: var(--leading-caption);
+  line-height: var(--control-height);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3819,6 +3820,11 @@ onUnmounted(() => {
     width: 44px;
     height: 44px;
     flex-basis: 44px;
+  }
+
+  .archive-file-item__reason {
+    min-height: 44px;
+    line-height: 44px;
   }
 
   :global(.archive-batch-drawer .el-drawer__close-btn) {

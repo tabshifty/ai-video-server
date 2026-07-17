@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 17:00 +0800
+- 进度：Task 20 首轮独立 review fix 完成提交前最终验证。Important 已以 reason 桌面 compact 32px、`<1024px` 44px 最小焦点目标闭合，并用匹配 line-height 保持单行 ellipsis 与垂直对齐；Minor 已以 CSS 声明边界 helper 替换 selection/Drawer 尺寸子串断言，width/height 不再能被 min-width/min-height 误满足。未运行浏览器审计。
+- 影响文件：最终精确纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个本轮 tracked 文件，并更新 git 忽略报告；不修改 precision rollout、helpers、共享样式、API、依赖、router、业务脚本或其它文件。相对固定 Base 的 Task 20 总白名单仍精确为 5 文件。
+- 验证：定向 RED 为 1 failed / 130 passed，GREEN 为 3 文件 131/131；完整 `npm test` 39 文件 472/472，`npm run build` 转换 2373 modules 成功且仅既有 chunk-size warning。`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、Base 5 文件白名单、禁止文件/API/依赖/router 零差异、业务脚本和 overlay opening tag 归一化全部通过。
+
+## 2026-07-17 16:58 +0800
+- 进度：Task 20 首轮 review fix 最小实现取得定向 GREEN。reason 继续使用原 block/overflow/ellipsis/white-space 与 focus trigger，只把桌面 min-height/line-height 对齐 compact `--control-height`，并在 `<1024px` 同步覆盖为 44px，确保焦点目标与文本垂直对齐；未改模板、handler、选择绑定或脚本。
+- 影响文件：已修改目标 SFC scoped CSS、spec 精确声明 helper/reason 契约、`CONTEXT.md` 长期 reason 目标契约与 `plan.md`，并待追加 git 忽略报告；未修改其它文件。
+- 验证：Task 20 三文件命令通过（3 文件，131/131）。待完整测试、构建及最终静态/差异归一化门禁。
+
+## 2026-07-17 16:57 +0800
+- 进度：Task 20 首轮 review fix 取得严格 RED。reason 真实 SFC 契约新增桌面 `min-height: var(--control-height)` 与窄屏 `min-height: 44px`；局部 `cssDeclarationPattern` 以声明起始边界精确区分 width/min-width 与 height/min-height，并替换 selection/Drawer 原子串循环，segmented 契约保持原样。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`；目标 SFC、`CONTEXT.md`、报告和其它文件尚未改。
+- 验证：Task 20 三文件命令按预期退出 1（3 文件，131 tests，1 failed / 130 passed）；唯一失败为 reason 基础规则缺少 compact 最小高度，helpers 41/41、rollout 63/63、Minor 精确尺寸断言及其它契约全部通过。
+
+## 2026-07-17 16:55 +0800
+- 进度：开始修复 Task 20 首轮独立 reviewer 的 1 个 Important 与 1 个 Minor。Important：独立 focus Tooltip 的 reason 触发器四视口实测均仅 16px，需桌面消费 `--control-height`、1024px 以下 44px；Minor：selection/Drawer 尺寸循环改用 CSS 声明边界匹配，杜绝 `width` 被 `min-width` 子串误满足。保留 reason 文案/format handler/Tooltip focus trigger/ellipsis、文件行选择点击与全部业务脚本。
+- 影响文件：计划精确修改 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件，并追加 git 忽略的 `.superpowers/sdd/task-20-report.md`；不修改 `precisionOpsRollout.spec.js`、helpers、共享样式、API、依赖、router 或其它文件。
+- 验证：先只修改 spec，运行 Task 20 三文件命令取得 reason 32/44px 准确 RED；最小 scoped CSS 后重跑定向 GREEN，再执行完整测试、构建、`git diff --check`、严格编码、相对固定 Base 的 5 文件/API/依赖/router/业务脚本/overlay 归一化门禁。按分工不运行浏览器审计。
+
 ## 2026-07-17 16:31 +0800
 - 进度：Task 20 浏览器矩阵修复完成提交前最终验证。文件选择位 32/44px、reason focus trigger + 2px 焦点、批次 Drawer 关闭按钮 36/44px、文件排序 segmented 32/44px 均由真实 SFC 契约闭合；浏览器矩阵既有四视口无溢出、MetricStrip、overlay 密度、文件/分组/BulkActionBar、零 mutation/控制台问题保持不变。未执行新的浏览器审计。
 - 影响文件：最终精确纳入 `admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md` 4 个 tracked 文件，并更新 git 忽略报告；未修改 `precisionOpsRollout.spec.js`、helpers、共享样式、API、依赖、router、业务脚本或其它文件。
