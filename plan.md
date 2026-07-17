@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 13:24 +0800
+- 进度：Task 17 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor，Cannot verify 为无。首轮 4 个 Important 已由 `b12cd4b` 闭合；最终三页 × 1440/1024/768/375px 浏览器矩阵为 PASS、0 failure，电视剧系列 7 行均具备原生按钮与 pressed 语义，三个筛选名称和两处动态长文本计算样式完整。合成 Settings smoke 又闭合非空日志、独立滚动和失败保留旧日志运行态。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-17-report.md`、浏览器/Settings smoke 脚本、矩阵和 12 张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 18。
+- 验证：主线程在 `b12cd4b` 上新鲜运行 Task 17 定向 77/77、管理端全量 39 文件 443/443、Vite 2373 modules 构建成功且仅既有 chunk-size warning；12/12 视口均为 0 document overflow、0 小控件、0 mutation、0 应用控制台问题，TV 网格 2/1/1/1、Toolbox 网格 4/2/1/1。Settings smoke 为 PASS，仅 2 次合成日志 GET、0 mutation、清理未激活、临时 target 已关闭；`git diff --check`、U+FFFD/C0/DEL、API/依赖、TV 业务脚本及干净工作区门禁通过。
+
 ## 2026-07-17 13:16 +0800
 - 进度：Task 17 第一轮 review fix 完成提交前最终验证与自审，4 个 Important 均由真实 SFC 契约覆盖并闭合，不推进 Task 18。系列项具备原生按钮键盘行为、准确选中语义和可见焦点；三个筛选控件有明确名称；系列标题与绑定视频文本的长词只在自身容器换行。完整证据已追加到 git 忽略的 `.superpowers/sdd/task-17-report.md`。
 - 影响文件：最终只纳入 `admin-web/src/views/TvSeriesManage.vue`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件；不纳入忽略报告或主线程浏览器审计脚本，不修改 API、依赖、路由、业务脚本模型/handler、共享主题、其它页面或 Task 18。
