@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 11:41 +0800
+- 进度：Task 15 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。首轮唯一 Important 已由 `be29742` 闭合：AV 地区 radio inner 在桌面命中 36px `form` 高度、窄屏继续命中 44px 触控高度；1440/768/375px 条件状态实测分别为 36/44/44px，三档 document overflow 为 0、键盘焦点可见且零写请求。固定基线既有的 1 条 `ElInput.rows` 类型 warning 与 3 条 AV radio `label` API 弃用 warning 均未被本任务改动，复审独立判定为非 finding。
+- 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-15-report.md`、浏览器脚本/矩阵与三张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 16。
+- 验证：主线程在最新提交 `be29742` 上新鲜运行 Task 15 定向 47/47、管理端全量 39 文件 424/424、Vite 2373 modules 构建成功且仅既有 chunk-size warning；最终 CDP 为 `PASS_WITH_CONCERNS`、0 failure，AV 条件 radio 三档 36/44/44px、移动表单 8/8 单列、document overflow 0、mutation request 0、临时 target 已关闭。`git diff --check`、总体 6 文件/修复 4 文件白名单、U+FFFD/C0/DEL、API/依赖零差异及修复提交脚本/模板零差异门禁通过，可进入 Task 16。
+
 ## 2026-07-17 11:32 +0800
 - 进度：Task 15 首轮独立复审的唯一 Important 已闭合。页面局部桌面媒体规则使条件性 AV 地区单选在 `64rem` 及以上命中 `form` 的 36px 控件高度，并以媒体范围隔离保证窄于 `64rem` 的共享 44px 规则继续生效；未修改共享主题、AV 逻辑、请求、payload 或 reviewer 明确认定非本任务 finding 的既有 `rows="3"`。本修复波次按指令未做浏览器验收，不推进 Task 16。
 - 影响文件：最终精确提交 `admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件；完整 fix report 追加到 git 忽略的 `.superpowers/sdd/task-15-report.md`。API、依赖、路由、共享主题、上传页脚本与模板均无差异。
