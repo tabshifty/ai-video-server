@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 18:10 +0800
+- 进度：Task 21 完成提交前最终验证与独立复审。自审以两个精确 RED 移除图库持续阴影并让 36/44px 图标轨道自适应；首轮 reviewer 的 1 个 Important 以 Element Plus 2.13.6 源码确认 Dialog attrs 与 `.el-dialog` 同根，随后用 `width="min(96vw, 1080px)"` 直接闭合窄屏宽度并删除无效后代选择器。复审结论 Ready，0 Critical / 0 Important / 0 Minor。
+- 影响文件：最终只纳入 `admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个 tracked 文件，并更新 git 忽略报告；不修改 API、依赖、router、helpers 生产代码、其它页面、Android 或后端。
+- 验证：最终定向 2 文件 78/78；管理端完整 `npm test` 39 文件 479/479；`npm run build` 转换 2373 modules 成功且仅既有 chunk-size warning。`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、固定 Base 六文件白名单、API/依赖/router 零差异、业务脚本/handler/pointer/emit 归一化及 direct-color/gradient/shadow 门禁通过；按 brief 不运行浏览器审计。
+
+## 2026-07-17 17:56 +0800
+- 进度：Task 21 最小生产实现取得定向 GREEN。图像工作台根声明 `form`，结果区与 Teleport 图库内容声明 `compact`，配置状态复用原 label/tone 的 `StatusIndicator`；两套媒体网格统一 184px/12px 与 contain 预览，结果动作继续常显。MaskEditor 仅增加白色数据常量与主题色解析，原 brush/eraser composite、坐标、pointer capture、保存/取消链路保持，工具栏使用 radio、滑杆和 36/44px 中文命名图标动作。
+- 影响文件：已修改两份目标 SFC、两份目标 spec、`plan.md`，并待追加 `CONTEXT.md` 与 git 忽略报告；未修改 API、依赖、router、helpers 生产代码、IndexedDB、生成/图库/导入业务或其它页面。
+- 验证：初始 Task 21 RED 为 6 failed / 72 passed；实现后自审收紧 compact 容器定位，准确复现 1 failed / 77 passed 并修正误落到输入卡的密度；最终同一两文件命令通过 78/78。待完整 `npm test`、`npm run build` 与最终静态/敏感差异门禁。
+
+## 2026-07-17 17:51 +0800
+- 进度：Task 21 两份真实 SFC 契约取得严格 RED。新增断言锁定独立工作台 `form` 根、结果/图库 `compact`、状态指示器、两套 184px/12px 媒体网格、稳定 contain 预览，以及 MaskEditor 的组件边界、白色数据色精确例外、主题 overlay、无数字 rgba/画布阴影、模式分段、滑杆、36px 中文命名图标动作与窄屏工具栏；生产 SFC 仍保持固定 Base 状态。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js` 与 `plan.md`；`ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`CONTEXT.md`、API、依赖和 router 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/imageWorkbench.helpers.spec.js src/views/precisionOpsRollout.spec.js` 按预期退出 1（2 文件，78 tests，6 failed / 72 passed）；失败全部对应目标视觉契约缺失，原 72 条 helper/rollout 契约通过，无测试语法、环境或既有业务失败。
+
+## 2026-07-17 17:48 +0800
+- 进度：开始 Task 21，把 `ToolboxImageWorkbench` 升级为独立 `form` 图像生成工作台，结果与图库选择集合使用 `compact` 和统一 184px 媒体网格；`ImageWorkbenchMaskEditor` 保持组件边界，工具栏迁移到稳定模式分段、数值滑杆与 36px 图标动作，并严格区分白色 mask 业务数据编码和主题 overlay 界面色。不推进阶段四，不运行浏览器审计。
+- 影响文件：计划精确修改 `admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个 tracked 文件，并写入 git 忽略的 `.superpowers/sdd/task-21-report.md`；不修改 API、权限、router、依赖、数据库、共享组件、Android 或后端。
+- 验证：先只补两份真实 SFC 契约并运行 `cd admin-web && npm test -- src/views/imageWorkbench.helpers.spec.js src/views/precisionOpsRollout.spec.js` 取得严格 RED；最小实现后依次运行同一定向测试、完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、固定 Base `7a952b7d7f0dd99311a57a703fef6dc27cc7594b` 六文件白名单、API/依赖/router 零差异及业务脚本/handler/pointer/emit 归一化门禁。
+
 ## 2026-07-17 17:34 +0800
 - 进度：Task 20 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。首轮 reason 焦点目标 32/44px 与尺寸断言边界、第二轮 Drawer 单一共享关闭入口与中文提示均已闭合；reviewer 的 Cannot verify 仅为按只读约束不重复执行主代理验证。压缩包导入工作台至此完成。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-20-report.md`、浏览器审计脚本与 8 张安全截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 21。

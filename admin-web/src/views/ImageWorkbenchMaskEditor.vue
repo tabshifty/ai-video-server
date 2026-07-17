@@ -1,5 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { Delete } from '@element-plus/icons-vue'
+
+const MASK_OPAQUE_COLOR = '#ffffff'
+
+function resolveCanvasColor(token) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return ''
+  return window.getComputedStyle(document.documentElement).getPropertyValue(token).trim()
+}
 
 const props = defineProps({
   modelValue: {
@@ -86,7 +94,7 @@ function fillWhiteMask() {
   if (!ctx) return
   ctx.globalCompositeOperation = 'source-over'
   ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height)
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = MASK_OPAQUE_COLOR
   ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
 }
 
@@ -139,7 +147,7 @@ function drawPreview() {
   ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height)
 
   overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height)
-  overlayCtx.fillStyle = '#3b82f6'
+  overlayCtx.fillStyle = resolveCanvasColor('--primary')
   overlayCtx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height)
   overlayCtx.globalCompositeOperation = 'destination-out'
   overlayCtx.drawImage(maskCanvas, 0, 0)
@@ -175,12 +183,12 @@ function drawSegment(from, to) {
   ctx.lineWidth = brushSize.value
   if (tool.value === 'brush') {
     ctx.globalCompositeOperation = 'destination-out'
-    ctx.strokeStyle = 'rgba(0, 0, 0, 1)'
-    ctx.fillStyle = 'rgba(0, 0, 0, 1)'
+    ctx.strokeStyle = MASK_OPAQUE_COLOR
+    ctx.fillStyle = MASK_OPAQUE_COLOR
   } else {
     ctx.globalCompositeOperation = 'source-over'
-    ctx.strokeStyle = '#ffffff'
-    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = MASK_OPAQUE_COLOR
+    ctx.fillStyle = MASK_OPAQUE_COLOR
   }
   if (!from || !to) return
   ctx.beginPath()
@@ -236,29 +244,36 @@ function saveMask() {
     v-model="visible"
     class="mask-editor"
     title="编辑局部蒙版"
-    width="1080px"
+    width="min(96vw, 1080px)"
     top="4vh"
     append-to-body
     destroy-on-close
+    data-density="form"
     :close-on-click-modal="false"
   >
     <div class="mask-editor__layout">
       <div class="mask-editor__toolbar">
-        <div class="mask-editor__toolbar-group">
+        <div class="mask-editor__toolbar-group mask-editor__toolbar-group--identity">
           <strong>{{ imageName || '目标参考图' }}</strong>
-          <span>蓝色区域表示会被重绘；橡皮用于恢复保留区域。</span>
+          <span>高亮区域表示会被重绘；橡皮用于恢复保留区域。</span>
         </div>
-        <div class="mask-editor__toolbar-group">
-          <el-button-group>
-            <el-button :type="tool === 'brush' ? 'primary' : 'default'" @click="tool = 'brush'">涂抹区域</el-button>
-            <el-button :type="tool === 'eraser' ? 'primary' : 'default'" @click="tool = 'eraser'">恢复保留</el-button>
-          </el-button-group>
+        <div class="mask-editor__toolbar-group mask-editor__toolbar-group--mode">
+          <el-radio-group v-model="tool" class="mask-editor__mode" aria-label="蒙版编辑模式">
+            <el-radio-button value="brush">涂抹区域</el-radio-button>
+            <el-radio-button value="eraser">恢复保留</el-radio-button>
+          </el-radio-group>
         </div>
         <div class="mask-editor__toolbar-group mask-editor__toolbar-group--slider">
           <span>笔刷 {{ brushSize }} px</span>
-          <el-slider v-model="brushSize" :min="16" :max="180" />
+          <el-slider v-model="brushSize" :min="16" :max="180" aria-label="笔刷大小" />
         </div>
-        <el-button @click="clearMask">清空蒙版</el-button>
+        <el-button
+          class="mask-editor__icon-button"
+          :icon="Delete"
+          aria-label="清空蒙版"
+          title="清空蒙版"
+          @click="clearMask"
+        />
       </div>
 
       <div class="mask-editor__stage" v-loading="loading">
@@ -284,18 +299,14 @@ function saveMask() {
 </template>
 
 <style scoped>
-.mask-editor :deep(.el-dialog) {
-  max-width: min(96vw, 1080px);
-}
-
 .mask-editor__layout {
   display: grid;
   gap: var(--space-4);
 }
 
 .mask-editor__toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto minmax(14rem, 20rem) auto;
   align-items: center;
   gap: var(--space-3);
 }
@@ -316,21 +327,45 @@ function saveMask() {
   font-size: var(--text-small);
 }
 
+.mask-editor__toolbar-group--identity {
+  overflow-wrap: anywhere;
+}
+
+.mask-editor__mode :deep(.el-radio-button__inner) {
+  min-height: var(--control-height);
+}
+
 .mask-editor__toolbar-group--slider {
-  min-width: min(18rem, 100%);
-  flex: 1 1 18rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.mask-editor__toolbar-group--slider :deep(.el-slider) {
+  min-height: var(--control-height);
+}
+
+.mask-editor__icon-button {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
 }
 
 .mask-editor__stage {
   display: grid;
   place-items: center;
+  width: 100%;
+  max-width: 100%;
   min-height: 20rem;
+  aspect-ratio: 16 / 9;
+  overflow: auto;
   padding: var(--space-3);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(45deg, rgba(15, 23, 42, 0.04) 25%, transparent 25%, transparent 75%, rgba(15, 23, 42, 0.04) 75%),
-    linear-gradient(45deg, rgba(15, 23, 42, 0.04) 25%, transparent 25%, transparent 75%, rgba(15, 23, 42, 0.04) 75%);
+    linear-gradient(45deg, color-mix(in srgb, var(--text-primary) 4%, transparent) 25%, transparent 25%, transparent 75%, color-mix(in srgb, var(--text-primary) 4%, transparent) 75%),
+    linear-gradient(45deg, color-mix(in srgb, var(--text-primary) 4%, transparent) 25%, transparent 25%, transparent 75%, color-mix(in srgb, var(--text-primary) 4%, transparent) 75%);
   background-position: 0 0, 12px 12px;
   background-size: 24px 24px;
 }
@@ -340,7 +375,6 @@ function saveMask() {
   max-width: 100%;
   max-height: min(72vh, 48rem);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
   touch-action: none;
   cursor: crosshair;
 }
@@ -351,9 +385,46 @@ function saveMask() {
   gap: var(--space-2);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 63.9375rem) {
+  .mask-editor__icon-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .mask-editor__toolbar-group--slider :deep(.el-slider) {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 47.9375rem) {
   .mask-editor__toolbar {
+    display: flex;
+    flex-wrap: wrap;
     align-items: stretch;
+  }
+
+  .mask-editor__toolbar-group--identity,
+  .mask-editor__toolbar-group--slider {
+    flex: 1 1 100%;
+  }
+
+  .mask-editor__toolbar-group--mode {
+    flex: 1 1 auto;
+  }
+
+  .mask-editor__mode {
+    display: flex;
+    width: 100%;
+  }
+
+  .mask-editor__mode :deep(.el-radio-button) {
+    flex: 1;
+  }
+
+  .mask-editor__mode :deep(.el-radio-button__inner) {
+    width: 100%;
   }
 
   .mask-editor__footer {

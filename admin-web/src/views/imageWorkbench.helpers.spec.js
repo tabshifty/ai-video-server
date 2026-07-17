@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   IMAGE_WORKBENCH_LIMITS,
@@ -9,6 +10,8 @@ import {
   normalizeImageWorkbenchParams,
   validateReferenceImageFiles
 } from './imageWorkbench.helpers'
+
+const readView = (file) => readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
 
 describe('image workbench helpers', () => {
   it('normalizes common generation params', () => {
@@ -207,5 +210,82 @@ describe('image workbench helpers', () => {
 
     expect(task.referenceSnapshots).toEqual([{ image_id: 'ref-a', source_kind: 'browser_input', slot_index: 0 }])
     expect(task.mask).toEqual({ image_id: 'mask-a', target_reference_index: 0 })
+  })
+})
+
+describe('image workbench Precision Ops contracts', () => {
+  it('keeps the mask editor component-only boundary and separates data colors from UI colors', () => {
+    const source = readView('ImageWorkbenchMaskEditor.vue')
+    const sourceWithoutMaskDataColor = source.replace("const MASK_OPAQUE_COLOR = '#ffffff'", '')
+
+    expect(source).toContain('data-density="form"')
+    expect(source).toContain('width="min(96vw, 1080px)"')
+    expect(source).not.toContain('.mask-editor :deep(.el-dialog)')
+    expect(source).toContain('mask-editor__toolbar')
+    expect(source).toContain("const MASK_OPAQUE_COLOR = '#ffffff'")
+    expect(source.match(/= MASK_OPAQUE_COLOR/g)).toHaveLength(5)
+    expect(source).toContain("function resolveCanvasColor(token) {\n  if (typeof window === 'undefined' || typeof document === 'undefined') return ''\n  return window.getComputedStyle(document.documentElement).getPropertyValue(token).trim()\n}")
+    expect(source).toContain("overlayCtx.fillStyle = resolveCanvasColor('--primary')")
+    expect(source).toContain('color-mix(in srgb, var(--text-primary) 4%, transparent)')
+    expect(source.match(/linear-gradient\(/g)).toHaveLength(2)
+    expect(sourceWithoutMaskDataColor).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+    expect(source).not.toMatch(/rgba?\(\s*\d/)
+    expect(source).not.toMatch(/\.mask-editor__canvas\s*\{[^}]*box-shadow:/s)
+    expect(source).not.toContain('<Layout')
+    expect(source).not.toContain('<PageHeader')
+  })
+
+  it('uses fixed-format mask controls without changing pointer or save contracts', () => {
+    const source = readView('ImageWorkbenchMaskEditor.vue')
+
+    expect(source).toContain('<el-radio-group v-model="tool"')
+    expect(source).toContain('<el-slider v-model="brushSize"')
+    expect(source).toContain('class="mask-editor__icon-button"')
+    expect(source).toContain('aria-label="清空蒙版"')
+    expect(source).toContain('title="清空蒙版"')
+    expect(source).toMatch(/\.mask-editor__icon-button\s*\{[^}]*width:\s*36px;[^}]*height:\s*36px;/s)
+    expect(source).toContain('grid-template-columns: minmax(12rem, 1fr) auto minmax(14rem, 20rem) auto;')
+    expect(source).toMatch(/@media \(max-width: 47\.9375rem\)[\s\S]*?\.mask-editor__toolbar\s*\{[^}]*flex-wrap:\s*wrap;/s)
+    expect(source).toContain("const emit = defineEmits(['update:modelValue', 'save'])")
+    for (const binding of [
+      '@pointerdown.prevent="handlePointerDown"',
+      '@pointermove.prevent="handlePointerMove"',
+      '@pointerup.prevent="stopDrawing"',
+      '@pointerleave.prevent="stopDrawing"',
+      '@pointercancel.prevent="stopDrawing"'
+    ]) {
+      expect(source).toContain(binding)
+    }
+    expect(source).toContain('event.target?.setPointerCapture?.(event.pointerId)')
+    expect(source).toContain('event.target.releasePointerCapture(event.pointerId)')
+    expect(source).toContain('x: ((event.clientX - rect.left) / rect.width) * canvas.width')
+    expect(source).toContain('y: ((event.clientY - rect.top) / rect.height) * canvas.height')
+    expect(source).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.mask-editor__icon-button\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/s)
+    expect(source).toContain("emit('save', maskCanvas.toDataURL('image/png'))")
+  })
+
+  it('uses stable compact media-grid geometry in the image workbench', () => {
+    const source = readView('ToolboxImageWorkbench.vue')
+    const resultGridRule = source.match(/\.result-grid\s*\{[^}]*\}/s)?.[0] || ''
+    const libraryGridRule = source.match(/\.library-grid\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(source).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
+    expect(source).toContain('<StatusIndicator :label="statusLabel" :tone="statusType" />')
+    expect(source).toContain('<section class="workbench-panel workbench-panel--preview" data-density="compact">')
+    expect(source).toContain('<div class="library-picker" data-density="compact">')
+    for (const rule of [resultGridRule, libraryGridRule]) {
+      expect(rule).toContain('grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));')
+      expect(rule).toContain('gap: 12px;')
+    }
+    expect(source).toMatch(/\.result-card img\s*\{[^}]*aspect-ratio:[^}]*object-fit:\s*contain;/s)
+    expect(source).toMatch(/\.library-card__preview\s*\{[^}]*aspect-ratio:/s)
+    expect(source).toMatch(/\.library-card__preview img\s*\{[^}]*object-fit:\s*contain;/s)
+    expect(source).not.toMatch(/\bbox-shadow\s*:/)
+    expect(source).toMatch(/\.result-card__actions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/s)
+    expect(source).toContain('@click="downloadResult(item, index)"')
+    expect(source).toContain('@click="reuseAsReference(item)"')
+    expect(source).toContain('@click="importToMediaLibrary(item, index)"')
+    expect(source).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.library-card__select\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/s)
+    expect(source).toContain('<PageHeader')
   })
 })

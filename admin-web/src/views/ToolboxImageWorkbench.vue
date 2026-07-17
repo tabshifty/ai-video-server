@@ -6,6 +6,7 @@ import { Back, Download, FolderOpened, Picture, Plus, Refresh, Search, Upload, W
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
+import StatusIndicator from '../components/base/StatusIndicator.vue'
 import ImageWorkbenchMaskEditor from './ImageWorkbenchMaskEditor.vue'
 import {
   generateAdminImage,
@@ -922,14 +923,14 @@ function formatLibraryItemMeta(item) {
 </script>
 
 <template>
-  <main class="image-workbench">
+  <main class="image-workbench" data-density="form">
     <div class="image-workbench__inner">
       <header class="workbench-topbar">
         <div class="workbench-topbar__actions">
           <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
           <el-button :icon="FolderOpened" @click="openMediaLibrary">打开媒体库</el-button>
         </div>
-        <el-tag :type="statusType" effect="plain">{{ statusLabel }}</el-tag>
+        <StatusIndicator :label="statusLabel" :tone="statusType" />
       </header>
 
       <PageHeader title="图像生成工作台" subtitle="使用提示词和参考图生成、编辑、保存图像结果。" />
@@ -1046,7 +1047,7 @@ function formatLibraryItemMeta(item) {
           </SectionCard>
         </aside>
 
-        <section class="workbench-panel workbench-panel--preview">
+        <section class="workbench-panel workbench-panel--preview" data-density="compact">
           <SectionCard>
             <template #title>当前结果</template>
             <template #actions>
@@ -1147,11 +1148,12 @@ function formatLibraryItemMeta(item) {
       title="选择图库参考图"
       direction="rtl"
       size="min(100%, 760px)"
+      data-density="form"
       :close-on-click-modal="!libraryAdding"
       :close-on-press-escape="!libraryAdding"
       @closed="onLibraryPickerClosed"
     >
-      <div class="library-picker">
+      <div class="library-picker" data-density="compact">
         <SectionCard dense>
           <template #title>图库筛选</template>
           <div class="library-picker__filters">
@@ -1264,8 +1266,10 @@ function formatLibraryItemMeta(item) {
 
 <style scoped>
 .image-workbench {
+  min-width: 0;
   min-height: 100vh;
   min-height: 100dvh;
+  overflow-x: clip;
   background: var(--bg-canvas);
 }
 
@@ -1466,8 +1470,8 @@ function formatLibraryItemMeta(item) {
 
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: 12px;
 }
 
 .task-input-summary {
@@ -1660,8 +1664,8 @@ function formatLibraryItemMeta(item) {
 
 .library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: 12px;
 }
 
 .library-card {
@@ -1675,14 +1679,12 @@ function formatLibraryItemMeta(item) {
   background: var(--bg-surface);
   transition:
     border-color var(--motion-duration-base) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-base) var(--motion-easing-standard),
     opacity var(--motion-duration-base) var(--motion-easing-standard);
 }
 
 .library-card.is-selected,
 .library-card:hover {
   border-color: var(--primary);
-  box-shadow: var(--shadow-sm);
 }
 
 .library-card.is-disabled {
@@ -1694,6 +1696,12 @@ function formatLibraryItemMeta(item) {
   top: var(--space-2);
   left: var(--space-2);
   z-index: 2;
+  display: grid;
+  width: var(--control-height);
+  height: var(--control-height);
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+  place-items: center;
 }
 
 .library-card__preview {
@@ -1711,7 +1719,7 @@ function formatLibraryItemMeta(item) {
 .library-card__preview img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .library-card__body {
@@ -1770,6 +1778,21 @@ function formatLibraryItemMeta(item) {
 
   .history-list {
     max-height: none;
+  }
+}
+
+@media (max-width: 63.9375rem) {
+  .image-workbench :deep(.el-input-number),
+  .image-workbench :deep(.el-slider),
+  .library-picker :deep(.el-pagination) {
+    min-height: 44px;
+  }
+
+  .library-card__select {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 
