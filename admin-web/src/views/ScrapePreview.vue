@@ -6,7 +6,6 @@ import { Search } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import { scrapeConfirm, scrapePreview } from '../api/admin'
@@ -288,14 +287,16 @@ async function doSave() {
 
 <template>
   <Layout>
-    <div class="page-shell page-shell--medium">
-      <PageHeader title="通用刮削" />
+    <template #header-actions>
+      <el-button type="primary" :icon="Search" :loading="previewLoading" @click="doPreview">查询预览</el-button>
+    </template>
 
-      <Toolbar>
+    <div class="page-shell scrape-preview-page" data-density="form">
+      <Toolbar class="scrape-filter-toolbar">
         <template #filters>
           <el-form inline class="scrape-filter-form">
             <el-form-item label="视频ID">
-              <el-input v-model="form.video_id" style="width: 300px" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
+              <el-input v-model="form.video_id" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
             </el-form-item>
             <el-form-item label="标题">
               <el-input v-model="form.title" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
@@ -308,7 +309,7 @@ async function doSave() {
               />
             </el-form-item>
             <el-form-item label="类型">
-              <el-select v-model="form.type" style="width: 120px" :disabled="previewLoading || saveLoading">
+              <el-select v-model="form.type" :disabled="previewLoading || saveLoading">
                 <el-option label="电影" value="movie" />
                 <el-option label="剧集" value="tv" />
               </el-select>
@@ -334,9 +335,6 @@ async function doSave() {
               </div>
             </el-form-item>
           </el-form>
-        </template>
-        <template #actions>
-          <el-button type="primary" :icon="Search" :loading="previewLoading" @click="doPreview">查询预览</el-button>
         </template>
       </Toolbar>
 
@@ -488,21 +486,44 @@ async function doSave() {
 </template>
 
 <style scoped>
-.page-shell--medium {
+.scrape-preview-page {
   display: grid;
   gap: var(--space-5);
 }
 
+.scrape-filter-toolbar :deep(.admin-toolbar__filters) {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
 .scrape-filter-form {
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-2);
+  width: 100%;
+}
+
+.scrape-filter-form :deep(.el-form-item) {
+  min-width: 0;
+  margin: 0;
+}
+
+.scrape-filter-form :deep(.el-form-item__content) {
+  min-width: 0;
+}
+
+.scrape-filter-form :deep(.el-input),
+.scrape-filter-form :deep(.el-input-number),
+.scrape-filter-form :deep(.el-select) {
+  width: 100%;
 }
 
 .tv-episode-fields {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
 }
 
 .tv-episode-divider {
@@ -635,7 +656,7 @@ async function doSave() {
   margin: 0;
   padding: 12px;
   background: var(--bg-inverse);
-  color: var(--text-on-inverse, #e2e8f0);
+  color: var(--text-on-inverse);
   border-radius: var(--radius-md);
   max-height: 320px;
   overflow: auto;
@@ -643,9 +664,21 @@ async function doSave() {
   line-height: 1.5;
 }
 
+@media (max-width: 1024px) {
+  .scrape-filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .detail-head {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .scrape-filter-form {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

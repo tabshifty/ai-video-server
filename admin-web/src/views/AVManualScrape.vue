@@ -6,7 +6,6 @@ import { Search } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import EmptyState from '../components/base/EmptyState.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import {
@@ -245,20 +244,22 @@ async function doSave() {
 
 <template>
   <Layout>
-    <div class="page-shell page-shell--medium">
-      <PageHeader title="AV 手动刮削" />
+    <template #header-actions>
+      <el-button type="primary" :icon="Search" :loading="previewLoading" @click="doPreview">查询预览</el-button>
+    </template>
 
-      <Toolbar>
+    <div class="page-shell av-manual-scrape-page" data-density="form">
+      <Toolbar class="av-filter-toolbar">
         <template #filters>
           <el-form inline class="av-filter-form">
             <el-form-item label="视频 ID">
-              <el-input v-model="form.video_id" style="width: 300px" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
+              <el-input v-model="form.video_id" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
             </el-form-item>
             <el-form-item label="标题">
-              <el-input v-model="form.title" style="width: 260px" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
+              <el-input v-model="form.title" :disabled="previewLoading || saveLoading" @keyup.enter="doPreview" />
             </el-form-item>
             <el-form-item label="站点分类">
-              <el-select v-model="form.site_category" clearable placeholder="按标题自动判断" style="width: 180px">
+              <el-select v-model="form.site_category" clearable placeholder="按标题自动判断">
                 <el-option label="自动判断" value="" />
                 <el-option label="FC2" value="fc2" />
                 <el-option label="欧美" value="western" />
@@ -266,7 +267,7 @@ async function doSave() {
               </el-select>
             </el-form-item>
             <el-form-item label="目标站点">
-              <el-select v-model="form.site_source" clearable filterable placeholder="使用自动推荐" style="width: 200px">
+              <el-select v-model="form.site_source" clearable filterable placeholder="使用自动推荐">
                 <el-option label="使用自动推荐" value="" />
                 <el-option v-for="site in enabledSources.length ? enabledSources : AV_SITE_OPTIONS" :key="site" :label="site" :value="site" />
               </el-select>
@@ -275,9 +276,6 @@ async function doSave() {
               <el-switch v-model="form.bypass_cache" active-text="始终重抓" inactive-text="允许缓存" />
             </el-form-item>
           </el-form>
-        </template>
-        <template #actions>
-          <el-button type="primary" :icon="Search" :loading="previewLoading" @click="doPreview">查询预览</el-button>
         </template>
       </Toolbar>
 
@@ -332,7 +330,7 @@ async function doSave() {
       </SectionCard>
 
       <div class="result-grid">
-        <SectionCard>
+        <SectionCard class="candidate-panel">
           <template #title>候选列表</template>
           <template #description>默认不走缓存，会先按标题自动推荐站点，也可以手动切换站点后重新预览。</template>
           <div v-loading="previewLoading" class="candidate-list-shell">
@@ -347,9 +345,24 @@ async function doSave() {
                 :key="item.external_id || String(index)"
                 class="candidate-item"
                 :class="{ active: index === selectedIndex }"
+                role="button"
+                tabindex="0"
+                :aria-pressed="index === selectedIndex"
                 @click="chooseCandidate(item, index)"
+                @keydown.enter.prevent="chooseCandidate(item, index)"
+                @keydown.space.prevent="chooseCandidate(item, index)"
               >
-                <div class="candidate-title">{{ toText(item.title) }}</div>
+                <div class="candidate-heading">
+                  <div class="candidate-title">{{ toText(item.title) }}</div>
+                  <el-tag
+                    v-if="index === selectedIndex"
+                    class="candidate-selected"
+                    size="small"
+                    type="success"
+                    effect="plain"
+                    role="status"
+                  >已选中</el-tag>
+                </div>
                 <div class="candidate-subtitle">{{ toText(item.av_code) }}</div>
                 <div class="candidate-meta">
                   <span>站点：{{ toText(item.scrape_source) }}</span>
@@ -368,7 +381,7 @@ async function doSave() {
           </div>
         </SectionCard>
 
-        <SectionCard>
+        <SectionCard class="detail-panel">
           <template #title>候选详情</template>
           <template #description>检查海报、番号与原始 metadata 再决定是否写入视频。</template>
           <EmptyState
@@ -402,7 +415,7 @@ async function doSave() {
           </div>
         </SectionCard>
 
-        <SectionCard>
+        <SectionCard class="save-panel">
           <template #title>覆盖保存</template>
           <template #description>把确认后的 metadata 写入当前视频。</template>
           <el-form label-width="90px">
@@ -424,20 +437,46 @@ async function doSave() {
 </template>
 
 <style scoped>
-.page-shell--medium {
+.av-manual-scrape-page {
   display: grid;
   gap: var(--space-5);
 }
 
+.av-filter-toolbar :deep(.admin-toolbar__filters) {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
 .av-filter-form {
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-2);
+  width: 100%;
+}
+
+.av-filter-form :deep(.el-form-item) {
+  min-width: 0;
+  margin: 0;
+}
+
+.av-filter-form :deep(.el-form-item__content) {
+  min-width: 0;
+}
+
+.av-filter-form :deep(.el-input),
+.av-filter-form :deep(.el-select) {
+  width: 100%;
 }
 
 .result-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-4);
+  align-items: start;
+}
+
+.candidate-panel {
+  grid-row: span 2;
 }
 
 .source-summary {
@@ -468,11 +507,33 @@ async function doSave() {
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.candidate-item:hover,
-.candidate-item.active {
+.candidate-item:hover {
   transform: translateY(-1px);
   border-color: var(--primary);
   box-shadow: var(--shadow-xs);
+}
+
+.candidate-item.active {
+  transform: translateY(-1px);
+  border-color: var(--primary);
+  box-shadow: inset 3px 0 0 var(--primary), var(--shadow-xs);
+}
+
+.candidate-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.candidate-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.candidate-selected {
+  flex: 0 0 auto;
+  font-weight: 600;
 }
 
 .candidate-title {
@@ -547,16 +608,36 @@ async function doSave() {
   margin: 0;
   padding: 16px;
   background: var(--bg-inverse);
-  color: var(--text-on-inverse, #e2e8f0);
+  color: var(--text-on-inverse);
   border-radius: var(--radius-md);
   font-size: 12px;
   line-height: 1.6;
   overflow: auto;
 }
 
+@media (max-width: 1024px) {
+  .av-filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
+  .result-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .candidate-panel {
+    grid-row: auto;
+  }
+
   .detail-head {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .av-filter-form {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

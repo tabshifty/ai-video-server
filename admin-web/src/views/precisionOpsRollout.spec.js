@@ -1,12 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import ActorManage from './ActorManage.vue'
+import AVManualScrape from './AVManualScrape.vue'
 import CollectionManage from './CollectionManage.vue'
 import Dashboard from './Dashboard.vue'
 import ImageCollectionManage from './ImageCollectionManage.vue'
 import ImageManage from './ImageManage.vue'
 import IPTVManage from './IPTVManage.vue'
 import PendingDeleteShorts from './PendingDeleteShorts.vue'
+import ScrapePreview from './ScrapePreview.vue'
 import TaskMonitor from './TaskMonitor.vue'
 import TvAppManage from './TvAppManage.vue'
 import UserManage from './UserManage.vue'
@@ -27,7 +29,9 @@ const migratedViews = [
   { file: 'UserManage.vue', component: 'UserManage', density: 'compact', compiled: UserManage },
   { file: 'IPTVManage.vue', component: 'IPTVManage', density: 'compact', compiled: IPTVManage },
   { file: 'TvAppManage.vue', component: 'TvAppManage', density: 'compact', compiled: TvAppManage },
-  { file: 'VideoUpload.vue', component: 'VideoUpload', density: 'form', compiled: VideoUpload }
+  { file: 'VideoUpload.vue', component: 'VideoUpload', density: 'form', compiled: VideoUpload },
+  { file: 'ScrapePreview.vue', component: 'ScrapePreview', density: 'form', compiled: ScrapePreview },
+  { file: 'AVManualScrape.vue', component: 'AVManualScrape', density: 'form', compiled: AVManualScrape }
 ]
 const phaseTwoFiles = [
   'PendingDeleteShorts.vue',
@@ -39,8 +43,6 @@ const phaseTwoFiles = [
   'TvAppManage.vue'
 ]
 const pendingShellViews = [
-  'AVManualScrape.vue',
-  'ScrapePreview.vue',
   'SystemSettings.vue',
   'Toolbox.vue',
   'TvSeriesManage.vue'
@@ -109,6 +111,20 @@ function toolbarBlock(template) {
   return match?.[0] || ''
 }
 
+function headerActionsBlock(template) {
+  const match = template.match(/<template #header-actions>[\s\S]*?<\/template>/)
+
+  expect(match).not.toBeNull()
+  return match?.[0] || ''
+}
+
+function candidateOpeningTag(template) {
+  const match = template.match(/<div\s+v-for="\(item, index\) in candidates"[\s\S]*?class="candidate-item"[\s\S]*?>/)
+
+  expect(match).not.toBeNull()
+  return match?.[0] || ''
+}
+
 function exactRoutePattern(component, withCompatibilityMeta) {
   const meta = withCompatibilityMeta
     ? ',\\s*meta:\\s*\\{\\s*hideShellPageHeader:\\s*true\\s*\\}'
@@ -120,11 +136,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('固定 12 个已迁移页面与 5 个兼容页面，且集合互不重叠', () => {
+  it('固定 14 个已迁移页面与 3 个兼容页面，且集合互不重叠', () => {
     const migratedFiles = migratedViews.map(({ file }) => file)
 
-    expect(migratedViews).toHaveLength(12)
-    expect(pendingShellViews).toHaveLength(5)
+    expect(migratedViews).toHaveLength(14)
+    expect(pendingShellViews).toHaveLength(3)
     expect(new Set(migratedFiles).size).toBe(migratedFiles.length)
     expect(new Set(pendingShellViews).size).toBe(pendingShellViews.length)
     expect(migratedFiles.filter((file) => pendingShellViews.includes(file))).toEqual([])
@@ -143,7 +159,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     })
   })
 
-  it('5 个待迁移 shell 页面保持 PageHeader 与精确兼容 meta', () => {
+  it('3 个待迁移 shell 页面保持 PageHeader 与精确兼容 meta', () => {
     pendingShellViews.forEach((file) => {
       const component = file.replace('.vue', '')
       const template = extractTemplate(readView(file))
@@ -152,6 +168,73 @@ describe('Precision Ops 第一阶段 rollout', () => {
       expect(template, file).toContain('<PageHeader')
       expect(line, component).toMatch(exactRoutePattern(component, true))
     })
+  })
+
+  it('两页刮削工作台把唯一查询动作合并到壳层页头', () => {
+    for (const file of ['ScrapePreview.vue', 'AVManualScrape.vue']) {
+      const template = extractTemplate(readView(file))
+      const headerActions = headerActionsBlock(template)
+      const toolbar = toolbarBlock(template)
+
+      expect.soft(template, file).toContain('data-density="form"')
+      expect.soft(template, file).not.toContain('<PageHeader')
+      expect(headerActions, file).toContain('type="primary"')
+      expect(headerActions, file).toContain(':icon="Search"')
+      expect(headerActions, file).toContain(':loading="previewLoading"')
+      expect(headerActions, file).toContain('@click="doPreview">查询预览</el-button>')
+      expect(template.match(/@click="doPreview">查询预览<\/el-button>/g), file).toHaveLength(1)
+      expect(toolbar, file).not.toContain('查询预览')
+    }
+  })
+
+  it('通用刮削保留完整筛选字段并按 5/2/1 栅格响应', () => {
+    const source = readView('ScrapePreview.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+
+    for (const model of ['video_id', 'title', 'year', 'type', 'season_number', 'episode_number']) {
+      expect(template).toContain(`v-model="form.${model}"`)
+    }
+    expect(style).toMatch(/\.scrape-filter-form\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\);/s)
+    expect(style).toMatch(/@media \(max-width: 1024px\)[\s\S]*?\.scrape-filter-form\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/)
+    expect(style).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.scrape-filter-form\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
+    expect(style).not.toContain('var(--text-on-inverse,')
+  })
+
+  it('两页候选继续使用原选择 handler 并支持键盘操作', () => {
+    const cases = [
+      ['ScrapePreview.vue', 'choose(item, index)'],
+      ['AVManualScrape.vue', 'chooseCandidate(item, index)']
+    ]
+
+    cases.forEach(([file, handler]) => {
+      const tag = candidateOpeningTag(extractTemplate(readView(file)))
+
+      expect(tag, file).toContain('role="button"')
+      expect(tag, file).toContain('tabindex="0"')
+      expect(tag, file).toContain(':aria-pressed="index === selectedIndex"')
+      expect(tag, file).toContain(`@click="${handler}"`)
+      expect(tag, file).toContain(`@keydown.enter.prevent="${handler}"`)
+      expect(tag, file).toContain(`@keydown.space.prevent="${handler}"`)
+    })
+  })
+
+  it('AV 刮削保留站点工作流、双栏结果和非纯色候选选中态', () => {
+    const source = readView('AVManualScrape.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+
+    for (const model of ['video_id', 'title', 'site_category', 'site_source', 'bypass_cache']) {
+      expect(template).toContain(`v-model="form.${model}"`)
+    }
+    expect(template).toContain('<template #title>AV 刮削配置</template>')
+    expect(template).toContain('v-model="configForm.enabled_sites"')
+    expect(template).toMatch(/<el-tag\s+v-if="index === selectedIndex"[\s\S]*?class="candidate-selected"[\s\S]*?role="status"[\s\S]*?>已选中<\/el-tag>/)
+    expect(style).toMatch(/\.result-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\);/s)
+    expect(style).toMatch(/\.candidate-item\.active\s*\{[^}]*border(?:-color)?:\s*var\(--primary\);/s)
+    expect(style).toMatch(/\.candidate-selected\s*\{[^}]*font-weight:\s*600;/s)
+    expect(style).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.result-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
+    expect(style).not.toContain('var(--text-on-inverse,')
   })
 
   it('上传流程保持在单个中密度工作区并保留原有五段顺序', () => {

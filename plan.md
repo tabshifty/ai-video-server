@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 11:56 +0800
+- 进度：Task 16 完成提交前最终验证与自审，不推进 Task 17。两页真实 SFC、14 migrated / 3 pending、form density、页头唯一主查询、通用 5/2/1 筛选、AV 双栏/单栏与非纯色候选选中态契约完整；候选/配置/保存内容保持原上下文且没有新增嵌套卡片。详细 RED、实现、验证与敏感门禁证据已写入 git 忽略的 `.superpowers/sdd/task-16-report.md`，按分工不执行浏览器验收。
+- 影响文件：最终只纳入 `admin-web/src/views/ScrapePreview.vue`、`AVManualScrape.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`index.spec.js`、`CONTEXT.md`、`plan.md` 共 7 个 tracked 文件；不纳入忽略的报告，不修改 API、依赖、权限、其它路由/页面、共享主题、Android、后端或 Task 17。
+- 验证：Task 16 四文件定向 64/64；管理端完整 `npm test` 为 39 文件 431/431；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、7 文件白名单、U+FFFD/C0/DEL、API/依赖零差异、router 仅两条兼容 meta 差异及两页业务脚本仅删除 PageHeader import 门禁均通过。
+
+## 2026-07-17 11:52 +0800
+- 进度：Task 16 完成最小生产迁移并取得定向 GREEN。两页删除自有 PageHeader，把唯一“查询预览”移入 Layout 页头，业务容器接入 form density；通用筛选使用宽屏 5 列、1024px 以下 2 列、768px 以下 1 列，AV 筛选同档收敛且结果工作台 900px 以下由双栏回落单栏。AV 候选保留 `chooseCandidate` 并补 role/tabindex/aria、Enter/Space 和边框+“已选中”状态，两个 JSON 反色文本移除 fallback；两条路由只删除兼容 meta。
+- 影响文件：生产修改 `admin-web/src/views/ScrapePreview.vue`、`admin-web/src/views/AVManualScrape.vue`、`admin-web/src/router/index.js`，保留两份 RED spec 并追加 `CONTEXT.md`、`plan.md`；两页脚本除删除 PageHeader import 外无差异，未改 API、依赖、权限、其它路由/页面、共享主题、请求、payload 或业务函数。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/scrapePreview.helpers.spec.js src/views/avManualScrape.helpers.spec.js src/router/index.spec.js` 通过（4 文件，64/64）；待管理端完整测试、生产构建与最终静态/敏感差异门禁。
+
+## 2026-07-17 11:50 +0800
+- 进度：Task 16 两份迁移契约取得严格 RED。rollout 使用真实 `ScrapePreview`、`AVManualScrape` SFC import，将权威清单更新为 14 migrated / 3 pending，并新增 form density、无 PageHeader、页头唯一查询/工具条去重、通用筛选 5/2/1 栅格、原候选 handler 键盘操作、AV 双栏断点与边框+文字状态选中态契约；router 以整行相等锁定两条目标。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.spec.js` 与 `plan.md`；尚未修改两页生产 SFC、生产路由、`CONTEXT.md`、API、依赖、权限、请求、payload 或业务数据流。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/scrapePreview.helpers.spec.js src/views/avManualScrape.helpers.spec.js` 按预期退出 1（3 文件，6 failed / 47 passed），失败精确命中两页 density/页头、通用 5/2/1 栅格、AV 候选键盘与非纯色选中态；`npm test -- src/router/index.spec.js` 按预期退出 1（1 failed / 10 passed），唯一失败为 `/scrape` 仍带 `hideShellPageHeader`，无语法或环境错误。
+
+## 2026-07-17 11:45 +0800
+- 进度：开始 Precision Ops Task 16“ScrapePreview 与 AVManualScrape 刮削工作台”，只迁移 `/scrape`、`/av-scrape` 的 form 中密度壳层、页头主查询动作、响应式筛选/结果布局与候选可访问选中态，不推进 Task 17。严格保留 route query、预览/保存请求、payload、候选 handler、站点配置、缓存绕过、图片与元数据表单及错误上下文；先以真实 SFC 和精确路由契约取得 RED，再做最小模板/CSS/路由迁移。
+- 影响文件：计划只修改 `admin-web/src/views/ScrapePreview.vue`、`admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；完整证据写入 git 忽略的 `.superpowers/sdd/task-16-report.md`。不修改 API、依赖、权限、其它路由/页面、共享主题、Android 或后端。
+- 验证：待执行 Task 16 三个视图测试与 router 测试的严格 RED→GREEN、管理端完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、7 文件白名单及 API/依赖/其它路由/两页业务脚本敏感差异门禁；按分工不执行浏览器验收。
+
 ## 2026-07-17 11:41 +0800
 - 进度：Task 15 最终独立复审通过，判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。首轮唯一 Important 已由 `be29742` 闭合：AV 地区 radio inner 在桌面命中 36px `form` 高度、窄屏继续命中 44px 触控高度；1440/768/375px 条件状态实测分别为 36/44/44px，三档 document overflow 为 0、键盘焦点可见且零写请求。固定基线既有的 1 条 `ElInput.rows` 类型 warning 与 3 条 AV radio `label` API 弃用 warning 均未被本任务改动，复审独立判定为非 finding。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-15-report.md`、浏览器脚本/矩阵与三张截图；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 16。
