@@ -754,6 +754,7 @@ describe('Precision Ops 独立工具工作区', () => {
     const style = extractStyle(source)
     const listIndex = template.indexOf('<SectionCard class="task-list-card" data-density="compact">')
     const detailIndex = template.indexOf('<SectionCard v-if="selectedTask">')
+    const taskWorkspaceRule = style.match(/\.task-workspace\s*\{[^}]*\}/s)?.[0] || ''
 
     expect.soft(rootMain).toContain('class="tool-workspace"')
     expect.soft(rootMain).toContain('data-density="form"')
@@ -764,8 +765,9 @@ describe('Precision Ops 独立工具工作区', () => {
     expect(listIndex).toBeGreaterThanOrEqual(0)
     expect(detailIndex).toBeGreaterThan(listIndex)
     expect(template.match(/<SectionCard\b/g)).toHaveLength(3)
-    expect(style).toMatch(/\.task-workspace\s*\{[^}]*display:\s*grid;[^}]*gap:\s*var\(--space-4\);/s)
-    expect(style).not.toMatch(/\.task-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*24rem\)/s)
+    expect(taskWorkspaceRule).toContain('display: grid;')
+    expect(taskWorkspaceRule).toContain('grid-template-columns: minmax(0, 1fr);')
+    expect(taskWorkspaceRule).toContain('gap: var(--space-4);')
   })
 
   it('独立工具无可见标签的主要输入提供中文可访问名称', () => {

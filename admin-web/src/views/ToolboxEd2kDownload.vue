@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, Delete, Download, Plus, RefreshRight } from '@element-plus/icons-vue'
+import { Back, Check, Delete, Download, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EmptyState from '../components/base/EmptyState.vue'
 import PageHeader from '../components/base/PageHeader.vue'
@@ -620,8 +620,12 @@ function buildDeleteTaskActionCopy(task) {
                 v-for="option in statusOptions"
                 :key="option.value"
                 :type="currentFilter === option.value ? 'primary' : ''"
+                :aria-pressed="currentFilter === option.value"
                 @click="setFilter(option.value)"
               >
+                <el-icon v-if="currentFilter === option.value" aria-hidden="true">
+                  <Check />
+                </el-icon>
                 {{ option.label }}
               </el-button>
             </div>
@@ -892,6 +896,7 @@ function buildDeleteTaskActionCopy(task) {
 
 .task-workspace {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }

@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 14:59 +0800
+- 进度：Task 19 首轮 reviewer 的 3 项 finding 已完成最终验证与自审。自审进一步发现圆角 helper 初版只取每条声明的第一个值，以 `8px 9.25px / 4px` 合成样式取得 1 failed / 8 passed 的独立 RED，改为逐声明枚举全部 px 值后 9/9 GREEN；筛选当前态、单列全宽与圆角门禁均无剩余阻塞问题。
+- 影响文件：最终精确纳入 `admin-web/src/views/ToolboxEd2kDownload.vue`、`ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件；git 忽略报告不纳入，不修改 API、payload、handler、router、依赖、其它页面或 Task 20。
+- 验证：最终 Task 19 定向 70/70、管理端完整 `npm test` 39 文件 461/461、`npm run build` 转换 2373 modules 成功且仅既有 chunk-size warning；`git diff --check`、5 文件白名单、U+FFFD/C0/DEL、全部直接 px 圆角、语义样式、API/依赖/router 零差异及去除 `Check`/`StatusIndicator` 后脚本归一化门禁均通过。
+
+## 2026-07-17 14:54 +0800
+- 进度：Task 19 首轮 review fix 取得定向 GREEN。状态筛选继续使用原 `type` 与 `setFilter(option.value)`，新增与 `currentFilter` 同步的 `aria-pressed` 和仅当前项显示的 Element Plus `Check`；任务工作区显式使用单列 `minmax(0, 1fr)`。未新增状态或辅助业务逻辑。
+- 影响文件：已修改目标 SFC、两份目标 spec、`CONTEXT.md`、`plan.md` 和 git 忽略报告；未修改 API、payload、handler、router、依赖或其它页面。
+- 验证：Task 19 定向测试通过（2 文件，70/70）；去除允许的 `Check` 与 `StatusIndicator` 后 `<script setup>` 相对固定 Base 逐字一致，API、依赖、router 零差异。待完整 `npm test`、`npm run build` 与最终静态/编码门禁。
+
+## 2026-07-17 14:52 +0800
+- 进度：Task 19 首轮 review fix 的真实 SFC 契约取得严格 RED。限定 `.status-filters` 后提取原 `el-button`，同时暴露缺少 `Check` import、`aria-pressed`、条件图标与唯一图标；两份全宽契约都精确暴露缺少 `grid-template-columns: minmax(0, 1fr)`。直接 px 圆角解析器用 8/9/8.5px 合成值证明可识别 9px 和小数，当前生产样式本身无超限值。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js`、`plan.md` 和 git 忽略报告；生产 SFC、`CONTEXT.md`、API、payload、handler、router、依赖均未修改。
+- 验证：`cd admin-web && npm test -- src/views/ToolboxEd2kDownload.spec.js src/views/precisionOpsRollout.spec.js` 按预期退出 1（2 文件，70 tests，3 failed / 67 passed）；失败均为目标生产契约缺失，无测试语法、环境或既有业务断言错误。
+
+## 2026-07-17 14:50 +0800
+- 进度：开始修复 Task 19 首轮 reviewer 的 3 项 finding：下载状态筛选补 `aria-pressed` 与仅当前项显示的 `Check` 非颜色标记；任务工作区正向锁定单列轨道；圆角门禁改为解析所有直接 px 数值并覆盖 9px/小数。保留原 `setFilter`、筛选业务、全宽顺序与全部下载数据流。
+- 影响文件：修复仍精确限制为 `admin-web/src/views/ToolboxEd2kDownload.vue`、`ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件，并追加 git 忽略的 `.superpowers/sdd/task-19-report.md`；不修改 API、payload、handler、router、依赖、其它页面或 Task 20。
+- 验证：先只修改两份真实 SFC 测试并运行 Task 19 定向命令取得严格 RED；最小生产实现后依次运行定向测试、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、5 文件白名单、业务/API/依赖/router 零差异及脚本相对固定 Base `ccb722ab4c32e4ff3e5b1f9ee91523fc80215e3a` 归一化门禁。
+
 ## 2026-07-17 14:29 +0800
 - 进度：Task 19 完成提交前最终验证与自审。自审发现 52px 任务行的两行文本在原纵向 padding 下少 2px，补测试取得 1 failed / 7 passed 的准确 RED，再以 `space-1` 纵向 padding 和统一 small line-height 闭合 GREEN；其余根/密度、全宽顺序、状态指示、无嵌套、Dialog、窄屏、业务命令与长期契约均无阻塞问题。
 - 影响文件：最终只纳入 `admin-web/src/views/ToolboxEd2kDownload.vue`、`ToolboxEd2kDownload.spec.js`、`precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 5 个 tracked 文件；git 忽略报告不纳入，不修改 API、依赖、router、其它页面、Android 或后端，不推进 Task 20。

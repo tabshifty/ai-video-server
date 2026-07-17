@@ -21,6 +21,12 @@ function extractStyle(sfcSource) {
   return match?.[1] || ''
 }
 
+function directPixelRadiusValues(style) {
+  return [...style.matchAll(/(?:^|[;{])\s*border-radius\s*:\s*([^;}]+)/gim)]
+    .flatMap((declaration) => [...declaration[1].matchAll(/([+-]?(?:\d+(?:\.\d+)?|\.\d+))px\b/gi)])
+    .map((match) => Number(match[1]))
+}
+
 function elementBlock(content, tagName, openingPattern) {
   const opening = content.match(openingPattern)
 
@@ -148,6 +154,21 @@ describe('ToolboxEd2kDownload', () => {
     expect(resultCard).toContain(':tone="getEd2kCreateResultMeta(item.status).tone"')
   })
 
+  it('exposes the active status filter with pressed state and a non-color check marker', () => {
+    const template = extractTemplate(source)
+    const taskWorkspace = elementBlock(template, 'section', /<section class="task-workspace">/)
+    const listCard = elementBlock(taskWorkspace, 'SectionCard', /<SectionCard class="task-list-card"[^>]*>/)
+    const statusFilters = elementBlock(listCard, 'div', /<div class="status-filters">/)
+    const filterButton = elementBlock(statusFilters, 'el-button', /<el-button\s+v-for="option in statusOptions"[\s\S]*?>/)
+
+    expect.soft(source).toContain("import { Back, Check, Delete, Download, Plus, RefreshRight } from '@element-plus/icons-vue'")
+    expect.soft(filterButton).toContain(":type=\"currentFilter === option.value ? 'primary' : ''\"")
+    expect.soft(filterButton).toContain(':aria-pressed="currentFilter === option.value"')
+    expect.soft(filterButton).toContain('@click="setFilter(option.value)"')
+    expect.soft(filterButton).toContain('<el-icon v-if="currentFilter === option.value" aria-hidden="true">')
+    expect.soft(filterButton.match(/<Check\s*\/>/g) || []).toHaveLength(1)
+  })
+
   it('keeps native task selection accurate, keyboard-visible, and fixed to compact media rows', () => {
     const template = extractTemplate(source)
     const style = extractStyle(source)
@@ -179,13 +200,15 @@ describe('ToolboxEd2kDownload', () => {
     const taskWorkspace = elementBlock(template, 'section', /<section class="task-workspace">/)
     const listCard = elementBlock(taskWorkspace, 'SectionCard', /<SectionCard class="task-list-card"[^>]*>/)
     const detailCard = elementBlock(taskWorkspace, 'SectionCard', /<SectionCard v-if="selectedTask"[^>]*>/)
+    const taskWorkspaceRule = style.match(/\.task-workspace\s*\{[^}]*\}/s)?.[0] || ''
 
     expect(listCard).toMatch(/^<SectionCard class="task-list-card" data-density="compact">/)
     expect(taskWorkspace.indexOf(listCard)).toBeLessThan(taskWorkspace.indexOf(detailCard))
     expect(taskWorkspace.match(/<SectionCard\b/g)).toHaveLength(2)
     expect(detailCard.match(/<SectionCard\b/g)).toHaveLength(1)
-    expect(style).toMatch(/\.task-workspace\s*\{[^}]*display:\s*grid;[^}]*gap:\s*var\(--space-4\);/s)
-    expect(style).not.toMatch(/\.task-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*24rem\)/s)
+    expect(taskWorkspaceRule).toContain('display: grid;')
+    expect(taskWorkspaceRule).toContain('grid-template-columns: minmax(0, 1fr);')
+    expect(taskWorkspaceRule).toContain('gap: var(--space-4);')
     expect(style).toMatch(/\.task-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto;/s)
     for (const [id, title] of [
       ['expected-file-title', '预期文件信息'],
@@ -231,7 +254,8 @@ describe('ToolboxEd2kDownload', () => {
     expect(style).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     expect(style).not.toMatch(/rgba?\(\s*\d/)
     expect(style).not.toMatch(/(?:linear|radial)-gradient\(/)
-    expect(style).not.toMatch(/border-radius:\s*(?:1[0-9]|[2-9][0-9])px/)
+    expect(directPixelRadiusValues('.ok { border-radius: 8px; } .nine { border-radius: 9px; } .multi { border-radius: 8px 9.25px / 4px; } .decimal { border-radius: .5px; }')).toEqual([8, 9, 8, 9.25, 4, 0.5])
+    expect(directPixelRadiusValues(style).filter((value) => value > 8)).toEqual([])
     expect(style).not.toContain('box-shadow:')
   })
 })
