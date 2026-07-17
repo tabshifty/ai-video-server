@@ -35,7 +35,7 @@ const routes = [
   { path: '/tv-series', component: TvSeriesManage, meta: { hideShellPageHeader: true } },
   { path: '/tv-app', component: TvAppManage },
   { path: '/iptv', component: IPTVManage },
-  { path: '/upload', component: VideoUpload, meta: { hideShellPageHeader: true } },
+  { path: '/upload', component: VideoUpload },
   { path: '/scrape', component: ScrapePreview, meta: { hideShellPageHeader: true } },
   { path: '/av-scrape', component: AVManualScrape, meta: { hideShellPageHeader: true } },
   { path: '/actors', component: ActorManage },

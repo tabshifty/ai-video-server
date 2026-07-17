@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 11:07 +0800
+- 进度：Task 15 独立收尾复审完成并取得最终 GREEN，无需追加生产修正。逐项确认 `/upload` 使用 Layout 壳层标题与 `form` 中密度作用域，五个 SectionCard 保持原顺序、16px 内边距和 14px 标题；页面只有一个“开始上传”入口，结果宽表、长文本 tooltip、44px 上传目标/按钮及 768px 以下单列表单契约完整。按本轮明确边界未执行浏览器验收，不推进 Task 16。
+- 影响文件：最终精确提交 `admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个 tracked 文件；详细报告写入 git 忽略的 `.superpowers/sdd/task-15-report.md`。API、payload、依赖、其它路由、Android 与后端均无差异。
+- 验证：前序严格 RED 为 3 文件 3 failed / 44 passed，失败精确命中 form density/PageHeader/44px/移动单列与 `/upload` 兼容 meta；本轮新鲜定向 GREEN 为 3 文件 47/47，管理端完整 `npm test` 为 39 文件 424/424，`npm run build` 成功转换 2373 modules（仅既有 chunk-size warning）。`git diff --check`、6 文件白名单、U+FFFD/C0/DEL、API/依赖零差异、其它路由零差异及 VideoUpload 业务脚本归一化零差异门禁均通过。
+
+## 2026-07-17 10:58 +0800
+- 进度：Task 15 完成最小生产迁移并取得定向 GREEN。上传页删除自有 PageHeader，接入 form density 与指定 context note；五个 SectionCard、唯一“开始上传”、结果 `.table-wrap` 和 overflow tooltip 原样保留，只补上传目标/操作按钮 44px、上传区宽度收敛及 768px 以下标签/控件单列。`/upload` 仅移除 `hideShellPageHeader`，`CONTEXT.md` 追加长期工作区边界。
+- 影响文件：生产修改 `admin-web/src/views/VideoUpload.vue`、`admin-web/src/router/index.js`、`CONTEXT.md`；保留 RED 阶段两份 spec 与 `plan.md`。未改 API、payload、依赖、其它路由或业务流程。
+- 验证：Task 15 三文件定向 47/47 通过；固定 base `965fdcb` 的 VideoUpload `<script setup>` 去除 PageHeader import 后与当前脚本 `diff -u` 退出 0，生产路由 diff 仅 `/upload` 一行删除兼容 meta。待完整 `npm test`、构建、静态/敏感差异门禁与 375/768/1440 CDP 安全复测。
+
+## 2026-07-17 10:57 +0800
+- 进度：Task 15 上传页契约取得严格 RED。rollout 使用真实 `VideoUpload` SFC import 与对象数组条目，权威清单更新为 12 migrated / 5 pending，并精确从 pending 移除上传页；新增契约锁定 form density、指定 context note、无自有 PageHeader、五段顺序、唯一提交入口、结果表 overflow tooltip、44px 目标与 768px 单列表单，router 契约锁定 `/upload` 精确行。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.spec.js` 与 `plan.md`；尚未修改 `VideoUpload.vue`、生产路由、API、payload、依赖或其它业务代码。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/videoUpload.remote.spec.js src/router/index.spec.js` 按预期退出 1（3 文件，3 failed / 44 passed）。失败精确命中上传页缺少 form density/context note、仍含 PageHeader、缺少 44px/移动单列样式及 `/upload` 仍带兼容 meta；12/5 清单、真实 SFC 编译和远程建议加载 4/4 均通过，无语法或环境错误。
+
+## 2026-07-17 10:54 +0800
+- 进度：开始 Precision Ops Task 15“VideoUpload 中密度上传流程”，只迁移 `/upload` 的页面工作区与兼容路由，不推进 Task 16。严格保留文件选择/去重、类型切换、远程关联数据、分片/秒传/取消、进度、结果及 payload 业务流程；先扩 rollout/router 契约取得 PageHeader、form density、路由 meta 与阶段数量的精确 RED，再做最小模板/CSS/路由迁移。
+- 影响文件：计划修改 `admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`admin-web/src/router/index.spec.js`、`CONTEXT.md`、`plan.md`；详细证据仅回填 git 忽略的 `.superpowers/sdd/task-15-report.md`。不修改 API、payload、依赖、其它路由、Android、后端或 Task 16。
+- 验证：待执行 Task 15 三文件定向 RED→GREEN、管理端完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、预期文件白名单、API/依赖/其它路由/VideoUpload 业务脚本敏感差异，以及已登录 CDP 临时标签的 375/768/1440 安全只读复测（不选择/上传文件，不触发保存/写请求）。
+
 ## 2026-07-17 10:50 +0800
 - 进度：Precision Ops Task 14 最终独立复审通过。第一轮复审发现四视口交互证据缺口与 User/TvApp 极端长行假阳性 2 个 Important，已由 `bd1852d` 以 required 强门禁、四档安全交互全量执行、具名 N/A/直接提交 concern 分类及局部文本收敛闭合；第二轮基于完整两提交差异包和更新矩阵判定 Spec compliant、Approved，0 Critical / 0 Important / 0 Minor。直接提交动作因禁止业务数据变更而明确记为非 required `NOT_RUN_DIRECT_MUTATION`，外部扩展错误与仅有 code 的 `PerformanceIssue` 在认证详情禁读边界下作为非阻塞环境 concern 保留。
 - 影响文件：本轮只追加 `plan.md` 最终复审记录，并更新 git 忽略的 `.superpowers/sdd/progress.md`、`task-14-report.md`；不修改生产代码、测试、API、路由、依赖、Android、后端或 Task 15。

@@ -3,7 +3,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
-import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import UploadProgress from '../components/UploadProgress.vue'
 import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
@@ -490,8 +489,8 @@ onMounted(() => {
 
 <template>
   <Layout>
-    <div class="page-shell upload-page">
-      <PageHeader title="上传中心" />
+    <div class="page-shell upload-page" data-density="form">
+      <p class="page-context-note">选择文件与媒体类型，补充关联信息后开始上传。</p>
 
       <SectionCard>
         <template #title>文件与基础信息</template>
@@ -677,7 +676,25 @@ onMounted(() => {
   padding-bottom: var(--space-1);
 }
 
+.page-context-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.upload-drop {
+  width: 100%;
+  min-width: 0;
+}
+
+.upload-drop :deep(.el-upload) {
+  width: 100%;
+}
+
 .upload-drop :deep(.el-upload-dragger) {
+  width: 100%;
+  min-height: 44px;
   border-radius: var(--radius-lg);
   background: var(--bg-surface-muted);
 }
@@ -696,6 +713,10 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.upload-actions :deep(.el-button) {
+  min-height: 44px;
 }
 
 .batch-progress {
@@ -718,6 +739,21 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .upload-page :deep(.el-form-item) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .upload-page :deep(.el-form-item__label) {
+    width: auto !important;
+    justify-content: flex-start;
+  }
+
+  .upload-page :deep(.el-form-item__content) {
+    min-width: 0;
+    margin-left: 0 !important;
+  }
+
   .upload-tip {
     flex-direction: column;
     align-items: flex-start;

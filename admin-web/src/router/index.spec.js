@@ -47,6 +47,14 @@ describe('resolveRouterHistoryBase', () => {
     expect(videoRoute).not.toContain('hideShellPageHeader')
   })
 
+  it('视频上传页使用壳层标题且只移除对应兼容 meta', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const uploadRoute = source.split('\n').find((line) => line.includes("path: '/upload'")) || ''
+
+    expect(uploadRoute.trim()).toBe("{ path: '/upload', component: VideoUpload },")
+    expect(uploadRoute).not.toContain('hideShellPageHeader')
+  })
+
   it('图片资产页使用壳层标题且保持原有路由目标', () => {
     const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
     const imageRoute = source.split('\n').find((line) => line.includes("path: '/images'"))

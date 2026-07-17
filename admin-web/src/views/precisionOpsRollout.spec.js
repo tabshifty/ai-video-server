@@ -11,6 +11,7 @@ import TaskMonitor from './TaskMonitor.vue'
 import TvAppManage from './TvAppManage.vue'
 import UserManage from './UserManage.vue'
 import VideoList from './VideoList.vue'
+import VideoUpload from './VideoUpload.vue'
 
 const readView = (file) => readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
 const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf8')
@@ -25,7 +26,8 @@ const migratedViews = [
   { file: 'CollectionManage.vue', component: 'CollectionManage', density: 'compact', compiled: CollectionManage },
   { file: 'UserManage.vue', component: 'UserManage', density: 'compact', compiled: UserManage },
   { file: 'IPTVManage.vue', component: 'IPTVManage', density: 'compact', compiled: IPTVManage },
-  { file: 'TvAppManage.vue', component: 'TvAppManage', density: 'compact', compiled: TvAppManage }
+  { file: 'TvAppManage.vue', component: 'TvAppManage', density: 'compact', compiled: TvAppManage },
+  { file: 'VideoUpload.vue', component: 'VideoUpload', density: 'form', compiled: VideoUpload }
 ]
 const phaseTwoFiles = [
   'PendingDeleteShorts.vue',
@@ -41,8 +43,7 @@ const pendingShellViews = [
   'ScrapePreview.vue',
   'SystemSettings.vue',
   'Toolbox.vue',
-  'TvSeriesManage.vue',
-  'VideoUpload.vue'
+  'TvSeriesManage.vue'
 ]
 
 const crudViews = [
@@ -119,11 +120,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('固定 11 个已迁移页面与 6 个兼容页面，且集合互不重叠', () => {
+  it('固定 12 个已迁移页面与 5 个兼容页面，且集合互不重叠', () => {
     const migratedFiles = migratedViews.map(({ file }) => file)
 
-    expect(migratedViews).toHaveLength(11)
-    expect(pendingShellViews).toHaveLength(6)
+    expect(migratedViews).toHaveLength(12)
+    expect(pendingShellViews).toHaveLength(5)
     expect(new Set(migratedFiles).size).toBe(migratedFiles.length)
     expect(new Set(pendingShellViews).size).toBe(pendingShellViews.length)
     expect(migratedFiles.filter((file) => pendingShellViews.includes(file))).toEqual([])
@@ -142,7 +143,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     })
   })
 
-  it('6 个待迁移 shell 页面保持 PageHeader 与精确兼容 meta', () => {
+  it('5 个待迁移 shell 页面保持 PageHeader 与精确兼容 meta', () => {
     pendingShellViews.forEach((file) => {
       const component = file.replace('.vue', '')
       const template = extractTemplate(readView(file))
@@ -151,6 +152,30 @@ describe('Precision Ops 第一阶段 rollout', () => {
       expect(template, file).toContain('<PageHeader')
       expect(line, component).toMatch(exactRoutePattern(component, true))
     })
+  })
+
+  it('上传流程保持在单个中密度工作区并保留原有五段顺序', () => {
+    const source = readView('VideoUpload.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const stages = ['文件与基础信息', '关联信息', '上传控制', '进度区', '结果区']
+    const stageIndexes = stages.map((stage) => template.indexOf(`<template #title>${stage}</template>`))
+
+    expect.soft(template).toContain('data-density="form"')
+    expect.soft(template).toContain('<p class="page-context-note">选择文件与媒体类型，补充关联信息后开始上传。</p>')
+    expect.soft(template).not.toContain('<PageHeader')
+    expect(template).toContain('uploadFileList')
+    expect(template).toContain('uploadResults')
+    expect(stageIndexes.every((index) => index >= 0)).toBe(true)
+    expect(stageIndexes).toEqual([...stageIndexes].sort((left, right) => left - right))
+    expect(template.match(/@click="submit"/g)).toHaveLength(1)
+    expect(template).toContain('class="table-wrap upload-result"')
+    expect(template).toMatch(/prop="name"[^>]*show-overflow-tooltip/)
+    expect(template).toMatch(/prop="message"[^>]*show-overflow-tooltip/)
+    expect(template).toMatch(/prop="videoId"[^>]*show-overflow-tooltip/)
+    expect(style).toMatch(/\.upload-actions :deep\(\.el-button\)\s*\{[^}]*min-height:\s*44px/s)
+    expect(style).toMatch(/\.upload-drop :deep\(\.el-upload-dragger\)\s*\{[^}]*min-height:\s*44px/s)
+    expect(style).toMatch(/@media \(max-width: 768px\)[\s\S]*\.upload-page :deep\(\.el-form-item\)\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/)
   })
 
   it('服务资源页使用指标条替代重复统计卡', () => {
