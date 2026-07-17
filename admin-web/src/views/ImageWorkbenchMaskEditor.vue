@@ -312,19 +312,19 @@ function saveMask() {
 </template>
 
 <style scoped>
-.mask-editor {
+:global(.mask-editor) {
   display: flex;
   max-height: 92vh;
   flex-direction: column;
   overflow: hidden;
 }
 
-.mask-editor :deep(.el-dialog__header),
-.mask-editor :deep(.el-dialog__footer) {
+:global(.mask-editor .el-dialog__header),
+:global(.mask-editor .el-dialog__footer) {
   flex: 0 0 auto;
 }
 
-.mask-editor :deep(.el-dialog__body) {
+:global(.mask-editor .el-dialog__body) {
   min-height: 0;
   flex: 1 1 auto;
   overflow: auto;

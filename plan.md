@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 19:30 +0800
+- 进度：Task 21 第二小波完成提交前最终验证与自审。Drawer 专属全局关闭目标契约和 Mask Teleport 全局视口约束均闭合；本波次两份业务脚本相对上一提交逐字一致，固定 Base 归一化后无业务差异，Drawer/Dialog opening props/events、Mask 五个 pointer 绑定、capture/release 与 emit 均保持。按分工不执行浏览器复验，由主代理在新提交上复测四视口。
+- 影响文件：本提交只纳入 `admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`plan.md` 共 5 个 tracked 文件，并更新 git 忽略报告；固定 Base 总差异仍精确为既定 8 文件，不修改 `SectionCard.vue`、共享组件 spec、`CONTEXT.md`、API、依赖、router 或其它文件。
+- 验证：定向 3 文件 97/97；管理端完整 `npm test` 39 文件 483/483；`npm run build` 转换 2373 modules 成功，仅既有 chunk-size warning。`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL（9/9 文件）、固定 Base 八文件白名单、API/依赖/router 零差异及业务脚本/handler/pointer/emit/Drawer/Dialog 归一化门禁通过。
+
+## 2026-07-17 19:24 +0800
+- 进度：Task 21 第二小波最小生产修复取得定向 GREEN。图库 Drawer 只增加 `image-workbench-library-drawer` class，并以真实全局后代规则固定关闭按钮桌面 36×36px、`<1024px` 44×44px；Mask Dialog 只把原 92vh flex、header/footer 固定和 body 滚动声明切换到 Teleport 可命中的全局根/后代选择器。
+- 影响文件：已修改两份目标生产 SFC、两份既有 spec、`plan.md` 与 git 忽略报告；`SectionCard.vue`、共享组件 spec、`CONTEXT.md`、API、依赖、router、stage/Canvas/pointer/radio/header/footer 行为均未修改。
+- 验证：同一三文件定向命令由准确 RED（4 failed / 93 passed）转为 GREEN（3 文件 97/97）；待完整 `npm test`、`npm run build` 与最终静态/编码/差异归一化门禁。
+
+## 2026-07-17 19:22 +0800
+- 进度：Task 21 第二小波两份既有真实 SFC 契约取得严格 RED，未增加 `it`。断言现精确要求 Drawer 专属 class、桌面/窄屏真实全局关闭按钮四维尺寸，以及 Mask Teleport 根/header/footer/body 的 `:global(...)` 路径，并反向禁止旧非全局根和 `.mask-editor :deep(.el-dialog__body)`。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`plan.md` 与 git 忽略报告；两份生产 SFC、共享组件/测试、`CONTEXT.md`、API、依赖、router 尚未修改。
+- 验证：3 文件定向命令按预期退出 1（97 tests，4 failed / 93 passed）；`precisionOpsComponents.spec.js` 17/17 通过，4 个失败只对应缺少目标全局选择器/class/尺寸，无测试语法、环境或既有业务契约失败。
+
+## 2026-07-17 19:20 +0800
+- 进度：开始 Task 21 第二小波浏览器根因修复。图库 Drawer 保留唯一共享 header、原 opening props/guards/events，只增加专属 class 与桌面 36px、`<1024px` 44px 关闭目标；Mask Dialog 保留 92vh flex/body 滚动声明，只把 Teleport 后失配的 scoped 根与 `:deep()` 后代路径改为真实 `:global(...)` 选择器，不改 stage、Canvas、pointer、radio、header/footer 行为。
+- 影响文件：本轮仍严格限制在固定 Base `7a952b7d7f0dd99311a57a703fef6dc27cc7594b` 的 8 文件白名单内；实际计划只修改 `admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js`、`plan.md`，并更新 git 忽略的 `.superpowers/sdd/task-21-report.md`；不修改 `SectionCard.vue`、共享组件测试、`CONTEXT.md`、API、依赖、router 或业务脚本。
+- 验证：先更新两份既有 `it`（不增加测试数）并运行 3 文件 97 项定向命令取得准确 RED；最小实现后运行同命令 GREEN，再执行完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、固定 Base 八文件白名单、API/依赖/router 零差异及 Toolbox/Mask 业务脚本、handler、pointer、emit、Drawer/Dialog props/events 归一化门禁。按分工不运行浏览器检查。
+
 ## 2026-07-17 19:07 +0800
 - 进度：Task 21 正式 review 与安全浏览器矩阵合并修复完成提交前验证。7 个目标 RED 已全部闭合，overlay 语义色赋值精确锚定且无颜色 fallback，compact 仅存在于结果区与 Teleport 图库区；共享折叠按钮、两个唯一关闭入口、radio 44px 和 Mask 视口内 footer/body 滚动契约均由真实 SFC 测试覆盖。按分工不运行浏览器，交由主代理复验四视口。
 - 影响文件：固定任务 Base `7a952b7d7f0dd99311a57a703fef6dc27cc7594b` 下最终精确纳入 `CONTEXT.md`、`plan.md`、`admin-web/src/components/base/SectionCard.vue`、`precisionOpsComponents.spec.js`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`ImageWorkbenchMaskEditor.vue`、`imageWorkbench.helpers.spec.js`、`precisionOpsRollout.spec.js` 共 8 个 tracked 文件，并更新 git 忽略报告；不修改其它文件。

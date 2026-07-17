@@ -752,7 +752,9 @@ describe('Precision Ops 独立工具工作区', () => {
     const template = extractTemplate(source)
     const style = extractStyle(source)
     const dialog = template.match(/<el-dialog\b[\s\S]*?>/)?.[0] || ''
-    const rootRule = style.match(/\.mask-editor\s*\{[^}]*\}/s)?.[0] || ''
+    const rootRule = style.match(/:global\(\.mask-editor\)\s*\{[^}]*\}/s)?.[0] || ''
+    const chromeRule = style.match(/:global\(\.mask-editor \.el-dialog__header\),\s*:global\(\.mask-editor \.el-dialog__footer\)\s*\{[^}]*\}/s)?.[0] || ''
+    const bodyRule = style.match(/:global\(\.mask-editor \.el-dialog__body\)\s*\{[^}]*\}/s)?.[0] || ''
 
     expect(source).toContain('data-density="form"')
     expect(source).toContain('mask-editor__toolbar')
@@ -767,7 +769,14 @@ describe('Precision Ops 独立工具工作区', () => {
     expect(rootRule).toContain('display: flex;')
     expect(rootRule).toContain('max-height: 92vh;')
     expect(rootRule).toContain('flex-direction: column;')
-    expect(style).toMatch(/\.mask-editor :deep\(\.el-dialog__body\)\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*auto;[^}]*overscroll-behavior:\s*contain;/s)
+    expect(chromeRule).toContain(':global(.mask-editor .el-dialog__header),')
+    expect(chromeRule).toContain(':global(.mask-editor .el-dialog__footer)')
+    expect(chromeRule).toContain('flex: 0 0 auto;')
+    expect(bodyRule).toContain('min-height: 0;')
+    expect(bodyRule).toContain('overflow: auto;')
+    expect(bodyRule).toContain('overscroll-behavior: contain;')
+    expect(style).not.toMatch(/(^|\n)\s*\.mask-editor\s*\{/)
+    expect(style).not.toContain('.mask-editor :deep(.el-dialog__body)')
     expect(source).not.toContain('<Layout')
     expect(source).not.toContain('<PageHeader')
   })
@@ -775,8 +784,13 @@ describe('Precision Ops 独立工具工作区', () => {
   it('图像工作台使用稳定媒体网格且保留独立页头', () => {
     const source = readView('ToolboxImageWorkbench.vue')
     const template = extractTemplate(source)
+    const style = extractStyle(source)
     const inputOpening = template.match(/<aside class="workbench-panel workbench-panel--input"[^>]*>/)?.[0] || ''
     const drawer = template.match(/<el-drawer\b[\s\S]*?<\/el-drawer>/)?.[0] || ''
+    const drawerOpening = drawer.match(/<el-drawer\b[\s\S]*?>/)?.[0] || ''
+    const closeSelector = ':global\\(\\.image-workbench-library-drawer \\.el-drawer__close-btn\\)'
+    const desktopCloseRule = style.match(new RegExp(`${closeSelector}\\s*\\{([^}]*)\\}`))?.[1] || ''
+    const mobileCloseRule = style.match(new RegExp(`@media \\(max-width: 63\\.9375rem\\)\\s*\\{[\\s\\S]*?${closeSelector}\\s*\\{([^}]*)\\}`))?.[1] || ''
 
     expect(source).toContain('minmax(184px, 1fr)')
     expect(source).toContain('object-fit: contain')
@@ -784,10 +798,16 @@ describe('Precision Ops 独立工具工作区', () => {
     expect(source.match(/data-density="compact"/g)).toHaveLength(2)
     expect(inputOpening).not.toContain('data-density')
     expect(source).toContain("import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'")
+    expect(drawerOpening).toContain('class="image-workbench-library-drawer"')
     expect(drawer).toContain(':show-close="false"')
     expect(drawer).toContain('<template #header="{ close, titleId, titleClass }">')
     expect(drawer).toContain('<AdminDrawerHeader title="选择图库参考图" :title-id="titleId" :title-class="titleClass" :close="close" />')
     expect(template.match(/<AdminDrawerHeader\b/g)).toHaveLength(1)
+    for (const [rule, size] of [[desktopCloseRule, 36], [mobileCloseRule, 44]]) {
+      for (const property of ['width', 'height', 'min-width', 'min-height']) {
+        expect(rule).toMatch(new RegExp(`(?:^|\\n)\\s*${property}:\\s*${size}px;`))
+      }
+    }
   })
 
   it('移除登录页装饰渐变与面板常驻阴影', () => {

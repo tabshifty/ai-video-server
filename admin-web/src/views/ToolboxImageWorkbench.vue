@@ -1146,6 +1146,7 @@ function formatLibraryItemMeta(item) {
     </div>
     <el-drawer
       v-model="libraryPickerVisible"
+      class="image-workbench-library-drawer"
       title="选择图库参考图"
       direction="rtl"
       size="min(100%, 760px)"
@@ -1655,6 +1656,13 @@ function formatLibraryItemMeta(item) {
   word-break: break-word;
 }
 
+:global(.image-workbench-library-drawer .el-drawer__close-btn) {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
 .library-picker {
   display: grid;
   gap: var(--space-3);
@@ -1787,6 +1795,13 @@ function formatLibraryItemMeta(item) {
 }
 
 @media (max-width: 63.9375rem) {
+  :global(.image-workbench-library-drawer .el-drawer__close-btn) {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .image-workbench :deep(.el-input-number),
   .image-workbench :deep(.el-slider),
   .library-picker :deep(.el-pagination) {

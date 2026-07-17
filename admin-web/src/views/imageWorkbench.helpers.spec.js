@@ -313,8 +313,9 @@ describe('image workbench Precision Ops contracts', () => {
     const style = extractSfcBlock(source, 'style')
     const dialogOpening = template.match(/<el-dialog\b[\s\S]*?>/)?.[0] || ''
     const header = template.match(/<template #header="\{ close, titleId, titleClass \}">[\s\S]*?<\/template>/)?.[0] || ''
-    const rootRule = findStyleRule(style, '.mask-editor')
-    const bodyRule = findStyleRule(style, '.mask-editor :deep(.el-dialog__body)')
+    const rootRule = findStyleRule(style, ':global(.mask-editor)')
+    const chromeRule = style.match(/:global\(\.mask-editor \.el-dialog__header\),\s*:global\(\.mask-editor \.el-dialog__footer\)\s*\{([^}]*)\}/s)?.[1] || ''
+    const bodyRule = findStyleRule(style, ':global(.mask-editor .el-dialog__body)')
 
     expect(source).toMatch(/import \{(?=[^}]*\bClose\b)(?=[^}]*\bDelete\b)[^}]*\} from '@element-plus\/icons-vue'/)
     expect(dialogOpening).toContain('v-model="visible"')
@@ -333,21 +334,31 @@ describe('image workbench Precision Ops contracts', () => {
     expect(rootRule).toContain('max-height: 92vh;')
     expect(rootRule).toContain('display: flex;')
     expect(rootRule).toContain('flex-direction: column;')
+    expect(style).toContain(':global(.mask-editor .el-dialog__header),')
+    expect(style).toContain(':global(.mask-editor .el-dialog__footer) {')
+    expect(chromeRule).toContain('flex: 0 0 auto;')
     expect(bodyRule).toContain('min-height: 0;')
     expect(bodyRule).toContain('overflow: auto;')
     expect(bodyRule).toContain('overscroll-behavior: contain;')
-    expect(style).not.toContain('.mask-editor :deep(.el-dialog)')
+    expect(style).not.toMatch(/(^|\n)\s*\.mask-editor\s*\{/)
+    expect(style).not.toContain('.mask-editor :deep(.el-dialog__body)')
   })
 
   it('uses the shared single close entry for the library drawer', () => {
     const source = readView('ToolboxImageWorkbench.vue')
     const template = extractSfcBlock(source, 'template')
+    const style = extractSfcBlock(source, 'style')
+    const mobileStyle = extractBraceBlock(style, '@media (max-width: 63.9375rem)')
     const drawer = template.match(/<el-drawer\b[\s\S]*?<\/el-drawer>/)?.[0] || ''
     const drawerOpening = drawer.match(/<el-drawer\b[\s\S]*?>/)?.[0] || ''
     const header = drawer.match(/<template #header="\{ close, titleId, titleClass \}">[\s\S]*?<\/template>/)?.[0] || ''
+    const closeSelector = ':global(.image-workbench-library-drawer .el-drawer__close-btn)'
+    const desktopCloseRule = findStyleRule(style, closeSelector)
+    const mobileCloseRule = findStyleRule(mobileStyle, closeSelector)
 
     expect(source).toContain("import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'")
     expect(drawerOpening).toContain('v-model="libraryPickerVisible"')
+    expect(drawerOpening).toContain('class="image-workbench-library-drawer"')
     expect(drawerOpening).toContain('title="选择图库参考图"')
     expect(drawerOpening).toContain('size="min(100%, 760px)"')
     expect(drawerOpening).toContain(':show-close="false"')
@@ -360,6 +371,11 @@ describe('image workbench Precision Ops contracts', () => {
     expect(header).toContain(':title-class="titleClass"')
     expect(header).toContain(':close="close"')
     expect(template.match(/<AdminDrawerHeader\b/g)).toHaveLength(1)
+    for (const [rule, size] of [[desktopCloseRule, 36], [mobileCloseRule, 44]]) {
+      for (const property of ['width', 'height', 'min-width', 'min-height']) {
+        expect(rule).toMatch(new RegExp(`(?:^|\\n)\\s*${property}:\\s*${size}px;`))
+      }
+    }
   })
 
   it('uses stable compact media-grid geometry in the image workbench', () => {
