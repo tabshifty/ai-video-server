@@ -234,6 +234,8 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(style).toMatch(/\.candidate-item\.active\s*\{[^}]*border(?:-color)?:\s*var\(--primary\);/s)
     expect(style).toMatch(/\.candidate-selected\s*\{[^}]*font-weight:\s*600;/s)
     expect(style).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.result-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
+    expect.soft(style).toMatch(/\.av-manual-scrape-page :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*var\(--control-height\);/s)
+    expect.soft(style).toMatch(/@media \(max-width: 63\.9375rem\)\s*\{[\s\S]*?\.av-manual-scrape-page :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*44px;/s)
     expect(style).not.toContain('var(--text-on-inverse,')
   })
 

@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-17 12:12 +0800
+- 进度：Task 16 AV switch 阻塞完成最小 CSS GREEN 与提交前最终验证，不推进 Task 17。页面局部 switch 默认跟随 `var(--control-height)` 保持桌面 36px，窄于 `64rem` 时提升到 44px；同时覆盖“绕过缓存”和“海报裁剪”，未修改共享主题、模板、脚本、switch v-model 或业务数据流。完整修复证据已追加到 git 忽略的 `.superpowers/sdd/task-16-report.md`，按分工不执行浏览器验收。
+- 影响文件：最终精确纳入 `admin-web/src/views/AVManualScrape.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md` 共 4 个 tracked 文件；去除长期文档后的修复白名单为 SFC/spec/plan 3 文件。API、依赖、router、共享主题、其它页面、AV 脚本与模板均无差异，不处理既有 `rows="3"` warning。
+- 验证：修复两文件 GREEN 47/47，Task 16 原四文件定向 64/64，管理端完整 `npm test` 为 39 文件 431/431；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、3/4 文件白名单、U+FFFD/C0/DEL、API/依赖/router 零差异及 AV 脚本/模板敏感差异门禁均通过。
+
+## 2026-07-17 12:09 +0800
+- 进度：Task 16 AV switch 触控尺寸契约取得严格 RED。现有真实 SFC 契约新增两条 soft assertion，分别要求 `.av-manual-scrape-page :deep(.el-switch)` 默认使用 `min-height: var(--control-height)`，并在 `max-width: 63.9375rem` 内明确覆盖为 `44px`；尚未修改生产 SFC。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/precisionOpsRollout.spec.js` 与 `plan.md`；`AVManualScrape.vue`、`CONTEXT.md`、共享主题、模板、脚本、switch v-model、API、依赖、路由、请求与 payload 均未改。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/avManualScrape.helpers.spec.js` 按预期退出 1（2 文件，1 failed / 46 passed）；唯一失败测试同时报告两条缺失高度规则，其它 rollout 与 AV helper 契约全部通过，无语法或环境错误。
+
+## 2026-07-17 12:07 +0800
+- 进度：Task 16 主线程首轮浏览器验收发现唯一阻塞：AV 页“绕过缓存”和“海报裁剪”两个 `.el-switch` 在 1440/1024/768/375px 均为 32px，未达到对应 36/36/44/44px 门限；其它布局、控件、键盘与零写请求门禁均通过。根因是共享 form density 只覆盖 button/input/select，页面没有 switch 局部高度规则。本修复不推进 Task 17，也不处理既有 `rows="3"` warning。
+- 影响文件：计划只修改 `admin-web/src/views/AVManualScrape.vue` scoped CSS、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`，并追加 git 忽略的 `.superpowers/sdd/task-16-report.md`；不修改共享主题、模板、脚本、switch v-model、API、依赖、路由、请求或 payload。
+- 验证：先要求页面局部 switch 桌面 `min-height: var(--control-height)`、窄于 `64rem` 时 `min-height: 44px` 并取得严格 RED，再执行最小 CSS GREEN、Task 16 原四文件定向、完整 `npm test`、`npm run build`、`git diff --check`、U+FFFD/C0/DEL、4 文件白名单及 API/依赖/路由/脚本/模板敏感差异门禁；按分工不执行浏览器验收。
+
 ## 2026-07-17 11:56 +0800
 - 进度：Task 16 完成提交前最终验证与自审，不推进 Task 17。两页真实 SFC、14 migrated / 3 pending、form density、页头唯一主查询、通用 5/2/1 筛选、AV 双栏/单栏与非纯色候选选中态契约完整；候选/配置/保存内容保持原上下文且没有新增嵌套卡片。详细 RED、实现、验证与敏感门禁证据已写入 git 忽略的 `.superpowers/sdd/task-16-report.md`，按分工不执行浏览器验收。
 - 影响文件：最终只纳入 `admin-web/src/views/ScrapePreview.vue`、`AVManualScrape.vue`、`precisionOpsRollout.spec.js`、`admin-web/src/router/index.js`、`index.spec.js`、`CONTEXT.md`、`plan.md` 共 7 个 tracked 文件；不纳入忽略的报告，不修改 API、依赖、权限、其它路由/页面、共享主题、Android、后端或 Task 17。

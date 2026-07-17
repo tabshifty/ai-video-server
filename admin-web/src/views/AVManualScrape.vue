@@ -442,6 +442,10 @@ async function doSave() {
   gap: var(--space-5);
 }
 
+.av-manual-scrape-page :deep(.el-switch) {
+  min-height: var(--control-height);
+}
+
 .av-filter-toolbar :deep(.admin-toolbar__filters) {
   flex: 1 1 100%;
   width: 100%;
@@ -613,6 +617,12 @@ async function doSave() {
   font-size: 12px;
   line-height: 1.6;
   overflow: auto;
+}
+
+@media (max-width: 63.9375rem) {
+  .av-manual-scrape-page :deep(.el-switch) {
+    min-height: 44px;
+  }
 }
 
 @media (max-width: 1024px) {
