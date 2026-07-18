@@ -2,7 +2,12 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
-## 2026-07-19 00:25 +0800
+## 2026-07-19 00:19 +0800
+- 进度：Task 3 主线程最终验证完成。压缩包选择器修复在隔离分支 `fix/archive-import-selector-search` 上取得完整管理端测试和生产构建通过，范围与编码门禁均闭合，待最终整分支 reviewer 审查。
+- 影响文件：最终产品改动为 `admin-web/src/views/videoUpload.remote.js`、`admin-web/src/views/ToolboxArchiveImport.vue` 及两个对应 spec；另含本事项实施计划与本账本。未纳入后端、API、Android、`VideoUpload.vue`、TV 图片删除或 `.superpowers/` 报告 artifact。
+- 验证：新鲜 `cd admin-web && npm test` 通过（40 files，656/656）；新鲜 `cd admin-web && npm run build` 通过（2373 modules transformed，仅既有 chunk-size warning）；`git diff --check master..HEAD` 与工作树检查通过；替换字符、C0/DEL 控制字符扫描无输出；`git status --short` 无未提交产品差异。
+
+## 2026-07-19 00:17 +0800
 - 进度：Task 2 最小生产实现完成并通过任务级审查。新增远程候选按已选值过滤 helper；压缩包页三个 loader 分别从上传默认、单文件、批量编辑和分组表单收集当前值，保留原 fetcher、合并器、防抖、latest-wins、payload 和上传中心行为。
 - 影响文件：`admin-web/src/views/videoUpload.remote.js`、`admin-web/src/views/ToolboxArchiveImport.vue`；实现提交 `31c7bf6`，Task 1 测试基线未改。
 - 验证：定向测试 `35/35` 通过；`cd admin-web && npm run build` 通过，仅有既有 chunk-size warning；Task reviewer 判定 Spec compliant / Task quality Approved，未发现 Critical、Important、Minor。
