@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 00:37 +0800
+- 进度：最终 reviewer fix wave 与 artifact 索引清理后的主线程复验完成。运行时 A->B->清空回归、已选对象引用、缺省输入和四类表单字段断言均已纳入，实施计划步骤已全部标记完成。
+- 影响文件：净 diff 只包含两个管理端生产文件、两个对应 spec、实施计划和 `plan.md`；`.superpowers` 报告均保留为 ignored 本地材料，不在 Git 索引中。
+- 验证：新鲜 `cd admin-web && npm test` 通过（40 files，659/659）；新鲜 `cd admin-web && npm run build` 通过（2373 modules transformed，仅既有 chunk-size warning）；`git diff --check master..HEAD`、工作树 diff check、替换字符和 C0/DEL 扫描均无输出；净文件名扫描未发现 `.superpowers`、Android、后端、API、`VideoUpload.vue` 或依赖文件。
+
 ## 2026-07-19 00:36 +0800
 - 进度：最终 reviewer fix wave 的报告 artifact 曾被代理提交，已用 `git rm --cached` 从索引移除并保留本地 ignored 报告，避免它进入最终产品 diff；不重写已有提交历史。
 - 影响文件：仅调整 `.superpowers/sdd/task-2-report.md` 的索引跟踪状态并追加本账本；测试与生产代码不变。
