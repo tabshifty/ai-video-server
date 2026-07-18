@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 00:15 +0800
+- 进度：Task 1 红灯测试完成并通过两轮任务级审查。新增纯 helper 测试与压缩包 loader 接线测试，准确锁定缺少候选过滤和历史候选接线；任务报告已从 Git 索引移除，产品净 diff 仅保留两个测试文件。
+- 影响文件：`admin-web/src/views/videoUpload.remote.spec.js`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`；Task 1 提交范围为 `fa530a1`、`a48d09a`、`baf8879`。
+- 验证：`cd admin-web && npm test -- src/views/videoUpload.remote.spec.js src/views/ToolboxArchiveImport.spec.js` 取得预期 RED（35 tests，32 passed，3 expected failures）；Task reviewer 首轮发现报告跟踪范围问题，修复后复审为 Spec compliant / Task quality Approved。
+
 ## 2026-07-19 00:02 +0800
 - 进度：SDD 执行前预检确认管理端基线为 40 个测试文件、653/653 全绿；发现实施计划的压缩包 loader 静态断言与推荐的多行属性格式存在内部冲突，已将合集/图片合集断言改为跨行正则，不改变实现契约。
 - 影响文件：`docs/superpowers/plans/2026-07-18-archive-import-selector-search.md`、`plan.md`。
