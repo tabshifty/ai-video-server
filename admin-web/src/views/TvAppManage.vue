@@ -367,8 +367,8 @@ onMounted(() => {
 <template>
   <Layout>
     <template #header-actions>
-      <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
-      <el-button type="primary" :icon="UploadFilled" :loading="uploadLoading" @click="uploadAPK(false)">上传 APK</el-button>
+      <el-button class="app-package-header-action" aria-label="刷新安装包列表" title="刷新安装包列表" :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
+      <el-button class="app-package-header-action" aria-label="上传 APK" title="上传 APK" type="primary" :icon="UploadFilled" :loading="uploadLoading" @click="uploadAPK(false)">上传 APK</el-button>
     </template>
 
     <div class="page-shell app-package-page" data-density="compact">
@@ -717,6 +717,24 @@ onMounted(() => {
 @media (max-width: 63.9375rem) {
   .client-type-switch :deep(.el-segmented__item) {
     min-height: 44px;
+  }
+}
+
+@media (max-width: 30rem) {
+  .app-package-header-action {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .app-package-header-action :deep(.el-icon) {
+    margin-right: 0;
+    font-size: var(--el-font-size-base);
+  }
+
+  .app-package-header-action :deep(.el-icon + span) {
+    margin-left: 0;
   }
 }
 </style>

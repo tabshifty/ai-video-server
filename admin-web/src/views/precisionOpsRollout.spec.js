@@ -305,6 +305,39 @@ describe('Precision Ops 第一阶段 rollout', () => {
     }
   })
 
+  it('电视剧列表卡把独立滚动区与分页完整约束在卡片边界内', () => {
+    const style = extractStyle(readView('TvSeriesManage.vue'))
+    const listCardRule = style.match(/\.tv-series-list-card\s*\{[^}]*\}/s)?.[0] || ''
+    const listCardBodyRule = style.match(/\.tv-series-list-card\s+:deep\(\.section-card__body\)\s*\{[^}]*\}/s)?.[0] || ''
+    const listShellRule = style.match(/\.series-list-shell\s*\{[^}]*\}/s)?.[0] || ''
+    const pagerRule = style.match(/\.pager-wrap\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect.soft(listCardRule).toContain('grid-template-rows: auto minmax(0, 1fr);')
+    expect.soft(listCardRule).toContain('max-height: calc(100vh - 12rem);')
+    expect.soft(listCardRule).toContain('overflow: hidden;')
+    expect.soft(listCardBodyRule).toContain('display: grid;')
+    expect.soft(listCardBodyRule).toContain('grid-template-rows: minmax(0, 1fr) auto;')
+    expect.soft(listCardBodyRule).toContain('min-height: 0;')
+    expect.soft(listShellRule).toContain('min-height: 0;')
+    expect.soft(listShellRule).toContain('max-height: none;')
+    expect.soft(pagerRule).toContain('min-width: 0;')
+    expect.soft(pagerRule).toContain('max-width: 100%;')
+  })
+
+  it('电视剧页最窄顶栏动作收为保留中文名称的 44px 图标按钮', () => {
+    const template = extractTemplate(readView('TvSeriesManage.vue'))
+    const style = extractStyle(readView('TvSeriesManage.vue'))
+    const headerActions = headerActionsBlock(template)
+    const mobileStart = style.indexOf('@media (max-width: 30rem)')
+    const mobileStyle = mobileStart >= 0 ? style.slice(mobileStart) : ''
+
+    expect.soft(headerActions).toMatch(/class="tv-series-header-action"[^>]*aria-label="新建系列"[^>]*title="新建系列"[^>]*:icon="Plus"[^>]*@click="openCreateSeries"/)
+    expect.soft(headerActions).toMatch(/class="tv-series-header-action"[^>]*aria-label="筛选电视剧"[^>]*title="筛选电视剧"[^>]*:icon="Search"[^>]*@click="query\.page = 1; loadList\(\)"/)
+    expect.soft(mobileStart).toBeGreaterThanOrEqual(0)
+    expect.soft(mobileStyle).toMatch(/\.tv-series-header-action\s*\{[^}]*width:\s*44px;[^}]*min-width:\s*44px;[^}]*padding:\s*0;[^}]*font-size:\s*0;/s)
+    expect.soft(mobileStyle).toMatch(/\.tv-series-header-action\s+:deep\(\.el-icon\)\s*\{[^}]*margin-right:\s*0;[^}]*font-size:\s*var\(--el-font-size-base\);/s)
+  })
+
   it('系统设置使用无阴影表单区块并在清理与日志区分别保留可恢复错误', () => {
     const source = readView('SystemSettings.vue')
     const template = extractTemplate(source)
@@ -432,6 +465,22 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect.soft(style).toMatch(/\.av-manual-scrape-page :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*var\(--control-height\);/s)
     expect.soft(style).toMatch(/@media \(max-width: 63\.9375rem\)\s*\{[\s\S]*?\.av-manual-scrape-page :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*44px;/s)
     expect(style).not.toContain('var(--text-on-inverse,')
+  })
+
+  it('AV 绕过缓存开关作为不可拆分单元且两侧文案保持单行', () => {
+    const source = readView('AVManualScrape.vue')
+    const template = extractTemplate(source)
+    const style = extractStyle(source)
+    const bypassItem = template.match(/<el-form-item\b[^>]*class="bypass-cache-item"[^>]*>[\s\S]*?<\/el-form-item>/)?.[0] || ''
+    const bypassRule = style.match(/\.bypass-cache-item\s+:deep\(\.el-switch\)\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect.soft(bypassItem).toContain('label="绕过缓存"')
+    expect.soft(bypassItem).toContain('v-model="form.bypass_cache"')
+    expect.soft(bypassItem).toContain('active-text="始终重抓"')
+    expect.soft(bypassItem).toContain('inactive-text="允许缓存"')
+    expect.soft(bypassRule).toContain('flex: 0 0 auto;')
+    expect.soft(bypassRule).toContain('white-space: nowrap;')
+    expect.soft(bypassRule).toContain('max-width: 100%;')
   })
 
   it('上传流程保持在单个中密度工作区并保留原有五段顺序', () => {

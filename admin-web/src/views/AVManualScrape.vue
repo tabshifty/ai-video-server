@@ -272,7 +272,7 @@ async function doSave() {
                 <el-option v-for="site in enabledSources.length ? enabledSources : AV_SITE_OPTIONS" :key="site" :label="site" :value="site" />
               </el-select>
             </el-form-item>
-            <el-form-item label="绕过缓存">
+            <el-form-item class="bypass-cache-item" label="绕过缓存">
               <el-switch v-model="form.bypass_cache" active-text="始终重抓" inactive-text="允许缓存" />
             </el-form-item>
           </el-form>
@@ -444,6 +444,12 @@ async function doSave() {
 
 .av-manual-scrape-page :deep(.el-switch) {
   min-height: var(--control-height);
+}
+
+.bypass-cache-item :deep(.el-switch) {
+  flex: 0 0 auto;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .av-filter-toolbar :deep(.admin-toolbar__filters) {

@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 19:46 +0800
+- 进度：Task 22 最终视觉复审三类修复完成提交前验证与自审。最终生产差异仅为电视剧列表卡滚动/分页 containment、两页 30rem 局部图标动作与 AV 目标 switch nowrap；没有业务脚本、handler、loading、顺序、v-model、请求、payload 或共享组件变化，准备按 7 文件白名单精确提交。
+- 影响文件：tracked 恰为简报允许的 `admin-web/src/views/TvSeriesManage.vue`、`TvAppManage.vue`、`AVManualScrape.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`；ignored 报告为 `.superpowers/sdd/task-22-final-visual-fix-report.md`。Layout、共享基础组件、browser harness、package/lockfile、API、router、权限、依赖、Go、Android、数据库、migration 与其它 tracked 文件均未修改。
+- 验证：定向 2 files、88/88；完整 `npm test` 40 files、653/653；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、7/7 固定白名单、8/8 严格 UTF-8 fatal decode、U+FFFD/C0/DEL 零命中、敏感路径零差异、三份 SFC 脚本 3/3 逐字一致及关键业务语义 token 5/5 基线一致全部通过；按简报要求未运行浏览器。
+
+## 2026-07-18 19:43 +0800
+- 进度：Task 22 最终视觉复审三类最小生产修复取得定向 GREEN。电视剧列表卡/body 使用双层两行网格，把独立滚动列表与卡内分页分轨并限制卡片视口高度；电视剧与安装包页只在 30rem 以下把页面动作收为带中文 aria/title 的 44px 图标按钮；AV 绕过缓存 switch 只增加局部不可拆分单行规则。
+- 影响文件：当前 tracked 差异精确位于 brief 允许的三份 SFC、两份既有 spec、`CONTEXT.md` 与 `plan.md`；三份 SFC 的完整 `<script setup>` 与基线逐字一致，原 handler、loading、按钮顺序、v-model、请求与业务行为未改变。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js` 通过（2 files，88/88）；三份脚本一致性 3/3。待运行完整 `npm test`、`npm run build` 及最终 diff、固定白名单、严格编码、敏感路径和业务脚本门禁。
+
+## 2026-07-18 19:40 +0800
+- 进度：Task 22 最终视觉复审的两份定向测试取得精确 RED。测试阶段只修改两份既有 spec 与 `plan.md`；生产 SFC、`CONTEXT.md` 和报告尚未修改。4 个失败测试逐项锁定电视剧列表卡 containment、电视剧/安装包页 375px 顶栏动作与 AV 开关单行边界。
+- 影响文件：RED 差异精确为 `admin-web/src/views/precisionOpsRollout.spec.js`、`admin-web/src/views/tvAppManagePage.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js` 按预期退出 1（2 files failed，88 tests 中 4 failed / 84 passed）；失败只对应三类当前生产缺口，无测试解析、SFC 编译、环境或既有业务契约失败。
+
+## 2026-07-18 19:37 +0800
+- 进度：开始 Task 22 最终视觉复审三类修复。先在既有 `precisionOpsRollout.spec.js` 与 `tvAppManagePage.spec.js` 锁定电视剧列表卡滚动区/分页边界、电视剧与安装包页 375px 顶栏紧凑命名动作、AV 绕过缓存开关单行不可拆分契约，取得只命中这些视觉缺口的真实 RED 后再做最小模板/CSS 实现。
+- 影响文件：计划只修改简报允许的三份目标 SFC、两份既有 spec、`CONTEXT.md`、`plan.md`，并填写 git 忽略报告 `.superpowers/sdd/task-22-final-visual-fix-report.md`；不修改 Layout、共享基础组件、browser harness、package/lockfile、API、router、权限、依赖、payload、Go、Android、数据库、migration 或其它 tracked 文件。
+- 验证：起始 HEAD 精确为 `03183badd6e2f3299d0df4f54d7e45a4582380f8`，tracked/index 干净；先运行 `cd admin-web && npm test -- src/views/precisionOpsRollout.spec.js src/views/tvAppManagePage.spec.js` 记录精确 RED，再运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、固定白名单、严格 UTF-8/U+FFFD/C0/DEL、敏感路径和三份 SFC 脚本逐字一致门禁；不运行浏览器。
+
 ## 2026-07-18 19:12 +0800
 - 进度：Task 22 整分支最终评审 8 项修复已完成新鲜提交前复验与自审。当前差异仍精确为保存视图结构/active 回退、三类对话框异常恢复、4:3 图片预览、动态 ID alt、三个装饰图标、Drawer overscroll 单一归属、Inter 本地首选与五处 hover 位移删除；未发现阻塞问题，准备按固定 22 文件白名单精确提交。
 - 影响文件：tracked 恰为简报允许的 20 份生产/测试文件及 `CONTEXT.md`、`plan.md`；ignored 报告为 `.superpowers/sdd/task-22-final-review-fix-report.md`。package/lockfile、API、router、权限、依赖声明、payload、Go、Android、数据库、migration、其它 tracked 文件及 ignored 浏览器 harness 均未修改。

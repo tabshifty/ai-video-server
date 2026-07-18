@@ -73,6 +73,18 @@ describe('TV app package management page', () => {
     expect(tvAppManage).toContain('下载 APK')
   })
 
+  it('安装包页最窄顶栏动作收为保留中文名称的 44px 图标按钮', () => {
+    const headerActions = template.match(/<template #header-actions>[\s\S]*?<\/template>/)?.[0] || ''
+    const mobileStart = style.indexOf('@media (max-width: 30rem)')
+    const mobileStyle = mobileStart >= 0 ? style.slice(mobileStart) : ''
+
+    expect.soft(headerActions).toMatch(/class="app-package-header-action"[^>]*aria-label="刷新安装包列表"[^>]*title="刷新安装包列表"[^>]*:icon="Refresh"[^>]*:loading="loading"[^>]*@click="load"/)
+    expect.soft(headerActions).toMatch(/class="app-package-header-action"[^>]*aria-label="上传 APK"[^>]*title="上传 APK"[^>]*type="primary"[^>]*:icon="UploadFilled"[^>]*:loading="uploadLoading"[^>]*@click="uploadAPK\(false\)"/)
+    expect.soft(mobileStart).toBeGreaterThanOrEqual(0)
+    expect.soft(mobileStyle).toMatch(/\.app-package-header-action\s*\{[^}]*width:\s*44px;[^}]*min-width:\s*44px;[^}]*padding:\s*0;[^}]*font-size:\s*0;/s)
+    expect.soft(mobileStyle).toMatch(/\.app-package-header-action\s+:deep\(\.el-icon\)\s*\{[^}]*margin-right:\s*0;[^}]*font-size:\s*var\(--el-font-size-base\);/s)
+  })
+
   it('客户端类型分段切换只在窄屏达到 44px 目标高度', () => {
     const clientTypeSwitch = template.match(/<el-segmented\b(?=[^>]*:model-value="clientType")[^>]*\/>/)?.[0] || ''
     const mobileStart = style.indexOf('@media (max-width: 63.9375rem)')

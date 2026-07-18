@@ -318,8 +318,8 @@ onMounted(async () => {
 <template>
   <Layout>
     <template #header-actions>
-      <el-button type="primary" :icon="Plus" @click="openCreateSeries">新建系列</el-button>
-      <el-button :icon="Search" @click="query.page = 1; loadList()">筛选</el-button>
+      <el-button type="primary" class="tv-series-header-action" aria-label="新建系列" title="新建系列" :icon="Plus" @click="openCreateSeries">新建系列</el-button>
+      <el-button class="tv-series-header-action" aria-label="筛选电视剧" title="筛选电视剧" :icon="Search" @click="query.page = 1; loadList()">筛选</el-button>
     </template>
 
     <div class="page-shell page-shell--medium tv-manage-shell" data-density="form">
@@ -584,6 +584,19 @@ onMounted(async () => {
   align-items: start;
 }
 
+.tv-series-list-card {
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: calc(100vh - 12rem);
+  overflow: hidden;
+}
+
+.tv-series-list-card :deep(.section-card__body) {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .tv-search {
   width: min(18rem, 100%);
 }
@@ -593,8 +606,8 @@ onMounted(async () => {
 }
 
 .series-list-shell {
-  min-height: 20rem;
-  max-height: calc(100vh - 24rem);
+  min-height: 0;
+  max-height: none;
 }
 
 .series-list-shell :deep(.el-scrollbar__wrap) {
@@ -658,7 +671,11 @@ onMounted(async () => {
 .pager-wrap {
   margin-top: var(--space-4);
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   justify-content: center;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
 }
 
 .editor-grid,
@@ -798,6 +815,24 @@ onMounted(async () => {
   .field-group__legend {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 30rem) {
+  .tv-series-header-action {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .tv-series-header-action :deep(.el-icon) {
+    margin-right: 0;
+    font-size: var(--el-font-size-base);
+  }
+
+  .tv-series-header-action :deep(.el-icon + span) {
+    margin-left: 0;
   }
 }
 </style>
