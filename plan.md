@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 00:36 +0800
+- 进度：最终 reviewer fix wave 的报告 artifact 曾被代理提交，已用 `git rm --cached` 从索引移除并保留本地 ignored 报告，避免它进入最终产品 diff；不重写已有提交历史。
+- 影响文件：仅调整 `.superpowers/sdd/task-2-report.md` 的索引跟踪状态并追加本账本；测试与生产代码不变。
+- 验证：报告文件仍存在于本地供复审；待提交索引清理后重新运行覆盖测试、范围检查和最终整分支复审。
+
 ## 2026-07-19 00:35 +0800
 - 进度：最终整分支 reviewer fix wave 已完成并提交 `e140a10`。新增真实 loader 的 A->B->清空查询回归覆盖，锁定未选历史候选移除、已选名称保留和每次当前结果合并；补充 helper 原对象引用及缺省输入断言，并将 Task 1/2/3 全部步骤与实际完成状态一致化。
 - 影响文件：`admin-web/src/views/videoUpload.remote.spec.js`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`docs/superpowers/plans/2026-07-18-archive-import-selector-search.md`、`plan.md`、`.superpowers/sdd/task-2-report.md`。
