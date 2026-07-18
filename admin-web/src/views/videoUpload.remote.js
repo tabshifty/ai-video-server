@@ -31,6 +31,19 @@ export function mergeRemoteValueOptions(existing, incoming) {
   return Array.from(optionMap.values())
 }
 
+export function filterRemoteOptionsByValues(options, selectedValues, getValue = (item) => item) {
+  const selected = new Set(
+    (selectedValues || [])
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean)
+  )
+
+  return (options || []).filter((item) => {
+    const value = String(getValue(item) || '').trim().toLowerCase()
+    return value !== '' && selected.has(value)
+  })
+}
+
 export function createRemoteSuggestionLoader({
   delay = 180,
   fetcher,

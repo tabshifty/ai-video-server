@@ -42,7 +42,12 @@ import {
   executeArchiveFilenameUpdate,
   isArchiveFilenameDraftSnapshotCurrent
 } from './toolboxArchiveImport.helpers'
-import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
+import {
+  createRemoteSuggestionLoader,
+  filterRemoteOptionsByValues,
+  mergeRemoteStringOptions,
+  mergeRemoteValueOptions
+} from './videoUpload.remote'
 
 const PROCESSABLE_ARCHIVE_FILE_STATUSES = new Set(['pending', 'failed', 'processing'])
 const FROZEN_ARCHIVE_FILE_STATUSES = new Set(['ready', 'existing'])
@@ -1989,9 +1994,37 @@ async function searchImageCollections(keyword = '') {
   }))
 }
 
+function selectedArchiveTagValues() {
+  return [
+    ...normalizeTagSelection(uploadForm.default_tags),
+    ...normalizeTagSelection(selectedFile.value?.tags),
+    ...normalizeTagSelection(batchEditForm.tags),
+    ...normalizeTagSelection(archiveGroupForm.tags)
+  ]
+}
+
+function selectedArchiveCollectionValues() {
+  return [
+    ...normalizeUUIDSelection(uploadForm.default_video_collection_ids),
+    ...normalizeUUIDSelection(selectedFile.value?.video_collection_ids),
+    ...normalizeUUIDSelection(batchEditForm.video_collection_ids),
+    ...normalizeUUIDSelection(archiveGroupForm.video_collection_ids)
+  ]
+}
+
+function selectedArchiveImageCollectionValues() {
+  return [
+    ...normalizeUUIDSelection(uploadForm.default_image_collection_ids),
+    ...normalizeUUIDSelection(selectedFile.value?.image_collection_ids),
+    ...normalizeUUIDSelection([batchEditForm.video_image_collection_id]),
+    ...normalizeUUIDSelection(batchEditForm.image_collection_ids),
+    ...normalizeUUIDSelection(archiveGroupForm.image_collection_ids)
+  ]
+}
+
 const loadTagSuggestions = createRemoteSuggestionLoader({
   fetcher: searchTags,
-  getOptions: () => tagOptions.value,
+  getOptions: () => filterRemoteOptionsByValues(tagOptions.value, selectedArchiveTagValues()),
   setOptions: (next) => {
     tagOptions.value = next
   },
@@ -2003,7 +2036,11 @@ const loadTagSuggestions = createRemoteSuggestionLoader({
 
 const loadCollectionSuggestions = createRemoteSuggestionLoader({
   fetcher: searchCollections,
-  getOptions: () => collectionOptions.value,
+  getOptions: () => filterRemoteOptionsByValues(
+    collectionOptions.value,
+    selectedArchiveCollectionValues(),
+    (item) => item?.value
+  ),
   setOptions: (next) => {
     collectionOptions.value = next
   },
@@ -2015,7 +2052,11 @@ const loadCollectionSuggestions = createRemoteSuggestionLoader({
 
 const loadImageCollectionSuggestions = createRemoteSuggestionLoader({
   fetcher: searchImageCollections,
-  getOptions: () => imageCollectionOptions.value,
+  getOptions: () => filterRemoteOptionsByValues(
+    imageCollectionOptions.value,
+    selectedArchiveImageCollectionValues(),
+    (item) => item?.value
+  ),
   setOptions: (next) => {
     imageCollectionOptions.value = next
   },
