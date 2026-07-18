@@ -16,10 +16,15 @@ export function revokeImagePreviewUrls(urlMap, revoke = (value) => URL.revokeObj
 }
 
 export function normalizeImageViewSnapshot(snapshot) {
+  const hasActive = snapshot !== null && snapshot !== undefined && Object.hasOwn(snapshot, 'active')
+  const active = hasActive && typeof snapshot.active === 'string' && ['', '0', '1'].includes(snapshot.active)
+    ? snapshot.active
+    : DEFAULT_IMAGE_ACTIVE
+
   return {
     q: String(snapshot?.q || ''),
     status: String(snapshot?.status || ''),
-    active: ['0', '1'].includes(String(snapshot?.active)) ? String(snapshot.active) : '',
+    active,
     actor_id: String(snapshot?.actor_id || ''),
     collection_id: String(snapshot?.collection_id || ''),
     viewMode: snapshot?.viewMode === 'list' ? 'list' : 'grid'

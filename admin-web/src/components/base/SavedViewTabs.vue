@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, EditPen, MoreFilled, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { CUSTOM_VIEW_ID } from './savedView.helpers'
 
@@ -25,6 +25,11 @@ function isDismissed(error) {
   return error === 'cancel' || error === 'close'
 }
 
+function reportDialogError(error, message) {
+  if (isDismissed(error)) return
+  ElMessage.error(message)
+}
+
 async function requestSave() {
   try {
     const { value } = await ElMessageBox.prompt('请输入视图名称', '保存视图', {
@@ -34,7 +39,7 @@ async function requestSave() {
     })
     emit('save', String(value).trim())
   } catch (error) {
-    if (!isDismissed(error)) throw error
+    reportDialogError(error, '保存视图失败，请重试')
   }
 }
 
@@ -50,7 +55,7 @@ async function requestRename() {
     })
     emit('rename', { id: activeItem.value.id, label: String(value).trim() })
   } catch (error) {
-    if (!isDismissed(error)) throw error
+    reportDialogError(error, '重命名视图失败，请重试')
   }
 }
 
@@ -65,7 +70,7 @@ async function requestRemove() {
     })
     emit('remove', activeItem.value.id)
   } catch (error) {
-    if (!isDismissed(error)) throw error
+    reportDialogError(error, '删除视图失败，请重试')
   }
 }
 </script>

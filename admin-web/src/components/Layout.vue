@@ -356,7 +356,7 @@ onUnmounted(() => {
                 :aria-label="item.label"
                 @click="closeMobileNav"
               >
-                <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+                <el-icon aria-hidden="true"><component :is="resolveIcon(item.icon)" /></el-icon>
                 <span class="nav-link__label">{{ item.label }}</span>
               </RouterLink>
             </el-tooltip>
@@ -481,7 +481,7 @@ onUnmounted(() => {
               :aria-current="isActive(item) ? 'page' : undefined"
               @click="closeMobileNav"
             >
-              <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+              <el-icon aria-hidden="true"><component :is="resolveIcon(item.icon)" /></el-icon>
               <span>{{ item.label }}</span>
             </RouterLink>
           </div>
@@ -946,7 +946,6 @@ button.drawer-nav__label,
 
 :deep(.mobile-nav-drawer .el-drawer__body) {
   padding: 0;
-  overscroll-behavior: contain;
 }
 
 @media (max-width: 63.9375rem) {

@@ -192,6 +192,13 @@ describe('TV app package management page', () => {
     expect(template).toContain(':href="downloadHref(row, abi.abi)"')
   })
 
+  it('下载链接的可见名称不重复暴露装饰图标', () => {
+    const downloadLink = template.match(/<a\b(?=[^>]*class="download-link")[\s\S]*?<\/a>/)?.[0] || ''
+
+    expect(downloadLink).toContain("{{ clientMeta.supportsAbi ? `下载 ${abi.abi}` : '下载 APK' }}")
+    expect(downloadLink).toContain('<el-icon aria-hidden="true"><Download /></el-icon>')
+  })
+
   it('长版本与 ABI 文本独立收敛且保留完整值提示', () => {
     const compactTextRule = style.match(/\.compact-text\s*\{[^}]*\}/s)?.[0] || ''
     const tableRowRule = style.match(/\.package-table\s+:deep\(\.el-table__row\)\s*\{[^}]*\}/s)?.[0] || ''

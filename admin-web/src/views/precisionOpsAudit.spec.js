@@ -153,7 +153,7 @@ describe('Product runtime hygiene contracts', () => {
     expect(runtimeSources).not.toMatch(REMOTE_FONT_DOMAIN_PATTERN)
     expect(remoteFontImports).toEqual([])
     expect(remoteFontPreconnects).toEqual([])
-    expect(fontSans).toBe("'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif")
+    expect(fontSans).toBe("'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif")
   })
 
   it('binds numeric el-input rows as numbers in every view', () => {

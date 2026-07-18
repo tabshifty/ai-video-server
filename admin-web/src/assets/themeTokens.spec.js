@@ -233,6 +233,14 @@ describe('theme tokens', () => {
     expect(bulkActionBar).toMatch(/\.bulk-action-bar\s*\{[^}]*box-shadow:\s*var\(--shadow-lg\)/)
   })
 
+  it('keeps interactive card hover feedback without vertical displacement', () => {
+    const hoverRule = css.match(/\.interactive-card:hover\s*\{([^}]*)\}/)?.[1] || ''
+
+    expect(hoverRule).toContain('border-color: var(--line-strong)')
+    expect(hoverRule).toContain('box-shadow: var(--shadow-hover)')
+    expect(hoverRule).not.toContain('transform:')
+  })
+
   it('removes the old rose palette and Fira stack', () => {
     expect(css).not.toMatch(/#881337/i)
     expect(css).not.toMatch(/#be123c/i)

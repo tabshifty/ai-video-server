@@ -78,6 +78,22 @@ describe('saved view helpers', () => {
     ])
   })
 
+  it('drops missing, null and array snapshots before normalization without losing valid records', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      items: [
+        { id: 'user-missing', label: '缺失' },
+        { id: 'user-null', label: '空值', snapshot: null },
+        { id: 'user-array', label: '数组', snapshot: [{ q: '错误结构' }] },
+        { id: 'user-good', label: '可用', snapshot: { q: '保留' } }
+      ]
+    })
+
+    expect(parseSavedViewDocument(raw, normalize)).toEqual([
+      { id: 'user-good', label: '可用', snapshot: normalize({ q: '保留' }) }
+    ])
+  })
+
   it('upserts and removes immutably while creating deterministic ids', () => {
     const original = [{ id: 'user-1', label: 'A', snapshot: {} }]
     const inserted = upsertSavedView(original, { id: 'user-2', label: 'B', snapshot: {} })

@@ -155,6 +155,7 @@ describe('Precision Ops base components', () => {
   })
 
   it('owns confirmed saved-view naming and deletion commands', () => {
+    expect.soft(savedViewScript).toContain("import { ElMessage, ElMessageBox } from 'element-plus'")
     expect(savedViewScript).toContain("ElMessageBox.prompt('请输入视图名称'")
     expect(savedViewScript).toContain("ElMessageBox.prompt('请输入新的视图名称'")
     expect(savedViewScript).toContain("ElMessageBox.confirm('确认删除这个保存视图？'")
@@ -162,7 +163,11 @@ describe('Precision Ops base components', () => {
     expect(savedViewScript).toContain("emit('rename', { id: activeItem.value.id, label: String(value).trim() })")
     expect(savedViewScript).toContain("emit('remove', activeItem.value.id)")
     expect(savedViewScript).toContain("return error === 'cancel' || error === 'close'")
-    expect(savedViewScript.match(/if \(!isDismissed\(error\)\) throw error/g)).toHaveLength(3)
+    expect.soft(savedViewScript).toContain("reportDialogError(error, '保存视图失败，请重试')")
+    expect.soft(savedViewScript).toContain("reportDialogError(error, '重命名视图失败，请重试')")
+    expect.soft(savedViewScript).toContain("reportDialogError(error, '删除视图失败，请重试')")
+    expect.soft(savedViewScript).toContain('ElMessage.error(message)')
+    expect.soft(savedViewScript).not.toContain('throw error')
     expect(savedViewScript).not.toContain('localStorage')
   })
 

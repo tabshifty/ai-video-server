@@ -545,7 +545,7 @@ onMounted(() => {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        <el-icon><Download /></el-icon>
+                        <el-icon aria-hidden="true"><Download /></el-icon>
                         {{ clientMeta.supportsAbi ? `下载 ${abi.abi}` : '下载 APK' }}
                       </a>
                     </div>

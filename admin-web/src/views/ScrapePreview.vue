@@ -551,7 +551,6 @@ async function doSave() {
 
 .candidate-item:hover,
 .candidate-item.active {
-  transform: translateY(-1px);
   border-color: var(--primary);
   box-shadow: var(--shadow-xs);
 }

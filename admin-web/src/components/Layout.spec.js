@@ -123,21 +123,25 @@ function unrelatedWrite(key, value) {
     expect(drawerNav).not.toContain(':aria-label="item.label"')
   })
 
-  it('只把四个新增导航装饰图标隐藏于辅助技术', () => {
+  it('把桌面和移动端六个导航装饰图标隐藏于辅助技术', () => {
     const desktopRecent = findBlock(layout, /<section v-if="recentNavItems\.length" class="nav-group nav-group--recent"[\s\S]*?<\/section>/)
+    const desktopGroup = findBlock(layout, /<section v-for="group in navGroups"[^>]*class="nav-group"[\s\S]*?<\/section>/)
     const desktopGroupButton = findBlock(layout, /<button\s+class="nav-group__label"[\s\S]*?<\/button>/)
     const mobileRecent = findBlock(layout, /<section v-if="recentNavItems\.length" class="drawer-nav__group drawer-nav__group--recent"[\s\S]*?<\/section>/)
+    const mobileGroup = findBlock(layout, /<section v-for="group in navGroups"[^>]*class="drawer-nav__group"[\s\S]*?<\/section>/)
     const mobileGroupButton = findBlock(layout, /<button\s+class="drawer-nav__label"[\s\S]*?<\/button>/)
     const decorativeIcons = [
       findBlock(desktopRecent, /<el-icon\b[^>]*>\s*<component :is="resolveIcon\(item\.icon\)" \/>\s*<\/el-icon>/),
       findBlock(desktopGroupButton, /<el-icon\b(?=[^>]*class="nav-group__chevron")[^>]*>[\s\S]*?<ArrowRight \/>[\s\S]*?<\/el-icon>/),
+      findBlock(desktopGroup, /<el-icon\b[^>]*>\s*<component :is="resolveIcon\(item\.icon\)" \/>\s*<\/el-icon>/),
       findBlock(mobileRecent, /<el-icon\b[^>]*>\s*<component :is="resolveIcon\(item\.icon\)" \/>\s*<\/el-icon>/),
-      findBlock(mobileGroupButton, /<el-icon\b(?=[^>]*class="nav-group__chevron")[^>]*>[\s\S]*?<ArrowRight \/>[\s\S]*?<\/el-icon>/)
+      findBlock(mobileGroupButton, /<el-icon\b(?=[^>]*class="nav-group__chevron")[^>]*>[\s\S]*?<ArrowRight \/>[\s\S]*?<\/el-icon>/),
+      findBlock(mobileGroup, /<el-icon\b[^>]*>\s*<component :is="resolveIcon\(item\.icon\)" \/>\s*<\/el-icon>/)
     ]
 
-    expect(decorativeIcons).toHaveLength(4)
+    expect(decorativeIcons).toHaveLength(6)
     for (const icon of decorativeIcons) {
-      expect(icon).toContain('aria-hidden="true"')
+      expect.soft(icon).toContain('aria-hidden="true"')
     }
   })
 
@@ -166,11 +170,13 @@ function unrelatedWrite(key, value) {
 
   it('为移动导航命名并在小于 1024px 时提供稳定命令点击目标', () => {
     const drawer = findBlock(layout, /<el-drawer\b(?=[^>]*class="mobile-nav-drawer")[\s\S]*?<\/el-drawer>/)
+    const drawerBodyRule = findRule(style, ':deep(.mobile-nav-drawer .el-drawer__body)')
     const mediaStart = style.indexOf('@media (max-width: 63.9375rem)')
     const narrowStart = style.indexOf('@media (max-width: 47.9375rem)', mediaStart)
 
     expect(drawer).toContain('aria-label="管理端导航"')
-    expect(findRule(style, ':deep(.mobile-nav-drawer .el-drawer__body)')).toContain('overscroll-behavior: contain')
+    expect(drawerBodyRule).toContain('padding: 0')
+    expect.soft(drawerBodyRule).not.toContain('overscroll-behavior')
     expect(mediaStart).toBeGreaterThan(-1)
     expect(narrowStart).toBeGreaterThan(mediaStart)
     const mobileStyle = style.slice(mediaStart, narrowStart)

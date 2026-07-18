@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 19:12 +0800
+- 进度：Task 22 整分支最终评审 8 项修复已完成新鲜提交前复验与自审。当前差异仍精确为保存视图结构/active 回退、三类对话框异常恢复、4:3 图片预览、动态 ID alt、三个装饰图标、Drawer overscroll 单一归属、Inter 本地首选与五处 hover 位移删除；未发现阻塞问题，准备按固定 22 文件白名单精确提交。
+- 影响文件：tracked 恰为简报允许的 20 份生产/测试文件及 `CONTEXT.md`、`plan.md`；ignored 报告为 `.superpowers/sdd/task-22-final-review-fix-report.md`。package/lockfile、API、router、权限、依赖声明、payload、Go、Android、数据库、migration、其它 tracked 文件及 ignored 浏览器 harness 均未修改。
+- 验证：简报指定定向命令新鲜 9 files、338/338；完整 `npm test` 新鲜 40 files、649/649；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、22/22 固定白名单、22/22 严格 UTF-8 fatal decode、U+FFFD/C0/DEL 零命中、敏感路径零差异、7/7 非目标 SFC 脚本逐字一致及 SavedViewTabs 反归一化业务脚本门禁全部通过；未运行浏览器。
+
+## 2026-07-18 18:58 +0800
+- 进度：Task 22 整分支最终评审 8 项最小生产修复取得定向 GREEN。保存视图在 normalizer 前拒绝非普通 snapshot，图片 active 用属性存在性和精确字符串白名单保留默认基线；SavedViewTabs 统一静默消费取消/关闭并为三个动作显示各自中文恢复错误。其余差异只涉及 4:3、动态 ID alt、三个装饰图标、页面级 overscroll 删除、Inter 本地首选与五处位移删除，边框/阴影反馈保持。
+- 影响文件：当前 tracked 差异精确位于简报允许的 20 份生产/测试文件及 `CONTEXT.md`、`plan.md`；`CONTEXT.md` 仅追加一条最终一致性契约。组件 props/emits、业务 handler/command、请求、payload、package/lockfile、API、权限、router、依赖、Go、Android 与数据库未修改。
+- 验证：`cd admin-web && npm test -- src/components/base/savedView.helpers.spec.js src/components/base/precisionOpsComponents.spec.js src/views/imageManage.helpers.spec.js src/views/imageManagePage.spec.js src/components/Layout.spec.js src/views/tvAppManagePage.spec.js src/assets/themeTokens.spec.js src/views/precisionOpsAudit.spec.js src/views/precisionOpsRollout.spec.js` 通过（9 files，338/338）；待运行完整测试、生产构建及最终 diff、编码、固定白名单、敏感范围与非目标业务脚本门禁。
+
+## 2026-07-18 18:57 +0800
+- 进度：Task 22 整分支最终评审的 9 文件定向测试取得逐项精确 RED。测试阶段只修改简报列出的 9 份现有 spec 与 `plan.md`，生产文件、`CONTEXT.md` 和报告尚未修改；第二次运行用软断言完整展开 SavedViewTabs 三个动作，确认所有预期缺口都由当前生产实现触发。
+- 影响文件：RED 差异精确为 `savedView.helpers.spec.js`、`precisionOpsComponents.spec.js`、`imageManage.helpers.spec.js`、`imageManagePage.spec.js`、`Layout.spec.js`、`tvAppManagePage.spec.js`、`themeTokens.spec.js`、`precisionOpsAudit.spec.js`、`precisionOpsRollout.spec.js` 与 `plan.md`。
+- 验证：简报指定定向命令按预期退出 1（9 files failed，338 tests 中 12 failed / 326 passed，25 条断言差异）；失败逐项命中非对象 snapshot 未丢弃、图片 active 默认回退错误、保存/重命名/删除仍 throw 且缺中文错误、16:9、图片与 IPTV 通用 alt、Layout 桌面/移动分组图标和 TV App 下载图标缺 `aria-hidden`、Layout 重复 overscroll、Inter 缺失，以及 theme/AV 两处/Scrape/电视剧共五处位移；无测试解析、SFC 编译、环境或既有业务契约失败。
+
+## 2026-07-18 18:51 +0800
+- 进度：开始 Task 22 Precision Ops 整分支最终评审修复。先只收紧简报指定的 9 份现有测试，逐项锁定保存视图 snapshot/图片 active 回退、SavedViewTabs 三类异常恢复、图片 4:3 预览、两个动态 ID alt、三个装饰图标、Drawer overscroll 单一归属、Inter 本地首选及五处 hover 位移；取得仅命中这些缺口的精确 RED 后，再一次性完成 8 项最小生产修复。
+- 影响文件：计划只修改最终评审简报允许的保存视图、图片、IPTV、Layout、TV App、主题与三份 hover 目标 Vue/现有测试，以及 `CONTEXT.md`、`plan.md`；报告写入 git 忽略的 `.superpowers/sdd/task-22-final-review-fix-report.md`。不修改组件 API、业务 handler/command、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库、其它 tracked 文件或既有 ignored 审计资产。
+- 验证：起始 HEAD 已确认精确为 `34a990268e952975b26b50ab871b0233a9729bdf`，tracked 与 index 干净；先运行简报指定 9 文件定向命令记录逐项 RED，再运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD/C0/DEL、固定白名单与敏感范围/非目标业务脚本门禁；不运行浏览器且不占用 9444 端口。
+
 ## 2026-07-18 18:28 +0800
 - 进度：Task 22 Precision Ops 最终浏览器验收完成。产品 HEAD `ebdeddc5c1559b22613fba6142be0a0bb6690bda` 上的无筛选完整矩阵为 96/96 页面 PASS、4/4 Mask PASS、100 张非空截图，`failures` 与 `concerns` 均为空；RAF 活性防线使第 74 个组合后的 Vue/Element Plus Dialog、Drawer transition 不再停留在 `enter-from/active`。独立视觉复审结论为 PASS，0 Critical / 0 Important / 0 Minor，Videos、Images、Tasks、Archive、Workbench 与 Mask 的 375/768/1024/1440px 布局无页面级溢出、无不连贯遮挡，Mask footer、关闭入口、工具栏和画布视窗均在视口内。
 - 影响文件：本次 tracked 只追加 `plan.md` 验收账本；git 忽略的浏览器审计器、29 条 Overlay/RAF 契约、三份最终报告、完整 matrix、100 张截图与联系表同步更新。产品 Vue/spec、`CONTEXT.md`、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库与业务流程均未再次修改。

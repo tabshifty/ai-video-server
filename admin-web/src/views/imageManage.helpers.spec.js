@@ -96,12 +96,23 @@ describe('图片管理视图 helper', () => {
     expect(normalizeImageViewSnapshot({ active: true, viewMode: 'table' })).toEqual({
       q: '',
       status: '',
-      active: '',
+      active: DEFAULT_IMAGE_ACTIVE,
       actor_id: '',
       collection_id: '',
       viewMode: 'grid'
     })
     expect(DEFAULT_IMAGE_ACTIVE).toBe('1')
+  })
+
+  it('图片 active 缺失或非法时回退默认启用并保留显式全部语义', () => {
+    expect.soft(normalizeImageViewSnapshot({}).active).toBe(DEFAULT_IMAGE_ACTIVE)
+    expect.soft(normalizeImageViewSnapshot({ active: undefined }).active).toBe(DEFAULT_IMAGE_ACTIVE)
+    expect.soft(normalizeImageViewSnapshot({ active: null }).active).toBe(DEFAULT_IMAGE_ACTIVE)
+    expect.soft(normalizeImageViewSnapshot({ active: 'invalid' }).active).toBe(DEFAULT_IMAGE_ACTIVE)
+    expect.soft(normalizeImageViewSnapshot({ active: [] }).active).toBe(DEFAULT_IMAGE_ACTIVE)
+    expect.soft(normalizeImageViewSnapshot({ active: '' }).active).toBe('')
+    expect.soft(normalizeImageViewSnapshot({ active: '0' }).active).toBe('0')
+    expect.soft(normalizeImageViewSnapshot({ active: '1' }).active).toBe('1')
   })
 
   it('把默认启用状态视为结果集基线而不是用户筛选', () => {

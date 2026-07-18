@@ -512,13 +512,11 @@ async function doSave() {
 }
 
 .candidate-item:hover {
-  transform: translateY(-1px);
   border-color: var(--primary);
   box-shadow: var(--shadow-xs);
 }
 
 .candidate-item.active {
-  transform: translateY(-1px);
   border-color: var(--primary);
   box-shadow: inset 3px 0 0 var(--primary), var(--shadow-xs);
 }

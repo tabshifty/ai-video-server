@@ -38,7 +38,10 @@ export function parseSavedViewDocument(raw, normalizeSnapshot) {
         const label = String(item?.label || '').trim()
         if (!isUserViewId(id) || !label || seen.has(id)) return []
 
-        const snapshot = normalizeSnapshot(item?.snapshot)
+        const rawSnapshot = item?.snapshot
+        if (!rawSnapshot || typeof rawSnapshot !== 'object' || Array.isArray(rawSnapshot)) return []
+
+        const snapshot = normalizeSnapshot(rawSnapshot)
         seen.add(id)
         return [{ id, label, snapshot }]
       } catch (_) {

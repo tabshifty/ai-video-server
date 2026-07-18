@@ -254,7 +254,7 @@ onMounted(loadPlaylist)
               </el-table-column>
               <el-table-column label="台标" width="96" align="center">
                 <template #default="{ row }">
-                  <el-image v-if="row.logo_url" class="logo-image" :src="row.logo_url" :alt="`${row.name || '未命名频道'}台标`" fit="contain" lazy>
+                  <el-image v-if="row.logo_url" class="logo-image" :src="row.logo_url" :alt="`${row.name || row.id}台标`" fit="contain" lazy>
                     <template #error>
                       <span class="logo-empty">无</span>
                     </template>

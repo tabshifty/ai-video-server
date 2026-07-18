@@ -1139,7 +1139,7 @@ onBeforeUnmount(() => {
               <img
                 v-if="imagePreviewUrl(item)"
                 :src="imagePreviewUrl(item)"
-                :alt="item.title || '图片预览'"
+                  :alt="item.title || item.id"
               />
               <span v-else-if="listPreviewErrors[item.id]">预览加载失败</span>
               <span v-else>{{ item.title || '图片' }}</span>
@@ -1621,7 +1621,7 @@ onBeforeUnmount(() => {
 
 .image-grid-card__preview {
   display: grid;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   place-items: center;
   overflow: hidden;
   border-radius: var(--radius-md);

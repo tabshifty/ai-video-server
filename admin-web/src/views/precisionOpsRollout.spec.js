@@ -397,6 +397,23 @@ describe('Precision Ops 第一阶段 rollout', () => {
     })
   })
 
+  it('可交互候选和系列卡保留边框阴影反馈且不发生 hover 位移', () => {
+    const cases = [
+      ['AVManualScrape.vue', '.candidate-item'],
+      ['ScrapePreview.vue', '.candidate-item'],
+      ['TvSeriesManage.vue', '.series-card']
+    ]
+
+    cases.forEach(([file, selector]) => {
+      const style = extractStyle(readView(file))
+      const translations = style.match(/transform:\s*translateY\(-1px\)/g) || []
+
+      expect.soft(translations, file).toEqual([])
+      expect.soft(style, file).toMatch(new RegExp(`${selector.replace('.', '\\.')}(?::hover|\\.active|\\.is-active)[\\s\\S]*?border-color:\\s*var\\(--primary\\)`))
+      expect.soft(style, file).toMatch(new RegExp(`${selector.replace('.', '\\.')}(?::hover|\\.active|\\.is-active)[\\s\\S]*?box-shadow:`))
+    })
+  })
+
   it('AV 刮削保留站点工作流、双栏结果和非纯色候选选中态', () => {
     const source = readView('AVManualScrape.vue')
     const template = extractTemplate(source)
@@ -963,7 +980,7 @@ describe('Precision Ops 第二阶段集成门禁', () => {
     const iptvStyle = extractStyle(iptv)
     const tvApp = readView('TvAppManage.vue')
 
-    expect(iptv).toContain(':alt="`${row.name || \'未命名频道\'}台标`"')
+    expect(iptv).toContain(':alt="`${row.name || row.id}台标`"')
     expect(iptvStyle).toMatch(/\.logo-image\s*\{[^}]*width:\s*44px;[^}]*height:\s*28px;/s)
     expect(tvApp).toContain(':alt="downloadQRCodeTitle" width="220" height="220"')
   })
