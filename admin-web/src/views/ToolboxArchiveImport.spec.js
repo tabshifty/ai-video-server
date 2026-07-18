@@ -23,6 +23,24 @@ function cssDeclarationPattern(property, value) {
 }
 
 describe('ToolboxArchiveImport', () => {
+  it('远程搜索只把当前已选值作为历史候选传入合并器', () => {
+    expect(source).toContain('function selectedArchiveTagValues()')
+    expect(source).toContain('function selectedArchiveCollectionValues()')
+    expect(source).toContain('function selectedArchiveImageCollectionValues()')
+    expect(source).toContain(
+      'filterRemoteOptionsByValues(tagOptions.value, selectedArchiveTagValues())'
+    )
+    expect(source).toMatch(
+      /filterRemoteOptionsByValues\(\s*collectionOptions\.value,\s*selectedArchiveCollectionValues\(\),\s*\(item\) => item\?\.value\s*\)/
+    )
+    expect(source).toMatch(
+      /filterRemoteOptionsByValues\(\s*imageCollectionOptions\.value,\s*selectedArchiveImageCollectionValues\(\),\s*\(item\) => item\?\.value\s*\)/
+    )
+    expect(source).not.toContain('getOptions: () => tagOptions.value')
+    expect(source).not.toContain('getOptions: () => collectionOptions.value')
+    expect(source).not.toContain('getOptions: () => imageCollectionOptions.value')
+  })
+
   it('keeps tags and collections as selector-based inputs instead of JSON or raw ID fields', () => {
     expect(source).toContain('默认标签')
     expect(source).toContain('可选择或输入标签')

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import * as remoteOptions from './videoUpload.remote'
 import {
   createRemoteSuggestionLoader,
   mergeRemoteStringOptions,
@@ -28,6 +29,28 @@ describe('mergeRemoteValueOptions', () => {
       { value: 'existing', label: '已选（更新标签）' },
       { value: 'new', label: '新结果' }
     ])
+  })
+})
+
+describe('filterRemoteOptionsByValues', () => {
+  it('只保留当前已选的字符串候选并规范化空白和大小写', () => {
+    expect(typeof remoteOptions.filterRemoteOptionsByValues).toBe('function')
+    expect(remoteOptions.filterRemoteOptionsByValues(
+      [' 剧情 ', '动作', '爱情'],
+      [' 动作 ']
+    )).toEqual(['动作'])
+  })
+
+  it('按值字段保留当前已选对象并忽略空值', () => {
+    expect(remoteOptions.filterRemoteOptionsByValues(
+      [
+        { value: 'collection-a', label: '甲' },
+        { value: 'collection-b', label: '乙' },
+        { value: '', label: '无效' }
+      ],
+      [' COLLECTION-B '],
+      (item) => item.value
+    )).toEqual([{ value: 'collection-b', label: '乙' }])
   })
 })
 
