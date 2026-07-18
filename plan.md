@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 18:28 +0800
+- 进度：Task 22 Precision Ops 最终浏览器验收完成。产品 HEAD `ebdeddc5c1559b22613fba6142be0a0bb6690bda` 上的无筛选完整矩阵为 96/96 页面 PASS、4/4 Mask PASS、100 张非空截图，`failures` 与 `concerns` 均为空；RAF 活性防线使第 74 个组合后的 Vue/Element Plus Dialog、Drawer transition 不再停留在 `enter-from/active`。独立视觉复审结论为 PASS，0 Critical / 0 Important / 0 Minor，Videos、Images、Tasks、Archive、Workbench 与 Mask 的 375/768/1024/1440px 布局无页面级溢出、无不连贯遮挡，Mask footer、关闭入口、工具栏和画布视窗均在视口内。
+- 影响文件：本次 tracked 只追加 `plan.md` 验收账本；git 忽略的浏览器审计器、29 条 Overlay/RAF 契约、三份最终报告、完整 matrix、100 张截图与联系表同步更新。产品 Vue/spec、`CONTEXT.md`、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库与业务流程均未再次修改。
+- 验证：`node --test .superpowers/sdd/task-22-overlay-hardening.spec.mjs` 新鲜 29/29，`node --check` 通过；full100 进程 exit 0，`targetedMode=false`、276 个业务 fixture 全为 GET，console error/warning/exception、network、external、mutation、unmapped、appApiNonGet 全 0，target observed/closed 2/2、remaining 0，IDB/Chrome/profile 清理成功；磁盘恰有 100 张非空 PNG，联系表 itemCount=100、PNG 914471 bytes，9444 无监听，Vite `http://127.0.0.1:4173` 返回 200。
+
 ## 2026-07-18 16:09 +0800
 - 进度：Task 22 行操作浮层键盘闭环修复完成提交前全量验证与自审。RED 的 10 条精确契约差异均由最小模板改动闭合；自审确认三处 Dropdown 仅失去外层 Tooltip 并补同值中文 `title`，列设置仅增加非持久挂载属性，两份 Vue 的完整非空脚本哈希与固定基线一致，业务 command、handler、删除确认、payload、列状态、持久化键、表格/网格结构和 CSS 均未改变。
 - 影响文件：最终 tracked 范围精确为 brief 允许的 `admin-web/src/views/VideoList.vue`、`videoListPage.spec.js`、`admin-web/src/views/ImageManage.vue`、`imageManagePage.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-dropdown-tooltip-fix-report.md`。浏览器审计器、package/lockfile、API、权限、router、依赖、Go、Android、数据库、其它页面和业务流程均未纳入。
