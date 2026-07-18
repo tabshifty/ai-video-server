@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 23:35 +0800
+- 进度：`writing-plans` 实施计划完成自审。规格中的当前结果替换、已选值保留、latest-wins、非目标范围和验证命令均有对应任务；helper 签名、三个 selected-value collector 与 loader 接线在任务间一致，无占位符或未定义接口。
+- 影响文件：`docs/superpowers/plans/2026-07-18-archive-import-selector-search.md`、`plan.md`。
+- 验证：计划文档反引号格式已修正；占位符扫描无命中；`git diff --check` 通过；待提交后选择执行方式并开始红灯测试。
+
+## 2026-07-18 23:34 +0800
+- 进度：用户复核并确认压缩包导入选择器设计规格，按 `writing-plans` 拆出“候选值过滤纯函数 + 压缩包页 loader 接线 + 定向/全量验证”三阶段实施计划。实现仍限定在管理端远程候选显示边界，不改后端 API、上传中心行为或 Android 版本。
+- 影响文件：新增 `docs/superpowers/plans/2026-07-18-archive-import-selector-search.md`；实施阶段修改 `admin-web/src/views/videoUpload.remote.js`、`videoUpload.remote.spec.js`、`ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`，并继续追加 `plan.md` 验证记录。
+- 验证：计划文档待自审和提交；红灯测试尚未开始。
+
 ## 2026-07-18 23:29 +0800
 - 进度：压缩包导入选择框搜索设计规格完成自审。文档已明确当前查询结果、已选值保留、latest-wins、非目标范围和验收条件；确认该选择器候选边界是可逆的页面接线决策，不新增 ADR。
 - 影响文件：`docs/superpowers/specs/2026-07-18-archive-import-selector-search-design.md`、`CONTEXT.md`、`plan.md`。
