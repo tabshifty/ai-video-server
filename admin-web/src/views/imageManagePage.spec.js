@@ -294,6 +294,16 @@ describe('图片资产集合页', () => {
     expect(paginationTag).not.toContain('v-model:page-size')
   })
 
+  it('图片快速搜索输入提供固定中文程序化名称', () => {
+    const quickSearchInput = template.match(/<el-input\b(?=[^>]*v-model="quickSearch")[^>]*\/>/)?.[0] || ''
+
+    expect(quickSearchInput).not.toBe('')
+    expect(quickSearchInput).toContain('aria-label="图片搜索"')
+    expect(quickSearchInput).toContain('placeholder="搜索图片"')
+    expect(quickSearchInput).toContain('@keyup.enter="applyQuickSearch"')
+    expect(quickSearchInput).toContain('@clear="applyQuickSearch"')
+  })
+
   it('默认 active 保持结果集基线且筛选移除和重置不会扩大结果集', () => {
     const removeBlock = extractBalancedBraceBlock(script, /function removeFilter\(key\)\s*\{/)
     const resetBlock = extractBalancedBraceBlock(script, /function resetFilters\(\)\s*\{/)

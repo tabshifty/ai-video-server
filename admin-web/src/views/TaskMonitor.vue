@@ -356,6 +356,11 @@ onUnmounted(() => {
     min-height: 44px;
   }
 
+  .task-error {
+    min-height: 44px;
+    align-content: center;
+  }
+
   .status-filter {
     max-width: 100%;
     overflow-x: auto;

@@ -1076,6 +1076,7 @@ onBeforeUnmount(() => {
           <el-input
             v-model="quickSearch"
             class="quick-search"
+            aria-label="图片搜索"
             placeholder="搜索图片"
             clearable
             :prefix-icon="Search"

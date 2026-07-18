@@ -374,7 +374,7 @@ onMounted(() => {
     <div class="page-shell app-package-page" data-density="compact">
       <Toolbar dense>
         <template #filters>
-          <el-segmented :model-value="clientType" :options="[
+          <el-segmented class="client-type-switch" :model-value="clientType" :options="[
             { label: 'TV 端', value: 'android_tv' },
             { label: '手机端', value: 'android_phone' }
           ]" @update:modelValue="changeClientType" />
@@ -712,5 +712,11 @@ onMounted(() => {
 
 .package-table :deep(.el-table__row) {
   height: var(--table-row-height);
+}
+
+@media (max-width: 63.9375rem) {
+  .client-type-switch :deep(.el-segmented__item) {
+    min-height: 44px;
+  }
 }
 </style>

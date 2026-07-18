@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 10:30 +0800
+- 进度：Task 22 产品可访问性收口完成提交前全量验证与自审。三项 RED 均由最小生产差异闭合；自审确认 ImageManage 只新增目标 aria，TvAppManage 只新增专用 class 和窄屏 item 规则，TaskMonitor 只新增窄屏目标/对齐规则，未改变 handler、请求、数据契约、业务流程、DOM 层级、桌面 compact 高度、Tooltip 全文或单行省略。
+- 影响文件：最终 tracked 范围精确为 brief 允许的三份目标 Vue、三份对应 page spec、`CONTEXT.md`、`plan.md` 共 8 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-product-a11y-report.md`。浏览器审计器、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库与其它页面均未纳入。
+- 验证：定向 3 files 50/50；完整 `npm test` 40 files 644/644；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、固定八文件白名单、package/lockfile/API/router 零差异、9 个任务文件严格 UTF-8/U+FFFD 门禁均已通过。
+
+## 2026-07-18 10:28 +0800
+- 进度：Task 22 最小生产实现取得定向 GREEN。TV App 客户端分段控件只增加专用 class 与窄屏 44px item 规则；图片快速搜索只增加固定中文 `aria-label`；任务错误触发器只在既有窄屏媒体查询增加 44px 最小高度和 block 内容垂直对齐，原 handler、请求、DOM 层级、桌面高度、Tooltip、单行省略和全文 aria 均未改变。
+- 影响文件：当前 tracked 差异精确位于 brief 允许的八个文件；`CONTEXT.md` 已追加独立搜索输入、可聚焦 Tooltip 文本目标与 TV App 客户端分段目标三条长期契约。
+- 验证：`cd admin-web && npm test -- src/views/tvAppManagePage.spec.js src/views/imageManagePage.spec.js src/views/taskMonitorPage.spec.js` 通过（3 files，50/50）；待运行完整测试、生产构建及最终范围、diff、编码门禁。
+
+## 2026-07-18 10:27 +0800
+- 进度：Task 22 三份页面静态契约取得真实 RED。新增测试分别精确定位客户端类型 `el-segmented`、`quickSearch` 输入和 `.task-error` Tooltip 触发器；失败仅对应专用窄屏 class/CSS、固定中文程序化名称、44px 与垂直对齐规则缺失。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/tvAppManagePage.spec.js`、`imageManagePage.spec.js`、`taskMonitorPage.spec.js`、`plan.md` 与 git 忽略报告；三份生产 SFC 和 `CONTEXT.md` 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/tvAppManagePage.spec.js src/views/imageManagePage.spec.js src/views/taskMonitorPage.spec.js` 按预期退出 1（3 files，50 tests，3 failed / 47 passed）；无测试解析、环境或既有契约失败。
+
+## 2026-07-18 10:26 +0800
+- 进度：开始 Task 22 产品可访问性收口。先在三份现有页面静态契约中分别锁定 TV App 客户端分段控件、图片快速搜索和任务错误 Tooltip 触发器的窄屏/程序化名称要求，取得只命中三个生产缺口的真实 RED 后，再做最小模板与 CSS 实现。
+- 影响文件：计划只修改 brief 允许的 `admin-web/src/views/TvAppManage.vue`、`tvAppManagePage.spec.js`、`admin-web/src/views/ImageManage.vue`、`imageManagePage.spec.js`、`admin-web/src/views/TaskMonitor.vue`、`taskMonitorPage.spec.js`、`CONTEXT.md`、`plan.md`，并填写 git 忽略报告 `.superpowers/sdd/task-22-product-a11y-report.md`；不修改浏览器审计器、API、权限、router、依赖、lockfile、payload、Go、Android、数据库、其它页面、业务流程或 DOM 层级。
+- 验证：先运行 `cd admin-web && npm test -- src/views/tvAppManagePage.spec.js src/views/imageManagePage.spec.js src/views/taskMonitorPage.spec.js` 记录准确 RED；最小实现后运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、本任务文件严格 UTF-8/U+FFFD 与固定范围门禁。
+
 ## 2026-07-18 09:46 +0800
 - 进度：Task 22 动态媒体与输入可访问性修复完成提交前全量验证与自审。三项 RED 均由对应生产属性最小闭合；自审确认两个生产 SFC 相对固定基线无删除，新增恰为三个目标属性，未改变 v-model、placeholder、图片 src/preview、handler、DOM 层级、CSS、请求或 payload。
 - 影响文件：最终 tracked 范围精确为 brief 允许的 `admin-web/src/views/VideoList.vue`、`videoListPage.spec.js`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`imageWorkbench.helpers.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-accessibility-fix-report.md`。浏览器审计器、package/lockfile、API、权限、router、依赖、Go、Android、数据库与其它文件均未纳入。

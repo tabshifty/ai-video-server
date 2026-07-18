@@ -73,6 +73,20 @@ describe('TV app package management page', () => {
     expect(tvAppManage).toContain('下载 APK')
   })
 
+  it('客户端类型分段切换只在窄屏达到 44px 目标高度', () => {
+    const clientTypeSwitch = template.match(/<el-segmented\b(?=[^>]*:model-value="clientType")[^>]*\/>/)?.[0] || ''
+    const mobileStart = style.indexOf('@media (max-width: 63.9375rem)')
+
+    expect(clientTypeSwitch).not.toBe('')
+    expect(clientTypeSwitch).toContain('class="client-type-switch"')
+    expect(clientTypeSwitch.match(/value: 'android_(?:tv|phone)'/g)).toHaveLength(2)
+    expect(mobileStart).toBeGreaterThan(-1)
+    expect(style.slice(mobileStart)).toMatch(
+      /\.client-type-switch\s+:deep\(\.el-segmented__item\)\s*\{[^}]*min-height:\s*44px/
+    )
+    expect(style.slice(0, mobileStart)).not.toMatch(/\.client-type-switch\s+:deep\(\.el-segmented__item\)/)
+  })
+
   it('读取失败只显示行内错误并在刷新时保留已有安装包', () => {
     const alertIndex = template.indexOf('<el-alert v-if="loadError"')
     const qrIndex = template.indexOf('<template #title>{{ downloadQRCodeTitle }}</template>')

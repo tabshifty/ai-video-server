@@ -313,4 +313,18 @@ function setPage(page) {
     expect(style).not.toContain('letter-spacing')
     expect(style).not.toContain('box-shadow')
   })
+
+  it('错误 Tooltip 触发器在窄屏保持 44px 高度并垂直对齐单行文字', () => {
+    const errorTrigger = template.match(/<span\b(?=[^>]*class="task-error")[^>]*>/)?.[0] || ''
+    const mobileStart = style.indexOf('@media (max-width: 63.9375rem)')
+
+    expect(errorTrigger).toContain('tabindex="0"')
+    expect(errorTrigger).toContain(':aria-label="row.error || \'无错误\'"')
+    expect(findRule(style, '.task-error')).toMatch(/display:\s*block/)
+    expect(findRule(style, '.task-error')).toMatch(/text-overflow:\s*ellipsis/)
+    expect(findRule(style, '.task-error')).toMatch(/white-space:\s*nowrap/)
+    expect(mobileStart).toBeGreaterThan(-1)
+    expect(findRule(style.slice(mobileStart), '.task-error')).toMatch(/min-height:\s*44px/)
+    expect(findRule(style.slice(mobileStart), '.task-error')).toMatch(/align-content:\s*center/)
+  })
 })

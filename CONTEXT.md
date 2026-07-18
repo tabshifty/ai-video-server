@@ -1138,3 +1138,6 @@
 ## 管理端动态媒体与独立输入可访问性约定
 - `动态资源图片替代文本契约`：动态资源图片必须提供由资源名称派生的替代文本；资源标题缺失时使用稳定资源 ID 回退，不能让已加载的内容图片保持无名称状态。
 - `独立输入程序化名称契约`：没有可见 `<label>` 或 `form-item` label 的独立输入必须提供中文程序化名称；placeholder 只表达输入提示，不能替代 label 或 `aria-label`。
+- `管理端独立搜索输入中文命名契约`：管理端没有可见 label 的独立搜索输入必须提供固定中文程序化名称；placeholder、v-model 和搜索事件继续承担原有提示与交互职责，不能用 placeholder 代替 `aria-label`。
+- `可聚焦 Tooltip 文本目标契约`：可聚焦的 Tooltip 文本触发器在 `max-width: 63.9375rem`（1024px 以下）必须以 `min-height: 44px` 提供足够目标高度，不能只依赖 line-height；垂直对齐不得破坏既有单行省略、全文 aria、焦点或表格布局。
+- `TV App 客户端分段目标契约`：管理端 TV App 页面中的客户端类型分段切换在 `max-width: 63.9375rem` 下，每个 `.el-segmented__item` 都必须达到 `min-height: 44px`；桌面 compact 高度继续由既有密度规则控制。
