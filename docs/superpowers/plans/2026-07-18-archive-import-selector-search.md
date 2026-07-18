@@ -38,7 +38,7 @@
 - Expected new export: `filterRemoteOptionsByValues(options, selectedValues, getValue)` returns a filtered array and defaults `getValue` to the item itself.
 - The archive page contract must use `filterRemoteOptionsByValues` for `tagOptions`, `collectionOptions` and `imageCollectionOptions` before calling `mergeOptions`.
 
-- [ ] **Step 1: Write the failing pure-helper tests**
+- [x] **Step 1: Write the failing pure-helper tests**
 
 Add a namespace import so the test fails as a missing behavior rather than changing an existing named import:
 
@@ -72,7 +72,7 @@ describe('filterRemoteOptionsByValues', () => {
 })
 ```
 
-- [ ] **Step 2: Write the failing archive-page wiring test**
+- [x] **Step 2: Write the failing archive-page wiring test**
 
 Add this test to `admin-web/src/views/ToolboxArchiveImport.spec.js`:
 
@@ -96,7 +96,7 @@ it('远程搜索只把当前已选值作为历史候选传入合并器', () => {
 })
 ```
 
-- [ ] **Step 3: Run the focused tests and verify the failure is correct**
+- [x] **Step 3: Run the focused tests and verify the failure is correct**
 
 Run:
 
@@ -120,7 +120,7 @@ Expected: Vitest exits with failure. The pure-helper test reports that `filterRe
 - `selectedArchiveCollectionValues()` returns normalized video collection IDs from `uploadForm.default_video_collection_ids`, `selectedFile.value?.video_collection_ids`, `batchEditForm.video_collection_ids` and `archiveGroupForm.video_collection_ids`.
 - `selectedArchiveImageCollectionValues()` returns normalized image collection IDs from upload defaults, the selected file, `batchEditForm.video_image_collection_id`, `batchEditForm.image_collection_ids` and `archiveGroupForm.image_collection_ids`.
 
-- [ ] **Step 1: Add the minimal pure helper**
+- [x] **Step 1: Add the minimal pure helper**
 
 Add this function to `admin-web/src/views/videoUpload.remote.js` without changing the existing merge functions:
 
@@ -139,7 +139,7 @@ export function filterRemoteOptionsByValues(options, selectedValues, getValue = 
 }
 ```
 
-- [ ] **Step 2: Import the helper in the archive page**
+- [x] **Step 2: Import the helper in the archive page**
 
 Extend the existing import in `ToolboxArchiveImport.vue`:
 
@@ -152,7 +152,7 @@ import {
 } from './videoUpload.remote'
 ```
 
-- [ ] **Step 3: Add selected-value collectors before the three loader declarations**
+- [x] **Step 3: Add selected-value collectors before the three loader declarations**
 
 Insert the following functions after `searchImageCollections` and before `const loadTagSuggestions`:
 
@@ -186,7 +186,7 @@ function selectedArchiveImageCollectionValues() {
 }
 ```
 
-- [ ] **Step 4: Change only the three archive loader `getOptions` callbacks**
+- [x] **Step 4: Change only the three archive loader `getOptions` callbacks**
 
 Use these exact callbacks and leave `fetcher`, `setOptions`, `setLoading` and `mergeOptions` unchanged:
 
@@ -212,7 +212,7 @@ getOptions: () => filterRemoteOptionsByValues(
 
 Do not change the corresponding `VideoUpload.vue` callbacks. The existing archive form normalizers already provide UUID and tag canonicalization; no new payload normalization is needed.
 
-- [ ] **Step 5: Run the focused tests and verify GREEN**
+- [x] **Step 5: Run the focused tests and verify GREEN**
 
 Run:
 
@@ -222,7 +222,7 @@ cd admin-web && npm test -- src/views/videoUpload.remote.spec.js src/views/Toolb
 
 Expected: both files pass, including the new helper behavior, archive loader wiring, remote debounce/latest-wins tests, and existing archive import contracts.
 
-- [ ] **Step 6: Commit the implementation**
+- [x] **Step 6: Commit the implementation**
 
 Run:
 
@@ -242,7 +242,7 @@ Expected: one Chinese commit containing only the implementation files, tests and
 - Verify: `admin-web/src/views/ToolboxArchiveImport.spec.js`
 - Modify: `plan.md`
 
-- [ ] **Step 1: Run the complete admin-web test suite**
+- [x] **Step 1: Run the complete admin-web test suite**
 
 Run:
 
@@ -252,7 +252,7 @@ cd admin-web && npm test
 
 Expected: Vitest exits 0 with all existing and new test files passing.
 
-- [ ] **Step 2: Build the admin web**
+- [x] **Step 2: Build the admin web**
 
 Run:
 
@@ -262,7 +262,7 @@ cd admin-web && npm run build
 
 Expected: Vite build exits 0; the existing chunk-size warning may remain, but there are no compile errors.
 
-- [ ] **Step 3: Run repository hygiene checks**
+- [x] **Step 3: Run repository hygiene checks**
 
 Run:
 
@@ -274,11 +274,11 @@ git status --short
 
 Expected: `git diff --check` passes, the replacement-character scan returns no matches, and status shows only the pre-existing TV splash deletion and `.superpowers/` directory after the implementation commit.
 
-- [ ] **Step 4: Append the final verification record**
+- [x] **Step 4: Append the final verification record**
 
 Add a new reverse-chronological entry to `plan.md` recording the focused RED/GREEN result, complete `npm test`, `npm run build`, hygiene checks, implementation commit, and the fact that unrelated worktree changes were not staged.
 
-- [ ] **Step 5: Commit the verification record**
+- [x] **Step 5: Commit the verification record**
 
 Run:
 

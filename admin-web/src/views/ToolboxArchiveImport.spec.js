@@ -41,6 +41,26 @@ describe('ToolboxArchiveImport', () => {
     expect(source).not.toContain('getOptions: () => imageCollectionOptions.value')
   })
 
+  it('从上传、单文件、批量编辑和分组表单收集已选历史字段', () => {
+    const tagCollector = source.match(/function selectedArchiveTagValues\(\) \{[\s\S]*?\n\}/)?.[0] || ''
+    const collectionCollector = source.match(/function selectedArchiveCollectionValues\(\) \{[\s\S]*?\n\}/)?.[0] || ''
+    const imageCollectionCollector = source.match(/function selectedArchiveImageCollectionValues\(\) \{[\s\S]*?\n\}/)?.[0] || ''
+
+    expect(tagCollector).toContain('uploadForm.default_tags')
+    expect(tagCollector).toContain('selectedFile.value?.tags')
+    expect(tagCollector).toContain('batchEditForm.tags')
+    expect(tagCollector).toContain('archiveGroupForm.tags')
+    expect(collectionCollector).toContain('uploadForm.default_video_collection_ids')
+    expect(collectionCollector).toContain('selectedFile.value?.video_collection_ids')
+    expect(collectionCollector).toContain('batchEditForm.video_collection_ids')
+    expect(collectionCollector).toContain('archiveGroupForm.video_collection_ids')
+    expect(imageCollectionCollector).toContain('uploadForm.default_image_collection_ids')
+    expect(imageCollectionCollector).toContain('selectedFile.value?.image_collection_ids')
+    expect(imageCollectionCollector).toContain('batchEditForm.video_image_collection_id')
+    expect(imageCollectionCollector).toContain('batchEditForm.image_collection_ids')
+    expect(imageCollectionCollector).toContain('archiveGroupForm.image_collection_ids')
+  })
+
   it('keeps tags and collections as selector-based inputs instead of JSON or raw ID fields', () => {
     expect(source).toContain('默认标签')
     expect(source).toContain('可选择或输入标签')

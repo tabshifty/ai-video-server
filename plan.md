@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 00:32 +0800
+- 进度：最终整分支 reviewer fix wave 开始。仅补充压缩包选择器候选过滤的运行时回归测试、四类表单字段静态接线断言，并将既有 Task 1/2/3 实施计划步骤同步标记为完成。
+- 影响文件：`admin-web/src/views/videoUpload.remote.spec.js`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`docs/superpowers/plans/2026-07-18-archive-import-selector-search.md`、`plan.md`、`.superpowers/sdd/task-2-report.md`。
+- 验证：待执行 `cd admin-web && npm test -- src/views/videoUpload.remote.spec.js src/views/ToolboxArchiveImport.spec.js`、`git diff --check` 与中文编码扫描；完成后仅提交允许范围内文件。
+
 ## 2026-07-19 00:19 +0800
 - 进度：Task 3 主线程最终验证完成。压缩包选择器修复在隔离分支 `fix/archive-import-selector-search` 上取得完整管理端测试和生产构建通过，范围与编码门禁均闭合，待最终整分支 reviewer 审查。
 - 影响文件：最终产品改动为 `admin-web/src/views/videoUpload.remote.js`、`admin-web/src/views/ToolboxArchiveImport.vue` 及两个对应 spec；另含本事项实施计划与本账本。未纳入后端、API、Android、`VideoUpload.vue`、TV 图片删除或 `.superpowers/` 报告 artifact。
