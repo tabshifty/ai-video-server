@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 00:35 +0800
+- 进度：最终整分支 reviewer fix wave 已完成并提交 `e140a10`。新增真实 loader 的 A->B->清空查询回归覆盖，锁定未选历史候选移除、已选名称保留和每次当前结果合并；补充 helper 原对象引用及缺省输入断言，并将 Task 1/2/3 全部步骤与实际完成状态一致化。
+- 影响文件：`admin-web/src/views/videoUpload.remote.spec.js`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`docs/superpowers/plans/2026-07-18-archive-import-selector-search.md`、`plan.md`、`.superpowers/sdd/task-2-report.md`。
+- 验证：`cd admin-web && npm test -- src/views/videoUpload.remote.spec.js src/views/ToolboxArchiveImport.spec.js` 通过（2 files，38/38 tests）；提交前 `git diff --check` 通过，替换字符扫描无命中。待提交本轮报告追加；历史 `a48d09a`/`baf8879` 中短暂跟踪后删除的 `task-1-report.md` 不重写，作为集成阶段历史清理注意事项记录。
+
 ## 2026-07-19 00:32 +0800
 - 进度：最终整分支 reviewer fix wave 开始。仅补充压缩包选择器候选过滤的运行时回归测试、四类表单字段静态接线断言，并将既有 Task 1/2/3 实施计划步骤同步标记为完成。
 - 影响文件：`admin-web/src/views/videoUpload.remote.spec.js`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`docs/superpowers/plans/2026-07-18-archive-import-selector-search.md`、`plan.md`、`.superpowers/sdd/task-2-report.md`。
