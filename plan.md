@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 20:00 +0800
+- 进度：Task 22 最终视觉修复已在产品 HEAD `2f22327349dd2120b3b86d505b576e6a9579df82` 完成浏览器闭环。TV Series、TV App、AV 刮削三路由四视口定向 12/12 PASS；无筛选 full100 为 96/96 页面 PASS、4/4 Mask PASS、100 张非空截图，`failures=[]`、`concerns=[]`。原视觉 reviewer 复审转为 PASS，上轮分页重叠 Important 与标题/开关文案 Minor 全部 CLOSED，当前无 OPEN finding。
+- 影响文件：本次 tracked 只追加 `plan.md` 验收账本；git 忽略的最终 matrix、100 张截图、联系表、视觉修复报告与 SDD 进度账本同步更新。产品 Vue/spec、`CONTEXT.md`、browser harness、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库与业务流程均未再次修改。
+- 验证：定向 12/12、12 图；full100 `targetedMode=false`，固定/期望/实际 HEAD 均为 `2f22327`，276 个业务 fixture 全为 GET，console error/warning/exception、network、external、mutation、unmapped、appApiNonGet 全 0；target observed/closed 2/2、remaining 0，合成 IDB、Chrome、profile、9444 全部清理成功。磁盘恰有 100 张非空 PNG，联系表 itemCount=100、1440×4222、914135 bytes；Vite `http://127.0.0.1:4173` 返回 200。
+
 ## 2026-07-18 19:46 +0800
 - 进度：Task 22 最终视觉复审三类修复完成提交前验证与自审。最终生产差异仅为电视剧列表卡滚动/分页 containment、两页 30rem 局部图标动作与 AV 目标 switch nowrap；没有业务脚本、handler、loading、顺序、v-model、请求、payload 或共享组件变化，准备按 7 文件白名单精确提交。
 - 影响文件：tracked 恰为简报允许的 `admin-web/src/views/TvSeriesManage.vue`、`TvAppManage.vue`、`AVManualScrape.vue`、`precisionOpsRollout.spec.js`、`tvAppManagePage.spec.js`、`CONTEXT.md`、`plan.md`；ignored 报告为 `.superpowers/sdd/task-22-final-visual-fix-report.md`。Layout、共享基础组件、browser harness、package/lockfile、API、router、权限、依赖、Go、Android、数据库、migration 与其它 tracked 文件均未修改。
