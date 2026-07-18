@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 23:29 +0800
+- 进度：压缩包导入选择框搜索设计规格完成自审。文档已明确当前查询结果、已选值保留、latest-wins、非目标范围和验收条件；确认该选择器候选边界是可逆的页面接线决策，不新增 ADR。
+- 影响文件：`docs/superpowers/specs/2026-07-18-archive-import-selector-search-design.md`、`CONTEXT.md`、`plan.md`。
+- 验证：文档无 `TODO`/`TBD`/`FIXME`/`待定` 占位；`git diff --check` 通过；目标文档乱码扫描无命中；待用户复核文档后进入实现。
+
+## 2026-07-18 23:28 +0800
+- 进度：通过 `grill-with-docs` 完成压缩包导入页选择框搜索问题的根因确认，用户已确认设计。根因是 `ToolboxArchiveImport` 的三个远程候选加载器把完整历史 `options` 传给合并器，搜索新关键词后旧候选持续保留；设计收口为当前查询结果覆盖历史未选候选，只保留当前压缩包工作台已选值对应的候选以维持 Element Plus 已选标签显示。
+- 影响文件：先写入 `docs/superpowers/specs/2026-07-18-archive-import-selector-search-design.md`、`CONTEXT.md`、`plan.md`；实现阶段预计修改 `admin-web/src/views/ToolboxArchiveImport.vue` 与对应现有测试，不修改后端 API、共享 `VideoUpload` 行为或 Android 模块。
+- 验证：设计文档待自审、提交并请用户复核；代码红灯测试和实现尚未开始。
+
 ## 2026-07-18 20:00 +0800
 - 进度：Task 22 最终视觉修复已在产品 HEAD `2f22327349dd2120b3b86d505b576e6a9579df82` 完成浏览器闭环。TV Series、TV App、AV 刮削三路由四视口定向 12/12 PASS；无筛选 full100 为 96/96 页面 PASS、4/4 Mask PASS、100 张非空截图，`failures=[]`、`concerns=[]`。原视觉 reviewer 复审转为 PASS，上轮分页重叠 Important 与标题/开关文案 Minor 全部 CLOSED，当前无 OPEN finding。
 - 影响文件：本次 tracked 只追加 `plan.md` 验收账本；git 忽略的最终 matrix、100 张截图、联系表、视觉修复报告与 SDD 进度账本同步更新。产品 Vue/spec、`CONTEXT.md`、browser harness、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库与业务流程均未再次修改。
