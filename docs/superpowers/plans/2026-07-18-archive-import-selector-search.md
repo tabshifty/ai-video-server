@@ -84,11 +84,11 @@ it('远程搜索只把当前已选值作为历史候选传入合并器', () => {
   expect(source).toContain(
     'filterRemoteOptionsByValues(tagOptions.value, selectedArchiveTagValues())'
   )
-  expect(source).toContain(
-    'filterRemoteOptionsByValues(collectionOptions.value, selectedArchiveCollectionValues(), (item) => item?.value)'
+  expect(source).toMatch(
+    /filterRemoteOptionsByValues\(\s*collectionOptions\.value,\s*selectedArchiveCollectionValues\(\),\s*\(item\) => item\?\.value\s*\)/
   )
-  expect(source).toContain(
-    'filterRemoteOptionsByValues(imageCollectionOptions.value, selectedArchiveImageCollectionValues(), (item) => item?.value)'
+  expect(source).toMatch(
+    /filterRemoteOptionsByValues\(\s*imageCollectionOptions\.value,\s*selectedArchiveImageCollectionValues\(\),\s*\(item\) => item\?\.value\s*\)/
   )
   expect(source).not.toContain('getOptions: () => tagOptions.value')
   expect(source).not.toContain('getOptions: () => collectionOptions.value')
