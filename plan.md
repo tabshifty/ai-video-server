@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 00:25 +0800
+- 进度：Task 2 最小生产实现完成并通过任务级审查。新增远程候选按已选值过滤 helper；压缩包页三个 loader 分别从上传默认、单文件、批量编辑和分组表单收集当前值，保留原 fetcher、合并器、防抖、latest-wins、payload 和上传中心行为。
+- 影响文件：`admin-web/src/views/videoUpload.remote.js`、`admin-web/src/views/ToolboxArchiveImport.vue`；实现提交 `31c7bf6`，Task 1 测试基线未改。
+- 验证：定向测试 `35/35` 通过；`cd admin-web && npm run build` 通过，仅有既有 chunk-size warning；Task reviewer 判定 Spec compliant / Task quality Approved，未发现 Critical、Important、Minor。
+
 ## 2026-07-19 00:15 +0800
 - 进度：Task 1 红灯测试完成并通过两轮任务级审查。新增纯 helper 测试与压缩包 loader 接线测试，准确锁定缺少候选过滤和历史候选接线；任务报告已从 Git 索引移除，产品净 diff 仅保留两个测试文件。
 - 影响文件：`admin-web/src/views/videoUpload.remote.spec.js`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`；Task 1 提交范围为 `fa530a1`、`a48d09a`、`baf8879`。
