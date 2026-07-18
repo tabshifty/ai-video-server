@@ -535,9 +535,10 @@ async function load() {
       expect(element).toContain('command="toggle"')
       expect(element).toContain('command="delete"')
       expect(element).toContain('popper-class="image-row-actions-popper"')
-      expect(element).toContain('content="图片操作"')
       expect(element).toContain('aria-label="图片操作"')
-      expect(element).toMatch(/<el-tooltip\b[^>]*content="图片操作"[^>]*>\s*<el-dropdown\b[\s\S]*?>\s*<el-button\b/)
+      expect.soft(element).toContain('title="图片操作"')
+      expect.soft(element).toMatch(/<el-dropdown\s+trigger="click"\s+popper-class="image-row-actions-popper"\s+@command="\(command\) => handleImageRowAction\(command, (?:item|row)\)"\s*>\s*<el-button\b(?=[^>]*:icon="MoreFilled")(?=[^>]*\bcircle\b)(?=[^>]*aria-label="图片操作")(?=[^>]*title="图片操作")[^>]*\/>/)
+      expect.soft(element).not.toMatch(/<el-tooltip\b[^>]*>\s*<el-dropdown\b/)
       expect(element).not.toMatch(/<el-dropdown\b[^>]*>\s*<el-tooltip\b/)
     }
     expect(deleteBlock?.body.indexOf('ElMessageBox.confirm')).toBeGreaterThan(-1)

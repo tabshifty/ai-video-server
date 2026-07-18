@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 16:09 +0800
+- 进度：Task 22 行操作浮层键盘闭环修复完成提交前全量验证与自审。RED 的 10 条精确契约差异均由最小模板改动闭合；自审确认三处 Dropdown 仅失去外层 Tooltip 并补同值中文 `title`，列设置仅增加非持久挂载属性，两份 Vue 的完整非空脚本哈希与固定基线一致，业务 command、handler、删除确认、payload、列状态、持久化键、表格/网格结构和 CSS 均未改变。
+- 影响文件：最终 tracked 范围精确为 brief 允许的 `admin-web/src/views/VideoList.vue`、`videoListPage.spec.js`、`admin-web/src/views/ImageManage.vue`、`imageManagePage.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-dropdown-tooltip-fix-report.md`。浏览器审计器、package/lockfile、API、权限、router、依赖、Go、Android、数据库、其它页面和业务流程均未纳入。
+- 验证：定向 2 files 37/37；完整 `npm test` 40 files 644/644；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、固定六文件白名单、package/lockfile/API/router/权限/依赖/Go/Android/数据库零差异、六文件严格 UTF-8/U+FFFD/C0/DEL 与两份 Vue 非空脚本/业务命令基线门禁均已通过；提交前从最终 tracked 状态新鲜复跑完整验证。
+
+## 2026-07-18 16:04 +0800
+- 进度：Task 22 最小生产实现取得定向 GREEN。视频和图片行操作仅移除三处外层 Tooltip，并为原圆形按钮补同值中文 `title`；视频列设置仅增加 `:persistent="false"`。首次 GREEN 复跑发现测试正则把 `@command` 箭头中的 `>` 误判为标签结束符，修正为按既有多行属性顺序锁定直接 Dropdown/Button 结构后通过，未因此追加任何生产改动。
+- 影响文件：当前 tracked 差异精确位于 brief 允许的 6 个文件；`CONTEXT.md` 已追加行操作 Dropdown 不叠加 Tooltip、含表单控件的按需 Popover 非持久挂载两条长期契约。既有 Dropdown、trigger、popper-class、command、handler、删除确认、列可见性状态、持久化键、checkbox 逻辑、表格/网格结构和 44px CSS 均未修改。
+- 验证：`cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageManagePage.spec.js` 通过（2 files，37/37）；待运行完整 `npm test`、`npm run build` 及最终 diff、编码、固定六文件与敏感范围门禁。
+
+## 2026-07-18 16:00 +0800
+- 进度：Task 22 两份真实 SFC 静态契约取得精确 RED。软断言同时确认视频 1 处、图片网格/表格 2 处仍存在 `el-tooltip > el-dropdown` 外层组合，三个圆形按钮均缺同值中文 `title`，视频列设置目标 Popover 缺 `:persistent="false"`；既有 Dropdown、command、handler、删除确认和 44px 断言继续通过。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/imageManagePage.spec.js` 与 `plan.md`；两份生产 SFC、`CONTEXT.md` 和报告尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageManagePage.spec.js` 按预期退出 1（2 files，37 tests，3 failed / 34 passed；3 个失败测试展开 10 条精确契约差异），无 SFC 编译、测试解析、环境或既有业务契约失败。
+
+## 2026-07-18 15:58 +0800
+- 进度：开始 Task 22 行操作浮层键盘闭环修复。先只收紧两份既有页面静态契约，锁定视频 1 处、图片网格/表格 2 处行操作不再以外层 Tooltip 包裹 Dropdown，三个圆形按钮同时保留同值中文 `aria-label` 与 `title`，并要求视频列设置 Popover 使用 `:persistent="false"`；取得只命中这些缺口的真实 RED 后再做最小生产实现。
+- 影响文件：计划精确修改 `admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/imageManagePage.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个 tracked 文件，并填写 git 忽略报告 `.superpowers/sdd/task-22-dropdown-tooltip-fix-report.md`；不修改浏览器审计器、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库、其它页面、业务 command、handler、删除确认、表格/网格结构或 44px 规则。
+- 验证：先运行 `cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageManagePage.spec.js` 记录精确 RED；最小实现后运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD、固定六文件白名单及 API/router/package/lock/依赖/业务脚本范围门禁；不运行浏览器且不占用 9444 端口。
+
 ## 2026-07-18 10:30 +0800
 - 进度：Task 22 产品可访问性收口完成提交前全量验证与自审。三项 RED 均由最小生产差异闭合；自审确认 ImageManage 只新增目标 aria，TvAppManage 只新增专用 class 和窄屏 item 规则，TaskMonitor 只新增窄屏目标/对齐规则，未改变 handler、请求、数据契约、业务流程、DOM 层级、桌面 compact 高度、Tooltip 全文或单行省略。
 - 影响文件：最终 tracked 范围精确为 brief 允许的三份目标 Vue、三份对应 page spec、`CONTEXT.md`、`plan.md` 共 8 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-product-a11y-report.md`。浏览器审计器、package/lockfile、API、权限、router、依赖、payload、Go、Android、数据库与其它页面均未纳入。

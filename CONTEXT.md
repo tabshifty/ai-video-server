@@ -1141,3 +1141,7 @@
 - `管理端独立搜索输入中文命名契约`：管理端没有可见 label 的独立搜索输入必须提供固定中文程序化名称；placeholder、v-model 和搜索事件继续承担原有提示与交互职责，不能用 placeholder 代替 `aria-label`。
 - `可聚焦 Tooltip 文本目标契约`：可聚焦的 Tooltip 文本触发器在 `max-width: 63.9375rem`（1024px 以下）必须以 `min-height: 44px` 提供足够目标高度，不能只依赖 line-height；垂直对齐不得破坏既有单行省略、全文 aria、焦点或表格布局。
 - `TV App 客户端分段目标契约`：管理端 TV App 页面中的客户端类型分段切换在 `max-width: 63.9375rem` 下，每个 `.el-segmented__item` 都必须达到 `min-height: 44px`；桌面 compact 高度继续由既有密度规则控制。
+
+## 管理端组合浮层键盘契约
+- `行操作 Dropdown 不叠加 Tooltip`：可聚焦的行操作菜单按钮由 `el-dropdown` 直接承载，不能再以 `el-tooltip` 包裹 Dropdown；外层 Tooltip 会与菜单各自维护浮层和焦点状态，可能在菜单关闭且焦点离开后继续残留。纯图标按钮必须保留同值中文 `aria-label` 与原生 `title`，分别提供稳定程序化名称和鼠标提示，不能为恢复提示而重新叠加 Tooltip。
+- `含表单控件的按需 Popover 非持久挂载`：列设置等包含 checkbox、input 或其它可聚焦控件的点击型 `el-popover`，若关闭后不需要保留内部 DOM 状态，应显式使用 `:persistent="false"`，使关闭浮层销毁隐藏控件并退出自然 Tab 顺序；业务状态继续由页面响应式数据和既有持久化键持有，不能依赖隐藏 Popover DOM 保存。

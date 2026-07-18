@@ -1343,7 +1343,7 @@ onBeforeUnmount(() => {
   <Layout>
     <template #header-actions>
       <div class="video-header-actions">
-        <el-popover trigger="click" :width="240" popper-class="video-column-settings-popper">
+        <el-popover trigger="click" :width="240" :persistent="false" popper-class="video-column-settings-popper">
           <template #reference>
             <el-button :icon="Setting" aria-label="列设置" title="列设置">
               <span class="video-column-settings-label">列设置</span>
@@ -1470,21 +1470,19 @@ onBeforeUnmount(() => {
               <template #default="{ row }">
                 <div class="video-row-actions">
                   <el-button link type="primary" @click="showDetail(row)">详情</el-button>
-                  <el-tooltip content="更多视频操作" placement="top">
-                    <el-dropdown
-                      trigger="click"
-                      popper-class="video-row-actions-popper"
-                      @command="(command) => handleVideoRowAction(command, row)"
-                    >
-                      <el-button :icon="MoreFilled" circle aria-label="更多视频操作" />
-                      <template #dropdown>
-                        <el-dropdown-menu>
-                          <el-dropdown-item command="retranscode">重新转码</el-dropdown-item>
-                          <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
-                  </el-tooltip>
+                  <el-dropdown
+                    trigger="click"
+                    popper-class="video-row-actions-popper"
+                    @command="(command) => handleVideoRowAction(command, row)"
+                  >
+                    <el-button :icon="MoreFilled" circle aria-label="更多视频操作" title="更多视频操作" />
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="retranscode">重新转码</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                 </div>
               </template>
             </el-table-column>

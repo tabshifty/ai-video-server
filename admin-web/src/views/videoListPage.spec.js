@@ -492,11 +492,12 @@ async function load() {
     expect(operationsColumn).toContain('fixed="right"')
     expect(operationsColumn).toMatch(/<el-button\b[^>]*link[^>]*@click="showDetail\(row\)"[^>]*>详情<\/el-button>/)
     expect(operationsColumn).toContain('<el-dropdown')
-    expect(operationsColumn).toContain('content="更多视频操作"')
     expect(operationsColumn).toContain('aria-label="更多视频操作"')
+    expect.soft(operationsColumn).toContain('title="更多视频操作"')
     expect(operationsColumn).toContain('command="retranscode"')
     expect(operationsColumn).toContain('command="delete"')
-    expect(operationsColumn).toMatch(/<el-tooltip\b[^>]*content="更多视频操作"[^>]*>\s*<el-dropdown\b[\s\S]*?>\s*<el-button\b/)
+    expect.soft(operationsColumn).toMatch(/<el-dropdown\s+trigger="click"\s+popper-class="video-row-actions-popper"\s+@command="\(command\) => handleVideoRowAction\(command, row\)"\s*>\s*<el-button\b(?=[^>]*:icon="MoreFilled")(?=[^>]*\bcircle\b)(?=[^>]*aria-label="更多视频操作")(?=[^>]*title="更多视频操作")[^>]*\/>/)
+    expect.soft(operationsColumn).not.toMatch(/<el-tooltip\b[^>]*>\s*<el-dropdown\b/)
     expect(operationsColumn).not.toMatch(/<el-dropdown\b[^>]*>\s*<el-tooltip\b/)
     expect(operationsColumn).not.toContain('@click="doRetranscode(row)"')
     expect(operationsColumn).not.toContain('@click="doDelete(row)"')
@@ -557,7 +558,7 @@ async function load() {
   it('窄屏壳层操作和 Teleport 菜单保持至少 44px 点击目标', () => {
     const mediaStart = style.indexOf('@media (max-width: 63.9375rem)')
 
-    expect(template).toContain('popper-class="video-column-settings-popper"')
+    expect(template).toMatch(/<el-popover\b(?=[^>]*trigger="click")(?=[^>]*:width="240")(?=[^>]*:persistent="false")(?=[^>]*popper-class="video-column-settings-popper")[^>]*>/)
     expect(operationsColumn).toContain('popper-class="video-row-actions-popper"')
     expect(mediaStart).toBeGreaterThan(-1)
     const mobileStyle = style.slice(mediaStart)

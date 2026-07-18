@@ -1154,21 +1154,19 @@ onBeforeUnmount(() => {
             </div>
             <div class="image-grid-card__actions image-row-actions">
               <el-button link type="primary" @click="showDetail(item)">详情</el-button>
-              <el-tooltip content="图片操作" placement="top">
-                <el-dropdown
-                  trigger="click"
-                  popper-class="image-row-actions-popper"
-                  @command="(command) => handleImageRowAction(command, item)"
-                >
-                  <el-button :icon="MoreFilled" circle aria-label="图片操作" />
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="toggle">{{ item.active ? '停用' : '启用' }}</el-dropdown-item>
-                      <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </el-tooltip>
+              <el-dropdown
+                trigger="click"
+                popper-class="image-row-actions-popper"
+                @command="(command) => handleImageRowAction(command, item)"
+              >
+                <el-button :icon="MoreFilled" circle aria-label="图片操作" title="图片操作" />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="toggle">{{ item.active ? '停用' : '启用' }}</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </article>
         </div>
@@ -1217,21 +1215,19 @@ onBeforeUnmount(() => {
               <template #default="{ row }">
                 <div class="image-row-actions">
                   <el-button link type="primary" @click="showDetail(row)">详情</el-button>
-                  <el-tooltip content="图片操作" placement="top">
-                    <el-dropdown
-                      trigger="click"
-                      popper-class="image-row-actions-popper"
-                      @command="(command) => handleImageRowAction(command, row)"
-                    >
-                      <el-button :icon="MoreFilled" circle aria-label="图片操作" />
-                      <template #dropdown>
-                        <el-dropdown-menu>
-                          <el-dropdown-item command="toggle">{{ row.active ? '停用' : '启用' }}</el-dropdown-item>
-                          <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
-                  </el-tooltip>
+                  <el-dropdown
+                    trigger="click"
+                    popper-class="image-row-actions-popper"
+                    @command="(command) => handleImageRowAction(command, row)"
+                  >
+                    <el-button :icon="MoreFilled" circle aria-label="图片操作" title="图片操作" />
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="toggle">{{ row.active ? '停用' : '启用' }}</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                 </div>
               </template>
             </el-table-column>
