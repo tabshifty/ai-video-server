@@ -946,6 +946,7 @@ function formatLibraryItemMeta(item) {
               <el-input
                 v-model="prompt"
                 type="textarea"
+                aria-label="图像生成提示词"
                 :rows="8"
                 resize="vertical"
                 placeholder="描述要生成或编辑的图像"

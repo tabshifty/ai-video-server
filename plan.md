@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-18 09:46 +0800
+- 进度：Task 22 动态媒体与输入可访问性修复完成提交前全量验证与自审。三项 RED 均由对应生产属性最小闭合；自审确认两个生产 SFC 相对固定基线无删除，新增恰为三个目标属性，未改变 v-model、placeholder、图片 src/preview、handler、DOM 层级、CSS、请求或 payload。
+- 影响文件：最终 tracked 范围精确为 brief 允许的 `admin-web/src/views/VideoList.vue`、`videoListPage.spec.js`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`imageWorkbench.helpers.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-accessibility-fix-report.md`。浏览器审计器、package/lockfile、API、权限、router、依赖、Go、Android、数据库与其它文件均未纳入。
+- 验证：定向 2 files 30/30；完整 `npm test` 40 files 641/641；`npm run build` 成功转换 2373 modules，仅既有 chunk-size warning。`git diff --check`、固定基线六文件白名单、package/lockfile/API/router 零差异、严格 UTF-8/U+FFFD 与生产差异仅三个目标属性门禁均已通过；提交前从最终状态新鲜重跑完整验证。
+
+## 2026-07-18 09:43 +0800
+- 进度：Task 22 最小生产实现取得定向 GREEN。VideoList 快速搜索只增加固定中文 `aria-label`，动态封面只增加由 `row.title || row.id` 派生的中文 `alt`；图像工作台主提示词 textarea 只增加固定中文 `aria-label`，原 v-model、placeholder、图片 src/preview、handler、DOM 层级、CSS、请求与 payload 均未修改。
+- 影响文件：当前 tracked 差异精确位于 brief 允许的 6 个文件；`CONTEXT.md` 已追加动态资源图片替代文本和独立输入中文程序化名称两条长期契约。
+- 验证：`cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageWorkbench.helpers.spec.js` 通过（2 files，30/30）；生产 SFC 差异恰为目标三个属性。待运行完整测试、生产构建与最终静态、编码、固定基线范围门禁。
+
+## 2026-07-18 09:42 +0800
+- 进度：Task 22 两份真实 SFC 静态契约取得严格 RED。三项新增测试分别提取目标 `el-image`、快速搜索 `el-input` 与主提示词 textarea opening tag，精确要求由 `row.title || row.id` 派生的中文封面替代文本，以及两个独立输入的固定中文 `aria-label`。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/videoListPage.spec.js`、`imageWorkbench.helpers.spec.js` 与 `plan.md`；两份生产 SFC、`CONTEXT.md` 和报告尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageWorkbench.helpers.spec.js` 按预期退出 1（2 files，30 tests，3 failed / 27 passed）；三个失败只对应目标属性缺失，无测试解析、环境或既有契约失败。
+
+## 2026-07-18 09:40 +0800
+- 进度：开始 Task 22 动态媒体与输入可访问性修复。先用两份既有真实 SFC 静态契约锁定 VideoList 动态封面替代文本、快速搜索中文程序化名称和图像工作台主提示词中文程序化名称，取得只命中三个属性缺失的真实 RED 后，仅向生产模板增加这三个属性。
+- 影响文件：计划精确修改 `admin-web/src/views/VideoList.vue`、`videoListPage.spec.js`、`admin-web/src/views/ToolboxImageWorkbench.vue`、`imageWorkbench.helpers.spec.js`、`CONTEXT.md`、`plan.md` 共 6 个 tracked 文件，并写入 git 忽略的 `.superpowers/sdd/task-22-accessibility-fix-report.md`；不修改浏览器审计器、API、权限、router、依赖、payload、Go、Android、数据库、业务流程、DOM 层级或 CSS。
+- 验证：先运行 `cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageWorkbench.helpers.spec.js` 记录准确 RED；最小属性修复后运行同一定向 GREEN、完整 `npm test`、`npm run build`、`git diff --check`、严格 UTF-8/U+FFFD、固定基线六文件白名单与 package/lockfile/API/router 零差异门禁。
+
 ## 2026-07-18 00:44 +0800
 - 进度：Task 22 产品运行时整洁完成提交前实现与自审。静态契约覆盖字体域名及远程字体 `@import`/preconnect、全视图字符串数字 `rows`、全视图 RadioButton 旧值属性，并在 GREEN 重构中把远程连接断言收窄到字体域名，避免误拦合法非字体 preconnect；生产差异保持 11 处目标字体/属性机械替换。
 - 影响文件：最终 tracked 范围精确为 brief 允许的 `admin-web/src/views/precisionOpsAudit.spec.js`、`admin-web/src/assets/theme.css`、`admin-web/index.html`、四份目标 Vue、`CONTEXT.md`、`plan.md` 共 9 个文件；git 忽略报告写入 `.superpowers/sdd/task-22-product-hygiene-report.md`。API、权限、router、依赖、lockfile、payload、Go、Android、数据库、业务脚本与浏览器审计器均不纳入。

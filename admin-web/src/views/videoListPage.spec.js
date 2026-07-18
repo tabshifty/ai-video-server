@@ -255,6 +255,8 @@ const operationsColumn = extractElement(
   /<el-table-column\b(?=[^>]*isColumnVisible\('operations'\))[^>]*>/,
   '</el-table-column>'
 )
+const quickSearchInput = template.match(/<el-input\b(?=[^>]*v-model="quickSearch")[^>]*>/)?.[0] || ''
+const videoCoverImage = template.match(/<el-image\b(?=[^>]*class="video-cover-image")[^>]*>/)?.[0] || ''
 
 describe('视频资源集合页', () => {
   it('通过真实 SFC 编译并只接入共享保存视图职责', () => {
@@ -450,6 +452,14 @@ async function load() {
     expect(template).toContain('@remove="removeVideoView"')
     expect(template).toContain('<Toolbar dense>')
     expect(template).toContain('class="page-shell video-list-page" data-density="compact"')
+  })
+
+  it('为动态视频封面提供由标题或 ID 派生的替代文本', () => {
+    expect(videoCoverImage).toContain(':alt="`${row.title || row.id} 封面`"')
+  })
+
+  it('为顶部快速搜索提供独立中文程序化名称', () => {
+    expect(quickSearchInput).toContain('aria-label="视频标题或标签搜索"')
   })
 
   it('保留已有行并以行内错误、首次骨架和诚实空态反馈请求结果', () => {

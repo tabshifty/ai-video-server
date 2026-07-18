@@ -1383,6 +1383,7 @@ onBeforeUnmount(() => {
           <el-input
             v-model="quickSearch"
             class="quick-search"
+            aria-label="视频标题或标签搜索"
             placeholder="标题/标签搜索"
             clearable
             :prefix-icon="Search"
@@ -1434,6 +1435,7 @@ onBeforeUnmount(() => {
                   <el-image
                     v-if="shouldShowVideoThumbnail(row)"
                     :src="getVideoThumbnailURL(row)"
+                    :alt="`${row.title || row.id} 封面`"
                     :preview-src-list="[getVideoThumbnailURL(row)]"
                     fit="cover"
                     preview-teleported

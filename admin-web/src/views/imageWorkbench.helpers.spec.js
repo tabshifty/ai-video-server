@@ -247,6 +247,16 @@ describe('image workbench helpers', () => {
 })
 
 describe('image workbench Precision Ops contracts', () => {
+  it('为主提示词输入提供独立中文程序化名称', () => {
+    const source = readView('ToolboxImageWorkbench.vue')
+    const template = extractSfcBlock(source, 'template')
+    const promptInput = template.match(
+      /<el-input\b(?=[^>]*v-model="prompt")(?=[^>]*type="textarea")[^>]*>/
+    )?.[0] || ''
+
+    expect(promptInput).toContain('aria-label="图像生成提示词"')
+  })
+
   it('keeps the mask editor component-only boundary and separates data colors from UI colors', () => {
     const source = readView('ImageWorkbenchMaskEditor.vue')
     const script = extractSfcBlock(source, 'script')

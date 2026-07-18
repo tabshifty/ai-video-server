@@ -1134,3 +1134,7 @@
 - `关键样式本地字体契约`：管理端关键样式不得依赖 Google Fonts 等公共远程字体服务；全局无衬线字体栈优先使用已有中文字体与系统字体 fallback，页面加载不能通过 CSS `@import` 或 HTML preconnect 建立公共字体外链。
 - `Vue 数值 prop 绑定契约`：Vue 模板向组件传递数值 prop 时必须使用 `:` 绑定保证运行时类型为 Number；例如 Element Plus `el-input` 的 `rows` 应写成 `:rows="3"`，不能写成字符串属性 `rows="3"`。
 - `RadioButton 选项值契约`：Element Plus `el-radio-button` 必须使用 `value`/`:value` 表达选项值，显示文案继续由默认 slot 承载；不得继续用已弃用的 `label`/`:label` 兼任选项值。
+
+## 管理端动态媒体与独立输入可访问性约定
+- `动态资源图片替代文本契约`：动态资源图片必须提供由资源名称派生的替代文本；资源标题缺失时使用稳定资源 ID 回退，不能让已加载的内容图片保持无名称状态。
+- `独立输入程序化名称契约`：没有可见 `<label>` 或 `form-item` label 的独立输入必须提供中文程序化名称；placeholder 只表达输入提示，不能替代 label 或 `aria-label`。
