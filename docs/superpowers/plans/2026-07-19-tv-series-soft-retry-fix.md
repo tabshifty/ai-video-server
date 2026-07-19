@@ -232,7 +232,7 @@ git commit -m "修复TV剧集播放器软重试状态"
 - Consumes: Task 1-2 已通过的实现与测试。
 - Produces: `versionCode = 135`、`versionName = "0.1.135"` 及长期兼容契约记录。
 
-- [ ] **Step 1: 更新版本与领域术语**
+- [x] **Step 1: 更新版本与领域术语**
 
 ```kotlin
 versionCode = 135
@@ -241,7 +241,7 @@ versionName = "0.1.135"
 
 在 `CONTEXT.md` 的 TV 播放术语追加：剧集播放器以当前分集首帧作为软重试门槛；软重试结果只归属当前未取消尝试，失败态由 BACK 优先关闭，preparing 由 BACK 取消。
 
-- [ ] **Step 2: 运行完整验证**
+- [x] **Step 2: 运行完整验证**
 
 ```bash
 cd android-tv-app
@@ -253,7 +253,7 @@ rg -n $'\uFFFD' CONTEXT.md plan.md docs/superpowers/specs/2026-07-19-tv-series-s
 
 Expected: Gradle `BUILD SUCCESSFUL`；diff check 和乱码扫描无输出。
 
-- [ ] **Step 3: 追加最终进度并提交**
+- [x] **Step 3: 追加最终进度并提交**
 
 ```bash
 git add android-tv-app/tv-app/build.gradle.kts CONTEXT.md plan.md \

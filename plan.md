@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 18:29 +0800
+- 进度：TV 剧集软重试 Task 3 交付门禁完成。TV 版本递增到 `135 / 0.1.135`，`CONTEXT.md` 追加剧集软重试首帧门槛与结果归属/BACK 术语；本次产品和测试改动已完成，待独立代理复审。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、实施计划、`plan.md`；既有未跟踪 `.superpowers/` 未纳入。
+- 验证：新鲜 `cd android-tv-app && ./gradlew --no-daemon -Pkotlin.incremental=false :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过（`BUILD SUCCESSFUL`）；`git diff --check` 与目标文件替换字符扫描无输出。
+
 ## 2026-07-19 18:24 +0800
 - 进度：TV 剧集软重试 Task 2 完成。剧集屏复用单片 `Preparing / Failed / Succeeded / Canceled` 状态与忽略令牌，BACK 可关闭失败或取消 preparing，Media3 接入取消请求键；软失败参与统一焦点守卫，重试按钮 requester 顺序已修正，成功/取消反馈 900ms 后按状态身份清除。
 - 影响文件：`TvSeriesPlayerScreen.kt`、`TvSeriesPlayerSoftRetrySpecTest.kt`、实施计划、`plan.md`
