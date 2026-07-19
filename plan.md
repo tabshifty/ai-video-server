@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 17:52 +0800
+- 进度：开始修复 TV 剧集播放器首帧后软重试评审问题。采用复用单片播放器软重试状态类型与令牌语义、保留剧集反馈 UI 的低风险方案；先固化设计，再按 TDD 补齐 BACK、preparing/cancel、latest-wins、焦点回收和空错误文案边界。
+- 影响文件：`docs/superpowers/specs/2026-07-19-tv-series-soft-retry-fix-design.md`、`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt`、对应测试、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`
+- 验证：待执行定向红绿测试、TV 全量单测、`assembleDebug`、`git diff --check` 与乱码扫描。
+
 ## 2026-07-19 00:42 +0800
 - 进度：最终整分支 reviewer 复审通过，结论为 Ready to merge。Important 的运行时回归缺口已闭合，生产实现、测试、实施计划 checkbox、文档和净范围均符合规格；唯一遗留为中间提交曾短暂跟踪后已移除的 ignored artifact 历史注意项。
 - 影响文件：最终净 diff 仍为两个管理端生产文件、两个 spec、实施计划和 `plan.md`；未纳入 `.superpowers`、后端、API、Android 或依赖文件。
