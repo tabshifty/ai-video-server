@@ -4,9 +4,21 @@ import android.app.Activity
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -19,16 +31,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
+import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.LongFormAudioTrack
+import com.chee.videos.core.ui.PlayerGlassSurfaceStrong
 import com.chee.videos.core.ui.TvEpisodeRailItem
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvPageLoadingState
@@ -37,6 +55,8 @@ import com.chee.videos.core.ui.buildAudioTrackPreference
 import com.chee.videos.core.ui.buildSubtitleTrackPreference
 import com.chee.videos.core.ui.resolveAudioSelectionOnTrackLoad
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
+import com.chee.videos.core.ui.tvFocusableScaleOnly
+import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 import kotlinx.coroutines.delay
 
@@ -160,6 +180,12 @@ fun TvSeriesPlayerScreen(
     var media3AudioTracks by remember(uiState.currentVideoId) { mutableStateOf(emptyList<LongFormAudioTrack>()) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var playerErrorMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    // 首帧渲染门槛：对齐单片屏 `TvLongFormPlayerScreen` 的软重试语义。首帧已现后的 onError
+    // 不再清 hasStartedPlayback、不再触发全屏 TvErrorState，改为非阻塞中心失败提示 + OK 重试。
+    var hasRenderedFirstFrame by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
+    // 首帧已现后的软重试局部态：保留当前分集已渲染画面，提供 OK 键重试入口。
+    var playerSoftRetryMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    var playerSoftRetryActionFocusRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
     val playbackDiagnosticMessage = remember(playbackRoute, displayCapability, uiState.currentSourceUrl, playerErrorMessage) {
         buildTvDolbyVisionDiagnosticMessage(
             route = playbackRoute,
@@ -239,6 +265,15 @@ fun TvSeriesPlayerScreen(
     fun updatePlaybackSession(nextSession: LongFormPlaybackSession) {
         hasStartedPlayback = nextSession.hasStartedPlayback
         isPausedByUser = nextSession.isPausedByUser
+    }
+
+    // 软重试入口：首帧已现后的非阻塞失败提示里，按 OK 重试当前分集。沿用屏内已有的
+    // routeRetryNonce 作为 Media3 retryKey，保留 hasStartedPlayback 与已渲染画面。
+    fun requestSoftPlaybackRetry() {
+        showDolbyVisionDiagnostics = false
+        playerSoftRetryMessage = null
+        routeRetryNonce += 1
+        updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
     }
 
     val resumePromptGuardInput = ResumePromptGuardInput(
@@ -506,10 +541,14 @@ fun TvSeriesPlayerScreen(
                     selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
                     selectedAudioTrackId = selectedAudioTrackId,
                     modifier = Modifier.fillMaxSize(),
+                    onRenderedFirstFrame = {
+                        hasRenderedFirstFrame = true
+                    },
                     onPlayingChanged = { playing ->
                         isPlayerActuallyPlaying = playing
                         if (playing) {
                             playerErrorMessage = null
+                            playerSoftRetryMessage = null
                             val resumePositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
                                 currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
                             } else {
@@ -526,9 +565,20 @@ fun TvSeriesPlayerScreen(
                         }
                     },
                     onError = { message ->
-                        playerErrorMessage = message
                         isPlayerActuallyPlaying = false
-                        updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
+                        when (resolveSeriesOnErrorAction(hasRenderedFirstFrame, message)) {
+                            is SeriesOnErrorAction.SoftRetry -> {
+                                // 首帧已现：保留当前分集已渲染画面，不清 hasStartedPlayback、
+                                // 不进全屏硬错误卡片；改为非阻塞中心失败提示，OK 键重试当前分集。
+                                playerSoftRetryMessage = message
+                                playerSoftRetryActionFocusRequestKey += 1
+                            }
+
+                            SeriesOnErrorAction.HardError -> {
+                                playerErrorMessage = message
+                                updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
+                            }
+                        }
                     },
                     onEnded = ::handlePlaybackEnded,
                     onSnapshotChanged = { snapshot ->
@@ -638,6 +688,14 @@ fun TvSeriesPlayerScreen(
                     onPlayNext = viewModel::nextEpisode,
                     onBackToDetail = onBack,
                     modifier = Modifier.fillMaxSize(),
+                )
+                // 首帧已现后的非阻塞软重试卡片：保留当前分集已渲染画面，OK 键重试当前分集。
+                // 不清 hasStartedPlayback、不进全屏 TvErrorState，对齐 CONTEXT.md「TV 长视频播放器软准备」契约。
+                TvSeriesPlayerSoftRetryFeedback(
+                    message = playerSoftRetryMessage,
+                    focusRequestKey = playerSoftRetryActionFocusRequestKey,
+                    onRetry = ::requestSoftPlaybackRetry,
+                    modifier = Modifier.align(Alignment.Center),
                 )
                 if (!playerErrorMessage.isNullOrBlank()) {
                     if (showDolbyVisionDiagnostics) {
@@ -823,3 +881,102 @@ internal fun shouldAutoStartTvLongFormMedia3Playback(
     isMedia3Route &&
         currentSourceUrl.isNotBlank() &&
         autoStartedSourceUrl != currentSourceUrl
+
+/**
+ * 剧集屏 Media3 onError 的分派决策。对齐单片屏 `TvLongFormPlayerScreen` 的 hasRenderedFirstFrame 门槛：
+ * - [SeriesOnErrorAction.SoftRetry]：首帧已现后失败，保留当前分集已渲染画面，走非阻塞中心失败提示 + OK 重试。
+ * - [SeriesOnErrorAction.HardError]：首帧未现（首次 prepare 失败）或无有效错误信息，回退原全屏硬错误卡片。
+ *
+ * 抽成纯函数以便单测覆盖门槛边界，避免内联在 Composable lambda 中难以测试。
+ */
+internal sealed interface SeriesOnErrorAction {
+    data class SoftRetry(val message: String) : SeriesOnErrorAction
+    object HardError : SeriesOnErrorAction
+}
+
+internal fun resolveSeriesOnErrorAction(
+    hasRenderedFirstFrame: Boolean,
+    errorMessage: String,
+): SeriesOnErrorAction =
+    if (hasRenderedFirstFrame && errorMessage.isNotBlank()) {
+        SeriesOnErrorAction.SoftRetry(errorMessage)
+    } else {
+        SeriesOnErrorAction.HardError
+    }
+
+/**
+ * 首帧已现后的非阻塞软重试卡片。仅当 [message] 非空时呈现，OK 键聚焦到「重试播放」按钮。
+ * 不清 hasStartedPlayback、不替换全屏 TvErrorState，对齐 CONTEXT.md「TV 长视频播放器软准备」契约。
+ */
+@Composable
+private fun TvSeriesPlayerSoftRetryFeedback(
+    message: String?,
+    focusRequestKey: Int,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (message.isNullOrBlank()) {
+        return
+    }
+    val retryFocusRequester = remember { FocusRequester() }
+
+    LaunchedTvInitialFocus(true, focusRequestKey, message) {
+        if (focusRequestKey > 0) {
+            retryFocusRequester.tryRequestFocus()
+        }
+    }
+
+    Surface(
+        color = PlayerGlassSurfaceStrong,
+        shape = AppChrome.SurfaceShape,
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = AppChrome.Error,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Text(
+                    text = message,
+                    color = AppChrome.TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 420.dp),
+                )
+            }
+            Surface(
+                color = AppChrome.AccentSoft,
+                shape = AppChrome.ChipShape,
+                modifier = Modifier
+                    .tvFocusableScaleOnly(focusedScale = 1.04f)
+                    .clickable(onClick = onRetry)
+                    .focusRequester(retryFocusRequester),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        tint = AppChrome.TextPrimary,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text(
+                        text = "重试播放",
+                        color = AppChrome.TextPrimary,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+    }
+}
