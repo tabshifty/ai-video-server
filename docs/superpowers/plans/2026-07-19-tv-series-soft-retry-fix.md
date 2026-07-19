@@ -261,7 +261,7 @@ git add android-tv-app/tv-app/build.gradle.kts CONTEXT.md plan.md \
 git commit -m "完成TV剧集软重试修复验证"
 ```
 
-- [ ] **Step 4: 独立评审与复验**
+- [x] **Step 4: 独立评审与复验**
 
 独立 reviewer 对设计规格、实施计划和 `0fd2db7..HEAD` 完整差异做规范与行为复审；如有阻塞项，修复后重复定向测试、完整验证和复审，直到无阻塞问题。
 

@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 19:27 +0800
+- 进度：TV 剧集软重试修复第三轮独立复审通过，结论 Ready。复合事件身份、带身份首帧、canceled identity 静默丢弃、匹配身份 stop、焦点/BACK、版本和文档均符合设计，未发现 Critical、Important 或 Minor 问题。
+- 影响文件：本事项设计、实施计划、TV Media3/单片/剧集播放器、三组新增/补强测试、TV 版本、`CONTEXT.md`、`plan.md`；既有未跟踪 `.superpowers/` 未纳入。
+- 验证：新鲜定向测试通过；新鲜 TV 全量单测与 `assembleDebug` 通过；`git diff --check` 与替换字符扫描无输出；第三轮 reviewer 判定 Ready。真实 TV 仍建议人工核对取消后承接帧与遥控器焦点体感。
+
 ## 2026-07-19 19:15 +0800
 - 进度：独立复审第二轮三个 Important 已修复。Media3 事件身份升级为 `mediaId + retryKey`，切片/切集后相同 nonce 不再碰撞；首帧改用带 EventTime 的 Analytics 回调；播放器层直接丢弃 canceled identity 的首帧、playing、error，单片与剧集再按当前复合身份二次过滤。
 - 影响文件：`TvLongFormMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、generation/结构测试、设计/实施文档、`CONTEXT.md`、`plan.md`
