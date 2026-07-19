@@ -55,7 +55,7 @@ class TvLongFormPlayerSoftRetrySpecTest {
         assertTrue(media3Source.contains("latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())"))
         assertTrue(cancelEffectBlock.contains("player.playWhenReady = false"))
         assertTrue(cancelEffectBlock.contains("player.stop()"))
-        assertTrue(cancelEffectBlock.contains("canceledRetryKey = cancelPrepareRetryKey"))
+        assertTrue(cancelEffectBlock.contains("canceledIdentity = cancelIdentity"))
     }
 
     @Test
@@ -64,12 +64,13 @@ class TvLongFormPlayerSoftRetrySpecTest {
 
         assertTrue(source.contains("cancelPrepareRequestKey: Int = 0"))
         assertTrue(source.contains("cancelPrepareRetryKey: Int? = null"))
-        assertTrue(source.contains("onRenderedFirstFrame: () -> Unit = {}"))
-        assertTrue(source.contains("onPlayingChanged: (Boolean, Int) -> Unit"))
-        assertTrue(source.contains("onError: (String, Int) -> Unit"))
-        assertTrue(source.contains("if (eventRetryKey == preparedRetryKey)"))
-        assertTrue(source.contains("if (eventRetryKey != preparedRetryKey)"))
-        assertTrue(source.contains("override fun onRenderedFirstFrame()"))
+        assertTrue(source.contains("onRenderedFirstFrame: (TvLongFormMedia3EventIdentity) -> Unit"))
+        assertTrue(source.contains("onPlayingChanged: (Boolean, TvLongFormMedia3EventIdentity) -> Unit"))
+        assertTrue(source.contains("onError: (String, TvLongFormMedia3EventIdentity) -> Unit"))
+        assertTrue(source.contains("if (eventIdentity == canceledIdentity)"))
+        assertTrue(source.contains("eventIdentity != preparedIdentity"))
+        assertTrue(source.contains("override fun onRenderedFirstFrame("))
+        assertTrue(source.contains("eventTime: AnalyticsListener.EventTime"))
         assertTrue(source.contains("val player = remember(accessToken) { ExoPlayer.Builder(context).build() }"))
         assertTrue(source.contains("LaunchedEffect(player, cancelPrepareRequestKey, cancelPrepareRetryKey)"))
         assertTrue(source.contains("setKeepContentOnPlayerReset(true)"))
@@ -80,9 +81,9 @@ class TvLongFormPlayerSoftRetrySpecTest {
         val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
 
         assertTrue(source.contains("cancelPrepareRetryKey = ignoredRetryAttemptKey"))
-        assertTrue(source.contains("onPlayingChanged = { playing, eventRetryKey ->"))
-        assertTrue(source.contains("eventRetryKey == activeRetryKey"))
-        assertTrue(source.contains("onError = { message, eventRetryKey ->"))
-        assertTrue(source.contains("if (eventRetryKey == routeRetryNonce)"))
+        assertTrue(source.contains("onPlayingChanged = { playing, eventIdentity ->"))
+        assertTrue(source.contains("eventIdentity.retryKey == activeRetryKey"))
+        assertTrue(source.contains("onError = { message, eventIdentity ->"))
+        assertTrue(source.contains("if (eventIdentity == currentPlaybackIdentity)"))
     }
 }

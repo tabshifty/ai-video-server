@@ -22,11 +22,12 @@ class TvSeriesPlayerSoftRetrySpecTest {
         assertTrue(source.contains("cancelPrepareRequestKey += 1"))
         assertTrue(source.contains("cancelPrepareRequestKey = cancelPrepareRequestKey"))
         assertTrue(source.contains("cancelPrepareRetryKey = ignoredRetryAttemptKey"))
-        assertTrue(source.contains("shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey)"))
-        assertTrue(source.contains("onPlayingChanged = { playing, eventRetryKey ->"))
-        assertTrue(source.contains("eventRetryKey == activeRetryKey"))
-        assertTrue(source.contains("onError = { message, eventRetryKey ->"))
-        assertTrue(source.contains("if (eventRetryKey == routeRetryNonce)"))
+        assertTrue(source.contains("shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventIdentity.retryKey)"))
+        assertTrue(source.contains("onRenderedFirstFrame = { eventIdentity ->"))
+        assertTrue(source.contains("onPlayingChanged = { playing, eventIdentity ->"))
+        assertTrue(source.contains("eventIdentity.retryKey == activeRetryKey"))
+        assertTrue(source.contains("onError = { message, eventIdentity ->"))
+        assertTrue(source.contains("if (eventIdentity == currentPlaybackIdentity)"))
     }
 
     @Test

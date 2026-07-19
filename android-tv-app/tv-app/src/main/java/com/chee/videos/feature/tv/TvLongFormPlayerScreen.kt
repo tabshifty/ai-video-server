@@ -153,6 +153,9 @@ fun TvLongFormPlayerScreen(
     }
 
     var routeRetryNonce by remember(detail.id) { mutableStateOf(0) }
+    val currentPlaybackIdentity = remember(detail.id, routeRetryNonce) {
+        TvLongFormMedia3EventIdentity(detail.id, routeRetryNonce)
+    }
     val displayCapability = remember(context, detail.id, routeRetryNonce) {
         evaluateDolbyVisionDisplayCapability(AndroidDisplayHdrCapabilityReader(context))
     }
@@ -438,17 +441,19 @@ fun TvLongFormPlayerScreen(
                 selectedSubtitleTrackId = selectedSubtitleTrackId?.takeIf { it.isNotBlank() },
                 selectedAudioTrackId = selectedAudioTrackId,
                 modifier = Modifier.fillMaxSize(),
-                onRenderedFirstFrame = {
-                    hasRenderedFirstFrame = true
+                onRenderedFirstFrame = { eventIdentity ->
+                    if (eventIdentity == currentPlaybackIdentity) {
+                        hasRenderedFirstFrame = true
+                    }
                 },
-                onPlayingChanged = { playing, eventRetryKey ->
-                    if (eventRetryKey == routeRetryNonce) {
+                onPlayingChanged = { playing, eventIdentity ->
+                    if (eventIdentity == currentPlaybackIdentity) {
                         isPlayerActuallyPlaying = playing
                         if (playing) {
                             playerErrorMessage = null
                             ignoredRetryAttemptKey = null
                             val activeRetryKey = activeSoftRetryAttemptKey
-                            if (activeRetryKey != null && eventRetryKey == activeRetryKey) {
+                            if (activeRetryKey != null && eventIdentity.retryKey == activeRetryKey) {
                                 activeSoftRetryAttemptKey = null
                                 softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
                             }
@@ -464,32 +469,35 @@ fun TvLongFormPlayerScreen(
                         }
                     }
                 },
-                onError = { message, eventRetryKey ->
-                    if (eventRetryKey == routeRetryNonce) {
+                onError = { message, eventIdentity ->
+                    if (eventIdentity == currentPlaybackIdentity) {
                         playerErrorMessage = message
                         isPlayerActuallyPlaying = false
                         if (hasRenderedFirstFrame) {
                             when {
-                                activeSoftRetryAttemptKey != null && eventRetryKey == activeSoftRetryAttemptKey -> {
+                                activeSoftRetryAttemptKey != null && eventIdentity.retryKey == activeSoftRetryAttemptKey -> {
                                     val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
                                     activeSoftRetryAttemptKey = null
                                     softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, message)
                                     retryActionFocusRequestKey += 1
                                 }
 
-                                shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey) -> {
+                                shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventIdentity.retryKey) -> {
                                     ignoredRetryAttemptKey = null
                                 }
 
                                 else -> {
-                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(eventRetryKey, message)
+                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(eventIdentity.retryKey, message)
                                     retryActionFocusRequestKey += 1
                                 }
                             }
                         } else {
                             updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
                         }
-                    } else if (shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey)) {
+                    } else if (
+                        eventIdentity.mediaId == detail.id &&
+                        shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventIdentity.retryKey)
+                    ) {
                         ignoredRetryAttemptKey = null
                     }
                 },

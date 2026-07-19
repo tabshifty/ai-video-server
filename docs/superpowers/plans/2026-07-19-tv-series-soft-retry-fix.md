@@ -267,7 +267,7 @@ git commit -m "完成TV剧集软重试修复验证"
 
 #### 独立评审修正
 
-- [x] 为 Media3 媒体项写入 retry generation，并从 Analytics 事件所属 timeline 还原实际代次。
-- [x] 单片与剧集播放器只接受当前 generation，取消或旧 generation 的迟到 playing/error 静默丢弃。
-- [x] 取消请求对匹配 generation 执行 `stop()`，并启用 PlayerView 保留当前帧，避免只取消 UI 或切黑承接画面。
+- [x] 为 Media3 媒体项写入 `mediaId + retryKey` 复合身份，并从 Analytics 事件所属 timeline 还原实际身份。
+- [x] 单片与剧集播放器只接受当前复合身份，取消或旧身份的迟到首帧/playing/error 静默丢弃。
+- [x] 取消请求对匹配身份执行 `stop()`，并启用 PlayerView 保留当前帧，避免只取消 UI 或切黑承接画面。
 - [x] 修正空错误分派注释，并补 generation 编解码、真实取消和双调用方接线回归测试。

@@ -150,6 +150,9 @@ fun TvSeriesPlayerScreen(
 
     val currentEpisode = activeEpisode(uiState)
     var routeRetryNonce by remember(uiState.currentVideoId) { mutableStateOf(0) }
+    val currentPlaybackIdentity = remember(uiState.currentVideoId, routeRetryNonce) {
+        TvLongFormMedia3EventIdentity(uiState.currentVideoId, routeRetryNonce)
+    }
     val displayCapability = remember(context, uiState.currentVideoId, routeRetryNonce) {
         evaluateDolbyVisionDisplayCapability(AndroidDisplayHdrCapabilityReader(context))
     }
@@ -597,17 +600,19 @@ fun TvSeriesPlayerScreen(
                     selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
                     selectedAudioTrackId = selectedAudioTrackId,
                     modifier = Modifier.fillMaxSize(),
-                    onRenderedFirstFrame = {
-                        hasRenderedFirstFrame = true
+                    onRenderedFirstFrame = { eventIdentity ->
+                        if (eventIdentity == currentPlaybackIdentity) {
+                            hasRenderedFirstFrame = true
+                        }
                     },
-                    onPlayingChanged = { playing, eventRetryKey ->
-                        if (eventRetryKey == routeRetryNonce) {
+                    onPlayingChanged = { playing, eventIdentity ->
+                        if (eventIdentity == currentPlaybackIdentity) {
                             isPlayerActuallyPlaying = playing
                             if (playing) {
                                 playerErrorMessage = null
                                 ignoredRetryAttemptKey = null
                                 val activeRetryKey = activeSoftRetryAttemptKey
-                                if (activeRetryKey != null && eventRetryKey == activeRetryKey) {
+                                if (activeRetryKey != null && eventIdentity.retryKey == activeRetryKey) {
                                     activeSoftRetryAttemptKey = null
                                     softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
                                 }
@@ -627,24 +632,24 @@ fun TvSeriesPlayerScreen(
                             }
                         }
                     },
-                    onError = { message, eventRetryKey ->
-                        if (eventRetryKey == routeRetryNonce) {
+                    onError = { message, eventIdentity ->
+                        if (eventIdentity == currentPlaybackIdentity) {
                             isPlayerActuallyPlaying = false
                             when (val action = resolveSeriesOnErrorAction(hasRenderedFirstFrame, message)) {
                                 is SeriesOnErrorAction.SoftRetry -> when {
-                                    activeSoftRetryAttemptKey != null && eventRetryKey == activeSoftRetryAttemptKey -> {
+                                    activeSoftRetryAttemptKey != null && eventIdentity.retryKey == activeSoftRetryAttemptKey -> {
                                         val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
                                         activeSoftRetryAttemptKey = null
                                         softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, action.message)
                                         retryActionFocusRequestKey += 1
                                     }
 
-                                    shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey) -> {
+                                    shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventIdentity.retryKey) -> {
                                         ignoredRetryAttemptKey = null
                                     }
 
                                     else -> {
-                                        softRetryUiState = TvLongFormSoftRetryUiState.Failed(eventRetryKey, action.message)
+                                        softRetryUiState = TvLongFormSoftRetryUiState.Failed(eventIdentity.retryKey, action.message)
                                         retryActionFocusRequestKey += 1
                                     }
                                 }
@@ -654,7 +659,10 @@ fun TvSeriesPlayerScreen(
                                     updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
                                 }
                             }
-                        } else if (shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey)) {
+                        } else if (
+                            eventIdentity.mediaId == uiState.currentVideoId &&
+                            shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventIdentity.retryKey)
+                        ) {
                             ignoredRetryAttemptKey = null
                         }
                     },

@@ -43,17 +43,34 @@ private const val TvLongFormMedia3RetryKeySeparator = "|retry:"
 internal fun buildTvLongFormMedia3ItemId(mediaId: String, retryKey: Int): String =
     "$mediaId$TvLongFormMedia3RetryKeySeparator$retryKey"
 
-internal fun parseTvLongFormMedia3RetryKey(mediaItemId: String): Int? =
-    mediaItemId.substringAfterLast(TvLongFormMedia3RetryKeySeparator, missingDelimiterValue = "").toIntOrNull()
+internal data class TvLongFormMedia3EventIdentity(
+    val mediaId: String,
+    val retryKey: Int,
+)
 
-private fun AnalyticsListener.EventTime.eventRetryKey(): Int? {
+internal fun parseTvLongFormMedia3EventIdentity(mediaItemId: String): TvLongFormMedia3EventIdentity? {
+    val separatorIndex = mediaItemId.lastIndexOf(TvLongFormMedia3RetryKeySeparator)
+    if (separatorIndex <= 0) {
+        return null
+    }
+    val retryKey = mediaItemId
+        .substring(separatorIndex + TvLongFormMedia3RetryKeySeparator.length)
+        .toIntOrNull()
+        ?: return null
+    return TvLongFormMedia3EventIdentity(
+        mediaId = mediaItemId.substring(0, separatorIndex),
+        retryKey = retryKey,
+    )
+}
+
+private fun AnalyticsListener.EventTime.eventIdentity(): TvLongFormMedia3EventIdentity? {
     if (!timeline.isEmpty && windowIndex in 0 until timeline.windowCount) {
-        return parseTvLongFormMedia3RetryKey(
+        return parseTvLongFormMedia3EventIdentity(
             timeline.getWindow(windowIndex, Timeline.Window()).mediaItem.mediaId,
         )
     }
     if (!currentTimeline.isEmpty && currentWindowIndex in 0 until currentTimeline.windowCount) {
-        return parseTvLongFormMedia3RetryKey(
+        return parseTvLongFormMedia3EventIdentity(
             currentTimeline.getWindow(currentWindowIndex, Timeline.Window()).mediaItem.mediaId,
         )
     }
@@ -103,9 +120,9 @@ internal fun TvLongFormMedia3Player(
     selectedSubtitleTrackId: String? = null,
     selectedAudioTrackId: String? = null,
     modifier: Modifier = Modifier,
-    onPlayingChanged: (Boolean, Int) -> Unit = { _, _ -> },
-    onRenderedFirstFrame: () -> Unit = {},
-    onError: (String, Int) -> Unit = { _, _ -> },
+    onPlayingChanged: (Boolean, TvLongFormMedia3EventIdentity) -> Unit = { _, _ -> },
+    onRenderedFirstFrame: (TvLongFormMedia3EventIdentity) -> Unit = {},
+    onError: (String, TvLongFormMedia3EventIdentity) -> Unit = { _, _ -> },
     onEnded: () -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
     onLifecyclePauseSnapshot: (TvMedia3PlaybackSnapshot) -> Unit = {},
@@ -131,8 +148,8 @@ internal fun TvLongFormMedia3Player(
     val playerSourceKey = remember(player) { Any() }
     var preparedPlayerSourceKey by remember { mutableStateOf<Any?>(null) }
     var preparedSourceKey by remember { mutableStateOf("") }
-    var preparedRetryKey by remember { mutableStateOf<Int?>(null) }
-    var canceledRetryKey by remember { mutableStateOf<Int?>(null) }
+    var preparedIdentity by remember { mutableStateOf<TvLongFormMedia3EventIdentity?>(null) }
+    var canceledIdentity by remember { mutableStateOf<TvLongFormMedia3EventIdentity?>(null) }
     var resumeAppliedSourceKey by remember { mutableStateOf("") }
     var playbackState by remember { mutableStateOf(Player.STATE_IDLE) }
     var isMedia3Playing by remember { mutableStateOf(false) }
@@ -140,10 +157,6 @@ internal fun TvLongFormMedia3Player(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onRenderedFirstFrame() {
-                latestOnRenderedFirstFrame()
-            }
-
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 trackSelectionRevision += 1
                 latestOnAudioTracksChanged(buildTvMedia3AudioTracks(tracks))
@@ -151,19 +164,22 @@ internal fun TvLongFormMedia3Player(
         }
         val analyticsListener = object : AnalyticsListener {
             override fun onIsPlayingChanged(eventTime: AnalyticsListener.EventTime, isPlaying: Boolean) {
-                val eventRetryKey = eventTime.eventRetryKey() ?: return
-                if (eventRetryKey == preparedRetryKey) {
+                val eventIdentity = eventTime.eventIdentity() ?: return
+                if (eventIdentity == canceledIdentity) {
+                    return
+                }
+                if (eventIdentity == preparedIdentity) {
                     isMedia3Playing = isPlaying
                 }
-                latestOnPlayingChanged(isPlaying, eventRetryKey)
+                latestOnPlayingChanged(isPlaying, eventIdentity)
             }
 
             override fun onPlaybackStateChanged(
                 eventTime: AnalyticsListener.EventTime,
                 nextPlaybackState: Int,
             ) {
-                val eventRetryKey = eventTime.eventRetryKey() ?: return
-                if (eventRetryKey != preparedRetryKey) {
+                val eventIdentity = eventTime.eventIdentity() ?: return
+                if (eventIdentity == canceledIdentity || eventIdentity != preparedIdentity) {
                     return
                 }
                 playbackState = nextPlaybackState
@@ -172,16 +188,31 @@ internal fun TvLongFormMedia3Player(
                 }
             }
 
+            override fun onRenderedFirstFrame(
+                eventTime: AnalyticsListener.EventTime,
+                output: Any,
+                renderTimeMs: Long,
+            ) {
+                val eventIdentity = eventTime.eventIdentity() ?: return
+                if (eventIdentity == canceledIdentity) {
+                    return
+                }
+                latestOnRenderedFirstFrame(eventIdentity)
+            }
+
             override fun onPlayerError(
                 eventTime: AnalyticsListener.EventTime,
                 error: androidx.media3.common.PlaybackException,
             ) {
-                val eventRetryKey = eventTime.eventRetryKey() ?: return
-                if (eventRetryKey == preparedRetryKey) {
+                val eventIdentity = eventTime.eventIdentity() ?: return
+                if (eventIdentity == canceledIdentity) {
+                    return
+                }
+                if (eventIdentity == preparedIdentity) {
                     isMedia3Playing = false
                 }
-                latestOnPlayingChanged(false, eventRetryKey)
-                latestOnError(friendlyLongFormPlaybackErrorMessage(error), eventRetryKey)
+                latestOnPlayingChanged(false, eventIdentity)
+                latestOnError(friendlyLongFormPlaybackErrorMessage(error), eventIdentity)
             }
         }
         player.addListener(listener)
@@ -191,7 +222,10 @@ internal fun TvLongFormMedia3Player(
             player.removeAnalyticsListener(analyticsListener)
             latestOnAudioTracksChanged(emptyList())
             latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
-            latestOnPlayingChanged(false, preparedRetryKey ?: retryKey)
+            latestOnPlayingChanged(
+                false,
+                preparedIdentity ?: TvLongFormMedia3EventIdentity(mediaId = mediaId, retryKey = retryKey),
+            )
             player.release()
         }
     }
@@ -206,8 +240,8 @@ internal fun TvLongFormMedia3Player(
             player.clearMediaItems()
             preparedPlayerSourceKey = null
             preparedSourceKey = ""
-            preparedRetryKey = null
-            canceledRetryKey = null
+            preparedIdentity = null
+            canceledIdentity = null
             resumeAppliedSourceKey = ""
             playbackState = Player.STATE_IDLE
             isMedia3Playing = false
@@ -222,10 +256,11 @@ internal fun TvLongFormMedia3Player(
                 isPreparedPlayerCurrent = preparedPlayerSourceKey === playerSourceKey,
             )
         ) {
+            val nextIdentity = TvLongFormMedia3EventIdentity(mediaId = mediaId, retryKey = retryKey)
             preparedPlayerSourceKey = playerSourceKey
             preparedSourceKey = sourceKey
-            preparedRetryKey = retryKey
-            canceledRetryKey = null
+            preparedIdentity = nextIdentity
+            canceledIdentity = null
             resumeAppliedSourceKey = ""
             val mediaItem = MediaItem.Builder()
                 .setUri(sourceUrl)
@@ -251,18 +286,19 @@ internal fun TvLongFormMedia3Player(
         if (
             cancelPrepareRequestKey <= 0 ||
             cancelPrepareRetryKey == null ||
-            preparedRetryKey != cancelPrepareRetryKey ||
+            preparedIdentity != TvLongFormMedia3EventIdentity(mediaId, cancelPrepareRetryKey) ||
             preparedSourceKey.isBlank()
         ) {
             return@LaunchedEffect
         }
         latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
-        canceledRetryKey = cancelPrepareRetryKey
+        val cancelIdentity = TvLongFormMedia3EventIdentity(mediaId, cancelPrepareRetryKey)
+        canceledIdentity = cancelIdentity
         player.playWhenReady = false
         player.stop()
         playbackState = Player.STATE_IDLE
         isMedia3Playing = false
-        latestOnPlayingChanged(false, cancelPrepareRetryKey)
+        latestOnPlayingChanged(false, cancelIdentity)
     }
 
     LaunchedEffect(player, preparedSourceKey, initialPositionMs) {
@@ -311,8 +347,8 @@ internal fun TvLongFormMedia3Player(
         }
     }
 
-    LaunchedEffect(player, preparedSourceKey, preparedRetryKey, canceledRetryKey, shouldPlay) {
-        if (preparedSourceKey.isBlank() || preparedRetryKey == canceledRetryKey) {
+    LaunchedEffect(player, preparedSourceKey, preparedIdentity, canceledIdentity, shouldPlay) {
+        if (preparedSourceKey.isBlank() || preparedIdentity == canceledIdentity) {
             return@LaunchedEffect
         }
         player.playWhenReady = shouldPlay
@@ -323,21 +359,22 @@ internal fun TvLongFormMedia3Player(
         }
     }
 
-    LaunchedEffect(preparedSourceKey, preparedRetryKey, canceledRetryKey, shouldPlay, playbackState, isMedia3Playing, retryKey) {
+    LaunchedEffect(preparedSourceKey, preparedIdentity, canceledIdentity, shouldPlay, playbackState, isMedia3Playing, retryKey) {
         if (
-            preparedRetryKey == canceledRetryKey ||
+            preparedIdentity == canceledIdentity ||
             !shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)
         ) {
             return@LaunchedEffect
         }
         delay(TvLongFormMedia3StartupTimeoutMillis)
         if (
-            preparedRetryKey != canceledRetryKey &&
+            preparedIdentity != canceledIdentity &&
             shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)
         ) {
             player.pause()
-            latestOnPlayingChanged(false, retryKey)
-            latestOnError(TvLongFormMedia3StartupTimeoutMessage, retryKey)
+            val timeoutIdentity = TvLongFormMedia3EventIdentity(mediaId, retryKey)
+            latestOnPlayingChanged(false, timeoutIdentity)
+            latestOnError(TvLongFormMedia3StartupTimeoutMessage, timeoutIdentity)
         }
     }
 
@@ -353,7 +390,7 @@ internal fun TvLongFormMedia3Player(
                     player.pause()
                 }
                 Lifecycle.Event.ON_RESUME -> {
-                    if (shouldPlay && preparedSourceKey.isNotBlank() && preparedRetryKey != canceledRetryKey) {
+                    if (shouldPlay && preparedSourceKey.isNotBlank() && preparedIdentity != canceledIdentity) {
                         player.play()
                     }
                 }
