@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
 package com.chee.videos.feature.tv
 
 import android.view.LayoutInflater
@@ -22,9 +24,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.chee.videos.core.ui.LongFormAudioTrack
@@ -34,6 +38,27 @@ import kotlinx.coroutines.delay
 
 internal const val TvLongFormMedia3StartupTimeoutMillis = 15_000L
 internal const val TvLongFormMedia3StartupTimeoutMessage = "长视频 ExoPlayer 播放链路启动超时，请重试"
+private const val TvLongFormMedia3RetryKeySeparator = "|retry:"
+
+internal fun buildTvLongFormMedia3ItemId(mediaId: String, retryKey: Int): String =
+    "$mediaId$TvLongFormMedia3RetryKeySeparator$retryKey"
+
+internal fun parseTvLongFormMedia3RetryKey(mediaItemId: String): Int? =
+    mediaItemId.substringAfterLast(TvLongFormMedia3RetryKeySeparator, missingDelimiterValue = "").toIntOrNull()
+
+private fun AnalyticsListener.EventTime.eventRetryKey(): Int? {
+    if (!timeline.isEmpty && windowIndex in 0 until timeline.windowCount) {
+        return parseTvLongFormMedia3RetryKey(
+            timeline.getWindow(windowIndex, Timeline.Window()).mediaItem.mediaId,
+        )
+    }
+    if (!currentTimeline.isEmpty && currentWindowIndex in 0 until currentTimeline.windowCount) {
+        return parseTvLongFormMedia3RetryKey(
+            currentTimeline.getWindow(currentWindowIndex, Timeline.Window()).mediaItem.mediaId,
+        )
+    }
+    return null
+}
 
 internal data class TvMedia3PlaybackSnapshot(
     val positionMs: Long,
@@ -68,6 +93,7 @@ internal fun TvLongFormMedia3Player(
     accessToken: String,
     retryKey: Int,
     cancelPrepareRequestKey: Int = 0,
+    cancelPrepareRetryKey: Int? = null,
     shouldPlay: Boolean,
     initialPositionMs: Long,
     seekPositionMs: Long? = null,
@@ -77,9 +103,9 @@ internal fun TvLongFormMedia3Player(
     selectedSubtitleTrackId: String? = null,
     selectedAudioTrackId: String? = null,
     modifier: Modifier = Modifier,
-    onPlayingChanged: (Boolean) -> Unit = {},
+    onPlayingChanged: (Boolean, Int) -> Unit = { _, _ -> },
     onRenderedFirstFrame: () -> Unit = {},
-    onError: (String) -> Unit = {},
+    onError: (String, Int) -> Unit = { _, _ -> },
     onEnded: () -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
     onLifecyclePauseSnapshot: (TvMedia3PlaybackSnapshot) -> Unit = {},
@@ -105,6 +131,8 @@ internal fun TvLongFormMedia3Player(
     val playerSourceKey = remember(player) { Any() }
     var preparedPlayerSourceKey by remember { mutableStateOf<Any?>(null) }
     var preparedSourceKey by remember { mutableStateOf("") }
+    var preparedRetryKey by remember { mutableStateOf<Int?>(null) }
+    var canceledRetryKey by remember { mutableStateOf<Int?>(null) }
     var resumeAppliedSourceKey by remember { mutableStateOf("") }
     var playbackState by remember { mutableStateOf(Player.STATE_IDLE) }
     var isMedia3Playing by remember { mutableStateOf(false) }
@@ -112,19 +140,6 @@ internal fun TvLongFormMedia3Player(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isMedia3Playing = playing
-                latestOnPlayingChanged(playing)
-            }
-
-            override fun onPlaybackStateChanged(nextPlaybackState: Int) {
-                playbackState = nextPlaybackState
-                if (nextPlaybackState == Player.STATE_ENDED) {
-                    latestOnPlayingChanged(false)
-                    latestOnEnded()
-                }
-            }
-
             override fun onRenderedFirstFrame() {
                 latestOnRenderedFirstFrame()
             }
@@ -133,18 +148,50 @@ internal fun TvLongFormMedia3Player(
                 trackSelectionRevision += 1
                 latestOnAudioTracksChanged(buildTvMedia3AudioTracks(tracks))
             }
+        }
+        val analyticsListener = object : AnalyticsListener {
+            override fun onIsPlayingChanged(eventTime: AnalyticsListener.EventTime, isPlaying: Boolean) {
+                val eventRetryKey = eventTime.eventRetryKey() ?: return
+                if (eventRetryKey == preparedRetryKey) {
+                    isMedia3Playing = isPlaying
+                }
+                latestOnPlayingChanged(isPlaying, eventRetryKey)
+            }
 
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                latestOnPlayingChanged(false)
-                latestOnError(friendlyLongFormPlaybackErrorMessage(error))
+            override fun onPlaybackStateChanged(
+                eventTime: AnalyticsListener.EventTime,
+                nextPlaybackState: Int,
+            ) {
+                val eventRetryKey = eventTime.eventRetryKey() ?: return
+                if (eventRetryKey != preparedRetryKey) {
+                    return
+                }
+                playbackState = nextPlaybackState
+                if (nextPlaybackState == Player.STATE_ENDED) {
+                    latestOnEnded()
+                }
+            }
+
+            override fun onPlayerError(
+                eventTime: AnalyticsListener.EventTime,
+                error: androidx.media3.common.PlaybackException,
+            ) {
+                val eventRetryKey = eventTime.eventRetryKey() ?: return
+                if (eventRetryKey == preparedRetryKey) {
+                    isMedia3Playing = false
+                }
+                latestOnPlayingChanged(false, eventRetryKey)
+                latestOnError(friendlyLongFormPlaybackErrorMessage(error), eventRetryKey)
             }
         }
         player.addListener(listener)
+        player.addAnalyticsListener(analyticsListener)
         onDispose {
             player.removeListener(listener)
+            player.removeAnalyticsListener(analyticsListener)
             latestOnAudioTracksChanged(emptyList())
             latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
-            latestOnPlayingChanged(false)
+            latestOnPlayingChanged(false, preparedRetryKey ?: retryKey)
             player.release()
         }
     }
@@ -159,6 +206,8 @@ internal fun TvLongFormMedia3Player(
             player.clearMediaItems()
             preparedPlayerSourceKey = null
             preparedSourceKey = ""
+            preparedRetryKey = null
+            canceledRetryKey = null
             resumeAppliedSourceKey = ""
             playbackState = Player.STATE_IDLE
             isMedia3Playing = false
@@ -173,9 +222,14 @@ internal fun TvLongFormMedia3Player(
                 isPreparedPlayerCurrent = preparedPlayerSourceKey === playerSourceKey,
             )
         ) {
+            preparedPlayerSourceKey = playerSourceKey
+            preparedSourceKey = sourceKey
+            preparedRetryKey = retryKey
+            canceledRetryKey = null
+            resumeAppliedSourceKey = ""
             val mediaItem = MediaItem.Builder()
                 .setUri(sourceUrl)
-                .setMediaId(mediaId)
+                .setMediaId(buildTvLongFormMedia3ItemId(mediaId, retryKey))
                 .setSubtitleConfigurations(subtitleConfigurations)
                 .setMediaMetadata(
                     androidx.media3.common.MediaMetadata.Builder()
@@ -190,17 +244,25 @@ internal fun TvLongFormMedia3Player(
             isMedia3Playing = false
             trackSelectionRevision += 1
             latestOnAudioTracksChanged(emptyList())
-            preparedPlayerSourceKey = playerSourceKey
-            preparedSourceKey = sourceKey
-            resumeAppliedSourceKey = ""
         }
     }
 
-    LaunchedEffect(player, cancelPrepareRequestKey) {
-        if (cancelPrepareRequestKey <= 0 || preparedSourceKey.isBlank()) {
+    LaunchedEffect(player, cancelPrepareRequestKey, cancelPrepareRetryKey) {
+        if (
+            cancelPrepareRequestKey <= 0 ||
+            cancelPrepareRetryKey == null ||
+            preparedRetryKey != cancelPrepareRetryKey ||
+            preparedSourceKey.isBlank()
+        ) {
             return@LaunchedEffect
         }
         latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
+        canceledRetryKey = cancelPrepareRetryKey
+        player.playWhenReady = false
+        player.stop()
+        playbackState = Player.STATE_IDLE
+        isMedia3Playing = false
+        latestOnPlayingChanged(false, cancelPrepareRetryKey)
     }
 
     LaunchedEffect(player, preparedSourceKey, initialPositionMs) {
@@ -249,8 +311,8 @@ internal fun TvLongFormMedia3Player(
         }
     }
 
-    LaunchedEffect(player, preparedSourceKey, shouldPlay) {
-        if (preparedSourceKey.isBlank()) {
+    LaunchedEffect(player, preparedSourceKey, preparedRetryKey, canceledRetryKey, shouldPlay) {
+        if (preparedSourceKey.isBlank() || preparedRetryKey == canceledRetryKey) {
             return@LaunchedEffect
         }
         player.playWhenReady = shouldPlay
@@ -261,15 +323,21 @@ internal fun TvLongFormMedia3Player(
         }
     }
 
-    LaunchedEffect(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing, retryKey) {
-        if (!shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
+    LaunchedEffect(preparedSourceKey, preparedRetryKey, canceledRetryKey, shouldPlay, playbackState, isMedia3Playing, retryKey) {
+        if (
+            preparedRetryKey == canceledRetryKey ||
+            !shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)
+        ) {
             return@LaunchedEffect
         }
         delay(TvLongFormMedia3StartupTimeoutMillis)
-        if (shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)) {
+        if (
+            preparedRetryKey != canceledRetryKey &&
+            shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)
+        ) {
             player.pause()
-            latestOnPlayingChanged(false)
-            latestOnError(TvLongFormMedia3StartupTimeoutMessage)
+            latestOnPlayingChanged(false, retryKey)
+            latestOnError(TvLongFormMedia3StartupTimeoutMessage, retryKey)
         }
     }
 
@@ -285,7 +353,7 @@ internal fun TvLongFormMedia3Player(
                     player.pause()
                 }
                 Lifecycle.Event.ON_RESUME -> {
-                    if (shouldPlay && preparedSourceKey.isNotBlank()) {
+                    if (shouldPlay && preparedSourceKey.isNotBlank() && preparedRetryKey != canceledRetryKey) {
                         player.play()
                     }
                 }
@@ -318,6 +386,7 @@ internal fun TvLongFormMedia3Player(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT,
                     )
+                    setKeepContentOnPlayerReset(true)
                     this.player = player
                 }
             },

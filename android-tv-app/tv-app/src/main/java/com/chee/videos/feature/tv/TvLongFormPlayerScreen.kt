@@ -424,6 +424,7 @@ fun TvLongFormPlayerScreen(
                 accessToken = uiState.accessToken,
                 retryKey = routeRetryNonce,
                 cancelPrepareRequestKey = cancelPrepareRequestKey,
+                cancelPrepareRetryKey = ignoredRetryAttemptKey,
                 shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
                 initialPositionMs = resolveTvMedia3ResumePositionMs(
                     historyPositionMs = detail.userState.watchSeconds.coerceAtLeast(0).times(1000L),
@@ -440,50 +441,56 @@ fun TvLongFormPlayerScreen(
                 onRenderedFirstFrame = {
                     hasRenderedFirstFrame = true
                 },
-                onPlayingChanged = { playing ->
-                    isPlayerActuallyPlaying = playing
-                    if (playing) {
-                        playerErrorMessage = null
-                        ignoredRetryAttemptKey = null
-                        val activeRetryKey = activeSoftRetryAttemptKey
-                        if (activeRetryKey != null) {
-                            activeSoftRetryAttemptKey = null
-                            softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
-                        }
-                        if (detail.id.isNotBlank() && resumedFromHistoryVideoId != detail.id) {
-                            val resumePositionMs = detail.userState.watchSeconds.coerceAtLeast(0).times(1000L)
-                            resumedFromHistoryVideoId = detail.id
-                            if (shouldTriggerResumePrompt(resumePositionMs)) {
-                                resumePromptLastPositionMs = resumePositionMs
-                                resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
-                                resumePromptDismissed = false
+                onPlayingChanged = { playing, eventRetryKey ->
+                    if (eventRetryKey == routeRetryNonce) {
+                        isPlayerActuallyPlaying = playing
+                        if (playing) {
+                            playerErrorMessage = null
+                            ignoredRetryAttemptKey = null
+                            val activeRetryKey = activeSoftRetryAttemptKey
+                            if (activeRetryKey != null && eventRetryKey == activeRetryKey) {
+                                activeSoftRetryAttemptKey = null
+                                softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
+                            }
+                            if (detail.id.isNotBlank() && resumedFromHistoryVideoId != detail.id) {
+                                val resumePositionMs = detail.userState.watchSeconds.coerceAtLeast(0).times(1000L)
+                                resumedFromHistoryVideoId = detail.id
+                                if (shouldTriggerResumePrompt(resumePositionMs)) {
+                                    resumePromptLastPositionMs = resumePositionMs
+                                    resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
+                                    resumePromptDismissed = false
+                                }
                             }
                         }
                     }
                 },
-                onError = { message ->
-                    playerErrorMessage = message
-                    isPlayerActuallyPlaying = false
-                    if (hasRenderedFirstFrame) {
-                        when {
-                            activeSoftRetryAttemptKey != null -> {
-                                val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
-                                activeSoftRetryAttemptKey = null
-                                softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, message)
-                                retryActionFocusRequestKey += 1
-                            }
+                onError = { message, eventRetryKey ->
+                    if (eventRetryKey == routeRetryNonce) {
+                        playerErrorMessage = message
+                        isPlayerActuallyPlaying = false
+                        if (hasRenderedFirstFrame) {
+                            when {
+                                activeSoftRetryAttemptKey != null && eventRetryKey == activeSoftRetryAttemptKey -> {
+                                    val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
+                                    activeSoftRetryAttemptKey = null
+                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, message)
+                                    retryActionFocusRequestKey += 1
+                                }
 
-                            shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, routeRetryNonce) -> {
-                                ignoredRetryAttemptKey = null
-                            }
+                                shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey) -> {
+                                    ignoredRetryAttemptKey = null
+                                }
 
-                            else -> {
-                                softRetryUiState = TvLongFormSoftRetryUiState.Failed(routeRetryNonce, message)
-                                retryActionFocusRequestKey += 1
+                                else -> {
+                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(eventRetryKey, message)
+                                    retryActionFocusRequestKey += 1
+                                }
                             }
+                        } else {
+                            updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
                         }
-                    } else {
-                        updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
+                    } else if (shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey)) {
+                        ignoredRetryAttemptKey = null
                     }
                 },
                 onSnapshotChanged = { snapshot ->

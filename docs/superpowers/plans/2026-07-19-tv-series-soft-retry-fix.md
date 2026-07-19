@@ -4,7 +4,7 @@
 
 **Goal:** 补齐 TV 剧集播放器首帧后软重试的状态、BACK、焦点和过期结果处理，同时保持首帧前硬错误行为。
 
-**Architecture:** 剧集屏复用同包内 `TvLongFormSoftRetryUiState` 与 `shouldIgnoreTvLongFormRetryError`，新增少量剧集纯逻辑分派和屏内状态接线。反馈 UI 仍留在 `TvSeriesPlayerScreen.kt`，不改 ViewModel、不抽共享组件、不改变 Media3 公共接口之外已有的 `cancelPrepareRequestKey` 参数。
+**Architecture:** 剧集屏复用同包内 `TvLongFormSoftRetryUiState` 与 `shouldIgnoreTvLongFormRetryError`，新增少量剧集纯逻辑分派和屏内状态接线。反馈 UI 仍留在 `TvSeriesPlayerScreen.kt`，不改 ViewModel、不抽共享组件；共享 Media3 播放器负责给 playing/error 回调附加实际重试代次，并停止匹配取消请求。
 
 **Tech Stack:** Kotlin、Jetpack Compose、Media3、JUnit 4、Gradle。
 
@@ -264,3 +264,10 @@ git commit -m "完成TV剧集软重试修复验证"
 - [ ] **Step 4: 独立评审与复验**
 
 独立 reviewer 对设计规格、实施计划和 `0fd2db7..HEAD` 完整差异做规范与行为复审；如有阻塞项，修复后重复定向测试、完整验证和复审，直到无阻塞问题。
+
+#### 独立评审修正
+
+- [x] 为 Media3 媒体项写入 retry generation，并从 Analytics 事件所属 timeline 还原实际代次。
+- [x] 单片与剧集播放器只接受当前 generation，取消或旧 generation 的迟到 playing/error 静默丢弃。
+- [x] 取消请求对匹配 generation 执行 `stop()`，并启用 PlayerView 保留当前帧，避免只取消 UI 或切黑承接画面。
+- [x] 修正空错误分派注释，并补 generation 编解码、真实取消和双调用方接线回归测试。

@@ -21,7 +21,12 @@ class TvSeriesPlayerSoftRetrySpecTest {
         assertTrue(source.contains("ignoredRetryAttemptKey = preparingState.retryKey"))
         assertTrue(source.contains("cancelPrepareRequestKey += 1"))
         assertTrue(source.contains("cancelPrepareRequestKey = cancelPrepareRequestKey"))
-        assertTrue(source.contains("shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, routeRetryNonce)"))
+        assertTrue(source.contains("cancelPrepareRetryKey = ignoredRetryAttemptKey"))
+        assertTrue(source.contains("shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey)"))
+        assertTrue(source.contains("onPlayingChanged = { playing, eventRetryKey ->"))
+        assertTrue(source.contains("eventRetryKey == activeRetryKey"))
+        assertTrue(source.contains("onError = { message, eventRetryKey ->"))
+        assertTrue(source.contains("if (eventRetryKey == routeRetryNonce)"))
     }
 
     @Test
@@ -41,6 +46,7 @@ class TvSeriesPlayerSoftRetrySpecTest {
         assertTrue("软重试动作按钮必须存在", buttonSource.isNotBlank())
         assertTrue("动作按钮必须接收外部 modifier", requesterIndex >= 0)
         assertTrue("动作按钮必须保留 TV 焦点节点", focusableIndex >= 0)
+        assertTrue(source.contains("modifier = Modifier.focusRequester(retryFocusRequester)"))
         assertTrue(
             "外部 focusRequester 必须排在 focusable 节点之前",
             requesterIndex < focusableIndex,

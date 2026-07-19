@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 18:51 +0800
+- 进度：独立复审首轮两个 Important 已修复。Media3 媒体项现在携带 retry generation，Analytics playing/error 回调上抛实际代次；单片与剧集只接收当前代次。取消 preparing 会停止匹配 generation，并通过 PlayerView 保留当前帧；旧代次迟到结果静默丢弃。同步修正过时注释与 requester 测试假阳性。
+- 影响文件：`TvLongFormMedia3Player.kt`、`TvLongFormPlayerScreen.kt`、`TvSeriesPlayerScreen.kt`、`TvLongFormMedia3GenerationTest.kt`、`TvLongFormPlayerSoftRetrySpecTest.kt`、`TvSeriesPlayerSoftRetrySpecTest.kt`、设计/实施文档、`CONTEXT.md`、`plan.md`
+- 验证：新增测试首次因 generation helper 缺失按预期 RED；定向 17 项通过；新鲜 TV 全量单测与 `assembleDebug` 通过（`BUILD SUCCESSFUL`）。待差异/编码检查、提交和独立复审第二轮。
+
 ## 2026-07-19 18:29 +0800
 - 进度：TV 剧集软重试 Task 3 交付门禁完成。TV 版本递增到 `135 / 0.1.135`，`CONTEXT.md` 追加剧集软重试首帧门槛与结果归属/BACK 术语；本次产品和测试改动已完成，待独立代理复审。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、实施计划、`plan.md`；既有未跟踪 `.superpowers/` 未纳入。

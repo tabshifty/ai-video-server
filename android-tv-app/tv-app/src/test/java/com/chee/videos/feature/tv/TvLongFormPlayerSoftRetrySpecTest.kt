@@ -33,7 +33,7 @@ class TvLongFormPlayerSoftRetrySpecTest {
     }
 
     @Test
-    fun `long form retry cancel keeps the current playback session active`() {
+    fun `long form retry cancel stops the matching media3 preparation without clearing session state`() {
         val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
         val cancelBlock = source
             .substringAfter("fun cancelCurrentPlaybackRetry() {")
@@ -48,14 +48,14 @@ class TvLongFormPlayerSoftRetrySpecTest {
 
         val media3Source = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").readText()
         val cancelEffectBlock = media3Source
-            .substringAfter("LaunchedEffect(player, cancelPrepareRequestKey) {")
+            .substringAfter("LaunchedEffect(player, cancelPrepareRequestKey, cancelPrepareRetryKey) {")
             .substringBefore("LaunchedEffect(player, preparedSourceKey, initialPositionMs) {")
 
-        assertTrue(media3Source.contains("LaunchedEffect(player, cancelPrepareRequestKey)"))
+        assertTrue(media3Source.contains("LaunchedEffect(player, cancelPrepareRequestKey, cancelPrepareRetryKey)"))
         assertTrue(media3Source.contains("latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())"))
-        assertFalse(cancelEffectBlock.contains("player.pause()"))
-        assertFalse(cancelEffectBlock.contains("player.stop()"))
-        assertFalse(cancelEffectBlock.contains("latestOnPlayingChanged(false)"))
+        assertTrue(cancelEffectBlock.contains("player.playWhenReady = false"))
+        assertTrue(cancelEffectBlock.contains("player.stop()"))
+        assertTrue(cancelEffectBlock.contains("canceledRetryKey = cancelPrepareRetryKey"))
     }
 
     @Test
@@ -63,9 +63,26 @@ class TvLongFormPlayerSoftRetrySpecTest {
         val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").readText()
 
         assertTrue(source.contains("cancelPrepareRequestKey: Int = 0"))
+        assertTrue(source.contains("cancelPrepareRetryKey: Int? = null"))
         assertTrue(source.contains("onRenderedFirstFrame: () -> Unit = {}"))
+        assertTrue(source.contains("onPlayingChanged: (Boolean, Int) -> Unit"))
+        assertTrue(source.contains("onError: (String, Int) -> Unit"))
+        assertTrue(source.contains("if (eventRetryKey == preparedRetryKey)"))
+        assertTrue(source.contains("if (eventRetryKey != preparedRetryKey)"))
         assertTrue(source.contains("override fun onRenderedFirstFrame()"))
         assertTrue(source.contains("val player = remember(accessToken) { ExoPlayer.Builder(context).build() }"))
-        assertTrue(source.contains("LaunchedEffect(player, cancelPrepareRequestKey)"))
+        assertTrue(source.contains("LaunchedEffect(player, cancelPrepareRequestKey, cancelPrepareRetryKey)"))
+        assertTrue(source.contains("setKeepContentOnPlayerReset(true)"))
+    }
+
+    @Test
+    fun `single player only accepts callbacks from the current retry generation`() {
+        val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
+
+        assertTrue(source.contains("cancelPrepareRetryKey = ignoredRetryAttemptKey"))
+        assertTrue(source.contains("onPlayingChanged = { playing, eventRetryKey ->"))
+        assertTrue(source.contains("eventRetryKey == activeRetryKey"))
+        assertTrue(source.contains("onError = { message, eventRetryKey ->"))
+        assertTrue(source.contains("if (eventRetryKey == routeRetryNonce)"))
     }
 }

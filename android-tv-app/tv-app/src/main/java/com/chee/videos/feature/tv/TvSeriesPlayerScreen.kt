@@ -579,6 +579,7 @@ fun TvSeriesPlayerScreen(
                     accessToken = accessToken,
                     retryKey = routeRetryNonce,
                     cancelPrepareRequestKey = cancelPrepareRequestKey,
+                    cancelPrepareRetryKey = ignoredRetryAttemptKey,
                     shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
                     initialPositionMs = resolveTvMedia3ResumePositionMs(
                         historyPositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
@@ -599,56 +600,62 @@ fun TvSeriesPlayerScreen(
                     onRenderedFirstFrame = {
                         hasRenderedFirstFrame = true
                     },
-                    onPlayingChanged = { playing ->
-                        isPlayerActuallyPlaying = playing
-                        if (playing) {
-                            playerErrorMessage = null
-                            ignoredRetryAttemptKey = null
-                            val activeRetryKey = activeSoftRetryAttemptKey
-                            if (activeRetryKey != null) {
-                                activeSoftRetryAttemptKey = null
-                                softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
-                            }
-                            val resumePositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
-                                currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
-                            } else {
-                                0L
-                            }
-                            if (uiState.currentVideoId.isNotBlank() && resumedFromHistoryVideoId != uiState.currentVideoId) {
-                                resumedFromHistoryVideoId = uiState.currentVideoId
-                                if (shouldTriggerResumePrompt(resumePositionMs)) {
-                                    resumePromptLastPositionMs = resumePositionMs
-                                    resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
-                                    resumePromptDismissed = false
+                    onPlayingChanged = { playing, eventRetryKey ->
+                        if (eventRetryKey == routeRetryNonce) {
+                            isPlayerActuallyPlaying = playing
+                            if (playing) {
+                                playerErrorMessage = null
+                                ignoredRetryAttemptKey = null
+                                val activeRetryKey = activeSoftRetryAttemptKey
+                                if (activeRetryKey != null && eventRetryKey == activeRetryKey) {
+                                    activeSoftRetryAttemptKey = null
+                                    softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
+                                }
+                                val resumePositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
+                                    currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
+                                } else {
+                                    0L
+                                }
+                                if (uiState.currentVideoId.isNotBlank() && resumedFromHistoryVideoId != uiState.currentVideoId) {
+                                    resumedFromHistoryVideoId = uiState.currentVideoId
+                                    if (shouldTriggerResumePrompt(resumePositionMs)) {
+                                        resumePromptLastPositionMs = resumePositionMs
+                                        resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
+                                        resumePromptDismissed = false
+                                    }
                                 }
                             }
                         }
                     },
-                    onError = { message ->
-                        isPlayerActuallyPlaying = false
-                        when (val action = resolveSeriesOnErrorAction(hasRenderedFirstFrame, message)) {
-                            is SeriesOnErrorAction.SoftRetry -> when {
-                                activeSoftRetryAttemptKey != null -> {
-                                    val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
-                                    activeSoftRetryAttemptKey = null
-                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, action.message)
-                                    retryActionFocusRequestKey += 1
+                    onError = { message, eventRetryKey ->
+                        if (eventRetryKey == routeRetryNonce) {
+                            isPlayerActuallyPlaying = false
+                            when (val action = resolveSeriesOnErrorAction(hasRenderedFirstFrame, message)) {
+                                is SeriesOnErrorAction.SoftRetry -> when {
+                                    activeSoftRetryAttemptKey != null && eventRetryKey == activeSoftRetryAttemptKey -> {
+                                        val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
+                                        activeSoftRetryAttemptKey = null
+                                        softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, action.message)
+                                        retryActionFocusRequestKey += 1
+                                    }
+
+                                    shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey) -> {
+                                        ignoredRetryAttemptKey = null
+                                    }
+
+                                    else -> {
+                                        softRetryUiState = TvLongFormSoftRetryUiState.Failed(eventRetryKey, action.message)
+                                        retryActionFocusRequestKey += 1
+                                    }
                                 }
 
-                                shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, routeRetryNonce) -> {
-                                    ignoredRetryAttemptKey = null
-                                }
-
-                                else -> {
-                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(routeRetryNonce, action.message)
-                                    retryActionFocusRequestKey += 1
+                                SeriesOnErrorAction.HardError -> {
+                                    playerErrorMessage = message.ifBlank { "播放失败，请重试" }
+                                    updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
                                 }
                             }
-
-                            SeriesOnErrorAction.HardError -> {
-                                playerErrorMessage = message.ifBlank { "播放失败，请重试" }
-                                updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
-                            }
+                        } else if (shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventRetryKey)) {
+                            ignoredRetryAttemptKey = null
                         }
                     },
                     onEnded = ::handlePlaybackEnded,
@@ -956,7 +963,7 @@ internal fun shouldAutoStartTvLongFormMedia3Playback(
 /**
  * 剧集屏 Media3 onError 的分派决策。对齐单片屏 `TvLongFormPlayerScreen` 的 hasRenderedFirstFrame 门槛：
  * - [SeriesOnErrorAction.SoftRetry]：首帧已现后失败，保留当前分集已渲染画面，走非阻塞中心失败提示 + OK 重试。
- * - [SeriesOnErrorAction.HardError]：首帧未现（首次 prepare 失败）或无有效错误信息，回退原全屏硬错误卡片。
+ * - [SeriesOnErrorAction.HardError]：首帧未现（首次 prepare 失败），回退原全屏硬错误卡片。
  *
  * 抽成纯函数以便单测覆盖门槛边界，避免内联在 Composable lambda 中难以测试。
  */
