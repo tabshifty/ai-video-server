@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -34,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -183,9 +186,12 @@ fun TvSeriesPlayerScreen(
     // 首帧渲染门槛：对齐单片屏 `TvLongFormPlayerScreen` 的软重试语义。首帧已现后的 onError
     // 不再清 hasStartedPlayback、不再触发全屏 TvErrorState，改为非阻塞中心失败提示 + OK 重试。
     var hasRenderedFirstFrame by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
-    // 首帧已现后的软重试局部态：保留当前分集已渲染画面，提供 OK 键重试入口。
-    var playerSoftRetryMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
-    var playerSoftRetryActionFocusRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
+    var activeSoftRetryAttemptKey by remember(uiState.currentVideoId) { mutableStateOf<Int?>(null) }
+    var ignoredRetryAttemptKey by remember(uiState.currentVideoId) { mutableStateOf<Int?>(null) }
+    var cancelPrepareRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
+    var softRetryUiState by remember(uiState.currentVideoId) { mutableStateOf<TvLongFormSoftRetryUiState?>(null) }
+    var retryActionFocusRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
+    val softRetryFailureVisible = softRetryUiState is TvLongFormSoftRetryUiState.Failed
     val playbackDiagnosticMessage = remember(playbackRoute, displayCapability, uiState.currentSourceUrl, playerErrorMessage) {
         buildTvDolbyVisionDiagnosticMessage(
             route = playbackRoute,
@@ -229,7 +235,7 @@ fun TvSeriesPlayerScreen(
             isPlaying = isPlayerActuallyPlaying,
             autoplayEnabled = uiState.autoplayEnabled,
             hasNextEpisode = hasNextEpisode,
-            isPlayerError = playerErrorMessage != null,
+            isPlayerError = playerErrorMessage != null || softRetryFailureVisible,
             isSelectorVisible = uiState.selectorVisible,
             isBackConfirmVisible = showBackConfirmPrompt,
             isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
@@ -247,39 +253,64 @@ fun TvSeriesPlayerScreen(
         )
     }
 
-    BackHandler(enabled = showDolbyVisionDiagnostics) {
-        showDolbyVisionDiagnostics = false
-    }
-    BackHandler(enabled = !showDolbyVisionDiagnostics) {
-        when {
-            uiState.playbackPreparing && uiState.episodeSwitchState is TvEpisodeSwitchUiState.Preparing -> {
-                viewModel.cancelEpisodeSwitch()
-            }
-            uiState.episodeSwitchState is TvEpisodeSwitchUiState.Failed -> {
-                viewModel.clearEpisodeSwitchFeedback()
-            }
-            else -> handlePlaybackBack()
-        }
-    }
-
     fun updatePlaybackSession(nextSession: LongFormPlaybackSession) {
         hasStartedPlayback = nextSession.hasStartedPlayback
         isPausedByUser = nextSession.isPausedByUser
     }
 
-    // 软重试入口：首帧已现后的非阻塞失败提示里，按 OK 重试当前分集。沿用屏内已有的
-    // routeRetryNonce 作为 Media3 retryKey，保留 hasStartedPlayback 与已渲染画面。
     fun requestSoftPlaybackRetry() {
+        val nextRetryKey = routeRetryNonce + 1
         showDolbyVisionDiagnostics = false
-        playerSoftRetryMessage = null
-        routeRetryNonce += 1
+        ignoredRetryAttemptKey = null
+        playerErrorMessage = null
+        activeSoftRetryAttemptKey = nextRetryKey
+        softRetryUiState = TvLongFormSoftRetryUiState.Preparing(nextRetryKey)
+        routeRetryNonce = nextRetryKey
         updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+    }
+
+    fun cancelCurrentPlaybackRetry() {
+        val preparingState = softRetryUiState as? TvLongFormSoftRetryUiState.Preparing ?: return
+        showDolbyVisionDiagnostics = false
+        activeSoftRetryAttemptKey = null
+        ignoredRetryAttemptKey = preparingState.retryKey
+        cancelPrepareRequestKey += 1
+        playerErrorMessage = null
+        softRetryUiState = TvLongFormSoftRetryUiState.Canceled(preparingState.retryKey, "已取消重试")
+    }
+
+    fun dismissSoftRetryFailure() {
+        if (softRetryUiState is TvLongFormSoftRetryUiState.Failed) {
+            softRetryUiState = null
+        }
+        showDolbyVisionDiagnostics = false
+    }
+
+    BackHandler(enabled = showDolbyVisionDiagnostics) {
+        showDolbyVisionDiagnostics = false
+    }
+    BackHandler(enabled = !showDolbyVisionDiagnostics) {
+        when (resolveSeriesSoftRetryBackAction(softRetryUiState)) {
+            SeriesSoftRetryBackAction.CancelPreparing -> cancelCurrentPlaybackRetry()
+            SeriesSoftRetryBackAction.DismissFailure -> dismissSoftRetryFailure()
+            SeriesSoftRetryBackAction.DelegateToPlayerBack -> when {
+                uiState.playbackPreparing && uiState.episodeSwitchState is TvEpisodeSwitchUiState.Preparing -> {
+                    viewModel.cancelEpisodeSwitch()
+                }
+
+                uiState.episodeSwitchState is TvEpisodeSwitchUiState.Failed -> {
+                    viewModel.clearEpisodeSwitchFeedback()
+                }
+
+                else -> handlePlaybackBack()
+            }
+        }
     }
 
     val resumePromptGuardInput = ResumePromptGuardInput(
         hasResumeSeekTriggered = resumedFromHistoryVideoId == uiState.currentVideoId && resumePromptLastPositionMs > 0L,
         promptPermanentlyDismissed = resumePromptDismissed,
-        isPlayerError = playerErrorMessage != null,
+        isPlayerError = playerErrorMessage != null || softRetryFailureVisible,
         isBackConfirmVisible = showBackConfirmPrompt,
         isEpisodeSelectorVisible = uiState.selectorVisible,
         isTrackSheetVisible = isTrackSheetVisible,
@@ -411,6 +442,22 @@ fun TvSeriesPlayerScreen(
         selectedAudioTrackId = uiState.selectedAudioTrackId
     }
 
+    LaunchedEffect(softRetryUiState) {
+        when (softRetryUiState) {
+            is TvLongFormSoftRetryUiState.Succeeded,
+            is TvLongFormSoftRetryUiState.Canceled,
+            -> {
+                val transientState = softRetryUiState
+                delay(900L)
+                if (softRetryUiState == transientState) {
+                    softRetryUiState = null
+                }
+            }
+
+            else -> Unit
+        }
+    }
+
     LaunchedEffect(
         uiState.currentVideoId,
         isMedia3Route,
@@ -441,6 +488,7 @@ fun TvSeriesPlayerScreen(
         screenDurationMs,
         remainingMs,
         playerErrorMessage,
+        softRetryFailureVisible,
         showBackConfirmPrompt,
         uiState.selectorVisible,
         uiState.pendingEndOverlayKind,
@@ -451,6 +499,7 @@ fun TvSeriesPlayerScreen(
             hasNextEpisode &&
             isPlayerActuallyPlaying &&
             playerErrorMessage == null &&
+            !softRetryFailureVisible &&
             !showBackConfirmPrompt &&
             !uiState.selectorVisible &&
             uiState.pendingEndOverlayKind == null &&
@@ -463,6 +512,7 @@ fun TvSeriesPlayerScreen(
 
     LaunchedEffect(
         playerErrorMessage,
+        softRetryFailureVisible,
         showBackConfirmPrompt,
         uiState.selectorVisible,
         isTrackSheetVisible,
@@ -471,6 +521,7 @@ fun TvSeriesPlayerScreen(
     ) {
         if (
             playerErrorMessage != null ||
+            softRetryFailureVisible ||
             showBackConfirmPrompt ||
             uiState.selectorVisible ||
             isTrackSheetVisible ||
@@ -510,6 +561,9 @@ fun TvSeriesPlayerScreen(
     }
 
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
+    val overlayPlayerErrorVisible = playerErrorMessage != null ||
+        softRetryFailureVisible ||
+        showDolbyVisionDiagnostics
 
     Box(
         modifier = Modifier
@@ -524,6 +578,7 @@ fun TvSeriesPlayerScreen(
                     title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
                     accessToken = accessToken,
                     retryKey = routeRetryNonce,
+                    cancelPrepareRequestKey = cancelPrepareRequestKey,
                     shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
                     initialPositionMs = resolveTvMedia3ResumePositionMs(
                         historyPositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
@@ -548,7 +603,12 @@ fun TvSeriesPlayerScreen(
                         isPlayerActuallyPlaying = playing
                         if (playing) {
                             playerErrorMessage = null
-                            playerSoftRetryMessage = null
+                            ignoredRetryAttemptKey = null
+                            val activeRetryKey = activeSoftRetryAttemptKey
+                            if (activeRetryKey != null) {
+                                activeSoftRetryAttemptKey = null
+                                softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
+                            }
                             val resumePositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
                                 currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
                             } else {
@@ -566,16 +626,27 @@ fun TvSeriesPlayerScreen(
                     },
                     onError = { message ->
                         isPlayerActuallyPlaying = false
-                        when (resolveSeriesOnErrorAction(hasRenderedFirstFrame, message)) {
-                            is SeriesOnErrorAction.SoftRetry -> {
-                                // 首帧已现：保留当前分集已渲染画面，不清 hasStartedPlayback、
-                                // 不进全屏硬错误卡片；改为非阻塞中心失败提示，OK 键重试当前分集。
-                                playerSoftRetryMessage = message
-                                playerSoftRetryActionFocusRequestKey += 1
+                        when (val action = resolveSeriesOnErrorAction(hasRenderedFirstFrame, message)) {
+                            is SeriesOnErrorAction.SoftRetry -> when {
+                                activeSoftRetryAttemptKey != null -> {
+                                    val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
+                                    activeSoftRetryAttemptKey = null
+                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, action.message)
+                                    retryActionFocusRequestKey += 1
+                                }
+
+                                shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, routeRetryNonce) -> {
+                                    ignoredRetryAttemptKey = null
+                                }
+
+                                else -> {
+                                    softRetryUiState = TvLongFormSoftRetryUiState.Failed(routeRetryNonce, action.message)
+                                    retryActionFocusRequestKey += 1
+                                }
                             }
 
                             SeriesOnErrorAction.HardError -> {
-                                playerErrorMessage = message
+                                playerErrorMessage = message.ifBlank { "播放失败，请重试" }
                                 updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
                             }
                         }
@@ -664,7 +735,7 @@ fun TvSeriesPlayerScreen(
                         )
                     },
                     backConfirmPromptVisible = showBackConfirmPrompt,
-                    playerErrorVisible = playerErrorMessage != null,
+                    playerErrorVisible = overlayPlayerErrorVisible,
                     openEpisodeRailRequestKey = openEpisodeRailRequestKey,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -692,8 +763,8 @@ fun TvSeriesPlayerScreen(
                 // 首帧已现后的非阻塞软重试卡片：保留当前分集已渲染画面，OK 键重试当前分集。
                 // 不清 hasStartedPlayback、不进全屏 TvErrorState，对齐 CONTEXT.md「TV 长视频播放器软准备」契约。
                 TvSeriesPlayerSoftRetryFeedback(
-                    message = playerSoftRetryMessage,
-                    focusRequestKey = playerSoftRetryActionFocusRequestKey,
+                    state = softRetryUiState,
+                    focusRequestKey = retryActionFocusRequestKey,
                     onRetry = ::requestSoftPlaybackRetry,
                     modifier = Modifier.align(Alignment.Center),
                 )
@@ -918,23 +989,91 @@ internal fun resolveSeriesOnErrorAction(
         SeriesOnErrorAction.HardError
     }
 
-/**
- * 首帧已现后的非阻塞软重试卡片。仅当 [message] 非空时呈现，OK 键聚焦到「重试播放」按钮。
- * 不清 hasStartedPlayback、不替换全屏 TvErrorState，对齐 CONTEXT.md「TV 长视频播放器软准备」契约。
- */
 @Composable
 private fun TvSeriesPlayerSoftRetryFeedback(
-    message: String?,
+    state: TvLongFormSoftRetryUiState?,
     focusRequestKey: Int,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (message.isNullOrBlank()) {
-        return
+    when (state) {
+        is TvLongFormSoftRetryUiState.Preparing -> {
+            TvSeriesPlayerSoftRetryTransientFeedback(
+                icon = Icons.Filled.Refresh,
+                message = state.message,
+                modifier = modifier,
+            )
+        }
+
+        is TvLongFormSoftRetryUiState.Succeeded -> {
+            TvSeriesPlayerSoftRetryTransientFeedback(
+                icon = Icons.Filled.PlayArrow,
+                message = state.message,
+                modifier = modifier,
+            )
+        }
+
+        is TvLongFormSoftRetryUiState.Canceled -> {
+            TvSeriesPlayerSoftRetryTransientFeedback(
+                icon = Icons.Filled.Pause,
+                message = state.message,
+                modifier = modifier,
+            )
+        }
+
+        is TvLongFormSoftRetryUiState.Failed -> {
+            TvSeriesPlayerSoftRetryFailureFeedback(
+                state = state,
+                focusRequestKey = focusRequestKey,
+                onRetry = onRetry,
+                modifier = modifier,
+            )
+        }
+
+        null -> Unit
     }
+}
+
+@Composable
+private fun TvSeriesPlayerSoftRetryTransientFeedback(
+    icon: ImageVector,
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = PlayerGlassSurfaceStrong,
+        shape = AppChrome.SurfaceShape,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = AppChrome.TextPrimary,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            Text(
+                text = message,
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvSeriesPlayerSoftRetryFailureFeedback(
+    state: TvLongFormSoftRetryUiState.Failed,
+    focusRequestKey: Int,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val retryFocusRequester = remember { FocusRequester() }
 
-    LaunchedTvInitialFocus(true, focusRequestKey, message) {
+    LaunchedTvInitialFocus(true, focusRequestKey, state.retryKey, state.message) {
         if (focusRequestKey > 0) {
             retryFocusRequester.tryRequestFocus()
         }
@@ -958,7 +1097,7 @@ private fun TvSeriesPlayerSoftRetryFeedback(
                     modifier = Modifier.padding(end = 8.dp),
                 )
                 Text(
-                    text = message,
+                    text = state.message,
                     color = AppChrome.TextPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
@@ -966,31 +1105,41 @@ private fun TvSeriesPlayerSoftRetryFeedback(
                     modifier = Modifier.widthIn(max = 420.dp),
                 )
             }
-            Surface(
-                color = AppChrome.AccentSoft,
-                shape = AppChrome.ChipShape,
-                modifier = Modifier
-                    .tvFocusableScaleOnly(focusedScale = 1.04f)
-                    .clickable(onClick = onRetry)
-                    .focusRequester(retryFocusRequester),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = null,
-                        tint = AppChrome.TextPrimary,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
-                    Text(
-                        text = "重试播放",
-                        color = AppChrome.TextPrimary,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
-            }
+            TvSeriesPlayerSoftRetryActionButton(
+                onClick = onRetry,
+                modifier = Modifier.focusRequester(retryFocusRequester),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvSeriesPlayerSoftRetryActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = AppChrome.AccentSoft,
+        shape = AppChrome.ChipShape,
+        modifier = modifier
+            .tvFocusableScaleOnly(focusedScale = 1.04f)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Refresh,
+                contentDescription = null,
+                tint = AppChrome.TextPrimary,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            Text(
+                text = "重试播放",
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.labelLarge,
+            )
         }
     }
 }

@@ -121,7 +121,7 @@ git commit -m "补齐TV剧集软重试分派逻辑"
 - Consumes: Task 1 的分派函数、`TvLongFormSoftRetryUiState`、`shouldIgnoreTvLongFormRetryError(Int?, Int)`、`TvLongFormMedia3Player(cancelPrepareRequestKey = ...)`。
 - Produces: 剧集屏 `Preparing / Failed / Succeeded / Canceled` 状态流、BACK 取消/关闭和稳定焦点回收。
 
-- [ ] **Step 1: 写源码结构红灯测试**
+- [x] **Step 1: 写源码结构红灯测试**
 
 ```kotlin
 val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
@@ -134,7 +134,7 @@ val buttonChain = source.substringAfter("modifier = modifier").substringBefore("
 assertTrue(buttonChain.indexOf(".focusRequester(retryFocusRequester)") < buttonChain.indexOf(".tvFocusableScaleOnly"))
 ```
 
-- [ ] **Step 2: 运行结构测试并确认 RED**
+- [x] **Step 2: 运行结构测试并确认 RED**
 
 Run:
 
@@ -146,7 +146,7 @@ cd android-tv-app
 
 Expected: 取消键、完整状态与 requester 顺序断言失败。
 
-- [ ] **Step 3: 接入状态机与 Media3 回调**
+- [x] **Step 3: 接入状态机与 Media3 回调**
 
 ```kotlin
 var activeSoftRetryAttemptKey by remember(uiState.currentVideoId) { mutableStateOf<Int?>(null) }
@@ -175,7 +175,7 @@ fun cancelCurrentPlaybackRetry() {
 
 `onPlayingChanged(true)` 只把非空 `activeSoftRetryAttemptKey` 转为 `Succeeded`；`onError` 按 active、ignored、普通首帧后错误的顺序进入 `Failed` 或静默丢弃。`Succeeded` 与 `Canceled` 用对象一致性保护延迟清除。
 
-- [ ] **Step 4: 接入 BACK、Overlay 与反馈 UI**
+- [x] **Step 4: 接入 BACK、Overlay 与反馈 UI**
 
 ```kotlin
 when (resolveSeriesSoftRetryBackAction(softRetryUiState)) {
@@ -199,7 +199,7 @@ val overlayPlayerErrorVisible = playerErrorMessage != null ||
 
 反馈组件接收完整 `TvLongFormSoftRetryUiState`：瞬态只显示图标与短文案，`Failed` 显示错误和主动作。按钮链必须由外部 `Modifier.focusRequester(retryFocusRequester)` 先于内部 `.tvFocusableScaleOnly().clickable()`。
 
-- [ ] **Step 5: 运行 Task 1+2 定向测试并确认 GREEN**
+- [x] **Step 5: 运行 Task 1+2 定向测试并确认 GREEN**
 
 Run:
 
@@ -213,7 +213,7 @@ cd android-tv-app
 
 Expected: 三个测试类全部通过。
 
-- [ ] **Step 6: 追加进度并提交**
+- [x] **Step 6: 追加进度并提交**
 
 ```bash
 git add android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt \

@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 18:24 +0800
+- 进度：TV 剧集软重试 Task 2 完成。剧集屏复用单片 `Preparing / Failed / Succeeded / Canceled` 状态与忽略令牌，BACK 可关闭失败或取消 preparing，Media3 接入取消请求键；软失败参与统一焦点守卫，重试按钮 requester 顺序已修正，成功/取消反馈 900ms 后按状态身份清除。
+- 影响文件：`TvSeriesPlayerScreen.kt`、`TvSeriesPlayerSoftRetrySpecTest.kt`、实施计划、`plan.md`
+- 验证：结构测试首次 3/3 按预期失败；生产接线后首次 GREEN 暴露测试取值范围错误，修正测试后 Task 1+2 三个测试类共 10 项全部通过，`BUILD SUCCESSFUL`。
+
 ## 2026-07-19 18:13 +0800
 - 进度：TV 剧集软重试 Task 1 完成红绿闭环。空错误文案在首帧后改用“播放失败，请重试”软失败兜底；新增纯逻辑 BACK 分派，明确 preparing 取消、failed 关闭、其它状态交回原播放器返回链路。
 - 影响文件：`TvSeriesPlayerScreen.kt`、`TvSeriesPlayerOnErrorActionTest.kt`、`TvSeriesPlayerSoftRetryLogicTest.kt`、实施计划、`plan.md`
