@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-19 18:13 +0800
+- 进度：TV 剧集软重试 Task 1 完成红绿闭环。空错误文案在首帧后改用“播放失败，请重试”软失败兜底；新增纯逻辑 BACK 分派，明确 preparing 取消、failed 关闭、其它状态交回原播放器返回链路。
+- 影响文件：`TvSeriesPlayerScreen.kt`、`TvSeriesPlayerOnErrorActionTest.kt`、`TvSeriesPlayerSoftRetryLogicTest.kt`、实施计划、`plan.md`
+- 验证：定向测试首次因缺少 `SeriesSoftRetryBackAction` / `resolveSeriesSoftRetryBackAction` 按预期失败；最小实现后同命令 `BUILD SUCCESSFUL`。
+
 ## 2026-07-19 18:04 +0800
 - 进度：TV 剧集播放器软重试实施计划已完成。状态机方案与测试方案经两个只读代理独立核对，确认不改 ViewModel、不抽共享 UI，复用单片软重试状态类型与取消键接线，分三项任务执行 TDD、生产接线和交付门禁。
 - 影响文件：`docs/superpowers/plans/2026-07-19-tv-series-soft-retry-fix.md`、`plan.md`

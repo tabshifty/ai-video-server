@@ -894,12 +894,26 @@ internal sealed interface SeriesOnErrorAction {
     object HardError : SeriesOnErrorAction
 }
 
+internal sealed interface SeriesSoftRetryBackAction {
+    object CancelPreparing : SeriesSoftRetryBackAction
+    object DismissFailure : SeriesSoftRetryBackAction
+    object DelegateToPlayerBack : SeriesSoftRetryBackAction
+}
+
+internal fun resolveSeriesSoftRetryBackAction(
+    state: TvLongFormSoftRetryUiState?,
+): SeriesSoftRetryBackAction = when (state) {
+    is TvLongFormSoftRetryUiState.Preparing -> SeriesSoftRetryBackAction.CancelPreparing
+    is TvLongFormSoftRetryUiState.Failed -> SeriesSoftRetryBackAction.DismissFailure
+    else -> SeriesSoftRetryBackAction.DelegateToPlayerBack
+}
+
 internal fun resolveSeriesOnErrorAction(
     hasRenderedFirstFrame: Boolean,
     errorMessage: String,
 ): SeriesOnErrorAction =
-    if (hasRenderedFirstFrame && errorMessage.isNotBlank()) {
-        SeriesOnErrorAction.SoftRetry(errorMessage)
+    if (hasRenderedFirstFrame) {
+        SeriesOnErrorAction.SoftRetry(errorMessage.ifBlank { "播放失败，请重试" })
     } else {
         SeriesOnErrorAction.HardError
     }

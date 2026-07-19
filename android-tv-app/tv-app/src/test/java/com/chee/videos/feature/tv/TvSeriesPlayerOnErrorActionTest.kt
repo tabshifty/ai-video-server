@@ -36,11 +36,11 @@ class TvSeriesPlayerOnErrorActionTest {
     }
 
     @Test
-    fun `首帧已现但错误信息为空时仍按硬错误回退，避免空提示`() {
+    fun `首帧已现且错误信息为空时仍返回带兜底文案的软重试`() {
         val action = resolveSeriesOnErrorAction(
             hasRenderedFirstFrame = true,
             errorMessage = "",
         )
-        assertEquals(SeriesOnErrorAction.HardError, action)
+        assertEquals(SeriesOnErrorAction.SoftRetry("播放失败，请重试"), action)
     }
 }

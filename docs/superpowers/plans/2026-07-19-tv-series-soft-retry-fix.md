@@ -31,7 +31,7 @@
 - Consumes: `TvLongFormSoftRetryUiState`。
 - Produces: `resolveSeriesOnErrorAction(Boolean, String)`、`resolveSeriesSoftRetryBackAction(TvLongFormSoftRetryUiState?)`、`SeriesSoftRetryBackAction`。
 
-- [ ] **Step 1: 写首帧空错误与 BACK 分派红灯测试**
+- [x] **Step 1: 写首帧空错误与 BACK 分派红灯测试**
 
 ```kotlin
 @Test
@@ -55,7 +55,7 @@ fun `preparing 与 failed 优先消费返回键`() {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 Run:
 
@@ -68,7 +68,7 @@ cd android-tv-app
 
 Expected: 空文案仍返回 `HardError`，且 BACK 分派符号尚不存在，测试失败。
 
-- [ ] **Step 3: 写最小纯逻辑实现**
+- [x] **Step 3: 写最小纯逻辑实现**
 
 ```kotlin
 internal sealed interface SeriesSoftRetryBackAction {
@@ -95,13 +95,13 @@ internal fun resolveSeriesOnErrorAction(
 }
 ```
 
-- [ ] **Step 4: 运行定向测试并确认 GREEN**
+- [x] **Step 4: 运行定向测试并确认 GREEN**
 
 Run: Step 2 同一命令。
 
 Expected: 两个测试类全部通过。
 
-- [ ] **Step 5: 追加进度并提交**
+- [x] **Step 5: 追加进度并提交**
 
 ```bash
 git add android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt \
