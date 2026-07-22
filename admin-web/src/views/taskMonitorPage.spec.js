@@ -294,6 +294,10 @@ function setPage(page) {
     expect(template).toContain('<AdminTablePagination')
   })
 
+  it('单列轨道允许窄屏分段筛选在自身横滚而不撑宽页面', () => {
+    expect(findRule(style, '.task-monitor-page')).toContain('grid-template-columns: minmax(0, 1fr)')
+  })
+
   it('错误全文可访问且监控密度和窄屏点击目标稳定', () => {
     expect(template).toContain('data-density="monitor"')
     expect(template).toContain('<el-tooltip :content="row.error || \'无错误\'"')

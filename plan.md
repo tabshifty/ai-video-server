@@ -2,6 +2,17 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-22 10:18 +0800
+- 进度：完成管理端布局健壮性 Task 4 的自动验证与 375px 任务页回归修复。新增静态契约首先按预期 RED（15 项中仅轨道断言失败），随后为 `.task-monitor-page` 单列 Grid 声明 `minmax(0, 1fr)`，阻止五项分段筛选的最小内容宽度撑大页面；保留筛选和九列表格各自的局部横滚，不使用 `overflow-x: hidden`，未修改业务行为、API、路由或依赖。
+- 影响文件：`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`plan.md`；本轮未产生新的长期约定，因此不修改 `CONTEXT.md`。提交仅纳入上述三个文件，`.superpowers/` 下 Task 4 brief/report 作为本地忽略材料明确不纳入。
+- 验证：定向 GREEN `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js` 通过（1 file，15/15）；完整 `cd admin-web && npm test` 通过（40 files，662/662）；`cd admin-web && npm run build` 通过（2373 modules，仅既有 chunk-size warning）；`git diff --check` 无输出；替换字符扫描退出状态 1 且输出为空；提交前状态仅有三个目标文件。
+- 浏览器：主代理实测修复前 `375x812` 的 23 条受保护路由中仅 `/tasks` 为 `scrollWidth/clientWidth = 376/375`，其余 22 条相等；`768x900`、`1024x900`、`1440x900` 的 23 条路由均相等，重点只读交互流程未发现其它阻塞。修复后的 `375x812 /tasks` 复测留待主代理确认，本记录不代替主代理宣称通过。
+
+## 2026-07-22 10:17 +0800
+- 进度：开始管理端布局健壮性 Task 4 的 375px 任务页回归修复。主代理实测仅 `/tasks` 出现页面宽度 376/375；根因定位为任务页单列 Grid 的默认 `auto` 轨道采纳五项分段筛选的最小内容宽度，连带 Toolbar、指标条和卡片超出 1px。先补轨道收敛静态契约取得 RED，再以 `minmax(0, 1fr)` 做最小样式修复。
+- 影响文件：计划只修改 `admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/views/TaskMonitor.vue`、`plan.md`，并填写 Git 忽略报告 `.superpowers/sdd/task-4-report.md`；不修改九列表格、业务行为、API、路由、依赖或 `CONTEXT.md`。
+- 验证：待运行单文件 RED/GREEN、完整 `npm test`、`npm run build`、`git diff --check`、替换字符扫描与状态检查；修复后的 375px `/tasks` 浏览器复测留待主代理确认。
+
 ## 2026-07-22 09:52 +0800
 - 进度：完成管理端布局健壮性 Task 3。演员别名通过统一 helper 清理空值并以单行省略、完整 Tooltip 和键盘焦点暴露；任务监控保留九列语义与 slot，仅将列预算收敛为 1142px；待删除详情只在 64rem–74.9375rem 改为纵向并左对齐操作，既有 1023px 以下工作台与 1200px 以上横向布局未改。
 - 影响文件：`admin-web/src/views/ActorManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`；保留 Actor Drawer 的 `data-density="form"`，提交不纳入 `.superpowers/` 本地报告。
