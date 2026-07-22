@@ -74,4 +74,16 @@ defineProps({
   opacity: 0;
   transform: translateY(var(--space-2));
 }
+
+@media (max-width: 63.9375rem) {
+  .bulk-action-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bulk-action-bar__actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
 </style>

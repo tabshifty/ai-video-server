@@ -9,6 +9,8 @@ const metricStripSource = readFileSync(new URL('./MetricStrip.vue', import.meta.
 const sectionCardSource = readFileSync(new URL('./SectionCard.vue', import.meta.url), 'utf8')
 const savedViewTabsSource = readFileSync(new URL('./SavedViewTabs.vue', import.meta.url), 'utf8')
 const statusIndicatorSource = readFileSync(new URL('./StatusIndicator.vue', import.meta.url), 'utf8')
+const bulkActionBarSource = readFileSync(new URL('./BulkActionBar.vue', import.meta.url), 'utf8')
+const commandPaletteSource = readFileSync(new URL('./CommandPalette.vue', import.meta.url), 'utf8')
 const drawerHeaderURL = new URL('./AdminDrawerHeader.vue', import.meta.url)
 const semanticTones = ['neutral', 'success', 'warning', 'danger', 'info']
 
@@ -59,6 +61,8 @@ const savedViewTemplate = extractBlock(savedViewTabsSource, 'template')
 const savedViewStyle = extractBlock(savedViewTabsSource, 'style')
 const statusTemplate = extractBlock(statusIndicatorSource, 'template')
 const statusStyle = extractBlock(statusIndicatorSource, 'style')
+const bulkActionBarStyle = extractBlock(bulkActionBarSource, 'style')
+const commandPaletteStyle = extractBlock(commandPaletteSource, 'style')
 
 describe('Precision Ops base components', () => {
   it('compiles both SFCs and renders labeled tabular metrics without cards', () => {
@@ -250,5 +254,20 @@ describe('Precision Ops base components', () => {
       expect(desktopRule).toContain(`${property}: var(--control-height)`)
       expect(mobileRule).toContain(`${property}: 44px`)
     }
+  })
+
+  it('共享批量操作条在窄屏换行且命令面板保留焦点与滚动边界', () => {
+    const mediaStart = bulkActionBarStyle.indexOf('@media (max-width: 63.9375rem)')
+
+    expect(mediaStart).toBeGreaterThan(-1)
+    const mobileBulkStyle = bulkActionBarStyle.slice(mediaStart)
+    expect(findRule(mobileBulkStyle, '.bulk-action-bar')).toContain('flex-direction: column')
+    expect(findRule(mobileBulkStyle, '.bulk-action-bar')).toContain('align-items: stretch')
+    expect(findRule(mobileBulkStyle, '.bulk-action-bar__actions')).toContain('width: 100%')
+    expect(findRule(mobileBulkStyle, '.bulk-action-bar__actions')).toContain('flex-wrap: wrap')
+    expect(commandPaletteStyle).toMatch(
+      /\.command-palette__search:focus-within\s*\{[^}]*box-shadow:\s*0 0 0 3px var\(--line-focus\);/s
+    )
+    expect(findRule(commandPaletteStyle, '.command-palette__list')).toContain('overscroll-behavior: contain')
   })
 })

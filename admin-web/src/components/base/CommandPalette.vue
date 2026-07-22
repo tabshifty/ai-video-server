@@ -209,6 +209,10 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
+.command-palette__search:focus-within {
+  box-shadow: 0 0 0 3px var(--line-focus);
+}
+
 .command-palette__input {
   min-width: 0;
   border: 0;
@@ -233,6 +237,7 @@ onUnmounted(() => {
   max-height: 26.25rem;
   padding: var(--space-2);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .command-palette__item {

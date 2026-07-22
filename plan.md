@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-22 09:31 +0800
+- 进度：Task 1 最终门禁与自审完成；逐项核对精确断点、窄屏纵向/换行、焦点环、滚动链契约，确认命令面板脚本与动画无改动，变更范围仅为本任务四个文件。
+- 影响文件：`admin-web/src/components/base/BulkActionBar.vue`、`admin-web/src/components/base/CommandPalette.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：`cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 通过（18/18）；`cd admin-web && npm run build` 通过（2373 modules，仅既有 chunk-size warning）；`git diff --check` 通过，目标文件替换字符扫描无匹配。
+
+## 2026-07-22 09:30 +0800
+- 进度：完成管理端布局健壮性 Task 1。红灯测试因共享批量操作条缺少 `@media (max-width: 63.9375rem)` 按预期失败；随后最小补充窄屏纵向布局与操作换行、命令面板搜索焦点环和结果列表滚动链隔离，未修改命令面板快捷键、焦点陷阱、路由或动画语义。
+- 影响文件：`admin-web/src/components/base/BulkActionBar.vue`、`admin-web/src/components/base/CommandPalette.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
+- 验证：RED 命令 `cd admin-web && npm test -- src/components/base/precisionOpsComponents.spec.js` 为 17 项通过、1 项按预期失败；GREEN 使用同一命令为 18/18 通过。提交仅纳入上述四个文件，`.superpowers/` 报告不纳入 Git。
+
 ## 2026-07-21 15:13 +0800
 - 进度：用户已确认布局健壮性设计，已产出按共享容器、Drawer/视频详情、集合/监控、全量验收拆分的 TDD 实施计划；计划已逐项自检规格覆盖、测试先后、接口名称、占位文本与编码，尚未修改生产代码。
 - 影响文件：`docs/superpowers/plans/2026-07-21-admin-web-layout-hardening.md`、`plan.md`。
