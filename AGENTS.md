@@ -14,6 +14,7 @@
 ## Global Rules
 - Keep changes minimal and scoped to the requested task.
 - Do not modify skill files under `.codex/skills/*` unless the task is explicitly about skill authoring.
+- 禁止使用 Superpowers 技能包及其工作流。即使相关 skill 出现在可用技能列表、自动触发规则或历史计划中，也不得读取或调用其 `SKILL.md`、脚本、`superpowers:` 命名空间或 `.superpowers/` 产物；除非更高优先级指令明确要求，否则统一使用仓库本地流程完成任务。
 - Prefer fast search/read commands (`rg`, targeted file reads) over broad scans.
 - Before claiming completion, run only the verifications that actually exist in this repo.
 - 所有 Markdown 文件以及前端面向用户的界面文案默认必须使用中文；仅在任务明确要求其他语言时可例外。
@@ -34,7 +35,7 @@
   3. `review.md`：最后按评审/验收脚本逐项验证，不能跳过 review 阶段直接宣称完成。
   - After the user confirms a task has passed their testing, mark that task complete by adding `tasks/<任务名>/DONE.md` with completion date, related commit, and verification summary, then commit that marker.
   - If a task directory lacks one of these files, record the gap in `plan.md` and proceed only when the missing step is unnecessary or can be reconstructed from local context.
-- 复杂任务默认走两段式：先通过 `grill-with-docs` 把需求和边界收口，再用多个子代理并行产出多个方案，由主代理选最优方案并拆成任务后再编码；代码完成后必须再让子代理独立评审，修复问题并复审，直到没有阻塞问题才可宣布完成。
+- 复杂任务先通过代码与现有文档收口需求和边界，在 `plan.md` 记录方案后再实施；代码完成后按风险执行定向验证和必要的独立评审，存在阻塞问题时修复并复验后才能宣布完成。该流程不得依赖 Superpowers skills。
 - `plan.md` is mandatory and append-only for progress tracking:
   - Every new plan must be appended as an incremental entry.
   - Every implementation update must append what changed (not overwrite old entries).
