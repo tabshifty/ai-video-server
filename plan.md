@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-22 10:24 +0800
+- 进度：主代理完成管理端布局健壮性 Task 4 修复后的真实浏览器复测，375px 任务页的页面级溢出已消除，上一记录中“待主代理确认”的 concern 已关闭；其他四视口与专项只读流程证据沿用前一记录。
+- 影响文件：仅追加 `plan.md` 验收事实记录；不修改生产代码、测试、`CONTEXT.md` 或 `.superpowers/` 索引状态。
+- 验证：主代理实测 `375x812 /tasks` 的 `document.documentElement.clientWidth/scrollWidth = 375/375`；`.task-monitor-page` 宽 351px，computed grid column 为 351px；`.status-filter` 的 `clientWidth/scrollWidth = 351/364`，`overflow-x: auto`、`overscroll-behavior-x: contain`，宽内容只在筛选器内部横滚；Toolbar、MetricStrip、SectionCard 右边界均为 363px。浏览器验收网络记录未触发保存、上传、停用、删除或发布等业务写请求。
+
 ## 2026-07-22 10:18 +0800
 - 进度：完成管理端布局健壮性 Task 4 的自动验证与 375px 任务页回归修复。新增静态契约首先按预期 RED（15 项中仅轨道断言失败），随后为 `.task-monitor-page` 单列 Grid 声明 `minmax(0, 1fr)`，阻止五项分段筛选的最小内容宽度撑大页面；保留筛选和九列表格各自的局部横滚，不使用 `overflow-x: hidden`，未修改业务行为、API、路由或依赖。
 - 影响文件：`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`plan.md`；本轮未产生新的长期约定，因此不修改 `CONTEXT.md`。提交仅纳入上述三个文件，`.superpowers/` 下 Task 4 brief/report 作为本地忽略材料明确不纳入。
