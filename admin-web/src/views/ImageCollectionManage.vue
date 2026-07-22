@@ -553,6 +553,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="editDrawerVisible"
+      data-density="form"
       :before-close="handleEditDrawerBeforeClose"
       :size="editDrawerSize"
       destroy-on-close
@@ -591,7 +592,7 @@ onBeforeUnmount(() => {
         <SectionCard>
           <template #title>发布设置</template>
           <el-form-item label="排序值">
-            <el-input-number v-model="form.sort_order" :step="1" :precision="0" style="width: 200px" />
+            <el-input-number v-model="form.sort_order" :step="1" :precision="0" style="width: min(200px, 100%)" />
           </el-form-item>
           <el-form-item label="启用状态">
             <el-switch v-model="form.active" active-text="启用" inactive-text="停用" />
@@ -611,6 +612,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="imageDrawerVisible"
+      data-density="form"
       title="合集关联图片"
       size="min(100vw, 920px)"
       destroy-on-close
@@ -813,9 +815,17 @@ onBeforeUnmount(() => {
 
 .drawer-cover-meta {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 10px;
   justify-content: center;
+}
+
+.drawer-cover-title,
+.drawer-cover-desc,
+.drawer-cover-note {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .drawer-cover-title {

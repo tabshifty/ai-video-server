@@ -1051,4 +1051,26 @@ describe('Precision Ops 第二阶段集成门禁', () => {
     expect(user).toContain('prop="username" label="用户名" min-width="160" show-overflow-tooltip')
     expect(user).toContain('prop="email" label="邮箱" min-width="220" show-overflow-tooltip')
   })
+
+  it('资源 Drawer 使用表单密度并收纳图片合集动态内容', () => {
+    const actor = readView('ActorManage.vue')
+    const collection = readView('CollectionManage.vue')
+    const user = readView('UserManage.vue')
+    const imageCollection = readView('ImageCollectionManage.vue')
+    const imageCollectionStyle = extractStyle(imageCollection)
+    const coverMetaRule = imageCollectionStyle.match(/\.drawer-cover-meta\s*\{[^}]*\}/s)?.[0] || ''
+    const coverTextRule = imageCollectionStyle.match(/\.drawer-cover-title,\s*\.drawer-cover-desc,\s*\.drawer-cover-note\s*\{[^}]*\}/s)?.[0] || ''
+
+    expect(actor).toMatch(/<el-drawer\b(?=[^>]*v-model="dialogVisible")(?=[^>]*data-density="form")[^>]*>/)
+    expect(collection).toMatch(/<el-drawer\b(?=[^>]*v-model="dialogVisible")(?=[^>]*data-density="form")[^>]*>/)
+    expect(user).toMatch(/<el-drawer\b(?=[^>]*v-model="dialogVisible")(?=[^>]*data-density="form")[^>]*>/)
+    expect(imageCollection).toMatch(/<el-drawer\b(?=[^>]*v-model="editDrawerVisible")(?=[^>]*data-density="form")[^>]*>/)
+    expect(imageCollection).toMatch(/<el-drawer\b(?=[^>]*v-model="imageDrawerVisible")(?=[^>]*data-density="form")[^>]*>/)
+    expect(imageCollection).toContain('<el-input-number v-model="form.sort_order" :step="1" :precision="0" style="width: min(200px, 100%)" />')
+    expect(coverMetaRule).toContain('min-width: 0')
+    expect(coverTextRule).toContain('.drawer-cover-title')
+    expect(coverTextRule).toContain('.drawer-cover-desc')
+    expect(coverTextRule).toContain('.drawer-cover-note')
+    expect(coverTextRule).toContain('overflow-wrap: anywhere')
+  })
 })

@@ -1250,6 +1250,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="uploadDialogVisible"
+      data-density="form"
       title="新增图片"
       direction="rtl"
       :size="drawerSize"
@@ -1346,7 +1347,8 @@ onBeforeUnmount(() => {
           :closable="false"
           :title="`上传结果：总计 ${uploadSummary.total_count || 0}，成功 ${uploadSummary.success_count || 0}，失败 ${uploadSummary.failed_count || 0}`"
         />
-        <el-table :data="uploadSummary.items || []" size="small" border>
+        <div class="drawer-table-wrap">
+          <el-table :data="uploadSummary.items || []" size="small" border>
           <el-table-column prop="filename" label="文件名" min-width="220" show-overflow-tooltip />
           <el-table-column label="结果" width="120">
             <template #default="{ row }">
@@ -1356,7 +1358,8 @@ onBeforeUnmount(() => {
           <el-table-column prop="message" label="说明" min-width="140" show-overflow-tooltip />
           <el-table-column prop="image_id" label="图片ID" min-width="220" />
           <el-table-column prop="error" label="失败原因" min-width="200" show-overflow-tooltip />
-        </el-table>
+          </el-table>
+        </div>
       </div>
 
       <template #footer>
@@ -1368,6 +1371,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="detailVisible"
+      data-density="form"
       title="图片详情"
       direction="rtl"
       :size="drawerSize"
@@ -1483,6 +1487,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="filterDrawerVisible"
+      data-density="form"
       title="更多筛选"
       direction="rtl"
       :size="drawerSize"
@@ -1695,6 +1700,12 @@ onBeforeUnmount(() => {
   margin-top: var(--space-3);
   display: grid;
   gap: var(--space-3);
+}
+
+.drawer-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .preview-controls {

@@ -1505,6 +1505,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="batchEditVisible"
+      data-density="form"
       title="批量编辑"
       direction="rtl"
       :size="batchEditDrawerSize"
@@ -1619,6 +1620,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="detailVisible"
+      data-density="form"
       title="视频详情"
       direction="rtl"
       :size="detailDrawerSize"
@@ -1957,6 +1959,7 @@ onBeforeUnmount(() => {
               </el-button>
             </div>
 
+            <div class="drawer-table-wrap">
             <el-table :data="subtitleItems" border size="small" v-loading="subtitleLoading">
               <el-table-column label="来源" width="84">
                 <template #default="{ row }">
@@ -2000,6 +2003,7 @@ onBeforeUnmount(() => {
                 </template>
               </el-table-column>
             </el-table>
+            </div>
 
             <div class="subtitle-upload">
               <el-upload
@@ -2037,6 +2041,7 @@ onBeforeUnmount(() => {
 
     <el-drawer
       v-model="filterDrawerVisible"
+      data-density="form"
       title="更多筛选"
       direction="rtl"
       :size="detailDrawerSize"
@@ -2261,6 +2266,12 @@ onBeforeUnmount(() => {
   gap: var(--space-3);
 }
 
+.drawer-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
 .subtitle-panel__actions {
   display: flex;
   gap: var(--space-2);
@@ -2296,6 +2307,25 @@ onBeforeUnmount(() => {
 
   .quick-search {
     width: 100%;
+  }
+
+  .episode-fields {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .episode-fields :deep(.el-input-number) {
+    width: 100%;
+  }
+
+  .tv-pending-candidate {
+    flex-wrap: wrap;
+  }
+
+  .tv-pending-candidate > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
 

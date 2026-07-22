@@ -195,6 +195,7 @@ onMounted(load)
 
     <el-drawer
       v-model="dialogVisible"
+      data-density="form"
       class="crud-drawer"
       title="添加用户"
       direction="rtl"

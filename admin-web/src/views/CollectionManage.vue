@@ -279,6 +279,7 @@ onMounted(load)
 
     <el-drawer
       v-model="dialogVisible"
+      data-density="form"
       class="crud-drawer"
       :title="editingID ? '编辑合集' : '新增合集'"
       direction="rtl"

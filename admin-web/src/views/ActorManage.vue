@@ -436,6 +436,7 @@ onMounted(load)
 
     <el-drawer
       v-model="dialogVisible"
+      data-density="form"
       class="crud-drawer"
       :title="editingID ? '编辑演员' : '创建演员'"
       direction="rtl"

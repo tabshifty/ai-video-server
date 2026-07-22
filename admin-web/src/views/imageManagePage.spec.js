@@ -645,6 +645,10 @@ async function load() {
     expect(script).toContain('collection_ids: normalizeCollectionSelection(detail.value.collection_ids)')
     expect(template).toContain(':before-close="handleUploadDrawerBeforeClose"')
     expect(template).toContain(':before-close="handleDetailDrawerBeforeClose"')
+    expect(template).toMatch(/<el-drawer\b(?=[^>]*v-model="uploadDialogVisible")(?=[^>]*data-density="form")[^>]*>/)
+    expect(template).toContain('<div class="drawer-table-wrap">\n          <el-table :data="uploadSummary.items || []"')
+    expect(findRule(style, '.drawer-table-wrap')).toContain('min-width: 0')
+    expect(findRule(style, '.drawer-table-wrap')).toContain('overflow-x: auto')
     expect(template).toContain('<BulkActionBar :count="selectedImageRows.length" :actions="bulkActions" />')
   })
 

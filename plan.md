@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-22 09:42 +0800
+- 进度：完成管理端布局健壮性 Task 2。三份测试先补充 Drawer 表单密度、宽表局部横滚、视频季集/候选窄屏收纳和图片合集动态文本契约，RED 为 107/110 通过且三个页面用例各按预期失败 1 项；随后为指定业务 Drawer 声明 `data-density="form"`，包裹字幕与上传结果宽表，并最小补充响应式和长文本规则，未修改既有 Drawer 尺寸、关闭守卫、表格列、候选 handler 或分页。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/ImageCollectionManage.vue`、`admin-web/src/views/ActorManage.vue`、`admin-web/src/views/CollectionManage.vue`、`admin-web/src/views/UserManage.vue`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/imageManagePage.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`。
+- 验证：GREEN 命令 `cd admin-web && npm test -- src/views/videoListPage.spec.js src/views/imageManagePage.spec.js src/views/precisionOpsRollout.spec.js` 通过（3 files，110/110）；`cd admin-web && npm run build` 通过（2373 modules，仅既有 chunk-size warning）；`git diff --check` 通过。提交仅纳入上述十个文件，`.superpowers/` 本地报告不纳入 Git。
+
 ## 2026-07-22 09:31 +0800
 - 进度：Task 1 最终门禁与自审完成；逐项核对精确断点、窄屏纵向/换行、焦点环、滚动链契约，确认命令面板脚本与动画无改动，变更范围仅为本任务四个文件。
 - 影响文件：`admin-web/src/components/base/BulkActionBar.vue`、`admin-web/src/components/base/CommandPalette.vue`、`admin-web/src/components/base/precisionOpsComponents.spec.js`、`plan.md`。
