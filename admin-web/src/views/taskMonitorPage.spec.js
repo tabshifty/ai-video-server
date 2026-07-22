@@ -275,6 +275,15 @@ function setPage(page) {
     for (const label of ['任务', '状态', '进度', '剩余时间', '已耗时', '重试', '错误', '开始时间', '进度更新时间']) {
       expect(template).toContain(`label="${label}"`)
     }
+    expect(template).toContain('label="任务" min-width="210"')
+    expect(template).toContain('label="状态" width="96"')
+    expect(template).toContain('label="进度" min-width="150"')
+    expect(template).toContain('label="剩余时间" width="88"')
+    expect(template).toContain('label="已耗时" width="88"')
+    expect(template).toContain('prop="retry_count" label="重试" width="60"')
+    expect(template).toContain('label="错误" min-width="160"')
+    expect(template).toContain('label="开始时间" width="145"')
+    expect(template).toContain('label="进度更新时间" width="145"')
     expect(template).toMatch(/<div class="task-cell">\s*<strong>\{\{ taskTitle\(row\) \}\}<\/strong>\s*<span>任务 ID：\{\{ row\.id \}\} · 视频 ID：\{\{ row\.video_id \|\| '--' \}\}<\/span>\s*<\/div>/)
     expect(template).toContain('<StatusIndicator :label="statusLabel(row.status)" :tone="taskStatusTone(row.status)" />')
     expect(script).toContain("if (status === 'success') return 'success'")

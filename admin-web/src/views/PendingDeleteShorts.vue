@@ -664,6 +664,18 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+@media (min-width: 64rem) and (max-width: 74.9375rem) {
+  .pending-delete-detail {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .pending-delete-detail__controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 1023px) {
   .pending-delete-page {
     height: auto;

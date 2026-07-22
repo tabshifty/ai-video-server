@@ -95,6 +95,13 @@ function sourceLabel(source) {
   return source || '-'
 }
 
+function actorAliases(row) {
+  const aliases = Array.isArray(row?.aliases)
+    ? row.aliases.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+  return aliases.length > 0 ? aliases.join(' / ') : '暂无'
+}
+
 function formatDateTime(value) {
   return formatAdminDateTime(value, '--')
 }
@@ -396,7 +403,11 @@ onMounted(load)
               <el-table-column prop="name" label="演员姓名" min-width="160" show-overflow-tooltip />
               <el-table-column prop="aliases" label="别名" min-width="220">
                 <template #default="{ row }">
-                  {{ Array.isArray(row.aliases) && row.aliases.length > 0 ? row.aliases.join(' / ') : '暂无' }}
+                  <el-tooltip :content="actorAliases(row)" placement="top">
+                    <span class="actor-aliases" tabindex="0" :aria-label="`演员别名：${actorAliases(row)}`">
+                      {{ actorAliases(row) }}
+                    </span>
+                  </el-tooltip>
                 </template>
               </el-table-column>
               <el-table-column prop="gender" label="性别" width="100" />
@@ -547,6 +558,19 @@ onMounted(load)
 
 .toolbar-select {
   width: 9.5rem;
+}
+
+.actor-aliases {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actor-aliases:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
 }
 
 .dialog-body {

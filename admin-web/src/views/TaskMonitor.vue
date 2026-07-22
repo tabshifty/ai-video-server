@@ -248,7 +248,7 @@ onUnmounted(() => {
         <template v-else>
           <div class="table-wrap">
             <el-table :data="list" border>
-              <el-table-column prop="video_title" label="任务" min-width="260">
+              <el-table-column prop="video_title" label="任务" min-width="210">
                 <template #default="{ row }">
                   <div class="task-cell">
                     <strong>{{ taskTitle(row) }}</strong>
@@ -256,38 +256,38 @@ onUnmounted(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column prop="status" label="状态" width="112">
+              <el-table-column prop="status" label="状态" width="96">
                 <template #default="{ row }">
                   <StatusIndicator :label="statusLabel(row.status)" :tone="taskStatusTone(row.status)" />
                 </template>
               </el-table-column>
-              <el-table-column label="进度" min-width="190">
+              <el-table-column label="进度" min-width="150">
                 <template #default="{ row }">
                   <el-progress :stroke-width="6" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
                 </template>
               </el-table-column>
-              <el-table-column label="剩余时间" width="112">
+              <el-table-column label="剩余时间" width="88">
                 <template #default="{ row }">
                   {{ formatRemaining(row) }}
                 </template>
               </el-table-column>
-              <el-table-column label="已耗时" width="112">
+              <el-table-column label="已耗时" width="88">
                 <template #default="{ row }">
                   {{ formatElapsed(row) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="retry_count" label="重试" width="72" />
-              <el-table-column prop="error" label="错误" min-width="220">
+              <el-table-column prop="retry_count" label="重试" width="60" />
+              <el-table-column prop="error" label="错误" min-width="160">
                 <template #default="{ row }">
                   <el-tooltip :content="row.error || '无错误'" placement="top">
                     <span class="task-error" tabindex="0" :aria-label="row.error || '无错误'">{{ row.error || '--' }}</span>
                   </el-tooltip>
                 </template>
               </el-table-column>
-              <el-table-column label="开始时间" width="168">
+              <el-table-column label="开始时间" width="145">
                 <template #default="{ row }">{{ formatDateTime(row.started_at) }}</template>
               </el-table-column>
-              <el-table-column label="进度更新时间" width="168">
+              <el-table-column label="进度更新时间" width="145">
                 <template #default="{ row }">{{ formatDateTime(row.progress_updated_at) }}</template>
               </el-table-column>
             </el-table>

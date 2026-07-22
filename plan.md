@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-22 09:52 +0800
+- 进度：完成管理端布局健壮性 Task 3。演员别名通过统一 helper 清理空值并以单行省略、完整 Tooltip 和键盘焦点暴露；任务监控保留九列语义与 slot，仅将列预算收敛为 1142px；待删除详情只在 64rem–74.9375rem 改为纵向并左对齐操作，既有 1023px 以下工作台与 1200px 以上横向布局未改。
+- 影响文件：`admin-web/src/views/ActorManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`；保留 Actor Drawer 的 `data-density="form"`，提交不纳入 `.superpowers/` 本地报告。
+- 验证：GREEN 命令 `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js src/views/precisionOpsRollout.spec.js` 通过（2 files，87/87）；`cd admin-web && npm run build` 通过（2373 modules，仅既有 chunk-size warning）；`git diff --check` 通过，六个目标文件替换字符扫描无匹配。提交前将从最终状态新鲜复跑定向测试、构建和范围门禁。
+
+## 2026-07-22 09:51 +0800
+- 进度：Task 3 两份真实 SFC 静态契约取得精确 RED。任务监控测试首个差异命中旧“任务”列 260px；阶段二资源测试首个差异命中演员别名 helper 缺失，源码核对同时确认待删除页尚无 64rem–74.9375rem 局部详情媒体规则。
+- 影响文件：RED 阶段只修改 `admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js` 与 `plan.md`；三份生产 SFC 尚未修改。
+- 验证：`cd admin-web && npm test -- src/views/taskMonitorPage.spec.js src/views/precisionOpsRollout.spec.js` 按预期退出 1（2 files failed，87 tests 中 2 failed / 85 passed）；失败只对应当前生产布局缺口，无测试解析、SFC 编译、环境或既有业务契约失败。
+
+## 2026-07-22 09:50 +0800
+- 进度：开始管理端布局健壮性 Task 3。先在既有两份页面静态契约中锁定任务监控九列精确宽度预算、演员别名完整值 Tooltip 与键盘焦点、待删除详情仅在 1024–1199px 纵向收纳；取得只命中三类生产缺口的真实 RED 后，再做最小模板、helper 与 CSS 实现。
+- 影响文件：计划只修改 `admin-web/src/views/ActorManage.vue`、`admin-web/src/views/TaskMonitor.vue`、`admin-web/src/views/PendingDeleteShorts.vue`、`admin-web/src/views/taskMonitorPage.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`，并填写 git 忽略报告 `.superpowers/sdd/task-3-report.md`；保留 Task 2 的 Actor Drawer 表单密度，不修改其它页面、业务函数、请求、分页或 1023px 以下/1200px 以上既有布局。
+- 验证：起始分支与索引干净，目标基线测试 `cd admin-web && npm test -- src/views/taskMonitorPage.spec.js src/views/precisionOpsRollout.spec.js` 通过（2 files，87/87）；待追加测试后记录精确 RED，再运行同一定向 GREEN、`npm run build`、`git diff --check`、范围与编码门禁。
+
 ## 2026-07-22 09:42 +0800
 - 进度：完成管理端布局健壮性 Task 2。三份测试先补充 Drawer 表单密度、宽表局部横滚、视频季集/候选窄屏收纳和图片合集动态文本契约，RED 为 107/110 通过且三个页面用例各按预期失败 1 项；随后为指定业务 Drawer 声明 `data-density="form"`，包裹字幕与上传结果宽表，并最小补充响应式和长文本规则，未修改既有 Drawer 尺寸、关闭守卫、表格列、候选 handler 或分页。
 - 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/ImageManage.vue`、`admin-web/src/views/ImageCollectionManage.vue`、`admin-web/src/views/ActorManage.vue`、`admin-web/src/views/CollectionManage.vue`、`admin-web/src/views/UserManage.vue`、`admin-web/src/views/videoListPage.spec.js`、`admin-web/src/views/imageManagePage.spec.js`、`admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`。

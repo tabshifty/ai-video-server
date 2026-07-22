@@ -120,6 +120,14 @@ function extractStyle(source) {
   return match?.[1] || ''
 }
 
+function findRule(styleSource, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = styleSource.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))
+
+  expect(match).not.toBeNull()
+  return match?.[1] || ''
+}
+
 function routeLine(component) {
   const componentPattern = new RegExp(`\\bcomponent:\\s*${component}(?=\\s*[,}])`)
   return router.split('\n').find((line) => componentPattern.test(line)) || ''
@@ -1035,14 +1043,29 @@ describe('Precision Ops 第二阶段集成门禁', () => {
   })
 
   it('阶段二资源名称与待删除详情标题保持紧凑收敛', () => {
-    const pendingStyle = extractStyle(readView('PendingDeleteShorts.vue'))
+    const actor = readView('ActorManage.vue')
+    const actorStyle = extractStyle(actor)
+    const pending = readView('PendingDeleteShorts.vue')
+    const pendingStyle = extractStyle(pending)
 
-    expect(readView('ActorManage.vue')).toContain('prop="name" label="演员姓名" min-width="160" show-overflow-tooltip')
+    expect(actor).toContain('prop="name" label="演员姓名" min-width="160" show-overflow-tooltip')
+    expect(actor).toContain('function actorAliases(row)')
+    expect(actor).toContain('<el-tooltip :content="actorAliases(row)" placement="top">')
+    expect(actor).toContain('class="actor-aliases" tabindex="0" :aria-label="`演员别名：${actorAliases(row)}`"')
+    expect(findRule(actorStyle, '.actor-aliases')).toContain('text-overflow: ellipsis')
+    expect(findRule(actorStyle, '.actor-aliases')).toContain('white-space: nowrap')
+    expect(findRule(actorStyle, '.actor-aliases:focus-visible')).toContain('outline: 2px solid var(--line-focus)')
     expect(readView('CollectionManage.vue')).toContain('prop="name" label="合集名称" min-width="180" show-overflow-tooltip')
     expect(readView('ImageCollectionManage.vue')).toContain('prop="name" label="图片合集名称" min-width="180" show-overflow-tooltip')
     expect(pendingStyle).toMatch(
       /\.pending-delete-detail__copy h2\s*\{[^}]*display:\s*-webkit-box;[^}]*overflow:\s*hidden;[^}]*-webkit-box-orient:\s*vertical;[^}]*-webkit-line-clamp:\s*2;/s
     )
+    const mediumStart = pendingStyle.indexOf('@media (min-width: 64rem) and (max-width: 74.9375rem)')
+    const mediumStyle = mediumStart >= 0 ? pendingStyle.slice(mediumStart, pendingStyle.indexOf('@media', mediumStart + 1)) : ''
+    expect(mediumStart).toBeGreaterThan(-1)
+    expect(findRule(mediumStyle, '.pending-delete-detail')).toContain('flex-direction: column')
+    expect(findRule(mediumStyle, '.pending-delete-detail__controls')).toContain('width: 100%')
+    expect(findRule(mediumStyle, '.pending-delete-detail__controls')).toContain('justify-content: flex-start')
   })
 
   it('用户身份字段使用表格溢出提示保持 compact 行高', () => {
