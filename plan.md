@@ -2,6 +2,12 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-25 +0800
+- 进度：完成手机端“短视频合集 + 投屏”`grill-with-docs` 收口，共确认 16 个决策点，已沉淀 `短视频合集投屏`、`投屏补页一致性`、`合集补页 SQL 统一` 三条术语，并落两份 ADR（0016 SearchVideos 统一 collection 维度、0017 投屏可见性只约束目录展示与发起）。核心约束：后端 `SearchVideos` 最右追加可选 `collectionID *uuid.UUID` 参数，与 `DiscoverShortVideos(mode=collection)` 共享 collection 过滤/排序 SQL 构造防漂移；`TvRemoteSearchContext` 新增 `CollectionID` 字段，JSONB 无需新迁移；TV 端 `remote-shorts` 播放屏零改动；手机端抽公共投屏组件 + 抽公共竖滑组件（均按重构既有代码处理，TDD + 独立评审）；投屏以手机已加载分页为快照、补页实时；可见性只管目录展示与发起、不中断已发起会话；不新增导航；phone 版本递增、TV 不 bump。本轮仅完成需求与边界收口及文档，未实施代码。
+- 影响文件：`CONTEXT.md`、`docs/adr/0016-searchvideos-unified-collection-dimension.md`、`docs/adr/0017-cast-visibility-scope-entry-not-resume.md`、`plan.md`；不修改手机端、后端接口、TV 端或版本号。
+- 验证：`git diff --check` 通过；`CONTEXT.md` 与两份 ADR 的 Unicode 替换字符扫描无匹配；差异检查确认无代码、接口或版本号改动，文档变更无需构建或测试。
+
+
 ## 2026-07-25 14:21 +0800
 - 进度：完成短视频合集目录权限术语沉淀；本轮讨论已覆盖入口、可见性、目录与内容排序、封面、卡片、播放承接、搜索、刷新、错误、分页、缓存、过期入口及接口边界，尚未开始实施。
 - 影响文件：仅 `CONTEXT.md`、`plan.md`；未跟踪 `.superpowers/` 保持原样且不纳入提交。
