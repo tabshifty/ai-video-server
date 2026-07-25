@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-25 22:00 +0800
+- 进度：提交后清理已完成验证并收口，提交仅纳入搜索页死代码删除、公共播放器静态守护测试更新和本轮 `plan.md` 记录；短视频合集主功能提交 `d6a3a70` 保持不变。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`plan.md`；无关未跟踪 `.superpowers/` 保持原样且不纳入提交。
+- 验证：手机端 176 项单测与 Debug APK 构建通过；后端 handlers、repository 及合集投屏相关 services 回归通过；`git diff --check` 通过；本次文件 Unicode 替换字符扫描无匹配；差异确认删除 350 行旧实现/无用导入并更新 17 行守护测试，无功能扩展或版本号二次递增。
+
+## 2026-07-25 21:59 +0800
+- 进度：完成提交后代码质量收口：删除搜索页已停用的私有竖滑播放器及无用导入，并将 `ShortOverlayFullscreenSpecTest` 从检查搜索页内部实现更新为检查 `ShortVerticalFeedPlayer` 公共组件，同时守护搜索页与合集内容页均接入该组件。短视频搜索与合集播放不再保留两套可漂移实现。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`plan.md`；未跟踪 `.superpowers/` 不读取、不修改、不纳入提交。
+- 验证：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` 通过（176 项单测、Debug APK 构建成功）；`go test ./internal/handlers/... ./internal/repository/... -count=1` 通过；`go test ./internal/services/... -count=1 -run 'TestApp|TestCollection|TestTVRemote|TestTvRemote|TestShortCollection|TestStartTVRemote|TestStepTVRemote|TestDiscoverShort'` 通过。待执行提交前差异、乱码与范围检查。
+
+## 2026-07-25 21:56 +0800
+- 进度：提交后复核发现 `ShortSearchScreen` 已改用公共 `ShortVerticalFeedPlayer`，但原私有 `ShortSearchPlayerOverlay` 仍以约 290 行死代码残留；现已删除旧实现及其无用导入，确保搜索页与短视频合集内容页只维护同一套竖滑播放器行为。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt`、`plan.md`；不触及已提交的接口、路由、版本号和 TV 端实现，未跟踪 `.superpowers/` 不读取、不修改、不纳入提交。
+- 验证：待执行手机端单测与 Debug APK 构建、后端相关包回归、`git diff --check`、中文替换字符扫描和提交范围检查。
+
 ## 2026-07-25 18:30 +0800
 - 进度：完成独立子代理代码评审（无阻塞问题）并按评审非阻塞建议 #3 补 ADR-0016 防漂移守护测试 `TestDiscoverShortVideosAndSearchVideosShareCollectionQueryPath`：用零值 `VideoRepository` 触发共享函数 `queryShortVideosByCollection` 的 nil-id 校验分支，断言 `DiscoverShortVideos(mode=collection,nil)` 与共享函数返回完全一致的 `collection_id is required` 错误，锁定 Discover 的 collection 分支委托共享实现而未另写 SQL。`SearchVideosOrdered` 的委托关系由既有调用点与 `internal/handlers`/`services` 全绿测试覆盖。待提交。
 - 影响文件：`internal/repository/collection_repository_test.go`（新增测试与 `context` 导入）、`plan.md`。

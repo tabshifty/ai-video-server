@@ -25,7 +25,7 @@ class ShortOverlayFullscreenSpecTest {
 
     @Test
     fun `short overlay files use the shared fullscreen host and button`() {
-        assertSourceUsesFullscreenHost("src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt")
+        assertSourceUsesFullscreenHost("src/main/java/com/chee/videos/core/ui/shorts/ShortVerticalFeedPlayer.kt")
         assertSourceUsesFullscreenHost("src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt")
         assertSourceUsesFullscreenHost("src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt")
         assertSourceUsesFullscreenHost("src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt")
@@ -34,11 +34,12 @@ class ShortOverlayFullscreenSpecTest {
     @Test
     fun `short overlay files do not hardcode fullscreen orientation or icon`() {
         val searchSource = Path.of("src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt").readText()
+        val sharedPlayerSource = Path.of("src/main/java/com/chee/videos/core/ui/shorts/ShortVerticalFeedPlayer.kt").readText()
         val discoverSource = Path.of("src/main/java/com/chee/videos/feature/shortdiscover/ShortDiscoverScreen.kt").readText()
         val feedSource = Path.of("src/main/java/com/chee/videos/feature/shorts/ShortFeedScreen.kt").readText()
         val playerSource = Path.of("src/main/java/com/chee/videos/feature/player/UnifiedPlayerScreen.kt").readText()
 
-        listOf(searchSource, discoverSource, feedSource, playerSource).forEach { source ->
+        listOf(searchSource, sharedPlayerSource, discoverSource, feedSource, playerSource).forEach { source ->
             assertTrue("全屏按钮图标必须复用共享组件，不得裸写 Icons.Filled.Fullscreen", !source.contains("Icons.Filled.Fullscreen"))
             assertTrue("横屏锁定必须由共享组件负责，不得裸写 SCREEN_ORIENTATION_LANDSCAPE", !source.contains("SCREEN_ORIENTATION_LANDSCAPE"))
         }
@@ -64,7 +65,7 @@ class ShortOverlayFullscreenSpecTest {
     @Test
     fun `all non home short overlays hide vertical pager while fullscreen`() {
         assertShortFullscreenBranches(
-            "src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt",
+            "src/main/java/com/chee/videos/core/ui/shorts/ShortVerticalFeedPlayer.kt",
             "isFullscreen",
         )
         assertShortFullscreenBranches(
@@ -91,11 +92,15 @@ class ShortOverlayFullscreenSpecTest {
     fun `search short fullscreen state must hide the app shell bottom bar`() {
         val appSource = Path.of("src/main/java/com/chee/videos/VideoHomeApp.kt").readText()
         val searchSource = Path.of("src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt").readText()
+        val collectionSource = Path.of("src/main/java/com/chee/videos/feature/shortcollections/ShortCollectionContentScreen.kt").readText()
+        val sharedPlayerSource = Path.of("src/main/java/com/chee/videos/core/ui/shorts/ShortVerticalFeedPlayer.kt").readText()
 
         assertTrue("搜索页必须暴露短视频全屏状态回调", searchSource.contains("onFullscreenChange: (Boolean) -> Unit = {}"))
-        assertTrue("搜索页播放器浮层必须接收短视频全屏状态回调", searchSource.contains("onFullscreenChange = onFullscreenChange"))
-        assertTrue("搜索页全屏状态变化必须回传应用壳", searchSource.contains("LaunchedEffect(isFullscreen)"))
-        assertTrue("搜索页离开播放器浮层时必须恢复应用壳底栏", searchSource.contains("onDispose { latestOnFullscreenChange(false) }"))
+        assertTrue("搜索页必须接入公共竖滑播放器", searchSource.contains("ShortVerticalFeedPlayer("))
+        assertTrue("合集内容页必须接入公共竖滑播放器", collectionSource.contains("ShortVerticalFeedPlayer("))
+        assertTrue("公共播放器必须接收短视频全屏状态回调", searchSource.contains("onFullscreenChange = onFullscreenChange"))
+        assertTrue("公共播放器全屏状态变化必须回传应用壳", sharedPlayerSource.contains("LaunchedEffect(isFullscreen)"))
+        assertTrue("公共播放器离开时必须恢复应用壳底栏", sharedPlayerSource.contains("onDispose { latestOnFullscreenChange(false) }"))
         assertTrue("根搜索 tab 必须把短视频全屏状态写入 isShortFullscreen", appSource.contains("onFullscreenChange = { isShortFullscreen = it }"))
     }
 
