@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-25 18:30 +0800
+- 进度：完成独立子代理代码评审（无阻塞问题）并按评审非阻塞建议 #3 补 ADR-0016 防漂移守护测试 `TestDiscoverShortVideosAndSearchVideosShareCollectionQueryPath`：用零值 `VideoRepository` 触发共享函数 `queryShortVideosByCollection` 的 nil-id 校验分支，断言 `DiscoverShortVideos(mode=collection,nil)` 与共享函数返回完全一致的 `collection_id is required` 错误，锁定 Discover 的 collection 分支委托共享实现而未另写 SQL。`SearchVideosOrdered` 的委托关系由既有调用点与 `internal/handlers`/`services` 全绿测试覆盖。待提交。
+- 影响文件：`internal/repository/collection_repository_test.go`（新增测试与 `context` 导入）、`plan.md`。
+- 验证：`go test ./internal/repository/... ./internal/handlers/... -count=1` 全绿，新增测试通过。
+
+## 2026-07-25 18:15 +0800
+- 进度：完成手机端“短视频合集入口 + 合集投屏”收口实现。工作区已修复既有编译错误，目录接口、目录/内容页、公共投屏弹窗、公共竖滑播放组件、投屏补页契约与可见性校验均已落地；首页「合集」tab 接入 `homeContentTabs`（`type=short_collection`），点击合集卡经 `onOpenShortCollection` 跳 `ShortCollectionContentRoute`，内容页缺失回调刷新目录并 `popBackStack`；手机端版本号 `versionCode` 9→10、`versionName` 0.1.8→0.1.9；CONTEXT.md 已沉淀短视频合集目录接口边界、SearchVideos 统一 collection 维度、投屏可见性只约束目录展示与发起、公共投屏与竖滑组件、入口版本与 TV 拆分五条长期约定。待补独立评审后提交。
+- 影响文件：`internal/handlers/app_short_collection.go`（新增）、`internal/handlers/router.go`、`internal/handlers/tv_remote.go`、`internal/models/app.go`、`internal/models/user.go`、`internal/repository/app_repository.go`、`internal/repository/collection_repository.go`、`internal/repository/collection_repository_test.go`、`internal/services/app.go`、`internal/services/tv_auth.go`、`internal/services/tv_remote.go`、`internal/services/tv_remote_test.go`、`android-app/app/build.gradle.kts`、`android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`、`core/model/ApiModels.kt`、`core/network/ApiService.kt`、`core/repository/VideoRepository.kt`、`core/ui/AppNavigationConfig.kt`、`core/util/UrlBuilder.kt`、`feature/home/HomeScreen.kt`、`feature/shortsearch/ShortSearchScreen.kt`、`feature/shortsearch/ShortSearchViewModel.kt`、`core/ui/cast/TvCast.kt`、`core/ui/cast/TvCastDeviceDialog.kt`、`core/ui/shorts/ShortVerticalFeedPlayer.kt`、`feature/shortcollections/*`（新增）、单测 `AppNavigationConfigTest.kt`、`ActorDetailViewModelTest.kt`、`HomeViewModelTest.kt`、`ShortSearchViewModelStateTest.kt`、`ShortCollectionRoutesTest.kt`、`TvCastTest.kt`、`CONTEXT.md`、`plan.md`。未跟踪 `.superpowers/` 不读取、不修改、不纳入提交。
+- 验证：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 全绿；`./gradlew --no-daemon :app:assembleDebug` 构建成功；`go test ./internal/handlers/... ./internal/repository/... -count=1` 全绿；`go test ./internal/services/... -count=1 -run 'TestApp|TestCollection|TestTvRemote|TestShortCollection'` 全绿；全量 `internal/services` 仅 `TestParseTVAPKMetadataParsesReleaseAPK`（期望 versionCode 121 实际 130）失败，属既有 TV 扫码授权工作区改动、与本任务差异拆分，不阻塞收口。`git diff --check` 通过。
+
+## 2026-07-25 17:46 +0800
+- 进度：恢复手机端“短视频合集入口 + 合集投屏”开发。现有工作区已包含目录接口、目录/内容页、公共投屏弹窗、公共竖滑播放组件及投屏补页契约的未提交实现，但尚未接入手机端首页分类与导航，手机端版本号也未递增。本轮计划先修复现有编译错误并补纯逻辑单测，再完成入口/路由接线、版本与长期约定更新，最后执行后端定向测试、手机端单测与构建并做差异评审。
+- 影响文件：预计包含现有短视频合集相关后端/手机端实现、`android-app/app/src/main/java/com/chee/videos/VideoHomeApp.kt`、首页分类相关文件、`android-app/app/build.gradle.kts`、定向测试、`CONTEXT.md`、`plan.md`；`internal/models/user.go`、`internal/services/tv_auth.go` 中与 TV 扫码授权有关的既有工作区改动需与本任务差异拆分，未跟踪 `.superpowers/` 明确不读取、不修改、不纳入提交。
+- 验证：红灯已确认：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 因合集实现的缺失导入、错误 `snapshotFlow` 导入、状态字段智能转换及实验 API 标注共 8 处编译错误失败；`go test ./internal/... -count=1` 中本任务涉及的 `handlers`、`repository` 包通过，仅既有 `internal/services` 的 TV APK 元数据期望版本 `121`、实际 `130` 失败，与本任务无关。待修复后执行定向与全量验证。
+
 ## 2026-07-25 +0800
 - 进度：完成手机端“短视频合集 + 投屏”`grill-with-docs` 收口，共确认 16 个决策点，已沉淀 `短视频合集投屏`、`投屏补页一致性`、`合集补页 SQL 统一` 三条术语，并落两份 ADR（0016 SearchVideos 统一 collection 维度、0017 投屏可见性只约束目录展示与发起）。核心约束：后端 `SearchVideos` 最右追加可选 `collectionID *uuid.UUID` 参数，与 `DiscoverShortVideos(mode=collection)` 共享 collection 过滤/排序 SQL 构造防漂移；`TvRemoteSearchContext` 新增 `CollectionID` 字段，JSONB 无需新迁移；TV 端 `remote-shorts` 播放屏零改动；手机端抽公共投屏组件 + 抽公共竖滑组件（均按重构既有代码处理，TDD + 独立评审）；投屏以手机已加载分页为快照、补页实时；可见性只管目录展示与发起、不中断已发起会话；不新增导航；phone 版本递增、TV 不 bump。本轮仅完成需求与边界收口及文档，未实施代码。
 - 影响文件：`CONTEXT.md`、`docs/adr/0016-searchvideos-unified-collection-dimension.md`、`docs/adr/0017-cast-visibility-scope-entry-not-resume.md`、`plan.md`；不修改手机端、后端接口、TV 端或版本号。

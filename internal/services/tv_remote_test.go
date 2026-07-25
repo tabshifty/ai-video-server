@@ -91,6 +91,33 @@ func TestStartTVRemoteSessionCreatesSessionWithCurrentItem(t *testing.T) {
 	}
 }
 
+func TestStartTVRemoteSessionRejectsUnavailableCollection(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 25, 18, 0, 0, 0, time.UTC)
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	videoID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	collectionID := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
+	repo := &fakeTVRemoteRepository{}
+	svc := &AppService{tvRemoteRepo: repo}
+
+	_, err := svc.StartTVRemoteSessionAt(
+		context.Background(),
+		userID,
+		"living-room",
+		[]models.TvRemoteSessionItem{{VideoID: videoID, Title: "条目 1", Type: "short"}},
+		0,
+		&models.TvRemoteSearchContext{Type: "short", Page: 1, PageSize: 24, TotalCount: 1, CollectionID: &collectionID},
+		now,
+	)
+	if !errors.Is(err, ErrTVRemoteCollectionUnavailable) {
+		t.Fatalf("expected ErrTVRemoteCollectionUnavailable, got=%v", err)
+	}
+	if repo.created != nil {
+		t.Fatal("unavailable collection must not create a remote session")
+	}
+}
+
 func TestUpdateTVRemoteSessionAutoplayNext(t *testing.T) {
 	t.Parallel()
 
@@ -499,6 +526,7 @@ func TestStepTVRemoteSessionLoadsMoreSearchResultsAtLoadedBoundary(t *testing.T)
 	videoID1 := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 	videoID2 := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 	videoID3 := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
+	collectionID := uuid.MustParse("dddddddd-dddd-dddd-dddd-dddddddddddd")
 
 	repo := &fakeTVRemoteRepository{
 		session: models.TvRemoteSession{
@@ -513,11 +541,11 @@ func TestStepTVRemoteSessionLoadsMoreSearchResultsAtLoadedBoundary(t *testing.T)
 				{VideoID: videoID2, Title: "条目 2", Type: "short"},
 			},
 			SearchContext: &models.TvRemoteSearchContext{
-				Query:      "老师",
-				Type:       "short",
-				Page:       1,
-				PageSize:   2,
-				TotalCount: 3,
+				Type:         "short",
+				Page:         1,
+				PageSize:     2,
+				TotalCount:   3,
+				CollectionID: &collectionID,
 			},
 			CurrentIndex: 1,
 			CurrentVideoID: func() *uuid.UUID {
@@ -539,7 +567,7 @@ func TestStepTVRemoteSessionLoadsMoreSearchResultsAtLoadedBoundary(t *testing.T)
 	if repo.searchCall == nil {
 		t.Fatal("expected search call to be issued when stepping at loaded boundary")
 	}
-	if repo.searchCall.query != "老师" || repo.searchCall.typ != "short" || repo.searchCall.limit != 2 || repo.searchCall.offset != 2 {
+	if repo.searchCall.query != "" || repo.searchCall.typ != "short" || repo.searchCall.collectionID == nil || *repo.searchCall.collectionID != collectionID || repo.searchCall.limit != 2 || repo.searchCall.offset != 2 {
 		t.Fatalf("unexpected search call: %+v", *repo.searchCall)
 	}
 	if session.CurrentIndex != 2 {
@@ -588,16 +616,19 @@ type fakeTVRemoteRepository struct {
 	searchItems                       []models.VideoListItem
 	searchTotalCount                  int
 	searchCall                        *fakeTVRemoteSearchCall
+	collectionVisible                 bool
+	collectionVisibilityErr           error
 	stateUpdates                      int
 	autoplayNextUpdates               int
 	autoplayNextExpectedIndexOverride *int
 }
 
 type fakeTVRemoteSearchCall struct {
-	query  string
-	typ    string
-	limit  int
-	offset int
+	query        string
+	typ          string
+	collectionID *uuid.UUID
+	limit        int
+	offset       int
 }
 
 func (r *fakeTVRemoteRepository) ListUserTVDevices(context.Context, uuid.UUID, string) ([]models.TvDeviceRecord, error) {
@@ -734,14 +765,19 @@ func (r *fakeTVRemoteRepository) EndTVRemoteSession(_ context.Context, sessionID
 	return nil
 }
 
-func (r *fakeTVRemoteRepository) SearchVideos(_ context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error) {
+func (r *fakeTVRemoteRepository) SearchVideos(_ context.Context, q, typ string, collectionID *uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error) {
 	r.searchCall = &fakeTVRemoteSearchCall{
-		query:  q,
-		typ:    typ,
-		limit:  limit,
-		offset: offset,
+		query:        q,
+		typ:          typ,
+		collectionID: collectionID,
+		limit:        limit,
+		offset:       offset,
 	}
 	return append([]models.VideoListItem(nil), r.searchItems...), r.searchTotalCount, nil
+}
+
+func (r *fakeTVRemoteRepository) IsVisibleAppShortCollection(_ context.Context, _ uuid.UUID) (bool, error) {
+	return r.collectionVisible, r.collectionVisibilityErr
 }
 
 func intPtr(value int) *int {

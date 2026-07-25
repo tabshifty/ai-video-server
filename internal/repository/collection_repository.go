@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/models"
+	"video-server/internal/utils"
 )
 
 var ErrCollectionsOnlyForShort = errors.New("collections only support short videos")
@@ -374,4 +375,111 @@ func dedupeCollectionVideoIDs(ids []uuid.UUID) []uuid.UUID {
 		out = append(out, id)
 	}
 	return out
+}
+
+// shortVideosByCollectionVisibilityClause 限定合集可见性：合集启用且至少有一条
+// 可播放短视频（type='short' 且 status='ready'）。它与可见短视频合集定义一致，见 ADR-0017。
+const shortVideosByCollectionVisibilityClause = `c.active = TRUE
+  AND EXISTS (
+    SELECT 1
+    FROM video_collections vc
+    JOIN videos v ON v.id = vc.video_id
+    WHERE vc.collection_id = c.id
+      AND v.type = 'short'
+      AND v.status = 'ready'
+  )`
+
+// IsVisibleAppShortCollection 校验合集当前是否允许从手机端目录发起新投屏会话。
+// 已建立会话的后续补页不调用此方法，因此合集下线不会中断正在播放的会话。
+func (r *VideoRepository) IsVisibleAppShortCollection(ctx context.Context, collectionID uuid.UUID) (bool, error) {
+	var visible bool
+	if err := r.pool.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM collections c
+  WHERE c.id = $1
+    AND `+shortVideosByCollectionVisibilityClause+`
+)`, collectionID).Scan(&visible); err != nil {
+		return false, fmt.Errorf("check app short collection visibility: %w", err)
+	}
+	return visible, nil
+}
+
+// ListAppShortCollections 返回手机端可见的短视频合集目录，按后台 sort_order DESC、
+// updated_at DESC 排序。每条返回最终封面 URL 与可播放短视频数量；封面优先使用合集
+// cover_url，未设置时回退到合集内最新可播放短视频的缩略图（见短视频合集封面回退）。
+func (r *VideoRepository) ListAppShortCollections(ctx context.Context, limit, offset int) ([]models.ShortCollectionListItem, int, error) {
+	const where = shortVideosByCollectionVisibilityClause
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM collections c WHERE `+where).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count app short collections: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx, `
+SELECT
+  c.id,
+  c.name,
+  COALESCE(c.description, ''),
+  COALESCE(c.cover_url, ''),
+  preview.cover_video_id,
+  preview.playable_count,
+  c.updated_at
+FROM collections c
+JOIN LATERAL (
+  SELECT
+    COUNT(*)::INT AS playable_count,
+    (
+      SELECT v.id
+      FROM video_collections vc
+      JOIN videos v ON v.id = vc.video_id
+      WHERE vc.collection_id = c.id
+        AND v.type = 'short'
+        AND v.status = 'ready'
+      ORDER BY v.created_at DESC
+      LIMIT 1
+    ) AS cover_video_id
+  FROM video_collections vc
+  JOIN videos v ON v.id = vc.video_id
+  WHERE vc.collection_id = c.id
+    AND v.type = 'short'
+    AND v.status = 'ready'
+) preview ON preview.playable_count > 0
+WHERE `+where+`
+ORDER BY c.sort_order DESC, c.updated_at DESC, c.name ASC
+LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list app short collections: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.ShortCollectionListItem, 0, limit)
+	for rows.Next() {
+		var (
+			item         models.ShortCollectionListItem
+			coverURL     string
+			coverVideoID uuid.UUID
+		)
+		if err := rows.Scan(&item.ID, &item.Name, &item.Description, &coverURL, &coverVideoID, &item.PlayableCount, &item.UpdatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan app short collection: %w", err)
+		}
+		item.CoverURL = resolveAppShortCollectionCoverURL(coverURL, coverVideoID)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// resolveAppShortCollectionCoverURL 解析合集最终封面：管理员设置的 cover_url 非空时直接使用；
+// 否则回退到合集内最新可播放短视频的缩略图 URL；两者都不可用时返回空字符串（由前端占位图兜底）。
+func resolveAppShortCollectionCoverURL(coverURL string, coverVideoID uuid.UUID) string {
+	if trimmed := strings.TrimSpace(coverURL); trimmed != "" {
+		return trimmed
+	}
+	if coverVideoID == uuid.Nil {
+		return ""
+	}
+	return utils.VideoThumbnailURL(coverVideoID)
 }

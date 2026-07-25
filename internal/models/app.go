@@ -119,6 +119,18 @@ type ImageCollectionListItem struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// ShortCollectionListItem 是手机端短视频合集目录中的一条可见合集卡片。
+// CoverURL 为最终封面（合集封面优先，否则回退到合集内最新可播放短视频缩略图）。
+// PlayableCount 为合集内可播放短视频数量，首期目录不暴露分页页码。
+type ShortCollectionListItem struct {
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	CoverURL      string    `json:"cover_url"`
+	PlayableCount int       `json:"playable_count"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 type ImageCollectionImage struct {
 	ID           uuid.UUID `json:"id"`
 	Title        string    `json:"title"`

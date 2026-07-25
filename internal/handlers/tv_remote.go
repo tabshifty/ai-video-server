@@ -52,8 +52,10 @@ func (a *API) CreateTVRemoteSession(c *gin.Context) {
 			response.Error(c, 2302, err.Error())
 		case errors.Is(err, services.ErrTVRemoteItemsRequired), errors.Is(err, services.ErrTVRemoteIndexOutOfRange):
 			response.Error(c, 2303, err.Error())
-		default:
+		case errors.Is(err, services.ErrTVRemoteCollectionUnavailable):
 			response.Error(c, 2304, err.Error())
+		default:
+			response.Error(c, 2305, err.Error())
 		}
 		return
 	}

@@ -7,7 +7,13 @@ class AppNavigationConfigTest {
     @Test
     fun homeContentTabs_matchCompactCategories() {
         assertEquals(
-            listOf("短视频" to "short", "电影" to "movie", "电视剧" to "episode", "AV" to "av"),
+            listOf(
+                "短视频" to "short",
+                "合集" to "short_collection",
+                "电影" to "movie",
+                "电视剧" to "episode",
+                "AV" to "av",
+            ),
             homeContentTabs.map { it.title to it.type },
         )
     }

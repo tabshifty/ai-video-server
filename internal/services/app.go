@@ -110,7 +110,7 @@ func (s *AppService) Search(ctx context.Context, q, typ string, page, pageSize i
 		typ = "all"
 	}
 	offset := (page - 1) * pageSize
-	items, total, err := s.repo.SearchVideos(ctx, q, typ, pageSize, offset)
+	items, total, err := s.repo.SearchVideos(ctx, q, typ, nil, pageSize, offset)
 	if err != nil {
 		return models.PageResult[models.VideoListItem]{}, err
 	}
@@ -181,6 +181,31 @@ func (s *AppService) ImageCollections(ctx context.Context, q string, page, pageS
 
 func (s *AppService) ImageCollectionDetail(ctx context.Context, collectionID uuid.UUID) (models.ImageCollectionDetail, error) {
 	return s.repo.GetAppImageCollectionDetail(ctx, collectionID)
+}
+
+// ShortCollections 返回手机端可见的短视频合集目录，分页每页 20 条，按后台 sort_order DESC、
+// updated_at DESC 排序。可见合集仅包含启用且至少一条可播放短视频的合集（见可见短视频合集）。
+func (s *AppService) ShortCollections(ctx context.Context, page, pageSize int) (models.PageResult[models.ShortCollectionListItem], error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	items, total, err := s.repo.ListAppShortCollections(ctx, pageSize, offset)
+	if err != nil {
+		return models.PageResult[models.ShortCollectionListItem]{}, err
+	}
+	return models.PageResult[models.ShortCollectionListItem]{
+		Items:      items,
+		TotalCount: total,
+		Page:       page,
+		PageSize:   pageSize,
+	}, nil
 }
 
 func (s *AppService) Profile(ctx context.Context, userID uuid.UUID) (models.UserProfileView, error) {

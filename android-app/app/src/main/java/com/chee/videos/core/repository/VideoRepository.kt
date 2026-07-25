@@ -12,6 +12,7 @@ import com.chee.videos.core.model.ImageCollectionDetailDto
 import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.ShortCollectionsPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvDeviceDto
 import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
@@ -146,6 +147,20 @@ class VideoRepository @Inject constructor(
 
                 else -> throw AppException("不支持的发现模式: $mode")
             }
+        }
+    }
+
+    suspend fun fetchShortCollections(
+        page: Int = 1,
+        pageSize: Int = 20,
+    ): Result<ShortCollectionsPayload> {
+        return callWithAuth { baseUrl, bearer ->
+            api.shortCollections(
+                url = UrlBuilder.shortCollections(baseUrl),
+                authorization = bearer,
+                page = page,
+                pageSize = pageSize,
+            )
         }
     }
 

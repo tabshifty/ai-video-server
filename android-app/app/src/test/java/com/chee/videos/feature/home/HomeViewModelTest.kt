@@ -14,6 +14,7 @@ import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.ShortCollectionsPayload
 import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
@@ -513,6 +514,13 @@ private class FakeHomeApiService(
         page: Int,
         pageSize: Int,
     ): ApiEnvelope<SearchPayload> = error("unused")
+
+    override suspend fun shortCollections(
+        url: String,
+        authorization: String,
+        page: Int,
+        pageSize: Int,
+    ): ApiEnvelope<ShortCollectionsPayload> = error("unused")
 
     override suspend fun tvHome(
         url: String,

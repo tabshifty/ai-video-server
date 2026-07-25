@@ -1,4 +1,4 @@
-package com.chee.videos.feature.shortsearch
+package com.chee.videos.feature.shortcollections
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,7 +12,7 @@ import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
-import com.chee.videos.core.ui.cast.buildKeywordShortTvRemoteSearchContext
+import com.chee.videos.core.ui.cast.buildCollectionShortTvRemoteSearchContext
 import com.chee.videos.core.ui.cast.buildShortTvRemoteItems
 import com.chee.videos.core.ui.cast.pickTvDeviceForLaunch
 import com.chee.videos.core.ui.cast.resolveShortTvRemoteStartIndex
@@ -23,16 +23,17 @@ import com.chee.videos.core.ui.cast.sortTvDevicesForSelection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class ShortSearchUiState(
-    val queryInput: String = "",
-    val activeQuery: String = "",
+private const val ShortCollectionContentPageSize = 24
+
+data class ShortCollectionContentUiState(
+    val collectionId: String = "",
+    val collectionName: String = "",
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
     val loaded: Boolean = false,
@@ -53,37 +54,18 @@ data class ShortSearchUiState(
     val castErrorMessage: String? = null,
     val pendingRemoteSessionId: String? = null,
     val errorMessage: String? = null,
+    val offlineMessage: String? = null,
 )
 
-internal fun normalizeShortSearchQuery(query: String): String = query.trim()
-
-internal fun resetShortSearchForQuery(state: ShortSearchUiState, query: String): ShortSearchUiState {
-    return state.copy(
-        activeQuery = query,
-        loading = true,
-        loadingMore = false,
-        loaded = false,
-        page = 0,
-        totalCount = 0,
-        items = emptyList(),
-        errorMessage = null,
-    )
-}
-
-internal fun mergeShortSearchItems(existing: List<VideoListItemDto>, incoming: List<VideoListItemDto>): List<VideoListItemDto> {
-    return (existing + incoming).distinctBy { it.id }
-}
-
 @HiltViewModel
-class ShortSearchViewModel @Inject constructor(
+class ShortCollectionContentViewModel @Inject constructor(
     private val videoRepository: VideoRepository,
     private val store: AppPreferencesStore,
     private val authRepository: AuthRepository,
 ) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(ShortSearchUiState())
-    val uiState: StateFlow<ShortSearchUiState> = _uiState.asStateFlow()
-    private var searchJob: Job? = null
+    private val _uiState = MutableStateFlow(ShortCollectionContentUiState())
+    val uiState: StateFlow<ShortCollectionContentUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -98,26 +80,33 @@ class ShortSearchViewModel @Inject constructor(
         }
     }
 
-    fun onQueryInputChange(value: String) {
-        _uiState.update { it.copy(queryInput = value) }
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            delay(350)
-            val query = normalizeShortSearchQuery(value)
-            if (query == _uiState.value.activeQuery) return@launch
-            if (query.isBlank()) {
-                _uiState.update {
-                    it.copy(activeQuery = "", loaded = false, loading = false, items = emptyList(), page = 0, totalCount = 0, errorMessage = null)
-                }
-            } else {
-                search(query)
-            }
+    fun bind(collectionId: String, collectionName: String) {
+        if (collectionId.isBlank()) {
+            _uiState.update { it.copy(offlineMessage = "合集参数缺失") }
+            return
         }
+        if (_uiState.value.collectionId == collectionId) return
+        _uiState.update {
+            it.copy(
+                collectionId = collectionId,
+                collectionName = collectionName,
+                loading = true,
+                loadingMore = false,
+                loaded = false,
+                page = 0,
+                totalCount = 0,
+                items = emptyList(),
+                playingVideoId = null,
+                errorMessage = null,
+                offlineMessage = null,
+            )
+        }
+        loadPage(page = 1, append = false)
     }
 
     fun retry() {
-        val query = _uiState.value.activeQuery.ifBlank { _uiState.value.queryInput.trim() }
-        if (query.isNotBlank()) search(query, force = true)
+        if (_uiState.value.collectionId.isBlank()) return
+        loadPage(page = 1, append = false)
     }
 
     fun loadMoreIfNeeded(currentIndex: Int) {
@@ -125,7 +114,7 @@ class ShortSearchViewModel @Inject constructor(
         if (state.loading || state.loadingMore || state.items.isEmpty()) return
         if (currentIndex < state.items.lastIndex - 5) return
         if (state.totalCount > 0 && state.items.size >= state.totalCount) return
-        loadPage(state.activeQuery, page = state.page + 1, append = true)
+        loadPage(page = state.page + 1, append = true)
     }
 
     fun enterPlayer(videoId: String) {
@@ -149,9 +138,7 @@ class ShortSearchViewModel @Inject constructor(
     }
 
     fun ensureDetailLoaded(videoId: String, force: Boolean = false) {
-        viewModelScope.launch {
-            loadDetail(videoId, force = force)
-        }
+        viewModelScope.launch { loadDetail(videoId, force = force) }
     }
 
     fun toggleLike(videoId: String) {
@@ -214,7 +201,7 @@ class ShortSearchViewModel @Inject constructor(
         _uiState.update { it.copy(selectedTvDeviceId = deviceId.trim()) }
     }
 
-    fun startCastFromCurrentSearch() {
+    fun startCastFromCollection() {
         val state = _uiState.value
         val selectedDeviceId = state.selectedTvDeviceId?.trim().orEmpty()
         val currentIndex = resolveShortTvRemoteStartIndex(state.items, state.playingVideoId)
@@ -228,27 +215,22 @@ class ShortSearchViewModel @Inject constructor(
         }
         val snapshotItems = buildShortTvRemoteItems(state.items)
         if (snapshotItems.isEmpty()) {
-            _uiState.update { it.copy(castErrorMessage = "当前搜索结果为空，无法发起投放") }
+            _uiState.update { it.copy(castErrorMessage = "当前合集为空，无法发起投放") }
             return
         }
         _uiState.update { it.copy(castLaunching = true, castErrorMessage = null) }
         viewModelScope.launch {
             val launchTarget = resolveTvDeviceRequestTarget(state.tvDevices, selectedDeviceId)
             if (launchTarget.isNullOrBlank()) {
-                _uiState.update {
-                    it.copy(
-                        castLaunching = false,
-                        castErrorMessage = "请选择要投放的电视",
-                    )
-                }
+                _uiState.update { it.copy(castLaunching = false, castErrorMessage = "请选择要投放的电视") }
                 return@launch
             }
             videoRepository.createTvRemoteSession(
                 deviceId = launchTarget,
                 items = snapshotItems,
                 currentIndex = currentIndex,
-                searchContext = buildKeywordShortTvRemoteSearchContext(
-                    activeQuery = state.activeQuery,
+                searchContext = buildCollectionShortTvRemoteSearchContext(
+                    collectionId = state.collectionId,
                     page = state.page,
                     totalCount = state.totalCount,
                 ),
@@ -285,21 +267,20 @@ class ShortSearchViewModel @Inject constructor(
         _uiState.update { it.copy(castErrorMessage = null) }
     }
 
-    private fun search(query: String, force: Boolean = false) {
-        val state = _uiState.value
-        if (!force && state.loading) return
-        _uiState.update { resetShortSearchForQuery(it, query) }
-        loadPage(query, page = 1, append = false)
-    }
-
-    private fun loadPage(query: String, page: Int, append: Boolean) {
-        if (query.isBlank()) return
-        viewModelScope.launch {
-            if (append) _uiState.update { it.copy(loadingMore = true, errorMessage = null) }
-            videoRepository.searchShort(query = query, page = page, pageSize = 24)
+    private fun loadPage(page: Int, append: Boolean) {
+        val collectionId = _uiState.value.collectionId
+        if (collectionId.isBlank()) return
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            if (append) {
+                _uiState.update { it.copy(loadingMore = true, errorMessage = null) }
+            } else {
+                _uiState.update { it.copy(loading = true, errorMessage = null) }
+            }
+            videoRepository.fetchShortDiscover(mode = "collection", value = collectionId, page = page, pageSize = ShortCollectionContentPageSize)
                 .onSuccess { payload ->
                     _uiState.update {
-                        val merged = if (append) mergeShortSearchItems(it.items, payload.items) else payload.items.distinctBy { row -> row.id }
+                        val merged = if (append) mergeItems(it.items, payload.items) else payload.items.distinctBy { row -> row.id }
                         it.copy(
                             loading = false,
                             loadingMore = false,
@@ -311,16 +292,30 @@ class ShortSearchViewModel @Inject constructor(
                             detailLoadingVideoIds = it.detailLoadingVideoIds.filter { id -> merged.any { row -> row.id == id } }.toSet(),
                             actionBusyVideoIds = it.actionBusyVideoIds.filter { id -> merged.any { row -> row.id == id } }.toSet(),
                             errorMessage = null,
+                            offlineMessage = if (!append && merged.isEmpty()) {
+                                "该合集已下线或暂无可播放内容"
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
                 .onFailure { err ->
                     handleAuthError(err)
                     _uiState.update {
-                        it.copy(loading = false, loadingMore = false, loaded = true, errorMessage = err.message ?: "短视频搜索失败")
+                        it.copy(
+                            loading = false,
+                            loadingMore = false,
+                            loaded = true,
+                            errorMessage = if (it.items.isNotEmpty()) null else (err.message ?: "加载合集内容失败"),
+                        )
                     }
                 }
         }
+    }
+
+    private fun mergeItems(existing: List<VideoListItemDto>, incoming: List<VideoListItemDto>): List<VideoListItemDto> {
+        return (existing + incoming).distinctBy { it.id }
     }
 
     private fun toggleAction(videoId: String, actionCall: suspend () -> Result<ActionTogglePayload>) {

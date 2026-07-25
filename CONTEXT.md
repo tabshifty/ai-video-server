@@ -1206,3 +1206,10 @@
 - `AV 缓存开关文案单行边界`：`AVManualScrape` 的“绕过缓存”switch 是现有筛选网格中的不可拆分单元，“允许缓存”“始终重抓”必须通过页面局部 `white-space: nowrap` 保持完整单行；`bypass_cache` 的 v-model 与缓存语义不变，规则不得扩散到共享 switch。
 
 - `压缩包远程选择候选边界`：`ToolboxArchiveImport` 的标签、视频合集和图片合集远程选择器，每次搜索都以当前关键词返回的候选为主，不累加历史未选候选；为保持已选值的可读名称，只保留压缩包工作台各表单当前已选值对应的候选。远程搜索的防抖、latest-wins 和后端查询参数不因该显示边界改变。
+
+## 手机端短视频合集入口与投屏补页约定
+- `短视频合集目录接口边界`：手机端目录走 `GET /api/v1/short/collections`，分页每页 20 条，按后台 `sort_order DESC`、`updated_at DESC` 排序；仅返回启用且至少一条可播放短视频的合集（`ListAppShortCollections`）。`ShortCollectionListItem` 的 `CoverURL` 为合集封面优先、否则回退合集内最新可播放短视频缩略图；`PlayableCount` 暴露可播放短视频数量，首期目录不暴露分页页码，也不提供按名称搜索。`internal/handlers/app_short_collection.go` 是该接口的唯一 handler。
+- `SearchVideos 统一 collection 维度`：`VideoRepository.SearchVideos` / `SearchVideosOrdered` 最右新增可选 `collectionID *uuid.UUID` 参数，非空且非 `uuid.Nil` 时走合集专属查询 `queryShortVideosByCollection`，忽略关键词与排序覆盖；`DiscoverShortVideos(mode=collection)` 同样收敛到 `queryShortVideosByCollection`，两段 SQL 不得分叉漂移（ADR-0016）。所有既有调用点（`AppService.Search`、`TVSearch`、`TVHome`、`tvHomeTyped`、`TVCatalogWall`）一律显式传 `nil`。
+- `投屏可见性只约束目录展示与发起`：投屏会话发起时若 `TvRemoteSearchContext.CollectionID` 非空，`StartTVRemoteSessionAt` 先经 `IsVisibleAppShortCollection` 校验可见性，不可见返回 `ErrTVRemoteCollectionUnavailable`（路由码 2304）；可见性不中断已发起会话、不约束补页，补页实时由 `SearchVideos(collectionID)` 取数（ADR-0017）。`normalizeTVRemoteSearchContext` 允许仅靠 `CollectionID` 成活（`query` 与 `collectionID` 同时为空才判 nil）。`TvRemoteSearchContext.CollectionID` 为 `*uuid.UUID` JSONB 字段，无新 DB 迁移。
+- `手机端公共投屏与竖滑组件`：投屏弹窗抽到 `core/ui/cast/TvCast` 与 `TvCastDeviceDialog`，竖滑播放抽到 `core/ui/shorts/ShortVerticalFeedPlayer`，合集目录与内容页分别在 `feature/shortcollections/` 下；首页新增「合集」tab（`homeContentTabs` 中 `type=short_collection`），点击合集卡经 `onOpenShortCollection` 跳 `ShortCollectionContentRoute`，内容页缺失时回调 `onCollectionUnavailable` 刷新目录并 `popBackStack`。重构既有代码时走 TDD + 独立评审，TV 端 `remote-shorts` 播放屏零改动。
+- `合集入口版本与 TV 拆分`：手机端因合集入口功能性变更，`versionCode` 9→10、`versionName` 0.1.8→0.1.9；TV 不 bump。`internal/services/tv_auth.go`、`internal/models/user.go` 中既有 TV 扫码授权改动与本任务差异拆分，与本合集入口无关的 `internal/services` 既有失败（`TestParseTVAPKMetadataParsesReleaseAPK` 期望 versionCode 121 实际 130）不阻塞本任务收口。

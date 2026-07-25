@@ -15,6 +15,7 @@ import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.ShortCollectionsPayload
 import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
@@ -233,6 +234,7 @@ private class FakeActorApiService(
     override suspend fun recommend(url: String, authorization: String, pageSize: Int): ApiEnvelope<FeedPayload> = error("unused")
     override suspend fun randomShort(url: String, pageSize: Int, excludeIds: String?): ApiEnvelope<FeedPayload> = error("unused")
     override suspend fun shortDiscover(url: String, authorization: String, mode: String, tag: String?, collectionID: String?, page: Int, pageSize: Int): ApiEnvelope<SearchPayload> = error("unused")
+    override suspend fun shortCollections(url: String, authorization: String, page: Int, pageSize: Int): ApiEnvelope<ShortCollectionsPayload> = error("unused")
     override suspend fun tvHome(url: String, authorization: String, keyword: String?, page: Int, pageSize: Int): ApiEnvelope<TvHomePayload> = error("unused")
     override suspend fun tvSearch(url: String, authorization: String, keyword: String, page: Int, pageSize: Int): ApiEnvelope<TvSearchPayload> = error("unused")
     override suspend fun tvSeriesDetail(url: String, authorization: String): ApiEnvelope<TvSeriesDetailDto> = error("unused")

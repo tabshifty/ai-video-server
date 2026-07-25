@@ -12,6 +12,7 @@ import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.ShortCollectionsPayload
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
@@ -68,6 +69,14 @@ interface ApiService {
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<SearchPayload>
+
+    @GET
+    suspend fun shortCollections(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): ApiEnvelope<ShortCollectionsPayload>
 
     @GET
     suspend fun tvHome(

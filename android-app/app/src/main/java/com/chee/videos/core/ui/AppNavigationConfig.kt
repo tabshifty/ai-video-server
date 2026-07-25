@@ -22,6 +22,7 @@ internal data class AppNavigationTransitionSpec(
 
 internal val homeContentTabs = listOf(
     HomeContentTabSpec(title = "短视频", type = "short"),
+    HomeContentTabSpec(title = "合集", type = "short_collection"),
     HomeContentTabSpec(title = "电影", type = "movie"),
     HomeContentTabSpec(title = "电视剧", type = "episode"),
     HomeContentTabSpec(title = "AV", type = "av"),

@@ -196,6 +196,7 @@ func (a *API) Register(r *gin.Engine) {
 		v1.GET("/tv/series/:id/seasons/:season/episodes/:episode/still", a.TVEpisodeStill)
 		v1.GET("/image-collections", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppImageCollections)
 		v1.GET("/image-collections/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppImageCollectionDetail)
+		v1.GET("/short/collections", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.AppShortCollections)
 		v1.GET("/images/:id/view", a.AppImageView)
 		v1.GET("/actors/:id", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.ActorDetail)
 		v1.GET("/actors/:id/avatar", a.ActorAvatar)

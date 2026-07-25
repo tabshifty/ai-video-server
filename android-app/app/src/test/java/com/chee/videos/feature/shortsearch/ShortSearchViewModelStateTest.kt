@@ -14,6 +14,7 @@ import com.chee.videos.core.model.LoginRequest
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.RefreshPayload
 import com.chee.videos.core.model.SearchPayload
+import com.chee.videos.core.model.ShortCollectionsPayload
 import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
@@ -34,6 +35,10 @@ import com.chee.videos.core.network.ApiService
 import com.chee.videos.core.player.PlaybackProfileResolver
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
+import com.chee.videos.core.ui.cast.buildKeywordShortTvRemoteSearchContext
+import com.chee.videos.core.ui.cast.buildShortTvRemoteItems
+import com.chee.videos.core.ui.cast.resolveTvDeviceSelection
+import com.chee.videos.core.ui.cast.sortTvDevicesForSelection
 import com.google.gson.Gson
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -95,8 +100,8 @@ class ShortSearchViewModelStateTest {
     }
 
     @Test
-    fun buildShortSearchRemoteItems_keepsCurrentSearchSnapshotOrder() {
-        val items = buildShortSearchRemoteItems(
+    fun buildShortTvRemoteItems_keepsCurrentSearchSnapshotOrder() {
+        val items = buildShortTvRemoteItems(
             listOf(
                 VideoListItemDto(id = "v1", title = " 第一条 ", type = "short", thumbnailPath = " /thumb1.jpg ", duration = 11),
                 VideoListItemDto(id = "v2", title = "第二条", type = "short", thumbnailPath = "/thumb2.jpg", duration = 12),
@@ -109,8 +114,8 @@ class ShortSearchViewModelStateTest {
     }
 
     @Test
-    fun buildShortSearchRemoteSearchContext_usesCurrentSearchWindow() {
-        val context = buildShortSearchRemoteSearchContext(
+    fun buildKeywordShortTvRemoteSearchContext_usesCurrentSearchWindow() {
+        val context = buildKeywordShortTvRemoteSearchContext(
             activeQuery = "  老师  ",
             page = 3,
             totalCount = 77,
@@ -348,6 +353,13 @@ private class FakeShortSearchApiService(
         page: Int,
         pageSize: Int,
     ): ApiEnvelope<SearchPayload> = error("unused")
+
+    override suspend fun shortCollections(
+        url: String,
+        authorization: String,
+        page: Int,
+        pageSize: Int,
+    ): ApiEnvelope<ShortCollectionsPayload> = error("unused")
 
     override suspend fun tvHome(
         url: String,

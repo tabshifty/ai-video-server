@@ -1,7 +1,6 @@
-package com.chee.videos.feature.shortsearch
+package com.chee.videos.core.ui.shorts
 
 import android.graphics.Color as AndroidColor
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,39 +11,21 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
-import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -53,28 +34,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
@@ -85,144 +62,36 @@ import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.toPlayerRepeatMode
 import com.chee.videos.core.ui.KeepScreenOnEffect
-import com.chee.videos.core.ui.cast.TvCastDeviceDialog
-import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
 import com.chee.videos.core.ui.ShortOverlayFullscreenButton
 import com.chee.videos.core.ui.ShortOverlayFullscreenHost
+import com.chee.videos.core.ui.ShortPlaybackModeToggleButton
 import com.chee.videos.core.ui.ShortVideoBottomProgressBar
 import com.chee.videos.core.ui.ShortVideoOverlayActionButton
 import com.chee.videos.core.ui.shouldShowShortOverlayProgressBar
-import com.chee.videos.core.ui.shorts.ShortVerticalFeedPlayer
 import com.chee.videos.core.ui.shortNonHomeProgressBarPadding
-import com.chee.videos.core.ui.shortPosterContentScale
 import com.chee.videos.core.ui.shortPlaybackModeLabel
+import com.chee.videos.core.ui.shortPosterContentScale
 import com.chee.videos.core.ui.shortScrubTargetFromDelta
 import com.chee.videos.core.ui.shortVideoResizeMode
 import com.chee.videos.core.util.UrlBuilder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.media3.datasource.DefaultHttpDataSource
 
+/**
+ * 共享竖滑短视频播放覆盖层。
+ *
+ * 搜索结果页与短视频合集页各自提供 items、起始下标与回调，共用同一套竖滑播放、
+ * 控件、进度条与投屏入口逻辑。合集内容页复用本组件实现“从用户点选的那条开始
+ * 连续竖滑播放”；投屏入口由各调用方接入公共投屏组件（见 core.ui.cast）。
+ *
+ * 本组件从 ShortSearchScreen 的播放覆盖层沉淀而来，搜索结果页和合集内容页均接入
+ * 此实现，避免两套播放交互随版本演进发生偏差。
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ShortSearchScreen(
-    baseUrl: String,
-    accessToken: String,
-    onFullscreenChange: (Boolean) -> Unit = {},
-    onOpenRemoteControl: (String) -> Unit = {},
-    viewModel: ShortSearchViewModel = hiltViewModel(),
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val playerStartIndex = remember(uiState.playingVideoId, uiState.items) {
-        val id = uiState.playingVideoId ?: return@remember -1
-        uiState.items.indexOfFirst { it.id == id }
-    }
-
-    BackHandler(enabled = uiState.playingVideoId != null) { viewModel.closePlayer() }
-
-    LaunchedEffect(uiState.pendingRemoteSessionId) {
-        val sessionId = uiState.pendingRemoteSessionId ?: return@LaunchedEffect
-        onOpenRemoteControl(sessionId)
-        viewModel.consumePendingRemoteSession()
-    }
-
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0B0E15)).statusBarsPadding()) {
-        OutlinedTextField(
-            value = uiState.queryInput,
-            onValueChange = viewModel::onQueryInputChange,
-            label = { Text("搜索短视频（标题/标签）") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-        )
-
-        when {
-            uiState.loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
-            uiState.errorMessage != null && uiState.items.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
-                    Text("点击重试", color = Color.White, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = viewModel::retry).padding(horizontal = 14.dp, vertical = 8.dp))
-                }
-            }
-            uiState.activeQuery.isBlank() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("输入关键词开始搜索", color = Color(0xFFB9C0CC)) }
-            uiState.items.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("暂无匹配结果", color = Color.White) }
-            else -> LazyVerticalStaggeredGrid(
-                columns = StaggeredGridCells.Fixed(2),
-                modifier = Modifier.fillMaxSize(),
-                verticalItemSpacing = 10.dp,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp, top = 8.dp),
-            ) {
-                itemsIndexed(uiState.items, key = { _, item -> item.id }) { index, item ->
-                    if (index >= uiState.items.lastIndex - 5) {
-                        LaunchedEffect(index, uiState.items.size, uiState.loadingMore) {
-                            viewModel.loadMoreIfNeeded(index)
-                        }
-                    }
-                    SearchCoverCard(baseUrl = baseUrl, item = item, onClick = { viewModel.enterPlayer(item.id) })
-                }
-                if (uiState.loadingMore) {
-                    item(span = StaggeredGridItemSpan.FullLine) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.Center) {
-                            CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (uiState.playingVideoId != null && playerStartIndex >= 0) {
-        ShortVerticalFeedPlayer(
-            baseUrl = baseUrl,
-            accessToken = accessToken,
-            items = uiState.items,
-            initialIndex = playerStartIndex,
-            fitMode = uiState.fitMode,
-            playbackMode = uiState.playbackMode,
-            detailByVideoId = uiState.detailByVideoId,
-            detailLoadingVideoIds = uiState.detailLoadingVideoIds,
-            actionBusyVideoIds = uiState.actionBusyVideoIds,
-            onNeedMore = viewModel::loadMoreIfNeeded,
-            onEnsureDetailLoaded = viewModel::ensureDetailLoaded,
-            onToggleLike = viewModel::toggleLike,
-            onToggleFavorite = viewModel::toggleFavorite,
-            onOpenCastSheet = viewModel::openCastSheet,
-            onClose = viewModel::closePlayer,
-            onToggleFitMode = viewModel::toggleFitMode,
-            onTogglePlaybackMode = viewModel::togglePlaybackMode,
-            onFullscreenChange = onFullscreenChange,
-        )
-    }
-
-    if (uiState.castSheetVisible) {
-        TvCastDeviceDialog(
-            devices = uiState.tvDevices,
-            loading = uiState.castDevicesLoading,
-            launching = uiState.castLaunching,
-            selectedDeviceId = uiState.selectedTvDeviceId,
-            errorMessage = uiState.castErrorMessage,
-            onDismiss = viewModel::dismissCastSheet,
-            onSelectDevice = viewModel::selectTvDevice,
-            onConfirm = viewModel::startCastFromCurrentSearch,
-        )
-    }
-}
-
-@Composable
-private fun SearchCoverCard(baseUrl: String, item: VideoListItemDto, onClick: () -> Unit) {
-    val thumbUrl = remember(baseUrl, item.thumbnailPath) { resolveThumbnailUrl(baseUrl, item.thumbnailPath) }
-    Surface(color = Color(0xFF141821), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)) {
-        Box {
-            AsyncImage(model = thumbUrl, contentDescription = item.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().aspectRatio(0.72f))
-            Box(modifier = Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0xBF090B11)))))
-            Text(text = item.title, color = Color.White, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.BottomStart).padding(10.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ShortSearchPlayerOverlay(
+internal fun ShortVerticalFeedPlayer(
     baseUrl: String,
     accessToken: String,
     items: List<VideoListItemDto>,
@@ -399,7 +268,7 @@ private fun ShortSearchPlayerOverlay(
                 val isActive = page == pagerState.currentPage
                 val detail = detailByVideoId[item.id]
                 val actionBusy = item.id in actionBusyVideoIds || item.id in detailLoadingVideoIds
-                val posterUrl = remember(baseUrl, item.thumbnailPath) { resolveThumbnailUrl(baseUrl, item.thumbnailPath) }
+                val posterUrl = remember(baseUrl, item.thumbnailPath) { resolveShortFeedThumbnailUrl(baseUrl, item.thumbnailPath) }
                 Box(modifier = Modifier.fillMaxSize().pointerInput(item.id) { detectTapGestures(onTap = {
                     showController = !showController
                     if (isActive) {
@@ -511,8 +380,7 @@ private fun ShortSearchPlayerOverlay(
     }
 }
 
-
-private fun resolveThumbnailUrl(baseUrl: String, rawPath: String?): String? {
+internal fun resolveShortFeedThumbnailUrl(baseUrl: String, rawPath: String?): String? {
     val path = rawPath?.trim().orEmpty()
     if (path.isBlank()) return null
     if (path.startsWith("http://") || path.startsWith("https://")) return path

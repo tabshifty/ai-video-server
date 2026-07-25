@@ -74,6 +74,12 @@ import com.chee.videos.feature.imagecollections.ImageCollectionsScreen
 import com.chee.videos.feature.mine.MineScreen
 import com.chee.videos.feature.player.UnifiedPlayerScreen
 import com.chee.videos.feature.shortdiscover.ShortDiscoverScreen
+import com.chee.videos.feature.shortcollections.ShortCollectionContentRoutePattern
+import com.chee.videos.feature.shortcollections.ShortCollectionContentScreen
+import com.chee.videos.feature.shortcollections.ShortCollectionIdArg
+import com.chee.videos.feature.shortcollections.ShortCollectionNameArg
+import com.chee.videos.feature.shortcollections.ShortCollectionsViewModel
+import com.chee.videos.feature.shortcollections.buildShortCollectionContentRoute
 import com.chee.videos.feature.shortsearch.ShortSearchScreen
 import com.chee.videos.feature.shortsearch.ShortSearchRemoteControlRoutePattern
 import com.chee.videos.feature.shortsearch.ShortSearchRemoteControlScreen
@@ -290,6 +296,9 @@ private fun AuthenticatedNav(
                                 "short-discover/${Uri.encode(mode)}/${Uri.encode(value)}/${Uri.encode(title)}",
                             )
                         },
+                        onOpenShortCollection = { collectionId, collectionName ->
+                            navController.navigate(buildShortCollectionContentRoute(collectionId, collectionName))
+                        },
                         onOpenImageCollectionViewer = { route ->
                             navController.navigate(route)
                         },
@@ -419,6 +428,37 @@ private fun AuthenticatedNav(
                     value = entry.arguments?.getString("value").orEmpty(),
                     title = entry.arguments?.getString("title").orEmpty(),
                     onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(
+                route = ShortCollectionContentRoutePattern,
+                arguments = listOf(
+                    navArgument(ShortCollectionIdArg) { type = NavType.StringType },
+                    navArgument(ShortCollectionNameArg) {
+                        type = NavType.StringType
+                        defaultValue = "短视频合集"
+                    },
+                ),
+            ) { entry ->
+                val homeEntry = remember(entry) { navController.getBackStackEntry("home") }
+                val directoryViewModel: ShortCollectionsViewModel = hiltViewModel(homeEntry)
+                val collectionUnavailable = {
+                    directoryViewModel.refresh()
+                    navController.popBackStack()
+                    Unit
+                }
+                ShortCollectionContentScreen(
+                    baseUrl = baseUrl,
+                    accessToken = accessToken,
+                    collectionId = entry.arguments?.getString(ShortCollectionIdArg).orEmpty(),
+                    collectionName = entry.arguments?.getString(ShortCollectionNameArg).orEmpty(),
+                    onBack = { navController.popBackStack() },
+                    onCollectionUnavailable = collectionUnavailable,
+                    onFullscreenChange = { isShortFullscreen = it },
+                    onOpenRemoteControl = { sessionId ->
+                        navController.navigate(buildShortSearchRemoteControlRoute(sessionId))
+                    },
                 )
             }
 

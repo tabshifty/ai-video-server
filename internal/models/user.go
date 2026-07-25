@@ -89,11 +89,12 @@ type TvRemoteSessionItem struct {
 }
 
 type TvRemoteSearchContext struct {
-	Query      string `json:"query"`
-	Type       string `json:"type"`
-	Page       int    `json:"page"`
-	PageSize   int    `json:"page_size"`
-	TotalCount int    `json:"total_count"`
+	Query        string     `json:"query"`
+	Type         string     `json:"type"`
+	Page         int        `json:"page"`
+	PageSize     int        `json:"page_size"`
+	TotalCount   int        `json:"total_count"`
+	CollectionID *uuid.UUID `json:"collection_id,omitempty"`
 }
 
 type TvRemoteSession struct {

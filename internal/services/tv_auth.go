@@ -31,8 +31,8 @@ type tvAuthRepository interface {
 	ListActiveTVSeriesSummaries(ctx context.Context, limit, offset int) ([]models.TvSeriesSummaryDto, int, error)
 	ListTVSeriesSummariesOrdered(ctx context.Context, orderClause string, limit, offset int) ([]models.TvSeriesSummaryDto, int, error)
 	SearchTVSeriesSummaries(ctx context.Context, q string, limit, offset int) ([]models.TvSeriesSummaryDto, int, error)
-	SearchVideos(ctx context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error)
-	SearchVideosOrdered(ctx context.Context, q, typ string, orderClause string, limit, offset int) ([]models.VideoListItem, int, error)
+	SearchVideos(ctx context.Context, q, typ string, collectionID *uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error)
+	SearchVideosOrdered(ctx context.Context, q, typ string, orderClause string, collectionID *uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error)
 	GetTVContinueWatching(ctx context.Context, userID uuid.UUID) (*models.TvContinueWatchingDto, error)
 	ContinueWatching(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.HistoryItem, int, error)
 }
@@ -406,11 +406,11 @@ func (s *AppService) TVSearch(ctx context.Context, q string, page, pageSize int)
 	if err != nil {
 		return models.TvSearchPayload{}, err
 	}
-	movies, totalMovies, err := s.repo.SearchVideos(ctx, query, "movie", pageSize, (page-1)*pageSize)
+	movies, totalMovies, err := s.repo.SearchVideos(ctx, query, "movie", nil, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return models.TvSearchPayload{}, err
 	}
-	avs, totalAV, err := s.repo.SearchVideos(ctx, query, "av", pageSize, (page-1)*pageSize)
+	avs, totalAV, err := s.repo.SearchVideos(ctx, query, "av", nil, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return models.TvSearchPayload{}, err
 	}
@@ -478,11 +478,11 @@ func (s *AppService) TVHome(ctx context.Context, userID uuid.UUID, q string, pag
 	if err != nil {
 		return models.TvHomePayload{}, err
 	}
-	movies, _, err := s.repo.SearchVideos(ctx, "", "movie", min(pageSize, 12), 0)
+	movies, _, err := s.repo.SearchVideos(ctx, "", "movie", nil, min(pageSize, 12), 0)
 	if err != nil {
 		return models.TvHomePayload{}, err
 	}
-	avs, _, err := s.repo.SearchVideos(ctx, "", "av", min(pageSize, 12), 0)
+	avs, _, err := s.repo.SearchVideos(ctx, "", "av", nil, min(pageSize, 12), 0)
 	if err != nil {
 		return models.TvHomePayload{}, err
 	}
@@ -541,7 +541,7 @@ func (s *AppService) tvHomeTyped(
 		return buildTypedTVHomePayload("tv", continueWatching, updates, page, pageSize), nil
 	case "movie", "av":
 		normalizedKind := normalizeTVHomeKind(kind)
-		updates, _, err := s.repo.SearchVideos(ctx, "", normalizedKind, limit, 0)
+		updates, _, err := s.repo.SearchVideos(ctx, "", normalizedKind, nil, limit, 0)
 		if err != nil {
 			return models.TvHomePayload{}, err
 		}
@@ -598,7 +598,7 @@ func (s *AppService) TVCatalogWall(
 		}
 		return buildTVCatalogWallPayload(page, pageSize, total, buildTVCatalogWallSeriesItems(items)), nil
 	case "movie", "av":
-		items, total, err := s.repo.SearchVideosOrdered(ctx, "", kind, tvCatalogWallVideoOrderClause(sort), pageSize, offset)
+		items, total, err := s.repo.SearchVideosOrdered(ctx, "", kind, tvCatalogWallVideoOrderClause(sort), nil, pageSize, offset)
 		if err != nil {
 			return models.PageResult[models.TvCatalogWallItemDto]{}, err
 		}

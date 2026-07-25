@@ -324,8 +324,8 @@ DO UPDATE SET updated_at=NOW()
 	return !existed, nil
 }
 
-func (r *VideoRepository) SearchVideos(ctx context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error) {
-	return r.SearchVideosOrdered(ctx, q, typ, "v.created_at DESC", limit, offset)
+func (r *VideoRepository) SearchVideos(ctx context.Context, q, typ string, collectionID *uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error) {
+	return r.SearchVideosOrdered(ctx, q, typ, "v.created_at DESC", collectionID, limit, offset)
 }
 
 const searchVideosCountSQL = `
@@ -354,7 +354,13 @@ ORDER BY ` + orderClause + `
 LIMIT $3 OFFSET $4`
 }
 
-func (r *VideoRepository) SearchVideosOrdered(ctx context.Context, q, typ string, orderClause string, limit, offset int) ([]models.VideoListItem, int, error) {
+func (r *VideoRepository) SearchVideosOrdered(ctx context.Context, q, typ string, orderClause string, collectionID *uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error) {
+	// 合集维度：collection_id 非空时走合集专属查询，与 DiscoverShortVideos(mode=collection)
+	// 共享同一份过滤/排序构造（见 ADR-0016），忽略关键词与排序覆盖，避免两段 SQL 漂移。
+	if collectionID != nil && *collectionID != uuid.Nil {
+		return r.queryShortVideosByCollection(ctx, collectionID, limit, offset)
+	}
+
 	keyword := "%" + strings.ToLower(strings.TrimSpace(q)) + "%"
 	if keyword == "%%" {
 		keyword = "%"
@@ -380,6 +386,67 @@ func (r *VideoRepository) SearchVideosOrdered(ctx context.Context, q, typ string
 		var rawMetadata []byte
 		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt, &rawMetadata); err != nil {
 			return nil, 0, fmt.Errorf("scan search item: %w", err)
+		}
+		finalizeVideoListItem(&item, rawMetadata)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if err := r.attachCollectionsToVideoListItems(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// shortVideosByCollectionColumns matches the select list used by the keyword search
+// path so collection-scoped results expose the same fields.
+const shortVideosByCollectionSelectColumns = `v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)`
+
+// queryShortVideosByCollection is the single source of truth for listing ready short
+// videos that belong to a given collection, ordered by created_at DESC. Both the
+// DiscoverShortVideos(mode=collection) data source and the SearchVideos(collectionID)
+// TV remote resume path funnel through here so the two cannot drift apart. See
+// ADR-0016.
+func (r *VideoRepository) queryShortVideosByCollection(ctx context.Context, collectionID *uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error) {
+	if collectionID == nil || *collectionID == uuid.Nil {
+		return nil, 0, fmt.Errorf("collection_id is required")
+	}
+	id := *collectionID
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM videos v
+JOIN video_collections vc ON vc.video_id = v.id
+WHERE v.status='ready'
+  AND v.type='short'
+  AND vc.collection_id = $1
+`, id).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count short discover by collection: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx, `
+SELECT `+shortVideosByCollectionSelectColumns+`
+FROM videos v
+JOIN video_collections vc ON vc.video_id = v.id
+WHERE v.status='ready'
+  AND v.type='short'
+  AND vc.collection_id = $1
+ORDER BY v.created_at DESC
+LIMIT $2 OFFSET $3
+`, id, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query short discover by collection: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.VideoListItem, 0, limit)
+	for rows.Next() {
+		var item models.VideoListItem
+		var rawMetadata []byte
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.ThumbnailPath, &item.TranscodedPath, &item.Duration, &item.CreatedAt, &rawMetadata); err != nil {
+			return nil, 0, fmt.Errorf("scan short discover item: %w", err)
 		}
 		finalizeVideoListItem(&item, rawMetadata)
 		items = append(items, item)
@@ -436,32 +503,8 @@ LIMIT $2 OFFSET $3
 			return nil, 0, fmt.Errorf("query short discover by tag: %w", err)
 		}
 	case "collection":
-		if collectionID == nil {
-			return nil, 0, fmt.Errorf("collection_id is required")
-		}
-		if err := r.pool.QueryRow(ctx, `
-SELECT COUNT(*)
-FROM videos v
-JOIN video_collections vc ON vc.video_id = v.id
-WHERE v.status='ready'
-  AND v.type='short'
-  AND vc.collection_id = $1
-`, *collectionID).Scan(&total); err != nil {
-			return nil, 0, fmt.Errorf("count short discover by collection: %w", err)
-		}
-		rows, err = r.pool.Query(ctx, `
-SELECT v.id, v.title, v.type, v.thumbnail_path, v.transcoded_path, v.duration_seconds, v.created_at, COALESCE(v.metadata, '{}'::jsonb)
-FROM videos v
-JOIN video_collections vc ON vc.video_id = v.id
-WHERE v.status='ready'
-  AND v.type='short'
-  AND vc.collection_id = $1
-ORDER BY v.created_at DESC
-LIMIT $2 OFFSET $3
-`, *collectionID, limit, offset)
-		if err != nil {
-			return nil, 0, fmt.Errorf("query short discover by collection: %w", err)
-		}
+		// 复用合集专属查询，避免与 SearchVideos(collectionID) / TV 投屏补页路径的 SQL 漂移（见 ADR-0016）。
+		return r.queryShortVideosByCollection(ctx, collectionID, limit, offset)
 	default:
 		return nil, 0, fmt.Errorf("invalid mode: %s", mode)
 	}

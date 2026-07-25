@@ -195,6 +195,7 @@ data class TvRemoteSearchContextRequest(
     @SerializedName("page") val page: Int,
     @SerializedName("page_size") val pageSize: Int,
     @SerializedName("total_count") val totalCount: Int,
+    @SerializedName("collection_id") val collectionId: String? = null,
 )
 
 data class TvRemoteCreateSessionRequest(
@@ -355,6 +356,22 @@ data class ImageCollectionListItemDto(
     @SerializedName("image_count") val imageCount: Int = 0,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null,
+)
+
+data class ShortCollectionListItemDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("cover_url") val coverUrl: String? = null,
+    @SerializedName("playable_count") val playableCount: Int = 0,
+    @SerializedName("updated_at") val updatedAt: String? = null,
+)
+
+data class ShortCollectionsPayload(
+    @SerializedName("items") val items: List<ShortCollectionListItemDto> = emptyList(),
+    @SerializedName("total_count") val totalCount: Int = 0,
+    @SerializedName("page") val page: Int = 1,
+    @SerializedName("page_size") val pageSize: Int = 20,
 )
 
 data class ImageCollectionDetailDto(

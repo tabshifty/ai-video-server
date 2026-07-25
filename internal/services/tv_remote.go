@@ -23,10 +23,11 @@ const (
 )
 
 var (
-	ErrTVRemoteItemsRequired   = errors.New("投放列表不能为空")
-	ErrTVRemoteIndexOutOfRange = errors.New("当前视频位置无效")
-	ErrTVRemoteDeviceOffline   = errors.New("目标电视当前不可接收投放")
-	ErrTVRemoteSessionInactive = errors.New("投放会话已结束")
+	ErrTVRemoteItemsRequired         = errors.New("投放列表不能为空")
+	ErrTVRemoteIndexOutOfRange       = errors.New("当前视频位置无效")
+	ErrTVRemoteDeviceOffline         = errors.New("目标电视当前不可接收投放")
+	ErrTVRemoteSessionInactive       = errors.New("投放会话已结束")
+	ErrTVRemoteCollectionUnavailable = errors.New("该合集已下线或暂无可播放内容")
 )
 
 type tvRemoteRepository interface {
@@ -40,7 +41,8 @@ type tvRemoteRepository interface {
 	UpdateTVRemoteSessionStateIfAutoplayNextEnabled(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, items []models.TvRemoteSessionItem, currentIndex int, currentVideoID uuid.UUID, searchContext *models.TvRemoteSearchContext, expectedCurrentIndex int, expectedCurrentVideoID uuid.UUID, now time.Time) error
 	UpdateTVRemoteSessionAutoplayNext(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, enabled bool, now time.Time) error
 	EndTVRemoteSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, endedReason string, endedAt time.Time) error
-	SearchVideos(ctx context.Context, q, typ string, limit, offset int) ([]models.VideoListItem, int, error)
+	SearchVideos(ctx context.Context, q, typ string, collectionID *uuid.UUID, limit, offset int) ([]models.VideoListItem, int, error)
+	IsVisibleAppShortCollection(ctx context.Context, collectionID uuid.UUID) (bool, error)
 }
 
 func (s *AppService) ListTVDevices(ctx context.Context, userID uuid.UUID) (models.TvDeviceListPayload, error) {
@@ -86,6 +88,16 @@ func (s *AppService) StartTVRemoteSessionAt(
 	if currentIndex < 0 || currentIndex >= len(normalizedItems) {
 		return models.TvRemoteSession{}, ErrTVRemoteIndexOutOfRange
 	}
+	normalizedSearchContext := normalizeTVRemoteSearchContext(searchContext, len(normalizedItems))
+	if normalizedSearchContext != nil && normalizedSearchContext.CollectionID != nil {
+		visible, visibilityErr := s.tvRemoteRepo.IsVisibleAppShortCollection(ctx, *normalizedSearchContext.CollectionID)
+		if visibilityErr != nil {
+			return models.TvRemoteSession{}, visibilityErr
+		}
+		if !visible {
+			return models.TvRemoteSession{}, ErrTVRemoteCollectionUnavailable
+		}
+	}
 	device, err := s.tvRemoteRepo.GetTVDeviceByDeviceIDAndUser(ctx, userID, normalizedDeviceID, tvRemotePlatform)
 	if err != nil {
 		return models.TvRemoteSession{}, err
@@ -101,7 +113,7 @@ func (s *AppService) StartTVRemoteSessionAt(
 		Platform:            tvRemotePlatform,
 		Status:              tvRemoteSessionStatusActive,
 		Items:               normalizedItems,
-		SearchContext:       normalizeTVRemoteSearchContext(searchContext, len(normalizedItems)),
+		SearchContext:       normalizedSearchContext,
 		CurrentIndex:        currentIndex,
 		CurrentVideoID:      &currentVideoID,
 		AutoplayNextEnabled: true,
@@ -364,7 +376,8 @@ func normalizeTVRemoteSearchContext(searchContext *models.TvRemoteSearchContext,
 		return nil
 	}
 	query := strings.TrimSpace(searchContext.Query)
-	if query == "" {
+	collectionID := normalizeTVRemoteCollectionID(searchContext.CollectionID)
+	if query == "" && collectionID == nil {
 		return nil
 	}
 	typ := strings.ToLower(strings.TrimSpace(searchContext.Type))
@@ -390,12 +403,26 @@ func normalizeTVRemoteSearchContext(searchContext *models.TvRemoteSearchContext,
 		totalCount = loadedItemCount
 	}
 	return &models.TvRemoteSearchContext{
-		Query:      query,
-		Type:       typ,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalCount: totalCount,
+		Query:        query,
+		Type:         typ,
+		Page:         page,
+		PageSize:     pageSize,
+		TotalCount:   totalCount,
+		CollectionID: collectionID,
 	}
+}
+
+// normalizeTVRemoteCollectionID trims and validates an optional collection id carried
+// in the remote search context. A nil or zero-valued id yields nil (no collection filter).
+func normalizeTVRemoteCollectionID(collectionID *uuid.UUID) *uuid.UUID {
+	if collectionID == nil {
+		return nil
+	}
+	if *collectionID == uuid.Nil {
+		return nil
+	}
+	id := *collectionID
+	return &id
 }
 
 func decorateTVRemoteSession(session models.TvRemoteSession) models.TvRemoteSession {
@@ -512,7 +539,7 @@ func (s *AppService) ensureTVRemoteSessionHasNextItemWithPersisting(
 		nextPage = 1
 	}
 	offset := (nextPage - 1) * searchContext.PageSize
-	items, totalCount, err := s.tvRemoteRepo.SearchVideos(ctx, searchContext.Query, searchContext.Type, searchContext.PageSize, offset)
+	items, totalCount, err := s.tvRemoteRepo.SearchVideos(ctx, searchContext.Query, searchContext.Type, searchContext.CollectionID, searchContext.PageSize, offset)
 	if err != nil {
 		return models.TvRemoteSession{}, err
 	}

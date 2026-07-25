@@ -24,6 +24,8 @@ object UrlBuilder {
 
     fun shortDiscover(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/short/discover"
 
+    fun shortCollections(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/short/collections"
+
     fun tvHome(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv/home"
 
     fun tvSearch(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv/search"

@@ -71,6 +71,7 @@ import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.homeContentTabs
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.feature.shorts.ShortFeedScreen
+import com.chee.videos.feature.shortcollections.ShortCollectionsScreen
 import com.chee.videos.feature.tv.TvCatalogScreen
 
 private val tabs = homeContentTabs
@@ -83,6 +84,7 @@ fun HomeScreen(
     onOpenTvSeries: (String) -> Unit,
     onOpenTvContinueWatching: (String, Int, Int) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
+    onOpenShortCollection: (collectionId: String, collectionName: String) -> Unit,
     onOpenImageCollectionViewer: (String) -> Unit,
     onShortFullscreenChange: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
@@ -132,6 +134,13 @@ fun HomeScreen(
                         onOpenDiscover = onOpenShortDiscover,
                         onOpenImageCollectionViewer = onOpenImageCollectionViewer,
                         onFullscreenChange = { isShortFullscreen = it },
+                    )
+                }
+
+                "short_collection" -> {
+                    ShortCollectionsScreen(
+                        baseUrl = baseUrl,
+                        onOpenCollection = onOpenShortCollection,
                     )
                 }
 
