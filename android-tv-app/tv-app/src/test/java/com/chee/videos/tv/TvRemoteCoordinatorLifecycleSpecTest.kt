@@ -28,11 +28,17 @@ class TvRemoteCoordinatorLifecycleSpecTest {
         listOf(
             "dismissedSessionIds += normalizedSessionId",
             "ensureDismissJob(normalizedSessionId)",
-            "dismissJobs[sessionId] = viewModelScope.launch {",
+            // LAZY 启动 + 先登记再启动：消除 Main.immediate 下协程体先于登记跑完的竞态
+            "viewModelScope.launch(start = CoroutineStart.LAZY)",
+            "dismissJobs[sessionId] = job",
+            "job.start()",
             "repeat(MAX_DISMISS_REPORT_ATTEMPTS)",
             "val ended = repository.endTvRemoteSession(sessionId).isSuccess",
             "dismissedSessionIds.remove(sessionId)",
-            "dismissJobs.remove(sessionId)",
+            // 身份校验删除：取消后不得误删同键新任务的条目
+            "dismissJobs.remove(sessionId, coroutineContext[Job])",
+            // 迭代快照取消：cancel() 会同步触发 finally 修改 map，直接遍历 values 会 CME
+            "dismissJobs.values.toList().forEach { it.cancel() }",
             "DISMISS_RETRY_BASE_DELAY_MS",
             "DISMISS_RETRY_MAX_DELAY_MS",
             "MAX_DISMISSED_SESSION_IDS",

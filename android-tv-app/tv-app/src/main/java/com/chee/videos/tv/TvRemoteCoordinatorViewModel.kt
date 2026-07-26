@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.chee.videos.feature.tv.TvRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -126,7 +128,9 @@ class TvRemoteCoordinatorViewModel @Inject constructor(
                 }
                 if (session == null || session.status != "active") {
                     dismissedSessionIds.clear()
-                    dismissJobs.values.forEach { it.cancel() }
+                    // 迭代快照：Main.immediate 下 cancel() 会同步恢复挂起在 delay 的协程并执行其
+                    // finally（移除 map 条目），直接遍历 values 会触发 ConcurrentModificationException
+                    dismissJobs.values.toList().forEach { it.cancel() }
                     dismissJobs.clear()
                 }
             }
@@ -136,7 +140,9 @@ class TvRemoteCoordinatorViewModel @Inject constructor(
         if (dismissJobs[sessionId]?.isActive == true) {
             return
         }
-        dismissJobs[sessionId] = viewModelScope.launch {
+        // LAZY 启动：先登记再启动，消除 Main.immediate 下「协程体同步跑完先于登记」导致
+        // finally 清理落空、已完成 Job 永久残留在 map 里的竞态
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
                 var retryDelayMs = DISMISS_RETRY_BASE_DELAY_MS
                 repeat(MAX_DISMISS_REPORT_ATTEMPTS) { attempt ->
@@ -151,8 +157,11 @@ class TvRemoteCoordinatorViewModel @Inject constructor(
                     }
                 }
             } finally {
-                dismissJobs.remove(sessionId)
+                // 身份校验删除：本任务被取消后若同键已注册新任务，不得误删新条目
+                dismissJobs.remove(sessionId, coroutineContext[Job])
             }
         }
+        dismissJobs[sessionId] = job
+        job.start()
     }
 }

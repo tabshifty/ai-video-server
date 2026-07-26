@@ -36,8 +36,9 @@ class TvImageLoaderFactorySpecTest {
             appSource.contains(".crossfade(false)"),
         )
         assertTrue(
-            "自建服务端缩略图 URL 含资源 ID，必须忽略缓存响应头以最大化磁盘命中",
-            appSource.contains(".respectCacheHeaders(false)"),
+            "禁止忽略服务端缓存响应头：海报缩略图 URL（/api/v1/videos/{id}/thumbnail）不带版本参数，" +
+                "忽略响应头会让封面重刮削后永久展示旧图",
+            !appSource.contains("respectCacheHeaders(false)"),
         )
     }
 

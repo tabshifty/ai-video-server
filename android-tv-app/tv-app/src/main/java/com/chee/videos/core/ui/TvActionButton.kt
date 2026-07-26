@@ -33,6 +33,9 @@ fun TvActionButton(
     tone: TvActionButtonTone = TvActionButtonTone.Primary,
     icon: ImageVector? = null,
     enabled: Boolean = true,
+    // 禁用时是否仍可聚焦：详情页「暂无片源」等作为首屏焦点目标的按钮必须保持可聚焦（默认），
+    // 否则 10-foot 下整页可能无焦点落点；「扫描中」一类瞬时禁用按钮可传 false 跳过聚焦。
+    focusableWhenDisabled: Boolean = true,
 ) {
     val containerColor = when {
         !enabled -> AppChrome.SurfaceStrong
@@ -49,7 +52,7 @@ fun TvActionButton(
         color = containerColor,
         shape = AppChrome.PillShape,
         modifier = modifier
-            .tvFocusableScaleOnly(enabled = enabled, focusedScale = focusedScale)
+            .tvFocusableScaleOnly(enabled = enabled || focusableWhenDisabled, focusedScale = focusedScale)
             .clickable(enabled = enabled, onClick = onClick),
     ) {
         // Surface 会向内容传播最小约束：外部传 fillMaxWidth 时 Row 被撑满，

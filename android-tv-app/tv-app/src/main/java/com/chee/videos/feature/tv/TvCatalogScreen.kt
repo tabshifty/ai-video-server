@@ -1257,8 +1257,8 @@ private fun TvCatalogSection(
             }
             if (section.items.isNotEmpty()) {
                 // 每个 section 是独立 LazyRow，key 作用域不跨 section；
-                // 旧 "${section.title}-more" 在服务端返回重名 section 时无增益、还依赖可重复的 title。
-                item(key = "more") {
+                // 用双下划线前缀避免与内容项的 item.id 意外撞键。
+                item(key = "__more__") {
                     TvPosterMoreCard(
                         label = "查看更多",
                         onClick = { onOpenCatalogWall(resolveTvSectionWallKind(section.title), section.title) },

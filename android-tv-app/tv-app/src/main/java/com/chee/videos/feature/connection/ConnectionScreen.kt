@@ -189,13 +189,15 @@ private fun ConnectionActionButton(
     enabled: Boolean = true,
     primary: Boolean = true,
 ) {
-    // 薄封装：保留连接页既有的 primary/enabled 语义参数，样式委托共享 TvActionButton
+    // 薄封装：保留连接页既有的 primary/enabled 语义参数，样式委托共享 TvActionButton；
+    // 连接页禁用按钮（如「扫描中...」）沿用旧行为不可聚焦
     TvActionButton(
         text = text,
         onClick = onClick,
         modifier = modifier,
         tone = if (primary) TvActionButtonTone.Primary else TvActionButtonTone.Secondary,
         enabled = enabled,
+        focusableWhenDisabled = false,
     )
 }
 

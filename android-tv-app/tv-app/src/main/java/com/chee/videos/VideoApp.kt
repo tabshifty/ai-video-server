@@ -23,18 +23,18 @@ class VideoApp : Application(), ImageLoaderFactory {
             }
             .diskCache {
                 DiskCache.Builder()
-                    .directory(cacheDir.resolve("tv_image_cache"))
-                    // TV 盒子内置存储紧张且被视频缓存挤占：128MB 足以容纳数千张海报缩略图，
+                    // 沿用 Coil 默认目录名以复用既有缓存目录，仅收紧上限：
+                    // TV 盒子内置存储紧张且被视频缓存挤占，128MB 足以容纳数千张海报缩略图，
                     // 远小于 Coil 默认「可用磁盘 2%」在大存储设备上可能膨胀出的 GB 级占用。
+                    .directory(cacheDir.resolve("image_cache"))
                     .maxSizeBytes(128L * 1024 * 1024)
                     .build()
             }
-            // 全局关闭 crossfade：Coil 仅豁免内存缓存命中，磁盘命中仍会重新淡入，
-            // 货架横向划出再划回时海报会反复闪淡入；需要淡入的位点（如短视频封面）
-            // 已由调用方用 AnimatedVisibility 自行控制，全局开启会叠成双重淡入。
+            // 全局关闭 crossfade（显式声明默认值以固化决策）：Coil 仅豁免内存缓存命中，
+            // 磁盘命中仍会重新淡入，货架横向划出再划回时海报会反复闪淡入；需要淡入的位点
+            // （如短视频封面）已由调用方用 AnimatedVisibility 自行控制，全局开启会叠成双重淡入。
+            // 注意：海报缩略图 URL（/api/v1/videos/{id}/thumbnail）不带版本参数，
+            // 必须尊重服务端缓存响应头（Coil 默认行为），否则封面重刮削后 TV 端会永久展示旧图。
             .crossfade(false)
-            // 自建服务端的海报缩略图 URL 含资源 ID、内容变更即换 URL，
-            // 忽略缓存响应头以最大化磁盘命中率。
-            .respectCacheHeaders(false)
             .build()
 }
