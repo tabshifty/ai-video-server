@@ -59,4 +59,21 @@ class TvShortFeedScreenSpecTest {
             source.contains("backPressTime") || source.contains("lastBackPress"),
         )
     }
+
+    @Test
+    fun shortFeedUsesSharedPrimarySourceAndDiagnostics() {
+        val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt").readText()
+
+        listOf(
+            "buildTvShortPlaybackSourceUrl(normalizedBase, currentVideoId)",
+            "TvShortPlaybackDiagnostics()",
+            "diagnostics.attach(sharedPlayer)",
+            "diagnostics.sourcePrepared(attempt)",
+            "diagnostics.detach(sharedPlayer)",
+            "createTvShortPlaybackAttempt(",
+            "entry = TvShortPlaybackEntry.Local",
+        ).forEach { line ->
+            assertTrue("TV 本地短视频页必须包含 $line", source.contains(line))
+        }
+    }
 }

@@ -207,12 +207,12 @@ class TvRemotePlaybackViewModel @Inject constructor(
     private fun applySession(session: TvRemoteSessionDto) {
         viewModelScope.launch {
             val currentVideoId = session.currentVideoId ?: session.currentItem?.videoId
+            val baseUrl = repository.readActiveBaseUrl().orEmpty()
             val sourceUrl = if (session.status == "active" && !currentVideoId.isNullOrBlank()) {
-                repository.buildSourceUrl(currentVideoId)
+                buildTvShortPlaybackSourceUrl(baseUrl, currentVideoId)
             } else {
                 ""
             }
-            val baseUrl = repository.readActiveBaseUrl().orEmpty()
             val posterUrl = session.currentItem?.thumbnailPath
                 ?.takeIf { it.isNotBlank() }
                 ?.let { raw ->
@@ -257,6 +257,7 @@ fun TvRemotePlaybackScreen(
             repeatMode = Player.REPEAT_MODE_OFF
         }
     }
+    val diagnostics = remember { TvShortPlaybackDiagnostics() }
 
     var renderedVideoId by remember { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
@@ -271,6 +272,7 @@ fun TvRemotePlaybackScreen(
     var seekOverlayDurationMs by remember { mutableLongStateOf(0L) }
     var seekOverlayHideJob by remember { mutableStateOf<Job?>(null) }
     var playbackErrorMessage by remember { mutableStateOf<String?>(null) }
+    var playbackAttemptSequence by remember { mutableLongStateOf(0L) }
     val session = uiState.session
     val currentItem = session?.currentItem ?: session?.items?.getOrNull(session.currentIndex)
     val currentVideoId = session?.currentVideoId ?: currentItem?.videoId.orEmpty()
@@ -372,6 +374,7 @@ fun TvRemotePlaybackScreen(
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     DisposableEffect(sharedPlayer) {
+        diagnostics.attach(sharedPlayer)
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
                 renderedVideoId = sharedPlayer.currentMediaItem?.mediaId
@@ -411,6 +414,7 @@ fun TvRemotePlaybackScreen(
             centerIndicatorHideJob?.cancel()
             seekOverlayHideJob?.cancel()
             sharedPlayer.removeListener(listener)
+            diagnostics.detach(sharedPlayer)
             sharedPlayer.release()
         }
     }
@@ -430,9 +434,18 @@ fun TvRemotePlaybackScreen(
         showCenterIndicator = false
         sharedPlayer.stop()
         sharedPlayer.clearMediaItems()
+        playbackAttemptSequence += 1L
+        val attempt = createTvShortPlaybackAttempt(
+            entry = TvShortPlaybackEntry.Remote,
+            attemptId = playbackAttemptSequence,
+            videoId = currentVideoId,
+            sourceUrl = uiState.currentSourceUrl,
+        )
+        diagnostics.sourcePrepared(attempt)
         val mediaItem = MediaItem.Builder()
             .setUri(uiState.currentSourceUrl)
             .setMediaId(currentVideoId)
+            .setTag(attempt)
             .build()
         val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
         sharedPlayer.setMediaSource(mediaSource, true)

@@ -113,6 +113,7 @@ fun TvShortFeedScreen(
             repeatMode = Player.REPEAT_MODE_OFF
         }
     }
+    val diagnostics = remember { TvShortPlaybackDiagnostics() }
     val imageLoader = remember { context.imageLoader }
     // 预加载并发上限：配合 execute（挂起）把封面预抓取并发钉在 2，外盘休眠时单条缩略图阻塞数秒也不并发打爆磁盘。
     val thumbnailPrefetchSemaphore = remember { Semaphore(permits = 2) }
@@ -131,6 +132,7 @@ fun TvShortFeedScreen(
     var seekOverlayDurationMs by remember { mutableLongStateOf(0L) }
     var seekOverlayHideJob by remember { mutableStateOf<Job?>(null) }
     var playbackRetryNonce by remember { mutableIntStateOf(0) }
+    var playbackAttemptSequence by remember { mutableLongStateOf(0L) }
     // 双按返回确认：与长视频/电视剧播放器同款状态机（复用 resolveTvPlayerBackAction）。
     var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showBackConfirmPrompt by remember { mutableStateOf(false) }
@@ -195,6 +197,7 @@ fun TvShortFeedScreen(
     KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
 
     DisposableEffect(sharedPlayer) {
+        diagnostics.attach(sharedPlayer)
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
                 // ExoPlayer 实际是 STATE_READY 先于 onRenderedFirstFrame 触发，故 READY 分支通常是
@@ -259,6 +262,7 @@ fun TvShortFeedScreen(
             centerIndicatorHideJob?.cancel()
             seekOverlayHideJob?.cancel()
             sharedPlayer.removeListener(listener)
+            diagnostics.detach(sharedPlayer)
             isPlayerActuallyPlaying = false
             playerPlaybackState = Player.STATE_IDLE
             sharedPlayer.release()
@@ -299,9 +303,19 @@ fun TvShortFeedScreen(
         hasEndedAtCurrentVideo = false
         sharedPlayer.stop()
         sharedPlayer.clearMediaItems()
+        val sourceUrl = buildTvShortPlaybackSourceUrl(normalizedBase, currentVideoId)
+        playbackAttemptSequence += 1L
+        val attempt = createTvShortPlaybackAttempt(
+            entry = TvShortPlaybackEntry.Local,
+            attemptId = playbackAttemptSequence,
+            videoId = currentVideoId,
+            sourceUrl = sourceUrl,
+        )
+        diagnostics.sourcePrepared(attempt)
         val mediaItem = MediaItem.Builder()
-            .setUri(UrlBuilder.source(normalizedBase, currentVideoId))
+            .setUri(sourceUrl)
             .setMediaId(currentVideoId)
+            .setTag(attempt)
             .build()
         val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
         sharedPlayer.setMediaSource(mediaSource, true)

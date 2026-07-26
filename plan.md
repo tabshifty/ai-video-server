@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-26 15:35 +0800
+- 进度：完成 TV 短视频投屏同源与内部诊断实现。本地短视频和手机投屏播放统一通过共享 helper 请求无 `profile` 覆盖的主源；两条链路均接入按 MediaItem 播放尝试归属的 Media3 诊断，只记录 `source_prepared`、`decoder_initialized`、`video_input_format`、`first_frame`、`player_error`，来源日志不含服务器主机、授权头或未知查询值。TV 版本 `versionCode` 135→136、`versionName` 0.1.135→0.1.136。
+- 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`TvShortPlaybackDiagnostics.kt`（新增）、`TvShortFeedScreen.kt`、`TvRemotePlaybackScreen.kt`、`TvShortPlaybackDiagnosticsTest.kt`（新增）、`TvShortFeedScreenSpecTest.kt`、`TvRemotePlaybackControlsSpecTest.kt`、`plan.md`；长期契约已在前序提交写入 `CONTEXT.md`。未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。
+- 验证：定向测试先红后绿；`./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过；输出 `tv-app-arm64-v8a-debug.apk` 与 `tv-app-armeabi-v7a-debug.apk`，metadata 均为 136 / 0.1.136；`git diff --check` 通过，本次中文 Markdown/Kotlin Unicode 替换字符扫描无匹配。真机是否消除原问题视频的马赛克仍待安装验收；若同源后仍复现，应按既定边界采集 `TvShortPlayback` 日志并转入媒体产物/设备硬解兼容排查。
+
+## 2026-07-26 15:31 +0800
+- 进度：红灯已确认。新增的同源与诊断定向测试因 `buildTvShortPlaybackSourceUrl`、`createTvShortPlaybackAttempt`、`TvShortPlaybackEntry` 尚不存在而在 `compileDebugUnitTestKotlin` 失败，证明测试能够约束待实现能力；开始最小实现。
+- 影响文件：`TvShortPlaybackDiagnosticsTest.kt`、`TvShortFeedScreenSpecTest.kt`、`TvRemotePlaybackControlsSpecTest.kt`、`plan.md`；下一步新增共享诊断实现并接入两条播放器链路。
+- 验证：`./gradlew --no-daemon :tv-app:testDebugUnitTest --tests ...TvShortPlaybackDiagnosticsTest --tests ...TvRemotePlaybackControlsSpecTest --tests ...TvShortFeedScreenSpecTest` 按预期失败，错误仅为新增共享诊断 API 未定义。
+
+## 2026-07-26 15:29 +0800
+- 进度：开始实施 TV 短视频投屏同源与内部诊断。先补红灯测试，锁定本地/投屏共享无档位播放 URL、来源日志脱敏、播放尝试身份以及 `source_prepared`、`decoder_initialized`、`video_input_format`、`first_frame`、`player_error` 五类 Media3 事件；随后做最小实现并递增 TV App 版本。
+- 影响文件：预计涉及 `TvShortPlaybackDiagnostics.kt`（新增）、`TvShortFeedScreen.kt`、`TvRemotePlaybackScreen.kt`、对应 TV 单测、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。
+- 验证：待先运行定向单测确认红灯，再实施并运行 TV 定向/全量单测、Debug 构建、`git diff --check`、中文替换字符扫描和提交范围检查。
+
 ## 2026-07-26 11:04 +0800
 - 进度：完成脱敏边界后的代码核对：TV 长视频已使用 Media3 `AnalyticsListener` 处理播放器事件，远程投屏短视频页尚未接入；可在不轮询、不逐帧记录的前提下复用该事件模型。根因假设仍待同源修复后的现场证据确认。
 - 影响文件：仅本轮 `plan.md`；未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。
