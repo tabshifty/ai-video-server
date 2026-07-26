@@ -24,7 +24,10 @@ class ConnectionScreenLoadingSpecTest {
 
         assertTrue("连接页区块应使用 TV 深色面板组件", source.contains("ConnectionPanel("))
         assertTrue("连接页操作应使用共享 TV 焦点视觉", source.contains("ConnectionActionButton("))
-        assertTrue("连接页操作按钮内部必须接入 tvFocusableScaleOnly", source.contains(".tvFocusableScaleOnly("))
+        assertTrue(
+            "连接页操作按钮必须委托共享 TvActionButton（其内部统一接入 tvFocusableScaleOnly，形态由 TvActionButtonSpecTest 锁定）",
+            source.contains("TvActionButton("),
+        )
         assertFalse("连接页不应继续使用默认 Material Card 作为主要区块", source.contains("import androidx.compose.material3.Card"))
         assertFalse("连接页不应继续使用默认 Material Button 作为主要操作", source.contains("import androidx.compose.material3.Button"))
         assertFalse("连接页不应继续使用默认 Material TextButton 作为主要操作", source.contains("import androidx.compose.material3.TextButton"))

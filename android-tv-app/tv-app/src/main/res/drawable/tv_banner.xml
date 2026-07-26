@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TV 启动器 banner（16:9，leanback 启动器按 320x180dp 呈现）：
+     暗玻璃渐变底 + 左侧暖金侧光 + 居左字形 + 暖金细压边。
+     banner 内不放文字（vector 无中文排版能力），应用名由启动器用 android:label 渲染。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#FF10161F"
+                android:centerColor="#FF080A0D"
+                android:endColor="#FF040508"
+                android:type="linear" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="#40E8B85B"
+                android:endColor="#00E8B85B"
+                android:type="linear" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/ic_launcher_glyph"
+        android:gravity="left|center_vertical"
+        android:left="20dp"
+        android:width="120dp"
+        android:height="120dp" />
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#00000000" />
+            <stroke
+                android:width="1dp"
+                android:color="#33E8B85B" />
+        </shape>
+    </item>
+</layer-list>

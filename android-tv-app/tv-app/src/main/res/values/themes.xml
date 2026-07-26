@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.VideoHome" parent="Theme.Material3.DayNight" />
+    <style name="Theme.VideoHome" parent="Theme.Material3.DayNight">
+        <!-- 深色窗口底色（AppChrome.Canvas）：消除从开屏主题切回应用主题时的浅色闪屏 -->
+        <item name="android:windowBackground">@color/tv_window_background</item>
+    </style>
 
     <style name="Theme.VideoHome.Starting" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/tv_splash_background</item>

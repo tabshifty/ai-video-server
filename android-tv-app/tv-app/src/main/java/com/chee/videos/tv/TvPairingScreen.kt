@@ -5,12 +5,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.remember
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -35,7 +39,8 @@ import androidx.lifecycle.ViewModel
 import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.repository.TvAuthRepository
 import com.chee.videos.core.ui.AppChrome
-import com.chee.videos.core.ui.tvFocusableScaleOnly
+import com.chee.videos.core.ui.TvActionButton
+import com.chee.videos.core.ui.TvActionButtonTone
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.tryRequestFocus
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -228,10 +233,31 @@ fun TvPairingScreen(
                     )
                 }
                 if (!uiState.statusMessage.isNullOrBlank()) {
-                    Text(uiState.statusMessage.orEmpty(), color = AppChrome.TextSecondary)
+                    Text(
+                        text = uiState.statusMessage.orEmpty(),
+                        color = AppChrome.TextSecondary,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 if (!uiState.errorMessage.isNullOrBlank()) {
-                    Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = AppChrome.Error,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = uiState.errorMessage.orEmpty(),
+                            color = AppChrome.Error,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 TvPairingActionButton(
                     text = if (uiState.loading) "生成中..." else "重新生成配对码",
@@ -258,21 +284,11 @@ private fun TvPairingActionButton(
     modifier: Modifier = Modifier,
     primary: Boolean = false,
 ) {
-    Surface(
-        color = if (primary) AppChrome.Accent else AppChrome.SurfaceElevated.copy(alpha = 0.9f),
-        shape = AppChrome.PillShape,
-        modifier = modifier
-            .tvFocusableScaleOnly(focusedScale = 1.04f)
-            .clickable(onClick = onClick),
-    ) {
-        val contentColor = if (primary) AppChrome.Canvas else AppChrome.TextPrimary
-        Text(
-            text = text,
-            color = contentColor,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-        )
-    }
+    // 薄封装：保留配对页既有的 primary 语义参数，样式委托共享 TvActionButton
+    TvActionButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        tone = if (primary) TvActionButtonTone.Primary else TvActionButtonTone.Secondary,
+    )
 }

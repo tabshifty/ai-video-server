@@ -328,7 +328,7 @@ fun TvIptvScreen(
 @Composable
 private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
     Surface(
-        color = Color(0x8C0D1016),
+        color = AppChrome.SurfaceMuted,
         shape = AppChrome.SurfaceShape,
         modifier = Modifier
             .padding(start = 18.dp, top = 18.dp),
@@ -354,7 +354,7 @@ private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
             }
             Text(
                 text = channel?.name ?: "IPTV",
-                color = Color.White,
+                color = AppChrome.TextPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -362,7 +362,13 @@ private fun TvIptvTopOverlay(channel: TvIptvChannelUiModel?) {
                 modifier = Modifier.width(220.dp),
             )
             channel?.group?.trim()?.takeIf { it.isNotBlank() }?.let { group ->
-                Text(text = group, color = AppChrome.TextSecondary, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    text = group,
+                    color = AppChrome.TextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -394,8 +400,8 @@ private fun TvIptvChannelListOverlay(
     }
 
     Surface(
-        color = Color(0xE80B0F17),
-        shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp),
+        color = AppChrome.CanvasRaised,
+        shape = RoundedCornerShape(topStart = AppChrome.RadiusDp, bottomStart = AppChrome.RadiusDp),
         modifier = modifier
             .fillMaxHeight()
             .width(360.dp),
@@ -426,6 +432,8 @@ private fun TvIptvChannelListOverlay(
                         color = AppChrome.AccentWarm,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
                     )
                 }
@@ -471,11 +479,11 @@ private fun TvIptvChannelRow(
                 channel = channel,
                 modifier = Modifier.size(30.dp),
                 iconSize = 18.dp,
-                tint = if (current) Color.White else AppChrome.TextMuted,
+                tint = if (current) AppChrome.Canvas else AppChrome.TextMuted,
             )
             Text(
                 text = channel.name,
-                color = if (current) Color.White else AppChrome.TextPrimary,
+                color = if (current) AppChrome.Canvas else AppChrome.TextPrimary,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
@@ -483,7 +491,7 @@ private fun TvIptvChannelRow(
                 modifier = Modifier.weight(1f),
             )
             if (current) {
-                Text(text = "播放中", color = Color.White.copy(alpha = 0.78f), style = MaterialTheme.typography.labelSmall)
+                Text(text = "播放中", color = AppChrome.Canvas.copy(alpha = 0.78f), style = MaterialTheme.typography.labelSmall)
             }
             Spacer(modifier = Modifier.width(0.dp))
         }
@@ -502,7 +510,7 @@ private fun TvIptvChannelLogo(
     Box(
         modifier = modifier
             .clip(AppChrome.ChipShape)
-            .background(Color.White.copy(alpha = 0.08f)),
+            .background(AppChrome.Surface),
         contentAlignment = Alignment.Center,
     ) {
         if (showFallback) {
@@ -530,7 +538,7 @@ private fun TvIptvLogoFallback(
     Box(
         modifier = modifier
             .clip(AppChrome.ChipShape)
-            .background(Color.White.copy(alpha = 0.08f)),
+            .background(AppChrome.Surface),
         contentAlignment = Alignment.Center,
     ) {
         Icon(Icons.Filled.Tv, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))

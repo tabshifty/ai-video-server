@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppChrome.Canvas 的 XML 侧镜像：值必须与 core/ui/AppChrome.kt 的 Canvas 保持一致，
+         由 TvLauncherIdentitySpecTest 锁定同步 -->
+    <color name="tv_window_background">#FF040508</color>
+</resources>

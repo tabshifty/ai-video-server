@@ -45,6 +45,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.TvActionButton
+import com.chee.videos.core.ui.TvActionButtonTone
 import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvDetailGlassPanel
@@ -67,7 +69,6 @@ private val TvLongFormBackdropFallbackBrush = Brush.horizontalGradient(
     colors = listOf(AppChrome.SurfaceStrong, AppChrome.Canvas),
 )
 private val TvLongFormActorFallbackColor = AppChrome.SurfaceStrong
-private val TvLongFormSecondaryActionColor = AppChrome.Surface.copy(alpha = 0.78f)
 
 @Composable
 fun TvLongFormDetailScreen(
@@ -213,8 +214,9 @@ fun TvLongFormDetailScreen(
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            TvDetailPrimaryActionButton(
+                            TvActionButton(
                                 text = if (canPlay) hero.primaryActionLabel else "暂无片源",
+                                icon = Icons.Filled.PlayArrow,
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 enabled = canPlay,
                                 onClick = {
@@ -223,8 +225,10 @@ fun TvLongFormDetailScreen(
                                     }
                                 },
                             )
-                            TvDetailSecondaryActionButton(
+                            TvActionButton(
                                 text = hero.secondaryActionLabel,
+                                icon = Icons.Filled.Star,
+                                tone = TvActionButtonTone.Secondary,
                                 onClick = { viewModel.toggleFavorite() },
                             )
                         }
@@ -380,64 +384,5 @@ private fun TvLongFormActorAvatar(actor: TvLongFormDetailActorUiModel) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-    }
-}
-
-@Composable
-private fun TvDetailPrimaryActionButton(
-    text: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = if (enabled) AppChrome.Accent else AppChrome.SurfaceStrong,
-        shape = AppChrome.PillShape,
-        modifier = modifier
-            .tvFocusableScaleOnly(focusedScale = 1.06f)
-            .clickable(enabled = enabled, onClick = onClick),
-    ) {
-        val primaryContentColor = if (enabled) AppChrome.Canvas else AppChrome.TextMuted
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = primaryContentColor)
-            Text(
-                text = text,
-                color = primaryContentColor,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TvDetailSecondaryActionButton(
-    text: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = TvLongFormSecondaryActionColor,
-        shape = AppChrome.PillShape,
-        modifier = Modifier
-            .tvFocusableScaleOnly(focusedScale = 1.05f)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(Icons.Filled.Star, contentDescription = null, tint = AppChrome.TextPrimary)
-            Text(
-                text = text,
-                color = AppChrome.TextPrimary,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
     }
 }

@@ -78,7 +78,9 @@ import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
+import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvMotionTokens
+import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.util.UrlBuilder
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -525,11 +527,16 @@ fun TvRemotePlaybackScreen(
     ) {
         when {
             uiState.loading -> {
-                Text("正在准备投放播放", modifier = Modifier.align(Alignment.Center), color = Color.White)
+                TvPageLoadingState(message = "正在准备投放播放")
             }
 
             session == null -> {
-                Text(uiState.errorMessage ?: "投放会话不存在", modifier = Modifier.align(Alignment.Center), color = Color.White)
+                TvErrorState(
+                    title = "投放会话不可用",
+                    message = uiState.errorMessage ?: "投放会话不存在",
+                    actionLabel = "返回",
+                    onAction = onBack,
+                )
             }
 
             session.status == "ended" -> {

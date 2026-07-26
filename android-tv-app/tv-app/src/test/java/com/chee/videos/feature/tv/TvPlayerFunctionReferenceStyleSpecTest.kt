@@ -57,10 +57,17 @@ class TvPlayerFunctionReferenceStyleSpecTest {
 
     @Test
     fun `gold controls in connection and pairing pages use canvas foreground`() {
+        // 连接/配对页按钮已收敛到共享 TvActionButton，金底深色前景在共享组件内统一保证
         val connection = Path.of("src/main/java/com/chee/videos/feature/connection/ConnectionScreen.kt").readText()
-        assertTrue("连接页金色主操作文字应使用深色画布前景", connection.contains("primary -> AppChrome.Canvas"))
+        assertTrue("连接页主操作必须委托共享 TvActionButton", connection.contains("TvActionButton("))
 
         val pairing = Path.of("src/main/java/com/chee/videos/tv/TvPairingScreen.kt").readText()
-        assertTrue("配对页金色主操作文字应使用深色画布前景", pairing.contains("if (primary) AppChrome.Canvas"))
+        assertTrue("配对页主操作必须委托共享 TvActionButton", pairing.contains("TvActionButton("))
+
+        val actionButton = Path.of("src/main/java/com/chee/videos/core/ui/TvActionButton.kt").readText()
+        assertTrue(
+            "共享 TvActionButton 的金色主操作前景必须使用深色画布（Primary -> AppChrome.Canvas）",
+            actionButton.contains("tone == TvActionButtonTone.Primary -> AppChrome.Canvas"),
+        )
     }
 }

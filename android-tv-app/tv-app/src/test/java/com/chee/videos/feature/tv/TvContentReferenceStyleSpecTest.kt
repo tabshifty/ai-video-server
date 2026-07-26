@@ -12,6 +12,7 @@ class TvContentReferenceStyleSpecTest {
         "TV 首页" to Path.of("src/main/java/com/chee/videos/feature/tv/TvCatalogScreen.kt"),
         "海报墙" to Path.of("src/main/java/com/chee/videos/feature/tv/TvPosterWallScreen.kt"),
         "长视频详情页" to Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt"),
+        "共享操作按钮" to Path.of("src/main/java/com/chee/videos/core/ui/TvActionButton.kt"),
     )
 
     @Test
@@ -67,7 +68,16 @@ class TvContentReferenceStyleSpecTest {
         assertTrue("TV 首页金色标签文字应使用深色画布前景", catalog.contains("color = AppChrome.Canvas"))
 
         val detail = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormDetailScreen.kt").readText()
-        assertTrue("长视频详情页金色主按钮文字/图标应使用深色画布前景", detail.contains("tint = primaryContentColor"))
-        assertTrue("长视频详情页金色主按钮文字应跟随 primaryContentColor", detail.contains("color = primaryContentColor"))
+        assertTrue("长视频详情页主/次操作必须委托共享 TvActionButton", detail.contains("TvActionButton("))
+
+        val actionButton = Path.of("src/main/java/com/chee/videos/core/ui/TvActionButton.kt").readText()
+        assertTrue(
+            "共享 TvActionButton 金色主操作前景必须使用深色画布",
+            actionButton.contains("tone == TvActionButtonTone.Primary -> AppChrome.Canvas"),
+        )
+        assertTrue(
+            "共享 TvActionButton 禁用态前景必须使用弱化文字色",
+            actionButton.contains("!enabled -> AppChrome.TextMuted"),
+        )
     }
 }

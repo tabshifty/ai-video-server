@@ -31,7 +31,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -428,13 +427,13 @@ private fun TvRootExitConfirmPrompt(
 ) {
     Surface(
         modifier = modifier,
-        color = Color(0xCC121212),
+        color = AppChrome.SurfaceMuted,
         shape = AppChrome.SurfaceShape,
     ) {
         Text(
             text = "再按一次退出",
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            color = Color.White,
+            color = AppChrome.TextPrimary,
             style = MaterialTheme.typography.bodySmall,
         )
     }

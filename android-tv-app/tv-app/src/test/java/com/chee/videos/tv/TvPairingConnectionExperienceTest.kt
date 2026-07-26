@@ -11,7 +11,10 @@ class TvPairingConnectionExperienceTest {
     fun pairingActionsUseSharedTvFocusAndSingleFocusableTarget() {
         val source = Path.of("src/main/java/com/chee/videos/tv/TvPairingScreen.kt").readText()
 
-        assertTrue("TV 配对页操作应接入共享 TV 焦点视觉", source.contains("tvFocusableScaleOnly"))
+        assertTrue(
+            "TV 配对页操作应委托共享 TvActionButton（其内部已接入 scale-only 焦点视觉）",
+            source.contains("TvActionButton("),
+        )
         assertFalse(
             "TV 配对页不应裸用 foundation focusable；共享 tvFocusableScaleOnly 已经提供唯一焦点目标",
             source.contains("import androidx.compose.foundation.focusable"),

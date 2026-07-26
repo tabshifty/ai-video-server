@@ -69,6 +69,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
+import com.chee.videos.core.ui.TvActionButton
+import com.chee.videos.core.ui.TvActionButtonTone
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvHeroMotionTokens
 import com.chee.videos.core.ui.TvLayoutSpec
@@ -1054,14 +1056,15 @@ private fun TvFeaturedHero(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TvHeroActionButton(
+                        TvActionButton(
                             text = if (data.source == TvFeaturedContentSource.CONTINUE_WATCHING) "继续播放" else "立即播放",
                             icon = Icons.Filled.PlayArrow,
                             modifier = primaryModifier,
                             onClick = onPrimaryAction,
                         )
-                        TvHeroSecondaryActionButton(
+                        TvActionButton(
                             text = "查看详情",
+                            tone = TvActionButtonTone.Secondary,
                             onClick = onSecondaryAction,
                         )
                     }
@@ -1102,53 +1105,6 @@ private fun TvFeaturedPoster(
             contentDescription = null,
             tint = AppChrome.TextMuted,
             modifier = Modifier.size(46.dp),
-        )
-    }
-}
-
-@Composable
-private fun TvHeroActionButton(
-    text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = AppChrome.Accent,
-        shape = AppChrome.PillShape,
-        modifier = modifier
-            .tvFocusableScaleOnly(focusedScale = 1.06f)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(icon, contentDescription = null, tint = AppChrome.Canvas)
-            Text(text = text, color = AppChrome.Canvas, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun TvHeroSecondaryActionButton(
-    text: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = AppChrome.Surface.copy(alpha = 0.82f),
-        shape = AppChrome.PillShape,
-        modifier = Modifier
-            .tvFocusableScaleOnly(focusedScale = 1.05f)
-            .clickable(onClick = onClick),
-    ) {
-        Text(
-            text = text,
-            color = AppChrome.TextPrimary,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
         )
     }
 }

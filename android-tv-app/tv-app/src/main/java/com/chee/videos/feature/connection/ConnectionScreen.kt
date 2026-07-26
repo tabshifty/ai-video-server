@@ -30,7 +30,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.ui.AppChrome
-import com.chee.videos.core.ui.tvFocusableScaleOnly
+import com.chee.videos.core.ui.TvActionButton
+import com.chee.videos.core.ui.TvActionButtonTone
 import com.chee.videos.core.ui.TvLayoutSpec
 
 private val ConnectionScanLoadingIndicatorSize = 14.dp
@@ -188,30 +189,14 @@ private fun ConnectionActionButton(
     enabled: Boolean = true,
     primary: Boolean = true,
 ) {
-    Surface(
-        color = when {
-            !enabled -> AppChrome.SurfaceElevated.copy(alpha = 0.45f)
-            primary -> AppChrome.Accent
-            else -> AppChrome.SurfaceElevated.copy(alpha = 0.9f)
-        },
-        shape = AppChrome.PillShape,
-        modifier = modifier
-            .tvFocusableScaleOnly(enabled = enabled, focusedScale = 1.04f)
-            .clickable(enabled = enabled, onClick = onClick),
-    ) {
-        val contentColor = when {
-            !enabled -> AppChrome.TextMuted
-            primary -> AppChrome.Canvas
-            else -> AppChrome.TextPrimary
-        }
-        Text(
-            text = text,
-            color = contentColor,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-        )
-    }
+    // 薄封装：保留连接页既有的 primary/enabled 语义参数，样式委托共享 TvActionButton
+    TvActionButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        tone = if (primary) TvActionButtonTone.Primary else TvActionButtonTone.Secondary,
+        enabled = enabled,
+    )
 }
 
 @Composable

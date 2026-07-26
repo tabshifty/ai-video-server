@@ -56,6 +56,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
+import com.chee.videos.core.ui.TvActionButton
+import com.chee.videos.core.ui.TvActionButtonTone
 import com.chee.videos.core.ui.TvFocusMotionTokens
 import com.chee.videos.core.ui.TvFocusSafeSpec
 import com.chee.videos.core.ui.TvLayoutSpec
@@ -346,12 +348,14 @@ private fun TvPosterWallTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        TvPosterWallSortButton(
-            label = tvPosterWallSortByLabel(sortBy),
+        TvActionButton(
+            text = tvPosterWallSortByLabel(sortBy),
+            tone = TvActionButtonTone.Secondary,
             onClick = { onChangeSort(if (sortBy == "added") "release" else "added", sortOrder) },
         )
-        TvPosterWallSortButton(
-            label = tvPosterWallSortOrderLabel(sortOrder),
+        TvActionButton(
+            text = tvPosterWallSortOrderLabel(sortOrder),
+            tone = TvActionButtonTone.Secondary,
             onClick = { onChangeSort(sortBy, if (sortOrder == "desc") "asc" else "desc") },
         )
         Surface(
@@ -379,29 +383,6 @@ private fun TvPosterWallTopBar(
     }
 }
 
-@Composable
-private fun TvPosterWallSortButton(
-    label: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = AppChrome.SurfaceElevated.copy(alpha = 0.9f),
-        shape = AppChrome.PillShape,
-        modifier = Modifier
-            .tvFocusableScaleOnly(focusedScale = 1.04f)
-            .clickable(onClick = onClick),
-    ) {
-        Text(
-            text = label,
-            color = AppChrome.TextPrimary,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 internal fun tvPosterWallSortByLabel(sortBy: String): String {
     return when (sortBy) {
