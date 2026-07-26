@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-26 16:06 +0800
+- 进度：完成 TV 本地短视频页标题浮层，对齐远程投放页信息层样式与显隐手感。`TvShortFeedScreen` 新增左上标题浮层（headlineMedium 白色粗体、最多两行、宽度上限 720dp）与 `showChrome` 3 秒自动隐藏状态机：切条（含播完自动推进）、上下切条键（含长按 repeat 阶段）、左右 seek、播放/暂停确认键均唤起；中心指示器（700ms）与 seek 进度条（1200ms）保留各自独立计时并在触发时顺带刷新 chrome，对齐投放页真实结构。浮层自带局部顶部渐变保证可读性，不引入投放页的全屏常驻压暗层；标题为空时整个浮层不显示，无占位文案；错误 UI 与失败态按键行为保持现状。两页继续各自独立实现，未引用投放页私有成员。TV 版本 `versionCode` 136→137、`versionName` 0.1.136→0.1.137。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`（新增术语「TV 本地短视频页标题浮层对齐投放页」）、`plan.md`。未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。
+- 验证：`./gradlew :tv-app:assembleDebug` 通过；子代理独立评审无阻塞问题，采纳其建议在 DPAD_UP/DOWN repeat 吞键分支补 `showChromeTemporarily()` 刷新计时（长按期间浮层不中途隐去），修复后重新构建通过并交回复审。真机观感（渐变浓度、隐藏时长手感）待安装验收。
+
 ## 2026-07-26 15:35 +0800
 - 进度：完成 TV 短视频投屏同源与内部诊断实现。本地短视频和手机投屏播放统一通过共享 helper 请求无 `profile` 覆盖的主源；两条链路均接入按 MediaItem 播放尝试归属的 Media3 诊断，只记录 `source_prepared`、`decoder_initialized`、`video_input_format`、`first_frame`、`player_error`，来源日志不含服务器主机、授权头或未知查询值。TV 版本 `versionCode` 135→136、`versionName` 0.1.135→0.1.136。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、`TvShortPlaybackDiagnostics.kt`（新增）、`TvShortFeedScreen.kt`、`TvRemotePlaybackScreen.kt`、`TvShortPlaybackDiagnosticsTest.kt`（新增）、`TvShortFeedScreenSpecTest.kt`、`TvRemotePlaybackControlsSpecTest.kt`、`plan.md`；长期契约已在前序提交写入 `CONTEXT.md`。未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。

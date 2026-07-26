@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -44,16 +45,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
@@ -77,6 +82,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.TvMotionTokens
 import com.chee.videos.core.ui.tvFocusableScaleOnly
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
@@ -131,6 +137,10 @@ fun TvShortFeedScreen(
     var seekOverlayPositionMs by remember { mutableLongStateOf(0L) }
     var seekOverlayDurationMs by remember { mutableLongStateOf(0L) }
     var seekOverlayHideJob by remember { mutableStateOf<Job?>(null) }
+    // 标题浮层 chrome：与远程投放页同款 3 秒自动隐藏手感（CONTEXT.md「TV 本地短视频页标题浮层对齐投放页」）。
+    // 中心指示器与 seek 进度条保留各自独立计时，触发时顺带唤起 chrome，对齐投放页真实结构。
+    var showChrome by rememberSaveable { mutableStateOf(true) }
+    var chromeHideJob by remember { mutableStateOf<Job?>(null) }
     var playbackRetryNonce by remember { mutableIntStateOf(0) }
     var playbackAttemptSequence by remember { mutableLongStateOf(0L) }
     // 双按返回确认：与长视频/电视剧播放器同款状态机（复用 resolveTvPlayerBackAction）。
@@ -143,6 +153,15 @@ fun TvShortFeedScreen(
     val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
     val latestCurrentIndex by rememberUpdatedState(uiState.currentIndex)
     val latestLastIndex by rememberUpdatedState(uiState.items.lastIndex)
+
+    fun showChromeTemporarily() {
+        showChrome = true
+        chromeHideJob?.cancel()
+        chromeHideJob = coroutineScope.launch {
+            delay(TvShortChromeAutoHideDurationMillis)
+            showChrome = false
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.load()
@@ -261,6 +280,7 @@ fun TvShortFeedScreen(
             }
             centerIndicatorHideJob?.cancel()
             seekOverlayHideJob?.cancel()
+            chromeHideJob?.cancel()
             sharedPlayer.removeListener(listener)
             diagnostics.detach(sharedPlayer)
             isPlayerActuallyPlaying = false
@@ -284,6 +304,7 @@ fun TvShortFeedScreen(
         showSeekOverlay = false
         seekOverlayHideJob?.cancel()
         playbackRetryNonce = 0
+        showChromeTemporarily()
     }
 
     LaunchedEffect(currentVideoId, baseUrl, dataSourceFactory, playbackRetryNonce) {
@@ -476,15 +497,20 @@ fun TvShortFeedScreen(
                         when (event.nativeKeyEvent.keyCode) {
                             AndroidKeyEvent.KEYCODE_DPAD_UP -> {
                                 if (event.nativeKeyEvent.repeatCount > 0) {
+                                    // repeat 阶段仍刷新 chrome 计时，长按期间标题浮层不中途隐去（对齐投放页手感）。
+                                    showChromeTemporarily()
                                     return@onPreviewKeyEvent true
                                 }
+                                showChromeTemporarily()
                                 viewModel.movePrevious()
                             }
 
                             AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
                                 if (event.nativeKeyEvent.repeatCount > 0) {
+                                    showChromeTemporarily()
                                     return@onPreviewKeyEvent true
                                 }
+                                showChromeTemporarily()
                                 viewModel.moveNext()
                             }
 
@@ -509,6 +535,7 @@ fun TvShortFeedScreen(
                                             delay(TvShortSeekOverlayDurationMillis)
                                             showSeekOverlay = false
                                         }
+                                        showChromeTemporarily()
                                     },
                                 )
                             }
@@ -533,6 +560,7 @@ fun TvShortFeedScreen(
                                             delay(TvShortSeekOverlayDurationMillis)
                                             showSeekOverlay = false
                                         }
+                                        showChromeTemporarily()
                                     },
                                 )
                             }
@@ -563,6 +591,7 @@ fun TvShortFeedScreen(
                                     delay(TvShortCenterIndicatorDurationMillis)
                                     showCenterIndicator = false
                                 }
+                                showChromeTemporarily()
                             }
 
                             AndroidKeyEvent.KEYCODE_BACK,
@@ -610,6 +639,18 @@ fun TvShortFeedScreen(
                     TvShortFeedLoadingOverlay(
                         modifier = Modifier.align(Alignment.Center),
                     )
+                }
+
+                // 标题浮层：样式与显隐手感对齐远程投放页信息层；本地页无投放语境，
+                // 只保留标题一行，标题为空时整个浮层不显示，不使用占位文案。
+                val overlayTitle = currentItem?.title?.trim().orEmpty()
+                AnimatedVisibility(
+                    visible = showChrome && overlayTitle.isNotBlank(),
+                    enter = fadeIn(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    exit = fadeOut(tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)),
+                    modifier = Modifier.align(Alignment.TopStart),
+                ) {
+                    TvShortFeedTitleOverlay(title = overlayTitle)
                 }
 
                 if (uiState.loadingMore) {
@@ -705,6 +746,33 @@ fun TvShortFeedScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TvShortFeedTitleOverlay(title: String) {
+    // 局部顶部渐变代替投放页的全屏常驻压暗层：只随浮层显隐，保证亮画面上标题可读，
+    // 不让本地观影画面永久变暗。
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xB3000000), Color.Transparent),
+                ),
+            )
+            .statusBarsPadding()
+            .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 32.dp),
+    ) {
+        Text(
+            text = title,
+            color = Color.White,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 720.dp),
+        )
     }
 }
 
@@ -913,6 +981,8 @@ private fun formatTvShortPlaybackTime(ms: Long): String {
 
 private const val TvShortCenterIndicatorDurationMillis = 700L
 private const val TvShortSeekOverlayDurationMillis = 1_200L
+// 与远程投放页 TvRemoteChromeAutoHideDurationMillis 同值，保持两页标题浮层显隐手感一致。
+private const val TvShortChromeAutoHideDurationMillis = 3_000L
 
 /**
  * 把 [FeedVideoDto.thumbnailPath] 解析成可被 Coil 直接加载的绝对封面 URL。
