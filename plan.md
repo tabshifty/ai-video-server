@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-26 10:48 +0800
+- 进度：完成“TV 短视频投屏同源播放”术语沉淀。该规则明确投屏短视频不得复用长视频档位选择造成历史兼容副本切换；后续若实施修复，先让投屏与 TV 本地短视频指向同一播放源，再对仍花屏样本排查媒体产物和设备解码兼容性。
+- 影响文件：`CONTEXT.md`、`plan.md`；未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。
+- 验证：`git diff --check -- CONTEXT.md plan.md` 通过；两份 Markdown Unicode 替换字符扫描无匹配；文档变更无需构建或测试。
+
+## 2026-07-26 10:47 +0800
+- 进度：用户确认“TV 短视频投屏同源播放”规则。本轮仅沉淀该跨入口播放源一致性契约，不修改播放器、接口、转码产物、App 版本或部署状态。
+- 影响文件：`CONTEXT.md`、`plan.md`；未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。
+- 验证：待执行 `git diff --check -- CONTEXT.md plan.md`、本次 Markdown Unicode 替换字符扫描、精确暂存与提交范围检查；文档变更无需构建或测试。
+
 ## 2026-07-25 22:00 +0800
 - 进度：提交后清理已完成验证并收口，提交仅纳入搜索页死代码删除、公共播放器静态守护测试更新和本轮 `plan.md` 记录；短视频合集主功能提交 `d6a3a70` 保持不变。
 - 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/shortsearch/ShortSearchScreen.kt`、`android-app/app/src/test/java/com/chee/videos/core/ui/ShortOverlayFullscreenSpecTest.kt`、`plan.md`；无关未跟踪 `.superpowers/` 保持原样且不纳入提交。
