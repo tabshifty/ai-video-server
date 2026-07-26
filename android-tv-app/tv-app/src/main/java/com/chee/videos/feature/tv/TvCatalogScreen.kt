@@ -146,21 +146,46 @@ fun TvCatalogScreen(
     val tvSeriesFocusRequester = remember { FocusRequester() }
     val movieFocusRequester = remember { FocusRequester() }
     val avFocusRequester = remember { FocusRequester() }
-    val featuredContent = resolveTvFeaturedContent(
-        continueWatching = uiState.continueWatching,
-        sections = uiState.sections,
-        tvSeries = uiState.tvSeries,
-        movies = uiState.movies,
-        av = uiState.av,
-    )
-    val initialFocusTarget = resolveTvCatalogInitialFocusTarget(
-        hasFeaturedContent = featuredContent != null,
-        hasContinueWatching = uiState.continueWatching != null,
-        sectionItemCounts = uiState.sections.map { it.items.size },
-        tvSeriesCount = uiState.tvSeries.size,
-        movieCount = uiState.movies.size,
-        avCount = uiState.av.size,
-    )
+    // 记忆化：两个解析函数会遍历全部分区并做字符串拼接/列表分配，
+    // uiState 其它字段（如搜索 query 逐字符）变化不应重复执行。
+    // key 均为 data class / List，remember 按 equals 比较，引用未变即命中缓存。
+    val featuredContent = remember(
+        uiState.continueWatching,
+        uiState.sections,
+        uiState.tvSeries,
+        uiState.movies,
+        uiState.av,
+    ) {
+        resolveTvFeaturedContent(
+            continueWatching = uiState.continueWatching,
+            sections = uiState.sections,
+            tvSeries = uiState.tvSeries,
+            movies = uiState.movies,
+            av = uiState.av,
+        )
+    }
+    val initialFocusTarget = remember(
+        featuredContent,
+        uiState.continueWatching,
+        uiState.sections,
+        uiState.tvSeries.size,
+        uiState.movies.size,
+        uiState.av.size,
+    ) {
+        resolveTvCatalogInitialFocusTarget(
+            hasFeaturedContent = featuredContent != null,
+            hasContinueWatching = uiState.continueWatching != null,
+            sectionItemCounts = uiState.sections.map { it.items.size },
+            tvSeriesCount = uiState.tvSeries.size,
+            movieCount = uiState.movies.size,
+            avCount = uiState.av.size,
+        )
+    }
+    val allEntryTitle = remember(uiState.kind, uiState.featured, uiState.recentWatching, uiState.recentUpdates) {
+        buildTvTypedHomeSections(uiState.kind, uiState.featured, uiState.recentWatching, uiState.recentUpdates)
+            .last()
+            .title
+    }
 
     LaunchedTvInitialFocus(uiState.loading, isSearching, initialFocusTarget, requestedMenuFocusItem) {
         if (uiState.loading || isSearching) return@LaunchedTvInitialFocus
@@ -293,7 +318,7 @@ fun TvCatalogScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             featuredContent?.let { featured ->
-                item(key = "featured") {
+                item(key = "featured", contentType = "hero") {
                     TvFeaturedHero(
                         baseUrl = uiState.baseUrl,
                         data = featured,
@@ -325,7 +350,7 @@ fun TvCatalogScreen(
                 }
             }
             uiState.errorMessage?.let { message ->
-                item(key = "error") {
+                item(key = "error", contentType = "error") {
                     TvErrorState(
                         message = message,
                         onAction = viewModel::retry,
@@ -334,7 +359,7 @@ fun TvCatalogScreen(
                 }
             }
             uiState.continueWatching?.takeIf { featuredContent?.source != TvFeaturedContentSource.CONTINUE_WATCHING }?.let { continueWatching ->
-                item(key = "continue-watching") {
+                item(key = "continue-watching", contentType = "continue") {
                     TvContinueWatchingBanner(
                         baseUrl = uiState.baseUrl,
                         data = continueWatching,
@@ -358,7 +383,13 @@ fun TvCatalogScreen(
                     )
                 }
             }
-            itemsIndexed(uiState.sections, key = { _, section -> section.title }) { _, section ->
+            itemsIndexed(
+                uiState.sections,
+                // section.title 由服务端透传、可能重名：带 index 兜底保证 key 唯一，
+                // 一次加载内 sections 不重排，index 稳定、滚动状态语义不变。
+                key = { index, section -> "section-$index-${section.title}" },
+                contentType = { _, _ -> "section" },
+            ) { _, section ->
                 TvCatalogSection(
                     baseUrl = uiState.baseUrl,
                     section = section,
@@ -369,7 +400,7 @@ fun TvCatalogScreen(
                 )
             }
             if (uiState.tvSeries.isNotEmpty()) {
-                item(key = "tv-series-shelf") {
+                item(key = "tv-series-shelf", contentType = "shelf") {
                     TvHomeShelf(
                         title = "电视剧",
                         wallKind = "tv",
@@ -383,7 +414,7 @@ fun TvCatalogScreen(
                 }
             }
             if (uiState.movies.isNotEmpty()) {
-                item(key = "movies-shelf") {
+                item(key = "movies-shelf", contentType = "shelf") {
                     TvHomeShelf(
                         title = "电影",
                         wallKind = "movie",
@@ -397,7 +428,7 @@ fun TvCatalogScreen(
                 }
             }
             if (uiState.av.isNotEmpty()) {
-                item(key = "av-shelf") {
+                item(key = "av-shelf", contentType = "shelf") {
                     TvHomeShelf(
                         title = "18+",
                         wallKind = "av",
@@ -410,11 +441,9 @@ fun TvCatalogScreen(
                     )
                 }
             }
-            item(key = "all-entry") {
+            item(key = "all-entry", contentType = "all-entry") {
                 TvHomeAllEntry(
-                    title = buildTvTypedHomeSections(uiState.kind, uiState.featured, uiState.recentWatching, uiState.recentUpdates)
-                        .last()
-                        .title,
+                    title = allEntryTitle,
                     subtitle = "查看当前分类的全部内容",
                     wallKind = uiState.kind,
                     onOpenCatalogWall = onOpenCatalogWall,
@@ -911,7 +940,10 @@ private fun TvFeaturedHero(
 
     val reduceMotion = rememberTvReduceMotionEnabled()
     val transition = rememberInfiniteTransition(label = "tvHeroKenBurns")
-    val progress by transition.animateFloat(
+    // 不用 by 解包：progress 保留 State 句柄、读取延后到 graphicsLayer 作用域，
+    // 让 120s Ken Burns 环境动效只驱动 backdrop 一层重绘，
+    // 不再逐帧重组整个 hero 子树（海报/文案/按钮）。
+    val progressState = transition.animateFloat(
         initialValue = 0f,
         targetValue = if (reduceMotion) 0f else 1f,
         animationSpec = infiniteRepeatable(
@@ -926,17 +958,9 @@ private fun TvFeaturedHero(
     val density = LocalDensity.current
     val panXPx = with(density) { TvHeroMotionTokens.PanOffsetXDp.toPx() }
     val panYPx = with(density) { TvHeroMotionTokens.PanOffsetYDp.toPx() }
-    val heroScale = if (reduceMotion) {
-        TvHeroMotionTokens.ScaleStaticTarget
-    } else {
-        lerp(
-            TvHeroMotionTokens.ScaleStart,
-            TvHeroMotionTokens.ScaleEnd,
-            progress,
-        )
-    }
-    val heroTranslationX = if (reduceMotion) 0f else lerp(-panXPx, panXPx, progress)
-    val heroTranslationY = if (reduceMotion) 0f else lerp(-panYPx, panYPx, progress)
+    val heroStaticScale = TvHeroMotionTokens.ScaleStaticTarget
+    val heroScaleStart = TvHeroMotionTokens.ScaleStart
+    val heroScaleEnd = TvHeroMotionTokens.ScaleEnd
 
     Surface(
         color = AppChrome.SurfaceElevated,
@@ -954,10 +978,16 @@ private fun TvFeaturedHero(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = heroScale
-                            scaleY = heroScale
-                            translationX = heroTranslationX
-                            translationY = heroTranslationY
+                            val progress = progressState.value
+                            val scale = if (reduceMotion) {
+                                heroStaticScale
+                            } else {
+                                lerp(heroScaleStart, heroScaleEnd, progress)
+                            }
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = if (reduceMotion) 0f else lerp(-panXPx, panXPx, progress)
+                            translationY = if (reduceMotion) 0f else lerp(-panYPx, panYPx, progress)
                         },
                     contentScale = ContentScale.Crop,
                 )
@@ -1270,7 +1300,9 @@ private fun TvCatalogSection(
                 )
             }
             if (section.items.isNotEmpty()) {
-                item(key = "${section.title}-more") {
+                // 每个 section 是独立 LazyRow，key 作用域不跨 section；
+                // 旧 "${section.title}-more" 在服务端返回重名 section 时无增益、还依赖可重复的 title。
+                item(key = "more") {
                     TvPosterMoreCard(
                         label = "查看更多",
                         onClick = { onOpenCatalogWall(resolveTvSectionWallKind(section.title), section.title) },

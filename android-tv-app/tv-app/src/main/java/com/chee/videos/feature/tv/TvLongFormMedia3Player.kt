@@ -404,8 +404,15 @@ internal fun TvLongFormMedia3Player(
     }
 
     LaunchedEffect(player, preparedSourceKey) {
+        // 250ms 是进度条刷新时基，不能降频；但暂停/缓冲态下快照恒定，
+        // 在发射端做结构相等去重，省掉下游逐 tick 的 State 写入与比较。
+        var lastEmitted: TvMedia3PlaybackSnapshot? = null
         while (preparedSourceKey.isNotBlank()) {
-            latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
+            val snapshot = player.readTvMedia3PlaybackSnapshot()
+            if (snapshot != lastEmitted) {
+                lastEmitted = snapshot
+                latestOnSnapshotChanged(snapshot)
+            }
             delay(250L)
         }
     }

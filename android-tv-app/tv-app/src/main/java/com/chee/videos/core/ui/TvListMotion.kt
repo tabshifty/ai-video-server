@@ -43,7 +43,9 @@ fun Modifier.tvStaggerEntry(index: Int): Modifier {
         }
         visible = true
     }
-    val progress by animateFloatAsState(
+    // 不用 by 解包：入场动画的 progress 读取延后到 graphicsLayer 作用域，
+    // 260ms 淡入期间只触发 layer 重绘，不再逐帧重组列表项（网格首屏多张卡同时入场时收益明显）。
+    val progressState = animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(
             durationMillis = TvListMotionTokens.StaggerEntryDurationMs,
@@ -55,6 +57,7 @@ fun Modifier.tvStaggerEntry(index: Int): Modifier {
         TvListMotionTokens.StaggerEntryDistanceDp.toPx()
     }
     return this.graphicsLayer {
+        val progress = progressState.value
         alpha = progress
         translationY = (1f - progress) * distancePx
     }

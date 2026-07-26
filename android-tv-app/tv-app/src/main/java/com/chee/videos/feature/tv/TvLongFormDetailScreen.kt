@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -333,8 +334,9 @@ private fun TvLongFormActorRow(actors: List<TvLongFormDetailActorUiModel>) {
             fontWeight = FontWeight.SemiBold,
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(actors.size) { index ->
-                TvLongFormActorAvatar(actor = actors[index])
+            // 补 key：演员名在展示层已去重（distinctBy lowercase），带 index 双保险防重复 key 崩溃
+            itemsIndexed(actors, key = { index, actor -> "actor-$index-${actor.name}" }) { _, actor ->
+                TvLongFormActorAvatar(actor = actor)
             }
         }
     }

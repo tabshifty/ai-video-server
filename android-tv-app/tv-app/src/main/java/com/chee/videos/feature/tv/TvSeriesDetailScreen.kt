@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -602,7 +603,9 @@ private fun TvSeriesCastRow(baseUrl: String, cast: List<TvSeriesCastUiModel>) {
             fontWeight = FontWeight.Normal,
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(cast.take(6), key = { it.id.ifBlank { it.name } }) { actor ->
+            // 演员可能出现空 id 且同名（mapper 只过滤空 name），旧 key `id.ifBlank { name }`
+            // 会因重复 key 直接崩溃；带 index 兜底保证唯一，单次详情加载内 cast 不重排。
+            itemsIndexed(cast.take(6), key = { index, actor -> "cast-$index-${actor.id}" }) { _, actor ->
                 TvSeriesCastItem(baseUrl = baseUrl, actor = actor)
             }
         }

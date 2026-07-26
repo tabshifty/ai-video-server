@@ -26,23 +26,23 @@ object AppChrome {
     val TextSubtle = Color(0xFF8D96A4)
     val Error = Color(0xFFFF8A7A)
 
-    val PageGradient: Brush
-        get() = Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF10161F),
-                CanvasRaised,
-                Canvas,
-            ),
-        )
+    // Brush 是不可变值对象，按 val 单例化：get() 属性会在每次读取时新建一个渐变实例，
+    // 使 background(AppChrome.PageGradient) 的 modifier 相等性失效并触发不必要的重绘。
+    val PageGradient: Brush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF10161F),
+            CanvasRaised,
+            Canvas,
+        ),
+    )
 
-    val HeroGradient: Brush
-        get() = Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF20180E),
-                Color(0xFF0A0D12),
-                Canvas,
-            ),
-        )
+    val HeroGradient: Brush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF20180E),
+            Color(0xFF0A0D12),
+            Canvas,
+        ),
+    )
 
     val RadiusDp: Dp = 8.dp
     val SurfaceShape: Shape = RoundedCornerShape(RadiusDp)

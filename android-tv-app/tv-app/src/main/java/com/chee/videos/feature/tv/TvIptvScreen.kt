@@ -429,7 +429,7 @@ private fun TvIptvChannelListOverlay(
                         modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
                     )
                 }
-                items(group.channels, key = { it.id }) { channel ->
+                items(group.channels, key = { "${group.group}-${it.id}" }) { channel ->
                     TvIptvChannelRow(
                         channel = channel,
                         focused = channel.id == focusedChannelId,

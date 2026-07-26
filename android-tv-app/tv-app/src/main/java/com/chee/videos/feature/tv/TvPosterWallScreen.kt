@@ -206,6 +206,8 @@ fun TvPosterWallScreen(
                     itemsIndexed(
                         uiState.items,
                         key = { _, item -> item.id },
+                        // N 张海报卡显式同型，避免与 refreshing/error/loadingMore 头尾项混用组合槽
+                        contentType = { _, _ -> "poster" },
                     ) { index, item ->
                         val focusModifier = if (uiState.page == 1 && uiState.items.firstOrNull()?.id == item.id) {
                             Modifier.focusRequester(firstItemFocusRequester)

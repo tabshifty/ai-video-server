@@ -92,7 +92,9 @@ fun Modifier.tvFocusableScaleOnly(
     var isFocused by remember { mutableStateOf(false) }
     var isPressed by remember { mutableStateOf(false) }
     val view = LocalView.current
-    val scale by animateFloatAsState(
+    // 不用 by 解包：保留 State 句柄，把读取延后到 graphicsLayer 作用域，
+    // 弹簧收敛期间只触发 layer 重绘、不再逐帧重组挂载该 modifier 的节点。
+    val scaleState = animateFloatAsState(
         targetValue = resolveTvFocusableScaleTarget(
             focused = isFocused,
             pressed = isPressed,
@@ -121,6 +123,7 @@ fun Modifier.tvFocusableScaleOnly(
             false
         }
         .graphicsLayer {
+            val scale = scaleState.value
             scaleX = scale
             scaleY = scale
         }
