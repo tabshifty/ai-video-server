@@ -127,8 +127,14 @@ fun TvIptvScreen(
     }
 
     DisposableEffect(vlcPlayer) {
+        // LibVLC 事件回调来自原生线程，统一 post 回主线程消费；released 守卫 + 退出时清空
+        // Handler 消息队列，确保迟到的事件回调不会在 release() 之后触碰已释放的原生播放器。
+        var released = false
         val listener = MediaPlayer.EventListener { event ->
             mainHandler.post {
+                if (released) {
+                    return@post
+                }
                 Log.i(
                     IPTV_LOG_TAG,
                     "event=${event.type} vout=${event.getVoutCount()} " +
@@ -156,7 +162,9 @@ fun TvIptvScreen(
         }
         vlcPlayer.setEventListener(listener)
         onDispose {
+            released = true
             vlcPlayer.setEventListener(null)
+            mainHandler.removeCallbacksAndMessages(null)
             vlcPlayer.release()
         }
     }
@@ -267,6 +275,8 @@ fun TvIptvScreen(
         DisposableEffect(vlcPlayer) {
             val currentPlayer = vlcPlayer
             onDispose {
+                // 本 effect 注册晚于持有 release() 的外层 effect，Compose 按注册逆序销毁，
+                // 因此 detachViews() 必然先于 release() 执行；视图解绑独立于播放器释放（既有决策）。
                 currentPlayer.detachViews()
             }
         }

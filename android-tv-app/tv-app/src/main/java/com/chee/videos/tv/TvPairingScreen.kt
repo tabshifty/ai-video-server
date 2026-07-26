@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -25,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.ViewModel
@@ -40,6 +44,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -59,6 +64,14 @@ class TvPairingViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(TvPairingUiState())
     val uiState: StateFlow<TvPairingUiState> = _uiState.asStateFlow()
+
+    // 前台可见性门控：应用退到后台（ON_STOP）时挂起配对轮询，回到前台自动续跑，
+    // 避免后台常驻网络轮询空耗电量与连接。
+    private val pollingAllowed = MutableStateFlow(true)
+
+    fun setPollingAllowed(allowed: Boolean) {
+        pollingAllowed.value = allowed
+    }
 
     fun startPairing() {
         viewModelScope.launch {
@@ -93,6 +106,8 @@ class TvPairingViewModel @Inject constructor(
         viewModelScope.launch {
             while (true) {
                 delay((payload.pollIntervalSeconds.coerceAtLeast(3) * 1000).toLong())
+                // 后台期间挂起在此处，恢复前台后才继续请求配对状态
+                pollingAllowed.first { it }
                 val result = repository.fetchSession(payload.sessionId)
                 result.onSuccess { session ->
                     when (session.status) {
@@ -133,6 +148,24 @@ fun TvPairingScreen(
     LaunchedEffect(Unit) {
         if (uiState.sessionId.isBlank()) {
             viewModel.startPairing()
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        // 对齐 TvShellApp 对远程协调器的门控方式：前台恢复轮询、后台挂起轮询
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> viewModel.setPollingAllowed(true)
+                Lifecycle.Event.ON_STOP -> viewModel.setPollingAllowed(false)
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            // 离开屏幕时恢复默认放行，避免共享 ViewModel 实例残留挂起状态
+            viewModel.setPollingAllowed(true)
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
     LaunchedTvInitialFocus(uiState.loading, uiState.sessionId, uiState.errorMessage) {
