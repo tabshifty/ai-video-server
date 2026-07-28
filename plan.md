@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-28 14:31 +0800
+- 进度：按用户决定废弃尚未实施的“TV 长视频播放器交互模型重构”设计与实施计划。删除原设计文档和实施计划，不修改当前 TV 播放器代码、既有交互契约或版本号；原始内容仍可通过历史提交 `468a177`、`898f10d` 追溯。
+- 影响文件：删除原 TV 长视频播放器交互模型设计文档与实施计划；更新 `plan.md`。
+- 验证：文档变更，不执行 App 构建；已确认目标文件删除，`git diff --check` 通过，`plan.md` 无 Unicode 替换字符。
+
 ## 2026-07-26 19:16 +0800
 - 进度：完成 TV 整体优化的子代理独立评审与修复。评审确认三批改动整体成立（defer-read 实现正确且视觉逐位一致、IPTV 生命周期无残留触碰路径、Compose 逆序销毁保证 detach 先于 release、共享按钮 fillMaxWidth 居中语义等效、启动器资源语法有效、规约无违例），并发现 3 个阻塞问题，全部修复：①`TvRemoteCoordinatorViewModel` dismiss 任务的 finally 清理与批量取消组合在 Main.immediate 下会 ConcurrentModificationException 崩溃且可能误删/残留任务——改为 `launch(start = LAZY)` 先登记再启动、finally 用 `remove(sessionId, coroutineContext[Job])` 身份校验、批量取消遍历 `values.toList()` 快照；②共享 `TvActionButton` 把 `enabled` 传给焦点修饰器导致长视频详情「暂无片源」时主按钮不可聚焦、整页无焦点落点——新增 `focusableWhenDisabled=true` 默认保持禁用可聚焦，连接页薄封装传 false 保留旧行为；③`respectCacheHeaders(false)` 的「缩略图 URL 带版本」前提经核实为假（`/api/v1/videos/{id}/thumbnail` 无版本参数），会导致封面重刮削后永久旧图——移除该配置并在 spec 测试中反向禁止。另采纳非阻塞建议：磁盘缓存目录沿用 Coil 默认名 `image_cache` 复用既有目录、目录 more 卡键改 `__more__` 防撞。遗留非阻塞项（记录待后续/真机验收）：IPTV 选中行台标底色对比、禁用按钮不透明底、自适应图标字形圆形遮罩边缘、`TvIptvPlayerViewLayoutTest` 整文件负向断言脆弱性。TV 版本 140→141。
 - 影响文件：`tv/TvRemoteCoordinatorViewModel.kt`、`core/ui/TvActionButton.kt`、`feature/connection/ConnectionScreen.kt`、`VideoApp.kt`、`feature/tv/TvCatalogScreen.kt`、`tv-app/build.gradle.kts`、`src/test/.../tv/TvRemoteCoordinatorLifecycleSpecTest.kt`、`src/test/.../TvImageLoaderFactorySpecTest.kt`、`CONTEXT.md`（修正 Coil 条目错误依据、补充 dismiss 并发口径）、`plan.md`。未跟踪 `.superpowers/` 保持原样且不读取、不修改、不纳入提交。
