@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-29 10:00 +0800
+- 进度：完成 `115-open-platform` Skill。已整理官方 38 篇文档的分类直达索引，记录授权码、手机扫码 PKCE、令牌旋转、Bearer 请求、频控与安全约束；长期契约已写入 `CONTEXT.md`。
+- 影响文件：`.codex/skills/115-open-platform/SKILL.md`、`.codex/skills/115-open-platform/agents/openai.yaml`、`.codex/skills/115-open-platform/references/authentication.md`、`.codex/skills/115-open-platform/references/official-doc-index.md`、`CONTEXT.md`、`plan.md`。
+- 验证：Skill `quick_validate.py` 通过；索引 38 个官方直达链接均返回 HTTP 200；`git diff --check` 通过；本次 Markdown 与 Skill 无 Unicode 替换字符。未跟踪 `docs/examples/115LocalNatManager/` 保持原状，不纳入本次提交。
+
+## 2026-07-29 09:54 +0800
+- 进度：开始整理 115 生活开放平台官方文档，新增仓库级 `115-open-platform` Skill；保留官方文档直达索引、OAuth 授权/令牌刷新契约与实施前回查流程，不复制整站易过期内容。
+- 影响文件：`.codex/skills/115-open-platform/` 、`CONTEXT.md`、`plan.md`。
+- 验证：待执行 Skill `quick_validate.py`、`git diff --check` 与 Unicode 替换字符扫描；官方文档目录于 2026-07-29 查阅。
+
 ## 2026-07-28 14:31 +0800
 - 进度：按用户决定废弃尚未实施的“TV 长视频播放器交互模型重构”设计与实施计划。删除原设计文档和实施计划，不修改当前 TV 播放器代码、既有交互契约或版本号；原始内容仍可通过历史提交 `468a177`、`898f10d` 追溯。
 - 影响文件：删除原 TV 长视频播放器交互模型设计文档与实施计划；更新 `plan.md`。
