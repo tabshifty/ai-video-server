@@ -60,17 +60,18 @@ class TvMedia3TrackSupportTest {
     }
 
     @Test
-    fun media3TrackPickerIsSharedBySingleAndSeriesRoutes() {
-        val picker = Path.of("src/main/java/com/chee/videos/feature/tv/TvMedia3TrackPickerLayer.kt").toFile().readText()
+    fun media3TrackPanelsAreOwnedBySharedLongFormChrome() {
+        val chrome = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlaybackChrome.kt").toFile().readText()
         val single = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").toFile().readText()
         val series = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").toFile().readText()
 
-        assertTrue(picker.contains("internal enum class TvMedia3TrackPickerKind"))
-        assertTrue(picker.contains("TvSubtitlePickerDialog("))
-        assertTrue(picker.contains("TvAudioTrackPickerDialog("))
-        assertTrue(single.contains("TvMedia3TrackPickerLayer("))
-        assertTrue(series.contains("TvMedia3TrackPickerLayer("))
-        assertFalse("共享弹层不应继续私有在剧集页面里", series.contains("private fun TvMedia3TrackPickerLayer"))
+        assertTrue(chrome.contains("TvLongFormInteractionMode.SubtitlePanel"))
+        assertTrue(chrome.contains("TvLongFormInteractionMode.AudioPanel"))
+        assertTrue(chrome.contains("TvLongFormRightPanel("))
+        assertTrue(single.contains("TvLongFormPlaybackChrome("))
+        assertTrue(series.contains("TvLongFormPlaybackChrome("))
+        assertFalse(single.contains("TvMedia3TrackPickerLayer("))
+        assertFalse(series.contains("TvMedia3TrackPickerLayer("))
     }
 
     @Test
@@ -91,8 +92,7 @@ class TvMedia3TrackSupportTest {
 
         assertFalse("DV 返回详情不应再保留 App 层黑色遮罩组件", cover.exists())
         listOf(single, series).forEach { source ->
-            assertTrue(source.contains("fun handlePlaybackBack()"))
-            assertTrue(source.contains("TvPlayerBackAction.Exit ->"))
+            assertTrue(source.contains("onExitPlayback = onBack"))
             assertFalse(source.contains("pendingDvExitToDetail"))
             assertFalse(source.contains("TvDolbyVisionExitToDetailCover"))
             assertFalse(source.contains("TvDolbyVisionExitToDetailCoverDelayMillis"))

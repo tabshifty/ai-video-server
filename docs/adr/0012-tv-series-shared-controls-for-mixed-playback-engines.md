@@ -1,6 +1,6 @@
 # TV 电视剧播放器用共享控制层承载混合播放内核
 
-> 状态：前提已被 `0013-tv-long-form-exoplayer-unification.md` 更新。共享控制层仍然有效，但“普通分集 LibVLC、DV 分集 Media3”的混合内核前提将随 TV 长视频统一 ExoPlayer 迁移撤销。
+> 状态：已被 `0018-tv-long-form-ott-playback-session.md` 取代。`0013-tv-long-form-exoplayer-unification.md` 先撤销了混合内核前提，`0018` 进一步把电视剧专属共享控制层升级为电影、`18+` 与电视剧共用的统一播放会话和能力驱动控制层。
 
 电视剧播放器允许同一部剧内的不同分集按播放安全策略选择不同内核：普通非 DV 分集继续走 LibVLC，满足门控的 DV 分集走 Media3/ExoPlayer 专用链路。为避免用户在选集、连播、续播和遥控操作上感知到两个播放器，本决策把电视剧核心互动抽成共享控制层，由 LibVLC 和 Media3 分别做播放内核适配；这不是恢复通用 Player fallback，也不允许 DV 分集失败后回退 LibVLC 强行播放。
 

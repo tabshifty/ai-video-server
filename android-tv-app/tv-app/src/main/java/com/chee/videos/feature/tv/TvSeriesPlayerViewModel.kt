@@ -15,8 +15,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-private val supportedPlaybackSpeeds = listOf(1f, 1.25f, 1.5f, 2f)
-
 data class TvSeriesPlayerUiState(
     val loading: Boolean = true,
     val series: TvSeriesUiModel? = null,
@@ -28,7 +26,6 @@ data class TvSeriesPlayerUiState(
     val selectedSubtitleTrackId: String? = null,
     val selectedAudioTrackId: String? = null,
     val selectedAudioPreference: TvTrackPreference? = null,
-    val playbackSpeed: Float = 1f,
     val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
     val autoplayEnabled: Boolean = TvSeriesAutoplaySetting.DEFAULT_ENABLED,
     val autoplayCanceledForCurrentEpisode: Boolean = false,
@@ -77,6 +74,8 @@ class TvSeriesPlayerViewModel @Inject constructor(
     private val seriesId = decodeTvRouteArg(savedStateHandle.get<String>(TvSeriesIdArg))
     private val requestedSeason = savedStateHandle.get<Int>(TvSeasonArg)
     private val requestedEpisode = savedStateHandle.get<Int>(TvEpisodeArg)
+    private val requestedStartFromBeginning =
+        savedStateHandle.get<Boolean>(TvLongFormStartFromBeginningArg) ?: false
 
     private val _uiState = MutableStateFlow(TvSeriesPlayerUiState())
     val uiState: StateFlow<TvSeriesPlayerUiState> = _uiState.asStateFlow()
@@ -88,14 +87,6 @@ class TvSeriesPlayerViewModel @Inject constructor(
 
     fun retry() {
         load()
-    }
-
-    fun cycleSpeed() {
-        _uiState.update { state ->
-            val currentIndex = supportedPlaybackSpeeds.indexOf(state.playbackSpeed).coerceAtLeast(0)
-            val nextSpeed = supportedPlaybackSpeeds[(currentIndex + 1) % supportedPlaybackSpeeds.size]
-            state.copy(playbackSpeed = nextSpeed)
-        }
     }
 
     fun setSelectorVisible(visible: Boolean) {
@@ -209,25 +200,17 @@ class TvSeriesPlayerViewModel @Inject constructor(
     }
 
     fun selectSubtitleTrack(subtitleTrackId: String?) {
-        val currentVideoId = _uiState.value.currentVideoId
-        if (currentVideoId.isBlank()) {
-            return
-        }
         val selectedTrack = activeEpisode(_uiState.value)
             ?.subtitleTracks
             ?.firstOrNull { it.id == subtitleTrackId }
         val preference = buildSubtitleTrackPreference(selectedTrack)
         _uiState.update { it.copy(selectedSubtitleTrackId = subtitleTrackId ?: "") }
         viewModelScope.launch {
-            repository.saveTvSubtitlePreference(currentVideoId, preference)
+            repository.saveTvSubtitlePreference(preference)
         }
     }
 
     fun selectAudioTrack(audioTrackId: String?, preference: TvTrackPreference?) {
-        val currentVideoId = _uiState.value.currentVideoId
-        if (currentVideoId.isBlank()) {
-            return
-        }
         _uiState.update {
             it.copy(
                 selectedAudioTrackId = audioTrackId ?: "",
@@ -235,7 +218,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            repository.saveTvAudioPreference(currentVideoId, preference)
+            repository.saveTvAudioPreference(preference)
         }
     }
 
@@ -269,12 +252,11 @@ class TvSeriesPlayerViewModel @Inject constructor(
                         selectedEpisodeNumber = resolvedEpisode?.number ?: 1,
                         activeSeasonNumber = resolvedSeason?.number ?: 1,
                         activeEpisodeNumber = resolvedEpisode?.number ?: 1,
-                        playbackSpeed = 1f,
                         tvSeekStepSeconds = tvSeekStepSeconds,
                         autoplayEnabled = autoplayEnabled,
                         autoplayCanceledForCurrentEpisode = false,
                         pendingEndOverlayKind = null,
-                        startCurrentEpisodeFromBeginning = false,
+                        startCurrentEpisodeFromBeginning = requestedStartFromBeginning,
                         selectorVisible = false,
                         errorMessage = null,
                     )
@@ -319,103 +301,69 @@ class TvSeriesPlayerViewModel @Inject constructor(
         val state = _uiState.value
         val episode = selectedEpisode(state)
         if (episode == null || !episode.playable || episode.videoId.isBlank()) {
-            val hasActivePlayback = state.currentSourceUrl.isNotBlank()
             _uiState.update { currentState ->
-                if (hasActivePlayback) {
-                    currentState.copy(
-                        selectedSeasonNumber = currentState.activeSeasonNumber,
-                        selectedEpisodeNumber = currentState.activeEpisodeNumber,
-                        playbackPreparing = false,
-                        playbackBlockedMessage = null,
-                        episodeSwitchState = TvEpisodeSwitchUiState.Failed(
-                            targetSeasonNumber = state.selectedSeasonNumber,
-                            targetEpisodeNumber = state.selectedEpisodeNumber,
-                            message = "当前分集暂无可播放视频",
-                        ),
-                        startCurrentEpisodeFromBeginning = false,
-                    )
-                } else {
-                    currentState.copy(
-                        activeSeasonNumber = episode?.let { state.selectedSeasonNumber } ?: currentState.activeSeasonNumber,
-                        activeEpisodeNumber = episode?.let { state.selectedEpisodeNumber } ?: currentState.activeEpisodeNumber,
-                        currentVideoId = episode?.videoId.orEmpty(),
-                        currentSourceUrl = "",
-                        selectedSubtitleTrackId = null,
-                        selectedAudioTrackId = null,
-                        selectedAudioPreference = null,
-                        canPlayCurrentEpisode = false,
-                        playbackPreparing = false,
-                        playbackBlockedMessage = "当前分集暂无可播放视频",
-                        episodeSwitchState = null,
-                    )
-                }
-            }
-            return
-        }
-        val candidateDecision = resolveTvPlaybackCandidateDecision(episode.metadata)
-        if (!candidateDecision.allowed) {
-            val hasActivePlayback = state.currentSourceUrl.isNotBlank()
-            _uiState.update { currentState ->
-                if (hasActivePlayback) {
-                    currentState.copy(
-                        selectedSeasonNumber = currentState.activeSeasonNumber,
-                        selectedEpisodeNumber = currentState.activeEpisodeNumber,
-                        playbackPreparing = false,
-                        playbackBlockedMessage = null,
-                        episodeSwitchState = TvEpisodeSwitchUiState.Failed(
-                            targetSeasonNumber = state.selectedSeasonNumber,
-                            targetEpisodeNumber = state.selectedEpisodeNumber,
-                            message = candidateDecision.blockMessage ?: "当前分集暂无可播放视频",
-                        ),
-                        startCurrentEpisodeFromBeginning = false,
-                    )
-                } else {
-                    currentState.copy(
-                        activeSeasonNumber = state.selectedSeasonNumber,
-                        activeEpisodeNumber = state.selectedEpisodeNumber,
-                        currentVideoId = episode.videoId,
-                        currentSourceUrl = "",
-                        selectedSubtitleTrackId = null,
-                        selectedAudioTrackId = null,
-                        selectedAudioPreference = null,
-                        canPlayCurrentEpisode = false,
-                        playbackPreparing = false,
-                        playbackBlockedMessage = candidateDecision.blockMessage,
-                        episodeSwitchState = null,
-                    )
-                }
-            }
-            return
-        }
-        val hasActivePlayback = state.currentSourceUrl.isNotBlank()
-        _uiState.update {
-            if (hasActivePlayback) {
-                it.copy(
-                    playbackPreparing = true,
-                    playbackBlockedMessage = null,
-                    episodeSwitchState = TvEpisodeSwitchUiState.Preparing(
-                        targetSeasonNumber = state.selectedSeasonNumber,
-                        targetEpisodeNumber = state.selectedEpisodeNumber,
-                    ),
-                )
-            } else {
-                it.copy(
+                currentState.copy(
                     activeSeasonNumber = state.selectedSeasonNumber,
                     activeEpisodeNumber = state.selectedEpisodeNumber,
-                    currentVideoId = "",
+                    currentVideoId = episode?.videoId.orEmpty(),
                     currentSourceUrl = "",
                     selectedSubtitleTrackId = null,
                     selectedAudioTrackId = null,
                     selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
-                    playbackPreparing = true,
-                    playbackBlockedMessage = null,
-                    episodeSwitchState = TvEpisodeSwitchUiState.Preparing(
+                    playbackPreparing = false,
+                    playbackBlockedMessage = "当前分集暂无可播放视频",
+                    episodeSwitchState = TvEpisodeSwitchUiState.Failed(
                         targetSeasonNumber = state.selectedSeasonNumber,
                         targetEpisodeNumber = state.selectedEpisodeNumber,
+                        message = "当前分集暂无可播放视频",
                     ),
+                    startCurrentEpisodeFromBeginning = false,
                 )
             }
+            return
+        }
+        val candidateDecision = resolveTvPlaybackCandidateDecision(episode.metadata)
+        if (!candidateDecision.allowed) {
+            _uiState.update { currentState ->
+                currentState.copy(
+                    activeSeasonNumber = state.selectedSeasonNumber,
+                    activeEpisodeNumber = state.selectedEpisodeNumber,
+                    currentVideoId = episode.videoId,
+                    currentSourceUrl = "",
+                    selectedSubtitleTrackId = null,
+                    selectedAudioTrackId = null,
+                    selectedAudioPreference = null,
+                    canPlayCurrentEpisode = false,
+                    playbackPreparing = false,
+                    playbackBlockedMessage = candidateDecision.blockMessage,
+                    episodeSwitchState = TvEpisodeSwitchUiState.Failed(
+                        targetSeasonNumber = state.selectedSeasonNumber,
+                        targetEpisodeNumber = state.selectedEpisodeNumber,
+                        message = candidateDecision.blockMessage ?: "当前分集暂无可播放视频",
+                    ),
+                    startCurrentEpisodeFromBeginning = false,
+                )
+            }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                activeSeasonNumber = state.selectedSeasonNumber,
+                activeEpisodeNumber = state.selectedEpisodeNumber,
+                currentVideoId = episode.videoId,
+                currentSourceUrl = "",
+                selectedSubtitleTrackId = null,
+                selectedAudioTrackId = null,
+                selectedAudioPreference = null,
+                canPlayCurrentEpisode = false,
+                playbackPreparing = true,
+                playbackBlockedMessage = null,
+                episodeSwitchState = TvEpisodeSwitchUiState.Preparing(
+                    targetSeasonNumber = state.selectedSeasonNumber,
+                    targetEpisodeNumber = state.selectedEpisodeNumber,
+                ),
+            )
         }
         viewModelScope.launch {
             val sourceResult = try {
@@ -425,9 +373,9 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 )
                 val preferredSubtitleTrackId = resolveSelectedSubtitleTrackByPreference(
                     tracks = episode.subtitleTracks,
-                    preference = repository.readTvSubtitlePreference(episode.videoId),
+                    preference = repository.readTvSubtitlePreference(),
                 )?.id
-                val preferredAudioPreference = repository.readTvAudioPreference(episode.videoId)
+                val preferredAudioPreference = repository.readTvAudioPreference()
                 TvSeriesPlaybackSourceResult.Ready(
                     sourceUrl = sourceUrl,
                     preferredSubtitleTrackId = preferredSubtitleTrackId,
@@ -448,8 +396,6 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 }
                 when (sourceResult) {
                     is TvSeriesPlaybackSourceResult.Ready -> it.copy(
-                        activeSeasonNumber = it.selectedSeasonNumber,
-                        activeEpisodeNumber = it.selectedEpisodeNumber,
                         currentVideoId = episode.videoId,
                         currentSourceUrl = sourceResult.sourceUrl,
                         selectedSubtitleTrackId = sourceResult.preferredSubtitleTrackId,
@@ -465,38 +411,22 @@ class TvSeriesPlayerViewModel @Inject constructor(
                         ),
                     )
 
-                    is TvSeriesPlaybackSourceResult.Failed -> {
-                        val hadActivePlayback = it.currentSourceUrl.isNotBlank()
-                        if (hadActivePlayback) {
-                            it.copy(
-                                selectedSeasonNumber = it.activeSeasonNumber,
-                                selectedEpisodeNumber = it.activeEpisodeNumber,
-                                playbackPreparing = false,
-                                playbackBlockedMessage = null,
-                                episodeSwitchState = TvEpisodeSwitchUiState.Failed(
-                                    targetSeasonNumber = state.selectedSeasonNumber,
-                                    targetEpisodeNumber = state.selectedEpisodeNumber,
-                                    message = sourceResult.message,
-                                ),
-                                startCurrentEpisodeFromBeginning = false,
-                            )
-                        } else {
-                            it.copy(
-                                activeSeasonNumber = it.selectedSeasonNumber,
-                                activeEpisodeNumber = it.selectedEpisodeNumber,
-                                currentVideoId = episode.videoId,
-                                currentSourceUrl = "",
-                                selectedSubtitleTrackId = null,
-                                selectedAudioTrackId = null,
-                                selectedAudioPreference = null,
-                                canPlayCurrentEpisode = false,
-                                playbackPreparing = false,
-                                playbackBlockedMessage = sourceResult.message,
-                                episodeSwitchState = null,
-                                startCurrentEpisodeFromBeginning = false,
-                            )
-                        }
-                    }
+                    is TvSeriesPlaybackSourceResult.Failed -> it.copy(
+                        currentVideoId = episode.videoId,
+                        currentSourceUrl = "",
+                        selectedSubtitleTrackId = null,
+                        selectedAudioTrackId = null,
+                        selectedAudioPreference = null,
+                        canPlayCurrentEpisode = false,
+                        playbackPreparing = false,
+                        playbackBlockedMessage = sourceResult.message,
+                        episodeSwitchState = TvEpisodeSwitchUiState.Failed(
+                            targetSeasonNumber = state.selectedSeasonNumber,
+                            targetEpisodeNumber = state.selectedEpisodeNumber,
+                            message = sourceResult.message,
+                        ),
+                        startCurrentEpisodeFromBeginning = false,
+                    )
                 }
             }
         }

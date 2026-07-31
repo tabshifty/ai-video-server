@@ -25,14 +25,13 @@ class TvAutoplayPromptCardSpecTest {
         assertTrue(prompt.contains("AppChrome.SurfaceShape"))
         assertTrue(prompt.contains("LaunchedTvInitialFocus("))
         assertTrue(prompt.contains("tryRequestFocus()"))
+        assertTrue(prompt.contains("观看片尾"))
         assertFalse(prompt.contains("RoundedCornerShape("))
         assertFalse(prompt.contains("tween("))
 
-        assertTrue(overlay.contains("TvMotionTokens.DurationStandardMs"))
-        assertTrue(overlay.contains("TvMotionTokens.EasingStandard"))
-        assertTrue(overlay.contains("AppChrome.SurfaceShape"))
-        assertTrue(overlay.contains("LaunchedTvInitialFocus("))
-        assertTrue(overlay.contains("tryRequestFocus()"))
+        assertTrue(overlay.contains("TvLongFormCompletionOverlay("))
+        assertTrue(overlay.contains("onBackToDetail = onBackToDetail"))
+        assertTrue(overlay.contains("\"重播本集\""))
         assertFalse(overlay.contains("RoundedCornerShape("))
         assertFalse(overlay.contains("tween("))
     }

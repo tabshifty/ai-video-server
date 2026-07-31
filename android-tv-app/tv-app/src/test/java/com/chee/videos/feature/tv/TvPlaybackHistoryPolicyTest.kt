@@ -7,19 +7,25 @@ import org.junit.Test
 
 class TvPlaybackHistoryPolicyTest {
     @Test
-    fun watchSnapshot_convertsPositionAndDetectsCompletionNearEnd() {
-        val snapshot = tvPlaybackHistorySnapshot(positionMs = 117_900L, durationMs = 120_000L)
+    fun watchSnapshot_convertsPositionAndDetectsCompletionInsideFinalFivePercent() {
+        val snapshot = tvPlaybackHistorySnapshot(positionMs = 114_000L, durationMs = 120_000L)
 
-        assertEquals(117, snapshot.watchSeconds)
+        assertEquals(114, snapshot.watchSeconds)
         assertTrue(snapshot.completed)
     }
 
     @Test
-    fun watchSnapshot_doesNotCompleteWhenMoreThanThreeSecondsRemain() {
-        val snapshot = tvPlaybackHistorySnapshot(positionMs = 116_900L, durationMs = 120_000L)
+    fun watchSnapshot_doesNotCompleteBeforeFinalFivePercent() {
+        val snapshot = tvPlaybackHistorySnapshot(positionMs = 113_999L, durationMs = 120_000L)
 
-        assertEquals(116, snapshot.watchSeconds)
+        assertEquals(113, snapshot.watchSeconds)
         assertFalse(snapshot.completed)
+    }
+
+    @Test
+    fun watchSnapshot_capsCompletionWindowAtFiveMinutesForLongContent() {
+        assertFalse(tvPlaybackHistorySnapshot(positionMs = 10_260_000L, durationMs = 10_800_000L).completed)
+        assertTrue(tvPlaybackHistorySnapshot(positionMs = 10_500_000L, durationMs = 10_800_000L).completed)
     }
 
     @Test
@@ -89,14 +95,29 @@ class TvPlaybackHistoryPolicyTest {
     }
 
     @Test
-    fun shouldReportHistory_ignoresBlankVideoAndZeroProgress() {
+    fun shouldReportHistory_ignoresBlankVideoAndShortTrialPlayback() {
         assertFalse(shouldReportHistory(videoId = "", watchSeconds = 12))
         assertFalse(shouldReportHistory(videoId = "video-1", watchSeconds = 0))
-        assertTrue(shouldReportHistory(videoId = "video-1", watchSeconds = 1))
+        assertFalse(shouldReportHistory(videoId = "video-1", watchSeconds = 29))
+        assertTrue(shouldReportHistory(videoId = "video-1", watchSeconds = 30))
+    }
+
+    @Test
+    fun completedPlaybackIsReportedEvenWhenContentIsShorterThanResumeThreshold() {
+        assertFalse(shouldSubmitTvPlaybackHistory(videoId = "video-1", watchSeconds = 29, completed = false))
+        assertTrue(shouldSubmitTvPlaybackHistory(videoId = "video-1", watchSeconds = 29, completed = true))
+        assertFalse(shouldSubmitTvPlaybackHistory(videoId = "", watchSeconds = 29, completed = true))
     }
 
     @Test
     fun periodicHistoryReportInterval_isFifteenSeconds() {
         assertEquals(15_000L, TvPeriodicHistoryReportIntervalMillis)
+    }
+
+    @Test
+    fun continuePlaybackIsOfferedOnlyInsideEffectiveResumeWindow() {
+        assertFalse(shouldOfferTvLongFormContinuePlayback(watchSeconds = 29, durationSeconds = 3_600))
+        assertTrue(shouldOfferTvLongFormContinuePlayback(watchSeconds = 30, durationSeconds = 3_600))
+        assertFalse(shouldOfferTvLongFormContinuePlayback(watchSeconds = 3_420, durationSeconds = 3_600))
     }
 }

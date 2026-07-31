@@ -84,14 +84,14 @@ class DetailViewModelTest {
         val api = FakeDetailApiService()
         val viewModel = buildDetailViewModel(api, backgroundScope)
 
-        assertEquals(null, viewModel.readTvAudioPreference("video-1"))
+        assertEquals(null, viewModel.readTvAudioPreference())
 
         val preference = TvTrackPreference(language = "zh", type = "default")
-        viewModel.saveTvAudioPreference("video-1", preference)
+        viewModel.saveTvAudioPreference(preference)
         mainDispatcherRule.scheduler.runCurrent()
         advanceUntilIdle()
 
-        assertEquals(preference, viewModel.readTvAudioPreference("video-1"))
+        assertEquals(preference, viewModel.readTvAudioPreference())
     }
 
     @Test

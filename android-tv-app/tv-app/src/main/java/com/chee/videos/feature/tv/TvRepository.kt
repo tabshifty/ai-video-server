@@ -34,10 +34,10 @@ interface TvRepository {
     suspend fun readActiveBaseUrl(): String?
     suspend fun buildSourceUrl(videoId: String, profile: String? = null): String
     suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean)
-    suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference?
-    suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?)
-    suspend fun readTvAudioPreference(videoId: String): TvTrackPreference?
-    suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?)
+    suspend fun readTvSubtitlePreference(): TvTrackPreference?
+    suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?)
+    suspend fun readTvAudioPreference(): TvTrackPreference?
+    suspend fun saveTvAudioPreference(preference: TvTrackPreference?)
     suspend fun readTvSeekStepSeconds(): Int
     suspend fun saveTvSeekStepSeconds(seconds: Int)
     suspend fun readTvSeriesAutoplayEnabled(): Boolean?
@@ -100,18 +100,18 @@ class NetworkTvRepository @Inject constructor(
         videoRepository.reportHistory(videoId, watchSeconds, completed)
     }
 
-    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? =
-        videoRepository.readTvSubtitlePreference(videoId)
+    override suspend fun readTvSubtitlePreference(): TvTrackPreference? =
+        videoRepository.readTvSubtitlePreference()
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
-        videoRepository.saveTvSubtitlePreference(videoId, preference)
+    override suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) {
+        videoRepository.saveTvSubtitlePreference(preference)
     }
 
-    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? =
-        videoRepository.readTvAudioPreference(videoId)
+    override suspend fun readTvAudioPreference(): TvTrackPreference? =
+        videoRepository.readTvAudioPreference()
 
-    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
-        videoRepository.saveTvAudioPreference(videoId, preference)
+    override suspend fun saveTvAudioPreference(preference: TvTrackPreference?) {
+        videoRepository.saveTvAudioPreference(preference)
     }
 
     override suspend fun readTvSeekStepSeconds(): Int =

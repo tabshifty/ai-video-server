@@ -56,6 +56,7 @@ import com.chee.videos.feature.tv.TvEpisodeArg
 import com.chee.videos.feature.tv.TvCatalogWallKindArg
 import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
 import com.chee.videos.feature.tv.TvCatalogWallTitleArg
+import com.chee.videos.feature.tv.TvLongFormStartFromBeginningArg
 import com.chee.videos.feature.tv.TvPlayerRoutePattern
 import com.chee.videos.feature.tv.TvSeasonArg
 import com.chee.videos.feature.tv.TvSeriesDetailScreen
@@ -317,8 +318,10 @@ private fun AuthenticatedNav(
             ) {
                 TvSeriesDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onPlayEpisode = { seriesId, season, episode ->
-                        navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
+                    onPlayEpisode = { seriesId, season, episode, startFromBeginning ->
+                        navController.navigate(
+                            buildTvPlayerRoute(seriesId, season, episode, startFromBeginning),
+                        )
                     },
                 )
             }
@@ -354,6 +357,10 @@ private fun AuthenticatedNav(
                     navArgument(TvEpisodeArg) {
                         type = NavType.IntType
                         defaultValue = 1
+                    },
+                    navArgument(TvLongFormStartFromBeginningArg) {
+                        type = NavType.BoolType
+                        defaultValue = false
                     },
                 ),
             ) {

@@ -64,13 +64,16 @@ class TvLongFormTitleOverlaySpecTest {
     @Test
     fun tvSeriesCallSitePassesSeriesAndEpisodeMetadata() {
         val source = readSource("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt")
-        val call = source.substringAfter("TvSeriesCorePlaybackOverlay(").substringBefore("TvAutoplayPromptCard(")
+        val call = source.substringAfter("TvLongFormPlaybackChrome(").substringBefore("TvAutoplayPromptCard(")
 
-        assertTrue(call.contains("title = series.title.ifBlank"))
-        assertTrue(call.contains("seriesTitleForOverlay = series.title"))
-        assertTrue(call.contains("seasonNumber = uiState.activeSeasonNumber"))
-        assertTrue(call.contains("episodeNumber = uiState.activeEpisodeNumber"))
-        assertTrue(call.contains("episodeTitle = currentEpisode?.title"))
+        assertTrue(source.contains("val titleOverlayData = remember("))
+        assertTrue(source.contains("seriesTitle = series.title"))
+        assertTrue(source.contains("seasonNumber = uiState.activeSeasonNumber"))
+        assertTrue(source.contains("episodeNumber = uiState.activeEpisodeNumber"))
+        assertTrue(source.contains("episodeTitle = currentEpisode?.title"))
+        assertTrue(source.contains("title = mediaSessionTitle"))
+        assertTrue(call.contains("title = titleOverlayData.primary"))
+        assertTrue(call.contains("secondaryTitle = titleOverlayData.secondary"))
     }
 
     @Test

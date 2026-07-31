@@ -90,7 +90,7 @@ private object TvSeriesDetailTokens {
 @Composable
 fun TvSeriesDetailScreen(
     onBack: () -> Unit,
-    onPlayEpisode: (seriesId: String, season: Int, episode: Int) -> Unit,
+    onPlayEpisode: (seriesId: String, season: Int, episode: Int, startFromBeginning: Boolean) -> Unit,
     viewModel: TvSeriesDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -129,6 +129,12 @@ fun TvSeriesDetailScreen(
     val episodes = season?.episodes.orEmpty()
     val backdropUrl = resolveTvResourceUrl(uiState.baseUrl, series.backdropUrl)
     val posterUrl = resolveTvResourceUrl(uiState.baseUrl, series.posterUrl)
+    val hasResume = currentEpisode?.let { episode ->
+        shouldOfferTvLongFormContinuePlayback(
+            watchSeconds = episode.watchSeconds,
+            durationSeconds = episode.durationSeconds,
+        )
+    } == true
 
     LaunchedTvInitialFocus(series.id, uiState.loading) {
         if (!initialFocusRequested && !uiState.loading && series.seasons.isNotEmpty()) {
@@ -186,13 +192,19 @@ fun TvSeriesDetailScreen(
                 currentEpisode = currentEpisode,
                 baseUrl = uiState.baseUrl,
                 playFocusRequester = playFocusRequester,
+                hasResume = hasResume,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-                onPlay = {
+                onPlay = { startFromBeginning ->
                     val episode = currentEpisode ?: return@TvSeriesHeroPane
                     if (episode.playable) {
-                        onPlayEpisode(series.id, uiState.selectedSeasonNumber, uiState.selectedEpisodeNumber)
+                        onPlayEpisode(
+                            series.id,
+                            uiState.selectedSeasonNumber,
+                            uiState.selectedEpisodeNumber,
+                            startFromBeginning,
+                        )
                     }
                 },
             )
@@ -212,7 +224,7 @@ fun TvSeriesDetailScreen(
                 onRetry = viewModel::retry,
                 onPlayEpisode = { episode ->
                     viewModel.selectEpisode(episode.number)
-                    onPlayEpisode(series.id, uiState.selectedSeasonNumber, episode.number)
+                    onPlayEpisode(series.id, uiState.selectedSeasonNumber, episode.number, false)
                 },
             )
         }
@@ -316,8 +328,9 @@ private fun TvSeriesHeroPane(
     currentEpisode: TvEpisodeUiModel?,
     baseUrl: String,
     playFocusRequester: FocusRequester,
+    hasResume: Boolean,
     modifier: Modifier = Modifier,
-    onPlay: () -> Unit,
+    onPlay: (startFromBeginning: Boolean) -> Unit,
 ) {
     Column(
         modifier = modifier.padding(top = 18.dp),
@@ -337,10 +350,12 @@ private fun TvSeriesHeroPane(
             modifier = Modifier.width(TvSeriesDetailTokens.HeroInfoWidthDp.dp),
         )
         TvSeriesReferenceActionRow(
-            primaryText = buildTvSeriesPlayButtonLabel(currentEpisode),
+            primaryText = if (hasResume) "继续播放" else buildTvSeriesPlayButtonLabel(currentEpisode),
             enabled = currentEpisode?.playable == true,
+            hasResume = hasResume,
             playFocusRequester = playFocusRequester,
-            onPlay = onPlay,
+            onPlay = { onPlay(false) },
+            onPlayFromBeginning = { onPlay(true) },
         )
         if (series.cast.isNotEmpty()) {
             Spacer(modifier = Modifier.height(2.dp))
@@ -467,8 +482,10 @@ private fun TvSeriesRatingRow(series: TvSeriesUiModel) {
 private fun TvSeriesReferenceActionRow(
     primaryText: String,
     enabled: Boolean,
+    hasResume: Boolean,
     playFocusRequester: FocusRequester,
     onPlay: () -> Unit,
+    onPlayFromBeginning: () -> Unit,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -480,7 +497,11 @@ private fun TvSeriesReferenceActionRow(
             modifier = Modifier.focusRequester(playFocusRequester),
             onClick = onPlay,
         )
-        TvSeriesSecondaryActionButton(text = "我的片单")
+        TvSeriesSecondaryActionButton(
+            text = if (hasResume) "从头播放" else "我的片单",
+            icon = if (hasResume) Icons.Filled.Refresh else Icons.Filled.Add,
+            onClick = { if (hasResume) onPlayFromBeginning() },
+        )
     }
 }
 
@@ -552,7 +573,11 @@ private fun TvSeriesPrimaryActionButton(
 }
 
 @Composable
-private fun TvSeriesSecondaryActionButton(text: String) {
+private fun TvSeriesSecondaryActionButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
     var focused by remember { mutableStateOf(false) }
     Surface(
         color = if (focused) Color(0x362B2419) else Color(0x31141820),
@@ -565,7 +590,7 @@ private fun TvSeriesSecondaryActionButton(text: String) {
             .width(108.dp)
             .height(40.dp)
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = {}),
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier
@@ -575,7 +600,7 @@ private fun TvSeriesSecondaryActionButton(text: String) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
-                imageVector = Icons.Filled.Add,
+                imageVector = icon,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.9f),
                 modifier = Modifier.size(14.dp),

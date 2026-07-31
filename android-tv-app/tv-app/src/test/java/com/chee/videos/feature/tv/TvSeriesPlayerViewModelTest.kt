@@ -54,6 +54,44 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
+    fun init_preservesExplicitSeriesStartFromBeginningIntent() = runTest {
+        val viewModel = TvSeriesPlayerViewModel(
+            repository = FakeTvRepository(
+                detailPayload = tvSeriesDetail(
+                    seasons = listOf(
+                        TvSeasonDto(
+                            id = "s1",
+                            seasonNumber = 1,
+                            title = "第一季",
+                            episodes = listOf(
+                                tvEpisode(
+                                    id = "e1",
+                                    number = 1,
+                                    title = "第1集",
+                                    videoId = "video-1",
+                                    videoStatus = "ready",
+                                    watchSeconds = 187,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            SavedStateHandle(
+                mapOf(
+                    TvSeriesIdArg to "series-1",
+                    TvSeasonArg to 1,
+                    TvEpisodeArg to 1,
+                    TvLongFormStartFromBeginningArg to true,
+                ),
+            ),
+        )
+        viewModel.awaitIdle()
+
+        assertTrue(viewModel.uiState.value.startCurrentEpisodeFromBeginning)
+    }
+
+    @Test
     fun init_exposesActiveBaseUrlForSubtitleResolution() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
@@ -153,7 +191,7 @@ class TvSeriesPlayerViewModelTest {
     fun init_restoresSavedSubtitleSelectionForCurrentVideo() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
-                subtitlePreferences = mapOf("video-1" to TvTrackPreference(language = "zh-CN", type = "default")),
+                subtitlePreference = TvTrackPreference(language = "zh-CN", type = "default"),
                 detailPayload = tvSeriesDetail(
                     seasons = listOf(
                         TvSeasonDto(
@@ -194,7 +232,7 @@ class TvSeriesPlayerViewModelTest {
     fun init_restoresSavedAudioSelectionForCurrentVideo() = runTest {
         val viewModel = TvSeriesPlayerViewModel(
             repository = FakeTvRepository(
-                audioPreferences = mapOf("video-1" to TvTrackPreference(language = "zh", type = "default")),
+                audioPreference = TvTrackPreference(language = "zh", type = "default"),
                 detailPayload = tvSeriesDetail(
                     seasons = listOf(
                         TvSeasonDto(
@@ -255,7 +293,7 @@ class TvSeriesPlayerViewModelTest {
         advanceUntilIdle()
 
         assertEquals("audio-zh-51", viewModel.uiState.value.selectedAudioTrackId)
-        assertEquals(preference, repository.readTvAudioPreference("video-1"))
+        assertEquals(preference, repository.readTvAudioPreference())
     }
 
     @Test
@@ -383,7 +421,7 @@ class TvSeriesPlayerViewModelTest {
         assertEquals(1, preparingState.selectedEpisodeNumber)
         assertEquals(1, preparingState.activeSeasonNumber)
         assertEquals(1, preparingState.activeEpisodeNumber)
-        assertEquals("", preparingState.currentVideoId)
+        assertEquals("video-1", preparingState.currentVideoId)
         assertEquals("", preparingState.currentSourceUrl)
         assertFalse(preparingState.canPlayCurrentEpisode)
         assertTrue(preparingState.playbackPreparing)
@@ -757,10 +795,10 @@ class TvSeriesPlayerViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(2, state.selectedEpisodeNumber)
-        assertEquals(1, state.activeEpisodeNumber)
-        assertEquals("video-1", state.currentVideoId)
-        assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
-        assertTrue(state.canPlayCurrentEpisode)
+        assertEquals(2, state.activeEpisodeNumber)
+        assertEquals("video-2", state.currentVideoId)
+        assertEquals("", state.currentSourceUrl)
+        assertFalse(state.canPlayCurrentEpisode)
         assertTrue(state.playbackPreparing)
         assertEquals(null, state.playbackBlockedMessage)
 
@@ -776,7 +814,7 @@ class TvSeriesPlayerViewModelTest {
     }
 
     @Test
-    fun selectEpisode_sourceFailureKeepsActiveEpisodeWhileExposingBlockedMessage() = runTest {
+    fun selectEpisode_sourceFailureStaysOnNewPlaybackTargetAndExposesBlockedMessage() = runTest {
         val repository = DelayedSourceTvRepository(
             detailPayload = tvSeriesDetail(
                 seasons = listOf(
@@ -807,13 +845,13 @@ class TvSeriesPlayerViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(1, state.selectedEpisodeNumber)
-        assertEquals(1, state.activeEpisodeNumber)
-        assertEquals("video-1", state.currentVideoId)
-        assertEquals("https://example.com/video-1.m3u8", state.currentSourceUrl)
-        assertTrue(state.canPlayCurrentEpisode)
+        assertEquals(2, state.selectedEpisodeNumber)
+        assertEquals(2, state.activeEpisodeNumber)
+        assertEquals("video-2", state.currentVideoId)
+        assertEquals("", state.currentSourceUrl)
+        assertFalse(state.canPlayCurrentEpisode)
         assertFalse(state.playbackPreparing)
-        assertEquals(null, state.playbackBlockedMessage)
+        assertEquals("第 2 集播放源准备失败，请重试", state.playbackBlockedMessage)
         val switchState = state.episodeSwitchState as TvEpisodeSwitchUiState.Failed
         assertEquals(2, switchState.targetEpisodeNumber)
         assertEquals("第 2 集播放源准备失败，请重试", switchState.message)

@@ -1,26 +1,11 @@
 package com.chee.videos.feature.tv
 
 import android.app.Activity
-import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -33,33 +18,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.KeepScreenOnEffect
-import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.LongFormAudioTrack
-import com.chee.videos.core.ui.PlayerGlassSurfaceStrong
-import com.chee.videos.core.ui.TvEpisodeRailItem
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvPageLoadingState
-import com.chee.videos.core.ui.TvSeriesCorePlaybackOverlay
 import com.chee.videos.core.ui.buildAudioTrackPreference
+import com.chee.videos.core.ui.buildTvLongFormTitleOverlayData
 import com.chee.videos.core.ui.buildSubtitleTrackPreference
 import com.chee.videos.core.ui.resolveAudioSelectionOnTrackLoad
 import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
-import com.chee.videos.core.ui.tvFocusableScaleOnly
-import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 import kotlinx.coroutines.delay
 
@@ -72,58 +46,17 @@ fun TvSeriesPlayerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? Activity
-    var backPromptAtMillis by remember { mutableStateOf<Long?>(null) }
-    var showBackConfirmPrompt by remember { mutableStateOf(false) }
     var showDolbyVisionDiagnostics by remember { mutableStateOf(false) }
 
-    fun handlePlaybackBack() {
-        val now = SystemClock.uptimeMillis()
-        when (resolveTvPlayerBackAction(backPromptAtMillis, now)) {
-            TvPlayerBackAction.ShowPrompt -> {
-                backPromptAtMillis = now
-                showBackConfirmPrompt = true
-            }
-
-            TvPlayerBackAction.Exit -> {
-                backPromptAtMillis = null
-                showBackConfirmPrompt = false
-                onBack()
-            }
-        }
-    }
-
-    LaunchedEffect(showBackConfirmPrompt, backPromptAtMillis) {
-        val promptAt = backPromptAtMillis
-        if (showBackConfirmPrompt && promptAt != null) {
-            delay(TvPlayerBackConfirmWindowMillis)
-            if (backPromptAtMillis == promptAt) {
-                showBackConfirmPrompt = false
-            }
-        }
-    }
-
     if (uiState.loading) {
-        BackHandler { handlePlaybackBack() }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-        ) {
-            TvPageLoadingState(message = "正在加载电视剧播放器")
-            if (showBackConfirmPrompt) {
-                TvPlayerBackConfirmPrompt(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 48.dp),
-                )
-            }
-        }
+        BackHandler(onBack = onBack)
+        TvLongFormStartupLoadingCanvas()
         return
     }
 
     val series = uiState.series
     if (series == null) {
-        BackHandler { handlePlaybackBack() }
+        BackHandler(onBack = onBack)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -133,13 +66,6 @@ fun TvSeriesPlayerScreen(
                 message = uiState.errorMessage ?: "播放器数据不存在",
                 onAction = viewModel::retry,
             )
-            if (showBackConfirmPrompt) {
-                TvPlayerBackConfirmPrompt(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 48.dp),
-                )
-            }
         }
         return
     }
@@ -186,15 +112,13 @@ fun TvSeriesPlayerScreen(
     var media3AudioTracks by remember(uiState.currentVideoId) { mutableStateOf(emptyList<LongFormAudioTrack>()) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var playerErrorMessage by remember(uiState.currentVideoId) { mutableStateOf<String?>(null) }
-    // 首帧渲染门槛：对齐单片屏 `TvLongFormPlayerScreen` 的软重试语义。首帧已现后的 onError
-    // 不再清 hasStartedPlayback、不再触发全屏 TvErrorState，改为非阻塞中心失败提示 + OK 重试。
     var hasRenderedFirstFrame by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
-    var activeSoftRetryAttemptKey by remember(uiState.currentVideoId) { mutableStateOf<Int?>(null) }
-    var ignoredRetryAttemptKey by remember(uiState.currentVideoId) { mutableStateOf<Int?>(null) }
-    var cancelPrepareRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
-    var softRetryUiState by remember(uiState.currentVideoId) { mutableStateOf<TvLongFormSoftRetryUiState?>(null) }
-    var retryActionFocusRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
-    val softRetryFailureVisible = softRetryUiState is TvLongFormSoftRetryUiState.Failed
+    var playbackStatus by remember(uiState.currentVideoId) { mutableStateOf(TvLongFormPlaybackStatus.Idle) }
+    var interactionMode by remember(uiState.currentVideoId) { mutableStateOf(TvLongFormInteractionMode.Hidden) }
+    var loadingFeedback by remember(uiState.currentVideoId) { mutableStateOf(TvLongFormLoadingFeedback.Hidden) }
+    var sourcePreparingFeedbackVisible by remember(uiState.currentVideoId) { mutableStateOf(false) }
+    var completedAutomaticRetries by remember(uiState.currentVideoId) { mutableStateOf(0) }
+    var scheduledRetry by remember(uiState.currentVideoId) { mutableStateOf<TvLongFormErrorAction.ScheduleRetry?>(null) }
     val playbackDiagnosticMessage = remember(playbackRoute, displayCapability, uiState.currentSourceUrl, playerErrorMessage) {
         buildTvDolbyVisionDiagnosticMessage(
             route = playbackRoute,
@@ -209,24 +133,48 @@ fun TvSeriesPlayerScreen(
     var lastHistoryVideoId by remember { mutableStateOf("") }
     var resumedFromHistoryVideoId by remember { mutableStateOf("") }
     var resumePromptLastPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
-    var resumePromptRemainingMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var resumePromptDismissed by remember(uiState.currentVideoId) { mutableStateOf(false) }
-    var isTrackSheetVisible by remember(uiState.currentVideoId) { mutableStateOf(false) }
-    var media3TrackPickerKind by remember(uiState.currentVideoId) { mutableStateOf<TvMedia3TrackPickerKind?>(null) }
     var lastAutoplaySwitchedVideoId by remember { mutableStateOf("") }
-    var openEpisodeRailRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
+
+    val titleOverlayData = remember(
+        series.title,
+        currentEpisode?.title,
+        uiState.activeSeasonNumber,
+        uiState.activeEpisodeNumber,
+    ) {
+        buildTvLongFormTitleOverlayData(
+            primaryFallback = currentEpisode?.title.orEmpty(),
+            seriesTitle = series.title,
+            seasonNumber = uiState.activeSeasonNumber,
+            episodeNumber = uiState.activeEpisodeNumber,
+            episodeTitle = currentEpisode?.title,
+        )
+    }
+    val mediaSessionTitle = remember(titleOverlayData) {
+        listOfNotNull(titleOverlayData.primary, titleOverlayData.secondary)
+            .filter { it.isNotBlank() }
+            .joinToString(" · ")
+    }
 
     val nextEpisodeRef = remember(uiState.series, uiState.activeSeasonNumber, uiState.activeEpisodeNumber) {
         uiState.nextEpisodeRef()
     }
-    val episodeRailItems = remember(uiState.series, uiState.activeSeasonNumber, uiState.activeEpisodeNumber) {
-        activeSeason(uiState)?.episodes.orEmpty().map { episode ->
-            TvEpisodeRailItem(
-                id = episode.id,
-                number = episode.number,
-                title = episode.title,
-                playable = episode.playable,
-                current = episode.number == uiState.activeEpisodeNumber,
+    val playbackSeasons = remember(uiState.series, uiState.activeSeasonNumber, uiState.activeEpisodeNumber) {
+        series.seasons.map { season ->
+            TvLongFormSeasonOption(
+                number = season.number,
+                title = season.title,
+                episodes = season.episodes.map { episode ->
+                    TvLongFormEpisodeOption(
+                        id = episode.id,
+                        seasonNumber = season.number,
+                        episodeNumber = episode.number,
+                        title = episode.title,
+                        progressPercent = episode.progressPercent,
+                        playable = episode.playable,
+                        current = season.number == uiState.activeSeasonNumber && episode.number == uiState.activeEpisodeNumber,
+                    )
+                },
             )
         }
     }
@@ -238,9 +186,9 @@ fun TvSeriesPlayerScreen(
             isPlaying = isPlayerActuallyPlaying,
             autoplayEnabled = uiState.autoplayEnabled,
             hasNextEpisode = hasNextEpisode,
-            isPlayerError = playerErrorMessage != null || softRetryFailureVisible,
+            isPlayerError = playerErrorMessage != null,
             isSelectorVisible = uiState.selectorVisible,
-            isBackConfirmVisible = showBackConfirmPrompt,
+            isBackConfirmVisible = false,
             isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
             isLoading = uiState.loading,
             isCanceledForCurrentEpisode = uiState.autoplayCanceledForCurrentEpisode,
@@ -261,70 +209,18 @@ fun TvSeriesPlayerScreen(
         isPausedByUser = nextSession.isPausedByUser
     }
 
-    fun requestSoftPlaybackRetry() {
-        val nextRetryKey = routeRetryNonce + 1
+    fun requestPlaybackRetry() {
         showDolbyVisionDiagnostics = false
-        ignoredRetryAttemptKey = null
         playerErrorMessage = null
-        activeSoftRetryAttemptKey = nextRetryKey
-        softRetryUiState = TvLongFormSoftRetryUiState.Preparing(nextRetryKey)
-        routeRetryNonce = nextRetryKey
+        completedAutomaticRetries = 0
+        scheduledRetry = null
+        routeRetryNonce += 1
         updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
-    }
-
-    fun cancelCurrentPlaybackRetry() {
-        val preparingState = softRetryUiState as? TvLongFormSoftRetryUiState.Preparing ?: return
-        showDolbyVisionDiagnostics = false
-        activeSoftRetryAttemptKey = null
-        ignoredRetryAttemptKey = preparingState.retryKey
-        cancelPrepareRequestKey += 1
-        playerErrorMessage = null
-        softRetryUiState = TvLongFormSoftRetryUiState.Canceled(preparingState.retryKey, "已取消重试")
-    }
-
-    fun dismissSoftRetryFailure() {
-        if (softRetryUiState is TvLongFormSoftRetryUiState.Failed) {
-            softRetryUiState = null
-        }
-        showDolbyVisionDiagnostics = false
     }
 
     BackHandler(enabled = showDolbyVisionDiagnostics) {
         showDolbyVisionDiagnostics = false
     }
-    BackHandler(enabled = !showDolbyVisionDiagnostics) {
-        when (resolveSeriesSoftRetryBackAction(softRetryUiState)) {
-            SeriesSoftRetryBackAction.CancelPreparing -> cancelCurrentPlaybackRetry()
-            SeriesSoftRetryBackAction.DismissFailure -> dismissSoftRetryFailure()
-            SeriesSoftRetryBackAction.DelegateToPlayerBack -> when {
-                uiState.playbackPreparing && uiState.episodeSwitchState is TvEpisodeSwitchUiState.Preparing -> {
-                    viewModel.cancelEpisodeSwitch()
-                }
-
-                uiState.episodeSwitchState is TvEpisodeSwitchUiState.Failed -> {
-                    viewModel.clearEpisodeSwitchFeedback()
-                }
-
-                else -> handlePlaybackBack()
-            }
-        }
-    }
-
-    val resumePromptGuardInput = ResumePromptGuardInput(
-        hasResumeSeekTriggered = resumedFromHistoryVideoId == uiState.currentVideoId && resumePromptLastPositionMs > 0L,
-        promptPermanentlyDismissed = resumePromptDismissed,
-        isPlayerError = playerErrorMessage != null || softRetryFailureVisible,
-        isBackConfirmVisible = showBackConfirmPrompt,
-        isEpisodeSelectorVisible = uiState.selectorVisible,
-        isTrackSheetVisible = isTrackSheetVisible,
-        isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
-        isAutoplayPromptVisible = shouldShowAutoplayPromptCard,
-        isPausedByUser = playbackSession.isPausedByUser,
-        remainingMs = resumePromptRemainingMs,
-        skipForUserInitiatedEpisodeSwitch = uiState.episodeSwitchState is TvEpisodeSwitchUiState.Succeeded,
-    )
-    val shouldTickResumePromptCountdown = shouldTickResumePromptCountdown(resumePromptGuardInput)
-    val shouldShowResumePromptCard = shouldShowResumePromptCard(resumePromptGuardInput)
     var media3SeekPositionMs by remember(uiState.currentVideoId) { mutableStateOf<Long?>(null) }
     var media3SeekRequestKey by remember(uiState.currentVideoId) { mutableStateOf(0) }
     val media3SubtitleConfigurations = remember(currentEpisode?.subtitleTracks, uiState.baseUrl, accessToken) {
@@ -353,6 +249,16 @@ fun TvSeriesPlayerScreen(
     fun selectEpisodeFromPlayer(episodeNumber: Int) {
         reportCurrentEpisodeHistory()
         viewModel.selectEpisode(episodeNumber)
+    }
+
+    fun selectEpisodeFromPlayer(seasonNumber: Int, episodeNumber: Int) {
+        reportCurrentEpisodeHistory()
+        viewModel.selectEpisode(seasonNumber, episodeNumber)
+    }
+
+    fun advanceToNextEpisodeManually() {
+        reportCurrentEpisodeHistory()
+        viewModel.nextEpisode()
     }
 
     fun advanceFromAutoplay() {
@@ -413,7 +319,6 @@ fun TvSeriesPlayerScreen(
         screenPositionMs = 0L
         screenDurationMs = 0L
         resumePromptLastPositionMs = 0L
-        resumePromptRemainingMs = 0L
         resumePromptDismissed = false
     }
 
@@ -445,19 +350,44 @@ fun TvSeriesPlayerScreen(
         selectedAudioTrackId = uiState.selectedAudioTrackId
     }
 
-    LaunchedEffect(softRetryUiState) {
-        when (softRetryUiState) {
-            is TvLongFormSoftRetryUiState.Succeeded,
-            is TvLongFormSoftRetryUiState.Canceled,
-            -> {
-                val transientState = softRetryUiState
-                delay(900L)
-                if (softRetryUiState == transientState) {
-                    softRetryUiState = null
-                }
-            }
+    LaunchedEffect(scheduledRetry) {
+        val retry = scheduledRetry ?: return@LaunchedEffect
+        delay(retry.delayMs)
+        if (scheduledRetry == retry) {
+            scheduledRetry = null
+            playerErrorMessage = null
+            routeRetryNonce += 1
+            updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+        }
+    }
 
-            else -> Unit
+    LaunchedEffect(uiState.playbackPreparing, uiState.currentSourceUrl, uiState.currentVideoId) {
+        sourcePreparingFeedbackVisible = false
+        if (uiState.playbackPreparing && uiState.currentSourceUrl.isBlank()) {
+            delay(TvLongFormStartupFeedbackDelayMillis)
+            sourcePreparingFeedbackVisible = true
+        }
+    }
+
+    val playIntent = playbackSession.hasStartedPlayback &&
+        !playbackSession.isPausedByUser &&
+        uiState.pendingEndOverlayKind == null
+    LaunchedEffect(playbackStatus, playIntent, hasRenderedFirstFrame, routeRetryNonce) {
+        loadingFeedback = TvLongFormLoadingFeedback.Hidden
+        if (!playIntent || playbackStatus !in setOf(TvLongFormPlaybackStatus.Preparing, TvLongFormPlaybackStatus.Buffering)) {
+            return@LaunchedEffect
+        }
+        delay(
+            if (hasRenderedFirstFrame) {
+                TvLongFormBufferingFeedbackDelayMillis
+            } else {
+                TvLongFormStartupFeedbackDelayMillis
+            },
+        )
+        loadingFeedback = if (hasRenderedFirstFrame) {
+            TvLongFormLoadingFeedback.Buffering
+        } else {
+            TvLongFormLoadingFeedback.Startup
         }
     }
 
@@ -491,8 +421,6 @@ fun TvSeriesPlayerScreen(
         screenDurationMs,
         remainingMs,
         playerErrorMessage,
-        softRetryFailureVisible,
-        showBackConfirmPrompt,
         uiState.selectorVisible,
         uiState.pendingEndOverlayKind,
     ) {
@@ -502,8 +430,6 @@ fun TvSeriesPlayerScreen(
             hasNextEpisode &&
             isPlayerActuallyPlaying &&
             playerErrorMessage == null &&
-            !softRetryFailureVisible &&
-            !showBackConfirmPrompt &&
             !uiState.selectorVisible &&
             uiState.pendingEndOverlayKind == null &&
             screenDurationMs > 0L &&
@@ -515,19 +441,13 @@ fun TvSeriesPlayerScreen(
 
     LaunchedEffect(
         playerErrorMessage,
-        softRetryFailureVisible,
-        showBackConfirmPrompt,
         uiState.selectorVisible,
-        isTrackSheetVisible,
         uiState.pendingEndOverlayKind,
         shouldShowAutoplayPromptCard,
     ) {
         if (
             playerErrorMessage != null ||
-            softRetryFailureVisible ||
-            showBackConfirmPrompt ||
             uiState.selectorVisible ||
-            isTrackSheetVisible ||
             uiState.pendingEndOverlayKind != null ||
             shouldShowAutoplayPromptCard
         ) {
@@ -535,22 +455,10 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    LaunchedEffect(uiState.currentVideoId, shouldTickResumePromptCountdown, resumePromptDismissed) {
-        if (resumePromptDismissed || !shouldTickResumePromptCountdown) return@LaunchedEffect
-        val startNanos = withFrameNanos { it }
-        val initialRemainingMs = resumePromptRemainingMs
-        while (resumePromptRemainingMs > 0L) {
-            val nowNanos = withFrameNanos { it }
-            val elapsedMs = (nowNanos - startNanos) / 1_000_000L
-            val next = (initialRemainingMs - elapsedMs).coerceAtLeast(0L)
-            if (next != resumePromptRemainingMs) {
-                resumePromptRemainingMs = next
-            }
-            if (next <= 0L) break
-        }
-        if (resumePromptRemainingMs <= 0L && resumePromptLastPositionMs > 0L) {
-            resumePromptDismissed = true
-        }
+    LaunchedEffect(uiState.currentVideoId, resumePromptLastPositionMs, resumePromptDismissed) {
+        if (resumePromptDismissed || resumePromptLastPositionMs <= 0L) return@LaunchedEffect
+        delay(3_000L)
+        resumePromptDismissed = true
     }
 
     DisposableEffect(isMedia3Route, uiState.currentVideoId) {
@@ -563,42 +471,45 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    KeepScreenOnEffect(enabled = isPlayerActuallyPlaying)
-    val overlayPlayerErrorVisible = playerErrorMessage != null ||
-        softRetryFailureVisible ||
-        showDolbyVisionDiagnostics
+    val screenOnPlaybackStatus = if (scheduledRetry != null) {
+        TvLongFormPlaybackStatus.Preparing
+    } else {
+        playbackStatus
+    }
+    KeepScreenOnEffect(enabled = shouldKeepTvLongFormScreenOn(playIntent, screenOnPlaybackStatus))
+    BackHandler(enabled = uiState.pendingEndOverlayKind != null, onBack = onBack)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        if (isMedia3Route) {
+        if (currentEpisode != null) {
             Box(modifier = Modifier.fillMaxSize()) {
                 TvLongFormMedia3Player(
-                    sourceUrl = uiState.currentSourceUrl,
+                    sourceUrl = uiState.currentSourceUrl.takeIf { isMedia3Route }.orEmpty(),
                     mediaId = uiState.currentVideoId,
-                    title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
+                    title = mediaSessionTitle,
                     accessToken = accessToken,
                     retryKey = routeRetryNonce,
-                    cancelPrepareRequestKey = cancelPrepareRequestKey,
-                    cancelPrepareRetryKey = ignoredRetryAttemptKey,
-                    shouldPlay = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser,
+                    shouldPlay = playIntent,
                     initialPositionMs = resolveTvMedia3ResumePositionMs(
                         historyPositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
-                            currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
+                            currentEpisode.watchSeconds.coerceAtLeast(0).times(1000L)
                         } else {
                             0L
                         },
                         currentSnapshotPositionMs = latestMedia3Snapshot.positionMs,
                         hasCurrentPlaybackSnapshot = resumedFromHistoryVideoId == uiState.currentVideoId,
                     ),
+                    tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                     seekPositionMs = media3SeekPositionMs,
                     seekRequestKey = media3SeekRequestKey,
                     outputSurface = playbackRoute.outputSurface,
                     subtitleConfigurations = media3SubtitleConfigurations,
                     selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
                     selectedAudioTrackId = selectedAudioTrackId,
+                    interactionMode = interactionMode,
                     modifier = Modifier.fillMaxSize(),
                     onRenderedFirstFrame = { eventIdentity ->
                         if (eventIdentity == currentPlaybackIdentity) {
@@ -610,14 +521,10 @@ fun TvSeriesPlayerScreen(
                             isPlayerActuallyPlaying = playing
                             if (playing) {
                                 playerErrorMessage = null
-                                ignoredRetryAttemptKey = null
-                                val activeRetryKey = activeSoftRetryAttemptKey
-                                if (activeRetryKey != null && eventIdentity.retryKey == activeRetryKey) {
-                                    activeSoftRetryAttemptKey = null
-                                    softRetryUiState = TvLongFormSoftRetryUiState.Succeeded(activeRetryKey, "已恢复播放")
-                                }
+                                completedAutomaticRetries = 0
+                                scheduledRetry = null
                                 val resumePositionMs = if (!uiState.startCurrentEpisodeFromBeginning) {
-                                    currentEpisode?.watchSeconds?.coerceAtLeast(0)?.times(1000L) ?: 0L
+                                    currentEpisode.watchSeconds.coerceAtLeast(0).times(1000L)
                                 } else {
                                     0L
                                 }
@@ -625,45 +532,28 @@ fun TvSeriesPlayerScreen(
                                     resumedFromHistoryVideoId = uiState.currentVideoId
                                     if (shouldTriggerResumePrompt(resumePositionMs)) {
                                         resumePromptLastPositionMs = resumePositionMs
-                                        resumePromptRemainingMs = TvResumePromptTokens.CountdownDurationMs
                                         resumePromptDismissed = false
                                     }
                                 }
                             }
                         }
                     },
-                    onError = { message, eventIdentity ->
+                    onError = { message, eventIdentity, retryable ->
                         if (eventIdentity == currentPlaybackIdentity) {
                             isPlayerActuallyPlaying = false
-                            when (val action = resolveSeriesOnErrorAction(hasRenderedFirstFrame, message)) {
-                                is SeriesOnErrorAction.SoftRetry -> when {
-                                    activeSoftRetryAttemptKey != null && eventIdentity.retryKey == activeSoftRetryAttemptKey -> {
-                                        val retryKey = activeSoftRetryAttemptKey ?: routeRetryNonce
-                                        activeSoftRetryAttemptKey = null
-                                        softRetryUiState = TvLongFormSoftRetryUiState.Failed(retryKey, action.message)
-                                        retryActionFocusRequestKey += 1
-                                    }
-
-                                    shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventIdentity.retryKey) -> {
-                                        ignoredRetryAttemptKey = null
-                                    }
-
-                                    else -> {
-                                        softRetryUiState = TvLongFormSoftRetryUiState.Failed(eventIdentity.retryKey, action.message)
-                                        retryActionFocusRequestKey += 1
-                                    }
+                            when (val action = resolveTvLongFormErrorAction(retryable, completedAutomaticRetries)) {
+                                is TvLongFormErrorAction.ScheduleRetry -> {
+                                    completedAutomaticRetries = action.attempt
+                                    scheduledRetry = action
+                                    playerErrorMessage = null
                                 }
 
-                                SeriesOnErrorAction.HardError -> {
+                                TvLongFormErrorAction.ShowFinalError -> {
+                                    scheduledRetry = null
                                     playerErrorMessage = message.ifBlank { "播放失败，请重试" }
                                     updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
                                 }
                             }
-                        } else if (
-                            eventIdentity.mediaId == uiState.currentVideoId &&
-                            shouldIgnoreTvLongFormRetryError(ignoredRetryAttemptKey, eventIdentity.retryKey)
-                        ) {
-                            ignoredRetryAttemptKey = null
                         }
                     },
                     onEnded = ::handlePlaybackEnded,
@@ -678,6 +568,13 @@ fun TvSeriesPlayerScreen(
                         screenDurationMs = snapshot.durationMs
                         reportTvSeriesMedia3History(viewModel, uiState.currentVideoId, snapshot)
                     },
+                    onLifecyclePaused = {
+                        isPausedByUser = true
+                        isPlayerActuallyPlaying = false
+                    },
+                    onPlaybackStatusChanged = { status ->
+                        playbackStatus = status
+                    },
                     onAudioTracksChanged = { tracks ->
                         media3AudioTracks = tracks
                         val resolvedSelection = resolveAudioSelectionOnTrackLoad(
@@ -690,223 +587,169 @@ fun TvSeriesPlayerScreen(
                         }
                     },
                 )
-                TvSeriesCorePlaybackOverlay(
-                    title = series.title.ifBlank { currentEpisode?.title.orEmpty() },
-                    isPlaying = playbackSession.hasStartedPlayback && !playbackSession.isPausedByUser && isPlayerActuallyPlaying,
-                    positionMs = screenPositionMs,
-                    durationMs = screenDurationMs,
-                    tvSeekStepSeconds = uiState.tvSeekStepSeconds,
-                    seriesTitleForOverlay = series.title,
-                    seasonNumber = uiState.activeSeasonNumber,
-                    episodeNumber = uiState.activeEpisodeNumber,
-                    episodeTitle = currentEpisode?.title,
-                    episodeRailItems = episodeRailItems,
-                    currentEpisodeRailItemId = currentEpisode?.id,
-                    episodeSwitchState = uiState.episodeSwitchState,
-                    onTogglePlayPause = {
-                        updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
-                    },
-                    onSeekTo = { targetMs ->
-                        media3SeekPositionMs = targetMs
-                        media3SeekRequestKey += 1
-                    },
-                    showTrackActions = true,
-                    onOpenSubtitle = {
-                        media3TrackPickerKind = TvMedia3TrackPickerKind.Subtitle
-                        isTrackSheetVisible = true
-                    },
-                    onOpenAudioTrack = {
-                        media3TrackPickerKind = TvMedia3TrackPickerKind.Audio
-                        isTrackSheetVisible = true
-                    },
-                    onSelectEpisodeRailItem = { selectedItem ->
-                        val episodeNumber = activeSeason(uiState)?.episodes
-                            ?.firstOrNull { it.id == selectedItem.id }
-                            ?.number
-                        if (episodeNumber != null) {
-                            selectEpisodeFromPlayer(episodeNumber)
-                        }
-                    },
-                    onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible,
-                    onDismissEpisodeSwitchFeedback = viewModel::clearEpisodeSwitchFeedback,
-                    resumePromptVisible = shouldShowResumePromptCard,
-                    resumePromptSlot = {
-                        TvResumePromptCard(
-                            lastPositionMs = resumePromptLastPositionMs,
-                            visible = shouldShowResumePromptCard,
-                            remainingSeconds = resumePromptCountdownTickRemaining(resumePromptRemainingMs),
-                            onContinue = { resumePromptDismissed = true },
-                            onStartFromBeginning = {
-                                media3SeekPositionMs = 0L
-                                media3SeekRequestKey += 1
-                                resumePromptDismissed = true
-                            },
+                if (isMedia3Route) {
+                    TvLongFormPlaybackChrome(
+                        title = titleOverlayData.primary,
+                        secondaryTitle = titleOverlayData.secondary,
+                        isPlaying = playbackSession.hasStartedPlayback &&
+                            !playbackSession.isPausedByUser &&
+                            isPlayerActuallyPlaying,
+                        positionMs = screenPositionMs,
+                        durationMs = screenDurationMs,
+                        tvSeekStepSeconds = uiState.tvSeekStepSeconds,
+                        subtitleTracks = currentEpisode.subtitleTracks
+                            .filter { it.available && it.url.isNotBlank() && !it.isEmbedded },
+                        selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
+                        audioTracks = media3AudioTracks,
+                        selectedAudioTrackId = selectedAudioTrackId?.takeIf { it.isNotBlank() },
+                        seasons = playbackSeasons,
+                        currentEpisodeId = currentEpisode.id,
+                        onTogglePlayPause = {
+                            updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
+                        },
+                        onSeekTo = { targetMs ->
+                            media3SeekPositionMs = targetMs
+                            media3SeekRequestKey += 1
+                        },
+                        onSelectSubtitleTrack = { trackId ->
+                            selectedSubtitleTrackId = trackId ?: ""
+                            viewModel.selectSubtitleTrack(trackId)
+                        },
+                        onSelectAudioTrack = { trackId ->
+                            selectedAudioTrackId = trackId ?: ""
+                            val preference = buildAudioTrackPreference(media3AudioTracks.firstOrNull { it.id == trackId })
+                            viewModel.selectAudioTrack(trackId, preference)
+                        },
+                        onSelectEpisode = { option ->
+                            selectEpisodeFromPlayer(option.seasonNumber, option.episodeNumber)
+                        },
+                        onPlayNextEpisode = if (hasNextEpisode) ::advanceToNextEpisodeManually else null,
+                        onExitPlayback = onBack,
+                        resumeNoticeText = if (!resumePromptDismissed && resumePromptLastPositionMs > 0L) {
+                            "已从 ${formatTvLongFormTime(resumePromptLastPositionMs)} 继续播放"
+                        } else {
+                            null
+                        },
+                        loadingFeedback = if (scheduledRetry != null) {
+                            TvLongFormLoadingFeedback.Startup
+                        } else {
+                            loadingFeedback
+                        },
+                        blockingUiVisible = playerErrorMessage != null ||
+                            showDolbyVisionDiagnostics ||
+                            uiState.pendingEndOverlayKind != null ||
+                            shouldShowAutoplayPromptCard,
+                        onInteractionModeChanged = { mode ->
+                            interactionMode = mode
+                            viewModel.setSelectorVisible(
+                                mode == TvLongFormInteractionMode.PrecisionSeek ||
+                                    mode == TvLongFormInteractionMode.SubtitlePanel ||
+                                    mode == TvLongFormInteractionMode.AudioPanel ||
+                                    mode == TvLongFormInteractionMode.EpisodePanel,
+                            )
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    nextEpisodeRef?.let { next ->
+                        TvAutoplayPromptCard(
+                            nextEpisodeRef = next,
+                            visible = shouldShowAutoplayPromptCard,
+                            remainingSeconds = remainingSeconds,
+                            onPlayNow = ::advanceFromAutoplay,
+                            onCancel = viewModel::cancelAutoplayForCurrentEpisode,
                             modifier = Modifier
-                                .align(Alignment.BottomStart)
+                                .align(Alignment.BottomEnd)
                                 .padding(
-                                    start = TvResumePromptTokens.HorizontalPaddingDp,
-                                    bottom = TvResumePromptTokens.BottomPaddingDp,
+                                    end = TvAutoplayPromptTokens.HorizontalPaddingDp,
+                                    bottom = TvAutoplayPromptTokens.BottomPaddingDp,
                                 ),
                         )
-                    },
-                    backConfirmPromptVisible = showBackConfirmPrompt,
-                    playerErrorVisible = overlayPlayerErrorVisible,
-                    openEpisodeRailRequestKey = openEpisodeRailRequestKey,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                nextEpisodeRef?.let { next ->
-                    TvAutoplayPromptCard(
-                        nextEpisodeRef = next,
-                        visible = shouldShowAutoplayPromptCard,
-                        remainingSeconds = remainingSeconds,
-                        onPlayNow = ::advanceFromAutoplay,
-                        onCancel = viewModel::cancelAutoplayForCurrentEpisode,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(
-                                end = TvAutoplayPromptTokens.HorizontalPaddingDp,
-                                bottom = TvAutoplayPromptTokens.BottomPaddingDp,
-                            ),
+                    }
+                    TvSeriesEndOverlay(
+                        kind = uiState.pendingEndOverlayKind,
+                        onPlayNext = viewModel::nextEpisode,
+                        onReplayCurrent = {
+                            viewModel.dismissEndOverlay()
+                            media3SeekPositionMs = 0L
+                            media3SeekRequestKey += 1
+                            updatePlaybackSession(
+                                LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false),
+                            )
+                        },
+                        onBackToDetail = onBack,
+                        modifier = Modifier.fillMaxSize(),
                     )
-                }
-                TvSeriesEndOverlay(
-                    kind = uiState.pendingEndOverlayKind,
-                    onPlayNext = viewModel::nextEpisode,
-                    onBackToDetail = onBack,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                // 首帧已现后的非阻塞软重试卡片：保留当前分集已渲染画面，OK 键重试当前分集。
-                // 不清 hasStartedPlayback、不进全屏 TvErrorState，对齐 CONTEXT.md「TV 长视频播放器软准备」契约。
-                TvSeriesPlayerSoftRetryFeedback(
-                    state = softRetryUiState,
-                    focusRequestKey = retryActionFocusRequestKey,
-                    onRetry = ::requestSoftPlaybackRetry,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-                if (!playerErrorMessage.isNullOrBlank()) {
+                    if (!playerErrorMessage.isNullOrBlank()) {
+                        if (showDolbyVisionDiagnostics) {
+                            TvErrorState(
+                                title = "诊断信息",
+                                message = playbackDiagnosticMessage,
+                                onAction = {
+                                    showDolbyVisionDiagnostics = false
+                                    requestPlaybackRetry()
+                                },
+                            )
+                        } else {
+                            TvErrorState(
+                                title = "暂不能播放",
+                                message = playerErrorMessage.orEmpty(),
+                                actionLabel = "重试播放",
+                                onAction = ::requestPlaybackRetry,
+                                secondaryActionLabel = "返回详情",
+                                onSecondaryAction = onBack,
+                                tertiaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                                onTertiaryAction = if (showDolbyVisionDiagnosticsButton) {
+                                    { showDolbyVisionDiagnostics = true }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                    }
+                } else if (uiState.playbackPreparing && uiState.currentSourceUrl.isBlank()) {
+                    if (sourcePreparingFeedbackVisible) {
+                        TvPageLoadingState(message = "")
+                    }
+                } else {
                     if (showDolbyVisionDiagnostics) {
                         TvErrorState(
                             title = "诊断信息",
                             message = playbackDiagnosticMessage,
                             onAction = {
                                 showDolbyVisionDiagnostics = false
-                                playerErrorMessage = null
                                 routeRetryNonce += 1
-                                updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                                viewModel.retry()
                             },
                         )
                     } else {
                         TvErrorState(
                             title = "暂不能播放",
-                            message = playerErrorMessage.orEmpty(),
+                            message = playerBlockMessage ?: "当前分集暂无可播放视频",
                             onAction = {
-                                playerErrorMessage = null
                                 routeRetryNonce += 1
-                                updatePlaybackSession(LongFormPlaybackSession(hasStartedPlayback = true, isPausedByUser = false))
+                                viewModel.retry()
                             },
-                            secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
-                            onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
-                                {
-                                    showDolbyVisionDiagnostics = true
-                                }
-                            } else {
-                                null
-                            },
-                            tertiaryActionLabel = if (episodeRailItems.isNotEmpty()) "选集" else null,
-                            onTertiaryAction = if (episodeRailItems.isNotEmpty()) {
-                                {
-                                    showDolbyVisionDiagnostics = false
-                                    playerErrorMessage = null
-                                    openEpisodeRailRequestKey += 1
-                                }
+                            secondaryActionLabel = "返回详情",
+                            onSecondaryAction = onBack,
+                            tertiaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
+                            onTertiaryAction = if (showDolbyVisionDiagnosticsButton) {
+                                { showDolbyVisionDiagnostics = true }
                             } else {
                                 null
                             },
                         )
                     }
                 }
-                if (showBackConfirmPrompt) {
-                    TvPlayerBackConfirmPrompt(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 72.dp),
-                    )
-                }
-                if (isTrackSheetVisible && playerErrorMessage == null && media3TrackPickerKind != null) {
-                    TvMedia3TrackPickerLayer(
-                        kind = media3TrackPickerKind,
-                        subtitleTracks = currentEpisode?.subtitleTracks.orEmpty().filter { it.available && it.url.isNotBlank() && !it.isEmbedded },
-                        selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
-                        onSelectSubtitleTrack = { trackId ->
-                            selectedSubtitleTrackId = trackId ?: ""
-                            viewModel.selectSubtitleTrack(trackId)
-                        },
-                        audioTracks = media3AudioTracks,
-                        selectedAudioTrackId = selectedAudioTrackId,
-                        onSelectAudioTrack = { trackId ->
-                            selectedAudioTrackId = trackId ?: ""
-                            val preference = buildAudioTrackPreference(media3AudioTracks.firstOrNull { it.id == trackId })
-                            viewModel.selectAudioTrack(trackId, preference)
-                        },
-                        onDismissRequest = {
-                            isTrackSheetVisible = false
-                            media3TrackPickerKind = null
-                        },
-                    )
-                }
-            }
-        } else if (uiState.playbackPreparing && uiState.currentSourceUrl.isBlank()) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                val message = when (val switchState = uiState.episodeSwitchState) {
-                    is TvEpisodeSwitchUiState.Preparing -> "正在切到第 ${switchState.targetEpisodeNumber} 集"
-                    else -> "正在准备当前分集"
-                }
-                TvPageLoadingState(message = message)
-                if (showBackConfirmPrompt) {
-                    TvPlayerBackConfirmPrompt(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 48.dp),
-                    )
-                }
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (showDolbyVisionDiagnostics) {
-                    TvErrorState(
-                        title = "诊断信息",
-                        message = playbackDiagnosticMessage,
-                        onAction = {
-                            showDolbyVisionDiagnostics = false
-                            routeRetryNonce += 1
-                            viewModel.retry()
-                        },
-                    )
-                } else {
-                    TvErrorState(
-                        title = "暂不能播放",
-                        message = playerBlockMessage ?: "当前分集暂无可播放视频",
-                        onAction = {
-                            routeRetryNonce += 1
-                            viewModel.retry()
-                        },
-                        secondaryActionLabel = if (showDolbyVisionDiagnosticsButton) "诊断信息" else null,
-                        onSecondaryAction = if (showDolbyVisionDiagnosticsButton) {
-                            {
-                                showDolbyVisionDiagnostics = true
-                            }
-                        } else {
-                            null
-                        },
-                    )
-                }
-                if (showBackConfirmPrompt) {
-                    TvPlayerBackConfirmPrompt(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 48.dp),
-                    )
-                }
+                TvErrorState(
+                    title = "暂不能播放",
+                    message = "当前分集不存在",
+                    onAction = viewModel::retry,
+                    secondaryActionLabel = "返回详情",
+                    onSecondaryAction = onBack,
+                )
             }
         }
     }
@@ -923,7 +766,10 @@ private fun reportTvSeriesMedia3History(
         positionMs = playerSnapshot.positionMs,
         durationMs = playerSnapshot.durationMs,
     )
-    viewModel.reportHistory(videoId, snapshot.watchSeconds, completedOverride ?: snapshot.completed)
+    val completed = completedOverride ?: snapshot.completed
+    if (shouldSubmitTvPlaybackHistory(videoId, snapshot.watchSeconds, completed)) {
+        viewModel.reportHistory(videoId, snapshot.watchSeconds, completed)
+    }
 }
 
 private fun TvSeriesPlayerUiState.nextEpisodeRef(): TvNextEpisodeRef? {
@@ -967,194 +813,3 @@ internal fun shouldAutoStartTvLongFormMedia3Playback(
     isMedia3Route &&
         currentSourceUrl.isNotBlank() &&
         autoStartedSourceUrl != currentSourceUrl
-
-/**
- * 剧集屏 Media3 onError 的分派决策。对齐单片屏 `TvLongFormPlayerScreen` 的 hasRenderedFirstFrame 门槛：
- * - [SeriesOnErrorAction.SoftRetry]：首帧已现后失败，保留当前分集已渲染画面，走非阻塞中心失败提示 + OK 重试。
- * - [SeriesOnErrorAction.HardError]：首帧未现（首次 prepare 失败），回退原全屏硬错误卡片。
- *
- * 抽成纯函数以便单测覆盖门槛边界，避免内联在 Composable lambda 中难以测试。
- */
-internal sealed interface SeriesOnErrorAction {
-    data class SoftRetry(val message: String) : SeriesOnErrorAction
-    object HardError : SeriesOnErrorAction
-}
-
-internal sealed interface SeriesSoftRetryBackAction {
-    object CancelPreparing : SeriesSoftRetryBackAction
-    object DismissFailure : SeriesSoftRetryBackAction
-    object DelegateToPlayerBack : SeriesSoftRetryBackAction
-}
-
-internal fun resolveSeriesSoftRetryBackAction(
-    state: TvLongFormSoftRetryUiState?,
-): SeriesSoftRetryBackAction = when (state) {
-    is TvLongFormSoftRetryUiState.Preparing -> SeriesSoftRetryBackAction.CancelPreparing
-    is TvLongFormSoftRetryUiState.Failed -> SeriesSoftRetryBackAction.DismissFailure
-    else -> SeriesSoftRetryBackAction.DelegateToPlayerBack
-}
-
-internal fun resolveSeriesOnErrorAction(
-    hasRenderedFirstFrame: Boolean,
-    errorMessage: String,
-): SeriesOnErrorAction =
-    if (hasRenderedFirstFrame) {
-        SeriesOnErrorAction.SoftRetry(errorMessage.ifBlank { "播放失败，请重试" })
-    } else {
-        SeriesOnErrorAction.HardError
-    }
-
-@Composable
-private fun TvSeriesPlayerSoftRetryFeedback(
-    state: TvLongFormSoftRetryUiState?,
-    focusRequestKey: Int,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    when (state) {
-        is TvLongFormSoftRetryUiState.Preparing -> {
-            TvSeriesPlayerSoftRetryTransientFeedback(
-                icon = Icons.Filled.Refresh,
-                message = state.message,
-                modifier = modifier,
-            )
-        }
-
-        is TvLongFormSoftRetryUiState.Succeeded -> {
-            TvSeriesPlayerSoftRetryTransientFeedback(
-                icon = Icons.Filled.PlayArrow,
-                message = state.message,
-                modifier = modifier,
-            )
-        }
-
-        is TvLongFormSoftRetryUiState.Canceled -> {
-            TvSeriesPlayerSoftRetryTransientFeedback(
-                icon = Icons.Filled.Pause,
-                message = state.message,
-                modifier = modifier,
-            )
-        }
-
-        is TvLongFormSoftRetryUiState.Failed -> {
-            TvSeriesPlayerSoftRetryFailureFeedback(
-                state = state,
-                focusRequestKey = focusRequestKey,
-                onRetry = onRetry,
-                modifier = modifier,
-            )
-        }
-
-        null -> Unit
-    }
-}
-
-@Composable
-private fun TvSeriesPlayerSoftRetryTransientFeedback(
-    icon: ImageVector,
-    message: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = PlayerGlassSurfaceStrong,
-        shape = AppChrome.SurfaceShape,
-        modifier = modifier,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = AppChrome.TextPrimary,
-                modifier = Modifier.padding(end = 8.dp),
-            )
-            Text(
-                text = message,
-                color = AppChrome.TextPrimary,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TvSeriesPlayerSoftRetryFailureFeedback(
-    state: TvLongFormSoftRetryUiState.Failed,
-    focusRequestKey: Int,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val retryFocusRequester = remember { FocusRequester() }
-
-    LaunchedTvInitialFocus(true, focusRequestKey, state.retryKey, state.message) {
-        if (focusRequestKey > 0) {
-            retryFocusRequester.tryRequestFocus()
-        }
-    }
-
-    Surface(
-        color = PlayerGlassSurfaceStrong,
-        shape = AppChrome.SurfaceShape,
-        modifier = modifier,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Warning,
-                    contentDescription = null,
-                    tint = AppChrome.Error,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-                Text(
-                    text = state.message,
-                    color = AppChrome.TextPrimary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 420.dp),
-                )
-            }
-            TvSeriesPlayerSoftRetryActionButton(
-                onClick = onRetry,
-                modifier = Modifier.focusRequester(retryFocusRequester),
-            )
-        }
-    }
-}
-
-@Composable
-private fun TvSeriesPlayerSoftRetryActionButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = AppChrome.AccentSoft,
-        shape = AppChrome.ChipShape,
-        modifier = modifier
-            .tvFocusableScaleOnly(focusedScale = 1.04f)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Refresh,
-                contentDescription = null,
-                tint = AppChrome.TextPrimary,
-                modifier = Modifier.padding(end = 8.dp),
-            )
-            Text(
-                text = "重试播放",
-                color = AppChrome.TextPrimary,
-                style = MaterialTheme.typography.labelLarge,
-            )
-        }
-    }
-}

@@ -64,7 +64,7 @@ class AppPreferencesStoreTest {
     }
 
     @Test
-    fun tvSubtitlePreference_persistsLanguageAndTypePerVideoId() = runTest {
+    fun tvSubtitlePreference_persistsNormalizedAccountSemanticAndCanClear() = runTest {
         val dataStore = PreferenceDataStoreFactory.create(
             scope = backgroundScope,
             produceFile = {
@@ -78,18 +78,17 @@ class AppPreferencesStoreTest {
             gson = Gson(),
         )
 
-        assertNull(store.readTvSubtitlePreference("video-1"))
+        assertNull(store.readTvSubtitlePreference())
 
-        store.saveTvSubtitlePreference("video-1", TvTrackPreference(language = " zh-CN ", type = "DEFAULT"))
-        store.saveTvSubtitlePreference("video-2", TvTrackPreference())
+        store.saveTvSubtitlePreference(TvTrackPreference(language = " zh-CN ", type = "DEFAULT"))
+        assertEquals(TvTrackPreference(language = "zh-CN", type = "default"), store.readTvSubtitlePreference())
 
-        assertEquals(TvTrackPreference(language = "zh-CN", type = "default"), store.readTvSubtitlePreference("video-1"))
-        assertNull(store.readTvSubtitlePreference("video-2"))
-        assertNull(store.readTvSubtitlePreference("video-3"))
+        store.saveTvSubtitlePreference(TvTrackPreference())
+        assertNull(store.readTvSubtitlePreference())
     }
 
     @Test
-    fun tvAudioPreference_persistsLanguageAndTypePerVideoIdAndCanClear() = runTest {
+    fun tvAudioPreference_persistsNormalizedAccountSemanticAndCanClear() = runTest {
         val dataStore = PreferenceDataStoreFactory.create(
             scope = backgroundScope,
             produceFile = {
@@ -103,18 +102,14 @@ class AppPreferencesStoreTest {
             gson = Gson(),
         )
 
-        assertNull(store.readTvAudioPreference("video-1"))
+        assertNull(store.readTvAudioPreference())
 
-        store.saveTvAudioPreference("video-1", TvTrackPreference(language = "ja", type = "commentary"))
-        store.saveTvAudioPreference("video-2", TvTrackPreference())
+        store.saveTvAudioPreference(TvTrackPreference(language = "ja", type = "commentary"))
 
-        assertEquals(TvTrackPreference(language = "ja", type = "commentary"), store.readTvAudioPreference("video-1"))
-        assertNull(store.readTvAudioPreference("video-2"))
-        assertNull(store.readTvAudioPreference("video-3"))
+        assertEquals(TvTrackPreference(language = "ja", type = "commentary"), store.readTvAudioPreference())
 
-        store.saveTvAudioPreference("video-1", null)
-        assertNull(store.readTvAudioPreference("video-1"))
-        assertNull(store.readTvAudioPreference("video-2"))
+        store.saveTvAudioPreference(null)
+        assertNull(store.readTvAudioPreference())
     }
 
     @Test
@@ -139,10 +134,30 @@ class AppPreferencesStoreTest {
             prefs[legacyAudioKey] = """{"video-1":"audio-zh"}"""
         }
 
-        assertNull(store.readTvSubtitlePreference("video-1"))
+        assertNull(store.readTvSubtitlePreference())
 
         val prefs = dataStore.data.first()
         assertNull(prefs[legacySubtitleKey])
         assertNull(prefs[legacyAudioKey])
+    }
+
+    @Test
+    fun clearTokens_clearsAccountTrackPreferences() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
+            produceFile = {
+                File.createTempFile("app-preferences-store", ".preferences_pb").apply {
+                    deleteOnExit()
+                }
+            },
+        )
+        val store = AppPreferencesStore(dataStore = dataStore, gson = Gson())
+        store.saveTvSubtitlePreference(TvTrackPreference(language = "zh-CN", type = "default"))
+        store.saveTvAudioPreference(TvTrackPreference(language = "ja", type = "commentary"))
+
+        store.clearTokens()
+
+        assertNull(store.readTvSubtitlePreference())
+        assertNull(store.readTvAudioPreference())
     }
 }

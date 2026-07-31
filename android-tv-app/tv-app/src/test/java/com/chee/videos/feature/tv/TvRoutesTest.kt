@@ -26,7 +26,7 @@ class TvRoutesTest {
     @Test
     fun buildTvPlayerRoute_clampsInvalidSeasonAndEpisode() {
         assertEquals(
-            "tv/player/demo?season=1&episode=1",
+            "tv/player/demo?season=1&episode=1&startFromBeginning=false",
             buildTvPlayerRoute("demo", season = 0, episode = -5),
         )
     }
@@ -34,8 +34,16 @@ class TvRoutesTest {
     @Test
     fun buildTvPlayerRoute_encodesReservedCharactersInSeriesId() {
         assertEquals(
-            "tv/player/series%2Falpha%231?season=2&episode=5",
+            "tv/player/series%2Falpha%231?season=2&episode=5&startFromBeginning=false",
             buildTvPlayerRoute("series/alpha#1", season = 2, episode = 5),
+        )
+    }
+
+    @Test
+    fun buildTvPlayerRoute_carriesExplicitSeriesStartFromBeginningIntent() {
+        assertEquals(
+            "tv/player/demo?season=2&episode=5&startFromBeginning=true",
+            buildTvPlayerRoute("demo", season = 2, episode = 5, startFromBeginning = true),
         )
     }
 
@@ -66,7 +74,7 @@ class TvRoutesTest {
     @Test
     fun buildTvLongFormPlayerRoute_defaultsToMovieForUnsupportedType() {
         assertEquals(
-            "tv/long-form-player/demo?videoType=movie",
+            "tv/long-form-player/demo?videoType=movie&startFromBeginning=false",
             buildTvLongFormPlayerRoute(videoId = "demo", videoType = "unknown"),
         )
     }
@@ -74,8 +82,16 @@ class TvRoutesTest {
     @Test
     fun buildTvLongFormPlayerRoute_encodesReservedCharactersInVideoIdAndPreservesAvType() {
         assertEquals(
-            "tv/long-form-player/av%2F2026%23scene-1?videoType=av",
+            "tv/long-form-player/av%2F2026%23scene-1?videoType=av&startFromBeginning=false",
             buildTvLongFormPlayerRoute(videoId = "av/2026#scene-1", videoType = "av"),
+        )
+    }
+
+    @Test
+    fun buildTvLongFormPlayerRoute_carriesExplicitStartFromBeginningIntent() {
+        assertEquals(
+            "tv/long-form-player/demo?videoType=movie&startFromBeginning=true",
+            buildTvLongFormPlayerRoute(videoId = "demo", videoType = "movie", startFromBeginning = true),
         )
     }
 

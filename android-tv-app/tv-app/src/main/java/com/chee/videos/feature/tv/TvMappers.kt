@@ -102,6 +102,7 @@ internal fun tvEpisodeToUiModel(dto: TvEpisodeDto): TvEpisodeUiModel =
         number = dto.episodeNumber,
         title = dto.title.ifBlank { "第${dto.episodeNumber}集" },
         durationLabel = if (dto.runtime > 0) "${dto.runtime} 分钟" else "时长待更新",
+        durationSeconds = dto.runtime.coerceAtLeast(0) * 60,
         summary = dto.overview.orEmpty().ifBlank { "暂无剧情简介" },
         watchSeconds = dto.watchSeconds,
         lastWatchedAt = dto.lastWatchedAt.orEmpty(),

@@ -73,76 +73,15 @@ class LongFormVideoPlayerSpecTest {
     }
 
     @Test
-    fun `long form player screen embeds resume prompt via slot only`() {
-        // TvResumePromptCard 只能在 resumePromptSlot = { ... } 块里出现，不允许作为 LongFormVideoPlayer 兄弟节点平铺
-        assertTrue(
-            "TvLongFormPlayerScreen 必须通过 resumePromptSlot 把续播卡内嵌到 LongFormVideoPlayer",
-            longFormPlayerScreenSource.contains("resumePromptSlot ="),
-        )
-        // 简化版的 sibling 检测：TvResumePromptCard 第一处出现之前必须有 "resumePromptSlot ="
-        val cardIndex = longFormPlayerScreenSource.indexOf("TvResumePromptCard(")
-        val slotIndex = longFormPlayerScreenSource.indexOf("resumePromptSlot =")
-        assertTrue(
-            "TvLongFormPlayerScreen 的 TvResumePromptCard 必须位于 resumePromptSlot 块之后（即作为 slot 内容）",
-            cardIndex == -1 || (slotIndex in 0 until cardIndex),
-        )
-    }
-
-    @Test
-    fun `series player screen embeds resume prompt via slot only`() {
-        assertTrue(
-            "TvSeriesPlayerScreen 必须通过 resumePromptSlot 把续播卡内嵌到 LongFormVideoPlayer",
-            seriesPlayerScreenSource.contains("resumePromptSlot ="),
-        )
-        val cardIndex = seriesPlayerScreenSource.indexOf("TvResumePromptCard(")
-        val slotIndex = seriesPlayerScreenSource.indexOf("resumePromptSlot =")
-        assertTrue(
-            "TvSeriesPlayerScreen 的 TvResumePromptCard 必须位于 resumePromptSlot 块之后（即作为 slot 内容）",
-            cardIndex == -1 || (slotIndex in 0 until cardIndex),
-        )
-    }
-
-    @Test
-    fun `screens propagate overlay visibility into player`() {
-        assertTrue(
-            "TvLongFormPlayerScreen 必须把 backConfirmPromptVisible 透传给 LongFormVideoPlayer",
-            longFormPlayerScreenSource.contains("backConfirmPromptVisible = showBackConfirmPrompt"),
-        )
-        assertTrue(
-            "TvLongFormPlayerScreen 必须把 playerErrorVisible 透传给 LongFormVideoPlayer",
-            longFormPlayerScreenSource.contains("playerErrorVisible ="),
-        )
-        assertTrue(
-            "TvSeriesPlayerScreen 必须把 backConfirmPromptVisible 透传给 LongFormVideoPlayer",
-            seriesPlayerScreenSource.contains("backConfirmPromptVisible = showBackConfirmPrompt"),
-        )
-        assertTrue(
-            "TvSeriesPlayerScreen 必须把 playerErrorVisible 透传给 LongFormVideoPlayer",
-            seriesPlayerScreenSource.contains("playerErrorVisible ="),
-        )
-    }
-
-    @Test
-    fun `screens no longer place resume prompt as sibling fallback path`() {
-        // 兜底校验：单片和电视剧 screen 都有 LibVLC / Media3 两个分支，但都必须在 slot 中。
-        val longFormCount = Regex("TvResumePromptCard\\(").findAll(longFormPlayerScreenSource).count()
-        val seriesCount = Regex("TvResumePromptCard\\(").findAll(seriesPlayerScreenSource).count()
-        assertTrue(
-            "TvLongFormPlayerScreen 中 TvResumePromptCard 调用应仅出现在 LibVLC / Media3 两个 resumePromptSlot 中，当前 $longFormCount",
-            longFormCount <= 2,
-        )
-        assertTrue(
-            "TvSeriesPlayerScreen 中 TvResumePromptCard 调用应仅出现在 LibVLC / Media3 两个 resumePromptSlot 中，当前 $seriesCount",
-            seriesCount <= 2,
-        )
-        assertTrue(
-            "TvLongFormPlayerScreen 的 Media3 分支也必须通过 resumePromptSlot 内嵌续播卡",
-            longFormPlayerScreenSource.substringAfter("TvSeriesCorePlaybackOverlay(").contains("resumePromptSlot ="),
-        )
-        assertTrue(
-            "TvSeriesPlayerScreen 的 Media3 分支也必须通过 resumePromptSlot 内嵌续播卡",
-            seriesPlayerScreenSource.substringAfter("TvSeriesCorePlaybackOverlay(").contains("resumePromptSlot ="),
-        )
+    fun `tv long form screens use the shared chrome and lightweight resume notice`() {
+        listOf(longFormPlayerScreenSource, seriesPlayerScreenSource).forEach { source ->
+            assertTrue(source.contains("TvLongFormPlaybackChrome("))
+            assertTrue(source.contains("resumeNoticeText ="))
+            assertTrue(source.contains("blockingUiVisible ="))
+            assertFalse(source.contains("TvResumePromptCard("))
+            assertFalse(source.contains("TvSeriesCorePlaybackOverlay("))
+            assertFalse(source.contains("showBackConfirmPrompt"))
+        }
     }
 
     @Test

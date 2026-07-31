@@ -73,7 +73,7 @@ private val TvLongFormActorFallbackColor = AppChrome.SurfaceStrong
 @Composable
 fun TvLongFormDetailScreen(
     onBack: () -> Unit,
-    onPlay: (String, String) -> Unit,
+    onPlay: (String, String, Boolean) -> Unit,
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -214,17 +214,29 @@ fun TvLongFormDetailScreen(
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val hasResume = shouldOfferTvLongFormContinuePlayback(
+                                watchSeconds = detail.userState.watchSeconds,
+                                durationSeconds = detail.duration,
+                            )
                             TvActionButton(
-                                text = if (canPlay) hero.primaryActionLabel else "暂无片源",
+                                text = if (!canPlay) "暂无片源" else if (hasResume) "继续播放" else hero.primaryActionLabel,
                                 icon = Icons.Filled.PlayArrow,
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 enabled = canPlay,
                                 onClick = {
                                     if (canPlay) {
-                                        onPlay(detail.id, uiState.videoType)
+                                        onPlay(detail.id, uiState.videoType, false)
                                     }
                                 },
                             )
+                            if (canPlay && hasResume) {
+                                TvActionButton(
+                                    text = "从头播放",
+                                    icon = Icons.Filled.Refresh,
+                                    tone = TvActionButtonTone.Secondary,
+                                    onClick = { onPlay(detail.id, uiState.videoType, true) },
+                                )
+                            }
                             TvActionButton(
                                 text = hero.secondaryActionLabel,
                                 icon = Icons.Filled.Star,

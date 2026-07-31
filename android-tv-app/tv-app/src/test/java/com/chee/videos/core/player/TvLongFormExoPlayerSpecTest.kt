@@ -14,7 +14,7 @@ class TvLongFormExoPlayerSpecTest {
 
         listOf(longForm, series).forEach { source ->
             assertTrue(source.contains("TvLongFormMedia3Player("))
-            assertTrue(source.contains("TvSeriesCorePlaybackOverlay("))
+            assertTrue(source.contains("TvLongFormPlaybackChrome("))
             assertFalse(source.contains("org.videolan.libvlc"))
             assertFalse(source.contains("TvVlcLibrary"))
             assertFalse(source.contains("newLongFormMediaPlayer"))

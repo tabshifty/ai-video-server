@@ -8,6 +8,7 @@ data class TvEpisodeUiModel(
     val title: String,
     val durationLabel: String,
     val summary: String,
+    val durationSeconds: Int = 0,
     val watchSeconds: Int = 0,
     val lastWatchedAt: String = "",
     val progressPercent: Int = 0,

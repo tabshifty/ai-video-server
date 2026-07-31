@@ -8,24 +8,16 @@ import org.junit.Test
 
 class TvResumePromptCardSpecTest {
     @Test
-    fun `long form and series players render resume prompt at bottom start`() {
+    fun `long form and series players render a non-focusable resume notice`() {
         val longForm = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
         val series = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
 
         listOf(longForm, series).forEach { source ->
-            assertTrue(source.contains("TvResumePromptCard("))
-            assertTrue(source.contains("Alignment.BottomStart"))
-            assertTrue(source.contains("TvResumePromptTokens.HorizontalPaddingDp"))
-            assertTrue(source.contains("TvResumePromptTokens.BottomPaddingDp"))
             assertTrue(source.contains("shouldTriggerResumePrompt("))
-            assertTrue(source.contains("shouldShowResumePromptCard("))
-            assertTrue(source.contains("LaunchedEffect") && source.contains("shouldTickResumePromptCountdown"))
-            assertTrue(source.contains("isTrackSheetVisible = isTrackSheetVisible"))
-            assertTrue(source.contains("TvSeriesCorePlaybackOverlay("))
-            assertTrue(source.contains("resumePromptSlot = {"))
-            assertTrue(source.contains("TvMedia3TrackPickerLayer("))
-            assertTrue(source.contains("showBackConfirmPrompt"))
-            assertTrue(source.contains("withFrameNanos"))
+            assertTrue(source.contains("resumeNoticeText ="))
+            assertTrue(source.contains("TvLongFormPlaybackChrome("))
+            assertFalse(source.contains("TvResumePromptCard("))
+            assertFalse(source.contains("showBackConfirmPrompt"))
         }
         assertTrue(longForm.contains("resumedFromHistoryVideoId == detail.id"))
         assertTrue(series.contains("resumedFromHistoryVideoId == uiState.currentVideoId"))

@@ -1,12 +1,23 @@
 package com.chee.videos.feature.tv
 
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TvLongFormMedia3PlayerTest {
+    @Test
+    fun mediaSessionSeekCommandsUseTheConfiguredTvStep() {
+        val source = java.nio.file.Path.of(
+            "src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt",
+        ).toFile().readText()
+
+        assertTrue(source.contains(".setSeekBackIncrementMs(seekIncrementMs)"))
+        assertTrue(source.contains(".setSeekForwardIncrementMs(seekIncrementMs)"))
+    }
+
     @Test
     fun seriesMedia3RouteAutoStartsWhenNewSourceIsReady() {
         assertTrue(
@@ -85,7 +96,7 @@ class TvLongFormMedia3PlayerTest {
 
     @Test
     fun startupTimeoutMessageUsesUnifiedLongFormWording() {
-        assertEquals("长视频 ExoPlayer 播放链路启动超时，请重试", TvLongFormMedia3StartupTimeoutMessage)
+        assertEquals("视频加载超时，请重试", TvLongFormMedia3StartupTimeoutMessage)
     }
 
     @Test
@@ -120,5 +131,25 @@ class TvLongFormMedia3PlayerTest {
                 isPreparedPlayerCurrent = false,
             ),
         )
+    }
+
+    @Test
+    fun onlyTemporaryMedia3FailuresAreRetried() {
+        assertTrue(isTvLongFormMedia3ErrorCodeRetryable(PlaybackException.ERROR_CODE_TIMEOUT))
+        assertTrue(isTvLongFormMedia3ErrorCodeRetryable(PlaybackException.ERROR_CODE_IO_UNSPECIFIED))
+        assertTrue(isTvLongFormMedia3ErrorCodeRetryable(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED))
+        assertTrue(isTvLongFormMedia3ErrorCodeRetryable(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT))
+        assertFalse(isTvLongFormMedia3ErrorCodeRetryable(PlaybackException.ERROR_CODE_DECODING_FAILED))
+        assertFalse(isTvLongFormMedia3ErrorCodeRetryable(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND))
+        assertFalse(isTvLongFormMedia3ErrorCodeRetryable(PlaybackException.ERROR_CODE_IO_NO_PERMISSION))
+    }
+
+    @Test
+    fun httpRetryPolicyAcceptsThrottlingTimeoutAndServerFailuresOnly() {
+        assertTrue(isTvLongFormHttpStatusRetryable(408))
+        assertTrue(isTvLongFormHttpStatusRetryable(429))
+        assertTrue(isTvLongFormHttpStatusRetryable(503))
+        assertFalse(isTvLongFormHttpStatusRetryable(401))
+        assertFalse(isTvLongFormHttpStatusRetryable(404))
     }
 }

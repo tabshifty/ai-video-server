@@ -35,11 +35,11 @@ class FakeTvRepository(
     private val sourceUrlError: Throwable? = null,
     private var tvSeekStepSeconds: Int = 10,
     private var tvSeriesAutoplayEnabled: Boolean? = null,
-    subtitlePreferences: Map<String, TvTrackPreference> = emptyMap(),
-    audioPreferences: Map<String, TvTrackPreference> = emptyMap(),
+    subtitlePreference: TvTrackPreference? = null,
+    audioPreference: TvTrackPreference? = null,
 ) : TvRepository {
-    private val storedSubtitlePreferences = subtitlePreferences.toMutableMap()
-    private val storedAudioPreferences = audioPreferences.toMutableMap()
+    private var storedSubtitlePreference = subtitlePreference
+    private var storedAudioPreference = audioPreference
     val historyReports = mutableListOf<TvHistoryReport>()
     val homeRequests = mutableListOf<TvHomeRequest>()
     val searchRequests = mutableListOf<TvSearchRequest>()
@@ -133,24 +133,16 @@ class FakeTvRepository(
         historyReports += TvHistoryReport(videoId, watchSeconds, completed)
     }
 
-    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = storedSubtitlePreferences[videoId]
+    override suspend fun readTvSubtitlePreference(): TvTrackPreference? = storedSubtitlePreference
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
-        if (preference == null) {
-            storedSubtitlePreferences.remove(videoId)
-        } else {
-            storedSubtitlePreferences[videoId] = preference
-        }
+    override suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) {
+        storedSubtitlePreference = preference
     }
 
-    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = storedAudioPreferences[videoId]
+    override suspend fun readTvAudioPreference(): TvTrackPreference? = storedAudioPreference
 
-    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
-        if (preference == null) {
-            storedAudioPreferences.remove(videoId)
-        } else {
-            storedAudioPreferences[videoId] = preference
-        }
+    override suspend fun saveTvAudioPreference(preference: TvTrackPreference?) {
+        storedAudioPreference = preference
     }
 
     override suspend fun readTvSeekStepSeconds(): Int = tvSeekStepSeconds
@@ -258,13 +250,13 @@ class DelayedSourceTvRepository(
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
 
-    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvSubtitlePreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) = Unit
 
-    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvAudioPreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvAudioPreference(preference: TvTrackPreference?) = Unit
 
     override suspend fun readTvSeekStepSeconds(): Int = 10
 
@@ -357,13 +349,13 @@ class DelayedCatalogTvRepository(
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
 
-    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvSubtitlePreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) = Unit
 
-    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvAudioPreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvAudioPreference(preference: TvTrackPreference?) = Unit
 
     override suspend fun readTvSeekStepSeconds(): Int = 10
 
@@ -475,13 +467,13 @@ class DelayedIptvTvRepository(
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
 
-    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvSubtitlePreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) = Unit
 
-    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvAudioPreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvAudioPreference(preference: TvTrackPreference?) = Unit
 
     override suspend fun readTvSeekStepSeconds(): Int = 10
 
@@ -563,13 +555,13 @@ class DelayedSeriesDetailTvRepository(
 
     override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
 
-    override suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvSubtitlePreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) = Unit
 
-    override suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? = null
+    override suspend fun readTvAudioPreference(): TvTrackPreference? = null
 
-    override suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) = Unit
+    override suspend fun saveTvAudioPreference(preference: TvTrackPreference?) = Unit
 
     override suspend fun readTvSeekStepSeconds(): Int = 10
 

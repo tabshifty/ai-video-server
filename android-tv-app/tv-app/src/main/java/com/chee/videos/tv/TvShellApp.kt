@@ -57,6 +57,7 @@ import com.chee.videos.feature.connection.ConnectionScreen
 import com.chee.videos.feature.tv.TvEpisodeArg
 import com.chee.videos.feature.tv.TvLongFormDetailRoutePattern
 import com.chee.videos.feature.tv.TvLongFormPlayerRoutePattern
+import com.chee.videos.feature.tv.TvLongFormStartFromBeginningArg
 import com.chee.videos.feature.tv.TvLongFormVideoIdArg
 import com.chee.videos.feature.tv.TvLongFormVideoTypeArg
 import com.chee.videos.feature.tv.TvLongFormDetailScreen
@@ -293,8 +294,8 @@ private fun TvAuthenticatedNav(
                     ) {
                         TvLongFormDetailScreen(
                             onBack = { navController.popBackStack() },
-                            onPlay = { videoId, videoType ->
-                                navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType))
+                            onPlay = { videoId, videoType, startFromBeginning ->
+                                navController.navigate(buildTvLongFormPlayerRoute(videoId, videoType, startFromBeginning))
                             },
                         )
                     }
@@ -305,6 +306,10 @@ private fun TvAuthenticatedNav(
                             navArgument(TvLongFormVideoTypeArg) {
                                 type = NavType.StringType
                                 defaultValue = "movie"
+                            },
+                            navArgument(TvLongFormStartFromBeginningArg) {
+                                type = NavType.BoolType
+                                defaultValue = false
                             },
                         ),
                         enterTransition = { EnterTransition.None },
@@ -358,8 +363,10 @@ private fun TvAuthenticatedNav(
                         CompositionLocalProvider(LocalTvAnimatedContentScope provides this@composable) {
                             TvSeriesDetailScreen(
                                 onBack = { navController.popBackStack() },
-                                onPlayEpisode = { seriesId, season, episode ->
-                                    navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
+                                onPlayEpisode = { seriesId, season, episode, startFromBeginning ->
+                                    navController.navigate(
+                                        buildTvPlayerRoute(seriesId, season, episode, startFromBeginning),
+                                    )
                                 },
                             )
                         }
@@ -370,6 +377,10 @@ private fun TvAuthenticatedNav(
                             navArgument(TvSeriesIdArg) { type = NavType.StringType },
                             navArgument(TvSeasonArg) { type = NavType.IntType; defaultValue = 1 },
                             navArgument(TvEpisodeArg) { type = NavType.IntType; defaultValue = 1 },
+                            navArgument(TvLongFormStartFromBeginningArg) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
                         ),
                         enterTransition = { EnterTransition.None },
                         exitTransition = { ExitTransition.None },

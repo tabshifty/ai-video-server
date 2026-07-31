@@ -363,18 +363,18 @@ class VideoRepository @Inject constructor(
 
     suspend fun readAccessToken(): String? = store.readAccessToken()
 
-    suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? =
-        store.readTvSubtitlePreference(videoId)
+    suspend fun readTvSubtitlePreference(): TvTrackPreference? =
+        store.readTvSubtitlePreference()
 
-    suspend fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
-        store.saveTvSubtitlePreference(videoId, preference)
+    suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) {
+        store.saveTvSubtitlePreference(preference)
     }
 
-    suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? =
-        store.readTvAudioPreference(videoId)
+    suspend fun readTvAudioPreference(): TvTrackPreference? =
+        store.readTvAudioPreference()
 
-    suspend fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
-        store.saveTvAudioPreference(videoId, preference)
+    suspend fun saveTvAudioPreference(preference: TvTrackPreference?) {
+        store.saveTvAudioPreference(preference)
     }
 
     suspend fun readTvSeekStepSeconds(): Int =

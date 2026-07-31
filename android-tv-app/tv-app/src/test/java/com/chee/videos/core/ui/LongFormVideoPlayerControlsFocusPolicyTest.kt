@@ -6,7 +6,7 @@ import org.junit.Test
 
 class LongFormVideoPlayerControlsFocusPolicyTest {
     @Test
-    fun seriesControlsWrapAcrossThreeActions() {
+    fun seriesControlsStopAtHorizontalEdges() {
         val targets = listOf(
             TvControlFocusTarget.PlayPause,
             TvControlFocusTarget.Subtitle,
@@ -14,7 +14,7 @@ class LongFormVideoPlayerControlsFocusPolicyTest {
         )
 
         assertEquals(
-            TvControlFocusTarget.AudioTrack,
+            TvControlFocusTarget.PlayPause,
             resolveTvControlHorizontalFocusTarget(
                 current = TvControlFocusTarget.PlayPause,
                 direction = TvControlFocusDirection.Left,
@@ -30,7 +30,7 @@ class LongFormVideoPlayerControlsFocusPolicyTest {
             ),
         )
         assertEquals(
-            TvControlFocusTarget.PlayPause,
+            TvControlFocusTarget.AudioTrack,
             resolveTvControlHorizontalFocusTarget(
                 current = TvControlFocusTarget.AudioTrack,
                 direction = TvControlFocusDirection.Right,

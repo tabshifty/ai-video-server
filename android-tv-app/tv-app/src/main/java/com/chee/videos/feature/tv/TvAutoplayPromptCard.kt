@@ -75,7 +75,7 @@ fun TvAutoplayPromptCard(
                         modifier = Modifier.focusRequester(playNowFocusRequester),
                     )
                     TvAutoplayActionButton(
-                        text = "取消本次",
+                        text = "观看片尾",
                         onClick = onCancel,
                     )
                 }

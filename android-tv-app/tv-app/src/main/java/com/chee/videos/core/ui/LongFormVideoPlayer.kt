@@ -128,8 +128,8 @@ internal fun resolveTvControlHorizontalFocusTarget(
         return null
     }
     return when (direction) {
-        TvControlFocusDirection.Left -> targets[(index - 1 + targets.size) % targets.size]
-        TvControlFocusDirection.Right -> targets[(index + 1) % targets.size]
+        TvControlFocusDirection.Left -> targets[(index - 1).coerceAtLeast(0)]
+        TvControlFocusDirection.Right -> targets[(index + 1).coerceAtMost(targets.lastIndex)]
     }
 }
 

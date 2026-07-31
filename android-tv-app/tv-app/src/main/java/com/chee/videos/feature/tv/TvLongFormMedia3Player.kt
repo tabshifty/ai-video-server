@@ -2,8 +2,10 @@
 
 package com.chee.videos.feature.tv
 
+import android.content.Context
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.accessibility.CaptioningManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,22 +24,28 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaSession
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.SubtitleView
 import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.tv.R
 import kotlinx.coroutines.delay
 
-internal const val TvLongFormMedia3StartupTimeoutMillis = 15_000L
-internal const val TvLongFormMedia3StartupTimeoutMessage = "长视频 ExoPlayer 播放链路启动超时，请重试"
+internal const val TvLongFormMedia3StartupTimeoutMillis = TvLongFormLoadingTimeoutMillis
+internal const val TvLongFormMedia3StartupTimeoutMessage = "视频加载超时，请重试"
 private const val TvLongFormMedia3RetryKeySeparator = "|retry:"
 
 internal fun buildTvLongFormMedia3ItemId(mediaId: String, retryKey: Int): String =
@@ -109,23 +117,25 @@ internal fun TvLongFormMedia3Player(
     title: String,
     accessToken: String,
     retryKey: Int,
-    cancelPrepareRequestKey: Int = 0,
-    cancelPrepareRetryKey: Int? = null,
     shouldPlay: Boolean,
     initialPositionMs: Long,
+    tvSeekStepSeconds: Int,
     seekPositionMs: Long? = null,
     seekRequestKey: Int = 0,
     outputSurface: TvPlaybackOutputSurface = TvPlaybackOutputSurface.TEXTURE_VIEW,
     subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
     selectedSubtitleTrackId: String? = null,
     selectedAudioTrackId: String? = null,
+    interactionMode: TvLongFormInteractionMode = TvLongFormInteractionMode.Hidden,
     modifier: Modifier = Modifier,
     onPlayingChanged: (Boolean, TvLongFormMedia3EventIdentity) -> Unit = { _, _ -> },
     onRenderedFirstFrame: (TvLongFormMedia3EventIdentity) -> Unit = {},
-    onError: (String, TvLongFormMedia3EventIdentity) -> Unit = { _, _ -> },
+    onError: (String, TvLongFormMedia3EventIdentity, Boolean) -> Unit = { _, _, _ -> },
     onEnded: () -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
     onLifecyclePauseSnapshot: (TvMedia3PlaybackSnapshot) -> Unit = {},
+    onLifecyclePaused: () -> Unit = {},
+    onPlaybackStatusChanged: (TvLongFormPlaybackStatus) -> Unit = {},
     onAudioTracksChanged: (List<LongFormAudioTrack>) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -136,6 +146,8 @@ internal fun TvLongFormMedia3Player(
     val latestOnEnded by rememberUpdatedState(onEnded)
     val latestOnSnapshotChanged by rememberUpdatedState(onSnapshotChanged)
     val latestOnLifecyclePauseSnapshot by rememberUpdatedState(onLifecyclePauseSnapshot)
+    val latestOnLifecyclePaused by rememberUpdatedState(onLifecyclePaused)
+    val latestOnPlaybackStatusChanged by rememberUpdatedState(onPlaybackStatusChanged)
     val latestOnAudioTracksChanged by rememberUpdatedState(onAudioTracksChanged)
     val dataSourceFactory = remember(accessToken) {
         DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
@@ -144,12 +156,21 @@ internal fun TvLongFormMedia3Player(
             }
         }
     }
-    val player = remember(accessToken) { ExoPlayer.Builder(context).build() }
+    val seekIncrementMs = tvSeekStepSeconds.coerceAtLeast(1).toLong() * 1_000L
+    val player = remember(accessToken, seekIncrementMs) {
+        ExoPlayer.Builder(context)
+            .setSeekBackIncrementMs(seekIncrementMs)
+            .setSeekForwardIncrementMs(seekIncrementMs)
+            .build()
+            .apply {
+            setAudioAttributes(AudioAttributes.DEFAULT, true)
+            setHandleAudioBecomingNoisy(true)
+        }
+    }
     val playerSourceKey = remember(player) { Any() }
     var preparedPlayerSourceKey by remember { mutableStateOf<Any?>(null) }
     var preparedSourceKey by remember { mutableStateOf("") }
     var preparedIdentity by remember { mutableStateOf<TvLongFormMedia3EventIdentity?>(null) }
-    var canceledIdentity by remember { mutableStateOf<TvLongFormMedia3EventIdentity?>(null) }
     var resumeAppliedSourceKey by remember { mutableStateOf("") }
     var playbackState by remember { mutableStateOf(Player.STATE_IDLE) }
     var isMedia3Playing by remember { mutableStateOf(false) }
@@ -161,15 +182,32 @@ internal fun TvLongFormMedia3Player(
                 trackSelectionRevision += 1
                 latestOnAudioTracksChanged(buildTvMedia3AudioTracks(tracks))
             }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (
+                    !playWhenReady &&
+                    reason in setOf(
+                        Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS,
+                        Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY,
+                    )
+                ) {
+                    latestOnLifecyclePaused()
+                }
+            }
         }
         val analyticsListener = object : AnalyticsListener {
             override fun onIsPlayingChanged(eventTime: AnalyticsListener.EventTime, isPlaying: Boolean) {
                 val eventIdentity = eventTime.eventIdentity() ?: return
-                if (eventIdentity == canceledIdentity) {
-                    return
-                }
                 if (eventIdentity == preparedIdentity) {
                     isMedia3Playing = isPlaying
+                }
+                if (eventIdentity == preparedIdentity) {
+                    latestOnPlaybackStatusChanged(
+                        if (isPlaying) TvLongFormPlaybackStatus.Playing else resolveTvLongFormPlaybackStatus(
+                            playbackState = playbackState,
+                            shouldPlay = player.playWhenReady,
+                        ),
+                    )
                 }
                 latestOnPlayingChanged(isPlaying, eventIdentity)
             }
@@ -179,10 +217,16 @@ internal fun TvLongFormMedia3Player(
                 nextPlaybackState: Int,
             ) {
                 val eventIdentity = eventTime.eventIdentity() ?: return
-                if (eventIdentity == canceledIdentity || eventIdentity != preparedIdentity) {
+                if (eventIdentity != preparedIdentity) {
                     return
                 }
                 playbackState = nextPlaybackState
+                latestOnPlaybackStatusChanged(
+                    resolveTvLongFormPlaybackStatus(
+                        playbackState = nextPlaybackState,
+                        shouldPlay = player.playWhenReady,
+                    ),
+                )
                 if (nextPlaybackState == Player.STATE_ENDED) {
                     latestOnEnded()
                 }
@@ -194,9 +238,6 @@ internal fun TvLongFormMedia3Player(
                 renderTimeMs: Long,
             ) {
                 val eventIdentity = eventTime.eventIdentity() ?: return
-                if (eventIdentity == canceledIdentity) {
-                    return
-                }
                 latestOnRenderedFirstFrame(eventIdentity)
             }
 
@@ -205,14 +246,16 @@ internal fun TvLongFormMedia3Player(
                 error: androidx.media3.common.PlaybackException,
             ) {
                 val eventIdentity = eventTime.eventIdentity() ?: return
-                if (eventIdentity == canceledIdentity) {
-                    return
-                }
                 if (eventIdentity == preparedIdentity) {
                     isMedia3Playing = false
                 }
+                latestOnPlaybackStatusChanged(TvLongFormPlaybackStatus.Error)
                 latestOnPlayingChanged(false, eventIdentity)
-                latestOnError(friendlyLongFormPlaybackErrorMessage(error), eventIdentity)
+                latestOnError(
+                    friendlyLongFormPlaybackErrorMessage(error),
+                    eventIdentity,
+                    error.isTvLongFormRetryable(),
+                )
             }
         }
         player.addListener(listener)
@@ -221,6 +264,7 @@ internal fun TvLongFormMedia3Player(
             player.removeListener(listener)
             player.removeAnalyticsListener(analyticsListener)
             latestOnAudioTracksChanged(emptyList())
+            latestOnPlaybackStatusChanged(TvLongFormPlaybackStatus.Idle)
             latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
             latestOnPlayingChanged(
                 false,
@@ -241,10 +285,10 @@ internal fun TvLongFormMedia3Player(
             preparedPlayerSourceKey = null
             preparedSourceKey = ""
             preparedIdentity = null
-            canceledIdentity = null
             resumeAppliedSourceKey = ""
             playbackState = Player.STATE_IDLE
             isMedia3Playing = false
+            latestOnPlaybackStatusChanged(TvLongFormPlaybackStatus.Idle)
             trackSelectionRevision += 1
             latestOnAudioTracksChanged(emptyList())
             return@LaunchedEffect
@@ -260,7 +304,6 @@ internal fun TvLongFormMedia3Player(
             preparedPlayerSourceKey = playerSourceKey
             preparedSourceKey = sourceKey
             preparedIdentity = nextIdentity
-            canceledIdentity = null
             resumeAppliedSourceKey = ""
             val mediaItem = MediaItem.Builder()
                 .setUri(sourceUrl)
@@ -277,28 +320,10 @@ internal fun TvLongFormMedia3Player(
             player.prepare()
             playbackState = Player.STATE_IDLE
             isMedia3Playing = false
+            latestOnPlaybackStatusChanged(TvLongFormPlaybackStatus.Preparing)
             trackSelectionRevision += 1
             latestOnAudioTracksChanged(emptyList())
         }
-    }
-
-    LaunchedEffect(player, cancelPrepareRequestKey, cancelPrepareRetryKey) {
-        if (
-            cancelPrepareRequestKey <= 0 ||
-            cancelPrepareRetryKey == null ||
-            preparedIdentity != TvLongFormMedia3EventIdentity(mediaId, cancelPrepareRetryKey) ||
-            preparedSourceKey.isBlank()
-        ) {
-            return@LaunchedEffect
-        }
-        latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
-        val cancelIdentity = TvLongFormMedia3EventIdentity(mediaId, cancelPrepareRetryKey)
-        canceledIdentity = cancelIdentity
-        player.playWhenReady = false
-        player.stop()
-        playbackState = Player.STATE_IDLE
-        isMedia3Playing = false
-        latestOnPlayingChanged(false, cancelIdentity)
     }
 
     LaunchedEffect(player, preparedSourceKey, initialPositionMs) {
@@ -347,8 +372,8 @@ internal fun TvLongFormMedia3Player(
         }
     }
 
-    LaunchedEffect(player, preparedSourceKey, preparedIdentity, canceledIdentity, shouldPlay) {
-        if (preparedSourceKey.isBlank() || preparedIdentity == canceledIdentity) {
+    LaunchedEffect(player, preparedSourceKey, preparedIdentity, shouldPlay) {
+        if (preparedSourceKey.isBlank()) {
             return@LaunchedEffect
         }
         player.playWhenReady = shouldPlay
@@ -359,26 +384,37 @@ internal fun TvLongFormMedia3Player(
         }
     }
 
-    LaunchedEffect(preparedSourceKey, preparedIdentity, canceledIdentity, shouldPlay, playbackState, isMedia3Playing, retryKey) {
+    LaunchedEffect(preparedSourceKey, preparedIdentity, shouldPlay, playbackState, isMedia3Playing, retryKey) {
         if (
-            preparedIdentity == canceledIdentity ||
             !shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)
         ) {
             return@LaunchedEffect
         }
         delay(TvLongFormMedia3StartupTimeoutMillis)
         if (
-            preparedIdentity != canceledIdentity &&
             shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)
         ) {
             player.pause()
             val timeoutIdentity = TvLongFormMedia3EventIdentity(mediaId, retryKey)
             latestOnPlayingChanged(false, timeoutIdentity)
-            latestOnError(TvLongFormMedia3StartupTimeoutMessage, timeoutIdentity)
+            latestOnError(TvLongFormMedia3StartupTimeoutMessage, timeoutIdentity, true)
         }
     }
 
-    DisposableEffect(lifecycleOwner, player, shouldPlay, preparedSourceKey) {
+    DisposableEffect(lifecycleOwner, player, preparedSourceKey) {
+        var mediaSession: MediaSession? = null
+        fun activateMediaSession() {
+            if (mediaSession == null) {
+                mediaSession = MediaSession.Builder(context, player).build()
+            }
+        }
+        fun deactivateMediaSession() {
+            mediaSession?.release()
+            mediaSession = null
+        }
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            activateMediaSession()
+        }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
@@ -388,11 +424,12 @@ internal fun TvLongFormMedia3Player(
                         latestOnLifecyclePauseSnapshot(snapshot)
                     }
                     player.pause()
+                    latestOnPlaybackStatusChanged(TvLongFormPlaybackStatus.Paused)
+                    latestOnLifecyclePaused()
+                    deactivateMediaSession()
                 }
                 Lifecycle.Event.ON_RESUME -> {
-                    if (shouldPlay && preparedSourceKey.isNotBlank() && preparedIdentity != canceledIdentity) {
-                        player.play()
-                    }
+                    activateMediaSession()
                 }
                 else -> Unit
             }
@@ -400,6 +437,7 @@ internal fun TvLongFormMedia3Player(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            deactivateMediaSession()
         }
     }
 
@@ -432,12 +470,86 @@ internal fun TvLongFormMedia3Player(
                     )
                     setKeepContentOnPlayerReset(true)
                     this.player = player
+                    applyTvLongFormSubtitlePresentation(context, interactionMode)
                 }
             },
             update = { view ->
                 view.player = player
+                view.applyTvLongFormSubtitlePresentation(context, interactionMode)
             },
         )
+    }
+}
+
+internal fun resolveTvLongFormPlaybackStatus(
+    playbackState: Int,
+    shouldPlay: Boolean,
+): TvLongFormPlaybackStatus = when (playbackState) {
+    Player.STATE_IDLE -> TvLongFormPlaybackStatus.Preparing
+    Player.STATE_BUFFERING -> TvLongFormPlaybackStatus.Buffering
+    Player.STATE_READY -> if (shouldPlay) TvLongFormPlaybackStatus.Playing else TvLongFormPlaybackStatus.Paused
+    Player.STATE_ENDED -> TvLongFormPlaybackStatus.Ended
+    else -> TvLongFormPlaybackStatus.Idle
+}
+
+internal fun isTvLongFormMedia3ErrorCodeRetryable(errorCode: Int): Boolean = errorCode in setOf(
+    PlaybackException.ERROR_CODE_TIMEOUT,
+    PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+)
+
+internal fun isTvLongFormHttpStatusRetryable(statusCode: Int): Boolean =
+    statusCode == 408 || statusCode == 429 || statusCode in 500..599
+
+private fun PlaybackException.isTvLongFormRetryable(): Boolean {
+    if (isTvLongFormMedia3ErrorCodeRetryable(errorCode)) {
+        return true
+    }
+    if (errorCode != PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
+        return false
+    }
+    val responseCode = generateSequence(cause) { it.cause }
+        .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
+        .firstOrNull()
+        ?.responseCode
+        ?: return false
+    return isTvLongFormHttpStatusRetryable(responseCode)
+}
+
+private fun PlayerView.applyTvLongFormSubtitlePresentation(
+    context: Context,
+    interactionMode: TvLongFormInteractionMode,
+) {
+    val captions = context.getSystemService(Context.CAPTIONING_SERVICE) as? CaptioningManager
+    subtitleView?.apply {
+        if (captions?.isEnabled == true) {
+            setStyle(CaptionStyleCompat.createFromCaptionStyle(captions.userStyle))
+            setFractionalTextSize(
+                SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * captions.fontScale.coerceIn(0.75f, 2f),
+            )
+        } else {
+            setStyle(CaptionStyleCompat.DEFAULT)
+            setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION)
+        }
+        setBottomPaddingFraction(
+            when (interactionMode) {
+                TvLongFormInteractionMode.Controls,
+                TvLongFormInteractionMode.PrecisionSeek,
+                -> 0.24f
+                else -> 0.08f
+            },
+        )
+        val endPadding = if (
+            interactionMode == TvLongFormInteractionMode.SubtitlePanel ||
+            interactionMode == TvLongFormInteractionMode.AudioPanel ||
+            interactionMode == TvLongFormInteractionMode.EpisodePanel
+        ) {
+            (440 * context.resources.displayMetrics.density).toInt()
+        } else {
+            0
+        }
+        setPadding(0, 0, endPadding, 0)
     }
 }
 

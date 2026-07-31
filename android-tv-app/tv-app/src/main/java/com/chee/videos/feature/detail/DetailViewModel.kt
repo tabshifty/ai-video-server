@@ -27,6 +27,7 @@ data class DetailUiState(
     val accessToken: String = "",
     val preferredPlaybackProfile: String = "",
     val tvSeekStepSeconds: Int = 10,
+    val startFromBeginning: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -39,6 +40,7 @@ class DetailViewModel @Inject constructor(
 
     private val videoId: String = decodeTvRouteArg(savedStateHandle["videoId"])
     private val videoType: String = savedStateHandle.get<String>("videoType").orEmpty()
+    private val startFromBeginning: Boolean = savedStateHandle.get<Boolean>("startFromBeginning") ?: false
     private var requestVersion = 0
 
     private val _uiState = MutableStateFlow(DetailUiState())
@@ -64,6 +66,7 @@ class DetailViewModel @Inject constructor(
                     accessToken = accessToken,
                     preferredPlaybackProfile = videoRepository.preferredLongFormPlaybackProfile().wireValue,
                     tvSeekStepSeconds = videoRepository.readTvSeekStepSeconds(),
+                    startFromBeginning = startFromBeginning,
                     errorMessage = null,
                 )
             }
@@ -123,27 +126,21 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    suspend fun readTvSubtitlePreference(videoId: String): TvTrackPreference? =
-        videoRepository.readTvSubtitlePreference(videoId)
+    suspend fun readTvSubtitlePreference(): TvTrackPreference? =
+        videoRepository.readTvSubtitlePreference()
 
-    fun saveTvSubtitlePreference(videoId: String, preference: TvTrackPreference?) {
-        if (videoId.isBlank()) {
-            return
-        }
+    fun saveTvSubtitlePreference(preference: TvTrackPreference?) {
         viewModelScope.launch {
-            videoRepository.saveTvSubtitlePreference(videoId, preference)
+            videoRepository.saveTvSubtitlePreference(preference)
         }
     }
 
-    suspend fun readTvAudioPreference(videoId: String): TvTrackPreference? =
-        videoRepository.readTvAudioPreference(videoId)
+    suspend fun readTvAudioPreference(): TvTrackPreference? =
+        videoRepository.readTvAudioPreference()
 
-    fun saveTvAudioPreference(videoId: String, preference: TvTrackPreference?) {
-        if (videoId.isBlank()) {
-            return
-        }
+    fun saveTvAudioPreference(preference: TvTrackPreference?) {
         viewModelScope.launch {
-            videoRepository.saveTvAudioPreference(videoId, preference)
+            videoRepository.saveTvAudioPreference(preference)
         }
     }
 

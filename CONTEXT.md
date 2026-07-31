@@ -186,6 +186,30 @@
 - `DV 重试依赖本地状态变化`：Dolby Vision 风险阻断页上的“重试”只有在能力判断依赖的本地状态刚发生变化时才真正有意义，例如显示模式、外接显示链路或相关系统状态变化；无论阻断原因是能力未知还是明确不支持，如果这些前置条件没有变化，重复点击本质上只是重复得到同一结论，不应被包装成通用修复手段。
 - `普通非 DV 播放链路（迁移前）`：在 TV Dolby Vision 播放兼容语境里，曾指 TV 长视频 LibVLC 播放链路，不包含任何新的系统播放器或 Media3 分支。该术语正被 [[TV 长视频 ExoPlayer 内核]] 迁移取代，后续不要再把“普通链路”默认解释为 LibVLC。
 - `TV 长视频 ExoPlayer 内核`：TV 端实际运行的单片长视频播放器和电视剧分集播放器统一使用 ExoPlayer/Media3 作为播放内核；既有 DV Media3 分支并入同一长视频内核语义，不再作为独立的全量播放器目标。IPTV 直播播放器不属于本术语范围，继续按 [[IPTV LibVLC 路径]] 独立维护。
+- `TV 长视频播放器`：TV App 中面向电影、`18+` 和电视剧分集的本地全屏观看体验，覆盖从起播、控制到退出、续播与切集的完整播放会话；不包含短视频、短视频投放、IPTV 或手机端播放器。当前重构把单片与剧集视为同一产品能力，同时重新设计播放器结构与用户界面；既有交互约定需要逐项重新验证，不能仅因旧实现存在就默认保留。
+- `TV 长视频统一播放会话`：电影、`18+` 和电视剧分集共享同一个长视频播放会话模型，由它统一表达播放状态、控制层模式、跳转、轨道、缓冲、错误、历史和生命周期。单片与剧集不再各自维护平行状态机，页面路由只负责提供播放目标与离开方式。
+- `TV 长视频播放能力集`：[[TV 长视频统一播放会话]] 根据当前内容声明可用能力；电影和 `18+` 使用基础播放能力，电视剧在此基础上增加选集、下一集和自动连播。能力差异用于驱动 [[TV 长视频控制能力显隐]]，不复制整套播放器。
+- `TV 长视频单内核实例`：[[TV 长视频统一播放会话]] 在同一页面会话内只拥有一个 Media3 播放器实例；电视剧切集更新当前媒体项并复用该实例，避免因页面或播放器重建制造额外黑屏、Surface 抖动和迟到回调。播放内核只通过适配边界接收命令并发出状态。
+- `TV 长视频前后台与音频焦点`：[[TV 长视频统一播放会话]] 进入后台时立即保存当前进度并暂停，返回前台后保持暂停，不因离开前正在播放就自动出声。Media3 负责申请和响应音频焦点；只有播放器页面始终处于前台、且中断被判定为可恢复的短暂音频焦点丢失时，才允许在焦点恢复后自动继续。永久失去音频焦点、应用退后台，以及 HDMI、蓝牙等音频输出设备发生切换或断开后均保持暂停，等待用户显式继续。
+- `TV 长视频亮屏与屏保`：[[TV 长视频播放器]] 只在正在播放，或用户仍明确期望继续播放但内核处于准备、缓冲状态时保持屏幕常亮；暂停、播放结束和最终错误时释放常亮，由电视继续执行系统屏保与待机设置。屏保使 App 失去前台后按 [[TV 长视频前后台与音频焦点]] 保存并暂停，返回播放器时不自动恢复播放。
+- `TV 长视频沉浸式 OTT 基线`：[[TV 长视频播放器]] 默认以视频内容为唯一视觉主体，只有用户主动唤起时才展示标题、进度和少量核心操作；字幕、音轨、选集等高级能力进入按需二级界面，播放诊断只在故障上下文出现。该基线参考成熟流媒体 TV 播放器，不采用常驻工具栏或把全部能力同时铺开的本地媒体工具界面。
+- `TV 长视频影院式视觉`：[[TV 长视频播放器]] 使用全屏视频、顶部与底部黑色渐隐遮罩和高对比白色信息构成主观看画面，核心控制层不套独立卡片；暖金只表达进度、焦点和当前选中状态。字幕、音轨、选集等二级能力使用克制的深色实体面板，不继续使用半透明玻璃作为主要视觉材料。
+- `TV 长视频操作安全区`：[[TV 长视频播放器]] 的视频画面始终延伸到物理屏幕边缘，标题、时间轴、按钮、字幕、提示和面板内部内容则限制在约 5% 的电视安全区内；右侧面板背景允许贴边，但其可读与可交互内容仍需内缩。720p、1080p 与 4K 使用同一套稳定 dp/sp 规格，不按分辨率动态放大字体或命中区域，避免老电视 overscan 裁掉操作，也避免高分辨率下布局比例漂移。
+- `TV 长视频播放器焦点视觉`：[[TV 长视频播放器]] 是全局“焦点只缩放”规则的明确局部例外。图标按钮聚焦时使用暖金圆形底、深色图标和轻微放大；右侧面板行聚焦时使用深色提亮面与暖金描边；当前已选项另用暖金勾选标记，不只靠颜色表达。焦点动画约 200ms、无光晕，并服从系统关闭动画设置；若旧焦点词汇与本条冲突，以本条为准。
+- `TV 长视频固定完整显示`：[[TV 长视频播放器]] 始终保持媒体原始宽高比并完整显示画面，允许出现黑边；不提供裁切铺满、拉伸或画面比例切换。单片、电视剧分集和 Dolby Vision/HDR 内容使用同一产品语义，底层输出层仍可按兼容策略选择。
+- `TV 长视频固定播放速度`：本轮 [[TV 长视频播放器]] 固定使用 `1.0x` 速度，不提供倍速入口，也不保存倍速偏好；倍速若以后有明确需求，应作为独立播放设置能力设计，不进入当前主控制层或右侧二级面板。
+- `TV 长视频自动画质`：本轮 [[TV 长视频播放器]] 不提供画质选择入口。单一渐进式播放源没有可选择的清晰度；HLS 等自适应媒体由 Media3 根据网络与设备能力自动选择码率，不把运行时分辨率伪装成用户可选版本。只有服务端以后明确提供多个真实可选版本时，画质才作为能力集进入“自动 / 具体清晰度”二级面板。
+- `TV 长视频主控制层布局`：[[TV 长视频播放器]] 的控制层由左上角轻量内容标题、底部时间轴和单行图标操作组成；单片只显示片名，剧集显示剧名、集号与集标题，不展示海报、简介或媒体格式徽章。操作行左侧承载后退、播放/暂停、前进和剧集下一集，右侧承载字幕、音轨和剧集选集，默认焦点为播放/暂停；画面中心只显示短暂状态反馈，不设置常驻控制岛。
+- `TV 长视频控制能力显隐`：[[TV 长视频播放器]] 主控制层只展示当前内容真正可用的动作：无字幕时隐藏字幕，只有一条音轨时隐藏音轨，单片隐藏选集与下一集，剧集无下一可播放分集时隐藏下一集但保留选集。隐藏能力后操作行按稳定间距重排，播放/暂停始终是默认焦点，不保留禁用按钮或空面板入口。
+- `TV 长视频确认键主操作`：[[TV 长视频播放器]] 隐藏控制层时，遥控器确认键直接切换播放/暂停并唤起控制层；方向下键只唤起控制层，不改变播放状态。该区分保证没有独立播放键的简化遥控器仍可一次暂停，同时允许用户无副作用地查看进度或进入高级能力。
+- `TV 长视频前台媒体会话`：[[TV 长视频统一播放会话]] 在播放器页面前台期间建立 Media3 `MediaSession`，统一接收电视遥控器、专用媒体键和 HDMI-CEC 的播放、暂停、快退、快进命令，并向系统暴露最少的片名、分集、进度与播放状态。播放、暂停命令不关闭已打开的右侧面板或改变其焦点；快退、快进复用 [[快进/快退步长]] 与 [[连按合并跳转]]，只显示瞬时反馈。离开播放器或进入后台即停用会话，不借此继续后台播放，也不暴露播放 URL、鉴权或诊断信息。
+- `TV 长视频系统音量边界`：[[TV 长视频播放器]] 不提供应用内音量滑杆或静音按钮，不消费电视遥控器的音量与静音键，也不保存播放器独立音量；音量统一交给电视、功放或 HDMI-CEC 系统处理，Media3 保持正常输出增益。发生音频焦点中断时按 [[TV 长视频前后台与音频焦点]] 暂停或等待恢复，不采用降低音量后继续播放的 ducking 体验。
+- `TV 长视频控制层自动隐藏`：[[TV 长视频播放器]] 正在播放且连续 4 秒没有有效操作时自动隐藏控制层，任一有效遥控操作重新计时；暂停时控制层保持可见，用户可以用返回键主动收起。精确拖动、字幕、音轨、选集、续播、连播或错误等需要持续关注或焦点的状态存在时不自动隐藏。
+- `TV 长视频延迟加载反馈`：[[TV 长视频播放器]] 首次起播使用纯黑画布，等待超过 300ms 才显示无文案的居中加载指示；已经出现首帧后的缓冲保留最后画面，等待超过 500ms 才显示较小的居中加载指示。短暂等待不闪现状态 UI，缓冲期间当前可见控制层不自动隐藏。
+- `TV 长视频缓冲升级`：[[TV 长视频播放器]] 连续启动或缓冲超过 15 秒时从等待状态升级为可恢复播放错误，不能无限显示加载指示；单片、电视剧分集和 Dolby Vision 内容使用同一时间边界。
+- `TV 长视频自动恢复`：[[TV 长视频播放器]] 遇到临时网络或媒体读取错误时，在保留当前位置和最后画面的前提下自动重试最多两次，间隔约 1 秒和 3 秒；自动恢复过程使用 [[TV 长视频延迟加载反馈]]，不提前切到错误页。
+- `TV 长视频确定性错误`：格式不支持、解码失败和 Dolby Vision 安全阻断等在当前条件下不会通过重复请求自行消失的故障，不进入 [[TV 长视频自动恢复]]，直接展示最终错误状态。
+- `TV 长视频最终错误层`：[[TV 长视频自动恢复]] 耗尽或发生 [[TV 长视频确定性错误]] 后显示的居中错误界面，只保留“重试”和“返回详情”，有可用诊断时再提供次级“诊断信息”。用户重试沿用失败位置、恢复播放，不切换播放内核或播放源；该统一语义取代单片与剧集各自维护的软重试 UI 分支。
 - `TV 长视频 ExoPlayer 端隔离`：[[TV 长视频 ExoPlayer 内核]] 迁移只作用于 `android-tv-app`，不改手机端播放器，不复用手机端 `UnifiedPlayerScreen` 或 `DetailScreen`，也不在本次抽共享播放层。若未来要统一手机端与 TV 端播放能力，应单独设计共享模块和跨端验收。
 - `TV 长视频 ExoPlayer 一次性切换`：TV 长视频迁到 [[TV 长视频 ExoPlayer 内核]] 时不提供用户可见的旧播放器开关，也不保留长视频 LibVLC 运行时回退。播放失败只提供重试、返回或诊断；若真机发现严重兼容问题，通过版本回滚或后续修复处理，不在产品内长期维持双轨。
 - `TV 长视频媒体源边界`：[[TV 长视频 ExoPlayer 内核]] 面向电影、`18+` 和电视剧分集的播放 URL，可以播放普通文件流、渐进式媒体以及 ExoPlayer/Media3 支持的媒体源；这不等于引入 IPTV 直播语义。长视频即使未来出现 HLS 播放源，也不得复用 IPTV 的频道列表、M3U 解析、直播诊断或 LibVLC 参数。
@@ -201,27 +225,31 @@
 - `DV 诊断单入口单视图`：[[DV 播放诊断入口]] 首轮只保留一个显式入口打开同一张诊断卡片，不在“摘要 / 详情”之间做切换，也不做可展开层级。用户进入后只面对这一张卡片和最少的返回路径。
 - `DV 专用链路重试保留当前快照`：[[杜比视界专用系统播放链路]] 首轮在专用 Media3/ExoPlayer 播放失败后重试时，优先沿用当前播放器已经拿到的进度快照继续尝试；只有切集或显式从头播放时才回到历史起点。这样重试能保留现场进度，不把失败恢复等同于重新选集。
 - `DV 专用链路启动边界`：电视剧分集进入 [[杜比视界专用系统播放链路]] 后，当前分集播放源准备完成时必须像普通 LibVLC 分支一样自动进入播放会话，不能停留在 `hasStartedPlayback=false` 导致 Media3 只 prepare 不 play。Media3/ExoPlayer 专用播放器若在已有播放源且用户期望播放的状态下长期停留在启动/缓冲、未进入 playing，应在有限时间内切到专用播放失败页并允许重试；不能无限黑屏或卡在播放器 surface 上。
-- `DV 专用链路核心互动层`：[[杜比视界专用系统播放链路]] 的播放会话应保留 TV 长视频的核心遥控体验，包括播放/暂停、快进快退、进度反馈、返回二次确认、续播提示、剧集选集轨与连播提示；字幕/音轨切换属于第二阶段增强能力，不应和核心互动层的可播放闭环互相阻断。
+- `DV 专用链路核心互动层（迁移前）`：统一 ExoPlayer 迁移期曾要求 Dolby Vision 分支保留当时的播放/暂停、快进快退、进度、双击返回、续播、选集与连播语义。当前 Dolby Vision 已并入 [[TV 长视频播放器]]，其交互统一服从本轮播放器设计，不再单独保留旧双击返回或选集轨约定。
 - `TV ExoPlayer 字幕音轨能力`：[[TV 长视频 ExoPlayer 内核]] 的字幕选择沿用服务端下发的外挂字幕列表，音轨选择来自 ExoPlayer/Media3 对当前播放源枚举到的内嵌音频轨；偏好继续按语言/类型等语义恢复。该能力不承诺追齐 LibVLC/libass 的内嵌字幕识别、ASS 特效或样式一致性。
+- `TV 长视频账户级轨道偏好`：[[TV 长视频播放器]] 按当前登录用户保存跨影片、跨分集的字幕和音轨语义偏好，不保存底层临时轨道 ID，也不让偏好跨账号泄漏。音轨偏好由语言和类型表达；字幕偏好明确区分“关闭”“自动”和指定语言。
+- `TV 长视频轨道偏好回退`：当前内容没有匹配 [[TV 长视频账户级轨道偏好]] 的轨道时，播放器临时回退媒体默认选择，但不得用这次回退覆盖用户保存的原偏好；后续内容重新出现匹配轨道时应继续自动恢复。
+- `TV 长视频字幕显示与避让`：[[TV 长视频播放器]] 优先遵循 Android TV 系统已显式设置的字幕字号与样式；系统没有显式字幕设置时，使用最多两行、高对比白字配黑色描边或阴影的默认样式，并始终保持电视安全边距。本轮不在播放器内增加字幕样式编辑器。主控制层或连播提示卡出现时字幕平滑上移，右侧二级面板打开时字幕限制在未被面板遮挡的视频区域，任何操作 UI 都不得覆盖字幕正文。
 - `TV ExoPlayer 媒体鉴权`：TV 长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后，视频源和外挂字幕请求都应通过 ExoPlayer/Media3 的 HTTP data source 发送 `Authorization: Bearer <token>` header 鉴权，不再把 `access_token` 拼进播放 URL 或字幕 URL。服务端 query token fallback 可以继续作为历史兼容能力存在，但不作为 TV 长视频新路径依赖。
 - `DV 第二阶段字幕音轨范围（迁移前）`：曾用于描述 DV 专用 Media3/ExoPlayer 分支接入外挂字幕选择与内嵌音轨选择的阶段性术语。随着 [[TV 长视频 ExoPlayer 内核]] 统一迁移，字幕与音轨能力不再按 DV 专用分支单独命名，统一归入 [[TV ExoPlayer 字幕音轨能力]]。
 - `DV 外挂字幕无感切换`：[[DV 第二阶段字幕音轨范围]] 中的外挂字幕切换目标是不重启播放会话、不露出黑屏、不跳回起点，并尽量保留当前播放状态；不能把每次字幕切换都表现成重新打开视频。若底层播放库能力不足以完全无感，必须在实现前重新收口验收边界。
 - `DV 字幕切换连续性`：[[DV 外挂字幕无感切换]] 的体验目标是播放中切换字幕时不跳黑、不闪回、不重启播放会话，并尽量维持当前画面连续；若底层库只能做到短暂重建但能保住进度，也必须先把这部分风险说清楚再实现。
-- `DV 音轨偏好匹配`：[[DV 第二阶段字幕音轨范围]] 中的音轨选择应保存语言、类型等语义偏好，并在下一集或下次进入时按最接近的 Media3/ExoPlayer 音频轨自动匹配；不要把底层 track id 当作跨分集稳定标识。
-- `DV Media3 默认音轨不等于用户选择`：Media3/ExoPlayer 在轨道刚加载时可能已经有一个底层默认选中音轨；这个 runtime selected 只能作为播放器当前状态参考，不能在 `onTracksChanged` 时回写成父层 `selectedAudioTrackId`，否则会覆盖 [[DV 音轨偏好匹配]] 按语言/类型恢复出的目标音轨。父层应先按 current selection / stored preference 解析目标，再通过 `TrackSelectionParameters` 应用 override。
-- `DV 字幕音轨偏好粒度`：[[DV 第二阶段字幕音轨范围]] 沿用 TV 长视频现有按 `videoId` 保存字幕和音轨偏好的语义，不新增整部剧共享偏好；电视剧下一集若需要复用选择，只能在该分集自己的偏好范围内按语言、类型等语义重新匹配。
+- `DV 音轨偏好匹配（迁移前）`：Dolby Vision 专用分支曾单独定义按语言和类型匹配音轨。当前 Dolby Vision 已并入 [[TV 长视频播放器]]，统一使用 [[TV 长视频账户级轨道偏好]]。
+- `Media3 默认轨道不等于用户选择`：Media3/ExoPlayer 在轨道加载时自动选中的运行时默认项只表示当前回退结果，不能回写并覆盖 [[TV 长视频账户级轨道偏好]]；父层应先解析用户偏好，再把匹配结果应用到当前媒体。
+- `DV 字幕音轨偏好粒度（已取代）`：旧播放器按 `videoId` 保存字幕和音轨偏好，不跨分集共享。当前该粒度已被 [[TV 长视频账户级轨道偏好]] 取代。
 - `DV 专用链路第二阶段`：[[杜比视界专用系统播放链路]] 在核心互动层真机通过后的下一阶段，同时包含 [[DV 返回详情连续性]] 与 [[DV 字幕音轨后续阶段]] 两条验收线；两者属于同一阶段范围，但不应互相耦合成同一个实现前提。
-- `DV 字幕音轨入口接入`：[[DV 字幕音轨第二阶段能力]] 完成后，单片与剧集 DV 专用播放控制层都应显示字幕和音轨入口，并复用 TV 端现有 picker 视觉与偏好保存口径；如果某个视频没有外挂字幕或可枚举音轨，picker 负责展示空态，不再隐藏整个入口。普通 LibVLC 分支继续保留既有字幕和音轨入口。
+- `DV 字幕音轨入口接入（已取代）`：Dolby Vision 专用分支曾要求无轨道时也保留字幕和音轨入口并展示空态。当前 Dolby Vision 已并入 [[TV 长视频播放器]]，统一服从 [[TV 长视频控制能力显隐]]。
 - `DV 退出显示切换边界`：退出或切离 [[杜比视界专用系统播放链路]] 时，TV App 负责避免白闪、上一帧抖动、详情页底图抢显、系统桌面露出或二次闪回；电视/系统因 Dolby Vision/HDR 显示模式切换产生的一次短暂黑屏属于显示链路边界，不作为 App 层缺陷。
 - `DV 返回详情闪动`：用户从 [[杜比视界专用系统播放链路]] 主动返回详情页时出现的、不像 [[普通非 DV 播放链路]] 那样自然的瞬时画面闪动。该术语只描述返回详情这一条退出路径，不默认包含播放结束、切下一集或选集切换；是否属于系统 HDR/Dolby Vision 模式切换黑屏，需与 [[DV 退出显示切换边界]] 分开判断。
 - `DV 返回详情连续性`：[[DV 返回详情闪动]] 的体验目标是返回详情时不暴露上一帧视频、详情页底图抢显、白闪或系统桌面露出；如果已经没有这些 App 层可控画面外露，只剩电视/系统因 Dolby Vision/HDR 模式切换产生的一次短暂黑屏，则归入 [[DV 退出显示切换边界]]。
 - `DV 返回详情黑场保持（已撤回）`：单片与剧集从 [[杜比视界专用系统播放链路]] 主动返回详情页时，曾采用 App 层全屏黑场加短延迟再导航的策略遮住 Media3 `AndroidView` 销毁与详情页重绘间隙；该策略会让用户明确感知“黑一下”，已撤回，后续不得把主动黑场遮罩作为默认返回体验。
-- `DV 返回详情正常导航`：单片与剧集从 [[杜比视界专用系统播放链路]] 主动返回详情页时，二次退出确认完成后应直接执行正常导航返回，不再设置 App 层黑色遮罩、不再人为延迟。若仍出现短暂黑屏，需先区分是电视/系统 Dolby Vision/HDR 显示模式切换还是详情页重绘性能问题；不要用主动黑场覆盖作为首选修复。
+- `DV 返回详情正常导航`：单片与剧集从 Dolby Vision 播放主动返回详情页时，在 [[TV 长视频分层返回]] 到达退出层后直接执行正常导航，不设置 App 层黑色遮罩，也不人为延迟。若仍出现短暂黑屏，需先区分是电视/系统 Dolby Vision/HDR 显示模式切换还是详情页重绘性能问题；不要用主动黑场覆盖作为首选修复。
 - `TV 长视频播放器导航即时退出`：TV 长视频播放器目的页承载 ExoPlayer `PlayerView`，其中 DV/HDR 风险源必须使用 `SurfaceView` 输出。播放器目的页从导航栈退出时不得使用默认 enter/exit/pop 动画把上一页保留在详情页背后，否则详情页已经显示后仍可能因为 `SurfaceView` / ExoPlayer 延迟释放触发黑闪或显示模式抖动；单片长视频播放器和电视剧分集播放器路由应禁用 NavHost 目的页过渡，让播放器页立即销毁。这个约束不等于给退出加黑幕或延迟，也不改变 [[TV 长视频输出层选择]]：DV/HDR 仍用 `surface_view`，普通 SDR 才优先 `texture_view`。
-- `TV 播放控制层`：TV 长视频播放器中承载遥控按键、播放/暂停、seek、进度反馈、返回确认、续播提示、字幕、音轨、选集轨、连播提示、错误/重试和历史上报触发的交互层；它不应被定义为某个播放内核的私有 UI。迁到 [[TV 长视频 ExoPlayer 内核]] 是播放内核替换，不是播放器交互重做。
-- `TV 播放内核适配`：播放内核必须通过适配边界向 [[TV 播放控制层]] 暴露播放状态、时长、进度、播放/暂停、seek、结束、错误和可选轨道，不让控制层直接依赖某个内核的私有对象。长视频迁到 ExoPlayer 后，验收重点是控制层语义保持，而不是重建一套新交互。
-- `电视剧核心控制层优先抽离`：[[TV 播放控制层]] 第一阶段只覆盖电视剧播放器的核心控制与选集/连播体验，不主动重构单片长视频的默认控制变体，也不抽离字幕/音轨选择能力。
+- `TV 播放控制层`：[[TV 长视频播放器]] 中把 [[TV 长视频统一播放会话]] 投影为遥控按键、主控制层、右侧二级面板、瞬时反馈、连播和错误恢复的交互层；它不拥有另一份业务状态，也不直接依赖 Media3 私有对象。当前控制层按本轮沉浸式 OTT 基线重做，不再保留迁移期的返回确认或底部选集轨语义。
+- `TV 播放内核适配`：播放内核必须通过适配边界向 [[TV 播放控制层]] 暴露播放状态、时长、进度、播放/暂停、seek、结束、错误和可选轨道，不让控制层直接依赖某个内核的私有对象。迁移期曾要求保持既有控制语义；该限制已被当前 [[TV 长视频播放器]] 整体重构取代。
+- `电视剧核心控制层优先抽离（迁移前）`：长视频统一 ExoPlayer 迁移期曾只抽离电视剧的核心控制与选集/连播体验，不主动重构单片播放器。当前 [[TV 长视频播放器]] 重构已把单片与剧集收口为同一产品能力，后续不得再以该阶段性边界阻止统一设计。
 - `统一剧集播放链路切换`：电视剧播放器内所有可播放分集都走 [[TV 长视频 ExoPlayer 内核]]，分集切换只重新选择当前分集媒体源、字幕、音轨、历史位置和播放兼容决策，不再在 LibVLC 与 Media3 之间切换播放内核。
+- `TV 剧集明确切换`：用户在选集面板确认其它分集，或触发手动下一集、自动连播后，统一会话先保存旧集历史并立即停止旧音频，关闭面板，把会话标题、加载、错误和重试归属切换到新目标；画面快速淡到黑色，在同一个 Media3 实例内替换媒体项，并按 [[TV 长视频延迟加载反馈]] 延迟显示加载指示。手动选集按目标集有效历史续播，手动下一集与自动连播从头播放；新目标失败时停留在新目标错误态，不回退或恢复旧集。
 - `统一剧集切换进度语义`：[[统一剧集播放链路切换]] 不改变既有 [[连播链路]] 的起播规则；自动连播、下一集和播放结束兜底切集从头开始，入口进入、继续观看和手动选集按目标集历史进度续播，切走前应保存当前集进度。
 - `DV 分集失败不退出剧集会话`：电视剧内某个 DV 分集在 [[TV 长视频 ExoPlayer 内核]] 下启动失败、播放失败或超时，只表示当前分集暂不能播放，不代表整个剧集播放器会话失败；用户仍应能返回、重试、查看诊断，并切到其它可播放分集。当前失败 DV 分集仍不提供回退 LibVLC 或强行播放入口。
 - `DV 诊断正式构建保留`：[[DV 播放诊断入口]] 首轮在正式发布构建里也保留，但只在 DV 相关阻断页或专用播放失败页可见；它不应依赖 debug 开关才出现，因为这类问题通常只在真机和现场环境暴露。
@@ -665,31 +693,31 @@
 - `TV 详情页软刷新复用页内轻量状态`：TV 详情页在已有内容后的软刷新状态继续沿用现有 TV 状态反馈语言：首屏无内容时使用页面级 `TvPageLoadingState` / `TvErrorState`，已有内容后的刷新和失败则降级为页内轻量状态，复用 `TvInlineLoadingState` 等同层级样式，不新造第二套大面板状态系统，也不允许用软刷新名义重新覆盖整页。
 - `TV 详情页软刷新轻量状态挂载点`：TV 详情页已有内容后的轻量刷新/失败状态应挂在当前可视主体内部，而不是页面中央整页遮罩。长视频详情页挂在底部 `TvDetailGlassPanel` 内部；电视剧详情页挂在左侧 hero 信息区或右侧剧集面板内部，优先贴近当前操作区域，不遮住整页背景或强制打断当前焦点路径。
 - `TV 详情页请求身份`：TV 长视频详情页与电视剧详情页的重载协程也必须带请求身份或等价版本号，只有最新一轮请求允许回写状态。否则旧详情响应会把较新的页内轻量状态、当前焦点语义或电视剧当前季/集选择回滚到过期数据，直接破坏“已有内容不抖动”的软刷新目标。
-- `TV 长视频播放器软准备`：TV 单片播放器与剧集播放器在已有播放内容后切换分集、重试准备播放源或重建播放链路时，不得退回整页 `loading` / `error` 或清空播放器承接画面。当前视频画面、返回路径和遥控焦点语义应尽量保持可用，准备中与失败反馈都应降级为播放器内部的轻量状态；只有首次进入且尚无任何可承接画面时，才允许整页加载或整页错误态。
+- `TV 长视频播放器软准备`：当前播放目标不变时，重试准备播放源或重建播放链路可以保留已有最后画面，并在播放器内部表达准备或失败；电视剧切换到另一分集不再属于本术语，统一使用 [[TV 剧集明确切换]]。
 - `TV 单片软准备保留旧画面承接`：单片播放器在已有承接画面后重试播放源、重建播放链路或重新入播时，不应为了准备过程主动把屏幕切回纯黑或空白。旧视频画面应尽量继续留在屏幕上承接当前上下文；只有播放内核自身无法继续维持画面时，才接受不可避免的瞬时闪断。
 - `TV 运行流畅`：TV App 里的“运行流畅”不只指播放器画面连续，也包括整 App 的遥控输入响应、页面切换、列表滚动、焦点移动、搜索输入、刷新反馈和状态切换都不出现可感知卡顿、整页抖动、长时间无反馈或重复抢焦点。只要某条主链路让用户感觉“按了没反应”“页面顿一下”“焦点跳来跳去”或“内容先清空再回来”，都属于流畅性问题，即使最终功能结果正确。
-- `TV 剧集切集失败保留旧分集承接`：电视剧播放器在用户切到目标分集后，如果目标分集播放源准备失败、鉴权失败或本地播放链路未能切起，不应先清空旧分集再把页面切到目标分集错误态。旧分集应继续承接当前播放或暂停画面，界面只在播放器内部提示“目标分集准备失败，可重试”，直到目标分集准备成功后才真正切换当前播放分集。
+- `TV 剧集切集失败保留旧分集承接（已取代）`：旧设计曾在新分集准备失败时继续播放旧分集；当前已由 [[TV 剧集明确切换]] 取代。新目标确认后旧音频立即停止，失败归属于新分集，不恢复或继续旧分集。
 - `TV 长视频播放器软准备中心挂载点`：[[TV 长视频播放器软准备]] 的 preparing/failed 轻量状态统一挂在播放器中心区，复用现有中心反馈层级，而不是挤占顶部标题区、底部控制条或分集 rail 区域。这样能保持“旧画面继续承接、当前切换未完成”的语义最直观，也避免准备态与控制层信息抢位。
 - `TV 长视频播放器软准备失败动作语义`：[[TV 长视频播放器软准备]] 从 preparing 进入 failed 后，中心区轻量错误态必须保留可聚焦动作，而不是只做纯提示。最少提供一个“重试切换/重试播放”主动作；电视剧场景在旧分集仍承接时，可以额外提供“留在当前分集”或等价关闭路径，但不应强迫用户先退出到整页错误态才能恢复操作。
-- `TV 剧集目标分集与实际播放分集分离`：电视剧播放器里“用户当前想切去的目标分集”和“播放器当前实际承接画面/音频/历史上报绑定的分集”不是同一个概念，必须允许短暂分离。目标分集用于表达当前切换意图与软准备状态；实际播放分集用于决定真实承接画面、标题、播放历史、续播与当前分集语义。只有当目标分集准备成功并真正切换播放链路后，实际播放分集才追上目标分集。
-- `TV 剧集软切集主语义跟随实际播放分集`：当 [[TV 剧集目标分集与实际播放分集分离]] 时，播放器标题、当前播放文案、播放历史上报、续播判断和“正在播放哪一集”的主语义都必须跟随实际播放分集，而不是提前切到目标分集。目标分集只应在分集 rail 或中心轻量状态里表达“正在切到哪一集”；只有真正切换成功后，主语义才整体追上目标分集。
-- `TV 剧集 rail 只跟随实际播放分集`：当 [[TV 剧集目标分集与实际播放分集分离]] 时，分集 rail 只保留实际播放分集的主态和当前焦点语义，不再额外展示目标分集的 soft preparing 弱态。目标分集的准备、失败和取消只通过播放器中心区表达，rail 专注于稳定呈现“现在实际在播哪一集”和“焦点在哪一项”。
+- `TV 剧集目标分集与实际播放分集分离（已取代）`：旧软切集模型曾让目标分集与仍在播放的旧分集长期并存；当前已由 [[TV 剧集明确切换]] 取代，用户确认目标后会话主语义立即归属新分集。
+- `TV 剧集软切集主语义跟随实际播放分集（已取代）`：旧设计曾在新目标准备期间继续让标题、历史和播放语义归属旧分集；当前切集开始前先保存旧集历史，随后标题、加载、错误与重试均归属新目标。
+- `TV 剧集 rail 只跟随实际播放分集（已取代）`：旧术语依赖已移除的底部分集 rail 与软切集双目标模型；当前选集使用 [[TV 长视频剧集浏览面板]]，确认后关闭面板并进入 [[TV 剧集明确切换]]。
 - `TV 剧集软切集 latest-wins`：当电视剧播放器处于 [[TV 长视频播放器软准备]]，用户又连续选择新的目标分集时，系统必须以最后一次选择为准。旧目标分集的准备请求和对应轻量状态都应失效，不得排队依次切过去，也不得在晚到响应返回时把当前目标回滚到用户已经放弃的分集。
-- `TV 软准备沿用当前播放态`：当长视频播放器进入 [[TV 长视频播放器软准备]] 时，旧分集或旧视频的承接方式应沿用用户当前播放态，而不是额外人为冻结。如果切换前正在播放，则旧内容继续播放直到新目标真正切换成功；如果切换前处于暂停，则旧内容继续停在当前帧等待切换完成。这样可以减少“按了切集后视频突然顿住”的额外体感抖动。
-- `TV 单片 soft preparing 沿用当前播放态`：单片播放器进入 [[TV 长视频播放器软准备]] 后，也沿用 [[TV 软准备沿用当前播放态]]，不单独改成统一暂停策略。重试播放源、重建播放链路或重新入播时，若旧内容原本在播就继续播；若原本已暂停就停在当前帧等待结果。
+- `TV 软准备沿用当前播放态（已取代）`：旧设计允许切集时旧内容继续播放；当前已由 [[TV 剧集明确切换]] 取代。相同目标的缓冲或重试是否保留最后画面，统一服从 [[TV 长视频延迟加载反馈]]，不再借此延续旧分集音频。
+- `TV 单片 soft preparing 沿用当前播放态（迁移前）`：旧单片重试曾直接继承当时的播放或暂停状态；当前统一会话按用户重试意图与 [[TV 长视频最终错误层]] 恢复当前目标，不再维护单片专属 soft preparing 状态机。
 - `TV 软切换成功短反馈`：当新的目标分集或目标视频真正切换成功后，播放器可以在中心区给出一条极短的轻提示，例如“已切换到第 N 集”，用于确认切换已生效。该提示必须自动消失，不抢焦点，不打断播放，不弹出新的确认层，也不要求用户再次操作。
 - `TV 软切换成功短反馈最新生效`：如果用户在前一个目标仍未完成切换时又切到新的目标，之前尚未显示或尚未消失的成功短反馈都应被取消或覆盖，只保留最后一次真正生效的切换提示。这样反馈内容始终跟随当前有效目标，而不是串出多条过期确认。
 - `TV 剧集切换成功短反馈带分集号`：电视剧播放器 soft preparing 成功后，中心短反馈应明确带出最终生效的目标分集号，例如“已切到第 N 集”，而不是只给抽象的“切换成功”。这样用户可以立刻核对最后一次操作到底生效到了哪一集，尤其适用于连续切集场景。
 - `TV 剧集 preparing 轻提示带分集号`：电视剧播放器进入 soft preparing 后，中心轻提示也应明确带出当前正在处理的目标分集号，例如“正在切到第 N 集”，而不是只写抽象的“正在切换”。这样用户能立刻看出当前 latest-wins 生效到了哪一集，避免连续切集时误判系统还在处理旧目标。
-- `TV 软准备失败的 BACK 先关轻错误态`：当 [[TV 长视频播放器软准备]] 的中心轻错误态仍在屏幕上时，用户第一次按 `BACK` 只关闭这次软准备失败态，继续留在当前实际播放分集；只有在轻错误态已关闭后再次按 `BACK`，才进入播放器既有的返回确认或退出链路。这样一次失败切集不会意外把用户直接踢回详情页。
-- `TV 单片 soft preparing 失败的 BACK 先关轻错误态`：单片播放器进入 [[TV 长视频播放器软准备]] 后，如果中心失败态仍在屏幕上，用户第一次按 `BACK` 也只关闭这层失败态，继续留在当前旧视频承接；只有失败态已关闭后再次按 `BACK`，才进入播放器既有的返回确认或退出链路。
+- `TV 软准备失败的 BACK 先关轻错误态（已取代）`：旧设计允许关闭新分集失败态后继续观看旧分集；当前新分集确认后不保留旧分集作为回退，失败时进入新目标的 [[TV 长视频最终错误层]]，返回动作使用“返回详情”。
+- `TV 单片 soft preparing 失败的 BACK 先关轻错误态（迁移前）`：旧单片播放器在已有承接画面时曾允许返回键只关闭软失败态。当前重构统一使用 [[TV 长视频最终错误层]] 与 [[TV 长视频分层返回]]，不再保留单片专属返回分支。
 - `TV 单片 soft preparing 失败不额外加继续观看按钮`：单片播放器 soft preparing 失败态在已有旧视频承接时，不额外提供“继续观看/留在当前视频”显式按钮。失败态保留“重试播放”主动作和可选“诊断信息”副动作即可；关闭失败态统一由 `BACK` 承担，避免中心态因为多一个关闭按钮而变重。
 - `TV 单片重试后立即切回 preparing 轻提示`：单片播放器 soft preparing 失败后，只要用户触发“重试播放”，旧失败态就应立即被当前这次重试的 preparing 轻提示顶掉，而不是继续留到真正成功或再次失败时才更新。这样用户一按就能看到“系统已开始处理这次重试”。
 - `TV 单片重试 preparing 用短文案`：单片播放器触发重试后显示的 preparing 中心轻提示应保持短文案，不需要像电视剧那样带出明确目标编号或长解释。单片场景只需表达“正在处理这次重试”，不把准备态变成说明态。
 - `TV 单片重试成功用短确认`：单片播放器的重试如果最终成功，中心区也只给一条极短确认，不展开成解释文案。它只负责告诉用户“这次重试已经生效”，不额外解释播放源、链路或容器细节。
 - `TV 单片重试成功用无编号短反馈`：单片播放器重试成功后的确认继续保持无编号、无目标说明的短反馈，例如“已恢复播放”这一类，不像电视剧那样带分集号。单片场景没有“切到了哪一集”的核对需求，反馈只需说明重试已生效。
 - `TV 单片 soft preparing 首屏例外`：单片播放器只有在首次进入且当前没有任何可承接画面时，才允许继续使用整页 `loading` / `error`。一旦已有可承接画面，后续准备失败、重试与成功确认都应下沉到播放器内部轻量状态，不再把整页状态重新抬起来。
-- `TV 单片 preparing 中 BACK 取消当前重试`：当单片播放器仍处于 [[TV 长视频播放器软准备]]、旧视频还在承接而这次重试尚未真正成功时，用户第一次按 `BACK` 应理解为取消当前重试，而不是直接进入播放器退出确认。取消后继续留在旧视频承接态；只有重试已取消或已结束后再次按 `BACK`，才进入播放器原有的返回确认/退出链路。
+- `TV 单片 preparing 中 BACK 取消当前重试`：当单片播放器仍处于 [[TV 长视频播放器软准备]]、旧视频还在承接而这次重试尚未真正成功时，用户按 `BACK` 应先取消当前重试。取消后继续留在旧视频承接态；重试已取消或结束后，后续返回继续服从 [[TV 长视频分层返回]]。
 - `TV 单片取消重试不回退播放会话`：单片播放器在 [[TV 单片 preparing 中 BACK 取消当前重试]] 时，只应终止这次准备并回写“已取消重试”，不把当前已承接的播放会话回退成未开始播放。这样 keep-screen-on、续播和历史回报仍沿用当前承接态。
 - `TV 单片取消重试短反馈`：当用户在 [[TV 单片 preparing 中 BACK 取消当前重试]] 的场景里取消一次正在进行的重试后，播放器可以在中心区给出一条比成功提示更轻、更短的取消反馈，例如“已取消重试”。该提示只在确实存在待取消重试时显示，不抢焦点，不阻断播放，也不应长时间停留。
 - `TV 单片诊断信息保留独立面板`：单片播放器里的“诊断信息”属于用户显式打开的调试视图，不并入 [[TV 长视频播放器软准备]] 的中心轻提示。即使平时 preparing/failed/success/cancel 都下沉到播放器中心区，诊断信息仍允许使用较重的独立面板，以保证排障信息可读。
@@ -711,10 +739,10 @@
 - `TV 软准备失败不自动重开选集 rail`：电视剧播放器 soft preparing 失败后，默认仍保持当前“选完即收起 rail”的沉浸路径，不自动把分集 rail 再次弹开。用户若想立刻改选其它分集，应通过轻错误态里的显式“选集”动作进入 rail，而不是被系统强制拉回操作面板。
 - `TV 软切换成功后保持 rail 收起`：目标分集或目标视频真正切换成功后，播放器仍保持当前“选完即收起 rail”的沉浸路径，不因为切换成功而自动把分集 rail 留在屏幕上。成功确认只通过中心区短反馈表达；用户若想继续选其它分集，再显式重新打开 rail。
 - `TV 软切换成功后直接播放`：当新的目标分集或目标视频真正切换成功后，播放器直接进入播放态，不继承切换前“旧内容暂停”的状态。旧内容在 soft preparing 期间仍可沿用原播放态承接，但一旦新目标切换完成，应立即播放新的目标内容；该目标自己的续播点、历史进度与续播提示链路仍按既有规则生效。
-- `TV 切集成功直进历史进度不弹续播卡`：如果用户在播放器内主动切到新的目标分集，且该分集本身存在历史进度，切换成功后应直接从该分集历史进度自动续播，不再弹续播提示卡二次询问。续播提示卡继续保留给首次进入播放器或其它非主动切集场景；主动切集本身已表达了足够明确的播放意图。
+- `TV 切集成功直进历史进度`：如果用户在播放器内主动切到有历史进度的目标分集，切换成功后直接按该进度自动续播，不再弹出二次选择；主动切集本身已经表达了足够明确的播放意图。
 - `TV 主动切到已完成分集从头播放`：如果用户在播放器内主动切到的目标分集，其历史进度已接近片尾或已被判定完成，则切换成功后不再从该历史进度继续，而是直接从头开始播放。这样避免“刚切过去就结束”的突兀体验，也把主动切集解释为“重新看这一集”的明确意图。
 - `TV 主动切到已完成分集不额外解释`：当 [[TV 主动切到已完成分集从头播放]] 生效时，不额外再弹第二条“已从头播放”说明，只沿用通用的“已切换到第 N 集”短反馈。这样中心提示保持确认型，而不是解释型，不把切换成功的轻反馈变成一段规则宣讲。
-- `TV preparing 中 BACK 取消目标切换`：当电视剧播放器仍处于 [[TV 长视频播放器软准备]]、旧分集还在承接而新目标尚未真正切换成功时，用户第一次按 `BACK` 应理解为取消这次目标切换，而不是直接进入播放器退出确认。取消后继续留在旧分集承接态；只有目标切换已取消或已完成后再次按 `BACK`，才进入播放器原有的返回确认/退出链路。
+- `TV preparing 中 BACK 取消目标切换`：当电视剧播放器仍处于 [[TV 长视频播放器软准备]]、旧分集还在承接而新目标尚未真正切换成功时，用户按 `BACK` 应先取消这次目标切换。取消后继续留在旧分集承接态；目标切换已取消或完成后，后续返回继续服从 [[TV 长视频分层返回]]。
 - `TV 取消目标切换短反馈`：当用户在 [[TV preparing 中 BACK 取消目标切换]] 的场景里取消一次正在进行的目标切换后，播放器可以在中心区给出一条比成功提示更轻、更短的取消反馈，例如“已取消切换到第 N 集”。该提示只在确实存在待取消目标时显示，不抢焦点，不阻断播放，也不应长时间停留。
 - `TV 失败或取消后重开 rail 默认回当前播放分集`：当用户从一次软切换失败态或取消态重新打开分集 rail 时，默认焦点与默认可见锚点都应回到当前实际播放分集，而不是回到上一次失败/取消的目标分集。这样重新进入 rail 时看到的是当前稳定上下文，而不是一个尚未生效的旧意图。
 - `TV rail 不保留失败目标痕迹`：当用户重新打开分集 rail 时，rail 内不再额外保留上一次失败或取消目标分集的弱提示痕迹。失败/取消信息只由中心区的轻提示短暂承接；rail 回归“当前实际播放分集 + 当前焦点 + 可选目标”的操作语义，避免把历史失败状态继续堆在操作层上。
@@ -722,9 +750,8 @@
 - `TV 成功/取消提示遇新操作立即让路`：成功提示和取消提示一旦遇到新的遥控操作，应立即消失并把屏幕空间让给当前交互，不继续拖着旧状态停留。它们的职责只是瞬时确认，不应与后续输入争屏或让用户感觉界面慢半拍。
 - `TV 连续切集失败原地替换失败态`：如果中心区已经存在一次目标切换失败态，而用户立刻发起新的切集且这次新目标也失败，界面应把它视为同一块失败态原地更新，而不是做一次新的闪烁、退场再进场或重复动效。用户真正需要知道的是“最后一次失败的是哪个目标、现在能做什么”，不需要被一串失败过渡动画打断。
 - `TV 新 preparing 立即顶掉旧失败态`：如果中心区还显示着上一次目标切换失败态，而用户又发起了新的切集，只要新的目标已经进入 soft preparing，就应立刻清掉旧失败态并切回当前目标的 preparing 轻提示，而不是把旧失败继续留到新结果落定。这样用户一按就能看到“新切换已开始处理”，不会误以为刚才的重试或改选没有生效。
-- `TV 打开 rail 不取消 preparing`：当长视频播放器仍处于 [[TV 长视频播放器软准备]] 时，用户只是重新打开分集 rail 并不等于放弃当前目标切换，系统不应因此自动取消正在准备的目标。只有用户明确改选了新的分集，或在 preparing 期间按下 `BACK` 触发取消语义时，当前目标才终止。这样 rail 既能承担“查看/犹豫/改选”的入口，又不会把半途中的切换无故掐断。
+- `TV 打开剧集面板不取消 preparing`：当长视频播放器仍处于 [[TV 长视频播放器软准备]] 时，用户只是重新打开 [[TV 长视频剧集浏览面板]] 不等于放弃当前目标切换。只有明确改选新分集或在准备期间返回取消，当前目标才终止。
 - `TV 剧集软切集反馈与承接状态分离`：电视剧播放器的 soft preparing / success / cancel / failed 都应通过独立的中心反馈状态表达，而不是复用 `selectedEpisodeNumber` 本身去长期挂住目标分集。失败或取消后，分集 rail 与主标题立即回到实际播放分集；失败的是哪一集、取消的是哪一集，只留在中心反馈态里，避免操作层残留过期目标。
-- `TV 剧集主动切集跳过续播卡`：当电视剧播放器是用户主动切集而进入新目标分集时，即使目标分集有历史进度，也不再弹续播提示卡；播放器直接按既有规则从历史进度或从头开始播放。续播卡继续只服务首次进入播放器等非主动切集路径。
 - `TV 剧集首屏软准备例外`：电视剧播放器只有在首次进入且当前还没有任何实际承接视频源时，才允许继续显示整页 preparing / blocked 状态；一旦已有实际播放分集承接，后续切集 preparing / failed / cancel 全部降到播放器中心区表达，不再退回整页状态。
 - `最近更新`：当前类型下最新可播放内容；电视剧按最近剧集更新，电影和 `18+` 按最新可播放视频。
 - `最近播放`：当前类型下用户已有播放进度的内容；电视剧保留季/集信息，电影和 `18+` 指向长视频本体。
@@ -733,16 +760,15 @@
 - `TV 长视频 LibVLC 内核（迁移前）`：TV 长视频播放器（电影 / `18+` / 电视剧）曾使用 `org.videolan.libvlc.MediaPlayer` 作为播放引擎，视频解码、字幕渲染、音轨切换均走 LibVLC。该内核正被 [[TV 长视频 ExoPlayer 内核]] 取代；LibVLC 后续只保留在 [[IPTV LibVLC 路径]] 等明确直播场景。
 - `TV 长视频输出层选择`：TV 长视频只有统一 ExoPlayer 内核，但 `PlayerView` 输出层必须按内容类型选择：普通 SDR 长视频优先 `texture_view`，用于避免 Compose 导航返回或 `AndroidView` 销毁时默认 `SurfaceView` 先脱离合成层并露出播放器页黑底；Dolby Vision / HDR 风险源必须使用 `surface_view`，避免 `TextureView` 破坏系统 HDR/DV 直出链路导致异色。播放器内部必须在 `PlayerView` 后方铺纯黑背板，避免 SurfaceView 透明、未铺满或重建期间露出详情页、海报或其它页面背景；这里的黑色背板不是覆盖视频的全屏遮罩，也不允许配合人为延迟作为退出体验。IPTV 直播仍按 [[IPTV LibVLC 路径]] 独立使用 LibVLC 输出策略。
 - `LibVLC track id 不稳定（IPTV/历史）`：LibVLC `MediaPlayer.getAudioTracks()` / `getSpuTracks()` 返回的 track id 在 Media 重新加载后不保证稳定，禁止把它当作长期协议或服务端字段。该约束后续主要保留给 [[IPTV LibVLC 路径]] 或迁移前长视频排障；TV 长视频迁到 ExoPlayer 后仍沿用“不保存底层临时 track id”的偏好原则。
-- `TV 轨道偏好持久化`：TV 长视频播放页的音轨/字幕偏好在 DataStore 中以 `language + type` 等语义形态保存，而不是保存底层播放器当前 media 的临时 track id。跨集、重载或切换来源时只读取持久化偏好并按当前 ExoPlayer/Media3 轨道列表重新映射。
-- `TV 长视频焦点真空`：TV 长视频播放器在 [[续播提示卡]] / 字幕 picker / 音轨 picker / 返回二次确认提示等叠加层关闭后留下的 Compose 焦点状态：没有任何 focusable 持焦，导致播放器根 Box 的 `onPreviewKeyEvent` 收不到 DPAD_DOWN / CENTER / DPAD_UP 事件。该问题与具体播放内核无关，迁到 ExoPlayer 后仍必须由 [[TV 播放控制层]] 兜底。
-- `LongFormVideoPlayer focus 兜底`：`LongFormVideoPlayer` 内部用于消除 [[TV 长视频焦点真空]] 的双层机制：①一个聚合 `LaunchedEffect` 监听 `controlsVisible` / `subtitleSheetVisible` / `audioTrackSheetVisible` / `resumePromptVisible` / `backConfirmPromptVisible` / `playerErrorVisible` 六个可见性，任一 true→false 跃迁且没有其他 overlay 仍在显示时显式 `rootFocusRequester.tryRequestFocus()`；②根 Box 的 `onFocusChanged`，当 root 自身丢焦点又无 overlay / 无 controls 焦点时也调用 `requestRootFocusWhenReady()`。两道关共同覆盖 LaunchedEffect 不感知的 Dialog dismiss 等场景。聚合判定纯函数在 `LongFormPlayerFocusGuard.kt`。
-- `续播提示卡内嵌位置`：续播提示卡（`TvResumePromptCard`）必须作为 TV 播放控制层内部子节点渲染，通过 `resumePromptSlot: @Composable BoxScope.() -> Unit` 槽位接入（当前 TV Shell 长视频使用 `TvSeriesCorePlaybackOverlay`）。卡片 dispose 时 Compose 焦点自然回收到 ancestor（player 根 Box）而不是清空成 null。不允许把 `TvResumePromptCard` 作为播放控制层兄弟节点平铺在 `TvLongFormPlayerScreen` / `TvSeriesPlayerScreen` 的外层 Box 里，否则 [[TV 长视频焦点真空]] 会再次出现。
+- `TV 轨道偏好持久化`：TV 长视频的字幕和音轨选择以 [[TV 长视频账户级轨道偏好]] 持久化；跨集、重载、切换来源或重新进入时都按当前轨道列表重新匹配，临时回退服从 [[TV 长视频轨道偏好回退]]。
+- `TV 长视频焦点真空`：TV 长视频播放器在续播提示、右侧二级面板或其它叠加层关闭后留下的 Compose 焦点状态：没有任何可聚焦节点持焦，导致播放器根层收不到方向键或确认键。该问题与具体播放内核无关，播放器控制层必须统一避免。
+- `LongFormVideoPlayer focus 兜底（旧实现）`：旧 `LongFormVideoPlayer` 通过监听控制层和多个浮层的可见性并在关闭后回收根焦点，以规避 [[TV 长视频焦点真空]]。当前重构不保留该组件及续播卡槽位形态，但活动面板关闭后必须把焦点恢复到明确目标的行为边界仍然成立。
 - `VLC Playing gate（迁移前）`：TV 长视频 LibVLC 内核为 `MediaPlayer.audioTrack = vlcTrackId` 和 `MediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, url, true)` 这类 track 切换性调用加的等待门。随着 [[TV 长视频 ExoPlayer 内核]] 迁移，该约束不再作为长视频实现前提；只在排查历史版本或明确 LibVLC 场景时适用。
 - `Type-only preference fallback`：TV 长视频字幕/音轨偏好恢复的兜底规则：当 DataStore 存的 `TvTrackPreference` 只有 `type`（如 "default" / "forced" / "commentary"）而 `language` 为空时，`resolveSelectedSubtitleTrackByPreference` 与 `resolveLongFormTrackByLanguage` 按 type 字段直接在 track 列表里找第一条同 type 的 track 返回，而不是直接放弃。修复 LibVLC 迁移之后 `isDefault=true` 但无 `languageCode` 的字幕/音轨永久丢失的 design hole。`buildSubtitleTrackPreference` / `buildAudioTrackPreference` 允许写入这类 type-only preference；resolve 端必须有对应解释路径。
 - `Audio LaunchedEffect 状态回灌`：`LongFormVideoPlayer` 的 audio LaunchedEffect 在 [[VLC Playing gate]] 通过且 `resolveAudioSelectionOnTrackLoad` 给出 `resolvedSelection` 时，除了 `player.audioTrack = vlcTrackId` 外还必须通过 `onSelectAudioTrack(resolvedSelection, preference, isUserAction = false)` 把 resolved track id 回灌给父级 `selectedAudioTrackId` state，使音轨 picker 不会显示成"自动选择"。`onSelectAudioTrack` 第三参数 `isUserAction: Boolean` 区分 picker 用户操作（true，触发 DataStore 写）与 LaunchedEffect 自动回灌（false，只更新 in-memory state），避免回灌→save→state change→LaunchedEffect 再 fire 的 save-loop。
 - `TV LibVLC playback URL 携带 access_token（迁移前）`：TV 长视频 LibVLC 内核时期，给 LibVLC 当 media URL 的播放 / 字幕地址必须用 `appendAccessTokenQuery(url, accessToken)` 在 URL 上附加 `?access_token=<jwt>` query 参数。长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后，该规则被 [[TV ExoPlayer 媒体鉴权]] 取代；若 IPTV 后续需要受权媒体 URL，再在 [[IPTV LibVLC 路径]] 下单独定义。
 - `MediaPlayer.addSlave 用 Uri 重载（迁移前）`：TV 长视频 LibVLC 内核时期，调 LibVLC `MediaPlayer.addSlave(int, ..., boolean)` 注入字幕时必须用 Uri 重载，不能用 String 重载。长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后不再使用该字幕注入路径；该规则只作为历史排障或明确 LibVLC 场景的约束。
-- `Player onPreviewKeyEvent overlay 透传`：`LongFormVideoPlayer` 根 Box 的 `onPreviewKeyEvent` 在 [[续播提示卡内嵌位置]] 之后必须首行检查 `currentFocusGuardInput.anyOverlayVisible()`，若为 true 直接 `return false`。这是 capture phase，不让出去的话 overlay（续播卡 / 字幕 picker / 音轨 picker / 返回二次确认）按 CENTER/←/→ 会被 player 路由的 toggle/seek 吃掉，overlay 按钮的 `clickable` 收不到 key event。与 [[LongFormVideoPlayer focus 兜底]] 的 onFocusChanged 是互补关系：兜底负责"无 overlay 时把焦点拉回 root"，透传负责"有 overlay 时不要从 overlay 抢键"。
+- `Player onPreviewKeyEvent overlay 透传（旧实现约束）`：旧 `LongFormVideoPlayer` 要求根层在续播、字幕、音轨或退出确认浮层可见时透传按键，避免抢走子层事件。当前重构不保留该组件形态，但“上层播放器不得截获当前活动面板的按键”这一行为边界仍然成立。
 - `LibVLC audioTrack=-1 是关音频（IPTV/历史）`：libvlc-android 3.x 把 `mediaPlayer.audioTrack = -1` 解释为"禁用音频输出"，不是"自动选择"。长视频迁到 [[TV 长视频 ExoPlayer 内核]] 后不再使用该规则；只在排查 IPTV 或历史 LibVLC 长视频版本时适用。
 
 ## TV 首页结构
@@ -754,7 +780,7 @@
 - `TV 参考图视觉基线`：TV App 的可见 UI 统一采用参考图中的暖金、暗玻璃和紧凑字号作为默认视觉语言。
 - `TV 焦点视觉语言`：旧版 TV 焦点态语言约定，已被 [[TV 参考图视觉基线]] 取代，仅作为存量实现的历史参考。
 - `TV 参考图可访问性护栏`：TV App 视觉换代后继续保留文本对比度和基本可读性要求；旧版 10-foot 排版 token 不再限制字号、间距、圆角或焦点样式。
-- `TV 播放器参考图换皮`：播放器内的控制条、进度条、按钮、字幕/音轨/倍速选择和返回/续播/连播浮层也采用 [[TV 参考图视觉基线]]；换皮只改变颜色、字号、圆角和焦点态，不改变控制条结构、遥控按键行为、播放内核或选择器层级。
+- `TV 播放器参考图换皮（已取代）`：旧播放器视觉批次只允许替换颜色、字号、圆角和焦点态，不改变控制结构、按键或选择器层级。当前 [[TV 长视频播放器]] 整体重构已取代该限制，并按 [[TV 长视频影院式视觉]] 重新设计；本轮不提供倍速。
 - `TV 功能状态页参考图换皮`：连接/配对、加载、错误和空态页面也采用 [[TV 参考图视觉基线]]，但继续保持清晰的功能面板结构；这些页面不为了统一风格引入影视海报式沉浸背景。
 - `TV 参考图 token 先行`：TV App 整体视觉换代应先建立暖金、暗玻璃、边框、焦点态、紧凑字号和 8dp 圆角等参考图风格 token，再替换共享组件和页面调用点；不要逐页散落硬编码颜色和字号。
 - `TV 参考图换代三批迁移`：TV App 视觉换代按三批推进：先改全局 token 与共享组件，再改内容页面，最后改播放器 UI 与连接/状态类功能页；每批独立验证和提交，避免一次性大范围换皮难以回滚。
@@ -763,22 +789,22 @@
 - `TV 开屏页图片`：TV App 冷启动时展示在系统窗口预览层的品牌图片。它只覆盖 Compose 首帧前的启动空白，不是业务页面、不设置固定等待时长，也不改变连接、配对或首页路由。
 - `TV 参考图全局 token 第一批`：TV App 全局 `AppChrome` token 的当前基线是参考图暖金 `Accent = #E8B85B` / `AccentStrong = #EFC463`、暗玻璃 surface、8dp `SurfaceShape` / `ChipShape` 和 999dp `PillShape`。`TvFocusGlowColor` 保留旧 API 名称以减少调用点震荡，但语义和值已经改为 `AppChrome.Accent` 暖金，不再表示蓝青 glow。`AppDarkColors.onPrimary` / `onSecondary` 必须使用深色画布，避免暖金按钮上出现低对比白字。
 - `TV 参考图内容页第二批`：TV 首页目录、海报墙和长视频详情页已经纳入 [[TV 参考图视觉基线]] 的内容页批次：占位海报、hero fallback、续播横幅、标题条和详情页 scrim 应使用 `AppChrome` 暖金/暗玻璃 token 或同页 reference brush，不再保留旧紫蓝/冷蓝占位色；任何 `AppChrome.Accent` 金色背景上的图标和文字必须使用 `AppChrome.Canvas` 深色前景。该批次只覆盖内容页视觉，不改变播放器 UI、连接/配对、加载/错误/空态、播放内核、路由或遥控器焦点结构。
-- `TV 参考图播放器与功能页第三批`：播放器 UI、字幕/音轨选择器、返回确认、续播/连播提示卡、连接服务器页、配对页以及共享加载/错误/空态属于 [[TV 参考图视觉基线]] 的第三批覆盖范围；这些界面应使用 `AppChrome` 暖金/暗玻璃 token，不再直接写旧冷色半透明 surface 或 `Color.White` 前景。播放器第三批只改变颜色、前景、surface 和进度条视觉，不改变播放内核、遥控器按键路由、焦点层级、播放历史上报或连接/配对业务流程。
+- `TV 参考图播放器与功能页第三批（播放器部分已取代）`：该批次曾要求播放器 UI、字幕/音轨选择器、返回确认、续播/连播提示卡与连接、配对、共享状态页统一使用暖金/暗玻璃视觉，并保持播放器原交互不变。当前 [[TV 长视频影院式视觉]] 与播放器整体重构只取代其中的长视频播放器部分；连接、配对和共享状态页不在本轮范围内。
 - `TV 参考图紧凑排版 token`：TV 端 `TvTypographyTokens` 当前不再暴露 10-foot 字号地板，而是按参考图角色命名：`HeroTitleSp = 30`、`LargeTitleSp = 26`、`SectionTitleSp = 20`、`BodySp = 14`、`HelperSp = 12`、`CaptionSp = 11`。`TvTypography` 仍由 `TvShellApp` 注入到 `MaterialTheme`，但 13 个 Material3 role 的 letterSpacing 固定为 `0.sp`，并只保留 lineHeight ≥ fontSize、层级单调和文本对比度作为护栏。
 - `TV 参考图对比度收口`：TV 端任何文本前景与暗色 surface 之间的对比度必须 ≥ 7.0:1（WCAG AAA），覆盖 `AppChrome.TextPrimary` / `TextSecondary` / `TextMuted` 三档前景，与 `AppChrome.Canvas` / `CanvasRaised` / `Surface` / `SurfaceElevated` / `SurfaceMuted` / `SurfaceStrong` 任意组合都必须达标。暖金按钮使用 `AppChrome.Canvas` 作为内容色，避免在 `AppChrome.Accent` / `AccentStrong` 上出现低对比白字。新增前景色、surface 或 accent 必须经 `TvColorContrastTest` 的纯函数 `wcagRelativeLuminance(Color)` / `wcagContrastRatio(Color, Color)` 校验通过——公式严格按 WCAG 2.x：sRGB 通道 ≤ 0.03928 时除以 12.92，否则按 `((c + 0.055)/1.055)^2.4` 线性化，亮度 `Y = 0.2126R + 0.7152G + 0.0722B`，contrast = `(L_lighter + 0.05) / (L_darker + 0.05)`，函数对前后景对称取大值/小值。
 - `TV 焦点动效物理`：TV 焦点缩放与光晕反馈一律使用 `androidx.compose.animation.core.spring`，禁止再使用 `tween(durationMillis = 140)` 一类的线性近线性曲线作为焦点反馈。spring 参数集中在 `core/ui/TvFocus.kt` 的 `object TvFocusMotionTokens` 暴露：`ScaleDampingRatio = 0.8f`（轻微回弹，保留分量感不过冲）、`ScaleStiffness = 380f`（中速、避免迟滞）适用于焦点放大；`SurfaceDampingRatio = 1f`、`SurfaceStiffness = 620f` 适用于光晕/背景提亮的淡入淡出（critically-damped、比缩放更快，让背景反馈追上 scale 起步）。`PressedScale = 0.97f`（DPad center / Enter / NumPadEnter 按下时下沉目标 scale，0.94–0.99 区间）、`PressDampingRatio = 0.7f`（按下时阻尼略低于焦点放大，按下/回弹更紧凑）、`PressStiffness = 720f`（高于 `ScaleStiffness`，按下与回弹明显比悬停焦点反馈快）适用于按下反馈。`tvFocusableGlow` / `tvFocusableScaleOnly` 内 scale 的 `targetValue` 必须通过纯函数 `resolveTvFocusableScaleTarget(focused, pressed, enabled, focusedScale)` 派生：`!enabled → 1f`，`pressed → PressedScale`，`focused → focusedScale`，否则 `1f`——不允许在 modifier 调用点内联三元表达式。spring 选择必须走 `tvFocusableScaleSpring(pressed)`，`pressed=true` 时使用 `Press*` 组、`pressed=false` 时使用 `Scale*` 组，让按下和悬停切换出现明显刚度差异。`Modifier.onPreviewKeyEvent` 拦截 `Key.DirectionCenter` / `Key.Enter` / `Key.NumPadEnter` 三个 TV 按下键（集中在 `isTvPressKey` 与 `TvPressKeys` 集合，新增按下键必须通过该集合统一注册），`KeyEventType.KeyDown` 翻转 `isPressed = true`、`KeyEventType.KeyUp` 翻转回 `false` 并通过 `performTvPressHapticFeedback(view)` 触发触觉；`onFocusChanged` 失焦时必须主动把 `isPressed` 复位，避免 keyUp 还没到 modifier 就丢失焦点时按下态卡住。触觉常量按 `Build.VERSION.SDK_INT >= Build.VERSION_CODES.R` 守门：API 30+ 用 `HapticFeedbackConstants.CONFIRM`，更低 API 回退 `HapticFeedbackConstants.VIRTUAL_KEY`，避免 CONFIRM 在旧设备上静默失败。`onPreviewKeyEvent` 内统一返回 `false` 表示不吞按键事件，让下游 `focusable()` / `clickable()` / `onClick` 仍能收到 Enter/Center，按下反馈是装饰层不是行为层。新增 TV 焦点反馈动画必须复用这些 token，不允许在调用点硬编码 spring 参数；动效 token 不影响 `focusedScale` / `focusedHaloPaddingDp` 等几何参数。
 - `TV 动效时长 token`：TV 端时长驱动的 `tween` 动画（fade、stagger、列表入场、浮层 show/hide 等）必须把 duration 与 easing 收口到 `core/ui/TvMotion.kt` 的 `object TvMotionTokens`，统一落在 200–260ms 区间（TV 端超过 300ms 即感觉迟滞，低于 200ms 即丢失动画感）。当前暴露三档 duration：`DurationFastMs = 200`（小型瞬时反馈，如临时浮层 alpha）、`DurationStandardMs = 240`（默认 TV 过渡时长，如 `LongFormVideoPlayer` 控制条 / seek preview / center feedback 的 `AnimatedVisibility` fade）、`DurationEmphasizedMs = 260`（入场强调，如列表 stagger 单 item 淡入），三档严格升序、Fast < Standard ≤ Emphasized 不允许颠倒。easing 暴露一个 `EasingStandard: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)`（Material 标准缓动曲线），不再在调用点写裸 `CubicBezierEasing(...)` 字面量、不允许使用 `LinearEasing` 或纯 `FastOutSlowInEasing`。具体收口位点：`TvListMotionTokens.StaggerEntryDurationMs` / `StaggerEntryEasing` 必须分别引用 `TvMotionTokens.DurationEmphasizedMs` / `TvMotionTokens.EasingStandard`；`LongFormVideoPlayer` 的所有 `fadeIn(...)` / `fadeOut(...)` 必须显式传入 `tween(TvMotionTokens.DurationStandardMs, easing = TvMotionTokens.EasingStandard)`，禁止裸 `fadeIn()` / `fadeOut()` 默认 400ms（超 A5 上限）。spring 系动效（焦点放大 / 按下反馈 / 光晕淡入）继续由 `TvFocusMotionTokens` 提供物理参数，与 duration token 不混用——`TvMotionTokens` 只负责 tween/easing，不负责 spring。新增 TV 时长动画必须从这三档 + 一个 easing 中挑选；如出现确需新 token 的场景（如更紧凑的 micro-interaction），应扩 `TvMotionTokens` 而不是在调用点硬编码数字。
 - `TV 旧 10-foot 排版 token`：旧版 `MainTitleSp = 34`、`SubtitleFloorSp = 22`、`HelperFloorSp = 18`、`TightHelperSp = 18` 已被 [[TV 参考图紧凑排版 token]] 取代，仅作为历史记录保留；新增或修改 TV 页面时不得继续用这些 10-foot 地板作为视觉准入标准。
-- `TV 焦点双层 glow`：TV 焦点态视觉继续由内层背景提亮与外层 tinted halo 两层表达，但颜色跟随 [[TV 参考图全局 token 第一批]] 的暖金 `TvFocusGlowColor = AppChrome.Accent`。`InnerGlowAlphaTarget = 0.42f` 用于暗玻璃上的克制提亮，`OuterHaloElevationDp = 12.dp` 继续控制外层扩散；禁止回退到旧蓝青 `Color(0xFF39D7E8)`、旧 alpha 字面量 `Color(0x2639D7E8)` 或裸 `graphicsLayer { shadowElevation = ... }`。
+- `TV 焦点双层 glow（已取代）`：旧参考图迁移阶段曾使用内层提亮与外层暖金光晕表达焦点，随后被“焦点只缩放”默认规则取代；当前 [[TV 长视频播放器焦点视觉]] 虽恢复暖金焦点底色与描边，但仍禁止外层光晕。
 - `TV hero ken-burns 环境动效`：TV `TvCatalogScreen` 首页 hero（`TvFeaturedHero`）的 backdrop `AsyncImage` 必须叠极缓慢的 Ken Burns 环境动效（缓慢缩放 + 菱形漂移），10-foot 视距下给屏幕「呼吸感」、避免纯静帧 hero 让人感觉应用卡住。参数集中在 `core/ui/TvHeroMotion.kt` 的 `object TvHeroMotionTokens` 暴露：`RampDurationMs: Int = 120_000`（半周期 tween 时长，配 `RepeatMode.Reverse` 视觉总周期 = 240s，区间 60s–300s——更快会让人察觉运动方向、更慢用户在一次会话内根本感知不到）、`ScaleStart: Float = 1.05f`（scale 下限，必须 ≥1.02f 才能为 translation 预留安全余量、≤1.10f 避免起手过度放大）、`ScaleEnd: Float = 1.10f`（scale 上限，区间 1.05f–1.15f，是 10-foot 视距下「能感觉到呼吸」但不会察觉到「在动」的甜点）、`ScaleStaticTarget: Float = 1.075f`（reduce-motion 冻结目标，必须等于 `(ScaleStart + ScaleEnd) / 2f`、容差 0.001f，避免冻结在端点造成视觉突变）、`PanOffsetXDp: Dp = 8.dp`（水平 pan 振幅，半周期内从 -8dp 漂到 +8dp，区间 4dp–16dp）、`PanOffsetYDp: Dp = 4.dp`（垂直 pan 振幅，区间 2dp–8dp，且**必须 ≤ PanOffsetXDp**——TV hero 横向更长，垂直振幅过大会与上层渐变 / 文案 Row 视觉错位）。驱动方式：`TvFeaturedHero` 内单一 `rememberInfiniteTransition` + `animateFloat(0f→1f)` + `infiniteRepeatable(tween(RampDurationMs, easing = TvMotionTokens.EasingStandard), repeatMode = RepeatMode.Reverse)` 输出 `progress ∈ [0,1]`，再用 `androidx.compose.ui.util.lerp` 把 progress 分别映射到 `scale ∈ [ScaleStart, ScaleEnd]` 与 `translationXY ∈ [-PanOffsetXY, +PanOffsetXY]`。强约束：(a) `graphicsLayer { scaleX = ; scaleY = ; translationX = ; translationY = }` **只能挂在 backdrop `AsyncImage` 一张图上**，不能挂在上层 horizontal gradient / `TvFeaturedPoster` / 文案 Row，否则文字会跟着抖；(b) 调用点不允许出现 `120_000` / `1.05f` / `1.10f` / `1.075f` / `8.dp` / `4.dp` 等裸字面量，必须从 `TvHeroMotionTokens` 取——`TvFeaturedHeroMotionSpecTest` 会切出 `TvFeaturedHero` 函数体（`private fun TvFeaturedHero(` 起、`private fun TvFeaturedPoster(` 止）做源文 audit；(c) hero 外层 `Surface(shape = AppChrome.CardShape)` 自带 clip 是 scale + pan 不漏边的物理保证，不能改 hero 容器去掉 shape；(d) 缓动**必须**复用 `TvMotionTokens.EasingStandard`，B3 不复用 `DurationFastMs/StandardMs/EmphasizedMs`（120s 比 TV 端 200-260ms 时长档高三个数量级，属不同尺度）——TV 端所有 tween 缓动统一一条曲线。reduce-motion 协议：`core/ui/TvAccessibilityMotion.kt` 的 `@Composable rememberTvReduceMotionEnabled(): Boolean` 是 TV 工程**唯一**读 `android.provider.Settings.Global.ANIMATOR_DURATION_SCALE` 的入口，`scale == 0f` 时返回 true 表示用户在开发者选项或无障碍里关闭了动画；`remember(context)` 缓存结果，不监听 `SettingsObserver`——系统级 setting 改动罕见、需要 app 重启才生效是公认的可接受约定。reduce-motion 命中时 `animateFloat` 的 `targetValue` 切到 `0f`（progress 锁定在 initial value），`heroScale` 直接取 `ScaleStaticTarget`、`heroTranslationX/Y` 直接 `0f`，整张 backdrop 冻结成静帧。未来其他动效（B5 圆角动效 / C2 状态屏渐入等）新增 reduce-motion 探测**必须**复用 `rememberTvReduceMotionEnabled()`，不允许另起 `Settings.Global` 调用点。
 - `TV 焦点 ISE 三层防线`：TV 端 `FocusRequester.requestFocus()` 因目标节点未挂载抛出 `IllegalStateException: FocusRequester is not initialized` 是 Compose 1.7 异步协程恢复路径的固有失败模式（栈穿过 `BaseContinuationImpl.resumeWith` → `DispatchedTask.run` → `AndroidUiDispatcher` 异步透到主 Looper），不能只靠单一调用点 try-catch 覆盖。整体防线由三层叠加构成、层层独立、缺一不可，禁止移除任何一层：第一层「同步」`core/ui/TvInitialFocusEffect.kt:24-35` 的 `fun FocusRequester.tryRequestFocus(): Boolean` 是业务侧唯一入口——内部同步 try-catch `IllegalStateException`，调用 `isFocusRequesterNotInitialized(err)` 关键字匹配命中即吞掉返回 `false`，未命中重抛；强约束**`LaunchedTvInitialFocus { ... }` 块体内必须用 `.tryRequestFocus()` 而不能裸调 `.requestFocus()`**（一次性事件回调如点击 / 按键 / 动画完成除外，那些路径上 try-catch 帧能正常生效）。第二层「协程」`core/ui/TvInitialFocusEffect.kt:37-53` 的 `@Composable LaunchedTvInitialFocus(vararg keys, block)` 在 `withFrameNanos { }` 等过一帧后跑 `runCatching { block() }.onFailure { ... }`：`CancellationException` 必须重抛以保留协程取消语义，focus-requester ISE 命中即吞掉，其他异常继续抛——这一层吞掉 R8 内联 / 异步恢复路径绕开 try-catch 帧时的兜底 ISE。第三层「主 Looper」`tv/TvMainActivity.kt` 的 `installMainLooperHoverExitGuard()`：`Handler.post { while(true) try Looper.loop() catch (err) { ... } }`，匹配 `shouldSwallowTvComposeHoverExitCrash(err)` **或** `shouldSwallowTvComposeFocusRequesterCrash(err)` 任一即吞，否则原样 `throw err`。focus-requester matcher 判别签名锁定两个充要条件：`err is IllegalStateException` 且 `err.message?.contains("FocusRequester is not initialized") == true`、栈中至少一帧 `frame.className.startsWith("androidx.compose.ui.focus.")`（不绑定具体方法名，因为 `FocusRequester` / `FocusOwnerImpl` / `findFocusTargetNode$ui_release` 等帧在不同 Compose 版本与 D8 lambda 合成路径下保留情况不一致）；非 Compose focus 子系统抛出的同消息异常必须继续重抛，回归测试 `TvMainActivityInputPolicyTest` 的 `does not swallow focus requester message from non compose source` / `does not swallow focus requester message when stack lacks compose focus package` 锁定误伤边界。该三层防线交集为：业务正常路径走第 1 层即返回，R8 内联 / 异步路径走第 2 层兜底，第 3 层永远兜底主 Looper——任何一层失效仍能整体防住 FATAL。详见 [`TV 焦点请求安全调用 tryRequestFocus`] 第 1 层细则、[`TV 初始焦点请求约束`] 第 2 层细则、[`TV 主 Looper FocusRequester 未初始化兜底`] 第 3 层细则。
 - `TV 图标操作`：TV 端圆形或小型图标按钮属于按钮焦点语言的一部分，应使用共享 TV 图标操作组件承载点击、尺寸、暗玻璃底色和暖金焦点反馈；不要把默认 Material `IconButton` 作为主要 TV 焦点控件。用于接收遥控按键的根焦点容器不属于图标操作。
 - `TV 整体视觉换代`：TV App 的主要界面统一采用电视剧详情页参考图的暖金、暗玻璃和更紧凑字号作为新的视觉基线；旧版蓝青焦点语言只作为历史参考，不再是全局风格基准。
 - `TV 参考图字号基线`：TV App 整体视觉换代时，标题、正文、按钮和元信息的字号以电视剧详情页参考图为准，优先保持更紧凑的层级密度，而不是沿用旧 TV 端更大的可读性余量。
-- `TV 电视剧详情页操作`：电视剧详情页的返回、播放、季选择和集选择都属于遥控器可达的详情页操作。返回应复用共享 TV 图标操作；播放、季选择和集选择继续使用共享焦点视觉，不使用默认 Material 按钮作为主要焦点控件。
+- `TV 电视剧详情页操作`：电视剧详情页的返回、起播、季选择和集选择都属于遥控器可达的详情页操作。起播按 [[TV 长视频详情起播意图]] 区分继续播放与从头播放；返回、季选择和集选择继续保持遥控器可达。
 - `TV 电视剧详情页焦点与选中分离`：电视剧详情页右侧剧集卡片和主播放按钮以遥控器焦点表达可操作状态，金色只跟随当前焦点；当前分集是业务状态，不作为独立视觉高亮。
 - `TV 电视剧详情页参考图还原`：电视剧详情页参考图还原只保留主体详情区，不引入参考图里的左侧竖向导航栏或顶部英文导航栏；返回仍作为详情页独立操作保留。左侧电视剧信息区优先贴近参考图层级：左对齐剧名、不再显示标题上方“剧集”顶标，点分元信息不带 `18+` 年龄角标，保留星级 + 分数 + IMDb 角标、至少四行剧情摘要、主播放按钮 + 我的片单按钮、演员行；这一区域允许为了视觉还原覆盖通用 TV 排版 token 的调用点约束，字号可以低于通用 10-foot 地板，但仍必须保持中文文案、遥控器可聚焦和 TV 端安全区域语义。参考图页主体不套用旧版共享青蓝 `tvFocusableGlow`，选中/聚焦态改用暖金边框与暗玻璃底；在 1920x1080 / density 320 的 TV 设备上按 960x540 逻辑 dp 计算布局，禁止把参考图像素值直接当 dp，避免右侧剧集面板吞掉左侧信息区。
-- `TV 长视频详情页操作`：电影和 `18+` 的沉浸式详情首屏中，返回、播放和收藏都属于遥控器可达的详情页操作。返回应复用共享 TV 图标操作；播放和收藏继续使用共享焦点视觉，不使用默认 Material 按钮作为主要焦点控件。
+- `TV 长视频详情页操作`：电影和 `18+` 的沉浸式详情首屏中，返回、起播和收藏都属于遥控器可达的详情页操作。起播按 [[TV 长视频详情起播意图]] 区分继续播放与从头播放；返回和收藏保持既有产品语义。
 - `TV 第一阶段视觉覆盖范围`：TV 遥控器体验与视觉一致性覆盖首页左侧菜单、首页内容卡片、搜索、设置、海报墙、电影/`18+` 详情页、电视剧详情页、IPTV 频道列表、播放器音轨/字幕/返回提示等浮层控件；不覆盖播放内核、解码策略、播放历史上报、IPTV 播放引擎选择或首页信息架构重排。
 - `TV 工程编译边界`：TV 独立工程的主编译图只应包含 TV 启动、连接/配对、长视频/电视剧、`18+`、IPTV、TV 设置和这些能力直接复用的基础设施；手机端首页、短视频、图片合集、Mine、上传或手机端互动流可以暂留源码目录作迁移参考，但必须排除在 TV 编译图之外。**强约束**：`android-tv-app/tv-app/build.gradle.kts` 顶部 `tvMainSourceExcludes` / `tvTestSourceExcludes` 是单一来源——三处必须同步生效：(a) `kotlin { sourceSets { getByName("main"/"test") { kotlin.exclude(...) } } }`（Kotlin Multiplatform 源集语义，主要给 IDE / Gradle 模型层用），(b) `tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach { exclude(...) }`（真正阻断 `compileDebugKotlin` / `compileDebugUnitTestKotlin` 等任务对 phone-only 源的 Kotlin 编译），(c) `tasks.withType<org.jetbrains.kotlin.gradle.internal.KaptGenerateStubsTask>().configureEach { exclude(...) }`（阻断 kapt 给 phone-only 文件生成 Java stub，否则 Hilt / kapt 的 stub 生成会顺带把 phone-only 文件拉进编译图，引发"明明在排除列表里却报 Unresolved reference"的假象）。**配置 (b) 与 (c) 必须按任务名 `contains("UnitTest", ignoreCase = true)` 区分主源集 vs 测试源集 exclude 列表**——否则测试源集会被错套主源集排除（漏掉 `feature/home/**` 等手机端测试），或反之。仅依赖 (a) 会让 phone-only 源继续被 kapt 加载、并被 Kotlin 编译器看到——这是 B5 落地时暴露的真实坑点（删除 `AppChrome.CardShape` / `SectionShape` 后 phone-side `feature/auth` / `feature/home` / `feature/mine` / `feature/shorts` / `feature/imagecollections` 全部 `Unresolved reference` 报红，确认 (a) 单独不够）。新增 phone-only 顶层路径时必须同步追加到 `tvMainSourceExcludes`（如果有测试也追加 `tvTestSourceExcludes`），三处任务/源集排除自动级联。
 - `TV 状态反馈语言`：TV 端加载、空态和错误态应使用统一状态组件表达。页面级加载使用居中紧凑状态，列表分页加载使用行内状态，空态说明保持短句，错误态必须提供可聚焦的重试动作；服务器自动嗅探继续使用表单内小型行内 loading，不升级为页面级加载态。
@@ -820,61 +846,49 @@
 - `TV 分集剧照本地化`：电视剧刮削同步分集时，`episodes.still_path` 仍保留 TMDB 原始 still 路径，但服务端对 TV 端暴露 `/api/v1/tv/series/:id/seasons/:season/episodes/:episode/still` 作为稳定访问路由。刮削器会把分集 still 下载到 `STORAGE_ROOT/tv/series/<seriesID>/episodes/sXXeYY.jpg`；接口优先返回该本地文件，缺失时才按原始路径回退到本地文件路径、远程 URL 或 TMDB original 图。
 - 长视频详情背景优先使用可识别的横向背景字段：电影使用 `backdrop_url`、`backdrop_path`、`fanart_url`、`fanart_path`；`18+` 保持 AV 原始横幅海报优先规则。缺少横向背景时才允许使用竖向海报作为模糊暗化兜底，并通过展示模型显式标记为兜底，避免把竖海报当作正常横幅裁切。
 - TV 电影详情页必须使用已下载到本地的电影横向背景；TMDB 原始相对图路径不能直接作为 TV 背景候选。后端应通过视频图片本地访问路由暴露电影横向背景，TV 端不依赖服务端文件系统路径。
-- TV 电影/`18+` 详情页操作只保留“播放”和“收藏/取消收藏”；收藏状态复用详情 DTO 的 `user_state.is_favorited` 与 `DetailViewModel.toggleFavorite()`，不新增分享入口或更多信息滚动入口。
+- TV 电影/`18+` 详情页操作只保留起播和“收藏/取消收藏”；有历史时起播展开为“继续播放”和“从头播放”，没有历史时只显示“播放”。收藏状态继续复用详情 DTO 的 `user_state.is_favorited`，不新增分享或更多信息入口。
 - 详情页演员区最多展示 5 个演员，优先使用接口 `actors.avatar_url`，无头像时显示圆形文字占位；无演员数据时隐藏演员区，不发起额外抓取。
 
 ## TV 播放术语
 - `运行时切轨`：TV 长视频播放过程中选择音轨后，当前播放音频应立即切换到目标音轨，并在音轨列表中反映当前播放音轨。
-- `夜台玻璃面板`：TV 播放器中的居中深色半透明玻璃浮层，背景保持可感知但压暗，边缘带细高光，焦点态使用柔和暖金光感；字幕和音轨选择共用这一视觉语言。
-- `TV 播放器退出确认`：TV 长视频和电视剧播放器内的系统返回键、控制条返回详情和退出播放操作都属于退出当前播放的用户意图，应进入同一套“第一次提示、第二次确认退出”流程；不允许控制条按钮绕过确认直接离开播放。[[BACK 优先收 UI]] 是该流程的前置例外，仅在 [[TV 操作 UI 层]] 可见时拦截系统返回键并先收起操作 UI，UI 已收起后下一次 BACK 继续进入退出确认。
-- `TV 操作 UI 层`：TV 长视频播放器 `tvMode=true` 下的操作可见性单元，包含底部 controls 玻璃条与左上信息层。两者共用 `controlsVisible` 状态、同一个 5 秒自动隐藏计时，以及 `TvMotionTokens.DurationStandardMs` + `EasingStandard` 的 240ms fade 动效；不得拆成两套独立 hide job。
-- `播放器内选集轨`：电视剧播放器内由用户主动呼出的横向集数选择轨，是 [[TV 操作 UI 层]] 的一部分，不是底部弹窗或居中确认面板。它只作用于电视剧播放，不覆盖电影、`18+`、IPTV 或短视频；本期范围只展示当前季的剧集，不做跨季混排或跨季切换。
-- `选集轨不可播集占位`：[[播放器内选集轨]] 中不可播放剧集仍保留集数占位，用于维持当前季集数连续性；但它们只能弱化展示，不能被点击，也不能成为焦点落点。
-- `选集标题气泡`：[[播放器内选集轨]] 上方的标题气泡跟随当前焦点集，而不是当前播放集。用户左右移动时，气泡应落在焦点所在集数卡片上方，并显示该集标题，用于弥补卡片本体只显示集数的信息压缩。
-- `选集轨固定槽位`：[[播放器内选集轨]] 的每个集卡在横向列表中占用稳定槽位，焦点变化不能改变该槽位宽度；[[选集标题气泡]] 只允许作为焦点集上方的覆盖信息，不能参与列表 item 的横向测量，否则会在左右集卡之间制造无端 gap。
-- `选集轨单行信息密度`：[[播放器内选集轨]] 本体只显示一排横向集数小卡片，避免再叠第二行摘要、时长或状态文案；标题信息统一由 [[选集标题气泡]] 承担，不在卡片内重复展示。
-- `中文序数集卡`：[[播放器内选集轨]] 的集数卡片在本期固定用中文序数文案显示，如“第一集”“第二集”。本期默认只覆盖当前季内的标准正整数正片集，不为 `SP`、预告、花絮或非整数集号单独设计展示文案。
-- `左上信息层`：TV 长视频播放器左上角无背板的纯文字标题层。电影和 `18+` 只显示主行标题；电视剧主行为剧名，副行为「第 X 季 · 第 Y 集 单集标题」，单集标题为空时不保留尾部空格。文字通过 Compose `TextStyle.shadow` 增强亮场景可读性，字号、阴影和 padding 统一收口在 `TvLongFormTitleOverlayTokens`。
-- `操作 UI 互动唤起`：TV 长视频播放器中遥控器 LEFT/RIGHT seek、DOWN 进入 controls、controls 内左右移动焦点、OK 播放暂停等互动都应唤起或维持 [[TV 操作 UI 层]] 并重置 5 秒计时；OK 在焦点不在 controls 时只切换播放暂停和显示中央反馈，不额外点亮整套 UI。
-- `controls 焦点入口`：非电视剧 TV 长视频仍由 DPad DOWN 把焦点送入底部控制条，落点为播放/暂停按钮。电视剧播放器首屏保持 UI 收起，第一次 DPad DOWN 先进入 controls 页，第二次 DPad DOWN 再进入 [[播放器内选集轨]]；无论 UI 是否可见，只要焦点仍在播放器根，LEFT/RIGHT 都继续只执行 seek，不把焦点送入 controls。
-- `controls 焦点环绕`：TV 长视频控制条中可见按钮按视觉顺序组成首尾相连的焦点链，最左侧按 LEFT 到最右侧，最右侧按 RIGHT 回最左侧。实现必须使用 Compose `Modifier.focusProperties { left/right = FocusRequester }` 配按钮 `FocusRequester`，禁止在根按键处理器里硬编码“当前焦点在哪个按钮”的 if-else；Slider 不参与焦点链，必须 `focusProperties { canFocus = false }`。
-- `BACK 优先收 UI`：TV 长视频播放器中系统 BACK 的两段式前置语义：[[TV 操作 UI 层]] 可见时先收起 UI、取消自动隐藏计时并把焦点退回播放器根，不进入退出确认；UI 已收起时 BACK 才交给调用方既有 BackHandler 进入 [[TV 播放器退出确认]]。控制条上的返回详情 / 退出播放按钮是点击动作，不适用该前置例外，仍直接进入退出确认流程。
-- `controls 与选集轨垂直切换`：电视剧播放器中，DPad DOWN 第一次呼出并进入 controls 页，第二次从 controls 进入 [[播放器内选集轨]]；DPad UP 从选集轨进入 controls，再从 controls 回到播放器根。
-- `controls 向下统一进入选集轨`：电视剧播放器的 controls 内任一可聚焦控件按 DPad DOWN 都应进入 [[播放器内选集轨]]，不为单个按钮保留例外入口或隐藏规则，保证 controls 页的向下导航语义一致。
-- `播放器内纵向切页无空按`：TV 播放器内凡是存在“当前焦点层 → 下一层面板”的纵向切页语义时，切页动作必须由当前持焦层自己也能稳定触发，不能只依赖更外层容器兜底；否则一旦根焦点回收时序与页面动画错位，就会出现用户必须多按一次方向键的空按体感。
+- `夜台玻璃面板（旧）`：旧 TV 播放器用于字幕和音轨选择的居中深色半透明玻璃浮层。当前 [[TV 长视频影院式视觉]] 已用克制的深色实体二级面板取代其玻璃材质；具体面板位置与导航方式由本轮播放器设计重新确定。
+- `TV 长视频分层返回`：[[TV 长视频播放器]] 按当前最内层交互逐级消费返回：右侧二级面板先关闭并恢复入口焦点，精确拖动先取消并恢复原位置，主控制层先收起并返回纯观看状态；只有纯观看状态下的返回才保存当前进度并立即回到详情页。长视频播放器不再显示“再按一次返回”提示，也不要求二次确认退出。
+- `TV 操作 UI 层`：[[TV 长视频播放器]] 覆盖在视频上的全部可交互界面，包含主控制层、右侧二级面板、瞬时反馈和播放提示；各部分服从同一个播放会话状态，但只有主控制层适用 [[TV 长视频控制层自动隐藏]]。
+- `TV 长视频右侧二级面板`：字幕、音轨和选集从各自主控制入口打开同一种右侧滑入深色实体面板；字幕和音轨显示单列选项，选集显示跨季浏览内容。面板打开期间主控制层不自动隐藏，也不允许焦点落回被面板遮挡的控件。
+- `TV 长视频二级面板初始焦点`：字幕或音轨面板打开时，初始焦点优先落在当前已选项；选集面板打开或切季时，初始焦点优先落在当前播放集，当前季没有该集时才回退到首个可播放分集。面板列表同时滚动到该目标，避免用户先从列表顶部重新定位当前状态。
+- `TV 长视频轨道即时选择`：字幕或音轨面板中的选项确认后立即应用并更新暖金选中勾，但面板保持打开、焦点留在当前行，便于连续试听或比较；不增加二次“确认”按钮。切换不得改变播放位置或原播放/暂停状态，返回键按 [[TV 长视频二级面板返回]] 关闭面板。应用失败时恢复上一有效选择并在当前面板内显示轻量错误，不重启视频，也不进入整页或最终播放错误态。
+- `TV 长视频剧集浏览面板`：[[TV 长视频右侧二级面板]] 中用于浏览电视剧分集的内容，顶部提供季切换，主体使用可滚动剧集行展示集号、标题和观看进度。不可播放分集保留弱化占位但不可点击、不可获焦；打开面板时定位当前播放集，并分别表达当前焦点集和当前播放集。
+- `TV 长视频二级面板返回`：用户从主控制层打开 [[TV 长视频右侧二级面板]] 后，返回键先关闭面板并把焦点恢复到原入口，不直接退出播放，也不跳到其它播放器层级。
+- `左上信息层`：[[TV 长视频播放器]] 左上角无独立卡片的轻量标题层。电影和 `18+` 只显示片名；电视剧显示剧名、集号与集标题，空字段不保留多余分隔符，不展示海报、简介或媒体格式徽章。
+- `操作 UI 互动唤起`：[[TV 长视频播放器]] 中任一有效遥控操作都会维持可见控制层并重置 [[TV 长视频控制层自动隐藏]] 计时；控制层隐藏时，确认键按 [[TV 长视频确认键主操作]] 切换播放状态并唤起控制层，方向下键只唤起控制层并把焦点落到播放/暂停。
+- `controls 焦点入口`：单片与电视剧统一由方向下键唤起底部主控制层并把焦点落到播放/暂停；焦点仍在播放器根时，左右键执行按步长快速跳转，不进入控制按钮焦点链。
+- `controls 焦点环绕（已取代）`：旧控制条曾让最左与最右按钮首尾循环，当前已由 [[TV 长视频控制区空间焦点]] 取代，不再允许焦点跨越整行瞬移。
+- `TV 长视频控制区空间焦点`：[[TV 长视频主控制层布局]] 使用与视觉位置一致的有边界焦点导航。操作行左右移动到边界后停留，不首尾循环；方向上从操作行进入时间轴，时间轴方向下回到播放/暂停。能力集变化导致当前按钮消失、焦点目标失效或控制层重新建立焦点时，统一回退到播放/暂停，不在根按键处理器里维护一套与 Compose 节点重复的按钮索引状态机。
+- `播放器内面板打开无空按`：[[TV 长视频右侧二级面板]] 必须由当前持焦入口直接打开并在同一次操作中建立面板焦点，不能依赖外层容器兜底或要求用户补按一次方向键。
 - `controls 持焦横向导航`：TV 播放器 controls 页内存在横向焦点链时，LEFT/RIGHT 切焦必须由当前持焦控件所在层稳定触发；根播放器只负责播放器根层的 seek 语义，不能成为 controls 页横向导航的唯一兜底。
-- `选集轨重入锚点`：每次从 controls 重新进入 [[播放器内选集轨]] 时，焦点都应回到当前播放集，不记忆上一次在选集轨里的浏览焦点；当前播放集是唯一稳定锚点。
-- `电视剧播放器三层焦点栈`：电视剧播放器在本期采用 `播放器根 → controls 页 → [[播放器内选集轨]]` 的三层焦点结构。DPad DOWN 负责逐层向下进入，DPad UP 负责逐层向上返回；当 controls 已可见时，第二次 DPad DOWN 必须立即进入选集页，不允许出现额外一次无响应的空按。
-- `电视剧 controls 收敛为四项`：电视剧播放器的 controls 本期只保留 `播放/暂停`、`进度条`、`字幕`、`音轨` 四项；不再保留“选集”或“下一集”按钮。选集能力改由 [[播放器内选集轨]] 承载，避免 controls 因重复入口而重新膨胀。
-- `电视剧进度条只展示不交互`：电视剧播放器 controls 中的进度条保留为播放信息展示，不参与焦点链，也不承担拖动或左右键 seek；快进/快退继续只由播放器根的左右键路由负责。
-- `controls 左右键切焦点`：电视剧播放器进入 controls 后，DPad LEFT/RIGHT 的语义切换为 controls 内部横向焦点移动，不再触发快进/快退。controls 页内部焦点按首尾循环规则横向切换；seek 只属于播放器根层，controls 与 [[播放器内选集轨]] 都不再复用左右键做 transport。
+- `controls 左右键切焦点`：[[TV 长视频播放器]] 的操作行获得焦点后，左右键只在可见操作之间移动焦点，不再触发快速跳转；进度条获得焦点后，左右键改为 [[TV 长视频精确拖动]]。
 - `seek 进度显示防抖`：TV 长视频播放器在播放器根层连续按 LEFT/RIGHT seek 时，进度显示应以当前 pending 目标为准并做短暂防抖，避免进度条在目标时间和底层 `player.time` 回写之间来回抖动。最终提交 seek 后，进度显示再与底层真实播放时间重新对齐。
-- `选集完成后收起操作 UI`：用户在 [[播放器内选集轨]] 里按确认切到目标集后，整个 [[TV 操作 UI 层]] 应立即收起，焦点回到播放器根。选集被视为一次性决策流，不保留 controls 或选集轨继续停留在屏上。
-- `选集轨暂停自动隐藏计时`：当焦点位于 [[播放器内选集轨]] 内时，[[TV 操作 UI 层]] 的自动隐藏计时必须暂停，避免用户挑集过程中 UI 自行消失；离开选集轨后才恢复原有的无互动自动隐藏语义。
-- `当前播放集确认无副作用`：当 [[播放器内选集轨]] 的焦点正落在当前正在播放的那一集时，用户按确认不应重播当前集，也不应触发新的历史/续播副作用；它只表示“当前选择无变更”，随后直接收起 [[TV 操作 UI 层]]。
-- `选集轨中位定位`：[[播放器内选集轨]] 首次打开时应直接定位到当前播放集附近，不做从头滚入的长动画；后续左右移动焦点时，不再每次都明显滚向中部，而是只在目标集快出视口边缘时做最短必要的跟随滚动。
-- `选集轨双态高亮`：[[播放器内选集轨]] 中必须同时区分“当前焦点集”和“当前播放集”。焦点集只使用静态高亮态，不使用 scale 或 glow 一类放大/光晕焦点效果；当前播放集即使失焦也保留更克制的常驻标记；两者重合时允许叠加，但不再额外显示“播放中”文字 badge，避免破坏简洁感。
-- `电视剧播放器底部单容器双页`：电视剧播放器中的 controls 与 [[播放器内选集轨]] 共享同一块底部操作容器，但任一时刻只展示其中一页。`controls 页` 与 `选集页` 通过克制的纵向 slide 在同一容器内切换，而不是同时堆成双层浮层；不得继续使用 `ModalBottomSheet` 一类独立弹窗语义承载选集。
-- `集卡切换无额外过渡`：[[播放器内选集轨]] 内左右切换集数时，不为单个集卡切换再叠加停顿感明显的间隔动画。焦点应直接切到目标集，列表只做必要的跟随滚动，不再增加花哨过渡。
+- `当前播放集确认无副作用`：当 [[TV 长视频剧集浏览面板]] 的焦点落在当前正在播放的分集时，确认不重播当前集，也不触发新的历史或续播副作用，只关闭面板并返回观看画面。
 - `自动选择`：TV 音轨选择中的默认项，表示跟随视频默认音轨，不等同于某一条固定音轨。
-- `快进/快退步长`：TV 长视频播放器左右键单次跳转的秒数，属于全局播放设置；可选值为 5、10、15、20、30 秒，默认 10 秒，同时作用于右键快进和左键快退，长按/重复按保持按步长倍数加速。
-- `连按合并跳转`：TV 长视频播放器在用户连续触发快进/快退时，界面应即时显示累计目标位置，但实际播放跳转应在停止按键约 300ms 后只执行一次；方向切换时以当前累计目标继续计算，避免连续 `seekTo` 造成播放卡顿。
+- `快进/快退步长`：[[TV 长视频播放器]] 在控制层隐藏时，左右键单次快速跳转的秒数属于全局播放设置；可选值为 5、10、15、20、30 秒，默认 10 秒，同时作用于右键快进和左键快退。该步长不限制进度条焦点下的 [[TV 长视频精确拖动]]。
+- `连按合并跳转`：[[TV 长视频播放器]] 在控制层隐藏时，用户连续触发快进/快退，界面即时显示累计目标位置，但实际播放跳转在停止按键约 300ms 后只执行一次；方向切换时以当前累计目标继续计算，避免连续跳转造成播放卡顿。
+- `TV 长视频精确拖动`：[[TV 长视频播放器]] 的进度条获得焦点后，左右键只移动待确认的目标位置，不立即改变实际播放位置；确认键提交目标，返回键取消并回到进入拖动前的位置。首期只需显示目标时间和进度，不以服务端缩略图为可用前提。
 - `TV 设置行抗挤压布局`：TV 设置页中“一行左文案 + 右侧控件”的设置项必须把左侧文案区视为可收缩内容、右侧控件视为不可压缩操作区。长文案、系统字号放大或面板宽度变窄时，文案可单行省略，右侧开关 / 按钮不可被挤压、裁切或改变命中区域；行容器应使用最小高度而非固定高度，允许内容在无障碍字号下向上生长。
 - `电视剧自动连播`：TV 电视剧播放器"上一集播完自动接下一集"的能力，作用域仅电视剧（不含电影、`18+`、IPTV、短视频）。受全局开关 `tv_series_autoplay_enabled` 控制（DataStore Boolean，默认 `true`，复用 `TvRepository` 已有通道，新增 `readTvSeriesAutoplayEnabled()` / `saveTvSeriesAutoplayEnabled()`），开关同时控制 [[连播提示卡]] 和自动切换；关闭后仅保留手动「下一集」按钮与选集面板。新增 `TvSeriesAutoplaySetting` object 暴露 `defaultEnabled = true` 与 `parse(raw: Boolean?)`，与 `TvPlaybackSeekStepSetting` 同款模式。设置入口落在 TV 设置界面「播放」分组，紧挨「快进/快退步长」。
 - `连播链路`：从当前 episode 解析"下一集"的统一规则。以季号和集号升序定义剧集顺序，不信任接口列表返回顺序；列表顺序只在编号重复或缺失时作为稳定兜底，且不引入额外历史排序键。先在当前季向后顺序遍历找第一个 `playable=true`，本季搜完未命中则跨季继续到下一季，直到找到或整剧末尾；`playable=false` 一律跳过不停留。手动「下一集」按钮、[[连播倒计时窗口]] 切换、`STATE_ENDED` 兜底切换共用同一链路；遍历无结果即视为"无下一集"，触发 [[连播覆盖层]] 的「全剧已播完」分支。链路触发的切集一律从头开始，不沿用目标集的历史续播位置；只有入口进入、继续观看或手动选集才保留历史进度。必须以纯函数形式落地以便单测覆盖跨季 / 跳过不可播放 / 整剧末尾 / 当前已是最后一集四条关键路径。手动选集面板不走此链路（用户主动选可命中 `playable=false` 集，展示「待绑定 / 未就绪」副标题）。
-- `连播倒计时窗口`：TV 电视剧自动连播在 `remainingMs = duration - position ≤ 10_000` 且 `duration > 0` 进入的 10 秒倒计时窗口。倒计时直接由播放器当前 `position` 与 `duration` 推导，不维护独立墙钟时间轴；显示层按剩余整秒取整，`ceil(remainingMs / 1000)` 后只显示 10 到 1；倒计时归零即按 [[连播链路]] 切下一集，不等 ExoPlayer `STATE_ENDED`；`STATE_ENDED` 仅作兜底（守卫吃掉倒计时时）。状态守卫：用户暂停时冻结倒计时（不消耗剩余秒数），并让 [[连播提示卡]] 暂时隐藏，恢复播放后若仍在窗口内会按冻结后的 remainingMs 重新出现；用户 seek 回 T-10 之前则隐藏提示并复位计时器、整剧末尾 / 播放错误 / 选集面板可见 / 退出确认提示可见 / [[电视剧自动连播]] 全局开关关闭任一成立时不显示。退出 T-10 窗口会重置本集提示触发状态，再次自然进入 T-10 时可以重新出现；切到下一集也会复位。倒计时长度写死 10 秒不开放设置项，保持与 Netflix / Disney+ TV 端默认一致。
-- `连播提示卡`：[[连播倒计时窗口]] 期间显示在播放器右下角的告知 + 操作卡。右侧保持 48dp 安全距离；底部位置优先避开播放器底部控制条，底距应至少为控制条安全区 + 48dp，控制条不可见时可退回底部 48dp。视觉跟随 [[TV 参考图视觉基线]] 的暖金焦点光感 + `AppChrome.SurfaceShape`（8dp 圆角）+ 半透明深色背景，**不复用居中的「夜台玻璃面板」**（夜台是用户主动召唤的居中选择浮层，连播卡是系统主动告知的右下角小卡，两套布局语言解耦）。上行「即将播放 · 第 N 集 标题」（标题受「TV 文本溢出保护」约束 `maxLines=1 + ellipsis`），下行「立即播放 (N)」（倒计时数字嵌在 label 内每秒更新）+「取消本次」两按钮。第一次出现时抢焦点到「立即播放」（使用 `LaunchedTvInitialFocus` + `tryRequestFocus()`，遵循「TV 初始焦点请求约束」与「TV 焦点请求安全调用 tryRequestFocus」）；DPad LEFT 切到「取消本次」；BACK 仍走「TV 播放器退出确认」全局契约，不被本卡劫持。
-- `取消本次连播`：[[连播提示卡]] 上「取消本次」按钮的语义。仅取消当前集的自动切（提示卡消失，本集 `STATE_ENDED` 时不切，进入 [[连播覆盖层]] 的「本集已播完」分支），不影响 [[电视剧自动连播]] 全局开关。取消状态绑定当前播放目标，用户 seek 出 T-10 再进入也不能撤销；只有切到下一集、手动选择其他集或离开当前播放目标后才清除，后续集再次抵达 T-10 时重新触发连播流程。
-- `连播覆盖层`：TV 电视剧播放器在 `STATE_ENDED` 时根据是否还存在下一集 / 用户是否取消本次显示的两种结尾覆盖层。「本集已播完」覆盖层：下一集存在但不会自动切（[[电视剧自动连播]] 关闭或用户 [[取消本次连播]]），含「播放下一集」（抢焦点）和「返回详情」两按钮。「全剧已播完」覆盖层：[[连播链路]] 解析为"无下一集"时显示，仅含「返回详情」按钮。两种覆盖层共用同一组件骨架，按状态决定按钮和文案；显示期间手动控制条仍可被遥控器唤醒，BACK 走「TV 播放器退出确认」契约，不被本覆盖层吞掉。
+- `连播倒计时窗口`：TV 电视剧自动连播只在存在下一可播放分集、`remainingMs = duration - position ≤ 10_000` 且 `duration > 0` 时进入 10 秒倒计时。倒计时归零即按 [[连播链路]] 切换，不等待播放结束事件；暂停、[[TV 长视频精确拖动]] 或右侧二级面板打开时冻结，播放错误、自动连播关闭或用户选择 [[观看片尾]] 时停止。用户跳回窗口之前后允许本集再次自然触发，切到下一集时复位。
+- `连播提示卡`：[[连播倒计时窗口]] 期间显示在播放器右下角的片尾卡，展示“下一集：标题”和剩余秒数，并提供“立即播放”和“观看片尾”；出现时默认焦点落在“立即播放”。它不占用右侧二级面板，返回行为服从 [[TV 长视频分层返回]]。
+- `观看片尾`：[[连播提示卡]] 上只取消当前分集自动跳转的动作，不关闭 [[电视剧自动连播]] 全局设置。选择后提示卡消失，当前分集播放结束时进入“本集已播完”状态；只有切集或离开当前播放目标后才清除该状态。
+- `连播覆盖层`：电视剧存在下一集但自动连播关闭或用户选择 [[观看片尾]] 时，播放结束显示“本集已播完”，提供“播放下一集”和“返回详情”；不存在下一集时进入 [[TV 长视频自然结束完成层]]，显示“全剧已播完”并提供“返回详情”和“重播本集”。返回行为服从 [[TV 长视频分层返回]]。
 - `连播自动切上报`：自动连播切到下一集前必须把当前集上报为 `completed=true`。复用 `TvSeriesPlayerScreen` 现有的 `LaunchedEffect(uiState.currentVideoId)` 切换上报通道，但在自动切路径上显式传 `completed=true`，并保留切换瞬间的真实 `watchSeconds`，**不依赖** `tvPlaybackHistorySnapshot` 的位置阈值（倒计时归零时 `player.currentPosition` 仍 ≤ `duration - 0s`，可能未达 95% completed 阈值）。
 - `手动下一集按钮`：TV 长视频/电视剧播放器控制条上的"下一集"按钮，属于用户主动切集，不走 [[连播自动切上报]] 的强制完成语义；它保留现有 `tvPlaybackHistorySnapshot` 位置阈值判断，只负责按 [[连播链路]] 找到下一集并切换。该按钮使用 `Icons.Filled.SkipNext`。
 - `TV 下一集按钮图标`：TV 长视频/电视剧播放器控制条上的"下一集"按钮使用 `Icons.Filled.SkipNext`，不使用 `Icons.Filled.FastForward`（后者用于"快进"），避免控制条上两个不同语义按钮共用同一图标导致 10-foot 视距下用户无法区分；该约束随 [[电视剧自动连播]] 一并落地，不属于本期 scope creep。
-- `续播提醒`：TV 长视频播放器在用户重新进入已有播放进度的电影、`18+` 或电视剧集时，对“已按上次位置继续播放”这一事实给出的短暂提示。它只用于 TV 长视频续播语境，不覆盖短视频、IPTV 或其它没有历史位置续播语义的播放入口。
-- `续播提示卡`：[[续播提醒]] 的可见载体，是播放器内的小型非阻塞提示卡，告知上次播放到的时间，并提供“继续观看”和“从头播放”两个选择。它属于系统主动告知的边角提示，不是居中确认弹窗，也不复用用户主动召唤的 [[夜台玻璃面板]] 语义。
-- `续播倒计时`：[[续播提示卡]] 自动消失前的短暂选择窗口。倒计时只在提示卡可见且可操作时消耗；用户暂停时冻结；焦点在卡内按钮之间移动不冻结。倒计时驱动一律走 `withFrameNanos` 推导剩余时间，不维护独立 `delay(50)` 自累加循环，避免主循环抖动累积与每帧冗余 recomposition。倒计时结束后默认继续观看并关闭提示卡。
-- `续播提示卡触发节流`：同一个播放会话内，同一个播放目标只在第一次实际按历史位置续播时触发一次 [[续播提示卡]]；同一目标后续因保留当前位置的播放源刷新不再触发。切换到另一个有历史进度的电视剧集属于新的播放目标，可以再次触发；自动连播和手动下一集这类从头开始的切集链路不触发。
-- `续播提示卡永久 dismiss`：当前播放会话内彻底关闭 [[续播提示卡]]、不再自动恢复的状态。触发条件：用户选择继续观看 / 选择从头播放 / 倒计时归零 / 播放错误 / [[TV 播放器退出确认]] 出现 / 电视剧选集面板出现 / 字幕或音轨夜台玻璃面板出现 / 连播提示或连播覆盖层出现，任一成立即进入。暂停只触发临时隐藏不属于永久 dismiss；退出确认与夜台玻璃面板因为属于「用户进入了别的决策流」，按永久 dismiss 处理，与暂停语义解耦。该状态不跨播放器会话保存。`LongFormVideoPlayer` 通过单一 `onTrackSheetVisibilityChanged: (Boolean) -> Unit` 把字幕与音轨夜台玻璃面板的合并可见性回传给父播放器屏，作为该守卫的统一信号。
-- `续播从头播放语义`：用户在 [[续播提示卡]] 中选择“从头播放”时，只改变当前播放器位置并关闭提示卡，不代表清空服务端观看历史，也不代表修改后续继续观看入口的历史来源。新的历史进度仍由正常播放过程中的历史上报自然覆盖。
+- `TV 长视频自动续播`：用户进入有有效历史进度的电影、`18+` 或电视剧分集时，[[TV 长视频播放器]] 直接从历史位置开始播放，不弹出确认卡，也不暂停等待选择；首次进入、主动切到有历史的分集和恢复播放源都服从同一语义。
+- `TV 长视频续播轻提示`：[[TV 长视频自动续播]] 首次实际应用历史位置时，在左下角短暂显示“已从 HH:MM:SS 继续播放”一类无焦点提示；它不提供按钮、不显示倒计时、不阻断遥控操作，同一播放目标在一次会话内只提示一次。
+- `TV 长视频详情起播意图`：详情页的播放入口在目标有有效历史进度时显示“继续播放”和“从头播放”，没有历史进度时只显示“播放”。“继续播放”进入 [[TV 长视频自动续播]]，“从头播放”以零位置开始新的观看过程；播放器主控制层不为此增加常驻重播按钮。
+- `TV 长视频起播路由参数`：电影、`18+` 与电视剧分集的详情页进入播放器时，都通过路由显式携带 `startFromBeginning` 布尔意图；默认值为 `false` 以兼容首页等直接起播入口，只有用户选择“从头播放”时传 `true`。播放器不得通过按钮文案、历史是否存在或来源页面反推该意图。
+- `TV 长视频自然结束完成层`：电影、`18+` 或全剧最后一集自然播放结束后不自动退出播放器；画面淡出到黑色完成层并把历史标记为已完成。单片显示片名与“返回详情 / 重新播放”，最后一集显示“全剧已播完”与“返回详情 / 重播本集”，默认焦点均落在“返回详情”。结束场景中的重播是一次性完成态操作，不进入主控制层常驻能力；已完成历史不得让详情页下次误显示临近结尾的“继续播放”。
+- `TV 长视频有效续播区间`：播放不足 30 秒的短暂试播不生成“继续播放”；自然结束或自动连播切集始终上报已完成。用户手动退出时，只有播放位置达到总时长 95% 且剩余不超过 5 分钟才判定为已完成，其余有效位置保存为续播历史。已完成目标在详情页只显示“播放”，不得把片尾附近位置继续作为续播入口。
 
 ## IPTV 术语
 - `IPTV 播放列表`：后台维护的一份全局 M3U/M3U8 频道源；本期只允许一个播放列表生效，上传文件或远程刷新都会替换当前频道清单。

@@ -62,6 +62,8 @@ class TvSeriesDetailActionSpecTest {
         assertTrue("电视剧详情页右侧剧集应使用横向缩略图卡片", source.contains("TvSeriesEpisodeCard("))
         assertTrue("电视剧详情页操作区应接近参考图的主按钮 + 次按钮组合", source.contains("TvSeriesReferenceActionRow("))
         assertTrue("电视剧详情页应提供参考图中的次操作“我的片单”", source.contains("我的片单"))
+        assertTrue("有效历史必须提供“继续播放”和“从头播放”", source.contains("继续播放") && source.contains("从头播放"))
+        assertTrue("电视剧起播必须携带显式从头意图", source.contains("startFromBeginning"))
         assertTrue("电视剧详情页应有参考图同类的 4K 角标", source.contains("\"4K\""))
         assertTrue("右侧标题文案必须是中文“剧集”", source.contains("\"剧集\""))
         assertTrue("主按钮文案必须使用中文播放集数", source.contains("播放第"))

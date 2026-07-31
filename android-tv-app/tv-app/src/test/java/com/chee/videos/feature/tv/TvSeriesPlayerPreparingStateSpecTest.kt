@@ -10,11 +10,13 @@ class TvSeriesPlayerPreparingStateSpecTest {
     fun `series player keeps fullscreen preparing only for initial no-source state`() {
         val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
         val preparingBranch = source.indexOf("uiState.playbackPreparing && uiState.currentSourceUrl.isBlank()")
-        val preparingMessage = source.indexOf("正在切到第")
-        val overlayState = source.indexOf("episodeSwitchState = uiState.episodeSwitchState")
+        val media3Player = source.indexOf("TvLongFormMedia3Player(")
+        val newTargetSource = source.indexOf("sourceUrl = uiState.currentSourceUrl.takeIf { isMedia3Route }.orEmpty()")
 
         assertTrue(preparingBranch >= 0)
-        assertTrue(preparingMessage > preparingBranch)
-        assertTrue(overlayState > 0)
+        assertTrue(media3Player > 0)
+        assertTrue(newTargetSource > media3Player)
+        assertTrue(source.contains("delay(TvLongFormStartupFeedbackDelayMillis)"))
+        assertTrue(source.contains("if (sourcePreparingFeedbackVisible)"))
     }
 }

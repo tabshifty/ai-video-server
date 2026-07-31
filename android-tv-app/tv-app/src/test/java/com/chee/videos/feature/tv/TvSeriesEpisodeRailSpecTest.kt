@@ -9,19 +9,17 @@ import org.junit.Test
 
 class TvSeriesEpisodeRailSpecTest {
     @Test
-    fun seriesPlayerUsesInlineEpisodeRailInsteadOfBottomSheet() {
+    fun seriesPlayerUsesSharedCrossSeasonRightPanelInsteadOfBottomRail() {
         val source = readSource("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt")
+        val chrome = readSource("src/main/java/com/chee/videos/feature/tv/TvLongFormPlaybackChrome.kt")
 
         assertFalse(source.contains("ModalBottomSheet("))
-        assertFalse(source.contains("LazyColumn("))
-        assertFalse(source.contains("text = \"选集播放\""))
-        assertTrue(source.contains("TvSeriesCorePlaybackOverlay("))
-        assertTrue(source.contains("episodeRailItems = episodeRailItems"))
-        assertTrue(source.contains("currentEpisodeRailItemId = currentEpisode?.id"))
-        assertTrue(source.contains("current = episode.number == uiState.activeEpisodeNumber"))
-        assertTrue(source.contains("onSelectEpisodeRailItem = { selectedItem ->"))
-        assertTrue(source.contains("onEpisodeRailVisibilityChanged = viewModel::setSelectorVisible"))
-        assertTrue(source.contains("openEpisodeRailRequestKey = openEpisodeRailRequestKey"))
+        assertFalse(source.contains("TvSeriesCorePlaybackOverlay("))
+        assertTrue(source.contains("seasons = playbackSeasons"))
+        assertTrue(source.contains("onSelectEpisode = { option ->"))
+        assertTrue(chrome.contains("TvLongFormInteractionMode.EpisodePanel"))
+        assertTrue(chrome.contains("LazyColumn("))
+        assertTrue(chrome.contains("panelSeasonNumber"))
     }
 
     @Test
