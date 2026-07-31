@@ -52,7 +52,6 @@ const pendingShellViews = []
 const standaloneViews = {
   'ToolboxArchiveImport.vue': 'form',
   'ToolboxEd2k.vue': 'form',
-  'ToolboxEd2kDownload.vue': 'form',
   'ToolboxImageWorkbench.vue': 'form',
   'ToolboxOrphanFiles.vue': 'form',
   'ToolboxPasswordVault.vue': 'form',
@@ -65,7 +64,7 @@ const shellViews = [
   'TvAppManage.vue', 'TvSeriesManage.vue', 'UserManage.vue', 'VideoList.vue', 'VideoUpload.vue'
 ]
 const standalonePageViews = [
-  'Login.vue', 'ToolboxArchiveImport.vue', 'ToolboxEd2k.vue', 'ToolboxEd2kDownload.vue',
+  'Login.vue', 'ToolboxArchiveImport.vue', 'ToolboxEd2k.vue',
   'ToolboxImageWorkbench.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue'
 ]
 const componentViews = ['ImageWorkbenchMaskEditor.vue']
@@ -174,11 +173,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('assigns all 25 Vue views to exactly one boundary', () => {
+  it('assigns all 24 Vue views to exactly one boundary', () => {
     const actual = readdirSync(new URL('.', import.meta.url)).filter((name) => name.endsWith('.vue')).sort()
     const assigned = [...shellViews, ...standalonePageViews, ...componentViews].sort()
     expect(actual).toEqual(assigned)
-    expect(assigned).toHaveLength(25)
+    expect(assigned).toHaveLength(24)
   })
 
   it('fully removes the ordinary-page compatibility meta', () => {
@@ -372,7 +371,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(style).toMatch(/\.log-text\s*\{[^}]*font-family:\s*var\(--font-mono\);/s)
   })
 
-  it('工具箱移除外层装饰卡并保留六个 8px 独立工具入口', () => {
+  it('工具箱移除外层装饰卡并保留五个 8px 独立工具入口', () => {
     const source = readView('Toolbox.vue')
     const template = extractTemplate(source)
     const style = extractStyle(source)
@@ -381,10 +380,10 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect.soft(template).toContain('<p class="page-context-note">工具会在独立标签页打开，并保持当前管理端上下文。</p>')
     expect.soft(template).not.toContain('<PageHeader')
     expect(template).not.toContain('<SectionCard')
-    expect(template.match(/<a class="tool-menu-item"/g)).toHaveLength(6)
-    expect(template.match(/target="_blank"/g)).toHaveLength(6)
-    expect(template.match(/rel="noopener noreferrer"/g)).toHaveLength(6)
-    expect(template.match(/<span>新标签页打开<\/span>/g)).toHaveLength(6)
+    expect(template.match(/<a class="tool-menu-item"/g)).toHaveLength(5)
+    expect(template.match(/target="_blank"/g)).toHaveLength(5)
+    expect(template.match(/rel="noopener noreferrer"/g)).toHaveLength(5)
+    expect(template.match(/<span>新标签页打开<\/span>/g)).toHaveLength(5)
     expect(style).toMatch(/\.tool-menu-item\s*\{[^}]*min-height:\s*44px;[^}]*border-radius:\s*8px;[^}]*box-shadow:\s*none;/s)
     expect(style).toMatch(/\.toolbox-page\s*\{[^}]*min-width:\s*0;[^}]*overflow-x:\s*clip;/s)
   })
@@ -923,42 +922,17 @@ describe('Precision Ops 独立工具工作区', () => {
     dialogs.forEach((dialog) => expect(dialog).toContain('data-density="form"'))
   })
 
-  it('ED2K 下载任务保持独立表单工作台与紧凑全宽列表', () => {
-    const source = readView('ToolboxEd2kDownload.vue')
-    const template = extractTemplate(source)
-    const rootMain = rootMainStartTag(source)
-    const style = extractStyle(source)
-    const listIndex = template.indexOf('<SectionCard class="task-list-card" data-density="compact">')
-    const detailIndex = template.indexOf('<SectionCard v-if="selectedTask">')
-    const taskWorkspaceRule = style.match(/\.task-workspace\s*\{[^}]*\}/s)?.[0] || ''
-
-    expect.soft(rootMain).toContain('class="tool-workspace"')
-    expect.soft(rootMain).toContain('data-density="form"')
-    expect.soft(template).toContain('<PageHeader')
-    expect.soft(template).not.toContain('<Layout')
-    expect(source).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
-    expect(template).toContain('<StatusIndicator')
-    expect(listIndex).toBeGreaterThanOrEqual(0)
-    expect(detailIndex).toBeGreaterThan(listIndex)
-    expect(template.match(/<SectionCard\b/g)).toHaveLength(3)
-    expect(taskWorkspaceRule).toContain('display: grid;')
-    expect(taskWorkspaceRule).toContain('grid-template-columns: minmax(0, 1fr);')
-    expect(taskWorkspaceRule).toContain('gap: var(--space-4);')
-  })
-
   it('独立工具无可见标签的主要输入提供中文可访问名称', () => {
     const ed2k = readView('ToolboxEd2k.vue')
-    const download = readView('ToolboxEd2kDownload.vue')
     const passwordVault = readView('ToolboxPasswordVault.vue')
 
     expect.soft(ed2k).toContain('aria-label="ED2K 链接文本"')
-    expect.soft(download).toContain('aria-label="ED2K 下载链接"')
     expect.soft(passwordVault).toContain('aria-label="密码库搜索"')
     expect.soft(passwordVault).toContain('aria-label="密码内容"')
   })
 
   it('独立工作区限制页面横向溢出并收纳窄屏操作', () => {
-    const workspaceFiles = ['ToolboxEd2k.vue', 'ToolboxEd2kDownload.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue']
+    const workspaceFiles = ['ToolboxEd2k.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue']
 
     workspaceFiles.forEach((file) => {
       const style = extractStyle(readView(file))
@@ -970,18 +944,11 @@ describe('Precision Ops 独立工具工作区', () => {
 
     const loginStyle = extractStyle(readView('Login.vue'))
     const loginRootRule = loginStyle.match(/\.login-page\s*\{[^}]*\}/s)?.[0] || ''
-    const downloadStyle = extractStyle(readView('ToolboxEd2kDownload.vue'))
     const orphanStyle = extractStyle(readView('ToolboxOrphanFiles.vue'))
     const passwordStyle = extractStyle(readView('ToolboxPasswordVault.vue'))
 
     expect.soft(loginRootRule).toContain('min-width: 0;')
     expect.soft(loginRootRule).toContain('overflow-x: clip;')
-    expect.soft(downloadStyle).toMatch(
-      /@media \(max-width: 63\.9375rem\)[\s\S]*?\.tool-workspace :deep\(\.el-button\),\s*\.crud-dialog :deep\(\.el-button\)\s*\{[^}]*min-height:\s*44px;/s
-    )
-    expect.soft(downloadStyle).toMatch(
-      /@media \(max-width: 63\.9375rem\)[\s\S]*?\.tool-workspace :deep\(\.page-header-shell__actions\),\s*\.task-list-card :deep\(\.section-card__actions\)\s*\{[^}]*flex-wrap:\s*wrap;/s
-    )
     expect.soft(orphanStyle).toMatch(
       /@media \(max-width: 63\.9375rem\)[\s\S]*?\.orphan-tool :deep\(\.section-card__actions\)\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s
     )

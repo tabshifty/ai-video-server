@@ -166,6 +166,21 @@ func TestEd2kDownloadTaskLifecycleMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)where\s+status\s*<>\s*'deleted'`)
 }
 
+func TestEd2kDownloadRetirementMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0035_retire_ed2k_download.up.sql")
+	down := readMigrationForTest(t, "0035_retire_ed2k_download.down.sql")
+
+	assertSQLPattern(t, up, `(?is)delete\s+from\s+ed2k_download_tasks`)
+	if regexp.MustCompile(`(?is)drop\s+table`).MatchString(up) {
+		t.Fatal("ED2K 退役迁移本次不能删除任务表")
+	}
+	if regexp.MustCompile(`(?is)insert\s+into\s+ed2k_download_tasks`).MatchString(down) {
+		t.Fatal("ED2K 退役迁移不得在回滚时恢复已清除的任务历史")
+	}
+}
+
 func TestShortPendingDeleteMigration(t *testing.T) {
 	t.Parallel()
 
@@ -232,22 +247,6 @@ func TestTVRemoteSessionAutoplayNextMigration(t *testing.T) {
 
 	assertSQLPattern(t, up, `(?is)alter\s+table\s+tv_remote_sessions\s+add\s+column\s+if\s+not\s+exists\s+autoplay_next_enabled\s+boolean\s+not\s+null\s+default\s+true`)
 	assertSQLPattern(t, down, `(?is)alter\s+table\s+tv_remote_sessions\s+drop\s+column\s+if\s+exists\s+autoplay_next_enabled`)
-}
-
-func TestMarkEd2kDownloadTaskRunningRefreshesStartedAt(t *testing.T) {
-	t.Parallel()
-
-	raw, err := os.ReadFile(filepath.Join(".", "ed2k_download_repository.go"))
-	if err != nil {
-		t.Fatalf("read repository source: %v", err)
-	}
-	source := string(raw)
-	if !strings.Contains(source, "started_at = $3") {
-		t.Fatal("expected running transition to refresh started_at directly")
-	}
-	if strings.Contains(source, "started_at = COALESCE($3, started_at)") {
-		t.Fatal("expected running transition not to preserve stale started_at")
-	}
 }
 
 func TestArchiveImportBatchEncodingMigration(t *testing.T) {

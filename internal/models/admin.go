@@ -158,58 +158,6 @@ type AdminTaskListItem struct {
 	ProgressUpdatedAt     *time.Time `json:"progress_updated_at"`
 }
 
-type AdminEd2kDownloadTaskFile struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-	Size int64  `json:"size"`
-}
-
-type AdminEd2kDownloadTaskHistoryItem struct {
-	Kind    string    `json:"kind"`
-	Label   string    `json:"label"`
-	Message string    `json:"message"`
-	At      time.Time `json:"at"`
-}
-
-type AdminEd2kDownloadTask struct {
-	ID             uuid.UUID                          `json:"id"`
-	SourceLink     string                             `json:"source_link"`
-	ResourceHash   string                             `json:"resource_hash"`
-	Title          string                             `json:"title"`
-	Filename       string                             `json:"filename"`
-	DeclaredSize   int64                              `json:"declared_size"`
-	Status         string                             `json:"status"`
-	ProgressText   string                             `json:"progress_text"`
-	ErrorMessage   string                             `json:"error_message"`
-	OutputDir      string                             `json:"output_dir"`
-	DownloadedPath string                             `json:"downloaded_path"`
-	RetryCount     int                                `json:"retry_count"`
-	Files          []AdminEd2kDownloadTaskFile        `json:"files"`
-	History        []AdminEd2kDownloadTaskHistoryItem `json:"history"`
-	CreatedAt      time.Time                          `json:"created_at"`
-	UpdatedAt      time.Time                          `json:"updated_at"`
-	StartedAt      *time.Time                         `json:"started_at"`
-	FinishedAt     *time.Time                         `json:"finished_at"`
-	CleanedAt      *time.Time                         `json:"cleaned_at"`
-	DeletedAt      *time.Time                         `json:"deleted_at"`
-}
-
-type AdminEd2kDownloadCreateResult struct {
-	LineNumber   int                    `json:"line_number"`
-	SourceLink   string                 `json:"source_link"`
-	ResourceHash string                 `json:"resource_hash"`
-	Status       string                 `json:"status"`
-	Message      string                 `json:"message"`
-	Task         *AdminEd2kDownloadTask `json:"task,omitempty"`
-}
-
-type AdminEd2kDownloadTaskQueueMeta struct {
-	JobID         string `json:"job_id"`
-	Executor      string `json:"executor"`
-	Command       string `json:"command"`
-	ArgumentCount int    `json:"argument_count"`
-}
-
 type AdminPasswordVaultEntry struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`

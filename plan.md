@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-31 15:52 +0800
+- 进度：完成 ED2K 下载工作台代码与部署定义退役。管理端只保留 ED2K 链接生成器，已删除下载工作台页面、路由、API 和专属 helper；Go 侧已删除下载 Handler/Repository/Model、Asynq 下载及 server.met 刷新处理、运行配置与构造依赖；删除两个执行器脚本和 aMule LaunchAgent 模板，家用部署文档与环境示例不再包含安装配置。新增 `0035` 清空任务历史但保留空表，历史迁移与 ADR 保留，当前术语表删除失效状态机词条并记录退役边界。
+- 影响文件：管理端 `admin-web/src` 相关入口/API/测试，后端 `main.go`、`internal/config`、`internal/handlers`、`internal/models`、`internal/queue`、`internal/repository`，`.env.example`、`migrations/0035_retire_ed2k_download.*.sql`、`scripts/`、`docs/家用部署机.md`、`docs/adr/0015-ed2k-serverlist-periodic-refresh.md`、`CONTEXT.md`、`plan.md`；Android 工程未修改，既有未跟踪 `docs/examples/115LocalNatManager/` 未纳入。
+- 验证：管理端全量 39 文件、639/639 测试通过，Vite 生产构建通过（仅既有大 chunk 警告）；Go 定向四包通过，`go vet ./...` 通过，`go test ./... -skip TestParseTVAPKMetadataParsesReleaseAPK -count=1` 全仓通过。未跳过的全仓测试仅失败于既有 TV APK 夹具版本断言（实际 135、期望 121），与本次差异无关。`git diff --check`、本次 Markdown/代码 U+FFFD 扫描和允许项残留扫描通过；待提交、推送家用部署机并执行远端卸载验收。
+
+## 2026-07-31 15:40 +0800
+- 进度：完成 ED2K 下载工作台退役契约 RED。管理端契约已改为保留链接生成器但禁止下载工作台菜单/路由；后端新增禁止注册 `/ed2k-download` 路由的测试；迁移测试锁定 `0035` 必须清空历史且不得删表或回滚恢复数据。
+- 影响文件：`admin-web/src/views/toolboxPage.spec.js`、`internal/handlers/ed2k_download_retirement_test.go`、`internal/repository/migrations_test.go`、`plan.md`。
+- 验证：管理端定向测试按预期 12 项中 2 项失败（现有菜单和路由仍在）；Handler 定向测试按预期命中仍注册的 ED2K POST 路由；Repository 定向测试按预期因 `0035_retire_ed2k_download.up.sql` 尚不存在失败。三处均为目标生产契约缺失，无环境或无关测试错误。
+
+## 2026-07-31 15:37 +0800
+- 进度：开始退役 ED2K 下载工作台。范围已通过 `grill-with-docs` 收口：保留纯浏览器端 ED2K 链接生成器和已入视频库成品；移除管理端下载工作台、后端 API/队列/仓储/配置、aMule 执行与部署资产；家用部署机清除 aMule 程序、LaunchAgent、配置、日志和空暂存目录。为满足上一版二进制回滚，本次迁移只清空 `ed2k_download_tasks` 历史、不删表，历史迁移与 ADR 保留并标注退役。
+- 影响文件：预计涉及 `admin-web/src` 的 ED2K 下载工作台入口与 API、`internal`/`main.go` 的 ED2K 下载链路、`.env.example`、`scripts/`、`docs/家用部署机.md`、ED2K 历史 ADR、迁移 `0035`、`CONTEXT.md`、`plan.md`；不修改 Android 工程及版本号，不纳入既有未跟踪 `docs/examples/115LocalNatManager/`。
+- 验证：待执行管理端定向/全量测试与构建、Go 受影响包及全仓测试、`go vet ./...`、迁移前向兼容检查、ED2K/aMule 残留白名单扫描、`git diff --check` 和中文乱码扫描；提交并推送家用部署机后验证健康检查、数据库空表与远端卸载结果。
+
 ## 2026-07-29 10:00 +0800
 - 进度：完成 `115-open-platform` Skill。已整理官方 38 篇文档的分类直达索引，记录授权码、手机扫码 PKCE、令牌旋转、Bearer 请求、频控与安全约束；长期契约已写入 `CONTEXT.md`。
 - 影响文件：`.codex/skills/115-open-platform/SKILL.md`、`.codex/skills/115-open-platform/agents/openai.yaml`、`.codex/skills/115-open-platform/references/authentication.md`、`.codex/skills/115-open-platform/references/official-doc-index.md`、`CONTEXT.md`、`plan.md`。

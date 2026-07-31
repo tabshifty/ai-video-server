@@ -84,18 +84,6 @@ func (s *orphanScanEnqueuerStub) EnqueueOrphanFileScan() error {
 	return s.orphanScanErr
 }
 
-func (s *orphanScanEnqueuerStub) EnqueueEd2kDownload(queue.Ed2kDownloadPayload) error {
-	return nil
-}
-
-func (s *orphanScanEnqueuerStub) HasEd2kDownloadTask(string) (bool, error) {
-	return false, nil
-}
-
-func (s *orphanScanEnqueuerStub) DeleteEd2kDownloadTask(string) error {
-	return nil
-}
-
 func TestAdminStartOrphanFileScanQueuesTaskAndReturnsPending(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)

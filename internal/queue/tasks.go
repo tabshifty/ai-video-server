@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -29,9 +28,6 @@ const (
 	TypeScrapeAV       = "video:scrape:av"
 	TypeScrapeRetag    = "video:scrape:retag"
 	TypeOrphanFileScan = "system:orphan-files:scan"
-	TypeEd2kDownload   = "download:ed2k"
-	// TypeEd2kServerlistRefresh 是 server.met 定时刷新任务类型，由 asynq.Scheduler 按 cron 入队。
-	TypeEd2kServerlistRefresh = "ed2k:serverlist:refresh"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -43,29 +39,10 @@ type TranscodePayload struct {
 	Force        bool   `json:"force,omitempty"`
 }
 
-// Ed2kDownloadPayload carries identifiers for ED2K download processing.
-type Ed2kDownloadPayload struct {
-	TaskID string `json:"task_id"`
-}
-
-// Ed2kServerlistRefreshPayload 为空 payload：刷新参数（URL/脚本路径）走 config + 执行器，
-// 不随任务携带；scheduler 以空 payload 入队即可。
-type Ed2kServerlistRefreshPayload struct{}
-
-var ErrEd2kDownloadTaskInFlight = errors.New("ed2k download task already in flight")
-
-const (
-	ed2kDownloadPollMaxRetry = 20160
-	ed2kDownloadPollDelay    = 30 * time.Second
-	ed2kDownloadTaskTimeout  = time.Minute
-)
-
 // Enqueuer wraps asynq client operations.
 type Enqueuer struct {
 	client               *asynq.Client
 	queue                string
-	redisAddr            string
-	redisPassword        string
 	transcodeTaskTimeout time.Duration
 }
 
@@ -76,8 +53,6 @@ func NewEnqueuer(redisAddr, redisPassword, queue string, transcodeTaskTimeout ti
 	return &Enqueuer{
 		client:               asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword}),
 		queue:                queue,
-		redisAddr:            redisAddr,
-		redisPassword:        redisPassword,
 		transcodeTaskTimeout: transcodeTaskTimeout,
 	}
 }
@@ -101,94 +76,6 @@ func (e *Enqueuer) EnqueueTranscode(payloadIn TranscodePayload) error {
 	return nil
 }
 
-func (e *Enqueuer) EnqueueEd2kDownload(payloadIn Ed2kDownloadPayload) error {
-	payload, err := json.Marshal(payloadIn)
-	if err != nil {
-		return fmt.Errorf("marshal ed2k download payload: %w", err)
-	}
-	_, err = e.client.Enqueue(
-		asynq.NewTask(TypeEd2kDownload, payload),
-		buildEd2kDownloadTaskOptions(e.queue, payloadIn.TaskID)...,
-	)
-	if err != nil {
-		return wrapEd2kDownloadEnqueueError(err)
-	}
-	return nil
-}
-
-func (e *Enqueuer) DeleteEd2kDownloadTask(taskID string) error {
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return nil
-	}
-	inspector := e.newInspector()
-	defer func() { _ = inspector.Close() }()
-	if err := inspector.DeleteTask(e.queue, taskID); err != nil {
-		if errors.Is(err, asynq.ErrTaskNotFound) {
-			return nil
-		}
-		return fmt.Errorf("delete enqueued ed2k download task: %w", err)
-	}
-	return nil
-}
-
-func (e *Enqueuer) HasEd2kDownloadTask(taskID string) (bool, error) {
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return false, nil
-	}
-	inspector := e.newInspector()
-	defer func() { _ = inspector.Close() }()
-	_, err := inspector.GetTaskInfo(e.queue, taskID)
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(err, asynq.ErrTaskNotFound) {
-		return false, nil
-	}
-	return false, fmt.Errorf("get enqueued ed2k download task info: %w", err)
-}
-
-func (e *Enqueuer) newInspector() *asynq.Inspector {
-	return asynq.NewInspector(asynq.RedisClientOpt{Addr: e.redisAddr, Password: e.redisPassword})
-}
-
-func wrapEd2kDownloadEnqueueError(err error) error {
-	if errors.Is(err, asynq.ErrTaskIDConflict) {
-		return fmt.Errorf("%w: %w", ErrEd2kDownloadTaskInFlight, err)
-	}
-	return fmt.Errorf("enqueue ed2k download task: %w", err)
-}
-
-func buildEd2kDownloadTaskOptions(queue, taskID string) []asynq.Option {
-	opts := []asynq.Option{
-		asynq.MaxRetry(ed2kDownloadPollMaxRetry),
-		asynq.ProcessIn(2 * time.Second),
-		asynq.Queue(queue),
-		asynq.Timeout(ed2kDownloadTaskTimeout),
-	}
-	if strings.TrimSpace(taskID) != "" {
-		opts = append(opts, asynq.TaskID(taskID))
-	}
-	return opts
-}
-
-func Ed2kDownloadRetryDelayFunc(fallback asynq.RetryDelayFunc) asynq.RetryDelayFunc {
-	if fallback == nil {
-		fallback = asynq.DefaultRetryDelayFunc
-	}
-	return func(n int, err error, task *asynq.Task) time.Duration {
-		if task != nil && task.Type() == TypeEd2kDownload && errors.Is(err, ErrEd2kDownloadStillInProgress) {
-			return ed2kDownloadPollDelay
-		}
-		return fallback(n, err, task)
-	}
-}
-
-func IsEd2kDownloadFailure(err error) bool {
-	return !errors.Is(err, ErrEd2kDownloadStillInProgress)
-}
-
 func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Option {
 	if timeout <= 0 {
 		timeout = 6 * time.Hour
@@ -203,20 +90,18 @@ func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Opti
 
 // Processor handles task registration and processing logic.
 type Processor struct {
-	repo               *repository.VideoRepository
-	trans              *services.TranscodeService
-	scrape             *services.ScraperService
-	subtitle           *services.SubtitleService
-	enqueuer           *Enqueuer
-	ed2kExecutor       Ed2kDownloadExecutor
-	ed2kServerlistExec Ed2kServerlistRefreshExecutor
-	logger             *slog.Logger
-	storageRoot        string
-	uploadGC           bool
+	repo        *repository.VideoRepository
+	trans       *services.TranscodeService
+	scrape      *services.ScraperService
+	subtitle    *services.SubtitleService
+	enqueuer    *Enqueuer
+	logger      *slog.Logger
+	storageRoot string
+	uploadGC    bool
 }
 
-func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, ed2kExecutor Ed2kDownloadExecutor, ed2kServerlistExec Ed2kServerlistRefreshExecutor, logger *slog.Logger, storageRoot string) *Processor {
-	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, ed2kExecutor: ed2kExecutor, ed2kServerlistExec: ed2kServerlistExec, logger: logger, storageRoot: storageRoot, uploadGC: true}
+func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, logger *slog.Logger, storageRoot string) *Processor {
+	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, logger: logger, storageRoot: storageRoot, uploadGC: true}
 }
 
 func (p *Processor) Register(mux *asynq.ServeMux) {
@@ -226,8 +111,6 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeAV, p.HandleScrapeAV)
 	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
 	mux.HandleFunc(TypeOrphanFileScan, p.HandleOrphanFileScan)
-	mux.HandleFunc(TypeEd2kDownload, p.HandleEd2kDownload)
-	mux.HandleFunc(TypeEd2kServerlistRefresh, p.HandleEd2kServerlistRefresh)
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

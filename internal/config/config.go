@@ -53,79 +53,54 @@ type Config struct {
 	ImageGenerationAPIKey      string
 	ImageGenerationModel       string
 	ImageGenerationTimeout     time.Duration
-	ED2KDownloadExecutable     string
-	ED2KDownloadTimeout        time.Duration
-	ED2KDownloadRoot           string
-	ED2KDownloadSubdir         string
-	AMULECMDBin                string
-	AMULERemoteHost            string
-	AMULERemotePort            string
-	AMULERemotePassword        string
-	// ED2K 服务器列表定时刷新：URL 留空 = 功能禁用（不启动 scheduler）。
-	ED2KServerlistURL               string
-	ED2KServerlistRefreshCron       string
-	ED2KServerlistRefreshExecutable string
-	ED2KServerlistRefreshTimeout    time.Duration
 }
 
 // Load returns validated application config from environment.
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:                        getEnv("HTTP_ADDR", ":8080"),
-		Mode:                            getEnv("APP_MODE", "server"),
-		PostgresDSN:                     os.Getenv("POSTGRES_DSN"),
-		RedisAddr:                       getEnv("REDIS_ADDR", "127.0.0.1:6379"),
-		RedisPassword:                   os.Getenv("REDIS_PASSWORD"),
-		ServerLogPath:                   getEnv("SERVER_LOG_PATH", "./.run/server.log"),
-		JWTSecret:                       os.Getenv("JWT_SECRET"),
-		PlayURLSignSecret:               os.Getenv("PLAY_URL_SIGN_SECRET"),
-		PasswordVaultKey:                os.Getenv("PASSWORD_VAULT_KEY"),
-		StorageRoot:                     getEnv("STORAGE_ROOT", "./storage"),
-		PosterStoragePath:               getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
-		AdminWebDistPath:                getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist"),
-		UploadTempDir:                   getEnv("UPLOAD_TEMP_DIR", "./tmp/uploads"),
-		TMDBAPIKey:                      os.Getenv("TMDB_API_KEY"),
-		TMDBBaseURL:                     getEnv("TMDB_BASE_URL", "https://api.themoviedb.org/3"),
-		AVScraperBaseURL:                getEnv("AV_SCRAPER_BASE_URL", "https://javdb.com"),
-		AVScraperUserAgent:              getEnv("AV_SCRAPER_USER_AGENT", "Mozilla/5.0 (compatible; VideoServerBot/1.0; +https://example.invalid/bot)"),
-		AVSiteURLJavDB:                  firstNonEmptyEnv("AV_SITE_URL_JAVDB", "AV_SCRAPER_BASE_URL"),
-		AVSiteURLJavBus:                 os.Getenv("AV_SITE_URL_JAVBUS"),
-		AVSiteURLJavLibrary:             os.Getenv("AV_SITE_URL_JAVLIBRARY"),
-		AVSiteURLThePornDB:              os.Getenv("AV_SITE_URL_THEPORNDB"),
-		AVSiteURLs:                      loadAVSiteURLs(),
-		AVScraperJavDBCookie:            os.Getenv("AV_SCRAPER_JAVDB_COOKIE"),
-		AVScraperJavBusCookie:           os.Getenv("AV_SCRAPER_JAVBUS_COOKIE"),
-		AVScraperThePornDBAPIToken:      os.Getenv("AV_SCRAPER_THEPORNDB_API_TOKEN"),
-		AVScraperThePornDBNoHash:        getBoolEnv("AV_SCRAPER_THEPORNDB_NO_HASH", false),
-		AsynqQueue:                      getEnv("ASYNQ_QUEUE", "transcode"),
-		MaxTranscodeWorkers:             getIntEnv("MAX_TRANSCODE_WORKERS", 2),
-		TranscodeTaskTimeout:            time.Duration(getIntEnv("TRANSCODE_TASK_TIMEOUT_MINUTES", 360)) * time.Minute,
-		MaxVideoSize:                    getInt64Env("MAX_VIDEO_SIZE", 2*1024*1024*1024),
-		EnableSwagger:                   getBoolEnv("ENABLE_SWAGGER", false),
-		TMDBTimeout:                     time.Duration(getIntEnv("TMDB_TIMEOUT_SECONDS", 10)) * time.Second,
-		AVScraperTimeout:                time.Duration(getIntEnv("AV_SCRAPER_TIMEOUT_SECONDS", 10)) * time.Second,
-		AccessTokenTTL:                  time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 87600)) * time.Hour,
-		RefreshTokenTTL:                 time.Duration(getIntEnv("REFRESH_TOKEN_TTL_HOURS", 168)) * time.Hour,
-		TranslationAPIURL:               strings.TrimSuffix(strings.TrimSpace(os.Getenv("TRANSLATION_API_URL")), "/"),
-		TranslationAPIKey:               os.Getenv("TRANSLATION_API_KEY"),
-		TranslationModel:                getEnv("TRANSLATION_MODEL", "HY-MT1.5-1.8B"),
-		TranslationTimeout:              time.Duration(getIntEnv("TRANSLATION_TIMEOUT_SECONDS", 15)) * time.Second,
-		ImageGenerationAPIURL:           strings.TrimSuffix(strings.TrimSpace(os.Getenv("IMAGE_GENERATION_API_URL")), "/"),
-		ImageGenerationAPIKey:           os.Getenv("IMAGE_GENERATION_API_KEY"),
-		ImageGenerationModel:            getEnv("IMAGE_GENERATION_MODEL", "gpt-image-2"),
-		ImageGenerationTimeout:          time.Duration(getIntEnv("IMAGE_GENERATION_TIMEOUT_SECONDS", 180)) * time.Second,
-		ED2KDownloadExecutable:          strings.TrimSpace(os.Getenv("ED2K_DOWNLOAD_EXECUTABLE")),
-		ED2KDownloadTimeout:             time.Duration(getIntEnv("ED2K_DOWNLOAD_TIMEOUT_SECONDS", 21600)) * time.Second,
-		ED2KDownloadRoot:                strings.TrimSpace(os.Getenv("ED2K_DOWNLOAD_ROOT")),
-		ED2KDownloadSubdir:              strings.TrimSpace(getEnv("ED2K_DOWNLOAD_SUBDIR", "ed2k-downloads")),
-		AMULECMDBin:                     strings.TrimSpace(getEnv("AMULECMD_BIN", "amulecmd")),
-		AMULERemoteHost:                 strings.TrimSpace(getEnv("AMULE_REMOTE_HOST", "127.0.0.1")),
-		AMULERemotePort:                 strings.TrimSpace(getEnv("AMULE_REMOTE_PORT", "4712")),
-		AMULERemotePassword:             strings.TrimSpace(os.Getenv("AMULE_REMOTE_PASSWORD")),
-		ED2KServerlistURL:               strings.TrimSpace(os.Getenv("ED2K_SERVERLIST_URL")),
-		ED2KServerlistRefreshCron:       strings.TrimSpace(os.Getenv("ED2K_SERVERLIST_REFRESH_CRON")),
-		ED2KServerlistRefreshExecutable: strings.TrimSpace(os.Getenv("ED2K_SERVERLIST_REFRESH_EXECUTABLE")),
-		ED2KServerlistRefreshTimeout:    time.Duration(getIntEnv("ED2K_SERVERLIST_REFRESH_TIMEOUT_SECONDS", 600)) * time.Second,
+		HTTPAddr:                   getEnv("HTTP_ADDR", ":8080"),
+		Mode:                       getEnv("APP_MODE", "server"),
+		PostgresDSN:                os.Getenv("POSTGRES_DSN"),
+		RedisAddr:                  getEnv("REDIS_ADDR", "127.0.0.1:6379"),
+		RedisPassword:              os.Getenv("REDIS_PASSWORD"),
+		ServerLogPath:              getEnv("SERVER_LOG_PATH", "./.run/server.log"),
+		JWTSecret:                  os.Getenv("JWT_SECRET"),
+		PlayURLSignSecret:          os.Getenv("PLAY_URL_SIGN_SECRET"),
+		PasswordVaultKey:           os.Getenv("PASSWORD_VAULT_KEY"),
+		StorageRoot:                getEnv("STORAGE_ROOT", "./storage"),
+		PosterStoragePath:          getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
+		AdminWebDistPath:           getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist"),
+		UploadTempDir:              getEnv("UPLOAD_TEMP_DIR", "./tmp/uploads"),
+		TMDBAPIKey:                 os.Getenv("TMDB_API_KEY"),
+		TMDBBaseURL:                getEnv("TMDB_BASE_URL", "https://api.themoviedb.org/3"),
+		AVScraperBaseURL:           getEnv("AV_SCRAPER_BASE_URL", "https://javdb.com"),
+		AVScraperUserAgent:         getEnv("AV_SCRAPER_USER_AGENT", "Mozilla/5.0 (compatible; VideoServerBot/1.0; +https://example.invalid/bot)"),
+		AVSiteURLJavDB:             firstNonEmptyEnv("AV_SITE_URL_JAVDB", "AV_SCRAPER_BASE_URL"),
+		AVSiteURLJavBus:            os.Getenv("AV_SITE_URL_JAVBUS"),
+		AVSiteURLJavLibrary:        os.Getenv("AV_SITE_URL_JAVLIBRARY"),
+		AVSiteURLThePornDB:         os.Getenv("AV_SITE_URL_THEPORNDB"),
+		AVSiteURLs:                 loadAVSiteURLs(),
+		AVScraperJavDBCookie:       os.Getenv("AV_SCRAPER_JAVDB_COOKIE"),
+		AVScraperJavBusCookie:      os.Getenv("AV_SCRAPER_JAVBUS_COOKIE"),
+		AVScraperThePornDBAPIToken: os.Getenv("AV_SCRAPER_THEPORNDB_API_TOKEN"),
+		AVScraperThePornDBNoHash:   getBoolEnv("AV_SCRAPER_THEPORNDB_NO_HASH", false),
+		AsynqQueue:                 getEnv("ASYNQ_QUEUE", "transcode"),
+		MaxTranscodeWorkers:        getIntEnv("MAX_TRANSCODE_WORKERS", 2),
+		TranscodeTaskTimeout:       time.Duration(getIntEnv("TRANSCODE_TASK_TIMEOUT_MINUTES", 360)) * time.Minute,
+		MaxVideoSize:               getInt64Env("MAX_VIDEO_SIZE", 2*1024*1024*1024),
+		EnableSwagger:              getBoolEnv("ENABLE_SWAGGER", false),
+		TMDBTimeout:                time.Duration(getIntEnv("TMDB_TIMEOUT_SECONDS", 10)) * time.Second,
+		AVScraperTimeout:           time.Duration(getIntEnv("AV_SCRAPER_TIMEOUT_SECONDS", 10)) * time.Second,
+		AccessTokenTTL:             time.Duration(getIntEnv("ACCESS_TOKEN_TTL_HOURS", 87600)) * time.Hour,
+		RefreshTokenTTL:            time.Duration(getIntEnv("REFRESH_TOKEN_TTL_HOURS", 168)) * time.Hour,
+		TranslationAPIURL:          strings.TrimSuffix(strings.TrimSpace(os.Getenv("TRANSLATION_API_URL")), "/"),
+		TranslationAPIKey:          os.Getenv("TRANSLATION_API_KEY"),
+		TranslationModel:           getEnv("TRANSLATION_MODEL", "HY-MT1.5-1.8B"),
+		TranslationTimeout:         time.Duration(getIntEnv("TRANSLATION_TIMEOUT_SECONDS", 15)) * time.Second,
+		ImageGenerationAPIURL:      strings.TrimSuffix(strings.TrimSpace(os.Getenv("IMAGE_GENERATION_API_URL")), "/"),
+		ImageGenerationAPIKey:      os.Getenv("IMAGE_GENERATION_API_KEY"),
+		ImageGenerationModel:       getEnv("IMAGE_GENERATION_MODEL", "gpt-image-2"),
+		ImageGenerationTimeout:     time.Duration(getIntEnv("IMAGE_GENERATION_TIMEOUT_SECONDS", 180)) * time.Second,
 	}
 
 	if cfg.PostgresDSN == "" {
@@ -139,10 +114,6 @@ func Load() (Config, error) {
 	}
 	if strings.TrimSpace(cfg.PlayURLSignSecret) == "" {
 		cfg.PlayURLSignSecret = cfg.JWTSecret
-	}
-	// server.met 刷新 cron 默认每日 01:17 本地时；URL 留空时整体禁用，cron 默认值无副作用。
-	if strings.TrimSpace(cfg.ED2KServerlistRefreshCron) == "" {
-		cfg.ED2KServerlistRefreshCron = "17 1 * * *"
 	}
 	if cfg.AVSiteURLs == nil {
 		cfg.AVSiteURLs = map[string]string{}

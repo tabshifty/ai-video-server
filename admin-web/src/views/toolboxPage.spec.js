@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 const toolbox = readFileSync(new URL('./Toolbox.vue', import.meta.url), 'utf8')
 const ed2kTool = readFileSync(new URL('./ToolboxEd2k.vue', import.meta.url), 'utf8')
-const ed2kDownloadTool = readFileSync(new URL('./ToolboxEd2kDownload.vue', import.meta.url), 'utf8')
 const archiveImportTool = readFileSync(new URL('./ToolboxArchiveImport.vue', import.meta.url), 'utf8')
 const imageWorkbench = readFileSync(new URL('./ToolboxImageWorkbench.vue', import.meta.url), 'utf8')
 const orphanFilesTool = readFileSync(new URL('./ToolboxOrphanFiles.vue', import.meta.url), 'utf8')
@@ -20,29 +19,27 @@ describe('toolbox pages', () => {
   it('keeps the toolbox page as a shell menu of tool entry buttons', () => {
     expect(toolbox).toContain('工具箱')
     expect(toolbox).toContain('ED2K 链接生成器')
-    expect(toolbox).toContain('ED2K 下载工作台')
+    expect(toolbox).not.toContain('ED2K 下载工作台')
     expect(toolbox).toContain('压缩包导入')
     expect(toolbox).toContain('图像生成工作台')
     expect(toolbox).toContain('孤儿文件扫描')
     expect(toolbox).toContain('密码管理')
-    expect(toolbox.match(/<a class="tool-menu-item"/g)).toHaveLength(6)
-    expect(toolbox.match(/target="_blank"/g)).toHaveLength(6)
-    expect(toolbox.match(/rel="noopener noreferrer"/g)).toHaveLength(6)
-    expect(toolbox.match(/新标签页打开/g)).toHaveLength(6)
+    expect(toolbox.match(/<a class="tool-menu-item"/g)).toHaveLength(5)
+    expect(toolbox.match(/target="_blank"/g)).toHaveLength(5)
+    expect(toolbox.match(/rel="noopener noreferrer"/g)).toHaveLength(5)
+    expect(toolbox.match(/新标签页打开/g)).toHaveLength(5)
     expect(toolbox).toContain('/toolbox/ed2k')
-    expect(toolbox).toContain('/toolbox/ed2k-download')
+    expect(toolbox).not.toContain('/toolbox/ed2k-download')
     expect(toolbox).toContain('/toolbox/archive-import')
     expect(toolbox).toContain('/toolbox/image-workbench')
     expect(toolbox).toContain('/toolbox/orphan-files')
     expect(toolbox).toContain('/toolbox/password-vault')
-    expect(toolbox).toContain('Download')
     expect(toolbox).toContain('Link')
   })
 
   it('keeps every toolbox destination resolved to its exact standalone route', () => {
     const destinations = [
       ['ed2kToolHref', '/toolbox/ed2k'],
-      ['ed2kDownloadHref', '/toolbox/ed2k-download'],
       ['archiveImportHref', '/toolbox/archive-import'],
       ['imageWorkbenchHref', '/toolbox/image-workbench'],
       ['orphanFilesHref', '/toolbox/orphan-files'],
@@ -73,32 +70,16 @@ describe('toolbox pages', () => {
     expect(ed2kTool).not.toMatch(/<Layout[>\s]/)
   })
 
-  it('keeps the ED2K download workbench anchored on source metadata and fixed detail sections', () => {
-    expect(ed2kDownloadTool).toContain('ED2K 下载工作台')
-    expect(ed2kDownloadTool).toContain('sourceLink')
-    expect(ed2kDownloadTool).toContain('resourceHash')
-    expect(ed2kDownloadTool).toContain('selectedTaskFiles')
-    expect(ed2kDownloadTool).toContain('selectedTaskHistory')
-    expect(ed2kDownloadTool).toContain('selectedTaskTone')
-    expect(ed2kDownloadTool).toContain('selectedTaskLabel')
-    expect(ed2kDownloadTool).toContain('selectedTaskID')
-    expect(ed2kDownloadTool).toContain('hasHistoryHit')
-    expect(ed2kDownloadTool).toContain('file-item__main')
-    expect(ed2kDownloadTool).toContain('来源标识')
-    expect(ed2kDownloadTool).toContain('新建任务')
-    expect(ed2kDownloadTool).toContain('创建任务')
-    expect(ed2kDownloadTool).toContain('下载任务')
-    expect(ed2kDownloadTool).toContain('任务详情')
-    expect(ed2kDownloadTool).toContain('历史记录')
-    expect(ed2kDownloadTool).not.toContain('ed2kClickedLinks')
-    expect(ed2kDownloadTool).not.toContain('已点击')
-  })
-
   it('registers the ED2K tool page as an authenticated route without shell header metadata', () => {
     expect(ed2kRoute).toContain("path: '/toolbox/ed2k'")
     expect(ed2kRoute).toContain('ToolboxEd2k')
     expect(ed2kRoute).not.toContain('public: true')
     expect(ed2kRoute).not.toContain('hideShellPageHeader')
+  })
+
+  it('does not register the retired ED2K download workbench', () => {
+    expect(router).not.toContain('ToolboxEd2kDownload')
+    expect(router).not.toContain('/toolbox/ed2k-download')
   })
 
   it('keeps the archive import tool page outside the admin shell while preserving batch-first archive workflows', () => {

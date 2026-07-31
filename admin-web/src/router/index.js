@@ -20,7 +20,6 @@ import SystemSettings from '../views/SystemSettings.vue'
 import TaskMonitor from '../views/TaskMonitor.vue'
 import Toolbox from '../views/Toolbox.vue'
 import ToolboxEd2k from '../views/ToolboxEd2k.vue'
-import ToolboxEd2kDownload from '../views/ToolboxEd2kDownload.vue'
 import ToolboxArchiveImport from '../views/ToolboxArchiveImport.vue'
 import ToolboxImageWorkbench from '../views/ToolboxImageWorkbench.vue'
 import ToolboxOrphanFiles from '../views/ToolboxOrphanFiles.vue'
@@ -45,7 +44,6 @@ const routes = [
   { path: '/users', component: UserManage },
   { path: '/toolbox', component: Toolbox },
   { path: '/toolbox/ed2k', component: ToolboxEd2k },
-  { path: '/toolbox/ed2k-download', component: ToolboxEd2kDownload },
   { path: '/toolbox/archive-import', component: ToolboxArchiveImport },
   { path: '/toolbox/image-workbench', component: ToolboxImageWorkbench },
   { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },

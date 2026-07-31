@@ -1,5 +1,7 @@
 # ED2K 服务器列表周期刷新走 asynq 定时任务 + 重启 amuled 生效
 
+状态：已被 [[ED2K 下载工作台退役]] 取代，仅保留为历史决策记录。
+
 aMule 的 `server.met` 会随 ED2K 服务器增减而过期，需要周期性从上游 `http://upd.emule-security.org/server.met` 刷新。aMule 自带 `AutoUpdateServerListAtStartup` 只在启动时拉取、且 macOS daemon 模式下不可靠；运行中的 `amuled` 又不热重载磁盘上的 `server.met`。决定在 Go worker 内新增一个 asynq 周期任务（默认每日 01:17 本地时，`ED2K_SERVERLIST_REFRESH_CRON` 可配）驱动刷新，实际“下载 server.met 落盘 + 重启 amuled”由独立执行器脚本 `scripts/ed2k-serverlist-refresh.sh` 完成，Go 侧不写 `~/.aMule/server.met`、不调 `amulecmd`，延续 [[ED2K aMule 执行器契约]] 把 aMule 远控细节拦在 Go 外的边界。
 
 ## 生效方式：重启 amuled，而非 amulecmd EC reload
