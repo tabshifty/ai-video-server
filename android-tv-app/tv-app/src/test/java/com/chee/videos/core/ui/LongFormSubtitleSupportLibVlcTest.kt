@@ -1,6 +1,7 @@
 package com.chee.videos.core.ui
 
 import com.chee.videos.core.model.SubtitleTrackDto
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.TvTrackPreference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -53,7 +54,14 @@ class LongFormSubtitleSupportLibVlcTest {
             ),
         )
 
-        assertEquals(TvTrackPreference(language = "zh-cn", type = "forced"), preference)
+        assertEquals(
+            TvTrackPreference(
+                language = "zh-cn",
+                type = "forced",
+                subtitleMode = TvSubtitlePreferenceMode.SPECIFIC.storageValue,
+            ),
+            preference,
+        )
     }
 
     private fun subtitleTrack(

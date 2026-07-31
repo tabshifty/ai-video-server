@@ -24,16 +24,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.buildAudioTrackPreference
-import com.chee.videos.core.ui.buildSubtitleTrackPreference
-import com.chee.videos.core.ui.resolveInitialSubtitleTrackId
+import com.chee.videos.core.ui.buildTvSubtitlePreference
 import com.chee.videos.core.ui.resolveAudioSelectionOnTrackLoad
-import com.chee.videos.core.ui.resolveSelectedSubtitleTrackByPreference
-import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
+import com.chee.videos.core.ui.resolveTvSubtitleSelection
 import com.chee.videos.feature.detail.DetailViewModel
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 import kotlinx.coroutines.delay
@@ -118,6 +117,7 @@ fun TvLongFormPlayerScreen(
     var resumePromptLastPositionMs by remember(detail.id, uiState.accessToken) { mutableStateOf(0L) }
     var resumePromptDismissed by remember(detail.id, uiState.accessToken) { mutableStateOf(false) }
     var selectedSubtitleTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
+    var subtitlePreferenceMode by rememberSaveable(detail.id) { mutableStateOf(TvSubtitlePreferenceMode.AUTO) }
     var storedSubtitlePreference by remember(detail.id) { mutableStateOf<TvTrackPreference?>(null) }
     var storedAudioPreference by remember(detail.id) { mutableStateOf<TvTrackPreference?>(null) }
     var selectedAudioTrackId by rememberSaveable(detail.id) { mutableStateOf<String?>(null) }
@@ -202,15 +202,13 @@ fun TvLongFormPlayerScreen(
         storedAudioPreference = viewModel.readTvAudioPreference()
     }
 
-    LaunchedEffect(detail.id, detail.subtitleTracks, hasStartedPlayback, storedSubtitlePreference) {
-        selectedSubtitleTrackId = resolveSelectedSubtitleTrackByPreference(
+    LaunchedEffect(detail.id, detail.subtitleTracks, storedSubtitlePreference) {
+        val selection = resolveTvSubtitleSelection(
             tracks = detail.subtitleTracks,
             preference = storedSubtitlePreference,
-        )?.id ?: resolveSubtitleSelectionOnTrackLoad(
-            currentSelection = selectedSubtitleTrackId,
-            tracks = detail.subtitleTracks,
-            hasStartedPlayback = hasStartedPlayback,
-        ) ?: resolveInitialSubtitleTrackId(detail.subtitleTracks)
+        )
+        subtitlePreferenceMode = selection.mode
+        selectedSubtitleTrackId = selection.trackId
     }
 
     LaunchedEffect(
@@ -321,6 +319,7 @@ fun TvLongFormPlayerScreen(
                 outputSurface = playbackRoute.outputSurface,
                 subtitleConfigurations = media3SubtitleConfigurations,
                 selectedSubtitleTrackId = selectedSubtitleTrackId?.takeIf { it.isNotBlank() },
+                subtitlePreferenceMode = subtitlePreferenceMode,
                 selectedAudioTrackId = selectedAudioTrackId,
                 interactionMode = interactionMode,
                 modifier = Modifier.fillMaxSize(),
@@ -369,10 +368,17 @@ fun TvLongFormPlayerScreen(
                         }
                     }
                 },
-                onEnded = {
-                    reportTvLongFormMedia3History(viewModel, detail.id, latestMedia3Snapshot, completedOverride = true)
-                    updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
-                    completionVisible = true
+                onEnded = { eventIdentity ->
+                    if (eventIdentity == currentPlaybackIdentity) {
+                        reportTvLongFormMedia3History(
+                            viewModel,
+                            detail.id,
+                            latestMedia3Snapshot,
+                            completedOverride = true,
+                        )
+                        updatePlaybackSession(playbackSession.copy(hasStartedPlayback = false))
+                        completionVisible = true
+                    }
                 },
                 onSnapshotChanged = { snapshot ->
                     media3Snapshot = snapshot
@@ -388,6 +394,9 @@ fun TvLongFormPlayerScreen(
                 onLifecyclePaused = {
                     isPausedByUser = true
                     isPlayerActuallyPlaying = false
+                },
+                onPlaybackIntentChanged = { shouldPlay ->
+                    updatePlaybackSession(playbackSession.setPlayIntent(shouldPlay = shouldPlay, canPlay = canPlay))
                 },
                 onPlaybackStatusChanged = { status ->
                     playbackStatus = status
@@ -413,6 +422,7 @@ fun TvLongFormPlayerScreen(
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
                 subtitleTracks = detail.subtitleTracks.filter { it.available && it.url.isNotBlank() && !it.isEmbedded },
                 selectedSubtitleTrackId = selectedSubtitleTrackId?.takeIf { it.isNotBlank() },
+                subtitlePreferenceMode = subtitlePreferenceMode,
                 audioTracks = media3AudioTracks,
                 selectedAudioTrackId = selectedAudioTrackId?.takeIf { it.isNotBlank() },
                 seasons = emptyList(),
@@ -420,13 +430,20 @@ fun TvLongFormPlayerScreen(
                 onTogglePlayPause = {
                     updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
                 },
+                onSetPlaybackIntent = { shouldPlay ->
+                    updatePlaybackSession(playbackSession.setPlayIntent(shouldPlay = shouldPlay, canPlay = canPlay))
+                },
                 onSeekTo = { targetMs ->
                     media3SeekPositionMs = targetMs
                     media3SeekRequestKey += 1
                 },
-                onSelectSubtitleTrack = { trackId ->
-                    selectedSubtitleTrackId = trackId ?: ""
-                    val preference = buildSubtitleTrackPreference(detail.subtitleTracks.firstOrNull { it.id == trackId })
+                onSelectSubtitleTrack = { mode, trackId ->
+                    subtitlePreferenceMode = mode
+                    selectedSubtitleTrackId = trackId
+                    val preference = buildTvSubtitlePreference(
+                        mode = mode,
+                        track = detail.subtitleTracks.firstOrNull { it.id == trackId },
+                    )
                     storedSubtitlePreference = preference
                     viewModel.saveTvSubtitlePreference(preference)
                 },

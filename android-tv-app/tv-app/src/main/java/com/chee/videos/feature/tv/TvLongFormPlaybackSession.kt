@@ -1,5 +1,7 @@
 package com.chee.videos.feature.tv
 
+import android.view.KeyEvent as AndroidKeyEvent
+
 internal const val TvLongFormControlsAutoHideMillis: Long = 4_000L
 internal const val TvLongFormStartupFeedbackDelayMillis: Long = 300L
 internal const val TvLongFormBufferingFeedbackDelayMillis: Long = 500L
@@ -21,6 +23,20 @@ internal enum class TvLongFormControlAction {
     AudioTracks,
     Episodes,
 }
+
+internal enum class TvLongFormMediaPlaybackCommand {
+    Play,
+    Pause,
+    Toggle,
+}
+
+internal fun resolveTvLongFormMediaPlaybackCommand(keyCode: Int): TvLongFormMediaPlaybackCommand? =
+    when (keyCode) {
+        AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> TvLongFormMediaPlaybackCommand.Play
+        AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> TvLongFormMediaPlaybackCommand.Pause
+        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> TvLongFormMediaPlaybackCommand.Toggle
+        else -> null
+    }
 
 internal fun buildTvLongFormVisibleActions(
     capabilities: TvLongFormPlaybackCapabilities,

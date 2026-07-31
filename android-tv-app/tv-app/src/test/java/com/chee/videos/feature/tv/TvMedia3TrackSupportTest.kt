@@ -33,6 +33,8 @@ class TvMedia3TrackSupportTest {
         assertTrue(source.contains("TrackSelectionOverride"))
         assertTrue(source.contains("setOverrideForType(TrackSelectionOverride"))
         assertTrue(source.contains("setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)"))
+        assertTrue(player.contains("TvSubtitlePreferenceMode.AUTO"))
+        assertTrue(player.contains("buildTvMedia3SelectionParametersForAuto"))
         assertTrue(source.contains("vlcTrackId = buildTvMedia3AudioPreferenceTrackId(groupIndex, trackIndex)"))
         assertFalse(
             "字幕/音轨切换不能通过 setMediaSource 重建播放源实现",
@@ -68,6 +70,8 @@ class TvMedia3TrackSupportTest {
         assertTrue(chrome.contains("TvLongFormInteractionMode.SubtitlePanel"))
         assertTrue(chrome.contains("TvLongFormInteractionMode.AudioPanel"))
         assertTrue(chrome.contains("TvLongFormRightPanel("))
+        assertTrue(chrome.contains("\"自动选择\""))
+        assertTrue(chrome.contains("\"关闭字幕\""))
         assertTrue(single.contains("TvLongFormPlaybackChrome("))
         assertTrue(series.contains("TvLongFormPlaybackChrome("))
         assertFalse(single.contains("TvMedia3TrackPickerLayer("))

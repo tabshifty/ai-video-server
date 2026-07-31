@@ -3,9 +3,10 @@ package com.chee.videos.feature.tv
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.TvTrackPreference
-import com.chee.videos.core.ui.buildSubtitleTrackPreference
-import com.chee.videos.core.ui.resolveSelectedSubtitleTrackByPreference
+import com.chee.videos.core.ui.buildTvSubtitlePreference
+import com.chee.videos.core.ui.resolveTvSubtitleSelection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -24,6 +25,7 @@ data class TvSeriesPlayerUiState(
     val activeSeasonNumber: Int = 1,
     val activeEpisodeNumber: Int = 1,
     val selectedSubtitleTrackId: String? = null,
+    val selectedSubtitlePreference: TvTrackPreference? = null,
     val selectedAudioTrackId: String? = null,
     val selectedAudioPreference: TvTrackPreference? = null,
     val tvSeekStepSeconds: Int = TvPlaybackSeekStepSetting.defaultSeconds,
@@ -199,12 +201,17 @@ class TvSeriesPlayerViewModel @Inject constructor(
         }
     }
 
-    fun selectSubtitleTrack(subtitleTrackId: String?) {
+    fun selectSubtitleTrack(mode: TvSubtitlePreferenceMode, subtitleTrackId: String?) {
         val selectedTrack = activeEpisode(_uiState.value)
             ?.subtitleTracks
             ?.firstOrNull { it.id == subtitleTrackId }
-        val preference = buildSubtitleTrackPreference(selectedTrack)
-        _uiState.update { it.copy(selectedSubtitleTrackId = subtitleTrackId ?: "") }
+        val preference = buildTvSubtitlePreference(mode = mode, track = selectedTrack)
+        _uiState.update {
+            it.copy(
+                selectedSubtitleTrackId = subtitleTrackId,
+                selectedSubtitlePreference = preference,
+            )
+        }
         viewModelScope.launch {
             repository.saveTvSubtitlePreference(preference)
         }
@@ -308,6 +315,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     currentVideoId = episode?.videoId.orEmpty(),
                     currentSourceUrl = "",
                     selectedSubtitleTrackId = null,
+                    selectedSubtitlePreference = null,
                     selectedAudioTrackId = null,
                     selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
@@ -332,6 +340,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     currentVideoId = episode.videoId,
                     currentSourceUrl = "",
                     selectedSubtitleTrackId = null,
+                    selectedSubtitlePreference = null,
                     selectedAudioTrackId = null,
                     selectedAudioPreference = null,
                     canPlayCurrentEpisode = false,
@@ -354,6 +363,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                 currentVideoId = episode.videoId,
                 currentSourceUrl = "",
                 selectedSubtitleTrackId = null,
+                selectedSubtitlePreference = null,
                 selectedAudioTrackId = null,
                 selectedAudioPreference = null,
                 canPlayCurrentEpisode = false,
@@ -371,14 +381,16 @@ class TvSeriesPlayerViewModel @Inject constructor(
                     episode.videoId,
                     resolveTvPlaybackSourceProfile(episode.metadata),
                 )
-                val preferredSubtitleTrackId = resolveSelectedSubtitleTrackByPreference(
+                val subtitlePreference = repository.readTvSubtitlePreference()
+                val subtitleSelection = resolveTvSubtitleSelection(
                     tracks = episode.subtitleTracks,
-                    preference = repository.readTvSubtitlePreference(),
-                )?.id
+                    preference = subtitlePreference,
+                )
                 val preferredAudioPreference = repository.readTvAudioPreference()
                 TvSeriesPlaybackSourceResult.Ready(
                     sourceUrl = sourceUrl,
-                    preferredSubtitleTrackId = preferredSubtitleTrackId,
+                    preferredSubtitleTrackId = subtitleSelection.trackId,
+                    preferredSubtitlePreference = subtitlePreference,
                     preferredAudioPreference = preferredAudioPreference,
                 )
             } catch (err: CancellationException) {
@@ -399,6 +411,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                         currentVideoId = episode.videoId,
                         currentSourceUrl = sourceResult.sourceUrl,
                         selectedSubtitleTrackId = sourceResult.preferredSubtitleTrackId,
+                        selectedSubtitlePreference = sourceResult.preferredSubtitlePreference,
                         selectedAudioTrackId = null,
                         selectedAudioPreference = sourceResult.preferredAudioPreference,
                         canPlayCurrentEpisode = true,
@@ -415,6 +428,7 @@ class TvSeriesPlayerViewModel @Inject constructor(
                         currentVideoId = episode.videoId,
                         currentSourceUrl = "",
                         selectedSubtitleTrackId = null,
+                        selectedSubtitlePreference = null,
                         selectedAudioTrackId = null,
                         selectedAudioPreference = null,
                         canPlayCurrentEpisode = false,
@@ -437,6 +451,7 @@ private sealed interface TvSeriesPlaybackSourceResult {
     data class Ready(
         val sourceUrl: String,
         val preferredSubtitleTrackId: String?,
+        val preferredSubtitlePreference: TvTrackPreference?,
         val preferredAudioPreference: TvTrackPreference?,
     ) : TvSeriesPlaybackSourceResult
 

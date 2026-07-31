@@ -39,6 +39,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.player.friendlyLongFormPlaybackErrorMessage
 import com.chee.videos.tv.R
@@ -55,6 +56,11 @@ internal data class TvLongFormMedia3EventIdentity(
     val mediaId: String,
     val retryKey: Int,
 )
+
+internal fun isCurrentTvLongFormMedia3Event(
+    eventIdentity: TvLongFormMedia3EventIdentity,
+    preparedIdentity: TvLongFormMedia3EventIdentity?,
+): Boolean = eventIdentity == preparedIdentity
 
 internal fun parseTvLongFormMedia3EventIdentity(mediaItemId: String): TvLongFormMedia3EventIdentity? {
     val separatorIndex = mediaItemId.lastIndexOf(TvLongFormMedia3RetryKeySeparator)
@@ -125,16 +131,18 @@ internal fun TvLongFormMedia3Player(
     outputSurface: TvPlaybackOutputSurface = TvPlaybackOutputSurface.TEXTURE_VIEW,
     subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
     selectedSubtitleTrackId: String? = null,
+    subtitlePreferenceMode: TvSubtitlePreferenceMode = TvSubtitlePreferenceMode.AUTO,
     selectedAudioTrackId: String? = null,
     interactionMode: TvLongFormInteractionMode = TvLongFormInteractionMode.Hidden,
     modifier: Modifier = Modifier,
     onPlayingChanged: (Boolean, TvLongFormMedia3EventIdentity) -> Unit = { _, _ -> },
     onRenderedFirstFrame: (TvLongFormMedia3EventIdentity) -> Unit = {},
     onError: (String, TvLongFormMedia3EventIdentity, Boolean) -> Unit = { _, _, _ -> },
-    onEnded: () -> Unit = {},
+    onEnded: (TvLongFormMedia3EventIdentity) -> Unit = {},
     onSnapshotChanged: (TvMedia3PlaybackSnapshot) -> Unit = {},
     onLifecyclePauseSnapshot: (TvMedia3PlaybackSnapshot) -> Unit = {},
     onLifecyclePaused: () -> Unit = {},
+    onPlaybackIntentChanged: (Boolean) -> Unit = {},
     onPlaybackStatusChanged: (TvLongFormPlaybackStatus) -> Unit = {},
     onAudioTracksChanged: (List<LongFormAudioTrack>) -> Unit = {},
 ) {
@@ -147,6 +155,7 @@ internal fun TvLongFormMedia3Player(
     val latestOnSnapshotChanged by rememberUpdatedState(onSnapshotChanged)
     val latestOnLifecyclePauseSnapshot by rememberUpdatedState(onLifecyclePauseSnapshot)
     val latestOnLifecyclePaused by rememberUpdatedState(onLifecyclePaused)
+    val latestOnPlaybackIntentChanged by rememberUpdatedState(onPlaybackIntentChanged)
     val latestOnPlaybackStatusChanged by rememberUpdatedState(onPlaybackStatusChanged)
     val latestOnAudioTracksChanged by rememberUpdatedState(onAudioTracksChanged)
     val dataSourceFactory = remember(accessToken) {
@@ -175,6 +184,18 @@ internal fun TvLongFormMedia3Player(
     var playbackState by remember { mutableStateOf(Player.STATE_IDLE) }
     var isMedia3Playing by remember { mutableStateOf(false) }
     var trackSelectionRevision by remember { mutableStateOf(0) }
+    var pendingInternalPlaybackIntent by remember(player) { mutableStateOf<Boolean?>(null) }
+
+    fun applyInternalPlaybackIntent(shouldPlay: Boolean) {
+        if (player.playWhenReady != shouldPlay) {
+            pendingInternalPlaybackIntent = shouldPlay
+        }
+        if (shouldPlay) {
+            player.play()
+        } else {
+            player.pause()
+        }
+    }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -184,6 +205,12 @@ internal fun TvLongFormMedia3Player(
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                val consumedInternalIntent = pendingInternalPlaybackIntent == playWhenReady
+                if (consumedInternalIntent) {
+                    pendingInternalPlaybackIntent = null
+                } else if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
+                    latestOnPlaybackIntentChanged(playWhenReady)
+                }
                 if (
                     !playWhenReady &&
                     reason in setOf(
@@ -198,10 +225,8 @@ internal fun TvLongFormMedia3Player(
         val analyticsListener = object : AnalyticsListener {
             override fun onIsPlayingChanged(eventTime: AnalyticsListener.EventTime, isPlaying: Boolean) {
                 val eventIdentity = eventTime.eventIdentity() ?: return
-                if (eventIdentity == preparedIdentity) {
+                if (isCurrentTvLongFormMedia3Event(eventIdentity, preparedIdentity)) {
                     isMedia3Playing = isPlaying
-                }
-                if (eventIdentity == preparedIdentity) {
                     latestOnPlaybackStatusChanged(
                         if (isPlaying) TvLongFormPlaybackStatus.Playing else resolveTvLongFormPlaybackStatus(
                             playbackState = playbackState,
@@ -217,7 +242,7 @@ internal fun TvLongFormMedia3Player(
                 nextPlaybackState: Int,
             ) {
                 val eventIdentity = eventTime.eventIdentity() ?: return
-                if (eventIdentity != preparedIdentity) {
+                if (!isCurrentTvLongFormMedia3Event(eventIdentity, preparedIdentity)) {
                     return
                 }
                 playbackState = nextPlaybackState
@@ -228,7 +253,7 @@ internal fun TvLongFormMedia3Player(
                     ),
                 )
                 if (nextPlaybackState == Player.STATE_ENDED) {
-                    latestOnEnded()
+                    latestOnEnded(eventIdentity)
                 }
             }
 
@@ -246,9 +271,10 @@ internal fun TvLongFormMedia3Player(
                 error: androidx.media3.common.PlaybackException,
             ) {
                 val eventIdentity = eventTime.eventIdentity() ?: return
-                if (eventIdentity == preparedIdentity) {
-                    isMedia3Playing = false
+                if (!isCurrentTvLongFormMedia3Event(eventIdentity, preparedIdentity)) {
+                    return
                 }
+                isMedia3Playing = false
                 latestOnPlaybackStatusChanged(TvLongFormPlaybackStatus.Error)
                 latestOnPlayingChanged(false, eventIdentity)
                 latestOnError(
@@ -280,7 +306,7 @@ internal fun TvLongFormMedia3Player(
         }
         val sourceKey = "$mediaId|$sourceUrl|$subtitleKey|retry:$retryKey"
         if (sourceUrl.isBlank() || mediaId.isBlank()) {
-            player.pause()
+            applyInternalPlaybackIntent(false)
             player.clearMediaItems()
             preparedPlayerSourceKey = null
             preparedSourceKey = ""
@@ -344,7 +370,7 @@ internal fun TvLongFormMedia3Player(
         latestOnSnapshotChanged(player.readTvMedia3PlaybackSnapshot())
     }
 
-    LaunchedEffect(player, preparedSourceKey, trackSelectionRevision, selectedSubtitleTrackId) {
+    LaunchedEffect(player, preparedSourceKey, trackSelectionRevision, selectedSubtitleTrackId, subtitlePreferenceMode) {
         if (preparedSourceKey.isBlank()) {
             return@LaunchedEffect
         }
@@ -352,6 +378,7 @@ internal fun TvLongFormMedia3Player(
             currentParameters = player.trackSelectionParameters,
             tracks = player.currentTracks,
             selectedSubtitleTrackId = selectedSubtitleTrackId,
+            subtitlePreferenceMode = subtitlePreferenceMode,
         )
         if (nextParameters != player.trackSelectionParameters) {
             player.trackSelectionParameters = nextParameters
@@ -376,12 +403,7 @@ internal fun TvLongFormMedia3Player(
         if (preparedSourceKey.isBlank()) {
             return@LaunchedEffect
         }
-        player.playWhenReady = shouldPlay
-        if (shouldPlay) {
-            player.play()
-        } else {
-            player.pause()
-        }
+        applyInternalPlaybackIntent(shouldPlay)
     }
 
     LaunchedEffect(preparedSourceKey, preparedIdentity, shouldPlay, playbackState, isMedia3Playing, retryKey) {
@@ -394,7 +416,7 @@ internal fun TvLongFormMedia3Player(
         if (
             shouldReportTvLongFormMedia3StartupTimeout(preparedSourceKey, shouldPlay, playbackState, isMedia3Playing)
         ) {
-            player.pause()
+            applyInternalPlaybackIntent(false)
             val timeoutIdentity = TvLongFormMedia3EventIdentity(mediaId, retryKey)
             latestOnPlayingChanged(false, timeoutIdentity)
             latestOnError(TvLongFormMedia3StartupTimeoutMessage, timeoutIdentity, true)
@@ -423,7 +445,7 @@ internal fun TvLongFormMedia3Player(
                         latestOnSnapshotChanged(snapshot)
                         latestOnLifecyclePauseSnapshot(snapshot)
                     }
-                    player.pause()
+                    applyInternalPlaybackIntent(false)
                     latestOnPlaybackStatusChanged(TvLongFormPlaybackStatus.Paused)
                     latestOnLifecyclePaused()
                     deactivateMediaSession()
@@ -569,10 +591,17 @@ internal fun resolveTvMedia3SubtitleSelectionParameters(
     currentParameters: TrackSelectionParameters,
     tracks: androidx.media3.common.Tracks,
     selectedSubtitleTrackId: String?,
+    subtitlePreferenceMode: TvSubtitlePreferenceMode,
 ): TrackSelectionParameters {
+    if (subtitlePreferenceMode == TvSubtitlePreferenceMode.AUTO) {
+        return buildTvMedia3SelectionParametersForAuto(currentParameters, androidx.media3.common.C.TRACK_TYPE_TEXT)
+    }
+    if (subtitlePreferenceMode == TvSubtitlePreferenceMode.OFF) {
+        return buildTvMedia3SelectionParametersForDisabledText(currentParameters)
+    }
     val normalizedSelection = selectedSubtitleTrackId?.trim().orEmpty()
     if (normalizedSelection.isBlank()) {
-        return buildTvMedia3SelectionParametersForDisabledText(currentParameters)
+        return buildTvMedia3SelectionParametersForAuto(currentParameters, androidx.media3.common.C.TRACK_TYPE_TEXT)
     }
     val groupAndTrack = findTvMedia3TrackById(
         tracks = tracks,

@@ -1,5 +1,6 @@
 package com.chee.videos.feature.tv
 
+import android.view.KeyEvent as AndroidKeyEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -7,6 +8,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TvLongFormPlaybackSessionTest {
+    @Test
+    fun dedicatedMediaKeysResolveToExplicitPlaybackCommands() {
+        assertEquals(
+            TvLongFormMediaPlaybackCommand.Play,
+            resolveTvLongFormMediaPlaybackCommand(AndroidKeyEvent.KEYCODE_MEDIA_PLAY),
+        )
+        assertEquals(
+            TvLongFormMediaPlaybackCommand.Pause,
+            resolveTvLongFormMediaPlaybackCommand(AndroidKeyEvent.KEYCODE_MEDIA_PAUSE),
+        )
+        assertEquals(
+            TvLongFormMediaPlaybackCommand.Toggle,
+            resolveTvLongFormMediaPlaybackCommand(AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE),
+        )
+        assertNull(resolveTvLongFormMediaPlaybackCommand(AndroidKeyEvent.KEYCODE_DPAD_CENTER))
+    }
+
     @Test
     fun capabilitiesExposeOnlyRealControls() {
         val actions = buildTvLongFormVisibleActions(
@@ -195,5 +213,17 @@ class TvLongFormPlaybackSessionTest {
                 actions = actions,
             ),
         )
+    }
+
+    @Test
+    fun chromeRestoresFocusAfterBlockingOverlayDisappears() {
+        val source = java.nio.file.Path.of(
+            "src/main/java/com/chee/videos/feature/tv/TvLongFormPlaybackChrome.kt",
+        ).toFile().readText()
+
+        assertTrue(source.contains("LaunchedEffect(mode, blockingUiVisible)"))
+        assertTrue(source.contains("if (blockingUiVisible) return@LaunchedEffect"))
+        assertTrue(source.contains("if (blockingUiVisible && mode != TvLongFormInteractionMode.Hidden)"))
+        assertTrue(source.contains("updateMode(TvLongFormInteractionMode.Hidden)"))
     }
 }

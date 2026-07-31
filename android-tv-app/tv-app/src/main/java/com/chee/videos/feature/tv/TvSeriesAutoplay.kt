@@ -94,6 +94,18 @@ fun shouldShowAutoplayPromptCard(input: AutoplayPromptGuardInput): Boolean {
     return input.remainingMs in 1L..10_000L
 }
 
+fun shouldSuspendPlaybackForAutoplayInteraction(input: AutoplayPromptGuardInput): Boolean {
+    if (!input.autoplayEnabled || !input.hasNextEpisode || !input.isSelectorVisible) return false
+    if (input.isPlayerError || input.isBackConfirmVisible || input.isEndOverlayVisible || input.isLoading) return false
+    if (input.isCanceledForCurrentEpisode || input.durationMs <= 0L) return false
+    return input.remainingMs in 1L..10_000L
+}
+
+fun shouldDeferTvSeriesPlaybackEnded(
+    isPausedByUser: Boolean,
+    isSelectorVisible: Boolean,
+): Boolean = isPausedByUser || isSelectorVisible
+
 fun shouldHandlePlaybackEnded(
     currentVideoId: String,
     lastAutoplaySwitchedVideoId: String,
@@ -101,7 +113,16 @@ fun shouldHandlePlaybackEnded(
     val current = currentVideoId.trim()
     val lastAutoplay = lastAutoplaySwitchedVideoId.trim()
     if (current.isBlank() || lastAutoplay.isBlank()) return true
-    return current == lastAutoplay
+    return current != lastAutoplay
+}
+
+fun resolveAutoplaySwitchGuardAfterVideoChanged(
+    currentVideoId: String,
+    lastAutoplaySwitchedVideoId: String,
+): String {
+    val current = currentVideoId.trim()
+    val lastAutoplay = lastAutoplaySwitchedVideoId.trim()
+    return lastAutoplay.takeIf { it.isNotBlank() && it == current }.orEmpty()
 }
 
 fun autoplayCountdownTickRemaining(

@@ -164,8 +164,50 @@ class TvSeriesAutoplaySpecTest {
     @Test
     fun shouldHandlePlaybackEnded_ignoresResidualAutoplayEndedEvents() {
         assertTrue(shouldHandlePlaybackEnded("video-1", ""))
-        assertFalse(shouldHandlePlaybackEnded("video-2", "video-1"))
-        assertTrue(shouldHandlePlaybackEnded("video-1", "video-1"))
+        assertTrue(shouldHandlePlaybackEnded("video-2", "video-1"))
+        assertFalse(shouldHandlePlaybackEnded("video-1", "video-1"))
+        assertEquals("", resolveAutoplaySwitchGuardAfterVideoChanged("video-2", "video-1"))
+        assertEquals("video-1", resolveAutoplaySwitchGuardAfterVideoChanged("video-1", "video-1"))
+    }
+
+    @Test
+    fun autoplayInteractionSuspension_onlyAppliesInsideTheFinalWindow() {
+        val finalWindowPanel = AutoplayPromptGuardInput(
+            isPlaying = true,
+            autoplayEnabled = true,
+            hasNextEpisode = true,
+            isPlayerError = false,
+            isSelectorVisible = true,
+            isBackConfirmVisible = false,
+            isLoading = false,
+            isCanceledForCurrentEpisode = false,
+            isEndOverlayVisible = false,
+            remainingMs = 8_000L,
+            durationMs = 120_000L,
+        )
+
+        assertTrue(shouldSuspendPlaybackForAutoplayInteraction(finalWindowPanel))
+        assertFalse(shouldSuspendPlaybackForAutoplayInteraction(finalWindowPanel.copy(remainingMs = 11_000L)))
+        assertFalse(shouldSuspendPlaybackForAutoplayInteraction(finalWindowPanel.copy(isSelectorVisible = false)))
+        assertFalse(shouldSuspendPlaybackForAutoplayInteraction(finalWindowPanel.copy(autoplayEnabled = false)))
+    }
+
+    @Test
+    fun playbackEnded_isDeferredWhileUserInteractionOwnsTheScreen() {
+        assertTrue(shouldDeferTvSeriesPlaybackEnded(isPausedByUser = true, isSelectorVisible = false))
+        assertTrue(shouldDeferTvSeriesPlaybackEnded(isPausedByUser = false, isSelectorVisible = true))
+        assertFalse(shouldDeferTvSeriesPlaybackEnded(isPausedByUser = false, isSelectorVisible = false))
+    }
+
+    @Test
+    fun seriesPlayerWiresAutoplaySuspensionAndDeferredEndHandling() {
+        val source = java.nio.file.Path.of(
+            "src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt",
+        ).toFile().readText()
+
+        assertTrue(source.contains("!shouldSuspendForAutoplayInteraction"))
+        assertTrue(source.contains("deferredPlaybackEndedVideoId"))
+        assertTrue(source.contains("resolveAutoplaySwitchGuardAfterVideoChanged"))
     }
 }
 

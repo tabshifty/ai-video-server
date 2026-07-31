@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-31 23:37 +0800
+- 进度：完成 TV 长视频播放器复审缺陷修复与最终验证。结束回调额外携带 `mediaId + retryKey` 并由单片/剧集宿主二次过滤，关闭切集换源竞态；阻塞层出现时 Chrome 收回到隐藏模式，消失后恢复根焦点。最终提交只纳入长视频播放器状态、字幕偏好、Media3/Chrome、剧集连播、相关测试、TV 版本和技术文档，不纳入既有未跟踪 `docs/examples/`。
+- 影响文件：`CONTEXT.md`、`plan.md`、`android-tv-app/tv-app/build.gradle.kts`、TV 长视频相关 `core/{data,model,ui}`、`feature/detail/LongFormPlaybackSession.kt`、`feature/tv/TvLongForm*`、`TvSeriesAutoplay.kt`、`TvSeriesPlayerScreen.kt`、`TvSeriesPlayerViewModel.kt` 及对应 8 个测试文件。
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过，642 项单测 0 失败/0 错误，生成 arm64-v8a 与 armeabi-v7a Debug APK；`git diff --check` 通过；本次中文/Markdown 乱码扫描无命中；工作区改动范围扫描确认未触及短视频、短视频投放、IPTV、手机端；版本为 `versionCode 143` / `versionName 0.1.143`。
+
+## 2026-07-31 23:30 +0800
+- 进度：完成 TV 长视频播放器六类复审缺陷的核心修复。自动连播 guard 改为只抑制当前旧集残留事件并在切集后清空；片尾面板/精确拖动临时挂起 Media3，已到达的结束事件延期；字幕偏好新增 `auto/off/specific` 三态并贯通 DataStore、单片、剧集、Media3 和右侧面板；专用播放/暂停键改为显式幂等意图，MediaSession 外部命令回传父层且内部命令不污染用户暂停；阻塞层关闭后按 mode 恢复焦点；旧 identity 错误在适配层直接丢弃。TV 版本更新为 `0.1.143 / 143`，`CONTEXT.md` 同步长期约定。
+- 影响文件：TV 轨道偏好模型/存储/解析、统一播放会话、Media3 适配、共享 Chrome、单片/剧集宿主与 ViewModel、自动连播逻辑及对应单测，另含 `android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
+- 验证：七个相关定向测试类通过；`:tv-app:testDebugUnitTest` 全量通过。待执行内部 Media3 意图区分后的复验、`:tv-app:assembleDebug`、静态检查与提交范围检查。
+
+## 2026-07-31 23:18 +0800
+- 进度：完成 TV 长视频播放器六类复审缺陷的红灯测试。新增字幕三态与跨内容回退、专用媒体键显式命令、MediaSession 幂等播放意图、片尾交互冻结与结束延期、覆盖层焦点恢复、迟到 Media3 identity 过滤断言，并反转旧自动连播结束门控的错误预期。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/core/data/AppPreferencesStoreTest.kt`、`core/ui/LongFormSubtitlePreferenceFallbackTest.kt`、`feature/detail/LongFormPlaybackSessionTest.kt`、`feature/tv/TvLongFormPlaybackSessionTest.kt`、`TvLongFormMedia3PlayerTest.kt`、`TvMedia3TrackSupportTest.kt`、`TvSeriesAutoplaySpecTest.kt`、`plan.md`。
+- 验证：定向 `:tv-app:testDebugUnitTest` 按预期退出 1；失败全部为新增目标 API 未实现的 unresolved reference，生产代码任务仍为 `UP-TO-DATE`。
+
+## 2026-07-31 23:11 +0800
+- 进度：开始修复 TV 长视频播放器复审发现的六类状态链缺陷：自动连播后的结束事件门控、片尾面板/精确拖动冻结、字幕“关闭/自动/指定语言”账号级偏好、专用媒体键与 MediaSession 播放意图同步、阻塞覆盖层关闭后的焦点恢复，以及旧媒体迟到错误过滤。先补纯逻辑和源码契约红灯测试，再做最小实现。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/core/model/TvTrackPreference.kt`、长视频字幕偏好支持、Media3 适配、播放会话、共享 Chrome、剧集/单片播放器及对应 `src/test`，并更新 TV 版本、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 不纳入。
+- 验证：待执行播放器相关定向单测、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、`git diff --check`、乱码扫描和提交范围检查。
+
 ## 2026-07-31 21:53 +0800
 - 进度：完成 TV 长视频播放器结构与 UI 重构。电影、`18+`、电视剧分集已统一到 Media3 OTT 播放会话、沉浸式控制层、右侧字幕/音轨/跨季选集面板和统一完成层；接入前台 `MediaSession`、账号级轨道偏好、详情页继续/从头起播意图、分层返回、片尾连播、延迟加载反馈与两次自动重试，删除旧电视剧控制层、外置轨道弹层及软重试状态。短视频、短视频投放、IPTV 与手机端保持不变，TV 版本更新为 `versionCode 142`、`versionName 0.1.142`。
 - 影响文件：`android-tv-app/tv-app/build.gradle.kts`、TV 长视频路由/详情/播放器/偏好/历史相关 `src/main` 与 `src/test`、播放器 XML、`docs/adr/0012-tv-series-shared-controls-for-mixed-playback-engines.md`、`docs/adr/0018-tv-long-form-ott-playback-session.md`、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 明确不纳入提交。

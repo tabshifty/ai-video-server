@@ -1,6 +1,7 @@
 package com.chee.videos.core.ui
 
 import com.chee.videos.core.model.SubtitleTrackDto
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.TvTrackPreference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -119,5 +120,48 @@ class LongFormSubtitlePreferenceFallbackTest {
             preference = TvTrackPreference(language = "zh", type = "default"),
         )
         assertEquals("zh-b", match?.id)
+    }
+
+    @Test
+    fun subtitlePreferenceDistinguishesAutoOffAndSpecificTrack() {
+        val tracks = listOf(track(id = "zh", languageCode = "zh", isDefault = true))
+
+        val automatic = resolveTvSubtitleSelection(
+            tracks = tracks,
+            preference = buildTvSubtitlePreference(TvSubtitlePreferenceMode.AUTO),
+        )
+        val disabled = resolveTvSubtitleSelection(
+            tracks = tracks,
+            preference = buildTvSubtitlePreference(TvSubtitlePreferenceMode.OFF),
+        )
+        val specific = resolveTvSubtitleSelection(
+            tracks = tracks,
+            preference = buildTvSubtitlePreference(TvSubtitlePreferenceMode.SPECIFIC, tracks.first()),
+        )
+
+        assertEquals(TvSubtitlePreferenceMode.AUTO, automatic.mode)
+        assertNull(automatic.trackId)
+        assertEquals(TvSubtitlePreferenceMode.OFF, disabled.mode)
+        assertNull(disabled.trackId)
+        assertEquals(TvSubtitlePreferenceMode.SPECIFIC, specific.mode)
+        assertEquals("zh", specific.trackId)
+    }
+
+    @Test
+    fun missingSpecificSubtitleTemporarilyFallsBackToAutoWithoutChangingPreference() {
+        val preference = TvTrackPreference(
+            language = "ja",
+            type = "default",
+            subtitleMode = TvSubtitlePreferenceMode.SPECIFIC.storageValue,
+        )
+
+        val selection = resolveTvSubtitleSelection(
+            tracks = listOf(track(id = "zh", languageCode = "zh", isDefault = true)),
+            preference = preference,
+        )
+
+        assertEquals(TvSubtitlePreferenceMode.AUTO, selection.mode)
+        assertNull(selection.trackId)
+        assertEquals("ja", preference.language)
     }
 }

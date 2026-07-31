@@ -67,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chee.videos.core.model.SubtitleTrackDto
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.ui.subtitleTrackDisplayLabel
@@ -81,6 +82,8 @@ private val TvLongFormSafeHorizontal = 64.dp
 private val TvLongFormSafeVertical = 40.dp
 private val TvLongFormPanelWidth = 440.dp
 private const val TvLongFormSeekCommitDelayMillis: Long = 300L
+private const val TvLongFormSubtitleAutoOptionId = "__tv_subtitle_auto__"
+private const val TvLongFormSubtitleOffOptionId = "__tv_subtitle_off__"
 
 internal data class TvLongFormEpisodeOption(
     val id: String,
@@ -133,13 +136,15 @@ internal fun TvLongFormPlaybackChrome(
     tvSeekStepSeconds: Int,
     subtitleTracks: List<SubtitleTrackDto>,
     selectedSubtitleTrackId: String?,
+    subtitlePreferenceMode: TvSubtitlePreferenceMode,
     audioTracks: List<LongFormAudioTrack>,
     selectedAudioTrackId: String?,
     seasons: List<TvLongFormSeasonOption>,
     currentEpisodeId: String?,
     onTogglePlayPause: () -> Unit,
+    onSetPlaybackIntent: (Boolean) -> Unit,
     onSeekTo: (Long) -> Unit,
-    onSelectSubtitleTrack: (String?) -> Unit,
+    onSelectSubtitleTrack: (TvSubtitlePreferenceMode, String?) -> Unit,
     onSelectAudioTrack: (String?) -> Unit,
     onSelectEpisode: (TvLongFormEpisodeOption) -> Unit,
     onPlayNextEpisode: (() -> Unit)?,
@@ -215,6 +220,14 @@ internal fun TvLongFormPlaybackChrome(
         )
     }
 
+    fun setPlaybackIntent(shouldPlay: Boolean) {
+        onSetPlaybackIntent(shouldPlay)
+        showCenterFeedback(
+            icon = if (shouldPlay) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+            text = if (shouldPlay) "继续播放" else "已暂停",
+        )
+    }
+
     fun performStepSeek(deltaMs: Long) {
         val previous = pendingStepSeek
         val anchor = previous?.anchorMs ?: positionMs.coerceAtLeast(0L)
@@ -274,6 +287,16 @@ internal fun TvLongFormPlaybackChrome(
 
     LaunchedEffect(mode) {
         onInteractionModeChanged(mode)
+    }
+
+    LaunchedEffect(blockingUiVisible) {
+        if (blockingUiVisible && mode != TvLongFormInteractionMode.Hidden) {
+            updateMode(TvLongFormInteractionMode.Hidden)
+        }
+    }
+
+    LaunchedEffect(mode, blockingUiVisible) {
+        if (blockingUiVisible) return@LaunchedEffect
         when (mode) {
             TvLongFormInteractionMode.Hidden -> rootFocusRequester.tryRequestFocus()
             TvLongFormInteractionMode.Controls -> {
@@ -321,12 +344,20 @@ internal fun TvLongFormPlaybackChrome(
                     return@onPreviewKeyEvent false
                 }
                 val keyCode = nativeEvent.keyCode
-                if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_PLAY ||
-                    keyCode == AndroidKeyEvent.KEYCODE_MEDIA_PAUSE ||
-                    keyCode == AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-                ) {
-                    togglePlayback()
-                    return@onPreviewKeyEvent true
+                when (resolveTvLongFormMediaPlaybackCommand(keyCode)) {
+                    TvLongFormMediaPlaybackCommand.Play -> {
+                        setPlaybackIntent(true)
+                        return@onPreviewKeyEvent true
+                    }
+                    TvLongFormMediaPlaybackCommand.Pause -> {
+                        setPlaybackIntent(false)
+                        return@onPreviewKeyEvent true
+                    }
+                    TvLongFormMediaPlaybackCommand.Toggle -> {
+                        togglePlayback()
+                        return@onPreviewKeyEvent true
+                    }
+                    null -> Unit
                 }
                 if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_REWIND) {
                     performStepSeek(-tvSeekStepSeconds.coerceAtLeast(1) * 1_000L)
@@ -472,6 +503,7 @@ internal fun TvLongFormPlaybackChrome(
             mode = mode,
             subtitleTracks = subtitleTracks,
             selectedSubtitleTrackId = selectedSubtitleTrackId,
+            subtitlePreferenceMode = subtitlePreferenceMode,
             audioTracks = audioTracks,
             selectedAudioTrackId = selectedAudioTrackId,
             seasons = seasons,
@@ -761,12 +793,13 @@ private fun TvLongFormRightPanel(
     mode: TvLongFormInteractionMode,
     subtitleTracks: List<SubtitleTrackDto>,
     selectedSubtitleTrackId: String?,
+    subtitlePreferenceMode: TvSubtitlePreferenceMode,
     audioTracks: List<LongFormAudioTrack>,
     selectedAudioTrackId: String?,
     seasons: List<TvLongFormSeasonOption>,
     selectedSeasonNumber: Int?,
     currentEpisodeId: String?,
-    onSelectSubtitleTrack: (String?) -> Unit,
+    onSelectSubtitleTrack: (TvSubtitlePreferenceMode, String?) -> Unit,
     onSelectAudioTrack: (String?) -> Unit,
     onSelectSeason: (Int) -> Unit,
     onSelectEpisode: (TvLongFormEpisodeOption) -> Unit,
@@ -800,6 +833,7 @@ private fun TvLongFormRightPanel(
                     TvLongFormInteractionMode.SubtitlePanel -> TvLongFormSubtitlePanel(
                         tracks = subtitleTracks,
                         selectedTrackId = selectedSubtitleTrackId,
+                        preferenceMode = subtitlePreferenceMode,
                         onSelect = onSelectSubtitleTrack,
                     )
                     TvLongFormInteractionMode.AudioPanel -> TvLongFormAudioPanel(
@@ -825,17 +859,43 @@ private fun TvLongFormRightPanel(
 private fun TvLongFormSubtitlePanel(
     tracks: List<SubtitleTrackDto>,
     selectedTrackId: String?,
-    onSelect: (String?) -> Unit,
+    preferenceMode: TvSubtitlePreferenceMode,
+    onSelect: (TvSubtitlePreferenceMode, String?) -> Unit,
 ) {
     Text("字幕", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-    val options = remember(tracks, selectedTrackId) {
+    val options = remember(tracks, selectedTrackId, preferenceMode) {
         listOf<TvChromePanelOption>(
-            TvChromePanelOption(null, "关闭字幕", "", selectedTrackId.isNullOrBlank()),
+            TvChromePanelOption(
+                TvLongFormSubtitleAutoOptionId,
+                "自动选择",
+                "跟随视频默认字幕",
+                preferenceMode == TvSubtitlePreferenceMode.AUTO,
+            ),
+            TvChromePanelOption(
+                TvLongFormSubtitleOffOptionId,
+                "关闭字幕",
+                "",
+                preferenceMode == TvSubtitlePreferenceMode.OFF,
+            ),
         ) + tracks.map {
-            TvChromePanelOption(it.id, subtitleTrackDisplayLabel(it), "", it.id == selectedTrackId)
+            TvChromePanelOption(
+                it.id,
+                subtitleTrackDisplayLabel(it),
+                "",
+                preferenceMode == TvSubtitlePreferenceMode.SPECIFIC && it.id == selectedTrackId,
+            )
         }
     }
-    TvLongFormOptionList(options = options, onSelect = { onSelect(it.id) })
+    TvLongFormOptionList(
+        options = options,
+        onSelect = { option ->
+            when (option.id) {
+                TvLongFormSubtitleAutoOptionId -> onSelect(TvSubtitlePreferenceMode.AUTO, null)
+                TvLongFormSubtitleOffOptionId -> onSelect(TvSubtitlePreferenceMode.OFF, null)
+                else -> onSelect(TvSubtitlePreferenceMode.SPECIFIC, option.id)
+            }
+        },
+    )
 }
 
 @Composable

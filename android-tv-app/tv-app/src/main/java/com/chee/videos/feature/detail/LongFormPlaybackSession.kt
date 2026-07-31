@@ -24,6 +24,16 @@ internal data class LongFormPlaybackSession(
         return copy(isPausedByUser = !isPausedByUser)
     }
 
+    fun setPlayIntent(shouldPlay: Boolean, canPlay: Boolean): LongFormPlaybackSession {
+        return if (shouldPlay) {
+            requestPlay(canPlay = canPlay)
+        } else if (hasStartedPlayback) {
+            copy(isPausedByUser = true)
+        } else {
+            this
+        }
+    }
+
     fun shouldShowPlayer(canPlay: Boolean): Boolean {
         return hasStartedPlayback && canPlay
     }

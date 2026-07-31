@@ -9,6 +9,7 @@ import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.util.UrlBuilder
 import com.google.gson.Gson
@@ -294,9 +295,14 @@ class AppPreferencesStore @Inject constructor(
     }
 
     private fun normalizeTvTrackPreference(preference: TvTrackPreference): TvTrackPreference? {
+        val normalizedSubtitleMode = preference.subtitleMode
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { raw -> TvSubtitlePreferenceMode.entries.any { it.storageValue == raw } }
         val normalized = TvTrackPreference(
             language = preference.language.trim(),
             type = preference.type.trim().lowercase(),
+            subtitleMode = normalizedSubtitleMode,
         )
         return normalized.takeUnless { it.isBlank() }
     }

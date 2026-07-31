@@ -37,4 +37,17 @@ class LongFormPlaybackSessionTest {
         assertFalse(session.shouldShowPlayer(canPlay = false))
         assertFalse(session.shouldResumeOnLifecycle())
     }
+
+    @Test
+    fun `explicit media play and pause intents are idempotent`() {
+        val playing = LongFormPlaybackSession().setPlayIntent(shouldPlay = true, canPlay = true)
+        val stillPlaying = playing.setPlayIntent(shouldPlay = true, canPlay = true)
+        val paused = stillPlaying.setPlayIntent(shouldPlay = false, canPlay = true)
+        val stillPaused = paused.setPlayIntent(shouldPlay = false, canPlay = true)
+
+        assertTrue(playing.hasStartedPlayback)
+        assertFalse(stillPlaying.isPausedByUser)
+        assertTrue(paused.isPausedByUser)
+        assertTrue(stillPaused.isPausedByUser)
+    }
 }

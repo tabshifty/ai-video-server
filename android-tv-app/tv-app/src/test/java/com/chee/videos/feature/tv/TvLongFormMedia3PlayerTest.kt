@@ -9,6 +9,55 @@ import org.junit.Test
 
 class TvLongFormMedia3PlayerTest {
     @Test
+    fun delayedMedia3EventsOnlyBelongToThePreparedIdentity() {
+        val prepared = TvLongFormMedia3EventIdentity(mediaId = "video-2", retryKey = 0)
+
+        assertTrue(isCurrentTvLongFormMedia3Event(prepared, prepared))
+        assertFalse(
+            isCurrentTvLongFormMedia3Event(
+                eventIdentity = TvLongFormMedia3EventIdentity(mediaId = "video-1", retryKey = 0),
+                preparedIdentity = prepared,
+            ),
+        )
+
+        val source = java.nio.file.Path.of(
+            "src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt",
+        ).toFile().readText()
+        val errorHandler = source.substringAfter("override fun onPlayerError(").substringBefore("player.addListener")
+        assertTrue(errorHandler.contains("!isCurrentTvLongFormMedia3Event(eventIdentity, preparedIdentity)"))
+        assertTrue(source.contains("onEnded: (TvLongFormMedia3EventIdentity) -> Unit"))
+        assertTrue(source.contains("latestOnEnded(eventIdentity)"))
+    }
+
+    @Test
+    fun mediaSessionUserRequestsAreReportedAsExplicitPlaybackIntent() {
+        val source = java.nio.file.Path.of(
+            "src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt",
+        ).toFile().readText()
+
+        assertTrue(source.contains("onPlaybackIntentChanged: (Boolean) -> Unit"))
+        assertTrue(source.contains("Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST"))
+        assertTrue(source.contains("latestOnPlaybackIntentChanged(playWhenReady)"))
+        assertTrue(source.contains("pendingInternalPlaybackIntent == playWhenReady"))
+        assertTrue(source.contains("applyInternalPlaybackIntent(shouldPlay)"))
+    }
+
+    @Test
+    fun playbackHostsFilterEndedEventsAgainstTheirCurrentIdentity() {
+        val single = java.nio.file.Path.of(
+            "src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt",
+        ).toFile().readText()
+        val series = java.nio.file.Path.of(
+            "src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt",
+        ).toFile().readText()
+
+        listOf(single, series).forEach { source ->
+            val endedHandler = source.substringAfter("onEnded = { eventIdentity ->").substringBefore("onSnapshotChanged")
+            assertTrue(endedHandler.contains("eventIdentity == currentPlaybackIdentity"))
+        }
+    }
+
+    @Test
     fun mediaSessionSeekCommandsUseTheConfiguredTvStep() {
         val source = java.nio.file.Path.of(
             "src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt",

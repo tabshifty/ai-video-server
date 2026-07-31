@@ -1,6 +1,7 @@
 package com.chee.videos.core.ui
 
 import com.chee.videos.core.model.SubtitleTrackDto
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.player.TvLongFormVlcMediaSpec
 import com.chee.videos.core.player.buildLongFormMedia
@@ -137,6 +138,9 @@ fun resolveSelectedSubtitleTrackByPreference(
     preference: TvTrackPreference?,
 ): SubtitleTrackDto? {
     val safePreference = preference ?: return null
+    if (TvSubtitlePreferenceMode.fromPreference(safePreference) != TvSubtitlePreferenceMode.SPECIFIC) {
+        return null
+    }
     val normalizedPreference = normalizeLongFormLanguageCode(safePreference.language)
     val typePreference = safePreference.type.trim().lowercase()
 
@@ -171,8 +175,45 @@ fun buildSubtitleTrackPreference(track: SubtitleTrackDto?): TvTrackPreference? {
     val safeTrack = track ?: return null
     val language = normalizeLongFormLanguageCode(safeTrack.languageCode)
     val type = subtitlePreferenceType(safeTrack)
-    val preference = TvTrackPreference(language = language, type = type)
+    val preference = TvTrackPreference(
+        language = language,
+        type = type,
+        subtitleMode = TvSubtitlePreferenceMode.SPECIFIC.storageValue,
+    )
     return preference.takeUnless { it.isBlank() }
+}
+
+data class TvSubtitleSelection(
+    val mode: TvSubtitlePreferenceMode,
+    val trackId: String? = null,
+)
+
+fun buildTvSubtitlePreference(
+    mode: TvSubtitlePreferenceMode,
+    track: SubtitleTrackDto? = null,
+): TvTrackPreference = when (mode) {
+    TvSubtitlePreferenceMode.AUTO,
+    TvSubtitlePreferenceMode.OFF,
+    -> TvTrackPreference(subtitleMode = mode.storageValue)
+
+    TvSubtitlePreferenceMode.SPECIFIC -> buildSubtitleTrackPreference(track)
+        ?: TvTrackPreference(subtitleMode = mode.storageValue)
+}
+
+fun resolveTvSubtitleSelection(
+    tracks: List<SubtitleTrackDto>,
+    preference: TvTrackPreference?,
+): TvSubtitleSelection {
+    val preferredMode = TvSubtitlePreferenceMode.fromPreference(preference)
+    if (preferredMode != TvSubtitlePreferenceMode.SPECIFIC) {
+        return TvSubtitleSelection(mode = preferredMode)
+    }
+    val track = resolveSelectedSubtitleTrackByPreference(tracks, preference)
+        ?: return TvSubtitleSelection(mode = TvSubtitlePreferenceMode.AUTO)
+    return TvSubtitleSelection(
+        mode = TvSubtitlePreferenceMode.SPECIFIC,
+        trackId = track.id,
+    )
 }
 
 private fun subtitlePreferenceType(track: SubtitleTrackDto): String {

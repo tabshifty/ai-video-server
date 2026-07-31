@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.chee.videos.core.model.ShortPlaybackMode
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.TvTrackPreference
 import com.chee.videos.core.testing.MainDispatcherRule
 import com.google.gson.Gson
@@ -80,8 +81,37 @@ class AppPreferencesStoreTest {
 
         assertNull(store.readTvSubtitlePreference())
 
-        store.saveTvSubtitlePreference(TvTrackPreference(language = " zh-CN ", type = "DEFAULT"))
-        assertEquals(TvTrackPreference(language = "zh-CN", type = "default"), store.readTvSubtitlePreference())
+        store.saveTvSubtitlePreference(
+            TvTrackPreference(
+                language = " zh-CN ",
+                type = "DEFAULT",
+                subtitleMode = TvSubtitlePreferenceMode.SPECIFIC.storageValue,
+            ),
+        )
+        assertEquals(
+            TvTrackPreference(
+                language = "zh-CN",
+                type = "default",
+                subtitleMode = TvSubtitlePreferenceMode.SPECIFIC.storageValue,
+            ),
+            store.readTvSubtitlePreference(),
+        )
+
+        store.saveTvSubtitlePreference(
+            TvTrackPreference(subtitleMode = TvSubtitlePreferenceMode.OFF.storageValue),
+        )
+        assertEquals(
+            TvTrackPreference(subtitleMode = TvSubtitlePreferenceMode.OFF.storageValue),
+            store.readTvSubtitlePreference(),
+        )
+
+        store.saveTvSubtitlePreference(
+            TvTrackPreference(subtitleMode = TvSubtitlePreferenceMode.AUTO.storageValue),
+        )
+        assertEquals(
+            TvTrackPreference(subtitleMode = TvSubtitlePreferenceMode.AUTO.storageValue),
+            store.readTvSubtitlePreference(),
+        )
 
         store.saveTvSubtitlePreference(TvTrackPreference())
         assertNull(store.readTvSubtitlePreference())

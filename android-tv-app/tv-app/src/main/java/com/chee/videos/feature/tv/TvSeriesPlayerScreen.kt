@@ -25,15 +25,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.ui.KeepScreenOnEffect
 import com.chee.videos.core.ui.LongFormAudioTrack
 import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvPageLoadingState
 import com.chee.videos.core.ui.buildAudioTrackPreference
 import com.chee.videos.core.ui.buildTvLongFormTitleOverlayData
-import com.chee.videos.core.ui.buildSubtitleTrackPreference
 import com.chee.videos.core.ui.resolveAudioSelectionOnTrackLoad
-import com.chee.videos.core.ui.resolveSubtitleSelectionOnTrackLoad
+import com.chee.videos.core.ui.resolveTvSubtitleSelection
 import com.chee.videos.feature.detail.LongFormPlaybackSession
 import kotlinx.coroutines.delay
 
@@ -108,6 +108,9 @@ fun TvSeriesPlayerScreen(
     var hasStartedPlayback by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable(uiState.currentVideoId) { mutableStateOf(false) }
     var selectedSubtitleTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
+    var subtitlePreferenceMode by rememberSaveable(uiState.currentVideoId) {
+        mutableStateOf(TvSubtitlePreferenceMode.AUTO)
+    }
     var selectedAudioTrackId by rememberSaveable(uiState.currentVideoId) { mutableStateOf<String?>(null) }
     var media3AudioTracks by remember(uiState.currentVideoId) { mutableStateOf(emptyList<LongFormAudioTrack>()) }
     var isPlayerActuallyPlaying by remember(uiState.currentVideoId) { mutableStateOf(false) }
@@ -135,6 +138,7 @@ fun TvSeriesPlayerScreen(
     var resumePromptLastPositionMs by remember(uiState.currentVideoId) { mutableStateOf(0L) }
     var resumePromptDismissed by remember(uiState.currentVideoId) { mutableStateOf(false) }
     var lastAutoplaySwitchedVideoId by remember { mutableStateOf("") }
+    var deferredPlaybackEndedVideoId by remember(uiState.currentVideoId) { mutableStateOf("") }
 
     val titleOverlayData = remember(
         series.title,
@@ -181,21 +185,21 @@ fun TvSeriesPlayerScreen(
     val hasNextEpisode = nextEpisodeRef != null
     val remainingMs = (screenDurationMs - screenPositionMs).coerceAtLeast(0L)
     val remainingSeconds = autoplayCountdownTickRemaining(remainingMs)
-    val shouldShowAutoplayPromptCard = shouldShowAutoplayPromptCard(
-        AutoplayPromptGuardInput(
-            isPlaying = isPlayerActuallyPlaying,
-            autoplayEnabled = uiState.autoplayEnabled,
-            hasNextEpisode = hasNextEpisode,
-            isPlayerError = playerErrorMessage != null,
-            isSelectorVisible = uiState.selectorVisible,
-            isBackConfirmVisible = false,
-            isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
-            isLoading = uiState.loading,
-            isCanceledForCurrentEpisode = uiState.autoplayCanceledForCurrentEpisode,
-            remainingMs = remainingMs,
-            durationMs = screenDurationMs,
-        ),
+    val autoplayGuardInput = AutoplayPromptGuardInput(
+        isPlaying = isPlayerActuallyPlaying,
+        autoplayEnabled = uiState.autoplayEnabled,
+        hasNextEpisode = hasNextEpisode,
+        isPlayerError = playerErrorMessage != null,
+        isSelectorVisible = uiState.selectorVisible,
+        isBackConfirmVisible = false,
+        isEndOverlayVisible = uiState.pendingEndOverlayKind != null,
+        isLoading = uiState.loading,
+        isCanceledForCurrentEpisode = uiState.autoplayCanceledForCurrentEpisode,
+        remainingMs = remainingMs,
+        durationMs = screenDurationMs,
     )
+    val shouldShowAutoplayPromptCard = shouldShowAutoplayPromptCard(autoplayGuardInput)
+    val shouldSuspendForAutoplayInteraction = shouldSuspendPlaybackForAutoplayInteraction(autoplayGuardInput)
 
     val playbackSession = remember(hasStartedPlayback, isPausedByUser) {
         LongFormPlaybackSession(
@@ -277,6 +281,11 @@ fun TvSeriesPlayerScreen(
         if (!shouldHandlePlaybackEnded(state.currentVideoId, lastAutoplaySwitchedVideoId)) {
             return
         }
+        if (shouldDeferTvSeriesPlaybackEnded(playbackSession.isPausedByUser, state.selectorVisible)) {
+            deferredPlaybackEndedVideoId = state.currentVideoId
+            return
+        }
+        deferredPlaybackEndedVideoId = ""
         val hasNext = state.hasNextPlayableEpisode()
         when {
             state.autoplayEnabled && !state.autoplayCanceledForCurrentEpisode && hasNext -> advanceFromAutoplay()
@@ -288,6 +297,20 @@ fun TvSeriesPlayerScreen(
                 reportCurrentEpisodeHistory(completedOverride = true)
                 viewModel.showEndOverlay(TvEndOverlayKind.SERIES_FINISHED)
             }
+        }
+    }
+
+    LaunchedEffect(
+        deferredPlaybackEndedVideoId,
+        uiState.currentVideoId,
+        playbackSession.isPausedByUser,
+        uiState.selectorVisible,
+    ) {
+        if (
+            deferredPlaybackEndedVideoId == uiState.currentVideoId &&
+            !shouldDeferTvSeriesPlaybackEnded(playbackSession.isPausedByUser, uiState.selectorVisible)
+        ) {
+            handlePlaybackEnded()
         }
     }
 
@@ -307,6 +330,10 @@ fun TvSeriesPlayerScreen(
     }
 
     LaunchedEffect(uiState.currentVideoId) {
+        lastAutoplaySwitchedVideoId = resolveAutoplaySwitchGuardAfterVideoChanged(
+            currentVideoId = uiState.currentVideoId,
+            lastAutoplaySwitchedVideoId = lastAutoplaySwitchedVideoId,
+        )
         if (lastHistoryVideoId.isNotBlank() && lastHistoryVideoId != uiState.currentVideoId) {
             reportTvSeriesMedia3History(
                 viewModel = viewModel,
@@ -337,13 +364,13 @@ fun TvSeriesPlayerScreen(
         }
     }
 
-    LaunchedEffect(uiState.currentVideoId, uiState.selectedSubtitleTrackId, currentEpisode?.subtitleTracks, hasStartedPlayback) {
-        selectedSubtitleTrackId = resolveTvSubtitleSelectionOnTrackLoad(
-            currentSelection = selectedSubtitleTrackId,
-            storedSelection = uiState.selectedSubtitleTrackId,
+    LaunchedEffect(uiState.currentVideoId, uiState.selectedSubtitlePreference, currentEpisode?.subtitleTracks) {
+        val selection = resolveTvSubtitleSelection(
             tracks = currentEpisode?.subtitleTracks.orEmpty(),
-            hasStartedPlayback = hasStartedPlayback,
+            preference = uiState.selectedSubtitlePreference,
         )
+        subtitlePreferenceMode = selection.mode
+        selectedSubtitleTrackId = selection.trackId
     }
 
     LaunchedEffect(uiState.currentVideoId, uiState.selectedAudioTrackId) {
@@ -371,6 +398,7 @@ fun TvSeriesPlayerScreen(
 
     val playIntent = playbackSession.hasStartedPlayback &&
         !playbackSession.isPausedByUser &&
+        !shouldSuspendForAutoplayInteraction &&
         uiState.pendingEndOverlayKind == null
     LaunchedEffect(playbackStatus, playIntent, hasRenderedFirstFrame, routeRetryNonce) {
         loadingFeedback = TvLongFormLoadingFeedback.Hidden
@@ -508,6 +536,7 @@ fun TvSeriesPlayerScreen(
                     outputSurface = playbackRoute.outputSurface,
                     subtitleConfigurations = media3SubtitleConfigurations,
                     selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
+                    subtitlePreferenceMode = subtitlePreferenceMode,
                     selectedAudioTrackId = selectedAudioTrackId,
                     interactionMode = interactionMode,
                     modifier = Modifier.fillMaxSize(),
@@ -556,7 +585,11 @@ fun TvSeriesPlayerScreen(
                             }
                         }
                     },
-                    onEnded = ::handlePlaybackEnded,
+                    onEnded = { eventIdentity ->
+                        if (eventIdentity == currentPlaybackIdentity) {
+                            handlePlaybackEnded()
+                        }
+                    },
                     onSnapshotChanged = { snapshot ->
                         media3Snapshot = snapshot
                         screenPositionMs = snapshot.positionMs
@@ -571,6 +604,9 @@ fun TvSeriesPlayerScreen(
                     onLifecyclePaused = {
                         isPausedByUser = true
                         isPlayerActuallyPlaying = false
+                    },
+                    onPlaybackIntentChanged = { shouldPlay ->
+                        updatePlaybackSession(playbackSession.setPlayIntent(shouldPlay = shouldPlay, canPlay = canPlay))
                     },
                     onPlaybackStatusChanged = { status ->
                         playbackStatus = status
@@ -600,6 +636,7 @@ fun TvSeriesPlayerScreen(
                         subtitleTracks = currentEpisode.subtitleTracks
                             .filter { it.available && it.url.isNotBlank() && !it.isEmbedded },
                         selectedSubtitleTrackId = normalizeTvSubtitleSelection(selectedSubtitleTrackId),
+                        subtitlePreferenceMode = subtitlePreferenceMode,
                         audioTracks = media3AudioTracks,
                         selectedAudioTrackId = selectedAudioTrackId?.takeIf { it.isNotBlank() },
                         seasons = playbackSeasons,
@@ -607,13 +644,19 @@ fun TvSeriesPlayerScreen(
                         onTogglePlayPause = {
                             updatePlaybackSession(playbackSession.togglePlayPause(canPlay = canPlay))
                         },
+                        onSetPlaybackIntent = { shouldPlay ->
+                            updatePlaybackSession(
+                                playbackSession.setPlayIntent(shouldPlay = shouldPlay, canPlay = canPlay),
+                            )
+                        },
                         onSeekTo = { targetMs ->
                             media3SeekPositionMs = targetMs
                             media3SeekRequestKey += 1
                         },
-                        onSelectSubtitleTrack = { trackId ->
-                            selectedSubtitleTrackId = trackId ?: ""
-                            viewModel.selectSubtitleTrack(trackId)
+                        onSelectSubtitleTrack = { mode, trackId ->
+                            subtitlePreferenceMode = mode
+                            selectedSubtitleTrackId = trackId
+                            viewModel.selectSubtitleTrack(mode, trackId)
                         },
                         onSelectAudioTrack = { trackId ->
                             selectedAudioTrackId = trackId ?: ""
@@ -778,27 +821,6 @@ private fun TvSeriesPlayerUiState.nextEpisodeRef(): TvNextEpisodeRef? {
         series = currentSeries,
         currentSeasonNumber = selectedSeasonNumber,
         currentEpisodeNumber = selectedEpisodeNumber,
-    )
-}
-
-private fun resolveTvSubtitleSelectionOnTrackLoad(
-    currentSelection: String?,
-    storedSelection: String?,
-    tracks: List<com.chee.videos.core.model.SubtitleTrackDto>,
-    hasStartedPlayback: Boolean,
-): String? {
-    val current = normalizeTvSubtitleSelection(currentSelection)
-    if (hasStartedPlayback && !current.isNullOrBlank() && tracks.any { it.id == current }) {
-        return current
-    }
-    val stored = normalizeTvSubtitleSelection(storedSelection)
-    if (!stored.isNullOrBlank() && tracks.any { it.id == stored }) {
-        return stored
-    }
-    return resolveSubtitleSelectionOnTrackLoad(
-        currentSelection = current,
-        tracks = tracks,
-        hasStartedPlayback = hasStartedPlayback,
     )
 }
 
