@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-07-31 15:57 +0800
+- 进度：ED2K 下载工作台与 aMule 已从唯一家用部署机完成退役。代码提交 `3c8fdd6` 已推送 `deploy/master`，远端前端构建、Go 编译、签名、`0035` 迁移和 launchd 重启成功；随后停止并移除 `com.aivideo.amuled`，删除 aMule 应用、用户配置、两个 LaunchAgent 文件、日志、ED2K 暂存目录及 `.env` 中全部 `ED2K_*`/`AMULE*` 键，并通过 MacPorts `--follow-dependencies` 卸载 aMule 及不再被引用的依赖、重置 `org.amule.aMule` TCC 记录。已入媒体库文件未处理。
+- 影响文件：本次收尾仅追加 `plan.md`；远端清理目标为 `~/deploy/aMule.app`、`~/.aMule`、`~/Library/LaunchAgents/com.aivideo.amuled.plist*`、`~/Library/Logs/ai-video-server/amuled*.log`、`/Volumes/large/ai-video-server/storage/ed2k-downloads`、`~/deploy/ed2k-downloads-local`、部署 `.env` 的 ED2K/aMule 键及 MacPorts aMule 安装。既有未跟踪 `docs/examples/115LocalNatManager/` 未纳入。
+- 验证：部署钩子 `/healthz` 通过；收尾复验 `/healthz` 与 `/admin/toolbox/ed2k` 均返回 200，server/worker 均为 running，原下载工作台三条 GET/POST API 均返回 404；`ed2k_download_tasks` 表仍存在且为 0 行；aMule LaunchAgent、`amuled`/`amulecmd` 进程与命令、MacPorts aMule 包、上述文件/目录、日志及环境键全部不存在。
+
 ## 2026-07-31 15:52 +0800
 - 进度：完成 ED2K 下载工作台代码与部署定义退役。管理端只保留 ED2K 链接生成器，已删除下载工作台页面、路由、API 和专属 helper；Go 侧已删除下载 Handler/Repository/Model、Asynq 下载及 server.met 刷新处理、运行配置与构造依赖；删除两个执行器脚本和 aMule LaunchAgent 模板，家用部署文档与环境示例不再包含安装配置。新增 `0035` 清空任务历史但保留空表，历史迁移与 ADR 保留，当前术语表删除失效状态机词条并记录退役边界。
 - 影响文件：管理端 `admin-web/src` 相关入口/API/测试，后端 `main.go`、`internal/config`、`internal/handlers`、`internal/models`、`internal/queue`、`internal/repository`，`.env.example`、`migrations/0035_retire_ed2k_download.*.sql`、`scripts/`、`docs/家用部署机.md`、`docs/adr/0015-ed2k-serverlist-periodic-refresh.md`、`CONTEXT.md`、`plan.md`；Android 工程未修改，既有未跟踪 `docs/examples/115LocalNatManager/` 未纳入。
