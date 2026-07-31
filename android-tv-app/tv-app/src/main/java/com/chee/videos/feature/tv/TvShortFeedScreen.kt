@@ -219,9 +219,8 @@ fun TvShortFeedScreen(
         diagnostics.attach(sharedPlayer)
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
-                // ExoPlayer 实际是 STATE_READY 先于 onRenderedFirstFrame 触发，故 READY 分支通常是
-                // 清封面的实际主触发；此回调作为冗余确认兜底。仅当首帧属于当前条目时才写，防止切条后
-                // 旧条目的迟到首帧误设 renderedVideoId（卡在 stale 值或过早摘掉新条目封面）。
+                // 只有真实首帧可撤除封面；STATE_READY 只代表播放器就绪，画面仍可能是黑色 shutter。
+                // 仅当首帧属于当前条目时才写，避免切条后旧条目的迟到事件摘掉新条目封面。
                 val renderedFor = sharedPlayer.currentMediaItem?.mediaId
                 if (renderedFor != null && renderedFor == latestCurrentVideoId &&
                     renderedVideoId != latestCurrentVideoId
@@ -244,16 +243,6 @@ fun TvShortFeedScreen(
                         hasEndedAtCurrentVideo = false
                     } else {
                         hasEndedAtCurrentVideo = true
-                    }
-                } else if (playbackState == Player.STATE_READY) {
-                    // 主清封面触发：短视频 ProgressiveMediaSource 下 STATE_READY 意味着解码器就绪、
-                    // 首帧即将/已经渲染（实际先于 onRenderedFirstFrame）。用同款 mediaId 守卫 + 已清则跳过，
-                    // 避免封面永久冻结；BUFFERING/IDLE 不触发，避免误杀慢加载。
-                    val readyFor = sharedPlayer.currentMediaItem?.mediaId
-                    if (readyFor != null && readyFor == latestCurrentVideoId &&
-                        renderedVideoId != latestCurrentVideoId
-                    ) {
-                        renderedVideoId = readyFor
                     }
                 }
             }

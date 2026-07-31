@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-01 01:55 +0800
+- 进度：完成 TV 本地短视频封面到视频黑帧修复的最终验证与提交范围审查。最终只纳入首帧撤封面逻辑、对应源码规格测试、TV 版本 `0.1.144(144)`、长期上下文和本任务计划记录；手机端与既有未跟踪 `docs/examples/` 均未修改、未纳入。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过，643 项单测 0 失败/0 错误并生成 Debug APK；`git diff --check` 通过；本次 Markdown、中文与 Kotlin/Gradle 文件乱码扫描无命中；差异审查确认 `STATE_READY` 不再撤除封面，真实首帧和 mediaId 守卫保持有效。
+
+## 2026-08-01 01:54 +0800
+- 进度：完成 TV 短视频封面黑帧的最小生产修复。`TvShortFeedScreen` 已删除 `STATE_READY` 提前写入 `renderedVideoId` 的分支，封面现在只在当前媒体真实 `onRenderedFirstFrame` 到达后按既有 150ms 动画淡出；mediaId 防迟到事件、封面预热、加载指示、错误与自动连播语义不变。TV 版本更新为 `versionCode 144` / `versionName 0.1.144`，`CONTEXT.md` 新增“TV 短视频封面撤除门槛”。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
+- 验证：定向 `TvShortFeedScreenSpecTest` 4 项全部通过；待执行 TV 全量单测、`:tv-app:assembleDebug` 与静态检查。
+
+## 2026-08-01 01:54 +0800
+- 进度：完成 TV 短视频封面首帧门槛红灯验证。新增 `shortFeedPosterWaitsForCurrentVideoFirstFrame`，锁定只有当前媒体的 `onRenderedFirstFrame` 可以撤除封面，并禁止 `STATE_READY` 分支写入 `renderedVideoId`；定向测试按预期 4 项中 1 项失败，失败点正是现有 READY 提前清封面逻辑。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`plan.md`。
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvShortFeedScreenSpecTest` 按预期失败，`shortFeedPosterWaitsForCurrentVideoFirstFrame` 命中红灯；开始最小生产修复。
+
+## 2026-08-01 01:51 +0800
+- 进度：开始修复 TV 本地短视频从封面切换到视频时短暂黑屏的问题。代码核对确认 `TvShortFeedScreen` 在真实首帧之前收到 `STATE_READY` 就提前写入 `renderedVideoId`、触发封面淡出，与 `CONTEXT.md` 已定义的“首帧由 `onRenderedFirstFrame` 渲染后封面交叉淡出”契约冲突；本轮收紧为仅当前媒体的真实首帧可撤除封面，保留 mediaId 防迟到事件串条。
+- 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；不修改手机端及既有未跟踪 `docs/examples/`。
+- 验证：待先新增首帧门槛源码规格测试并确认红灯，再执行定向测试、TV 全量单测、`:tv-app:assembleDebug`、`git diff --check`、乱码扫描与提交范围检查。
+
 ## 2026-07-31 23:37 +0800
 - 进度：完成 TV 长视频播放器复审缺陷修复与最终验证。结束回调额外携带 `mediaId + retryKey` 并由单片/剧集宿主二次过滤，关闭切集换源竞态；阻塞层出现时 Chrome 收回到隐藏模式，消失后恢复根焦点。最终提交只纳入长视频播放器状态、字幕偏好、Media3/Chrome、剧集连播、相关测试、TV 版本和技术文档，不纳入既有未跟踪 `docs/examples/`。
 - 影响文件：`CONTEXT.md`、`plan.md`、`android-tv-app/tv-app/build.gradle.kts`、TV 长视频相关 `core/{data,model,ui}`、`feature/detail/LongFormPlaybackSession.kt`、`feature/tv/TvLongForm*`、`TvSeriesAutoplay.kt`、`TvSeriesPlayerScreen.kt`、`TvSeriesPlayerViewModel.kt` 及对应 8 个测试文件。

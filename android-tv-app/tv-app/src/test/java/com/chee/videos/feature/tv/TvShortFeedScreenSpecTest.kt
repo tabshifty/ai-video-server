@@ -76,4 +76,26 @@ class TvShortFeedScreenSpecTest {
             assertTrue("TV 本地短视频页必须包含 $line", source.contains(line))
         }
     }
+
+    @Test
+    fun shortFeedPosterWaitsForCurrentVideoFirstFrame() {
+        val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt").readText()
+        val firstFrameBlock = source
+            .substringAfter("override fun onRenderedFirstFrame()")
+            .substringBefore("override fun onIsPlayingChanged")
+        val playbackStateBlock = source
+            .substringAfter("override fun onPlaybackStateChanged(playbackState: Int)")
+            .substringBefore("override fun onPlayerError")
+
+        assertTrue(
+            "TV 短视频封面只能在当前媒体真实首帧到达后撤除",
+            firstFrameBlock.contains("renderedFor == latestCurrentVideoId") &&
+                firstFrameBlock.contains("renderedVideoId = renderedFor"),
+        )
+        assertFalse(
+            "STATE_READY 早于画面首帧，不能提前写 renderedVideoId 导致封面后露出黑帧",
+            playbackStateBlock.contains("Player.STATE_READY") &&
+                playbackStateBlock.contains("renderedVideoId ="),
+        )
+    }
 }

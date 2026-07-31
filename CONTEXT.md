@@ -685,6 +685,7 @@
 - `TV 短视频补货排重接口`：TV 短视频信息流的拉取与补货统一走 `fetchShortFeed(pageSize, excludeIds)`；`excludeIds` 传当前进入会话里已经出现过的视频 ID，服务端尽量排除这些内容，候选池不足时客户端允许接受重复结果继续补货，不把偶发重复视为协议错误。
 - `TV 短视频返回后焦点回入口`：用户从短视频页按 `BACK` 返回首页后，焦点应稳定回到左侧菜单里的 `短视频` 入口按钮，而不是回到内容区上一次残留的焦点位置。返回语义以“回到来处”为先。
 - `TV 短视频封面占位`：TV 短视频页在切条、重试或 ON_RESUME 恢复等“等待首帧”期间，把当前条目的视频缩略图（`FeedVideoDto.thumbnailPath` → `/api/v1/videos/:id/thumbnail`，公开端点，无需鉴权）作为封面盖在 PlayerView 之上，消除切条瞬间的黑屏 loading；首帧由 `onRenderedFirstFrame` 渲染后封面交叉淡出。封面显隐统一由 `renderedVideoId != currentVideoId && playbackErrorMessage == null` 单一判定覆盖切条、重试、恢复等所有等首帧场景，不缓存“已渲染过首帧的条目集合”——切回旧条目按重新等首帧处理，封面重新显示。封面用 `ContentScale.Fit` 与 PlayerView `RESIZE_MODE_FIT` 几何对齐、两侧留黑一致，避免首帧缩放跳变（遵循 [[TV 短视频固定完整显示]]）；[[TV 短视频保留极简加载指示]] 的转圈仍保留并叠在封面之上，区分“加载中”与“暂停/卡住”。封面通过 `AnimatedVisibility` 淡入淡出（约 150ms）并与首帧交叉淡入无黑缝；对当前条 ±1~2 条预热 Coil 缓存，让相邻切条瞬时命中封面，首次未命中时接受短暂黑屏（首屏本就有整页 loading）。该口径只作用于 TV 短视频正常播放/切条主路径，首屏 loading/错误/空态与单条播放失败态不显示封面；实现留在 `feature/tv` 包内独立维护，不复用手机端 `feature/shorts` 等源码（遵循 [[TV 短视频 TV 端独立维护]]）。
+- `TV 短视频封面撤除门槛`：播放器的 `STATE_READY` 只表示媒体已经具备播放条件，不表示视频帧已经显示到电视画面；TV 本地短视频封面只能在当前媒体的 `onRenderedFirstFrame` 到达后撤除，并继续以当前视频 ID 拦截迟到事件。若首帧尚未到达，封面和极简加载指示应继续承接，不允许用 READY 或固定超时提前露出 PlayerView 的黑色 shutter。
 
 ## TV 首页术语
 - `18+`：面向 TV 端显示的成人内容入口。代码、接口参数和存储内部仍使用 `av`，TV 界面文案不得显示为 `AV`。
