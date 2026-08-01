@@ -101,7 +101,7 @@ func buildTranscodeVideoArgs(inputPath, outputPath string, profile TranscodeProf
 		"-fflags", "+discardcorrupt",
 		"-err_detect", "ignore_err",
 		"-i", inputPath,
-		"-map", "0:v:0",
+		"-map", "0:V:0",
 		"-map", "0:a:0?",
 	}
 	if scaleFilter := buildMaxDimensionScaleFilter(options.SourceWidth, options.SourceHeight, options.MaxVideoDimension); scaleFilter != "" {

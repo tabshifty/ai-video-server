@@ -1141,3 +1141,6 @@
 - `IPTV 视觉收口`：选中频道行前景（文字/台标/「播放中」角标）由白色改 `AppChrome.Canvas`——金底白字对比度仅约 2.2:1，远低于 7:1 护栏，改后约 9.5:1；频道列表面板 `0xE80B0F17` 冷色改 `CanvasRaised`、非对称圆角 18dp 回归 `RadiusDp` 8dp（该写法曾逃逸 `TvShapeAuditTest` 的对称正则）；顶部提示浮层 `0x8C0D1016` 改 `SurfaceMuted`、标题白字改 `TextPrimary`；台标底色白纱 `White 0.08f` 改 `Surface`；分组名（外部 M3U 数据、长度不可控）补单行省略。
 - `投放页状态屏`：`TvRemotePlaybackScreen` 的加载/错误两处裸白字 `Text` 改共享 `TvPageLoadingState`/`TvErrorState`（错误态带「返回」动作）；播放器覆盖层内的白色前景仍属「覆盖在任意视频画面上」的既有豁免，不动。`TvShellApp` 退出确认提示 `0xCC121212` 冷灰改 `SurfaceMuted` + `TextPrimary`。配对页错误行加 `Warning` 图标与三行省略，状态行补三行省略。
 - `视觉收口明确不做`：不抽共享海报图片组件（各屏占位形态差异是既有设计、海报墙 shared-element 修饰器透传风险高、crossfade 已全局关闭后收益不成立）；不删 `TvFeaturedPoster` 与 `TvPosterArtwork` 的重复（前者是 `TvFeaturedHeroMotionSpecTest` 函数体切片的结束锚点，删除即破坏该测试的审计机制）；连接页行内扫描 loading 保持本地紧凑形态（`ConnectionScreenLoadingSpecTest` 与 `TvPairingConnectionExperienceTest` 锁定的既有决策，不升级为共享状态组件）。
+
+## FFmpeg 转码流选择约定
+- `转码真实视频流选择`：转码命令的视频映射必须使用 `-map 0:V:0`（大写 `V`），而非 `-map 0:v:0`。前者只匹配非 attached picture、封面图和视频缩略图的真实视频流，避免 ASF/WMV 等“封面 MJPEG 在前、正片视频在后”的文件把封面编码为 MP4 主视频并在写入输出头时失败；音频继续使用首条可选流 `-map 0:a:0?`。

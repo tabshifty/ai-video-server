@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-01 15:29 +0800
+- 进度：完成转码封面流误选修复，提交范围只纳入 `pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md` 与本次新增的 `plan.md` 记录；既有未跟踪 `docs/examples/` 保持原状，不纳入。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：新增断言已完成红绿验证；`go test ./pkg/ffmpeg -count=1 -v`、受影响 `internal/services` 测试、临时封面流实测、`go vet ./...`、`git diff --check` 与 `gofmt -d` 均通过；本次文件的乱码扫描无命中。`go test ./... -count=1` 仅失败于本任务无关的 TV APK versionCode 断言（121 vs 当前 144）。
+
+## 2026-08-01 15:28 +0800
+- 进度：完成转码封面流误选修复的验证收口，准备提交。全量 Go 测试唯一失败为既有 `TestParseTVAPKMetadataParsesReleaseAPK`：测试期望 release APK `version_code=121`，当前 TV 构建产物为 144；该测试不涉及 FFmpeg 且本轮未改 Android/TV 文件，保持原状不纳入修复。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 不纳入。
+- 验证：`go test ./pkg/ffmpeg -count=1 -v` 通过；`go test ./internal/services -run 'Test.*Transcode|Test.*Probe|Test.*Playback' -count=1 -v` 通过；临时封面流媒体实测通过；`go vet ./...` 通过；`go test ./... -count=1` 仅上述既有断言失败。待执行 `git diff --check`、乱码扫描、提交范围审查与提交。
+
+## 2026-08-01 15:27 +0800
+- 进度：完成最小修复：`buildTranscodeVideoArgs` 的视频流映射由 `0:v:0` 改为 `0:V:0`，两个 HEVC/AVC 参数构建测试同步锁定该值并确认红灯后转绿。使用临时 MP4 构造出一条 H.264 正片流和一条 `attached_pic=1` MJPEG 封面流，实际执行 `-map '0:V:0'` + VideoToolbox 编码后，输出仅含 320×240 H.264 正片流；原始失败 WMV 当前不在工作区，无法直接重跑。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`；不修改 Android 与既有未跟踪 `docs/examples/`。
+- 验证：新增用例先按预期失败，随后 `go test ./pkg/ffmpeg -count=1 -v` 与 `go test ./internal/services -run 'Test.*Transcode|Test.*Probe|Test.*Playback' -count=1 -v` 通过；待执行全量 Go 测试、vet、静态检查与提交范围审查。
+
+## 2026-08-01 15:23 +0800
+- 进度：开始修复含内嵌封面图的视频转码失败。错误样本的 ASF/WMV 输入同时含 `mjpeg` attached picture（`0:0`）与实际 `wmv3` 视频（`0:1`）；现有 `-map 0:v:0` 选中封面图，导致 MP4 输出头写入失败。计划改用 FFmpeg 的真实视频流选择器，并新增参数构建单测锁定“不选 attached picture”的约定。
+- 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`；不修改 Android 与既有未跟踪 `docs/examples/`。
+- 验证：待先执行新增用例确认红灯，再跑 `go test ./pkg/ffmpeg`、受影响服务测试、`go test ./... -count=1`、`go vet ./...`、静态检查及提交范围审查。
+
 ## 2026-08-01 14:03 +0800
 - 进度：完成管理端上传视频页「标题替换」功能（规则已与用户逐项确认）。全局标题输入框旁新增 switch（默认关闭）：开启后禁用输入框并提示「已启用标题替换，使用各自文件名」，批量上传时每个文件以各自文件名清洗结果作为标题；关闭时保持统一标题（可留空）原行为。清洗规则：去末尾常见视频扩展名（大小写不敏感）→ 全局替换 `www.98t.la@`（`/www\.98t\.la@/gi`）→ 收尾清理（连续空白/`.-_` 合并、去首尾点号空白）→ 空结果回退为去扩展名文件名。
 - 影响文件：`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/videoUpload.filename.js`（新增）、`admin-web/src/views/videoUpload.filename.spec.js`（新增）、`CONTEXT.md`、`plan.md`。未改后端、Android 与 App 版本号。
