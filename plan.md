@@ -3,6 +3,11 @@
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
 ## 2026-08-01 15:31 +0800
+- 进度：转码封面流误选修复已成功部署到家用部署机。`deploy/master` 从 `093580c` 推进至 `9f76c26`（包含修复提交 `41d3d86`）；远端 hook 完成 Go build、稳定签名、migration、server/worker `launchctl kickstart`，`/healthz` 探活成功。部署后的只读核验确认工作树为 `9f76c26`、server/worker 均为 running 且 last exit code 为 0。
+- 影响文件：`plan.md`；部署机数据层保持独立、未重启。远端 GitHub mirror 同步失败但为 hook 约定的 non-fatal 状态，不影响本次部署。
+- 验证：SSH 部署前 `healthz` 正常；`git push deploy master` hook 输出 `/healthz OK — deploy succeeded`；部署后以 bare repo + work-tree 方式确认提交，并核对两个 launchd service 与 `curl http://127.0.0.1:8080/healthz`。
+
+## 2026-08-01 15:31 +0800
 - 进度：开始将提交 `41d3d86 修复转码时误选封面视频流` 推送至家用部署机。`deploy` remote 已配置为 `chee@192.168.1.24:/Users/chee/deploy/ai-video-server/repo.git`；变更位于 `pkg/`，命中部署 hook 的 Go 构建、稳定签名、迁移、server/worker 硬重启与 `/healthz` 探活分桶。
 - 影响文件：`plan.md`；部署目标为家用部署机的 Go server/worker，数据层保持独立、不重启。
 - 验证：待执行 SSH 连通性与部署仓库只读预检、`git push deploy master` 的 hook 输出及部署后服务状态/健康检查。
