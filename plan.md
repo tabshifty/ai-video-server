@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-01 18:56 +0800
+- 进度：开始将管理端视频标签远程候选修复部署至家用部署机。部署机当前 `master` 为 `00c49c2`、`/healthz` 正常；本地修复提交为 `c2042da`，仅命中 `admin-web/*` 分桶，预期 hook 重建前端静态产物，不重启 Go server/worker，数据层保持独立。
+- 影响文件：`plan.md`；部署目标为 `deploy` remote 的家用部署机，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：已通过 SSH、远端 bare repo SHA 与部署前 `/healthz` 预检；待提交本条部署记录、`git push deploy master` hook 输出、部署后远端 SHA、管理端产物与健康检查核验。
+
 ## 2026-08-01 18:55 +0800
 - 进度：完成管理端 PC 视频列表详情标签远程候选修复的提交前核验。只纳入 `VideoList.vue` 的标签候选加载、对应页面契约、长期接口约定和本次计划记录；既有未跟踪 `docs/examples/` 不纳入。
 - 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。
