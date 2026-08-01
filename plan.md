@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-01 18:58 +0800
+- 进度：管理端视频标签远程候选修复已部署到家用部署机。`deploy/master` 从 `00c49c2` 推进至 `455f56f`（包含功能修复提交 `c2042da`）；hook 识别为前端分桶，完成 `npm ci && npm run build` 与静态资源更新，未重启 Go server/worker，数据层保持独立。
+- 影响文件：`plan.md`；部署机当前 bare 仓库和 `work` 工作树均为 `455f56f`，`current/admin-web-dist/index.html` 存在。GitHub mirror 同步失败为 hook 约定的 non-fatal 状态，不影响本次部署。
+- 验证：部署前 SSH、远端 SHA 和 `/healthz` 通过；push hook 显示 2372 个模块构建成功并 `frontend updated`；部署后以 `--git-dir` / `--work-tree` 核对 bare 与工作树 SHA 一致，`curl http://127.0.0.1:8080/healthz` 返回 `{"status":"ok"}`。
+
 ## 2026-08-01 18:56 +0800
 - 进度：开始将管理端视频标签远程候选修复部署至家用部署机。部署机当前 `master` 为 `00c49c2`、`/healthz` 正常；本地修复提交为 `c2042da`，仅命中 `admin-web/*` 分桶，预期 hook 重建前端静态产物，不重启 Go server/worker，数据层保持独立。
 - 影响文件：`plan.md`；部署目标为 `deploy` remote 的家用部署机，既有未跟踪 `docs/examples/` 不纳入。
