@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-01 11:01 +0800
+- 进度：为 TV 长视频独立频道页创建本地 Wayfinder 决策地图。目标是在不触及短视频、详情页、播放器或服务端推荐能力的前提下，收敛电影、电视剧、18+ 三个频道的 UI 重构规格；用户已明确首屏优先呈现最近播放、最新添加与相似内容。
+- 影响文件：`docs/wayfinder/tv-long-video-channel-ui.md`、`docs/wayfinder/tickets/`、`plan.md`；未修改 Android 代码、资源、接口、App 版本或 `CONTEXT.md`。
+- 验证：已核对现有 TV 首页导航、电影分类、电视剧目录、18+ 海报墙与相关 UI 模型；已建立数据能力盘点、首屏信息架构、三频道共用结构、遥控器焦点和视觉语言五个待决问题及依赖关系。等待逐个决策后再进入实现规划。
+
 ## 2026-08-01 01:55 +0800
 - 进度：完成 TV 本地短视频封面到视频黑帧修复的最终验证与提交范围审查。最终只纳入首帧撤封面逻辑、对应源码规格测试、TV 版本 `0.1.144(144)`、长期上下文和本任务计划记录；手机端与既有未跟踪 `docs/examples/` 均未修改、未纳入。
 - 影响文件：`android-tv-app/tv-app/src/main/java/com/chee/videos/feature/tv/TvShortFeedScreen.kt`、`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvShortFeedScreenSpecTest.kt`、`android-tv-app/tv-app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
