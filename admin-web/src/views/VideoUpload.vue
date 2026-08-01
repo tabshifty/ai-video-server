@@ -9,6 +9,7 @@ import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } fro
 import { getAdminActors, getAdminCollections, getAdminImageCollections, getAdminPopularVideoTags, getAdminVideoTags } from '../api/admin'
 import { sha256File } from '../utils/hash'
 import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
+import { buildTitleFromFilename } from './videoUpload.filename'
 
 const uploadFileList = ref([])
 const uploadRef = ref(null)
@@ -31,6 +32,7 @@ const tagOptions = ref([])
 const loadingTags = ref(false)
 const previousType = ref('short')
 const revertingType = ref(false)
+const useFilenameTitle = ref(false)
 
 const form = reactive({
   type: 'short',
@@ -366,7 +368,6 @@ async function submit() {
   const { actorIDs, actorNames } = splitActorSelection(form.actors)
   const sharedPayload = {
     type: form.type,
-    title: form.title,
     description: form.description,
     tags: normalizedTags,
     actorIDs,
@@ -385,7 +386,10 @@ async function submit() {
       break
     }
 
-    const itemResult = await uploadOneFile(targetFile, sharedPayload)
+    const itemResult = await uploadOneFile(targetFile, {
+      ...sharedPayload,
+      title: useFilenameTitle.value ? buildTitleFromFilename(targetFile.name) : form.title
+    })
     pushResult(targetFile, itemResult.status, itemResult.message, itemResult.videoId)
 
     if (itemResult.status === 'cancelled') {
@@ -530,7 +534,13 @@ onMounted(() => {
               </el-radio-button>
             </el-radio-group>
           </el-form-item>
-          <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
+          <el-form-item label="标题">
+            <div class="title-field">
+              <el-input v-model="form.title" :disabled="useFilenameTitle" placeholder="可选，作为所有文件的统一标题" />
+              <el-switch v-model="useFilenameTitle" :disabled="uploading" active-text="标题替换" />
+            </div>
+            <div v-if="useFilenameTitle" class="title-field-tip">已启用标题替换，使用各自文件名。</div>
+          </el-form-item>
           <el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="3" /></el-form-item>
         </el-form>
       </SectionCard>
@@ -715,6 +725,26 @@ onMounted(() => {
   gap: var(--space-2);
 }
 
+.title-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.title-field :deep(.el-input) {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-field-tip {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
 .upload-actions :deep(.el-button) {
   min-height: 44px;
 }
@@ -748,6 +778,11 @@ onMounted(() => {
   .upload-page :deep(.el-form-item) {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .title-field {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .upload-page :deep(.el-form-item__label) {
