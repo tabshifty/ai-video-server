@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-01 15:31 +0800
+- 进度：开始将提交 `41d3d86 修复转码时误选封面视频流` 推送至家用部署机。`deploy` remote 已配置为 `chee@192.168.1.24:/Users/chee/deploy/ai-video-server/repo.git`；变更位于 `pkg/`，命中部署 hook 的 Go 构建、稳定签名、迁移、server/worker 硬重启与 `/healthz` 探活分桶。
+- 影响文件：`plan.md`；部署目标为家用部署机的 Go server/worker，数据层保持独立、不重启。
+- 验证：待执行 SSH 连通性与部署仓库只读预检、`git push deploy master` 的 hook 输出及部署后服务状态/健康检查。
+
 ## 2026-08-01 15:29 +0800
 - 进度：完成转码封面流误选修复，提交范围只纳入 `pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md` 与本次新增的 `plan.md` 记录；既有未跟踪 `docs/examples/` 保持原状，不纳入。
 - 影响文件：`pkg/ffmpeg/ffmpeg.go`、`pkg/ffmpeg/ffmpeg_test.go`、`CONTEXT.md`、`plan.md`。
