@@ -22,9 +22,11 @@ import {
   getAdminActors,
   getAdminCollections,
   getAdminImageCollections,
+  getAdminPopularVideoTags,
   getAdminVideoDetail,
   getAdminVideoPlayURL,
   getAdminVideoSubtitles,
+  getAdminVideoTags,
   getAdminVideos,
   rescanAdminVideoSubtitles,
   retranscodeVideo,
@@ -57,6 +59,11 @@ import {
   subtitleUploadAccept,
   tvPendingStageLabel
 } from './videoList.helpers'
+import {
+  createRemoteSuggestionLoader,
+  filterRemoteOptionsByValues,
+  mergeRemoteStringOptions
+} from './videoUpload.remote'
 import { formatAdminDateTime } from '../utils/dateTime'
 
 const list = ref([])
@@ -80,6 +87,8 @@ const collectionOptions = ref([])
 const loadingCollections = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
+const tagOptions = ref([])
+const loadingTags = ref(false)
 const subtitleItems = ref([])
 const subtitleLoading = ref(false)
 const subtitleUploadRef = ref(null)
@@ -770,6 +779,32 @@ async function searchImageCollections(keyword = '') {
   }
 }
 
+async function searchTags(keyword = '') {
+  if (!keyword) {
+    const data = await getAdminPopularVideoTags({ limit: 5 })
+    return (data.items || [])
+      .map((item) => String(item.tag || '').trim().toLowerCase())
+      .filter((tag) => tag !== '')
+  }
+
+  const data = await getAdminVideoTags({ q: keyword, limit: 12 })
+  return (data.items || [])
+    .map((item) => String(item.tag || '').trim().toLowerCase())
+    .filter((tag) => tag !== '')
+}
+
+const loadTagSuggestions = createRemoteSuggestionLoader({
+  fetcher: searchTags,
+  getOptions: () => filterRemoteOptionsByValues(tagOptions.value, detail.value?.tags),
+  setOptions: (next) => {
+    tagOptions.value = next
+  },
+  setLoading: (next) => {
+    loadingTags.value = next
+  },
+  mergeOptions: mergeRemoteStringOptions
+})
+
 async function showDetail(row) {
   const requestToken = nextDetailRequestToken(detailRequestToken.value)
   detailRequestToken.value = requestToken
@@ -792,8 +827,10 @@ async function showDetail(row) {
   if (detail.value.image_collection) {
     mergeImageCollectionOptions([detail.value.image_collection])
   }
+  tagOptions.value = [...(detail.value.tags || [])]
   captureDetailSnapshot()
   detailVisible.value = true
+  loadTagSuggestions('')
   await Promise.all([
     searchActors(''),
     searchCollections(''),
@@ -1770,12 +1807,18 @@ onBeforeUnmount(() => {
             v-model="detail.tags"
             multiple
             filterable
+            remote
+            reserve-keyword
+            :remote-method="loadTagSuggestions"
+            :loading="loadingTags"
             allow-create
             default-first-option
             clearable
             placeholder="可新增标签"
             style="width: 100%"
-          />
+          >
+            <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
+          </el-select>
         </el-form-item>
         <el-form-item label="演员">
           <el-select

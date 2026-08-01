@@ -257,8 +257,28 @@ const operationsColumn = extractElement(
 )
 const quickSearchInput = template.match(/<el-input\b(?=[^>]*v-model="quickSearch")[^>]*>/)?.[0] || ''
 const videoCoverImage = template.match(/<el-image\b(?=[^>]*class="video-cover-image")[^>]*>/)?.[0] || ''
+const detailTagSelect = template.match(/<el-form-item label="标签">[\s\S]*?<\/el-form-item>/)?.[0] || ''
 
 describe('视频资源集合页', () => {
+  it('详情标签编辑加载远程候选并保留当前已选标签', () => {
+    const showDetailBlock = extractBalancedBraceBlock(script, /async function showDetail\(row\)\s*\{/)
+    const loadTagSuggestionsBlock = extractBalancedBraceBlock(script, /const loadTagSuggestions = createRemoteSuggestionLoader\(\{/)
+
+    expect(script).toContain('getAdminPopularVideoTags')
+    expect(script).toContain('getAdminVideoTags')
+    expect(script).toContain("from './videoUpload.remote'")
+    expect(script).toContain("async function searchTags(keyword = '')")
+    expect(showDetailBlock?.body).toContain("loadTagSuggestions('')")
+    expect(loadTagSuggestionsBlock?.body).toContain('fetcher: searchTags')
+    expect(loadTagSuggestionsBlock?.body).toContain('filterRemoteOptionsByValues(tagOptions.value, detail.value?.tags)')
+    expect(detailTagSelect).toContain('v-model="detail.tags"')
+    expect(detailTagSelect).toContain('remote')
+    expect(detailTagSelect).toContain('reserve-keyword')
+    expect(detailTagSelect).toContain(':remote-method="loadTagSuggestions"')
+    expect(detailTagSelect).toContain(':loading="loadingTags"')
+    expect(detailTagSelect).toContain('<el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />')
+  })
+
   it('通过真实 SFC 编译并只接入共享保存视图职责', () => {
     expect(VideoList).toBeTruthy()
     expect(script).toContain("import SavedViewTabs from '../components/base/SavedViewTabs.vue'")

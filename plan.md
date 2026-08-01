@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-01 18:55 +0800
+- 进度：完成管理端 PC 视频列表详情标签远程候选修复的提交前核验。只纳入 `VideoList.vue` 的标签候选加载、对应页面契约、长期接口约定和本次计划记录；既有未跟踪 `docs/examples/` 不纳入。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：定向 Vitest 2 文件 24 项通过；全量 `npm test` 40 文件 649 项通过；`npm run build` 成功（仅既有 chunk-size warning）；`git diff --check` 通过；本次文件 U+FFFD 乱码扫描无命中。
+
+## 2026-08-01 18:54 +0800
+- 进度：完成管理端 PC 视频列表详情标签远程候选修复，准备提交。提交范围仅纳入详情标签的远程 loader 接入、页面回归契约、长期接口约定和本次计划记录；原有标签保存请求、后端 API、Android/TV 版本均未改动。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：定向 `npm test -- --run src/views/videoListPage.spec.js src/views/videoUpload.remote.spec.js` 通过（2 文件、24 项）；全量 `npm test` 通过（40 文件、649 项）；`npm run build` 通过（仅既有 chunk-size warning）。待执行最终 `git diff --check`、乱码扫描、精确暂存与提交后工作区复查。
+
+## 2026-08-01 18:53 +0800
+- 进度：管理端 PC 视频列表详情 Drawer 的标签编辑已接入与上传页一致的远程候选加载。打开详情后加载热门标签，输入关键词后请求匹配标签；防抖、latest-wins 和当前已选标签保留继续复用 `videoUpload.remote`。原 `PUT /admin/videos/:id` 保存路径原本已携带 `tags`，未改动。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`；不修改后端、Android/TV 版本，既有未跟踪 `docs/examples/` 保持不变。
+- 验证：新增静态契约先取得 1 项预期 RED，生产改动后 `npm test -- --run src/views/videoListPage.spec.js src/views/videoUpload.remote.spec.js` 通过（2 文件、24 项）。待执行管理端全量测试、构建和最终静态检查。
+
+## 2026-08-01 18:49 +0800
+- 进度：开始修复管理端 PC 视频列表编辑单条视频标签时未发起远程候选请求的问题。确认详情保存链路本来就会通过 `updateAdminVideo` 提交 `tags`，缺口位于标签选择框没有启用远程候选检索。
+- 影响文件：预计 `admin-web/src/views/VideoList.vue`、其既有测试、`plan.md`；若仅影响管理端，不修改 Android/TV 版本和后端接口。
+- 验证：待先补定向静态契约并确认红灯，再执行管理端 Vitest、构建、`git diff --check` 与本次 Markdown/中文文件乱码扫描。
+
 ## 2026-08-01 15:31 +0800
 - 进度：转码封面流误选修复已成功部署到家用部署机。`deploy/master` 从 `093580c` 推进至 `9f76c26`（包含修复提交 `41d3d86`）；远端 hook 完成 Go build、稳定签名、migration、server/worker `launchctl kickstart`，`/healthz` 探活成功。部署后的只读核验确认工作树为 `9f76c26`、server/worker 均为 running 且 last exit code 为 0。
 - 影响文件：`plan.md`；部署机数据层保持独立、未重启。远端 GitHub mirror 同步失败但为 hook 约定的 non-fatal 状态，不影响本次部署。
