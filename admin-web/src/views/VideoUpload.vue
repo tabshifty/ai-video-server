@@ -1,12 +1,19 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { Plus, UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import UploadProgress from '../components/UploadProgress.vue'
 import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
-import { getAdminActors, getAdminCollections, getAdminImageCollections, getAdminPopularVideoTags, getAdminVideoTags } from '../api/admin'
+import {
+  createAdminCollection,
+  getAdminActors,
+  getAdminCollections,
+  getAdminImageCollections,
+  getAdminPopularVideoTags,
+  getAdminVideoTags
+} from '../api/admin'
 import { sha256File } from '../utils/hash'
 import { createRemoteSuggestionLoader, mergeRemoteStringOptions, mergeRemoteValueOptions } from './videoUpload.remote'
 import { buildTitleFromFilename } from './videoUpload.filename'
@@ -26,6 +33,7 @@ const actorOptions = ref([])
 const loadingActors = ref(false)
 const collectionOptions = ref([])
 const loadingCollections = ref(false)
+const creatingCollection = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
 const tagOptions = ref([])
@@ -199,6 +207,57 @@ function normalizeCollectionSelection(values) {
     out.push(value)
   }
   return out
+}
+
+function extractErrorMessage(error, fallback) {
+  const responseMsg = error?.response?.data?.msg
+  if (typeof responseMsg === 'string' && responseMsg.trim() !== '') {
+    return responseMsg.trim()
+  }
+  const message = error?.message
+  if (typeof message === 'string' && message.trim() !== '') {
+    return message.trim()
+  }
+  return fallback
+}
+
+async function createCollectionForUpload() {
+  if (creatingCollection.value) return
+
+  let value
+  try {
+    ({ value } = await ElMessageBox.prompt('请输入新合集名称', '新增合集', {
+      confirmButtonText: '创建',
+      cancelButtonText: '取消',
+      inputPlaceholder: '例如：旅行记录',
+      inputValidator: (input) => String(input || '').trim() !== '' || '请输入合集名称'
+    }))
+  } catch (_) {
+    return
+  }
+
+  creatingCollection.value = true
+  try {
+    const created = await createAdminCollection({
+      name: String(value || '').trim(),
+      description: '',
+      cover_url: '',
+      sort_order: 0,
+      active: true
+    })
+    const option = {
+      value: created.id,
+      label: created.name
+    }
+    collectionOptions.value = mergeRemoteValueOptions(collectionOptions.value, [option])
+    form.collections = normalizeCollectionSelection([...form.collections, created.id])
+    loadCollectionSuggestions('')
+    ElMessage.success('合集已创建并关联')
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '创建合集失败'))
+  } finally {
+    creatingCollection.value = false
+  }
 }
 
 async function searchCollections(keyword = '') {
@@ -587,27 +646,33 @@ onMounted(() => {
             </el-select>
           </el-form-item>
           <el-form-item v-if="isShortType" label="所属合集">
-            <el-select
-              v-model="form.collections"
-              multiple
-              filterable
-              remote
-              reserve-keyword
-              clearable
-              collapse-tags
-              collapse-tags-tooltip
-              :remote-method="loadCollectionSuggestions"
-              :loading="loadingCollections"
-              placeholder="可选，可多选"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="collection in collectionOptions"
-                :key="collection.value"
-                :label="collection.label"
-                :value="collection.value"
-              />
-            </el-select>
+            <div class="collection-picker">
+              <el-select
+                v-model="form.collections"
+                class="collection-select"
+                multiple
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                collapse-tags
+                collapse-tags-tooltip
+                :remote-method="loadCollectionSuggestions"
+                :loading="loadingCollections"
+                placeholder="可选，可多选"
+              >
+                <el-option
+                  v-for="collection in collectionOptions"
+                  :key="collection.value"
+                  :label="collection.label"
+                  :value="collection.value"
+                />
+              </el-select>
+              <el-button class="collection-create-button" :loading="creatingCollection" @click="createCollectionForUpload">
+                <el-icon aria-hidden="true"><Plus /></el-icon>
+                <span>新增合集</span>
+              </el-button>
+            </div>
           </el-form-item>
           <el-form-item label="关联演员">
             <el-select
@@ -745,6 +810,23 @@ onMounted(() => {
   line-height: var(--leading-small);
 }
 
+.collection-picker {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.collection-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.collection-create-button {
+  flex: 0 0 auto;
+}
+
 .upload-actions :deep(.el-button) {
   min-height: 44px;
 }
@@ -783,6 +865,15 @@ onMounted(() => {
   .title-field {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .collection-picker {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .collection-create-button {
+    width: 100%;
   }
 
   .upload-page :deep(.el-form-item__label) {

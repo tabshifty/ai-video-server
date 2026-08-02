@@ -515,6 +515,22 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(style).toMatch(/@media \(max-width: 768px\)[\s\S]*\.upload-page :deep\(\.el-form-item\)\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/)
   })
 
+  it('上传页可在所属合集选择器右侧新增并自动关联合集', () => {
+    const source = readView('VideoUpload.vue')
+    const template = extractTemplate(source)
+    const collectionItem = template.match(/<el-form-item v-if="isShortType" label="所属合集">[\s\S]*?<\/el-form-item>/)?.[0] || ''
+
+    expect(source).toContain('createAdminCollection')
+    expect(source).toContain('async function createCollectionForUpload()')
+    expect(source).toContain("const created = await createAdminCollection({")
+    expect(source).toContain("active: true")
+    expect(source).toContain('form.collections = normalizeCollectionSelection([...form.collections, created.id])')
+    expect(collectionItem).toContain('class="collection-picker"')
+    expect(collectionItem).toContain('class="collection-select"')
+    expect(collectionItem).toContain('@click="createCollectionForUpload"')
+    expect(collectionItem).toContain('<span>新增合集</span>')
+  })
+
   it('服务资源页使用指标条替代重复统计卡', () => {
     for (const file of ['IPTVManage.vue', 'TvAppManage.vue']) {
       const source = readView(file)

@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-02 23:18 +0800
+- 进度：完成管理端上传视频页“所属合集”选择器的就地新增功能。桌面端选择框右侧显示带加号图标的“新增合集”按钮，窄屏改为上下布局；弹窗仅收集名称，创建后立即写入远程候选并自动关联到本次上传。创建请求复用既有 `POST /admin/collections`，没有改变上传 API、后端或 Android/TV 版本。
+- 影响文件：`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：新增契约先按预期 RED，随后 `npm test -- --run src/views/precisionOpsRollout.spec.js`（72 项）通过；`npm test`（40 文件 / 651 项）通过；`npm run build` 通过（仅既有 chunk 体积告警）；`git diff --check` 通过；本地 `http://127.0.0.1:5173/` 返回管理端 HTML；本次中文文件 U+FFFD 扫描无命中。
+
+## 2026-08-02 23:13 +0800
+- 进度：开始为管理端上传视频页的“所属合集”远程选择器补充就地新增入口。计划复用既有 `POST /admin/collections`，只收集新合集名称，使用默认的启用、空简介、空封面和零排序值；创建成功后刷新候选并自动关联到当前上传表单，不修改上传提交结构或后端接口。
+- 影响文件：预计 `admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：先运行新增上传页契约取得预期 RED；实现后运行该定向 Vitest、管理端全量测试、`npm run build`、`git diff --check` 与本次中文文件乱码扫描。
+
 ## 2026-08-02 18:44 +0800
 - 进度：已在家用部署机完成视频主播放文件大小历史回填。先将提交 `c40e134` 部署至 `deploy/master`，hook 成功构建、签名、应用 `0036` 并重启 server/worker；远端回填按当前 `STORAGE_ROOT=/Volumes/large/videos` 写入所有可验证常规文件。dry-run 与 `--apply` 均扫描 `165,564` 条，实际写入 `16,448` 条正数字节数。
 - 影响文件：`plan.md`；部署机临时报告为 `/tmp/video-size-backfill-dry-run-20260802-183943.json`、`/tmp/video-size-backfill-apply-20260802-184202.json`，不纳入仓库；既有未跟踪 `docs/examples/` 保持不变且不纳入。
