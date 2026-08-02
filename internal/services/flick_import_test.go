@@ -205,6 +205,9 @@ func TestFlickImportServiceImportPlayableVideoCreatesReadyVideo(t *testing.T) {
 	if created.TranscodedPath == "" || created.ThumbnailPath == "" {
 		t.Fatalf("expected target paths to be populated: %#v", created)
 	}
+	if created.TranscodedFileSize != int64(len("video-data")) {
+		t.Fatalf("expected transcoded file size %d, got %d", len("video-data"), created.TranscodedFileSize)
+	}
 	if _, err := os.Stat(created.TranscodedPath); err != nil {
 		t.Fatalf("expected copied transcoded file: %v", err)
 	}

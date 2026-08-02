@@ -352,6 +352,20 @@ function formatDateTime(value) {
   return formatAdminDateTime(value, '--')
 }
 
+function formatFileSize(value) {
+  const bytes = Number(value)
+  if (!Number.isFinite(bytes) || bytes <= 0) return '--'
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KiB', 'MiB', 'GiB', 'TiB']
+  let size = bytes / 1024
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+  return `${size.toFixed(size >= 100 ? 0 : 1)} ${units[unitIndex]}`
+}
+
 function typeLabel(type) {
   const map = {
     short: '短视频',
@@ -1801,6 +1815,9 @@ onBeforeUnmount(() => {
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="detail.title" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="detail.description" type="textarea" :rows="4" /></el-form-item>
+        <el-form-item label="转码后大小">
+          {{ formatFileSize(detail.transcoded_file_size) }}
+        </el-form-item>
         <el-form-item label="封面"><el-input v-model="detail.thumbnail_path" /></el-form-item>
         <el-form-item label="标签">
           <el-select

@@ -201,6 +201,7 @@ SELECT
   COALESCE(height, 0),
   COALESCE(original_path, ''),
   COALESCE(transcoded_path, ''),
+  transcoded_file_size,
   COALESCE(thumbnail_path, ''),
   COALESCE(metadata, '{}'::jsonb),
   created_at,
@@ -209,7 +210,7 @@ FROM videos
 WHERE id=$1
 `, videoID).Scan(
 		&out.ID, &out.UserID, &imageCollectionID, &out.Title, &out.Description, &out.Type, &out.Status, &out.DurationSeconds,
-		&out.Width, &out.Height, &out.OriginalPath, &out.TranscodedPath, &out.ThumbnailPath, &metadata, &out.CreatedAt, &out.UpdatedAt,
+		&out.Width, &out.Height, &out.OriginalPath, &out.TranscodedPath, &out.TranscodedFileSize, &out.ThumbnailPath, &metadata, &out.CreatedAt, &out.UpdatedAt,
 	)
 	if err != nil {
 		return models.AdminVideoDetail{}, fmt.Errorf("admin video detail: %w", err)

@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-02 17:37 +0800
+- 进度：完成视频主播放文件大小持久化与历史回填工具。`videos.transcoded_file_size` 以可空正数字节数表示 `transcoded_path` 的主播放常规文件；常规转码、重新转码、DV 剧集直拷和 Flick 直接导入均在就绪落库前写入。管理端详情显示“转码后大小”；新增 ADR、术语和运行说明，明确该字段不等于视频目录或磁盘总占用。
+- 影响文件：`migrations/0036_video_transcoded_file_size.*.sql`、`cmd/backfill-video-transcoded-file-size/*`、`internal/{models/admin.go,repository/{video_repository.go,admin_repository.go,migrations_test.go,video_transcoded_file_size_test.go},queue/tasks.go,services/{file_size.go,file_size_test.go,flick_import.go,flick_import_test.go}}`、`admin-web/src/views/{VideoList.vue,videoListPage.spec.js}`、`CONTEXT.md`、`docs/{run.md,adr/0019-video-primary-playback-file-size.md}`、`plan.md`。既有未跟踪 `docs/examples/` 不纳入。
+- 验证：新增测试先取得预期 RED，修复后 `go test ./internal/services -run 'TestRequiredRegularFileSize|TestFlickImportServiceImportPlayableVideoCreatesReadyVideo' -count=1`、`go test ./internal/repository ./internal/queue ./cmd/backfill-video-transcoded-file-size -count=1`、回填命令全量测试、`npm test`（40 文件 / 650 项）、`npm run build`、`go vet ./...`、`git diff --check` 和 `gofmt -d` 均通过；`go run ./cmd/backfill-video-transcoded-file-size --help` 可用。`go test ./... -count=1` 唯一失败为既有 `internal/services/TestParseTVAPKMetadataParsesReleaseAPK` 的硬编码 versionCode 121 与当前提交的 TV release APK 144 不一致，本任务未改 TV 固件/版本；本机未安装 Docker，未能执行真实数据库 migration，已通过 `TestVideoTranscodedFileSizeMigration` 静态契约验证前向兼容 SQL。
+
+## 2026-08-02 17:32 +0800
+- 进度：完成首轮实现与红绿验证。实际 migration 序号为 `0036`（先前计划条目的 `0032` 仅为预估，后续以本条为准）；新增 `videos.transcoded_file_size` 可空正数约束、常规转码/杜比视界直拷/直接导入写入、受 `STORAGE_ROOT/videos` 边界保护的批量回填命令与管理端详情显示。回填命令默认 dry-run，传 `--apply` 才写入，任何缺失文件或写库失败均在 JSON 报告中列出并以非零退出。
+- 影响文件：`migrations/0036_video_transcoded_file_size.*.sql`、`internal/models/admin.go`、`internal/repository/{video_repository.go,admin_repository.go,migrations_test.go,admin_repository_test.go}`、`internal/queue/tasks.go`、`internal/services/{file_size.go,file_size_test.go,flick_import.go,flick_import_test.go}`、`cmd/backfill-video-transcoded-file-size/*`、`admin-web/src/views/{VideoList.vue,videoListPage.spec.js}`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变。
+- 验证：新增测试先取得预期 RED；`go test ./internal/repository ./internal/queue ./cmd/backfill-video-transcoded-file-size -count=1` 通过，`go test ./internal/services -count=1` 仅失败于既有 TV APK `version_code` 断言（实际 144、期望 121）；`npm test -- --run src/views/videoListPage.spec.js` 通过（17 项），`npm run build` 通过（仅既有 chunk-size warning）。待补直接导入断言、运行定向服务测试、全量 Go/Vitest、vet、静态检查与长期文档。
+
+## 2026-08-02 17:23 +0800
+- 进度：开始为视频主播放文件建立转码后大小记录。已与用户确认字段 `transcoded_file_size` 为可空正数字节数；常规转码、重新转码和直接导入已就绪视频同步写入；仅管理端视频详情展示。将新增前向兼容 migration、默认 dry-run 的受限路径回填命令、后端持久化链路和管理端格式化展示。
+- 影响文件：预计 `migrations/0032_video_transcoded_file_size.*.sql`、`internal/models/*`、`internal/repository/*`、`internal/queue/*`、`internal/services/*`、`cmd/backfill-video-transcoded-file-size/*`、`admin-web/src/views/VideoList.vue`、对应测试、`CONTEXT.md`、`plan.md`；不修改 Android/TV 工程及版本号。既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：待先补定向 Go/Vitest 测试并确认红灯；随后执行相关包测试、迁移静态契约、回填命令 dry-run 单测、`npm run build`、`go test ./... -count=1`、`go vet ./...`、`git diff --check` 与乱码扫描。
+
 ## 2026-08-01 18:58 +0800
 - 进度：管理端视频标签远程候选修复已部署到家用部署机。`deploy/master` 从 `00c49c2` 推进至 `455f56f`（包含功能修复提交 `c2042da`）；hook 识别为前端分桶，完成 `npm ci && npm run build` 与静态资源更新，未重启 Go server/worker，数据层保持独立。
 - 影响文件：`plan.md`；部署机当前 bare 仓库和 `work` 工作树均为 `455f56f`，`current/admin-web-dist/index.html` 存在。GitHub mirror 同步失败为 hook 约定的 non-fatal 状态，不影响本次部署。

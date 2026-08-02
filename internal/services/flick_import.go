@@ -176,6 +176,11 @@ func (s *FlickImportService) ImportPlayableVideo(ctx context.Context, src FlickS
 		_ = s.removeAll(filepath.Dir(targetVideoPath))
 		return FlickImportOutcome{}, fmt.Errorf("copy source cover: %w", err)
 	}
+	transcodedFileSize, err := RequiredRegularFileSize(targetVideoPath)
+	if err != nil {
+		_ = s.removeAll(filepath.Dir(targetVideoPath))
+		return FlickImportOutcome{}, fmt.Errorf("stat imported playback file: %w", err)
+	}
 
 	createdAt := src.CreatedAt
 	if createdAt.IsZero() {
@@ -187,20 +192,21 @@ func (s *FlickImportService) ImportPlayableVideo(ctx context.Context, src FlickS
 	}
 
 	spec := repository.ImportedReadyVideo{
-		ID:              videoID,
-		Title:           deriveImportedTitle(tags),
-		Description:     strings.TrimSpace(src.Description),
-		Type:            "short",
-		Status:          "ready",
-		OriginalPath:    targetVideoPath,
-		TranscodedPath:  targetVideoPath,
-		ThumbnailPath:   targetCoverPath,
-		DurationSeconds: int(math.Round(probe.Duration)),
-		Width:           probe.Width,
-		Height:          probe.Height,
-		Hash:            sha256Value,
-		FileSize:        info.Size(),
-		Tags:            tags,
+		ID:                 videoID,
+		Title:              deriveImportedTitle(tags),
+		Description:        strings.TrimSpace(src.Description),
+		Type:               "short",
+		Status:             "ready",
+		OriginalPath:       targetVideoPath,
+		TranscodedPath:     targetVideoPath,
+		TranscodedFileSize: transcodedFileSize,
+		ThumbnailPath:      targetCoverPath,
+		DurationSeconds:    int(math.Round(probe.Duration)),
+		Width:              probe.Width,
+		Height:             probe.Height,
+		Hash:               sha256Value,
+		FileSize:           info.Size(),
+		Tags:               tags,
 		Metadata: map[string]any{
 			"migration_source":       "flick-server",
 			"migration_source_id":    strings.TrimSpace(src.SourceID),

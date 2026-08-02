@@ -108,6 +108,22 @@ ALLOW_REMOTE_MIGRATIONS=1 POSTGRES_DSN='postgres://...' bash scripts/migrate-app
 
 没有 `ALLOW_REMOTE_MIGRATIONS=1` 时，`scripts/migrate-apply.sh` 会拒绝对非本机 Postgres 执行 migration。
 
+## 回填视频转码后大小
+
+部署包含 `0036_video_transcoded_file_size` 的服务端后，可在能访问数据库和 `STORAGE_ROOT` 的同一台机器执行回填。命令默认只扫描并输出 JSON 报告，不写数据库：
+
+```bash
+go run ./cmd/backfill-video-transcoded-file-size --batch-size=100
+```
+
+先核对 `scanned`、`would_update` 与 `failures` 后，再显式写入：
+
+```bash
+go run ./cmd/backfill-video-transcoded-file-size --batch-size=100 --apply
+```
+
+命令只接受 `STORAGE_ROOT/videos/` 下的绝对常规非空文件；路径越界、文件缺失、空文件和写库失败都会留在 `failures` 中，命令将以非零状态退出。可修复这些项后重复运行，已存在的大小会按当前文件元数据重新校准。
+
 ## 停止全部进程
 
 ```bash

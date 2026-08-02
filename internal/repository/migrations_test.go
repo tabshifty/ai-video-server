@@ -18,6 +18,18 @@ func TestVideoTitleTextMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+alter\s+column\s+title\s+type\s+varchar\s*\(\s*200\s*\)\s+using\s+left\s*\(\s*title\s*,\s*200\s*\)`)
 }
 
+func TestVideoTranscodedFileSizeMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0036_video_transcoded_file_size.up.sql")
+	down := readMigrationForTest(t, "0036_video_transcoded_file_size.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+videos\s+add\s+column\s+if\s+not\s+exists\s+transcoded_file_size\s+bigint`)
+	assertSQLPattern(t, up, `(?is)constraint\s+videos_transcoded_file_size_positive\s+check\s*\(\s*transcoded_file_size\s+is\s+null\s+or\s+transcoded_file_size\s*>\s*0\s*\)`)
+	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+drop\s+constraint\s+if\s+exists\s+videos_transcoded_file_size_positive`)
+	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+drop\s+column\s+if\s+exists\s+transcoded_file_size`)
+}
+
 func TestIPTVPlaylistMigration(t *testing.T) {
 	t.Parallel()
 

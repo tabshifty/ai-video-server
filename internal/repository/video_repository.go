@@ -25,23 +25,30 @@ type VideoRepository struct {
 }
 
 type ImportedReadyVideo struct {
-	ID              uuid.UUID
-	Title           string
-	Description     string
-	Type            string
-	Status          string
-	OriginalPath    string
-	TranscodedPath  string
-	ThumbnailPath   string
-	DurationSeconds int
-	Width           int
-	Height          int
-	Hash            string
-	FileSize        int64
-	Tags            []string
-	Metadata        map[string]any
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                 uuid.UUID
+	Title              string
+	Description        string
+	Type               string
+	Status             string
+	OriginalPath       string
+	TranscodedPath     string
+	TranscodedFileSize int64
+	ThumbnailPath      string
+	DurationSeconds    int
+	Width              int
+	Height             int
+	Hash               string
+	FileSize           int64
+	Tags               []string
+	Metadata           map[string]any
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+// TranscodedVideoFile identifies a persisted primary playback path for size reconciliation.
+type TranscodedVideoFile struct {
+	ID             uuid.UUID
+	TranscodedPath string
 }
 
 func NewVideoRepository(pool *pgxpool.Pool) *VideoRepository {
@@ -229,6 +236,9 @@ func (r *VideoRepository) CreateImportedReadyVideo(ctx context.Context, spec Imp
 	if spec.ID == uuid.Nil {
 		return fmt.Errorf("create imported ready video: missing video id")
 	}
+	if spec.TranscodedFileSize <= 0 {
+		return fmt.Errorf("create imported ready video: transcoded file size must be positive")
+	}
 	if spec.Type == "" {
 		spec.Type = "short"
 	}
@@ -260,10 +270,10 @@ func (r *VideoRepository) CreateImportedReadyVideo(ctx context.Context, spec Imp
 INSERT INTO videos (
   id, user_id, tmdb_id, title, description, type, status,
   duration_seconds, width, height, original_path, transcoded_path,
-  thumbnail_path, metadata, created_at, updated_at
+  transcoded_file_size, thumbnail_path, metadata, created_at, updated_at
 )
-VALUES ($1,NULL,NULL,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-`, spec.ID, spec.Title, spec.Description, spec.Type, spec.Status, spec.DurationSeconds, spec.Width, spec.Height, spec.OriginalPath, spec.TranscodedPath, spec.ThumbnailPath, metaRaw, spec.CreatedAt, spec.UpdatedAt); err != nil {
+VALUES ($1,NULL,NULL,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+`, spec.ID, spec.Title, spec.Description, spec.Type, spec.Status, spec.DurationSeconds, spec.Width, spec.Height, spec.OriginalPath, spec.TranscodedPath, spec.TranscodedFileSize, spec.ThumbnailPath, metaRaw, spec.CreatedAt, spec.UpdatedAt); err != nil {
 		return fmt.Errorf("insert imported ready video: %w", err)
 	}
 
@@ -440,17 +450,70 @@ DO UPDATE SET watch_seconds = EXCLUDED.watch_seconds, updated_at = NOW()
 	return nil
 }
 
-func (r *VideoRepository) UpdateTranscodeResult(ctx context.Context, videoID uuid.UUID, transcodedPath, thumbPath string, duration, width, height int, metadata map[string]any) error {
+func (r *VideoRepository) UpdateTranscodeResult(ctx context.Context, videoID uuid.UUID, transcodedPath, thumbPath string, transcodedFileSize int64, duration, width, height int, metadata map[string]any) error {
+	if transcodedFileSize <= 0 {
+		return fmt.Errorf("transcoded file size must be positive")
+	}
 	metaRaw, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("marshal metadata: %w", err)
 	}
 	_, err = r.pool.Exec(ctx, `
 UPDATE videos
-SET transcoded_path=$2, thumbnail_path=$3, duration_seconds=$4, width=$5, height=$6, metadata=$7, status='ready', updated_at=NOW()
-WHERE id=$1`, videoID, transcodedPath, thumbPath, duration, width, height, metaRaw)
+SET transcoded_path=$2, thumbnail_path=$3, transcoded_file_size=$4, duration_seconds=$5, width=$6, height=$7, metadata=$8, status='ready', updated_at=NOW()
+WHERE id=$1`, videoID, transcodedPath, thumbPath, transcodedFileSize, duration, width, height, metaRaw)
 	if err != nil {
 		return fmt.Errorf("update transcode result: %w", err)
+	}
+	return nil
+}
+
+func (r *VideoRepository) ListTranscodedVideoFiles(ctx context.Context, afterID uuid.UUID, limit int) ([]TranscodedVideoFile, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx, `
+SELECT id, transcoded_path
+FROM videos
+WHERE id > $1
+  AND transcoded_path IS NOT NULL
+  AND BTRIM(transcoded_path) <> ''
+ORDER BY id ASC
+LIMIT $2
+`, afterID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list transcoded video files: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]TranscodedVideoFile, 0, limit)
+	for rows.Next() {
+		var item TranscodedVideoFile
+		if err := rows.Scan(&item.ID, &item.TranscodedPath); err != nil {
+			return nil, fmt.Errorf("scan transcoded video file: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate transcoded video files: %w", err)
+	}
+	return items, nil
+}
+
+func (r *VideoRepository) UpdateVideoTranscodedFileSize(ctx context.Context, videoID uuid.UUID, size int64) error {
+	if size <= 0 {
+		return fmt.Errorf("transcoded file size must be positive")
+	}
+	result, err := r.pool.Exec(ctx, `
+UPDATE videos
+SET transcoded_file_size = $2
+WHERE id = $1
+`, videoID, size)
+	if err != nil {
+		return fmt.Errorf("update transcoded video file size: %w", err)
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("update transcoded video file size: video %s not found", videoID)
 	}
 	return nil
 }

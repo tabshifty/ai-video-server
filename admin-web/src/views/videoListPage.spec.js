@@ -482,6 +482,11 @@ async function load() {
     expect(quickSearchInput).toContain('aria-label="视频标题或标签搜索"')
   })
 
+  it('在视频详情中展示转码后主播放文件大小', () => {
+    expect(template).toContain('<el-form-item label="转码后大小">')
+    expect(template).toContain('{{ formatFileSize(detail.transcoded_file_size) }}')
+  })
+
   it('保留已有行并以行内错误、首次骨架和诚实空态反馈请求结果', () => {
     const violatingLoad = `async function load() {
   try {

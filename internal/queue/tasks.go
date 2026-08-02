@@ -194,7 +194,12 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 			p.logger.Error("dv direct copy failed", "video_id", videoID, "error", directCopyErr)
 			return directCopyErr
 		}
-		if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, result.ThumbnailPath, result.Duration, result.Width, result.Height, result.Metadata); err != nil {
+		transcodedFileSize, sizeErr := services.RequiredRegularFileSize(result.TranscodedPath)
+		if sizeErr != nil {
+			p.finalizeTranscodeFailure(ctx, videoID, jobID, sizeErr.Error())
+			return sizeErr
+		}
+		if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, result.ThumbnailPath, transcodedFileSize, result.Duration, result.Width, result.Height, result.Metadata); err != nil {
 			p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
 			return err
 		}
@@ -225,6 +230,11 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 		p.logger.Error("transcode failed", "video_id", videoID, "error", transcodeErr)
 		return transcodeErr
 	}
+	transcodedFileSize, sizeErr := services.RequiredRegularFileSize(result.TranscodedPath)
+	if sizeErr != nil {
+		p.finalizeTranscodeFailure(ctx, videoID, jobID, sizeErr.Error())
+		return sizeErr
+	}
 
 	thumbPath, metadata := resolveTranscodePersistence(video, result)
 	outputPlaybackProbe, outputPlaybackProbeErr := services.ProbePlaybackCompatibility(ctx, result.TranscodedPath)
@@ -247,7 +257,7 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 			"source_playback_path": preservedSourcePath,
 		})
 	}
-	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, thumbPath, result.Duration, result.Width, result.Height, metadata); err != nil {
+	if err := p.repo.UpdateTranscodeResult(ctx, videoID, result.TranscodedPath, thumbPath, transcodedFileSize, result.Duration, result.Width, result.Height, metadata); err != nil {
 		p.finalizeTranscodeFailure(ctx, videoID, jobID, err.Error())
 		return err
 	}
