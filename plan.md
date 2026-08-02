@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-02 18:44 +0800
+- 进度：已在家用部署机完成视频主播放文件大小历史回填。先将提交 `c40e134` 部署至 `deploy/master`，hook 成功构建、签名、应用 `0036` 并重启 server/worker；远端回填按当前 `STORAGE_ROOT=/Volumes/large/videos` 写入所有可验证常规文件。dry-run 与 `--apply` 均扫描 `165,564` 条，实际写入 `16,448` 条正数字节数。
+- 影响文件：`plan.md`；部署机临时报告为 `/tmp/video-size-backfill-dry-run-20260802-183943.json`、`/tmp/video-size-backfill-apply-20260802-184202.json`，不纳入仓库；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：部署 hook `/healthz OK`；回填报告 `updated=16448`、`failures=149116`；Postgres 聚合为 `with_transcoded_path=165564`、`with_transcoded_file_size=16448`、`non_positive_transcoded_file_size=0`、`missing_size_with_path=149116`；部署后 `/healthz`、server 与 worker 均为 `running`。未填项包括 `144,955` 条当前根目录外绝对路径、`4,108` 条相对路径和 `53` 条文件缺失，均按安全边界保留 `NULL`，未进行猜测性路径映射。
+
+## 2026-08-02 18:36 +0800
+- 进度：用户授权在家用部署机执行视频主播放文件大小历史回填。先通过 SSH 核对部署提交、`0036_video_transcoded_file_size` 迁移、远端 `STORAGE_ROOT/videos` 与数据库可达性；随后保存 dry-run JSON 报告并核对汇总，正常后在同一环境显式执行 `--apply`，不在开发机对不可达媒体卷写库。
+- 影响文件：`plan.md`；远端临时 JSON 报告位于 `/tmp`，不纳入仓库；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：待执行远端预检、dry-run 汇总、`--apply` 汇总及数据库写入结果核验。
+
 ## 2026-08-02 17:37 +0800
 - 进度：完成视频主播放文件大小持久化与历史回填工具。`videos.transcoded_file_size` 以可空正数字节数表示 `transcoded_path` 的主播放常规文件；常规转码、重新转码、DV 剧集直拷和 Flick 直接导入均在就绪落库前写入。管理端详情显示“转码后大小”；新增 ADR、术语和运行说明，明确该字段不等于视频目录或磁盘总占用。
 - 影响文件：`migrations/0036_video_transcoded_file_size.*.sql`、`cmd/backfill-video-transcoded-file-size/*`、`internal/{models/admin.go,repository/{video_repository.go,admin_repository.go,migrations_test.go,video_transcoded_file_size_test.go},queue/tasks.go,services/{file_size.go,file_size_test.go,flick_import.go,flick_import_test.go}}`、`admin-web/src/views/{VideoList.vue,videoListPage.spec.js}`、`CONTEXT.md`、`docs/{run.md,adr/0019-video-primary-playback-file-size.md}`、`plan.md`。既有未跟踪 `docs/examples/` 不纳入。
