@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-04 17:17 +0800
+- 进度：完成 Hermes 论坛采集接口部署、历史基线导入和定时任务切换。家用部署机从 `c40e134` 部署到 `923dfca`，hook 完成前端/Go 构建、签名、`0037` migration、server/worker 重启和健康检查；服务端 `.env` 已备份并配置 64 位随机机器 Token。首次导入 1188 个明确 tid 全部 `created`，214 个旧版 URL/哈希键被忽略；重复导入 1188 条全部 `duplicate`。本机 Hermes 脚本和 `.env` 已各自备份，脚本停止读写 `seen.json`，改为 `discover -> 抓取 -> inspection -> Telegram`，只有检查结果入库成功才输出。
+- 影响文件：`CONTEXT.md`、`docs/run.md`、`plan.md`；外部变更为家用部署机部署仓库/二进制、`.env`、PostgreSQL 两张采集表，以及本机 `~/.hermes/{.env,scripts/watch_sehuatang_forum95.py}`。回滚备份为部署机 `.env.pre-hermes-20260804-170921`、本机 `.env.pre-hermes-forum-api-20260804-171331` 和 `watch_sehuatang_forum95.py.pre-api-20260804-171331`；旧 `seen.json` 保留未删除。
+- 验证：push hook `/healthz OK`；错误/正确 Token 分别进入 HTTP 401/业务 400；migration 账本包含 `0037_collected_forum_posts.up.sql`。导入后端到端任务于 17:16 执行完成且无投递错误：数据库共 1190 帖，`dedupe_only=1188`、`inspected=2`、`pending=0`，筛选为 `included=1/excluded=1`，保存 1 条 ED2K；任务输出仅含 included 帖。Hermes 脚本 `py_compile`、多附件/多 ED2K/接口失败纯逻辑验证通过，任务已恢复为每 15 分钟运行；旧 `seen.json` 修改时间保持在切换前 17:05。残余提示：`hermes gateway status` 报 launchd service definition 相对当前 Hermes 安装较旧，但 gateway 受 launchd 管理、Telegram/微信均已连接，本次未扩展处理 Hermes 安装升级。
+
 ## 2026-08-04 17:08 +0800
 - 进度：开始将 Hermes 论坛采集接口部署到家用部署机并导入历史 tid。预检确认部署机当前 `master=c40e134`、server/worker 运行且 `/healthz` 正常，但 `.env` 尚未配置 `HERMES_API_TOKEN`；计划先备份远端环境文件并生成独立随机 Token，再 push `master` 触发前端/Go 构建、`0037` migration 和硬切重启，随后验证接口鉴权与数据库结构，并从本机状态文件导入 1188 个明确的 `tid:<数字>` 键。后端和历史基线验证完成前不修改 Hermes 定时任务。
 - 影响文件：`plan.md`；外部影响为家用部署机 `.env`、部署仓库/二进制、PostgreSQL `0037` schema 与历史查重记录。本机 `~/.hermes/state/sehuatang_forum95_seen.json` 只读，既有未跟踪 `docs/examples/` 保持不变。

@@ -136,6 +136,8 @@ HERMES_API_TOKEN='实际机器令牌' go run ./cmd/import-hermes-forum-seen \
 
 命令只导入 `seen_threads` 中明确的 `tid:<数字>` 键，旧版 URL/哈希键不会用于推导 tid。它按最多 100 条调用 `dedupe_only` 发现接口，输出 `input_tids`、`ignored_entries`、`submitted`、`created`、`pending` 和 `duplicate` JSON 汇总；任一批失败或响应数量不一致时立即停止并以非零状态退出。核对 `submitted = created + pending + duplicate` 后，才能让 Hermes 改用项目接口查重；该命令不会修改原状态文件或正在运行的定时任务。
 
+切换 Hermes 时，在 Hermes 自身受限 `.env` 中配置 `HERMES_FORUM_API_BASE_URL` 和与服务端相同的 `HERMES_API_TOKEN`，重启 gateway 使环境生效，再恢复任务。切换后的脚本必须先调用 `discover`，只检查 `created/pending`；每帖 `inspection` 成功后才能输出给 Telegram。接口失败时保持静默并让记录停在 `pending`，不得回写本地 `seen.json`。
+
 ## 停止全部进程
 
 ```bash
