@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-04 17:08 +0800
+- 进度：开始将 Hermes 论坛采集接口部署到家用部署机并导入历史 tid。预检确认部署机当前 `master=c40e134`、server/worker 运行且 `/healthz` 正常，但 `.env` 尚未配置 `HERMES_API_TOKEN`；计划先备份远端环境文件并生成独立随机 Token，再 push `master` 触发前端/Go 构建、`0037` migration 和硬切重启，随后验证接口鉴权与数据库结构，并从本机状态文件导入 1188 个明确的 `tid:<数字>` 键。后端和历史基线验证完成前不修改 Hermes 定时任务。
+- 影响文件：`plan.md`；外部影响为家用部署机 `.env`、部署仓库/二进制、PostgreSQL `0037` schema 与历史查重记录。本机 `~/.hermes/state/sehuatang_forum95_seen.json` 只读，既有未跟踪 `docs/examples/` 保持不变。
+- 验证：待核对 `c40e134..HEAD` 累计部署范围、远端环境备份、push hook 构建/migration/健康检查、Token 正反鉴权、两表约束、导入汇总与数据库计数；未完成 Hermes 脚本切换。
+
 ## 2026-08-04 16:36 +0800
 - 进度：完成 ADR-0020 后端实现。新增 `0037` 两表迁移、`source + external_post_id` 原子查重、`pending` 唯一恢复例外、最终检查结果指纹幂等/冲突保护、多附件与多 ED2K 顺序持久化、有效发现请求触发的 30 天清理、独立 Hermes Bearer Token、真实 HTTP 状态码及请求体限制。一次性导入命令只接受本机混合状态文件中明确的 `tid:<数字>` 键，按接口每批最多 100 条导入，不修改状态文件或 Hermes 任务。
 - 影响文件：`migrations/0037_collected_forum_posts.*.sql`、`internal/{models,repository,services,middleware,handlers}/hermes_*`、`internal/{config/config.go,config/config_test.go,handlers/router.go,repository/migrations_test.go}`、`cmd/import-hermes-forum-seen/*`、`main.go`、`.env.example`、`docs/run.md`、`CONTEXT.md`、`plan.md`；未修改 Android/TV、管理端、本机 Hermes 脚本与任务，既有未跟踪 `docs/examples/` 保持不变。
