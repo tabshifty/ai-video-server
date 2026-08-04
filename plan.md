@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-04 22:40 +0800
+- 进度：管理端论坛资源列表已部署到家用部署机。`git push deploy master` 将部署机 `master` 从 `e07924b` 更新到 `7705c72`；hook 判定 `RESTART_GO=1 REBUILD_FRONTEND=1`，完成 `npm ci && npm run build`、Go 构建与稳定签名、migration、server/worker hard restart，`/healthz OK`。
+- 影响文件：部署机 `repo.git`、`current/admin-web-dist`、稳定 Go binary 与 launchd server/worker；代码提交范围仍不含 `docs/examples/`。GitHub 镜像同步本次因 hook 网络/远端条件失败并按既有 fail-open 规则记录为 non-fatal，未影响家用部署机发布。
+- 验证：部署机 `refs/heads/master=7705c721f383b2425d15844f63da32208c4a577c`；server PID `44556`、worker PID `44573` 均为 `running` 且 `last exit code=0`。`/admin/` 与 `/admin/forum-posts` 返回 HTTP 200，未携带凭证访问 `/api/v1/admin/forum-posts` 返回 `{code:401}`；生产入口为 `http://192.168.1.24:8080/admin/forum-posts`。部署 hook 的 `npm ci` 报告 7 个依赖审计告警（2 moderate、4 high、1 critical），未改变本次依赖内容。
+
 ## 2026-08-04 22:36 +0800
 - 进度：开始把管理端论坛资源列表提交 `09875fb` 推送到家用部署机。目标为 `deploy/master`，沿用部署机 `post-receive` hook 完成管理端构建、Go 构建及 server/worker hard restart；不改数据库结构、部署环境变量或数据层生命周期。
 - 影响文件：`plan.md`；外部影响为家用部署机代码、管理端静态产物及 server/worker 进程，既有未跟踪 `docs/examples/` 不纳入提交。
