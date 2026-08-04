@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-04 16:18 +0800
+- 进度：完成 Hermes 论坛帖子采集入库设计文档。ADR 已固化一对多帖子/资源模型、`source + tid` 唯一查重、`dedupe_only/pending/最终状态` 约束、批量发现与单帖检查接口、检查结果不可变、独立机器 Token、数据库先成功再推送、请求触发的 30 天清理及历史基线切换；`CONTEXT.md` 已同步长期领域术语。此次仅完成设计，不实现 migration、Go 接口或 Hermes 脚本。
+- 影响文件：`docs/adr/0020-hermes-forum-post-ingestion.md`（新增）、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：`git diff --check` 通过；三个 ADR JSON 示例均可解析；11 项关键契约静态核对通过；本次三个 Markdown 文件均为 UTF-8，U+FFFD 乱码扫描无命中；ADR 关联的 migration、前向兼容 ADR 和 Hermes 本机脚本/状态文件均存在。
+
+## 2026-08-04 16:01 +0800
+- 进度：完成 Hermes 色花堂帖子采集入库的可行性访谈并收口设计。Hermes 继续负责每 15 分钟调度、站点抓取、正文检查、重试和 Telegram 推送；项目后端仅提供按 `source + tid` 查重的两阶段机器接口及 PostgreSQL 持久化。首期不做展示、下载任务或资源级查重；帖子与多条附件/ED2K 作为一次性采集快照保留 30 天，现有 `seen.json` 通过 `dedupe_only` 模式导入。
+- 影响文件：`docs/adr/0020-hermes-forum-post-ingestion.md`（新增）、`CONTEXT.md`、`plan.md`；未修改 Go、migration、Hermes 本机脚本、Android/TV 或管理端，既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：待完成 ADR 与长期术语写入后运行 `git diff --check`、本次 Markdown U+FFFD 乱码扫描、链接与状态/接口契约人工核对，并精确提交上述文档。
+
 ## 2026-08-02 23:18 +0800
 - 进度：完成管理端上传视频页“所属合集”选择器的就地新增功能。桌面端选择框右侧显示带加号图标的“新增合集”按钮，窄屏改为上下布局；弹窗仅收集名称，创建后立即写入远程候选并自动关联到本次上传。创建请求复用既有 `POST /admin/collections`，没有改变上传 API、后端或 Android/TV 版本。
 - 影响文件：`admin-web/src/views/VideoUpload.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。
