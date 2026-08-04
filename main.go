@@ -197,6 +197,8 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
 	archiveImportSvc := services.NewArchiveImportService(pool, uploadSvc, imageSvc, repo, archiveImportQueueAdapter{enqueuer: enqueuer}, cfg.StorageRoot, cfg.UploadTempDir, logger)
+	hermesForumRepo := repository.NewHermesForumRepository(repo)
+	hermesForumSvc := services.NewHermesForumService(hermesForumRepo)
 	passwordVaultCipher, err := services.NewPasswordVaultCipher(cfg.PasswordVaultKey)
 	if err != nil {
 		return err
@@ -215,6 +217,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		imageSvc,
 		subtitleSvc,
 		archiveImportSvc,
+		hermesForumSvc,
 		enqueuer,
 		logger,
 		redisClient,
@@ -223,6 +226,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		cfg.AsynqQueue,
 		cfg.JWTSecret,
 		cfg.PlayURLSignSecret,
+		cfg.HermesAPIToken,
 		cfg.AccessTokenTTL,
 		cfg.RefreshTokenTTL,
 		cfg.MaxVideoSize,

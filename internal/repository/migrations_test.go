@@ -30,6 +30,26 @@ func TestVideoTranscodedFileSizeMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)alter\s+table\s+videos\s+drop\s+column\s+if\s+exists\s+transcoded_file_size`)
 }
 
+func TestCollectedForumPostsMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0037_collected_forum_posts.up.sql")
+	down := readMigrationForTest(t, "0037_collected_forum_posts.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+collected_forum_posts`)
+	assertSQLPattern(t, up, `(?is)unique\s*\(\s*source\s*,\s*external_post_id\s*\)`)
+	assertSQLPattern(t, up, `(?is)'dedupe_only'.*'pending'.*'inspected'.*'restricted'.*'failed'`)
+	assertSQLPattern(t, up, `(?is)filter_reasons\s+jsonb\s+not\s+null\s+default\s+'\[\]'::jsonb`)
+	assertSQLPattern(t, up, `(?is)jsonb_typeof\s*\(\s*filter_reasons\s*\)\s*=\s*'array'`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_collected_forum_posts_created_at`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+collected_forum_post_resources`)
+	assertSQLPattern(t, up, `(?is)references\s+collected_forum_posts\s*\(\s*id\s*\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, up, `(?is)kind\s+in\s*\(\s*'attachment'\s*,\s*'ed2k'\s*\)`)
+	assertSQLPattern(t, up, `(?is)unique\s*\(\s*post_id\s*,\s*kind\s*,\s*position\s*\)`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+collected_forum_post_resources`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+collected_forum_posts`)
+}
+
 func TestIPTVPlaylistMigration(t *testing.T) {
 	t.Parallel()
 

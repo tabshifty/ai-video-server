@@ -19,6 +19,7 @@ type Config struct {
 	JWTSecret                  string
 	PlayURLSignSecret          string
 	PasswordVaultKey           string
+	HermesAPIToken             string
 	StorageRoot                string
 	PosterStoragePath          string
 	AdminWebDistPath           string
@@ -67,6 +68,7 @@ func Load() (Config, error) {
 		JWTSecret:                  os.Getenv("JWT_SECRET"),
 		PlayURLSignSecret:          os.Getenv("PLAY_URL_SIGN_SECRET"),
 		PasswordVaultKey:           os.Getenv("PASSWORD_VAULT_KEY"),
+		HermesAPIToken:             strings.TrimSpace(os.Getenv("HERMES_API_TOKEN")),
 		StorageRoot:                getEnv("STORAGE_ROOT", "./storage"),
 		PosterStoragePath:          getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
 		AdminWebDistPath:           getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist"),

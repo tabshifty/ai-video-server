@@ -6,6 +6,7 @@
 - `Hermes 两阶段采集协议`：Hermes 先通过批量 `discover` 接口登记版块候选并按 `tid` 取得 `created`、`pending` 或 `duplicate`，只对需要处理的记录抓正文，再通过单帖 `inspection` 接口一次性提交状态、筛选快照和全部已提取资源。`pending` 是重复过滤的唯一例外，用于恢复登记成功但结果尚未提交的中断窗口；是否继续检查和如何重试完全由 Hermes 决定。
 - `Hermes 检查结果不可变`：论坛采集记录只允许从 `pending` 一次进入 `inspected`、`restricted` 或 `failed`。相同最终结果可幂等重放，不同结果不得覆盖并返回 HTTP 409；受限或失败结果仍保存已经提取到的部分资源。后端不保存原始 HTML、完整正文或 Telegram 投递状态。
 - `Hermes tid 查重窗口`：项目数据库只保证帖子首次入库后 30 天内按 `source + tid` 查重；每次有效 `discover` 请求按服务端 `created_at` 顺带清理更早记录，重复发现不续期。现有 `seen.json` 通过同一接口的 `dedupe_only` 模式导入为历史基线，核对完成后不再作为查重权威。
+- `Hermes 历史 tid 键`：本机 `seen.json` 的 `seen_threads` 混有旧版 URL/哈希键和新版 `tid:<数字>` 键。历史导入只能接受明确的 `tid:<数字>`，不得从旧 URL 猜测或派生 tid；重复键与旧键计入导入报告的 `ignored_entries`，格式为 `tid:` 但值非数字时必须中止。
 - `Hermes 筛选快照`：Hermes 在完成帖子检查时提交 `included` 或 `excluded` 及原因字符串数组；项目后端只校验和记录，不解释原因、不重算筛选，也不按附件、ED2K、标题或正文去重。
 - `Hermes 机器接口边界`：Hermes 继续负责每 15 分钟调度、站点登录态、抓取、重试、筛选与 Telegram 推送；项目后端只提供持久化接口和请求触发的 30 天清理。机器请求使用独立 `HERMES_API_TOKEN`，不得复用管理员 JWT 或直连 PostgreSQL；首期只允许受信任家庭局域网 HTTP，检查结果入库成功后才允许推送，离开受信任局域网前必须先启用 HTTPS。详见 `docs/adr/0020-hermes-forum-post-ingestion.md`。
 

@@ -187,6 +187,19 @@ func TestLoadDefaultsImageGenerationModel(t *testing.T) {
 	}
 }
 
+func TestLoadIncludesHermesAPIToken(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("HERMES_API_TOKEN", "hermes-machine-token")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.HermesAPIToken != "hermes-machine-token" {
+		t.Fatalf("unexpected HermesAPIToken: %q", cfg.HermesAPIToken)
+	}
+}
+
 func TestLoadRequiresPasswordVaultKey(t *testing.T) {
 	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
 	t.Setenv("JWT_SECRET", "secret")

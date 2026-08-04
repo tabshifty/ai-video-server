@@ -2,6 +2,16 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-04 16:36 +0800
+- 进度：完成 ADR-0020 后端实现。新增 `0037` 两表迁移、`source + external_post_id` 原子查重、`pending` 唯一恢复例外、最终检查结果指纹幂等/冲突保护、多附件与多 ED2K 顺序持久化、有效发现请求触发的 30 天清理、独立 Hermes Bearer Token、真实 HTTP 状态码及请求体限制。一次性导入命令只接受本机混合状态文件中明确的 `tid:<数字>` 键，按接口每批最多 100 条导入，不修改状态文件或 Hermes 任务。
+- 影响文件：`migrations/0037_collected_forum_posts.*.sql`、`internal/{models,repository,services,middleware,handlers}/hermes_*`、`internal/{config/config.go,config/config_test.go,handlers/router.go,repository/migrations_test.go}`、`cmd/import-hermes-forum-seen/*`、`main.go`、`.env.example`、`docs/run.md`、`CONTEXT.md`、`plan.md`；未修改 Android/TV、管理端、本机 Hermes 脚本与任务，既有未跟踪 `docs/examples/` 保持不变。
+- 验证：新增测试先取得缺少类型、迁移、服务与中间件的预期红灯；实现后 Hermes 定向测试、导入命令测试及这些用例的 `-race` 均通过，`go vet ./...` 通过。`go test ./... -count=1` 除既有 `TestParseTVAPKMetadataParsesReleaseAPK` 仍将 release APK 实际 `version_code=144` 与硬编码期望 `121` 比较失败外均通过。完整 handlers 包的 `-race` 仍会命中既有并行测试同时调用 Gin 全局 `SetMode` 的数据竞争；本次新增 handler 测试已改为串行并单独通过竞态检查。本机无 Docker、`psql` 和 `golangci-lint`，未执行真实 PostgreSQL migration 集成测试与 golangci-lint；migration 静态契约测试通过。
+
+## 2026-08-04 16:24 +0800
+- 进度：开始实现 ADR-0020 的 Hermes 论坛帖子采集入库。计划新增前向兼容 `0037` migration、独立 repository/service、Hermes Bearer Token 中间件、批量 `discover` 与单帖 `inspection` 处理器、配置和一次性 `seen.json` 导入命令；先以定向测试锁定 `source + tid` 查重、`pending` 例外、最终结果不可变、多附件/多 ED2K、30 天清理与真实 HTTP 状态码。后端部署可用前不切换正在运行的 Hermes 任务。
+- 影响文件：预计 `migrations/0037_*`、`internal/{models,repository,services,middleware,handlers}` 相关新增文件及测试、`internal/config`、`main.go`、`.env.example`、`cmd/import-hermes-forum-seen/`、`CONTEXT.md`、`plan.md`；不修改 Android/TV、管理端或现有 Hermes 本机脚本，既有未跟踪 `docs/examples/` 保持不变。
+- 验证：待执行新增测试红灯、相关 Go 包定向测试与 `-race`、`go test ./... -count=1`、`go vet ./...`、可用时 `golangci-lint run`、migration 静态契约、导入命令测试、`git diff --check`、gofmt 和乱码扫描。
+
 ## 2026-08-04 16:18 +0800
 - 进度：完成 Hermes 论坛帖子采集入库设计文档。ADR 已固化一对多帖子/资源模型、`source + tid` 唯一查重、`dedupe_only/pending/最终状态` 约束、批量发现与单帖检查接口、检查结果不可变、独立机器 Token、数据库先成功再推送、请求触发的 30 天清理及历史基线切换；`CONTEXT.md` 已同步长期领域术语。此次仅完成设计，不实现 migration、Go 接口或 Hermes 脚本。
 - 影响文件：`docs/adr/0020-hermes-forum-post-ingestion.md`（新增）、`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。

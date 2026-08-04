@@ -124,6 +124,18 @@ go run ./cmd/backfill-video-transcoded-file-size --batch-size=100 --apply
 
 命令只接受 `STORAGE_ROOT/videos/` 下的绝对常规非空文件；路径越界、文件缺失、空文件和写库失败都会留在 `failures` 中，命令将以非零状态退出。可修复这些项后重复运行，已存在的大小会按当前文件元数据重新校准。
 
+## 导入 Hermes 论坛历史 tid
+
+先部署包含 `0037_collected_forum_posts` migration 的后端，并在服务端与执行命令的环境中配置相同的 `HERMES_API_TOKEN`。确认机器接口可用后执行：
+
+```bash
+HERMES_API_TOKEN='实际机器令牌' go run ./cmd/import-hermes-forum-seen \
+  --state="$HOME/.hermes/state/sehuatang_forum95_seen.json" \
+  --base-url=http://127.0.0.1:8080
+```
+
+命令只导入 `seen_threads` 中明确的 `tid:<数字>` 键，旧版 URL/哈希键不会用于推导 tid。它按最多 100 条调用 `dedupe_only` 发现接口，输出 `input_tids`、`ignored_entries`、`submitted`、`created`、`pending` 和 `duplicate` JSON 汇总；任一批失败或响应数量不一致时立即停止并以非零状态退出。核对 `submitted = created + pending + duplicate` 后，才能让 Hermes 改用项目接口查重；该命令不会修改原状态文件或正在运行的定时任务。
+
 ## 停止全部进程
 
 ```bash

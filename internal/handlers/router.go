@@ -71,6 +71,7 @@ type API struct {
 	imageSvc              *services.ImageService
 	subtitleSvc           *services.SubtitleService
 	archiveImportSvc      archiveImportService
+	hermesForumSvc        hermesForumService
 	tvAPKSvc              tvAPKService
 	iptvSvc               iptvService
 	enqueuer              taskEnqueuer
@@ -92,9 +93,10 @@ type API struct {
 	enableSwagger         bool
 	imageGenerationConfig ImageGenerationConfig
 	passwordVaultCipher   *services.PasswordVaultCipher
+	hermesAPIToken        string
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, hermesForumSvc hermesForumService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret, hermesAPIToken string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
 	return &API{
 		repo:                  repo,
 		orphanFileScanRepo:    repo,
@@ -106,6 +108,7 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		imageSvc:              imageSvc,
 		subtitleSvc:           subtitleSvc,
 		archiveImportSvc:      archiveImportSvc,
+		hermesForumSvc:        hermesForumSvc,
 		tvAPKSvc:              services.NewTVAPKService(repo, uploadTempDir, storageRoot),
 		iptvSvc:               services.NewIPTVService(repo, nil),
 		enqueuer:              enqueuer,
@@ -127,12 +130,18 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		enableSwagger:         enableSwagger,
 		imageGenerationConfig: imageGenerationConfig,
 		passwordVaultCipher:   passwordVaultCipher,
+		hermesAPIToken:        hermesAPIToken,
 	}
 }
 
 func (a *API) Register(r *gin.Engine) {
 	v1 := r.Group("/api/v1")
 	{
+		hermes := v1.Group("/integrations/hermes", middleware.HermesTokenMiddleware(a.hermesAPIToken))
+		{
+			hermes.POST("/forum-posts/discover", a.HermesDiscoverForumPosts)
+			hermes.PUT("/forum-posts/:id/inspection", a.HermesCompleteForumPostInspection)
+		}
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/register", a.RegisterAuth)
