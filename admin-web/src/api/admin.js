@@ -187,6 +187,7 @@ export const generateAdminImage = (payload) =>
   })
 
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
+export const getAdminForumPosts = (params) => request.get('/admin/forum-posts', { params })
 
 export const startOrphanFileScan = () => request.post('/admin/system/orphan-files/scan')
 export const getLatestOrphanFileScan = () => request.get('/admin/system/orphan-files/latest')

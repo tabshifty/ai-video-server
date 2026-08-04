@@ -39,6 +39,14 @@ describe('resolveRouterHistoryBase', () => {
     expect(taskRoute).not.toContain('hideShellPageHeader')
   })
 
+  it('论坛资源使用壳层标题并注册独立路由', () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
+    const forumRoute = source.split('\n').find((line) => line.includes("path: '/forum-posts'")) || ''
+
+    expect(forumRoute).toContain("{ path: '/forum-posts', component: ForumPostList }")
+    expect(forumRoute).not.toContain('hideShellPageHeader')
+  })
+
   it('视频资源页使用壳层标题且保持原有路由目标', () => {
     const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8')
     const videoRoute = source.split('\n').find((line) => line.includes("path: '/videos'"))

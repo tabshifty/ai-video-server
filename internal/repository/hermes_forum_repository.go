@@ -26,6 +26,68 @@ func NewHermesForumRepository(videoRepo *VideoRepository) *HermesForumRepository
 	return &HermesForumRepository{videoRepo: videoRepo}
 }
 
+func buildAdminForumPostListSQL(page, pageSize int) (string, string, []any) {
+	const where = `
+WHERE p.inspection_status = 'inspected'
+  AND p.filter_decision = 'included'
+  AND p.created_at >= NOW() - INTERVAL '30 days'`
+	countSQL := `SELECT COUNT(*) FROM collected_forum_posts p` + where
+	listSQL := `
+SELECT p.id,
+       p.title,
+       p.url,
+       COALESCE(
+           ARRAY_AGG(r.value ORDER BY r.position) FILTER (WHERE r.kind = 'attachment'),
+           ARRAY[]::TEXT[]
+       ) AS attachments,
+       COALESCE(
+           ARRAY_AGG(r.value ORDER BY r.position) FILTER (WHERE r.kind = 'ed2k'),
+           ARRAY[]::TEXT[]
+       ) AS ed2k_links,
+       p.observed_at
+FROM collected_forum_posts p
+LEFT JOIN collected_forum_post_resources r ON r.post_id = p.id` + where + `
+GROUP BY p.id, p.title, p.url, p.observed_at
+ORDER BY p.observed_at DESC, p.id DESC
+LIMIT $1 OFFSET $2`
+	return countSQL, listSQL, []any{pageSize, (page - 1) * pageSize}
+}
+
+// ListAdminForumPosts returns the recent, included forum resource projection for the admin UI.
+func (r *HermesForumRepository) ListAdminForumPosts(ctx context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
+	countSQL, listSQL, listArgs := buildAdminForumPostListSQL(page, pageSize)
+	var total int
+	if err := r.videoRepo.pool.QueryRow(ctx, countSQL).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count admin forum posts: %w", err)
+	}
+
+	rows, err := r.videoRepo.pool.Query(ctx, listSQL, listArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list admin forum posts: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.AdminForumPostListItem, 0, pageSize)
+	for rows.Next() {
+		var item models.AdminForumPostListItem
+		if err := rows.Scan(
+			&item.ID,
+			&item.Title,
+			&item.URL,
+			&item.Attachments,
+			&item.ED2KLinks,
+			&item.ObservedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan admin forum post: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate admin forum posts: %w", err)
+	}
+	return items, total, nil
+}
+
 func (r *HermesForumRepository) DiscoverForumPosts(ctx context.Context, input models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error) {
 	tx, err := r.videoRepo.pool.Begin(ctx)
 	if err != nil {

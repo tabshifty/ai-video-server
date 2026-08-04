@@ -35,6 +35,7 @@ import {
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
+  getAdminForumPosts,
   getAdminPasswordVaultEntries,
   getAdminPasswordVaultPassword,
   deleteAdminArchiveImportBatch,
@@ -81,6 +82,21 @@ import {
   uploadAdminVideoSubtitle,
   uploadAdminImages
 } from './admin'
+
+describe('admin forum post api', () => {
+  beforeEach(() => {
+    get.mockReset()
+    get.mockResolvedValue({ ok: true })
+  })
+
+  it('loads the read-only forum post list with pagination', async () => {
+    await getAdminForumPosts({ page: 2, page_size: 20 })
+
+    expect(get).toHaveBeenCalledWith('/admin/forum-posts', {
+      params: { page: 2, page_size: 20 }
+    })
+  })
+})
 
 describe('uploadAdminImages', () => {
   beforeEach(() => {

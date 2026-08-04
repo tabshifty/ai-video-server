@@ -41,6 +41,7 @@ export const adminShellNavGroups = [
     items: [
       { path: '/iptv', label: 'IPTV 管理', title: 'IPTV 管理', icon: 'Monitor', alias: 'iptv live' },
       { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' },
+      { path: '/forum-posts', label: '论坛资源', title: '论坛资源', icon: 'Link', alias: 'forum forums hermes forum-posts hermes-forum luntan ziyuan ltz y' },
       {
         path: '/toolbox',
         label: '工具箱',

@@ -12,14 +12,25 @@ import (
 )
 
 type hermesForumRepositoryStub struct {
-	discoverInput    models.ForumPostDiscoverInput
-	discoverResults  []models.ForumPostDiscoverResult
-	discoverErr      error
-	inspectionPostID uuid.UUID
-	inspectionInput  models.ForumPostInspectionInput
-	inspectionHash   string
-	inspectionResult models.ForumPostInspectionResult
-	inspectionErr    error
+	adminListPage     int
+	adminListPageSize int
+	adminListItems    []models.AdminForumPostListItem
+	adminListTotal    int
+	adminListErr      error
+	discoverInput     models.ForumPostDiscoverInput
+	discoverResults   []models.ForumPostDiscoverResult
+	discoverErr       error
+	inspectionPostID  uuid.UUID
+	inspectionInput   models.ForumPostInspectionInput
+	inspectionHash    string
+	inspectionResult  models.ForumPostInspectionResult
+	inspectionErr     error
+}
+
+func (s *hermesForumRepositoryStub) ListAdminForumPosts(_ context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
+	s.adminListPage = page
+	s.adminListPageSize = pageSize
+	return s.adminListItems, s.adminListTotal, s.adminListErr
 }
 
 func (s *hermesForumRepositoryStub) DiscoverForumPosts(_ context.Context, input models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error) {
@@ -32,6 +43,30 @@ func (s *hermesForumRepositoryStub) CompleteForumPostInspection(_ context.Contex
 	s.inspectionInput = input
 	s.inspectionHash = fingerprint
 	return s.inspectionResult, s.inspectionErr
+}
+
+func TestHermesForumServiceListsAdminReadModel(t *testing.T) {
+	t.Parallel()
+
+	wantItems := []models.AdminForumPostListItem{{
+		ID:          uuid.New(),
+		Title:       "帖子标题",
+		URL:         "https://sehuatang.org/thread-1",
+		Attachments: []string{"https://sehuatang.org/attachment.php?aid=1"},
+		ED2KLinks:   []string{"ed2k://|file|a.zip|1|0123456789ABCDEF0123456789ABCDEF|/"},
+	}}
+	repo := &hermesForumRepositoryStub{adminListItems: wantItems, adminListTotal: 21}
+
+	items, total, err := NewHermesForumService(repo).ListAdmin(context.Background(), 2, 20)
+	if err != nil {
+		t.Fatalf("ListAdmin returned error: %v", err)
+	}
+	if repo.adminListPage != 2 || repo.adminListPageSize != 20 {
+		t.Fatalf("repository pagination=(%d,%d), want (2,20)", repo.adminListPage, repo.adminListPageSize)
+	}
+	if len(items) != 1 || items[0].ID != wantItems[0].ID || total != 21 {
+		t.Fatalf("items=%#v total=%d, want=%#v total=21", items, total, wantItems)
+	}
 }
 
 func TestHermesForumServiceDiscoverValidatesWholeBatch(t *testing.T) {

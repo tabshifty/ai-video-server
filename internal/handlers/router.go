@@ -220,6 +220,7 @@ func (a *API) Register(r *gin.Engine) {
 		{
 			admin.GET("/events/ws", a.AdminEventsStream)
 			admin.GET("/stats", a.AdminStats)
+			admin.GET("/forum-posts", a.AdminForumPosts)
 			admin.GET("/iptv/playlist", a.AdminIPTVPlaylist)
 			admin.POST("/iptv/playlist/upload", a.AdminIPTVUploadPlaylist)
 			admin.PUT("/iptv/playlist/source", a.AdminIPTVSaveSource)

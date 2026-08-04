@@ -9,6 +9,8 @@
 - `Hermes 历史 tid 键`：本机 `seen.json` 的 `seen_threads` 混有旧版 URL/哈希键和新版 `tid:<数字>` 键。历史导入只能接受明确的 `tid:<数字>`，不得从旧 URL 猜测或派生 tid；重复键与旧键计入导入报告的 `ignored_entries`，格式为 `tid:` 但值非数字时必须中止。
 - `Hermes 筛选快照`：Hermes 在完成帖子检查时提交 `included` 或 `excluded` 及原因字符串数组；项目后端只校验和记录，不解释原因、不重算筛选，也不按附件、ED2K、标题或正文去重。
 - `Hermes 机器接口边界`：Hermes 继续负责每 15 分钟调度、站点登录态、抓取、重试、筛选与 Telegram 推送；项目后端只提供持久化接口和请求触发的 30 天清理。机器请求使用独立 `HERMES_API_TOKEN`，不得复用管理员 JWT 或直连 PostgreSQL；Hermes 脚本从受限 `.env` 读取 `HERMES_FORUM_API_BASE_URL` 与同一 Token，`seen.json` 切换后仅作回滚留档，不再读写或承担查重。首期只允许受信任家庭局域网 HTTP，检查结果入库成功后才允许推送，离开受信任局域网前必须先启用 HTTPS。详见 `docs/adr/0020-hermes-forum-post-ingestion.md`。
+- `admin 论坛资源列表`：管理员在“服务与工具”的 `/forum-posts` 只读浏览最近 30 天内 `inspection_status=inspected` 且 `filter_decision=included` 的[[论坛采集帖子]]。列表一帖一行，按 `observed_at DESC, id DESC` 分页；`dedupe_only`、`pending`、`excluded`、`restricted` 和 `failed` 不属于该浏览投影。读取接口为管理员 JWT 保护的 `GET /api/v1/admin/forum-posts`，不复用 Hermes 机器 Token。
+- `论坛资源原生链接边界`：[[admin 论坛资源列表]]中的标题和附件直接链接 Hermes 入库的原始 HTTP(S) URL，ED2K 直接使用原始 `ed2k://` 作为 `<a href>`；页面只解析 ED2K 文件名作为可见文本，资源按类型内 `position` 原样展示且不去重。点击链接不调用后端，不代理论坛 Cookie，不创建下载或 115 任务，也不记录点击状态。详见 `docs/adr/0021-admin-forum-resource-list.md`。
 
 ## 115 开放平台接入约定
 - `115 官方文档为准`：115 生活开放平台接入以 `https://www.yuque.com/115yun/open` 为唯一主事实源；仓库内 `.codex/skills/115-open-platform` 只维护导航、稳定契约和安全流程，不镜像整站内容。每次实现前必须回查目标页面与更新记录，并记录核对日期。

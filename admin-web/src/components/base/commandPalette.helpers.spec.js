@@ -22,6 +22,8 @@ describe('command palette helpers', () => {
     expect(searchMenuItems('archive import').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
     expect(searchMenuItems('密码管理').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
     expect(searchMenuItems('password vault').map((item) => item.label).slice(0, 1)).toEqual(['工具箱'])
+    expect(searchMenuItems('论坛资源').map((item) => item.label).slice(0, 1)).toEqual(['论坛资源'])
+    expect(searchMenuItems('hermes forum').map((item) => item.label).slice(0, 1)).toEqual(['论坛资源'])
   })
 
   it('keeps every item when the query is empty', () => {
@@ -53,6 +55,7 @@ describe('command palette helpers', () => {
     expect(group.items.map(({ path, label, title, icon, alias }) => ({ path, label, title, icon, alias }))).toEqual([
       { path: '/iptv', label: 'IPTV 管理', title: 'IPTV 管理', icon: 'Monitor', alias: 'iptv live' },
       { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' },
+      { path: '/forum-posts', label: '论坛资源', title: '论坛资源', icon: 'Link', alias: 'forum forums hermes forum-posts hermes-forum luntan ziyuan ltz y' },
       {
         path: '/toolbox',
         label: '工具箱',
@@ -63,6 +66,7 @@ describe('command palette helpers', () => {
     ])
     expect(searchMenuItems('live')[0]).toMatchObject({ path: '/iptv', groupKey: 'service-tools' })
     expect(searchMenuItems('jobs')[0]).toMatchObject({ path: '/tasks', groupKey: 'service-tools' })
+    expect(searchMenuItems('hermes')[0]).toMatchObject({ path: '/forum-posts', groupKey: 'service-tools' })
     expect(searchMenuItems('gjx')[0]).toMatchObject({ path: '/toolbox', groupKey: 'service-tools' })
   })
 

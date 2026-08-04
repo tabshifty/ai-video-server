@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-04 22:33 +0800
+- 进度：完成管理端论坛资源列表最终复核。确认 30 天窗口沿用 ADR-0020 的服务端 `created_at` 保留期，页面按 `observed_at DESC, id DESC` 展示；附件与 ED2K 依 `position` 保序并保留重复值。修正 `Layout.spec.js` 两行缩进，完整差异未发现阻塞问题，既有未跟踪 `docs/examples/` 保持在提交范围外。
+- 影响文件：本次论坛资源后端、管理端、测试、ADR-0021、`CONTEXT.md` 与 `plan.md`；无 migration、Hermes 脚本或 Android/TV 版本改动。
+- 验证：新增 Go 仓储/服务/处理器/路由定向测试与竞态检查通过，`go vet ./...` 通过；管理端 `npm test` 共 41 个文件、664 项通过，`npm run build` 通过（仅既有 chunk 体积警告）；1440px 与 375px Chrome 实测无页面横向溢出、控制台或网络错误，窄屏宽表仅在自身容器滚动。`git diff --check`、gofmt 和乱码扫描通过；`golangci-lint` 未安装。`go test ./... -count=1` 唯一失败为既有 TV APK 元数据断言仍期望 `version_code=121`、实际构建为 `144`，与本次未修改的 TV 代码及版本无关。
+
+## 2026-08-04 22:23 +0800
+- 进度：完成论坛资源管理端核心实现与设计沉淀。后端新增管理员只读分页投影和 `/api/v1/admin/forum-posts` 路由，按 30 天、`inspected + included`、发现时间倒序读取帖子并聚合有序资源；管理端新增“服务与工具 → 论坛资源”、四列表格、原帖/附件/ED2K 原生链接、手动刷新、状态反馈与分页。ADR-0021 和长期术语同步固化只读、无代理、无下载副作用边界。
+- 影响文件：`internal/{models,repository,services,handlers}/hermes_forum*`、`internal/handlers/router.go`、`admin-web/src/{api/admin*,components/Layout*,components/base/commandPalette.helpers*,router/index*,views/ForumPostList*}`、`docs/adr/0021-admin-forum-resource-list.md`、`CONTEXT.md`、`plan.md`；未新增 migration，未修改 Hermes 脚本、Android/TV 版本或既有未跟踪 `docs/examples/`。
+- 验证：后端 4 项新增仓储/服务/处理器/路由定向测试通过；管理端 5 个相关测试文件 67 项通过，红灯阶段曾分别因缺少新类型、方法、API、页面、路由和菜单项按预期失败。待执行 Go 竞态与受影响包测试、管理端全量测试与构建、全量 Go 测试、vet/lint、响应式页面检查、静态检查及提交。
+
+## 2026-08-04 22:14 +0800
+- 进度：完成 Hermes 论坛资源管理端展示的需求访谈并开始实施。新增管理员只读分页接口，只返回最近 30 天内 `inspected + included` 的论坛帖子，按发现时间倒序并保留附件/ED2K 原始顺序与重复值；管理端在“服务与工具”新增“论坛资源”四列表格，提供原帖、附件和原生 ED2K 链接、手动刷新及每页 20 条分页，不增加搜索、轮询、代理下载或写操作。
+- 影响文件：预计 `internal/{models,repository,services,handlers}/hermes_forum*`、`admin-web/src/{api,components/base,router,views}` 相关文件与测试、`docs/adr/0021-admin-forum-resource-list.md`、`CONTEXT.md`、`plan.md`；不修改数据库结构、Hermes 脚本、Android/TV 版本或既有未跟踪 `docs/examples/`。
+- 验证：待先补后端查询/处理器与管理端 API/路由/页面契约测试并确认红灯；实现后执行定向 Go/Vitest、竞态检查、管理端全量测试与构建、`go test ./... -count=1`、`go vet ./...`、可用时 `golangci-lint run`、响应式页面检查、`git diff --check`、gofmt 和乱码扫描。
+
 ## 2026-08-04 17:17 +0800
 - 进度：完成 Hermes 论坛采集接口部署、历史基线导入和定时任务切换。家用部署机从 `c40e134` 部署到 `923dfca`，hook 完成前端/Go 构建、签名、`0037` migration、server/worker 重启和健康检查；服务端 `.env` 已备份并配置 64 位随机机器 Token。首次导入 1188 个明确 tid 全部 `created`，214 个旧版 URL/哈希键被忽略；重复导入 1188 条全部 `duplicate`。本机 Hermes 脚本和 `.env` 已各自备份，脚本停止读写 `seen.json`，改为 `discover -> 抓取 -> inspection -> Telegram`，只有检查结果入库成功才输出。
 - 影响文件：`CONTEXT.md`、`docs/run.md`、`plan.md`；外部变更为家用部署机部署仓库/二进制、`.env`、PostgreSQL 两张采集表，以及本机 `~/.hermes/{.env,scripts/watch_sehuatang_forum95.py}`。回滚备份为部署机 `.env.pre-hermes-20260804-170921`、本机 `.env.pre-hermes-forum-api-20260804-171331` 和 `watch_sehuatang_forum95.py.pre-api-20260804-171331`；旧 `seen.json` 保留未删除。

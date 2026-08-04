@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,10 +19,21 @@ import (
 )
 
 type hermesForumServiceStub struct {
-	discoverResult []models.ForumPostDiscoverResult
-	discoverErr    error
-	inspectResult  models.ForumPostInspectionResult
-	inspectErr     error
+	adminListPage     int
+	adminListPageSize int
+	adminListResult   []models.AdminForumPostListItem
+	adminListTotal    int
+	adminListErr      error
+	discoverResult    []models.ForumPostDiscoverResult
+	discoverErr       error
+	inspectResult     models.ForumPostInspectionResult
+	inspectErr        error
+}
+
+func (s *hermesForumServiceStub) ListAdmin(_ context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
+	s.adminListPage = page
+	s.adminListPageSize = pageSize
+	return s.adminListResult, s.adminListTotal, s.adminListErr
 }
 
 func (s *hermesForumServiceStub) Discover(context.Context, models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error) {
@@ -30,6 +42,66 @@ func (s *hermesForumServiceStub) Discover(context.Context, models.ForumPostDisco
 
 func (s *hermesForumServiceStub) CompleteInspection(context.Context, uuid.UUID, models.ForumPostInspectionInput) (models.ForumPostInspectionResult, error) {
 	return s.inspectResult, s.inspectErr
+}
+
+func TestAdminForumPostsReturnsPaginatedReadModel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	observedAt := time.Date(2026, 8, 4, 10, 30, 0, 0, time.UTC)
+	service := &hermesForumServiceStub{
+		adminListResult: []models.AdminForumPostListItem{{
+			ID:          uuid.New(),
+			Title:       "帖子标题",
+			URL:         "https://sehuatang.org/thread-1",
+			Attachments: []string{"https://sehuatang.org/attachment.php?aid=1"},
+			ED2KLinks:   []string{"ed2k://|file|a.zip|1|0123456789ABCDEF0123456789ABCDEF|/"},
+			ObservedAt:  observedAt,
+		}},
+		adminListTotal: 21,
+	}
+	api := &API{hermesForumSvc: service}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/forum-posts?page=2&page_size=20", nil)
+
+	api.AdminForumPosts(ctx)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d, want=%d body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if service.adminListPage != 2 || service.adminListPageSize != 20 {
+		t.Fatalf("service pagination=(%d,%d), want (2,20)", service.adminListPage, service.adminListPageSize)
+	}
+	var envelope struct {
+		Code int `json:"code"`
+		Data struct {
+			Items      []models.AdminForumPostListItem `json:"items"`
+			TotalCount int                             `json:"total_count"`
+			Page       int                             `json:"page"`
+			PageSize   int                             `json:"page_size"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if envelope.Code != 0 || envelope.Data.TotalCount != 21 || envelope.Data.Page != 2 || envelope.Data.PageSize != 20 || len(envelope.Data.Items) != 1 {
+		t.Fatalf("unexpected response: %#v", envelope)
+	}
+}
+
+func TestRegisterIncludesAdminForumPostRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	api := &API{}
+	router := gin.New()
+	api.Register(router)
+
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodGet && route.Path == "/api/v1/admin/forum-posts" {
+			return
+		}
+	}
+	t.Fatal("未注册管理员论坛资源列表路由")
 }
 
 func TestHermesDiscoverForumPostsReturnsRealHTTPStatus(t *testing.T) {

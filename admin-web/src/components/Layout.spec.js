@@ -30,6 +30,8 @@ describe('Layout shell', () => {
     expect(commandPaletteHelper).toContain('媒体库')
     expect(commandPaletteHelper).toContain('录入处理')
     expect(commandPaletteHelper).toContain('工具箱')
+    expect(commandPaletteHelper).toContain('论坛资源')
+    expect(layout).toMatch(/\bLink\b/)
     expect(commandPaletteHelper).toContain('系统')
     expect(layout).toMatch(/CommandPalette|command-palette/i)
   })

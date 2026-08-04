@@ -18,6 +18,7 @@ import ImageManage from '../views/ImageManage.vue'
 import ImageCollectionManage from '../views/ImageCollectionManage.vue'
 import SystemSettings from '../views/SystemSettings.vue'
 import TaskMonitor from '../views/TaskMonitor.vue'
+import ForumPostList from '../views/ForumPostList.vue'
 import Toolbox from '../views/Toolbox.vue'
 import ToolboxEd2k from '../views/ToolboxEd2k.vue'
 import ToolboxArchiveImport from '../views/ToolboxArchiveImport.vue'
@@ -49,7 +50,8 @@ const routes = [
   { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },
   { path: '/toolbox/password-vault', component: ToolboxPasswordVault },
   { path: '/settings', component: SystemSettings },
-  { path: '/tasks', component: TaskMonitor }
+  { path: '/tasks', component: TaskMonitor },
+  { path: '/forum-posts', component: ForumPostList }
 ]
 
 const router = createRouter({

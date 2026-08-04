@@ -23,6 +23,7 @@ var (
 )
 
 type hermesForumRepository interface {
+	ListAdminForumPosts(context.Context, int, int) ([]models.AdminForumPostListItem, int, error)
 	DiscoverForumPosts(context.Context, models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error)
 	CompleteForumPostInspection(context.Context, uuid.UUID, models.ForumPostInspectionInput, string) (models.ForumPostInspectionResult, error)
 }
@@ -33,6 +34,11 @@ type HermesForumService struct {
 
 func NewHermesForumService(repo hermesForumRepository) *HermesForumService {
 	return &HermesForumService{repo: repo}
+}
+
+// ListAdmin returns the paginated read model used by the administrator forum resource page.
+func (s *HermesForumService) ListAdmin(ctx context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
+	return s.repo.ListAdminForumPosts(ctx, page, pageSize)
 }
 
 func (s *HermesForumService) Discover(ctx context.Context, input models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error) {

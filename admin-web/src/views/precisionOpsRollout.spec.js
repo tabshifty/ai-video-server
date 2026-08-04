@@ -4,6 +4,7 @@ import ActorManage from './ActorManage.vue'
 import AVManualScrape from './AVManualScrape.vue'
 import CollectionManage from './CollectionManage.vue'
 import Dashboard from './Dashboard.vue'
+import ForumPostList from './ForumPostList.vue'
 import ImageCollectionManage from './ImageCollectionManage.vue'
 import ImageManage from './ImageManage.vue'
 import IPTVManage from './IPTVManage.vue'
@@ -23,6 +24,7 @@ const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf
 const migratedViews = [
   { file: 'Dashboard.vue', component: 'Dashboard', density: 'compact', compiled: Dashboard },
   { file: 'TaskMonitor.vue', component: 'TaskMonitor', density: 'monitor', compiled: TaskMonitor },
+  { file: 'ForumPostList.vue', component: 'ForumPostList', density: 'compact', compiled: ForumPostList },
   { file: 'VideoList.vue', component: 'VideoList', density: 'compact', compiled: VideoList },
   { file: 'ImageManage.vue', component: 'ImageManage', density: 'compact', compiled: ImageManage },
   { file: 'PendingDeleteShorts.vue', component: 'PendingDeleteShorts', density: 'compact', compiled: PendingDeleteShorts },
@@ -59,7 +61,7 @@ const standaloneViews = {
 }
 const shellViews = [
   'AVManualScrape.vue', 'ActorManage.vue', 'CollectionManage.vue', 'Dashboard.vue',
-  'IPTVManage.vue', 'ImageCollectionManage.vue', 'ImageManage.vue', 'PendingDeleteShorts.vue',
+  'ForumPostList.vue', 'IPTVManage.vue', 'ImageCollectionManage.vue', 'ImageManage.vue', 'PendingDeleteShorts.vue',
   'ScrapePreview.vue', 'SystemSettings.vue', 'TaskMonitor.vue', 'Toolbox.vue',
   'TvAppManage.vue', 'TvSeriesManage.vue', 'UserManage.vue', 'VideoList.vue', 'VideoUpload.vue'
 ]
@@ -173,11 +175,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('assigns all 24 Vue views to exactly one boundary', () => {
+  it('assigns all 25 Vue views to exactly one boundary', () => {
     const actual = readdirSync(new URL('.', import.meta.url)).filter((name) => name.endsWith('.vue')).sort()
     const assigned = [...shellViews, ...standalonePageViews, ...componentViews].sort()
     expect(actual).toEqual(assigned)
-    expect(assigned).toHaveLength(24)
+    expect(assigned).toHaveLength(25)
   })
 
   it('fully removes the ordinary-page compatibility meta', () => {
@@ -185,10 +187,10 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(router).not.toContain('hideShellPageHeader')
   })
 
-  it('固定 17 个已迁移页面与 0 个兼容页面，且集合互不重叠', () => {
+  it('固定 18 个已迁移页面与 0 个兼容页面，且集合互不重叠', () => {
     const migratedFiles = migratedViews.map(({ file }) => file)
 
-    expect(migratedViews).toHaveLength(17)
+    expect(migratedViews).toHaveLength(18)
     expect(pendingShellViews).toHaveLength(0)
     expect(new Set(migratedFiles).size).toBe(migratedFiles.length)
     expect(new Set(pendingShellViews).size).toBe(pendingShellViews.length)

@@ -11,14 +11,33 @@ import (
 	"github.com/google/uuid"
 
 	"video-server/internal/models"
+	"video-server/internal/response"
 	"video-server/internal/services"
 )
 
 const hermesForumMaxRequestBytes = 2 * 1024 * 1024
 
 type hermesForumService interface {
+	ListAdmin(context.Context, int, int) ([]models.AdminForumPostListItem, int, error)
 	Discover(context.Context, models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error)
 	CompleteInspection(context.Context, uuid.UUID, models.ForumPostInspectionInput) (models.ForumPostInspectionResult, error)
+}
+
+// AdminForumPosts serves the read-only, recent forum resource list to administrators.
+func (a *API) AdminForumPosts(c *gin.Context) {
+	page := parsePage(c.Query("page"), 1)
+	pageSize := parsePageSize(c.Query("page_size"), 20)
+	items, total, err := a.hermesForumSvc.ListAdmin(c.Request.Context(), page, pageSize)
+	if err != nil {
+		response.Error(c, 2501, err.Error())
+		return
+	}
+	ok(c, gin.H{
+		"items":       items,
+		"total_count": total,
+		"page":        page,
+		"page_size":   pageSize,
+	})
 }
 
 func (a *API) HermesDiscoverForumPosts(c *gin.Context) {
