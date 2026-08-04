@@ -2,6 +2,11 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-04 22:36 +0800
+- 进度：开始把管理端论坛资源列表提交 `09875fb` 推送到家用部署机。目标为 `deploy/master`，沿用部署机 `post-receive` hook 完成管理端构建、Go 构建及 server/worker hard restart；不改数据库结构、部署环境变量或数据层生命周期。
+- 影响文件：`plan.md`；外部影响为家用部署机代码、管理端静态产物及 server/worker 进程，既有未跟踪 `docs/examples/` 不纳入提交。
+- 验证：待核对 hook 推送分桶与远端基线，提交本次部署记录后推送 `master:master`，跟踪 hook 输出，并检查远端提交、服务进程与 HTTP 健康状态。
+
 ## 2026-08-04 22:33 +0800
 - 进度：完成管理端论坛资源列表最终复核。确认 30 天窗口沿用 ADR-0020 的服务端 `created_at` 保留期，页面按 `observed_at DESC, id DESC` 展示；附件与 ED2K 依 `position` 保序并保留重复值。修正 `Layout.spec.js` 两行缩进，完整差异未发现阻塞问题，既有未跟踪 `docs/examples/` 保持在提交范围外。
 - 影响文件：本次论坛资源后端、管理端、测试、ADR-0021、`CONTEXT.md` 与 `plan.md`；无 migration、Hermes 脚本或 Android/TV 版本改动。
