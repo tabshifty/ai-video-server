@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.model.ActionTogglePayload
 import com.chee.videos.core.model.AuthExpiredException
 import com.chee.videos.core.model.VideoDetailDto
+import com.chee.videos.core.model.isPhoneSupportedVideoType
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +25,7 @@ data class DetailUiState(
     val accessToken: String = "",
     val preferredPlaybackProfile: String = "",
     val errorMessage: String? = null,
+    val contentUnavailable: Boolean = false,
 )
 
 @HiltViewModel
@@ -44,6 +46,14 @@ class DetailViewModel @Inject constructor(
     }
 
     fun load() {
+        if (!isPhoneSupportedVideoType(videoType)) {
+            _uiState.value = DetailUiState(
+                loading = false,
+                videoType = videoType,
+                contentUnavailable = true,
+            )
+            return
+        }
         viewModelScope.launch {
             val baseUrl = videoRepository.readActiveBaseUrl().orEmpty()
             val accessToken = videoRepository.readAccessToken().orEmpty()
@@ -56,6 +66,7 @@ class DetailViewModel @Inject constructor(
                     accessToken = accessToken,
                     preferredPlaybackProfile = videoRepository.preferredLongFormPlaybackProfile().wireValue,
                     errorMessage = null,
+                    contentUnavailable = false,
                 )
             }
             videoRepository.fetchDetail(videoId)
@@ -65,6 +76,7 @@ class DetailViewModel @Inject constructor(
                             loading = false,
                             detail = detail,
                             errorMessage = null,
+                            contentUnavailable = false,
                         )
                     }
                 }

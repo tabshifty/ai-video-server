@@ -34,8 +34,6 @@ data class PagedVideoListState(
 )
 
 data class HomeUiState(
-    val movie: PagedVideoListState = PagedVideoListState(),
-    val episode: PagedVideoListState = PagedVideoListState(),
     val av: PagedVideoListState = PagedVideoListState(),
     val avSearch: AvSearchState = AvSearchState(),
 )
@@ -58,46 +56,8 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    fun loadCategory(type: String, force: Boolean = false) {
-        if (type == "av") {
-            loadAvBrowse(forceRefresh = force)
-            return
-        }
-
-        val current = stateFor(type)
-        if (current.loaded && !force) {
-            return
-        }
-
-        viewModelScope.launch {
-            updateState(type) { it.copy(loading = true, errorMessage = null) }
-            videoRepository.fetchCategory(type)
-                .onSuccess { payload ->
-                    updateState(type) {
-                        it.copy(
-                            loading = false,
-                            loaded = true,
-                            items = payload.items,
-                            page = payload.page.coerceAtLeast(1),
-                            pageSize = payload.pageSize.coerceAtLeast(1),
-                            totalCount = payload.totalCount.coerceAtLeast(payload.items.size),
-                            hasMore = payload.totalCount > payload.items.size,
-                            errorMessage = null,
-                            loadMoreErrorMessage = null,
-                        )
-                    }
-                }
-                .onFailure { err ->
-                    handleAuthError(err)
-                    updateState(type) {
-                        it.copy(
-                            loading = false,
-                            loaded = true,
-                            errorMessage = err.message ?: "加载失败",
-                        )
-                    }
-                }
-        }
+    fun loadAv(forceRefresh: Boolean = false) {
+        loadAvBrowse(forceRefresh = forceRefresh)
     }
 
     fun updateAvQuery(rawQuery: String) {
@@ -205,7 +165,7 @@ class HomeViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            videoRepository.fetchCategory(type = "av", page = page, pageSize = pageSize)
+            videoRepository.fetchAv(page = page, pageSize = pageSize)
                 .onSuccess { payload ->
                     _uiState.update { state ->
                         state.copy(
@@ -396,26 +356,6 @@ class HomeViewModel @Inject constructor(
                 loadingMore = false,
                 errorMessage = message,
             )
-        }
-    }
-
-    private fun stateFor(type: String): PagedVideoListState {
-        return when (type) {
-            "movie" -> _uiState.value.movie
-            "episode" -> _uiState.value.episode
-            "av" -> _uiState.value.av
-            else -> PagedVideoListState()
-        }
-    }
-
-    private fun updateState(type: String, transform: (PagedVideoListState) -> PagedVideoListState) {
-        _uiState.update { state ->
-            when (type) {
-                "movie" -> state.copy(movie = transform(state.movie))
-                "episode" -> state.copy(episode = transform(state.episode))
-                "av" -> state.copy(av = transform(state.av))
-                else -> state
-            }
         }
     }
 

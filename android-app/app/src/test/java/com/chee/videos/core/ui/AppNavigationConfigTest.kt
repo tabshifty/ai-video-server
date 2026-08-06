@@ -10,8 +10,6 @@ class AppNavigationConfigTest {
             listOf(
                 "短视频" to "short",
                 "合集" to "short_collection",
-                "电影" to "movie",
-                "电视剧" to "episode",
                 "AV" to "av",
             ),
             homeContentTabs.map { it.title to it.type },
@@ -27,6 +25,14 @@ class AppNavigationConfigTest {
                 .map { it.name }
                 .toSet(),
         )
+    }
+
+    @Test
+    fun invalidRestoredHomeTabIndexFallsBackToShortVideo() {
+        assertEquals(0, resolveHomeContentTabIndex(restoredIndex = -1, tabCount = 3))
+        assertEquals(0, resolveHomeContentTabIndex(restoredIndex = 3, tabCount = 3))
+        assertEquals(0, resolveHomeContentTabIndex(restoredIndex = 4, tabCount = 3))
+        assertEquals(2, resolveHomeContentTabIndex(restoredIndex = 2, tabCount = 3))
     }
 
     @Test

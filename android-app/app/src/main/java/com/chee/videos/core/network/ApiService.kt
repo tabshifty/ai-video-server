@@ -18,11 +18,8 @@ import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvDeviceListPayload
 import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
-import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
-import com.chee.videos.core.model.TvSearchPayload
-import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import retrofit2.http.Body
@@ -77,30 +74,6 @@ interface ApiService {
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<ShortCollectionsPayload>
-
-    @GET
-    suspend fun tvHome(
-        @Url url: String,
-        @Header("Authorization") authorization: String,
-        @Query("q") keyword: String? = null,
-        @Query("page") page: Int,
-        @Query("page_size") pageSize: Int,
-    ): ApiEnvelope<TvHomePayload>
-
-    @GET
-    suspend fun tvSearch(
-        @Url url: String,
-        @Header("Authorization") authorization: String,
-        @Query("q") keyword: String,
-        @Query("page") page: Int,
-        @Query("page_size") pageSize: Int,
-    ): ApiEnvelope<TvSearchPayload>
-
-    @GET
-    suspend fun tvSeriesDetail(
-        @Url url: String,
-        @Header("Authorization") authorization: String,
-    ): ApiEnvelope<TvSeriesDetailDto>
 
     @POST
     suspend fun createTvAuthSession(

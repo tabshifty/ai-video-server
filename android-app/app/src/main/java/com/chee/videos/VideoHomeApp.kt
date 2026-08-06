@@ -84,19 +84,10 @@ import com.chee.videos.feature.shortsearch.ShortSearchScreen
 import com.chee.videos.feature.shortsearch.ShortSearchRemoteControlRoutePattern
 import com.chee.videos.feature.shortsearch.ShortSearchRemoteControlScreen
 import com.chee.videos.feature.shortsearch.buildShortSearchRemoteControlRoute
-import com.chee.videos.feature.tv.TvEpisodeArg
-import com.chee.videos.feature.tv.TvPlayerRoutePattern
-import com.chee.videos.feature.tv.TvSeasonArg
-import com.chee.videos.feature.tv.TvSeriesDetailScreen
-import com.chee.videos.feature.tv.TvSeriesIdArg
-import com.chee.videos.feature.tv.TvSeriesPlayerScreen
-import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tvauth.TvAuthApprovalScreen
 import com.chee.videos.feature.tvauth.TvAuthDeepLinkParser
 import com.chee.videos.feature.tvauth.PortraitCaptureActivity
 import com.chee.videos.feature.tvauth.resolveTvAuthDeepLink
-import com.chee.videos.feature.tv.buildTvPlayerRoute
-import com.chee.videos.feature.tv.buildTvSeriesRoute
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
@@ -185,6 +176,17 @@ private fun AuthenticatedNav(
                 scope.launch {
                     snackbarHostState.showSnackbar("未识别为 TV 登录二维码")
                 }
+            }
+        }
+    }
+    val returnFromUnavailableContent: () -> Unit = {
+        scope.launch {
+            snackbarHostState.showSnackbar("该内容不在手机端提供")
+        }
+        if (!navController.popBackStack()) {
+            navController.navigate("home") {
+                popUpTo(navController.graph.findStartDestination().id)
+                launchSingleTop = true
             }
         }
     }
@@ -285,12 +287,6 @@ private fun AuthenticatedNav(
                         onOpenDetail = { videoId, videoType ->
                             navController.navigate(buildVideoDetailRoute(videoId, videoType))
                         },
-                        onOpenTvSeries = { seriesId ->
-                            navController.navigate(buildTvSeriesRoute(seriesId))
-                        },
-                        onOpenTvContinueWatching = { seriesId, season, episode ->
-                            navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
-                        },
                         onOpenShortDiscover = { mode, value, title ->
                             navController.navigate(
                                 "short-discover/${Uri.encode(mode)}/${Uri.encode(value)}/${Uri.encode(title)}",
@@ -375,6 +371,7 @@ private fun AuthenticatedNav(
             ) {
                 DetailScreen(
                     onBack = { navController.popBackStack() },
+                    onUnsupportedContent = returnFromUnavailableContent,
                     onOpenActor = { actorId ->
                         navController.navigate(buildActorRoute(actorId))
                     },
@@ -410,6 +407,7 @@ private fun AuthenticatedNav(
                     source = entry.arguments?.getString("source").orEmpty(),
                     startVideoId = entry.arguments?.getString("videoId").orEmpty(),
                     onBack = { navController.popBackStack() },
+                    onUnsupportedContent = returnFromUnavailableContent,
                 )
             }
 
@@ -459,40 +457,6 @@ private fun AuthenticatedNav(
                     onOpenRemoteControl = { sessionId ->
                         navController.navigate(buildShortSearchRemoteControlRoute(sessionId))
                     },
-                )
-            }
-
-            composable(
-                route = TvSeriesRoutePattern,
-                arguments = listOf(
-                    navArgument(TvSeriesIdArg) { type = NavType.StringType },
-                ),
-            ) {
-                TvSeriesDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    onPlayEpisode = { seriesId, season, episode ->
-                        navController.navigate(buildTvPlayerRoute(seriesId, season, episode))
-                    },
-                )
-            }
-
-            composable(
-                route = TvPlayerRoutePattern,
-                arguments = listOf(
-                    navArgument(TvSeriesIdArg) { type = NavType.StringType },
-                    navArgument(TvSeasonArg) {
-                        type = NavType.IntType
-                        defaultValue = 1
-                    },
-                    navArgument(TvEpisodeArg) {
-                        type = NavType.IntType
-                        defaultValue = 1
-                    },
-                ),
-            ) {
-                TvSeriesPlayerScreen(
-                    accessToken = accessToken,
-                    onBack = { navController.popBackStack() },
                 )
             }
 

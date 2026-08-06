@@ -95,6 +95,7 @@ import com.chee.videos.core.util.UrlBuilder
 @Composable
 fun DetailScreen(
     onBack: () -> Unit,
+    onUnsupportedContent: () -> Unit,
     onOpenActor: (String) -> Unit = {},
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
@@ -107,6 +108,12 @@ fun DetailScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.contentUnavailable) {
+        if (uiState.contentUnavailable) {
+            onUnsupportedContent()
+        }
+    }
 
     BackHandler(enabled = isFullscreen) {
         isFullscreen = false
@@ -149,6 +156,14 @@ fun DetailScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { innerPadding ->
         when {
+            uiState.contentUnavailable -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                )
+            }
+
             uiState.loading -> {
                 Box(
                     modifier = Modifier
@@ -1127,7 +1142,7 @@ private fun AvSectionTitle(title: String) {
 
 private fun isLongFormVideoType(type: String): Boolean {
     val normalized = type.trim().lowercase()
-    return normalized == "movie" || normalized == "episode" || normalized == "av"
+    return normalized == "av"
 }
 
 @Composable

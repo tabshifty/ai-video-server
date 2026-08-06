@@ -20,12 +20,9 @@ import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvDeviceListPayload
-import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
-import com.chee.videos.core.model.TvSearchPayload
-import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
@@ -51,7 +48,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
     @Test
-    fun `loadCategory loads default av list`() = runTest {
+    fun `loadAv loads default av list`() = runTest {
         withMainDispatcher {
             val api = FakeHomeApiService(
                 browsePages = mapOf(
@@ -65,7 +62,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
 
             val state = viewModel.uiState.value
@@ -92,7 +89,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ssis 222")
             awaitUntil {
@@ -139,7 +136,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ipx")
             awaitUntil {
@@ -176,7 +173,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("broken")
             awaitUntil {
@@ -214,7 +211,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.loadMoreAvIfNeeded(1)
             awaitUntil { viewModel.uiState.value.av.page == 2 && !viewModel.uiState.value.av.loadingMore }
@@ -254,7 +251,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.loadMoreAvIfNeeded(1)
             awaitUntil { viewModel.uiState.value.av.page == 2 && !viewModel.uiState.value.av.loadingMore }
@@ -293,7 +290,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ssis")
             awaitUntil {
@@ -345,7 +342,7 @@ class HomeViewModelTest {
             val viewModel = buildViewModel(api)
             viewModel.avSearchDebounceMs = 0
 
-            viewModel.loadCategory("av")
+            viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.loadMoreAvIfNeeded(0)
             awaitUntil {
@@ -521,27 +518,6 @@ private class FakeHomeApiService(
         page: Int,
         pageSize: Int,
     ): ApiEnvelope<ShortCollectionsPayload> = error("unused")
-
-    override suspend fun tvHome(
-        url: String,
-        authorization: String,
-        keyword: String?,
-        page: Int,
-        pageSize: Int,
-    ): ApiEnvelope<TvHomePayload> = error("unused")
-
-    override suspend fun tvSearch(
-        url: String,
-        authorization: String,
-        keyword: String,
-        page: Int,
-        pageSize: Int,
-    ): ApiEnvelope<TvSearchPayload> = error("unused")
-
-    override suspend fun tvSeriesDetail(
-        url: String,
-        authorization: String,
-    ): ApiEnvelope<TvSeriesDetailDto> = error("unused")
 
     override suspend fun createTvAuthSession(
         url: String,

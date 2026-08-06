@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.model.ActorDetailDto
 import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.PhoneContentSourcePage
 import com.chee.videos.core.model.VideoListItemDto
+import com.chee.videos.core.model.loadPhoneContentBatch
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +29,6 @@ data class ActorDetailUiState(
     val loaded: Boolean = false,
     val page: Int = 0,
     val pageSize: Int = ACTOR_WORKS_PAGE_SIZE,
-    val totalCount: Int = 0,
     val hasMore: Boolean = true,
     val errorMessage: String? = null,
     val loadMoreErrorMessage: String? = null,
@@ -98,30 +99,51 @@ class ActorDetailViewModel @Inject constructor(
         val actorId = _uiState.value.actorId
         val pageSize = _uiState.value.pageSize.coerceAtLeast(ACTOR_WORKS_PAGE_SIZE)
         viewModelScope.launch {
-            videoRepository.fetchActorDetail(actorId = actorId, page = page, pageSize = pageSize)
-                .onSuccess { payload ->
-                    _uiState.update { state ->
-                        val mergedItems = if (append) {
-                            (state.items + payload.items).distinctBy { it.id }
-                        } else {
-                            payload.items.distinctBy { it.id }
-                        }
-                        state.copy(
-                            actor = payload.actor,
-                            items = mergedItems,
-                            loading = false,
-                            refreshing = false,
-                            loadingMore = false,
-                            loaded = true,
-                            page = payload.page.coerceAtLeast(page),
-                            pageSize = payload.pageSize.coerceAtLeast(1),
-                            totalCount = payload.totalCount.coerceAtLeast(mergedItems.size),
-                            hasMore = payload.totalCount > mergedItems.size,
-                            errorMessage = null,
-                            loadMoreErrorMessage = null,
+            var loadedActor: ActorDetailDto? = null
+            loadPhoneContentBatch(
+                firstPage = page,
+                minimumVisibleItems = 1,
+                typeOf = VideoListItemDto::type,
+                fetchPage = { sourcePage ->
+                    videoRepository.fetchActorDetail(
+                        actorId = actorId,
+                        page = sourcePage,
+                        pageSize = pageSize,
+                    ).map { payload ->
+                        loadedActor = payload.actor
+                        PhoneContentSourcePage(
+                            items = payload.items,
+                            hasMore = hasMoreSourcePages(
+                                page = payload.page,
+                                pageSize = payload.pageSize,
+                                totalCount = payload.totalCount,
+                            ),
                         )
                     }
+                },
+            ).onSuccess { batch ->
+                _uiState.update { state ->
+                    val mergedItems = if (append) {
+                        (state.items + batch.items).distinctBy { it.id }
+                    } else {
+                        batch.items.distinctBy { it.id }
+                    }
+                    val trailingErrorMessage = batch.trailingError?.message
+                    state.copy(
+                        actor = loadedActor ?: state.actor,
+                        items = mergedItems,
+                        loading = false,
+                        refreshing = false,
+                        loadingMore = false,
+                        loaded = true,
+                        page = batch.lastLoadedPage,
+                        pageSize = pageSize,
+                        hasMore = batch.hasMore,
+                        errorMessage = trailingErrorMessage.takeIf { mergedItems.isEmpty() },
+                        loadMoreErrorMessage = trailingErrorMessage.takeIf { mergedItems.isNotEmpty() },
+                    )
                 }
+            }
                 .onFailure { err ->
                     if (err is AuthExpiredException) {
                         authRepository.logoutLocal()
@@ -143,5 +165,11 @@ class ActorDetailViewModel @Inject constructor(
                     }
                 }
         }
+    }
+
+    private fun hasMoreSourcePages(page: Int, pageSize: Int, totalCount: Int): Boolean {
+        val safePage = page.coerceAtLeast(1)
+        val safePageSize = pageSize.coerceAtLeast(1)
+        return safePage * safePageSize < totalCount.coerceAtLeast(0)
     }
 }

@@ -107,6 +107,7 @@ fun UnifiedPlayerScreen(
     source: String,
     startVideoId: String,
     onBack: () -> Unit,
+    onUnsupportedContent: () -> Unit,
     viewModel: UnifiedPlayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -115,7 +116,17 @@ fun UnifiedPlayerScreen(
         viewModel.load(source = source, startVideoId = startVideoId)
     }
 
+    LaunchedEffect(uiState.contentUnavailable) {
+        if (uiState.contentUnavailable) {
+            onUnsupportedContent()
+        }
+    }
+
     when {
+        uiState.contentUnavailable -> {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+        }
+
         uiState.loading && uiState.items.isEmpty() -> {
             Box(
                 modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding(),
@@ -889,5 +900,5 @@ private fun sourceLabel(source: String): String {
 
 private fun isLongFormVideoType(type: String): Boolean {
     val normalized = type.trim().lowercase()
-    return normalized == "movie" || normalized == "episode" || normalized == "av"
+    return normalized == "av"
 }

@@ -90,7 +90,6 @@ fun ActorDetailScreen(
                     baseUrl = baseUrl,
                     actor = uiState.actor,
                     loading = uiState.loading,
-                    totalCount = uiState.totalCount,
                     onBack = onBack,
                 )
             }
@@ -113,7 +112,7 @@ fun ActorDetailScreen(
 
                 uiState.items.isEmpty() -> {
                     item(span = StaggeredGridItemSpan.FullLine) {
-                        ActorStateCard(message = "暂无可展示作品", showProgress = false)
+                        ActorStateCard(message = "暂无内容", showProgress = false)
                     }
                 }
 
@@ -157,7 +156,6 @@ private fun ActorHeader(
     baseUrl: String,
     actor: ActorDetailDto?,
     loading: Boolean,
-    totalCount: Int,
     onBack: () -> Unit,
 ) {
     Surface(
@@ -185,7 +183,7 @@ private fun ActorHeader(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = if (totalCount > 0) "$totalCount 部作品" else "作品",
+                        text = "作品",
                         style = MaterialTheme.typography.bodyMedium,
                         color = AppChrome.TextSecondary,
                     )
@@ -404,8 +402,6 @@ private fun resolveActorAvatarUrl(baseUrl: String, rawUrl: String?): String? = r
 private fun actorWorkTypeLabel(type: String): String {
     return when (type.trim().lowercase()) {
         "av" -> "AV"
-        "movie" -> "电影"
-        "episode" -> "剧集"
         "short" -> "短视频"
         else -> "视频"
     }

@@ -26,13 +26,6 @@ object UrlBuilder {
 
     fun shortCollections(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/short/collections"
 
-    fun tvHome(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv/home"
-
-    fun tvSearch(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv/search"
-
-    fun tvSeriesDetail(baseUrl: String, seriesId: String): String =
-        "${normalizeBaseUrl(baseUrl)}/api/v1/tv/series/$seriesId"
-
     fun tvAuthSessions(baseUrl: String): String = "${normalizeBaseUrl(baseUrl)}/api/v1/tv-auth/sessions"
 
     fun tvAuthSession(baseUrl: String, sessionId: String): String =

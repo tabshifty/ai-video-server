@@ -15,8 +15,8 @@ class ActorRoutesTest {
     @Test
     fun buildVideoDetailRoute_encodesVideoType() {
         assertEquals(
-            "detail/video-1?type=movie%2Fav",
-            buildVideoDetailRoute(videoId = "video-1", videoType = "movie/av"),
+            "detail/video-1?type=av%2Bspecial",
+            buildVideoDetailRoute(videoId = "video-1", videoType = "av+special"),
         )
     }
 }

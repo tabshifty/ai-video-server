@@ -21,12 +21,9 @@ import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvDeviceDto
 import com.chee.videos.core.model.TvDeviceListPayload
-import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
-import com.chee.videos.core.model.TvSearchPayload
-import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.UserStateDto
 import com.chee.videos.core.model.VideoDetailDto
@@ -360,27 +357,6 @@ private class FakeShortSearchApiService(
         page: Int,
         pageSize: Int,
     ): ApiEnvelope<ShortCollectionsPayload> = error("unused")
-
-    override suspend fun tvHome(
-        url: String,
-        authorization: String,
-        keyword: String?,
-        page: Int,
-        pageSize: Int,
-    ): ApiEnvelope<TvHomePayload> = error("unused")
-
-    override suspend fun tvSearch(
-        url: String,
-        authorization: String,
-        keyword: String,
-        page: Int,
-        pageSize: Int,
-    ): ApiEnvelope<TvSearchPayload> = error("unused")
-
-    override suspend fun tvSeriesDetail(
-        url: String,
-        authorization: String,
-    ): ApiEnvelope<TvSeriesDetailDto> = error("unused")
 
     override suspend fun createTvAuthSession(
         url: String,

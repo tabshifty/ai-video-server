@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -69,10 +67,10 @@ import com.chee.videos.core.model.VideoListItemDto
 import com.chee.videos.core.model.resolveAvPosterUrl
 import com.chee.videos.core.ui.AppChrome
 import com.chee.videos.core.ui.homeContentTabs
+import com.chee.videos.core.ui.resolveHomeContentTabIndex
 import com.chee.videos.core.util.UrlBuilder
 import com.chee.videos.feature.shorts.ShortFeedScreen
 import com.chee.videos.feature.shortcollections.ShortCollectionsScreen
-import com.chee.videos.feature.tv.TvCatalogScreen
 
 private val tabs = homeContentTabs
 
@@ -81,8 +79,6 @@ fun HomeScreen(
     baseUrl: String,
     accessToken: String,
     onOpenDetail: (String, String) -> Unit,
-    onOpenTvSeries: (String) -> Unit,
-    onOpenTvContinueWatching: (String, Int, Int) -> Unit,
     onOpenShortDiscover: (mode: String, value: String, title: String) -> Unit,
     onOpenShortCollection: (collectionId: String, collectionName: String) -> Unit,
     onOpenImageCollectionViewer: (String) -> Unit,
@@ -91,13 +87,19 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val activeTab = resolveHomeContentTabIndex(selectedTab, tabs.size)
     var isShortFullscreen by rememberSaveable { mutableStateOf(false) }
 
+    LaunchedEffect(selectedTab, activeTab) {
+        if (selectedTab != activeTab) {
+            selectedTab = activeTab
+        }
+    }
     LaunchedEffect(isShortFullscreen) {
         onShortFullscreenChange(isShortFullscreen)
     }
-    LaunchedEffect(selectedTab) {
-        if (tabs[selectedTab].type != "short" && isShortFullscreen) {
+    LaunchedEffect(activeTab) {
+        if (tabs[activeTab].type != "short" && isShortFullscreen) {
             isShortFullscreen = false
         }
     }
@@ -105,10 +107,10 @@ fun HomeScreen(
         onDispose { onShortFullscreenChange(false) }
     }
 
-    LaunchedEffect(selectedTab) {
-        val tab = tabs[selectedTab]
-        if (tab.type == "movie" || tab.type == "av") {
-            viewModel.loadCategory(tab.type)
+    LaunchedEffect(activeTab) {
+        val tab = tabs[activeTab]
+        if (tab.type == "av") {
+            viewModel.loadAv()
         }
     }
 
@@ -120,13 +122,13 @@ fun HomeScreen(
     ) {
         if (!isShortFullscreen) {
             HomeHeader(
-                selectedTab = selectedTab,
+                selectedTab = activeTab,
                 onSelectTab = { selectedTab = it },
             )
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            when (tabs[selectedTab].type) {
+            when (tabs[activeTab].type) {
                 "short" -> {
                     ShortFeedScreen(
                         baseUrl = baseUrl,
@@ -141,24 +143,6 @@ fun HomeScreen(
                     ShortCollectionsScreen(
                         baseUrl = baseUrl,
                         onOpenCollection = onOpenShortCollection,
-                    )
-                }
-
-                "movie" -> {
-                    CategoryListSection(
-                        baseUrl = baseUrl,
-                        state = uiState.movie,
-                        categoryTitle = tabs[selectedTab].title,
-                        onRetry = { viewModel.loadCategory("movie", force = true) },
-                        onOpenDetail = onOpenDetail,
-                    )
-                }
-
-                "episode" -> {
-                    TvCatalogScreen(
-                        onOpenSeries = onOpenTvSeries,
-                        onOpenContinueWatching = onOpenTvContinueWatching,
-                        onOpenLongForm = onOpenDetail,
                     )
                 }
 
@@ -695,173 +679,6 @@ private fun AvPosterCard(
     }
 }
 
-@Composable
-private fun CategoryListSection(
-    baseUrl: String,
-    state: PagedVideoListState,
-    categoryTitle: String,
-    onRetry: () -> Unit,
-    onOpenDetail: (String, String) -> Unit,
-) {
-    when {
-        state.loading && state.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = AppChrome.AccentStrong)
-            }
-        }
-
-        !state.errorMessage.isNullOrBlank() && state.items.isEmpty() -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Surface(
-                    color = AppChrome.SurfaceElevated,
-                    shape = AppChrome.CardShape,
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(categoryTitle, color = AppChrome.TextMuted, style = MaterialTheme.typography.labelLarge)
-                        Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
-                        Button(
-                            onClick = onRetry,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = AppChrome.Accent,
-                                contentColor = Color.White,
-                            ),
-                        ) {
-                            Icon(Icons.Filled.Refresh, contentDescription = null)
-                            Text("重试", modifier = Modifier.padding(start = 6.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        else -> {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item(key = "hero") {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = AppChrome.Surface,
-                        shape = AppChrome.CardShape,
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                text = categoryTitle,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = AppChrome.AccentWarm,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                text = "长内容列表改为统一深色排布，浏览与继续观看都更稳定。",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = AppChrome.TextSecondary,
-                            )
-                        }
-                    }
-                }
-                items(state.items, key = { it.id }) { item ->
-                    VideoCard(
-                        baseUrl = baseUrl,
-                        item = item,
-                        onOpenDetail = onOpenDetail,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VideoCard(
-    baseUrl: String,
-    item: VideoListItemDto,
-    onOpenDetail: (String, String) -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(AppChrome.CardShape)
-            .clickable { onOpenDetail(item.id, item.type) },
-        color = AppChrome.SurfaceElevated,
-        shape = AppChrome.CardShape,
-        tonalElevation = 0.dp,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val thumb = resolveThumbnailUrl(baseUrl, item.thumbnailPath)
-            if (!thumb.isNullOrBlank()) {
-                AsyncImage(
-                    model = thumb,
-                    contentDescription = item.title,
-                    modifier = Modifier
-                        .size(width = 128.dp, height = 78.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(width = 128.dp, height = 78.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(AppChrome.SurfaceStrong),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                        tint = AppChrome.TextMuted,
-                    )
-                }
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppChrome.TextPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "${typeLabel(item.type)} · ${if (item.type == "av") formatDurationHms(item.duration) else "${item.duration} 秒"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppChrome.TextMuted,
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Surface(
-                    color = AppChrome.SurfaceStrong,
-                    shape = AppChrome.PillShape,
-                ) {
-                    Text(
-                        text = "打开详情",
-                        color = AppChrome.TextSecondary,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
 private fun buildAvStatusText(
     browseState: PagedVideoListState,
     searchState: AvSearchState,
@@ -877,16 +694,6 @@ private fun buildAvStatusText(
         browseState.refreshing -> "正在刷新默认海报墙"
         browseState.loaded -> "默认浏览 ${browseState.totalCount.coerceAtLeast(browseState.items.size)} 部作品，直接按番号或标题定位"
         else -> "远程搜索当前服务器里的全部 AV 内容"
-    }
-}
-
-private fun typeLabel(type: String): String {
-    return when (type) {
-        "short" -> "短视频"
-        "movie" -> "电影"
-        "episode" -> "电视剧"
-        "av" -> "AV"
-        else -> type
     }
 }
 

@@ -21,12 +21,9 @@ import com.chee.videos.core.model.TvAuthSessionCreatePayload
 import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthSessionStatusPayload
 import com.chee.videos.core.model.TvDeviceListPayload
-import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
-import com.chee.videos.core.model.TvSearchPayload
-import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
@@ -92,6 +89,39 @@ class ActorDetailViewModelTest {
 
             val state = viewModel.uiState.value
             assertEquals(listOf("v1", "v2"), state.items.map { it.id })
+            assertFalse(state.hasMore)
+            assertEquals(
+                listOf(
+                    ActorCall("actor-1", 1, 24),
+                    ActorCall("actor-1", 2, 24),
+                ),
+                api.calls,
+            )
+        }
+    }
+
+    @Test
+    fun initialize_skipsExcludedPagesAndKeepsOnlyPhoneContent() = runTest {
+        withMainDispatcher {
+            val api = FakeActorApiService(
+                pages = mapOf(
+                    1 to listOf(
+                        actorVideo("movie-1", "电影", type = "movie"),
+                        actorVideo("episode-1", "剧集", type = "episode"),
+                    ),
+                    2 to listOf(actorVideo("av-1", "AV", type = "av")),
+                ),
+                totalCount = 3,
+                responsePageSize = 2,
+            )
+            val viewModel = buildViewModel(api)
+
+            viewModel.initialize("actor-1")
+            awaitUntil { viewModel.uiState.value.loaded && !viewModel.uiState.value.loading }
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf("av-1"), state.items.map { it.id })
+            assertEquals(2, state.page)
             assertFalse(state.hasMore)
             assertEquals(
                 listOf(
@@ -192,12 +222,13 @@ private suspend fun TestScope.awaitUntil(
 
 private data class ActorCall(val actorId: String, val page: Int, val pageSize: Int)
 
-private fun actorVideo(id: String, title: String): VideoListItemDto =
-    VideoListItemDto(id = id, title = title, type = "av", thumbnailPath = "/thumb/$id.jpg")
+private fun actorVideo(id: String, title: String, type: String = "av"): VideoListItemDto =
+    VideoListItemDto(id = id, title = title, type = type, thumbnailPath = "/thumb/$id.jpg")
 
 private class FakeActorApiService(
     private val pages: Map<Int, List<VideoListItemDto>> = emptyMap(),
     private val totalCount: Int = pages.values.sumOf { it.size },
+    private val responsePageSize: Int = 1,
     private val errors: Map<Int, Throwable> = emptyMap(),
     private val expireFirstPage: Boolean = false,
 ) : ApiService {
@@ -222,7 +253,7 @@ private class FakeActorApiService(
                 items = pages[page].orEmpty(),
                 totalCount = totalCount,
                 page = page,
-                pageSize = pageSize,
+                pageSize = responsePageSize,
             ),
         )
     }
@@ -235,9 +266,6 @@ private class FakeActorApiService(
     override suspend fun randomShort(url: String, pageSize: Int, excludeIds: String?): ApiEnvelope<FeedPayload> = error("unused")
     override suspend fun shortDiscover(url: String, authorization: String, mode: String, tag: String?, collectionID: String?, page: Int, pageSize: Int): ApiEnvelope<SearchPayload> = error("unused")
     override suspend fun shortCollections(url: String, authorization: String, page: Int, pageSize: Int): ApiEnvelope<ShortCollectionsPayload> = error("unused")
-    override suspend fun tvHome(url: String, authorization: String, keyword: String?, page: Int, pageSize: Int): ApiEnvelope<TvHomePayload> = error("unused")
-    override suspend fun tvSearch(url: String, authorization: String, keyword: String, page: Int, pageSize: Int): ApiEnvelope<TvSearchPayload> = error("unused")
-    override suspend fun tvSeriesDetail(url: String, authorization: String): ApiEnvelope<TvSeriesDetailDto> = error("unused")
     override suspend fun createTvAuthSession(url: String, body: TvAuthSessionCreateRequest): ApiEnvelope<TvAuthSessionCreatePayload> = error("unused")
     override suspend fun getTvAuthSession(url: String): ApiEnvelope<TvAuthSessionStatusPayload> = error("unused")
     override suspend fun approveTvAuthSession(url: String, authorization: String): ApiEnvelope<Map<String, Boolean>> = error("unused")

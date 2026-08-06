@@ -3,7 +3,10 @@ package com.chee.videos.feature.mine
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.model.AuthExpiredException
+import com.chee.videos.core.model.PhoneContentSourcePage
 import com.chee.videos.core.model.UserProfileDto
+import com.chee.videos.core.model.VideoListItemDto
+import com.chee.videos.core.model.loadPhoneContentBatch
 import com.chee.videos.core.repository.AuthRepository
 import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -142,72 +145,88 @@ class MineViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            when (section) {
-                MineSection.HISTORY -> {
-                    videoRepository.fetchContinueHistory(page = page, limit = PAGE_SIZE)
-                        .onSuccess { payload ->
-                            val incoming = payload.items.map { history ->
-                                MineVideoItem(
-                                    videoId = history.videoId,
-                                    title = history.title,
-                                    type = history.type,
-                                    thumbnailPath = history.thumbnailPath,
-                                    duration = history.duration,
-                                    subtitle = "已观看 ${history.watchSeconds} 秒",
-                                    progress = history.progress.coerceIn(0f, 1f),
-                                )
-                            }
-                            val hasMore = page * PAGE_SIZE < payload.totalCount
-                            onSectionLoadSuccess(section, page, incoming, hasMore, append)
-                        }
-                        .onFailure { err ->
-                            onSectionLoadFailure(section, err)
-                        }
-                }
-
-                MineSection.FAVORITE -> {
-                    videoRepository.fetchFavoritedVideos(page = page, pageSize = PAGE_SIZE)
-                        .onSuccess { rows ->
-                            val incoming = rows.map { row ->
-                                MineVideoItem(
-                                    videoId = row.id,
-                                    title = row.title,
-                                    type = row.type,
-                                    thumbnailPath = row.thumbnailPath,
-                                    duration = row.duration,
-                                    subtitle = "${typeLabel(row.type)} · ${row.duration} 秒",
-                                )
-                            }
-                            val hasMore = rows.size >= PAGE_SIZE
-                            onSectionLoadSuccess(section, page, incoming, hasMore, append)
-                        }
-                        .onFailure { err ->
-                            onSectionLoadFailure(section, err)
-                        }
-                }
-
-                MineSection.LIKE -> {
-                    videoRepository.fetchLikedVideos(page = page, pageSize = PAGE_SIZE)
-                        .onSuccess { rows ->
-                            val incoming = rows.map { row ->
-                                MineVideoItem(
-                                    videoId = row.id,
-                                    title = row.title,
-                                    type = row.type,
-                                    thumbnailPath = row.thumbnailPath,
-                                    duration = row.duration,
-                                    subtitle = "${typeLabel(row.type)} · ${row.duration} 秒",
-                                )
-                            }
-                            val hasMore = rows.size >= PAGE_SIZE
-                            onSectionLoadSuccess(section, page, incoming, hasMore, append)
-                        }
-                        .onFailure { err ->
-                            onSectionLoadFailure(section, err)
-                        }
-                }
+            loadPhoneContentBatch(
+                firstPage = page,
+                minimumVisibleItems = 1,
+                typeOf = MineVideoItem::type,
+                fetchPage = { sourcePage -> fetchSectionPage(section, sourcePage) },
+            ).onSuccess { batch ->
+                onSectionLoadSuccess(
+                    section = section,
+                    page = batch.lastLoadedPage,
+                    incoming = batch.items,
+                    hasMore = batch.hasMore,
+                    append = append,
+                    trailingErrorMessage = batch.trailingError?.message,
+                )
+            }.onFailure { err ->
+                onSectionLoadFailure(section, err)
             }
         }
+    }
+
+    private suspend fun fetchSectionPage(
+        section: MineSection,
+        page: Int,
+    ): Result<PhoneContentSourcePage<MineVideoItem>> {
+        return when (section) {
+            MineSection.HISTORY -> videoRepository.fetchContinueHistory(page = page, limit = PAGE_SIZE)
+                .map { payload ->
+                    PhoneContentSourcePage(
+                        items = payload.items.map { history ->
+                            MineVideoItem(
+                                videoId = history.videoId,
+                                title = history.title,
+                                type = history.type,
+                                thumbnailPath = history.thumbnailPath,
+                                duration = history.duration,
+                                subtitle = "已观看 ${history.watchSeconds} 秒",
+                                progress = history.progress.coerceIn(0f, 1f),
+                            )
+                        },
+                        hasMore = hasMoreSourcePages(
+                            page = payload.page,
+                            pageSize = payload.pageSize,
+                            totalCount = payload.totalCount,
+                        ),
+                    )
+                }
+
+            MineSection.FAVORITE -> videoRepository.fetchFavoritedVideos(page = page, pageSize = PAGE_SIZE)
+                .map { payload ->
+                    PhoneContentSourcePage(
+                        items = payload.items.map { row -> row.toMineVideoItem() },
+                        hasMore = hasMoreSourcePages(
+                            page = payload.page,
+                            pageSize = payload.pageSize,
+                            totalCount = payload.totalCount,
+                        ),
+                    )
+                }
+
+            MineSection.LIKE -> videoRepository.fetchLikedVideos(page = page, pageSize = PAGE_SIZE)
+                .map { payload ->
+                    PhoneContentSourcePage(
+                        items = payload.items.map { row -> row.toMineVideoItem() },
+                        hasMore = hasMoreSourcePages(
+                            page = payload.page,
+                            pageSize = payload.pageSize,
+                            totalCount = payload.totalCount,
+                        ),
+                    )
+                }
+        }
+    }
+
+    private fun VideoListItemDto.toMineVideoItem(): MineVideoItem {
+        return MineVideoItem(
+            videoId = id,
+            title = title,
+            type = type,
+            thumbnailPath = thumbnailPath,
+            duration = duration,
+            subtitle = "${typeLabel(type)} · $duration 秒",
+        )
     }
 
     private fun onSectionLoadSuccess(
@@ -216,6 +235,7 @@ class MineViewModel @Inject constructor(
         incoming: List<MineVideoItem>,
         hasMore: Boolean,
         append: Boolean,
+        trailingErrorMessage: String?,
     ) {
         updateListState(section) { state ->
             val mergedItems = if (append) mergeByVideoId(state.items, incoming) else incoming
@@ -227,7 +247,7 @@ class MineViewModel @Inject constructor(
                 page = page,
                 hasMore = hasMore,
                 items = mergedItems,
-                errorMessage = null,
+                errorMessage = trailingErrorMessage,
             )
         }
     }
@@ -292,11 +312,15 @@ class MineViewModel @Inject constructor(
     private fun typeLabel(type: String): String {
         return when (type) {
             "short" -> "短视频"
-            "movie" -> "电影"
-            "episode" -> "电视剧"
             "av" -> "AV"
             else -> "视频"
         }
+    }
+
+    private fun hasMoreSourcePages(page: Int, pageSize: Int, totalCount: Int): Boolean {
+        val safePage = page.coerceAtLeast(1)
+        val safePageSize = pageSize.coerceAtLeast(1)
+        return safePage * safePageSize < totalCount.coerceAtLeast(0)
     }
 
     private companion object {

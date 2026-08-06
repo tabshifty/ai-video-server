@@ -2,6 +2,61 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-06 18:07 +0800
+- 进度：完成手机端精简变更的提交前复核。补充旧版首页已保存电影/电视剧页签索引的升级兼容测试并取得缺少解析 helper 的预期红灯，随后让无效索引统一回落到默认短视频；复核确认电影、电视剧内容入口、专属实现和生产文案均已移除，TV 扫码授权、短视频投屏与遥控链路保留。提交范围仅含本任务 `android-app`、`CONTEXT.md` 与 `plan.md`，既有未跟踪 `docs/examples/` 不纳入。
+- 影响文件：本任务全部手机端生产代码、测试、README、版本文件，以及 `CONTEXT.md`、`plan.md`；后端、管理端和 `android-tv-app` 无差异。
+- 验证：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug` 通过，共 165 项单测；Debug APK 元数据为 `versionCode 11`、`versionName 0.1.10`。生产源码电影/电视剧残留扫描无输出，`feature/tv` 生产与测试目录均不存在；`git diff --check` 通过，本次中文/Markdown/源码 U+FFFD 扫描无输出。仅有 Android Gradle Plugin 8.5.2 对 `compileSdk 35` 的既有兼容性提示，不影响构建结果。
+
+## 2026-08-06 17:42 +0800
+- 进度：完成手机端电影、电视剧能力的核心移除与共享入口收口。已物理删除手机端电视剧目录、系列详情、分集播放器、专属网络模型/API/仓储/偏好和测试；首页仅保留短视频、合集、AV。历史、收藏、喜欢、演员作品与统一播放器接入 `short`/`av` 白名单和跨页补读，演员页不再展示混合服务端总数；异常详情或起播项统一提示“该内容不在手机端提供”并返回上一页，无上一页时回首页。TV 扫码授权、短视频投屏与遥控保持不变。
+- 影响文件：`android-app/app/src/{main,test}` 下内容策略、导航、首页、个人列表、演员、详情、统一播放器、网络/模型/仓储/偏好及已删除的 `feature/tv`，`android-app/README.md`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；后端、管理端和 `android-tv-app` 未修改，既有未跟踪 `docs/examples/` 未纳入。
+- 验证：内容策略、移除契约、首页导航、演员混合分页、首页 AV、短视频搜索及偏好定向单测共 38 项通过；手机版本已更新为 `versionCode 11` / `versionName 0.1.10`。待执行手机端全量单测、Debug 构建、残留引用/乱码/差异检查和提交。
+
+## 2026-08-06 16:08 +0800
+- 进度：红灯阶段完成。新增 `PhoneContentPolicyTest`、`PhoneContentRemovalSpecTest` 并更新首页导航断言；定向 Gradle 测试按预期在 `compileDebugUnitTestKotlin` 因统一策略尚未实现而失败，错误均为缺少 `isPhoneSupportedVideoType`、分页批次 helper 和移除后的源码契约，未触及环境或既有生产编译错误。
+- 影响文件：`android-app/app/src/test/java/com/chee/videos/core/model/PhoneContentPolicyTest.kt`、`PhoneContentRemovalSpecTest.kt`、`core/ui/AppNavigationConfigTest.kt`、`plan.md`。
+- 验证：红灯命令：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.core.model.PhoneContentPolicyTest --tests com.chee.videos.core.model.PhoneContentRemovalSpecTest --tests com.chee.videos.core.ui.AppNavigationConfigTest`；待实现后复跑。
+
+## 2026-08-06 16:06 +0800
+- 进度：用户已确认手机 App 去除电影、电视剧内容的完整共同理解，开始实施。计划先以纯逻辑测试锁定 `short`/`av` 白名单、混合来源自动跳页与异常入口语义，再删除电影首页链路和手机端电视剧专属模块，接入“我的”/演员/统一播放器过滤，最后更新 README、手机版本并完成全量验证。
+- 影响文件：预计 `android-app/app/src/{main,test}` 下导航、首页、内容策略、个人列表、演员、详情、统一播放器、网络/模型/仓储/偏好与电视剧模块，`android-app/README.md`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`；后端、管理端、`android-tv-app` 与既有未跟踪 `docs/examples/` 不修改。
+- 验证：先运行新增内容策略、导航与移除契约测试取得预期红灯；实现后运行相关定向单测、`:app:testDebugUnitTest`、`:app:assembleDebug`、`git diff --check`、乱码扫描及残留引用检查。
+
+## 2026-08-06 15:56 +0800
+- 进度：完成手机 App 移除电影、电视剧内容访谈文档的静态复核。设计树已无未决分支，当前只等待用户确认共同理解；确认前不生成实施改动、不更新手机端版本号、不提交本轮文档。
+- 影响文件：`CONTEXT.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：`git diff --check -- CONTEXT.md plan.md` 通过；`rg -n $'\uFFFD' CONTEXT.md plan.md` 无输出；文档差异为 `CONTEXT.md` 新增/修订手机端领域术语、`plan.md` 追加六轮访谈记录，无 Android 代码变更，因此未运行 Gradle。
+
+## 2026-08-06 15:55 +0800
+- 进度：`grill-with-docs` 第六轮确认精简后的导航与本地兼容策略。首页顶部固定为“短视频、合集、AV”且默认短视频；底部“首页、搜索、图集、我的”不变，搜索继续只面向短视频。旧安装遗留的电视剧分集字幕偏好不增加清理迁移，相关代码删除后不再读取或展示，旧值随用户清除 App 数据自然消失。至此设计树已无未决分支，等待用户确认共同理解后再进入实施。
+- 影响文件：`CONTEXT.md`、`plan.md`；尚未修改 `android-app` 代码、测试、README 或版本号。
+- 验证：待执行 Markdown 差异检查、`git diff --check` 和本次中文文档乱码扫描；无需运行 Android 构建或测试。
+
+## 2026-08-06 15:43 +0800
+- 进度：`grill-with-docs` 第五轮确认排除内容的用户体验。混合来源过滤后没有可见条目时沿用普通空态，不提示已隐藏电影或电视剧；旧导航状态或异常参数指向白名单外媒体时，在详情/播放器加载前拦截，轻提示“该内容不在手机端提供”并返回上一页，无上一页时回首页，不保留电影/电视剧错误详情页。
+- 影响文件：`CONTEXT.md`、`plan.md`；实施时需要在保留的通用详情与播放器入口接入统一类型守卫，并保持首页、“我的”和演员页空态文案不暴露已移除分类。
+- 验证：访谈尚未结束；待确认精简后导航形态与已废弃本地电视剧偏好的处置，当前不运行 Android 构建或测试。
+
+## 2026-08-06 15:40 +0800
+- 进度：`grill-with-docs` 第四轮确认手机端使用支持类型白名单，只允许 `short`、`av` 进入内容列表、详情和播放器队列；`movie`、`episode`、电视剧目录标记 `tv` 及未知类型默认排除，TV 设备协作协议不受该内容白名单影响。混合来源分页不得只过滤单页造成假空态，应继续读取后续页直至取得支持内容或来源耗尽；演员页不再展示包含排除内容的服务端作品总数。
+- 影响文件：`CONTEXT.md`、`plan.md`；实施时需要为首页、“我的”、演员作品、统一播放器与保留详情入口复用同一手机端内容判定。
+- 验证：访谈尚未结束；待确认保留内容的演员/个人功能边界及异常入口体验，当前不运行 Android 构建或测试。
+
+## 2026-08-06 15:36 +0800
+- 进度：`grill-with-docs` 第三轮确认两项边界。数据方面，服务端已有电影/电视剧历史、收藏和喜欢原样保留，手机端只停止展示与播放，不删除或迁移，独立 TV App 和管理端仍可使用。代码方面，实施时物理删除手机端电视剧专属目录、详情、分集播放器、专属 API/DTO/偏好与测试，以及电影首页目录链路；保留 AV/短视频共用详情、播放器和历史接口，并保留 TV 扫码授权、短视频投屏与遥控。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续实现范围仍集中在 `android-app`，不修改后端、管理端或 `android-tv-app`。
+- 验证：访谈尚未结束；待继续确认手机端支持类型判定和混合分页过滤策略，当前不运行 Android 构建或测试。
+
+## 2026-08-06 15:29 +0800
+- 进度：`grill-with-docs` 第二轮确认手机端对电影、电视剧采用完整内容排除，而非只隐藏首页入口。电影、电视剧不得继续出现在首页、“我的”历史/收藏/喜欢、演员作品或播放器混合队列中，也不能通过手机端保留导航进入或播放；电视剧专属目录、详情与分集播放器纳入移除范围。
+- 影响文件：`CONTEXT.md`、`plan.md`；访谈仍未结束，代码、版本号和测试尚未修改。
+- 验证：待继续确认服务端既有数据处置与手机端代码清理深度；当前不运行 Android 构建或测试。
+
+## 2026-08-06 15:26 +0800
+- 进度：通过 `grill-with-docs` 开始收口手机 App 去除电影、电视剧内容的产品边界。已确认变更仅作用于 `android-app`；精简后的手机端保留短视频、短视频合集、AV、图片合集，以及 TV 扫码授权、短视频投屏和遥控，后端、管理端与独立 TV App 的电影/电视剧能力不受影响。领域语言已区分“电视剧内容”和“TV 设备协作”，访谈尚未完成，未开始代码删除。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续预计影响 `android-app` 首页分类、电视剧专属目录/详情/分集播放、混合内容列表、导航、网络模型与相关测试，具体以剩余决策为准。既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：待完成访谈并由用户确认共同理解后，再形成实施与验收文档；当前仅检查 Markdown 差异、中文编码与术语一致性，不运行 Android 构建或测试。
+
 ## 2026-08-04 22:40 +0800
 - 进度：管理端论坛资源列表已部署到家用部署机。`git push deploy master` 将部署机 `master` 从 `e07924b` 更新到 `7705c72`；hook 判定 `RESTART_GO=1 REBUILD_FRONTEND=1`，完成 `npm ci && npm run build`、Go 构建与稳定签名、migration、server/worker hard restart，`/healthz OK`。
 - 影响文件：部署机 `repo.git`、`current/admin-web-dist`、稳定 Go binary 与 launchd server/worker；代码提交范围仍不含 `docs/examples/`。GitHub 镜像同步本次因 hook 网络/远端条件失败并按既有 fail-open 规则记录为 non-fatal，未影响家用部署机发布。

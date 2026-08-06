@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -37,33 +36,6 @@ class AppPreferencesStoreTest {
             assertEquals(ShortPlaybackMode.LOOP_ONE, store.shortPlaybackModeFlow.first())
             store.saveShortPlaybackMode(ShortPlaybackMode.AUTO_NEXT)
             assertEquals(ShortPlaybackMode.AUTO_NEXT, store.shortPlaybackModeFlow.first())
-        }
-    }
-
-    @Test
-    fun tvSubtitlePreference_persistsPerVideoId() = runTest {
-        withMainDispatcher {
-            val dataStore = PreferenceDataStoreFactory.create(
-                scope = backgroundScope,
-                produceFile = {
-                    File.createTempFile("app-preferences-store", ".preferences_pb").apply {
-                        deleteOnExit()
-                    }
-                },
-            )
-            val store = AppPreferencesStore(
-                dataStore = dataStore,
-                gson = Gson(),
-            )
-
-            assertNull(store.readTvSubtitlePreference("video-1"))
-
-            store.saveTvSubtitlePreference("video-1", "subtitle-zh")
-            store.saveTvSubtitlePreference("video-2", "")
-
-            assertEquals("subtitle-zh", store.readTvSubtitlePreference("video-1"))
-            assertEquals("", store.readTvSubtitlePreference("video-2"))
-            assertNull(store.readTvSubtitlePreference("video-3"))
         }
     }
 }

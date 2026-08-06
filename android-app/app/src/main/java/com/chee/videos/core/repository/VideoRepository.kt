@@ -13,15 +13,12 @@ import com.chee.videos.core.model.ImageCollectionsPayload
 import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.ShortCollectionsPayload
-import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvDeviceDto
 import com.chee.videos.core.model.TvRemoteAutoplayNextRequest
 import com.chee.videos.core.model.TvRemoteCreateSessionRequest
 import com.chee.videos.core.model.TvRemoteSearchContextRequest
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvRemoteSessionItemDto
-import com.chee.videos.core.model.TvSearchPayload
-import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
@@ -59,13 +56,13 @@ class VideoRepository @Inject constructor(
         }
     }
 
-    suspend fun fetchCategory(type: String, page: Int = 1, pageSize: Int = 30): Result<SearchPayload> {
+    suspend fun fetchAv(page: Int = 1, pageSize: Int = 30): Result<SearchPayload> {
         return callWithAuth { baseUrl, bearer ->
             api.search(
                 url = UrlBuilder.search(baseUrl),
                 authorization = bearer,
                 keyword = "",
-                type = type,
+                type = "av",
                 page = page,
                 pageSize = pageSize,
             )
@@ -158,47 +155,6 @@ class VideoRepository @Inject constructor(
             api.shortCollections(
                 url = UrlBuilder.shortCollections(baseUrl),
                 authorization = bearer,
-                page = page,
-                pageSize = pageSize,
-            )
-        }
-    }
-
-    suspend fun fetchTvHome(
-        query: String = "",
-        page: Int = 1,
-        pageSize: Int = 20,
-    ): Result<TvHomePayload> {
-        return callWithAuth { baseUrl, bearer ->
-            api.tvHome(
-                url = UrlBuilder.tvHome(baseUrl),
-                authorization = bearer,
-                keyword = query.trim().takeIf { it.isNotBlank() },
-                page = page,
-                pageSize = pageSize,
-            )
-        }
-    }
-
-    suspend fun fetchTvSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> {
-        return callWithAuth { baseUrl, bearer ->
-            api.tvSeriesDetail(
-                url = UrlBuilder.tvSeriesDetail(baseUrl, seriesId),
-                authorization = bearer,
-            )
-        }
-    }
-
-    suspend fun fetchTvSearch(
-        query: String,
-        page: Int = 1,
-        pageSize: Int = 20,
-    ): Result<TvSearchPayload> {
-        return callWithAuth { baseUrl, bearer ->
-            api.tvSearch(
-                url = UrlBuilder.tvSearch(baseUrl),
-                authorization = bearer,
-                keyword = query.trim(),
                 page = page,
                 pageSize = pageSize,
             )
@@ -344,7 +300,7 @@ class VideoRepository @Inject constructor(
         }
     }
 
-    suspend fun fetchLikedVideos(page: Int = 1, pageSize: Int = 30): Result<List<VideoListItemDto>> {
+    suspend fun fetchLikedVideos(page: Int = 1, pageSize: Int = 30): Result<SearchPayload> {
         return callWithAuth { baseUrl, bearer ->
             api.likedVideos(
                 url = UrlBuilder.likedVideos(baseUrl),
@@ -352,10 +308,10 @@ class VideoRepository @Inject constructor(
                 page = page,
                 pageSize = pageSize,
             )
-        }.map { it.items }
+        }
     }
 
-    suspend fun fetchFavoritedVideos(page: Int = 1, pageSize: Int = 30): Result<List<VideoListItemDto>> {
+    suspend fun fetchFavoritedVideos(page: Int = 1, pageSize: Int = 30): Result<SearchPayload> {
         return callWithAuth { baseUrl, bearer ->
             api.favoritedVideos(
                 url = UrlBuilder.favoritedVideos(baseUrl),
@@ -363,7 +319,7 @@ class VideoRepository @Inject constructor(
                 page = page,
                 pageSize = pageSize,
             )
-        }.map { it.items }
+        }
     }
 
     suspend fun fetchUserProfile(): Result<UserProfileDto> {
@@ -378,13 +334,6 @@ class VideoRepository @Inject constructor(
     suspend fun readActiveBaseUrl(): String? = store.readActiveBaseUrl()
 
     suspend fun readAccessToken(): String? = store.readAccessToken()
-
-    suspend fun readTvSubtitlePreference(videoId: String): String? =
-        store.readTvSubtitlePreference(videoId)
-
-    suspend fun saveTvSubtitlePreference(videoId: String, subtitleTrackId: String?) {
-        store.saveTvSubtitlePreference(videoId, subtitleTrackId)
-    }
 
     suspend fun readLastTvRemoteDeviceId(): String? =
         store.readLastTvRemoteDeviceId()
