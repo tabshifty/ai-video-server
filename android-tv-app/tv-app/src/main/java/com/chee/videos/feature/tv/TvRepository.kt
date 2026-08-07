@@ -2,7 +2,6 @@ package com.chee.videos.feature.tv
 
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvCatalogWallPayload
-import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
@@ -22,7 +21,6 @@ interface TvRepository {
         sortBy: String = "added",
         sortOrder: String = "desc",
     ): Result<TvCatalogWallPayload>
-    suspend fun fetchIptvChannels(): Result<TvIptvPayload>
     suspend fun fetchShortFeed(pageSize: Int = 20, excludeIds: List<String> = emptyList()): Result<List<FeedVideoDto>>
     suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto>
     suspend fun fetchCurrentTvRemoteSession(deviceId: String, legacyDeviceId: String? = null): Result<TvRemoteSessionDto?>
@@ -62,9 +60,6 @@ class NetworkTvRepository @Inject constructor(
         sortOrder: String,
     ): Result<TvCatalogWallPayload> =
         videoRepository.fetchTvCatalogWall(kind, page, pageSize, sortBy, sortOrder)
-
-    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
-        videoRepository.fetchTvIptvChannels()
 
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         videoRepository.fetchShortFeed(pageSize = pageSize, excludeIds = excludeIds)

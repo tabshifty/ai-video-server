@@ -28,14 +28,6 @@ class TvIconActionSpecTest {
         assertSourceDoesNotImportIconButton("src/main/java/com/chee/videos/core/ui/LongFormVideoPlayer.kt")
     }
 
-    @Test
-    fun `iptv root focus remains a key event target not an icon action`() {
-        val source = Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt").readText()
-
-        assertTrue("IPTV 播放页根节点仍需要焦点以接收遥控按键", source.contains(".focusable()"))
-        assertTrue("IPTV 播放页根节点仍需要处理遥控按键", source.contains(".onPreviewKeyEvent"))
-    }
-
     private fun assertSourceDoesNotImportIconButton(path: String) {
         val sourcePath = Path.of(path)
         assertTrue("$path 必须存在", sourcePath.exists())

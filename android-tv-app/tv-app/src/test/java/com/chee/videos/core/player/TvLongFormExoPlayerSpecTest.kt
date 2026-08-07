@@ -39,7 +39,7 @@ class TvLongFormExoPlayerSpecTest {
     }
 
     @Test
-    fun tvBuildFileKeepsIptvLibVlcAndMedia3Dependencies() {
+    fun tvBuildFileKeepsDistributionLibVlcAndMedia3Dependencies() {
         val source = Path.of("build.gradle.kts").readText()
 
         assertTrue(source.contains("org.videolan.android:libvlc-all"))

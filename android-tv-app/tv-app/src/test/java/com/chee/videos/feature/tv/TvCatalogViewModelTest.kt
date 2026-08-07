@@ -243,7 +243,7 @@ class TvCatalogViewModelTest {
         viewModel.updateQuery("雾")
         advanceTimeBy(300)
         runCurrent()
-        viewModel.openIptv()
+        viewModel.openShortFeed()
         repository.completeSearchFailure(query = "雾", error = IllegalStateException("旧搜索失败"))
         advanceUntilIdle()
 

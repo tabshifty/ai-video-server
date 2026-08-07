@@ -14,7 +14,6 @@ class TvStateFeedbackUsageTest {
         val longFormPlayer = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormPlayerScreen.kt").readText()
         val seriesDetail = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesDetailScreen.kt").readText()
         val seriesPlayer = Path.of("src/main/java/com/chee/videos/feature/tv/TvSeriesPlayerScreen.kt").readText()
-        val iptv = Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt").readText()
 
         assertTrue(catalog.contains("TvPageLoadingState("))
         assertTrue(catalog.contains("TvErrorState("))
@@ -31,7 +30,5 @@ class TvStateFeedbackUsageTest {
         assertTrue(seriesDetail.contains("TvErrorState("))
         assertTrue(seriesPlayer.contains("TvErrorState("))
         assertTrue(seriesPlayer.contains("onAction = viewModel::retry"))
-        assertTrue(iptv.contains("TvPageLoadingState("))
-        assertTrue(iptv.contains("TvErrorState("))
     }
 }

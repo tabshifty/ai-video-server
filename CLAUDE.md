@@ -122,4 +122,4 @@ When touching `android-tv-app/`, consult `CONTEXT.md` for the binding rules. Hig
 - Use the shared TV icon-action component for round/small icon buttons — not Material `IconButton`.
 - A focusable node must not stack `tvFocusableGlow()` with an additional `.focusable()` (causes double-focus and "press twice" bugs).
 - `FocusRequester.requestFocus()` may only target nodes actually composed at that moment — don't request the search box focus from home when it isn't mounted.
-- TV project's compile graph is intentionally narrow: TV launch/pairing, long video, TV series, `18+`, IPTV, TV settings, and shared infra only. Phone-side home/short video/image-collection/Mine/upload sources may remain on disk as migration reference but stay excluded from the TV build graph.
+- TV 工程的编译图保持窄边界：仅包含 TV 启动/配对、长视频、电视剧、`18+`、短视频、TV 设置和共享基础设施。手机端首页、短视频实现、图片合集、“我的”和上传源码可作为迁移参考留在磁盘，但必须排除在 TV 编译图之外。

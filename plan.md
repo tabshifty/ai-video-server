@@ -2,6 +2,41 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-07 11:05 +0800
+- 进度：完成 TV App IPTV 客户端能力移除的最终验收与独立差异复核。确认首页六项菜单、路由/页面/ViewModel/模型/客户端 API/Repository/资源物理删除和负向契约一致；短视频入口仍先失效目录与搜索请求再清空状态；后端、管理端、频道数据和旧 APK 不在代码改动范围。复核未发现阻塞问题，准备精确暂存本任务文件并用中文提交，既有未跟踪 `docs/examples/` 保持排除。
+- 影响文件：本次 TV IPTV 客户端移除的全部生产代码、测试、版本、ADR、`CLAUDE.md`、`CONTEXT.md` 与 `plan.md`；不包含 `docs/examples/`。
+- 验证：`cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest` 通过，共 617 项，失败/错误/跳过均为 0；`:tv-app:assembleDebug` 通过，生成 `armeabi-v7a`、`arm64-v8a` 两个 APK，元数据均为 `versionCode 145` / `versionName 0.1.145`。除负向契约测试外的 `android-tv-app` IPTV 残留扫描无输出，`git diff --check` 与本次变更文件 U+FFFD 扫描通过；仅有 AGP 8.5.2 对 `compileSdk 35` 的既有提示。
+
+## 2026-08-07 11:03 +0800
+- 进度：完成 TV App IPTV 客户端能力的核心移除。首页菜单收口为“电视剧、电影、18+、短视频、搜索、设置”；删除 IPTV 内部路由、页面/ViewModel/模型、客户端网络 API/Repository/URL、专属播放器布局及正向测试，并把短视频入口的请求失效逻辑改为独立中性实现。保留后端/管理端/旧 APK 兼容边界与 `libvlc-all`、ARM 双 ABI 分发契约；新增负向源码契约防止 IPTV 客户端入口和实现回归。TV 版本更新为 `versionCode 145` / `versionName 0.1.145`。
+- 影响文件：`android-tv-app/tv-app/src/{main,test}` 下首页、导航、网络、模型、仓储、IPTV 专属模块和共享测试，`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/proguard-rules.pro`、`CLAUDE.md`、`CONTEXT.md`、`docs/adr/0022-tv-iptv-client-retirement.md`、`plan.md`；后端、管理端和既有未跟踪 `docs/examples/` 未修改。
+- 验证：新增 `TvClientCapabilityRemovalSpecTest` 定向测试通过，生产与测试源码编译通过；`android-tv-app` 除该负向契约测试外的 IPTV 术语/符号扫描无输出。待运行 TV 全量单测、Debug 构建、APK 元数据、差异和乱码检查。
+
+## 2026-08-07 10:56 +0800
+- 进度：TV IPTV 移除契约红灯完成。新增 `TvClientCapabilityRemovalSpecTest` 后运行定向测试，测试在菜单顺序断言处按预期失败：当前仍为“电视剧、电影、18+、IPTV、短视频、搜索、设置”，目标为移除 IPTV 后的六项菜单；失败发生在测试执行阶段，生产与测试代码均正常编译，未发现环境阻塞。
+- 影响文件：`android-tv-app/tv-app/src/test/java/com/chee/videos/feature/tv/TvClientCapabilityRemovalSpecTest.kt`、`plan.md`。
+- 验证：红灯命令 `cd android-tv-app && ./gradlew --no-daemon :tv-app:testDebugUnitTest --tests com.chee.videos.feature.tv.TvClientCapabilityRemovalSpecTest`，结果 1 项执行、1 项预期失败；仅有 Android Gradle Plugin 8.5.2 对 `compileSdk 35` 的既有提示。
+
+## 2026-08-07 10:54 +0800
+- 进度：用户已确认 TV App 去除 IPTV 的完整共同理解，开始实施。先新增负向源码契约锁定首页菜单、内部路由、客户端 API/Repository、专属源码与资源必须移除并取得预期红灯；随后删除 IPTV 客户端链路，把短视频入口借用的 `openIptv()` 请求失效副作用改为中性实现，最后更新 TV 版本、分发说明和共享测试。
+- 影响文件：预计覆盖 `android-tv-app/tv-app/src/{main,test}` 的首页、导航、网络、模型、仓储、IPTV 专属模块与共享测试，`android-tv-app/tv-app/build.gradle.kts`、`android-tv-app/tv-app/proguard-rules.pro`、`CLAUDE.md`、`CONTEXT.md`、ADR-0022 与 `plan.md`；后端、管理端、数据库和既有未跟踪 `docs/examples/` 不修改。
+- 验证：先运行新增移除契约测试取得预期失败；实现后运行相关定向测试、`:tv-app:testDebugUnitTest`、`:tv-app:assembleDebug`、IPTV 生产残留扫描、`git diff --check` 和乱码检查。
+
+## 2026-08-07 10:41 +0800
+- 进度：TV App 去除 IPTV 的设计树已无未决分支。领域词典已删除仍把 TV IPTV 页面、频道播放和交互规则视为当前能力的条目，并明确“新版客户端下线、旧版接口兼容、双 ABI 分发兼容”三个边界；新增 ADR-0022 取代旧 ADR 中“TV IPTV 客户端继续使用 LibVLC”的子决策。当前等待用户最终确认共同理解，确认前不修改 Android 代码、资源、测试或版本号。
+- 影响文件：`CONTEXT.md`、`docs/adr/0022-tv-iptv-client-retirement.md`、`plan.md`；既有未跟踪 `docs/examples/` 保持不变且不纳入。
+- 验证：`git diff --check -- CONTEXT.md plan.md docs/adr/0022-tv-iptv-client-retirement.md` 通过；上述文档 U+FFFD 乱码扫描无输出；失效的 `IPTV 播放页`、`IPTV LibVLC 路径`、`当前播放频道`、`IPTV 频道列表软刷新`、`TvIptv` 术语扫描无输出。文档阶段未运行 Android 构建或测试。
+
+## 2026-08-07 10:35 +0800
+- 进度：`grill-with-docs` 第二轮确认 TV IPTV 的下线强度、分发兼容和防回归口径。仅新版本 TV App 移除 IPTV，旧 APK、后端频道接口、管理端和数据继续可用；本轮保留 `libvlc-all`、ARM 双 ABI 构建及既有 APK 分发模型，不扩大到遗留 VLC 播放代码和分发后端迁移。当前领域词典将移除失效的 TV IPTV 页面/播放规则，只保留客户端已下线边界、后端/管理端有效约定和 ADR；实现时以负向源码契约锁定 IPTV 入口、路由、客户端 API、专属源码和资源不得回归。设计树已无新的产品分支，待汇总共同理解并由用户最终确认后开始编码。
+- 影响文件：`CONTEXT.md`、`docs/adr/0022-tv-iptv-client-retirement.md`、`plan.md`；Android 生产代码、测试、资源和版本号仍未修改，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：待完成访谈文档静态检查；最终确认后先补 TV IPTV 移除契约红灯，再实施并运行 TV 全量单测、Debug 构建和残留扫描。
+
+## 2026-08-07 10:14 +0800
+- 进度：通过 `grill-with-docs` 开始收口 TV App 去除 IPTV 功能的边界。首轮确认完整移除 TV 客户端的 IPTV 首页入口、路由、页面、频道状态、客户端 API/Repository 适配、专属播放配置/布局与测试；后端、管理端和既有频道数据保留，通用 LibVLC 能力按其它播放链路实际依赖保留。旧 IPTV 路由不保留下线页，失效入口回 TV 首页；首页菜单收口为“电视剧、电影、18+、短视频、搜索、设置”，其它顺序、默认焦点和短视频返回语义不变。访谈尚未结束，当前未修改 Android 代码、资源或版本号。
+- 影响文件：`CONTEXT.md`、`plan.md`；后续预计影响 `android-tv-app/tv-app/src/{main,test}`、`android-tv-app/tv-app/build.gradle.kts`、TV README 或相关说明及新增 ADR，具体以剩余决策为准。后端、管理端和既有未跟踪 `docs/examples/` 不纳入。
+- 验证：待完成设计树并由用户确认共同理解后，再执行红灯测试、实现、TV 定向/全量单测、Debug 构建、残留引用检查、Markdown/中文编码检查和提交。
+
 ## 2026-08-06 18:07 +0800
 - 进度：完成手机端精简变更的提交前复核。补充旧版首页已保存电影/电视剧页签索引的升级兼容测试并取得缺少解析 helper 的预期红灯，随后让无效索引统一回落到默认短视频；复核确认电影、电视剧内容入口、专属实现和生产文案均已移除，TV 扫码授权、短视频投屏与遥控链路保留。提交范围仅含本任务 `android-app`、`CONTEXT.md` 与 `plan.md`，既有未跟踪 `docs/examples/` 不纳入。
 - 影响文件：本任务全部手机端生产代码、测试、README、版本文件，以及 `CONTEXT.md`、`plan.md`；后端、管理端和 `android-tv-app` 无差异。

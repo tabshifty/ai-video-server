@@ -13,7 +13,6 @@ import com.chee.videos.core.model.RecordHistoryRequest
 import com.chee.videos.core.model.SearchPayload
 import com.chee.videos.core.model.TvHomePayload
 import com.chee.videos.core.model.TvCatalogWallPayload
-import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
@@ -194,15 +193,6 @@ class VideoRepository @Inject constructor(
                 pageSize = pageSize,
                 sortBy = sortBy.trim(),
                 sortOrder = sortOrder.trim(),
-            )
-        }
-    }
-
-    suspend fun fetchTvIptvChannels(): Result<TvIptvPayload> {
-        return callWithAuth { baseUrl, bearer ->
-            api.tvIptvChannels(
-                url = UrlBuilder.tvIptvChannels(baseUrl),
-                authorization = bearer,
             )
         }
     }

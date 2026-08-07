@@ -124,7 +124,6 @@ fun TvCatalogScreen(
     onOpenLongForm: (String, String) -> Unit,
     onPlayLongForm: (String, String) -> Unit,
     onOpenCatalogWall: (String, String) -> Unit = { _, _ -> },
-    onOpenIptv: () -> Unit = {},
     onOpenShorts: () -> Unit = {},
     homeContentFocusRequester: FocusRequester? = null,
     requestedMenuFocusItem: TvHomeMenuItem? = null,
@@ -215,7 +214,6 @@ fun TvCatalogScreen(
                 selectedMenu = uiState.selectedMenu,
                 menuFocusRequesters = menuFocusRequesters,
                 onSelect = viewModel::selectMenu,
-                onOpenIptv = onOpenIptv,
                 onOpenShorts = onOpenShorts,
             )
             TvPageLoadingState(message = "正在加载 TV 首页")
@@ -228,7 +226,6 @@ fun TvCatalogScreen(
             selectedMenu = uiState.selectedMenu,
             menuFocusRequesters = menuFocusRequesters,
             onSelect = viewModel::selectMenu,
-            onOpenIptv = onOpenIptv,
             onOpenShorts = onOpenShorts,
         )
         if (uiState.selectedMenu == TvHomeMenuItem.Settings) {
@@ -504,7 +501,6 @@ private fun TvHomeSideMenu(
     selectedMenu: TvHomeMenuItem,
     menuFocusRequesters: Map<TvHomeMenuItem, FocusRequester>,
     onSelect: (TvHomeMenuItem) -> Unit,
-    onOpenIptv: () -> Unit,
     onOpenShorts: () -> Unit,
 ) {
     Column(
@@ -523,10 +519,7 @@ private fun TvHomeSideMenu(
                 icon = tvHomeMenuIcon(item),
                 modifier = Modifier.focusRequester(menuFocusRequesters.getValue(item)),
                 onClick = {
-                    if (item == TvHomeMenuItem.Iptv) {
-                        onSelect(item)
-                        onOpenIptv()
-                    } else if (item == TvHomeMenuItem.Shorts) {
+                    if (item == TvHomeMenuItem.Shorts) {
                         onSelect(item)
                         onOpenShorts()
                     } else {
@@ -840,7 +833,6 @@ private fun tvHomeMenuIcon(item: TvHomeMenuItem): ImageVector {
         TvHomeMenuItem.Series -> Icons.Filled.Tv
         TvHomeMenuItem.Movie -> Icons.Filled.LocalMovies
         TvHomeMenuItem.Adult -> Icons.Filled.Warning
-        TvHomeMenuItem.Iptv -> Icons.Filled.Tv
         TvHomeMenuItem.Shorts -> Icons.Filled.PlayArrow
         TvHomeMenuItem.Search -> Icons.Filled.Search
         TvHomeMenuItem.Settings -> Icons.Filled.Settings

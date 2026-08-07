@@ -51,7 +51,7 @@ class TvApkPackagingConfigTest {
             gradle.contains("isShrinkResources = true"),
         )
         assertTrue(
-            "IPTV 播放兼容性依赖必须保留 LibVLC",
+            "双 ABI 分发识别依赖必须保留 LibVLC 原生库",
             gradle.contains("implementation(\"org.videolan.android:libvlc-all:3.6.0\")"),
         )
     }

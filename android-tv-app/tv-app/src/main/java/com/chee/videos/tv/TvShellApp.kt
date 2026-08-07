@@ -62,8 +62,6 @@ import com.chee.videos.feature.tv.TvLongFormVideoIdArg
 import com.chee.videos.feature.tv.TvLongFormVideoTypeArg
 import com.chee.videos.feature.tv.TvLongFormDetailScreen
 import com.chee.videos.feature.tv.TvLongFormPlayerScreen
-import com.chee.videos.feature.tv.TvIptvRoute
-import com.chee.videos.feature.tv.TvIptvScreen
 import com.chee.videos.feature.tv.TvSeriesRoutePattern
 import com.chee.videos.feature.tv.TvCatalogWallKindArg
 import com.chee.videos.feature.tv.TvCatalogWallRoutePattern
@@ -247,9 +245,6 @@ private fun TvAuthenticatedNav(
                             onOpenCatalogWall = { kind, title ->
                                 navController.navigate(buildTvCatalogWallRoute(kind, title))
                             },
-                            onOpenIptv = {
-                                navController.navigate(TvIptvRoute)
-                            },
                             onOpenShorts = {
                                 navController.navigate(TvShortFeedRoute)
                             },
@@ -318,11 +313,6 @@ private fun TvAuthenticatedNav(
                         popExitTransition = { ExitTransition.None },
                     ) {
                         TvLongFormPlayerScreen(
-                            onBack = { navController.popBackStack() },
-                        )
-                    }
-                    composable(TvIptvRoute) {
-                        TvIptvScreen(
                             onBack = { navController.popBackStack() },
                         )
                     }
@@ -501,7 +491,6 @@ internal fun shouldHandleTvShellBack(route: String?): Boolean {
         value.startsWith("tv/wall/") ||
         value == TvLongFormDetailRoutePattern ||
         value.startsWith("tv/detail/") ||
-        value == TvIptvRoute ||
         value == TvSeriesRoutePattern ||
         value.startsWith("tv/series/")
 }
@@ -512,5 +501,4 @@ private fun String.isTvPlaybackRoute(): Boolean =
         this == TvLongFormPlayerRoutePattern ||
         startsWith("tv/long-form-player/") ||
         this == TvRemotePlaybackRoutePattern ||
-        startsWith("tv/remote-shorts/") ||
-        this == TvIptvRoute
+        startsWith("tv/remote-shorts/")

@@ -37,11 +37,6 @@ class TvSmoothnessAuditSpecTest {
             !longFormDetail.contains("items(actors.size)") && longFormDetail.contains("actor-\$index-"),
         )
 
-        val iptv = Path.of("src/main/java/com/chee/videos/feature/tv/TvIptvScreen.kt").readText()
-        assertTrue(
-            "IPTV 频道键必须带分组前缀，防止跨分组频道 id 重复",
-            iptv.contains("key = { \"\${group.group}-\${it.id}\" }"),
-        )
     }
 
     @Test

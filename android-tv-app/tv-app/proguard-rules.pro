@@ -1,4 +1,4 @@
-# IPTV 播放页依赖 LibVLC 原生桥接和事件回调，Release R8 时保留 VLC API 面。
+# 现有 ARM 双 ABI 分发契约仍依赖 LibVLC 原生库识别产物，Release R8 时保留 VLC API 面。
 -keep class org.videolan.** { *; }
 -dontwarn org.videolan.**
 

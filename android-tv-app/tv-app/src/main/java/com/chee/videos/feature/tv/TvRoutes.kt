@@ -19,7 +19,6 @@ const val TvPlayerRoutePattern = "tv/player/{$TvSeriesIdArg}?$TvSeasonArg={$TvSe
 const val TvLongFormDetailRoutePattern = "tv/detail/{$TvLongFormVideoIdArg}?$TvLongFormVideoTypeArg={$TvLongFormVideoTypeArg}"
 const val TvLongFormPlayerRoutePattern = "tv/long-form-player/{$TvLongFormVideoIdArg}?$TvLongFormVideoTypeArg={$TvLongFormVideoTypeArg}&$TvLongFormStartFromBeginningArg={$TvLongFormStartFromBeginningArg}"
 const val TvCatalogWallRoutePattern = "tv/wall/{$TvCatalogWallKindArg}?$TvCatalogWallTitleArg={$TvCatalogWallTitleArg}"
-const val TvIptvRoute = "tv/iptv"
 
 fun buildTvSeriesRoute(seriesId: String): String = "tv/series/${encodeTvRouteSegment(seriesId)}"
 

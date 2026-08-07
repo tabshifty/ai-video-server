@@ -83,16 +83,13 @@ class TvCatalogViewModel @Inject constructor(
                 }
                 loadTvPlaybackSettings()
             }
-            menuItem == TvHomeMenuItem.Iptv -> {
-                openIptv()
-            }
             menuItem == TvHomeMenuItem.Shorts -> {
                 openShortFeed()
             }
         }
     }
 
-    fun openIptv() {
+    fun openShortFeed() {
         invalidateCatalogRequests()
         _uiState.update {
             it.copy(
@@ -103,10 +100,6 @@ class TvCatalogViewModel @Inject constructor(
                 errorMessage = null,
             )
         }
-    }
-
-    fun openShortFeed() {
-        openIptv()
     }
 
     fun selectTvSeekStepSeconds(seconds: Int) {

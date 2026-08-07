@@ -16,7 +16,6 @@ import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthStatusEnvelope
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
-import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvRemoteDeviceSessionPayload
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
@@ -97,12 +96,6 @@ interface ApiService {
         @Query("sort_by") sortBy: String,
         @Query("sort_order") sortOrder: String,
     ): ApiEnvelope<TvCatalogWallPayload>
-
-    @GET
-    suspend fun tvIptvChannels(
-        @Url url: String,
-        @Header("Authorization") authorization: String,
-    ): ApiEnvelope<TvIptvPayload>
 
     @GET
     suspend fun tvSeriesDetail(

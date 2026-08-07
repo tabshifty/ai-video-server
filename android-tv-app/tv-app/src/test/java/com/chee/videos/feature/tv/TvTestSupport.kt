@@ -6,7 +6,6 @@ import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvEpisodeDto
 import com.chee.videos.core.model.FeedVideoDto
 import com.chee.videos.core.model.TvHomePayload
-import com.chee.videos.core.model.TvIptvPayload
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSearchResultDto
@@ -25,7 +24,6 @@ class FakeTvRepository(
     private val homePayload: TvHomePayload = TvHomePayload(),
     private val homePayloads: Map<String, TvHomePayload> = emptyMap(),
     private val searchPayload: TvSearchPayload = TvSearchPayload(),
-    private val iptvPayload: TvIptvPayload = TvIptvPayload(),
     private val shortFeedItems: List<FeedVideoDto> = emptyList(),
     private val shortFeedPages: List<List<FeedVideoDto>> = emptyList(),
     private val posterWallPages: List<TvCatalogWallPayload> = emptyList(),
@@ -80,11 +78,6 @@ class FakeTvRepository(
         val payload = posterWallPages.firstOrNull { it.page == page }
             ?: TvCatalogWallPayload(page = page, pageSize = pageSize)
         return Result.success(payload)
-    }
-
-    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> {
-        homeError?.let { return Result.failure(it) }
-        return Result.success(iptvPayload)
     }
 
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> {
@@ -216,9 +209,6 @@ class DelayedSourceTvRepository(
     ): Result<TvCatalogWallPayload> =
         Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
 
-    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
-        Result.success(TvIptvPayload())
-
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         Result.success(emptyList())
 
@@ -315,9 +305,6 @@ class DelayedCatalogTvRepository(
         return deferred.await()
     }
 
-    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
-        Result.success(TvIptvPayload())
-
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         Result.success(emptyList())
 
@@ -408,94 +395,6 @@ class DelayedCatalogTvRepository(
     }
 }
 
-class DelayedIptvTvRepository(
-    private val baseUrl: String = "https://example.com",
-) : TvRepository {
-    private val pendingIptvRequests = ArrayDeque<CompletableDeferred<Result<TvIptvPayload>>>()
-    val iptvRequestCount: Int
-        get() = pendingIptvRequests.size
-
-    override suspend fun fetchHome(kind: String, query: String, page: Int, pageSize: Int): Result<TvHomePayload> =
-        Result.success(TvHomePayload())
-
-    override suspend fun fetchSearch(query: String, page: Int, pageSize: Int): Result<TvSearchPayload> =
-        Result.success(TvSearchPayload())
-
-    override suspend fun fetchCatalogWall(
-        kind: String,
-        page: Int,
-        pageSize: Int,
-        sortBy: String,
-        sortOrder: String,
-    ): Result<TvCatalogWallPayload> =
-        Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
-
-    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> {
-        val deferred = CompletableDeferred<Result<TvIptvPayload>>()
-        pendingIptvRequests.addLast(deferred)
-        return deferred.await()
-    }
-
-    override suspend fun fetchSeriesDetail(seriesId: String): Result<TvSeriesDetailDto> =
-        Result.success(tvSeriesDetail(id = seriesId))
-
-    override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
-        Result.success(emptyList())
-
-    override suspend fun fetchTvRemoteSession(sessionId: String): Result<TvRemoteSessionDto> =
-        Result.failure(UnsupportedOperationException("unused"))
-
-    override suspend fun fetchCurrentTvRemoteSession(deviceId: String, legacyDeviceId: String?): Result<TvRemoteSessionDto?> =
-        Result.success(null)
-
-    override suspend fun tvRemotePrevious(sessionId: String): Result<TvRemoteSessionDto> =
-        Result.failure(UnsupportedOperationException("unused"))
-
-    override suspend fun tvRemoteNext(sessionId: String): Result<TvRemoteSessionDto> =
-        Result.failure(UnsupportedOperationException("unused"))
-
-    override suspend fun tvRemoteAutoNext(sessionId: String): Result<TvRemoteSessionDto> =
-        Result.failure(UnsupportedOperationException("unused"))
-
-    override suspend fun endTvRemoteSession(sessionId: String, endedReason: String): Result<Unit> =
-        Result.success(Unit)
-
-    override suspend fun readActiveBaseUrl(): String = baseUrl
-
-    override suspend fun buildSourceUrl(videoId: String, profile: String?): String =
-        "https://example.com/$videoId.m3u8"
-
-    override suspend fun reportHistory(videoId: String, watchSeconds: Int, completed: Boolean) = Unit
-
-    override suspend fun readTvSubtitlePreference(): TvTrackPreference? = null
-
-    override suspend fun saveTvSubtitlePreference(preference: TvTrackPreference?) = Unit
-
-    override suspend fun readTvAudioPreference(): TvTrackPreference? = null
-
-    override suspend fun saveTvAudioPreference(preference: TvTrackPreference?) = Unit
-
-    override suspend fun readTvSeekStepSeconds(): Int = 10
-
-    override suspend fun saveTvSeekStepSeconds(seconds: Int) = Unit
-
-    override suspend fun readTvSeriesAutoplayEnabled(): Boolean? = null
-
-    override suspend fun saveTvSeriesAutoplayEnabled(enabled: Boolean) = Unit
-
-    fun completeIptv(payload: TvIptvPayload = TvIptvPayload()) {
-        pendingIptvRequests.removeFirst().complete(Result.success(payload))
-    }
-
-    fun completeLatestIptv(payload: TvIptvPayload = TvIptvPayload()) {
-        pendingIptvRequests.removeLast().complete(Result.success(payload))
-    }
-
-    fun completeIptvFailure(error: Throwable = IllegalStateException("IPTV 频道加载失败，请重试")) {
-        pendingIptvRequests.removeFirst().complete(Result.failure(error))
-    }
-}
-
 class DelayedSeriesDetailTvRepository(
     private val baseUrl: String = "https://example.com",
 ) : TvRepository {
@@ -516,9 +415,6 @@ class DelayedSeriesDetailTvRepository(
         sortOrder: String,
     ): Result<TvCatalogWallPayload> =
         Result.success(TvCatalogWallPayload(page = page, pageSize = pageSize))
-
-    override suspend fun fetchIptvChannels(): Result<TvIptvPayload> =
-        Result.success(TvIptvPayload())
 
     override suspend fun fetchShortFeed(pageSize: Int, excludeIds: List<String>): Result<List<FeedVideoDto>> =
         Result.success(emptyList())
@@ -644,7 +540,6 @@ suspend fun TvCatalogViewModel.awaitIdle() = Unit
 suspend fun TvPosterWallViewModel.awaitIdle() = Unit
 suspend fun TvSeriesDetailViewModel.awaitIdle() = Unit
 suspend fun TvSeriesPlayerViewModel.awaitIdle() = Unit
-suspend fun TvIptvViewModel.awaitIdle() = Unit
 
 fun tvSearchResult(
     id: String = "movie-1",
