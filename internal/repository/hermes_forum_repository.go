@@ -30,7 +30,15 @@ func buildAdminForumPostListSQL(page, pageSize int) (string, string, []any) {
 	const where = `
 WHERE p.inspection_status = 'inspected'
   AND p.filter_decision = 'included'
-  AND p.created_at >= NOW() - INTERVAL '30 days'`
+  AND (
+      p.created_at >= NOW() - INTERVAL '30 days'
+      OR EXISTS (
+          SELECT 1
+          FROM collected_forum_post_resources rp
+          WHERE rp.post_id = p.id
+            AND rp.kind IN ('attachment', 'ed2k')
+      )
+  )`
 	countSQL := `SELECT COUNT(*) FROM collected_forum_posts p` + where
 	listSQL := `
 SELECT p.id,
@@ -53,7 +61,17 @@ LIMIT $1 OFFSET $2`
 	return countSQL, listSQL, []any{pageSize, (page - 1) * pageSize}
 }
 
-// ListAdminForumPosts returns the recent, included forum resource projection for the admin UI.
+const cleanupExpiredForumPostsSQL = `
+DELETE FROM collected_forum_posts p
+WHERE p.created_at < NOW() - INTERVAL '30 days'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM collected_forum_post_resources r
+      WHERE r.post_id = p.id
+        AND r.kind IN ('attachment', 'ed2k')
+  )`
+
+// ListAdminForumPosts returns the resource-aware, included forum projection for the admin UI.
 func (r *HermesForumRepository) ListAdminForumPosts(ctx context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
 	countSQL, listSQL, listArgs := buildAdminForumPostListSQL(page, pageSize)
 	var total int
@@ -95,7 +113,7 @@ func (r *HermesForumRepository) DiscoverForumPosts(ctx context.Context, input mo
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `DELETE FROM collected_forum_posts WHERE created_at < NOW() - INTERVAL '30 days'`); err != nil {
+	if _, err := tx.Exec(ctx, cleanupExpiredForumPostsSQL); err != nil {
 		return nil, fmt.Errorf("clean expired forum posts: %w", err)
 	}
 

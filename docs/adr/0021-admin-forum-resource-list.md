@@ -14,9 +14,9 @@ ADR-0020 已确定由 Hermes 负责论坛调度、抓取和筛选，项目后端
 
 - 页面命名为“论坛资源”，路由为 `/forum-posts`，位于管理端“服务与工具”分组。
 - 列表只展示 `inspection_status='inspected' AND filter_decision='included'` 的帖子。
-- `dedupe_only`、`pending`、`excluded`、`restricted` 和 `failed` 不进入该浏览投影；它们仍按 ADR-0020 作为采集事实保留，不因展示需求删除或改写。
+- `dedupe_only`、`pending`、`excluded`、`restricted` 和 `failed` 不进入该浏览投影；它们在资源感知保留策略允许的生命周期内仍作为采集事实保留，不因展示需求删除或改写。
 - 页面严格只读，不提供编辑、删除、重新抓取、批量操作或资源状态回写。
-- 继续使用 ADR-0020 的 30 天保留边界。读取查询显式限定 `created_at >= NOW() - INTERVAL '30 days'`，即使 Hermes 暂停且请求触发的物理清理尚未运行，也不展示超期记录。
+- 继续使用 ADR-0020 的资源感知保留边界。读取查询限定 `created_at >= NOW() - INTERVAL '30 days' OR EXISTS (SELECT 1 FROM collected_forum_post_resources ... kind IN ('attachment', 'ed2k'))`：30 天内的已纳入记录全部展示，超过 30 天的记录只有仍有附件或 ED2K 时展示。即使 Hermes 暂停且请求触发的物理清理尚未运行，也不展示超期无资源记录。
 
 ### 管理员读取接口
 
@@ -81,7 +81,7 @@ Authorization: Bearer <admin JWT>
 ## 考虑过的替代方案
 
 - **展示所有采集状态**：历史 `dedupe_only` 记录没有可展示内容，其他状态属于采集审计而不是资源浏览，拒绝混入首期页面。
-- **永久保留浏览记录**：会改变 ADR-0020 的数据生命周期和查重边界，本次继续采用 30 天窗口。
+- **所有浏览记录永久保留**：会让无资源的历史查重基线持续增长；本次只允许仍有附件或 ED2K 的记录跨过 30 天进入浏览投影。
 - **把资源放入“媒体库”**：论坛链接尚未进入项目媒体库，放入该分组会暗示已经下载或入库，改放“服务与工具”。
 - **把每条资源拆成独立表格行**：会重复帖子标题并破坏帖子聚合边界，采用一帖一行、资源作为子项。
 - **前端去重**：会让页面与不可变采集快照不一致，拒绝采用。
@@ -91,13 +91,14 @@ Authorization: Bearer <admin JWT>
 ## 后果与风险
 
 - 不需要 migration，旧二进制和现有 Hermes 写入协议均不受影响。
-- 超过 30 天的帖子会从页面消失；该页面不是资源归档。
+- 超过 30 天且没有附件或 ED2K 的帖子会从页面消失；仍有资源的帖子不因年龄消失，该页面可以浏览被策略保留的旧资源，但仍不是无条件的历史归档。
 - 附件能否打开取决于目标论坛可用性和浏览器登录态，项目后端无法保证。
 - ED2K 能否拉起客户端取决于访问管理端的设备是否注册对应协议处理器。
-- 当前 30 天数据量有限，复用 `created_at` 索引并在读取时聚合资源即可；若未来扩大保留期或来源数量，应基于真实查询计划再评估复合索引，而不是提前增加 migration。
+- 当前资源数据量有限，读取时复用 `created_at` 索引和资源表的帖子关联索引即可；若未来扩大来源数量或资源保留规模，应基于真实查询计划再评估复合索引，而不是提前增加 migration。
 
 ## 关联
 
 - `docs/adr/0020-hermes-forum-post-ingestion.md`
+- `docs/adr/0023-hermes-resource-aware-retention.md`
 - `CONTEXT.md` 中 [[论坛采集帖子]]、[[论坛采集资源]]、[[admin 论坛资源列表]] 与 [[论坛资源原生链接边界]]
 - `migrations/0037_collected_forum_posts.up.sql`

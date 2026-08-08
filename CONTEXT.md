@@ -5,11 +5,11 @@
 - `论坛采集资源`：隶属于一条[[论坛采集帖子]]的附件或 ED2K 原始链接。一帖可以同时拥有多条附件和多条 ED2K；资源只保留 Hermes 提交值及同类型数组内顺序，不做帖子内或跨帖查重，不自动触发 115 云下载、本地暂存、媒体入库或转码。
 - `Hermes 两阶段采集协议`：Hermes 先通过批量 `discover` 接口登记版块候选并按 `tid` 取得 `created`、`pending` 或 `duplicate`，只对需要处理的记录抓正文，再通过单帖 `inspection` 接口一次性提交状态、筛选快照和全部已提取资源。`pending` 是重复过滤的唯一例外，用于恢复登记成功但结果尚未提交的中断窗口；是否继续检查和如何重试完全由 Hermes 决定。
 - `Hermes 检查结果不可变`：论坛采集记录只允许从 `pending` 一次进入 `inspected`、`restricted` 或 `failed`。相同最终结果可幂等重放，不同结果不得覆盖并返回 HTTP 409；受限或失败结果仍保存已经提取到的部分资源。后端不保存原始 HTML、完整正文或 Telegram 投递状态。
-- `Hermes tid 查重窗口`：项目数据库只保证帖子首次入库后 30 天内按 `source + tid` 查重；每次有效 `discover` 请求按服务端 `created_at` 顺带清理更早记录，重复发现不续期。现有 `seen.json` 通过同一接口的 `dedupe_only` 模式导入为历史基线，核对完成后不再作为查重权威。
+- `Hermes 资源感知保留策略`：论坛采集帖子按服务端首次入库时间计算清理边界：首次入库 30 天内的记录全部保留；超过 30 天且没有任何[[论坛采集资源]]（附件或 ED2K）的记录才允许清理；只要拥有任一附件或 ED2K，记录及资源不因年龄清理。重复发现不刷新 `created_at`；无资源旧记录被清理后，同一 `source + tid` 可以重新登记，有资源记录继续承担查重权威。现有 `seen.json` 通过同一接口的 `dedupe_only` 模式导入为历史基线，核对完成后不再作为查重权威。
 - `Hermes 历史 tid 键`：本机 `seen.json` 的 `seen_threads` 混有旧版 URL/哈希键和新版 `tid:<数字>` 键。历史导入只能接受明确的 `tid:<数字>`，不得从旧 URL 猜测或派生 tid；重复键与旧键计入导入报告的 `ignored_entries`，格式为 `tid:` 但值非数字时必须中止。
 - `Hermes 筛选快照`：Hermes 在完成帖子检查时提交 `included` 或 `excluded` 及原因字符串数组；项目后端只校验和记录，不解释原因、不重算筛选，也不按附件、ED2K、标题或正文去重。
-- `Hermes 机器接口边界`：Hermes 继续负责每 15 分钟调度、站点登录态、抓取、重试、筛选与 Telegram 推送；项目后端只提供持久化接口和请求触发的 30 天清理。机器请求使用独立 `HERMES_API_TOKEN`，不得复用管理员 JWT 或直连 PostgreSQL；Hermes 脚本从受限 `.env` 读取 `HERMES_FORUM_API_BASE_URL` 与同一 Token，`seen.json` 切换后仅作回滚留档，不再读写或承担查重。首期只允许受信任家庭局域网 HTTP，检查结果入库成功后才允许推送，离开受信任局域网前必须先启用 HTTPS。详见 `docs/adr/0020-hermes-forum-post-ingestion.md`。
-- `admin 论坛资源列表`：管理员在“服务与工具”的 `/forum-posts` 只读浏览最近 30 天内 `inspection_status=inspected` 且 `filter_decision=included` 的[[论坛采集帖子]]。列表一帖一行，按 `observed_at DESC, id DESC` 分页；`dedupe_only`、`pending`、`excluded`、`restricted` 和 `failed` 不属于该浏览投影。读取接口为管理员 JWT 保护的 `GET /api/v1/admin/forum-posts`，不复用 Hermes 机器 Token。
+- `Hermes 机器接口边界`：Hermes 继续负责每 15 分钟调度、站点登录态、抓取、重试、筛选与 Telegram 推送；项目后端只提供持久化接口和由有效 `discover` 请求触发的资源感知清理，不增加独立后端定时器。机器请求使用独立 `HERMES_API_TOKEN`，不得复用管理员 JWT 或直连 PostgreSQL；Hermes 脚本从受限 `.env` 读取 `HERMES_FORUM_API_BASE_URL` 与同一 Token，`seen.json` 切换后仅作回滚留档，不再读写或承担查重。首期只允许受信任家庭局域网 HTTP，检查结果入库成功后才允许推送，离开受信任局域网前必须先启用 HTTPS。详见 `docs/adr/0020-hermes-forum-post-ingestion.md`。
+- `admin 论坛资源列表`：管理员在“服务与工具”的 `/forum-posts` 只读浏览尚存且 `inspection_status=inspected`、`filter_decision=included` 的[[论坛采集帖子]]；30 天内记录全部进入投影，超过 30 天的记录只有存在附件或 ED2K 时进入投影。列表一帖一行，按 `observed_at DESC, id DESC` 分页；`dedupe_only`、`pending`、`excluded`、`restricted` 和 `failed` 不属于该浏览投影。读取接口为管理员 JWT 保护的 `GET /api/v1/admin/forum-posts`，不复用 Hermes 机器 Token。
 - `论坛资源原生链接边界`：[[admin 论坛资源列表]]中的标题和附件直接链接 Hermes 入库的原始 HTTP(S) URL，ED2K 直接使用原始 `ed2k://` 作为 `<a href>`；页面只解析 ED2K 文件名作为可见文本，资源按类型内 `position` 原样展示且不去重。点击链接不调用后端，不代理论坛 Cookie，不创建下载或 115 任务，也不记录点击状态。详见 `docs/adr/0021-admin-forum-resource-list.md`。
 
 ## 115 开放平台接入约定

@@ -2,6 +2,46 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-08 09:51 +0800
+- 进度：Hermes 资源感知保留策略已完成并提交。超过 30 天且无附件/ED2K 的记录由有效 `discover` 请求清理；30 天内记录和有资源的旧记录保留；管理端使用同源读取边界。无关未跟踪 `docs/examples/` 未纳入提交。
+- 影响文件：本任务提交中的 `CONTEXT.md`、3 个 ADR、2 个仓储生产/单元测试文件、可选 PostgreSQL 集成测试和 `plan.md`。
+- 验证：提交前 `go test ./internal/repository -count=1`、`go vet ./...`、`git diff --cached --check` 和本次文件乱码扫描通过；全量 Go 测试仅被任务外 TV APK 元数据断言阻断，详见上一条记录。
+
+## 2026-08-08 09:50 +0800
+- 进度：完成提交前验证与独立复核。资源感知清理、管理端读取条件、可选 PostgreSQL 集成测试、ADR 和领域词典均已纳入本任务；未纳入既有未跟踪 `docs/examples/`。
+- 影响文件：本任务精确暂存的 8 个文件：`CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`docs/adr/0021-admin-forum-resource-list.md`、`docs/adr/0023-hermes-resource-aware-retention.md`、两个仓储生产/单测文件、可选集成测试、`plan.md`。
+- 验证：`go test ./internal/repository -count=1` 通过；可选 `TestCleanupExpiredForumPostsSQLAgainstPostgres` 在无 `HERMES_TEST_DATABASE_URL` 时明确跳过；`go vet ./...`、`git diff --cached --check` 和本次文件 U+FFFD 扫描通过。`go test ./... -count=1` 仍仅在任务外 `internal/services/tv_apk_test.go:51` 因实际 `version_code=144`、期望 `121` 失败。
+
+## 2026-08-08 09:49 +0800
+- 进度：独立复核确认 SQL 条件互补且无 Critical 问题，并指出原测试仅为 SQL 文本契约。因仓库无 PostgreSQL 测试环境，新增可选 `HERMES_TEST_DATABASE_URL` 集成测试，覆盖 30 天内空记录、精确 30 天边界、超期无资源、超期附件和超期 ED2K；同时收紧 ADR-0020/0021 的历史表述。
+- 影响文件：新增 `internal/repository/hermes_forum_repository_integration_test.go`，以及 `docs/adr/0020-hermes-forum-post-ingestion.md`、`docs/adr/0021-admin-forum-resource-list.md`、`plan.md`；既有 Hermes SQL、测试、`CONTEXT.md` 和 ADR-0023 保持本任务范围。
+- 验证：`go test ./internal/repository -count=1` 通过；可选 PostgreSQL 测试因未配置 `HERMES_TEST_DATABASE_URL` 跳过；`go vet ./...` 待记录最终结果。全量 `go test ./... -count=1` 仍受任务外 TV APK 元数据测试阻断。
+
+## 2026-08-08 09:39 +0800
+- 进度：补齐管理端资源感知读取的红绿循环。临时恢复旧的纯 30 天条件后，新增断言按预期失败；恢复“30 天内全部展示、超 30 天仅有附件/ED2K 展示”的 SQL 后定向测试通过。相关 ADR 与 `CONTEXT.md` 已完成更新。
+- 影响文件：`internal/repository/hermes_forum_repository.go`、`internal/repository/hermes_forum_repository_test.go`、`CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`docs/adr/0021-admin-forum-resource-list.md`、`docs/adr/0023-hermes-resource-aware-retention.md`、`plan.md`。
+- 验证：红灯 `go test ./internal/repository -run 'TestBuildAdminForumPostListSQLKeepsReadModelContract|TestDiscoverForumPostsCleanupSkipsPostsWithResources' -count=1` 按预期失败；恢复后同命令通过。待执行 Go 全量测试与静态检查。
+
+## 2026-08-08 09:37 +0800
+- 进度：资源感知清理 SQL、管理端读取条件和相关回归测试已实现并通过定向测试。管理端采用“30 天内全部展示，超过 30 天仅展示有附件/ED2K”的同源边界，兼容 Hermes 停止时清理尚未触发的情况。已同步更新 `CONTEXT.md`、ADR-0020、ADR-0021，并新增 ADR-0023 记录取舍；待执行完整验证。
+- 影响文件：`internal/repository/hermes_forum_repository.go`、`internal/repository/hermes_forum_repository_test.go`、`CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`docs/adr/0021-admin-forum-resource-list.md`、`docs/adr/0023-hermes-resource-aware-retention.md`、`plan.md`。
+- 验证：`go test ./internal/repository -run 'TestBuildAdminForumPostListSQLKeepsReadModelContract|TestDiscoverForumPostsCleanupSkipsPostsWithResources' -count=1` 通过；待执行 Go 全量测试、静态检查、Markdown 差异和乱码检查。
+
+## 2026-08-08 09:33 +0800
+- 进度：补充懒触发清理下的读取边界：管理端应展示 30 天内全部已纳入记录，以及超过 30 天但仍有附件/ED2K 的记录；超过 30 天且无资源的记录即使尚未被下一次 `discover` 物理清理，也不应出现在列表中。为此调整回归断言，要求读取 SQL 使用同一资源感知条件。
+- 影响文件：`internal/repository/hermes_forum_repository_test.go`、`plan.md`。
+- 验证：待运行本轮读取边界红灯测试。
+
+## 2026-08-08 09:32 +0800
+- 进度：Hermes 资源感知保留策略红灯完成。新增断言按预期失败：现有管理端 SQL 仍限定最近 30 天，现有 discover 清理 SQL 也未排除已有附件/ED2K 的帖子；失败均发生在测试断言阶段，未发现编译或环境问题。
+- 影响文件：`internal/repository/hermes_forum_repository_test.go`、`plan.md`。
+- 验证：`go test ./internal/repository -run 'TestBuildAdminForumPostListSQLKeepsReadModelContract|TestDiscoverForumPostsCleanupSkipsPostsWithResources' -count=1`，2 个测试失败，符合预期红灯。
+
+## 2026-08-08 09:30 +0800
+- 进度：用户确认保留 Hermes 记录清理策略，但将边界改为“超过 30 天且没有附件、没有 ED2K 资源”才清理；30 天内记录全部保留，有任意资源的旧记录长期保留；管理端展示所有符合条件的已纳入资源；继续使用有效 `discover` 请求触发清理，不新增独立定时器。先按 TDD 补充清理 SQL 与管理端读取边界的回归断言。
+- 影响文件：`internal/repository/hermes_forum_repository.go`、`internal/repository/hermes_forum_repository_test.go`、`CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`docs/adr/0021-admin-forum-resource-list.md`、新增资源感知保留 ADR、`plan.md`；既有未跟踪 `docs/examples/` 不纳入。
+- 验证：待运行 Hermes repository 定向红灯测试；实现后运行定向测试、Go 全量测试/静态检查、Markdown 差异与中文乱码检查。
+
 ## 2026-08-07 11:05 +0800
 - 进度：完成 TV App IPTV 客户端能力移除的最终验收与独立差异复核。确认首页六项菜单、路由/页面/ViewModel/模型/客户端 API/Repository/资源物理删除和负向契约一致；短视频入口仍先失效目录与搜索请求再清空状态；后端、管理端、频道数据和旧 APK 不在代码改动范围。复核未发现阻塞问题，准备精确暂存本任务文件并用中文提交，既有未跟踪 `docs/examples/` 保持排除。
 - 影响文件：本次 TV IPTV 客户端移除的全部生产代码、测试、版本、ADR、`CLAUDE.md`、`CONTEXT.md` 与 `plan.md`；不包含 `docs/examples/`。
