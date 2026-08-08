@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-08 23:34 +0800
+- 进度：Hermes 历史补漏稳定队列修复完成并恢复调度。清理既有 102 条 pending 后，真实 scheduler 首轮在第 1993 页登记 30 条并完成 8 条，留下 queue/pending 各 22；第二轮继续完成 8 条，queue/pending 同步降为 14 且页码保持 1993。两轮均 `completed`、无错误，证明未清空不翻页；剩余 14 条由 active 的 30 分钟任务继续排空。
+- 影响文件：外部生效脚本 `~/.hermes/scripts/watch_sehuatang_forum95_backfill.py`、游标及任务运行状态；仓库提交范围仅为 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、本任务新增的 `plan.md` 记录。回滚备份后缀 `.pre-pending-fix-20260808-2255` 保留，既有未跟踪 `docs/examples/` 未纳入。
+- 验证：`py_compile`、稳定队列/失败保留/游标损坏 fail-closed 回归、新页 12 条模拟流程、`git diff --check` 和本次文件 U+FFFD 扫描通过；生产库与游标精确集合核对为 `queue_count=14`、`pending_count=14`、双向差均 0，论坛资源投影当前 545 条；任务 `enabled=true`、`state=scheduled`、`last_status=ok`，无在途执行。
+
+## 2026-08-08 23:25 +0800
+- 进度：Hermes 历史补漏已改为持久化具体候选的稳定队列：每批重新 discover，只有 inspection 成功才移除条目，失败留队重试，队列清空才推进页码；补充 `--import-pending-json` 运维入口。生产库原有 102 条 pending 已精确导入并分 13 批全部补完，恢复过程未发送补发 Telegram；游标从旧 `page=1994, offset=16` 收敛为 `page=1993, queue=[]`。
+- 影响文件：外部修改 `~/.hermes/scripts/watch_sehuatang_forum95_backfill.py` 与游标，回滚备份后缀为 `.pre-pending-fix-20260808-2255`；仓库内更新 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`。任务仍暂停，待提交前验证后恢复；既有未跟踪 `docs/examples/` 未纳入。
+- 验证：旧逻辑红灯复现通过；新脚本 `py_compile`、稳定队列/失败保留纯逻辑测试、新页 12 条模拟流程通过。生产 PostgreSQL 当前 `pending=0`、`inspected+included=529`、`inspected+excluded=83`，论坛资源读取条件命中 529 条，资源表共 1005 条；待执行文档差异/乱码检查、提交并恢复任务后做一次真实定时运行复核。
+
+## 2026-08-08 22:58 +0800
+- 进度：Hermes 补漏任务已暂停，确认无 claimed/running 执行；外部脚本、游标和任务定义已分别生成 `.pre-pending-fix-20260808-2255` 回滚备份。最小回归场景已复现动态 offset 缺陷：首轮 1–8 成功并从 actionable 消失后，旧 offset=8 会把仍为 pending 的 9–12 全部跳过。
+- 影响文件：当前仓库仅新增本条 `plan.md`；外部备份位于 `~/.hermes/{scripts,state,cron}` 对应文件旁。既有未跟踪 `docs/examples/` 未触碰。
+- 验证：旧脚本纯逻辑断言以 `expected=['9','10','11','12'], actual=[]` 失败，符合预期红灯；待改为稳定待处理队列并验证失败不推进。
+
+## 2026-08-08 22:54 +0800
+- 进度：开始修复 Hermes“色花堂综合讨论区历史补漏”动态列表 offset 导致 pending 被跳过的问题。计划先暂停任务并备份外部脚本/游标/任务定义，以回归场景锁定“成功项从 actionable 消失后旧 offset 跳过未完成项”，再改为稳定待处理队列和“检查结果入库成功后才推进”；最后恢复现有 pending、核对生产库与管理端论坛资源投影后恢复调度。
+- 影响文件：预计外部修改 `~/.hermes/scripts/watch_sehuatang_forum95_backfill.py`、`~/.hermes/state/sehuatang_forum95_backfill_cursor.json` 和 Hermes 任务运行状态；仓库内仅更新 `CONTEXT.md`、相关 ADR（若接口/长期边界变化）与 `plan.md`，不修改 Android/TV 版本。既有未跟踪 `docs/examples/` 不纳入。
+- 验证：待执行旧逻辑红灯复现、脚本 `py_compile`/纯逻辑回归、Hermes 定向任务运行、生产 PostgreSQL pending 收敛与 `/forum-posts` 读取条件核对；完成前保持任务暂停并保留可回滚备份。
+
 ## 2026-08-08 10:15 +0800
 - 进度：已将 Hermes 资源感知清理策略提交到家用部署机。部署 hook 对 `15e3cc0` 执行 Go build、codesign、迁移、server/worker 硬切重启并完成健康检查；GitHub mirror 同步失败按 fail-open 约定处理，不影响本地部署。补充本条后将只触发文档路径同步，不重启服务。
 - 影响文件：部署目标为已提交的 `15e3cc0`；本条仅新增 `plan.md` 部署记录，既有未跟踪 `docs/examples/` 不纳入。
