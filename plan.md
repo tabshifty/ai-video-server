@@ -2,6 +2,36 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-09 00:59 +0800
+- 进度：Hermes 新帖监控遗漏修复完成。候选发现、检查入库和 Telegram 通知均有可恢复本地状态；送达必须同时满足 `hermes send` 退出码 0、JSON `success=true` 且未标记 `skipped`。生产补齐 5 个已知遗漏 tid 及同轮新增 1 条，代理中断时队列保持、恢复后全部送达；无新增回归未产生重复。新帖与历史补漏任务均恢复 active。
+- 影响文件：外部生效 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/cron/jobs.json`、`~/.hermes/state/sehuatang_forum95_monitor.json`；本次仓库提交仅纳入 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、本任务新增的 `plan.md` 记录，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：两个 Python 脚本 `py_compile` 通过；11 项状态机 mock 回归及结构化 success/skip/空响应/错误/媒体降级定向回归通过；真实执行 `df278c89f33442209a0a52c6597af697`、`10ca05fa146e4bdaa0dd234c655082a4` completed；6 个目标 tid 均为 `duplicate + inspected`，候选/通知队列与临时图片均为空；`git diff --check` 和本次 Markdown 乱码检查通过；三份 `.pre-reliability-fix-20260809-0020` 回滚备份保留。
+
+## 2026-08-09 00:54 +0800
+- 进度：新帖监控真实恢复验证通过。生产运行先发现并持久化 `3680259` 加此前遗漏的 5 个 tid，共 6 条；代理中断恢复后，执行 `df278c89f33442209a0a52c6597af697` 将 6 条通知全部确认送达并出队，服务端复查均为 `duplicate + inspected`，对应临时图片已清理。随后执行 `10ca05fa146e4bdaa0dd234c655082a4` 完成无新增幂等回归，队列保持为空且未重复发送。新帖 15 分钟任务和历史补漏 30 分钟任务均已恢复 active。
+- 影响文件：外部生效 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/cron/jobs.json`、新增 `~/.hermes/state/sehuatang_forum95_monitor.json`；仓库记录更新 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`。保留 `.pre-reliability-fix-20260809-0020` 回滚备份，不纳入既有未跟踪 `docs/examples/`。
+- 验证：6 个目标 tid 的远端状态全部为最终 `inspected`，候选/通知队列均为 0，临时图片均不存在；无新增真实运行 completed；待执行仓库最终差异、乱码检查并精确提交。
+
+## 2026-08-09 00:46 +0800
+- 进度：真实故障保持性验证通过。首轮生产运行已把 6 条候选全部完成 `inspection` 并转入通知队列；当本机代理断开导致 Telegram 全部超时时，任务以非零退出且 6 条通知一条未出队。随后把 `hermes send --quiet` 改为捕获 `--json` 结果，使平台失败详情可诊断而不写入 cron stdout；系统代理恢复后 Telegram `getMe` 探测成功。
+- 影响文件：`~/.hermes/scripts/watch_sehuatang_forum95.py`、Hermes 新帖监控运行状态、`plan.md`。
+- 验证：失败执行 `84562cd1540e4a67bd75293cb5881b8e` 状态为 failed、错误码 1，状态文件仍含 6 条通知；`py_compile` 与发送命令 mock 回归通过。
+
+## 2026-08-09 00:42 +0800
+- 进度：新帖监控可靠状态机实现完成。新增版本化候选/通知队列和单实例锁；每页在 `discover` 前先保存具体候选，检查结果先保存为 `prepared` 再提交，抓取与入库失败保留并轮转；`inspection` 成功后才进入通知队列，脚本通过 `hermes send` 逐帖确认，成功才出队并清理图片，媒体失败降级文字；页面完全不可读和任一未确认失败均非零退出，成功 stdout 为空。任务说明同步改为脚本直接投递契约。
+- 影响文件：`~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/cron/jobs.json`、`plan.md`。
+- 验证：`py_compile` 通过；11 项隔离 mock 回归全部通过，覆盖全源失败、状态损坏、逐页预落盘、discover 响应丢失、抓取/inspection 失败轮转、prepared 幂等恢复、每轮 8 条上限、发送失败留队、媒体文字降级、CLI 退出码和成功静默。
+
+## 2026-08-09 00:26 +0800
+- 进度：新帖监控可靠性红灯完成。纯 mock 回归同时复现两项缺陷：CDP 与 Cookie 全部失败时 `direct_forum_pages()` 返回空迭代且任务仍成功；`inspection` 入库抛错后旧主流程仍输出含 tid 的通知并返回 0，服务端最终态与未确认投递之间存在遗漏窗口。
+- 影响文件：本阶段仅新增 `plan.md` 记录；生产任务仍暂停，外部脚本尚未修改，回滚备份后缀为 `.pre-reliability-fix-20260809-0020`。
+- 验证：红灯命令退出码 1，并输出“页面抓取完全失败仍被当作空页面成功返回”“inspection 入库失败后仍输出通知并以成功退出”；下一步实现后复跑同等场景的绿灯及队列持久化测试。
+
+## 2026-08-09 00:20 +0800
+- 进度：开始修复 Hermes“色花堂综合讨论区新帖监控”的静默抓取失败和通知遗漏。只读诊断确认 23:54、00:10 两轮虽显示 `ok`，论坛快照却停在 23:37；00:16 站点第一页已有 5 个新 tid 未进入生产库。计划暂停新帖任务并备份脚本/任务定义，以回归测试锁定抓取失败必须非零退出、候选必须稳定排队、检查入库失败不得通知、Telegram 真实发送失败必须留队重试，再恢复任务并核对 5 条遗漏候选。
+- 影响文件：预计外部修改 `~/.hermes/scripts/watch_sehuatang_forum95.py`、新增新帖监控队列状态并临时调整任务运行状态；仓库内更新 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`。不修改后端 schema、Android/TV 版本或既有未跟踪 `docs/examples/`。
+- 验证：待执行旧逻辑红灯复现、脚本 `py_compile`、候选/通知队列纯逻辑回归、失败退出与投递确认回归、真实定时运行、生产库/论坛第一页集合核对、文档差异与乱码检查；完成前保持新帖任务暂停，历史补漏任务继续运行。
+
 ## 2026-08-08 23:34 +0800
 - 进度：Hermes 历史补漏稳定队列修复完成并恢复调度。清理既有 102 条 pending 后，真实 scheduler 首轮在第 1993 页登记 30 条并完成 8 条，留下 queue/pending 各 22；第二轮继续完成 8 条，queue/pending 同步降为 14 且页码保持 1993。两轮均 `completed`、无错误，证明未清空不翻页；剩余 14 条由 active 的 30 分钟任务继续排空。
 - 影响文件：外部生效脚本 `~/.hermes/scripts/watch_sehuatang_forum95_backfill.py`、游标及任务运行状态；仓库提交范围仅为 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、本任务新增的 `plan.md` 记录。回滚备份后缀 `.pre-pending-fix-20260808-2255` 保留，既有未跟踪 `docs/examples/` 未纳入。
