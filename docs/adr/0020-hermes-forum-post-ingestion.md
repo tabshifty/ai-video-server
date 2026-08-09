@@ -201,6 +201,7 @@ Content-Type: application/json
 - 上线前由一次性导入命令读取 `~/.hermes/state/sehuatang_forum95_seen.json`，使用同一发现接口的 `dedupe_only` 模式按每批 100 项导入。核对输入数、创建数和重复数后，数据库取代 `seen.json` 成为查重权威。
 - 当前基线约 1391 个 `tid`。该数量是切换时的运行数据，不写入 migration 或仓库静态文件。
 - 历史翻页补漏使用本机持久化候选队列，不对每轮可能变化的页面候选集合保存数字 offset。队列条目保存后，每批先通过 `discover` 重新确认状态：最终状态或 `dedupe_only` 返回 `duplicate` 后移出，`created/pending` 只有在 `inspection` 成功后才移出；失败条目保留重试，整页队列清空后才推进页码。这样调度中断、页面漂移或接口失败都不会把已登记记录永久留在 `pending`。
+- 历史补漏读取版块列表时，只有成功取得目标 `forumdisplay` 页面后没有主题或 discover 后没有 `created/pending`，才允许把空队列视为当前页完成并推进。CDP 与 Cookie 均不可用时必须保留原页并以非零状态失败；版块页即使含“阅读权限”等普通文本，只要仍能解析出 `normalthread` 主题行就属于有效列表，不能套用帖子正文的权限词规则误报整页受限。
 - 既有 pending 的运维恢复可以由管理员只读导出明确的 `id/tid/title/url` JSON，再通过 Hermes 补漏脚本 `--import-pending-json` 原子合并到同一队列。该入口不读取数据库凭证、不改变服务端状态机，也不解除“Hermes 不得直连 PostgreSQL”的边界；恢复时仍必须逐条走 `discover -> inspection` 机器接口。
 
 ## 考虑过的替代方案

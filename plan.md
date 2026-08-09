@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-09 11:33 +0800
+- 进度：Hermes 历史补漏第 1991 页静默卡住问题已修复并恢复调度。共享 CDP 抓取器现在只在目标 `forumdisplay` 页面确实存在普通主题行时豁免列表内的权限词，帖子正文权限判断仍保持严格；补漏脚本会尝试两个 Cookie 入口，所有来源失败或 discover 失败时保留状态并报错，成功读到空页或无 `created/pending` 时推进游标。生产第 1991 页共 30 条候选已按 8、8、8、6 四批全部完成，队列降为 0，游标推进到第 1990 页，任务保持 active。
+- 影响文件：外部生效 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/scripts/watch_sehuatang_forum95_backfill.py`、补漏游标及任务运行状态，保留 `.pre-cursor-fix-20260809-1115` 回滚备份；仓库提交仅纳入 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md` 和本任务新增的 `plan.md` 记录，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：两个 Python 脚本 `py_compile` 通过；7 项隔离回归通过，覆盖列表权限词、正文权限守卫、抓取失败、空页、无 pending、游标保持和 discover 失败；真实第 1991 页解析 30 条、新帖第一页解析 26 条；四次执行 `905c06983eca43cd8b3444dac97451eb`、`3b014a5548e04c7684f7010e585a020e`、`c7d12700551243b48735b088694bfd48`、`1b19677dfb114305b54e622cc09059f2` 均 completed，`last_status=ok` 且无 delivery error；`git diff --check` 和本次 Markdown 乱码检查通过。
+
+## 2026-08-09 11:18 +0800
+- 进度：历史补漏任务已暂停且无在途执行，脚本、游标和任务定义已保留 `.pre-cursor-fix-20260809-1115` 回滚备份。隔离红灯进一步确认误判触发词实际是公开版块 HTML 中的通用“阅读权限”，不是登录导航本身；现有 `cdp_fetch` 因该词拒绝包含完整普通主题行的页面，`fetch_page` 又在 CDP/Cookie 均失败时返回空列表。相对地，成功 discover 后全部为 `duplicate` 的“无 pending”路径本身会正确减页。
+- 影响文件：当前仓库新增本条 `plan.md` 记录；待修改外部共享监控脚本和补漏脚本。既有未跟踪 `docs/examples/` 不纳入。
+- 验证：红灯共 3 项，`公开版块含权限字样仍可解析` 与 `版块抓取失败必须显式失败` 按预期失败，`无 created/pending 时游标推进` 已通过；任务 `28a3ebadd255` 为 `enabled=false/state=paused`，执行库无 claimed/running 记录。
+
+## 2026-08-09 11:15 +0800
+- 进度：开始修复 Hermes 历史补漏游标停在第 1991 页的问题。只读诊断确认该页实际包含 30 条主题，但共享 CDP 抓取器因公开版块页导航栏含“请登录”而误报权限限制；补漏脚本又把抓取失败当作空页成功退出，因此游标和空队列每轮原地保存。计划暂停补漏任务并保留回滚备份，先锁定“公开版块可解析、真实抓取失败不得推进、无 `created/pending` 必须推进”三类回归，再修复、恢复调度并观察真实执行。
+- 影响文件：预计外部修改 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/scripts/watch_sehuatang_forum95_backfill.py` 和任务运行状态；仓库内更新 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`。不修改后端、Android/TV 版本，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：已复现第 1991 页原始 CDP 响应 `ok=true`、30 条普通主题可解析，但现有 `cdp_fetch` 返回 `permission or verification required`；待执行隔离红绿回归、两个脚本 `py_compile`、真实页面解析、定向任务运行、游标推进、任务状态、仓库差异和乱码检查。
+
 ## 2026-08-09 00:59 +0800
 - 进度：Hermes 新帖监控遗漏修复完成。候选发现、检查入库和 Telegram 通知均有可恢复本地状态；送达必须同时满足 `hermes send` 退出码 0、JSON `success=true` 且未标记 `skipped`。生产补齐 5 个已知遗漏 tid 及同轮新增 1 条，代理中断时队列保持、恢复后全部送达；无新增回归未产生重复。新帖与历史补漏任务均恢复 active。
 - 影响文件：外部生效 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/cron/jobs.json`、`~/.hermes/state/sehuatang_forum95_monitor.json`；本次仓库提交仅纳入 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、本任务新增的 `plan.md` 记录，既有未跟踪 `docs/examples/` 不纳入。
