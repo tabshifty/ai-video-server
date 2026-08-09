@@ -2,6 +2,26 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-09 13:59 +0800
+- 进度：Hermes 标题资源承诺延迟定稿已完成生产恢复验证。新帖任务恢复 active 后，定向执行 `9abc26dc897b4ab99e7bf323391b6661` 正常完成；任务保持 `enabled=true/state=scheduled/last_status=ok`，无运行或投递错误且无在途执行。当前候选与通知队列均为空，本轮没有自然出现等待候选；等待分支由隔离回归验证，已完成历史记录未重开。
+- 影响文件：外部生效 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/cron/jobs.json`、`~/.hermes/state/sehuatang_forum95_monitor.json` 和任务运行状态，保留 `.pre-late-resource-fix-20260809-1325` 回滚备份；仓库提交仅纳入 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、本任务新增的 `plan.md` 记录，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：脚本 `py_compile` 和 7 项隔离回归通过；结构化对比确认修改前后 3 个任务数量不变且目标任务除 prompt 外无静态配置变化，v1 空状态仅迁移为 v2；任务 prompt 策略、v2 队列结构、执行数据库 completed/error 为空和在途数 0 均通过核对；`git diff --check` 与本次 Markdown U+FFFD 乱码检查通过。
+
+## 2026-08-09 13:32 +0800
+- 进度：Hermes 标题资源承诺延迟定稿实现及隔离回归完成。新帖监控状态升级到 v2，标题含字面量 `115` 或大小写不敏感 `ed2k` 且本轮无附件/ED2K 时保持远端 `pending`，本地按 30 分钟、1 小时、2 小时、之后每 6 小时无限退避；休眠候选不占每轮 8 条额度，普通 ready 候选优先，资源出现后清除等待状态并继续原有入库通知流程。无提示词空帖仍立即定稿，历史最终态不追溯重开。任务已暂停且无在途执行，脚本、任务定义和空队列状态均保留 `.pre-late-resource-fix-20260809-1325` 回滚备份。
+- 影响文件：外部修改 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/cron/jobs.json`、`~/.hermes/state/sehuatang_forum95_monitor.json`；仓库更新 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`。不修改后端 schema/API 或 Android/TV 版本，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：同一份 7 项隔离回归由 `failures=2/errors=3` 转为 `Ran 7 tests`、`OK`，覆盖标题匹配、30 分钟/1 小时/2 小时/6 小时退避、未到期不占批次、等待元数据合并、v1→v2 迁移、延迟定稿、资源补出后入库通知及普通空帖立即定稿；脚本 `python -m py_compile` 通过。下一步恢复任务并执行一次真实调度，再核对任务、队列和错误状态。
+
+## 2026-08-09 13:25 +0800
+- 进度：Hermes 标题资源承诺延迟定稿红灯完成。同一份 7 项隔离回归中，现有脚本仅通过“已有资源正常定稿”和“普通空帖立即排除”；标题匹配/退避 helper 不存在，标题含 `115` 的空结果仍立即提交最终态，休眠候选无到期调度，等待元数据在合并中丢失，v1 状态不会迁移到 v2。
+- 影响文件：当前仅 `plan.md`；生产 Hermes 脚本、任务和状态尚未修改，既有未跟踪 `docs/examples/` 不触碰。
+- 验证：隔离回归结果为 `Ran 7 tests`、`failures=2/errors=3`，失败面精确覆盖本次待实现行为；下一步暂停任务、备份外部文件并将同一回归转绿。
+
+## 2026-08-09 13:23 +0800
+- 进度：开始收口 Hermes 新帖编辑后补资源的漏通知窗口。仅对标题含 `115` 或大小写不敏感 `ed2k` 且正文首次未提取到附件/ED2K 的候选保持服务端 `pending`，按 30 分钟、1 小时、2 小时、之后每 6 小时退避复查；无标题资源承诺的空结果仍立即定稿，已完成的历史记录不追溯重开。
+- 影响文件：预计外部修改 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/cron/jobs.json`、`~/.hermes/state/sehuatang_forum95_monitor.json` 和新帖任务运行状态；仓库内更新 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`。不修改后端 schema/API 或 Android/TV 版本，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：待执行标题规则、退避时间、v1→v2 状态兼容、未到期候选不占每轮 8 条、有资源后定稿/通知、无提示词立即排除等隔离红绿回归，脚本 `py_compile`，真实定向任务执行，队列/任务状态，以及文档差异与乱码检查。
+
 ## 2026-08-09 12:58 +0800
 - 进度：Hermes `tid=3680933` 补录与通知已完成最终仓库复核，本次只提交运维过程记录，不修改后端、Hermes 脚本或 App 版本。
 - 影响文件：仓库仅 `plan.md`；外部生产更改与回滚备份见上一条，既有未跟踪 `docs/examples/` 不纳入。
