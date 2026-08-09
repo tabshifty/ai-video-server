@@ -2,6 +2,21 @@
 
 > 2026-07-02 整理版：已按用户要求删除纯环境发布与推送流水记录，并将同一事项的开始、准备、待执行等重复过程记录合并为保留最终有效记录。后续新增计划继续按反向时间顺序追加。
 
+## 2026-08-09 12:58 +0800
+- 进度：Hermes `tid=3680933` 补录与通知已完成最终仓库复核，本次只提交运维过程记录，不修改后端、Hermes 脚本或 App 版本。
+- 影响文件：仓库仅 `plan.md`；外部生产更改与回滚备份见上一条，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：`git diff --check` 通过，`plan.md` U+FFFD 乱码检查通过，`git diff --stat` 确认仅 `plan.md` 新增本任务记录。
+
+## 2026-08-09 12:57 +0800
+- 进度：Hermes 新帖 `tid=3680933` 已补录并通知。暂停任务且确认无在途执行后，将原 `inspected/excluded`、资源数 0 的唯一生产记录备份并精确删除；现有脚本重走两阶段协议后生成新记录 `796555c7-b811-4693-81c1-f015ef41b55c`，状态为 `inspected/included`，已入库 1 个 `115 .txt` 附件并完成一次 Telegram 投递。新帖任务已恢复 active。
+- 影响文件：外部备份 `~/.hermes/state/sehuatang_forum95_tid3680933.pre-repair-20260809-1253.json`（权限 `0600`，SHA-256 `fd75b9ac136fbed750beb20d3b89d2623dad93380e003be84aca737823373c74`）、生产单帖记录、Hermes 任务运行状态；仓库内仅 `plan.md`，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：数据库精确删除 1 条且重建后 `row_count=1`，新记录为 `inspected+included`、`filter_reasons=["attachment"]`、`attachment_count=1`、`ed2k_count=0`；定向执行 `b662e14292334f31812f2cd51d050d62` 为 completed，12:55:42 仅一次结构化 Telegram 发送后候选/通知队列均为 0，任务 `enabled=true/state=scheduled/last_status=ok`，无 delivery error，临时图片已清理。
+
+## 2026-08-09 12:53 +0800
+- 进度：开始补录并通知 Hermes 新帖 `tid=3680933`。只读诊断确认该帖 10:40 首次检查时无资源而以 `excluded/no_relevant_resources` 定稿，11:03 编辑后新增 `115 .txt` 附件和迅雷链接，后续重复发现不会重新检查。计划暂停新帖任务并备份该条生产记录，精确删除错误终态后由现有脚本重走 `discover -> inspection -> Telegram`，最后恢复调度。
+- 影响文件：预计外部修改生产 `collected_forum_posts` 中唯一 `source=sehuatang/tid=3680933` 记录、Hermes 任务运行状态及本机回滚备份；仓库内仅更新 `plan.md`，既有未跟踪 `docs/examples/` 不纳入。
+- 验证：待核对备份可读、精确删除 1 条、定向执行 completed、新记录为 `inspected+included`且附件数为 1、Telegram 结构化送达确认、队列清空、任务恢复 active，以及 `git diff --check` 和乱码检查。
+
 ## 2026-08-09 11:33 +0800
 - 进度：Hermes 历史补漏第 1991 页静默卡住问题已修复并恢复调度。共享 CDP 抓取器现在只在目标 `forumdisplay` 页面确实存在普通主题行时豁免列表内的权限词，帖子正文权限判断仍保持严格；补漏脚本会尝试两个 Cookie 入口，所有来源失败或 discover 失败时保留状态并报错，成功读到空页或无 `created/pending` 时推进游标。生产第 1991 页共 30 条候选已按 8、8、8、6 四批全部完成，队列降为 0，游标推进到第 1990 页，任务保持 active。
 - 影响文件：外部生效 `~/.hermes/scripts/watch_sehuatang_forum95.py`、`~/.hermes/scripts/watch_sehuatang_forum95_backfill.py`、补漏游标及任务运行状态，保留 `.pre-cursor-fix-20260809-1115` 回滚备份；仓库提交仅纳入 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md` 和本任务新增的 `plan.md` 记录，既有未跟踪 `docs/examples/` 不纳入。
