@@ -40,6 +40,7 @@
   - Every new plan must be appended as an incremental entry.
   - Every implementation update must append what changed (not overwrite old entries).
   - Maintain reverse-chronological entries with date/time, summary, affected files, and verification status.
+  - 纯部署、推送、重启、健康检查、镜像同步等不产生仓库开发变更的非开发操作，无需写入 `plan.md`；仅当操作伴随代码、配置或迁移变更，或暴露长期兼容约束、未解决阻塞时记录结论。
 
 ## Module Map (Current)
 | Module | Path | Purpose | Notes |
