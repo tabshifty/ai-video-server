@@ -345,6 +345,7 @@ func (a *API) Register(r *gin.Engine) {
 const (
 	adminIndexCacheControl        = "no-store"
 	adminAssetCacheControl        = "public, max-age=31536000, immutable"
+	adminMapDataCacheControl      = "public, max-age=0, must-revalidate"
 	adminMissingAssetCacheControl = "no-store"
 )
 
@@ -375,6 +376,33 @@ func mountAdminStatic(r *gin.Engine, adminDist string) {
 	}
 	r.GET("/admin/assets/*filepath", serveAdminAsset)
 	r.HEAD("/admin/assets/*filepath", serveAdminAsset)
+	mapDataDir := filepath.Join(adminDist, "china-map")
+	serveAdminMapData := func(c *gin.Context) {
+		mapDataPath, ok := resolveAdminAssetPath(mapDataDir, c.Param("filepath"))
+		if !ok {
+			serveMissingAdminAsset(c)
+			return
+		}
+		extension := strings.ToLower(filepath.Ext(mapDataPath))
+		if extension != ".json" && extension != ".geojson" {
+			serveMissingAdminAsset(c)
+			return
+		}
+		st, err := os.Stat(mapDataPath)
+		if err != nil || st.IsDir() {
+			serveMissingAdminAsset(c)
+			return
+		}
+		c.Header("Cache-Control", adminMapDataCacheControl)
+		if extension == ".geojson" {
+			c.Header("Content-Type", "application/geo+json")
+		} else {
+			c.Header("Content-Type", "application/json")
+		}
+		c.File(mapDataPath)
+	}
+	r.GET("/admin/china-map/*filepath", serveAdminMapData)
+	r.HEAD("/admin/china-map/*filepath", serveAdminMapData)
 	serveAdminIndex := func(c *gin.Context) {
 		c.Header("Cache-Control", adminIndexCacheControl)
 		c.File(filepath.Join(adminDist, "index.html"))
@@ -385,7 +413,7 @@ func mountAdminStatic(r *gin.Engine, adminDist string) {
 	r.HEAD("/admin/", serveAdminIndex)
 	r.NoRoute(func(c *gin.Context) {
 		reqPath := strings.TrimSpace(c.Request.URL.Path)
-		if strings.HasPrefix(reqPath, "/admin/assets/") {
+		if strings.HasPrefix(reqPath, "/admin/assets/") || strings.HasPrefix(reqPath, "/admin/china-map/") {
 			serveMissingAdminAsset(c)
 			return
 		}

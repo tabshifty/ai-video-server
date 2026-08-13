@@ -87,6 +87,91 @@ func TestMountAdminStaticMissingAssetIsNotLongCached(t *testing.T) {
 	}
 }
 
+func TestMountAdminStaticServesChinaMapDataFiles(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	mapDir := filepath.Join(dir, "china-map")
+	if err := os.MkdirAll(filepath.Join(mapDir, "layers"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("hello-admin"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mapDir, "catalog.json"), []byte(`{"root_region_code":"CN"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mapDir, "layers", "CN.geojson"), []byte(`{"type":"FeatureCollection","features":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	r := gin.New()
+	mountAdminStatic(r, dir)
+
+	tests := []struct {
+		name         string
+		path         string
+		wantStatus   int
+		wantBody     string
+		contentType  string
+		cacheControl string
+	}{
+		{
+			name:         "catalog",
+			path:         "/admin/china-map/catalog.json",
+			wantStatus:   http.StatusOK,
+			wantBody:     `{"root_region_code":"CN"}`,
+			contentType:  "application/json",
+			cacheControl: adminMapDataCacheControl,
+		},
+		{
+			name:         "layer",
+			path:         "/admin/china-map/layers/CN.geojson",
+			wantStatus:   http.StatusOK,
+			wantBody:     `{"type":"FeatureCollection","features":[]}`,
+			contentType:  "application/geo+json",
+			cacheControl: adminMapDataCacheControl,
+		},
+		{
+			name:       "missing data",
+			path:       "/admin/china-map/layers/missing.geojson",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "path traversal",
+			path:       "/admin/china-map/%2e%2e/index.html",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "unsupported file",
+			path:       "/admin/china-map/readme.txt",
+			wantStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.wantStatus {
+				t.Fatalf("GET %s = %d, want %d; body %q", tt.path, w.Code, tt.wantStatus, w.Body.String())
+			}
+			if tt.wantBody != "" && w.Body.String() != tt.wantBody {
+				t.Fatalf("GET %s body = %q, want %q", tt.path, w.Body.String(), tt.wantBody)
+			}
+			if tt.contentType != "" && w.Header().Get("Content-Type") != tt.contentType {
+				t.Fatalf("GET %s Content-Type = %q, want %q", tt.path, w.Header().Get("Content-Type"), tt.contentType)
+			}
+			if tt.cacheControl != "" && w.Header().Get("Cache-Control") != tt.cacheControl {
+				t.Fatalf("GET %s Cache-Control = %q, want %q", tt.path, w.Header().Get("Cache-Control"), tt.cacheControl)
+			}
+			if tt.wantStatus == http.StatusNotFound && w.Body.String() == "hello-admin" {
+				t.Fatalf("GET %s unexpectedly returned the SPA index", tt.path)
+			}
+		})
+	}
+}
+
 func TestMountAdminStaticSkipsWhenDirMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	missing := filepath.Join(t.TempDir(), "no-such-dir")

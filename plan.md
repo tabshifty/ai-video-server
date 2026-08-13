@@ -2,6 +2,16 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-08-13 17:24 +0800
+- 进度：中国行政区划地图生产解析故障修复完成。Go 管理端静态服务现在于 SPA 回退前原样提供 `/admin/china-map/**` 下的 `.json` 与 `.geojson`，设置正确 MIME 和每次复验缓存策略；缺失、越界或非允许扩展统一 404，不再返回 `index.html`。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`CONTEXT.md`、`plan.md`；无关 Hermes 记录与 `docs/examples/115LocalNatManager/` 不纳入提交。
+- 验证：静态路由红灯已复现并转绿；`go test ./internal/handlers -count=1`、定向 `-race`、`go vet ./...`、`go build ./...`、管理端 46 个文件 704/704、`npm run build`、`npm run china-map:validate`、差异/乱码/控制字符检查通过。`go test ./... -count=1` 仅有既有 TV release APK 元数据漂移失败：产物 `versionCode=144`，测试仍期望 `121`，未修改无关 TV 产物或测试。待提交、推送部署机并按生产 JSON/GeoJSON 响应和浏览器地图加载复验。
+
+## 2026-08-13 17:19 +0800
+- 进度：修复中国行政区划地图部署后数据解析失败。生产取证确认 `/admin/china-map/catalog.json` 与 `manifest.json` 被 Go 管理端静态服务错误回退为 `index.html`；先补后端红灯测试，再为地图 JSON/GeoJSON 增加受路径边界保护的静态文件服务，缺失文件保持 404，不得伪装成 SPA 页面。
+- 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：待执行后端定向测试、全量 Go 测试与 `go vet ./...`、管理端构建/地图校验、生产响应 Content-Type/正文及浏览器地图加载复验；完成后提交并推送部署机。
+
 ## 2026-08-13 15:32 +0800
 - 进度：中国行政区划地图完成提交前收口。启动数据明确为目录与清单必需、南海诸岛附图可选，附图加载失败不阻塞主地图；地图信息弹层补齐打开后聚焦、Tab 焦点约束、Esc 关闭和触发按钮焦点恢复。无关 Hermes 记录与 `docs/examples/115LocalNatManager/` 保留在工作区，不纳入本次提交。
 - 影响文件：`admin-web/src/views/ToolboxChinaMap.vue`、`admin-web/src/views/chinaMap.data.js`、对应测试、地图功能既有代码与快照、`CONTEXT.md`、`plan.md`。
