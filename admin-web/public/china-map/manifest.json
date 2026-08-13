@@ -1,0 +1,1991 @@
+{
+  "status": "complete",
+  "dataset_name": "中国行政区划地图 OSM 离线快照",
+  "version": "2026.08.12-osm",
+  "snapshot_timestamp": "2026-08-12T00:00:00Z",
+  "geometry_source": "OpenStreetMap 固定时间点行政边界",
+  "directory_source": "modood/Administrative-divisions-of-China @ c49d495b40ac73eb1a66f6eeae5f8fd10696f035",
+  "directory_sha256": {
+    "pca-code": "83b7536f853ad16beb4d37b92890a3fd7bb9d33d4f37e7c8885fb948749a9bc4",
+    "HK-MO-TW": "546616aa6ec7239d9bcf02cb063539652604162b1ab74ef65293537c54ea3534"
+  },
+  "south_china_sea_osm_elements": [
+    {
+      "name": "西沙群岛",
+      "type": "relation",
+      "id": 2417005
+    },
+    {
+      "name": "中沙群岛",
+      "type": "relation",
+      "id": 3959723
+    },
+    {
+      "name": "南沙群岛",
+      "type": "relation",
+      "id": 4856843
+    },
+    {
+      "name": "曾母暗沙",
+      "type": "way",
+      "id": 890873502
+    }
+  ],
+  "license": "Open Database License (ODbL) 1.0",
+  "attribution": "© OpenStreetMap contributors；行政目录来自 modood/Administrative-divisions-of-China。衍生边界数据库按 ODbL 1.0 提供。",
+  "generated_at": "2026-08-13T06:53:22.016Z",
+  "counts": {
+    "regions": 3631,
+    "provinces": 34,
+    "terminal_regions": 3245,
+    "layers": 386,
+    "features": 3630
+  },
+  "files": [
+    {
+      "path": "catalog.json",
+      "bytes": 1124275,
+      "sha256": "2b77940875aa0f7e5ca60bafc03e541deb4909dc29d571091782cc1225006063"
+    },
+    {
+      "path": "layers/CN-11.geojson",
+      "bytes": 60808,
+      "sha256": "288f4d63e7b4a59b94516aa65797e805f0cbefd4fbf01d59d27806d61caf7dd9"
+    },
+    {
+      "path": "layers/CN-12.geojson",
+      "bytes": 26009,
+      "sha256": "47f16816c9e08710430885671e9a372b2c95ce2acfc38cbcb6e9e969d558351f"
+    },
+    {
+      "path": "layers/CN-13-1301.geojson",
+      "bytes": 21768,
+      "sha256": "8fa21dceb54dc96d1ec2b9b804f94f8acaad9e9148d826bc5664b9d616bee627"
+    },
+    {
+      "path": "layers/CN-13-1302.geojson",
+      "bytes": 32139,
+      "sha256": "e941335dd3244712b040fb9bd73ab6fea704317005690965248554e8d95de4fb"
+    },
+    {
+      "path": "layers/CN-13-1303.geojson",
+      "bytes": 12712,
+      "sha256": "3b9c77c7c110c70d11c7a87fe0129b4a1b81589e9d84579d7520e6991cab9b11"
+    },
+    {
+      "path": "layers/CN-13-1304.geojson",
+      "bytes": 18958,
+      "sha256": "f14510df4cffabaae71187915b491aae0f569890be80d65530f228327d4098bb"
+    },
+    {
+      "path": "layers/CN-13-1305.geojson",
+      "bytes": 17366,
+      "sha256": "c245a7276e0016eacf2e2e6cba3f914811d24bc55721019cc13fb601c9b886c9"
+    },
+    {
+      "path": "layers/CN-13-1306.geojson",
+      "bytes": 33539,
+      "sha256": "0f12a82425ae2da4576bde488a347ea9b31cd02d42c99c1d19bfae81d0b0b4d1"
+    },
+    {
+      "path": "layers/CN-13-1307.geojson",
+      "bytes": 43559,
+      "sha256": "e084fd1b3633f7169f6cb751fc335fc5bfd3a38a264b4b0b350da18e92742cf1"
+    },
+    {
+      "path": "layers/CN-13-1308.geojson",
+      "bytes": 27946,
+      "sha256": "e70adb6580a832cb03eb38bf4c100d1ce479fed88372e3a4b70a15a4c92bfacb"
+    },
+    {
+      "path": "layers/CN-13-1309.geojson",
+      "bytes": 25988,
+      "sha256": "03c5ac623895bf6c11d8022259ced5b6d80ec5d8f8f46d5a0132b00427b1efb0"
+    },
+    {
+      "path": "layers/CN-13-1310.geojson",
+      "bytes": 16734,
+      "sha256": "258b9dadee46ca0b257bfde1321faf5c9b4fbe205f1e204c08de222426d6b1c4"
+    },
+    {
+      "path": "layers/CN-13-1311.geojson",
+      "bytes": 12333,
+      "sha256": "4556076ec0c4bd759323cf50539de05f89783ad9975ec7c9a54e97b8c6334052"
+    },
+    {
+      "path": "layers/CN-13.geojson",
+      "bytes": 89369,
+      "sha256": "cb4616619701b40975b962dded519cd684c62bfefd4df8a8231a2ac246cefe82"
+    },
+    {
+      "path": "layers/CN-14-1401.geojson",
+      "bytes": 15945,
+      "sha256": "d8bfe2b2dd69085a0c74818f3f0b615808cc4b708aebabf9cb5f7d9520a9622f"
+    },
+    {
+      "path": "layers/CN-14-1402.geojson",
+      "bytes": 44545,
+      "sha256": "33c1c14bfc6cdd5a864fa7ef286feae1467519537488a0b20a1874308f055e0a"
+    },
+    {
+      "path": "layers/CN-14-1403.geojson",
+      "bytes": 13026,
+      "sha256": "86bbd7991161f687e096f1a8c680ba3a6308e78f19216e5a5f792452ddbf9376"
+    },
+    {
+      "path": "layers/CN-14-1404.geojson",
+      "bytes": 23408,
+      "sha256": "49ce0e6317ed1264ace5a531e8c83d7dd7afd2e76297afbf5d4bad8911f50d86"
+    },
+    {
+      "path": "layers/CN-14-1405.geojson",
+      "bytes": 13361,
+      "sha256": "f07a50bc51554f6f8218696c63133c8e84ea4451a2fac28784e21aeaf3714f7a"
+    },
+    {
+      "path": "layers/CN-14-1406.geojson",
+      "bytes": 21673,
+      "sha256": "aeece194ce9ccb8e9196a1f312ff72edeb09463a4c25e7ce3db34e663270ba49"
+    },
+    {
+      "path": "layers/CN-14-1407.geojson",
+      "bytes": 28414,
+      "sha256": "aef0e6f2701d90b42738b07bedb56ecf4730dc4dc9cfa76dd2ca4adae00114f3"
+    },
+    {
+      "path": "layers/CN-14-1408.geojson",
+      "bytes": 20731,
+      "sha256": "d1685f5b0f5c8e48292f4f46fe0c7e5e4a44e7bf2029e33b9f0e7d25f3bd977b"
+    },
+    {
+      "path": "layers/CN-14-1409.geojson",
+      "bytes": 46230,
+      "sha256": "18a8f11297417262b9d6006183cbb698d75aed05db2697ea2d703026f0b195eb"
+    },
+    {
+      "path": "layers/CN-14-1410.geojson",
+      "bytes": 74398,
+      "sha256": "2508d269a76ea02f557d15e58a01f82a467dae8e74484f8c53b40f514529976c"
+    },
+    {
+      "path": "layers/CN-14-1411.geojson",
+      "bytes": 17614,
+      "sha256": "030e155b3d017d157e487eeac1387b8c2509164bc17997a29932eaa05b7de158"
+    },
+    {
+      "path": "layers/CN-14.geojson",
+      "bytes": 108006,
+      "sha256": "74d4c269efb70a4785aa24d9d2df9d1dc0101aece3fd401d4ff03b53be496656"
+    },
+    {
+      "path": "layers/CN-15-1501.geojson",
+      "bytes": 16340,
+      "sha256": "4027f981cb533b4aa0a0b17217d4cc76ea26e23c8ced9db34ca6f7d3cc19327a"
+    },
+    {
+      "path": "layers/CN-15-1502.geojson",
+      "bytes": 8364,
+      "sha256": "13a36d3f7d3cdda8877313397d107074dd6f5624dc38e057d746e181605082fa"
+    },
+    {
+      "path": "layers/CN-15-1503.geojson",
+      "bytes": 1919,
+      "sha256": "627ee5a3a6a9bafabf5cabb77cc733153e09b81919b21eb86a2e5aaf67a4e5ab"
+    },
+    {
+      "path": "layers/CN-15-1504.geojson",
+      "bytes": 30996,
+      "sha256": "48fed4e6b5ff2748d0edfc39a6a089a8a8bfaaa8e49482799e843b8cd4930687"
+    },
+    {
+      "path": "layers/CN-15-1505.geojson",
+      "bytes": 18805,
+      "sha256": "46be04f384645110a194772290f9f8900688df2b8c915b8fd9a1859602003091"
+    },
+    {
+      "path": "layers/CN-15-1506.geojson",
+      "bytes": 13648,
+      "sha256": "613f99fbc8f52a41e914cb4dc21934d32b52ee145805274b4e5b78cf3ea7323a"
+    },
+    {
+      "path": "layers/CN-15-1507.geojson",
+      "bytes": 47988,
+      "sha256": "1a201fb71af787af23fb9e3b78677e3607cd29c0dc2ffd87d6e1c85182109407"
+    },
+    {
+      "path": "layers/CN-15-1508.geojson",
+      "bytes": 8539,
+      "sha256": "30c31bca47a0cbf85e7b010104597d09a9c9b091dbb3566150a670cf247dfc5f"
+    },
+    {
+      "path": "layers/CN-15-1509.geojson",
+      "bytes": 45734,
+      "sha256": "35d03fb27841aca80f636bccafbf6fa15d890a641a02c7e61e1605681c5c4f8c"
+    },
+    {
+      "path": "layers/CN-15-1522.geojson",
+      "bytes": 13706,
+      "sha256": "0e6cad3442a1fceeb988271645e7b6c3cb26cd4f63eccfac2c1490e97f2b9c41"
+    },
+    {
+      "path": "layers/CN-15-1525.geojson",
+      "bytes": 29303,
+      "sha256": "69baccc31c0743b8252995f020c62ea6f45ce5e9cf1640b8446b4f1d1e6b5b99"
+    },
+    {
+      "path": "layers/CN-15-1529.geojson",
+      "bytes": 6966,
+      "sha256": "230a018aab1ca9ea0cfe41c6a42866176976dbba4d4b0063bf7c06b749b319f3"
+    },
+    {
+      "path": "layers/CN-15.geojson",
+      "bytes": 88175,
+      "sha256": "407daa93886a247421bac4d69b2ca854df70ad7b99cd2bacda9fc6ad5425d204"
+    },
+    {
+      "path": "layers/CN-21-2101.geojson",
+      "bytes": 18589,
+      "sha256": "b34e9dc0ab99d04f62e1492995218d72ee06b0ada6833c7815a720e8e23da41a"
+    },
+    {
+      "path": "layers/CN-21-2102.geojson",
+      "bytes": 102862,
+      "sha256": "e9dbdd3e2fc840813efff938bd00265b5b07539c5a7e67615ad5e802c0df80b1"
+    },
+    {
+      "path": "layers/CN-21-2103.geojson",
+      "bytes": 9756,
+      "sha256": "ab43b99b1c9d5cfac3aae01595bbe8a4bf5154491c729890cdda45e8d3a91272"
+    },
+    {
+      "path": "layers/CN-21-2104.geojson",
+      "bytes": 9155,
+      "sha256": "40790c8df8ac631e2f439cb2aaa205e1f56b62ada29ebc5c201b41a09478d14b"
+    },
+    {
+      "path": "layers/CN-21-2105.geojson",
+      "bytes": 11363,
+      "sha256": "dc2364681bc906cac17d941fab8d61736c45d172080d37d9bc94ff883ac8663e"
+    },
+    {
+      "path": "layers/CN-21-2106.geojson",
+      "bytes": 18451,
+      "sha256": "e3410f0ef32a69da345e1f2a8950e2f59623fd183cb17410225e07606388a300"
+    },
+    {
+      "path": "layers/CN-21-2107.geojson",
+      "bytes": 15060,
+      "sha256": "57f0b5cd913c6c0b474654d0d5f4872e990c9f0bc90185cc4013e578f179156b"
+    },
+    {
+      "path": "layers/CN-21-2108.geojson",
+      "bytes": 17658,
+      "sha256": "e68c18e08cec5e0383169bb8c031d718deb646b4dd7a7919bba32dfcdba6d42e"
+    },
+    {
+      "path": "layers/CN-21-2109.geojson",
+      "bytes": 15393,
+      "sha256": "df7aa8bb8d9114780d9ed126ac7e367d74ccc282b8f78a4fa8e6da8ba1202ca6"
+    },
+    {
+      "path": "layers/CN-21-2110.geojson",
+      "bytes": 11015,
+      "sha256": "3bafc00baf0c05d9739078fb3a3d336331d049fef6a6f2935f2c8b1dd3f22a59"
+    },
+    {
+      "path": "layers/CN-21-2111.geojson",
+      "bytes": 10850,
+      "sha256": "fa659cb15a52f99ac6ca86f5aca146b7850b60952ab7ae90b326d28d2297e0ea"
+    },
+    {
+      "path": "layers/CN-21-2112.geojson",
+      "bytes": 15248,
+      "sha256": "1828e3a6a7a3c7e711f1ae0597bcf9743f9df8a466d618365ed7f08707cd9af8"
+    },
+    {
+      "path": "layers/CN-21-2113.geojson",
+      "bytes": 17371,
+      "sha256": "daf70f5b6d455e80907f0b663e499a14e5fa9e98e96f9e9831ce19f7a2d97ce3"
+    },
+    {
+      "path": "layers/CN-21-2114.geojson",
+      "bytes": 26825,
+      "sha256": "45de9dacb24903e804c74574439c0ff6ba7e488efc3ef7a55f7b640bd1ac81dd"
+    },
+    {
+      "path": "layers/CN-21.geojson",
+      "bytes": 206884,
+      "sha256": "efe14140ddbfee79e6489fc736647fafd9fc94570a13736aa9b646b44c3a3fac"
+    },
+    {
+      "path": "layers/CN-22-2201.geojson",
+      "bytes": 23979,
+      "sha256": "854f82c1ba381a9cb372867e4f7b9dbdcdc2e25ab5fbb1789753f6c371e5b86f"
+    },
+    {
+      "path": "layers/CN-22-2202.geojson",
+      "bytes": 29241,
+      "sha256": "232cec8552390c0a9a786156210bd2641e616dda72fe01991ceeff445a2ed0bd"
+    },
+    {
+      "path": "layers/CN-22-2203.geojson",
+      "bytes": 6087,
+      "sha256": "6e026b3b8be7e774b613edd814907977e9ca201f5935c12c57df7b4bf9ed0052"
+    },
+    {
+      "path": "layers/CN-22-2204.geojson",
+      "bytes": 9665,
+      "sha256": "0a72cc3f0b9a80fd26a4756377f76a9417777849b8fac3523d6e7e35d2d1e54d"
+    },
+    {
+      "path": "layers/CN-22-2205.geojson",
+      "bytes": 17055,
+      "sha256": "21b2bd904dbf6c22bab5acfd2767fab7418ee2d94c8fe993ed9e1876c41eb663"
+    },
+    {
+      "path": "layers/CN-22-2206.geojson",
+      "bytes": 16486,
+      "sha256": "490cf0681f3bab99f37b129753db1e3560d3148166735eeb5c5a7c98dcb5aa7f"
+    },
+    {
+      "path": "layers/CN-22-2207.geojson",
+      "bytes": 6625,
+      "sha256": "cee28d3f361a3aa995a7e7c963226e0c2a520ae663dd59220c85860ad859e1d3"
+    },
+    {
+      "path": "layers/CN-22-2208.geojson",
+      "bytes": 8898,
+      "sha256": "81c0a38670f08d33b01625c1cffb839c610f9b36ef8ff68d7d270c70406cd137"
+    },
+    {
+      "path": "layers/CN-22-2224.geojson",
+      "bytes": 42164,
+      "sha256": "dd87a72e18c02dca1fc43f6ce6e51b9bc3e3bd17e7dd42388ce1c48bd93d4777"
+    },
+    {
+      "path": "layers/CN-22.geojson",
+      "bytes": 62378,
+      "sha256": "4c42a495b5eec5238e4567d456540e250b77c743000ab72f14ffe4837ea8e7f5"
+    },
+    {
+      "path": "layers/CN-23-2301.geojson",
+      "bytes": 30450,
+      "sha256": "4fe8e1fa176577fafd73f216fb0af5afb1edfc2922ea3c6a3a105b3f080eea0f"
+    },
+    {
+      "path": "layers/CN-23-2302.geojson",
+      "bytes": 25030,
+      "sha256": "4618d75e6f35f6807183cb21b590f7af18095c4d8373bf181f577dac56ad691f"
+    },
+    {
+      "path": "layers/CN-23-2303.geojson",
+      "bytes": 20942,
+      "sha256": "1a37a508a35138fea041cbbd1027b63c14549591512f7dbaa0bfb47387a67725"
+    },
+    {
+      "path": "layers/CN-23-2304.geojson",
+      "bytes": 7615,
+      "sha256": "b78141ba3c49e68ef3ab18d2812c300f054c07f6181efa24b331949d57db7966"
+    },
+    {
+      "path": "layers/CN-23-2305.geojson",
+      "bytes": 18760,
+      "sha256": "d25964b3ee662d365a1af5da7f9878317a47ed840e31f787e3ecd56a6ecfe00e"
+    },
+    {
+      "path": "layers/CN-23-2306.geojson",
+      "bytes": 10728,
+      "sha256": "e5ac206f0f7e61120665aa2dc94b37ccff2053fafb2ff78569c36921d8aa22e8"
+    },
+    {
+      "path": "layers/CN-23-2307.geojson",
+      "bytes": 14555,
+      "sha256": "50c325d94bb9228e3f3b8632b7646028a04b85e2e2dcf8a76981371ccb533f46"
+    },
+    {
+      "path": "layers/CN-23-2308.geojson",
+      "bytes": 19590,
+      "sha256": "d220cde5bb51bcd69dd1f31716665e1ce3c7d0cadb7251a879d19610f2e3157e"
+    },
+    {
+      "path": "layers/CN-23-2309.geojson",
+      "bytes": 5961,
+      "sha256": "657ee2b2ba0b2b1b056d96b3c03e98070799780f52f89aac4bc01989abb08a24"
+    },
+    {
+      "path": "layers/CN-23-2310.geojson",
+      "bytes": 18642,
+      "sha256": "d2193c183aa134a08ad5af33aaa34be2ba7a3fdf387266ca5fc863036ee055ba"
+    },
+    {
+      "path": "layers/CN-23-2311.geojson",
+      "bytes": 15048,
+      "sha256": "6cc2fc43c197be4dd5559f3a011dbe8fcbc492da2dd02a389cdd417a14ea7570"
+    },
+    {
+      "path": "layers/CN-23-2312.geojson",
+      "bytes": 23345,
+      "sha256": "6babf069c7315ab0d668357fc679fd5fe8516406ad32b906d3a4c3827c2efb9f"
+    },
+    {
+      "path": "layers/CN-23-2327.geojson",
+      "bytes": 34841,
+      "sha256": "e458ecc941c419d1d5ac741025a0a32098ca5d4ca4aedc9c1a3064c53f2edde0"
+    },
+    {
+      "path": "layers/CN-23.geojson",
+      "bytes": 86870,
+      "sha256": "8237e7b06201e1b2c5b2c11075e3b30b4085fd4b1dbc32814b496b3bd2c81fa1"
+    },
+    {
+      "path": "layers/CN-31.geojson",
+      "bytes": 36346,
+      "sha256": "29de2a50ce8422814cc058f68bf8896739fffab8046bbaa5c20e7a77ed3c7445"
+    },
+    {
+      "path": "layers/CN-32-3201.geojson",
+      "bytes": 33250,
+      "sha256": "e0470445b58ff2b4a68e5afbf1136e12f9fc278087ac1f323a3ee6b3acdb5c58"
+    },
+    {
+      "path": "layers/CN-32-3202.geojson",
+      "bytes": 21879,
+      "sha256": "baf085e588a8b2ec49273f0296df0a6f1558b3043945dbd1cdcc8d2ce9cfb25d"
+    },
+    {
+      "path": "layers/CN-32-3203.geojson",
+      "bytes": 28398,
+      "sha256": "872440dba16db7ff1759f934d02fcb61bd6fc473d7329eabd40f3323c0b28999"
+    },
+    {
+      "path": "layers/CN-32-3204.geojson",
+      "bytes": 26226,
+      "sha256": "ad862211de6f188119ab3ab265b1b1824aafec3b37c5cae188acf86d54d381ae"
+    },
+    {
+      "path": "layers/CN-32-3205.geojson",
+      "bytes": 40212,
+      "sha256": "c4ca7a23d04ddde09748302d70d13c57a9a38d648fb01edfabc165890b763cf0"
+    },
+    {
+      "path": "layers/CN-32-3206.geojson",
+      "bytes": 18299,
+      "sha256": "ec32efa6fae05136924ad977173ccbb572a859404c9200a2eac1358d90bf4602"
+    },
+    {
+      "path": "layers/CN-32-3207.geojson",
+      "bytes": 11517,
+      "sha256": "a6b4ddf3f43ded0a8671ef73f0f479e58e139fd58008e303e266a8fbc2266dbe"
+    },
+    {
+      "path": "layers/CN-32-3208.geojson",
+      "bytes": 12966,
+      "sha256": "93abb92d417cd8fa3e781f7d42d6a6305613971dc821896c379fde30ff3a4071"
+    },
+    {
+      "path": "layers/CN-32-3209.geojson",
+      "bytes": 15639,
+      "sha256": "facf021f6831aea82142697463f0b45397430d7810b0282a78ef0867e5054d94"
+    },
+    {
+      "path": "layers/CN-32-3210.geojson",
+      "bytes": 9331,
+      "sha256": "b3d17aaffae9481b77a71dba563bf20f89e7cd6332f2fee0023c7e7ce00fdfdb"
+    },
+    {
+      "path": "layers/CN-32-3211.geojson",
+      "bytes": 26299,
+      "sha256": "73d5e1cbd0900d3a9218372528617cdea31a59cadecd3edb742128ba8bfde406"
+    },
+    {
+      "path": "layers/CN-32-3212.geojson",
+      "bytes": 10383,
+      "sha256": "0f0a0f035672896cc1c57f298b46c1fe21920648ef55d3496d4d67610bad65ca"
+    },
+    {
+      "path": "layers/CN-32-3213.geojson",
+      "bytes": 12782,
+      "sha256": "d98eea1f69e0e0648f83431cf8c7fe53557e9604780710b8ad524962f9ecceb8"
+    },
+    {
+      "path": "layers/CN-32.geojson",
+      "bytes": 111486,
+      "sha256": "2e7f76a38215c8c442fe7d722e818fc3333f2f21046a3107cea8112c805dbf99"
+    },
+    {
+      "path": "layers/CN-33-3301.geojson",
+      "bytes": 88477,
+      "sha256": "2c06da94ac35b1f5f57476b3f61adb28d4a247558aabb5822236d53a027bdaf9"
+    },
+    {
+      "path": "layers/CN-33-3302.geojson",
+      "bytes": 87391,
+      "sha256": "6b8476216d17fca99d66d6325bba1739b629c4389e13e49414d2a056816b90ef"
+    },
+    {
+      "path": "layers/CN-33-3303.geojson",
+      "bytes": 47998,
+      "sha256": "a5f734d4dbc0d475e6ce05904df9c0b6efdf6346398da9a044720d9f7a93ae37"
+    },
+    {
+      "path": "layers/CN-33-3304.geojson",
+      "bytes": 25308,
+      "sha256": "d80713f419d2ccfc5a1bbc5f6585419761c8a4736366c95cca09bf269d8a6323"
+    },
+    {
+      "path": "layers/CN-33-3305.geojson",
+      "bytes": 21675,
+      "sha256": "be985157b005518395f003602a067d5dedc5428bb7142a25b876f998d90e600e"
+    },
+    {
+      "path": "layers/CN-33-3306.geojson",
+      "bytes": 120084,
+      "sha256": "28bf1404d368ef221f6435be1e9784d48a3b853e32a176c46b52386f449aa334"
+    },
+    {
+      "path": "layers/CN-33-3307.geojson",
+      "bytes": 201872,
+      "sha256": "1a421081c530162dfacd5a99612b28a052e6c769235dfaae909d823a1fe36d1a"
+    },
+    {
+      "path": "layers/CN-33-3308.geojson",
+      "bytes": 43525,
+      "sha256": "db9efce703b1bb6b43238fd2cb4b173f29aaac7c6e88fa663fa7710fb5d6bd74"
+    },
+    {
+      "path": "layers/CN-33-3309.geojson",
+      "bytes": 2207,
+      "sha256": "992404d764620dfa9799bd18b3ed5c2a680d110d49c4739a6e0a19c2ae4d9e83"
+    },
+    {
+      "path": "layers/CN-33-3310.geojson",
+      "bytes": 116182,
+      "sha256": "4fa762f3d48fcec793a0a4b495db4a87c51127a776b079abc562211b7cce11e9"
+    },
+    {
+      "path": "layers/CN-33-3311.geojson",
+      "bytes": 57556,
+      "sha256": "0b64de6d88bc01ca72f7fcdebba7a466a47dc9f78c8c8edb2a60680bfe19c15c"
+    },
+    {
+      "path": "layers/CN-33.geojson",
+      "bytes": 285084,
+      "sha256": "86a4a916110cfbfb702131e4c4d5e3c56c9cd325eaa46500f539147ceca60658"
+    },
+    {
+      "path": "layers/CN-34-3401.geojson",
+      "bytes": 105047,
+      "sha256": "7053e52b5533bec9047179d5caa76211a9127070e69fd3705b4ede1251c9ad52"
+    },
+    {
+      "path": "layers/CN-34-3402.geojson",
+      "bytes": 14160,
+      "sha256": "3a123bd68aad10329eac20b5e1dab5521d1bacf5cfa3ed85bb3bef3695466f4a"
+    },
+    {
+      "path": "layers/CN-34-3403.geojson",
+      "bytes": 14529,
+      "sha256": "f6bdd8463d3adeb9f57aee7b1535ea57d72c16f002828a9afe3a54c4f04b5451"
+    },
+    {
+      "path": "layers/CN-34-3404.geojson",
+      "bytes": 31749,
+      "sha256": "1e8bb81c94232372b99d06ba4944ec4f67cd387d2ec3412c92ecccb356cd8ee7"
+    },
+    {
+      "path": "layers/CN-34-3405.geojson",
+      "bytes": 14791,
+      "sha256": "446e6e70b7cbe2d0f999ef8f94818910606acb11a8e684f97e56955e4d5cf411"
+    },
+    {
+      "path": "layers/CN-34-3406.geojson",
+      "bytes": 10378,
+      "sha256": "be5fc2da5abd6b455c0c2a3dc6f889a17088001046799ccc8015d802548a899b"
+    },
+    {
+      "path": "layers/CN-34-3407.geojson",
+      "bytes": 7075,
+      "sha256": "c50ed1ed334cac6dfb59150ee6dba03d7c1fa7354eda572e609e6f8018be885c"
+    },
+    {
+      "path": "layers/CN-34-3408.geojson",
+      "bytes": 25988,
+      "sha256": "09e5142436ff2bc50c888905509bd8224d4bce31b598eda9ce132c253e4b66ce"
+    },
+    {
+      "path": "layers/CN-34-3410.geojson",
+      "bytes": 21318,
+      "sha256": "4bcf32d3b284260ac2cf55e7d7179f25566aedc880cbf1f9cd1ec090c4f88667"
+    },
+    {
+      "path": "layers/CN-34-3411.geojson",
+      "bytes": 34677,
+      "sha256": "38aa380d6eee1bc3362bea2b31b6b5db445e515edc27bf76b98e538f7c7520f5"
+    },
+    {
+      "path": "layers/CN-34-3412.geojson",
+      "bytes": 35833,
+      "sha256": "006998b090140f56705f8ab2688ce90d1613f70c75f3305b175a0d4912752636"
+    },
+    {
+      "path": "layers/CN-34-3413.geojson",
+      "bytes": 19409,
+      "sha256": "557a80b278ccee4f2bb27c25d201d60ff784880a0fba9545e31e0966766f9363"
+    },
+    {
+      "path": "layers/CN-34-3415.geojson",
+      "bytes": 47308,
+      "sha256": "328e6bbcc0a3ba489a45c34fd35ab3276f5a5057d0f1773c052a9d23b782170b"
+    },
+    {
+      "path": "layers/CN-34-3416.geojson",
+      "bytes": 22595,
+      "sha256": "6f8495aaf06f308220a0a845cad1d4595a0fd3f244d62d6cd780016d0b18abbb"
+    },
+    {
+      "path": "layers/CN-34-3417.geojson",
+      "bytes": 11563,
+      "sha256": "eda4ae41af52d609ffc4dfbee3cddb15bc9a32ea618b967f080308801efa417f"
+    },
+    {
+      "path": "layers/CN-34-3418.geojson",
+      "bytes": 29211,
+      "sha256": "1607b3c641505776bf8249f4e3cd9ef1e5fbd5f2904b0c205252bce924b6fb91"
+    },
+    {
+      "path": "layers/CN-34.geojson",
+      "bytes": 181491,
+      "sha256": "6c11193e1311b296b31a1c7f7221a96673f1926764c2fedadffd50622f14c87a"
+    },
+    {
+      "path": "layers/CN-35-3501.geojson",
+      "bytes": 30341,
+      "sha256": "d27c305e396406cf5ba1aa91f5e411b1e1b3a0bf68d11a8e18b1d36c82244aaf"
+    },
+    {
+      "path": "layers/CN-35-3502.geojson",
+      "bytes": 11900,
+      "sha256": "a8d4f801d622ea93e750b731672b5464cc85c89881148f64fc7d3652b2a9fb67"
+    },
+    {
+      "path": "layers/CN-35-3503.geojson",
+      "bytes": 16692,
+      "sha256": "3a8a302664586fc72b8b3074c06693af3e7606dedb38df5aecb541f40a2e5fe3"
+    },
+    {
+      "path": "layers/CN-35-3504.geojson",
+      "bytes": 65531,
+      "sha256": "806ff5db5b8ddd9292b8f3e0166d30c520438aeaf82ba42597309d29fe22d259"
+    },
+    {
+      "path": "layers/CN-35-3505.geojson",
+      "bytes": 40232,
+      "sha256": "2bc21da9569e8f3984ba64a876c44c8242c5467cf541d7931c96425d476b403b"
+    },
+    {
+      "path": "layers/CN-35-3506.geojson",
+      "bytes": 36387,
+      "sha256": "2fea431ab46e2cd80c23f6cd2c92e25460cf5fc053c6dd02ee71a55ebf0f3ce5"
+    },
+    {
+      "path": "layers/CN-35-3507.geojson",
+      "bytes": 54429,
+      "sha256": "9bdf741f1753d8f1d6cd0c61efe885258785efee4ae17441f9f0b81a1d56db2d"
+    },
+    {
+      "path": "layers/CN-35-3508.geojson",
+      "bytes": 47154,
+      "sha256": "1ca53bf14f56f390f68500d9e0e2079744477645cf2f0db3ab92de55c81338de"
+    },
+    {
+      "path": "layers/CN-35-3509.geojson",
+      "bytes": 37652,
+      "sha256": "f3ee3d14f1e38df3b3b33bb2bc34a5a16f84d1acb18ab6c07d36d23ccf3759db"
+    },
+    {
+      "path": "layers/CN-35.geojson",
+      "bytes": 99799,
+      "sha256": "7ec8abe66d347532f62373664f9289086189864829db609fb83cd3af35638d3f"
+    },
+    {
+      "path": "layers/CN-36-3601.geojson",
+      "bytes": 57700,
+      "sha256": "172fbe230deb5118b999eeb85a79fbf73817194884ceb3888673bb264d0b2374"
+    },
+    {
+      "path": "layers/CN-36-3602.geojson",
+      "bytes": 22509,
+      "sha256": "3e2cfeb9c7afed7961907df499e7cd271579766de3a701d30958ee2f71a3f2b7"
+    },
+    {
+      "path": "layers/CN-36-3603.geojson",
+      "bytes": 16275,
+      "sha256": "d7d5e4505d690effd9a520355d62c0f3f54ff75ef01196ac8e0a7ac187f4a6ba"
+    },
+    {
+      "path": "layers/CN-36-3604.geojson",
+      "bytes": 60626,
+      "sha256": "235c5506b626228bb230f1312b09e4c556c7d8726bc8efc6dbf481f2bc0f6fe3"
+    },
+    {
+      "path": "layers/CN-36-3605.geojson",
+      "bytes": 14912,
+      "sha256": "e407d937501f5ace4f2786da66a0e42d72687e52d39c9cf5f1ea84ff765234b9"
+    },
+    {
+      "path": "layers/CN-36-3606.geojson",
+      "bytes": 24618,
+      "sha256": "a2fdcf8f2d0e27e0d6fd5108c7cde76e6e428712d44fba2afe744bc8e2cb0151"
+    },
+    {
+      "path": "layers/CN-36-3607.geojson",
+      "bytes": 103496,
+      "sha256": "f04870bf96c6f223be821994022a2ae38075a1b1ffa9926f33bc2a42e8aeb618"
+    },
+    {
+      "path": "layers/CN-36-3608.geojson",
+      "bytes": 73413,
+      "sha256": "66586e198642d1e469a108ba5dea5128e79bdf8088e44d55ba1c93b9b817c44f"
+    },
+    {
+      "path": "layers/CN-36-3609.geojson",
+      "bytes": 70167,
+      "sha256": "cdd28d9681cd76e91e5dbe98e05da161b1fe59627b53f0c72b229e7cea28f465"
+    },
+    {
+      "path": "layers/CN-36-3610.geojson",
+      "bytes": 68478,
+      "sha256": "5ab8070a439ca297d1209d5b65db3b1927336983a5ccf08a927d7ff260bc1447"
+    },
+    {
+      "path": "layers/CN-36-3611.geojson",
+      "bytes": 96246,
+      "sha256": "eaf13239aab716940ca830d712744ab715a8613b06eab679d5226b24cda34e41"
+    },
+    {
+      "path": "layers/CN-36.geojson",
+      "bytes": 177539,
+      "sha256": "a3777d629c75df4c9ea214e44b71717172aaaeb278482320031c3a706307b6ce"
+    },
+    {
+      "path": "layers/CN-37-3701.geojson",
+      "bytes": 22650,
+      "sha256": "863570b0176389eaf65121a9e23ee0032881f354757bfe962dc1b10da21cd1d1"
+    },
+    {
+      "path": "layers/CN-37-3702.geojson",
+      "bytes": 31476,
+      "sha256": "35e1f1a03ddb0edb0a4a741b38b313483c8eb1d225fca7403c20772c8e61ee79"
+    },
+    {
+      "path": "layers/CN-37-3703.geojson",
+      "bytes": 9641,
+      "sha256": "fefafbaf4ced235af999bd9436c5cfd72d058818cb9b02da9bbccc67b11e3fc9"
+    },
+    {
+      "path": "layers/CN-37-3704.geojson",
+      "bytes": 18277,
+      "sha256": "f47bb851a5359ae82ccb020992f3e339b292051958c1804991c9a41360fe541d"
+    },
+    {
+      "path": "layers/CN-37-3705.geojson",
+      "bytes": 7043,
+      "sha256": "8684f2014853011f02be497ae0db72aea4d01b89e0cf2d47bfb96aec1fbebf10"
+    },
+    {
+      "path": "layers/CN-37-3706.geojson",
+      "bytes": 36172,
+      "sha256": "1d9c5e04aa23251c310973b7ede2a002b3eaa407fa06e7a88d1fc8d134537c87"
+    },
+    {
+      "path": "layers/CN-37-3707.geojson",
+      "bytes": 18725,
+      "sha256": "c692f233b25e8a16cb05fa558ed3eebe060dc6f822c519556f0fb9005e4caa49"
+    },
+    {
+      "path": "layers/CN-37-3708.geojson",
+      "bytes": 37249,
+      "sha256": "75910b6a7985cc248cfad7998bbd642b1793087d72e680c815402bb34e20cb9d"
+    },
+    {
+      "path": "layers/CN-37-3709.geojson",
+      "bytes": 18046,
+      "sha256": "64294a3e69226aa57cdc5a7cbc815b5f9d4b375dada3a2731f5ec0d9d75c116e"
+    },
+    {
+      "path": "layers/CN-37-3710.geojson",
+      "bytes": 3969,
+      "sha256": "623f69468adfdfeda6006aedf9145f01cdd1748ad0c99db4b2a1c1191f2aa5f1"
+    },
+    {
+      "path": "layers/CN-37-3711.geojson",
+      "bytes": 7703,
+      "sha256": "ee0dcf9ea59abe1bcbd6b46ac3790c5bd0b44895a716176fd694943bd6fe8e36"
+    },
+    {
+      "path": "layers/CN-37-3713.geojson",
+      "bytes": 41438,
+      "sha256": "0c72657f7005126c7de7fe949c77fe14f121caed84e38da01aebde9018d3e511"
+    },
+    {
+      "path": "layers/CN-37-3714.geojson",
+      "bytes": 34494,
+      "sha256": "56ce35a46c671c21d64aa1a56fc87a6855a56fbf6c417a1e3b0de5e8202b07bc"
+    },
+    {
+      "path": "layers/CN-37-3715.geojson",
+      "bytes": 16742,
+      "sha256": "44d2320291f3d1e6a6c279afb8641c0d8e3c54dc7f4aa7b3e05ecff0ca46bcfb"
+    },
+    {
+      "path": "layers/CN-37-3716.geojson",
+      "bytes": 20444,
+      "sha256": "fd39729cf617a6267a5e561392ed6699ca0fe01e694df0db9865be6944f0704f"
+    },
+    {
+      "path": "layers/CN-37-3717.geojson",
+      "bytes": 27490,
+      "sha256": "3ce17b4030b4f2762f972e646eb4e31b19db2e85785ca87e58396c13fa4a36e0"
+    },
+    {
+      "path": "layers/CN-37.geojson",
+      "bytes": 115352,
+      "sha256": "5fd7c50860cc3c42dab610e5c5d257b29099dc2a629610d9446d679d69a20720"
+    },
+    {
+      "path": "layers/CN-41-4101.geojson",
+      "bytes": 29191,
+      "sha256": "d0281de3011085ef0354a5bcf1e1a7df84de91d2d91bd7de7a0ae9e2a4a984bc"
+    },
+    {
+      "path": "layers/CN-41-4102.geojson",
+      "bytes": 23503,
+      "sha256": "a17e282d639a1c41b7d62ab8828095da7cec84189c5b1938ecd08dd53c5c5a6f"
+    },
+    {
+      "path": "layers/CN-41-4103.geojson",
+      "bytes": 40458,
+      "sha256": "08d9eacd2980c57b82de3d9374be9e07ac6cb20d6e3d5d797bdda63cee3293da"
+    },
+    {
+      "path": "layers/CN-41-4104.geojson",
+      "bytes": 29611,
+      "sha256": "cef527ff27b8e020b9a05101766faec6ceff689a9425f9f10a74f4ae190cedbd"
+    },
+    {
+      "path": "layers/CN-41-4105.geojson",
+      "bytes": 18424,
+      "sha256": "a721a7d350314996e2d7e86fe35e9c97a798de37af7c183df0a234bb51a0867f"
+    },
+    {
+      "path": "layers/CN-41-4106.geojson",
+      "bytes": 7185,
+      "sha256": "36f78a3491401ed3f404151d6c1a5a4622b0fdf7b810a61b2b1af89a48d24a64"
+    },
+    {
+      "path": "layers/CN-41-4107.geojson",
+      "bytes": 25120,
+      "sha256": "9fc1f47cbddf03e2e0ec2d0a5e3b4fc37b1e82795c1883c9e653b9e7eea73e89"
+    },
+    {
+      "path": "layers/CN-41-4108.geojson",
+      "bytes": 13652,
+      "sha256": "53568b01dda19b1b0f341ffa986c3cdddafc11e0b8411f0039760f241cf01fdf"
+    },
+    {
+      "path": "layers/CN-41-4109.geojson",
+      "bytes": 12436,
+      "sha256": "5c60984ab6bb9f94fd1006eb69ef4c315b5cd79b1dc4bd8f8758880493d9c780"
+    },
+    {
+      "path": "layers/CN-41-4110.geojson",
+      "bytes": 19594,
+      "sha256": "fe1b86e98a906b5d2f399724a528b27c6a4a8703ae064422165e7d763463e96a"
+    },
+    {
+      "path": "layers/CN-41-4111.geojson",
+      "bytes": 10300,
+      "sha256": "179525e58b1236176f57060d8b2349978e95124006457b078cff013a4b0f7123"
+    },
+    {
+      "path": "layers/CN-41-4112.geojson",
+      "bytes": 19510,
+      "sha256": "dd9103d8ace82fd9d94763ac5d3dbf2cb7553eba836a687556adc830bec4c96e"
+    },
+    {
+      "path": "layers/CN-41-4113.geojson",
+      "bytes": 51730,
+      "sha256": "278f165b6a14621f7438da8f5b9186913fcbe844a6663fbe4efd47395339f64e"
+    },
+    {
+      "path": "layers/CN-41-4114.geojson",
+      "bytes": 31362,
+      "sha256": "74a0ef5d09c24ed220500f09f6a8874d5d7b39b09fd832c89659acc8b7812ca3"
+    },
+    {
+      "path": "layers/CN-41-4115.geojson",
+      "bytes": 39283,
+      "sha256": "44a16cdff19270c403f3049ae56ef63699c7d5a6188900fc034883cd1ec171b6"
+    },
+    {
+      "path": "layers/CN-41-4116.geojson",
+      "bytes": 30908,
+      "sha256": "ea63870650dc2410198dcf194ca96a620ef54d9eecda023c2b6585db0cb7992f"
+    },
+    {
+      "path": "layers/CN-41-4117.geojson",
+      "bytes": 39440,
+      "sha256": "f6da414347b3cdb077a86231d3f15eb5a23d5dff635eca20042114835eaff775"
+    },
+    {
+      "path": "layers/CN-41.geojson",
+      "bytes": 146416,
+      "sha256": "ebd44ee40b335e066ae6af1aa32ef13b6969985d399d2027ad5471ef31144485"
+    },
+    {
+      "path": "layers/CN-42-4201.geojson",
+      "bytes": 29666,
+      "sha256": "feec2c52de99154ad5df48ce23c81c830ecc3f3aaad5a5f3f57e8bef6266a3f1"
+    },
+    {
+      "path": "layers/CN-42-4202.geojson",
+      "bytes": 26056,
+      "sha256": "a156388e81ac07619b82ea53e11941f16118d8248cf3a35aa1911233f4e7bdff"
+    },
+    {
+      "path": "layers/CN-42-4203.geojson",
+      "bytes": 10406,
+      "sha256": "d66d8d82868edba29c21586f65c0b70ded2530c98ef8743f80b8a6b06089ed7b"
+    },
+    {
+      "path": "layers/CN-42-4205.geojson",
+      "bytes": 14300,
+      "sha256": "d615ff7f4cc1ff9cf6d2643778607f7badc4e04683be4b689e6aee67c22bee62"
+    },
+    {
+      "path": "layers/CN-42-4206.geojson",
+      "bytes": 11403,
+      "sha256": "88e0c341fa134664305c50e82eda4b85c83b4572fbbbf81f55c6d28d44e7bb92"
+    },
+    {
+      "path": "layers/CN-42-4207.geojson",
+      "bytes": 12603,
+      "sha256": "18d69113edbeae157c01ca04c369c68b7b044861555d987b740d749f3ae97158"
+    },
+    {
+      "path": "layers/CN-42-4208.geojson",
+      "bytes": 12942,
+      "sha256": "0644e7808e456fd173685b0e7318a31697664a2bb6644a9a0e787a9795a40340"
+    },
+    {
+      "path": "layers/CN-42-4209.geojson",
+      "bytes": 11277,
+      "sha256": "13292cdec568d50ab571eda1b662202eefdc86eec10701a1241304f9228fd485"
+    },
+    {
+      "path": "layers/CN-42-4210.geojson",
+      "bytes": 10300,
+      "sha256": "d69ddbbde18348410ea06189578de88dd4d289133b3ed8391d60d7d118bdc6d5"
+    },
+    {
+      "path": "layers/CN-42-4211.geojson",
+      "bytes": 21014,
+      "sha256": "939172b43564ec0a16f53e01b6d8b747617e92dc962342fb21e0f001ef0e4c64"
+    },
+    {
+      "path": "layers/CN-42-4212.geojson",
+      "bytes": 25884,
+      "sha256": "a4274186f0630188c66db6a0a647e42159caf25926da2421b69682b635cfcc9a"
+    },
+    {
+      "path": "layers/CN-42-4213.geojson",
+      "bytes": 5231,
+      "sha256": "8190e0f08044f9c1e3f6b7d2a032164cf4dcf8d2a1f0644931aa872195a013fb"
+    },
+    {
+      "path": "layers/CN-42-4228.geojson",
+      "bytes": 12990,
+      "sha256": "3883410ee7012e69becfd65fb1bd7bb37a4e1b0010be19f34d1a357d0ab2dbcd"
+    },
+    {
+      "path": "layers/CN-42.geojson",
+      "bytes": 79939,
+      "sha256": "77b6eb2cd7174acf1c217f3fd7d05cef10837253ea3b6537f979770b4674b927"
+    },
+    {
+      "path": "layers/CN-43-4301.geojson",
+      "bytes": 23166,
+      "sha256": "c6756006c64452061936db4c445f367431f26d0918d2309e8ee5f5399c2631e4"
+    },
+    {
+      "path": "layers/CN-43-4302.geojson",
+      "bytes": 19083,
+      "sha256": "f89906eebc49f358e913035cea144920199d8a3e94de0f01323a3d55a470957a"
+    },
+    {
+      "path": "layers/CN-43-4303.geojson",
+      "bytes": 21271,
+      "sha256": "a18f8479dccab7581751c3bba06b69f8e3ae832865fe8f888f476c9e82e7c3e7"
+    },
+    {
+      "path": "layers/CN-43-4304.geojson",
+      "bytes": 25421,
+      "sha256": "8d11ddb19e9e8c3b92de14a66c94dd83e0b51bf929bee8cddcb1ddb61a046ec3"
+    },
+    {
+      "path": "layers/CN-43-4305.geojson",
+      "bytes": 26432,
+      "sha256": "e90d21b3fa70826dcc4d0a550e416f3340fcba07947db1623ed50208170f9114"
+    },
+    {
+      "path": "layers/CN-43-4306.geojson",
+      "bytes": 32037,
+      "sha256": "5ecdeaa5298fa50ad0ee476e31fed4adb241d50128c383e87e3d02312539178d"
+    },
+    {
+      "path": "layers/CN-43-4307.geojson",
+      "bytes": 20161,
+      "sha256": "c2e8026923d9142a9a679c0981c40fb5ab4a64ff43e2c10f60fbf7002d21df75"
+    },
+    {
+      "path": "layers/CN-43-4308.geojson",
+      "bytes": 22734,
+      "sha256": "b82ea7d7af813272dedbc664064e4bd2ffc87199684f5318d30145e07aa66ba4"
+    },
+    {
+      "path": "layers/CN-43-4309.geojson",
+      "bytes": 16803,
+      "sha256": "90563fd7dc71c04216cdf65a12fc4fb2ad1a69bbc927b7742abe13749e566b3e"
+    },
+    {
+      "path": "layers/CN-43-4310.geojson",
+      "bytes": 30417,
+      "sha256": "43c7179fcfcbdf5ea17a2beb03abfe0b3fce7a622d08e4f3f6f3911ab92b0540"
+    },
+    {
+      "path": "layers/CN-43-4311.geojson",
+      "bytes": 18497,
+      "sha256": "9079f589cc15fefae8a188e97b2a55bfb81864da97f7a082c4d187948ee22e74"
+    },
+    {
+      "path": "layers/CN-43-4312.geojson",
+      "bytes": 32560,
+      "sha256": "66423757c20a839a4001ababd4bb83db629d5c1e6c4d1a350ed3c43c67d154b5"
+    },
+    {
+      "path": "layers/CN-43-4313.geojson",
+      "bytes": 59662,
+      "sha256": "078e750e2c5876e522cf14a0febfada9c329addd258b1e3bc9fc554bafdc8520"
+    },
+    {
+      "path": "layers/CN-43-4331.geojson",
+      "bytes": 13787,
+      "sha256": "7afd2e52bf830d260bbd0537964e8e8ba81c402418d41ffb84e1573238cac40c"
+    },
+    {
+      "path": "layers/CN-43.geojson",
+      "bytes": 128235,
+      "sha256": "ac2824f40760507ae923bf7557449f4f1f20548a08bb0d49dbac4aaff2dc1eb7"
+    },
+    {
+      "path": "layers/CN-44-4401.geojson",
+      "bytes": 22549,
+      "sha256": "77914eb8d5fcaa915bce6bf57a96007389e9eefb42d27703cf3367113af5e372"
+    },
+    {
+      "path": "layers/CN-44-4402.geojson",
+      "bytes": 63794,
+      "sha256": "6c373b00b8ada9de76a6064851584505fb40da7b4623589970ea647ea6ba0352"
+    },
+    {
+      "path": "layers/CN-44-4403.geojson",
+      "bytes": 16490,
+      "sha256": "ff60d1bef1ddb0296881565bdfecceaad6249fb458dafcb784e501cacf0e6b31"
+    },
+    {
+      "path": "layers/CN-44-4404.geojson",
+      "bytes": 3926,
+      "sha256": "b3454dcc105a10b54878552a115b16eacab72ee1ab0941622b69f450a0987f5d"
+    },
+    {
+      "path": "layers/CN-44-4405.geojson",
+      "bytes": 6230,
+      "sha256": "110a923a912555b707b335e8b9e9cc9c1db6f43092c4929817f3a7d642d3446e"
+    },
+    {
+      "path": "layers/CN-44-4406.geojson",
+      "bytes": 14247,
+      "sha256": "ccb026710c95041f3cea3f63faf9c664e89305f60c1e95343f40cb1e0ce75af1"
+    },
+    {
+      "path": "layers/CN-44-4407.geojson",
+      "bytes": 24889,
+      "sha256": "be338f14b9347bb797e646abf531bee4d2ad27525749af2ce555186408d4ca9c"
+    },
+    {
+      "path": "layers/CN-44-4408.geojson",
+      "bytes": 32934,
+      "sha256": "6eccf4a0080f850504ff9a9fb7ea152973ce7042234c40a8808dd0254c2f6709"
+    },
+    {
+      "path": "layers/CN-44-4409.geojson",
+      "bytes": 27582,
+      "sha256": "3252107b003b668984634c1d043bd5506026e8e27ad8083a3095348ef6372669"
+    },
+    {
+      "path": "layers/CN-44-4412.geojson",
+      "bytes": 17320,
+      "sha256": "b1e987f57f382838fde94a7f3fa9a29813ec7021fbf26526dfeb59b5408cfcf1"
+    },
+    {
+      "path": "layers/CN-44-4413.geojson",
+      "bytes": 20214,
+      "sha256": "071822fa129e47947adc67bd9451ee7af29f5ed3b5d111242b2a4f288a221831"
+    },
+    {
+      "path": "layers/CN-44-4414.geojson",
+      "bytes": 20106,
+      "sha256": "544ebe6f5d8cb570551f1cc0bf451355c27ce2ffe6fdb358eed6d3aed175d862"
+    },
+    {
+      "path": "layers/CN-44-4415.geojson",
+      "bytes": 6757,
+      "sha256": "82bccbfd79809c74cdc8583c8242f99cdc07e8335a2f732870915f4165112648"
+    },
+    {
+      "path": "layers/CN-44-4416.geojson",
+      "bytes": 21696,
+      "sha256": "5c7913626484971a7228cf7c0d5645aa1ca01b0023ba088a71ee8dbca1ec5e78"
+    },
+    {
+      "path": "layers/CN-44-4417.geojson",
+      "bytes": 8515,
+      "sha256": "07a5c0d65b59669a796153021a3af65d8eb085ad7a5247639188cf235185e98d"
+    },
+    {
+      "path": "layers/CN-44-4418.geojson",
+      "bytes": 26940,
+      "sha256": "e5b490ed092a9af82e3a43d481e043f2304b7cd25a8489e196ce11266f95ad15"
+    },
+    {
+      "path": "layers/CN-44-4451.geojson",
+      "bytes": 6139,
+      "sha256": "4e1880f59f13e3742a727094b50362fb3a1522b59c7946160f8832d2b573d870"
+    },
+    {
+      "path": "layers/CN-44-4452.geojson",
+      "bytes": 8825,
+      "sha256": "a5363559b38f7c1e30df3ab77de54f4e9d9092f39a5a878f8f1884cf73daa1dc"
+    },
+    {
+      "path": "layers/CN-44-4453.geojson",
+      "bytes": 14833,
+      "sha256": "63095ecb3ef4b141cd042d5965581214299a907bff640c12ef36aab2c7f3ba23"
+    },
+    {
+      "path": "layers/CN-44.geojson",
+      "bytes": 159052,
+      "sha256": "62c5de4e85b7ebbaba4d4c0e44c562de020715b91cb85db02e5645e54e3291ce"
+    },
+    {
+      "path": "layers/CN-45-4501.geojson",
+      "bytes": 56497,
+      "sha256": "2be11a5ac071a0886b3eec50684e54e3bbb665751ced3706dff0a52bdb7de3bd"
+    },
+    {
+      "path": "layers/CN-45-4502.geojson",
+      "bytes": 26632,
+      "sha256": "6a5dbe5124f6fdc678e317fe452ac89b9a53c1d4d1c2be19f97cf4f25e80c958"
+    },
+    {
+      "path": "layers/CN-45-4503.geojson",
+      "bytes": 43119,
+      "sha256": "e5c8ed4dd4edd988dbd2197812819ca642bc6eceeb0caf9e1ee98ceeec1a2a2d"
+    },
+    {
+      "path": "layers/CN-45-4504.geojson",
+      "bytes": 36529,
+      "sha256": "8a380f715722cebd2784c8ca91de03bd1e6515bc6368b7343590a8ec0817716d"
+    },
+    {
+      "path": "layers/CN-45-4505.geojson",
+      "bytes": 8979,
+      "sha256": "7c33906eef0c1c0b4f0e2ae71b7abca361392251f7c1c82b024b48fe93ed9fc3"
+    },
+    {
+      "path": "layers/CN-45-4506.geojson",
+      "bytes": 13277,
+      "sha256": "9185412c784bb82cf1df29165f6e15aa86403d0d07508d2699c4c168182e2e49"
+    },
+    {
+      "path": "layers/CN-45-4507.geojson",
+      "bytes": 24119,
+      "sha256": "e237d5122f97a561408397a700eed278d5ca39d6ba82b6caaeb8de64d28f2128"
+    },
+    {
+      "path": "layers/CN-45-4508.geojson",
+      "bytes": 33853,
+      "sha256": "72a91a58de60f59dc88789ebcd76aeb402a3b1166d2bdc160c106f88c0e1e81e"
+    },
+    {
+      "path": "layers/CN-45-4509.geojson",
+      "bytes": 41428,
+      "sha256": "0191c37f18641b09b1ecb8f80fc26143cfad5d2c1c01e122cf78d4d8f7a23a8e"
+    },
+    {
+      "path": "layers/CN-45-4510.geojson",
+      "bytes": 59986,
+      "sha256": "8a00242daea8eb09d2492def6b11b179aa832a63961513b694dd8d4f1e99cb9c"
+    },
+    {
+      "path": "layers/CN-45-4511.geojson",
+      "bytes": 24969,
+      "sha256": "7f33bdb0f1c4fa7b6cfdf212d858bd70030c659b1fa688524c0ae7d760f13897"
+    },
+    {
+      "path": "layers/CN-45-4512.geojson",
+      "bytes": 48558,
+      "sha256": "f1ab5f4a97418f220c48e0469f5de93831974f2799c379e009e5b41d8ddd8317"
+    },
+    {
+      "path": "layers/CN-45-4513.geojson",
+      "bytes": 34233,
+      "sha256": "53923edf5ed1e98491722f3dd7fefe7432173f66f1e7eb6ca6728beedab470c1"
+    },
+    {
+      "path": "layers/CN-45-4514.geojson",
+      "bytes": 34981,
+      "sha256": "f4509fca9c9d785e4540e51d576dda3332db65c7a5009ca04807eef3a1490aae"
+    },
+    {
+      "path": "layers/CN-45.geojson",
+      "bytes": 184460,
+      "sha256": "f4a9de44fbae5ca6b2dd50da168510e6e9eaec30308a1c8f6537a829dff0c9b9"
+    },
+    {
+      "path": "layers/CN-46-4601.geojson",
+      "bytes": 3741,
+      "sha256": "76a23425805339f960122dbfe9ae79905dda8aec75160b0745e8dc5577986d41"
+    },
+    {
+      "path": "layers/CN-46-4602.geojson",
+      "bytes": 3432,
+      "sha256": "d5aadb2761f22386165afae65b6b1fdcabe2468b0cd749b0d0790c2444142ad2"
+    },
+    {
+      "path": "layers/CN-46-4603.geojson",
+      "bytes": 8813,
+      "sha256": "6b115200b8ef9f89dc9fbe35c8fe9b1a5f31fa15714ed30d08108292b283c299"
+    },
+    {
+      "path": "layers/CN-46.geojson",
+      "bytes": 32344,
+      "sha256": "ddbfe74f19e6c158429312c39d6e8e2a651220b86da7ae3a939d23560be3f1f7"
+    },
+    {
+      "path": "layers/CN-50.geojson",
+      "bytes": 85432,
+      "sha256": "bdac90493a3c9e9a1a66caeeb68555148fb9daf9808e10d11dc190f8f7c017a1"
+    },
+    {
+      "path": "layers/CN-51-5101.geojson",
+      "bytes": 62043,
+      "sha256": "7c9858d59e47e9761bf72fb9ec01daea550520c9a00e04a34c49fb8a44c4b81c"
+    },
+    {
+      "path": "layers/CN-51-5103.geojson",
+      "bytes": 26552,
+      "sha256": "f3cc4ab8666d04ccdb551983195ad30943bde9353aa9e70256f930883d164c09"
+    },
+    {
+      "path": "layers/CN-51-5104.geojson",
+      "bytes": 7036,
+      "sha256": "88d85c33b23beb41b81e39f54c9082eb48693187bc74d356c15b612e4519eaf3"
+    },
+    {
+      "path": "layers/CN-51-5105.geojson",
+      "bytes": 22501,
+      "sha256": "7af9851bee0428aa1156d28d0f07338e3502e0c5f935359edc093970894a7fb6"
+    },
+    {
+      "path": "layers/CN-51-5106.geojson",
+      "bytes": 10938,
+      "sha256": "800a99e193fc6adc8a03153c49f56de937fd4b03d91b443b4cab0b8a3b53ab37"
+    },
+    {
+      "path": "layers/CN-51-5107.geojson",
+      "bytes": 20367,
+      "sha256": "247d33d178c82ff17cf3b22a2bf6e6bc31a0a28ce7652a61415208fb2acf96a9"
+    },
+    {
+      "path": "layers/CN-51-5108.geojson",
+      "bytes": 14985,
+      "sha256": "3bd36dd5598be34758239e0266f0c23387d44ae09bb758002af7363234872870"
+    },
+    {
+      "path": "layers/CN-51-5109.geojson",
+      "bytes": 12401,
+      "sha256": "eb9c07de8bff720156dc378b999f1952a083af117fd5b099c05c896205518834"
+    },
+    {
+      "path": "layers/CN-51-5110.geojson",
+      "bytes": 14697,
+      "sha256": "d0073af34ffb7e237298058425c59fc9054880716c83c2b25b80846ca2cbe68c"
+    },
+    {
+      "path": "layers/CN-51-5111.geojson",
+      "bytes": 17459,
+      "sha256": "ba85a455f9822c9f4e968c864f4edef467440f68571270d95cb29491ec9e4898"
+    },
+    {
+      "path": "layers/CN-51-5113.geojson",
+      "bytes": 22748,
+      "sha256": "4549a0a97e4b475fae8e5bbe95f47901022d2cdac6b4d5e545ccfed60691e087"
+    },
+    {
+      "path": "layers/CN-51-5114.geojson",
+      "bytes": 18949,
+      "sha256": "f1efa7de072b1c9f03e32dd380cb22c80f9e2f61773f0141ccfe9305e3185910"
+    },
+    {
+      "path": "layers/CN-51-5115.geojson",
+      "bytes": 19479,
+      "sha256": "dd2bbabb01eab4846ab3fca5ac87756c0003ca356a6393b74cefd3f5ef6a2a19"
+    },
+    {
+      "path": "layers/CN-51-5116.geojson",
+      "bytes": 10561,
+      "sha256": "e9a094e056a9694d55fcabae9d9d364352106decec393bee3eb87eef68abd66a"
+    },
+    {
+      "path": "layers/CN-51-5117.geojson",
+      "bytes": 11072,
+      "sha256": "ad1ecfe73d9db490df8d59d8354a747c3df0657ddbecf3fd1833897f5bf2074a"
+    },
+    {
+      "path": "layers/CN-51-5118.geojson",
+      "bytes": 28805,
+      "sha256": "68359783cb865276b0bdbb3389b47ebfb78135428a4802e72471e41ad2741a44"
+    },
+    {
+      "path": "layers/CN-51-5119.geojson",
+      "bytes": 12303,
+      "sha256": "ccb5d68a60aee7d934c715a6cb41f7a9a2ca28c0945ddf6839ea857a1d38b1cd"
+    },
+    {
+      "path": "layers/CN-51-5120.geojson",
+      "bytes": 8349,
+      "sha256": "9846366d93920e8f80f4663f88c78e48233efbcb366bd97eb90161a0b100b2c9"
+    },
+    {
+      "path": "layers/CN-51-5132.geojson",
+      "bytes": 30852,
+      "sha256": "9a980005294b9da1a2f258bf29de1d50ab0db65e59bfc3b5dc61dea9ac7a1b32"
+    },
+    {
+      "path": "layers/CN-51-5133.geojson",
+      "bytes": 50282,
+      "sha256": "7425267c35b547660cca2d6e2165867ada863fbf9c19354fae600dae21ae8e88"
+    },
+    {
+      "path": "layers/CN-51-5134.geojson",
+      "bytes": 27550,
+      "sha256": "df452963447601ac4077059747ca07a9b9fc43a3dd6e12556ad994bf3fa7e449"
+    },
+    {
+      "path": "layers/CN-51.geojson",
+      "bytes": 155774,
+      "sha256": "a30b17bb7f9b00b980d01b6bbd0cca01e8d671b663be6a26adc99465ed20e300"
+    },
+    {
+      "path": "layers/CN-52-5201.geojson",
+      "bytes": 16424,
+      "sha256": "c5203ea3a359cd32473a0c877feca49414863366719f92245fecee5be6172d5c"
+    },
+    {
+      "path": "layers/CN-52-5202.geojson",
+      "bytes": 14601,
+      "sha256": "b2e3710e958597536791cbd446b102c1fb23b81fb02b07b2a97803cf22d5bb04"
+    },
+    {
+      "path": "layers/CN-52-5203.geojson",
+      "bytes": 27063,
+      "sha256": "0c0f56021326a50bfddbec7e48c29dc4efdaba971bab132db1c5d6f48c058e6d"
+    },
+    {
+      "path": "layers/CN-52-5204.geojson",
+      "bytes": 7097,
+      "sha256": "9d3f4685c81d026bccfadb6a02bb2042084acf245b52c3ff54ce6dff9212758c"
+    },
+    {
+      "path": "layers/CN-52-5205.geojson",
+      "bytes": 17747,
+      "sha256": "bb1dd2b7001dbf681b448369028086546557ff5da51aef6345da9db5ed21bedd"
+    },
+    {
+      "path": "layers/CN-52-5206.geojson",
+      "bytes": 16815,
+      "sha256": "df283b7438caff53243599f4ead78c8d1772a7e7dfdb7d719ab4b5de37b9202b"
+    },
+    {
+      "path": "layers/CN-52-5223.geojson",
+      "bytes": 10135,
+      "sha256": "555e667b8995e817132df61be0f6f687504650398c296aa9954ba4eb68a2306a"
+    },
+    {
+      "path": "layers/CN-52-5226.geojson",
+      "bytes": 30022,
+      "sha256": "9f06718622007f339aa11cb4ca4f0d5f5409227cdb9f5d39f86bceab14b0f2c9"
+    },
+    {
+      "path": "layers/CN-52-5227.geojson",
+      "bytes": 27454,
+      "sha256": "a517b080b2bda062e322c1ac0f1c2076a17fc58ea1a96ba0405abe2609e4fdb4"
+    },
+    {
+      "path": "layers/CN-52.geojson",
+      "bytes": 51579,
+      "sha256": "4a48c3b6ee8d1c614bc16608df729d532d83bcc4fee034493c1ecc92c7b96010"
+    },
+    {
+      "path": "layers/CN-53-5301.geojson",
+      "bytes": 54458,
+      "sha256": "f3016145492e4bd7379e2d1d84fabf3e1938cd0bbf8312665e5c3bf7b7237328"
+    },
+    {
+      "path": "layers/CN-53-5303.geojson",
+      "bytes": 38333,
+      "sha256": "0a29795652bf8afc928adce0ddd735e2018d8cdcac7e12828b3ff620371faa19"
+    },
+    {
+      "path": "layers/CN-53-5304.geojson",
+      "bytes": 28823,
+      "sha256": "04aa9d8b765e109cc3b719bd8eef1fd44397e8ac7b1fc807da45161c63ee7b75"
+    },
+    {
+      "path": "layers/CN-53-5305.geojson",
+      "bytes": 14893,
+      "sha256": "b13e5422d71ab601ac9dab79a818e32174bf806849c3617994626cb4d331b6f4"
+    },
+    {
+      "path": "layers/CN-53-5306.geojson",
+      "bytes": 26529,
+      "sha256": "fe36642a96937ba081503fcf713f87e342c5be4d1ed0339fedebef3a54d382fe"
+    },
+    {
+      "path": "layers/CN-53-5307.geojson",
+      "bytes": 15134,
+      "sha256": "8cf2a536f64f297cec421b3891da9152fdae386d25310588d1c2d718743b0b02"
+    },
+    {
+      "path": "layers/CN-53-5308.geojson",
+      "bytes": 36916,
+      "sha256": "6f5568892a3c48353a9c501d46e23b4c13ee1bc9689324e83d8eaaff0ebe0645"
+    },
+    {
+      "path": "layers/CN-53-5309.geojson",
+      "bytes": 20790,
+      "sha256": "fc385aa6464554bdddeba59f3d0984064741bceec146e0230c529028a932032b"
+    },
+    {
+      "path": "layers/CN-53-5323.geojson",
+      "bytes": 31360,
+      "sha256": "86ba5a1a07b76205bf41b8ecf69bb7190988defee4240ba429c9089f9bb574c8"
+    },
+    {
+      "path": "layers/CN-53-5325.geojson",
+      "bytes": 42231,
+      "sha256": "857434b7460b88a572735cf415d891070fbd0bb9b74d258cb7b448a04c91f6e5"
+    },
+    {
+      "path": "layers/CN-53-5326.geojson",
+      "bytes": 27723,
+      "sha256": "9192603cf3054341263e560c922649f811896909bd9e86d81b7238d680db9819"
+    },
+    {
+      "path": "layers/CN-53-5328.geojson",
+      "bytes": 17241,
+      "sha256": "a8b755a240e5202d379df486563f11958712ae9c34ae3d3009b66198005f6756"
+    },
+    {
+      "path": "layers/CN-53-5329.geojson",
+      "bytes": 36126,
+      "sha256": "3dbd56718588e500a31be53973fd7270222fc1921549263562cb966a45c9ba22"
+    },
+    {
+      "path": "layers/CN-53-5331.geojson",
+      "bytes": 18193,
+      "sha256": "51a11059523887a37612cd273602544b6241e778f861f487a220557bb701d014"
+    },
+    {
+      "path": "layers/CN-53-5333.geojson",
+      "bytes": 10718,
+      "sha256": "4ce1240aaac6a112397cbcd905667d295fd5a2002bdae1db06b4f7b617cde81f"
+    },
+    {
+      "path": "layers/CN-53-5334.geojson",
+      "bytes": 9457,
+      "sha256": "fac3f69e79e79f391c1dd87ad9bae6a3e70c5bfb7f7f02bfd67281554deff1ad"
+    },
+    {
+      "path": "layers/CN-53.geojson",
+      "bytes": 188611,
+      "sha256": "a510d7a6821a524bef88ad9fadd403a19a32ef1ce533ba4a51a2c343dfe95bc2"
+    },
+    {
+      "path": "layers/CN-54-5401.geojson",
+      "bytes": 8666,
+      "sha256": "5735b843820391a5aff92b6cddec78ac29e08e454329c4886477d583bd3750df"
+    },
+    {
+      "path": "layers/CN-54-5402.geojson",
+      "bytes": 44553,
+      "sha256": "bbb2cd58244aaca22f4d0a148fc567610718263a35b0c72a73fb42bd67713bb7"
+    },
+    {
+      "path": "layers/CN-54-5403.geojson",
+      "bytes": 26441,
+      "sha256": "4ec20c52eb8e5db1585b10be1662b0d0013a33147a45f7e6c0dd0118a07a06ad"
+    },
+    {
+      "path": "layers/CN-54-5404.geojson",
+      "bytes": 25486,
+      "sha256": "07ca48e8a49bdccefda759706b4fdcf7c54aeb330217f95238d75144becc71db"
+    },
+    {
+      "path": "layers/CN-54-5405.geojson",
+      "bytes": 19672,
+      "sha256": "0fa6ab49de0ae0c24c7e0c1ab0d0cc4d1b39a84dbd7bfcc61d8e58415743c9b5"
+    },
+    {
+      "path": "layers/CN-54-5406.geojson",
+      "bytes": 26132,
+      "sha256": "a5300ddcea11108f6e8e6823f7897c11e2bfcedf31f2d3efc3cdf686074ce736"
+    },
+    {
+      "path": "layers/CN-54-5425.geojson",
+      "bytes": 30190,
+      "sha256": "7aa98154782c6e11efdb4afe40f0b8483f2d442c7f7cfc500d55dfa966c21c0d"
+    },
+    {
+      "path": "layers/CN-54.geojson",
+      "bytes": 87998,
+      "sha256": "8b0a43fbc4ff7c4b7e2b55a9ba5264dbd685ba74d4f6161aa0db5b329d38d972"
+    },
+    {
+      "path": "layers/CN-61-6101.geojson",
+      "bytes": 65175,
+      "sha256": "25f637d2a2657a37c4281e2b13c56d7fe9a9c84289f5ea6320aae13d0ff5a2f9"
+    },
+    {
+      "path": "layers/CN-61-6102.geojson",
+      "bytes": 3775,
+      "sha256": "6f228d50b1e74324e4f1688b6ce117e471d8960052b8d3b83789ff10ac4e2891"
+    },
+    {
+      "path": "layers/CN-61-6103.geojson",
+      "bytes": 29412,
+      "sha256": "6127c38e83423023ec5e1156525cc151e22b2a90f16ce71bdead0d319f175088"
+    },
+    {
+      "path": "layers/CN-61-6104.geojson",
+      "bytes": 25589,
+      "sha256": "a17d19d8848c9f7d487e07fdd9b4be52ba9cf5b1bb3ebd71a7932c7c2aa7dc46"
+    },
+    {
+      "path": "layers/CN-61-6105.geojson",
+      "bytes": 17847,
+      "sha256": "961377ac5c20d66dedcb838e5dbb8ca8509c60cba41a9bd63bc42cb8bc33096d"
+    },
+    {
+      "path": "layers/CN-61-6106.geojson",
+      "bytes": 23037,
+      "sha256": "06c212a9edb0acf74ff2959ddee5a4e42503edb83fa109bfb43ac8dcb554827a"
+    },
+    {
+      "path": "layers/CN-61-6107.geojson",
+      "bytes": 20735,
+      "sha256": "a19275f628ce5ac9fb9179a11ef5a0cea6254aca101f4b94d7f43052c083bc24"
+    },
+    {
+      "path": "layers/CN-61-6108.geojson",
+      "bytes": 28606,
+      "sha256": "eaff4a82090b3fedd7741cad0e56b32a1ee11a7e46417ab85887b5c1fdc51706"
+    },
+    {
+      "path": "layers/CN-61-6109.geojson",
+      "bytes": 24429,
+      "sha256": "c5626e3c45bd4718e08593b733e4df715d3a3ca0c2fc708dd60584426e0376c2"
+    },
+    {
+      "path": "layers/CN-61-6110.geojson",
+      "bytes": 28244,
+      "sha256": "2633d2c140f2b5e07ceb2c1d02f661a9fba214e64d30bb1e9ec41b620ad28a5b"
+    },
+    {
+      "path": "layers/CN-61.geojson",
+      "bytes": 77595,
+      "sha256": "ef0010d0325e4aec4a286c331715bc2aed34cbe4e13d4602e63bcaf733420dba"
+    },
+    {
+      "path": "layers/CN-62-6201.geojson",
+      "bytes": 99545,
+      "sha256": "347c9a463878883285c6406f75d248d11f065a4f848515b7f509829531117194"
+    },
+    {
+      "path": "layers/CN-62-6203.geojson",
+      "bytes": 15937,
+      "sha256": "0c4f2bb7a3ba0cdca0fdba41f5d2f4059e137d3cf12b815172149341eee5ee9c"
+    },
+    {
+      "path": "layers/CN-62-6204.geojson",
+      "bytes": 98248,
+      "sha256": "21d594847eaf2a21f523d40e73b35775da7d4c1cfe4c57d947fee927ef60b649"
+    },
+    {
+      "path": "layers/CN-62-6205.geojson",
+      "bytes": 17862,
+      "sha256": "d159db6db4063de8d173ecc2c72455b4c6f5198dab04220f3997d6c0fca39269"
+    },
+    {
+      "path": "layers/CN-62-6206.geojson",
+      "bytes": 58141,
+      "sha256": "4416cacef3ab8e3ad4e9eb78ab645d7ddf93c2ce01d51e0c538442bc5706e974"
+    },
+    {
+      "path": "layers/CN-62-6207.geojson",
+      "bytes": 67168,
+      "sha256": "608d205cdfd11fe337541f4d904cdfe1a92c67292e6a6c2dddd08fa73a2872e9"
+    },
+    {
+      "path": "layers/CN-62-6208.geojson",
+      "bytes": 17844,
+      "sha256": "5dfc9d6a19606c1a0aa5280068d201e82a96eecc8da0be7e64edb53639fc7133"
+    },
+    {
+      "path": "layers/CN-62-6209.geojson",
+      "bytes": 8454,
+      "sha256": "e4f0ceab4b96ffee0012c1a0e4a56d3d876fbff012369d76577c9ec4a8988396"
+    },
+    {
+      "path": "layers/CN-62-6210.geojson",
+      "bytes": 27207,
+      "sha256": "7c4a84a5b7640635d691c0ab8292ec962d1ff2f1daf08a5b157999c8ab1a4e3c"
+    },
+    {
+      "path": "layers/CN-62-6211.geojson",
+      "bytes": 20259,
+      "sha256": "5e179c9e4b21b65f84fc2a2c1e303c1b9538bab3c8dd7bd84d9607c1188eac7f"
+    },
+    {
+      "path": "layers/CN-62-6212.geojson",
+      "bytes": 17160,
+      "sha256": "c253fcaa86624377d8767dfb7ef286b4c7720390b348546359f410c5a7d249bb"
+    },
+    {
+      "path": "layers/CN-62-6229.geojson",
+      "bytes": 11484,
+      "sha256": "bada107a56c5338bb770994be0edc3f83c8c338bc2ce9e023bfa7bd99807c0d8"
+    },
+    {
+      "path": "layers/CN-62-6230.geojson",
+      "bytes": 20050,
+      "sha256": "f2248023cacd3e2ef3e0bc37a1e86816c61576bc52cd565ab1de9c57dceb1fc4"
+    },
+    {
+      "path": "layers/CN-62.geojson",
+      "bytes": 156043,
+      "sha256": "21de7b8b3e75b56a6b6a75c44344efa6aa659e80d6ee391d48e50e3021b1590c"
+    },
+    {
+      "path": "layers/CN-63-6301.geojson",
+      "bytes": 8407,
+      "sha256": "d780351f0610aa123336af84ba6fe9a76b7a6c1a5fee62ba354580b422f90a2e"
+    },
+    {
+      "path": "layers/CN-63-6302.geojson",
+      "bytes": 10260,
+      "sha256": "7bac888d293ef8434958f4615f07f9c1ce79b503eae75389e6ca1317ea5aaf13"
+    },
+    {
+      "path": "layers/CN-63-6322.geojson",
+      "bytes": 10439,
+      "sha256": "23fca873a4206b393d3d8c05482bcf3be42dd5a9cde8c800792a491898dae848"
+    },
+    {
+      "path": "layers/CN-63-6323.geojson",
+      "bytes": 7863,
+      "sha256": "38ddc49eb7a67e62fe58cff697dd1c56443eadbb01883b90dae5832393ef6fe9"
+    },
+    {
+      "path": "layers/CN-63-6325.geojson",
+      "bytes": 9151,
+      "sha256": "fe18210fded3af093d8d0d0c2824c19ad930007fd7daba0aec1359d36b9b6e24"
+    },
+    {
+      "path": "layers/CN-63-6326.geojson",
+      "bytes": 16753,
+      "sha256": "9022b38c9937a3f24a2956bf38576d6fbc37e162e6af06fade616f7fb7e4075c"
+    },
+    {
+      "path": "layers/CN-63-6327.geojson",
+      "bytes": 32686,
+      "sha256": "00fed55ce548c7d0313aafaa84b351f2c3d8c7fd58cf45c0528ea40f42f2f79a"
+    },
+    {
+      "path": "layers/CN-63-6328.geojson",
+      "bytes": 12109,
+      "sha256": "fbafe78a6a8dcc7e3fcce2d6f041aea3907f8bb8e34ecdf1b6004cbc00631ccd"
+    },
+    {
+      "path": "layers/CN-63.geojson",
+      "bytes": 52272,
+      "sha256": "e6caae6372b2114fa55c5b7f08e60be43e1e25bb08ea10df8dfff350fc770066"
+    },
+    {
+      "path": "layers/CN-64-6401.geojson",
+      "bytes": 4959,
+      "sha256": "05c35252bcfec34b1b078c9ede7b5af48e7e1810e866d2faa54636f4e2351eef"
+    },
+    {
+      "path": "layers/CN-64-6402.geojson",
+      "bytes": 2721,
+      "sha256": "4bd56ef994450dad5cbdb7fa09784a5e1726be56a359b52782c06b00f27fa5d1"
+    },
+    {
+      "path": "layers/CN-64-6403.geojson",
+      "bytes": 9151,
+      "sha256": "e3ab3b590b587fcb9e964f6e38880dc97269c3bc0b72df1bc77d1cd3706b012c"
+    },
+    {
+      "path": "layers/CN-64-6404.geojson",
+      "bytes": 9624,
+      "sha256": "0cb387d5ba3996003ef0a44d7418df40d3db5700ac6a85edc9e3616c7a56f501"
+    },
+    {
+      "path": "layers/CN-64-6405.geojson",
+      "bytes": 14746,
+      "sha256": "673502b56f238f1babc39f058084b85110e8cce9337f731ab08e9e2f264256f9"
+    },
+    {
+      "path": "layers/CN-64.geojson",
+      "bytes": 22013,
+      "sha256": "faf26a794b2ea9b0a811be91094de2709289a11029bf3345a7cbb85e34eda064"
+    },
+    {
+      "path": "layers/CN-65-6501.geojson",
+      "bytes": 16051,
+      "sha256": "1909725b80fad8522753b1c4daecc3d848f3f560d6881d8250c45d91851e0a9d"
+    },
+    {
+      "path": "layers/CN-65-6502.geojson",
+      "bytes": 9370,
+      "sha256": "f6c6485fcbedea65ba7682d92ad1719c629296c227cb1acdb70acbebf169e361"
+    },
+    {
+      "path": "layers/CN-65-6504.geojson",
+      "bytes": 15098,
+      "sha256": "732d91b6346f6a8eb631f1671526962c24a3aea544ce691657fd2a216c8835fd"
+    },
+    {
+      "path": "layers/CN-65-6505.geojson",
+      "bytes": 6118,
+      "sha256": "01f692f31f8fcd6771f3fa1dc20948fdc2a46e63343f0a02143f0467004fc2fa"
+    },
+    {
+      "path": "layers/CN-65-6523.geojson",
+      "bytes": 18882,
+      "sha256": "a30ddd7f39866a31feba3b8c69df22922d3e82c9e2dce1e8b4a5ac3c0ded2dc4"
+    },
+    {
+      "path": "layers/CN-65-6527.geojson",
+      "bytes": 16808,
+      "sha256": "820f268fee43a465f809d14f0c26f65932275e41527ce2ea9a68ee580a0e0d48"
+    },
+    {
+      "path": "layers/CN-65-6528.geojson",
+      "bytes": 37005,
+      "sha256": "42673a21c82f28894305db3535e21714f2ff1aa7908afde69bf462f1be89b109"
+    },
+    {
+      "path": "layers/CN-65-6529.geojson",
+      "bytes": 25036,
+      "sha256": "c52130bfbb9d273964d6c95b66f0b9573e35679e22a049fe0321d0ae6904b294"
+    },
+    {
+      "path": "layers/CN-65-6530.geojson",
+      "bytes": 26991,
+      "sha256": "5b7c91c3c1c419a5fb1b9de7fb7cc9726db109b025cf89e7b66fda2841957904"
+    },
+    {
+      "path": "layers/CN-65-6531.geojson",
+      "bytes": 45500,
+      "sha256": "760ddb6c0e3e444b718bc0d49384d7bccff73e785feaa2640797b5d712ed4463"
+    },
+    {
+      "path": "layers/CN-65-6532.geojson",
+      "bytes": 53915,
+      "sha256": "2b156cca01fa8467880af95a8bb37378927c445f3892c04ec781d1d246dd448a"
+    },
+    {
+      "path": "layers/CN-65-6540.geojson",
+      "bytes": 108567,
+      "sha256": "ec2a8d32b0e24b4c79658709d9933ebde2e2bfa3e017dac7f935a546277f6292"
+    },
+    {
+      "path": "layers/CN-65-6542.geojson",
+      "bytes": 38615,
+      "sha256": "5f085b65f87e3daccfe4e013fcc89d25402b18e4707a81a852b9d98c74bbbf1a"
+    },
+    {
+      "path": "layers/CN-65-6543.geojson",
+      "bytes": 34598,
+      "sha256": "e50c9b6a5c19a415efeede6af2b44d95a79459a8f3c27b997ee4bec0c5a70e53"
+    },
+    {
+      "path": "layers/CN-65.geojson",
+      "bytes": 372439,
+      "sha256": "64b358042f167631d0c51665aaabe92ca21fca46e2f402fcfee4df9c6bef31c3"
+    },
+    {
+      "path": "layers/CN-71-068512FC01.geojson",
+      "bytes": 34460,
+      "sha256": "d6a01502b40c8f8ebe279cb0525fef16f3becf7979d8e110be3c199f2feba3bd"
+    },
+    {
+      "path": "layers/CN-71-2A66153DBB.geojson",
+      "bytes": 4188,
+      "sha256": "077c5aac3a36a8ee936300431da6093a6faf075276a27b04d0e67b02a03825ef"
+    },
+    {
+      "path": "layers/CN-71-2B195F9E16.geojson",
+      "bytes": 74826,
+      "sha256": "5ecd49dcb68af105cc0c030f297d92e2595a5962cc96e1057b13cba3093637e3"
+    },
+    {
+      "path": "layers/CN-71-315F400D87.geojson",
+      "bytes": 85887,
+      "sha256": "b6eaa8ff102ed32be5da1f85a570a31062fc47b261e8e0ce0d19691127ec6abf"
+    },
+    {
+      "path": "layers/CN-71-32A0F6BD16.geojson",
+      "bytes": 60179,
+      "sha256": "4ac8475ec399f7527a928e9ef126cc0134c26889aec63e85b08c4b0febe4ecf9"
+    },
+    {
+      "path": "layers/CN-71-3C2D66024E.geojson",
+      "bytes": 16114,
+      "sha256": "4bdaf101f4eec0c49a9cd3967cac33f767f81e6fc3a7dbcf0356f32897688552"
+    },
+    {
+      "path": "layers/CN-71-4367232D27.geojson",
+      "bytes": 12254,
+      "sha256": "dda33b6b097a959d2f9e06bca9fb2fd1f43679536080b1ab36b73764cb521d6e"
+    },
+    {
+      "path": "layers/CN-71-49006C11F1.geojson",
+      "bytes": 22288,
+      "sha256": "7ea4c555d33069314c68ac45a9fdeeea171748abd30129f3e36b422ec9014ece"
+    },
+    {
+      "path": "layers/CN-71-500B1463C6.geojson",
+      "bytes": 58321,
+      "sha256": "0150d79bddd05ff214d9465152fd9ccc9462b445aee5f45eef216a543d273e9a"
+    },
+    {
+      "path": "layers/CN-71-55CEC165D3.geojson",
+      "bytes": 72282,
+      "sha256": "d597a07d2c4ed9945b176c566f71ef0e3f7a1b078066679447708776b53ba05a"
+    },
+    {
+      "path": "layers/CN-71-60BC8F32B5.geojson",
+      "bytes": 16424,
+      "sha256": "20ea00ff6f5536ccc6421239f478cda1bd26bdb652c0e5109d499ad915d5a5c2"
+    },
+    {
+      "path": "layers/CN-71-6E2911F209.geojson",
+      "bytes": 29924,
+      "sha256": "092fbbd83a80eda45883464973796c2533d6594c8359548ff698a1b3a629919f"
+    },
+    {
+      "path": "layers/CN-71-6E94C40F48.geojson",
+      "bytes": 36775,
+      "sha256": "0f50708a7426de1ab56c9d079a1fd159578d1701fbd2ad05b72cb7327ac54469"
+    },
+    {
+      "path": "layers/CN-71-6F11402DB0.geojson",
+      "bytes": 38011,
+      "sha256": "10a648e7aab514e9400085c02a793cdcf3375f65db343061b46b4e3b0d4f196d"
+    },
+    {
+      "path": "layers/CN-71-7BFB4A099E.geojson",
+      "bytes": 2606,
+      "sha256": "8de1471d468e5577adaa4d67653ad05d426ad138ddb14e37dbbcf2f58d01e061"
+    },
+    {
+      "path": "layers/CN-71-7E3D634C75.geojson",
+      "bytes": 72016,
+      "sha256": "143aa3204c1260826a8eea59fd362e9ba9e7c820def1a74be184e252307fa03c"
+    },
+    {
+      "path": "layers/CN-71-800CCC9236.geojson",
+      "bytes": 42850,
+      "sha256": "97c0e787a34ece67581e88e1439d013ffb7350e2017767af479e0a15d684edb2"
+    },
+    {
+      "path": "layers/CN-71-862208247E.geojson",
+      "bytes": 38237,
+      "sha256": "d84cacd7fb3601bee7ae3da7a69793ab498b7cbe85ca629c174c6505db41a7dc"
+    },
+    {
+      "path": "layers/CN-71-8CD506706F.geojson",
+      "bytes": 26684,
+      "sha256": "c9aafb7b8249e5dde28d0000ea9307385ce76520dfcb4c975eb370ea5c509e28"
+    },
+    {
+      "path": "layers/CN-71-91EEC60B9D.geojson",
+      "bytes": 15760,
+      "sha256": "2ce8803eaf8e6d0cc1b11213bc2da9b7fcc0a6c84c5c07239560fbf5454c65b8"
+    },
+    {
+      "path": "layers/CN-71-AA881784B5.geojson",
+      "bytes": 46113,
+      "sha256": "a50ea68fde80cbf5dc6388f69711a840deafef099ccf11b5b666efd89cfb1504"
+    },
+    {
+      "path": "layers/CN-71-ECEFFD2447.geojson",
+      "bytes": 20554,
+      "sha256": "9f4acf0e0b312f0789e9d3d0d24b8df45960d2baf1a150512b8dbbbed658f745"
+    },
+    {
+      "path": "layers/CN-71.geojson",
+      "bytes": 217548,
+      "sha256": "c1bbe507fccf31d6d8375f7049eeb71ecf27fdfabb2b9a88b688f5f4a2d77f0c"
+    },
+    {
+      "path": "layers/CN-81.geojson",
+      "bytes": 34168,
+      "sha256": "77ed9e65d3d27b48d1d52233c491cbe690cafbad19b68651cbcca40895573068"
+    },
+    {
+      "path": "layers/CN-82.geojson",
+      "bytes": 7163,
+      "sha256": "fef71f646957cdd6af91e634293fdb5a644b6333affa2ce2c9b89b7f247a9cfd"
+    },
+    {
+      "path": "layers/CN.geojson",
+      "bytes": 370852,
+      "sha256": "c60bb5d7b6a9810f7e09b5559b0dbc27ec1d8dd82cbd37a0dde297cde38da430"
+    },
+    {
+      "path": "match-report.json",
+      "bytes": 432790,
+      "sha256": "5bbec4d5fefa3177ab9744c3b703ff818a1dd7b555a05bcdfd64f258db88febf"
+    },
+    {
+      "path": "south-china-sea.geojson",
+      "bytes": 1617,
+      "sha256": "04aa66885e6dd00b4db75ae64795c238a11988418cf370ef922dc77c2928a9ce"
+    }
+  ]
+}

@@ -4,3 +4,10 @@ export function getRouteTransitionName(route) {
   }
   return undefined
 }
+
+export function getRouteViewKey(route) {
+  if (route?.path === '/toolbox/china-map') {
+    return route.path
+  }
+  return route?.fullPath || route?.path
+}

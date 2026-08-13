@@ -25,6 +25,7 @@ import ToolboxArchiveImport from '../views/ToolboxArchiveImport.vue'
 import ToolboxImageWorkbench from '../views/ToolboxImageWorkbench.vue'
 import ToolboxOrphanFiles from '../views/ToolboxOrphanFiles.vue'
 import ToolboxPasswordVault from '../views/ToolboxPasswordVault.vue'
+import ToolboxChinaMap from '../views/ToolboxChinaMap.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { public: true } },
@@ -49,6 +50,7 @@ const routes = [
   { path: '/toolbox/image-workbench', component: ToolboxImageWorkbench },
   { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },
   { path: '/toolbox/password-vault', component: ToolboxPasswordVault },
+  { path: '/toolbox/china-map', component: ToolboxChinaMap },
   { path: '/settings', component: SystemSettings },
   { path: '/tasks', component: TaskMonitor },
   { path: '/forum-posts', component: ForumPostList }

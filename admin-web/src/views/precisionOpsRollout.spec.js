@@ -66,7 +66,7 @@ const shellViews = [
   'TvAppManage.vue', 'TvSeriesManage.vue', 'UserManage.vue', 'VideoList.vue', 'VideoUpload.vue'
 ]
 const standalonePageViews = [
-  'Login.vue', 'ToolboxArchiveImport.vue', 'ToolboxEd2k.vue',
+  'Login.vue', 'ToolboxArchiveImport.vue', 'ToolboxChinaMap.vue', 'ToolboxEd2k.vue',
   'ToolboxImageWorkbench.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue'
 ]
 const componentViews = ['ImageWorkbenchMaskEditor.vue']
@@ -175,11 +175,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('assigns all 25 Vue views to exactly one boundary', () => {
+  it('assigns all 26 Vue views to exactly one boundary', () => {
     const actual = readdirSync(new URL('.', import.meta.url)).filter((name) => name.endsWith('.vue')).sort()
     const assigned = [...shellViews, ...standalonePageViews, ...componentViews].sort()
     expect(actual).toEqual(assigned)
-    expect(assigned).toHaveLength(25)
+    expect(assigned).toHaveLength(26)
   })
 
   it('fully removes the ordinary-page compatibility meta', () => {
@@ -373,7 +373,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(style).toMatch(/\.log-text\s*\{[^}]*font-family:\s*var\(--font-mono\);/s)
   })
 
-  it('工具箱移除外层装饰卡并保留五个 8px 独立工具入口', () => {
+  it('工具箱移除外层装饰卡并保留六个 8px 独立工具入口', () => {
     const source = readView('Toolbox.vue')
     const template = extractTemplate(source)
     const style = extractStyle(source)
@@ -382,10 +382,10 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect.soft(template).toContain('<p class="page-context-note">工具会在独立标签页打开，并保持当前管理端上下文。</p>')
     expect.soft(template).not.toContain('<PageHeader')
     expect(template).not.toContain('<SectionCard')
-    expect(template.match(/<a class="tool-menu-item"/g)).toHaveLength(5)
-    expect(template.match(/target="_blank"/g)).toHaveLength(5)
-    expect(template.match(/rel="noopener noreferrer"/g)).toHaveLength(5)
-    expect(template.match(/<span>新标签页打开<\/span>/g)).toHaveLength(5)
+    expect(template.match(/<a class="tool-menu-item"/g)).toHaveLength(6)
+    expect(template.match(/target="_blank"/g)).toHaveLength(6)
+    expect(template.match(/rel="noopener noreferrer"/g)).toHaveLength(6)
+    expect(template.match(/<span>新标签页打开<\/span>/g)).toHaveLength(6)
     expect(style).toMatch(/\.tool-menu-item\s*\{[^}]*min-height:\s*44px;[^}]*border-radius:\s*8px;[^}]*box-shadow:\s*none;/s)
     expect(style).toMatch(/\.toolbox-page\s*\{[^}]*min-width:\s*0;[^}]*overflow-x:\s*clip;/s)
   })

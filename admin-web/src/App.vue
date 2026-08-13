@@ -1,18 +1,19 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { getRouteTransitionName } from './router/transition'
+import { getRouteTransitionName, getRouteViewKey } from './router/transition'
 
 const route = useRoute()
 const transitionName = computed(() => getRouteTransitionName(route))
+const routeViewKey = computed(() => getRouteViewKey(route))
 </script>
 
 <template>
   <router-view v-slot="{ Component }">
     <transition v-if="transitionName" :name="transitionName" mode="out-in">
-      <component :is="Component" :key="route.fullPath" />
+      <component :is="Component" :key="routeViewKey" />
     </transition>
-    <component :is="Component" v-else :key="route.fullPath" />
+    <component :is="Component" v-else :key="routeViewKey" />
   </router-view>
 </template>
 

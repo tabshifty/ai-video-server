@@ -7,6 +7,7 @@ const archiveImportTool = readFileSync(new URL('./ToolboxArchiveImport.vue', imp
 const imageWorkbench = readFileSync(new URL('./ToolboxImageWorkbench.vue', import.meta.url), 'utf8')
 const orphanFilesTool = readFileSync(new URL('./ToolboxOrphanFiles.vue', import.meta.url), 'utf8')
 const passwordVaultTool = readFileSync(new URL('./ToolboxPasswordVault.vue', import.meta.url), 'utf8')
+const chinaMapTool = readFileSync(new URL('./ToolboxChinaMap.vue', import.meta.url), 'utf8')
 const systemSettings = readFileSync(new URL('./SystemSettings.vue', import.meta.url), 'utf8')
 const router = readFileSync(new URL('../router/index.js', import.meta.url), 'utf8')
 const ed2kRoute = router.match(/\{ path: '\/toolbox\/ed2k'[^}]+\}/)?.[0] || ''
@@ -14,6 +15,7 @@ const archiveImportRoute = router.match(/\{ path: '\/toolbox\/archive-import'[^}
 const imageWorkbenchRoute = router.match(/\{ path: '\/toolbox\/image-workbench'[^}]+\}/)?.[0] || ''
 const orphanFilesRoute = router.match(/\{ path: '\/toolbox\/orphan-files'[^}]+\}/)?.[0] || ''
 const passwordVaultRoute = router.match(/\{ path: '\/toolbox\/password-vault'[^}]+\}/)?.[0] || ''
+const chinaMapRoute = router.match(/\{ path: '\/toolbox\/china-map'[^}]+\}/)?.[0] || ''
 
 describe('toolbox pages', () => {
   it('keeps the toolbox page as a shell menu of tool entry buttons', () => {
@@ -24,16 +26,18 @@ describe('toolbox pages', () => {
     expect(toolbox).toContain('图像生成工作台')
     expect(toolbox).toContain('孤儿文件扫描')
     expect(toolbox).toContain('密码管理')
-    expect(toolbox.match(/<a class="tool-menu-item"/g)).toHaveLength(5)
-    expect(toolbox.match(/target="_blank"/g)).toHaveLength(5)
-    expect(toolbox.match(/rel="noopener noreferrer"/g)).toHaveLength(5)
-    expect(toolbox.match(/新标签页打开/g)).toHaveLength(5)
+    expect(toolbox).toContain('中国行政区划地图')
+    expect(toolbox.match(/<a class="tool-menu-item"/g)).toHaveLength(6)
+    expect(toolbox.match(/target="_blank"/g)).toHaveLength(6)
+    expect(toolbox.match(/rel="noopener noreferrer"/g)).toHaveLength(6)
+    expect(toolbox.match(/新标签页打开/g)).toHaveLength(6)
     expect(toolbox).toContain('/toolbox/ed2k')
     expect(toolbox).not.toContain('/toolbox/ed2k-download')
     expect(toolbox).toContain('/toolbox/archive-import')
     expect(toolbox).toContain('/toolbox/image-workbench')
     expect(toolbox).toContain('/toolbox/orphan-files')
     expect(toolbox).toContain('/toolbox/password-vault')
+    expect(toolbox).toContain('/toolbox/china-map')
     expect(toolbox).toContain('Link')
   })
 
@@ -43,7 +47,8 @@ describe('toolbox pages', () => {
       ['archiveImportHref', '/toolbox/archive-import'],
       ['imageWorkbenchHref', '/toolbox/image-workbench'],
       ['orphanFilesHref', '/toolbox/orphan-files'],
-      ['passwordVaultHref', '/toolbox/password-vault']
+      ['passwordVaultHref', '/toolbox/password-vault'],
+      ['chinaMapHref', '/toolbox/china-map']
     ]
 
     destinations.forEach(([href, path]) => {
@@ -147,6 +152,26 @@ describe('toolbox pages', () => {
     expect(passwordVaultRoute).toContain('ToolboxPasswordVault')
     expect(passwordVaultRoute).not.toContain('public: true')
     expect(passwordVaultRoute).not.toContain('hideShellPageHeader')
+  })
+
+  it('adds a full-viewport authenticated China map outside the admin shell', () => {
+    expect(chinaMapTool).toContain('中国行政区划地图')
+    expect(chinaMapTool).toContain('返回工具箱')
+    expect(chinaMapTool).toContain('aria-label="返回工具箱"')
+    expect(chinaMapTool).toContain('@keydown="handleInformationKeydown"')
+    expect(chinaMapTool).toContain('informationCloseButton.value?.focus()')
+    expect(chinaMapTool).toContain('informationReturnFocus?.focus?.()')
+    expect(chinaMapTool).toContain('搜索省、市、县级行政区')
+    expect(chinaMapTool).toContain('地图信息')
+    expect(chinaMapTool).toContain('南海诸岛')
+    expect(chinaMapTool).toContain('100dvh')
+    expect(chinaMapTool).toContain('100vw')
+    expect(chinaMapTool).not.toContain('components/Layout.vue')
+    expect(chinaMapTool).not.toMatch(/<Layout[>\s]/)
+    expect(chinaMapTool).not.toContain('<PageHeader')
+    expect(chinaMapRoute).toContain("path: '/toolbox/china-map'")
+    expect(chinaMapRoute).toContain('ToolboxChinaMap')
+    expect(chinaMapRoute).not.toContain('public: true')
   })
 
   it('removes orphan scanning from system settings after the toolbox migration', () => {

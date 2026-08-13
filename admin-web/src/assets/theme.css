@@ -51,6 +51,15 @@
   --line-strong: #cbd5e1;
   --line-focus: var(--primary-ring);
 
+  --map-water: #dceef8;
+  --map-land: var(--bg-surface-muted);
+  --map-land-hover: #d8e0e6;
+  --map-selection: #c79a3b;
+  --map-selection-strong: #765719;
+  --map-selection-text: #946f26;
+  --map-selection-soft: #efdcae;
+  --map-selection-surface: #fff8e8;
+
   --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
 
@@ -180,6 +189,9 @@
   --text-muted: var(--slate-400);
   --line-soft: var(--slate-700);
   --line-strong: var(--slate-600);
+  --map-water: var(--slate-900);
+  --map-land: var(--slate-700);
+  --map-land-hover: var(--slate-600);
 }
 
 * {

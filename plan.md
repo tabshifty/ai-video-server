@@ -2,10 +2,55 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-08-13 15:32 +0800
+- 进度：中国行政区划地图完成提交前收口。启动数据明确为目录与清单必需、南海诸岛附图可选，附图加载失败不阻塞主地图；地图信息弹层补齐打开后聚焦、Tab 焦点约束、Esc 关闭和触发按钮焦点恢复。无关 Hermes 记录与 `docs/examples/115LocalNatManager/` 保留在工作区，不纳入本次提交。
+- 影响文件：`admin-web/src/views/ToolboxChinaMap.vue`、`admin-web/src/views/chinaMap.data.js`、对应测试、地图功能既有代码与快照、`CONTEXT.md`、`plan.md`。
+- 验证：定向回归 19/19、全量 Vitest 46 个文件 704/704、`npm run build`、`npm run china-map:validate` 和浏览器控制台检查通过；1024×768 实测画布与视口同为 1024×768、画布像素非空、悬浮控件无重叠，弹层焦点闭环正常；模拟 `CN-63` 图层首次网络失败时保留全国地图，点击重试后恢复“中国 / 青海省”。构建仅有项目既有的大包体积警告。
+
+## 2026-08-13 15:22 +0800
+- 进度：中国行政区划地图完成代码、数据和浏览器收尾。新页面作为 `/toolbox/china-map` 管理员认证独立工作区接入工具箱，画布覆盖完整视口；支持全国、省、地、县可变层级钻取、末级高亮、全局搜索、URL/历史恢复、缩放复位、错误重试、数据说明及不可交互南海诸岛附图。正式提交固定 OSM 时间点的 34 个省级范围与港澳台分层快照，并补齐生成、完整性校验、语义色门禁、首屏返回状态和窄屏按钮可访问性。
+- 影响文件：`admin-web/package*.json`、`admin-web/src/App.vue`、`admin-web/src/assets/theme.css`、`admin-web/src/router/*`、`admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxChinaMap.vue`、地图 helper/loader 与测试、`admin-web/scripts/china-map/*`、`admin-web/public/china-map/*`、`docs/adr/0024-admin-china-administrative-map-data.md`、`CONTEXT.md`、`plan.md`。
+- 验证：定向 Precision Ops 门禁 227/227、地图与工具箱回归 20/20、全量 Vitest 702/702、`npm run build`、`npm run china-map:validate`、`git diff --check`、U+FFFD 与控制字符扫描均通过；数据门禁为 3631 个区域、34 个省级范围、3245 个末级区域、386 个图层、3630 个面要素。Chrome 验收覆盖 1440×900 与 375×812：画布非空且等于视口，控件无重叠，搜索“乌丘”可定位并恢复完整路径，URL/浏览器后退正常，控制台无报错；无关 Hermes 记录与 `docs/examples/` 不纳入本次提交。最终全量复验与独立审阅待提交前完成。
+
+## 2026-08-13 14:57 +0800
+- 进度：中国行政区划地图主体与正式数据已完成，收尾复现全量测试剩余的 5 个 Precision Ops 门禁失败：新视图尚未登记到独立页面边界、工具箱数量仍锁定为 5，以及地图视图存在直接颜色、3 处常驻面板阴影和 2 处直接百分比圆角。按现有门禁修复页面和接入清单，不放宽审计规则。
+- 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/views/ToolboxChinaMap.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`、`plan.md`。
+- 验证：定向 `npm test -- --run src/views/precisionOpsAudit.spec.js src/views/precisionOpsRollout.spec.js` 已按预期出现 5 项红灯；待重跑定向与全量测试、管理端构建、地图数据校验和浏览器多视口验收。
+
+## 2026-08-13 10:18 +0800
+- 进度：用户确认中国行政区划地图完整方案，进入管理端实现。采用现有 Vue 3、Vue Router、ECharts 与 Element Plus；新增 `/toolbox/china-map` 认证独立路由和工具箱新标签页入口，页面保持无 shell 且地图占满视口。实现按静态索引与父级拆分 GeoJSON 契约分离层级、搜索、URL 恢复、缓存和错误处理，并先补红灯测试；正式数据只接受许可与来源可追溯的快照，不把临时无许可证样本纳入仓库。
+- 影响文件：预计涉及 `admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxChinaMap.vue`、地图 helper/测试、`admin-web/src/router/*`、`admin-web/public/china-map/*`、数据构建脚本与说明、`CONTEXT.md`、ADR-0024、`plan.md`。
+- 验证：待执行管理端定向 Vitest、全量 `npm test`、`npm run build`、数据完整性校验、`git diff --check`、中文乱码扫描，以及 1024/1440/窄视口浏览器截图核验。
+
 ## 2026-08-13 09:31 +0800
 - 进度：修复 Hermes 将附件提示“阅读权限: 10”误判为整页权限门禁的问题。外部活动脚本 `~/.hermes/scripts/watch_sehuatang_forum95.py` 仅移除 `is_blocked_or_permission_text()` 中的裸“阅读权限”词项，保留明确的“需要阅读权限”“阅读权限高于”“本帖隐藏的内容需要”及登录/验证门禁；已生成可回滚备份 `~/.hermes/scripts/watch_sehuatang_forum95.py.pre-attachment-permission-fix-20260813-0920`。
 - 影响文件：外部 Hermes 脚本及其回滚备份；仓库仅追加 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`，既有 `docs/adr/0024-admin-china-administrative-map-data.md` 与 `docs/examples/` 不纳入。
 - 验证：临时回归 `/tmp/hermes_attachment_regression_test.py` 修改前按预期红灯，修改后通过；Hermes venv `py_compile` 通过；真实 CDP 页面和 `/tmp/hermes-2526602-cdp.json` 均确认正文含“阅读权限: 10”时 `cdp_fetch()` 为 `ok=true`，`extract_attachments()` 返回 `mod=attachment` 链接；09:21 新帖任务保持 `last_status=ok`。只读数据库核对显示 `tid=2526602` 当前历史终态仍为 `restricted/included`、附件数 0；根据检查结果不可覆盖约束，本次不直接改写记录、不补发通知，待明确授权后另行走可回滚修复流程。
+
+## 2026-08-11 16:42 +0800
+- 进度：`grill-with-docs` 数据治理轮全部采用推荐方案。行政边界以固定版本 OpenStreetMap 快照为几何来源，结合可追溯公开中文行政区目录离线规范化并生成分层 GeoJSON；生成数据遵守 ODbL 归属和相同方式共享要求，页面运行时不访问第三方地图服务。区域统一使用仓库稳定 `region_code` 作为“区划标识”，来源行政编码另存且允许为空。数据构建对完整省级范围与港澳台、父子闭合、标识唯一、中文名、有效几何和末级可达实行失败即停止门禁；快照只允许人工触发、审核差异后随管理端版本发布。新增 ADR-0024 固化该难以逆转的数据选择。
+- 影响文件：`CONTEXT.md`、`docs/adr/0024-admin-china-administrative-map-data.md`、`plan.md`；生产代码仍未修改。
+- 验证：待用户确认完整共同理解后执行文档差异、乱码与术语一致性检查并提交；确认前不进入实现。
+
+## 2026-08-11 15:53 +0800
+- 进度：`grill-with-docs` 第三轮全部采用推荐方案。静态行政区划按父级编码拆分并逐层懒加载；切层时保留旧图和轻量加载反馈，数据失败保留上一层并提供重试/返回；县级浮层只显示名称、完整路径和编码；搜索支持即时候选、键盘选择、回车定位和无结果反馈；全国视图包含不参与钻取的南海诸岛附图；层级动画为 200–260ms 且尊重减弱动效；数据来源、版本和许可放入按需地图信息浮层；缓存仅使用静态资源 HTTP 缓存与会话内存。
+- 影响文件：`CONTEXT.md`、`plan.md`；生产代码仍未修改。
+- 验证：数据源核查确认现成数据均有关键缺口：无许可证、离线再分发条款不明确，或虽开放许可但中国县级数据代表年份为 2017、英文名称且无行政区编码。需要最后确认采用可追溯数据构建方案及编码口径。
+
+## 2026-08-11 15:37 +0800
+- 进度：`grill-with-docs` 第二轮全部采用推荐方案。县级点击仅高亮并展示完整行政路径；直辖市、港澳台等按真实父子关系使用可变层级；面包屑可跳祖先、地图返回逐级回退、浏览器历史与 URL 行政区编码同步，退出工具箱独立；全局搜索覆盖省/地/县并以完整路径消歧；标签只显示当前层级且碰撞时隐藏、悬停可查；地图沿用管理端中性语义色与暖金选中态，支持滚轮缩放、拖拽、按钮缩放和复位；正式支持不低于 1024px 的 PC，窄窗口只保证基本可用。
+- 影响文件：`CONTEXT.md`、`plan.md`；仍未修改管理端生产代码、依赖、路由或 App 版本。
+- 验证：行政区划数据来源事实核查重新执行中；待完成加载、异常、数据版本和验收边界的最后一轮访谈。
+
+## 2026-08-11 09:58 +0800
+- 进度：`grill-with-docs` 第一轮确认地图定位。页面是只读的完整中国行政区划浏览工具，包含台湾，不承载业务统计、热力、选择、绑定或编辑；按全国省级轮廓 → 地级层级 → 县级行政区逐级进入，“县级行政区”包含市辖区、县级市、自治县、旗等同级单位。行政区划 GeoJSON 随前端版本静态打包，入口位于工具箱并以新标签页打开，地图浮层提供返回、当前位置、搜索、缩放和复位。
+- 影响文件：`CONTEXT.md`、`plan.md`；尚未修改 `admin-web` 代码、路由、依赖或 App 版本。
+- 验证：已核对管理端现有 ECharts 5.6 依赖与无 shell 工具页路由模式；行政区划数据来源、许可和体积正在核查，待完成后继续访谈与文档静态检查。
+
+## 2026-08-11 09:51 +0800
+- 进度：开始规划 PC 管理端中国行政区划地图页面。已确认页面采用 `admin 全屏地图工作区`：无后台 shell，地图画布占满浏览器视口，返回、搜索和层级操作只能以地图浮层呈现；尚未决定地图用途、县级交互、数据新鲜度和入口位置。
+- 影响文件：`CONTEXT.md`、`plan.md`；尚未修改 `admin-web` 代码、路由或依赖。
+- 验证：待完成需求访谈后执行文档差异、乱码和结构检查。
 
 ## 2026-08-11 09:18 +0800
 - 进度：完成 `plan.md` 压缩清理，并明确今后纯部署等非开发操作无需写入开发账本。1133 条、5707 行历史流水按事项和月份归并；纯部署记录删除，已完成事项只保留最终结论，未发现仍待验收的任务目录。

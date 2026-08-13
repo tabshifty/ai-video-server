@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { FolderOpened, Key, Link, Picture, Search, TopRight } from '@element-plus/icons-vue'
+import { FolderOpened, Key, Link, MapLocation, Picture, Search, TopRight } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 
 const router = useRouter()
@@ -11,6 +11,7 @@ const archiveImportHref = computed(() => router.resolve('/toolbox/archive-import
 const imageWorkbenchHref = computed(() => router.resolve('/toolbox/image-workbench').href)
 const orphanFilesHref = computed(() => router.resolve('/toolbox/orphan-files').href)
 const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault').href)
+const chinaMapHref = computed(() => router.resolve('/toolbox/china-map').href)
 </script>
 
 <template>
@@ -78,6 +79,19 @@ const passwordVaultHref = computed(() => router.resolve('/toolbox/password-vault
             <span class="tool-menu-item__content">
               <strong>密码管理</strong>
               <span>记录外部服务、网站和设备的账号密码。</span>
+            </span>
+            <span class="tool-menu-item__meta">
+              <el-icon><TopRight /></el-icon>
+              <span>新标签页打开</span>
+            </span>
+          </a>
+          <a class="tool-menu-item" :href="chinaMapHref" target="_blank" rel="noopener noreferrer">
+            <span class="tool-menu-item__icon">
+              <el-icon><MapLocation /></el-icon>
+            </span>
+            <span class="tool-menu-item__content">
+              <strong>中国行政区划地图</strong>
+              <span>逐级浏览省级、地级与县级行政区边界。</span>
             </span>
             <span class="tool-menu-item__meta">
               <el-icon><TopRight /></el-icon>
