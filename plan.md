@@ -2,6 +2,11 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-08-13 09:31 +0800
+- 进度：修复 Hermes 将附件提示“阅读权限: 10”误判为整页权限门禁的问题。外部活动脚本 `~/.hermes/scripts/watch_sehuatang_forum95.py` 仅移除 `is_blocked_or_permission_text()` 中的裸“阅读权限”词项，保留明确的“需要阅读权限”“阅读权限高于”“本帖隐藏的内容需要”及登录/验证门禁；已生成可回滚备份 `~/.hermes/scripts/watch_sehuatang_forum95.py.pre-attachment-permission-fix-20260813-0920`。
+- 影响文件：外部 Hermes 脚本及其回滚备份；仓库仅追加 `CONTEXT.md`、`docs/adr/0020-hermes-forum-post-ingestion.md`、`plan.md`，既有 `docs/adr/0024-admin-china-administrative-map-data.md` 与 `docs/examples/` 不纳入。
+- 验证：临时回归 `/tmp/hermes_attachment_regression_test.py` 修改前按预期红灯，修改后通过；Hermes venv `py_compile` 通过；真实 CDP 页面和 `/tmp/hermes-2526602-cdp.json` 均确认正文含“阅读权限: 10”时 `cdp_fetch()` 为 `ok=true`，`extract_attachments()` 返回 `mod=attachment` 链接；09:21 新帖任务保持 `last_status=ok`。只读数据库核对显示 `tid=2526602` 当前历史终态仍为 `restricted/included`、附件数 0；根据检查结果不可覆盖约束，本次不直接改写记录、不补发通知，待明确授权后另行走可回滚修复流程。
+
 ## 2026-08-11 09:18 +0800
 - 进度：完成 `plan.md` 压缩清理，并明确今后纯部署等非开发操作无需写入开发账本。1133 条、5707 行历史流水按事项和月份归并；纯部署记录删除，已完成事项只保留最终结论，未发现仍待验收的任务目录。
 - 影响文件：`AGENTS.md`、`plan.md`；既有未跟踪 `docs/examples/` 不纳入。
