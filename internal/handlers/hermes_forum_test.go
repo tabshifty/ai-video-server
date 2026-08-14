@@ -21,6 +21,7 @@ import (
 type hermesForumServiceStub struct {
 	adminListPage     int
 	adminListPageSize int
+	adminListQuery    string
 	adminListResult   []models.AdminForumPostListItem
 	adminListTotal    int
 	adminListErr      error
@@ -30,9 +31,10 @@ type hermesForumServiceStub struct {
 	inspectErr        error
 }
 
-func (s *hermesForumServiceStub) ListAdmin(_ context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
+func (s *hermesForumServiceStub) ListAdmin(_ context.Context, page, pageSize int, query string) ([]models.AdminForumPostListItem, int, error) {
 	s.adminListPage = page
 	s.adminListPageSize = pageSize
+	s.adminListQuery = query
 	return s.adminListResult, s.adminListTotal, s.adminListErr
 }
 
@@ -50,27 +52,28 @@ func TestAdminForumPostsReturnsPaginatedReadModel(t *testing.T) {
 	observedAt := time.Date(2026, 8, 4, 10, 30, 0, 0, time.UTC)
 	service := &hermesForumServiceStub{
 		adminListResult: []models.AdminForumPostListItem{{
-			ID:          uuid.New(),
-			Title:       "帖子标题",
-			URL:         "https://sehuatang.org/thread-1",
-			Attachments: []string{"https://sehuatang.org/attachment.php?aid=1"},
-			ED2KLinks:   []string{"ed2k://|file|a.zip|1|0123456789ABCDEF0123456789ABCDEF|/"},
-			ObservedAt:  observedAt,
+			ID:               uuid.New(),
+			Title:            "帖子标题",
+			URL:              "https://sehuatang.org/thread-1",
+			InspectionStatus: models.ForumPostStatusRestricted,
+			Attachments:      []string{"https://sehuatang.org/attachment.php?aid=1"},
+			ED2KLinks:        []string{"ed2k://|file|a.zip|1|0123456789ABCDEF0123456789ABCDEF|/"},
+			ObservedAt:       observedAt,
 		}},
 		adminListTotal: 21,
 	}
 	api := &API{hermesForumSvc: service}
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/forum-posts?page=2&page_size=20", nil)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/forum-posts?page=2&page_size=20&q=%20%E8%B5%84%E6%BA%90%20", nil)
 
 	api.AdminForumPosts(ctx)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status=%d, want=%d body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
-	if service.adminListPage != 2 || service.adminListPageSize != 20 {
-		t.Fatalf("service pagination=(%d,%d), want (2,20)", service.adminListPage, service.adminListPageSize)
+	if service.adminListPage != 2 || service.adminListPageSize != 20 || service.adminListQuery != " 资源 " {
+		t.Fatalf("service query=(%d,%d,%q), want (2,20,%q)", service.adminListPage, service.adminListPageSize, service.adminListQuery, " 资源 ")
 	}
 	var envelope struct {
 		Code int `json:"code"`
@@ -84,7 +87,29 @@ func TestAdminForumPostsReturnsPaginatedReadModel(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if envelope.Code != 0 || envelope.Data.TotalCount != 21 || envelope.Data.Page != 2 || envelope.Data.PageSize != 20 || len(envelope.Data.Items) != 1 {
+	if envelope.Code != 0 || envelope.Data.TotalCount != 21 || envelope.Data.Page != 2 || envelope.Data.PageSize != 20 || len(envelope.Data.Items) != 1 || envelope.Data.Items[0].InspectionStatus != models.ForumPostStatusRestricted {
+		t.Fatalf("unexpected response: %#v", envelope)
+	}
+}
+
+func TestAdminForumPostsMapsInvalidSearchQuery(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	api := &API{hermesForumSvc: &hermesForumServiceStub{adminListErr: services.ErrAdminForumSearchQueryTooLong}}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/forum-posts?q="+strings.Repeat("a", 201), nil)
+
+	api.AdminForumPosts(ctx)
+
+	var envelope struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if envelope.Code != 1 || envelope.Msg != services.ErrAdminForumSearchQueryTooLong.Error() {
 		t.Fatalf("unexpected response: %#v", envelope)
 	}
 }

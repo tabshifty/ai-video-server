@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 type hermesForumRepositoryStub struct {
 	adminListPage     int
 	adminListPageSize int
+	adminListQuery    string
 	adminListItems    []models.AdminForumPostListItem
 	adminListTotal    int
 	adminListErr      error
@@ -27,9 +29,10 @@ type hermesForumRepositoryStub struct {
 	inspectionErr     error
 }
 
-func (s *hermesForumRepositoryStub) ListAdminForumPosts(_ context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
+func (s *hermesForumRepositoryStub) ListAdminForumPosts(_ context.Context, page, pageSize int, query string) ([]models.AdminForumPostListItem, int, error) {
 	s.adminListPage = page
 	s.adminListPageSize = pageSize
+	s.adminListQuery = query
 	return s.adminListItems, s.adminListTotal, s.adminListErr
 }
 
@@ -49,23 +52,37 @@ func TestHermesForumServiceListsAdminReadModel(t *testing.T) {
 	t.Parallel()
 
 	wantItems := []models.AdminForumPostListItem{{
-		ID:          uuid.New(),
-		Title:       "帖子标题",
-		URL:         "https://sehuatang.org/thread-1",
-		Attachments: []string{"https://sehuatang.org/attachment.php?aid=1"},
-		ED2KLinks:   []string{"ed2k://|file|a.zip|1|0123456789ABCDEF0123456789ABCDEF|/"},
+		ID:               uuid.New(),
+		Title:            "帖子标题",
+		URL:              "https://sehuatang.org/thread-1",
+		InspectionStatus: models.ForumPostStatusRestricted,
+		Attachments:      []string{"https://sehuatang.org/attachment.php?aid=1"},
+		ED2KLinks:        []string{"ed2k://|file|a.zip|1|0123456789ABCDEF0123456789ABCDEF|/"},
 	}}
 	repo := &hermesForumRepositoryStub{adminListItems: wantItems, adminListTotal: 21}
 
-	items, total, err := NewHermesForumService(repo).ListAdmin(context.Background(), 2, 20)
+	items, total, err := NewHermesForumService(repo).ListAdmin(context.Background(), 2, 20, "  资源%_  ")
 	if err != nil {
 		t.Fatalf("ListAdmin returned error: %v", err)
 	}
-	if repo.adminListPage != 2 || repo.adminListPageSize != 20 {
-		t.Fatalf("repository pagination=(%d,%d), want (2,20)", repo.adminListPage, repo.adminListPageSize)
+	if repo.adminListPage != 2 || repo.adminListPageSize != 20 || repo.adminListQuery != "资源%_" {
+		t.Fatalf("repository query=(%d,%d,%q), want (2,20,%q)", repo.adminListPage, repo.adminListPageSize, repo.adminListQuery, "资源%_")
 	}
 	if len(items) != 1 || items[0].ID != wantItems[0].ID || total != 21 {
 		t.Fatalf("items=%#v total=%d, want=%#v total=21", items, total, wantItems)
+	}
+}
+
+func TestHermesForumServiceRejectsLongAdminSearchQuery(t *testing.T) {
+	t.Parallel()
+
+	repo := &hermesForumRepositoryStub{}
+	_, _, err := NewHermesForumService(repo).ListAdmin(context.Background(), 1, 20, strings.Repeat("字", 201))
+	if !errors.Is(err, ErrAdminForumSearchQueryTooLong) {
+		t.Fatalf("error=%v, want ErrAdminForumSearchQueryTooLong", err)
+	}
+	if repo.adminListQuery != "" {
+		t.Fatalf("repository query=%q, want no repository call", repo.adminListQuery)
 	}
 }
 

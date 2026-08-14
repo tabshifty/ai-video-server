@@ -18,7 +18,7 @@ import (
 const hermesForumMaxRequestBytes = 2 * 1024 * 1024
 
 type hermesForumService interface {
-	ListAdmin(context.Context, int, int) ([]models.AdminForumPostListItem, int, error)
+	ListAdmin(context.Context, int, int, string) ([]models.AdminForumPostListItem, int, error)
 	Discover(context.Context, models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error)
 	CompleteInspection(context.Context, uuid.UUID, models.ForumPostInspectionInput) (models.ForumPostInspectionResult, error)
 }
@@ -27,8 +27,12 @@ type hermesForumService interface {
 func (a *API) AdminForumPosts(c *gin.Context) {
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 20)
-	items, total, err := a.hermesForumSvc.ListAdmin(c.Request.Context(), page, pageSize)
+	items, total, err := a.hermesForumSvc.ListAdmin(c.Request.Context(), page, pageSize, c.Query("q"))
 	if err != nil {
+		if errors.Is(err, services.ErrAdminForumSearchQueryTooLong) {
+			bad(c, err.Error())
+			return
+		}
 		response.Error(c, 2501, err.Error())
 		return
 	}

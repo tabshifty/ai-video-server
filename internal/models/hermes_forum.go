@@ -63,10 +63,11 @@ type ForumPostInspectionResult struct {
 
 // AdminForumPostListItem is the read-only forum resource projection exposed to administrators.
 type AdminForumPostListItem struct {
-	ID          uuid.UUID `json:"id"`
-	Title       string    `json:"title"`
-	URL         string    `json:"url"`
-	Attachments []string  `json:"attachments"`
-	ED2KLinks   []string  `json:"ed2k_links"`
-	ObservedAt  time.Time `json:"observed_at"`
+	ID               uuid.UUID `json:"id"`
+	Title            string    `json:"title"`
+	URL              string    `json:"url"`
+	InspectionStatus string    `json:"inspection_status"`
+	Attachments      []string  `json:"attachments"`
+	ED2KLinks        []string  `json:"ed2k_links"`
+	ObservedAt       time.Time `json:"observed_at"`
 }

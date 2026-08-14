@@ -90,10 +90,10 @@ describe('admin forum post api', () => {
   })
 
   it('loads the read-only forum post list with pagination', async () => {
-    await getAdminForumPosts({ page: 2, page_size: 20 })
+    await getAdminForumPosts({ page: 2, page_size: 20, q: '资源' })
 
     expect(get).toHaveBeenCalledWith('/admin/forum-posts', {
-      params: { page: 2, page_size: 20 }
+      params: { page: 2, page_size: 20, q: '资源' }
     })
   })
 })

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -20,10 +21,13 @@ var (
 	ErrHermesForumInvalidInput       = errors.New("invalid Hermes forum input")
 	ErrHermesForumPostNotFound       = repository.ErrHermesForumPostNotFound
 	ErrHermesForumInspectionConflict = repository.ErrHermesForumInspectionConflict
+	ErrAdminForumSearchQueryTooLong  = errors.New("标题搜索词不能超过 200 个字符")
 )
 
+const adminForumSearchQueryMaxRunes = 200
+
 type hermesForumRepository interface {
-	ListAdminForumPosts(context.Context, int, int) ([]models.AdminForumPostListItem, int, error)
+	ListAdminForumPosts(context.Context, int, int, string) ([]models.AdminForumPostListItem, int, error)
 	DiscoverForumPosts(context.Context, models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error)
 	CompleteForumPostInspection(context.Context, uuid.UUID, models.ForumPostInspectionInput, string) (models.ForumPostInspectionResult, error)
 }
@@ -37,8 +41,12 @@ func NewHermesForumService(repo hermesForumRepository) *HermesForumService {
 }
 
 // ListAdmin returns the paginated read model used by the administrator forum resource page.
-func (s *HermesForumService) ListAdmin(ctx context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
-	return s.repo.ListAdminForumPosts(ctx, page, pageSize)
+func (s *HermesForumService) ListAdmin(ctx context.Context, page, pageSize int, query string) ([]models.AdminForumPostListItem, int, error) {
+	query = strings.TrimSpace(query)
+	if utf8.RuneCountInString(query) > adminForumSearchQueryMaxRunes {
+		return nil, 0, ErrAdminForumSearchQueryTooLong
+	}
+	return s.repo.ListAdminForumPosts(ctx, page, pageSize, query)
 }
 
 func (s *HermesForumService) Discover(ctx context.Context, input models.ForumPostDiscoverInput) ([]models.ForumPostDiscoverResult, error) {

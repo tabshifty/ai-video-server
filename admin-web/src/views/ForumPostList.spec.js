@@ -12,19 +12,36 @@ describe('论坛资源列表页', () => {
     expect(ForumPostList).toBeTruthy()
     expect(script).toContain("import Layout from '../components/Layout.vue'")
     expect(script).toContain("import AdminTablePagination from '../components/AdminTablePagination.vue'")
+    expect(script).toContain("import Toolbar from '../components/base/Toolbar.vue'")
+    expect(script).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
     expect(script).toContain("import { getAdminForumPosts } from '../api/admin'")
     expect(script).toContain("import { getEd2kLinkLabel } from './toolbox.helpers'")
   })
 
-  it('固定每页 20 条并只提供进入加载、手动刷新与分页', () => {
-    expect(script).toContain("const query = reactive({ page: 1, page_size: 20 })")
+  it('固定每页 20 条并以独立草稿提交服务端标题搜索', () => {
+    expect(script).toContain("const query = reactive({ page: 1, page_size: 20, q: '' })")
+    expect(script).toContain("const searchDraft = ref('')")
+    expect(script).toContain('q: query.q')
+    expect(script).toContain('query.q = searchDraft.value.trim()')
+    expect(script).toContain('query.page = 1')
+    expect(script).toContain("searchDraft.value = ''")
     expect(script).toContain('onMounted(load)')
     expect(script).not.toContain('setInterval')
     expect(template).toContain('aria-label="刷新论坛资源"')
     expect(template).toContain('title="刷新论坛资源"')
     expect(template).toContain('<AdminTablePagination')
-    expect(template).not.toContain('<el-input')
+    expect(template).toContain('v-model="searchDraft"')
+    expect(template).toContain(':maxlength="200"')
+    expect(template).toContain('@keyup.enter="applySearch"')
+    expect(template).toContain('@clear="clearSearch"')
+    expect(template).toContain('@click="applySearch">搜索</el-button>')
     expect(template).not.toContain('<el-select')
+  })
+
+  it('在标题旁标记受限记录', () => {
+    expect(template).toContain("row.inspection_status === 'restricted'")
+    expect(template).toContain('label="受限"')
+    expect(template).toContain('tone="warning"')
   })
 
   it('一帖一行展示四个已确认字段', () => {
@@ -54,7 +71,8 @@ describe('论坛资源列表页', () => {
 
   it('明确空资源、加载失败和首次空列表状态', () => {
     expect(template).toContain('暂无论坛资源')
-    expect(template).toContain('最近 30 天内暂无可展示的论坛资源')
+    expect(template).toContain("hasAppliedSearch ? '未找到匹配的论坛资源' : '暂无论坛资源'")
+    expect(template).toContain("hasAppliedSearch ? '请调整标题关键词后重试' : '当前没有可展示的论坛资源'")
     expect(template).toContain("row.attachments?.length")
     expect(template).toContain("row.ed2k_links?.length")
     expect(template.match(/>无<\/span>/g)).toHaveLength(2)

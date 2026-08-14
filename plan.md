@@ -2,6 +2,26 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-08-14 09:25 +0800
+- 进度：论坛资源改动完成提交前复核，代码、测试、接口契约、ADR 与长期上下文一致；提交仅纳入本任务文件及本任务 `plan.md` 记录，保留既有历史重抓记录和 `docs/examples/` 工作区内容。
+- 影响文件：本任务文件同 09:24 记录；不修改 Android/TV 版本号。
+- 验证：`git diff --check`、Go 格式检查及本任务中文文件 U+FFFD 扫描通过，暂存后继续核对 staged diff 并提交。
+
+## 2026-08-14 09:24 +0800
+- 进度：论坛资源标题搜索、受限帖子展示及保留规则实现完成。管理员列表接口新增最多 200 字符的标题字面子串查询，投影纳入并标记 `restricted + included`；有效 Hermes `discover` 触发的 30 天清理现在保护当前 `pending` 与 `restricted`，其余无资源旧帖规则不变。管理端采用独立搜索草稿和显式提交，刷新/翻页保留已提交查询，清空恢复完整列表；长期契约已同步至 `CONTEXT.md` 与 ADR-0025。
+- 影响文件：`internal/models/hermes_forum.go`、`internal/handlers/hermes_forum.go`、`internal/handlers/hermes_forum_test.go`、`internal/services/hermes_forum.go`、`internal/services/hermes_forum_test.go`、`internal/repository/hermes_forum_repository.go`、`internal/repository/hermes_forum_repository_test.go`、`internal/repository/hermes_forum_repository_integration_test.go`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ForumPostList.vue`、`admin-web/src/views/ForumPostList.spec.js`、`CONTEXT.md`、`docs/adr/0021-admin-forum-resource-list.md`、`docs/adr/0023-hermes-resource-aware-retention.md`、`docs/adr/0025-admin-forum-restricted-search-retention.md`、`plan.md`；不修改 Android/TV 版本号，不纳入既有 `docs/examples/` 与无关 `plan.md` 记录。
+- 验证：论坛定向 Go 测试与对应 `-race` 通过，`go vet ./...` 通过；管理端定向 36 项、全量 705 项测试及 `npm run build` 通过；浏览器桌面与 390px 视口验证搜索提交、空态、清空恢复、受限标记、容器滚动及控制台均通过。PostgreSQL 集成测试因未设置 `HERMES_TEST_DATABASE_URL` 按既有机制跳过，`golangci-lint` 本机未安装；`go test ./... -count=1` 的无关 TV APK 固件版本 144/旧断言 121 失败，整包 `-race` 的无关并行 Gin `SetMode` 基线竞态仍存在。待执行提交前差异、乱码与暂存范围检查。
+
+## 2026-08-14 09:12 +0800
+- 进度：论坛资源标题搜索与受限帖子展示/保留红灯已建立。Go 定向测试因旧代码缺少搜索参数、受限状态字段、查询构造及超长错误类型而按预期编译失败；管理端定向测试 36 项中 4 项按预期失败，覆盖搜索控件与提交状态、受限标记和搜索空态，API 请求包装既有测试保持通过。
+- 影响文件：`internal/handlers/hermes_forum_test.go`、`internal/services/hermes_forum_test.go`、`internal/repository/hermes_forum_repository_test.go`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ForumPostList.spec.js`、`plan.md`。
+- 验证：红灯命令为 `go test ./internal/handlers ./internal/services ./internal/repository -run 'TestAdminForumPosts|TestHermesForumService(ListsAdminReadModel|RejectsLongAdminSearchQuery)|TestBuildAdminForumPostListSQL|TestDiscoverForumPostsCleanup' -count=1` 与 `npm test -- --run src/api/admin.spec.js src/views/ForumPostList.spec.js`；待实现后复跑转绿。
+
+## 2026-08-14 09:08 +0800
+- 进度：用户确认 PC 管理端论坛资源完整方案，进入实现。列表新增服务端标题字面子串搜索并展示 `restricted + included`，标题旁标记“受限”；当前为 `pending` 或 `restricted` 的记录不再参与 30 天无资源清理，豁免仅跟随当前状态，不恢复已删除历史。先补 Handler、Service、Repository 与 Vue 页面红灯测试，再做最小实现。
+- 影响文件：预计涉及 `internal/models/hermes_forum.go`、`internal/handlers/hermes_forum*`、`internal/services/hermes_forum*`、`internal/repository/hermes_forum*`、`admin-web/src/api/admin.spec.js`、`admin-web/src/views/ForumPostList*`、`CONTEXT.md`、`docs/adr/0021-admin-forum-resource-list.md`、`docs/adr/0023-hermes-resource-aware-retention.md`、`docs/adr/0025-admin-forum-restricted-search-retention.md`、`plan.md`；不修改 Android/TV 版本号。
+- 验证：待执行后端定向红灯与回归、`go test ./... -count=1`、`go test -race` 定向包、`go vet ./...`、管理端定向与全量 Vitest、`npm run build`、页面桌面/窄视口检查、`git diff --check` 与中文乱码扫描。
+
 ## 2026-08-13 17:24 +0800
 - 进度：中国行政区划地图生产解析故障修复完成。Go 管理端静态服务现在于 SPA 回退前原样提供 `/admin/china-map/**` 下的 `.json` 与 `.geojson`，设置正确 MIME 和每次复验缓存策略；缺失、越界或非允许扩展统一 404，不再返回 `index.html`。
 - 影响文件：`internal/handlers/router.go`、`internal/handlers/admin_static_test.go`、`CONTEXT.md`、`plan.md`；无关 Hermes 记录与 `docs/examples/115LocalNatManager/` 不纳入提交。

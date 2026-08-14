@@ -33,7 +33,8 @@ func TestCleanupExpiredForumPostsSQLAgainstPostgres(t *testing.T) {
 	_, err = tx.Exec(ctx, `
 CREATE TEMP TABLE collected_forum_posts (
     id INTEGER PRIMARY KEY,
-    created_at TIMESTAMPTZ NOT NULL
+    created_at TIMESTAMPTZ NOT NULL,
+    inspection_status TEXT NOT NULL
 );
 CREATE TEMP TABLE collected_forum_post_resources (
     post_id INTEGER NOT NULL,
@@ -44,12 +45,16 @@ CREATE TEMP TABLE collected_forum_post_resources (
 	}
 
 	_, err = tx.Exec(ctx, `
-INSERT INTO collected_forum_posts (id, created_at) VALUES
-    (1, NOW() - INTERVAL '29 days'),
-    (2, NOW() - INTERVAL '31 days'),
-    (3, NOW() - INTERVAL '31 days'),
-    (4, NOW() - INTERVAL '31 days'),
-    (5, NOW() - INTERVAL '30 days');
+INSERT INTO collected_forum_posts (id, created_at, inspection_status) VALUES
+    (1, NOW() - INTERVAL '29 days', 'inspected'),
+    (2, NOW() - INTERVAL '31 days', 'inspected'),
+    (3, NOW() - INTERVAL '31 days', 'inspected'),
+    (4, NOW() - INTERVAL '31 days', 'failed'),
+    (5, NOW() - INTERVAL '30 days', 'inspected'),
+    (6, NOW() - INTERVAL '31 days', 'pending'),
+    (7, NOW() - INTERVAL '31 days', 'restricted'),
+    (8, NOW() - INTERVAL '31 days', 'dedupe_only'),
+    (9, NOW() - INTERVAL '31 days', 'failed');
 INSERT INTO collected_forum_post_resources (post_id, kind) VALUES
     (3, 'attachment'),
     (4, 'ed2k');`)
@@ -79,7 +84,7 @@ INSERT INTO collected_forum_post_resources (post_id, kind) VALUES
 		t.Fatalf("iterate PostgreSQL retention test data: %v", err)
 	}
 
-	want := []int{1, 3, 4, 5}
+	want := []int{1, 3, 4, 5, 6, 7}
 	if len(retained) != len(want) {
 		t.Fatalf("retained IDs=%v, want %v", retained, want)
 	}

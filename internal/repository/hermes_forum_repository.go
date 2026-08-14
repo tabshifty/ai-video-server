@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,12 +27,13 @@ func NewHermesForumRepository(videoRepo *VideoRepository) *HermesForumRepository
 	return &HermesForumRepository{videoRepo: videoRepo}
 }
 
-func buildAdminForumPostListSQL(page, pageSize int) (string, string, []any) {
-	const where = `
-WHERE p.inspection_status = 'inspected'
+func buildAdminForumPostListSQL(page, pageSize int, query string) (string, string, []any, []any) {
+	where := `
+WHERE p.inspection_status IN ('inspected', 'restricted')
   AND p.filter_decision = 'included'
   AND (
-      p.created_at >= NOW() - INTERVAL '30 days'
+      p.inspection_status = 'restricted'
+      OR p.created_at >= NOW() - INTERVAL '30 days'
       OR EXISTS (
           SELECT 1
           FROM collected_forum_post_resources rp
@@ -39,11 +41,17 @@ WHERE p.inspection_status = 'inspected'
             AND rp.kind IN ('attachment', 'ed2k')
       )
   )`
+	countArgs := make([]any, 0, 1)
+	if keyword := strings.ToLower(strings.TrimSpace(query)); keyword != "" {
+		countArgs = append(countArgs, "%"+escapeForumPostLikePattern(keyword)+"%")
+		where += fmt.Sprintf("\n  AND LOWER(p.title) LIKE $%d ESCAPE '\\'", len(countArgs))
+	}
 	countSQL := `SELECT COUNT(*) FROM collected_forum_posts p` + where
 	listSQL := `
 SELECT p.id,
        p.title,
        p.url,
+       p.inspection_status,
        COALESCE(
            ARRAY_AGG(r.value ORDER BY r.position) FILTER (WHERE r.kind = 'attachment'),
            ARRAY[]::TEXT[]
@@ -55,10 +63,21 @@ SELECT p.id,
        p.observed_at
 FROM collected_forum_posts p
 LEFT JOIN collected_forum_post_resources r ON r.post_id = p.id` + where + `
-GROUP BY p.id, p.title, p.url, p.observed_at
+GROUP BY p.id, p.title, p.url, p.inspection_status, p.observed_at
 ORDER BY p.observed_at DESC, p.id DESC
-LIMIT $1 OFFSET $2`
-	return countSQL, listSQL, []any{pageSize, (page - 1) * pageSize}
+LIMIT $%d OFFSET $%d`
+	listArgs := append([]any(nil), countArgs...)
+	listArgs = append(listArgs, pageSize, (page-1)*pageSize)
+	listSQL = fmt.Sprintf(listSQL, len(listArgs)-1, len(listArgs))
+	return countSQL, listSQL, countArgs, listArgs
+}
+
+func escapeForumPostLikePattern(value string) string {
+	return strings.NewReplacer(
+		`\`, `\\`,
+		`%`, `\%`,
+		`_`, `\_`,
+	).Replace(value)
 }
 
 const cleanupExpiredForumPostsSQL = `
@@ -69,13 +88,14 @@ WHERE p.created_at < NOW() - INTERVAL '30 days'
       FROM collected_forum_post_resources r
       WHERE r.post_id = p.id
         AND r.kind IN ('attachment', 'ed2k')
-  )`
+  )
+  AND p.inspection_status NOT IN ('pending', 'restricted')`
 
 // ListAdminForumPosts returns the resource-aware, included forum projection for the admin UI.
-func (r *HermesForumRepository) ListAdminForumPosts(ctx context.Context, page, pageSize int) ([]models.AdminForumPostListItem, int, error) {
-	countSQL, listSQL, listArgs := buildAdminForumPostListSQL(page, pageSize)
+func (r *HermesForumRepository) ListAdminForumPosts(ctx context.Context, page, pageSize int, query string) ([]models.AdminForumPostListItem, int, error) {
+	countSQL, listSQL, countArgs, listArgs := buildAdminForumPostListSQL(page, pageSize, query)
 	var total int
-	if err := r.videoRepo.pool.QueryRow(ctx, countSQL).Scan(&total); err != nil {
+	if err := r.videoRepo.pool.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count admin forum posts: %w", err)
 	}
 
@@ -92,6 +112,7 @@ func (r *HermesForumRepository) ListAdminForumPosts(ctx context.Context, page, p
 			&item.ID,
 			&item.Title,
 			&item.URL,
+			&item.InspectionStatus,
 			&item.Attachments,
 			&item.ED2KLinks,
 			&item.ObservedAt,
