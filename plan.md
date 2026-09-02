@@ -2,6 +2,16 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-09-02 16:18 +0800
+- 进度：Task 4 完成。固定 `github.com/gotd/td v0.99.2`，封装个人账号 session、chat 解析、历史分页、实时订阅、消息刷新、document 流式下载和 FloodWait 错误；元数据构造规则已覆盖 caption 标题与文件名回退。
+- 影响文件：`internal/telegram/client.go`、`internal/telegram/client_test.go`、`internal/telegram/gotd_client.go`、`internal/services/telegram_metadata.go`、`internal/services/telegram_metadata_test.go`、`go.mod`、`go.sum`、`plan.md`；未纳入用户既有 `docs/examples/`。
+- 验证：`go test ./internal/telegram ./internal/services -count=1`、`go vet ./internal/telegram ./internal/services`、`gofmt -d`、`git diff --check` 通过；准备精确提交 Task 4。
+
+## 2026-09-02 16:00 +0800
+- 进度：进入 Task 4。接口、FloodWait 包装类型和 Telegram 元数据测试已建立；待固定 `github.com/gotd/td` 稳定版本并实现个人账号 session、群组解析、历史分页、实时消息订阅、消息刷新和 document 流式下载适配器。
+- 影响文件：`internal/telegram/client.go`、`internal/telegram/client_test.go`、`internal/telegram/gotd_client.go`、`internal/services/telegram_metadata.go`、`internal/services/telegram_metadata_test.go`、`go.mod`、`go.sum`、`plan.md`；保留 `docs/examples/` 未跟踪内容，不修改 Android 工程。
+- 验证：现有 `go test ./internal/telegram ./internal/services -run 'Test(Client|BuildTelegramVideoMetadata)' -count=1` 待适配器完成后复跑；随后执行 `go vet`、竞态定向测试和提交前差异/乱码检查。
+
 ## 2026-09-02 15:47 +0800
 - 进度：Task 3 完成。抽取 `UploadService` 的本地文件保存核心；手动上传保留重复时刷新可替换原片路径的既有语义，`SaveImportedFile` 在重复内容时不写入临时导入路径，并覆盖 hash 竞态分支。
 - 影响文件：`internal/services/upload.go`、`internal/services/upload_test.go`、`internal/services/import_file.go`、`internal/services/import_file_test.go`、`plan.md`。
@@ -76,6 +86,16 @@
 - 进度：用户确认中国行政区划地图完整方案，进入管理端实现。采用现有 Vue 3、Vue Router、ECharts 与 Element Plus；新增 `/toolbox/china-map` 认证独立路由和工具箱新标签页入口，页面保持无 shell 且地图占满视口。实现按静态索引与父级拆分 GeoJSON 契约分离层级、搜索、URL 恢复、缓存和错误处理，并先补红灯测试；正式数据只接受许可与来源可追溯的快照，不把临时无许可证样本纳入仓库。
 - 影响文件：预计涉及 `admin-web/src/views/Toolbox.vue`、`admin-web/src/views/ToolboxChinaMap.vue`、地图 helper/测试、`admin-web/src/router/*`、`admin-web/public/china-map/*`、数据构建脚本与说明、`CONTEXT.md`、ADR-0024、`plan.md`。
 - 验证：待执行管理端定向 Vitest、全量 `npm test`、`npm run build`、数据完整性校验、`git diff --check`、中文乱码扫描，以及 1024/1440/窄视口浏览器截图核验。
+
+## 2026-08-13 09:42 +0800
+- 进度：开始处理 Hermes 权限误判修复后的历史重抓。目标为 `source=sehuatang` 且 `inspection_status=restricted` 的最终帖子；先只读统计并按旧权限误判、已有资源和真实登录/验证受限分类，再备份数据库行、资源行、Hermes 任务定义和相关状态，暂停新帖与历史补漏调度后逐条执行 `discover -> cdp_fetch -> enrich_thread -> inspection`。仅新发现资源的帖子允许产生通知，避免重复投递。
+- 影响文件：`plan.md`；运行时目标为远程 Hermes Forum API、PostgreSQL、`~/.hermes/cron/jobs.json` 与 `~/.hermes/state/`，不修改 Android/TV 版本号。
+- 验证：待完成 restricted 统计、备份完整性、重抓结果、通知队列清理及调度恢复核对。
+
+## 2026-08-13 09:50 +0800
+- 进度：按用户确认改用状态机恢复方案：将 `source=sehuatang` 的 150 条 `restricted` 终态重置为 `pending`，保留帖子身份和观察时间，清空旧检查结论与指纹；恢复两个论坛 cron，让其按既有 `discover -> inspection` 流程重抓。由于历史补漏游标可能已越过旧页，重置后核对并在必要时把明确候选加入持久队列。
+- 影响文件：`plan.md`；运行时目标为远程 `collected_forum_posts` / `collected_forum_post_resources`、Hermes 任务定义和补漏队列。
+- 验证：待执行事务行数与约束核对、cron 入队/检查进度、资源结果、重复通知防护及任务恢复状态检查。
 
 ## 2026-08-13 09:31 +0800
 - 进度：修复 Hermes 将附件提示“阅读权限: 10”误判为整页权限门禁的问题。外部活动脚本 `~/.hermes/scripts/watch_sehuatang_forum95.py` 仅移除 `is_blocked_or_permission_text()` 中的裸“阅读权限”词项，保留明确的“需要阅读权限”“阅读权限高于”“本帖隐藏的内容需要”及登录/验证门禁；已生成可回滚备份 `~/.hermes/scripts/watch_sehuatang_forum95.py.pre-attachment-permission-fix-20260813-0920`。
