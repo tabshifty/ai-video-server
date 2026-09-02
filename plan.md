@@ -2,6 +2,11 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-09-02
+- 进度：完成 Telegram 指定群组视频采集与全部历史回填的设计确认，生成实现计划 `docs/superpowers/plans/2026-09-02-telegram-video-ingestion.md`。方案固定多群组数据库来源、实时/历史独立下载队列、`(source_id,message_id)` + Telegram document ID + `SHA-256/文件大小` 三层幂等、短视频导入及转码投递补偿；尚未修改业务代码。
+- 影响文件：`docs/superpowers/specs/2026-09-02-telegram-video-ingestion-design.md`、`docs/superpowers/plans/2026-09-02-telegram-video-ingestion.md`、`plan.md`；不修改 Android/TV 版本号。设计提交为 `b187a8e`，实现计划待确认执行方式。
+- 验证：设计文档自检通过；计划完成占位词、接口一致性和 `git diff --check` 检查，待用户选择按任务执行方式后进入实现。
+
 ## 2026-08-14 09:25 +0800
 - 进度：论坛资源改动完成提交前复核，代码、测试、接口契约、ADR 与长期上下文一致；提交仅纳入本任务文件及本任务 `plan.md` 记录，保留既有历史重抓记录和 `docs/examples/` 工作区内容。
 - 影响文件：本任务文件同 09:24 记录；不修改 Android/TV 版本号。
