@@ -2,6 +2,16 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-09-02 15:24 +0800
+- 进度：根据 `docs/superpowers/plans/2026-09-02-telegram-video-ingestion.md` 开始实现 Telegram 指定群组视频采集、历史回填和管理 API。当前进入 Task 1，先建立可回滚 migration、来源/媒体模型和仓储边界；保持个人 MTProto session 独占、短视频导入、三层幂等及队列/数据库状态分工。
+- 影响文件：预计涉及 `migrations/0038_*`、`internal/models/telegram.go`、`internal/repository/telegram_*`、`internal/config`、`internal/queue`、`internal/services`、`internal/telegram`、`internal/handlers`、`cmd/telegram-ingestor`、`deploy`、`docs/telegram-video-ingestion.md`、`CONTEXT.md`、`plan.md`；保留既有 `docs/examples/` 和其它工作区差异，不修改 Android 工程。
+- 验证：待按 Task 1 至 Task 7 逐项执行定向测试、`go vet`、构建、迁移/Compose 静态检查及最终全量验证；每个任务完成后独立使用中文提交。
+
+## 2026-09-02 15:32 +0800
+- 进度：Task 1 完成。新增 `0038` Telegram 来源/媒体 migration 及可回滚 down migration，建立来源、消息、document ID、SHA-256、导入/转码状态、重试字段和索引；新增模型与 VideoRepository 仓储边界，支持消息幂等登记、同事务游标推进、行锁 claim、部分更新、转码补偿查询和状态统计。
+- 影响文件：`migrations/0038_telegram_video_ingestion.up.sql`、`migrations/0038_telegram_video_ingestion.down.sql`、`internal/models/telegram.go`、`internal/repository/telegram_repository.go`、`internal/repository/telegram_repository_test.go`、`internal/repository/migrations_test.go`、`plan.md`。
+- 验证：`go test ./internal/repository -run 'TestTelegram|Test.*Migration' -count=1`、`go test ./internal/repository -count=1`、`go vet ./internal/repository`、`git diff --check` 均通过；待提交 `新增 Telegram 采集状态模型`。
+
 ## 2026-09-02
 - 进度：完成 Telegram 指定群组视频采集与全部历史回填的设计确认，生成实现计划 `docs/superpowers/plans/2026-09-02-telegram-video-ingestion.md`。方案固定多群组数据库来源、实时/历史独立下载队列、`(source_id,message_id)` + Telegram document ID + `SHA-256/文件大小` 三层幂等、短视频导入及转码投递补偿；尚未修改业务代码。
 - 影响文件：`docs/superpowers/specs/2026-09-02-telegram-video-ingestion-design.md`、`docs/superpowers/plans/2026-09-02-telegram-video-ingestion.md`、`plan.md`；不修改 Android/TV 版本号。设计提交为 `b187a8e`，实现计划待确认执行方式。

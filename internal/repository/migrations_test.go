@@ -50,6 +50,28 @@ func TestCollectedForumPostsMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+collected_forum_posts`)
 }
 
+func TestTelegramVideoIngestionMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0038_telegram_video_ingestion.up.sql")
+	down := readMigrationForTest(t, "0038_telegram_video_ingestion.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+telegram_sources`)
+	assertSQLPattern(t, up, `(?is)telegram_sources[\s\S]*chat_id\s+bigint[\s\S]*unique`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+telegram_media`)
+	assertSQLPattern(t, up, `(?is)unique\s*\(\s*source_id\s*,\s*message_id\s*\)`)
+	assertSQLPattern(t, up, `(?is)source_id\s+uuid\s+not\s+null\s+references\s+telegram_sources\s*\(\s*id\s*\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, up, `(?is)video_id\s+uuid[\s\S]*references\s+videos\s*\(\s*id\s*\)\s+on\s+delete\s+set\s+null`)
+	assertSQLPattern(t, up, `(?is)'pending'[\s\S]*'backfilling'[\s\S]*'live'[\s\S]*'paused'[\s\S]*'error'`)
+	assertSQLPattern(t, up, `(?is)'discovered'[\s\S]*'queued'[\s\S]*'downloading'[\s\S]*'importing'[\s\S]*'imported'[\s\S]*'duplicate'[\s\S]*'failed'[\s\S]*'skipped'`)
+	assertSQLPattern(t, up, `(?is)'not_required'[\s\S]*'pending'[\s\S]*'enqueued'[\s\S]*'ready'[\s\S]*'failed'`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_telegram_media_document_id`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_telegram_media_processing_status`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+idx_telegram_media_next_retry_at`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+telegram_media`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+telegram_sources`)
+}
+
 func TestIPTVPlaylistMigration(t *testing.T) {
 	t.Parallel()
 
