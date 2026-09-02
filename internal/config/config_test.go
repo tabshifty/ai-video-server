@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -197,6 +198,88 @@ func TestLoadIncludesHermesAPIToken(t *testing.T) {
 	}
 	if cfg.HermesAPIToken != "hermes-machine-token" {
 		t.Fatalf("unexpected HermesAPIToken: %q", cfg.HermesAPIToken)
+	}
+}
+
+func TestLoadIncludesTelegramConfig(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("TELEGRAM_API_ID", "12345")
+	t.Setenv("TELEGRAM_API_HASH", "api-hash")
+	t.Setenv("TELEGRAM_PHONE", "+8613800000000")
+	t.Setenv("TELEGRAM_SESSION_PATH", "/data/telegram-session/account.session")
+	t.Setenv("TELEGRAM_IMPORT_USER_ID", "11111111-1111-1111-1111-111111111111")
+	t.Setenv("TELEGRAM_REALTIME_QUEUE", "tg-realtime-test")
+	t.Setenv("TELEGRAM_BACKFILL_QUEUE", "tg-backfill-test")
+	t.Setenv("TELEGRAM_CONTROL_QUEUE", "tg-control-test")
+	t.Setenv("TELEGRAM_DOWNLOAD_CONCURRENCY", "2")
+	t.Setenv("TELEGRAM_MAX_ACTIVE_TASKS", "3")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.TelegramAPIID != 12345 || cfg.TelegramAPIHash != "api-hash" || cfg.TelegramPhone != "+8613800000000" {
+		t.Fatalf("unexpected Telegram credentials: %+v", cfg)
+	}
+	if cfg.TelegramSessionPath != "/data/telegram-session/account.session" || cfg.TelegramImportUserID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("unexpected Telegram session/import user config: %+v", cfg)
+	}
+	if cfg.TelegramRealtimeQueue != "tg-realtime-test" || cfg.TelegramBackfillQueue != "tg-backfill-test" || cfg.TelegramControlQueue != "tg-control-test" {
+		t.Fatalf("unexpected Telegram queues: %+v", cfg)
+	}
+	if cfg.TelegramDownloadConcurrency != 2 || cfg.TelegramMaxActiveTasks != 3 {
+		t.Fatalf("unexpected Telegram limits: concurrency=%d active=%d", cfg.TelegramDownloadConcurrency, cfg.TelegramMaxActiveTasks)
+	}
+}
+
+func TestLoadDefaultsTelegramQueuesAndLimits(t *testing.T) {
+	setRequiredEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.TelegramRealtimeQueue != "telegram-realtime" || cfg.TelegramBackfillQueue != "telegram-backfill" || cfg.TelegramControlQueue != "telegram-control" {
+		t.Fatalf("unexpected default Telegram queues: %+v", cfg)
+	}
+	if cfg.TelegramDownloadConcurrency != 1 || cfg.TelegramMaxActiveTasks <= 0 {
+		t.Fatalf("unexpected default Telegram limits: concurrency=%d active=%d", cfg.TelegramDownloadConcurrency, cfg.TelegramMaxActiveTasks)
+	}
+}
+
+func TestValidateTelegramIngestorRequiresCredentials(t *testing.T) {
+	t.Parallel()
+
+	valid := Config{
+		TelegramAPIID:               12345,
+		TelegramAPIHash:             "api-hash",
+		TelegramPhone:               "+8613800000000",
+		TelegramSessionPath:         "/data/telegram-session/account.session",
+		TelegramImportUserID:        "11111111-1111-1111-1111-111111111111",
+		TelegramDownloadConcurrency: 1,
+		TelegramMaxActiveTasks:      1,
+	}
+	tests := []struct {
+		name   string
+		mutate func(*Config)
+		want   string
+	}{
+		{name: "api id", mutate: func(cfg *Config) { cfg.TelegramAPIID = 0 }, want: "TELEGRAM_API_ID"},
+		{name: "api hash", mutate: func(cfg *Config) { cfg.TelegramAPIHash = " " }, want: "TELEGRAM_API_HASH"},
+		{name: "phone", mutate: func(cfg *Config) { cfg.TelegramPhone = "" }, want: "TELEGRAM_PHONE"},
+		{name: "session path", mutate: func(cfg *Config) { cfg.TelegramSessionPath = "" }, want: "TELEGRAM_SESSION_PATH"},
+		{name: "import user", mutate: func(cfg *Config) { cfg.TelegramImportUserID = "not-a-uuid" }, want: "TELEGRAM_IMPORT_USER_ID"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := valid
+			tt.mutate(&cfg)
+			err := cfg.ValidateTelegramIngestor()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("ValidateTelegramIngestor() error=%v, want field %s", err, tt.want)
+			}
+		})
 	}
 }
 
