@@ -273,6 +273,7 @@ type telegramIngestionFakeClient struct {
 	refreshed     map[string]telegram.Message
 	historyPages  map[int64][]telegram.Message
 	historyCalls  []int64
+	historyHook   func()
 	downloads     int
 	downloadData  []byte
 	refreshErrors error
@@ -289,6 +290,9 @@ func (c *telegramIngestionFakeClient) History(_ context.Context, _, offsetID int
 		if err := fn(message); err != nil {
 			return err
 		}
+	}
+	if c.historyHook != nil {
+		c.historyHook()
 	}
 	return nil
 }
@@ -649,6 +653,36 @@ func TestTelegramIngestionHistoryCursorAllowsRepeatedScanWithoutMissingMessages(
 	}
 	if repo.sources[sourceID].SyncStatus != "live" {
 		t.Fatalf("sync status = %q, want live", repo.sources[sourceID].SyncStatus)
+	}
+}
+
+func TestTelegramIngestionStopsBackfillWhenSourceIsPaused(t *testing.T) {
+	repo := newTelegramIngestionFakeRepository()
+	sourceID := seedTelegramSource(repo)
+	client := &telegramIngestionFakeClient{
+		chat: telegram.Chat{ID: -100123, Title: "测试群组"},
+		historyPages: map[int64][]telegram.Message{
+			0: {telegramTestMessage(-100123, 2, 4002, "two")},
+			2: {telegramTestMessage(-100123, 1, 4001, "one")},
+		},
+	}
+	client.historyHook = func() {
+		source := repo.sources[sourceID]
+		source.Enabled = false
+		source.SyncStatus = "paused"
+		repo.sources[sourceID] = source
+		client.historyHook = nil
+	}
+	service := telegramTestService(t, repo, client, &telegramIngestionFakeUpload{}, &telegramIngestionFakeTasks{}, &telegramIngestionFakeTranscode{})
+
+	if err := service.SyncSource(context.Background(), sourceID); err != nil {
+		t.Fatalf("SyncSource() error = %v", err)
+	}
+	if got := repo.sources[sourceID].SyncStatus; got != "paused" {
+		t.Fatalf("sync status = %q, want paused", got)
+	}
+	if len(client.historyCalls) != 1 {
+		t.Fatalf("history calls = %v, want one page before pause", client.historyCalls)
 	}
 }
 

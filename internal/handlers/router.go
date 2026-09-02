@@ -72,6 +72,7 @@ type API struct {
 	subtitleSvc           *services.SubtitleService
 	archiveImportSvc      archiveImportService
 	hermesForumSvc        hermesForumService
+	telegramSourceSvc     telegramSourceService
 	tvAPKSvc              tvAPKService
 	iptvSvc               iptvService
 	enqueuer              taskEnqueuer
@@ -96,7 +97,7 @@ type API struct {
 	hermesAPIToken        string
 }
 
-func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, hermesForumSvc hermesForumService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret, hermesAPIToken string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
+func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, hermesForumSvc hermesForumService, telegramSourceSvc telegramSourceService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret, hermesAPIToken string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
 	return &API{
 		repo:                  repo,
 		orphanFileScanRepo:    repo,
@@ -109,6 +110,7 @@ func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService,
 		subtitleSvc:           subtitleSvc,
 		archiveImportSvc:      archiveImportSvc,
 		hermesForumSvc:        hermesForumSvc,
+		telegramSourceSvc:     telegramSourceSvc,
 		tvAPKSvc:              services.NewTVAPKService(repo, uploadTempDir, storageRoot),
 		iptvSvc:               services.NewIPTVService(repo, nil),
 		enqueuer:              enqueuer,
@@ -220,6 +222,12 @@ func (a *API) Register(r *gin.Engine) {
 		{
 			admin.GET("/events/ws", a.AdminEventsStream)
 			admin.GET("/stats", a.AdminStats)
+			admin.GET("/telegram/sources", a.AdminTelegramSources)
+			admin.POST("/telegram/sources", a.AdminTelegramAddSource)
+			admin.POST("/telegram/sources/:id/pause", a.AdminTelegramPauseSource)
+			admin.POST("/telegram/sources/:id/resume", a.AdminTelegramResumeSource)
+			admin.POST("/telegram/sources/:id/backfill", a.AdminTelegramStartBackfill)
+			admin.GET("/telegram/sources/:id/progress", a.AdminTelegramProgress)
 			admin.GET("/forum-posts", a.AdminForumPosts)
 			admin.GET("/iptv/playlist", a.AdminIPTVPlaylist)
 			admin.POST("/iptv/playlist/upload", a.AdminIPTVUploadPlaylist)

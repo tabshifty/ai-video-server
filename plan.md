@@ -2,6 +2,16 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-09-02 18:14 +0800
+- 进度：Task 6 完成。管理员接口已覆盖来源列表、新增、暂停、恢复、重新回填和进度查询；新增来源统一保存规范化 `chat_ref`，恢复保留游标，重新回填清零游标，控制任务异步投递。
+- 影响文件：`internal/services/telegram_source.go`、`internal/services/telegram_source_test.go`、`internal/handlers/admin_telegram.go`、`internal/handlers/admin_telegram_test.go`、`internal/handlers/router.go`、`main.go`、`plan.md`；未纳入用户既有 `docs/examples/`。
+- 验证：Task 6 定向测试、handler 全量测试、`go vet` 和主程序构建通过；待提交 `增加 Telegram 群组管理接口`。
+
+## 2026-09-02 18:02 +0800
+- 进度：进入 Task 6。按已批准计划实现 Telegram 来源管理服务和管理员 API；HTTP 请求只更新 PostgreSQL 状态并投递 control 任务，群组解析与历史扫描继续由独立采集器执行。
+- 影响文件：`internal/services/telegram_source.go`、`internal/services/telegram_source_test.go`、`internal/handlers/admin_telegram.go`、`internal/handlers/admin_telegram_test.go`、`internal/handlers/router.go`、`main.go`、`plan.md`；保留用户既有 `docs/examples/`。
+- 验证：`go test ./internal/services ./internal/handlers -run 'TestAdminTelegram|TestTelegramSource' -count=1` 已按预期红灯，待实现后复跑定向测试、`go vet` 和主入口构建。
+
 ## 2026-09-02 17:51 +0800
 - 进度：Task 5 完成。补齐暂停来源的 claim 前检查、超时下载/导入记录恢复、下载并发限制、转码与下载双重 reconcile，并新增独立 `telegram-ingestor` 的登录/运行入口；实时与回填队列按 `10:1` 权重消费。
 - 影响文件：`internal/services/telegram_ingestion.go`、`internal/services/telegram_ingestion_test.go`、`internal/services/upload.go`、`internal/repository/telegram_repository.go`、`internal/queue/telegram_processor.go`、`internal/queue/telegram_processor_test.go`、`cmd/telegram-ingestor/main.go`、`cmd/telegram-ingestor/main_test.go`、`plan.md`；保留用户既有 `docs/examples/` 未跟踪内容。

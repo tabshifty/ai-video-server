@@ -197,6 +197,13 @@ func (s *TelegramIngestionService) SyncSource(ctx context.Context, sourceID uuid
 		if err != nil {
 			return s.recordSourceFailure(ctx, sourceID, fmt.Errorf("read Telegram history: %w", err))
 		}
+		active, err := s.telegramSourceActive(ctx, sourceID)
+		if err != nil {
+			return s.recordSourceFailure(ctx, sourceID, fmt.Errorf("check Telegram source state: %w", err))
+		}
+		if !active {
+			return nil
+		}
 		if len(page) == 0 {
 			break
 		}
@@ -256,6 +263,14 @@ func (s *TelegramIngestionService) readHistoryPage(ctx context.Context, chatID, 
 		return nil, err
 	}
 	return page, nil
+}
+
+func (s *TelegramIngestionService) telegramSourceActive(ctx context.Context, sourceID uuid.UUID) (bool, error) {
+	source, err := s.repo.GetTelegramSource(ctx, sourceID)
+	if err != nil {
+		return false, err
+	}
+	return source.Enabled && source.SyncStatus != "paused", nil
 }
 
 // ProcessMedia claims and imports one persisted Telegram message.

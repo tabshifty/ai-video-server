@@ -199,6 +199,9 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 	archiveImportSvc := services.NewArchiveImportService(pool, uploadSvc, imageSvc, repo, archiveImportQueueAdapter{enqueuer: enqueuer}, cfg.StorageRoot, cfg.UploadTempDir, logger)
 	hermesForumRepo := repository.NewHermesForumRepository(repo)
 	hermesForumSvc := services.NewHermesForumService(hermesForumRepo)
+	telegramTasks := queue.NewTelegramTaskEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.TelegramRealtimeQueue, cfg.TelegramBackfillQueue, cfg.TelegramControlQueue)
+	defer telegramTasks.Close()
+	telegramSourceSvc := services.NewTelegramSourceService(repo, telegramTasks)
 	passwordVaultCipher, err := services.NewPasswordVaultCipher(cfg.PasswordVaultKey)
 	if err != nil {
 		return err
@@ -218,6 +221,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		subtitleSvc,
 		archiveImportSvc,
 		hermesForumSvc,
+		telegramSourceSvc,
 		enqueuer,
 		logger,
 		redisClient,
