@@ -1,5 +1,13 @@
 # 项目上下文
 
+## Telegram 视频采集约定
+- `Telegram 来源`：管理员明确添加、由个人账号 MTProto session 解析和读取的群组或频道。`telegram_sources` 是多来源、启停状态和历史游标的权威，不能退化成单个 `TELEGRAM_CHAT_ID`；API 只更新来源并投递 control 任务，不持有 session 或直接访问 Telegram。
+- `Telegram 三层幂等`：先以 `(source_id, message_id)` 收敛同一来源消息，再以 Telegram document ID 复用已处理文档，下载完成后以流式 SHA-256 加文件大小复用现有视频。Redis/Asynq 允许至少一次投递，重复任务必须依赖上述数据库键和行 claim 收敛，不能假设队列恰好一次。
+- `Telegram 历史游标`：历史消息固定从新到旧分页，`history_cursor_message_id` 保存已扫描页的最小消息 ID，并与该页消息登记在同一事务中以 `LEAST` 单调向旧消息推进。恢复来源保留游标；重新回填才清零游标和完成时间；暂停必须在分页边界停止且不得误写为 `live`。
+- `Telegram 状态边界`：PostgreSQL 中的来源、媒体、游标、导入和转码状态是权威，队列只携带 UUID 并负责唤醒处理。采集器重启会重新同步启用来源，周期 reconcile 负责重新投递超时的 `queued/downloading/importing` 和待投递的 `transcode_status=pending`；运维不得用清空 Redis 代替状态恢复。
+- `外部导入重复路径保护`：Telegram 等外部本地文件导入命中已有 SHA-256 和文件大小时，不得用采集器临时路径覆盖既有视频的 `original_path`；手动上传保留可替换原片路径的既有语义。该差异由导入入口显式表达，不能仅根据哈希命中结果共用更新策略。
+- `Telegram 共享容器路径`：OrbStack Compose 中 API、worker、telegram-ingestor 必须把同一宿主目录分别映射到相同的 `/data/storage` 和 `/data/tmp/uploads`，确保采集器写入的原片可被转码 worker 读取；个人 session 仅挂载到采集器的 `/data/telegram-session`，且采集器以非 root 用户运行。视频类型固定为 `short`。
+
 ## 论坛采集与 Hermes 接口约定
 - `论坛采集帖子`：由 Hermes 首次发现并提交给项目后端的外部论坛帖子快照；当前来源 `sehuatang` 的身份键为 `source + tid`，版块、标题、URL、附件和 ED2K 不参与查重。记录不是下载任务，也不是持续同步对象；完成后不因同一 `tid` 再次出现而更新。_避免：ED2K 下载任务、帖子同步记录。_
 - `论坛采集资源`：隶属于一条[[论坛采集帖子]]的附件或 ED2K 原始链接。一帖可以同时拥有多条附件和多条 ED2K；资源只保留 Hermes 提交值及同类型数组内顺序，不做帖子内或跨帖查重，不自动触发 115 云下载、本地暂存、媒体入库或转码。

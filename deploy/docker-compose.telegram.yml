@@ -1,0 +1,108 @@
+version: "3.9"
+
+x-video-environment: &video-environment
+  POSTGRES_DSN: postgres://video:video@postgres:5432/video_server?sslmode=disable
+  REDIS_ADDR: redis:6379
+  REDIS_PASSWORD: ""
+  HTTP_ADDR: ":8080"
+  JWT_SECRET: "${JWT_SECRET:-}"
+  PASSWORD_VAULT_KEY: "${PASSWORD_VAULT_KEY:-}"
+  PLAY_URL_SIGN_SECRET: "${PLAY_URL_SIGN_SECRET:-}"
+  HERMES_API_TOKEN: "${HERMES_API_TOKEN:-}"
+  ENABLE_SWAGGER: "${ENABLE_SWAGGER:-false}"
+  ASYNQ_QUEUE: "${ASYNQ_QUEUE:-transcode}"
+  MAX_TRANSCODE_WORKERS: "${MAX_TRANSCODE_WORKERS:-2}"
+  TRANSCODE_TASK_TIMEOUT_MINUTES: "${TRANSCODE_TASK_TIMEOUT_MINUTES:-360}"
+  MAX_VIDEO_SIZE: "${MAX_VIDEO_SIZE:-2147483648}"
+  TMDB_API_KEY: "${TMDB_API_KEY:-}"
+  TMDB_BASE_URL: "${TMDB_BASE_URL:-https://api.themoviedb.org/3}"
+  TMDB_TIMEOUT_SECONDS: "${TMDB_TIMEOUT_SECONDS:-10}"
+  AV_SCRAPER_BASE_URL: "${AV_SCRAPER_BASE_URL:-https://javdb.com}"
+  AV_SCRAPER_TIMEOUT_SECONDS: "${AV_SCRAPER_TIMEOUT_SECONDS:-120}"
+  AV_SCRAPER_USER_AGENT: "${AV_SCRAPER_USER_AGENT:-Mozilla/5.0 (compatible; VideoServerBot/1.0; +https://example.invalid/bot)}"
+  AV_SITE_URL_JAVDB: "${AV_SITE_URL_JAVDB:-}"
+  AV_SITE_URL_JAVBUS: "${AV_SITE_URL_JAVBUS:-}"
+  AV_SITE_URL_JAVLIBRARY: "${AV_SITE_URL_JAVLIBRARY:-}"
+  AV_SITE_URL_THEPORNDB: "${AV_SITE_URL_THEPORNDB:-}"
+  AV_SCRAPER_JAVDB_COOKIE: "${AV_SCRAPER_JAVDB_COOKIE:-}"
+  AV_SCRAPER_JAVBUS_COOKIE: "${AV_SCRAPER_JAVBUS_COOKIE:-}"
+  AV_SCRAPER_THEPORNDB_API_TOKEN: "${AV_SCRAPER_THEPORNDB_API_TOKEN:-}"
+  AV_SCRAPER_THEPORNDB_NO_HASH: "${AV_SCRAPER_THEPORNDB_NO_HASH:-false}"
+  ACCESS_TOKEN_TTL_HOURS: "${ACCESS_TOKEN_TTL_HOURS:-87600}"
+  REFRESH_TOKEN_TTL_HOURS: "${REFRESH_TOKEN_TTL_HOURS:-168}"
+  TRANSLATION_API_URL: "${TRANSLATION_API_URL:-}"
+  TRANSLATION_API_KEY: "${TRANSLATION_API_KEY:-}"
+  TRANSLATION_MODEL: "${TRANSLATION_MODEL:-HY-MT1.5-1.8B}"
+  TRANSLATION_TIMEOUT_SECONDS: "${TRANSLATION_TIMEOUT_SECONDS:-15}"
+  IMAGE_GENERATION_API_URL: "${IMAGE_GENERATION_API_URL:-}"
+  IMAGE_GENERATION_API_KEY: "${IMAGE_GENERATION_API_KEY:-}"
+  IMAGE_GENERATION_MODEL: "${IMAGE_GENERATION_MODEL:-gpt-image-2}"
+  IMAGE_GENERATION_TIMEOUT_SECONDS: "${IMAGE_GENERATION_TIMEOUT_SECONDS:-180}"
+  STORAGE_ROOT: /data/storage
+  POSTER_STORAGE_PATH: /data/storage/posters
+  UPLOAD_TEMP_DIR: /data/tmp/uploads
+  SERVER_LOG_PATH: /data/tmp/server.log
+  TELEGRAM_REALTIME_QUEUE: "${TELEGRAM_REALTIME_QUEUE:-telegram-realtime}"
+  TELEGRAM_BACKFILL_QUEUE: "${TELEGRAM_BACKFILL_QUEUE:-telegram-backfill}"
+  TELEGRAM_CONTROL_QUEUE: "${TELEGRAM_CONTROL_QUEUE:-telegram-control}"
+
+x-video-volumes: &video-volumes
+  - "${VIDEO_STORAGE_HOST_PATH:-./storage}:/data/storage"
+  - "${VIDEO_UPLOAD_TEMP_HOST_PATH:-./tmp/uploads}:/data/tmp/uploads"
+
+x-video-build: &video-build
+  context: .
+  dockerfile: deploy/video-server.Dockerfile
+
+services:
+  api:
+    build: *video-build
+    image: ai-video-server:telegram
+    command: ["/app/video-server", "-mode", "server"]
+    environment:
+      <<: *video-environment
+      APP_MODE: server
+    volumes: *video-volumes
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    restart: unless-stopped
+
+  worker:
+    build: *video-build
+    image: ai-video-server:telegram
+    command: ["/app/video-server", "-mode", "worker"]
+    environment:
+      <<: *video-environment
+      APP_MODE: worker
+    volumes: *video-volumes
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  telegram-ingestor:
+    build: *video-build
+    image: ai-video-server:telegram
+    command: ["/app/telegram-ingestor", "-mode", "run"]
+    user: "10001:10001"
+    environment:
+      <<: *video-environment
+      APP_MODE: telegram-ingestor
+      TELEGRAM_API_ID: "${TELEGRAM_API_ID:-}"
+      TELEGRAM_API_HASH: "${TELEGRAM_API_HASH:-}"
+      TELEGRAM_PHONE: "${TELEGRAM_PHONE:-}"
+      TELEGRAM_SESSION_PATH: /data/telegram-session/account.session
+      TELEGRAM_IMPORT_USER_ID: "${TELEGRAM_IMPORT_USER_ID:-}"
+      TELEGRAM_DOWNLOAD_CONCURRENCY: "${TELEGRAM_DOWNLOAD_CONCURRENCY:-1}"
+      TELEGRAM_MAX_ACTIVE_TASKS: "${TELEGRAM_MAX_ACTIVE_TASKS:-2}"
+    volumes:
+      - "${VIDEO_STORAGE_HOST_PATH:-./storage}:/data/storage"
+      - "${VIDEO_UPLOAD_TEMP_HOST_PATH:-./tmp/uploads}:/data/tmp/uploads"
+      - "${TELEGRAM_SESSION_HOST_PATH:-./telegram-session}:/data/telegram-session"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped

@@ -2,6 +2,26 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-09-02 21:47 +0800
+- 进度：Task 7 自动实现与仓库内验收完成。部署契约覆盖统一镜像、三服务共享路径、session 隔离、非 root 运行、容器服务名连接、固定容器端口、敏感构建上下文排除和手册必备操作；最终包级测试还发现并修复 Task 1 测试行扫描器缺少 Go `int` 目标支持的问题，生产仓储逻辑未改。
+- 影响文件：`.dockerignore`、`.gitignore`、`.env.example`、`deploy/video-server.Dockerfile`、`deploy/docker-compose.telegram.yml`、`deploy/telegram_deploy_test.go`、`docs/telegram-video-ingestion.md`、`CONTEXT.md`、`internal/repository/telegram_repository_test.go`、`plan.md`；提交时明确排除用户既有 `docs/examples/`。
+- 验证：`go test ./deploy ./internal/repository -count=1`、计划包集与全仓测试在跳过既有 `TestParseTVAPKMetadataParsesReleaseAPK` 后通过；`go vet ./...`、两个 `CGO_ENABLED=0 GOOS=linux go build`、`git diff --check`、U+FFFD 扫描通过。未跳过时计划包集和 `go test ./... -count=1` 仅因既有 TV APK 实际 version code `144`、断言仍为 `121` 失败。当前机器没有 `docker` 命令，故 `docker compose ... config`、镜像实际构建和测试群组登录/回填/重启/实时采集需在 OrbStack 部署机按运行手册执行，未冒充已验证。
+
+## 2026-09-02 18:41 +0800
+- 进度：Task 7 核心实现完成。新增 Go 1.22 多阶段镜像和三服务 Compose，统一共享媒体/暂存路径并隔离个人 session；Compose 同步透传既有 API/worker 的外部服务配置，避免容器部署丢失原有能力；补齐中文运维手册和 Telegram 长期架构约定。Dockerfile 只复制 Go 构建必需源码，`.dockerignore` 进一步阻止本地 `.env`、session 和媒体目录进入构建上下文。
+- 影响文件：`.dockerignore`、`.gitignore`、`deploy/video-server.Dockerfile`、`deploy/docker-compose.telegram.yml`、`deploy/telegram_deploy_test.go`、`docs/telegram-video-ingestion.md`、`.env.example`、`CONTEXT.md`、`internal/repository/telegram_repository_test.go`、`plan.md`；保留用户既有 `docs/examples/` 未跟踪内容。
+- 验证：`go test ./deploy -count=1`、`git diff --check` 通过，目标文件 U+FFFD 扫描无输出；本机缺少 `docker` 命令，Compose CLI 解析和真实 Telegram 测试待最终验收时如实记录。
+
+## 2026-09-02 18:27 +0800
+- 进度：Task 7 部署契约红灯已建立，覆盖三服务统一镜像/共享挂载、session 仅由非 root 采集器挂载、`ffmpeg`/`ffprobe`、采集器 `-mode run` 和 Telegram 环境变量完整性。
+- 影响文件：`deploy/telegram_deploy_test.go`、`plan.md`。
+- 验证：`go test ./deploy -count=1` 按预期失败，原因仅为 `deploy/docker-compose.telegram.yml`、`deploy/video-server.Dockerfile` 和三个宿主挂载变量尚未实现。
+
+## 2026-09-02 18:24 +0800
+- 进度：进入 Task 7。开始建立 OrbStack 部署契约测试，并补齐统一应用镜像、三服务 Compose、Telegram 一次性登录与日常运维手册；三个应用服务共享媒体和上传暂存容器路径，个人 session 仅由非 root 采集器持有。
+- 影响文件：预计新增 `deploy/video-server.Dockerfile`、`deploy/docker-compose.telegram.yml`、`deploy/telegram_deploy_test.go`、`docs/telegram-video-ingestion.md`，修改 `.env.example`、`CONTEXT.md`、`plan.md`；保留用户既有 `docs/examples/`，不修改 Android 工程。
+- 验证：先运行 `go test ./deploy -count=1` 确认部署契约红灯；实现后执行 Task 7 定向测试、全量 Go 测试、`go vet ./...`、Compose 配置解析、差异及乱码检查。
+
 ## 2026-09-02 18:14 +0800
 - 进度：Task 6 完成。管理员接口已覆盖来源列表、新增、暂停、恢复、重新回填和进度查询；新增来源统一保存规范化 `chat_ref`，恢复保留游标，重新回填清零游标，控制任务异步投递。
 - 影响文件：`internal/services/telegram_source.go`、`internal/services/telegram_source_test.go`、`internal/handlers/admin_telegram.go`、`internal/handlers/admin_telegram_test.go`、`internal/handlers/router.go`、`main.go`、`plan.md`；未纳入用户既有 `docs/examples/`。

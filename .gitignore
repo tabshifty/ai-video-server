@@ -8,6 +8,8 @@
 .worktrees/
 .gocache/
 storage/
+/tmp/
+/telegram-session/
 /referencesm/
 /references/
 /release/

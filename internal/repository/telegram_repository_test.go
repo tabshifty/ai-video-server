@@ -19,6 +19,8 @@ func (r telegramTestRow) Scan(dest ...any) error {
 			*target = value.(uuid.UUID)
 		case *int64:
 			*target = value.(int64)
+		case *int:
+			*target = int(value.(int64))
 		case *string:
 			*target = value.(string)
 		case *bool:
