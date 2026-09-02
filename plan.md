@@ -2,6 +2,17 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-09-02 17:51 +0800
+- 进度：Task 5 完成。补齐暂停来源的 claim 前检查、超时下载/导入记录恢复、下载并发限制、转码与下载双重 reconcile，并新增独立 `telegram-ingestor` 的登录/运行入口；实时与回填队列按 `10:1` 权重消费。
+- 影响文件：`internal/services/telegram_ingestion.go`、`internal/services/telegram_ingestion_test.go`、`internal/services/upload.go`、`internal/repository/telegram_repository.go`、`internal/queue/telegram_processor.go`、`internal/queue/telegram_processor_test.go`、`cmd/telegram-ingestor/main.go`、`cmd/telegram-ingestor/main_test.go`、`plan.md`；保留用户既有 `docs/examples/` 未跟踪内容。
+- 验证：`go test ./internal/services ./internal/queue -run 'TestTelegram(Ingestion|Processor)' -count=1`、`go test ./cmd/telegram-ingestor ./internal/services ./internal/queue ./internal/telegram -run 'TestTelegram' -count=1`、`go vet ./internal/services ./internal/queue ./internal/telegram ./cmd/telegram-ingestor`、`go build ./cmd/telegram-ingestor` 通过；Task 5 包级测试仅因既有 `TestParseTVAPKMetadataParsesReleaseAPK` 断言 `121` 与当前 APK 实际版本 `144` 不一致而失败。
+- 提交：待提交 `实现 Telegram 视频采集与回填`，随后进入 Task 6 管理 API。
+
+## 2026-09-02 16:31 +0800
+- 进度：进入 Task 5。开始建立 Telegram 来源同步、下载处理、三层幂等和转码补偿的服务/队列处理器边界；独立采集器入口继续保持与现有 `server`/`worker` 入口隔离。
+- 影响文件：预计新增 `internal/services/telegram_ingestion.go`、`internal/services/telegram_ingestion_test.go`、`internal/queue/telegram_processor.go`、`internal/queue/telegram_processor_test.go`、`cmd/telegram-ingestor/main.go`，必要时最小修改 `main.go` 与本记录；保留用户既有 `docs/examples/`，不修改 Android 工程。
+- 验证：先运行 `go test ./internal/services ./internal/queue -run 'TestTelegram(Ingestion|Processor)' -count=1` 验证红灯，再按 Task 5 完成定向测试、`go vet` 和入口构建。
+
 ## 2026-09-02 16:18 +0800
 - 进度：Task 4 完成。固定 `github.com/gotd/td v0.99.2`，封装个人账号 session、chat 解析、历史分页、实时订阅、消息刷新、document 流式下载和 FloodWait 错误；元数据构造规则已覆盖 caption 标题与文件名回退。
 - 影响文件：`internal/telegram/client.go`、`internal/telegram/client_test.go`、`internal/telegram/gotd_client.go`、`internal/services/telegram_metadata.go`、`internal/services/telegram_metadata_test.go`、`go.mod`、`go.sum`、`plan.md`；未纳入用户既有 `docs/examples/`。

@@ -68,6 +68,7 @@ type LocalUploadInput struct {
 	ImageCollectionID *uuid.UUID
 	SiteCategory      string
 	Hash              string
+	Metadata          map[string]any
 }
 
 func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
@@ -195,6 +196,12 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 		"source_hash":       serverHash,
 		"source_size":       info.Size(),
 	}
+	for key, value := range in.Metadata {
+		meta[key] = value
+	}
+	meta["original_filename"] = in.Filename
+	meta["source_hash"] = serverHash
+	meta["source_size"] = info.Size()
 	if in.Type == "av" {
 		meta["site_category"] = siteCategory
 	}

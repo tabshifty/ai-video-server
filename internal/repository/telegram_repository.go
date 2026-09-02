@@ -38,6 +38,9 @@ type TelegramSourcePatch struct {
 
 // TelegramMediaPatch contains fields that may be changed during ingestion.
 type TelegramMediaPatch struct {
+	DocumentID       *int64
+	ClearDocumentID  bool
+	DocumentDCID     *int
 	ProcessingStatus *string
 	TranscodeStatus  *string
 	VideoID          *uuid.UUID
@@ -295,21 +298,43 @@ func insertTelegramMediaAndAdvanceCursor(ctx context.Context, pool telegramPoolB
 	if err != nil {
 		return models.TelegramMedia{}, false, err
 	}
-	result, err := tx.Exec(ctx, `
-UPDATE telegram_sources
-SET history_cursor_message_id = GREATEST(history_cursor_message_id, $2), updated_at = NOW()
-WHERE id = $1
-`, media.SourceID, cursor)
-	if err != nil {
-		return models.TelegramMedia{}, false, fmt.Errorf("advance Telegram source cursor: %w", err)
-	}
-	if result.RowsAffected() == 0 {
-		return models.TelegramMedia{}, false, fmt.Errorf("%w: %s", ErrTelegramSourceNotFound, media.SourceID)
+	if err := advanceTelegramSourceCursor(ctx, tx, media.SourceID, cursor); err != nil {
+		return models.TelegramMedia{}, false, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return models.TelegramMedia{}, false, fmt.Errorf("commit Telegram media transaction: %w", err)
 	}
 	return stored, inserted, nil
+}
+
+// AdvanceTelegramSourceCursor advances a history cursor when a page contains
+// no importable video messages.
+func (r *VideoRepository) AdvanceTelegramSourceCursor(ctx context.Context, sourceID uuid.UUID, cursor int64) error {
+	return advanceTelegramSourceCursor(ctx, r.pool, sourceID, cursor)
+}
+
+func advanceTelegramSourceCursor(ctx context.Context, db telegramQuerier, sourceID uuid.UUID, cursor int64) error {
+	if sourceID == uuid.Nil {
+		return fmt.Errorf("advance Telegram source cursor: missing source id")
+	}
+	if cursor < 0 {
+		return fmt.Errorf("advance Telegram source cursor: cursor must be non-negative")
+	}
+	result, err := db.Exec(ctx, `
+UPDATE telegram_sources
+SET history_cursor_message_id = CASE
+    WHEN history_cursor_message_id = 0 THEN $2
+    ELSE LEAST(history_cursor_message_id, $2)
+END, updated_at = NOW()
+WHERE id = $1
+`, sourceID, cursor)
+	if err != nil {
+		return fmt.Errorf("advance Telegram source cursor: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("%w: %s", ErrTelegramSourceNotFound, sourceID)
+	}
+	return nil
 }
 
 type telegramPoolBeginner interface {
@@ -403,6 +428,14 @@ func (r *VideoRepository) UpdateTelegramMedia(ctx context.Context, mediaID uuid.
 		sets = append(sets, fmt.Sprintf("%s = $%d", expression, len(args)))
 	}
 
+	if patch.ClearDocumentID {
+		sets = append(sets, "telegram_document_id = NULL")
+	} else if patch.DocumentID != nil {
+		addValue("telegram_document_id", *patch.DocumentID)
+	}
+	if patch.DocumentDCID != nil {
+		addValue("document_dc_id", *patch.DocumentDCID)
+	}
 	if patch.ProcessingStatus != nil {
 		addValue("processing_status", strings.TrimSpace(*patch.ProcessingStatus))
 	}
@@ -468,6 +501,39 @@ LIMIT $1`, limit)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate Telegram media needing transcode: %w", err)
+	}
+	return items, nil
+}
+
+// ListTelegramMediaNeedingDownload returns active media records that have
+// remained unchanged long enough to be recovered after a worker interruption.
+func (r *VideoRepository) ListTelegramMediaNeedingDownload(ctx context.Context, staleBefore time.Time, limit int) ([]models.TelegramMedia, error) {
+	if staleBefore.IsZero() {
+		staleBefore = time.Now().UTC().Add(-30 * time.Minute)
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := r.pool.Query(ctx, telegramMediaSelect+`
+WHERE processing_status IN ('queued', 'downloading', 'importing')
+  AND updated_at <= $1
+  AND (next_retry_at IS NULL OR next_retry_at <= NOW())
+ORDER BY updated_at ASC, id ASC
+LIMIT $2`, staleBefore, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list Telegram media needing download: %w", err)
+	}
+	defer rows.Close()
+	items := make([]models.TelegramMedia, 0, limit)
+	for rows.Next() {
+		item, scanErr := scanTelegramMedia(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan Telegram media needing download: %w", scanErr)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate Telegram media needing download: %w", err)
 	}
 	return items, nil
 }
