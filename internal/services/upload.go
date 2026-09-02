@@ -113,6 +113,10 @@ func (s *UploadService) PreviewUploadedFile(ctx context.Context, in LocalUploadI
 }
 
 func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInput, maxVideoSize int64) (UploadResult, error) {
+	return s.saveLocalFile(ctx, in, maxVideoSize, true)
+}
+
+func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, maxVideoSize int64, refreshExistingOriginalPath bool) (UploadResult, error) {
 	if in.Type != "short" && in.Type != "movie" && in.Type != "episode" && in.Type != "av" {
 		return UploadResult{}, ErrInvalidType
 	}
@@ -153,7 +157,7 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 		if err := s.setExistingVideoImageCollectionIfEmpty(ctx, existingID, existingVideo, in.ImageCollectionID); err != nil {
 			return UploadResult{}, err
 		}
-		if shouldRefreshExistingVideoOriginalPath(existingVideo.Status) && strings.TrimSpace(existingVideo.OriginalPath) != strings.TrimSpace(in.FilePath) {
+		if shouldUpdateExistingVideoOriginalPath(refreshExistingOriginalPath, existingVideo.Status) && strings.TrimSpace(existingVideo.OriginalPath) != strings.TrimSpace(in.FilePath) {
 			if err := s.repo.UpdateVideoOriginalPath(ctx, existingID, in.FilePath); err != nil {
 				return UploadResult{}, err
 			}
@@ -254,6 +258,11 @@ func (s *UploadService) SaveUploadedFile(ctx context.Context, in LocalUploadInpu
 			}
 			if err := s.setExistingVideoImageCollectionIfEmpty(ctx, existingID, existingVideo, in.ImageCollectionID); err != nil {
 				return UploadResult{}, err
+			}
+			if shouldUpdateExistingVideoOriginalPath(refreshExistingOriginalPath, existingVideo.Status) && strings.TrimSpace(existingVideo.OriginalPath) != strings.TrimSpace(in.FilePath) {
+				if err := s.repo.UpdateVideoOriginalPath(ctx, existingID, in.FilePath); err != nil {
+					return UploadResult{}, err
+				}
 			}
 			return UploadResult{
 				VideoID:       existingID,
@@ -376,4 +385,8 @@ func shouldRefreshExistingVideoOriginalPath(status string) bool {
 	default:
 		return false
 	}
+}
+
+func shouldUpdateExistingVideoOriginalPath(refresh bool, status string) bool {
+	return refresh && shouldRefreshExistingVideoOriginalPath(status)
 }

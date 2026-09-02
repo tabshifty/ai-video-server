@@ -1,6 +1,10 @@
 package services
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"testing"
+)
 
 func TestPredictedUploadStatus(t *testing.T) {
 	t.Parallel()
@@ -45,6 +49,40 @@ func TestShouldRefreshExistingVideoOriginalPath(t *testing.T) {
 		t.Run(tt.status, func(t *testing.T) {
 			if got := shouldRefreshExistingVideoOriginalPath(tt.status); got != tt.want {
 				t.Fatalf("shouldRefreshExistingVideoOriginalPath(%q) = %v, want %v", tt.status, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSaveImportedFileRejectsInvalidType(t *testing.T) {
+	t.Parallel()
+
+	service := &UploadService{}
+	_, err := service.SaveImportedFile(context.Background(), LocalUploadInput{Type: "telegram"}, 0)
+	if !errors.Is(err, ErrInvalidType) {
+		t.Fatalf("SaveImportedFile() error=%v, want ErrInvalidType", err)
+	}
+}
+
+func TestShouldUpdateExistingVideoOriginalPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		refresh bool
+		status  string
+		want    bool
+	}{
+		{name: "manual uploaded", refresh: true, status: "uploaded", want: true},
+		{name: "import uploaded", refresh: false, status: "uploaded", want: false},
+		{name: "manual ready", refresh: true, status: "ready", want: false},
+		{name: "import failed", refresh: false, status: "failed", want: false},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldUpdateExistingVideoOriginalPath(tt.refresh, tt.status); got != tt.want {
+				t.Fatalf("shouldUpdateExistingVideoOriginalPath(%v, %q)=%v, want %v", tt.refresh, tt.status, got, tt.want)
 			}
 		})
 	}

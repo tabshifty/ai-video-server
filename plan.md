@@ -2,6 +2,11 @@
 
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
 
+## 2026-09-02 15:47 +0800
+- 进度：Task 3 完成。抽取 `UploadService` 的本地文件保存核心；手动上传保留重复时刷新可替换原片路径的既有语义，`SaveImportedFile` 在重复内容时不写入临时导入路径，并覆盖 hash 竞态分支。
+- 影响文件：`internal/services/upload.go`、`internal/services/upload_test.go`、`internal/services/import_file.go`、`internal/services/import_file_test.go`、`plan.md`。
+- 验证：`go test ./internal/services -run 'TestSaveImportedFile|TestShouldUpdateExistingVideoOriginalPath|TestShouldRefreshExistingVideoOriginalPath|TestPredictedUploadStatus' -count=1`、`go vet ./internal/services`、`git diff --check` 通过；完整 `go test ./internal/services -count=1` 仅受既有 TV APK 测试版本断言 `144 != 121` 失败，未涉及本次代码。
+
 ## 2026-09-02 15:41 +0800
 - 进度：Task 2 完成。新增 Telegram API ID/hash、电话、session、导入归属用户、实时/历史/控制队列及下载限流配置；`Load` 保持 Telegram 配置可选，`ValidateTelegramIngestor` 单独校验采集器凭据、UUID 和并发边界；新增仅携带 UUID 的 Asynq 采集任务和默认队列。
 - 影响文件：`internal/config/config.go`、`internal/config/config_test.go`、`internal/queue/telegram_tasks.go`、`internal/queue/telegram_tasks_test.go`、`.env.example`、`plan.md`。
