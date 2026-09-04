@@ -58,3 +58,30 @@ func TestAuthorizationStateMachineTransitionsAndExpiresWithoutSecrets(t *testing
 		t.Fatalf("public view must not contain transient secrets: %+v", view)
 	}
 }
+
+func TestAuthorizationStateMachineExpiresQRImageWithoutExpiringAuthorization(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 9, 4, 8, 0, 0, 0, time.UTC)
+	current := now
+	state := NewAuthorizationStateMachine(func() time.Time { return current }, 10*time.Minute)
+	authorization, err := state.Start(AuthorizationStart{Kind: AuthorizationKindQR, OwnerID: uuid.New()})
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	if err := state.SetQRImage(authorization.ID, "data:image/png;base64,temporary", now.Add(30*time.Second)); err != nil {
+		t.Fatalf("SetQRImage() error = %v", err)
+	}
+	if authorization.ExpiresAt != now.Add(10*time.Minute) {
+		t.Fatalf("authorization expiry changed after QR image update: %s", authorization.ExpiresAt)
+	}
+
+	current = current.Add(31 * time.Second)
+	view, ok := state.View(authorization.ID, uuid.New())
+	if !ok || view.Status != AuthorizationStatusScanning {
+		t.Fatalf("View() = %+v, ok=%v; QR refresh must not expire authorization", view, ok)
+	}
+	if view.QRImageDataURL != "" || !view.QRImageExpiresAt.IsZero() {
+		t.Fatalf("expired QR image leaked into view: %+v", view)
+	}
+}

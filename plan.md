@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-04 15:26 +0800
+- 进度：完成页面化 Telegram 授权服务的首个可提交层：单例授权服务将账号元数据、审计、管理员所有权和取消/过期清理与短期 session 分离；首次绑定仅允许手机号，二维码仅允许已有绑定且成功后校验 Telegram 用户 ID。新增 gotd 临时 session adapter，验证码、二次验证密码、二维码 token 均不进入仓储、审计或日志；临时文件在同目录经原子替换提升为正式 session。二维码图片过期独立于授权会话总时限，避免 token 刷新导致授权提前过期。
+- 影响文件：新增 `internal/telegram/authorization_service.go`、`internal/telegram/authorization_service_test.go`、`internal/telegram/authorization_session_gotd.go`、`internal/telegram/authorization_session_gotd_test.go`；修改 `internal/telegram/auth_state.go`、`internal/telegram/auth_state_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：`GOPROXY=off go test ./internal/telegram -count=1`、`GOPROXY=off go test -race ./internal/telegram -count=1`、`GOPROXY=off go vet ./internal/telegram`、`git diff --check` 通过；二维码登录、手机号验证码和 session 切换仍需在具备真实 Telegram 凭据的部署环境验收。待提交本层，继续采集器常驻控制端口与运行时 gate。
+
+## 2026-09-04 14:54 +0800
+- 进度：已提交 Telegram 管理状态与控制协议基线 `ec96d66`。继续实现页面化授权运行时：采集器常驻内部控制端口、手机号验证码/二次验证、二维码短期图像、临时 session 校验和原子替换，以及 30 秒心跳；之后接入管理 API、来源预解析确认、失败恢复和 Vue 工作区。
+- 影响文件：预计新增/修改 `internal/telegram/` 授权服务与 gotd adapter、`cmd/telegram-ingestor/`、`internal/config/`、`internal/handlers/`、`internal/services/`、`admin-web/src/`、`deploy/docker-compose.telegram.yml`、`.env.example`、ADR、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：每层先补定向单测，阶段性运行 Telegram 相关 Go 测试与 `go vet`；前端阶段运行 `npm run build`；收尾运行差异检查、乱码扫描。真实 Telegram 授权、二维码扫描、私密邀请和 Compose 端到端仍需具备凭据的部署环境验收。
+
 ## 2026-09-04 继续 +0800
 - 进度：接续 Telegram 管理台控制平面实现。已确认上轮红灯测试进程退出，开始实现 `0039` 管理状态 schema、账号/心跳/授权/审计模型与仓储；随后接入授权状态机、内部控制 HTTP 和管理 API/页面。
 - 影响文件：预计新增 `migrations/0039_telegram_management.*.sql`、`internal/models/telegram_management.go`、`internal/repository/telegram_management_repository.go`、`internal/telegram/auth_state.go`、`internal/telegram/control.go` 及后续管理服务、页面和部署配置；保留用户既有 `docs/examples/` 不纳入。

@@ -56,17 +56,18 @@ type AuthorizationStart struct {
 // AuthorizationView is the sanitized representation exposed to administrators.
 // It intentionally has no code, password, login token, or QR token field.
 type AuthorizationView struct {
-	ID             uuid.UUID `json:"id"`
-	Kind           string    `json:"kind"`
-	Status         string    `json:"status"`
-	OwnerID        uuid.UUID `json:"owner_id,omitempty"`
-	ExpiresAt      time.Time `json:"expires_at"`
-	QRImageDataURL string    `json:"qr_image_data_url,omitempty"`
-	Error          string    `json:"error,omitempty"`
-	TelegramUserID *int64    `json:"telegram_user_id,omitempty"`
-	Username       string    `json:"username,omitempty"`
-	FirstName      string    `json:"first_name,omitempty"`
-	LastName       string    `json:"last_name,omitempty"`
+	ID               uuid.UUID `json:"id"`
+	Kind             string    `json:"kind"`
+	Status           string    `json:"status"`
+	OwnerID          uuid.UUID `json:"owner_id,omitempty"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	QRImageDataURL   string    `json:"qr_image_data_url,omitempty"`
+	QRImageExpiresAt time.Time `json:"qr_image_expires_at,omitempty"`
+	Error            string    `json:"error,omitempty"`
+	TelegramUserID   *int64    `json:"telegram_user_id,omitempty"`
+	Username         string    `json:"username,omitempty"`
+	FirstName        string    `json:"first_name,omitempty"`
+	LastName         string    `json:"last_name,omitempty"`
 }
 
 type authorizationRecord struct {
@@ -202,8 +203,8 @@ func (s *AuthorizationStateMachine) SetQRImage(authorizationID uuid.UUID, dataUR
 		return errors.New("Telegram 二维码图像不能为空")
 	}
 	record.QRImageDataURL = strings.TrimSpace(dataURL)
-	if !expiresAt.IsZero() && expiresAt.Before(record.ExpiresAt) {
-		record.ExpiresAt = expiresAt
+	if !expiresAt.IsZero() {
+		record.QRImageExpiresAt = expiresAt.UTC()
 	}
 	return nil
 }
@@ -238,7 +239,9 @@ func (s *AuthorizationStateMachine) View(authorizationID, _ uuid.UUID) (Authoriz
 	if record == nil {
 		return AuthorizationView{}, false
 	}
-	s.expireActiveLocked(s.now())
+	now := s.now()
+	s.expireActiveLocked(now)
+	s.expireQRImageLocked(record, now)
 	return record.view(), true
 }
 
@@ -264,13 +267,23 @@ func (s *AuthorizationStateMachine) expireActiveLocked(now time.Time) {
 	s.active.Status = AuthorizationStatusExpired
 	s.active.Error = ""
 	s.active.QRImageDataURL = ""
+	s.active.QRImageExpiresAt = time.Time{}
 	s.active = nil
+}
+
+func (s *AuthorizationStateMachine) expireQRImageLocked(record *authorizationRecord, now time.Time) {
+	if record == nil || record.QRImageExpiresAt.IsZero() || now.Before(record.QRImageExpiresAt) {
+		return
+	}
+	record.QRImageDataURL = ""
+	record.QRImageExpiresAt = time.Time{}
 }
 
 func (r *authorizationRecord) view() AuthorizationView {
 	view := r.AuthorizationView
 	if view.Status == AuthorizationStatusExpired {
 		view.QRImageDataURL = ""
+		view.QRImageExpiresAt = time.Time{}
 	}
 	return view
 }
