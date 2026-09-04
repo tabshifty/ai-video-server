@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-04 15:38 +0800
+- 进度：完成第二阶段采集器运行时基础的客户端子步骤。`GotdClient.RunAuthorized` 仅验证现有 persistent session 的授权状态，未授权时返回可识别错误且不进入 stdin 登录；来源解析已拆为不入群的 `PreviewChat` 与确认后才可能执行邀请导入的 `ConfirmChat`，保留 `ResolveChat` 的既有兼容语义。私密邀请的审批加入请求不会自动入群或生成来源。
+- 影响文件：`internal/telegram/client.go`、`internal/telegram/gotd_client.go`、`internal/telegram/client_test.go`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：`GOPROXY=off go test ./internal/telegram -count=1`、`GOPROXY=off go test -race ./internal/telegram -count=1`、`GOPROXY=off go vet ./internal/telegram`、`git diff --check` 通过；待精确提交后进入常驻控制 HTTP、授权维护 gate 与心跳接线。
+
+## 2026-09-04 15:32 +0800
+- 进度：授权服务层已提交 `1cb50d0`，开始第二阶段采集器运行时基础：为 gotd 客户端增加仅使用现有 session 的无交互运行入口，并将来源引用拆成不入群的预解析和确认后入群两步；随后把该能力接入常驻控制 HTTP、授权维护 gate 和心跳。旧 `-mode run` 不再依赖 stdin，页面化授权成为正常路径。
+- 影响文件：预计修改 `internal/telegram/client.go`、`internal/telegram/gotd_client.go` 及测试，后续修改 `cmd/telegram-ingestor/`、`internal/config/`、`.env.example`、Compose、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：先建立无网络的客户端状态/引用解析测试，阶段性运行 `GOPROXY=off go test ./internal/telegram`、`go vet` 和采集器构建；真实 session、私密邀请和在线运行仍在部署环境验证。
+
 ## 2026-09-04 15:26 +0800
 - 进度：完成页面化 Telegram 授权服务的首个可提交层：单例授权服务将账号元数据、审计、管理员所有权和取消/过期清理与短期 session 分离；首次绑定仅允许手机号，二维码仅允许已有绑定且成功后校验 Telegram 用户 ID。新增 gotd 临时 session adapter，验证码、二次验证密码、二维码 token 均不进入仓储、审计或日志；临时文件在同目录经原子替换提升为正式 session。二维码图片过期独立于授权会话总时限，避免 token 刷新导致授权提前过期。
 - 影响文件：新增 `internal/telegram/authorization_service.go`、`internal/telegram/authorization_service_test.go`、`internal/telegram/authorization_session_gotd.go`、`internal/telegram/authorization_session_gotd_test.go`；修改 `internal/telegram/auth_state.go`、`internal/telegram/auth_state_test.go`、`CONTEXT.md`、`plan.md`。

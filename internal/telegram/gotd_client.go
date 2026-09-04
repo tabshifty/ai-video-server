@@ -21,7 +21,13 @@ import (
 	"go.uber.org/zap"
 )
 
-var _ Client = (*GotdClient)(nil)
+var (
+	_ Client = (*GotdClient)(nil)
+
+	// ErrTelegramSessionUnauthorized indicates that the persistent collector
+	// session has not completed Telegram authorization.
+	ErrTelegramSessionUnauthorized = errors.New("Telegram session 尚未授权")
+)
 
 const telegramChannelIDOffset int64 = 1_000_000_000_000
 
@@ -155,38 +161,134 @@ func (c *GotdClient) Run(ctx context.Context, prompter LoginPrompter, fn func(co
 	return nil
 }
 
+// RunAuthorized starts the MTProto session only when its existing persistent
+// session is authorized. Unlike Run, it never starts an interactive login
+// flow and is therefore safe for the long-lived collector process.
+func (c *GotdClient) RunAuthorized(ctx context.Context, fn func(context.Context) error) error {
+	if c == nil || c.raw == nil {
+		return errors.New("Telegram client 未初始化")
+	}
+	if ctx == nil {
+		return errors.New("Telegram client context 不能为空")
+	}
+	if fn == nil {
+		return errors.New("Telegram client 回调不能为空")
+	}
+
+	err := c.raw.Run(ctx, func(runCtx context.Context) error {
+		status, err := c.raw.Auth().Status(runCtx)
+		if err != nil {
+			return fmt.Errorf("检查 Telegram session 授权状态: %w", err)
+		}
+		if err := requireTelegramAuthorized(status); err != nil {
+			return err
+		}
+		return fn(runCtx)
+	})
+	if err != nil {
+		return wrapTelegramError("运行 Telegram 已授权客户端", err)
+	}
+	return nil
+}
+
 // ResolveChat resolves a username, Telegram link, invite link, or numeric
-// chat identifier and caches the peer required by later operations.
+// chat identifier. Private invite links retain their historical behavior and
+// join only through ConfirmChat.
 func (c *GotdClient) ResolveChat(ctx context.Context, ref string) (Chat, error) {
-	if err := requireTelegramContext(ctx, "解析 Telegram chat"); err != nil {
-		return Chat{}, err
-	}
-	if err := c.ensureReady(); err != nil {
-		return Chat{}, err
-	}
-	kind, value, err := parseChatReference(ref)
+	preview, err := c.ConfirmChat(ctx, ref)
 	if err != nil {
 		return Chat{}, err
 	}
+	return chatFromPreview(preview)
+}
 
-	// A source can be resolved by multiple control tasks after a restart. The
+// PreviewChat resolves a source reference without joining a private invite.
+// It returns whether a later explicit confirmation is required.
+func (c *GotdClient) PreviewChat(ctx context.Context, ref string) (ChatPreviewResult, error) {
+	if err := requireTelegramContext(ctx, "解析 Telegram chat"); err != nil {
+		return ChatPreviewResult{}, err
+	}
+	if err := c.ensureReady(); err != nil {
+		return ChatPreviewResult{}, err
+	}
+	kind, value, err := parseChatReference(ref)
+	if err != nil {
+		return ChatPreviewResult{}, err
+	}
+
+	c.resolving.Lock()
+	defer c.resolving.Unlock()
+	return c.previewChat(ctx, kind, value)
+}
+
+// ConfirmChat resolves a source reference and joins a private invite only
+// after the caller has explicitly confirmed it.
+func (c *GotdClient) ConfirmChat(ctx context.Context, ref string) (ChatPreviewResult, error) {
+	if err := requireTelegramContext(ctx, "确认 Telegram chat"); err != nil {
+		return ChatPreviewResult{}, err
+	}
+	if err := c.ensureReady(); err != nil {
+		return ChatPreviewResult{}, err
+	}
+	kind, value, err := parseChatReference(ref)
+	if err != nil {
+		return ChatPreviewResult{}, err
+	}
+
+	// A source can be confirmed by multiple control tasks after a restart. The
 	// lock prevents duplicate invite imports and duplicate peer refreshes.
 	c.resolving.Lock()
 	defer c.resolving.Unlock()
+	return c.confirmChat(ctx, kind, value)
+}
 
+func (c *GotdClient) previewChat(ctx context.Context, kind chatReferenceKind, value string) (ChatPreviewResult, error) {
 	switch kind {
 	case chatReferenceUsername:
-		return c.resolveUsername(ctx, value)
+		preview, _, err := c.previewUsername(ctx, value)
+		return preview, err
 	case chatReferenceInvite:
-		return c.resolveInvite(ctx, value)
+		return c.previewInvite(ctx, value)
 	case chatReferenceNumeric:
 		chatID, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return Chat{}, fmt.Errorf("解析 Telegram chat ID %q: %w", value, err)
+			return ChatPreviewResult{}, fmt.Errorf("解析 Telegram chat ID %q: %w", value, err)
 		}
-		return c.resolveNumeric(ctx, chatID)
+		preview, _, err := c.previewNumeric(ctx, chatID)
+		return preview, err
 	default:
-		return Chat{}, fmt.Errorf("未知 Telegram chat 引用类型 %q", kind)
+		return ChatPreviewResult{}, fmt.Errorf("未知 Telegram chat 引用类型 %q", kind)
+	}
+}
+
+func (c *GotdClient) confirmChat(ctx context.Context, kind chatReferenceKind, value string) (ChatPreviewResult, error) {
+	switch kind {
+	case chatReferenceUsername:
+		preview, peer, err := c.previewUsername(ctx, value)
+		if err != nil {
+			return ChatPreviewResult{}, err
+		}
+		if err := c.rememberPreview(preview, peer); err != nil {
+			return ChatPreviewResult{}, err
+		}
+		return preview, nil
+	case chatReferenceInvite:
+		return c.confirmInvite(ctx, value)
+	case chatReferenceNumeric:
+		chatID, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return ChatPreviewResult{}, fmt.Errorf("解析 Telegram chat ID %q: %w", value, err)
+		}
+		preview, peer, err := c.previewNumeric(ctx, chatID)
+		if err != nil {
+			return ChatPreviewResult{}, err
+		}
+		if err := c.rememberPreview(preview, peer); err != nil {
+			return ChatPreviewResult{}, err
+		}
+		return preview, nil
+	default:
+		return ChatPreviewResult{}, fmt.Errorf("未知 Telegram chat 引用类型 %q", kind)
 	}
 }
 
@@ -360,6 +462,13 @@ func requireTelegramContext(ctx context.Context, operation string) error {
 	return nil
 }
 
+func requireTelegramAuthorized(status *gotdauth.Status) error {
+	if status == nil || !status.Authorized {
+		return ErrTelegramSessionUnauthorized
+	}
+	return nil
+}
+
 func (c *GotdClient) peerForChat(ctx context.Context, chatID int64) (tg.InputPeerClass, error) {
 	c.peersMu.RLock()
 	peer, ok := c.peers[chatID]
@@ -379,117 +488,206 @@ func (c *GotdClient) peerForChat(ctx context.Context, chatID int64) (tg.InputPee
 	return peer, nil
 }
 
-func (c *GotdClient) resolveUsername(ctx context.Context, username string) (Chat, error) {
+func (c *GotdClient) previewUsername(ctx context.Context, username string) (ChatPreviewResult, tg.InputPeerClass, error) {
 	result, err := c.api.ContactsResolveUsername(ctx, strings.TrimPrefix(username, "@"))
 	if err != nil {
-		return Chat{}, wrapTelegramError("解析 Telegram 用户名", err)
+		return ChatPreviewResult{}, nil, wrapTelegramError("解析 Telegram 用户名", err)
 	}
-	chat, peer, err := c.chatFromResolved(result)
-	if err != nil {
-		return Chat{}, err
-	}
-	c.rememberChat(chat, peer)
-	return chat, nil
+	return chatPreviewFromResolved(result)
 }
 
-func (c *GotdClient) resolveInvite(ctx context.Context, hash string) (Chat, error) {
+func (c *GotdClient) previewInvite(ctx context.Context, hash string) (ChatPreviewResult, error) {
 	invite, err := c.api.MessagesCheckChatInvite(ctx, hash)
 	if err != nil {
-		return Chat{}, wrapTelegramError("检查 Telegram 邀请链接", err)
+		return ChatPreviewResult{}, wrapTelegramError("检查 Telegram 邀请链接", err)
 	}
-	if already, ok := invite.(*tg.ChatInviteAlready); ok {
-		chat, peer, err := c.chatFromClass(already.GetChat())
-		if err != nil {
-			return Chat{}, err
+	preview, peer, err := chatPreviewFromInvite(invite)
+	if err != nil {
+		return ChatPreviewResult{}, err
+	}
+	if !preview.RequiresJoin {
+		if err := c.rememberPreview(preview, peer); err != nil {
+			return ChatPreviewResult{}, err
 		}
-		c.rememberChat(chat, peer)
-		return chat, nil
 	}
+	return preview, nil
+}
 
+func (c *GotdClient) confirmInvite(ctx context.Context, hash string) (ChatPreviewResult, error) {
+	invite, err := c.api.MessagesCheckChatInvite(ctx, hash)
+	if err != nil {
+		return ChatPreviewResult{}, wrapTelegramError("检查 Telegram 邀请链接", err)
+	}
+	preview, peer, err := chatPreviewFromInvite(invite)
+	if err != nil {
+		return ChatPreviewResult{}, err
+	}
+	if !preview.RequiresJoin {
+		if err := c.rememberPreview(preview, peer); err != nil {
+			return ChatPreviewResult{}, err
+		}
+		return preview, nil
+	}
+	if preview.RequiresApproval {
+		return ChatPreviewResult{}, errors.New("Telegram 邀请需要管理员审核，无法自动加入")
+	}
+	return c.importInvite(ctx, hash)
+}
+
+func (c *GotdClient) importInvite(ctx context.Context, hash string) (ChatPreviewResult, error) {
 	updates, err := c.api.MessagesImportChatInvite(ctx, hash)
 	if err != nil {
-		return Chat{}, wrapTelegramError("加入 Telegram 邀请群组", err)
+		return ChatPreviewResult{}, wrapTelegramError("加入 Telegram 邀请群组", err)
 	}
 	withChats, ok := updates.(interface{ GetChats() []tg.ChatClass })
 	if !ok {
-		return Chat{}, fmt.Errorf("Telegram 邀请响应类型 %T 不包含群组", updates)
+		return ChatPreviewResult{}, fmt.Errorf("Telegram 邀请响应类型 %T 不包含群组", updates)
 	}
 	for _, rawChat := range withChats.GetChats() {
-		chat, peer, err := c.chatFromClass(rawChat)
-		if err == nil {
-			c.rememberChat(chat, peer)
-			return chat, nil
+		preview, peer, err := chatPreviewFromClass(rawChat)
+		if err != nil {
+			continue
 		}
+		if err := c.rememberPreview(preview, peer); err != nil {
+			return ChatPreviewResult{}, err
+		}
+		return preview, nil
 	}
-	return Chat{}, errors.New("Telegram 邀请响应未返回可访问群组")
+	return ChatPreviewResult{}, errors.New("Telegram 邀请响应未返回可访问群组")
 }
 
-func (c *GotdClient) resolveNumeric(ctx context.Context, chatID int64) (Chat, error) {
+func (c *GotdClient) previewNumeric(ctx context.Context, chatID int64) (ChatPreviewResult, tg.InputPeerClass, error) {
 	if chatID <= -telegramChannelIDOffset {
 		result, err := c.api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{Limit: 1000})
 		if err != nil {
-			return Chat{}, wrapTelegramError("按 ID 查找 Telegram 频道", err)
+			return ChatPreviewResult{}, nil, wrapTelegramError("按 ID 查找 Telegram 频道", err)
 		}
 		modified, ok := result.AsModified()
 		if !ok {
-			return Chat{}, fmt.Errorf("Telegram chat %d 不在当前账号对话列表", chatID)
+			return ChatPreviewResult{}, nil, fmt.Errorf("Telegram chat %d 不在当前账号对话列表", chatID)
 		}
 		for _, rawChat := range modified.GetChats() {
-			chat, peer, err := c.chatFromClass(rawChat)
-			if err == nil && chat.ID == chatID {
-				c.rememberChat(chat, peer)
-				return chat, nil
+			preview, peer, err := chatPreviewFromClass(rawChat)
+			if err == nil && preview.ChatID == chatID {
+				return preview, peer, nil
 			}
 		}
-		return Chat{}, fmt.Errorf("Telegram 频道 %d 不在当前账号对话列表", chatID)
+		return ChatPreviewResult{}, nil, fmt.Errorf("Telegram 频道 %d 不在当前账号对话列表", chatID)
 	}
 	if chatID <= 0 {
-		return Chat{}, errors.New("Telegram 基础群组 ID 必须为正数；频道请使用 -100 开头的 ID")
+		return ChatPreviewResult{}, nil, errors.New("Telegram 基础群组 ID 必须为正数；频道请使用 -100 开头的 ID")
 	}
 	result, err := c.api.MessagesGetChats(ctx, []int64{chatID})
 	if err != nil {
-		return Chat{}, wrapTelegramError("按 ID 查找 Telegram 群组", err)
+		return ChatPreviewResult{}, nil, wrapTelegramError("按 ID 查找 Telegram 群组", err)
 	}
 	for _, rawChat := range result.GetChats() {
-		chat, peer, err := c.chatFromClass(rawChat)
-		if err == nil && chat.ID == chatID {
-			c.rememberChat(chat, peer)
-			return chat, nil
+		preview, peer, err := chatPreviewFromClass(rawChat)
+		if err == nil && preview.ChatID == chatID {
+			return preview, peer, nil
 		}
 	}
-	return Chat{}, fmt.Errorf("Telegram 群组 %d 不存在或当前账号无权访问", chatID)
+	return ChatPreviewResult{}, nil, fmt.Errorf("Telegram 群组 %d 不存在或当前账号无权访问", chatID)
 }
 
-func (c *GotdClient) chatFromResolved(result *tg.ContactsResolvedPeer) (Chat, tg.InputPeerClass, error) {
+func chatPreviewFromResolved(result *tg.ContactsResolvedPeer) (ChatPreviewResult, tg.InputPeerClass, error) {
 	if result == nil || result.Peer == nil {
-		return Chat{}, nil, errors.New("Telegram 用户名解析未返回 peer")
+		return ChatPreviewResult{}, nil, errors.New("Telegram 用户名解析未返回 peer")
 	}
 	targetID, ok := chatIDFromPeer(result.Peer)
 	if !ok {
-		return Chat{}, nil, errors.New("Telegram 引用不是群组或频道")
+		return ChatPreviewResult{}, nil, errors.New("Telegram 引用不是群组或频道")
 	}
 	for _, rawChat := range result.Chats {
-		chat, peer, err := c.chatFromClass(rawChat)
-		if err == nil && chat.ID == targetID {
-			return chat, peer, nil
+		preview, peer, err := chatPreviewFromClass(rawChat)
+		if err == nil && preview.ChatID == targetID {
+			return preview, peer, nil
 		}
 	}
-	return Chat{}, nil, fmt.Errorf("Telegram peer %d 缺少群组详情", targetID)
+	return ChatPreviewResult{}, nil, fmt.Errorf("Telegram peer %d 缺少群组详情", targetID)
 }
 
-func (c *GotdClient) chatFromClass(rawChat tg.ChatClass) (Chat, tg.InputPeerClass, error) {
+func chatPreviewFromClass(rawChat tg.ChatClass) (ChatPreviewResult, tg.InputPeerClass, error) {
 	switch chat := rawChat.(type) {
 	case *tg.Chat:
-		return Chat{ID: chat.ID, Title: chat.Title}, chat.AsInputPeer(), nil
+		return ChatPreviewResult{
+			ChatID:   chat.ID,
+			Title:    strings.TrimSpace(chat.Title),
+			ChatType: TelegramChatTypeGroup,
+		}, chat.AsInputPeer(), nil
 	case *tg.Channel:
-		return Chat{
-			ID:       channelChatID(chat.ID),
-			Title:    chat.Title,
+		return ChatPreviewResult{
+			ChatID:   channelChatID(chat.ID),
+			Title:    strings.TrimSpace(chat.Title),
 			Username: strings.TrimSpace(chat.Username),
+			ChatType: chatTypeFromChannel(chat),
 		}, chat.AsInputPeer(), nil
 	default:
-		return Chat{}, nil, fmt.Errorf("Telegram chat 类型 %T 不可访问", rawChat)
+		return ChatPreviewResult{}, nil, fmt.Errorf("Telegram chat 类型 %T 不可访问", rawChat)
 	}
+}
+
+func chatPreviewFromInvite(invite tg.ChatInviteClass) (ChatPreviewResult, tg.InputPeerClass, error) {
+	switch value := invite.(type) {
+	case *tg.ChatInviteAlready:
+		return chatPreviewFromClass(value.GetChat())
+	case *tg.ChatInvite:
+		return ChatPreviewResult{
+			Title:            strings.TrimSpace(value.Title),
+			ChatType:         chatTypeFromInvite(value),
+			RequiresJoin:     true,
+			RequiresApproval: value.RequestNeeded,
+		}, nil, nil
+	case *tg.ChatInvitePeek:
+		preview, peer, err := chatPreviewFromClass(value.GetChat())
+		if err != nil {
+			return ChatPreviewResult{}, nil, err
+		}
+		preview.RequiresJoin = true
+		return preview, peer, nil
+	default:
+		return ChatPreviewResult{}, nil, fmt.Errorf("Telegram 邀请类型 %T 不可访问", invite)
+	}
+}
+
+func chatTypeFromChannel(chat *tg.Channel) string {
+	if chat != nil && chat.Megagroup {
+		return TelegramChatTypeSupergroup
+	}
+	return TelegramChatTypeChannel
+}
+
+func chatTypeFromInvite(invite *tg.ChatInvite) string {
+	if invite != nil && invite.Megagroup {
+		return TelegramChatTypeSupergroup
+	}
+	if invite != nil && invite.Channel {
+		return TelegramChatTypeChannel
+	}
+	return TelegramChatTypeGroup
+}
+
+func chatFromPreview(preview ChatPreviewResult) (Chat, error) {
+	if preview.ChatID == 0 {
+		return Chat{}, errors.New("Telegram chat 尚未加入，缺少可保存的 chat ID")
+	}
+	return Chat{
+		ID:       preview.ChatID,
+		Title:    preview.Title,
+		Username: preview.Username,
+	}, nil
+}
+
+func (c *GotdClient) rememberPreview(preview ChatPreviewResult, peer tg.InputPeerClass) error {
+	if peer == nil {
+		return errors.New("Telegram chat 缺少访问 peer")
+	}
+	chat, err := chatFromPreview(preview)
+	if err != nil {
+		return err
+	}
+	c.rememberChat(chat, peer)
+	return nil
 }
 
 func (c *GotdClient) rememberChat(chat Chat, peer tg.InputPeerClass) {

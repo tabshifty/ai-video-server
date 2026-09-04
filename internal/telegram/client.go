@@ -29,6 +29,27 @@ type Chat struct {
 	Username string
 }
 
+const (
+	// TelegramChatTypeGroup identifies a basic Telegram group.
+	TelegramChatTypeGroup = "group"
+	// TelegramChatTypeSupergroup identifies a Telegram supergroup.
+	TelegramChatTypeSupergroup = "supergroup"
+	// TelegramChatTypeChannel identifies a Telegram broadcast channel.
+	TelegramChatTypeChannel = "channel"
+)
+
+// ChatPreviewResult describes a candidate Telegram source without exposing
+// its invite token. A zero ChatID means the account must join before Telegram
+// exposes a durable chat identity.
+type ChatPreviewResult struct {
+	ChatID           int64
+	Title            string
+	Username         string
+	ChatType         string
+	RequiresJoin     bool
+	RequiresApproval bool
+}
+
 // Client contains only Telegram operations required by the ingestion service.
 type Client interface {
 	ResolveChat(ctx context.Context, ref string) (Chat, error)

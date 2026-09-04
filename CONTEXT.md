@@ -1236,3 +1236,7 @@
 ## 视频主播放文件大小约定
 - `转码后主播放文件大小`：`videos.transcoded_file_size` 固定以字节记录 `transcoded_path` 指向的主播放常规文件大小；它不包含缩略图、字幕、海报或整个视频目录占用。`NULL` 表示历史数据未回填、尚未生成播放文件或文件无法读取，正数表示已验证的实际文件大小，数据库约束禁止 `0` 和负数。管理端视频详情以 `transcoded_file_size` 对管理员展示格式化大小，手机端、TV 端和公开视频接口不扩展该字段。
 - `主播放文件大小写入与校准`：常规转码、重新转码与 Dolby Vision 剧集直拷在置 `ready` 前必须读取主播放文件大小并同次写库；直接导入已就绪视频也必须写入。历史数据由 `go run ./cmd/backfill-video-transcoded-file-size` 校准，命令只接受 `STORAGE_ROOT/videos/` 内的绝对常规文件，默认 dry-run，显式 `--apply` 后分批写入；缺失、越界、非普通或空文件与写库失败都保留 `NULL`、写入 JSON 报告并以非零状态退出。该命令可重跑，重跑会以实际文件大小覆盖旧值。
+
+## Telegram 运行时安全边界
+- `Telegram 已授权运行入口`：常驻 `telegram-ingestor` 只能通过 `GotdClient.RunAuthorized` 使用现有 persistent session；它先调用 Telegram 授权状态检查，未授权时返回 `ErrTelegramSessionUnauthorized`，绝不回退到 stdin、终端提示或任意交互登录流程。页面化授权是恢复 session 的唯一正常路径。
+- `Telegram 来源预解析与确认分界`：`PreviewChat` 对私密邀请只执行 Telegram 的邀请检查，不执行导入或入群；只有经管理员高风险确认的 `ConfirmChat` 才可尝试导入。需要管理员审批的邀请不得自动申请加入，也不得在尚无 canonical chat ID 时落库；`ChatInvitePeek` 即使可读也仍须显式确认加入。预览结果只携带标题、用户名、来源类型、canonical chat ID（如已可得）和加入/审批标记，不能携带邀请 token。
