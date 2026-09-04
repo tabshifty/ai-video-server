@@ -1240,3 +1240,7 @@
 ## Telegram 运行时安全边界
 - `Telegram 已授权运行入口`：常驻 `telegram-ingestor` 只能通过 `GotdClient.RunAuthorized` 使用现有 persistent session；它先调用 Telegram 授权状态检查，未授权时返回 `ErrTelegramSessionUnauthorized`，绝不回退到 stdin、终端提示或任意交互登录流程。页面化授权是恢复 session 的唯一正常路径。
 - `Telegram 来源预解析与确认分界`：`PreviewChat` 对私密邀请只执行 Telegram 的邀请检查，不执行导入或入群；只有经管理员高风险确认的 `ConfirmChat` 才可尝试导入。需要管理员审批的邀请不得自动申请加入，也不得在尚无 canonical chat ID 时落库；`ChatInvitePeek` 即使可读也仍须显式确认加入。预览结果只携带标题、用户名、来源类型、canonical chat ID（如已可得）和加入/审批标记，不能携带邀请 token。
+
+## Telegram 常驻控制配置
+- `Telegram 控制通道配置`：`TELEGRAM_CONTROL_ADDR` 只由 `telegram-ingestor` 监听，`TELEGRAM_CONTROL_URL` 只供 API 容器通过 Docker 内网调用，二者不用于映射宿主机端口；`TELEGRAM_CONTROL_TOKEN` 是二者必须一致的部署级密钥，采集器启动校验不得接受空值。令牌不能出现在浏览器、数据库、日志、队列或示例外的源码默认值中。
+- `Telegram 采集运行时门控`：常驻运行时在 session 未授权、连接异常或工厂初始化失败后停止重试并保持控制面存活，等待授权终态调用 `Resume` 后再创建全新 MTProto 客户端；`Pause` 先取消并等待活动连接退出后才允许临时 session 提升。预解析和确认来源只可使用处于 `running` 的已授权连接，授权维护中的 `draining/authorizing` 状态必须拒绝这些操作。

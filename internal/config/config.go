@@ -50,6 +50,9 @@ type Config struct {
 	TelegramRealtimeQueue       string
 	TelegramBackfillQueue       string
 	TelegramControlQueue        string
+	TelegramControlAddr         string
+	TelegramControlURL          string
+	TelegramControlToken        string
 	TelegramDownloadConcurrency int
 	TelegramMaxActiveTasks      int
 	MaxVideoSize                int64
@@ -109,6 +112,9 @@ func Load() (Config, error) {
 		TelegramRealtimeQueue:       getEnv("TELEGRAM_REALTIME_QUEUE", "telegram-realtime"),
 		TelegramBackfillQueue:       getEnv("TELEGRAM_BACKFILL_QUEUE", "telegram-backfill"),
 		TelegramControlQueue:        getEnv("TELEGRAM_CONTROL_QUEUE", "telegram-control"),
+		TelegramControlAddr:         strings.TrimSpace(getEnv("TELEGRAM_CONTROL_ADDR", ":8091")),
+		TelegramControlURL:          strings.TrimSuffix(strings.TrimSpace(getEnv("TELEGRAM_CONTROL_URL", "http://telegram-ingestor:8091")), "/"),
+		TelegramControlToken:        strings.TrimSpace(os.Getenv("TELEGRAM_CONTROL_TOKEN")),
 		TelegramDownloadConcurrency: getIntEnv("TELEGRAM_DOWNLOAD_CONCURRENCY", 1),
 		TelegramMaxActiveTasks:      getIntEnv("TELEGRAM_MAX_ACTIVE_TASKS", 2),
 		MaxVideoSize:                getInt64Env("MAX_VIDEO_SIZE", 2*1024*1024*1024),
@@ -166,6 +172,12 @@ func (c Config) ValidateTelegramIngestor() error {
 	}
 	if _, err := uuid.Parse(strings.TrimSpace(c.TelegramImportUserID)); err != nil {
 		return fmt.Errorf("TELEGRAM_IMPORT_USER_ID must be a valid UUID: %w", err)
+	}
+	if strings.TrimSpace(c.TelegramControlAddr) == "" {
+		return fmt.Errorf("TELEGRAM_CONTROL_ADDR is required")
+	}
+	if strings.TrimSpace(c.TelegramControlToken) == "" {
+		return fmt.Errorf("TELEGRAM_CONTROL_TOKEN is required")
 	}
 	if c.TelegramDownloadConcurrency < 1 {
 		return fmt.Errorf("TELEGRAM_DOWNLOAD_CONCURRENCY must be at least 1")

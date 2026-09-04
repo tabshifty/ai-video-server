@@ -211,6 +211,9 @@ func TestLoadIncludesTelegramConfig(t *testing.T) {
 	t.Setenv("TELEGRAM_REALTIME_QUEUE", "tg-realtime-test")
 	t.Setenv("TELEGRAM_BACKFILL_QUEUE", "tg-backfill-test")
 	t.Setenv("TELEGRAM_CONTROL_QUEUE", "tg-control-test")
+	t.Setenv("TELEGRAM_CONTROL_ADDR", ":19091")
+	t.Setenv("TELEGRAM_CONTROL_URL", "http://telegram-ingestor:19091")
+	t.Setenv("TELEGRAM_CONTROL_TOKEN", "telegram-control-test-token")
 	t.Setenv("TELEGRAM_DOWNLOAD_CONCURRENCY", "2")
 	t.Setenv("TELEGRAM_MAX_ACTIVE_TASKS", "3")
 
@@ -226,6 +229,9 @@ func TestLoadIncludesTelegramConfig(t *testing.T) {
 	}
 	if cfg.TelegramRealtimeQueue != "tg-realtime-test" || cfg.TelegramBackfillQueue != "tg-backfill-test" || cfg.TelegramControlQueue != "tg-control-test" {
 		t.Fatalf("unexpected Telegram queues: %+v", cfg)
+	}
+	if cfg.TelegramControlAddr != ":19091" || cfg.TelegramControlURL != "http://telegram-ingestor:19091" || cfg.TelegramControlToken != "telegram-control-test-token" {
+		t.Fatalf("unexpected Telegram control config: %+v", cfg)
 	}
 	if cfg.TelegramDownloadConcurrency != 2 || cfg.TelegramMaxActiveTasks != 3 {
 		t.Fatalf("unexpected Telegram limits: concurrency=%d active=%d", cfg.TelegramDownloadConcurrency, cfg.TelegramMaxActiveTasks)
@@ -245,6 +251,9 @@ func TestLoadDefaultsTelegramQueuesAndLimits(t *testing.T) {
 	if cfg.TelegramDownloadConcurrency != 1 || cfg.TelegramMaxActiveTasks <= 0 {
 		t.Fatalf("unexpected default Telegram limits: concurrency=%d active=%d", cfg.TelegramDownloadConcurrency, cfg.TelegramMaxActiveTasks)
 	}
+	if cfg.TelegramControlAddr != ":8091" || cfg.TelegramControlURL != "http://telegram-ingestor:8091" {
+		t.Fatalf("unexpected default Telegram control endpoints: addr=%q url=%q", cfg.TelegramControlAddr, cfg.TelegramControlURL)
+	}
 }
 
 func TestValidateTelegramIngestorRequiresCredentials(t *testing.T) {
@@ -256,6 +265,8 @@ func TestValidateTelegramIngestorRequiresCredentials(t *testing.T) {
 		TelegramPhone:               "+8613800000000",
 		TelegramSessionPath:         "/data/telegram-session/account.session",
 		TelegramImportUserID:        "11111111-1111-1111-1111-111111111111",
+		TelegramControlAddr:         ":8091",
+		TelegramControlToken:        "telegram-control-test-token",
 		TelegramDownloadConcurrency: 1,
 		TelegramMaxActiveTasks:      1,
 	}
@@ -269,6 +280,8 @@ func TestValidateTelegramIngestorRequiresCredentials(t *testing.T) {
 		{name: "phone", mutate: func(cfg *Config) { cfg.TelegramPhone = "" }, want: "TELEGRAM_PHONE"},
 		{name: "session path", mutate: func(cfg *Config) { cfg.TelegramSessionPath = "" }, want: "TELEGRAM_SESSION_PATH"},
 		{name: "import user", mutate: func(cfg *Config) { cfg.TelegramImportUserID = "not-a-uuid" }, want: "TELEGRAM_IMPORT_USER_ID"},
+		{name: "control address", mutate: func(cfg *Config) { cfg.TelegramControlAddr = " " }, want: "TELEGRAM_CONTROL_ADDR"},
+		{name: "control token", mutate: func(cfg *Config) { cfg.TelegramControlToken = " " }, want: "TELEGRAM_CONTROL_TOKEN"},
 	}
 	for _, tt := range tests {
 		tt := tt

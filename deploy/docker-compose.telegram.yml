@@ -45,6 +45,8 @@ x-video-environment: &video-environment
   TELEGRAM_REALTIME_QUEUE: "${TELEGRAM_REALTIME_QUEUE:-telegram-realtime}"
   TELEGRAM_BACKFILL_QUEUE: "${TELEGRAM_BACKFILL_QUEUE:-telegram-backfill}"
   TELEGRAM_CONTROL_QUEUE: "${TELEGRAM_CONTROL_QUEUE:-telegram-control}"
+  TELEGRAM_CONTROL_URL: "${TELEGRAM_CONTROL_URL:-http://telegram-ingestor:8091}"
+  TELEGRAM_CONTROL_TOKEN: "${TELEGRAM_CONTROL_TOKEN:-}"
 
 x-video-volumes: &video-volumes
   - "${VIDEO_STORAGE_HOST_PATH:-./storage}:/data/storage"
@@ -96,6 +98,7 @@ services:
       TELEGRAM_PHONE: "${TELEGRAM_PHONE:-}"
       TELEGRAM_SESSION_PATH: /data/telegram-session/account.session
       TELEGRAM_IMPORT_USER_ID: "${TELEGRAM_IMPORT_USER_ID:-}"
+      TELEGRAM_CONTROL_ADDR: "${TELEGRAM_CONTROL_ADDR:-:8091}"
       TELEGRAM_DOWNLOAD_CONCURRENCY: "${TELEGRAM_DOWNLOAD_CONCURRENCY:-1}"
       TELEGRAM_MAX_ACTIVE_TASKS: "${TELEGRAM_MAX_ACTIVE_TASKS:-2}"
     volumes:

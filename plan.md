@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-04 15:52 +0800
+- 进度：完成控制通道配置与采集器运行时门控子步骤。配置新增地址、API 访问 URL 和必填共享令牌，Compose 与示例环境同步注入；新运行时状态机在未授权后停驻等待页面授权恢复、在授权开始时取消并等待旧连接释放 session、恢复后以新客户端重连，控制操作仅在已授权运行态可用。
+- 影响文件：`internal/config/config.go`、`internal/config/config_test.go`、`cmd/telegram-ingestor/runtime.go`、`cmd/telegram-ingestor/runtime_test.go`、`.env.example`、`deploy/docker-compose.telegram.yml`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：`GOPROXY=off go test ./internal/config ./cmd/telegram-ingestor -count=1`、对应 `-race`、`GOPROXY=off go vet ./internal/config ./cmd/telegram-ingestor` 通过；待检查 Compose 解析、精确提交后实现控制服务与心跳入口接线。
+
+## 2026-09-04 15:42 +0800
+- 进度：提交 `8436e85` 后进入采集器常驻控制阶段。将增加 `TELEGRAM_CONTROL_ADDR`、`TELEGRAM_CONTROL_URL`、`TELEGRAM_CONTROL_TOKEN`，在独立运行时管理器中把未授权空闲、授权暂停、session 重载和已授权采集连接收敛为可测试状态；随后启动仅内部可达的控制 HTTP 并按 30 秒写入心跳。
+- 影响文件：预计修改 `internal/config/`、`cmd/telegram-ingestor/`、`internal/telegram/control.go` 及测试，后续同步 Compose、`.env.example`、运维文档、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：先为配置与运行时状态机建立无网络红灯测试；阶段性运行 `GOPROXY=off go test ./internal/config ./cmd/telegram-ingestor -count=1`、对应 `-race`、`go vet` 与 `go build ./cmd/telegram-ingestor`。
+
 ## 2026-09-04 15:38 +0800
 - 进度：完成第二阶段采集器运行时基础的客户端子步骤。`GotdClient.RunAuthorized` 仅验证现有 persistent session 的授权状态，未授权时返回可识别错误且不进入 stdin 登录；来源解析已拆为不入群的 `PreviewChat` 与确认后才可能执行邀请导入的 `ConfirmChat`，保留 `ResolveChat` 的既有兼容语义。私密邀请的审批加入请求不会自动入群或生成来源。
 - 影响文件：`internal/telegram/client.go`、`internal/telegram/gotd_client.go`、`internal/telegram/client_test.go`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
