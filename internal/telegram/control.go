@@ -50,13 +50,14 @@ type ControlStatus struct {
 
 // ChatPreview is the sanitized result of resolving a Telegram chat reference.
 type ChatPreview struct {
-	PreviewID string `json:"preview_id,omitempty"`
-	ChatID    int64  `json:"chat_id"`
-	Title     string `json:"title"`
-	Username  string `json:"username,omitempty"`
-	ChatType  string `json:"chat_type"`
-	ChatRef   string `json:"chat_ref,omitempty"`
-	ExpiresAt string `json:"expires_at,omitempty"`
+	PreviewID        string `json:"preview_id,omitempty"`
+	ChatID           int64  `json:"chat_id"`
+	Title            string `json:"title"`
+	Username         string `json:"username,omitempty"`
+	ChatType         string `json:"chat_type"`
+	RequiresJoin     bool   `json:"requires_join"`
+	RequiresApproval bool   `json:"requires_approval"`
+	ExpiresAt        string `json:"expires_at,omitempty"`
 }
 
 // ControlService is implemented by the session-owning ingestor process.

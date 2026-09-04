@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-09-04 15:56 +0800
+- 进度：完成来源预解析确认票据层。控制协议的预览响应新增加入/审批标记且不再包含原始 `chat_ref`；`SourcePreviewService` 仅保存操作者、过期时间、Telegram 返回的展示结果和输入 SHA-256 指纹，确认时校验操作者/引用/类型/canonical ID，并且只有返回可保存 chat ID 后才消费票据。
+- 影响文件：`internal/telegram/control.go`、`internal/telegram/source_preview.go`、`internal/telegram/source_preview_test.go`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：`GOPROXY=off go test ./internal/telegram -count=1`、对应 `-race`、`GOPROXY=off go vet ./internal/telegram`、`git diff --check` 通过；待精确提交后将服务接入采集器控制 HTTP。
+
 ## 2026-09-04 15:52 +0800
 - 进度：完成控制通道配置与采集器运行时门控子步骤。配置新增地址、API 访问 URL 和必填共享令牌，Compose 与示例环境同步注入；新运行时状态机在未授权后停驻等待页面授权恢复、在授权开始时取消并等待旧连接释放 session、恢复后以新客户端重连，控制操作仅在已授权运行态可用。
 - 影响文件：`internal/config/config.go`、`internal/config/config_test.go`、`cmd/telegram-ingestor/runtime.go`、`cmd/telegram-ingestor/runtime_test.go`、`.env.example`、`deploy/docker-compose.telegram.yml`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
