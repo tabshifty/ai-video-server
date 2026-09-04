@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -29,7 +31,14 @@ import (
 	"video-server/internal/telegram"
 )
 
-const telegramReconcileInterval = time.Minute
+const (
+	telegramReconcileInterval      = time.Minute
+	telegramSourcePreviewTTL       = 5 * time.Minute
+	telegramControlShutdownTimeout = 15 * time.Second
+)
+
+// telegramIngestorVersion can be set through -ldflags during release builds.
+var telegramIngestorVersion = "dev"
 
 func main() {
 	loadEnvironment()
@@ -130,7 +139,7 @@ func runIngestor(ctx context.Context, cfg config.Config, logger *slog.Logger) er
 		return fmt.Errorf("连接 Redis: %w", err)
 	}
 
-	client, err := telegram.NewGotdClient(telegram.GotdClientConfig{
+	sessionFactory, err := telegram.NewGotdAuthorizationSessionFactory(telegram.GotdAuthorizationSessionFactoryConfig{
 		APIID:       cfg.TelegramAPIID,
 		APIHash:     cfg.TelegramAPIHash,
 		Phone:       cfg.TelegramPhone,
@@ -138,7 +147,7 @@ func runIngestor(ctx context.Context, cfg config.Config, logger *slog.Logger) er
 		Logger:      zap.NewNop(),
 	})
 	if err != nil {
-		return fmt.Errorf("创建 Telegram 客户端: %w", err)
+		return fmt.Errorf("创建 Telegram 授权 session 工厂: %w", err)
 	}
 
 	telegramTasks := queue.NewTelegramTaskEnqueuer(
@@ -161,35 +170,179 @@ func runIngestor(ctx context.Context, cfg config.Config, logger *slog.Logger) er
 	}()
 
 	uploadSvc := services.NewUploadService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
-	ingestion := services.NewTelegramIngestionService(
-		client,
-		repo,
-		uploadSvc,
-		telegramTasks,
-		transcodeQueueAdapter{enqueuer: transcodeTasks},
-		cfg.UploadTempDir,
-		cfg.StorageRoot,
-		cfg.MaxVideoSize,
-		importUserID,
+	runtime := newTelegramRuntime(
+		func() (telegramRuntimeClient, error) {
+			return telegram.NewGotdClient(telegram.GotdClientConfig{
+				APIID:       cfg.TelegramAPIID,
+				APIHash:     cfg.TelegramAPIHash,
+				Phone:       cfg.TelegramPhone,
+				SessionPath: cfg.TelegramSessionPath,
+				Logger:      zap.NewNop(),
+			})
+		},
+		func(runCtx context.Context, runtimeClient telegramRuntimeClient) error {
+			client, ok := runtimeClient.(telegram.Client)
+			if !ok {
+				return errors.New("Telegram 采集客户端不支持消息采集")
+			}
+			ingestion := services.NewTelegramIngestionService(
+				client,
+				repo,
+				uploadSvc,
+				telegramTasks,
+				transcodeQueueAdapter{enqueuer: transcodeTasks},
+				cfg.UploadTempDir,
+				cfg.StorageRoot,
+				cfg.MaxVideoSize,
+				importUserID,
+			)
+			processor := queue.NewTelegramProcessor(ingestion, logger, cfg.TelegramDownloadConcurrency)
+			mux := asynq.NewServeMux()
+			processor.Register(mux)
+			server := asynq.NewServer(asynq.RedisClientOpt{
+				Addr:     cfg.RedisAddr,
+				Password: cfg.RedisPassword,
+			}, asynq.Config{
+				Concurrency: cfg.TelegramMaxActiveTasks,
+				Queues:      telegramQueueWeights(cfg),
+			})
+			return runTelegramRuntime(runCtx, client, repo, ingestion, telegramTasks, server, mux, logger)
+		},
 	)
-	processor := queue.NewTelegramProcessor(ingestion, logger, cfg.TelegramDownloadConcurrency)
-	mux := asynq.NewServeMux()
-	processor.Register(mux)
-	server := asynq.NewServer(asynq.RedisClientOpt{
-		Addr:     cfg.RedisAddr,
-		Password: cfg.RedisPassword,
-	}, asynq.Config{
-		Concurrency: cfg.TelegramMaxActiveTasks,
-		Queues:      telegramQueueWeights(cfg),
+	authorizations := telegram.NewAuthorizationService(telegram.AuthorizationServiceConfig{
+		Phone:       cfg.TelegramPhone,
+		Repository:  repo,
+		Sessions:    sessionFactory,
+		Maintenance: runtime,
 	})
+	previews := telegram.NewSourcePreviewService(runtime, nil, telegramSourcePreviewTTL)
+	control := newIngestorControlService(repo, runtime, authorizations, previews)
+	return runTelegramControlPlane(
+		ctx,
+		cfg.TelegramControlAddr,
+		cfg.TelegramControlToken,
+		control,
+		repo,
+		runtime,
+		telegramIngestorVersion,
+		logger,
+	)
+}
 
-	prompter := &stdinLoginPrompter{reader: bufio.NewReader(os.Stdin), writer: os.Stdout}
-	if err := client.Run(ctx, prompter, func(runCtx context.Context) error {
-		return runTelegramRuntime(runCtx, client, repo, ingestion, telegramTasks, server, mux, logger)
-	}); err != nil {
-		return fmt.Errorf("运行 Telegram 采集器: %w", err)
+type telegramRuntimeLifecycle interface {
+	Run(ctx context.Context) error
+	View() telegramRuntimeView
+}
+
+// runTelegramControlPlane keeps control HTTP and collector heartbeats alive
+// independently from the currently authorized MTProto connection.
+func runTelegramControlPlane(
+	ctx context.Context,
+	address string,
+	token string,
+	control telegram.ControlService,
+	repo telegramHeartbeatRepository,
+	runtime telegramRuntimeLifecycle,
+	version string,
+	logger *slog.Logger,
+) error {
+	if strings.TrimSpace(address) == "" {
+		return errors.New("Telegram 控制监听地址不能为空")
 	}
-	return nil
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return fmt.Errorf("监听 Telegram 控制端口: %w", err)
+	}
+	return runTelegramControlPlaneOnListener(ctx, listener, token, control, repo, runtime, version, logger)
+}
+
+func runTelegramControlPlaneOnListener(
+	ctx context.Context,
+	listener net.Listener,
+	token string,
+	control telegram.ControlService,
+	repo telegramHeartbeatRepository,
+	runtime telegramRuntimeLifecycle,
+	version string,
+	logger *slog.Logger,
+) error {
+	if ctx == nil {
+		if listener != nil {
+			_ = listener.Close()
+		}
+		return errors.New("Telegram 控制平面 context 不能为空")
+	}
+	if listener == nil {
+		return errors.New("Telegram 控制监听器不可用")
+	}
+	if strings.TrimSpace(token) == "" {
+		_ = listener.Close()
+		return errors.New("Telegram 控制令牌不能为空")
+	}
+	if control == nil || repo == nil || runtime == nil {
+		_ = listener.Close()
+		return errors.New("Telegram 控制平面依赖不可用")
+	}
+	controlServer := &http.Server{
+		Handler:           telegram.NewControlHandler(control, token),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      time.Minute,
+		IdleTimeout:       time.Minute,
+	}
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	httpErrCh := make(chan error, 1)
+	go func() {
+		httpErrCh <- controlServer.Serve(listener)
+	}()
+	heartbeatsDone := make(chan struct{})
+	go func() {
+		defer close(heartbeatsDone)
+		runTelegramHeartbeats(runCtx, repo, runtime, version, logger)
+	}()
+	runtimeErrCh := make(chan error, 1)
+	go func() {
+		runtimeErrCh <- runtime.Run(runCtx)
+	}()
+
+	if logger != nil {
+		logger.Info("Telegram 控制服务已启动", "address", listener.Addr().String())
+	}
+	var result error
+	select {
+	case <-ctx.Done():
+	case err := <-runtimeErrCh:
+		if err != nil {
+			result = fmt.Errorf("运行 Telegram 采集运行时: %w", err)
+		} else if ctx.Err() == nil {
+			result = errors.New("Telegram 采集运行时意外停止")
+		}
+	case err := <-httpErrCh:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			result = fmt.Errorf("运行 Telegram 控制服务: %w", err)
+		}
+	}
+
+	cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), telegramControlShutdownTimeout)
+	defer shutdownCancel()
+	if err := controlServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) && result == nil {
+		result = fmt.Errorf("关闭 Telegram 控制服务: %w", err)
+	}
+	select {
+	case err := <-runtimeErrCh:
+		if err != nil && result == nil {
+			result = fmt.Errorf("停止 Telegram 采集运行时: %w", err)
+		}
+	case <-shutdownCtx.Done():
+		if result == nil {
+			result = fmt.Errorf("等待 Telegram 采集运行时停止: %w", shutdownCtx.Err())
+		}
+	}
+	<-heartbeatsDone
+	return result
 }
 
 func runTelegramRuntime(

@@ -1244,6 +1244,7 @@
 ## Telegram 常驻控制配置
 - `Telegram 控制通道配置`：`TELEGRAM_CONTROL_ADDR` 只由 `telegram-ingestor` 监听，`TELEGRAM_CONTROL_URL` 只供 API 容器通过 Docker 内网调用，二者不用于映射宿主机端口；`TELEGRAM_CONTROL_TOKEN` 是二者必须一致的部署级密钥，采集器启动校验不得接受空值。令牌不能出现在浏览器、数据库、日志、队列或示例外的源码默认值中。
 - `Telegram 采集运行时门控`：常驻运行时在 session 未授权、连接异常或工厂初始化失败后停止重试并保持控制面存活，等待授权终态调用 `Resume` 后再创建全新 MTProto 客户端；`Pause` 先取消并等待活动连接退出后才允许临时 session 提升。预解析和确认来源只可使用处于 `running` 的已授权连接，授权维护中的 `draining/authorizing` 状态必须拒绝这些操作。
+- `Telegram 控制面进程模型`：`-mode run` 先启动私有控制 HTTP、即时/30 秒心跳和运行时状态机，再尝试现有 persistent session；未授权不能使控制端口退出。每次 `Resume` 必须重新创建 MTProto 客户端、Telegram 采集服务、Asynq server 和实时订阅，不能复用已暂停的连接或 worker。进程退出时先取消运行时和心跳，再优雅关闭控制 HTTP；状态接口同时返回持久账号资料、内存运行时快照和最近一次心跳。
 
 ## Telegram 来源确认票据
 - `Telegram 来源确认票据`：一次预解析在采集器内存中生成短期 UUID 票据，仅保留操作者 UUID、失效时间、Telegram 返回的非敏感预览结果和原始输入的 SHA-256 指纹；不得保存原始 `chat_ref` 或私密邀请 token。确认必须由原操作者提交相同输入，并再次向 Telegram 校验，只有已获得 canonical chat ID 且不再需要加入或审批时才消费票据。采集器重启会使票据全部失效。

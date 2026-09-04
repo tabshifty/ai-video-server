@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-04 16:11 +0800
+- 进度：完成采集器常驻控制面接线。`-mode run` 通过运行时门控重建已授权 MTProto 客户端及其采集/订阅/Asynq 实例，不再创建 stdin 登录输入器；私有控制 HTTP、立即及 30 秒心跳独立常驻，未授权 session 时页面仍可查询并启动手机号或二维码授权。补充真实监听器集成测试，覆盖控制状态响应、初始心跳和取消后的优雅关闭。
+- 影响文件：`cmd/telegram-ingestor/main.go`、新增 `cmd/telegram-ingestor/control_service.go`、`cmd/telegram-ingestor/heartbeat.go`、`cmd/telegram-ingestor/control_service_test.go`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：`GOPROXY=off go test ./cmd/telegram-ingestor -count=1`、`GOPROXY=off go test -race ./cmd/telegram-ingestor -count=1`、`GOPROXY=off go vet ./cmd/telegram-ingestor`、`GOPROXY=off go build ./cmd/telegram-ingestor`、`git diff --check` 通过；`golangci-lint` 未安装。构建产生的临时根目录二进制已移入系统废纸篓，未纳入工作区或提交。
+
+## 2026-09-04 16:05 +0800
+- 进度：续接 Telegram 管理控制面。新增采集器内进程控制服务与心跳的定向测试已通过，下一步把授权服务、来源预览、运行时门控和仅内部可达的控制 HTTP 接入 `-mode run`；采集连接恢复后将重建消费服务与订阅，未授权状态仍保留页面管理能力。
+- 影响文件：新增 `cmd/telegram-ingestor/control_service.go`、`cmd/telegram-ingestor/heartbeat.go`、`cmd/telegram-ingestor/control_service_test.go`；预计修改 `cmd/telegram-ingestor/main.go`、后续 API/管理端文件、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：`GOPROXY=off go test ./cmd/telegram-ingestor -run 'Test(IngestorControlService|WriteTelegramHeartbeat)' -count=1` 通过；待继续运行采集器包测试、race、vet 和构建。
+
 ## 2026-09-04 15:56 +0800
 - 进度：完成来源预解析确认票据层。控制协议的预览响应新增加入/审批标记且不再包含原始 `chat_ref`；`SourcePreviewService` 仅保存操作者、过期时间、Telegram 返回的展示结果和输入 SHA-256 指纹，确认时校验操作者/引用/类型/canonical ID，并且只有返回可保存 chat ID 后才消费票据。
 - 影响文件：`internal/telegram/control.go`、`internal/telegram/source_preview.go`、`internal/telegram/source_preview_test.go`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
