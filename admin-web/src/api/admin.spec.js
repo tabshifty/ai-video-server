@@ -20,6 +20,8 @@ import {
   batchDeleteAdminVideos,
   batchUpdateAdminArchiveImportFiles,
   batchUpdateAdminVideos,
+  cancelAdminTelegramAuthorization,
+  confirmAdminTelegramSource,
   createAdminTvEpisode,
   createAdminTvSeason,
   createAdminTvSeries,
@@ -36,6 +38,11 @@ import {
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
   getAdminForumPosts,
+  getAdminTelegramAuthorization,
+  getAdminTelegramAudits,
+  getAdminTelegramSourceProgress,
+  getAdminTelegramSources,
+  getAdminTelegramStatus,
   getAdminPasswordVaultEntries,
   getAdminPasswordVaultPassword,
   deleteAdminArchiveImportBatch,
@@ -57,6 +64,7 @@ import {
   keepAdminPendingDeleteShort,
   markAdminShortVideoPendingDelete,
   offlineAdminTVAppRelease,
+  pauseAdminTelegramSource,
   publishAdminTVAppRelease,
   processAdminArchiveImportBatch,
   processAdminArchiveImportFile,
@@ -65,8 +73,17 @@ import {
   removeAdminArchiveImportGroupFiles,
   restoreAdminTVAppRelease,
   retryAdminArchiveImportExtract,
+  recoverAdminTelegramSource,
+  resumeAdminTelegramSource,
   scrapePreview,
+  startAdminTelegramPhoneAuthorization,
+  startAdminTelegramQRAuthorization,
   startOrphanFileScan,
+  startAdminTelegramSourceBackfill,
+  submitAdminTelegramAuthorizationCode,
+  submitAdminTelegramAuthorizationPassword,
+  issueAdminTelegramConfirmation,
+  previewAdminTelegramSource,
   assignAdminArchiveImportGroupFiles,
   updateAdminArchiveImportGroup,
   updateAdminTVAppRelease,
@@ -94,6 +111,70 @@ describe('admin forum post api', () => {
 
     expect(get).toHaveBeenCalledWith('/admin/forum-posts', {
       params: { page: 2, page_size: 20, q: '资源' }
+    })
+  })
+})
+
+describe('telegram management apis', () => {
+  beforeEach(() => {
+    get.mockReset()
+    post.mockReset()
+    get.mockResolvedValue({ ok: true })
+    post.mockResolvedValue({ ok: true })
+  })
+
+  it('uses the management workflow instead of a raw source create endpoint', async () => {
+    const confirmation = {
+      action: 'authorization_phone',
+      current_password: 'admin-password',
+      confirmed: true
+    }
+    const sourcePreview = {
+      chat_ref: 'https://t.me/+private-invite',
+      confirmation_ticket: 'preview-ticket'
+    }
+    const sourceConfirm = {
+      preview_id: 'preview-1',
+      chat_ref: 'https://t.me/+private-invite',
+      confirmation_ticket: 'confirm-ticket'
+    }
+
+    await getAdminTelegramStatus()
+    await issueAdminTelegramConfirmation(confirmation)
+    await startAdminTelegramPhoneAuthorization({ confirmation_ticket: 'phone-ticket' })
+    await startAdminTelegramQRAuthorization({ confirmation_ticket: 'qr-ticket' })
+    await getAdminTelegramAuthorization('authorization-1')
+    await submitAdminTelegramAuthorizationCode('authorization-1', { code: '12345' })
+    await submitAdminTelegramAuthorizationPassword('authorization-1', { password: 'telegram-2fa' })
+    await cancelAdminTelegramAuthorization('authorization-1')
+    await previewAdminTelegramSource(sourcePreview)
+    await confirmAdminTelegramSource(sourceConfirm)
+    await getAdminTelegramSources()
+    await pauseAdminTelegramSource('source-1')
+    await resumeAdminTelegramSource('source-1')
+    await recoverAdminTelegramSource('source-1')
+    await startAdminTelegramSourceBackfill('source-1')
+    await getAdminTelegramSourceProgress('source-1')
+    await getAdminTelegramAudits({ page: 2, page_size: 10, action: 'source.paused' })
+
+    expect(get).toHaveBeenCalledWith('/admin/telegram/status')
+    expect(post).toHaveBeenCalledWith('/admin/telegram/confirmations', confirmation)
+    expect(post).toHaveBeenCalledWith('/admin/telegram/authorizations/phone', { confirmation_ticket: 'phone-ticket' })
+    expect(post).toHaveBeenCalledWith('/admin/telegram/authorizations/qr', { confirmation_ticket: 'qr-ticket' })
+    expect(get).toHaveBeenCalledWith('/admin/telegram/authorizations/authorization-1')
+    expect(post).toHaveBeenCalledWith('/admin/telegram/authorizations/authorization-1/code', { code: '12345' })
+    expect(post).toHaveBeenCalledWith('/admin/telegram/authorizations/authorization-1/password', { password: 'telegram-2fa' })
+    expect(post).toHaveBeenCalledWith('/admin/telegram/authorizations/authorization-1/cancel')
+    expect(post).toHaveBeenCalledWith('/admin/telegram/sources/preview', sourcePreview)
+    expect(post).toHaveBeenCalledWith('/admin/telegram/sources/confirm', sourceConfirm)
+    expect(get).toHaveBeenCalledWith('/admin/telegram/sources')
+    expect(post).toHaveBeenCalledWith('/admin/telegram/sources/source-1/pause')
+    expect(post).toHaveBeenCalledWith('/admin/telegram/sources/source-1/resume')
+    expect(post).toHaveBeenCalledWith('/admin/telegram/sources/source-1/recover')
+    expect(post).toHaveBeenCalledWith('/admin/telegram/sources/source-1/backfill')
+    expect(get).toHaveBeenCalledWith('/admin/telegram/sources/source-1/progress')
+    expect(get).toHaveBeenCalledWith('/admin/telegram/audits', {
+      params: { page: 2, page_size: 10, action: 'source.paused' }
     })
   })
 })

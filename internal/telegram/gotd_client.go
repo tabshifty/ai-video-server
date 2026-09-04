@@ -939,6 +939,15 @@ func parseChatReference(ref string) (chatReferenceKind, string, error) {
 	return parseUsernameValue(ref)
 }
 
+// IsPrivateInviteReference reports whether a source reference is a Telegram
+// invitation that carries a private invite token. It is intended only for
+// deciding whether the API must require an administrator's high-risk
+// confirmation before forwarding the value to the private control service.
+func IsPrivateInviteReference(ref string) bool {
+	kind, _, err := parseChatReference(ref)
+	return err == nil && kind == chatReferenceInvite
+}
+
 func parseUsernameValue(value string) (chatReferenceKind, string, error) {
 	value = strings.TrimSpace(strings.TrimPrefix(value, "@"))
 	if value == "" {

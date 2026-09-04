@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,18 +13,21 @@ import (
 
 	"video-server/internal/models"
 	"video-server/internal/repository"
+	"video-server/internal/telegram"
 )
 
 var (
-	ErrTelegramChatRefRequired     = errors.New("Telegram 群组引用不能为空")
-	ErrTelegramSourceAlreadyExists = errors.New("Telegram 来源已存在")
+	ErrTelegramSourceAlreadyExists  = errors.New("Telegram 来源已存在")
+	ErrTelegramSourceUnresolved     = errors.New("Telegram 来源尚未获得可保存的 chat ID")
+	ErrTelegramSourceTypeInvalid    = errors.New("Telegram 来源类型不受支持")
+	ErrTelegramSourceNotRecoverable = errors.New("Telegram 来源当前不处于可恢复失败状态")
 )
 
 type telegramSourceRepository interface {
-	CreateTelegramSource(ctx context.Context, source models.TelegramSource) error
+	CreateTelegramSourceWithAudit(ctx context.Context, source models.TelegramSource, audit models.TelegramAuditLog) error
+	UpdateTelegramSourceWithAudit(ctx context.Context, sourceID uuid.UUID, patch repository.TelegramSourcePatch, audit models.TelegramAuditLog) error
 	ListTelegramSources(ctx context.Context, enabledOnly bool) ([]models.TelegramSource, error)
 	GetTelegramSource(ctx context.Context, sourceID uuid.UUID) (models.TelegramSource, error)
-	UpdateTelegramSource(ctx context.Context, sourceID uuid.UUID, patch repository.TelegramSourcePatch) error
 	CountTelegramMediaByStatus(ctx context.Context, sourceID uuid.UUID) (map[string]int, error)
 }
 
@@ -59,22 +64,26 @@ func (s *TelegramSourceService) List(ctx context.Context) ([]models.TelegramSour
 	return items, nil
 }
 
-// Add stores a chat reference and schedules asynchronous resolution.
-func (s *TelegramSourceService) Add(ctx context.Context, chatRef string) (models.TelegramSource, error) {
+// AddConfirmed creates a source from the collector's confirmed canonical chat
+// identity. It intentionally derives ChatRef from ChatID so private invitation
+// links and their tokens never enter the database.
+func (s *TelegramSourceService) AddConfirmed(ctx context.Context, actorID uuid.UUID, preview telegram.ChatPreview) (models.TelegramSource, error) {
 	if err := s.validateDependencies(); err != nil {
 		return models.TelegramSource{}, err
 	}
-	chatRef = normalizeTelegramChatRef(chatRef)
-	if chatRef == "" {
-		return models.TelegramSource{}, ErrTelegramChatRefRequired
+	if actorID == uuid.Nil {
+		return models.TelegramSource{}, errors.New("Telegram 来源缺少管理员身份")
+	}
+	if err := validateConfirmedTelegramPreview(preview); err != nil {
+		return models.TelegramSource{}, err
 	}
 	existing, err := s.repo.ListTelegramSources(ctx, false)
 	if err != nil {
 		return models.TelegramSource{}, fmt.Errorf("检查 Telegram 来源: %w", err)
 	}
-	wantedKey := telegramChatRefKey(chatRef)
+	canonicalRef := strconv.FormatInt(preview.ChatID, 10)
 	for _, source := range existing {
-		if telegramChatRefKey(source.ChatRef) == wantedKey {
+		if source.ChatID == preview.ChatID || telegramChatRefKey(source.ChatRef) == canonicalRef {
 			return models.TelegramSource{}, fmt.Errorf("%w: %s", ErrTelegramSourceAlreadyExists, source.ID)
 		}
 	}
@@ -82,17 +91,24 @@ func (s *TelegramSourceService) Add(ctx context.Context, chatRef string) (models
 	now := time.Now().UTC()
 	source := models.TelegramSource{
 		ID:         uuid.New(),
-		ChatRef:    chatRef,
+		ChatID:     preview.ChatID,
+		ChatRef:    canonicalRef,
+		Title:      strings.TrimSpace(preview.Title),
+		Username:   strings.TrimSpace(preview.Username),
 		Enabled:    true,
 		SyncStatus: "pending",
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
-	if err := s.repo.CreateTelegramSource(ctx, source); err != nil {
+	audit, err := telegramSourceCreatedAudit(actorID, source, preview.ChatType)
+	if err != nil {
+		return models.TelegramSource{}, err
+	}
+	if err := s.repo.CreateTelegramSourceWithAudit(ctx, source, audit); err != nil {
 		if repository.IsUniqueViolation(err) {
 			return models.TelegramSource{}, ErrTelegramSourceAlreadyExists
 		}
-		return models.TelegramSource{}, fmt.Errorf("新增 Telegram 来源: %w", err)
+		return models.TelegramSource{}, fmt.Errorf("新增 Telegram 已确认来源: %w", err)
 	}
 	if err := s.enqueueSource(source.ID); err != nil {
 		return source, err
@@ -101,16 +117,39 @@ func (s *TelegramSourceService) Add(ctx context.Context, chatRef string) (models
 }
 
 // Pause disables a source without changing its history cursor.
-func (s *TelegramSourceService) Pause(ctx context.Context, sourceID uuid.UUID) (models.TelegramSource, error) {
-	return s.updateSource(ctx, sourceID, repository.TelegramSourcePatch{
+func (s *TelegramSourceService) Pause(ctx context.Context, actorID, sourceID uuid.UUID) (models.TelegramSource, error) {
+	return s.updateSourceWithAudit(ctx, actorID, sourceID, "source.paused", repository.TelegramSourcePatch{
 		Enabled:    telegramBoolPointer(false),
 		SyncStatus: telegramStringPointer("paused"),
 	}, false)
 }
 
 // Resume enables a source at its existing history cursor and schedules sync.
-func (s *TelegramSourceService) Resume(ctx context.Context, sourceID uuid.UUID) (models.TelegramSource, error) {
-	return s.updateSource(ctx, sourceID, repository.TelegramSourcePatch{
+func (s *TelegramSourceService) Resume(ctx context.Context, actorID, sourceID uuid.UUID) (models.TelegramSource, error) {
+	return s.updateSourceWithAudit(ctx, actorID, sourceID, "source.resumed", repository.TelegramSourcePatch{
+		Enabled:          telegramBoolPointer(true),
+		SyncStatus:       telegramStringPointer("pending"),
+		LastError:        telegramStringPointer(""),
+		ClearNextRetryAt: true,
+	}, true)
+}
+
+// Recover clears a source-level failure while preserving its history cursor.
+func (s *TelegramSourceService) Recover(ctx context.Context, actorID, sourceID uuid.UUID) (models.TelegramSource, error) {
+	if err := s.validateDependencies(); err != nil {
+		return models.TelegramSource{}, err
+	}
+	if sourceID == uuid.Nil {
+		return models.TelegramSource{}, repository.ErrTelegramSourceNotFound
+	}
+	source, err := s.repo.GetTelegramSource(ctx, sourceID)
+	if err != nil {
+		return models.TelegramSource{}, fmt.Errorf("读取 Telegram 来源: %w", err)
+	}
+	if source.SyncStatus != "error" {
+		return models.TelegramSource{}, ErrTelegramSourceNotRecoverable
+	}
+	return s.updateKnownSourceWithAudit(ctx, actorID, source, "source.recovery_started", repository.TelegramSourcePatch{
 		Enabled:          telegramBoolPointer(true),
 		SyncStatus:       telegramStringPointer("pending"),
 		LastError:        telegramStringPointer(""),
@@ -119,8 +158,8 @@ func (s *TelegramSourceService) Resume(ctx context.Context, sourceID uuid.UUID) 
 }
 
 // StartBackfill resets the history cursor and schedules a full history scan.
-func (s *TelegramSourceService) StartBackfill(ctx context.Context, sourceID uuid.UUID) (models.TelegramSource, error) {
-	return s.updateSource(ctx, sourceID, repository.TelegramSourcePatch{
+func (s *TelegramSourceService) StartBackfill(ctx context.Context, actorID, sourceID uuid.UUID) (models.TelegramSource, error) {
+	return s.updateSourceWithAudit(ctx, actorID, sourceID, "source.backfill_started", repository.TelegramSourcePatch{
 		Enabled:                  telegramBoolPointer(true),
 		SyncStatus:               telegramStringPointer("pending"),
 		HistoryCursorMessageID:   telegramInt64Pointer(0),
@@ -149,27 +188,39 @@ func (s *TelegramSourceService) GetProgress(ctx context.Context, sourceID uuid.U
 	return TelegramSourceProgress{Source: source, Counts: counts}, nil
 }
 
-func (s *TelegramSourceService) updateSource(ctx context.Context, sourceID uuid.UUID, patch repository.TelegramSourcePatch, enqueue bool) (models.TelegramSource, error) {
+func (s *TelegramSourceService) updateSourceWithAudit(ctx context.Context, actorID, sourceID uuid.UUID, action string, patch repository.TelegramSourcePatch, enqueue bool) (models.TelegramSource, error) {
 	if err := s.validateDependencies(); err != nil {
 		return models.TelegramSource{}, err
 	}
 	if sourceID == uuid.Nil {
 		return models.TelegramSource{}, repository.ErrTelegramSourceNotFound
 	}
-	if _, err := s.repo.GetTelegramSource(ctx, sourceID); err != nil {
+	if actorID == uuid.Nil {
+		return models.TelegramSource{}, errors.New("Telegram 来源缺少管理员身份")
+	}
+	source, err := s.repo.GetTelegramSource(ctx, sourceID)
+	if err != nil {
 		return models.TelegramSource{}, fmt.Errorf("读取 Telegram 来源: %w", err)
 	}
-	if err := s.repo.UpdateTelegramSource(ctx, sourceID, patch); err != nil {
+	return s.updateKnownSourceWithAudit(ctx, actorID, source, action, patch, enqueue)
+}
+
+func (s *TelegramSourceService) updateKnownSourceWithAudit(ctx context.Context, actorID uuid.UUID, source models.TelegramSource, action string, patch repository.TelegramSourcePatch, enqueue bool) (models.TelegramSource, error) {
+	audit, err := telegramSourceLifecycleAudit(actorID, action, source, patch)
+	if err != nil {
+		return models.TelegramSource{}, err
+	}
+	if err := s.repo.UpdateTelegramSourceWithAudit(ctx, source.ID, patch, audit); err != nil {
 		return models.TelegramSource{}, fmt.Errorf("更新 Telegram 来源: %w", err)
 	}
-	if enqueue {
-		if err := s.enqueueSource(sourceID); err != nil {
-			return models.TelegramSource{}, err
-		}
-	}
-	updated, err := s.repo.GetTelegramSource(ctx, sourceID)
+	updated, err := s.repo.GetTelegramSource(ctx, source.ID)
 	if err != nil {
 		return models.TelegramSource{}, fmt.Errorf("读取更新后的 Telegram 来源: %w", err)
+	}
+	if enqueue {
+		if err := s.enqueueSource(source.ID); err != nil {
+			return updated, fmt.Errorf("Telegram 来源状态已更新，但调度同步失败: %w", err)
+		}
 	}
 	return updated, nil
 }
@@ -189,6 +240,72 @@ func (s *TelegramSourceService) validateDependencies() error {
 		return errors.New("Telegram 来源服务不可用")
 	}
 	return nil
+}
+
+func validateConfirmedTelegramPreview(preview telegram.ChatPreview) error {
+	if preview.ChatID == 0 || preview.RequiresJoin || preview.RequiresApproval {
+		return ErrTelegramSourceUnresolved
+	}
+	if strings.TrimSpace(preview.Title) == "" {
+		return ErrTelegramSourceUnresolved
+	}
+	switch preview.ChatType {
+	case telegram.TelegramChatTypeGroup, telegram.TelegramChatTypeSupergroup, telegram.TelegramChatTypeChannel:
+		return nil
+	default:
+		return ErrTelegramSourceTypeInvalid
+	}
+}
+
+func telegramSourceCreatedAudit(actorID uuid.UUID, source models.TelegramSource, chatType string) (models.TelegramAuditLog, error) {
+	summary, err := json.Marshal(map[string]any{
+		"chat_id":   source.ChatID,
+		"chat_type": strings.TrimSpace(chatType),
+		"username":  strings.TrimSpace(source.Username),
+	})
+	if err != nil {
+		return models.TelegramAuditLog{}, errors.New("编码 Telegram 来源审计失败")
+	}
+	return models.TelegramAuditLog{
+		ActorUserID: actorID,
+		Action:      "source.created",
+		TargetType:  "source",
+		TargetID:    source.ID.String(),
+		Result:      "succeeded",
+		Summary:     summary,
+		CreatedAt:   source.CreatedAt,
+	}, nil
+}
+
+func telegramSourceLifecycleAudit(actorID uuid.UUID, action string, source models.TelegramSource, patch repository.TelegramSourcePatch) (models.TelegramAuditLog, error) {
+	if actorID == uuid.Nil || source.ID == uuid.Nil {
+		return models.TelegramAuditLog{}, errors.New("Telegram 来源审计缺少操作者或来源")
+	}
+	enabled := source.Enabled
+	if patch.Enabled != nil {
+		enabled = *patch.Enabled
+	}
+	syncStatus := source.SyncStatus
+	if patch.SyncStatus != nil {
+		syncStatus = *patch.SyncStatus
+	}
+	summary, err := json.Marshal(map[string]any{
+		"chat_id":     source.ChatID,
+		"enabled":     enabled,
+		"sync_status": strings.TrimSpace(syncStatus),
+	})
+	if err != nil {
+		return models.TelegramAuditLog{}, errors.New("编码 Telegram 来源状态审计失败")
+	}
+	return models.TelegramAuditLog{
+		ActorUserID: actorID,
+		Action:      strings.TrimSpace(action),
+		TargetType:  "source",
+		TargetID:    source.ID.String(),
+		Result:      "succeeded",
+		Summary:     summary,
+		CreatedAt:   time.Now().UTC(),
+	}, nil
 }
 
 func normalizeTelegramChatRef(value string) string {

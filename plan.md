@@ -1,5 +1,25 @@
 # plan.md
 
+## 2026-09-04 17:41 +0800
+- 进度：完成 Telegram 管理台收尾。部署手册契约已改为校验管理页面、手机号/二维码授权、来源预解析确认、失败恢复和重新回填，并明确移除旧的交互式登录、直接来源 API 和手工媒体 SQL 流程；环境示例测试同步覆盖控制令牌。
+- 影响文件：`deploy/telegram_deploy_test.go`、`docs/telegram-video-ingestion.md`、`.env.example`、Telegram 管理 API/服务/采集器/管理端页面及其测试、`CONTEXT.md`；用户既有未跟踪目录 `docs/examples/` 明确不纳入。
+- 验证：Telegram 定向 Go 测试、精确 `-race` 测试、部署契约、`go vet ./...`、`go build ./...`、管理端 55 项定向测试、`npm run build`、`git diff --check` 和 U+FFFD 乱码扫描通过。全量 `go test ./... -count=1` 仅因既有 `internal/services/tv_apk_test.go` 固定期望 `versionCode=121` 而实际为 `144` 失败；该问题与本次改动无关。待精确暂存并提交。
+
+## 2026-09-04 16:56 +0800
+- 进度：继续 Telegram 管理台页面实现。将在 `admin-web` 增加受保护的 `/telegram` 工作区、控制 API 封装和定向测试，覆盖手机号/二维码授权、验证码与二次验证、来源预解析确认、来源运行控制、进度与审计；授权秘密、确认票据和私密邀请引用仅保留当前页面内存。轮询按授权中 2 秒、普通状态 5 秒执行，禁止请求重入，页面隐藏或离开时停止。
+- 影响文件：预计修改 `admin-web/src/api/admin.js`、`admin-web/src/api/admin.spec.js`、`admin-web/src/router/index.js`、导航配置及新增 Telegram 管理视图/帮助函数和测试，后续更新 Telegram 运维文档、ADR、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。
+- 验证：先运行新增 API/轮询 helper 的 Vitest 定向测试，再运行 `npm run build`；收尾复跑 Telegram Go 定向测试、race、vet、差异检查与乱码扫描。
+
+## 2026-09-04 16:36 +0800
+- 进度：继续 Telegram 管理 API 接线。确认新增 handler 草稿当前红灯仅因局部 `ok` 布尔变量遮蔽统一响应函数，且 `API` 尚未注入管理服务；下一步将用管理服务替换旧的原始 `chat_ref` 直写路由，补管理端权限/票据/API 覆盖，并保持私密邀请链接不落库、不入审计。
+- 影响文件：`internal/handlers/admin_telegram_management.go`、`internal/handlers/admin_telegram_test.go`、`internal/handlers/router.go`、`main.go`、`plan.md`；后续继续处理来源恢复、Vue 管理页、文档与长期约定；继续排除用户既有 `docs/examples/`。
+- 验证：`GOPROXY=off go test ./internal/handlers ./internal/services ./internal/telegram -run 'Test(AdminTelegram|TelegramManagement|TelegramConfirmation|TelegramSource|ControlClient)' -count=1` 当前预期红灯，报错为 handler 内 `ok` 遮蔽；服务与控制客户端相关测试已通过。
+
+## 2026-09-04 16:14 +0800
+- 进度：进入 Telegram 管理 API 阶段。将新增 API 到采集器的受控 HTTP 客户端、管理员密码确认的一次性短期票据，以及预览确认后按 canonical chat ID 创建来源的服务边界；随后接入现有 admin 路由、审计、失败恢复和 Vue 工作区。旧的直接 `chat_ref` 新增路径不再作为管理台正常流程。
+- 影响文件：预计新增 `internal/telegram/control_client.go`、`internal/services/telegram_management.go` 及测试，修改 `internal/handlers/`、`internal/services/telegram_source.go`、`main.go`、`CONTEXT.md`、`plan.md`；后续修改 `admin-web/src/`；继续排除用户既有 `docs/examples/`。
+- 验证：先建立控制客户端、票据消费和已确认来源创建的无网络红灯测试；随后运行 Telegram/API 相关 Go 包测试、race、vet 和管理端构建。
+
 ## 2026-09-04 16:11 +0800
 - 进度：完成采集器常驻控制面接线。`-mode run` 通过运行时门控重建已授权 MTProto 客户端及其采集/订阅/Asynq 实例，不再创建 stdin 登录输入器；私有控制 HTTP、立即及 30 秒心跳独立常驻，未授权 session 时页面仍可查询并启动手机号或二维码授权。补充真实监听器集成测试，覆盖控制状态响应、初始心跳和取消后的优雅关闭。
 - 影响文件：`cmd/telegram-ingestor/main.go`、新增 `cmd/telegram-ingestor/control_service.go`、`cmd/telegram-ingestor/heartbeat.go`、`cmd/telegram-ingestor/control_service_test.go`、`CONTEXT.md`、`plan.md`；继续排除用户既有 `docs/examples/`。

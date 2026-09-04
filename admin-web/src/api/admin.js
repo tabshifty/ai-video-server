@@ -189,6 +189,26 @@ export const generateAdminImage = (payload) =>
 export const getAdminTasks = (params) => request.get('/admin/tasks', { params })
 export const getAdminForumPosts = (params) => request.get('/admin/forum-posts', { params })
 
+export const getAdminTelegramStatus = () => request.get('/admin/telegram/status')
+export const issueAdminTelegramConfirmation = (payload) => request.post('/admin/telegram/confirmations', payload)
+export const startAdminTelegramPhoneAuthorization = (payload) => request.post('/admin/telegram/authorizations/phone', payload)
+export const startAdminTelegramQRAuthorization = (payload) => request.post('/admin/telegram/authorizations/qr', payload)
+export const getAdminTelegramAuthorization = (id) => request.get(`/admin/telegram/authorizations/${id}`)
+export const submitAdminTelegramAuthorizationCode = (id, payload) =>
+  request.post(`/admin/telegram/authorizations/${id}/code`, payload)
+export const submitAdminTelegramAuthorizationPassword = (id, payload) =>
+  request.post(`/admin/telegram/authorizations/${id}/password`, payload)
+export const cancelAdminTelegramAuthorization = (id) => request.post(`/admin/telegram/authorizations/${id}/cancel`)
+export const previewAdminTelegramSource = (payload) => request.post('/admin/telegram/sources/preview', payload)
+export const confirmAdminTelegramSource = (payload) => request.post('/admin/telegram/sources/confirm', payload)
+export const getAdminTelegramSources = () => request.get('/admin/telegram/sources')
+export const pauseAdminTelegramSource = (id) => request.post(`/admin/telegram/sources/${id}/pause`)
+export const resumeAdminTelegramSource = (id) => request.post(`/admin/telegram/sources/${id}/resume`)
+export const recoverAdminTelegramSource = (id) => request.post(`/admin/telegram/sources/${id}/recover`)
+export const startAdminTelegramSourceBackfill = (id) => request.post(`/admin/telegram/sources/${id}/backfill`)
+export const getAdminTelegramSourceProgress = (id) => request.get(`/admin/telegram/sources/${id}/progress`)
+export const getAdminTelegramAudits = (params) => request.get('/admin/telegram/audits', { params })
+
 export const startOrphanFileScan = () => request.post('/admin/system/orphan-files/scan')
 export const getLatestOrphanFileScan = () => request.get('/admin/system/orphan-files/latest')
 export const deleteLatestOrphanFileScan = () =>

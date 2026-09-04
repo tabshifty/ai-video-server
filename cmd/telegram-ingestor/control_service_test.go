@@ -33,7 +33,13 @@ func TestIngestorControlServiceProjectsStatusAndDelegatesOperations(t *testing.T
 			LastSeenAt:    now,
 		},
 	}
-	authorizations := &ingestorControlTestAuthorization{}
+	authorizationID := uuid.New()
+	authorizations := &ingestorControlTestAuthorization{active: &telegram.AuthorizationView{
+		ID:      authorizationID,
+		Kind:    telegram.AuthorizationKindPhone,
+		Status:  telegram.AuthorizationStatusAwaitingCode,
+		OwnerID: actorID,
+	}}
 	previews := &ingestorControlTestPreview{}
 	service := newIngestorControlService(repo, ingestorControlTestRuntime{view: telegramRuntimeView{
 		Status: models.TelegramIngestorStatusRunning,
@@ -51,6 +57,9 @@ func TestIngestorControlServiceProjectsStatusAndDelegatesOperations(t *testing.T
 	}
 	if got, _ := status.Heartbeat["status"].(string); got != models.TelegramIngestorStatusRunning {
 		t.Fatalf("status heartbeat = %+v", status.Heartbeat)
+	}
+	if status.Authorization == nil || status.Authorization.ID != authorizationID || authorizations.activeActor != actorID.String() {
+		t.Fatalf("status authorization = %+v, fake=%+v", status.Authorization, authorizations)
 	}
 
 	if _, err := service.StartPhone(context.Background(), "request-123", actorID.String()); err != nil {
@@ -206,6 +215,13 @@ func (r *ingestorControlTestRepository) UpsertTelegramIngestorHeartbeat(_ contex
 
 type ingestorControlTestAuthorization struct {
 	startPhoneActor string
+	activeActor     string
+	active          *telegram.AuthorizationView
+}
+
+func (s *ingestorControlTestAuthorization) ActiveAuthorization(_ context.Context, actorID string) (*telegram.AuthorizationView, error) {
+	s.activeActor = actorID
+	return s.active, nil
 }
 
 func (s *ingestorControlTestAuthorization) StartPhone(_ context.Context, actorID string) (telegram.AuthorizationView, error) {

@@ -137,6 +137,7 @@ func TestTelegramEnvironmentExampleIsComplete(t *testing.T) {
 		"TELEGRAM_CONTROL_QUEUE",
 		"TELEGRAM_DOWNLOAD_CONCURRENCY",
 		"TELEGRAM_MAX_ACTIVE_TASKS",
+		"TELEGRAM_CONTROL_TOKEN",
 		"TELEGRAM_SESSION_HOST_PATH",
 		"VIDEO_STORAGE_HOST_PATH",
 		"VIDEO_UPLOAD_TEMP_HOST_PATH",
@@ -151,6 +152,28 @@ func TestTelegramRunbookCoversRequiredOperationsAndSafety(t *testing.T) {
 	runbook := string(readProjectFile(t, "docs/telegram-video-ingestion.md"))
 	for _, required := range []string{
 		"migrate-apply.sh",
+		"/admin/telegram",
+		"手机号授权",
+		"二维码重新授权",
+		"预解析",
+		"确认添加",
+		"恢复失败来源",
+		"重新回填",
+		"0039_telegram_management.up.sql",
+		"TELEGRAM_CONTROL_TOKEN",
+		"0038_telegram_video_ingestion.down.sql",
+		"0039_telegram_management.down.sql",
+		"FloodWait",
+		"个人账号",
+		"私密邀请",
+		"session",
+		"版权",
+	} {
+		if !strings.Contains(runbook, required) {
+			t.Errorf("Telegram 运维手册缺少 %q", required)
+		}
+	}
+	for _, removed := range []string{
 		"-mode login",
 		"/admin/telegram/sources",
 		"/progress",
@@ -158,14 +181,11 @@ func TestTelegramRunbookCoversRequiredOperationsAndSafety(t *testing.T) {
 		"/resume",
 		"/backfill",
 		"processing_status = 'failed'",
-		"0038_telegram_video_ingestion.down.sql",
-		"FloodWait",
-		"个人账号",
-		"session",
-		"版权",
+		"telegram_media SET",
+		"FLUSHDB",
 	} {
-		if !strings.Contains(runbook, required) {
-			t.Errorf("Telegram 运维手册缺少 %q", required)
+		if strings.Contains(runbook, removed) {
+			t.Errorf("Telegram 运维手册不应再包含旧手工操作 %q", removed)
 		}
 	}
 

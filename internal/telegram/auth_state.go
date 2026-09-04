@@ -245,6 +245,25 @@ func (s *AuthorizationStateMachine) View(authorizationID, _ uuid.UUID) (Authoriz
 	return record.view(), true
 }
 
+// Active returns the one active authorization for status projection. It is a
+// sanitized read-only view: callers may observe progress but still need
+// CanSubmit to decide whether they may send a code or password.
+func (s *AuthorizationStateMachine) Active() (AuthorizationView, bool) {
+	if s == nil {
+		return AuthorizationView{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record := s.active
+	if record == nil {
+		return AuthorizationView{}, false
+	}
+	now := s.now()
+	s.expireActiveLocked(now)
+	s.expireQRImageLocked(record, now)
+	return record.view(), true
+}
+
 // Cancel terminates an active authorization owned by ownerID.
 func (s *AuthorizationStateMachine) Cancel(authorizationID, ownerID uuid.UUID) error {
 	if !s.CanSubmit(authorizationID, ownerID) {

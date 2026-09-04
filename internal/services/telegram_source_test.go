@@ -10,12 +10,14 @@ import (
 
 	"video-server/internal/models"
 	"video-server/internal/repository"
+	"video-server/internal/telegram"
 )
 
 type telegramSourceFakeRepository struct {
 	sources   map[uuid.UUID]models.TelegramSource
 	counts    map[uuid.UUID]map[string]int
 	created   []models.TelegramSource
+	audits    []models.TelegramAuditLog
 	patches   map[uuid.UUID][]repository.TelegramSourcePatch
 	createErr error
 	listErr   error
@@ -43,6 +45,14 @@ func (r *telegramSourceFakeRepository) CreateTelegramSource(_ context.Context, s
 	}
 	r.sources[source.ID] = source
 	r.created = append(r.created, source)
+	return nil
+}
+
+func (r *telegramSourceFakeRepository) CreateTelegramSourceWithAudit(ctx context.Context, source models.TelegramSource, audit models.TelegramAuditLog) error {
+	if err := r.CreateTelegramSource(ctx, source); err != nil {
+		return err
+	}
+	r.audits = append(r.audits, audit)
 	return nil
 }
 
@@ -103,6 +113,14 @@ func (r *telegramSourceFakeRepository) UpdateTelegramSource(_ context.Context, s
 	return nil
 }
 
+func (r *telegramSourceFakeRepository) UpdateTelegramSourceWithAudit(ctx context.Context, sourceID uuid.UUID, patch repository.TelegramSourcePatch, audit models.TelegramAuditLog) error {
+	if err := r.UpdateTelegramSource(ctx, sourceID, patch); err != nil {
+		return err
+	}
+	r.audits = append(r.audits, audit)
+	return nil
+}
+
 func (r *telegramSourceFakeRepository) CountTelegramMediaByStatus(_ context.Context, sourceID uuid.UUID) (map[string]int, error) {
 	if r.countErr != nil {
 		return nil, r.countErr
@@ -123,51 +141,52 @@ func (q *telegramSourceFakeTasks) EnqueueSourceSync(sourceID uuid.UUID) error {
 	return nil
 }
 
-func TestTelegramSourceServiceRejectsEmptyChatReference(t *testing.T) {
-	repo := newTelegramSourceFakeRepository()
-	service := NewTelegramSourceService(repo, &telegramSourceFakeTasks{})
-
-	_, err := service.Add(context.Background(), "   ")
-	if !errors.Is(err, ErrTelegramChatRefRequired) {
-		t.Fatalf("Add() error = %v, want ErrTelegramChatRefRequired", err)
-	}
-	if len(repo.created) != 0 {
-		t.Fatalf("created source count = %d, want 0", len(repo.created))
-	}
-}
-
-func TestTelegramSourceServiceRejectsDuplicateChatReference(t *testing.T) {
-	repo := newTelegramSourceFakeRepository()
-	existingID := uuid.New()
-	repo.sources[existingID] = models.TelegramSource{ID: existingID, ChatRef: "@TestGroup", Enabled: true, SyncStatus: "live"}
-	service := NewTelegramSourceService(repo, &telegramSourceFakeTasks{})
-
-	_, err := service.Add(context.Background(), " @testgroup/ ")
-	if !errors.Is(err, ErrTelegramSourceAlreadyExists) {
-		t.Fatalf("Add() error = %v, want ErrTelegramSourceAlreadyExists", err)
-	}
-}
-
-func TestTelegramSourceServiceAddsSourceAndEnqueuesSync(t *testing.T) {
+func TestTelegramSourceServiceAddsConfirmedCanonicalSourceWithoutOriginalReference(t *testing.T) {
 	repo := newTelegramSourceFakeRepository()
 	tasks := &telegramSourceFakeTasks{}
 	service := NewTelegramSourceService(repo, tasks)
+	actorID := uuid.New()
 
-	source, err := service.Add(context.Background(), " https://t.me/TestGroup/ ")
+	source, err := service.AddConfirmed(context.Background(), actorID, telegram.ChatPreview{
+		ChatID:   -100123,
+		Title:    "已确认频道",
+		Username: "confirmed_channel",
+		ChatType: telegram.TelegramChatTypeChannel,
+	})
 	if err != nil {
-		t.Fatalf("Add() error = %v", err)
+		t.Fatalf("AddConfirmed() error = %v", err)
 	}
-	if source.ID == uuid.Nil || source.ChatRef != "https://t.me/TestGroup" || !source.Enabled || source.SyncStatus != "pending" {
-		t.Fatalf("created source = %+v", source)
+	if source.ChatID != -100123 || source.ChatRef != "-100123" || source.Title != "已确认频道" || source.Username != "confirmed_channel" || !source.Enabled || source.SyncStatus != "pending" {
+		t.Fatalf("confirmed source = %+v", source)
 	}
 	if len(tasks.sourceIDs) != 1 || tasks.sourceIDs[0] != source.ID {
 		t.Fatalf("source sync tasks = %v, want [%s]", tasks.sourceIDs, source.ID)
+	}
+	if len(repo.audits) != 1 || repo.audits[0].ActorUserID != actorID || repo.audits[0].Action != "source.created" || repo.audits[0].TargetID != source.ID.String() {
+		t.Fatalf("source audits = %+v", repo.audits)
+	}
+}
+
+func TestTelegramSourceServiceRejectsDuplicateConfirmedChatID(t *testing.T) {
+	repo := newTelegramSourceFakeRepository()
+	existingID := uuid.New()
+	repo.sources[existingID] = models.TelegramSource{ID: existingID, ChatID: -100123, ChatRef: "-100123"}
+	service := NewTelegramSourceService(repo, &telegramSourceFakeTasks{})
+
+	_, err := service.AddConfirmed(context.Background(), uuid.New(), telegram.ChatPreview{
+		ChatID:   -100123,
+		Title:    "重复频道",
+		ChatType: telegram.TelegramChatTypeChannel,
+	})
+	if !errors.Is(err, ErrTelegramSourceAlreadyExists) {
+		t.Fatalf("AddConfirmed() error = %v, want ErrTelegramSourceAlreadyExists", err)
 	}
 }
 
 func TestTelegramSourceServicePauseAndResumePreserveCursor(t *testing.T) {
 	repo := newTelegramSourceFakeRepository()
 	tasks := &telegramSourceFakeTasks{}
+	actorID := uuid.New()
 	sourceID := uuid.New()
 	repo.sources[sourceID] = models.TelegramSource{
 		ID:                     sourceID,
@@ -180,7 +199,7 @@ func TestTelegramSourceServicePauseAndResumePreserveCursor(t *testing.T) {
 	}
 	service := NewTelegramSourceService(repo, tasks)
 
-	paused, err := service.Pause(context.Background(), sourceID)
+	paused, err := service.Pause(context.Background(), actorID, sourceID)
 	if err != nil {
 		t.Fatalf("Pause() error = %v", err)
 	}
@@ -188,7 +207,7 @@ func TestTelegramSourceServicePauseAndResumePreserveCursor(t *testing.T) {
 		t.Fatalf("paused source = %+v", paused)
 	}
 
-	resumed, err := service.Resume(context.Background(), sourceID)
+	resumed, err := service.Resume(context.Background(), actorID, sourceID)
 	if err != nil {
 		t.Fatalf("Resume() error = %v", err)
 	}
@@ -197,6 +216,9 @@ func TestTelegramSourceServicePauseAndResumePreserveCursor(t *testing.T) {
 	}
 	if len(tasks.sourceIDs) != 1 || tasks.sourceIDs[0] != sourceID {
 		t.Fatalf("resume source sync tasks = %v, want [%s]", tasks.sourceIDs, sourceID)
+	}
+	if len(repo.audits) != 2 || repo.audits[0].Action != "source.paused" || repo.audits[1].Action != "source.resumed" {
+		t.Fatalf("source audits = %+v", repo.audits)
 	}
 }
 
@@ -220,6 +242,7 @@ func TestTelegramSourceServiceProgressIncludesStatusCounts(t *testing.T) {
 func TestTelegramSourceServiceStartBackfillResetsCursor(t *testing.T) {
 	repo := newTelegramSourceFakeRepository()
 	tasks := &telegramSourceFakeTasks{}
+	actorID := uuid.New()
 	sourceID := uuid.New()
 	completedAt := time.Now().UTC().Add(-time.Hour)
 	repo.sources[sourceID] = models.TelegramSource{
@@ -232,7 +255,7 @@ func TestTelegramSourceServiceStartBackfillResetsCursor(t *testing.T) {
 	}
 	service := NewTelegramSourceService(repo, tasks)
 
-	source, err := service.StartBackfill(context.Background(), sourceID)
+	source, err := service.StartBackfill(context.Background(), actorID, sourceID)
 	if err != nil {
 		t.Fatalf("StartBackfill() error = %v", err)
 	}
@@ -241,5 +264,53 @@ func TestTelegramSourceServiceStartBackfillResetsCursor(t *testing.T) {
 	}
 	if len(tasks.sourceIDs) != 1 || tasks.sourceIDs[0] != sourceID {
 		t.Fatalf("backfill source sync tasks = %v, want [%s]", tasks.sourceIDs, sourceID)
+	}
+	if len(repo.audits) != 1 || repo.audits[0].Action != "source.backfill_started" || repo.audits[0].ActorUserID != actorID {
+		t.Fatalf("source audits = %+v", repo.audits)
+	}
+}
+
+func TestTelegramSourceServiceRecoversFailedSourceWithoutResettingCursor(t *testing.T) {
+	repo := newTelegramSourceFakeRepository()
+	tasks := &telegramSourceFakeTasks{}
+	actorID := uuid.New()
+	sourceID := uuid.New()
+	nextRetryAt := time.Now().UTC().Add(time.Hour)
+	repo.sources[sourceID] = models.TelegramSource{
+		ID:                     sourceID,
+		ChatID:                 -100123,
+		ChatRef:                "-100123",
+		Enabled:                true,
+		SyncStatus:             "error",
+		HistoryCursorMessageID: 345,
+		LastError:              "会话暂时不可用",
+		NextRetryAt:            &nextRetryAt,
+	}
+	service := NewTelegramSourceService(repo, tasks)
+
+	recovered, err := service.Recover(context.Background(), actorID, sourceID)
+	if err != nil {
+		t.Fatalf("Recover() error = %v", err)
+	}
+	if !recovered.Enabled || recovered.SyncStatus != "pending" || recovered.HistoryCursorMessageID != 345 || recovered.LastError != "" || recovered.NextRetryAt != nil {
+		t.Fatalf("recovered source = %+v", recovered)
+	}
+	if len(tasks.sourceIDs) != 1 || tasks.sourceIDs[0] != sourceID {
+		t.Fatalf("source recovery tasks = %v, want [%s]", tasks.sourceIDs, sourceID)
+	}
+	if len(repo.audits) != 1 || repo.audits[0].Action != "source.recovery_started" || repo.audits[0].ActorUserID != actorID {
+		t.Fatalf("source audits = %+v", repo.audits)
+	}
+}
+
+func TestTelegramSourceServiceRejectsRecoveryForHealthySource(t *testing.T) {
+	repo := newTelegramSourceFakeRepository()
+	sourceID := uuid.New()
+	repo.sources[sourceID] = models.TelegramSource{ID: sourceID, ChatRef: "-100123", Enabled: true, SyncStatus: "live"}
+	service := NewTelegramSourceService(repo, &telegramSourceFakeTasks{})
+
+	_, err := service.Recover(context.Background(), uuid.New(), sourceID)
+	if !errors.Is(err, ErrTelegramSourceNotRecoverable) {
+		t.Fatalf("Recover() error = %v, want ErrTelegramSourceNotRecoverable", err)
 	}
 }

@@ -173,6 +173,30 @@ func TestAuthorizationServiceRestrictsSecretSubmissionToOwnerAndCancels(t *testi
 	}
 }
 
+func TestAuthorizationServiceExposesSanitizedActiveAuthorizationToAdministrators(t *testing.T) {
+	t.Parallel()
+
+	ownerID := uuid.New()
+	observerID := uuid.New()
+	service := NewAuthorizationService(AuthorizationServiceConfig{
+		Repository: newAuthorizationServiceFakeRepository(),
+		Sessions:   authorizationServiceFakeFactory{session: &authorizationServiceFakeSession{}},
+		State:      NewAuthorizationStateMachine(nil, time.Minute),
+	})
+
+	started, err := service.StartPhone(context.Background(), ownerID.String())
+	if err != nil {
+		t.Fatalf("StartPhone() error = %v", err)
+	}
+	active, err := service.ActiveAuthorization(context.Background(), observerID.String())
+	if err != nil {
+		t.Fatalf("ActiveAuthorization() error = %v", err)
+	}
+	if active == nil || active.ID != started.ID || active.OwnerID != ownerID || active.Status != AuthorizationStatusAwaitingCode {
+		t.Fatalf("active authorization = %+v, want active phone flow", active)
+	}
+}
+
 type authorizationServiceFakeRepository struct {
 	mu             sync.Mutex
 	account        models.TelegramAccountState

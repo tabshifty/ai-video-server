@@ -21,6 +21,53 @@ var (
 	ErrTelegramAuthorizationNotFound = errors.New("Telegram 授权记录不存在")
 )
 
+// CreateTelegramSourceWithAudit atomically records a newly confirmed source
+// and its sanitized administrative audit event. The source must already carry
+// a canonical chat ID; raw invitation references are never accepted here.
+func (r *VideoRepository) CreateTelegramSourceWithAudit(ctx context.Context, source models.TelegramSource, audit models.TelegramAuditLog) error {
+	if r == nil || r.pool == nil {
+		return errors.New("Telegram 来源仓储不可用")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("开始 Telegram 来源审计事务: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := createTelegramSource(ctx, tx, source); err != nil {
+		return err
+	}
+	if err := createTelegramAuditLog(ctx, tx, audit); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("提交 Telegram 来源审计事务: %w", err)
+	}
+	return nil
+}
+
+// UpdateTelegramSourceWithAudit atomically changes a source lifecycle state
+// and appends its sanitized administrator audit event.
+func (r *VideoRepository) UpdateTelegramSourceWithAudit(ctx context.Context, sourceID uuid.UUID, patch TelegramSourcePatch, audit models.TelegramAuditLog) error {
+	if r == nil || r.pool == nil {
+		return errors.New("Telegram 来源仓储不可用")
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("开始 Telegram 来源状态审计事务: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := updateTelegramSource(ctx, tx, sourceID, patch); err != nil {
+		return err
+	}
+	if err := createTelegramAuditLog(ctx, tx, audit); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("提交 Telegram 来源状态审计事务: %w", err)
+	}
+	return nil
+}
+
 // GetTelegramAccountState returns the singleton account metadata.
 func (r *VideoRepository) GetTelegramAccountState(ctx context.Context) (models.TelegramAccountState, error) {
 	row := r.pool.QueryRow(ctx, `
@@ -196,6 +243,10 @@ WHERE id = $1`, id, strings.TrimSpace(status), strings.TrimSpace(errorSummary), 
 
 // CreateTelegramAuditLog appends a sanitized administrative event.
 func (r *VideoRepository) CreateTelegramAuditLog(ctx context.Context, item models.TelegramAuditLog) error {
+	return createTelegramAuditLog(ctx, r.pool, item)
+}
+
+func createTelegramAuditLog(ctx context.Context, db telegramQuerier, item models.TelegramAuditLog) error {
 	if item.ActorUserID == uuid.Nil || strings.TrimSpace(item.Action) == "" {
 		return errors.New("Telegram 审计缺少操作者或动作")
 	}
@@ -209,7 +260,7 @@ func (r *VideoRepository) CreateTelegramAuditLog(ctx context.Context, item model
 	if item.Result == "" {
 		item.Result = "succeeded"
 	}
-	_, err := r.pool.Exec(ctx, `
+	_, err := db.Exec(ctx, `
 INSERT INTO telegram_audit_logs (
     actor_user_id, action, target_type, target_id, result, summary, created_at
 )

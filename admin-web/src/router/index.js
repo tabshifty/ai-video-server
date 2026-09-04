@@ -9,6 +9,7 @@ import VideoUpload from '../views/VideoUpload.vue'
 import TvSeriesManage from '../views/TvSeriesManage.vue'
 import TvAppManage from '../views/TvAppManage.vue'
 import IPTVManage from '../views/IPTVManage.vue'
+import TelegramManage from '../views/TelegramManage.vue'
 import ScrapePreview from '../views/ScrapePreview.vue'
 import AVManualScrape from '../views/AVManualScrape.vue'
 import UserManage from '../views/UserManage.vue'
@@ -36,6 +37,7 @@ const routes = [
   { path: '/tv-series', component: TvSeriesManage },
   { path: '/tv-app', component: TvAppManage },
   { path: '/iptv', component: IPTVManage },
+  { path: '/telegram', component: TelegramManage },
   { path: '/upload', component: VideoUpload },
   { path: '/scrape', component: ScrapePreview },
   { path: '/av-scrape', component: AVManualScrape },

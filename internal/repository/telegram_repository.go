@@ -69,6 +69,10 @@ type telegramMediaRowScanner interface {
 
 // CreateTelegramSource inserts an administrator-selected chat reference.
 func (r *VideoRepository) CreateTelegramSource(ctx context.Context, source models.TelegramSource) error {
+	return createTelegramSource(ctx, r.pool, source)
+}
+
+func createTelegramSource(ctx context.Context, db telegramQuerier, source models.TelegramSource) error {
 	if source.ID == uuid.Nil {
 		return fmt.Errorf("create Telegram source: missing id")
 	}
@@ -87,7 +91,7 @@ func (r *VideoRepository) CreateTelegramSource(ctx context.Context, source model
 	if source.UpdatedAt.IsZero() {
 		source.UpdatedAt = source.CreatedAt
 	}
-	_, err := r.pool.Exec(ctx, `
+	_, err := db.Exec(ctx, `
 INSERT INTO telegram_sources (
     id, chat_id, chat_ref, title, username, enabled, sync_status,
     history_cursor_message_id, last_error, next_retry_at,

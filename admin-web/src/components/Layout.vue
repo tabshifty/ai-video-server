@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowRight,
   Avatar,
+  Connection,
   DataAnalysis,
   Expand,
   Files,
@@ -52,6 +53,7 @@ const validGroupKeys = adminShellNavGroups.map((group) => group.key)
 
 const iconMap = {
   Avatar,
+  Connection,
   DataAnalysis,
   Files,
   Film,

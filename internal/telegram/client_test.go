@@ -214,3 +214,27 @@ func TestRequireTelegramAuthorizedRejectsMissingSessionAuthorization(t *testing.
 		t.Fatalf("requireTelegramAuthorized() error = %v", err)
 	}
 }
+
+func TestIsPrivateInviteReference(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		ref  string
+		want bool
+	}{
+		{ref: "https://t.me/+privateInviteToken", want: true},
+		{ref: "https://telegram.me/joinchat/privateInviteToken", want: true},
+		{ref: "tg://join?invite=privateInviteToken", want: true},
+		{ref: "@public_channel", want: false},
+		{ref: "https://t.me/public_channel", want: false},
+		{ref: "-100123", want: false},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.ref, func(t *testing.T) {
+			if got := IsPrivateInviteReference(tt.ref); got != tt.want {
+				t.Fatalf("IsPrivateInviteReference(%q) = %v, want %v", tt.ref, got, tt.want)
+			}
+		})
+	}
+}

@@ -21,6 +21,7 @@ type ingestorControlRuntime interface {
 }
 
 type ingestorControlAuthorizations interface {
+	ActiveAuthorization(ctx context.Context, actorID string) (*telegram.AuthorizationView, error)
 	StartPhone(ctx context.Context, actorID string) (telegram.AuthorizationView, error)
 	StartQR(ctx context.Context, actorID string) (telegram.AuthorizationView, error)
 	GetAuthorization(ctx context.Context, authorizationID, actorID string) (telegram.AuthorizationView, error)
@@ -59,12 +60,20 @@ func newIngestorControlService(
 
 // Status returns durable account data together with the current in-process
 // runtime view. A missing singleton row is a normal unconfigured state.
-func (s *ingestorControlService) Status(ctx context.Context, requestID, _ string) (telegram.ControlStatus, error) {
+func (s *ingestorControlService) Status(ctx context.Context, requestID, actorID string) (telegram.ControlStatus, error) {
 	if s == nil || s.repo == nil || s.runtime == nil {
 		return telegram.ControlStatus{}, errors.New("Telegram 控制服务不可用")
 	}
 	if ctx == nil {
 		return telegram.ControlStatus{}, errors.New("Telegram 控制状态 context 不能为空")
+	}
+	var authorization *telegram.AuthorizationView
+	if s.authorizations != nil {
+		view, err := s.authorizations.ActiveAuthorization(ctx, actorID)
+		if err != nil {
+			return telegram.ControlStatus{}, fmt.Errorf("读取 Telegram 当前授权: %w", err)
+		}
+		authorization = view
 	}
 	account, err := s.repo.GetTelegramAccountState(ctx)
 	if err != nil && !errors.Is(err, repository.ErrTelegramAccountStateNotFound) {
@@ -86,6 +95,7 @@ func (s *ingestorControlService) Status(ctx context.Context, requestID, _ string
 		IngestorStatus: view.Status,
 		AccountStatus:  account.Status,
 		Account:        controlAccountMap(account),
+		Authorization:  authorization,
 		Error:          strings.TrimSpace(view.Error),
 	}
 	heartbeat, err := s.repo.GetTelegramIngestorHeartbeat(ctx)

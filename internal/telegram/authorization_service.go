@@ -284,11 +284,47 @@ func (s *AuthorizationService) GetAuthorization(ctx context.Context, authorizati
 		active := s.active[id]
 		s.mu.Unlock()
 		if active != nil {
-			s.finishTerminal(ctx, active, AuthorizationStatusExpired, "", nil, false)
+			s.finishTerminal(ctx, active, AuthorizationStatusExpired, "", nil, true)
 			view, _ = s.view(id, owner)
 		}
 	}
 	return view, nil
+}
+
+// ActiveAuthorization returns the single in-progress authorization for the
+// control status projection. Any authenticated administrator may view its
+// sanitized state, but only its owner can submit secrets through the existing
+// ownership checks.
+func (s *AuthorizationService) ActiveAuthorization(ctx context.Context, actorID string) (*AuthorizationView, error) {
+	if s == nil || s.state == nil {
+		return nil, errors.New("Telegram 授权服务不可用")
+	}
+	if ctx == nil {
+		return nil, errors.New("Telegram 授权 context 不能为空")
+	}
+	observerID, err := parseAuthorizationActorID(actorID)
+	if err != nil {
+		return nil, err
+	}
+	view, ok := s.state.Active()
+	if !ok {
+		return nil, nil
+	}
+	if view.Status == AuthorizationStatusExpired {
+		s.mu.Lock()
+		active := s.active[view.ID]
+		s.mu.Unlock()
+		if active != nil {
+			if err := s.finishTerminal(ctx, active, AuthorizationStatusExpired, "", nil, true); err != nil {
+				return nil, err
+			}
+			view, err = s.view(view.ID, observerID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return &view, nil
 }
 
 // Cancel stops an active authorization. It does not modify an existing bound

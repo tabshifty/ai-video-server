@@ -23,6 +23,7 @@ import (
 	"video-server/internal/queue"
 	"video-server/internal/repository"
 	"video-server/internal/services"
+	"video-server/internal/telegram"
 )
 
 //go:generate go run ./cmd/gen-openapi
@@ -202,6 +203,25 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 	telegramTasks := queue.NewTelegramTaskEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.TelegramRealtimeQueue, cfg.TelegramBackfillQueue, cfg.TelegramControlQueue)
 	defer telegramTasks.Close()
 	telegramSourceSvc := services.NewTelegramSourceService(repo, telegramTasks)
+	var telegramManagementSvc *services.TelegramManagementService
+	if cfg.TelegramControlToken != "" {
+		controlClient, err := telegram.NewControlClient(telegram.ControlClientConfig{
+			BaseURL: cfg.TelegramControlURL,
+			Token:   cfg.TelegramControlToken,
+		})
+		if err != nil {
+			return fmt.Errorf("创建 Telegram 控制客户端: %w", err)
+		}
+		telegramConfirmations := services.NewTelegramConfirmationService(services.TelegramConfirmationServiceConfig{
+			Repository: repo,
+		})
+		telegramManagementSvc = services.NewTelegramManagementService(services.TelegramManagementServiceConfig{
+			Control:       controlClient,
+			Sources:       telegramSourceSvc,
+			Audits:        repo,
+			Confirmations: telegramConfirmations,
+		})
+	}
 	passwordVaultCipher, err := services.NewPasswordVaultCipher(cfg.PasswordVaultKey)
 	if err != nil {
 		return err
@@ -221,7 +241,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		subtitleSvc,
 		archiveImportSvc,
 		hermesForumSvc,
-		telegramSourceSvc,
+		telegramManagementSvc,
 		enqueuer,
 		logger,
 		redisClient,
