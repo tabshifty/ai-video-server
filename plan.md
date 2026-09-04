@@ -1,6 +1,36 @@
 # plan.md
 
+## 2026-09-04 继续 +0800
+- 进度：接续 Telegram 管理台控制平面实现。已确认上轮红灯测试进程退出，开始实现 `0039` 管理状态 schema、账号/心跳/授权/审计模型与仓储；随后接入授权状态机、内部控制 HTTP 和管理 API/页面。
+- 影响文件：预计新增 `migrations/0039_telegram_management.*.sql`、`internal/models/telegram_management.go`、`internal/repository/telegram_management_repository.go`、`internal/telegram/auth_state.go`、`internal/telegram/control.go` 及后续管理服务、页面和部署配置；保留用户既有 `docs/examples/` 不纳入。
+- 验证：已确认 `TestTelegramManagementMigration` 与 `TestAuthorizationStateMachine|TestControlHandler` 按预期红灯；实现后分阶段运行 Go 定向测试、`go vet`、管理端构建、差异检查和乱码扫描。真实 Telegram 凭据与 Docker 端到端验收仍待部署环境。
+
+## 2026-09-03 13:05 +0800
+- 进度：开始实现 Telegram 管理台控制平面。第一阶段锁定 `0039` 账号状态、采集器心跳、短期授权元数据和追加式审计表，并建立内部控制协议、常量时间 token 校验、敏感字段脱敏和单例授权状态机的红灯测试；不改变既有 `0038` 来源/媒体表及采集队列语义。
+- 影响文件：预计新增 `migrations/0039_telegram_management.*.sql`、`internal/models/telegram_management.go`、`internal/repository/telegram_management_repository.go`、`internal/telegram/control.go`、`internal/telegram/auth_state.go` 及对应测试；保留用户既有 `docs/examples/` 不纳入。
+- 验证：先运行新增定向测试确认因实现缺失而失败；随后按阶段运行 Go 定向测试、`go vet`、管理端构建和差异/乱码检查。真实 Telegram 手机号、二维码、私密邀请和重启恢复继续留待具备凭据与 Docker 的部署机验收。
+
+## 2026-09-03 12:20 +0800
+- 进度：用户确认采用 Telegram 管理台全部推荐方案，开始进入实现。新增能力将以 `telegram-ingestor` 独占 session、API 仅经 Docker 内网控制通道转发为边界；引入前向兼容的账号状态/采集器心跳/审计 migration，保留现有来源 API 与队列语义。首次以手机号验证码绑定，二维码仅用于已绑定账号重新授权；高风险操作使用当前管理员密码确认与一次性短期凭据；来源采用预解析后确认、canonical chat ID 去重和来源级失败恢复。
+- 影响文件：预计新增 `migrations/0039_telegram_management.*.sql`、`docs/adr/0026-telegram-ingestor-control-plane.md`、Telegram 控制/管理 service 与测试；修改 `internal/telegram/`、`cmd/telegram-ingestor/`、`internal/handlers/`、`internal/repository/`、`internal/config/`、`main.go`、`deploy/docker-compose.telegram.yml`、`admin-web/src/`、`.env.example`、`CONTEXT.md`、`plan.md`。保留用户既有 `docs/examples/` 不纳入。
+- 验证：先建立 migration、控制协议、权限/脱敏和页面轮询的红灯测试；实现后运行相关 Go 测试、`go vet`、管理端 `npm run build` 与差异/乱码检查。真实手机号、二维码、私密群组、回填及重启恢复仅能在具备 Telegram 凭据与 Docker 的部署环境验收。
+
+## 2026-09-03 11:57 +0800
+- 进度：`grill-with-docs` 第五轮全部采用推荐方案。沿用现有 `admin` 权限；首次绑定、重新授权和私密邀请解析需要管理员密码确认及页面二次确认；授权会话全局单例且发起者独占秘密提交；二维码只返回短期图像；重新授权有限排空现有下载/导入；账号、采集器、来源状态分层；首期限定群组/超级群组/频道、预解析短期有效、无自定义别名；审计保留一年；普通状态 5 秒、授权状态 2 秒轮询且不重入。
+- 影响文件：`CONTEXT.md`、`plan.md`；当前仅记录领域术语和设计共识，未修改运行时代码、接口或管理端页面。
+- 验证：待最后一轮确认页面字段、接口响应、危险操作文案和端到端验收清单；用户确认共享理解前不进入实现。
+
 > 2026-08-11 压缩整理版：按用户要求删除纯部署、推送、重启、健康检查和镜像同步流水；将同一事项的访谈、开始、红灯、实现、复核、待提交等过程记录合并为最终有效结论。历史精确差异与验证细节以 Git 提交、`CONTEXT.md`、ADR 和 `tasks/*/DONE.md` 为准。后续仍按反向时间顺序在顶部追加计划与进度。
+
+## 2026-09-03 11:36 +0800
+- 进度：`grill-with-docs` Telegram 管理台设计访谈完成前三轮。用户确认采用完整页面化管理、单个系统 Telegram 采集账号、固定导入归属用户、添加来源前确认并自动历史回填、暂停/恢复/重新回填、失败恢复和轮询状态；新增二维码授权，但首次绑定仍要求手机号验证码，二维码只用于重新授权或恢复。页面不编辑部署级 API ID/hash、手机号或服务生命周期；验证码和二次验证密码属于短期授权输入，不持久化。二维码重新授权必须校验首次绑定的 Telegram 用户 ID；新 session 仅在校验成功后替换旧 session。来源先预解析再确认加入、按 canonical chat ID 去重，采集器运行状态通过心跳观测，页面不启动容器。
+- 影响文件：`CONTEXT.md`、`plan.md`；当前仅记录领域术语与设计共识，未修改运行时代码、接口或管理端页面。
+- 验证：已核对现有 Vue 管理端、管理员认证、Telegram gotd 客户端和二维码 API 能力；待继续完成登录状态机、来源生命周期、错误恢复和页面验收边界访谈，用户确认共享理解前不进入实现。
+
+## 2026-09-03 11:52 +0800
+- 进度：`grill-with-docs` 第四轮完成。用户确认 API 通过仅内部可达的采集器控制通道转发授权交互；新增单例 Telegram 账号状态元数据与追加式管理审计；私密邀请 token 解析后丢弃；采集器以 30 秒心跳、90 秒超时提供结构化运行状态；管理台 PC 优先并保证窄视口无溢出，不展示原始采集器日志。
+- 影响文件：`CONTEXT.md`、`plan.md`；当前仅补充领域语言和设计进度，未修改运行时代码、接口或管理端页面。
+- 验证：已核对现有 Compose session 挂载边界、Telegram 客户端 QR 能力和管理端路由/日志现状；待继续确认控制通道认证、管理员权限、审计保留和异常恢复细节，用户确认共享理解前不进入实现。
 
 ## 2026-09-02 21:47 +0800
 - 进度：Task 7 自动实现与仓库内验收完成。部署契约覆盖统一镜像、三服务共享路径、session 隔离、非 root 运行、容器服务名连接、固定容器端口、敏感构建上下文排除和手册必备操作；最终包级测试还发现并修复 Task 1 测试行扫描器缺少 Go `int` 目标支持的问题，生产仓储逻辑未改。
