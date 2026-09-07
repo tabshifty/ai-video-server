@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-07 16:09 +0800
+- 进度：完成 TV 整体优化的第一批确定性改进：设置页可滚动、连播整行单一开关与步长单选语义、账户动作区分图标；共享状态页收口主次按钮并支持换行；海报墙保存影片 ID 并恢复跨页焦点；重复确认当前菜单不重载或清空搜索。视觉方向与返回键偏好尚未收到答复，本批沿用原视觉和退出语义，整体重设计及实机验收仍待继续。
+- 影响文件：TV 设置/目录与 ViewModel、海报墙及焦点策略、共享状态组件、对应回归测试、`android-tv-app/tv-app/build.gradle.kts`（146 / 0.1.146）、`CONTEXT.md`、`plan.md`。既有 `docs/examples/` 不纳入。
+- 验证：搜索重复确认回归测试先失败后修复；完整 `:tv-app:testDebugUnitTest :tv-app:assembleDebug` 通过。独立评审发现返回期间刷新结束不触发焦点恢复，已补 `refreshing` effect key 并保留一次性抢焦保护；修复后 `:tv-app:testDebugUnitTest --tests '*TvPosterWall*' :tv-app:assembleDebug` 通过。差异与中文 U+FFFD 检查通过。ADB 无连接设备，尚未执行真实电视截图与遥控焦点验收。
+
+## 2026-09-07 16:00 +0800
+- 进度：启动 TV App 整体 UI 与遥控操作优化。已读取实际 TV 入口、共享视觉组件、目录/海报墙、设置与历史约定；确认设置页不可滚动、连播开关重复焦点、状态按钮独立样式等问题。先收口共享组件与设置可达性，再处理浏览恢复与导航；视觉方向和返回语义已向用户征询。
+- 影响文件：预计涉及 `android-tv-app/tv-app/src/main/java/com/chee/videos/core/ui/`、`feature/tv/`、`tv/` 及对应测试、TV 版本文件、`CONTEXT.md`、`plan.md`；排除既有未跟踪 `docs/examples/`。
+- 验证：按风险执行 TV 定向单测、全量单测与 debug 构建，收尾检查差异和中文编码；当前 `adb devices -l` 无连接设备，实机焦点与视觉验收仍需设备。
+
 ## 2026-09-04 17:41 +0800
 - 进度：完成 Telegram 管理台收尾。部署手册契约已改为校验管理页面、手机号/二维码授权、来源预解析确认、失败恢复和重新回填，并明确移除旧的交互式登录、直接来源 API 和手工媒体 SQL 流程；环境示例测试同步覆盖控制令牌。
 - 影响文件：`deploy/telegram_deploy_test.go`、`docs/telegram-video-ingestion.md`、`.env.example`、Telegram 管理 API/服务/采集器/管理端页面及其测试、`CONTEXT.md`；用户既有未跟踪目录 `docs/examples/` 明确不纳入。

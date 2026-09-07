@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -115,11 +116,20 @@ fun TvPosterWallScreen(
     val gridState = rememberLazyGridState()
     val firstItemFocusRequester = remember { FocusRequester() }
     val refreshFocusRequester = remember { FocusRequester() }
+    var lastFocusedItemId by rememberSaveable { mutableStateOf<String?>(null) }
     var initialFocusRequested by remember { mutableStateOf(false) }
     val wallSpec = resolveTvCatalogWallSpec(uiState.kind, uiState.title)
+    val focusTargetIndex = remember(uiState.items, lastFocusedItemId) {
+        resolveTvPosterWallRestoreIndex(uiState.items.map { it.id }, lastFocusedItemId)
+    }
+    val focusTargetId = uiState.items.getOrNull(focusTargetIndex)?.id
 
-    LaunchedTvInitialFocus(uiState.items.firstOrNull()?.id, uiState.page, uiState.loading) {
-        if (!initialFocusRequested && uiState.items.isNotEmpty() && uiState.page == 1 && !uiState.loading && !uiState.refreshing) {
+    LaunchedTvInitialFocus(uiState.items.firstOrNull()?.id, uiState.page, uiState.loading, uiState.refreshing) {
+        if (!initialFocusRequested && uiState.items.isNotEmpty() && !uiState.loading && !uiState.refreshing) {
+            // 返回时目标可能尚未进入可见组合，先定位网格再等待一帧请求焦点。
+            val headerCount = if (!uiState.errorMessage.isNullOrBlank()) 1 else 0
+            gridState.scrollToItem(focusTargetIndex + headerCount)
+            androidx.compose.runtime.withFrameNanos { }
             if (firstItemFocusRequester.tryRequestFocus()) {
                 initialFocusRequested = true
             }
@@ -211,7 +221,7 @@ fun TvPosterWallScreen(
                         // N 张海报卡显式同型，避免与 refreshing/error/loadingMore 头尾项混用组合槽
                         contentType = { _, _ -> "poster" },
                     ) { index, item ->
-                        val focusModifier = if (uiState.page == 1 && uiState.items.firstOrNull()?.id == item.id) {
+                        val focusModifier = if (focusTargetId == item.id) {
                             Modifier.focusRequester(firstItemFocusRequester)
                         } else {
                             Modifier
@@ -219,7 +229,9 @@ fun TvPosterWallScreen(
                         TvPosterWallCard(
                             baseUrl = baseUrl,
                             item = item,
-                            modifier = focusModifier.tvStaggerEntry(index = index),
+                            modifier = focusModifier
+                                .onFocusChanged { if (it.hasFocus) lastFocusedItemId = item.id }
+                                .tvStaggerEntry(index = index),
                             onClick = {
                                 if (item.type == "tv") {
                                     onOpenSeries(item.id)

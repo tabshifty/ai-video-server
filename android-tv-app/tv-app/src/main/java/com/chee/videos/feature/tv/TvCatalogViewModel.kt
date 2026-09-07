@@ -51,6 +51,7 @@ class TvCatalogViewModel @Inject constructor(
     }
 
     fun selectMenu(menuItem: TvHomeMenuItem) {
+        if (menuItem == _uiState.value.selectedMenu) return
         when {
             menuItem.isContentKind -> {
                 _uiState.update { it.copy(selectedMenu = menuItem) }

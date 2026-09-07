@@ -1,6 +1,7 @@
 package com.chee.videos.core.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -183,6 +184,7 @@ private fun TvStateTexts(title: String, message: String) {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun TvStateActions(
     actionLabel: String?,
     onAction: (() -> Unit)?,
@@ -196,11 +198,15 @@ private fun TvStateActions(
     }
     val hasSecondaryAction = secondaryActionLabel != null && onSecondaryAction != null
     val hasTertiaryAction = tertiaryActionLabel != null && onTertiaryAction != null
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         TvStateActionButton(
             text = actionLabel,
             onClick = onAction,
             icon = Icons.Filled.Refresh,
+            tone = TvActionButtonTone.Primary,
         )
         if (hasSecondaryAction) {
             val secondaryAction = onSecondaryAction
@@ -230,21 +236,7 @@ private fun TvStateActionButton(
     text: String,
     onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tone: TvActionButtonTone = TvActionButtonTone.Secondary,
 ) {
-    Surface(
-        color = AppChrome.AccentSoft,
-        shape = AppChrome.SurfaceShape,
-        modifier = Modifier
-            .tvFocusableScaleOnly(focusedScale = 1.04f)
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null, tint = AppChrome.TextPrimary, modifier = Modifier.size(20.dp))
-            Text(text = text, color = AppChrome.TextPrimary, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
+    TvActionButton(text = text, onClick = onClick, icon = icon, tone = tone)
 }

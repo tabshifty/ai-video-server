@@ -24,6 +24,19 @@ class TvCatalogViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
+    fun selectingCurrentSearch_keepsQueryAndResults() = runTest {
+        val viewModel = TvCatalogViewModel(repository = FakeTvRepository())
+        viewModel.awaitIdle()
+        viewModel.updateQuery("测试")
+        advanceUntilIdle()
+        val state = viewModel.uiState.value
+
+        viewModel.selectMenu(TvHomeMenuItem.Search)
+
+        assertEquals(state, viewModel.uiState.value)
+    }
+
+    @Test
     fun init_loadsBrowsePayloadWithAvContent() = runTest {
         val viewModel = TvCatalogViewModel(
             repository = FakeTvRepository(

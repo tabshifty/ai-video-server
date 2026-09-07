@@ -9,6 +9,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +39,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -60,6 +68,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -595,7 +604,9 @@ private fun TvHomeSettingsPanel(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
@@ -650,7 +661,7 @@ private fun TvSeriesAutoplaySettingRow(
             .fillMaxWidth()
             .heightIn(min = 68.dp)
             .tvFocusableScaleOnly(focusedScale = 1.02f)
-            .clickable { onSetEnabled(!enabled) },
+            .toggleable(value = enabled, role = Role.Switch, onValueChange = onSetEnabled),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp),
@@ -683,7 +694,7 @@ private fun TvSeriesAutoplaySettingRow(
             ) {
                 Switch(
                     checked = enabled,
-                    onCheckedChange = onSetEnabled,
+                    onCheckedChange = null,
                 )
             }
         }
@@ -721,6 +732,7 @@ private fun TvSeekStepSettingRow(
             )
         }
         Row(
+            modifier = Modifier.selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -733,7 +745,7 @@ private fun TvSeekStepSettingRow(
                         .width(72.dp)
                         .height(44.dp)
                         .tvFocusableScaleOnly(focusedScale = 1.04f)
-                        .clickable { onSelectSeconds(seconds) },
+                        .selectable(selected = selected, role = Role.RadioButton) { onSelectSeconds(seconds) },
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -769,7 +781,11 @@ private fun TvSettingsActionRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
-                imageVector = Icons.Filled.Settings,
+                imageVector = when (action) {
+                    TvAccountMenuAction.Repair -> Icons.Filled.Link
+                    TvAccountMenuAction.Logout -> Icons.AutoMirrored.Filled.Logout
+                    TvAccountMenuAction.SwitchServer -> Icons.Filled.Dns
+                },
                 contentDescription = null,
                 tint = AppChrome.AccentWarm,
                 modifier = Modifier.size(22.dp),

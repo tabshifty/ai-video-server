@@ -164,7 +164,8 @@ class TvPosterWallFocusLayoutSpecTest {
             .substringBefore(") {")
 
         assertTrue("海报墙首屏焦点必须用一次性标记，软刷新/排序完成后不得再次抢回第一张海报", focusSource.contains("initialFocusRequested"))
-        assertTrue("海报墙首焦点 effect 不得把 refreshing 作为 key，否则软更新完成会重新请求首项焦点", !focusEffectKeys.contains("uiState.refreshing"))
+        assertTrue("返回时若刷新未完成，结束后必须重试恢复；是否抢焦点由一次性标记控制", focusEffectKeys.contains("uiState.refreshing"))
+        assertTrue("恢复必须受一次性标记保护，已聚焦页面刷新后不得抢焦点", focusSource.contains("if (!initialFocusRequested &&"))
         assertTrue("海报墙首焦点请求成功后必须置位，避免后续软更新再次抢焦点", focusSource.contains("initialFocusRequested = true"))
     }
 }
