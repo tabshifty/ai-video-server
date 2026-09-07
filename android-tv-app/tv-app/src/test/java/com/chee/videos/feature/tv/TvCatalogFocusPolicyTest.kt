@@ -167,7 +167,8 @@ class TvCatalogFocusPolicyTest {
             "搜索输入期间必须保持搜索页可见，用 searchLoading 做行内状态，避免每个字符触发全屏 TV 首页 loading",
             searchSource.contains("searching = uiState.searchLoading") &&
                 searchSource.contains("uiState.query.isNotBlank() && uiState.searchLoading") &&
-                searchSource.contains("title = \"正在搜索\""),
+                searchSource.contains("TvInlineLoadingState(") &&
+                searchSource.contains("message = \"正在搜索\""),
         )
         assertTrue(
             "搜索失败必须在搜索页内显示错误与重试，且要先于空结果判断，不能误显示成没有找到相关内容",

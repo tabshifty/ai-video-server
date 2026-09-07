@@ -14,6 +14,17 @@ import org.junit.Test
 
 class TvShellAppBackPolicyTest {
     @Test
+    fun browsingOrNavigatingCancelsPendingExit() {
+        val source = java.nio.file.Path.of("src/main/java/com/chee/videos/tv/TvShellApp.kt").toFile().readText()
+        val keyHandler = source.substringAfter(".onPreviewKeyEvent { event ->")
+            .substringBefore(".background(AppChrome.PageGradient)")
+        assertTrue(keyHandler.contains("event.type == KeyEventType.KeyDown && event.key != Key.Back"))
+        assertTrue(keyHandler.contains("rootExitPromptAtMillis = null"))
+        assertTrue(keyHandler.contains("showRootExitPrompt = false"))
+        assertTrue(source.contains("LaunchedEffect(currentRoute)"))
+    }
+
+    @Test
     fun handlesPosterWallAndDetailRoutesWithShellBack() {
         assertTrue(shouldHandleTvShellBack(TvCatalogWallRoutePattern))
         assertTrue(shouldHandleTvShellBack(TvLongFormDetailRoutePattern))

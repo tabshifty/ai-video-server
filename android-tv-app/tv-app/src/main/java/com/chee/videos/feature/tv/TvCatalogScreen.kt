@@ -1,5 +1,6 @@
 package com.chee.videos.feature.tv
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -9,6 +10,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -59,17 +64,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
@@ -88,6 +105,7 @@ import com.chee.videos.core.ui.TvErrorState
 import com.chee.videos.core.ui.TvIconActionButton
 import com.chee.videos.core.ui.TvMotionTokens
 import com.chee.videos.core.ui.TvPageLoadingState
+import com.chee.videos.core.ui.TvInlineLoadingState
 import com.chee.videos.core.ui.rememberTvReduceMotionEnabled
 import com.chee.videos.core.ui.tryRequestFocus
 import com.chee.videos.core.ui.tvFocusableScaleOnly
@@ -143,19 +161,22 @@ fun TvCatalogScreen(
     viewModel: TvCatalogViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
     val isSearching = uiState.selectedMenu == TvHomeMenuItem.Search
+    var menuHasFocus by remember { mutableStateOf(false) }
     val localSearchFocusRequester = remember { FocusRequester() }
     val searchFocusRequester = homeContentFocusRequester ?: localSearchFocusRequester
     val menuFocusRequesters = remember {
         TvHomeMenuItem.defaults().associateWith { FocusRequester() }
     }
-    val menuFocusRequester = menuFocusRequesters.getValue(TvHomeMenuItem.defaultSelected())
+    val menuFocusRequester = menuFocusRequesters.getValue(uiState.selectedMenu)
     val featuredFocusRequester = remember { FocusRequester() }
     val continueFocusRequester = remember { FocusRequester() }
     val firstSectionItemFocusRequester = remember { FocusRequester() }
     val tvSeriesFocusRequester = remember { FocusRequester() }
     val movieFocusRequester = remember { FocusRequester() }
     val avFocusRequester = remember { FocusRequester() }
+    val settingsFocusRequester = remember { FocusRequester() }
     // 记忆化：两个解析函数会遍历全部分区并做字符串拼接/列表分配，
     // uiState 其它字段（如搜索 query 逐字符）变化不应重复执行。
     // key 均为 data class / List，remember 按 equals 比较，引用未变即命中缓存。
@@ -197,12 +218,38 @@ fun TvCatalogScreen(
             .title
     }
 
+    BackHandler(enabled = !menuHasFocus) {
+        menuFocusRequester.tryRequestFocus()
+    }
+
+    fun enterContent(): Boolean {
+        if (uiState.loading) return false
+        val requester = when (uiState.selectedMenu) {
+            TvHomeMenuItem.Search -> searchFocusRequester
+            TvHomeMenuItem.Settings -> settingsFocusRequester
+            else -> when (initialFocusTarget) {
+                TvCatalogInitialFocusTarget.FEATURED -> featuredFocusRequester
+                TvCatalogInitialFocusTarget.CONTINUE_WATCHING -> continueFocusRequester
+                TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM -> firstSectionItemFocusRequester
+                TvCatalogInitialFocusTarget.TV_SERIES_ITEM -> tvSeriesFocusRequester
+                TvCatalogInitialFocusTarget.MOVIE_ITEM -> movieFocusRequester
+                TvCatalogInitialFocusTarget.AV_ITEM -> avFocusRequester
+                else -> return false
+            }
+        }
+        return requester.tryRequestFocus()
+    }
+
     LaunchedTvInitialFocus(uiState.loading, isSearching, initialFocusTarget, requestedMenuFocusItem) {
-        if (uiState.loading || isSearching) return@LaunchedTvInitialFocus
         val requestedFocusRequester = requestedMenuFocusItem?.let(menuFocusRequesters::get)
         if (requestedFocusRequester != null) {
             requestedFocusRequester.tryRequestFocus()
             onRequestedMenuFocusConsumed()
+            return@LaunchedTvInitialFocus
+        }
+        if (uiState.loading || isSearching || menuHasFocus) return@LaunchedTvInitialFocus
+        if (uiState.selectedMenu == TvHomeMenuItem.Settings) {
+            menuFocusRequester.tryRequestFocus()
             return@LaunchedTvInitialFocus
         }
         when (initialFocusTarget) {
@@ -217,26 +264,25 @@ fun TvCatalogScreen(
         }
     }
 
-    if (uiState.loading) {
-        Row(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            TvHomeSideMenu(
-                selectedMenu = uiState.selectedMenu,
-                menuFocusRequesters = menuFocusRequesters,
-                onSelect = viewModel::selectMenu,
-                onOpenShorts = onOpenShorts,
-            )
-            TvPageLoadingState(message = "正在加载 TV 首页")
-        }
-        return
-    }
-
     Row(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         TvHomeSideMenu(
             selectedMenu = uiState.selectedMenu,
             menuFocusRequesters = menuFocusRequesters,
-            onSelect = viewModel::selectMenu,
+            onSelect = { item ->
+                if (item == uiState.selectedMenu) {
+                    if (!uiState.loading && !enterContent()) focusManager.moveFocus(FocusDirection.Right)
+                } else {
+                    viewModel.selectMenu(item)
+                }
+            },
             onOpenShorts = onOpenShorts,
+            onFocusChanged = { menuHasFocus = it },
+            onEnterContent = ::enterContent,
         )
+        if (uiState.loading) {
+            TvPageLoadingState(message = "正在加载${uiState.selectedMenu.label}")
+            return
+        }
         if (uiState.selectedMenu == TvHomeMenuItem.Settings) {
             TvHomeSettingsPanel(
                 tvSeekStepSeconds = uiState.tvSeekStepSeconds,
@@ -246,6 +292,7 @@ fun TvCatalogScreen(
                 onSwitchServer = onSwitchServer,
                 seriesAutoplayEnabled = uiState.seriesAutoplayEnabled,
                 onSetSeriesAutoplayEnabled = viewModel::setSeriesAutoplayEnabled,
+                firstActionFocusRequester = settingsFocusRequester,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 22.dp, vertical = 18.dp),
@@ -268,8 +315,7 @@ fun TvCatalogScreen(
                         query = uiState.query,
                         onQueryChanged = viewModel::updateQuery,
                         modifier = Modifier
-                            .focusRequester(searchFocusRequester)
-                            .tvFocusableScaleOnly(focusedScale = 1.01f),
+                            .focusRequester(searchFocusRequester),
                     )
                 }
                 item(key = "search-header") {
@@ -277,9 +323,8 @@ fun TvCatalogScreen(
                 }
                 if (uiState.query.isNotBlank() && uiState.searchLoading) {
                     item(key = "search-loading") {
-                        TvEmptyState(
-                            title = "正在搜索",
-                            message = "保持当前输入，可继续补全关键词",
+                        TvInlineLoadingState(
+                            message = "正在搜索",
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -397,13 +442,14 @@ fun TvCatalogScreen(
                 // 一次加载内 sections 不重排，index 稳定、滚动状态语义不变。
                 key = { index, section -> "section-$index-${section.title}" },
                 contentType = { _, _ -> "section" },
-            ) { _, section ->
+            ) { sectionIndex, section ->
                 TvCatalogSection(
                     baseUrl = uiState.baseUrl,
                     section = section,
                     onOpenSeries = onOpenSeries,
                     firstItemFocusRequester = firstSectionItemFocusRequester,
-                    requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM,
+                    requestInitialFocus = initialFocusTarget == TvCatalogInitialFocusTarget.FIRST_SECTION_ITEM &&
+                        sectionIndex == uiState.sections.indexOfFirst { it.items.isNotEmpty() },
                     onOpenCatalogWall = onOpenCatalogWall,
                 )
             }
@@ -467,11 +513,18 @@ private fun TvCatalogSearchBar(
     onQueryChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChanged,
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = {
+            keyboardController?.hide()
+            focusManager.moveFocus(FocusDirection.Down)
+        }),
         placeholder = {
             Text("搜索电视剧、电影或18+", color = AppChrome.TextMuted)
         },
@@ -506,18 +559,27 @@ private fun TvCatalogSearchBar(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun TvHomeSideMenu(
     selectedMenu: TvHomeMenuItem,
     menuFocusRequesters: Map<TvHomeMenuItem, FocusRequester>,
     onSelect: (TvHomeMenuItem) -> Unit,
     onOpenShorts: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    onEnterContent: () -> Boolean,
 ) {
     Column(
         modifier = Modifier
-            .width(72.dp)
+            .width(136.dp)
             .fillMaxSize()
             .background(AppChrome.Canvas.copy(alpha = 0.90f))
-            .padding(horizontal = 8.dp, vertical = 18.dp),
+            .padding(horizontal = 8.dp, vertical = 18.dp)
+            .onFocusChanged { onFocusChanged(it.hasFocus) }
+            .onPreviewKeyEvent { event ->
+                event.key == Key.DirectionRight && event.type == KeyEventType.KeyDown && onEnterContent()
+            }
+            .focusGroup()
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -566,28 +628,32 @@ private fun TvHomeSideMenuButton(
         border = focusBorder,
         shape = AppChrome.ChipShape,
         modifier = modifier
-            .width(56.dp)
+            .fillMaxWidth()
             .height(48.dp)
+            .semantics { this.selected = selected }
             .onFocusChanged { focused = it.isFocused || it.hasFocus }
             .focusable()
             .clickable(onClick = onClick),
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (item == TvHomeMenuItem.Adult) {
-                Text(
-                    text = "18+",
-                    color = contentColor,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-            } else {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = item.label,
-                    tint = contentColor,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(22.dp),
+            )
+            Text(
+                text = item.label,
+                color = contentColor,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -601,6 +667,7 @@ private fun TvHomeSettingsPanel(
     onRepair: () -> Unit,
     onLogout: () -> Unit,
     onSwitchServer: () -> Unit,
+    firstActionFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -620,9 +687,10 @@ private fun TvHomeSettingsPanel(
             color = AppChrome.TextMuted,
             style = MaterialTheme.typography.bodyMedium,
         )
-        TvAccountMenuAction.defaults().forEach { action ->
+        TvAccountMenuAction.defaults().forEachIndexed { index, action ->
             TvSettingsActionRow(
                 action = action,
+                modifier = if (index == 0) Modifier.focusRequester(firstActionFocusRequester) else Modifier,
                 onClick = {
                     when (action) {
                         TvAccountMenuAction.Repair -> onRepair()
@@ -765,11 +833,12 @@ private fun TvSeekStepSettingRow(
 private fun TvSettingsActionRow(
     action: TvAccountMenuAction,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         color = AppChrome.SurfaceElevated,
         shape = AppChrome.SurfaceShape,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(62.dp)
             .tvFocusableScaleOnly(focusedScale = 1.02f)
@@ -972,13 +1041,12 @@ private fun TvFeaturedHero(
     val heroScaleStart = TvHeroMotionTokens.ScaleStart
     val heroScaleEnd = TvHeroMotionTokens.ScaleEnd
 
-    Surface(
-        color = AppChrome.SurfaceElevated,
-        shape = AppChrome.SurfaceShape,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(324.dp),
-            shadowElevation = 12.dp,
+            .height(324.dp)
+            .clipToBounds()
+            .background(AppChrome.CanvasRaised),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (!backdropUrl.isNullOrBlank()) {
