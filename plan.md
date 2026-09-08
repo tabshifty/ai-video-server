@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-08 10:19 +0800
+- 进度：完成日本 AV 元数据目录第二轮设计沉淀。新增来源准入状态与证据门禁、现有 35 个抓取器盘点、五个候选来源的只读 `robots.txt` 检查、目录领域模型，以及“目录发行条目与本地视频分离”的提议中 ADR；明确当前没有已批准来源，禁止启动全量或周期抓取。
+- 影响文件：`tasks/2026-09-08-japanese-av-catalog/{prd.md,implement.md,review.md,source-audit.md,domain-model.md}`、`docs/adr/0027-av-catalog-separate-from-local-video.md`、`plan.md`；未修改运行时代码、数据库或 Android 版本，未纳入既有未跟踪 `docs/examples/`。
+- 验证：代码计数确认 `newAVCrawlerProvider` 注册 35 个抓取器、`defaultAVEnabledSites` 启用 15 个；`git diff --check` 通过；相关 Markdown U+FFFD 扫描无结果；ADR 和领域模型均保持“提议中”。
+
+## 2026-09-08 10:18 +0800
+- 进度：继续日本 AV 元数据目录需求收口。代码审计确认现有 35 个 AV 抓取器只支持按查询搜索和详情读取，统一候选模型缺少分类、片商、系列、导演、时长及目录发现/同步状态；首批五个候选来源的 `robots.txt` 只读检查未产生可直接上线的授权证据。将新增来源准入台账、领域模型草案和“外部目录与本地视频分离”的提议中 ADR，不进入运行时代码。
+- 影响文件：预计新增 `tasks/2026-09-08-japanese-av-catalog/source-audit.md`、`tasks/2026-09-08-japanese-av-catalog/domain-model.md`、`docs/adr/0027-av-catalog-separate-from-local-video.md`，更新任务三段文档与 `plan.md`；保留既有未跟踪 `docs/examples/`。
+- 验证：待执行 Markdown 差异检查、U+FFFD 乱码扫描、来源数量与默认启用来源对照检查；ADR 保持“提议中”，用户未确认前不写入 `CONTEXT.md` 作为已接受术语。
+
 ## 2026-09-08 10:12 +0800
 - 进度：完成“日本 AV 元数据目录”长期任务骨架，建立访谈中的 PRD、分阶段实现草案和评审门禁。文档明确复用现有单片刮削能力，但在产品范围、使用范围、来源许可、采集规模、业务主键、字段冲突、图片版权、语言、删除策略和本地视频关联十项决策完成前不进入实现。
 - 影响文件：`tasks/2026-09-08-japanese-av-catalog/prd.md`、`tasks/2026-09-08-japanese-av-catalog/implement.md`、`tasks/2026-09-08-japanese-av-catalog/review.md`、`plan.md`；未修改运行时代码，未纳入既有未跟踪 `docs/examples/`。
