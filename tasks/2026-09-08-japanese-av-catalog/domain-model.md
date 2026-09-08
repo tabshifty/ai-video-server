@@ -71,11 +71,18 @@
                          |    -> partial
                          -> failed
 
-来源状态：candidate -> approved -> paused
-                    -> rejected
+准入状态：candidate -> pending_evidence -> approved
+                                  |       -> rejected
+                                  -> rejected
+
+运行状态：idle -> running -> idle
+             |       |     -> error
+             -> paused <----+
 ```
 
 `partial` 表示运行已保存部分确定结果，但因限速、来源故障或主动停止未完成当前窗口；下一次必须从持久化游标安全续跑。
+
+准入状态表达“是否有权采集”，运行状态表达“当前能否运行”。网络故障、熔断或人工暂停不删除批准记录；条款变化则同时暂停运行并把准入退回 `pending_evidence`。
 
 ## 暂不创建的万能抽象
 

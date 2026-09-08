@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-08 10:29 +0800
+- 进度：完成日本 AV 元数据目录第三轮设计。ThePornDB 官方 OpenAPI 能力与政策缺口已写入来源台账；新增可实施的数据与同步契约，覆盖审批证据、准入/运行双状态、目录发行与来源快照、人物/分类/图片、人工覆盖、本地视频关联、运行游标、适配接口、页事务、增量重叠水位、限速重试、自动暂停和管理 API。来源仍未获准，未调用目录数据接口。
+- 影响文件：`tasks/2026-09-08-japanese-av-catalog/{prd.md,implement.md,review.md,source-audit.md,domain-model.md,data-and-sync-contract.md}`、`plan.md`；未修改运行时代码、数据库或 Android 版本，未纳入既有未跟踪 `docs/examples/`。
+- 验证：官方 OpenAPI 实时回放确认版本 `v3.24.747`、Bearer 认证、`/jav`、`/changes/{type}`、`jav` 变化类型和每页上限 100，同时确认 `termsOfService` 与 `license` 均为空；`git diff --check` 通过；相关 Markdown 均存在且非空，U+FFFD 扫描无结果。
+
+## 2026-09-08 10:24 +0800
+- 进度：进入日本 AV 元数据目录第三轮设计。ThePornDB 官方 OpenAPI 只读审计确认其提供 `/jav` 列表、`/changes/jav` 增量变化、Bearer Token、最大每页 100 条，以及标题、简介、日期、时长、演员、标签、导演、站点、图片和更新时间字段；但规范未声明 Terms、License、Rate Limit、缓存或再展示授权，站点也未提供可访问的条款页，因此继续保持“待证据”。本轮将新增数据与同步契约，细化核心 schema、来源适配接口、事务水位、失败暂停和管理 API。
+- 影响文件：预计新增 `tasks/2026-09-08-japanese-av-catalog/data-and-sync-contract.md`，更新 `source-audit.md`、`prd.md`、`implement.md`、`review.md` 与 `plan.md`；不修改运行时代码、数据库、Android 版本或既有未跟踪 `docs/examples/`。
+- 验证：待执行文档差异/乱码检查，并逐项核对 OpenAPI 版本、路径、分页上限、认证和缺失政策声明；来源未批准前不得调用目录数据接口或实施生产调度。
+
 ## 2026-09-08 10:19 +0800
 - 进度：完成日本 AV 元数据目录第二轮设计沉淀。新增来源准入状态与证据门禁、现有 35 个抓取器盘点、五个候选来源的只读 `robots.txt` 检查、目录领域模型，以及“目录发行条目与本地视频分离”的提议中 ADR；明确当前没有已批准来源，禁止启动全量或周期抓取。
 - 影响文件：`tasks/2026-09-08-japanese-av-catalog/{prd.md,implement.md,review.md,source-audit.md,domain-model.md}`、`docs/adr/0027-av-catalog-separate-from-local-video.md`、`plan.md`；未修改运行时代码、数据库或 Android 版本，未纳入既有未跟踪 `docs/examples/`。
