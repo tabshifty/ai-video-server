@@ -201,6 +201,26 @@ func TestShortPendingDeleteWorkflowSourceGuards(t *testing.T) {
 	}
 }
 
+// TestAdminListVideosFileSizeSourceGuard：管理端视频列表在 SQL 层就带出大小，
+// 口径为「转码后优先、回落上传原始大小」，避免前端为了大小再逐行请求详情。
+func TestAdminListVideosFileSizeSourceGuard(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(filepath.Join(".", "admin_repository.go"))
+	if err != nil {
+		t.Fatalf("read admin repository source: %v", err)
+	}
+	list := functionSourceForTest(t, string(raw), "func (r *VideoRepository) AdminListVideos(")
+	for _, want := range []string{
+		"COALESCE(v.transcoded_file_size, (SELECT MAX(fh.file_size) FROM file_hashes fh WHERE fh.video_id = v.id), 0)",
+		"&item.UploadUser, &item.FileSize, &item.CreatedAt, &item.UpdatedAt",
+	} {
+		if !strings.Contains(list, want) {
+			t.Fatalf("AdminListVideos should contain %q:\n%s", want, list)
+		}
+	}
+}
+
 func functionSourceForTest(t *testing.T, source, signature string) string {
 	t.Helper()
 	start := strings.Index(source, signature)

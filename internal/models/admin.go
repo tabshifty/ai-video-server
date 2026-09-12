@@ -42,8 +42,11 @@ type AdminVideoListItem struct {
 	Thumbnail    string     `json:"thumbnail"`
 	UploadUserID *uuid.UUID `json:"upload_user_id"`
 	UploadUser   string     `json:"upload_user"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	// FileSize 是列表展示口径：优先 transcoded_file_size（转码后大小），
+	// 缺失时回落到 file_hashes.file_size（上传原始大小），两者都无则为 0。
+	FileSize  int64     `json:"file_size"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type AdminVideoDetail struct {

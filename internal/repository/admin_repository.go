@@ -135,7 +135,9 @@ func (r *VideoRepository) AdminListVideos(ctx context.Context, f models.AdminVid
 	limit := f.PageSize
 	offset := (f.Page - 1) * f.PageSize
 	args = append(args, limit, offset)
-	listSQL := "SELECT v.id, v.title, v.type, v.status, COALESCE(v.thumbnail_path,''), v.user_id, COALESCE(us.username,''), v.created_at, v.updated_at FROM videos v LEFT JOIN users us ON us.id = v.user_id WHERE " + baseWhere + " ORDER BY v.created_at DESC LIMIT $" + fmt.Sprintf("%d", len(args)-1) + " OFFSET $" + fmt.Sprintf("%d", len(args))
+	// 列表大小口径：优先 transcoded_file_size（转码后大小），缺失时回落
+	// file_hashes.file_size（上传原始大小），两者都无则为 0，前端显示 --。
+	listSQL := "SELECT v.id, v.title, v.type, v.status, COALESCE(v.thumbnail_path,''), v.user_id, COALESCE(us.username,''), COALESCE(v.transcoded_file_size, (SELECT MAX(fh.file_size) FROM file_hashes fh WHERE fh.video_id = v.id), 0), v.created_at, v.updated_at FROM videos v LEFT JOIN users us ON us.id = v.user_id WHERE " + baseWhere + " ORDER BY v.created_at DESC LIMIT $" + fmt.Sprintf("%d", len(args)-1) + " OFFSET $" + fmt.Sprintf("%d", len(args))
 	rows, err := r.pool.Query(ctx, listSQL, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("admin list videos: %w", err)
@@ -145,7 +147,7 @@ func (r *VideoRepository) AdminListVideos(ctx context.Context, f models.AdminVid
 	items := make([]models.AdminVideoListItem, 0, limit)
 	for rows.Next() {
 		var item models.AdminVideoListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.Status, &item.Thumbnail, &item.UploadUserID, &item.UploadUser, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.Status, &item.Thumbnail, &item.UploadUserID, &item.UploadUser, &item.FileSize, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan admin video: %w", err)
 		}
 		items = append(items, item)

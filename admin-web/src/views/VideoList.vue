@@ -135,11 +135,12 @@ const ALL_COLUMNS = [
   { key: 'thumbnail', label: '封面' },
   { key: 'type', label: '类型' },
   { key: 'status', label: '状态' },
+  { key: 'size', label: '大小' },
   { key: 'upload_user', label: '上传用户', secondary: true },
   { key: 'created_at', label: '上传时间', secondary: true },
   { key: 'operations', label: '操作', required: true }
 ]
-const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'upload_user', 'created_at', 'operations']
+const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'size', 'upload_user', 'created_at', 'operations']
 const columnVisibility = ref(readStoredColumns())
 const allowedColumnKeys = ALL_COLUMNS.map((item) => item.key)
 const builtInViews = createVideoBuiltInViews(DEFAULT_VISIBLE_COLUMNS)
@@ -1512,6 +1513,9 @@ onBeforeUnmount(() => {
               <template #default="{ row }">
                 <StatusIndicator :label="statusLabel(row.status)" :tone="videoStatusTone(row.status)" />
               </template>
+            </el-table-column>
+            <el-table-column v-if="isColumnVisible('size')" label="大小" width="100">
+              <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
             </el-table-column>
             <el-table-column v-if="isColumnVisible('upload_user')" prop="upload_user" label="上传用户" width="128" show-overflow-tooltip />
             <el-table-column v-if="isColumnVisible('created_at')" label="上传时间" width="168">

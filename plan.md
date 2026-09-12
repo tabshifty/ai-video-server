@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-09-12 10:53 +0800
+- 进度：管理端「视频管理」列表新增「大小」列。列表接口 `AdminListVideos` 在 SQL 内一次带出大小，口径为「已转码优先 `videos.transcoded_file_size`，缺失回落 `file_hashes.file_size`（上传原始大小）」，都缺失返回 0、前端显示 `--`，不再需要为看大小逐行打开详情；列设置新增 `size` 项并默认可见，窄屏不隐藏。用户已确认该口径。
+- 影响文件：`internal/models/admin.go`、`internal/repository/admin_repository.go`、`admin-web/src/views/VideoList.vue`、`internal/repository/admin_repository_test.go`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。未修改运行时代码以外的数据库结构或 Android 版本，未纳入既有未跟踪 `docs/examples/`。
+- 验证：`go test ./internal/repository/ ./internal/handlers/ ./internal/models/` 通过（含新增源码守卫 `TestAdminListVideosFileSizeSourceGuard`）；`npx vitest run src/views/videoListPage.spec.js src/views/videoList.helpers.spec.js` 44 项通过；`npm test` 715/716 通过，唯一失败为既有 `precisionOpsRollout.spec.js` 的 views 清单断言（写死 26 个 `.vue`，目录实际 27 个），与本次改动无关。未连接数据库，未执行列表接口的真实数据回放。
+
 ## 2026-09-08 10:29 +0800
 - 进度：完成日本 AV 元数据目录第三轮设计。ThePornDB 官方 OpenAPI 能力与政策缺口已写入来源台账；新增可实施的数据与同步契约，覆盖审批证据、准入/运行双状态、目录发行与来源快照、人物/分类/图片、人工覆盖、本地视频关联、运行游标、适配接口、页事务、增量重叠水位、限速重试、自动暂停和管理 API。来源仍未获准，未调用目录数据接口。
 - 影响文件：`tasks/2026-09-08-japanese-av-catalog/{prd.md,implement.md,review.md,source-audit.md,domain-model.md,data-and-sync-contract.md}`、`plan.md`；未修改运行时代码、数据库或 Android 版本，未纳入既有未跟踪 `docs/examples/`。

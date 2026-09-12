@@ -1197,6 +1197,10 @@
 - `行操作 Dropdown 不叠加 Tooltip`：可聚焦的行操作菜单按钮由 `el-dropdown` 直接承载，不能再以 `el-tooltip` 包裹 Dropdown；外层 Tooltip 会与菜单各自维护浮层和焦点状态，可能在菜单关闭且焦点离开后继续残留。纯图标按钮必须保留同值中文 `aria-label` 与原生 `title`，分别提供稳定程序化名称和鼠标提示，不能为恢复提示而重新叠加 Tooltip。
 - `含表单控件的按需 Popover 非持久挂载`：列设置等包含 checkbox、input 或其它可聚焦控件的点击型 `el-popover`，若关闭后不需要保留内部 DOM 状态，应显式使用 `:persistent="false"`，使关闭浮层销毁隐藏控件并退出自然 Tab 顺序；业务状态继续由页面响应式数据和既有持久化键持有，不能依赖隐藏 Popover DOM 保存。
 
+## 管理端视频列表大小展示约定
+- `列表大小口径`：管理端「视频管理」列表的「大小」列由列表接口 `AdminListVideos` 的单条 SQL 带出，口径是「已转码优先、回落原始」：`COALESCE(v.transcoded_file_size, (SELECT MAX(fh.file_size) FROM file_hashes fh WHERE fh.video_id = v.id), 0)`。因此 `AdminVideoListItem.file_size` 是列表展示口径，与详情里的 `transcoded_file_size`（纯转码后大小）语义不同；两者都缺失时返回 0，前端 `formatFileSize` 显示 `--`。该列在列设置中的 key 为 `size`、默认可见，且不标 `secondary`，窄屏也保留。
+- `列表大小不逐行取详情`：列表级信息必须在列表查询内解决，禁止前端对每行再请求 `AdminVideoDetail` 补字段；`videos` 表本身没有原始文件大小，原始大小只存在于 `file_hashes.file_size`（按 `video_id` 关联），后续新增列级字段同样优先扩展 `AdminListVideos` 的 SELECT。
+
 ## 管理端窄屏布局边界约定
 - `电视剧列表卡滚动与分页边界`：`TvSeriesManage` 的列表卡必须把卡头与 body 定义为受卡片最大高度约束的两行网格，body 再把系列滚动区与分页定义为 `minmax(0, 1fr) auto`；系列列表独立滚动，分页始终留在滚动区外并由自身容器收纳横向内容。不得用固定列表最小高度把分页推出卡片，也不得让分页与后续编辑卡重叠。
 - `页面级窄屏动作让位标题`：`TvSeriesManage` 与 `TvAppManage` 在不宽于 `30rem` 时仅把各自页头动作收为 44px 图标按钮，为壳层页面标题保留识别空间；每个动作必须继续提供中文 `aria-label` 与同值原生 `title`，并保留原图标、顺序、handler、loading 和按钮语义。该规则是页面局部例外，不修改共享 Layout 的顶栏高度或其它页面。

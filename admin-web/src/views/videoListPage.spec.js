@@ -620,6 +620,9 @@ async function load() {
     expect(template).toContain('<BulkActionBar :count="selectedRows.length" :actions="bulkActions" />')
     expect(template).toContain('<AdminTablePagination')
     expect(template).toContain('@current-change="setPage"')
+    expect(script).toContain("{ key: 'size', label: '大小' }")
+    expect(template).toMatch(/<el-table-column\b(?=[^>]*isColumnVisible\('size'\))(?=[^>]*label="大小")[^>]*>/)
+    expect(template).toContain('{{ formatFileSize(row.file_size) }}')
   })
 
   it('三个 Drawer 复用中文关闭标题且继续由原有关闭守卫控制', () => {
