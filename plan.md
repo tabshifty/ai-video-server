@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-12 15:20 +0800
+- 进度：完成部署机媒体路径修复。事务内更新 4,107 条 `ready` 短视频记录的 `original_path`、`transcoded_path`、`thumbnail_path`，将 `storage/videos/...` 统一归一化为 `/Volumes/large/video-server-storage/videos/...`；未搬动媒体文件，未改状态、创建时间或数据库结构。
+- 影响文件：`plan.md`；部署机 PostgreSQL `videos` 表 4,107 条记录；远程备份 `/Users/chee/deploy/ai-video-server/repair-backups/relative-video-paths-20260912-1510.csv`（4,108 行含表头，SHA-256 `c12d260f6888dbe74f41b0017717f57a4fcdb9d10f694e514581fd6d3df5e0a6`）。未纳入仓库无关未跟踪目录 `.reasonix/`、`docs/examples/`。
+- 验证：数据库 `ready` 相对路径剩余 0；备份中的 4,107 个 ID 全部找到且仍为 `ready`，路径逐条匹配、4,107 × 3 个文件均为现存非空普通文件；修复记录与现用存储记录的 signed source 抽样均返回 `206 video/mp4`。
+
+## 2026-09-12 15:10 +0800
+- 进度：确认部署机 4,107 条 `ready` 短视频记录的三类媒体路径均为 `storage/videos/...` 相对路径，实际文件全部存在于 `/Volumes/large/video-server-storage/videos/...`；计划在部署机导出原路径快照后，将 `original_path`、`transcoded_path`、`thumbnail_path` 统一归一化为该旧存储根下的绝对路径，不搬动媒体文件。
+- 影响文件：`plan.md`；部署机 PostgreSQL `videos` 表中的上述 4,107 条记录及远程路径快照文件。未修改应用代码、数据库结构或 Android 版本。
+- 验证：已完成全量文件元数据核对，三类路径均为现存非空普通文件；待执行快照校验、事务更新、更新后计数与播放接口抽样验证。
+
 ## 2026-09-12 10:53 +0800
 - 进度：管理端「视频管理」列表新增「大小」列。列表接口 `AdminListVideos` 在 SQL 内一次带出大小，口径为「已转码优先 `videos.transcoded_file_size`，缺失回落 `file_hashes.file_size`（上传原始大小）」，都缺失返回 0、前端显示 `--`，不再需要为看大小逐行打开详情；列设置新增 `size` 项并默认可见，窄屏不隐藏。用户已确认该口径。
 - 影响文件：`internal/models/admin.go`、`internal/repository/admin_repository.go`、`admin-web/src/views/VideoList.vue`、`internal/repository/admin_repository_test.go`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。未修改运行时代码以外的数据库结构或 Android 版本，未纳入既有未跟踪 `docs/examples/`。
