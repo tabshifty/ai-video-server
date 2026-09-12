@@ -1,5 +1,12 @@
 # plan.md
 
+## 2026-09-12 计划：删除 53 条失效视频记录
+- 进度：已完成。最终核对 53/53 个 ID 仍存在且全部为 `ready`、`short`、标题 `#迁移`；在部署机 PostgreSQL 单事务内锁定目标后删除 53 条 `videos` 记录，事务保护条件未触发异常。
+- 影响范围：部署机 PostgreSQL 中明确列出的 53 个视频 ID、数据库关联数据及这些记录自身引用的媒体文件；不修改应用代码，不触碰工作树已有 `.reasonix/`、`docs/examples/`。
+- 安全措施：删除前备份目录为 `/Users/chee/deploy/ai-video-server/repair-backups/delete-invalid-videos-20260912-1558`，包含 53 行视频快照、107 行关联快照、53 行路径来源、267 行路径状态、删除 SQL/结果及全表数据备份；清单 `SHA256SUMS.ALL` 的 SHA-256 为 `03b3b07d2b25227236e0eae4b2808c7100ee6046dc7aca634afaba1c27db646a`，全表备份 SHA-256 为 `50a0d792c67a5f6b9549b792ecd704088daf51726c859846558c19dcc7b894c`。
+- 删除语义：显式清理 `transcoding_jobs`、`user_video_actions`、`video_subtitles` 后删除 `videos`；数据库外键级联清理 `video_tags`、`file_hashes`、`video_actors`、`video_collections`，`episodes`/`telegram_media` 的设置为空约束保持一致。目标记录的主视频路径均已缺失，因此没有应用层媒体文件可删除；特殊记录的 `/Volumes/large/videos/videos/1e450f13-ea2e-4740-9166-7d9592af97ed/source-original.mp4` 不在记录路径字段中，保留为待后续人工确认的孤立文件（1,484,461 字节，MD5 `3dad85b48a2281b5213c7609332c539a`）。
+- 验证：删除后上述 10 个关联表按目标 ID 查询均为 0 行；删除结果 UUID 共 106 行、去重后 53 个，快照 53 行；目标旧/新视频目录均不存在（特殊 `source-original` 目录除外），4 类视频路径缺失 212 项、53 个 metadata 封面仍存在；`GET /api/v1/videos/1e450f13-ea2e-4740-9166-7d9592af97ed/thumbnail` 返回 `404 video not found`，部署健康检查 `/healthz` 返回 200。
+
 ## 2026-09-12 15:20 +0800
 - 进度：完成部署机媒体路径修复。事务内更新 4,107 条 `ready` 短视频记录的 `original_path`、`transcoded_path`、`thumbnail_path`，将 `storage/videos/...` 统一归一化为 `/Volumes/large/video-server-storage/videos/...`；未搬动媒体文件，未改状态、创建时间或数据库结构。
 - 影响文件：`plan.md`；部署机 PostgreSQL `videos` 表 4,107 条记录；远程备份 `/Users/chee/deploy/ai-video-server/repair-backups/relative-video-paths-20260912-1510.csv`（4,108 行含表头，SHA-256 `c12d260f6888dbe74f41b0017717f57a4fcdb9d10f694e514581fd6d3df5e0a6`）。未纳入仓库无关未跟踪目录 `.reasonix/`、`docs/examples/`。
