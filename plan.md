@@ -1,6 +1,12 @@
 # plan.md
 
 ## 2026-09-20 00:47 +0800
+- 进度：清理家用部署机内盘的构建/包管理缓存，共释放约 8 GB（`/System/Volumes/Data` 已用 124 GB → 115 GB，可用 71 GB → 79 GB）：`~/.npm` 2.4 GB → 6.3 MB、`~/Library/Caches/Homebrew` 2.3 GB → 797 MB、`~/Library/Caches/Google/Chrome` 1.6 GB、`~/Library/Caches/go-build` 598 MB → 8 KB、`~/Library/Caches/115Browser` 605 MB、`~/.cache/huggingface/hub`（翻译模型下载缓存）1.1 GB、`~/.docker/modules` 176 MB。按约定未触碰 Android 开发环境（`~/Library/Android/sdk` 11 GB、`~/.android/avd` 6.7 GB、`~/.gradle` 5.1 GB、`Android Studio.app` 3 GB）与 Chrome 用户数据（`~/Library/Application Support/Google` 7.5 GB），也保留了 `~/Library/Caches/Google/AndroidStudio2025.3.3`（810 MB）。
+- 关键约束：翻译服务的 `llama-server` 实际由 `~/.docker/bin/inference/llama-server`（Docker Desktop 卸载后的残留二进制）提供，因此 `~/.docker/bin` 不能跟着残留一起清理；它用绝对路径 `-m` 加载 `~/Library/Caches/llama.cpp/` 下的 gguf，所以 `~/.cache/huggingface/hub` 的同源下载缓存可以安全删除。已作为 `部署机翻译服务运行时依赖` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`（新增 `部署机翻译服务运行时依赖`）、`plan.md`；本次只做部署机缓存清理，未修改应用代码、配置或 Android 版本。
+- 验证：清理后 `curl 127.0.0.1:8000/health` 返回 200（模型 gguf 1,133,080,512 字节仍在、`llama-server` 进程存活）、`curl 127.0.0.1:8080/healthz` 返回 200；各缓存目录清理后大小逐一复核，`df -h /System/Volumes/Data` 确认释放约 8 GB。
+
+## 2026-09-20 00:47 +0800
 - 进度：修正上一则条目的遗留 ①。`0d3ca1be-f41c-4cfb-9c5c-b96aa8b49e4b` 并未停留在 `failed`：symlink 生效后 asynq 重试队列重新取回该任务，worker 已再次开始转码，因此无需人工执行「重新转码」；遗留 ②（`server.log` 轮转空档）与 ③（Postgres 绑定 `0.0.0.0:5432`）仍然成立。
 - 验证：`pgrep -fl ffmpeg` 同时可见 `689edf6e`（pid 45721）与 `0d3ca1be`（pid 45860）两个转码进程，两者命令行都以 `tmp/uploads/assembled/...` 相对路径读取外盘源文件；`/Volumes/large/videos/videos/689edf6e-.../video-avc.mp4` 已写入 466 MB 且持续增长；`asynq:{transcode}:active` = 2、`pending` = 0。
 
