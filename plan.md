@@ -1,5 +1,9 @@
 # plan.md
 
+## 2026-09-20 00:47 +0800
+- 进度：修正上一则条目的遗留 ①。`0d3ca1be-f41c-4cfb-9c5c-b96aa8b49e4b` 并未停留在 `failed`：symlink 生效后 asynq 重试队列重新取回该任务，worker 已再次开始转码，因此无需人工执行「重新转码」；遗留 ②（`server.log` 轮转空档）与 ③（Postgres 绑定 `0.0.0.0:5432`）仍然成立。
+- 验证：`pgrep -fl ffmpeg` 同时可见 `689edf6e`（pid 45721）与 `0d3ca1be`（pid 45860）两个转码进程，两者命令行都以 `tmp/uploads/assembled/...` 相对路径读取外盘源文件；`/Volumes/large/videos/videos/689edf6e-.../video-avc.mp4` 已写入 466 MB 且持续增长；`asynq:{transcode}:active` = 2、`pending` = 0。
+
 ## 2026-09-20 00:41 +0800
 - 进度：恢复家用部署机服务并完成上传暂存目录外盘化的收尾。部署机上 `com.aivideo.server` / `com.aivideo.worker` 两个 launchd 服务当时已不存在（plist 仍在、非 disabled 状态），8080 无监听，因此客户端无法访问；机器本身连续在线 116 天，Postgres（OrbStack）/Redis/翻译端点均正常，DB 数据完整（171397 条 `videos`、schema `0039_telegram_management`）。根因是 2026-09-20 00:19～00:21 的容器运行时迁移（卸载 Docker Desktop、改用 OrbStack）期间停了服务但没有恢复：worker 于 00:19:40 收到 SIGTERM 并 graceful shutdown，Postgres 容器 00:21:20 重新启动。处置：用 `launchctl bootstrap` 重新加载两个 plist，服务恢复，`/healthz` 在本机与 LAN 均返回 200。
 - 进度：完成 `~/deploy/ai-video-server/current/tmp/uploads` 到 `/Volumes/large/ai-video-server/tmp/uploads` 的迁移收尾。rsync 复制此前已完成，核对两边 1286 个文件、73,718,611,048 字节以及「相对路径 + 大小」清单完全一致后删除内置盘副本，根盘可用空间由 2.4 GB 恢复到 71 GB（占用 192 GB → 124 GB）；同时清理外盘 `chunk-sessions` 中 1251 个全部超过 30 天的废弃分片（4.9 GB），清单留档 `repair-backups/chunk-sessions-list-20260920-003746.txt`。
