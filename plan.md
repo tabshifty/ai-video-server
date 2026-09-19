@@ -1,5 +1,13 @@
 # plan.md
 
+## 2026-09-20 00:41 +0800
+- 进度：恢复家用部署机服务并完成上传暂存目录外盘化的收尾。部署机上 `com.aivideo.server` / `com.aivideo.worker` 两个 launchd 服务当时已不存在（plist 仍在、非 disabled 状态），8080 无监听，因此客户端无法访问；机器本身连续在线 116 天，Postgres（OrbStack）/Redis/翻译端点均正常，DB 数据完整（171397 条 `videos`、schema `0039_telegram_management`）。根因是 2026-09-20 00:19～00:21 的容器运行时迁移（卸载 Docker Desktop、改用 OrbStack）期间停了服务但没有恢复：worker 于 00:19:40 收到 SIGTERM 并 graceful shutdown，Postgres 容器 00:21:20 重新启动。处置：用 `launchctl bootstrap` 重新加载两个 plist，服务恢复，`/healthz` 在本机与 LAN 均返回 200。
+- 进度：完成 `~/deploy/ai-video-server/current/tmp/uploads` 到 `/Volumes/large/ai-video-server/tmp/uploads` 的迁移收尾。rsync 复制此前已完成，核对两边 1286 个文件、73,718,611,048 字节以及「相对路径 + 大小」清单完全一致后删除内置盘副本，根盘可用空间由 2.4 GB 恢复到 71 GB（占用 192 GB → 124 GB）；同时清理外盘 `chunk-sessions` 中 1251 个全部超过 30 天的废弃分片（4.9 GB），清单留档 `repair-backups/chunk-sessions-list-20260920-003746.txt`。
+- 关键约束：`UPLOAD_TEMP_DIR` 必须维持相对路径 `./tmp/uploads`，靠 `current/tmp/uploads -> 外盘` 的 symlink 生效。`videos.original_path` 与 asynq 任务参数里持久化的是 `tmp/uploads/assembled/...` 这类相对 launchd 工作目录（`current/`）的路径，直接改成外盘绝对路径会让历史记录与队列任务全部报 `ffmpeg ... No such file or directory`（本次已在删除内置盘副本的窗口内实测到该失败）。
+- 影响文件：`CONTEXT.md`（改写 `admin 上传暂存目录`，新增 `launchd 日志轮转空档`）、`docs/家用部署机.md`（新增「上传暂存目录：实体在外盘，配置保持相对路径」小节，更新 `.env` 示例注释与「只做服务器时的权限收口方案」第 1 条）、`plan.md`；部署机侧改动 `~/deploy/ai-video-server/.env`（备份 `.env.bak-20260920003742`，最终值与迁移前一致）与 `current/tmp/uploads` symlink。未修改应用代码，未改 Android 版本。
+- 遗留：① `0d3ca1be-f41c-4cfb-9c5c-b96aa8b49e4b` 在删除窗口内被 worker 重试到 `MaxRetry(3)` 上限并置为 `failed`（它原本就是卡住的 stale `processing`），需在管理端对该视频执行「重新转码」（`POST /api/v1/admin/videos/:id/retranscode`，源文件现已可通过 symlink 解析）；② `server.log` 自 2026-09-14 10:30 newsyslog 轮转后连续 6 天零输出，轮转方案需另行处理；③ Postgres 容器端口当前绑定 `0.0.0.0:5432`，与文档约定的 `127.0.0.1:5432` 不一致。
+- 验证：部署机 `curl 127.0.0.1:8080/healthz` 与开发机 `curl 192.168.1.24:8080/healthz` 均返回 `{"status":"ok"}`；删除内置盘副本后 worker 经 symlink 正常转码（`ffmpeg -i tmp/uploads/assembled/3083dce6-...mp4 ... /Volumes/large/videos/videos/689edf6e-.../video-avc.mp4` 实测读取成功）；`df -h /System/Volumes/Data` 确认释放 69 GB；`lsof` 确认无进程仍占用被删目录；`launchctl print` 确认两个服务 running。
+
 ## 2026-09-12 计划：删除 53 条失效视频记录
 - 进度：已完成。最终核对 53/53 个 ID 仍存在且全部为 `ready`、`short`、标题 `#迁移`；在部署机 PostgreSQL 单事务内锁定目标后删除 53 条 `videos` 记录，事务保护条件未触发异常。
 - 影响范围：部署机 PostgreSQL 中明确列出的 53 个视频 ID、数据库关联数据及这些记录自身引用的媒体文件；不修改应用代码，不触碰工作树已有 `.reasonix/`、`docs/examples/`。
