@@ -1,5 +1,12 @@
 # plan.md
 
+## 2026-09-20 11:20 +0800
+- 进度：核查凌晨迁移后的上传暂存与记录关联，并修复发现的缺口。① `uploads/assembled/` 迁移后 33 个文件中 28 个有记录引用，5 个为孤儿（清单归档 `repair-backups/orphan-files-20260920-111616.txt`；其中 `fb4ff09a-…ASMR Puffin 熟客限定` 经确认是重复上传，同一视频另有 session `9f65e51f` 的记录已 `ready`），在 `archive_import_files` 引用校验为 0 后删除，释放约 6.4 GB；② 未转码记录共 25 条（全部 `short` 类型、9/19 21:11–22:18 创建），源文件 25/25 全部存在，不存在"记录缺文件"；③ 其中 23 条为 `uploaded` 且 `transcoding_jobs` 计数为 0（对照：近 3 天 82 条 `ready` 记录 82/82 都有 job 行），属"记录已落库但转码任务未入队"的缺口；另 2 条 `failed` 的 job 错误信息为「转码任务长时间无进度，系统已自动标记失败」。
+- 进度：用管理端 `POST /api/v1/admin/videos/:id/retranscode` 逐条补齐这 25 条。触发前先校验"记录存在且源文件存在"（25/25 通过、缺失 0，否则整体中止），全部返回 `200` 且 `enqueued:true`、`input_source:original`。
+- 关键约束：上传的"写记录"与"入队转码"是两步、非同一事务，入队失败会留下 `status=uploaded` 且 `transcoding_jobs` 为 0 的哑记录，只能靠人工 `retranscode` 恢复；该缺口恰好发生在 `server.log` 轮转空档期内，具体入队报错已丢失。已作为 `上传转码入队缺口` 写入 `CONTEXT.md`。
+- 影响文件：`CONTEXT.md`（新增 `上传转码入队缺口`）、`plan.md`；部署机侧仅删除 5 个孤儿暂存文件并触发 25 条重转码，未修改应用代码、配置或 Android 版本。
+- 验证：触发后 `asynq:{transcode}` 为 `pending=23`、`active=2`，两个 `ffmpeg` 进程以 `tmp/uploads/assembled/...` 相对路径读取源文件；`transcoding_jobs` 出现新的 `running` 行、对应视频状态转为 `processing`；`videos` 近 3 天状态分布由 `ready 82 / uploaded 23 / failed 2` 变为 `ready 82 / uploaded 23 / processing 2`。25 条全部转码完成需数小时（worker 并发 2），本轮未等待完成。
+
 ## 2026-09-20 00:47 +0800
 - 进度：清理家用部署机内盘的构建/包管理缓存，共释放约 8 GB（`/System/Volumes/Data` 已用 124 GB → 115 GB，可用 71 GB → 79 GB）：`~/.npm` 2.4 GB → 6.3 MB、`~/Library/Caches/Homebrew` 2.3 GB → 797 MB、`~/Library/Caches/Google/Chrome` 1.6 GB、`~/Library/Caches/go-build` 598 MB → 8 KB、`~/Library/Caches/115Browser` 605 MB、`~/.cache/huggingface/hub`（翻译模型下载缓存）1.1 GB、`~/.docker/modules` 176 MB。按约定未触碰 Android 开发环境（`~/Library/Android/sdk` 11 GB、`~/.android/avd` 6.7 GB、`~/.gradle` 5.1 GB、`Android Studio.app` 3 GB）与 Chrome 用户数据（`~/Library/Application Support/Google` 7.5 GB），也保留了 `~/Library/Caches/Google/AndroidStudio2025.3.3`（810 MB）。
 - 关键约束：翻译服务的 `llama-server` 实际由 `~/.docker/bin/inference/llama-server`（Docker Desktop 卸载后的残留二进制）提供，因此 `~/.docker/bin` 不能跟着残留一起清理；它用绝对路径 `-m` 加载 `~/Library/Caches/llama.cpp/` 下的 gguf，所以 `~/.cache/huggingface/hub` 的同源下载缓存可以安全删除。已作为 `部署机翻译服务运行时依赖` 写入 `CONTEXT.md`。
