@@ -1204,6 +1204,9 @@
 - `列表大小口径`：管理端「视频管理」列表的「大小」列由列表接口 `AdminListVideos` 的单条 SQL 带出，口径是「已转码优先、回落原始」：`COALESCE(v.transcoded_file_size, (SELECT MAX(fh.file_size) FROM file_hashes fh WHERE fh.video_id = v.id), 0)`。因此 `AdminVideoListItem.file_size` 是列表展示口径，与详情里的 `transcoded_file_size`（纯转码后大小）语义不同；两者都缺失时返回 0，前端 `formatFileSize` 显示 `--`。该列在列设置中的 key 为 `size`、默认可见，且不标 `secondary`，窄屏也保留。
 - `列表大小不逐行取详情`：列表级信息必须在列表查询内解决，禁止前端对每行再请求 `AdminVideoDetail` 补字段；`videos` 表本身没有原始文件大小，原始大小只存在于 `file_hashes.file_size`（按 `video_id` 关联），后续新增列级字段同样优先扩展 `AdminListVideos` 的 SELECT。
 
+## 管理端视频列表时长排序约定
+- `管理端视频时长排序`：管理端 `/admin/videos` 的 `sort_by=duration&sort_order=asc|desc` 按 `videos.duration_seconds` 秒值排序；未传排序或参数非法时维持上传时间倒序。时长为 `NULL` 或 `0` 均视为未知并始终排在末尾，时长相同时按上传时间倒序、视频 ID 升序稳定分页；列表 DTO 同时返回 `duration_seconds`，前端保存视图包含排序状态，旧视图缺字段时回到默认排序。
+
 ## 管理端窄屏布局边界约定
 - `电视剧列表卡滚动与分页边界`：`TvSeriesManage` 的列表卡必须把卡头与 body 定义为受卡片最大高度约束的两行网格，body 再把系列滚动区与分页定义为 `minmax(0, 1fr) auto`；系列列表独立滚动，分页始终留在滚动区外并由自身容器收纳横向内容。不得用固定列表最小高度把分页推出卡片，也不得让分页与后续编辑卡重叠。
 - `页面级窄屏动作让位标题`：`TvSeriesManage` 与 `TvAppManage` 在不宽于 `30rem` 时仅把各自页头动作收为 44px 图标按钮，为壳层页面标题保留识别空间；每个动作必须继续提供中文 `aria-label` 与同值原生 `title`，并保留原图标、顺序、handler、loading 和按钮语义。该规则是页面局部例外，不修改共享 Layout 的顶栏高度或其它页面。

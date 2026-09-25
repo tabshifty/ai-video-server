@@ -296,7 +296,20 @@ describe('视频资源集合页', () => {
     expect(script).toContain("ElMessageBox.prompt('请输入弃刮原因'")
   })
 
-  it('快照只包含查询和列，并按约定顺序应用后交给共享 refresh', () => {
+  it('时长排序随筛选分页走服务端，时长列默认可见且支持列设置隐藏', () => {
+    expect(script).toContain("sort_by: query.sort_by")
+    expect(script).toContain("sort_order: query.sort_order")
+    expect(script).toContain("query.sort_by = next.sort_by")
+    expect(script).toContain("query.sort_order = next.sort_order")
+    expect(template).toContain('aria-label="视频列表排序"')
+    expect(template).toContain('value="duration_asc"')
+    expect(template).toContain('value="duration_desc"')
+    expect(template).toContain("isColumnVisible('duration')")
+    expect(template).toContain('prop="duration_seconds" label="时长"')
+    expect(script).toContain("'duration', 'size'")
+  })
+
+  it('快照包含查询、排序和列，并按约定顺序应用后交给共享 refresh', () => {
     const validFixture = `applySnapshot: (snapshot) => {
   const next = normalizeVideoViewSnapshot(snapshot)
   query.q = next.q
@@ -341,10 +354,12 @@ describe('视频资源集合页', () => {
     }
     expect(ownsSnapshotApplyOrder(savedViewsOptions?.body || '')).toBe(true)
     expect(currentSnapshotBlock).not.toBeNull()
-    expect(currentSnapshotBlock?.body.match(/^\s*(q|type|status|columns):/gm)?.map((line) => line.trim().split(':')[0])).toEqual([
+    expect(currentSnapshotBlock?.body.match(/^\s*(q|type|status|sort_by|sort_order|columns):/gm)?.map((line) => line.trim().split(':')[0])).toEqual([
       'q',
       'type',
       'status',
+      'sort_by',
+      'sort_order',
       'columns'
     ])
     expect(currentSnapshotBlock?.body).not.toMatch(/\bpage\b|selectedRows|detailVisible|filterDrawerVisible/)

@@ -108,6 +108,8 @@ func (a *API) AdminVideos(c *gin.Context) {
 		Tag:       c.Query("tag"),
 		StartTime: startTime,
 		EndTime:   endTime,
+		SortBy:    c.Query("sort_by"),
+		SortOrder: c.Query("sort_order"),
 	})
 	if err != nil {
 		response.Error(c, 1005, err.Error())

@@ -22,8 +22,24 @@ export function normalizeVideoViewSnapshot(snapshot, allowedColumns, defaultColu
     q: String(snapshot?.q || ''),
     type: String(snapshot?.type || ''),
     status: String(snapshot?.status || ''),
+    sort_by: snapshot?.sort_by === 'duration' && ['asc', 'desc'].includes(snapshot?.sort_order)
+      ? 'duration'
+      : '',
+    sort_order: snapshot?.sort_by === 'duration' && ['asc', 'desc'].includes(snapshot?.sort_order)
+      ? snapshot.sort_order
+      : '',
     columns: columns.length > 0 ? columns : [...defaultColumns]
   }
+}
+
+export function formatVideoDuration(value) {
+  const seconds = Number(value)
+  if (!Number.isFinite(seconds) || seconds <= 0) return '--'
+  const total = Math.floor(seconds)
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const remainder = total % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
 }
 
 export function createVideoBuiltInViews(defaultColumns) {

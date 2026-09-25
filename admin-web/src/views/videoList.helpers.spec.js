@@ -7,6 +7,7 @@ import {
   canPreviewVideoStatus,
   canManuallyEditVideoStatus,
   createVideoBuiltInViews,
+  formatVideoDuration,
   extractTvPendingDiagnostics,
   getManualVideoStatusOptions,
   getManualVideoStatusValue,
@@ -60,6 +61,8 @@ describe('videoList helpers', () => {
       q: 'A',
       type: 'movie',
       status: 'ready',
+      sort_by: '',
+      sort_order: '',
       columns: ['status', 'title', 'operations']
     })
     expect(snapshot.columns).not.toBe(sourceColumns)
@@ -73,12 +76,33 @@ describe('videoList helpers', () => {
     const defaults = ['title', 'thumbnail', 'status', 'operations']
     const snapshot = normalizeVideoViewSnapshot({}, allowed, defaults)
 
-    expect(snapshot).toEqual({ q: '', type: '', status: '', columns: defaults })
+    expect(snapshot).toEqual({ q: '', type: '', status: '', sort_by: '', sort_order: '', columns: defaults })
     expect(snapshot.columns).not.toBe(defaults)
     expect(normalizeVideoViewSnapshot({ columns: ['title'] }, allowed, defaults).columns).toEqual([
       'title',
       'operations'
     ])
+  })
+
+  it('保存视图保留时长排序并兼容旧快照', () => {
+    const allowed = ['title', 'duration', 'operations']
+    const defaults = ['title', 'duration', 'operations']
+
+    expect(normalizeVideoViewSnapshot({ sort_by: 'duration', sort_order: 'desc' }, allowed, defaults)).toMatchObject({
+      sort_by: 'duration',
+      sort_order: 'desc'
+    })
+    expect(normalizeVideoViewSnapshot({}, allowed, defaults)).toMatchObject({
+      sort_by: '',
+      sort_order: ''
+    })
+  })
+
+  it('格式化视频时长并将未知值显示为横线', () => {
+    expect(formatVideoDuration(0)).toBe('--')
+    expect(formatVideoDuration(null)).toBe('--')
+    expect(formatVideoDuration(65)).toBe('00:01:05')
+    expect(formatVideoDuration(360000)).toBe('100:00:00')
   })
 
   it('includes non-ready workflow status labels and tag types', () => {

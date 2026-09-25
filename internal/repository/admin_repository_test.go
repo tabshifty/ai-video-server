@@ -213,11 +213,38 @@ func TestAdminListVideosFileSizeSourceGuard(t *testing.T) {
 	list := functionSourceForTest(t, string(raw), "func (r *VideoRepository) AdminListVideos(")
 	for _, want := range []string{
 		"COALESCE(v.transcoded_file_size, (SELECT MAX(fh.file_size) FROM file_hashes fh WHERE fh.video_id = v.id), 0)",
-		"&item.UploadUser, &item.FileSize, &item.CreatedAt, &item.UpdatedAt",
+		"COALESCE(v.duration_seconds, 0)",
+		"adminVideoOrderClause(f.SortBy, f.SortOrder)",
+		"&item.UploadUser, &item.FileSize, &item.DurationSeconds, &item.CreatedAt, &item.UpdatedAt",
 	} {
 		if !strings.Contains(list, want) {
 			t.Fatalf("AdminListVideos should contain %q:\n%s", want, list)
 		}
+	}
+}
+
+func TestAdminVideoOrderClause(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		sortBy    string
+		sortOrder string
+		want      string
+	}{
+		{name: "default", want: "v.created_at DESC"},
+		{name: "duration ascending", sortBy: "duration", sortOrder: "asc", want: "NULLIF(v.duration_seconds, 0) ASC NULLS LAST, v.created_at DESC, v.id ASC"},
+		{name: "duration descending", sortBy: "duration", sortOrder: "desc", want: "NULLIF(v.duration_seconds, 0) DESC NULLS LAST, v.created_at DESC, v.id ASC"},
+		{name: "invalid input defaults", sortBy: "duration; DROP TABLE videos", sortOrder: "desc", want: "v.created_at DESC"},
+		{name: "invalid direction defaults", sortBy: "duration", sortOrder: "random", want: "v.created_at DESC"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := adminVideoOrderClause(tt.sortBy, tt.sortOrder); got != tt.want {
+				t.Fatalf("adminVideoOrderClause(%q, %q) = %q, want %q", tt.sortBy, tt.sortOrder, got, tt.want)
+			}
+		})
 	}
 }
 

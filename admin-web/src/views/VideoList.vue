@@ -49,6 +49,7 @@ import {
   getVideoStatusMeta,
   getVideoThumbnailPlaceholder,
   getVideoThumbnailURL,
+  formatVideoDuration,
   isStaleDetailRequest,
   nextDetailRequestToken,
   normalizeVideoViewSnapshot,
@@ -125,22 +126,24 @@ const batchEditForm = reactive({
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const router = useRouter()
 
-const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '' })
+const query = reactive({ page: 1, page_size: 20, q: '', type: '', status: '', sort_by: '', sort_order: '' })
 const quickSearch = ref(query.q)
 const filterDraft = reactive({ q: query.q, type: query.type, status: query.status })
 const SAVED_VIEWS_KEY = 'admin-videolist-saved-views-v1'
 const COLUMN_VISIBILITY_KEY = 'admin-videolist-columns'
+const COLUMN_VISIBILITY_VERSION_KEY = 'admin-videolist-columns-version'
 const ALL_COLUMNS = [
   { key: 'title', label: '标题' },
   { key: 'thumbnail', label: '封面' },
   { key: 'type', label: '类型' },
   { key: 'status', label: '状态' },
+  { key: 'duration', label: '时长' },
   { key: 'size', label: '大小' },
   { key: 'upload_user', label: '上传用户', secondary: true },
   { key: 'created_at', label: '上传时间', secondary: true },
   { key: 'operations', label: '操作', required: true }
 ]
-const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'size', 'upload_user', 'created_at', 'operations']
+const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'duration', 'size', 'upload_user', 'created_at', 'operations']
 const columnVisibility = ref(readStoredColumns())
 const allowedColumnKeys = ALL_COLUMNS.map((item) => item.key)
 const builtInViews = createVideoBuiltInViews(DEFAULT_VISIBLE_COLUMNS)
@@ -165,6 +168,8 @@ const {
     q: query.q,
     type: query.type,
     status: query.status,
+    sort_by: query.sort_by,
+    sort_order: query.sort_order,
     columns: columnVisibility.value
   }),
   applySnapshot: (snapshot) => {
@@ -172,6 +177,8 @@ const {
     query.q = next.q
     query.type = next.type
     query.status = next.status
+    query.sort_by = next.sort_by
+    query.sort_order = next.sort_order
     query.page = 1
     columnVisibility.value = [...next.columns]
     persistColumns()
@@ -192,6 +199,18 @@ const isNarrowViewport = computed(() => viewportWidth.value < 1280)
 const batchActionBusy = computed(() => deletingBatch.value || updatingBatch.value)
 const canBatchEditCollections = computed(() => selectedRows.value.length > 0 && selectedRows.value.every((row) => normalizeVideoType(row.type) === 'short'))
 const hasActiveFilters = computed(() => String(query.q || '').trim() !== '' || query.type !== '' || query.status !== '')
+const sortMode = computed({
+  get: () => query.sort_by === 'duration' ? `duration_${query.sort_order}` : 'default',
+  set: (value) => {
+    if (value === 'duration_asc' || value === 'duration_desc') {
+      query.sort_by = 'duration'
+      query.sort_order = value.slice('duration_'.length)
+    } else {
+      query.sort_by = ''
+      query.sort_order = ''
+    }
+  }
+})
 const activeFilterChips = computed(() => {
   const chips = []
   if (query.type) chips.push({ key: 'type', label: '类型', value: typeLabel(query.type) })
@@ -222,6 +241,12 @@ function readStoredColumns() {
     const parsed = raw ? JSON.parse(raw) : null
     if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_COLUMNS]
     const known = parsed.filter((key) => ALL_COLUMNS.some((column) => column.key === key))
+    const version = window.localStorage.getItem(COLUMN_VISIBILITY_VERSION_KEY)
+    if (version !== '2') {
+      if (!known.includes('duration')) known.push('duration')
+      window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(known))
+      window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '2')
+    }
     return Array.from(new Set([...known, ...required]))
   } catch (_) {
     return [...DEFAULT_VISIBLE_COLUMNS]
@@ -232,6 +257,7 @@ function persistColumns() {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility.value))
+    window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '2')
   } catch (_) {
     // localStorage 不可用时仅保留本会话列设置。
   }
@@ -255,6 +281,12 @@ function removeFilter(key) {
   query.page = 1
   quickSearch.value = query.q
   syncFilterDraftFromQuery()
+  resetQueryIdentity()
+  load()
+}
+
+function applySort() {
+  query.page = 1
   resetQueryIdentity()
   load()
 }
@@ -1446,6 +1478,11 @@ onBeforeUnmount(() => {
             {{ chip.label }}：{{ chip.value }}
           </el-tag>
           <el-button plain @click="openFilterDrawer">更多筛选</el-button>
+          <el-select v-model="sortMode" aria-label="视频列表排序" style="width: 176px" @change="applySort">
+            <el-option label="默认排序" value="default" />
+            <el-option label="时长从短到长" value="duration_asc" />
+            <el-option label="时长从长到短" value="duration_desc" />
+          </el-select>
         </template>
       </Toolbar>
 
@@ -1513,6 +1550,9 @@ onBeforeUnmount(() => {
               <template #default="{ row }">
                 <StatusIndicator :label="statusLabel(row.status)" :tone="videoStatusTone(row.status)" />
               </template>
+            </el-table-column>
+            <el-table-column v-if="isColumnVisible('duration')" prop="duration_seconds" label="时长" width="108">
+              <template #default="{ row }">{{ formatVideoDuration(row.duration_seconds) }}</template>
             </el-table-column>
             <el-table-column v-if="isColumnVisible('size')" label="大小" width="100">
               <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>

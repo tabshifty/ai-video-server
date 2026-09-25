@@ -35,13 +35,14 @@ type AVScraperSiteConfig struct {
 }
 
 type AdminVideoListItem struct {
-	ID           uuid.UUID  `json:"id"`
-	Title        string     `json:"title"`
-	Type         string     `json:"type"`
-	Status       string     `json:"status"`
-	Thumbnail    string     `json:"thumbnail"`
-	UploadUserID *uuid.UUID `json:"upload_user_id"`
-	UploadUser   string     `json:"upload_user"`
+	ID              uuid.UUID  `json:"id"`
+	Title           string     `json:"title"`
+	Type            string     `json:"type"`
+	Status          string     `json:"status"`
+	Thumbnail       string     `json:"thumbnail"`
+	UploadUserID    *uuid.UUID `json:"upload_user_id"`
+	UploadUser      string     `json:"upload_user"`
+	DurationSeconds int        `json:"duration_seconds"`
 	// FileSize 是列表展示口径：优先 transcoded_file_size（转码后大小），
 	// 缺失时回落到 file_hashes.file_size（上传原始大小），两者都无则为 0。
 	FileSize  int64     `json:"file_size"`
@@ -123,6 +124,8 @@ type AdminVideoFilter struct {
 	Tag       string
 	StartTime *time.Time
 	EndTime   *time.Time
+	SortBy    string
+	SortOrder string
 }
 
 type AdminBatchVideoPatch struct {

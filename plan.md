@@ -1,5 +1,20 @@
 # plan.md
 
+## 2026-09-25 15:01 +0800 验证：管理端视频列表按时长排序
+- 进度：实现与复核完成。默认查询仍按上传时间倒序；时长排序与关键词/类型/状态筛选和服务端分页共用接口；新列在旧列设置中自动迁移为默认显示，之后可以隐藏；旧保存视图加载为默认排序。
+- 影响文件：`CONTEXT.md`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`internal/models/admin.go`、`internal/handlers/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`plan.md`。未纳入既有未跟踪目录 `.reasonix/`、`docs/examples/`。
+- 验证：`go test ./internal/repository ./internal/handlers ./internal/models -count=1` 通过；`npm test -- --run src/views/videoList.helpers.spec.js src/views/videoListPage.spec.js` 的 47 项测试通过；`npm run build` 通过（仅报告 bundle 大小提示）；`git diff --check` 通过；乱码扫描无结果；Vite 开发服务 `/` 返回 HTTP 200。
+
+## 2026-09-25 计划：管理端视频列表按时长排序
+- 进度：需求经 `grill-with-docs` 访谈确认。仅修改管理端 `/videos`；新增默认/时长升序/时长降序排序，服务端分页与现有筛选组合；未知时长（NULL/0）始终置后；同长度按上传时间倒序、视频 ID 升序稳定排序；保存视图包含排序；时长列默认显示且可通过列设置隐藏。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、对应前端测试、`internal/models/admin.go`、`internal/handlers/admin.go`、`internal/repository/admin_repository.go`、对应 Go 测试、`CONTEXT.md`、`plan.md`。不涉及 Android App 版本。
+- 验证：先运行新增定向测试确认红灯，再执行 Go handler/repository 测试、管理端定向测试与构建；完成后追加验证记录。
+
+## 2026-09-25 15:00 +0800 实施：管理端视频列表按时长排序
+- 进度：后端列表新增 `duration_seconds`、受控时长升降序和未知时长置后；时长并列时按上传时间倒序、ID 升序稳定排序；默认排序保持原 `created_at DESC`。前端新增排序下拉和时长列，排序随筛选及分页请求，保存视图记住排序，并把已有列设置迁移为默认显示时长列。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`internal/models/admin.go`、`internal/handlers/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：`go test ./internal/repository ./internal/handlers ./internal/models -count=1`、前端定向 47 项测试及 `npm run build` 已通过；待最终复跑和差异检查。
+
 ## 2026-09-20 11:20 +0800
 - 进度：核查凌晨迁移后的上传暂存与记录关联，并修复发现的缺口。① `uploads/assembled/` 迁移后 33 个文件中 28 个有记录引用，5 个为孤儿（清单归档 `repair-backups/orphan-files-20260920-111616.txt`；其中 `fb4ff09a-…ASMR Puffin 熟客限定` 经确认是重复上传，同一视频另有 session `9f65e51f` 的记录已 `ready`），在 `archive_import_files` 引用校验为 0 后删除，释放约 6.4 GB；② 未转码记录共 25 条（全部 `short` 类型、9/19 21:11–22:18 创建），源文件 25/25 全部存在，不存在"记录缺文件"；③ 其中 23 条为 `uploaded` 且 `transcoding_jobs` 计数为 0（对照：近 3 天 82 条 `ready` 记录 82/82 都有 job 行），属"记录已落库但转码任务未入队"的缺口；另 2 条 `failed` 的 job 错误信息为「转码任务长时间无进度，系统已自动标记失败」。
 - 进度：用管理端 `POST /api/v1/admin/videos/:id/retranscode` 逐条补齐这 25 条。触发前先校验"记录存在且源文件存在"（25/25 通过、缺失 0，否则整体中止），全部返回 `200` 且 `enqueued:true`、`input_source:original`。
