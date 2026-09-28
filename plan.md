@@ -1,5 +1,9 @@
 # plan.md
 
+## 2026-09-28 11:47 +0800 部署：启用 7zip 解包依赖
+- 进度：部署机通过 Homebrew 安装 `sevenzip` 26.03，`/opt/homebrew/bin/7zz` 已存在；launchd server/worker 的 `PATH` 均包含 `/opt/homebrew/bin`，因此新解包逻辑会优先命中 7zz。提交 `b066f17` 已推送到 `deploy/master`，远端 Go 构建、签名、迁移、重启全部成功。
+- 验证：部署 hook 报告 `/healthz OK — deploy succeeded`；部署机 server 与 worker 均为 `running`，HTTP `/healthz` 返回 200，7-Zip 输出版本 `26.03`。尚未使用用户原始归档做端到端导入复现，若安装 7zip 后仍报 CRC，应重新上传或校验归档完整性。
+
 ## 2026-09-28 11:45 +0800 验证：修复 RAR/7z 压缩包 CRC 导入失败
 - 进度：定位到无密码 RAR/7z 强制走旧版 `bsdtar`，导致兼容格式被报为 `Header CRC error`。已让两种格式无论是否有密码都优先调用 `7zz`/`7z`；只有命令不存在时才回退 `bsdtar`，7zip 的真实 CRC、密码或格式错误直接返回。新增回归测试锁定无密码 RAR 的 7zip 优先级。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `.reasonix/`、`docs/examples/`。
