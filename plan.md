@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-09-28 11:45 +0800 验证：修复 RAR/7z 压缩包 CRC 导入失败
+- 进度：定位到无密码 RAR/7z 强制走旧版 `bsdtar`，导致兼容格式被报为 `Header CRC error`。已让两种格式无论是否有密码都优先调用 `7zz`/`7z`；只有命令不存在时才回退 `bsdtar`，7zip 的真实 CRC、密码或格式错误直接返回。新增回归测试锁定无密码 RAR 的 7zip 优先级。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `.reasonix/`、`docs/examples/`。
+- 验证：新增测试及归档相关测试通过；`go test ./internal/services -count=1` 仅失败于既有 `TestParseTVAPKMetadataParsesReleaseAPK`（部署样本 version_code=144、测试期望 121），与本次改动无关；`git diff --check` 通过。部署机当前未安装 `7zz`/`7z`，生产环境仍会回退 `bsdtar`，需安装 7zip 后再验证真实归档。
+
 ## 2026-09-25 15:01 +0800 验证：管理端视频列表按时长排序
 - 进度：实现与复核完成。默认查询仍按上传时间倒序；时长排序与关键词/类型/状态筛选和服务端分页共用接口；新列在旧列设置中自动迁移为默认显示，之后可以隐藏；旧保存视图加载为默认排序。
 - 影响文件：`CONTEXT.md`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`internal/models/admin.go`、`internal/handlers/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`plan.md`。未纳入既有未跟踪目录 `.reasonix/`、`docs/examples/`。

@@ -581,6 +581,44 @@ func TestExtractZipArchiveDecodesGBKPaths(t *testing.T) {
 	}
 }
 
+func TestExtractArchivePrefersSevenZipForRarWithoutPassword(t *testing.T) {
+	root := t.TempDir()
+	fakeBinDir := filepath.Join(root, "bin")
+	extractedDir := filepath.Join(root, "out")
+	archivePath := filepath.Join(root, "sample.rar")
+	if err := os.MkdirAll(fakeBinDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(archivePath, []byte("not a real archive"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	script := `#!/bin/sh
+set -eu
+case "$3" in
+  -o*) output_dir="${3#-o}" ;;
+  *) echo "missing output dir" >&2; exit 2 ;;
+esac
+mkdir -p "$output_dir"
+printf 'sevenzip' > "$output_dir/marker.txt"
+`
+	if err := os.WriteFile(filepath.Join(fakeBinDir, "7zz"), []byte(script), 0o755); err != nil {
+		t.Fatalf("WriteFile(7zz) error = %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	service := &ArchiveImportService{}
+	if _, err := service.extractArchive(context.Background(), "rar", archivePath, extractedDir, "", archiveEncodingAuto); err != nil {
+		t.Fatalf("extractArchive() error = %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(extractedDir, "marker.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile(marker) error = %v", err)
+	}
+	if string(data) != "sevenzip" {
+		t.Fatalf("marker = %q, want sevenzip", string(data))
+	}
+}
+
 func TestExtractZipArchiveRejectsDecodedPathConflicts(t *testing.T) {
 	t.Parallel()
 

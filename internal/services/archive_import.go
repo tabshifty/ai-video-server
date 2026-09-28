@@ -1508,12 +1508,10 @@ func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archi
 		}
 		return extractZipArchive(archivePath, extractedDir, archiveEncodingRequestedModeForFormat(format, requestedMode))
 	case "rar", "7z":
-		if strings.TrimSpace(password) != "" {
-			if err := s.extractWithSevenZip(ctx, archivePath, extractedDir, password); err == nil {
-				return "", nil
-			} else if !errors.Is(err, exec.ErrNotFound) {
-				return "", err
-			}
+		if err := s.extractWithSevenZip(ctx, archivePath, extractedDir, password); err == nil {
+			return "", nil
+		} else if !errors.Is(err, exec.ErrNotFound) {
+			return "", err
 		}
 		if err := s.extractWithBsdtar(ctx, archivePath, extractedDir); err != nil {
 			return "", err
