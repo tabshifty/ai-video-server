@@ -2,6 +2,8 @@ package com.chee.videos.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -152,6 +155,7 @@ fun HomeScreen(
                         browseState = uiState.av,
                         searchState = uiState.avSearch,
                         onQueryChange = viewModel::updateAvQuery,
+                        onSubmitQuery = viewModel::submitAvQuery,
                         onRetry = viewModel::retryAvState,
                         onClearQuery = { viewModel.updateAvQuery("") },
                         onRefresh = viewModel::refreshAvState,
@@ -225,6 +229,7 @@ private fun AvCatalogSection(
     browseState: PagedVideoListState,
     searchState: AvSearchState,
     onQueryChange: (String) -> Unit,
+    onSubmitQuery: () -> Unit,
     onRetry: () -> Unit,
     onClearQuery: () -> Unit,
     onRefresh: () -> Unit,
@@ -257,6 +262,7 @@ private fun AvCatalogSection(
                     statusText = statusText,
                     isSearching = activeState.loading || activeState.refreshing,
                     onQueryChange = onQueryChange,
+                    onSubmitQuery = onSubmitQuery,
                     onClearQuery = onClearQuery,
                 )
             }
@@ -268,9 +274,9 @@ private fun AvCatalogSection(
                     }
                 }
 
-                searchState.resultState.loading && searchState.resultState.items.isEmpty() -> {
+                searchState.resultState.loading && searchState.submittedQuery.isNotBlank() && searchState.resultState.items.isEmpty() -> {
                     item(span = StaggeredGridItemSpan.FullLine) {
-                        LoadingStateCard(label = "正在远程搜索“${searchState.query.trim()}”")
+                        LoadingStateCard(label = "正在远程搜索“${searchState.submittedQuery.trim()}”")
                     }
                 }
 
@@ -401,6 +407,7 @@ private fun AvCatalogHero(
     statusText: String,
     isSearching: Boolean,
     onQueryChange: (String) -> Unit,
+    onSubmitQuery: () -> Unit,
     onClearQuery: () -> Unit,
 ) {
     Box(
@@ -430,19 +437,23 @@ private fun AvCatalogHero(
                 onValueChange = onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSubmitQuery() }),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = AppChrome.TextPrimary),
                 placeholder = {
                     Text(
-                        text = "输入番号或标题，直接远程搜索",
+                        text = "输入番号或标题，点击搜索",
                         color = AppChrome.TextMuted,
                     )
                 },
                 leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = AppChrome.TextMuted,
-                    )
+                    IconButton(onClick = onSubmitQuery) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "搜索",
+                            tint = AppChrome.TextMuted,
+                        )
+                    }
                 },
                 trailingIcon = {
                     if (query.isNotBlank()) {
@@ -683,10 +694,15 @@ private fun buildAvStatusText(
     browseState: PagedVideoListState,
     searchState: AvSearchState,
 ): String {
-    val searchLabel = searchState.query.trim().ifBlank { searchState.lastCompletedQuery }
+    val submittedLabel = searchState.submittedQuery.trim().ifBlank { searchState.lastCompletedQuery }
+    val searchLabel = if (searchState.query.trim() == searchState.submittedQuery.trim()) {
+        searchState.query.trim().ifBlank { submittedLabel }
+    } else {
+        submittedLabel
+    }
     val searchResultState = searchState.resultState
     return when {
-        searchResultState.loading && searchState.query.isNotBlank() -> "正在远程搜索“${searchState.query.trim()}”"
+        searchResultState.loading && submittedLabel.isNotBlank() -> "正在远程搜索“$submittedLabel”"
         searchResultState.refreshing && searchLabel.isNotBlank() -> "正在刷新“$searchLabel”"
         !searchResultState.errorMessage.isNullOrBlank() && searchLabel.isNotBlank() -> "搜索“$searchLabel”失败"
         searchState.isSearchMode && searchResultState.items.isEmpty() && searchLabel.isNotBlank() -> "没有找到“$searchLabel”相关作品"

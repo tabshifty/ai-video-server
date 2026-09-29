@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-09-29 09:13 +0800 完成：手机端搜索改为点击后提交
+- 进度：`updateAvQuery` 现在只更新输入并在清空时恢复默认浏览；新增 `submitAvQuery`，由放大镜按钮和键盘 Search 动作触发远程搜索。新增 `submittedQuery`，确保编辑待提交关键词时分页加载/下拉刷新不会隐式搜索新词；手机端版本升级为 `versionCode 12`、`versionName 0.1.11`。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/home/HomeViewModel.kt`、`android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`、`android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
+- 验证：`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest --tests com.chee.videos.feature.home.HomeViewModelTest` 通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过；`git diff --check` 通过；本次文件乱码扫描无结果；已提交 `3b3f479`。
+
+## 2026-09-29 计划：手机端搜索改为点击后提交
+- 进度：已定位 `HomeViewModel.updateAvQuery` 的防抖实时搜索，以及首页搜索框缺少显式提交动作的问题；计划改为输入仅更新状态，放大镜按钮/键盘搜索动作提交请求。
+- 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/home/HomeViewModel.kt`、`android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`、`android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
+- 验证：待补充输入阶段无请求、提交后请求的单测，并运行手机端定向单测与差异检查。
+
 ## 2026-09-28 11:47 +0800 部署：启用 7zip 解包依赖
 - 进度：部署机通过 Homebrew 安装 `sevenzip` 26.03，`/opt/homebrew/bin/7zz` 已存在；launchd server/worker 的 `PATH` 均包含 `/opt/homebrew/bin`，因此新解包逻辑会优先命中 7zz。提交 `b066f17` 已推送到 `deploy/master`，远端 Go 构建、签名、迁移、重启全部成功。
 - 验证：部署 hook 报告 `/healthz OK — deploy succeeded`；部署机 server 与 worker 均为 `running`，HTTP `/healthz` 返回 200，7-Zip 输出版本 `26.03`。尚未使用用户原始归档做端到端导入复现，若安装 7zip 后仍报 CRC，应重新上传或校验归档完整性。

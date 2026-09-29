@@ -10,7 +10,6 @@ import com.chee.videos.core.repository.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +39,7 @@ data class HomeUiState(
 
 data class AvSearchState(
     val query: String = "",
+    val submittedQuery: String = "",
     val isSearchMode: Boolean = false,
     val lastCompletedQuery: String = "",
     val resultState: PagedVideoListState = PagedVideoListState(),
@@ -51,7 +51,6 @@ class HomeViewModel @Inject constructor(
     private val authRepository: AuthRepository,
 ) : ViewModel() {
     private var avSearchJob: Job? = null
-    internal var avSearchDebounceMs: Long = AV_SEARCH_DEBOUNCE_MS
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -84,15 +83,23 @@ class HomeViewModel @Inject constructor(
             }
             return
         }
+    }
+
+    fun submitAvQuery() {
+        avSearchJob?.cancel()
+        val normalizedQuery = _uiState.value.avSearch.query.trim()
+        if (normalizedQuery.isBlank()) {
+            updateAvQuery("")
+            return
+        }
 
         avSearchJob = viewModelScope.launch {
-            delay(avSearchDebounceMs)
             performAvSearch(normalizedQuery, forceRefresh = false)
         }
     }
 
     fun retryAvState() {
-        val normalizedQuery = _uiState.value.avSearch.query.trim()
+        val normalizedQuery = _uiState.value.avSearch.submittedQuery.trim()
         if (normalizedQuery.isBlank()) {
             loadAvBrowse(forceRefresh = true)
             return
@@ -104,7 +111,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshAvState() {
-        val normalizedQuery = _uiState.value.avSearch.query.trim()
+        val normalizedQuery = _uiState.value.avSearch.submittedQuery.trim()
         if (_uiState.value.avSearch.isSearchMode && normalizedQuery.isNotBlank()) {
             avSearchJob?.cancel()
             viewModelScope.launch {
@@ -117,13 +124,14 @@ class HomeViewModel @Inject constructor(
 
     fun loadMoreAvIfNeeded(currentIndex: Int) {
         val searchState = _uiState.value.avSearch
-        if (searchState.isSearchMode && searchState.query.trim().isNotBlank()) {
+        val submittedQuery = searchState.submittedQuery.trim()
+        if (searchState.isSearchMode && submittedQuery.isNotBlank()) {
             val current = searchState.resultState
             if (!shouldLoadMore(current, currentIndex)) {
                 return
             }
             loadAvSearchPage(
-                query = searchState.query.trim(),
+                query = submittedQuery,
                 page = current.page + 1,
                 append = true,
                 forceRefresh = false,
@@ -216,6 +224,7 @@ class HomeViewModel @Inject constructor(
             state.copy(
                 avSearch = searchState.copy(
                     query = normalizedQuery,
+                    submittedQuery = normalizedQuery,
                     isSearchMode = true,
                     resultState = preparePagedState(
                         current = searchState.resultState,
@@ -368,7 +377,6 @@ class HomeViewModel @Inject constructor(
     }
 
     private companion object {
-        const val AV_SEARCH_DEBOUNCE_MS = 350L
         const val AV_LOAD_MORE_THRESHOLD = 5
     }
 }

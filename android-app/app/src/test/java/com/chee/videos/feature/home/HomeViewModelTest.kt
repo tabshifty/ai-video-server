@@ -60,8 +60,6 @@ class HomeViewModelTest {
                 ),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
 
@@ -74,7 +72,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `updateAvQuery triggers remote av search after debounce`() = runTest {
+    fun `search only starts after explicit submit`() = runTest {
         withMainDispatcher {
             val api = FakeHomeApiService(
                 browsePages = mapOf("av" to mapOf(1 to listOf(avItem(id = "av-1", title = "SSIS-101 夜色标本")))),
@@ -87,11 +85,14 @@ class HomeViewModelTest {
                 ),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ssis 222")
+            assertEquals(
+                listOf(SearchCall(keyword = "", type = "av", page = 1, pageSize = 30)),
+                api.searchCalls,
+            )
+            viewModel.submitAvQuery()
             awaitUntil {
                 viewModel.uiState.value.avSearch.isSearchMode &&
                     !viewModel.uiState.value.avSearch.resultState.loading &&
@@ -134,11 +135,10 @@ class HomeViewModelTest {
                 ),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ipx")
+            viewModel.submitAvQuery()
             awaitUntil {
                 viewModel.uiState.value.avSearch.isSearchMode &&
                     !viewModel.uiState.value.avSearch.resultState.loading &&
@@ -171,11 +171,10 @@ class HomeViewModelTest {
                 searchErrors = mapOf(SearchErrorKey(keyword = "broken", page = 1) to IllegalStateException("搜索失败")),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("broken")
+            viewModel.submitAvQuery()
             awaitUntil {
                 viewModel.uiState.value.avSearch.isSearchMode &&
                     !viewModel.uiState.value.avSearch.resultState.loading &&
@@ -209,8 +208,6 @@ class HomeViewModelTest {
                 browseTotalCounts = mapOf("av" to 3),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.loadMoreAvIfNeeded(1)
@@ -249,8 +246,6 @@ class HomeViewModelTest {
                 browseTotalCounts = mapOf("av" to 3),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.loadMoreAvIfNeeded(1)
@@ -288,11 +283,10 @@ class HomeViewModelTest {
                 searchTotalCounts = mapOf("ssis" to 2),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.updateAvQuery("ssis")
+            viewModel.submitAvQuery()
             awaitUntil {
                 viewModel.uiState.value.avSearch.isSearchMode &&
                     viewModel.uiState.value.avSearch.resultState.page == 1 &&
@@ -340,8 +334,6 @@ class HomeViewModelTest {
                 browseErrors = mapOf(BrowseErrorKey(type = "av", page = 2) to IllegalStateException("补货失败")),
             )
             val viewModel = buildViewModel(api)
-            viewModel.avSearchDebounceMs = 0
-
             viewModel.loadAv()
             awaitUntil { viewModel.uiState.value.av.loaded && !viewModel.uiState.value.av.loading }
             viewModel.loadMoreAvIfNeeded(0)
