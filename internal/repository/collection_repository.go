@@ -408,15 +408,22 @@ SELECT EXISTS (
 // ListAppShortCollections 返回手机端可见的短视频合集目录，按后台 sort_order DESC、
 // updated_at DESC 排序。每条返回最终封面 URL 与可播放短视频数量；封面优先使用合集
 // cover_url，未设置时回退到合集内最新可播放短视频的缩略图（见短视频合集封面回退）。
-func (r *VideoRepository) ListAppShortCollections(ctx context.Context, limit, offset int) ([]models.ShortCollectionListItem, int, error) {
+func (r *VideoRepository) ListAppShortCollections(ctx context.Context, query string, limit, offset int) ([]models.ShortCollectionListItem, int, error) {
 	const where = shortVideosByCollectionVisibilityClause
+	namePattern := shortCollectionSearchPattern(query)
 
 	var total int
-	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM collections c WHERE `+where).Scan(&total); err != nil {
+	countSQL := `SELECT COUNT(*) FROM collections c WHERE ` + where
+	countArgs := []any{}
+	if namePattern != "" {
+		countSQL += ` AND c.name ILIKE $1 ESCAPE E'\\'`
+		countArgs = append(countArgs, namePattern)
+	}
+	if err := r.pool.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count app short collections: %w", err)
 	}
 
-	rows, err := r.pool.Query(ctx, `
+	listSQL := `
 SELECT
   c.id,
   c.name,
@@ -445,9 +452,16 @@ JOIN LATERAL (
     AND v.type = 'short'
     AND v.status = 'ready'
 ) preview ON preview.playable_count > 0
-WHERE `+where+`
+WHERE ` + where
+	listArgs := []any{limit, offset}
+	if namePattern != "" {
+		listSQL += ` AND c.name ILIKE $3 ESCAPE E'\\'`
+		listArgs = append(listArgs, namePattern)
+	}
+	listSQL += `
 ORDER BY c.sort_order DESC, c.updated_at DESC, c.name ASC
-LIMIT $1 OFFSET $2`, limit, offset)
+LIMIT $1 OFFSET $2`
+	rows, err := r.pool.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list app short collections: %w", err)
 	}
@@ -470,6 +484,15 @@ LIMIT $1 OFFSET $2`, limit, offset)
 		return nil, 0, err
 	}
 	return items, total, nil
+}
+
+func shortCollectionSearchPattern(query string) string {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return ""
+	}
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+	return "%" + escaped + "%"
 }
 
 // resolveAppShortCollectionCoverURL 解析合集最终封面：管理员设置的 cover_url 非空时直接使用；

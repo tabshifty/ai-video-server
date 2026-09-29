@@ -96,10 +96,10 @@
 - `短视频合集目录卡片`：短视频合集目录中的单个合集展示单元，固定显示合集名称和可播放短视频数量；后台简介非空时仅显示一行，超长内容截断。
 - `短视频合集内容页`：用户从短视频合集目录打开单个合集后进入的浏览页，先展示该合集内短视频的双列封面列表；用户点选某条视频后，才从该条开始连续竖滑播放，不自动播放合集第一条。
 - `短视频合集内容排序`：短视频合集内容页按视频创建时间从新到旧排列；封面列表与连续竖滑播放使用同一顺序。
-- `短视频合集目录搜索范围`：短视频合集目录首期不提供按名称搜索，用户按后台排序直接浏览；搜索能力属于后续可独立扩展的范围。
+- `短视频合集目录搜索范围`：短视频合集目录支持按合集名称搜索；搜索使用去除首尾空格后的大小写不敏感字面子串匹配，`%`、`_` 等字符不具有通配语义，搜索词最多 200 个字符。搜索不改变可见合集范围和既有后台排序，空搜索词恢复完整目录。该能力只属于手机端短视频合集目录，不扩展到图片合集、AV、电视剧或 TV App。
 - `短视频合集目录刷新`：短视频合集目录首次进入时自动加载；后续不因切换首页内容分类而自动请求，用户通过下拉手动刷新。
 - `短视频合集目录错误反馈`：刷新失败且已有目录数据时保留旧列表并提示可重试；首次加载失败且没有目录数据时显示完整错误态和重试入口，网络失败不表示目录为空。
-- `短视频合集目录接口`：鉴权目录接口 `GET /api/v1/short/collections` 按分页返回可见短视频合集的 `id`、名称、简介、最终封面 URL 和可播放短视频数量；进入合集内容页继续复用现有按 `collection_id` 发现短视频的接口，首期不新增合集详情接口。
+- `短视频合集目录接口`：鉴权目录接口 `GET /api/v1/short/collections` 接受可选 `q` 名称搜索参数并按分页返回可见短视频合集的 `id`、名称、简介、最终封面 URL 和可播放短视频数量；进入合集内容页继续复用现有按 `collection_id` 发现短视频的接口，不新增合集详情接口。搜索提交后从第一页开始，翻页和下拉刷新沿用已提交的搜索词；清空搜索词恢复无搜索目录；不传 `q` 的旧客户端继续获得完整目录。超长搜索词返回参数错误，不静默截断。
 - `短视频合集目录分页`：短视频合集目录每页返回 20 个合集，滚动接近底部时自动加载下一页；首期不展示页码或“加载更多”按钮。
 - `短视频合集目录缓存`：短视频合集目录只在当前应用会话与返回导航中保留数据、已加载页和滚动位置；不写入磁盘，应用重启后重新请求。
 - `短视频合集过期入口`：用户从缓存目录打开的短视频合集若已停用或不再有可播放内容，内容页明确提示“该合集已下线或暂无可播放内容”并提供返回；这次返回目录时自动刷新一次以移除过期卡片。
@@ -1216,7 +1216,7 @@
 - `压缩包远程选择候选边界`：`ToolboxArchiveImport` 的标签、视频合集和图片合集远程选择器，每次搜索都以当前关键词返回的候选为主，不累加历史未选候选；为保持已选值的可读名称，只保留压缩包工作台各表单当前已选值对应的候选。远程搜索的防抖、latest-wins 和后端查询参数不因该显示边界改变。
 
 ## 手机端短视频合集入口与投屏补页约定
-- `短视频合集目录接口边界`：手机端目录走 `GET /api/v1/short/collections`，分页每页 20 条，按后台 `sort_order DESC`、`updated_at DESC` 排序；仅返回启用且至少一条可播放短视频的合集（`ListAppShortCollections`）。`ShortCollectionListItem` 的 `CoverURL` 为合集封面优先、否则回退合集内最新可播放短视频缩略图；`PlayableCount` 暴露可播放短视频数量，首期目录不暴露分页页码，也不提供按名称搜索。`internal/handlers/app_short_collection.go` 是该接口的唯一 handler。
+- `短视频合集目录接口边界`：手机端目录走 `GET /api/v1/short/collections`，分页每页 20 条，按后台 `sort_order DESC`、`updated_at DESC` 排序；仅返回启用且至少一条可播放短视频的合集（`ListAppShortCollections`）。`ShortCollectionListItem` 的 `CoverURL` 为合集封面优先、否则回退合集内最新可播放短视频缩略图；`PlayableCount` 暴露可播放短视频数量；接口接受可选 `q` 名称字面子串搜索，旧客户端不传 `q` 时保持完整目录行为。`internal/handlers/app_short_collection.go` 是该接口的唯一 handler。
 - `SearchVideos 统一 collection 维度`：`VideoRepository.SearchVideos` / `SearchVideosOrdered` 最右新增可选 `collectionID *uuid.UUID` 参数，非空且非 `uuid.Nil` 时走合集专属查询 `queryShortVideosByCollection`，忽略关键词与排序覆盖；`DiscoverShortVideos(mode=collection)` 同样收敛到 `queryShortVideosByCollection`，两段 SQL 不得分叉漂移（ADR-0016）。所有既有调用点（`AppService.Search`、`TVSearch`、`TVHome`、`tvHomeTyped`、`TVCatalogWall`）一律显式传 `nil`。
 - `投屏可见性只约束目录展示与发起`：投屏会话发起时若 `TvRemoteSearchContext.CollectionID` 非空，`StartTVRemoteSessionAt` 先经 `IsVisibleAppShortCollection` 校验可见性，不可见返回 `ErrTVRemoteCollectionUnavailable`（路由码 2304）；可见性不中断已发起会话、不约束补页，补页实时由 `SearchVideos(collectionID)` 取数（ADR-0017）。`normalizeTVRemoteSearchContext` 允许仅靠 `CollectionID` 成活（`query` 与 `collectionID` 同时为空才判 nil）。`TvRemoteSearchContext.CollectionID` 为 `*uuid.UUID` JSONB 字段，无新 DB 迁移。
 - `手机端公共投屏与竖滑组件`：投屏弹窗抽到 `core/ui/cast/TvCast` 与 `TvCastDeviceDialog`，竖滑播放抽到 `core/ui/shorts/ShortVerticalFeedPlayer`，合集目录与内容页分别在 `feature/shortcollections/` 下；首页新增「合集」tab（`homeContentTabs` 中 `type=short_collection`），点击合集卡经 `onOpenShortCollection` 跳 `ShortCollectionContentRoute`，内容页缺失时回调 `onCollectionUnavailable` 刷新目录并 `popBackStack`。重构既有代码时走 TDD + 独立评审，TV 端 `remote-shorts` 播放屏零改动。

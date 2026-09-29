@@ -71,6 +71,7 @@ interface ApiService {
     suspend fun shortCollections(
         @Url url: String,
         @Header("Authorization") authorization: String,
+        @Query("q") query: String? = null,
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<ShortCollectionsPayload>

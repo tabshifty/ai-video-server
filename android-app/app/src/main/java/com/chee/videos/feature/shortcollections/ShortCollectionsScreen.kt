@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,8 +19,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.ExperimentalMaterialApi
@@ -38,6 +47,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -67,13 +77,24 @@ fun ShortCollectionsScreen(
         onRefresh = viewModel::refresh,
     )
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppChrome.PageGradient)
-            .pullRefresh(pullRefreshState),
+            .background(AppChrome.PageGradient),
     ) {
-        when {
+        ShortCollectionsSearchBar(
+            query = uiState.query,
+            onQueryChanged = viewModel::updateQuery,
+            onSubmit = viewModel::submitQuery,
+            onClear = { viewModel.updateQuery("") },
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .pullRefresh(pullRefreshState),
+        ) {
+            when {
             uiState.loading && uiState.items.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color.White)
@@ -101,7 +122,7 @@ fun ShortCollectionsScreen(
 
             uiState.items.isEmpty() -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("暂无合集", color = Color.White)
+                    Text(shortCollectionsEmptyMessage(uiState.submittedQuery), color = Color.White)
                 }
             }
 
@@ -128,6 +149,19 @@ fun ShortCollectionsScreen(
                             )
                         }
                     }
+                    if (uiState.loading) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(4.dp),
+                                    color = Color.White,
+                                )
+                            }
+                        }
+                    }
                     items(items = uiState.items, key = { it.id }) { collection ->
                         ShortCollectionCard(
                             baseUrl = baseUrl,
@@ -144,12 +178,49 @@ fun ShortCollectionsScreen(
                     }
                 }
             }
+            }
+            PullRefreshIndicator(
+                refreshing = uiState.refreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
-        PullRefreshIndicator(
-            refreshing = uiState.refreshing,
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter),
+    }
+}
+
+@Composable
+private fun ShortCollectionsSearchBar(
+    query: String,
+    onQueryChanged: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChanged,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            placeholder = { Text("搜索合集") },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "搜索") },
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(onClick = onClear) {
+                        Icon(Icons.Filled.Close, contentDescription = "清空搜索")
+                    }
+                }
+            } else {
+                null
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
         )
+        IconButton(onClick = onSubmit) {
+            Icon(Icons.Filled.Search, contentDescription = "提交搜索")
+        }
     }
 }
 

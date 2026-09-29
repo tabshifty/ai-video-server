@@ -265,7 +265,7 @@ private class FakeActorApiService(
     override suspend fun recommend(url: String, authorization: String, pageSize: Int): ApiEnvelope<FeedPayload> = error("unused")
     override suspend fun randomShort(url: String, pageSize: Int, excludeIds: String?): ApiEnvelope<FeedPayload> = error("unused")
     override suspend fun shortDiscover(url: String, authorization: String, mode: String, tag: String?, collectionID: String?, page: Int, pageSize: Int): ApiEnvelope<SearchPayload> = error("unused")
-    override suspend fun shortCollections(url: String, authorization: String, page: Int, pageSize: Int): ApiEnvelope<ShortCollectionsPayload> = error("unused")
+    override suspend fun shortCollections(url: String, authorization: String, query: String?, page: Int, pageSize: Int): ApiEnvelope<ShortCollectionsPayload> = error("unused")
     override suspend fun createTvAuthSession(url: String, body: TvAuthSessionCreateRequest): ApiEnvelope<TvAuthSessionCreatePayload> = error("unused")
     override suspend fun getTvAuthSession(url: String): ApiEnvelope<TvAuthSessionStatusPayload> = error("unused")
     override suspend fun approveTvAuthSession(url: String, authorization: String): ApiEnvelope<Map<String, Boolean>> = error("unused")

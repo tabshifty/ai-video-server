@@ -507,6 +507,7 @@ private class FakeHomeApiService(
     override suspend fun shortCollections(
         url: String,
         authorization: String,
+        query: String?,
         page: Int,
         pageSize: Int,
     ): ApiEnvelope<ShortCollectionsPayload> = error("unused")

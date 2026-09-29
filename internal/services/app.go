@@ -2,13 +2,19 @@ package services
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
 	"video-server/internal/models"
 	"video-server/internal/repository"
 )
+
+var ErrShortCollectionSearchQueryTooLong = errors.New("合集搜索词不能超过 200 个字符")
+
+const shortCollectionSearchQueryMaxRunes = 200
 
 // AppService handles app-facing APIs for detail/history/interaction/search/user.
 type AppService struct {
@@ -185,7 +191,11 @@ func (s *AppService) ImageCollectionDetail(ctx context.Context, collectionID uui
 
 // ShortCollections 返回手机端可见的短视频合集目录，分页每页 20 条，按后台 sort_order DESC、
 // updated_at DESC 排序。可见合集仅包含启用且至少一条可播放短视频的合集（见可见短视频合集）。
-func (s *AppService) ShortCollections(ctx context.Context, page, pageSize int) (models.PageResult[models.ShortCollectionListItem], error) {
+func (s *AppService) ShortCollections(ctx context.Context, query string, page, pageSize int) (models.PageResult[models.ShortCollectionListItem], error) {
+	query, err := normalizeShortCollectionSearchQuery(query)
+	if err != nil {
+		return models.PageResult[models.ShortCollectionListItem]{}, err
+	}
 	if page < 1 {
 		page = 1
 	}
@@ -196,7 +206,7 @@ func (s *AppService) ShortCollections(ctx context.Context, page, pageSize int) (
 		pageSize = 100
 	}
 	offset := (page - 1) * pageSize
-	items, total, err := s.repo.ListAppShortCollections(ctx, pageSize, offset)
+	items, total, err := s.repo.ListAppShortCollections(ctx, query, pageSize, offset)
 	if err != nil {
 		return models.PageResult[models.ShortCollectionListItem]{}, err
 	}
@@ -206,6 +216,14 @@ func (s *AppService) ShortCollections(ctx context.Context, page, pageSize int) (
 		Page:       page,
 		PageSize:   pageSize,
 	}, nil
+}
+
+func normalizeShortCollectionSearchQuery(raw string) (string, error) {
+	query := strings.TrimSpace(raw)
+	if utf8.RuneCountInString(query) > shortCollectionSearchQueryMaxRunes {
+		return "", ErrShortCollectionSearchQueryTooLong
+	}
+	return query, nil
 }
 
 func (s *AppService) Profile(ctx context.Context, userID uuid.UUID) (models.UserProfileView, error) {

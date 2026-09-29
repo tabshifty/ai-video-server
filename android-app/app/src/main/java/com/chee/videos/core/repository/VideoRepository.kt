@@ -148,6 +148,7 @@ class VideoRepository @Inject constructor(
     }
 
     suspend fun fetchShortCollections(
+        query: String? = null,
         page: Int = 1,
         pageSize: Int = 20,
     ): Result<ShortCollectionsPayload> {
@@ -155,6 +156,7 @@ class VideoRepository @Inject constructor(
             api.shortCollections(
                 url = UrlBuilder.shortCollections(baseUrl),
                 authorization = bearer,
+                query = query?.trim()?.takeIf { it.isNotEmpty() },
                 page = page,
                 pageSize = pageSize,
             )

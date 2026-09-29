@@ -478,3 +478,16 @@
 - 架构取舍：查阅 `docs/adr/`。
 - 有 PRD/实现/评审流程的任务：查阅 `tasks/<任务>/prd.md`、`implement.md`、`review.md` 和 `DONE.md`。
 - 本文件不再记录纯部署流水；只有部署暴露新的长期兼容约束或未解决阻塞时，才记录结论。
+## 2026-09-29 计划：手机端短视频合集支持显式名称搜索
+- 进度：需求访谈已确认。仅改手机端短视频合集目录及其后端接口；新增可选 `q` 参数，按名称做去首尾空格、大小写不敏感的字面子串匹配，最多 200 个字符；空词恢复完整目录，搜索提交后从第一页开始，翻页/刷新沿用已提交词；取消置顶能力，不新增字段、管理配置、特殊排序或标注。手机端只保留搜索草稿，显式提交后请求；旧请求响应不得覆盖新查询状态；搜索失败按已有列表/无列表分别反馈。手机端版本按规则升级。
+- 影响文件：`internal/handlers/app_short_collection.go`、`internal/services/app.go`、`internal/repository/collection_repository.go`、对应 Go 测试；`android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`、`core/repository/VideoRepository.kt`、`feature/shortcollections/ShortCollectionsViewModel.kt`、`ShortCollectionsScreen.kt`、对应测试；`android-app/app/build.gradle.kts`、`CONTEXT.md`。
+- 验证：先运行后端与手机端新增定向测试确认红灯，再完成实现；收尾运行 Go 定向测试、`go vet ./...`、手机端 `:app:testDebugUnitTest` 与 `:app:assembleDebug`，并检查乱码、差异和提交范围。
+
+## 2026-09-29 实施：手机端短视频合集支持显式名称搜索
+- 进度：后端 `GET /api/v1/short/collections` 接受可选 `q`，服务层按 200 Unicode 字符限制并去首尾空格，仓储层对合集名称执行大小写不敏感字面子串匹配并转义 `%`、`_`、反斜杠；缺省 `q` 保持旧客户端完整目录行为。手机端新增搜索草稿/已提交词、显式按钮与键盘 Search 提交、空词恢复、分页/刷新沿用已提交词、请求代次 latest-wins、搜索空态和错误态；未实现置顶能力。
+- 影响文件：`internal/handlers/app_short_collection.go`、`internal/services/app.go`、`internal/repository/collection_repository.go`、`internal/services/app_test.go`、`internal/repository/collection_search_test.go`；`android-app/app/src/main/java/com/chee/videos/core/network/ApiService.kt`、`core/repository/VideoRepository.kt`、`feature/shortcollections/ShortCollectionsViewModel.kt`、`ShortCollectionsScreen.kt`、测试替身与 `ShortCollectionsSearchStateTest.kt`；`android-app/app/build.gradle.kts`、`CONTEXT.md`。
+- 验证：新增 Go/Kotlin 定向测试已按 TDD 先红后绿；手机端 `:app:testDebugUnitTest` 通过。Go 受影响包测试中既有 `TestParseTVAPKMetadataParsesReleaseAPK` 仍因仓库当前 APK versionCode 144 与旧断言 121 失败，其余 handlers/repository 测试通过；待执行 `go vet ./...`、Android assemble、乱码与提交前差异检查。
+
+## 2026-09-29 验证：手机端短视频合集搜索
+- 进度：实现完成，未增加置顶能力。手机端版本已升级为 `versionCode 13`、`versionName 0.1.12`。
+- 验证：`go test ./internal/handlers ./internal/repository -count=1` 通过；`go vet ./...` 通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过；`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过；本次涉及文件乱码扫描通过，`git diff --check` 待提交前复核。`go test ./internal/services ./internal/repository ./internal/handlers -count=1` 中 services 仍有既有 `TestParseTVAPKMetadataParsesReleaseAPK` 失败（当前 APK versionCode 144、旧断言 121），与本任务无关。
