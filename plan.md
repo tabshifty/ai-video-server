@@ -1,5 +1,8 @@
 # plan.md
 
+## 2026-09-30 开放环境复验
+- 验证：开放本机端口后运行 `GOCACHE=/tmp/ai-video-go-cache go test ./... -count=1`；网络监听型测试已通过。仅 `internal/services/TestParseTVAPKMetadataParsesReleaseAPK` 失败，仓库中的测试期望版本 `121 / 0.1.121`，当前 release APK 元数据为 `144`，TV 工程 Gradle 为 `147 / 0.1.147`，属于既有测试夹具与构建产物版本不一致，与本次压缩包媒体导入改动无关。
+
 ## 2026-09-30 收尾：补齐 HEIC/HEIF 识别与多图片合集配置
 - 进度：归档扫描按图片扩展名返回稳定 MIME，HEIC/HEIF 在内容探测器无法识别时仍能进入图片流程；工作台移除视频关联图片合集的单选截断，保持视频级、分组级和批量编辑的多合集契约。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`。
