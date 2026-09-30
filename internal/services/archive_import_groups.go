@@ -159,6 +159,7 @@ SELECT
   id,
   batch_id,
   name,
+  COALESCE(directory_path, ''),
   COALESCE(note, ''),
   media_kind,
   title,
@@ -181,6 +182,7 @@ func scanArchiveImportGroupRecord(scanner archiveImportScanner) (models.ArchiveI
 		&item.ID,
 		&item.BatchID,
 		&item.Name,
+		&item.DirectoryPath,
 		&item.Note,
 		&item.MediaKind,
 		&title,
@@ -299,7 +301,7 @@ func (s *ArchiveImportService) CreateGroup(ctx context.Context, batchID uuid.UUI
 	if description := strings.TrimSpace(in.Description); description != "" {
 		group.Description = &description
 	}
-	if mediaKind == "video" {
+	if mediaKind == "video" || mediaKind == "mixed" {
 		if tags := normalizeArchiveTags(in.Tags); len(tags) > 0 {
 			group.Tags = tags
 		}
@@ -318,7 +320,8 @@ func (s *ArchiveImportService) CreateGroup(ctx context.Context, batchID uuid.UUI
 		if err != nil {
 			return models.ArchiveImportGroup{}, err
 		}
-	} else {
+	}
+	if mediaKind == "image" || mediaKind == "mixed" {
 		group.ImageCollectionIDs, err = s.resolveArchiveImportImageCollectionIDs(ctx, in.ImageCollectionIDs)
 		if err != nil {
 			return models.ArchiveImportGroup{}, err
@@ -333,10 +336,10 @@ func (s *ArchiveImportService) CreateGroup(ctx context.Context, batchID uuid.UUI
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO archive_import_groups (
-  id, batch_id, name, note, media_kind
+  id, batch_id, name, directory_path, note, media_kind
 )
-VALUES ($1,$2,$3,$4,$5)
-`, groupID, batchID, group.Name, group.Note, group.MediaKind); err != nil {
+VALUES ($1,$2,$3,$4,$5,$6)
+`, groupID, batchID, group.Name, group.DirectoryPath, group.Note, group.MediaKind); err != nil {
 		return models.ArchiveImportGroup{}, fmt.Errorf("insert archive group: %w", err)
 	}
 	if err := updateArchiveImportGroupTx(ctx, tx, group); err != nil {
@@ -376,7 +379,7 @@ func (s *ArchiveImportService) UpdateGroup(ctx context.Context, groupID uuid.UUI
 	next := current
 	next.Name = name
 	next.Note = strings.TrimSpace(in.Note)
-	if current.MediaKind == "video" {
+	if current.MediaKind == "video" || current.MediaKind == "mixed" {
 		if in.UpdateTitle {
 			title := strings.TrimSpace(in.Title)
 			if title == "" {
@@ -424,7 +427,8 @@ func (s *ArchiveImportService) UpdateGroup(ctx context.Context, groupID uuid.UUI
 				next.ImageCollectionIDs = []uuid.UUID{}
 			}
 		}
-	} else {
+	}
+	if current.MediaKind == "image" || current.MediaKind == "mixed" {
 		if in.UpdateTitle {
 			title := strings.TrimSpace(in.Title)
 			if title == "" {
@@ -542,7 +546,7 @@ func (s *ArchiveImportService) AssignFilesToGroup(ctx context.Context, groupID u
 		return err
 	}
 	for _, file := range files {
-		if file.MediaKind != group.MediaKind {
+		if group.MediaKind != "mixed" && file.MediaKind != group.MediaKind {
 			return fmt.Errorf("group media kind mismatch")
 		}
 	}
@@ -764,16 +768,17 @@ func updateArchiveImportGroupTx(ctx context.Context, tx pgx.Tx, group models.Arc
 UPDATE archive_import_groups
 SET
   name=$2,
-  note=$3,
-  title=$4,
-  description=$5,
-  tags=$6,
-  video_type=$7,
-  video_collection_ids=$8,
-  image_collection_ids=$9,
+  directory_path=$3,
+  note=$4,
+  title=$5,
+  description=$6,
+  tags=$7,
+  video_type=$8,
+  video_collection_ids=$9,
+  image_collection_ids=$10,
   updated_at=NOW()
 WHERE id=$1
-`, group.ID, group.Name, group.Note, title, description, tagsRaw, videoType, videoCollectionsRaw, imageCollectionsRaw); err != nil {
+`, group.ID, group.Name, group.DirectoryPath, group.Note, title, description, tagsRaw, videoType, videoCollectionsRaw, imageCollectionsRaw); err != nil {
 		return fmt.Errorf("update archive group: %w", err)
 	}
 	return nil

@@ -134,6 +134,14 @@ func (s *ImageService) saveFromLocalPath(ctx context.Context, in SaveImageInput,
 	}
 	originalMIME := strings.ToLower(strings.TrimSpace(detected.String()))
 	if !isAllowedImageMIME(originalMIME) {
+		switch strings.ToLower(filepath.Ext(strings.TrimSpace(filename))) {
+		case ".heic":
+			originalMIME = "image/heic"
+		case ".heif":
+			originalMIME = "image/heif"
+		}
+	}
+	if !isAllowedImageMIME(originalMIME) {
 		return SaveImageResult{}, ErrInvalidImageType
 	}
 
@@ -454,7 +462,7 @@ func sendOpenImageResult(ctx context.Context, resultCh chan<- openImageResult, r
 func isAllowedImageMIME(mime string) bool {
 	mime = strings.ToLower(strings.TrimSpace(mime))
 	switch mime {
-	case "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/tiff", "image/x-tiff":
+	case "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/tiff", "image/x-tiff", "image/heic", "image/heif":
 		return true
 	default:
 		return false
@@ -476,6 +484,10 @@ func normalizeImageExt(ext string) string {
 		return ".bmp"
 	case ".tif", ".tiff":
 		return ".tiff"
+	case ".heic":
+		return ".heic"
+	case ".heif":
+		return ".heif"
 	default:
 		return ext
 	}

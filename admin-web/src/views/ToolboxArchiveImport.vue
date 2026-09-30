@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Back, Check, CircleCheck, Close, Delete, DocumentCopy, EditPen, Plus, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { Back, Check, CircleCheck, Close, Delete, DocumentCopy, EditPen, FolderOpened, Picture, Plus, RefreshRight, UploadFilled, VideoCamera } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
@@ -20,6 +20,7 @@ import {
   deleteAdminArchiveImportGroup,
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
+  getAdminArchiveImportFileImages,
   getAdminCollections,
   getAdminImageCollections,
   getAdminPopularVideoTags,
@@ -30,6 +31,7 @@ import {
   retryAdminArchiveImportExtract,
   updateAdminArchiveImportGroup,
   updateAdminArchiveImportFile,
+  updateAdminArchiveImportFileImages,
   uploadAdminArchiveImport
 } from '../api/admin'
 import {
@@ -162,7 +164,7 @@ const batchEditForm = reactive({
   video_collection_enabled: false,
   video_collection_ids: [],
   video_image_collection_enabled: false,
-  video_image_collection_id: '',
+  video_image_collection_ids: [],
   image_collection_enabled: false,
   image_collection_ids: []
 })
@@ -276,30 +278,30 @@ const archiveGroupCards = computed(() => {
 const archiveSelectedGroupCard = computed(() =>
   archiveGroupCards.value.find((group) => String(group.id || '') === String(activeGroupFilter.value || '')) || null
 )
-const selectedVideoImageCollectionID = computed({
+const archiveFileTreeRows = computed(() => buildArchiveFileTreeRows(selectedBatchFiles.value))
+const selectedFileImageCandidates = computed(() => {
+  const groupID = String(selectedFile.value?.group_id || '')
+  return selectedBatchFiles.value.filter((file) =>
+    file?.media_kind === 'image'
+    && (!groupID || String(file.group_id || '') === groupID)
+  )
+})
+const selectedVideoImageCollectionIDs = computed({
   get() {
-    if (!selectedFile.value || selectedFile.value.media_kind !== 'video') return ''
-    return String(selectedFile.value.image_collection_ids?.[0] || '')
+    if (!selectedFile.value || selectedFile.value.media_kind !== 'video') return []
+    return normalizeUUIDSelection(selectedFile.value.image_collection_ids)
   },
   set(value) {
     if (!selectedFile.value || selectedFile.value.media_kind !== 'video') return
-    selectedFile.value.image_collection_ids = value ? [value] : []
+    selectedFile.value.image_collection_ids = normalizeUUIDSelection(value)
   }
 })
-const batchEditVideoImageCollectionID = computed({
+const batchEditVideoImageCollectionIDs = computed({
   get() {
-    return String(batchEditForm.video_image_collection_id || '')
+    return normalizeUUIDSelection(batchEditForm.video_image_collection_ids)
   },
   set(value) {
-    batchEditForm.video_image_collection_id = String(value || '')
-  }
-})
-const archiveGroupVideoImageCollectionID = computed({
-  get() {
-    return String(archiveGroupForm.image_collection_ids?.[0] || '')
-  },
-  set(value) {
-    archiveGroupForm.image_collection_ids = value ? [String(value)] : []
+    batchEditForm.video_image_collection_ids = normalizeUUIDSelection(value)
   }
 })
 const overviewCards = computed(() => {
@@ -535,7 +537,8 @@ function normalizeArchiveFileState(data) {
     ...data,
     tags: normalizeTagSelection(data.tags),
     video_collection_ids: normalizeUUIDSelection(data.video_collection_ids),
-    image_collection_ids: normalizeUUIDSelection(data.image_collection_ids)
+    image_collection_ids: normalizeUUIDSelection(data.image_collection_ids),
+    related_image_file_ids: normalizeUUIDSelection(data.related_image_file_ids)
   }
 }
 
@@ -544,7 +547,8 @@ function createSelectedFileDraft(file) {
     ...file,
     tags: [...(file?.tags || [])],
     video_collection_ids: [...(file?.video_collection_ids || [])],
-    image_collection_ids: [...(file?.image_collection_ids || [])]
+    image_collection_ids: [...(file?.image_collection_ids || [])],
+    related_image_file_ids: [...(file?.related_image_file_ids || [])]
   })
 }
 
@@ -668,6 +672,55 @@ function findArchiveFileByID(fileID) {
   return selectedBatchFiles.value.find((item) => String(item?.id || '') === String(fileID || '')) || null
 }
 
+function buildArchiveFileTreeRows(files) {
+  const root = { name: '根目录', path: '', children: new Map(), files: [] }
+  for (const file of Array.isArray(files) ? files : []) {
+    const path = String(file?.relative_path || '').replaceAll('\\', '/').replace(/^\/+|\/+$/g, '')
+    if (!path) continue
+    const segments = path.split('/').filter(Boolean)
+    const fileName = segments.pop()
+    let node = root
+    let currentPath = ''
+    for (const segment of segments) {
+      currentPath = currentPath ? `${currentPath}/${segment}` : segment
+      if (!node.children.has(segment)) {
+        node.children.set(segment, { name: segment, path: currentPath, children: new Map(), files: [] })
+      }
+      node = node.children.get(segment)
+    }
+    node.files.push({ ...file, treeFileName: fileName })
+  }
+
+  const rows = []
+  const appendNode = (node, depth) => {
+    const group = archiveRealGroups.value.find((item) => String(item.directory_path || '') === node.path)
+    const filesInTree = [...node.files]
+    const descendants = []
+    const collect = (child) => {
+      descendants.push(...child.files)
+      for (const nested of child.children.values()) collect(nested)
+    }
+    for (const child of node.children.values()) collect(child)
+    rows.push({
+      kind: 'directory',
+      depth,
+      name: node.name,
+      path: node.path,
+      groupID: group?.id || '',
+      videoCount: [...filesInTree, ...descendants].filter((file) => file.media_kind === 'video').length,
+      imageCount: [...filesInTree, ...descendants].filter((file) => file.media_kind === 'image').length
+    })
+    for (const file of [...node.files].sort((left, right) => String(left.treeFileName).localeCompare(String(right.treeFileName), 'zh-CN'))) {
+      rows.push({ kind: 'file', depth: depth + 1, name: file.treeFileName, file })
+    }
+    for (const child of [...node.children.values()].sort((left, right) => left.path.localeCompare(right.path, 'zh-CN'))) {
+      appendNode(child, depth + 1)
+    }
+  }
+  appendNode(root, 0)
+  return rows
+}
+
 function serializeSelectedFileState() {
   if (!selectedFile.value) return ''
   return JSON.stringify({
@@ -677,7 +730,8 @@ function serializeSelectedFileState() {
     tags: [...normalizeTagSelection(selectedFile.value.tags)].sort(),
     video_type: String(selectedFile.value.video_type || ''),
     video_collection_ids: [...normalizeUUIDSelection(selectedFile.value.video_collection_ids)].sort(),
-    image_collection_ids: [...normalizeUUIDSelection(selectedFile.value.image_collection_ids)].sort()
+    image_collection_ids: [...normalizeUUIDSelection(selectedFile.value.image_collection_ids)].sort(),
+    related_image_file_ids: [...normalizeUUIDSelection(selectedFile.value.related_image_file_ids)].sort()
   })
 }
 
@@ -852,6 +906,15 @@ async function openArchiveFileEditor(row) {
   const selected = await requestArchiveFileSelection([row.id], findArchiveFileIndex(row.id))
   if (!selected || !selectedFile.value) return
   await preloadSelectedFileEditor(row)
+  if (row.media_kind === 'video') {
+    try {
+      const response = await getAdminArchiveImportFileImages(row.id)
+      selectedFile.value.related_image_file_ids = normalizeUUIDSelection(response?.image_file_ids || response?.data?.image_file_ids || [])
+      captureSelectedFileSnapshot()
+    } catch (error) {
+      ElMessage.warning(extractErrorMessage(error, '读取视频图片关系失败'))
+    }
+  }
   selectedFileDialogVisible.value = true
 }
 
@@ -1052,7 +1115,7 @@ function pushSelectedCollectionValue(target, collectionID) {
     return
   }
   if (target === 'file-video-image' && selectedFile.value) {
-    selectedFile.value.image_collection_ids = normalizeUUIDSelection([collectionID]).slice(0, 1)
+    selectedFile.value.image_collection_ids = normalizeUUIDSelection([...(selectedFile.value.image_collection_ids || []), collectionID])
   }
 }
 
@@ -1233,14 +1296,20 @@ async function saveSelectedFile() {
   const metadataDraft = filenameModeActive ? captureSelectedFileMetadataDraft() : null
   fileSaving.value = true
   try {
+    const saveSelectedImageLinks = async () => {
+      if (selectedFile.value?.media_kind !== 'video') return
+      await updateAdminArchiveImportFileImages(selectedFile.value.id, {
+        image_file_ids: normalizeUUIDSelection(selectedFile.value.related_image_file_ids)
+      })
+    }
     const payload = {
       title: selectedFile.value.title || '',
       description: selectedFile.value.description || '',
       tags: normalizeTagSelection(selectedFile.value.tags),
       video_type: selectedFile.value.video_type || 'short',
       video_collection_ids: normalizeUUIDSelection(selectedFile.value.video_collection_ids),
-      image_collection_ids: selectedFile.value.media_kind === 'video'
-        ? normalizeUUIDSelection([selectedVideoImageCollectionID.value])
+        image_collection_ids: selectedFile.value.media_kind === 'video'
+        ? normalizeUUIDSelection(selectedVideoImageCollectionIDs.value)
         : normalizeUUIDSelection(selectedFile.value.image_collection_ids)
     }
     if (filenameModeActive) {
@@ -1252,7 +1321,7 @@ async function saveSelectedFile() {
         update_video_collection_ids: true,
         video_collection_ids: normalizeUUIDSelection(selectedFile.value.video_collection_ids),
         update_image_collection_ids: true,
-        image_collection_ids: normalizeUUIDSelection([selectedVideoImageCollectionID.value])
+        image_collection_ids: normalizeUUIDSelection(selectedVideoImageCollectionIDs.value)
       })
       const outcome = await executeArchiveFilenameUpdate({
         submit: async () => {
@@ -1266,6 +1335,7 @@ async function saveSelectedFile() {
         }
       })
       if (outcome.status === 'success') {
+        await saveSelectedImageLinks()
         selectedFileDialogVisible.value = false
         ElMessage.success('已保存文件信息')
         return
@@ -1280,6 +1350,7 @@ async function saveSelectedFile() {
     }
 
     await updateAdminArchiveImportFile(selectedFile.value.id, payload)
+    await saveSelectedImageLinks()
     const refreshed = await refreshBatchDetail({ skipConfirm: true })
     if (!refreshed) {
       ElMessage.warning('文件信息已保存，但刷新失败，请手动刷新')
@@ -1437,7 +1508,7 @@ function buildArchiveGroupPayload() {
       : [],
     image_collection_ids: normalizeUUIDSelection(
       archiveGroupForm.media_kind === 'video'
-        ? archiveGroupForm.image_collection_ids.slice(0, 1)
+        ? archiveGroupForm.image_collection_ids
         : archiveGroupForm.image_collection_ids
     )
   }
@@ -1589,7 +1660,7 @@ function resetBatchEditForm() {
   batchEditForm.video_collection_enabled = false
   batchEditForm.video_collection_ids = []
   batchEditForm.video_image_collection_enabled = false
-  batchEditForm.video_image_collection_id = ''
+  batchEditForm.video_image_collection_ids = []
   batchEditForm.image_collection_enabled = false
   batchEditForm.image_collection_ids = []
 }
@@ -1607,7 +1678,7 @@ function serializeBatchEditState() {
     video_collection_enabled: batchEditForm.video_collection_enabled,
     video_collection_ids: [...normalizeUUIDSelection(batchEditForm.video_collection_ids)].sort(),
     video_image_collection_enabled: batchEditForm.video_image_collection_enabled,
-    video_image_collection_id: String(batchEditForm.video_image_collection_id || ''),
+    video_image_collection_ids: [...normalizeUUIDSelection(batchEditForm.video_image_collection_ids)].sort(),
     image_collection_enabled: batchEditForm.image_collection_enabled,
     image_collection_ids: [...normalizeUUIDSelection(batchEditForm.image_collection_ids)].sort()
   })
@@ -1690,8 +1761,8 @@ function buildBatchEditPayloadForFile(file) {
       : normalizeUUIDSelection(current.video_collection_ids),
     image_collection_ids: archiveFileProcessKind(file) === 'video'
       ? (batchEditForm.video_image_collection_enabled
-        ? normalizeUUIDSelection([batchEditForm.video_image_collection_id])
-        : normalizeUUIDSelection(current.image_collection_ids).slice(0, 1))
+        ? normalizeUUIDSelection(batchEditForm.video_image_collection_ids)
+        : normalizeUUIDSelection(current.image_collection_ids))
       : (archiveFileProcessKind(file) === 'image'
           ? (batchEditForm.image_collection_enabled
             ? normalizeUUIDSelection(batchEditForm.image_collection_ids)
@@ -1710,7 +1781,7 @@ function buildArchiveFilenameBatchPatch() {
     video_collection_enabled: batchEditForm.video_collection_enabled,
     video_collection_ids: normalizeUUIDSelection(batchEditForm.video_collection_ids),
     video_image_collection_enabled: batchEditForm.video_image_collection_enabled,
-    image_collection_ids: normalizeUUIDSelection([batchEditForm.video_image_collection_id])
+        image_collection_ids: normalizeUUIDSelection(batchEditForm.video_image_collection_ids)
   })
 }
 
@@ -2016,7 +2087,7 @@ function selectedArchiveImageCollectionValues() {
   return [
     ...normalizeUUIDSelection(uploadForm.default_image_collection_ids),
     ...normalizeUUIDSelection(selectedFile.value?.image_collection_ids),
-    ...normalizeUUIDSelection([batchEditForm.video_image_collection_id]),
+    ...normalizeUUIDSelection(batchEditForm.video_image_collection_ids),
     ...normalizeUUIDSelection(batchEditForm.image_collection_ids),
     ...normalizeUUIDSelection(archiveGroupForm.image_collection_ids)
   ]
@@ -2270,6 +2341,30 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <div class="archive-file-tree" role="tree" aria-label="压缩包文件系统">
+              <div
+                v-for="row in archiveFileTreeRows"
+                :key="row.kind === 'file' ? `file-${row.file.id}` : `dir-${row.path}`"
+                class="archive-file-tree__row"
+                :class="{
+                  'is-file': row.kind === 'file',
+                  'is-directory': row.kind === 'directory',
+                  'is-selected': row.kind === 'file' && String(selectedFile?.id || '') === String(row.file.id || '')
+                }"
+                :style="{ '--tree-depth': row.depth }"
+                role="treeitem"
+                @click="row.kind === 'file' ? openArchiveFileEditor(row.file) : openArchiveGroupFiles(row.groupID || ARCHIVE_GROUP_FILTER_ALL)"
+              >
+                <span class="archive-file-tree__branch" aria-hidden="true"></span>
+                <component :is="row.kind === 'directory' ? FolderOpened : (row.file.media_kind === 'video' ? VideoCamera : Picture)" class="archive-file-tree__icon" />
+                <span class="archive-file-tree__name">{{ row.name }}</span>
+                <span v-if="row.kind === 'directory'" class="archive-file-tree__stats">视频 {{ row.videoCount }} · 图片 {{ row.imageCount }}</span>
+                <el-tag v-else size="small" effect="plain" :type="row.file.status === 'failed' ? 'danger' : row.file.status === 'ready' || row.file.status === 'existing' ? 'success' : 'info'">
+                  {{ fileStatusLabel(row.file.status) }}
+                </el-tag>
+              </div>
+            </div>
+
             <div class="archive-group-grid">
               <article
                 v-for="group in archiveGroupCards"
@@ -2512,10 +2607,10 @@ onUnmounted(() => {
               <el-button class="collection-picker__button" @click="openCreateVideoCollection('file-video')">新建视频合集</el-button>
             </div>
           </el-form-item>
-          <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'video'">
+          <el-form-item label="视频关联的图片合集" v-if="selectedFile.media_kind === 'video'">
             <div class="collection-picker">
               <el-select
-                v-model="selectedVideoImageCollectionID"
+                v-model="selectedVideoImageCollectionIDs"
                 class="collection-picker__select"
                 filterable
                 remote
@@ -2524,7 +2619,7 @@ onUnmounted(() => {
                 default-first-option
                 :remote-method="loadImageCollectionSuggestions"
                 :loading="loadingImageCollections"
-                placeholder="可选，仅可关联一个图片图集"
+                placeholder="可选，可多选"
               >
                 <el-option
                   v-for="collection in imageCollectionOptions"
@@ -2535,6 +2630,25 @@ onUnmounted(() => {
               </el-select>
               <el-button class="collection-picker__button" @click="openCreateImageCollection('file-video-image')">新建图片合集</el-button>
             </div>
+          </el-form-item>
+          <el-form-item label="关联图片文件" v-if="selectedFile.media_kind === 'video'">
+            <el-select
+              v-model="selectedFile.related_image_file_ids"
+              multiple
+              filterable
+              clearable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="默认关联同目录全部图片，可手动调整"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="imageFile in selectedFileImageCandidates"
+                :key="imageFile.id"
+                :label="imageFile.relative_path"
+                :value="imageFile.id"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="图片合集" v-if="selectedFile.media_kind === 'image'">
             <div class="collection-picker">
@@ -2831,13 +2945,14 @@ onUnmounted(() => {
               <el-form-item>
                 <el-checkbox v-model="batchEditForm.video_image_collection_enabled">视频关联的图片合集</el-checkbox>
                 <el-select
-                  v-model="batchEditVideoImageCollectionID"
+                  v-model="batchEditVideoImageCollectionIDs"
                   :disabled="!batchEditForm.video_image_collection_enabled"
+                  multiple
                   filterable
                   remote
                   reserve-keyword
                   clearable
-                  placeholder="统一覆盖为同一个图片图集"
+                  placeholder="统一覆盖为同一组图片合集"
                   style="width: 100%"
                   :remote-method="loadImageCollectionSuggestions"
                   :loading="loadingImageCollections"
@@ -2985,12 +3100,13 @@ onUnmounted(() => {
 
             <el-form-item v-if="archiveGroupForm.media_kind === 'video'" label="默认图片合集">
               <el-select
-                v-model="archiveGroupVideoImageCollectionID"
+                v-model="archiveGroupForm.image_collection_ids"
+                multiple
                 filterable
                 remote
                 reserve-keyword
                 clearable
-                placeholder="可选，仅可关联一个图片图集"
+                placeholder="可选，可多选"
                 style="width: 100%"
                 :remote-method="loadImageCollectionSuggestions"
                 :loading="loadingImageCollections"
@@ -3363,6 +3479,67 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: var(--space-3);
+}
+
+.archive-file-tree {
+  display: grid;
+  gap: 1px;
+  padding: var(--space-2) 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
+}
+
+.archive-file-tree__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  gap: var(--space-2);
+  padding: 5px var(--space-3) 5px calc(var(--space-3) + (var(--tree-depth) * 1.35rem));
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color var(--motion-duration-fast) var(--motion-easing-standard), color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.archive-file-tree__row:hover,
+.archive-file-tree__row.is-selected {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.archive-file-tree__row.is-directory {
+  font-weight: 600;
+}
+
+.archive-file-tree__branch {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--space-3) + (var(--tree-depth) * 1.35rem) - 0.65rem);
+  width: 1px;
+  background: var(--line-soft);
+}
+
+.archive-file-tree__icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}
+
+.archive-file-tree__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-file-tree__stats {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
 }
 
 .archive-group-card {

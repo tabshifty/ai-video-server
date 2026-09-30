@@ -135,64 +135,67 @@ type ArchiveImportBatchListItem struct {
 }
 
 type ArchiveImportFile struct {
-	ID                 uuid.UUID
-	BatchID            uuid.UUID
-	GroupID            *uuid.UUID
-	RelativePath       string
-	FilePath           string
-	EntryType          string
-	MediaKind          string
-	VideoType          string
-	FileSize           int64
-	MIMEType           string
-	Status             string
-	Reason             string
-	Title              string
-	Description        string
-	Tags               []string
-	VideoCollectionIDs []uuid.UUID
-	ImageCollectionIDs []uuid.UUID
-	FieldOverrides     map[string]bool
-	LinkedVideoID      *uuid.UUID
-	LinkedImageID      *uuid.UUID
-	Metadata           map[string]any
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	ProcessedAt        *time.Time
+	ID                  uuid.UUID
+	BatchID             uuid.UUID
+	GroupID             *uuid.UUID
+	RelativePath        string
+	FilePath            string
+	EntryType           string
+	MediaKind           string
+	VideoType           string
+	FileSize            int64
+	MIMEType            string
+	Status              string
+	Reason              string
+	Title               string
+	Description         string
+	Tags                []string
+	VideoCollectionIDs  []uuid.UUID
+	ImageCollectionIDs  []uuid.UUID
+	RelatedImageFileIDs []uuid.UUID `json:"related_image_file_ids"`
+	FieldOverrides      map[string]bool
+	LinkedVideoID       *uuid.UUID
+	LinkedImageID       *uuid.UUID
+	Metadata            map[string]any
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ProcessedAt         *time.Time
 }
 
 type ArchiveImportFileListItem struct {
-	ID                 uuid.UUID       `json:"id"`
-	BatchID            uuid.UUID       `json:"batch_id"`
-	GroupID            *uuid.UUID      `json:"group_id"`
-	GroupName          string          `json:"group_name"`
-	RelativePath       string          `json:"relative_path"`
-	FilePath           string          `json:"file_path"`
-	EntryType          string          `json:"entry_type"`
-	MediaKind          string          `json:"media_kind"`
-	VideoType          string          `json:"video_type"`
-	FileSize           int64           `json:"file_size"`
-	MIMEType           string          `json:"mime_type"`
-	Status             string          `json:"status"`
-	Reason             string          `json:"reason"`
-	Title              string          `json:"title"`
-	Description        string          `json:"description"`
-	Tags               []string        `json:"tags"`
-	VideoCollectionIDs []uuid.UUID     `json:"video_collection_ids"`
-	ImageCollectionIDs []uuid.UUID     `json:"image_collection_ids"`
-	FieldOverrides     map[string]bool `json:"field_overrides"`
-	LinkedVideoID      *uuid.UUID      `json:"linked_video_id"`
-	LinkedImageID      *uuid.UUID      `json:"linked_image_id"`
-	Metadata           map[string]any  `json:"metadata"`
-	CreatedAt          time.Time       `json:"created_at"`
-	UpdatedAt          time.Time       `json:"updated_at"`
-	ProcessedAt        *time.Time      `json:"processed_at"`
+	ID                  uuid.UUID       `json:"id"`
+	BatchID             uuid.UUID       `json:"batch_id"`
+	GroupID             *uuid.UUID      `json:"group_id"`
+	GroupName           string          `json:"group_name"`
+	RelativePath        string          `json:"relative_path"`
+	FilePath            string          `json:"file_path"`
+	EntryType           string          `json:"entry_type"`
+	MediaKind           string          `json:"media_kind"`
+	VideoType           string          `json:"video_type"`
+	FileSize            int64           `json:"file_size"`
+	MIMEType            string          `json:"mime_type"`
+	Status              string          `json:"status"`
+	Reason              string          `json:"reason"`
+	Title               string          `json:"title"`
+	Description         string          `json:"description"`
+	Tags                []string        `json:"tags"`
+	VideoCollectionIDs  []uuid.UUID     `json:"video_collection_ids"`
+	ImageCollectionIDs  []uuid.UUID     `json:"image_collection_ids"`
+	RelatedImageFileIDs []uuid.UUID     `json:"related_image_file_ids"`
+	FieldOverrides      map[string]bool `json:"field_overrides"`
+	LinkedVideoID       *uuid.UUID      `json:"linked_video_id"`
+	LinkedImageID       *uuid.UUID      `json:"linked_image_id"`
+	Metadata            map[string]any  `json:"metadata"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	ProcessedAt         *time.Time      `json:"processed_at"`
 }
 
 type ArchiveImportGroup struct {
 	ID                 uuid.UUID   `json:"id"`
 	BatchID            uuid.UUID   `json:"batch_id"`
 	Name               string      `json:"name"`
+	DirectoryPath      string      `json:"directory_path"`
 	Note               string      `json:"note"`
 	MediaKind          string      `json:"media_kind"`
 	Title              *string     `json:"title"`

@@ -403,6 +403,56 @@ func (a *API) AdminArchiveImportFileDetail(c *gin.Context) {
 	ok(c, file)
 }
 
+// AdminArchiveImportFileImages returns the image candidates linked to a video entry.
+func (a *API) AdminArchiveImportFileImages(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "压缩包导入服务不可用")
+		return
+	}
+	fileID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "文件ID格式错误")
+		return
+	}
+	ids, err := a.archiveImportSvc.ListArchiveImportImageFileIDs(c.Request.Context(), fileID)
+	if err != nil {
+		response.Error(c, 1075, err.Error())
+		return
+	}
+	ok(c, gin.H{"image_file_ids": ids})
+}
+
+// AdminUpdateArchiveImportFileImages replaces the image candidates for a video entry.
+func (a *API) AdminUpdateArchiveImportFileImages(c *gin.Context) {
+	if a.archiveImportSvc == nil {
+		response.Error(c, 1071, "压缩包导入服务不可用")
+		return
+	}
+	fileID, okID := parseUUID(c.Param("id"))
+	if !okID {
+		bad(c, "文件ID格式错误")
+		return
+	}
+	var req struct {
+		ImageFileIDs []string `json:"image_file_ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bad(c, "请求参数格式错误")
+		return
+	}
+	imageFileIDs, err := parseUUIDStrings(req.ImageFileIDs)
+	if err != nil {
+		bad(c, "图片文件ID格式错误")
+		return
+	}
+	ids, err := a.archiveImportSvc.UpdateArchiveImportImageFileIDs(c.Request.Context(), fileID, imageFileIDs)
+	if err != nil {
+		response.Error(c, 1075, err.Error())
+		return
+	}
+	ok(c, gin.H{"image_file_ids": ids})
+}
+
 // AdminBatchUpdateArchiveImportFiles updates selected archive files atomically.
 func (a *API) AdminBatchUpdateArchiveImportFiles(c *gin.Context) {
 	if a.archiveImportSvc == nil {

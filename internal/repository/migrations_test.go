@@ -72,6 +72,27 @@ func TestTelegramVideoIngestionMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+telegram_sources`)
 }
 
+func TestArchiveMediaRelationsMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0040_archive_media_relations.up.sql")
+	down := readMigrationForTest(t, "0040_archive_media_relations.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+video_image_collections`)
+	assertSQLPattern(t, up, `(?is)video_id\s+uuid\s+not\s+null\s+references\s+videos\(id\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, up, `(?is)primary\s+key\s*\(\s*video_id\s*,\s*image_collection_id\s*\)`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+video_collection_image_collections`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+video_images`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+archive_import_file_images`)
+	assertSQLPattern(t, up, `(?is)add\s+column\s+if\s+not\s+exists\s+directory_path\s+text`)
+	assertSQLPattern(t, up, `(?is)media_kind\s+in\s*\(\s*'video'\s*,\s*'image'\s*,\s*'mixed'\s*\)`)
+	assertSQLPattern(t, up, `(?is)insert\s+into\s+video_image_collections`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+archive_import_file_images`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+video_images`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+video_collection_image_collections`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+video_image_collections`)
+}
+
 func TestIPTVPlaylistMigration(t *testing.T) {
 	t.Parallel()
 

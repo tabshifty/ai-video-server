@@ -590,7 +590,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			return models.ArchiveImportFileListItem{}, err
 		}
 		var videoImageCollectionID *uuid.UUID
-		if len(imageCollectionIDs) == 1 {
+		if len(imageCollectionIDs) > 0 {
 			videoImageCollectionID = &imageCollectionIDs[0]
 		}
 		hash, err := hashutil.SHA256(workPath)
@@ -652,6 +652,19 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 				return models.ArchiveImportFileListItem{}, err
 			}
 		}
+		if s.repo != nil {
+			inheritedImageCollectionIDs, inheritErr := s.repo.ListInheritedImageCollectionIDs(ctx, result.VideoID)
+			if inheritErr != nil {
+				_ = s.updateArchiveFileFailure(ctx, fileID, inheritErr.Error())
+				return models.ArchiveImportFileListItem{}, inheritErr
+			}
+			allImageCollectionIDs := append([]uuid.UUID{}, inheritedImageCollectionIDs...)
+			allImageCollectionIDs = append(allImageCollectionIDs, imageCollectionIDs...)
+			if relationErr := s.repo.ReplaceVideoImageCollections(ctx, result.VideoID, dedupeArchiveUUIDs(allImageCollectionIDs), "archive_import"); relationErr != nil {
+				_ = s.updateArchiveFileFailure(ctx, fileID, relationErr.Error())
+				return models.ArchiveImportFileListItem{}, relationErr
+			}
+		}
 		if err := s.markArchiveVideoFileProcessed(ctx, fileID, result.VideoID, result.AlreadyExists, result.Status); err != nil {
 			return models.ArchiveImportFileListItem{}, err
 		}
@@ -702,6 +715,9 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			return models.ArchiveImportFileListItem{}, err
 		}
 	}
+	if err := s.syncArchiveVideoImageLinks(ctx, file.BatchID); err != nil {
+		return models.ArchiveImportFileListItem{}, err
+	}
 
 	if err := s.refreshArchiveBatchStats(ctx, file.BatchID); err != nil {
 		return models.ArchiveImportFileListItem{}, err
@@ -750,11 +766,7 @@ func shouldProcessArchiveFileInBatch(item models.ArchiveImportFileListItem) bool
 }
 
 func normalizeArchiveVideoImageCollectionIDs(ids []uuid.UUID) ([]uuid.UUID, error) {
-	out := dedupeArchiveUUIDs(ids)
-	if len(out) > 1 {
-		return nil, fmt.Errorf("视频仅支持关联一个图片图集")
-	}
-	return out, nil
+	return dedupeArchiveUUIDs(ids), nil
 }
 
 func archiveVideoImageCollectionsForProcessing(file models.ArchiveImportFileListItem, batch models.ArchiveImportBatch) ([]uuid.UUID, error) {
@@ -1006,7 +1018,76 @@ VALUES ` + strings.Join(placeholders, ",")
 	if _, err := s.db.Exec(ctx, sql, values...); err != nil {
 		return fmt.Errorf("insert archive file rows: %w", err)
 	}
+	if err := s.createArchiveDirectoryGroupsAndLinks(ctx, batchID); err != nil {
+		return err
+	}
 	return s.refreshArchiveBatchStats(ctx, batchID)
+}
+
+// createArchiveDirectoryGroupsAndLinks turns the extracted path into a stable
+// import tree and creates the default all-images-to-each-video links per folder.
+func (s *ArchiveImportService) createArchiveDirectoryGroupsAndLinks(ctx context.Context, batchID uuid.UUID) error {
+	if _, err := s.db.Exec(ctx, `DELETE FROM archive_import_file_images WHERE video_file_id IN (SELECT id FROM archive_import_files WHERE batch_id=$1)`, batchID); err != nil {
+		return fmt.Errorf("clear archive directory media links: %w", err)
+	}
+	if _, err := s.db.Exec(ctx, `DELETE FROM archive_import_groups WHERE batch_id=$1`, batchID); err != nil {
+		return fmt.Errorf("clear archive directory groups: %w", err)
+	}
+	if _, err := s.db.Exec(ctx, `
+INSERT INTO archive_import_groups (id, batch_id, name, directory_path, note, media_kind)
+SELECT
+  gen_random_uuid(),
+  f.batch_id,
+  CASE WHEN directory_path = '' THEN '根目录' ELSE directory_path END,
+  directory_path,
+  '',
+  CASE
+    WHEN BOOL_OR(f.media_kind = 'video') AND BOOL_OR(f.media_kind = 'image') THEN 'mixed'
+    WHEN BOOL_OR(f.media_kind = 'video') THEN 'video'
+    ELSE 'image'
+  END
+FROM (
+  SELECT
+    batch_id,
+    media_kind,
+    CASE
+      WHEN POSITION('/' IN relative_path) = 0 THEN ''
+      ELSE REGEXP_REPLACE(relative_path, '/[^/]*$', '')
+    END AS directory_path
+  FROM archive_import_files
+  WHERE batch_id=$1 AND entry_type='file' AND media_kind IN ('video','image')
+) f
+GROUP BY f.batch_id, f.directory_path
+ON CONFLICT DO NOTHING
+`, batchID); err != nil {
+		return fmt.Errorf("create archive directory groups: %w", err)
+	}
+	if _, err := s.db.Exec(ctx, `
+UPDATE archive_import_files f
+SET group_id=g.id, updated_at=NOW()
+FROM archive_import_groups g
+WHERE g.batch_id=f.batch_id
+  AND f.batch_id=$1
+  AND f.entry_type='file'
+  AND f.media_kind IN ('video','image')
+  AND g.directory_path = CASE
+    WHEN POSITION('/' IN f.relative_path) = 0 THEN ''
+    ELSE REGEXP_REPLACE(f.relative_path, '/[^/]*$', '')
+  END
+`, batchID); err != nil {
+		return fmt.Errorf("assign archive files to directory groups: %w", err)
+	}
+	if _, err := s.db.Exec(ctx, `
+INSERT INTO archive_import_file_images (video_file_id, image_file_id, source)
+SELECT v.id, i.id, 'directory'
+FROM archive_import_files v
+JOIN archive_import_files i ON i.batch_id=v.batch_id AND i.group_id=v.group_id
+WHERE v.batch_id=$1 AND v.media_kind='video' AND i.media_kind='image'
+ON CONFLICT (video_file_id, image_file_id) DO NOTHING
+`, batchID); err != nil {
+		return fmt.Errorf("create archive directory media links: %w", err)
+	}
+	return nil
 }
 
 func scanArchiveEntries(extractedDir string, batch models.ArchiveImportBatch) ([]archiveImportFileMeta, error) {
@@ -1183,6 +1264,9 @@ func classifyArchiveFile(path string) (mediaKind, mimeType, videoType, reason st
 	if isAllowedArchiveVideoExt(path) {
 		return "video", detectArchiveMIME(path), videoType, ""
 	}
+	if isAllowedArchiveImageExt(path) {
+		return "image", detectArchiveImageMIME(path), videoType, ""
+	}
 	detected, err := mimetype.DetectFile(path)
 	if err == nil {
 		mimeType = strings.ToLower(strings.TrimSpace(detected.String()))
@@ -1202,10 +1286,43 @@ func classifyArchiveFile(path string) (mediaKind, mimeType, videoType, reason st
 func isAllowedArchiveVideoExt(name string) bool {
 	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(name)))
 	switch ext {
-	case ".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v":
+	case ".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v", ".ts", ".mts", ".m2ts", ".mpeg", ".mpg", ".vob", ".3gp", ".ogv":
 		return true
 	default:
 		return false
+	}
+}
+
+func isAllowedArchiveImageExt(name string) bool {
+	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(name)))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif":
+		return true
+	default:
+		return false
+	}
+}
+
+func detectArchiveImageMIME(path string) string {
+	switch strings.ToLower(filepath.Ext(strings.TrimSpace(path))) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".bmp":
+		return "image/bmp"
+	case ".tif", ".tiff":
+		return "image/tiff"
+	case ".heic":
+		return "image/heic"
+	case ".heif":
+		return "image/heif"
+	default:
+		return ""
 	}
 }
 

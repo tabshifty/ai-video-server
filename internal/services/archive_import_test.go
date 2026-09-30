@@ -361,15 +361,15 @@ func TestNormalizeArchiveVideoImageCollectionIDs(t *testing.T) {
 	}
 }
 
-func TestNormalizeArchiveVideoImageCollectionIDsRejectsMultiple(t *testing.T) {
+func TestNormalizeArchiveVideoImageCollectionIDsAllowsMultiple(t *testing.T) {
 	t.Parallel()
 
-	_, err := normalizeArchiveVideoImageCollectionIDs([]uuid.UUID{
+	got, err := normalizeArchiveVideoImageCollectionIDs([]uuid.UUID{
 		uuid.MustParse("66666666-6666-4666-8666-666666666666"),
 		uuid.MustParse("77777777-7777-4777-8777-777777777777"),
 	})
-	if err == nil {
-		t.Fatal("expected error for multiple image collections on one video")
+	if err != nil || len(got) != 2 {
+		t.Fatalf("normalizeArchiveVideoImageCollectionIDs() = %#v, error=%v; want two collections", got, err)
 	}
 }
 
@@ -388,6 +388,41 @@ func TestArchiveImageCollectionsForScannedFileOnlyAppliesToImages(t *testing.T) 
 	next := archiveImageCollectionsForScannedFile("image", []uuid.UUID{id})
 	if next[0] != id {
 		t.Fatal("archiveImageCollectionsForScannedFile should return a copy")
+	}
+}
+
+func TestClassifyArchiveFileRecognizesTransportStreamsAndHEIC(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{"season/video.ts", "season/video.m2ts", "season/video.mpeg"} {
+		kind, _, _, reason := classifyArchiveFile(path)
+		if kind != "video" || reason != "" {
+			t.Fatalf("classifyArchiveFile(%q) = kind=%q reason=%q, want video", path, kind, reason)
+		}
+	}
+	for _, path := range []string{"season/cover.heic", "season/cover.heif"} {
+		kind, mime, _, reason := classifyArchiveFile(path)
+		if kind != "image" || reason != "" || !strings.HasPrefix(mime, "image/he") {
+			t.Fatalf("classifyArchiveFile(%q) = kind=%q mime=%q reason=%q, want HEIC image", path, kind, mime, reason)
+		}
+	}
+}
+
+func TestClassifyArchiveFileReturnsStableImageMIMEByExtension(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"cover.jpg":  "image/jpeg",
+		"cover.png":  "image/png",
+		"cover.webp": "image/webp",
+		"cover.heic": "image/heic",
+		"cover.heif": "image/heif",
+	}
+	for path, wantMIME := range tests {
+		kind, gotMIME, _, reason := classifyArchiveFile(path)
+		if kind != "image" || gotMIME != wantMIME || reason != "" {
+			t.Errorf("classifyArchiveFile(%q) = kind=%q mime=%q reason=%q, want image/%s", path, kind, gotMIME, reason, wantMIME)
+		}
 	}
 }
 

@@ -53,6 +53,14 @@ func (s *archiveImportServiceStub) GetFile(context.Context, uuid.UUID) (models.A
 	return models.ArchiveImportFileListItem{}, nil
 }
 
+func (s *archiveImportServiceStub) ListArchiveImportImageFileIDs(context.Context, uuid.UUID) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (s *archiveImportServiceStub) UpdateArchiveImportImageFileIDs(context.Context, uuid.UUID, []uuid.UUID) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
 func (s *archiveImportServiceStub) UploadArchive(_ context.Context, in services.ArchiveImportUploadInput, fileHeader *multipart.FileHeader) (models.ArchiveImportBatch, error) {
 	s.uploadCalls++
 	s.uploadInput = in

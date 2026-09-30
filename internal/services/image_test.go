@@ -15,6 +15,15 @@ import (
 	"video-server/pkg/ffmpeg"
 )
 
+func TestAllowedImageMIMEIncludesHEIC(t *testing.T) {
+	t.Parallel()
+	for _, mime := range []string{"image/heic", "image/heif"} {
+		if !isAllowedImageMIME(mime) {
+			t.Fatalf("isAllowedImageMIME(%q) = false", mime)
+		}
+	}
+}
+
 type fakeImageRepository struct {
 	createdImage models.Image
 }

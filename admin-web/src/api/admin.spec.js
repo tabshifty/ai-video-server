@@ -37,6 +37,7 @@ import {
   getAdminArchiveImportBatches,
   getAdminArchiveImportBatchDetail,
   getAdminArchiveImportFileDetail,
+  getAdminArchiveImportFileImages,
   getAdminForumPosts,
   getAdminTelegramAuthorization,
   getAdminTelegramAudits,
@@ -88,6 +89,7 @@ import {
   updateAdminArchiveImportGroup,
   updateAdminTVAppRelease,
   updateAdminArchiveImportFile,
+  updateAdminArchiveImportFileImages,
   updateAdminPasswordVaultEntry,
   updateAdminVideoSubtitle,
   updateAdminTvEpisode,
@@ -295,12 +297,14 @@ describe('archive import apis', () => {
     await getAdminArchiveImportBatches({ page: 2, page_size: 20 })
     await getAdminArchiveImportBatchDetail('batch-1')
     await getAdminArchiveImportFileDetail('file-1')
+    await getAdminArchiveImportFileImages('file-1')
 
     expect(get).toHaveBeenCalledWith('/admin/archive-import/batches', {
       params: { page: 2, page_size: 20 }
     })
     expect(get).toHaveBeenCalledWith('/admin/archive-import/batches/batch-1')
     expect(get).toHaveBeenCalledWith('/admin/archive-import/files/file-1')
+    expect(get).toHaveBeenCalledWith('/admin/archive-import/files/file-1/images')
   })
 
   it('updates archive import files through the semantic batch endpoint', async () => {
@@ -321,6 +325,7 @@ describe('archive import apis', () => {
     await uploadAdminArchiveImport(formData)
     await deleteAdminArchiveImportBatch('batch-1')
     await updateAdminArchiveImportFile('file-1', { title: '标题' })
+    await updateAdminArchiveImportFileImages('file-1', { image_file_ids: ['image-1'] })
     await processAdminArchiveImportFile('file-1')
     await processAdminArchiveImportBatch('batch-1')
     await retryAdminArchiveImportExtract('batch-1', payload)
@@ -333,6 +338,7 @@ describe('archive import apis', () => {
       timeout: 0
     })
     expect(put).toHaveBeenCalledWith('/admin/archive-import/files/file-1', { title: '标题' })
+    expect(put).toHaveBeenCalledWith('/admin/archive-import/files/file-1/images', { image_file_ids: ['image-1'] })
     expect(post).toHaveBeenCalledWith('/admin/archive-import/files/file-1/process', null, {
       timeout: 0
     })

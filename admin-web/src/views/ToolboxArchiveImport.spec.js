@@ -56,7 +56,7 @@ describe('ToolboxArchiveImport', () => {
     expect(collectionCollector).toContain('archiveGroupForm.video_collection_ids')
     expect(imageCollectionCollector).toContain('uploadForm.default_image_collection_ids')
     expect(imageCollectionCollector).toContain('selectedFile.value?.image_collection_ids')
-    expect(imageCollectionCollector).toContain('batchEditForm.video_image_collection_id')
+    expect(imageCollectionCollector).toContain('batchEditForm.video_image_collection_ids')
     expect(imageCollectionCollector).toContain('batchEditForm.image_collection_ids')
     expect(imageCollectionCollector).toContain('archiveGroupForm.image_collection_ids')
   })
@@ -144,10 +144,10 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain("file.group_name || '未分组'")
   })
 
-  it('lets archive video files link to one image collection while images can join image collections', () => {
-    expect(source).toContain('selectedVideoImageCollectionID')
-    expect(source).toContain('batchEditVideoImageCollectionID')
-    expect(source).toContain('仅可关联一个图片图集')
+  it('lets archive video files link to multiple image collections while images can join image collections', () => {
+    expect(source).toContain('selectedVideoImageCollectionIDs')
+    expect(source).toContain('batchEditVideoImageCollectionIDs')
+    expect(source).toContain('可多选')
     expect(source).toContain('视频关联的图片合集')
     expect(source).toContain('图片入库后加入的合集')
   })

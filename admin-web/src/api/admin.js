@@ -165,7 +165,9 @@ export const deleteAdminArchiveImportBatch = (id) =>
     timeout: 0
   })
 export const getAdminArchiveImportFileDetail = (id) => request.get(`/admin/archive-import/files/${id}`)
+export const getAdminArchiveImportFileImages = (id) => request.get(`/admin/archive-import/files/${id}/images`)
 export const updateAdminArchiveImportFile = (id, payload) => request.put(`/admin/archive-import/files/${id}`, payload)
+export const updateAdminArchiveImportFileImages = (id, payload) => request.put(`/admin/archive-import/files/${id}/images`, payload)
 export const batchUpdateAdminArchiveImportFiles = (payload) =>
   request.put('/admin/archive-import/files/batch-update', payload)
 export const processAdminArchiveImportFile = (id) =>

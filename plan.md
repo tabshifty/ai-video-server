@@ -1,9 +1,26 @@
 # plan.md
 
+## 2026-09-30 收尾：补齐 HEIC/HEIF 识别与多图片合集配置
+- 进度：归档扫描按图片扩展名返回稳定 MIME，HEIC/HEIF 在内容探测器无法识别时仍能进入图片流程；工作台移除视频关联图片合集的单选截断，保持视频级、分组级和批量编辑的多合集契约。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`。
+- 验证：`GOCACHE=/tmp/ai-video-go-cache go test ./... -run '^$' -count=1` 通过；HEIC/HEIF、TS 和图片 MIME 定向测试通过；管理端定向 60 项测试和 `npm run build` 通过；`git diff --check` 与乱码扫描通过。完整包测试中的 `httptest` 监听型既有测试受沙箱禁止本机端口影响，未能运行。
+- 提交范围：仅纳入本次压缩包导入、媒体关系、格式识别和相关文档/测试文件；保留工作区既有未跟踪目录 `.reasonix/`、`docs/examples/`。
+
+## 2026-09-30 实施：压缩包目录树、媒体关系与格式扩展
+- 进度：已实现第一阶段。新增 `video_image_collections`、`video_collection_image_collections`、`video_images`、`archive_import_file_images` 关系表及旧 `videos.image_collection_id` 回填；归档扫描按目录生成导入组并默认建立同目录视频到全部图片的候选关系；新增网页 API 可查询/替换视频条目的图片文件关系；管理端增加文件系统层级树、目录统计、视频图片关系多选编辑和视频关联图片合集多选。
+- 媒体识别：归档视频新增 `.ts`、`.mts`、`.m2ts`、`.mpeg`、`.mpg`、`.vob`、`.3gp`、`.ogv`；图片新增 `.heic`、`.heif`，图片服务支持按扩展名回退识别 HEIC/HEIF。
+- 影响文件：`migrations/0040_archive_media_relations.{up,down}.sql`、`internal/repository/media_relation_repository.go`、`internal/services/archive_import_relations.go`、归档服务/模型/路由/管理端工作台及对应测试、`CONTEXT.md`。
+- 验证：`GOCACHE=/tmp/ai-video-go-cache go test ./... -run '^$' -count=1` 通过；归档/关系定向 Go 测试和迁移测试通过；管理端定向 60 项测试通过；`npm run build` 通过（仅有既有 bundle 体积提示）；`git diff --check` 与 UTF-8 乱码扫描通过。完整 Go 测试未执行网络监听型测试，之前定向完整包测试受沙箱禁止 `httptest` 监听端口影响。
+
 ## 2026-09-30 设计：压缩包视频图片导入重构
 - 进度：需求已确认。上传 ZIP 后递归扫描并按媒体所在目录生成导入组；同组每个视频默认关联同组全部图片；网页支持批次默认、导入组覆盖和单文件修正；视频可加入多个视频合集，图片可加入多个图片合集，视频合集可关联多个图片合集并向视频继承；确认入库后逐项处理，成功项保留、失败项可重试。
 - 影响文档：`docs/superpowers/specs/2026-09-30-zip-media-import-redesign-design.md`、`plan.md`。本阶段未修改运行时代码、数据库或 App 版本。
 - 验证：设计规格待用户评审；提交前执行 Markdown 差异检查、占位符扫描和 UTF-8 乱码扫描。
+
+## 2026-09-30 需求补充：压缩包工作台使用文件系统层级展示
+- 进度：工作台改为左侧目录树、右侧详情编辑；目录按路径段构造父子节点，用连接线显示层级，视频和图片作为叶子节点，目录节点提供统计和批量选择，视频节点提供同目录图片关系编辑。
+- 影响文档：`docs/superpowers/specs/2026-09-30-zip-media-import-redesign-design.md`、`docs/superpowers/plans/2026-09-30-zip-media-import-redesign.md`、`plan.md`。尚未修改运行时代码。
+- 验证：待实现后执行管理端源码测试、构建和差异检查。
 
 ## 2026-09-29 09:13 +0800 完成：手机端搜索改为点击后提交
 - 进度：`updateAvQuery` 现在只更新输入并在清空时恢复默认浏览；新增 `submitAvQuery`，由放大镜按钮和键盘 Search 动作触发远程搜索。新增 `submittedQuery`，确保编辑待提交关键词时分页加载/下拉刷新不会隐式搜索新词；手机端版本升级为 `versionCode 12`、`versionName 0.1.11`。
