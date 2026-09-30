@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-09-30 设计：压缩包视频图片导入重构
+- 进度：需求已确认。上传 ZIP 后递归扫描并按媒体所在目录生成导入组；同组每个视频默认关联同组全部图片；网页支持批次默认、导入组覆盖和单文件修正；视频可加入多个视频合集，图片可加入多个图片合集，视频合集可关联多个图片合集并向视频继承；确认入库后逐项处理，成功项保留、失败项可重试。
+- 影响文档：`docs/superpowers/specs/2026-09-30-zip-media-import-redesign-design.md`、`plan.md`。本阶段未修改运行时代码、数据库或 App 版本。
+- 验证：设计规格待用户评审；提交前执行 Markdown 差异检查、占位符扫描和 UTF-8 乱码扫描。
+
 ## 2026-09-29 09:13 +0800 完成：手机端搜索改为点击后提交
 - 进度：`updateAvQuery` 现在只更新输入并在清空时恢复默认浏览；新增 `submitAvQuery`，由放大镜按钮和键盘 Search 动作触发远程搜索。新增 `submittedQuery`，确保编辑待提交关键词时分页加载/下拉刷新不会隐式搜索新词；手机端版本升级为 `versionCode 12`、`versionName 0.1.11`。
 - 影响文件：`android-app/app/src/main/java/com/chee/videos/feature/home/HomeViewModel.kt`、`android-app/app/src/main/java/com/chee/videos/feature/home/HomeScreen.kt`、`android-app/app/src/test/java/com/chee/videos/feature/home/HomeViewModelTest.kt`、`android-app/app/build.gradle.kts`、`CONTEXT.md`、`plan.md`。
