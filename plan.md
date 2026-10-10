@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-10 11:38 +0800
+- 进度：排查压缩包上传后 7zz 报 `ERRORS: Headers Error`。确认 7zz 调用参数正确；补充上传落盘字节数与 multipart 声明大小校验，并完整合并 7zz 标准输出/错误输出，避免截断归档进入解包阶段且保留完整头部诊断。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`plan.md`。
+- 验证：归档定向测试通过；`git diff --check` 与乱码扫描通过；`go test ./internal/services -count=1` 仅失败于既有 `TestParseTVAPKMetadataParsesReleaseAPK`（测试期望版本 121，当前 release APK 为 144）。
+
 ## 2026-09-30 开放环境复验
 - 验证：开放本机端口后运行 `GOCACHE=/tmp/ai-video-go-cache go test ./... -count=1`；网络监听型测试已通过。仅 `internal/services/TestParseTVAPKMetadataParsesReleaseAPK` 失败，仓库中的测试期望版本 `121 / 0.1.121`，当前 release APK 元数据为 `144`，TV 工程 Gradle 为 `147 / 0.1.147`，属于既有测试夹具与构建产物版本不一致，与本次压缩包媒体导入改动无关。
 

@@ -317,10 +317,16 @@ func (s *ArchiveImportService) UploadArchive(ctx context.Context, in ArchiveImpo
 	if err != nil {
 		return models.ArchiveImportBatch{}, fmt.Errorf("create archive temp file: %w", err)
 	}
-	if _, err := io.Copy(dst, src); err != nil {
+	written, err := io.Copy(dst, src)
+	if err != nil {
 		dst.Close()
 		_ = os.Remove(tempPath)
 		return models.ArchiveImportBatch{}, fmt.Errorf("write archive temp file: %w", err)
+	}
+	if fileHeader.Size >= 0 && written != fileHeader.Size {
+		dst.Close()
+		_ = os.Remove(tempPath)
+		return models.ArchiveImportBatch{}, fmt.Errorf("archive upload incomplete: received %d bytes, expected %d", written, fileHeader.Size)
 	}
 	if err := dst.Close(); err != nil {
 		_ = os.Remove(tempPath)
@@ -1890,12 +1896,13 @@ func (s *ArchiveImportService) extractWithSevenZip(ctx context.Context, archiveP
 	}
 	args = append(args, archivePath)
 	cmd := exec.CommandContext(ctx, exe, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &output
 	if err := cmd.Run(); err != nil {
-		output := sanitizeArchiveText(stderr.String())
-		if output != "" {
-			err = fmt.Errorf("%w: %s", err, output)
+		commandOutput := sanitizeArchiveText(output.String())
+		if commandOutput != "" {
+			err = fmt.Errorf("%w: %s", err, commandOutput)
 		}
 		if isArchivePasswordRelatedError(err) {
 			return ErrArchivePasswordRequired

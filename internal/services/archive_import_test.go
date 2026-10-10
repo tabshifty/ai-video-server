@@ -654,6 +654,28 @@ printf 'sevenzip' > "$output_dir/marker.txt"
 	}
 }
 
+func TestExtractWithSevenZipIncludesStdoutInError(t *testing.T) {
+	root := t.TempDir()
+	fakeBinDir := filepath.Join(root, "bin")
+	archivePath := filepath.Join(root, "sample.rar")
+	outputDir := filepath.Join(root, "out")
+	if err := os.MkdirAll(fakeBinDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fakeBinDir, "7zz"), []byte("#!/bin/sh\nprintf 'ERRORS: Headers Error\\n'\nexit 2\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile(7zz) error = %v", err)
+	}
+	if err := os.WriteFile(archivePath, []byte("broken"), 0o644); err != nil {
+		t.Fatalf("WriteFile(archive) error = %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	err := (&ArchiveImportService{}).extractWithSevenZip(context.Background(), archivePath, outputDir, "")
+	if err == nil || !strings.Contains(err.Error(), "Headers Error") {
+		t.Fatalf("extractWithSevenZip() error = %v, want stdout diagnostic", err)
+	}
+}
+
 func TestExtractZipArchiveRejectsDecodedPathConflicts(t *testing.T) {
 	t.Parallel()
 
