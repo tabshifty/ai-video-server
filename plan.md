@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-10-13 压缩包解压兼容与误判修复完成
+- 进度：收紧密码错误识别为明确的密码/passphrase 诊断；统一保留 7zz、7z、bsdtar、unzip 的原始错误文本；ZIP 元数据检测加密条目；Go ZIP 遇到不支持的压缩算法时清理半成品并自动回退 7zz/7z。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
+- 验证：归档相关定向测试通过；`git diff --check` 与乱码扫描通过。`go test ./internal/services -count=1` 受沙箱禁止 `httptest` 监听端口影响，既有 `TestMDCxMigratedSitesSearchCandidates` 失败，非本次改动。
+
+## 2026-10-13 压缩包密码误判优化
+- 进度：确认解压器错误被按模糊关键词归类为 `needs_password`，导致损坏、CRC、格式兼容性错误被误报为密码错误；计划收紧密码错误识别并保留外部解压器诊断文本。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`plan.md`。
+- 验证：先补充密码误判与错误诊断回归测试并确认红灯，再运行服务端归档定向测试。
+
 ## 2026-10-10 11:38 +0800
 - 进度：排查压缩包上传后 7zz 报 `ERRORS: Headers Error`。确认 7zz 调用参数正确；补充上传落盘字节数与 multipart 声明大小校验，并完整合并 7zz 标准输出/错误输出，避免截断归档进入解包阶段且保留完整头部诊断。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`plan.md`。

@@ -2,6 +2,7 @@ package services
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -580,6 +581,141 @@ func TestArchiveBatchFailureStatus(t *testing.T) {
 				t.Fatalf("archiveBatchFailureStatus() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestIsArchivePasswordRelatedErrorRequiresExplicitDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{name: "wrong password", msg: "ERROR: Wrong password : video.mp4", want: true},
+		{name: "password required", msg: "passphrase required for archive", want: true},
+		{name: "encrypted file unsupported", msg: "zip: encrypted file not supported", want: false},
+		{name: "headers error", msg: "ERROR: Headers Error", want: false},
+		{name: "encrypted diagnostic without password signal", msg: "encrypted metadata header is corrupt", want: false},
+		{name: "crc error", msg: "CRC Failed", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isArchivePasswordRelatedError(errors.New(tt.msg)); got != tt.want {
+				t.Fatalf("isArchivePasswordRelatedError(%q) = %v, want %v", tt.msg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestArchiveCommandErrorPreservesPasswordDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	err := archiveCommandError("extract archive with 7zz", errors.New("exit status 2"), "ERROR: Data Error in encrypted file. Wrong password?")
+	if !errors.Is(err, ErrArchivePasswordRequired) {
+		t.Fatalf("archiveCommandError() error = %v, want ErrArchivePasswordRequired", err)
+	}
+	if !strings.Contains(err.Error(), "Data Error in encrypted file") {
+		t.Fatalf("archiveCommandError() error = %v, want original diagnostic", err)
+	}
+}
+
+func TestArchiveCommandErrorPreservesNonPasswordDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	err := archiveCommandError("extract archive with 7zz", errors.New("exit status 2"), "ERROR: Headers Error")
+	if errors.Is(err, ErrArchivePasswordRequired) {
+		t.Fatalf("archiveCommandError() error = %v, must not require password", err)
+	}
+	if !strings.Contains(err.Error(), "Headers Error") {
+		t.Fatalf("archiveCommandError() error = %v, want original diagnostic", err)
+	}
+}
+
+func TestExtractArchiveFallsBackToSevenZipForUnsupportedZipMethod(t *testing.T) {
+	root := t.TempDir()
+	fakeBinDir := filepath.Join(root, "bin")
+	extractedDir := filepath.Join(root, "out")
+	archivePath := filepath.Join(root, "modern.zip")
+	if err := os.MkdirAll(fakeBinDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := writeTestZipArchive(archivePath, []testZipArchiveEntry{{Name: "video.mp4", Body: "fallback-body"}}); err != nil {
+		t.Fatalf("writeTestZipArchive() error = %v", err)
+	}
+	data, err := os.ReadFile(archivePath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	data[8], data[9] = 99, 0
+	centralOffset := bytes.Index(data, []byte{'P', 'K', 1, 2})
+	if centralOffset < 0 {
+		t.Fatal("central directory header not found")
+	}
+	data[centralOffset+10], data[centralOffset+11] = 99, 0
+	if err := os.WriteFile(archivePath, data, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	script := `#!/bin/sh
+set -eu
+output_dir=""
+for arg in "$@"; do
+  case "$arg" in
+    -o*) output_dir="${arg#-o}" ;;
+  esac
+done
+mkdir -p "$output_dir"
+printf 'fallback-body' > "$output_dir/video.mp4"
+`
+	if err := os.WriteFile(filepath.Join(fakeBinDir, "7zz"), []byte(script), 0o755); err != nil {
+		t.Fatalf("WriteFile(7zz) error = %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	mode, err := (&ArchiveImportService{}).extractArchive(context.Background(), "zip", archivePath, extractedDir, "", archiveEncodingAuto)
+	if err != nil {
+		t.Fatalf("extractArchive() error = %v", err)
+	}
+	if mode != archiveEncodingUTF8 {
+		t.Fatalf("extractArchive() mode = %q, want %q", mode, archiveEncodingUTF8)
+	}
+	body, err := os.ReadFile(filepath.Join(extractedDir, "video.mp4"))
+	if err != nil {
+		t.Fatalf("ReadFile(video.mp4) error = %v", err)
+	}
+	if string(body) != "fallback-body" {
+		t.Fatalf("fallback body = %q, want fallback-body", string(body))
+	}
+}
+
+func TestExtractZipArchiveDetectsEncryptedEntryFromZipMetadata(t *testing.T) {
+	t.Parallel()
+
+	archivePath := filepath.Join(t.TempDir(), "encrypted.zip")
+	file, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	writer := zip.NewWriter(file)
+	header := &zip.FileHeader{Name: "secret.txt", Method: zip.Store, Flags: 0x1}
+	entry, err := writer.CreateHeader(header)
+	if err != nil {
+		t.Fatalf("CreateHeader() error = %v", err)
+	}
+	if _, err := entry.Write([]byte("encrypted")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("zip Close() error = %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("file Close() error = %v", err)
+	}
+
+	_, err = extractZipArchive(archivePath, filepath.Join(filepath.Dir(archivePath), "out"), archiveEncodingAuto)
+	if !errors.Is(err, ErrArchivePasswordRequired) {
+		t.Fatalf("extractZipArchive() error = %v, want ErrArchivePasswordRequired", err)
 	}
 }
 

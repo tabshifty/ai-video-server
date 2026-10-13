@@ -1540,8 +1540,47 @@ func isArchivePasswordRelatedError(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "password") || strings.Contains(msg, "passphrase") || strings.Contains(msg, "encrypted")
+	if errors.Is(err, ErrArchivePasswordRequired) {
+		return true
+	}
+	msg := strings.ToLower(strings.Join(strings.Fields(err.Error()), " "))
+	for _, marker := range []string{
+		"bad password",
+		"wrong password",
+		"incorrect password",
+		"invalid password",
+		"password incorrect",
+		"password required",
+		"password is required",
+		"need password",
+		"unable to get password",
+		"enter password",
+		"bad passphrase",
+		"wrong passphrase",
+		"incorrect passphrase",
+		"passphrase required",
+		"passphrase is required",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func archiveCommandError(operation string, runErr error, output string) error {
+	detail := sanitizeArchiveText(output)
+	combinedErr := runErr
+	if detail != "" {
+		combinedErr = fmt.Errorf("%w: %s", runErr, detail)
+	}
+	if isArchivePasswordRelatedError(combinedErr) {
+		if detail != "" {
+			return fmt.Errorf("%w: %s", ErrArchivePasswordRequired, detail)
+		}
+		return fmt.Errorf("%w: %v", ErrArchivePasswordRequired, runErr)
+	}
+	return fmt.Errorf("%s: %w", operation, combinedErr)
 }
 
 func sanitizeArchiveText(value string) string {
@@ -1629,7 +1668,7 @@ func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archi
 		if strings.TrimSpace(password) != "" {
 			return s.extractZipArchiveWithPassword(ctx, archivePath, extractedDir, password, archiveEncodingRequestedModeForFormat(format, requestedMode))
 		}
-		return extractZipArchive(archivePath, extractedDir, archiveEncodingRequestedModeForFormat(format, requestedMode))
+		return s.extractZipArchiveWithFallback(ctx, archivePath, extractedDir, archiveEncodingRequestedModeForFormat(format, requestedMode))
 	case "rar", "7z":
 		if err := s.extractWithSevenZip(ctx, archivePath, extractedDir, password); err == nil {
 			return "", nil
@@ -1645,6 +1684,27 @@ func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archi
 	}
 }
 
+func (s *ArchiveImportService) extractZipArchiveWithFallback(ctx context.Context, archivePath, extractedDir, requestedMode string) (string, error) {
+	mode, err := extractZipArchive(archivePath, extractedDir, requestedMode)
+	if err == nil || !errors.Is(err, zip.ErrAlgorithm) {
+		return mode, err
+	}
+
+	if findArchiveExtractorCommand("7zz", "7z") == "" {
+		return "", err
+	}
+	if clearErr := os.RemoveAll(extractedDir); clearErr != nil && !os.IsNotExist(clearErr) {
+		return "", fmt.Errorf("clear zip fallback extraction dir: %w", clearErr)
+	}
+	if clearErr := os.MkdirAll(extractedDir, 0o755); clearErr != nil {
+		return "", fmt.Errorf("create zip fallback extraction dir: %w", clearErr)
+	}
+	if err := s.extractWithSevenZip(ctx, archivePath, extractedDir, ""); err != nil {
+		return "", err
+	}
+	return archiveEncodingUTF8, nil
+}
+
 type archiveZipExtractEntry struct {
 	file       *zip.File
 	targetPath string
@@ -1657,6 +1717,9 @@ func extractZipArchive(archivePath, extractedDir, requestedMode string) (string,
 		return "", fmt.Errorf("open zip archive: %w", err)
 	}
 	defer reader.Close()
+	if zipArchiveHasEncryptedEntries(reader.File) {
+		return "", ErrArchivePasswordRequired
+	}
 
 	entries, effectiveMode, err := planZipExtractEntries(reader.File, extractedDir, requestedMode)
 	if err != nil {
@@ -1702,6 +1765,15 @@ func extractZipArchive(archivePath, extractedDir, requestedMode string) (string,
 		effectiveMode = archiveEncodingUTF8
 	}
 	return normalizeArchiveEncodingModeValue(effectiveMode), nil
+}
+
+func zipArchiveHasEncryptedEntries(files []*zip.File) bool {
+	for _, file := range files {
+		if file.Flags&0x1 != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ArchiveImportService) extractZipArchiveWithPassword(ctx context.Context, archivePath, extractedDir, password, requestedMode string) (string, error) {
@@ -1827,14 +1899,7 @@ func (s *ArchiveImportService) extractWithBsdtar(ctx context.Context, archivePat
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		output := sanitizeArchiveText(stderr.String())
-		if output != "" {
-			err = fmt.Errorf("%w: %s", err, output)
-		}
-		if isArchivePasswordRelatedError(err) {
-			return ErrArchivePasswordRequired
-		}
-		return fmt.Errorf("extract archive with bsdtar: %w", err)
+		return archiveCommandError("extract archive with bsdtar", err, stderr.String())
 	}
 	return nil
 }
@@ -1845,14 +1910,7 @@ func (s *ArchiveImportService) extractWithUnzip(ctx context.Context, archivePath
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		output := sanitizeArchiveText(stderr.String())
-		if output != "" {
-			err = fmt.Errorf("%w: %s", err, output)
-		}
-		if isArchivePasswordRelatedError(err) {
-			return ErrArchivePasswordRequired
-		}
-		return fmt.Errorf("extract archive with unzip: %w", err)
+		return archiveCommandError("extract archive with unzip", err, stderr.String())
 	}
 	return nil
 }
@@ -1870,14 +1928,7 @@ func extractZipEntryWithUnzip(ctx context.Context, archivePath, rawName, targetP
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		_ = out.Close()
-		output := sanitizeArchiveText(stderr.String())
-		if output != "" {
-			err = fmt.Errorf("%w: %s", err, output)
-		}
-		if isArchivePasswordRelatedError(err) {
-			return ErrArchivePasswordRequired
-		}
-		return fmt.Errorf("extract zip entry with unzip: %w", err)
+		return archiveCommandError("extract zip entry with unzip", err, stderr.String())
 	}
 	if err := out.Close(); err != nil {
 		return fmt.Errorf("close zip entry file: %w", err)
@@ -1900,14 +1951,7 @@ func (s *ArchiveImportService) extractWithSevenZip(ctx context.Context, archiveP
 	cmd.Stdout = &output
 	cmd.Stderr = &output
 	if err := cmd.Run(); err != nil {
-		commandOutput := sanitizeArchiveText(output.String())
-		if commandOutput != "" {
-			err = fmt.Errorf("%w: %s", err, commandOutput)
-		}
-		if isArchivePasswordRelatedError(err) {
-			return ErrArchivePasswordRequired
-		}
-		return fmt.Errorf("extract archive with %s: %w", exe, err)
+		return archiveCommandError(fmt.Sprintf("extract archive with %s", exe), err, output.String())
 	}
 	return nil
 }
