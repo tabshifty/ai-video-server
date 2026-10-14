@@ -95,6 +95,54 @@ type archiveImportEnqueuer interface {
 	EnqueueScrapeMovie(videoID, filePath, filename string) error
 	EnqueueScrapeTV(videoID, filePath, filename string) error
 	EnqueueScrapeAV(videoID, filePath, filename string) error
+	EnqueueArchiveExtract(batchID uuid.UUID, password string) error
+}
+
+func (s *ArchiveImportService) ProcessExtractTask(ctx context.Context, batchID uuid.UUID, password string) error {
+	batch, err := s.GetBatch(ctx, batchID)
+	if err != nil {
+		return err
+	}
+	if batch.OriginalPath == "" || batch.ExtractedDir == "" {
+		return fmt.Errorf("batch paths missing")
+	}
+	if batch.Status == "processing" {
+		return nil
+	}
+	requestedMode := batch.EncodingRequestedMode
+	if requestedMode == "" {
+		requestedMode = archiveEncodingAuto
+	}
+	actualEncodingMode, err := s.extractArchive(ctx, batch.ArchiveFormat, batch.OriginalPath, batch.ExtractedDir, strings.TrimSpace(password), requestedMode)
+	if err != nil {
+		status := archiveBatchFailureStatus(batch, requestedMode, err)
+		if updateErr := s.updateArchiveBatchExtractFailure(ctx, batchID, status, err.Error(), requestedMode); updateErr != nil {
+			return updateErr
+		}
+		return err
+	}
+	if updateErr := s.updateArchiveBatchExtractSuccess(ctx, batchID, requestedMode, actualEncodingMode); updateErr != nil {
+		return updateErr
+	}
+	if err := s.recordArchiveEntries(ctx, batchID, batch); err != nil {
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
+		return err
+	}
+	if err := s.refreshArchiveBatchStats(ctx, batchID); err != nil {
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
+		return err
+	}
+	return nil
+}
+
+func (s *ArchiveImportService) enqueueArchiveExtract(ctx context.Context, batchID uuid.UUID, batch models.ArchiveImportBatch, password string) error {
+	if s.enqueuer == nil {
+		return fmt.Errorf("archive extract queue unavailable")
+	}
+	if err := s.updateArchiveBatchExtractFailure(ctx, batchID, "extracting", "", batch.EncodingRequestedMode); err != nil {
+		return err
+	}
+	return s.enqueuer.EnqueueArchiveExtract(batchID, password)
 }
 
 type archiveImportFileMeta struct {
@@ -364,27 +412,7 @@ func (s *ArchiveImportService) UploadArchive(ctx context.Context, in ArchiveImpo
 		return models.ArchiveImportBatch{}, err
 	}
 
-	actualEncodingMode, err := s.extractArchive(ctx, format, originalPath, extractedDir, passwordForInput(in), batch.EncodingRequestedMode)
-	if err != nil {
-		status := archiveBatchFailureStatus(batch, batch.EncodingRequestedMode, err)
-		if updateErr := s.updateArchiveBatchExtractFailure(ctx, batchID, status, err.Error(), batch.EncodingRequestedMode); updateErr != nil {
-			return models.ArchiveImportBatch{}, updateErr
-		}
-		refreshed, getErr := s.GetBatch(ctx, batchID)
-		if getErr != nil {
-			return models.ArchiveImportBatch{}, err
-		}
-		return refreshed, err
-	}
-	if updateErr := s.updateArchiveBatchExtractSuccess(ctx, batchID, batch.EncodingRequestedMode, actualEncodingMode); updateErr != nil {
-		return models.ArchiveImportBatch{}, updateErr
-	}
-
-	if err := s.recordArchiveEntries(ctx, batchID, batch); err != nil {
-		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), batch.EncodingRequestedMode)
-		return models.ArchiveImportBatch{}, err
-	}
-	if err := s.refreshArchiveBatchStats(ctx, batchID); err != nil {
+	if err := s.enqueueArchiveExtract(ctx, batchID, batch, passwordForInput(in)); err != nil {
 		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), batch.EncodingRequestedMode)
 		return models.ArchiveImportBatch{}, err
 	}
@@ -819,26 +847,7 @@ func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UU
 	if err := os.RemoveAll(batch.ExtractedDir); err != nil && !os.IsNotExist(err) {
 		return models.ArchiveImportBatch{}, fmt.Errorf("clear archive extracted dir: %w", err)
 	}
-	actualEncodingMode, err := s.extractArchive(ctx, batch.ArchiveFormat, batch.OriginalPath, batch.ExtractedDir, strings.TrimSpace(password), requestedMode)
-	if err != nil {
-		status := archiveBatchFailureStatus(batch, requestedMode, err)
-		if updateErr := s.updateArchiveBatchExtractFailure(ctx, batchID, status, err.Error(), requestedMode); updateErr != nil {
-			return models.ArchiveImportBatch{}, updateErr
-		}
-		refreshed, getErr := s.GetBatch(ctx, batchID)
-		if getErr != nil {
-			return models.ArchiveImportBatch{}, err
-		}
-		return refreshed, err
-	}
-	if updateErr := s.updateArchiveBatchExtractSuccess(ctx, batchID, requestedMode, actualEncodingMode); updateErr != nil {
-		return models.ArchiveImportBatch{}, updateErr
-	}
-	if err := s.recordArchiveEntries(ctx, batchID, batch); err != nil {
-		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
-		return models.ArchiveImportBatch{}, err
-	}
-	if err := s.refreshArchiveBatchStats(ctx, batchID); err != nil {
+	if err := s.enqueueArchiveExtract(ctx, batchID, batch, strings.TrimSpace(password)); err != nil {
 		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
 		return models.ArchiveImportBatch{}, err
 	}

@@ -573,6 +573,7 @@ function batchStatusLabel(status) {
     uploaded: '已上传',
     ready: '待处理',
     processing: '处理中',
+    extracting: '解包中',
     partial: '部分完成',
     completed: '已完成',
     needs_password: '待密码',
@@ -586,7 +587,7 @@ function batchStatusType(status) {
   if (status === 'completed') return 'success'
   if (status === 'partial' || status === 'needs_password' || status === 'needs_encoding') return 'warning'
   if (status === 'failed') return 'danger'
-  if (status === 'processing') return 'info'
+  if (status === 'processing' || status === 'extracting') return 'info'
   return 'primary'
 }
 

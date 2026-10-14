@@ -28,6 +28,7 @@ const (
 	TypeScrapeAV       = "video:scrape:av"
 	TypeScrapeRetag    = "video:scrape:retag"
 	TypeOrphanFileScan = "system:orphan-files:scan"
+	TypeArchiveExtract = "archive:extract"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -90,18 +91,27 @@ func buildTranscodeTaskOptions(queue string, timeout time.Duration) []asynq.Opti
 
 // Processor handles task registration and processing logic.
 type Processor struct {
-	repo        *repository.VideoRepository
-	trans       *services.TranscodeService
-	scrape      *services.ScraperService
-	subtitle    *services.SubtitleService
-	enqueuer    *Enqueuer
-	logger      *slog.Logger
-	storageRoot string
-	uploadGC    bool
+	repo          *repository.VideoRepository
+	trans         *services.TranscodeService
+	scrape        *services.ScraperService
+	subtitle      *services.SubtitleService
+	enqueuer      *Enqueuer
+	logger        *slog.Logger
+	storageRoot   string
+	uploadGC      bool
+	archiveImport ArchiveExtractService
+}
+
+type ArchiveExtractService interface {
+	ProcessExtractTask(ctx context.Context, batchID uuid.UUID, password string) error
 }
 
 func NewProcessor(repo *repository.VideoRepository, trans *services.TranscodeService, scrape *services.ScraperService, subtitle *services.SubtitleService, enqueuer *Enqueuer, logger *slog.Logger, storageRoot string) *Processor {
 	return &Processor{repo: repo, trans: trans, scrape: scrape, subtitle: subtitle, enqueuer: enqueuer, logger: logger, storageRoot: storageRoot, uploadGC: true}
+}
+
+func (p *Processor) SetArchiveExtractService(svc ArchiveExtractService) {
+	p.archiveImport = svc
 }
 
 func (p *Processor) Register(mux *asynq.ServeMux) {
@@ -111,6 +121,7 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeAV, p.HandleScrapeAV)
 	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
 	mux.HandleFunc(TypeOrphanFileScan, p.HandleOrphanFileScan)
+	mux.HandleFunc(TypeArchiveExtract, p.HandleArchiveExtract)
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

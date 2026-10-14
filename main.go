@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -123,6 +124,16 @@ func (a archiveImportQueueAdapter) EnqueueScrapeTV(videoID, filePath, filename s
 		FilePath: filePath,
 		Filename: filename,
 		Type:     "episode",
+	})
+}
+
+func (a archiveImportQueueAdapter) EnqueueArchiveExtract(batchID uuid.UUID, password string) error {
+	if a.enqueuer == nil {
+		return fmt.Errorf("queue enqueuer unavailable")
+	}
+	return a.enqueuer.EnqueueArchiveExtract(queue.ArchiveExtractPayload{
+		BatchID:  batchID.String(),
+		Password: password,
 	})
 }
 
@@ -310,6 +321,15 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	configureContentTranslation(scrapeSvc, cfg)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
 	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger, cfg.StorageRoot)
+	pool, err := pgxpool.New(context.Background(), cfg.PostgresDSN)
+	if err != nil {
+		return fmt.Errorf("create archive extract pool: %w", err)
+	}
+	defer pool.Close()
+	uploadSvc := services.NewUploadService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
+	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
+	archiveImportSvc := services.NewArchiveImportService(pool, uploadSvc, imageSvc, repo, archiveImportQueueAdapter{enqueuer: enqueuer}, cfg.StorageRoot, cfg.UploadTempDir, logger)
+	processor.SetArchiveExtractService(archiveImportSvc)
 	processor.Register(mux)
 
 	redisOpt := asynq.RedisClientOpt{Addr: cfg.RedisAddr, Password: cfg.RedisPassword}

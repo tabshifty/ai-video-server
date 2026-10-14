@@ -561,3 +561,8 @@
 - 进度：部署机日志显示 `/admin/archive-import/upload` 实际返回 HTTP 200，耗时 7m48s/7m44s；`ERR_EMPTY_RESPONSE` 来自浏览器端连接中断，而不是服务端崩溃。上传本身已完成 18GB 落盘、复制与批次入库；卡在同步解压，期间批次状态停在 `uploaded`，无子进程、无磁盘活动、无 CPU，疑似 RAR5 QuickOpen/压缩算法路径在外部解压器启动或等待处卡死。已关闭部署机低功耗模式复测观察。
 - 影响文件：暂无代码变更；记录 `plan.md`。
 - 验证：检查 server/worker 日志、PostgreSQL 批次状态、进程表、lsof 与 iostat；确认 `/healthz` 正常。后续需把上传后的同步解压改为可观测状态或异步任务，避免浏览器与代理等待长请求。
+
+## 2026-10-14 压缩包导入异步解压
+- 进度：按用户确认，把上传与重试后的同步解压改为 asynq `archive:extract` 任务。上传/重试只落盘、清理旧文件并立即返回 `extracting`，worker 执行 `ProcessExtractTask` 完成解包、扫描、统计与失败归档；队列任务 12 小时超时且不自动重试，避免同一 18GB 包反复重解。前端补充 `extracting=解包中` 状态显示。已知全量测试仍仅失败于既有 TV APK 版本夹具 144/121。
+- 影响文件：`main.go`、`internal/queue/tasks.go`、`internal/queue/archive_extract.go`、`internal/services/archive_import.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`。
+- 验证：`go test ./... -count=1` 除既有 `TestParseTVAPKMetadataParsesReleaseAPK` 外通过；`git diff --check` 通过。待推送部署机后真实验证。
