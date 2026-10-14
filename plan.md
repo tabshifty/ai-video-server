@@ -556,3 +556,8 @@
 - 进度：定位到前端 `canRetryArchiveExtract` 仅允许 `needs_password` / `needs_encoding`，导致 `failed` 批次既不显示重试按钮也不显示补密码卡片，但后端 `/retry-extract` 本身支持任意非处理中批次。计划将该判定扩展到 `failed`，并让失败批次的说明文案/密码占位按是否可补密区分；补前端契约测试锁定失败批次可重试。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`。
 - 验证：`npm test -- --run src/views/ToolboxArchiveImport.spec.js` 通过（31/31）；`npm run build` 通过；`git diff --check` 通过。后端 `/retry-extract` 无需改动；部署机可直接重新解包失败批次。
+
+## 2026-10-14 排查大压缩包上传接口 ERR_EMPTY_RESPONSE
+- 进度：部署机日志显示 `/admin/archive-import/upload` 实际返回 HTTP 200，耗时 7m48s/7m44s；`ERR_EMPTY_RESPONSE` 来自浏览器端连接中断，而不是服务端崩溃。上传本身已完成 18GB 落盘、复制与批次入库；卡在同步解压，期间批次状态停在 `uploaded`，无子进程、无磁盘活动、无 CPU，疑似 RAR5 QuickOpen/压缩算法路径在外部解压器启动或等待处卡死。已关闭部署机低功耗模式复测观察。
+- 影响文件：暂无代码变更；记录 `plan.md`。
+- 验证：检查 server/worker 日志、PostgreSQL 批次状态、进程表、lsof 与 iostat；确认 `/healthz` 正常。后续需把上传后的同步解压改为可观测状态或异步任务，避免浏览器与代理等待长请求。
