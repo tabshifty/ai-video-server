@@ -562,6 +562,11 @@
 - 影响文件：暂无代码变更；记录 `plan.md`。
 - 验证：检查 server/worker 日志、PostgreSQL 批次状态、进程表、lsof 与 iostat；确认 `/healthz` 正常。后续需把上传后的同步解压改为可观测状态或异步任务，避免浏览器与代理等待长请求。
 
+## 2026-10-14 新增解包中状态约束
+- 进度：修复异步解压入队时 `extracting` 违反既有 status check 的问题，新增 migration 0041 扩展 `archive_import_batches_status_check`。部署机迁移、重启和健康检查通过。
+- 影响文件：`migrations/0041_archive_import_extracting.up.sql`、`migrations/0041_archive_import_extracting.down.sql`、`plan.md`。
+- 验证：`git push deploy master` 触发构建、迁移与 `/healthz OK`。
+
 ## 2026-10-14 允许 uploaded 批次重试解压
 - 进度：异步解压上线后，历史卡住的批次状态是 `uploaded`，但前端重试入口此前只覆盖 `failed / needs_password / needs_encoding`，导致没有按钮。已把 `uploaded` 纳入 `canRetryArchiveExtract`，并更新契约测试。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`。
