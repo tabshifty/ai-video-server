@@ -489,6 +489,15 @@ async function load() {
     expect(template).toContain('class="page-shell video-list-page" data-density="compact"')
   })
 
+  it('在视频列表左下侧提供复用当前查询条件的刷新按钮', () => {
+    expect(script).toContain("import { Delete, EditPen, MagicStick, MoreFilled, Refresh, Setting, Search } from '@element-plus/icons-vue'")
+    expect(template).toContain('<div class="toolbar-row video-list-pagination-row">')
+    expect(template).toMatch(/<el-button\b(?=[^>]*:icon="Refresh")(?=[^>]*:loading="listLoading")(?=[^>]*@click="load")(?=[^>]*aria-label="刷新视频列表")(?=[^>]*title="刷新视频列表")[^>]*>\s*刷新\s*<\/el-button>/)
+    expect(template).toContain('<AdminTablePagination')
+    expect(template.indexOf('aria-label="刷新视频列表"')).toBeLessThan(template.indexOf('<AdminTablePagination'))
+    expect(findRule(style, '.video-list-pagination-row :deep(.admin-table-pagination)')).toContain('flex: 1 1 auto')
+  })
+
   it('为动态视频封面提供由标题或 ID 派生的替代文本', () => {
     expect(videoCoverImage).toContain(':alt="`${row.title || row.id} 封面`"')
   })

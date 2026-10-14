@@ -1,7 +1,7 @@
 ﻿<script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, EditPen, MagicStick, MoreFilled, Setting, Search } from '@element-plus/icons-vue'
+import { Delete, EditPen, MagicStick, MoreFilled, Refresh, Setting, Search } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
@@ -1584,7 +1584,16 @@ onBeforeUnmount(() => {
           </el-table>
         </div>
 
-        <div class="toolbar-row toolbar-row--end">
+        <div class="toolbar-row video-list-pagination-row">
+          <el-button
+            :icon="Refresh"
+            :loading="listLoading"
+            aria-label="刷新视频列表"
+            title="刷新视频列表"
+            @click="load"
+          >
+            刷新
+          </el-button>
           <AdminTablePagination
             :current-page="query.page"
             :page-size="query.page_size"
@@ -2191,6 +2200,12 @@ onBeforeUnmount(() => {
 <style scoped>
 .video-list-page {
   padding-bottom: var(--space-1);
+}
+
+.video-list-pagination-row :deep(.admin-table-pagination) {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .video-header-actions,

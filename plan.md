@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-10-14 视频管理列表刷新按钮完成
+- 进度：已在视频列表底部左侧增加带 Refresh 图标、加载状态和可访问名称的“刷新”按钮，复用 `load()` 保留当前查询条件；分页区域继续在同一行右侧对齐，并允许窄屏换行。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
+- 验证：`npm test -- --run src/views/videoListPage.spec.js` 通过（19/19）；`npm run build` 通过；`git diff --check` 和本次文件乱码检查通过。待提交本次任务文件。
+
+## 2026-10-14 视频管理列表增加刷新按钮
+- 进度：确认视频列表底部现有分页仅靠右显示；计划在左侧增加带 Refresh 图标和加载状态的“刷新”按钮，复用当前查询条件下的 `load()`。
+- 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`plan.md`。
+- 验证：先补充底部刷新按钮与当前查询复用契约测试，再运行视频列表定向测试和管理端构建。
+
 ## 2026-10-13 压缩包解压兼容与误判修复完成
 - 进度：收紧密码错误识别为明确的密码/passphrase 诊断；统一保留 7zz、7z、bsdtar、unzip 的原始错误文本；ZIP 元数据检测加密条目；Go ZIP 遇到不支持的压缩算法时清理半成品并自动回退 7zz/7z。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
