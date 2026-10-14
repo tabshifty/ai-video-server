@@ -601,7 +601,7 @@ function archiveEncodingModeLabel(mode) {
 }
 
 function canRetryArchiveExtract(batch) {
-  return ['failed', 'needs_password', 'needs_encoding'].includes(batch?.status)
+  return ['uploaded', 'failed', 'needs_password', 'needs_encoding'].includes(batch?.status)
 }
 
 function batchSupportsEncodingRetry(batch) {

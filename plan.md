@@ -562,6 +562,11 @@
 - 影响文件：暂无代码变更；记录 `plan.md`。
 - 验证：检查 server/worker 日志、PostgreSQL 批次状态、进程表、lsof 与 iostat；确认 `/healthz` 正常。后续需把上传后的同步解压改为可观测状态或异步任务，避免浏览器与代理等待长请求。
 
+## 2026-10-14 允许 uploaded 批次重试解压
+- 进度：异步解压上线后，历史卡住的批次状态是 `uploaded`，但前端重试入口此前只覆盖 `failed / needs_password / needs_encoding`，导致没有按钮。已把 `uploaded` 纳入 `canRetryArchiveExtract`，并更新契约测试。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`。
+- 验证：`npm test -- --run src/views/ToolboxArchiveImport.spec.js` 通过（31/31）。
+
 ## 2026-10-14 压缩包导入异步解压
 - 进度：按用户确认，把上传与重试后的同步解压改为 asynq `archive:extract` 任务。上传/重试只落盘、清理旧文件并立即返回 `extracting`，worker 执行 `ProcessExtractTask` 完成解包、扫描、统计与失败归档；队列任务 12 小时超时且不自动重试，避免同一 18GB 包反复重解。前端补充 `extracting=解包中` 状态显示。已知全量测试仍仅失败于既有 TV APK 版本夹具 144/121。
 - 影响文件：`main.go`、`internal/queue/tasks.go`、`internal/queue/archive_extract.go`、`internal/services/archive_import.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`。
