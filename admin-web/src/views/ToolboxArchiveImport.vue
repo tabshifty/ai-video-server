@@ -600,7 +600,7 @@ function archiveEncodingModeLabel(mode) {
 }
 
 function canRetryArchiveExtract(batch) {
-  return batch?.status === 'needs_password' || batch?.status === 'needs_encoding'
+  return ['failed', 'needs_password', 'needs_encoding'].includes(batch?.status)
 }
 
 function batchSupportsEncodingRetry(batch) {
@@ -2285,9 +2285,11 @@ onUnmounted(() => {
             <template #title>纠偏后继续解包</template>
             <template #description>
               {{
-                selectedBatch.status === 'needs_password'
-                  ? '当前批次在等待管理员重新输入密码；ZIP 批次也可以顺手确认条目名编码模式。'
-                  : '当前批次在等待管理员确认 ZIP 条目名编码。默认先走自动判定，必要时改用 UTF-8 或 GBK / CP936。'
+                selectedBatch.status === 'failed'
+                  ? '当前批次解包失败。可先补充密码（如已加密）后重试；ZIP 批次也可确认条目名编码。'
+                  : selectedBatch.status === 'needs_password'
+                    ? '当前批次在等待管理员重新输入密码；ZIP 批次也可以顺手确认条目名编码模式。'
+                    : '当前批次在等待管理员确认 ZIP 条目名编码。默认先走自动判定，必要时改用 UTF-8 或 GBK / CP936。'
               }}
             </template>
             <div class="archive-password-card__form">
@@ -2295,7 +2297,7 @@ onUnmounted(() => {
                 v-model="retryExtractPassword"
                 type="password"
                 show-password
-                :placeholder="selectedBatch.status === 'needs_password' ? '请输入压缩包密码' : '如需补密码可一并填写'"
+                :placeholder="selectedBatch.status === 'failed' ? '解包失败的批次如有密码请输入' : selectedBatch.status === 'needs_password' ? '请输入压缩包密码' : '如需补密码可一并填写'"
               />
               <el-select
                 v-if="batchSupportsEncodingRetry(selectedBatch)"

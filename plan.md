@@ -551,3 +551,8 @@
 - 进度：基于真实 18GB RAR5 报错确认 `7zz 26.03` 不支持 `Method = v6:32M...`；新增 Unsupported Method 错误分类与中文收敛诊断，避免 49 条逐项错误、7zz 横幅或密码误判。RAR/7z 在 7zz 返回该分类时清理半成品并尝试 `unar`/`unrar` 回退，失败保留原始压缩算法不兼容诊断。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
 - 验证：`go test ./internal/services -count=1 -run 'TestArchiveCommandError|TestExtractArchive'` 通过；`go test ./internal/services -count=1 -run 'TestArchive|TestExtractArchive|TestScanArchive'` 通过；`git diff --check` 通过。部署机需安装 `unar` 或 `unrar`（`brew install unar`）后重试该批次。
+
+## 2026-10-14 修复失败压缩包无法重试解包
+- 进度：定位到前端 `canRetryArchiveExtract` 仅允许 `needs_password` / `needs_encoding`，导致 `failed` 批次既不显示重试按钮也不显示补密码卡片，但后端 `/retry-extract` 本身支持任意非处理中批次。计划将该判定扩展到 `failed`，并让失败批次的说明文案/密码占位按是否可补密区分；补前端契约测试锁定失败批次可重试。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`admin-web/src/views/ToolboxArchiveImport.spec.js`、`plan.md`。
+- 验证：`npm test -- --run src/views/ToolboxArchiveImport.spec.js` 通过（31/31）；`npm run build` 通过；`git diff --check` 通过。后端 `/retry-extract` 无需改动；部署机可直接重新解包失败批次。

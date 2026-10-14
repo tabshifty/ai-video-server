@@ -478,3 +478,9 @@ describe('ToolboxArchiveImport', () => {
     expect(source).toContain('requestArchiveGroupDialogClose')
   })
 })
+
+  it('允许失败压缩包批次重新解包并保留密码补充入口', () => {
+    expect(source).toContain("['failed', 'needs_password', 'needs_encoding'].includes(batch?.status)")
+    expect(source).toContain('当前批次解包失败。可先补充密码（如已加密）后重试')
+    expect(source).toContain("selectedBatch.status === 'failed' ? '解包失败的批次如有密码请输入'")
+  })
