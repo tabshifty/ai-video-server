@@ -33,6 +33,7 @@ import (
 
 var (
 	ErrArchiveUnsupportedFormat = errors.New("unsupported archive format")
+	ErrArchiveUnsupportedMethod = errors.New("archive compression method is not supported")
 	ErrArchivePasswordRequired  = errors.New("archive password required")
 	ErrArchiveNestedArchive     = errors.New("nested archive is not allowed")
 	ErrArchiveBatchBusy         = errors.New("archive batch is processing")
@@ -1568,11 +1569,68 @@ func isArchivePasswordRelatedError(err error) bool {
 	return false
 }
 
+func isArchiveUnsupportedMethodError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrArchiveUnsupportedMethod) {
+		return true
+	}
+	msg := strings.ToLower(strings.Join(strings.Fields(err.Error()), " "))
+	for _, marker := range []string{
+		"unsupported method",
+		"not implemented",
+		"unsupported compression method",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// condenseArchiveUnsupportedMethodDiagnostic 把 7zz 的多行 Unsupported Method 报告
+// 收敛成可读归因：7zz 对 18GB 级归档会为每个条目打印一行 ERROR，并附带完整版权横幅和
+// 归档绝对路径，直接写入 last_error 会既超长又无法指明根因。
+func condenseArchiveUnsupportedMethodDiagnostic(detail string) string {
+	const marker = "ERROR: Unsupported Method"
+	lower := strings.ToLower(detail)
+	if !strings.Contains(lower, "unsupported method") {
+		return detail
+	}
+
+	failingCount := 0
+	for _, line := range strings.Split(detail, "\n") {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(line)), "unsupported method") {
+			failingCount++
+		}
+	}
+
+	parts := []string{
+		marker,
+		fmt.Sprintf("该归档使用了当前解压工具不支持的压缩算法（%d 个条目受影响）", failingCount),
+		"这不是密码问题；通常是 RAR 新版压缩算法，需要改用 unar 或 unrar 解压",
+	}
+	if index := strings.Index(detail, marker); index >= 0 {
+		firstLine := strings.TrimSpace(strings.SplitN(detail[index:], "\n", 2)[0])
+		if firstLine != "" && !strings.EqualFold(firstLine, marker) {
+			parts = append(parts, "示例条目: "+strings.TrimSpace(strings.TrimPrefix(firstLine, marker)))
+		}
+	}
+	return strings.Join(parts, "；")
+}
+
 func archiveCommandError(operation string, runErr error, output string) error {
 	detail := sanitizeArchiveText(output)
 	combinedErr := runErr
 	if detail != "" {
 		combinedErr = fmt.Errorf("%w: %s", runErr, detail)
+	}
+	if isArchiveUnsupportedMethodError(combinedErr) {
+		if condensed := condenseArchiveUnsupportedMethodDiagnostic(detail); condensed != "" {
+			return fmt.Errorf("%w: %s", ErrArchiveUnsupportedMethod, condensed)
+		}
+		return ErrArchiveUnsupportedMethod
 	}
 	if isArchivePasswordRelatedError(combinedErr) {
 		if detail != "" {
@@ -1670,18 +1728,69 @@ func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archi
 		}
 		return s.extractZipArchiveWithFallback(ctx, archivePath, extractedDir, archiveEncodingRequestedModeForFormat(format, requestedMode))
 	case "rar", "7z":
-		if err := s.extractWithSevenZip(ctx, archivePath, extractedDir, password); err == nil {
-			return "", nil
-		} else if !errors.Is(err, exec.ErrNotFound) {
-			return "", err
-		}
-		if err := s.extractWithBsdtar(ctx, archivePath, extractedDir); err != nil {
-			return "", err
-		}
-		return "", nil
+		return "", s.extractRarLikeArchive(ctx, archivePath, extractedDir, password)
 	default:
 		return "", ErrArchiveUnsupportedFormat
 	}
+}
+
+// extractRarLikeArchive 处理 RAR/7z：优先 7zz；仅当 7zz 缺失才回退 bsdtar。
+// 当 7zz 明确报“压缩算法不支持”时，改用支持新版 RAR 算法的 unar/unrar；
+// 该场景不属于 [[压缩包 RAR/7z 解包工具边界]] 里禁止覆盖的密码或 CRC 误报，
+// 因为 7zz 已给出确定诊断，且换工具是唯一可行的解包路径。
+func (s *ArchiveImportService) extractRarLikeArchive(ctx context.Context, archivePath, extractedDir, password string) error {
+	err := s.extractWithSevenZip(ctx, archivePath, extractedDir, password)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, exec.ErrNotFound) {
+		return s.extractWithBsdtar(ctx, archivePath, extractedDir)
+	}
+	if !errors.Is(err, ErrArchiveUnsupportedMethod) {
+		return err
+	}
+
+	if fallbackErr := s.extractRarArchiveWithAlternativeTool(ctx, archivePath, extractedDir, password); fallbackErr == nil {
+		return nil
+	}
+	return err
+}
+
+func (s *ArchiveImportService) extractRarArchiveWithAlternativeTool(ctx context.Context, archivePath, extractedDir, password string) error {
+	if err := s.clearArchiveExtractedDir(extractedDir); err != nil {
+		return err
+	}
+	if exe := findArchiveExtractorCommand("unar"); exe != "" {
+		args := []string{"-quiet", "-no-directory", "-output-directory", extractedDir}
+		if strings.TrimSpace(password) != "" {
+			args = append(args, "-p", password)
+		}
+		args = append(args, archivePath)
+		if err := runArchiveExtractor(ctx, exe, args, ""); err == nil {
+			return nil
+		}
+	}
+	if exe := findArchiveExtractorCommand("unrar"); exe != "" {
+		args := []string{"x", "-y", "-o+", extractedDir}
+		if strings.TrimSpace(password) != "" {
+			args = append(args, "-p"+password)
+		}
+		args = append(args, archivePath)
+		if err := runArchiveExtractor(ctx, exe, args, ""); err == nil {
+			return nil
+		}
+	}
+	return ErrArchiveUnsupportedMethod
+}
+
+func (s *ArchiveImportService) clearArchiveExtractedDir(extractedDir string) error {
+	if err := os.RemoveAll(extractedDir); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("clear archive extraction dir: %w", err)
+	}
+	if err := os.MkdirAll(extractedDir, 0o755); err != nil {
+		return fmt.Errorf("create archive extraction dir: %w", err)
+	}
+	return nil
 }
 
 func (s *ArchiveImportService) extractZipArchiveWithFallback(ctx context.Context, archivePath, extractedDir, requestedMode string) (string, error) {
@@ -1946,12 +2055,16 @@ func (s *ArchiveImportService) extractWithSevenZip(ctx context.Context, archiveP
 		args = append(args, "-p"+password)
 	}
 	args = append(args, archivePath)
+	return runArchiveExtractor(ctx, exe, args, archivePath)
+}
+
+func runArchiveExtractor(ctx context.Context, exe string, args []string, archivePath string) error {
 	cmd := exec.CommandContext(ctx, exe, args...)
 	var output bytes.Buffer
 	cmd.Stdout = &output
 	cmd.Stderr = &output
 	if err := cmd.Run(); err != nil {
-		return archiveCommandError(fmt.Sprintf("extract archive with %s", exe), err, output.String())
+		return archiveCommandError(fmt.Sprintf("extract %s with %s", archivePath, exe), err, output.String())
 	}
 	return nil
 }

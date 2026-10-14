@@ -633,6 +633,147 @@ func TestArchiveCommandErrorPreservesNonPasswordDiagnostic(t *testing.T) {
 	}
 }
 
+func TestArchiveCommandErrorClassifiesUnsupportedMethodWithoutPasswordHint(t *testing.T) {
+	t.Parallel()
+
+	output := strings.Join([]string{
+		"ERROR: Unsupported Method : 1/www.98T.la@001.mp4",
+		"ERROR: Unsupported Method : 1/www.98T.la@002.mp4",
+		"Sub items Errors: 49 Archives with Errors: 1",
+	}, "\n")
+	err := archiveCommandError("extract archive with /opt/homebrew/bin/7zz", errors.New("exit status 2"), output)
+	if !errors.Is(err, ErrArchiveUnsupportedMethod) {
+		t.Fatalf("archiveCommandError() error = %v, want ErrArchiveUnsupportedMethod", err)
+	}
+	if errors.Is(err, ErrArchivePasswordRequired) {
+		t.Fatalf("archiveCommandError() error = %v, must not require password", err)
+	}
+	if !strings.Contains(err.Error(), "压缩算法") {
+		t.Fatalf("archiveCommandError() error = %v, want Chinese compression-method cause", err)
+	}
+	if !strings.Contains(err.Error(), "unar") {
+		t.Fatalf("archiveCommandError() error = %v, want unar fallback hint", err)
+	}
+	if strings.Contains(err.Error(), "Unsupported Method : 1/www.98T.la@002.mp4") {
+		t.Fatalf("archiveCommandError() error = %v, must not dump every failing entry", err)
+	}
+	if strings.Contains(err.Error(), "Copyright (c) 1999-2026 Igor Pavlov") {
+		t.Fatalf("archiveCommandError() error = %v, must not include 7zz banner", err)
+	}
+	if !strings.Contains(err.Error(), "ERROR: Unsupported Method") {
+		t.Fatalf("archiveCommandError() error = %v, want condensed unsupported-method marker", err)
+	}
+}
+
+func TestArchiveCommandErrorKeepsUnsupportedMethodUnrelatedToPasswordMarkers(t *testing.T) {
+	t.Parallel()
+
+	err := archiveCommandError("extract archive with 7zz", errors.New("exit status 2"), "ERROR: Unsupported Method : 1/a.mp4\nCan not open encrypted archive. Wrong password?")
+	if errors.Is(err, ErrArchivePasswordRequired) {
+		t.Fatalf("archiveCommandError() error = %v, unsupported method must not be reported as password issue", err)
+	}
+	if !errors.Is(err, ErrArchiveUnsupportedMethod) {
+		t.Fatalf("archiveCommandError() error = %v, want ErrArchiveUnsupportedMethod", err)
+	}
+}
+
+func TestArchiveCommandErrorKeepsGenericErrorsUnchanged(t *testing.T) {
+	t.Parallel()
+
+	err := archiveCommandError("extract archive with 7zz", errors.New("exit status 2"), "ERROR: Headers Error\nCan not open the file as archive")
+	if errors.Is(err, ErrArchiveUnsupportedMethod) {
+		t.Fatalf("archiveCommandError() error = %v, must not be classified as unsupported method", err)
+	}
+	if !strings.Contains(err.Error(), "Headers Error") {
+		t.Fatalf("archiveCommandError() error = %v, want original diagnostic", err)
+	}
+}
+
+func TestExtractArchiveRetriesUnsupportedMethodWithUnar(t *testing.T) {
+	root := t.TempDir()
+	fakeBinDir := filepath.Join(root, "bin")
+	extractedDir := filepath.Join(root, "out")
+	archivePath := filepath.Join(root, "modern.rar")
+	if err := os.MkdirAll(fakeBinDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(archivePath, []byte("not a real archive"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	sevenZipScript := `#!/bin/sh
+set -eu
+output_dir=""
+for arg in "$@"; do
+  case "$arg" in
+    -o*) output_dir="${arg#-o}" ;;
+  esac
+done
+mkdir -p "$output_dir"
+printf 'ERROR: Unsupported Method : 1/movie.mp4\nERROR: Unsupported Method : 1/movie2.mp4\nSub items Errors: 2 Archives with Errors: 1\n' >&2
+exit 2
+`
+	if err := os.WriteFile(filepath.Join(fakeBinDir, "7zz"), []byte(sevenZipScript), 0o755); err != nil {
+		t.Fatalf("WriteFile(7zz) error = %v", err)
+	}
+	unarScript := `#!/bin/sh
+set -eu
+output_dir=""
+while [ $# -gt 0 ]; do
+  arg="$1"
+  case "$arg" in
+    -output-directory|-o) output_dir="$2"; shift ;;
+  esac
+  shift
+done
+mkdir -p "$output_dir"
+printf 'unar-body' > "$output_dir/movie.mp4"
+`
+	if err := os.WriteFile(filepath.Join(fakeBinDir, "unar"), []byte(unarScript), 0o755); err != nil {
+		t.Fatalf("WriteFile(unar) error = %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if _, err := (&ArchiveImportService{}).extractArchive(context.Background(), "rar", archivePath, extractedDir, "", archiveEncodingAuto); err != nil {
+		t.Fatalf("extractArchive() error = %v, want unar fallback success", err)
+	}
+	data, err := os.ReadFile(filepath.Join(extractedDir, "movie.mp4"))
+	if err != nil {
+		t.Fatalf("ReadFile(movie.mp4) error = %v", err)
+	}
+	if string(data) != "unar-body" {
+		t.Fatalf("body = %q, want unar-body", string(data))
+	}
+}
+
+func TestExtractArchiveSurfacesUnsupportedMethodWhenNoFallbackToolExists(t *testing.T) {
+	root := t.TempDir()
+	fakeBinDir := filepath.Join(root, "bin")
+	extractedDir := filepath.Join(root, "out")
+	archivePath := filepath.Join(root, "modern.rar")
+	if err := os.MkdirAll(fakeBinDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(archivePath, []byte("not a real archive"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	sevenZipScript := `#!/bin/sh
+printf 'ERROR: Unsupported Method : 1/movie.mp4\nSub items Errors: 1 Archives with Errors: 1\n' >&2
+exit 2
+`
+	if err := os.WriteFile(filepath.Join(fakeBinDir, "7zz"), []byte(sevenZipScript), 0o755); err != nil {
+		t.Fatalf("WriteFile(7zz) error = %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir)
+
+	_, err := (&ArchiveImportService{}).extractArchive(context.Background(), "rar", archivePath, extractedDir, "", archiveEncodingAuto)
+	if !errors.Is(err, ErrArchiveUnsupportedMethod) {
+		t.Fatalf("extractArchive() error = %v, want ErrArchiveUnsupportedMethod", err)
+	}
+	if !strings.Contains(err.Error(), "压缩算法") {
+		t.Fatalf("extractArchive() error = %v, want Chinese compression-method cause", err)
+	}
+}
+
 func TestExtractArchiveFallsBackToSevenZipForUnsupportedZipMethod(t *testing.T) {
 	root := t.TempDir()
 	fakeBinDir := filepath.Join(root, "bin")

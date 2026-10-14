@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-14 RAR 新版压缩算法不兼容解压诊断优化
+- 进度：收到部署机真实报错 `7zz 26.03 ERROR: Unsupported Method`（RAR5 + `Method = v6:32M:m0:m1:m3` + `QuickOpen` + `Blocks = 55`），确认不是密码误判，而是 7zz 不支持该 RAR 压缩方法；现有实现把 7zz 全部输出原样写入 `last_error`，既缺中文归因也缺可执行建议。计划新增“压缩算法不兼容”错误分类、精简错误文本与工具回退建议，并按 TDD 补纯逻辑单测。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
+- 验证：待执行 `go test ./internal/services -run 'TestArchive'` 定向测试；回退链是否引入 unar/unrar 依赖需先确认部署机可用工具。
+
 ## 2026-10-14 视频管理列表刷新按钮完成
 - 进度：已在视频列表底部左侧增加带 Refresh 图标、加载状态和可访问名称的“刷新”按钮，复用 `load()` 保留当前查询条件；分页区域继续在同一行右侧对齐，并允许窄屏换行。
 - 影响文件：`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
@@ -541,3 +546,8 @@
 ## 2026-09-29 验证：手机端短视频合集搜索
 - 进度：实现完成，未增加置顶能力。手机端版本已升级为 `versionCode 13`、`versionName 0.1.12`。
 - 验证：`go test ./internal/handlers ./internal/repository -count=1` 通过；`go vet ./...` 通过；`cd android-app && ./gradlew --no-daemon :app:testDebugUnitTest` 通过；`cd android-app && ./gradlew --no-daemon :app:assembleDebug` 通过；本次涉及文件乱码扫描通过，`git diff --check` 待提交前复核。`go test ./internal/services ./internal/repository ./internal/handlers -count=1` 中 services 仍有既有 `TestParseTVAPKMetadataParsesReleaseAPK` 失败（当前 APK versionCode 144、旧断言 121），与本任务无关。
+
+## 2026-10-14 RAR 新版压缩算法回退与错误诊断
+- 进度：基于真实 18GB RAR5 报错确认 `7zz 26.03` 不支持 `Method = v6:32M...`；新增 Unsupported Method 错误分类与中文收敛诊断，避免 49 条逐项错误、7zz 横幅或密码误判。RAR/7z 在 7zz 返回该分类时清理半成品并尝试 `unar`/`unrar` 回退，失败保留原始压缩算法不兼容诊断。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
+- 验证：`go test ./internal/services -count=1 -run 'TestArchiveCommandError|TestExtractArchive'` 通过；`go test ./internal/services -count=1 -run 'TestArchive|TestExtractArchive|TestScanArchive'` 通过；`git diff --check` 通过。部署机需安装 `unar` 或 `unrar`（`brew install unar`）后重试该批次。
