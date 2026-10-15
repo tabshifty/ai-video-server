@@ -576,3 +576,9 @@
 - 进度：按用户确认，把上传与重试后的同步解压改为 asynq `archive:extract` 任务。上传/重试只落盘、清理旧文件并立即返回 `extracting`，worker 执行 `ProcessExtractTask` 完成解包、扫描、统计与失败归档；队列任务 12 小时超时且不自动重试，避免同一 18GB 包反复重解。前端补充 `extracting=解包中` 状态显示。已知全量测试仍仅失败于既有 TV APK 版本夹具 144/121。
 - 影响文件：`main.go`、`internal/queue/tasks.go`、`internal/queue/archive_extract.go`、`internal/services/archive_import.go`、`admin-web/src/views/ToolboxArchiveImport.vue`、`plan.md`。
 - 验证：`go test ./... -count=1` 除既有 `TestParseTVAPKMetadataParsesReleaseAPK` 外通过；`git diff --check` 通过。待推送部署机后真实验证。
+## 2026-10-15 09:25 压缩包解压队列与详情状态
+
+- 变更：压缩包解压任务改用独立 `archive` 队列，worker 增加 `ARCHIVE_EXTRACT_WORKERS=1` 专用并发；批次详情在 `extracting` 状态每 5 秒自动刷新并显示后台解包提示。
+- 影响文件：`internal/config/config.go`、`internal/queue/archive_extract.go`、`main.go`、`admin-web/src/views/ToolboxArchiveImport.vue`。
+- 验证：`go build ./...`、`go test ./internal/config ./internal/queue`、`admin-web npm run build` 均通过。
+

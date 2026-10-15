@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Back, Check, CircleCheck, Close, Delete, DocumentCopy, EditPen, FolderOpened, Picture, Plus, RefreshRight, UploadFilled, VideoCamera } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -65,6 +65,7 @@ const deletingBatchID = ref('')
 const fileSaving = ref(false)
 const batchEditSaving = ref(false)
 const batchDrawerVisible = ref(false)
+const batchExtractPollingTimer = ref(null)
 const selectedFileDialogVisible = ref(false)
 const uploadDialogVisible = ref(false)
 const batchEditDialogVisible = ref(false)
@@ -1012,6 +1013,33 @@ function applyBatchDetailData(data, options = {}) {
 
   syncArchiveFileSelection(nextSelection, nextSelection.length === 1 ? findArchiveFileIndex(nextSelection[0]) : -1)
   batchDrawerVisible.value = true
+}
+
+watch(
+  () => [selectedBatch.value?.id, selectedBatch.value?.status],
+  ([batchID, status], [previousBatchID, previousStatus] = []) => {
+    if (!batchID || status !== 'extracting') {
+      stopArchiveExtractPolling()
+      return
+    }
+    if (batchID === previousBatchID && status === previousStatus && batchExtractPollingTimer.value) return
+    startArchiveExtractPolling(batchID)
+  },
+  { immediate: true }
+)
+
+function startArchiveExtractPolling(batchID) {
+  stopArchiveExtractPolling()
+  batchExtractPollingTimer.value = window.setInterval(async () => {
+    if (batchDetailLoading.value) return
+    await refreshBatchDetail({ skipConfirm: true })
+  }, 5000)
+}
+
+function stopArchiveExtractPolling() {
+  if (!batchExtractPollingTimer.value) return
+  window.clearInterval(batchExtractPollingTimer.value)
+  batchExtractPollingTimer.value = null
 }
 
 async function loadBatches() {
@@ -2279,6 +2307,14 @@ onUnmounted(() => {
             type="warning"
             :closable="false"
             :title="selectedBatch.last_error"
+            class="archive-inline-alert"
+          />
+
+          <el-alert
+            v-if="selectedBatch.status === 'extracting'"
+            type="info"
+            :closable="false"
+            title="压缩包正在后台解包，完成后详情会自动刷新"
             class="archive-inline-alert"
           />
 

@@ -337,13 +337,14 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	srv := asynq.NewServer(
 		redisOpt,
 		asynq.Config{
-			Concurrency: cfg.MaxTranscodeWorkers,
+			Concurrency: cfg.MaxTranscodeWorkers + cfg.ArchiveExtractWorkers,
 			Queues: map[string]int{
-				cfg.AsynqQueue: 10,
+				cfg.AsynqQueue:          10,
+				cfg.ArchiveExtractQueue: 20,
 			},
 		},
 	)
-	logger.Info("worker started", "concurrency", cfg.MaxTranscodeWorkers, "queue", cfg.AsynqQueue)
+	logger.Info("worker started", "concurrency", cfg.MaxTranscodeWorkers+cfg.ArchiveExtractWorkers, "queues", []string{cfg.AsynqQueue, cfg.ArchiveExtractQueue})
 	if err := srv.Run(mux); err != nil {
 		return fmt.Errorf("run asynq server: %w", err)
 	}

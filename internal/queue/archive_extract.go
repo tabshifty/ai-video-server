@@ -15,11 +15,11 @@ type ArchiveExtractPayload struct {
 	Password string `json:"password,omitempty"`
 }
 
-func buildArchiveExtractTaskOptions(queue string) []asynq.Option {
+func buildArchiveExtractTaskOptions() []asynq.Option {
 	return []asynq.Option{
 		asynq.MaxRetry(0),
 		asynq.ProcessIn(1 * time.Second),
-		asynq.Queue(queue),
+		asynq.Queue(archiveExtractQueue),
 		asynq.Timeout(12 * time.Hour),
 	}
 }
@@ -31,13 +31,15 @@ func (e *Enqueuer) EnqueueArchiveExtract(payloadIn ArchiveExtractPayload) error 
 	}
 	_, err = e.client.Enqueue(
 		asynq.NewTask(TypeArchiveExtract, payload),
-		buildArchiveExtractTaskOptions(e.queue)...,
+		buildArchiveExtractTaskOptions()...,
 	)
 	if err != nil {
 		return fmt.Errorf("enqueue archive extract task: %w", err)
 	}
 	return nil
 }
+
+const archiveExtractQueue = "archive"
 
 func (p *Processor) HandleArchiveExtract(ctx context.Context, task *asynq.Task) error {
 	if p.archiveImport == nil {

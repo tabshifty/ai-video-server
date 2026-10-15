@@ -41,6 +41,8 @@ type Config struct {
 	AVScraperThePornDBNoHash    bool
 	MaxTranscodeWorkers         int
 	AsynqQueue                  string
+	ArchiveExtractQueue         string
+	ArchiveExtractWorkers       int
 	TranscodeTaskTimeout        time.Duration
 	TelegramAPIID               int
 	TelegramAPIHash             string
@@ -102,6 +104,8 @@ func Load() (Config, error) {
 		AVScraperThePornDBAPIToken:  os.Getenv("AV_SCRAPER_THEPORNDB_API_TOKEN"),
 		AVScraperThePornDBNoHash:    getBoolEnv("AV_SCRAPER_THEPORNDB_NO_HASH", false),
 		AsynqQueue:                  getEnv("ASYNQ_QUEUE", "transcode"),
+		ArchiveExtractQueue:         getEnv("ARCHIVE_EXTRACT_QUEUE", "archive"),
+		ArchiveExtractWorkers:       getIntEnv("ARCHIVE_EXTRACT_WORKERS", 1),
 		MaxTranscodeWorkers:         getIntEnv("MAX_TRANSCODE_WORKERS", 2),
 		TranscodeTaskTimeout:        time.Duration(getIntEnv("TRANSCODE_TASK_TIMEOUT_MINUTES", 360)) * time.Minute,
 		TelegramAPIID:               getIntEnv("TELEGRAM_API_ID", 0),
