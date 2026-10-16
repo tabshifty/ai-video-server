@@ -56,6 +56,7 @@ import {
   teardownPreviewPlayer,
   shouldShowVideoThumbnail,
   shouldShowStuckScrapeAction,
+  videoOriginalTitle,
   buildStuckScrapeRoute,
   subtitleUploadAccept,
   tvPendingStageLabel
@@ -134,6 +135,7 @@ const COLUMN_VISIBILITY_KEY = 'admin-videolist-columns'
 const COLUMN_VISIBILITY_VERSION_KEY = 'admin-videolist-columns-version'
 const ALL_COLUMNS = [
   { key: 'title', label: '标题' },
+  { key: 'original_title', label: '原始标题', secondary: true },
   { key: 'thumbnail', label: '封面' },
   { key: 'type', label: '类型' },
   { key: 'status', label: '状态' },
@@ -143,7 +145,7 @@ const ALL_COLUMNS = [
   { key: 'created_at', label: '上传时间', secondary: true },
   { key: 'operations', label: '操作', required: true }
 ]
-const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'duration', 'size', 'upload_user', 'created_at', 'operations']
+const DEFAULT_VISIBLE_COLUMNS = ['title', 'original_title', 'thumbnail', 'type', 'status', 'duration', 'size', 'upload_user', 'created_at', 'operations']
 const columnVisibility = ref(readStoredColumns())
 const allowedColumnKeys = ALL_COLUMNS.map((item) => item.key)
 const builtInViews = createVideoBuiltInViews(DEFAULT_VISIBLE_COLUMNS)
@@ -242,10 +244,13 @@ function readStoredColumns() {
     if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_COLUMNS]
     const known = parsed.filter((key) => ALL_COLUMNS.some((column) => column.key === key))
     const version = window.localStorage.getItem(COLUMN_VISIBILITY_VERSION_KEY)
-    if (version !== '2') {
-      if (!known.includes('duration')) known.push('duration')
+    if (version !== '3') {
+      // 历史用户列设置补上后续新增的默认列，避免升级后看不到新列。
+      for (const key of ['duration', 'original_title']) {
+        if (!known.includes(key)) known.push(key)
+      }
       window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(known))
-      window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '2')
+      window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '3')
     }
     return Array.from(new Set([...known, ...required]))
   } catch (_) {
@@ -257,7 +262,7 @@ function persistColumns() {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility.value))
-    window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '2')
+    window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '3')
   } catch (_) {
     // localStorage 不可用时仅保留本会话列设置。
   }
@@ -1518,6 +1523,9 @@ onBeforeUnmount(() => {
           >
             <el-table-column type="selection" width="44" />
             <el-table-column v-if="isColumnVisible('title')" prop="title" label="标题" min-width="220" show-overflow-tooltip />
+            <el-table-column v-if="isColumnVisible('original_title')" prop="original_title" label="原始标题" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }">{{ videoOriginalTitle(row) }}</template>
+            </el-table-column>
             <el-table-column v-if="isColumnVisible('thumbnail')" label="封面" width="96">
               <template #default="{ row }">
                 <div class="video-cover-cell">

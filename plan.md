@@ -582,3 +582,13 @@
 - 影响文件：`internal/config/config.go`、`internal/queue/archive_extract.go`、`main.go`、`admin-web/src/views/ToolboxArchiveImport.vue`。
 - 验证：`go build ./...`、`go test ./internal/config ./internal/queue`、`admin-web npm run build` 均通过。
 
+
+## 2026-10-16 09:43 +0800
+- 进度：管理端视频列表新增「原始标题」列。原始标题没有独立数据库列，只能从 `videos.metadata` JSONB 派生：刮削链路统一写入 `metadata.title_original`（`withLocalizedScrapeMetadata`，刮削确认/同步时落库），上传/Telegram/压缩包链路不写该键，仅有 `metadata.original_filename`。计划在列表 SQL 用 `metadata->>'title_original'` 带出，无该键时回退显示当前标题（而非空），避免把已等同的标题渲染成空列；同时新增 `original_title` 列设置项、窄屏归为 secondary。
+- 影响文件：`internal/models/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：待执行 `go test ./internal/repository -run 'TestAdminListVideos' -count=1`、`go vet ./internal/repository ./internal/models`、`npm test -- --run src/views/videoListPage.spec.js`、`npm run build`、`git diff --check`、乱码扫描。
+
+## 2026-10-16 09:55 +0800
+- 进度：管理端视频列表「原始标题」列完成。后端 `AdminVideoListItem` 新增 `OriginalTitle`，`AdminListVideos` 在既有列表 SQL 内以 `COALESCE(v.metadata->>'title_original','')` 带出，无需新增列或迁移；前端新增 `original_title` 列（默认可见、窄屏归为 secondary、可经列设置隐藏），取值 helper `videoOriginalTitle` 按 `original_title` → `metadata.title_original` → 当前标题回退，上传/Telegram/压缩包等未写原始标题的视频退化为当前标题而非空值。历史用户列设置的 localStorage 版本号从 `2` 提到 `3`，升级时补齐 `duration` 与 `original_title`。
+- 影响文件：`internal/models/admin.go`、`internal/repository/admin_repository.go`、`internal/repository/admin_repository_test.go`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/videoList.helpers.js`、`admin-web/src/views/videoList.helpers.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。未纳入既有未跟踪目录 `docs/examples/`。
+- 验证：`go build ./...`、`go vet ./internal/repository ./internal/models`、`go test ./internal/repository ./internal/models -count=1` 通过；`admin-web` `npx vitest run src/views/videoListPage.spec.js`（19/19）、`npx vitest run src/views/videoList.helpers.spec.js`（30/30）、`npm run build` 通过；`npm test` 全量仅 `src/views/precisionOpsRollout.spec.js` 视图清单用例失败，`git stash` 后复现为既有失败，与本任务无关。待提交。
