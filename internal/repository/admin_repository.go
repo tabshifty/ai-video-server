@@ -149,9 +149,7 @@ func (r *VideoRepository) AdminListVideos(ctx context.Context, f models.AdminVid
 	args = append(args, limit, offset)
 	// 列表大小口径：优先 transcoded_file_size（转码后大小），缺失时回落
 	// file_hashes.file_size（上传原始大小），两者都无则为 0，前端显示 --。
-	// 原始标题来自 metadata->>'title_original'（刮削链路在翻译写库前保存的原文标题）；
-	// 上传/Telegram/压缩包等链路不写该键，值为 NULL，前端回退展示当前标题。
-	listSQL := "SELECT v.id, v.title, COALESCE(v.metadata->>'title_original', ''), v.type, v.status, COALESCE(v.thumbnail_path,''), v.user_id, COALESCE(us.username,''), COALESCE(v.transcoded_file_size, (SELECT MAX(fh.file_size) FROM file_hashes fh WHERE fh.video_id = v.id), 0), COALESCE(v.duration_seconds, 0), v.created_at, v.updated_at FROM videos v LEFT JOIN users us ON us.id = v.user_id WHERE " + baseWhere + " ORDER BY " + adminVideoOrderClause(f.SortBy, f.SortOrder) + " LIMIT $" + fmt.Sprintf("%d", len(args)-1) + " OFFSET $" + fmt.Sprintf("%d", len(args))
+	listSQL := "SELECT v.id, v.title, v.type, v.status, COALESCE(v.thumbnail_path,''), v.user_id, COALESCE(us.username,''), COALESCE(v.transcoded_file_size, (SELECT MAX(fh.file_size) FROM file_hashes fh WHERE fh.video_id = v.id), 0), COALESCE(v.duration_seconds, 0), v.created_at, v.updated_at FROM videos v LEFT JOIN users us ON us.id = v.user_id WHERE " + baseWhere + " ORDER BY " + adminVideoOrderClause(f.SortBy, f.SortOrder) + " LIMIT $" + fmt.Sprintf("%d", len(args)-1) + " OFFSET $" + fmt.Sprintf("%d", len(args))
 	rows, err := r.pool.Query(ctx, listSQL, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("admin list videos: %w", err)
@@ -161,7 +159,7 @@ func (r *VideoRepository) AdminListVideos(ctx context.Context, f models.AdminVid
 	items := make([]models.AdminVideoListItem, 0, limit)
 	for rows.Next() {
 		var item models.AdminVideoListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.OriginalTitle, &item.Type, &item.Status, &item.Thumbnail, &item.UploadUserID, &item.UploadUser, &item.FileSize, &item.DurationSeconds, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Type, &item.Status, &item.Thumbnail, &item.UploadUserID, &item.UploadUser, &item.FileSize, &item.DurationSeconds, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan admin video: %w", err)
 		}
 		items = append(items, item)

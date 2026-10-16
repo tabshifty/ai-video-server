@@ -647,11 +647,6 @@ async function load() {
     expect(script).toContain("{ key: 'size', label: '大小' }")
     expect(template).toMatch(/<el-table-column\b(?=[^>]*isColumnVisible\('size'\))(?=[^>]*label="大小")[^>]*>/)
     expect(template).toContain('{{ formatFileSize(row.file_size) }}')
-    expect(script).toContain("{ key: 'original_title', label: '原始标题', secondary: true }")
-    expect(script).toContain("'title', 'original_title', 'thumbnail'")
-    expect(script).toContain("for (const key of ['duration', 'original_title'])")
-    expect(template).toMatch(/<el-table-column\b(?=[^>]*isColumnVisible\('original_title'\))(?=[^>]*label="原始标题")[^>]*>/)
-    expect(template).toContain('{{ videoOriginalTitle(row) }}')
   })
 
   it('三个 Drawer 复用中文关闭标题且继续由原有关闭守卫控制', () => {

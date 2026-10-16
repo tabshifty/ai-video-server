@@ -20,8 +20,7 @@ import {
   shouldShowVideoThumbnail,
   shouldShowStuckScrapeAction,
   subtitleUploadAccept,
-  teardownPreviewPlayer,
-  videoOriginalTitle
+  teardownPreviewPlayer
 } from './videoList.helpers'
 
 describe('videoList helpers', () => {
@@ -392,21 +391,6 @@ describe('videoList helpers', () => {
     expect(source).toContain('if (shiftKeyPressed.value && selectionAnchorIndex.value >= 0 && currentIndex >= 0)')
     expect(source).toContain('applySelectionByIDs(Array.from(selectedSet), selectionAnchorIndex.value)')
     expect(source).toContain('clearSelection()')
-  })
-
-  it('prefers the scraped original title and falls back to the current title', () => {
-    expect(videoOriginalTitle({
-      title: '中文标题',
-      original_title: 'Original English Title'
-    })).toBe('Original English Title')
-    expect(videoOriginalTitle({
-      title: '中文标题',
-      metadata: { title_original: 'Metadata Original Title' }
-    })).toBe('Metadata Original Title')
-    // 上传/Telegram/压缩包等链路不写原始标题，退化为当前标题而不是空值。
-    expect(videoOriginalTitle({ title: '仅当前标题', metadata: {} })).toBe('仅当前标题')
-    expect(videoOriginalTitle({ title: '  仅当前标题  ', metadata: null })).toBe('仅当前标题')
-    expect(videoOriginalTitle({})).toBe('')
   })
 
   it('keeps batch actions mutually exclusive and drawer preload guarded', () => {

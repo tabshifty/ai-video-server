@@ -233,15 +233,6 @@ export function teardownPreviewPlayer(player) {
   } catch (_) {}
 }
 
-// videoOriginalTitle：列表「原始标题」列取值口径。
-// 刮削链路会把原文标题写进 metadata.title_original，此时原始标题与当前标题可能不同
-// （当前标题多为中文翻译结果）；上传/Telegram/压缩包等链路不写该键，值退化为当前标题，
-// 让该列与「标题」列保持一致而不是显示空值。
-export function videoOriginalTitle(video) {
-  const metadata = video && typeof video.metadata === 'object' && video.metadata !== null ? video.metadata : {}
-  return toText(video?.original_title) || toText(metadata.title_original) || toText(video?.title)
-}
-
 export function nextDetailRequestToken(currentToken) {
   return Number(currentToken || 0) + 1
 }

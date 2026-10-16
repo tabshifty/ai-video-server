@@ -248,27 +248,6 @@ func TestAdminVideoOrderClause(t *testing.T) {
 	}
 }
 
-// TestAdminListVideosOriginalTitleSourceGuard：管理端视频列表直接带出原始标题，
-// 来源为 metadata->>'title_original'（刮削链路写入），无该键时为空串由前端兜底，
-// 避免前端为看原始标题逐行请求详情。
-func TestAdminListVideosOriginalTitleSourceGuard(t *testing.T) {
-	t.Parallel()
-
-	raw, err := os.ReadFile(filepath.Join(".", "admin_repository.go"))
-	if err != nil {
-		t.Fatalf("read admin repository source: %v", err)
-	}
-	list := functionSourceForTest(t, string(raw), "func (r *VideoRepository) AdminListVideos(")
-	for _, want := range []string{
-		"COALESCE(v.metadata->>'title_original', '')",
-		"&item.Title, &item.OriginalTitle, &item.Type",
-	} {
-		if !strings.Contains(list, want) {
-			t.Fatalf("AdminListVideos should contain %q:\n%s", want, list)
-		}
-	}
-}
-
 func functionSourceForTest(t *testing.T, source, signature string) string {
 	t.Helper()
 	start := strings.Index(source, signature)

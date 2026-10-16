@@ -35,11 +35,8 @@ type AVScraperSiteConfig struct {
 }
 
 type AdminVideoListItem struct {
-	ID    uuid.UUID `json:"id"`
-	Title string    `json:"title"`
-	// OriginalTitle 是刮削前的原始标题，来源为 metadata->>'title_original'
-	// （刮削链路写入），无该键时为空字符串，由前端决定展示兜底。
-	OriginalTitle   string     `json:"original_title"`
+	ID              uuid.UUID  `json:"id"`
+	Title           string     `json:"title"`
 	Type            string     `json:"type"`
 	Status          string     `json:"status"`
 	Thumbnail       string     `json:"thumbnail"`
