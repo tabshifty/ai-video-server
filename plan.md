@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-17 20:02 +0800 补充：重试后的 pending 任务也先查 115
+- 进度：`pending` 且 `retry_count > 0` 的任务（手动重试或失败重置）在提交前同样调用 `FindTask`；115 侧已有该任务时直接进入等待，避免对已完成的旧任务重复提交。新增 `TestProcessSkipsSubmitWhenRetriedPendingTaskExistsOn115`。
+- 影响文件：`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`plan.md`。
+- 验证：`go test ./internal/services -run 'TestProcessResubmits|TestProcessSkipsSubmit|TestProcessWritesBlocked|TestProcessBlocksWhenQuota|TestProcessDoesNotBlock|TestProcessSkipsTrigger|TestRetry|TestSubmitResets|TestReconcile|TestMarkFailed|TestFindDownloaded|TestExpectedDownload' -count=1` 通过（15 项云下载状态机/落盘测试）；`go build ./...` 通过。
+
 ## 2026-10-17 19:58 +0800 完成：115 云下载失败恢复与幂等修复
 - 进度：已按计划完成。① `submitting` 先查 115 是否已有该 info_hash，查到则直接等待、查不到才重新提交，消除一次 CDP/网络错误后的永久挂起；② `block`/`fail`/`MarkFailed` 使用 `context.WithoutCancel` + 10 秒写终态，asynq 最后一次重试失败时由 `HandleCloudDownload` 调用 `MarkFailed`；worker 启动及每 2 分钟对账非终态任务；③ `blocked` 在云下载页和论坛资源页均可直接重试；④ asynq 任务 ID 为 `cloud:download:<id>:<retry_count>`，重复入队返回 `ErrTaskIDConflict` 视为成功，新增 `download_triggered_at` 一次性触发标记与 migration 0043，手动重试清空标记；⑤ 落盘校验优先使用 115 返回大小，要求文件大小/mtime 稳定一个轮询周期，跳过常见临时后缀；⑥ 页面展开行展示错误信息/本地路径/pick_code/重试次数；⑦ 开启功能时校验 CDP URL 与端口，补齐 handler 404/409、docs/ADR/CONTEXT。
 - 影响文件：`internal/cloud/browser.go`、`internal/cloud/protocol.go`、`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`internal/repository/cloud_download_repository.go`、`internal/models/cloud_download.go`、`internal/queue/cloud_download.go`、`internal/queue/cloud_download_test.go`、`internal/queue/tasks.go`、`internal/handlers/admin_cloud_download.go`、`internal/config/config.go`、`internal/config/config_test.go`、`internal/config/config_cloud_download_test.go`、`main.go`、`migrations/0043_cloud_download_triggered.{up,down}.sql`、`admin-web/src/views/CloudDownloadList.vue`、`admin-web/src/views/cloudDownloadList.spec.js`、`admin-web/src/views/ForumPostList.vue`、`admin-web/src/views/ForumPostList.spec.js`、`CONTEXT.md`、`docs/adr/0028-explicit-cloud-download-from-forum-resources.md`、`docs/家用部署机.md`、`.gitignore`、`go.mod`、`plan.md`。

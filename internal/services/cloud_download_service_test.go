@@ -306,6 +306,52 @@ func TestProcessSkipsSubmitWhenSubmittingTaskExistsOn115(t *testing.T) {
 	}
 }
 
+func TestProcessSkipsSubmitWhenRetriedPendingTaskExistsOn115(t *testing.T) {
+	dir := t.TempDir()
+	writeDownloadFile(t, dir, "movie.zip", 5)
+	const hash = "0123456789abcdef0123456789abcdef"
+
+	repo := &fakeCloudRepo{
+		task: models.CloudDownloadTask{
+			ID:           13,
+			Status:       models.CloudDownloadPending,
+			RetryCount:   1,
+			InfoHash:     hash,
+			SourceURL:    "ed2k://|file|movie.zip|5|0123456789abcdef0123456789abcdef|/",
+			DeclaredName: "movie.zip",
+			DeclaredSize: int64Ptr(5),
+		},
+		triggerClaimed: true,
+	}
+	finished := &cloud.Task{
+		InfoHash: hash,
+		Name:     "movie.zip",
+		Size:     5,
+		Status:   "finished",
+		PickCode: "pick-code",
+		Percent:  100,
+	}
+	session := &fakeCloudSession{
+		quota:    cloud.Quota{Known: true, SurplusKnown: true, Surplus: 10},
+		findTask: finished,
+		waitTask: finished,
+	}
+	svc := newCloudTestService(repo, session, &fakeCloudEnqueuer{}, dir)
+
+	if err := svc.Process(context.Background(), 13); err != nil {
+		t.Fatalf("Process returned error: %v", err)
+	}
+	if session.finds != 1 {
+		t.Fatalf("FindTask calls = %d, want 1", session.finds)
+	}
+	if session.submitted != 0 {
+		t.Fatalf("submitted = %d, want 0 when 115 already has the retried task", session.submitted)
+	}
+	if repo.task.Status != models.CloudDownloadCompleted {
+		t.Fatalf("status = %q, want completed", repo.task.Status)
+	}
+}
+
 func TestProcessWritesBlockedStatusAfterCanceledWait(t *testing.T) {
 	repo := &fakeCloudRepo{
 		task: models.CloudDownloadTask{

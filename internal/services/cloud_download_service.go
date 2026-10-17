@@ -288,11 +288,13 @@ func (s *CloudDownloadService) Process(ctx context.Context, id int64) error {
 	}
 
 	// submitting means an earlier attempt was interrupted somewhere between
-	// SetStatus and the 115 response. Ask 115 first: if the task is already
-	// there (finished included), continue with waiting; otherwise re-submit.
-	// pending always submits, and 10008 keeps that idempotent.
+	// SetStatus and the 115 response. A retried pending row can also still be
+	// present on 115 after a manual retry. Ask 115 first: if the task is
+	// already there (finished included), continue with waiting; otherwise
+	// submit. A fresh pending row skips the lookup and relies on 10008.
 	submitNeeded := task.Status == models.CloudDownloadPending
-	if task.Status == models.CloudDownloadSubmitting {
+	if task.Status == models.CloudDownloadSubmitting ||
+		(task.Status == models.CloudDownloadPending && task.RetryCount > 0) {
 		existing, findErr := session.FindTask(ctx, task.InfoHash)
 		if findErr != nil {
 			return findErr // transient: retry the lookup on the next attempt
