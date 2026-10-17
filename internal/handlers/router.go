@@ -76,6 +76,7 @@ type API struct {
 	hermesForumSvc        hermesForumService
 	telegramManagementSvc telegramManagementService
 	cloudDownload         cloudDownloadService
+	cloudDownloadImport   cloudDownloadImportService
 	tvAPKSvc              tvAPKService
 	iptvSvc               iptvService
 	enqueuer              taskEnqueuer
@@ -336,6 +337,8 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/cloud-downloads/status", a.AdminCloudDownloadStatuses)
 			admin.POST("/cloud-downloads/batch", a.AdminCloudDownloadBatchCreate)
 			admin.POST("/cloud-downloads/:id/retry", a.AdminCloudDownloadRetry)
+			admin.POST("/cloud-downloads/:id/import/preview", a.AdminCloudDownloadImportPreview)
+			admin.POST("/cloud-downloads/:id/import", a.AdminCloudDownloadImport)
 			admin.GET("/cloud-downloads/browser", a.AdminCloudDownloadBrowser)
 			admin.GET("/cloud-downloads/login-qr", a.AdminCloudDownloadLoginQR)
 			admin.POST("/system/orphan-files/scan", a.AdminStartOrphanFileScan)

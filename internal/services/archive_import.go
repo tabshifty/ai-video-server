@@ -135,11 +135,14 @@ func (s *ArchiveImportService) ProcessExtractTask(ctx context.Context, batchID u
 	return nil
 }
 
-func (s *ArchiveImportService) enqueueArchiveExtract(ctx context.Context, batchID uuid.UUID, batch models.ArchiveImportBatch, password string) error {
+func (s *ArchiveImportService) enqueueArchiveExtract(ctx context.Context, batchID uuid.UUID, batch models.ArchiveImportBatch, password, requestedMode string) error {
 	if s.enqueuer == nil {
 		return fmt.Errorf("archive extract queue unavailable")
 	}
-	if err := s.updateArchiveBatchExtractFailure(ctx, batchID, "extracting", "", batch.EncodingRequestedMode); err != nil {
+	if strings.TrimSpace(requestedMode) == "" {
+		requestedMode = batch.EncodingRequestedMode
+	}
+	if err := s.updateArchiveBatchExtractFailure(ctx, batchID, "extracting", "", requestedMode); err != nil {
 		return err
 	}
 	return s.enqueuer.EnqueueArchiveExtract(batchID, password)
@@ -412,9 +415,104 @@ func (s *ArchiveImportService) UploadArchive(ctx context.Context, in ArchiveImpo
 		return models.ArchiveImportBatch{}, err
 	}
 
-	if err := s.enqueueArchiveExtract(ctx, batchID, batch, passwordForInput(in)); err != nil {
+	if err := s.enqueueArchiveExtract(ctx, batchID, batch, passwordForInput(in), batch.EncodingRequestedMode); err != nil {
 		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), batch.EncodingRequestedMode)
 		return models.ArchiveImportBatch{}, err
+	}
+
+	refreshed, err := s.GetBatch(ctx, batchID)
+	if err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	return refreshed, nil
+}
+
+// ImportLocalArchive creates a batch from a local file that was not uploaded
+// through multipart, such as a completed cloud download. The source is copied
+// into the batch original directory, so the batch never references or deletes
+// the download directory.
+func (s *ArchiveImportService) ImportLocalArchive(ctx context.Context, in ArchiveImportUploadInput, sourcePath string) (models.ArchiveImportBatch, error) {
+	sourcePath = strings.TrimSpace(sourcePath)
+	if sourcePath == "" {
+		return models.ArchiveImportBatch{}, fmt.Errorf("archive source path is required")
+	}
+	info, err := os.Stat(sourcePath)
+	if err != nil {
+		return models.ArchiveImportBatch{}, fmt.Errorf("stat archive source: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return models.ArchiveImportBatch{}, fmt.Errorf("archive source is not a regular file")
+	}
+	filename := filepath.Base(sourcePath)
+	format, err := detectArchiveFormat(filename)
+	if err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	if in.HasPassword && strings.TrimSpace(in.Password) == "" {
+		return models.ArchiveImportBatch{}, fmt.Errorf("archive password is required")
+	}
+
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		title = strings.TrimSuffix(filename, filepath.Ext(filename))
+		if title == "" {
+			title = "untitled"
+		}
+	}
+	batchID := uuid.New()
+	batchRoot := filepath.Join(s.storageRoot, "archive-imports", batchID.String())
+	originalDir := filepath.Join(batchRoot, "original")
+	extractedDir := filepath.Join(batchRoot, "extracted")
+	if err := os.MkdirAll(originalDir, 0o755); err != nil {
+		return models.ArchiveImportBatch{}, fmt.Errorf("create archive original dir: %w", err)
+	}
+
+	originalFilename := filename
+	if originalFilename == "." || originalFilename == string(filepath.Separator) || originalFilename == "" {
+		originalFilename = batchID.String() + "." + format
+	}
+	originalPath := filepath.Join(originalDir, originalFilename)
+	tempPath := originalPath + ".part"
+	if err := ffmpeg.CopyFile(tempPath, sourcePath); err != nil {
+		_ = os.Remove(tempPath)
+		_ = os.RemoveAll(batchRoot)
+		return models.ArchiveImportBatch{}, fmt.Errorf("copy archive to storage: %w", err)
+	}
+	if err := os.Rename(tempPath, originalPath); err != nil {
+		_ = os.Remove(tempPath)
+		_ = os.RemoveAll(batchRoot)
+		return models.ArchiveImportBatch{}, fmt.Errorf("finalize archive copy: %w", err)
+	}
+
+	batch := models.ArchiveImportBatch{
+		ID:                        batchID,
+		UserID:                    &in.UserID,
+		Title:                     title,
+		OriginalFilename:          filename,
+		ArchiveFormat:             format,
+		OriginalPath:              originalPath,
+		ExtractedDir:              extractedDir,
+		Status:                    "uploaded",
+		LastError:                 "",
+		EncodingMode:              "",
+		EncodingRequestedMode:     archiveEncodingAuto,
+		DefaultTitlePrefix:        title,
+		DefaultDescription:        strings.TrimSpace(in.DefaultDescription),
+		DefaultTags:               normalizeArchiveTags(in.DefaultTags),
+		DefaultVideoCollectionIDs: dedupeArchiveUUIDs(in.DefaultVideoCollectionIDs),
+		DefaultImageCollectionIDs: dedupeArchiveUUIDs(in.DefaultImageCollectionIDs),
+	}
+	if err := s.insertArchiveBatch(ctx, batch); err != nil {
+		_ = os.RemoveAll(batchRoot)
+		return models.ArchiveImportBatch{}, err
+	}
+
+	if err := s.enqueueArchiveExtract(ctx, batchID, batch, passwordForInput(in), batch.EncodingRequestedMode); err != nil {
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), batch.EncodingRequestedMode)
+		if refreshed, getErr := s.GetBatch(ctx, batchID); getErr == nil {
+			return refreshed, err
+		}
+		return batch, err
 	}
 
 	refreshed, err := s.GetBatch(ctx, batchID)
@@ -650,6 +748,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			CollectionIDs:     videoCollections,
 			ImageCollectionID: videoImageCollectionID,
 			Hash:              hash,
+			HashVerified:      true,
 		})
 		if err != nil {
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
@@ -672,6 +771,8 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			CollectionIDs:     videoCollections,
 			ImageCollectionID: videoImageCollectionID,
 			Hash:              hash,
+			HashVerified:      true,
+			VideoID:           resultPreview.VideoID,
 		}, 0)
 		if err != nil {
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
@@ -847,7 +948,7 @@ func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UU
 	if err := os.RemoveAll(batch.ExtractedDir); err != nil && !os.IsNotExist(err) {
 		return models.ArchiveImportBatch{}, fmt.Errorf("clear archive extracted dir: %w", err)
 	}
-	if err := s.enqueueArchiveExtract(ctx, batchID, batch, strings.TrimSpace(password)); err != nil {
+	if err := s.enqueueArchiveExtract(ctx, batchID, batch, strings.TrimSpace(password), requestedMode); err != nil {
 		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
 		return models.ArchiveImportBatch{}, err
 	}

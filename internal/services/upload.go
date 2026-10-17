@@ -68,7 +68,13 @@ type LocalUploadInput struct {
 	ImageCollectionID *uuid.UUID
 	SiteCategory      string
 	Hash              string
-	Metadata          map[string]any
+	// HashVerified means Hash was calculated by the caller from FilePath, so
+	// Preview/Save must not re-read the file to hash it again.
+	HashVerified bool
+	// VideoID lets an importer reserve the storage directory before Save.
+	// Zero means SaveUploadedFile generates a new id as usual.
+	VideoID  uuid.UUID
+	Metadata map[string]any
 }
 
 func NewUploadService(repo *repository.VideoRepository, uploadDir, storageRoot string, logger *slog.Logger) *UploadService {
@@ -83,12 +89,9 @@ func (s *UploadService) PreviewUploadedFile(ctx context.Context, in LocalUploadI
 	if err != nil {
 		return UploadPreview{}, fmt.Errorf("stat uploaded file: %w", err)
 	}
-	serverHash, err := hashutil.SHA256(in.FilePath)
+	serverHash, err := s.resolveUploadHash(in)
 	if err != nil {
-		return UploadPreview{}, fmt.Errorf("calculate file hash: %w", err)
-	}
-	if !strings.EqualFold(strings.TrimSpace(in.Hash), serverHash) {
-		return UploadPreview{}, ErrHashMismatch
+		return UploadPreview{}, err
 	}
 	if existingID, exists, err := s.repo.FindVideoByHash(ctx, serverHash, info.Size()); err != nil {
 		return UploadPreview{}, err
@@ -128,12 +131,9 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 	if maxVideoSize > 0 && info.Size() > maxVideoSize {
 		return UploadResult{}, ErrFileTooLarge
 	}
-	serverHash, err := hashutil.SHA256(in.FilePath)
+	serverHash, err := s.resolveUploadHash(in)
 	if err != nil {
-		return UploadResult{}, fmt.Errorf("calculate file hash: %w", err)
-	}
-	if !strings.EqualFold(strings.TrimSpace(in.Hash), serverHash) {
-		return UploadResult{}, ErrHashMismatch
+		return UploadResult{}, err
 	}
 	siteCategory := normalizeAVSiteCategory(in.SiteCategory)
 	if in.Type == "av" && siteCategory == "" {
@@ -181,7 +181,10 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 		return UploadResult{}, err
 	}
 
-	videoID := uuid.New()
+	videoID := in.VideoID
+	if videoID == uuid.Nil {
+		videoID = uuid.New()
+	}
 	osHash := ""
 	if in.Type == "av" && siteCategory == avSiteCategoryWestern {
 		if h, err := oshash.Compute(in.FilePath); err == nil {
@@ -293,6 +296,24 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 		TargetFormat:  "mp4",
 		OSHash:        osHash,
 	}, nil
+}
+
+func (s *UploadService) resolveUploadHash(in LocalUploadInput) (string, error) {
+	if in.HashVerified {
+		serverHash := strings.ToLower(strings.TrimSpace(in.Hash))
+		if serverHash == "" {
+			return "", ErrInvalidUpload
+		}
+		return serverHash, nil
+	}
+	serverHash, err := hashutil.SHA256(in.FilePath)
+	if err != nil {
+		return "", fmt.Errorf("calculate file hash: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(in.Hash), serverHash) {
+		return "", ErrHashMismatch
+	}
+	return serverHash, nil
 }
 
 func (s *UploadService) setExistingVideoImageCollectionIfEmpty(ctx context.Context, existingID uuid.UUID, existingVideo models.Video, imageCollectionID *uuid.UUID) error {

@@ -371,6 +371,26 @@ func TestCloudDownloadSourceMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+source`)
 }
 
+func TestCloudDownloadImportsMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0045_cloud_download_imports.up.sql")
+	down := readMigrationForTest(t, "0045_cloud_download_imports.down.sql")
+
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+cloud_download_imports`)
+	assertSQLPattern(t, up, `(?is)id\s+bigserial\s+primary\s+key`)
+	assertSQLPattern(t, up, `(?is)task_id\s+bigint\s+not\s+null\s+unique\s+references\s+cloud_download_tasks\s*\(\s*id\s*\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, up, `(?is)kind\s+text\s+not\s+null\s+check\s*\(\s*kind\s+in\s*\(\s*'video'\s*,\s*'archive'\s*\)\s*\)`)
+	assertSQLPattern(t, up, `(?is)'queued'.*'hashing'.*'copying'.*'creating'.*'imported'.*'skipped_existing'.*'failed'`)
+	assertSQLPattern(t, up, `(?is)video_id\s+uuid\s+references\s+videos\s*\(\s*id\s*\)\s+on\s+delete\s+set\s+null`)
+	assertSQLPattern(t, up, `(?is)archive_batch_id\s+uuid\s+references\s+archive_import_batches\s*\(\s*id\s*\)\s+on\s+delete\s+set\s+null`)
+	assertSQLPattern(t, up, `(?is)attempt\s+integer\s+not\s+null\s+default\s+0`)
+	assertSQLPattern(t, up, `(?is)source_size\s+bigint`)
+	assertSQLPattern(t, up, `(?is)sha256\s+char\s*\(\s*64\s*\)`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+cloud_download_imports_status_idx\s+on\s+cloud_download_imports\s*\(\s*status\s*\)`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+cloud_download_imports`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

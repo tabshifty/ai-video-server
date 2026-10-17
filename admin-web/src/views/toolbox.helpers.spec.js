@@ -80,6 +80,12 @@ describe('toolbox ed2k helpers', () => {
   it('extracts backend error messages from the response envelope', () => {
     expect(extractApiErrorMessage({ response: { data: { msg: '云下载功能未启用' } } }, 'fallback'))
       .toBe('云下载功能未启用')
+    expect(extractApiErrorMessage({ response: { status: 404 } }, 'fallback')).toBe('云下载功能未启用')
+    expect(extractApiErrorMessage({ response: { status: 503 } }, 'fallback')).toBe('云下载功能未启用')
+    expect(extractApiErrorMessage({ code: 404, message: 'cloud: not found' }, 'fallback'))
+      .toBe('云下载功能未启用')
+    expect(extractApiErrorMessage({ code: 503, message: '云下载导入功能未启用' }, 'fallback'))
+      .toBe('云下载功能未启用')
     expect(extractApiErrorMessage({ message: 'network down' }, 'fallback')).toBe('network down')
     expect(extractApiErrorMessage({}, 'fallback')).toBe('fallback')
   })

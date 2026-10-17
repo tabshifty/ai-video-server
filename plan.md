@@ -1,5 +1,18 @@
 # plan.md
 
+## 2026-10-18 01:21 +0800 实施完成/评审修复：云下载任务显式导入媒体库
+- 进度：后端、前端、迁移、文档已完成，独立评审的阻塞/重要问题已修复并复验。新增 `cloud:ingest`（`cloud` 队列，2h/2 retry，TaskID 含 import id + attempt）与 `cloud_download_imports`（task_id 唯一，状态 queued/hashing/copying/creating/imported/skipped_existing/failed，UUID FK）；服务端 preview/import，任务列表 import 摘要；视频 SHA-256/size 查重、hash 命中（含 pending_delete）删下载源不改已有视频、未命中复制到 `STORAGE_ROOT/videos/<videoID>/source-original`、建 videos 入现有队列、转码成功删导入源（DV `source-dv` 播放产物保留）；压缩包复制到 `archive-imports/<batchID>/original`、异步解包、工具箱处理，批次删除不触碰 DOWNLOAD_DIR；修 `RetryExtract` encoding_mode。
+- 评审修复：`Process`/`MarkFailed` 校验 payload attempt，旧 asynq 重试不再覆盖新尝试；活动导入 10 分钟后 UI 允许“重新导入”，后端用同一 attempt/TaskID 幂等补投（队列丢失可自救，表单需重填）；视频 `SaveImportedFile` 成功但 `video_id` 未回写时按 metadata `source=cloud_download`+`cloud_task_id` 走 resume，不误判 skipped；压缩包重试只有 uploaded/failed 才 RetryExtract，已入队/已解包批次只关联完成；补 copy 父目录、ready 孤儿源清理、target 缺失时非 ready/processing 失败保源、sha256 持久化。
+- 影响文件：`migrations/0045_cloud_download_imports.{up,down}.sql`、`internal/models/cloud_download_import.go`、`internal/repository/cloud_download_import_repository.go`、`internal/services/cloud_download_import_service.go`、`internal/queue/cloud_ingest.go`、`internal/handlers/admin_cloud_download_import.go`、`internal/handlers/router.go`、`internal/queue/tasks.go`、`internal/services/{upload,archive_import,cloud_download_service}.go`、`main.go`、`admin-web/src/{api/admin.js,views/CloudDownloadList.vue,views/cloudDownloadImport.helpers.js,components/CloudDownloadImportDialog.vue}` 及测试、`CONTEXT.md`、`docs/adr/0028`、`docs/adr/0030`、`docs/家用部署机.md`。
+- 验证：`go build ./...`；`go test ./... -skip 'TestParseTVAPKMetadataParsesReleaseAPK'`（全绿；历史 APK 测试仍失败，已知）；前端 `npm test -- --run` 51 文件 772 测试通过，`npm run build` 成功；`gofmt`/`git diff --check` 干净。未跑真实 115/ffprobe 端到端，未部署。
+- 残余风险：无独立 import reconciler（活动记录靠 10 分钟重新提交自救）；`SetArchiveBatch` 失败时批次已创建但未关联，重试可能产生第二个批次；弹窗未加“新建合集/图片合集”入口；本次收尾提交包含以上改动，未部署。
+
+## 2026-10-18 00:55 +0800 计划/实施：云下载任务显式导入媒体库
+- 进度：grilling 已收口，开始实现。入口只在 CloudDownloadList 的 completed 单文件；点击“入媒体库”后端探测实际文件，视频/压缩包分流；异步 `cloud:ingest` + `cloud_download_imports`（task_id 唯一，状态 queued/hashing/copying/creating/imported/skipped_existing/failed，2h/2 retry）。视频先 SHA-256 + size，hash 命中不判断类型、关联已有视频并直接删除下载原文件（含 pending_delete）；未命中复制到 `STORAGE_ROOT/videos/<videoID>/source-original`，建 videos 并入现有转码/刮削，转码成功删除导入源文件（DV 的 `source-dv` 是播放产物，保留；original_path 若已 move 成播放路径则跳过），失败保留。压缩包新增本地文件入口，复制到 `STORAGE_ROOT/archive-imports/<batchID>/original`，异步解包，工具箱继续处理，永不把 DOWNLOAD_DIR 写进批次 original_path。一次性/失败重试；不自动、不等待转码/解压；不做多文件/目录/ISO；顺手修 RetryExtract encoding_mode。
+- 影响文件：迁移 0045、models/repository/services/queue/handlers/main、admin-web CloudDownloadList/两个弹窗/admin.js/tests、CONTEXT/ADR 0028/0030/部署文档。
+- 验证：待后端/前端完成，执行 go build/定向测试、admin tests/build、独立评审。
+- 备注：部署机尚未更新。
+
 ## 2026-10-17 23:58 +0800 评审修复：无效结果映射、确认框无效计数与并发重试
 - 进度：第二轮独立评审提出两个阻塞项并已修复。无效项只按 info_hash/link 单键索引，导致前端用 hash 查不到后端 invalid 结果、不显示“无效”也不保持勾选；现 `indexCloudBatchItems` 同时登记 info_hash、原始 link 和 link 解析出的 hash。确认框缺少“无效”且无 hash 项被计为“新提交”；现 `summarizeEd2kBatchSelection` 分离无 hash 的 invalid，确认框显示无效/重复/将提交/已存在/重试，并列出被忽略的非 ED2K 行，invalid 不再计入新提交。
 - 重要项：`BumpRetry` 改为 `WHERE status IN ('failed','blocked')` 并返回 RowsAffected；并发重试已被抢占时 `Submit`/`Retry` 不再二次入队。部分失败/无效的结果提示从 success 改为 warning。`CLOUD_DOWNLOAD_QUEUE` 增加 asynq 队列名字符校验。修正 handler 路由注释。补 50 条接受/503、50 条 service、状态查询失败、source 不覆盖、并发抢占、invalid 映射与确认计数测试。

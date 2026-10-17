@@ -36,7 +36,19 @@ type fakeCloudRepo struct {
 	unfinished        []models.CloudDownloadTask
 	statusByHash      map[string]models.CloudDownloadStatus
 	statusErr         error
+	listTasks         []models.CloudDownloadTask
 	setStatusHook     func(ctx context.Context, status string) error
+}
+
+type fakeCloudImportSummaryRepo struct {
+	summaries map[int64]models.CloudDownloadImportSummary
+	err       error
+	gotIDs    []int64
+}
+
+func (f *fakeCloudImportSummaryRepo) ListSummariesByTaskIDs(_ context.Context, taskIDs []int64) (map[int64]models.CloudDownloadImportSummary, error) {
+	f.gotIDs = append([]int64(nil), taskIDs...)
+	return f.summaries, f.err
 }
 
 func (f *fakeCloudRepo) CreateOrGet(_ context.Context, task models.CloudDownloadTask) (models.CloudDownloadTask, bool, error) {
@@ -59,7 +71,7 @@ func (f *fakeCloudRepo) GetByID(_ context.Context, _ int64) (models.CloudDownloa
 }
 
 func (f *fakeCloudRepo) List(_ context.Context, _ string, _, _ int) ([]models.CloudDownloadTask, int, error) {
-	return nil, 0, nil
+	return f.listTasks, len(f.listTasks), nil
 }
 
 func (f *fakeCloudRepo) StatusByHashes(_ context.Context, _ []string) (map[string]models.CloudDownloadStatus, error) {
@@ -860,6 +872,38 @@ func TestSubmitBatchRejectsEmptyAndOversizedRequests(t *testing.T) {
 	}
 	if _, err := svc.SubmitBatch(context.Background(), links, nil); err == nil {
 		t.Fatalf("SubmitBatch(%d links) returned nil error", len(links))
+	}
+}
+
+func TestListAttachesImportSummary(t *testing.T) {
+	t.Parallel()
+
+	videoID := uuid.New()
+	repo := &fakeCloudRepo{listTasks: []models.CloudDownloadTask{{ID: 1}, {ID: 2}}}
+	summaries := &fakeCloudImportSummaryRepo{summaries: map[int64]models.CloudDownloadImportSummary{
+		1: {ID: 9, Kind: models.CloudImportKindVideo, Status: models.CloudImportImported, VideoID: &videoID},
+	}}
+	svc := &CloudDownloadService{repo: repo}
+	svc.SetImportSummaryRepository(summaries)
+
+	tasks, total, err := svc.List(context.Background(), "", 1, 20)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if total != 2 || len(tasks) != 2 {
+		t.Fatalf("total = %d tasks = %d", total, len(tasks))
+	}
+	if tasks[0].Import == nil || tasks[0].Import.Status != models.CloudImportImported {
+		t.Fatalf("task 1 import = %+v", tasks[0].Import)
+	}
+	if tasks[0].Import.VideoID == nil || *tasks[0].Import.VideoID != videoID {
+		t.Fatalf("task 1 import video = %v", tasks[0].Import.VideoID)
+	}
+	if tasks[1].Import != nil {
+		t.Fatalf("task 2 import = %+v, want nil", tasks[1].Import)
+	}
+	if len(summaries.gotIDs) != 2 || summaries.gotIDs[0] != 1 || summaries.gotIDs[1] != 2 {
+		t.Fatalf("summary ids = %v", summaries.gotIDs)
 	}
 }
 

@@ -243,5 +243,7 @@ export const createCloudDownload = (data) => request.post('/admin/cloud-download
 export const createCloudDownloadBatch = (links) => request.post('/admin/cloud-downloads/batch', { links })
 export const cloudDownloadStatuses = (infoHashes) => request.post('/admin/cloud-downloads/status', { info_hashes: infoHashes })
 export const retryCloudDownload = (id) => request.post(`/admin/cloud-downloads/${id}/retry`)
+export const previewCloudDownloadImport = (id) => request.post(`/admin/cloud-downloads/${id}/import/preview`)
+export const importCloudDownload = (id, payload) => request.post(`/admin/cloud-downloads/${id}/import`, payload)
 export const getCloudBrowserState = () => request.get('/admin/cloud-downloads/browser')
 export const getCloudLoginQR = () => request.get('/admin/cloud-downloads/login-qr')

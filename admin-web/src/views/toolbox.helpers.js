@@ -114,7 +114,15 @@ export function dedupeEd2kLinksByInfoHash(links) {
 }
 
 export function extractApiErrorMessage(error, fallback = '操作失败') {
-  if (error?.response?.status === 404) {
+  // 后端统一用 HTTP 200 包裹业务 code；路由未注册时才是 HTTP 404/503。
+  const httpStatus = Number(error?.response?.status)
+  const businessCode = Number(error?.code)
+  if (
+    httpStatus === 404
+    || httpStatus === 503
+    || businessCode === 404
+    || businessCode === 503
+  ) {
     return '云下载功能未启用'
   }
   const responseMessage = error?.response?.data?.msg

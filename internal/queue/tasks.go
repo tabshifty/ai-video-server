@@ -30,6 +30,7 @@ const (
 	TypeOrphanFileScan = "system:orphan-files:scan"
 	TypeArchiveExtract = "archive:extract"
 	TypeCloudDownload  = "cloud:download"
+	TypeCloudIngest    = "cloud:ingest"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -108,6 +109,7 @@ type Processor struct {
 	uploadGC      bool
 	archiveImport ArchiveExtractService
 	cloudDownload CloudDownload
+	cloudImport   CloudDownloadImport
 }
 
 type ArchiveExtractService interface {
@@ -132,6 +134,9 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeArchiveExtract, p.HandleArchiveExtract)
 	if p.cloudDownload != nil {
 		mux.HandleFunc(TypeCloudDownload, p.HandleCloudDownload)
+	}
+	if p.cloudImport != nil {
+		mux.HandleFunc(TypeCloudIngest, p.HandleCloudIngest)
 	}
 }
 
@@ -242,6 +247,11 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 		if err := p.repo.FinishTranscodingJob(ctx, jobID, "success", ""); err != nil {
 			return err
 		}
+		if shouldDeleteSourceAfterTranscode(video) {
+			// The preserved source-dv file is the playable output, so this only
+			// removes a still-existing imported source-original copy.
+			p.removeImportedSourceAfterTranscode(video, result.TranscodedPath)
+		}
 		p.logger.Info("dv direct copy completed", "video_id", videoID, "output", result.TranscodedPath)
 		return nil
 	}
@@ -295,7 +305,7 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	if err := p.repo.FinishTranscodingJob(ctx, jobID, "success", ""); err != nil {
 		return err
 	}
-	if p.uploadGC && !shouldPreserveEpisodeDolbyVisionSource(video.Type, sourcePlaybackProbe, sourcePlaybackProbeErr) {
+	if (p.uploadGC || shouldDeleteSourceAfterTranscode(video)) && !shouldPreserveEpisodeDolbyVisionSource(video.Type, sourcePlaybackProbe, sourcePlaybackProbeErr) {
 		_ = os.Remove(video.OriginalPath)
 	}
 
@@ -553,6 +563,28 @@ func stringFromAny(value any) string {
 
 func shouldPreserveEpisodeDolbyVisionSource(videoType string, sourceProbe ffmpegpkg.PlaybackCompatibilityProbe, sourceProbeErr error) bool {
 	return strings.EqualFold(strings.TrimSpace(videoType), "episode") && sourceProbeErr == nil && sourceProbe.VideoStreamFound && sourceProbe.DolbyVision
+}
+
+// shouldDeleteSourceAfterTranscode reports whether an importer explicitly
+// asked for the original source file to be removed after a successful
+// transcode. Cloud downloads set this; regular uploads keep their status quo.
+func shouldDeleteSourceAfterTranscode(video models.Video) bool {
+	value, ok := decodeMetadataMap(video.Metadata)["delete_source_after_transcode"].(bool)
+	return ok && value
+}
+
+func (p *Processor) removeImportedSourceAfterTranscode(video models.Video, playbackPath string) {
+	sourcePath := strings.TrimSpace(video.OriginalPath)
+	if sourcePath == "" {
+		return
+	}
+	if strings.TrimSpace(playbackPath) != "" && services.IsSameFilePath(sourcePath, playbackPath) {
+		// Never delete the playable source-dv output.
+		return
+	}
+	if err := os.Remove(sourcePath); err != nil && !os.IsNotExist(err) {
+		p.logger.Warn("remove imported source after transcode failed", "video_id", video.ID, "path", sourcePath, "error", err)
+	}
 }
 
 func moveFilePreservingSource(srcPath, dstPath string) error {

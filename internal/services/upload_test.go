@@ -54,6 +54,27 @@ func TestShouldRefreshExistingVideoOriginalPath(t *testing.T) {
 	}
 }
 
+func TestResolveUploadHashReusesVerifiedHash(t *testing.T) {
+	t.Parallel()
+
+	service := &UploadService{}
+	hash, err := service.resolveUploadHash(LocalUploadInput{
+		FilePath:     "/path/that/does/not/exist.mkv",
+		Hash:         "AABBCC",
+		HashVerified: true,
+	})
+	if err != nil {
+		t.Fatalf("resolveUploadHash() error = %v", err)
+	}
+	if hash != "aabbcc" {
+		t.Fatalf("hash = %q, want aabbcc", hash)
+	}
+
+	if _, err := service.resolveUploadHash(LocalUploadInput{HashVerified: true}); !errors.Is(err, ErrInvalidUpload) {
+		t.Fatalf("empty verified hash error = %v, want ErrInvalidUpload", err)
+	}
+}
+
 func TestSaveImportedFileRejectsInvalidType(t *testing.T) {
 	t.Parallel()
 

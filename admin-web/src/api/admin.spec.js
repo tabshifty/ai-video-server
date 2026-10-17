@@ -63,10 +63,12 @@ import {
   getAdminTVAppReleases,
   getAdminVideoSubtitles,
   getLatestOrphanFileScan,
+  importCloudDownload,
   keepAdminPendingDeleteShort,
   markAdminShortVideoPendingDelete,
   offlineAdminTVAppRelease,
   pauseAdminTelegramSource,
+  previewCloudDownloadImport,
   publishAdminTVAppRelease,
   processAdminArchiveImportBatch,
   processAdminArchiveImportFile,
@@ -697,5 +699,54 @@ describe('cloud download batch api', () => {
     expect(post).toHaveBeenCalledWith('/admin/cloud-downloads/batch', {
       links: ['ed2k://a', 'ed2k://b']
     })
+  })
+})
+
+describe('cloud download import apis', () => {
+  beforeEach(() => {
+    post.mockReset()
+    post.mockResolvedValue({ ok: true })
+  })
+
+  it('previews the selected cloud download task import type', async () => {
+    await previewCloudDownloadImport(42)
+
+    expect(post).toHaveBeenCalledWith('/admin/cloud-downloads/42/import/preview')
+  })
+
+  it('posts a video import body to the task import endpoint', async () => {
+    const payload = {
+      kind: 'video',
+      type: 'short',
+      site_category: '',
+      title: '标题',
+      description: '描述',
+      tags: ['标签'],
+      actor_ids: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
+      actor_names: ['新演员'],
+      collection_ids: ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
+      image_collection_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    }
+
+    await importCloudDownload(42, payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/cloud-downloads/42/import', payload)
+  })
+
+  it('posts an archive import body with password fields', async () => {
+    const payload = {
+      kind: 'archive',
+      title: '压缩包标题',
+      default_description: '说明',
+      default_tags: ['标签'],
+      default_video_collection_ids: ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
+      default_image_collection_ids: ['cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+      has_password: true,
+      password: 'secret'
+    }
+
+    await importCloudDownload(42, payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/cloud-downloads/42/import', payload)
   })
 })

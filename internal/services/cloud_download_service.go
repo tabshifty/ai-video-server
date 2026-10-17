@@ -55,9 +55,17 @@ type cloudSession interface {
 
 type cloudSessionProvider func(ctx context.Context) (cloudSession, cloud.State, error)
 
+// cloudDownloadImportSummaryRepository supplies the compact import view for
+// task list rows. It is optional so the download service keeps working when
+// the import feature is not wired (tests, older deployments).
+type cloudDownloadImportSummaryRepository interface {
+	ListSummariesByTaskIDs(ctx context.Context, taskIDs []int64) (map[int64]models.CloudDownloadImportSummary, error)
+}
+
 // CloudDownloadService orchestrates parse -> 115 submit -> 115 wait -> download.
 type CloudDownloadService struct {
 	repo             cloudDownloadRepository
+	importSummaries  cloudDownloadImportSummaryRepository
 	client           *cloud.Client
 	downloadDir      string
 	enqueuer         CloudDownloadEnqueuer
@@ -96,6 +104,11 @@ func NewCloudDownloadService(
 		}
 	}
 	return svc
+}
+
+// SetImportSummaryRepository attaches the optional import summary lookup.
+func (s *CloudDownloadService) SetImportSummaryRepository(repo cloudDownloadImportSummaryRepository) {
+	s.importSummaries = repo
 }
 
 // Submit parses a link, records the task (deduplicated by info hash) and
@@ -352,9 +365,34 @@ func (s *CloudDownloadService) Get(ctx context.Context, id int64) (models.CloudD
 	return s.repo.GetByID(ctx, id)
 }
 
-// List returns a filtered page.
+// List returns a filtered page, decorated with explicit import summaries.
 func (s *CloudDownloadService) List(ctx context.Context, status string, page, pageSize int) ([]models.CloudDownloadTask, int, error) {
-	return s.repo.List(ctx, status, page, pageSize)
+	tasks, total, err := s.repo.List(ctx, status, page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	s.attachImportSummaries(ctx, tasks)
+	return tasks, total, nil
+}
+
+func (s *CloudDownloadService) attachImportSummaries(ctx context.Context, tasks []models.CloudDownloadTask) {
+	if s.importSummaries == nil || len(tasks) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(tasks))
+	for _, task := range tasks {
+		ids = append(ids, task.ID)
+	}
+	summaries, err := s.importSummaries.ListSummariesByTaskIDs(ctx, ids)
+	if err != nil {
+		s.logWarn("load cloud download import summaries failed", "error", err)
+		return
+	}
+	for index := range tasks {
+		if summary, ok := summaries[tasks[index].ID]; ok {
+			tasks[index].Import = &summary
+		}
+	}
 }
 
 // StatusByHashes returns the compact status map for the forum list.

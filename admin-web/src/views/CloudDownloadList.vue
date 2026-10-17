@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
@@ -7,16 +8,25 @@ import EmptyState from '../components/base/EmptyState.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import StatusIndicator from '../components/base/StatusIndicator.vue'
 import Toolbar from '../components/base/Toolbar.vue'
+import CloudDownloadImportDialog from '../components/CloudDownloadImportDialog.vue'
 import {
   getCloudBrowserState,
   getCloudLoginQR,
   listCloudDownloads,
+  previewCloudDownloadImport,
   retryCloudDownload
 } from '../api/admin'
 import { formatAdminDateTime } from '../utils/dateTime'
+import {
+  hasActiveImportTasks,
+  importDestination,
+  resolveCloudImportAction
+} from './cloudDownloadImport.helpers'
+import { extractApiErrorMessage } from './toolbox.helpers'
 
 const POLL_INTERVAL_MS = 5000
 const ACTIVE_STATUSES = new Set(['pending', 'submitting', 'queued', 'ready', 'downloading'])
+const router = useRouter()
 const STATUS_META = {
   pending: { label: '排队中', type: 'info' },
   submitting: { label: '提交中', type: 'info' },
@@ -47,6 +57,10 @@ const query = reactive({ page: 1, page_size: 20, status: '' })
 const browserState = ref({})
 const browserStateError = ref('')
 const retryingId = ref(0)
+const previewingImportId = ref(0)
+const importDialogVisible = ref(false)
+const importTask = ref(null)
+const importPreview = ref(null)
 const qrDialogVisible = ref(false)
 const qrImage = ref('')
 const qrLoading = ref(false)
@@ -61,9 +75,12 @@ let loadSeq = 0
 const initialLoading = computed(() => loading.value && !loaded.value)
 const backgroundRefreshing = computed(() => loading.value && loaded.value)
 const hasActiveTasks = computed(() => list.value.some((task) => ACTIVE_STATUSES.has(task.status)))
+const hasActiveImport = computed(() => hasActiveImportTasks(list.value))
+const shouldPoll = computed(() => hasActiveTasks.value || hasActiveImport.value)
 const hasStatusFilter = computed(() => query.status !== '')
 const refreshIndicatorLabel = computed(() => {
   if (backgroundRefreshing.value) return '正在刷新'
+  if (hasActiveImport.value) return '导入中，每 5 秒自动刷新'
   if (hasActiveTasks.value) return '每 5 秒自动刷新'
   return '自动刷新已停止'
 })
@@ -80,7 +97,7 @@ function extractErrorMessage(error, fallback) {
 }
 
 function syncPolling() {
-  if (hasActiveTasks.value) {
+  if (shouldPoll.value) {
     if (!timer) {
       timer = setInterval(() => load({ skipIfLoading: true }), POLL_INTERVAL_MS)
     }
@@ -221,6 +238,50 @@ async function retryTask(row) {
   } finally {
     retryingId.value = 0
   }
+}
+
+async function startImport(row) {
+  if (!row?.id || previewingImportId.value) return
+  previewingImportId.value = row.id
+  try {
+    const preview = await previewCloudDownloadImport(row.id)
+    if (!preview || (preview.kind !== 'video' && preview.kind !== 'archive')) {
+      ElMessage.error('该文件类型不支持入媒体库')
+      return
+    }
+    const existingKind = row.import?.kind
+    if (existingKind && existingKind !== preview.kind) {
+      ElMessage.error('文件类型与已有导入记录不一致，无法重试')
+      return
+    }
+    importTask.value = row
+    importPreview.value = preview
+    importDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error(extractApiErrorMessage(error, '无法入媒体库'))
+  } finally {
+    previewingImportId.value = 0
+  }
+}
+
+function openImportResult(row) {
+  const destination = importDestination(row)
+  if (destination) {
+    router.push(destination)
+  }
+}
+
+async function handleImportSubmitted(importInfo) {
+  if (importTask.value && importInfo && typeof importInfo === 'object') {
+    importTask.value.import = importInfo
+  }
+  syncPolling()
+  await load()
+}
+
+function resetImportDialog() {
+  importTask.value = null
+  importPreview.value = null
 }
 
 function stopQrTimer() {
@@ -465,17 +526,61 @@ onUnmounted(() => {
               <el-table-column label="创建时间" width="168">
                 <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="96">
+              <el-table-column label="操作" width="160">
                 <template #default="{ row }">
-                  <el-button
-                    v-if="row.status === 'failed' || row.status === 'blocked'"
-                    size="small"
-                    :loading="retryingId === row.id"
-                    @click="retryTask(row)"
-                  >
-                    重试
-                  </el-button>
-                  <span v-else class="cloud-empty-action">--</span>
+                  <div class="cloud-actions">
+                    <template v-if="resolveCloudImportAction(row) === 'import'">
+                      <el-button
+                        size="small"
+                        type="primary"
+                        plain
+                        :loading="previewingImportId === row.id"
+                        @click="startImport(row)"
+                      >
+                        入媒体库
+                      </el-button>
+                    </template>
+                    <template v-else-if="resolveCloudImportAction(row) === 'missing'">
+                      <span class="cloud-empty-action">文件不存在</span>
+                    </template>
+                    <template v-else-if="resolveCloudImportAction(row) === 'importing'">
+                      <el-button size="small" disabled>导入中</el-button>
+                    </template>
+                    <template v-else-if="resolveCloudImportAction(row) === 'imported'">
+                      <el-button link type="success" @click="openImportResult(row)">已导入</el-button>
+                    </template>
+                    <template v-else-if="resolveCloudImportAction(row) === 'existing'">
+                      <el-button link @click="openImportResult(row)">已存在</el-button>
+                    </template>
+                    <template v-else-if="resolveCloudImportAction(row) === 'retry-import'">
+                      <el-tooltip
+                        :content="row.import?.status === 'failed'
+                          ? (row.import?.error_message || '导入失败，点击重试')
+                          : '导入任务可能已中断，点击重新提交'"
+                        placement="top"
+                      >
+                        <el-button
+                          size="small"
+                          type="danger"
+                          plain
+                          :loading="previewingImportId === row.id"
+                          @click="startImport(row)"
+                        >
+                          {{ row.import?.status === 'failed' ? '重试导入' : '重新导入' }}
+                        </el-button>
+                      </el-tooltip>
+                    </template>
+                    <template v-else-if="resolveCloudImportAction(row) === 'retry-download'">
+                      <el-button
+                        size="small"
+                        :loading="retryingId === row.id"
+                        @click="retryTask(row)"
+                      >
+                        重试
+                      </el-button>
+                    </template>
+                    <span v-else class="cloud-empty-action">--</span>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -520,6 +625,14 @@ onUnmounted(() => {
         <el-button type="primary" :loading="qrLoading" @click="loadQr">刷新二维码</el-button>
       </template>
     </el-dialog>
+
+    <CloudDownloadImportDialog
+      v-model="importDialogVisible"
+      :task="importTask"
+      :preview="importPreview"
+      @submitted="handleImportSubmitted"
+      @closed="resetImportDialog"
+    />
   </Layout>
 </template>
 
@@ -552,6 +665,17 @@ onUnmounted(() => {
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
   overflow-wrap: anywhere;
+}
+
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cloud-actions :deep(.el-button) {
+  margin-left: 0;
 }
 
 .cloud-empty-action {
@@ -634,6 +758,11 @@ onUnmounted(() => {
 
 @media (max-width: 63.9375rem) {
   .cloud-refresh {
+    min-height: 44px;
+  }
+
+  .cloud-actions :deep(.el-button) {
+    min-width: 44px;
     min-height: 44px;
   }
 

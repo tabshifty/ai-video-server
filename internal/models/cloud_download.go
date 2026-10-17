@@ -92,6 +92,8 @@ type CloudDownloadTask struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 	StartedAt           *time.Time `json:"started_at"`
 	FinishedAt          *time.Time `json:"finished_at"`
+	// Import is the explicit media-library import summary, when one exists.
+	Import *CloudDownloadImportSummary `json:"import,omitempty"`
 }
 
 // CloudDownloadStatus is the compact per-hash view used by the forum list.

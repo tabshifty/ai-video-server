@@ -22,6 +22,7 @@ import (
 	"video-server/internal/config"
 	"video-server/internal/database"
 	"video-server/internal/handlers"
+	"video-server/internal/models"
 	"video-server/internal/queue"
 	"video-server/internal/repository"
 	"video-server/internal/services"
@@ -136,6 +137,13 @@ func (a archiveImportQueueAdapter) EnqueueArchiveExtract(batchID uuid.UUID, pass
 		BatchID:  batchID.String(),
 		Password: password,
 	})
+}
+
+func (a archiveImportQueueAdapter) EnqueueCloudIngest(importID int64, attempt int, input models.CloudDownloadImportInput) error {
+	if a.enqueuer == nil {
+		return fmt.Errorf("queue enqueuer unavailable")
+	}
+	return a.enqueuer.EnqueueCloudIngest(importID, attempt, input)
 }
 
 func (a archiveImportQueueAdapter) EnqueueScrapeAV(videoID, filePath, filename string) error {
@@ -282,8 +290,22 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 	if cfg.CloudDownloadEnabled {
 		cloudClient := cloud.NewClient(cfg.CloudBrowserCDP, cfg.CloudBrowserApp)
 		cloudRepo := repository.NewCloudDownloadRepository(pool)
+		cloudImportRepo := repository.NewCloudDownloadImportRepository(pool)
 		cloudSvc := services.NewCloudDownloadService(cloudRepo, cloudClient, cfg.DownloadDir, enqueuer, logger)
+		cloudSvc.SetImportSummaryRepository(cloudImportRepo)
+		cloudImportSvc := services.NewCloudDownloadImportService(
+			cloudRepo,
+			cloudImportRepo,
+			repo,
+			uploadSvc,
+			archiveImportSvc,
+			archiveImportQueueAdapter{enqueuer: enqueuer},
+			cfg.DownloadDir,
+			cfg.StorageRoot,
+			logger,
+		)
 		api.SetCloudDownloadService(cloudSvc)
+		api.SetCloudDownloadImportService(cloudImportSvc)
 		logger.Info("cloud download enabled", "cdp", cfg.CloudBrowserCDP, "download_dir", cfg.DownloadDir)
 	}
 	api.Register(r)
@@ -341,8 +363,22 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	if cfg.CloudDownloadEnabled {
 		cloudClient := cloud.NewClient(cfg.CloudBrowserCDP, cfg.CloudBrowserApp)
 		cloudRepo := repository.NewCloudDownloadRepository(pool)
+		cloudImportRepo := repository.NewCloudDownloadImportRepository(pool)
 		cloudSvc := services.NewCloudDownloadService(cloudRepo, cloudClient, cfg.DownloadDir, enqueuer, logger)
+		cloudSvc.SetImportSummaryRepository(cloudImportRepo)
+		cloudImportSvc := services.NewCloudDownloadImportService(
+			cloudRepo,
+			cloudImportRepo,
+			repo,
+			uploadSvc,
+			archiveImportSvc,
+			archiveImportQueueAdapter{enqueuer: enqueuer},
+			cfg.DownloadDir,
+			cfg.StorageRoot,
+			logger,
+		)
 		processor.SetCloudDownloadService(cloudSvc)
+		processor.SetCloudDownloadImportService(cloudImportSvc)
 		// Recover rows left behind by a hard deploy kill or a lost enqueue.
 		// asynq task IDs make repeated reconciliation safe across workers.
 		reconcileCtx, reconcileCancel := context.WithCancel(context.Background())
