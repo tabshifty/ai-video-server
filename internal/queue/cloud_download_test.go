@@ -1,6 +1,20 @@
 package queue
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/hibiken/asynq"
+)
+
+func TestBuildCloudDownloadTaskOptionsUsesDedicatedQueue(t *testing.T) {
+	opts := buildCloudDownloadTaskOptions("cloud", "cloud:download:7:1")
+
+	assertOption(t, opts, asynq.QueueOpt, "cloud")
+	assertOption(t, opts, asynq.TaskIDOpt, "cloud:download:7:1")
+	assertOption(t, opts, asynq.MaxRetryOpt, 2)
+	assertOption(t, opts, asynq.TimeoutOpt, 6*time.Hour)
+}
 
 func TestCloudDownloadTaskIDIncludesRetryCount(t *testing.T) {
 	cases := []struct {

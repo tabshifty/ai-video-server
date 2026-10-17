@@ -240,6 +240,7 @@ export const avScrapeConfirm = (payload) => request.put('/admin/av-scrape/confir
 
 export const listCloudDownloads = (params) => request.get('/admin/cloud-downloads', { params })
 export const createCloudDownload = (data) => request.post('/admin/cloud-downloads', data)
+export const createCloudDownloadBatch = (links) => request.post('/admin/cloud-downloads/batch', { links })
 export const cloudDownloadStatuses = (infoHashes) => request.post('/admin/cloud-downloads/status', { info_hashes: infoHashes })
 export const retryCloudDownload = (id) => request.post(`/admin/cloud-downloads/${id}/retry`)
 export const getCloudBrowserState = () => request.get('/admin/cloud-downloads/browser')

@@ -979,7 +979,7 @@ describe('Precision Ops 独立工具工作区', () => {
     const ed2kStyle = extractStyle(readView('ToolboxEd2k.vue'))
     const passwordStyle = extractStyle(readView('ToolboxPasswordVault.vue'))
 
-    expect.soft(ed2kStyle).toMatch(/\.ed2k-link:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--line-focus\);/s)
+    expect.soft(ed2kStyle).toMatch(/\.ed2k-link__anchor:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--line-focus\);/s)
     expect.soft(passwordStyle).toMatch(/\.password-vault-tool__url:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--line-focus\);/s)
   })
 })

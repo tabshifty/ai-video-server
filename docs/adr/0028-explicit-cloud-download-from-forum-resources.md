@@ -8,12 +8,12 @@
 
 ## 决策
 
-- 论坛列表保持只读；新增**逐条**「发送到115」按钮，仅管理员可用，一次只提交一条链接。
+- 论坛列表保持只读；新增**逐条**「发送到115」按钮，仅管理员可用，一次只提交一条链接。该逐条约束只适用于论坛列表；工具箱的显式批量入口见 `0029-explicit-batch-cloud-download-from-ed2k-toolbox.md`。
 - 后端以 `info_hash` 作为全局唯一键建立任务（`cloud_download_tasks`）；同一链接出现在多个帖子时复用同一任务，只记录首次触发的来源帖。
 - 任务异步执行：入队即写入 DB 行，状态机为 `pending → submitting → queued → ready → downloading → completed`，异常状态为 `failed` 和带原因的 `blocked`。
 - 下载文件只落到 `DOWNLOAD_DIR`，**不进入媒体库、不创建 `videos` 记录、不触发转码或归档导入**。
 - 浏览器自动化由部署机上已登录的 115 浏览器通过 CDP 完成，用纯 Go 实现；不引入 Node 运行时。登录失效时由管理员在管理端获取二维码扫码恢复。
-- 功能由 `CLOUD_DOWNLOAD_ENABLED` 控制；关闭时不注册路由、不注册 worker 处理器。
+- 功能由 `CLOUD_DOWNLOAD_ENABLED` 控制；关闭时不注册 worker 处理器、不消费 `cloud` 队列。2026-10-17 修订：路由保留注册并统一返回 503，避免管理端把功能关闭误判成 404。
 
 ## 与 ADR 0021 的关系
 
@@ -33,3 +33,9 @@
 - 部署机新增前置：115 浏览器、调试端口、登录态、下载目录与外部卷的 TCC 权限。登录过期属于需要人工处理的状态，任务标记 `blocked(login_required)` 而不是 `failed`。
 - 每次部署都会硬杀 worker，任务会从头重跑，因此提交、查询和落地每一步都必须幂等：已提交（`10008`）、已就绪、文件已存在都要能继续推进。
 - 恢复策略：worker 启动时及每 2 分钟对账 `pending/submitting/queued/ready/downloading` 并重新入队；asynq 任务 ID 使用 `cloud:download:<id>:<retry_count>` 去重，`download_triggered_at` 保证本地下载只触发一次；`submitting` 允许重新提交（115 以 `10008` 表示已存在）。终态写库使用与任务取消脱钩的 context，避免 asynq 超时后留下不可恢复的非终态行；手动重试会递增 `retry_count`、清空触发标记与终态时间。
+
+## 后续修订（2026-10-17）
+
+- 云下载任务从主队列迁到独立 `cloud` 队列（权重 1）；server 与 worker 通过 `CLOUD_DOWNLOAD_QUEUE`（默认 `cloud`）保持一致，改队列需同时重启两者。旧主队列中的存量云下载任务仍会被 worker 的转码队列消费。
+- 任务新增 `source`（`forum_post` / `toolbox` / `manual`），只在首次创建时写入；同一 `info_hash` 的后续重试不覆盖首次来源。
+- 工具箱 ED2K 生成器的显式批量提交由 ADR 0029 约束；论坛列表仍逐条，不改右侧操作列。

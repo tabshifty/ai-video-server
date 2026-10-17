@@ -15,6 +15,7 @@ func setRequiredEnv(t *testing.T) {
 	// Keep the optional cloud-download feature off unless a test enables it,
 	// so a developer's shell environment cannot inject validation failures.
 	t.Setenv("CLOUD_DOWNLOAD_ENABLED", "false")
+	t.Setenv("CLOUD_DOWNLOAD_QUEUE", "cloud")
 }
 
 func TestLoadIncludesAVSiteOverridesAndTokens(t *testing.T) {

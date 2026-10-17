@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,8 @@ import (
 
 // cloudDownloadService is the admin-facing contract for cloud downloads.
 type cloudDownloadService interface {
-	Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID) (models.CloudDownloadTask, bool, error)
+	Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID, source string) (models.CloudDownloadTask, bool, error)
+	SubmitBatch(ctx context.Context, links []string, createdBy *uuid.UUID) (models.CloudDownloadBatchResult, error)
 	Retry(ctx context.Context, id int64) (models.CloudDownloadTask, error)
 	List(ctx context.Context, status string, page, pageSize int) ([]models.CloudDownloadTask, int, error)
 	StatusByHashes(ctx context.Context, hashes []string) (map[string]models.CloudDownloadStatus, error)
@@ -77,7 +79,11 @@ func (a *API) AdminCloudDownloadCreate(c *gin.Context) {
 	if userID, okUser := middleware.UserIDFromContext(c); okUser {
 		createdBy = &userID
 	}
-	task, created, err := a.cloudDownload.Submit(c.Request.Context(), req.PostID, req.Link, createdBy)
+	source := models.CloudDownloadSourceManual
+	if req.PostID != nil {
+		source = models.CloudDownloadSourceForumPost
+	}
+	task, created, err := a.cloudDownload.Submit(c.Request.Context(), req.PostID, req.Link, createdBy, source)
 	if err != nil {
 		if errors.Is(err, cloud.ErrEmptyLink) ||
 			errors.Is(err, cloud.ErrUnsupportedLink) ||
@@ -89,6 +95,41 @@ func (a *API) AdminCloudDownloadCreate(c *gin.Context) {
 		return
 	}
 	ok(c, gin.H{"task": task, "created": created})
+}
+
+// AdminCloudDownloadBatchCreate explicitly submits up to 50 links. It returns
+// one outcome per link and never waits for 115.
+func (a *API) AdminCloudDownloadBatchCreate(c *gin.Context) {
+	if !a.requireCloudDownload(c) {
+		return
+	}
+	var req struct {
+		Links []string `json:"links"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	if len(req.Links) == 0 {
+		response.Error(c, 400, "links 不能为空")
+		return
+	}
+	if len(req.Links) > models.CloudDownloadBatchLimit {
+		response.Error(c, 400, fmt.Sprintf("单次最多 %d 条链接", models.CloudDownloadBatchLimit))
+		return
+	}
+	var createdBy *uuid.UUID
+	if userID, okUser := middleware.UserIDFromContext(c); okUser {
+		createdBy = &userID
+	}
+	// Keep the request 1:1 with the response: empty entries are invalid items,
+	// not silently removed (their indexes are used in duplicate messages).
+	result, err := a.cloudDownload.SubmitBatch(c.Request.Context(), req.Links, createdBy)
+	if err != nil {
+		response.Error(c, 500, err.Error())
+		return
+	}
+	ok(c, result)
 }
 
 // AdminCloudDownloadStatuses returns the compact status map for a hash batch.

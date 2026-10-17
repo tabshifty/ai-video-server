@@ -33,6 +33,8 @@ type fakeCloudRepo struct {
 	triggerClaimed    bool
 	clearTriggerCalls int
 	unfinished        []models.CloudDownloadTask
+	statusByHash      map[string]models.CloudDownloadStatus
+	statusErr         error
 	setStatusHook     func(ctx context.Context, status string) error
 }
 
@@ -60,7 +62,13 @@ func (f *fakeCloudRepo) List(_ context.Context, _ string, _, _ int) ([]models.Cl
 }
 
 func (f *fakeCloudRepo) StatusByHashes(_ context.Context, _ []string) (map[string]models.CloudDownloadStatus, error) {
-	return map[string]models.CloudDownloadStatus{}, nil
+	if f.statusErr != nil {
+		return nil, f.statusErr
+	}
+	if f.statusByHash == nil {
+		return map[string]models.CloudDownloadStatus{}, nil
+	}
+	return f.statusByHash, nil
 }
 
 func (f *fakeCloudRepo) SetStatus(ctx context.Context, _ int64, status, reason, message string) error {
@@ -209,6 +217,10 @@ func newCloudTestService(repo *fakeCloudRepo, session *fakeCloudSession, enq *fa
 }
 
 func int64Ptr(value int64) *int64 { return &value }
+
+func testED2KLink(name, hash string) string {
+	return fmt.Sprintf("ed2k://|file|%s|1|%s|/", name, hash)
+}
 
 func writeDownloadFile(t *testing.T, dir, name string, size int) {
 	t.Helper()
@@ -522,7 +534,7 @@ func TestSubmitResetsBlockedTask(t *testing.T) {
 	enq := &fakeCloudEnqueuer{}
 	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
 
-	task, created, err := svc.Submit(context.Background(), nil, "ed2k://|file|a.zip|1|0123456789abcdef0123456789abcdef|/", nil)
+	task, created, err := svc.Submit(context.Background(), nil, "ed2k://|file|a.zip|1|0123456789abcdef0123456789abcdef|/", nil, models.CloudDownloadSourceManual)
 	if err != nil {
 		t.Fatalf("Submit returned error: %v", err)
 	}
@@ -546,7 +558,7 @@ func TestSubmitKeepsForumPostUUID(t *testing.T) {
 	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
 	postID := uuid.New()
 
-	task, created, err := svc.Submit(context.Background(), &postID, "ed2k://|file|a.zip|1|0123456789abcdef0123456789abcdef|/", nil)
+	task, created, err := svc.Submit(context.Background(), &postID, "ed2k://|file|a.zip|1|0123456789abcdef0123456789abcdef|/", nil, models.CloudDownloadSourceForumPost)
 	if err != nil {
 		t.Fatalf("Submit returned error: %v", err)
 	}
@@ -556,8 +568,177 @@ func TestSubmitKeepsForumPostUUID(t *testing.T) {
 	if repo.lastCreate.PostID == nil || *repo.lastCreate.PostID != postID {
 		t.Fatalf("stored post_id = %v, want %s", repo.lastCreate.PostID, postID)
 	}
+	if repo.lastCreate.Source != models.CloudDownloadSourceForumPost {
+		t.Fatalf("stored source = %q, want %q", repo.lastCreate.Source, models.CloudDownloadSourceForumPost)
+	}
 	if task.PostID == nil || *task.PostID != postID {
 		t.Fatalf("returned post_id = %v, want %s", task.PostID, postID)
+	}
+}
+
+func TestSubmitBatchDedupesAndCreatesIndependentTasks(t *testing.T) {
+	const (
+		hashA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	)
+	repo := &fakeCloudRepo{createCreated: true}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	result, err := svc.SubmitBatch(context.Background(), []string{
+		testED2KLink("a.mkv", hashA),
+		testED2KLink("a-copy.mkv", hashA),
+		"not-an-ed2k-link",
+	}, nil)
+	if err != nil {
+		t.Fatalf("SubmitBatch returned error: %v", err)
+	}
+	if result.Summary.Total != 3 || result.Summary.Submitted != 1 ||
+		result.Summary.Duplicate != 1 || result.Summary.Invalid != 1 {
+		t.Fatalf("summary = %+v, want 3 total / 1 submitted / 1 duplicate / 1 invalid", result.Summary)
+	}
+	if len(result.Items) != 3 {
+		t.Fatalf("items = %d, want 3", len(result.Items))
+	}
+	if result.Items[0].Status != models.CloudBatchSubmitted {
+		t.Fatalf("item 0 status = %q, want submitted", result.Items[0].Status)
+	}
+	if result.Items[1].Status != models.CloudBatchDuplicate || result.Items[1].InfoHash != hashA {
+		t.Fatalf("item 1 = %+v, want duplicate with info hash", result.Items[1])
+	}
+	if result.Items[2].Status != models.CloudBatchInvalid {
+		t.Fatalf("item 2 status = %q, want invalid", result.Items[2].Status)
+	}
+	if repo.lastCreate.Source != models.CloudDownloadSourceToolbox {
+		t.Fatalf("created source = %q, want %q", repo.lastCreate.Source, models.CloudDownloadSourceToolbox)
+	}
+	if len(enq.ids) != 1 {
+		t.Fatalf("enqueue calls = %v, want exactly 1", enq.ids)
+	}
+}
+
+func TestSubmitBatchSkipsTerminalAndRetriesFailed(t *testing.T) {
+	const (
+		hashA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		hashB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		hashC = "cccccccccccccccccccccccccccccccc"
+	)
+	repo := &fakeCloudRepo{
+		task: models.CloudDownloadTask{
+			ID:         7,
+			InfoHash:   hashB,
+			Status:     models.CloudDownloadFailed,
+			RetryCount: 1,
+		},
+		statusByHash: map[string]models.CloudDownloadStatus{
+			hashA: {TaskID: 1, Status: models.CloudDownloadCompleted},
+			hashB: {TaskID: 7, Status: models.CloudDownloadFailed},
+			hashC: {TaskID: 3, Status: models.CloudDownloadQueued},
+		},
+	}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	result, err := svc.SubmitBatch(context.Background(), []string{
+		testED2KLink("a.mkv", hashA),
+		testED2KLink("b.mkv", hashB),
+		testED2KLink("c.mkv", hashC),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SubmitBatch returned error: %v", err)
+	}
+	want := []string{
+		models.CloudBatchSkippedCompleted,
+		models.CloudBatchRetried,
+		models.CloudBatchSkippedActive,
+	}
+	for index, status := range want {
+		if result.Items[index].Status != status {
+			t.Fatalf("item %d status = %q, want %q", index, result.Items[index].Status, status)
+		}
+	}
+	if result.Items[0].TaskID == nil || *result.Items[0].TaskID != 1 ||
+		result.Items[1].TaskID == nil || *result.Items[1].TaskID != 7 ||
+		result.Items[2].TaskID == nil || *result.Items[2].TaskID != 3 {
+		t.Fatalf("task ids = %+v", result.Items)
+	}
+	if repo.bumpRetryCalls != 1 {
+		t.Fatalf("bumpRetryCalls = %d, want 1", repo.bumpRetryCalls)
+	}
+	if len(enq.ids) != 1 || enq.ids[0] != 7 {
+		t.Fatalf("enqueue calls = %v, want [7]", enq.ids)
+	}
+}
+
+func TestSubmitBatchContinuesAfterItemFailure(t *testing.T) {
+	const (
+		hashA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		hashB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	)
+	repo := &fakeCloudRepo{
+		createCreated: true,
+		statusByHash: map[string]models.CloudDownloadStatus{
+			hashB: {TaskID: 2, Status: models.CloudDownloadCompleted},
+		},
+	}
+	enq := &fakeCloudEnqueuer{err: errors.New("redis down")}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	result, err := svc.SubmitBatch(context.Background(), []string{
+		testED2KLink("a.mkv", hashA),
+		testED2KLink("b.mkv", hashB),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SubmitBatch returned error for a per-item failure: %v", err)
+	}
+	if result.Items[0].Status != models.CloudBatchFailed || result.Items[0].Message == "" {
+		t.Fatalf("item 0 = %+v, want failed with message", result.Items[0])
+	}
+	if result.Items[1].Status != models.CloudBatchSkippedCompleted {
+		t.Fatalf("item 1 status = %q, want skipped_completed", result.Items[1].Status)
+	}
+	if result.Summary.Failed != 1 || result.Summary.SkippedCompleted != 1 {
+		t.Fatalf("summary = %+v", result.Summary)
+	}
+}
+
+func TestSubmitBatchHandlesConcurrentCreate(t *testing.T) {
+	const hash = "dddddddddddddddddddddddddddddddd"
+	repo := &fakeCloudRepo{
+		task: models.CloudDownloadTask{ID: 9, InfoHash: hash, Status: models.CloudDownloadQueued},
+	}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	result, err := svc.SubmitBatch(context.Background(), []string{
+		testED2KLink("d.mkv", hash),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SubmitBatch returned error: %v", err)
+	}
+	if result.Items[0].Status != models.CloudBatchSkippedActive {
+		t.Fatalf("status = %q, want skipped_active", result.Items[0].Status)
+	}
+	if result.Items[0].TaskID == nil || *result.Items[0].TaskID != 9 {
+		t.Fatalf("task id = %v, want 9", result.Items[0].TaskID)
+	}
+	if len(enq.ids) != 0 {
+		t.Fatalf("enqueue calls = %v, want none", enq.ids)
+	}
+}
+
+func TestSubmitBatchRejectsEmptyAndOversizedRequests(t *testing.T) {
+	repo := &fakeCloudRepo{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, &fakeCloudEnqueuer{}, t.TempDir())
+
+	if _, err := svc.SubmitBatch(context.Background(), nil, nil); err == nil {
+		t.Fatalf("SubmitBatch(nil) returned nil error")
+	}
+	links := make([]string, models.CloudDownloadBatchLimit+1)
+	for index := range links {
+		links[index] = testED2KLink("x.mkv", fmt.Sprintf("%032x", index+1))
+	}
+	if _, err := svc.SubmitBatch(context.Background(), links, nil); err == nil {
+		t.Fatalf("SubmitBatch(%d links) returned nil error", len(links))
 	}
 }
 

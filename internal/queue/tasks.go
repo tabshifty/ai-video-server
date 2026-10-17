@@ -45,16 +45,22 @@ type TranscodePayload struct {
 type Enqueuer struct {
 	client               *asynq.Client
 	queue                string
+	cloudQueue           string
 	transcodeTaskTimeout time.Duration
 }
 
-func NewEnqueuer(redisAddr, redisPassword, queue string, transcodeTaskTimeout time.Duration) *Enqueuer {
+func NewEnqueuer(redisAddr, redisPassword, queue, cloudQueue string, transcodeTaskTimeout time.Duration) *Enqueuer {
 	if transcodeTaskTimeout <= 0 {
 		transcodeTaskTimeout = 6 * time.Hour
+	}
+	cloudQueue = strings.TrimSpace(cloudQueue)
+	if cloudQueue == "" {
+		cloudQueue = "cloud"
 	}
 	return &Enqueuer{
 		client:               asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword}),
 		queue:                queue,
+		cloudQueue:           cloudQueue,
 		transcodeTaskTimeout: transcodeTaskTimeout,
 	}
 }

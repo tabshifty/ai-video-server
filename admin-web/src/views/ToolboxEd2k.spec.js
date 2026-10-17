@@ -16,4 +16,18 @@ describe('ToolboxEd2k', () => {
     expect(source).not.toContain('source_link')
     expect(source).not.toContain('expected_files')
   })
+
+  it('adds explicit checkbox batch submission with a 50-link confirmation', () => {
+    expect(source).toContain('全选')
+    expect(source).toContain('发送选中到115')
+    expect(source).toContain('selectedLinkIds')
+    expect(source).toContain('duplicateLinkIds')
+    expect(source).toContain('createCloudDownloadBatch')
+    expect(source).toContain('cloudDownloadStatuses')
+    expect(source).toContain('ElMessageBox.confirm')
+    expect(source).toContain('BATCH_LIMIT = 50')
+    expect(source).toContain('单次最多')
+    expect(source).toContain('批量提交完成')
+    expect(source).toContain('cloudStatusFor')
+  })
 })

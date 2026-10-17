@@ -360,6 +360,17 @@ func TestCloudDownloadTasksMigration(t *testing.T) {
 	assertSQLPattern(t, triggeredDown, `(?is)drop\s+column\s+if\s+exists\s+download_triggered_at`)
 }
 
+func TestCloudDownloadSourceMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0044_cloud_download_source.up.sql")
+	down := readMigrationForTest(t, "0044_cloud_download_source.down.sql")
+
+	assertSQLPattern(t, up, `(?is)add\s+column\s+if\s+not\s+exists\s+source\s+text\s+not\s+null\s+default\s+'forum_post'`)
+	assertSQLPattern(t, up, `(?is)source\s+in\s*\(\s*'forum_post'\s*,\s*'toolbox'\s*,\s*'manual'\s*\)`)
+	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+source`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

@@ -329,14 +329,15 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/archive-import/batches/:id/process", a.AdminProcessArchiveImportBatch)
 			admin.POST("/archive-import/batches/:id/retry-extract", a.AdminRetryArchiveImportExtract)
 			admin.GET("/tasks", a.AdminTasks)
-			if a.cloudDownload != nil {
-				admin.GET("/cloud-downloads", a.AdminCloudDownloadList)
-				admin.POST("/cloud-downloads", a.AdminCloudDownloadCreate)
-				admin.POST("/cloud-downloads/status", a.AdminCloudDownloadStatuses)
-				admin.POST("/cloud-downloads/:id/retry", a.AdminCloudDownloadRetry)
-				admin.GET("/cloud-downloads/browser", a.AdminCloudDownloadBrowser)
-				admin.GET("/cloud-downloads/login-qr", a.AdminCloudDownloadLoginQR)
-			}
+			// Keep the routes registered when the feature is off so every
+			// endpoint returns the same 503 envelope instead of a raw 404.
+			admin.GET("/cloud-downloads", a.AdminCloudDownloadList)
+			admin.POST("/cloud-downloads", a.AdminCloudDownloadCreate)
+			admin.POST("/cloud-downloads/status", a.AdminCloudDownloadStatuses)
+			admin.POST("/cloud-downloads/batch", a.AdminCloudDownloadBatchCreate)
+			admin.POST("/cloud-downloads/:id/retry", a.AdminCloudDownloadRetry)
+			admin.GET("/cloud-downloads/browser", a.AdminCloudDownloadBrowser)
+			admin.GET("/cloud-downloads/login-qr", a.AdminCloudDownloadLoginQR)
 			admin.POST("/system/orphan-files/scan", a.AdminStartOrphanFileScan)
 			admin.GET("/system/orphan-files/latest", a.AdminLatestOrphanFileScan)
 			admin.DELETE("/system/orphan-files/latest", a.AdminDeleteLatestOrphanFileScan)

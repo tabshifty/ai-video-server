@@ -162,7 +162,7 @@ func runIngestor(ctx context.Context, cfg config.Config, logger *slog.Logger) er
 			logger.Warn("关闭 Telegram 任务客户端失败", "error", closeErr)
 		}
 	}()
-	transcodeTasks := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.TranscodeTaskTimeout)
+	transcodeTasks := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.CloudDownloadQueue, cfg.TranscodeTaskTimeout)
 	defer func() {
 		if closeErr := transcodeTasks.Close(); closeErr != nil {
 			logger.Warn("关闭转码任务客户端失败", "error", closeErr)

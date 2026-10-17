@@ -37,4 +37,11 @@ describe('115 云下载列表页', () => {
     expect(style).toContain('@media (max-width: 63.9375rem)')
     expect(style).toContain('.cloud-detail__path')
   })
+
+  it('按 source 显示工具箱、手动或原帖来源', () => {
+    expect(template).toContain('label="来源"')
+    expect(template).toContain("row.source === 'toolbox'")
+    expect(template).toContain("row.source === 'manual'")
+    expect(template).toContain("row.post_title || '原帖已删除'")
+  })
 })

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -24,6 +25,7 @@ SELECT
     t.id,
     t.post_id,
     COALESCE(p.title, ''),
+    t.source,
     t.protocol,
     t.info_hash,
     t.source_url,
@@ -53,6 +55,7 @@ func scanCloudDownload(row interface{ Scan(...any) error }) (models.CloudDownloa
 		&task.ID,
 		&task.PostID,
 		&task.PostTitle,
+		&task.Source,
 		&task.Protocol,
 		&task.InfoHash,
 		&task.SourceURL,
@@ -80,11 +83,17 @@ func scanCloudDownload(row interface{ Scan(...any) error }) (models.CloudDownloa
 // CreateOrGet inserts a task unless the info hash is already tracked. The
 // bool reports whether this call created the row.
 func (r *CloudDownloadRepository) CreateOrGet(ctx context.Context, task models.CloudDownloadTask) (models.CloudDownloadTask, bool, error) {
+	source := strings.TrimSpace(task.Source)
+	if source == "" {
+		// Match the column default; the service normally resolves the source
+		// before reaching the repository.
+		source = models.CloudDownloadSourceForumPost
+	}
 	tag, err := r.pool.Exec(ctx, `
-INSERT INTO cloud_download_tasks (post_id, protocol, info_hash, source_url, declared_name, declared_size, status, created_by)
-VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8)
+INSERT INTO cloud_download_tasks (post_id, source, protocol, info_hash, source_url, declared_name, declared_size, status, created_by)
+VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, $9)
 ON CONFLICT (info_hash) DO NOTHING`,
-		task.PostID, task.Protocol, task.InfoHash, task.SourceURL, task.DeclaredName, task.DeclaredSize, task.Status, task.CreatedBy)
+		task.PostID, source, task.Protocol, task.InfoHash, task.SourceURL, task.DeclaredName, task.DeclaredSize, task.Status, task.CreatedBy)
 	if err != nil {
 		return models.CloudDownloadTask{}, false, fmt.Errorf("insert cloud download task: %w", err)
 	}

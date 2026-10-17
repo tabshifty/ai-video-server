@@ -25,6 +25,7 @@ import {
   createAdminTvEpisode,
   createAdminTvSeason,
   createAdminTvSeries,
+  createCloudDownloadBatch,
   deleteAdminTVAppReleaseDraft,
   deleteAdminPasswordVaultEntry,
   deleteAdminTvEpisode,
@@ -680,6 +681,21 @@ describe('video batch update apis', () => {
 
     expect(put).toHaveBeenCalledWith('/admin/videos/batch-update', payload, {
       timeout: 0
+    })
+  })
+})
+
+describe('cloud download batch api', () => {
+  beforeEach(() => {
+    post.mockReset()
+    post.mockResolvedValue({ ok: true })
+  })
+
+  it('posts the selected raw links to the batch endpoint', async () => {
+    await createCloudDownloadBatch(['ed2k://a', 'ed2k://b'])
+
+    expect(post).toHaveBeenCalledWith('/admin/cloud-downloads/batch', {
+      links: ['ed2k://a', 'ed2k://b']
     })
   })
 })

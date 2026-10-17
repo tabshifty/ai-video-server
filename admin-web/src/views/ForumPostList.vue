@@ -10,7 +10,7 @@ import StatusIndicator from '../components/base/StatusIndicator.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import { cloudDownloadStatuses, createCloudDownload, getAdminForumPosts, retryCloudDownload } from '../api/admin'
 import { formatAdminDateTime } from '../utils/dateTime'
-import { getEd2kLinkLabel } from './toolbox.helpers'
+import { getEd2kInfoHash, getEd2kLinkLabel } from './toolbox.helpers'
 
 const CLOUD_ACTIVE_STATUSES = new Set(['pending', 'submitting', 'queued', 'ready', 'downloading'])
 const CLOUD_BLOCKED_REASON_LABELS = {
@@ -92,22 +92,6 @@ function applySearch() {
 function clearSearch() {
   searchDraft.value = ''
   applySearch()
-}
-
-function getEd2kInfoHash(link) {
-  const raw = String(link || '').trim()
-  if (!/^ed2k:\/\//i.test(raw)) {
-    return ''
-  }
-  const parts = raw.slice('ed2k://'.length).split('|')
-  if (parts[0] === '') {
-    parts.shift()
-  }
-  if (parts.length < 4 || parts[0]?.toLowerCase() !== 'file') {
-    return ''
-  }
-  const hash = String(parts[3] || '').trim()
-  return /^[0-9a-fA-F]{32}$/.test(hash) ? hash.toLowerCase() : ''
 }
 
 function cloudLinkKey(link) {
@@ -353,8 +337,8 @@ onMounted(load)
                         <span class="resource-link-action">
                           <el-button
                             size="small"
-                            link
                             type="primary"
+                            plain
                             :disabled="cloudActionFor(ed2kLink).disabled || isCloudSubmitting(ed2kLink)"
                             :loading="isCloudSubmitting(ed2kLink)"
                             @click="handleCloudAction(row, ed2kLink)"

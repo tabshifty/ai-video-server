@@ -34,9 +34,9 @@ func CloudDownloadTaskID(taskID int64, retryCount int) string {
 	return fmt.Sprintf("cloud:download:%d:%d", taskID, retryCount)
 }
 
-// EnqueueCloudDownload schedules a cloud download task on the main queue.
-// It reuses the transcode queue so no extra asynq queue or deployment change
-// is required; a job occupies one worker slot for its lifetime.
+// EnqueueCloudDownload schedules a cloud download task on the dedicated cloud
+// queue. The queue has a low weight so long downloads cannot occupy every
+// worker slot needed by transcodes and archive extraction.
 func (e *Enqueuer) EnqueueCloudDownload(taskID int64, retryCount int) error {
 	payload, err := json.Marshal(CloudDownloadPayload{TaskID: taskID})
 	if err != nil {
@@ -44,10 +44,7 @@ func (e *Enqueuer) EnqueueCloudDownload(taskID int64, retryCount int) error {
 	}
 	_, err = e.client.Enqueue(
 		asynq.NewTask(TypeCloudDownload, payload),
-		asynq.Queue(e.queue),
-		asynq.TaskID(CloudDownloadTaskID(taskID, retryCount)),
-		asynq.MaxRetry(2),
-		asynq.Timeout(6*time.Hour),
+		buildCloudDownloadTaskOptions(e.cloudQueue, CloudDownloadTaskID(taskID, retryCount))...,
 	)
 	if errors.Is(err, asynq.ErrTaskIDConflict) {
 		// Already pending, active or scheduled for this attempt; that is
@@ -58,6 +55,15 @@ func (e *Enqueuer) EnqueueCloudDownload(taskID int64, retryCount int) error {
 		return fmt.Errorf("enqueue cloud download task: %w", err)
 	}
 	return nil
+}
+
+func buildCloudDownloadTaskOptions(queue, taskID string) []asynq.Option {
+	return []asynq.Option{
+		asynq.Queue(queue),
+		asynq.TaskID(taskID),
+		asynq.MaxRetry(2),
+		asynq.Timeout(6 * time.Hour),
+	}
 }
 
 // HandleCloudDownload runs one cloud download task. On the final asynq attempt

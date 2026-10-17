@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  dedupeEd2kLinksByInfoHash,
+  extractApiErrorMessage,
+  getEd2kInfoHash,
   getEd2kLinkLabel,
   parseEd2kLinks
 } from './toolbox.helpers'
@@ -38,6 +41,45 @@ describe('toolbox ed2k helpers', () => {
     expect(result.invalidCount).toBe(1)
     expect(result.links).toHaveLength(1)
     expect(result.links[0].label).toBe('ok.mkv')
+  })
+
+  it('extracts normalized info hashes and rejects non-file or malformed links', () => {
+    expect(getEd2kInfoHash('ed2k://|file|a.mkv|1|0123456789ABCDEF0123456789ABCDEF|/'))
+      .toBe('0123456789abcdef0123456789abcdef')
+    expect(getEd2kInfoHash('ED2K://|file|a.mkv|1|0123456789abcdef0123456789abcdef|/'))
+      .toBe('0123456789abcdef0123456789abcdef')
+    expect(getEd2kInfoHash('ed2k://|server|127.0.0.1|4661|/')).toBe('')
+    expect(getEd2kInfoHash('ed2k://|file|a.mkv|1|not-a-hash|/')).toBe('')
+  })
+
+  it('deduplicates selected links by info hash and keeps the first occurrence', () => {
+    const first = {
+      id: '1:a',
+      href: 'ed2k://|file|a.mkv|1|0123456789ABCDEF0123456789ABCDEF|/',
+      infoHash: '0123456789abcdef0123456789abcdef'
+    }
+    const duplicate = {
+      id: '2:b',
+      href: 'ed2k://|file|a-copy.mkv|1|0123456789abcdef0123456789abcdef|/',
+      infoHash: '0123456789abcdef0123456789abcdef'
+    }
+    const other = {
+      id: '3:c',
+      href: 'ed2k://|file|c.mkv|1|FEDCBA9876543210FEDCBA9876543210|/',
+      infoHash: 'fedcba9876543210fedcba9876543210'
+    }
+
+    const result = dedupeEd2kLinksByInfoHash([first, duplicate, other])
+
+    expect(result.links).toEqual([first, other])
+    expect(result.duplicates).toEqual([duplicate])
+  })
+
+  it('extracts backend error messages from the response envelope', () => {
+    expect(extractApiErrorMessage({ response: { data: { msg: '云下载功能未启用' } } }, 'fallback'))
+      .toBe('云下载功能未启用')
+    expect(extractApiErrorMessage({ message: 'network down' }, 'fallback')).toBe('network down')
+    expect(extractApiErrorMessage({}, 'fallback')).toBe('fallback')
   })
 
 })

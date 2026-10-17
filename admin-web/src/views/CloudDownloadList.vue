@@ -434,8 +434,12 @@ onUnmounted(() => {
               <el-table-column label="大小" width="110">
                 <template #default="{ row }">{{ formatBytes(row.declared_size) }}</template>
               </el-table-column>
-              <el-table-column label="来源帖" min-width="200" show-overflow-tooltip>
-                <template #default="{ row }">{{ row.post_title || '--' }}</template>
+              <el-table-column label="来源" min-width="200" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <el-tag v-if="row.source === 'toolbox'" size="small" effect="plain">工具箱</el-tag>
+                  <el-tag v-else-if="row.source === 'manual'" size="small" effect="plain" type="info">手动</el-tag>
+                  <span v-else>{{ row.post_title || '原帖已删除' }}</span>
+                </template>
               </el-table-column>
               <el-table-column label="状态" min-width="140">
                 <template #default="{ row }">

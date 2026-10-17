@@ -189,7 +189,7 @@ func configureContentTranslation(scrapeSvc contentTranslationConfigurer, cfg con
 }
 
 func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
-	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.TranscodeTaskTimeout)
+	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.CloudDownloadQueue, cfg.TranscodeTaskTimeout)
 	defer enqueuer.Close()
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     cfg.RedisAddr,
@@ -322,7 +322,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 
 func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
 	mux := asynq.NewServeMux()
-	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.TranscodeTaskTimeout)
+	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.CloudDownloadQueue, cfg.TranscodeTaskTimeout)
 	defer enqueuer.Close()
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
 	configureAVScraper(scrapeSvc, cfg)
@@ -353,18 +353,24 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	processor.Register(mux)
 
 	redisOpt := asynq.RedisClientOpt{Addr: cfg.RedisAddr, Password: cfg.RedisPassword}
+	workerQueues := map[string]int{
+		cfg.AsynqQueue:          10,
+		cfg.ArchiveExtractQueue: 20,
+	}
+	queueNames := []string{cfg.AsynqQueue, cfg.ArchiveExtractQueue}
+	if cfg.CloudDownloadEnabled {
+		workerQueues[cfg.CloudDownloadQueue] = 1
+		queueNames = append(queueNames, cfg.CloudDownloadQueue)
+	}
 
 	srv := asynq.NewServer(
 		redisOpt,
 		asynq.Config{
 			Concurrency: cfg.MaxTranscodeWorkers + cfg.ArchiveExtractWorkers,
-			Queues: map[string]int{
-				cfg.AsynqQueue:          10,
-				cfg.ArchiveExtractQueue: 20,
-			},
+			Queues:      workerQueues,
 		},
 	)
-	logger.Info("worker started", "concurrency", cfg.MaxTranscodeWorkers+cfg.ArchiveExtractWorkers, "queues", []string{cfg.AsynqQueue, cfg.ArchiveExtractQueue})
+	logger.Info("worker started", "concurrency", cfg.MaxTranscodeWorkers+cfg.ArchiveExtractWorkers, "queues", queueNames)
 	if err := srv.Run(mux); err != nil {
 		return fmt.Errorf("run asynq server: %w", err)
 	}

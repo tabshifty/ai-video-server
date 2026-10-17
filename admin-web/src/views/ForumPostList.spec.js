@@ -15,7 +15,7 @@ describe('论坛资源列表页', () => {
     expect(script).toContain("import Toolbar from '../components/base/Toolbar.vue'")
     expect(script).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
     expect(script).toContain("import { cloudDownloadStatuses, createCloudDownload, getAdminForumPosts, retryCloudDownload } from '../api/admin'")
-    expect(script).toContain("import { getEd2kLinkLabel } from './toolbox.helpers'")
+    expect(script).toContain("import { getEd2kInfoHash, getEd2kLinkLabel } from './toolbox.helpers'")
   })
 
   it('固定每页 20 条并以独立草稿提交服务端标题搜索', () => {
@@ -89,5 +89,18 @@ describe('论坛资源列表页', () => {
     expect(style).toContain('overflow-wrap: anywhere;')
     expect(style).toContain('@media (max-width: 63.9375rem)')
     expect(style).toContain('min-height: 44px;')
+  })
+
+  it('行内 115 动作渲染为普通按钮而不是链接样式', () => {
+    const actionStart = template.indexOf('class="resource-link-action"')
+    expect(actionStart).toBeGreaterThan(-1)
+    const buttonStart = template.indexOf('<el-button', actionStart)
+    const buttonEnd = template.indexOf('</el-button>', buttonStart)
+    const actionButton = template.slice(buttonStart, buttonEnd + '</el-button>'.length)
+
+    expect(actionButton).toContain('size="small"')
+    expect(actionButton).toContain('type="primary"')
+    expect(actionButton).toContain('plain')
+    expect(actionButton).not.toContain('link')
   })
 })

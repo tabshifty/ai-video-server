@@ -100,13 +100,26 @@ func NewCloudDownloadService(
 
 // Submit parses a link, records the task (deduplicated by info hash) and
 // schedules it. It returns the task plus whether this call created it.
-func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID) (models.CloudDownloadTask, bool, error) {
+func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID, source string) (models.CloudDownloadTask, bool, error) {
 	link, err := cloud.ParseLink(rawLink)
 	if err != nil {
 		return models.CloudDownloadTask{}, false, err
 	}
+	source = strings.TrimSpace(source)
+	if source == "" {
+		source = models.CloudDownloadSourceManual
+		if postID != nil {
+			source = models.CloudDownloadSourceForumPost
+		}
+	}
+	switch source {
+	case models.CloudDownloadSourceForumPost, models.CloudDownloadSourceToolbox, models.CloudDownloadSourceManual:
+	default:
+		return models.CloudDownloadTask{}, false, fmt.Errorf("invalid cloud download source %q", source)
+	}
 	task, created, err := s.repo.CreateOrGet(ctx, models.CloudDownloadTask{
 		PostID:       postID,
+		Source:       source,
 		Protocol:     string(link.Kind),
 		InfoHash:     link.InfoHash,
 		SourceURL:    link.Raw,
@@ -141,6 +154,153 @@ func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, ra
 		return task, created, fmt.Errorf("enqueue cloud download: %w", err)
 	}
 	return task, created, nil
+}
+
+// SubmitBatch explicitly submits up to CloudDownloadBatchLimit links. It
+// creates no batch entity: every link becomes an independent task and gets
+// its own outcome. Existing completed/active tasks are skipped; failed or
+// blocked tasks are retried; one item's failure never aborts the batch.
+func (s *CloudDownloadService) SubmitBatch(ctx context.Context, links []string, createdBy *uuid.UUID) (models.CloudDownloadBatchResult, error) {
+	result := models.CloudDownloadBatchResult{Items: make([]models.CloudDownloadBatchItem, len(links))}
+	if len(links) == 0 {
+		return result, fmt.Errorf("links 不能为空")
+	}
+	if len(links) > models.CloudDownloadBatchLimit {
+		return result, fmt.Errorf("单次最多 %d 条链接", models.CloudDownloadBatchLimit)
+	}
+
+	type candidate struct {
+		index int
+		raw   string
+		link  cloud.Link
+	}
+	candidates := make([]candidate, 0, len(links))
+	seen := make(map[string]int, len(links))
+	for index, raw := range links {
+		trimmed := strings.TrimSpace(raw)
+		result.Items[index] = models.CloudDownloadBatchItem{Link: trimmed}
+		if trimmed == "" {
+			result.Items[index].Status = models.CloudBatchInvalid
+			result.Items[index].Message = "链接为空"
+			continue
+		}
+		parsed, err := cloud.ParseLink(trimmed)
+		if err != nil {
+			result.Items[index].Status = models.CloudBatchInvalid
+			result.Items[index].Message = err.Error()
+			continue
+		}
+		result.Items[index].InfoHash = parsed.InfoHash
+		if firstIndex, ok := seen[parsed.InfoHash]; ok {
+			result.Items[index].Status = models.CloudBatchDuplicate
+			result.Items[index].Message = fmt.Sprintf("与第 %d 条重复", firstIndex+1)
+			continue
+		}
+		seen[parsed.InfoHash] = index
+		candidates = append(candidates, candidate{index: index, raw: trimmed, link: parsed})
+	}
+
+	hashes := make([]string, 0, len(candidates))
+	for _, item := range candidates {
+		hashes = append(hashes, item.link.InfoHash)
+	}
+	statuses := map[string]models.CloudDownloadStatus{}
+	if len(hashes) > 0 {
+		loaded, err := s.repo.StatusByHashes(ctx, hashes)
+		if err != nil {
+			return result, fmt.Errorf("load cloud download statuses: %w", err)
+		}
+		statuses = loaded
+	}
+
+	for _, item := range candidates {
+		existing, exists := statuses[item.link.InfoHash]
+		if exists {
+			switch existing.Status {
+			case models.CloudDownloadCompleted:
+				result.Items[item.index].Status = models.CloudBatchSkippedCompleted
+				id := existing.TaskID
+				result.Items[item.index].TaskID = &id
+				continue
+			case models.CloudDownloadPending, models.CloudDownloadSubmitting,
+				models.CloudDownloadQueued, models.CloudDownloadReady,
+				models.CloudDownloadDownloading:
+				result.Items[item.index].Status = models.CloudBatchSkippedActive
+				id := existing.TaskID
+				result.Items[item.index].TaskID = &id
+				continue
+			case models.CloudDownloadFailed, models.CloudDownloadBlocked:
+				// Explicit user action: retry below.
+			default:
+				// Unknown future state: do not risk resetting it.
+				result.Items[item.index].Status = models.CloudBatchSkippedActive
+				id := existing.TaskID
+				result.Items[item.index].TaskID = &id
+				continue
+			}
+		}
+
+		task, created, err := s.Submit(ctx, nil, item.raw, createdBy, models.CloudDownloadSourceToolbox)
+		if err != nil {
+			result.Items[item.index].Status = models.CloudBatchFailed
+			result.Items[item.index].Message = err.Error()
+			continue
+		}
+		id := task.ID
+		result.Items[item.index].TaskID = &id
+		switch {
+		case created:
+			result.Items[item.index].Status = models.CloudBatchSubmitted
+		case task.Status == models.CloudDownloadCompleted:
+			result.Items[item.index].Status = models.CloudBatchSkippedCompleted
+		case exists && (existing.Status == models.CloudDownloadFailed || existing.Status == models.CloudDownloadBlocked):
+			result.Items[item.index].Status = models.CloudBatchRetried
+		case isCloudDownloadBatchActive(task.Status):
+			// A concurrent submitter won the create race; do not report a new
+			// submission for a task this request did not create.
+			result.Items[item.index].Status = models.CloudBatchSkippedActive
+		default:
+			result.Items[item.index].Status = models.CloudBatchFailed
+			result.Items[item.index].Message = "任务状态已变化，请刷新后重试"
+		}
+	}
+
+	result.Summary = summarizeCloudDownloadBatch(result.Items)
+	return result, nil
+}
+
+func isCloudDownloadBatchActive(status string) bool {
+	switch status {
+	case models.CloudDownloadPending, models.CloudDownloadSubmitting,
+		models.CloudDownloadQueued, models.CloudDownloadReady,
+		models.CloudDownloadDownloading:
+		return true
+	default:
+		return false
+	}
+}
+
+func summarizeCloudDownloadBatch(items []models.CloudDownloadBatchItem) models.CloudDownloadBatchSummary {
+	summary := models.CloudDownloadBatchSummary{Total: len(items)}
+	for _, item := range items {
+		switch item.Status {
+		case models.CloudBatchSubmitted:
+			summary.Submitted++
+		case models.CloudBatchRetried:
+			summary.Retried++
+		case models.CloudBatchSkippedCompleted:
+			summary.SkippedCompleted++
+		case models.CloudBatchSkippedActive:
+			summary.SkippedActive++
+		case models.CloudBatchDuplicate:
+			summary.Duplicate++
+		case models.CloudBatchInvalid:
+			summary.Invalid++
+		case models.CloudBatchFailed:
+			summary.Failed++
+		}
+	}
+	return summary
 }
 
 // Retry resets a failed/blocked task and schedules it again.

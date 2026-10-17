@@ -1,5 +1,23 @@
 # plan.md
 
+## 2026-10-17 23:51 +0800 完成：工具箱批量 115 提交与论坛按钮样式
+- 进度：批量接口、source、cloud 队列、工具箱勾选/全选/确认/逐条状态、论坛按钮样式、任务来源列、ADR/CONTEXT/部署文档均已完成。论坛右侧操作列按用户要求延期；未执行部署。
+- 评审修复：独立方案子代理在实现前后审阅 WIP，指出并已修复——handler 先过滤空项导致响应不 1:1；批量忽略 `created` 导致并发创建误报 submitted；source 仓库兜底 manual 与 DB 默认不一致；队列名未 trim；关闭功能时路由 404 而非 503；invalid 项未保留勾选；输入变化后选中集残留；窄屏操作目标不足 44px。
+- 影响文件：`migrations/0044_cloud_download_source.{up,down}.sql`、`internal/models/cloud_download.go`、`internal/repository/cloud_download_repository.go`、`internal/services/cloud_download_service{,_test}.go`、`internal/handlers/admin_cloud_download{,_test}.go`、`internal/handlers/router.go`、`internal/queue/{tasks,cloud_download,cloud_download_test}.go`、`internal/config/{config,config_test,config_cloud_download_test}.go`、`main.go`、`cmd/telegram-ingestor/main.go`、`admin-web/src/api/{admin,admin.spec}.js`、`admin-web/src/views/{ToolboxEd2k,ToolboxEd2k.spec,toolbox.helpers,toolbox.helpers.spec,ForumPostList,ForumPostList.spec,CloudDownloadList,cloudDownloadList.spec,precisionOpsRollout.spec}.{vue,js}`、`CONTEXT.md`、`docs/adr/0028-...md`、`docs/adr/0029-...md`、`docs/家用部署机.md`、`.env.example`、`plan.md`。
+- 验证：`go build ./...`、`go vet` 目标包、`go test ./... -skip 'TestParseTVAPKMetadataParsesReleaseAPK' -count=1` 全部通过；admin-web `npm test -- --run` 737 项通过、`npm run build` 通过；`git diff --check` 与乱码扫描通过。历史失败 `TestParseTVAPKMetadataParsesReleaseAPK`（version_code 144 vs 121）未触碰。
+- 备注：论坛操作列/`>2 条弹层` 留待后续；部署机尚未更新到本提交。
+
+## 2026-10-17 23:48 +0800 实施：工具箱批量 115 提交与 cloud 队列
+- 进度：已落地 migration 0044（`cloud_download_tasks.source`，默认 `forum_post`，check 三值）、任务来源读写与“来源”列、批量接口 `POST /admin/cloud-downloads/batch`（handler/service 双重 50 条上限、空项保留为 invalid、逐条结果、completed/进行中跳过、failed/blocked 重试、`created`/状态竞态分类）、独立 `cloud` 队列（权重 1，server/worker 配置一致，关闭功能时 worker 不消费）、工具箱勾选/全选/确认/逐条状态/失败保留勾选、论坛行内按钮改为普通 `plain` 按钮（不加操作列）、ADR 0029/CONTEXT/ADR 0028/部署文档/.env.example。
+- 影响文件：见本轮 plan 计划条目；另新增 `internal/handlers/admin_cloud_download_test.go`、`migrations/0044_cloud_download_source.{up,down}.sql`、`docs/adr/0029-explicit-batch-cloud-download-from-ed2k-toolbox.md`。
+- 验证：`go build ./...` 通过；`go vet` 目标包通过；`go test ./internal/handlers ./internal/config ./internal/queue ./internal/repository ./internal/cloud -count=1` 通过；service 定向测试（批量/Source/Process）通过；admin-web `npm test -- --run` 736 项通过，`npm run build` 通过；`git diff --check` 与乱码扫描通过。已知 `TestParseTVAPKMetadataParsesReleaseAPK` 为历史失败（version_code 144 vs 121），未在本轮触碰。
+- 评审：独立子代理评审进行中；发现问题后修复并复审。
+
+## 2026-10-17 23:34 +0800 计划：工具箱批量 115 提交与论坛按钮样式
+- 进度：按 grilling 结论实施。工具箱 ED2K 生成器增加勾选/全选、单批最多 50 条、确认后显式批量提交；新增 `POST /admin/cloud-downloads/batch` 逐条返回结果；云下载任务改走独立 `cloud` 队列（权重 1），避免批量任务占满转码槽位；任务新增 `source`（`forum_post`/`toolbox`/`manual`）。论坛仍逐条，仅把行内 `el-button link` 改成普通 `size="small"` 按钮，重试保留原位；右侧操作列改造延后。新增 ADR 0029，更新 CONTEXT/部署文档。
+- 影响文件：`migrations/0044_cloud_download_source.{up,down}.sql`、`internal/models/cloud_download.go`、`internal/repository/cloud_download_repository.go`、`internal/services/cloud_download_service.go`、`internal/handlers/admin_cloud_download.go`、`internal/queue/cloud_download.go`、`internal/queue/tasks.go`、`internal/config/config.go`、`main.go`、`admin-web/src/api/admin.js`、`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/toolbox.helpers.js`、`admin-web/src/views/ForumPostList.vue`、`admin-web/src/views/CloudDownloadList.vue`、对应测试、`CONTEXT.md`、`docs/adr/0029-explicit-batch-cloud-download-from-ed2k-toolbox.md`、`docs/adr/0028-...md`、`docs/家用部署机.md`、`.env.example`、`plan.md`。
+- 验证：待执行 `GOPROXY=off GOSUMDB=off go build ./...`、`go vet` 目标包、Go 定向测试、`admin-web npm test -- --run` 与 `npm run build`，并做 `git diff --check` 与乱码扫描。
+
 ## 2026-10-17 23:07 +0800 修复：cloud_download_tasks.post_id 改为 UUID
 - 进度：部署 hook 在 `0042_cloud_download_tasks` 失败：`collected_forum_posts.id` 是 UUID，原 `post_id BIGINT` 无法建立外键（`incompatible types: bigint and uuid`）。已把 migration 0042 的 `post_id` 改为 `UUID`，`CloudDownloadTask.PostID`、service `Submit`、handler 请求体统一为 `*uuid.UUID`；新增 `TestCloudDownloadTasksMigration` 锁定列类型，新增 `TestSubmitKeepsForumPostUUID` 锁定提交链路。部署机确认未创建该表、未写入 0042/0043 版本记录，修正后可直接重放迁移。
 - 影响文件：`migrations/0042_cloud_download_tasks.up.sql`、`internal/models/cloud_download.go`、`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`internal/handlers/admin_cloud_download.go`、`internal/repository/migrations_test.go`、`CONTEXT.md`、`plan.md`。

@@ -29,6 +29,29 @@ const (
 	CloudBlockedNeedsAttention = "needs_attention"
 )
 
+// Cloud download task provenance. The first explicit action keeps its source;
+// later submissions of the same info hash do not rewrite it.
+const (
+	CloudDownloadSourceForumPost = "forum_post"
+	CloudDownloadSourceToolbox   = "toolbox"
+	CloudDownloadSourceManual    = "manual"
+)
+
+// CloudDownloadBatchLimit is the maximum number of links one explicit batch
+// submit may contain. It is enforced by both the handler and the service.
+const CloudDownloadBatchLimit = 50
+
+// Per-link outcomes for an explicit batch submit.
+const (
+	CloudBatchSubmitted        = "submitted"
+	CloudBatchRetried          = "retried"
+	CloudBatchSkippedCompleted = "skipped_completed"
+	CloudBatchSkippedActive    = "skipped_active"
+	CloudBatchDuplicate        = "duplicate"
+	CloudBatchInvalid          = "invalid"
+	CloudBatchFailed           = "failed"
+)
+
 var (
 	// ErrCloudDownloadNotFound means the task id does not exist.
 	ErrCloudDownloadNotFound = errors.New("cloud: download task not found")
@@ -46,6 +69,7 @@ type CloudDownloadTask struct {
 	ID                int64      `json:"id"`
 	PostID            *uuid.UUID `json:"post_id"`
 	PostTitle         string     `json:"post_title"`
+	Source            string     `json:"source"`
 	Protocol          string     `json:"protocol"`
 	InfoHash          string     `json:"info_hash"`
 	SourceURL         string     `json:"source_url"`
@@ -75,4 +99,31 @@ type CloudDownloadStatus struct {
 	TaskID        int64  `json:"task_id"`
 	Status        string `json:"status"`
 	BlockedReason string `json:"blocked_reason"`
+}
+
+// CloudDownloadBatchItem is one link's outcome in an explicit batch submit.
+type CloudDownloadBatchItem struct {
+	Link     string `json:"link"`
+	InfoHash string `json:"info_hash,omitempty"`
+	Status   string `json:"status"`
+	TaskID   *int64 `json:"task_id,omitempty"`
+	Message  string `json:"message,omitempty"`
+}
+
+// CloudDownloadBatchSummary counts item outcomes for the batch response.
+type CloudDownloadBatchSummary struct {
+	Total            int `json:"total"`
+	Submitted        int `json:"submitted"`
+	Retried          int `json:"retried"`
+	SkippedCompleted int `json:"skipped_completed"`
+	SkippedActive    int `json:"skipped_active"`
+	Duplicate        int `json:"duplicate"`
+	Invalid          int `json:"invalid"`
+	Failed           int `json:"failed"`
+}
+
+// CloudDownloadBatchResult is returned by the explicit batch endpoint.
+type CloudDownloadBatchResult struct {
+	Items   []CloudDownloadBatchItem  `json:"items"`
+	Summary CloudDownloadBatchSummary `json:"summary"`
 }

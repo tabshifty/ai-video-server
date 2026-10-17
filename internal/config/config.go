@@ -47,6 +47,7 @@ type Config struct {
 	MaxTranscodeWorkers         int
 	AsynqQueue                  string
 	ArchiveExtractQueue         string
+	CloudDownloadQueue          string
 	ArchiveExtractWorkers       int
 	TranscodeTaskTimeout        time.Duration
 	TelegramAPIID               int
@@ -114,6 +115,7 @@ func Load() (Config, error) {
 		AVScraperThePornDBNoHash:    getBoolEnv("AV_SCRAPER_THEPORNDB_NO_HASH", false),
 		AsynqQueue:                  getEnv("ASYNQ_QUEUE", "transcode"),
 		ArchiveExtractQueue:         getEnv("ARCHIVE_EXTRACT_QUEUE", "archive"),
+		CloudDownloadQueue:          strings.TrimSpace(getEnv("CLOUD_DOWNLOAD_QUEUE", "cloud")),
 		ArchiveExtractWorkers:       getIntEnv("ARCHIVE_EXTRACT_WORKERS", 1),
 		MaxTranscodeWorkers:         getIntEnv("MAX_TRANSCODE_WORKERS", 2),
 		TranscodeTaskTimeout:        time.Duration(getIntEnv("TRANSCODE_TASK_TIMEOUT_MINUTES", 360)) * time.Minute,
@@ -161,6 +163,9 @@ func Load() (Config, error) {
 	if err := validateCloudDownload(cfg); err != nil {
 		return Config{}, err
 	}
+	if err := validateQueues(cfg); err != nil {
+		return Config{}, err
+	}
 	if cfg.AVSiteURLs == nil {
 		cfg.AVSiteURLs = map[string]string{}
 	}
@@ -187,6 +192,20 @@ func validateCloudDownload(cfg Config) error {
 	}
 	if strings.TrimSpace(cfg.CloudBrowserApp) != "" && parsed.Port() == "" {
 		return fmt.Errorf("CLOUD_BROWSER_CDP must include a port when CLOUD_BROWSER_APP is set")
+	}
+	return nil
+}
+
+// validateQueues keeps the dedicated cloud queue from colliding with the
+// transcode/archive queues; asynq would silently merge equal names.
+func validateQueues(cfg Config) error {
+	cloudQueue := strings.TrimSpace(cfg.CloudDownloadQueue)
+	if cloudQueue == "" {
+		return fmt.Errorf("CLOUD_DOWNLOAD_QUEUE is required")
+	}
+	if cloudQueue == strings.TrimSpace(cfg.AsynqQueue) ||
+		cloudQueue == strings.TrimSpace(cfg.ArchiveExtractQueue) {
+		return fmt.Errorf("CLOUD_DOWNLOAD_QUEUE must differ from ASYNQ_QUEUE and ARCHIVE_EXTRACT_QUEUE")
 	}
 	return nil
 }
