@@ -35,7 +35,7 @@ type cloudDownloadRepository interface {
 	SetProgress(ctx context.Context, id int64, percent float64, cloudStatus string) error
 	SetReady(ctx context.Context, id int64, pickCode string) error
 	SetLocalPath(ctx context.Context, id int64, localPath string) error
-	BumpRetry(ctx context.Context, id int64) error
+	BumpRetry(ctx context.Context, id int64) (bool, error)
 	ClaimDownloadTrigger(ctx context.Context, id int64) (bool, error)
 	ClearDownloadTrigger(ctx context.Context, id int64) error
 	ListUnfinished(ctx context.Context, limit int) ([]models.CloudDownloadTask, error)
@@ -138,12 +138,18 @@ func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, ra
 	case task.Status == models.CloudDownloadFailed || task.Status == models.CloudDownloadBlocked:
 		// A new user action is also an explicit retry: reset the attempt so
 		// the worker starts from submit and clears the old trigger marker.
-		if err := s.repo.BumpRetry(ctx, task.ID); err != nil {
+		bumped, err := s.repo.BumpRetry(ctx, task.ID)
+		if err != nil {
 			return task, created, err
 		}
 		task, err = s.repo.GetByID(ctx, task.ID)
 		if err != nil {
 			return task, created, err
+		}
+		if !bumped {
+			// Another request already retried or completed this row; do not
+			// enqueue a second job for the same user action.
+			return task, created, nil
 		}
 	default:
 		// submitting/queued/ready/downloading: the reconciler owns the row.
@@ -319,12 +325,19 @@ func (s *CloudDownloadService) Retry(ctx context.Context, id int64) (models.Clou
 	if task.Status != models.CloudDownloadFailed && task.Status != models.CloudDownloadBlocked {
 		return task, fmt.Errorf("%w: %s", models.ErrCloudDownloadNotRetryable, task.Status)
 	}
-	if err := s.repo.BumpRetry(ctx, id); err != nil {
+	bumped, err := s.repo.BumpRetry(ctx, id)
+	if err != nil {
 		return models.CloudDownloadTask{}, err
 	}
 	updated, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return models.CloudDownloadTask{}, err
+	}
+	if !bumped {
+		if updated.Status == models.CloudDownloadPending {
+			return updated, nil
+		}
+		return updated, fmt.Errorf("%w: %s", models.ErrCloudDownloadNotRetryable, updated.Status)
 	}
 	if err := s.enqueuer.EnqueueCloudDownload(updated.ID, updated.RetryCount); err != nil {
 		// Keep the row recoverable instead of leaving it pending with no job.

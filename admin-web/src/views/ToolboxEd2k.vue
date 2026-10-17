@@ -10,12 +10,13 @@ import { cloudDownloadStatuses, createCloudDownloadBatch } from '../api/admin'
 import {
   dedupeEd2kLinksByInfoHash,
   extractApiErrorMessage,
-  parseEd2kLinks
+  indexCloudBatchItems,
+  parseEd2kLinks,
+  summarizeEd2kBatchSelection
 } from './toolbox.helpers'
 
 // Keep this aligned with models.CloudDownloadBatchLimit on the backend.
 const BATCH_LIMIT = 50
-const ACTIVE_CLOUD_STATUSES = new Set(['pending', 'submitting', 'queued', 'ready', 'downloading'])
 const CLOUD_STATUS_META = {
   pending: { label: '排队中', type: 'info' },
   submitting: { label: '提交中', type: 'info' },
@@ -176,40 +177,35 @@ async function submitSelected() {
     return
   }
 
-  const hashes = [...new Set(uniqueLinks.map((link) => link.infoHash).filter(Boolean))]
+  const preliminary = summarizeEd2kBatchSelection(uniqueLinks, duplicates, {})
+  if (preliminary.submittableLinks.length === 0) {
+    ElMessage.warning('所选链接缺少有效的 info_hash，无法提交')
+    return
+  }
+
   batchSubmitting.value = true
   try {
     let statuses = {}
-    if (hashes.length > 0) {
-      const payload = await cloudDownloadStatuses(hashes)
+    if (preliminary.hashes.length > 0) {
+      const payload = await cloudDownloadStatuses(preliminary.hashes)
       statuses = payload?.statuses || {}
     }
-
-    const counts = { completed: 0, active: 0, retry: 0, fresh: 0 }
-    for (const link of uniqueLinks) {
-      const status = statuses[link.infoHash]?.status
-      if (status === 'completed') {
-        counts.completed += 1
-      } else if (ACTIVE_CLOUD_STATUSES.has(status)) {
-        counts.active += 1
-      } else if (status === 'failed' || status === 'blocked') {
-        counts.retry += 1
-      } else {
-        counts.fresh += 1
-      }
-    }
+    const selection = summarizeEd2kBatchSelection(uniqueLinks, duplicates, statuses)
 
     const summaryText = [
       `共选 ${selectedLinks.value.length} 条，去重后 ${uniqueLinks.length} 条`,
-      `新提交 ${counts.fresh} 条`,
-      `重试 ${counts.retry} 条`,
-      `已下载跳过 ${counts.completed} 条`,
-      `进行中跳过 ${counts.active} 条`,
-      duplicates.length > 0 ? `重复 ${duplicates.length} 条` : ''
+      `无效 ${selection.invalidLinks.length} 条（不提交）`,
+      `重复 ${selection.duplicateCount} 条（已合并）`,
+      `将提交 ${selection.submittableLinks.length} 条`,
+      `新提交 ${selection.fresh} 条`,
+      `重试 ${selection.retry} 条`,
+      `已下载跳过 ${selection.completed} 条`,
+      `进行中跳过 ${selection.active} 条`,
+      ed2kInvalidCount.value > 0 ? `另有 ${ed2kInvalidCount.value} 行非 ED2K 文本已忽略` : ''
     ].filter(Boolean).join('；')
     try {
       await ElMessageBox.confirm(
-        `${summaryText}。将把 ${uniqueLinks.length} 条链接提交到 115 云下载。`,
+        `${summaryText}。确认发送到 115 云下载？`,
         '发送选中到115',
         { confirmButtonText: '提交', cancelButtonText: '取消', type: 'warning' }
       )
@@ -217,11 +213,10 @@ async function submitSelected() {
       return
     }
 
-    const result = await createCloudDownloadBatch(uniqueLinks.map((link) => link.href))
-    const items = Array.isArray(result?.items) ? result.items : []
-    const byHash = {}
-    for (const item of items) {
-      byHash[item.info_hash || item.link] = item
+    const result = await createCloudDownloadBatch(selection.submittableLinks.map((link) => link.href))
+    const byHash = indexCloudBatchItems(result?.items)
+    for (const link of selection.invalidLinks) {
+      byHash[link.href] = { link: link.href, status: 'invalid', message: 'info_hash 无效' }
     }
     batchItemsByHash.value = byHash
     duplicateLinkIds.value = new Set(duplicates.map((link) => link.id))
@@ -231,8 +226,8 @@ async function submitSelected() {
       retried: summary.retried || 0,
       skipped_completed: summary.skipped_completed || 0,
       skipped_active: summary.skipped_active || 0,
-      duplicate: (summary.duplicate || 0) + duplicates.length,
-      invalid: summary.invalid || 0,
+      duplicate: (summary.duplicate || 0) + selection.duplicateCount,
+      invalid: (summary.invalid || 0) + selection.invalidLinks.length,
       failed: summary.failed || 0
     }
     selectedLinkIds.value = new Set(
@@ -240,11 +235,17 @@ async function submitSelected() {
         .filter((link) => ['failed', 'invalid'].includes(byHash[link.infoHash || link.href]?.status))
         .map((link) => link.id)
     )
-    ElMessage.success('批量提交完成')
+    if (batchSummary.value.failed > 0) {
+      ElMessage.warning('部分链接发送失败，请查看结果')
+    } else if (batchSummary.value.invalid > 0) {
+      ElMessage.warning('部分链接无效，请查看结果')
+    } else {
+      ElMessage.success('批量提交完成')
+    }
 
-    if (hashes.length > 0) {
+    if (selection.hashes.length > 0) {
       try {
-        const refreshed = await cloudDownloadStatuses(hashes)
+        const refreshed = await cloudDownloadStatuses(selection.hashes)
         cloudStatuses.value = refreshed?.statuses || {}
       } catch {
         // The batch result is already visible; a status refresh failure must

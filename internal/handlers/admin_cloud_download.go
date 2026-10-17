@@ -27,8 +27,9 @@ type cloudDownloadService interface {
 	LoginQR(ctx context.Context) (string, error)
 }
 
-// SetCloudDownloadService wires the service. Routes register only when set,
-// which keeps CLOUD_DOWNLOAD_ENABLED=false a real off switch.
+// SetCloudDownloadService wires the service. The admin routes are always
+// registered; requireCloudDownload returns 503 when the service is nil, which
+// keeps CLOUD_DOWNLOAD_ENABLED=false a real off switch without a raw 404.
 func (a *API) SetCloudDownloadService(svc cloudDownloadService) {
 	a.cloudDownload = svc
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -198,10 +199,15 @@ func validateCloudDownload(cfg Config) error {
 
 // validateQueues keeps the dedicated cloud queue from colliding with the
 // transcode/archive queues; asynq would silently merge equal names.
+var queueNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
 func validateQueues(cfg Config) error {
 	cloudQueue := strings.TrimSpace(cfg.CloudDownloadQueue)
 	if cloudQueue == "" {
 		return fmt.Errorf("CLOUD_DOWNLOAD_QUEUE is required")
+	}
+	if !queueNamePattern.MatchString(cloudQueue) {
+		return fmt.Errorf("CLOUD_DOWNLOAD_QUEUE must contain only letters, digits, underscores or dashes")
 	}
 	if cloudQueue == strings.TrimSpace(cfg.AsynqQueue) ||
 		cloudQueue == strings.TrimSpace(cfg.ArchiveExtractQueue) {

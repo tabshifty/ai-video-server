@@ -4,7 +4,9 @@ import {
   extractApiErrorMessage,
   getEd2kInfoHash,
   getEd2kLinkLabel,
-  parseEd2kLinks
+  indexCloudBatchItems,
+  parseEd2kLinks,
+  summarizeEd2kBatchSelection
 } from './toolbox.helpers'
 
 describe('toolbox ed2k helpers', () => {
@@ -80,6 +82,42 @@ describe('toolbox ed2k helpers', () => {
       .toBe('云下载功能未启用')
     expect(extractApiErrorMessage({ message: 'network down' }, 'fallback')).toBe('network down')
     expect(extractApiErrorMessage({}, 'fallback')).toBe('fallback')
+  })
+
+  it('indexes an invalid batch result by both its raw link and parsed hash', () => {
+    const link = 'ed2k://|file|bad-size.mkv|not-a-number|0123456789ABCDEF0123456789ABCDEF|/'
+    const item = { link, info_hash: '', status: 'invalid' }
+
+    const index = indexCloudBatchItems([item])
+
+    expect(index[link]).toBe(item)
+    expect(index['0123456789abcdef0123456789abcdef']).toBe(item)
+  })
+
+  it('separates invalid-hash selections and counts existing task states', () => {
+    const hashA = 'a'.repeat(32)
+    const hashB = 'b'.repeat(32)
+    const hashC = 'c'.repeat(32)
+    const links = [
+      { id: '1', href: 'ed2k://|file|a|1|' + hashA + '|/', infoHash: hashA },
+      { id: '2', href: 'ed2k://|file|b|1|' + hashB + '|/', infoHash: hashB },
+      { id: '3', href: 'ed2k://|file|c|1|' + hashC + '|/', infoHash: hashC },
+      { id: '4', href: 'ed2k://|file|bad|1|not-a-hash|/', infoHash: '' }
+    ]
+    const summary = summarizeEd2kBatchSelection(links, [{ id: '5' }], {
+      [hashA]: { status: 'completed' },
+      [hashB]: { status: 'queued' },
+      [hashC]: { status: 'failed' }
+    })
+
+    expect(summary.invalidLinks).toEqual([links[3]])
+    expect(summary.submittableLinks).toEqual([links[0], links[1], links[2]])
+    expect(summary.hashes).toEqual([hashA, hashB, hashC])
+    expect(summary.duplicateCount).toBe(1)
+    expect(summary.completed).toBe(1)
+    expect(summary.active).toBe(1)
+    expect(summary.retry).toBe(1)
+    expect(summary.fresh).toBe(0)
   })
 
 })

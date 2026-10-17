@@ -36,6 +36,65 @@ export function getEd2kInfoHash(link) {
   return /^[0-9a-fA-F]{32}$/.test(hash) ? hash.toLowerCase() : ''
 }
 
+export const CLOUD_DOWNLOAD_ACTIVE_STATUSES = new Set([
+  'pending',
+  'submitting',
+  'queued',
+  'ready',
+  'downloading'
+])
+
+export function indexCloudBatchItems(items) {
+  const index = {}
+  for (const item of Array.isArray(items) ? items : []) {
+    const infoHash = String(item?.info_hash || '').trim().toLowerCase()
+    const link = String(item?.link || '').trim()
+    // Backend invalid items have no info_hash. Register the link and the hash
+    // that the frontend parsed from it, so the row lookup finds the outcome.
+    const keys = new Set([infoHash, link, getEd2kInfoHash(link)].filter(Boolean))
+    for (const key of keys) {
+      index[key] = item
+    }
+  }
+  return index
+}
+
+export function summarizeEd2kBatchSelection(uniqueLinks, duplicates = [], statuses = {}) {
+  const invalidLinks = []
+  const submittableLinks = []
+  for (const link of uniqueLinks) {
+    if (link.infoHash) {
+      submittableLinks.push(link)
+    } else {
+      invalidLinks.push(link)
+    }
+  }
+
+  const counts = { fresh: 0, retry: 0, completed: 0, active: 0 }
+  const hashes = []
+  for (const link of submittableLinks) {
+    hashes.push(link.infoHash)
+    const status = statuses?.[link.infoHash]?.status
+    if (status === 'completed') {
+      counts.completed += 1
+    } else if (CLOUD_DOWNLOAD_ACTIVE_STATUSES.has(status)) {
+      counts.active += 1
+    } else if (status === 'failed' || status === 'blocked') {
+      counts.retry += 1
+    } else {
+      counts.fresh += 1
+    }
+  }
+
+  return {
+    invalidLinks,
+    submittableLinks,
+    hashes: [...new Set(hashes)],
+    duplicateCount: Array.isArray(duplicates) ? duplicates.length : 0,
+    ...counts
+  }
+}
+
 export function dedupeEd2kLinksByInfoHash(links) {
   const seen = new Set()
   const unique = []

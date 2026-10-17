@@ -29,6 +29,7 @@ type fakeCloudRepo struct {
 	readyPickCodes    []string
 	localPaths        []string
 	bumpRetryCalls    int
+	bumpRetryDenied   bool
 	triggerClaims     int
 	triggerClaimed    bool
 	clearTriggerCalls int
@@ -107,15 +108,20 @@ func (f *fakeCloudRepo) SetLocalPath(_ context.Context, _ int64, localPath strin
 	return nil
 }
 
-func (f *fakeCloudRepo) BumpRetry(_ context.Context, _ int64) error {
+func (f *fakeCloudRepo) BumpRetry(_ context.Context, _ int64) (bool, error) {
 	f.bumpRetryCalls++
+	if f.bumpRetryDenied {
+		// Simulate another request having already moved the row to pending.
+		f.task.Status = models.CloudDownloadPending
+		return false, nil
+	}
 	f.task.RetryCount++
 	f.task.Status = models.CloudDownloadPending
 	f.task.BlockedReason = ""
 	f.task.ErrorMessage = ""
 	f.task.FinishedAt = nil
 	f.task.DownloadTriggeredAt = nil
-	return nil
+	return true, nil
 }
 
 func (f *fakeCloudRepo) ClaimDownloadTrigger(_ context.Context, _ int64) (bool, error) {
@@ -742,6 +748,102 @@ func TestSubmitBatchHandlesConcurrentCreate(t *testing.T) {
 	}
 	if len(enq.ids) != 0 {
 		t.Fatalf("enqueue calls = %v, want none", enq.ids)
+	}
+}
+
+func TestSubmitBatchAcceptsFiftyLinks(t *testing.T) {
+	repo := &fakeCloudRepo{createCreated: true}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+	links := make([]string, models.CloudDownloadBatchLimit)
+	for index := range links {
+		links[index] = testED2KLink(fmt.Sprintf("f%d.mkv", index), fmt.Sprintf("%032x", index+1))
+	}
+
+	result, err := svc.SubmitBatch(context.Background(), links, nil)
+	if err != nil {
+		t.Fatalf("SubmitBatch returned error: %v", err)
+	}
+	if result.Summary.Submitted != models.CloudDownloadBatchLimit || len(enq.ids) != models.CloudDownloadBatchLimit {
+		t.Fatalf("summary = %+v, enqueues = %d", result.Summary, len(enq.ids))
+	}
+}
+
+func TestSubmitBatchReturnsStatusLookupError(t *testing.T) {
+	repo := &fakeCloudRepo{statusErr: errors.New("database down")}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	_, err := svc.SubmitBatch(context.Background(), []string{
+		testED2KLink("a.mkv", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+	}, nil)
+	if err == nil {
+		t.Fatalf("SubmitBatch returned nil error")
+	}
+	if len(enq.ids) != 0 {
+		t.Fatalf("enqueue calls = %v, want none", enq.ids)
+	}
+}
+
+func TestSubmitBatchDoesNotDuplicateAlreadyClaimedRetry(t *testing.T) {
+	const hash = "ffffffffffffffffffffffffffffffff"
+	repo := &fakeCloudRepo{
+		task: models.CloudDownloadTask{
+			ID:         8,
+			InfoHash:   hash,
+			Status:     models.CloudDownloadFailed,
+			RetryCount: 2,
+		},
+		statusByHash: map[string]models.CloudDownloadStatus{
+			hash: {TaskID: 8, Status: models.CloudDownloadFailed},
+		},
+		bumpRetryDenied: true,
+	}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	result, err := svc.SubmitBatch(context.Background(), []string{
+		testED2KLink("f.mkv", hash),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SubmitBatch returned error: %v", err)
+	}
+	if result.Items[0].Status != models.CloudBatchRetried {
+		t.Fatalf("status = %q, want retried", result.Items[0].Status)
+	}
+	if len(enq.ids) != 0 {
+		t.Fatalf("enqueue calls = %v, want none for an already-claimed retry", enq.ids)
+	}
+}
+
+func TestSubmitBatchDoesNotRewriteExistingSource(t *testing.T) {
+	const hash = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+	repo := &fakeCloudRepo{
+		task: models.CloudDownloadTask{
+			ID:         7,
+			InfoHash:   hash,
+			Status:     models.CloudDownloadFailed,
+			RetryCount: 1,
+			Source:     models.CloudDownloadSourceForumPost,
+		},
+		statusByHash: map[string]models.CloudDownloadStatus{
+			hash: {TaskID: 7, Status: models.CloudDownloadFailed},
+		},
+	}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	result, err := svc.SubmitBatch(context.Background(), []string{
+		testED2KLink("e.mkv", hash),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SubmitBatch returned error: %v", err)
+	}
+	if result.Items[0].Status != models.CloudBatchRetried {
+		t.Fatalf("status = %q, want retried", result.Items[0].Status)
+	}
+	if repo.task.Source != models.CloudDownloadSourceForumPost {
+		t.Fatalf("source = %q, want forum_post", repo.task.Source)
 	}
 }
 

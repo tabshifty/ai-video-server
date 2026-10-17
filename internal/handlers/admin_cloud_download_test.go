@@ -102,6 +102,48 @@ func TestAdminCloudDownloadBatchCreateKeepsEmptyEntries(t *testing.T) {
 	}
 }
 
+func TestAdminCloudDownloadBatchCreateAcceptsFifty(t *testing.T) {
+	fake := &fakeBatchCloudDownloadService{}
+	router := newBatchTestRouter(fake)
+	links := make([]string, models.CloudDownloadBatchLimit)
+	for index := range links {
+		links[index] = "ed2k://|file|a.mkv|1|0123456789abcdef0123456789abcdef|/"
+	}
+	body, err := json.Marshal(map[string]any{"links": links})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	rec := postBatch(t, router, string(body))
+	var envelope struct {
+		Code int `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if envelope.Code != 0 {
+		t.Fatalf("code = %d, want 0", envelope.Code)
+	}
+	if len(fake.links) != models.CloudDownloadBatchLimit {
+		t.Fatalf("service links = %d, want %d", len(fake.links), models.CloudDownloadBatchLimit)
+	}
+}
+
+func TestAdminCloudDownloadBatchCreateReturns503WhenDisabled(t *testing.T) {
+	router := newBatchTestRouter(nil)
+
+	rec := postBatch(t, router, `{"links":["ed2k://|file|a.mkv|1|0123456789abcdef0123456789abcdef|/"]}`)
+	var envelope struct {
+		Code int `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if envelope.Code != 503 {
+		t.Fatalf("code = %d, want 503", envelope.Code)
+	}
+}
+
 func TestAdminCloudDownloadBatchCreateRejectsEmptyAndOversizedRequests(t *testing.T) {
 	fake := &fakeBatchCloudDownloadService{}
 	router := newBatchTestRouter(fake)

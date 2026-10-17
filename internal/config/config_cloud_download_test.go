@@ -38,6 +38,16 @@ func TestLoadCloudDownloadRequiresPortWhenBrowserPathIsSet(t *testing.T) {
 	}
 }
 
+func TestLoadCloudDownloadQueueRejectsInvalidName(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("CLOUD_DOWNLOAD_QUEUE", "cloud queue")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "CLOUD_DOWNLOAD_QUEUE") {
+		t.Fatalf("error = %v, want CLOUD_DOWNLOAD_QUEUE name validation error", err)
+	}
+}
+
 func TestLoadCloudDownloadQueueRejectsCollision(t *testing.T) {
 	setRequiredEnv(t)
 	t.Setenv("CLOUD_DOWNLOAD_QUEUE", "transcode")

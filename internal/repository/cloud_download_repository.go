@@ -289,22 +289,24 @@ func (r *CloudDownloadRepository) ListUnfinished(ctx context.Context, limit int)
 	return tasks, nil
 }
 
-// BumpRetry increments the retry counter and requeues the task.
-func (r *CloudDownloadRepository) BumpRetry(ctx context.Context, id int64) error {
-	_, err := r.pool.Exec(ctx, `
+// BumpRetry increments the retry counter and requeues a failed/blocked task.
+// The bool reports whether this call won the conditional update; a concurrent
+// retry that already moved the row must not enqueue a second job.
+func (r *CloudDownloadRepository) BumpRetry(ctx context.Context, id int64) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
 UPDATE cloud_download_tasks SET
     retry_count = retry_count + 1,
-    status = $2,
+    status = 'pending',
     blocked_reason = NULL,
     error_message = NULL,
     finished_at = NULL,
     download_triggered_at = NULL,
     updated_at = now()
-WHERE id = $1`, id, models.CloudDownloadPending)
+WHERE id = $1 AND status IN ('failed', 'blocked')`, id)
 	if err != nil {
-		return fmt.Errorf("retry cloud download: %w", err)
+		return false, fmt.Errorf("retry cloud download: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // StatusByHashes returns the compact status map used by the forum list.

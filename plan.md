@@ -1,5 +1,11 @@
 # plan.md
 
+## 2026-10-17 23:58 +0800 评审修复：无效结果映射、确认框无效计数与并发重试
+- 进度：第二轮独立评审提出两个阻塞项并已修复。无效项只按 info_hash/link 单键索引，导致前端用 hash 查不到后端 invalid 结果、不显示“无效”也不保持勾选；现 `indexCloudBatchItems` 同时登记 info_hash、原始 link 和 link 解析出的 hash。确认框缺少“无效”且无 hash 项被计为“新提交”；现 `summarizeEd2kBatchSelection` 分离无 hash 的 invalid，确认框显示无效/重复/将提交/已存在/重试，并列出被忽略的非 ED2K 行，invalid 不再计入新提交。
+- 重要项：`BumpRetry` 改为 `WHERE status IN ('failed','blocked')` 并返回 RowsAffected；并发重试已被抢占时 `Submit`/`Retry` 不再二次入队。部分失败/无效的结果提示从 success 改为 warning。`CLOUD_DOWNLOAD_QUEUE` 增加 asynq 队列名字符校验。修正 handler 路由注释。补 50 条接受/503、50 条 service、状态查询失败、source 不覆盖、并发抢占、invalid 映射与确认计数测试。
+- 影响文件：`internal/repository/cloud_download_repository.go`、`internal/services/cloud_download_service{,_test}.go`、`internal/handlers/admin_cloud_download{,_test}.go`、`internal/config/config{,_cloud_download_test}.go`、`admin-web/src/views/ToolboxEd2k{,.spec}.vue`、`admin-web/src/views/toolbox.helpers{,.spec}.js`、`plan.md`。
+- 验证：`go build ./...`、`go vet` 目标包、`go test ./... -skip 'TestParseTVAPKMetadataParsesReleaseAPK'` 全部通过；admin-web 739 项测试与 `npm run build` 通过；`git diff --check` 通过。
+
 ## 2026-10-17 23:53 +0800 评审修复：入队失败语义与超 50 全选
 - 进度：独立评审确认无阻塞，但指出两个重要项并已修复。其一，`Submit` 在 enqueue 失败时行仍为 `pending`，reconciler 会继续跑，而单条/批量却报失败；现与 `Retry` 一致，enqueue 失败调用 `s.fail` 落为 `failed` 并返回错误。其二，工具箱有效链接超过 50 时“全选→发送”必然超限；现全选只选前 50 条，达到 50 后其余行复选框禁用并提示“取消一条后可改选其他链接”。
 - 影响文件：`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/ToolboxEd2k.spec.js`、`plan.md`。
