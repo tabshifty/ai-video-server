@@ -58,7 +58,9 @@ const ed2kInvalidCount = computed(() => ed2kParseResult.value.invalidCount)
 const ed2kHasInput = computed(() => ed2kInput.value.trim() !== '')
 const selectedLinks = computed(() => ed2kLinks.value.filter((link) => selectedLinkIds.value.has(link.id)))
 const selectedCount = computed(() => selectedLinks.value.length)
-const allSelected = computed(() => ed2kLinks.value.length > 0 && selectedCount.value === ed2kLinks.value.length)
+const batchSelectableCount = computed(() => Math.min(ed2kLinks.value.length, BATCH_LIMIT))
+const allSelected = computed(() => batchSelectableCount.value > 0 && selectedCount.value === batchSelectableCount.value)
+const isSelectionLimitReached = computed(() => selectedCount.value >= BATCH_LIMIT)
 const selectionIndeterminate = computed(() => selectedCount.value > 0 && !allSelected.value)
 watch(ed2kLinks, (links) => {
   const currentIds = new Set(links.map((link) => link.id))
@@ -104,6 +106,10 @@ function toggleSelection(link) {
   if (next.has(link.id)) {
     next.delete(link.id)
   } else {
+    if (selectedCount.value >= BATCH_LIMIT) {
+      ElMessage.warning(`单批最多 ${BATCH_LIMIT} 条，请先取消一条`)
+      return
+    }
     next.add(link.id)
   }
   selectedLinkIds.value = next
@@ -114,7 +120,7 @@ function toggleSelectAll(value) {
     return
   }
   selectedLinkIds.value = value
-    ? new Set(ed2kLinks.value.map((link) => link.id))
+    ? new Set(ed2kLinks.value.slice(0, BATCH_LIMIT).map((link) => link.id))
     : new Set()
 }
 
@@ -313,9 +319,14 @@ async function submitSelected() {
                 :disabled="batchSubmitting"
                 @change="toggleSelectAll"
               >
-                全选
+                {{ ed2kLinks.length > BATCH_LIMIT ? `全选前 ${BATCH_LIMIT} 条` : '全选' }}
               </el-checkbox>
-              <span class="ed2k-batch-hint">单次最多 {{ BATCH_LIMIT }} 条</span>
+              <span class="ed2k-batch-hint">
+                单次最多 {{ BATCH_LIMIT }} 条
+                <template v-if="ed2kLinks.length > BATCH_LIMIT">
+                  ；全选只选前 {{ BATCH_LIMIT }} 条，取消一条后可改选其他链接
+                </template>
+              </span>
             </div>
 
             <div
@@ -327,7 +338,7 @@ async function submitSelected() {
               <el-checkbox
                 :model-value="isSelected(link)"
                 :aria-label="`选择第 ${link.lineNumber} 行 ${link.label}`"
-                :disabled="batchSubmitting"
+                :disabled="batchSubmitting || (!isSelected(link) && isSelectionLimitReached)"
                 @change="toggleSelection(link)"
               />
               <span class="ed2k-link__line tabular-num">{{ link.lineNumber }}</span>

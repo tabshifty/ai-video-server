@@ -19,6 +19,9 @@ describe('ToolboxEd2k', () => {
 
   it('adds explicit checkbox batch submission with a 50-link confirmation', () => {
     expect(source).toContain('全选')
+    expect(source).toContain('全选前')
+    expect(source).toContain('isSelectionLimitReached')
+    expect(source).toContain('取消一条后可改选其他链接')
     expect(source).toContain('发送选中到115')
     expect(source).toContain('selectedLinkIds')
     expect(source).toContain('duplicateLinkIds')

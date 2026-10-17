@@ -151,6 +151,10 @@ func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, ra
 	}
 
 	if err := s.enqueuer.EnqueueCloudDownload(task.ID, task.RetryCount); err != nil {
+		// Keep the persisted row consistent with the returned error: a
+		// pending row would otherwise be picked up by the reconciler while the
+		// caller (and a batch item) reports failure.
+		_ = s.fail(ctx, task.ID, fmt.Sprintf("入队失败: %v", err))
 		return task, created, fmt.Errorf("enqueue cloud download: %w", err)
 	}
 	return task, created, nil

@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-17 23:53 +0800 评审修复：入队失败语义与超 50 全选
+- 进度：独立评审确认无阻塞，但指出两个重要项并已修复。其一，`Submit` 在 enqueue 失败时行仍为 `pending`，reconciler 会继续跑，而单条/批量却报失败；现与 `Retry` 一致，enqueue 失败调用 `s.fail` 落为 `failed` 并返回错误。其二，工具箱有效链接超过 50 时“全选→发送”必然超限；现全选只选前 50 条，达到 50 后其余行复选框禁用并提示“取消一条后可改选其他链接”。
+- 影响文件：`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`admin-web/src/views/ToolboxEd2k.vue`、`admin-web/src/views/ToolboxEd2k.spec.js`、`plan.md`。
+- 验证：service 定向测试（含新增 `TestSubmitMarksFailedWhenEnqueueFails`）通过；admin-web 737 项测试与 `npm run build` 通过。
+
 ## 2026-10-17 23:51 +0800 完成：工具箱批量 115 提交与论坛按钮样式
 - 进度：批量接口、source、cloud 队列、工具箱勾选/全选/确认/逐条状态、论坛按钮样式、任务来源列、ADR/CONTEXT/部署文档均已完成。论坛右侧操作列按用户要求延期；未执行部署。
 - 评审修复：独立方案子代理在实现前后审阅 WIP，指出并已修复——handler 先过滤空项导致响应不 1:1；批量忽略 `created` 导致并发创建误报 submitted；source 仓库兜底 manual 与 DB 默认不一致；队列名未 trim；关闭功能时路由 404 而非 503；invalid 项未保留勾选；输入变化后选中集残留；窄屏操作目标不足 44px。

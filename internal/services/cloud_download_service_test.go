@@ -701,6 +701,25 @@ func TestSubmitBatchContinuesAfterItemFailure(t *testing.T) {
 	}
 }
 
+func TestSubmitMarksFailedWhenEnqueueFails(t *testing.T) {
+	repo := &fakeCloudRepo{createCreated: true}
+	enq := &fakeCloudEnqueuer{err: errors.New("redis down")}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+
+	_, _, err := svc.Submit(context.Background(), nil,
+		"ed2k://|file|a.zip|1|0123456789abcdef0123456789abcdef|/", nil,
+		models.CloudDownloadSourceManual)
+	if err == nil {
+		t.Fatalf("Submit returned nil error")
+	}
+	if repo.task.Status != models.CloudDownloadFailed {
+		t.Fatalf("persisted status = %q, want failed", repo.task.Status)
+	}
+	if repo.task.ErrorMessage == "" {
+		t.Fatalf("persisted error message is empty")
+	}
+}
+
 func TestSubmitBatchHandlesConcurrentCreate(t *testing.T) {
 	const hash = "dddddddddddddddddddddddddddddddd"
 	repo := &fakeCloudRepo{
