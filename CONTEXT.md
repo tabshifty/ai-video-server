@@ -67,11 +67,13 @@
 - `Hermes 机器接口边界`：Hermes 继续负责每 15 分钟调度、站点登录态、抓取、重试、筛选与 Telegram 推送；项目后端只提供持久化接口和由有效 `discover` 请求触发的资源感知清理，不增加独立后端定时器。机器请求使用独立 `HERMES_API_TOKEN`，不得复用管理员 JWT 或直连 PostgreSQL；Hermes 脚本从受限 `.env` 读取 `HERMES_FORUM_API_BASE_URL` 与同一 Token，`seen.json` 切换后仅作回滚留档，不再读写或承担查重。首期只允许受信任家庭局域网 HTTP，检查结果入库成功后才允许推送，离开受信任局域网前必须先启用 HTTPS。详见 `docs/adr/0020-hermes-forum-post-ingestion.md`。
 - `admin 论坛资源列表`：管理员在“服务与工具”的 `/forum-posts` 只读浏览筛选结论为 `included`，且检查状态为 `inspected` 或 `restricted` 的[[论坛采集帖子]]；受限记录不受年龄或资源存在性限制，并必须带有可辨认的状态标记。列表一帖一行，按发现时间倒序分页；`dedupe_only`、`pending`、`excluded` 和 `failed` 不属于该浏览投影。读取接口使用管理员身份，不复用 Hermes 机器身份。
 - `论坛标题搜索`：在完整的[[admin 论坛资源列表]]投影中，按帖子标题进行大小写不敏感的字面子串匹配；搜索词去除首尾空白，`%` 与 `_` 等字符不具有通配语义。搜索不改变列表的状态范围、保留边界或发现时间倒序。
-- `论坛资源原生链接边界`：[[admin 论坛资源列表]]中的标题和附件直接链接 Hermes 入库的原始 HTTP(S) URL，ED2K 直接使用原始 `ed2k://` 作为 `<a href>`；页面只解析 ED2K 文件名作为可见文本，资源按类型内 `position` 原样展示且不去重。点击链接不调用后端，不代理论坛 Cookie，不创建下载或 115 任务，也不记录点击状态。详见 `docs/adr/0021-admin-forum-resource-list.md`。
+- `论坛资源原生链接边界`：[[admin 论坛资源列表]]中的标题和附件直接链接 Hermes 入库的原始 HTTP(S) URL，ED2K 直接使用原始 `ed2k://` 作为 `<a href>`；页面只解析 ED2K 文件名作为可见文本，资源按类型内 `position` 原样展示且不去重。点击链接不调用后端，不代理论坛 Cookie，不创建下载或 115 任务，也不记录点击状态。管理员可对单条 ED2K 显式点击「发送到115」，它创建[[115 云下载任务]]但不入库、不转码；自动行为仍受 `docs/adr/0021-admin-forum-resource-list.md` 约束，显式例外见 `docs/adr/0028-explicit-cloud-download-from-forum-resources.md`。
 
 ## 115 开放平台接入约定
 - `115 官方文档为准`：115 生活开放平台接入以 `https://www.yuque.com/115yun/open` 为唯一主事实源；仓库内 `.codex/skills/115-open-platform` 只维护导航、稳定契约和安全流程，不镜像整站内容。每次实现前必须回查目标页面与更新记录，并记录核对日期。
 - `115 云下载`：115 在云端获取外部链接资源并把结果写入用户 115 云盘的过程；云下载完成只表示云盘中已经形成文件或文件夹，不表示文件已经到达家用部署机，也不表示已经进入视频库。_避免：115 本地下载、自动媒体入库。_
+- `115 云下载任务`：管理员显式提交的单条 ed2k/磁力链任务，按 `info_hash` 全局唯一，入队即落库；状态为 `pending/submitting/queued/ready/downloading/completed`，异常为 `failed` 与带原因的 `blocked(login_required|quota_exhausted|browser_down|needs_attention)`。下载文件只落到 `DOWNLOAD_DIR`，不创建 `videos` 记录、不触发转码；worker 重启后必须能从 115 侧与文件系统重建状态。
+- `115 云下载任务恢复`：worker 启动及每 2 分钟扫描 `pending/submitting/queued/ready/downloading` 并重新入队；asynq 任务 ID 为 `cloud:download:<id>:<retry_count>`，同一尝试在途时重复入队被忽略；`download_triggered_at` 是本地下载的一次性触发标记，手动重试（`retry_count + 1`）会清空它。`submitting` 视为可重新提交（115 返回 `10008` 表示任务已存在），不能当作“已经提交过”而跳过；`blocked` 只由管理员显式重试恢复。终态写库必须与 asynq 任务取消脱钩（`context.WithoutCancel`），否则 6 小时超时会留下无法恢复的非终态行。
 - `115 本地暂存`：[[115 云下载]]完成后，由家用部署机把对应云盘文件拉取到受管理的本地暂存目录；首期流程在本地暂存完成后结束，不创建视频库记录，也不触发转码或刮削。_避免：自动入库、下载即入库。_
 - `115 OAuth 模式边界`：有可保密服务端的应用使用授权码模式，`client_secret` 只存在服务端；无后端客户端使用手机扫码 OAuth 2.0 + PKCE，不得收集 115 账号密码或依赖非官方工具导出令牌。
 - `115 令牌旋转契约`：调用 `POST https://passportapi.115.com/open/refreshToken` 后必须将新 `access_token`、新 `refresh_token` 和实际 `expires_in` 作为一组原子替换；使用单航刷新防止并发覆盖，不硬编码官方页面的示例有效期，不频繁刷新。新 refresh token 不延长原 refresh token 的有效期。

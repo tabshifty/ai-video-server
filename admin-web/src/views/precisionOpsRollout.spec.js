@@ -60,9 +60,9 @@ const standaloneViews = {
   'Login.vue': 'form'
 }
 const shellViews = [
-  'AVManualScrape.vue', 'ActorManage.vue', 'CollectionManage.vue', 'Dashboard.vue',
+  'AVManualScrape.vue', 'ActorManage.vue', 'CloudDownloadList.vue', 'CollectionManage.vue', 'Dashboard.vue',
   'ForumPostList.vue', 'IPTVManage.vue', 'ImageCollectionManage.vue', 'ImageManage.vue', 'PendingDeleteShorts.vue',
-  'ScrapePreview.vue', 'SystemSettings.vue', 'TaskMonitor.vue', 'Toolbox.vue',
+  'ScrapePreview.vue', 'SystemSettings.vue', 'TaskMonitor.vue', 'TelegramManage.vue', 'Toolbox.vue',
   'TvAppManage.vue', 'TvSeriesManage.vue', 'UserManage.vue', 'VideoList.vue', 'VideoUpload.vue'
 ]
 const standalonePageViews = [
@@ -175,11 +175,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('assigns all 26 Vue views to exactly one boundary', () => {
+  it('assigns all 28 Vue views to exactly one boundary', () => {
     const actual = readdirSync(new URL('.', import.meta.url)).filter((name) => name.endsWith('.vue')).sort()
     const assigned = [...shellViews, ...standalonePageViews, ...componentViews].sort()
     expect(actual).toEqual(assigned)
-    expect(assigned).toHaveLength(26)
+    expect(assigned).toHaveLength(28)
   })
 
   it('fully removes the ordinary-page compatibility meta', () => {

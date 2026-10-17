@@ -18,6 +18,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
+	"video-server/internal/cloud"
 	"video-server/internal/config"
 	"video-server/internal/database"
 	"video-server/internal/handlers"
@@ -278,6 +279,13 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		},
 		passwordVaultCipher,
 	)
+	if cfg.CloudDownloadEnabled {
+		cloudClient := cloud.NewClient(cfg.CloudBrowserCDP, cfg.CloudBrowserApp)
+		cloudRepo := repository.NewCloudDownloadRepository(pool)
+		cloudSvc := services.NewCloudDownloadService(cloudRepo, cloudClient, cfg.DownloadDir, enqueuer, logger)
+		api.SetCloudDownloadService(cloudSvc)
+		logger.Info("cloud download enabled", "cdp", cfg.CloudBrowserCDP, "download_dir", cfg.DownloadDir)
+	}
 	api.Register(r)
 
 	srv := &http.Server{
@@ -330,6 +338,18 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	archiveImportSvc := services.NewArchiveImportService(pool, uploadSvc, imageSvc, repo, archiveImportQueueAdapter{enqueuer: enqueuer}, cfg.StorageRoot, cfg.UploadTempDir, logger)
 	processor.SetArchiveExtractService(archiveImportSvc)
+	if cfg.CloudDownloadEnabled {
+		cloudClient := cloud.NewClient(cfg.CloudBrowserCDP, cfg.CloudBrowserApp)
+		cloudRepo := repository.NewCloudDownloadRepository(pool)
+		cloudSvc := services.NewCloudDownloadService(cloudRepo, cloudClient, cfg.DownloadDir, enqueuer, logger)
+		processor.SetCloudDownloadService(cloudSvc)
+		// Recover rows left behind by a hard deploy kill or a lost enqueue.
+		// asynq task IDs make repeated reconciliation safe across workers.
+		reconcileCtx, reconcileCancel := context.WithCancel(context.Background())
+		defer reconcileCancel()
+		go cloudSvc.RunReconciler(reconcileCtx, 2*time.Minute)
+		logger.Info("cloud download worker enabled", "cdp", cfg.CloudBrowserCDP, "download_dir", cfg.DownloadDir)
+	}
 	processor.Register(mux)
 
 	redisOpt := asynq.RedisClientOpt{Addr: cfg.RedisAddr, Password: cfg.RedisPassword}

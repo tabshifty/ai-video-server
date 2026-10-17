@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -26,6 +27,10 @@ type Config struct {
 	PosterStoragePath           string
 	AdminWebDistPath            string
 	UploadTempDir               string
+	CloudDownloadEnabled        bool
+	DownloadDir                 string
+	CloudBrowserCDP             string
+	CloudBrowserApp             string
 	TMDBAPIKey                  string
 	TMDBBaseURL                 string
 	AVScraperBaseURL            string
@@ -90,6 +95,10 @@ func Load() (Config, error) {
 		PosterStoragePath:           getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
 		AdminWebDistPath:            getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist"),
 		UploadTempDir:               getEnv("UPLOAD_TEMP_DIR", "./tmp/uploads"),
+		CloudDownloadEnabled:        getBoolEnv("CLOUD_DOWNLOAD_ENABLED", false),
+		DownloadDir:                 getEnv("DOWNLOAD_DIR", "./downloads"),
+		CloudBrowserCDP:             strings.TrimSuffix(strings.TrimSpace(getEnv("CLOUD_BROWSER_CDP", "http://127.0.0.1:9333")), "/"),
+		CloudBrowserApp:             getEnv("CLOUD_BROWSER_APP", "/Applications/115Browser.app"),
 		TMDBAPIKey:                  os.Getenv("TMDB_API_KEY"),
 		TMDBBaseURL:                 getEnv("TMDB_BASE_URL", "https://api.themoviedb.org/3"),
 		AVScraperBaseURL:            getEnv("AV_SCRAPER_BASE_URL", "https://javdb.com"),
@@ -149,6 +158,9 @@ func Load() (Config, error) {
 	if strings.TrimSpace(cfg.PlayURLSignSecret) == "" {
 		cfg.PlayURLSignSecret = cfg.JWTSecret
 	}
+	if err := validateCloudDownload(cfg); err != nil {
+		return Config{}, err
+	}
 	if cfg.AVSiteURLs == nil {
 		cfg.AVSiteURLs = map[string]string{}
 	}
@@ -158,6 +170,25 @@ func Load() (Config, error) {
 	cfg.AVSiteURLJavDB = cfg.AVSiteURLs["javdb"]
 
 	return cfg, nil
+}
+
+// validateCloudDownload rejects an enabled feature with an unusable endpoint
+// or download directory instead of letting every task fail at runtime.
+func validateCloudDownload(cfg Config) error {
+	if !cfg.CloudDownloadEnabled {
+		return nil
+	}
+	if strings.TrimSpace(cfg.DownloadDir) == "" {
+		return fmt.Errorf("DOWNLOAD_DIR is required when CLOUD_DOWNLOAD_ENABLED=true")
+	}
+	parsed, err := url.Parse(cfg.CloudBrowserCDP)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf("CLOUD_BROWSER_CDP must be a valid http(s) URL")
+	}
+	if strings.TrimSpace(cfg.CloudBrowserApp) != "" && parsed.Port() == "" {
+		return fmt.Errorf("CLOUD_BROWSER_CDP must include a port when CLOUD_BROWSER_APP is set")
+	}
+	return nil
 }
 
 // ValidateTelegramIngestor validates configuration required only by the Telegram ingestor.

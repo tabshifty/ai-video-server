@@ -14,7 +14,7 @@ describe('论坛资源列表页', () => {
     expect(script).toContain("import AdminTablePagination from '../components/AdminTablePagination.vue'")
     expect(script).toContain("import Toolbar from '../components/base/Toolbar.vue'")
     expect(script).toContain("import StatusIndicator from '../components/base/StatusIndicator.vue'")
-    expect(script).toContain("import { getAdminForumPosts } from '../api/admin'")
+    expect(script).toContain("import { cloudDownloadStatuses, createCloudDownload, getAdminForumPosts, retryCloudDownload } from '../api/admin'")
     expect(script).toContain("import { getEd2kLinkLabel } from './toolbox.helpers'")
   })
 
@@ -67,6 +67,11 @@ describe('论坛资源列表页', () => {
     expect(template).toContain('getEd2kLinkLabel(ed2kLink)')
     expect(template).toContain("`${row.id}:attachment:${index}`")
     expect(template).toContain("`${row.id}:ed2k:${index}`")
+  })
+
+  it('允许对需处理的云下载任务直接重新入队', () => {
+    expect(script).toContain("status === 'blocked'")
+    expect(script).toContain("label: '重试', disabled: false, action: 'retry', tooltip: cloudBlockedReason(task.blocked_reason)")
   })
 
   it('明确空资源、加载失败和首次空列表状态', () => {

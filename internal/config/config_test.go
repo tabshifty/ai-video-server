@@ -12,6 +12,9 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("POSTGRES_DSN", "postgres://user:pass@127.0.0.1:5432/app?sslmode=disable")
 	t.Setenv("JWT_SECRET", "secret")
 	t.Setenv("PASSWORD_VAULT_KEY", "password-vault-test-key")
+	// Keep the optional cloud-download feature off unless a test enables it,
+	// so a developer's shell environment cannot inject validation failures.
+	t.Setenv("CLOUD_DOWNLOAD_ENABLED", "false")
 }
 
 func TestLoadIncludesAVSiteOverridesAndTokens(t *testing.T) {

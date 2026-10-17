@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
@@ -7,9 +8,17 @@ import EmptyState from '../components/base/EmptyState.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import StatusIndicator from '../components/base/StatusIndicator.vue'
 import Toolbar from '../components/base/Toolbar.vue'
-import { getAdminForumPosts } from '../api/admin'
+import { cloudDownloadStatuses, createCloudDownload, getAdminForumPosts, retryCloudDownload } from '../api/admin'
 import { formatAdminDateTime } from '../utils/dateTime'
 import { getEd2kLinkLabel } from './toolbox.helpers'
+
+const CLOUD_ACTIVE_STATUSES = new Set(['pending', 'submitting', 'queued', 'ready', 'downloading'])
+const CLOUD_BLOCKED_REASON_LABELS = {
+  login_required: '需要登录 115',
+  quota_exhausted: '配额不足',
+  browser_down: '浏览器未运行',
+  needs_attention: '需要人工确认'
+}
 
 const list = ref([])
 const total = ref(0)
@@ -18,7 +27,10 @@ const loaded = ref(false)
 const loadError = ref('')
 const query = reactive({ page: 1, page_size: 20, q: '' })
 const searchDraft = ref('')
+const cloudStatuses = ref({})
+const cloudSubmitting = ref(new Set())
 let loadSequence = 0
+let cloudStatusSequence = 0
 
 const initialLoading = computed(() => loading.value && !loaded.value)
 const hasAppliedSearch = computed(() => query.q.length > 0)
@@ -48,6 +60,7 @@ async function load() {
     loadError.value = ''
     list.value = Array.isArray(data?.items) ? data.items : []
     total.value = Number(data?.total_count || 0)
+    refreshCloudStatuses()
   } catch (error) {
     if (sequence !== loadSequence) return
     loadError.value = extractErrorMessage(error, '加载论坛资源失败')
@@ -79,6 +92,142 @@ function applySearch() {
 function clearSearch() {
   searchDraft.value = ''
   applySearch()
+}
+
+function getEd2kInfoHash(link) {
+  const raw = String(link || '').trim()
+  if (!/^ed2k:\/\//i.test(raw)) {
+    return ''
+  }
+  const parts = raw.slice('ed2k://'.length).split('|')
+  if (parts[0] === '') {
+    parts.shift()
+  }
+  if (parts.length < 4 || parts[0]?.toLowerCase() !== 'file') {
+    return ''
+  }
+  const hash = String(parts[3] || '').trim()
+  return /^[0-9a-fA-F]{32}$/.test(hash) ? hash.toLowerCase() : ''
+}
+
+function cloudLinkKey(link) {
+  return getEd2kInfoHash(link) || String(link || '').trim()
+}
+
+function normalizeCloudStatuses(payload) {
+  const statuses = payload?.statuses
+  if (!statuses || typeof statuses !== 'object') {
+    return {}
+  }
+  return Object.entries(statuses).reduce((result, [hash, status]) => {
+    const key = String(hash || '').trim().toLowerCase()
+    if (key && status) {
+      result[key] = status
+    }
+    return result
+  }, {})
+}
+
+async function refreshCloudStatuses() {
+  const hashes = [...new Set(
+    list.value.flatMap((row) => (Array.isArray(row?.ed2k_links) ? row.ed2k_links : [])
+      .map(getEd2kInfoHash)
+      .filter(Boolean))
+  )]
+  if (hashes.length === 0) {
+    cloudStatuses.value = {}
+    return
+  }
+  const sequence = ++cloudStatusSequence
+  try {
+    const data = await cloudDownloadStatuses(hashes)
+    if (sequence !== cloudStatusSequence) return
+    cloudStatuses.value = normalizeCloudStatuses(data)
+  } catch (error) {
+    if (sequence !== cloudStatusSequence) return
+    console.warn('[ForumPostList] refreshCloudStatuses failed:', error)
+  }
+}
+
+function cloudTaskFor(link) {
+  const hash = getEd2kInfoHash(link)
+  return hash ? cloudStatuses.value[hash] || null : null
+}
+
+function cloudBlockedReason(reason) {
+  return CLOUD_BLOCKED_REASON_LABELS[reason] || reason || ''
+}
+
+function cloudActionFor(link) {
+  const task = cloudTaskFor(link)
+  if (!task) {
+    return { label: '发送到115', disabled: false, action: 'create', tooltip: '' }
+  }
+  const status = String(task.status || '')
+  if (CLOUD_ACTIVE_STATUSES.has(status)) {
+    return { label: '进行中', disabled: true, action: '', tooltip: '' }
+  }
+  if (status === 'completed') {
+    return { label: '已下载', disabled: true, action: '', tooltip: '' }
+  }
+  if (status === 'failed') {
+    return { label: '重试', disabled: false, action: 'retry', tooltip: '' }
+  }
+  if (status === 'blocked') {
+    // blocked 任务需要人工处理后才能继续；允许在这里直接重新入队，
+    // 避免扫码登录后任务永远停在「需处理」。
+    return { label: '重试', disabled: false, action: 'retry', tooltip: cloudBlockedReason(task.blocked_reason) }
+  }
+  return { label: '进行中', disabled: true, action: '', tooltip: '' }
+}
+
+function isCloudSubmitting(link) {
+  return cloudSubmitting.value.has(cloudLinkKey(link))
+}
+
+function setCloudSubmitting(link, active) {
+  const key = cloudLinkKey(link)
+  const next = new Set(cloudSubmitting.value)
+  if (active) {
+    next.add(key)
+  } else {
+    next.delete(key)
+  }
+  cloudSubmitting.value = next
+}
+
+async function handleCloudAction(row, ed2kLink) {
+  const action = cloudActionFor(ed2kLink)
+  if (action.disabled || isCloudSubmitting(ed2kLink)) return
+  setCloudSubmitting(ed2kLink, true)
+  const hash = getEd2kInfoHash(ed2kLink)
+  try {
+    if (action.action === 'retry') {
+      const task = cloudTaskFor(ed2kLink)
+      if (!task?.task_id) {
+        throw new Error('未找到云下载任务')
+      }
+      await retryCloudDownload(task.task_id)
+      if (hash) {
+        cloudStatuses.value = { ...cloudStatuses.value, [hash]: { ...task, status: 'pending', blocked_reason: '' } }
+      }
+      ElMessage.success('已提交重试')
+    } else {
+      await createCloudDownload({ post_id: row.id, link: ed2kLink })
+      if (hash) {
+        cloudStatuses.value = {
+          ...cloudStatuses.value,
+          [hash]: { task_id: null, status: 'pending', blocked_reason: '' }
+        }
+      }
+      ElMessage.success('已发送到 115')
+    }
+    await refreshCloudStatuses()
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, action.action === 'retry' ? '重试云下载任务失败' : '发送到 115 失败'))
+  } finally {
+    setCloudSubmitting(ed2kLink, false)
+  }
 }
 
 onMounted(load)
@@ -184,15 +333,37 @@ onMounted(load)
               <el-table-column label="ED2K" min-width="280">
                 <template #default="{ row }">
                   <div v-if="row.ed2k_links?.length" class="resource-links">
-                    <a
+                    <div
                       v-for="(ed2kLink, index) in row.ed2k_links"
                       :key="`${row.id}:ed2k:${index}`"
-                      class="forum-link"
-                      :href="ed2kLink"
-                      :title="ed2kLink"
+                      class="resource-link-row"
                     >
-                      {{ getEd2kLinkLabel(ed2kLink) }}
-                    </a>
+                      <a
+                        class="forum-link"
+                        :href="ed2kLink"
+                        :title="ed2kLink"
+                      >
+                        {{ getEd2kLinkLabel(ed2kLink) }}
+                      </a>
+                      <el-tooltip
+                        :content="cloudActionFor(ed2kLink).tooltip"
+                        :disabled="!cloudActionFor(ed2kLink).tooltip"
+                        placement="top"
+                      >
+                        <span class="resource-link-action">
+                          <el-button
+                            size="small"
+                            link
+                            type="primary"
+                            :disabled="cloudActionFor(ed2kLink).disabled || isCloudSubmitting(ed2kLink)"
+                            :loading="isCloudSubmitting(ed2kLink)"
+                            @click="handleCloudAction(row, ed2kLink)"
+                          >
+                            {{ cloudActionFor(ed2kLink).label }}
+                          </el-button>
+                        </span>
+                      </el-tooltip>
+                    </div>
                   </div>
                   <span v-else class="empty-resource">无</span>
                 </template>
@@ -261,6 +432,25 @@ onMounted(load)
   gap: var(--space-2);
 }
 
+.resource-link-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.resource-link-row .forum-link {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.resource-link-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
 .forum-link {
   display: inline-flex;
   width: fit-content;
@@ -310,6 +500,10 @@ onMounted(load)
   .forum-link {
     min-height: 44px;
     align-items: center;
+  }
+
+  .resource-link-action :deep(.el-button) {
+    min-height: 44px;
   }
 }
 

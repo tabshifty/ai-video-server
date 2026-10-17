@@ -59,6 +59,7 @@ describe('command palette helpers', () => {
       { path: '/telegram', label: 'Telegram 管理', title: 'Telegram 管理', icon: 'Connection', alias: 'telegram tg 电报 telegram管理' },
       { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' },
       { path: '/forum-posts', label: '论坛资源', title: '论坛资源', icon: 'Link', alias: 'forum forums hermes forum-posts hermes-forum luntan ziyuan ltz y' },
+      { path: '/cloud-downloads', label: '115 云下载', title: '115 云下载', icon: 'Monitor', alias: '115 cloud download cloud-downloads yun xiazai yunxiazai wangpan yxz' },
       {
         path: '/toolbox',
         label: '工具箱',

@@ -29,6 +29,7 @@ const (
 	TypeScrapeRetag    = "video:scrape:retag"
 	TypeOrphanFileScan = "system:orphan-files:scan"
 	TypeArchiveExtract = "archive:extract"
+	TypeCloudDownload  = "cloud:download"
 )
 
 // TranscodePayload carries identifiers for worker-side processing.
@@ -100,6 +101,7 @@ type Processor struct {
 	storageRoot   string
 	uploadGC      bool
 	archiveImport ArchiveExtractService
+	cloudDownload CloudDownload
 }
 
 type ArchiveExtractService interface {
@@ -122,6 +124,9 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
 	mux.HandleFunc(TypeOrphanFileScan, p.HandleOrphanFileScan)
 	mux.HandleFunc(TypeArchiveExtract, p.HandleArchiveExtract)
+	if p.cloudDownload != nil {
+		mux.HandleFunc(TypeCloudDownload, p.HandleCloudDownload)
+	}
 }
 
 func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error {

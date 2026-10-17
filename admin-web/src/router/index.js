@@ -20,6 +20,7 @@ import ImageCollectionManage from '../views/ImageCollectionManage.vue'
 import SystemSettings from '../views/SystemSettings.vue'
 import TaskMonitor from '../views/TaskMonitor.vue'
 import ForumPostList from '../views/ForumPostList.vue'
+import CloudDownloadList from '../views/CloudDownloadList.vue'
 import Toolbox from '../views/Toolbox.vue'
 import ToolboxEd2k from '../views/ToolboxEd2k.vue'
 import ToolboxArchiveImport from '../views/ToolboxArchiveImport.vue'
@@ -55,7 +56,8 @@ const routes = [
   { path: '/toolbox/china-map', component: ToolboxChinaMap },
   { path: '/settings', component: SystemSettings },
   { path: '/tasks', component: TaskMonitor },
-  { path: '/forum-posts', component: ForumPostList }
+  { path: '/forum-posts', component: ForumPostList },
+  { path: '/cloud-downloads', name: 'CloudDownloadList', component: CloudDownloadList, meta: { title: '115 云下载' } }
 ]
 
 const router = createRouter({
