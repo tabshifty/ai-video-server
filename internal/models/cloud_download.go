@@ -44,7 +44,7 @@ func CloudDownloadTerminal(status string) bool {
 // CloudDownloadTask is one ed2k/magnet link tracked through 115 cloud download.
 type CloudDownloadTask struct {
 	ID                int64      `json:"id"`
-	PostID            *int64     `json:"post_id"`
+	PostID            *uuid.UUID `json:"post_id"`
 	PostTitle         string     `json:"post_title"`
 	Protocol          string     `json:"protocol"`
 	InfoHash          string     `json:"info_hash"`

@@ -100,7 +100,7 @@ func NewCloudDownloadService(
 
 // Submit parses a link, records the task (deduplicated by info hash) and
 // schedules it. It returns the task plus whether this call created it.
-func (s *CloudDownloadService) Submit(ctx context.Context, postID *int64, rawLink string, createdBy *uuid.UUID) (models.CloudDownloadTask, bool, error) {
+func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID) (models.CloudDownloadTask, bool, error) {
 	link, err := cloud.ParseLink(rawLink)
 	if err != nil {
 		return models.CloudDownloadTask{}, false, err

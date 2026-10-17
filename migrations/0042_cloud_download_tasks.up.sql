@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS cloud_download_tasks (
     id                  BIGSERIAL PRIMARY KEY,
-    post_id             BIGINT REFERENCES collected_forum_posts(id) ON DELETE SET NULL,
+    post_id             UUID REFERENCES collected_forum_posts(id) ON DELETE SET NULL,
     protocol            TEXT NOT NULL CHECK (protocol IN ('ed2k', 'magnet')),
     info_hash           TEXT NOT NULL,
     source_url          TEXT NOT NULL,

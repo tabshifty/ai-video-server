@@ -17,7 +17,7 @@ import (
 
 // cloudDownloadService is the admin-facing contract for cloud downloads.
 type cloudDownloadService interface {
-	Submit(ctx context.Context, postID *int64, rawLink string, createdBy *uuid.UUID) (models.CloudDownloadTask, bool, error)
+	Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID) (models.CloudDownloadTask, bool, error)
 	Retry(ctx context.Context, id int64) (models.CloudDownloadTask, error)
 	List(ctx context.Context, status string, page, pageSize int) ([]models.CloudDownloadTask, int, error)
 	StatusByHashes(ctx context.Context, hashes []string) (map[string]models.CloudDownloadStatus, error)
@@ -60,8 +60,10 @@ func (a *API) AdminCloudDownloadCreate(c *gin.Context) {
 		return
 	}
 	var req struct {
-		PostID *int64 `json:"post_id"`
-		Link   string `json:"link"`
+		// collected_forum_posts.id is a UUID; using int64 here would reject
+		// every real forum row before the request reaches the service.
+		PostID *uuid.UUID `json:"post_id"`
+		Link   string     `json:"link"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")

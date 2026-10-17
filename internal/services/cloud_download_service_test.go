@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"video-server/internal/cloud"
@@ -20,6 +21,7 @@ type fakeCloudRepo struct {
 	getErr            error
 	createErr         error
 	createCreated     bool
+	lastCreate        models.CloudDownloadTask
 	statuses          []string
 	reasons           []string
 	messages          []string
@@ -38,6 +40,7 @@ func (f *fakeCloudRepo) CreateOrGet(_ context.Context, task models.CloudDownload
 	if f.createErr != nil {
 		return models.CloudDownloadTask{}, false, f.createErr
 	}
+	f.lastCreate = task
 	if f.createCreated {
 		f.task = task
 		return task, true, nil
@@ -534,6 +537,27 @@ func TestSubmitResetsBlockedTask(t *testing.T) {
 	}
 	if len(enq.ids) != 1 || enq.ids[0] != 5 || enq.retrys[0] != 2 {
 		t.Fatalf("enqueue calls = %+v, want id=5 retry=2", enq)
+	}
+}
+
+func TestSubmitKeepsForumPostUUID(t *testing.T) {
+	repo := &fakeCloudRepo{createCreated: true}
+	enq := &fakeCloudEnqueuer{}
+	svc := newCloudTestService(repo, &fakeCloudSession{}, enq, t.TempDir())
+	postID := uuid.New()
+
+	task, created, err := svc.Submit(context.Background(), &postID, "ed2k://|file|a.zip|1|0123456789abcdef0123456789abcdef|/", nil)
+	if err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+	if !created {
+		t.Fatalf("created = false, want true")
+	}
+	if repo.lastCreate.PostID == nil || *repo.lastCreate.PostID != postID {
+		t.Fatalf("stored post_id = %v, want %s", repo.lastCreate.PostID, postID)
+	}
+	if task.PostID == nil || *task.PostID != postID {
+		t.Fatalf("returned post_id = %v, want %s", task.PostID, postID)
 	}
 }
 

@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-17 23:07 +0800 修复：cloud_download_tasks.post_id 改为 UUID
+- 进度：部署 hook 在 `0042_cloud_download_tasks` 失败：`collected_forum_posts.id` 是 UUID，原 `post_id BIGINT` 无法建立外键（`incompatible types: bigint and uuid`）。已把 migration 0042 的 `post_id` 改为 `UUID`，`CloudDownloadTask.PostID`、service `Submit`、handler 请求体统一为 `*uuid.UUID`；新增 `TestCloudDownloadTasksMigration` 锁定列类型，新增 `TestSubmitKeepsForumPostUUID` 锁定提交链路。部署机确认未创建该表、未写入 0042/0043 版本记录，修正后可直接重放迁移。
+- 影响文件：`migrations/0042_cloud_download_tasks.up.sql`、`internal/models/cloud_download.go`、`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`internal/handlers/admin_cloud_download.go`、`internal/repository/migrations_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：`GOPROXY=off GOSUMDB=off go build ./...` 通过；`go vet` 目标包通过；`go test ./internal/cloud ./internal/config ./internal/handlers ./internal/queue ./internal/repository -count=1` 通过；service 定向测试（16 项，含 UUID 提交）通过；admin-web 730 项测试与 `npm run build` 通过。本机 Go 默认 `GOPROXY` 会因访问 `proxy.golang.org` 卡住，验证统一加 `GOPROXY=off`。
+
 ## 2026-10-17 20:02 +0800 补充：重试后的 pending 任务也先查 115
 - 进度：`pending` 且 `retry_count > 0` 的任务（手动重试或失败重置）在提交前同样调用 `FindTask`；115 侧已有该任务时直接进入等待，避免对已完成的旧任务重复提交。新增 `TestProcessSkipsSubmitWhenRetriedPendingTaskExistsOn115`。
 - 影响文件：`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`plan.md`。

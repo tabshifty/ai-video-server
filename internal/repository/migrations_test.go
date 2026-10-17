@@ -341,6 +341,25 @@ func TestArchiveImportBatchEncodingMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+encoding_mode`)
 }
 
+func TestCloudDownloadTasksMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0042_cloud_download_tasks.up.sql")
+	down := readMigrationForTest(t, "0042_cloud_download_tasks.down.sql")
+	triggeredUp := readMigrationForTest(t, "0043_cloud_download_triggered.up.sql")
+	triggeredDown := readMigrationForTest(t, "0043_cloud_download_triggered.down.sql")
+
+	// collected_forum_posts.id is a UUID; a BIGINT post_id fails at deploy
+	// time with "incompatible types: bigint and uuid".
+	assertSQLPattern(t, up, `(?is)post_id\s+uuid\s+references\s+collected_forum_posts\s*\(\s*id\s*\)\s+on\s+delete\s+set\s+null`)
+	assertSQLPattern(t, up, `(?is)create\s+unique\s+index\s+if\s+not\s+exists\s+cloud_download_tasks_info_hash_key\s+on\s+cloud_download_tasks\s*\(\s*info_hash\s*\)`)
+	assertSQLPattern(t, up, `(?is)'pending'.*'submitting'.*'queued'.*'ready'.*'downloading'.*'completed'.*'failed'.*'blocked'`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+cloud_download_tasks`)
+
+	assertSQLPattern(t, triggeredUp, `(?is)alter\s+table\s+cloud_download_tasks\s+add\s+column\s+if\s+not\s+exists\s+download_triggered_at\s+timestamptz`)
+	assertSQLPattern(t, triggeredDown, `(?is)drop\s+column\s+if\s+exists\s+download_triggered_at`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

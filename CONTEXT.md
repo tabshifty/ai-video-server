@@ -73,6 +73,7 @@
 - `115 官方文档为准`：115 生活开放平台接入以 `https://www.yuque.com/115yun/open` 为唯一主事实源；仓库内 `.codex/skills/115-open-platform` 只维护导航、稳定契约和安全流程，不镜像整站内容。每次实现前必须回查目标页面与更新记录，并记录核对日期。
 - `115 云下载`：115 在云端获取外部链接资源并把结果写入用户 115 云盘的过程；云下载完成只表示云盘中已经形成文件或文件夹，不表示文件已经到达家用部署机，也不表示已经进入视频库。_避免：115 本地下载、自动媒体入库。_
 - `115 云下载任务`：管理员显式提交的单条 ed2k/磁力链任务，按 `info_hash` 全局唯一，入队即落库；状态为 `pending/submitting/queued/ready/downloading/completed`，异常为 `failed` 与带原因的 `blocked(login_required|quota_exhausted|browser_down|needs_attention)`。下载文件只落到 `DOWNLOAD_DIR`，不创建 `videos` 记录、不触发转码；worker 重启后必须能从 115 侧与文件系统重建状态。
+- `115 云下载任务 post_id`：`cloud_download_tasks.post_id` 必须与 `collected_forum_posts.id` 同为 `UUID`，Go 模型与 handler 使用 `*uuid.UUID`。写成 BIGINT 会在部署迁移时报 `foreign key ... incompatible types: bigint and uuid`，接口绑定也会拒绝真实帖子 ID。
 - `115 云下载任务恢复`：worker 启动及每 2 分钟扫描 `pending/submitting/queued/ready/downloading` 并重新入队；asynq 任务 ID 为 `cloud:download:<id>:<retry_count>`，同一尝试在途时重复入队被忽略；`download_triggered_at` 是本地下载的一次性触发标记，手动重试（`retry_count + 1`）会清空它。`submitting` 视为可重新提交（115 返回 `10008` 表示任务已存在），不能当作“已经提交过”而跳过；`blocked` 只由管理员显式重试恢复。终态写库必须与 asynq 任务取消脱钩（`context.WithoutCancel`），否则 6 小时超时会留下无法恢复的非终态行。
 - `115 本地暂存`：[[115 云下载]]完成后，由家用部署机把对应云盘文件拉取到受管理的本地暂存目录；首期流程在本地暂存完成后结束，不创建视频库记录，也不触发转码或刮削。_避免：自动入库、下载即入库。_
 - `115 OAuth 模式边界`：有可保密服务端的应用使用授权码模式，`client_secret` 只存在服务端；无后端客户端使用手机扫码 OAuth 2.0 + PKCE，不得收集 115 账号密码或依赖非官方工具导出令牌。
