@@ -2551,9 +2551,10 @@ onUnmounted(() => {
               <template v-else>当前是多选模式；批量编辑和批量处理继续走下方主动作区，单文件弹窗不在这里打开。</template>
             </template>
           </SectionCard>
-
-          <BulkActionBar :count="selectedFileIDs.length" :actions="bulkActions" />
         </div>
+        <template v-if="selectedFileIDs.length > 0" #footer>
+          <BulkActionBar :count="selectedFileIDs.length" :actions="bulkActions" />
+        </template>
       </el-drawer>
 
       <el-dialog
@@ -4094,16 +4095,6 @@ onUnmounted(() => {
     height: 44px;
     min-width: 44px;
     min-height: 44px;
-  }
-
-  .archive-drawer :deep(.bulk-action-bar) {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .archive-drawer :deep(.bulk-action-bar__actions) {
-    width: 100%;
-    flex-wrap: wrap;
   }
 
   .archive-file-sort :deep(.el-segmented__item) {

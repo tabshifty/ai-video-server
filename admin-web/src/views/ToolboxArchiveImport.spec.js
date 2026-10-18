@@ -336,7 +336,7 @@ describe('ToolboxArchiveImport', () => {
     expect(template).toContain('v-model="archiveGroupDialogVisible"')
     expect(template).toContain(':before-close="handleArchiveGroupDialogBeforeClose"')
     expect(template).toContain('v-model="quickCollectionDialogVisible"')
-    expect(template).toContain('<BulkActionBar :count="selectedFileIDs.length" :actions="bulkActions" />')
+    expect(template).toMatch(/<template v-if="selectedFileIDs\.length > 0" #footer>\s*<BulkActionBar :count="selectedFileIDs\.length" :actions="bulkActions" \/>/s)
   })
 
   it('uses a 52px minimum media row and exposes the full skipped reason through a focusable tooltip', () => {
@@ -452,7 +452,6 @@ describe('ToolboxArchiveImport', () => {
     expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-group-panel__actions,[\s\S]*?\.archive-drawer__hero-actions\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s)
     expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-import-tool :deep\(\.page-header-shell__actions\),[\s\S]*?\.archive-file-panel :deep\(\.section-card__actions\)\s*\{[^}]*width:\s*100%;[^}]*margin-left:\s*0;[^}]*flex-wrap:\s*wrap;/s)
     expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-batch-panel :deep\(\.section-card__header\),[\s\S]*?\.archive-file-panel :deep\(\.section-card__header\)\s*\{[^}]*flex-wrap:\s*wrap;/s)
-    expect(style).toMatch(/@media \(max-width: 63\.9375rem\)[\s\S]*?\.archive-drawer :deep\(\.bulk-action-bar\)\s*\{[^}]*flex-direction:\s*column;[\s\S]*?\.archive-drawer :deep\(\.bulk-action-bar__actions\)\s*\{[^}]*width:\s*100%;[^}]*flex-wrap:\s*wrap;/s)
     expect(style).toMatch(/@media \(max-width: 48rem\)[\s\S]*?\.archive-group-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/s)
     expect(style).toMatch(/@media \(max-width: 48rem\)[\s\S]*?\.archive-file-sort\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;/s)
     expect(style).toMatch(/@media \(max-width: 48rem\)[\s\S]*?\.archive-file-editor__form :deep\(\.el-form-item__content\),[\s\S]*?\.quick-collection-form :deep\(\.el-form-item__content\)\s*\{[^}]*margin-left:\s*0 !important;[^}]*min-width:\s*0;/s)

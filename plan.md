@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-18 15:15 +0800 修复：压缩包批次批量操作条不显示
+- 进度：`BulkActionBar` 原先放在批次详情抽屉正文末尾，长文件清单下虽为 sticky 但初始在视口外，勾选后看不到批量入口。现改为 `el-drawer` 的 `footer` 插槽，选中 ≥1 项时固定在抽屉底部立即显示；删除失效的 `.archive-drawer :deep(.bulk-action-bar)` 移动端规则，保留共享组件自身的响应式布局。更新抽屉/批量条测试断言。
+- 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：`npm test -- --run` 51 文件 773 测试通过；`npm run build` 通过；待提交并推送 `deploy`（仅前端重建）。
+
 ## 2026-10-18 15:00 +0800 前端修复：压缩包导入弹窗支持新建合集
 - 进度：压缩包入媒体库弹窗的“默认视频合集/默认图片合集”增加“新建视频合集/新建图片合集”按钮；复用管理端 collection/image-collection 创建 API，弹出名称+简介小对话框，创建成功后把新合集合并进候选并自动加入当前默认合集数组，随导入表单提交。视频弹窗未改。
 - 影响文件：`admin-web/src/components/CloudDownloadImportDialog.vue`、`CloudDownloadImportDialog.spec.js`、`CONTEXT.md`、`plan.md`。
