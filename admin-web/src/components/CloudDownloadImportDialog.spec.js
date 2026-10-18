@@ -60,6 +60,19 @@ describe('115 云下载导入弹窗', () => {
     expect(script).toContain('validateArchiveImportForm')
   })
 
+  it('压缩包弹窗可新建视频/图片合集并自动选中', () => {
+    expect(script).toContain('createAdminCollection')
+    expect(script).toContain('createAdminImageCollection')
+    expect(script).toContain('quickCollectionDialogVisible')
+    expect(script).toContain('async function saveQuickCollection()')
+    expect(script).toContain('archiveForm.default_video_collection_ids')
+    expect(script).toContain('archiveForm.default_image_collection_ids')
+    expect(template).toContain('新建视频合集')
+    expect(template).toContain('新建图片合集')
+    expect(template).toContain('v-model="quickCollectionDialogVisible"')
+    expect(template).toContain('创建并选中')
+  })
+
   it('默认标题取 local_path basename，提交走任务 import 接口', () => {
     expect(script).toContain('resolveCloudImportDefaultTitle')
     expect(script).toContain('buildVideoImportPayload')

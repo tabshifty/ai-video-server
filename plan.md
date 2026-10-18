@@ -1,5 +1,11 @@
 # plan.md
 
+## 2026-10-18 15:00 +0800 前端修复：压缩包导入弹窗支持新建合集
+- 进度：压缩包入媒体库弹窗的“默认视频合集/默认图片合集”增加“新建视频合集/新建图片合集”按钮；复用管理端 collection/image-collection 创建 API，弹出名称+简介小对话框，创建成功后把新合集合并进候选并自动加入当前默认合集数组，随导入表单提交。视频弹窗未改。
+- 影响文件：`admin-web/src/components/CloudDownloadImportDialog.vue`、`CloudDownloadImportDialog.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：`npm test -- --run` 51 文件 773 测试通过；`npm run build` 通过；`git diff --check` 干净。
+- 收尾：提交并推送 `deploy`，触发前端重建（Go 不在变更桶，不重启 server/worker）。
+
 ## 2026-10-18 01:21 +0800 实施完成/评审修复：云下载任务显式导入媒体库
 - 进度：后端、前端、迁移、文档已完成，独立评审的阻塞/重要问题已修复并复验。新增 `cloud:ingest`（`cloud` 队列，2h/2 retry，TaskID 含 import id + attempt）与 `cloud_download_imports`（task_id 唯一，状态 queued/hashing/copying/creating/imported/skipped_existing/failed，UUID FK）；服务端 preview/import，任务列表 import 摘要；视频 SHA-256/size 查重、hash 命中（含 pending_delete）删下载源不改已有视频、未命中复制到 `STORAGE_ROOT/videos/<videoID>/source-original`、建 videos 入现有队列、转码成功删导入源（DV `source-dv` 播放产物保留）；压缩包复制到 `archive-imports/<batchID>/original`、异步解包、工具箱处理，批次删除不触碰 DOWNLOAD_DIR；修 `RetryExtract` encoding_mode。
 - 评审修复：`Process`/`MarkFailed` 校验 payload attempt，旧 asynq 重试不再覆盖新尝试；活动导入 10 分钟后 UI 允许“重新导入”，后端用同一 attempt/TaskID 幂等补投（队列丢失可自救，表单需重填）；视频 `SaveImportedFile` 成功但 `video_id` 未回写时按 metadata `source=cloud_download`+`cloud_task_id` 走 resume，不误判 skipped；压缩包重试只有 uploaded/failed 才 RetryExtract，已入队/已解包批次只关联完成；补 copy 父目录、ready 孤儿源清理、target 缺失时非 ready/processing 失败保源、sha256 持久化。

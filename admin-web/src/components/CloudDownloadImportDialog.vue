@@ -2,6 +2,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
+  createAdminCollection,
+  createAdminImageCollection,
   getAdminActors,
   getAdminCollections,
   getAdminImageCollections,
@@ -13,6 +15,7 @@ import {
   buildArchiveImportPayload,
   buildVideoImportPayload,
   formatImportFileSize,
+  normalizeImportUUIDs,
   resolveCloudImportDefaultTitle,
   validateArchiveImportForm,
   validateVideoImportForm
@@ -54,6 +57,13 @@ const collectionOptions = ref([])
 const loadingCollections = ref(false)
 const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
+const quickCollectionDialogVisible = ref(false)
+const quickCollectionSaving = ref(false)
+const quickCollectionForm = reactive({
+  kind: 'video',
+  name: '',
+  description: ''
+})
 
 const videoForm = reactive({
   type: 'short',
@@ -80,6 +90,9 @@ const kind = computed(() => (props.preview?.kind === 'archive' ? 'archive' : 'vi
 const isAVType = computed(() => videoForm.type === 'av')
 const isShortType = computed(() => videoForm.type === 'short')
 const dialogTitle = computed(() => (kind.value === 'archive' ? '压缩包入媒体库' : '视频入媒体库'))
+const quickCollectionDialogTitle = computed(() =>
+  quickCollectionForm.kind === 'image' ? '新建图片合集' : '新建视频合集'
+)
 const fileName = computed(() => String(props.preview?.name || props.task?.declared_name || '').trim() || '--')
 const fileSize = computed(() => formatImportFileSize(props.preview?.size))
 const fileMime = computed(() => String(props.preview?.mime || '').trim())
@@ -223,6 +236,77 @@ const loadImageCollectionSuggestions = createRemoteSuggestionLoader({
   },
   mergeOptions: mergeRemoteValueOptions
 })
+
+function openQuickCollectionDialog(collectionKind) {
+  quickCollectionForm.kind = collectionKind
+  quickCollectionForm.name = ''
+  quickCollectionForm.description = ''
+  quickCollectionDialogVisible.value = true
+}
+
+function openCreateVideoCollection() {
+  openQuickCollectionDialog('video')
+}
+
+function openCreateImageCollection() {
+  openQuickCollectionDialog('image')
+}
+
+function appendCreatedCollection(collectionKind, created) {
+  const option = {
+    value: created.id,
+    label: created.name || quickCollectionForm.name.trim()
+  }
+  if (collectionKind === 'image') {
+    imageCollectionOptions.value = mergeRemoteValueOptions(imageCollectionOptions.value, [option])
+    archiveForm.default_image_collection_ids = normalizeImportUUIDs([
+      ...archiveForm.default_image_collection_ids,
+      created.id
+    ])
+    return
+  }
+  collectionOptions.value = mergeRemoteValueOptions(collectionOptions.value, [option])
+  archiveForm.default_video_collection_ids = normalizeImportUUIDs([
+    ...archiveForm.default_video_collection_ids,
+    created.id
+  ])
+}
+
+async function saveQuickCollection() {
+  if (quickCollectionSaving.value) return
+  const name = quickCollectionForm.name.trim()
+  if (!name) {
+    ElMessage.warning(`请输入${quickCollectionForm.kind === 'image' ? '图片合集' : '视频合集'}名称`)
+    return
+  }
+
+  quickCollectionSaving.value = true
+  try {
+    const payload = {
+      name,
+      description: quickCollectionForm.description.trim(),
+      cover_url: '',
+      sort_order: 0,
+      active: true
+    }
+    if (quickCollectionForm.kind === 'image') {
+      payload.cover_image_id = null
+    }
+    const created = quickCollectionForm.kind === 'image'
+      ? await createAdminImageCollection(payload)
+      : await createAdminCollection(payload)
+    appendCreatedCollection(quickCollectionForm.kind, created)
+    quickCollectionDialogVisible.value = false
+    ElMessage.success(`${quickCollectionForm.kind === 'image' ? '图片合集' : '视频合集'}已创建并选中`)
+  } catch (error) {
+    ElMessage.error(extractApiErrorMessage(
+      error,
+      quickCollectionForm.kind === 'image' ? '创建图片合集失败' : '创建视频合集失败'
+    ))
+  } finally {
+    quickCollectionSaving.value = false
+  }
+}
 
 function resetVideoForm() {
   videoForm.type = 'short'
@@ -486,52 +570,62 @@ async function submitImport() {
           </el-select>
         </el-form-item>
         <el-form-item label="默认视频合集">
-          <el-select
-            v-model="archiveForm.default_video_collection_ids"
-            class="cloud-import-control"
-            multiple
-            filterable
-            remote
-            reserve-keyword
-            clearable
-            default-first-option
-            collapse-tags
-            collapse-tags-tooltip
-            :remote-method="loadCollectionSuggestions"
-            :loading="loadingCollections"
-            placeholder="可选，可多选"
-          >
-            <el-option
-              v-for="collection in collectionOptions"
-              :key="collection.value"
-              :label="collection.label"
-              :value="collection.value"
-            />
-          </el-select>
+          <div class="cloud-import-collection-row">
+            <el-select
+              v-model="archiveForm.default_video_collection_ids"
+              class="cloud-import-control cloud-import-collection-select"
+              multiple
+              filterable
+              remote
+              reserve-keyword
+              clearable
+              default-first-option
+              collapse-tags
+              collapse-tags-tooltip
+              :remote-method="loadCollectionSuggestions"
+              :loading="loadingCollections"
+              placeholder="可选，可多选"
+            >
+              <el-option
+                v-for="collection in collectionOptions"
+                :key="collection.value"
+                :label="collection.label"
+                :value="collection.value"
+              />
+            </el-select>
+            <el-button class="cloud-import-collection-button" @click="openCreateVideoCollection">
+              新建视频合集
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="默认图片合集">
-          <el-select
-            v-model="archiveForm.default_image_collection_ids"
-            class="cloud-import-control"
-            multiple
-            filterable
-            remote
-            reserve-keyword
-            clearable
-            default-first-option
-            collapse-tags
-            collapse-tags-tooltip
-            :remote-method="loadImageCollectionSuggestions"
-            :loading="loadingImageCollections"
-            placeholder="可选，可多选"
-          >
-            <el-option
-              v-for="collection in imageCollectionOptions"
-              :key="collection.value"
-              :label="collection.label"
-              :value="collection.value"
-            />
-          </el-select>
+          <div class="cloud-import-collection-row">
+            <el-select
+              v-model="archiveForm.default_image_collection_ids"
+              class="cloud-import-control cloud-import-collection-select"
+              multiple
+              filterable
+              remote
+              reserve-keyword
+              clearable
+              default-first-option
+              collapse-tags
+              collapse-tags-tooltip
+              :remote-method="loadImageCollectionSuggestions"
+              :loading="loadingImageCollections"
+              placeholder="可选，可多选"
+            >
+              <el-option
+                v-for="collection in imageCollectionOptions"
+                :key="collection.value"
+                :label="collection.label"
+                :value="collection.value"
+              />
+            </el-select>
+            <el-button class="cloud-import-collection-button" @click="openCreateImageCollection">
+              新建图片合集
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="有密码">
           <el-switch v-model="archiveForm.has_password" />
@@ -546,6 +640,39 @@ async function submitImport() {
         </el-form-item>
       </el-form>
     </div>
+
+    <el-dialog
+      v-model="quickCollectionDialogVisible"
+      :title="quickCollectionDialogTitle"
+      width="min(94vw, 520px)"
+      append-to-body
+      destroy-on-close
+      data-density="form"
+    >
+      <el-form label-width="104px" class="cloud-import-quick-collection-form">
+        <el-form-item :label="quickCollectionForm.kind === 'image' ? '图片合集名称' : '视频合集名称'">
+          <el-input
+            v-model="quickCollectionForm.name"
+            placeholder="请输入合集名称"
+            @keyup.enter="saveQuickCollection"
+          />
+        </el-form-item>
+        <el-form-item label="合集简介">
+          <el-input
+            v-model="quickCollectionForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="可选，简介用于后台识别"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="quickCollectionDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="quickCollectionSaving" @click="saveQuickCollection">
+          创建并选中
+        </el-button>
+      </template>
+    </el-dialog>
 
     <template #footer>
       <el-button :disabled="submitting" @click="closeDialog">取消</el-button>
@@ -601,6 +728,23 @@ async function submitImport() {
   width: 100%;
 }
 
+.cloud-import-collection-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.cloud-import-collection-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.cloud-import-collection-button {
+  flex: 0 0 auto;
+}
+
 @media (max-width: 48rem) {
   .cloud-import-form :deep(.el-form-item) {
     display: grid;
@@ -615,6 +759,11 @@ async function submitImport() {
   .cloud-import-form :deep(.el-form-item__content) {
     min-width: 0;
     margin-left: 0 !important;
+  }
+
+  .cloud-import-collection-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
