@@ -64,6 +64,7 @@ import {
   getAdminVideoSubtitles,
   getLatestOrphanFileScan,
   importCloudDownload,
+  deleteCloudDownloadCloudFile,
   keepAdminPendingDeleteShort,
   markAdminShortVideoPendingDelete,
   offlineAdminTVAppRelease,
@@ -748,5 +749,15 @@ describe('cloud download import apis', () => {
     await importCloudDownload(42, payload)
 
     expect(post).toHaveBeenCalledWith('/admin/cloud-downloads/42/import', payload)
+  })
+
+  it('posts an explicit confirmation when moving the 115 source to recycle', async () => {
+    await deleteCloudDownloadCloudFile(42)
+
+    expect(post).toHaveBeenCalledWith(
+      '/admin/cloud-downloads/42/cloud-file/delete',
+      { confirm: true },
+      { timeout: 120000 }
+    )
   })
 })

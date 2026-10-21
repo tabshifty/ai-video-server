@@ -245,5 +245,7 @@ export const cloudDownloadStatuses = (infoHashes) => request.post('/admin/cloud-
 export const retryCloudDownload = (id) => request.post(`/admin/cloud-downloads/${id}/retry`)
 export const previewCloudDownloadImport = (id) => request.post(`/admin/cloud-downloads/${id}/import/preview`)
 export const importCloudDownload = (id, payload) => request.post(`/admin/cloud-downloads/${id}/import`, payload)
+export const deleteCloudDownloadCloudFile = (id) =>
+  request.post(`/admin/cloud-downloads/${id}/cloud-file/delete`, { confirm: true }, { timeout: 120000 })
 export const getCloudBrowserState = () => request.get('/admin/cloud-downloads/browser')
 export const getCloudLoginQR = () => request.get('/admin/cloud-downloads/login-qr')

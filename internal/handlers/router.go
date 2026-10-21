@@ -77,6 +77,7 @@ type API struct {
 	telegramManagementSvc telegramManagementService
 	cloudDownload         cloudDownloadService
 	cloudDownloadImport   cloudDownloadImportService
+	cloudFileDeletion     cloudFileDeletionService
 	tvAPKSvc              tvAPKService
 	iptvSvc               iptvService
 	enqueuer              taskEnqueuer
@@ -339,6 +340,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/cloud-downloads/:id/retry", a.AdminCloudDownloadRetry)
 			admin.POST("/cloud-downloads/:id/import/preview", a.AdminCloudDownloadImportPreview)
 			admin.POST("/cloud-downloads/:id/import", a.AdminCloudDownloadImport)
+			admin.POST("/cloud-downloads/:id/cloud-file/delete", a.AdminCloudDownloadDeleteCloudFile)
 			admin.GET("/cloud-downloads/browser", a.AdminCloudDownloadBrowser)
 			admin.GET("/cloud-downloads/login-qr", a.AdminCloudDownloadLoginQR)
 			admin.POST("/system/orphan-files/scan", a.AdminStartOrphanFileScan)

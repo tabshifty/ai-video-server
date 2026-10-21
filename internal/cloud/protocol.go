@@ -3,9 +3,14 @@ package cloud
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
+
+// ErrAmbiguousTask means more than one 115 task matched the same info hash.
+var ErrAmbiguousTask = errors.New("cloud: multiple 115 tasks match info hash")
 
 // ErrCodeTaskExists is 115's "task already exists" response. It is a success
 // for our purposes: the same link is already queued or finished.
@@ -45,7 +50,12 @@ type Task struct {
 	Percent    float64 `json:"percent"`
 	PickCode   string  `json:"pick_code"`
 	FileID     string  `json:"file_id"`
-	AddTime    int64   `json:"add_time"`
+	// DeleteFileID is the actual cloud file, while FileID can be the parent
+	// cloud-download directory. WPPathID is that parent directory.
+	DeleteFileID string `json:"delete_file_id"`
+	WPPathID     string `json:"wp_path_id"`
+	FileCategory int    `json:"file_category"`
+	AddTime      int64  `json:"add_time"`
 }
 
 // Finished reports whether 115 says the task completed.
@@ -212,6 +222,9 @@ func ListTasks(ctx context.Context, s *Session, stat int, page int) ([]Task, err
 			percent: Number(x.display_percent) || 0,
 			pick_code: String(x.pick_code || ''),
 			file_id: x.file_id ? String(x.file_id) : '',
+			delete_file_id: x.delete_file_id ? String(x.delete_file_id) : '',
+			wp_path_id: x.wp_path_id ? String(x.wp_path_id) : '',
+			file_category: Number(x.file_category) || 0,
 			add_time: Number(x.add_time) || 0
 		}));
 	})()`, jsString(fmt.Sprint(page)), jsString(fmt.Sprint(stat)))
@@ -224,22 +237,62 @@ func ListTasks(ctx context.Context, s *Session, stat int, page int) ([]Task, err
 }
 
 // FindTask locates a task by info hash across the downloading and finished
-// lists. Page 1 is enough: 115 orders tasks newest first and a just-submitted
-// task is at the top.
+// lists. Page 1 is enough for the download state machine: 115 orders tasks
+// newest first and a just-submitted task is at the top.
 func FindTask(ctx context.Context, s *Session, infoHash string) (*Task, error) {
+	return FindTaskDeep(ctx, s, infoHash, 1)
+}
+
+// FindTaskDeep is the bounded historical lookup used by the cleanup path. It
+// scans a small number of pages because an old completed task is not
+// guaranteed to be on page 1. It never scans unboundedly.
+func FindTaskDeep(ctx context.Context, s *Session, infoHash string, maxPages int) (*Task, error) {
+	task, _, err := findTasksDeep(ctx, s, infoHash, maxPages)
+	return task, err
+}
+
+// FindUniqueTaskDeep is the cleanup lookup. A repeated info hash can belong to
+// more than one 115 task/account, so ambiguity must not silently pick the first
+// row and delete an unrelated file.
+func FindUniqueTaskDeep(ctx context.Context, s *Session, infoHash string, maxPages int) (*Task, error) {
+	task, count, err := findTasksDeep(ctx, s, infoHash, maxPages)
+	if err != nil {
+		return nil, err
+	}
+	if count > 1 {
+		return nil, ErrAmbiguousTask
+	}
+	return task, nil
+}
+
+func findTasksDeep(ctx context.Context, s *Session, infoHash string, maxPages int) (*Task, int, error) {
+	if maxPages < 1 {
+		maxPages = 5
+	}
 	want := normalizeHash(infoHash)
+	var first *Task
+	count := 0
 	for _, stat := range []int{12, 13} {
-		tasks, err := ListTasks(ctx, s, stat, 1)
-		if err != nil {
-			return nil, err
-		}
-		for i := range tasks {
-			if normalizeHash(tasks[i].InfoHash) == want {
-				return &tasks[i], nil
+		for page := 1; page <= maxPages; page++ {
+			tasks, err := ListTasks(ctx, s, stat, page)
+			if err != nil {
+				return nil, count, err
+			}
+			for i := range tasks {
+				if normalizeHash(tasks[i].InfoHash) == want {
+					count++
+					if first == nil {
+						copy := tasks[i]
+						first = &copy
+					}
+				}
+			}
+			if len(tasks) == 0 {
+				break
 			}
 		}
 	}
-	return nil, nil
+	return first, count, nil
 }
 
 // CreateDownloadTask asks the native downloader to pull a finished cloud file.
@@ -260,6 +313,75 @@ func CreateDownloadTask(ctx context.Context, s *Session, name, pickCode string) 
 		return fmt.Errorf("cloud: CreateDownloadTask did not run")
 	}
 	return nil
+}
+
+// DeleteFileResult is the 115 web rb/delete response. 115 returns HTTP 200
+// with a JSON body even for application errors.
+type DeleteFileResult struct {
+	State      bool   `json:"state"`
+	Error      string `json:"error"`
+	Errno      string `json:"errno"`
+	ErrType    string `json:"errtype"`
+	HTTPStatus int    `json:"http_status"`
+	JSONParsed bool   `json:"json_parsed"`
+}
+
+// DeleteFile moves one actual 115 cloud file to the recycle bin. parentID is
+// 115's wp_path_id and fileID is delete_file_id; the task's file_id must not be
+// used as fileID because it can identify the parent directory instead.
+func DeleteFile(ctx context.Context, s *Session, parentID, fileID string) (DeleteFileResult, error) {
+	parentID = strings.TrimSpace(parentID)
+	fileID = strings.TrimSpace(fileID)
+	if parentID == "" || fileID == "" {
+		return DeleteFileResult{}, fmt.Errorf("cloud: delete file requires parent id and file id")
+	}
+	var result DeleteFileResult
+	if err := s.Evaluate(ctx, deleteFileExpression(parentID, fileID), &result); err != nil {
+		return DeleteFileResult{}, err
+	}
+	return result, nil
+}
+
+func deleteFileExpression(parentID, fileID string) string {
+	return fmt.Sprintf(`(async () => {
+		const body = new URLSearchParams();
+		body.set('pid', %s);
+		body.set('fid[0]', %s);
+		body.set('ignore_warn', '1');
+		let r;
+		try {
+			r = await fetch('https://webapi.115.com/rb/delete', {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: body.toString()
+			});
+		} catch (e) {
+			return { state: false, error: 'fetch failed: ' + String(e), errno: '', errtype: '', http_status: 0, json_parsed: false };
+		}
+		const text = await r.text();
+		try {
+			const j = JSON.parse(text);
+			const state = j.state === true || j.state === 1 || j.state === '1';
+			return {
+				state,
+				error: String(j.error || ''),
+				errno: j.errno === undefined || j.errno === null ? '' : String(j.errno),
+				errtype: j.errtype === undefined || j.errtype === null ? '' : String(j.errtype),
+				http_status: Number(r.status) || 0,
+				json_parsed: true
+			};
+		} catch (e) {
+			return {
+				state: false,
+				error: 'invalid 115 response: ' + text.slice(0, 200),
+				errno: '',
+				errtype: '',
+				http_status: Number(r.status) || 0,
+				json_parsed: false
+			};
+		}
+	})()`, jsString(parentID), jsString(fileID))
 }
 
 // WaitForTask polls 115 until the task reaches a terminal or usable state.

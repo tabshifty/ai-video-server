@@ -391,6 +391,25 @@ func TestCloudDownloadImportsMigration(t *testing.T) {
 	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+cloud_download_imports`)
 }
 
+func TestCloudDownloadFileDeletionsMigration(t *testing.T) {
+	t.Parallel()
+
+	up := readMigrationForTest(t, "0046_cloud_download_file_deletions.up.sql")
+	down := readMigrationForTest(t, "0046_cloud_download_file_deletions.down.sql")
+
+	assertSQLPattern(t, up, `(?is)alter\s+table\s+cloud_download_tasks`)
+	assertSQLPattern(t, up, `(?is)cloud_file_id\s+text`)
+	assertSQLPattern(t, up, `(?is)cloud_parent_id\s+text`)
+	assertSQLPattern(t, up, `(?is)cloud_user_id\s+text`)
+	assertSQLPattern(t, up, `(?is)cloud_file_category\s+integer`)
+	assertSQLPattern(t, up, `(?is)create\s+table\s+if\s+not\s+exists\s+cloud_download_file_deletions`)
+	assertSQLPattern(t, up, `(?is)task_id\s+bigint\s+primary\s+key\s+references\s+cloud_download_tasks\s*\(\s*id\s*\)\s+on\s+delete\s+cascade`)
+	assertSQLPattern(t, up, `(?is)'deleting'.*'deleted'.*'failed'`)
+	assertSQLPattern(t, up, `(?is)create\s+index\s+if\s+not\s+exists\s+cloud_download_file_deletions_status_idx`)
+	assertSQLPattern(t, down, `(?is)drop\s+table\s+if\s+exists\s+cloud_download_file_deletions`)
+	assertSQLPattern(t, down, `(?is)drop\s+column\s+if\s+exists\s+cloud_file_id`)
+}
+
 func readMigrationForTest(t *testing.T, name string) string {
 	t.Helper()
 

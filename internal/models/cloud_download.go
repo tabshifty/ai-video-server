@@ -66,20 +66,27 @@ func CloudDownloadTerminal(status string) bool {
 
 // CloudDownloadTask is one ed2k/magnet link tracked through 115 cloud download.
 type CloudDownloadTask struct {
-	ID                int64      `json:"id"`
-	PostID            *uuid.UUID `json:"post_id"`
-	PostTitle         string     `json:"post_title"`
-	Source            string     `json:"source"`
-	Protocol          string     `json:"protocol"`
-	InfoHash          string     `json:"info_hash"`
-	SourceURL         string     `json:"source_url"`
-	DeclaredName      string     `json:"declared_name"`
-	DeclaredSize      *int64     `json:"declared_size"`
-	Status            string     `json:"status"`
-	BlockedReason     string     `json:"blocked_reason"`
-	ErrorMessage      string     `json:"error_message"`
-	RetryCount        int        `json:"retry_count"`
-	PickCode          string     `json:"pick_code"`
+	ID            int64      `json:"id"`
+	PostID        *uuid.UUID `json:"post_id"`
+	PostTitle     string     `json:"post_title"`
+	Source        string     `json:"source"`
+	Protocol      string     `json:"protocol"`
+	InfoHash      string     `json:"info_hash"`
+	SourceURL     string     `json:"source_url"`
+	DeclaredName  string     `json:"declared_name"`
+	DeclaredSize  *int64     `json:"declared_size"`
+	Status        string     `json:"status"`
+	BlockedReason string     `json:"blocked_reason"`
+	ErrorMessage  string     `json:"error_message"`
+	RetryCount    int        `json:"retry_count"`
+	PickCode      string     `json:"pick_code"`
+	// CloudFileID is 115's delete_file_id (the actual cloud file); CloudParentID
+	// is its wp_path_id. They are deliberately separate from the 115 task's
+	// file_id, which can be the parent cloud-download directory.
+	CloudFileID       string     `json:"-"`
+	CloudParentID     string     `json:"-"`
+	CloudUserID       string     `json:"-"`
+	CloudFileCategory int        `json:"-"`
 	CloudStatus       string     `json:"cloud_status"`
 	ProgressPercent   *float64   `json:"progress_percent"`
 	ProgressUpdatedAt *time.Time `json:"progress_updated_at"`
@@ -94,6 +101,8 @@ type CloudDownloadTask struct {
 	FinishedAt          *time.Time `json:"finished_at"`
 	// Import is the explicit media-library import summary, when one exists.
 	Import *CloudDownloadImportSummary `json:"import,omitempty"`
+	// FileDeletion is the optional 115 recycle-bin cleanup summary.
+	FileDeletion *CloudDownloadFileDeletionSummary `json:"file_deletion,omitempty"`
 }
 
 // CloudDownloadStatus is the compact per-hash view used by the forum list.

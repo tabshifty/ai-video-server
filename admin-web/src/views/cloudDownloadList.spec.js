@@ -19,6 +19,10 @@ describe('115 云下载列表页', () => {
     expect(script).toContain('getCloudBrowserState')
     expect(script).toContain('getCloudLoginQR')
     expect(script).toContain('extractApiErrorMessage')
+    expect(script).toContain('deleteCloudDownloadCloudFile')
+    expect(script).toContain('cloudFileDeletionMeta')
+    expect(script).toContain('canDeleteCloudDownloadFile')
+    expect(script).toContain('hasActiveCloudFileDeletions')
   })
 
   it('失败和需处理任务仍然可以重试下载', () => {
@@ -73,6 +77,35 @@ describe('115 云下载列表页', () => {
     expect(script).toContain('importDestination')
     expect(script).toContain('router.push(destination)')
     expect(script).toMatch(/handleImportSubmitted[\s\S]*syncPolling\(\)[\s\S]*await load\(\)/)
+  })
+
+  it('已完成任务通过更多菜单移入 115 回收站并显式确认', () => {
+    expect(template).toContain('canDeleteCloudFileRow(row)')
+    expect(script).toContain('MoreFilled')
+    expect(template).toContain('aria-label="更多云下载操作"')
+    expect(template).toContain('cloudFileDeletionActionLabel(row)')
+    expect(template).toContain('handleCloudFileDeletionCommand')
+    expect(template).toContain('移入 115 回收站')
+    expect(template).toContain('deleteCloudFileDialogVisible')
+    expect(template).toContain('deleteCloudFileError')
+    expect(template).toContain('仅影响 115 云盘源文件')
+    expect(template).toContain('不会删除本地文件或导入记录')
+    expect(script).toContain('deleteCloudDownloadCloudFile(task.id)')
+    expect(script).toContain('deleteCloudFileDialogVisible.value = true')
+    expect(script).toContain('deleteCloudFileError.value = message')
+    expect(script).toMatch(/confirmDeleteCloudFile[\s\S]*extractErrorMessage\(error/)
+    expect(template).toContain(':close-on-click-modal="!deletingCloudFileId"')
+    expect(template).toContain(':close-on-press-escape="!deletingCloudFileId"')
+    expect(script).toContain('blockedCloudFileDeletionIds')
+  })
+
+  it('展示清理状态并在失败时提供重试，清理中继续轮询', () => {
+    expect(template).toContain('cloudFileDeletionMeta(row)?.detail')
+    expect(template).toContain("row.file_deletion?.status === 'deleting'")
+    expect(template).toContain('移入中')
+    expect(script).toContain('hasActiveCloudFileDeletions')
+    expect(script).toContain('hasActiveFileDeletion.value')
+    expect(script).toContain('云盘清理中，每 5 秒自动刷新')
   })
 
   it('操作列加宽，窄屏导入与下载按钮保持 44px 触控目标', () => {

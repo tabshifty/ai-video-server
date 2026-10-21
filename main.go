@@ -304,8 +304,12 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 			cfg.StorageRoot,
 			logger,
 		)
+		cloudFileDeletionRepo := repository.NewCloudDownloadFileDeletionRepository(pool)
+		cloudSvc.SetFileDeletionSummaryRepository(cloudFileDeletionRepo)
+		cloudFileDeletionSvc := services.NewCloudFileDeletionService(cloudRepo, cloudImportRepo, cloudFileDeletionRepo, cloudClient, cfg.DownloadDir, logger)
 		api.SetCloudDownloadService(cloudSvc)
 		api.SetCloudDownloadImportService(cloudImportSvc)
+		api.SetCloudFileDeletionService(cloudFileDeletionSvc)
 		logger.Info("cloud download enabled", "cdp", cfg.CloudBrowserCDP, "download_dir", cfg.DownloadDir)
 	}
 	api.Register(r)

@@ -106,9 +106,13 @@ func (f *fakeCloudRepo) SetProgress(_ context.Context, _ int64, percent float64,
 	return nil
 }
 
-func (f *fakeCloudRepo) SetReady(_ context.Context, _ int64, pickCode string) error {
+func (f *fakeCloudRepo) SetReady(_ context.Context, _ int64, pickCode, cloudFileID, cloudParentID, cloudUserID string, cloudFileCategory int) error {
 	f.readyPickCodes = append(f.readyPickCodes, pickCode)
 	f.task.PickCode = pickCode
+	f.task.CloudFileID = cloudFileID
+	f.task.CloudParentID = cloudParentID
+	f.task.CloudUserID = cloudUserID
+	f.task.CloudFileCategory = cloudFileCategory
 	f.task.Status = models.CloudDownloadReady
 	return nil
 }

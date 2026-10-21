@@ -1,5 +1,12 @@
 # plan.md
 
+## 2026-10-22 00:05 +0800 实施完成：115 云盘源文件手动移入回收站
+- 进度：新增 migration `0046_cloud_download_file_deletions`（task 增加 cloud_file_id/cloud_parent_id/cloud_user_id/cloud_file_category，清理记录 task_id 唯一，状态 deleting/deleted/failed）；新增 `cloud.DeleteFile` 使用已登录 115 页面的 `POST https://webapi.115.com/rb/delete`，严格校验 state；云下载任务 ready 时保存 `delete_file_id`/`wp_path_id`/账号/文件类型；新增同步管理接口 `POST /admin/cloud-downloads/:id/cloud-file/delete`（必须 confirm=true），独立 service/记录摘要；历史任务按 info_hash 有界分页唯一匹配、文件名/大小/普通文件校验；本地源或导入终态放行、活动导入/缺失本地拒绝；目录/非普通文件拒绝；账号不一致拒绝；并发 claim 409；5 分钟 stale 可重试；终态写库用 WithoutCancel + attempt CAS；前端“更多 → 移入 115 回收站”确认框、状态标签、导入终态/超时重试、登录错误打开二维码。
+- 评审采纳：只使用 delete_file_id 作 fid[0]、file_id 不当删除目标；新增 cloud_user_id/file_category 守卫；Start 在浏览器前落 failed 记录；Mark 返回 rowsAffected 并重读权威状态；115 文件不存在按幂等 deleted；发现 after-import 本地源已删后允许以导入终态放行。
+- 影响文件：`migrations/0046_*`、`internal/cloud/protocol.go`、`internal/models/cloud_download*.go`、`internal/repository/cloud_download*repository.go`、`internal/services/cloud_file_deletion_service.go`、`internal/services/cloud_download_service.go`、`internal/handlers/admin_cloud_file_deletion.go`、`router.go`、`main.go`、`admin-web/src/{api/admin.js,views/CloudDownloadList.vue,views/cloudDownloadFileDeletion.helpers.js}` 及测试、`docs/adr/0031-manual-115-cloud-source-cleanup.md`、`CONTEXT.md`、`docs/家用部署机.md`。
+- 验证：`go build ./...`；`go test ./... -skip '^TestParseTVAPKMetadataParsesReleaseAPK$'` 全绿（含新增 deletion service/handler/migration tests）；前端 52 文件 780 测试通过；`npm run build` 通过；受控测试任务 10 已真实调用 115 `/rb/delete` 返回 state=true 并移入回收站，本地/任务记录未改。
+- 残余风险：115 删除是私有 web 接口，未覆盖全部 errno/账号切换/大量请求；历史任务无创建时 115 账号快照，保留有界懒解析的理论跨账号风险；无独立回收站只读核对，ambiguous 超时按 failed 允许手动重试；未部署、未做真实端到端 UI 点击。
+
 ## 2026-10-18 15:15 +0800 修复：压缩包批次批量操作条不显示
 - 进度：`BulkActionBar` 原先放在批次详情抽屉正文末尾，长文件清单下虽为 sticky 但初始在视口外，勾选后看不到批量入口。现改为 `el-drawer` 的 `footer` 插槽，选中 ≥1 项时固定在抽屉底部立即显示；删除失效的 `.archive-drawer :deep(.bulk-action-bar)` 移动端规则，保留共享组件自身的响应式布局。更新抽屉/批量条测试断言。
 - 影响文件：`admin-web/src/views/ToolboxArchiveImport.vue`、`ToolboxArchiveImport.spec.js`、`CONTEXT.md`、`plan.md`。

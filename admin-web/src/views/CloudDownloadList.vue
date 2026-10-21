@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { MoreFilled } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
 import EmptyState from '../components/base/EmptyState.vue'
@@ -10,6 +11,7 @@ import StatusIndicator from '../components/base/StatusIndicator.vue'
 import Toolbar from '../components/base/Toolbar.vue'
 import CloudDownloadImportDialog from '../components/CloudDownloadImportDialog.vue'
 import {
+  deleteCloudDownloadCloudFile,
   getCloudBrowserState,
   getCloudLoginQR,
   listCloudDownloads,
@@ -22,6 +24,13 @@ import {
   importDestination,
   resolveCloudImportAction
 } from './cloudDownloadImport.helpers'
+import {
+  canDeleteCloudDownloadFile,
+  cloudDownloadFileName,
+  cloudFileDeletionActionLabel,
+  cloudFileDeletionMeta,
+  hasActiveCloudFileDeletions
+} from './cloudDownloadFileDeletion.helpers'
 import { extractApiErrorMessage } from './toolbox.helpers'
 
 const POLL_INTERVAL_MS = 5000
@@ -61,6 +70,11 @@ const previewingImportId = ref(0)
 const importDialogVisible = ref(false)
 const importTask = ref(null)
 const importPreview = ref(null)
+const deletingCloudFileId = ref(0)
+const deleteCloudFileDialogVisible = ref(false)
+const deleteCloudFileTask = ref(null)
+const deleteCloudFileError = ref('')
+const blockedCloudFileDeletionIds = ref([])
 const qrDialogVisible = ref(false)
 const qrImage = ref('')
 const qrLoading = ref(false)
@@ -76,10 +90,12 @@ const initialLoading = computed(() => loading.value && !loaded.value)
 const backgroundRefreshing = computed(() => loading.value && loaded.value)
 const hasActiveTasks = computed(() => list.value.some((task) => ACTIVE_STATUSES.has(task.status)))
 const hasActiveImport = computed(() => hasActiveImportTasks(list.value))
-const shouldPoll = computed(() => hasActiveTasks.value || hasActiveImport.value)
+const hasActiveFileDeletion = computed(() => hasActiveCloudFileDeletions(list.value))
+const shouldPoll = computed(() => hasActiveTasks.value || hasActiveImport.value || hasActiveFileDeletion.value)
 const hasStatusFilter = computed(() => query.status !== '')
 const refreshIndicatorLabel = computed(() => {
   if (backgroundRefreshing.value) return '正在刷新'
+  if (hasActiveFileDeletion.value) return '云盘清理中，每 5 秒自动刷新'
   if (hasActiveImport.value) return '导入中，每 5 秒自动刷新'
   if (hasActiveTasks.value) return '每 5 秒自动刷新'
   return '自动刷新已停止'
@@ -282,6 +298,75 @@ async function handleImportSubmitted(importInfo) {
 function resetImportDialog() {
   importTask.value = null
   importPreview.value = null
+}
+
+function canDeleteCloudFileRow(row) {
+  if (!row?.id || blockedCloudFileDeletionIds.value.includes(String(row.id))) return false
+  return canDeleteCloudDownloadFile(row)
+}
+
+function openDeleteCloudFileDialog(row) {
+  if (deletingCloudFileId.value || !canDeleteCloudFileRow(row)) return
+  deleteCloudFileTask.value = row
+  deleteCloudFileError.value = ''
+  deleteCloudFileDialogVisible.value = true
+}
+
+function handleCloudFileDeletionCommand(command, row) {
+  if (command === 'delete-cloud-file') {
+    openDeleteCloudFileDialog(row)
+  }
+}
+
+function applyDeletedTask(updated) {
+  if (!updated || typeof updated !== 'object') return
+  const index = list.value.findIndex((task) => task.id === updated.id)
+  if (index >= 0) {
+    list.value[index] = { ...list.value[index], ...updated }
+  }
+}
+
+async function confirmDeleteCloudFile() {
+  const task = deleteCloudFileTask.value
+  if (!task?.id || deletingCloudFileId.value) return
+  deletingCloudFileId.value = task.id
+  deleteCloudFileError.value = ''
+  try {
+    const data = await deleteCloudDownloadCloudFile(task.id)
+    applyDeletedTask(data?.task)
+    if (deleteCloudFileTask.value?.id === task.id) {
+      deleteCloudFileDialogVisible.value = false
+    }
+    ElMessage.success('已移入 115 回收站')
+    await load()
+  } catch (error) {
+    let message = extractErrorMessage(error, '移入 115 回收站失败')
+    if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT' || /timeout/i.test(message)) {
+      message = '请求超时，可能仍在处理；正在重新确认结果，请勿重复操作'
+    }
+    if (deleteCloudFileTask.value?.id === task.id) {
+      deleteCloudFileError.value = message
+    }
+    ElMessage.error(message)
+    const errorCode = Number(error?.code ?? error?.response?.data?.code)
+    if (errorCode === 410 || message.includes('本地文件不存在')) {
+      blockedCloudFileDeletionIds.value = [...new Set([...blockedCloudFileDeletionIds.value, String(task.id)])]
+    }
+    if (message.includes('登录')) {
+      await loadBrowserState()
+      openQrDialog()
+    } else if (message.includes('浏览器')) {
+      await loadBrowserState()
+    }
+    await load()
+  } finally {
+    deletingCloudFileId.value = 0
+  }
+}
+
+function resetDeleteCloudFileDialog() {
+  deleteCloudFileTask.value = null
+  deleteCloudFileError.value = ''
 }
 
 function stopQrTimer() {
@@ -511,6 +596,23 @@ onUnmounted(() => {
                     <span v-if="row.blocked_reason" class="cloud-blocked-reason">
                       {{ blockedReasonLabel(row.blocked_reason) }}
                     </span>
+                    <el-tooltip
+                      v-if="cloudFileDeletionMeta(row)?.detail"
+                      :content="cloudFileDeletionMeta(row).detail"
+                      placement="top"
+                    >
+                      <el-tag size="small" effect="plain" :type="cloudFileDeletionMeta(row).type">
+                        {{ cloudFileDeletionMeta(row).label }}
+                      </el-tag>
+                    </el-tooltip>
+                    <el-tag
+                      v-else-if="cloudFileDeletionMeta(row)"
+                      size="small"
+                      effect="plain"
+                      :type="cloudFileDeletionMeta(row).type"
+                    >
+                      {{ cloudFileDeletionMeta(row).label }}
+                    </el-tag>
                   </div>
                 </template>
               </el-table-column>
@@ -580,6 +682,35 @@ onUnmounted(() => {
                       </el-button>
                     </template>
                     <span v-else class="cloud-empty-action">--</span>
+                    <el-dropdown
+                      v-if="canDeleteCloudFileRow(row)"
+                      trigger="click"
+                      placement="bottom-end"
+                      popper-class="cloud-file-actions-popper"
+                      @command="handleCloudFileDeletionCommand($event, row)"
+                    >
+                      <el-button
+                        :icon="MoreFilled"
+                        circle
+                        size="small"
+                        aria-label="更多云下载操作"
+                        title="更多云下载操作"
+                      />
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="delete-cloud-file">
+                            {{ cloudFileDeletionActionLabel(row) }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                    <el-button
+                      v-else-if="row.file_deletion?.status === 'deleting'"
+                      size="small"
+                      disabled
+                    >
+                      移入中
+                    </el-button>
                   </div>
                 </template>
               </el-table-column>
@@ -633,6 +764,58 @@ onUnmounted(() => {
       @submitted="handleImportSubmitted"
       @closed="resetImportDialog"
     />
+
+    <el-dialog
+      v-model="deleteCloudFileDialogVisible"
+      title="移入 115 回收站"
+      width="min(32rem, calc(100vw - 2rem))"
+      destroy-on-close
+      :close-on-click-modal="!deletingCloudFileId"
+      :close-on-press-escape="!deletingCloudFileId"
+      :show-close="!deletingCloudFileId"
+      @closed="resetDeleteCloudFileDialog"
+    >
+      <div class="cloud-file-delete">
+        <p class="cloud-file-delete__lead">
+          确认将以下 115 云盘源文件移入回收站？
+        </p>
+        <dl class="cloud-file-delete__file">
+          <div>
+            <dt>文件名</dt>
+            <dd>{{ cloudDownloadFileName(deleteCloudFileTask) }}</dd>
+          </div>
+          <div>
+            <dt>大小</dt>
+            <dd>{{ formatBytes(deleteCloudFileTask?.declared_size) }}</dd>
+          </div>
+        </dl>
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+          title="仅影响 115 云盘源文件，不会删除本地文件或导入记录；可在 115 回收站恢复。移入后不能从 115 重新下载。"
+        />
+        <el-alert
+          v-if="deleteCloudFileError"
+          type="error"
+          :closable="false"
+          :title="deleteCloudFileError"
+        />
+      </div>
+      <template #footer>
+        <el-button :disabled="Boolean(deletingCloudFileId)" @click="deleteCloudFileDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="danger"
+          :loading="deletingCloudFileId === deleteCloudFileTask?.id"
+          :disabled="Boolean(deletingCloudFileId)"
+          @click="confirmDeleteCloudFile"
+        >
+          移入回收站
+        </el-button>
+      </template>
+    </el-dialog>
   </Layout>
 </template>
 
@@ -756,6 +939,46 @@ onUnmounted(() => {
   justify-self: center;
 }
 
+.cloud-file-delete {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.cloud-file-delete__lead {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: var(--leading-small);
+}
+
+.cloud-file-delete__file {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-muted);
+}
+
+.cloud-file-delete__file > div {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.cloud-file-delete__file dt {
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+}
+
+.cloud-file-delete__file dd {
+  margin: 0;
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 63.9375rem) {
   .cloud-refresh {
     min-height: 44px;
@@ -769,6 +992,10 @@ onUnmounted(() => {
   .cloud-status-filter {
     width: 100%;
     max-width: 20rem;
+  }
+
+  :global(.cloud-file-actions-popper .el-dropdown-menu__item) {
+    min-height: 44px;
   }
 }
 </style>

@@ -36,6 +36,10 @@ SELECT
     COALESCE(t.error_message, ''),
     t.retry_count,
     COALESCE(t.pick_code, ''),
+    COALESCE(t.cloud_file_id, ''),
+    COALESCE(t.cloud_parent_id, ''),
+    COALESCE(t.cloud_user_id, ''),
+    COALESCE(t.cloud_file_category, 0),
     COALESCE(t.cloud_status, ''),
     t.progress_percent,
     t.progress_updated_at,
@@ -66,6 +70,10 @@ func scanCloudDownload(row interface{ Scan(...any) error }) (models.CloudDownloa
 		&task.ErrorMessage,
 		&task.RetryCount,
 		&task.PickCode,
+		&task.CloudFileID,
+		&task.CloudParentID,
+		&task.CloudUserID,
+		&task.CloudFileCategory,
 		&task.CloudStatus,
 		&task.ProgressPercent,
 		&task.ProgressUpdatedAt,
@@ -198,20 +206,43 @@ WHERE id = $1`, id, percent, cloudStatus)
 	return nil
 }
 
-// SetReady records the pick code once 115 reports the file is available.
-func (r *CloudDownloadRepository) SetReady(ctx context.Context, id int64, pickCode string) error {
+// SetReady records the pick code and the actual 115 cloud file identity once
+// 115 reports the file is available.
+func (r *CloudDownloadRepository) SetReady(ctx context.Context, id int64, pickCode, cloudFileID, cloudParentID, cloudUserID string, cloudFileCategory int) error {
 	_, err := r.pool.Exec(ctx, `
 UPDATE cloud_download_tasks SET
-    pick_code = NULLIF($2, ''),
-    status = $3,
+    pick_code = COALESCE(NULLIF($2, ''), pick_code),
+    cloud_file_id = COALESCE(NULLIF($3, ''), cloud_file_id),
+    cloud_parent_id = COALESCE(NULLIF($4, ''), cloud_parent_id),
+    cloud_user_id = COALESCE(NULLIF($5, ''), cloud_user_id),
+    cloud_file_category = CASE WHEN $6 > 0 THEN $6 ELSE cloud_file_category END,
+    status = $7,
     progress_percent = 100,
     progress_updated_at = now(),
     updated_at = now()
-WHERE id = $1`, id, pickCode, models.CloudDownloadReady)
+WHERE id = $1`, id, pickCode, cloudFileID, cloudParentID, cloudUserID, cloudFileCategory, models.CloudDownloadReady)
 	if err != nil {
 		return fmt.Errorf("set cloud download ready: %w", err)
 	}
 	return nil
+}
+
+// SetCloudFileIDs stores the lazily resolved 115 delete_file_id/wp_path_id for
+// historical tasks that predate these columns.
+func (r *CloudDownloadRepository) SetCloudFileIDs(ctx context.Context, id int64, cloudFileID, cloudParentID, cloudUserID string, cloudFileCategory int) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+UPDATE cloud_download_tasks SET
+    cloud_file_id = COALESCE(NULLIF($2, ''), cloud_file_id),
+    cloud_parent_id = COALESCE(NULLIF($3, ''), cloud_parent_id),
+    cloud_user_id = COALESCE(NULLIF($4, ''), cloud_user_id),
+    cloud_file_category = CASE WHEN $5 > 0 THEN $5 ELSE cloud_file_category END,
+    updated_at = now()
+WHERE id = $1
+  AND (cloud_file_id IS NULL OR cloud_file_id = '' OR cloud_file_id = $2)`, id, cloudFileID, cloudParentID, cloudUserID, cloudFileCategory)
+	if err != nil {
+		return false, fmt.Errorf("set cloud download file ids: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // SetLocalPath records the downloaded file path and completes the task.

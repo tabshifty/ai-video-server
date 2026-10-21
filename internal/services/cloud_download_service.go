@@ -33,7 +33,7 @@ type cloudDownloadRepository interface {
 	StatusByHashes(ctx context.Context, hashes []string) (map[string]models.CloudDownloadStatus, error)
 	SetStatus(ctx context.Context, id int64, status, blockedReason, errorMessage string) error
 	SetProgress(ctx context.Context, id int64, percent float64, cloudStatus string) error
-	SetReady(ctx context.Context, id int64, pickCode string) error
+	SetReady(ctx context.Context, id int64, pickCode, cloudFileID, cloudParentID, cloudUserID string, cloudFileCategory int) error
 	SetLocalPath(ctx context.Context, id int64, localPath string) error
 	BumpRetry(ctx context.Context, id int64) (bool, error)
 	ClaimDownloadTrigger(ctx context.Context, id int64) (bool, error)
@@ -62,10 +62,17 @@ type cloudDownloadImportSummaryRepository interface {
 	ListSummariesByTaskIDs(ctx context.Context, taskIDs []int64) (map[int64]models.CloudDownloadImportSummary, error)
 }
 
+// cloudFileDeletionSummaryRepository supplies the optional 115 cleanup view for
+// task list rows.
+type cloudFileDeletionSummaryRepository interface {
+	ListSummariesByTaskIDs(ctx context.Context, taskIDs []int64) (map[int64]models.CloudDownloadFileDeletionSummary, error)
+}
+
 // CloudDownloadService orchestrates parse -> 115 submit -> 115 wait -> download.
 type CloudDownloadService struct {
 	repo             cloudDownloadRepository
 	importSummaries  cloudDownloadImportSummaryRepository
+	fileDeletions    cloudFileDeletionSummaryRepository
 	client           *cloud.Client
 	downloadDir      string
 	enqueuer         CloudDownloadEnqueuer
@@ -109,6 +116,11 @@ func NewCloudDownloadService(
 // SetImportSummaryRepository attaches the optional import summary lookup.
 func (s *CloudDownloadService) SetImportSummaryRepository(repo cloudDownloadImportSummaryRepository) {
 	s.importSummaries = repo
+}
+
+// SetFileDeletionSummaryRepository attaches the optional 115 cleanup summary.
+func (s *CloudDownloadService) SetFileDeletionSummaryRepository(repo cloudFileDeletionSummaryRepository) {
+	s.fileDeletions = repo
 }
 
 // Submit parses a link, records the task (deduplicated by info hash) and
@@ -372,6 +384,7 @@ func (s *CloudDownloadService) List(ctx context.Context, status string, page, pa
 		return nil, 0, err
 	}
 	s.attachImportSummaries(ctx, tasks)
+	s.attachFileDeletionSummaries(ctx, tasks)
 	return tasks, total, nil
 }
 
@@ -391,6 +404,26 @@ func (s *CloudDownloadService) attachImportSummaries(ctx context.Context, tasks 
 	for index := range tasks {
 		if summary, ok := summaries[tasks[index].ID]; ok {
 			tasks[index].Import = &summary
+		}
+	}
+}
+
+func (s *CloudDownloadService) attachFileDeletionSummaries(ctx context.Context, tasks []models.CloudDownloadTask) {
+	if s.fileDeletions == nil || len(tasks) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(tasks))
+	for _, task := range tasks {
+		ids = append(ids, task.ID)
+	}
+	summaries, err := s.fileDeletions.ListSummariesByTaskIDs(ctx, ids)
+	if err != nil {
+		s.logWarn("load cloud download file deletion summaries failed", "error", err)
+		return
+	}
+	for index := range tasks {
+		if summary, ok := summaries[tasks[index].ID]; ok {
+			tasks[index].FileDeletion = &summary
 		}
 	}
 }
@@ -490,7 +523,7 @@ func (s *CloudDownloadService) Process(ctx context.Context, id int64) error {
 		return s.fail(ctx, id, "云下载浏览器客户端未配置")
 	}
 
-	session, _, err := s.ensureSession(ctx)
+	session, state, err := s.ensureSession(ctx)
 	if err != nil {
 		return s.handleSessionError(ctx, id, err)
 	}
@@ -550,7 +583,7 @@ func (s *CloudDownloadService) Process(ctx context.Context, id int64) error {
 	if cloudTask == nil || cloudTask.PickCode == "" {
 		return s.fail(ctx, id, "115 未返回 pick_code")
 	}
-	if err := s.repo.SetReady(ctx, id, cloudTask.PickCode); err != nil {
+	if err := s.repo.SetReady(ctx, id, cloudTask.PickCode, cloudTask.DeleteFileID, cloudTask.WPPathID, state.UserID, cloudTask.FileCategory); err != nil {
 		return err
 	}
 
