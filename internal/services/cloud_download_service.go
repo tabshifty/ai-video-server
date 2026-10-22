@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -768,26 +769,77 @@ func expectedDownloadSize(task *cloud.Task, declared *int64) *int64 {
 	return declared
 }
 
-// LoginQR opens (or reuses) the 115 login page and returns a data URL for the
-// QR code, falling back to a viewport screenshot when the QR cannot be read
-// directly. The tab intentionally stays open: the login page polls 115 for the
-// scan result and writes the session cookie, so closing it after capture would
-// break the login. Reusing the tab avoids one new tab per refresh.
+// loginQRProbe is the state of the 115 login QR panel on the attached page.
+type loginQRProbe struct {
+	State     string  `json:"state"`
+	Image     string  `json:"image"`
+	DataImage bool    `json:"data_image"`
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	Width     float64 `json:"width"`
+	Height    float64 `json:"height"`
+}
+
+const (
+	// cloudLoginPageURL is the 115 page that renders the scan-to-login QR. The
+	// old /login route now answers 404, so the plain home page is the canonical
+	// login entry (and 115Browser opens it by default when launched).
+	cloudLoginPageURL = "https://115.com/"
+
+	// loginQRProbeExpr reports whether the QR panel is ready, expired, or
+	// absent. The QR lives under .qrcode-login .pic img on the 115 home page;
+	// 115 keeps the stale bitmap visible after expiry, so an expired panel must
+	// be refreshed before its image is returned.
+	loginQRProbeExpr = `(() => {
+	const box = document.querySelector('.qrcode-login') || document.querySelector('.login-qrcode');
+	if (!box) return {state: 'missing'};
+	if (!box.getClientRects().length) return {state: 'missing'};
+	const text = (box.innerText || '').replace(/\s+/g, '');
+	const refresh = box.querySelector('a.ql-refresh');
+	const refreshStyle = refresh ? window.getComputedStyle(refresh) : null;
+	const refreshVisible = !!refreshStyle && refreshStyle.display !== 'none' && refreshStyle.visibility !== 'hidden';
+	const img = box.querySelector('.pic img') || box.querySelector('img#js_login_qrcode_img') || box.querySelector('img');
+	const rect = img ? img.getBoundingClientRect() : null;
+	const src = img && img.src ? img.src : '';
+	const ready = !!img && img.complete && (img.naturalWidth || 0) >= 100 && (img.naturalHeight || 0) >= 100;
+	const expired = text.indexOf('二维码失效') >= 0 || text.indexOf('请点击刷新') >= 0 || text.indexOf('网络异常') >= 0;
+	return {
+		state: expired || refreshVisible ? 'expired' : (ready ? 'ok' : 'waiting'),
+		image: src,
+		data_image: src.indexOf('data:image') === 0,
+		x: rect ? rect.x + window.scrollX : 0,
+		y: rect ? rect.y + window.scrollY : 0,
+		width: rect ? rect.width : 0,
+		height: rect ? rect.height : 0
+	};
+})()`
+
+	// loginQRRefreshExpr clicks the "请点击刷新" link 115 renders over an
+	// expired QR code.
+	loginQRRefreshExpr = `(() => {
+	const box = document.querySelector('.qrcode-login') || document.querySelector('.login-qrcode');
+	if (!box) return false;
+	const refresh = box.querySelector('a.ql-refresh');
+	if (refresh) { refresh.click(); return true; }
+	const nodes = Array.from(box.querySelectorAll('a, button'));
+	const hit = nodes.find(function (node) { return /刷新/.test(node.innerText || ''); });
+	if (hit) { hit.click(); return true; }
+	return false;
+})()`
+)
+
+// LoginQR reuses the 115 tab the browser already has open and returns a data
+// URL for its login QR code. 115Browser always opens https://115.com/ as its
+// default page, and that page renders the QR under .qrcode-login .pic img, so a
+// dedicated /login tab is neither needed nor valid. The QR is refreshed in place
+// when 115 shows the "二维码失效" overlay instead of reloading the tab.
 func (s *CloudDownloadService) LoginQR(ctx context.Context) (string, error) {
 	if s.client == nil {
 		return "", fmt.Errorf("cloud: browser client is not configured")
 	}
-	tab, found, err := s.client.Browser.FindTarget(ctx, func(t cloud.Target) bool {
-		return is115LoginURL(t.URL)
-	})
+	tab, err := s.loginTarget(ctx)
 	if err != nil {
 		return "", err
-	}
-	if !found {
-		tab, err = s.client.Browser.OpenTab(ctx, "https://115.com/login")
-		if err != nil {
-			return "", err
-		}
 	}
 	session, err := s.client.Browser.Attach(ctx, tab)
 	if err != nil {
@@ -795,33 +847,41 @@ func (s *CloudDownloadService) LoginQR(ctx context.Context) (string, error) {
 	}
 	defer session.Close()
 
-	// A reused tab may already show an expired QR; reload it so the page
-	// fetches a fresh one before we capture.
-	if found {
-		_ = session.Reload(ctx)
-	}
-
-	const qrExpr = `(() => {
-		const canvases = Array.from(document.querySelectorAll('canvas'));
-		for (const c of canvases) {
-			try {
-				const url = c.toDataURL('image/png');
-				if (url && url.length > 200) return url;
-			} catch (e) {}
-		}
-		const imgs = Array.from(document.querySelectorAll('img'));
-		for (const img of imgs) {
-			if (img.src && img.src.startsWith('data:image') && img.src.length > 200) return img.src;
-		}
-		return '';
-	})()`
-
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(20 * time.Second)
+	var last loginQRProbe
+	lastRefresh := time.Time{}
+	pendingSrc := ""
+	pendingAt := time.Time{}
 	for {
-		var dataURL string
-		_ = session.Evaluate(ctx, qrExpr, &dataURL)
-		if strings.HasPrefix(dataURL, "data:image") {
-			return dataURL, nil
+		var probe loginQRProbe
+		if evalErr := session.Evaluate(ctx, loginQRProbeExpr, &probe); evalErr == nil {
+			last = probe
+			switch probe.State {
+			case "ok":
+				// Right after a refresh click 115 may briefly hide the overlay
+				// while still showing the old bitmap. Do not return it until the
+				// QR image actually changes.
+				if pendingSrc != "" && probe.Image == pendingSrc {
+					if time.Since(pendingAt) < 10*time.Second {
+						break
+					}
+					pendingSrc = ""
+				}
+				if probe.DataImage && strings.HasPrefix(probe.Image, "data:image") {
+					return probe.Image, nil
+				}
+				if image := screenshotLoginQR(ctx, session, probe); image != "" {
+					return image, nil
+				}
+			case "expired":
+				// Throttle refresh clicks so a slow login worker is not spammed.
+				if time.Since(lastRefresh) >= 3*time.Second {
+					lastRefresh = time.Now()
+					pendingSrc = probe.Image
+					pendingAt = lastRefresh
+					_ = session.Evaluate(ctx, loginQRRefreshExpr, nil)
+				}
+			}
 		}
 		if time.Now().After(deadline) {
 			break
@@ -833,11 +893,100 @@ func (s *CloudDownloadService) LoginQR(ctx context.Context) (string, error) {
 		}
 	}
 
-	png, err := session.Screenshot(ctx)
-	if err != nil {
-		return "", err
+	switch last.State {
+	case "ok":
+		if image := screenshotLoginQR(ctx, session, last); image != "" {
+			return image, nil
+		}
+		return "", fmt.Errorf("115 登录二维码读取失败，请稍后重试")
+	case "expired":
+		return "", fmt.Errorf("115 登录二维码已失效且刷新失败，请稍后重试")
+	case "waiting":
+		return "", fmt.Errorf("115 登录二维码未就绪，请稍后重试")
+	default:
+		return "", fmt.Errorf("115 登录页未找到二维码，请确认 115 浏览器已打开 115.com 且未登录")
 	}
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(png), nil
+}
+
+// screenshotLoginQR crops the QR element out of the page, which covers pages
+// that render the code as a remote or blob image instead of a data URL.
+func screenshotLoginQR(ctx context.Context, session *cloud.Session, probe loginQRProbe) string {
+	if probe.Width < 80 || probe.Height < 80 {
+		return ""
+	}
+	png, err := session.ScreenshotClip(ctx, probe.X, probe.Y, probe.Width, probe.Height, 2)
+	if err != nil {
+		return ""
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+}
+
+// loginTarget reuses the unclosable 115.com tab 115Browser keeps open and only
+// opens a new tab when the browser has no 115 page at all. The short wait covers
+// a browser that is still restoring its default tab right after launch.
+func (s *CloudDownloadService) loginTarget(ctx context.Context) (cloud.Target, error) {
+	deadline := time.Now().Add(8 * time.Second)
+	for {
+		targets, err := s.client.Browser.Targets(ctx)
+		if err != nil {
+			return cloud.Target{}, err
+		}
+		if tab, ok := preferredLoginTarget(targets); ok {
+			return tab, nil
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return cloud.Target{}, ctx.Err()
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	return s.client.Browser.OpenTab(ctx, cloudLoginPageURL)
+}
+
+func preferredLoginTarget(targets []cloud.Target) (cloud.Target, bool) {
+	var best cloud.Target
+	bestScore := 0
+	for _, target := range targets {
+		if target.Type != "page" {
+			continue
+		}
+		if score := loginPageScore(target.URL); score > bestScore {
+			best = target
+			bestScore = score
+		}
+	}
+	return best, bestScore > 0
+}
+
+// loginPageScore ranks 115 tabs. A query-less home page is the default
+// 115Browser page and wins; the pan view still works but is ranked lower.
+func loginPageScore(raw string) int {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return 0
+	}
+	switch strings.ToLower(parsed.Hostname()) {
+	case "115.com", "www.115.com":
+	default:
+		return 0
+	}
+	if parsed.Path == "/login" {
+		// The current 115 site answers /login with 404, so it cannot show a QR.
+		return 0
+	}
+	if parsed.Path == "" || parsed.Path == "/" {
+		if strings.TrimSpace(parsed.RawQuery) == "" {
+			return 3
+		}
+		return 2
+	}
+	if strings.EqualFold(parsed.Query().Get("ac"), "login") {
+		return 2
+	}
+	return 1
 }
 
 func (s *CloudDownloadService) logInfo(msg string, args ...any) {
@@ -850,13 +999,6 @@ func (s *CloudDownloadService) logWarn(msg string, args ...any) {
 	if s.logger != nil {
 		s.logger.Warn(msg, args...)
 	}
-}
-
-func is115LoginURL(raw string) bool {
-	if !strings.Contains(raw, "115.com") {
-		return false
-	}
-	return strings.Contains(raw, "/login") || strings.Contains(raw, "ac=login")
 }
 
 func truncateMessage(message string, maxRunes int) string {

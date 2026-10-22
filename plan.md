@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-23 00:35 +0800 修复：115 云下载扫码登录取码
+- 进度：登录二维码改为复用 115Browser 默认常开的 `https://115.com/` 标签页，不再打开已返回 404 的 `/login`；从 `.qrcode-login .pic img`（`#js_login_qrcode_img`）读取 data URL，二维码过期（“二维码失效/请点击刷新”）时先点击 `.ql-refresh` 再取图；非 data URL 时按二维码元素 rect 调 `Page.captureScreenshot` 裁剪，不再用整页截图兜底。`loginTarget` 会等待并优先选择无 query 的 115 首页，只有完全不存在 115 页面时才新开标签页。
+- 影响文件：`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`internal/cloud/browser.go`、`CONTEXT.md`、`plan.md`。
+- 验证：`go build ./...`；`go test ./internal/services -skip '^TestParseTVAPKMetadataParsesReleaseAPK$'`、`go test ./internal/cloud ./internal/handlers` 通过；真实 115Browser（9333）实测：复用默认 `https://115.com/` tab，约 0.41s 返回 334×334 GIF data URL，前后目标列表一致（未新增 tab）；新增 `preferredLoginTarget`/`loginPageScore` 单测 4 项通过。历史 APK fixture 失败（version_code 144 vs 121）与本次无关。
+
 ## 2026-10-22 17:27 +0800 计划：云下载状态列统一 Tag 展示
 - 进度：状态列将任务状态、需处理原因和 115 回收站状态统一以 Tag 呈现，并用间距与自动换行区分多个状态。
 - 影响文件：`admin-web/src/views/CloudDownloadList.vue`、`admin-web/src/views/cloudDownloadList.spec.js`、`plan.md`。

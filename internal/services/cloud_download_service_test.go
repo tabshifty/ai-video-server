@@ -993,3 +993,58 @@ func TestExpectedDownloadSizePrefersCloudTaskSize(t *testing.T) {
 		t.Fatalf("got %v, want nil", got)
 	}
 }
+
+func TestPreferredLoginTargetPrefersDefaultHomePage(t *testing.T) {
+	targets := []cloud.Target{
+		{Type: "page", URL: "https://115.com/?cid=0&offset=0&mode=wangpan"},
+		{Type: "shared_worker", URL: "https://cdnassets.115.com/login/loginworker/loginWkApi.js"},
+		{Type: "page", URL: "https://115.com/"},
+		{Type: "page", URL: "https://example.com/"},
+	}
+	target, ok := preferredLoginTarget(targets)
+	if !ok {
+		t.Fatal("expected a 115 login target")
+	}
+	if target.URL != "https://115.com/" {
+		t.Fatalf("target = %q, want the query-less home page", target.URL)
+	}
+}
+
+func TestPreferredLoginTargetReusesReloginRedirectPage(t *testing.T) {
+	targets := []cloud.Target{
+		{Type: "page", URL: "https://115.com/?goto=http%3A%2F%2F115.com%2F%3Fmode%3Dwangpan"},
+	}
+	target, ok := preferredLoginTarget(targets)
+	if !ok || target.URL == "" {
+		t.Fatal("expected the home page redirect target to be reused")
+	}
+}
+
+func TestPreferredLoginTargetIgnoresDeadLoginRoute(t *testing.T) {
+	targets := []cloud.Target{{Type: "page", URL: "https://115.com/login"}}
+	if target, ok := preferredLoginTarget(targets); ok {
+		t.Fatalf("target = %q, want no match for the 404 /login route", target.URL)
+	}
+}
+
+func TestLoginPageScoreRanks115Pages(t *testing.T) {
+	cases := []struct {
+		url  string
+		want int
+	}{
+		{"https://115.com/", 3},
+		{"https://www.115.com/", 3},
+		{"https://115.com/?goto=http%3A%2F%2F115.com%2F", 2},
+		{"https://115.com/?cid=0&offset=0&mode=wangpan", 2},
+		{"https://115.com/?ac=login", 2},
+		{"https://115.com/storage/allfiles", 1},
+		{"https://115.com/login", 0},
+		{"https://example.com/", 0},
+		{"not a url", 0},
+	}
+	for _, tc := range cases {
+		if got := loginPageScore(tc.url); got != tc.want {
+			t.Errorf("loginPageScore(%q) = %d, want %d", tc.url, got, tc.want)
+		}
+	}
+}

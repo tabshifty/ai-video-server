@@ -212,6 +212,38 @@ func (s *Session) Screenshot(ctx context.Context) ([]byte, error) {
 	return result.Data, nil
 }
 
+// ScreenshotClip captures one rectangular page region in CSS pixels. It is
+// used to read the login QR code when the page renders it as a non-data image,
+// without returning a page-wide screenshot.
+func (s *Session) ScreenshotClip(ctx context.Context, x, y, width, height, scale float64) ([]byte, error) {
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("screenshot clip: invalid size %gx%g", width, height)
+	}
+	if scale <= 0 {
+		scale = 1
+	}
+	raw, err := s.call(ctx, "Page.captureScreenshot", map[string]any{
+		"format": "png",
+		"clip": map[string]any{
+			"x":      x,
+			"y":      y,
+			"width":  width,
+			"height": height,
+			"scale":  scale,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	var result struct {
+		Data []byte `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("screenshot clip: %w", err)
+	}
+	return result.Data, nil
+}
+
 func (s *Session) call(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
