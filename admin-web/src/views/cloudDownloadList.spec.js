@@ -108,6 +108,11 @@ describe('115 云下载列表页', () => {
     expect(script).toContain('云盘清理中，每 5 秒自动刷新')
   })
 
+  it('状态列使用间隔一致且可换行的 Tag 展示多个状态', () => {
+    expect(template).toContain('<el-tag v-if="row.blocked_reason" size="small" effect="plain" type="danger">')
+    expect(style).toMatch(/\.cloud-status-cell\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;[^}]*gap:\s*var\(--space-2\);/)
+  })
+
   it('操作列加宽，窄屏导入与下载按钮保持 44px 触控目标', () => {
     expect(template).toMatch(/label="操作" width="160"/)
     expect(style).toContain('.cloud-actions')

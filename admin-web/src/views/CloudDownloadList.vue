@@ -593,9 +593,9 @@ onUnmounted(() => {
                     <el-tag size="small" effect="plain" :type="statusMeta(row.status).type">
                       {{ statusMeta(row.status).label }}
                     </el-tag>
-                    <span v-if="row.blocked_reason" class="cloud-blocked-reason">
+                    <el-tag v-if="row.blocked_reason" size="small" effect="plain" type="danger">
                       {{ blockedReasonLabel(row.blocked_reason) }}
-                    </span>
+                    </el-tag>
                     <el-tooltip
                       v-if="cloudFileDeletionMeta(row)?.detail"
                       :content="cloudFileDeletionMeta(row).detail"
@@ -838,16 +838,10 @@ onUnmounted(() => {
 }
 
 .cloud-status-cell {
-  display: grid;
+  display: flex;
   min-width: 0;
-  gap: var(--space-1);
-}
-
-.cloud-blocked-reason {
-  color: var(--danger-600);
-  font-size: var(--text-caption);
-  line-height: var(--leading-caption);
-  overflow-wrap: anywhere;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .cloud-actions {

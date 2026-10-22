@@ -1,5 +1,10 @@
 # plan.md
 
+## 2026-10-22 17:27 +0800 计划：云下载状态列统一 Tag 展示
+- 进度：状态列将任务状态、需处理原因和 115 回收站状态统一以 Tag 呈现，并用间距与自动换行区分多个状态。
+- 影响文件：`admin-web/src/views/CloudDownloadList.vue`、`admin-web/src/views/cloudDownloadList.spec.js`、`plan.md`。
+- 验证：新增断言先失败后通过；定向 Vitest 14 项通过；`npm run build` 通过（存在既有 chunk 大小提示）；`git diff --check` 通过；本次文件未发现乱码。
+
 ## 2026-10-22 00:05 +0800 实施完成：115 云盘源文件手动移入回收站
 - 进度：新增 migration `0046_cloud_download_file_deletions`（task 增加 cloud_file_id/cloud_parent_id/cloud_user_id/cloud_file_category，清理记录 task_id 唯一，状态 deleting/deleted/failed）；新增 `cloud.DeleteFile` 使用已登录 115 页面的 `POST https://webapi.115.com/rb/delete`，严格校验 state；云下载任务 ready 时保存 `delete_file_id`/`wp_path_id`/账号/文件类型；新增同步管理接口 `POST /admin/cloud-downloads/:id/cloud-file/delete`（必须 confirm=true），独立 service/记录摘要；历史任务按 info_hash 有界分页唯一匹配、文件名/大小/普通文件校验；本地源或导入终态放行、活动导入/缺失本地拒绝；目录/非普通文件拒绝；账号不一致拒绝；并发 claim 409；5 分钟 stale 可重试；终态写库用 WithoutCancel + attempt CAS；前端“更多 → 移入 115 回收站”确认框、状态标签、导入终态/超时重试、登录错误打开二维码。
 - 评审采纳：只使用 delete_file_id 作 fid[0]、file_id 不当删除目标；新增 cloud_user_id/file_category 守卫；Start 在浏览器前落 failed 记录；Mark 返回 rowsAffected 并重读权威状态；115 文件不存在按幂等 deleted；发现 after-import 本地源已删后允许以导入终态放行。
