@@ -34,6 +34,7 @@ import (
 var (
 	ErrArchiveUnsupportedFormat = errors.New("unsupported archive format")
 	ErrArchiveUnsupportedMethod = errors.New("archive compression method is not supported")
+	ErrArchiveHeaders           = errors.New("压缩包头部解析失败（Headers Error）")
 	ErrArchivePasswordRequired  = errors.New("archive password required")
 	ErrArchiveNestedArchive     = errors.New("nested archive is not allowed")
 	ErrArchiveBatchBusy         = errors.New("archive batch is processing")
@@ -1719,7 +1720,7 @@ func condenseArchiveUnsupportedMethodDiagnostic(detail string) string {
 	parts := []string{
 		marker,
 		fmt.Sprintf("该归档使用了当前解压工具不支持的压缩算法（%d 个条目受影响）", failingCount),
-		"这不是密码问题；通常是 RAR 新版压缩算法，需要改用 unar 或 unrar 解压",
+		"可尝试更新解压工具，或改用 unrar / unar 进行 RAR 兼容解压",
 	}
 	if index := strings.Index(detail, marker); index >= 0 {
 		firstLine := strings.TrimSpace(strings.SplitN(detail[index:], "\n", 2)[0])
@@ -1747,6 +1748,17 @@ func archiveCommandError(operation string, runErr error, output string) error {
 			return fmt.Errorf("%w: %s", ErrArchivePasswordRequired, detail)
 		}
 		return fmt.Errorf("%w: %v", ErrArchivePasswordRequired, runErr)
+	}
+	hasHeaderError, hasDataError := false, false
+	for _, line := range strings.Split(strings.ToLower(detail), "\n") {
+		line = strings.TrimSpace(line)
+		line = strings.TrimSpace(strings.TrimPrefix(line, "errors:"))
+		line = strings.TrimSpace(strings.TrimPrefix(line, "error:"))
+		hasHeaderError = hasHeaderError || strings.HasPrefix(line, "headers error")
+		hasDataError = hasDataError || strings.HasPrefix(line, "crc ") || strings.HasPrefix(line, "data error") || strings.HasPrefix(line, "checksum error")
+	}
+	if hasHeaderError && !hasDataError {
+		return fmt.Errorf("%w：可能是格式兼容问题或文件损坏；兼容工具仍失败时请检查源文件完整性和分卷是否齐全", ErrArchiveHeaders)
 	}
 	return fmt.Errorf("%s: %w", operation, combinedErr)
 }
@@ -1823,74 +1835,97 @@ func detectArchiveFormat(filename string) (string, error) {
 	}
 }
 
-func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archivePath, extractedDir, password, requestedMode string) (string, error) {
-	if err := os.RemoveAll(extractedDir); err != nil && !os.IsNotExist(err) {
-		return "", fmt.Errorf("clear archive extraction dir: %w", err)
+func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archivePath, extractedDir, password, requestedMode string) (mode string, err error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
-	if err := os.MkdirAll(extractedDir, 0o755); err != nil {
-		return "", fmt.Errorf("create archive extraction dir: %w", err)
+	if err := s.clearArchiveExtractedDir(extractedDir); err != nil {
+		return "", err
 	}
+	defer func() {
+		if err != nil {
+			if cleanupErr := os.RemoveAll(extractedDir); cleanupErr != nil {
+				err = errors.Join(err, fmt.Errorf("清理解压半成品失败: %w", cleanupErr))
+			}
+		}
+	}()
 
-	switch strings.ToLower(strings.TrimSpace(format)) {
+	format = strings.ToLower(strings.TrimSpace(format))
+	switch format {
 	case "zip":
 		if strings.TrimSpace(password) != "" {
 			return s.extractZipArchiveWithPassword(ctx, archivePath, extractedDir, password, archiveEncodingRequestedModeForFormat(format, requestedMode))
 		}
 		return s.extractZipArchiveWithFallback(ctx, archivePath, extractedDir, archiveEncodingRequestedModeForFormat(format, requestedMode))
 	case "rar", "7z":
-		return "", s.extractRarLikeArchive(ctx, archivePath, extractedDir, password)
+		return "", s.extractRarLikeArchive(ctx, format, archivePath, extractedDir, password)
 	default:
 		return "", ErrArchiveUnsupportedFormat
 	}
 }
 
-// extractRarLikeArchive 处理 RAR/7z：优先 7zz；仅当 7zz 缺失才回退 bsdtar。
-// 当 7zz 明确报“压缩算法不支持”时，改用支持新版 RAR 算法的 unar/unrar；
-// 该场景不属于 [[压缩包 RAR/7z 解包工具边界]] 里禁止覆盖的密码或 CRC 误报，
-// 因为 7zz 已给出确定诊断，且换工具是唯一可行的解包路径。
-func (s *ArchiveImportService) extractRarLikeArchive(ctx context.Context, archivePath, extractedDir, password string) error {
+// extractRarLikeArchive 优先使用 7zip，RAR 兼容性错误可尝试原生工具。
+// CRC、密码与取消错误直接返回；7z 不交给仅支持 RAR 的工具。
+func (s *ArchiveImportService) extractRarLikeArchive(ctx context.Context, format, archivePath, extractedDir, password string) error {
 	err := s.extractWithSevenZip(ctx, archivePath, extractedDir, password)
 	if err == nil {
 		return nil
 	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if format == "rar" && (errors.Is(err, ErrArchiveUnsupportedMethod) || errors.Is(err, ErrArchiveHeaders) || errors.Is(err, exec.ErrNotFound)) {
+		fallbackErr := s.extractRarArchiveWithAlternativeTool(ctx, archivePath, extractedDir, password)
+		if fallbackErr == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if !errors.Is(err, exec.ErrNotFound) || !errors.Is(fallbackErr, exec.ErrNotFound) {
+			return errors.Join(err, fallbackErr)
+		}
+	}
 	if errors.Is(err, exec.ErrNotFound) {
 		return s.extractWithBsdtar(ctx, archivePath, extractedDir)
-	}
-	if !errors.Is(err, ErrArchiveUnsupportedMethod) {
-		return err
-	}
-
-	if fallbackErr := s.extractRarArchiveWithAlternativeTool(ctx, archivePath, extractedDir, password); fallbackErr == nil {
-		return nil
 	}
 	return err
 }
 
 func (s *ArchiveImportService) extractRarArchiveWithAlternativeTool(ctx context.Context, archivePath, extractedDir, password string) error {
-	if err := s.clearArchiveExtractedDir(extractedDir); err != nil {
-		return err
-	}
-	if exe := findArchiveExtractorCommand("unar"); exe != "" {
-		args := []string{"-quiet", "-no-directory", "-output-directory", extractedDir}
-		if strings.TrimSpace(password) != "" {
-			args = append(args, "-p", password)
+	var failures []error
+	for _, name := range []string{"unrar", "unar"} {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		args = append(args, archivePath)
-		if err := runArchiveExtractor(ctx, exe, args, ""); err == nil {
+		exe := findArchiveExtractorCommand(name)
+		if exe == "" {
+			continue
+		}
+		if err := s.clearArchiveExtractedDir(extractedDir); err != nil {
+			return err
+		}
+		args := []string{"-quiet", "-force-overwrite", "-no-directory", "-output-directory", extractedDir, "-password", password, archivePath}
+		if name == "unrar" {
+			passwordArg := "-p-" // 无密码也禁止等待交互输入。
+			if password != "" {
+				passwordArg = "-p" + password
+			}
+			args = []string{"x", "-y", "-o+", passwordArg, "--", archivePath, filepath.Clean(extractedDir) + string(os.PathSeparator)}
+		}
+		err := runArchiveExtractor(ctx, exe, args, archivePath)
+		if err == nil {
 			return nil
 		}
-	}
-	if exe := findArchiveExtractorCommand("unrar"); exe != "" {
-		args := []string{"x", "-y", "-o+", extractedDir}
-		if strings.TrimSpace(password) != "" {
-			args = append(args, "-p"+password)
-		}
-		args = append(args, archivePath)
-		if err := runArchiveExtractor(ctx, exe, args, ""); err == nil {
-			return nil
+		failures = append(failures, fmt.Errorf("%s 兼容解压失败: %w", name, err))
+		if isArchivePasswordRelatedError(err) || ctx.Err() != nil {
+			break
 		}
 	}
-	return ErrArchiveUnsupportedMethod
+	if len(failures) == 0 {
+		return fmt.Errorf("未安装 RAR 兼容解压工具，请安装 unrar 或 unar 后重试: %w", exec.ErrNotFound)
+	}
+	return errors.Join(failures...)
 }
 
 func (s *ArchiveImportService) clearArchiveExtractedDir(extractedDir string) error {
@@ -2174,6 +2209,9 @@ func runArchiveExtractor(ctx context.Context, exe string, args []string, archive
 	cmd.Stdout = &output
 	cmd.Stderr = &output
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return archiveCommandError(fmt.Sprintf("extract %s with %s", archivePath, exe), err, output.String())
 	}
 	return nil

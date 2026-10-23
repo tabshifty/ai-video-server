@@ -1,5 +1,21 @@
 # plan.md
 
+## 2026-10-23 09:30 +0800 完成：压缩包解压兼容与失败恢复
+- 进度：完成 RAR 头部错误回退、原生工具命令修正、解压失败清理、密码和取消边界及中文诊断；复查差异确认未改 API、数据库或 App。仅提交本任务 5 个文件，保留既有未跟踪 `docs/examples/`。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_extract_test.go`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`。
+- 验证：14 组工具链恢复场景及头部诊断、文件名误判、取消用例通过；`go test ./internal/services -run 'Test.*Archive|TestExtract.*|TestZip.*' -race -count=1`、`go test ./internal/handlers -run 'Test.*Archive' -race -parallel 1 -count=1`、`go test ./... -skip '^TestParseTVAPKMetadataParsesReleaseAPK$' -count=1`、`go vet ./...`、`go build ./...`、`git diff --check` 及本次 5 文件严格 UTF-8 和替换字符检查均通过。原生 unrar 对普通和加密中文文本归档实测解压并逐字节比对通过。
+- 验证边界：未跳过时全量测试存在既有 APK 版本断言失败（144 vs 121）；handlers 默认并行 race 存在既有 Gin.SetMode 全局变量竞争，串行复验通过；未安装 golangci-lint，仓库未提供对应配置，未执行额外 lint。未部署、未复验原始问题归档，部署后需要对失败批次手动重试，实际恢复取决于原归档完整性与兼容工具是否可用。
+
+## 2026-10-23 09:28 +0800 实施：压缩包解压兼容与失败恢复
+- 进度：新增 RAR 头部错误兼容回退，修正 unrar 参数并补齐无交互密码参数；兼容工具逐次清理半成品，最终失败保留合并诊断且删除输出；区分 7z、CRC、密码和取消，头部错误按诊断行识别而非文件名匹配。原始问题归档不在开发机，不执行现场内容操作。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_extract_test.go`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`。
+- 验证：新用例先在旧实现失败；首轮定向测试、services 解压 race 检查、build/vet 通过；RAR 官方 7.30 beta 1 工具生成普通和加密的中文文件名文本归档，两种 unrar 命令实际解压并逐字节比对通过。全量测试仅遇既有 TV APK fixture 版本断言（144 vs 121）；扩展 handlers race 检查发现既有并行测试反复写 Gin 全局模式，准备串行复验并记录范围，避免修改无关模块。最终代码的补充密码和诊断边界测试与复验运行中。
+
+## 2026-10-23 计划：压缩包解压兼容与失败恢复
+- 进度：确认 RAR 头部错误缺少兼容回退、unrar 参数顺序错误、备用工具间半成品未隔离；计划对 RAR 的 Headers Error/Unsupported Method 尝试原生 unrar 与 unar，保留密码/CRC/取消边界，修正无交互命令参数并清理解压失败残留，收敛头部错误中文诊断。
+- 影响文件：`internal/services/archive_import.go`、解压回归测试、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`。
+- 验证：先补工具链模拟回归测试，之后运行定向测试（含 race）、后端测试、构建与 vet；当前开发机不存在报错归档，不能据日志断定真实文件损坏或宣称真实归档已恢复。
+
 ## 2026-10-23 00:35 +0800 修复：115 云下载扫码登录取码
 - 进度：登录二维码改为复用 115Browser 默认常开的 `https://115.com/` 标签页，不再打开已返回 404 的 `/login`；从 `.qrcode-login .pic img`（`#js_login_qrcode_img`）读取 data URL，二维码过期（“二维码失效/请点击刷新”）时先点击 `.ql-refresh` 再取图；非 data URL 时按二维码元素 rect 调 `Page.captureScreenshot` 裁剪，不再用整页截图兜底。`loginTarget` 会等待并优先选择无 query 的 115 首页，只有完全不存在 115 页面时才新开标签页。
 - 影响文件：`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`internal/cloud/browser.go`、`CONTEXT.md`、`plan.md`。
