@@ -154,3 +154,19 @@ func dedupeMediaUUIDs(ids []uuid.UUID) []uuid.UUID {
 	}
 	return out
 }
+
+// AddVideoImageCollections preserves all existing direct and inherited relationships.
+func (r *VideoRepository) AddVideoImageCollections(ctx context.Context, videoID uuid.UUID, ids []uuid.UUID, source string) error {
+	ids, err := r.ResolveImageCollectionIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err = r.pool.Exec(ctx, `INSERT INTO video_image_collections(video_id,image_collection_id,source) SELECT $1,unnest($2::uuid[]),$3 ON CONFLICT DO NOTHING`, videoID, ids, source)
+	if err != nil {
+		return fmt.Errorf("append video image collections: %w", err)
+	}
+	return nil
+}

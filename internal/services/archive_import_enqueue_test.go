@@ -22,7 +22,7 @@ type fakeArchiveImportDB struct {
 }
 
 func (f *fakeArchiveImportDB) Begin(context.Context) (pgx.Tx, error) {
-	return nil, errors.New("not implemented")
+	return &fakeArchiveLifecycleTx{db: f}, nil
 }
 
 func (f *fakeArchiveImportDB) Exec(_ context.Context, _ string, args ...any) (pgconn.CommandTag, error) {
@@ -220,4 +220,31 @@ func TestRetryExtractPersistsRequestedEncodingMode(t *testing.T) {
 	if len(args) != 4 || args[3] != archiveEncodingGBK {
 		t.Fatalf("last exec args = %#v, want encoding %q", args, archiveEncodingGBK)
 	}
+}
+
+// fakeArchiveLifecycleTx exercises the new transaction-protected retry transition.
+type fakeArchiveLifecycleTx struct {
+	pgx.Tx
+	db *fakeArchiveImportDB
+}
+
+func (t *fakeArchiveLifecycleTx) Exec(ctx context.Context, q string, args ...any) (pgconn.CommandTag, error) {
+	return t.db.Exec(ctx, q, args...)
+}
+func (t *fakeArchiveLifecycleTx) QueryRow(_ context.Context, q string, args ...any) pgx.Row {
+	return archiveLifecycleRow{batch: t.db.row}
+}
+func (t *fakeArchiveLifecycleTx) Commit(context.Context) error   { return nil }
+func (t *fakeArchiveLifecycleTx) Rollback(context.Context) error { return nil }
+
+type archiveLifecycleRow struct{ batch models.ArchiveImportBatch }
+
+func (r archiveLifecycleRow) Scan(dest ...any) error {
+	switch v := dest[0].(type) {
+	case *uuid.UUID:
+		*v = r.batch.ID
+	case *bool:
+		*v = false
+	}
+	return nil
 }

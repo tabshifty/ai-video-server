@@ -129,6 +129,13 @@ func (a archiveImportQueueAdapter) EnqueueScrapeTV(videoID, filePath, filename s
 	})
 }
 
+func (a archiveImportQueueAdapter) EnqueueArchiveWorkspace(id uuid.UUID) error {
+	if a.enqueuer == nil {
+		return fmt.Errorf("queue enqueuer unavailable")
+	}
+	return a.enqueuer.EnqueueArchiveWorkspace(id)
+}
+
 func (a archiveImportQueueAdapter) EnqueueArchiveExtract(batchID uuid.UUID, password string) error {
 	if a.enqueuer == nil {
 		return fmt.Errorf("queue enqueuer unavailable")
@@ -355,7 +362,12 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	configureContentTranslation(scrapeSvc, cfg)
 	subtitleSvc := services.NewSubtitleService(repo, cfg.StorageRoot, logger)
 	processor := queue.NewProcessor(repo, transSvc, scrapeSvc, subtitleSvc, enqueuer, logger, cfg.StorageRoot)
-	pool, err := pgxpool.New(context.Background(), cfg.PostgresDSN)
+	archivePoolConfig, err := pgxpool.ParseConfig(cfg.PostgresDSN)
+	if err != nil {
+		return fmt.Errorf("parse archive pool config: %w", err)
+	}
+	archivePoolConfig.MaxConns = int32(2*(cfg.MaxTranscodeWorkers+cfg.ArchiveExtractWorkers) + 8)
+	pool, err := pgxpool.NewWithConfig(context.Background(), archivePoolConfig)
 	if err != nil {
 		return fmt.Errorf("create archive extract pool: %w", err)
 	}
@@ -364,6 +376,9 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	imageSvc := services.NewImageService(repo, cfg.UploadTempDir, cfg.StorageRoot, logger)
 	archiveImportSvc := services.NewArchiveImportService(pool, uploadSvc, imageSvc, repo, archiveImportQueueAdapter{enqueuer: enqueuer}, cfg.StorageRoot, cfg.UploadTempDir, logger)
 	processor.SetArchiveExtractService(archiveImportSvc)
+	workspaceCtx, workspaceCancel := context.WithCancel(context.Background())
+	defer workspaceCancel()
+	go archiveImportSvc.RunWorkspaceReconciler(workspaceCtx)
 	if cfg.CloudDownloadEnabled {
 		cloudClient := cloud.NewClient(cfg.CloudBrowserCDP, cfg.CloudBrowserApp)
 		cloudRepo := repository.NewCloudDownloadRepository(pool)

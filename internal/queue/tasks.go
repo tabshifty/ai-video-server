@@ -132,6 +132,7 @@ func (p *Processor) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeScrapeRetag, p.HandleScrapeRetag)
 	mux.HandleFunc(TypeOrphanFileScan, p.HandleOrphanFileScan)
 	mux.HandleFunc(TypeArchiveExtract, p.HandleArchiveExtract)
+	mux.HandleFunc(TypeArchiveWorkspace, p.HandleArchiveWorkspace)
 	if p.cloudDownload != nil {
 		mux.HandleFunc(TypeCloudDownload, p.HandleCloudDownload)
 	}

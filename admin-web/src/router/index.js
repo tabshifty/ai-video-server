@@ -24,6 +24,7 @@ import CloudDownloadList from '../views/CloudDownloadList.vue'
 import Toolbox from '../views/Toolbox.vue'
 import ToolboxEd2k from '../views/ToolboxEd2k.vue'
 import ToolboxArchiveImport from '../views/ToolboxArchiveImport.vue'
+import ArchiveImportWorkspace from '../views/ArchiveImportWorkspace.vue'
 import ToolboxImageWorkbench from '../views/ToolboxImageWorkbench.vue'
 import ToolboxOrphanFiles from '../views/ToolboxOrphanFiles.vue'
 import ToolboxPasswordVault from '../views/ToolboxPasswordVault.vue'
@@ -50,6 +51,7 @@ const routes = [
   { path: '/toolbox', component: Toolbox },
   { path: '/toolbox/ed2k', component: ToolboxEd2k },
   { path: '/toolbox/archive-import', component: ToolboxArchiveImport },
+  { path: '/toolbox/archive-import/:id', name: 'ArchiveImportWorkspace', component: ArchiveImportWorkspace },
   { path: '/toolbox/image-workbench', component: ToolboxImageWorkbench },
   { path: '/toolbox/orphan-files', component: ToolboxOrphanFiles },
   { path: '/toolbox/password-vault', component: ToolboxPasswordVault },

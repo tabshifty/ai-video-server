@@ -291,7 +291,7 @@ func TestProcessFileReloadsMetadataAfterMarkingProcessing(t *testing.T) {
 		t.Fatalf("ReadFile(archive_import.go) error = %v", err)
 	}
 	source := string(raw)
-	const signature = "func (s *ArchiveImportService) ProcessFile"
+	const signature = "func (s *ArchiveImportService) processArchiveFile"
 	start := strings.Index(source, signature)
 	if start < 0 {
 		t.Fatalf("%s not found", signature)

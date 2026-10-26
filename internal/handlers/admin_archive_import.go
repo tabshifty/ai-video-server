@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -461,7 +462,7 @@ func (a *API) AdminBatchUpdateArchiveImportFiles(c *gin.Context) {
 	}
 
 	var req adminArchiveImportBatchUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		bad(c, "请求参数格式错误")
 		return
 	}

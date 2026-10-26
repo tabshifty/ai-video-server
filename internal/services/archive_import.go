@@ -540,6 +540,25 @@ func (s *ArchiveImportService) GetFile(ctx context.Context, fileID uuid.UUID) (m
 }
 
 func (s *ArchiveImportService) DeleteBatch(ctx context.Context, batchID uuid.UUID) error {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,47))`, batchID.String()); err != nil {
+		return err
+	}
+	var locked uuid.UUID
+	if err = tx.QueryRow(ctx, `SELECT id FROM archive_import_batches WHERE id=$1`, batchID).Scan(&locked); err != nil {
+		return err
+	}
+	var active bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM archive_import_workspace_jobs WHERE batch_id=$1 AND state IN ('queued','running'))`, batchID).Scan(&active); err != nil {
+		return err
+	}
+	if active {
+		return ErrArchiveBatchBusy
+	}
 	batch, err := s.GetBatch(ctx, batchID)
 	if err != nil {
 		return err
@@ -548,10 +567,13 @@ func (s *ArchiveImportService) DeleteBatch(ctx context.Context, batchID uuid.UUI
 		return err
 	}
 
-	if _, err := s.db.Exec(ctx, `DELETE FROM archive_import_batches WHERE id=$1`, batchID); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM archive_import_batches WHERE id=$1`, batchID); err != nil {
 		return fmt.Errorf("delete archive batch: %w", err)
 	}
 
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
 	cleanupPaths := archiveBatchCleanupPaths(batch)
 	for _, path := range cleanupPaths {
 		if path == "" {
@@ -670,6 +692,10 @@ func (s *ArchiveImportService) UpdateFile(ctx context.Context, fileID uuid.UUID,
 }
 
 func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID) (models.ArchiveImportFileListItem, error) {
+	return s.processArchiveFile(ctx, fileID, nil)
+}
+
+func (s *ArchiveImportService) processArchiveFile(ctx context.Context, fileID uuid.UUID, snapshot *ArchiveWorkspaceValues) (models.ArchiveImportFileListItem, error) {
 	file, err := s.getArchiveFile(ctx, fileID)
 	if err != nil {
 		return models.ArchiveImportFileListItem{}, err
@@ -700,7 +726,33 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 	}
 	defer func() { _ = os.Remove(workPath) }()
 
+	if snapshot != nil {
+		file.Title = snapshot.Title
+		file.Description = snapshot.Description
+		file.Tags = snapshot.Tags
+		file.VideoType = snapshot.VideoType
+		file.VideoCollectionIDs = snapshot.VideoCollectionIDs
+		file.ImageCollectionIDs = snapshot.ImageCollectionIDs
+		tagsRaw, e := json.Marshal(file.Tags)
+		if e != nil {
+			return models.ArchiveImportFileListItem{}, e
+		}
+		vcRaw, e := json.Marshal(file.VideoCollectionIDs)
+		if e != nil {
+			return models.ArchiveImportFileListItem{}, e
+		}
+		icRaw, e := json.Marshal(file.ImageCollectionIDs)
+		if e != nil {
+			return models.ArchiveImportFileListItem{}, e
+		}
+		if _, e = s.db.Exec(ctx, `UPDATE archive_import_files SET title=$2,description=$3,tags=$4,video_type=$5,video_collection_ids=$6,image_collection_ids=$7,updated_at=NOW() WHERE id=$1`, fileID, file.Title, file.Description, tagsRaw, archiveImportVideoTypeOrDefault(file.VideoType), vcRaw, icRaw); e != nil {
+			return models.ArchiveImportFileListItem{}, e
+		}
+	}
 	title := archiveFileTitleForProcessing(file, batch)
+	if snapshot != nil {
+		title = snapshot.Title
+	}
 	description := file.Description
 	tags := append([]string{}, file.Tags...)
 	if len(tags) == 0 {
@@ -719,6 +771,10 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			videoCollections = nil
 		}
 		imageCollectionIDs, err := archiveVideoImageCollectionsForProcessing(file, batch)
+		if snapshot != nil {
+			imageCollectionIDs = snapshot.ImageCollectionIDs
+			err = nil
+		}
 		if err != nil {
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 			return models.ArchiveImportFileListItem{}, err
@@ -755,12 +811,23 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 			return models.ArchiveImportFileListItem{}, err
 		}
-		sourcePath, err := s.copyArchiveVideoSourceFile(resultPreview.VideoID, file, workPath)
+		sourcePath := workPath
+		if !resultPreview.AlreadyExists {
+			sourcePath, err = s.copyArchiveVideoSourceFile(resultPreview.VideoID, file, workPath)
+		}
 		if err != nil {
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 			return models.ArchiveImportFileListItem{}, err
 		}
-		result, err := s.uploadSvc.SaveUploadedFile(ctx, LocalUploadInput{
+		saveFile := s.uploadSvc.SaveUploadedFile
+		if snapshot != nil || resultPreview.AlreadyExists {
+			if imported, ok := s.uploadSvc.(interface {
+				SaveImportedFile(context.Context, LocalUploadInput, int64) (UploadResult, error)
+			}); ok {
+				saveFile = imported.SaveImportedFile
+			}
+		}
+		result, err := saveFile(ctx, LocalUploadInput{
 			UserID:            userID,
 			FilePath:          sourcePath,
 			Filename:          archiveFilename,
@@ -779,7 +846,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 			return models.ArchiveImportFileListItem{}, err
 		}
-		if len(archiveVideoCollections) > 0 && videoType != "short" {
+		if len(archiveVideoCollections) > 0 && (videoType != "short" || snapshot != nil) {
 			if s.repo == nil {
 				_ = s.updateArchiveFileFailure(ctx, fileID, "video repository unavailable")
 				return models.ArchiveImportFileListItem{}, fmt.Errorf("video repository unavailable")
@@ -797,7 +864,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			}
 			allImageCollectionIDs := append([]uuid.UUID{}, inheritedImageCollectionIDs...)
 			allImageCollectionIDs = append(allImageCollectionIDs, imageCollectionIDs...)
-			if relationErr := s.repo.ReplaceVideoImageCollections(ctx, result.VideoID, dedupeArchiveUUIDs(allImageCollectionIDs), "archive_import"); relationErr != nil {
+			if relationErr := s.repo.AddVideoImageCollections(ctx, result.VideoID, dedupeArchiveUUIDs(allImageCollectionIDs), "archive_import"); relationErr != nil {
 				_ = s.updateArchiveFileFailure(ctx, fileID, relationErr.Error())
 				return models.ArchiveImportFileListItem{}, relationErr
 			}
@@ -805,7 +872,7 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 		if err := s.markArchiveVideoFileProcessed(ctx, fileID, result.VideoID, result.AlreadyExists, result.Status); err != nil {
 			return models.ArchiveImportFileListItem{}, err
 		}
-		if !result.AlreadyExists && s.enqueuer != nil {
+		if snapshot == nil && !result.AlreadyExists && s.enqueuer != nil {
 			if videoType == "short" {
 				if err := s.enqueuer.EnqueueTranscode(result.VideoID.String(), result.InputPath, result.OutputDir, result.TargetFormat, false); err != nil {
 					_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
@@ -852,10 +919,11 @@ func (s *ArchiveImportService) ProcessFile(ctx context.Context, fileID uuid.UUID
 			return models.ArchiveImportFileListItem{}, err
 		}
 	}
-	if err := s.syncArchiveVideoImageLinks(ctx, file.BatchID); err != nil {
-		return models.ArchiveImportFileListItem{}, err
+	if snapshot == nil {
+		if err := s.syncArchiveVideoImageLinks(ctx, file.BatchID); err != nil {
+			return models.ArchiveImportFileListItem{}, err
+		}
 	}
-
 	if err := s.refreshArchiveBatchStats(ctx, file.BatchID); err != nil {
 		return models.ArchiveImportFileListItem{}, err
 	}
@@ -935,6 +1003,25 @@ func sameArchiveUUIDSet(left, right []uuid.UUID) bool {
 }
 
 func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UUID, password, requestedMode string) (models.ArchiveImportBatch, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,47))`, batchID.String()); err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	var locked uuid.UUID
+	if err = tx.QueryRow(ctx, `SELECT id FROM archive_import_batches WHERE id=$1`, batchID).Scan(&locked); err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	var protected bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM archive_import_workspace_jobs WHERE batch_id=$1 AND state IN ('queued','running')) OR EXISTS(SELECT 1 FROM archive_import_files WHERE batch_id=$1 AND (status IN ('ready','existing','processing') OR linked_video_id IS NOT NULL OR linked_image_id IS NOT NULL))`, batchID).Scan(&protected); err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	if protected {
+		return models.ArchiveImportBatch{}, fmt.Errorf("存在已入库或处理中文件，不能重新解压")
+	}
 	batch, err := s.GetBatch(ctx, batchID)
 	if err != nil {
 		return models.ArchiveImportBatch{}, err
@@ -943,10 +1030,23 @@ func (s *ArchiveImportService) RetryExtract(ctx context.Context, batchID uuid.UU
 		return models.ArchiveImportBatch{}, fmt.Errorf("batch paths missing")
 	}
 	requestedMode = archiveEncodingRequestedModeForFormat(batch.ArchiveFormat, requestedMode)
-	if err := s.clearArchiveBatchFiles(ctx, batchID); err != nil {
+	if batch.Status == "extracting" || batch.Status == "processing" {
+		return models.ArchiveImportBatch{}, ErrArchiveBatchBusy
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM archive_import_workspaces WHERE batch_id=$1`, batchID); err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM archive_import_files WHERE batch_id=$1`, batchID); err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE archive_import_batches SET status='extracting',workspace_generation=TRUE,updated_at=NOW() WHERE id=$1`, batchID); err != nil {
+		return models.ArchiveImportBatch{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
 		return models.ArchiveImportBatch{}, err
 	}
 	if err := os.RemoveAll(batch.ExtractedDir); err != nil && !os.IsNotExist(err) {
+		_ = s.updateArchiveBatchExtractFailure(ctx, batchID, "failed", err.Error(), requestedMode)
 		return models.ArchiveImportBatch{}, fmt.Errorf("clear archive extracted dir: %w", err)
 	}
 	if err := s.enqueueArchiveExtract(ctx, batchID, batch, strings.TrimSpace(password), requestedMode); err != nil {
@@ -973,9 +1073,9 @@ func (s *ArchiveImportService) insertArchiveBatch(ctx context.Context, batch mod
 INSERT INTO archive_import_batches (
   id, user_id, title, original_filename, archive_format, original_path, extracted_dir, status, last_error,
   encoding_mode, encoding_requested_mode, default_title_prefix, default_description, default_tags,
-  default_video_collection_ids, default_image_collection_ids
+  default_video_collection_ids, default_image_collection_ids, workspace_generation
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,TRUE)
 `, batch.ID, batch.UserID, batch.Title, batch.OriginalFilename, batch.ArchiveFormat, batch.OriginalPath, batch.ExtractedDir, batch.Status, batch.LastError, batch.EncodingMode, batch.EncodingRequestedMode, batch.DefaultTitlePrefix, batch.DefaultDescription, defaultTagsRaw, defaultVideoCollectionsRaw, defaultImageCollectionsRaw)
 	if err != nil {
 		return fmt.Errorf("insert archive batch: %w", err)
@@ -1136,8 +1236,14 @@ VALUES ` + strings.Join(placeholders, ",")
 	if _, err := s.db.Exec(ctx, sql, values...); err != nil {
 		return fmt.Errorf("insert archive file rows: %w", err)
 	}
-	if err := s.createArchiveDirectoryGroupsAndLinks(ctx, batchID); err != nil {
+	var workspaceGeneration bool
+	if err := s.db.QueryRow(ctx, `SELECT workspace_generation FROM archive_import_batches WHERE id=$1`, batchID).Scan(&workspaceGeneration); err != nil {
 		return err
+	}
+	if !workspaceGeneration {
+		if err := s.createArchiveDirectoryGroupsAndLinks(ctx, batchID); err != nil {
+			return err
+		}
 	}
 	return s.refreshArchiveBatchStats(ctx, batchID)
 }

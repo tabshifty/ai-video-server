@@ -1086,10 +1086,7 @@ async function loadBatchDetail(batchID, options = {}) {
 
 async function openBatchDetail(batchID) {
   if (!batchID) return
-  if (batchDrawerVisible.value && String(selectedBatch.value?.id || '') === String(batchID || '')) {
-    return
-  }
-  await loadBatchDetail(batchID, { preserveSelection: false })
+  await router.push({ name: 'ArchiveImportWorkspace', params: { id: batchID } })
 }
 
 async function refreshBatchDetail(options = {}) {
@@ -1254,9 +1251,7 @@ async function uploadArchive() {
     clearUploadForm()
     uploadDialogVisible.value = false
     await loadBatches()
-    const opened = await loadBatchDetail(batch.id, {
-      preserveSelection: false
-    })
+    const opened = await router.push({ name: 'ArchiveImportWorkspace', params: { id: batch.id } }).then(() => true)
     if (!opened) {
       ElMessage.info('新批次已创建，可稍后在列表中继续处理')
     }
@@ -1265,10 +1260,7 @@ async function uploadArchive() {
     await loadBatches()
     const recoverableBatchID = String(error?.data?.id || '').trim()
     if (recoverableBatchID) {
-      await loadBatchDetail(recoverableBatchID, {
-        preserveSelection: false,
-        skipConfirm: true
-      })
+      await openBatchDetail(recoverableBatchID)
     }
   } finally {
     uploadLoading.value = false

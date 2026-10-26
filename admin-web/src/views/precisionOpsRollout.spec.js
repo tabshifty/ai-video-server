@@ -66,6 +66,7 @@ const shellViews = [
   'TvAppManage.vue', 'TvSeriesManage.vue', 'UserManage.vue', 'VideoList.vue', 'VideoUpload.vue'
 ]
 const standalonePageViews = [
+  'ArchiveImportWorkspace.vue',
   'Login.vue', 'ToolboxArchiveImport.vue', 'ToolboxChinaMap.vue', 'ToolboxEd2k.vue',
   'ToolboxImageWorkbench.vue', 'ToolboxOrphanFiles.vue', 'ToolboxPasswordVault.vue'
 ]
@@ -175,11 +176,11 @@ function exactRoutePattern(component, withCompatibilityMeta) {
 }
 
 describe('Precision Ops 第一阶段 rollout', () => {
-  it('assigns all 28 Vue views to exactly one boundary', () => {
+  it('assigns all 29 Vue views to exactly one boundary', () => {
     const actual = readdirSync(new URL('.', import.meta.url)).filter((name) => name.endsWith('.vue')).sort()
     const assigned = [...shellViews, ...standalonePageViews, ...componentViews].sort()
     expect(actual).toEqual(assigned)
-    expect(assigned).toHaveLength(28)
+    expect(assigned).toHaveLength(29)
   })
 
   it('fully removes the ordinary-page compatibility meta', () => {

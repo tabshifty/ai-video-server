@@ -249,3 +249,8 @@ export const deleteCloudDownloadCloudFile = (id) =>
   request.post(`/admin/cloud-downloads/${id}/cloud-file/delete`, { confirm: true }, { timeout: 120000 })
 export const getCloudBrowserState = () => request.get('/admin/cloud-downloads/browser')
 export const getCloudLoginQR = () => request.get('/admin/cloud-downloads/login-qr')
+
+export const getAdminArchiveWorkspace = (id) => request.get(`/admin/archive-import/batches/${id}/workspace`)
+export const saveAdminArchiveWorkspace = (id, payload) => request.put(`/admin/archive-import/batches/${id}/workspace`, payload)
+export const submitAdminArchiveWorkspace = (id, payload) => request.post(`/admin/archive-import/batches/${id}/workspace/submit`, payload)
+export const generateAdminArchiveWorkspaceGroups = (id, payload) => request.post(`/admin/archive-import/batches/${id}/workspace/generate-groups`, payload)
