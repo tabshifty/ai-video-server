@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-10-26 11:20 +0800 访谈首轮记录：需求边界与现状差异
+- 进度：记录用户已明确要求的全屏、虚拟文件整理与入库分组术语，列出首轮九项待决问题。核实当前分组平级、按目录自动建组、混合媒体与图片合集多选存在不同路径行为不一致；尚未完成需求收口，不修改业务代码，不将建议写成已接受的决策。
+- 影响文件：仅提交 `docs/design/2026-10-26-archive-import-workspace.md`、`CONTEXT.md` 和本文件的访谈记录；既有未跟踪 `docs/examples/` 保留。
+- 验证：`git diff --check`、三份文档严格 UTF-8 解码与替换字符检查通过；纯文档未运行构建或业务测试。
+
+## 2026-10-26 11:18 +0800 需求访谈：压缩包全屏入库工作台
+- 进度：使用用户指定的 grill-with-docs，结合 grilling 与 domain-modeling 梳理现有流程；先记录用户明确要求的领域术语与待决问题，分轮确认关系、继承、合集和执行边界。当前处于需求访谈阶段，尚未确认实施方案。
+- 影响文件：`docs/design/2026-10-26-archive-import-workspace.md`、`CONTEXT.md`、`plan.md`；业务代码暂不修改。
+- 验证：待执行文档差异、UTF-8 与乱码检查；纯文档无需构建。已有未跟踪 `docs/examples/` 不纳入本任务。
+
 ## 2026-10-23 09:30 +0800 完成：压缩包解压兼容与失败恢复
 - 进度：完成 RAR 头部错误回退、原生工具命令修正、解压失败清理、密码和取消边界及中文诊断；复查差异确认未改 API、数据库或 App。仅提交本任务 5 个文件，保留既有未跟踪 `docs/examples/`。
 - 影响文件：`internal/services/archive_import.go`、`internal/services/archive_extract_test.go`、`docs/家用部署机.md`、`CONTEXT.md`、`plan.md`。
