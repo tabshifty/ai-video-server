@@ -68,7 +68,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -247,14 +246,8 @@ fun TvRemotePlaybackScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val rootFocusRequester = remember { FocusRequester() }
-    val dataSourceFactory = remember(accessToken) {
-        DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
-            if (accessToken.isNotBlank()) {
-                setDefaultRequestProperties(mapOf("Authorization" to "Bearer $accessToken"))
-            }
-        }
-    }
-    val sharedPlayer = remember(accessToken) {
+    val dataSourceFactory = rememberTvPlaybackDataSource(accessToken)
+    val sharedPlayer = remember(context) {
         ExoPlayer.Builder(context).build().apply {
             repeatMode = Player.REPEAT_MODE_OFF
         }
@@ -263,6 +256,8 @@ fun TvRemotePlaybackScreen(
 
     var renderedVideoId by remember { mutableStateOf<String?>(null) }
     var isPlayerActuallyPlaying by remember { mutableStateOf(false) }
+    var screensaverPlayWhenReady by remember { mutableStateOf(false) }
+    var screensaverPlaybackEnded by remember { mutableStateOf(false) }
     var isPausedByUser by rememberSaveable { mutableStateOf(false) }
     var showChrome by rememberSaveable { mutableStateOf(true) }
     var chromeHideJob by remember { mutableStateOf<Job?>(null) }
@@ -280,6 +275,11 @@ fun TvRemotePlaybackScreen(
     val currentVideoId = session?.currentVideoId ?: currentItem?.videoId.orEmpty()
     val currentAutoplayKey = session?.let { "${it.sessionId}:${it.currentIndex}:$currentVideoId" }.orEmpty()
     val visibleErrorMessage = uiState.errorMessage ?: playbackErrorMessage
+    TvScreensaverPlaybackEffect(
+        busy = uiState.loading || isPlayerActuallyPlaying || (currentVideoId.isNotBlank() && playbackErrorMessage == null &&
+            ((!screensaverPlaybackEnded && screensaverPlayWhenReady) ||
+                sharedPlayer.currentMediaItem?.mediaId != currentVideoId)),
+    )
     val keepChromeVisible = !visibleErrorMessage.isNullOrBlank()
     val latestHasNext by rememberUpdatedState(session?.hasNext == true)
     val latestActionLoading by rememberUpdatedState(uiState.actionLoading)
@@ -387,7 +387,12 @@ fun TvRemotePlaybackScreen(
                 isPlayerActuallyPlaying = isPlaying
             }
 
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                screensaverPlayWhenReady = playWhenReady
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
+                screensaverPlaybackEnded = playbackState == Player.STATE_ENDED
                 if (playbackState != Player.STATE_ENDED) {
                     return
                 }

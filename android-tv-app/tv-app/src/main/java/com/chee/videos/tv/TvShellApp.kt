@@ -82,6 +82,8 @@ import com.chee.videos.feature.tv.TvShortFeedRoute
 import com.chee.videos.feature.tv.TvHomeMenuItem
 import com.chee.videos.feature.tv.TvShortFeedScreen
 import com.chee.videos.feature.tv.TvSeriesPlayerScreen
+import com.chee.videos.feature.tv.TvScreensaverHost
+import com.chee.videos.feature.tv.LocalTvScreensaverController
 import com.chee.videos.feature.tv.buildTvSeriesRoute
 import com.chee.videos.feature.tv.buildTvCatalogWallRoute
 import com.chee.videos.feature.tv.buildTvLongFormDetailRoute
@@ -95,9 +97,11 @@ fun TvShellApp(
     appRootViewModel: AppRootViewModel = hiltViewModel(),
 ) {
     val appState by appRootViewModel.appState.collectAsStateWithLifecycle()
+    val readyState = appState as? AppRootState.Ready
 
     MaterialTheme(colorScheme = AppDarkColors, typography = TvTypography) {
         Surface(modifier = Modifier.fillMaxSize(), color = AppChrome.Canvas) {
+            TvScreensaverHost(baseUrl = readyState?.baseUrl, accessToken = readyState?.accessToken) {
             when (val state = appState) {
                 AppRootState.Loading -> {
                     TvPageLoadingState(message = "正在准备 TV 首页")
@@ -114,6 +118,7 @@ fun TvShellApp(
                     onRepair = appRootViewModel::logout,
                     onSwitchServer = appRootViewModel::switchToServerSelection,
                 )
+            }
             }
         }
     }
@@ -142,6 +147,7 @@ private fun TvAuthenticatedNav(
     var homeMenuFocusTarget by remember { mutableStateOf<TvHomeMenuItem?>(null) }
     val activity = LocalContext.current.findActivity()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val screensaver = LocalTvScreensaverController.current
     var rootExitPromptAtMillis by remember { mutableStateOf<Long?>(null) }
     var showRootExitPrompt by remember { mutableStateOf(false) }
 
@@ -168,6 +174,7 @@ private fun TvAuthenticatedNav(
     BackHandler(enabled = handleRootExitConfirm, onBack = ::handleRootBack)
 
     LaunchedEffect(currentRoute) {
+        screensaver?.userActivity()
         rootExitPromptAtMillis = null
         showRootExitPrompt = false
     }
@@ -212,6 +219,7 @@ private fun TvAuthenticatedNav(
         if (currentRoute == targetRoute) {
             return@LaunchedEffect
         }
+        screensaver?.userActivity()
         navController.navigate(targetRoute) {
             launchSingleTop = true
             if (isTvRemotePlaybackRoute(currentRoute) && currentEntry != null) {

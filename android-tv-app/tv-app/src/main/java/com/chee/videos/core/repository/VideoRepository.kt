@@ -17,6 +17,9 @@ import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
 import com.chee.videos.core.model.TvSeriesDetailDto
 import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.model.TvScreensaverImage
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import com.chee.videos.core.model.UserProfileDto
 import com.chee.videos.core.model.VideoDetailDto
 import com.chee.videos.core.model.VideoListItemDto
@@ -277,6 +280,30 @@ class VideoRepository @Inject constructor(
                 authorization = bearer,
             )
         }
+    }
+
+    suspend fun fetchTvScreensaverImages(): List<TvScreensaverImage> {
+        val items = linkedMapOf<String, TvScreensaverImage>()
+        val visitedCursors = mutableSetOf<String>()
+        var cursor: String? = null
+        do {
+            currentCoroutineContext().ensureActive()
+            val page = callWithAuth { baseUrl, bearer ->
+                api.tvScreensaverImages(
+                    url = "${UrlBuilder.normalizeBaseUrl(baseUrl)}/api/v1/tv/screensaver/images",
+                    authorization = bearer,
+                    after = cursor,
+                    limit = 200,
+                )
+            }.getOrThrow()
+            currentCoroutineContext().ensureActive()
+            page.items.filter { it.id.isNotBlank() && it.viewUrl.isNotBlank() }.forEach { items[it.id] = it }
+            cursor = page.nextCursor.takeIf { it.isNotBlank() }
+            if (cursor != null && !visitedCursors.add(cursor)) {
+                throw AppException("屏保图片游标重复")
+            }
+        } while (cursor != null)
+        return items.values.toList()
     }
 
     suspend fun toggleLike(videoId: String): Result<ActionTogglePayload> {

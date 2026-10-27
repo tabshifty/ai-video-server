@@ -8,6 +8,7 @@ import com.chee.videos.core.network.ApiService
 import com.chee.videos.core.util.UrlBuilder
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 
 @Singleton
 class AuthRepository @Inject constructor(
@@ -58,6 +59,8 @@ class AuthRepository @Inject constructor(
                 )
                 true
             }
+        } catch (err: CancellationException) {
+            throw err
         } catch (_: Exception) {
             store.clearTokens()
             false

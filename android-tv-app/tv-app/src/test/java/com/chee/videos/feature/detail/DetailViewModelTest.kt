@@ -352,6 +352,13 @@ private class FakeDetailApiService : ApiService {
         body: Map<String, String>,
     ): ApiEnvelope<Map<String, Boolean>> = error("unused")
 
+    override suspend fun tvScreensaverImages(
+        url: String,
+        authorization: String,
+        after: String?,
+        limit: Int,
+    ): ApiEnvelope<com.chee.videos.core.model.TvScreensaverImagesPayload> = error("本测试不读取屏保图片")
+
     override suspend fun imageCollections(
         url: String,
         authorization: String,
@@ -546,6 +553,13 @@ private class DelayedDetailApiService : ApiService {
         authorization: String,
         body: Map<String, String>,
     ): ApiEnvelope<Map<String, Boolean>> = error("unused")
+
+    override suspend fun tvScreensaverImages(
+        url: String,
+        authorization: String,
+        after: String?,
+        limit: Int,
+    ): ApiEnvelope<com.chee.videos.core.model.TvScreensaverImagesPayload> = error("本测试不读取屏保图片")
 
     override suspend fun imageCollections(
         url: String,

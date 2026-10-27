@@ -4,11 +4,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.chee.videos.core.model.ServerEndpoint
 import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.SessionTokens
 import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.model.TvScreensaverSettings
 import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.VideoFitMode
 import com.chee.videos.core.util.UrlBuilder
@@ -43,6 +45,9 @@ class AppPreferencesStore @Inject constructor(
         val tvSeekStepSeconds = stringPreferencesKey("tv_seek_step_seconds")
         val tvSeriesAutoplayEnabled = booleanPreferencesKey("tv_series_autoplay_enabled")
         val tvDeviceFallbackId = stringPreferencesKey("tv_device_fallback_id")
+        val tvScreensaverEnabled = booleanPreferencesKey("tv_screensaver_enabled")
+        val tvScreensaverIdleMinutes = intPreferencesKey("tv_screensaver_idle_minutes")
+        val tvScreensaverSlideSeconds = intPreferencesKey("tv_screensaver_slide_seconds")
     }
 
     val activeBaseUrlFlow: Flow<String?> = dataStore.data.map { prefs ->
@@ -79,6 +84,26 @@ class AppPreferencesStore @Inject constructor(
 
     val tvSeriesAutoplayEnabledFlow: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.tvSeriesAutoplayEnabled] ?: true
+    }
+
+    val tvScreensaverSettingsFlow: Flow<TvScreensaverSettings> = dataStore.data.map { prefs ->
+        TvScreensaverSettings(
+            enabled = prefs[Keys.tvScreensaverEnabled] ?: true,
+            idleMinutes = TvScreensaverSettings.normalizeIdleMinutes(prefs[Keys.tvScreensaverIdleMinutes]),
+            slideSeconds = TvScreensaverSettings.normalizeSlideSeconds(prefs[Keys.tvScreensaverSlideSeconds]),
+        )
+    }
+
+    suspend fun saveTvScreensaverEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.tvScreensaverEnabled] = enabled }
+    }
+
+    suspend fun saveTvScreensaverIdleMinutes(minutes: Int) {
+        dataStore.edit { it[Keys.tvScreensaverIdleMinutes] = TvScreensaverSettings.normalizeIdleMinutes(minutes) }
+    }
+
+    suspend fun saveTvScreensaverSlideSeconds(seconds: Int) {
+        dataStore.edit { it[Keys.tvScreensaverSlideSeconds] = TvScreensaverSettings.normalizeSlideSeconds(seconds) }
     }
 
     val endpointsFlow: Flow<List<ServerEndpoint>> = dataStore.data.map { prefs ->

@@ -44,6 +44,7 @@ fun TvSeriesPlayerScreen(
     viewModel: TvSeriesPlayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    TvScreensaverPlaybackEffect(busy = uiState.loading)
     val context = LocalContext.current
     val activity = context as? Activity
     var showDolbyVisionDiagnostics by remember { mutableStateOf(false) }
@@ -505,6 +506,7 @@ fun TvSeriesPlayerScreen(
         playbackStatus
     }
     KeepScreenOnEffect(enabled = shouldKeepTvLongFormScreenOn(playIntent, screenOnPlaybackStatus))
+    TvScreensaverPlaybackEffect(busy = shouldKeepTvLongFormScreenOn(playIntent, screenOnPlaybackStatus))
     BackHandler(enabled = uiState.pendingEndOverlayKind != null, onBack = onBack)
 
     Box(

@@ -16,6 +16,7 @@ import com.chee.videos.core.model.TvAuthSessionCreateRequest
 import com.chee.videos.core.model.TvAuthStatusEnvelope
 import com.chee.videos.core.model.TvCatalogWallPayload
 import com.chee.videos.core.model.TvHomePayload
+import com.chee.videos.core.model.TvScreensaverImagesPayload
 import com.chee.videos.core.model.TvRemoteDeviceSessionPayload
 import com.chee.videos.core.model.TvRemoteSessionDto
 import com.chee.videos.core.model.TvSearchPayload
@@ -173,6 +174,14 @@ interface ApiService {
         @Query("page") page: Int,
         @Query("page_size") pageSize: Int,
     ): ApiEnvelope<ImageCollectionsPayload>
+
+    @GET
+    suspend fun tvScreensaverImages(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Query("after") after: String?,
+        @Query("limit") limit: Int,
+    ): ApiEnvelope<TvScreensaverImagesPayload>
 
     @GET
     suspend fun imageCollectionDetail(

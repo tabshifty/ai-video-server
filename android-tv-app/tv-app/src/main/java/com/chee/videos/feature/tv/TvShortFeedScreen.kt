@@ -76,7 +76,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -107,14 +106,8 @@ fun TvShortFeedScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rootFocusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
-    val dataSourceFactory = remember(accessToken) {
-        DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
-            if (accessToken.isNotBlank()) {
-                setDefaultRequestProperties(mapOf("Authorization" to "Bearer $accessToken"))
-            }
-        }
-    }
-    val sharedPlayer = remember(accessToken) {
+    val dataSourceFactory = rememberTvPlaybackDataSource(accessToken)
+    val sharedPlayer = remember(context) {
         ExoPlayer.Builder(context).build().apply {
             repeatMode = Player.REPEAT_MODE_OFF
         }
@@ -151,6 +144,10 @@ fun TvShortFeedScreen(
     val currentVideoId = currentItem?.id.orEmpty()
     val currentPausedByUser = currentVideoId.isNotBlank() && currentVideoId in uiState.pausedByUserVideoIds
     val latestCurrentVideoId by rememberUpdatedState(currentVideoId)
+    TvScreensaverPlaybackEffect(
+        busy = uiState.loading || (currentVideoId.isNotBlank() && !currentPausedByUser &&
+            !hasEndedAtCurrentVideo && playbackErrorMessage == null),
+    )
     val latestCurrentIndex by rememberUpdatedState(uiState.currentIndex)
     val latestLastIndex by rememberUpdatedState(uiState.items.lastIndex)
 

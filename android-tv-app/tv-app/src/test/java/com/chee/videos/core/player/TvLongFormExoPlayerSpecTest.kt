@@ -29,10 +29,12 @@ class TvLongFormExoPlayerSpecTest {
     fun tvLongFormMedia3SubtitleSupportUsesMediaItemAndBearerHeaderPath() {
         val trackSupport = Path.of("src/main/java/com/chee/videos/feature/tv/TvMedia3TrackSupport.kt").readText()
         val player = Path.of("src/main/java/com/chee/videos/feature/tv/TvLongFormMedia3Player.kt").readText()
+        val dataSource = Path.of("src/main/java/com/chee/videos/feature/tv/TvPlaybackDataSource.kt").readText()
 
         assertTrue(trackSupport.contains("MediaItem.SubtitleConfiguration.Builder"))
-        assertTrue(player.contains("DefaultHttpDataSource.Factory()"))
-        assertTrue(player.contains("\"Authorization\" to \"Bearer \$accessToken\""))
+        assertTrue(player.contains("rememberTvPlaybackDataSource(accessToken)"))
+        assertTrue(dataSource.contains("DefaultHttpDataSource.Factory()"))
+        assertTrue(dataSource.contains("\"Authorization\" to \"Bearer \$accessToken\""))
         assertTrue(player.contains(".setSubtitleConfigurations(subtitleConfigurations)"))
         assertFalse(trackSupport.contains("appendAccessTokenQuery"))
         assertFalse(trackSupport.contains("access_token"))

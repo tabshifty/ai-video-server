@@ -30,7 +30,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -158,15 +157,9 @@ internal fun TvLongFormMedia3Player(
     val latestOnPlaybackIntentChanged by rememberUpdatedState(onPlaybackIntentChanged)
     val latestOnPlaybackStatusChanged by rememberUpdatedState(onPlaybackStatusChanged)
     val latestOnAudioTracksChanged by rememberUpdatedState(onAudioTracksChanged)
-    val dataSourceFactory = remember(accessToken) {
-        DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).apply {
-            if (accessToken.isNotBlank()) {
-                setDefaultRequestProperties(mapOf("Authorization" to "Bearer $accessToken"))
-            }
-        }
-    }
+    val dataSourceFactory = rememberTvPlaybackDataSource(accessToken)
     val seekIncrementMs = tvSeekStepSeconds.coerceAtLeast(1).toLong() * 1_000L
-    val player = remember(accessToken, seekIncrementMs) {
+    val player = remember(context, seekIncrementMs) {
         ExoPlayer.Builder(context)
             .setSeekBackIncrementMs(seekIncrementMs)
             .setSeekForwardIncrementMs(seekIncrementMs)

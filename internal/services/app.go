@@ -189,6 +189,11 @@ func (s *AppService) ImageCollectionDetail(ctx context.Context, collectionID uui
 	return s.repo.GetAppImageCollectionDetail(ctx, collectionID)
 }
 
+// TVScreensaverImages 读取全图库候选，包含未加入合集的可用图片。
+func (s *AppService) TVScreensaverImages(ctx context.Context, after uuid.UUID, limit int) (models.TVScreensaverImages, error) {
+	return s.repo.ListTVScreensaverImages(ctx, after, limit)
+}
+
 // ShortCollections 返回手机端可见的短视频合集目录，分页每页 20 条，按后台 sort_order DESC、
 // updated_at DESC 排序。可见合集仅包含启用且至少一条可播放短视频的合集（见可见短视频合集）。
 func (s *AppService) ShortCollections(ctx context.Context, query string, page, pageSize int) (models.PageResult[models.ShortCollectionListItem], error) {

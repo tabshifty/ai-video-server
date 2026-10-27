@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.chee.videos.core.model.ShortPlaybackMode
 import com.chee.videos.core.model.TvSubtitlePreferenceMode
 import com.chee.videos.core.model.TvTrackPreference
+import com.chee.videos.core.model.TvScreensaverSettings
 import com.chee.videos.core.testing.MainDispatcherRule
 import com.google.gson.Gson
 import java.io.File
@@ -19,6 +20,29 @@ import org.junit.Test
 class AppPreferencesStoreTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+
+    @Test
+    fun screensaverDefaultsAndDeviceSettingsSurviveLoginAndServerChanges() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
+            produceFile = { File.createTempFile("tv-screensaver", ".preferences_pb").apply { deleteOnExit() } },
+        )
+        val store = AppPreferencesStore(dataStore, Gson())
+        assertEquals(TvScreensaverSettings(), store.tvScreensaverSettingsFlow.first())
+        store.saveTvScreensaverIdleMinutes(30)
+        store.saveTvScreensaverSlideSeconds(60)
+        store.saveTvScreensaverEnabled(false)
+        store.setActiveBaseUrl("https://first.example")
+        store.clearTokens()
+        store.clearActiveServerAndTokens()
+        store.setActiveBaseUrl("https://second.example")
+        assertEquals(TvScreensaverSettings(false, 30, 60), store.tvScreensaverSettingsFlow.first())
+        store.saveTvScreensaverEnabled(true)
+        assertEquals(TvScreensaverSettings(true, 30, 60), store.tvScreensaverSettingsFlow.first())
+        store.saveTvScreensaverIdleMinutes(-1)
+        store.saveTvScreensaverSlideSeconds(7)
+        assertEquals(TvScreensaverSettings(), store.tvScreensaverSettingsFlow.first())
+    }
 
     @Test
     fun shortPlaybackMode_defaultsToLoopOne_andCanPersist() = runTest {

@@ -714,6 +714,7 @@ private fun TvHomeSettingsPanel(
             enabled = seriesAutoplayEnabled,
             onSetEnabled = onSetSeriesAutoplayEnabled,
         )
+        TvScreensaverSettingsSection()
     }
 }
 

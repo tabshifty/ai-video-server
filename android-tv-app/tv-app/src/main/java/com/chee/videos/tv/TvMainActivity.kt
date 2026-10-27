@@ -12,10 +12,16 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.chee.videos.tv.R
+import com.chee.videos.feature.tv.TvScreensaverController
+import com.chee.videos.feature.tv.TvScreensaverInputGate
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TvMainActivity : ComponentActivity() {
+    @Inject lateinit var screensaver: TvScreensaverController
+    private val screensaverInputGate = TvScreensaverInputGate()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_VideoHome)
         super.onCreate(savedInstanceState)
@@ -30,6 +36,20 @@ class TvMainActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val systemKey = event.keyCode in setOf(
+            KeyEvent.KEYCODE_HOME, KeyEvent.KEYCODE_POWER, KeyEvent.KEYCODE_SLEEP,
+            KeyEvent.KEYCODE_WAKEUP, KeyEvent.KEYCODE_APP_SWITCH,
+            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN,
+            KeyEvent.KEYCODE_VOLUME_MUTE, KeyEvent.KEYCODE_MUTE,
+        )
+        val consume = screensaverInputGate.key(
+            keyCode = event.keyCode,
+            down = event.action == KeyEvent.ACTION_DOWN,
+            showing = screensaver.showing.value,
+            systemKey = systemKey,
+        )
+        if (!systemKey || !screensaver.showing.value) screensaver.userActivity()
+        if (consume) return true
         return try {
             super.dispatchKeyEvent(event)
         } catch (err: IllegalStateException) {
@@ -43,6 +63,11 @@ class TvMainActivity : ComponentActivity() {
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked != MotionEvent.ACTION_HOVER_ENTER && event.actionMasked != MotionEvent.ACTION_HOVER_EXIT) {
+            val consume = screensaver.showing.value
+            screensaver.userActivity()
+            if (consume) return true
+        }
         return try {
             super.dispatchGenericMotionEvent(event)
         } catch (err: IllegalStateException) {
@@ -52,6 +77,30 @@ class TvMainActivity : ComponentActivity() {
                 throw err
             }
         }
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val wasShowing = screensaver.showing.value
+        val consume = screensaverInputGate.touch(
+            start = event.actionMasked == MotionEvent.ACTION_DOWN,
+            end = event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL,
+            showing = wasShowing,
+        )
+        screensaver.userActivity()
+        if (consume && wasShowing && event.actionMasked != MotionEvent.ACTION_DOWN) {
+            val cancel = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
+            try {
+                super.dispatchTouchEvent(cancel)
+            } finally {
+                cancel.recycle()
+            }
+        }
+        return if (consume) true else super.dispatchTouchEvent(event)
+    }
+
+    override fun onStop() {
+        screensaverInputGate.reset()
+        super.onStop()
     }
 
     private fun installMainLooperHoverExitGuard() {
