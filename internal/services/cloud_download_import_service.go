@@ -105,6 +105,27 @@ func NewCloudDownloadImportService(
 	}
 }
 
+// GetImportTask restores task and import state without requiring the downloaded source to exist.
+func (s *CloudDownloadImportService) GetImportTask(ctx context.Context, taskID int64) (models.CloudDownloadTask, error) {
+	task, err := s.taskRepo.GetByID(ctx, taskID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return models.CloudDownloadTask{}, models.ErrCloudDownloadNotFound
+	}
+	if err != nil {
+		return models.CloudDownloadTask{}, fmt.Errorf("读取云下载任务: %w", err)
+	}
+	record, err := s.repo.GetByTaskID(ctx, taskID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		task.Import = nil
+		return task, nil
+	}
+	if err != nil {
+		return models.CloudDownloadTask{}, fmt.Errorf("读取云下载导入状态: %w", err)
+	}
+	task.Import = &models.CloudDownloadImportSummary{ID: record.ID, Kind: record.Kind, Status: record.Status, VideoID: record.VideoID, ArchiveBatchID: record.ArchiveBatchID, ErrorMessage: record.ErrorMessage, CreatedAt: record.CreatedAt}
+	return task, nil
+}
+
 // Preview inspects the actual downloaded file. It does not create anything.
 func (s *CloudDownloadImportService) Preview(ctx context.Context, taskID int64) (models.CloudDownloadImportPreview, error) {
 	_, sourcePath, info, err := s.loadCompletedSource(ctx, taskID)

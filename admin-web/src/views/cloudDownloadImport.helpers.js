@@ -178,13 +178,27 @@ export function resolveCloudImportAction(task, now = Date.now()) {
   return 'none'
 }
 
-// video_id / archive_batch_id 是后端返回的 UUID 字符串，这里只按 kind
-// 选择列表页，不做数字转换。
+// 导入批次一旦创建即可进入工作台，排队、失败及源文件移除均不影响定位。
 export function importDestination(task) {
+  const info = task?.import
+  const batchID = String(info?.archive_batch_id || '').trim()
+  if (info?.kind === 'archive' && UUID_PATTERN.test(batchID)) return `/toolbox/archive-import/${batchID}`
   const action = resolveCloudImportAction(task)
-  if (action === 'imported') {
-    return task?.import?.kind === 'archive' ? '/toolbox/archive-import' : '/videos'
-  }
+  if (action === 'imported') return info?.kind === 'archive' ? '/toolbox/archive-import' : '/videos'
   if (action === 'existing') return '/videos'
   return ''
+}
+
+export function cloudArchiveImportPath(taskID) {
+  const id = String(taskID || '').trim()
+  return /^[1-9]\d*$/.test(id) ? `/cloud-downloads/${id}/archive-import` : ''
+}
+
+export function cloudArchiveImportState(task) {
+  const info = task?.import
+  if (info?.kind && info.kind !== 'archive') return 'unsupported'
+  if (info?.archive_batch_id && importDestination(task).startsWith('/toolbox/archive-import/')) return 'workspace'
+  if (isImportActive(task)) return 'waiting'
+  if (info?.status === 'imported') return 'missing-batch'
+  return 'form'
 }

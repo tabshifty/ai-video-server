@@ -1149,3 +1149,44 @@ func TestCloudImportMarkFailedIgnoresStaleAttempt(t *testing.T) {
 		t.Fatalf("stale MarkFailed changed status: %s", h.repo.record.Status)
 	}
 }
+
+func TestCloudImportGetTaskRestoresArchiveWithoutSource(t *testing.T) {
+	t.Parallel()
+	for _, status := range []string{models.CloudImportQueued, models.CloudImportImported, models.CloudImportFailed} {
+		t.Run(status, func(t *testing.T) {
+			h := newCloudImportHarness(t)
+			if err := os.Remove(h.source); err != nil {
+				t.Fatal(err)
+			}
+			batchID := uuid.New()
+			h.repo.record = models.CloudDownloadImport{ID: 12, TaskID: h.tasks.task.ID, Kind: models.CloudImportKindArchive, Status: status, ArchiveBatchID: &batchID, ErrorMessage: "原导入错误"}
+			task, err := h.svc.GetImportTask(context.Background(), h.tasks.task.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if task.Import == nil || task.Import.ArchiveBatchID == nil || *task.Import.ArchiveBatchID != batchID || task.Import.Status != status {
+				t.Fatalf("未恢复导入状态: %+v", task.Import)
+			}
+			if h.repo.createdCount != 0 || len(h.enqueuer.ingestCalls) != 0 {
+				t.Fatal("查询不应创建或重新入队")
+			}
+		})
+	}
+}
+
+func TestCloudImportGetTaskHandlesMissingAndReadErrors(t *testing.T) {
+	t.Parallel()
+	h := newCloudImportHarness(t)
+	task, err := h.svc.GetImportTask(context.Background(), h.tasks.task.ID)
+	if err != nil || task.Import != nil {
+		t.Fatalf("无导入记录应返回任务: %+v %v", task, err)
+	}
+	h.repo.getErr = errors.New("模拟数据库不可用")
+	if _, err = h.svc.GetImportTask(context.Background(), h.tasks.task.ID); !errors.Is(err, h.repo.getErr) {
+		t.Fatalf("查询错误未传递: %v", err)
+	}
+	h.tasks.err = pgx.ErrNoRows
+	if _, err = h.svc.GetImportTask(context.Background(), h.tasks.task.ID); !errors.Is(err, models.ErrCloudDownloadNotFound) {
+		t.Fatalf("任务不存在: %v", err)
+	}
+}

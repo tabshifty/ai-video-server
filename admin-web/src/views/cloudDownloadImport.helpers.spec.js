@@ -8,6 +8,8 @@ import {
   formatImportFileSize,
   hasActiveImportTasks,
   importDestination,
+  cloudArchiveImportPath,
+  cloudArchiveImportState,
   isImportActive,
   isStaleActiveImport,
   normalizeImportTags,
@@ -223,21 +225,48 @@ describe('115 云下载导入状态', () => {
       .toBe('none')
   })
 
-  it('导入结果跳转到对应列表页，skipped_existing 固定回视频列表', () => {
+  it('压缩包导入结果直达批次工作台，视频保留列表入口', () => {
     expect(importDestination({
       import: { kind: 'video', status: 'imported', video_id: 'video-uuid' }
     })).toBe('/videos')
     expect(importDestination({
-      import: { kind: 'archive', status: 'imported', archive_batch_id: 'batch-uuid' }
-    })).toBe('/toolbox/archive-import')
+      import: { kind: 'archive', status: 'imported', archive_batch_id: '11111111-1111-4111-8111-111111111111' }
+    })).toBe('/toolbox/archive-import/11111111-1111-4111-8111-111111111111')
     expect(importDestination({
       import: { kind: 'archive', status: 'skipped_existing', video_id: 'video-uuid' }
     })).toBe('/videos')
+    expect(importDestination({ import: { kind: 'archive', status: 'imported' } })).toBe('/toolbox/archive-import')
+    expect(importDestination({ import: { kind: 'archive', status: 'failed', archive_batch_id: '11111111-1111-4111-8111-111111111111' } })).toBe('/toolbox/archive-import/11111111-1111-4111-8111-111111111111')
     expect(importDestination({ status: 'completed' })).toBe('')
   })
 
   it('活动状态集合与视频类型集合保持契约', () => {
     expect(ACTIVE_IMPORT_STATUSES).toEqual(['queued', 'hashing', 'copying', 'creating'])
     expect(VIDEO_IMPORT_TYPES).toEqual(['short', 'movie', 'episode', 'av'])
+  })
+})
+
+
+describe('115 压缩包全屏导入恢复', () => {
+  it('任务入口保留大整数 ID，不经过 Number 转换或拼接任意路径', () => {
+    expect(cloudArchiveImportPath('9223372036854775807')).toBe('/cloud-downloads/9223372036854775807/archive-import')
+    for (const id of ['', 0, -1, '1/other', '1?redirect=x']) expect(cloudArchiveImportPath(id)).toBe('')
+  })
+  it('批次已创建时，源是否存在和导入成功/失败都不阻止恢复工作台', () => {
+    for (const status of ['queued', 'creating', 'imported', 'failed']) {
+      const task = { import: { kind: 'archive', status, archive_batch_id: '11111111-1111-4111-8111-111111111111' } }
+      expect(cloudArchiveImportState(task)).toBe('workspace')
+      expect(importDestination(task)).toBe('/toolbox/archive-import/11111111-1111-4111-8111-111111111111')
+    }
+  })
+  it('刷新活动任务只等待，未提交或失败才显示可提交表单', () => {
+    for (const status of ACTIVE_IMPORT_STATUSES) expect(cloudArchiveImportState({ import: { kind: 'archive', status } })).toBe('waiting')
+    expect(cloudArchiveImportState({ status: 'completed' })).toBe('form')
+    expect(cloudArchiveImportState({ import: { kind: 'archive', status: 'failed' } })).toBe('form')
+    expect(cloudArchiveImportState({ import: { kind: 'video', status: 'queued' } })).toBe('unsupported')
+    expect(cloudArchiveImportState({ import: { kind: 'archive', status: 'imported' } })).toBe('missing-batch')
+  })
+  it('失效批次 ID 安全回退列表，不能注入路径', () => {
+    expect(importDestination({ import: { kind: 'archive', status: 'imported', archive_batch_id: '../../videos' } })).toBe('/toolbox/archive-import')
   })
 })

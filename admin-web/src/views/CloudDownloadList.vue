@@ -20,6 +20,7 @@ import {
 } from '../api/admin'
 import { formatAdminDateTime } from '../utils/dateTime'
 import {
+  cloudArchiveImportPath,
   hasActiveImportTasks,
   importDestination,
   resolveCloudImportAction
@@ -260,6 +261,10 @@ async function startImport(row) {
   if (!row?.id || previewingImportId.value) return
   previewingImportId.value = row.id
   try {
+    if (row.import?.kind === 'archive') {
+      await router.push(importDestination(row) || cloudArchiveImportPath(row.id))
+      return
+    }
     const preview = await previewCloudDownloadImport(row.id)
     if (!preview || (preview.kind !== 'video' && preview.kind !== 'archive')) {
       ElMessage.error('该文件类型不支持入媒体库')
@@ -268,6 +273,10 @@ async function startImport(row) {
     const existingKind = row.import?.kind
     if (existingKind && existingKind !== preview.kind) {
       ElMessage.error('文件类型与已有导入记录不一致，无法重试')
+      return
+    }
+    if (preview.kind === 'archive') {
+      await router.push(cloudArchiveImportPath(row.id))
       return
     }
     importTask.value = row
@@ -646,7 +655,8 @@ onUnmounted(() => {
                       <span class="cloud-empty-action">文件不存在</span>
                     </template>
                     <template v-else-if="resolveCloudImportAction(row) === 'importing'">
-                      <el-button size="small" disabled>导入中</el-button>
+                      <el-button v-if="row.import?.kind === 'archive'" size="small" @click="router.push(importDestination(row) || cloudArchiveImportPath(row.id))">继续导入</el-button>
+                      <el-button v-else size="small" disabled>导入中</el-button>
                     </template>
                     <template v-else-if="resolveCloudImportAction(row) === 'imported'">
                       <el-button link type="success" @click="openImportResult(row)">已导入</el-button>

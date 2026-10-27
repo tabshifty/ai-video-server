@@ -342,6 +342,7 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/cloud-downloads/status", a.AdminCloudDownloadStatuses)
 			admin.POST("/cloud-downloads/batch", a.AdminCloudDownloadBatchCreate)
 			admin.POST("/cloud-downloads/:id/retry", a.AdminCloudDownloadRetry)
+			admin.GET("/cloud-downloads/:id/import", a.AdminCloudDownloadImportTask)
 			admin.POST("/cloud-downloads/:id/import/preview", a.AdminCloudDownloadImportPreview)
 			admin.POST("/cloud-downloads/:id/import", a.AdminCloudDownloadImport)
 			admin.POST("/cloud-downloads/:id/cloud-file/delete", a.AdminCloudDownloadDeleteCloudFile)

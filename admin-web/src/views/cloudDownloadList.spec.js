@@ -31,10 +31,12 @@ describe('115 云下载列表页', () => {
     expect(script).toContain('retryCloudDownload(row.id)')
   })
 
-  it('完成且未导入的任务先 preview，再按类型打开导入弹窗', () => {
+  it('完成任务按类型进入压缩包全屏配置或视频弹窗', () => {
     expect(script).toContain('previewCloudDownloadImport(row.id)')
     expect(script).toContain("preview.kind !== 'video' && preview.kind !== 'archive'")
     expect(script).toContain('importDialogVisible.value = true')
+    expect(script).toContain('router.push(cloudArchiveImportPath(row.id))')
+    expect(script).toContain("row.import?.kind === 'archive'")
     expect(template).toContain('入媒体库')
     expect(template).toContain(':loading="previewingImportId === row.id"')
     expect(template).toContain('<CloudDownloadImportDialog')
@@ -54,7 +56,8 @@ describe('115 云下载列表页', () => {
     expect(template).toContain("resolveCloudImportAction(row) === 'existing'")
     expect(template).toContain("resolveCloudImportAction(row) === 'retry-import'")
     expect(template).toContain('row.import?.error_message')
-    expect(template).toContain('<el-button size="small" disabled>导入中</el-button>')
+    expect(template).toContain('<el-button v-else size="small" disabled>导入中</el-button>')
+    expect(template).toContain('继续导入')
   })
 
   it('失败导入通过同一 preview + 弹窗流程重试，而不是无请求体重试', () => {

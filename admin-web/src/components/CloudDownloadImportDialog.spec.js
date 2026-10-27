@@ -46,7 +46,7 @@ describe('115 云下载导入弹窗', () => {
     expect(script).toContain('videoForm.collections')
   })
 
-  it('压缩包弹窗字段与工具箱上传弹窗一致（去掉文件）', () => {
+  it('压缩包配置保留主分组默认值和密码字段', () => {
     expect(template).toContain('label="视频默认标题"')
     expect(template).toContain('label="默认说明"')
     expect(template).toContain('label="默认标签"')
@@ -60,7 +60,7 @@ describe('115 云下载导入弹窗', () => {
     expect(script).toContain('validateArchiveImportForm')
   })
 
-  it('压缩包弹窗可新建视频/图片合集并自动选中', () => {
+  it('压缩包配置可内联新建视频/图片合集并自动选中', () => {
     expect(script).toContain('createAdminCollection')
     expect(script).toContain('createAdminImageCollection')
     expect(script).toContain('quickCollectionDialogVisible')
@@ -70,6 +70,8 @@ describe('115 云下载导入弹窗', () => {
     expect(template).toContain('新建视频合集')
     expect(template).toContain('新建图片合集')
     expect(template).toContain('v-model="quickCollectionDialogVisible"')
+    expect(template).toContain(':inline="inline"')
+    expect(script).toContain("import CloudImportFrame from './CloudImportFrame.vue'")
     expect(template).toContain('创建并选中')
   })
 
@@ -85,9 +87,9 @@ describe('115 云下载导入弹窗', () => {
   })
 
   it('提交期间防重复点击并保持按钮 loading', () => {
-    expect(script).toContain('if (submitting.value) return')
+    expect(script).toContain('if (submitting.value || quickCollectionSaving.value) return')
     expect(template).toContain(':loading="submitting"')
-    expect(template).toContain(':disabled="submitting"')
+    expect(template).toContain(':disabled="submitting || quickCollectionSaving"')
     expect(script).toContain('handleBeforeClose')
   })
 

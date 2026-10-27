@@ -16,6 +16,7 @@ import (
 // cloudDownloadImportService is the admin-facing contract for explicit cloud
 // download imports.
 type cloudDownloadImportService interface {
+	GetImportTask(ctx context.Context, taskID int64) (models.CloudDownloadTask, error)
 	Preview(ctx context.Context, taskID int64) (models.CloudDownloadImportPreview, error)
 	Create(ctx context.Context, taskID int64, input models.CloudDownloadImportInput, createdBy *uuid.UUID) (models.CloudDownloadImport, error)
 }
@@ -33,6 +34,24 @@ func (a *API) requireCloudDownloadImport(c *gin.Context) bool {
 		return false
 	}
 	return true
+}
+
+// AdminCloudDownloadImportTask loads progress even after the source was moved into an archive batch.
+func (a *API) AdminCloudDownloadImportTask(c *gin.Context) {
+	if !a.requireCloudDownload(c) || !a.requireCloudDownloadImport(c) {
+		return
+	}
+	taskID, okID := parseInt64(c.Param("id"))
+	if !okID || taskID <= 0 {
+		response.Error(c, 400, "任务 id 无效")
+		return
+	}
+	task, err := a.cloudDownloadImport.GetImportTask(c.Request.Context(), taskID)
+	if err != nil {
+		respondCloudImportError(c, err)
+		return
+	}
+	ok(c, task)
 }
 
 // AdminCloudDownloadImportPreview inspects the completed task's actual file.

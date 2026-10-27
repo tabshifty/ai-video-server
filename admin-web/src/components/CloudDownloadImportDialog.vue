@@ -1,6 +1,7 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import CloudImportFrame from './CloudImportFrame.vue'
 import {
   createAdminCollection,
   createAdminImageCollection,
@@ -30,11 +31,12 @@ import {
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
+  inline: { type: Boolean, default: false },
   task: { type: Object, default: null },
   preview: { type: Object, default: null }
 })
 
-const emit = defineEmits(['update:modelValue', 'submitted', 'closed'])
+const emit = defineEmits(['update:modelValue', 'submitted', 'closed', 'dirty', 'submitting', 'submit-error'])
 
 const videoTypeOptions = [
   { value: 'short', label: '短视频' },
@@ -48,6 +50,7 @@ const avSiteCategoryOptions = [
   { value: 'fc2', label: 'FC2' }
 ]
 
+let initializing = false
 const submitting = ref(false)
 const tagOptions = ref([])
 const loadingTags = ref(false)
@@ -59,6 +62,7 @@ const imageCollectionOptions = ref([])
 const loadingImageCollections = ref(false)
 const quickCollectionDialogVisible = ref(false)
 const quickCollectionSaving = ref(false)
+watch([submitting, quickCollectionSaving], ([importing, creating]) => emit('submitting', importing || creating), { flush: 'sync' })
 const quickCollectionForm = reactive({
   kind: 'video',
   name: '',
@@ -85,6 +89,9 @@ const archiveForm = reactive({
   has_password: false,
   password: ''
 })
+
+watch(archiveForm, () => { if (!initializing && props.inline) emit('dirty', true) }, { deep: true, flush: 'sync' })
+onMounted(() => { if (props.inline && props.modelValue) initializeForms() })
 
 const kind = computed(() => (props.preview?.kind === 'archive' ? 'archive' : 'video'))
 const isAVType = computed(() => videoForm.type === 'av')
@@ -238,6 +245,7 @@ const loadImageCollectionSuggestions = createRemoteSuggestionLoader({
 })
 
 function openQuickCollectionDialog(collectionKind) {
+  if (submitting.value || quickCollectionSaving.value) return
   quickCollectionForm.kind = collectionKind
   quickCollectionForm.name = ''
   quickCollectionForm.description = ''
@@ -273,7 +281,7 @@ function appendCreatedCollection(collectionKind, created) {
 }
 
 async function saveQuickCollection() {
-  if (quickCollectionSaving.value) return
+  if (quickCollectionSaving.value || submitting.value) return
   const name = quickCollectionForm.name.trim()
   if (!name) {
     ElMessage.warning(`请输入${quickCollectionForm.kind === 'image' ? '图片合集' : '视频合集'}名称`)
@@ -330,6 +338,7 @@ function resetArchiveForm() {
 }
 
 function initializeForms() {
+  initializing = true
   resetVideoForm()
   resetArchiveForm()
   const defaultTitle = resolveCloudImportDefaultTitle(props.task, props.preview)
@@ -342,11 +351,13 @@ function initializeForms() {
   loadTagSuggestions('')
   loadCollectionSuggestions('')
   loadImageCollectionSuggestions('')
-  searchActors().catch(() => {})
+  if (!props.inline) searchActors().catch(() => {})
+  initializing = false
+  emit('dirty', false)
 }
 
 function closeDialog() {
-  if (submitting.value) return
+  if (submitting.value || quickCollectionSaving.value) return
   emit('update:modelValue', false)
 }
 
@@ -359,7 +370,7 @@ function handleVisibleChange(visible) {
 }
 
 function handleBeforeClose(done) {
-  if (submitting.value) return
+  if (submitting.value || quickCollectionSaving.value) return
   done()
 }
 
@@ -371,7 +382,7 @@ function handleClosed() {
 }
 
 async function submitImport() {
-  if (submitting.value) return
+  if (submitting.value || quickCollectionSaving.value) return
   const taskId = props.task?.id
   if (!taskId) {
     ElMessage.error('缺少云下载任务')
@@ -403,6 +414,7 @@ async function submitImport() {
     emit('update:modelValue', false)
   } catch (error) {
     ElMessage.error(extractApiErrorMessage(error, '提交导入任务失败'))
+    emit('submit-error', error)
   } finally {
     submitting.value = false
   }
@@ -410,7 +422,8 @@ async function submitImport() {
 </script>
 
 <template>
-  <el-dialog
+  <CloudImportFrame
+    :inline="inline"
     :model-value="modelValue"
     :title="dialogTitle"
     width="min(94vw, 760px)"
@@ -420,7 +433,7 @@ async function submitImport() {
     @update:model-value="handleVisibleChange"
     @closed="handleClosed"
   >
-    <div class="cloud-import-dialog">
+    <div class="cloud-import-dialog" :inert="submitting || quickCollectionSaving">
       <p class="cloud-import-dialog__lead">文件已下载到本地，提交后由后台导入媒体库，不会重新上传文件。</p>
       <div class="cloud-import-file">
         <span class="cloud-import-file__name">{{ fileName }}</span>
@@ -641,7 +654,8 @@ async function submitImport() {
       </el-form>
     </div>
 
-    <el-dialog
+    <CloudImportFrame
+      :inline="inline"
       v-model="quickCollectionDialogVisible"
       :title="quickCollectionDialogTitle"
       width="min(94vw, 520px)"
@@ -649,7 +663,7 @@ async function submitImport() {
       destroy-on-close
       data-density="form"
     >
-      <el-form label-width="104px" class="cloud-import-quick-collection-form">
+      <el-form label-width="104px" class="cloud-import-quick-collection-form" :disabled="quickCollectionSaving || submitting">
         <el-form-item :label="quickCollectionForm.kind === 'image' ? '图片合集名称' : '视频合集名称'">
           <el-input
             v-model="quickCollectionForm.name"
@@ -667,20 +681,20 @@ async function submitImport() {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="quickCollectionDialogVisible = false">取消</el-button>
+        <el-button :disabled="quickCollectionSaving || submitting" @click="quickCollectionDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="quickCollectionSaving" @click="saveQuickCollection">
           创建并选中
         </el-button>
       </template>
-    </el-dialog>
+    </CloudImportFrame>
 
     <template #footer>
-      <el-button :disabled="submitting" @click="closeDialog">取消</el-button>
-      <el-button type="primary" :loading="submitting" :disabled="submitting" @click="submitImport">
+      <el-button :disabled="submitting || quickCollectionSaving" @click="closeDialog">取消</el-button>
+      <el-button type="primary" :loading="submitting" :disabled="submitting || quickCollectionSaving" @click="submitImport">
         提交导入
       </el-button>
     </template>
-  </el-dialog>
+  </CloudImportFrame>
 </template>
 
 <style scoped>

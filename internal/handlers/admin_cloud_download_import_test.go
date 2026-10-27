@@ -16,6 +16,8 @@ import (
 )
 
 type fakeCloudImportService struct {
+	task         models.CloudDownloadTask
+	taskErr      error
 	preview      models.CloudDownloadImportPreview
 	previewErr   error
 	created      models.CloudDownloadImport
@@ -23,6 +25,11 @@ type fakeCloudImportService struct {
 	gotTaskID    int64
 	gotInput     models.CloudDownloadImportInput
 	gotCreatedBy *uuid.UUID
+}
+
+func (f *fakeCloudImportService) GetImportTask(_ context.Context, id int64) (models.CloudDownloadTask, error) {
+	f.gotTaskID = id
+	return f.task, f.taskErr
 }
 
 func (f *fakeCloudImportService) Preview(context.Context, int64) (models.CloudDownloadImportPreview, error) {
@@ -40,6 +47,7 @@ func newCloudImportTestRouter(importSvc cloudDownloadImportService) *gin.Engine 
 	gin.SetMode(gin.TestMode)
 	api := &API{cloudDownload: &fakeBatchCloudDownloadService{}, cloudDownloadImport: importSvc}
 	router := gin.New()
+	router.GET("/cloud-downloads/:id/import", api.AdminCloudDownloadImportTask)
 	router.POST("/cloud-downloads/:id/import/preview", api.AdminCloudDownloadImportPreview)
 	router.POST("/cloud-downloads/:id/import", api.AdminCloudDownloadImport)
 	return router
@@ -273,6 +281,7 @@ func TestCloudDownloadImportRoutesAreRegistered(t *testing.T) {
 		got[route.Method+" "+route.Path] = true
 	}
 	for _, want := range []string{
+		"GET /api/v1/admin/cloud-downloads/:id/import",
 		"POST /api/v1/admin/cloud-downloads/:id/import/preview",
 		"POST /api/v1/admin/cloud-downloads/:id/import",
 	} {
@@ -288,11 +297,43 @@ func TestAdminCloudDownloadImportReturns503WhenDisabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	api := &API{cloudDownload: &fakeBatchCloudDownloadService{}}
 	router := gin.New()
+	router.GET("/cloud-downloads/:id/import", api.AdminCloudDownloadImportTask)
 	router.POST("/cloud-downloads/:id/import/preview", api.AdminCloudDownloadImportPreview)
 	router.POST("/cloud-downloads/:id/import", api.AdminCloudDownloadImport)
 
 	rec := doCloudImportRequest(t, router, "/cloud-downloads/7/import", `{"kind":"video","type":"short"}`)
 	if got := decodeCloudImportEnvelope(t, rec).Code; got != 503 {
 		t.Fatalf("code = %d, want 503 (body=%s)", got, rec.Body.String())
+	}
+}
+
+func TestAdminCloudDownloadImportTaskRestoresAndHandlesErrors(t *testing.T) {
+	for _, tt := range []struct {
+		name, path string
+		err        error
+		code       int
+	}{
+		{name: "成功", path: "7", code: 0}, {name: "无效 ID", path: "invalid", code: 400}, {name: "非正 ID", path: "0", code: 400}, {name: "不存在", path: "7", err: models.ErrCloudDownloadNotFound, code: 404}, {name: "查询失败", path: "7", err: errors.New("查询失败"), code: 500},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			batchID := uuid.New()
+			f := &fakeCloudImportService{taskErr: tt.err, task: models.CloudDownloadTask{ID: 7, Import: &models.CloudDownloadImportSummary{Kind: "archive", Status: "imported", ArchiveBatchID: &batchID}}}
+			r := newCloudImportTestRouter(f)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/cloud-downloads/"+tt.path+"/import", nil))
+			envelope := decodeCloudImportEnvelope(t, rec)
+			if envelope.Code != tt.code {
+				t.Fatalf("code=%d, body=%s", envelope.Code, rec.Body.String())
+			}
+			if tt.code == 0 {
+				var task models.CloudDownloadTask
+				if err := json.Unmarshal(envelope.Data, &task); err != nil {
+					t.Fatal(err)
+				}
+				if task.Import == nil || task.Import.ArchiveBatchID == nil || *task.Import.ArchiveBatchID != batchID {
+					t.Fatal("批次标识丢失")
+				}
+			}
+		})
 	}
 }

@@ -21,6 +21,7 @@ import SystemSettings from '../views/SystemSettings.vue'
 import TaskMonitor from '../views/TaskMonitor.vue'
 import ForumPostList from '../views/ForumPostList.vue'
 import CloudDownloadList from '../views/CloudDownloadList.vue'
+import CloudArchiveImport from '../views/CloudArchiveImport.vue'
 import Toolbox from '../views/Toolbox.vue'
 import ToolboxEd2k from '../views/ToolboxEd2k.vue'
 import ToolboxArchiveImport from '../views/ToolboxArchiveImport.vue'
@@ -59,6 +60,7 @@ const routes = [
   { path: '/settings', component: SystemSettings },
   { path: '/tasks', component: TaskMonitor },
   { path: '/forum-posts', component: ForumPostList },
+  { path: '/cloud-downloads/:id/archive-import', name: 'CloudArchiveImport', component: CloudArchiveImport },
   { path: '/cloud-downloads', name: 'CloudDownloadList', component: CloudDownloadList, meta: { title: '115 云下载' } }
 ]
 

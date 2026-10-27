@@ -69,6 +69,7 @@ import {
   markAdminShortVideoPendingDelete,
   offlineAdminTVAppRelease,
   pauseAdminTelegramSource,
+  getCloudDownloadImportTask,
   previewCloudDownloadImport,
   publishAdminTVAppRelease,
   processAdminArchiveImportBatch,
@@ -710,6 +711,8 @@ describe('cloud download import apis', () => {
   })
 
   it('previews the selected cloud download task import type', async () => {
+    await getCloudDownloadImportTask('9223372036854775807')
+    expect(get).toHaveBeenCalledWith('/admin/cloud-downloads/9223372036854775807/import')
     await previewCloudDownloadImport(42)
 
     expect(post).toHaveBeenCalledWith('/admin/cloud-downloads/42/import/preview')
