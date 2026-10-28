@@ -27,7 +27,7 @@ class TvHomeInteractionSpecTest {
     @Test
     fun `navigation names and selected state are exposed`() {
         val button = source.substringAfter("private fun TvHomeSideMenuButton(")
-            .substringBefore("private fun TvHomeSettingsPanel(")
+            .substringBefore("internal fun TvHomeSettingsPanel(")
         assertTrue(button.contains("text = item.label"))
         assertTrue(button.contains(".semantics { this.selected = selected }"))
     }

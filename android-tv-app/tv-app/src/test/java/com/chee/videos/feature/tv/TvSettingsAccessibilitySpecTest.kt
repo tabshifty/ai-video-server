@@ -11,7 +11,7 @@ class TvSettingsAccessibilitySpecTest {
 
     @Test
     fun `settings can scroll to controls below the viewport`() {
-        val panel = source.substringAfter("private fun TvHomeSettingsPanel(")
+        val panel = source.substringAfter("internal fun TvHomeSettingsPanel(")
             .substringBefore("private fun TvSeriesAutoplaySettingRow(")
         assertTrue(panel.contains(".verticalScroll(rememberScrollState())"))
         assertTrue(panel.contains("TvLayoutSpec.scrollBottomSafePaddingDp.dp"))

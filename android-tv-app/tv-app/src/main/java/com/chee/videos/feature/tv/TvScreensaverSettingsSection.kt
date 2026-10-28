@@ -33,7 +33,6 @@ import androidx.lifecycle.viewModelScope
 import com.chee.videos.core.data.AppPreferencesStore
 import com.chee.videos.core.model.TvScreensaverSettings
 import com.chee.videos.core.ui.AppChrome
-import com.chee.videos.core.ui.tvFocusableScaleOnly
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -82,7 +81,7 @@ internal fun TvScreensaverSettingsSection(viewModel: TvScreensaverSettingsViewMo
         color = AppChrome.SurfaceElevated,
         shape = AppChrome.SurfaceShape,
         modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp)
-            .tvFocusableScaleOnly(focusedScale = 1.02f)
+            .tvSettingsFocus(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
             .toggleable(value = settings.enabled, role = Role.Switch, onValueChange = viewModel::setEnabled),
     ) {
         Row(
@@ -136,7 +135,7 @@ private fun TvScreensaverDurationRow(
                     color = if (isSelected) AppChrome.Accent.copy(alpha = 0.92f) else AppChrome.Surface.copy(alpha = 0.72f),
                     shape = AppChrome.ChipShape,
                     modifier = Modifier.width(80.dp).height(44.dp)
-                        .tvFocusableScaleOnly(enabled = enabled, focusedScale = 1.04f)
+                        .tvSettingsFocus(shape = AppChrome.ChipShape, enabled = enabled)
                         .selectable(selected = isSelected, enabled = enabled, role = Role.RadioButton,
                             onClick = { onSelect(value) }),
                 ) {

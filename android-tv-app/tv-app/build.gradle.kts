@@ -38,8 +38,8 @@ android {
         applicationId = "com.chee.videos.tv"
         minSdk = 26
         targetSdk = 35
-        versionCode = 148
-        versionName = "0.1.148"
+        versionCode = 149
+        versionName = "0.1.149"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true

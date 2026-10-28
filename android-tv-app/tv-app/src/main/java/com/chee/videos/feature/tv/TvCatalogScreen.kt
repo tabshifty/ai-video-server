@@ -19,6 +19,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +59,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,6 +97,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.chee.videos.core.ui.AppChrome
+import com.chee.videos.core.ui.calculateTvMinimalBringIntoViewScrollDistance
 import com.chee.videos.core.ui.LaunchedTvInitialFocus
 import com.chee.videos.core.ui.TvActionButton
 import com.chee.videos.core.ui.TvActionButtonTone
@@ -295,7 +299,7 @@ fun TvCatalogScreen(
                 firstActionFocusRequester = settingsFocusRequester,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 22.dp, vertical = 18.dp),
+                    .padding(start = 22.dp, end = 22.dp, top = 18.dp),
             )
             return
         }
@@ -658,8 +662,9 @@ private fun TvHomeSideMenuButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TvHomeSettingsPanel(
+internal fun TvHomeSettingsPanel(
     tvSeekStepSeconds: Int,
     onSelectTvSeekStepSeconds: (Int) -> Unit,
     seriesAutoplayEnabled: Boolean,
@@ -670,51 +675,67 @@ private fun TvHomeSettingsPanel(
     firstActionFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Text(
-            text = "设置",
-            color = AppChrome.TextPrimary,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "账户与设备",
-            color = AppChrome.TextMuted,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        TvAccountMenuAction.defaults().forEachIndexed { index, action ->
-            TvSettingsActionRow(
-                action = action,
-                modifier = if (index == 0) Modifier.focusRequester(firstActionFocusRequester) else Modifier,
-                onClick = {
-                    when (action) {
-                        TvAccountMenuAction.Repair -> onRepair()
-                        TvAccountMenuAction.Logout -> onLogout()
-                        TvAccountMenuAction.SwitchServer -> onSwitchServer()
-                    }
-                },
-            )
+    val focusInset = with(LocalDensity.current) { 8.dp.toPx() }
+    val bringIntoViewSpec = remember(focusInset) {
+        object : BringIntoViewSpec {
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                calculateTvMinimalBringIntoViewScrollDistance(
+                    offset = offset - focusInset,
+                    size = size + focusInset * 2,
+                    containerSize = containerSize,
+                )
         }
-        Text(
-            text = "播放设置",
-            color = AppChrome.TextMuted,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-        TvSeekStepSettingRow(
-            selectedSeconds = tvSeekStepSeconds,
-            onSelectSeconds = onSelectTvSeekStepSeconds,
-        )
-        TvSeriesAutoplaySettingRow(
-            enabled = seriesAutoplayEnabled,
-            onSetEnabled = onSetSeriesAutoplayEnabled,
-        )
-        TvScreensaverSettingsSection()
+    }
+    // 除屏幕安全区外，焦点滚动还须在视口内为放大后的边框留出余量。
+    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+        Column(
+            modifier = modifier
+                // 视口外留白：自动滚入焦点时也不能贴屏幕底边。
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = TvLayoutSpec.scrollBottomSafePaddingDp.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = "设置",
+                color = AppChrome.TextPrimary,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "账户与设备",
+                color = AppChrome.TextMuted,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            TvAccountMenuAction.defaults().forEachIndexed { index, action ->
+                TvSettingsActionRow(
+                    action = action,
+                    modifier = if (index == 0) Modifier.focusRequester(firstActionFocusRequester) else Modifier,
+                    onClick = {
+                        when (action) {
+                            TvAccountMenuAction.Repair -> onRepair()
+                            TvAccountMenuAction.Logout -> onLogout()
+                            TvAccountMenuAction.SwitchServer -> onSwitchServer()
+                        }
+                    },
+                )
+            }
+            Text(
+                text = "播放设置",
+                color = AppChrome.TextMuted,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            TvSeekStepSettingRow(
+                selectedSeconds = tvSeekStepSeconds,
+                onSelectSeconds = onSelectTvSeekStepSeconds,
+            )
+            TvSeriesAutoplaySettingRow(
+                enabled = seriesAutoplayEnabled,
+                onSetEnabled = onSetSeriesAutoplayEnabled,
+            )
+            TvScreensaverSettingsSection()
+        }
     }
 }
 
@@ -729,7 +750,7 @@ private fun TvSeriesAutoplaySettingRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
-            .tvFocusableScaleOnly(focusedScale = 1.02f)
+            .tvSettingsFocus(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
             .toggleable(value = enabled, role = Role.Switch, onValueChange = onSetEnabled),
     ) {
         Row(
@@ -813,7 +834,7 @@ private fun TvSeekStepSettingRow(
                     modifier = Modifier
                         .width(72.dp)
                         .height(44.dp)
-                        .tvFocusableScaleOnly(focusedScale = 1.04f)
+                        .tvSettingsFocus(shape = AppChrome.ChipShape)
                         .selectable(selected = selected, role = Role.RadioButton) { onSelectSeconds(seconds) },
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -842,7 +863,7 @@ private fun TvSettingsActionRow(
         modifier = modifier
             .fillMaxWidth()
             .height(62.dp)
-            .tvFocusableScaleOnly(focusedScale = 1.02f)
+            .tvSettingsFocus(shape = AppChrome.SurfaceShape, focusedScale = 1.02f)
             .clickable(onClick = onClick),
     ) {
         Row(

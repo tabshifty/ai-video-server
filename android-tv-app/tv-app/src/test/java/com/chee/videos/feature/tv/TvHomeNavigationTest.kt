@@ -138,7 +138,7 @@ class TvHomeNavigationTest {
         val sideMenuSource = source.substringAfter("private fun TvHomeSideMenu(")
             .substringBefore("@Composable\nprivate fun TvHomeSideMenuButton(")
         val buttonSource = source.substringAfter("private fun TvHomeSideMenuButton(")
-            .substringBefore("@Composable\nprivate fun TvHomeSettingsPanel(")
+            .substringBefore("@Composable\ninternal fun TvHomeSettingsPanel(")
 
         assertTrue(
             "短视频菜单点击前也必须先通知 ViewModel 离开目录状态域，并在其后再导航到独立短视频页",
@@ -156,7 +156,7 @@ class TvHomeNavigationTest {
             buttonSource.contains(".focusable()"),
         )
 
-        val settingsSource = source.substringAfter("@Composable\nprivate fun TvHomeSettingsPanel(")
+        val settingsSource = source.substringAfter("@Composable\ninternal fun TvHomeSettingsPanel(")
         assertTrue(settingsSource.contains("播放设置"))
         assertTrue(settingsSource.contains("快进/快退步长"))
     }
