@@ -21,11 +21,12 @@ const PanPageURL = "https://115.com/?cid=0&offset=0&mode=wangpan"
 
 // State is the observable browser session state.
 type State struct {
-	Up       bool
-	LoggedIn bool
-	UserID   string
-	PageURL  string
-	Quota    *Quota
+	Up           bool
+	LoggedIn     bool
+	UserID       string
+	PageURL      string
+	Quota        *Quota
+	SessionError string
 }
 
 // Quota is the cloud-download monthly quota when 115 reports it.
@@ -70,30 +71,56 @@ type SubmitResult struct {
 	ErrorMsg string `json:"error_msg"`
 }
 
-// Probe reads the page-level capabilities and login state.
-func Probe(ctx context.Context, s *Session) (State, error) {
-	const expr = `(() => ({
+// USER_ID survives session expiry in an already-open page. Verify the cookie
+// with a read-only authenticated endpoint rather than trusting that variable.
+const sessionProbeExpression = `(async () => {
+	const page = {
 		url: location.href,
 		lixianKey: typeof (window.browserInterface && browserInterface.ChromeGetLixianKey) === 'function',
 		download: typeof (window.browserInterface && browserInterface.CreateDownloadTask) === 'function',
-		userId: (typeof USER_ID !== 'undefined' && USER_ID) ? String(USER_ID) : null
-	}))()`
+		userId: (typeof USER_ID !== 'undefined' && USER_ID) ? String(USER_ID) : null,
+		loggedIn: false, error: ''
+	};
+	try {
+		const r = await fetch('https://my.115.com/?ct=ajax&ac=nav', {
+			credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(5000)
+		});
+		if (!r.ok) throw new Error('会话验证服务返回 HTTP ' + r.status);
+		const j = await r.json();
+		if (j.state === true || j.state === 1 || j.state === '1') {
+			page.loggedIn = !!page.userId;
+		} else if (!/登录|login/i.test(String(j.error || j.message || ''))) {
+			throw new Error('会话验证响应异常');
+		}
+	} catch (e) {
+		page.error = '115 登录状态验证失败，请稍后刷新';
+	}
+	return page;
+})()`
+
+// Probe reads the native bridge and verifies the current server-side session.
+func Probe(ctx context.Context, s *Session) (State, error) {
 	var raw struct {
 		URL       string `json:"url"`
 		LixianKey bool   `json:"lixianKey"`
 		Download  bool   `json:"download"`
 		UserID    string `json:"userId"`
+		LoggedIn  bool   `json:"loggedIn"`
+		Error     string `json:"error"`
 	}
-	if err := s.Evaluate(ctx, expr, &raw); err != nil {
+	if err := s.Evaluate(ctx, sessionProbeExpression, &raw); err != nil {
 		return State{}, err
 	}
 	state := State{
 		Up:       true,
-		LoggedIn: raw.UserID != "",
+		LoggedIn: raw.LoggedIn,
 		UserID:   raw.UserID,
 		PageURL:  raw.URL,
 	}
-	if !raw.LixianKey || !raw.Download {
+	if raw.Error != "" {
+		return state, errors.New(raw.Error)
+	}
+	if state.LoggedIn && (!raw.LixianKey || !raw.Download) {
 		return state, fmt.Errorf("cloud: page %s is missing the 115 native bridge", raw.URL)
 	}
 	return state, nil

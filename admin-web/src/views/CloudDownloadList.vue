@@ -35,6 +35,7 @@ import {
 import { extractApiErrorMessage } from './toolbox.helpers'
 
 const POLL_INTERVAL_MS = 5000
+const BROWSER_POLL_INTERVAL_MS = 10000
 const ACTIVE_STATUSES = new Set(['pending', 'submitting', 'queued', 'ready', 'downloading'])
 const router = useRouter()
 const STATUS_META = {
@@ -86,6 +87,10 @@ let qrTimer = null
 let qrDeadline = 0
 let qrSeq = 0
 let loadSeq = 0
+let browserTimer = null
+let browserLoading = false
+let disposed = false
+let loginPrompted = false
 
 const initialLoading = computed(() => loading.value && !loaded.value)
 const backgroundRefreshing = computed(() => loading.value && loaded.value)
@@ -163,12 +168,28 @@ async function load(options = {}) {
 }
 
 async function loadBrowserState() {
+  if (browserLoading || disposed) return
+  browserLoading = true
   try {
     const data = await getCloudBrowserState()
+    if (disposed) return
     browserState.value = data && typeof data === 'object' ? data : {}
-    browserStateError.value = ''
+    browserStateError.value = browserState.value.session_error || ''
+    if (browserStateError.value) return
+    if (browserState.value.logged_in === true) {
+      loginPrompted = false
+      if (qrDialogVisible.value) {
+        qrDialogVisible.value = false
+        resetQr()
+      }
+    } else if (browserState.value.up === true && browserState.value.logged_in === false && !loginPrompted) {
+      openQrDialog()
+    }
   } catch (error) {
+    if (disposed) return
     browserStateError.value = extractErrorMessage(error, '获取 115 浏览器状态失败')
+  } finally {
+    browserLoading = false
   }
 }
 
@@ -363,7 +384,6 @@ async function confirmDeleteCloudFile() {
     }
     if (message.includes('登录')) {
       await loadBrowserState()
-      openQrDialog()
     } else if (message.includes('浏览器')) {
       await loadBrowserState()
     }
@@ -450,6 +470,8 @@ async function loadQr() {
 }
 
 function openQrDialog() {
+  if (disposed || qrDialogVisible.value) return
+  loginPrompted = true
   qrDialogVisible.value = true
   resetQr()
   loadQr()
@@ -458,14 +480,18 @@ function openQrDialog() {
 onMounted(() => {
   load()
   loadBrowserState()
+  browserTimer = setInterval(loadBrowserState, BROWSER_POLL_INTERVAL_MS)
 })
 
 onUnmounted(() => {
+  disposed = true
+  loadSeq += 1
+  clearInterval(browserTimer)
   if (timer) {
     clearInterval(timer)
     timer = null
   }
-  stopQrTimer()
+  resetQr()
 })
 </script>
 
@@ -486,7 +512,7 @@ onUnmounted(() => {
         <template #default>请启动 115 浏览器后点击「立即刷新」。</template>
       </el-alert>
       <el-alert
-        v-else-if="browserState.logged_in === false"
+        v-else-if="browserState.logged_in === false && !browserStateError"
         type="warning"
         :closable="false"
         show-icon

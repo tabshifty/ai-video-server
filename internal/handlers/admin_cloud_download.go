@@ -194,11 +194,13 @@ func (a *API) AdminCloudDownloadBrowser(c *gin.Context) {
 		return
 	}
 	state := a.cloudDownload.BrowserState(c.Request.Context())
+	c.Header("Cache-Control", "no-store")
 	ok(c, gin.H{
-		"up":        state.Up,
-		"logged_in": state.LoggedIn,
-		"page_url":  state.PageURL,
-		"quota":     state.Quota,
+		"up":            state.Up,
+		"logged_in":     state.LoggedIn,
+		"page_url":      state.PageURL,
+		"quota":         state.Quota,
+		"session_error": state.SessionError,
 	})
 }
 

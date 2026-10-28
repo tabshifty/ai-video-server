@@ -83,17 +83,20 @@ func (c *Client) Inspect(ctx context.Context) State {
 		return State{}
 	}
 	target, ok, err := c.Browser.FindTarget(ctx, isPanPage)
-	if err != nil || !ok {
+	if err != nil {
+		return State{Up: true, SessionError: "115 浏览器页面读取失败，请稍后刷新"}
+	}
+	if !ok {
 		return State{Up: true}
 	}
 	session, err := c.Browser.Attach(ctx, target)
 	if err != nil {
-		return State{Up: true}
+		return State{Up: true, SessionError: "115 浏览器连接失败，请稍后刷新"}
 	}
 	defer session.Close()
 	state, err := Probe(ctx, session)
 	if err != nil {
-		return State{Up: true, PageURL: target.URL}
+		return State{Up: true, PageURL: target.URL, SessionError: err.Error()}
 	}
 	state.Quota = nil
 	if state.LoggedIn {
