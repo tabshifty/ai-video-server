@@ -1419,3 +1419,7 @@
 - **状态与错误的统一表达**：状态统一用 `StatusIndicator`（圆点 + 文字 + 柔和底色，颜色之外仍有文字），视频、任务、云下载共用同一套语义色；异常任务行只用极浅语义底色局部强调，长错误在行内显示摘要并提供可复制的全文入口，监控页不弹全局 toast 干扰后台刷新。
 - **深色主题映射边界**：本项目深色主题通过 `:root[data-theme="dark"]` 启用，而 Element Plus 的暗色变量默认挂在 `html.dark`。因此 `theme.css` 必须显式把 `--el-bg-color`、`--el-fill-color-blank`、`--el-table-tr-bg-color`、`--el-text-color-*`、`--el-border-color-*` 等映射到本主题令牌，否则表格行、输入框和浮层会在深色下退化为亮底白字。
 - **管理端设计合约测试**：`admin-web/src/assets/themeTokens.spec.js`、`components/Layout.spec.js`、`components/adminShellPreferences.spec.js`、`components/base/commandPalette.helpers.spec.js`、`views/videoListPage.spec.js`、`views/taskMonitorPage.spec.js` 以源码断言锁定上述视觉与结构约定；改版应先更新这些合约再改实现，避免样式与测试各说一套。
+
+### 115 网盘页 URL 与标签页复用（2026-11-05）
+- `115 网盘页 URL 兼容`：115 会把网盘入口跳到 `?goto=<urlencoded>`，其中 `mode=wangpan` 被编码为 `mode%3Dwangpan`。判断网盘页必须解析 `goto` 内层 URL，并兼容 `ct=file`、`ct=lixian` 与 `/storage` 路径；只匹配字面量 `mode=wangpan` 会让客户端误判“没有网盘页”。
+- `115 标签页复用`：`EnsureSession` 找不到网盘页时应复用任意 `115.com`/`www.115.com` 标签页并 `Page.navigate` 到网盘页，只有完全没有 115 页面时才新开；登录取码在复用页找不到二维码时同理导航当前页回首页。禁止在每次重试时 `OpenTab`——115 的 `?goto=` 重定向会让旧判断持续失败，从而无限累积标签页。

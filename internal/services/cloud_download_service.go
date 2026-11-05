@@ -920,6 +920,8 @@ func (s *CloudDownloadService) LoginQR(ctx context.Context) (string, error) {
 	defer session.Close()
 
 	deadline := time.Now().Add(20 * time.Second)
+	start := time.Now()
+	navigatedHome := false
 	var last loginQRProbe
 	lastRefresh := time.Time{}
 	pendingSrc := ""
@@ -952,6 +954,13 @@ func (s *CloudDownloadService) LoginQR(ctx context.Context) (string, error) {
 					pendingSrc = probe.Image
 					pendingAt = lastRefresh
 					_ = session.Evaluate(ctx, loginQRRefreshExpr, nil)
+				}
+			case "missing":
+				// The reused tab may be on the pan/storage view. Navigate the
+				// same tab to the QR page instead of opening another tab.
+				if !navigatedHome && time.Since(start) >= 2*time.Second {
+					navigatedHome = true
+					_ = session.Navigate(ctx, cloudLoginPageURL)
 				}
 			}
 		}

@@ -212,6 +212,13 @@ func (s *Session) Screenshot(ctx context.Context) ([]byte, error) {
 	return result.Data, nil
 }
 
+// Navigate loads rawURL in the attached page. It lets the client reuse the
+// browser's own 115 tab instead of opening a new one on every attempt.
+func (s *Session) Navigate(ctx context.Context, rawURL string) error {
+	_, err := s.call(ctx, "Page.navigate", map[string]any{"url": rawURL})
+	return err
+}
+
 // ScreenshotClip captures one rectangular page region in CSS pixels. It is
 // used to read the login QR code when the page renders it as a non-data image,
 // without returning a page-wide screenshot.

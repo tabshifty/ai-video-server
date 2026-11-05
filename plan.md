@@ -1,5 +1,12 @@
 # plan.md
 
+## 2026-11-05 16:45 +0800 修复：115 云下载反复新开标签页
+- 现象：部署机 115Browser 持续累积新的 115.com 标签页，未能复用浏览器常开且不可关闭的 115 标签页。
+- 根因：`isPanPage` 只认字面量 `mode=wangpan`，而 115 经常把网盘页跳到 `?goto=<urlencoded pan url>`（`mode%3Dwangpan`）；匹配失败后每次 `EnsureSession` 都 `OpenTab` 新开一个网盘页。旧版登录取码还会新开 `/login`。
+- 修复：`isPanPage` 解析 `goto` 内层 URL，并兼容 `ct=file`/`ct=lixian` 与 `/storage` 路径；`ensurePanTarget` 优先复用任意 `115.com` 页面并用 `Page.navigate` 导航到网盘页，只有完全没有 115 页面时才新开；`LoginQR` 在复用页找不到二维码时导航同一 tab 回首页，不再新开。新增 `Session.Navigate` 与 `isPanPage`/`is115Page` 单测。
+- 验证：本地 115Browser（9333）实测 `EnsureSession` 前后 tab 数不变（2→2），首页 tab 被导航到网盘页（`?goto=...mode%3Dwangpan`）；`go build ./...`、cloud/services 定向测试通过。
+- 影响文件：`internal/cloud/lifecycle.go`、`internal/cloud/browser.go`、`internal/cloud/lifecycle_test.go`、`internal/services/cloud_download_service.go`、`CONTEXT.md`、`plan.md`。
+
 ## 2026-11-05 14:35 +0800 PC 后台样式改版交接：文档完成
 - 进度：完成 GitHub 参考、源码基线、视觉规范、导航与页面建议、三阶段实施顺序和验收清单；明确推荐范围与可选功能增强，供其他 agent 实施。
 - 验证：文档及 plan 的严格 UTF-8、替换字符检查、文档表格列数与 `git diff --check` 通过；纯文档未运行前端构建，未修改功能代码、版本或 CONTEXT。
