@@ -1048,3 +1048,77 @@ func TestLoginPageScoreRanks115Pages(t *testing.T) {
 		}
 	}
 }
+
+func TestFindDownloadedFileMatches115BrowserSuffix(t *testing.T) {
+	dir := t.TempDir()
+	writeDownloadFile(t, dir, "movie.zip.115chrome_54_0", 5)
+
+	path, info, ok := findDownloadedFile(dir, "movie.zip", "movie", int64Ptr(5))
+	if !ok || info.Size() != 5 || filepath.Base(path) != "movie.zip.115chrome_54_0" {
+		t.Fatalf("unexpected match: %q %v %v", path, info, ok)
+	}
+
+	final, err := finalizeDownloadedFile(path, info)
+	if err != nil {
+		t.Fatalf("finalizeDownloadedFile returned error: %v", err)
+	}
+	if filepath.Base(final) != "movie.zip" {
+		t.Fatalf("final = %q, want movie.zip", final)
+	}
+	if _, err := os.Stat(final); err != nil {
+		t.Fatalf("final file missing: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("browser-suffixed file should have been renamed")
+	}
+}
+
+func TestFindDownloadedFileRejectsPartial115BrowserFile(t *testing.T) {
+	dir := t.TempDir()
+	writeDownloadFile(t, dir, "movie.zip.115chrome_54_0", 4)
+
+	if _, _, ok := findDownloadedFile(dir, "movie.zip", "movie", int64Ptr(5)); ok {
+		t.Fatalf("size mismatch must not match")
+	}
+}
+
+func TestFindDownloadedFileMatchesSanitized115Name(t *testing.T) {
+	dir := t.TempDir()
+	writeDownloadFile(t, dir, "_www.example.zip", 5)
+
+	path, _, ok := findDownloadedFile(dir, "?www.example.zip", "?www.example", int64Ptr(5))
+	if !ok || filepath.Base(path) != "_www.example.zip" {
+		t.Fatalf("path = %q ok = %v, want the sanitized file", path, ok)
+	}
+}
+
+func TestFinalizeDownloadedFilePrefersExistingCleanFile(t *testing.T) {
+	dir := t.TempDir()
+	writeDownloadFile(t, dir, "movie.zip.115chrome_1_0", 5)
+	writeDownloadFile(t, dir, "movie.zip", 5)
+
+	suffixed := filepath.Join(dir, "movie.zip.115chrome_1_0")
+	info, err := os.Stat(suffixed)
+	if err != nil {
+		t.Fatalf("stat suffixed file: %v", err)
+	}
+	final, err := finalizeDownloadedFile(suffixed, info)
+	if err != nil {
+		t.Fatalf("finalizeDownloadedFile returned error: %v", err)
+	}
+	if filepath.Base(final) != "movie.zip" {
+		t.Fatalf("final = %q, want movie.zip", final)
+	}
+	if _, err := os.Stat(suffixed); err != nil {
+		t.Fatalf("suffixed file should be kept when the clean file exists: %v", err)
+	}
+}
+
+func TestFindDownloadedFileSkips115BrowserSidecar(t *testing.T) {
+	dir := t.TempDir()
+	writeDownloadFile(t, dir, "movie.zip.115chrome_1_0.cfg", 5)
+
+	if _, _, ok := findDownloadedFile(dir, "movie.zip", "movie", int64Ptr(5)); ok {
+		t.Fatalf("browser sidecar must not be treated as the downloaded media")
+	}
+}

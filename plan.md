@@ -1,5 +1,13 @@
 # plan.md
 
+## 2026-11-05 10:25 +0800 修复：115 云下载落盘文件匹配
+- 现象：部署机 6 个 `failed` 云下载任务全部报“等待文件落盘失败: timed out waiting for ...”，但文件已完整躺在 `DOWNLOAD_DIR`。
+- 根因：115Browser 自带下载器把文件写成 `<name>.115chrome_<task>_<seq>`，且 115 会把文件名非法字符（如 `?`）改写成 `_`；`findDownloadedFile` 只认精确名和 `name (n).ext`，这两类文件都被忽略，5 小时超时后判失败。
+- 修复：匹配时剥离 `.115chrome_N_M` 后缀并做非法字符归一化（`?`→`_`/去除）；文件大小与 mtime 稳定后把带后缀文件重命名回干净名，避免 `local_path` 扩展名错误导致压缩包识别失败；新增 `.cfg` 边车过滤与 5 项单测。
+- 影响文件：`internal/services/cloud_download_service.go`、`internal/services/cloud_download_service_test.go`、`CONTEXT.md`、`plan.md`。
+- 验证：`go build ./...`；services 定向匹配/登录测试 11 项通过。
+- 后续：部署后需在管理端对 6 个 `failed` 任务逐个“重试”，重试会直接复用已落盘文件并重命名归档。
+
 ## 2026-10-28 115 会话失效提示：最终收尾
 - 验证补充：services 云下载定向测试及 `go build ./...` 均已完成通过；前端 44 项定向测试、生产构建、后端 cloud race 与接口/队列测试、现场过期会话只读验证均通过。全 services 包既有 TV APK 版本夹具断言失败已记录，不属于本次变更。
 - 复查：确认探针异常通过 session_error 展示、不会触发扫码；未登录时不因缺少原生桥掩盖扫码入口；页面不会并发探测，卸载后不会恢复计时器或弹窗。UTF-8 与差异检查通过。

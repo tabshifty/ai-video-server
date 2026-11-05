@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -690,7 +691,11 @@ func (s *CloudDownloadService) waitForFile(ctx context.Context, name string, wan
 			previous, exists := seen[path]
 			seen[path] = current
 			if exists && previous.size == current.size && previous.modTime.Equal(current.modTime) {
-				return path, nil
+				finalPath, renameErr := finalizeDownloadedFile(path, info)
+				if renameErr != nil {
+					s.logWarn("115 下载文件重命名失败", "path", path, "error", renameErr)
+				}
+				return finalPath, nil
 			}
 		}
 		if time.Now().After(deadline) {
@@ -704,9 +709,42 @@ func (s *CloudDownloadService) waitForFile(ctx context.Context, name string, wan
 	}
 }
 
-// findDownloadedFile returns the exact declared name when present, otherwise
-// the first "name (n).ext" duplicate the native downloader creates when the
-// target already exists. Partial files are skipped.
+// browserDownloadSuffix matches 115Browser's own downloader naming:
+// "<name>.115chrome_<task>_<seq>". The browser does not always rename the file
+// back to <name> after the transfer completes, so the suffix is treated as
+// download bookkeeping and stripped before matching.
+var browserDownloadSuffix = regexp.MustCompile(`\.115chrome_[0-9]+_[0-9]+$`)
+
+// downloadIllegalNameChars are rewritten by 115 when a cloud file name becomes
+// a local file name, so matching has to tolerate that rewrite.
+var downloadIllegalNameChars = regexp.MustCompile(`[\\/:*?"<>|]`)
+
+func stripBrowserDownloadSuffix(name string) string {
+	stripped := browserDownloadSuffix.ReplaceAllString(name, "")
+	if stripped == name || stripped == "" {
+		return ""
+	}
+	return stripped
+}
+
+func normalizeDownloadName(name string) string {
+	return downloadIllegalNameChars.ReplaceAllString(strings.TrimSpace(name), "_")
+}
+
+func downloadNamesEqual(left, right string) bool {
+	if left == right {
+		return true
+	}
+	if normalizeDownloadName(left) == normalizeDownloadName(right) {
+		return true
+	}
+	return downloadIllegalNameChars.ReplaceAllString(left, "") == downloadIllegalNameChars.ReplaceAllString(right, "")
+}
+
+// findDownloadedFile returns a completed download for the declared name. It
+// accepts the exact name, the "<stem> (n).ext" duplicate the native downloader
+// creates, and 115Browser's "<name>.115chrome_<task>_<seq>" file. Partial files
+// are skipped, and a size mismatch is never accepted when the size is known.
 func findDownloadedFile(dir, name, stem string, wantSize *int64) (string, os.FileInfo, bool) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -723,8 +761,12 @@ func findDownloadedFile(dir, name, stem string, wantSize *int64) (string, os.Fil
 		if isPartialDownloadName(fileName) {
 			continue
 		}
-		exact := fileName == name
-		duplicate := strings.HasPrefix(fileName, stem+" (") && filepath.Ext(fileName) == extension
+		baseName := fileName
+		if stripped := stripBrowserDownloadSuffix(fileName); stripped != "" {
+			baseName = stripped
+		}
+		exact := downloadNamesEqual(baseName, name)
+		duplicate := isDuplicateDownloadName(baseName, stem, extension)
 		if !exact && !duplicate {
 			continue
 		}
@@ -749,9 +791,39 @@ func findDownloadedFile(dir, name, stem string, wantSize *int64) (string, os.Fil
 	return "", nil, false
 }
 
+func isDuplicateDownloadName(fileName, stem, extension string) bool {
+	normalized := normalizeDownloadName(fileName)
+	prefix := normalizeDownloadName(stem) + " ("
+	if !strings.HasPrefix(normalized, prefix) {
+		return false
+	}
+	return strings.EqualFold(filepath.Ext(normalized), normalizeDownloadName(extension))
+}
+
+// finalizeDownloadedFile renames a 115Browser download to its clean name once
+// its size and mtime are stable. An existing regular file with the same size is
+// preferred; otherwise the original path is kept and the rename error returned.
+func finalizeDownloadedFile(path string, info os.FileInfo) (string, error) {
+	cleanName := stripBrowserDownloadSuffix(filepath.Base(path))
+	if cleanName == "" {
+		return path, nil
+	}
+	target := filepath.Join(filepath.Dir(path), cleanName)
+	if existing, err := os.Stat(target); err == nil {
+		if existing.Mode().IsRegular() && info != nil && existing.Size() == info.Size() {
+			return target, nil
+		}
+		return path, fmt.Errorf("target %q already exists", cleanName)
+	}
+	if err := os.Rename(path, target); err != nil {
+		return path, err
+	}
+	return target, nil
+}
+
 func isPartialDownloadName(name string) bool {
 	lower := strings.ToLower(name)
-	for _, suffix := range []string{".crdownload", ".download", ".part", ".tmp", ".aria2", ".!qb", ".bc!"} {
+	for _, suffix := range []string{".crdownload", ".download", ".part", ".tmp", ".aria2", ".!qb", ".bc!", ".cfg"} {
 		if strings.HasSuffix(lower, suffix) {
 			return true
 		}
