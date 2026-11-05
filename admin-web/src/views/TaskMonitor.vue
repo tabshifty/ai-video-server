@@ -9,6 +9,7 @@ import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import { formatAdminDateTime } from '../utils/dateTime'
 import { getAdminTasks } from '../api/admin'
+import { copyTextToClipboard } from '../utils/clipboard'
 
 const list = ref([])
 const total = ref(0)
@@ -16,7 +17,10 @@ const loading = ref(false)
 const loaded = ref(false)
 const loadError = ref('')
 const query = reactive({ page: 1, page_size: 20, status: '' })
+const lastRefreshedAt = ref('')
+const copiedErrorID = ref('')
 let timer = null
+let copyTimer = null
 let loadSeq = 0
 
 const queuedCount = computed(() => list.value.filter((item) => item.status === 'pending').length)
@@ -69,6 +73,7 @@ async function load(options = {}) {
     loadError.value = ''
     list.value = data.items || []
     total.value = data.total_count || 0
+    lastRefreshedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
   } catch (error) {
     if (seq !== loadSeq) {
       return
@@ -184,6 +189,26 @@ function statusLabel(status) {
   return status
 }
 
+function taskRowClassName({ row }) {
+  if (row.status === 'failed') return 'task-row--failed'
+  if (row.status === 'running') return 'task-row--running'
+  return ''
+}
+
+// 长错误只在行内展示摘要，完整文本通过「复制」交给用户带走，避免整表被撑开
+async function copyTaskError(row) {
+  const text = String(row.error || '')
+  if (!text) return
+  const copied = await copyTextToClipboard(text)
+  if (!copied) return
+  copiedErrorID.value = String(row.id)
+  if (copyTimer) clearTimeout(copyTimer)
+  copyTimer = setTimeout(() => {
+    copiedErrorID.value = ''
+    copyTimer = null
+  }, 2000)
+}
+
 function taskTitle(row) {
   const title = String(row.video_title || '').trim()
   return title || '未命名视频'
@@ -196,6 +221,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (copyTimer) clearTimeout(copyTimer)
 })
 </script>
 
@@ -217,6 +243,7 @@ onUnmounted(() => {
           />
         </template>
         <template #actions>
+          <span v-if="lastRefreshedAt" class="refresh-meta tabular-num">最后刷新 {{ lastRefreshedAt }}</span>
           <StatusIndicator
             :label="backgroundRefreshing ? '正在刷新' : '每 5 秒自动刷新'"
             :tone="backgroundRefreshing ? 'info' : 'neutral'"
@@ -247,8 +274,8 @@ onUnmounted(() => {
         </EmptyState>
         <template v-else>
           <div class="table-wrap">
-            <el-table :data="list" border>
-              <el-table-column prop="video_title" label="任务" min-width="210">
+            <el-table :data="list" border :row-class-name="taskRowClassName">
+              <el-table-column prop="video_title" label="任务" min-width="190">
                 <template #default="{ row }">
                   <div class="task-cell">
                     <strong>{{ taskTitle(row) }}</strong>
@@ -261,7 +288,7 @@ onUnmounted(() => {
                   <StatusIndicator :label="statusLabel(row.status)" :tone="taskStatusTone(row.status)" />
                 </template>
               </el-table-column>
-              <el-table-column label="进度" min-width="150">
+              <el-table-column label="进度" min-width="130">
                 <template #default="{ row }">
                   <el-progress :stroke-width="6" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
                 </template>
@@ -277,17 +304,29 @@ onUnmounted(() => {
                 </template>
               </el-table-column>
               <el-table-column prop="retry_count" label="重试" width="60" />
-              <el-table-column prop="error" label="错误" min-width="160">
+              <el-table-column prop="error" label="错误" min-width="200">
                 <template #default="{ row }">
-                  <el-tooltip :content="row.error || '无错误'" placement="top">
-                    <span class="task-error" tabindex="0" :aria-label="row.error || '无错误'">{{ row.error || '--' }}</span>
-                  </el-tooltip>
+                  <div class="task-error-cell">
+                    <el-tooltip :content="row.error || '无错误'" placement="top">
+                      <span class="task-error" tabindex="0" :aria-label="row.error || '无错误'">{{ row.error || '--' }}</span>
+                    </el-tooltip>
+                    <el-button
+                      v-if="row.error"
+                      class="task-error-copy"
+                      link
+                      type="primary"
+                      :aria-label="`复制任务 ${row.id} 的错误信息`"
+                      @click="copyTaskError(row)"
+                    >
+                      {{ copiedErrorID === String(row.id) ? '已复制' : '复制' }}
+                    </el-button>
+                  </div>
                 </template>
               </el-table-column>
-              <el-table-column label="开始时间" width="145">
+              <el-table-column label="开始时间" width="140">
                 <template #default="{ row }">{{ formatDateTime(row.started_at) }}</template>
               </el-table-column>
-              <el-table-column label="进度更新时间" width="145">
+              <el-table-column label="进度更新时间" width="140">
                 <template #default="{ row }">{{ formatDateTime(row.progress_updated_at) }}</template>
               </el-table-column>
             </el-table>
@@ -338,7 +377,35 @@ onUnmounted(() => {
   line-height: var(--leading-caption);
 }
 
+.refresh-meta {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.task-error-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.task-error-copy {
+  flex: 0 0 auto;
+}
+
+/* 异常行用极浅底色局部强调，不整块铺红；运行中同理用信息色 */
+.task-monitor-page :deep(.task-row--failed > td.el-table__cell) {
+  background: color-mix(in srgb, var(--danger-600) 5%, var(--bg-surface));
+}
+
+.task-monitor-page :deep(.task-row--running > td.el-table__cell) {
+  background: color-mix(in srgb, var(--info-600) 4%, var(--bg-surface));
+}
+
 .task-error {
+  min-width: 0;
+  flex: 1 1 auto;
   display: block;
   min-width: 0;
   max-width: 100%;

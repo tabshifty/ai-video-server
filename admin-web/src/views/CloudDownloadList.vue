@@ -220,8 +220,24 @@ function setPage(page) {
   load()
 }
 
+const STATUS_TONE = {
+  pending: 'info',
+  submitting: 'info',
+  queued: 'warning',
+  ready: 'warning',
+  downloading: 'info',
+  completed: 'success',
+  failed: 'danger',
+  blocked: 'danger'
+}
+
 function statusMeta(status) {
   return STATUS_META[status] || { label: status || '未知', type: 'info' }
+}
+
+// 状态统一用「圆点 + 文字」表达，与任务监控保持同一套状态语言
+function statusTone(status) {
+  return STATUS_TONE[status] || 'neutral'
 }
 
 function blockedReasonLabel(reason) {
@@ -625,9 +641,7 @@ onUnmounted(() => {
               <el-table-column label="状态" min-width="140">
                 <template #default="{ row }">
                   <div class="cloud-status-cell">
-                    <el-tag size="small" effect="plain" :type="statusMeta(row.status).type">
-                      {{ statusMeta(row.status).label }}
-                    </el-tag>
+                    <StatusIndicator :label="statusMeta(row.status).label" :tone="statusTone(row.status)" />
                     <el-tag v-if="row.blocked_reason" size="small" effect="plain" type="danger">
                       {{ blockedReasonLabel(row.blocked_reason) }}
                     </el-tag>

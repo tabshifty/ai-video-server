@@ -356,7 +356,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     const runCleanup = functionBlock(source, 'async function runCleanup()')
 
     expect.soft(template).toContain('class="page-shell settings-page" data-density="form"')
-    expect.soft(template).toContain('<p class="page-context-note">执行临时文件清理并查看最近系统日志。</p>')
+    expect.soft(template).toContain('<p class="page-context-note">执行临时文件清理并查看最近系统日志。清理与日志分区独立，互不影响。</p>')
     expect.soft(template).not.toContain('<PageHeader')
     expect(template.match(/<SectionCard\b/g)).toHaveLength(2)
     expect(source).toContain("const logsError = ref('')")

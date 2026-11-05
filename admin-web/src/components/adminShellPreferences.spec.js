@@ -11,7 +11,7 @@ import {
 import { adminShellNavGroups } from './base/commandPalette.helpers'
 
 const paths = ['/dashboard', '/videos', '/tasks', '/toolbox']
-const groups = ['overview', 'media', 'ingest', 'service-tools', 'system']
+const groups = ['workspace', 'content', 'ingest', 'operations', 'system', 'service-tools']
 
 describe('admin shell preferences', () => {
   it('keeps three unique recent known routes with newest first', () => {
@@ -73,34 +73,44 @@ describe('admin shell preferences', () => {
 
   it('round trips versioned documents with the documented structure', () => {
     const recentRaw = serializeRecentRoutes(['/videos'])
-    const expandedRaw = serializeExpandedGroupKeys(['overview'])
+    const expandedRaw = serializeExpandedGroupKeys(['workspace'])
 
     expect(SHELL_PREFERENCE_VERSION).toBe(1)
     expect(JSON.parse(recentRaw)).toEqual({ version: 1, paths: ['/videos'] })
-    expect(JSON.parse(expandedRaw)).toEqual({ version: 1, keys: ['overview'] })
+    expect(JSON.parse(expandedRaw)).toEqual({ version: 1, keys: ['workspace'] })
     expect(parseRecentRoutes(recentRaw, paths)).toEqual(['/videos'])
-    expect(parseExpandedGroupKeys(expandedRaw, groups)).toEqual(['overview'])
+    expect(parseExpandedGroupKeys(expandedRaw, groups)).toEqual(['workspace'])
   })
 
-  it('filters expanded groups and forces a known active group open once', () => {
+  it('filters duplicate expanded groups and forces a known active group open once', () => {
     const raw = JSON.stringify({
       version: SHELL_PREFERENCE_VERSION,
-      keys: ['overview', 'unknown', 'overview', 'system']
+      keys: ['workspace', 'workspace', 'system', 'system']
     })
 
-    expect(parseExpandedGroupKeys(raw, groups)).toEqual(['overview', 'system'])
-    expect(ensureActiveGroup(['overview', 'media', 'overview'], 'media', groups)).toEqual(['overview', 'media'])
-    expect(ensureActiveGroup(['overview'], 'service-tools', groups)).toEqual(['overview', 'service-tools'])
-    expect(ensureActiveGroup(['overview'], 'unknown', groups)).toEqual(['overview'])
+    expect(parseExpandedGroupKeys(raw, groups)).toEqual(['workspace', 'system'])
+    expect(ensureActiveGroup(['workspace', 'content', 'workspace'], 'content', groups)).toEqual(['workspace', 'content'])
+    expect(ensureActiveGroup(['workspace'], 'service-tools', groups)).toEqual(['workspace', 'service-tools'])
+    expect(ensureActiveGroup(['workspace'], 'unknown', groups)).toEqual(['workspace'])
   })
 
-  it('exposes exactly five navigation groups', () => {
+  it('re-expands every group when stored keys belong to an older nav layout', () => {
+    const legacyRaw = JSON.stringify({
+      version: SHELL_PREFERENCE_VERSION,
+      keys: ['overview', 'media']
+    })
+
+    expect(parseExpandedGroupKeys(legacyRaw, groups)).toEqual(groups)
+  })
+
+  it('exposes exactly six purpose-based navigation groups', () => {
     expect(adminShellNavGroups.map((group) => [group.key, group.label])).toEqual([
-      ['overview', '仪表盘'],
-      ['media', '媒体库'],
-      ['ingest', '录入处理'],
-      ['service-tools', '服务与工具'],
-      ['system', '系统']
+      ['workspace', '工作台'],
+      ['content', '内容管理'],
+      ['ingest', '采集与导入'],
+      ['operations', '任务与运维'],
+      ['system', '应用与系统'],
+      ['service-tools', '服务与工具']
     ])
   })
 })

@@ -74,6 +74,7 @@ const listError = ref('')
 const tableRef = ref(null)
 const detail = ref(null)
 const detailVisible = ref(false)
+const detailTab = ref('basic')
 const detailSnapshot = ref('')
 const filterDrawerVisible = ref(false)
 const viewportWidth = ref(readViewportWidth())
@@ -133,8 +134,7 @@ const SAVED_VIEWS_KEY = 'admin-videolist-saved-views-v1'
 const COLUMN_VISIBILITY_KEY = 'admin-videolist-columns'
 const COLUMN_VISIBILITY_VERSION_KEY = 'admin-videolist-columns-version'
 const ALL_COLUMNS = [
-  { key: 'title', label: '标题' },
-  { key: 'thumbnail', label: '封面' },
+  { key: 'title', label: '视频' },
   { key: 'type', label: '类型' },
   { key: 'status', label: '状态' },
   { key: 'duration', label: '时长' },
@@ -143,7 +143,7 @@ const ALL_COLUMNS = [
   { key: 'created_at', label: '上传时间', secondary: true },
   { key: 'operations', label: '操作', required: true }
 ]
-const DEFAULT_VISIBLE_COLUMNS = ['title', 'thumbnail', 'type', 'status', 'duration', 'size', 'upload_user', 'created_at', 'operations']
+const DEFAULT_VISIBLE_COLUMNS = ['title', 'type', 'status', 'duration', 'size', 'upload_user', 'created_at', 'operations']
 const columnVisibility = ref(readStoredColumns())
 const allowedColumnKeys = ALL_COLUMNS.map((item) => item.key)
 const builtInViews = createVideoBuiltInViews(DEFAULT_VISIBLE_COLUMNS)
@@ -242,10 +242,10 @@ function readStoredColumns() {
     if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_COLUMNS]
     const known = parsed.filter((key) => ALL_COLUMNS.some((column) => column.key === key))
     const version = window.localStorage.getItem(COLUMN_VISIBILITY_VERSION_KEY)
-    if (version !== '2') {
+    if (version !== '3') {
       if (!known.includes('duration')) known.push('duration')
       window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(known))
-      window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '2')
+      window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '3')
     }
     return Array.from(new Set([...known, ...required]))
   } catch (_) {
@@ -257,7 +257,7 @@ function persistColumns() {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(columnVisibility.value))
-    window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '2')
+    window.localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, '3')
   } catch (_) {
     // localStorage 不可用时仅保留本会话列设置。
   }
@@ -274,6 +274,17 @@ function isColumnVisible(key) {
   if (!isNarrowViewport.value) return true
   const column = ALL_COLUMNS.find((item) => item.key === key)
   return !column?.secondary
+}
+
+// mediaMetaSegments：媒体单元第二行只补充「当前未单独展示」的次要字段，
+// 既保证列设置/窄屏收起列后信息不丢，也避免与独立列重复。
+function mediaMetaSegments(row) {
+  const segments = []
+  if (!isColumnVisible('type')) segments.push(typeLabel(row.type))
+  if (!isColumnVisible('duration')) segments.push(formatVideoDuration(row.duration_seconds))
+  if (!isColumnVisible('size')) segments.push(formatFileSize(row.file_size))
+  if (!isColumnVisible('created_at')) segments.push(formatDateTime(row.created_at))
+  return segments.filter(Boolean)
 }
 
 function removeFilter(key) {
@@ -862,6 +873,7 @@ async function showDetail(row) {
     return
   }
   detail.value = data
+  detailTab.value = 'basic'
   detail.value.actor_tokens = (detail.value.actors || []).map((actor) => actor.id)
   detail.value.collection_ids = (detail.value.collections || []).map((collection) => collection.id)
   detail.value.image_collection_id = detail.value.image_collection?.id || ''
@@ -927,6 +939,7 @@ function resetDetailState({ invalidateToken = true } = {}) {
     detailRequestToken.value = nextDetailRequestToken(detailRequestToken.value)
   }
   detail.value = null
+  detailTab.value = 'basic'
   playURL.value = ''
   playExpiresAt.value = 0
   resetSubtitleState()
@@ -1517,36 +1530,43 @@ onBeforeUnmount(() => {
             @select-all="onSelectionSelectAll"
           >
             <el-table-column type="selection" width="44" />
-            <el-table-column v-if="isColumnVisible('title')" prop="title" label="标题" min-width="220" show-overflow-tooltip />
-            <el-table-column v-if="isColumnVisible('thumbnail')" label="封面" width="96">
+            <el-table-column v-if="isColumnVisible('title')" prop="title" label="视频" min-width="260">
               <template #default="{ row }">
-                <div class="video-cover-cell">
-                  <el-image
-                    v-if="shouldShowVideoThumbnail(row)"
-                    :src="getVideoThumbnailURL(row)"
-                    :alt="`${row.title || row.id} 封面`"
-                    :preview-src-list="[getVideoThumbnailURL(row)]"
-                    fit="cover"
-                    preview-teleported
-                    class="video-cover-image"
-                  >
-                    <template #placeholder>
-                      <div class="video-cover-placeholder video-cover-placeholder--loading">加载中</div>
-                    </template>
-                    <template #error>
-                      <div class="video-cover-placeholder">暂无封面</div>
-                    </template>
-                  </el-image>
-                  <div v-else class="video-cover-placeholder">{{ getVideoThumbnailPlaceholder(row) }}</div>
+                <div class="video-media-cell">
+                  <div class="video-cover-cell">
+                    <el-image
+                      v-if="shouldShowVideoThumbnail(row)"
+                      :src="getVideoThumbnailURL(row)"
+                      :alt="`${row.title || row.id} 封面`"
+                      :preview-src-list="[getVideoThumbnailURL(row)]"
+                      fit="cover"
+                      preview-teleported
+                      class="video-cover-image"
+                    >
+                      <template #placeholder>
+                        <div class="video-cover-placeholder video-cover-placeholder--loading">加载中</div>
+                      </template>
+                      <template #error>
+                        <div class="video-cover-placeholder">暂无封面</div>
+                      </template>
+                    </el-image>
+                    <div v-else class="video-cover-placeholder">{{ getVideoThumbnailPlaceholder(row) }}</div>
+                  </div>
+                  <div class="video-media-copy">
+                    <span class="video-media-title" :title="row.title || '未命名视频'">{{ row.title || '未命名视频' }}</span>
+                    <span v-if="mediaMetaSegments(row).length" class="video-media-meta">
+                      {{ mediaMetaSegments(row).join(' · ') }}
+                    </span>
+                  </div>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column v-if="isColumnVisible('type')" prop="type" label="类型" width="96">
+            <el-table-column v-if="isColumnVisible('type')" prop="type" label="类型" width="88">
               <template #default="{ row }">
                 {{ typeLabel(row.type) }}
               </template>
             </el-table-column>
-            <el-table-column v-if="isColumnVisible('status')" prop="status" label="状态" width="120">
+            <el-table-column v-if="isColumnVisible('status')" prop="status" label="状态" width="104">
               <template #default="{ row }">
                 <StatusIndicator :label="statusLabel(row.status)" :tone="videoStatusTone(row.status)" />
               </template>
@@ -1557,14 +1577,14 @@ onBeforeUnmount(() => {
             <el-table-column v-if="isColumnVisible('size')" label="大小" width="100">
               <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
             </el-table-column>
-            <el-table-column v-if="isColumnVisible('upload_user')" prop="upload_user" label="上传用户" width="128" show-overflow-tooltip />
-            <el-table-column v-if="isColumnVisible('created_at')" label="上传时间" width="168">
+            <el-table-column v-if="isColumnVisible('upload_user')" prop="upload_user" label="上传用户" width="112" show-overflow-tooltip />
+            <el-table-column v-if="isColumnVisible('created_at')" label="上传时间" width="176">
               <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
             </el-table-column>
             <el-table-column v-if="isColumnVisible('operations')" label="操作" width="108" fixed="right">
               <template #default="{ row }">
                 <div class="video-row-actions">
-                  <el-button link type="primary" @click="showDetail(row)">详情</el-button>
+                  <el-button link type="primary" @click="showDetail(row)">编辑</el-button>
                   <el-dropdown
                     trigger="click"
                     popper-class="video-row-actions-popper"
@@ -1597,7 +1617,7 @@ onBeforeUnmount(() => {
           <AdminTablePagination
             :current-page="query.page"
             :page-size="query.page_size"
-            layout="total, prev, pager, next"
+            layout="prev, pager, next"
             :total="total"
             @current-change="setPage"
           />
@@ -1737,9 +1757,36 @@ onBeforeUnmount(() => {
       <template #header="{ close, titleId, titleClass }">
         <AdminDrawerHeader title="视频详情" :title-id="titleId" :title-class="titleClass" :close="close" />
       </template>
+      <div v-if="detail" class="detail-hero">
+        <el-image
+          v-if="getVideoThumbnailURL(detail)"
+          :src="getVideoThumbnailURL(detail)"
+          :alt="`${detail.title || detail.id} 封面`"
+          :preview-src-list="[getVideoThumbnailURL(detail)]"
+          fit="cover"
+          preview-teleported
+          class="detail-hero__cover"
+        >
+          <template #error>
+            <div class="detail-hero__placeholder">暂无封面</div>
+          </template>
+        </el-image>
+        <div v-else class="detail-hero__placeholder">暂无封面</div>
+        <div class="detail-hero__copy">
+          <h2 class="detail-hero__title">{{ detail.title || '未命名视频' }}</h2>
+          <div class="detail-hero__meta">
+            <StatusIndicator :label="statusLabel(detail.status)" :tone="videoStatusTone(detail.status)" />
+            <span>{{ typeLabel(detail.type) }}</span>
+            <span class="tabular-num">{{ formatVideoDuration(detail.duration_seconds) }}</span>
+            <span class="tabular-num">{{ formatFileSize(detail.file_size) }}</span>
+          </div>
+        </div>
+      </div>
+
       <el-form v-if="detail" label-width="90px" class="detail-drawer-form">
+        <el-tabs v-model="detailTab" class="detail-tabs">
+        <el-tab-pane label="基本信息" name="basic">
         <SectionCard dense>
-          <template #title>基础信息</template>
           <el-form-item v-if="detail.type === 'episode' && detail.status === 'tv_pending'" label="待处理">
           <div class="tv-pending-panel">
             <el-alert
@@ -1868,9 +1915,6 @@ onBeforeUnmount(() => {
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="detail.title" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="detail.description" type="textarea" :rows="4" /></el-form-item>
-        <el-form-item label="转码后大小">
-          {{ formatFileSize(detail.transcoded_file_size) }}
-        </el-form-item>
         <el-form-item label="封面"><el-input v-model="detail.thumbnail_path" /></el-form-item>
         <el-form-item label="标签">
           <el-select
@@ -1973,9 +2017,13 @@ onBeforeUnmount(() => {
           </el-select>
         </el-form-item>
         </SectionCard>
+        </el-tab-pane>
 
-        <SectionCard dense collapsible :default-expanded="false">
-          <template #title>播放预览</template>
+        <el-tab-pane label="文件与播放" name="playback">
+        <SectionCard dense>
+          <el-form-item label="转码后大小">
+            {{ formatFileSize(detail.transcoded_file_size) }}
+          </el-form-item>
           <el-form-item label="播放预览">
           <div class="play-preview">
             <div class="play-actions">
@@ -2047,9 +2095,10 @@ onBeforeUnmount(() => {
           </div>
         </el-form-item>
         </SectionCard>
+        </el-tab-pane>
 
-        <SectionCard v-if="supportsSubtitleManage(detail.type)" dense collapsible :default-expanded="false">
-          <template #title>字幕管理</template>
+        <el-tab-pane v-if="supportsSubtitleManage(detail.type)" label="字幕" name="subtitles">
+        <SectionCard dense>
           <el-form-item v-if="supportsSubtitleManage(detail.type)" label="字幕管理">
           <div class="subtitle-panel">
             <div class="subtitle-panel__actions">
@@ -2144,6 +2193,8 @@ onBeforeUnmount(() => {
           </div>
         </el-form-item>
         </SectionCard>
+        </el-tab-pane>
+        </el-tabs>
       </el-form>
 
       <template #footer>
@@ -2244,6 +2295,120 @@ onBeforeUnmount(() => {
   gap: var(--space-3);
 }
 
+/* 详情顶部摘要：封面、标题、状态与文件关键指标集中一处 */
+.detail-hero {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.detail-hero__cover,
+.detail-hero__placeholder {
+  width: 96px;
+  height: 54px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-muted);
+  overflow: hidden;
+}
+
+.detail-hero__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  border-style: dashed;
+}
+
+.detail-hero__copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.detail-hero__title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.detail-hero__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+/* 详情分区：标签栏吸顶在 Drawer 内容顶部，切换分区不卸载表单（el-tabs 默认保留已渲染面板） */
+.detail-tabs :deep(.el-tabs__header) {
+  position: sticky;
+  top: calc(-1 * var(--space-5));
+  z-index: 2;
+  margin-bottom: var(--space-3);
+  background: var(--bg-surface);
+}
+
+.detail-tabs :deep(.el-tabs__nav-wrap::after) {
+  background: var(--line-soft);
+}
+
+.detail-tabs :deep(.el-tabs__item) {
+  height: 36px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-small);
+}
+
+.detail-tabs :deep(.el-tabs__item:first-child) {
+  padding-left: 0;
+}
+
+/* 媒体单元：封面 + 标题 + 次要信息，压缩横向阅读距离 */
+.video-media-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.video-media-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.video-media-title {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-media-meta {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .status-field {
   width: 100%;
   display: grid;
@@ -2271,6 +2436,7 @@ onBeforeUnmount(() => {
 .video-cover-cell {
   width: 72px;
   height: 40px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2400,10 +2566,16 @@ onBeforeUnmount(() => {
 .subtitle-upload {
   display: grid;
   gap: var(--space-3);
+  justify-items: start;
   padding: var(--space-3);
   border-radius: var(--radius-lg);
   border: 1px solid var(--line-soft);
   background: var(--bg-surface-muted);
+}
+
+.subtitle-upload :deep(.el-input),
+.subtitle-upload :deep(.el-upload) {
+  width: 100%;
 }
 
 @media (max-width: 63.9375rem) {

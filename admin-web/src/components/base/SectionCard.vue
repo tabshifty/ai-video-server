@@ -22,7 +22,10 @@ const expanded = ref(props.defaultExpanded)
 
 <template>
   <section class="section-card" :class="{ 'is-dense': dense }">
-    <header class="section-card__header">
+    <header
+      v-if="collapsible || $slots.title || $slots.description || $slots.actions"
+      class="section-card__header"
+    >
       <button
         v-if="collapsible"
         class="section-card__toggle"
@@ -59,7 +62,7 @@ const expanded = ref(props.defaultExpanded)
   position: relative;
   display: grid;
   gap: var(--space-4);
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
@@ -67,7 +70,7 @@ const expanded = ref(props.defaultExpanded)
 
 .section-card.is-dense {
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   box-shadow: none;
 }
 

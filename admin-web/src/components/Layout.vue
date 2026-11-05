@@ -323,8 +323,8 @@ onUnmounted(() => {
 
         <section v-for="group in navGroups" :key="group.key" class="nav-group" :aria-label="`${group.label}分组`">
           <el-tooltip
+            v-if="!isSidebarCollapsed"
             :content="group.label"
-            :disabled="!isSidebarCollapsed"
             placement="right"
           >
             <button
@@ -334,7 +334,7 @@ onUnmounted(() => {
               :aria-label="`${group.label}分组，${isGroupExpanded(group.key) ? '点击收起' : '点击展开'}`"
               @click="toggleGroup(group.key)"
             >
-              <span v-if="!isSidebarCollapsed">{{ group.label }}</span>
+              <span>{{ group.label }}</span>
               <el-icon
                 aria-hidden="true"
                 class="nav-group__chevron"
@@ -344,7 +344,10 @@ onUnmounted(() => {
               </el-icon>
             </button>
           </el-tooltip>
-          <div v-show="isGroupExpanded(group.key)" class="nav-group__items">
+          <div
+            v-show="isSidebarCollapsed || isGroupExpanded(group.key)"
+            class="nav-group__items"
+          >
             <el-tooltip
               v-for="item in group.items"
               :key="item.path"
@@ -400,7 +403,8 @@ onUnmounted(() => {
             @click="openMobileNav"
           />
           <div v-if="showShellPageHeader" class="workspace-identity">
-            <span>{{ pageGroupLabel }}</span>
+            <span class="workspace-identity__crumb">{{ pageGroupLabel }}</span>
+            <span class="workspace-identity__divider" aria-hidden="true">›</span>
             <h1>{{ pageTitle }}</h1>
           </div>
         </div>
@@ -552,8 +556,8 @@ onUnmounted(() => {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
 }
 
 .brand-mark {
@@ -573,6 +577,10 @@ onUnmounted(() => {
 .profile-chip__copy {
   display: grid;
   min-width: 0;
+}
+
+.brand-copy {
+  flex: 1 1 auto;
 }
 
 .brand-copy strong,
@@ -598,7 +606,7 @@ onUnmounted(() => {
 }
 
 .collapse-button {
-  margin-left: auto;
+  margin-left: var(--space-2);
   flex: 0 0 auto;
 }
 
@@ -635,13 +643,18 @@ onUnmounted(() => {
 .nav-groups {
   min-width: 0;
   overflow-y: auto;
-  padding: 0 var(--space-2) var(--space-4);
+  padding: var(--space-1) var(--space-2) var(--space-4);
 }
 
 .nav-group {
   display: grid;
   gap: var(--space-1);
-  margin-top: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.nav-group + .nav-group {
+  padding-top: var(--space-3);
+  border-top: 1px solid color-mix(in srgb, var(--line-soft) 70%, transparent);
 }
 
 .nav-group__items,
@@ -676,6 +689,7 @@ button.nav-group__label {
   min-height: var(--space-6);
 }
 
+/* 折叠态不渲染分组按钮：所有菜单项平铺为图标轨道，分组之间以细线分隔 */
 .admin-shell.is-collapsed button.nav-group__label {
   min-height: var(--space-8);
   justify-content: center;
@@ -724,13 +738,29 @@ button.drawer-nav__label:hover {
 .nav-link:hover,
 .drawer-nav__link:hover {
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: var(--bg-sidebar-hover);
 }
 
+.nav-link {
+  position: relative;
+}
+
+/* 当前项用轻量底色 + 左侧强调条，颜色之外再给一重位置线索 */
 .nav-link.is-active,
 .drawer-nav__link.is-active {
   color: var(--primary);
   background: var(--primary-soft);
+  font-weight: 600;
+}
+
+.nav-link.is-active::before {
+  position: absolute;
+  inset-block: calc(var(--space-2) - 2px);
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--primary);
+  content: '';
 }
 
 .profile-chip {
@@ -812,9 +842,16 @@ button.drawer-nav__label:hover {
   white-space: nowrap;
 }
 
-.workspace-identity span {
+.workspace-identity__crumb {
   flex: 0 1 auto;
   color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.workspace-identity__divider {
+  flex: 0 0 auto;
+  color: var(--line-strong);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
 }
@@ -823,8 +860,8 @@ button.drawer-nav__label:hover {
   min-width: 0;
   margin: 0;
   color: var(--text-primary);
-  font-size: var(--text-body);
-  line-height: var(--leading-body);
+  font-size: var(--text-h1);
+  line-height: var(--leading-h1);
   font-weight: 600;
 }
 
@@ -990,7 +1027,8 @@ button.drawer-nav__label,
     gap: var(--space-2);
   }
 
-  .workspace-identity span,
+  .workspace-identity__crumb,
+  .workspace-identity__divider,
   .command-trigger span,
   .command-trigger kbd {
     display: none;

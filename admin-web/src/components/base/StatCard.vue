@@ -50,13 +50,12 @@ function trendIcon() {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
 }
 
 .stat-card__label {
   color: var(--text-secondary);
-  font-size: var(--text-small);
-  line-height: var(--leading-small);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
 }
 
 .stat-card__value {

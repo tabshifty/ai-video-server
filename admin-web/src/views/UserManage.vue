@@ -131,7 +131,7 @@ onMounted(load)
 
     <div class="page-shell user-page" data-density="compact">
 
-      <Toolbar>
+      <Toolbar dense>
         <template #filters>
           <el-tag effect="plain">共 {{ total }} 个账号</el-tag>
         </template>

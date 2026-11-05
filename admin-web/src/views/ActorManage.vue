@@ -553,7 +553,8 @@ onMounted(load)
 }
 
 .toolbar-search {
-  width: min(20rem, 100%);
+  width: 20rem;
+  max-width: 100%;
 }
 
 .toolbar-select {

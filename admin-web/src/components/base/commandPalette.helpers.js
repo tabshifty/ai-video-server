@@ -1,7 +1,7 @@
 export const adminShellNavGroups = [
   {
-    key: 'overview',
-    label: '仪表盘',
+    key: 'workspace',
+    label: '工作台',
     items: [
       {
         path: '/dashboard',
@@ -13,13 +13,12 @@ export const adminShellNavGroups = [
     ]
   },
   {
-    key: 'media',
-    label: '媒体库',
+    key: 'content',
+    label: '内容管理',
     items: [
       { path: '/videos', label: '视频管理', title: '视频管理', icon: 'Film', alias: 'video videos sj spgl' },
       { path: '/short-pending-delete', label: '待删除短视频', title: '待删除短视频', icon: 'Delete', alias: 'short pending delete cleanup dsc dsp dscdsp ql' },
       { path: '/tv-series', label: '电视剧管理', title: '电视剧管理', icon: 'Files', alias: 'tv series dsj' },
-      { path: '/tv-app', label: '安装包管理', title: '安装包管理', icon: 'Monitor', alias: 'tv app phone app apk tvapk dzb azb' },
       { path: '/actors', label: '演员管理', title: '演员管理', icon: 'Avatar', alias: 'actor actors yy' },
       { path: '/collections', label: '合集管理', title: '合集管理', icon: 'List', alias: 'collection collections hj' },
       { path: '/images', label: '图片管理', title: '图片管理', icon: 'PictureFilled', alias: 'image images tp' },
@@ -28,11 +27,35 @@ export const adminShellNavGroups = [
   },
   {
     key: 'ingest',
-    label: '录入处理',
+    label: '采集与导入',
     items: [
       { path: '/upload', label: '上传视频', title: '上传中心', icon: 'UploadFilled', alias: 'upload uploader spsc' },
       { path: '/scrape', label: '通用刮削', title: '通用刮削', icon: 'MagicStick', alias: 'scrape tmdb ty' },
-      { path: '/av-scrape', label: 'AV 手动刮削', title: 'AV 手动刮削', icon: 'MagicStick', alias: 'av scrape manual' }
+      { path: '/av-scrape', label: 'AV 手动刮削', title: 'AV 手动刮削', icon: 'MagicStick', alias: 'av scrape manual' },
+      { path: '/forum-posts', label: '论坛资源', title: '论坛资源', icon: 'Link', alias: 'forum forums hermes forum-posts hermes-forum luntan ziyuan ltz y' },
+      { path: '/cloud-downloads', label: '115 云下载', title: '115 云下载', icon: 'Monitor', alias: '115 cloud download cloud-downloads yun xiazai yunxiazai wangpan yxz' }
+    ]
+  },
+  {
+    key: 'operations',
+    label: '任务与运维',
+    items: [
+      {
+        path: '/tasks',
+        label: '任务监控',
+        title: '任务监控',
+        icon: 'List',
+        alias: 'task tasks jobs rw'
+      }
+    ]
+  },
+  {
+    key: 'system',
+    label: '应用与系统',
+    items: [
+      { path: '/tv-app', label: '安装包管理', title: '安装包管理', icon: 'Monitor', alias: 'tv app phone app apk tvapk dzb azb' },
+      { path: '/users', label: '用户管理', title: '用户管理', icon: 'User', alias: 'user users yh' },
+      { path: '/settings', label: '系统设置', title: '系统设置', icon: 'Setting', alias: 'settings system xt' }
     ]
   },
   {
@@ -41,9 +64,6 @@ export const adminShellNavGroups = [
     items: [
       { path: '/iptv', label: 'IPTV 管理', title: 'IPTV 管理', icon: 'Monitor', alias: 'iptv live' },
       { path: '/telegram', label: 'Telegram 管理', title: 'Telegram 管理', icon: 'Connection', alias: 'telegram tg 电报 telegram管理' },
-      { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' },
-      { path: '/forum-posts', label: '论坛资源', title: '论坛资源', icon: 'Link', alias: 'forum forums hermes forum-posts hermes-forum luntan ziyuan ltz y' },
-      { path: '/cloud-downloads', label: '115 云下载', title: '115 云下载', icon: 'Monitor', alias: '115 cloud download cloud-downloads yun xiazai yunxiazai wangpan yxz' },
       {
         path: '/toolbox',
         label: '工具箱',
@@ -51,14 +71,6 @@ export const adminShellNavGroups = [
         icon: 'Tools',
         alias: 'toolbox tools ed2k orphan scan orphan-files 孤儿文件扫描 archive archive-import archive import zip rar 7z 压缩包导入 压缩包 password vault credentials 密码 密码库 密码管理 gjx'
       }
-    ]
-  },
-  {
-    key: 'system',
-    label: '系统',
-    items: [
-      { path: '/users', label: '用户管理', title: '用户管理', icon: 'User', alias: 'user users yh' },
-      { path: '/settings', label: '系统设置', title: '系统设置', icon: 'Setting', alias: 'settings system xt' }
     ]
   }
 ]

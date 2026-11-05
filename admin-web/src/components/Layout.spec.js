@@ -27,12 +27,13 @@ const style = findBlock(layout, /<style scoped>[\s\S]*?<\/style>/)
 describe('Layout shell', () => {
   it('uses grouped navigation and the command palette shell', () => {
     expect(layout).toContain('分组')
-    expect(commandPaletteHelper).toContain('媒体库')
-    expect(commandPaletteHelper).toContain('录入处理')
+    expect(commandPaletteHelper).toContain('内容管理')
+    expect(commandPaletteHelper).toContain('采集与导入')
+    expect(commandPaletteHelper).toContain('任务与运维')
+    expect(commandPaletteHelper).toContain('应用与系统')
     expect(commandPaletteHelper).toContain('工具箱')
     expect(commandPaletteHelper).toContain('论坛资源')
     expect(layout).toMatch(/\bLink\b/)
-    expect(commandPaletteHelper).toContain('系统')
     expect(layout).toMatch(/CommandPalette|command-palette/i)
   })
 
@@ -62,9 +63,11 @@ function unrelatedWrite(key, value) {
     expect(layout).toContain('width: var(--space-8);')
   })
 
-  it('keeps collapsed group toggles operable without rendering their text', () => {
-    expect(layout).toContain('<span v-if="!isSidebarCollapsed">{{ group.label }}</span>')
+  it('keeps the collapsed rail readable by listing every item without group toggles', () => {
+    expect(layout).toContain('<span>{{ group.label }}</span>')
+    expect(layout).toMatch(/<el-tooltip\s+v-if="!isSidebarCollapsed"/)
     expect(layout).toContain(':aria-label="`${group.label}分组')
+    expect(layout).toContain('v-show="isSidebarCollapsed || isGroupExpanded(group.key)"')
     expect(layout).toContain('.admin-shell.is-collapsed button.nav-group__label {')
   })
 
@@ -155,7 +158,8 @@ function unrelatedWrite(key, value) {
     const narrowStyle = style.slice(narrowStart)
 
     expect(layout.match(/v-for="group in navGroups"/g) || []).toHaveLength(2)
-    expect(layout.match(/v-show="isGroupExpanded\(group.key\)"/g) || []).toHaveLength(2)
+    expect(layout.match(/v-show="isSidebarCollapsed \|\| isGroupExpanded\(group.key\)"/g) || []).toHaveLength(1)
+    expect(layout.match(/v-show="isGroupExpanded\(group.key\)"/g) || []).toHaveLength(1)
     expect(mediaStart).toBeGreaterThan(-1)
     expect(narrowStart).toBeGreaterThan(mediaStart)
     expect(findRule(baseStyle, '.shell-header')).toContain('height: var(--admin-header-height)')

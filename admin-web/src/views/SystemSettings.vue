@@ -1,11 +1,12 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { RefreshRight } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { CopyDocument, RefreshRight } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import Layout from '../components/Layout.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
 import { getSystemLogs, systemCleanup } from '../api/admin'
+import { copyTextToClipboard } from '../utils/clipboard'
 
 const logs = ref([])
 const loading = ref(false)
@@ -41,7 +42,30 @@ async function loadLogs() {
   }
 }
 
+async function copyLogs() {
+  const copied = await copyTextToClipboard(logs.value.join('\n'))
+  if (copied) {
+    ElMessage.success('日志已复制到剪贴板')
+    return
+  }
+  ElMessage.error('复制日志失败，请手动选择日志文本')
+}
+
+async function confirmCleanup() {
+  try {
+    await ElMessageBox.confirm(
+      '将清理超过 24 小时的上传暂存文件，释放磁盘占用。该操作不可撤销，是否继续？',
+      '执行临时文件清理',
+      { type: 'warning', confirmButtonText: '确认清理', cancelButtonText: '取消' }
+    )
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
 async function runCleanup() {
+  if (!(await confirmCleanup())) return
   cleanupLoading.value = true
   cleanupError.value = ''
   try {
@@ -59,11 +83,11 @@ async function runCleanup() {
 <template>
   <Layout>
     <div class="page-shell settings-page" data-density="form">
-      <p class="page-context-note">执行临时文件清理并查看最近系统日志。</p>
+      <p class="page-context-note">执行临时文件清理并查看最近系统日志。清理与日志分区独立，互不影响。</p>
 
       <SectionCard>
         <template #title>临时文件清理</template>
-        <template #description>清理超过 24 小时的临时文件，释放磁盘占用。</template>
+        <template #description>清理超过 24 小时的上传暂存文件，释放磁盘占用；不影响业务库中的媒体资源。</template>
         <template #actions>
           <el-button type="warning" :loading="cleanupLoading" @click="runCleanup">执行清理</el-button>
         </template>
@@ -81,12 +105,10 @@ async function runCleanup() {
 
       <SectionCard>
         <template #title>系统日志</template>
-        <template #description>按时间顺序展示最近日志输出</template>
+        <template #description>按时间顺序展示最近 300 行日志输出，等宽字体便于比对时间戳。</template>
         <template #actions>
-          <el-button :loading="loading" @click="loadLogs">
-            <el-icon><RefreshRight /></el-icon>
-            <span>刷新日志</span>
-          </el-button>
+          <el-button :loading="loading" :icon="RefreshRight" @click="loadLogs">刷新日志</el-button>
+          <el-button :disabled="!hasLogs" :icon="CopyDocument" @click="copyLogs">复制日志</el-button>
         </template>
         <el-alert
           v-if="logsError"

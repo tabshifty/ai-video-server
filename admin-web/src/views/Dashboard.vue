@@ -180,13 +180,17 @@ onBeforeUnmount(() => {
 
         <div class="dashboard-workspace">
           <div class="dashboard-workspace__main">
-            <section class="dashboard-section">
-              <h2>内容库存</h2>
+            <section class="dashboard-section" aria-label="内容库存">
+              <div class="dashboard-section__head">
+                <h2>内容库存</h2>
+                <span>按内容类型统计，用于判断库存结构</span>
+              </div>
               <MetricStrip :items="metricGroups.inventory" aria-label="内容库存" />
             </section>
 
             <SectionCard dense>
               <template #title>近 7 天上传趋势</template>
+              <template #description>按天统计新增视频数量，单位为条</template>
               <div
                 v-if="trendPoints.length"
                 ref="chartRef"
@@ -203,7 +207,10 @@ onBeforeUnmount(() => {
           </div>
 
           <nav class="dashboard-quick-actions" aria-label="常用入口">
-            <h2>常用入口</h2>
+            <div class="dashboard-quick-actions__head">
+              <h2>常用入口</h2>
+              <span>高频维护动作</span>
+            </div>
             <RouterLink
               v-for="item in dashboardQuickActions"
               :key="item.path"
@@ -260,23 +267,41 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
 }
 
+.dashboard-section__head,
+.dashboard-quick-actions__head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 .dashboard-section h2,
 .dashboard-quick-actions h2 {
   margin: 0;
   color: var(--text-primary);
   font-size: var(--text-h2);
   line-height: var(--leading-h2);
+  font-weight: 600;
+}
+
+.dashboard-section__head span,
+.dashboard-quick-actions__head span {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
 }
 
 .dashboard-quick-actions {
   align-self: start;
   display: grid;
   gap: var(--space-1);
-  padding-left: var(--space-4);
+  padding: var(--space-3) 0 var(--space-3) var(--space-4);
   border-left: 1px solid var(--line-soft);
 }
 
-.dashboard-quick-actions h2 {
+.dashboard-quick-actions__head {
   margin-bottom: var(--space-1);
 }
 

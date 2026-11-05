@@ -41,25 +41,22 @@ describe('command palette helpers', () => {
     })
   })
 
-  it('registers pending delete shorts under media navigation', () => {
+  it('registers pending delete shorts under content navigation', () => {
     const item = adminShellNavItems.find((entry) => entry.path === '/short-pending-delete')
     expect(item).toMatchObject({
       label: '待删除短视频',
-      groupLabel: '媒体库',
+      groupLabel: '内容管理',
       icon: 'Delete'
     })
   })
 
-  it('keeps service and toolbox navigation capabilities in one authoritative group', () => {
+  it('keeps services and toolbox in a dedicated group without mixing ingest or ops', () => {
     const group = adminShellNavGroups.find((entry) => entry.key === 'service-tools')
 
     expect(group).toMatchObject({ label: '服务与工具' })
     expect(group.items.map(({ path, label, title, icon, alias }) => ({ path, label, title, icon, alias }))).toEqual([
       { path: '/iptv', label: 'IPTV 管理', title: 'IPTV 管理', icon: 'Monitor', alias: 'iptv live' },
       { path: '/telegram', label: 'Telegram 管理', title: 'Telegram 管理', icon: 'Connection', alias: 'telegram tg 电报 telegram管理' },
-      { path: '/tasks', label: '任务监控', title: '任务监控', icon: 'List', alias: 'task tasks jobs rw' },
-      { path: '/forum-posts', label: '论坛资源', title: '论坛资源', icon: 'Link', alias: 'forum forums hermes forum-posts hermes-forum luntan ziyuan ltz y' },
-      { path: '/cloud-downloads', label: '115 云下载', title: '115 云下载', icon: 'Monitor', alias: '115 cloud download cloud-downloads yun xiazai yunxiazai wangpan yxz' },
       {
         path: '/toolbox',
         label: '工具箱',
@@ -70,9 +67,25 @@ describe('command palette helpers', () => {
     ])
     expect(searchMenuItems('live')[0]).toMatchObject({ path: '/iptv', groupKey: 'service-tools' })
     expect(searchMenuItems('telegram')[0]).toMatchObject({ path: '/telegram', groupKey: 'service-tools' })
-    expect(searchMenuItems('jobs')[0]).toMatchObject({ path: '/tasks', groupKey: 'service-tools' })
-    expect(searchMenuItems('hermes')[0]).toMatchObject({ path: '/forum-posts', groupKey: 'service-tools' })
     expect(searchMenuItems('gjx')[0]).toMatchObject({ path: '/toolbox', groupKey: 'service-tools' })
+  })
+
+  it('groups capture, task monitoring and app/system entries by working purpose', () => {
+    const groupKeys = Object.fromEntries(adminShellNavItems.map((item) => [item.path, item.groupKey]))
+
+    expect(groupKeys['/upload']).toBe('ingest')
+    expect(groupKeys['/scrape']).toBe('ingest')
+    expect(groupKeys['/av-scrape']).toBe('ingest')
+    expect(groupKeys['/forum-posts']).toBe('ingest')
+    expect(groupKeys['/cloud-downloads']).toBe('ingest')
+    expect(groupKeys['/tasks']).toBe('operations')
+    expect(groupKeys['/tv-app']).toBe('system')
+    expect(groupKeys['/users']).toBe('system')
+    expect(groupKeys['/settings']).toBe('system')
+    expect(searchMenuItems('jobs')[0]).toMatchObject({ path: '/tasks', groupKey: 'operations' })
+    expect(searchMenuItems('hermes')[0]).toMatchObject({ path: '/forum-posts', groupKey: 'ingest' })
+    expect(adminShellNavGroups.find((entry) => entry.key === 'operations')).toMatchObject({ label: '任务与运维' })
+    expect(adminShellNavGroups.find((entry) => entry.key === 'system')).toMatchObject({ label: '应用与系统' })
   })
 
   it('keeps individual toolbox tools out of direct shell navigation', () => {

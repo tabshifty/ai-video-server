@@ -120,6 +120,7 @@ const chinaMapHref = computed(() => router.resolve('/toolbox/china-map').href)
 .tool-menu-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: var(--space-3);
   min-width: 0;
@@ -182,6 +183,8 @@ const chinaMapHref = computed(() => router.resolve('/toolbox/china-map').href)
 
 .tool-menu-item__meta {
   grid-column: 2;
+  grid-row: 3;
+  align-self: end;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);

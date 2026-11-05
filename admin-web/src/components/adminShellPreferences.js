@@ -42,7 +42,11 @@ export function serializeRecentRoutes(paths) {
 
 export function parseExpandedGroupKeys(raw, validKeys) {
   const document = parseDocument(raw)
-  return document && Array.isArray(document.keys) ? knownUnique(document.keys, validKeys) : [...validKeys]
+  if (!document || !Array.isArray(document.keys)) return [...validKeys]
+  // 分组键变更后旧键会被白名单过滤。若存储里出现未知键，说明是旧版分组结构，
+  // 直接回退为全部展开，避免升级后新分组默认折叠、用户找不到入口。
+  if (document.keys.some((key) => !validKeys.includes(key))) return [...validKeys]
+  return knownUnique(document.keys, validKeys)
 }
 
 export function ensureActiveGroup(keys, activeKey, validKeys) {

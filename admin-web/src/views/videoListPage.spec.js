@@ -539,7 +539,7 @@ async function load() {
   it('详情常驻且低频行操作进入可访问菜单并保留删除确认', () => {
     expect(operationsColumn).toContain('width="108"')
     expect(operationsColumn).toContain('fixed="right"')
-    expect(operationsColumn).toMatch(/<el-button\b[^>]*link[^>]*@click="showDetail\(row\)"[^>]*>详情<\/el-button>/)
+    expect(operationsColumn).toMatch(/<el-button\b[^>]*link[^>]*@click="showDetail\(row\)"[^>]*>编辑<\/el-button>/)
     expect(operationsColumn).toContain('<el-dropdown')
     expect(operationsColumn).toContain('aria-label="更多视频操作"')
     expect.soft(operationsColumn).toContain('title="更多视频操作"')
@@ -647,6 +647,20 @@ async function load() {
     expect(script).toContain("{ key: 'size', label: '大小' }")
     expect(template).toMatch(/<el-table-column\b(?=[^>]*isColumnVisible\('size'\))(?=[^>]*label="大小")[^>]*>/)
     expect(template).toContain('{{ formatFileSize(row.file_size) }}')
+  })
+
+  it('详情按职责分区，切换标签不卸载表单以保留未保存输入', () => {
+    const tabs = template.match(/<el-tabs v-model="detailTab" class="detail-tabs">[\s\S]*?<\/el-tabs>/)?.[0] || ''
+
+    expect(tabs).not.toBe('')
+    for (const label of ['基本信息', '文件与播放', '字幕']) {
+      expect(tabs).toContain(`label="${label}"`)
+    }
+    expect(tabs).not.toMatch(/<el-tab-pane[^>]*\blazy\b/)
+    expect(script).toContain("const detailTab = ref('basic')")
+    expect(script.match(/detailTab\.value = 'basic'/g)).toHaveLength(2)
+    expect(template).toContain('class="detail-hero"')
+    expect(template).toContain('<StatusIndicator :label="statusLabel(detail.status)" :tone="videoStatusTone(detail.status)" />')
   })
 
   it('三个 Drawer 复用中文关闭标题且继续由原有关闭守卫控制', () => {

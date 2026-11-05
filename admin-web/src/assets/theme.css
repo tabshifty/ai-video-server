@@ -30,6 +30,12 @@
   --info-50: #f0f9ff;
   --info-600: #0369a1;
 
+  /* 状态底色：语义色的浅色面，供标签、行高亮与提示条共用，避免各页自配色 */
+  --success-surface: var(--success-50);
+  --warning-surface: var(--warning-50);
+  --danger-surface: var(--danger-50);
+  --info-surface: var(--info-50);
+
   --primary: var(--blue-600);
   --primary-strong: var(--blue-700);
   --primary-soft: var(--blue-50);
@@ -38,7 +44,8 @@
   --bg-canvas: #f7f8fa;
   --bg-surface: #ffffff;
   --bg-surface-muted: #f1f3f5;
-  --bg-sidebar: #f1f3f5;
+  --bg-sidebar: #ffffff;
+  --bg-sidebar-hover: #f1f3f5;
   --bg-overlay: color-mix(in srgb, var(--slate-950) 36%, transparent);
   --bg-inverse: #0f172a;
 
@@ -63,32 +70,34 @@
   --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
 
-  --text-h1: 20px;
-  --leading-h1: 28px;
-  --text-h2: 14px;
-  --leading-h2: 20px;
+  --text-h1: 22px;
+  --leading-h1: 30px;
+  --text-h2: 15px;
+  --leading-h2: 22px;
   --text-body: 14px;
-  --leading-body: 20px;
+  --leading-body: 22px;
   --text-small: 13px;
-  --leading-small: 18px;
+  --leading-small: 20px;
   --text-caption: 12px;
-  --leading-caption: 16px;
-  --text-kpi: 24px;
-  --leading-kpi: 30px;
+  --leading-caption: 18px;
+  --text-kpi: 26px;
+  --leading-kpi: 34px;
   --text-display: var(--text-kpi);
   --leading-display: var(--leading-kpi);
 
+  /* 圆角分层：控件 6px、轻量容器 8px、主要容器 10px、浮层 12px、大浮层 16px */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
-  --radius-2xl: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
 
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10), 0 4px 8px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.12), 0 6px 12px rgba(15, 23, 42, 0.06);
+  --shadow-overlay: var(--shadow-lg);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -112,7 +121,7 @@
 
   --admin-sidebar-width: 224px;
   --admin-sidebar-collapsed-width: 56px;
-  --admin-header-height: 52px;
+  --admin-header-height: 56px;
 
   --font-main: var(--font-sans);
   --bg-subtle: var(--bg-surface-muted);
@@ -184,6 +193,7 @@
   --bg-surface: var(--slate-800);
   --bg-surface-muted: var(--slate-700);
   --bg-sidebar: var(--slate-950);
+  --bg-sidebar-hover: var(--slate-800);
   --text-primary: var(--slate-50);
   --text-secondary: var(--slate-300);
   --text-muted: var(--slate-400);
@@ -192,6 +202,29 @@
   --map-water: var(--slate-900);
   --map-land: var(--slate-700);
   --map-land-hover: var(--slate-600);
+
+  /* 深色映射：Element Plus 的暗色变量默认挂在 html.dark 上，本项目用 data-theme，
+     这里显式把其表面/文字/填充映射到本主题令牌，避免表格、输入与浮层在深色下退化为亮底。 */
+  --el-bg-color: var(--bg-surface);
+  --el-bg-color-page: var(--bg-canvas);
+  --el-bg-color-overlay: var(--bg-surface);
+  --el-fill-color-blank: var(--bg-surface);
+  --el-fill-color-light: var(--bg-surface-muted);
+  --el-fill-color-lighter: var(--bg-surface-muted);
+  --el-text-color-primary: var(--text-primary);
+  --el-text-color-regular: var(--text-secondary);
+  --el-text-color-secondary: var(--text-muted);
+  --el-border-color: var(--line-soft);
+  --el-border-color-light: var(--line-soft);
+  --el-border-color-lighter: var(--line-soft);
+  --el-mask-color: var(--bg-overlay);
+  --el-disabled-bg-color: var(--bg-surface-muted);
+  --el-table-bg-color: var(--bg-surface);
+  --el-table-tr-bg-color: var(--bg-surface);
+  --el-table-expanded-cell-bg-color: var(--bg-surface);
+  --el-table-header-bg-color: color-mix(in srgb, var(--bg-surface-muted) 55%, var(--bg-surface));
+  --el-table-row-hover-bg-color: var(--bg-surface-muted);
+  --el-table-border-color: var(--line-soft);
 }
 
 * {
@@ -292,7 +325,6 @@ select {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
 }
 
 #app .page-section {
@@ -333,7 +365,6 @@ select {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-xs);
 }
 
 .soft-card .el-card__header {
@@ -385,11 +416,16 @@ select {
   --el-table-header-text-color: var(--text-secondary);
 }
 
+/* 优先横线分隔：纵向网格线压到接近背景，宽表仍可读但不割裂 */
+.table-wrap .el-table .el-table__cell {
+  border-right-color: color-mix(in srgb, var(--line-soft) 42%, transparent);
+}
+
 .table-wrap .el-table th.el-table__cell {
-  color: var(--text-secondary);
-  background: var(--bg-surface-muted);
-  border-bottom-color: var(--line-soft);
-  font-size: var(--text-small);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg-surface-muted) 55%, var(--bg-surface));
+  border-bottom-color: var(--line-strong);
+  font-size: var(--text-caption);
   font-weight: 600;
 }
 

@@ -37,23 +37,28 @@ defineProps({
   min-width: 0;
   align-items: center;
   gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  font-size: var(--text-small);
-  line-height: var(--leading-small);
+  background: color-mix(in srgb, currentColor 8%, var(--bg-surface));
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+}
+
+.status-indicator__dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .status-indicator__label {
   min-width: 0;
   overflow-wrap: anywhere;
   white-space: normal;
-}
-
-.status-indicator__dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border: 2px solid currentColor;
-  border-radius: 50%;
 }
 
 .status-indicator--success {

@@ -275,15 +275,15 @@ function setPage(page) {
     for (const label of ['任务', '状态', '进度', '剩余时间', '已耗时', '重试', '错误', '开始时间', '进度更新时间']) {
       expect(template).toContain(`label="${label}"`)
     }
-    expect(template).toContain('label="任务" min-width="210"')
+    expect(template).toContain('label="任务" min-width="190"')
     expect(template).toContain('label="状态" width="96"')
-    expect(template).toContain('label="进度" min-width="150"')
+    expect(template).toContain('label="进度" min-width="130"')
     expect(template).toContain('label="剩余时间" width="88"')
     expect(template).toContain('label="已耗时" width="88"')
     expect(template).toContain('prop="retry_count" label="重试" width="60"')
-    expect(template).toContain('label="错误" min-width="160"')
-    expect(template).toContain('label="开始时间" width="145"')
-    expect(template).toContain('label="进度更新时间" width="145"')
+    expect(template).toContain('label="错误" min-width="200"')
+    expect(template).toContain('label="开始时间" width="140"')
+    expect(template).toContain('label="进度更新时间" width="140"')
     expect(template).toMatch(/<div class="task-cell">\s*<strong>\{\{ taskTitle\(row\) \}\}<\/strong>\s*<span>任务 ID：\{\{ row\.id \}\} · 视频 ID：\{\{ row\.video_id \|\| '--' \}\}<\/span>\s*<\/div>/)
     expect(template).toContain('<StatusIndicator :label="statusLabel(row.status)" :tone="taskStatusTone(row.status)" />')
     expect(script).toContain("if (status === 'success') return 'success'")
@@ -325,6 +325,17 @@ function setPage(page) {
     expect(style).not.toContain('linear-gradient')
     expect(style).not.toContain('letter-spacing')
     expect(style).not.toContain('box-shadow')
+  })
+
+  it('异常行局部强调，长错误可复制全文且不引入全局提示', () => {
+    expect(template).toContain(':row-class-name="taskRowClassName"')
+    expect(script).toContain("if (row.status === 'failed') return 'task-row--failed'")
+    expect(script).toContain("if (row.status === 'running') return 'task-row--running'")
+    expect(template).toContain('@click="copyTaskError(row)"')
+    expect(template).toContain('{{ copiedErrorID === String(row.id) ? \'已复制\' : \'复制\' }}')
+    expect(style).toContain('color-mix(in srgb, var(--danger-600) 5%')
+    expect(style).toContain('color-mix(in srgb, var(--info-600) 4%')
+    expect(script).not.toContain('ElMessage')
   })
 
   it('错误 Tooltip 触发器在窄屏保持 44px 高度并垂直对齐单行文字', () => {

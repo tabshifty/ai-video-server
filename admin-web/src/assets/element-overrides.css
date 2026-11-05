@@ -1,5 +1,5 @@
 :where(.el-button) {
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   font-weight: 500;
   transition: background var(--motion-duration-base) var(--motion-easing-standard),
     border-color var(--motion-duration-base) var(--motion-easing-standard),
@@ -39,7 +39,7 @@
 }
 
 :where(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner) {
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   box-shadow: 0 0 0 1px var(--line-soft) inset;
   transition: box-shadow var(--motion-duration-base) var(--motion-easing-standard),
     background var(--motion-duration-base) var(--motion-easing-standard);
@@ -52,7 +52,7 @@
 :where(.el-card) {
   border-color: var(--line-soft);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
 }
 
 :where(.el-dialog) {
@@ -77,8 +77,12 @@
 
 :where(.el-drawer__header) {
   margin: 0;
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--line-soft);
+  color: var(--text-primary);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: 600;
 }
 
 :where(.el-drawer__body) {
@@ -86,16 +90,28 @@
   overscroll-behavior: contain;
 }
 
+/* Drawer 底部固定操作区：预留安全间距，避免遮挡最后一个字段 */
+:where(.el-drawer__footer) {
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-surface);
+}
+
 :where(.el-table) {
   --el-table-border-color: var(--line-soft);
-  --el-table-header-bg-color: var(--bg-surface-muted);
+  --el-table-header-bg-color: color-mix(in srgb, var(--bg-surface-muted) 55%, var(--bg-surface));
   --el-table-row-hover-bg-color: var(--bg-surface-muted);
   font-size: var(--text-small);
 }
 
 :where(.el-table th.el-table__cell) {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-weight: 600;
+}
+
+/* 表格优先用横向分隔表达结构，纵向网格线压淡 */
+:where(.el-table--border .el-table__cell) {
+  border-right-color: color-mix(in srgb, var(--line-soft) 42%, transparent);
 }
 
 :where(.el-table .cell) {
@@ -104,16 +120,17 @@
 
 :where(.el-tag) {
   height: auto;
-  padding: 2px var(--space-2);
+  padding: 1px var(--space-2);
   border-radius: var(--radius-sm);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
+  font-weight: 500;
 }
 
 :where(.el-pagination .btn-prev, .el-pagination .btn-next, .el-pager li) {
   min-width: 32px;
   height: 32px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
 }
 
 :where(.el-message, .el-notification) {
@@ -123,10 +140,34 @@
 
 :where(.el-dropdown-menu, .el-popper) {
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-overlay);
 }
 
 :where(.el-form-item__label) {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+:where(.el-tabs__item) {
+  color: var(--text-secondary);
+  font-size: var(--text-body);
+}
+
+:where(.el-tabs__item.is-active) {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+:where(.el-tabs__nav-wrap::after) {
+  height: 1px;
+  background: var(--line-soft);
+}
+
+:where(.el-alert) {
+  border-radius: var(--radius-md);
+}
+
+:where(.el-descriptions__label) {
   color: var(--text-secondary);
   font-weight: 500;
 }

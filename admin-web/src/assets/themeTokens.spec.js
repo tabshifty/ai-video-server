@@ -60,10 +60,10 @@ const densityTokenContracts = [
 ]
 
 describe('theme tokens', () => {
-  it('locks the final Precision Ops geometry and semantic palette', () => {
+  it('locks the final admin geometry and semantic palette', () => {
     expect(css).toContain('--admin-sidebar-width: 224px')
     expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
-    expect(css).toContain('--admin-header-height: 52px')
+    expect(css).toContain('--admin-header-height: 56px')
     expect(css).toContain('--text-muted: #607085')
     expect(css).toContain('--success-600: #047857')
     expect(css).toContain('--warning-600: #b45309')
@@ -72,13 +72,16 @@ describe('theme tokens', () => {
     expect(css).toMatch(/\[data-density="compact"\][\s\S]*--control-height:\s*32px/)
     expect(css).toMatch(/\[data-density="monitor"\][\s\S]*--table-row-height:\s*44px/)
     expect(css).toMatch(/\[data-density="form"\][\s\S]*--control-height:\s*36px/)
+    expect(css).toMatch(/--radius-sm:\s*6px/)
     expect(css).toMatch(/--radius-md:\s*8px/)
+    expect(css).toMatch(/--radius-lg:\s*10px/)
+    expect(css).toMatch(/--radius-xl:\s*12px/)
   })
 
-  it('exports the approved Precision Ops shell and semantic tokens', () => {
+  it('exports the approved admin shell and semantic tokens', () => {
     expect(css).toContain('--admin-sidebar-width: 224px')
     expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
-    expect(css).toContain('--admin-header-height: 52px')
+    expect(css).toContain('--admin-header-height: 56px')
     expect(css).toContain('--bg-canvas: #f7f8fa')
     expect(css).toContain('--text-primary: #172033')
     expect(css).toContain('--text-muted: #607085')
@@ -218,12 +221,12 @@ describe('theme tokens', () => {
   })
 
   it('exports the approved typography scale', () => {
-    expect(css).toMatch(/--text-h1:\s*20px/)
-    expect(css).toMatch(/--text-h2:\s*14px/)
+    expect(css).toMatch(/--text-h1:\s*22px/)
+    expect(css).toMatch(/--text-h2:\s*15px/)
     expect(css).toMatch(/--text-body:\s*14px/)
     expect(css).toMatch(/--text-small:\s*13px/)
     expect(css).toMatch(/--text-caption:\s*12px/)
-    expect(css).toMatch(/--text-kpi:\s*24px/)
+    expect(css).toMatch(/--text-kpi:\s*26px/)
   })
 
   it('uses the approved base section geometry', () => {
