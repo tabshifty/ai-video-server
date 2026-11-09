@@ -60,7 +60,7 @@ describe('115 云下载导入弹窗', () => {
     expect(script).toContain('validateArchiveImportForm')
   })
 
-  it('压缩包配置可内联新建视频/图片合集并自动选中', () => {
+  it('详情页通过独立弹窗新建视频/图片合集并自动选中', () => {
     expect(script).toContain('createAdminCollection')
     expect(script).toContain('createAdminImageCollection')
     expect(script).toContain('quickCollectionDialogVisible')
@@ -69,6 +69,10 @@ describe('115 云下载导入弹窗', () => {
     expect(script).toContain('archiveForm.default_image_collection_ids')
     expect(template).toContain('新建视频合集')
     expect(template).toContain('新建图片合集')
+    const quickDialog = template.slice(template.indexOf('<CloudImportFrame', template.indexOf('<CloudImportFrame') + 1), template.indexOf('class="cloud-import-quick-collection-form"'))
+    expect(quickDialog).not.toContain(':inline="inline"')
+    expect(quickDialog).toContain(':close-on-click-modal="false"')
+    expect(quickDialog).toContain(':close-on-press-escape="!quickCollectionSaving"')
     expect(template).toContain('v-model="quickCollectionDialogVisible"')
     expect(template).toContain(':inline="inline"')
     expect(script).toContain("import CloudImportFrame from './CloudImportFrame.vue'")

@@ -1,5 +1,16 @@
 # plan.md
 
+## 2026-11-09 导入媒体库详情合集弹窗：完成验证
+- 实现：合集创建容器不再继承详情页 inline 属性，固定使用弹窗；创建中禁止关闭，保留自动回填。
+- 验证：回归用例修复前失败、修复后通过，相关 3 文件 12 个测试及管理端构建通过（既有大包体警告），差异及中文编码检查通过；未执行真实导入链路。
+- 提交范围：CloudDownloadImportDialog.vue、CloudDownloadImportDialog.spec.js、CONTEXT.md、plan.md；既有 docs/examples/ 保留。
+
+## 2026-11-09 导入媒体库详情合集弹窗：计划
+- 原因：云下载导入详情的内联布局透传到合集创建容器，导致新建视频/图片合集显示在页面内。
+- 方案：仅合集创建固定弹窗，保留详情内联布局及创建后自动选中；创建请求期间禁止关闭。
+- 影响文件：CloudDownloadImportDialog.vue、对应测试、CONTEXT.md、plan.md。
+- 验证：定向测试、管理端构建及差异/编码检查；既有 docs/examples/ 不纳入。
+
 ## 2026-11-09 14:50 +0800 修复：115 云下载无后缀压缩包无法导入
 - 现象：pick_code `ayh1l3w7q5eenhfj9` 的 115 云下载文件实际是 RAR，但落盘文件名没有后缀，管理端无法识别为压缩包；手工改成 `.zip` 后预览/导入报 `cloud: downloaded file is missing: ...part2`。
 - 根因：压缩包识别与 `ImportLocalArchive` 都只按扩展名判定格式；`resolveCloudImportSource` 严格匹配任务记录的 `local_path`，文件被改名即视为缺失。原文件无后缀时既识别不了压缩包，改名又会破坏导入路径。

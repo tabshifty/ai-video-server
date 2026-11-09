@@ -655,8 +655,11 @@ async function submitImport() {
     </div>
 
     <CloudImportFrame
-      :inline="inline"
       v-model="quickCollectionDialogVisible"
+      :close-on-click-modal="false"
+      :close-on-press-escape="!quickCollectionSaving"
+      :show-close="!quickCollectionSaving"
+      :before-close="(done) => { if (!quickCollectionSaving) done() }"
       :title="quickCollectionDialogTitle"
       width="min(94vw, 520px)"
       append-to-body
