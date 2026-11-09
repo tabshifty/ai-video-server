@@ -1,0 +1,31 @@
+--- watch_sehuatang_forum95.py
++++ watch_sehuatang_forum95.py
+@@ -1052,6 +1052,18 @@
+     raise RuntimeError("hermes send executable is unavailable")
+
+
++def forum_download_enabled():
++    """Only use the button sender after the independent plugin is enabled."""
++    import yaml
++    config_path = Path.home() / ".hermes" / "config.yaml"
++    try:
++        config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
++    except (OSError, yaml.YAMLError):
++        return False
++    plugins = config.get("plugins") or {}
++    return "forum-download" in (plugins.get("enabled") or []) and "forum-download" not in (plugins.get("disabled") or [])
++
++
+ def send_notification_once(item):
+     message = build_single_notification(item)
+     command = [
+@@ -1063,6 +1075,9 @@
+         "--file",
+         "-",
+     ]
++    if item.get("ed2k") and forum_download_enabled():
++        command[1] = "forum-download-send"
++        command.extend(["--tid", str(item["tid"])])
+     try:
+         result = subprocess.run(
+             command,

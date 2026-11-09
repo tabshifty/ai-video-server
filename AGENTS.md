@@ -48,6 +48,7 @@
 | Root workspace | `.` | Project root and coordination point | Put cross-module rules here |
 | Android app | `android-app` | 手机端 Android 工程 | 已有模块级 AGENTS.md |
 | Android TV app | `android-tv-app` | TV 独立 Android 工程 | 已与手机端源码目录隔离 |
+| Hermes 集成 | `integrations/` | 独立 Hermes 扩展及可回滚安装补丁 | 源码在本仓库维护，Hermes 侧独立安装；见模块级 AGENTS.md |
 | Agents skill | `.codex/skills/agents-md` | AGENTS.md generation guidance | Treat as managed skill content |
 | UI/UX skill | `.codex/skills/ui-ux-pro-max` | UI/UX reference assets and scripts | Read-only unless requested |
 

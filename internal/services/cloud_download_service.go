@@ -128,6 +128,28 @@ func (s *CloudDownloadService) SetFileDeletionSummaryRepository(repo cloudFileDe
 // Submit parses a link, records the task (deduplicated by info hash) and
 // schedules it. It returns the task plus whether this call created it.
 func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID, source string) (models.CloudDownloadTask, bool, error) {
+	return s.submit(ctx, postID, rawLink, createdBy, source, true, nil)
+}
+
+// SubmitInTransaction persists the normal submission without publishing uncommitted tasks.
+// The caller commits first, then calls EnqueueCommittedTask; the reconciler repairs lost wakeups.
+func (s *CloudDownloadService) SubmitInTransaction(ctx context.Context, tx pgx.Tx, postID uuid.UUID, link string, confirmedRetry int) (models.CloudDownloadTask, bool, error) {
+	clone := *s
+	clone.repo = repository.NewCloudDownloadRepositoryWithTx(tx)
+	return clone.submit(ctx, &postID, link, nil, models.CloudDownloadSourceForumPost, false, func(task models.CloudDownloadTask) error {
+		if (task.Status == models.CloudDownloadFailed || task.Status == models.CloudDownloadBlocked) && task.RetryCount != confirmedRetry {
+			return models.ErrCloudDownloadNotRetryable
+		}
+		return nil
+	})
+}
+
+// EnqueueCommittedTask wakes a committed task without turning a transient queue error into download failure.
+func (s *CloudDownloadService) EnqueueCommittedTask(task models.CloudDownloadTask) error {
+	return s.enqueuer.EnqueueCloudDownload(task.ID, task.RetryCount)
+}
+
+func (s *CloudDownloadService) submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID, source string, enqueue bool, retryPolicy func(models.CloudDownloadTask) error) (models.CloudDownloadTask, bool, error) {
 	link, err := cloud.ParseLink(rawLink)
 	if err != nil {
 		return models.CloudDownloadTask{}, false, err
@@ -159,6 +181,11 @@ func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, ra
 		return models.CloudDownloadTask{}, false, err
 	}
 
+	if retryPolicy != nil {
+		if err := retryPolicy(task); err != nil {
+			return task, created, err
+		}
+	}
 	switch {
 	case created || task.Status == models.CloudDownloadPending:
 		// Fresh row or a pending row whose enqueue was lost; schedule it.
@@ -183,6 +210,9 @@ func (s *CloudDownloadService) Submit(ctx context.Context, postID *uuid.UUID, ra
 		return task, created, nil
 	}
 
+	if !enqueue {
+		return task, created, nil
+	}
 	if err := s.enqueuer.EnqueueCloudDownload(task.ID, task.RetryCount); err != nil {
 		// Keep the persisted row consistent with the returned error: a
 		// pending row would otherwise be picked up by the reconciler while the

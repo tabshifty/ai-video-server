@@ -21,6 +21,7 @@ import (
 	"video-server/internal/cloud"
 	"video-server/internal/config"
 	"video-server/internal/database"
+	"video-server/internal/forumdownload"
 	"video-server/internal/handlers"
 	"video-server/internal/models"
 	"video-server/internal/queue"
@@ -294,6 +295,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		},
 		passwordVaultCipher,
 	)
+	var telegramForumDownload *forumdownload.Service
 	if cfg.CloudDownloadEnabled {
 		cloudClient := cloud.NewClient(cfg.CloudBrowserCDP, cfg.CloudBrowserApp)
 		cloudRepo := repository.NewCloudDownloadRepository(pool)
@@ -314,11 +316,13 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		cloudFileDeletionRepo := repository.NewCloudDownloadFileDeletionRepository(pool)
 		cloudSvc.SetFileDeletionSummaryRepository(cloudFileDeletionRepo)
 		cloudFileDeletionSvc := services.NewCloudFileDeletionService(cloudRepo, cloudImportRepo, cloudFileDeletionRepo, cloudClient, cfg.DownloadDir, logger)
+		telegramForumDownload = forumdownload.New(pool, cloudSvc, logger)
 		api.SetCloudDownloadService(cloudSvc)
 		api.SetCloudDownloadImportService(cloudImportSvc)
 		api.SetCloudFileDeletionService(cloudFileDeletionSvc)
 		logger.Info("cloud download enabled", "cdp", cfg.CloudBrowserCDP, "download_dir", cfg.DownloadDir)
 	}
+	forumdownload.Register(r, telegramForumDownload, cfg.TelegramForumDownloadToken, cfg.TelegramForumOwnerID)
 	api.Register(r)
 
 	srv := &http.Server{

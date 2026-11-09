@@ -24,6 +24,8 @@ type Config struct {
 	PlayURLSignSecret           string
 	PasswordVaultKey            string
 	HermesAPIToken              string
+	TelegramForumDownloadToken  string
+	TelegramForumOwnerID        int64
 	StorageRoot                 string
 	PosterStoragePath           string
 	AdminWebDistPath            string
@@ -93,6 +95,7 @@ func Load() (Config, error) {
 		PlayURLSignSecret:           os.Getenv("PLAY_URL_SIGN_SECRET"),
 		PasswordVaultKey:            os.Getenv("PASSWORD_VAULT_KEY"),
 		HermesAPIToken:              strings.TrimSpace(os.Getenv("HERMES_API_TOKEN")),
+		TelegramForumDownloadToken:  strings.TrimSpace(os.Getenv("TELEGRAM_FORUM_DOWNLOAD_TOKEN")),
 		StorageRoot:                 getEnv("STORAGE_ROOT", "./storage"),
 		PosterStoragePath:           getEnv("POSTER_STORAGE_PATH", "./storage/posters"),
 		AdminWebDistPath:            getEnv("ADMIN_WEB_DIST_PATH", "admin-web/dist"),
@@ -149,6 +152,16 @@ func Load() (Config, error) {
 		ImageGenerationTimeout:      time.Duration(getIntEnv("IMAGE_GENERATION_TIMEOUT_SECONDS", 180)) * time.Second,
 	}
 
+	if cfg.TelegramForumDownloadToken != "" {
+		owner, err := strconv.ParseInt(strings.TrimSpace(os.Getenv("TELEGRAM_FORUM_OWNER_ID")), 10, 64)
+		if err != nil || owner <= 0 {
+			return Config{}, fmt.Errorf("TELEGRAM_FORUM_OWNER_ID must be a positive Telegram user ID")
+		}
+		if cfg.TelegramForumDownloadToken == cfg.HermesAPIToken {
+			return Config{}, fmt.Errorf("TELEGRAM_FORUM_DOWNLOAD_TOKEN must differ from HERMES_API_TOKEN")
+		}
+		cfg.TelegramForumOwnerID = owner
+	}
 	if cfg.PostgresDSN == "" {
 		return Config{}, fmt.Errorf("POSTGRES_DSN is required")
 	}

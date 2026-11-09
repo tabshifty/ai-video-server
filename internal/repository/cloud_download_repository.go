@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"video-server/internal/models"
@@ -12,7 +14,19 @@ import (
 
 // CloudDownloadRepository persists cloud download tasks.
 type CloudDownloadRepository struct {
-	pool *pgxpool.Pool
+	pool      cloudDownloadDB
+	lockTasks bool
+}
+
+type cloudDownloadDB interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+// NewCloudDownloadRepositoryWithTx shares task persistence with an atomic integration operation.
+func NewCloudDownloadRepositoryWithTx(tx pgx.Tx) *CloudDownloadRepository {
+	return &CloudDownloadRepository{pool: tx, lockTasks: true}
 }
 
 // NewCloudDownloadRepository builds the repository.
@@ -114,7 +128,11 @@ ON CONFLICT (info_hash) DO NOTHING`,
 
 // GetByInfoHash returns a task by its normalized info hash.
 func (r *CloudDownloadRepository) GetByInfoHash(ctx context.Context, infoHash string) (models.CloudDownloadTask, error) {
-	row := r.pool.QueryRow(ctx, cloudDownloadSelect+` WHERE t.info_hash = $1`, infoHash)
+	query := cloudDownloadSelect + ` WHERE t.info_hash = $1`
+	if r.lockTasks {
+		query += ` FOR UPDATE OF t`
+	}
+	row := r.pool.QueryRow(ctx, query, infoHash)
 	task, err := scanCloudDownload(row)
 	if err != nil {
 		return models.CloudDownloadTask{}, fmt.Errorf("get cloud download task by hash: %w", err)
