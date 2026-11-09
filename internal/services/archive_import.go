@@ -704,6 +704,9 @@ func (s *ArchiveImportService) processArchiveFile(ctx context.Context, fileID uu
 	if err != nil {
 		return models.ArchiveImportFileListItem{}, err
 	}
+	if snapshot != nil && snapshot.GroupRelations && (file.LinkedVideoID != nil || file.LinkedImageID != nil) {
+		return file, nil
+	}
 	if file.Status == "ready" || file.Status == "existing" || file.Status == "skipped" {
 		return file, nil
 	}

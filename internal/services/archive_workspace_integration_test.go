@@ -161,12 +161,15 @@ func TestArchiveWorkspacePostgresLifecycle(t *testing.T) {
 		}
 		return result
 	}
+	vc1, vc2, ic1, ic2 := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	exec(`INSERT INTO collections(id,name,normalized_name) VALUES($1,'视频一','视频一'),($2,'视频二','视频二')`, vc1, vc2)
+	exec(`INSERT INTO collections_images(id,name,normalized_name) VALUES($1,'图片一','图片一'),($2,'图片二','图片二')`, ic1, ic2)
 	batch, ids := fixture(true)
 	r, err := svc.GetArchiveWorkspace(ctx, batch)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Version != 1 || len(r.Draft.Groups) != 3 {
+	if r.Version != 1 || len(r.Draft.Groups) != 1 {
 		t.Fatalf("新工作台初始化: %+v", r)
 	}
 	if _, err = svc.AcquireLegacyWorkspaceGuard(ctx, "batch", batch); err == nil {
@@ -174,6 +177,8 @@ func TestArchiveWorkspacePostgresLifecycle(t *testing.T) {
 	}
 	title := "快照标题"
 	r.Draft.Groups[0].Config.Title = &title
+	initialTargets := []uuid.UUID{vc1}
+	r.Draft.Groups[0].Config.VideoCollectionIDs = &initialTargets
 	r, err = svc.SaveArchiveWorkspace(ctx, batch, ArchiveWorkspaceSave{Version: r.Version, Draft: r.Draft})
 	if err != nil {
 		t.Fatal(err)
@@ -198,12 +203,17 @@ func TestArchiveWorkspacePostgresLifecycle(t *testing.T) {
 	if _, err = svc.SaveArchiveWorkspace(ctx, batch, ArchiveWorkspaceSave{Version: r.Version, Draft: bad}); err == nil {
 		t.Fatal("活动文件可被排除")
 	}
-	// 同批次其他文件与父组默认值仍可保存；快照不随之变化。
+	// 执行中的分组不能修改；其他未提交文件仍可编辑内容，快照不随之变化。
 	changed := clone(r.Draft)
 	title = "后续默认标题"
 	changed.Groups[0].Config.Title = &title
+	if _, err = svc.SaveArchiveWorkspace(ctx, batch, ArchiveWorkspaceSave{Version: r.Version, Draft: changed}); err == nil {
+		t.Fatal("执行中的组仍可修改")
+	}
+	changed = clone(r.Draft)
 	f = changed.Files[ids[1].String()]
 	f.Name = "新的虚拟名称.mp4"
+	f.Config.Title = &title
 	changed.Files[ids[1].String()] = f
 	r, err = svc.SaveArchiveWorkspace(ctx, batch, ArchiveWorkspaceSave{Version: r.Version, Draft: changed})
 	if err != nil {
@@ -300,9 +310,6 @@ func TestArchiveWorkspacePostgresLifecycle(t *testing.T) {
 		t.Fatalf("恢复后批次统计未刷新: %d %v", count, err)
 	}
 	// 重复视频追加两个合集关系，并保持已有元数据和物理源。
-	vc1, vc2, ic1, ic2 := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-	exec(`INSERT INTO collections(id,name,normalized_name) VALUES($1,'视频一','视频一'),($2,'视频二','视频二')`, vc1, vc2)
-	exec(`INSERT INTO collections_images(id,name,normalized_name) VALUES($1,'图片一','图片一'),($2,'图片二','图片二')`, ic1, ic2)
 	if err = repo.AddVideoCollectionsByIDsAnyType(ctx, videoID, []uuid.UUID{vc1}); err != nil {
 		t.Fatal(err)
 	}
@@ -337,6 +344,60 @@ func TestArchiveWorkspacePostgresLifecycle(t *testing.T) {
 	}
 	if pathAfter != original || titleAfter != titleBefore {
 		t.Fatal("重复视频覆盖原内容")
+	}
+	// 成功成员换到独立组再次入库：不重复媒体，只追加关系，并真正配对合集。
+	dup, err = svc.GetArchiveWorkspace(ctx, dupBatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved := clone(dup.Draft)
+	newGroup := uuid.NewString()
+	allVC := []uuid.UUID{vc1, vc2}
+	allIC := []uuid.UUID{ic1, ic2}
+	newTitle := "不能覆盖正式标题"
+	moved.Groups = append(moved.Groups, ArchiveWorkspaceGroup{ID: newGroup, Name: "再次关联", Config: ArchiveWorkspaceConfig{Title: &newTitle, VideoCollectionIDs: &allVC, ImageCollectionIDs: &allIC}})
+	node := moved.Files[dupIDs[0].String()]
+	node.GroupID = newGroup
+	moved.Files[dupIDs[0].String()] = node
+	dup, err = svc.SaveArchiveWorkspace(ctx, dupBatch, ArchiveWorkspaceSave{Version: dup.Version, Draft: moved})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.SubmitArchiveWorkspace(ctx, dupBatch, ArchiveWorkspaceSubmit{Version: dup.Version, FileIDs: dupIDs[:1]}); err != nil {
+		t.Fatal(err)
+	}
+	if err = svc.ProcessArchiveWorkspace(ctx, dupBatch); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM video_collection_image_collections WHERE video_collection_id IN ($1,$2) AND image_collection_id IN ($3,$4)`, vc1, vc2, ic1, ic2).Scan(&count); err != nil || count != 4 {
+		t.Fatalf("未建立全部合集配对: %d %v", count, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT title FROM videos WHERE id=$1`, videoID).Scan(&titleAfter); err != nil || titleAfter != titleBefore {
+		t.Fatal("补关系改写了正式标题")
+	}
+	var jobCount int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM archive_import_workspace_jobs WHERE file_id=$1`, dupIDs[0]).Scan(&jobCount); err != nil {
+		t.Fatal(err)
+	}
+	dup, err = svc.GetArchiveWorkspace(ctx, dupBatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.SubmitArchiveWorkspace(ctx, dupBatch, ArchiveWorkspaceSubmit{Version: dup.Version, FileIDs: dupIDs[:1]}); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM archive_import_workspace_jobs WHERE file_id=$1`, dupIDs[0]).Scan(&count); err != nil || count != jobCount {
+		t.Fatal("完成关系重复提交产生多余任务")
+	}
+	// 删除含成功成员的批次：草稿和分组消失，正式关联继续存在。
+	if err = svc.DeleteBatch(ctx, dupBatch); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM archive_import_workspaces WHERE batch_id=$1`, dupBatch).Scan(&count); err != nil || count != 0 {
+		t.Fatal("批次删除遗留分组草稿")
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM video_collection_image_collections WHERE video_collection_id IN ($1,$2)`, vc1, vc2).Scan(&count); err != nil || count != 4 {
+		t.Fatal("删除批次撤销正式关联")
 	}
 	// 图片加入全部图片合集，重复入库追加关系并保留旧标题；不生成逐图片视频关联。
 	gifBytes, err := base64.StdEncoding.DecodeString("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
@@ -376,9 +437,16 @@ func TestArchiveWorkspacePostgresLifecycle(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT title FROM images WHERE id=$1`, imageID).Scan(&titleAfter); err != nil || titleAfter != "原图" {
 		t.Fatalf("图片默认标题: %s %v", titleAfter, err)
 	}
-	// 同批次第二个源条目复用同图，已入库文件仍不能排除/换组。
+	// 同批次第二个源条目复用同图，已入库文件仍不能排除，但可以换组。
 	exec(`UPDATE archive_import_files SET media_kind='image',relative_path='另一张.gif',file_path=$2,file_size=$3 WHERE id=$1`, imageIDs[1], imagePath, len(gifBytes))
 	imageDraft, err = svc.GetArchiveWorkspace(ctx, imageBatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := imageDraft.Draft.Files[imageIDs[1].String()]
+	second.GroupID = imageDraft.Draft.Files[imageIDs[0].String()].GroupID
+	imageDraft.Draft.Files[imageIDs[1].String()] = second
+	imageDraft, err = svc.SaveArchiveWorkspace(ctx, imageBatch, ArchiveWorkspaceSave{Version: imageDraft.Version, Draft: imageDraft.Draft})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,6 +495,52 @@ func TestArchiveWorkspacePostgresLifecycle(t *testing.T) {
 	var retryStatus string
 	if err = pool.QueryRow(ctx, `SELECT status FROM archive_import_batches WHERE id=$1`, retryBatch).Scan(&retryStatus); err != nil || retryStatus != "failed" {
 		t.Fatalf("清理失败后状态: %s %v", retryStatus, err)
+	}
+	// 已保存的旧草稿只在活动任务结束后转换，保留原未分组有效值。
+	legacyBatch, legacyIDs := fixture(true)
+	legacyTitle, legacyDescription := "兼容标题", "兼容说明"
+	legacyVC := []uuid.UUID{vc1}
+	legacyDraft := ArchiveWorkspaceDraft{Directories: []ArchiveWorkspaceDirectory{}, Groups: []ArchiveWorkspaceGroup{{ID: archiveWorkspaceMain, Name: "原主组", Config: ArchiveWorkspaceConfig{Title: &legacyTitle, Description: &legacyDescription, VideoCollectionIDs: &legacyVC}}}, Files: map[string]ArchiveWorkspaceFile{}}
+	for _, id := range legacyIDs {
+		legacyDraft.Files[id.String()] = ArchiveWorkspaceFile{Name: id.String() + ".mp4"}
+	}
+	legacyRaw, e := json.Marshal(legacyDraft)
+	if e != nil {
+		t.Fatal(e)
+	}
+	exec(`INSERT INTO archive_import_workspaces(batch_id,draft) VALUES($1,$2)`, legacyBatch, legacyRaw)
+	legacySnapshot, e := json.Marshal(ArchiveWorkspaceValues{Title: legacyTitle})
+	if e != nil {
+		t.Fatal(e)
+	}
+	exec(`INSERT INTO archive_import_workspace_jobs(batch_id,file_id,snapshot) VALUES($1,$2,$3)`, legacyBatch, legacyIDs[0], legacySnapshot)
+	legacyResult, e := svc.GetArchiveWorkspace(ctx, legacyBatch)
+	if e != nil || legacyResult.Draft.LayoutVersion != 0 || legacyResult.Version != 1 {
+		t.Fatalf("活动任务期间提前转换: %+v %v", legacyResult, e)
+	}
+	exec(`UPDATE archive_import_workspace_jobs SET state='completed' WHERE batch_id=$1`, legacyBatch)
+	legacyResult, e = svc.GetArchiveWorkspace(ctx, legacyBatch)
+	if e != nil || legacyResult.Draft.LayoutVersion != 2 || legacyResult.Version != 2 {
+		t.Fatalf("任务结束未转换: %+v %v", legacyResult, e)
+	}
+	legacyValues, e := resolveWorkspaceFile(legacyResult.Draft, legacyIDs[1].String(), "video")
+	if e != nil || legacyValues.Title != legacyTitle || legacyValues.Description != legacyDescription || !workspaceSameIDs(legacyValues.VideoCollectionIDs, legacyVC) {
+		t.Fatalf("旧未分组丢配置: %+v %v", legacyValues, e)
+	}
+	// 混合组只提交视频也不能绕过图片合集要求。
+	mixedBatch, mixedIDs := fixture(true)
+	exec(`UPDATE archive_import_files SET media_kind='image' WHERE id=$1`, mixedIDs[1])
+	mixed, e := svc.GetArchiveWorkspace(ctx, mixedBatch)
+	if e != nil {
+		t.Fatal(e)
+	}
+	mixed.Draft.Groups[0].Config.VideoCollectionIDs = &legacyVC
+	mixed, e = svc.SaveArchiveWorkspace(ctx, mixedBatch, ArchiveWorkspaceSave{Version: mixed.Version, Draft: mixed.Draft})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = svc.SubmitArchiveWorkspace(ctx, mixedBatch, ArchiveWorkspaceSubmit{Version: mixed.Version, FileIDs: mixedIDs[:1]}); e == nil {
+		t.Fatal("混合组缺少图片合集仍可提交视频")
 	}
 	// 旧批次路径式组名、图片自定义标题在首次保存和后续继承时保留。
 	oldBatch, oldIDs := fixture(false)

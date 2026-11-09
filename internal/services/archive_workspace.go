@@ -123,6 +123,27 @@ func (s *ArchiveImportService) GetArchiveWorkspace(ctx context.Context, id uuid.
 	} else if err != nil {
 		return ArchiveWorkspaceResponse{}, err
 	}
+	if draft.LayoutVersion < 2 {
+		active, e := workspaceActiveJobs(ctx, tx, id)
+		if e != nil {
+			return ArchiveWorkspaceResponse{}, e
+		}
+		if len(active) == 0 {
+			files, e := s.ListFiles(ctx, id)
+			if e != nil {
+				return ArchiveWorkspaceResponse{}, e
+			}
+			draft = flattenWorkspace(draft, files)
+			raw, e := json.Marshal(draft)
+			if e != nil {
+				return ArchiveWorkspaceResponse{}, e
+			}
+			if _, e = tx.Exec(ctx, `UPDATE archive_import_workspaces SET draft=$2,version=version+1,updated_at=NOW() WHERE batch_id=$1`, id, raw); e != nil {
+				return ArchiveWorkspaceResponse{}, e
+			}
+			version++
+		}
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return ArchiveWorkspaceResponse{}, err
 	}
@@ -212,6 +233,9 @@ func (s *ArchiveImportService) SaveArchiveWorkspace(ctx context.Context, id uuid
 	if err != nil {
 		return ArchiveWorkspaceResponse{}, err
 	}
+	if old.LayoutVersion < 2 {
+		return ArchiveWorkspaceResponse{}, fmt.Errorf("旧批次正在处理，请等待任务结束后刷新转换")
+	}
 	if version != in.Version {
 		return ArchiveWorkspaceResponse{}, ErrArchiveWorkspaceConflict
 	}
@@ -294,6 +318,9 @@ func (s *ArchiveImportService) SubmitArchiveWorkspace(ctx context.Context, id uu
 	if err != nil {
 		return ArchiveWorkspaceResponse{}, err
 	}
+	if draft.LayoutVersion < 2 {
+		return ArchiveWorkspaceResponse{}, fmt.Errorf("请等待旧任务结束后刷新工作区")
+	}
 	if in.Version != version {
 		return ArchiveWorkspaceResponse{}, ErrArchiveWorkspaceConflict
 	}
@@ -319,6 +346,23 @@ func (s *ArchiveImportService) SubmitArchiveWorkspace(ctx context.Context, id uu
 	if err = s.validateWorkspaceCollections(ctx, draft); err != nil {
 		return ArchiveWorkspaceResponse{}, err
 	}
+	selectedGroups := map[string]bool{}
+	for _, fid := range ids {
+		selectedGroups[draft.Files[fid.String()].GroupID] = true
+	}
+	for _, member := range files {
+		node := draft.Files[member.ID.String()]
+		if !workspaceMedia(member) || node.Excluded || !selectedGroups[node.GroupID] || node.GroupID == "" {
+			continue
+		}
+		v, e := resolveWorkspaceFile(draft, member.ID.String(), member.MediaKind)
+		if e != nil {
+			return ArchiveWorkspaceResponse{}, e
+		}
+		if e = validateWorkspaceImportTarget(draft, member, v); e != nil {
+			return ArchiveWorkspaceResponse{}, e
+		}
+	}
 	for _, fileID := range ids {
 		f, ok := byID[fileID]
 		if !ok {
@@ -328,14 +372,39 @@ func (s *ArchiveImportService) SubmitArchiveWorkspace(ctx context.Context, id uu
 		if !ok || !workspaceMedia(f) {
 			return ArchiveWorkspaceResponse{}, fmt.Errorf("选择包含不支持入库的文件")
 		}
-		if node.Excluded || workspaceSuccess(f) || active[fileID.String()] {
+		if node.Excluded || active[fileID.String()] || f.Status == "processing" {
 			continue
+		}
+		for fid := range active {
+			if draft.Files[fid].GroupID == node.GroupID && node.GroupID != "" {
+				return ArchiveWorkspaceResponse{}, fmt.Errorf("分组正在入库，请等待结束后重试")
+			}
 		}
 		v, e := resolveWorkspaceFile(draft, fileID.String(), f.MediaKind)
 		if e != nil {
 			return ArchiveWorkspaceResponse{}, e
 		}
-		if v.Title == "" {
+		if err = validateWorkspaceImportTarget(draft, f, v); err != nil {
+			return ArchiveWorkspaceResponse{}, err
+		}
+		if workspaceSuccess(f) {
+			var rawCompleted []byte
+			var lastState string
+			e = tx.QueryRow(ctx, `SELECT snapshot,state FROM archive_import_workspace_jobs WHERE file_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1`, fileID).Scan(&rawCompleted, &lastState)
+			if e != nil && !errors.Is(e, pgx.ErrNoRows) {
+				return ArchiveWorkspaceResponse{}, e
+			}
+			if e == nil {
+				var completed ArchiveWorkspaceValues
+				if e = json.Unmarshal(rawCompleted, &completed); e != nil {
+					return ArchiveWorkspaceResponse{}, e
+				}
+				if lastState == "completed" && workspaceRelationsApplied(completed, v) {
+					continue
+				}
+			}
+		}
+		if v.Title == "" && !workspaceSuccess(f) {
 			return ArchiveWorkspaceResponse{}, fmt.Errorf("%s 的入库标题为空，请补填或切换标题模式", node.Name)
 		}
 		raw, e := json.Marshal(v)
@@ -420,6 +489,19 @@ func (s *ArchiveImportService) ProcessArchiveWorkspace(ctx context.Context, id u
 			return err
 		}
 		_, workErr := s.processArchiveFile(ctx, job.FileID, &job.Snapshot)
+		if workErr == nil && job.Snapshot.GroupRelations {
+			file, e := s.getArchiveFile(ctx, job.FileID)
+			if e != nil {
+				workErr = e
+			} else if s.repo == nil {
+				workErr = fmt.Errorf("媒体关系服务不可用")
+			} else {
+				workErr = s.repo.ApplyArchiveGroupRelations(ctx, file.LinkedVideoID, file.LinkedImageID, job.Snapshot.VideoCollectionIDs, job.Snapshot.ImageCollectionIDs)
+				if workErr == nil && file.Status == "failed" {
+					_, workErr = s.db.Exec(ctx, `UPDATE archive_import_files SET status='existing',reason='',updated_at=NOW() WHERE id=$1`, job.FileID)
+				}
+			}
+		}
 		if workErr == nil {
 			workErr = s.finishWorkspaceVideo(ctx, job.FileID)
 		}
@@ -433,9 +515,16 @@ func (s *ArchiveImportService) ProcessArchiveWorkspace(ctx context.Context, id u
 				return ctx.Err()
 			}
 			state = "failed"
-			if e := s.updateArchiveFileFailure(ctx, job.FileID, workErr.Error()); e != nil {
+			file, e := s.getArchiveFile(ctx, job.FileID)
+			if e != nil {
 				_ = tx.Rollback(ctx)
 				return e
+			}
+			if file.LinkedVideoID == nil && file.LinkedImageID == nil {
+				if e := s.updateArchiveFileFailure(ctx, job.FileID, workErr.Error()); e != nil {
+					_ = tx.Rollback(ctx)
+					return e
+				}
 			}
 			message = sanitizeArchiveText(workErr.Error())
 		}

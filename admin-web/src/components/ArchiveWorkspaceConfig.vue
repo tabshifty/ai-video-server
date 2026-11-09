@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 const model = defineModel<Record<string, any>>({ required: true })
-const props = defineProps<{ root?: boolean; image?: boolean; disabled?: boolean; videoOptions: any[]; imageOptions: any[]; tagOptions: string[] }>()
+const props = defineProps<{ root?: boolean; contentOnly?: boolean; image?: boolean; disabled?: boolean; videoOptions: any[]; imageOptions: any[]; tagOptions: string[] }>()
 const emit = defineEmits(['search-video', 'search-image', 'search-tags', 'create'])
 const fields = computed(() => [
   { key: 'title_mode', label: '标题模式', empty: 'uniform', kind: 'mode' },
   { key: 'title', label: '统一标题', empty: '', kind: 'text' },
   { key: 'description', label: '说明', empty: '', kind: 'description' },
-  ...(!props.image ? [{ key: 'tags', label: '标签', empty: [], kind: 'tags' }, { key: 'video_type', label: '视频类型', empty: 'short', kind: 'type' }, { key: 'video_collection_ids', label: '视频合集', empty: [], kind: 'video' }] : []),
-  { key: 'image_collection_ids', label: props.image ? '所属图片合集' : '关联图片合集', empty: [], kind: 'image' }
+  ...(!props.image ? [{ key: 'tags', label: '标签', empty: [], kind: 'tags' }, { key: 'video_type', label: '视频类型', empty: 'short', kind: 'type' }, ...(!props.contentOnly ? [{ key: 'video_collection_ids', label: '视频合集', empty: [], kind: 'video' }] : [])] : []),
+  ...(!props.contentOnly ? [{ key: 'image_collection_ids', label: '图片合集', empty: [], kind: 'image' }] : [])
 ])
 function toggle(field: any, override: boolean) {
   const next = { ...model.value }
@@ -30,7 +30,7 @@ function options(kind: string, key: string) {
         <span>{{ field.label }}</span>
         <el-checkbox v-if="!root" :model-value="model[field.key] !== undefined" :disabled="disabled" @change="toggle(field, Boolean($event))">单独设置</el-checkbox>
       </div>
-      <small v-if="model[field.key] === undefined">继承上级配置</small>
+      <small v-if="model[field.key] === undefined">采用所属分组配置</small>
       <template v-else>
         <el-select v-if="field.kind === 'mode'" v-model="model[field.key]" :disabled="disabled" aria-label="标题模式">
           <el-option label="统一标题" value="uniform" /><el-option label="按文件名" value="filename" />
@@ -42,7 +42,7 @@ function options(kind: string, key: string) {
           <el-option v-for="tag in [...new Set([...tagOptions, ...(model[field.key] || [])])]" :key="tag" :label="tag" :value="tag" />
         </el-select>
         <template v-else-if="field.kind === 'video' || field.kind === 'image'">
-          <el-select v-model="model[field.key]" multiple filterable remote clearable :remote-method="(q: string) => emit(field.kind === 'video' ? 'search-video' : 'search-image', q)" :disabled="disabled" :aria-label="field.label" placeholder="可不选，可多选">
+          <el-select v-model="model[field.key]" multiple filterable remote clearable :remote-method="(q: string) => emit(field.kind === 'video' ? 'search-video' : 'search-image', q)" :disabled="disabled" :aria-label="field.label" placeholder="选择目标合集，可多选">
             <el-option v-for="o in options(field.kind, field.key)" :key="o.id" :label="o.name" :value="o.id" />
           </el-select>
           <el-button text type="primary" :disabled="disabled" @click="emit('create', field.kind)">新建{{ field.kind === 'video' ? '视频' : '图片' }}合集</el-button>

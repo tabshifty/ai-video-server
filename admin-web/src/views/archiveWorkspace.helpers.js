@@ -52,7 +52,16 @@ export function importableWorkspaceFiles(data, ids) {
   const byID = new Map((data.files || []).map((f) => [f.id, f]))
   return [...new Set(ids)].filter((id) => {
     const f = byID.get(id), node = data.draft.files[id]
-    return f && node && !node.excluded && ['video', 'image'].includes(f.media_kind) && ['pending', 'failed'].includes(f.status) && !active.has(id)
+    if (!f || !node || node.excluded || !['video', 'image'].includes(f.media_kind) || active.has(id)) return false
+    if (data.draft.layout_version >= 2) {
+      if (!node.group_id || !data.draft.groups.some((g) => g.id === node.group_id)) return false
+      if ((data.jobs || []).some((j) => ['queued', 'running'].includes(j.state) && (j.snapshot?.group_id || data.draft.files[j.file_id]?.group_id) === node.group_id)) return false
+      if (['pending', 'failed'].includes(f.status)) return true
+      const job = (data.jobs || []).find((j) => j.file_id === id)
+      if (job?.state === 'failed') return true
+      return ['ready', 'existing'].includes(f.status) && !workspaceRelationsApplied(job?.state === 'completed' ? job.snapshot : null, resolveWorkspaceValues(data.draft, id, f.media_kind))
+    }
+    return ['pending', 'failed'].includes(f.status)
   })
 }
 
@@ -62,7 +71,7 @@ export function summarizeWorkspaceImport(data, ids) {
   const byID = new Map(data.files.map((f) => [f.id, f]))
   for (const id of selected) {
     const f = byID.get(id), values = data.effective[id] || {}
-    if (!String(values.title || '').trim()) summary.emptyTitles.push(data.draft.files[id].name)
+    if (!['ready', 'existing'].includes(f.status) && !String(values.title || '').trim()) summary.emptyTitles.push(data.draft.files[id].name)
     if (f.media_kind === 'video') {
       summary.videos++
       if (!values.video_collection_ids?.length) summary.missingVideoCollections++
@@ -72,18 +81,30 @@ export function summarizeWorkspaceImport(data, ids) {
       if (!values.image_collection_ids?.length) summary.missingImageCollections++
     }
   }
+  if (data.draft.layout_version >= 2) {
+    const groups = new Set(selected.map((id) => data.draft.files[id].group_id))
+    for (const f of data.files) {
+      const node = data.draft.files[f.id]
+      if (!node || node.excluded || !groups.has(node.group_id)) continue
+      const values = resolveWorkspaceValues(data.draft, f.id, f.media_kind)
+      if (f.media_kind === 'video' && !values.video_collection_ids.length) summary.missingVideoCollections = Math.max(1, summary.missingVideoCollections)
+      if (f.media_kind === 'image' && !values.image_collection_ids.length) summary.missingImageCollections = Math.max(1, summary.missingImageCollections)
+    }
+  }
   return summary
 }
 
 export function resolveWorkspaceValues(draft, fileID, kind) {
   const file = draft.files[fileID], byID = new Map(draft.groups.map((g) => [g.id, g]))
   const chain = [], seen = new Set()
-  let id = file?.group_id || MAIN_GROUP
+  let id = file?.group_id || (draft.layout_version >= 2 ? '' : MAIN_GROUP)
   while (id && byID.has(id) && !seen.has(id)) { seen.add(id); const group = byID.get(id); chain.unshift(group); id = group.parent_id }
   let values = { title_mode: 'uniform', title: '', description: '', tags: [], video_type: 'short', video_collection_ids: [], image_collection_ids: [] }
   for (const group of chain) Object.assign(values, group.config)
   if (kind === 'image') values.title_mode = 'filename'
-  Object.assign(values, file?.config)
+  const config = { ...file?.config }
+  if (draft.layout_version >= 2) { delete config.video_collection_ids; delete config.image_collection_ids }
+  Object.assign(values, config)
   if (file?.config?.title !== undefined && file?.config?.title_mode === undefined) values.title_mode = 'uniform'
   if (values.title_mode === 'filename') values.title = fileTitle(file?.name)
   values.title = String(values.title || '').trim()
@@ -100,4 +121,20 @@ export function newWorkspaceID(cryptoProvider = globalThis.crypto) {
   bytes[8] = (bytes[8] & 63) | 128
   const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+
+export function workspaceRelationsApplied(have, want) {
+  return !!have?.group_relations && ['video_collection_ids', 'image_collection_ids'].every((key) => (want[key] || []).every((id) => (have[key] || []).includes(id)))
+}
+
+export function workspaceGroupStatus(data, groupID) {
+  const ids = Object.keys(data.draft.files).filter((id) => data.draft.files[id].group_id === groupID && !data.draft.files[id].excluded && ['video', 'image'].includes(data.files.find((f) => f.id === id)?.media_kind))
+  if ((data.jobs || []).some((j) => ['queued', 'running'].includes(j.state) && (j.snapshot?.group_id || data.draft.files[j.file_id]?.group_id) === groupID)) return '处理中'
+  if (!ids.length) return '空分组'
+  const relevant = (data.jobs || []).filter((j) => ids.includes(j.file_id))
+  if (relevant.some((j) => j.state === 'failed')) return '有失败'
+  const pending = importableWorkspaceFiles(data, ids)
+  if (!pending.length) return '已完成'
+  return pending.some((id) => ['ready', 'existing'].includes(data.files.find((f) => f.id === id)?.status)) ? '待补充关联' : '待入库'
 }

@@ -2,19 +2,21 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Back, Refresh, Folder, Document, Plus, Delete, UploadFilled } from '@element-plus/icons-vue'
+import { Back, Refresh, Folder, Document, Plus, Delete, UploadFilled, MoreFilled } from '@element-plus/icons-vue'
 import ArchiveWorkspaceConfig from '../components/ArchiveWorkspaceConfig.vue'
 import { getAdminArchiveImportBatchDetail, getAdminArchiveWorkspace, saveAdminArchiveWorkspace, submitAdminArchiveWorkspace, generateAdminArchiveWorkspaceGroups, retryAdminArchiveImportExtract, getAdminCollections, getAdminImageCollections, createAdminCollection, createAdminImageCollection, getAdminVideoTags, getAdminPopularVideoTags } from '../api/admin'
-import { cloneWorkspace, descendantIDs, workspaceTree, directoryBreadcrumbs, selectedWorkspaceFiles, summarizeWorkspaceImport, resolveWorkspaceValues, fileTitle, newWorkspaceID, MAIN_GROUP } from './archiveWorkspace.helpers'
+import { cloneWorkspace, descendantIDs, workspaceTree, directoryBreadcrumbs, selectedWorkspaceFiles, summarizeWorkspaceImport, resolveWorkspaceValues, fileTitle, newWorkspaceID, workspaceGroupStatus } from './archiveWorkspace.helpers'
 
 const route = useRoute(), router = useRouter(), batchID = String(route.params.id)
 const data = ref<any>(null), draft = ref<any>(null), batch = ref<any>(null)
 const loading = ref(true), errorText = ref(''), dirty = ref(false), saving = ref(false), conflict = ref(false), saveError = ref('')
-const currentDirectory = ref(''), currentGroup = ref(MAIN_GROUP), selected = ref<any[]>([]), editor = ref<'group' | 'file' | 'batch'>('group'), fileID = ref('')
+const currentDirectory = ref(''), currentGroup = ref(''), selected = ref<any[]>([]), editor = ref<'group' | 'file' | 'batch'>('group'), fileID = ref('')
 const directoryTreeVisible = ref(false)
+const groupView = ref<'desktop' | 'members' | 'edit'>('desktop'), memberSelection = ref<string[]>([])
+const groupMenu = reactive({ open: false, id: '', x: 0, y: 0 })
 const operation = ref(''), busy = computed(() => !!operation.value), fileTable = ref<any>(null)
 const bulkConfig = ref<Record<string, any>>({})
-const search = ref(''), cut = ref<{ ids: string[]; dirs: string[] } | null>(null), targetGroup = ref(MAIN_GROUP)
+const search = ref(''), cut = ref<{ ids: string[]; dirs: string[] } | null>(null), targetGroup = ref('')
 const newDirectory = reactive({ open: false, name: '' }), newGroup = reactive({ open: false, name: '' })
 const collection = reactive({ open: false, kind: 'video', name: '', description: '', target: '' as string, targetKind: 'group' as 'group' | 'file' | 'batch' })
 const retry = reactive({ password: '', encoding_mode: 'auto' }), retrying = ref(false)
@@ -28,12 +30,12 @@ const sources = computed(() => new Map((data.value?.files || []).map((f: any) =>
 const group = computed(() => draft.value?.groups.find((g: any) => g.id === currentGroup.value))
 const editedFile = computed(() => draft.value?.files[fileID.value])
 const fileLocked = (id: string) => activeIDs.value.has(id) || ['ready', 'existing', 'processing'].includes((sources.value.get(id) as any)?.status)
-const groupLocked = (id: string) => {
-  const descendants = descendantIDs(draft.value?.groups || [], id)
-  return Object.entries(draft.value?.files || {}).some(([fid, f]: any) => descendants.has(f.group_id) && fileLocked(fid))
-}
+const groupLocked = (id: string) => !!id && ((data.value?.jobs || []).some((j: any) => ['queued', 'running'].includes(j.state) && (j.snapshot?.group_id || draft.value?.files[j.file_id]?.group_id) === id) || Object.entries(draft.value?.files || {}).some(([fid, f]: any) => f.group_id === id && activeIDs.value.has(fid)))
+const fileMoveLocked = (id: string) => activeIDs.value.has(id) || (sources.value.get(id) as any)?.status === 'processing' || groupLocked(draft.value?.files[id]?.group_id)
+const workspaceData = computed(() => ({ ...data.value, draft: draft.value, effective: effective.value }))
+const groupStatus = (id: string) => draft.value ? workspaceGroupStatus(workspaceData.value, id) : ''
+const ungroupedCount = computed(() => Object.values(draft.value?.files || {}).filter((f: any) => !f.group_id).length)
 const directoryTree = computed(() => workspaceTree(draft.value?.directories || [], '', '根目录'))
-const groupTree = computed(() => [...workspaceTree(draft.value?.groups || [], MAIN_GROUP), { id: '', label: '未分组', children: [] }])
 const rows = computed(() => {
   if (!draft.value) return []
   const dirs = draft.value.directories.filter((d: any) => !search.value && d.parent_id === currentDirectory.value).map((d: any) => ({ ...d, rowID: `dir:${d.id}`, isDirectory: true }))
@@ -42,14 +44,13 @@ const rows = computed(() => {
 })
 const memberIDs = computed(() => {
   if (!draft.value) return []
-  const descendants = descendantIDs(draft.value.groups, currentGroup.value)
-  return Object.keys(draft.value.files).filter((id) => currentGroup.value === '' ? !draft.value.files[id].group_id : descendants.has(draft.value.files[id].group_id))
+  return Object.keys(draft.value.files).filter((id) => draft.value.files[id].group_id === currentGroup.value)
 })
 const selectedIDs = computed(() => draft.value ? selectedWorkspaceFiles(draft.value, data.value.files, selected.value.filter((r: any) => !r.isDirectory).map((r: any) => r.id), selected.value.filter((r: any) => r.isDirectory).map((r: any) => r.id)) : [])
 const editorConfig = computed({ get: () => editor.value === 'batch' ? bulkConfig.value : editor.value === 'file' ? editedFile.value?.config || {} : group.value?.config || {}, set: (value) => { if (editor.value === 'batch') bulkConfig.value = value; else if (editor.value === 'file' && editedFile.value) editedFile.value.config = value; else if (group.value) group.value.config = value } })
 const effective = computed(() => {
   const result: any = {}
-  if (draft.value) for (const f of data.value.files) if (draft.value.files[f.id]) result[f.id] = fileLocked(f.id) && data.value.effective[f.id] ? data.value.effective[f.id] : resolveWorkspaceValues(draft.value, f.id, f.media_kind)
+  if (draft.value) for (const f of data.value.files) if (draft.value.files[f.id]) result[f.id] = resolveWorkspaceValues(draft.value, f.id, f.media_kind)
   return result
 })
 const directoryPath = computed(() => directoryBreadcrumbs(draft.value?.directories || [], currentDirectory.value))
@@ -63,9 +64,9 @@ function applyResponse(result: any, replaceDraft = true) {
 }
 function clearWorkspace() {
   muted = true; draft.value = null; muted = false
-  data.value = null; selected.value = []; currentDirectory.value = ''; currentGroup.value = MAIN_GROUP; editor.value = 'group'; fileID.value = ''
-  contextMenu.directory = ''; contextMenu.open = false; cut.value = null; targetGroup.value = MAIN_GROUP
-  newDirectory.open = false; newGroup.open = false; collection.open = false; bulkConfig.value = {}
+  data.value = null; selected.value = []; currentDirectory.value = ''; currentGroup.value = ''; editor.value = 'group'; fileID.value = ''
+  contextMenu.directory = ''; contextMenu.open = false; cut.value = null; targetGroup.value = ''
+  groupView.value = 'desktop'; groupMenu.open = false; memberSelection.value = []; newDirectory.open = false; newGroup.open = false; collection.open = false; bulkConfig.value = {}
 }
 async function load(initial = false) {
   if (busy.value || (!initial && (saving.value || dirty.value || conflict.value))) return
@@ -126,8 +127,12 @@ async function reloadDraft() {
   } catch (e: any) { ElMessage.error(e.message || '重新加载失败，当前草稿已保留') }
   finally { operation.value = '' }
 }
-function chooseGroup(node: any) { currentGroup.value = node.id; editor.value = 'group' }
-function chooseFile(row: any) { if (row.isDirectory) { currentDirectory.value = row.id; search.value = ''; return } fileID.value = row.id; editor.value = 'file' }
+function chooseGroup(node: any) { currentGroup.value = node.id; editor.value = 'group'; groupView.value = 'members'; memberSelection.value = []; collection.open = false }
+function editGroup(id: string) { chooseGroup({ id }); groupView.value = 'edit' }
+function showGroupMenu(event: MouseEvent, id: string) { event.preventDefault(); event.stopPropagation(); groupMenu.id = id; groupMenu.x = Math.max(0, Math.min(event.clientX, window.innerWidth - 210)); groupMenu.y = Math.max(0, Math.min(event.clientY, window.innerHeight - 150)); groupMenu.open = true }
+function toggleMember(id: string, checked: boolean) { memberSelection.value = checked ? [...new Set([...memberSelection.value, id])] : memberSelection.value.filter((f) => f !== id) }
+
+function chooseFile(row: any) { if (row.isDirectory) { currentDirectory.value = row.id; search.value = ''; return } fileID.value = row.id; editor.value = 'file'; collection.open = false }
 function showContext(event: MouseEvent, row?: any) {
   event.preventDefault(); event.stopPropagation(); contextMenu.open = true; contextMenu.x = Math.min(event.clientX, window.innerWidth - 210); contextMenu.y = Math.min(event.clientY, window.innerHeight - 250)
   contextMenu.directory = row?.isDirectory ? row.id : ''
@@ -139,8 +144,10 @@ function setExcluded(excluded: boolean) {
   contextMenu.open = false
 }
 function assignToGroup(id = targetGroup.value, ids = selectedIDs.value) {
+  if (id && !draft.value.groups.some((g: any) => g.id === id)) { targetGroup.value = ''; ElMessage.warning('目标分组已不存在，请重新选择'); return }
+  if (id && groupLocked(id)) { ElMessage.warning('目标分组正在入库，暂不能加入'); return }
   let changed = 0
-  for (const fid of ids) if (!fileLocked(fid) && ['video', 'image'].includes((sources.value.get(fid) as any)?.media_kind)) { draft.value.files[fid].group_id = id; changed++ }
+  for (const fid of ids) if (!fileMoveLocked(fid) && ['video', 'image'].includes((sources.value.get(fid) as any)?.media_kind)) { draft.value.files[fid].group_id = id; changed++ }
   if (!changed) ElMessage.info('没有可调整归属的文件')
   contextMenu.open = false
 }
@@ -186,13 +193,20 @@ function addDirectory() {
   if (draft.value.directories.some((d: any) => d.parent_id === currentDirectory.value && d.name.toLowerCase() === name.toLowerCase()) || Object.values(draft.value.files).some((f: any) => f.directory_id === currentDirectory.value && f.name.toLowerCase() === name.toLowerCase())) { ElMessage.warning('同目录已有此名称'); return }
   draft.value.directories.push({ id: newWorkspaceID(), parent_id: currentDirectory.value, name }); newDirectory.open = false; newDirectory.name = ''
 }
-function addGroup() { const name = newGroup.name.trim(); if (!name) return; const parent = currentGroup.value || MAIN_GROUP; if (draft.value.groups.some((g: any) => g.parent_id === parent && g.name.toLowerCase() === name.toLowerCase())) { ElMessage.warning('同级分组不能重名'); return }; const id = newWorkspaceID(); draft.value.groups.push({ id, parent_id: parent, name, config: {} }); currentGroup.value = id; editor.value = 'group'; newGroup.open = false; newGroup.name = '' }
-async function deleteGroup() {
-  if (currentGroup.value === MAIN_GROUP || !currentGroup.value || groupLocked(currentGroup.value)) return
-  try { await ElMessageBox.confirm('将删除本组及全部子组，成员回到未分组并保留单文件覆盖，源文件不变。', '删除分组', { type: 'warning' }) } catch { return }
-  const ids = descendantIDs(draft.value.groups, currentGroup.value)
-  for (const file of Object.values(draft.value.files) as any[]) if (ids.has(file.group_id)) file.group_id = ''
-  draft.value.groups = draft.value.groups.filter((g: any) => !ids.has(g.id)); currentGroup.value = MAIN_GROUP
+function addGroup() {
+  const name = newGroup.name.trim(); if (!name) return
+  if (draft.value.groups.some((g: any) => g.name.toLowerCase() === name.toLowerCase())) { ElMessage.warning('分组不能重名'); return }
+  const id = newWorkspaceID(); draft.value.groups.push({ id, parent_id: '', name, config: cloneWorkspace(draft.value.template) })
+  newGroup.open = false; newGroup.name = ''; editGroup(id)
+}
+async function deleteGroup(id = currentGroup.value) {
+  if (!id || groupLocked(id)) return
+  try { await ElMessageBox.confirm('删除分组后成员回到未分组。源文件、已入库媒体、合集及历史关联保留。', '删除分组', { type: 'warning' }) } catch { return }
+  if (groupLocked(id)) return
+  for (const file of Object.values(draft.value.files) as any[]) if (file.group_id === id) file.group_id = ''
+  draft.value.groups = draft.value.groups.filter((g: any) => g.id !== id)
+  if (targetGroup.value === id) targetGroup.value = ''
+  if (currentGroup.value === id) { currentGroup.value = ''; groupView.value = 'desktop'; editor.value = 'group' }
 }
 async function generateGroups() {
   if (busy.value || saving.value) return
@@ -234,8 +248,11 @@ async function submit(ids: string[]) {
     const confirmedVersion = data.value.version
     const summary = summarizeWorkspaceImport({ ...data.value, draft: draft.value, effective: effective.value }, ids)
     if (!summary.ids.length) { ElMessage.info('没有可入库文件'); return }
+    if (summary.missingVideoCollections || summary.missingImageCollections) { ElMessage.warning('请先补齐分组的目标合集：视频需要视频合集，图片需要图片合集'); return }
     if (summary.emptyTitles.length) { ElMessage.warning(`以下文件标题为空：${summary.emptyTitles.join('、')}`); return }
-    const warnings = [`${summary.missingVideoCollections} 个视频未选视频合集`, `${summary.missingImageCollections} 张图片未选图片合集`, `${summary.missingVideoImageCollections} 个视频未关联图片合集`]
+    const selectedGroups = draft.value.groups.filter((g: any) => summary.ids.some((id: string) => draft.value.files[id].group_id === g.id))
+    const pairs = selectedGroups.map((g: any) => `${g.name}：${(g.config.video_collection_ids || []).length} 个视频合集 × ${(g.config.image_collection_ids || []).length} 个图片合集`)
+    const warnings = [`未分组 ${ungroupedCount.value} 个文件不参与入库`, ...pairs, '以上合集将两两追加关联，对合集及原有成员生效；已入库媒体只补关系，不覆盖内容']
     try { await ElMessageBox.confirm(`将入库 ${summary.videos} 个视频、${summary.images} 张图片。${warnings.join('；')}。确认后后台持续处理，离开页面不中断。`, '入库预览', { confirmButtonText: '确认入库', cancelButtonText: '取消' }) } catch { return }
     if (confirmedSerial !== editSerial || confirmedVersion !== data.value.version || dirty.value || saving.value) { ElMessage.warning('配置已变化，请重新预览并提交'); return }
     ++requestEpoch
@@ -264,14 +281,15 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
 </script>
 
 <template>
-  <main class="archive-workspace" @click="contextMenu.open = false">
+  <main class="archive-workspace" @click="contextMenu.open = false; groupMenu.open = false">
     <header class="workspace-header">
       <div class="header-title"><el-button :icon="Back" circle aria-label="返回批次列表" @click="router.push('/toolbox/archive-import')" /><div><small>压缩包入库工作台</small><h1>{{ batch?.title || '正在加载批次' }}</h1></div></div>
       <div class="header-actions"><el-tag v-if="draft" :type="saveError || conflict ? 'danger' : dirty || saving ? 'warning' : 'success'">{{ saveLabel }}</el-tag><el-button v-if="draft" :loading="saving" :disabled="conflict || busy" @click="save()">保存 / 重试</el-button><el-button :icon="Refresh" :disabled="dirty || saving || busy" @click="load(true)">刷新</el-button><el-button v-if="draft" type="primary" :icon="UploadFilled" :disabled="saving || conflict || busy" :loading="operation === 'submit'" @click="submit(Object.keys(draft.files))">全部入库</el-button></div>
     </header>
     <el-alert v-if="saveError || conflict" :title="saveError || '保存冲突'" type="error" :closable="false" show-icon><el-button text @click="exportDraft">下载当前草稿</el-button><el-button text @click="reloadDraft">重新加载服务器草稿</el-button></el-alert>
     <div v-if="!draft" v-loading="loading" class="workspace-waiting"><el-icon :size="42"><Folder /></el-icon><h2>{{ batch?.status === 'extracting' ? '正在解压，完成后自动打开工作台' : '等待完成解压' }}</h2><p v-if="errorText">{{ errorText }}</p><div v-if="canRetryExtract" class="retry-form"><el-input v-model="retry.password" type="password" show-password placeholder="压缩包密码（可选）" /><el-select v-model="retry.encoding_mode" aria-label="文件名编码"><el-option label="自动识别编码" value="auto" /><el-option label="UTF-8" value="utf8" /><el-option label="GBK" value="gbk" /></el-select><el-button :loading="retrying" @click="retryExtract">重新解压</el-button></div></div>
-    <div v-else class="workspace-columns" :inert="busy" :aria-busy="busy">
+    <el-alert v-if="draft && draft.layout_version < 2" title="旧批次正在执行任务，结束后将自动转换为平级分组" type="info" :closable="false" />
+    <div v-if="draft" class="workspace-columns" :inert="busy || draft.layout_version < 2" :aria-busy="busy">
       <section class="files-pane" aria-label="虚拟文件管理器">
         <div class="pane-heading"><div><h2>文件管理器</h2><small>仅整理虚拟关系，原有物理文件保持不变</small></div><el-button :icon="Plus" @click="newDirectory.open = !newDirectory.open">新建文件夹</el-button></div>
         <div v-if="newDirectory.open" class="inline-create"><el-input v-model="newDirectory.name" maxlength="200" placeholder="文件夹名称" @keyup.enter="addDirectory" /><el-button type="primary" @click="addDirectory">创建</el-button></div>
@@ -288,25 +306,41 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
           </div>
         </div>
         <div v-if="contextMenu.directory && draft.directories.some((d: any) => d.id === contextMenu.directory)" class="inline-create"><span>目录名称</span><el-input v-model="draft.directories.find((d: any) => d.id === contextMenu.directory).name" :disabled="selectedWorkspaceFiles(draft, data.files, [], [contextMenu.directory]).some((id: string) => activeIDs.has(id))" maxlength="200" /><el-button @click="contextMenu.directory = ''">完成</el-button></div>
-        <div class="selection-toolbar"><span>已选 {{ selectedIDs.length }} 个文件</span><el-select v-model="targetGroup" aria-label="批量目标分组"><el-option label="未分组" value="" /><el-option v-for="g in draft.groups" :key="g.id" :label="g.name" :value="g.id" /></el-select><el-button :disabled="!selectedIDs.length" @click="assignToGroup()">移入分组</el-button><el-button :disabled="!selectedIDs.length" @click="editor = 'batch'; bulkConfig = {}">批量属性</el-button><el-button :disabled="!selectedIDs.length" @click="setExcluded(true)">排除</el-button><el-button :disabled="!selectedIDs.length" @click="setExcluded(false)">恢复</el-button><el-button type="primary" :disabled="!selectedIDs.length || conflict" @click="submit(selectedIDs)">入库所选</el-button></div>
+        <div class="selection-toolbar"><span>已选 {{ selectedIDs.length }} 个文件</span><el-select v-model="targetGroup" aria-label="批量目标分组"><el-option label="未分组" value="" /><el-option v-for="g in draft.groups" :key="g.id" :label="g.name" :value="g.id" /></el-select><el-button :disabled="!selectedIDs.length" @click="assignToGroup()">加入分组</el-button><el-button :disabled="!selectedIDs.length" @click="editor = 'batch'; bulkConfig = {}">批量属性</el-button><el-button :disabled="!selectedIDs.length" @click="setExcluded(true)">排除</el-button><el-button :disabled="!selectedIDs.length" @click="setExcluded(false)">恢复</el-button><el-button type="primary" :disabled="!selectedIDs.length || conflict" @click="submit(selectedIDs)">入库所选</el-button></div>
       </section>
       <section class="groups-pane" aria-label="入库分组">
         <div class="pane-heading"><div><h2>入库分组</h2><small>拖入文件或文件夹，按媒体类型进入所选合集</small></div><el-button :icon="Plus" @click="newGroup.open = !newGroup.open">新建分组</el-button></div>
-        <div v-if="newGroup.open" class="inline-create"><el-input v-model="newGroup.name" maxlength="200" placeholder="新建子分组名称" @keyup.enter="addGroup" /><el-button type="primary" @click="addGroup">创建</el-button></div>
-        <el-tree class="group-tree" :data="groupTree" node-key="id" default-expand-all highlight-current :expand-on-click-node="false" @node-click="chooseGroup"><template #default="{ data: node }"><div class="group-drop" @dragover.prevent @drop="dropGroup($event, node.id)"><el-icon><Folder /></el-icon><span>{{ node.label }}</span><small>{{ Object.values(draft.files).filter((f: any) => f.group_id === node.id).length }}</small></div></template></el-tree>
-        <div class="group-actions"><el-button @click="generateGroups">按文件夹补建</el-button><el-button :disabled="!currentGroup || currentGroup === MAIN_GROUP || groupLocked(currentGroup)" :icon="Delete" @click="deleteGroup">删除分组</el-button><el-button type="primary" :disabled="conflict" @click="submit(memberIDs)">入库本组</el-button></div>
-        <div class="properties">
-          <div class="properties-heading"><h3>{{ editor === 'batch' ? '批量文件属性' : editor === 'file' ? '文件属性' : currentGroup ? '分组配置' : '未分组' }}</h3><el-button v-if="editor !== 'group'" text @click="editor = 'group'">返回分组</el-button></div>
+        <div v-if="newGroup.open" class="inline-create"><el-input v-model="newGroup.name" maxlength="200" placeholder="分组名称" @keyup.enter="addGroup" /><el-button type="primary" @click="addGroup">创建</el-button></div>
+        <div v-if="editor === 'group' && groupView === 'desktop'" class="group-desktop">
+          <article class="group-folder" @dblclick="chooseGroup({ id: '' })" @dragover.prevent @drop="dropGroup($event, '')">
+            <button class="folder-open" @dblclick.stop="chooseGroup({ id: '' })" @keydown.enter="chooseGroup({ id: '' })"><el-icon :size="42"><Folder /></el-icon><strong>未分组</strong><small>{{ ungroupedCount }} 个文件</small></button>
+            <el-button text @click="chooseGroup({ id: '' })">打开</el-button>
+          </article>
+          <article v-for="g in draft.groups" :key="g.id" class="group-folder" :class="{ 'is-locked': groupLocked(g.id) }" @dblclick="chooseGroup(g)" @contextmenu="showGroupMenu($event, g.id)" @dragover.prevent @drop="dropGroup($event, g.id)">
+            <button class="folder-open" @dblclick.stop="chooseGroup(g)" @keydown.enter="chooseGroup(g)"><el-icon :size="42"><Folder /></el-icon><strong :title="g.name">{{ g.name }}</strong><small>{{ Object.values(draft.files).filter((f: any) => f.group_id === g.id).length }} 个文件 · {{ groupStatus(g.id) }}</small></button>
+            <div class="folder-actions"><el-button text @click="chooseGroup(g)">打开</el-button><el-button text :icon="MoreFilled" :aria-label="`${g.name}的操作菜单`" @click.stop="showGroupMenu($event, g.id)">操作</el-button></div>
+          </article>
+        </div>
+        <div v-if="editor === 'group' && groupView === 'members'" class="group-members">
+          <div class="group-actions"><el-button :icon="Back" @click="groupView = 'desktop'">返回分组</el-button><strong>{{ group?.name || '未分组' }}</strong><el-button v-if="group" :disabled="groupLocked(currentGroup)" @click="editGroup(currentGroup)">编辑</el-button><el-button v-if="group" type="primary" :disabled="conflict || groupLocked(currentGroup)" @click="submit(memberIDs)">入库本组</el-button></div>
+          <p v-if="!group" class="muted member-note">先从左侧选择文件并加入分组，再执行入库。</p>
+          <div class="group-actions"><span>{{ memberIDs.length }} 个文件 · 已选 {{ memberSelection.length }} 个</span><el-button v-if="group" :disabled="!memberSelection.length || groupLocked(currentGroup)" @click="assignToGroup('', memberSelection); memberSelection = []">移出本组</el-button></div>
+          <div class="member-list"><div v-for="id in memberIDs" :key="id" class="member-row"><el-checkbox :model-value="memberSelection.includes(id)" :disabled="fileMoveLocked(id)" :aria-label="`选择${draft.files[id].name}`" @change="toggleMember(id, Boolean($event))" /><button class="file-link" @click="chooseFile({ id })">{{ draft.files[id].name }}</button><small>{{ statusLabel({ ...draft.files[id], source: sources.get(id), job: jobs.get(id) }) }}</small></div><p v-if="!memberIDs.length" class="muted member-note">暂无文件，可从左侧拖入或通过“加入分组”添加。</p></div>
+        </div>
+        <div v-if="editor !== 'group' || groupView === 'edit'" class="properties">
+
+          <div class="properties-heading"><h3>{{ editor === 'batch' ? '批量文件属性' : editor === 'file' ? '文件属性' : currentGroup ? '分组配置' : '未分组' }}</h3><el-button v-if="editor !== 'group'" text @click="editor = 'group'; groupView = 'members'">返回分组</el-button></div>
           <template v-if="editor === 'file' && editedFile"><el-input v-model="editedFile.name" :disabled="activeIDs.has(fileID)" maxlength="200" aria-label="虚拟文件名称" /><p class="muted">原路径：{{ (sources.get(fileID) as any)?.relative_path }}</p><el-alert v-if="fileLocked(fileID)" title="已入库或处理中：入库配置锁定" :closable="false" type="info" /><p v-if="(jobs.get(fileID) as any)?.last_error" class="error-text">{{ (jobs.get(fileID) as any).last_error }}</p><p class="resolved-title">有效标题：{{ effective[fileID]?.title || '（空，入库前须补填）' }}</p><el-button v-if="!fileLocked(fileID)" @click="archiveTitleToDescription">按文件名替换标题并转存原标题</el-button></template>
           <template v-else-if="editor === 'batch'"><p class="muted">作用于当前所选 {{ selectedIDs.length }} 个文件，跳过已入库和处理中成员。勾选字段后编辑，点击应用；未勾选字段不修改。</p><el-button type="primary" @click="applyBulkConfig()">应用批量字段</el-button><el-button @click="applyBulkConfig(true)">所选文件恢复全部继承</el-button><el-button @click="archiveTitleToDescription">按文件名替换标题并转存原标题</el-button></template>
-          <template v-else-if="group"><el-input v-model="group.name" maxlength="200" aria-label="分组显示名称" /><p class="muted">{{ currentGroup === MAIN_GROUP ? '来自上传时填写的内容，普通分组逐字段继承。' : '勾选“单独设置”可覆盖，取消勾选恢复继承。集合字段覆盖会整项替换。' }}</p><el-select v-if="currentGroup !== MAIN_GROUP" v-model="group.parent_id" aria-label="父分组"><el-option v-for="g in draft.groups.filter((g: any) => !descendantIDs(draft.groups, currentGroup).has(g.id))" :key="g.id" :label="g.name" :value="g.id" /></el-select></template>
-          <p v-else class="muted">未分组文件继承主分组默认值。</p>
-          <ArchiveWorkspaceConfig v-if="editor === 'batch' || (editor === 'file' && editedFile) || group" v-model="editorConfig" :root="editor === 'group' && currentGroup === MAIN_GROUP" :image="editor === 'file' && (sources.get(fileID) as any)?.media_kind === 'image'" :disabled="editor === 'file' && fileLocked(fileID)" :video-options="videoOptions" :image-options="imageOptions" :tag-options="tagOptions" @search-video="searchVideo" @search-image="searchImage" @search-tags="searchTags" @create="openCollection" />
+          <template v-else-if="group"><el-input v-model="group.name" :disabled="groupLocked(currentGroup)" maxlength="200" aria-label="分组显示名称" /><p class="muted">本组配置独立保存。视频与图片分别加入对应合集，两类合集会在入库时两两追加关联。</p><el-button @click="groupView = 'members'; collection.open = false">完成编辑</el-button></template>
+          <ArchiveWorkspaceConfig v-if="editor === 'batch' || (editor === 'file' && editedFile) || group" v-model="editorConfig" :root="editor === 'group'" :content-only="editor !== 'group'" :image="editor === 'file' && (sources.get(fileID) as any)?.media_kind === 'image'" :disabled="editor === 'file' ? fileLocked(fileID) : editor === 'group' && groupLocked(currentGroup)" :video-options="videoOptions" :image-options="imageOptions" :tag-options="tagOptions" @search-video="searchVideo" @search-image="searchImage" @search-tags="searchTags" @create="openCollection" />
           <div v-if="collection.open" class="collection-inline"><h4>新建{{ collection.kind === 'video' ? '视频' : '图片' }}合集</h4><el-input v-model="collection.name" placeholder="合集名称" maxlength="200" /><el-input v-model="collection.description" type="textarea" placeholder="合集说明（可选）" /><p class="muted">创建后即正式保存，取消本次入库也会保留。</p><el-button @click="collection.open = false">取消</el-button><el-button type="primary" @click="createCollection">创建并选中</el-button></div>
-          <div v-if="memberIDs.length" class="member-preview"><h4>当前分组及子组 · {{ memberIDs.length }} 个文件</h4><button v-for="id in memberIDs" :key="id" class="member-row" @click="fileID = id; editor = 'file'"><span>{{ draft.files[id].name }}</span><small>{{ effective[id]?.title }}</small></button></div>
           <details v-if="canRetryExtract" class="reextract"><summary>重新解压并重置整理</summary><el-input v-model="retry.password" type="password" show-password placeholder="密码（可选）" /><el-button type="danger" plain :loading="retrying" @click="retryExtract">确认重置并重新解压</el-button></details>
         </div>
       </section>
+    </div>
+    <div v-if="groupMenu.open && !busy" class="context-menu" role="menu" :style="{ left: `${groupMenu.x}px`, top: `${groupMenu.y}px` }" @click.stop>
+      <button role="menuitem" :disabled="groupLocked(groupMenu.id)" @click="editGroup(groupMenu.id); groupMenu.open = false">编辑</button><button role="menuitem" :disabled="groupLocked(groupMenu.id)" @click="deleteGroup(groupMenu.id); groupMenu.open = false">删除</button><button role="menuitem" :disabled="conflict || groupLocked(groupMenu.id)" @click="submit(Object.keys(draft.files).filter((id) => draft.files[id].group_id === groupMenu.id)); groupMenu.open = false">入库</button>
     </div>
     <div v-if="contextMenu.open && !busy" class="context-menu" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
       <button @click="renameSelection">重命名 / 文件属性</button><button @click="cutSelection">剪切</button><button :disabled="!cut" @click="pasteSelection(contextMenu.directory || currentDirectory)">粘贴到此目录</button><button @click="assignToGroup(targetGroup)">移入所选目标分组</button><button @click="setExcluded(true)">排除入库</button><button @click="setExcluded(false)">恢复入库</button><button @click="newDirectory.open = true; contextMenu.open = false">新建文件夹</button>
@@ -344,6 +378,18 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
 .group-drop small{margin-left:auto;margin-right:12px;color:var(--text-muted);}
 .group-drop:hover{background:var(--primary-soft);}
 .group-actions{border-bottom:1px solid var(--line-soft);}
+.group-desktop{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px;padding:16px;overflow:auto;align-content:start;}
+.group-folder{border:1px solid var(--line-soft);border-radius:8px;padding:10px;min-width:0;}
+.group-folder:hover{background:var(--bg-surface-muted);}
+.folder-open{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;border:0;background:none;color:inherit;cursor:pointer;padding:8px 0;}
+.folder-open .el-icon{color:var(--primary);}
+.folder-open strong{max-width:100%;overflow-wrap:anywhere;}
+.folder-open small{font-size:12px;color:var(--text-muted);}
+.folder-actions{display:flex;justify-content:center;}
+.group-members{display:flex;flex-direction:column;min-height:0;flex:1;}
+.member-list{overflow:auto;padding:0 14px;}
+.member-note{padding:0 14px;}
+.member-row .file-link{flex:1;min-width:0;}
 .properties{flex:1;min-height:0;overflow:auto;padding:14px 18px;}
 .properties-heading{display:flex;align-items:center;justify-content:space-between;}
 .properties h3{font-size:14px;margin:0 0 12px;}

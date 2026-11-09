@@ -51,13 +51,17 @@ type ArchiveWorkspaceFile struct {
 
 // ArchiveWorkspaceDraft is persisted independently of extracted file locations.
 type ArchiveWorkspaceDraft struct {
-	Directories []ArchiveWorkspaceDirectory     `json:"directories"`
-	Groups      []ArchiveWorkspaceGroup         `json:"groups"`
-	Files       map[string]ArchiveWorkspaceFile `json:"files"`
+	LayoutVersion int                             `json:"layout_version,omitempty"`
+	Template      ArchiveWorkspaceConfig          `json:"template"`
+	Directories   []ArchiveWorkspaceDirectory     `json:"directories"`
+	Groups        []ArchiveWorkspaceGroup         `json:"groups"`
+	Files         map[string]ArchiveWorkspaceFile `json:"files"`
 }
 
 // ArchiveWorkspaceValues is the resolved, immutable configuration of a submitted file.
 type ArchiveWorkspaceValues struct {
+	GroupID            string      `json:"group_id,omitempty"`
+	GroupRelations     bool        `json:"group_relations,omitempty"`
 	TitleMode          string      `json:"title_mode"`
 	Title              string      `json:"title"`
 	Description        string      `json:"description"`
@@ -101,7 +105,7 @@ func resolveWorkspaceFile(d ArchiveWorkspaceDraft, id, kind string) (ArchiveWork
 		groups[g.ID] = g
 	}
 	groupID := f.GroupID
-	if groupID == "" {
+	if groupID == "" && d.LayoutVersion < 2 {
 		groupID = archiveWorkspaceMain
 	}
 	chain := []ArchiveWorkspaceGroup{}
@@ -122,7 +126,12 @@ func resolveWorkspaceFile(d ArchiveWorkspaceDraft, id, kind string) (ArchiveWork
 	if kind == "image" {
 		v.TitleMode = "filename"
 	}
-	applyWorkspaceConfig(&v, f.Config)
+	fileConfig := f.Config
+	if d.LayoutVersion >= 2 {
+		fileConfig.VideoCollectionIDs = nil
+		fileConfig.ImageCollectionIDs = nil
+	}
+	applyWorkspaceConfig(&v, fileConfig)
 	if f.Config.Title != nil && f.Config.TitleMode == nil {
 		v.TitleMode = "uniform"
 	}
@@ -130,6 +139,8 @@ func resolveWorkspaceFile(d ArchiveWorkspaceDraft, id, kind string) (ArchiveWork
 		v.Title = deriveArchiveFilenameTitle(f.Name)
 	}
 	v.Title = strings.TrimSpace(v.Title)
+	v.GroupID = f.GroupID
+	v.GroupRelations = d.LayoutVersion >= 2
 	return v, nil
 }
 
@@ -204,7 +215,10 @@ func newArchiveWorkspace(b models.ArchiveImportBatch, files []models.ArchiveImpo
 			d.Groups = append(d.Groups, ArchiveWorkspaceGroup{ID: g.ID.String(), ParentID: archiveWorkspaceMain, Name: g.Name, Config: ArchiveWorkspaceConfig{Title: g.Title, Description: g.Description, Tags: workspaceSlicePointer(g.Tags), VideoType: g.VideoType, VideoCollectionIDs: workspaceSlicePointer(g.VideoCollectionIDs), ImageCollectionIDs: workspaceSlicePointer(g.ImageCollectionIDs)}})
 		}
 	}
-	return d
+	if fresh {
+		return freshDesktopWorkspace(d, files)
+	}
+	return flattenWorkspace(d, files)
 }
 
 func workspaceSlicePointer[T any](v []T) *[]T {
@@ -216,6 +230,10 @@ func workspaceSlicePointer[T any](v []T) *[]T {
 }
 
 func generateWorkspaceDirectoryGroups(d *ArchiveWorkspaceDraft, files []models.ArchiveImportFileListItem, initial bool) {
+	if d.LayoutVersion >= 2 {
+		generateDesktopGroups(d, files, initial)
+		return
+	}
 	dirMap := map[string]ArchiveWorkspaceDirectory{}
 	for _, dir := range d.Directories {
 		dirMap[dir.ID] = dir
@@ -304,7 +322,7 @@ func validateWorkspaceConfig(c ArchiveWorkspaceConfig) error {
 }
 
 func validateWorkspace(d, old ArchiveWorkspaceDraft, files []models.ArchiveImportFileListItem, active map[string]bool) error {
-	if len(d.Groups) == 0 || len(d.Groups) > 10000 || len(d.Directories) > 100000 {
+	if (d.LayoutVersion < 2 && len(d.Groups) == 0) || len(d.Groups) > 10000 || len(d.Directories) > 100000 {
 		return fmt.Errorf("工作区层级数量无效")
 	}
 	groups := map[string]ArchiveWorkspaceGroup{}
@@ -326,23 +344,31 @@ func validateWorkspace(d, old ArchiveWorkspaceDraft, files []models.ArchiveImpor
 			return err
 		}
 	}
-	main, ok := groups[archiveWorkspaceMain]
-	if !ok || main.ParentID != "" {
-		return fmt.Errorf("主分组不可删除或移动")
-	}
-	for id := range groups {
-		seen := map[string]bool{}
-		cur := id
-		for cur != "" {
-			g, ok := groups[cur]
-			if !ok || seen[cur] {
-				return fmt.Errorf("分组层级无效或存在循环")
+	if d.LayoutVersion < 2 {
+		main, ok := groups[archiveWorkspaceMain]
+		if !ok || main.ParentID != "" {
+			return fmt.Errorf("主分组不可删除或移动")
+		}
+		for id := range groups {
+			seen := map[string]bool{}
+			cur := id
+			for cur != "" {
+				g, ok := groups[cur]
+				if !ok || seen[cur] {
+					return fmt.Errorf("分组层级无效或存在循环")
+				}
+				seen[cur] = true
+				if cur != archiveWorkspaceMain && g.ParentID == "" {
+					return fmt.Errorf("普通分组必须继承主分组")
+				}
+				cur = g.ParentID
 			}
-			seen[cur] = true
-			if cur != archiveWorkspaceMain && g.ParentID == "" {
-				return fmt.Errorf("普通分组必须继承主分组")
+		}
+	} else {
+		for _, g := range d.Groups {
+			if g.ParentID != "" {
+				return fmt.Errorf("分组必须为平级")
 			}
-			cur = g.ParentID
 		}
 	}
 	dirs := map[string]ArchiveWorkspaceDirectory{}
@@ -401,32 +427,50 @@ func validateWorkspace(d, old ArchiveWorkspaceDraft, files []models.ArchiveImpor
 		if err := validateWorkspaceConfig(f.Config); err != nil {
 			return err
 		}
-		if workspaceSuccess(file) || active[id] || file.Status == "processing" {
-			prev, exists := old.Files[id]
-			if !exists || prev.GroupID != f.GroupID || prev.Excluded != f.Excluded || !reflect.DeepEqual(prev.Config, f.Config) {
-				return fmt.Errorf("已入库或处理中文件不能修改归属、资格和配置")
+		if d.LayoutVersion >= 2 {
+			if f.Config.VideoCollectionIDs != nil || f.Config.ImageCollectionIDs != nil {
+				return fmt.Errorf("合集目标请在分组中设置")
+			}
+			prev := old.Files[id]
+			if workspaceSuccess(file) && (prev.Excluded != f.Excluded || !reflect.DeepEqual(prev.Config, f.Config)) {
+				return fmt.Errorf("已入库文件不能修改入库内容或排除资格")
+			}
+			lockedGroup := func(gid string) bool {
+				for fid, af := range old.Files {
+					if af.GroupID == gid && gid != "" && active[fid] {
+						return true
+					}
+				}
+				return false
 			}
 			if active[id] || file.Status == "processing" {
-				if prev.Name != f.Name || prev.DirectoryID != f.DirectoryID || workspaceLogicalPath(old, id) != workspaceLogicalPath(d, id) {
-					return fmt.Errorf("处理中文件不能改名或移动")
+				if !reflect.DeepEqual(prev, f) || workspaceLogicalPath(old, id) != workspaceLogicalPath(d, id) {
+					return fmt.Errorf("处理中文件不能修改")
 				}
 			}
-			oldGroups := map[string]ArchiveWorkspaceGroup{}
-			for _, g := range old.Groups {
-				oldGroups[g.ID] = g
+			if (lockedGroup(prev.GroupID) || lockedGroup(f.GroupID)) && prev.GroupID != f.GroupID {
+				return fmt.Errorf("执行中的分组不能增删成员")
 			}
-			cur := prev.GroupID
-			for cur != "" {
-				g, ok := oldGroups[cur]
-				if !ok {
-					break
-				}
-				if _, exists := groups[cur]; !exists {
-					return fmt.Errorf("包含已入库或处理中文件的分组及祖先不能删除")
-				}
-				cur = g.ParentID
+		} else if workspaceSuccess(file) || active[id] || file.Status == "processing" {
+			prev := old.Files[id]
+			if prev.GroupID != f.GroupID || prev.Excluded != f.Excluded || !reflect.DeepEqual(prev.Config, f.Config) {
+				return fmt.Errorf("旧工作区活动成员不可修改")
 			}
 		}
+	}
+	for _, g := range old.Groups {
+		locked := false
+		for fid, f := range old.Files {
+			if f.GroupID == g.ID && active[fid] {
+				locked = true
+			}
+		}
+		if locked && !reflect.DeepEqual(g, groups[g.ID]) {
+			return fmt.Errorf("执行中的分组不能编辑或删除")
+		}
+	}
+	if d.LayoutVersion != old.LayoutVersion || !reflect.DeepEqual(d.Template, old.Template) {
+		return fmt.Errorf("工作区版本及上传模板不可修改")
 	}
 	if len(d.Files) != expected {
 		return fmt.Errorf("工作区文件清单与源文件不一致")

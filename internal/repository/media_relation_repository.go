@@ -170,3 +170,37 @@ func (r *VideoRepository) AddVideoImageCollections(ctx context.Context, videoID 
 	}
 	return nil
 }
+
+// ApplyArchiveGroupRelations appends group targets without replacing any existing media or relations.
+func (r *VideoRepository) ApplyArchiveGroupRelations(ctx context.Context, videoID, imageID *uuid.UUID, videoCollections, imageCollections []uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin archive group relations: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	for _, vc := range dedupeMediaUUIDs(videoCollections) {
+		if videoID != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO video_collections(video_id,collection_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, *videoID, vc); err != nil {
+				return fmt.Errorf("append video collection: %w", err)
+			}
+		}
+		for _, ic := range dedupeMediaUUIDs(imageCollections) {
+			if _, err = tx.Exec(ctx, `INSERT INTO video_collection_image_collections(video_collection_id,image_collection_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, vc, ic); err != nil {
+				return fmt.Errorf("append collection pair: %w", err)
+			}
+		}
+	}
+	for _, ic := range dedupeMediaUUIDs(imageCollections) {
+		if videoID != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO video_image_collections(video_id,image_collection_id,source) VALUES($1,$2,'archive_import') ON CONFLICT DO NOTHING`, *videoID, ic); err != nil {
+				return fmt.Errorf("append video image collection: %w", err)
+			}
+		}
+		if imageID != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO image_collections(image_id,collection_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, *imageID, ic); err != nil {
+				return fmt.Errorf("append image collection: %w", err)
+			}
+		}
+	}
+	return tx.Commit(ctx)
+}

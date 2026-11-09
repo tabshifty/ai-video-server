@@ -9,11 +9,11 @@ import (
 	"video-server/internal/models"
 )
 
-func TestArchiveWorkspaceInheritance(t *testing.T) {
+func TestArchiveWorkspaceIndependentConfiguration(t *testing.T) {
 	id := uuid.New()
 	groupID := uuid.NewString()
 	draft := newArchiveWorkspace(models.ArchiveImportBatch{Title: "批次", DefaultTitlePrefix: "上传标题", DefaultTags: []string{"父标签"}}, []models.ArchiveImportFileListItem{{ID: id, RelativePath: "目录/片段.mp4", EntryType: "file", MediaKind: "video", Status: "pending"}}, nil, true)
-	draft.Groups = append(draft.Groups, ArchiveWorkspaceGroup{ID: groupID, ParentID: archiveWorkspaceMain, Name: "子组"})
+	draft.Groups = append(draft.Groups, ArchiveWorkspaceGroup{ID: groupID, Name: "独立组", Config: draft.Template})
 	f := draft.Files[id.String()]
 	f.GroupID = groupID
 	draft.Files[id.String()] = f
@@ -51,16 +51,16 @@ func TestArchiveWorkspaceTreeAndFrozenProtection(t *testing.T) {
 		d.Groups = append([]ArchiveWorkspaceGroup{}, base.Groups...)
 		return d
 	}
-	t.Run("禁止移动成功文件", func(t *testing.T) {
+	t.Run("允许移动成功文件", func(t *testing.T) {
 		d := clone()
 		f := d.Files[id.String()]
 		f.GroupID = ""
 		d.Files[id.String()] = f
-		if validateWorkspace(d, base, files, nil) == nil {
-			t.Fatal("应拒绝")
+		if err := validateWorkspace(d, base, files, nil); err != nil {
+			t.Fatal(err)
 		}
 	})
-	t.Run("禁止删除主组", func(t *testing.T) {
+	t.Run("删除分组必须移出成员", func(t *testing.T) {
 		d := clone()
 		d.Groups = nil
 		if validateWorkspace(d, base, files, nil) == nil {
@@ -75,12 +75,12 @@ func TestArchiveWorkspaceTreeAndFrozenProtection(t *testing.T) {
 			t.Fatal("应拒绝")
 		}
 	})
-	t.Run("活动成员不受父配置更改影响", func(t *testing.T) {
+	t.Run("执行中的分组不可编辑", func(t *testing.T) {
 		d := clone()
 		title := "新默认值"
 		d.Groups[0].Config.Title = &title
-		if err := validateWorkspace(d, base, files, map[string]bool{id.String(): true}); err != nil {
-			t.Fatal(err)
+		if err := validateWorkspace(d, base, files, map[string]bool{id.String(): true}); err == nil {
+			t.Fatal("应拒绝执行中的分组编辑")
 		}
 	})
 }
@@ -91,7 +91,7 @@ func TestArchiveWorkspaceInitialization(t *testing.T) {
 	files := []models.ArchiveImportFileListItem{{ID: a, RelativePath: "根.mp4", EntryType: "file", MediaKind: "video", Status: "pending", Title: "旧文件标题", GroupID: &oldGroup}, {ID: b, RelativePath: "父/子/图.jpg", EntryType: "file", MediaKind: "image", Status: "pending", Title: "图片"}}
 	batch := models.ArchiveImportBatch{Title: "批次", DefaultTitlePrefix: "上传标题"}
 	fresh := newArchiveWorkspace(batch, files, nil, true)
-	if len(fresh.Groups) != 3 || fresh.Files[a.String()].GroupID != archiveWorkspaceMain {
+	if len(fresh.Groups) != 2 || fresh.Files[a.String()].GroupID == "" {
 		t.Fatalf("目录层级或根归属错误: %+v", fresh)
 	}
 	got, err := resolveWorkspaceFile(fresh, a.String(), "video")

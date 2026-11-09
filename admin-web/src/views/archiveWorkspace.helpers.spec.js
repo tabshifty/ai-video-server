@@ -52,3 +52,38 @@ describe('工作台目录路径导航', () => {
     expect(directoryBreadcrumbs([{ id: 'a', parent_id: 'b', name: '甲' }, { id: 'b', parent_id: 'a', name: '乙' }], 'b')).toHaveLength(3)
   })
 })
+
+const desktopDraft = () => ({
+  layout_version: 2, directories: [],
+  groups: [{ id: 'a', parent_id: '', name: '甲组', config: { title_mode: 'filename', title: '组标题', tags: ['甲'], video_collection_ids: ['v1'], image_collection_ids: ['i1'] } }, { id: 'b', parent_id: '', name: '乙组', config: { title_mode: 'uniform', title: '乙标题', video_collection_ids: ['v2'], image_collection_ids: [] } }],
+  files: { v: { group_id: 'a', name: '新视频.mp4', config: {} }, i: { group_id: 'a', name: '图片.jpg', config: {} } }
+})
+describe('平级桌面分组', () => {
+  it('单组移动采用目标配置，单文件内容覆盖保留，合集不能覆盖分组', () => {
+    const d = desktopDraft(); d.files.v.config = { title: '单独标题', video_collection_ids: ['绕过组'] }
+    expect(resolveWorkspaceValues(d, 'v', 'video')).toMatchObject({ title: '单独标题', video_collection_ids: ['v1'] })
+    d.files.v.group_id = 'b'
+    expect(resolveWorkspaceValues(d, 'v', 'video')).toMatchObject({ title: '单独标题', video_collection_ids: ['v2'], tags: [] })
+    expect(resolveWorkspaceValues(d, 'i', 'image').title).toBe('图片')
+  })
+  it('成功媒体新增目标可补关系，完成目标不重复提交，移出后不能直接入库', () => {
+    const d = desktopDraft(); const data = { draft: d, files: [{ ...files[0], status: 'ready' }], jobs: [] }
+    expect(importableWorkspaceFiles(data, ['v'])).toEqual(['v'])
+    data.jobs = [{ file_id: 'v', state: 'completed', snapshot: { group_id: 'a', group_relations: true, video_collection_ids: ['v1'], image_collection_ids: ['i1'] } }]
+    expect(importableWorkspaceFiles(data, ['v'])).toEqual([])
+    d.groups[0].config.image_collection_ids.push('i2')
+    expect(importableWorkspaceFiles(data, ['v'])).toEqual(['v'])
+    d.files.v.group_id = ''
+    expect(importableWorkspaceFiles(data, ['v'])).toEqual([])
+  })
+  it('组内存在活动任务时禁止对同组其他文件重复提交', () => {
+    const d = desktopDraft()
+    expect(importableWorkspaceFiles({ draft: d, files, jobs: [{ file_id: 'v', state: 'running', snapshot: { group_id: 'a' } }] }, ['i'])).toEqual([])
+  })
+})
+
+it('混合组只选择视频也必须补齐组内图片目标', () => {
+ const d = desktopDraft(); d.groups[0].config.image_collection_ids = []
+ const result = summarizeWorkspaceImport({ draft: d, files, jobs: [], effective: { v: resolveWorkspaceValues(d, 'v', 'video') } }, ['v'])
+ expect(result.missingImageCollections).toBe(1)
+})
