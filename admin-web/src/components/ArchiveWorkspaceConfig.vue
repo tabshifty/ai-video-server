@@ -30,7 +30,7 @@ function options(kind: string, key: string) {
         <span>{{ field.label }}</span>
         <el-checkbox v-if="!root" :model-value="model[field.key] !== undefined" :disabled="disabled" @change="toggle(field, Boolean($event))">单独设置</el-checkbox>
       </div>
-      <small v-if="model[field.key] === undefined">采用所属分组配置</small>
+      <small v-if="!root && model[field.key] === undefined">采用所属分组配置</small>
       <template v-else>
         <el-select v-if="field.kind === 'mode'" v-model="model[field.key]" :disabled="disabled" aria-label="标题模式">
           <el-option label="统一标题" value="uniform" /><el-option label="按文件名" value="filename" />
