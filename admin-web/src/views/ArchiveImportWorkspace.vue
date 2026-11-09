@@ -12,13 +12,14 @@ const data = ref<any>(null), draft = ref<any>(null), batch = ref<any>(null)
 const loading = ref(true), errorText = ref(''), dirty = ref(false), saving = ref(false), conflict = ref(false), saveError = ref('')
 const currentDirectory = ref(''), currentGroup = ref(''), selected = ref<any[]>([]), editor = ref<'group' | 'file' | 'batch'>('group'), fileID = ref('')
 const directoryTreeVisible = ref(false)
-const groupView = ref<'desktop' | 'members' | 'edit'>('desktop'), memberSelection = ref<string[]>([])
+const groupView = ref<'desktop' | 'members'>('desktop'), memberSelection = ref<string[]>([])
 const groupMenu = reactive({ open: false, id: '', x: 0, y: 0 })
 const operation = ref(''), busy = computed(() => !!operation.value), fileTable = ref<any>(null)
 const bulkConfig = ref<Record<string, any>>({})
 const search = ref(''), cut = ref<{ ids: string[]; dirs: string[] } | null>(null), targetGroup = ref('')
-const newDirectory = reactive({ open: false, name: '' }), newGroup = reactive({ open: false, name: '' })
-const collection = reactive({ open: false, kind: 'video', name: '', description: '', target: '' as string, targetKind: 'group' as 'group' | 'file' | 'batch' })
+const newDirectory = reactive({ open: false, name: '' })
+const groupDialog = reactive({ open: false, id: '', name: '', config: {} as Record<string, any> })
+const collection = reactive({ open: false, kind: 'video', name: '', description: '', target: '' as string, targetKind: 'group-dialog' as 'group-dialog' | 'group' | 'file' | 'batch' })
 const retry = reactive({ password: '', encoding_mode: 'auto' }), retrying = ref(false)
 const contextMenu = reactive({ open: false, x: 0, y: 0, directory: '' })
 const videoOptions = ref<any[]>([]), imageOptions = ref<any[]>([]), tagOptions = ref<string[]>([])
@@ -66,7 +67,7 @@ function clearWorkspace() {
   muted = true; draft.value = null; muted = false
   data.value = null; selected.value = []; currentDirectory.value = ''; currentGroup.value = ''; editor.value = 'group'; fileID.value = ''
   contextMenu.directory = ''; contextMenu.open = false; cut.value = null; targetGroup.value = ''
-  groupView.value = 'desktop'; groupMenu.open = false; memberSelection.value = []; newDirectory.open = false; newGroup.open = false; collection.open = false; bulkConfig.value = {}
+  groupView.value = 'desktop'; groupMenu.open = false; memberSelection.value = []; newDirectory.open = false; groupDialog.open = false; collection.open = false; bulkConfig.value = {}
 }
 async function load(initial = false) {
   if (busy.value || (!initial && (saving.value || dirty.value || conflict.value))) return
@@ -128,7 +129,14 @@ async function reloadDraft() {
   finally { operation.value = '' }
 }
 function chooseGroup(node: any) { currentGroup.value = node.id; editor.value = 'group'; groupView.value = 'members'; memberSelection.value = []; collection.open = false }
-function editGroup(id: string) { chooseGroup({ id }); groupView.value = 'edit' }
+function editGroup(id = '') {
+  if (!draft.value || busy.value || (id && groupLocked(id))) return
+  const target = draft.value.groups.find((g: any) => g.id === id)
+  if (id && !target) return
+  groupDialog.id = id; groupDialog.name = target?.name || ''
+  groupDialog.config = cloneWorkspace(target?.config || draft.value.template || {})
+  groupDialog.open = true
+}
 function showGroupMenu(event: MouseEvent, id: string) { event.preventDefault(); event.stopPropagation(); groupMenu.id = id; groupMenu.x = Math.max(0, Math.min(event.clientX, window.innerWidth - 210)); groupMenu.y = Math.max(0, Math.min(event.clientY, window.innerHeight - 150)); groupMenu.open = true }
 function toggleMember(id: string, checked: boolean) { memberSelection.value = checked ? [...new Set([...memberSelection.value, id])] : memberSelection.value.filter((f) => f !== id) }
 
@@ -193,11 +201,22 @@ function addDirectory() {
   if (draft.value.directories.some((d: any) => d.parent_id === currentDirectory.value && d.name.toLowerCase() === name.toLowerCase()) || Object.values(draft.value.files).some((f: any) => f.directory_id === currentDirectory.value && f.name.toLowerCase() === name.toLowerCase())) { ElMessage.warning('同目录已有此名称'); return }
   draft.value.directories.push({ id: newWorkspaceID(), parent_id: currentDirectory.value, name }); newDirectory.open = false; newDirectory.name = ''
 }
-function addGroup() {
-  const name = newGroup.name.trim(); if (!name) return
-  if (draft.value.groups.some((g: any) => g.name.toLowerCase() === name.toLowerCase())) { ElMessage.warning('分组不能重名'); return }
-  const id = newWorkspaceID(); draft.value.groups.push({ id, parent_id: '', name, config: cloneWorkspace(draft.value.template) })
-  newGroup.open = false; newGroup.name = ''; editGroup(id)
+async function saveGroup() {
+  if (!draft.value || busy.value || saving.value || conflict.value) return
+  const name = groupDialog.name.trim()
+  if (!name) { ElMessage.warning('请填写分组名称'); return }
+  if (groupDialog.id && groupLocked(groupDialog.id)) { ElMessage.warning('分组正在入库，暂不能修改'); return }
+  if (draft.value.groups.some((g: any) => g.id !== groupDialog.id && g.name.toLowerCase() === name.toLowerCase())) { ElMessage.warning('分组不能重名'); return }
+  let target = draft.value.groups.find((g: any) => g.id === groupDialog.id)
+  if (groupDialog.id && !target) { ElMessage.warning('分组已不存在，请关闭后重新选择'); return }
+  if (!target) {
+    target = { id: newWorkspaceID(), parent_id: '', name, config: {} }
+    draft.value.groups.push(target)
+    groupDialog.id = target.id
+    target = draft.value.groups.find((g: any) => g.id === groupDialog.id)
+  }
+  target.name = name; target.config = cloneWorkspace(groupDialog.config)
+  if (await save()) { groupDialog.open = false; ElMessage.success('分组已保存') }
 }
 async function deleteGroup(id = currentGroup.value) {
   if (!id || groupLocked(id)) return
@@ -221,13 +240,13 @@ async function generateGroups() {
   finally { ++requestEpoch; operation.value = '' }
 }
 function renameSelection() { const row = selected.value[0]; if (!row) return; if (row.isDirectory) { contextMenu.directory = row.id } else chooseFile(row); contextMenu.open = false }
-function openCollection(kind: string) { collection.kind = kind; collection.target = editor.value === 'file' ? fileID.value : currentGroup.value; collection.targetKind = editor.value; collection.name = ''; collection.description = ''; collection.open = true }
+function openCollection(kind: string) { collection.kind = kind; collection.target = editor.value === 'file' ? fileID.value : currentGroup.value; collection.targetKind = groupDialog.open ? 'group-dialog' : editor.value; collection.name = ''; collection.description = ''; collection.open = true }
 async function createCollection() {
   if (!collection.name.trim() || busy.value) return
   operation.value = 'collection'
   try {
     const result = await (collection.kind === 'video' ? createAdminCollection : createAdminImageCollection)({ name: collection.name.trim(), description: collection.description })
-    const target = collection.targetKind === 'batch' ? { config: bulkConfig.value } : collection.targetKind === 'file' ? draft.value.files[collection.target] : draft.value.groups.find((g: any) => g.id === collection.target)
+    const target = collection.targetKind === 'group-dialog' ? (groupDialog.open ? groupDialog : null) : collection.targetKind === 'batch' ? { config: bulkConfig.value } : collection.targetKind === 'file' ? draft.value.files[collection.target] : draft.value.groups.find((g: any) => g.id === collection.target)
     if (!target || (collection.targetKind === 'file' && fileLocked(collection.target))) { ElMessage.warning('合集已创建，当前编辑对象已改变，请重新选择'); collection.open = false; return }
     const key = collection.kind === 'video' ? 'video_collection_ids' : 'image_collection_ids'; target.config[key] = [...new Set([...(target.config[key] || []), result.id])]
     const list = collection.kind === 'video' ? videoOptions : imageOptions; list.value = [...list.value, { id: result.id, name: collection.name.trim() }]
@@ -309,8 +328,7 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
         <div class="selection-toolbar"><span>已选 {{ selectedIDs.length }} 个文件</span><el-select v-model="targetGroup" aria-label="批量目标分组"><el-option label="未分组" value="" /><el-option v-for="g in draft.groups" :key="g.id" :label="g.name" :value="g.id" /></el-select><el-button :disabled="!selectedIDs.length" @click="assignToGroup()">加入分组</el-button><el-button :disabled="!selectedIDs.length" @click="editor = 'batch'; bulkConfig = {}">批量属性</el-button><el-button :disabled="!selectedIDs.length" @click="setExcluded(true)">排除</el-button><el-button :disabled="!selectedIDs.length" @click="setExcluded(false)">恢复</el-button><el-button type="primary" :disabled="!selectedIDs.length || conflict" @click="submit(selectedIDs)">入库所选</el-button></div>
       </section>
       <section class="groups-pane" aria-label="入库分组">
-        <div class="pane-heading"><div><h2>入库分组</h2><small>拖入文件或文件夹，按媒体类型进入所选合集</small></div><el-button :icon="Plus" @click="newGroup.open = !newGroup.open">新建分组</el-button></div>
-        <div v-if="newGroup.open" class="inline-create"><el-input v-model="newGroup.name" maxlength="200" placeholder="分组名称" @keyup.enter="addGroup" /><el-button type="primary" @click="addGroup">创建</el-button></div>
+        <div class="pane-heading"><div><h2>入库分组</h2><small>拖入文件或文件夹，按媒体类型进入所选合集</small></div><el-button :icon="Plus" @click="editGroup()">新建分组</el-button></div>
         <div v-if="editor === 'group' && groupView === 'desktop'" class="group-desktop">
           <article class="group-folder" @dblclick="chooseGroup({ id: '' })" @dragover.prevent @drop="dropGroup($event, '')">
             <button class="folder-open" @dblclick.stop="chooseGroup({ id: '' })" @keydown.enter="chooseGroup({ id: '' })"><el-icon :size="42"><Folder /></el-icon><strong>未分组</strong><small>{{ ungroupedCount }} 个文件</small></button>
@@ -327,18 +345,34 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
           <div class="group-actions"><span>{{ memberIDs.length }} 个文件 · 已选 {{ memberSelection.length }} 个</span><el-button v-if="group" :disabled="!memberSelection.length || groupLocked(currentGroup)" @click="assignToGroup('', memberSelection); memberSelection = []">移出本组</el-button></div>
           <div class="member-list"><div v-for="id in memberIDs" :key="id" class="member-row"><el-checkbox :model-value="memberSelection.includes(id)" :disabled="fileMoveLocked(id)" :aria-label="`选择${draft.files[id].name}`" @change="toggleMember(id, Boolean($event))" /><button class="file-link" @click="chooseFile({ id })">{{ draft.files[id].name }}</button><small>{{ statusLabel({ ...draft.files[id], source: sources.get(id), job: jobs.get(id) }) }}</small></div><p v-if="!memberIDs.length" class="muted member-note">暂无文件，可从左侧拖入或通过“加入分组”添加。</p></div>
         </div>
-        <div v-if="editor !== 'group' || groupView === 'edit'" class="properties">
+        <div v-if="editor !== 'group'" class="properties">
 
           <div class="properties-heading"><h3>{{ editor === 'batch' ? '批量文件属性' : editor === 'file' ? '文件属性' : currentGroup ? '分组配置' : '未分组' }}</h3><el-button v-if="editor !== 'group'" text @click="editor = 'group'; groupView = 'members'">返回分组</el-button></div>
           <template v-if="editor === 'file' && editedFile"><el-input v-model="editedFile.name" :disabled="activeIDs.has(fileID)" maxlength="200" aria-label="虚拟文件名称" /><p class="muted">原路径：{{ (sources.get(fileID) as any)?.relative_path }}</p><el-alert v-if="fileLocked(fileID)" title="已入库或处理中：入库配置锁定" :closable="false" type="info" /><p v-if="(jobs.get(fileID) as any)?.last_error" class="error-text">{{ (jobs.get(fileID) as any).last_error }}</p><p class="resolved-title">有效标题：{{ effective[fileID]?.title || '（空，入库前须补填）' }}</p><el-button v-if="!fileLocked(fileID)" @click="archiveTitleToDescription">按文件名替换标题并转存原标题</el-button></template>
           <template v-else-if="editor === 'batch'"><p class="muted">作用于当前所选 {{ selectedIDs.length }} 个文件，跳过已入库和处理中成员。勾选字段后编辑，点击应用；未勾选字段不修改。</p><el-button type="primary" @click="applyBulkConfig()">应用批量字段</el-button><el-button @click="applyBulkConfig(true)">所选文件恢复全部继承</el-button><el-button @click="archiveTitleToDescription">按文件名替换标题并转存原标题</el-button></template>
-          <template v-else-if="group"><el-input v-model="group.name" :disabled="groupLocked(currentGroup)" maxlength="200" aria-label="分组显示名称" /><p class="muted">本组配置独立保存。视频与图片分别加入对应合集，两类合集会在入库时两两追加关联。</p><el-button @click="groupView = 'members'; collection.open = false">完成编辑</el-button></template>
-          <ArchiveWorkspaceConfig v-if="editor === 'batch' || (editor === 'file' && editedFile) || group" v-model="editorConfig" :root="editor === 'group'" :content-only="editor !== 'group'" :image="editor === 'file' && (sources.get(fileID) as any)?.media_kind === 'image'" :disabled="editor === 'file' ? fileLocked(fileID) : editor === 'group' && groupLocked(currentGroup)" :video-options="videoOptions" :image-options="imageOptions" :tag-options="tagOptions" @search-video="searchVideo" @search-image="searchImage" @search-tags="searchTags" @create="openCollection" />
-          <div v-if="collection.open" class="collection-inline"><h4>新建{{ collection.kind === 'video' ? '视频' : '图片' }}合集</h4><el-input v-model="collection.name" placeholder="合集名称" maxlength="200" /><el-input v-model="collection.description" type="textarea" placeholder="合集说明（可选）" /><p class="muted">创建后即正式保存，取消本次入库也会保留。</p><el-button @click="collection.open = false">取消</el-button><el-button type="primary" @click="createCollection">创建并选中</el-button></div>
+          <ArchiveWorkspaceConfig v-if="editor === 'batch' || (editor === 'file' && editedFile)" v-model="editorConfig" :root="editor === 'group'" :content-only="editor !== 'group'" :image="editor === 'file' && (sources.get(fileID) as any)?.media_kind === 'image'" :disabled="editor === 'file' ? fileLocked(fileID) : editor === 'group' && groupLocked(currentGroup)" :video-options="videoOptions" :image-options="imageOptions" :tag-options="tagOptions" @search-video="searchVideo" @search-image="searchImage" @search-tags="searchTags" @create="openCollection" />
           <details v-if="canRetryExtract" class="reextract"><summary>重新解压并重置整理</summary><el-input v-model="retry.password" type="password" show-password placeholder="密码（可选）" /><el-button type="danger" plain :loading="retrying" @click="retryExtract">确认重置并重新解压</el-button></details>
         </div>
       </section>
     </div>
+    <el-dialog v-model="groupDialog.open" :title="groupDialog.id ? '编辑分组' : '新建分组'" width="min(820px, 94vw)" append-to-body destroy-on-close :close-on-click-modal="false" :close-on-press-escape="!saving && !collection.open" :show-close="!saving && !collection.open" :before-close="(done: () => void) => { if (!saving && !collection.open) done() }">
+      <div class="group-dialog-form" :inert="busy || saving || collection.open">
+        <el-form label-position="top"><el-form-item label="分组名称" required><el-input v-model="groupDialog.name" maxlength="200" aria-label="分组名称" placeholder="请输入分组名称" :disabled="groupLocked(groupDialog.id)" /></el-form-item></el-form>
+        <p class="muted">本组配置独立保存。视频与图片分别加入对应合集，入库时两类合集会两两追加关联。</p>
+        <el-alert v-if="groupLocked(groupDialog.id)" title="分组正在入库，暂不能修改" type="info" :closable="false" />
+        <ArchiveWorkspaceConfig v-model="groupDialog.config" root :disabled="groupLocked(groupDialog.id)" :video-options="videoOptions" :image-options="imageOptions" :tag-options="tagOptions" @search-video="searchVideo" @search-image="searchImage" @search-tags="searchTags" @create="openCollection" />
+        <el-alert v-if="saveError || conflict" :title="saveError || '保存冲突，请关闭弹窗并重新加载草稿'" type="error" :closable="false" />
+      </div>
+      <template #footer><el-button :disabled="saving || busy || collection.open" @click="groupDialog.open = false">取消</el-button><el-button type="primary" :loading="saving" :disabled="busy || conflict || collection.open || groupLocked(groupDialog.id)" @click="saveGroup">保存分组</el-button></template>
+    </el-dialog>
+    <el-dialog v-model="collection.open" :title="`新建${collection.kind === 'video' ? '视频' : '图片'}合集`" width="min(520px, 94vw)" append-to-body destroy-on-close :close-on-click-modal="false" :close-on-press-escape="!busy" :show-close="!busy" :before-close="(done: () => void) => { if (!busy) done() }">
+      <el-form label-position="top" :disabled="busy">
+        <el-form-item label="合集名称" required><el-input v-model="collection.name" placeholder="请输入合集名称" maxlength="200" @keyup.enter="createCollection" /></el-form-item>
+        <el-form-item label="合集说明"><el-input v-model="collection.description" type="textarea" :rows="3" placeholder="合集说明（可选）" /></el-form-item>
+      </el-form>
+      <p class="muted">创建后即正式保存，取消分组编辑仍会保留此合集。</p>
+      <template #footer><el-button :disabled="busy" @click="collection.open = false">取消</el-button><el-button type="primary" :loading="operation === 'collection'" :disabled="!collection.name.trim() || busy" @click="createCollection">创建并选中</el-button></template>
+    </el-dialog>
     <div v-if="groupMenu.open && !busy" class="context-menu" role="menu" :style="{ left: `${groupMenu.x}px`, top: `${groupMenu.y}px` }" @click.stop>
       <button role="menuitem" :disabled="groupLocked(groupMenu.id)" @click="editGroup(groupMenu.id); groupMenu.open = false">编辑</button><button role="menuitem" :disabled="groupLocked(groupMenu.id)" @click="deleteGroup(groupMenu.id); groupMenu.open = false">删除</button><button role="menuitem" :disabled="conflict || groupLocked(groupMenu.id)" @click="submit(Object.keys(draft.files).filter((id) => draft.files[id].group_id === groupMenu.id)); groupMenu.open = false">入库</button>
     </div>
@@ -396,8 +430,8 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
 .properties :deep(.el-select){width:100%;}
 .properties>.el-input,.properties>.el-select{margin-bottom:10px;}
 .resolved-title{font-size:12px;background:var(--bg-surface-muted);padding:10px;border-radius:6px;}
-.collection-inline{margin-top:18px;padding:14px;background:var(--primary-soft);border:1px solid var(--line-soft);border-radius:8px;}
-.collection-inline .el-input{margin-bottom:10px;}
+.group-dialog-form{max-height:65dvh;overflow:auto;padding:0 4px;}
+.group-dialog-form>.el-alert{margin:12px 0;}
 .member-preview{border-top:1px solid var(--line-soft);margin-top:18px;}
 .member-preview h4{font-size:12px;color:var(--text-muted);}
 .member-row{display:flex;justify-content:space-between;gap:8px;align-items:center;width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--bg-surface);padding:9px 0;text-align:left;cursor:pointer;color:inherit;}
