@@ -5,12 +5,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Refresh, Folder, Document, Plus, Delete, UploadFilled } from '@element-plus/icons-vue'
 import ArchiveWorkspaceConfig from '../components/ArchiveWorkspaceConfig.vue'
 import { getAdminArchiveImportBatchDetail, getAdminArchiveWorkspace, saveAdminArchiveWorkspace, submitAdminArchiveWorkspace, generateAdminArchiveWorkspaceGroups, retryAdminArchiveImportExtract, getAdminCollections, getAdminImageCollections, createAdminCollection, createAdminImageCollection, getAdminVideoTags, getAdminPopularVideoTags } from '../api/admin'
-import { cloneWorkspace, descendantIDs, workspaceTree, selectedWorkspaceFiles, summarizeWorkspaceImport, resolveWorkspaceValues, fileTitle, newWorkspaceID, MAIN_GROUP } from './archiveWorkspace.helpers'
+import { cloneWorkspace, descendantIDs, workspaceTree, directoryBreadcrumbs, selectedWorkspaceFiles, summarizeWorkspaceImport, resolveWorkspaceValues, fileTitle, newWorkspaceID, MAIN_GROUP } from './archiveWorkspace.helpers'
 
 const route = useRoute(), router = useRouter(), batchID = String(route.params.id)
 const data = ref<any>(null), draft = ref<any>(null), batch = ref<any>(null)
 const loading = ref(true), errorText = ref(''), dirty = ref(false), saving = ref(false), conflict = ref(false), saveError = ref('')
 const currentDirectory = ref(''), currentGroup = ref(MAIN_GROUP), selected = ref<any[]>([]), editor = ref<'group' | 'file' | 'batch'>('group'), fileID = ref('')
+const directoryTreeVisible = ref(false)
 const operation = ref(''), busy = computed(() => !!operation.value), fileTable = ref<any>(null)
 const bulkConfig = ref<Record<string, any>>({})
 const search = ref(''), cut = ref<{ ids: string[]; dirs: string[] } | null>(null), targetGroup = ref(MAIN_GROUP)
@@ -31,7 +32,7 @@ const groupLocked = (id: string) => {
   const descendants = descendantIDs(draft.value?.groups || [], id)
   return Object.entries(draft.value?.files || {}).some(([fid, f]: any) => descendants.has(f.group_id) && fileLocked(fid))
 }
-const directoryTree = computed(() => workspaceTree(draft.value?.directories || []))
+const directoryTree = computed(() => workspaceTree(draft.value?.directories || [], '', '根目录'))
 const groupTree = computed(() => [...workspaceTree(draft.value?.groups || [], MAIN_GROUP), { id: '', label: '未分组', children: [] }])
 const rows = computed(() => {
   if (!draft.value) return []
@@ -51,7 +52,7 @@ const effective = computed(() => {
   if (draft.value) for (const f of data.value.files) if (draft.value.files[f.id]) result[f.id] = fileLocked(f.id) && data.value.effective[f.id] ? data.value.effective[f.id] : resolveWorkspaceValues(draft.value, f.id, f.media_kind)
   return result
 })
-const directoryLabel = computed(() => currentDirectory.value ? draft.value?.directories.find((d: any) => d.id === currentDirectory.value)?.name || '目录' : '根目录')
+const directoryPath = computed(() => directoryBreadcrumbs(draft.value?.directories || [], currentDirectory.value))
 const saveLabel = computed(() => conflict.value ? '保存冲突' : saving.value ? '正在保存…' : saveError.value ? '保存失败' : dirty.value ? '等待保存…' : '已自动保存')
 const statusLabel = (row: any) => row.excluded ? '已排除' : row.job?.state === 'queued' ? '等待入库' : row.job?.state === 'running' ? '正在入库' : row.job?.state === 'failed' ? '入库失败' : ({ pending: '待入库', ready: '已入库', existing: '复用已有', processing: '处理中', failed: '失败', skipped: '不支持' } as any)[row.source?.status] || row.source?.status
 
@@ -274,10 +275,10 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
       <section class="files-pane" aria-label="虚拟文件管理器">
         <div class="pane-heading"><div><h2>文件管理器</h2><small>仅整理虚拟关系，原有物理文件保持不变</small></div><el-button :icon="Plus" @click="newDirectory.open = !newDirectory.open">新建文件夹</el-button></div>
         <div v-if="newDirectory.open" class="inline-create"><el-input v-model="newDirectory.name" maxlength="200" placeholder="文件夹名称" @keyup.enter="addDirectory" /><el-button type="primary" @click="addDirectory">创建</el-button></div>
-        <div class="file-toolbar"><el-input v-model="search" clearable placeholder="搜索文件名称" aria-label="搜索文件" /><el-button :disabled="!selected.length" @click="cutSelection">剪切</el-button><el-button :disabled="!cut" @click="pasteSelection()">粘贴到此目录</el-button></div>
+        <div class="file-toolbar"><el-button :icon="Folder" :aria-expanded="directoryTreeVisible" aria-controls="archive-directory-tree" :type="directoryTreeVisible ? 'primary' : undefined" @click="directoryTreeVisible = !directoryTreeVisible">目录</el-button><el-input v-model="search" clearable placeholder="搜索文件名称" aria-label="搜索文件" /><el-button :disabled="!selected.length" @click="cutSelection">剪切</el-button><el-button :disabled="!cut" @click="pasteSelection()">粘贴到此目录</el-button></div>
         <div class="file-browser">
-          <el-tree class="directory-tree" :data="directoryTree" node-key="id" default-expand-all highlight-current :expand-on-click-node="false" @node-click="(node: any) => { currentDirectory = node.id; search = '' }" />
-          <div class="file-list" @contextmenu="showContext($event)"><div class="breadcrumb"><el-button text @click="currentDirectory = ''; search = ''">根目录</el-button><span v-if="currentDirectory"> / {{ directoryLabel }}</span></div>
+          <el-tree v-if="directoryTreeVisible" id="archive-directory-tree" class="directory-tree" aria-label="目录导航" :current-node-key="currentDirectory" :data="directoryTree" node-key="id" default-expand-all highlight-current :expand-on-click-node="false" @node-click="(node: any) => { currentDirectory = node.id; search = '' }" />
+          <div class="file-list" @contextmenu="showContext($event)"><nav class="breadcrumb" aria-label="当前目录路径"><template v-for="(directory, index) in directoryPath" :key="directory.id"><span v-if="index" aria-hidden="true">/</span><el-button text :aria-current="directory.id === currentDirectory ? 'page' : undefined" @click="currentDirectory = directory.id; search = ''">{{ directory.name }}</el-button></template></nav>
             <el-table ref="fileTable" :data="rows" row-key="rowID" height="100%" @selection-change="selected = $event" @row-dblclick="chooseFile" @row-contextmenu="(row: any, _c: any, event: MouseEvent) => showContext(event, row)">
               <el-table-column type="selection" width="42" reserve-selection />
               <el-table-column label="名称" min-width="200"><template #default="{ row }"><div class="file-name" draggable="true" @dragstart="startDrag($event, row)"><el-icon><Folder v-if="row.isDirectory" /><Document v-else /></el-icon><button class="file-link" @click="chooseFile(row)">{{ row.name }}</button></div></template></el-table-column>
@@ -331,7 +332,8 @@ onUnmounted(() => { clearTimeout(timer); clearInterval(poll); window.removeEvent
 .file-browser{display:flex;flex:1;min-height:0;}
 .directory-tree{width:155px;flex-shrink:0;overflow:auto;padding:10px 4px;background:var(--bg-surface-muted);border-right:1px solid var(--line-soft);}
 .file-list{flex:1;min-width:0;display:flex;flex-direction:column;}
-.breadcrumb{height:34px;font-size:12px;padding:0 8px;display:flex;align-items:center;}
+.breadcrumb{min-height:34px;flex-shrink:0;font-size:12px;padding:0 8px;display:flex;align-items:center;overflow-x:auto;white-space:nowrap;}
+.breadcrumb .el-button{flex-shrink:0;margin-left:0;}
 .file-name{display:flex;align-items:center;gap:7px;min-width:0;}
 .file-name .el-icon{color:var(--primary);}
 .file-link{background:none;border:0;text-align:left;color:inherit;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 0;font-size:13px;}

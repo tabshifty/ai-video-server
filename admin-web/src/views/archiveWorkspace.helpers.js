@@ -27,6 +27,19 @@ export function workspaceTree(nodes, rootID = '', rootLabel = '全部文件') {
   return [root]
 }
 
+export function directoryBreadcrumbs(directories, currentID) {
+  const byID = new Map((directories || []).map((directory) => [directory.id, directory]))
+  const path = [], seen = new Set()
+  let id = currentID
+  while (id && byID.has(id) && !seen.has(id)) {
+    seen.add(id)
+    const directory = byID.get(id)
+    path.unshift({ id: directory.id, name: directory.name })
+    id = directory.parent_id
+  }
+  return [{ id: '', name: '根目录' }, ...path]
+}
+
 export function selectedWorkspaceFiles(draft, files, ids = [], directoryIDs = []) {
   const selected = new Set(ids)
   const directories = new Set()

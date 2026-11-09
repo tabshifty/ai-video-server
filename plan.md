@@ -1,5 +1,15 @@
 # plan.md
 
+## 2026-11-09 目录导航精简：完成验证
+- 进度：默认隐藏目录树，新增目录开关并同步当前目录高亮；完整路径面包屑支持返回任意上级，长路径可横向滚动。根节点改称根目录；界面显隐不写入草稿。
+- 验证：路径规则测试先确认新增用例失败，实施后 archiveWorkspace.helpers.spec.js 全部 9 项通过；npm run build 通过（存在产物体积提示）；git diff --check 通过。未进行浏览器人工验收。
+- 提交范围：工作台 Vue、导航 helper 及测试、CONTEXT.md、plan.md；既有未跟踪 docs/examples/ 不纳入。
+
+## 2026-11-09 目录导航精简：实施计划
+- 进度：压缩包详情默认收起目录树，提供目录开关和完整路径面包屑，目录树根节点改为根目录。
+- 影响文件：工作台 Vue、导航 helper 与定向测试、CONTEXT.md、plan.md；保留既有 docs/examples/。
+- 验证：待执行路径导航单测、管理端构建及差异检查。
+
 ## 2026-11-05 16:45 +0800 修复：115 云下载反复新开标签页
 - 现象：部署机 115Browser 持续累积新的 115.com 标签页，未能复用浏览器常开且不可关闭的 115 标签页。
 - 根因：`isPanPage` 只认字面量 `mode=wangpan`，而 115 经常把网盘页跳到 `?goto=<urlencoded pan url>`（`mode%3Dwangpan`）；匹配失败后每次 `EnsureSession` 都 `OpenTab` 新开一个网盘页。旧版登录取码还会新开 `/login`。

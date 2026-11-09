@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { descendantIDs, selectedWorkspaceFiles, importableWorkspaceFiles, resolveWorkspaceValues, summarizeWorkspaceImport, newWorkspaceID } from './archiveWorkspace.helpers'
+import { descendantIDs, selectedWorkspaceFiles, importableWorkspaceFiles, resolveWorkspaceValues, summarizeWorkspaceImport, newWorkspaceID, directoryBreadcrumbs } from './archiveWorkspace.helpers'
 
 const draft = {
   directories: [{ id: 'a', parent_id: '', name: '甲' }, { id: 'b', parent_id: 'a', name: '乙' }],
@@ -38,4 +38,17 @@ describe('压缩包全屏工作台规则', () => {
 it('家庭局域网 HTTP 没有 randomUUID 时仍可新建目录和分组', () => {
   const id = newWorkspaceID({ getRandomValues: (bytes) => bytes.fill(17) })
   expect(id).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/)
+})
+
+
+describe('工作台目录路径导航', () => {
+  it('根目录、嵌套路径与不存在的目录均可安全导航', () => {
+    expect(directoryBreadcrumbs(draft.directories, '')).toEqual([{ id: '', name: '根目录' }])
+    expect(directoryBreadcrumbs(draft.directories, 'b')).toEqual([{ id: '', name: '根目录' }, { id: 'a', name: '甲' }, { id: 'b', name: '乙' }])
+    expect(directoryBreadcrumbs(draft.directories, 'missing')).toEqual([{ id: '', name: '根目录' }])
+  })
+  it('目录重命名及时反映在路径中，异常循环不会无限遍历', () => {
+    expect(directoryBreadcrumbs([{ id: 'a', parent_id: '', name: '新名称' }], 'a')[1].name).toBe('新名称')
+    expect(directoryBreadcrumbs([{ id: 'a', parent_id: 'b', name: '甲' }, { id: 'b', parent_id: 'a', name: '乙' }], 'b')).toHaveLength(3)
+  })
 })
