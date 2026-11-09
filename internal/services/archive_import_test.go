@@ -1240,3 +1240,88 @@ func TestArchiveImportApplyGroupToFileHonorsOverrides(t *testing.T) {
 		t.Fatalf("file.ImageCollectionIDs = %#v, want group default image collection", file.ImageCollectionIDs)
 	}
 }
+
+func TestDetectArchiveFormatByContentUsesMagicBytes(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	cases := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{name: "download", header: "PK\x03\x04payload", want: "zip"},
+		{name: "download.zip", header: "Rar!\x1a\x07\x00payload", want: "rar"},
+		{name: "download.rar", header: "Rar!\x1a\x07\x01\x00payload", want: "rar"},
+		{name: "download", header: "7z\xbc\xaf\x27\x1cpayload", want: "7z"},
+	}
+	for _, tt := range cases {
+		path := filepath.Join(dir, tt.name)
+		if err := os.WriteFile(path, []byte(tt.header), 0o644); err != nil {
+			t.Fatalf("write %s: %v", tt.name, err)
+		}
+		format, err := detectArchiveFormatByContent(path)
+		if err != nil {
+			t.Fatalf("detectArchiveFormatByContent(%q) error = %v", tt.name, err)
+		}
+		if format != tt.want {
+			t.Fatalf("detectArchiveFormatByContent(%q) = %q, want %q", tt.name, format, tt.want)
+		}
+	}
+
+	videoPath := filepath.Join(dir, "demo.mkv")
+	if err := os.WriteFile(videoPath, []byte("video-body"), 0o644); err != nil {
+		t.Fatalf("write video: %v", err)
+	}
+	if _, err := detectArchiveFormatByContent(videoPath); !errors.Is(err, ErrArchiveUnsupportedFormat) {
+		t.Fatalf("video content error = %v, want ErrArchiveUnsupportedFormat", err)
+	}
+
+	emptyPath := filepath.Join(dir, "empty")
+	if err := os.WriteFile(emptyPath, nil, 0o644); err != nil {
+		t.Fatalf("write empty: %v", err)
+	}
+	if _, err := detectArchiveFormatByContent(emptyPath); !errors.Is(err, ErrArchiveUnsupportedFormat) {
+		t.Fatalf("empty content error = %v, want ErrArchiveUnsupportedFormat", err)
+	}
+
+	if _, err := detectArchiveFormatByContent(filepath.Join(dir, "missing")); err == nil {
+		t.Fatal("missing file should return an error")
+	}
+}
+
+func TestDetectArchiveFormatForFilePrefersContentOverName(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	rarPath := filepath.Join(dir, "无后缀下载")
+	if err := os.WriteFile(rarPath, []byte("Rar!\x1a\x07\x01\x00payload"), 0o644); err != nil {
+		t.Fatalf("write rar: %v", err)
+	}
+	format, err := detectArchiveFormatForFile(filepath.Base(rarPath), rarPath)
+	if err != nil || format != "rar" {
+		t.Fatalf("extensionless rar = (%q, %v), want rar", format, err)
+	}
+
+	mislabeledPath := filepath.Join(dir, "mislabeled.zip")
+	if err := os.WriteFile(mislabeledPath, []byte("Rar!\x1a\x07\x00payload"), 0o644); err != nil {
+		t.Fatalf("write mislabeled: %v", err)
+	}
+	format, err = detectArchiveFormatForFile(filepath.Base(mislabeledPath), mislabeledPath)
+	if err != nil || format != "rar" {
+		t.Fatalf("mislabeled rar = (%q, %v), want rar", format, err)
+	}
+
+	// Content that is not a supported archive keeps the historical name rule.
+	nameOnlyPath := filepath.Join(dir, "demo.7z")
+	if err := os.WriteFile(nameOnlyPath, []byte("unknown"), 0o644); err != nil {
+		t.Fatalf("write name-only: %v", err)
+	}
+	format, err = detectArchiveFormatForFile(filepath.Base(nameOnlyPath), nameOnlyPath)
+	if err != nil || format != "7z" {
+		t.Fatalf("name-only 7z = (%q, %v), want 7z", format, err)
+	}
+	if _, err := detectArchiveFormatForFile("demo.txt", nameOnlyPath); !errors.Is(err, ErrArchiveUnsupportedFormat) {
+		t.Fatalf("unsupported name-only error = %v, want ErrArchiveUnsupportedFormat", err)
+	}
+}

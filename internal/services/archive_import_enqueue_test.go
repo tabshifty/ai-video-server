@@ -248,3 +248,46 @@ func (r archiveLifecycleRow) Scan(dest ...any) error {
 	}
 	return nil
 }
+
+func TestImportLocalArchiveDetectsFormatFromExtensionlessContent(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	downloadDir := filepath.Join(root, "downloads")
+	storageRoot := filepath.Join(root, "storage")
+	if err := os.MkdirAll(downloadDir, 0o755); err != nil {
+		t.Fatalf("mkdir downloads: %v", err)
+	}
+	sourcePath := filepath.Join(downloadDir, "www.98T.la@91Pron【性感小皮鞭】53部官方原版大尺度视频part2")
+	if err := os.WriteFile(sourcePath, []byte("Rar!\x1a\x07\x01\x00payload"), 0o644); err != nil {
+		t.Fatalf("write rar: %v", err)
+	}
+
+	db := &fakeArchiveImportDB{row: models.ArchiveImportBatch{Status: "extracting"}}
+	enqueuer := &fakeArchiveEnqueuer{}
+	svc := &ArchiveImportService{db: db, enqueuer: enqueuer, storageRoot: storageRoot}
+
+	if _, err := svc.ImportLocalArchive(context.Background(), ArchiveImportUploadInput{
+		UserID: uuid.New(),
+		Title:  "压缩包标题",
+	}, sourcePath); err != nil {
+		t.Fatalf("ImportLocalArchive() error = %v", err)
+	}
+	if enqueuer.extractCalls != 1 {
+		t.Fatalf("extract calls = %d, want 1", enqueuer.extractCalls)
+	}
+	if len(db.execArgs) == 0 {
+		t.Fatal("expected an insert")
+	}
+	insertArgs := db.execArgs[0]
+	if insertArgs[2] != "压缩包标题" || insertArgs[4] != "rar" {
+		t.Fatalf("insert args = %#v, want format rar", insertArgs)
+	}
+	originalPath, okPath := insertArgs[5].(string)
+	if !okPath {
+		t.Fatalf("original path type = %T", insertArgs[5])
+	}
+	if filepath.Base(originalPath) != filepath.Base(sourcePath) {
+		t.Fatalf("original path = %q, want extensionless name preserved", originalPath)
+	}
+}

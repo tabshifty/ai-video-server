@@ -146,11 +146,16 @@ func (s *CloudDownloadImportService) Preview(ctx context.Context, taskID int64) 
 }
 
 // classifyCloudImportFile decides the actual kind from file content, not from
-// the (possibly stale) declared name. An archive requires both a supported
-// extension and an archive MIME; everything else must prove a video stream.
+// the (possibly stale) declared name. Archive content wins outright so an
+// extensionless download or a hand-corrected name still enters the archive
+// flow; otherwise the name plus MIME must agree, and everything else must
+// prove a video stream.
 func (s *CloudDownloadImportService) classifyCloudImportFile(ctx context.Context, sourcePath string) (string, string, error) {
 	name := filepath.Base(sourcePath)
 	mime := detectCloudImportMIME(sourcePath)
+	if format, err := detectArchiveFormatByContent(sourcePath); err == nil {
+		return models.CloudImportKindArchive, archiveMIMEForFormat(format), nil
+	}
 	if isSupportedArchiveFile(name, mime) {
 		return models.CloudImportKindArchive, archivePreviewMIME(name, mime), nil
 	}
@@ -715,7 +720,7 @@ func resolveCloudImportSource(downloadDir, localPath string) (string, os.FileInf
 	}
 	resolvedTarget, err := filepath.EvalSymlinks(absTarget)
 	if err != nil {
-		return "", nil, fmt.Errorf("%w: %s", models.ErrCloudImportFileMissing, localPath)
+		return "", nil, fmt.Errorf("%w: %s（文件可能已被改名或移出下载目录；导入以任务记录的 local_path 为准）", models.ErrCloudImportFileMissing, localPath)
 	}
 	rel, err := filepath.Rel(absRoot, resolvedTarget)
 	if err != nil || filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
@@ -742,7 +747,8 @@ func normalizeCloudImportInput(input models.CloudDownloadImportInput, sourcePath
 		}
 		input.Type = videoType
 	case models.CloudImportKindArchive:
-		if !isSupportedArchiveFile(filename, detectCloudImportMIME(sourcePath)) {
+		if _, contentErr := detectArchiveFormatByContent(sourcePath); contentErr != nil &&
+			!isSupportedArchiveFile(filename, detectCloudImportMIME(sourcePath)) {
 			return input, fmt.Errorf("%w: %s", models.ErrCloudImportUnsupported, filename)
 		}
 		if input.HasPassword && strings.TrimSpace(input.Password) == "" {
@@ -854,6 +860,21 @@ func isSupportedArchiveFile(name, mime string) bool {
 	return isArchiveMIME(lower)
 }
 
+// archiveMIMEForFormat reports the canonical MIME for a detected format so the
+// admin preview never claims the wrong archive type.
+func archiveMIMEForFormat(format string) string {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "zip":
+		return "application/zip"
+	case "rar":
+		return "application/vnd.rar"
+	case "7z":
+		return "application/x-7z-compressed"
+	default:
+		return "application/octet-stream"
+	}
+}
+
 func archivePreviewMIME(name, detectedMIME string) string {
 	if detectedMIME != "" && detectedMIME != "application/octet-stream" && isArchiveMIME(detectedMIME) {
 		return detectedMIME
@@ -862,14 +883,5 @@ func archivePreviewMIME(name, detectedMIME string) string {
 	if err != nil {
 		return detectedMIME
 	}
-	switch format {
-	case "zip":
-		return "application/zip"
-	case "rar":
-		return "application/vnd.rar"
-	case "7z":
-		return "application/x-7z-compressed"
-	default:
-		return detectedMIME
-	}
+	return archiveMIMEForFormat(format)
 }

@@ -1,5 +1,13 @@
 # plan.md
 
+## 2026-11-09 14:50 +0800 修复：115 云下载无后缀压缩包无法导入
+- 现象：pick_code `ayh1l3w7q5eenhfj9` 的 115 云下载文件实际是 RAR，但落盘文件名没有后缀，管理端无法识别为压缩包；手工改成 `.zip` 后预览/导入报 `cloud: downloaded file is missing: ...part2`。
+- 根因：压缩包识别与 `ImportLocalArchive` 都只按扩展名判定格式；`resolveCloudImportSource` 严格匹配任务记录的 `local_path`，文件被改名即视为缺失。原文件无后缀时既识别不了压缩包，改名又会破坏导入路径。
+- 修复：新增按魔数识别 zip/rar/7z 的 `detectArchiveFormatByContent` 和内容优先的 `detectArchiveFormatForFile`；云下载导入分类、归档参数校验与 `ImportLocalArchive` 改为内容优先，扩展名 + 归档 MIME 仅作空/截断文件后备；预览 MIME 统一由检测到的格式给出；源文件缺失错误补充改名提示。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/cloud_download_import_service.go`、对应三个测试文件、`CONTEXT.md`、`plan.md`。仅服务端变更，不涉及手机/TV 版本号与管理端代码。
+- 验证：`go build ./...` 通过；新增 5 个定向用例通过；services 整包除既有 TV APK 版本夹具失败（148/121，与本轮无关）外通过；`internal/handlers`、`internal/cloud` 通过；`go vet ./internal/services/...` 通过。
+- 后续：既有任务需把文件恢复到记录的 `local_path`（原名，无后缀）再导入，或把 `local_path` 更新为实际文件名；部署新版本后无后缀文件无需再手工补后缀。
+
 ## 2026-11-09 分组及合集弹窗：实现与验证完成
 - 实现：新建和编辑分组统一完整弹窗，使用独立表单副本；合集使用叠加弹窗，创建后回填外层表单；保留组配置锁定、重名检查及失败重试。
 - 验证：组件与工作台定向 15 个测试通过，管理端构建通过（既有大包体警告）；浏览器隔离模拟接口核验完整字段、新建视频合集回填、分组保存、右键编辑和取消不保存，无控制台错误。未执行真实入库链路。

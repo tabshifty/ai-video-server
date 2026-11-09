@@ -445,7 +445,7 @@ func (s *ArchiveImportService) ImportLocalArchive(ctx context.Context, in Archiv
 		return models.ArchiveImportBatch{}, fmt.Errorf("archive source is not a regular file")
 	}
 	filename := filepath.Base(sourcePath)
-	format, err := detectArchiveFormat(filename)
+	format, err := detectArchiveFormatForFile(filename, sourcePath)
 	if err != nil {
 		return models.ArchiveImportBatch{}, err
 	}
@@ -1942,6 +1942,56 @@ func detectArchiveFormat(filename string) (string, error) {
 	default:
 		return "", ErrArchiveUnsupportedFormat
 	}
+}
+
+// archiveFormatSignatures are the leading bytes of the supported archives.
+// RAR has two signatures: 4.x starts "Rar!\x1a\x07\x00" and 5.x extends it
+// with "\x01\x00".
+var archiveFormatSignatures = []struct {
+	format string
+	magic  []byte
+}{
+	{format: "zip", magic: []byte("PK\x03\x04")},
+	{format: "zip", magic: []byte("PK\x05\x06")},
+	{format: "zip", magic: []byte("PK\x07\x08")},
+	{format: "rar", magic: []byte("Rar!\x1a\x07\x00")},
+	{format: "rar", magic: []byte("Rar!\x1a\x07\x01\x00")},
+	{format: "7z", magic: []byte("7z\xbc\xaf\x27\x1c")},
+}
+
+// detectArchiveFormatByContent identifies an archive from its leading bytes.
+// 115 sometimes delivers files without a name extension and an admin may fix
+// the extension by hand, so the stored name cannot decide the format alone.
+func detectArchiveFormatByContent(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	header := make([]byte, 8)
+	read, readErr := io.ReadFull(file, header)
+	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
+		return "", readErr
+	}
+	header = header[:read]
+	for _, signature := range archiveFormatSignatures {
+		if bytes.HasPrefix(header, signature.magic) {
+			return signature.format, nil
+		}
+	}
+	return "", ErrArchiveUnsupportedFormat
+}
+
+// detectArchiveFormatForFile prefers the actual content and falls back to the
+// name, so a mislabeled or extensionless archive still extracts with the right
+// tool.
+func detectArchiveFormatForFile(filename, path string) (string, error) {
+	if strings.TrimSpace(path) != "" {
+		if format, err := detectArchiveFormatByContent(path); err == nil {
+			return format, nil
+		}
+	}
+	return detectArchiveFormat(filename)
 }
 
 func (s *ArchiveImportService) extractArchive(ctx context.Context, format, archivePath, extractedDir, password, requestedMode string) (mode string, err error) {

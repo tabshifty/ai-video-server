@@ -426,6 +426,59 @@ func TestCloudImportPreviewUsesContentNotExtension(t *testing.T) {
 	}
 }
 
+func TestCloudImportPreviewClassifiesExtensionlessArchiveByContent(t *testing.T) {
+	t.Parallel()
+
+	h := newCloudImportHarness(t)
+	name := "www.98T.la@91Pron【性感小皮鞭】53部官方原版大尺度视频part2"
+	path := filepath.Join(filepath.Dir(h.source), name)
+	if err := os.WriteFile(path, []byte("Rar!\x1a\x07\x01\x00payload"), 0o644); err != nil {
+		t.Fatalf("write rar: %v", err)
+	}
+	h.source = path
+	h.tasks.task.LocalPath = path
+
+	preview, err := h.svc.Preview(context.Background(), 7)
+	if err != nil {
+		t.Fatalf("Preview() error = %v", err)
+	}
+	if preview.Kind != models.CloudImportKindArchive {
+		t.Fatalf("kind = %s, want archive", preview.Kind)
+	}
+	if preview.Name != name {
+		t.Fatalf("name = %q, want %q", preview.Name, name)
+	}
+	if preview.Mime != "application/vnd.rar" {
+		t.Fatalf("mime = %q, want application/vnd.rar", preview.Mime)
+	}
+}
+
+func TestCloudImportCreateAcceptsExtensionlessArchiveByContent(t *testing.T) {
+	t.Parallel()
+
+	h := newCloudImportHarness(t)
+	path := filepath.Join(filepath.Dir(h.source), "无后缀压缩包")
+	if err := os.WriteFile(path, []byte("Rar!\x1a\x07\x00payload"), 0o644); err != nil {
+		t.Fatalf("write rar: %v", err)
+	}
+	h.source = path
+	h.tasks.task.LocalPath = path
+
+	record, err := h.svc.Create(context.Background(), 7, models.CloudDownloadImportInput{Kind: models.CloudImportKindArchive}, nil)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if record.Kind != models.CloudImportKindArchive {
+		t.Fatalf("kind = %s, want archive", record.Kind)
+	}
+	if len(h.enqueuer.ingestCalls) != 1 {
+		t.Fatalf("ingest calls = %d, want 1", len(h.enqueuer.ingestCalls))
+	}
+	if len(h.upload.previewInputs) != 0 || len(h.upload.saveInputs) != 0 {
+		t.Fatalf("archive import must not touch the video upload flow")
+	}
+}
+
 func TestCloudImportPreviewRejectsUnsupportedFile(t *testing.T) {
 	t.Parallel()
 
