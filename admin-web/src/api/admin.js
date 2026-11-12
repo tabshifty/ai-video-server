@@ -255,3 +255,7 @@ export const getAdminArchiveWorkspace = (id) => request.get(`/admin/archive-impo
 export const saveAdminArchiveWorkspace = (id, payload) => request.put(`/admin/archive-import/batches/${id}/workspace`, payload)
 export const submitAdminArchiveWorkspace = (id, payload) => request.post(`/admin/archive-import/batches/${id}/workspace/submit`, payload)
 export const generateAdminArchiveWorkspaceGroups = (id, payload) => request.post(`/admin/archive-import/batches/${id}/workspace/generate-groups`, payload)
+
+export const getVideoRotation = (id) => request.get(`/admin/videos/${id}/rotation`)
+export const previewVideoRotation = (id, mode) => request.post(`/admin/videos/${id}/rotation/preview`, { mode }, { timeout: 45000 })
+export const submitVideoRotation = (id, payload) => request.post(`/admin/videos/${id}/rotation`, payload, { timeout: 60000 })

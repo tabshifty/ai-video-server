@@ -5,6 +5,7 @@ import { Delete, EditPen, MagicStick, MoreFilled, Refresh, Setting, Search } fro
 import { useRouter } from 'vue-router'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
 import Layout from '../components/Layout.vue'
+import VideoRotationPanel from '../components/VideoRotationPanel.vue'
 import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import BulkActionBar from '../components/base/BulkActionBar.vue'
 import EmptyState from '../components/base/EmptyState.vue'
@@ -902,6 +903,29 @@ async function showDetail(row) {
   if (canPreviewVideoStatus(detail.value?.status)) {
     await refreshPlayURL(requestToken)
   }
+}
+
+async function rotationCompleted() {
+  const videoID = detail.value?.id
+  if (!videoID) return
+  const token = detailRequestToken.value
+  const latest = await getAdminVideoDetail(videoID)
+  if (!detailVisible.value || token !== detailRequestToken.value || detail.value?.id !== videoID) return
+  // Keep unsaved form edits and the current playback session intact.
+  for (const field of ['transcoded_file_size', 'transcoded_path', 'original_path', 'width', 'height', 'updated_at']) {
+    detail.value[field] = latest[field]
+  }
+  const baseline = JSON.parse(detailSnapshot.value || '{}')
+  if (baseline.id === videoID) {
+    if ((detail.value.thumbnail_path || '') === (baseline.thumbnail_path || '')) detail.value.thumbnail_path = latest.thumbnail_path
+    baseline.thumbnail_path = latest.thumbnail_path || ''
+    detailSnapshot.value = JSON.stringify(baseline)
+  }
+  detail.value.metadata ||= {}
+  for (const key of ['playback_path', 'codec', 'playback_codec', 'playback_compat', 'playback_file_revision', 'direction_rotation']) {
+    if (latest.metadata?.[key] !== undefined) detail.value.metadata[key] = latest.metadata[key]
+  }
+  load().catch(() => {})
 }
 
 async function refreshPlayURL(expectedToken = detailRequestToken.value) {
@@ -2021,6 +2045,9 @@ onBeforeUnmount(() => {
 
         <el-tab-pane label="文件与播放" name="playback">
         <SectionCard dense>
+          <el-form-item label="修正方向">
+            <VideoRotationPanel v-if="detailVisible" :key="detail.id" :video="detail" @completed="rotationCompleted().catch(() => ElMessage.warning('修正已完成，请刷新详情查看文件信息'))" />
+          </el-form-item>
           <el-form-item label="转码后大小">
             {{ formatFileSize(detail.transcoded_file_size) }}
           </el-form-item>

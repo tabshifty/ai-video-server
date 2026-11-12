@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -35,11 +36,12 @@ const (
 
 // TranscodePayload carries identifiers for worker-side processing.
 type TranscodePayload struct {
-	VideoID      string `json:"video_id"`
-	InputPath    string `json:"input_path"`
-	OutputDir    string `json:"output_dir"`
-	TargetFormat string `json:"target_format"`
-	Force        bool   `json:"force,omitempty"`
+	RotationJobID string `json:"rotation_job_id,omitempty"`
+	VideoID       string `json:"video_id"`
+	InputPath     string `json:"input_path"`
+	OutputDir     string `json:"output_dir"`
+	TargetFormat  string `json:"target_format"`
+	Force         bool   `json:"force,omitempty"`
 }
 
 // Enqueuer wraps asynq client operations.
@@ -75,10 +77,14 @@ func (e *Enqueuer) EnqueueTranscode(payloadIn TranscodePayload) error {
 	if err != nil {
 		return fmt.Errorf("marshal transcode payload: %w", err)
 	}
-	_, err = e.client.Enqueue(
-		asynq.NewTask(TypeVideoTranscode, payload),
-		buildTranscodeTaskOptions(e.queue, e.transcodeTaskTimeout)...,
-	)
+	options := buildTranscodeTaskOptions(e.queue, e.transcodeTaskTimeout)
+	if payloadIn.RotationJobID != "" {
+		options = append(options, asynq.Unique(30*time.Second))
+	}
+	_, err = e.client.Enqueue(asynq.NewTask(TypeVideoTranscode, payload), options...)
+	if payloadIn.RotationJobID != "" && (errors.Is(err, asynq.ErrTaskIDConflict) || errors.Is(err, asynq.ErrDuplicateTask)) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("enqueue transcode task: %w", err)
 	}
@@ -146,11 +152,30 @@ func (p *Processor) HandleTranscode(ctx context.Context, task *asynq.Task) error
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("unmarshal payload: %w", err)
 	}
+	if payload.RotationJobID != "" {
+		jobID, err := uuid.Parse(payload.RotationJobID)
+		if err != nil {
+			return fmt.Errorf("invalid rotation job: %w", err)
+		}
+		return services.NewVideoRotationService(p.repo, p.storageRoot).Process(ctx, jobID)
+	}
 	videoID, err := uuid.Parse(payload.VideoID)
 	if err != nil {
 		return fmt.Errorf("invalid video id: %w", err)
 	}
 
+	unlock, err := p.repo.LockVideoFiles(ctx, videoID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	rotation, err := p.repo.LatestRotation(ctx, videoID)
+	if err != nil {
+		return err
+	}
+	if rotation != nil && (rotation.Status == "queued" || rotation.Status == "running" || rotation.Status == "cleanup") {
+		return repository.ErrVideoMutationBusy
+	}
 	video, err := p.repo.GetVideoByID(ctx, videoID)
 	if err != nil {
 		return err

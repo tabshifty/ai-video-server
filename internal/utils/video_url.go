@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -80,4 +81,17 @@ func imageViewURL(prefix string, imageID uuid.UUID, width, height int, fit strin
 		return base
 	}
 	return base + "?" + params.Encode()
+}
+
+// VideoThumbnailURLForPath versions generated rotation covers without exposing disk paths.
+func VideoThumbnailURLForPath(videoID uuid.UUID, path string) string {
+	base := VideoThumbnailURL(videoID)
+	filename := filepath.Base(path)
+	if strings.HasPrefix(filename, "rotation-") && strings.HasSuffix(filename, ".jpg") {
+		revision := strings.TrimSuffix(strings.TrimPrefix(filename, "rotation-"), ".jpg")
+		if id, err := uuid.Parse(revision); err == nil {
+			return base + "?v=" + id.String()
+		}
+	}
+	return base
 }

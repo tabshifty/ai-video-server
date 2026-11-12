@@ -149,7 +149,9 @@ export function buildStuckScrapeRoute(video, diagnostics) {
 
 export function getVideoThumbnailURL(video) {
   const videoID = toText(video?.id)
-  return videoID ? `/api/v1/videos/${videoID}/thumbnail` : ''
+  if (!videoID) return ''
+  const match = toText(video?.thumbnail_path).match(/rotation-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jpg$/i)
+  return `/api/v1/videos/${videoID}/thumbnail${match ? `?v=${match[1]}` : ''}`
 }
 
 export function shouldShowVideoThumbnail(video) {

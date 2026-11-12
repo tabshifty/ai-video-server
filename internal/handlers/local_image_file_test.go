@@ -133,3 +133,48 @@ func waitForLimiterRelease(t *testing.T, limiter chan struct{}) {
 		}
 	}
 }
+
+func TestMutableVideoSourceETagChangesWithinSameSecond(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	stamp := time.Now().Truncate(time.Second)
+	serve := func(path, tag string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodGet, "/source", nil)
+		c.Header("Cache-Control", "private, no-cache")
+		if tag != "" {
+			c.Request.Header.Set("If-None-Match", tag)
+		}
+		c.Request.Header.Set("If-Modified-Since", stamp.Format(http.TimeFormat))
+		if !tryServeLocalImagePath(c, path, "missing", "unavailable") {
+			t.Fatal("file not served")
+		}
+		c.Writer.WriteHeaderNow()
+		return rec
+	}
+	a, b := filepath.Join(dir, "rotation-a.mp4"), filepath.Join(dir, "rotation-b.mp4")
+	for _, path := range []string{a, b} {
+		if err := os.WriteFile(path, []byte("same-size"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first := serve(a, "")
+	if first.Code != 200 || first.Header().Get("ETag") == "" {
+		t.Fatal("missing initial version")
+	}
+	same := serve(a, first.Header().Get("ETag"))
+	if same.Code != 304 {
+		t.Fatalf("unchanged status %d", same.Code)
+	}
+	changed := serve(b, first.Header().Get("ETag"))
+	if changed.Code != 200 {
+		t.Fatalf("rotated file incorrectly cached: %d", changed.Code)
+	}
+	if changed.Header().Get("ETag") == first.Header().Get("ETag") {
+		t.Fatal("different rotations share ETag")
+	}
+}

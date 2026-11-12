@@ -257,6 +257,26 @@ FROM videos
 	}
 	rows.Close()
 
+	rotationRows, err := r.pool.Query(ctx, `SELECT input_path, original_path, old_thumbnail, output_path, thumbnail_path FROM video_rotation_jobs WHERE status IN ('queued','running','cleanup')`)
+	if err != nil {
+		return nil, fmt.Errorf("query rotation file references: %w", err)
+	}
+	for rotationRows.Next() {
+		var input, original, oldThumb, output, thumb string
+		if err := rotationRows.Scan(&input, &original, &oldThumb, &output, &thumb); err != nil {
+			rotationRows.Close()
+			return nil, err
+		}
+		for _, path := range []string{input, original, oldThumb, output, thumb} {
+			add(path)
+		}
+	}
+	if err := rotationRows.Err(); err != nil {
+		rotationRows.Close()
+		return nil, err
+	}
+	rotationRows.Close()
+
 	rows, err = r.pool.Query(ctx, `
 SELECT COALESCE(original_path, ''), COALESCE(stored_path, ''), COALESCE(metadata, '{}'::jsonb)
 FROM images

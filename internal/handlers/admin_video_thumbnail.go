@@ -25,6 +25,22 @@ func (a *API) AdminCaptureVideoThumbnail(c *gin.Context) {
 		return
 	}
 
+	unlock, err := a.repo.LockVideoFiles(c.Request.Context(), videoID)
+	if err != nil {
+		response.Error(c, 1093, err.Error())
+		return
+	}
+	defer unlock()
+	rotation, err := a.repo.LatestRotation(c.Request.Context(), videoID)
+	if err != nil {
+		response.Error(c, 1093, "读取方向修正任务失败")
+		return
+	}
+	if rotation != nil && (rotation.Status == "queued" || rotation.Status == "running" || rotation.Status == "cleanup") {
+		response.Error(c, 1093, "视频方向修正或清理进行中，请稍后设置封面")
+		return
+	}
+
 	var req struct {
 		TimeSeconds float64 `json:"time_seconds"`
 	}

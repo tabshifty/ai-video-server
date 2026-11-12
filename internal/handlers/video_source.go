@@ -38,6 +38,7 @@ func (a *API) VideoSource(c *gin.Context) {
 	if !ok {
 		return
 	}
+	c.Header("Cache-Control", "private, no-cache")
 	if !tryServeLocalImagePath(c, sourcePath, "video source not found", "video source temporarily unavailable") {
 		return
 	}
@@ -60,6 +61,7 @@ func (a *API) VideoThumbnail(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+	c.Header("Cache-Control", "private, no-cache")
 	serveOpenedLocalImage(c, thumbPath, file, info)
 }
 
@@ -93,6 +95,7 @@ func (a *API) VideoSourceSigned(c *gin.Context) {
 	if !ok {
 		return
 	}
+	c.Header("Cache-Control", "private, no-cache")
 	if !tryServeLocalImagePath(c, sourcePath, "video source not found", "video source temporarily unavailable") {
 		return
 	}

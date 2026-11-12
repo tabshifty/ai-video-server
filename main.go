@@ -383,6 +383,7 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	workspaceCtx, workspaceCancel := context.WithCancel(context.Background())
 	defer workspaceCancel()
 	go archiveImportSvc.RunWorkspaceReconciler(workspaceCtx)
+	go processor.RunRotationReconciler(workspaceCtx)
 	if cfg.CloudDownloadEnabled {
 		cloudClient := cloud.NewClient(cfg.CloudBrowserCDP, cfg.CloudBrowserApp)
 		cloudRepo := repository.NewCloudDownloadRepository(pool)

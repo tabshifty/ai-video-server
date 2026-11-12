@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"mime"
 	"net/http"
 	"os"
@@ -123,11 +125,20 @@ func serveOpenedLocalImage(c *gin.Context, path string, file *os.File, info os.F
 	if info != nil {
 		c.Header("Content-Length", strconv.FormatInt(info.Size(), 10))
 		modTime = info.ModTime()
+		if c.Writer.Header().Get("Cache-Control") == "private, no-cache" {
+			tag := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", path, info.Size(), info.ModTime().UnixNano())))
+			c.Header("ETag", fmt.Sprintf("\"%x\"", tag))
+			// Mutable source URLs use the precise version tag; second-resolution dates
+			// must not validate a different rotation published during the same second.
+			modTime = time.Time{}
+		}
 	}
 	if mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(path))); mimeType != "" && strings.TrimSpace(c.Writer.Header().Get("Content-Type")) == "" {
 		c.Header("Content-Type", mimeType)
 	}
-	c.Header("Cache-Control", "public, max-age=86400")
+	if c.Writer.Header().Get("Cache-Control") == "" {
+		c.Header("Cache-Control", "public, max-age=86400")
+	}
 	http.ServeContent(c.Writer, c.Request, filepath.Base(path), modTime, file)
 }
 

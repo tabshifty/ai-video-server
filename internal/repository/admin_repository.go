@@ -306,6 +306,26 @@ func (r *VideoRepository) AdminUpdateVideo(ctx context.Context, videoID uuid.UUI
 	if err != nil {
 		return err
 	}
+	var currentMetadata map[string]any
+	if err := json.Unmarshal(video.Metadata, &currentMetadata); err != nil {
+		return fmt.Errorf("读取现有视频元数据失败: %w", err)
+	}
+	if revision, ok := currentMetadata["playback_file_revision"].(string); ok && revision != "" {
+		if metadata["playback_file_revision"] != revision {
+			return fmt.Errorf("视频方向已更新，请刷新详情后再保存")
+		}
+		// File-owned metadata cannot be rolled back by an older open admin form.
+		for _, key := range []string{"playback_path", "playback_codec", "codec", "playback_compat", "direction_rotation", "thumbnail_source"} {
+			if value, exists := currentMetadata[key]; exists {
+				metadata[key] = value
+			}
+		}
+		raw, err = json.Marshal(metadata)
+		if err != nil {
+			return err
+		}
+	}
+
 	nextType := strings.ToLower(strings.TrimSpace(targetType))
 	if nextType == "" {
 		nextType = video.Type
@@ -622,11 +642,11 @@ func validateAdminVideoStatusEdit(video models.Video, status string) error {
 func lockVideoForAdminUpdate(ctx context.Context, tx pgx.Tx, videoID uuid.UUID) (models.Video, error) {
 	var video models.Video
 	if err := tx.QueryRow(ctx, `
-SELECT type, status
+SELECT type, status, COALESCE(metadata,'{}'::jsonb)
 FROM videos
 WHERE id=$1
 FOR UPDATE
-`, videoID).Scan(&video.Type, &video.Status); err != nil {
+`, videoID).Scan(&video.Type, &video.Status, &video.Metadata); err != nil {
 		return models.Video{}, fmt.Errorf("lock video for admin update: %w", err)
 	}
 	return video, nil
@@ -635,7 +655,7 @@ FOR UPDATE
 func (r *VideoRepository) AdminUpdateVideoThumbnail(ctx context.Context, videoID uuid.UUID, thumbnailPath string) error {
 	_, err := r.pool.Exec(ctx, `
 UPDATE videos
-SET thumbnail_path=$2, updated_at=NOW()
+SET thumbnail_path=$2, metadata=COALESCE(metadata,'{}'::jsonb)||'{"thumbnail_source":"manual"}'::jsonb, updated_at=NOW()
 WHERE id=$1
 `, videoID, strings.TrimSpace(thumbnailPath))
 	if err != nil {

@@ -284,3 +284,26 @@ func TestAdminDeleteLatestOrphanFileScanRejectsIncompleteScan(t *testing.T) {
 		t.Fatalf("expected no delete call, got %d", repo.deleteCalls)
 	}
 }
+
+func TestOrphanDeleteSkipsNewlyReferencedRotationOutput(t *testing.T) {
+	dir := t.TempDir()
+	active := filepath.Join(dir, "rotation-active.mp4")
+	orphan := filepath.Join(dir, "orphan.mp4")
+	for _, path := range []string{active, orphan} {
+		if err := os.WriteFile(path, []byte("sample"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot := []models.AdminOrphanFileScanItem{{FilePath: active}, {FilePath: orphan}}
+	items := unreferencedOrphanItems(snapshot, map[string]struct{}{active: {}})
+	deleted, err := deleteOrphanFileScanItems(items)
+	if err != nil || deleted != 1 {
+		t.Fatalf("deleted %d: %v", deleted, err)
+	}
+	if _, err = os.Stat(active); err != nil {
+		t.Fatal("newly referenced output removed")
+	}
+	if _, err = os.Stat(orphan); !os.IsNotExist(err) {
+		t.Fatal("orphan not removed")
+	}
+}

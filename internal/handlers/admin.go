@@ -631,6 +631,11 @@ func deleteVideosIndividually(videoIDs []uuid.UUID, deleteFn func(videoID uuid.U
 }
 
 func (a *API) deleteVideoResources(ctx context.Context, videoID uuid.UUID) error {
+	unlock, err := a.repo.LockVideoFiles(ctx, videoID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	video, err := a.repo.GetVideoByID(ctx, videoID)
 	if err != nil {
 		return err
@@ -660,6 +665,12 @@ func (a *API) AdminRetranscodeVideo(c *gin.Context) {
 		bad(c, "invalid video id")
 		return
 	}
+	unlock, lockErr := a.repo.LockVideoFiles(c.Request.Context(), videoID)
+	if lockErr != nil {
+		response.Error(c, 1093, lockErr.Error())
+		return
+	}
+	defer unlock()
 	video, err := a.repo.GetVideoByID(c.Request.Context(), videoID)
 	if err != nil {
 		response.Error(c, 1011, err.Error())
@@ -1082,7 +1093,17 @@ func (a *API) AdminDeleteLatestOrphanFileScan(c *gin.Context) {
 		return
 	}
 
-	deletedCount, deleteErr := deleteOrphanFileScanItems(scan.Items)
+	items := scan.Items
+	// The scan is a snapshot: a rotation may have published one of these files since then.
+	if a.repo != nil {
+		refs, err := a.repo.CollectReferencedFilePaths(c.Request.Context(), a.storageRoot)
+		if err != nil {
+			response.Error(c, 1070, "重新核对文件引用失败，未执行删除")
+			return
+		}
+		items = unreferencedOrphanItems(items, refs)
+	}
+	deletedCount, deleteErr := deleteOrphanFileScanItems(items)
 	if deleteErr != nil {
 		response.Error(c, 1070, deleteErr.Error())
 		return
@@ -1095,6 +1116,16 @@ func (a *API) AdminDeleteLatestOrphanFileScan(c *gin.Context) {
 	scan.Status = "deleted"
 	scan.DeletedFiles = deletedCount
 	ok(c, scan)
+}
+
+func unreferencedOrphanItems(items []models.AdminOrphanFileScanItem, refs map[string]struct{}) []models.AdminOrphanFileScanItem {
+	result := make([]models.AdminOrphanFileScanItem, 0, len(items))
+	for _, item := range items {
+		if _, used := refs[filepath.Clean(strings.TrimSpace(item.FilePath))]; !used {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func deleteOrphanFileScanItems(items []models.AdminOrphanFileScanItem) (int64, error) {

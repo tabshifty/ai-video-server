@@ -126,7 +126,7 @@ WHERE user_id=$1 AND video_id=$2 AND action_type IN ('like','favorite','dislike'
 		detail.Metadata = []byte(`{}`)
 	}
 	if strings.TrimSpace(detail.ThumbnailPath) != "" {
-		detail.ThumbnailPath = utils.VideoThumbnailURL(detail.ID)
+		detail.ThumbnailPath = utils.VideoThumbnailURLForPath(detail.ID, detail.ThumbnailPath)
 	}
 	return detail, nil
 }
@@ -629,7 +629,7 @@ func (r *VideoRepository) attachCollectionsToVideoListItems(ctx context.Context,
 
 func finalizeVideoListItem(item *models.VideoListItem, rawMetadata []byte) {
 	if strings.TrimSpace(item.ThumbnailPath) != "" {
-		item.ThumbnailPath = utils.VideoThumbnailURL(item.ID)
+		item.ThumbnailPath = utils.VideoThumbnailURLForPath(item.ID, item.ThumbnailPath)
 	}
 	item.Metadata = normalizeVideoListItemMetadata(rawMetadata)
 }

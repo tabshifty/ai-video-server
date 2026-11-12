@@ -397,7 +397,7 @@ LIMIT $1`, limit)
 			return nil, fmt.Errorf("scan random short: %w", err)
 		}
 		if strings.TrimSpace(v.ThumbnailPath) != "" {
-			v.ThumbnailPath = utils.VideoThumbnailURL(v.ID)
+			v.ThumbnailPath = utils.VideoThumbnailURLForPath(v.ID, v.ThumbnailPath)
 		}
 		out = append(out, v)
 	}
@@ -1064,7 +1064,7 @@ LIMIT $3`, userID, tags, limit)
 			return nil, fmt.Errorf("scan candidate: %w", err)
 		}
 		if strings.TrimSpace(v.ThumbnailPath) != "" {
-			v.ThumbnailPath = utils.VideoThumbnailURL(v.ID)
+			v.ThumbnailPath = utils.VideoThumbnailURLForPath(v.ID, v.ThumbnailPath)
 		}
 		out = append(out, v)
 	}
@@ -1101,7 +1101,7 @@ LIMIT $1`, limit)
 			return nil, fmt.Errorf("scan hot video: %w", err)
 		}
 		if strings.TrimSpace(v.ThumbnailPath) != "" {
-			v.ThumbnailPath = utils.VideoThumbnailURL(v.ID)
+			v.ThumbnailPath = utils.VideoThumbnailURLForPath(v.ID, v.ThumbnailPath)
 		}
 		out = append(out, v)
 	}
