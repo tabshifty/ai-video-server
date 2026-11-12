@@ -1325,3 +1325,169 @@ func TestDetectArchiveFormatForFilePrefersContentOverName(t *testing.T) {
 		t.Fatalf("unsupported name-only error = %v, want ErrArchiveUnsupportedFormat", err)
 	}
 }
+
+func TestArchiveBatchRootPathOnlyAcceptsManagedBatchDir(t *testing.T) {
+	t.Parallel()
+
+	storageRoot := filepath.Join(string(filepath.Separator), "data", "storage")
+	batchID := uuid.New()
+	managedRoot := filepath.Join(storageRoot, "archive-imports", batchID.String())
+
+	cases := []struct {
+		name  string
+		batch models.ArchiveImportBatch
+		want  string
+	}{
+		{
+			name: "standard layout",
+			batch: models.ArchiveImportBatch{
+				ID:           batchID,
+				OriginalPath: filepath.Join(managedRoot, "original", "demo.zip"),
+				ExtractedDir: filepath.Join(managedRoot, "extracted"),
+			},
+			want: managedRoot,
+		},
+		{
+			name: "original directly in batch root",
+			batch: models.ArchiveImportBatch{
+				ID:           batchID,
+				OriginalPath: filepath.Join(managedRoot, "demo.zip"),
+				ExtractedDir: filepath.Join(managedRoot, "extracted"),
+			},
+			want: managedRoot,
+		},
+		{
+			name: "unmanaged path",
+			batch: models.ArchiveImportBatch{
+				ID:           batchID,
+				OriginalPath: filepath.Join(storageRoot, "uploads", "demo.zip"),
+				ExtractedDir: filepath.Join(storageRoot, "uploads", "extracted"),
+			},
+			want: "",
+		},
+		{
+			name: "nested under managed root",
+			batch: models.ArchiveImportBatch{
+				ID:           batchID,
+				OriginalPath: filepath.Join(managedRoot, "nested", "original", "demo.zip"),
+			},
+			want: "",
+		},
+		{
+			name:  "missing paths",
+			batch: models.ArchiveImportBatch{ID: batchID},
+			want:  "",
+		},
+	}
+	for _, tt := range cases {
+		if got := archiveBatchRootPath(storageRoot, tt.batch); got != tt.want {
+			t.Fatalf("%s: archiveBatchRootPath() = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+	if got := archiveBatchRootPath("", models.ArchiveImportBatch{OriginalPath: filepath.Join(managedRoot, "original", "demo.zip")}); got != "" {
+		t.Fatalf("empty storage root must not resolve: %q", got)
+	}
+}
+
+func TestRemoveArchiveBatchFilesDeletesManagedBatchRoot(t *testing.T) {
+	t.Parallel()
+
+	storageRoot := t.TempDir()
+	batchID := uuid.New()
+	batchRoot := filepath.Join(storageRoot, "archive-imports", batchID.String())
+	originalDir := filepath.Join(batchRoot, "original")
+	extractedDir := filepath.Join(batchRoot, "extracted")
+	nestedDir := filepath.Join(extractedDir, "第一季", "子目录")
+	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
+		t.Fatalf("mkdir extracted: %v", err)
+	}
+	if err := os.MkdirAll(originalDir, 0o755); err != nil {
+		t.Fatalf("mkdir original: %v", err)
+	}
+	for path, body := range map[string]string{
+		filepath.Join(originalDir, "demo.zip"): "archive-body",
+		filepath.Join(nestedDir, "第一集.mp4"):    "video-body",
+		filepath.Join(batchRoot, ".DS_Store"):  "finder-metadata",
+	} {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+	batch := models.ArchiveImportBatch{
+		ID:           batchID,
+		OriginalPath: filepath.Join(originalDir, "demo.zip"),
+		ExtractedDir: extractedDir,
+	}
+
+	if err := removeArchiveBatchFiles(storageRoot, batch); err != nil {
+		t.Fatalf("removeArchiveBatchFiles() error = %v", err)
+	}
+	if _, err := os.Stat(batchRoot); !os.IsNotExist(err) {
+		t.Fatalf("batch root still exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(storageRoot, "archive-imports")); err != nil {
+		t.Fatalf("managed root should remain: %v", err)
+	}
+}
+
+func TestRemoveArchiveBatchFilesKeepsUnmanagedParent(t *testing.T) {
+	t.Parallel()
+
+	storageRoot := t.TempDir()
+	outside := filepath.Join(storageRoot, "elsewhere")
+	originalDir := filepath.Join(outside, "original")
+	extractedDir := filepath.Join(outside, "extracted")
+	if err := os.MkdirAll(filepath.Join(extractedDir, "nested"), 0o755); err != nil {
+		t.Fatalf("mkdir extracted: %v", err)
+	}
+	if err := os.MkdirAll(originalDir, 0o755); err != nil {
+		t.Fatalf("mkdir original: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(originalDir, "demo.zip"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("write original: %v", err)
+	}
+	batch := models.ArchiveImportBatch{
+		OriginalPath: filepath.Join(originalDir, "demo.zip"),
+		ExtractedDir: extractedDir,
+	}
+
+	if err := removeArchiveBatchFiles(storageRoot, batch); err != nil {
+		t.Fatalf("removeArchiveBatchFiles() error = %v", err)
+	}
+	if _, err := os.Stat(originalDir); !os.IsNotExist(err) {
+		t.Fatalf("original dir still exists: %v", err)
+	}
+	if _, err := os.Stat(extractedDir); !os.IsNotExist(err) {
+		t.Fatalf("extracted dir still exists: %v", err)
+	}
+	if _, err := os.Stat(outside); err != nil {
+		t.Fatalf("unmanaged parent must remain: %v", err)
+	}
+}
+
+func TestRemoveArchiveBatchFilesKeepsLegacyStorageRoot(t *testing.T) {
+	t.Parallel()
+
+	storageRoot := t.TempDir()
+	batchDir := filepath.Join(storageRoot, uuid.NewString())
+	if err := os.MkdirAll(batchDir, 0o755); err != nil {
+		t.Fatalf("mkdir batch: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(batchDir, "demo.zip"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("write batch file: %v", err)
+	}
+	batch := models.ArchiveImportBatch{
+		OriginalPath: filepath.Join(batchDir, "demo.zip"),
+		ExtractedDir: batchDir,
+	}
+
+	if err := removeArchiveBatchFiles(storageRoot, batch); err != nil {
+		t.Fatalf("removeArchiveBatchFiles() error = %v", err)
+	}
+	if _, err := os.Stat(batchDir); !os.IsNotExist(err) {
+		t.Fatalf("legacy batch dir still exists: %v", err)
+	}
+	if _, err := os.Stat(storageRoot); err != nil {
+		t.Fatalf("storage root must remain: %v", err)
+	}
+}

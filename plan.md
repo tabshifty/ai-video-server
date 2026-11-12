@@ -1,5 +1,13 @@
 # plan.md
 
+## 2026-11-12 14:40 +0800 修复：删除压缩包批次后遗留空目录
+- 现象：完成压缩包入库后删除批次，界面提示成功，但磁盘 `STORAGE_ROOT/archive-imports/` 下留下大量空文件夹（349 个，其中 2 个含 `.DS_Store`）。
+- 根因：`DeleteBatch` 只递归删除 `<batchID>/original` 与 `<batchID>/extracted`，从不删除 `<batchID>/` 本身；每个已删批次因此留下一个空目录。
+- 修复：抽出 `removeArchiveBatchFiles`，在删除登记路径后清理受管批次根目录；新增 `archiveBatchRootPath`，只接受 `archive-imports` 的直接子目录，自定义/历史布局只删登记路径，避免误删父目录；`.DS_Store` 随 `RemoveAll` 一并清除。
+- 影响文件：`internal/services/archive_import.go`、`internal/services/archive_import_test.go`、`CONTEXT.md`、`plan.md`。仅服务端变更，不涉及手机/TV 版本号与管理端代码。
+- 运维：确认数据库 `archive_import_batches` 与活动作业均为 0 后，一次性删除部署机 349 个孤立批次目录（释放约 16 KB；目录本身为空，仅占 inode）。
+- 验证：新增 4 个定向用例（受管布局、非受管父目录、历史布局、根路径判定）通过；services 整包除既有 TV APK 版本夹具失败外通过；`internal/handlers` 通过；`go vet ./internal/services/...` 通过。
+
 ## 2026-11-12 视频方向修正：最终验证与提交范围
 - 交付：管理端“视频管理 → 编辑 → 文件与播放 → 修正方向”；无损优先，重编码明确确认，持续可播放，发布后删除旧文件，任务幂等与失败恢复。
 - 验证：隔离PG16集成与race、真实FFmpeg流摘要/画面方向/VideoToolbox重编码通过；Chrome真实H.264无损标记显示160×96→96×160，模拟管理端完整交互及390px布局通过；前端54个定向用例及构建、go vet ./...、go build ./...通过。

@@ -574,14 +574,28 @@ func (s *ArchiveImportService) DeleteBatch(ctx context.Context, batchID uuid.UUI
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
-	cleanupPaths := archiveBatchCleanupPaths(batch)
-	for _, path := range cleanupPaths {
+	return removeArchiveBatchFiles(s.storageRoot, batch)
+}
+
+// removeArchiveBatchFiles deletes the batch's original/extracted paths and, for
+// the managed layout, the per-batch directory that contained them. Leaving that
+// directory behind produced one empty (or .DS_Store-only) folder per deleted
+// batch.
+func removeArchiveBatchFiles(storageRoot string, batch models.ArchiveImportBatch) error {
+	for _, path := range archiveBatchCleanupPaths(batch) {
 		if path == "" {
 			continue
 		}
 		if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove archive batch path %s: %w", path, err)
 		}
+	}
+	batchRoot := archiveBatchRootPath(storageRoot, batch)
+	if batchRoot == "" {
+		return nil
+	}
+	if err := os.RemoveAll(batchRoot); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove archive batch root %s: %w", batchRoot, err)
 	}
 	return nil
 }
@@ -1445,6 +1459,32 @@ func archiveVideoDefaultTitle(batch models.ArchiveImportBatch, relativePath stri
 		return title
 	}
 	return deriveArchiveFileTitle(relativePath)
+}
+
+// archiveBatchRootPath returns the managed <storageRoot>/archive-imports/<batchID>
+// directory for a batch whose stored paths still follow that layout. A custom or
+// legacy path returns "" so deletion never removes an unrelated parent.
+func archiveBatchRootPath(storageRoot string, batch models.ArchiveImportBatch) string {
+	storage := strings.TrimSpace(storageRoot)
+	if storage == "" {
+		return ""
+	}
+	managed := filepath.Join(storage, "archive-imports")
+	candidates := make([]string, 0, 2)
+	if original := strings.TrimSpace(batch.OriginalPath); original != "" {
+		candidates = append(candidates, filepath.Dir(filepath.Dir(original)))
+	}
+	if extracted := strings.TrimSpace(batch.ExtractedDir); extracted != "" {
+		candidates = append(candidates, filepath.Dir(extracted))
+	}
+	for _, candidate := range candidates {
+		rel, err := filepath.Rel(managed, candidate)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || strings.ContainsRune(rel, filepath.Separator) {
+			continue
+		}
+		return candidate
+	}
+	return ""
 }
 
 func archiveBatchCleanupPaths(batch models.ArchiveImportBatch) []string {
