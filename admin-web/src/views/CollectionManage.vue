@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
+import EmptyCollectionCleanupButton from '../components/EmptyCollectionCleanupButton.vue'
 import Layout from '../components/Layout.vue'
 import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import Toolbar from '../components/base/Toolbar.vue'
@@ -192,11 +193,17 @@ async function doDelete(row) {
 }
 
 onMounted(load)
+
+function onCleanupCompleted() {
+  query.page = 1
+  load()
+}
 </script>
 
 <template>
   <Layout>
     <template #header-actions>
+      <EmptyCollectionCleanupButton kind="video" @completed="onCleanupCompleted" />
       <el-button :loading="loading" @click="load">刷新</el-button>
       <el-button type="primary" @click="openCreate">新增合集</el-button>
     </template>

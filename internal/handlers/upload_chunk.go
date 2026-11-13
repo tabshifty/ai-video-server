@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -94,6 +96,30 @@ func (a *API) UploadInit(c *gin.Context) {
 	imageCollectionIDRaw := ""
 	if imageCollectionID != nil {
 		imageCollectionIDRaw = imageCollectionID.String()
+	}
+	if len(normalizedCollectionIDs) > 0 || imageCollectionID != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 25*time.Second)
+		defer cancel()
+		release, err := a.repo.LockCollectionReferenceFiles(ctx)
+		if err != nil {
+			response.Error(c, 2001, err.Error())
+			return
+		}
+		defer release()
+		ids := make([]uuid.UUID, 0, len(normalizedCollectionIDs))
+		for _, raw := range normalizedCollectionIDs {
+			ids = append(ids, uuid.MustParse(raw))
+		}
+		if _, err = a.repo.ResolveCollectionIDs(ctx, ids); err != nil {
+			bad(c, "视频合集不存在，请刷新后重新选择")
+			return
+		}
+		if imageCollectionID != nil {
+			if _, err = a.repo.ResolveVideoImageCollectionID(ctx, []uuid.UUID{*imageCollectionID}); err != nil {
+				bad(c, "图片合集不存在，请刷新后重新选择")
+				return
+			}
+		}
 	}
 
 	session, err := a.chunkUpload.Init(

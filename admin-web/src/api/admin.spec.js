@@ -17,6 +17,8 @@ vi.mock('./request', () => ({
 }))
 
 import {
+  previewAdminEmptyCollections,
+  cleanupAdminEmptyCollections,
   batchDeleteAdminVideos,
   batchUpdateAdminArchiveImportFiles,
   batchUpdateAdminVideos,
@@ -106,6 +108,18 @@ import {
   uploadAdminVideoSubtitle,
   uploadAdminImages
 } from './admin'
+
+describe('空合集清理接口', () => {
+  it.each([
+    ['video', '/admin/collections/cleanup-empty'],
+    ['image', '/admin/image-collections/cleanup-empty']
+  ])('%s 先预览、仅提交签名凭据', (kind, path) => {
+    previewAdminEmptyCollections(kind)
+    expect(post).toHaveBeenCalledWith(`${path}/preview`)
+    cleanupAdminEmptyCollections(kind, 'signed-preview')
+    expect(post).toHaveBeenCalledWith(path, { preview_token: 'signed-preview' })
+  })
+})
 
 describe('admin forum post api', () => {
   beforeEach(() => {

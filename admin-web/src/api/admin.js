@@ -107,6 +107,14 @@ export const createAdminActor = (payload) => request.post('/admin/actors', paylo
 export const scrapeAdminActorPreview = (payload) => request.post('/admin/actors/scrape/preview', payload)
 export const updateAdminActor = (id, payload) => request.put(`/admin/actors/${id}`, payload)
 export const getAdminCollections = (params) => request.get('/admin/collections', { params })
+function emptyCollectionCleanupPath(kind) {
+  if (kind === 'video') return '/admin/collections/cleanup-empty'
+  if (kind === 'image') return '/admin/image-collections/cleanup-empty'
+  throw new Error('未知合集类型')
+}
+export const previewAdminEmptyCollections = (kind) => request.post(`${emptyCollectionCleanupPath(kind)}/preview`)
+export const cleanupAdminEmptyCollections = (kind, previewToken) =>
+  request.post(emptyCollectionCleanupPath(kind), { preview_token: previewToken })
 export const createAdminCollection = (payload) => request.post('/admin/collections', payload)
 export const updateAdminCollection = (id, payload) => request.put(`/admin/collections/${id}`, payload)
 export const deleteAdminCollection = (id) =>

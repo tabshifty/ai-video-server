@@ -69,7 +69,7 @@ func workspaceIntegrationDB(t *testing.T) *pgxpool.Pool {
 		}
 	}
 	// 新迁移可重复执行，并能在隔离库中完整撤销、重新应用。
-	for _, name := range []string{"0047_archive_workspace.up.sql", "0047_archive_workspace.down.sql", "0047_archive_workspace.up.sql"} {
+	for _, name := range []string{"0050_empty_collection_cleanup.down.sql", "0047_archive_workspace.up.sql", "0047_archive_workspace.down.sql", "0047_archive_workspace.up.sql", "0050_empty_collection_cleanup.up.sql"} {
 		raw, e := os.ReadFile(filepath.Join("../../migrations", name))
 		if e != nil {
 			t.Fatal(e)

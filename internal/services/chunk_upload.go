@@ -76,6 +76,9 @@ func (s *ChunkUploadService) Init(ctx context.Context, userID uuid.UUID, filenam
 		CreatedAt:         time.Now().UTC(),
 		LastUpdated:       time.Now().UTC(),
 	}
+	if err := os.MkdirAll(filepath.Join(s.sessionDir(session.ID), "chunks"), 0o755); err != nil {
+		return ChunkSession{}, fmt.Errorf("create session dir: %w", err)
+	}
 	if err := s.persist(session); err != nil {
 		return ChunkSession{}, err
 	}
@@ -92,8 +95,10 @@ func (s *ChunkUploadService) SaveChunk(ctx context.Context, sessionID string, ch
 		return ChunkSession{}, fmt.Errorf("chunk index out of range")
 	}
 	dir := s.sessionDir(sessionID)
-	if err := os.MkdirAll(filepath.Join(dir, "chunks"), 0o755); err != nil {
-		return ChunkSession{}, fmt.Errorf("create chunk dir: %w", err)
+	// 目录仅由 Init 创建；取消中的分片请求不得重新创建会话。
+	// 旧版 Init 未创建 chunks 子目录，仅允许在现存会话内补建这一层。
+	if err := os.Mkdir(filepath.Join(dir, "chunks"), 0o755); err != nil && !os.IsExist(err) {
+		return ChunkSession{}, fmt.Errorf("create chunk subdir: %w", err)
 	}
 	target := filepath.Join(dir, "chunks", strconv.Itoa(chunkIndex)+".part")
 	f, err := os.Create(target)
@@ -177,6 +182,56 @@ func (s *ChunkUploadService) Load(sessionID string) (ChunkSession, error) {
 	return session, nil
 }
 
+// CollectionReferences includes every retained upload session, including old ones.
+// Callers serialize new session creation with cleanup before reading this snapshot.
+func (s *ChunkUploadService) CollectionReferences(ctx context.Context, kind string) (map[uuid.UUID]bool, error) {
+	refs := map[uuid.UUID]bool{}
+	entries, err := os.ReadDir(s.baseDir)
+	if os.IsNotExist(err) {
+		return refs, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("读取上传会话目录: %w", err)
+	}
+	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if !entry.IsDir() {
+			continue
+		}
+		if _, err := uuid.Parse(entry.Name()); err != nil {
+			continue
+		}
+		raw, err := os.ReadFile(s.metaPath(entry.Name()))
+		if os.IsNotExist(err) {
+			continue
+		} // 允许同时取消会话。
+		if err != nil {
+			return nil, fmt.Errorf("读取上传会话引用: %w", err)
+		}
+		var session ChunkSession
+		if err := json.Unmarshal(raw, &session); err != nil {
+			return nil, fmt.Errorf("上传会话元数据损坏，无法安全清理合集: %w", err)
+		}
+		ids := session.CollectionIDs
+		if kind == "image" {
+			ids = []string{session.ImageCollectionID}
+		}
+		for _, rawID := range ids {
+			if strings.TrimSpace(rawID) == "" {
+				continue
+			}
+			id, err := uuid.Parse(strings.TrimSpace(rawID))
+			if err != nil {
+				return nil, fmt.Errorf("上传会话合集引用无效: %w", err)
+			}
+			refs[id] = true
+		}
+	}
+	return refs, nil
+}
+
 func (s *ChunkUploadService) sessionDir(sessionID string) string {
 	return filepath.Join(s.baseDir, sessionID)
 }
@@ -187,15 +242,25 @@ func (s *ChunkUploadService) metaPath(sessionID string) string {
 
 func (s *ChunkUploadService) persist(session ChunkSession) error {
 	dir := s.sessionDir(session.ID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create session dir: %w", err)
-	}
 	raw, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode session meta: %w", err)
 	}
-	if err := os.WriteFile(s.metaPath(session.ID), raw, 0o644); err != nil {
+	// 原子替换，避免引用扫描撞上 SaveChunk 截断写入中的元数据。
+	f, err := os.CreateTemp(dir, ".meta-*")
+	if err != nil {
+		return fmt.Errorf("create session meta: %w", err)
+	}
+	defer os.Remove(f.Name())
+	if _, err = f.Write(raw); err != nil {
+		_ = f.Close()
 		return fmt.Errorf("write session meta: %w", err)
+	}
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("close session meta: %w", err)
+	}
+	if err = os.Rename(f.Name(), s.metaPath(session.ID)); err != nil {
+		return fmt.Errorf("replace session meta: %w", err)
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
+import EmptyCollectionCleanupButton from '../components/EmptyCollectionCleanupButton.vue'
 import Layout from '../components/Layout.vue'
 import AdminDrawerHeader from '../components/base/AdminDrawerHeader.vue'
 import EmptyState from '../components/base/EmptyState.vue'
@@ -45,6 +46,11 @@ const query = reactive({
   q: '',
   active: '1'
 })
+
+function onCleanupCompleted() {
+  query.page = 1
+  load()
+}
 
 const imageDrawerQuery = reactive({
   page: 1,
@@ -465,6 +471,7 @@ onBeforeUnmount(() => {
 <template>
   <Layout>
     <template #header-actions>
+      <EmptyCollectionCleanupButton kind="image" @completed="onCleanupCompleted" />
       <el-button type="primary" :icon="Plus" @click="openCreate">创建合集</el-button>
     </template>
 
