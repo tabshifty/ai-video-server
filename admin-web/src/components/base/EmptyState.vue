@@ -49,9 +49,9 @@ defineProps({
   height: calc(var(--space-12) + var(--space-2));
   place-items: center;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-xl);
-  color: var(--primary);
-  background: var(--primary-soft);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  background: var(--bg-surface-muted);
   font-size: var(--text-display);
 }
 

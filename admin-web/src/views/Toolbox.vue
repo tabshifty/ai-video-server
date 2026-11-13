@@ -130,7 +130,7 @@ const chinaMapHref = computed(() => router.resolve('/toolbox/china-map').href)
   border-radius: 8px;
   box-shadow: none;
   color: var(--text-primary);
-  background: var(--bg-surface-muted);
+  background: var(--bg-surface);
   text-decoration: none;
   transition: border-color var(--motion-duration-base) var(--motion-easing-standard),
     box-shadow var(--motion-duration-base) var(--motion-easing-standard),
@@ -139,9 +139,9 @@ const chinaMapHref = computed(() => router.resolve('/toolbox/china-map').href)
 
 .tool-menu-item:hover,
 .tool-menu-item:focus-visible {
-  border-color: var(--primary);
+  border-color: var(--line-strong);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-tier);
 }
 
 .tool-menu-item:focus-visible {
@@ -156,8 +156,8 @@ const chinaMapHref = computed(() => router.resolve('/toolbox/china-map').href)
   place-items: center;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
-  color: var(--primary);
-  background: var(--primary-soft);
+  color: var(--text-primary);
+  background: var(--bg-surface-strong);
   font-size: var(--text-h1);
 }
 

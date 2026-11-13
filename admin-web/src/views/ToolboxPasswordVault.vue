@@ -408,14 +408,17 @@ onMounted(loadEntries)
   display: block;
   max-width: 100%;
   overflow: hidden;
-  color: var(--primary);
+  color: var(--text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
 }
 
 .password-vault-tool__url:hover {
-  text-decoration: underline;
+  color: var(--primary-text);
+  text-decoration-color: currentColor;
 }
 
 .password-vault-tool__url:focus-visible {

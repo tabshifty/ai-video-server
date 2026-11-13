@@ -1,4 +1,4 @@
-:where(.el-button) {
+.el-button {
   border-radius: var(--radius-sm);
   font-weight: 500;
   transition: background var(--motion-duration-base) var(--motion-easing-standard),
@@ -7,21 +7,85 @@
     box-shadow var(--motion-duration-base) var(--motion-easing-standard);
 }
 
-:where(.el-button--primary) {
+/* 主操作是页面上唯一的 Rausch 色块，按设计指导保持 500 字重与 8px 圆角 */
+.el-button--primary {
   background: var(--primary);
   border-color: var(--primary);
+  color: var(--on-primary);
 }
 
-:where(.el-button--primary:hover) {
+/* 悬停/按下都压到更深一档，避免 Element 默认的 primary-light-3 把红色带成浅粉 */
+.el-button--primary:hover,
+.el-button--primary:focus {
   background: var(--primary-strong);
   border-color: var(--primary-strong);
+  color: var(--on-primary);
 }
 
-:where(.el-button:focus-visible) {
-  box-shadow: 0 0 0 3px var(--primary-ring);
+.el-button--primary.is-disabled,
+.el-button--primary.is-disabled:hover,
+.el-button--primary.is-disabled:focus {
+  background: var(--rausch-disabled);
+  border-color: var(--rausch-disabled);
+  color: var(--on-primary);
 }
 
-:where(.el-segmented__item-input:focus-visible + .el-segmented__item-label) {
+/* plain 主操作：粉底 + 深红字，文字仍达 AA */
+.el-button--primary.is-plain {
+  color: var(--primary-text);
+  border-color: var(--rausch-soft-strong);
+  background: var(--rausch-soft);
+}
+
+.el-button--primary.is-plain:hover,
+.el-button--primary.is-plain:focus {
+  color: var(--ink);
+  border-color: var(--primary-text);
+  background: var(--rausch-soft-strong);
+}
+
+/* 次级按钮：白底 + 发丝描边 + 墨色文字，与主操作形成明确层级 */
+/* 只处理没有类型修饰的默认按钮；success/warning/danger/info 保持 Element 语义色，
+   否则高特异性选择器会把"执行清理""弃刮并转码"等破坏性操作中和成白底。 */
+.el-button:not([class*='el-button--']):not(.is-text):not(.is-link) {
+  border-color: var(--line-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.el-button:not([class*='el-button--']):not(.is-text):not(.is-link):hover {
+  border-color: var(--ink);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.el-button.is-text,
+.el-button.is-link {
+  background: transparent;
+}
+
+.el-button.is-text:hover {
+  background: var(--bg-surface-muted);
+}
+
+/* 内联链接按钮使用文本红（白底 3.52:1 → 5.2:1）；
+   但 success/warning/danger/info 的 link 按钮保留自己的语义色。 */
+.el-button.is-link:not(.is-disabled):not(.el-button--success):not(.el-button--warning):not(.el-button--danger):not(.el-button--info) {
+  color: var(--primary-text);
+}
+
+.el-button.is-link:not(.is-disabled):not(.el-button--success):not(.el-button--warning):not(.el-button--danger):not(.el-button--info):hover {
+  color: var(--error-text-hover);
+}
+
+/* 键盘焦点用墨色描边，不额外加发光环 */
+.el-button:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.el-segmented__item-input:focus-visible + .el-segmented__item-label {
   outline: 2px solid var(--line-focus);
   outline-offset: 2px;
 }
@@ -36,46 +100,80 @@
 .el-dropdown-menu__item:focus-visible {
   outline: 2px solid var(--line-focus);
   outline-offset: 2px;
+  background: var(--bg-surface-muted);
 }
 
-:where(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner) {
+/* 输入：发丝描边 + 8px 圆角；聚焦时描边加粗为墨色，不出光环 */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
   border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 1px var(--line-soft) inset;
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--line-strong) inset;
   transition: box-shadow var(--motion-duration-base) var(--motion-easing-standard),
     background var(--motion-duration-base) var(--motion-easing-standard);
 }
 
-:where(.el-input__wrapper.is-focus, .el-select__wrapper.is-focused, .el-textarea__inner:focus) {
-  box-shadow: 0 0 0 1px var(--primary) inset, 0 0 0 3px var(--primary-ring);
+.el-input__wrapper:hover,
+.el-select__wrapper:hover,
+.el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--ink) inset;
 }
 
-:where(.el-card) {
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 2px var(--ink) inset;
+}
+
+/* Element 把圆角变量声明在组件自身，:root 上的同名变量会被覆盖，因此同选择器声明 */
+.el-card {
+  --el-card-border-radius: var(--radius-md);
   border-color: var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   box-shadow: none;
 }
 
-:where(.el-dialog) {
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+.el-dialog {
+  --el-dialog-border-radius: var(--radius-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-tier);
 }
 
-:where(.el-dialog__header) {
+.el-message-box {
+  --el-messagebox-border-radius: var(--radius-lg);
+  border-radius: var(--radius-lg);
+}
+
+.el-popover.el-popper {
+  --el-popover-border-radius: var(--radius-md);
+}
+
+.el-tag {
+  --el-tag-border-radius: var(--radius-full);
+}
+
+.el-notification {
+  --el-notification-radius: var(--radius-md);
+}
+
+.el-dialog__header {
   margin: 0;
   padding: var(--space-5) var(--space-6);
   border-bottom: 1px solid var(--line-soft);
 }
 
-:where(.el-dialog__body) {
+.el-dialog__body {
   padding: var(--space-5) var(--space-6);
 }
 
-:where(.el-dialog__footer) {
+.el-dialog__footer {
   padding: var(--space-4) var(--space-6);
   border-top: 1px solid var(--line-soft);
 }
 
-:where(.el-drawer__header) {
+/* Drawer 贴着视口边缘，保留直角；内部标题区用发丝线分区 */
+.el-drawer__header {
   margin: 0;
   padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--line-soft);
@@ -85,91 +183,170 @@
   font-weight: 600;
 }
 
-:where(.el-drawer__body) {
+.el-drawer__body {
   padding: var(--space-5) var(--space-6);
   overscroll-behavior: contain;
 }
 
 /* Drawer 底部固定操作区：预留安全间距，避免遮挡最后一个字段 */
-:where(.el-drawer__footer) {
+.el-drawer__footer {
   padding: var(--space-3) var(--space-6);
   border-top: 1px solid var(--line-soft);
   background: var(--bg-surface);
 }
 
-:where(.el-table) {
+/* 表格只留横向发丝线：纵向网格线不参与层级表达 */
+.el-table {
   --el-table-border-color: var(--line-soft);
-  --el-table-header-bg-color: color-mix(in srgb, var(--bg-surface-muted) 55%, var(--bg-surface));
+  --el-table-header-bg-color: var(--bg-surface-muted);
   --el-table-row-hover-bg-color: var(--bg-surface-muted);
+  --el-table-header-text-color: var(--text-muted);
   font-size: var(--text-small);
 }
 
-:where(.el-table th.el-table__cell) {
+.el-table--border .el-table__cell {
+  border-right-color: transparent;
+}
+
+.el-table th.el-table__cell {
   color: var(--text-muted);
   font-weight: 600;
 }
 
-/* 表格优先用横向分隔表达结构，纵向网格线压淡 */
-:where(.el-table--border .el-table__cell) {
-  border-right-color: color-mix(in srgb, var(--line-soft) 42%, transparent);
-}
-
-:where(.el-table .cell) {
+.el-table .cell {
   line-height: var(--leading-small);
 }
 
-:where(.el-tag) {
+/* 标签与状态：胶囊形，小字号，靠颜色 + 文字共同表达 */
+.el-tag {
   height: auto;
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
   font-weight: 500;
 }
 
-:where(.el-pagination .btn-prev, .el-pagination .btn-next, .el-pager li) {
+/* 无类型标签只做中性计数，不占用品牌色；语义标签仍使用 success/warning/danger/info */
+.el-tag.el-tag--primary {
+  --el-tag-bg-color: transparent;
+  --el-tag-border-color: var(--line-strong);
+  --el-tag-text-color: var(--text-secondary);
+}
+
+.el-pagination .btn-prev,
+.el-pagination .btn-next,
+.el-pager li {
   min-width: 32px;
   height: 32px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
 }
 
-:where(.el-message, .el-notification) {
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+.el-pager li.is-active {
+  color: var(--bg-canvas);
+  background: var(--text-primary);
+  font-weight: 600;
 }
 
-:where(.el-dropdown-menu, .el-popper) {
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-overlay);
+.el-pager li:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-muted);
 }
 
-:where(.el-form-item__label) {
+.el-message,
+.el-notification {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-tier);
+}
+
+.el-dropdown-menu,
+.el-popper {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-tier);
+}
+
+.el-dropdown-menu__item {
+  border-radius: var(--radius-xs);
+}
+
+.el-form-item__label {
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-:where(.el-tabs__item) {
-  color: var(--text-secondary);
+/* 标签页沿用产品标签页语汇：墨色文字 + 2px 墨色下划线，不用品牌色 */
+.el-tabs__item {
+  color: var(--text-muted);
   font-size: var(--text-body);
 }
 
-:where(.el-tabs__item.is-active) {
+.el-tabs__item:hover {
+  color: var(--text-primary);
+}
+
+.el-tabs__item.is-active {
   color: var(--text-primary);
   font-weight: 600;
 }
 
-:where(.el-tabs__nav-wrap::after) {
+.el-tabs__active-bar {
+  height: 2px;
+  background: var(--ink);
+}
+
+.el-tabs__nav-wrap::after {
   height: 1px;
   background: var(--line-soft);
 }
 
-:where(.el-alert) {
+/* 分段筛选器做成胶囊轨道，当前项回到白底墨字 */
+.el-segmented {
+  --el-segmented-bg-color: var(--bg-surface-muted);
+  --el-segmented-item-selected-bg-color: var(--bg-surface);
+  --el-segmented-item-selected-color: var(--text-primary);
+  --el-segmented-item-hover-bg-color: var(--bg-surface-strong);
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-muted);
+}
+
+.el-segmented__item {
+  border-radius: var(--radius-full);
+}
+
+.el-segmented__item-selected {
+  box-shadow: 0 0 0 1px var(--line-strong) inset;
+}
+
+.el-segmented__item-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.el-segmented__item.is-selected .el-segmented__item-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.el-radio-button:first-child .el-radio-button__inner {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.el-radio-button:last-child .el-radio-button__inner {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.el-alert {
   border-radius: var(--radius-md);
 }
 
-:where(.el-descriptions__label) {
+.el-descriptions__label {
   color: var(--text-secondary);
   font-weight: 500;
+}
+
+.el-checkbox__inner,
+.el-radio__inner {
+  border-color: var(--line-strong);
 }
 
 :where([data-density="compact"], [data-density="monitor"]) .el-button,

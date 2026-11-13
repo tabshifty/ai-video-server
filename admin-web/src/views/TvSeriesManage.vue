@@ -637,7 +637,7 @@ onMounted(async () => {
 
 .series-card:hover,
 .series-card.is-active {
-  border-color: var(--primary);
+  border-color: var(--ink);
   box-shadow: var(--shadow-xs);
 }
 

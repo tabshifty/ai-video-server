@@ -352,7 +352,7 @@ onMounted(loadPlaylist)
 }
 
 .upload-icon {
-  color: var(--primary);
+  color: var(--text-muted);
 }
 
 .channel-table {

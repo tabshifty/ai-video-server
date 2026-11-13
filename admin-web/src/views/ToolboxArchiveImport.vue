@@ -3291,7 +3291,7 @@ onUnmounted(() => {
 .archive-batch-card:hover,
 .archive-batch-card:focus-visible,
 .archive-batch-card.is-active {
-  border-color: var(--primary);
+  border-color: var(--ink);
   background: var(--bg-surface);
   box-shadow: var(--shadow-sm);
 }
@@ -3380,7 +3380,7 @@ onUnmounted(() => {
   gap: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--bg-surface-muted);
 }
 
@@ -3410,7 +3410,7 @@ onUnmounted(() => {
 }
 
 .archive-drawer__eyebrow {
-  color: var(--primary);
+  color: var(--text-muted);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
   font-weight: 600;
@@ -3557,7 +3557,7 @@ onUnmounted(() => {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
-  color: var(--primary);
+  color: var(--text-muted);
 }
 
 .archive-file-tree__name {
@@ -3588,7 +3588,7 @@ onUnmounted(() => {
 }
 
 .archive-group-card.is-active {
-  border-color: var(--primary);
+  border-color: var(--ink);
   background: var(--bg-surface);
   box-shadow: var(--shadow-xs);
 }
@@ -3721,7 +3721,7 @@ onUnmounted(() => {
 .archive-file-item:focus-visible,
 .archive-file-item.is-selected,
 .archive-file-item.is-active {
-  border-color: var(--primary);
+  border-color: var(--ink);
   background: var(--bg-surface);
   box-shadow: var(--shadow-xs);
 }
@@ -3743,7 +3743,7 @@ onUnmounted(() => {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
-  color: var(--primary);
+  color: var(--text-muted);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bg-surface) 80%, transparent);
   transition: border-color var(--motion-duration-fast) var(--motion-easing-standard),
     background-color var(--motion-duration-fast) var(--motion-easing-standard),
@@ -3753,8 +3753,8 @@ onUnmounted(() => {
 .archive-file-item__selection:hover,
 .archive-file-item__selection:focus-visible,
 .archive-file-item__selection.is-selected {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface));
+  border-color: var(--ink);
+  background: var(--bg-surface-strong);
 }
 
 .archive-file-item__selection:focus-visible {
@@ -3990,7 +3990,7 @@ onUnmounted(() => {
 .archive-upload-dialog__icon {
   margin-top: var(--space-2);
   font-size: 2.25rem;
-  color: var(--primary);
+  color: var(--text-muted);
 }
 
 .archive-upload-dialog__hint {

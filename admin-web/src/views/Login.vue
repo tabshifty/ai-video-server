@@ -74,7 +74,7 @@ async function submit() {
   gap: var(--space-6);
   padding: var(--space-6);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--bg-surface);
 }
 
@@ -87,13 +87,12 @@ async function submit() {
 
 .login-brand__mark {
   display: grid;
-  width: calc(var(--space-8) + var(--space-2));
-  height: calc(var(--space-8) + var(--space-2));
+  width: calc(var(--space-8) + var(--space-1));
+  height: calc(var(--space-8) + var(--space-1));
   place-items: center;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  color: var(--primary);
-  background: var(--primary-soft);
+  border-radius: var(--radius-md);
+  color: var(--on-primary);
+  background: var(--primary);
   font-weight: 600;
 }
 

@@ -38,12 +38,13 @@ defineProps({
   align-items: center;
   gap: var(--space-1);
   padding: 1px var(--space-2);
-  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
-  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
-  background: color-mix(in srgb, currentColor 8%, var(--bg-surface));
+  background: color-mix(in srgb, currentColor 7%, var(--bg-surface));
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
+  font-weight: 500;
 }
 
 .status-indicator__dot {

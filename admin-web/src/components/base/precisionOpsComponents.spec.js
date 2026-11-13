@@ -266,7 +266,7 @@ describe('Precision Ops base components', () => {
     expect(findRule(mobileBulkStyle, '.bulk-action-bar__actions')).toContain('width: 100%')
     expect(findRule(mobileBulkStyle, '.bulk-action-bar__actions')).toContain('flex-wrap: wrap')
     expect(commandPaletteStyle).toMatch(
-      /\.command-palette__search:focus-within\s*\{[^}]*box-shadow:\s*0 0 0 3px var\(--line-focus\);/s
+      /\.command-palette__search:focus-within\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--line-focus\);/s
     )
     expect(findRule(commandPaletteStyle, '.command-palette__list')).toContain('overscroll-behavior: contain')
   })

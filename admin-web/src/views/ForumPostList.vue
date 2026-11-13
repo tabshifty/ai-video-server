@@ -439,11 +439,13 @@ onMounted(load)
   display: inline-flex;
   width: fit-content;
   max-width: 100%;
-  color: var(--primary);
+  color: var(--text-primary);
   line-height: var(--leading-body);
   overflow-wrap: anywhere;
-  text-decoration: none;
-  transition: color 160ms ease;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
 }
 
 .forum-link--title {
@@ -453,9 +455,8 @@ onMounted(load)
 }
 
 .forum-link:hover {
-  color: var(--primary-strong);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--primary-text);
+  text-decoration-color: currentColor;
 }
 
 .forum-link:focus-visible {

@@ -465,7 +465,7 @@ async function submitSelected() {
 
 .ed2k-link-row:hover,
 .ed2k-link-row--selected {
-  border-color: var(--primary);
+  border-color: var(--ink);
   background: var(--bg-surface);
 }
 
@@ -483,7 +483,7 @@ async function submitSelected() {
 }
 
 .ed2k-link__anchor:hover {
-  color: var(--primary);
+  color: var(--primary-text);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

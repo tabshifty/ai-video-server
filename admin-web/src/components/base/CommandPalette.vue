@@ -185,7 +185,7 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   border: 0;
-  background: color-mix(in srgb, var(--slate-950) 28%, transparent);
+  background: var(--bg-overlay);
 }
 
 .command-palette__panel {
@@ -194,7 +194,7 @@ onUnmounted(() => {
   width: min(40rem, calc(100vw - var(--space-8)));
   overflow: hidden;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-lg);
   background: var(--bg-surface);
   box-shadow: var(--shadow-lg);
 }
@@ -210,7 +210,7 @@ onUnmounted(() => {
 }
 
 .command-palette__search:focus-within {
-  box-shadow: 0 0 0 3px var(--line-focus);
+  box-shadow: 0 0 0 2px var(--line-focus);
 }
 
 .command-palette__input {
@@ -223,9 +223,9 @@ onUnmounted(() => {
 }
 
 .command-palette__search kbd {
-  padding: calc(var(--space-1) / 2) var(--space-2);
+  padding: 2px var(--space-2);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   color: var(--text-muted);
   background: var(--bg-surface-muted);
   font-size: var(--text-caption);
@@ -248,7 +248,7 @@ onUnmounted(() => {
   gap: var(--space-4);
   padding: var(--space-3);
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   background: transparent;
   text-align: left;
@@ -257,7 +257,7 @@ onUnmounted(() => {
 
 .command-palette__item.is-active,
 .command-palette__item:hover {
-  background: var(--primary-soft);
+  background: var(--bg-surface-strong);
 }
 
 .command-palette__item strong,

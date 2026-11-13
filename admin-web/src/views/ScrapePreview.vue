@@ -551,12 +551,12 @@ async function doSave() {
 
 .candidate-item:hover,
 .candidate-item.active {
-  border-color: var(--primary);
+  border-color: var(--ink);
   box-shadow: var(--shadow-xs);
 }
 
 .candidate-item:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--line-focus);
   outline-offset: 2px;
 }
 
@@ -638,7 +638,7 @@ async function doSave() {
   border: 1px dashed var(--line-soft);
   border-radius: var(--radius-md);
   padding: var(--space-3);
-  background: var(--primary-soft);
+  background: var(--bg-surface-strong);
 }
 
 .episode-title {

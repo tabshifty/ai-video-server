@@ -33,28 +33,28 @@ const densityTokenContracts = [
   {
     density: 'compact',
     tokens: [
-      ['--control-height', '32px'],
-      ['--table-head-height', '36px'],
-      ['--table-row-height', '40px'],
-      ['--media-row-height', '52px'],
-      ['--section-padding', '12px']
+      ['--control-height', '36px'],
+      ['--table-head-height', '40px'],
+      ['--table-row-height', '44px'],
+      ['--media-row-height', '56px'],
+      ['--section-padding', '16px']
     ]
   },
   {
     density: 'monitor',
     tokens: [
-      ['--control-height', '32px'],
-      ['--table-head-height', '36px'],
-      ['--table-row-height', '44px'],
-      ['--media-row-height', '44px'],
-      ['--section-padding', '12px']
+      ['--control-height', '36px'],
+      ['--table-head-height', '40px'],
+      ['--table-row-height', '48px'],
+      ['--media-row-height', '48px'],
+      ['--section-padding', '16px']
     ]
   },
   {
     density: 'form',
     tokens: [
-      ['--control-height', '36px'],
-      ['--section-padding', '16px']
+      ['--control-height', '40px'],
+      ['--section-padding', '24px']
     ]
   }
 ]
@@ -63,32 +63,72 @@ describe('theme tokens', () => {
   it('locks the final admin geometry and semantic palette', () => {
     expect(css).toContain('--admin-sidebar-width: 224px')
     expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
-    expect(css).toContain('--admin-header-height: 56px')
-    expect(css).toContain('--text-muted: #607085')
-    expect(css).toContain('--success-600: #047857')
-    expect(css).toContain('--warning-600: #b45309')
-    expect(css).toContain('--danger-600: #c81e1e')
-    expect(css).toContain('--info-600: #0369a1')
-    expect(css).toMatch(/\[data-density="compact"\][\s\S]*--control-height:\s*32px/)
-    expect(css).toMatch(/\[data-density="monitor"\][\s\S]*--table-row-height:\s*44px/)
-    expect(css).toMatch(/\[data-density="form"\][\s\S]*--control-height:\s*36px/)
-    expect(css).toMatch(/--radius-sm:\s*6px/)
-    expect(css).toMatch(/--radius-md:\s*8px/)
-    expect(css).toMatch(/--radius-lg:\s*10px/)
-    expect(css).toMatch(/--radius-xl:\s*12px/)
+    expect(css).toContain('--admin-header-height: 68px')
+    expect(css).toContain('--muted: #6a6a6a')
+    expect(css).toContain('--success-600: #0a7d55')
+    expect(css).toContain('--warning-600: #9a5b13')
+    expect(css).toContain('--danger-600: var(--error-text)')
+    expect(css).toContain('--error-text: #c13515')
+    expect(css).toContain('--info-600: #4d4d4d')
+    expect(css).toMatch(/\[data-density="compact"\][\s\S]*--control-height:\s*36px/)
+    expect(css).toMatch(/\[data-density="monitor"\][\s\S]*--table-row-height:\s*48px/)
+    expect(css).toMatch(/\[data-density="form"\][\s\S]*--control-height:\s*40px/)
+    expect(css).toMatch(/--radius-sm:\s*8px/)
+    expect(css).toMatch(/--radius-md:\s*14px/)
+    expect(css).toMatch(/--radius-lg:\s*20px/)
+    expect(css).toMatch(/--radius-xl:\s*32px/)
   })
 
   it('exports the approved admin shell and semantic tokens', () => {
     expect(css).toContain('--admin-sidebar-width: 224px')
     expect(css).toContain('--admin-sidebar-collapsed-width: 56px')
-    expect(css).toContain('--admin-header-height: 56px')
-    expect(css).toContain('--bg-canvas: #f7f8fa')
-    expect(css).toContain('--text-primary: #172033')
-    expect(css).toContain('--text-muted: #607085')
-    expect(css).toContain('--success-600: #047857')
-    expect(css).toContain('--warning-600: #b45309')
-    expect(css).toContain('--danger-600: #c81e1e')
-    expect(css).toContain('--info-600: #0369a1')
+    expect(css).toContain('--admin-header-height: 68px')
+    expect(css).toContain('--canvas: #ffffff')
+    expect(css).toContain('--bg-canvas: var(--canvas)')
+    expect(css).toContain('--ink: #222222')
+    expect(css).toContain('--text-primary: var(--ink)')
+    expect(css).toContain('--rausch: #ff385c')
+    expect(css).toContain('--primary: var(--rausch)')
+    expect(css).toContain('--primary-strong: var(--rausch-active)')
+  })
+
+  it('fills the whole primary scale so Element hover states stay on Rausch', () => {
+    for (const level of ['1', '2', '3', '4', '5', '6', '7', '8', '9']) {
+      expect(css).toContain(`--el-color-primary-light-${level}:`)
+    }
+    expect(css).toContain('--el-color-primary-dark-2: var(--primary-strong)')
+    expect(css).not.toMatch(/--el-color-primary-light-3:\s*#79bbff/i)
+    expect(css).toContain('--el-input-focus-border-color: var(--ink)')
+    expect(css).toContain('--el-input-hover-border-color: var(--ink)')
+    expect(css).toContain('--el-text-color-placeholder: var(--text-muted)')
+    expect(css).toContain('--primary-text: #d3203f')
+  })
+
+  it('uses plain selectors for Element state overrides that :where() could not win', () => {
+    expect(overrides).toContain('.el-button--primary:hover,')
+    expect(overrides).toContain('.el-input__wrapper.is-focus,')
+    expect(overrides).toContain('.el-card {\n  --el-card-border-radius: var(--radius-md);')
+    expect(overrides).toContain('.el-tag {\n  --el-tag-border-radius: var(--radius-full);')
+    expect(overrides).not.toContain(':where(.el-button--primary)')
+  })
+
+  it('keeps semantic link buttons coloured while darkening default inline links', () => {
+    const linkRule = overrides.slice(overrides.indexOf('.el-button.is-link:not(.is-disabled)'))
+    expect(linkRule).toContain(':not(.el-button--success)')
+    expect(linkRule).toContain(':not(.el-button--warning)')
+    expect(linkRule).toContain(':not(.el-button--danger)')
+    expect(linkRule).toContain(':not(.el-button--info)')
+    expect(overrides).toContain('color: var(--primary-text);')
+  })
+
+  it('never neutralises typed semantic buttons when restyling the default button', () => {
+    expect(overrides).toContain(".el-button:not([class*='el-button--']):not(.is-text):not(.is-link)")
+    expect(overrides).not.toContain('.el-button:not(.el-button--primary):not(.is-text):not(.is-link)')
+    for (const type of ['success', 'warning', 'danger', 'info']) {
+      expect(overrides).not.toContain(`.el-button--${type} {`)
+    }
+    expect(css).toContain('--rausch-soft: #2a1418')
+    expect(css).toContain('--rausch-disabled: #4a2229')
   })
 
   it('scopes compact sizing instead of applying it to every form', () => {
@@ -171,7 +211,7 @@ describe('theme tokens', () => {
   })
 
   it('keeps Element Plus segmented keyboard focus visible on its rendered label', () => {
-    const selector = ':where(.el-segmented__item-input:focus-visible + .el-segmented__item-label)'
+    const selector = '.el-segmented__item-input:focus-visible + .el-segmented__item-label'
     const start = overrides.indexOf(selector)
     const end = start >= 0 ? overrides.indexOf('}', start) : -1
     const rule = start >= 0 && end > start ? overrides.slice(start, end + 1) : ''
@@ -200,7 +240,7 @@ describe('theme tokens', () => {
   })
 
   it('contains scroll chaining inside every Drawer body', () => {
-    const selector = ':where(.el-drawer__body)'
+    const selector = '.el-drawer__body'
     const start = overrides.indexOf(selector)
     const end = start >= 0 ? overrides.indexOf('}', start) : -1
     const rule = start >= 0 && end > start ? overrides.slice(start, end + 1) : ''
@@ -221,26 +261,27 @@ describe('theme tokens', () => {
   })
 
   it('exports the approved typography scale', () => {
-    expect(css).toMatch(/--text-h1:\s*22px/)
-    expect(css).toMatch(/--text-h2:\s*15px/)
+    expect(css).toMatch(/--text-h1:\s*24px/)
+    expect(css).toMatch(/--text-h2:\s*16px/)
     expect(css).toMatch(/--text-body:\s*14px/)
     expect(css).toMatch(/--text-small:\s*13px/)
     expect(css).toMatch(/--text-caption:\s*12px/)
-    expect(css).toMatch(/--text-kpi:\s*26px/)
+    expect(css).toMatch(/--text-micro:\s*11px/)
+    expect(css).toMatch(/--text-kpi:\s*32px/)
   })
 
   it('uses the approved base section geometry', () => {
     expect(sectionCard).not.toMatch(/\.section-card\s*\{[^}]*box-shadow:/)
     expect(emptyState).toMatch(/\.empty-state\s*\{[^}]*min-height:\s*160px/)
     expect(bulkActionBar).toMatch(/\.bulk-action-bar\s*\{[^}]*border-radius:\s*var\(--radius-md\)/)
-    expect(bulkActionBar).toMatch(/\.bulk-action-bar\s*\{[^}]*box-shadow:\s*var\(--shadow-lg\)/)
+    expect(bulkActionBar).toMatch(/\.bulk-action-bar\s*\{[^}]*box-shadow:\s*var\(--shadow-tier\)/)
   })
 
   it('keeps interactive card hover feedback without vertical displacement', () => {
     const hoverRule = css.match(/\.interactive-card:hover\s*\{([^}]*)\}/)?.[1] || ''
 
     expect(hoverRule).toContain('border-color: var(--line-strong)')
-    expect(hoverRule).toContain('box-shadow: var(--shadow-hover)')
+    expect(hoverRule).toContain('box-shadow: var(--shadow-tier)')
     expect(hoverRule).not.toContain('transform:')
   })
 

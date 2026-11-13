@@ -160,6 +160,13 @@ function progressStatus(row) {
   return ''
 }
 
+// 进度条按状态取色：运行中用墨色，失败/完成才用语义色，避免与品牌红混淆
+function progressColor(row) {
+  if (row.status === 'failed') return 'var(--danger-600)'
+  if (row.status === 'success') return 'var(--success-600)'
+  return 'var(--ink)'
+}
+
 function resetQueryIdentity() {
   list.value = []
   total.value = 0
@@ -275,7 +282,7 @@ onUnmounted(() => {
         <template v-else>
           <div class="table-wrap">
             <el-table :data="list" border :row-class-name="taskRowClassName">
-              <el-table-column prop="video_title" label="任务" min-width="190">
+              <el-table-column prop="video_title" label="任务" min-width="160">
                 <template #default="{ row }">
                   <div class="task-cell">
                     <strong>{{ taskTitle(row) }}</strong>
@@ -288,23 +295,28 @@ onUnmounted(() => {
                   <StatusIndicator :label="statusLabel(row.status)" :tone="taskStatusTone(row.status)" />
                 </template>
               </el-table-column>
-              <el-table-column label="进度" min-width="130">
+              <el-table-column label="进度" min-width="110">
                 <template #default="{ row }">
-                  <el-progress :stroke-width="6" :percentage="resolveProgress(row)" :status="progressStatus(row)" />
+                  <el-progress
+                    :stroke-width="6"
+                    :percentage="resolveProgress(row)"
+                    :status="progressStatus(row)"
+                    :color="progressColor(row)"
+                  />
                 </template>
               </el-table-column>
-              <el-table-column label="剩余时间" width="88">
+              <el-table-column label="剩余时间" width="92">
                 <template #default="{ row }">
-                  {{ formatRemaining(row) }}
+                  <span class="task-time tabular-num">{{ formatRemaining(row) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="已耗时" width="88">
+              <el-table-column label="已耗时" width="96">
                 <template #default="{ row }">
-                  {{ formatElapsed(row) }}
+                  <span class="task-time tabular-num">{{ formatElapsed(row) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="retry_count" label="重试" width="60" />
-              <el-table-column prop="error" label="错误" min-width="200">
+              <el-table-column prop="retry_count" label="重试" width="56" />
+              <el-table-column prop="error" label="错误" min-width="170">
                 <template #default="{ row }">
                   <div class="task-error-cell">
                     <el-tooltip :content="row.error || '无错误'" placement="top">
@@ -323,11 +335,15 @@ onUnmounted(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="开始时间" width="140">
-                <template #default="{ row }">{{ formatDateTime(row.started_at) }}</template>
+              <el-table-column label="开始时间" width="160">
+                <template #default="{ row }">
+                  <span class="task-time tabular-num">{{ formatDateTime(row.started_at) }}</span>
+                </template>
               </el-table-column>
-              <el-table-column label="进度更新时间" width="140">
-                <template #default="{ row }">{{ formatDateTime(row.progress_updated_at) }}</template>
+              <el-table-column label="进度更新时间" width="160">
+                <template #default="{ row }">
+                  <span class="task-time tabular-num">{{ formatDateTime(row.progress_updated_at) }}</span>
+                </template>
               </el-table-column>
             </el-table>
           </div>
@@ -381,6 +397,11 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
+}
+
+.task-time {
+  font-size: var(--text-caption);
+  white-space: nowrap;
 }
 
 .task-error-cell {

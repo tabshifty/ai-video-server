@@ -1334,8 +1334,8 @@ function formatLibraryItemMeta(item) {
 }
 
 .reference-drop.is-active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
+  border-color: var(--ink);
+  background: var(--bg-surface-strong);
 }
 
 .reference-drop__input {
@@ -1366,9 +1366,9 @@ function formatLibraryItemMeta(item) {
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line-soft));
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--primary) 8%, var(--bg-surface));
+  background: var(--bg-surface-strong);
 }
 
 .mask-summary strong,
@@ -1625,7 +1625,7 @@ function formatLibraryItemMeta(item) {
 
 .history-item:hover,
 .history-item.is-active {
-  border-color: var(--primary);
+  border-color: var(--ink);
 }
 
 .history-item img,
@@ -1698,7 +1698,7 @@ function formatLibraryItemMeta(item) {
 
 .library-card.is-selected,
 .library-card:hover {
-  border-color: var(--primary);
+  border-color: var(--ink);
 }
 
 .library-card.is-disabled {

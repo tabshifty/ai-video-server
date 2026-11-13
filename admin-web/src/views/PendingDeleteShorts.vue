@@ -515,8 +515,8 @@ onBeforeUnmount(() => {
 }
 
 .pending-delete-item.is-active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
+  border-color: var(--ink);
+  background: var(--bg-surface-strong);
 }
 
 .pending-delete-item__thumb {

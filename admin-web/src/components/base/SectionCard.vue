@@ -62,15 +62,15 @@ const expanded = ref(props.defaultExpanded)
   position: relative;
   display: grid;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-5) var(--space-6);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
 
 .section-card.is-dense {
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   box-shadow: none;
 }
 
@@ -126,7 +126,7 @@ const expanded = ref(props.defaultExpanded)
   place-items: center;
   padding: 0;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
   background: var(--bg-surface);
   cursor: pointer;

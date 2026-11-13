@@ -525,7 +525,7 @@ onUnmounted(() => {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
-  color: var(--primary);
+  color: var(--text-primary);
   background: var(--bg-surface);
   box-shadow: var(--shadow-sm);
   transform: translateY(calc(-1 * var(--space-12)));
@@ -560,16 +560,17 @@ onUnmounted(() => {
   padding: var(--space-4) var(--space-3);
 }
 
+/* 品牌标记是侧栏里唯一的 Rausch 色块，其余表面保持白底墨字 */
 .brand-mark {
   display: grid;
-  width: calc(var(--space-8) + var(--space-2));
-  height: calc(var(--space-8) + var(--space-2));
+  width: calc(var(--space-8) + var(--space-1));
+  height: calc(var(--space-8) + var(--space-1));
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-xl);
-  color: var(--primary);
-  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  color: var(--on-primary);
+  background: var(--primary);
+  font-size: var(--text-small);
   font-weight: 600;
 }
 
@@ -728,6 +729,9 @@ button.drawer-nav__label:hover {
   justify-content: flex-start;
   min-height: calc(var(--space-8) + var(--space-2));
   padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-body);
+  font-weight: 500;
 }
 
 .admin-shell.is-collapsed .nav-link {
@@ -745,11 +749,11 @@ button.drawer-nav__label:hover {
   position: relative;
 }
 
-/* 当前项用轻量底色 + 左侧强调条，颜色之外再给一重位置线索 */
+/* 当前项沿用产品标签页的“墨色 + 下划线”语汇，换成侧栏的左侧强调条 */
 .nav-link.is-active,
 .drawer-nav__link.is-active {
-  color: var(--primary);
-  background: var(--primary-soft);
+  color: var(--text-primary);
+  background: var(--bg-surface-strong);
   font-weight: 600;
 }
 
@@ -758,8 +762,8 @@ button.drawer-nav__label:hover {
   inset-block: calc(var(--space-2) - 2px);
   inset-inline-start: 0;
   width: 2px;
-  border-radius: var(--radius-xs);
-  background: var(--primary);
+  border-radius: var(--radius-full);
+  background: var(--ink);
   content: '';
 }
 
@@ -770,11 +774,16 @@ button.drawer-nav__label:hover {
   align-items: center;
   gap: var(--space-3);
   margin: var(--space-2);
-  padding: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-full);
   background: var(--bg-surface);
   cursor: pointer;
+  transition: box-shadow var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+.profile-chip:hover {
+  box-shadow: var(--shadow-tier);
 }
 
 .profile-chip__avatar {
@@ -783,9 +792,10 @@ button.drawer-nav__label:hover {
   height: var(--space-8);
   flex: 0 0 auto;
   place-items: center;
-  border-radius: var(--radius-lg);
-  color: var(--bg-surface);
-  background: var(--primary);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  background: var(--bg-surface-strong);
   font-size: var(--text-small);
   font-weight: 600;
 }
@@ -813,11 +823,10 @@ button.drawer-nav__label:hover {
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-4);
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-6);
   box-sizing: border-box;
   border-bottom: 1px solid var(--line-soft);
-  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
-  backdrop-filter: blur(var(--space-3));
+  background: var(--bg-surface);
 }
 
 .shell-header__left {
@@ -851,7 +860,7 @@ button.drawer-nav__label:hover {
 
 .workspace-identity__divider {
   flex: 0 0 auto;
-  color: var(--line-strong);
+  color: var(--text-muted-soft);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
 }
@@ -869,28 +878,34 @@ button.drawer-nav__label:hover {
   display: none;
 }
 
+/* 全局搜索沿用设计指导的胶囊搜索形态：胶囊描边 + 右侧快捷键小胶囊 */
 .command-trigger {
   display: inline-flex;
-  min-height: var(--space-8);
+  min-height: calc(var(--space-8) + var(--space-2));
   align-items: center;
   gap: var(--space-2);
   margin-left: auto;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
   background: var(--bg-surface);
   cursor: pointer;
+  transition: box-shadow var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+.command-trigger:hover {
+  box-shadow: var(--shadow-tier);
 }
 
 .command-trigger kbd {
-  padding: calc(var(--space-1) / 2) var(--space-2);
+  padding: 2px var(--space-2);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   color: var(--text-muted);
   background: var(--bg-surface-muted);
-  font-size: var(--text-caption);
-  line-height: var(--leading-caption);
+  font-size: var(--text-micro);
+  line-height: var(--leading-micro);
 }
 
 .shell-header__actions {
@@ -898,15 +913,21 @@ button.drawer-nav__label:hover {
   min-width: 0;
   flex: 0 0 auto;
   align-items: center;
+  gap: var(--space-2);
+}
+
+.shell-header__actions :deep(.el-button) {
+  min-height: calc(var(--space-8) + var(--space-1));
+  padding-inline: var(--space-4);
 }
 
 .shell-main {
   min-width: 0;
-  padding: var(--space-5);
+  padding: var(--space-6);
 }
 
 .shell-main:focus-visible {
-  outline: calc(var(--space-1) / 2) solid var(--primary);
+  outline: calc(var(--space-1) / 2) solid var(--line-focus);
   outline-offset: calc(var(--space-1) / 2);
 }
 
@@ -976,8 +997,8 @@ button.drawer-nav__label,
   width: fit-content;
   padding: calc(var(--space-1) / 2) var(--space-2);
   border-radius: var(--radius-sm);
-  color: var(--primary);
-  background: var(--primary-soft);
+  color: var(--text-primary);
+  background: var(--bg-surface-strong);
   font-size: var(--text-caption);
 }
 
@@ -1032,6 +1053,11 @@ button.drawer-nav__label,
   .command-trigger span,
   .command-trigger kbd {
     display: none;
+  }
+
+  .workspace-identity h1 {
+    font-size: 20px;
+    line-height: 28px;
   }
 
   .command-trigger {

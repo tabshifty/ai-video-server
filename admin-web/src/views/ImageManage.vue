@@ -1609,7 +1609,7 @@ onBeforeUnmount(() => {
 
 .image-grid-card.is-selected,
 .image-grid-card:hover {
-  border-color: var(--primary);
+  border-color: var(--ink);
 }
 
 .image-grid-card__select {
@@ -1726,7 +1726,7 @@ onBeforeUnmount(() => {
 .zoom-label {
   width: 50px;
   text-align: right;
-  color: var(--primary);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 

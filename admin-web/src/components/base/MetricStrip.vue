@@ -61,7 +61,7 @@ defineProps({
 
 .metric-strip__item {
   min-width: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-right: 1px solid var(--line-soft);
 }
 
@@ -79,7 +79,7 @@ defineProps({
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: var(--text-caption);
   line-height: var(--leading-caption);
 }

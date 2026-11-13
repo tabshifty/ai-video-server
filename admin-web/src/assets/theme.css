@@ -1,34 +1,65 @@
 :root {
   color-scheme: light;
 
-  --slate-50: #f8fafc;
-  --slate-100: #f1f5f9;
-  --slate-200: #e2e8f0;
-  --slate-300: #cbd5e1;
-  --slate-400: #94a3b8;
-  --slate-500: #64748b;
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1e293b;
-  --slate-900: #0f172a;
-  --slate-950: #020617;
+  /* ---------- 品牌与中性色（取自 Airbnb 设计指导） ----------
+     Rausch 是唯一的品牌电压：主操作、搜索球、当前项强调只用它；
+     页面 90% 由白色画布 + 近黑文字 + 发丝线构成，不为装饰引入第二种品牌色。 */
+  --rausch: #ff385c;
+  --rausch-active: #e00b41;
+  --rausch-disabled: #ffd1da;
+  --rausch-soft: #fff1f3;
+  --rausch-soft-strong: #ffdde3;
 
-  --blue-50: #eff6ff;
-  --blue-100: #dbeafe;
-  --blue-200: #bfdbfe;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-700: #1d4ed8;
-  --blue-900: #1e3a8a;
+  --ink: #222222;
+  --body: #3f3f3f;
+  --muted: #6a6a6a;
+  --muted-soft: #929292;
+  --on-primary: #ffffff;
+  --on-dark: #ffffff;
 
-  --success-50: #ecfdf5;
-  --success-600: #047857;
-  --warning-50: #fffbeb;
-  --warning-600: #b45309;
-  --danger-50: #fef2f2;
-  --danger-600: #c81e1e;
-  --info-50: #f0f9ff;
-  --info-600: #0369a1;
+  --canvas: #ffffff;
+  --surface-soft: #f7f7f7;
+  --surface-strong: #f2f2f2;
+
+  --hairline: #dddddd;
+  --hairline-soft: #ebebeb;
+  --border-strong: #c1c1c1;
+
+  --error-text: #c13515;
+  --error-text-hover: #b32505;
+  --legal-link: #428bff;
+  --scrim: #000000;
+
+  /* 兼容层：历史令牌名保留，值统一收敛到上面这套中性/Airbnb 色板 */
+  --slate-50: #fafafa;
+  --slate-100: #f7f7f7;
+  --slate-200: #ebebeb;
+  --slate-300: #dddddd;
+  --slate-400: #929292;
+  --slate-500: #6a6a6a;
+  --slate-600: #4d4d4d;
+  --slate-700: #3f3f3f;
+  --slate-800: #2a2a2a;
+  --slate-900: #1c1c1c;
+  --slate-950: #0f0f0f;
+
+  /* 兼容层：历史代码里的 blue 令牌已指向 Rausch 家族，新代码请直接用 --primary/--rausch */
+  --blue-50: var(--rausch-soft);
+  --blue-100: var(--rausch-soft-strong);
+  --blue-200: #ffb3c1;
+  --blue-500: #ff5a76;
+  --blue-600: var(--rausch);
+  --blue-700: var(--rausch-active);
+  --blue-900: #7a1228;
+
+  --success-50: #eef7f1;
+  --success-600: #0a7d55;
+  --warning-50: #fdf6ec;
+  --warning-600: #9a5b13;
+  --danger-50: #fdf3f1;
+  --danger-600: var(--error-text);
+  --info-50: var(--surface-soft);
+  --info-600: #4d4d4d;
 
   /* 状态底色：语义色的浅色面，供标签、行高亮与提示条共用，避免各页自配色 */
   --success-surface: var(--success-50);
@@ -36,69 +67,83 @@
   --danger-surface: var(--danger-50);
   --info-surface: var(--info-50);
 
-  --primary: var(--blue-600);
-  --primary-strong: var(--blue-700);
-  --primary-soft: var(--blue-50);
-  --primary-ring: color-mix(in srgb, var(--blue-600) 36%, transparent);
+  --primary: var(--rausch);
+  --primary-strong: var(--rausch-active);
+  /* 文本红：Rausch 作为 14px 文字在白底只有 3.52:1，正文/链接改用更深一档以满足 AA */
+  --primary-text: #d3203f;
+  --primary-soft: var(--rausch-soft);
 
-  --bg-canvas: #f7f8fa;
-  --bg-surface: #ffffff;
-  --bg-surface-muted: #f1f3f5;
-  --bg-sidebar: #ffffff;
-  --bg-sidebar-hover: #f1f3f5;
-  --bg-overlay: color-mix(in srgb, var(--slate-950) 36%, transparent);
-  --bg-inverse: #0f172a;
+  --bg-canvas: var(--canvas);
+  --bg-surface: var(--canvas);
+  --bg-surface-muted: var(--surface-soft);
+  --bg-surface-strong: var(--surface-strong);
+  --bg-sidebar: var(--canvas);
+  --bg-sidebar-hover: var(--surface-soft);
+  --bg-overlay: color-mix(in srgb, var(--scrim) 50%, transparent);
+  --bg-inverse: var(--ink);
 
-  --text-primary: #172033;
-  --text-secondary: #475569;
-  --text-muted: #607085;
-  --text-on-inverse: #ffffff;
+  --text-primary: var(--ink);
+  --text-secondary: var(--body);
+  --text-muted: var(--muted);
+  --text-muted-soft: var(--muted-soft);
+  --text-on-inverse: var(--on-primary);
 
-  --line-soft: #e2e8f0;
-  --line-strong: #cbd5e1;
-  --line-focus: var(--primary-ring);
+  --line-soft: var(--hairline-soft);
+  --line-strong: var(--hairline);
+  --line-focus: var(--ink);
 
-  --map-water: #dceef8;
-  --map-land: var(--bg-surface-muted);
-  --map-land-hover: #d8e0e6;
-  --map-selection: #c79a3b;
-  --map-selection-strong: #765719;
-  --map-selection-text: #946f26;
-  --map-selection-soft: #efdcae;
-  --map-selection-surface: #fff8e8;
+  /* 地图需要比页面更高的对比：水面色略深、陆地再深一档，选中仍用暖金 */
+  --map-water: #f3f5f6;
+  --map-land: #e7e7e7;
+  --map-land-hover: #dbdbdb;
+  --map-selection: #b07d2b;
+  --map-selection-strong: #6b4a12;
+  --map-selection-text: #8a6520;
+  --map-selection-soft: #f0dfb8;
+  --map-selection-surface: #fdf8ee;
 
-  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  /* Cereal 不可用时的开源替代是 Inter，其后回落到系统中文字体 */
+  --font-sans: 'Inter', 'Circular', -apple-system, system-ui, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
 
-  --text-h1: 22px;
-  --leading-h1: 30px;
-  --text-h2: 15px;
-  --leading-h2: 22px;
+  /* 字号层级：标题克制，页面 24、区块 16，靠留白与图片承担视觉重量 */
+  --text-h1: 24px;
+  --leading-h1: 32px;
+  --text-h2: 16px;
+  --leading-h2: 24px;
   --text-body: 14px;
   --leading-body: 22px;
   --text-small: 13px;
   --leading-small: 20px;
   --text-caption: 12px;
   --leading-caption: 18px;
-  --text-kpi: 26px;
-  --leading-kpi: 34px;
+  --text-micro: 11px;
+  --leading-micro: 16px;
+  --text-kpi: 32px;
+  --leading-kpi: 40px;
   --text-display: var(--text-kpi);
   --leading-display: var(--leading-kpi);
 
-  /* 圆角分层：控件 6px、轻量容器 8px、主要容器 10px、浮层 12px、大浮层 16px */
+  /* 圆角分层：控件 8px、卡片 14px、浮层 20px、大面积/胶囊 32px 起，
+     全站除页面栅格本身外不出现硬直角 */
   --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;
 
-  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
-  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.12), 0 6px 12px rgba(15, 23, 42, 0.06);
-  --shadow-overlay: var(--shadow-lg);
+  /* 只保留一档阴影，用于浮起的卡片、下拉与浮层；其余表面靠发丝线和留白分层 */
+  --shadow-tier: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0,
+    rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+  --shadow-xs: var(--shadow-tier);
+  --shadow-sm: var(--shadow-tier);
+  --shadow-md: var(--shadow-tier);
+  --shadow-lg: var(--shadow-tier);
+  --shadow-overlay: var(--shadow-tier);
 
+  /* 4px 基础间距（保留既有档位以免尺寸类引用发生位移），另加大区块 64px */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -107,6 +152,7 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-12: 48px;
+  --space-section: 64px;
 
   --motion-duration-fast: 120ms;
   --motion-duration-base: 180ms;
@@ -121,7 +167,7 @@
 
   --admin-sidebar-width: 224px;
   --admin-sidebar-collapsed-width: 56px;
-  --admin-header-height: 56px;
+  --admin-header-height: 68px;
 
   --font-main: var(--font-sans);
   --bg-subtle: var(--bg-surface-muted);
@@ -135,9 +181,9 @@
   --success: var(--success-600);
   --danger: var(--danger-600);
   --warning: var(--warning-600);
-  --shadow-soft: var(--shadow-sm);
-  --shadow-mid: var(--shadow-md);
-  --shadow-hover: var(--shadow-md);
+  --shadow-soft: var(--shadow-tier);
+  --shadow-mid: var(--shadow-tier);
+  --shadow-hover: var(--shadow-tier);
   --gap-page: var(--space-5);
   --gap-section: var(--space-4);
   --bg-page: var(--bg-canvas);
@@ -147,61 +193,155 @@
   --border: var(--line-soft);
 
   --el-color-primary: var(--primary);
-  --el-color-primary-light-9: var(--primary-soft);
-  --el-color-primary-light-7: var(--blue-100);
+  /* primary 色阶必须补齐 1/2/3/4/6/8，否则 Element 的 hover/plain 会拿默认蓝色 */
+  --el-color-primary-light-1: #ff6a83;
+  --el-color-primary-light-2: #ff7f94;
+  --el-color-primary-light-3: #ff8a9e;
+  --el-color-primary-light-4: #ff9cab;
+  --el-color-primary-light-5: #ffb3c1;
+  --el-color-primary-light-6: #ffc7d1;
+  --el-color-primary-light-7: #ffd9e0;
+  --el-color-primary-light-8: #ffe7eb;
+  --el-color-primary-light-9: #fff1f3;
   --el-color-primary-dark-2: var(--primary-strong);
+  --el-input-focus-border-color: var(--ink);
+  --el-input-hover-border-color: var(--ink);
   --el-color-success: var(--success-600);
   --el-color-warning: var(--warning-600);
   --el-color-danger: var(--danger-600);
+  --el-color-error: var(--error-text);
   --el-color-info: var(--info-600);
-  --el-border-color: var(--line-soft);
+  --el-border-color: var(--line-strong);
   --el-border-color-light: var(--line-soft);
+  --el-border-color-lighter: var(--line-soft);
   --el-text-color-primary: var(--text-primary);
   --el-text-color-regular: var(--text-secondary);
   --el-text-color-secondary: var(--text-muted);
+  --el-text-color-placeholder: var(--text-muted);
   --el-fill-color-light: var(--bg-surface-muted);
+  --el-fill-color-blank: var(--bg-surface);
+  --el-bg-color: var(--bg-surface);
   --el-bg-color-overlay: var(--bg-surface);
   --el-mask-color: var(--bg-overlay);
-  --el-border-radius-base: var(--radius-md);
+  --el-border-radius-base: var(--radius-sm);
+  --el-border-radius-round: var(--radius-full);
   --el-font-family: var(--font-sans);
+  --el-font-size-base: var(--text-body);
+  --el-box-shadow-light: var(--shadow-tier);
+  --el-box-shadow: var(--shadow-tier);
+  --el-card-border-radius: var(--radius-md);
+  --el-dialog-border-radius: var(--radius-lg);
+  --el-messagebox-border-radius: var(--radius-lg);
+  --el-popover-border-radius: var(--radius-md);
+  --el-popper-border-radius: var(--radius-md);
+  --el-alert-border-radius-base: var(--radius-md);
+  --el-tag-border-radius: var(--radius-full);
+  --el-tag-border-radius-rounded: var(--radius-full);
+  --el-pagination-border-radius: var(--radius-full);
+  --el-notification-radius: var(--radius-md);
+  --el-table-header-text-color: var(--text-muted);
 }
 
 [data-density="compact"] {
-  --control-height: 32px;
-  --table-head-height: 36px;
-  --table-row-height: 40px;
-  --media-row-height: 52px;
-  --section-padding: 12px;
+  --control-height: 36px;
+  --table-head-height: 40px;
+  --table-row-height: 44px;
+  --media-row-height: 56px;
+  --section-padding: 16px;
 }
 
 [data-density="monitor"] {
-  --control-height: 32px;
-  --table-head-height: 36px;
-  --table-row-height: 44px;
-  --media-row-height: 44px;
-  --section-padding: 12px;
+  --control-height: 36px;
+  --table-head-height: 40px;
+  --table-row-height: 48px;
+  --media-row-height: 48px;
+  --section-padding: 16px;
 }
 
 [data-density="form"] {
-  --control-height: 36px;
-  --section-padding: 16px;
+  --control-height: 40px;
+  --section-padding: 24px;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg-canvas: var(--slate-900);
-  --bg-surface: var(--slate-800);
-  --bg-surface-muted: var(--slate-700);
-  --bg-sidebar: var(--slate-950);
-  --bg-sidebar-hover: var(--slate-800);
-  --text-primary: var(--slate-50);
-  --text-secondary: var(--slate-300);
-  --text-muted: var(--slate-400);
-  --line-soft: var(--slate-700);
-  --line-strong: var(--slate-600);
-  --map-water: var(--slate-900);
-  --map-land: var(--slate-700);
-  --map-land-hover: var(--slate-600);
+  --canvas: #121212;
+  --surface-soft: #1d1d1d;
+  --surface-strong: #262626;
+  --ink: #f7f7f7;
+  --body: #d4d4d4;
+  --muted: #9a9a9a;
+  --muted-soft: #757575;
+  --hairline: #333333;
+  --hairline-soft: #2a2a2a;
+  --border-strong: #4d4d4d;
+  --error-text: #ff6b5e;
+  --error-text-hover: #ff8a7f;
+  --rausch-soft: #2a1418;
+  --rausch-soft-strong: #3a1a20;
+  --rausch-disabled: #4a2229;
+
+  --success-50: #16261d;
+  --success-600: #4ec08c;
+  --warning-50: #2a2115;
+  --warning-600: #e6a85c;
+  --danger-50: #2c1a17;
+  --danger-600: var(--error-text);
+  --info-50: var(--surface-soft);
+  --info-600: #b5b5b5;
+
+  --primary-text: #ff8a9e;
+  /* 深色下 light-1/2 作为“浅粉文字”使用（Element link hover），3..9 才是深色底 */
+  --el-color-primary-light-1: #ff7288;
+  --el-color-primary-light-2: #ff7f94;
+  --el-color-primary-light-3: #8f2531;
+  --el-color-primary-light-4: #7a1f2a;
+  --el-color-primary-light-5: #642029;
+  --el-color-primary-light-6: #4f1b22;
+  --el-color-primary-light-7: #3d171c;
+  --el-color-primary-light-8: #33151a;
+  --el-color-primary-light-9: #2a1418;
+
+  /* 语义色也需要深色色阶：Element 的 plain 按钮/提示背景读取 -light-9/-8/-5，
+     不覆盖会得到亮色底，在深色画布上刺眼。 */
+  --el-color-success-light-9: var(--success-50);
+  --el-color-success-light-8: #1c3226;
+  --el-color-success-light-7: #24402f;
+  --el-color-success-light-5: #2f5940;
+  --el-color-success-light-3: #3d7a5a;
+  --el-color-warning-light-9: var(--warning-50);
+  --el-color-warning-light-8: #332818;
+  --el-color-warning-light-7: #3d311d;
+  --el-color-warning-light-5: #57461f;
+  --el-color-warning-light-3: #7a6329;
+  --el-color-danger-light-9: var(--danger-50);
+  --el-color-danger-light-8: #3a211c;
+  --el-color-danger-light-7: #452722;
+  --el-color-danger-light-5: #5f3229;
+  --el-color-danger-light-3: #8a4437;
+  --el-color-info-light-9: var(--info-50);
+  --el-color-info-light-8: #262626;
+  --el-color-info-light-7: #2f2f2f;
+  --el-color-info-light-5: #3d3d3d;
+  --el-color-info-light-3: #4d4d4d;
+
+  --bg-canvas: var(--canvas);
+  --bg-surface: #1a1a1a;
+  --bg-surface-muted: var(--surface-soft);
+  --bg-sidebar: #0d0d0d;
+  --bg-sidebar-hover: var(--surface-soft);
+  --text-primary: var(--ink);
+  --text-secondary: var(--body);
+  --text-muted: var(--muted);
+  --text-muted-soft: var(--muted-soft);
+  --line-soft: var(--hairline-soft);
+  --line-strong: var(--hairline);
+  --line-focus: var(--ink);
+  --bg-overlay: color-mix(in srgb, #000000 62%, transparent);
+
+  --map-water: #14181b;
+  --map-land: #232323;
+  --map-land-hover: #2e2e2e;
 
   /* 深色映射：Element Plus 的暗色变量默认挂在 html.dark 上，本项目用 data-theme，
      这里显式把其表面/文字/填充映射到本主题令牌，避免表格、输入与浮层在深色下退化为亮底。 */
@@ -214,7 +354,7 @@
   --el-text-color-primary: var(--text-primary);
   --el-text-color-regular: var(--text-secondary);
   --el-text-color-secondary: var(--text-muted);
-  --el-border-color: var(--line-soft);
+  --el-border-color: var(--line-strong);
   --el-border-color-light: var(--line-soft);
   --el-border-color-lighter: var(--line-soft);
   --el-mask-color: var(--bg-overlay);
@@ -222,7 +362,7 @@
   --el-table-bg-color: var(--bg-surface);
   --el-table-tr-bg-color: var(--bg-surface);
   --el-table-expanded-cell-bg-color: var(--bg-surface);
-  --el-table-header-bg-color: color-mix(in srgb, var(--bg-surface-muted) 55%, var(--bg-surface));
+  --el-table-header-bg-color: var(--bg-surface-muted);
   --el-table-row-hover-bg-color: var(--bg-surface-muted);
   --el-table-border-color: var(--line-soft);
 }
@@ -323,7 +463,7 @@ select {
 #app :where(.page-section, .content-card, .table-panel) {
   min-width: 0;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
 
@@ -363,12 +503,12 @@ select {
 .soft-card.el-card {
   overflow: hidden;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
 
 .soft-card .el-card__header {
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--line-soft);
   font-weight: 600;
 }
@@ -413,18 +553,18 @@ select {
   --el-table-header-bg-color: var(--bg-surface-muted);
   --el-table-row-hover-bg-color: var(--bg-surface-muted);
   --el-table-text-color: var(--text-primary);
-  --el-table-header-text-color: var(--text-secondary);
+  --el-table-header-text-color: var(--text-muted);
 }
 
-/* 优先横线分隔：纵向网格线压到接近背景，宽表仍可读但不割裂 */
+/* 只用横向发丝线分隔，纵向网格线不参与表达结构 */
 .table-wrap .el-table .el-table__cell {
-  border-right-color: color-mix(in srgb, var(--line-soft) 42%, transparent);
+  border-right-color: transparent;
 }
 
 .table-wrap .el-table th.el-table__cell {
   color: var(--text-muted);
-  background: color-mix(in srgb, var(--bg-surface-muted) 55%, var(--bg-surface));
-  border-bottom-color: var(--line-strong);
+  background: var(--bg-surface-muted);
+  border-bottom: 1px solid var(--line-strong);
   font-size: var(--text-caption);
   font-weight: 600;
 }
@@ -441,14 +581,14 @@ select {
 
 .interactive-card {
   cursor: pointer;
-  transition: transform var(--motion-duration-fast) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-base) var(--motion-easing-standard),
-    border-color var(--motion-duration-base) var(--motion-easing-standard);
+  transition: box-shadow var(--motion-duration-base) var(--motion-easing-standard),
+    border-color var(--motion-duration-base) var(--motion-easing-standard),
+    background-color var(--motion-duration-base) var(--motion-easing-standard);
 }
 
 .interactive-card:hover {
   border-color: var(--line-strong);
-  box-shadow: var(--shadow-hover);
+  box-shadow: var(--shadow-tier);
 }
 
 @media (max-width: 1200px) {

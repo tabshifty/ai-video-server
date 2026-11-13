@@ -45,7 +45,7 @@ defineProps({
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-tier);
 }
 
 .bulk-action-bar__copy {

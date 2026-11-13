@@ -153,7 +153,9 @@ describe('Product runtime hygiene contracts', () => {
     expect(runtimeSources).not.toMatch(REMOTE_FONT_DOMAIN_PATTERN)
     expect(remoteFontImports).toEqual([])
     expect(remoteFontPreconnects).toEqual([])
-    expect(fontSans).toBe("'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif")
+    expect(fontSans).toBe(
+      "'Inter', 'Circular', -apple-system, system-ui, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif"
+    )
   })
 
   it('binds numeric el-input rows as numbers in every view', () => {
@@ -195,6 +197,19 @@ describe('Precision Ops final audit', () => {
   it('keeps image card actions visible without hover dependency', () => {
     const imageManage = readFileSync(new URL('./ImageManage.vue', import.meta.url), 'utf8')
     expect(imageActionVisibilityViolations(imageManage)).toEqual([])
+  })
+
+  it('keeps Rausch out of view decoration and only in whitelisted brand moments', () => {
+    // 白名单：登录品牌标记、上传进度、仪表盘数据图（图表主色属于允许的品牌用途）
+    const allowed = new Set(['Login.vue', 'UploadProgress.vue', 'Dashboard.vue', 'ImageWorkbenchMaskEditor.vue'])
+    const brandToken = /var\(--rausch(?:-[a-z-]+)?\)|var\(--primary(?:-strong|-soft)?\)|['"]--primary(?:-soft)?['"]/g
+    const violations = viewFiles.flatMap((file) => {
+      if (allowed.has(file)) return []
+      const source = readFileSync(new URL(file, directory), 'utf8')
+      return (source.match(brandToken) || []).map((token) => `${file}: ${token}`)
+    })
+
+    expect(violations).toEqual([])
   })
 
   it('keeps shell letter spacing at zero', () => {

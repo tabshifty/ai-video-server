@@ -518,17 +518,17 @@ async function doSave() {
 }
 
 .candidate-item:hover {
-  border-color: var(--primary);
+  border-color: var(--ink);
   box-shadow: var(--shadow-xs);
 }
 
 .candidate-item.active {
-  border-color: var(--primary);
-  box-shadow: inset 3px 0 0 var(--primary), var(--shadow-xs);
+  border-color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--ink), var(--shadow-xs);
 }
 
 .candidate-item:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--line-focus);
   outline-offset: 2px;
 }
 

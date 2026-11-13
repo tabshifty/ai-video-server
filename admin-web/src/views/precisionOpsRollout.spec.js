@@ -452,7 +452,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
       const translations = style.match(/transform:\s*translateY\(-1px\)/g) || []
 
       expect.soft(translations, file).toEqual([])
-      expect.soft(style, file).toMatch(new RegExp(`${selector.replace('.', '\\.')}(?::hover|\\.active|\\.is-active)[\\s\\S]*?border-color:\\s*var\\(--primary\\)`))
+      expect.soft(style, file).toMatch(new RegExp(`${selector.replace('.', '\\.')}(?::hover|\\.active|\\.is-active)[\\s\\S]*?border-color:\\s*var\\(--ink\\)`))
       expect.soft(style, file).toMatch(new RegExp(`${selector.replace('.', '\\.')}(?::hover|\\.active|\\.is-active)[\\s\\S]*?box-shadow:`))
     })
   })
@@ -469,7 +469,7 @@ describe('Precision Ops 第一阶段 rollout', () => {
     expect(template).toContain('v-model="configForm.enabled_sites"')
     expect(template).toMatch(/<el-tag\s+v-if="index === selectedIndex"[\s\S]*?class="candidate-selected"[\s\S]*?role="status"[\s\S]*?>已选中<\/el-tag>/)
     expect(style).toMatch(/\.result-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\);/s)
-    expect(style).toMatch(/\.candidate-item\.active\s*\{[^}]*border(?:-color)?:\s*var\(--primary\);/s)
+    expect(style).toMatch(/\.candidate-item\.active\s*\{[^}]*border(?:-color)?:\s*var\(--ink\);/s)
     expect(style).toMatch(/\.candidate-selected\s*\{[^}]*font-weight:\s*600;/s)
     expect(style).toMatch(/@media \(max-width: 900px\)[\s\S]*?\.result-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
     expect.soft(style).toMatch(/\.av-manual-scrape-page :deep\(\.el-switch\)\s*\{[^}]*min-height:\s*var\(--control-height\);/s)

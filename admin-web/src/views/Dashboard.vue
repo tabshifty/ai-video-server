@@ -322,12 +322,12 @@ onBeforeUnmount(() => {
 }
 
 .dashboard-quick-actions a:hover {
-  color: var(--primary);
-  background: var(--primary-soft);
+  color: var(--text-primary);
+  background: var(--bg-surface-strong);
 }
 
 .dashboard-quick-actions a:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--line-focus);
   outline-offset: 2px;
 }
 

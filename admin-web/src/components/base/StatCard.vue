@@ -46,16 +46,16 @@ function trendIcon() {
   min-height: calc(var(--space-8) * 3 + var(--space-4));
   align-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-5);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
 
 .stat-card__label {
-  color: var(--text-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--leading-caption);
+  color: var(--text-muted);
+  font-size: var(--text-small);
+  line-height: var(--leading-small);
 }
 
 .stat-card__value {
