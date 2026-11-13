@@ -1034,15 +1034,15 @@ describe('Precision Ops 第二阶段集成门禁', () => {
     const pending = readView('PendingDeleteShorts.vue')
     const pendingStyle = extractStyle(pending)
 
-    expect(actor).toContain('prop="name" label="演员姓名" min-width="160" show-overflow-tooltip')
+    expect(actor).toContain('prop="name" label="演员姓名" min-width="150" show-overflow-tooltip')
     expect(actor).toContain('function actorAliases(row)')
     expect(actor).toContain('<el-tooltip :content="actorAliases(row)" placement="top">')
     expect(actor).toContain('class="actor-aliases" tabindex="0" :aria-label="`演员别名：${actorAliases(row)}`"')
     expect(findRule(actorStyle, '.actor-aliases')).toContain('text-overflow: ellipsis')
     expect(findRule(actorStyle, '.actor-aliases')).toContain('white-space: nowrap')
     expect(findRule(actorStyle, '.actor-aliases:focus-visible')).toContain('outline: 2px solid var(--line-focus)')
-    expect(readView('CollectionManage.vue')).toContain('prop="name" label="合集名称" min-width="180" show-overflow-tooltip')
-    expect(readView('ImageCollectionManage.vue')).toContain('prop="name" label="图片合集名称" min-width="180" show-overflow-tooltip')
+    expect(readView('CollectionManage.vue')).toContain('prop="name" label="合集名称" min-width="160" show-overflow-tooltip')
+    expect(readView('ImageCollectionManage.vue')).toContain('prop="name" label="图片合集名称" min-width="160" show-overflow-tooltip')
     expect(pendingStyle).toMatch(
       /\.pending-delete-detail__copy h2\s*\{[^}]*display:\s*-webkit-box;[^}]*overflow:\s*hidden;[^}]*-webkit-box-orient:\s*vertical;[^}]*-webkit-line-clamp:\s*2;/s
     )

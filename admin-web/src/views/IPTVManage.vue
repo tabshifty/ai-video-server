@@ -197,7 +197,7 @@ onMounted(loadPlaylist)
           <article class="source-panel">
             <div class="source-panel__title">本地 M3U 文件</div>
             <p class="source-panel__desc">选择 .m3u / .m3u8 文件后点击上传并替换。</p>
-            <div class="source-panel__actions">
+            <div class="source-panel__actions source-panel__actions--upload">
               <el-upload
                 v-model:file-list="uploadFiles"
                 drag
@@ -349,6 +349,22 @@ onMounted(loadPlaylist)
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* 上传区独占一行，拖拽框铺满卡片宽度，按钮落到下一行左对齐，避免窄拖拽框旁挤一个按钮 */
+/* 上传区独占一行：网格布局让拖拽框铺满卡片宽度，按钮自然落到下一行 */
+.source-panel__actions--upload {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.source-panel__actions--upload :deep(.el-upload) {
+  display: block;
+  width: 100%;
+}
+
+.source-panel__actions--upload :deep(.el-upload-dragger) {
+  width: 100%;
 }
 
 .upload-icon {

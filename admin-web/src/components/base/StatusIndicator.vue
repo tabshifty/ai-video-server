@@ -35,6 +35,8 @@ defineProps({
   display: inline-flex;
   max-width: 100%;
   min-width: 0;
+  /* 作为 grid 子项时不要被拉伸成整行胶囊 */
+  justify-self: start;
   align-items: center;
   gap: var(--space-1);
   padding: 1px var(--space-2);

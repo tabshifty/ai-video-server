@@ -205,6 +205,17 @@ async function copyText(text, successMessage) {
   }
 }
 
+// 复制账号/密码合并为一个下拉：五个并排按钮会把操作列挤成两行
+function handleCopyCommand(command, row) {
+  if (command === 'account') {
+    copyAccount(row)
+    return
+  }
+  if (command === 'password') {
+    copyPassword(row)
+  }
+}
+
 async function copyAccount(row) {
   await copyText(row.account || '', '账号已复制')
 }
@@ -251,7 +262,7 @@ onMounted(loadEntries)
   <main class="tool-workspace password-vault-tool" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
-        <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
+        <el-button :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
       </div>
 
       <PageHeader title="密码管理" subtitle="记录外部服务、网站和设备的账号密码。" />
@@ -293,9 +304,9 @@ onMounted(loadEntries)
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="name" label="名称" min-width="160" />
-              <el-table-column prop="account" label="账号" min-width="180" show-overflow-tooltip />
-              <el-table-column label="网址" min-width="220" show-overflow-tooltip>
+              <el-table-column prop="name" label="名称" min-width="120" />
+              <el-table-column prop="account" label="账号" min-width="130" show-overflow-tooltip />
+              <el-table-column label="网址" min-width="150" show-overflow-tooltip>
                 <template #default="{ row }">
                   <a v-if="row.url" class="password-vault-tool__url" :href="row.url" target="_blank" rel="noopener noreferrer">
                     {{ row.url }}
@@ -303,16 +314,27 @@ onMounted(loadEntries)
                   <span v-else>--</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="note" label="备注" min-width="220" show-overflow-tooltip />
-              <el-table-column label="更新时间" width="180">
+              <el-table-column prop="note" label="备注" min-width="110" show-overflow-tooltip />
+              <el-table-column label="更新时间" width="160">
                 <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="330" fixed="right">
+              <el-table-column label="操作" width="360" fixed="right">
                 <template #default="{ row }">
                   <div class="password-vault-tool__actions">
                     <el-button size="small" :icon="View" :loading="passwordLoading" @click="showPassword(row)">显示密码</el-button>
-                    <el-button size="small" :icon="CopyDocument" @click="copyAccount(row)">复制账号</el-button>
-                    <el-button size="small" :icon="Key" :loading="passwordLoading" @click="copyPassword(row)">复制密码</el-button>
+                    <el-dropdown
+                      trigger="click"
+                      popper-class="password-vault-copy-popper"
+                      @command="(command) => handleCopyCommand(command, row)"
+                    >
+                      <el-button size="small" :icon="CopyDocument" :loading="passwordLoading">复制</el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="account">复制账号</el-dropdown-item>
+                          <el-dropdown-item command="password">复制密码</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                     <el-button size="small" :icon="Edit" @click="openEditDialog(row)">修改</el-button>
                     <el-button
                       size="small"

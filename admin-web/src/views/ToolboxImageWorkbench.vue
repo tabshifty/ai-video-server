@@ -928,7 +928,7 @@ function formatLibraryItemMeta(item) {
     <div class="image-workbench__inner">
       <header class="workbench-topbar">
         <div class="workbench-topbar__actions">
-          <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
+          <el-button :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
           <el-button :icon="FolderOpened" @click="openMediaLibrary">打开媒体库</el-button>
         </div>
         <StatusIndicator :label="statusLabel" :tone="statusType" />

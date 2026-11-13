@@ -518,6 +518,33 @@ async function doSave() {
   width: 100%;
 }
 
+/* 内联筛选条的宽度由字段语义决定：年份/类型只需窄列，标题需要长列，
+   否则百分比宽度会塌成几十像素，年份输入框被箭头挤满。 */
+.scrape-filter-form :deep(.el-form-item:nth-child(1) .el-input) {
+  width: 11rem;
+}
+
+.scrape-filter-form :deep(.el-form-item:nth-child(2) .el-input) {
+  width: 16rem;
+}
+
+.scrape-filter-form :deep(.el-form-item:nth-child(3) .el-input-number) {
+  width: 8rem;
+}
+
+.scrape-filter-form :deep(.el-form-item:nth-child(4) .el-select) {
+  width: 8rem;
+}
+
+.scrape-filter-form :deep(.tv-episode-fields) {
+  width: 13rem;
+}
+
+/* 数字输入在表单里保持左对齐，与文本输入一致 */
+.scrape-preview-page :deep(.el-input-number .el-input__inner) {
+  text-align: left;
+}
+
 .tv-episode-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;

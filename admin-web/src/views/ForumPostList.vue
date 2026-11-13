@@ -405,6 +405,15 @@ onMounted(load)
   gap: var(--space-2);
 }
 
+.forum-title-cell .forum-link--title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .forum-title-cell .status-indicator {
   flex: 0 0 auto;
   margin-top: 0.125rem;

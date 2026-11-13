@@ -2182,7 +2182,7 @@ onUnmounted(() => {
   <main class="tool-workspace archive-import-tool" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
-        <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
+        <el-button :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
       </div>
 
       <PageHeader title="压缩包导入" subtitle="先继续处理已有批次；需要新建批次时，再从上传弹窗进入。">

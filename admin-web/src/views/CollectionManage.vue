@@ -250,19 +250,19 @@ function onCleanupCompleted() {
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="name" label="合集名称" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
-              <el-table-column prop="cover_url" label="封面地址" min-width="240" show-overflow-tooltip />
-              <el-table-column prop="sort_order" label="排序" width="90" />
-              <el-table-column label="状态" width="100">
+              <el-table-column prop="name" label="合集名称" min-width="160" show-overflow-tooltip />
+              <el-table-column prop="description" label="简介" min-width="200" show-overflow-tooltip />
+              <el-table-column prop="cover_url" label="封面地址" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="sort_order" label="排序" width="80" />
+              <el-table-column label="状态" width="88">
                 <template #default="{ row }">
                   <StatusIndicator :label="row.active ? '启用' : '停用'" :tone="row.active ? 'success' : 'warning'" />
                 </template>
               </el-table-column>
-              <el-table-column label="更新时间" width="180">
+              <el-table-column label="更新时间" width="160">
                 <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="180">
+              <el-table-column label="操作" width="170">
                 <template #default="{ row }">
                   <el-button size="small" @click="openEdit(row)">编辑</el-button>
                   <el-button size="small" type="danger" @click="doDelete(row)">删除</el-button>

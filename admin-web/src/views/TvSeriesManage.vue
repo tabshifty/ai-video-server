@@ -363,7 +363,7 @@ onMounted(async () => {
                 <span class="series-card__meta">
                   <span>{{ item.total_seasons || 0 }} 季</span>
                   <span>{{ item.total_episodes || 0 }} 集</span>
-                  <span>{{ item.playable_episodes || 0 }} 集可播</span>
+                  <span>可播 {{ item.playable_episodes || 0 }}</span>
                 </span>
                 <span class="series-card__status">
                   <el-tag :type="item.active ? 'success' : 'info'">{{ item.active ? '启用' : '停用' }}</el-tag>
@@ -598,7 +598,8 @@ onMounted(async () => {
 }
 
 .tv-search {
-  width: min(18rem, 100%);
+  width: 18rem;
+  max-width: 100%;
 }
 
 .tv-filter {

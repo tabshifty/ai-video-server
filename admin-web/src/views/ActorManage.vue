@@ -400,8 +400,8 @@ onMounted(load)
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" :data="list" border>
-              <el-table-column prop="name" label="演员姓名" min-width="160" show-overflow-tooltip />
-              <el-table-column prop="aliases" label="别名" min-width="220">
+              <el-table-column prop="name" label="演员姓名" min-width="150" show-overflow-tooltip />
+              <el-table-column prop="aliases" label="别名" min-width="180">
                 <template #default="{ row }">
                   <el-tooltip :content="actorAliases(row)" placement="top">
                     <span class="actor-aliases" tabindex="0" :aria-label="`演员别名：${actorAliases(row)}`">
@@ -410,20 +410,20 @@ onMounted(load)
                   </el-tooltip>
                 </template>
               </el-table-column>
-              <el-table-column prop="gender" label="性别" width="100" />
-              <el-table-column prop="country" label="国家/地区" width="130" />
-              <el-table-column prop="source" label="来源" width="110">
+              <el-table-column prop="gender" label="性别" width="72" />
+              <el-table-column prop="country" label="国家/地区" width="110" />
+              <el-table-column prop="source" label="来源" width="84">
                 <template #default="{ row }">{{ sourceLabel(row.source) }}</template>
               </el-table-column>
-              <el-table-column prop="active" label="状态" width="100">
+              <el-table-column prop="active" label="状态" width="88">
                 <template #default="{ row }">
                   <StatusIndicator :label="buildStatusLabel(row)" :tone="row.active ? 'success' : 'warning'" />
                 </template>
               </el-table-column>
-              <el-table-column label="更新时间" width="180">
+              <el-table-column label="更新时间" width="160">
                 <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="220">
+              <el-table-column label="操作" width="200">
                 <template #default="{ row }">
                   <el-button size="small" @click="openEdit(row)">编辑</el-button>
                   <el-button size="small" @click="toggleActive(row)">{{ row.active ? '停用' : '启用' }}</el-button>

@@ -35,6 +35,9 @@ const playLoading = ref(false)
 const actionBusy = ref(false)
 const videoRef = ref(null)
 const requestSeq = ref(0)
+// 已确认不在待删除列表中的 id：列表接口与详情接口短暂不一致时，
+// 避免反复重选同一项造成刷新循环与提示风暴
+const stalePendingIDs = new Set()
 
 const hasItems = computed(() => items.value.length > 0)
 const initialLoading = computed(() => listLoading.value && items.value.length === 0)
@@ -112,6 +115,12 @@ async function selectIndex(index) {
     const detail = await getAdminVideoDetail(item.id)
     if (isStale(seq) || activeItem.value?.id !== item.id) return
     if (!isPendingDeleteShortVideo(detail)) {
+      if (stalePendingIDs.has(item.id)) {
+        currentDetail.value = null
+        resetPlayback()
+        return
+      }
+      stalePendingIDs.add(item.id)
       ElMessage.warning('该短视频已不在待删除列表中')
       await loadPage(page.value, { selectIndexAfterLoad: normalizedIndex })
       return
@@ -156,6 +165,7 @@ async function loadPage(targetPage = page.value, { selectIndexAfterLoad = 0 } = 
 }
 
 async function refreshList() {
+  stalePendingIDs.clear()
   await loadPage(page.value, { selectIndexAfterLoad: Math.max(currentIndex.value, 0) })
 }
 
@@ -659,9 +669,10 @@ onBeforeUnmount(() => {
 
 .pending-delete-detail__controls {
   display: flex;
+  flex: 0 0 auto;
   justify-content: flex-end;
   gap: var(--space-2);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 @media (min-width: 64rem) and (max-width: 74.9375rem) {
@@ -717,6 +728,10 @@ onBeforeUnmount(() => {
     max-width: 100%;
     max-height: calc(100% - var(--space-6));
     padding: var(--space-2);
+  }
+
+  .pending-delete-detail__controls {
+    flex-wrap: wrap;
   }
 
   .pending-delete-detail__controls .el-button {

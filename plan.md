@@ -1126,3 +1126,10 @@
 - 验证：`cd admin-web && npx vitest run` 通过（60 文件 / 838 用例）；`npm run build` 通过。使用本地 mock API + Vite dev + headless Chrome（CDP）走查视频列表、任务监控、仪表盘、视频详情、系统设置、用户、115 云下载、上传中心、图片管理、工具箱、行政区划地图与登录页，覆盖 1440×1000、1920×1080、1024×900、768×900、390×844 与 `data-theme=dark`，截图见 `docs/design/screenshots/2026-11-13-admin-web-airbnb/`。同时修正任务列宽避免时间换行、移动端标题降为 20px、深色分页当前页反色。
 - 未验证：真实后端数据下的视觉与交互；图片工坊、密码库、刮削工作台的深色表现；115 云下载扫码/会话失效回归。走查使用 mock 数据，未做改版前后同数据对比图。
 - 回退：仅前端样式与少量列宽/类名调整，无接口或数据结构变化；整体 revert 本提交即可，主题令牌保留 `--slate-*`/`--blue-*` 别名指向新色板以免历史引用失效。
+
+## 2026-11-13 17:15 +0800 PC 管理端全页面布局巡检与修复
+- 进度：用 mock API + Vite dev + headless Chrome 遍历 27 个管理端路由，在 1440×1000 下逐页截图并跑脚本检查（页面横向溢出、元素越界、文字纵向裁切、严重截断、过窄换行），再补 1024/768 抽查。未发现页面级横向滚动或元素越界；`severeTruncate` 仅命中视频标题与任务错误摘要这两处有意的省略号。真实问题集中在表格列宽与工具条挤压。
+- 修复：① actors/collections/image-collections/cloud-downloads/password-vault 五张表在 1440 下横向溢出 88–186px，操作列被裁切，按内容重分配列宽后全部落在 1126px 卡片宽度内；② 图片合集操作列由 200→240，避免"查看图片/编辑"与"删除"折成两行；③ 密码库五个并排按钮改为「显示密码 / 复制▾（复制账号、复制密码）/ 修改 / 删除」并加宽操作列，行高恢复单行；④ 待删除短视频详情操作区改为默认不换行（仅 767px 以下换行），避免"保留/最终删除"被挤到第三行；并修复当列表接口仍返回已不符合待删条件的条目时，`selectIndex → 非待删 → 刷新 → 再选中` 的无限循环与提示风暴（同一 id 只重试一次，手动刷新时清空记录）；⑤ Telegram「采集器」状态胶囊在 grid 子项中被拉伸成整行，StatusIndicator 增加 `justify-self: start`；⑥ 论坛标题两行溢出固定行高，改为单行省略并保留 title 提示；⑦ 通用刮削筛选条中年份/类型输入被百分比宽度挤成几十像素，改为按语义固定宽度并把数字输入左对齐；⑧ 电视剧筛选条因 `min(18rem,100%)` 循环换行，改为固定宽度，卡片文案「0 集可播」改为「可播 0」；⑨ IPTV 上传拖拽框只有 270px 宽且按钮挤在右侧，改为整行拖拽框 + 按钮下一行；⑩ 四个工具箱子页的「返回工具箱」由 primary plain（浅粉）改为中性次级按钮。
+- 影响文件：`admin-web/src/views/{ActorManage,CollectionManage,ImageCollectionManage,CloudDownloadList,ToolboxPasswordVault,PendingDeleteShorts,ForumPostList,ScrapePreview,TvSeriesManage,IPTVManage,ToolboxImageWorkbench,ToolboxArchiveImport,ToolboxEd2k,ToolboxOrphanFiles}.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`（列宽契约同步）、`CONTEXT.md`、`plan.md`。
+- 验证：`npx vitest run` 通过（60 文件 / 844 用例）；`npm run build` 通过；列宽修正后重跑表格溢出检测为 0 条；1440 全量巡检复跑后除两处有意省略号外无溢出/裁切/过窄换行；1024/768 抽查 tv-series、telegram、images、archive-import 均单列或双列正常。
+- 未验证：真实后端数据下的超长标题、多附件论坛行与多按钮组合；深色主题下的本轮布局改动（仅尺寸与排列变化，未逐页复看）。

@@ -220,7 +220,7 @@ onUnmounted(() => {
   <main class="tool-workspace orphan-tool" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
-        <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
+        <el-button :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
       </div>
 
       <PageHeader title="孤儿文件扫描" subtitle="盘点存储目录中的未引用持久文件，并按扫描结果统一处理。" />

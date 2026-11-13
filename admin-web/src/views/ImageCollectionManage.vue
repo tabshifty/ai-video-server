@@ -516,9 +516,9 @@ onBeforeUnmount(() => {
         <template v-else>
           <div class="table-wrap">
             <el-table v-loading="loading" class="image-collection-table" :data="list" border>
-              <el-table-column prop="name" label="图片合集名称" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="description" label="简介" min-width="260" show-overflow-tooltip />
-              <el-table-column label="封面" min-width="240">
+              <el-table-column prop="name" label="图片合集名称" min-width="160" show-overflow-tooltip />
+              <el-table-column prop="description" label="简介" min-width="200" show-overflow-tooltip />
+              <el-table-column label="封面" min-width="180">
                 <template #default="{ row }">
                   <div class="cover-cell">
                     <el-tag v-if="row.cover_image_id" type="success" size="small">已绑定图片封面</el-tag>
@@ -526,16 +526,16 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column prop="sort_order" label="排序" width="90" />
-              <el-table-column label="状态" width="100">
+              <el-table-column prop="sort_order" label="排序" width="80" />
+              <el-table-column label="状态" width="88">
                 <template #default="{ row }">
                   <StatusIndicator :label="row.active ? '启用' : '停用'" :tone="row.active ? 'success' : 'warning'" />
                 </template>
               </el-table-column>
-              <el-table-column label="更新时间" width="180">
+              <el-table-column label="更新时间" width="160">
                 <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="260">
+              <el-table-column label="操作" width="240">
                 <template #default="{ row }">
                   <el-button size="small" type="primary" plain @click="openImageDrawer(row)">查看图片</el-button>
                   <el-button size="small" @click="openEdit(row)">编辑</el-button>

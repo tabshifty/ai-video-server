@@ -625,13 +625,13 @@ onUnmounted(() => {
                   </dl>
                 </template>
               </el-table-column>
-              <el-table-column label="文件名" min-width="220" show-overflow-tooltip>
+              <el-table-column label="文件名" min-width="190" show-overflow-tooltip>
                 <template #default="{ row }">{{ row.declared_name || '--' }}</template>
               </el-table-column>
-              <el-table-column label="大小" width="110">
+              <el-table-column label="大小" width="100">
                 <template #default="{ row }">{{ formatBytes(row.declared_size) }}</template>
               </el-table-column>
-              <el-table-column label="来源" min-width="200" show-overflow-tooltip>
+              <el-table-column label="来源" min-width="130" show-overflow-tooltip>
                 <template #default="{ row }">
                   <el-tag v-if="row.source === 'toolbox'" size="small" effect="plain">工具箱</el-tag>
                   <el-tag v-else-if="row.source === 'manual'" size="small" effect="plain" type="info">手动</el-tag>
@@ -665,7 +665,7 @@ onUnmounted(() => {
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="进度" min-width="170">
+              <el-table-column label="进度" min-width="150">
                 <template #default="{ row }">
                   <el-progress
                     :stroke-width="6"
@@ -674,7 +674,7 @@ onUnmounted(() => {
                   />
                 </template>
               </el-table-column>
-              <el-table-column label="创建时间" width="168">
+              <el-table-column label="创建时间" width="160">
                 <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
               </el-table-column>
               <el-table-column label="操作" width="160">

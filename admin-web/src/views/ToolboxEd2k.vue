@@ -264,7 +264,7 @@ async function submitSelected() {
   <main class="tool-workspace" data-density="form">
     <div class="tool-workspace__inner">
       <div class="tool-workspace__topbar">
-        <el-button type="primary" plain :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
+        <el-button :icon="Back" @click="returnToToolbox">返回工具箱</el-button>
       </div>
 
       <PageHeader
