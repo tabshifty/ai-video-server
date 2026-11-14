@@ -71,6 +71,71 @@ type SubmitResult struct {
 	ErrorMsg string `json:"error_msg"`
 }
 
+// LoginState is the server-side session verdict. It deliberately ignores page
+// globals: after a scanned QR login 115 keeps the landing page with an
+// "进入网盘" button, where USER_ID and the native bridge are not defined yet.
+type LoginState string
+
+const (
+	// LoginStateLoggedIn means the cookie session is valid.
+	LoginStateLoggedIn LoginState = "logged_in"
+	// LoginStateLoggedOut means 115 explicitly asked for a login.
+	LoginStateLoggedOut LoginState = "logged_out"
+	// LoginStateUnknown means the check could not decide either way.
+	LoginStateUnknown LoginState = "unknown"
+)
+
+// LoginCheck is the cookie-session verdict plus the landing-page hint.
+type LoginCheck struct {
+	State LoginState
+	// EnterPan reports that the page itself shows the post-scan "进入网盘"
+	// affordance. Only that page is auto-navigated; a home page the admin is
+	// browsing must stay where it is.
+	EnterPan bool
+}
+
+const loginCheckExpression = `(async () => {
+	try {
+		const r = await fetch('https://my.115.com/?ct=ajax&ac=nav', {
+			credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(5000)
+		});
+		if (!r.ok) return { state: 'unknown', error: '会话验证服务返回 HTTP ' + r.status, enter_pan: false };
+		const j = await r.json();
+		const text = (document.body && document.body.innerText) || '';
+		const enterPan = /进入网盘|进入云盘|登录成功/.test(text);
+		if (j.state === true || j.state === 1 || j.state === '1') return { state: 'logged_in', enter_pan: enterPan };
+		const message = String(j.error || j.message || '');
+		if (/登录|login/i.test(message)) return { state: 'logged_out', enter_pan: false };
+		return { state: 'unknown', error: message, enter_pan: false };
+	} catch (e) {
+		return { state: 'unknown', error: String((e && e.name) || e), enter_pan: false };
+	}
+})()`
+
+// CheckLogin checks the cookie session without requiring page globals. It is
+// what lets the client notice a completed scan on the 115 landing page and
+// whether that page is waiting for the "进入网盘" click.
+func CheckLogin(ctx context.Context, s *Session) (LoginCheck, error) {
+	var raw struct {
+		State    string `json:"state"`
+		EnterPan bool   `json:"enter_pan"`
+		Error    string `json:"error"`
+	}
+	if err := s.Evaluate(ctx, loginCheckExpression, &raw); err != nil {
+		return LoginCheck{State: LoginStateUnknown}, err
+	}
+	check := LoginCheck{State: LoginState(raw.State), EnterPan: raw.EnterPan}
+	switch check.State {
+	case LoginStateLoggedIn, LoginStateLoggedOut:
+		return check, nil
+	}
+	check.State = LoginStateUnknown
+	if raw.Error != "" {
+		return check, errors.New(raw.Error)
+	}
+	return check, nil
+}
+
 // USER_ID survives session expiry in an already-open page. Verify the cookie
 // with a read-only authenticated endpoint rather than trusting that variable.
 const sessionProbeExpression = `(async () => {

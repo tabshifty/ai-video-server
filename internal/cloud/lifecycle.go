@@ -51,11 +51,20 @@ func (c *Client) EnsureSession(ctx context.Context) (*Session, State, error) {
 
 	deadline := time.Now().Add(20 * time.Second)
 	var last State
+	enteredPan := false
 	for {
 		state, probeErr := Probe(ctx, session)
 		last = state
 		if probeErr == nil && state.LoggedIn {
 			return session, state, nil
+		}
+		// 扫码完成后 115 会停在带“进入网盘”按钮的落地页，USER_ID 与原生桥
+		// 只在网盘页出现。这里替用户完成那一步，避免下载永远等不到登录态。
+		if !enteredPan && !isPanPageURL(state.PageURL) {
+			if check, checkErr := CheckLogin(ctx, session); checkErr == nil && check.State == LoginStateLoggedIn && check.EnterPan {
+				enteredPan = true
+				_ = session.Navigate(ctx, PanPageURL)
+			}
 		}
 		if time.Now().After(deadline) {
 			session.Close()
@@ -86,8 +95,16 @@ func (c *Client) Inspect(ctx context.Context) State {
 	if err != nil {
 		return State{Up: true, SessionError: "115 浏览器页面读取失败，请稍后刷新"}
 	}
+	onLandingPage := false
 	if !ok {
-		return State{Up: true}
+		target, ok, err = c.Browser.FindTarget(ctx, is115LoginLandingPage)
+		if err != nil {
+			return State{Up: true, SessionError: "115 浏览器页面读取失败，请稍后刷新"}
+		}
+		if !ok {
+			return State{Up: true}
+		}
+		onLandingPage = true
 	}
 	session, err := c.Browser.Attach(ctx, target)
 	if err != nil {
@@ -95,8 +112,16 @@ func (c *Client) Inspect(ctx context.Context) State {
 	}
 	defer session.Close()
 	state, err := Probe(ctx, session)
+	if onLandingPage && !state.LoggedIn {
+		// 扫码成功但 115 停在登录落地页：cookie 已生效，自动进入网盘页，
+		// 等价于用户点击页面上的“进入网盘”，随后原生桥才可用。
+		if check, checkErr := CheckLogin(ctx, session); checkErr == nil && check.State == LoginStateLoggedIn && check.EnterPan {
+			state, err = enterPanPage(ctx, session)
+			state.Up = true
+		}
+	}
 	if err != nil {
-		return State{Up: true, PageURL: target.URL, SessionError: err.Error()}
+		return State{Up: true, PageURL: state.PageURL, SessionError: err.Error()}
 	}
 	state.Quota = nil
 	if state.LoggedIn {
@@ -211,6 +236,62 @@ func (c *Client) navigateAndWait(ctx context.Context, target Target, rawURL stri
 		}
 	}
 	return Target{}, fmt.Errorf("cloud: pan page did not open")
+}
+
+// is115LoginLandingPage reports whether the target is the 115 home/login page
+// that stays open after a scanned QR login and asks for "进入网盘". Only that
+// page is auto-navigated; other 115 pages the admin may be browsing stay put.
+func is115LoginLandingPage(t Target) bool {
+	if t.Type != "page" || isPanPage(t) {
+		return false
+	}
+	parsed, err := url.Parse(strings.TrimSpace(t.URL))
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(parsed.Hostname()) {
+	case "115.com", "www.115.com":
+	default:
+		return false
+	}
+	path := strings.ToLower(strings.TrimSuffix(parsed.Path, "/"))
+	return path == "" || path == "/login"
+}
+
+// isPanPageURL is isPanPage for a raw URL, used on probe results.
+func isPanPageURL(rawURL string) bool {
+	return isPanPage(Target{Type: "page", URL: strings.TrimSpace(rawURL)})
+}
+
+// enterPanPage loads the pan view in an attached landing page and waits for
+// USER_ID and the native bridge to appear. 115 finishes a scanned login on the
+// landing page, where that button would be a human step.
+func enterPanPage(ctx context.Context, session *Session) (State, error) {
+	if err := session.Navigate(ctx, PanPageURL); err != nil {
+		return State{Up: true}, err
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	var last State
+	var lastErr error
+	for {
+		state, probeErr := Probe(ctx, session)
+		state.Up = true
+		last, lastErr = state, probeErr
+		if probeErr == nil && state.LoggedIn {
+			return state, nil
+		}
+		if time.Now().After(deadline) {
+			if lastErr != nil {
+				return last, lastErr
+			}
+			return last, nil
+		}
+		select {
+		case <-ctx.Done():
+			return last, ctx.Err()
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 }
 
 // is115Page reports whether the target is a 115 web page. Subdomains other than
