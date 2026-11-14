@@ -1,5 +1,13 @@
 # plan.md
 
+## 2026-11-14 11:02 +0800 Hermes 定时推送图文合并：需求调查
+- 范围：按用户指定的 grill-with-docs 调查 Telegram 图片、文字和下载按钮的组合展示；当前只收口需求，不实施发送逻辑或修改运行配置。
+- 事实：仓库 `send_post()` 先以空文字参数发送媒体，再单独发送文字；按钮绑定最后一段文字，交互使用文字消息编辑接口。
+- 运行核实：活动 Hermes 已启用该扩展，含 ED2K 的新帖及复用通知逻辑的历史补漏会走该路径；当前每帖单张预览图，通用发送器已有单图说明文字能力。
+- 待确认：超长说明文字和下载选择面板的位置；本轮无需新增多图策略。
+- 影响文件：`docs/hermes-telegram-image-text-exploration.md`、`plan.md`；尚无已收口的新领域术语，不改 `CONTEXT.md`。
+- 验证：文档差异和中文编码检查通过；无需构建；既有 `docs/examples/` 不纳入。
+
 ## 2026-11-14 10:55 +0800 115 本地暂存删除：实现、评审修复与验证
 - 实现：migration `0051` 增加 `local_file_deleted_at/local_file_deleted_by`；模型与仓储补字段与幂等 `MarkLocalFileDeleted`；新增 `CloudLocalFileDeletionService`（仅 completed、活动导入 409、`DOWNLOAD_DIR` 包含校验、软链根缺失文件幂等、空路径拒绝、副作用后写库与回读兜底）；新增 `GET /admin/cloud-downloads/:id/local-file` 与 `POST .../local-file/delete`（confirm 校验、中文错误映射）；main/router 接线；`localSourceOrImported` 放宽为显式本地删除也算来源已处置。
 - 管理端：列表「更多 → 删除本地文件」、确认框（路径/实际大小/不可恢复）、「本地已删除」标签与停用导入、归档失败时保留「查看批次」入口、115 回收站唯一副本警告；新增 helper/API 测试。
