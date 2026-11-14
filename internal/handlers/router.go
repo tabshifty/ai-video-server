@@ -178,6 +178,7 @@ func (a *API) Register(r *gin.Engine) {
 			tvRemote.POST("/sessions/:session_id/end", a.EndTVRemoteSession)
 		}
 		v1.POST("/upload/check", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadCheck)
+		v1.POST("/upload/attach", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadAttach)
 		v1.POST("/upload/init", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadInit)
 		v1.PUT("/upload/chunk", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadChunk)
 		v1.POST("/upload/complete", middleware.AuthMiddleware(a.jwtSecret, a.redis), a.UploadComplete)

@@ -45,6 +45,12 @@ type UploadResult struct {
 	OutputDir     string
 	TargetFormat  string
 	OSHash        string
+	// AddedCollections / AddedImageCollection 记录命中已存在视频时实际补齐的关系，
+	// 供入口回报「已存在，新增 N 个合集」。
+	AddedCollections     int
+	AddedImageCollection bool
+	// SkippedPendingDelete 表示命中视频正在等待删除，未写入任何合集关系。
+	SkippedPendingDelete bool
 }
 
 type UploadPreview struct {
@@ -150,13 +156,9 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 		if existingVideo.Type != in.Type {
 			return UploadResult{}, ErrHashTypeConflict
 		}
-		if len(in.CollectionIDs) > 0 {
-			if err := s.repo.AddVideoCollectionsByIDsAnyType(ctx, existingID, in.CollectionIDs); err != nil {
-				return UploadResult{}, err
-			}
-		}
-		if err := s.setExistingVideoImageCollectionIfEmpty(ctx, existingID, existingVideo, in.ImageCollectionID); err != nil {
-			return UploadResult{}, err
+		attachment, attachErr := AttachExistingVideoCollections(ctx, s.repo, existingVideo, in.CollectionIDs, in.ImageCollectionID)
+		if attachErr != nil {
+			return UploadResult{}, attachErr
 		}
 		if shouldUpdateExistingVideoOriginalPath(refreshExistingOriginalPath, existingVideo.Status) && strings.TrimSpace(existingVideo.OriginalPath) != strings.TrimSpace(in.FilePath) {
 			if err := s.repo.UpdateVideoOriginalPath(ctx, existingID, in.FilePath); err != nil {
@@ -165,11 +167,14 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 			existingVideo.OriginalPath = in.FilePath
 		}
 		return UploadResult{
-			VideoID:       existingID,
-			Status:        existingVideo.Status,
-			AlreadyExists: true,
-			Enqueue:       false,
-			OSHash:        existingVideo.OSHash,
+			VideoID:              existingID,
+			Status:               existingVideo.Status,
+			AlreadyExists:        true,
+			Enqueue:              false,
+			OSHash:               existingVideo.OSHash,
+			AddedCollections:     attachment.AddedCollections,
+			AddedImageCollection: attachment.AddedImageCollection,
+			SkippedPendingDelete: attachment.VideoPendingDelete,
 		}, nil
 	}
 	rawImageCollectionIDs := make([]uuid.UUID, 0, 1)
@@ -266,8 +271,9 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 			if existingVideo.Type != in.Type {
 				return UploadResult{}, ErrHashTypeConflict
 			}
-			if err := s.setExistingVideoImageCollectionIfEmpty(ctx, existingID, existingVideo, in.ImageCollectionID); err != nil {
-				return UploadResult{}, err
+			attachment, attachErr := AttachExistingVideoCollections(ctx, s.repo, existingVideo, in.CollectionIDs, in.ImageCollectionID)
+			if attachErr != nil {
+				return UploadResult{}, attachErr
 			}
 			if shouldUpdateExistingVideoOriginalPath(refreshExistingOriginalPath, existingVideo.Status) && strings.TrimSpace(existingVideo.OriginalPath) != strings.TrimSpace(in.FilePath) {
 				if err := s.repo.UpdateVideoOriginalPath(ctx, existingID, in.FilePath); err != nil {
@@ -275,11 +281,14 @@ func (s *UploadService) saveLocalFile(ctx context.Context, in LocalUploadInput, 
 				}
 			}
 			return UploadResult{
-				VideoID:       existingID,
-				Status:        existingVideo.Status,
-				AlreadyExists: true,
-				Enqueue:       false,
-				OSHash:        existingVideo.OSHash,
+				VideoID:              existingID,
+				Status:               existingVideo.Status,
+				AlreadyExists:        true,
+				Enqueue:              false,
+				OSHash:               existingVideo.OSHash,
+				AddedCollections:     attachment.AddedCollections,
+				AddedImageCollection: attachment.AddedImageCollection,
+				SkippedPendingDelete: attachment.VideoPendingDelete,
 			}, nil
 		}
 		_ = s.repo.DeleteVideoByID(ctx, videoID)
@@ -314,13 +323,6 @@ func (s *UploadService) resolveUploadHash(in LocalUploadInput) (string, error) {
 		return "", ErrHashMismatch
 	}
 	return serverHash, nil
-}
-
-func (s *UploadService) setExistingVideoImageCollectionIfEmpty(ctx context.Context, existingID uuid.UUID, existingVideo models.Video, imageCollectionID *uuid.UUID) error {
-	if imageCollectionID == nil || existingVideo.ImageCollectionID != nil {
-		return nil
-	}
-	return s.repo.SetVideoImageCollectionIfEmpty(ctx, existingID, *imageCollectionID)
 }
 
 func (s *UploadService) SaveUpload(ctx context.Context, userID uuid.UUID, fileHeader *multipart.FileHeader, title, desc, typ string, tags []string, actorIDs []uuid.UUID, actorNames []string, collectionIDs []uuid.UUID, imageCollectionID *uuid.UUID, siteCategory, clientHash string, maxVideoSize int64) (UploadResult, error) {

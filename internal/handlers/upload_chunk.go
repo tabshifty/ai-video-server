@@ -264,10 +264,7 @@ func (a *API) UploadComplete(c *gin.Context) {
 	if result.AlreadyExists {
 		_ = os.Remove(mergedPath)
 		_ = a.chunkUpload.Abort(req.SessionID)
-		ok(c, gin.H{
-			"exists":   true,
-			"video_id": result.VideoID,
-		})
+		ok(c, existingUploadPayload(result))
 		return
 	}
 

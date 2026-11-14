@@ -42,6 +42,8 @@ type cloudImportTaskRepository interface {
 type cloudImportVideoLookup interface {
 	FindVideoByHash(ctx context.Context, hash string, fileSize int64) (uuid.UUID, bool, error)
 	GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error)
+	AddVideoCollectionsByIDsAnyTypeReturningAdded(ctx context.Context, videoID uuid.UUID, collectionIDs []uuid.UUID) (int, error)
+	FillVideoImageCollectionIfEmpty(ctx context.Context, videoID uuid.UUID, imageCollectionID uuid.UUID) (bool, error)
 }
 
 type cloudImportUploadService interface {
@@ -378,7 +380,7 @@ func (s *CloudDownloadImportService) processVideoImport(
 			record.VideoID = &videoID
 			return s.resumeVideoImport(ctx, record, videoID, sourcePath)
 		}
-		return s.finishSkippedExisting(ctx, record, videoID, sourcePath)
+		return s.finishSkippedExisting(ctx, record, videoID, sourcePath, input)
 	}
 	if resuming {
 		return s.resumeVideoImport(ctx, record, videoID, sourcePath)
@@ -412,7 +414,7 @@ func (s *CloudDownloadImportService) processVideoImport(
 			return s.failImport(ctx, record.ID, fmt.Sprintf("预览视频导入失败: %v", previewErr))
 		}
 		if preview.AlreadyExists {
-			return s.finishSkippedExisting(ctx, record, preview.VideoID, sourcePath)
+			return s.finishSkippedExisting(ctx, record, preview.VideoID, sourcePath, input)
 		}
 		targetID = preview.VideoID
 	}
@@ -468,7 +470,7 @@ func (s *CloudDownloadImportService) processVideoImport(
 			if copied {
 				_ = os.Remove(targetPath)
 			}
-			return s.finishSkippedExisting(ctx, record, result.VideoID, sourcePath)
+			return s.finishSkippedExisting(ctx, record, result.VideoID, sourcePath, input)
 		}
 		if result.VideoID != uuid.Nil {
 			targetID = result.VideoID
@@ -617,12 +619,40 @@ func (s *CloudDownloadImportService) enqueueImportedVideo(videoID uuid.UUID, inp
 	}
 }
 
-func (s *CloudDownloadImportService) finishSkippedExisting(ctx context.Context, record models.CloudDownloadImport, videoID uuid.UUID, sourcePath string) error {
+func (s *CloudDownloadImportService) finishSkippedExisting(ctx context.Context, record models.CloudDownloadImport, videoID uuid.UUID, sourcePath string, input models.CloudDownloadImportInput) error {
+	// 命中已有视频时不再只写「已跳过」：本次选择携带的合集关系要追加到那条视频上。
+	if err := s.attachExistingVideoCollections(ctx, videoID, input); err != nil {
+		if errors.Is(err, ErrHashTypeConflict) {
+			return s.failImport(ctx, record.ID, "追加视频合集关系失败：已有视频类型与本次导入不一致")
+		}
+		return s.failImport(ctx, record.ID, fmt.Sprintf("追加视频合集关系失败：%v", err))
+	}
 	if err := s.finish(ctx, record.ID, models.CloudImportSkippedExisting, &videoID, nil); err != nil {
 		return err
 	}
 	s.removeDownloadedSource(sourcePath)
 	return nil
+}
+
+// attachExistingVideoCollections 把云导入携带的合集关系追加到已存在视频。
+// 待删除视频不写入；类型冲突按既有语义报错，不静默追加。
+func (s *CloudDownloadImportService) attachExistingVideoCollections(ctx context.Context, videoID uuid.UUID, input models.CloudDownloadImportInput) error {
+	if len(input.CollectionIDs) == 0 && input.ImageCollectionID == nil {
+		return nil
+	}
+	videoType, err := normalizeCloudImportVideoType(input.Type)
+	if err != nil {
+		return err
+	}
+	video, err := s.videos.GetVideoByID(ctx, videoID)
+	if err != nil {
+		return err
+	}
+	if video.Type != videoType {
+		return ErrHashTypeConflict
+	}
+	_, err = AttachExistingVideoCollections(ctx, s.videos, video, input.CollectionIDs, input.ImageCollectionID)
+	return err
 }
 
 func (s *CloudDownloadImportService) finish(ctx context.Context, id int64, status string, videoID, archiveBatchID *uuid.UUID) error {
@@ -746,6 +776,10 @@ func normalizeCloudImportInput(input models.CloudDownloadImportInput, sourcePath
 			return input, err
 		}
 		input.Type = videoType
+		// 视频合集仍只属于短视频：入口层拦下非短视频携带合集，避免命中已有视频时静默写入。
+		if len(input.CollectionIDs) > 0 && videoType != "short" {
+			return input, fmt.Errorf("%w: 仅短视频支持合集", models.ErrCloudImportInvalidInput)
+		}
 	case models.CloudImportKindArchive:
 		if _, contentErr := detectArchiveFormatByContent(sourcePath); contentErr != nil &&
 			!isSupportedArchiveFile(filename, detectCloudImportMIME(sourcePath)) {

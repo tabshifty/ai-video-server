@@ -717,26 +717,29 @@ WHERE id = $1`, videoID, value)
 	return nil
 }
 
-func (r *VideoRepository) SetVideoImageCollectionIfEmpty(ctx context.Context, videoID uuid.UUID, imageCollectionID uuid.UUID) error {
+// FillVideoImageCollectionIfEmpty 只在视频还没有图片合集时补写，并返回是否真的写入了一行。
+// 合集不存在、视频已有图集或并发下被先到者写入都会返回 false（依赖 READ COMMITTED 的
+// UPDATE 重新求值 WHERE 语义）。
+func (r *VideoRepository) FillVideoImageCollectionIfEmpty(ctx context.Context, videoID uuid.UUID, imageCollectionID uuid.UUID) (bool, error) {
 	if imageCollectionID == uuid.Nil {
-		return nil
+		return false, nil
 	}
 	resolvedImageCollectionID, err := r.ResolveVideoImageCollectionID(ctx, []uuid.UUID{imageCollectionID})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if resolvedImageCollectionID == nil {
-		return nil
+		return false, nil
 	}
-	_, err = r.pool.Exec(ctx, `
+	tag, err := r.pool.Exec(ctx, `
 UPDATE videos
 SET image_collection_id=$2, updated_at=NOW()
 WHERE id=$1 AND image_collection_id IS NULL
 `, videoID, resolvedImageCollectionID)
 	if err != nil {
-		return fmt.Errorf("set video image collection if empty: %w", err)
+		return false, fmt.Errorf("set video image collection if empty: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *VideoRepository) GetVideoByID(ctx context.Context, videoID uuid.UUID) (models.Video, error) {

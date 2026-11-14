@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -151,11 +152,14 @@ func (f *fakeCloudImportRepo) ListSummariesByTaskIDs(context.Context, []int64) (
 }
 
 type fakeCloudImportVideoLookup struct {
-	videoID  uuid.UUID
-	found    bool
-	err      error
-	video    models.Video
-	videoErr error
+	videoID               uuid.UUID
+	found                 bool
+	err                   error
+	video                 models.Video
+	videoErr              error
+	collectionErr         error
+	addedCollectionIDs    []uuid.UUID
+	filledImageCollection uuid.UUID
 }
 
 func (f *fakeCloudImportVideoLookup) FindVideoByHash(context.Context, string, int64) (uuid.UUID, bool, error) {
@@ -167,6 +171,22 @@ func (f *fakeCloudImportVideoLookup) GetVideoByID(context.Context, uuid.UUID) (m
 		return models.Video{}, f.videoErr
 	}
 	return f.video, nil
+}
+
+func (f *fakeCloudImportVideoLookup) AddVideoCollectionsByIDsAnyTypeReturningAdded(_ context.Context, _ uuid.UUID, ids []uuid.UUID) (int, error) {
+	if f.collectionErr != nil {
+		return 0, f.collectionErr
+	}
+	f.addedCollectionIDs = append(f.addedCollectionIDs, ids...)
+	return len(ids), nil
+}
+
+func (f *fakeCloudImportVideoLookup) FillVideoImageCollectionIfEmpty(_ context.Context, _ uuid.UUID, imageCollectionID uuid.UUID) (bool, error) {
+	if f.collectionErr != nil {
+		return false, f.collectionErr
+	}
+	f.filledImageCollection = imageCollectionID
+	return true, nil
 }
 
 type fakeCloudImportUpload struct {
@@ -663,6 +683,74 @@ func TestCloudImportProcessVideoSkipsHashHitAndDeletesSource(t *testing.T) {
 	}
 	if _, statErr := os.Stat(h.source); !os.IsNotExist(statErr) {
 		t.Fatalf("download source still exists, stat err = %v", statErr)
+	}
+}
+
+func TestCloudImportProcessVideoHashHitAppendsCollections(t *testing.T) {
+	t.Parallel()
+
+	h := newCloudImportHarness(t)
+	existingVideoID := uuid.New()
+	virtual := uuid.New()
+	h.videos.found = true
+	h.videos.videoID = existingVideoID
+	h.videos.video = models.Video{ID: existingVideoID, Type: "short", Status: "ready"}
+	h.repo.record = models.CloudDownloadImport{ID: 4, TaskID: 7, Kind: models.CloudImportKindVideo, Status: models.CloudImportQueued}
+
+	err := h.svc.Process(context.Background(), 4, 0, models.CloudDownloadImportInput{
+		Kind:          models.CloudImportKindVideo,
+		Type:          "short",
+		CollectionIDs: []uuid.UUID{virtual},
+	})
+	if err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+	if h.repo.record.Status != models.CloudImportSkippedExisting {
+		t.Fatalf("status = %s, want skipped_existing", h.repo.record.Status)
+	}
+	if len(h.videos.addedCollectionIDs) != 1 || h.videos.addedCollectionIDs[0] != virtual {
+		t.Fatalf("已存在视频未追加合集: %v", h.videos.addedCollectionIDs)
+	}
+}
+
+func TestCloudImportProcessVideoHashHitAttachFailureFailsImport(t *testing.T) {
+	t.Parallel()
+
+	h := newCloudImportHarness(t)
+	existingVideoID := uuid.New()
+	h.videos.found = true
+	h.videos.videoID = existingVideoID
+	h.videos.video = models.Video{ID: existingVideoID, Type: "short", Status: "ready"}
+	h.videos.collectionErr = errors.New("合集不存在")
+	h.repo.record = models.CloudDownloadImport{ID: 5, TaskID: 7, Kind: models.CloudImportKindVideo, Status: models.CloudImportQueued}
+
+	err := h.svc.Process(context.Background(), 5, 0, models.CloudDownloadImportInput{
+		Kind:          models.CloudImportKindVideo,
+		Type:          "short",
+		CollectionIDs: []uuid.UUID{uuid.New()},
+	})
+	if err == nil || !strings.Contains(err.Error(), "追加视频合集关系失败") {
+		t.Fatalf("Process() error = %v, want 追加合集失败", err)
+	}
+	if h.repo.record.Status != models.CloudImportFailed {
+		t.Fatalf("status = %s, want failed", h.repo.record.Status)
+	}
+	if !strings.Contains(h.repo.record.ErrorMessage, "追加视频合集关系失败") {
+		t.Fatalf("error message = %q", h.repo.record.ErrorMessage)
+	}
+}
+
+func TestCloudImportRejectsCollectionsOnNonShortVideo(t *testing.T) {
+	t.Parallel()
+
+	h := newCloudImportHarness(t)
+	_, err := h.svc.Create(context.Background(), 7, models.CloudDownloadImportInput{
+		Kind:          models.CloudImportKindVideo,
+		Type:          "movie",
+		CollectionIDs: []uuid.UUID{uuid.New()},
+	}, nil)
+	if !errors.Is(err, models.ErrCloudImportInvalidInput) {
+		t.Fatalf("non-short collections error = %v, want ErrCloudImportInvalidInput", err)
 	}
 }
 

@@ -489,14 +489,32 @@ func (s *ArchiveImportService) ProcessArchiveWorkspace(ctx context.Context, id u
 			return err
 		}
 		_, workErr := s.processArchiveFile(ctx, job.FileID, &job.Snapshot)
-		if workErr == nil && job.Snapshot.GroupRelations {
+		if workErr == nil {
+			// 关系对齐不再依赖 GroupRelations 或 layout 版本：v1 工作区同样要把
+			// 作业快照里的合集关系补到已链接的正式记录上。
 			file, e := s.getArchiveFile(ctx, job.FileID)
-			if e != nil {
+			switch {
+			case e != nil:
 				workErr = e
-			} else if s.repo == nil {
+			case s.repo == nil:
 				workErr = fmt.Errorf("媒体关系服务不可用")
-			} else {
-				workErr = s.repo.ApplyArchiveGroupRelations(ctx, file.LinkedVideoID, file.LinkedImageID, job.Snapshot.VideoCollectionIDs, job.Snapshot.ImageCollectionIDs)
+			default:
+				videoID := file.LinkedVideoID
+				if videoID != nil {
+					video, vErr := s.repo.GetVideoByID(ctx, *videoID)
+					if errors.Is(vErr, pgx.ErrNoRows) {
+						// linked_video_id 没有外键，视频行可能已被清理：按没有视频处理。
+						videoID = nil
+					} else if vErr != nil {
+						workErr = vErr
+					} else if video.Status == "pending_delete" {
+						// 待删除视频不接收新关系，避免写入随即被级联清理的关系。
+						videoID = nil
+					}
+				}
+				if workErr == nil {
+					workErr = s.repo.ApplyArchiveGroupRelations(ctx, videoID, file.LinkedImageID, job.Snapshot.VideoCollectionIDs, job.Snapshot.ImageCollectionIDs)
+				}
 				if workErr == nil && file.Status == "failed" {
 					_, workErr = s.db.Exec(ctx, `UPDATE archive_import_files SET status='existing',reason='',updated_at=NOW() WHERE id=$1`, job.FileID)
 				}

@@ -719,9 +719,16 @@ func (s *ArchiveImportService) processArchiveFile(ctx context.Context, fileID uu
 		return models.ArchiveImportFileListItem{}, err
 	}
 	if snapshot != nil && snapshot.GroupRelations && (file.LinkedVideoID != nil || file.LinkedImageID != nil) {
-		return file, nil
+		applySnapshotCollections(&file, snapshot)
+		return s.alignAndReloadArchiveFile(ctx, file, batch)
 	}
-	if file.Status == "ready" || file.Status == "existing" || file.Status == "skipped" {
+	if file.Status == "ready" || file.Status == "existing" {
+		// 已入库文件不再重建媒体；但要按当前批次/分组配置做一次幂等关系对齐，
+		// 否则事后修改合集或重复点击入库永远不会补到正式记录上。
+		applySnapshotCollections(&file, snapshot)
+		return s.alignAndReloadArchiveFile(ctx, file, batch)
+	}
+	if file.Status == "skipped" {
 		return file, nil
 	}
 	if file.EntryType != "file" || (file.MediaKind != "video" && file.MediaKind != "image") {
@@ -863,15 +870,18 @@ func (s *ArchiveImportService) processArchiveFile(ctx context.Context, fileID uu
 			_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
 			return models.ArchiveImportFileListItem{}, err
 		}
-		if len(archiveVideoCollections) > 0 && (videoType != "short" || snapshot != nil) {
+		addedCollections := 0
+		if len(archiveVideoCollections) > 0 && (videoType != "short" || snapshot != nil) && !result.SkippedPendingDelete {
 			if s.repo == nil {
 				_ = s.updateArchiveFileFailure(ctx, fileID, "video repository unavailable")
 				return models.ArchiveImportFileListItem{}, fmt.Errorf("video repository unavailable")
 			}
-			if err := s.repo.AddVideoCollectionsByIDsAnyType(ctx, result.VideoID, archiveVideoCollections); err != nil {
-				_ = s.updateArchiveFileFailure(ctx, fileID, err.Error())
-				return models.ArchiveImportFileListItem{}, err
+			added, addErr := s.repo.AddVideoCollectionsByIDsAnyTypeReturningAdded(ctx, result.VideoID, archiveVideoCollections)
+			if addErr != nil {
+				_ = s.updateArchiveFileFailure(ctx, fileID, addErr.Error())
+				return models.ArchiveImportFileListItem{}, addErr
 			}
+			addedCollections = added
 		}
 		if s.repo != nil {
 			inheritedImageCollectionIDs, inheritErr := s.repo.ListInheritedImageCollectionIDs(ctx, result.VideoID)
@@ -881,12 +891,23 @@ func (s *ArchiveImportService) processArchiveFile(ctx context.Context, fileID uu
 			}
 			allImageCollectionIDs := append([]uuid.UUID{}, inheritedImageCollectionIDs...)
 			allImageCollectionIDs = append(allImageCollectionIDs, imageCollectionIDs...)
+			if result.SkippedPendingDelete {
+				allImageCollectionIDs = nil
+			}
 			if relationErr := s.repo.AddVideoImageCollections(ctx, result.VideoID, dedupeArchiveUUIDs(allImageCollectionIDs), "archive_import"); relationErr != nil {
 				_ = s.updateArchiveFileFailure(ctx, fileID, relationErr.Error())
 				return models.ArchiveImportFileListItem{}, relationErr
 			}
 		}
-		if err := s.markArchiveVideoFileProcessed(ctx, fileID, result.VideoID, result.AlreadyExists, result.Status); err != nil {
+		reason := ""
+		if result.AlreadyExists {
+			if result.SkippedPendingDelete {
+				reason = archiveExistingVideoPendingDeleteReason
+			} else {
+				reason = archiveExistingVideoReason(result.AddedCollections + addedCollections)
+			}
+		}
+		if err := s.markArchiveVideoFileProcessed(ctx, fileID, result.VideoID, result.AlreadyExists, result.Status, reason); err != nil {
 			return models.ArchiveImportFileListItem{}, err
 		}
 		if snapshot == nil && !result.AlreadyExists && s.enqueuer != nil {
@@ -982,6 +1003,9 @@ func shouldProcessArchiveFileInBatch(item models.ArchiveImportFileListItem) bool
 	switch item.Status {
 	case "pending", "failed", "processing":
 		return true
+	case "existing":
+		// 已存在的视频允许再次处理，但只做幂等的关系对齐，不重建媒体。
+		return item.MediaKind == "video"
 	default:
 		return false
 	}
@@ -1735,7 +1759,21 @@ WHERE id=$1
 	return s.refreshArchiveBatchStats(ctx, s.mustArchiveFileBatchID(ctx, fileID))
 }
 
-func (s *ArchiveImportService) markArchiveVideoFileProcessed(ctx context.Context, fileID, videoID uuid.UUID, alreadyExists bool, status string) error {
+// alignAndReloadArchiveFile 只补关系、不改媒体状态：合集关系写入失败时记录原因并向上返回错误，
+// 不把已经成功入库的文件重新打成 failed（那会让下一次重试退化为完整媒体导入）。
+func (s *ArchiveImportService) alignAndReloadArchiveFile(ctx context.Context, file models.ArchiveImportFileListItem, batch models.ArchiveImportBatch) (models.ArchiveImportFileListItem, error) {
+	if err := s.alignArchiveFileRelations(ctx, file, batch); err != nil {
+		_ = s.setArchiveFileReason(ctx, file.ID, archiveRelationFailurePrefix+": "+err.Error())
+		return models.ArchiveImportFileListItem{}, err
+	}
+	updated, err := s.getArchiveFile(ctx, file.ID)
+	if err != nil {
+		return models.ArchiveImportFileListItem{}, err
+	}
+	return updated, nil
+}
+
+func (s *ArchiveImportService) markArchiveVideoFileProcessed(ctx context.Context, fileID, videoID uuid.UUID, alreadyExists bool, status, reason string) error {
 	fileStatus := "ready"
 	if alreadyExists {
 		fileStatus = "existing"
@@ -1748,7 +1786,7 @@ func (s *ArchiveImportService) markArchiveVideoFileProcessed(ctx context.Context
 UPDATE archive_import_files
 SET status=$2, reason=$3, linked_video_id=$4, processed_at=NOW(), updated_at=NOW()
 WHERE id=$1
-`, fileID, fileStatus, "", linked)
+`, fileID, fileStatus, sanitizeArchiveText(reason), linked)
 	if err != nil {
 		return fmt.Errorf("update archive video file: %w", err)
 	}

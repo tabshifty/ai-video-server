@@ -51,6 +51,11 @@ func TestArchiveImportShouldProcessInBatch(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "existing video",
+			file: models.ArchiveImportFileListItem{EntryType: "file", MediaKind: "video", Status: "existing"},
+			want: true,
+		},
+		{
 			name: "skipped archive",
 			file: models.ArchiveImportFileListItem{EntryType: "file", MediaKind: "archive", Status: "skipped"},
 			want: false,

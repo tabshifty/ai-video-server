@@ -1,6 +1,8 @@
 import request from './request'
 
 export const checkUpload = (payload) => request.post('/upload/check', payload)
+// 命中已有视频后显式追加本次选择的合集关系；/upload/check 本身保持只读。
+export const attachUploadCollections = (payload) => request.post('/upload/attach', payload)
 export const uploadSingle = (formData, onUploadProgress, signal) =>
   request.post('/upload', formData, {
     signal,

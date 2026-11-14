@@ -5,7 +5,8 @@ import { Plus, UploadFilled } from '@element-plus/icons-vue'
 import Layout from '../components/Layout.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import UploadProgress from '../components/UploadProgress.vue'
-import { checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
+import { attachUploadCollections, checkUpload, uploadAbort, uploadChunk, uploadComplete, uploadInit } from '../api/video'
+import { buildExistingUploadMessage, hasExistingAttachmentSelection } from './videoUpload.existing'
 import {
   createAdminCollection,
   getAdminActors,
@@ -327,11 +328,38 @@ function pushResult(file, status, message, videoId = '') {
   })
 }
 
+const ATTACH_ERROR_MESSAGES = {
+  409: '已存在，但视频类型与本次选择不一致，未关联合集',
+  2008: '已存在状态已失效，未关联合集',
+  2009: '已存在，但关联合集失败'
+}
+
 function parseErrorMessage(err) {
   if (cancelRequested.value) return '已取消'
   if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return '已取消'
   const text = String(err?.message || '').trim()
   return text || '上传失败'
+}
+
+async function attachExistingCollections(hash, targetFile, sharedPayload) {
+  const collectionIDs = normalizeCollectionSelection(sharedPayload.collectionIDs)
+  const imageCollectionID = String(sharedPayload.imageCollectionID || '').trim()
+  if (!hasExistingAttachmentSelection(collectionIDs, imageCollectionID)) {
+    return { message: '秒传命中（已存在）' }
+  }
+  try {
+    const result = await attachUploadCollections({
+      hash,
+      file_size: targetFile.size,
+      type: sharedPayload.type,
+      collection_ids: collectionIDs,
+      image_collection_id: imageCollectionID
+    })
+    return { message: buildExistingUploadMessage(result) }
+  } catch (err) {
+    // 视频本身已在库，失败的是“合集追加”，不能显示成上传失败或英文内部错误。
+    return { failed: true, message: ATTACH_ERROR_MESSAGES[err?.code] || '已存在，但关联合集失败' }
+  }
 }
 
 async function uploadOneFile(targetFile, sharedPayload) {
@@ -349,7 +377,16 @@ async function uploadOneFile(targetFile, sharedPayload) {
 
     const check = await checkUpload({ hash, file_size: targetFile.size })
     if (check.exists) {
-      return { status: 'success', message: '秒传命中', videoId: check.video_id || '' }
+      if (cancelRequested.value) {
+        return { status: 'cancelled', message: '已取消', videoId: '' }
+      }
+      // attach 一旦发出即不可回滚：取消后本次追加仍可能生效，故不接 signal。
+      const attached = await attachExistingCollections(hash, targetFile, sharedPayload)
+      return {
+        status: attached.failed ? 'failed' : 'success',
+        message: attached.message,
+        videoId: check.video_id || ''
+      }
     }
 
     const chunkSize = 4 * 1024 * 1024
@@ -387,6 +424,10 @@ async function uploadOneFile(targetFile, sharedPayload) {
     const completed = await uploadComplete(activeSessionID)
     activeSessionID = ''
     sessionId.value = ''
+    if (completed?.exists) {
+      // 预检之后被其它任务抢先入库：同样按“已存在”口径提示合集追加结果。
+      return { status: 'success', message: buildExistingUploadMessage(completed), videoId: completed.video_id || '' }
+    }
     return { status: 'success', message: '上传成功', videoId: completed.video_id || '' }
   } catch (err) {
     if (cancelRequested.value || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') {

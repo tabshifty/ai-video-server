@@ -26,7 +26,7 @@ func (a *API) UploadCheck(c *gin.Context) {
 		bad(c, "invalid payload")
 		return
 	}
-	req.Hash = strings.TrimSpace(req.Hash)
+	req.Hash = strings.ToLower(strings.TrimSpace(req.Hash))
 	if !isSHA256Hex(req.Hash) {
 		bad(c, "invalid hash")
 		return

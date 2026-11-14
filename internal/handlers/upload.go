@@ -125,10 +125,7 @@ func (a *API) Upload(c *gin.Context) {
 	}
 
 	if result.AlreadyExists {
-		ok(c, gin.H{
-			"exists":   true,
-			"video_id": result.VideoID,
-		})
+		ok(c, existingUploadPayload(result))
 		return
 	}
 

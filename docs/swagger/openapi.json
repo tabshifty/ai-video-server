@@ -125,6 +125,72 @@
         "summary": "Upload video"
       }
     },
+    "/upload/attach": {
+      "post": {
+        "description": "Append the requested video collection relations to a video already registered by the same hash and size.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "collection_ids": {
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "file_size": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "hash": {
+                    "type": "string"
+                  },
+                  "image_collection_id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": {
+                    "enum": [
+                      "short",
+                      "movie",
+                      "episode",
+                      "av"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "hash",
+                  "file_size",
+                  "type"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "403": {
+            "description": "Admin role required"
+          },
+          "409": {
+            "description": "Hash exists with another video type"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Attach collections to an existing uploaded video"
+      }
+    },
     "/upload/check": {
       "post": {
         "responses": {

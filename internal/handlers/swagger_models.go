@@ -23,6 +23,14 @@ type UploadCheckRequest struct {
 	FileSize int64  `json:"file_size" example:"10485760"`
 }
 
+type UploadAttachRequest struct {
+	Hash              string   `json:"hash" example:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"`
+	FileSize          int64    `json:"file_size" example:"10485760"`
+	Type              string   `json:"type" example:"short"`
+	CollectionIDs     []string `json:"collection_ids" example:"4b2b2c62-0d43-4b4e-9f5d-6d2d3f2c1a11"`
+	ImageCollectionID string   `json:"image_collection_id" example:"7f5a3c40-6b1e-4f6a-9a9c-1f0a2b3c4d5e"`
+}
+
 type AdminScrapePreviewRequest struct {
 	VideoID       string `json:"video_id" example:"8fbe33de-0189-4972-a7c5-b77c9e75b859"`
 	Title         string `json:"title" example:"庆余年第一季第一集"`

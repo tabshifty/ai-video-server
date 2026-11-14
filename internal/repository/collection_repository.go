@@ -225,29 +225,39 @@ func (r *VideoRepository) ReplaceVideoCollectionsByIDsAnyType(ctx context.Contex
 }
 
 func (r *VideoRepository) AddVideoCollectionsByIDsAnyType(ctx context.Context, videoID uuid.UUID, collectionIDs []uuid.UUID) error {
+	_, err := r.AddVideoCollectionsByIDsAnyTypeReturningAdded(ctx, videoID, collectionIDs)
+	return err
+}
+
+// AddVideoCollectionsByIDsAnyTypeReturningAdded 追加视频合集关系（主键冲突即忽略），
+// 并返回本次实际新增的关系条数，用于向管理员回报「新增 N 个合集」。
+func (r *VideoRepository) AddVideoCollectionsByIDsAnyTypeReturningAdded(ctx context.Context, videoID uuid.UUID, collectionIDs []uuid.UUID) (int, error) {
 	resolvedIDs, err := r.ResolveCollectionIDs(ctx, collectionIDs)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if len(resolvedIDs) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("begin tx add video collections: %w", err)
+		return 0, fmt.Errorf("begin tx add video collections: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
+	added := 0
 	for _, collectionID := range resolvedIDs {
-		if _, err := tx.Exec(ctx, `INSERT INTO video_collections(video_id, collection_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, videoID, collectionID); err != nil {
-			return fmt.Errorf("insert video collection: %w", err)
+		tag, execErr := tx.Exec(ctx, `INSERT INTO video_collections(video_id, collection_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, videoID, collectionID)
+		if execErr != nil {
+			return 0, fmt.Errorf("insert video collection: %w", execErr)
 		}
+		added += int(tag.RowsAffected())
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit add video collections: %w", err)
+		return 0, fmt.Errorf("commit add video collections: %w", err)
 	}
-	return nil
+	return added, nil
 }
 
 func (r *VideoRepository) AddVideoCollectionsByIDs(ctx context.Context, videoID uuid.UUID, videoType string, collectionIDs []uuid.UUID) error {

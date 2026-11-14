@@ -1,5 +1,17 @@
 # plan.md
 
+## 2026-11-14 15:35 +0800 已存在视频合集关系追加：实现、修复与验证
+- 实现：新增 `internal/services/existing_video_collections.go` 共享追加逻辑（幂等并集、待删除短路、图片合集仅在为空且实际写入时置位）；`repository` 新增 `AddVideoCollectionsByIDsAnyTypeReturningAdded` 与 `FillVideoImageCollectionIfEmpty`；上传命中与竞态分支、压缩包主链路与 `existing/ready` 早退对齐、工作台关系对齐（去掉 GroupRelations/layout 门禁，悬空视频按无视频处理）、115 云导入命中均接入。
+- 接口：新增 `POST /api/v1/upload/attach`（管理员、`hash+file_size` 反查、类型冲突 409、待删除只报告不写入），`/upload/check` 保持只读并把 hash 归一为小写；`/upload` 与 `/upload/complete` 的已存在响应补 `added_collections/added_image_collection/pending_delete`；OpenAPI 已重新生成。
+- 压缩包：`existing` 视频纳入批次重跑（仅做关系对齐）；对齐失败只写 `reason` 并返回错误，不改媒体状态；reason 文案区分“新增 N 个视频合集/合集无变化/待删除未关联”。
+- 115：入口拒绝非短视频携带合集；追加快照失败改 `failed` 可重试；类型冲突单独中文提示。
+- 管理端：秒传命中后调用 attach，文案区分“已存在/新增 N 个合集（并补齐图片合集）/已补齐图片合集/无变化/待删除未关联”，attach 失败中文可见且不伪装成上传失败；`/upload/complete` 竞态命中复用同一文案。
+- 测试：新增共享逻辑单测（幂等、待删除、图片仅空补、错误包装）、115 三例、压缩包 filter/reason、真实 PG 集成两例（追加幂等/并发/待删除、压缩包对齐与 reason）与 handler 集成一例（鉴权/幂等/409/2008/待删除/真实落库），均按既有 DSN 环境变量 gating。
+- 评审：两个独立子代理各两轮。首轮修复阻塞项（仅补齐图片合集时误报“合集无变化”）、测试 FK 与 409 假绿、ready 文件被打成 failed、115 入口缺 short-only、无选择时不报待删除、图片补齐虚报、hash 大小写、悬空视频导致 job 失败；复审又修 swagger requestBody 漏生成、handler 409 用例被入口校验短路、`ready` 文件失败 reason 残留、reload 失败被吞，以及前端取消复查与布尔判定。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/services ./internal/handlers ./internal/repository ./internal/queue`（仅既有 `TestParseTVAPKMetadataParsesReleaseAPK` 夹具失败，与本改动无关）；`admin-web` 62 文件 861 用例与 `npm run build`；`go generate ./...` 后 swagger 无漂移；`git diff --check` 与 UTF-8 检查通过。本机无 PostgreSQL/Docker，两个真实库集成测试按约定 skip。
+- 残余风险：压缩包 existing 全量对齐仍在同步请求内逐文件执行，万级批次可能超时；115 类型冲突进入永久 failed。已记录在 ADR 0037。
+- 范围：服务端与管理端；不改 Android/TV，不升版本号；`docs/examples/` 不纳入。
+
 ## 2026-11-14 15:13 +0800 Hermes 单资源直接下载：验证与安装完成
 - 实现：单条可下载资源直接显示「下载」，失败或阻塞显示「重试下载」；点击持久化提交并回复提示，不编辑图文。多资源保留「选择下载」，已完成、进行中或无效资源显示状态入口。
 - 安全与兼容：本人授权、消息绑定、资源指纹、固定重试次数和事件幂等继续生效；指纹变化时只打开新面板重新选择，不提交；历史按钮继续兼容。

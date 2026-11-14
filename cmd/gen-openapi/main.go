@@ -68,6 +68,36 @@ func pathsSpec() map[string]any {
 				"responses": map[string]any{"200": map[string]any{"description": "OK"}},
 			},
 		},
+		"/upload/attach": map[string]any{
+			"post": map[string]any{
+				"summary":     "Attach collections to an existing uploaded video",
+				"description": "Append the requested video collection relations to a video already registered by the same hash and size.",
+				"security":    []map[string]any{{"BearerAuth": []string{}}},
+				"requestBody": map[string]any{
+					"required": true,
+					"content": map[string]any{
+						"application/json": map[string]any{
+							"schema": map[string]any{
+								"type":     "object",
+								"required": []string{"hash", "file_size", "type"},
+								"properties": map[string]any{
+									"hash":                map[string]any{"type": "string"},
+									"file_size":           map[string]any{"type": "integer", "format": "int64"},
+									"type":                map[string]any{"type": "string", "enum": []string{"short", "movie", "episode", "av"}},
+									"collection_ids":      map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}},
+									"image_collection_id": map[string]any{"type": "string", "format": "uuid"},
+								},
+							},
+						},
+					},
+				},
+				"responses": map[string]any{
+					"200": map[string]any{"description": "OK"},
+					"403": map[string]any{"description": "Admin role required"},
+					"409": map[string]any{"description": "Hash exists with another video type"},
+				},
+			},
+		},
 		"/upload": map[string]any{
 			"post": map[string]any{
 				"summary":   "Upload video",
