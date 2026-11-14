@@ -1,5 +1,16 @@
 # plan.md
 
+## 2026-11-14 15:05 +0800 已存在视频合集关系追加：需求收口与实施方案（待实现）
+- 需求：上传页秒传、压缩包批次/工作台、115 云导入在哈希命中已有视频时不再只跳过，而是把本次携带的视频合集关系追加到已有视频；本次未选合集时不写库。
+- 决策（grilling 三轮确认）：追加不覆盖；只补关系不同步标题/说明/标签/演员；图片合集仅在已有视频为空时补；视频合集仍等于短视频合集，上传入口继续 short-only，压缩包既有 any-type 能力保留；类型冲突继续 409；待删除视频不追加；失败可见且不回滚已写入关系。
+- 接口：`POST /api/v1/upload/check` 保持只读；新增 `POST /api/v1/upload/attach`（管理员，`hash + file_size` 反查，不信任 video_id），返回实际新增合集数。
+- 压缩包：`existing` 早退前做幂等关系对齐，覆盖 layout v1 工作台；新增数写入文件行 reason 文本，不加 schema。
+- 115：命中追加失败改为 `failed` 可重试，不新增记录字段。
+- 反馈：区分「已存在」「已存在，新增 N 个合集」「已存在，合集无变化」「已存在（该视频待删除），未关联合集」。
+- 影响文件（预计）：`internal/services/upload.go`、新增共享追加服务、`internal/services/archive_import.go`、`internal/services/archive_workspace.go`、`internal/services/cloud_download_import_service.go`、`internal/repository/collection_repository.go`、`internal/handlers/upload_check.go` 或新增 handler、`internal/handlers/router.go`、`admin-web/src/views/VideoUpload.vue`、`admin-web/src/api/video.js`、`admin-web/src/views/ToolboxArchiveImport.vue`、`CONTEXT.md`、`docs/adr/0037-*.md`。
+- 验证（计划）：服务层与 handler 单测 + 前端 helper 单测；真实 Postgres 集成测试覆盖幂等与上传并发竞态；不涉及 Android/TV，不升版本号。
+- 状态：文档已落（`CONTEXT.md`、ADR 0037、本计划），代码实现待用户确认后开始。
+
 ## 2026-11-14 11:31 +0800 Hermes 图文合并：验证、独立评审与安装完成
 - 实现：单图与短正文合并；超长正文改为标题、完整帖子链接和资源数量摘要；图文入口打开独立回复面板，按钮与下载请求绑定面板消息，旧按钮继续兼容，无图或图片失败回退完整文字。
 - 测试：新增图文发送、超长 emoji 说明、媒体失败回退、面板独立绑定与提交、真实 PTB General 话题回归；修正安装测试对本机脚本尚未安装补丁的过时假设，只在临时目录还原测试夹具。
