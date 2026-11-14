@@ -8,6 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import secrets
 import sqlite3
 import sys
@@ -136,6 +137,20 @@ def size_text(value):
         value /= 1024
 
 
+def photo_caption(post, text):
+    """短正文原样附图；长正文保留标题、完整帖子链接和资源概况。"""
+    if len(text.encode("utf-16-le")) // 2 <= 1024:
+        return text
+    match = re.search(r"\[打开帖子\]\((https?://[^\s)]+)\)", text)
+    link = match.group(1) if match else ""
+    summary = f"共 {len(post['resources'])} 条 ED2K；附件请打开帖子查看。\n点击下方按钮查看下载资源。"
+    tail = "\n" + (link + "\n" if link else "") + summary
+    budget = 1024 - len(tail.encode("utf-16-le")) // 2
+    if budget < 1:
+        raise ValueError("帖子链接过长，无法生成图片说明")
+    return short(post["title"], min(200, budget)) + tail
+
+
 def button(store, payload, label):
     from telegram import InlineKeyboardButton
     return InlineKeyboardButton(label, callback_data="fd:" + store.choice(payload))
@@ -215,6 +230,13 @@ class Bridge:
             choice = self.store.get(key, chat, message_id)
             post = await self.call("GET", "/posts/" + choice["post_id"])
             action = choice["action"]
+            if action == "open":
+                # 先取得回复消息 ID，再将面板按钮绑定到回复，保留原始图文。
+                # 显式 None 防止 PTB 从 General 话题原消息继承无效的 thread_id=1。
+                panel = await message.reply_text("正在加载下载资源…", reply_to_message_id=message_id, message_thread_id=thread_args(choice.get("thread_id")).get("message_thread_id"))
+                text, markup = render(post, self.store, panel.chat_id, panel.message_id, choice.get("thread_id"))
+                await panel.edit_text(text, reply_markup=markup)
+                return
             if post["fingerprint"] != choice["fingerprint"]:
                 if action == "list":
                     choice["selected"] = []
@@ -384,7 +406,7 @@ async def send_post(args, message, client, store):
     from gateway.platforms.base import BasePlatformAdapter, utf16_len
     from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
     from telegram.request import HTTPXRequest
-    from tools.send_message_tool import _parse_target_ref, _send_telegram
+    from tools.send_message_tool import _parse_target_ref
     from gateway.channel_directory import resolve_channel_name
     from gateway.platforms.base import resolve_proxy_url
     post = await asyncio.to_thread(client.call, "GET", "/posts?tid=" + str(int(args.tid)))
@@ -404,32 +426,27 @@ async def send_post(args, message, client, store):
     else:
         raise ValueError("论坛下载只支持 Telegram 推送")
     media, text = BasePlatformAdapter.extract_media(message)
-    if media:
-        # 独立发送预览；按钮始终位于随后发送的纯文字消息。
-        result = await _send_telegram(pc.token, chat, "", media_files=media, thread_id=thread)
-        if not result.get("success"):
-            log.warning("论坛预览发送失败，降级纯文字推送")
     proxy = resolve_proxy_url("TELEGRAM_PROXY", target_hosts=["api.telegram.org"])
     bot = Bot(token=pc.token, request=HTTPXRequest(proxy=proxy))
     async with bot:
-        common = dict(post_id=post["id"], fingerprint=post["fingerprint"], thread_id=int(thread) if thread else None, selected=[], page=0)
+        common = dict(action="open", post_id=post["id"], fingerprint=post["fingerprint"], thread_id=int(thread) if thread else None)
         resources = post["resources"]
-        if len(resources) == 1 and resources[0]["status"] not in {"invalid", "completed"}:
-            common.update(action="submit", all=False, resource_ids=[resources[0]["id"]])
-            common["retry_attempts"] = {resources[0]["id"]: resources[0]["retry_count"]} if resources[0]["status"] in {"failed", "blocked"} else {}
-            label = "重试下载" if resources[0]["status"] in {"failed", "blocked"} else "下载" if not resources[0]["status"] else "查看下载资源"
-            if resources[0]["status"] not in {"", "failed", "blocked"}:
-                common["action"] = "list"
-        else:
-            common["action"] = "list"
-            label = f"选择下载资源（{len(resources)}）"
+        label = f"查看下载资源（{len(resources)}）"
         token = store.choice(common) if resources else None
         markup = InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data="fd:" + token)]]) if token else None
-        # 按 Telegram UTF-16 限额拆分，按钮仅挂最后一段文字。
-        chunks = BasePlatformAdapter.truncate_message(text, 3500, len_fn=utf16_len)
         last = None
-        for index, chunk in enumerate(chunks):
-            last = await bot.send_message(chat_id=chat, text=chunk, **thread_args(thread))
+        if len(media) == 1:
+            caption = photo_caption(post, text)
+            try:
+                with open(media[0][0], "rb") as photo:
+                    last = await bot.send_photo(chat_id=chat, photo=photo, caption=caption, **thread_args(thread))
+            except Exception:
+                # 不记录可能携带 Bot Token 的异常原文；失败时保留完整文字。
+                log.warning("论坛图片发送失败，降级纯文字推送")
+        if last is None:
+            chunks = BasePlatformAdapter.truncate_message(text, 3500, len_fn=utf16_len)
+            for chunk in chunks:
+                last = await bot.send_message(chat_id=chat, text=chunk, **thread_args(thread))
         if last is None:
             raise ValueError("论坛文字为空")
         if token:

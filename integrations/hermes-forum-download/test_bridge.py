@@ -1,11 +1,14 @@
 """离线行为验证：无需真实 Bot 或生产下载。"""
 import asyncio
+from datetime import datetime, timezone
 import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import sys
+from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 import uuid
 
 spec = importlib.util.spec_from_file_location("forum_bridge_test_subject", Path(__file__).with_name("bridge.py"))
@@ -22,6 +25,101 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.store = bridge.Store(Path(self.temp.name) / "state.db")
+
+    async def send_post(self, text, media=True, photo_error=None, count=2):
+        p = post(count)
+        photo = Path(self.temp.name) / "preview.jpg"
+        photo.write_bytes(b"offline-image")
+        sent = SimpleNamespace(chat_id=11, message_id=22)
+        bot = AsyncMock()
+        bot.__aenter__.return_value = bot
+        bot.send_photo.side_effect = photo_error
+        bot.send_photo.return_value = sent
+        bot.send_message.return_value = sent
+        base = SimpleNamespace(extract_media=Mock(return_value=([(str(photo), False)] if media else [], text)), truncate_message=lambda value, *a, **kw: [value])
+        modules = {
+            "gateway.config": SimpleNamespace(Platform=SimpleNamespace(TELEGRAM="telegram"), load_gateway_config=lambda: SimpleNamespace(platforms={"telegram": SimpleNamespace(token="123:test", home_channel=SimpleNamespace(chat_id=11, thread_id=3))})),
+            "gateway.platforms.base": SimpleNamespace(BasePlatformAdapter=base, utf16_len=lambda value: len(value.encode("utf-16-le")) // 2, resolve_proxy_url=lambda *a, **kw: None),
+            "gateway.channel_directory": SimpleNamespace(resolve_channel_name=Mock()),
+            "tools.send_message_tool": SimpleNamespace(_parse_target_ref=Mock(), _send_telegram=AsyncMock()),
+        }
+        with patch.dict(sys.modules, modules), patch("telegram.Bot", return_value=bot):
+            result = await bridge.send_post(SimpleNamespace(tid=123, to="telegram"), text, SimpleNamespace(call=Mock(return_value=p)), self.store)
+        return p, bot, result
+
+    async def test_photo_and_short_text_are_one_message_with_bound_button(self):
+        text = "测试帖子\nhttps://example.invalid/post"
+        p, bot, result = await self.send_post(text)
+        bot.send_photo.assert_awaited_once()
+        self.assertEqual(bot.send_photo.call_args.kwargs["caption"], text)
+        self.assertEqual(bot.send_photo.call_args.kwargs["message_thread_id"], 3)
+        bot.send_message.assert_not_awaited()
+        self.assertTrue(result["success"])
+        markup = bot.edit_message_reply_markup.call_args.kwargs["reply_markup"]
+        choice = self.store.get(markup.inline_keyboard[0][0].callback_data[3:], 11, 22)
+        self.assertEqual(choice["action"], "open")
+        self.assertEqual(choice["post_id"], p["id"])
+
+    async def test_long_photo_caption_preserves_post_link_and_full_resource_count(self):
+        text = "[打开帖子](https://example.invalid/post)\n" + "😀" * 1000
+        _, bot, _ = await self.send_post(text, count=51)
+        caption = bot.send_photo.call_args.kwargs["caption"]
+        self.assertLessEqual(len(caption.encode("utf-16-le")) // 2, 1024)
+        self.assertIn("https://example.invalid/post", caption)
+        self.assertIn("51", caption)
+        bot.send_message.assert_not_awaited()
+
+    async def test_missing_or_failed_photo_falls_back_to_original_text_with_button(self):
+        for media, error in ((False, None), (True, RuntimeError("offline failure"))):
+            with self.subTest(media=media):
+                _, bot, result = await self.send_post("完整原文", media=media, photo_error=error)
+                self.assertEqual(bot.send_message.call_args.kwargs["text"], "完整原文")
+                bot.edit_message_reply_markup.assert_awaited_once()
+                self.assertTrue(result["success"])
+
+    async def test_photo_button_opens_fresh_reply_panel_without_editing_original(self):
+        p = post(51)
+        token = self.store.choice(dict(action="open", post_id=p["id"], fingerprint="old", chat_id=11, message_id=22, thread_id=3))
+        panel = SimpleNamespace(chat_id=11, message_id=33, edit_text=AsyncMock())
+        message = SimpleNamespace(chat_id=11, message_id=22, reply_text=AsyncMock(return_value=panel))
+        query = SimpleNamespace(from_user=SimpleNamespace(id=123), answer=AsyncMock(), message=message, data="fd:" + token, edit_message_text=AsyncMock())
+        subject = bridge.Bridge(SimpleNamespace(owner=123), self.store)
+        subject.call = AsyncMock(return_value=p)
+        await subject.handle(query)
+        query.edit_message_text.assert_not_awaited()
+        self.assertEqual(message.reply_text.call_args.kwargs["reply_to_message_id"], 22)
+        self.assertEqual(message.reply_text.call_args.kwargs["message_thread_id"], 3)
+        panel.edit_text.assert_awaited_once()
+        self.assertIn("共 51", panel.edit_text.call_args.args[0])
+        markup = panel.edit_text.call_args.kwargs["reply_markup"]
+        for row in markup.inline_keyboard:
+            for item in row:
+                choice = self.store.get(item.callback_data[3:], 11, 33)
+                self.assertEqual(choice["fingerprint"], p["fingerprint"])
+        self.assertEqual(self.store.pending(), [])
+        # 面板中的下载请求关联回复消息，不能误绑原图文。
+        query.message = panel
+        query.data = markup.inline_keyboard[0][0].callback_data
+        await subject.handle(query)
+        pending = self.store.pending()
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0][1]["message_id"], 33)
+        self.assertEqual(pending[0][1]["thread_id"], 3)
+
+    async def test_general_topic_panel_does_not_inherit_thread_one(self):
+        from telegram import Chat, Message
+        p = post(1)
+        token = self.store.choice(dict(action="open", post_id=p["id"], fingerprint=p["fingerprint"], chat_id=11, message_id=22, thread_id=1))
+        panel = SimpleNamespace(chat_id=11, message_id=33, edit_text=AsyncMock())
+        bot = SimpleNamespace(send_message=AsyncMock(return_value=panel))
+        message = Message(message_id=22, date=datetime.now(timezone.utc), chat=Chat(11, "supergroup"), is_topic_message=True, message_thread_id=1)
+        message.set_bot(bot)
+        query = SimpleNamespace(from_user=SimpleNamespace(id=123), answer=AsyncMock(), message=message, data="fd:" + token)
+        subject = bridge.Bridge(SimpleNamespace(owner=123), self.store)
+        subject.call = AsyncMock(return_value=p)
+        await subject.handle(query)
+        bot.send_message.assert_awaited_once()
+        self.assertIsNone(bot.send_message.call_args.kwargs["message_thread_id"])
 
     async def test_unauthorized_callback_never_reads_resources(self):
         client = type("Client", (), {"owner": 123})()

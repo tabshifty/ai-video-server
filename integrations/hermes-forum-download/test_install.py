@@ -17,6 +17,11 @@ class InstallTests(unittest.TestCase):
             script = home / "scripts/watch_sehuatang_forum95.py"
             script.parent.mkdir()
             shutil.copy2(source, script)
+            # 活动脚本可能已经安装；仅在临时目录还原补丁，保证首装分支可测。
+            if 'command[1] = "forum-download-send"' in script.read_text(encoding="utf-8"):
+                patch_file = Path(__file__).with_name("monitor.patch")
+                result = subprocess.run(["patch", "--reverse", "--batch", str(script), str(patch_file)], capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             original = script.read_bytes()
             installer = Path(__file__).with_name("install.py")
             for arguments in (("--check",), (), ()):
