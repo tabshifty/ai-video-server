@@ -18,7 +18,7 @@ describe('115 本地暂存删除 helpers', () => {
     })).toBe(false)
   })
 
-  it('活动导入拒绝删除，失败或已结束的导入不阻塞', () => {
+  it('活动导入拒绝删除，失败导入仍允许清理', () => {
     for (const status of ['queued', 'hashing', 'copying', 'creating']) {
       expect(canDeleteCloudDownloadLocalFile({
         status: 'completed',
@@ -31,11 +31,16 @@ describe('115 本地暂存删除 helpers', () => {
       local_path: '/downloads/a.rar',
       import: { status: 'failed' }
     })).toBe(true)
-    expect(canDeleteCloudDownloadLocalFile({
-      status: 'completed',
-      local_path: '/downloads/a.rar',
-      import: { status: 'skipped_existing' }
-    })).toBe(true)
+  })
+
+  it('导入终态已自动删除本地文件，不再提供删除入口', () => {
+    for (const status of ['imported', 'skipped_existing']) {
+      expect(canDeleteCloudDownloadLocalFile({
+        status: 'completed',
+        local_path: '/downloads/a.rar',
+        import: { status }
+      })).toBe(false)
+    }
   })
 
   it('确认框大小标签区分读取中、已删除、路径异常与文件缺失', () => {

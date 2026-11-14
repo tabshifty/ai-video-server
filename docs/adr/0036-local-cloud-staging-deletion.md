@@ -15,7 +15,7 @@
 
 - **只删本地、单任务、显式**：新增 `POST /admin/cloud-downloads/:id/local-file/delete`，只删除 `DOWNLOAD_DIR` 内的本地文件；不删除任务记录、不删除导入记录、不改动 115 云盘源文件；不自动、不批量。删除前用 `GET /admin/cloud-downloads/:id/local-file` 展示路径、实际大小与存在性。
 - **状态保持 `completed`**：删除本地文件不改变“115 已下载完成”的结果，因此任务状态机不变；新增 `local_file_deleted_at` / `local_file_deleted_by` 记录清理事实，列表显示「本地已删除」并停用导入入口。`local_path` 保留作为历史。
-- **守卫**：任务必须 `completed`；活动导入（`queued/hashing/copying/creating`）拒绝（409）；`failed` 导入允许删除但确认框提示无法再重试；`failed/blocked/进行中` 不开放。
+- **守卫**：任务必须 `completed`；活动导入（`queued/hashing/copying/creating`）拒绝（409）；导入终态（`imported/skipped_existing`）已由导入服务自动删除源文件，列表不再提供入口；`failed` 导入允许删除但确认框提示无法再重试；`failed/blocked/进行中` 不开放。
 - **幂等与路径安全**：路径必须解析在 `DOWNLOAD_DIR` 内（拒绝 `..`、符号链接逃逸、目录与非普通文件）；文件已不存在视为幂等成功并补记删除时间，避免陈旧记录无法清理；空 `local_path` 返回明确错误，不伪造清理事实。
 - **确认**：API 要求 `{"confirm":true}`；前端确认框明确“仅删除本地暂存文件，不删除任务记录，也不影响 115 云盘原件；删除后不可恢复且无法再导入媒体库”。
 - **不放宽为“可重新下载”**：`info_hash` 全局唯一且 `completed` 任务再次提交会被跳过，误删无法通过重新提交找回；v1 不提供重新下载，确认框明示不可恢复。
