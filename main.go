@@ -316,10 +316,12 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 		cloudFileDeletionRepo := repository.NewCloudDownloadFileDeletionRepository(pool)
 		cloudSvc.SetFileDeletionSummaryRepository(cloudFileDeletionRepo)
 		cloudFileDeletionSvc := services.NewCloudFileDeletionService(cloudRepo, cloudImportRepo, cloudFileDeletionRepo, cloudClient, cfg.DownloadDir, logger)
+		cloudLocalFileSvc := services.NewCloudLocalFileDeletionService(cloudRepo, cloudImportRepo, cfg.DownloadDir, logger)
 		telegramForumDownload = forumdownload.New(pool, cloudSvc, logger)
 		api.SetCloudDownloadService(cloudSvc)
 		api.SetCloudDownloadImportService(cloudImportSvc)
 		api.SetCloudFileDeletionService(cloudFileDeletionSvc)
+		api.SetCloudLocalFileDeletionService(cloudLocalFileSvc)
 		logger.Info("cloud download enabled", "cdp", cfg.CloudBrowserCDP, "download_dir", cfg.DownloadDir)
 	}
 	forumdownload.Register(r, telegramForumDownload, cfg.TelegramForumDownloadToken, cfg.TelegramForumOwnerID)

@@ -272,6 +272,11 @@ func (s *CloudFileDeletionService) DeleteCloudFile(ctx context.Context, taskID i
 }
 
 func (s *CloudFileDeletionService) localSourceOrImported(ctx context.Context, task models.CloudDownloadTask) bool {
+	if task.LocalFileDeletedAt != nil {
+		// The admin explicitly discarded local staging, so the 115 copy is the
+		// remaining cleanup target rather than the last surviving copy.
+		return true
+	}
 	if _, _, err := resolveCloudImportSource(s.downloadDir, task.LocalPath); err == nil {
 		return true
 	}

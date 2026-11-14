@@ -198,6 +198,39 @@ describe('115 云下载导入状态', () => {
       .toBe('import')
   })
 
+  it('本地文件被显式删除后不再提供导入', () => {
+    expect(resolveCloudImportAction({
+      status: 'completed',
+      local_path: '/downloads/a.mkv',
+      local_file_deleted_at: '2026-11-14T02:00:00Z'
+    })).toBe('local-deleted')
+    expect(resolveCloudImportAction({
+      status: 'completed',
+      local_path: '',
+      local_file_deleted_at: '2026-11-14T02:00:00Z'
+    })).toBe('local-deleted')
+  })
+
+  it('本地已删除且导入失败时不再提供失败重试入口', () => {
+    expect(resolveCloudImportAction({
+      status: 'completed',
+      local_path: '/downloads/a.mkv',
+      local_file_deleted_at: '2026-11-14T02:00:00Z',
+      import: { status: 'failed', error_message: '源文件缺失' }
+    })).toBe('local-deleted')
+    expect(resolveCloudImportAction({
+      status: 'completed',
+      local_path: '/downloads/a.mkv',
+      local_file_deleted_at: '2026-11-14T02:00:00Z',
+      import: { status: 'imported' }
+    })).toBe('imported')
+    expect(cloudArchiveImportState({
+      status: 'completed',
+      local_path: '/downloads/a.rar',
+      local_file_deleted_at: '2026-11-14T02:00:00Z'
+    })).toBe('local-deleted')
+  })
+
   it('活动导入超过宽限期后才允许重新提交', () => {
     const now = Date.parse('2026-10-18T01:00:00Z')
     const activeTask = (createdAt) => ({

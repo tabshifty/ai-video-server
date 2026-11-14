@@ -57,7 +57,31 @@ var (
 	ErrCloudDownloadNotFound = errors.New("cloud: download task not found")
 	// ErrCloudDownloadNotRetryable means the task is not in a manual retry state.
 	ErrCloudDownloadNotRetryable = errors.New("cloud: download task is not retryable")
+	// ErrCloudLocalFileNotFound means the local-file request targets no task.
+	ErrCloudLocalFileNotFound = errors.New("cloud: local file task not found")
+	// ErrCloudLocalFileNotCompleted means only a completed download may be
+	// discarded; active transfers still own the file.
+	ErrCloudLocalFileNotCompleted = errors.New("cloud: local file deletion requires a completed task")
+	// ErrCloudLocalFileImportActive means an import is still reading the file.
+	ErrCloudLocalFileImportActive = errors.New("cloud: local file is being imported")
+	// ErrCloudLocalFileNotRecorded means the task never recorded a local file.
+	ErrCloudLocalFileNotRecorded = errors.New("cloud: local file path is not recorded")
+	// ErrCloudLocalFileUnavailable means the stored path is not a managed
+	// regular file inside DOWNLOAD_DIR.
+	ErrCloudLocalFileUnavailable = errors.New("cloud: local file path is not managed")
 )
+
+// CloudLocalFilePreview describes the downloaded file before an explicit
+// deletion. Absent files are reported, not treated as errors.
+type CloudLocalFilePreview struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+	// Managed reports that Path resolves inside DOWNLOAD_DIR. An unmanaged
+	// path is shown but cannot be deleted.
+	Managed bool `json:"managed"`
+	Exists  bool `json:"exists"`
+	Deleted bool `json:"deleted"`
+}
 
 // CloudDownloadTerminal reports whether a status needs no further work.
 func CloudDownloadTerminal(status string) bool {
@@ -94,11 +118,16 @@ type CloudDownloadTask struct {
 	// DownloadTriggeredAt is set exactly once before the native download is
 	// triggered, so a redelivered job does not start a second local copy.
 	DownloadTriggeredAt *time.Time `json:"download_triggered_at"`
-	CreatedBy           *uuid.UUID `json:"created_by"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	StartedAt           *time.Time `json:"started_at"`
-	FinishedAt          *time.Time `json:"finished_at"`
+	// LocalFileDeletedAt marks an explicit admin deletion of the downloaded
+	// file. Local cleanup is orthogonal to the 115 download result, so the
+	// task keeps status=completed; LocalPath stays as history.
+	LocalFileDeletedAt *time.Time `json:"local_file_deleted_at"`
+	LocalFileDeletedBy *uuid.UUID `json:"local_file_deleted_by"`
+	CreatedBy          *uuid.UUID `json:"created_by"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	StartedAt          *time.Time `json:"started_at"`
+	FinishedAt         *time.Time `json:"finished_at"`
 	// Import is the explicit media-library import summary, when one exists.
 	Import *CloudDownloadImportSummary `json:"import,omitempty"`
 	// FileDeletion is the optional 115 recycle-bin cleanup summary.

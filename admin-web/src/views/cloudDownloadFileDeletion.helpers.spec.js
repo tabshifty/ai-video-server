@@ -17,6 +17,19 @@ describe('115 云盘源文件清理 helpers', () => {
     expect(canDeleteCloudDownloadFile({ status: 'completed', local_path: '/tmp/a.zip', file_deletion: { status: 'failed' } })).toBe(true)
   })
 
+  it('本地文件被显式删除后仍可清理 115 云盘', () => {
+    expect(canDeleteCloudDownloadFile({
+      status: 'completed',
+      local_path: '',
+      local_file_deleted_at: '2026-11-14T02:00:00Z'
+    })).toBe(true)
+    expect(canDeleteCloudDownloadFile({
+      status: 'completed',
+      local_path: '/tmp/a.zip',
+      local_file_deleted_at: '2026-11-14T02:00:00Z'
+    })).toBe(true)
+  })
+
   it('展示移入回收站状态与失败原因', () => {
     expect(cloudFileDeletionMeta({ file_deletion: { status: 'deleting' } })).toMatchObject({ label: '移入回收站中', type: 'warning' })
     expect(cloudFileDeletionMeta({ file_deletion: { status: 'deleted' } })).toMatchObject({ label: '已移入回收站', type: 'success' })

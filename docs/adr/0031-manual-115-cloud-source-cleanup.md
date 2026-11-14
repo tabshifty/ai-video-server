@@ -20,7 +20,7 @@
 - **标识落库**：新任务在 `SetReady` 时保存 `cloud_file_id=delete_file_id`、`cloud_parent_id=wp_path_id`、`cloud_user_id` 和 `cloud_file_category`。历史任务按 `info_hash` 有界分页懒解析，必须唯一匹配，且文件名、大小和普通文件类型都与任务记录一致；解析不到、歧义或不一致时禁用删除。绝不把 `file_id` 当 `fid[0]`。
 - **独立清理记录**：新增 `cloud_download_file_deletions`（`task_id` 唯一），记录 `file_id/parent_id/status/attempt/requested_by/error/note/timestamps`；状态为 `deleting/deleted/failed`。删除失败只改清理记录，云下载任务保持 `completed`，本地文件与导入记录不变。
 - **显式确认**：前端从“更多”菜单打开确认框，展示任务记录的文件名/大小，明确“仅影响 115 云盘源文件，不会删除本地文件或导入记录，可在 115 回收站恢复，移入后不能从 115 重新下载”。API 要求 `{"confirm":true}`。
-- **前置守卫**：任务必须 `completed`；本地源文件在 `DOWNLOAD_DIR` 内且为普通文件，或导入记录已终态 `imported/skipped_existing`（导入成功后本地源可能已被删除）；云文件标识必须是数字字符串；115 账号与任务创建账号一致（新任务）；浏览器会话必须已登录。活动导入不阻塞手动清理，清理也不等待导入。
+- **前置守卫**：任务必须 `completed`；本地源文件在 `DOWNLOAD_DIR` 内且为普通文件，或导入记录已终态 `imported/skipped_existing`（导入成功后本地源可能已被删除），或本地文件已被显式[[115 本地暂存删除]]删除（见 `docs/adr/0036-local-cloud-staging-deletion.md`）；云文件标识必须是数字字符串；115 账号与任务创建账号一致（新任务）；浏览器会话必须已登录。活动导入不阻塞手动清理，清理也不等待导入。
 - **幂等与并发**：`task_id` 唯一 + 原子 claim；并发第二个请求返回 409，不产生第二次 115 POST。`deleted` 重复请求直接返回；失败可显式重试；5 分钟未完成的 `deleting` 允许重新 claim。终态写库使用 `context.WithoutCancel` 和 attempt CAS，避免浏览器成功后请求取消把记录卡在 `deleting`。
 - **115 成功语义**：仅严格 `state=true/1/"1"`、HTTP 200、错误字段为空且 JSON 解析成功视为成功；明确 `文件不存在/文件已删除` 的 JSON 错误可幂等记为 `deleted` 并带备注，父目录/HTML/未知错误必须失败；其他失败保留错误并允许重试。
 

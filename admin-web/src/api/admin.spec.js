@@ -67,6 +67,8 @@ import {
   getLatestOrphanFileScan,
   importCloudDownload,
   deleteCloudDownloadCloudFile,
+  deleteCloudDownloadLocalFile,
+  getCloudDownloadLocalFile,
   keepAdminPendingDeleteShort,
   markAdminShortVideoPendingDelete,
   offlineAdminTVAppRelease,
@@ -775,6 +777,17 @@ describe('cloud download import apis', () => {
       '/admin/cloud-downloads/42/cloud-file/delete',
       { confirm: true },
       { timeout: 120000 }
+    )
+  })
+
+  it('reads and deletes the local staging file through their own endpoints', async () => {
+    await getCloudDownloadLocalFile(42)
+    await deleteCloudDownloadLocalFile(42)
+
+    expect(get).toHaveBeenCalledWith('/admin/cloud-downloads/42/local-file')
+    expect(post).toHaveBeenCalledWith(
+      '/admin/cloud-downloads/42/local-file/delete',
+      { confirm: true }
     )
   })
 })

@@ -1,5 +1,21 @@
 # plan.md
 
+## 2026-11-14 10:55 +0800 115 本地暂存删除：实现、评审修复与验证
+- 实现：migration `0051` 增加 `local_file_deleted_at/local_file_deleted_by`；模型与仓储补字段与幂等 `MarkLocalFileDeleted`；新增 `CloudLocalFileDeletionService`（仅 completed、活动导入 409、`DOWNLOAD_DIR` 包含校验、软链根缺失文件幂等、空路径拒绝、副作用后写库与回读兜底）；新增 `GET /admin/cloud-downloads/:id/local-file` 与 `POST .../local-file/delete`（confirm 校验、中文错误映射）；main/router 接线；`localSourceOrImported` 放宽为显式本地删除也算来源已处置。
+- 管理端：列表「更多 → 删除本地文件」、确认框（路径/实际大小/不可恢复）、「本地已删除」标签与停用导入、归档失败时保留「查看批次」入口、115 回收站唯一副本警告；新增 helper/API 测试。
+- 评审：独立子代理两轮。阻断项 B1（软链 `DOWNLOAD_DIR` + 文件缺失被误判 409）已修复并补软链用例；S1/S2/S3/S4/S6/S7 与 Q1 已修；S5 导入创建与删除的 check-then-act 窗口、Q2 stale 活动导入记录为残余风险（ADR 0036）。
+- 文档：CONTEXT 增补「115 本地暂存删除」；新增 `docs/adr/0036-local-cloud-staging-deletion.md` 并链接 ADR 0031。
+- 验证：`go build ./...`、`go vet ./...`；services/handlers/cloud 定向与整包（排除既有 TV APK 版本夹具失败）；admin-web 61 文件 853 用例与 `npm run build`；migration up/down 在部署库事务内执行后回滚；`git diff --check` 与 UTF-8 检查通过。
+- 范围：仅服务端与管理端；不涉及手机/TV 版本号；未纳入无关的 `docs/examples/`。
+
+## 2026-11-14 10:40 +0800 115 本地暂存删除：实施计划（需求已收口）
+- 需求：已完成且已下载到本地的 115 云下载任务，管理员手动确认资源已在库后，可显式删除 `DOWNLOAD_DIR` 中的本地暂存文件；只删本地，不动 115 云盘、不删任务记录。
+- 决策（grilling 两轮确认）：`status` 保持 `completed`，新增 `local_file_deleted_at`/`local_file_deleted_by` 表示正交维度；列表显示「本地已删除」并禁用导入；仅 `completed` 可删；活动导入（`queued/hashing/copying/creating`）拒绝，`failed` 导入允许但确认框提示无法重试；`failed/blocked/进行中` 不开放；v1 单行入口、无批量、无重新下载；文件已不存在视为幂等成功；路径必须在 `DOWNLOAD_DIR` 内。
+- 联动：「移入 115 回收站」的前置条件放宽为 `local_file_deleted_at` 非空也算来源已处置，避免先删本地导致云端文件无法清理。
+- 接口：`GET /admin/cloud-downloads/:id/local-file`（返回路径、是否存在、大小）；`POST /admin/cloud-downloads/:id/local-file/delete`（与 `cloud-file/delete` 同构，返回最新任务）。
+- 影响文件：`migrations/0051_*`、`internal/models/cloud_download.go`、`internal/repository/cloud_download_repository.go`、新增 `internal/services/cloud_local_file_deletion_service.go` 及测试、`internal/services/cloud_file_deletion_service.go`、`internal/handlers/admin_cloud_download*.go`、`internal/handlers/router.go`、`main.go`、管理端 `CloudDownloadList.vue`、`cloudDownloadFileDeletion.helpers.js`、新增 `cloudDownloadLocalFileDeletion.helpers.js` 及测试、`api/admin.js`、`CONTEXT.md`、`plan.md`。不涉及手机/TV 版本号。
+- 验证：Go 定向单测（服务守卫、幂等、路径边界、清理前置放宽）、handlers 路由测试、前端 helper 测试、`npm run build`、`go vet`、独立子代理评审后复验。
+
 ## 2026-11-14 09:10 +0800 修复：115 扫码成功后需人工点击“进入网盘”
 - 现象：管理端扫码登录 115 成功后，状态仍显示未登录；必须在 115Browser 窗口里手动点一下“进入网盘”按钮，后续轮询才认到登录态。
 - 根因：扫码确认后 115 停在登录落地页，`USER_ID` 与原生桥只在网盘页存在，`Probe` 因而判未登录；状态接口只找网盘页，`EnsureSession` 也只在探测成功后退出，没有人执行“进入网盘”这一步。

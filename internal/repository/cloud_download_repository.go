@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -59,6 +60,8 @@ SELECT
     t.progress_updated_at,
     COALESCE(t.local_path, ''),
     t.download_triggered_at,
+    t.local_file_deleted_at,
+    t.local_file_deleted_by,
     t.created_by,
     t.created_at,
     t.updated_at,
@@ -93,6 +96,8 @@ func scanCloudDownload(row interface{ Scan(...any) error }) (models.CloudDownloa
 		&task.ProgressUpdatedAt,
 		&task.LocalPath,
 		&task.DownloadTriggeredAt,
+		&task.LocalFileDeletedAt,
+		&task.LocalFileDeletedBy,
 		&task.CreatedBy,
 		&task.CreatedAt,
 		&task.UpdatedAt,
@@ -261,6 +266,22 @@ WHERE id = $1
 		return false, fmt.Errorf("set cloud download file ids: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
+}
+
+// MarkLocalFileDeleted records an explicit admin deletion of the downloaded
+// file. It never changes the download status and is idempotent: an existing
+// timestamp is kept so the first actor and time survive retries.
+func (r *CloudDownloadRepository) MarkLocalFileDeleted(ctx context.Context, id int64, deletedBy *uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `
+UPDATE cloud_download_tasks SET
+    local_file_deleted_at = COALESCE(local_file_deleted_at, now()),
+    local_file_deleted_by = COALESCE(local_file_deleted_by, $2),
+    updated_at = now()
+WHERE id = $1`, id, deletedBy)
+	if err != nil {
+		return fmt.Errorf("mark cloud download local file deleted: %w", err)
+	}
+	return nil
 }
 
 // SetLocalPath records the downloaded file path and completes the task.

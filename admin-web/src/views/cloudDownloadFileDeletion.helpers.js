@@ -36,7 +36,9 @@ export function canDeleteCloudDownloadFile(row) {
   if (!row || row.status !== 'completed') return false
   const hasLocalFile = Boolean(String(row.local_path || '').trim())
   const imported = TERMINAL_IMPORT_STATUSES.has(String(row?.import?.status || ''))
-  if (!hasLocalFile && !imported) return false
+  // 本地文件被显式删除后，115 云端那份成为唯一清理目标，仍允许移入回收站。
+  const localDeleted = Boolean(String(row?.local_file_deleted_at || '').trim())
+  if (!hasLocalFile && !imported && !localDeleted) return false
   const status = String(row?.file_deletion?.status || '')
   if (status === 'deleted') return false
   if (status === 'deleting') return isStaleDeleting(row)

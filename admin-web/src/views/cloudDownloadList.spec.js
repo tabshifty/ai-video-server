@@ -82,6 +82,17 @@ describe('115 云下载列表页', () => {
     expect(script).toMatch(/handleImportSubmitted[\s\S]*syncPolling\(\)[\s\S]*await load\(\)/)
   })
 
+  it('已完成任务通过更多菜单删除本地暂存文件', () => {
+    expect(template).toContain('canDeleteLocalFileRow(row)')
+    expect(template).toContain('删除本地文件')
+    expect(template).toContain('deleteLocalFileDialogVisible')
+    expect(template).toContain('localFileDeletionSizeLabel(deleteLocalFilePreview)')
+    expect(script).toContain('deleteCloudDownloadLocalFile(task.id)')
+    expect(template).toContain('canConfirmLocalFileDeletion(deleteLocalFilePreview)')
+    expect(template).toContain('查看批次')
+    expect(script).toMatch(/confirmDeleteLocalFile[\s\S]*extractErrorMessage\(error/)
+  })
+
   it('已完成任务通过更多菜单移入 115 回收站并显式确认', () => {
     expect(template).toContain('canDeleteCloudFileRow(row)')
     expect(script).toContain('MoreFilled')
@@ -91,8 +102,9 @@ describe('115 云下载列表页', () => {
     expect(template).toContain('移入 115 回收站')
     expect(template).toContain('deleteCloudFileDialogVisible')
     expect(template).toContain('deleteCloudFileError')
-    expect(template).toContain('仅影响 115 云盘源文件')
-    expect(template).toContain('不会删除本地文件或导入记录')
+    expect(template).toContain(':title="deleteCloudFileWarning"')
+    expect(script).toContain('仅影响 115 云盘源文件')
+    expect(script).toContain('不会删除本地文件或导入记录')
     expect(script).toContain('deleteCloudDownloadCloudFile(task.id)')
     expect(script).toContain('deleteCloudFileDialogVisible.value = true')
     expect(script).toContain('deleteCloudFileError.value = message')

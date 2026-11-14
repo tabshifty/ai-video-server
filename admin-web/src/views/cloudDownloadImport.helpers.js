@@ -141,6 +141,10 @@ export function validateArchiveImportForm(form = {}) {
 
 export const STALE_IMPORT_MS = 10 * 60 * 1000
 
+export function isCloudLocalFileDeleted(task) {
+  return Boolean(String(task?.local_file_deleted_at || '').trim())
+}
+
 export function isImportActive(task) {
   return ACTIVE_IMPORT_STATUS_SET.has(String(task?.import?.status || ''))
 }
@@ -157,6 +161,12 @@ export function hasActiveImportTasks(tasks) {
 }
 
 export function resolveCloudImportAction(task, now = Date.now()) {
+  const importStatus = String(task?.import?.status || '')
+  // 本地文件被显式删除后，任何未成功的导入（无记录或 failed）都不再提供入口，
+  // 否则会渲染出必然 410 的“重试导入”。
+  if (isCloudLocalFileDeleted(task) && (!task?.import || importStatus === 'failed')) {
+    return 'local-deleted'
+  }
   if (!task?.import) {
     if (task?.status === 'completed') {
       return String(task?.local_path || '').trim() ? 'import' : 'missing'
@@ -198,6 +208,7 @@ export function cloudArchiveImportState(task) {
   const info = task?.import
   if (info?.kind && info.kind !== 'archive') return 'unsupported'
   if (info?.archive_batch_id && importDestination(task).startsWith('/toolbox/archive-import/')) return 'workspace'
+  if (isCloudLocalFileDeleted(task)) return 'local-deleted'
   if (isImportActive(task)) return 'waiting'
   if (info?.status === 'imported') return 'missing-batch'
   return 'form'

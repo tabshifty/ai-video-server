@@ -33,6 +33,7 @@ async function refresh() {
     if (waiting.value) dirty.value = false
     if (state.value === 'unsupported') throw new Error('该任务已按视频导入，请返回云下载列表查看')
     if (state.value === 'missing-batch') throw new Error('导入已结束，但未找到关联批次，请到压缩包批次列表查看')
+    if (state.value === 'local-deleted') return
     if (!waiting.value && !preview.value) {
       const file = await previewCloudDownloadImport(taskID)
       if (disposed) return
@@ -95,13 +96,14 @@ onUnmounted(() => { disposed = true; clearTimeout(timer); window.removeEventList
       <div class="cloud-archive-actions"><el-button :disabled="submitting" @click="router.push('/cloud-downloads')">返回云下载</el-button><el-button :loading="refreshing" :disabled="submitting || dirty" @click="refresh">刷新状态</el-button></div>
     </header>
     <el-alert v-if="errorText" :title="errorText" type="error" :closable="false" show-icon />
-    <el-alert v-if="task?.import?.status === 'failed' && !waiting" :title="task.import.error_message || '上次导入失败，可调整配置后重新提交'" type="warning" :closable="false" show-icon />
+    <el-alert v-if="state === 'local-deleted'" title="该任务的本地文件已被删除，无法再导入媒体库" type="info" :closable="false" show-icon />
+    <el-alert v-else-if="task?.import?.status === 'failed' && !waiting" :title="task.import.error_message || '上次导入失败，可调整配置后重新提交'" type="warning" :closable="false" show-icon />
     <section v-if="loading || waiting" v-loading="loading || refreshing" class="cloud-archive-status" aria-live="polite">
       <h2>{{ waiting ? '正在创建压缩包批次' : '正在读取压缩包' }}</h2>
       <p>批次就绪后自动进入全屏工作台，继续整理目录、分组与入库配置。离开页面不会中断已提交的后台任务。</p>
       <el-button v-if="retryAvailable" :disabled="refreshing" @click="prepareRetry">重新填写并提交</el-button>
     </section>
-    <section v-else-if="preview && !['unsupported', 'missing-batch'].includes(state)" class="cloud-archive-form">
+    <section v-else-if="preview && !['unsupported', 'missing-batch', 'local-deleted'].includes(state)" class="cloud-archive-form">
       <p class="cloud-archive-lead">以下内容作为主分组默认配置，解压后可在工作台继续调整。</p>
       <CloudDownloadImportDialog
         inline :model-value="true" :task="task" :preview="preview"

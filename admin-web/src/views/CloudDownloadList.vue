@@ -12,7 +12,9 @@ import Toolbar from '../components/base/Toolbar.vue'
 import CloudDownloadImportDialog from '../components/CloudDownloadImportDialog.vue'
 import {
   deleteCloudDownloadCloudFile,
+  deleteCloudDownloadLocalFile,
   getCloudBrowserState,
+  getCloudDownloadLocalFile,
   getCloudLoginQR,
   listCloudDownloads,
   previewCloudDownloadImport,
@@ -32,6 +34,7 @@ import {
   cloudFileDeletionMeta,
   hasActiveCloudFileDeletions
 } from './cloudDownloadFileDeletion.helpers'
+import { canConfirmLocalFileDeletion, canDeleteCloudDownloadLocalFile, localFileDeletionSizeLabel } from './cloudDownloadLocalFileDeletion.helpers'
 import { extractApiErrorMessage } from './toolbox.helpers'
 
 const POLL_INTERVAL_MS = 5000
@@ -77,6 +80,12 @@ const deleteCloudFileDialogVisible = ref(false)
 const deleteCloudFileTask = ref(null)
 const deleteCloudFileError = ref('')
 const blockedCloudFileDeletionIds = ref([])
+const deleteLocalFileDialogVisible = ref(false)
+const deleteLocalFileTask = ref(null)
+const deleteLocalFilePreview = ref(null)
+const deleteLocalFileLoading = ref(false)
+const deletingLocalFileId = ref(0)
+const deleteLocalFileError = ref('')
 const qrDialogVisible = ref(false)
 const qrImage = ref('')
 const qrLoading = ref(false)
@@ -351,6 +360,16 @@ function canDeleteCloudFileRow(row) {
   return canDeleteCloudDownloadFile(row)
 }
 
+const deleteCloudFileWarning = computed(() => {
+  const row = deleteCloudFileTask.value
+  const imported = ['imported', 'skipped_existing'].includes(String(row?.import?.status || ''))
+  const localDeleted = Boolean(String(row?.local_file_deleted_at || '').trim())
+  if (localDeleted && !imported) {
+    return '本地文件已删除且没有成功导入记录，移入回收站后本地与 115 均无可用副本（可在 115 回收站恢复）。'
+  }
+  return '仅影响 115 云盘源文件，不会删除本地文件或导入记录；可在 115 回收站恢复。移入后不能从 115 重新下载。'
+})
+
 function openDeleteCloudFileDialog(row) {
   if (deletingCloudFileId.value || !canDeleteCloudFileRow(row)) return
   deleteCloudFileTask.value = row
@@ -358,9 +377,17 @@ function openDeleteCloudFileDialog(row) {
   deleteCloudFileDialogVisible.value = true
 }
 
+function canDeleteLocalFileRow(row) {
+  return canDeleteCloudDownloadLocalFile(row)
+}
+
 function handleCloudFileDeletionCommand(command, row) {
   if (command === 'delete-cloud-file') {
     openDeleteCloudFileDialog(row)
+    return
+  }
+  if (command === 'delete-local-file') {
+    openDeleteLocalFileDialog(row)
   }
 }
 
@@ -412,6 +439,57 @@ async function confirmDeleteCloudFile() {
 function resetDeleteCloudFileDialog() {
   deleteCloudFileTask.value = null
   deleteCloudFileError.value = ''
+}
+
+async function openDeleteLocalFileDialog(row) {
+  if (!canDeleteLocalFileRow(row) || deletingLocalFileId.value) return
+  deleteLocalFileTask.value = row
+  deleteLocalFilePreview.value = null
+  deleteLocalFileError.value = ''
+  deleteLocalFileDialogVisible.value = true
+  deleteLocalFileLoading.value = true
+  try {
+    const data = await getCloudDownloadLocalFile(row.id)
+    if (deleteLocalFileTask.value?.id === row.id) {
+      deleteLocalFilePreview.value = data && typeof data === 'object' ? data : null
+    }
+  } catch (error) {
+    deleteLocalFileError.value = extractErrorMessage(error, '读取本地文件信息失败')
+  } finally {
+    deleteLocalFileLoading.value = false
+  }
+}
+
+async function confirmDeleteLocalFile() {
+  const task = deleteLocalFileTask.value
+  if (!task?.id || deletingLocalFileId.value) return
+  deletingLocalFileId.value = task.id
+  deleteLocalFileError.value = ''
+  try {
+    const data = await deleteCloudDownloadLocalFile(task.id)
+    applyDeletedTask(data?.task)
+    if (deleteLocalFileTask.value?.id === task.id) {
+      deleteLocalFileDialogVisible.value = false
+    }
+    ElMessage.success('本地文件已删除')
+    await load()
+  } catch (error) {
+    const message = extractErrorMessage(error, '删除本地文件失败')
+    if (deleteLocalFileTask.value?.id === task.id) {
+      deleteLocalFileError.value = message
+    }
+    ElMessage.error(message)
+    await load()
+  } finally {
+    deletingLocalFileId.value = 0
+  }
+}
+
+function resetDeleteLocalFileDialog() {
+  deleteLocalFileTask.value = null
+  deleteLocalFilePreview.value = null
+  deleteLocalFileLoading.value = false
+  deleteLocalFileError.value = ''
 }
 
 function stopQrTimer() {
@@ -615,6 +693,10 @@ onUnmounted(() => {
                       <dd class="cloud-detail__path">{{ row.local_path || '--' }}</dd>
                     </div>
                     <div class="cloud-detail__item">
+                      <dt>本地文件</dt>
+                      <dd>{{ row.local_file_deleted_at ? `已删除 ${formatDateTime(row.local_file_deleted_at)}` : '--' }}</dd>
+                    </div>
+                    <div class="cloud-detail__item">
                       <dt>pick_code</dt>
                       <dd>{{ row.pick_code || '--' }}</dd>
                     </div>
@@ -644,6 +726,9 @@ onUnmounted(() => {
                     <StatusIndicator :label="statusMeta(row.status).label" :tone="statusTone(row.status)" />
                     <el-tag v-if="row.blocked_reason" size="small" effect="plain" type="danger">
                       {{ blockedReasonLabel(row.blocked_reason) }}
+                    </el-tag>
+                    <el-tag v-if="row.local_file_deleted_at" size="small" effect="plain" type="info">
+                      本地已删除
                     </el-tag>
                     <el-tooltip
                       v-if="cloudFileDeletionMeta(row)?.detail"
@@ -691,6 +776,17 @@ onUnmounted(() => {
                         入媒体库
                       </el-button>
                     </template>
+                    <template v-else-if="resolveCloudImportAction(row) === 'local-deleted'">
+                      <span class="cloud-empty-action">本地已删除</span>
+                      <el-button
+                        v-if="importDestination(row)"
+                        link
+                        type="primary"
+                        @click="router.push(importDestination(row))"
+                      >
+                        查看批次
+                      </el-button>
+                    </template>
                     <template v-else-if="resolveCloudImportAction(row) === 'missing'">
                       <span class="cloud-empty-action">文件不存在</span>
                     </template>
@@ -733,7 +829,7 @@ onUnmounted(() => {
                     </template>
                     <span v-else class="cloud-empty-action">--</span>
                     <el-dropdown
-                      v-if="canDeleteCloudFileRow(row)"
+                      v-if="canDeleteCloudFileRow(row) || canDeleteLocalFileRow(row)"
                       trigger="click"
                       placement="bottom-end"
                       popper-class="cloud-file-actions-popper"
@@ -748,7 +844,10 @@ onUnmounted(() => {
                       />
                       <template #dropdown>
                         <el-dropdown-menu>
-                          <el-dropdown-item command="delete-cloud-file">
+                          <el-dropdown-item v-if="canDeleteLocalFileRow(row)" command="delete-local-file">
+                            删除本地文件
+                          </el-dropdown-item>
+                          <el-dropdown-item v-if="canDeleteCloudFileRow(row)" command="delete-cloud-file">
                             {{ cloudFileDeletionActionLabel(row) }}
                           </el-dropdown-item>
                         </el-dropdown-menu>
@@ -843,7 +942,7 @@ onUnmounted(() => {
           type="warning"
           :closable="false"
           show-icon
-          title="仅影响 115 云盘源文件，不会删除本地文件或导入记录；可在 115 回收站恢复。移入后不能从 115 重新下载。"
+          :title="deleteCloudFileWarning"
         />
         <el-alert
           v-if="deleteCloudFileError"
@@ -863,6 +962,69 @@ onUnmounted(() => {
           @click="confirmDeleteCloudFile"
         >
           移入回收站
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="deleteLocalFileDialogVisible"
+      title="删除本地文件"
+      width="min(32rem, calc(100vw - 2rem))"
+      destroy-on-close
+      :close-on-click-modal="!deletingLocalFileId"
+      :close-on-press-escape="!deletingLocalFileId"
+      :show-close="!deletingLocalFileId"
+      @closed="resetDeleteLocalFileDialog"
+    >
+      <div class="cloud-file-delete">
+        <p class="cloud-file-delete__lead">
+          确认删除以下已下载到本地的文件？
+        </p>
+        <dl class="cloud-file-delete__file">
+          <div>
+            <dt>文件名</dt>
+            <dd>{{ cloudDownloadFileName(deleteLocalFileTask) }}</dd>
+          </div>
+          <div>
+            <dt>本地路径</dt>
+            <dd class="cloud-file-delete__path">{{ deleteLocalFilePreview?.path || deleteLocalFileTask?.local_path || '--' }}</dd>
+          </div>
+          <div>
+            <dt>占用大小</dt>
+            <dd>{{ deleteLocalFileLoading ? '读取中…' : localFileDeletionSizeLabel(deleteLocalFilePreview) }}</dd>
+          </div>
+        </dl>
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+          title="仅删除本地暂存文件，不删除任务记录，也不影响 115 云盘原件。删除后不可恢复，且该任务无法再导入媒体库。"
+        />
+        <el-alert
+          v-if="deleteLocalFilePreview?.managed === false"
+          type="error"
+          :closable="false"
+          show-icon
+          title="本地路径不在下载目录内，无法删除该文件"
+        />
+        <el-alert
+          v-if="deleteLocalFileError"
+          type="error"
+          :closable="false"
+          :title="deleteLocalFileError"
+        />
+      </div>
+      <template #footer>
+        <el-button :disabled="Boolean(deletingLocalFileId)" @click="deleteLocalFileDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="danger"
+          :loading="deletingLocalFileId === deleteLocalFileTask?.id"
+          :disabled="deleteLocalFileLoading || Boolean(deletingLocalFileId) || !canConfirmLocalFileDeletion(deleteLocalFilePreview)"
+          @click="confirmDeleteLocalFile"
+        >
+          删除本地文件
         </el-button>
       </template>
     </el-dialog>
@@ -1014,6 +1176,10 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-size: var(--text-small);
   line-height: var(--leading-small);
+}
+
+.cloud-file-delete__path {
+  overflow-wrap: anywhere;
 }
 
 .cloud-file-delete__file dd {

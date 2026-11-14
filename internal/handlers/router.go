@@ -63,43 +63,44 @@ type orphanFileScanRepository interface {
 
 // API bundles all HTTP handlers.
 type API struct {
-	repo                  *repository.VideoRepository
-	orphanFileScanRepo    orphanFileScanRepository
-	uploadSvc             *services.UploadService
-	chunkUpload           *services.ChunkUploadService
-	recSvc                *services.RecommendService
-	scrapeSvc             *services.ScraperService
-	appSvc                *services.AppService
-	imageSvc              *services.ImageService
-	subtitleSvc           *services.SubtitleService
-	archiveImportSvc      archiveImportService
-	hermesForumSvc        hermesForumService
-	telegramManagementSvc telegramManagementService
-	cloudDownload         cloudDownloadService
-	cloudDownloadImport   cloudDownloadImportService
-	cloudFileDeletion     cloudFileDeletionService
-	tvAPKSvc              tvAPKService
-	iptvSvc               iptvService
-	enqueuer              taskEnqueuer
-	logger                *slog.Logger
-	redis                 *redis.Client
-	redisAddr             string
-	redisPassword         string
-	asynqQueue            string
-	jwtSecret             string
-	playSignSecret        string
-	playSignTTL           time.Duration
-	accessTTL             time.Duration
-	refreshTTL            time.Duration
-	maxVideoSize          int64
-	storageRoot           string
-	uploadTempDir         string
-	serverLogPath         string
-	adminWebDistPath      string
-	enableSwagger         bool
-	imageGenerationConfig ImageGenerationConfig
-	passwordVaultCipher   *services.PasswordVaultCipher
-	hermesAPIToken        string
+	repo                   *repository.VideoRepository
+	orphanFileScanRepo     orphanFileScanRepository
+	uploadSvc              *services.UploadService
+	chunkUpload            *services.ChunkUploadService
+	recSvc                 *services.RecommendService
+	scrapeSvc              *services.ScraperService
+	appSvc                 *services.AppService
+	imageSvc               *services.ImageService
+	subtitleSvc            *services.SubtitleService
+	archiveImportSvc       archiveImportService
+	hermesForumSvc         hermesForumService
+	telegramManagementSvc  telegramManagementService
+	cloudDownload          cloudDownloadService
+	cloudDownloadImport    cloudDownloadImportService
+	cloudFileDeletion      cloudFileDeletionService
+	cloudLocalFileDeletion cloudLocalFileDeletionService
+	tvAPKSvc               tvAPKService
+	iptvSvc                iptvService
+	enqueuer               taskEnqueuer
+	logger                 *slog.Logger
+	redis                  *redis.Client
+	redisAddr              string
+	redisPassword          string
+	asynqQueue             string
+	jwtSecret              string
+	playSignSecret         string
+	playSignTTL            time.Duration
+	accessTTL              time.Duration
+	refreshTTL             time.Duration
+	maxVideoSize           int64
+	storageRoot            string
+	uploadTempDir          string
+	serverLogPath          string
+	adminWebDistPath       string
+	enableSwagger          bool
+	imageGenerationConfig  ImageGenerationConfig
+	passwordVaultCipher    *services.PasswordVaultCipher
+	hermesAPIToken         string
 }
 
 func NewAPI(repo *repository.VideoRepository, uploadSvc *services.UploadService, chunkUpload *services.ChunkUploadService, recSvc *services.RecommendService, scrapeSvc *services.ScraperService, appSvc *services.AppService, imageSvc *services.ImageService, subtitleSvc *services.SubtitleService, archiveImportSvc archiveImportService, hermesForumSvc hermesForumService, telegramManagementSvc telegramManagementService, enqueuer taskEnqueuer, logger *slog.Logger, redisClient *redis.Client, redisAddr, redisPassword, asynqQueue, jwtSecret, playSignSecret, hermesAPIToken string, accessTTL, refreshTTL time.Duration, maxVideoSize int64, storageRoot, uploadTempDir, serverLogPath, adminWebDistPath string, enableSwagger bool, imageGenerationConfig ImageGenerationConfig, passwordVaultCipher *services.PasswordVaultCipher) *API {
@@ -354,6 +355,8 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/cloud-downloads/:id/import/preview", a.AdminCloudDownloadImportPreview)
 			admin.POST("/cloud-downloads/:id/import", a.AdminCloudDownloadImport)
 			admin.POST("/cloud-downloads/:id/cloud-file/delete", a.AdminCloudDownloadDeleteCloudFile)
+			admin.GET("/cloud-downloads/:id/local-file", a.AdminCloudDownloadLocalFilePreview)
+			admin.POST("/cloud-downloads/:id/local-file/delete", a.AdminCloudDownloadDeleteLocalFile)
 			admin.GET("/cloud-downloads/browser", a.AdminCloudDownloadBrowser)
 			admin.GET("/cloud-downloads/login-qr", a.AdminCloudDownloadLoginQR)
 			admin.POST("/system/orphan-files/scan", a.AdminStartOrphanFileScan)
