@@ -230,11 +230,14 @@ class Bridge:
             choice = self.store.get(key, chat, message_id)
             post = await self.call("GET", "/posts/" + choice["post_id"])
             action = choice["action"]
-            if action == "open":
+            changed = post["fingerprint"] != choice["fingerprint"]
+            if action == "open" or (choice.get("direct") and changed):
                 # 先取得回复消息 ID，再将面板按钮绑定到回复，保留原始图文。
                 # 显式 None 防止 PTB 从 General 话题原消息继承无效的 thread_id=1。
                 panel = await message.reply_text("正在加载下载资源…", reply_to_message_id=message_id, message_thread_id=thread_args(choice.get("thread_id")).get("message_thread_id"))
                 text, markup = render(post, self.store, panel.chat_id, panel.message_id, choice.get("thread_id"))
+                if changed:
+                    text = "资源已变化，请重新选择并确认。\n" + text
                 await panel.edit_text(text, reply_markup=markup)
                 return
             if post["fingerprint"] != choice["fingerprint"]:
@@ -268,6 +271,9 @@ class Bridge:
                 request.update(event_id="choice:" + key, actor_id=query.from_user.id, retry_attempts=choice.get("retry_attempts", {}))
                 self.store.queue(request)
                 self.wake.set()
+                if choice.get("direct"):
+                    await message.reply_text("操作已保存，受理结果将回复到此会话。", reply_to_message_id=message_id, message_thread_id=thread_args(choice.get("thread_id")).get("message_thread_id"))
+                    return
                 # 任务受理回执经持久化通道发送；刷新后的按钮提供显式重试。
                 text, markup = render(post, self.store, chat, message_id, choice.get("thread_id"))
                 await query.edit_message_text(text + "\n操作已保存，受理结果将回复到此会话。", reply_markup=markup)
@@ -431,7 +437,13 @@ async def send_post(args, message, client, store):
     async with bot:
         common = dict(action="open", post_id=post["id"], fingerprint=post["fingerprint"], thread_id=int(thread) if thread else None)
         resources = post["resources"]
-        label = f"查看下载资源（{len(resources)}）"
+        label = f"选择下载（{len(resources)}）"
+        if len(resources) == 1:
+            resource = resources[0]
+            label = "查看下载状态"
+            if resource["status"] in {"", "failed", "blocked"}:
+                common.update(action="submit", direct=True, all=False, resource_ids=[resource["id"]], retry_attempts={resource["id"]: resource["retry_count"]} if resource["status"] in {"failed", "blocked"} else {})
+                label = "重试下载" if resource["status"] else "下载"
         token = store.choice(common) if resources else None
         markup = InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data="fd:" + token)]]) if token else None
         last = None

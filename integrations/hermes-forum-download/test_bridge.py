@@ -26,8 +26,10 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.temp.cleanup)
         self.store = bridge.Store(Path(self.temp.name) / "state.db")
 
-    async def send_post(self, text, media=True, photo_error=None, count=2):
+    async def send_post(self, text, media=True, photo_error=None, count=2, status=""):
         p = post(count)
+        for resource in p["resources"]:
+            resource.update(status=status, retry_count=2)
         photo = Path(self.temp.name) / "preview.jpg"
         photo.write_bytes(b"offline-image")
         sent = SimpleNamespace(chat_id=11, message_id=22)
@@ -46,6 +48,48 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(sys.modules, modules), patch("telegram.Bot", return_value=bot):
             result = await bridge.send_post(SimpleNamespace(tid=123, to="telegram"), text, SimpleNamespace(call=Mock(return_value=p)), self.store)
         return p, bot, result
+
+    async def test_single_resource_button_downloads_or_retries_without_opening_panel(self):
+        for status, action, label in (("", "submit", "下载"), ("failed", "submit", "重试下载"), ("blocked", "submit", "重试下载"), ("completed", "open", "查看下载状态"), ("invalid", "open", "查看下载状态"), ("downloading", "open", "查看下载状态")):
+            with self.subTest(status=status):
+                p, bot, _ = await self.send_post("单资源", count=1, status=status)
+                button = bot.edit_message_reply_markup.call_args.kwargs["reply_markup"].inline_keyboard[0][0]
+                self.assertEqual(button.text, label)
+                choice = self.store.get(button.callback_data[3:], 11, 22)
+                self.assertEqual(choice["action"], action)
+                if action == "submit":
+                    self.assertTrue(choice["direct"])
+                    self.assertEqual(choice["resource_ids"], [p["resources"][0]["id"]])
+                    self.assertEqual(choice["retry_attempts"], {p["resources"][0]["id"]: 2} if status else {})
+
+    async def test_direct_download_queues_once_without_editing_photo(self):
+        p, bot, _ = await self.send_post("单资源", count=1)
+        button = bot.edit_message_reply_markup.call_args.kwargs["reply_markup"].inline_keyboard[0][0]
+        message = SimpleNamespace(chat_id=11, message_id=22, reply_text=AsyncMock())
+        query = SimpleNamespace(from_user=SimpleNamespace(id=123), answer=AsyncMock(), message=message, data=button.callback_data, edit_message_text=AsyncMock())
+        subject = bridge.Bridge(SimpleNamespace(owner=123), self.store)
+        subject.call = AsyncMock(return_value=p)
+        await subject.handle(query)
+        await subject.handle(query)
+        self.assertEqual(len(self.store.pending()), 1)
+        self.assertTrue(subject.wake.is_set())
+        query.edit_message_text.assert_not_awaited()
+        self.assertIn("操作已保存", message.reply_text.call_args.args[0])
+
+    async def test_changed_direct_resource_opens_panel_without_submitting(self):
+        p, bot, _ = await self.send_post("单资源", count=1)
+        button = bot.edit_message_reply_markup.call_args.kwargs["reply_markup"].inline_keyboard[0][0]
+        p["fingerprint"] = "changed"
+        panel = SimpleNamespace(chat_id=11, message_id=33, edit_text=AsyncMock())
+        message = SimpleNamespace(chat_id=11, message_id=22, reply_text=AsyncMock(return_value=panel))
+        query = SimpleNamespace(from_user=SimpleNamespace(id=123), answer=AsyncMock(), message=message, data=button.callback_data, edit_message_text=AsyncMock())
+        subject = bridge.Bridge(SimpleNamespace(owner=123), self.store)
+        subject.call = AsyncMock(return_value=p)
+        await subject.handle(query)
+        self.assertEqual(self.store.pending(), [])
+        query.edit_message_text.assert_not_awaited()
+        panel.edit_text.assert_awaited_once()
+        self.assertIn("资源已变化", panel.edit_text.call_args.args[0])
 
     async def test_photo_and_short_text_are_one_message_with_bound_button(self):
         text = "测试帖子\nhttps://example.invalid/post"
