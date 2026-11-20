@@ -187,6 +187,13 @@ function setPage(page) {
   load()
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  resetQueryIdentity()
+  load()
+}
+
 function statusLabel(status) {
   if (!status) return '全部'
   if (status === 'pending') return '排队'
@@ -354,6 +361,7 @@ onUnmounted(() => {
               layout="total, prev, pager, next"
               :total="total"
               @current-change="setPage"
+              @size-change="setPageSize"
             />
           </div>
         </template>

@@ -229,6 +229,16 @@ function setPage(page) {
   load()
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  list.value = []
+  total.value = 0
+  loaded.value = false
+  loadError.value = ''
+  load()
+}
+
 const STATUS_TONE = {
   pending: 'info',
   submitting: 'info',
@@ -874,6 +884,7 @@ onUnmounted(() => {
               :total="total"
               :disabled="loading"
               @current-change="setPage"
+              @size-change="setPageSize"
             />
           </div>
         </template>

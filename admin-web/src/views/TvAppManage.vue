@@ -358,6 +358,12 @@ function downloadHref(item, abi) {
   return downloadAdminTVAppReleaseURL(item.id, abi, clientType.value)
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  load()
+}
+
 onMounted(() => {
   load()
   refreshDownloadQRCode()
@@ -598,7 +604,7 @@ onMounted(() => {
                 layout="total, prev, pager, next"
                 :total="currentTotalCount"
                 @current-change="load"
-                @size-change="load"
+                @size-change="setPageSize"
               />
             </div>
           </template>

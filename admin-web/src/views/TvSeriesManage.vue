@@ -307,6 +307,12 @@ async function searchEpisodeVideos(keyword = '') {
   }
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  loadList()
+}
+
 onMounted(async () => {
   if (typeof route.query.q === 'string' && route.query.q.trim()) {
     query.q = route.query.q.trim()
@@ -375,9 +381,11 @@ onMounted(async () => {
             <AdminTablePagination
               v-model:current-page="query.page"
               v-model:page-size="query.page_size"
+              :page-sizes="[12, 24, 48, 96]"
               layout="prev, pager, next"
               :total="total"
               @current-change="loadList"
+              @size-change="setPageSize"
             />
           </div>
         </SectionCard>

@@ -80,6 +80,15 @@ function setPage(page) {
   load()
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  list.value = []
+  loaded.value = false
+  loadError.value = ''
+  load()
+}
+
 function applySearch() {
   query.q = searchDraft.value.trim()
   query.page = 1
@@ -371,6 +380,7 @@ onMounted(load)
               :total="total"
               :disabled="loading"
               @current-change="setPage"
+              @size-change="setPageSize"
             />
           </div>
         </template>

@@ -1214,3 +1214,9 @@
 - 影响文件：`admin-web/src/views/{ActorManage,CollectionManage,ImageCollectionManage,CloudDownloadList,ToolboxPasswordVault,PendingDeleteShorts,ForumPostList,ScrapePreview,TvSeriesManage,IPTVManage,ToolboxImageWorkbench,ToolboxArchiveImport,ToolboxEd2k,ToolboxOrphanFiles}.vue`、`admin-web/src/components/base/StatusIndicator.vue`、`admin-web/src/views/precisionOpsRollout.spec.js`（列宽契约同步）、`CONTEXT.md`、`plan.md`。
 - 验证：`npx vitest run` 通过（60 文件 / 844 用例）；`npm run build` 通过；列宽修正后重跑表格溢出检测为 0 条；1440 全量巡检复跑后除两处有意省略号外无溢出/裁切/过窄换行；1024/768 抽查 tv-series、telegram、images、archive-import 均单列或双列正常。
 - 未验证：真实后端数据下的超长标题、多附件论坛行与多按钮组合；深色主题下的本轮布局改动（仅尺寸与排列变化，未逐页复看）。
+
+## 2026-11-14 管理端列表支持选择每页条数
+
+- 进度：共享分页组件新增每页条数选择器，默认提供 10、20、50、100 条；全部后台分页列表在切换条数后重置到第 1 页并重新加载。电视剧列表与图片工坊使用 12、24、48、96 条。
+- 影响文件：`admin-web/src/components/AdminTablePagination.vue`、`admin-web/src/components/adminTablePagination.helpers.js`、`admin-web/src/views/*.vue`、`CONTEXT.md`、`plan.md`。
+- 验证：`npm test` 与 `npm run build` 通过；等待用户确认后再部署。

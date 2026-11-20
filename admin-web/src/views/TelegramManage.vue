@@ -671,6 +671,12 @@ function setAuditPage(page) {
   void loadDashboard({ silent: true })
 }
 
+function setAuditPageSize(size) {
+  auditQuery.page_size = Number(size) || auditQuery.page_size
+  auditQuery.page = 1
+  void loadDashboard({ silent: true })
+}
+
 function handleVisibilityChange() {
   if (!pageDocumentVisible()) {
     clearPollTimer()
@@ -1054,6 +1060,7 @@ onUnmounted(() => {
                 :total="auditTotal"
                 :disabled="refreshing"
                 @current-change="setAuditPage"
+                @size-change="setAuditPageSize"
               />
             </div>
           </template>

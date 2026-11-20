@@ -1,3 +1,23 @@
+export function resolvePaginationLayout(layout, showPageSizes = true) {
+  const normalized = typeof layout === 'string' ? layout.trim() : ''
+  if (!normalized || !showPageSizes) {
+    return normalized || 'total, prev, pager, next'
+  }
+
+  const parts = normalized.split(',').map((part) => part.trim()).filter(Boolean)
+  if (parts.includes('sizes')) {
+    return parts.join(', ')
+  }
+
+  const prevIndex = parts.indexOf('prev')
+  if (prevIndex >= 0) {
+    parts.splice(prevIndex, 0, 'sizes')
+  } else {
+    parts.push('sizes')
+  }
+  return parts.join(', ')
+}
+
 export function resolvePageJump(rawPage, options = {}) {
   const currentPage = toPositiveInt(options.currentPage, 1)
   const pageSize = toPositiveInt(options.pageSize, 20)

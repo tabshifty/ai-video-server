@@ -454,6 +454,18 @@ function onImageDrawerClosed() {
   imageDrawerLoading.value = false
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  load()
+}
+
+function setImageDrawerPageSize(size) {
+  imageDrawerQuery.page_size = Number(size) || imageDrawerQuery.page_size
+  imageDrawerQuery.page = 1
+  loadImageDrawerImages()
+}
+
 onMounted(() => {
   load()
   updateViewportWidth()
@@ -552,6 +564,7 @@ onBeforeUnmount(() => {
               layout="total, prev, pager, next"
               :total="total"
               @current-change="load"
+              @size-change="setPageSize"
             />
           </div>
         </template>
@@ -683,6 +696,7 @@ onBeforeUnmount(() => {
             layout="total, prev, pager, next"
             :total="imageDrawerTotal"
             @current-change="loadImageDrawerImages"
+            @size-change="setImageDrawerPageSize"
           />
         </div>
       </div>

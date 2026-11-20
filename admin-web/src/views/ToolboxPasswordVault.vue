@@ -255,6 +255,12 @@ async function deleteEntry(row) {
   }
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  loadEntries()
+}
+
 onMounted(loadEntries)
 </script>
 
@@ -357,7 +363,7 @@ onMounted(loadEntries)
               layout="total, sizes, prev, pager, next"
               :total="total"
               @current-change="loadEntries"
-              @size-change="loadEntries"
+              @size-change="setPageSize"
             />
           </div>
         </template>

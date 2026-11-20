@@ -19,7 +19,7 @@ import {
   resolveTotalPendingDeletePages
 } from './pendingDeleteShorts.helpers'
 
-const PAGE_SIZE = 20
+const pageSize = ref(20)
 
 const items = ref([])
 const total = ref(0)
@@ -43,11 +43,11 @@ const hasItems = computed(() => items.value.length > 0)
 const initialLoading = computed(() => listLoading.value && items.value.length === 0)
 const activeItem = computed(() => (currentIndex.value >= 0 ? items.value[currentIndex.value] || null : null))
 const activeTitle = computed(() => currentDetail.value?.title || activeItem.value?.title || '未命名短视频')
-const totalPages = computed(() => resolveTotalPendingDeletePages(total.value, PAGE_SIZE))
+const totalPages = computed(() => resolveTotalPendingDeletePages(total.value, pageSize.value))
 const pageSummaryText = computed(() => `第 ${page.value} / ${totalPages.value} 页 · 共 ${total.value} 条`)
 const progressText = computed(() => {
   if (!hasItems.value || currentIndex.value < 0) return '0 / 0'
-  const absoluteIndex = (page.value - 1) * PAGE_SIZE + currentIndex.value + 1
+  const absoluteIndex = (page.value - 1) * pageSize.value + currentIndex.value + 1
   return `${Math.min(absoluteIndex, total.value || absoluteIndex)} / ${total.value || items.value.length}`
 })
 const canGoPrevious = computed(() => currentIndex.value > 0 || page.value > 1)
@@ -142,7 +142,7 @@ async function loadPage(targetPage = page.value, { selectIndexAfterLoad = 0 } = 
   try {
     const data = await getAdminPendingDeleteShorts({
       page: Math.max(1, Number(targetPage) || 1),
-      page_size: PAGE_SIZE
+      page_size: pageSize.value
     })
     items.value = Array.isArray(data?.items) ? data.items : []
     total.value = Number(data?.total_count || 0)
@@ -175,18 +175,26 @@ async function handlePageChange(targetPage) {
   await loadPage(normalizedPage, { selectIndexAfterLoad: 0 })
 }
 
+async function handlePageSizeChange(size) {
+  const normalizedSize = Number(size)
+  if (!Number.isInteger(normalizedSize) || normalizedSize <= 0) return
+  pageSize.value = normalizedSize
+  stalePendingIDs.clear()
+  await loadPage(1, { selectIndexAfterLoad: 0 })
+}
+
 async function goPrevious() {
   if (!canGoPrevious.value) return
   if (currentIndex.value > 0) {
     await selectIndex(currentIndex.value - 1)
     return
   }
-  await loadPage(page.value - 1, { selectIndexAfterLoad: PAGE_SIZE - 1 })
+  await loadPage(page.value - 1, { selectIndexAfterLoad: pageSize.value - 1 })
 }
 
 function nextTargetPageAfterMutation() {
   const nextTotal = Math.max(0, total.value - 1)
-  return Math.max(1, Math.min(page.value, resolveTotalPendingDeletePages(nextTotal, PAGE_SIZE)))
+  return Math.max(1, Math.min(page.value, resolveTotalPendingDeletePages(nextTotal, pageSize.value)))
 }
 
 async function reloadAfterMutation(removedIndex) {
@@ -326,11 +334,13 @@ onBeforeUnmount(() => {
             <div class="pending-delete-queue__pagination">
               <AdminTablePagination
                 :current-page="page"
-                :page-size="PAGE_SIZE"
+                :page-size="pageSize"
+                :page-sizes="[10, 20, 50, 100]"
                 :total="total"
                 layout="prev, pager, next"
                 :disabled="listLoading || actionBusy"
                 @current-change="handlePageChange"
+                @size-change="handlePageSizeChange"
               />
             </div>
           </div>

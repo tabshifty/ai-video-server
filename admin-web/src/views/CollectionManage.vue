@@ -192,6 +192,12 @@ async function doDelete(row) {
   }
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  load()
+}
+
 onMounted(load)
 
 function onCleanupCompleted() {
@@ -278,6 +284,7 @@ function onCleanupCompleted() {
               layout="total, prev, pager, next"
               :total="total"
               @current-change="load"
+              @size-change="setPageSize"
             />
           </div>
         </template>

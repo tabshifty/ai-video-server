@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import AdminTablePagination from './AdminTablePagination.vue'
-import { resolvePageJump } from './adminTablePagination.helpers'
+import { resolvePageJump, resolvePaginationLayout } from './adminTablePagination.helpers'
 
 const source = readFileSync(new URL('./AdminTablePagination.vue', import.meta.url), 'utf8')
 const style = source.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] || ''
@@ -14,6 +14,18 @@ function findRule(styleSource, selector) {
   expect(match).not.toBeNull()
   return match?.[1] || ''
 }
+
+describe('resolvePaginationLayout', () => {
+  it('injects the page-size selector before the previous-page control', () => {
+    expect(resolvePaginationLayout('total, prev, pager, next')).toBe('total, sizes, prev, pager, next')
+    expect(resolvePaginationLayout('prev, pager, next')).toBe('sizes, prev, pager, next')
+  })
+
+  it('keeps an explicit sizes segment and supports opting out', () => {
+    expect(resolvePaginationLayout('total, sizes, prev, pager, next')).toBe('total, sizes, prev, pager, next')
+    expect(resolvePaginationLayout('total, prev, pager, next', false)).toBe('total, prev, pager, next')
+  })
+})
 
 describe('resolvePageJump', () => {
   it('通过真实 SFC 编译并在小于 1024px 时保持跳页输入和按钮至少 44px 高', () => {
@@ -138,5 +150,17 @@ describe('resolvePageJump', () => {
       page: 1,
       displayValue: '1'
     })
+  })
+})
+describe('shared page-size selector contract', () => {
+  it('defaults to common page sizes and passes them to Element Plus', () => {
+    expect(source).toContain('pageSizes: {')
+    expect(source).toContain('default: () => [10, 20, 50, 100]')
+    expect(source).toContain(':page-sizes="pageSizes"')
+  })
+
+  it('labels the page-size selector for assistive technology', () => {
+    expect(source).toContain('.el-pagination__sizes .el-select__wrapper')
+    expect(source).toContain("setAttribute('aria-label'")
   })
 })

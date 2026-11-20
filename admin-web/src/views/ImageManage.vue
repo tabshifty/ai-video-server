@@ -944,6 +944,13 @@ function setPage(page) {
   load()
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  resetQueryIdentity()
+  load()
+}
+
 async function doDelete(row) {
   try {
     await ElMessageBox.confirm(`确认删除图片「${row.title || row.id}」？`, '删除图片', {
@@ -1241,6 +1248,7 @@ onBeforeUnmount(() => {
             layout="total, prev, pager, next"
             :total="total"
             @current-change="setPage"
+            @size-change="setPageSize"
           />
         </div>
       </SectionCard>

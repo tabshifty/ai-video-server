@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUpdated, ref, watch } from 'vue'
 
-import { resolvePageJump } from './adminTablePagination.helpers'
+import { resolvePageJump, resolvePaginationLayout } from './adminTablePagination.helpers'
 
 const props = defineProps({
   currentPage: {
@@ -19,6 +19,14 @@ const props = defineProps({
   layout: {
     type: String,
     default: 'total, prev, pager, next'
+  },
+  pageSizes: {
+    type: Array,
+    default: () => [10, 20, 50, 100]
+  },
+  showPageSizes: {
+    type: Boolean,
+    default: true
   },
   disabled: {
     type: Boolean,
@@ -43,6 +51,7 @@ const jumpState = computed(() =>
   })
 )
 
+const paginationLayout = computed(() => resolvePaginationLayout(props.layout, props.showPageSizes))
 const jumpDisabled = computed(() => props.disabled || jumpState.value.disabled)
 
 watch(
@@ -78,6 +87,13 @@ function submitJump() {
   emit('current-change', result.page)
 }
 
+function syncPageSizeHint(root) {
+  const selector = root.querySelector('.el-pagination__sizes .el-select__wrapper')
+  if (!selector) return
+  selector.setAttribute('aria-label', '每页条数')
+  selector.setAttribute('title', '每页条数')
+}
+
 function syncPaginationNavigationHints() {
   const root = paginationRef.value?.$el
   if (!root?.querySelector) return
@@ -88,6 +104,7 @@ function syncPaginationNavigationHints() {
     button.setAttribute('aria-label', label)
     button.setAttribute('title', label)
   })
+  syncPageSizeHint(root)
 }
 
 onMounted(syncPaginationNavigationHints)
@@ -100,7 +117,8 @@ onUpdated(syncPaginationNavigationHints)
       ref="paginationRef"
       :current-page="currentPage"
       :page-size="pageSize"
-      :layout="layout"
+      :page-sizes="pageSizes"
+      :layout="paginationLayout"
       :total="total"
       :disabled="disabled"
       @current-change="handleCurrentChange"

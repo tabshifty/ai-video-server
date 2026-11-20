@@ -217,6 +217,12 @@ async function loadLibraryImages() {
   }
 }
 
+function setLibraryPageSize(size) {
+  libraryQuery.page_size = Number(size) || libraryQuery.page_size
+  libraryQuery.page = 1
+  loadLibraryImages()
+}
+
 async function searchLibraryCollections(keyword = '') {
   libraryCollectionsLoading.value = true
   try {
@@ -1236,9 +1242,11 @@ function formatLibraryItemMeta(item) {
             <el-pagination
               v-model:current-page="libraryQuery.page"
               v-model:page-size="libraryQuery.page_size"
-              layout="total, prev, pager, next"
+              :page-sizes="[12, 24, 48, 96]"
+              layout="total, sizes, prev, pager, next"
               :total="libraryTotal"
               @current-change="loadLibraryImages"
+              @size-change="setLibraryPageSize"
             />
           </div>
         </SectionCard>

@@ -769,6 +769,13 @@ function setPage(page) {
   load()
 }
 
+function setPageSize(size) {
+  query.page_size = Number(size) || query.page_size
+  query.page = 1
+  resetQueryIdentity()
+  load()
+}
+
 async function searchActors(keyword = '') {
   loadingActors.value = true
   try {
@@ -1644,6 +1651,7 @@ onBeforeUnmount(() => {
             layout="prev, pager, next"
             :total="total"
             @current-change="setPage"
+            @size-change="setPageSize"
           />
         </div>
       </SectionCard>
