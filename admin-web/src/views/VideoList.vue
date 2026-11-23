@@ -2288,6 +2288,10 @@ onBeforeUnmount(() => {
   padding-bottom: var(--space-1);
 }
 
+.video-list-pagination-row {
+  margin-top: var(--space-3);
+}
+
 .video-list-pagination-row :deep(.admin-table-pagination) {
   flex: 1 1 auto;
   width: auto;

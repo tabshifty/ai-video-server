@@ -494,6 +494,7 @@ select {
 
 #app .toolbar-row--end {
   justify-content: flex-end;
+  margin-top: var(--space-3);
 }
 
 #app .toolbar-row--start {

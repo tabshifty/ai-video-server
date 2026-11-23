@@ -1220,3 +1220,9 @@
 - 进度：共享分页组件新增每页条数选择器，默认提供 10、20、50、100 条；全部后台分页列表在切换条数后重置到第 1 页并重新加载。电视剧列表与图片工坊使用 12、24、48、96 条。
 - 影响文件：`admin-web/src/components/AdminTablePagination.vue`、`admin-web/src/components/adminTablePagination.helpers.js`、`admin-web/src/views/*.vue`、`CONTEXT.md`、`plan.md`。
 - 验证：`npm test` 与 `npm run build` 通过；等待用户确认后再部署。
+
+## 2026-11-20 修复表格与分页间距
+
+- 进度：为表格下方分页补齐 12px 上间距，覆盖右对齐工具栏、视频列表混合工具栏与图片合集抽屉。
+- 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/ImageCollectionManage.vue`、`CONTEXT.md`、`plan.md`。
+- 验证：`npx vitest run` 通过（62 文件 / 866 用例）；`npm run build` 通过；等待用户确认后再部署。

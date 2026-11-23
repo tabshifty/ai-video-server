@@ -926,6 +926,7 @@ onBeforeUnmount(() => {
 }
 
 .drawer-pagination {
+  padding-top: var(--space-3);
   padding-bottom: 8px;
 }
 
