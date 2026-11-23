@@ -20,11 +20,23 @@ import (
 type cloudDownloadService interface {
 	Submit(ctx context.Context, postID *uuid.UUID, rawLink string, createdBy *uuid.UUID, source string) (models.CloudDownloadTask, bool, error)
 	SubmitBatch(ctx context.Context, links []string, createdBy *uuid.UUID) (models.CloudDownloadBatchResult, error)
+	SubmitIngestBatch(ctx context.Context, input models.CloudIngestBatchInput, createdBy *uuid.UUID) (models.CloudIngestBatch, models.CloudDownloadBatchResult, error)
 	Retry(ctx context.Context, id int64) (models.CloudDownloadTask, error)
 	List(ctx context.Context, status string, page, pageSize int) ([]models.CloudDownloadTask, int, error)
+	ListByBatch(ctx context.Context, status string, batchID uuid.UUID, page, pageSize int) ([]models.CloudDownloadTask, int, error)
 	StatusByHashes(ctx context.Context, hashes []string) (map[string]models.CloudDownloadStatus, error)
 	BrowserState(ctx context.Context) cloud.State
 	LoginQR(ctx context.Context) (string, error)
+}
+
+// cloudIngestBatchList reads batch ingest presets for the filter dropdown.
+type cloudIngestBatchList interface {
+	ListSummaries(ctx context.Context, limit int) ([]models.CloudIngestBatchSummary, error)
+}
+
+// SetCloudIngestBatchRepository wires the optional batch ingest filter source.
+func (a *API) SetCloudIngestBatchRepository(repo cloudIngestBatchList) {
+	a.ingestBatches = repo
 }
 
 // SetCloudDownloadService wires the service. The admin routes are always
@@ -49,7 +61,20 @@ func (a *API) AdminCloudDownloadList(c *gin.Context) {
 	}
 	page := parsePage(c.Query("page"), 1)
 	pageSize := parsePageSize(c.Query("page_size"), 20)
-	items, total, err := a.cloudDownload.List(c.Request.Context(), strings.TrimSpace(c.Query("status")), page, pageSize)
+	status := strings.TrimSpace(c.Query("status"))
+	batchID, hasBatch, batchErr := parseOptionalUUID(c.Query("ingest_batch_id"))
+	if batchErr != nil {
+		response.Error(c, 400, "ingest_batch_id 无效")
+		return
+	}
+	var items []models.CloudDownloadTask
+	var total int
+	var err error
+	if hasBatch {
+		items, total, err = a.cloudDownload.ListByBatch(c.Request.Context(), status, *batchID, page, pageSize)
+	} else {
+		items, total, err = a.cloudDownload.List(c.Request.Context(), status, page, pageSize)
+	}
 	if err != nil {
 		response.Error(c, 500, err.Error())
 		return
@@ -216,4 +241,70 @@ func (a *API) AdminCloudDownloadLoginQR(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store, no-cache, must-revalidate, private")
 	ok(c, gin.H{"image": image, "expires_in_seconds": 120})
+}
+
+// AdminCloudDownloadIngestBatchCreate is the explicit 批量入库 action: one
+// batch preset, one task per confirmed link, auto-import after each download.
+func (a *API) AdminCloudDownloadIngestBatchCreate(c *gin.Context) {
+	if !a.requireCloudDownload(c) {
+		return
+	}
+	var req models.CloudIngestBatchInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	if len(req.Links) == 0 {
+		response.Error(c, 400, "links 不能为空")
+		return
+	}
+	if len(req.Links) > models.CloudDownloadBatchLimit {
+		response.Error(c, 400, fmt.Sprintf("单次最多 %d 条链接", models.CloudDownloadBatchLimit))
+		return
+	}
+	var createdBy *uuid.UUID
+	if userID, okUser := middleware.UserIDFromContext(c); okUser {
+		createdBy = &userID
+	}
+	batch, result, err := a.cloudDownload.SubmitIngestBatch(c.Request.Context(), req, createdBy)
+	if err != nil {
+		if errors.Is(err, models.ErrCloudIngestBatchInvalidInput) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.Error(c, 500, err.Error())
+		return
+	}
+	ok(c, gin.H{"batch": batch, "items": result.Items, "summary": result.Summary})
+}
+
+// AdminCloudDownloadIngestBatchList lists recent batch ingests for filtering.
+func (a *API) AdminCloudDownloadIngestBatchList(c *gin.Context) {
+	if !a.requireCloudDownload(c) {
+		return
+	}
+	if a.ingestBatches == nil {
+		response.Error(c, 503, "云下载功能未启用")
+		return
+	}
+	limit := parsePageSize(c.Query("limit"), 50)
+	items, err := a.ingestBatches.ListSummaries(c.Request.Context(), limit)
+	if err != nil {
+		response.Error(c, 500, err.Error())
+		return
+	}
+	ok(c, gin.H{"items": items})
+}
+
+// parseOptionalUUID parses a query value that may be absent.
+func parseOptionalUUID(raw string) (*uuid.UUID, bool, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, false, nil
+	}
+	parsed, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, false, err
+	}
+	return &parsed, true, nil
 }

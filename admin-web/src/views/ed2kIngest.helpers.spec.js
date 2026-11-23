@@ -1,0 +1,188 @@
+import { describe, expect, it } from 'vitest'
+import {
+  ED2K_INGEST_NOT_VIDEO,
+  ED2K_INGEST_UNKNOWN,
+  ED2K_INGEST_VIDEO,
+  buildEd2kIngestLinks,
+  buildEd2kIngestPayload,
+  buildEd2kIngestPlan,
+  classifyEd2kIngestLink,
+  cleanEd2kIngestTitle,
+  getEd2kFilenameExtension,
+  resolveIngestStatusMeta,
+  validateEd2kIngestForm
+} from './ed2kIngest.helpers'
+
+describe('getEd2kFilenameExtension', () => {
+  it('取最后一段扩展名并小写', () => {
+    expect(getEd2kFilenameExtension('Movie.MKV')).toBe('mkv')
+    expect(getEd2kFilenameExtension('Show.tar.gz')).toBe('gz')
+  })
+
+  it('没有扩展名或以点开头时返回空', () => {
+    expect(getEd2kFilenameExtension('Movie')).toBe('')
+    expect(getEd2kFilenameExtension('.mp4')).toBe('')
+    expect(getEd2kFilenameExtension('trailing.')).toBe('')
+  })
+})
+
+describe('classifyEd2kIngestLink', () => {
+  it('白名单内的扩展名判为视频', () => {
+    expect(classifyEd2kIngestLink('a.mp4').kind).toBe(ED2K_INGEST_VIDEO)
+    expect(classifyEd2kIngestLink('b.M2TS').kind).toBe(ED2K_INGEST_VIDEO)
+  })
+
+  it('压缩包与图片是"明确不是"，并给出确定原因', () => {
+    const archive = classifyEd2kIngestLink('a.zip')
+    expect(archive.kind).toBe(ED2K_INGEST_NOT_VIDEO)
+    expect(archive.reason).toContain('压缩包')
+    expect(classifyEd2kIngestLink('a.tar.gz').kind).toBe(ED2K_INGEST_NOT_VIDEO)
+    expect(classifyEd2kIngestLink('a.jpg').kind).toBe(ED2K_INGEST_NOT_VIDEO)
+  })
+
+  it('其它已识别媒体不进入裁决区', () => {
+    expect(classifyEd2kIngestLink('a.srt').kind).toBe(ED2K_INGEST_NOT_VIDEO)
+    expect(classifyEd2kIngestLink('a.mp3').kind).toBe(ED2K_INGEST_NOT_VIDEO)
+  })
+
+  it('无扩展名与未知扩展名才需要管理员裁决', () => {
+    expect(classifyEd2kIngestLink('Movie.2024.1080p.BluRay.x264-GROUP').kind).toBe(ED2K_INGEST_UNKNOWN)
+    expect(classifyEd2kIngestLink('Movie').kind).toBe(ED2K_INGEST_UNKNOWN)
+    expect(classifyEd2kIngestLink('a.part').kind).toBe(ED2K_INGEST_UNKNOWN)
+  })
+})
+
+describe('cleanEd2kIngestTitle', () => {
+  const cases = [
+    ['Movie.2024.1080p.BluRay.x264-GROUP.mkv', 'Movie 2024 1080p BluRay x264-GROUP'],
+    ['www.98t.la@Movie.2024.mkv', 'Movie 2024'],
+    ['hhd800.com@ABC_1080p.mp4', 'ABC 1080p'],
+    ['【中文字幕】Movie.2024.mkv', 'Movie 2024'],
+    ['【1080p】Movie.mkv', '1080p Movie'],
+    ['Movie(98t.la).mkv', 'Movie'],
+    ['Movie (2019).mkv', 'Movie (2019)'],
+    ['Movie - 副本.mkv', 'Movie'],
+    ['Movie(1).mkv', 'Movie'],
+    ['Movie 副本 3.mkv', 'Movie'],
+    ['Show_01.mkv', 'Show 01']
+  ]
+
+  for (const [input, expected] of cases) {
+    it(`${input} -> ${expected}`, () => {
+      expect(cleanEd2kIngestTitle(input)).toBe(expected)
+    })
+  }
+
+  it('只剥白名单视频扩展名', () => {
+    expect(cleanEd2kIngestTitle('Show.S01.tar.gz')).toBe('Show S01 tar gz')
+  })
+
+  it('空输入与仅扩展名返回空串', () => {
+    expect(cleanEd2kIngestTitle('')).toBe('')
+    expect(cleanEd2kIngestTitle('   ')).toBe('')
+  })
+
+  it('保留中文与 emoji，不劈代理对', () => {
+    expect(cleanEd2kIngestTitle('【中字】夏日限定🌊.2024.mkv')).toBe('夏日限定🌊 2024')
+  })
+})
+
+describe('buildEd2kIngestPlan', () => {
+  const links = [
+    { href: 'ed2k://a', label: 'a.mp4', infoHash: 'a'.repeat(32) },
+    { href: 'ed2k://b', label: 'b.zip', infoHash: 'b'.repeat(32) },
+    { href: 'ed2k://c', label: 'c.unknown', infoHash: 'c'.repeat(32) }
+  ]
+
+  it('三分法分组并算好标题', () => {
+    const plan = buildEd2kIngestPlan(links)
+    expect(plan.videos).toHaveLength(1)
+    expect(plan.notVideos).toHaveLength(1)
+    expect(plan.unknown).toHaveLength(1)
+    expect(plan.videos[0].title).toBe('a')
+    expect(plan.unknown[0].reason).toContain('unknown')
+  })
+
+  it('只有被强制放行的无法识别项会进入提交列表', () => {
+    const plan = buildEd2kIngestPlan(links)
+    expect(buildEd2kIngestLinks(plan)).toHaveLength(1)
+    const forced = new Set([plan.unknown[0].infoHash])
+    const items = buildEd2kIngestLinks(plan, { forcedKeys: forced })
+    expect(items).toHaveLength(2)
+    expect(items[1]).toMatchObject({ link: 'ed2k://c', forced: true })
+  })
+})
+
+describe('buildEd2kIngestPayload', () => {
+  const links = [{ link: 'ed2k://a', title: '标题 A', forced: false }]
+
+  it('按文件名模式带每条标题', () => {
+    const payload = buildEd2kIngestPayload({
+      links,
+      form: { titleMode: 'filename', videoType: 'short', collectionIDs: ['c1'] }
+    })
+    expect(payload.title_mode).toBe('filename')
+    expect(payload.uniform_title).toBe('')
+    expect(payload.links[0].title).toBe('标题 A')
+    expect(payload.collection_ids).toEqual(['c1'])
+    expect(payload.site_category).toBe('')
+  })
+
+  it('统一标题模式清掉每条标题', () => {
+    const payload = buildEd2kIngestPayload({
+      links,
+      form: { titleMode: 'uniform', uniformTitle: '合辑', videoType: 'movie' }
+    })
+    expect(payload.uniform_title).toBe('合辑')
+    expect(payload.links[0].title).toBe('')
+    expect(payload.collection_ids).toEqual([])
+    expect(payload.site_category).toBe('')
+  })
+
+  it('AV 默认带日本地区', () => {
+    const payload = buildEd2kIngestPayload({ links, form: { videoType: 'av' } })
+    expect(payload.site_category).toBe('japanese')
+  })
+})
+
+describe('validateEd2kIngestForm', () => {
+  it('统一标题必填且不超过 200 字', () => {
+    expect(validateEd2kIngestForm({ titleMode: 'uniform', uniformTitle: '' })).toContain('不能为空')
+    expect(validateEd2kIngestForm({ titleMode: 'uniform', uniformTitle: 'あ'.repeat(201) })).toContain('200')
+    expect(validateEd2kIngestForm({ titleMode: 'uniform', uniformTitle: 'ok' })).toBe('')
+  })
+
+  it('非短视频不能带视频合集', () => {
+    expect(
+      validateEd2kIngestForm({ titleMode: 'filename', videoType: 'movie', collectionIDs: ['c1'] })
+    ).toContain('仅短视频')
+  })
+})
+
+describe('resolveIngestStatusMeta', () => {
+  it('非批成员返回 null', () => {
+    expect(resolveIngestStatusMeta({ status: 'completed' })).toBeNull()
+  })
+
+  it('按任务与导入状态派生文案', () => {
+    expect(resolveIngestStatusMeta({ ingest_batch_id: 'b', status: 'downloading' })).toMatchObject({
+      label: '等待落盘'
+    })
+    expect(resolveIngestStatusMeta({ ingest_batch_id: 'b', status: 'completed' })).toMatchObject({
+      label: '待自动入库'
+    })
+    expect(
+      resolveIngestStatusMeta({ ingest_batch_id: 'b', status: 'completed', import: { status: 'imported' } })
+    ).toMatchObject({ label: '已入库' })
+    expect(
+      resolveIngestStatusMeta({
+        ingest_batch_id: 'b',
+        status: 'completed',
+        import: { status: 'skipped_existing' }
+      })
+    ).toMatchObject({ label: '已在库' })
+    expect(
+      resolveIngestStatusMeta({ ingest_batch_id: 'b', status: 'completed', import: { status: 'failed' } })
+    ).toMatchObject({ label: '入库失败' })
+  })
+})

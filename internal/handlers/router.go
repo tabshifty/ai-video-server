@@ -76,6 +76,7 @@ type API struct {
 	hermesForumSvc         hermesForumService
 	telegramManagementSvc  telegramManagementService
 	cloudDownload          cloudDownloadService
+	ingestBatches          cloudIngestBatchList
 	cloudDownloadImport    cloudDownloadImportService
 	cloudFileDeletion      cloudFileDeletionService
 	cloudLocalFileDeletion cloudLocalFileDeletionService
@@ -351,6 +352,8 @@ func (a *API) Register(r *gin.Engine) {
 			admin.POST("/cloud-downloads", a.AdminCloudDownloadCreate)
 			admin.POST("/cloud-downloads/status", a.AdminCloudDownloadStatuses)
 			admin.POST("/cloud-downloads/batch", a.AdminCloudDownloadBatchCreate)
+			admin.POST("/cloud-downloads/ingest-batches", a.AdminCloudDownloadIngestBatchCreate)
+			admin.GET("/cloud-downloads/ingest-batches", a.AdminCloudDownloadIngestBatchList)
 			admin.POST("/cloud-downloads/:id/retry", a.AdminCloudDownloadRetry)
 			admin.GET("/cloud-downloads/:id/import", a.AdminCloudDownloadImportTask)
 			admin.POST("/cloud-downloads/:id/import/preview", a.AdminCloudDownloadImportPreview)

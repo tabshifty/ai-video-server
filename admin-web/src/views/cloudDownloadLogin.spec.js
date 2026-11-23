@@ -11,10 +11,14 @@ function createPage() {
   const api = {
     getCloudBrowserState: vi.fn().mockResolvedValue({ up: true, logged_in: false }),
     getCloudLoginQR: vi.fn().mockResolvedValue({ image: 'data:image/png;base64,qr', expires_in_seconds: 120 }),
-    listCloudDownloads: vi.fn().mockResolvedValue({ items: [], total_count: 0 })
+    listCloudDownloads: vi.fn().mockResolvedValue({ items: [], total_count: 0 }),
+    listCloudIngestBatches: vi.fn().mockResolvedValue({ items: [] })
   }
   const bindings = {
     computed, reactive, ref, useRouter: () => ({}),
+    useRoute: () => ({ query: {} }),
+    watch: () => () => {},
+    resolveIngestStatusMeta: () => null,
     onMounted: fn => mounted.push(fn), onUnmounted: fn => unmounted.push(fn),
     hasActiveImportTasks: () => false, hasActiveCloudFileDeletions: () => false, ...api
   }

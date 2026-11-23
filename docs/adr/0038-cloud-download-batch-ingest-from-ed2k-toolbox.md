@@ -39,7 +39,8 @@
 
 ### 提交前检查
 
-- 只查两层：**任务层**（本库 `cloud_download_tasks` 同 `info_hash`）与**库层**（`FindVideoByHash(hash, size)`）。
+- **提交前只能查任务层**：本库 `cloud_download_tasks` 同 `info_hash`。
+- **库层命中无法预检**：ED2K 的 `info_hash` 是文件的 MD4，而本地 `file_hashes` 存的是 SHA-256，不下载就拿不到内容哈希。所以"已在库"只能在导入阶段判定，走既有的 `FindVideoByHash` + `skipped_existing` + 合集追加（ADR 0037），高频命中不会重复转码，但仍会真实下载一次。
 - **不新建 115 目录查询能力**。`internal/cloud` 当前没有目录浏览/文件列表能力（只调会话校验、配额、`get_id`、提交离线、任务列表、删除），查"115 里是否已有同名文件"是需要立项的新能力，且文件名会被 115 改写，同名不等于同文件。
 - 命中行为：
 

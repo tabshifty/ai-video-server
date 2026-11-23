@@ -145,8 +145,13 @@ export function parseEd2kLinks(input) {
     if (!href) {
       return
     }
-    const parts = href.split('|')
-    const isEd2kFileLink = ED2K_SCHEME_RE.test(href) && parts.length >= 6 && parts[1]?.toLowerCase() === 'file'
+    // 与服务端 internal/cloud/parse.go 保持一致：剥掉首个空段后只要 >=4 段，
+    // 并容忍缺少尾斜杠的 `ed2k://|file|name|size|hash`。
+    const parts = href.slice('ed2k://'.length).split('|')
+    if (parts[0] === '') {
+      parts.shift()
+    }
+    const isEd2kFileLink = ED2K_SCHEME_RE.test(href) && parts.length >= 4 && parts[0]?.toLowerCase() === 'file'
     if (!isEd2kFileLink) {
       invalidCount += 1
       return

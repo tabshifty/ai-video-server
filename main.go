@@ -313,6 +313,11 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 			cfg.StorageRoot,
 			logger,
 		)
+		cloudBatchRepo := repository.NewCloudIngestBatchRepository(pool)
+		cloudSvc.SetIngestBatchRepository(cloudBatchRepo)
+		cloudSvc.SetBatchAutoImporter(cloudImportSvc)
+		cloudImportSvc.SetIngestBatchRepository(cloudBatchRepo)
+		api.SetCloudIngestBatchRepository(cloudBatchRepo)
 		cloudFileDeletionRepo := repository.NewCloudDownloadFileDeletionRepository(pool)
 		cloudSvc.SetFileDeletionSummaryRepository(cloudFileDeletionRepo)
 		cloudFileDeletionSvc := services.NewCloudFileDeletionService(cloudRepo, cloudImportRepo, cloudFileDeletionRepo, cloudClient, cfg.DownloadDir, logger)
@@ -403,6 +408,10 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 			cfg.StorageRoot,
 			logger,
 		)
+		cloudBatchRepo := repository.NewCloudIngestBatchRepository(pool)
+		cloudSvc.SetIngestBatchRepository(cloudBatchRepo)
+		cloudSvc.SetBatchAutoImporter(cloudImportSvc)
+		cloudImportSvc.SetIngestBatchRepository(cloudBatchRepo)
 		processor.SetCloudDownloadService(cloudSvc)
 		processor.SetCloudDownloadImportService(cloudImportSvc)
 		// Recover rows left behind by a hard deploy kill or a lost enqueue.

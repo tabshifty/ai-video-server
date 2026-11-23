@@ -36,6 +36,7 @@ type fakeCloudRepo struct {
 	unfinished        []models.CloudDownloadTask
 	statusByHash      map[string]models.CloudDownloadStatus
 	statusErr         error
+	nextCreatedID     int64
 	listTasks         []models.CloudDownloadTask
 	setStatusHook     func(ctx context.Context, status string) error
 }
@@ -57,6 +58,9 @@ func (f *fakeCloudRepo) CreateOrGet(_ context.Context, task models.CloudDownload
 	}
 	f.lastCreate = task
 	if f.createCreated {
+		if f.nextCreatedID > 0 {
+			task.ID = f.nextCreatedID
+		}
 		f.task = task
 		return task, true, nil
 	}
@@ -68,6 +72,10 @@ func (f *fakeCloudRepo) GetByID(_ context.Context, _ int64) (models.CloudDownloa
 		return models.CloudDownloadTask{}, f.getErr
 	}
 	return f.task, nil
+}
+
+func (f *fakeCloudRepo) ListByBatch(_ context.Context, _ string, _ uuid.UUID, _, _ int) ([]models.CloudDownloadTask, int, error) {
+	return nil, 0, nil
 }
 
 func (f *fakeCloudRepo) List(_ context.Context, _ string, _, _ int) ([]models.CloudDownloadTask, int, error) {

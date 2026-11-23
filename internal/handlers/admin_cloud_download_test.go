@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,11 @@ type fakeBatchCloudDownloadService struct {
 	result models.CloudDownloadBatchResult
 	err    error
 	links  []string
+
+	ingestInput  models.CloudIngestBatchInput
+	ingestBatch  models.CloudIngestBatch
+	ingestResult models.CloudDownloadBatchResult
+	ingestErr    error
 }
 
 func (f *fakeBatchCloudDownloadService) Submit(context.Context, *uuid.UUID, string, *uuid.UUID, string) (models.CloudDownloadTask, bool, error) {
@@ -37,6 +43,15 @@ func (f *fakeBatchCloudDownloadService) Retry(context.Context, int64) (models.Cl
 
 func (f *fakeBatchCloudDownloadService) List(context.Context, string, int, int) ([]models.CloudDownloadTask, int, error) {
 	return nil, 0, nil
+}
+
+func (f *fakeBatchCloudDownloadService) ListByBatch(context.Context, string, uuid.UUID, int, int) ([]models.CloudDownloadTask, int, error) {
+	return nil, 0, nil
+}
+
+func (f *fakeBatchCloudDownloadService) SubmitIngestBatch(_ context.Context, input models.CloudIngestBatchInput, _ *uuid.UUID) (models.CloudIngestBatch, models.CloudDownloadBatchResult, error) {
+	f.ingestInput = input
+	return f.ingestBatch, f.ingestResult, f.ingestErr
 }
 
 func (f *fakeBatchCloudDownloadService) StatusByHashes(context.Context, []string) (map[string]models.CloudDownloadStatus, error) {
@@ -192,5 +207,68 @@ func TestAdminCloudDownloadBatchCreateMapsServiceError(t *testing.T) {
 	}
 	if envelope.Code != 500 {
 		t.Fatalf("code = %d, want 500", envelope.Code)
+	}
+}
+
+func newIngestBatchTestRouter(svc cloudDownloadService) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	api := &API{cloudDownload: svc}
+	router := gin.New()
+	router.POST("/ingest-batches", api.AdminCloudDownloadIngestBatchCreate)
+	return router
+}
+
+func postIngestBatch(t *testing.T, router *gin.Engine, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/ingest-batches", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestAdminCloudDownloadIngestBatchCreateForwardsInput(t *testing.T) {
+	fake := &fakeBatchCloudDownloadService{
+		ingestBatch: models.CloudIngestBatch{ID: uuid.MustParse("22222222-2222-4222-8222-222222222222")},
+		ingestResult: models.CloudDownloadBatchResult{
+			Items: []models.CloudDownloadBatchItem{
+				{Link: "ed2k://|file|a.mkv|1|0123456789abcdef0123456789abcdef|/", Status: models.CloudBatchSubmitted},
+				{Link: "ed2k://|file|b.unknownext|1|0123456789abcdef0123456789abcdee|/", Status: models.CloudBatchSubmitted, Forced: true},
+			},
+			Summary: models.CloudDownloadBatchSummary{Total: 2, Submitted: 2, Forced: 1},
+		},
+	}
+	router := newIngestBatchTestRouter(fake)
+
+	rec := postIngestBatch(t, router, `{
+		"title_mode":"filename",
+		"video_type":"short",
+		"links":[
+			{"link":"ed2k://|file|a.mkv|1|0123456789abcdef0123456789abcdef|/","title":"A"},
+			{"link":"ed2k://|file|b.unknownext|1|0123456789abcdef0123456789abcdee|/","title":"B","forced":true}
+		]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("http status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	if fake.ingestInput.TitleMode != models.CloudIngestTitleFilename {
+		t.Fatalf("title_mode = %q", fake.ingestInput.TitleMode)
+	}
+	if len(fake.ingestInput.Links) != 2 || !fake.ingestInput.Links[1].Forced {
+		t.Fatalf("forced link not forwarded: %+v", fake.ingestInput.Links)
+	}
+	if !strings.Contains(rec.Body.String(), "22222222") {
+		t.Fatalf("batch id missing from response: %s", rec.Body.String())
+	}
+}
+
+func TestAdminCloudDownloadIngestBatchCreateRejectsEmptyLinks(t *testing.T) {
+	router := newIngestBatchTestRouter(&fakeBatchCloudDownloadService{})
+	// 业务错误走 {code,msg,data} 信封，HTTP 仍是 200。
+	rec := postIngestBatch(t, router, `{"links":[]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("http status = %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":400`) {
+		t.Fatalf("want business code 400, got %s", rec.Body.String())
 	}
 }

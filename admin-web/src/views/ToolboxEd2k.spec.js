@@ -37,4 +37,18 @@ describe('ToolboxEd2k', () => {
     expect(source).toContain('批量提交完成')
     expect(source).toContain('cloudStatusFor')
   })
+
+  it('adds an independent batch ingest entry beside the download-only button', () => {
+    // 两个入口必须并存：旧的"只投递"语义不能被子化。
+    expect(source).toContain('发送选中到115')
+    expect(source).toContain('批量入库到媒体库')
+    expect(source).toContain('CloudIngestBatchDialog')
+    expect(source).toContain('buildEd2kIngestPlan')
+    expect(source).toContain('ingestDialogVisible')
+    expect(source).toContain('const busy = computed')
+    expect(source).toContain('ingest_batch_id')
+    expect(source).toContain('压缩包批量入库')
+    // 打开确认框前先做本地分类，不能空手弹窗。
+    expect(source).toContain('plan.videos.length === 0 && plan.unknown.length === 0')
+  })
 })

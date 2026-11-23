@@ -250,6 +250,11 @@ export const listCloudDownloads = (params) => request.get('/admin/cloud-download
 export const createCloudDownload = (data) => request.post('/admin/cloud-downloads', data)
 export const createCloudDownloadBatch = (links) => request.post('/admin/cloud-downloads/batch', { links })
 export const cloudDownloadStatuses = (infoHashes) => request.post('/admin/cloud-downloads/status', { info_hashes: infoHashes })
+// 入库批：一次显式「批量入库」创建的批级前置要求 + 逐条结果。
+export const createCloudIngestBatch = (payload) =>
+  request.post('/admin/cloud-downloads/ingest-batches', payload, { timeout: 0 })
+export const listCloudIngestBatches = (params) =>
+  request.get('/admin/cloud-downloads/ingest-batches', { params })
 export const retryCloudDownload = (id) => request.post(`/admin/cloud-downloads/${id}/retry`)
 export const getCloudDownloadImportTask = (id) => request.get(`/admin/cloud-downloads/${id}/import`)
 export const previewCloudDownloadImport = (id) => request.post(`/admin/cloud-downloads/${id}/import/preview`)

@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { MoreFilled } from '@element-plus/icons-vue'
 import AdminTablePagination from '../components/AdminTablePagination.vue'
@@ -17,6 +17,7 @@ import {
   getCloudDownloadLocalFile,
   getCloudLoginQR,
   listCloudDownloads,
+  listCloudIngestBatches,
   previewCloudDownloadImport,
   retryCloudDownload
 } from '../api/admin'
@@ -67,7 +68,9 @@ const total = ref(0)
 const loading = ref(false)
 const loaded = ref(false)
 const loadError = ref('')
-const query = reactive({ page: 1, page_size: 20, status: '' })
+const query = reactive({ page: 1, page_size: 20, status: '', ingest_batch_id: '' })
+const route = useRoute()
+const ingestBatchOptions = ref([])
 const browserState = ref({})
 const browserStateError = ref('')
 const retryingId = ref(0)
@@ -107,7 +110,7 @@ const hasActiveTasks = computed(() => list.value.some((task) => ACTIVE_STATUSES.
 const hasActiveImport = computed(() => hasActiveImportTasks(list.value))
 const hasActiveFileDeletion = computed(() => hasActiveCloudFileDeletions(list.value))
 const shouldPoll = computed(() => hasActiveTasks.value || hasActiveImport.value || hasActiveFileDeletion.value)
-const hasStatusFilter = computed(() => query.status !== '')
+const hasStatusFilter = computed(() => query.status !== '' || query.ingest_batch_id !== '')
 const refreshIndicatorLabel = computed(() => {
   if (backgroundRefreshing.value) return '正在刷新'
   if (hasActiveFileDeletion.value) return '云盘清理中，每 5 秒自动刷新'
@@ -154,6 +157,9 @@ async function load(options = {}) {
     }
     if (query.status) {
       params.status = query.status
+    }
+    if (query.ingest_batch_id) {
+      params.ingest_batch_id = query.ingest_batch_id
     }
     const data = await listCloudDownloads(params)
     if (seq !== loadSeq) {
@@ -217,7 +223,35 @@ function applyStatusFilter() {
 
 function clearStatusFilter() {
   query.status = ''
+  query.ingest_batch_id = ''
   applyStatusFilter()
+}
+
+function ingestMeta(row) {
+  return resolveIngestStatusMeta(row)
+}
+
+async function loadIngestBatchOptions() {
+  try {
+    const data = await listCloudIngestBatches({ limit: 50 })
+    ingestBatchOptions.value = Array.isArray(data?.items) ? data.items : []
+  } catch {
+    // Filter options are advisory; the task list must still work without them.
+    ingestBatchOptions.value = []
+  }
+}
+
+// 从工具箱跳过来时带 ingest_batch_id，首屏就要是这一批。
+function applyRouteBatchQuery() {
+  const raw = Array.isArray(route.query.ingest_batch_id)
+    ? route.query.ingest_batch_id[0]
+    : route.query.ingest_batch_id
+  const id = typeof raw === 'string' ? raw.trim() : ''
+  if (!id || id === query.ingest_batch_id) {
+    return false
+  }
+  query.ingest_batch_id = id
+  return true
 }
 
 function setPage(page) {
@@ -582,10 +616,24 @@ function openQrDialog() {
 }
 
 onMounted(() => {
+  const fromRoute = applyRouteBatchQuery()
+  if (fromRoute) {
+    query.page = 1
+  }
   load()
   loadBrowserState()
+  loadIngestBatchOptions()
   browserTimer = setInterval(loadBrowserState, BROWSER_POLL_INTERVAL_MS)
 })
+
+watch(
+  () => route.query.ingest_batch_id,
+  () => {
+    if (applyRouteBatchQuery()) {
+      applyStatusFilter()
+    }
+  }
+)
 
 onUnmounted(() => {
   disposed = true
@@ -660,6 +708,23 @@ onUnmounted(() => {
                 :value="option.value"
               />
             </el-select>
+            <el-select
+              v-model="query.ingest_batch_id"
+              class="cloud-ingest-filter"
+              aria-label="入库批筛选"
+              placeholder="入库批筛选"
+              clearable
+              filterable
+              @change="applyStatusFilter"
+            >
+              <el-option label="全部入库批" value="" />
+              <el-option
+                v-for="batch in ingestBatchOptions"
+                :key="batch.id"
+                :label="`入库批 ${String(batch.id).slice(0, 8)} · ${batch.counts?.members || 0} 条`"
+                :value="batch.id"
+              />
+            </el-select>
           </template>
           <template #actions>
             <StatusIndicator
@@ -672,7 +737,7 @@ onUnmounted(() => {
         <EmptyState
           v-if="list.length === 0"
           :title="hasStatusFilter ? '当前筛选无结果' : '暂无云下载任务'"
-          :description="hasStatusFilter ? '清除状态筛选后查看全部任务' : '从论坛资源页发送 ED2K 链接后会显示在这里'"
+          :description="hasStatusFilter ? '清除筛选后查看全部任务' : '从论坛资源页发送 ED2K 链接后会显示在这里'"
         >
           <template v-if="hasStatusFilter" #action>
             <el-button @click="clearStatusFilter">清除筛选</el-button>
@@ -717,6 +782,16 @@ onUnmounted(() => {
               </el-table-column>
               <el-table-column label="大小" width="100">
                 <template #default="{ row }">{{ formatBytes(row.declared_size) }}</template>
+              </el-table-column>
+              <el-table-column label="入库状态" min-width="120">
+                <template #default="{ row }">
+                  <StatusIndicator
+                    v-if="ingestMeta(row)"
+                    :label="ingestMeta(row).label"
+                    :tone="ingestMeta(row).tone"
+                  />
+                  <span v-else>--</span>
+                </template>
               </el-table-column>
               <el-table-column label="来源" min-width="130" show-overflow-tooltip>
                 <template #default="{ row }">

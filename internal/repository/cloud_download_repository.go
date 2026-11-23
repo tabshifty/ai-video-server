@@ -62,6 +62,8 @@ SELECT
     t.download_triggered_at,
     t.local_file_deleted_at,
     t.local_file_deleted_by,
+    t.ingest_batch_id,
+    COALESCE(t.ingest_title, ''),
     t.created_by,
     t.created_at,
     t.updated_at,
@@ -98,6 +100,8 @@ func scanCloudDownload(row interface{ Scan(...any) error }) (models.CloudDownloa
 		&task.DownloadTriggeredAt,
 		&task.LocalFileDeletedAt,
 		&task.LocalFileDeletedBy,
+		&task.IngestBatchID,
+		&task.IngestTitle,
 		&task.CreatedBy,
 		&task.CreatedAt,
 		&task.UpdatedAt,
@@ -157,6 +161,15 @@ func (r *CloudDownloadRepository) GetByID(ctx context.Context, id int64) (models
 
 // List returns a filtered page plus the total count.
 func (r *CloudDownloadRepository) List(ctx context.Context, status string, page, pageSize int) ([]models.CloudDownloadTask, int, error) {
+	return r.list(ctx, status, nil, page, pageSize)
+}
+
+// ListByBatch lists tasks bound to one batch ingest.
+func (r *CloudDownloadRepository) ListByBatch(ctx context.Context, status string, batchID uuid.UUID, page, pageSize int) ([]models.CloudDownloadTask, int, error) {
+	return r.list(ctx, status, &batchID, page, pageSize)
+}
+
+func (r *CloudDownloadRepository) list(ctx context.Context, status string, batchID *uuid.UUID, page, pageSize int) ([]models.CloudDownloadTask, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -168,6 +181,10 @@ func (r *CloudDownloadRepository) List(ctx context.Context, status string, page,
 	if status != "" {
 		args = append(args, status)
 		where += fmt.Sprintf(" AND t.status = $%d", len(args))
+	}
+	if batchID != nil {
+		args = append(args, *batchID)
+		where += fmt.Sprintf(" AND t.ingest_batch_id = $%d", len(args))
 	}
 
 	var total int

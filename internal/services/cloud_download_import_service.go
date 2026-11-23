@@ -58,6 +58,11 @@ type cloudImportArchiveService interface {
 	RetryExtract(ctx context.Context, batchID uuid.UUID, password, requestedMode string) (models.ArchiveImportBatch, error)
 }
 
+// cloudIngestBatchLookup reads the batch ingest preset for auto-import.
+type cloudIngestBatchLookup interface {
+	GetByID(ctx context.Context, id uuid.UUID) (models.CloudIngestBatch, error)
+}
+
 type cloudImportEnqueuer interface {
 	EnqueueCloudIngest(importID int64, attempt int, input models.CloudDownloadImportInput) error
 	EnqueueTranscode(videoID, inputPath, outputDir, targetFormat string, force bool) error
@@ -76,6 +81,7 @@ type CloudDownloadImportService struct {
 	upload        cloudImportUploadService
 	archive       cloudImportArchiveService
 	enqueuer      cloudImportEnqueuer
+	batchRepo     cloudIngestBatchLookup
 	downloadDir   string
 	storageRoot   string
 	logger        *slog.Logger
@@ -105,6 +111,11 @@ func NewCloudDownloadImportService(
 		logger:        logger,
 		probePlayback: ffmpeg.ProbePlaybackCompatibility,
 	}
+}
+
+// SetIngestBatchRepository attaches the optional batch ingest preset lookup.
+func (s *CloudDownloadImportService) SetIngestBatchRepository(repo cloudIngestBatchLookup) {
+	s.batchRepo = repo
 }
 
 // GetImportTask restores task and import state without requiring the downloaded source to exist.
@@ -918,4 +929,68 @@ func archivePreviewMIME(name, detectedMIME string) string {
 		return detectedMIME
 	}
 	return archiveMIMEForFormat(format)
+}
+
+// AutoImportFromBatch runs the batch preset for one completed member task. It
+// exists so the download worker can fulfil a 批量入库 promise without a second
+// admin action. Permanent rejections are recorded as a failed import (so the
+// reconciler stops retrying and the admin sees why); transient failures are
+// returned and retried by the reconciler.
+func (s *CloudDownloadImportService) AutoImportFromBatch(ctx context.Context, taskID int64) error {
+	task, err := s.taskRepo.GetByID(ctx, taskID)
+	if err != nil {
+		return fmt.Errorf("读取云下载任务: %w", err)
+	}
+	if task.IngestBatchID == nil {
+		return nil
+	}
+	if s.batchRepo == nil {
+		return errors.New("入库批未配置")
+	}
+	batch, err := s.batchRepo.GetByID(ctx, *task.IngestBatchID)
+	if err != nil {
+		return fmt.Errorf("读取入库批: %w", err)
+	}
+	title := strings.TrimSpace(task.IngestTitle)
+	if title == "" {
+		title = strings.TrimSpace(batch.UniformTitle)
+	}
+	input := models.CloudDownloadImportInput{
+		Kind:              models.CloudImportKindVideo,
+		Type:              batch.VideoType,
+		SiteCategory:      batch.SiteCategory,
+		Title:             title,
+		Description:       batch.Description,
+		Tags:              batch.Tags,
+		ActorIDs:          batch.ActorIDs,
+		ActorNames:        batch.ActorNames,
+		CollectionIDs:     batch.CollectionIDs,
+		ImageCollectionID: batch.ImageCollectionID,
+	}
+	if _, err := s.Create(ctx, taskID, input, batch.CreatedBy); err != nil {
+		if errors.Is(err, models.ErrCloudImportInvalidInput) ||
+			errors.Is(err, models.ErrCloudImportUnsupported) ||
+			errors.Is(err, models.ErrCloudImportFileMissing) {
+			s.recordAutoImportFailure(ctx, taskID, err)
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// recordAutoImportFailure stores one failed import row so a link that can never
+// be imported is visible in the task list instead of being retried forever.
+func (s *CloudDownloadImportService) recordAutoImportFailure(ctx context.Context, taskID int64, cause error) {
+	_, _, err := s.repo.CreateOrGet(ctx, models.CloudDownloadImport{
+		TaskID:       taskID,
+		Kind:         models.CloudImportKindVideo,
+		Status:       models.CloudImportFailed,
+		ErrorMessage: truncateMessage(cause.Error(), 800),
+	})
+	if err != nil {
+		s.logger.Error("record auto import failure", "task_id", taskID, "error", err)
+		return
+	}
+	s.logger.Warn("auto import rejected", "task_id", taskID, "reason", cause)
 }

@@ -1,5 +1,16 @@
 # plan.md
 
+## 2026-11-23 16:22 +0800 云下载批量入库：实现与验证
+- 需求：按 ADR 0038 在 ED2K 工具箱新增「批量入库到媒体库」，一次点击完成提交 115 → 下载落盘 → 带入库前置要求自动入库。
+- 后端：新增迁移 `0052`（`cloud_ingest_batches` 批级前置要求 + `cloud_download_tasks.ingest_batch_id/ingest_title` + 两条索引 + 短视频专属合集 CHECK）；新增 `CloudIngestBatchRepository`、`CloudIngestBatch` 模型与 `SubmitIngestBatch`；把 `SubmitBatch` 的逐条循环抽成 `submitBatch(..., decorate)` 并保留原契约，冲突矩阵只有一份；`Process` 落盘后恒调用自动入库（由导入侧按 `ingest_batch_id` 自行短路），reconciler 每 2 分钟补投「已完成但无导入记录」的成员；导入侧新增 `AutoImportFromBatch`，永久拒绝（非法输入/不支持内容/源文件缺失）落 `failed` 记录止损。
+- 接口：`POST/GET /api/v1/admin/cloud-downloads/ingest-batches`；任务列表新增 `ingest_batch_id` 过滤（新增 `ListByBatch`，不改既有 `List` 签名）。
+- 前端：`ed2kIngest.helpers.js` 提供三分法分类、文件名清洗、payload/表单校验、入库状态派生；新增 `CloudIngestBatchDialog.vue`（批级统计、排除折叠、无法识别强制分区、入库前置表单、逐条标题预览分页）；工具箱新增并列按钮并把勾选守卫收敛为 `busy`；云下载列表新增入库批筛选、入库状态列与 `ingest_batch_id` 路由参数。
+- 修正：ADR 0038 原写「提交前查库层 `hash+size`」是错的——ED2K 的 `info_hash` 是 MD4、本地存 SHA-256，不下载拿不到内容哈希；已改为「提交前只查任务层，库层命中只能在导入阶段判定」，并同步 `CONTEXT.md`。
+- 一致性：前端 ED2K 解析放宽到与服务端相同的四段规则并容忍缺尾斜杠，避免本可入库的链接被判无效。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/services ./internal/handlers ./internal/models ./internal/repository ./internal/queue` 仅既有 `TestParseTVAPKMetadataParsesReleaseAPK` 夹具失败（与本改动无关）；`admin-web` 64 文件 897 用例全绿、`npm run build` 通过；新增 29 条前端纯函数用例与 2 条 handler 用例。
+- 未验证：migration 0052 未在真实 Postgres 上跑 up→down→up；115 侧同名文件与 `.chrome` 后缀的真实行为未复现。
+- 范围：服务端与管理端；不改 Android/TV，不升 App 版本号；`docs/examples/` 不纳入提交。
+
 ## 2026-11-23 16:05 +0800 云下载批量入库：需求收口与领域文档（待实现）
 - 需求：ED2K 工具箱新增一条龙「批量入库」——一次点击完成"提交 115 → 下载落盘 → 带元数据入库"，不再逐条去云下载列表点导入。
 - 收口方式：`grill-with-docs` 六轮，三路并行只读勘查（ED2K 工具箱、上传/合集、115 云能力）后逐条裁决；定稿 14 条决策 + 4 条实现边界。

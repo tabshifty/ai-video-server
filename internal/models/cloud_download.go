@@ -128,6 +128,13 @@ type CloudDownloadTask struct {
 	UpdatedAt          time.Time  `json:"updated_at"`
 	StartedAt          *time.Time `json:"started_at"`
 	FinishedAt         *time.Time `json:"finished_at"`
+	// IngestBatchID binds this task to one batch ingest. A task belongs to at
+	// most one batch, mirroring how Source is claimed by the first explicit
+	// action; later batches keep the original binding.
+	IngestBatchID *uuid.UUID `json:"ingest_batch_id,omitempty"`
+	// IngestTitle is the final per-link title captured when the batch was
+	// submitted (title_mode=filename). Empty means the batch title applies.
+	IngestTitle string `json:"ingest_title,omitempty"`
 	// Import is the explicit media-library import summary, when one exists.
 	Import *CloudDownloadImportSummary `json:"import,omitempty"`
 	// FileDeletion is the optional 115 recycle-bin cleanup summary.
@@ -148,6 +155,10 @@ type CloudDownloadBatchItem struct {
 	Status   string `json:"status"`
 	TaskID   *int64 `json:"task_id,omitempty"`
 	Message  string `json:"message,omitempty"`
+	// Forced marks a link the admin explicitly released although its declared
+	// filename could not be recognised as a video. It only promises that the
+	// download runs; the import stage still probes the real content.
+	Forced bool `json:"forced,omitempty"`
 }
 
 // CloudDownloadBatchSummary counts item outcomes for the batch response.
@@ -160,6 +171,7 @@ type CloudDownloadBatchSummary struct {
 	Duplicate        int `json:"duplicate"`
 	Invalid          int `json:"invalid"`
 	Failed           int `json:"failed"`
+	Forced           int `json:"forced"`
 }
 
 // CloudDownloadBatchResult is returned by the explicit batch endpoint.

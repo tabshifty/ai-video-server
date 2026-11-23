@@ -6,6 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '../components/base/PageHeader.vue'
 import SectionCard from '../components/base/SectionCard.vue'
 import EmptyState from '../components/base/EmptyState.vue'
+import CloudIngestBatchDialog from '../components/CloudIngestBatchDialog.vue'
 import { cloudDownloadStatuses, createCloudDownloadBatch } from '../api/admin'
 import {
   dedupeEd2kLinksByInfoHash,
@@ -14,6 +15,7 @@ import {
   parseEd2kLinks,
   summarizeEd2kBatchSelection
 } from './toolbox.helpers'
+import { buildEd2kIngestPlan } from './ed2kIngest.helpers'
 
 // Keep this aligned with models.CloudDownloadBatchLimit on the backend.
 const BATCH_LIMIT = 50
@@ -52,6 +54,13 @@ const cloudStatuses = ref({})
 const batchItemsByHash = ref({})
 const batchSummary = ref(null)
 const batchSubmitting = ref(false)
+// 批量入库的确认框独立于"发送选中到115"：两个动作都禁用勾选，
+// 否则确认框里的链接会与页面勾选集漂移。
+const ingestDialogVisible = ref(false)
+const ingestPlan = ref({ videos: [], notVideos: [], unknown: [] })
+const ingestDuplicateCount = ref(0)
+const ingestInvalidCount = ref(0)
+const busy = computed(() => batchSubmitting.value || ingestDialogVisible.value)
 
 const ed2kParseResult = computed(() => parseEd2kLinks(ed2kInput.value))
 const ed2kLinks = computed(() => ed2kParseResult.value.links)
@@ -100,7 +109,7 @@ function isSelected(link) {
 }
 
 function toggleSelection(link) {
-  if (batchSubmitting.value) {
+  if (busy.value) {
     return
   }
   const next = new Set(selectedLinkIds.value)
@@ -117,7 +126,7 @@ function toggleSelection(link) {
 }
 
 function toggleSelectAll(value) {
-  if (batchSubmitting.value) {
+  if (busy.value) {
     return
   }
   selectedLinkIds.value = value
@@ -161,6 +170,40 @@ function returnToToolbox() {
 
 function goToCloudDownloads() {
   router.push('/cloud-downloads')
+}
+
+// 批量入库：本地先做三分法，确认框里再做云端状态核对。
+// 全部被排除时直接给结论，不打开确认框。
+function openIngestDialog() {
+  if (busy.value || selectedCount.value === 0) {
+    return
+  }
+  const { links: uniqueLinks, duplicates } = dedupeEd2kLinksByInfoHash(selectedLinks.value)
+  const usable = uniqueLinks.filter((link) => link.infoHash)
+  const unusable = uniqueLinks.length - usable.length
+  const plan = buildEd2kIngestPlan(usable)
+  if (plan.videos.length === 0 && plan.unknown.length === 0) {
+    const parts = []
+    if (unusable > 0) {
+      parts.push(`缺少有效 info_hash ${unusable} 条`)
+    }
+    if (plan.notVideos.length > 0) {
+      parts.push(`不是单文件视频 ${plan.notVideos.length} 条（压缩包请改用「压缩包批量入库」）`)
+    }
+    ElMessage.warning(`没有可入库的单文件视频：${parts.join('；') || '所选链接为空'}`)
+    return
+  }
+  ingestPlan.value = plan
+  ingestDuplicateCount.value = duplicates.length
+  ingestInvalidCount.value = unusable
+  ingestDialogVisible.value = true
+}
+
+function onIngestSubmitted({ batchId } = {}) {
+  if (batchId) {
+    // 唯一的进度真相是云下载任务列表；跳到这一批而不是新开一个页面。
+    router.push({ path: '/cloud-downloads', query: { ingest_batch_id: String(batchId) } })
+  }
 }
 
 async function submitSelected() {
@@ -277,14 +320,22 @@ async function submitSelected() {
         <template #description>每行输入一个以 ed2k:// 开头的链接。</template>
         <template #actions>
           <div class="ed2k-tool__actions">
-            <el-button :disabled="!ed2kHasInput || batchSubmitting" @click="clearEd2kInput">清空</el-button>
+            <el-button :disabled="!ed2kHasInput || busy" @click="clearEd2kInput">清空</el-button>
             <el-button
               type="primary"
               :loading="batchSubmitting"
-              :disabled="selectedCount === 0 || batchSubmitting"
+              :disabled="selectedCount === 0 || busy"
               @click="submitSelected"
             >
               发送选中到115
+            </el-button>
+            <el-button
+              type="primary"
+              plain
+              :disabled="selectedCount === 0 || busy"
+              @click="openIngestDialog"
+            >
+              批量入库到媒体库
             </el-button>
           </div>
         </template>
@@ -297,7 +348,7 @@ async function submitSelected() {
             resize="vertical"
             placeholder="每行一个 ed2k:// 链接"
             aria-label="ED2K 链接文本"
-            :disabled="batchSubmitting"
+            :disabled="busy"
             class="ed2k-tool__input"
           />
           <div class="ed2k-tool__summary">
@@ -317,7 +368,7 @@ async function submitSelected() {
               <el-checkbox
                 :model-value="allSelected"
                 :indeterminate="selectionIndeterminate"
-                :disabled="batchSubmitting"
+                :disabled="busy"
                 @change="toggleSelectAll"
               >
                 {{ ed2kLinks.length > BATCH_LIMIT ? `全选前 ${BATCH_LIMIT} 条` : '全选' }}
@@ -379,6 +430,13 @@ async function submitSelected() {
         </div>
       </SectionCard>
     </div>
+    <CloudIngestBatchDialog
+      v-model="ingestDialogVisible"
+      :plan="ingestPlan"
+      :duplicate-count="ingestDuplicateCount"
+      :invalid-count="ingestInvalidCount"
+      @submitted="onIngestSubmitted"
+    />
   </main>
 </template>
 
