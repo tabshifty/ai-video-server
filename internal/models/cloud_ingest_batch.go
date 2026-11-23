@@ -53,16 +53,16 @@ type CloudIngestBatchLink struct {
 // CloudIngestBatchInput is the explicit 批量入库 request: batch-level ingest
 // preset plus the confirmed links in display order.
 type CloudIngestBatchInput struct {
-	TitleMode         string                `json:"title_mode"`
-	UniformTitle      string                `json:"uniform_title,omitempty"`
-	VideoType         string                `json:"video_type"`
-	SiteCategory      string                `json:"site_category,omitempty"`
-	Description       string                `json:"description,omitempty"`
-	Tags              []string              `json:"tags,omitempty"`
-	ActorIDs          []uuid.UUID           `json:"actor_ids,omitempty"`
-	ActorNames        []string              `json:"actor_names,omitempty"`
-	CollectionIDs     []uuid.UUID           `json:"collection_ids,omitempty"`
-	ImageCollectionID *uuid.UUID            `json:"image_collection_id,omitempty"`
+	TitleMode         string                 `json:"title_mode"`
+	UniformTitle      string                 `json:"uniform_title,omitempty"`
+	VideoType         string                 `json:"video_type"`
+	SiteCategory      string                 `json:"site_category,omitempty"`
+	Description       string                 `json:"description,omitempty"`
+	Tags              []string               `json:"tags,omitempty"`
+	ActorIDs          []uuid.UUID            `json:"actor_ids,omitempty"`
+	ActorNames        []string               `json:"actor_names,omitempty"`
+	CollectionIDs     []uuid.UUID            `json:"collection_ids,omitempty"`
+	ImageCollectionID *uuid.UUID             `json:"image_collection_id,omitempty"`
 	Links             []CloudIngestBatchLink `json:"links"`
 }
 

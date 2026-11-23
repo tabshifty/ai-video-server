@@ -37,6 +37,7 @@ import {
 } from './cloudDownloadFileDeletion.helpers'
 import { canConfirmLocalFileDeletion, canDeleteCloudDownloadLocalFile, localFileDeletionSizeLabel } from './cloudDownloadLocalFileDeletion.helpers'
 import { extractApiErrorMessage } from './toolbox.helpers'
+import { resolveIngestStatusMeta } from './ed2kIngest.helpers'
 
 const POLL_INTERVAL_MS = 5000
 const BROWSER_POLL_INTERVAL_MS = 10000

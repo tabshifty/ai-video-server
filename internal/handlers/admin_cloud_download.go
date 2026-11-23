@@ -275,7 +275,12 @@ func (a *API) AdminCloudDownloadIngestBatchCreate(c *gin.Context) {
 		response.Error(c, 500, err.Error())
 		return
 	}
-	ok(c, gin.H{"batch": batch, "items": result.Items, "summary": result.Summary})
+	payload := gin.H{"items": result.Items, "summary": result.Summary}
+	// 全部链接无效时不会落批行，此时不返回 batch，避免前端按空 id 跳转。
+	if batch.ID != uuid.Nil {
+		payload["batch"] = batch
+	}
+	ok(c, payload)
 }
 
 // AdminCloudDownloadIngestBatchList lists recent batch ingests for filtering.

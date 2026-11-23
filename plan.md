@@ -1,5 +1,17 @@
 # plan.md
 
+## 2026-11-23 16:40 +0800 云下载批量入库：独立评审与修复
+- 评审方式：两个独立子代理只读评审提交 `cd47d7e`（后端 / 管理端前端），逐项给出阻塞/应修/可接受。
+- 修复（阻塞）：`cloud_ingest_batches` 的数组列是 NOT NULL，而 `normalizeIngestTextList` 空时返回 nil、pgx 会编码成 SQL NULL，最常见请求（无标签/无演员/无合集）必然 500；改为永不返回 nil 并用 `nonNilUUIDs` 兜住 `actor_ids`/`collection_ids`。
+- 修复（阻塞）：云下载列表页调用 `resolveIngestStatusMeta` 却漏了 import，任何非空列表都会运行期崩；评审同时指出该缺陷被 spec 里的 `() => null` stub 掩盖，现已改成注入真实实现。
+- 修复（阻塞）：入库弹窗读标签候选的 `item.name`，而 `/admin/video-tags` 返回 `{tag,used_count}`，会把 `"undefined"` 写成标签；改读 `item.tag` 并过滤空值。
+- 修复（应修）：逐条标题未按 200 字截断会让整批 400（新增 `truncateTitle`）；`buildEd2kIngestLinks` 丢掉 `label`/`infoHash` 导致预览与云端核对失效；混合括号 `[中文字幕 1080p]` 把画质标记连坐丢弃（改为画质优先 unwrap）；`_2` 重复后缀未剥（`Show_01` 仍保留）；超过 20 条未提示下载槽位；uniform 空标题预览文案误导；遮罩点击会丢弃已填表单（改为不可点遮罩 + 提交中冻结表单）；URL 移除 `ingest_batch_id` 后筛选仍生效；工具箱 44px 断点从 48rem 收敛到 63.9375rem 并补齐弹窗内控件；两个单选组补中文可访问名称。
+- 修复（应修）：ffprobe 自身失败曾被包成 `ErrCloudImportUnsupported`，会让自动入库把它固化成永久失败；新增 `ErrCloudImportProbeFailed` 按瞬态处理，并更新既有 `TestCloudImportPreviewRejectsUnsupportedFile` 区分「无视频流」与「探测失败」。
+- 修复（应修）：修复扫描原先只能补「完全没有导入记录」，卡在 `queued` 的记录会永久停住；`ListAwaitingAutoImport` 放宽为「无记录，或非终态且 30 分钟未推进」，并新增 `Delete` 在提交失败时回收未挂成员的空批。
+- 新增测试：`normalizeCloudIngestBatchInput` 数组非 nil、状态查询失败回收批、无候选不建批、前端 `buildEd2kIngestLinks` 形状/混合括号/`_2`/截断/四段解析共 6 条；新增 gated 真库用例 `TestCloudIngestBatchRepositoryPersistsEmptyArrays`（`CLOUD_INGEST_TEST_DATABASE_URL`，顺带验证短视频专属合集 CHECK 与 Delete）。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/services ./internal/handlers ./internal/repository ./internal/models ./internal/queue` 仅既有 `TestParseTVAPKMetadataParsesReleaseAPK` 夹具失败（与本改动无关）；`admin-web` 64 文件 904 用例全绿、`npm run build` 通过。
+- 已知未覆盖：合成器把合集/演员候选固定为 `page_size: 100` 且无远程检索，超过 100 个候选无法选中；`batch.forced_count` 统计全部 forced 输入而 `summary.Forced` 只统计进入提交循环的项，两者可能不等；`forced` 未按行落库，列表页无法单行标注。
+
 ## 2026-11-23 16:22 +0800 云下载批量入库：实现与验证
 - 需求：按 ADR 0038 在 ED2K 工具箱新增「批量入库到媒体库」，一次点击完成提交 115 → 下载落盘 → 带入库前置要求自动入库。
 - 后端：新增迁移 `0052`（`cloud_ingest_batches` 批级前置要求 + `cloud_download_tasks.ingest_batch_id/ingest_title` + 两条索引 + 短视频专属合集 CHECK）；新增 `CloudIngestBatchRepository`、`CloudIngestBatch` 模型与 `SubmitIngestBatch`；把 `SubmitBatch` 的逐条循环抽成 `submitBatch(..., decorate)` 并保留原契约，冲突矩阵只有一份；`Process` 落盘后恒调用自动入库（由导入侧按 `ingest_batch_id` 自行短路），reconciler 每 2 分钟补投「已完成但无导入记录」的成员；导入侧新增 `AutoImportFromBatch`，永久拒绝（非法输入/不支持内容/源文件缺失）落 `failed` 记录止损。

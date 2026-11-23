@@ -510,11 +510,17 @@ func TestCloudImportPreviewRejectsUnsupportedFile(t *testing.T) {
 		t.Fatalf("no video stream error = %v, want ErrCloudImportUnsupported", err)
 	}
 
+	// ffprobe 自身失败（缺失/被杀/超时）不说明内容不受支持，必须按瞬态返回，
+	// 否则自动入库会把它固化成永久失败。
 	h.svc.probePlayback = func(context.Context, string) (ffmpeg.PlaybackCompatibilityProbe, error) {
 		return ffmpeg.PlaybackCompatibilityProbe{}, errors.New("ffprobe failed")
 	}
-	if _, err := h.svc.Preview(context.Background(), 7); !errors.Is(err, models.ErrCloudImportUnsupported) {
-		t.Fatalf("probe failure error = %v, want ErrCloudImportUnsupported", err)
+	_, probeErr := h.svc.Preview(context.Background(), 7)
+	if !errors.Is(probeErr, models.ErrCloudImportProbeFailed) {
+		t.Fatalf("probe failure error = %v, want ErrCloudImportProbeFailed", probeErr)
+	}
+	if errors.Is(probeErr, models.ErrCloudImportUnsupported) {
+		t.Fatalf("probe failure must not be reported as unsupported content")
 	}
 }
 

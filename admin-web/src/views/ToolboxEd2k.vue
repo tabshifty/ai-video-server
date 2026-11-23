@@ -583,7 +583,7 @@ async function submitSelected() {
   line-height: var(--leading-small);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 63.9375rem) {
   .tool-workspace__inner {
     padding: var(--space-4);
   }

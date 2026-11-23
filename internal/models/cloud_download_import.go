@@ -36,6 +36,10 @@ var (
 	ErrCloudImportFileMissing = errors.New("cloud: downloaded file is missing")
 	// ErrCloudImportUnsupported means the file cannot enter either media flow.
 	ErrCloudImportUnsupported = errors.New("cloud: downloaded file is not supported")
+	// ErrCloudImportProbeFailed means ffprobe itself failed (missing, killed or
+	// timed out). It says nothing about the content, so callers must treat it as
+	// transient instead of permanently rejecting the file.
+	ErrCloudImportProbeFailed = errors.New("cloud: probing the downloaded file failed")
 	// ErrCloudImportInvalidInput means the import form does not match kind.
 	ErrCloudImportInvalidInput = errors.New("cloud: invalid import input")
 )

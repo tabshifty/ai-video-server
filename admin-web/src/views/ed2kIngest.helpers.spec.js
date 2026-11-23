@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseEd2kLinks } from './toolbox.helpers'
 import {
   ED2K_INGEST_NOT_VIDEO,
   ED2K_INGEST_UNKNOWN,
@@ -10,6 +11,7 @@ import {
   cleanEd2kIngestTitle,
   getEd2kFilenameExtension,
   resolveIngestStatusMeta,
+  truncateTitle,
   validateEd2kIngestForm
 } from './ed2kIngest.helpers'
 
@@ -184,5 +186,45 @@ describe('resolveIngestStatusMeta', () => {
     expect(
       resolveIngestStatusMeta({ ingest_batch_id: 'b', status: 'completed', import: { status: 'failed' } })
     ).toMatchObject({ label: '入库失败' })
+  })
+
+  it('混合括号里画质标记必须保留，语言词不能连坐', () => {
+    // 去括号、保留内容；分隔符归一后 `98t.la` 里的点也会变成空格。
+    expect(cleanEd2kIngestTitle('Movie[中文字幕 1080p].mkv')).toBe('Movie 中文字幕 1080p')
+    expect(cleanEd2kIngestTitle('Movie(98t.la 720p).mkv')).toBe('Movie 98t la 720p')
+  })
+
+  it('剥离 `_2` 这类重复后缀但不动集数', () => {
+    expect(cleanEd2kIngestTitle('Movie_2.mkv')).toBe('Movie')
+    expect(cleanEd2kIngestTitle('Movie_9.mkv')).toBe('Movie')
+    expect(cleanEd2kIngestTitle('Show_01.mkv')).toBe('Show 01')
+  })
+})
+
+describe('buildEd2kIngestLinks 的形状', () => {
+  it('保留 label 与 infoHash，预览与云端核对都依赖它们', () => {
+    const plan = buildEd2kIngestPlan([{ href: 'ed2k://a', label: 'a.mp4', infoHash: 'a'.repeat(32) }])
+    const [item] = buildEd2kIngestLinks(plan)
+    expect(item).toMatchObject({ link: 'ed2k://a', label: 'a.mp4', infoHash: 'a'.repeat(32), forced: false })
+  })
+})
+
+describe('toolbox.helpers.parseEd2kLinks 与服务端一致', () => {
+  it('接受缺尾斜杠的四段链接', () => {
+    const { links, invalidCount } = parseEd2kLinks('ed2k://|file|a.mkv|1|0123456789abcdef0123456789abcdef')
+    expect(invalidCount).toBe(0)
+    expect(links).toHaveLength(1)
+    expect(links[0].label).toBe('a.mkv')
+  })
+
+  it('仍然拒绝非 file 段', () => {
+    expect(parseEd2kLinks('ed2k://|server|1.2.3.4|4661|/').invalidCount).toBe(1)
+  })
+})
+
+describe('truncateTitle', () => {
+  it('按码点截断并补省略号', () => {
+    expect(truncateTitle('あ'.repeat(250))).toHaveLength(200)
+    expect(truncateTitle('短标题')).toBe('短标题')
   })
 })

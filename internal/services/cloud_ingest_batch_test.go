@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ type fakeIngestBatchRepo struct {
 	attachTitle []string
 	attachOK    bool
 	awaiting    []int64
+	deleteCalls int
 }
 
 func (f *fakeIngestBatchRepo) Create(_ context.Context, batch models.CloudIngestBatch) (models.CloudIngestBatch, error) {
@@ -31,6 +33,11 @@ func (f *fakeIngestBatchRepo) AttachTask(_ context.Context, taskID int64, _ uuid
 	f.attachCalls = append(f.attachCalls, taskID)
 	f.attachTitle = append(f.attachTitle, title)
 	return f.attachOK, nil
+}
+
+func (f *fakeIngestBatchRepo) Delete(context.Context, uuid.UUID) error {
+	f.deleteCalls++
+	return nil
 }
 
 func (f *fakeIngestBatchRepo) ListAwaitingAutoImport(context.Context, int) ([]int64, error) {
@@ -272,5 +279,62 @@ func TestDecideCloudBatchExisting(t *testing.T) {
 	}
 	if d := decideCloudBatchExisting("future_state"); !d.skip || d.status != models.CloudBatchSkippedActive {
 		t.Fatalf("unknown decision = %+v", d)
+	}
+}
+
+func TestSubmitIngestBatchSkipsBatchWhenNoCandidateRemains(t *testing.T) {
+	batchRepo := &fakeIngestBatchRepo{attachOK: true}
+	svc := &CloudDownloadService{
+		repo:          &fakeCloudRepo{},
+		batchRepo:     batchRepo,
+		batchImporter: &fakeBatchAutoImporter{},
+		enqueuer:      &fakeCloudEnqueuer{},
+	}
+	_, result, err := svc.SubmitIngestBatch(context.Background(), models.CloudIngestBatchInput{
+		UniformTitle: "合辑",
+		Links:        []models.CloudIngestBatchLink{{Link: "not-an-ed2k-link"}},
+	}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if batchRepo.created.ID != uuid.Nil {
+		t.Fatalf("must not create a batch when every link is invalid")
+	}
+	if len(result.Items) != 1 || result.Items[0].Status != models.CloudBatchInvalid {
+		t.Fatalf("items = %+v, want one invalid item", result.Items)
+	}
+}
+
+func TestNormalizeCloudIngestBatchInputKeepsArraysNonNull(t *testing.T) {
+	// NOT NULL 数组列：nil 切片会被 pgx 编码成 SQL NULL 而违反约束。
+	batch, _, err := normalizeCloudIngestBatchInput(models.CloudIngestBatchInput{
+		UniformTitle: "合辑",
+		Links:        []models.CloudIngestBatchLink{{Link: "ed2k://x"}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if batch.Tags == nil || batch.ActorNames == nil || batch.ActorIDs == nil || batch.CollectionIDs == nil {
+		t.Fatalf("batch arrays must not be nil: %+v", batch)
+	}
+}
+
+func TestSubmitIngestBatchDropsBatchWhenStatusLookupFails(t *testing.T) {
+	batchRepo := &fakeIngestBatchRepo{attachOK: true}
+	svc := &CloudDownloadService{
+		repo:          &fakeCloudRepo{statusErr: errors.New("boom")},
+		batchRepo:     batchRepo,
+		batchImporter: &fakeBatchAutoImporter{},
+		enqueuer:      &fakeCloudEnqueuer{},
+	}
+	_, _, err := svc.SubmitIngestBatch(context.Background(), models.CloudIngestBatchInput{
+		UniformTitle: "合辑",
+		Links:        []models.CloudIngestBatchLink{{Link: testED2KLink("a.mp4", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")}},
+	}, nil)
+	if err == nil {
+		t.Fatalf("expected the status lookup error to surface")
+	}
+	if batchRepo.deleteCalls != 1 {
+		t.Fatalf("delete calls = %d, want 1 (compensate the orphan batch)", batchRepo.deleteCalls)
 	}
 }

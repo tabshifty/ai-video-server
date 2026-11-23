@@ -136,7 +136,11 @@ async function loadOptions() {
     getAdminCollections({ active: 1, page: 1, page_size: 100 }).catch(() => ({ items: [] })),
     getAdminImageCollections({ active: 1, page: 1, page_size: 100 }).catch(() => ({ items: [] }))
   ])
-  tagOptions.value = (tags.items || []).map((item) => ({ value: item.name || item.value, label: item.name || item.value }))
+  // /admin/video-tags 返回 {tag, used_count}：读错字段会把 undefined 写成标签。
+  tagOptions.value = (tags.items || [])
+    .map((item) => String(item.tag || item.name || '').trim())
+    .filter(Boolean)
+    .map((tag) => ({ value: tag, label: tag }))
   actorOptions.value = (actors.items || []).map((item) => ({ value: item.name, label: item.name }))
   collectionOptions.value = (collections.items || []).map((item) => ({ value: item.id, label: item.name }))
   imageCollectionOptions.value = (imageCollections.items || []).map((item) => ({
@@ -266,7 +270,7 @@ async function submit() {
     :width="'min(94vw, 900px)'"
     data-density="form"
     title="批量入库到媒体库"
-    :close-on-click-modal="!submitting"
+    :close-on-click-modal="false""
     :before-close="handleBeforeClose"
     @open="onOpen"
     @closed="resetForm"
@@ -280,6 +284,9 @@ async function submit() {
         <span v-if="duplicateCount">重复 {{ duplicateCount }}</span>
         <span v-if="invalidCount">无效 {{ invalidCount }}</span>
         <span v-if="items.length">将提交 {{ items.length }}</span>
+        <span v-if="items.length > 20" class="ingest-stats__warn">
+          本批将占用 {{ items.length }} 个下载槽位
+        </span>
         <span v-if="loading">正在核对云端…</span>
       </div>
 
@@ -319,7 +326,7 @@ async function submit() {
         </div>
       </section>
 
-      <el-form label-width="96px" class="ingest-form">
+      <el-form label-width="96px" class="ingest-form" :disabled="submitting">
         <el-form-item label="视频类型">
           <el-select v-model="form.videoType" aria-label="视频类型">
             <el-option
@@ -331,7 +338,7 @@ async function submit() {
           </el-select>
         </el-form-item>
         <el-form-item v-if="isAVType" label="AV 地区">
-          <el-radio-group v-model="form.siteCategory">
+          <el-radio-group v-model="form.siteCategory" aria-label="AV 地区">
             <el-radio-button
               v-for="option in CLOUD_INGEST_SITE_CATEGORIES"
               :key="option.value"
@@ -342,7 +349,7 @@ async function submit() {
           </el-radio-group>
         </el-form-item>
         <el-form-item label="标题模式">
-          <el-radio-group v-model="form.titleMode">
+          <el-radio-group v-model="form.titleMode" aria-label="标题模式">
             <el-radio
               v-for="option in CLOUD_INGEST_TITLE_MODES"
               :key="option.value"
@@ -448,7 +455,9 @@ async function submit() {
             </el-table-column>
             <el-table-column label="最终标题" min-width="180">
               <template #default="{ row }">
-                <span class="ingest-preview__title">{{ displayTitle(row) || '（空，将回退文件名）' }}</span>
+                <span class="ingest-preview__title">
+                  {{ displayTitle(row) || (form.titleMode === 'uniform' ? '统一标题未填写' : '（文件名清洗为空）') }}
+                </span>
               </template>
             </el-table-column>
             <el-table-column label="类型" width="90">
@@ -585,8 +594,15 @@ async function submit() {
 @media (max-width: 63.9375rem) {
   .ingest-unknown__body :deep(.el-checkbox),
   .ingest-unknown__actions :deep(.el-button),
-  .ingest-preview__pager :deep(.el-button) {
+  .ingest-preview__pager :deep(.el-button),
+  .ingest-form :deep(.el-select),
+  .ingest-form :deep(.el-radio-button__inner),
+  .ingest-form :deep(.el-input__wrapper) {
     min-height: 44px;
   }
+}
+
+.ingest-stats__warn {
+  color: var(--warning-text, #b8860b);
 }
 </style>

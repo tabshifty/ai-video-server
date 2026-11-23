@@ -23,6 +23,10 @@ func NewCloudIngestBatchRepository(pool *pgxpool.Pool) *CloudIngestBatchReposito
 	return &CloudIngestBatchRepository{pool: pool}
 }
 
+// staleImportAfter is how long a non-terminal import may sit untouched before
+// the repair scan re-enqueues it.
+const staleImportAfter = "30 minutes"
+
 const cloudIngestBatchColumns = `
     id,
     title_mode,
@@ -107,6 +111,14 @@ WHERE id = $1 AND ingest_batch_id IS NULL`, taskID, batchID, title)
 	return tag.RowsAffected() > 0, nil
 }
 
+// Delete removes one batch preset that never received a member.
+func (r *CloudIngestBatchRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	if _, err := r.pool.Exec(ctx, `DELETE FROM cloud_ingest_batches WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("delete cloud ingest batch: %w", err)
+	}
+	return nil
+}
+
 // ListSummaries returns the most recent batches with derived member counts.
 func (r *CloudIngestBatchRepository) ListSummaries(ctx context.Context, limit int) ([]models.CloudIngestBatchSummary, error) {
 	if limit <= 0 || limit > 200 {
@@ -168,8 +180,10 @@ LIMIT $1`, limit)
 	return summaries, rows.Err()
 }
 
-// ListAwaitingAutoImport returns completed batch members that still have a
-// local file and no import record, so a lost wakeup can be repaired.
+// ListAwaitingAutoImport returns completed batch members whose import is
+// missing or stuck, so a lost wakeup can be repaired. "Stuck" means a
+// non-terminal import whose only timestamp is older than staleImportAfter;
+// without it a record left in queued by a crash would never be woken again.
 func (r *CloudIngestBatchRepository) ListAwaitingAutoImport(ctx context.Context, limit int) ([]int64, error) {
 	if limit <= 0 {
 		limit = 50
@@ -182,9 +196,13 @@ WHERE t.ingest_batch_id IS NOT NULL
   AND t.status = 'completed'
   AND COALESCE(t.local_path, '') <> ''
   AND t.local_file_deleted_at IS NULL
-  AND i.id IS NULL
+  AND (
+        i.id IS NULL
+     OR (i.status IN ('queued', 'hashing', 'copying', 'creating')
+         AND COALESCE(i.started_at, i.created_at) < now() - $2::interval)
+  )
 ORDER BY t.id
-LIMIT $1`, limit)
+LIMIT $1`, limit, staleImportAfter)
 	if err != nil {
 		return nil, fmt.Errorf("list awaiting auto import: %w", err)
 	}

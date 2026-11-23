@@ -26,9 +26,9 @@ func normalizeCloudIngestBatchInput(input models.CloudIngestBatchInput) (models.
 		VideoType:         strings.ToLower(strings.TrimSpace(input.VideoType)),
 		Description:       strings.TrimSpace(input.Description),
 		Tags:              normalizeIngestTextList(input.Tags),
-		ActorIDs:          input.ActorIDs,
 		ActorNames:        normalizeIngestTextList(input.ActorNames),
-		CollectionIDs:     input.CollectionIDs,
+		CollectionIDs:     nonNilUUIDs(input.CollectionIDs),
+		ActorIDs:          nonNilUUIDs(input.ActorIDs),
 		ImageCollectionID: input.ImageCollectionID,
 	}
 	if batch.TitleMode == "" {
@@ -60,6 +60,12 @@ func normalizeCloudIngestBatchInput(input models.CloudIngestBatchInput) (models.
 	// 视频合集仍只属于短视频：非短视频携带合集会让命中已有视频时静默写入。
 	if batch.VideoType != "short" && len(batch.CollectionIDs) > 0 {
 		return models.CloudIngestBatch{}, nil, fmt.Errorf("%w: 仅短视频支持合集", models.ErrCloudIngestBatchInvalidInput)
+	}
+	if batch.Tags == nil {
+		batch.Tags = []string{}
+	}
+	if batch.ActorNames == nil {
+		batch.ActorNames = []string{}
 	}
 	if batch.VideoType == "av" {
 		batch.SiteCategory = normalizeAVSiteCategory(input.SiteCategory)
@@ -95,6 +101,9 @@ func normalizeCloudIngestBatchInput(input models.CloudIngestBatchInput) (models.
 	return batch, links, nil
 }
 
+// normalizeIngestTextList trims and drops empties. The result is never nil:
+// the batch table declares these columns NOT NULL, and pgx encodes a nil slice
+// as SQL NULL (an empty slice as '{}').
 func normalizeIngestTextList(values []string) []string {
 	result := make([]string, 0, len(values))
 	for _, value := range values {
@@ -102,10 +111,14 @@ func normalizeIngestTextList(values []string) []string {
 			result = append(result, trimmed)
 		}
 	}
-	if len(result) == 0 {
-		return nil
-	}
 	return result
+}
+
+func nonNilUUIDs(values []uuid.UUID) []uuid.UUID {
+	if values == nil {
+		return []uuid.UUID{}
+	}
+	return values
 }
 
 // SubmitIngestBatch is the explicit 批量入库 action: it creates one batch
@@ -120,12 +133,6 @@ func (s *CloudDownloadService) SubmitIngestBatch(ctx context.Context, input mode
 	if s.batchRepo == nil {
 		return models.CloudIngestBatch{}, models.CloudDownloadBatchResult{}, errors.New("入库批未配置")
 	}
-	batch.CreatedBy = createdBy
-	created, err := s.batchRepo.Create(ctx, batch)
-	if err != nil {
-		return models.CloudIngestBatch{}, models.CloudDownloadBatchResult{}, err
-	}
-
 	rawLinks := make([]string, len(links))
 	titles := make([]string, len(links))
 	forced := make([]bool, len(links))
@@ -133,6 +140,19 @@ func (s *CloudDownloadService) SubmitIngestBatch(ctx context.Context, input mode
 		rawLinks[index] = link.Link
 		titles[index] = link.Title
 		forced[index] = link.Forced
+	}
+
+	// 全部链接都无效时不落批行：批不可删除，空批只会变成永远清不掉的孤儿。
+	probe := models.CloudDownloadBatchResult{Items: make([]models.CloudDownloadBatchItem, len(rawLinks))}
+	if len(parseCloudBatchCandidates(rawLinks, &probe)) == 0 {
+		probe.Summary = summarizeCloudDownloadBatch(probe.Items)
+		return models.CloudIngestBatch{}, probe, nil
+	}
+
+	batch.CreatedBy = createdBy
+	created, err := s.batchRepo.Create(ctx, batch)
+	if err != nil {
+		return models.CloudIngestBatch{}, models.CloudDownloadBatchResult{}, err
 	}
 
 	result, submitErr := s.submitBatch(ctx, rawLinks, createdBy, func(ctx context.Context, index int, taskID int64, hasTask bool, item *models.CloudDownloadBatchItem) {
@@ -151,7 +171,16 @@ func (s *CloudDownloadService) SubmitIngestBatch(ctx context.Context, input mode
 		}
 		s.autoImportBatchMember(ctx, taskID)
 	})
-	return created, result, submitErr
+	if submitErr != nil {
+		// Candidates resolve before the loop, so no member can be attached yet:
+		// dropping the batch keeps the "one explicit action = one batch" rule
+		// without leaving an unusable orphan.
+		if dropErr := s.batchRepo.Delete(ctx, created.ID); dropErr != nil {
+			s.logWarn("drop ingest batch after failure", "batch_id", created.ID, "error", dropErr)
+		}
+		return models.CloudIngestBatch{}, result, submitErr
+	}
+	return created, result, nil
 }
 
 func joinIngestMessage(existing, extra string) string {

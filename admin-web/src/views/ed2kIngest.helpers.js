@@ -131,11 +131,12 @@ function classifyBracketContent(inner) {
   if (!text) {
     return 'drop'
   }
-  if (SITE_AND_LANGUAGE_WORDS.some((keyword) => text.includes(keyword))) {
-    return 'drop'
-  }
+  // 画质优先：`[中文字幕 1080p]` 必须去括号保留 1080p，而不是整段丢掉。
   if (QUALITY_WORDS.some((keyword) => text.includes(keyword))) {
     return 'unwrap'
+  }
+  if (SITE_AND_LANGUAGE_WORDS.some((keyword) => text.includes(keyword))) {
+    return 'drop'
   }
   return 'keep'
 }
@@ -145,7 +146,8 @@ const BRACKET_PATTERN = /【([^】]*)】|\[([^\]]*)\]|\(([^)]*)\)/g
 // 域名水印：www.98t.la@、98T.la@、hhd800.com@ 一类。
 const WATERMARK_PATTERN = /(?:www\.)?[a-z0-9-]+\.(?:la|com|net|org)@/gi
 // 重复下载后缀：`- 副本`、`(1)`、`（1）`，只在结尾处生效。
-const DUPLICATE_SUFFIX_PATTERN = /(?:[\s_-]*副本\s*\d{0,3}|[(（]\s*\d{1,3}\s*[)）])$/
+const DUPLICATE_SUFFIX_PATTERN =
+  /(?:[\s_-]*副本\s*\d{0,3}|[(（]\s*\d{1,3}\s*[)）]|\s*_[2-9])$/
 
 export function cleanEd2kIngestTitle(label) {
   const base = stripVideoExtension(String(label || '').trim())
@@ -238,11 +240,11 @@ export function ed2kIngestKey(link) {
 export function buildEd2kIngestLinks(plan, { forcedKeys = new Set() } = {}) {
   const items = []
   for (const link of plan?.videos || []) {
-    items.push({ link: link.href, title: link.title, forced: false })
+    items.push({ link: link.href, label: link.label, infoHash: link.infoHash, title: link.title, forced: false })
   }
   for (const link of plan?.unknown || []) {
     if (forcedKeys.has(ed2kIngestKey(link))) {
-      items.push({ link: link.href, title: link.title, forced: true })
+      items.push({ link: link.href, label: link.label, infoHash: link.infoHash, title: link.title, forced: true })
     }
   }
   return items
@@ -270,6 +272,14 @@ export const CLOUD_INGEST_SITE_CATEGORIES = [
 
 export function runeLength(text) {
   return Array.from(String(text ?? '')).length
+}
+
+export function truncateTitle(text, max = CLOUD_INGEST_TITLE_MAX_RUNES) {
+  const chars = Array.from(String(text ?? ''))
+  if (chars.length <= max) {
+    return chars.join('')
+  }
+  return `${chars.slice(0, max - 1).join('')}…`
 }
 
 // 提交前校验，与后端 normalizeCloudIngestBatchInput 保持同一口径。
@@ -302,7 +312,7 @@ export function buildEd2kIngestPayload({ links = [], form = {} } = {}) {
     image_collection_id: form.imageCollectionID || null,
     links: links.map((item) => ({
       link: item.link,
-      title: titleMode === 'filename' ? String(item.title || '').trim() : '',
+      title: titleMode === 'filename' ? truncateTitle(String(item.title || '').trim()) : '',
       forced: Boolean(item.forced)
     }))
   }

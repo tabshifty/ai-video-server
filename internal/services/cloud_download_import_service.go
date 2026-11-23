@@ -174,7 +174,9 @@ func (s *CloudDownloadImportService) classifyCloudImportFile(ctx context.Context
 	}
 	probe, probeErr := s.probePlayback(ctx, sourcePath)
 	if probeErr != nil {
-		return "", mime, fmt.Errorf("%w: %v", models.ErrCloudImportUnsupported, probeErr)
+		// ffprobe missing, killed or timed out says nothing about the content:
+		// treat it as transient so an auto-import can be retried later.
+		return "", mime, fmt.Errorf("%w: %v", models.ErrCloudImportProbeFailed, probeErr)
 	}
 	if !probe.VideoStreamFound {
 		return "", mime, fmt.Errorf("%w: 未探测到视频流", models.ErrCloudImportUnsupported)
