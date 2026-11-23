@@ -1,5 +1,14 @@
 # plan.md
 
+## 2026-11-23 16:05 +0800 云下载批量入库：需求收口与领域文档（待实现）
+- 需求：ED2K 工具箱新增一条龙「批量入库」——一次点击完成"提交 115 → 下载落盘 → 带元数据入库"，不再逐条去云下载列表点导入。
+- 收口方式：`grill-with-docs` 六轮，三路并行只读勘查（ED2K 工具箱、上传/合集、115 云能力）后逐条裁决；定稿 14 条决策 + 4 条实现边界。
+- 关键决策：只判视频不判单文件（`|file|` 已保证）；三分法（视频/明确不是/无法识别），压缩包排除并指向压缩包工作台；无扩展名走汇总式"取消或强制按视频"，强制项标 `forced` 且只承诺照下不误；提交前只查任务层 `info_hash` 与库层 `hash+size`，不新建 115 目录查询；入库前置要求整批一份、字段等于上传页入库前字段，非 `short` 隐藏并清空视频合集；新写文件名清洗纯函数只服务新链路，既有四套标题实现不收敛；新增 `cloud_ingest_batches` + `ingest_batch_id`（推翻 ADR 0029「无 batch 表」）；自动入库只对批成员生效；不做取消与滚动投递。
+- 文档：新增 `docs/adr/0038-cloud-download-batch-ingest-from-ed2k-toolbox.md`；`CONTEXT.md` 新增「云下载批量入库领域语言」与接口约定，并给四条冲突词条（`115 云下载`、`115 云下载任务`、`115 云下载批量提交`、`admin ED2K 链接生成器`）补上指向 ADR 0038 的边界说明。
+- 明确不做：图片/图片合集入库通道、115 目录/文件列表查询、取消状态与批取消、集数字段、标题清洗全量收敛、Android/TV 改动。
+- 验证：文档变更，无构建与测试；UTF-8 与中文编码检查通过。
+- 待实现：尚未拆任务、未改代码；下一步按 ADR 0038 出实现计划（批表迁移、自动入库触发、批量确认框与前端清洗函数）。
+
 ## 2026-11-14 15:35 +0800 已存在视频合集关系追加：实现、修复与验证
 - 实现：新增 `internal/services/existing_video_collections.go` 共享追加逻辑（幂等并集、待删除短路、图片合集仅在为空且实际写入时置位）；`repository` 新增 `AddVideoCollectionsByIDsAnyTypeReturningAdded` 与 `FillVideoImageCollectionIfEmpty`；上传命中与竞态分支、压缩包主链路与 `existing/ready` 早退对齐、工作台关系对齐（去掉 GroupRelations/layout 门禁，悬空视频按无视频处理）、115 云导入命中均接入。
 - 接口：新增 `POST /api/v1/upload/attach`（管理员、`hash+file_size` 反查、类型冲突 409、待删除只报告不写入），`/upload/check` 保持只读并把 hash 归一为小写；`/upload` 与 `/upload/complete` 的已存在响应补 `added_collections/added_image_collection/pending_delete`；OpenAPI 已重新生成。
