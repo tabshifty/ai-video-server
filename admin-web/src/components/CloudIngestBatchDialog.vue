@@ -270,7 +270,7 @@ async function submit() {
     :width="'min(94vw, 900px)'"
     data-density="form"
     title="批量入库到媒体库"
-    :close-on-click-modal="false""
+    :close-on-click-modal="false"
     :before-close="handleBeforeClose"
     @open="onOpen"
     @closed="resetForm"
@@ -595,9 +595,10 @@ async function submit() {
   .ingest-unknown__body :deep(.el-checkbox),
   .ingest-unknown__actions :deep(.el-button),
   .ingest-preview__pager :deep(.el-button),
-  .ingest-form :deep(.el-select),
+  .ingest-form :deep(.el-select__wrapper),
   .ingest-form :deep(.el-radio-button__inner),
-  .ingest-form :deep(.el-input__wrapper) {
+  .ingest-form :deep(.el-input__wrapper),
+  :deep(.el-dialog__footer .el-button) {
     min-height: 44px;
   }
 }

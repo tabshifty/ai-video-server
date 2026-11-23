@@ -984,15 +984,24 @@ func (s *CloudDownloadImportService) AutoImportFromBatch(ctx context.Context, ta
 // recordAutoImportFailure stores one failed import row so a link that can never
 // be imported is visible in the task list instead of being retried forever.
 func (s *CloudDownloadImportService) recordAutoImportFailure(ctx context.Context, taskID int64, cause error) {
-	_, _, err := s.repo.CreateOrGet(ctx, models.CloudDownloadImport{
+	message := truncateMessage(cause.Error(), 800)
+	record, created, err := s.repo.CreateOrGet(ctx, models.CloudDownloadImport{
 		TaskID:       taskID,
 		Kind:         models.CloudImportKindVideo,
 		Status:       models.CloudImportFailed,
-		ErrorMessage: truncateMessage(cause.Error(), 800),
+		ErrorMessage: message,
 	})
 	if err != nil {
 		s.logger.Error("record auto import failure", "task_id", taskID, "error", err)
 		return
+	}
+	// CreateOrGet never overwrites an existing row, so a record already sitting
+	// in a non-terminal state would keep the repair scan re-picking it forever.
+	if !created && !models.CloudImportTerminal(record.Status) {
+		if updateErr := s.repo.UpdateProgress(ctx, record.ID, models.CloudImportFailed, message); updateErr != nil {
+			s.logger.Error("mark auto import failed", "task_id", taskID, "error", updateErr)
+			return
+		}
 	}
 	s.logger.Warn("auto import rejected", "task_id", taskID, "reason", cause)
 }

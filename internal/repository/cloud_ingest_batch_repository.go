@@ -111,9 +111,14 @@ WHERE id = $1 AND ingest_batch_id IS NULL`, taskID, batchID, title)
 	return tag.RowsAffected() > 0, nil
 }
 
-// Delete removes one batch preset that never received a member.
+// Delete removes one batch preset that never received a member. The NOT EXISTS
+// guard turns "errors only happen before any attach" into a SQL invariant, so a
+// future code path cannot silently detach members by cleaning up a batch.
 func (r *CloudIngestBatchRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	if _, err := r.pool.Exec(ctx, `DELETE FROM cloud_ingest_batches WHERE id = $1`, id); err != nil {
+	if _, err := r.pool.Exec(ctx, `
+DELETE FROM cloud_ingest_batches b
+WHERE b.id = $1
+  AND NOT EXISTS (SELECT 1 FROM cloud_download_tasks t WHERE t.ingest_batch_id = b.id)`, id); err != nil {
 		return fmt.Errorf("delete cloud ingest batch: %w", err)
 	}
 	return nil

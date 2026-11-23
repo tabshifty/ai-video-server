@@ -1,5 +1,13 @@
 # plan.md
 
+## 2026-11-23 16:46 +0800 云下载批量入库：复审与收敛
+- 复审：同一对子代理复核 `5f82ed1`。后端阻塞项全部关闭；前端两个阻塞项关闭，但复审发现我在改 `close-on-click-modal` 时多留了一个引号，弹窗挂载即抛 `InvalidCharacterError`（build 与字符串断言都发现不了）。
+- 修复：修掉多余引号；补 `CloudIngestBatchDialog.spec.js` 用属性名正则真解析模板，拦住这类「引号错位变成伪属性」的问题（同类缺陷此前只在运行时暴露）。
+- 修复：`applyRouteBatchQuery` 在地址栏移除 `ingest_batch_id` 时清空筛选；弹窗窄屏 44px 补齐 footer 按钮与 `.el-select__wrapper`（`.el-select` 根是 inline-block，抬高根高无效）。
+- 修复：`recordAutoImportFailure` 对已存在的非终态记录改用 `UpdateProgress` 固化 `failed`，否则放宽后的修复扫描会在「记录建好但文件被删」时每 2 分钟重试永不收敛。
+- 修复：`Delete` 加 `NOT EXISTS` 守卫，把「只在无成员时回收」从隐含前提变成 SQL 不变量；提交请求内的即时导入上限 5 条、每轮修复扫描上限 10 条，避免 50 次串行 ffprobe 占住请求与 reconcile 循环。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/services ./internal/handlers ./internal/repository` 仅既有 `TestParseTVAPKMetadataParsesReleaseAPK` 夹具失败；`admin-web` 65 文件 911 用例全绿、`npm run build` 通过。
+
 ## 2026-11-23 16:40 +0800 云下载批量入库：独立评审与修复
 - 评审方式：两个独立子代理只读评审提交 `cd47d7e`（后端 / 管理端前端），逐项给出阻塞/应修/可接受。
 - 修复（阻塞）：`cloud_ingest_batches` 的数组列是 NOT NULL，而 `normalizeIngestTextList` 空时返回 nil、pgx 会编码成 SQL NULL，最常见请求（无标签/无演员/无合集）必然 500；改为永不返回 nil 并用 `nonNilUUIDs` 兜住 `actor_ids`/`collection_ids`。

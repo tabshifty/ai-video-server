@@ -12,6 +12,10 @@ import (
 	"video-server/internal/models"
 )
 
+// maxInlineAutoImports bounds the ffprobe work an explicit request may do for
+// already-downloaded members; the repair scan finishes the rest.
+const maxInlineAutoImports = 5
+
 // CloudIngestBatchTitleMaxRunes caps one batch or per-link title. Titles are
 // rendered in admin tables and video lists, so a runaway filename must not
 // become a runaway heading.
@@ -155,6 +159,9 @@ func (s *CloudDownloadService) SubmitIngestBatch(ctx context.Context, input mode
 		return models.CloudIngestBatch{}, models.CloudDownloadBatchResult{}, err
 	}
 
+	// 已下载过的成员会在请求内立刻导入；只做前几个，其余交给修复扫描，
+	// 避免一次请求里串行跑 50 次 ffprobe。
+	inlineImports := 0
 	result, submitErr := s.submitBatch(ctx, rawLinks, createdBy, func(ctx context.Context, index int, taskID int64, hasTask bool, item *models.CloudDownloadBatchItem) {
 		item.Forced = forced[index]
 		if !hasTask || taskID == 0 {
@@ -169,7 +176,10 @@ func (s *CloudDownloadService) SubmitIngestBatch(ctx context.Context, input mode
 			item.Message = joinIngestMessage(item.Message, "该链接已属于其它入库批，本次未改归属")
 			return
 		}
-		s.autoImportBatchMember(ctx, taskID)
+		if inlineImports < maxInlineAutoImports {
+			inlineImports++
+			s.autoImportBatchMember(ctx, taskID)
+		}
 	})
 	if submitErr != nil {
 		// Candidates resolve before the loop, so no member can be attached yet:
@@ -210,7 +220,7 @@ func (s *CloudDownloadService) reconcileBatchIngest(ctx context.Context) {
 	if s.batchRepo == nil || s.batchImporter == nil {
 		return
 	}
-	taskIDs, err := s.batchRepo.ListAwaitingAutoImport(ctx, 50)
+	taskIDs, err := s.batchRepo.ListAwaitingAutoImport(ctx, 10)
 	if err != nil {
 		s.logWarn("reconcile batch ingest: list failed", "error", err)
 		return

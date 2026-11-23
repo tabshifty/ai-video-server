@@ -248,9 +248,10 @@ function applyRouteBatchQuery() {
     ? route.query.ingest_batch_id[0]
     : route.query.ingest_batch_id
   const id = typeof raw === 'string' ? raw.trim() : ''
-  if (!id || id === query.ingest_batch_id) {
+  if (id === query.ingest_batch_id) {
     return false
   }
+  // 地址栏移除筛选（例如点了侧边栏同名入口）时必须同步清空，否则列表仍被旧批过滤。
   query.ingest_batch_id = id
   return true
 }
